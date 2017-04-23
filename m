@@ -1,35 +1,70 @@
-From: bianpan201602@163.com (Pan Bian)
-Date: Sun, 23 Apr 2017 20:48:07 +0800
-Subject: [PATCH 1/1] rtc: gemini: add return value validation
-Message-ID: <1492951687-16777-1-git-send-email-bianpan201602@163.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Sun, 23 Apr 2017 19:08:11 +0200
+Subject: [PULL 01/79] arm64: sysreg: sort by encoding
+In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
+References: <20170423170929.27334-1-cdall@linaro.org>
+Message-ID: <20170423170929.27334-2-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pan Bian <bianpan2016@163.com>
+From: Mark Rutland <mark.rutland@arm.com>
 
-Function devm_ioremap() will return a NULL pointer if it fails to remap
-IO address, and its return value should be validated before it is used.
-However, in function gemini_rtc_probe(), its return value is not
-checked. This may result in bad memory access bugs on future access,
-e.g. calling the function gemini_rtc_read_time().
+Out sysreg definitions are largely (but not entirely) in ascending order
+of op0:op1:CRn:CRm:op2.
 
-Signed-off-by: Pan Bian <bianpan2016@163.com>
+It would be preferable to enforce this sort, as this makes it easier to
+verify the set of encodings against documentation, and provides an
+obvious location for each addition in future, minimising conflicts.
+
+This patch enforces this order, by moving the few items that break it.
+There should be no functional change.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/rtc/rtc-gemini.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/include/asm/sysreg.h | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/rtc/rtc-gemini.c b/drivers/rtc/rtc-gemini.c
-index ccf0dba..5279390 100644
---- a/drivers/rtc/rtc-gemini.c
-+++ b/drivers/rtc/rtc-gemini.c
-@@ -139,6 +139,8 @@ static int gemini_rtc_probe(struct platform_device *pdev)
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index ac24b6e..e6498ac 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -81,6 +81,14 @@
  
- 	rtc->rtc_base = devm_ioremap(dev, res->start,
- 				     resource_size(res));
-+	if (!rtc->rtc_base)
-+		return -ENOMEM;
+ #endif	/* CONFIG_BROKEN_GAS_INST */
  
- 	ret = devm_request_irq(dev, rtc->rtc_irq, gemini_rtc_interrupt,
- 			       IRQF_SHARED, pdev->name, dev);
++#define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
++#define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
++
++#define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
++				      (!!x)<<8 | 0x1f)
++#define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
++				      (!!x)<<8 | 0x1f)
++
+ #define SYS_MIDR_EL1			sys_reg(3, 0, 0, 0, 0)
+ #define SYS_MPIDR_EL1			sys_reg(3, 0, 0, 0, 5)
+ #define SYS_REVIDR_EL1			sys_reg(3, 0, 0, 0, 6)
+@@ -118,17 +126,10 @@
+ #define SYS_ID_AA64MMFR1_EL1		sys_reg(3, 0, 0, 7, 1)
+ #define SYS_ID_AA64MMFR2_EL1		sys_reg(3, 0, 0, 7, 2)
+ 
+-#define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
+ #define SYS_CTR_EL0			sys_reg(3, 3, 0, 0, 1)
+ #define SYS_DCZID_EL0			sys_reg(3, 3, 0, 0, 7)
+ 
+-#define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
+-#define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
+-
+-#define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
+-				      (!!x)<<8 | 0x1f)
+-#define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
+-				      (!!x)<<8 | 0x1f)
++#define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
+ 
+ /* Common SCTLR_ELx flags. */
+ #define SCTLR_ELx_EE    (1 << 25)
 -- 
-1.9.1
+2.9.0
