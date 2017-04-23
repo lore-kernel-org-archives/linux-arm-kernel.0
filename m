@@ -1,77 +1,108 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:37 +0200
-Subject: [PULL 27/79] arm64: KVM: PMU: Refactor pmu_*_el0_disabled
+Date: Sun, 23 Apr 2017 19:08:42 +0200
+Subject: [PULL 32/79] arm64: KVM: Treat sysreg accessors returning false as
+ successful
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-28-cdall@linaro.org>
+Message-ID: <20170423170929.27334-33-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-There is a lot of duplication in the pmu_*_el0_disabled helpers,
-and as we're going to modify them shortly, let's move all the
-common stuff in a single function.
+Instead of considering that a sysreg accessor has failed when
+returning false, let's consider that it is *always* successful
+(after all, we won't stand for an incomplete emulation).
 
-No functional change.
+The return value now simply indicates whether we should skip
+the instruction (because it has now been emulated), or if we
+should leave the PC alone if the emulation has injected an
+exception.
 
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 25 +++++++++++--------------
- 1 file changed, 11 insertions(+), 14 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 49 +++++++++++++++++++----------------------------
+ 1 file changed, 20 insertions(+), 29 deletions(-)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 0e26f8c..036efc97 100644
+index 3fef01d..2f4418e 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -460,35 +460,32 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
- 	vcpu_sys_reg(vcpu, PMCR_EL0) = val;
+@@ -1571,6 +1571,22 @@ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return 1;
  }
  
--static bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
-+static bool check_pmu_access_disabled(struct kvm_vcpu *vcpu, u64 flags)
- {
- 	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-+	bool enabled = (reg & flags) || vcpu_mode_priv(vcpu);
- 
--	return !((reg & ARMV8_PMU_USERENR_EN) || vcpu_mode_priv(vcpu));
-+	return !enabled;
- }
- 
--static bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
-+static bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
- {
--	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-+	return check_pmu_access_disabled(vcpu, ARMV8_PMU_USERENR_EN);
-+}
- 
--	return !((reg & (ARMV8_PMU_USERENR_SW | ARMV8_PMU_USERENR_EN))
--		 || vcpu_mode_priv(vcpu));
-+static bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
++static void perform_access(struct kvm_vcpu *vcpu,
++			   struct sys_reg_params *params,
++			   const struct sys_reg_desc *r)
 +{
-+	return check_pmu_access_disabled(vcpu, ARMV8_PMU_USERENR_SW | ARMV8_PMU_USERENR_EN);
- }
++	/*
++	 * Not having an accessor means that we have configured a trap
++	 * that we don't know how to handle. This certainly qualifies
++	 * as a gross bug that should be fixed right away.
++	 */
++	BUG_ON(!r->access);
++
++	/* Skip instruction if instructed so */
++	if (likely(r->access(vcpu, params, r)))
++		kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
++}
++
+ /*
+  * emulate_cp --  tries to match a sys_reg access in a handling table, and
+  *                call the corresponding trap handler.
+@@ -1594,20 +1610,8 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
+ 	r = find_reg(params, table, num);
  
- static bool pmu_access_cycle_counter_el0_disabled(struct kvm_vcpu *vcpu)
- {
--	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+ 	if (r) {
+-		/*
+-		 * Not having an accessor means that we have
+-		 * configured a trap that we don't know how to
+-		 * handle. This certainly qualifies as a gross bug
+-		 * that should be fixed right away.
+-		 */
+-		BUG_ON(!r->access);
 -
--	return !((reg & (ARMV8_PMU_USERENR_CR | ARMV8_PMU_USERENR_EN))
--		 || vcpu_mode_priv(vcpu));
-+	return check_pmu_access_disabled(vcpu, ARMV8_PMU_USERENR_CR | ARMV8_PMU_USERENR_EN);
- }
+-		if (likely(r->access(vcpu, params, r))) {
+-			/* Skip instruction, since it was emulated */
+-			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+-			/* Handled */
+-			return 0;
+-		}
++		perform_access(vcpu, params, r);
++		return 0;
+ 	}
  
- static bool pmu_access_event_counter_el0_disabled(struct kvm_vcpu *vcpu)
- {
--	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+ 	/* Not handled */
+@@ -1777,26 +1781,13 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
+ 		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+ 
+ 	if (likely(r)) {
+-		/*
+-		 * Not having an accessor means that we have
+-		 * configured a trap that we don't know how to
+-		 * handle. This certainly qualifies as a gross bug
+-		 * that should be fixed right away.
+-		 */
+-		BUG_ON(!r->access);
 -
--	return !((reg & (ARMV8_PMU_USERENR_ER | ARMV8_PMU_USERENR_EN))
--		 || vcpu_mode_priv(vcpu));
-+	return check_pmu_access_disabled(vcpu, ARMV8_PMU_USERENR_ER | ARMV8_PMU_USERENR_EN);
+-		if (likely(r->access(vcpu, params, r))) {
+-			/* Skip instruction, since it was emulated */
+-			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+-			return 1;
+-		}
+-		/* If access function fails, it should complain. */
++		perform_access(vcpu, params, r);
+ 	} else {
+ 		kvm_err("Unsupported guest sys_reg access at: %lx\n",
+ 			*vcpu_pc(vcpu));
+ 		print_sys_reg_instr(params);
++		kvm_inject_undefined(vcpu);
+ 	}
+-	kvm_inject_undefined(vcpu);
+ 	return 1;
  }
  
- static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 -- 
 2.9.0
