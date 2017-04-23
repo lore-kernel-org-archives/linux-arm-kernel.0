@@ -1,65 +1,127 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:09:12 +0200
-Subject: [PULL 62/79] arm/arm64: KVM: Remove kvm_get_idmap_start
+Date: Sun, 23 Apr 2017 19:08:26 +0200
+Subject: [PULL 16/79] kvm: arm/arm64: Rework gpa callback handlers
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-63-cdall@linaro.org>
+Message-ID: <20170423170929.27334-17-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-With __cpu_reset_hyp_mode having become fairly dumb, there is no
-need for kvm_get_idmap_start anymore.
+In order to perform an operation on a gpa range, we currently iterate
+over each page in a user memory slot for the given range. This is
+inefficient while dealing with a big range (e.g, a VMA), especially
+while unmaping a range. At present, with stage2 unmap on a range with
+a hugepage backed region, we clear the PMD when we unmap the first
+page in the loop. The remaining iterations simply traverse the page table
+down to the PMD level only to see that nothing is in there.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+This patch reworks the code to invoke the callback handlers on the
+biggest range possible within the memory slot to to reduce the number of
+times the handler is called.
+
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm/include/asm/kvm_mmu.h   | 1 -
- arch/arm/kvm/mmu.c               | 5 -----
- arch/arm64/include/asm/kvm_mmu.h | 1 -
- 3 files changed, 7 deletions(-)
+ arch/arm/kvm/mmu.c | 31 +++++++++++++------------------
+ 1 file changed, 13 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 95f38dc..fa6f217 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -56,7 +56,6 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
- 
- phys_addr_t kvm_mmu_get_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
--phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
- 
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 69554bd..efb4335 100644
+index 962616f..69554bd 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -1669,11 +1669,6 @@ phys_addr_t kvm_get_idmap_vector(void)
- 	return hyp_idmap_vector;
+@@ -1512,7 +1512,8 @@ static int handle_hva_to_gpa(struct kvm *kvm,
+ 			     unsigned long start,
+ 			     unsigned long end,
+ 			     int (*handler)(struct kvm *kvm,
+-					    gpa_t gpa, void *data),
++					    gpa_t gpa, u64 size,
++					    void *data),
+ 			     void *data)
+ {
+ 	struct kvm_memslots *slots;
+@@ -1524,7 +1525,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
+ 	/* we only care about the pages that the guest sees */
+ 	kvm_for_each_memslot(memslot, slots) {
+ 		unsigned long hva_start, hva_end;
+-		gfn_t gfn, gfn_end;
++		gfn_t gpa;
+ 
+ 		hva_start = max(start, memslot->userspace_addr);
+ 		hva_end = min(end, memslot->userspace_addr +
+@@ -1532,25 +1533,16 @@ static int handle_hva_to_gpa(struct kvm *kvm,
+ 		if (hva_start >= hva_end)
+ 			continue;
+ 
+-		/*
+-		 * {gfn(page) | page intersects with [hva_start, hva_end)} =
+-		 * {gfn_start, gfn_start+1, ..., gfn_end-1}.
+-		 */
+-		gfn = hva_to_gfn_memslot(hva_start, memslot);
+-		gfn_end = hva_to_gfn_memslot(hva_end + PAGE_SIZE - 1, memslot);
+-
+-		for (; gfn < gfn_end; ++gfn) {
+-			gpa_t gpa = gfn << PAGE_SHIFT;
+-			ret |= handler(kvm, gpa, data);
+-		}
++		gpa = hva_to_gfn_memslot(hva_start, memslot) << PAGE_SHIFT;
++		ret |= handler(kvm, gpa, (u64)(hva_end - hva_start), data);
+ 	}
+ 
+ 	return ret;
  }
  
--phys_addr_t kvm_get_idmap_start(void)
--{
--	return hyp_idmap_start;
--}
--
- static int kvm_map_idmap_text(pgd_t *pgd)
+-static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
++static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
  {
- 	int err;
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index ed12460..91d93a5 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -155,7 +155,6 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+-	unmap_stage2_range(kvm, gpa, PAGE_SIZE);
++	unmap_stage2_range(kvm, gpa, size);
+ 	return 0;
+ }
  
- phys_addr_t kvm_mmu_get_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
--phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
+@@ -1577,10 +1569,11 @@ int kvm_unmap_hva_range(struct kvm *kvm,
+ 	return 0;
+ }
  
+-static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
++static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ {
+ 	pte_t *pte = (pte_t *)data;
+ 
++	WARN_ON(size != PAGE_SIZE);
+ 	/*
+ 	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
+ 	 * flag clear because MMU notifiers will have unmapped a huge PMD before
+@@ -1606,11 +1599,12 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
+ 	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
+ }
+ 
+-static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
++static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ {
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ 
++	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
+ 	pmd = stage2_get_pmd(kvm, NULL, gpa);
+ 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+ 		return 0;
+@@ -1625,11 +1619,12 @@ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ 	return stage2_ptep_test_and_clear_young(pte);
+ }
+ 
+-static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
++static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ {
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ 
++	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
+ 	pmd = stage2_get_pmd(kvm, NULL, gpa);
+ 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+ 		return 0;
 -- 
 2.9.0
