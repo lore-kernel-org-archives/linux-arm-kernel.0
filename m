@@ -1,154 +1,86 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:09:23 +0200
-Subject: [PULL 73/79] KVM: arm/arm64: Report PMU overflow interrupts to
- userspace irqchip
+Date: Sun, 23 Apr 2017 19:09:13 +0200
+Subject: [PULL 63/79] arm/arm64: KVM: Use HVC_RESET_VECTORS to reinit HYP mode
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-74-cdall@linaro.org>
+Message-ID: <20170423170929.27334-64-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-When not using an in-kernel VGIC, but instead emulating an interrupt
-controller in userspace, we should report the PMU overflow status to
-that userspace interrupt controller using the KVM_CAP_ARM_USER_IRQ
-feature.
+Instead of trying to compare the value given by __hyp_get_vectors(),
+which doesn't offer any real guarantee to be the stub's address, use
+HVC_RESET_VECTORS to make sure we're in a sane state to reinstall
+KVM across PM events.
 
-Reviewed-by: Alexander Graf <agraf@suse.de>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm/kvm/arm.c        | 13 +++++++++----
- include/kvm/arm_pmu.h     |  7 +++++++
- virt/kvm/arm/arch_timer.c |  3 ---
- virt/kvm/arm/pmu.c        | 39 +++++++++++++++++++++++++++++++++++----
- 4 files changed, 51 insertions(+), 11 deletions(-)
+ arch/arm/kvm/arm.c | 24 +++++++++---------------
+ 1 file changed, 9 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index ac6e57b..9eda293 100644
+index c8f4fa6..c378502 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -635,11 +635,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+@@ -53,7 +53,6 @@ __asm__(".arch_extension	virt");
  
- 		/*
- 		 * If we have a singal pending, or need to notify a userspace
--		 * irqchip about timer level changes, then we exit (and update
--		 * the timer level state in kvm_timer_update_run below).
-+		 * irqchip about timer or PMU level changes, then we exit (and
-+		 * update the timer level state in kvm_timer_update_run
-+		 * below).
- 		 */
- 		if (signal_pending(current) ||
--		    kvm_timer_should_notify_user(vcpu)) {
-+		    kvm_timer_should_notify_user(vcpu) ||
-+		    kvm_pmu_should_notify_user(vcpu)) {
- 			ret = -EINTR;
- 			run->exit_reason = KVM_EXIT_INTR;
- 		}
-@@ -712,7 +714,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	}
+ static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
+ static kvm_cpu_context_t __percpu *kvm_host_cpu_state;
+-static unsigned long hyp_default_vectors;
  
- 	/* Tell userspace about in-kernel device output levels */
--	kvm_timer_update_run(vcpu);
-+	if (unlikely(!irqchip_in_kernel(vcpu->kvm))) {
-+		kvm_timer_update_run(vcpu);
-+		kvm_pmu_update_run(vcpu);
-+	}
+ /* Per-CPU variable containing the currently running vcpu. */
+ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
+@@ -1113,8 +1112,16 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	kvm_arm_init_debug();
+ }
  
- 	if (vcpu->sigset_active)
- 		sigprocmask(SIG_SETMASK, &sigsaved, NULL);
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index 92e7e97..1ab4633 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -50,6 +50,8 @@ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
-+bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu);
-+void kvm_pmu_update_run(struct kvm_vcpu *vcpu);
- void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
-@@ -85,6 +87,11 @@ static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
- static inline void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
-+static inline bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu)
++static void cpu_hyp_reset(void)
 +{
-+	return false;
++	if (!is_kernel_in_hyp_mode())
++		__hyp_reset_vectors();
 +}
-+static inline void kvm_pmu_update_run(struct kvm_vcpu *vcpu) {}
- static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 5dc2167..5976609 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -193,9 +193,6 @@ void kvm_timer_update_run(struct kvm_vcpu *vcpu)
- 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 	struct kvm_sync_regs *regs = &vcpu->run->s.regs;
- 
--	if (likely(irqchip_in_kernel(vcpu->kvm)))
--		return;
--
- 	/* Populate the device bitmap with the timer states */
- 	regs->device_irq_level &= ~(KVM_ARM_DEV_EL1_VTIMER |
- 				    KVM_ARM_DEV_EL1_PTIMER);
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 69ccce3..4b43e7f 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -230,13 +230,44 @@ static void kvm_pmu_update_state(struct kvm_vcpu *vcpu)
- 		return;
- 
- 	overflow = !!kvm_pmu_overflow_status(vcpu);
--	if (pmu->irq_level != overflow) {
--		pmu->irq_level = overflow;
--		kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
--				    pmu->irq_num, overflow);
-+	if (pmu->irq_level == overflow)
-+		return;
 +
-+	pmu->irq_level = overflow;
+ static void cpu_hyp_reinit(void)
+ {
++	cpu_hyp_reset();
 +
-+	if (likely(irqchip_in_kernel(vcpu->kvm))) {
-+		int ret;
-+		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-+					  pmu->irq_num, overflow);
-+		WARN_ON(ret);
+ 	if (is_kernel_in_hyp_mode()) {
+ 		/*
+ 		 * __cpu_init_stage2() is safe to call even if the PM
+@@ -1122,17 +1129,10 @@ static void cpu_hyp_reinit(void)
+ 		 */
+ 		__cpu_init_stage2();
+ 	} else {
+-		if (__hyp_get_vectors() == hyp_default_vectors)
+-			cpu_init_hyp_mode(NULL);
++		cpu_init_hyp_mode(NULL);
  	}
  }
  
-+bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_sync_regs *sregs = &vcpu->run->s.regs;
-+	bool run_level = sregs->device_irq_level & KVM_ARM_DEV_PMU;
-+
-+	if (likely(irqchip_in_kernel(vcpu->kvm)))
-+		return false;
-+
-+	return pmu->irq_level != run_level;
-+}
-+
-+/*
-+ * Reflect the PMU overflow interrupt output level into the kvm_run structure
-+ */
-+void kvm_pmu_update_run(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_sync_regs *regs = &vcpu->run->s.regs;
-+
-+	/* Populate the timer bitmap for user space */
-+	regs->device_irq_level &= ~KVM_ARM_DEV_PMU;
-+	if (vcpu->arch.pmu.irq_level)
-+		regs->device_irq_level |= KVM_ARM_DEV_PMU;
-+}
-+
- /**
-  * kvm_pmu_flush_hwstate - flush pmu state to cpu
-  * @vcpu: The vcpu pointer
+-static void cpu_hyp_reset(void)
+-{
+-	if (!is_kernel_in_hyp_mode())
+-		__hyp_reset_vectors();
+-}
+-
+ static void _kvm_arch_hardware_enable(void *discard)
+ {
+ 	if (!__this_cpu_read(kvm_arm_hardware_enabled)) {
+@@ -1316,12 +1316,6 @@ static int init_hyp_mode(void)
+ 		goto out_err;
+ 
+ 	/*
+-	 * It is probably enough to obtain the default on one
+-	 * CPU. It's unlikely to be different on the others.
+-	 */
+-	hyp_default_vectors = __hyp_get_vectors();
+-
+-	/*
+ 	 * Allocate stack pages for Hypervisor-mode
+ 	 */
+ 	for_each_possible_cpu(cpu) {
 -- 
 2.9.0
