@@ -1,133 +1,78 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 23 Apr 2017 18:37:52 +0800
-Subject: [PATCH v5 09/11] ARM: dts: sun8i: add DE2 nodes for V3s SoC
+Date: Sun, 23 Apr 2017 18:37:54 +0800
+Subject: [PATCH v5 11/11] [DO NOT MERGE] ARM: dts: sun8i: enable LCD panel of
+ Lichee Pi Zero
 In-Reply-To: <20170423103754.50012-1-icenowy@aosc.io>
 References: <20170423103754.50012-1-icenowy@aosc.io>
-Message-ID: <20170423103754.50012-10-icenowy@aosc.io>
+Message-ID: <20170423103754.50012-12-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner V3s SoC features a "Display Engine 2.0" with only one TCON
-which have RGB LCD output.
+A 480x272 QiaoDian QD43003C0-40-7LED panel is available from Lichee Pi.
 
-Add device nodes for it as well as the TCON.
+This commit connects this panel to Lichee Pi Zero.
+
+Lichee Pi also provides a 800x480 panel without accurate model number,
+so do not merge this patch. It will finally come as device tree overlay.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm/boot/dts/sun8i-v3s.dtsi | 87 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 87 insertions(+)
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 36 +++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-index 71075969e5e6..0a895179d8ae 100644
---- a/arch/arm/boot/dts/sun8i-v3s.dtsi
-+++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-@@ -41,6 +41,10 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/sun8i-v3s-ccu.h>
-+#include <dt-bindings/clock/sun8i-de2.h>
-+#include <dt-bindings/reset/sun8i-v3s-ccu.h>
-+#include <dt-bindings/reset/sun8i-de2.h>
- 
- / {
- 	#address-cells = <1>;
-@@ -59,6 +63,12 @@
+diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+index 387fc2aa546d..7ae72bf63cd0 100644
+--- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
++++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+@@ -75,6 +75,28 @@
+ 			gpios = <&pio 6 2 GPIO_ACTIVE_LOW>; /* PG2 */
  		};
  	};
- 
-+	de: display-engine {
-+		compatible = "allwinner,sun8i-v3s-display-engine";
-+		allwinner,pipelines = <&de2_mixer0>;
-+		status = "disabled";
++
++	panel: panel {
++		compatible = "qiaodian,qd43003c0-40", "simple-panel";
++		enable-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* Should be backlight */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			panel_input: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&tcon0_out_lcd>;
++			};
++		};
 +	};
++};
 +
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -93,6 +103,83 @@
- 		#size-cells = <1>;
- 		ranges;
++&de {
++	status = "okay";
+ };
  
-+		de2_clocks: clock at 1000000 {
-+			compatible = "allwinner,sun50i-h5-de2-clk";
-+			reg = <0x01000000 0x100000>;
-+			clocks = <&ccu CLK_DE>,
-+				 <&ccu CLK_BUS_DE>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&ccu RST_BUS_DE>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
+ &mmc0 {
+@@ -86,6 +108,20 @@
+ 	status = "okay";
+ };
+ 
++&tcon0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd_rgb666_pins>;
++	status = "okay";
 +
-+		de2_mixer0: mixer at 1100000 {
-+			compatible = "allwinner,sun8i-v3s-de2-mixer";
-+			reg = <0x01100000 0x100000>;
-+			clocks = <&de2_clocks CLK_MIXER0>,
-+				 <&de2_clocks CLK_BUS_MIXER0>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&de2_clocks RST_MIXER0>;
-+			assigned-clocks = <&de2_clocks CLK_MIXER0>;
-+			assigned-clock-rates = <150000000>;
++};
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++&tcon0_out {
++	tcon0_out_lcd: endpoint at 0 {
++		reg = <0>;
++		remote-endpoint = <&panel_input>;
++	};
++};
 +
-+				mixer0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					mixer0_out_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_in_mixer0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		tcon0: lcd-controller at 1c0c000 {
-+			compatible = "allwinner,sun8i-v3s-tcon";
-+			reg = <0x01c0c000 0x1000>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_TCON0>,
-+				 <&ccu CLK_TCON0>;
-+			clock-names = "ahb",
-+				      "tcon-ch0";
-+			clock-output-names = "tcon-pixel-clock";
-+			resets = <&ccu RST_BUS_TCON0>;
-+			reset-names = "lcd";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon0_in_mixer0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&mixer0_out_tcon0>;
-+					};
-+				};
-+
-+				tcon0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
-+
- 		mmc0: mmc at 01c0f000 {
- 			compatible = "allwinner,sun7i-a20-mmc";
- 			reg = <0x01c0f000 0x1000>;
+ &uart0 {
+ 	pinctrl-0 = <&uart0_pins_a>;
+ 	pinctrl-names = "default";
 -- 
 2.12.2
