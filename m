@@ -1,78 +1,46 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 23 Apr 2017 18:37:54 +0800
-Subject: [PATCH v5 11/11] [DO NOT MERGE] ARM: dts: sun8i: enable LCD panel of
- Lichee Pi Zero
-In-Reply-To: <20170423103754.50012-1-icenowy@aosc.io>
-References: <20170423103754.50012-1-icenowy@aosc.io>
-Message-ID: <20170423103754.50012-12-icenowy@aosc.io>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Sun, 23 Apr 2017 12:44:11 +0200
+Subject: s3c24xx: Use devm_kcalloc() in s3c24xx_dma_probe()
+In-Reply-To: <02134825-fec7-73d7-2eb6-b510eaaf3b08@users.sourceforge.net>
+References: <930f0a6c-bc5c-3d01-6814-563780fc90ef@users.sourceforge.net>
+ <9c10b823-f49b-8c73-2bf8-0fd2b0ba0231@users.sourceforge.net>
+ <f1257887-ca14-6415-b1ff-d57190a1810f@math.uni-bielefeld.de>
+ <02134825-fec7-73d7-2eb6-b510eaaf3b08@users.sourceforge.net>
+Message-ID: <49f1c0b2-7463-2121-1aed-0998f6635c92@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A 480x272 QiaoDian QD43003C0-40-7LED panel is available from Lichee Pi.
+SF Markus Elfring wrote:
+>>> * A multiplication for the size determination of a memory allocation
+>>>   indicated that an array data structure should be processed.
+>>>   Thus use the corresponding function "devm_kcalloc".
+>> I have trouble parsing that sentences. This looks like the typical
+>> approach of native german speakers to directly transfer sentence
+>> constructions from German to English. Which, in most cases, doesn't work
+>> or is just plain confusing.
+> 
+> Do you find the following wording better to understand
+> if it would be presented by a script like ?checkpatch.pl??
+> 
+> WARNING: Prefer devm_kcalloc over devm_kzalloc with multiply
+For example. Also I just noticed some previous comment by Krzysztof that
+pointed that out already.
 
-This commit connects this panel to Lichee Pi Zero.
+My suggestion: One sentence describing that the current situation is.
+Another sentence explaining why this is bad/undesirable. Last sentence
+saying what you're doing to fix this (can sometimes be omitted if it's
+clear from the diffstat). In this case, the output of the checkpatch
+script would come in handy.
 
-Lichee Pi also provides a 800x480 panel without accurate model number,
-so do not merge this patch. It will finally come as device tree overlay.
+With this, you avoid cramming every information into one long and
+complicated sentence.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 36 +++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+With best wishes,
+Tobias
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-index 387fc2aa546d..7ae72bf63cd0 100644
---- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-@@ -75,6 +75,28 @@
- 			gpios = <&pio 6 2 GPIO_ACTIVE_LOW>; /* PG2 */
- 		};
- 	};
-+
-+	panel: panel {
-+		compatible = "qiaodian,qd43003c0-40", "simple-panel";
-+		enable-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* Should be backlight */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			panel_input: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&tcon0_out_lcd>;
-+			};
-+		};
-+	};
-+};
-+
-+&de {
-+	status = "okay";
- };
- 
- &mmc0 {
-@@ -86,6 +108,20 @@
- 	status = "okay";
- };
- 
-+&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_rgb666_pins>;
-+	status = "okay";
-+
-+};
-+
-+&tcon0_out {
-+	tcon0_out_lcd: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&panel_input>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-0 = <&uart0_pins_a>;
- 	pinctrl-names = "default";
--- 
-2.12.2
+
+> 
+> 
+> Regards,
+> Markus
+> 
