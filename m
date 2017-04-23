@@ -1,43 +1,129 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:21 +0200
-Subject: [PULL 11/79] KVM: arm64: Use common GICv3 sysreg definitions
+Date: Sun, 23 Apr 2017 19:08:19 +0200
+Subject: [PULL 09/79] KVM: arm64: Use common debug sysreg definitions
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-12-cdall@linaro.org>
+Message-ID: <20170423170929.27334-10-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Rutland <mark.rutland@arm.com>
 
-Now that we have common definitions for the GICv3 register encodings,
+Now that we have common definitions for the debug register encodings,
 make the KVM code use these, simplifying the sys_reg_descs table.
+
+The table previously erroneously referred to MDCCSR_EL0 as MDCCSR_EL1.
+This is corrected (as is necessary in order to use the common sysreg
+definition).
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: kvmarm at lists.cs.columbia.edu
 ---
- arch/arm64/kvm/sys_regs.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 73 ++++++++++++++---------------------------------
+ 1 file changed, 21 insertions(+), 52 deletions(-)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 63b0785..1f3062b 100644
+index 0e26f8c..5fa23fd 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -973,12 +973,8 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
- 	  NULL, reset_val, VBAR_EL1, 0 },
+@@ -793,17 +793,13 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
  
--	/* ICC_SGI1R_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1011), Op2(0b101),
--	  access_gic_sgi },
--	/* ICC_SRE_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
--	  access_gic_sre },
-+	{ SYS_DESC(SYS_ICC_SGI1R_EL1), access_gic_sgi },
-+	{ SYS_DESC(SYS_ICC_SRE_EL1), access_gic_sre },
+ /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+ #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+-	/* DBGBVRn_EL1 */						\
+-	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b100),	\
++	{ SYS_DESC(SYS_DBGBVRn_EL1(n)),					\
+ 	  trap_bvr, reset_bvr, n, 0, get_bvr, set_bvr },		\
+-	/* DBGBCRn_EL1 */						\
+-	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b101),	\
++	{ SYS_DESC(SYS_DBGBCRn_EL1(n)),					\
+ 	  trap_bcr, reset_bcr, n, 0, get_bcr, set_bcr },		\
+-	/* DBGWVRn_EL1 */						\
+-	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b110),	\
++	{ SYS_DESC(SYS_DBGWVRn_EL1(n)),					\
+ 	  trap_wvr, reset_wvr, n, 0,  get_wvr, set_wvr },		\
+-	/* DBGWCRn_EL1 */						\
+-	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b111),	\
++	{ SYS_DESC(SYS_DBGWCRn_EL1(n)),					\
+ 	  trap_wcr, reset_wcr, n, 0,  get_wcr, set_wcr }
  
- 	/* CONTEXTIDR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
+ /* Macro to expand the PMEVCNTRn_EL0 register */
+@@ -899,12 +895,8 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 
+ 	DBG_BCR_BVR_WCR_WVR_EL1(0),
+ 	DBG_BCR_BVR_WCR_WVR_EL1(1),
+-	/* MDCCINT_EL1 */
+-	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b000),
+-	  trap_debug_regs, reset_val, MDCCINT_EL1, 0 },
+-	/* MDSCR_EL1 */
+-	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b010),
+-	  trap_debug_regs, reset_val, MDSCR_EL1, 0 },
++	{ SYS_DESC(SYS_MDCCINT_EL1), trap_debug_regs, reset_val, MDCCINT_EL1, 0 },
++	{ SYS_DESC(SYS_MDSCR_EL1), trap_debug_regs, reset_val, MDSCR_EL1, 0 },
+ 	DBG_BCR_BVR_WCR_WVR_EL1(2),
+ 	DBG_BCR_BVR_WCR_WVR_EL1(3),
+ 	DBG_BCR_BVR_WCR_WVR_EL1(4),
+@@ -920,44 +912,21 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	DBG_BCR_BVR_WCR_WVR_EL1(14),
+ 	DBG_BCR_BVR_WCR_WVR_EL1(15),
+ 
+-	/* MDRAR_EL1 */
+-	{ Op0(0b10), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000),
+-	  trap_raz_wi },
+-	/* OSLAR_EL1 */
+-	{ Op0(0b10), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b100),
+-	  trap_raz_wi },
+-	/* OSLSR_EL1 */
+-	{ Op0(0b10), Op1(0b000), CRn(0b0001), CRm(0b0001), Op2(0b100),
+-	  trap_oslsr_el1 },
+-	/* OSDLR_EL1 */
+-	{ Op0(0b10), Op1(0b000), CRn(0b0001), CRm(0b0011), Op2(0b100),
+-	  trap_raz_wi },
+-	/* DBGPRCR_EL1 */
+-	{ Op0(0b10), Op1(0b000), CRn(0b0001), CRm(0b0100), Op2(0b100),
+-	  trap_raz_wi },
+-	/* DBGCLAIMSET_EL1 */
+-	{ Op0(0b10), Op1(0b000), CRn(0b0111), CRm(0b1000), Op2(0b110),
+-	  trap_raz_wi },
+-	/* DBGCLAIMCLR_EL1 */
+-	{ Op0(0b10), Op1(0b000), CRn(0b0111), CRm(0b1001), Op2(0b110),
+-	  trap_raz_wi },
+-	/* DBGAUTHSTATUS_EL1 */
+-	{ Op0(0b10), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b110),
+-	  trap_dbgauthstatus_el1 },
+-
+-	/* MDCCSR_EL1 */
+-	{ Op0(0b10), Op1(0b011), CRn(0b0000), CRm(0b0001), Op2(0b000),
+-	  trap_raz_wi },
+-	/* DBGDTR_EL0 */
+-	{ Op0(0b10), Op1(0b011), CRn(0b0000), CRm(0b0100), Op2(0b000),
+-	  trap_raz_wi },
+-	/* DBGDTR[TR]X_EL0 */
+-	{ Op0(0b10), Op1(0b011), CRn(0b0000), CRm(0b0101), Op2(0b000),
+-	  trap_raz_wi },
+-
+-	/* DBGVCR32_EL2 */
+-	{ Op0(0b10), Op1(0b100), CRn(0b0000), CRm(0b0111), Op2(0b000),
+-	  NULL, reset_val, DBGVCR32_EL2, 0 },
++	{ SYS_DESC(SYS_MDRAR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_OSLAR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_OSLSR_EL1), trap_oslsr_el1 },
++	{ SYS_DESC(SYS_OSDLR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_DBGPRCR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_DBGCLAIMSET_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_DBGCLAIMCLR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_DBGAUTHSTATUS_EL1), trap_dbgauthstatus_el1 },
++
++	{ SYS_DESC(SYS_MDCCSR_EL0), trap_raz_wi },
++	{ SYS_DESC(SYS_DBGDTR_EL0), trap_raz_wi },
++	// DBGDTR[TR]X_EL0 share the same encoding
++	{ SYS_DESC(SYS_DBGDTRTX_EL0), trap_raz_wi },
++
++	{ SYS_DESC(SYS_DBGVCR32_EL2), NULL, reset_val, DBGVCR32_EL2, 0 },
+ 
+ 	/* MPIDR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b101),
 -- 
 2.9.0
