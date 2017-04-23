@@ -1,59 +1,46 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:30 +0200
-Subject: [PULL 20/79] KVM: arm/arm64: vgic: Only set underflow when actually
- out of LRs
+Date: Sun, 23 Apr 2017 19:09:29 +0200
+Subject: [PULL 79/79] ARM: KVM: Fix idmap stub entry when running Thumb-2 code
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-21-cdall@linaro.org>
+Message-ID: <20170423170929.27334-80-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently assume that all the interrupts in our AP list will be
-queued to LRs, but that's not necessarily the case, because some of them
-could have been migrated away to different VCPUs and only the VCPU
-thread itself can remove interrupts from its AP list.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Therefore, slightly change the logic to only setting the underflow
-interrupt when we actually run out of LRs.
+When entering the hyp stub implemented in the idmap, we try to
+be mindful of the fact that we could be running a Thumb-2 kernel
+by adding 1 to the address we compute. Unfortunately, the assembler
+also knows about this trick, and has already generated an address
+that has bit 0 set in the litteral pool.
 
-As it turns out, this allows us to further simplify the handling in
-vgic_sync_hwstate in later patches.
+Our superfluous correction ends up confusing the CPU entierely,
+as we now branch to the stub in ARM mode instead of Thumb, and on
+a possibly unaligned address for good measure. From that point,
+nothing really good happens.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+The obvious fix in to remove this stupid target PC correction.
+
+Fixes: 6bebcecb6c5b ("ARM: KVM: Allow the main HYP code to use the init hyp stub implementation")
+Reported-by: Christoffer Dall <cdall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/kvm/hyp/hyp-entry.S | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 1043291..442f7df 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -601,10 +601,8 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+index a35baa8..95a2fae 100644
+--- a/arch/arm/kvm/hyp/hyp-entry.S
++++ b/arch/arm/kvm/hyp/hyp-entry.S
+@@ -144,7 +144,6 @@ hyp_hvc:
+ 	ldr	r1, [r1]
+ 	ldr	ip, =__kvm_handle_stub_hvc
+ 	sub	ip, ip, r1
+-THUMB(	add	ip, ip, #1)
+ 	pop	{r1}
  
- 	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
- 
--	if (compute_ap_list_depth(vcpu) > kvm_vgic_global_state.nr_lr) {
--		vgic_set_underflow(vcpu);
-+	if (compute_ap_list_depth(vcpu) > kvm_vgic_global_state.nr_lr)
- 		vgic_sort_ap_list(vcpu);
--	}
- 
- 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
- 		spin_lock(&irq->irq_lock);
-@@ -623,8 +621,12 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
- next:
- 		spin_unlock(&irq->irq_lock);
- 
--		if (count == kvm_vgic_global_state.nr_lr)
-+		if (count == kvm_vgic_global_state.nr_lr) {
-+			if (!list_is_last(&irq->ap_list,
-+					  &vgic_cpu->ap_list_head))
-+				vgic_set_underflow(vcpu);
- 			break;
-+		}
- 	}
- 
- 	vcpu->arch.vgic_cpu.used_lrs = count;
+ 	bx	ip
 -- 
 2.9.0
