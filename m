@@ -1,171 +1,75 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:24 +0200
-Subject: [PULL 14/79] KVM: arm64: Use common sysreg definitions
+Date: Sun, 23 Apr 2017 19:09:11 +0200
+Subject: [PULL 61/79] arm/arm64: KVM: Use __hyp_reset_vectors() directly
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-15-cdall@linaro.org>
+Message-ID: <20170423170929.27334-62-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Now that we have common definitions for the remaining register encodings
-required by KVM, make the KVM code use these, simplifying the
-sys_reg_descs table and the genericv8_sys_regs table.
+__cpu_reset_hyp_mode doesn't need to be passed any argument now,
+as the hyp-stub implementations are self-contained, and is now
+reduced to just calling __hyp_reset_vectors(). Let's drop the
+wrapper and use the stub hypercall directly.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c            | 94 +++++++++---------------------------
- arch/arm64/kvm/sys_regs_generic_v8.c |  4 +-
- 2 files changed, 25 insertions(+), 73 deletions(-)
+ arch/arm/include/asm/kvm_host.h   | 6 ------
+ arch/arm/kvm/arm.c                | 3 +--
+ arch/arm64/include/asm/kvm_host.h | 6 ------
+ 3 files changed, 1 insertion(+), 14 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index e637e1d..effa5ce 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -924,72 +924,36 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index adea307..d488b88 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -270,12 +270,6 @@ static inline void __cpu_init_stage2(void)
+ 	kvm_call_hyp(__init_stage2_translation);
+ }
  
- 	{ SYS_DESC(SYS_DBGVCR32_EL2), NULL, reset_val, DBGVCR32_EL2, 0 },
- 
--	/* MPIDR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b101),
--	  NULL, reset_mpidr, MPIDR_EL1 },
--	/* SCTLR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000),
--	  access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
--	/* CPACR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b010),
--	  NULL, reset_val, CPACR_EL1, 0 },
--	/* TTBR0_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b000),
--	  access_vm_reg, reset_unknown, TTBR0_EL1 },
--	/* TTBR1_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b001),
--	  access_vm_reg, reset_unknown, TTBR1_EL1 },
--	/* TCR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b010),
--	  access_vm_reg, reset_val, TCR_EL1, 0 },
+-static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
+-					phys_addr_t phys_idmap_start)
+-{
+-	__hyp_reset_vectors();
+-}
 -
--	/* AFSR0_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b000),
--	  access_vm_reg, reset_unknown, AFSR0_EL1 },
--	/* AFSR1_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b001),
--	  access_vm_reg, reset_unknown, AFSR1_EL1 },
--	/* ESR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0010), Op2(0b000),
--	  access_vm_reg, reset_unknown, ESR_EL1 },
--	/* FAR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0110), CRm(0b0000), Op2(0b000),
--	  access_vm_reg, reset_unknown, FAR_EL1 },
--	/* PAR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0111), CRm(0b0100), Op2(0b000),
--	  NULL, reset_unknown, PAR_EL1 },
-+	{ SYS_DESC(SYS_MPIDR_EL1), NULL, reset_mpidr, MPIDR_EL1 },
-+	{ SYS_DESC(SYS_SCTLR_EL1), access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
-+	{ SYS_DESC(SYS_CPACR_EL1), NULL, reset_val, CPACR_EL1, 0 },
-+	{ SYS_DESC(SYS_TTBR0_EL1), access_vm_reg, reset_unknown, TTBR0_EL1 },
-+	{ SYS_DESC(SYS_TTBR1_EL1), access_vm_reg, reset_unknown, TTBR1_EL1 },
-+	{ SYS_DESC(SYS_TCR_EL1), access_vm_reg, reset_val, TCR_EL1, 0 },
-+
-+	{ SYS_DESC(SYS_AFSR0_EL1), access_vm_reg, reset_unknown, AFSR0_EL1 },
-+	{ SYS_DESC(SYS_AFSR1_EL1), access_vm_reg, reset_unknown, AFSR1_EL1 },
-+	{ SYS_DESC(SYS_ESR_EL1), access_vm_reg, reset_unknown, ESR_EL1 },
-+	{ SYS_DESC(SYS_FAR_EL1), access_vm_reg, reset_unknown, FAR_EL1 },
-+	{ SYS_DESC(SYS_PAR_EL1), NULL, reset_unknown, PAR_EL1 },
+ static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+ {
+ 	return 0;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 46fd375..c8f4fa6 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1130,8 +1130,7 @@ static void cpu_hyp_reinit(void)
+ static void cpu_hyp_reset(void)
+ {
+ 	if (!is_kernel_in_hyp_mode())
+-		__cpu_reset_hyp_mode(hyp_default_vectors,
+-				     kvm_get_idmap_start());
++		__hyp_reset_vectors();
+ }
  
- 	{ SYS_DESC(SYS_PMINTENSET_EL1), access_pminten, reset_unknown, PMINTENSET_EL1 },
- 	{ SYS_DESC(SYS_PMINTENCLR_EL1), access_pminten, NULL, PMINTENSET_EL1 },
+ static void _kvm_arch_hardware_enable(void *discard)
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 0355dd1..578df18 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -362,12 +362,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+ 	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
+ }
  
--	/* MAIR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
--	  access_vm_reg, reset_unknown, MAIR_EL1 },
--	/* AMAIR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0011), Op2(0b000),
--	  access_vm_reg, reset_amair_el1, AMAIR_EL1 },
-+	{ SYS_DESC(SYS_MAIR_EL1), access_vm_reg, reset_unknown, MAIR_EL1 },
-+	{ SYS_DESC(SYS_AMAIR_EL1), access_vm_reg, reset_amair_el1, AMAIR_EL1 },
- 
--	/* VBAR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
--	  NULL, reset_val, VBAR_EL1, 0 },
-+	{ SYS_DESC(SYS_VBAR_EL1), NULL, reset_val, VBAR_EL1, 0 },
- 
- 	{ SYS_DESC(SYS_ICC_SGI1R_EL1), access_gic_sgi },
- 	{ SYS_DESC(SYS_ICC_SRE_EL1), access_gic_sre },
- 
--	/* CONTEXTIDR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
--	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
--	/* TPIDR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b100),
--	  NULL, reset_unknown, TPIDR_EL1 },
-+	{ SYS_DESC(SYS_CONTEXTIDR_EL1), access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
-+	{ SYS_DESC(SYS_TPIDR_EL1), NULL, reset_unknown, TPIDR_EL1 },
- 
--	/* CNTKCTL_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1110), CRm(0b0001), Op2(0b000),
--	  NULL, reset_val, CNTKCTL_EL1, 0},
-+	{ SYS_DESC(SYS_CNTKCTL_EL1), NULL, reset_val, CNTKCTL_EL1, 0},
- 
--	/* CSSELR_EL1 */
--	{ Op0(0b11), Op1(0b010), CRn(0b0000), CRm(0b0000), Op2(0b000),
--	  NULL, reset_unknown, CSSELR_EL1 },
-+	{ SYS_DESC(SYS_CSSELR_EL1), NULL, reset_unknown, CSSELR_EL1 },
- 
- 	{ SYS_DESC(SYS_PMCR_EL0), access_pmcr, reset_pmcr, },
- 	{ SYS_DESC(SYS_PMCNTENSET_EL0), access_pmcnten, reset_unknown, PMCNTENSET_EL0 },
-@@ -1009,12 +973,8 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ SYS_DESC(SYS_PMUSERENR_EL0), access_pmuserenr, reset_val, PMUSERENR_EL0, 0 },
- 	{ SYS_DESC(SYS_PMOVSSET_EL0), access_pmovs, reset_unknown, PMOVSSET_EL0 },
- 
--	/* TPIDR_EL0 */
--	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b010),
--	  NULL, reset_unknown, TPIDR_EL0 },
--	/* TPIDRRO_EL0 */
--	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
--	  NULL, reset_unknown, TPIDRRO_EL0 },
-+	{ SYS_DESC(SYS_TPIDR_EL0), NULL, reset_unknown, TPIDR_EL0 },
-+	{ SYS_DESC(SYS_TPIDRRO_EL0), NULL, reset_unknown, TPIDRRO_EL0 },
- 
- 	{ SYS_DESC(SYS_CNTP_TVAL_EL0), access_cntp_tval },
- 	{ SYS_DESC(SYS_CNTP_CTL_EL0), access_cntp_ctl },
-@@ -1090,15 +1050,9 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	 */
- 	{ SYS_DESC(SYS_PMCCFILTR_EL0), access_pmu_evtyper, reset_val, PMCCFILTR_EL0, 0 },
- 
--	/* DACR32_EL2 */
--	{ Op0(0b11), Op1(0b100), CRn(0b0011), CRm(0b0000), Op2(0b000),
--	  NULL, reset_unknown, DACR32_EL2 },
--	/* IFSR32_EL2 */
--	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0000), Op2(0b001),
--	  NULL, reset_unknown, IFSR32_EL2 },
--	/* FPEXC32_EL2 */
--	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0011), Op2(0b000),
--	  NULL, reset_val, FPEXC32_EL2, 0x70 },
-+	{ SYS_DESC(SYS_DACR32_EL2), NULL, reset_unknown, DACR32_EL2 },
-+	{ SYS_DESC(SYS_IFSR32_EL2), NULL, reset_unknown, IFSR32_EL2 },
-+	{ SYS_DESC(SYS_FPEXC32_EL2), NULL, reset_val, FPEXC32_EL2, 0x70 },
- };
- 
- static bool trap_dbgidr(struct kvm_vcpu *vcpu,
-diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
-index 46af718..969ade1 100644
---- a/arch/arm64/kvm/sys_regs_generic_v8.c
-+++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-@@ -52,9 +52,7 @@ static void reset_actlr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
-  */
- static const struct sys_reg_desc genericv8_sys_regs[] = {
--	/* ACTLR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b001),
--	  access_actlr, reset_actlr, ACTLR_EL1 },
-+	{ SYS_DESC(SYS_ACTLR_EL1), access_actlr, reset_actlr, ACTLR_EL1 },
- };
- 
- static const struct sys_reg_desc genericv8_cp15_regs[] = {
+-static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
+-					phys_addr_t phys_idmap_start)
+-{
+-	__hyp_reset_vectors();
+-}
+-
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
 -- 
 2.9.0
