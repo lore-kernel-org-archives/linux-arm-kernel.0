@@ -1,61 +1,51 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:09:10 +0200
-Subject: [PULL 60/79] ARM: KVM: Gracefully handle hyp-stubs being restored
- from under our feet
+Date: Sun, 23 Apr 2017 19:09:01 +0200
+Subject: [PULL 51/79] ARM: hyp-stub: Use r1 for the soft-restart address
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-61-cdall@linaro.org>
+Message-ID: <20170423170929.27334-52-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Should kvm_reboot() be invoked while guest is running, an IPI
-wil be issued, forcing the guest to exit and HYP being reset to
-the stubs. We will then try to reenter the guest, only to get
-an error (HVC_STUB_ERR).
+It is not really obvious why the restart address should be in r3
+when communicated to the hyp-stub. r1 should be perfectly adequate,
+and consistent with the rest of the code.
 
-This patch allows this case to be gracefully handled by exiting
-the run loop.
-
+Tested-by: Keerthy <j-keerthy@ti.com>
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm/include/asm/kvm_asm.h | 2 +-
- arch/arm/kvm/handle_exit.c     | 8 ++++++++
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/kernel/hyp-stub.S | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index eae11b3..14d68a4 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -33,7 +33,7 @@
- #define ARM_EXCEPTION_IRQ	  5
- #define ARM_EXCEPTION_FIQ	  6
- #define ARM_EXCEPTION_HVC	  7
--
-+#define ARM_EXCEPTION_HYP_GONE	  HVC_STUB_ERR
- /*
-  * The rr_lo_hi macro swaps a pair of registers depending on
-  * current endianness. It is used in conjunction with ldrd and strd
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index 96af65a..5fd7968 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -160,6 +160,14 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	case ARM_EXCEPTION_DATA_ABORT:
- 		kvm_inject_vabt(vcpu);
- 		return 1;
-+	case ARM_EXCEPTION_HYP_GONE:
-+		/*
-+		 * HYP has been reset to the hyp-stub. This happens
-+		 * when a guest is pre-empted by kvm_reboot()'s
-+		 * shutdown call.
-+		 */
-+		run->exit_reason = KVM_EXIT_FAIL_ENTRY;
-+		return 0;
- 	default:
- 		kvm_pr_unimpl("Unsupported exception type: %d",
- 			      exception_index);
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 8301db9..15eaa14 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -214,7 +214,7 @@ __hyp_stub_do_trap:
+ 
+ 1:	teq	r0, #HVC_SOFT_RESTART
+ 	bne	1f
+-	bx	r3
++	bx	r1
+ 
+ 1:	mov	r0, #-1
+ 
+@@ -258,10 +258,9 @@ ENTRY(__hyp_set_vectors)
+ ENDPROC(__hyp_set_vectors)
+ 
+ ENTRY(__hyp_soft_restart)
+-	mov	r3, r0
++	mov	r1, r0
+ 	mov	r0, #HVC_SOFT_RESTART
+ 	__HVC(0)
+-	mov	r0, r3
+ 	ret	lr
+ ENDPROC(__hyp_soft_restart)
+ 
 -- 
 2.9.0
