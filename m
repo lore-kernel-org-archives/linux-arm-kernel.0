@@ -1,46 +1,105 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:48 +0200
-Subject: [PULL 38/79] arm64: hyp-stub: Don't save lr in the EL1 code
-In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
-References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-39-cdall@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 23 Apr 2017 22:13:20 +0200
+Subject: [RFC] minimum gcc version for kernel: raise to gcc-4.3 or 4.6?
+In-Reply-To: <CAK8P3a28fi0GRcz1yLq+wRkaBBO_w74NnBCY7f3myg78JpaCCQ@mail.gmail.com>
+References: <20161216105634.235457-1-arnd@arndb.de>
+ <3302470.IDcDrWa0u6@wuerfel>
+ <CAGXu5jLPRYi+HK=07Zndc8szEKD4mZCqaHJFnHmmoYr7tA1xPw@mail.gmail.com>
+ <CAK8P3a2C2WhWjzF=HrzU15Ncg0juR+nstZukBEpqCrVNW5pnDA@mail.gmail.com>
+ <CAGXu5jLTR+dY_Ayyix5Tg0Yn9LBFAt=j56MQVdJVGue-R-CizA@mail.gmail.com>
+ <CAK8P3a114EVbnhbObfq-4pZp8XCT4fWzMXD+WkRi7iPXs1vFMA@mail.gmail.com>
+ <CAGXu5jJpofLF0qAf0-2iNTesZt-X704Q7L=DpQYdtHY5n2HD0w@mail.gmail.com>
+ <alpine.LFD.2.20.1704220400380.32200@eddie.linux-mips.org>
+ <CAK8P3a28fi0GRcz1yLq+wRkaBBO_w74NnBCY7f3myg78JpaCCQ@mail.gmail.com>
+Message-ID: <CAMuHMdWTiurUSacddYXgW69=QwOrZDV3Zt2DezJauPy8j-GMHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+Hi Arnd,
 
-The EL2 code is not corrupting lr anymore, so don't bother preserving
-it in the EL1 trampoline code.
+On Sat, Apr 22, 2017 at 5:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Based on what I found so far, gcc-4 can be pretty much ruled out from
+> being the minimum version based on the number of failures I got.
+> It's much better than 3.4 but much worse than 4.1 or 4.2 which seem
+> fixable on MIPS and x86 at least, and may or may not work depending
+> on configuration. So the best two possible (but conflicting) answers I
+> have are
+>
+> a) There are known users on gcc-4.1, and we never break things that
+>     work for users, so gcc-4.1 (or possibly 4.0 if a user shows up) would
+>     be the minimum version.
+> b) gcc-4.1 and 4.2 have too many problems, so users are better off
+>     when we tell them to upgrade to something newer, and a minimum
+>     version of gcc-4.3 has fewer surprises. We should remove all
+>     workarounds for pre-gcc-4.3 compilers and just force a build error
+>     message.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
----
- arch/arm64/kernel/hyp-stub.S | 4 ----
- 1 file changed, 4 deletions(-)
+If there's no real good reason (brokenness) to deprecate gcc-4.1, I would not
+do it.I guess most people using old compilers know what they're doing.
 
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index e4215ad..193dfb2 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -116,18 +116,14 @@ ENDPROC(\label)
-  */
- 
- ENTRY(__hyp_get_vectors)
--	str	lr, [sp, #-16]!
- 	mov	x0, #HVC_GET_VECTORS
- 	hvc	#0
--	ldr	lr, [sp], #16
- 	ret
- ENDPROC(__hyp_get_vectors)
- 
- ENTRY(__hyp_set_vectors)
--	str	lr, [sp, #-16]!
- 	mov	x1, x0
- 	mov	x0, #HVC_SET_VECTORS
- 	hvc	#0
--	ldr	lr, [sp], #16
- 	ret
- ENDPROC(__hyp_set_vectors)
--- 
-2.9.0
+My main motivation for keep on using gcc-4.1 is that it gives many warnings
+that were disabled in later gcc versions.  I do look at all new warnings, and
+send patches when they are real bugs, or are trivial to silence.
+
+Lately the usefulness has been decreasing, as you've been too aggressively
+killing compiler warnings with recent gcc versions (which became better) ;-)
+Hence if I detected a new warning with a point or an rc release, it usually
+means the code was never in nex (ugh)t, or the maintainer ignored your patch.
+
+I could easily switch to v4.9 from kernel.org crosstool, though, but then I
+would loose all those warnings.
+
+BTW, below is the diff I use to avoid an ICE.
+After that, it builds and (test)boots fine on ARAnyM ;-)
+
+diff --git a/fs/gfs2/glock.c b/fs/gfs2/glock.c
+index ec0848fcca02d896..eb75b324ac0ac53d 100644
+--- a/fs/gfs2/glock.c
++++ b/fs/gfs2/glock.c
+@@ -650,13 +650,16 @@ int gfs2_glock_get(struct gfs2_sbd *sdp, u64 number,
+                   struct gfs2_glock **glp)
+ {
+        struct super_block *s = sdp->sd_vfs;
+-       struct lm_lockname name = { .ln_number = number,
++       // FIXME Avoid gcc 4.1.2 20061115 (prerelease) (Ubuntu 4.1.1-21) ICE
++       //struct lm_lockname name = { .ln_number = number,
++       struct lm_lockname name = {
+                                    .ln_type = glops->go_type,
+                                    .ln_sbd = sdp };
+        struct gfs2_glock *gl, *tmp = NULL;
+        struct address_space *mapping;
+        struct kmem_cache *cachep;
+        int ret, tries = 0;
++       name.ln_number = number;
+
+        rcu_read_lock();
+        gl = rhashtable_lookup_fast(&gl_hash_table, &name, ht_parms);
+diff --git a/fs/gfs2/rgrp.c b/fs/gfs2/rgrp.c
+index 86ccc01593937d93..8783b72df5fa3d0c 100644
+--- a/fs/gfs2/rgrp.c
++++ b/fs/gfs2/rgrp.c
+@@ -1767,7 +1767,11 @@ static void try_rgrp_unlink(struct gfs2_rgrpd
+*rgd, u64 *last_unlinked, u64 skip
+        struct gfs2_inode *ip;
+        int error;
+        int found = 0;
+-       struct gfs2_rbm rbm = { .rgd = rgd, .bii = 0, .offset = 0 };
++       // FIXME Avoid gcc 4.1.2 20061115 (prerelease) (Ubuntu 4.1.1-21) ICE
++       // struct gfs2_rbm rbm = { .rgd = rgd, .bii = 0, .offset = 0 };
++       struct gfs2_rbm rbm = { .bii = 0, .offset = 0 };
++       rbm.rgd = rgd;
++
+
+        while (1) {
+                down_write(&sdp->sd_log_flush_lock);
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
