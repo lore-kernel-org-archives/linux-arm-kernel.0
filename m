@@ -1,80 +1,71 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:57 +0200
-Subject: [PULL 47/79] ARM: hyp-stub: improve ABI
+Date: Sun, 23 Apr 2017 19:08:43 +0200
+Subject: [PULL 33/79] arm64: KVM: Do not corrupt registers on failed 64bit CP
+ read
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-48-cdall@linaro.org>
+Message-ID: <20170423170929.27334-34-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@armlinux.org.uk>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Improve the hyp-stub ABI to allow it to do more than just get/set the
-vectors.  We follow the example in ARM64, where r0 is used as an opcode
-with the other registers as an argument.
+If we fail to emulate a mrrc instruction, we:
+1) deliver an exception,
+2) spit a nastygram on the console,
+3) write back some garbage to Rt/Rt2
 
-Tested-by: Keerthy <j-keerthy@ti.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+While 1) and 2) are perfectly acceptable, 3) is out of the scope of
+the architecture... Let's mimick the code in kvm_handle_cp_32 and
+be more cautious.
+
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm/kernel/hyp-stub.S | 27 ++++++++++++++++++++++-----
- 1 file changed, 22 insertions(+), 5 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 27 ++++++++++++++++-----------
+ 1 file changed, 16 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 15d073a..f3e9ba5 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -22,6 +22,9 @@
- #include <asm/assembler.h>
- #include <asm/virt.h>
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 2f4418e..582d68e 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1678,20 +1678,25 @@ static int kvm_handle_cp_64(struct kvm_vcpu *vcpu,
+ 		params.regval |= vcpu_get_reg(vcpu, Rt2) << 32;
+ 	}
  
-+#define HVC_GET_VECTORS 0
-+#define HVC_SET_VECTORS 1
-+
- #ifndef ZIMAGE
- /*
-  * For the kernel proper, we need to find out the CPU boot mode long after
-@@ -202,9 +205,19 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
- ENDPROC(__hyp_stub_install_secondary)
+-	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
+-		goto out;
+-	if (!emulate_cp(vcpu, &params, global, nr_global))
+-		goto out;
+-
+-	unhandled_cp_access(vcpu, &params);
++	/*
++	 * Try to emulate the coprocessor access using the target
++	 * specific table first, and using the global table afterwards.
++	 * If either of the tables contains a handler, handle the
++	 * potential register operation in the case of a read and return
++	 * with success.
++	 */
++	if (!emulate_cp(vcpu, &params, target_specific, nr_specific) ||
++	    !emulate_cp(vcpu, &params, global, nr_global)) {
++		/* Split up the value between registers for the read side */
++		if (!params.is_write) {
++			vcpu_set_reg(vcpu, Rt, lower_32_bits(params.regval));
++			vcpu_set_reg(vcpu, Rt2, upper_32_bits(params.regval));
++		}
  
- __hyp_stub_do_trap:
--	cmp	r0, #-1
--	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
--	mcrne	p15, 4, r0, c12, c0, 0	@ set HVBAR
-+	teq	r0, #HVC_GET_VECTORS
-+	bne	1f
-+	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
-+	b	__hyp_stub_exit
-+
-+1:	teq	r0, #HVC_SET_VECTORS
-+	bne	1f
-+	mcr	p15, 4, r1, c12, c0, 0	@ set HVBAR
-+	b	__hyp_stub_exit
-+
-+1:	mov	r0, #-1
-+
-+__hyp_stub_exit:
- 	__ERET
- ENDPROC(__hyp_stub_do_trap)
+-out:
+-	/* Split up the value between registers for the read side */
+-	if (!params.is_write) {
+-		vcpu_set_reg(vcpu, Rt, lower_32_bits(params.regval));
+-		vcpu_set_reg(vcpu, Rt2, upper_32_bits(params.regval));
++		return 1;
+ 	}
  
-@@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
-  * initialisation entry point.
-  */
- ENTRY(__hyp_get_vectors)
--	mov	r0, #-1
-+	mov	r0, #HVC_GET_VECTORS
-+	__HVC(0)
-+	ret	lr
- ENDPROC(__hyp_get_vectors)
--	@ fall through
-+
- ENTRY(__hyp_set_vectors)
-+	mov	r1, r0
-+	mov	r0, #HVC_SET_VECTORS
- 	__HVC(0)
- 	ret	lr
- ENDPROC(__hyp_set_vectors)
++	unhandled_cp_access(vcpu, &params);
+ 	return 1;
+ }
+ 
 -- 
 2.9.0
