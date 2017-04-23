@@ -1,20 +1,19 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:13 +0200
-Subject: [PULL 03/79] arm64: sysreg: add performance monitor registers
+Date: Sun, 23 Apr 2017 19:08:15 +0200
+Subject: [PULL 05/79] arm64: sysreg: add physical timer registers
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-4-cdall@linaro.org>
+Message-ID: <20170423170929.27334-6-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Rutland <mark.rutland@arm.com>
 
-This patch adds sysreg definitions for system registers which are part
-of the performance monitors extension. Subsequent patches will make use
-of these definitions.
+This patch adds sysreg definitions for system registers used to control
+the architected physical timer. Subsequent patches will make use of
+these definitions.
 
-The set of registers is described in ARM DDI 0487A.k_iss10775, Table
-D5-9. The encodings were taken from Table C5-6 in the same document.
+The encodings were taken from ARM DDI 0487A.k_iss10775, Table C5-6.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
@@ -22,49 +21,23 @@ Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm64/include/asm/sysreg.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index b54f8a4..3498d02 100644
+index 9dc30bc..3e281b1 100644
 --- a/arch/arm64/include/asm/sysreg.h
 +++ b/arch/arm64/include/asm/sysreg.h
-@@ -149,11 +149,36 @@
- #define SYS_ID_AA64MMFR1_EL1		sys_reg(3, 0, 0, 7, 1)
- #define SYS_ID_AA64MMFR2_EL1		sys_reg(3, 0, 0, 7, 2)
+@@ -182,6 +182,10 @@
  
-+#define SYS_PMINTENSET_EL1		sys_reg(3, 0, 9, 14, 1)
-+#define SYS_PMINTENCLR_EL1		sys_reg(3, 0, 9, 14, 2)
-+
- #define SYS_CTR_EL0			sys_reg(3, 3, 0, 0, 1)
- #define SYS_DCZID_EL0			sys_reg(3, 3, 0, 0, 7)
- 
-+#define SYS_PMCR_EL0			sys_reg(3, 3, 9, 12, 0)
-+#define SYS_PMCNTENSET_EL0		sys_reg(3, 3, 9, 12, 1)
-+#define SYS_PMCNTENCLR_EL0		sys_reg(3, 3, 9, 12, 2)
-+#define SYS_PMOVSCLR_EL0		sys_reg(3, 3, 9, 12, 3)
-+#define SYS_PMSWINC_EL0			sys_reg(3, 3, 9, 12, 4)
-+#define SYS_PMSELR_EL0			sys_reg(3, 3, 9, 12, 5)
-+#define SYS_PMCEID0_EL0			sys_reg(3, 3, 9, 12, 6)
-+#define SYS_PMCEID1_EL0			sys_reg(3, 3, 9, 12, 7)
-+#define SYS_PMCCNTR_EL0			sys_reg(3, 3, 9, 13, 0)
-+#define SYS_PMXEVTYPER_EL0		sys_reg(3, 3, 9, 13, 1)
-+#define SYS_PMXEVCNTR_EL0		sys_reg(3, 3, 9, 13, 2)
-+#define SYS_PMUSERENR_EL0		sys_reg(3, 3, 9, 14, 0)
-+#define SYS_PMOVSSET_EL0		sys_reg(3, 3, 9, 14, 3)
-+
  #define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
  
-+#define __PMEV_op2(n)			((n) & 0x7)
-+#define __CNTR_CRm(n)			(0x8 | (((n) >> 3) & 0x3))
-+#define SYS_PMEVCNTRn_EL0(n)		sys_reg(3, 3, 14, __CNTR_CRm(n), __PMEV_op2(n))
-+#define __TYPER_CRm(n)			(0xc | (((n) >> 3) & 0x3))
-+#define SYS_PMEVTYPERn_EL0(n)		sys_reg(3, 3, 14, __TYPER_CRm(n), __PMEV_op2(n))
++#define SYS_CNTP_TVAL_EL0		sys_reg(3, 3, 14, 2, 0)
++#define SYS_CNTP_CTL_EL0		sys_reg(3, 3, 14, 2, 1)
++#define SYS_CNTP_CVAL_EL0		sys_reg(3, 3, 14, 2, 2)
 +
-+#define SYS_PMCCFILTR_EL0		sys_reg (3, 3, 14, 15, 7)
-+
- /* Common SCTLR_ELx flags. */
- #define SCTLR_ELx_EE    (1 << 25)
- #define SCTLR_ELx_I	(1 << 12)
+ #define __PMEV_op2(n)			((n) & 0x7)
+ #define __CNTR_CRm(n)			(0x8 | (((n) >> 3) & 0x3))
+ #define SYS_PMEVCNTRn_EL0(n)		sys_reg(3, 3, 14, __CNTR_CRm(n), __PMEV_op2(n))
 -- 
 2.9.0
