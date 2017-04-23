@@ -1,355 +1,169 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:27 +0200
-Subject: [PULL 17/79] KVM: arm/arm64: vgic: Defer touching GICH_VMCR to
- vcpu_load/put
+Date: Sun, 23 Apr 2017 19:08:34 +0200
+Subject: [PULL 24/79] KVM: arm/arm64: vgic: Implement early VGIC init
+ functionality
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-18-cdall@linaro.org>
+Message-ID: <20170423170929.27334-25-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <cdall@cs.columbia.edu>
+Implement early initialization for both the distributor and the CPU
+interfaces.  The basic idea is that even though the VGIC is not
+functional or not requested from user space, the critical path of the
+run loop can still call VGIC functions that just won't do anything,
+without them having to check additional initialization flags to ensure
+they don't look at uninitialized data structures.
 
-We don't have to save/restore the VMCR on every entry to/from the guest,
-since on GICv2 we can access the control interface from EL1 and on VHE
-systems with GICv3 we can access the control interface from KVM running
-in EL2.
-
-GICv3 systems without VHE becomes the rare case, which has to
-save/restore the register on each round trip.
-
-Note that userspace accesses may see out-of-date values if the VCPU is
-running while accessing the VGIC state via the KVM device API, but this
-is already the case and it is up to userspace to quiesce the CPUs before
-reading the CPU registers from the GIC for an up-to-date view.
-
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm/include/asm/kvm_asm.h   |  3 +++
- arch/arm/kvm/arm.c               | 11 ++++++-----
- arch/arm64/include/asm/kvm_asm.h |  2 ++
- include/kvm/arm_vgic.h           |  3 +++
- virt/kvm/arm/hyp/vgic-v2-sr.c    |  3 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c    | 14 ++++++++++----
- virt/kvm/arm/vgic/vgic-init.c    | 12 ++++++++++++
- virt/kvm/arm/vgic/vgic-v2.c      | 24 ++++++++++++++++++++++--
- virt/kvm/arm/vgic/vgic-v3.c      | 22 ++++++++++++++++++++--
- virt/kvm/arm/vgic/vgic.c         | 22 ++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h         |  6 ++++++
- 11 files changed, 106 insertions(+), 16 deletions(-)
+ virt/kvm/arm/vgic/vgic-init.c | 96 +++++++++++++++++++++++++------------------
+ 1 file changed, 56 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 8ef0538..dd16044 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -75,7 +75,10 @@ extern void __init_stage2_translation(void);
- extern void __kvm_hyp_reset(unsigned long);
- 
- extern u64 __vgic_v3_get_ich_vtr_el2(void);
-+extern u64 __vgic_v3_read_vmcr(void);
-+extern void __vgic_v3_write_vmcr(u32 vmcr);
- extern void __vgic_v3_init_lrs(void);
-+
- #endif
- 
- #endif /* __ARM_KVM_ASM_H__ */
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 96dba7c..46fd375 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -351,15 +351,14 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
- 	vcpu->arch.host_cpu_context = this_cpu_ptr(kvm_host_cpu_state);
- 
- 	kvm_arm_set_running_vcpu(vcpu);
-+
-+	kvm_vgic_load(vcpu);
- }
- 
- void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- {
--	/*
--	 * The arch-generic KVM code expects the cpu field of a vcpu to be -1
--	 * if the vcpu is no longer assigned to a cpu.  This is used for the
--	 * optimized make_all_cpus_request path.
--	 */
-+	kvm_vgic_put(vcpu);
-+
- 	vcpu->cpu = -1;
- 
- 	kvm_arm_set_running_vcpu(NULL);
-@@ -633,7 +632,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		 * non-preemptible context.
- 		 */
- 		preempt_disable();
-+
- 		kvm_pmu_flush_hwstate(vcpu);
-+
- 		kvm_timer_flush_hwstate(vcpu);
- 		kvm_vgic_flush_hwstate(vcpu);
- 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index ec3553eb..49f99cd 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -59,6 +59,8 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
- extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
- 
- extern u64 __vgic_v3_get_ich_vtr_el2(void);
-+extern u64 __vgic_v3_read_vmcr(void);
-+extern void __vgic_v3_write_vmcr(u32 vmcr);
- extern void __vgic_v3_init_lrs(void);
- 
- extern u32 __kvm_get_mdcr_el2(void);
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index b72dd2a..f7a2e31 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -306,6 +306,9 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
- 
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
- 
-+void kvm_vgic_load(struct kvm_vcpu *vcpu);
-+void kvm_vgic_put(struct kvm_vcpu *vcpu);
-+
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
- #define vgic_initialized(k)	((k)->arch.vgic.initialized)
- #define vgic_ready(k)		((k)->arch.vgic.ready)
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index c8aeb7b..d3d3b9b 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -114,8 +114,6 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- 	if (!base)
- 		return;
- 
--	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
--
- 	if (vcpu->arch.vgic_cpu.live_lrs) {
- 		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
- 
-@@ -165,7 +163,6 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
- 		}
- 	}
- 
--	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
- 	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
- }
- 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 3947095..e51ee7e 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -159,8 +159,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 	if (!cpu_if->vgic_sre)
- 		dsb(st);
- 
--	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
--
- 	if (vcpu->arch.vgic_cpu.live_lrs) {
- 		int i;
- 		u32 max_lr_idx, nr_pri_bits;
-@@ -261,8 +259,6 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 			live_lrs |= (1 << i);
- 	}
- 
--	write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
--
- 	if (live_lrs) {
- 		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
- 
-@@ -326,3 +322,13 @@ u64 __hyp_text __vgic_v3_get_ich_vtr_el2(void)
- {
- 	return read_gicreg(ICH_VTR_EL2);
- }
-+
-+u64 __hyp_text __vgic_v3_read_vmcr(void)
-+{
-+	return read_gicreg(ICH_VMCR_EL2);
-+}
-+
-+void __hyp_text __vgic_v3_write_vmcr(u32 vmcr)
-+{
-+	write_gicreg(vmcr, ICH_VMCR_EL2);
-+}
 diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 276139a..e8e973b 100644
+index e8e973b..87de048 100644
 --- a/virt/kvm/arm/vgic/vgic-init.c
 +++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -262,6 +262,18 @@ int vgic_init(struct kvm *kvm)
- 	vgic_debug_init(kvm);
+@@ -24,7 +24,12 @@
  
- 	dist->initialized = true;
+ /*
+  * Initialization rules: there are multiple stages to the vgic
+- * initialization, both for the distributor and the CPU interfaces.
++ * initialization, both for the distributor and the CPU interfaces.  The basic
++ * idea is that even though the VGIC is not functional or not requested from
++ * user space, the critical path of the run loop can still call VGIC functions
++ * that just won't do anything, without them having to check additional
++ * initialization flags to ensure they don't look at uninitialized data
++ * structures.
+  *
+  * Distributor:
+  *
+@@ -39,23 +44,67 @@
+  *
+  * CPU Interface:
+  *
+- * - kvm_vgic_cpu_early_init(): initialization of static data that
++ * - kvm_vgic_vcpu_early_init(): initialization of static data that
+  *   doesn't depend on any sizing information or emulation type. No
+  *   allocation is allowed there.
+  */
+ 
+ /* EARLY INIT */
+ 
+-/*
+- * Those 2 functions should not be needed anymore but they
+- * still are called from arm.c
++/**
++ * kvm_vgic_early_init() - Initialize static VGIC VCPU data structures
++ * @kvm: The VM whose VGIC districutor should be initialized
++ *
++ * Only do initialization of static structures that don't require any
++ * allocation or sizing information from userspace.  vgic_init() called
++ * kvm_vgic_dist_init() which takes care of the rest.
+  */
+ void kvm_vgic_early_init(struct kvm *kvm)
+ {
++	struct vgic_dist *dist = &kvm->arch.vgic;
++
++	INIT_LIST_HEAD(&dist->lpi_list_head);
++	spin_lock_init(&dist->lpi_list_lock);
+ }
+ 
++/**
++ * kvm_vgic_vcpu_early_init() - Initialize static VGIC VCPU data structures
++ * @vcpu: The VCPU whose VGIC data structures whould be initialized
++ *
++ * Only do initialization, but do not actually enable the VGIC CPU interface
++ * yet.
++ */
+ void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
+ {
++	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	int i;
++
++	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
++	spin_lock_init(&vgic_cpu->ap_list_lock);
 +
 +	/*
-+	 * If we're initializing GICv2 on-demand when first running the VCPU
-+	 * then we need to load the VGIC state onto the CPU.  We can detect
-+	 * this easily by checking if we are in between vcpu_load and vcpu_put
-+	 * when we just initialized the VGIC.
++	 * Enable and configure all SGIs to be edge-triggered and
++	 * configure all PPIs as level-triggered.
 +	 */
-+	preempt_disable();
-+	vcpu = kvm_arm_get_running_vcpu();
-+	if (vcpu)
-+		kvm_vgic_load(vcpu);
-+	preempt_enable();
- out:
- 	return ret;
- }
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index b834ecd..2f241e0 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -184,6 +184,7 @@ void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr)
- 
- void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- {
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
- 	u32 vmcr;
- 
- 	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
-@@ -194,12 +195,15 @@ void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) &
- 		GICH_VMCR_PRIMASK_MASK;
- 
--	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
-+	cpu_if->vgic_vmcr = vmcr;
++	for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
++		struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
++
++		INIT_LIST_HEAD(&irq->ap_list);
++		spin_lock_init(&irq->irq_lock);
++		irq->intid = i;
++		irq->vcpu = NULL;
++		irq->target_vcpu = vcpu;
++		irq->targets = 1U << vcpu->vcpu_id;
++		kref_init(&irq->refcount);
++		if (vgic_irq_is_sgi(i)) {
++			/* SGIs */
++			irq->enabled = 1;
++			irq->config = VGIC_CONFIG_EDGE;
++		} else {
++			/* PPIs */
++			irq->config = VGIC_CONFIG_LEVEL;
++		}
++	}
  }
  
- void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- {
--	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	u32 vmcr;
-+
-+	vmcr = cpu_if->vgic_vmcr;
+ /* CREATION */
+@@ -148,9 +197,6 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
+ 	struct kvm_vcpu *vcpu0 = kvm_get_vcpu(kvm, 0);
+ 	int i;
  
- 	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >>
- 			GICH_VMCR_CTRL_SHIFT;
-@@ -375,3 +379,19 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
- 
- 	return ret;
- }
-+
-+void vgic_v2_load(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
-+
-+	writel_relaxed(cpu_if->vgic_vmcr, vgic->vctrl_base + GICH_VMCR);
-+}
-+
-+void vgic_v2_put(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
-+
-+	cpu_if->vgic_vmcr = readl_relaxed(vgic->vctrl_base + GICH_VMCR);
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index be0f4c3..99213d7 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -173,6 +173,7 @@ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
- 
- void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- {
-+	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
- 	u32 vmcr;
- 
- 	/*
-@@ -188,12 +189,15 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vmcr |= (vmcrp->grpen0 << ICH_VMCR_ENG0_SHIFT) & ICH_VMCR_ENG0_MASK;
- 	vmcr |= (vmcrp->grpen1 << ICH_VMCR_ENG1_SHIFT) & ICH_VMCR_ENG1_MASK;
- 
--	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = vmcr;
-+	cpu_if->vgic_vmcr = vmcr;
+-	INIT_LIST_HEAD(&dist->lpi_list_head);
+-	spin_lock_init(&dist->lpi_list_lock);
+-
+ 	dist->spis = kcalloc(nr_spis, sizeof(struct vgic_irq), GFP_KERNEL);
+ 	if (!dist->spis)
+ 		return  -ENOMEM;
+@@ -181,41 +227,11 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
  }
  
- void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+ /**
+- * kvm_vgic_vcpu_init: initialize the vcpu data structures and
+- * enable the VCPU interface
+- * @vcpu: the VCPU which's VGIC should be initialized
++ * kvm_vgic_vcpu_init() - Enable the VCPU interface
++ * @vcpu: the VCPU which's VGIC should be enabled
+  */
+ static void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
  {
--	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr;
-+	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+	u32 vmcr;
-+
-+	vmcr = cpu_if->vgic_vmcr;
- 
- 	/*
- 	 * Ignore the FIQen bit, because GIC emulation always implies
-@@ -386,3 +390,17 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
- 
- 	return 0;
- }
-+
-+void vgic_v3_load(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+
-+	kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
-+}
-+
-+void vgic_v3_put(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+
-+	cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
-+}
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 654dfd4..2ac0def 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -656,6 +656,28 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
- }
- 
-+void kvm_vgic_load(struct kvm_vcpu *vcpu)
-+{
-+	if (unlikely(!vgic_initialized(vcpu->kvm)))
-+		return;
-+
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_load(vcpu);
-+	else
-+		vgic_v3_load(vcpu);
-+}
-+
-+void kvm_vgic_put(struct kvm_vcpu *vcpu)
-+{
-+	if (unlikely(!vgic_initialized(vcpu->kvm)))
-+		return;
-+
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_put(vcpu);
-+	else
-+		vgic_v3_put(vcpu);
-+}
-+
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index db28f7c..9afb455 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -130,6 +130,9 @@ int vgic_v2_map_resources(struct kvm *kvm);
- int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
- 			     enum vgic_type);
- 
-+void vgic_v2_load(struct kvm_vcpu *vcpu);
-+void vgic_v2_put(struct kvm_vcpu *vcpu);
-+
- static inline void vgic_get_irq_kref(struct vgic_irq *irq)
- {
- 	if (irq->intid < VGIC_MIN_LPI)
-@@ -150,6 +153,9 @@ int vgic_v3_probe(const struct gic_kvm_info *info);
- int vgic_v3_map_resources(struct kvm *kvm);
- int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
- 
-+void vgic_v3_load(struct kvm_vcpu *vcpu);
-+void vgic_v3_put(struct kvm_vcpu *vcpu);
-+
- int vgic_register_its_iodevs(struct kvm *kvm);
- bool vgic_has_its(struct kvm *kvm);
- int kvm_vgic_register_its_device(void);
+-	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+-	int i;
+-
+-	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+-	spin_lock_init(&vgic_cpu->ap_list_lock);
+-
+-	/*
+-	 * Enable and configure all SGIs to be edge-triggered and
+-	 * configure all PPIs as level-triggered.
+-	 */
+-	for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
+-		struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
+-
+-		INIT_LIST_HEAD(&irq->ap_list);
+-		spin_lock_init(&irq->irq_lock);
+-		irq->intid = i;
+-		irq->vcpu = NULL;
+-		irq->target_vcpu = vcpu;
+-		irq->targets = 1U << vcpu->vcpu_id;
+-		kref_init(&irq->refcount);
+-		if (vgic_irq_is_sgi(i)) {
+-			/* SGIs */
+-			irq->enabled = 1;
+-			irq->config = VGIC_CONFIG_EDGE;
+-		} else {
+-			/* PPIs */
+-			irq->config = VGIC_CONFIG_LEVEL;
+-		}
+-	}
+ 	if (kvm_vgic_global_state.type == VGIC_V2)
+ 		vgic_v2_enable(vcpu);
+ 	else
 -- 
 2.9.0
