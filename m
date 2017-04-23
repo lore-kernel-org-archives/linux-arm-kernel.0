@@ -1,69 +1,52 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:47 +0200
-Subject: [PULL 37/79] arm64: KVM: Move lr save/restore to do_el2_call
+Date: Sun, 23 Apr 2017 19:08:45 +0200
+Subject: [PULL 35/79] arm: KVM: Treat CP15 accessors returning false as
+ successful
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-38-cdall@linaro.org>
+Message-ID: <20170423170929.27334-36-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-At the moment, we only save/restore lr if on VHE, as we rely only
-the EL1 code to have preserved it in the non-VHE case.
+Instead of considering that a CP15 accessor has failed when
+returning false, let's consider that it is *always* successful
+(after all, we won't stand for an incomplete emulation).
 
-As we're about to get rid of the latter, let's move the save/restore
-code to the do_el2_call macro, unifying both code paths.
+The return value now simply indicates whether we should skip
+the instruction (because it has now been emulated), or if we
+should leave the PC alone if the emulation has injected an
+exception.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm64/kvm/hyp.S           | 3 ---
- arch/arm64/kvm/hyp/hyp-entry.S | 4 ++--
- 2 files changed, 2 insertions(+), 5 deletions(-)
+ arch/arm/kvm/coproc.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 2726635..f6f20b5 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -38,13 +38,10 @@
-  * A function pointer with a value less than 0xfff has a special meaning,
-  * and is used to implement __hyp_get_vectors in the same way as in
-  * arch/arm64/kernel/hyp_stub.S.
-- * HVC behaves as a 'bl' call and will clobber lr.
-  */
- ENTRY(__kvm_call_hyp)
- alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
--	str     lr, [sp, #-16]!
- 	hvc	#0
--	ldr     lr, [sp], #16
- 	ret
- alternative_else_nop_endif
- 	b	__vhe_hyp_call
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 5e9052f..d8ef788 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -32,17 +32,17 @@
- 	 * Shuffle the parameters before calling the function
- 	 * pointed to in x0. Assumes parameters in x[1,2,3].
- 	 */
-+	str	lr, [sp, #-16]!
- 	mov	lr, x0
- 	mov	x0, x1
- 	mov	x1, x2
- 	mov	x2, x3
- 	blr	lr
-+	ldr	lr, [sp], #16
- .endm
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index 519aac1..2c14b69 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -520,15 +520,15 @@ static int emulate_cp15(struct kvm_vcpu *vcpu,
+ 		if (likely(r->access(vcpu, params, r))) {
+ 			/* Skip instruction, since it was emulated */
+ 			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+-			return 1;
+ 		}
+-		/* If access function fails, it should complain. */
+ 	} else {
++		/* If access function fails, it should complain. */
+ 		kvm_err("Unsupported guest CP15 access at: %08lx\n",
+ 			*vcpu_pc(vcpu));
+ 		print_cp_instr(params);
++		kvm_inject_undefined(vcpu);
+ 	}
+-	kvm_inject_undefined(vcpu);
++
+ 	return 1;
+ }
  
- ENTRY(__vhe_hyp_call)
--	str	lr, [sp, #-16]!
- 	do_el2_call
--	ldr	lr, [sp], #16
- 	/*
- 	 * We used to rely on having an exception return to get
- 	 * an implicit isb. In the E2H case, we don't have it anymore.
 -- 
 2.9.0
