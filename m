@@ -1,108 +1,66 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:42 +0200
-Subject: [PULL 32/79] arm64: KVM: Treat sysreg accessors returning false as
- successful
+Date: Sun, 23 Apr 2017 19:08:49 +0200
+Subject: [PULL 39/79] arm64: hyp-stub: Define a return value for failed stub
+ calls
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-33-cdall@linaro.org>
+Message-ID: <20170423170929.27334-40-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Instead of considering that a sysreg accessor has failed when
-returning false, let's consider that it is *always* successful
-(after all, we won't stand for an incomplete emulation).
+Define a standard return value to be returned when a hyp stub
+call fails, and make KVM use it for ARM_EXCEPTION_HYP_GONE
+(instead of using a KVM-specific value).
 
-The return value now simply indicates whether we should skip
-the instruction (because it has now been emulated), or if we
-should leave the PC alone if the emulation has injected an
-exception.
-
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 49 +++++++++++++++++++----------------------------
- 1 file changed, 20 insertions(+), 29 deletions(-)
+ arch/arm64/include/asm/kvm_asm.h | 2 +-
+ arch/arm64/include/asm/virt.h    | 3 +++
+ arch/arm64/kernel/hyp-stub.S     | 2 +-
+ 3 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 3fef01d..2f4418e 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1571,6 +1571,22 @@ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	return 1;
- }
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 49f99cd..b7e4ef5 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -28,7 +28,7 @@
+ #define ARM_EXCEPTION_EL1_SERROR  1
+ #define ARM_EXCEPTION_TRAP	  2
+ /* The hyp-stub will return this for any kvm_call_hyp() call */
+-#define ARM_EXCEPTION_HYP_GONE	  3
++#define ARM_EXCEPTION_HYP_GONE	  HVC_STUB_ERR
  
-+static void perform_access(struct kvm_vcpu *vcpu,
-+			   struct sys_reg_params *params,
-+			   const struct sys_reg_desc *r)
-+{
-+	/*
-+	 * Not having an accessor means that we have configured a trap
-+	 * that we don't know how to handle. This certainly qualifies
-+	 * as a gross bug that should be fixed right away.
-+	 */
-+	BUG_ON(!r->access);
+ #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
+ #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 439f6b5..1466d14 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -39,6 +39,9 @@
+  */
+ #define HVC_SOFT_RESTART 2
+ 
++/* Error returned when an invalid stub number is passed into x0 */
++#define HVC_STUB_ERR	0xbadca11
 +
-+	/* Skip instruction if instructed so */
-+	if (likely(r->access(vcpu, params, r)))
-+		kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-+}
-+
- /*
-  * emulate_cp --  tries to match a sys_reg access in a handling table, and
-  *                call the corresponding trap handler.
-@@ -1594,20 +1610,8 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
- 	r = find_reg(params, table, num);
+ #define BOOT_CPU_MODE_EL1	(0xe11)
+ #define BOOT_CPU_MODE_EL2	(0xe12)
  
- 	if (r) {
--		/*
--		 * Not having an accessor means that we have
--		 * configured a trap that we don't know how to
--		 * handle. This certainly qualifies as a gross bug
--		 * that should be fixed right away.
--		 */
--		BUG_ON(!r->access);
--
--		if (likely(r->access(vcpu, params, r))) {
--			/* Skip instruction, since it was emulated */
--			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
--			/* Handled */
--			return 0;
--		}
-+		perform_access(vcpu, params, r);
-+		return 0;
- 	}
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index 193dfb2..f53e8b8 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -74,7 +74,7 @@ el1_sync:
+ 	br	x4				// no return
  
- 	/* Not handled */
-@@ -1777,26 +1781,13 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
- 		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+ 	/* Someone called kvm_call_hyp() against the hyp-stub... */
+-3:	mov	x0, #ARM_EXCEPTION_HYP_GONE
++3:	ldr	x0, =HVC_STUB_ERR
  
- 	if (likely(r)) {
--		/*
--		 * Not having an accessor means that we have
--		 * configured a trap that we don't know how to
--		 * handle. This certainly qualifies as a gross bug
--		 * that should be fixed right away.
--		 */
--		BUG_ON(!r->access);
--
--		if (likely(r->access(vcpu, params, r))) {
--			/* Skip instruction, since it was emulated */
--			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
--			return 1;
--		}
--		/* If access function fails, it should complain. */
-+		perform_access(vcpu, params, r);
- 	} else {
- 		kvm_err("Unsupported guest sys_reg access at: %lx\n",
- 			*vcpu_pc(vcpu));
- 		print_sys_reg_instr(params);
-+		kvm_inject_undefined(vcpu);
- 	}
--	kvm_inject_undefined(vcpu);
- 	return 1;
- }
- 
+ 9:	eret
+ ENDPROC(el1_sync)
 -- 
 2.9.0
