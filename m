@@ -1,69 +1,59 @@
-From: jiajie.hao@mediatek.com (Jiajie Hao)
-Date: Sun, 23 Apr 2017 17:38:27 +0800
-Subject: [PATCH v2] mmc: sdio: Fix sdio wait busy implement limitation
-Message-ID: <1492940307-20785-1-git-send-email-jiajie.hao@mediatek.com>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Sun, 23 Apr 2017 11:59:05 +0200
+Subject: [PATCH 1/2] dmaengine: s3c24xx: Use devm_kcalloc() in
+ s3c24xx_dma_probe()
+In-Reply-To: <9c10b823-f49b-8c73-2bf8-0fd2b0ba0231@users.sourceforge.net>
+References: <930f0a6c-bc5c-3d01-6814-563780fc90ef@users.sourceforge.net>
+ <9c10b823-f49b-8c73-2bf8-0fd2b0ba0231@users.sourceforge.net>
+Message-ID: <f1257887-ca14-6415-b1ff-d57190a1810f@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The host may issue an I/O abort by writing to the CCCR at any time
-during I/O read operation via CMD52. And host may need suspend
-transcation during write busy stage in SDIO suspend/resume scenario.
->From other side, a card may accept CMD52 during data transfer phase.
+Hello Markus,
 
-Previous implement would block issuing above command in busy stage.
-It cause function driver can't implement as proper way and has no
-opportunity to do some coverage in error case via I/O abort etc.
 
-We need bypass some necessary operation during busy check stage.
+SF Markus Elfring wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Sat, 22 Apr 2017 23:00:23 +0200
+> 
+> * A multiplication for the size determination of a memory allocation
+>   indicated that an array data structure should be processed.
+>   Thus use the corresponding function "devm_kcalloc".
+I have trouble parsing that sentences. This looks like the typical
+approach of native german speakers to directly transfer sentence
+constructions from German to English. Which, in most cases, doesn't work
+or is just plain confusing.
 
-Signed-off-by: Jiajie Hao <jiajie.hao@mediatek.com>
----
-Changes since v1:(https://lkml.org/lkml/2017/4/17/69)
-    * extend orignal interface to cover necessary cases.
-    * rename mmc_is_io_op() to sdio_is_op_busy() for matching it's meaning.
+With best wishes,
+Tobias
 
----
- drivers/mmc/core/core.c     |    4 +++-
- drivers/mmc/core/sdio_ops.h |   10 ++++++++--
- 2 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 926e0fd..2ae83a7 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -234,8 +234,10 @@ static void __mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
- 	/*
- 	 * For sdio rw commands we must wait for card busy otherwise some
- 	 * sdio devices won't work properly.
-+	 * And bypass I/O abort, reset and bus suspend operations.
- 	 */
--	if (mmc_is_io_op(mrq->cmd->opcode) && host->ops->card_busy) {
-+	if (sdio_is_io_busy(mrq->cmd->opcode, mrq->cmd->arg) &&
-+	    host->ops->card_busy) {
- 		int tries = 500; /* Wait aprox 500ms at maximum */
- 
- 		while (host->ops->card_busy(host) && --tries)
-diff --git a/drivers/mmc/core/sdio_ops.h b/drivers/mmc/core/sdio_ops.h
-index bed8a83..ee35cb4 100644
---- a/drivers/mmc/core/sdio_ops.h
-+++ b/drivers/mmc/core/sdio_ops.h
-@@ -26,9 +26,15 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
- int sdio_reset(struct mmc_host *host);
- unsigned int mmc_align_data_size(struct mmc_card *card, unsigned int sz);
- 
--static inline bool mmc_is_io_op(u32 opcode)
-+static inline bool sdio_is_io_busy(u32 opcode, u32 arg)
- {
--	return opcode == SD_IO_RW_DIRECT || opcode == SD_IO_RW_EXTENDED;
-+	u32 addr;
-+
-+	addr = (arg >> 9) & 0x1FFFF;
-+
-+	return (opcode == SD_IO_RW_EXTENDED ||
-+		(opcode == SD_IO_RW_DIRECT &&
-+		!(addr == SDIO_CCCR_ABORT || addr == SDIO_CCCR_SUSPEND)));
- }
- 
- #endif
--- 
-1.7.9.5
+> * Replace the specification of a data structure by a pointer dereference
+>   to make the corresponding size determination a bit safer according to
+>   the Linux coding style convention.
+> 
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> ---
+>  drivers/dma/s3c24xx-dma.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/dma/s3c24xx-dma.c b/drivers/dma/s3c24xx-dma.c
+> index f04c4702d98b..967229829683 100644
+> --- a/drivers/dma/s3c24xx-dma.c
+> +++ b/drivers/dma/s3c24xx-dma.c
+> @@ -1216,10 +1216,10 @@ static int s3c24xx_dma_probe(struct platform_device *pdev)
+>  	if (IS_ERR(s3cdma->base))
+>  		return PTR_ERR(s3cdma->base);
+>  
+> -	s3cdma->phy_chans = devm_kzalloc(&pdev->dev,
+> -					      sizeof(struct s3c24xx_dma_phy) *
+> -							pdata->num_phy_channels,
+> -					      GFP_KERNEL);
+> +	s3cdma->phy_chans = devm_kcalloc(&pdev->dev,
+> +					 pdata->num_phy_channels,
+> +					 sizeof(*s3cdma->phy_chans),
+> +					 GFP_KERNEL);
+>  	if (!s3cdma->phy_chans)
+>  		return -ENOMEM;
+>  
+> 
