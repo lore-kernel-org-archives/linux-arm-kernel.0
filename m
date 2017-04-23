@@ -1,78 +1,61 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:09:07 +0200
-Subject: [PULL 57/79] ARM: KVM: Allow the main HYP code to use the init hyp
- stub implementation
+Date: Sun, 23 Apr 2017 19:09:10 +0200
+Subject: [PULL 60/79] ARM: KVM: Gracefully handle hyp-stubs being restored
+ from under our feet
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-58-cdall@linaro.org>
+Message-ID: <20170423170929.27334-61-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-We now have a full hyp-stub implementation in the KVM init code,
-but the main KVM code only supports HVC_GET_VECTORS, which is not
-enough.
+Should kvm_reboot() be invoked while guest is running, an IPI
+wil be issued, forcing the guest to exit and HYP being reset to
+the stubs. We will then try to reenter the guest, only to get
+an error (HVC_STUB_ERR).
 
-Instead of reinventing the wheel, let's reuse the init implementation
-by branching to the idmap page when called with a hyp-stub hypercall.
+This patch allows this case to be gracefully handled by exiting
+the run loop.
 
-Tested-by: Keerthy <j-keerthy@ti.com>
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm/kvm/hyp/hyp-entry.S | 29 ++++++++++++++++++++++++-----
- 1 file changed, 24 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/kvm_asm.h | 2 +-
+ arch/arm/kvm/handle_exit.c     | 8 ++++++++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index 1f8db7d..a35baa8 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -126,11 +126,30 @@ hyp_hvc:
- 	 */
- 	pop	{r0, r1, r2}
- 
--	/* Check for __hyp_get_vectors */
--	cmp	r0, #HVC_GET_VECTORS
--	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
--	beq	1f
-+	/*
-+	 * Check if we have a kernel function, which is guaranteed to be
-+	 * bigger than the maximum hyp stub hypercall
-+	 */
-+	cmp	r0, #HVC_STUB_HCALL_NR
-+	bhs	1f
- 
-+	/*
-+	 * Not a kernel function, treat it as a stub hypercall.
-+	 * Compute the physical address for __kvm_handle_stub_hvc
-+	 * (as the code lives in the idmaped page) and branch there.
-+	 * We hijack ip (r12) as a tmp register.
-+	 */
-+	push	{r1}
-+	ldr	r1, =kimage_voffset
-+	ldr	r1, [r1]
-+	ldr	ip, =__kvm_handle_stub_hvc
-+	sub	ip, ip, r1
-+THUMB(	add	ip, ip, #1)
-+	pop	{r1}
-+
-+	bx	ip
-+
-+1:
- 	push	{lr}
- 
- 	mov	lr, r0
-@@ -142,7 +161,7 @@ THUMB(	orr	lr, #1)
- 	blx	lr			@ Call the HYP function
- 
- 	pop	{lr}
--1:	eret
-+	eret
- 
- guest_trap:
- 	load_vcpu r0			@ Load VCPU pointer to r0
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index eae11b3..14d68a4 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -33,7 +33,7 @@
+ #define ARM_EXCEPTION_IRQ	  5
+ #define ARM_EXCEPTION_FIQ	  6
+ #define ARM_EXCEPTION_HVC	  7
+-
++#define ARM_EXCEPTION_HYP_GONE	  HVC_STUB_ERR
+ /*
+  * The rr_lo_hi macro swaps a pair of registers depending on
+  * current endianness. It is used in conjunction with ldrd and strd
+diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+index 96af65a..5fd7968 100644
+--- a/arch/arm/kvm/handle_exit.c
++++ b/arch/arm/kvm/handle_exit.c
+@@ -160,6 +160,14 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	case ARM_EXCEPTION_DATA_ABORT:
+ 		kvm_inject_vabt(vcpu);
+ 		return 1;
++	case ARM_EXCEPTION_HYP_GONE:
++		/*
++		 * HYP has been reset to the hyp-stub. This happens
++		 * when a guest is pre-empted by kvm_reboot()'s
++		 * shutdown call.
++		 */
++		run->exit_reason = KVM_EXIT_FAIL_ENTRY;
++		return 0;
+ 	default:
+ 		kvm_pr_unimpl("Unsupported exception type: %d",
+ 			      exception_index);
 -- 
 2.9.0
