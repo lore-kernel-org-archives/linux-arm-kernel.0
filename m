@@ -1,80 +1,77 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:40 +0200
-Subject: [PULL 30/79] arm64: KVM: Make unexpected reads from WO registers
- inject an undef
+Date: Sun, 23 Apr 2017 19:08:37 +0200
+Subject: [PULL 27/79] arm64: KVM: PMU: Refactor pmu_*_el0_disabled
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-31-cdall@linaro.org>
+Message-ID: <20170423170929.27334-28-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Reads from write-only system registers are generally confined to
-EL1 and not propagated to EL2 (that's what the architecture
-mantates). In order to be sure that we have a sane behaviour
-even in the unlikely event that we have a broken system, we still
-handle it in KVM.
+There is a lot of duplication in the pmu_*_el0_disabled helpers,
+and as we're going to modify them shortly, let's move all the
+common stuff in a single function.
 
-In that case, let's inject an undef into the guest.
-
-Let's also remove write_to_read_only which isn't used anywhere.
+No functional change.
 
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c |  9 +++++++++
- arch/arm64/kvm/sys_regs.h | 18 ------------------
- 2 files changed, 9 insertions(+), 18 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 25 +++++++++++--------------
+ 1 file changed, 11 insertions(+), 14 deletions(-)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index d343c0f..20f90c0 100644
+index 0e26f8c..036efc97 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -55,6 +55,15 @@
-  * 64bit interface.
-  */
- 
-+static bool read_from_write_only(struct kvm_vcpu *vcpu,
-+				 const struct sys_reg_params *params)
-+{
-+	WARN_ONCE(1, "Unexpected sys_reg read to write-only register\n");
-+	print_sys_reg_instr(params);
-+	kvm_inject_undefined(vcpu);
-+	return false;
-+}
-+
- /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
- static u32 cache_levels;
- 
-diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-index 9c6ffd0..638f724 100644
---- a/arch/arm64/kvm/sys_regs.h
-+++ b/arch/arm64/kvm/sys_regs.h
-@@ -83,24 +83,6 @@ static inline bool read_zero(struct kvm_vcpu *vcpu,
- 	return true;
+@@ -460,35 +460,32 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+ 	vcpu_sys_reg(vcpu, PMCR_EL0) = val;
  }
  
--static inline bool write_to_read_only(struct kvm_vcpu *vcpu,
--				      const struct sys_reg_params *params)
--{
--	kvm_debug("sys_reg write to read-only register at: %lx\n",
--		  *vcpu_pc(vcpu));
--	print_sys_reg_instr(params);
--	return false;
--}
+-static bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
++static bool check_pmu_access_disabled(struct kvm_vcpu *vcpu, u64 flags)
+ {
+ 	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
++	bool enabled = (reg & flags) || vcpu_mode_priv(vcpu);
+ 
+-	return !((reg & ARMV8_PMU_USERENR_EN) || vcpu_mode_priv(vcpu));
++	return !enabled;
+ }
+ 
+-static bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
++static bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
+ {
+-	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
++	return check_pmu_access_disabled(vcpu, ARMV8_PMU_USERENR_EN);
++}
+ 
+-	return !((reg & (ARMV8_PMU_USERENR_SW | ARMV8_PMU_USERENR_EN))
+-		 || vcpu_mode_priv(vcpu));
++static bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
++{
++	return check_pmu_access_disabled(vcpu, ARMV8_PMU_USERENR_SW | ARMV8_PMU_USERENR_EN);
+ }
+ 
+ static bool pmu_access_cycle_counter_el0_disabled(struct kvm_vcpu *vcpu)
+ {
+-	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
 -
--static inline bool read_from_write_only(struct kvm_vcpu *vcpu,
--					const struct sys_reg_params *params)
--{
--	kvm_debug("sys_reg read to write-only register at: %lx\n",
--		  *vcpu_pc(vcpu));
--	print_sys_reg_instr(params);
--	return false;
--}
+-	return !((reg & (ARMV8_PMU_USERENR_CR | ARMV8_PMU_USERENR_EN))
+-		 || vcpu_mode_priv(vcpu));
++	return check_pmu_access_disabled(vcpu, ARMV8_PMU_USERENR_CR | ARMV8_PMU_USERENR_EN);
+ }
+ 
+ static bool pmu_access_event_counter_el0_disabled(struct kvm_vcpu *vcpu)
+ {
+-	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
 -
- /* Reset functions */
- static inline void reset_unknown(struct kvm_vcpu *vcpu,
- 				 const struct sys_reg_desc *r)
+-	return !((reg & (ARMV8_PMU_USERENR_ER | ARMV8_PMU_USERENR_EN))
+-		 || vcpu_mode_priv(vcpu));
++	return check_pmu_access_disabled(vcpu, ARMV8_PMU_USERENR_ER | ARMV8_PMU_USERENR_EN);
+ }
+ 
+ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 -- 
 2.9.0
