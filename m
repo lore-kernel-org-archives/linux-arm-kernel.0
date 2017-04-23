@@ -1,127 +1,94 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:26 +0200
-Subject: [PULL 16/79] kvm: arm/arm64: Rework gpa callback handlers
+Date: Sun, 23 Apr 2017 19:08:23 +0200
+Subject: [PULL 13/79] KVM: arm64: use common invariant sysreg definitions
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-17-cdall@linaro.org>
+Message-ID: <20170423170929.27334-14-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+From: Mark Rutland <mark.rutland@arm.com>
 
-In order to perform an operation on a gpa range, we currently iterate
-over each page in a user memory slot for the given range. This is
-inefficient while dealing with a big range (e.g, a VMA), especially
-while unmaping a range. At present, with stage2 unmap on a range with
-a hugepage backed region, we clear the PMD when we unmap the first
-page in the loop. The remaining iterations simply traverse the page table
-down to the PMD level only to see that nothing is in there.
+Now that we have common definitions for the register encodings used by
+KVM, make the KVM code uses thse for invariant sysreg definitions. This
+makes said definitions a reasonable amount shorter, especially as many
+comments are rendered redundant and can be removed.
 
-This patch reworks the code to invoke the callback handlers on the
-biggest range possible within the memory slot to to reduce the number of
-times the handler is called.
-
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Cc: kvmarm at lists.cs.columbia.edu
 ---
- arch/arm/kvm/mmu.c | 31 +++++++++++++------------------
- 1 file changed, 13 insertions(+), 18 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 57 ++++++++++++++++-------------------------------
+ 1 file changed, 19 insertions(+), 38 deletions(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 962616f..69554bd 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1512,7 +1512,8 @@ static int handle_hva_to_gpa(struct kvm *kvm,
- 			     unsigned long start,
- 			     unsigned long end,
- 			     int (*handler)(struct kvm *kvm,
--					    gpa_t gpa, void *data),
-+					    gpa_t gpa, u64 size,
-+					    void *data),
- 			     void *data)
- {
- 	struct kvm_memslots *slots;
-@@ -1524,7 +1525,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
- 	/* we only care about the pages that the guest sees */
- 	kvm_for_each_memslot(memslot, slots) {
- 		unsigned long hva_start, hva_end;
--		gfn_t gfn, gfn_end;
-+		gfn_t gpa;
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 860707f..e637e1d 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1857,44 +1857,25 @@ FUNCTION_INVARIANT(aidr_el1)
  
- 		hva_start = max(start, memslot->userspace_addr);
- 		hva_end = min(end, memslot->userspace_addr +
-@@ -1532,25 +1533,16 @@ static int handle_hva_to_gpa(struct kvm *kvm,
- 		if (hva_start >= hva_end)
- 			continue;
+ /* ->val is filled in by kvm_sys_reg_table_init() */
+ static struct sys_reg_desc invariant_sys_regs[] = {
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b000),
+-	  NULL, get_midr_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b110),
+-	  NULL, get_revidr_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b000),
+-	  NULL, get_id_pfr0_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b001),
+-	  NULL, get_id_pfr1_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b010),
+-	  NULL, get_id_dfr0_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b011),
+-	  NULL, get_id_afr0_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b100),
+-	  NULL, get_id_mmfr0_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b101),
+-	  NULL, get_id_mmfr1_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b110),
+-	  NULL, get_id_mmfr2_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b111),
+-	  NULL, get_id_mmfr3_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b000),
+-	  NULL, get_id_isar0_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b001),
+-	  NULL, get_id_isar1_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b010),
+-	  NULL, get_id_isar2_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b011),
+-	  NULL, get_id_isar3_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b100),
+-	  NULL, get_id_isar4_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b101),
+-	  NULL, get_id_isar5_el1 },
+-	{ Op0(0b11), Op1(0b001), CRn(0b0000), CRm(0b0000), Op2(0b001),
+-	  NULL, get_clidr_el1 },
+-	{ Op0(0b11), Op1(0b001), CRn(0b0000), CRm(0b0000), Op2(0b111),
+-	  NULL, get_aidr_el1 },
+-	{ Op0(0b11), Op1(0b011), CRn(0b0000), CRm(0b0000), Op2(0b001),
+-	  NULL, get_ctr_el0 },
++	{ SYS_DESC(SYS_MIDR_EL1), NULL, get_midr_el1 },
++	{ SYS_DESC(SYS_REVIDR_EL1), NULL, get_revidr_el1 },
++	{ SYS_DESC(SYS_ID_PFR0_EL1), NULL, get_id_pfr0_el1 },
++	{ SYS_DESC(SYS_ID_PFR1_EL1), NULL, get_id_pfr1_el1 },
++	{ SYS_DESC(SYS_ID_DFR0_EL1), NULL, get_id_dfr0_el1 },
++	{ SYS_DESC(SYS_ID_AFR0_EL1), NULL, get_id_afr0_el1 },
++	{ SYS_DESC(SYS_ID_MMFR0_EL1), NULL, get_id_mmfr0_el1 },
++	{ SYS_DESC(SYS_ID_MMFR1_EL1), NULL, get_id_mmfr1_el1 },
++	{ SYS_DESC(SYS_ID_MMFR2_EL1), NULL, get_id_mmfr2_el1 },
++	{ SYS_DESC(SYS_ID_MMFR3_EL1), NULL, get_id_mmfr3_el1 },
++	{ SYS_DESC(SYS_ID_ISAR0_EL1), NULL, get_id_isar0_el1 },
++	{ SYS_DESC(SYS_ID_ISAR1_EL1), NULL, get_id_isar1_el1 },
++	{ SYS_DESC(SYS_ID_ISAR2_EL1), NULL, get_id_isar2_el1 },
++	{ SYS_DESC(SYS_ID_ISAR3_EL1), NULL, get_id_isar3_el1 },
++	{ SYS_DESC(SYS_ID_ISAR4_EL1), NULL, get_id_isar4_el1 },
++	{ SYS_DESC(SYS_ID_ISAR5_EL1), NULL, get_id_isar5_el1 },
++	{ SYS_DESC(SYS_CLIDR_EL1), NULL, get_clidr_el1 },
++	{ SYS_DESC(SYS_AIDR_EL1), NULL, get_aidr_el1 },
++	{ SYS_DESC(SYS_CTR_EL0), NULL, get_ctr_el0 },
+ };
  
--		/*
--		 * {gfn(page) | page intersects with [hva_start, hva_end)} =
--		 * {gfn_start, gfn_start+1, ..., gfn_end-1}.
--		 */
--		gfn = hva_to_gfn_memslot(hva_start, memslot);
--		gfn_end = hva_to_gfn_memslot(hva_end + PAGE_SIZE - 1, memslot);
--
--		for (; gfn < gfn_end; ++gfn) {
--			gpa_t gpa = gfn << PAGE_SHIFT;
--			ret |= handler(kvm, gpa, data);
--		}
-+		gpa = hva_to_gfn_memslot(hva_start, memslot) << PAGE_SHIFT;
-+		ret |= handler(kvm, gpa, (u64)(hva_end - hva_start), data);
- 	}
- 
- 	return ret;
- }
- 
--static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
-+static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
- {
--	unmap_stage2_range(kvm, gpa, PAGE_SIZE);
-+	unmap_stage2_range(kvm, gpa, size);
- 	return 0;
- }
- 
-@@ -1577,10 +1569,11 @@ int kvm_unmap_hva_range(struct kvm *kvm,
- 	return 0;
- }
- 
--static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
-+static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
- {
- 	pte_t *pte = (pte_t *)data;
- 
-+	WARN_ON(size != PAGE_SIZE);
- 	/*
- 	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
- 	 * flag clear because MMU notifiers will have unmapped a huge PMD before
-@@ -1606,11 +1599,12 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
- 	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
- }
- 
--static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
-+static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
- {
- 	pmd_t *pmd;
- 	pte_t *pte;
- 
-+	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
- 	pmd = stage2_get_pmd(kvm, NULL, gpa);
- 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
- 		return 0;
-@@ -1625,11 +1619,12 @@ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
- 	return stage2_ptep_test_and_clear_young(pte);
- }
- 
--static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
-+static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
- {
- 	pmd_t *pmd;
- 	pte_t *pte;
- 
-+	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
- 	pmd = stage2_get_pmd(kvm, NULL, gpa);
- 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
- 		return 0;
+ static int reg_from_user(u64 *val, const void __user *uaddr, u64 id)
 -- 
 2.9.0
