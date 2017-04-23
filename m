@@ -1,95 +1,61 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:09:26 +0200
-Subject: [PULL 76/79] KVM: arm/arm64: vgic-v3: De-optimize VMCR save/restore
- when emulating a GICv2
+Date: Sun, 23 Apr 2017 19:09:14 +0200
+Subject: [PULL 64/79] ARM: decompressor: Remove __hyp_get_vectors usage
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-77-cdall@linaro.org>
+Message-ID: <20170423170929.27334-65-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-When emulating a GICv2-on-GICv3, special care must be taken to only
-save/restore VMCR_EL2 when ICC_SRE_EL1.SRE is cleared. Otherwise,
-all Group-0 interrupts end-up being delivered as FIQ, which is
-probably not what the guest expects, as demonstrated here with
-an unhappy EFI:
+When the compressed image needs to be relocated to avoid being
+overwritten by the decompression process, we need to relocate
+the hyp vectors as well so that we can find them once the
+decompression has taken effect.
 
-	FIQ Exception at 0x000000013BD21CC4
+For that, we perform the following calculation:
+	u32 v = __hyp_get_vectors();
+	v += offset;
+	__hyp_set_vectors(v);
 
-This means that we cannot perform the load/put trick when dealing
-with VMCR_EL2 (because the host has SRE set), and we have to deal
-with it in the world-switch.
+But we're guaranteed that the initial value of v as returned by
+__hyp_get_vectors is always __hyp_stub_vectors, because we have
+just set it by calling __hyp_stub_install.
 
-Fortunately, this is not the most common case (modern guests should
-be able to deal with GICv3 directly), and the performance is not worse
-than what it was before the VMCR optimization.
+So let's remove the use of __hyp_get_vectors, and directly use
+__hyp_stub_vectors instead.
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c |  8 ++++++--
- virt/kvm/arm/vgic/vgic-v3.c   | 11 +++++++++--
- 2 files changed, 15 insertions(+), 4 deletions(-)
+ arch/arm/boot/compressed/head.S | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 3d0b1dd..91922c1 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -128,8 +128,10 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 	 * Make sure stores to the GIC via the memory mapped interface
- 	 * are now visible to the system register interface.
- 	 */
--	if (!cpu_if->vgic_sre)
-+	if (!cpu_if->vgic_sre) {
- 		dsb(st);
-+		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
-+	}
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 9150f97..7c711ba 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -422,7 +422,17 @@ dtb_check_done:
+ 		cmp	r0, #HYP_MODE
+ 		bne	1f
  
- 	if (used_lrs) {
- 		int i;
-@@ -205,11 +207,13 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 	 * delivered as a FIQ to the guest, with potentially fatal
- 	 * consequences. So we must make sure that ICC_SRE_EL1 has
- 	 * been actually programmed with the value we want before
--	 * starting to mess with the rest of the GIC.
-+	 * starting to mess with the rest of the GIC, and VMCR_EL2 in
-+	 * particular.
- 	 */
- 	if (!cpu_if->vgic_sre) {
- 		write_gicreg(0, ICC_SRE_EL1);
- 		isb();
-+		write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
- 	}
- 
- 	val = read_gicreg(ICH_VTR_EL2);
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index bc7010d..df15036 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -373,12 +373,19 @@ void vgic_v3_load(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
- 
--	kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
-+	/*
-+	 * If dealing with a GICv2 emulation on GICv3, VMCR_EL2.VFIQen
-+	 * is dependent on ICC_SRE_EL1.SRE, and we have to perform the
-+	 * VMCR_EL2 save/restore in the world switch.
-+	 */
-+	if (likely(cpu_if->vgic_sre))
-+		kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
- }
- 
- void vgic_v3_put(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
- 
--	cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
-+	if (likely(cpu_if->vgic_sre))
-+		cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
- }
+-		bl	__hyp_get_vectors
++		/*
++		 * Compute the address of the hyp vectors after relocation.
++		 * This requires some arithmetic since we cannot directly
++		 * reference __hyp_stub_vectors in a PC-relative way.
++		 * Call __hyp_set_vectors with the new address so that we
++		 * can HVC again after the copy.
++		 */
++0:		adr	r0, 0b
++		movw	r1, #:lower16:__hyp_stub_vectors - 0b
++		movt	r1, #:upper16:__hyp_stub_vectors - 0b
++		add	r0, r0, r1
+ 		sub	r0, r0, r5
+ 		add	r0, r0, r10
+ 		bl	__hyp_set_vectors
 -- 
 2.9.0
