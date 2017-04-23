@@ -1,89 +1,78 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:09:20 +0200
-Subject: [PULL 70/79] KVM: arm/arm64: Cleanup the arch timer code's irqchip
- checking
+Date: Sun, 23 Apr 2017 19:09:07 +0200
+Subject: [PULL 57/79] ARM: KVM: Allow the main HYP code to use the init hyp
+ stub implementation
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-71-cdall@linaro.org>
+Message-ID: <20170423170929.27334-58-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Currently we check if we have an in-kernel irqchip and if the vgic was
-properly implemented several places in the arch timer code.  But, we
-already predicate our enablement of the arm timers on having a valid
-and initialized gic, so we can simply check if the timers are enabled or
-not.
+We now have a full hyp-stub implementation in the KVM init code,
+but the main KVM code only supports HVC_GET_VECTORS, which is not
+enough.
 
-This also gets rid of the ugly "error that's not an error but used to
-signal that the timer shouldn't poke the gic" construct we have.
+Instead of reinventing the wheel, let's reuse the init implementation
+by branching to the idmap page when called with a hyp-stub hypercall.
 
-Reviewed-by: Alexander Graf <agraf@suse.de>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Tested-by: Keerthy <j-keerthy@ti.com>
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
+ arch/arm/kvm/hyp/hyp-entry.S | 29 ++++++++++++++++++++++++-----
+ 1 file changed, 24 insertions(+), 5 deletions(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 35d7100..363f0d2 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -189,8 +189,6 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
- {
- 	int ret;
- 
--	BUG_ON(!vgic_initialized(vcpu->kvm));
--
- 	timer_ctx->active_cleared_last = false;
- 	timer_ctx->irq.level = new_level;
- 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
-@@ -205,7 +203,7 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
-  * Check if there was a change in the timer state (should we raise or lower
-  * the line level to the GIC).
-  */
--static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
-+static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-@@ -217,16 +215,14 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	 * because the guest would never see the interrupt.  Instead wait
- 	 * until we call this function from kvm_timer_flush_hwstate.
+diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+index 1f8db7d..a35baa8 100644
+--- a/arch/arm/kvm/hyp/hyp-entry.S
++++ b/arch/arm/kvm/hyp/hyp-entry.S
+@@ -126,11 +126,30 @@ hyp_hvc:
  	 */
--	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
--		return -ENODEV;
-+	if (!timer->enabled)
-+		return;
+ 	pop	{r0, r1, r2}
  
- 	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
- 		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
+-	/* Check for __hyp_get_vectors */
+-	cmp	r0, #HVC_GET_VECTORS
+-	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+-	beq	1f
++	/*
++	 * Check if we have a kernel function, which is guaranteed to be
++	 * bigger than the maximum hyp stub hypercall
++	 */
++	cmp	r0, #HVC_STUB_HCALL_NR
++	bhs	1f
  
- 	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
- 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
--
--	return 0;
- }
- 
- /* Schedule the background timer for the emulated timer. */
-@@ -295,13 +291,16 @@ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
-  */
- void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
- {
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 	bool phys_active;
- 	int ret;
- 
--	if (kvm_timer_update_state(vcpu))
-+	if (unlikely(!timer->enabled))
- 		return;
- 
-+	kvm_timer_update_state(vcpu);
++	/*
++	 * Not a kernel function, treat it as a stub hypercall.
++	 * Compute the physical address for __kvm_handle_stub_hvc
++	 * (as the code lives in the idmaped page) and branch there.
++	 * We hijack ip (r12) as a tmp register.
++	 */
++	push	{r1}
++	ldr	r1, =kimage_voffset
++	ldr	r1, [r1]
++	ldr	ip, =__kvm_handle_stub_hvc
++	sub	ip, ip, r1
++THUMB(	add	ip, ip, #1)
++	pop	{r1}
 +
- 	/* Set the background timer for the physical timer emulation. */
- 	kvm_timer_emulate(vcpu, vcpu_ptimer(vcpu));
++	bx	ip
++
++1:
+ 	push	{lr}
  
+ 	mov	lr, r0
+@@ -142,7 +161,7 @@ THUMB(	orr	lr, #1)
+ 	blx	lr			@ Call the HYP function
+ 
+ 	pop	{lr}
+-1:	eret
++	eret
+ 
+ guest_trap:
+ 	load_vcpu r0			@ Load VCPU pointer to r0
 -- 
 2.9.0
