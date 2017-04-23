@@ -1,59 +1,43 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Sun, 23 Apr 2017 11:59:05 +0200
-Subject: [PATCH 1/2] dmaengine: s3c24xx: Use devm_kcalloc() in
- s3c24xx_dma_probe()
-In-Reply-To: <9c10b823-f49b-8c73-2bf8-0fd2b0ba0231@users.sourceforge.net>
-References: <930f0a6c-bc5c-3d01-6814-563780fc90ef@users.sourceforge.net>
- <9c10b823-f49b-8c73-2bf8-0fd2b0ba0231@users.sourceforge.net>
-Message-ID: <f1257887-ca14-6415-b1ff-d57190a1810f@math.uni-bielefeld.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 23 Apr 2017 18:31:06 +0800
+Subject: [PATCH 1/2] PCI: mediatek: Add Mediatek PCIe host controller
+ support
+In-Reply-To: <1492935543-18190-2-git-send-email-ryder.lee@mediatek.com>
+Message-ID: <201704231826.aSxlgvd0%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Markus,
+Hi Ryder,
 
+[auto build test WARNING on pci/next]
+[also build test WARNING on v4.11-rc7 next-20170421]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-SF Markus Elfring wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Sat, 22 Apr 2017 23:00:23 +0200
-> 
-> * A multiplication for the size determination of a memory allocation
->   indicated that an array data structure should be processed.
->   Thus use the corresponding function "devm_kcalloc".
-I have trouble parsing that sentences. This looks like the typical
-approach of native german speakers to directly transfer sentence
-constructions from German to English. Which, in most cases, doesn't work
-or is just plain confusing.
+url:    https://github.com/0day-ci/linux/commits/Ryder-Lee/Add-PCIe-host-driver-support-for-some-Mediatek-SoCs/20170423-163432
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
+config: ia64-allmodconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=ia64 
 
-With best wishes,
-Tobias
+All warnings (new ones prefixed by >>):
 
+>> WARNING: drivers/pci/host/built-in.o(.text+0x1830): Section mismatch in reference from the function mtk_pcie_probe() to the function .init.text:mtk_pcie_map_irq()
+   The function mtk_pcie_probe() references
+   the function __init mtk_pcie_map_irq().
+   This is often because mtk_pcie_probe lacks a __init
+   annotation or the annotation of mtk_pcie_map_irq is wrong.
 
-> * Replace the specification of a data structure by a pointer dereference
->   to make the corresponding size determination a bit safer according to
->   the Linux coding style convention.
-> 
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> ---
->  drivers/dma/s3c24xx-dma.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/dma/s3c24xx-dma.c b/drivers/dma/s3c24xx-dma.c
-> index f04c4702d98b..967229829683 100644
-> --- a/drivers/dma/s3c24xx-dma.c
-> +++ b/drivers/dma/s3c24xx-dma.c
-> @@ -1216,10 +1216,10 @@ static int s3c24xx_dma_probe(struct platform_device *pdev)
->  	if (IS_ERR(s3cdma->base))
->  		return PTR_ERR(s3cdma->base);
->  
-> -	s3cdma->phy_chans = devm_kzalloc(&pdev->dev,
-> -					      sizeof(struct s3c24xx_dma_phy) *
-> -							pdata->num_phy_channels,
-> -					      GFP_KERNEL);
-> +	s3cdma->phy_chans = devm_kcalloc(&pdev->dev,
-> +					 pdata->num_phy_channels,
-> +					 sizeof(*s3cdma->phy_chans),
-> +					 GFP_KERNEL);
->  	if (!s3cdma->phy_chans)
->  		return -ENOMEM;
->  
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 46818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170423/3ce975ba/attachment-0001.gz>
