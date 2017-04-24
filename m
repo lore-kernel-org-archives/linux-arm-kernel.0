@@ -1,68 +1,72 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Mon, 24 Apr 2017 18:53:10 +0200 (CEST)
-Subject: [PATCH 1/5 v3] usb: host: add DT bindings for faraday fotg2
-In-Reply-To: <20170421204058.6206-1-linus.walleij@linaro.org>
-References: <20170421204058.6206-1-linus.walleij@linaro.org>
-Message-ID: <alpine.LNX.2.00.1704241846300.15211@T420s>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Mon, 24 Apr 2017 22:26:53 +0530
+Subject: [PATCH] iommu/arm-smmu-v3: Increase SMMU CMD queue poll timeout
+In-Reply-To: <20170424160841.GS12323@arm.com>
+References: <1493035176-3633-1-git-send-email-gakula@caviumnetworks.com>
+ <20170424160841.GS12323@arm.com>
+Message-ID: <CA+sq2CeyVm4pcAVME7OAFVxpOcSJc5CsP0vz3ypDkSxdx0SKnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus
+On Mon, Apr 24, 2017 at 9:38 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Apr 24, 2017 at 05:29:36PM +0530, Geetha sowjanya wrote:
+>> From: Geetha <gakula@cavium.com>
+>>
+>> When large memory is being unmapped, huge no of tlb invalidation cmds are
+>> submitted followed by a SYNC command. This sometimes hits CMD queue full and
+>> poll on queue drain is being timedout throwing error message 'CMD_SYNC timeout'.
+>>
+>> Although there is no functional issue, error message confuses user. Hence increased
+>> poll timeout to 500us
+>
+> Hmm, what are you doing to unmap that much? Is this VFIO teardown? Do you
+> have 7c6d90e2bb1a ("iommu/io-pgtable-arm: Fix iova_to_phys for block
+> entries") applied?
 
-On Fri, 21 Apr 2017, Linus Walleij wrote:
+Yes it's VFIO teardown and again yes the above fix is applied.
+But i didn't get how above fix is related.
+TLB invalidation commands are submitted at 'arm_smmu_tlb_inv_range_nosync()'
+and it's a loop over granule size.
 
-> From: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> 
-> This adds device tree bindings for the Faraday FOTG2
-> dual-mode host controller.
-> 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v3:
-> - Change compatible to "faraday,fotg210" as the name of the
->   hardware block.
-> - Add an elaborate SoC-specific compatible string for the
->   Cortina Systems Gemini so that SoC-specific features can
->   be enabled.
-> - Add cortina,gemini-mini-b to indicate a Gemini PHY with
->   a Mini-B adapter connected.
-> - Indicated that the Gemini version can handle "wakeup-source".
-> - Add optional IP block clock.
-> ---
->  .../devicetree/bindings/usb/faraday,fotg210.txt    | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/faraday,fotg210.txt
-> 
+1357         do {
+1358                 arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+1359                 cmd.tlbi.addr += granule;
+1360         } while (size -= granule);
 
-Got NAK'ed from Rob on some ealier round due missing "device mode" on this 
-IP. I've blatantly overrided this to a host only driver.
+So if invalidation size is big then huge no of invalidation commands
+will be submitted
+irrespective of fix that you pointed above, right ?
 
-These are the needed changes in DT to support both modes
-Note the -dr at the end of fotg210, to reflect this in an dual role device
+Thanks,
+Sunil.
 
-diff --git a/Documentation/devicetree/bindings/usb/faraday,fotg210.txt 
-b/Documentation/devicetree/bindings/usb/faraday,fotg210.txt
-index cf06808303e2..862cda19e9d3 100644
---- a/Documentation/devicetree/bindings/usb/faraday,fotg210.txt
-+++ b/Documentation/devicetree/bindings/usb/faraday,fotg210.txt
-@@ -13,6 +13,9 @@ Required properties:
- Optional properties:
- - clocks: should contain the IP block clock
- - clock-names: should be "PCLK" for the IP block clock
-+- dr_mode : indicates the working mode for "fotg210-dr" compatible
-+   controllers.  Can be "host", "peripheral". Default to
-+   "host" if not defined for backward compatibility.
- 
- Required properties for "cortina,gemini-usb" compatible:
- - syscon: a phandle to the system controller to access PHY registers
-@@ -25,7 +28,7 @@ Optional properties for "cortina,gemini-usb" compatible:
- Example for Gemini:
- 
- usb at 68000000 {
--       compatible = "cortina,gemini-usb", "faraday,fotg210";
-+       compatible = "cortina,gemini-usb", "faraday,fotg210-dr";
-        reg = <0x68000000 0x1000>;
-        interrupts = <10 IRQ_TYPE_LEVEL_HIGH>;
-        clocks = <&cc 12>;
+>
+> Will
+>
+>>
+>> Signed-off-by: Geetha <gakula@cavium.com>
+>> ---
+>>  drivers/iommu/arm-smmu-v3.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 591bb96..1dcd154 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -407,7 +407,7 @@
+>>  #define PRIQ_1_ADDR_MASK             0xfffffffffffffUL
+>>
+>>  /* High-level queue structures */
+>> -#define ARM_SMMU_POLL_TIMEOUT_US     100
+>> +#define ARM_SMMU_POLL_TIMEOUT_US     500
+>>
+>>  #define MSI_IOVA_BASE                        0x8000000
+>>  #define MSI_IOVA_LENGTH                      0x100000
+>> --
+>> 1.9.1
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
