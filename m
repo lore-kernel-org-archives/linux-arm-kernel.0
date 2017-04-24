@@ -1,49 +1,29 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 24 Apr 2017 09:37:09 +0530
-Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
-In-Reply-To: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
-References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
-Message-ID: <20170424040709.GG26900@vireshk-i7>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 24 Apr 2017 09:50:33 +0530
+Subject: linux-next: build failure after merge of the arm tree
+In-Reply-To: <f89b6045-8c09-f6c4-3893-84f172260926@free.fr>
+References: <20170421084033.5c987e13@canb.auug.org.au>
+ <9858a4ed-bdd9-bd6c-d8a4-e9e6bd539904@free.fr>
+ <20170421181230.05dcf937@canb.auug.org.au>
+ <20170421234315.GO17774@n2100.armlinux.org.uk>
+ <f89b6045-8c09-f6c4-3893-84f172260926@free.fr>
+Message-ID: <20170424042033.GC6263@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21-04-17, 13:11, Fabio Estevam wrote:
-> Hi,
+On Sat, Apr 22, 2017 at 10:41:37AM +0200, Mason wrote:
+> On 22/04/2017 01:43, Russell King - ARM Linux wrote:
 > 
-> Running 4.11-rc7 on a imx6q-sabresd board I notice that egalax
-> touchscreen stops generating evtest events after a random period of
-> time.
+> > Or I drop the offending patch (done) and we get the DMA subsystem fixed
+> > first.  Given how long it's been this way, I doubt there's any hurry to
+> > get this change in for the next merge window.
 > 
-> This problem can be avoided if I unselect CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND:
+> Your solution makes sense.
 > 
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -54,7 +54,6 @@ CONFIG_CMA=y
->  CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
->  CONFIG_KEXEC=y
->  CONFIG_CPU_FREQ=y
-> -CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
->  CONFIG_ARM_IMX6Q_CPUFREQ=y
->  CONFIG_CPU_IDLE=y
->  CONFIG_VFP=y
-> 
-> With this change evtest always capture all touchscreen events. No
-> single failure is seen.
-> 
-> I could see the same behavior with all mainline kernels I tested (4.9 and 4.10).
-> 
-> Any ideas as to how fix this bug when CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y?
+> Vinod, could you apply [PATCH v2] dmaengine: sun4i: fix invalid argument
+> to your tree when you have the time?
 
-So as Rafael pointed out the problem doesn't happen if you stay at the max
-frequencies, but otherwise.
-
-You need to investigate on why that is the case. You can go to the cpufreq sysfs
-directory and see what frequencies are getting selected, etc..
-
-Give me output of this for now:
-
-grep . /sys/devices/system/cpu/cpufreq/policy0/*
-grep . /sys/devices/system/cpu/cpufreq/policy0/stats/*
+Done now..
 
 -- 
-viresh
+~Vinod
