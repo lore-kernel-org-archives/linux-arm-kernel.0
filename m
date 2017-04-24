@@ -1,75 +1,55 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 25 Apr 2017 00:00:53 +0800
-Subject: [PATCH v4 00/10] AXP803 PMIC support for Pine64
-Message-ID: <20170424160103.9447-1-icenowy@aosc.io>
+Date: Tue, 25 Apr 2017 00:00:54 +0800
+Subject: [PATCH v4 01/10] arm64: allwinner: a64: enable RSB on A64
+In-Reply-To: <20170424160103.9447-1-icenowy@aosc.io>
+References: <20170424160103.9447-1-icenowy@aosc.io>
+Message-ID: <20170424160103.9447-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Pine64 (including Pine64+) boards have an AXP803 PMIC, which is a PMIC
-similar to AXP288, but tweaked to use with Allwinner SoCs rather than Intel
-tablets (with DCIN and Vbus re-splitted like other AXP PMICs, and RSB bus
-support added).
+Allwinner A64 have a RSB controller like the one on A23/A33 SoCs.
 
-This patchset adds support for it and enabled it in Pine64 device tree.
+Add it and its pinmux.
 
-The basical part of AXP803 MFD driver is already applied, according to Lee.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+---
+Changes in v2:
+- Removed bonus properties in pio node.
+- Added Chen-Yu's ACK.
 
-Thus this patchset is now still two parts, but a bit different to older
-revisions:
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-- Part1: from PATCH 1/10 to PATCH 5/10, which focus on enabling AXP803 in
-  the device tree: the RSB bus, the R_INTC interrupt controller (for the
-  NMI line, which is connected to AXP803 on Pine64), and finally the basical
-  AXP803 node.
-- Part2: from PATCH 5/10 to PATCH 10/10, which are enabling the regulator
-  function of the AXP803 PMIC. Finally Wi-Fi function is added
-  as a usage of regulators function.
-
-PATCH 1 adds RSB device nodes, which is used for the communication between
-A64 and AXP803.
-
-PATCH 2 adds device tree binding of A64 R_INTC.
-
-PATCH 3 really adds support for A64 R_INTC in NMI driver.
-
-PATCH 4 adds R_INTC node in A64 device tree.
-
-PATCH 5 adds AXP803 node to the Pine64 device tree by using already
-applied drivers/bindings.
-
-PATCH 6 adds support for AXP803 regulators in AXP20x regulatoe driver.
-(The binding is already applied)
-
-PATCH 7 enables the AXP803 regulator cell in MFD driver.
-
-PATCH 8 adds a DTSI file for AXP803, like other older AXP PMICs.
-
-PATCH 9 enables AXP803 regulators in Pine64 device tree.
-
-PATCH 10 enables Wi-Fi for Pine64.
-
-Icenowy Zheng (10):
-  arm64: allwinner: a64: enable RSB on A64
-  irqchip/sunxi-nmi: add A64 R_INTC to the binding doc
-  irqchip/sunxi-nmi: add support for the NMI in A64 R_INTC
-  arm64: allwinner: a64: add NMI (R_INTC) controller on A64
-  arm64: allwinner: a64: add AXP803 node to Pine64 device tree
-  regulator: axp20x-regulator: add support for AXP803
-  mfd: axp20x: add axp20x-regulator cell for AXP803
-  arm64: allwinner: a64: add DTSI file for AXP803 PMIC
-  arm64: allwinner: a64: enable AXP803 regulators for Pine64
-  arm64: allwinner: a64: enable Wi-Fi for Pine64
-
- .../interrupt-controller/allwinner,sunxi-nmi.txt   |   7 +-
- arch/arm64/boot/dts/allwinner/axp803.dtsi          | 150 ++++++++++++++++++++
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 136 ++++++++++++++++++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  27 ++++
- drivers/irqchip/irq-sunxi-nmi.c                    |  13 ++
- drivers/mfd/axp20x.c                               |   3 +-
- drivers/regulator/axp20x-regulator.c               | 153 ++++++++++++++++++---
- include/linux/mfd/axp20x.h                         |  37 +++++
- 8 files changed, 501 insertions(+), 25 deletions(-)
- create mode 100644 arch/arm64/boot/dts/allwinner/axp803.dtsi
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index c7f669f5884f..05ec9fc5e81f 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -422,6 +422,25 @@
+ 			#gpio-cells = <3>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
++
++			r_rsb_pins: rsb at 0 {
++				pins = "PL0", "PL1";
++				function = "s_rsb";
++			};
++		};
++
++		r_rsb: rsb at 1f03400 {
++			compatible = "allwinner,sun8i-a23-rsb";
++			reg = <0x01f03400 0x400>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&r_ccu 6>;
++			clock-frequency = <3000000>;
++			resets = <&r_ccu 2>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&r_rsb_pins>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 	};
+ };
 -- 
 2.12.2
