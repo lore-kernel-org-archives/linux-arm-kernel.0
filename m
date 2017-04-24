@@ -1,59 +1,50 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 24 Apr 2017 10:32:16 +0200
-Subject: [PATCH V5 3/7] ARM: exynos: Use - instead of @ for DT OPP entries
-In-Reply-To: <CAK7LNAQChtyRzKoSWCFakg+3_Qp_NZoXP1pEt6edDQrnL9FQ2w@mail.gmail.com>
-References: <cover.1492685450.git.viresh.kumar@linaro.org>
- <8fd1dcd1bfa2011411dceab82bcd1587fe913cd1.1492685450.git.viresh.kumar@linaro.org>
- <20170420160930.halyszjunt4q2634@kozik-lap>
- <CAK7LNAQChtyRzKoSWCFakg+3_Qp_NZoXP1pEt6edDQrnL9FQ2w@mail.gmail.com>
-Message-ID: <CAJKOXPcWJbibxahgnDAsnGbUpkurwSOtSsdV28hKbWxn_x83Jw@mail.gmail.com>
+Date: Mon, 24 Apr 2017 10:33:14 +0200
+Subject: [GIT PULL 2/2] arm64 dts: exynos: Last round for v4.12
+In-Reply-To: <20170421164050.7404-2-krzk@kernel.org>
+References: <20170421164050.7404-1-krzk@kernel.org>
+ <20170421164050.7404-2-krzk@kernel.org>
+Message-ID: <CAJKOXPfnwRHG-J8X6ZqB2RY7MX+WVpJn=-7dkwnxL3NT+GVf9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 10:30 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> 2017-04-21 1:09 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
->> On Thu, Apr 20, 2017 at 04:25:07PM +0530, Viresh Kumar wrote:
->>> Compiling the DT file with W=1, DTC warns like follows:
->>>
->>> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
->>> unit name, but no reg property
->>>
->>> Fix this by replacing '@' with '-' as the OPP nodes will never have a
->>> "reg" property.
->>>
->>> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
->>> Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>> Suggested-by: Mark Rutland <mark.rutland@arm.com>
->>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>> ---
->>>  .../devicetree/bindings/devfreq/exynos-bus.txt     | 46 +++++++--------
->>>  arch/arm/boot/dts/exynos3250.dtsi                  | 46 +++++++--------
->>>  arch/arm/boot/dts/exynos4210.dtsi                  | 32 +++++------
->>>  arch/arm/boot/dts/exynos4412-prime.dtsi            |  4 +-
->>>  arch/arm/boot/dts/exynos4412.dtsi                  | 66 +++++++++++-----------
->>>  arch/arm/boot/dts/exynos5420.dtsi                  | 40 ++++++-------
->>>  arch/arm/boot/dts/exynos5800.dtsi                  | 56 +++++++++---------
->>>  arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi     | 48 ++++++++--------
->>>  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 50 ++++++++--------
->>>  9 files changed, 194 insertions(+), 194 deletions(-)
->>
->>
->> Thanks, split ARM64 from ARM and applied (for v4.12). arm-soc keeps DTS
->> separated between ARM architectures. Technically this should require a
->> resend but we had way too many resends for this simple patch.
->>
+On Fri, Apr 21, 2017 at 6:40 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> Hi,
+>
+> On top of previous pull request.
+>
+> Best regards,
+> Krzysztof
 >
 >
-> Minor note:
+> The following changes since commit e3c07546747cdec07ff15c984bc6cebc9c9f788c:
 >
-> For arm64 part, Krzysztof's Signed-off-by is doubled.
-> (commit 5dccc9873c4af60f4478b3ef54267353f25cc301)
+>   arm64: dts: exynos: Add the burst and esc clock frequency properties to DSI node (2017-03-08 08:55:39 +0200)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.12-2
+>
+> for you to fetch changes up to 5dccc9873c4af60f4478b3ef54267353f25cc301:
+>
+>   arm64: dts: exynos: Use - instead of @ for DT OPP entries (2017-04-20 18:10:05 +0200)
+>
+> ----------------------------------------------------------------
+> Second update of  Samsung DeviceTree ARM64 for v4.12:
+>  - Fix DTC warnings in Exynos ARM64 Device Tree sources.
+>  - Add panel node to TM2E board.
+>
+> ----------------------------------------------------------------
+> Hoegeun Kwon (1):
+>       arm64: dts: exynos: Add support for s6e3hf2 panel device on TM2e board
+>
+> Viresh Kumar (1):
+>       arm64: dts: exynos: Use - instead of @ for DT OPP entries
 
-Thanks for spotting it.
+I need to fix this commit - my SoB got doubled:
+https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git/commit/?h=next/dt64&id=5dccc9873c4af60f4478b3ef54267353f25cc301
+
+I'll (unfortunately) rebase and send.
 
 Best regards,
 Krzysztof
