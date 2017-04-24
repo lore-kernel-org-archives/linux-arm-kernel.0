@@ -1,53 +1,50 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 24 Apr 2017 10:51:55 +0200
-Subject: [PATCH] arm64: dts: r8a7795: update PFC node name to pin-controller
-Message-ID: <1493023915-21658-1-git-send-email-horms+renesas@verge.net.au>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 24 Apr 2017 10:57:32 +0200
+Subject: [PATCH v3 2/3] crypto: inside-secure: add SafeXcel EIP197 crypto
+ engine driver
+In-Reply-To: <8ff65d6a5e5e4d388d3c5a384e4f5fd6@IL-EXCH01.marvell.com>
+References: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
+ <20170424075407.19730-3-antoine.tenart@free-electrons.com>
+ <8ff65d6a5e5e4d388d3c5a384e4f5fd6@IL-EXCH01.marvell.com>
+Message-ID: <20170424085731.wbg53t5lcler4mng@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device trees for Renesas SoCs use either pfc or pin-controller
-as the node name for the PFC device. This patch is intended to take a step
-towards unifying the node name used as pin-controller which appears to
-be more the more generic of the two and thus more in keeping with the DT
-specs.
+Hi Igal,
 
-My analysis is that this is a user-visible change to the extent that kernel
-logs, and sysfs entries change from e6060000.pfc and pfc at e6060000 to
-e6060000.pin-controller and pin-controller at e6060000.
+On Mon, Apr 24, 2017 at 08:50:32AM +0000, Igal Liberman wrote:
+> [...]
+> 
+> > +	priv->clk = of_clk_get(dev->of_node, 0);
+> > +	if (!IS_ERR(priv->clk)) {
+> > +		ret = clk_prepare_enable(priv->clk);
+> > +		if (ret) {
+> > +			dev_err(dev, "unable to enable clk (%d)\n", ret);
+> > +			return ret;
+> > +		}
+> > +	} else {
+> > +		/* The clock isn't mandatory */
+> > +		if (PTR_ERR(priv->clk) == -EPROBE_DEFER)
+> > +			return -EPROBE_DEFER;
+> > +	}
+> > +
+> > +	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64));
+> 
+> The correct address width of the engine in Marvell SoCs is 40bit.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-Before:
-/sys/kernel/debug/pinctrl/e6060000.pfc
-/sys/devices/platform/soc/e6060000.pfc
-/sys/firmware/devicetree/base/soc/pfc at e6060000
-/sys/bus/platform/devices/e6060000.pfc
-/sys/bus/platform/drivers/sh-pfc
-/sys/bus/platform/drivers/sh-pfc/e6060000.pfc
+Oops. I'll update.
 
-After:
-/sys/kernel/debug/pinctrl/e6060000.pin-controller
-/sys/devices/platform/soc/e6060000.pin-controller
-/sys/firmware/devicetree/base/soc/pin-controller at e6060000
-/sys/bus/platform/devices/e6060000.pin-controller
-/sys/bus/platform/drivers/sh-pfc
-/sys/bus/platform/drivers/sh-pfc/e6060000.pin-controller
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks!
+Antoine
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index e99d6443b3e4..7d87dff70ac8 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -398,7 +398,7 @@
- 			#power-domain-cells = <1>;
- 		};
- 
--		pfc: pfc at e6060000 {
-+		pfc: pin-controller at e6060000 {
- 			compatible = "renesas,pfc-r8a7795";
- 			reg = <0 0xe6060000 0 0x50c>;
- 		};
 -- 
-2.7.0.rc3.207.g0ac5344
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170424/4f99b7e5/attachment.sig>
