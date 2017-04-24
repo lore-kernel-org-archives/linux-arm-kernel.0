@@ -1,65 +1,36 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Tue, 25 Apr 2017 00:11:44 +0800
-Subject: [PATCH v4 03/10] irqchip/sunxi-nmi: add support for the NMI in
- A64 R_INTC
-In-Reply-To: <20170424160103.9447-4-icenowy@aosc.io>
-References: <20170424160103.9447-1-icenowy@aosc.io>
- <20170424160103.9447-4-icenowy@aosc.io>
-Message-ID: <854c73045151f98498c848f692957f30@aosc.io>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 24 Apr 2017 18:12:09 +0200
+Subject: [Bug] VCHIQ functional test broken
+In-Reply-To: <20170420195822.GA22677@laptop>
+References: <331235003.222371.1491934205807@email.1und1.de>
+ <685482264.60263.1492105308873@email.1und1.de>
+ <20170413222915.GF17774@n2100.armlinux.org.uk> <20170414074104.GA8704@laptop>
+ <87pog7x7c5.fsf@eliezer.anholt.net> <20170420195822.GA22677@laptop>
+Message-ID: <696fb1c1-7751-caf0-e0d9-9c67b059b4cc@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-04-25 00:00?Icenowy Zheng ???
-> Add support for the newly imported compatible for the A64 R_INTC in
-> irq-sunxi-nmi driver
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> New patch in v4, which is part of NMI refactor.
-> 
->  drivers/irqchip/irq-sunxi-nmi.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/drivers/irqchip/irq-sunxi-nmi.c 
-> b/drivers/irqchip/irq-sunxi-nmi.c
-> index 668730c5cb66..5f7408b1cd4d 100644
-> --- a/drivers/irqchip/irq-sunxi-nmi.c
-> +++ b/drivers/irqchip/irq-sunxi-nmi.c
-> @@ -56,6 +56,12 @@ static struct sunxi_sc_nmi_reg_offs sun9i_reg_offs = 
-> {
->  	.enable	= 0x04,
->  };
-> 
-> +static struct sunxi_sc_nmi_reg_offs sun50i_reg_offs = {
-> +	.ctrl	= 0x0c,
-> +	.pend	= 0x10,
-> +	.enable	= 0x40,
-> +};
-> +
->  static inline void sunxi_sc_nmi_write(struct irq_chip_generic *gc, u32 
-> off,
->  				      u32 val)
->  {
-> @@ -220,3 +226,10 @@ static int __init sun9i_nmi_irq_init(struct
-> device_node *node,
->  	return sunxi_sc_nmi_irq_init(node, &sun9i_reg_offs);
->  }
->  IRQCHIP_DECLARE(sun9i_nmi, "allwinner,sun9i-a80-nmi", 
-> sun9i_nmi_irq_init);
-> +
-> +static int __init sun50i_nmi_irq_init(struct device_node *node,
-> +				     struct device_node *parent)
-> +{
-> +	return sunxi_sc_nmi_irq_init(node, &sun50i_reg_offs);
-> +}
-> +IRQCHIP_DECLARE(sun50i_nmi, "allwinner,sun50i-a80-nmi", 
-> sun50i_nmi_irq_init);
+Am 20.04.2017 um 21:58 schrieb Rabin Vincent:
+> On Thu, Apr 20, 2017 at 11:27:38AM -0700, Eric Anholt wrote:
+>> I'm confused by what you're saying here.  The driver has already been
+>> converted to not use dmac_map_area (commit
+>> cf9caf1929882b66922aee698e99e6c8f357bee5), and uses dma_map_sg instead,
+>> matching the radeon driver you give as a model as far as I can see.
+>> That commit is in v4.11-rc6 from Stefan's regression report.
+> Right.  Sorry.  I must have had an old tag checked out when I looked at
+> the driver earlier.  The DMA API usage in the driver in v4.11-rc6 and
+> current master looks fine, except for one thing:
+>
+> The flush in flush_dcache_page() (from get_user_pages()) was done with a
+> v6_flush_kern_dcache_page() which always did a clean+invalidate while
+> the DMA API only does what is required by the direction, which is only a
+> invalidate for DMA_FROM_DEVICE.  Since the driver calls dma_from_sg() on
+> the entire page, even if userspace sent in an offset into the page,
+> unrelated data in userspace may be thrown away.
+>
+> Does changing the dma API calls to always use DMA_BIDIRECTIONAL make the
+> test pass?
 
-Should be:
-+IRQCHIP_DECLARE(sun50i_nmi, "allwinner,sun50i-a64-r-intc", 
-sun50i_nmi_irq_init);
+Unfortunately not (at least not that simple).
 
-Sorry!
-
-Thanks,
-Icenowy
+Do we need special DMA mapping attributes here ? Or a dma_sync_sg_for_* ?
