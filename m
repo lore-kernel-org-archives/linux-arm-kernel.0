@@ -1,64 +1,180 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 24 Apr 2017 17:14:42 +0100
-Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
-In-Reply-To: <20170424155841.GH25449@e104818-lin.cambridge.arm.com>
-References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
- <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
- <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
- <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
- <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
- <20170424154023.GM12323@arm.com>
- <20170424155841.GH25449@e104818-lin.cambridge.arm.com>
-Message-ID: <20170424161441.GI25449@e104818-lin.cambridge.arm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue, 25 Apr 2017 00:01:01 +0800
+Subject: [PATCH v4 08/10] arm64: allwinner: a64: add DTSI file for AXP803 PMIC
+In-Reply-To: <20170424160103.9447-1-icenowy@aosc.io>
+References: <20170424160103.9447-1-icenowy@aosc.io>
+Message-ID: <20170424160103.9447-9-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 04:58:41PM +0100, Catalin Marinas wrote:
-> On Mon, Apr 24, 2017 at 04:40:23PM +0100, Will Deacon wrote:
-> > On Wed, Apr 19, 2017 at 11:33:14AM +0100, Catalin Marinas wrote:
-> > > On Tue, Apr 18, 2017 at 09:01:52PM +0100, Peter Maydell wrote:
-> > > > On 18 April 2017 at 18:01, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > > > On Thu, Apr 13, 2017 at 08:33:52PM +0800, dongbo (E) wrote:
-> > > > >> From: Dong Bo <dongbo4@huawei.com>
-> > > > >>
-> > > > >> In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
-> > > > >> the flag is propagated to its child processes, even the elf
-> > > > >> files are marked as not requiring executable stack. It may
-> > > > >> cause superfluous operations on some arch, e.g.
-> > > > >> __sync_icache_dcache on aarch64 due to a PROT_READ mmap is
-> > > > >> also marked as PROT_EXEC.
-> > > > 
-> > > > > That's affecting most architectures with a risk of ABI breakage. We
-> > > > > could do it on arm64 only, though I'm not yet clear on the ABI
-> > > > > implications (at a first look, there shouldn't be any).
-> > > > 
-> > > > Is there a reason why it isn't just straightforwardly a bug
-> > > > (which we could fix) to make READ_IMPLIES_EXEC propagate to
-> > > > child processes?
-> > > 
-> > > While I agree that it looks like a bug, if there are user programs
-> > > relying on such bug we call it "ABI". On arm64, I don't think there is
-> > > anything relying on inheriting READ_IMPLIES_EXEC but I wouldn't change
-> > > the compat task handling without the corresponding change in arch/arm.
-> > > 
-> > > > AFAICT this should be per-process: just because
-> > > > init happens not to have been (re)compiled to permit non-executable
-> > > > stacks doesn't mean every process on the system needs to have
-> > > > an executable stack.
-> > > 
-> > > I think this also affects the heap if brk(2) is used (via
-> > > VM_DATA_DEFAULT_FLAGS though I guess malloc mostly uses mmap these
-> > > days).
-> > 
-> > I think it also affects mprotect, which is more worrying imo, particularly
-> > for things like JIT code that is ported from 32-bit (although a quick look
-> > at v8, ionmonkey and art suggests they all pass PROT_EXEC when needed).
-> 
-> As Peter said, the default behaviour is READ_IMPLIES_EXEC off,
+As nearly all A64 boards are using AXP803 PMIC, add a DTSI file for it,
+like the old DTSI files for AXP20x/22x, for the common parts of the
+PMIC.
 
-For the record, just to clarify the "default" behaviour: what I meant is
-that the (newish) toolchain always generates the GNU_STACK header which
-disables the executable stack (and therefore READ_IMPLIES_EXEC is off).
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+Changes in v4:
+- Re-sorted the nodes.
 
+ arch/arm64/boot/dts/allwinner/axp803.dtsi | 150 ++++++++++++++++++++++++++++++
+ 1 file changed, 150 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/axp803.dtsi
+
+diff --git a/arch/arm64/boot/dts/allwinner/axp803.dtsi b/arch/arm64/boot/dts/allwinner/axp803.dtsi
+new file mode 100644
+index 000000000000..ff8af52743ff
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/axp803.dtsi
+@@ -0,0 +1,150 @@
++/*
++ * Copyright 2017 Icenowy Zheng <icenowy@aosc.xyz>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/*
++ * AXP803 Integrated Power Management Chip
++ * http://files.pine64.org/doc/datasheet/pine64/AXP803_Datasheet_V1.0.pdf
++ */
++
++&axp803 {
++	interrupt-controller;
++	#interrupt-cells = <1>;
++
++	regulators {
++		/* Default work frequency for buck regulators */
++		x-powers,dcdc-freq = <3000>;
++
++		reg_aldo1: aldo1 {
++			regulator-name = "aldo1";
++		};
++
++		reg_aldo2: aldo2 {
++			regulator-name = "aldo2";
++		};
++
++		reg_aldo3: aldo3 {
++			regulator-name = "aldo3";
++		};
++
++		reg_dc1sw: dc1sw {
++			regulator-name = "dc1sw";
++		};
++
++		reg_dcdc1: dcdc1 {
++			regulator-name = "dcdc1";
++		};
++
++		reg_dcdc2: dcdc2 {
++			regulator-name = "dcdc2";
++		};
++
++		reg_dcdc3: dcdc3 {
++			regulator-name = "dcdc3";
++		};
++
++		reg_dcdc4: dcdc4 {
++			regulator-name = "dcdc4";
++		};
++
++		reg_dcdc5: dcdc5 {
++			regulator-name = "dcdc5";
++		};
++
++		reg_dcdc6: dcdc6 {
++			regulator-name = "dcdc6";
++		};
++
++		reg_dldo1: dldo1 {
++			regulator-name = "dldo1";
++		};
++
++		reg_dldo2: dldo2 {
++			regulator-name = "dldo2";
++		};
++
++		reg_dldo3: dldo3 {
++			regulator-name = "dldo3";
++		};
++
++		reg_dldo4: dldo4 {
++			regulator-name = "dldo4";
++		};
++
++		reg_eldo1: eldo1 {
++			regulator-name = "eldo1";
++		};
++
++		reg_eldo2: eldo2 {
++			regulator-name = "eldo2";
++		};
++
++		reg_eldo3: eldo3 {
++			regulator-name = "eldo3";
++		};
++
++		reg_fldo1: fldo1 {
++			regulator-name = "fldo1";
++		};
++
++		reg_fldo2: fldo2 {
++			regulator-name = "fldo2";
++		};
++
++		reg_ldo_io0: ldo-io0 {
++			regulator-name = "ldo-io0";
++			status = "disabled";
++		};
++
++		reg_ldo_io1: ldo-io1 {
++			regulator-name = "ldo-io1";
++			status = "disabled";
++		};
++
++		reg_rtc_ldo: rtc-ldo {
++			/* RTC_LDO is a fixed, always-on regulator */
++			regulator-always-on;
++			regulator-min-microvolt = <3000000>;
++			regulator-max-microvolt = <3000000>;
++			regulator-name = "rtc-ldo";
++		};
++	};
++};
 -- 
-Catalin
+2.12.2
