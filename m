@@ -1,60 +1,91 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 25 Apr 2017 00:01:00 +0800
-Subject: [PATCH v4 07/10] mfd: axp20x: add axp20x-regulator cell for AXP803
-In-Reply-To: <20170424160103.9447-1-icenowy@aosc.io>
-References: <20170424160103.9447-1-icenowy@aosc.io>
-Message-ID: <20170424160103.9447-8-icenowy@aosc.io>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Mon, 24 Apr 2017 21:50:32 +0530
+Subject: [PATCH] iommu/arm-smmu: Return IOVA in iova_to_phys when SMMU is
+ bypassed
+In-Reply-To: <20170424160030.GQ12323@arm.com>
+References: <1492430246-17267-1-git-send-email-sunil.kovvuri@gmail.com>
+ <20170424144429.GI12323@arm.com>
+ <CA+sq2Cc3cjjPcw0F1D_BOu0j3x+MUNO27MeRguj6BpQ+t11_HQ@mail.gmail.com>
+ <20170424160030.GQ12323@arm.com>
+Message-ID: <CA+sq2CfOZsAWhqLV-SNajUo+SNobNX9TFJfgZr76NOzz5h+RCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As axp20x-regulator now supports AXP803, add a cell for it.
+On Mon, Apr 24, 2017 at 9:30 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Apr 24, 2017 at 09:23:16PM +0530, Sunil Kovvuri wrote:
+>> On Mon, Apr 24, 2017 at 8:14 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Mon, Apr 17, 2017 at 05:27:26PM +0530, sunil.kovvuri at gmail.com wrote:
+>> >> From: Sunil Goutham <sgoutham@cavium.com>
+>> >>
+>> >> For software initiated address translation, when domain type is
+>> >> IOMMU_DOMAIN_IDENTITY i.e SMMU is bypassed, mimic HW behavior
+>> >> i.e return the same IOVA as translated address.
+>> >>
+>> >> This patch is an extension to Will Deacon's patchset
+>> >> "Implement SMMU passthrough using the default domain".
+>> >
+>> > Are you actually seeing an issue here? If so, why isn't SMMUv3 affected too?
+>> Yes and SMMUv3 should also be effected but as of now I don't see any use case.
+>> If needed, i can re-submit the patch with changes in SMMUv3 as well.
+>
+> Yes, please.
+>
+>> >> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+>> >> ---
+>> >>  drivers/iommu/arm-smmu.c | 3 +++
+>> >>  1 file changed, 3 insertions(+)
+>> >>
+>> >> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> >> index 41afb07..2f4a130 100644
+>> >> --- a/drivers/iommu/arm-smmu.c
+>> >> +++ b/drivers/iommu/arm-smmu.c
+>> >> @@ -1405,6 +1405,9 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
+>> >>       struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>> >>       struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
+>> >>
+>> >> +     if (domain->type == IOMMU_DOMAIN_IDENTITY)
+>> >> +             return iova;
+>> >> +
+>> >>       if (!ops)
+>> >>               return 0;
+>> >
+>> > I'd have thought ops would be NULL, since arm_smmu_init_domain_context
+>> > doesn't allocate them for an identity domain.
+>> Yes ops is set to NULL.
+>
+> Argh, sorry, I completely overlooked that we return 0 in that case, rather
+> than the iova.
+>
+>> > I don't understand this patch. Please can you explain the problem more
+>> > clearly?
+>> AFAIK for any driver outside IOMMU there is only one way to identify
+>> if device is attached to
+>> IOMMU or not and that is by checking iommu_domain. And I don't think
+>> it would be appropriate
+>> for the driver to check domain->type before calling 'iommu_iova_to_phys()' API.
+>>
+>> The difference between IOMMU disabled and IOMMU being in passthrough
+>> mode is that, in the
+>> later case device is still attached to default domain but in former's
+>> case it's NULL. So there is no
+>> way to differentiate for the external driver whether IOMMU is in
+>> passthrough mode or DMA mode.
+>>
+>> And since ops is NULL in passthrough mode, 'iommu_iova_to_phys()' will
+>> return zero.
+>>
+>> Use case for your reference
+>> https://lkml.org/lkml/2017/3/7/299
+>> This driver is for a NIC interface on platform which supports SMMUv2.
+>
+> Blimey, that driver is horrible, but I take your point on the API. Please
+> repost, fixing SMMUv3 at the same time.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes in v4:
-- Added a trailing comma for new cell, for easier further cell addition.
-Changes in v3:
-- Make the new cell one-liner.
+Sure, will re-submit the patch with SMMUv3 changes.
 
- drivers/mfd/axp20x.c                 | 3 ++-
- drivers/regulator/axp20x-regulator.c | 6 +++---
- 2 files changed, 5 insertions(+), 4 deletions(-)
+On a separate note, if you have time, I would definitely like to know
+your feedback and what's horrible in that driver, probably in a different
+email to keep that out of scope of this patch.
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 1dc6235778eb..917b6ddc4f15 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -848,7 +848,8 @@ static struct mfd_cell axp803_cells[] = {
- 		.name			= "axp20x-pek",
- 		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
- 		.resources		= axp803_pek_resources,
--	}
-+	},
-+	{	.name			= "axp20x-regulator" },
- };
- 
- static struct mfd_cell axp806_cells[] = {
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 9356ec8a9a1f..e2608fe770b9 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -311,13 +311,13 @@ static const struct regulator_desc axp803_regulators[] = {
- 		 AXP803_FLDO1_V_OUT, 0x0f, AXP22X_PWR_OUT_CTRL3, BIT(2)),
- 	AXP_DESC(AXP803, FLDO2, "fldo2", "fldoin", 700, 1450, 50,
- 		 AXP803_FLDO2_V_OUT, 0x0f, AXP22X_PWR_OUT_CTRL3, BIT(3)),
--	AXP_DESC_IO(AXP803, LDO_IO0, "ldo_io0", "ips", 700, 3300, 100,
-+	AXP_DESC_IO(AXP803, LDO_IO0, "ldo-io0", "ips", 700, 3300, 100,
- 		    AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
- 		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
--	AXP_DESC_IO(AXP803, LDO_IO1, "ldo_io1", "ips", 700, 3300, 100,
-+	AXP_DESC_IO(AXP803, LDO_IO1, "ldo-io1", "ips", 700, 3300, 100,
- 		    AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
- 		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
--	AXP_DESC_FIXED(AXP803, RTC_LDO, "rtc_ldo", "ips", 3000),
-+	AXP_DESC_FIXED(AXP803, RTC_LDO, "rtc-ldo", "ips", 3000),
- };
- 
- static const struct regulator_linear_range axp806_dcdca_ranges[] = {
--- 
-2.12.2
+Thanks,
+Sunil.
