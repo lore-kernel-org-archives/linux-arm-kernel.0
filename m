@@ -1,98 +1,63 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 24 Apr 2017 12:17:03 +0200
-Subject: [RFC] minimum gcc version for kernel: raise to gcc-4.3 or 4.6?
-In-Reply-To: <CAK8P3a32Y0AiKyVaotYb14uZZ1jM=nwhFD1vyP56epW1Y9KqSw@mail.gmail.com>
-References: <20161216105634.235457-1-arnd@arndb.de>
- <3302470.IDcDrWa0u6@wuerfel>
- <CAGXu5jLPRYi+HK=07Zndc8szEKD4mZCqaHJFnHmmoYr7tA1xPw@mail.gmail.com>
- <CAK8P3a2C2WhWjzF=HrzU15Ncg0juR+nstZukBEpqCrVNW5pnDA@mail.gmail.com>
- <CAGXu5jLTR+dY_Ayyix5Tg0Yn9LBFAt=j56MQVdJVGue-R-CizA@mail.gmail.com>
- <CAK8P3a114EVbnhbObfq-4pZp8XCT4fWzMXD+WkRi7iPXs1vFMA@mail.gmail.com>
- <CAGXu5jJpofLF0qAf0-2iNTesZt-X704Q7L=DpQYdtHY5n2HD0w@mail.gmail.com>
- <alpine.LFD.2.20.1704220400380.32200@eddie.linux-mips.org>
- <CAK8P3a28fi0GRcz1yLq+wRkaBBO_w74NnBCY7f3myg78JpaCCQ@mail.gmail.com>
- <CAMuHMdWTiurUSacddYXgW69=QwOrZDV3Zt2DezJauPy8j-GMHw@mail.gmail.com>
- <CAK8P3a32Y0AiKyVaotYb14uZZ1jM=nwhFD1vyP56epW1Y9KqSw@mail.gmail.com>
-Message-ID: <CAMuHMdUOv-sn9vDei0qPaRe19faYJGZ1zo1X==JDyFWJW3x5=A@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 24 Apr 2017 11:16:52 +0100
+Subject: [PATCH v4 2/7] dma: Add simple dma_noop_mmap
+In-Reply-To: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
+References: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1493029017-31382-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+This patch adds a simple implementation of mmap to dma_noop_ops.
 
-On Mon, Apr 24, 2017 at 11:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sun, Apr 23, 2017 at 10:13 PM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Sat, Apr 22, 2017 at 5:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> Based on what I found so far, gcc-4 can be pretty much ruled out from
->>> being the minimum version based on the number of failures I got.
->>> It's much better than 3.4 but much worse than 4.1 or 4.2 which seem
->>> fixable on MIPS and x86 at least, and may or may not work depending
->>> on configuration. So the best two possible (but conflicting) answers I
->>> have are
->>>
->>> a) There are known users on gcc-4.1, and we never break things that
->>>     work for users, so gcc-4.1 (or possibly 4.0 if a user shows up) would
->>>     be the minimum version.
->>> b) gcc-4.1 and 4.2 have too many problems, so users are better off
->>>     when we tell them to upgrade to something newer, and a minimum
->>>     version of gcc-4.3 has fewer surprises. We should remove all
->>>     workarounds for pre-gcc-4.3 compilers and just force a build error
->>>     message.
->>
->> If there's no real good reason (brokenness) to deprecate gcc-4.1, I would not
->> do it.I guess most people using old compilers know what they're doing.
->
-> What I'm trying to find out first is whether "people regularly using 10+
-> year old compilers for the latest kernels" is a strict subset of "people in
-> Geert's household".
+Cc: Joerg Roedel <jroedel@suse.de>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Andras Szemzo <sza@esh.hu>
+Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ lib/dma-noop.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-Fair enough.
-
->> My main motivation for keep on using gcc-4.1 is that it gives many warnings
->> that were disabled in later gcc versions.  I do look at all new warnings, and
->> send patches when they are real bugs, or are trivial to silence.
->
-> What kind of warnings do you see that disappeared with later versions?
-> Do you know what caused them to disappear in later versions (different
-> optimization decisions, warning getting disabled by default but still available
-> for turning on manually, ...)? Do you know if the disabled warnings are
-> still there in gcc-4.3 (I can try it out if you give me examples)?
-
-Mostly the "may be used uninitialized" warnings. I believe they were disabled
-in gcc-4.3 (4.2?) and later due to too many false positives, which is not an
-issue for me, as I look at differences.
-They were re-enabled lately (with much less false-positives), that's why you
-see them, and fix them.
-
-For example, do you see the warning fixed by commit 1b8c1012142d8322
-("drivers: net: xgene: Simplify xgene_enet_setup_mss() to kill warning")
-with gcc-4.3? Yes, that was a false positive.
-
-Or see commit cc4a7ffe02c95f53 ("spi: fsl-lpspi: Pre-initialize ret in
-fsl_lpspi_transfer_one_msg()"). That one was a real bug.
-
-I don't see that in any of the kisskb build logs, and they use gcc-4.2.4 for
-avr32. So having gcc-4.2 or gcc-4.3 in a farm won't help.
-
-And as long as I find real bugs this way, I'd like to continue doing it.
-
->> BTW, below is the diff I use to avoid an ICE.
->> After that, it builds and (test)boots fine on ARAnyM ;-)
->
-> I guess this means that even your builds require extra patches and you
-> can't strictly build a defconfig and expect that to work ;-)
-
-No sane people enable GFS in defconfig, so it's not affected.
-
-Oh wait, some mips, powerpc, s390, and tile do ;-)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/lib/dma-noop.c b/lib/dma-noop.c
+index ff4ef5e..0acc3f6 100644
+--- a/lib/dma-noop.c
++++ b/lib/dma-noop.c
+@@ -66,6 +66,26 @@ static int dma_noop_supported(struct device *dev, u64 mask)
+ 	return 1;
+ }
+ 
++static int dma_noop_mmap(struct device *dev, struct vm_area_struct *vma,
++			 void *cpu_addr, dma_addr_t dma_addr, size_t size,
++			 unsigned long attrs)
++{
++	unsigned long user_count = vma_pages(vma);
++	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
++	unsigned long off = vma->vm_pgoff;
++	int ret = -ENXIO;
++
++	if (off < count && user_count <= (count - off)) {
++		ret = remap_pfn_range(vma, vma->vm_start,
++				      pfn + off,
++				      user_count << PAGE_SHIFT,
++				      vma->vm_page_prot);
++	}
++
++	return ret;
++}
++
+ const struct dma_map_ops dma_noop_ops = {
+ 	.alloc			= dma_noop_alloc,
+ 	.free			= dma_noop_free,
+@@ -73,6 +93,7 @@ const struct dma_map_ops dma_noop_ops = {
+ 	.map_sg			= dma_noop_map_sg,
+ 	.mapping_error		= dma_noop_mapping_error,
+ 	.dma_supported		= dma_noop_supported,
++	.mmap			= dma_noop_mmap,
+ };
+ 
+ EXPORT_SYMBOL(dma_noop_ops);
+-- 
+2.0.0
