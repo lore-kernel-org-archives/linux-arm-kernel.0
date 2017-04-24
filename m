@@ -1,53 +1,51 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 24 Apr 2017 22:17:25 +0200
-Subject: [PATCH 0/3] Add eSDHC UHS-I/HS200 mode support for
- ls1012a/ls1046a/ls208xa
-In-Reply-To: <1492746756-12024-1-git-send-email-yangbo.lu@nxp.com>
-References: <1492746756-12024-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <CAPDyKFp_TWSj7FH6KagU4gz+A9CR-thwU9b1WaSEgupZMBAyaQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Apr 2017 22:19:53 +0200
+Subject: [PATCH V3 2/2] ARM64: dts: hi6220-hikey: Add clock binding for
+ the pmic mfd
+In-Reply-To: <20170424201139.GF2137@mai>
+References: <1492449567-31399-1-git-send-email-daniel.lezcano@linaro.org>
+ <1492449567-31399-2-git-send-email-daniel.lezcano@linaro.org>
+ <20170422020233.GA7065@codeaurora.org>
+ <370c36f9-e6fc-416c-776b-edc1e42d7ddc@linaro.org>
+ <20170424085944.aa5dsc4g6bwm5rgi@dell> <20170424201139.GF2137@mai>
+Message-ID: <CAK8P3a24Y+HO=XcGjcXb65PyKkzKRsLJiKQTpntYvpaUuew8Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 April 2017 at 05:52, Yangbo Lu <yangbo.lu@nxp.com> wrote:
-> This patch is to add eSDHC UHS-I/HS200 mode support for ls1012a/ls1046a/ls208xa.
-> Because eSDHC is not a standard SD controller, the specific speed mode support
-> depends on board's peripheral circuit for eSDHC. So, we have to add these speed
-> modes support on board dts file.
+On Mon, Apr 24, 2017 at 10:11 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On Mon, Apr 24, 2017 at 09:59:44AM +0100, Lee Jones wrote:
+>> On Sat, 22 Apr 2017, Daniel Lezcano wrote:
+>>
+>> > On 22/04/2017 04:02, Stephen Boyd wrote:
+>> > > On 04/17, Daniel Lezcano wrote:
+>> > >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> > >> ---
+>> > >>  Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt | 6 ++++++
+>> > >>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts             | 1 +
+>> > >>  2 files changed, 7 insertions(+)
+>> > >>
+>> > >
+>> > > I take it this goes through arm-soc? Not sure why I'm on To:
+>> > > line.
+>> >
+>> > Probably it should go through Lee's tree.
+>>
+>> Unlikely.
+>>
+>> The document and the DTS change should really have gone separately,
+>> but to save you from having to mess around so close to the merge window:
+>>
+>> Acked-by: Lee Jones <lee.jones@linaro.org>
 >
-> In additon, these dts patches depends on esdhc driver patches which just had been merged
-> on mmc.git. Otherwise, the UHS-I SD card and eMMC HS200 card would fail to be initialized,
-> but other cards still could work fine.
-> https://patchwork.kernel.org/patch/9689875/
-> https://patchwork.kernel.org/patch/9689877/
-> https://patchwork.kernel.org/patch/9689879/
-> https://patchwork.kernel.org/patch/9689887/
-> https://patchwork.kernel.org/patch/9689885/
->
-> Yangbo Lu (3):
->   arm64: dts: ls1046a: support SD UHS-I and eMMC HS200 on RDB
->   arm64: dts: ls208xa: support SD UHS-I on RDB and eMMC HS200 on QDS
->   arm64: dts: ls1012a: add eSDHC nodes
->
->  arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  |  8 +++++++
->  arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts  | 13 +++++++++++
->  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 25 ++++++++++++++++++++++
->  arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts  |  8 +++++++
->  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     |  4 ++--
->  arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi |  1 +
->  arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi |  4 ++++
->  arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |  2 +-
->  8 files changed, 62 insertions(+), 3 deletions(-)
->
-> --
-> 2.1.0.27.g96db324
->
+> So who is supposed to take this patch? Xu? Rob?
 
-By curiosity I tried applying these to my mmc tree, but they don't
-apply. So I can pick them, even with acks.
-Also it's too difficult for me to host an immutable branch with the
-relevant sdhci-esdc changes, because of additional sdhci dependencies.
+The DTS file changes should normally go through the platform maintainer
+and from there to arm-soc, to minimize the risk for patch conflicts.
 
-Perhaps just easier to pick this for 4.13 or 4.12 rc2.
+For binding changes, conflicts are much rarer, so we any of the tree
+(arm-soc, driver subsystem, or devicetree) works equally well IMHO.
+In this particular case,keeping the two together is best, so please send
+it to Wei Xu with the added chagnelog and Acks.
 
-Kind regards
-Uffe
+       Arnd
