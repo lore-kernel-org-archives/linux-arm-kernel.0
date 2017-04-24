@@ -1,75 +1,94 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 24 Apr 2017 11:25:12 +1000
-Subject: linux-next: build failure after merge of the drm-misc tree
-In-Reply-To: <20170421121014.3ee14a83@canb.auug.org.au>
-References: <20170421121014.3ee14a83@canb.auug.org.au>
-Message-ID: <20170424112512.582d04da@canb.auug.org.au>
+From: oss@buserror.net (Scott Wood)
+Date: Sun, 23 Apr 2017 20:44:59 -0500
+Subject: [PATCH v2 02/11] soc/fsl/qbman: Use shared-dma-pool for QMan
+ private memory allocations
+In-Reply-To: <1492634930-10765-3-git-send-email-roy.pledge@nxp.com>
+References: <1492634930-10765-1-git-send-email-roy.pledge@nxp.com>
+ <1492634930-10765-3-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1492998299.25397.14.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Wed, 2017-04-19 at 16:48 -0400, Roy Pledge wrote:
+> @@ -727,10 +730,81 @@ static int fsl_qman_probe(struct platform_device
+> *pdev)
+> ?		qm_channel_caam = QMAN_CHANNEL_CAAM_REV3;
+> ?	}
+> ?
+> -	ret = zero_priv_mem(dev, node, fqd_a, fqd_sz);
+> -	WARN_ON(ret);
+> -	if (ret)
+> -		return -ENODEV;
+> +	if (fqd_a) {
+> +#ifdef CONFIG_PPC
+> +		/*
+> +		?* For PPC backward DT compatibility
+> +		?* FQD memory MUST be zero'd by software
+> +		?*/
+> +		zero_priv_mem(fqd_a, fqd_sz);
+> +#endif
 
-On Fri, 21 Apr 2017 12:10:14 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->
-> After merging the drm-misc tree, today's linux-next build (x86_64
-> allmodconfig) failed like this:
-> 
-> drivers/tee/tee_shm.c:87:2: error: unknown field 'kmap_atomic' specified in initializer
->   .kmap_atomic = tee_shm_op_kmap_atomic,
->   ^
-> drivers/tee/tee_shm.c:87:17: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
->   .kmap_atomic = tee_shm_op_kmap_atomic,
->                  ^
-> drivers/tee/tee_shm.c:87:17: note: (near initialization for 'tee_shm_dma_buf_ops.begin_cpu_access')
-> drivers/tee/tee_shm.c:88:2: error: unknown field 'kmap' specified in initializer
->   .kmap = tee_shm_op_kmap,
->   ^
-> drivers/tee/tee_shm.c:88:10: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
->   .kmap = tee_shm_op_kmap,
->           ^
-> drivers/tee/tee_shm.c:88:10: note: (near initialization for 'tee_shm_dma_buf_ops.end_cpu_access')
-> 
-> Caused by commit
-> 
->   f9b67f0014cb ("dma-buf: Rename dma-ops to prevent conflict with kunmap_atomic macro")
-> 
-> interacting with commit
-> 
->   967c9cca2cc5 ("tee: generic TEE subsystem")
-> 
-> from the arm-soc tree.
-> 
-> I applied the following merge fix patch for today:
-> 
-> From: Stephen Rothwell <sfr@canb.auug.org.au>
-> Date: Fri, 21 Apr 2017 12:06:32 +1000
-> Subject: [PATCH] tee: merge fix for dma-ops field name changes
-> 
-> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
-> ---
->  drivers/tee/tee_shm.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
-> index 0be1e3e93bee..4e14c9c9cb1c 100644
-> --- a/drivers/tee/tee_shm.c
-> +++ b/drivers/tee/tee_shm.c
-> @@ -84,8 +84,8 @@ static struct dma_buf_ops tee_shm_dma_buf_ops = {
->  	.map_dma_buf = tee_shm_op_map_dma_buf,
->  	.unmap_dma_buf = tee_shm_op_unmap_dma_buf,
->  	.release = tee_shm_op_release,
-> -	.kmap_atomic = tee_shm_op_kmap_atomic,
-> -	.kmap = tee_shm_op_kmap,
-> +	.map_atomic = tee_shm_op_kmap_atomic,
-> +	.map = tee_shm_op_kmap,
->  	.mmap = tee_shm_op_mmap,
->  };
->  
-> -- 
-> 2.11.0
+Should probably warn if you get here on non-PPC rather than silently accepting
+it.
 
-This merge fix is now needed when I merge the drm tree (as Dave merged
-the drm-misc tree).
--- 
-Cheers,
-Stephen Rothwell
+> +	} else {
+> +		/*
+> +		?* Order of memory regions is assumed as FQD followed by
+> PFDR
+> +		?* in order to ensure allocations from the correct regions
+> the
+> +		?* driver initializes then allocates each piece in order
+> +		?*/
+
+This should be explicitly specified in the binding rather than here.
+
+
+
+> +		ret = of_reserved_mem_device_init_by_idx(dev, dev->of_node, 
+> 0);
+> +		if (ret) {
+> +			dev_err(dev, "of_reserved_mem_device_init_by_idx(0)
+> failed 0x%x\n",
+> +				ret);
+> +			return -ENODEV;
+> +		}
+> +		mem_node = of_parse_phandle(dev->of_node, "memory-region",
+> 0);
+> +		if (mem_node) {
+> +			ret = of_property_read_u64(mem_node, "size",
+> &size);
+> +			if (ret) {
+> +				dev_err(dev, "FQD: of_address_to_resource
+> fails 0x%x\n",
+> +					ret);
+> +				return -ENODEV;
+> +			}
+> +			fqd_sz = size;
+> +		} else {
+> +			dev_err(dev, "No memory-region found for FQD\n");
+> +			return -ENODEV;
+> +		}
+> +		if (!dma_zalloc_coherent(dev, fqd_sz, &fqd_a, 0)) {
+> +			dev_err(dev, "Alloc FQD memory failed\n");
+> +			return -ENODEV;
+> +		}
+> +
+> +		/*
+> +		?* Disassociate the FQD reseverd memory area from the
+> device
+> +		?* because a device can only have one DMA memory area. This
+> +		?* should be fine since the memory is allocated and
+> initialized
+> +		?* and only ever accessed by the QMan device from now on
+> +		?*/
+> +		of_reserved_mem_device_release(dev);
+
+s/reseverd/reserved/
+
+
+> +	}
+> +	dev_info(dev, "Allocated FQD 0x%llx 0x%zx\n", fqd_a, fqd_sz);
+
+dev_dbg()?
+
+-Scott
