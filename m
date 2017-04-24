@@ -1,35 +1,41 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 24 Apr 2017 18:06:10 +0200
-Subject: [PATCH v2 6/7] ARM: Kconfig: Introduce MACH_STM32F469 flag
-In-Reply-To: <CACRpkdZmWFKaZWB8qZaH=jB61xdwvJ=TC8idYH9kJdi=HEZRAA@mail.gmail.com>
-References: <1491568984-20169-1-git-send-email-alexandre.torgue@st.com>
- <1491568984-20169-7-git-send-email-alexandre.torgue@st.com>
- <CACRpkdZmWFKaZWB8qZaH=jB61xdwvJ=TC8idYH9kJdi=HEZRAA@mail.gmail.com>
-Message-ID: <a45e5791-cca1-79b8-a368-6d113c933ec3@st.com>
+Date: Mon, 24 Apr 2017 18:07:51 +0200
+Subject: [PATCH 3/4] pinctrl: stm32: Implement .get_direction gpio_chip
+ callback
+In-Reply-To: <CACRpkdZG-yxMCzBqP2s37QThP7tgWKgd3pVgZGgceB+ihZs3nw@mail.gmail.com>
+References: <1491577811-26989-1-git-send-email-alexandre.torgue@st.com>
+ <1491577811-26989-4-git-send-email-alexandre.torgue@st.com>
+ <CACRpkdZG-yxMCzBqP2s37QThP7tgWKgd3pVgZGgceB+ihZs3nw@mail.gmail.com>
+Message-ID: <a2ef1742-e455-69a9-ffd5-3a3cdf9ca7d6@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Linus,
 
-On 04/24/2017 02:30 PM, Linus Walleij wrote:
-> On Fri, Apr 7, 2017 at 2:43 PM, Alexandre TORGUE
+On 04/24/2017 02:37 PM, Linus Walleij wrote:
+> On Fri, Apr 7, 2017 at 5:10 PM, Alexandre TORGUE
 > <alexandre.torgue@st.com> wrote:
 >
->> This patch introduces the MACH_STM32F469 to make possible to only select
->> STM32F469 pinctrl driver
->>
->> By default, all the MACH_STM32Fxxx flags will be set with STM32 defconfig.
+>> Add .get_direction() gpiochip callback in STM32 pinctrl driver.
 >>
 >> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 >
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> (...)
+>> +#include <linux/gpio.h>
 >
-> Please funnel this through the ARM SoC tree.
+> No this is wrong, drivers should never include this file.
+> It is a deprecated consumer header.
+>
+>> +       if ((alt == 0) && (mode == 0))
+>> +               ret = GPIOF_DIR_IN;
+>> +       else if ((alt == 0) && (mode == 1))
+>> +               ret = GPIOF_DIR_OUT;
+>
+> Just return 0 or 1, that is the driver-internal API.
 
-Yes, I'll merge it in future pull request.
-Thanks for the series.
+Ok. I will fix it in V2.
 
-Regards
+Thanks
 Alex
 
 >
