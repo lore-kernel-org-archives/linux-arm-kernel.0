@@ -1,57 +1,53 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Mon, 24 Apr 2017 11:04:43 +0200
-Subject: [PATCH 1/3] ARM: dts: at91: sama5d2_xplained: enable ADTRG pin
-In-Reply-To: <1492590045-17329-2-git-send-email-eugen.hristev@microchip.com>
-References: <1492590045-17329-1-git-send-email-eugen.hristev@microchip.com>
- <1492590045-17329-2-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20170424090443.g4ywq5soomzbjmk3@rfolt0960.corp.atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Apr 2017 11:05:00 +0200
+Subject: [PATCH v5 05/11] drm/sun4i: abstract a engine type
+In-Reply-To: <20170423103754.50012-6-icenowy@aosc.io>
+References: <20170423103754.50012-1-icenowy@aosc.io>
+ <20170423103754.50012-6-icenowy@aosc.io>
+Message-ID: <20170424090500.i3k6u7pcahc7m3hv@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 11:20:43AM +0300, Eugen Hristev wrote:
-> Enable pinctrl for ADTRG pin (PD31) for ADC hardware trigger support.
-> 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Hi,
 
-> ---
->  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 16 +++++++++++++++-
->  1 file changed, 15 insertions(+), 1 deletion(-)
+Thanks a lot for that work.
+
+On Sun, Apr 23, 2017 at 06:37:48PM +0800, Icenowy Zheng wrote:
+> As we are going to add support for the Allwinner DE2 engine in sun4i-drm
+> driver, we will finally have two types of display engines -- the DE1
+> backend and the DE2 mixer. They both do some display blending and feed
+> graphics data to TCON, so I choose to call them both "engine" here.
 > 
-> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> index 0bef9e0..04754b1 100644
-> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> @@ -303,7 +303,7 @@
->  				vddana-supply = <&vdd_3v3_lp_reg>;
->  				vref-supply = <&vdd_3v3_lp_reg>;
->  				pinctrl-names = "default";
-> -				pinctrl-0 = <&pinctrl_adc_default>;
-> +				pinctrl-0 = <&pinctrl_adc_default &pinctrl_adtrg_default>;
->  				status = "okay";
->  			};
->  
-> @@ -322,6 +322,20 @@
->  					bias-disable;
->  				};
->  
-> +				/*
-> +				 * The ADTRG pin can work on any edge type.
-> +				 * In here it's being pulled up, so need to
-> +				 * connect it to ground to get an edge e.g.
-> +				 * Trigger can be configured on falling, rise
-> +				 * or any edge, and the pull-up can be changed
-> +				 * to pull-down or left floating according to
-> +				 * needs.
-> +				 */
-> +				pinctrl_adtrg_default: adtrg_default {
-> +					pinmux = <PIN_PD31__ADTRG>;
-> +					bias-pull-up;
-> +				};
-> +
->  				pinctrl_charger_chglev: charger_chglev {
->  					pinmux = <PIN_PA12__GPIO>;
->  					bias-disable;
-> -- 
-> 2.7.4
+> Abstract the engine type to a new struct with an ops struct, which contains
+> functions that should be called outside the engine-specified code (in
+> TCON, CRTC or TV Encoder code).
 > 
+> A dedicated Kconfig option is also added to control whether
+> sun4i-backend-specified code (sun4i_backend.c and sun4i_layer.c) should
+> be built. As we removed the codes in CRTC code that directly call the
+> layer code, we can now extract the layer part and combine it with the
+> backend part into a new module, sun4i-backend.ko.
+
+While the code itself is good now, the patch mixes a few things that
+would be better to be split in separate patches. I think it would be
+better if you had patches organized like this:
+  - Abstract the engine type by create the sunxi_engine structure and
+    fixing all the callers.
+  - Move the layers and backend files in the same module, and remove
+    the now useless EXPORT_SYMBOLS.
+  - Create a Kconfig option.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170424/d1d15dd2/attachment-0001.sig>
