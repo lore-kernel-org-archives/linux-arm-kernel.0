@@ -1,60 +1,69 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 25 Apr 2017 00:01:03 +0800
-Subject: [PATCH v4 10/10] arm64: allwinner: a64: enable Wi-Fi for Pine64
-In-Reply-To: <20170424160103.9447-1-icenowy@aosc.io>
-References: <20170424160103.9447-1-icenowy@aosc.io>
-Message-ID: <20170424160103.9447-11-icenowy@aosc.io>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Apr 2017 17:05:19 +0100
+Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
+In-Reply-To: <20170424155841.GH25449@e104818-lin.cambridge.arm.com>
+References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
+ <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
+ <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
+ <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
+ <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
+ <20170424154023.GM12323@arm.com>
+ <20170424155841.GH25449@e104818-lin.cambridge.arm.com>
+Message-ID: <20170424160519.GR12323@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Wi-Fi module of Pine64 is powered via DLDO4 and ELDO1 (the latter
-one provides I/O voltage).
+On Mon, Apr 24, 2017 at 04:58:41PM +0100, Catalin Marinas wrote:
+> On Mon, Apr 24, 2017 at 04:40:23PM +0100, Will Deacon wrote:
+> > On Wed, Apr 19, 2017 at 11:33:14AM +0100, Catalin Marinas wrote:
+> > > On Tue, Apr 18, 2017 at 09:01:52PM +0100, Peter Maydell wrote:
+> > > > On 18 April 2017 at 18:01, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > > > > On Thu, Apr 13, 2017 at 08:33:52PM +0800, dongbo (E) wrote:
+> > > > >> From: Dong Bo <dongbo4@huawei.com>
+> > > > >>
+> > > > >> In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
+> > > > >> the flag is propagated to its child processes, even the elf
+> > > > >> files are marked as not requiring executable stack. It may
+> > > > >> cause superfluous operations on some arch, e.g.
+> > > > >> __sync_icache_dcache on aarch64 due to a PROT_READ mmap is
+> > > > >> also marked as PROT_EXEC.
+> > > > 
+> > > > > That's affecting most architectures with a risk of ABI breakage. We
+> > > > > could do it on arm64 only, though I'm not yet clear on the ABI
+> > > > > implications (at a first look, there shouldn't be any).
+> > > > 
+> > > > Is there a reason why it isn't just straightforwardly a bug
+> > > > (which we could fix) to make READ_IMPLIES_EXEC propagate to
+> > > > child processes?
+> > > 
+> > > While I agree that it looks like a bug, if there are user programs
+> > > relying on such bug we call it "ABI". On arm64, I don't think there is
+> > > anything relying on inheriting READ_IMPLIES_EXEC but I wouldn't change
+> > > the compat task handling without the corresponding change in arch/arm.
+> > > 
+> > > > AFAICT this should be per-process: just because
+> > > > init happens not to have been (re)compiled to permit non-executable
+> > > > stacks doesn't mean every process on the system needs to have
+> > > > an executable stack.
+> > > 
+> > > I think this also affects the heap if brk(2) is used (via
+> > > VM_DATA_DEFAULT_FLAGS though I guess malloc mostly uses mmap these
+> > > days).
+> > 
+> > I think it also affects mprotect, which is more worrying imo, particularly
+> > for things like JIT code that is ported from 32-bit (although a quick look
+> > at v8, ionmonkey and art suggests they all pass PROT_EXEC when needed).
+> 
+> As Peter said, the default behaviour is READ_IMPLIES_EXEC off, so JIT
+> code must already pass PROT_EXEC if it wants executable permission. The
+> question is whether any user code relies on READ_IMPLIES_EXEC being
+> passed down to child processes. I don't think so but I would be
+> reluctant to make an such cross-arch change (happy to do it for arm64
+> though).
 
-Add device node for it.
+I was thinking of the case where init has an executable stack, but that's
+not the common case and such code would be broken under a different init
+anyway, so I agree that we should make this change for arm64 (but not compat
+without arch/arm/).
 
-Although the Wi-Fi module is an external module which should be inserted
-to a header, according to my personal talk with TL Lim, he does not want
-this header to be used as GPIO (so it's with 2.0mm pitch, not 2.54mm as
-other GPIO headers).
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index abc1879e91f2..2e4f44800162 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -64,6 +64,11 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
- 	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-+	};
- };
- 
- &ehci1 {
-@@ -91,6 +96,17 @@
- 	status = "okay";
- };
- 
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	vmmc-supply = <&reg_dldo4>;
-+	vqmmc-supply = <&reg_eldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	non-removable;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
--- 
-2.12.2
+Will
