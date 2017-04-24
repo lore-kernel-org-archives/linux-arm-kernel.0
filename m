@@ -1,41 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 24 Apr 2017 09:59:44 +0100
-Subject: [PATCH V3 2/2] ARM64: dts: hi6220-hikey: Add clock binding for
- the pmic mfd
-In-Reply-To: <370c36f9-e6fc-416c-776b-edc1e42d7ddc@linaro.org>
-References: <1492449567-31399-1-git-send-email-daniel.lezcano@linaro.org>
- <1492449567-31399-2-git-send-email-daniel.lezcano@linaro.org>
- <20170422020233.GA7065@codeaurora.org>
- <370c36f9-e6fc-416c-776b-edc1e42d7ddc@linaro.org>
-Message-ID: <20170424085944.aa5dsc4g6bwm5rgi@dell>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 24 Apr 2017 11:03:54 +0200
+Subject: [PATCH] arm64: dts: r8a7795: update PFC node name to
+ pin-controller
+In-Reply-To: <1493023915-21658-1-git-send-email-horms+renesas@verge.net.au>
+References: <1493023915-21658-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVw9OJZarw3SRa7NuuaMtmDKPVN3Om0GFVFm5k_YAqn6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 22 Apr 2017, Daniel Lezcano wrote:
+On Mon, Apr 24, 2017 at 10:51 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> The device trees for Renesas SoCs use either pfc or pin-controller
+> as the node name for the PFC device. This patch is intended to take a step
+> towards unifying the node name used as pin-controller which appears to
+> be more the more generic of the two and thus more in keeping with the DT
 
-> On 22/04/2017 04:02, Stephen Boyd wrote:
-> > On 04/17, Daniel Lezcano wrote:
-> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >> ---
-> >>  Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt | 6 ++++++
-> >>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts             | 1 +
-> >>  2 files changed, 7 insertions(+)
-> >>
-> > 
-> > I take it this goes through arm-soc? Not sure why I'm on To:
-> > line.
-> 
-> Probably it should go through Lee's tree.
+s/be more/be/
 
-Unlikely.
+> specs.
+>
+> My analysis is that this is a user-visible change to the extent that kernel
+> logs, and sysfs entries change from e6060000.pfc and pfc at e6060000 to
+> e6060000.pin-controller and pin-controller at e6060000.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-The document and the DTS change should really have gone separately,
-but to save you from having to mess around so close to the merge window:
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Gr{oetje,eeting}s,
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
