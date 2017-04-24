@@ -1,47 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Apr 2017 17:08:41 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Increase SMMU CMD queue poll timeout
-In-Reply-To: <1493035176-3633-1-git-send-email-gakula@caviumnetworks.com>
-References: <1493035176-3633-1-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <20170424160841.GS12323@arm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue, 25 Apr 2017 00:00:57 +0800
+Subject: [PATCH v4 04/10] arm64: allwinner: a64: add NMI (R_INTC) controller
+ on A64
+In-Reply-To: <20170424160103.9447-1-icenowy@aosc.io>
+References: <20170424160103.9447-1-icenowy@aosc.io>
+Message-ID: <20170424160103.9447-5-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 05:29:36PM +0530, Geetha sowjanya wrote:
-> From: Geetha <gakula@cavium.com>
-> 
-> When large memory is being unmapped, huge no of tlb invalidation cmds are
-> submitted followed by a SYNC command. This sometimes hits CMD queue full and
-> poll on queue drain is being timedout throwing error message 'CMD_SYNC timeout'.
-> 
-> Although there is no functional issue, error message confuses user. Hence increased
-> poll timeout to 500us
+Allwinner A64 SoC features a R_INTC controller, which controls the NMI
+line, and this interrupt line is usually connected to the AXP PMIC.
 
-Hmm, what are you doing to unmap that much? Is this VFIO teardown? Do you
-have 7c6d90e2bb1a ("iommu/io-pgtable-arm: Fix iova_to_phys for block
-entries") applied?
+Add support for it.
 
-Will
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+Changes in v4:
+- Changes it to use R_INTC binding and change node label to r_intc.
+- Fixed MMIO region.
+- Dropped Chen-Yu's ACK due to big change.
+Changes in v2:
+- Added Chen-Yu's ACK.
 
-> 
-> Signed-off-by: Geetha <gakula@cavium.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 591bb96..1dcd154 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -407,7 +407,7 @@
->  #define PRIQ_1_ADDR_MASK		0xfffffffffffffUL
->  
->  /* High-level queue structures */
-> -#define ARM_SMMU_POLL_TIMEOUT_US	100
-> +#define ARM_SMMU_POLL_TIMEOUT_US	500
->  
->  #define MSI_IOVA_BASE			0x8000000
->  #define MSI_IOVA_LENGTH			0x100000
-> -- 
-> 1.9.1
-> 
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 05ec9fc5e81f..a6566d292934 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -403,6 +403,14 @@
+ 				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
++		r_intc: interrupt-controller at 1f00c00 {
++			compatible = "allwinner,sun50i-a64-r-intc";
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reg = <0x01f00c00 0x400>;
++			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
+ 		r_ccu: clock at 1f01400 {
+ 			compatible = "allwinner,sun50i-a64-r-ccu";
+ 			reg = <0x01f01400 0x100>;
+-- 
+2.12.2
