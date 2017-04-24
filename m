@@ -1,62 +1,64 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 24 Apr 2017 12:02:39 +0100
-Subject: [GIT PULL] Immutable branch between MFD and IIO due for the
- v4.12 merge window
-In-Reply-To: <0f30afec-ff42-e125-96d6-35893324f7ef@kernel.org>
-References: <20170404063441.7656-1-quentin.schulz@free-electrons.com>
- <20170411100528.2zif3fyi7uoyw33n@dell>
- <0f30afec-ff42-e125-96d6-35893324f7ef@kernel.org>
-Message-ID: <20170424110239.cv5nylgvymhwvg4w@dell>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 24 Apr 2017 08:20:28 -0300
+Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
+In-Reply-To: <20170424040709.GG26900@vireshk-i7>
+References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
+ <20170424040709.GG26900@vireshk-i7>
+Message-ID: <CAOMZO5B4_xrLcWQGF=yRfj-14XQKudzjyr2roGRkzofkHCfuHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Apr 2017, Jonathan Cameron wrote:
+Hi Viresh,
 
-> On 11/04/17 11:05, Lee Jones wrote:
-> > Enjoy!
-> > 
-> > The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-> > 
-> >   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-iio-v4.12
-> > 
-> > for you to fetch changes up to f2499ab450d3052097ba53a7d763f767935c0c59:
-> > 
-> >   iio: adc: add support for X-Powers AXP20X and AXP22X PMICs ADCs (2017-04-11 11:02:33 +0100)
-> > 
-> > ----------------------------------------------------------------
-> > Immutable branch between MFD and IIO due for the v4.12 merge window
-> > 
-> > ----------------------------------------------------------------
-> > Quentin Schulz (1):
-> >       iio: adc: add support for X-Powers AXP20X and AXP22X PMICs ADCs
-> > 
-> >  drivers/iio/adc/Kconfig      |  10 +
-> >  drivers/iio/adc/Makefile     |   1 +
-> >  drivers/iio/adc/axp20x_adc.c | 617 +++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 628 insertions(+)
-> >  create mode 100644 drivers/iio/adc/axp20x_adc.c
-> > 
-> Hi Lee, 
-> 
-> Thanks for doing this, but the reason it was going to go through your
-> tree in the first place was a dependency on
-> commit 4707274714ef ("mfd: axp20x: Correct name of temperature data ADC registers")
-> 
-> Not present in the immutable branch.
-> 
-> There isn't much time for anything else going on around this driver though
-> so other than a possible merge conflict on the Kconfig and Makefile shouldn't
-> matter if this just goes through mfd. (famous last words ;)
+On Mon, Apr 24, 2017 at 1:07 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
-It's not as though you committed it to text and sent it out to a
-public mailing list for us all to reference though is it?  Doh!
+> So as Rafael pointed out the problem doesn't happen if you stay at the max
+> frequencies, but otherwise.
+>
+> You need to investigate on why that is the case. You can go to the cpufreq sysfs
+> directory and see what frequencies are getting selected, etc..
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yes, when the CPU frequency stays at 996 MHz I do not see the
+touchscreen failure. When it goes to 396MHz I do see see touchscreeen
+events getting lost.
+
+> Give me output of this for now:
+>
+> grep . /sys/devices/system/cpu/cpufreq/policy0/*
+> grep . /sys/devices/system/cpu/cpufreq/policy0/stats/*
+
+Here it goes, thanks.
+
+# grep . /sys/devices/system/cpu/cpufreq/policy0/*
+/sys/devices/system/cpu/cpufreq/policy0/affected_cpus:0 1 2 3
+/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_cur_freq:396000
+/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_max_freq:996000
+/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_min_freq:396000
+/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_transition_latency:109036
+/sys/devices/system/cpu/cpufreq/policy0/related_cpus:0 1 2 3
+/sys/devices/system/cpu/cpufreq/policy0/scaling_available_frequencies:396000
+792000 996000
+/sys/devices/system/cpu/cpufreq/policy0/scaling_available_governors:ondemand
+performance
+/sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq:396000
+/sys/devices/system/cpu/cpufreq/policy0/scaling_driver:imx6q-cpufreq
+/sys/devices/system/cpu/cpufreq/policy0/scaling_governor:ondemand
+/sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq:996000
+/sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq:396000
+/sys/devices/system/cpu/cpufreq/policy0/scaling_setspeed:<unsupported>
+
+# grep . /sys/devices/system/cpu/cpufreq/policy0/stats/*
+grep: /sys/devices/system/cpu/cpufreq/policy0/stats/reset: Permission denied
+/sys/devices/system/cpu/cpufreq/policy0/stats/time_in_state:396000 2869
+/sys/devices/system/cpu/cpufreq/policy0/stats/time_in_state:792000 76
+/sys/devices/system/cpu/cpufreq/policy0/stats/time_in_state:996000 33
+/sys/devices/system/cpu/cpufreq/policy0/stats/total_trans:8
+/sys/devices/system/cpu/cpufreq/policy0/stats/trans_table:   From  :    To
+/sys/devices/system/cpu/cpufreq/policy0/stats/trans_table:         :
+ 396000    792000    996000
+/sys/devices/system/cpu/cpufreq/policy0/stats/trans_table:   396000:
+      0         2         0
+/sys/devices/system/cpu/cpufreq/policy0/stats/trans_table:   792000:
+      2         0         2
+/sys/devices/system/cpu/cpufreq/policy0/stats/trans_table:   996000:
+      1         1         0
