@@ -1,61 +1,128 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Apr 2017 18:34:14 +0100
-Subject: [PATCH] arm64: Add ASM modifier for xN register operands
-In-Reply-To: <CAKv+Gu_Ms73qfFFjmhkwF9Rh2jBM6Cx9LfuSHPUnXv0GTR1z7w@mail.gmail.com>
-References: <20170420183053.718-1-mka@chromium.org>
- <20170424170009.GT12323@arm.com>
- <CAKv+Gu_Ms73qfFFjmhkwF9Rh2jBM6Cx9LfuSHPUnXv0GTR1z7w@mail.gmail.com>
-Message-ID: <20170424173413.GW12323@arm.com>
+From: m.bielski@virtualopensystems.com (Maciej Bielski)
+Date: Mon, 24 Apr 2017 19:35:39 +0200
+Subject: [PATCH 3/5] Memory hotplug support for arm64 platform (v2)
+In-Reply-To: <20170411155843.GC32267@leverpostej>
+References: <cover.1491920513.git.ar@linux.vnet.ibm.com>
+ <50119579bdbb23a4d888d13b0a46cb2e027839ed.1491920513.git.ar@linux.vnet.ibm.com>
+ <20170411155843.GC32267@leverpostej>
+Message-ID: <20170424173539.GB13988@tpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 06:22:51PM +0100, Ard Biesheuvel wrote:
-> On 24 April 2017 at 18:00, Will Deacon <will.deacon@arm.com> wrote:
-> > Hi Matthias,
-> >
-> > On Thu, Apr 20, 2017 at 11:30:53AM -0700, Matthias Kaehlcke wrote:
-> >> Many inline assembly statements don't include the 'x' modifier when
-> >> using xN registers as operands. This is perfectly valid, however it
-> >> causes clang to raise warnings like this:
-> >>
-> >> warning: value size does not match register size specified by the
-> >>   constraint and modifier [-Wasm-operand-widths]
-> >> ...
-> >> arch/arm64/include/asm/barrier.h:62:23: note: expanded from macro
-> >>   '__smp_store_release'
-> >>     asm volatile ("stlr %1, %0"
-> >
-> > If I understand this correctly, then the warning is emitted when we pass
-> > in a value smaller than 64-bit, but refer to %<n> without a modifier
-> > in the inline asm.
-> >
-> > However, if that's the case then I don't understand why:
-> >
-> >> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> >> index 0c00c87bb9dd..021e1733da0c 100644
-> >> --- a/arch/arm64/include/asm/io.h
-> >> +++ b/arch/arm64/include/asm/io.h
-> >> @@ -39,33 +39,33 @@
-> >>  #define __raw_writeb __raw_writeb
-> >>  static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
-> >>  {
-> >> -     asm volatile("strb %w0, [%1]" : : "rZ" (val), "r" (addr));
-> >> +     asm volatile("strb %w0, [%x1]" : : "rZ" (val), "r" (addr));
-> >
-> > is necessary. addr is a pointer type, so is 64-bit.
-> >
-> > Given that the scattergun nature of this patch implies that you've been
-> > fixing the places where warnings are reported, then I'm confused as to
-> > why a warning is generated for the case above.
-> >
-> > What am I missing?
-> >
+Hi Mark,
+
+Thank you for having a look on the code and providing comments. Same to others
+that replied to the whole patchset. To the large extent, first purpose of this code
+was to just to implement the functionality and I am totally aware that it may
+be suboptimal at some places and therefore your feedback is very much
+appreciated.
+
+More answers below.
+
+On Tue, Apr 11, 2017 at 04:58:43PM +0100, Mark Rutland wrote:
+> Hi,
 > 
-> AIUI, Clang now always complains for missing register width modifiers,
-> not just for placeholders that resolve to a 32-bit (or smaller)
-> quantity.
+> On Tue, Apr 11, 2017 at 03:55:22PM +0100, Andrea Reale wrote:
+> > From: Maciej Bielski <m.bielski@virtualopensystems.com>
+> > 
+> > This is a second and improved version of the patch previously released
+> > in [3].
+> > 
+> > It builds on the work by Scott Branden [2] and, henceforth,
+> > it needs to be applied on top of Scott's patches [2].
+> > Comments are very welcome.
+> > 
+> > Changes from the original patchset and known issues:
+> > 
+> > - Compared to Scott's original patchset, this work adds the mapping of
+> >   the new hotplugged pages into the kernel page tables. This is done by
+> >   copying the old swapper_pg_dir over a new page, adding the new mappings,
+> >   and then switching to the newly built pg_dir (see `hotplug_paging` in
+> >   arch/arm64/mmu.c). There might be better ways to to this: suggestions
+> >   are more than welcome.
+> 
+> For this reply, I'm just going to focus on the PGD replacement.
+> 
+> It's not clear to me if we need to swap the PGD, since everything we do
+> here is strictly additive and non-conflicting, and it should be safe to
+> add things to the swapper_pg_dir live.
+> 
+> However, assuming there's something I've missed, I have some comments
+> below.
+> 
+> [...]
 
-Ok, in which case this patch is incomplete as there's a bunch of asm that
-isn't updated (e.g. spinlock.h).
+For one CPU it should work, I have quickly checked on QEMU. More concerns
+regarding multiple CPUs below(*).
 
-Will
+> 
+> > +#ifdef CONFIG_MEMORY_HOTPLUG
+> > +
+> > +/*
+> > + * hotplug_paging() is used by memory hotplug to build new page tables
+> > + * for hot added memory.
+> > + */
+> > +void hotplug_paging(phys_addr_t start, phys_addr_t size)
+> > +{
+> > +
+> > +	struct page *pg;
+> > +	phys_addr_t pgd_phys = pgd_pgtable_alloc();
+> > +	pgd_t *pgd = pgd_set_fixmap(pgd_phys);
+> > +
+> > +	memcpy(pgd, swapper_pg_dir, PAGE_SIZE);
+> 
+> s/PAGE_SIZE/PGD_SIZE/ (and below, too).
+> 
+> See commit 12f043ff2b28fa64 ("arm64: fix warning about swapper_pg_dir
+> overflow").
+> 
+
+Noted, thanks.
+
+> > +
+> > +	__create_pgd_mapping(pgd, start, __phys_to_virt(start), size,
+> > +		PAGE_KERNEL, pgd_pgtable_alloc, false);
+> > +
+> > +	cpu_replace_ttbr1(__va(pgd_phys));
+> 
+> Other CPUs may be online at this point, and cpu_replace_ttbr1() was only
+> intended for UP operation. Other CPUs will still have swapper_pg_dir in
+> their TTBR1_EL1 at this point in time...
+> 
+> > +	memcpy(swapper_pg_dir, pgd, PAGE_SIZE);
+> 
+> ... which this will alter, in an unsafe fashion.
+> 
+> The other CPUs are live, and might be altering swapper. e.g. one might
+> be using the fixmap to alter code. We will need some stop_machine()-like
+> machinery here to synchronise with other CPUs, ensuring that they don't
+> have swapper_pg_dir live.
+
+(*)
+I am familiar with stop_machine(), for example it is done at later stage, when
+pages are onlined (inside build_all_zonelists). But do you think that we should
+check if swapper_pg_dir is under modification before stopping (and optionally
+wait until this modification is finished)? Is there a mechanism to serialize
+the write access to swapper_pg_dir?
+
+> 
+> Unfortunately, we can't change other to the temporary pgdir in a cross
+> call, then fix things up, then do another cross call. If any exception
+> is taken when we're in the temporary pgdir, __uaccess_ttbr0_disable will
+> install junk into TTBR0, and we risk the usual set of pain junk TLBs
+> entail.
+> 
+> We appear to have a latent bug at boot time along those lines, when
+> setting up the page tables and initialising KASAN. I'll see about
+> cleaning that up.
+
+Great, thank you for any hints.
+
+> 
+> Thanks,
+> Mark.
+
+Best regards,
+
+-- 
+Maciej Bielski
