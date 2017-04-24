@@ -1,133 +1,26 @@
-From: zhongjiang@huawei.com (zhongjiang)
-Date: Mon, 24 Apr 2017 17:22:09 +0800
-Subject: [PATCH] arm64: fix the overlap between the kernel image and vmalloc
- address
-Message-ID: <1493025729-21505-1-git-send-email-zhongjiang@huawei.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Apr 2017 11:29:26 +0200
+Subject: [PATCH v4 1/7] pinctrl: dt-bindings: Add documentation for Armada
+ 37xx pin controllers
+In-Reply-To: <941d03c9a3bdfd5e789aada29b35184ec9fed9fe.1491405475.git-series.gregory.clement@free-electrons.com>
+References: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
+ <941d03c9a3bdfd5e789aada29b35184ec9fed9fe.1491405475.git-series.gregory.clement@free-electrons.com>
+Message-ID: <CACRpkdZ7NQRMcxaqecRNskWC_=2YpbG-L+JEhnSx+XTgANPJmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zhong jiang <zhongjiang@huawei.com>
+On Wed, Apr 5, 2017 at 5:18 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
 
-Recently, xiaojun report the following issue.
+> Document the device tree binding for the pin controllers found on the
+> Armada 37xx SoCs.
+>
+> Update the binding documention of the xtal clk which is a subnode of this
+> syscon node.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-[ 4544.984139] Unable to handle kernel paging request at virtual address ffff804392800000
-[ 4544.991995] pgd = ffff80096745f000
-[ 4544.995369] [ffff804392800000] *pgd=0000000000000000
-[ 4545.000297] Internal error: Oops: 96000005 [#1] PREEMPT SMP
-[ 4545.005815] Modules linked in:
-[ 4545.008843] CPU: 1 PID: 8976 Comm: cat Not tainted 4.11.0-rc6 #1
-[ 4545.014790] Hardware name: ARM Juno development board (r1) (DT)
-[ 4545.020653] task: ffff8009753fdb00 task.stack: ffff80097533c000
-[ 4545.026520] PC is at __memcpy+0x100/0x180
-[ 4545.030491] LR is at vread+0x144/0x280
-[ 4545.034202] pc : [<ffff0000083a1000>] lr : [<ffff0000081c126c>] pstate: 20000145
-[ 4545.041530] sp : ffff80097533fcb0
-[ 4545.044811] x29: ffff80097533fcb0 x28: ffff800962d24000
-[ 4545.050074] x27: 0000000000001000 x26: ffff8009753fdb00
-[ 4545.055337] x25: ffff000008200000 x24: ffff800977801380
-[ 4545.060600] x23: ffff8009753fdb00 x22: ffff800962d24000
-[ 4545.065863] x21: 0000000000001000 x20: ffff000008200000
-[ 4545.071125] x19: 0000000000001000 x18: 0000ffffefa323c0
-[ 4545.076387] x17: 0000ffffa9c87440 x16: ffff0000081fdfd0
-[ 4545.081649] x15: 0000ffffa9d01588 x14: 72a77346b2407be7
-[ 4545.086911] x13: 5299400690000000 x12: b0000001f9001a79
-[ 4545.092173] x11: 97fc098d91042260 x10: 0000000000000000
-[ 4545.097435] x9 : 0000000000000000 x8 : 9110626091260021
-[ 4545.102698] x7 : 0000000000001000 x6 : ffff800962d24000
-[ 4545.107960] x5 : ffff8009778013b0 x4 : 0000000000000000
-[ 4545.113222] x3 : 0400000000000001 x2 : 0000000000000f80
-[ 4545.118484] x1 : ffff804392800000 x0 : ffff800962d24000
-[ 4545.123745]
-[ 4545.125220] Process cat (pid: 8976, stack limit = 0xffff80097533c000)
-[ 4545.131598] Stack: (0xffff80097533fcb0 to 0xffff800975340000)
-[ 4545.137289] fca0:                                   ffff80097533fd30 ffff000008270f64
-[ 4545.145049] fcc0: 000000000000e000 000000003956f000 ffff000008f950d0 ffff80097533feb8
-[ 4545.152809] fce0: 0000000000002000 ffff8009753fdb00 ffff800962d24000 ffff000008e8d3d8
-[ 4545.160568] fd00: 0000000000001000 ffff000008200000 0000000000001000 ffff800962d24000
-[ 4545.168327] fd20: 0000000000001000 ffff000008e884a0 ffff80097533fdb0 ffff00000826340c
-[ 4545.176086] fd40: ffff800976bf2800 fffffffffffffffb 000000003956d000 ffff80097533feb8
-[ 4545.183846] fd60: 0000000060000000 0000000000000015 0000000000000124 000000000000003f
-[ 4545.191605] fd80: ffff000008962000 ffff8009753fdb00 ffff8009753fdb00 ffff8009753fdb00
-[ 4545.199364] fda0: 0000000300000124 0000000000002000 ffff80097533fdd0 ffff0000081fb83c
-[ 4545.207123] fdc0: 0000000000010000 ffff80097514f900 ffff80097533fe50 ffff0000081fcb28
-[ 4545.214883] fde0: 0000000000010000 ffff80097514f900 0000000000000000 0000000000000000
-[ 4545.222642] fe00: ffff80097533fe30 ffff0000081fca1c ffff80097514f900 0000000000000000
-[ 4545.230401] fe20: 000000003956d000 ffff80097533feb8 ffff80097533fe50 ffff0000081fcb04
-[ 4545.238160] fe40: 0000000000010000 ffff80097514f900 ffff80097533fe80 ffff0000081fe014
-[ 4545.245919] fe60: ffff80097514f900 ffff80097514f900 000000003956d000 0000000000010000
-[ 4545.253678] fe80: 0000000000000000 ffff000008082f30 0000000000000000 0000800977146000
-[ 4545.261438] fea0: ffffffffffffffff 0000ffffa9c8745c 0000000000000124 0000000008202000
-[ 4545.269197] fec0: 0000000000000003 000000003956d000 0000000000010000 0000000000000000
-[ 4545.276956] fee0: 0000000000011011 0000000000000001 0000000000000011 0000000000000002
-[ 4545.284715] ff00: 000000000000003f 1f3c201f7372686b 00000000ffffffff 0000000000000030
-[ 4545.292474] ff20: 0000000000000038 0000000000000000 0000ffffa9bcca94 0000ffffa9d01588
-[ 4545.300233] ff40: 0000000000000000 0000ffffa9c87440 0000ffffefa323c0 0000000000010000
-[ 4545.307993] ff60: 000000000041a310 000000003956d000 0000000000000003 000000007fffe000
-[ 4545.315751] ff80: 00000000004088d0 0000000000010000 0000000000000000 0000000000000000
-[ 4545.323511] ffa0: 0000000000010000 0000ffffefa32690 0000000000404dcc 0000ffffefa32690
-[ 4545.331270] ffc0: 0000ffffa9c8745c 0000000060000000 0000000000000003 000000000000003f
-[ 4545.339029] ffe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-[ 4545.346786] Call trace:
-[ 4545.349207] Exception stack(0xffff80097533fae0 to 0xffff80097533fc10)
-[ 4545.355586] fae0: 0000000000001000 0001000000000000 ffff80097533fcb0 ffff0000083a1000
-[ 4545.363345] fb00: 000000003957c000 ffff80097533fc00 0000000020000145 0000000000000025
-[ 4545.371105] fb20: ffff800962d24000 ffff000008e8d3d8 0000000000001000 ffff8009753fdb00
-[ 4545.378864] fb40: 0000000000000000 0000000000000002 ffff80097533fd30 ffff000008082604
-[ 4545.386623] fb60: 0000000000001000 0001000000000000 ffff80097533fd30 ffff0000083a0a90
-[ 4545.394382] fb80: ffff800962d24000 ffff804392800000 0000000000000f80 0400000000000001
-[ 4545.402140] fba0: 0000000000000000 ffff8009778013b0 ffff800962d24000 0000000000001000
-[ 4545.409899] fbc0: 9110626091260021 0000000000000000 0000000000000000 97fc098d91042260
-[ 4545.417658] fbe0: b0000001f9001a79 5299400690000000 72a77346b2407be7 0000ffffa9d01588
-[ 4545.425416] fc00: ffff0000081fdfd0 0000ffffa9c87440
-[ 4545.430248] [<ffff0000083a1000>] __memcpy+0x100/0x180
-[ 4545.435253] [<ffff000008270f64>] read_kcore+0x21c/0x3b0
-[ 4545.440429] [<ffff00000826340c>] proc_reg_read+0x64/0x90
-[ 4545.445691] [<ffff0000081fb83c>] __vfs_read+0x1c/0x108
-[ 4545.450779] [<ffff0000081fcb28>] vfs_read+0x80/0x130
-[ 4545.455696] [<ffff0000081fe014>] SyS_read+0x44/0xa0
-[ 4545.460528] [<ffff000008082f30>] el0_svc_naked+0x24/0x28
-[ 4545.465790] Code: d503201f d503201f d503201f d503201f (a8c12027)
-[ 4545.471852] ---[ end trace 4d1897f94759f461 ]---
-[ 4545.476435] note: cat[8976] exited with preempt_count 2
+Patch applied, fixed up Rob's comment and added his ACK in the process.
 
-I find the issue is introduced when applying commit f9040773b7bb
-("arm64: move kernel image to base of vmalloc area"). This patch
-make the kernel image overlap with vmalloc area. It will result in
-vmalloc area have the huge page table. but the vmalloc_to_page is
-not realize the change. and the function is public to any arch.
-
-I fix it by change the init mapping to make it keep the accordance
-with vmalloc area mapping.
-
-Fixes: f9040773b7bb ("arm64: move kernel image to base of vmalloc area")
-Reported-by: tan xiaojun <tanxiaojun@huawei.com>
-Signed-off-by: zhong jiang <zhongjiang@huawei.com>
----
- arch/arm64/mm/mmu.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 17243e4..2d8b34d 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -185,7 +185,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 
- 		/* try section mapping first */
- 		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
--		      !page_mappings_only) {
-+		      !page_mappings_only && !is_vmalloc_addr((void *)addr)) {
- 			/*
- 			 * Set the contiguous bit for the subsequent group of
- 			 * PMDs if its size and alignment are appropriate.
-@@ -256,7 +256,8 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
- 		/*
- 		 * For 4K granule only, attempt to put down a 1GB block
- 		 */
--		if (use_1G_block(addr, next, phys) && !page_mappings_only) {
-+		if (use_1G_block(addr, next, phys) && !page_mappings_only &&
-+					!is_vmalloc_addr((void *)addr)) {
- 			pud_set_huge(pud, phys, prot);
- 
- 			/*
--- 
-1.7.12.4
+Yours,
+Linus Walleij
