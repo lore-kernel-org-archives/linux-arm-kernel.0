@@ -1,33 +1,86 @@
-From: apinski@caviumnetworks.com (Andrew Pinski)
-Date: Mon, 24 Apr 2017 11:49:10 -0700
-Subject: [PATCH 1/2] arm64:vdso: Rewrite gettimeofday into C.
-In-Reply-To: <20170424152106.GG25449@e104818-lin.cambridge.arm.com>
-References: <1492991221-5156-1-git-send-email-apinski@cavium.com>
- <20170424152106.GG25449@e104818-lin.cambridge.arm.com>
-Message-ID: <31273d31-57a8-2bfd-283f-025d3a88c96f@caviumnetworks.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Apr 2017 20:55:45 +0200
+Subject: [PATCH 1/2] clk: Add bindings for the Gemini Clock Controller
+Message-ID: <20170424185545.26608-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/2017 8:21 AM, Catalin Marinas wrote:
-> On Sun, Apr 23, 2017 at 04:47:00PM -0700, Andrew Pinski wrote:
->> This allows the compiler to optimize the divide by 1000.
->> And remove the other divide.
->>
->> On ThunderX, gettimeofday improves by 32%.  On ThunderX 2,
->> gettimeofday improves by 18%.
-> Is this with or without the second patch (removing the ISB)?
+This adds device tree bindings and a header for the Gemini SoC
+Clock Controller.
 
-Hi Caralin,
-   This is without the second patch that removes the ISB.  Maybe I 
-should not have sent them as the same patch set to make it clear that 
-way.  As I tried to make a mention of, the improvement is the compiler 
-not outputting the udiv instruction for the division by 1000.    I 
-should also mention I tested this patch on a softiron using GCC 4.8.5 
-(SUSE's default compiler) and the performance was the same; GCC 4.8.5 
-emits udiv still in this case.  I did not try a newer compiler to see 
-the performance there.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ .../clock/cortina,gemini-clock-controller.txt      | 25 +++++++++++++++++++
+ include/dt-bindings/clock/cortina,gemini-clock.h   | 29 ++++++++++++++++++++++
+ 2 files changed, 54 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/cortina,gemini-clock-controller.txt
+ create mode 100644 include/dt-bindings/clock/cortina,gemini-clock.h
 
-Thanks,
-Andrew Pinski
-
->
+diff --git a/Documentation/devicetree/bindings/clock/cortina,gemini-clock-controller.txt b/Documentation/devicetree/bindings/clock/cortina,gemini-clock-controller.txt
+new file mode 100644
+index 000000000000..7af84acfcbce
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/cortina,gemini-clock-controller.txt
+@@ -0,0 +1,25 @@
++Clock bindings for the Cortina Systems Gemini SoC Clock Controller
++
++Required properties :
++- compatible : shall contain the following:
++  "cortina,gemini-clock-controller"
++- #clock-cells should be <1>
++
++The Gemini clock controller needs to be placed as a subnode of the
++system controller.
++
++All available clocks are defined as preprocessor macros in
++dt-bindings/clock/cortina,gemini-clock.h header and can be used in device
++tree sources.
++
++Example:
++
++syscon: syscon at 40000000 {
++	compatible = "cortina,gemini-syscon", "syscon", "simple-mfd";
++	reg = <0x40000000 0x1000>;
++
++	clock-controller {
++		compatible = "cortina,gemini-clock-controller";
++		#clock-cells = <1>;
++	};
++};
+diff --git a/include/dt-bindings/clock/cortina,gemini-clock.h b/include/dt-bindings/clock/cortina,gemini-clock.h
+new file mode 100644
+index 000000000000..acf5cd550b0c
+--- /dev/null
++++ b/include/dt-bindings/clock/cortina,gemini-clock.h
+@@ -0,0 +1,29 @@
++#ifndef DT_BINDINGS_CORTINA_GEMINI_CLOCK_H
++#define DT_BINDINGS_CORTINA_GEMINI_CLOCK_H
++
++/* RTC, AHB, APB, CPU, PCI, TVC, UART clocks and 13 gates */
++#define GEMINI_NUM_CLKS 20
++
++#define GEMINI_CLK_RTC 0
++#define GEMINI_CLK_AHB 1
++#define GEMINI_CLK_APB 2
++#define GEMINI_CLK_CPU 3
++#define GEMINI_CLK_PCI 4
++#define GEMINI_CLK_TVC 5
++#define GEMINI_CLK_UART 6
++#define GEMINI_CLK_GATES 7
++#define GEMINI_CLK_GATE_SECURITY 7
++#define GEMINI_CLK_GATE_GMAC0 8
++#define GEMINI_CLK_GATE_GMAC1 9
++#define GEMINI_CLK_GATE_SATA0 10
++#define GEMINI_CLK_GATE_SATA1 11
++#define GEMINI_CLK_GATE_USB0 12
++#define GEMINI_CLK_GATE_USB1 13
++#define GEMINI_CLK_GATE_IDE 14
++#define GEMINI_CLK_GATE_PCI 15
++#define GEMINI_CLK_GATE_DDR 16
++#define GEMINI_CLK_GATE_FLASH 17
++#define GEMINI_CLK_GATE_TVC 18
++#define GEMINI_CLK_GATE_BOOT 19
++
++#endif /* DT_BINDINGS_CORTINA_GEMINI_CLOCK_H */
+-- 
+2.9.3
