@@ -1,16 +1,18 @@
 From: lixiaoping3@huawei.com (Lixiaoping (Timmy))
-Date: Mon, 24 Apr 2017 08:18:49 +0000
+Date: Mon, 24 Apr 2017 08:25:07 +0000
 Subject: [PATCH v3 15/18] arm64: arch_timer: Enable CNTVCT_EL0 trap if
  workaround is enabled
 In-Reply-To: <95ac3477-436a-22ad-80f4-d4bed6c73e1c@arm.com>
 References: <20170404171826.25030-1-marc.zyngier@arm.com>
  <20170404171826.25030-16-marc.zyngier@arm.com> <58FDB05B.6020108@huawei.com>
  <95ac3477-436a-22ad-80f4-d4bed6c73e1c@arm.com>
-Message-ID: <AF3DCEF48831C6498A12720ADD13CD7F2A5DAC91@dggeml506-mbs.china.huawei.com>
+Message-ID: <AF3DCEF48831C6498A12720ADD13CD7F2A5DACA8@dggeml506-mbs.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Marc,
+
+Sorry about previous email's confidential info. Please forget it.
 
 +#define ESR_ELx_SYS64_ISS_SYS_CNTFRQ	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 14, 0, 0) | \
 +					 ESR_ELx_SYS64_ISS_DIR_READ)
@@ -21,10 +23,6 @@ I think (3, 3, 14, 0, 0) should be (3, 3, 0, 14, 0)?
 Best Regards,
 
 Timmy Li (Lixiaoping)
-Turing Architecture and Design Dept, Hisilicon
-
------------------------------------------------------------------------------
-This e-mail and its attachments contain confidential information from HUAWEI, which is intended only for the person or entity whose address is listed above. Any use of the information contained herein in any way (including, but not limited to, total or partial disclosure, reproduction, or dissemination) by persons other than the intended recipient(s) is prohibited. If you receive this e-mail in error, please notify the sender by phone or email immediately and delete it!
 
 -----Original Message-----
 From: Marc Zyngier [mailto:marc.zyngier at arm.com] 
