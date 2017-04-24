@@ -1,71 +1,105 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 24 Apr 2017 11:16:51 +0100
-Subject: [PATCH v4 1/7] dma: Take into account dma_pfn_offset
-In-Reply-To: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
-References: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1493029017-31382-2-git-send-email-vladimir.murzin@arm.com>
+Date: Mon, 24 Apr 2017 11:16:50 +0100
+Subject: [PATCH v4 0/7] ARM: Fix dma_alloc_coherent() and friends for NOMMU
+Message-ID: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even though dma-noop-ops assumes 1:1 memory mapping DMA memory range
-can be different to RAM. For example, ARM STM32F4 MCU offers the
-possibility to remap SDRAM from 0xc000_0000 to 0x0 to get CPU
-performance boost, but DMA continue to see SDRAM at 0xc000_0000. This
-difference in mapping is handled via device-tree "dma-range" property
-which leads to dev->dma_pfn_offset is set nonzero. To handle such
-cases take dma_pfn_offset into account.
+It seem that addition of cache support for M-class CPUs uncovered
+latent bug in DMA usage. NOMMU memory model has been treated as being
+always consistent; however, for R/M CPU classes memory can be covered
+by MPU which in turn might configure RAM as Normal i.e. bufferable and
+cacheable. It breaks dma_alloc_coherent() and friends, since data can
+stuck in caches now or be buffered.
+
+This patch set is trying to address the issue by providing region of
+memory suitable for consistent DMA operations. It is supposed that
+such region is marked by MPU as non-cacheable. Robin suggested to
+advertise such memory as reserved shared-dma-pool, rather then using
+homebrew command line option, and extend dma-coherent to provide
+default DMA area in the similar way as it is done for CMA (PATCH
+4/7). It allows us to offload all bookkeeping on generic coherent DMA
+framework, and it seems that it might be reused by other architectures
+like c6x and blackfin.
+
+While reviewing/testing previous vesrions of the patch set it turned
+out that dma-coherent does not take into account "dma-ranges" device
+tree property, so it is addressed in PATCH 3/7.
+
+For ARM, dedicated DMA region is required for cases other than:
+ - MMU/MPU is off
+ - cpu is v7m w/o cache support
+ - device is coherent
+
+In case one of the above conditions is true dma operations are forced
+to be coherent and wired with dma_noop_ops.
+
+To make life easier NOMMU dma operations are kept in separate
+compilation unit.
+
+Since the issue was reported in the same time as Benjamin sent his
+patch [1] to allow mmap for NOMMU, his case is also addressed in this
+series (PATCH 1/7 and PATCH 2/7).
+
+Thanks!
+
+[1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
 
 Cc: Joerg Roedel <jroedel@suse.de>
 Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Tested-by: Andras Szemzo <sza@esh.hu>
-Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- lib/dma-noop.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+Cc: Michal Nazarewicz <mina86@mina86.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+Cc: Rich Felker <dalias@libc.org>
+Cc: Roger Quadros <rogerq@ti.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Doug Ledford <dledford@redhat.com>
 
-diff --git a/lib/dma-noop.c b/lib/dma-noop.c
-index de26c8b..ff4ef5e 100644
---- a/lib/dma-noop.c
-+++ b/lib/dma-noop.c
-@@ -7,6 +7,7 @@
- #include <linux/mm.h>
- #include <linux/dma-mapping.h>
- #include <linux/scatterlist.h>
-+#include <linux/pfn.h>
- 
- static void *dma_noop_alloc(struct device *dev, size_t size,
- 			    dma_addr_t *dma_handle, gfp_t gfp,
-@@ -16,7 +17,8 @@ static void *dma_noop_alloc(struct device *dev, size_t size,
- 
- 	ret = (void *)__get_free_pages(gfp, get_order(size));
- 	if (ret)
--		*dma_handle = virt_to_phys(ret);
-+		*dma_handle = virt_to_phys(ret) - PFN_PHYS(dev->dma_pfn_offset);
-+
- 	return ret;
- }
- 
-@@ -32,7 +34,7 @@ static dma_addr_t dma_noop_map_page(struct device *dev, struct page *page,
- 				      enum dma_data_direction dir,
- 				      unsigned long attrs)
- {
--	return page_to_phys(page) + offset;
-+	return page_to_phys(page) + offset - PFN_PHYS(dev->dma_pfn_offset);
- }
- 
- static int dma_noop_map_sg(struct device *dev, struct scatterlist *sgl, int nents,
-@@ -47,7 +49,7 @@ static int dma_noop_map_sg(struct device *dev, struct scatterlist *sgl, int nent
- 
- 		BUG_ON(!sg_page(sg));
- 		va = sg_virt(sg);
--		sg_dma_address(sg) = (dma_addr_t)virt_to_phys(va);
-+		sg_dma_address(sg) = (dma_addr_t)(virt_to_phys(va) - PFN_PHYS(dev->dma_pfn_offset));
- 		sg_dma_len(sg) = sg->length;
- 	}
- 
+Changelog:
+	    v3 -> v4
+	       - rebased on v4.11-rc7
+	       - made CONFIG_ARM_DMA_MEM_BUFFERABLE optional for CPU_V7M
+	       - added Arnd's Acked-by
+
+	    v2 -> v3
+	       - fixed warnings reported by Alexandre and kbuild robot
+
+	    v1 -> v2
+	       - rebased on v4.11-rc1
+	       - added Robin's Reviewed-by
+	       - dedicated flag is introduced to use dev->dma_pfn_offset
+	         rather than mem->device_base in case memory region is
+		 configured via device tree (so Tested-by discarded there)
+
+	RFC v6 -> v1
+	       - dropped RFC tag
+	       - added Alexandre's Tested-by
+
+
+Vladimir Murzin (7):
+  dma: Take into account dma_pfn_offset
+  dma: Add simple dma_noop_mmap
+  drivers: dma-coherent: Account dma_pfn_offset when used with device
+    tree
+  drivers: dma-coherent: Introduce default DMA pool
+  ARM: NOMMU: Introduce dma operations for noMMU
+  ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
+  ARM: dma-mapping: Remove traces of NOMMU code
+
+ .../bindings/reserved-memory/reserved-memory.txt   |   3 +
+ arch/arm/Kconfig                                   |   1 +
+ arch/arm/include/asm/dma-mapping.h                 |   2 +-
+ arch/arm/mm/Kconfig                                |   4 +-
+ arch/arm/mm/Makefile                               |   5 +-
+ arch/arm/mm/dma-mapping-nommu.c                    | 253 +++++++++++++++++++++
+ arch/arm/mm/dma-mapping.c                          |  29 +--
+ drivers/base/dma-coherent.c                        |  74 +++++-
+ lib/dma-noop.c                                     |  29 ++-
+ 9 files changed, 355 insertions(+), 45 deletions(-)
+ create mode 100644 arch/arm/mm/dma-mapping-nommu.c
+
 -- 
 2.0.0
