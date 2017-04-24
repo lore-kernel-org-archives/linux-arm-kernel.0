@@ -1,84 +1,139 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 24 Apr 2017 12:05:05 -0500
-Subject: [PATCH 1/1] PCI: Add MCFG quirk for 2nd node of Cavium ThunderX
- pass2.x host controller
-In-Reply-To: <20170424093429.GT16981@rric.localdomain>
-References: <1490789773-21506-1-git-send-email-tn@semihalf.com>
- <20170421165614.GA17916@bhelgaas-glaptop.roam.corp.google.com>
- <20170424093429.GT16981@rric.localdomain>
-Message-ID: <CAErSpo4-a4jKEpxZX3YKeAzE-oVdE3gtRDGSx7nrGuVzK9OKGA@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 24 Apr 2017 09:58:23 -0700
+Subject: [PATCH] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS mmaping
+ code
+In-Reply-To: <20170421161234.GD5312@e104818-lin.cambridge.arm.com>
+References: <CGME20170329100540eucas1p22d428e33aa678cbef0a24dd249820451@eucas1p2.samsung.com>
+ <1490781926-6209-1-git-send-email-a.hajda@samsung.com>
+ <15b1be13-625f-db74-d213-ad1df86f7eb5@arm.com>
+ <20170421161234.GD5312@e104818-lin.cambridge.arm.com>
+Message-ID: <a344c9c8-8a1f-cfc4-4dcd-1b49f3e1ac6c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 4:34 AM, Robert Richter
-<robert.richter@cavium.com> wrote:
-> On 21.04.17 11:56:14, Bjorn Helgaas wrote:
->> On Wed, Mar 29, 2017 at 02:16:13PM +0200, Tomasz Nowicki wrote:
->> > Currently SoCs pass2.x do not emulate EA headers for ACPI boot method at all.
->> > However, for pass2.x some devices (like EDAC) advertise incorrect base addresses
->> > in their BARs which results in driver probe failure during resource request.
->> > Since all problematic blocks are on 2nd NUMA node under domain 10 add necessary
->> > quirk entry to obtain BAR addresses correction using EA header emulation.
->> >
->> > Fixes: 44f22bd91e88 ("PCI: Add MCFG quirks for Cavium ThunderX pass2.x host controller")
->> > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> > CC: stable at vger.kernel.org  # v4.10+
+On 04/21/2017 09:12 AM, Catalin Marinas wrote:
+> On Wed, Mar 29, 2017 at 01:55:32PM +0100, Robin Murphy wrote:
+>> On 29/03/17 11:05, Andrzej Hajda wrote:
+>>> In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
+>>> is invalid. __iommu_mmap_attrs and __iommu_get_sgtable cannot use
+>>> it. In first case temporary pages array is passed to iommu_dma_mmap,
+>>> in 2nd case single entry sg table is created directly instead
+>>> of calling helper.
+>>>
+>>> Fixes: 44176bb ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
+>>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>>> ---
+>>> Hi,
+>>>
+>>> I am not familiar with this framework so please don't be too cruel ;)
+>>> Alternative solution I see is to always create vm_area->pages,
+>>> I do not know which approach is preferred.
+>>>
+>>> Regards
+>>> Andrzej
+>>> ---
+>>>  arch/arm64/mm/dma-mapping.c | 40 ++++++++++++++++++++++++++++++++++++++--
+>>>  1 file changed, 38 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>>> index f7b5401..bba2bc8 100644
+>>> --- a/arch/arm64/mm/dma-mapping.c
+>>> +++ b/arch/arm64/mm/dma-mapping.c
+>>> @@ -704,7 +704,30 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+>>>  		return ret;
+>>>  
+>>>  	area = find_vm_area(cpu_addr);
+>>> -	if (WARN_ON(!area || !area->pages))
+>>> +	if (WARN_ON(!area))
 >>
->> Sorry Tomasz, I must have mistakenly marked this "accepted" in
->> patchwork, so it fell off my to-do list.  It's too late to get this in
->> v4.11, but I can still apply it for v4.12.
->>
->> I put it on my pci/host-thunder branch with Robert's ack.  I added a preceding
->> patch to tidy up whitespace, which makes this patch look like just:
->>
->>         /* SoC pass2.x */
->>         THUNDER_PEM_QUIRK(1, 0),
->>         THUNDER_PEM_QUIRK(1, 1),
->> +       THUNDER_ECAM_QUIRK(1, 10),
->>
->> Please double-check it to make sure this is what you need.
->
-> Bjorn,
->
-> since the second is marked stable there will be conflicts when
-> applying it to stable (or built errors). The best would be to change
-> order of both (128cd6e8249f^, 128cd6e8249f) for smooth backporting
-> which makes it then more close to Tomasz's version again.
+>> From the look of things, it doesn't seem strictly necessary to change
+>> this, but whether that's a good thing is another matter. I'm not sure
+>> that dma_common_contiguous_remap() should really be leaving a dangling
+>> pointer in area->pages as it apparently does... :/
+> 
+> On this specific point, I don't think area->pages should be set either
+> (cc'ing Laura). As in the vmalloc vs vmap case, area->pages when pages
+> need to be freed (via vfree), which is not the case here. The
+> dma_common_pages_remap() would need to set area->pages when called
+> directly from the iommu DMA ops. Proposal below, not tested with the
+> iommu ops. I assume the patch would cause __iommu_mmap_attrs() to return
+> -ENXIO if DMA_ATTR_FORCE_CONTIGUOUS is set.
+> 
+> ------------8<---------------------------------
+> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+> index efd71cf4fdea..ab7071041141 100644
+> --- a/drivers/base/dma-mapping.c
+> +++ b/drivers/base/dma-mapping.c
+> @@ -277,8 +277,8 @@ EXPORT_SYMBOL(dma_common_mmap);
+>   * remaps an array of PAGE_SIZE pages into another vm_area
+>   * Cannot be used in non-sleeping contexts
+>   */
+> -void *dma_common_pages_remap(struct page **pages, size_t size,
+> -			unsigned long vm_flags, pgprot_t prot,
+> +static struct vm_struct *__dma_common_pages_remap(struct page **pages,
+> +			size_t size, unsigned long vm_flags, pgprot_t prot,
+>  			const void *caller)
+>  {
+>  	struct vm_struct *area;
+> @@ -287,13 +287,26 @@ void *dma_common_pages_remap(struct page **pages, size_t size,
+>  	if (!area)
+>  		return NULL;
+>  
+> -	area->pages = pages;
+> -
+>  	if (map_vm_area(area, prot, pages)) {
+>  		vunmap(area->addr);
+>  		return NULL;
+>  	}
+>  
+> +	return area;
+> +}
+> +
+> +void *dma_common_pages_remap(struct page **pages, size_t size,
+> +			unsigned long vm_flags, pgprot_t prot,
+> +			const void *caller)
+> +{
+> +	struct vm_struct *area;
+> +
+> +	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
+> +	if (!area)
+> +		return NULL;
+> +
+> +	area->pages = pages;
+> +
+>  	return area->addr;
+>  }
+>  
+> @@ -308,7 +321,7 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
+>  {
+>  	int i;
+>  	struct page **pages;
+> -	void *ptr;
+> +	struct vm_struct *area;
+>  	unsigned long pfn;
+>  
+>  	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
+> @@ -318,11 +331,13 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
+>  	for (i = 0, pfn = page_to_pfn(page); i < (size >> PAGE_SHIFT); i++)
+>  		pages[i] = pfn_to_page(pfn + i);
+>  
+> -	ptr = dma_common_pages_remap(pages, size, vm_flags, prot, caller);
+> +	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
+>  
+>  	kfree(pages);
+>  
+> -	return ptr;
+> +	if (!area)
+> +		return NULL;
+> +	return area->addr;
+>  }
+>  
+>  /*
+> 
 
-Thanks, I should have noticed that.  Could go either way; I just
-marked 128cd6e8249f^ for stable as well, since it seemed marginally
-easier to read to split the whitespace changes from the real change.
+>From a quick glance, this looks okay. I can give a proper tag when
+the fix to allow mmaping comes in since I'm guessing -ENXIO is not the
+end goal.
 
->> > ---
->> >  drivers/acpi/pci_mcfg.c | 7 ++++---
->> >  1 file changed, 4 insertions(+), 3 deletions(-)
->> >
->> > diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
->> > index a6a4cea..a0a391e 100644
->> > --- a/drivers/acpi/pci_mcfg.c
->> > +++ b/drivers/acpi/pci_mcfg.c
->> > @@ -90,13 +90,14 @@ static struct mcfg_fixup mcfg_quirks[] = {
->> >       &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x894057000000UL, node) },  \
->> >     { "CAVIUM", "THUNDERX", rev, 9 + (10 * (node)), MCFG_BUS_ANY,       \
->> >       &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x89808f000000UL, node) }
->> > +#define THUNDER_ECAM_QUIRK(rev, seg)                                       \
->> > +   { "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,                 \
->> > +   &pci_thunder_ecam_ops }
->> >     /* SoC pass2.x */
->> >     THUNDER_PEM_QUIRK(1, 0),
->> >     THUNDER_PEM_QUIRK(1, 1),
->> > +   THUNDER_ECAM_QUIRK(1, 10),
->> >
->> > -#define THUNDER_ECAM_QUIRK(rev, seg)                                       \
->> > -   { "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,                 \
->> > -   &pci_thunder_ecam_ops }
->> >     /* SoC pass1.x */
->> >     THUNDER_PEM_QUIRK(2, 0),        /* off-chip devices */
->> >     THUNDER_PEM_QUIRK(2, 1),        /* off-chip devices */
->> > --
->> > 2.7.4
->> >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
+Laura
