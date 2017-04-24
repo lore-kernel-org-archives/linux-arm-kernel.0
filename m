@@ -1,50 +1,63 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 25 Apr 2017 00:00:56 +0800
-Subject: [PATCH v4 03/10] irqchip/sunxi-nmi: add support for the NMI in A64
- R_INTC
-In-Reply-To: <20170424160103.9447-1-icenowy@aosc.io>
-References: <20170424160103.9447-1-icenowy@aosc.io>
-Message-ID: <20170424160103.9447-4-icenowy@aosc.io>
+From: macro@linux-mips.org (Maciej W. Rozycki)
+Date: Mon, 24 Apr 2017 17:53:37 +0100 (BST)
+Subject: [RFC] minimum gcc version for kernel: raise to gcc-4.3 or 4.6?
+In-Reply-To: <CAK8P3a32Y0AiKyVaotYb14uZZ1jM=nwhFD1vyP56epW1Y9KqSw@mail.gmail.com>
+References: <20161216105634.235457-1-arnd@arndb.de>
+ <3302470.IDcDrWa0u6@wuerfel>
+ <CAGXu5jLPRYi+HK=07Zndc8szEKD4mZCqaHJFnHmmoYr7tA1xPw@mail.gmail.com>
+ <CAK8P3a2C2WhWjzF=HrzU15Ncg0juR+nstZukBEpqCrVNW5pnDA@mail.gmail.com>
+ <CAGXu5jLTR+dY_Ayyix5Tg0Yn9LBFAt=j56MQVdJVGue-R-CizA@mail.gmail.com>
+ <CAK8P3a114EVbnhbObfq-4pZp8XCT4fWzMXD+WkRi7iPXs1vFMA@mail.gmail.com>
+ <CAGXu5jJpofLF0qAf0-2iNTesZt-X704Q7L=DpQYdtHY5n2HD0w@mail.gmail.com>
+ <alpine.LFD.2.20.1704220400380.32200@eddie.linux-mips.org>
+ <CAK8P3a28fi0GRcz1yLq+wRkaBBO_w74NnBCY7f3myg78JpaCCQ@mail.gmail.com>
+ <CAMuHMdWTiurUSacddYXgW69=QwOrZDV3Zt2DezJauPy8j-GMHw@mail.gmail.com>
+ <CAK8P3a32Y0AiKyVaotYb14uZZ1jM=nwhFD1vyP56epW1Y9KqSw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.20.1704241249350.32200@eddie.linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the newly imported compatible for the A64 R_INTC in
-irq-sunxi-nmi driver
+On Mon, 24 Apr 2017, Arnd Bergmann wrote:
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
-New patch in v4, which is part of NMI refactor.
+> > If there's no real good reason (brokenness) to deprecate gcc-4.1, I would not
+> > do it.I guess most people using old compilers know what they're doing.
+> 
+> What I'm trying to find out first is whether "people regularly using 10+
+> year old compilers for the latest kernels" is a strict subset of "people in
+> Geert's household".
 
- drivers/irqchip/irq-sunxi-nmi.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ Well I do not live with Geert TBH.
 
-diff --git a/drivers/irqchip/irq-sunxi-nmi.c b/drivers/irqchip/irq-sunxi-nmi.c
-index 668730c5cb66..5f7408b1cd4d 100644
---- a/drivers/irqchip/irq-sunxi-nmi.c
-+++ b/drivers/irqchip/irq-sunxi-nmi.c
-@@ -56,6 +56,12 @@ static struct sunxi_sc_nmi_reg_offs sun9i_reg_offs = {
- 	.enable	= 0x04,
- };
- 
-+static struct sunxi_sc_nmi_reg_offs sun50i_reg_offs = {
-+	.ctrl	= 0x0c,
-+	.pend	= 0x10,
-+	.enable	= 0x40,
-+};
-+
- static inline void sunxi_sc_nmi_write(struct irq_chip_generic *gc, u32 off,
- 				      u32 val)
- {
-@@ -220,3 +226,10 @@ static int __init sun9i_nmi_irq_init(struct device_node *node,
- 	return sunxi_sc_nmi_irq_init(node, &sun9i_reg_offs);
- }
- IRQCHIP_DECLARE(sun9i_nmi, "allwinner,sun9i-a80-nmi", sun9i_nmi_irq_init);
-+
-+static int __init sun50i_nmi_irq_init(struct device_node *node,
-+				     struct device_node *parent)
-+{
-+	return sunxi_sc_nmi_irq_init(node, &sun50i_reg_offs);
-+}
-+IRQCHIP_DECLARE(sun50i_nmi, "allwinner,sun50i-a80-nmi", sun50i_nmi_irq_init);
--- 
-2.12.2
+> Given that none of the three architectures I looked at (arm, mips, x86)
+> has successfully built any defconfig for a few years, it's quite possible
+> that it's just you ;-) The other architectures that were around 10 years
+> ago (so they might have someone who still has old toolchain binaries)
+> and that still exist today are alpha, cris, frv, ia64, m32r, parisc, powerpc,
+> s390, sh, sparc and xtensa. The first six are similar to m68k in that the
+> hardware is mostly obsolete and the ports are kept around to support
+> those old systems that might also use ancient toolchains, or new
+> toolchains may be unmaintained or buggy, which could be a reason
+> to keep 4.1 supported or at least try to find out if 4.1 (or even any other
+> version) still works at all.
+
+ Huh?
+
+$ git log -1
+commit 5a7ad1146caa895ad718a534399e38bd2ba721b7
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Sun Apr 23 16:53:00 2017 -0700
+
+    Linux 4.11-rc8
+$ /usr/bin/time make ARCH=mips CROSS_COMPILE=mipsel-linux- decstation_defconfig vmlinux >/dev/null 2>&1
+1014.19user 71.47system 19:33.24elapsed 92%CPU (0avgtext+0avgdata 
+0maxresident)k18764inputs+242504outputs (704major+9549837minor)pagefaults 0swaps
+$ mipsel-linux-gcc --version
+gcc (GCC) 4.1.2
+Copyright (C) 2006 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+$ 
+
+Methinks it builds just fine.
+
+  Maciej
