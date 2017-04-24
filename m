@@ -1,77 +1,153 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Mon, 24 Apr 2017 17:45:26 +0000
-Subject: [PATCH] arm64: pmuv3: Support v8.1 PMUv3 extension
-In-Reply-To: <20170424164507.GB5972@leverpostej>
-References: <1493033503-4712-1-git-send-email-jnair@caviumnetworks.com>
- <20170424125747.GA5767@leverpostej>
- <20170424133929.GA4952@localhost>
- <20170424140348.GB5767@leverpostej>
- <20170424164008.GA4657@localhost>
- <20170424164507.GB5972@leverpostej>
-Message-ID: <20170424174526.GB4657@localhost>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 24 Apr 2017 10:52:08 -0700
+Subject: [PATCH] arm64: fix the overlap between the kernel image and
+ vmalloc address
+In-Reply-To: <20170424155125.GA5972@leverpostej>
+References: <1493025729-21505-1-git-send-email-zhongjiang@huawei.com>
+ <20170424104456.GA4343@leverpostej> <58FDFD90.8050300@huawei.com>
+ <20170424155125.GA5972@leverpostej>
+Message-ID: <ffd0a3c5-5d89-4bbd-9995-c545bccaa8f6@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 05:45:08PM +0100, Mark Rutland wrote:
-> On Mon, Apr 24, 2017 at 04:40:09PM +0000, Jayachandran C wrote:
-> > On Mon, Apr 24, 2017 at 03:03:48PM +0100, Mark Rutland wrote:
-> > > On Mon, Apr 24, 2017 at 01:39:30PM +0000, Jayachandran C wrote:
-> > > > The v8.1 supplement is quite clear on the field definition:
-> > > >
-> > > > PMUVer, bits [11:8]
-> > > > ....
-> > > > Defined values are:
-> > > >       0000 Performance Monitors extension System registers not implemented.
-> > > >       0001 Performance Monitors extension System registers implemented, PMUv3.
-> > > >       0100 Performance Monitors extension System registers implemented, PMUv3, with a 16-bit
-> > > >            evtCount field, and if EL2 is implemented, the addition of the MDCR_EL2.HPMD bit.
-> > > >       1111 IMPLEMENTATION DEFINED form of performance monitors supported, PMUv3 not
-> > > >            supported.
-> > > >         All other values are reserved.
-> > > >         In ARMv8-A the permitted values are 0b0000, 0b0001 and 0b1111.
-> > > >         In ARMv8.1 the permitted values are 0b0000, 0b0100 and 0b1111.
-> > > >
-> > > > I changed the code to strictly do this. We have to exclude 0xf, since that is not PMUv3.
-> > > > And we cannot predict what the reserved values will represent, so it is best to skip them
-> > > > until they are defined to be PMUv3 compatible.
-> > > 
-> > > My understanding is that ID_AA64DFR0.PMUVer is intended to be covered by
-> > > the usual ID register principles, and thus at least 0x2-0x7 are reserved
-> > > for architected backwards compatible extensions to PMUv3.
-> > > 
-> > > See ARM DDI 0487B.a, D7.1.4, "Principles of the ID scheme for fields in
-> > > ID registers". It is explicitly stated that the scheme applies to
-> > > ID_AA64DFR0.
-> > > 
-> > > Per those rules, we should check >= the minimum PMUv3 implemented value,
-> > > i.e. val >= 1. Due to both 0x0 and 0xF meaning PMUv3 isn't implemented,
-> > > it's not clear if the fields should be treated as if it were signed or
-> > > unsigned, and I'm awaiting clarification on this.
-> > 
-> > Thanks for the reference. Since 0xf means that there is a PMU (but it is
-> > not PMUv3), this looks like an unsigned ID with a special case.
-> > 
-> > > Either way, I believe that 0x1-0x7 must all be compatible with baseline
-> > > PMUv3 per the ID scheme principles.
-> > 
-> > In case you don't get authoritative information on this, can you please
-> > merge a version which does either 'if (pmuver < 1 || pmuver == 0xf)' or
-> > 'if (pmuver < 1 || pmuver > 7)' to the patchset?
+On 04/24/2017 08:51 AM, Mark Rutland wrote:
+> On Mon, Apr 24, 2017 at 09:28:48PM +0800, zhong jiang wrote:
+>> On 2017/4/24 18:44, Mark Rutland wrote:
+>>> So the issue is that we have the callchain below for a kernel image
+>>> address:
+>>>
+>>> read_kcore()
+>>> ->is_vmalloc_or_module_addr() // returns true
+>>> ->vread()
+>>> -->aligned_vread()
+>>> --->vmalloc_to_page()
+>>>
+>>> In is_vmalloc{,or_module}_addr() we just check the addr against
+>>> VMALLOC_START and VMALLOC_END, so they will return true for a kernel
+>>> image address.
+>>>
+>>> Then, we call vmalloc_to_page(). While this only handles mappings made
+>>> at page granularity, the kernel image mapping may have used sections. So
+>>> this tries a bogus walk to the pte level.
 > 
-> Sure, that's what I proposed:
+>>> Should we special-case kernel image handling, e.g. with new
+>>> is_kernel_image_addr() / kernel_image_to_page() helpers?
 > 
->         pmuver = cpuid_feature_extract_signed_field(dfr0,
->                         ID_AA64DFR0_PMUVER_SHIFT);
->         if (pmuver < 1)
->                 return;
+>>   yes ,  it seems to the best way to implents it  without performance back.
 > 
-> Note that it treats the value as signed, so it will accept 0x1-0x7, and
-> return for 0x0 or 0x8-0xf.
+>> The following patch is the implment. Any thought?
+>>
+>> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+>>
+>>   diff --git a/include/linux/mm.h b/include/linux/mm.h
+>> index b84615b..851ac35 100644
+>> --- a/include/linux/mm.h
+>> +++ b/include/linux/mm.h
+>> @@ -475,6 +475,15 @@ static inline bool is_vmalloc_addr(const void *x)
+>>         return false;
+>>  #endif
+>>  }
+>> +
+>> +static inline bool is_kernel_image_addr(const void *x)
+>> +{
+>> +       unsigned long addr = (unsigned long)x;
+>> +
+>> +       return addr >= (unsigned long)_stext && addr < (unsigned long)_end;
+>> +
+>> +}
+>> +
+>>  #ifdef CONFIG_MMU
+>>  extern int is_vmalloc_or_module_addr(const void *x);
+>>  #else
+>> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+>> index 3ca82d4..9a9ef65 100644
+>> --- a/mm/vmalloc.c
+>> +++ b/mm/vmalloc.c
+>> @@ -229,6 +229,42 @@ int is_vmalloc_or_module_addr(const void *x)
+>>         return is_vmalloc_addr(x);
+>>  }
+>>
+>> +static struct page *kernel_image_to_page(const void *kernel_addr, pgd_t *pgd)
+>> +{
+>> +       unsigned long addr = (unsigned long)kernel_addr;
+>> +       struct page *page = NULL;
+>> +       pud_t *pud;
+>> +       pmd_t *pmd;
+>> +       pte_t *pte;
+>> +
+>> +       if (pgd_none(*pgd))
+>> +               goto out;
+>> +
+>> +       pud = pud_offset(pgd, addr);
+>> +       if (pud_none(*pud))
+>> +               goto out;
+>> +
+>> +       if (pud_sect(*pud))
+>> +               return pud_page(*pud);
+> 
+> The *_sect() helpers are arch-specific, so we cannot use them in generic
+> code. This would need to be architecture-specific.
+> 
+> Secondly, this will return head page of the section regardless of which
+> page in the section the address corresponds to
+> 
+>> +
+>> +       pmd = pmd_offset(*pmd, addr);
+>> +       if (pmd_none(*pmd))
+>> +               goto out;
+>> +
+>> +       if (pmd_sect(*pmd))
+>> +               return pmd_page(*pmd);
+> 
+> Likewise on both counts.
+> 
+>> +
+>> +       pte = pte_offset_kernel(pmd, addr);
+>> +       if (pte_none(*pte))
+>> +               goto out;
+>> +
+>> +       page = pte_page(*pte);
+>> +
+>> +out:
+>> +       return page;
+>> +
+>> +}
+> 
+> Given we know what the address should map to, I don't think we need to
+> walk the page tables here. I think this can be:
+> 
+> static struct page *kernel_image_to_page(const void *addr)
+> {
+> 	return virt_to_page(lm_alias(vmalloc_addr));
+> }
+> 
+>> +
+>>  /*
+>>    * Walk a vmap address to the struct page it maps.
+>>    */
+>> @@ -244,6 +280,9 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
+>>          */
+>>         VIRTUAL_BUG_ON(!is_vmalloc_or_module_addr(vmalloc_addr));
+>>
+>> +       if (is_kernel_image_addr(vmalloc_addr))
+>> +               return kernel_image_to_page(vmalloc_addr, pgd);
+> 
+> It's not clear to me that this is the right place for this to live.
+> 
+> It might be best to code the kernel image logic directly in kcore (and
+> kmem), assuming everyone's OK with that approach.
+> 
 
-Ok, we will need to change the type of pmuver to int as well.
+That will fix kcore and kmem but this will show up in other places too.
+We've gone through and made sure that virt_addr_valid returns
+true if and only if virt_to_page returns a valid address. I don't know
+if we can make as strong a claim about is_vmalloc_addr and
+vmalloc_to_page in all cases but is_vmalloc_addr should not return true
+for the kernel image. That would at least let kcore fall back to
+kern_addr_valid which should correctly handle the kernel image.
+The suggestion to move the kernel image out of VMALLOC_START/VMALLOC_END
+seems like the best approach although I haven't tried a prototype
+at all.
 
-But even then, I think the reasonable interpretation of the current spec
-is that the field is unsigned. Your original 'if (pmuver < 1 || pmuver == 0xf)'
-is the least surprising way of writing it.
-
-JC.
+Thanks,
+Laura
