@@ -1,56 +1,33 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Apr 2017 14:34:47 +0100
-Subject: [PATCH] arm64: prefetch: Change assembly to be compatible with
- gcc and clang
-In-Reply-To: <20170420084206.GB31436@leverpostej>
-References: <20170419212211.95803-1-mka@chromium.org>
- <20170420084206.GB31436@leverpostej>
-Message-ID: <20170424133447.GA12323@arm.com>
+Date: Mon, 24 Apr 2017 14:36:23 +0100
+Subject: [RFC PATCH 0/3] arm64: queued spinlocks and rw-locks
+In-Reply-To: <a4f067df-4c22-5c90-d70a-809903c60296@codeaurora.org>
+References: <1491860104-4103-1-git-send-email-ynorov@caviumnetworks.com>
+ <a4f067df-4c22-5c90-d70a-809903c60296@codeaurora.org>
+Message-ID: <20170424133622.GB12323@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 20, 2017 at 09:42:07AM +0100, Mark Rutland wrote:
-> On Wed, Apr 19, 2017 at 02:22:11PM -0700, Matthias Kaehlcke wrote:
-> > clang fails to build with the current code:
+On Wed, Apr 12, 2017 at 01:04:55PM -0400, Adam Wallis wrote:
+> On 4/10/2017 5:35 PM, Yury Norov wrote:
+> > The patch of Jan Glauber enables queued spinlocks on arm64. I rebased it on
+> > latest kernel sources, and added a couple of fixes to headers to apply it 
+> > smoothly.
 > > 
-> > arch/arm64/include/asm/processor.h:172:15: error: invalid operand in
-> > inline asm: 'prfm pldl1keep, ${0:a}'
+> > Though, locktourture test shows significant performance degradation in the
+> > acquisition of rw-lock for read on qemu:
 > > 
-> > Apparently clang does not support the 'a' modifier. Change the
-> > constraint from 'p' ('An operand that is a valid memory address is
-> > allowed') to 'Q' ('A memory address which uses a single base register
-> > with no offset'), which works for both gcc and clang.
+> >                           Before           After
+> > spin_lock-torture:      38957034        37076367         -4.83
+> > rw_lock-torture W:       5369471        18971957        253.33
+> > rw_lock-torture R:       6413179         3668160        -42.80
+> > 
 > 
-> It looks like the current %a0 template and p constraint were inherited
-> from arch/arm, as they've been there from day one on arm64.
-> 
-> Looking at the arch/arm history, the "a" operand modifier and "p"
-> constraint were introduced in commit:
-> 
->   16f719de62809e22 ("[ARM] 5196/1: fix inline asm constraints for preload")
-> 
-> ... so as to avoid GCC assuming prefetch of a pointer implied it was not
-> NULL. Until that point, we'd used no operand modifier and "o"
-> constraint.
-> 
-> It's not clear to me whether "o", "p", and "Q" constraints differ in
-> this regard on AArch64, or if the issue regarding NULL is still
-> relevant. The GCC docs say the "p" constraint is used for "a valid
-> memory address", which does sound like it shouldn't be NULL.
-> 
-> Otherwise, this does look consistent with what we do elsewhere.
+> On our 48 core QDF2400 part, I am seeing huge improvements with these patches on
+> the torture tests. The improvements go up even further when I apply Jason Low's
+> MCS Spinlock patch: https://lkml.org/lkml/2016/4/20/725
 
-I really don't like using 'Q' here, for two reasons:
-
-1. It means we likely allocate a register where we don't need to, because
-   we're going to need to use [Xn] as the addressing mode, which means
-   adding any immediate offsets.
-
-2. As you mention, 16f719de62809e22 says that GCC will use this as an
-   indication that the address is non-NULL.
-
-We also can't just remove the 'a', because that will result in assembly
-failures. I haven't dug into exactly why, but I suspect it's because "p"
-can generate a label, which then won't assemble if surrounded by '[]'.
+Does the QDF2400 implement the large system extensions? If so, how do the
+queued lock implementations compare to the LSE-based ticket locks?
 
 Will
