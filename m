@@ -1,64 +1,68 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 24 Apr 2017 08:20:28 -0300
-Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
-In-Reply-To: <20170424040709.GG26900@vireshk-i7>
-References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
- <20170424040709.GG26900@vireshk-i7>
-Message-ID: <CAOMZO5B4_xrLcWQGF=yRfj-14XQKudzjyr2roGRkzofkHCfuHg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 24 Apr 2017 12:26:38 +0100
+Subject: [PATCH v3 15/18] arm64: arch_timer: Enable CNTVCT_EL0 trap if
+ workaround is enabled
+In-Reply-To: <d7c03009-3b21-0bce-74f5-b11dd359eb97@arm.com>
+References: <20170404171826.25030-1-marc.zyngier@arm.com>
+ <20170404171826.25030-16-marc.zyngier@arm.com>
+ <58FDB05B.6020108@huawei.com>
+ <95ac3477-436a-22ad-80f4-d4bed6c73e1c@arm.com>
+ <AF3DCEF48831C6498A12720ADD13CD7F2A5DACA8@dggeml506-mbs.china.huawei.com>
+ <493e2b26-96a2-4b92-fd4b-f6f7d5c89fb5@arm.com>
+ <58FDC1F5.3000401@huawei.com>
+ <d7c03009-3b21-0bce-74f5-b11dd359eb97@arm.com>
+Message-ID: <20170424112638.GA25449@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+On Mon, Apr 24, 2017 at 10:33:29AM +0100, Marc Zyngier wrote:
+> On 24/04/17 10:14, Hanjun Guo wrote:
+> > On 2017/4/24 16:40, Marc Zyngier wrote:
+> >> On 24/04/17 09:25, Lixiaoping (Timmy) wrote:
+> >>> Sorry about previous email's confidential info. Please forget it.
+> >>>
+> >>> +#define ESR_ELx_SYS64_ISS_SYS_CNTFRQ	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 14, 0, 0) | \
+> >>> +					 ESR_ELx_SYS64_ISS_DIR_READ)
+> >>>
+> >>> I think (3, 3, 14, 0, 0) should be (3, 3, 0, 14, 0)?
+> >> Thanks for spotting this. I assumed that the sys_reg() and
+> >> SR_ELx_SYS64_ISS_SYS_VAL() macros took their arguments in the same 
+> >> order. That would have been too easy... ;-)
+> >>
+> >> Amended patch below, please let me know if it works for you.
+> >>
+> >> Thanks,
+> >>
+> >> 	M.
+> >>
+> >> >From 4444c86a97c1a487e12c319fdc197c88631d72b5 Mon Sep 17 00:00:00 2001
+> >> From: Marc Zyngier <marc.zyngier@arm.com>
+> >> Date: Mon, 24 Apr 2017 09:04:03 +0100
+> >> Subject: [PATCH] arm64: Add CNTFRQ_EL0 trap handler
+> >>
+> >> We now trap accesses to CNTVCT_EL0 when the counter is broken
+> >> enough to require the kernel to mediate the access. But it
+> >> turns out that some existing userspace (such as OpenMPI) do
+> >> probe for the counter frequency, leading to an UNDEF exception
+> >> as CNTVCT_EL0 and CNTFRQ_EL0 share the same control bit.
+> >>
+> >> The fix is to handle the exception the same way we do for CNTVCT_EL0.
+> >>
+> >> Fixes: a86bd139f2ae ("arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround is enabled")
+> >> Reported-by: Hanjun Guo <guohanjun@huawei.com>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> > 
+> > I tested this patch and the undefined instruction error is gone, I can
+> > get the FREQ in the user space now, thank you very much for the quick
+> > response.
+> > 
+> > Tested-by: Hanjun Guo <guohanjun@huawei.com>
+> > Reviewed-by: Hanjun Guo <guohanjun@huawei.com>
+> 
+> Thanks for giving it a go. Catalin, can you queue this via the arm64 tree?
 
-On Mon, Apr 24, 2017 at 1:07 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+Done. Thanks for the quick fix.
 
-> So as Rafael pointed out the problem doesn't happen if you stay at the max
-> frequencies, but otherwise.
->
-> You need to investigate on why that is the case. You can go to the cpufreq sysfs
-> directory and see what frequencies are getting selected, etc..
-
-Yes, when the CPU frequency stays at 996 MHz I do not see the
-touchscreen failure. When it goes to 396MHz I do see see touchscreeen
-events getting lost.
-
-> Give me output of this for now:
->
-> grep . /sys/devices/system/cpu/cpufreq/policy0/*
-> grep . /sys/devices/system/cpu/cpufreq/policy0/stats/*
-
-Here it goes, thanks.
-
-# grep . /sys/devices/system/cpu/cpufreq/policy0/*
-/sys/devices/system/cpu/cpufreq/policy0/affected_cpus:0 1 2 3
-/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_cur_freq:396000
-/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_max_freq:996000
-/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_min_freq:396000
-/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_transition_latency:109036
-/sys/devices/system/cpu/cpufreq/policy0/related_cpus:0 1 2 3
-/sys/devices/system/cpu/cpufreq/policy0/scaling_available_frequencies:396000
-792000 996000
-/sys/devices/system/cpu/cpufreq/policy0/scaling_available_governors:ondemand
-performance
-/sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq:396000
-/sys/devices/system/cpu/cpufreq/policy0/scaling_driver:imx6q-cpufreq
-/sys/devices/system/cpu/cpufreq/policy0/scaling_governor:ondemand
-/sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq:996000
-/sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq:396000
-/sys/devices/system/cpu/cpufreq/policy0/scaling_setspeed:<unsupported>
-
-# grep . /sys/devices/system/cpu/cpufreq/policy0/stats/*
-grep: /sys/devices/system/cpu/cpufreq/policy0/stats/reset: Permission denied
-/sys/devices/system/cpu/cpufreq/policy0/stats/time_in_state:396000 2869
-/sys/devices/system/cpu/cpufreq/policy0/stats/time_in_state:792000 76
-/sys/devices/system/cpu/cpufreq/policy0/stats/time_in_state:996000 33
-/sys/devices/system/cpu/cpufreq/policy0/stats/total_trans:8
-/sys/devices/system/cpu/cpufreq/policy0/stats/trans_table:   From  :    To
-/sys/devices/system/cpu/cpufreq/policy0/stats/trans_table:         :
- 396000    792000    996000
-/sys/devices/system/cpu/cpufreq/policy0/stats/trans_table:   396000:
-      0         2         0
-/sys/devices/system/cpu/cpufreq/policy0/stats/trans_table:   792000:
-      2         0         2
-/sys/devices/system/cpu/cpufreq/policy0/stats/trans_table:   996000:
-      1         1         0
+-- 
+Catalin
