@@ -1,49 +1,66 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 24 Apr 2017 11:35:04 +0100
-Subject: [PATCH v4 3/6] mfd: exynos-lpass: Remove pad retention control
-In-Reply-To: <4646acab-261e-32ea-df63-6f8333f64e2d@samsung.com>
-References: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170323080348eucas1p29d1fb4eb06e4785d20341be7a374bfb3@eucas1p2.samsung.com>
- <1490256207-10061-4-git-send-email-m.szyprowski@samsung.com>
- <20170411120231.hivtn6c7to4z2gu6@dell>
- <4646acab-261e-32ea-df63-6f8333f64e2d@samsung.com>
-Message-ID: <20170424103504.vl4hhnh4pvl66ggu@dell>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 24 Apr 2017 12:35:39 +0200
+Subject: [PATCH] arm64: dts: rockchip: update cpu opp table for rk3399 op1
+In-Reply-To: <9edc6ebc-8aab-03df-49b2-759ed8581a6c@163.com>
+References: <1493014730-9670-1-git-send-email-wxt@rock-chips.com>
+ <3119382.DFiP2J6FnE@diego> <9edc6ebc-8aab-03df-49b2-759ed8581a6c@163.com>
+Message-ID: <1552813.CRZkXFJCNX@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Apr 2017, Marek Szyprowski wrote:
-
-> Hi Lee,
-> 
-> On 2017-04-11 14:02, Lee Jones wrote:
-> > On Thu, 23 Mar 2017, Marek Szyprowski wrote:
+Am Montag, 24. April 2017, 18:25:49 CEST schrieb Caesar Wang:
+> ? 2017?04?24? 17:15, Heiko St?bner ??:
+> > Am Montag, 24. April 2017, 16:49:08 CEST schrieb Caesar Wang:
+> >> ? 2017?04?24? 16:26, Heiko St?bner ??:
+> >>> Hi Caesar,
+> >>> 
+> >>> Am Montag, 24. April 2017, 14:18:50 CEST schrieb Caesar Wang:
+> >>>> Update the cpu opp table for rk3399 op1.
+> >>> 
+> >>> Ideally this should contain something about the "why".
+> >>> Are these new voltage settings safer to operate under?
+> >> 
+> >> The before opp table is for earlier batch of rk3399 SoCs,  that's no
+> >> enough for the current and
+> >> newer batch of rk3399 op1. In order to suit for the rk3399 op1, we need
+> >> to little voltages changed.
 > > 
-> > > Pad retention should be controlled from pin control driver, so remove it
-> > > from Exynos LPASS driver. After this change, no more access to PMU regmap
-> > > is needed, so remove also the code for handling PMU regmap.
-> > > 
-> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > > Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > > Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > > Acked-by: Rob Herring <robh@kernel.org>
-> > > Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >   .../bindings/mfd/samsung,exynos5433-lpass.txt           |  2 --
-> > >   drivers/mfd/exynos-lpass.c                              | 17 -----------------
-> > >   include/linux/mfd/syscon/exynos5-pmu.h                  |  3 ---
-> > >   3 files changed, 22 deletions(-)
-> > Applied, thanks.
+> > just to make sure, this is also safe for all the non-chromebook rk3399
+> > socs
+> > (like the firefly and tv-boxes, etc), right?
 > 
-> When can I expect this (and the remaining patches from this patchset) to
-> appear
-> in your -next branch?
+> No,  just for chromebook.
+> 
+> Maybe, we need support two table for rk3399 SoCs.
+> For chromebook supporting 2GHz frequency and others support 1.8GHz
+> frequency.
 
-Now. ;)
+Definitly. So please move the chromebook opp-table to something like a rk3399-
+op1-opp.dtsi and adapt rk3399-opp.dtsi to be safe for all rk3399 variants.
 
-[sorry for the delay, I was on Honeymoon last week]
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks
+Heiko
+
+> 
+> For example:
+> ....
+>    opp03 {
+>                opp-hz = /bits/ 64 <1008000000>;
+>                opp-microvolt = <925000 925000 1350000>;
+>                opp-microvolt-l0 = <925000 925000 1350000>;
+>                opp-microvolt-l1 = <900000 900000 1350000>;
+>            };
+> ....
+> 
+> 
+> 
+> -Caesar
+> 
+> > Thanks
+> > Heiko
+> > 
+> > _______________________________________________
+> > Linux-rockchip mailing list
+> > Linux-rockchip at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-rockchip
