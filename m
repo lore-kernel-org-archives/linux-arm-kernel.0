@@ -1,64 +1,66 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 24 Apr 2017 20:16:19 +0200
-Subject: [RFC] minimum gcc version for kernel: raise to gcc-4.3 or 4.6?
-In-Reply-To: <CAK8P3a03BTEBgz87k_dhJuqzOYQm_S5FFDrFgcBAE5FCH-e=dQ@mail.gmail.com>
-References: <20161216105634.235457-1-arnd@arndb.de>
- <3302470.IDcDrWa0u6@wuerfel>
- <CAGXu5jLPRYi+HK=07Zndc8szEKD4mZCqaHJFnHmmoYr7tA1xPw@mail.gmail.com>
- <CAK8P3a2C2WhWjzF=HrzU15Ncg0juR+nstZukBEpqCrVNW5pnDA@mail.gmail.com>
- <CAGXu5jLTR+dY_Ayyix5Tg0Yn9LBFAt=j56MQVdJVGue-R-CizA@mail.gmail.com>
- <CAK8P3a114EVbnhbObfq-4pZp8XCT4fWzMXD+WkRi7iPXs1vFMA@mail.gmail.com>
- <CAGXu5jJpofLF0qAf0-2iNTesZt-X704Q7L=DpQYdtHY5n2HD0w@mail.gmail.com>
- <alpine.LFD.2.20.1704220400380.32200@eddie.linux-mips.org>
- <CAK8P3a28fi0GRcz1yLq+wRkaBBO_w74NnBCY7f3myg78JpaCCQ@mail.gmail.com>
- <CAMuHMdWTiurUSacddYXgW69=QwOrZDV3Zt2DezJauPy8j-GMHw@mail.gmail.com>
- <CAK8P3a32Y0AiKyVaotYb14uZZ1jM=nwhFD1vyP56epW1Y9KqSw@mail.gmail.com>
- <alpine.LFD.2.20.1704241249350.32200@eddie.linux-mips.org>
- <CAK8P3a03BTEBgz87k_dhJuqzOYQm_S5FFDrFgcBAE5FCH-e=dQ@mail.gmail.com>
-Message-ID: <CAMuHMdWKngq9TAkjEAYscQRVzKpO63-XVcnjzEM0UNVX_1Ddhg@mail.gmail.com>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Mon, 24 Apr 2017 14:21:54 -0400
+Subject: [PATCH 1/3 v2] xen: Export xen_reboot
+In-Reply-To: <20170424175839.5262-2-julien.grall@arm.com>
+References: <20170424175839.5262-1-julien.grall@arm.com>
+ <20170424175839.5262-2-julien.grall@arm.com>
+Message-ID: <41fd4caf-7554-7d54-6332-d227228a13ea@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Mon, Apr 24, 2017 at 7:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Mon, Apr 24, 2017 at 6:53 PM, Maciej W. Rozycki <macro@linux-mips.org> wrote:
->> On Mon, 24 Apr 2017, Arnd Bergmann wrote:
->>> > If there's no real good reason (brokenness) to deprecate gcc-4.1, I would not
->>> > do it.I guess most people using old compilers know what they're doing.
->>>
->>> What I'm trying to find out first is whether "people regularly using 10+
->>> year old compilers for the latest kernels" is a strict subset of "people in
->>> Geert's household".
->>
->> Well I do not live with Geert TBH.
+On 04/24/2017 01:58 PM, Julien Grall wrote:
+> The helper xen_reboot will be called by the EFI code in a later patch.
 >
-> Sorry about that, you had mentioned that you had used it recently, which should
-> have weighed more than my own results.
+> Note that the ARM version does not yet exist and will be added in a
+> later patch too.
+>
+> Signed-off-by: Julien Grall <julien.grall@arm.com>
 
-If you prefer to consider everyone who's been sleeping in the same room
-at one of the Oldenburg Linux meetings as part of my household, that's
-fine for me ;-)
+I don't think these changes are worth a whole patch. They can be folded
+into the third patch.
 
-> So it still fails, but only because of one compiler error that I can avoid by
-> disabling that driver, and you probably use a slightly patched compiler
-> version that doesn't have this particular bug, or it was a regression between
-> gcc-4.1.2 and 4.1.3.
+-boris
 
-Mine is also some patched version of 4.1.1, built from Ubuntu sources:
-
-    gcc version 4.1.2 20061115 (prerelease) (Ubuntu 4.1.1-21)
-
-These sources probably even contained the fixes to make gcc-4.1.1
-usable on CELL.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+> ---
+>
+> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: Juergen Gross <jgross@suse.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: "H. Peter Anvin" <hpa@zytor.com>
+> Cc: x86 at kernel.org
+>
+>     Changes in v2:
+>         - Patch added
+> ---
+>  arch/x86/xen/enlighten.c | 2 +-
+>  include/xen/xen-ops.h    | 2 ++
+>  2 files changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
+> index ec1d5c46e58f..563f2d963a04 100644
+> --- a/arch/x86/xen/enlighten.c
+> +++ b/arch/x86/xen/enlighten.c
+> @@ -1294,7 +1294,7 @@ static const struct pv_cpu_ops xen_cpu_ops __initconst = {
+>  	.end_context_switch = xen_end_context_switch,
+>  };
+>  
+> -static void xen_reboot(int reason)
+> +void xen_reboot(int reason)
+>  {
+>  	struct sched_shutdown r = { .reason = reason };
+>  	int cpu;
+> diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
+> index b5486e648607..fc5ddb472f86 100644
+> --- a/include/xen/xen-ops.h
+> +++ b/include/xen/xen-ops.h
+> @@ -22,6 +22,8 @@ void xen_timer_resume(void);
+>  void xen_arch_resume(void);
+>  void xen_arch_suspend(void);
+>  
+> +void xen_reboot(int reason);
+> +
+>  void xen_resume_notifier_register(struct notifier_block *nb);
+>  void xen_resume_notifier_unregister(struct notifier_block *nb);
+>  
