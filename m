@@ -1,81 +1,61 @@
-From: jiada_wang@mentor.com (Jiada Wang)
-Date: Mon, 24 Apr 2017 05:48:48 -0700
-Subject: [PATCH RFC 0/5] *** SPI Slave mode support ***
-In-Reply-To: <CAMuHMdXa_O6RsqUciiNWQ0Zp6dniS47AUmPN9UWAWitP0csx=Q@mail.gmail.com>
-References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
- <20170413125929.dygodgj6c35ydh5p@sirena.org.uk>
- <CAMuHMdUm=90ddNWM5KWqT+W0hqZ-QO6vPHj5OisbYquDYq1ZmA@mail.gmail.com>
- <58F06092.9080409@mentor.com>
- <CAMuHMdXa_O6RsqUciiNWQ0Zp6dniS47AUmPN9UWAWitP0csx=Q@mail.gmail.com>
-Message-ID: <58FDF430.5090306@mentor.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Apr 2017 13:57:47 +0100
+Subject: [PATCH] arm64: pmuv3: Support v8.1 PMUv3 extension
+In-Reply-To: <1493033503-4712-1-git-send-email-jnair@caviumnetworks.com>
+References: <1493033503-4712-1-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <20170424125747.GA5767@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert
+Hi,
 
-On 04/24/2017 03:55 AM, Geert Uytterhoeven wrote:
-> Hi Jiada,
+On Mon, Apr 24, 2017 at 11:31:43AM +0000, Jayachandran C wrote:
+> The PMUVer field can have a value 4 for PMUv3 which supports 16 bit
+> evtCount field (this is documented in ARM Architecture Reference Manual
+> Supplement ARMv8.1).
 >
-> On Fri, Apr 14, 2017 at 7:39 AM, Jiada Wang<jiada_wang@mentor.com>  wrote:
->> On 04/13/2017 12:47 PM, Geert Uytterhoeven wrote:
->>> On Thu, Apr 13, 2017 at 2:59 PM, Mark Brown<broonie@kernel.org>   wrote:
->>>> On Thu, Apr 13, 2017 at 05:13:59AM -0700, jiada_wang at mentor.com wrote:
->>>>> From: Jiada Wang<jiada_wang@mentor.com>
->>>>>
->>>>> v1:
->>>>>     add Slave mode support in SPI core
->>>>>     spidev create slave device when SPI controller work in slave mode
->>>>>     spi-imx support to work in slave mode
->>>> Adding Geert who also had a series doing this in progress that was
->>>> getting very near to being merged.
->>> Thank you!
->>>
->>> Actually my plan is to fix the last remaining issues and resubmit for
->>> v4.13.
->> I noticed your patch set for SPI slave support,
->> (I am sure you can find out some of the change
->> in this patch set is based on your work).
->> we have similar requirement to add slave mode support to ecspi IP on imx6
->> Soc.
->>
->> Our use case is to use spidev as an interface to communicate with external
->> SPI master devices.
->> meanwhile the SPI bus controller can also act as master device to send data
->> to other
->> SPI slave devices on the board.
-> That sounds a bit hackish to me. SPI was never meant to be a multi-master bus.
-> While it can be done, you will need external synchronization (signals) to
-> avoid conflicts between the SPI masters.
-It doesn't need to be a multi-master bus,
-for example A is master device for slave device B.
-while B has its own slave device C
-for each SPI connection A <=> B, and B <=> C, there is only one master 
-device.
+> The current check for PMUVer to be equal to 1 fails on ThunderX2 which
+> has value 4 in PMUVer field. Fix this.
+>
+> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+> ---
+>
+> This applies on top of the current arm64 tree and fixes a breakage due
+> to the  ACPI perf patches.
 
-and I think from use case point of view, it's very normal,
-one CPU upon receives command from external SPI master device,
-it writes data to its own slave device (EEPROM) connected to it.
+Sorry for the delay on this. I'm still awaiting an architectural
+clarification on how this field should be interpreted, as per my prior
+comments [1].
+
+I realise that's not much consolation here, so I'm happy to take an
+intermediate fix. One comment on that below.
+
+>  arch/arm64/kernel/perf_event.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 98c7493..5388ed8 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -972,7 +972,7 @@ static void __armv8pmu_probe_pmu(void *info)
+>       dfr0 = read_sysreg(id_aa64dfr0_el1);
+>       pmuver = cpuid_feature_extract_unsigned_field(dfr0,
+>                       ID_AA64DFR0_PMUVER_SHIFT);
+> -     if (pmuver != 1)
+> +     if (pmuver != 1 && pmuver != 4)
+>               return;
+
+Can we please make this:
+
+        pmuver = cpuid_feature_extract_signed_field(dfr0,
+                        ID_AA64DFR0_PMUVER_SHIFT);
+        if (pmuver < 1)
+                return;
+
+With that, I'm happy to take this while we await further clarification.
 
 Thanks,
-Jiada
->> I found in your implementation, SPI bus controller is limited to either work
->> in master mode or
->> slave mode, is there any reasoning to not configure SPI mode based on SPI
->> devices use case?
-> If you really need both master and slave support, you can use 2 subnodes
-> in DT, the first representing the master, the second the slave.
->
-> Mark, what's your opinion about this?
->
-> Thanks!
->
-> Gr{oetje,eeting}s,
->
->                          Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                  -- Linus Torvalds
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/501305.html
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
