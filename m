@@ -1,32 +1,62 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 24 Apr 2017 11:15:48 +0200
-Subject: [PATCH] arm64: dts: rockchip: update cpu opp table for rk3399 op1
-In-Reply-To: <f4c389af-5b1f-9197-0df4-f8407ed8622a@rock-chips.com>
-References: <1493014730-9670-1-git-send-email-wxt@rock-chips.com>
- <2250946.xrPjMl5Kf1@diego>
- <f4c389af-5b1f-9197-0df4-f8407ed8622a@rock-chips.com>
-Message-ID: <3119382.DFiP2J6FnE@diego>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 24 Apr 2017 11:16:10 +0200
+Subject: [PATCH V3 2/2] ARM64: dts: hi6220-hikey: Add clock binding for
+ the pmic mfd
+In-Reply-To: <20170424085944.aa5dsc4g6bwm5rgi@dell>
+References: <1492449567-31399-1-git-send-email-daniel.lezcano@linaro.org>
+ <1492449567-31399-2-git-send-email-daniel.lezcano@linaro.org>
+ <20170422020233.GA7065@codeaurora.org>
+ <370c36f9-e6fc-416c-776b-edc1e42d7ddc@linaro.org>
+ <20170424085944.aa5dsc4g6bwm5rgi@dell>
+Message-ID: <20170424091609.GA2137@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 24. April 2017, 16:49:08 CEST schrieb Caesar Wang:
-> ? 2017?04?24? 16:26, Heiko St?bner ??:
-> > Hi Caesar,
-> > 
-> > Am Montag, 24. April 2017, 14:18:50 CEST schrieb Caesar Wang:
-> >> Update the cpu opp table for rk3399 op1.
-> > 
-> > Ideally this should contain something about the "why".
-> > Are these new voltage settings safer to operate under?
+On Mon, Apr 24, 2017 at 09:59:44AM +0100, Lee Jones wrote:
+> On Sat, 22 Apr 2017, Daniel Lezcano wrote:
 > 
-> The before opp table is for earlier batch of rk3399 SoCs,  that's no
-> enough for the current and
-> newer batch of rk3399 op1. In order to suit for the rk3399 op1, we need
-> to little voltages changed.
+> > On 22/04/2017 04:02, Stephen Boyd wrote:
+> > > On 04/17, Daniel Lezcano wrote:
+> > >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > >> ---
+> > >>  Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt | 6 ++++++
+> > >>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts             | 1 +
+> > >>  2 files changed, 7 insertions(+)
+> > >>
+> > > 
+> > > I take it this goes through arm-soc? Not sure why I'm on To:
+> > > line.
+> > 
+> > Probably it should go through Lee's tree.
+> 
+> Unlikely.
+> 
+> The document and the DTS change should really have gone separately,
+> but to save you from having to mess around so close to the merge window:
+> 
+> Acked-by: Lee Jones <lee.jones@linaro.org>
 
-just to make sure, this is also safe for all the non-chromebook rk3399 socs 
-(like the firefly and tv-boxes, etc), right?
+Thanks Lee.
 
+Usually, I take the DT changes (including doc) with the timers changes with the
+maintainer and Rob's blessing. So the DT and the driver changes are aligned in
+my tree and make the submission changes easier.
 
-Thanks
-Heiko
+I agree mixing the patches for different destinations into a single patchset is
+fuzzy, I will take care next time to separate the patches.
+
+  -- Daniel
+
+> -- 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
+
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
