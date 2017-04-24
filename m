@@ -1,99 +1,122 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 24 Apr 2017 11:16:57 +0100
-Subject: [PATCH v4 7/7] ARM: dma-mapping: Remove traces of NOMMU code
-In-Reply-To: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
-References: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1493029017-31382-8-git-send-email-vladimir.murzin@arm.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Mon, 24 Apr 2017 18:25:51 +0800
+Subject: [linux-sunxi] Re: [PATCH v3 02/12] arm64: allwinner: a64: add NMI
+ controller on A64
+In-Reply-To: <20170424071746.u2lrk43kmvvd7m25@lukather>
+References: <20170417115747.7300-1-icenowy@aosc.io>
+ <20170417115747.7300-3-icenowy@aosc.io>
+ <20170418070016.qsng3qtk76bqxyc5@lukather>
+ <FB3B3C68-EB16-4352-B0B9-64857B1A6C03@aosc.io>
+ <20170420055802.btibui5pspan4qal@lukather>
+ <18ae853e9ce59a83bdeb6b64f96caee0@aosc.io>
+ <20170424071746.u2lrk43kmvvd7m25@lukather>
+Message-ID: <2970665c4666a321f14a8d2ff13bc57c@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA operations for NOMMU case have been just factored out into
-separate compilation unit, so don't keep dead code.
+? 2017-04-24 15:17?Maxime Ripard ???
+> On Thu, Apr 20, 2017 at 03:03:38PM +0800, icenowy at aosc.io wrote:
+>> ? 2017-04-20 13:58?Maxime Ripard ???
+>> > On Tue, Apr 18, 2017 at 06:56:43PM +0800, Icenowy Zheng wrote:
+>> > >
+>> > >
+>> > > ? 2017?4?18? GMT+08:00 ??3:00:16, Maxime Ripard
+>> > > <maxime.ripard@free-electrons.com> ??:
+>> > > >On Mon, Apr 17, 2017 at 07:57:37PM +0800, Icenowy Zheng wrote:
+>> > > >> Allwinner A64 SoC features a NMI controller, which is usually
+>> > > >connected
+>> > > >> to the AXP PMIC.
+>> > > >>
+>> > > >> Add support for it.
+>> > > >>
+>> > > >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> > > >> Acked-by: Chen-Yu Tsai <wens@csie.org>
+>> > > >> ---
+>> > > >> Changes in v2:
+>> > > >> - Added Chen-Yu's ACK.
+>> > > >>
+>> > > >>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 8 ++++++++
+>> > > >>  1 file changed, 8 insertions(+)
+>> > > >>
+>> > > >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> > > >b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> > > >> index 05ec9fc5e81f..53c18ca372ea 100644
+>> > > >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> > > >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> > > >> @@ -403,6 +403,14 @@
+>> > > >>  				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+>> > > >>  		};
+>> > > >>
+>> > > >> +		nmi_intc: interrupt-controller at 01f00c0c {
+>> > > >> +			compatible = "allwinner,sun6i-a31-sc-nmi";
+>> > > >> +			interrupt-controller;
+>> > > >> +			#interrupt-cells = <2>;
+>> > > >> +			reg = <0x01f00c0c 0x38>;
+>> > > >
+>> > > >The base address is not correct, and there's uncertainty on whether
+>> > > >this is this particular controller or not. Did you even test this?
+>> > >
+>> > > Tested by axp20x-pek.
+>> >
+>> > Still, the base address is wrong, which is yet another hint that this
+>> > is not the same interrupt controller, and just works by accident.
+>> 
+>> No, it's the same as other post-sun6i device trees.
+>> See other post-sun6i device trees: (or maybe they're all wrong, but
+>> as we have no document for it, we should temporarily keep them)
+>> 
+>> sun6i-a31.dtsi
+>> ```
+>> 		nmi_intc: interrupt-controller at 01f00c0c {
+>> 			compatible = "allwinner,sun6i-a31-sc-nmi";
+>> 			interrupt-controller;
+>> 			#interrupt-cells = <2>;
+>> 			reg = <0x01f00c0c 0x38>;
+>> 			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+>> 		};
+>> ```
+>> 
+>> sun8i-a23-a33.dtsi
+>> ```
+>> 		nmi_intc: interrupt-controller at 01f00c0c {
+>> 			compatible = "allwinner,sun6i-a31-sc-nmi";
+>> 			interrupt-controller;
+>> 			#interrupt-cells = <2>;
+>> 			reg = <0x01f00c0c 0x38>;
+>> 			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+>> 		};
+>> ```
+>> 
+>> But according to the BSP device tree, the base address should be
+>> 0x01f00c00. Should I send some patch to fix all of them? (but it will
+>> break device tree compatibility)
+> 
+> I'm really not a big fan of "if we see something that is broken, just
+> let it rot" to be honest.
+> 
+> We have no idea how this controller works exactly, just like we have
+> no idea if it is exactly the same controller or not.
+> 
+> The only thing we have today is the memory map, and it tells us that
+> it has more registers than what you express here.
+> 
+> Because of the DT backward compatibility, you have to think of it the
+> other way around: what will happen if it turns out we need to setup
+> any register outside of that region you described in the DT, in
+> something like a year or so?
+> 
+> We can't, really. While if you have the full memory region from the
+> beginning, then you just have to add a single writel in your driver.
 
-Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Tested-by: Andras Szemzo <sza@esh.hu>
-Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mm/dma-mapping.c | 29 ++---------------------------
- 1 file changed, 2 insertions(+), 27 deletions(-)
+So things are now already broken, and we may need to fix also A31 and
+A23/33.
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 475811f..cd90338 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -344,8 +344,6 @@ static void __dma_free_buffer(struct page *page, size_t size)
- 	}
- }
- 
--#ifdef CONFIG_MMU
--
- static void *__alloc_from_contiguous(struct device *dev, size_t size,
- 				     pgprot_t prot, struct page **ret_page,
- 				     const void *caller, bool want_vaddr,
-@@ -647,22 +645,6 @@ static inline pgprot_t __get_dma_pgprot(unsigned long attrs, pgprot_t prot)
- 	return prot;
- }
- 
--#define nommu() 0
--
--#else	/* !CONFIG_MMU */
--
--#define nommu() 1
--
--#define __get_dma_pgprot(attrs, prot)				__pgprot(0)
--#define __alloc_remap_buffer(dev, size, gfp, prot, ret, c, wv)	NULL
--#define __alloc_from_pool(size, ret_page)			NULL
--#define __alloc_from_contiguous(dev, size, prot, ret, c, wv, coherent_flag, gfp)	NULL
--#define __free_from_pool(cpu_addr, size)			do { } while (0)
--#define __free_from_contiguous(dev, page, cpu_addr, size, wv)	do { } while (0)
--#define __dma_free_remap(cpu_addr, size)			do { } while (0)
--
--#endif	/* CONFIG_MMU */
--
- static void *__alloc_simple_buffer(struct device *dev, size_t size, gfp_t gfp,
- 				   struct page **ret_page)
- {
-@@ -805,7 +787,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 
- 	if (cma)
- 		buf->allocator = &cma_allocator;
--	else if (nommu() || is_coherent)
-+	else if (is_coherent)
- 		buf->allocator = &simple_allocator;
- 	else if (allowblock)
- 		buf->allocator = &remap_allocator;
-@@ -854,8 +836,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		 unsigned long attrs)
- {
--	int ret = -ENXIO;
--#ifdef CONFIG_MMU
-+	int ret;
- 	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
- 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
- 	unsigned long pfn = dma_to_pfn(dev, dma_addr);
-@@ -870,10 +851,6 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 				      vma->vm_end - vma->vm_start,
- 				      vma->vm_page_prot);
- 	}
--#else
--	ret = vm_iomap_memory(vma, vma->vm_start,
--			      (vma->vm_end - vma->vm_start));
--#endif	/* CONFIG_MMU */
- 
- 	return ret;
- }
-@@ -892,9 +869,7 @@ int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		 unsigned long attrs)
- {
--#ifdef CONFIG_MMU
- 	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
--#endif	/* CONFIG_MMU */
- 	return __arm_dma_mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
- }
- 
--- 
-2.0.0
+How should we do this?
+
+> 
+> Maxime
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
