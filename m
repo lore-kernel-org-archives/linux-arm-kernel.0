@@ -1,32 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 24 Apr 2017 09:25:10 +0200
-Subject: [PATCH/RFC 0/5] arm64: dts: renesas: Break out common board
- support
-In-Reply-To: <1492779321-23939-1-git-send-email-geert+renesas@glider.be>
-References: <1492779321-23939-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdXWptBgSxy44zLJU+=c3ycbMJ9jkc6UzDqkbSMznJqeUQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 24 Apr 2017 09:45:24 +0200
+Subject: [PATCH 21/29] clocksource: Add missing line break to error
+ messages
+In-Reply-To: <1492374441-23336-21-git-send-email-daniel.lezcano@linaro.org>
+References: <20170416202542.GV2078@mai>
+ <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
+ <1492374441-23336-21-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20170424074524.2rdxtbi6n6czq6sf@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 2:55 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> Geert Uytterhoeven (5):
->   arm64: renesas: r8a7796: Add external audio clocks
->   arm64: renesas: r8a7796: Add external PCIe bus clock
+Hello,
 
-Oops, the above should have had the proper "arm64: dts:" prefix.
+On Sun, Apr 16, 2017 at 10:27:11PM +0200, Daniel Lezcano wrote:
+>  drivers/clocksource/time-efm32.c          |  2 +-
 
->   [RFC] arm64: dts: r8a7796: Add placeholders for various devices
->   [RFC] arm64: dts: renesas: Extract common Salvator-X board support
->   [RFC] arm64: dts: renesas: Extract common ULCB board support
+For efm32:
 
-Gr{oetje,eeting}s,
+	Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-                        Geert
+(if it's not too late yet).
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+For efm32 (and I guess for others, too) this was introduced by the
+"Convert init function to return error" series.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
