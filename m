@@ -1,19 +1,49 @@
-From: kubakici@wp.pl (Jakub Kicinski)
-Date: Sun, 23 Apr 2017 20:49:43 -0700
-Subject: [PATCH 1/1] mt7601u: check return value of alloc_skb
-In-Reply-To: <1492930823-17249-1-git-send-email-bianpan2016@163.com>
-References: <1492930823-17249-1-git-send-email-bianpan2016@163.com>
-Message-ID: <20170423204943.3ce98a63@laptop>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 24 Apr 2017 09:37:09 +0530
+Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
+In-Reply-To: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
+References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
+Message-ID: <20170424040709.GG26900@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 23 Apr 2017 15:00:23 +0800, Pan Bian wrote:
-> Function alloc_skb() will return a NULL pointer if there is no enough
-> memory. However, in function mt7601u_mcu_msg_alloc(), its return value
-> is not validated before it is used. This patch fixes it.
+On 21-04-17, 13:11, Fabio Estevam wrote:
+> Hi,
 > 
-> Signed-off-by: Pan Bian <bianpan2016@163.com>
+> Running 4.11-rc7 on a imx6q-sabresd board I notice that egalax
+> touchscreen stops generating evtest events after a random period of
+> time.
+> 
+> This problem can be avoided if I unselect CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND:
+> 
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -54,7 +54,6 @@ CONFIG_CMA=y
+>  CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
+>  CONFIG_KEXEC=y
+>  CONFIG_CPU_FREQ=y
+> -CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+>  CONFIG_ARM_IMX6Q_CPUFREQ=y
+>  CONFIG_CPU_IDLE=y
+>  CONFIG_VFP=y
+> 
+> With this change evtest always capture all touchscreen events. No
+> single failure is seen.
+> 
+> I could see the same behavior with all mainline kernels I tested (4.9 and 4.10).
+> 
+> Any ideas as to how fix this bug when CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y?
 
-Acked-by: Jakub Kicinski <kubakici@wp.pl>
+So as Rafael pointed out the problem doesn't happen if you stay at the max
+frequencies, but otherwise.
 
-Thanks!
+You need to investigate on why that is the case. You can go to the cpufreq sysfs
+directory and see what frequencies are getting selected, etc..
+
+Give me output of this for now:
+
+grep . /sys/devices/system/cpu/cpufreq/policy0/*
+grep . /sys/devices/system/cpu/cpufreq/policy0/stats/*
+
+-- 
+viresh
