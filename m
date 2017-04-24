@@ -1,63 +1,68 @@
-From: macro@linux-mips.org (Maciej W. Rozycki)
-Date: Mon, 24 Apr 2017 17:53:37 +0100 (BST)
-Subject: [RFC] minimum gcc version for kernel: raise to gcc-4.3 or 4.6?
-In-Reply-To: <CAK8P3a32Y0AiKyVaotYb14uZZ1jM=nwhFD1vyP56epW1Y9KqSw@mail.gmail.com>
-References: <20161216105634.235457-1-arnd@arndb.de>
- <3302470.IDcDrWa0u6@wuerfel>
- <CAGXu5jLPRYi+HK=07Zndc8szEKD4mZCqaHJFnHmmoYr7tA1xPw@mail.gmail.com>
- <CAK8P3a2C2WhWjzF=HrzU15Ncg0juR+nstZukBEpqCrVNW5pnDA@mail.gmail.com>
- <CAGXu5jLTR+dY_Ayyix5Tg0Yn9LBFAt=j56MQVdJVGue-R-CizA@mail.gmail.com>
- <CAK8P3a114EVbnhbObfq-4pZp8XCT4fWzMXD+WkRi7iPXs1vFMA@mail.gmail.com>
- <CAGXu5jJpofLF0qAf0-2iNTesZt-X704Q7L=DpQYdtHY5n2HD0w@mail.gmail.com>
- <alpine.LFD.2.20.1704220400380.32200@eddie.linux-mips.org>
- <CAK8P3a28fi0GRcz1yLq+wRkaBBO_w74NnBCY7f3myg78JpaCCQ@mail.gmail.com>
- <CAMuHMdWTiurUSacddYXgW69=QwOrZDV3Zt2DezJauPy8j-GMHw@mail.gmail.com>
- <CAK8P3a32Y0AiKyVaotYb14uZZ1jM=nwhFD1vyP56epW1Y9KqSw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.20.1704241249350.32200@eddie.linux-mips.org>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Mon, 24 Apr 2017 18:53:10 +0200 (CEST)
+Subject: [PATCH 1/5 v3] usb: host: add DT bindings for faraday fotg2
+In-Reply-To: <20170421204058.6206-1-linus.walleij@linaro.org>
+References: <20170421204058.6206-1-linus.walleij@linaro.org>
+Message-ID: <alpine.LNX.2.00.1704241846300.15211@T420s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Apr 2017, Arnd Bergmann wrote:
+Hi Linus
 
-> > If there's no real good reason (brokenness) to deprecate gcc-4.1, I would not
-> > do it.I guess most people using old compilers know what they're doing.
+On Fri, 21 Apr 2017, Linus Walleij wrote:
+
+> From: Hans Ulli Kroll <ulli.kroll@googlemail.com>
 > 
-> What I'm trying to find out first is whether "people regularly using 10+
-> year old compilers for the latest kernels" is a strict subset of "people in
-> Geert's household".
+> This adds device tree bindings for the Faraday FOTG2
+> dual-mode host controller.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v3:
+> - Change compatible to "faraday,fotg210" as the name of the
+>   hardware block.
+> - Add an elaborate SoC-specific compatible string for the
+>   Cortina Systems Gemini so that SoC-specific features can
+>   be enabled.
+> - Add cortina,gemini-mini-b to indicate a Gemini PHY with
+>   a Mini-B adapter connected.
+> - Indicated that the Gemini version can handle "wakeup-source".
+> - Add optional IP block clock.
+> ---
+>  .../devicetree/bindings/usb/faraday,fotg210.txt    | 35 ++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/faraday,fotg210.txt
+> 
 
- Well I do not live with Geert TBH.
+Got NAK'ed from Rob on some ealier round due missing "device mode" on this 
+IP. I've blatantly overrided this to a host only driver.
 
-> Given that none of the three architectures I looked at (arm, mips, x86)
-> has successfully built any defconfig for a few years, it's quite possible
-> that it's just you ;-) The other architectures that were around 10 years
-> ago (so they might have someone who still has old toolchain binaries)
-> and that still exist today are alpha, cris, frv, ia64, m32r, parisc, powerpc,
-> s390, sh, sparc and xtensa. The first six are similar to m68k in that the
-> hardware is mostly obsolete and the ports are kept around to support
-> those old systems that might also use ancient toolchains, or new
-> toolchains may be unmaintained or buggy, which could be a reason
-> to keep 4.1 supported or at least try to find out if 4.1 (or even any other
-> version) still works at all.
+These are the needed changes in DT to support both modes
+Note the -dr at the end of fotg210, to reflect this in an dual role device
 
- Huh?
-
-$ git log -1
-commit 5a7ad1146caa895ad718a534399e38bd2ba721b7
-Author: Linus Torvalds <torvalds@linux-foundation.org>
-Date:   Sun Apr 23 16:53:00 2017 -0700
-
-    Linux 4.11-rc8
-$ /usr/bin/time make ARCH=mips CROSS_COMPILE=mipsel-linux- decstation_defconfig vmlinux >/dev/null 2>&1
-1014.19user 71.47system 19:33.24elapsed 92%CPU (0avgtext+0avgdata 
-0maxresident)k18764inputs+242504outputs (704major+9549837minor)pagefaults 0swaps
-$ mipsel-linux-gcc --version
-gcc (GCC) 4.1.2
-Copyright (C) 2006 Free Software Foundation, Inc.
-This is free software; see the source for copying conditions.  There is NO
-warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-$ 
-
-Methinks it builds just fine.
-
-  Maciej
+diff --git a/Documentation/devicetree/bindings/usb/faraday,fotg210.txt 
+b/Documentation/devicetree/bindings/usb/faraday,fotg210.txt
+index cf06808303e2..862cda19e9d3 100644
+--- a/Documentation/devicetree/bindings/usb/faraday,fotg210.txt
++++ b/Documentation/devicetree/bindings/usb/faraday,fotg210.txt
+@@ -13,6 +13,9 @@ Required properties:
+ Optional properties:
+ - clocks: should contain the IP block clock
+ - clock-names: should be "PCLK" for the IP block clock
++- dr_mode : indicates the working mode for "fotg210-dr" compatible
++   controllers.  Can be "host", "peripheral". Default to
++   "host" if not defined for backward compatibility.
+ 
+ Required properties for "cortina,gemini-usb" compatible:
+ - syscon: a phandle to the system controller to access PHY registers
+@@ -25,7 +28,7 @@ Optional properties for "cortina,gemini-usb" compatible:
+ Example for Gemini:
+ 
+ usb at 68000000 {
+-       compatible = "cortina,gemini-usb", "faraday,fotg210";
++       compatible = "cortina,gemini-usb", "faraday,fotg210-dr";
+        reg = <0x68000000 0x1000>;
+        interrupts = <10 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&cc 12>;
