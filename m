@@ -1,44 +1,65 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 24 Apr 2017 18:07:51 +0200
-Subject: [PATCH 3/4] pinctrl: stm32: Implement .get_direction gpio_chip
- callback
-In-Reply-To: <CACRpkdZG-yxMCzBqP2s37QThP7tgWKgd3pVgZGgceB+ihZs3nw@mail.gmail.com>
-References: <1491577811-26989-1-git-send-email-alexandre.torgue@st.com>
- <1491577811-26989-4-git-send-email-alexandre.torgue@st.com>
- <CACRpkdZG-yxMCzBqP2s37QThP7tgWKgd3pVgZGgceB+ihZs3nw@mail.gmail.com>
-Message-ID: <a2ef1742-e455-69a9-ffd5-3a3cdf9ca7d6@st.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Tue, 25 Apr 2017 00:11:44 +0800
+Subject: [PATCH v4 03/10] irqchip/sunxi-nmi: add support for the NMI in
+ A64 R_INTC
+In-Reply-To: <20170424160103.9447-4-icenowy@aosc.io>
+References: <20170424160103.9447-1-icenowy@aosc.io>
+ <20170424160103.9447-4-icenowy@aosc.io>
+Message-ID: <854c73045151f98498c848f692957f30@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+? 2017-04-25 00:00?Icenowy Zheng ???
+> Add support for the newly imported compatible for the A64 R_INTC in
+> irq-sunxi-nmi driver
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> New patch in v4, which is part of NMI refactor.
+> 
+>  drivers/irqchip/irq-sunxi-nmi.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-sunxi-nmi.c 
+> b/drivers/irqchip/irq-sunxi-nmi.c
+> index 668730c5cb66..5f7408b1cd4d 100644
+> --- a/drivers/irqchip/irq-sunxi-nmi.c
+> +++ b/drivers/irqchip/irq-sunxi-nmi.c
+> @@ -56,6 +56,12 @@ static struct sunxi_sc_nmi_reg_offs sun9i_reg_offs = 
+> {
+>  	.enable	= 0x04,
+>  };
+> 
+> +static struct sunxi_sc_nmi_reg_offs sun50i_reg_offs = {
+> +	.ctrl	= 0x0c,
+> +	.pend	= 0x10,
+> +	.enable	= 0x40,
+> +};
+> +
+>  static inline void sunxi_sc_nmi_write(struct irq_chip_generic *gc, u32 
+> off,
+>  				      u32 val)
+>  {
+> @@ -220,3 +226,10 @@ static int __init sun9i_nmi_irq_init(struct
+> device_node *node,
+>  	return sunxi_sc_nmi_irq_init(node, &sun9i_reg_offs);
+>  }
+>  IRQCHIP_DECLARE(sun9i_nmi, "allwinner,sun9i-a80-nmi", 
+> sun9i_nmi_irq_init);
+> +
+> +static int __init sun50i_nmi_irq_init(struct device_node *node,
+> +				     struct device_node *parent)
+> +{
+> +	return sunxi_sc_nmi_irq_init(node, &sun50i_reg_offs);
+> +}
+> +IRQCHIP_DECLARE(sun50i_nmi, "allwinner,sun50i-a80-nmi", 
+> sun50i_nmi_irq_init);
 
-On 04/24/2017 02:37 PM, Linus Walleij wrote:
-> On Fri, Apr 7, 2017 at 5:10 PM, Alexandre TORGUE
-> <alexandre.torgue@st.com> wrote:
->
->> Add .get_direction() gpiochip callback in STM32 pinctrl driver.
->>
->> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
->
-> (...)
->> +#include <linux/gpio.h>
->
-> No this is wrong, drivers should never include this file.
-> It is a deprecated consumer header.
->
->> +       if ((alt == 0) && (mode == 0))
->> +               ret = GPIOF_DIR_IN;
->> +       else if ((alt == 0) && (mode == 1))
->> +               ret = GPIOF_DIR_OUT;
->
-> Just return 0 or 1, that is the driver-internal API.
+Should be:
++IRQCHIP_DECLARE(sun50i_nmi, "allwinner,sun50i-a64-r-intc", 
+sun50i_nmi_irq_init);
 
-Ok. I will fix it in V2.
+Sorry!
 
-Thanks
-Alex
-
->
-> Yours,
-> Linus Walleij
->
+Thanks,
+Icenowy
