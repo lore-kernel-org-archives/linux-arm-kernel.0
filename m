@@ -1,80 +1,41 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Mon, 24 Apr 2017 21:23:16 +0530
-Subject: [PATCH] iommu/arm-smmu: Return IOVA in iova_to_phys when SMMU is
- bypassed
-In-Reply-To: <20170424144429.GI12323@arm.com>
-References: <1492430246-17267-1-git-send-email-sunil.kovvuri@gmail.com>
- <20170424144429.GI12323@arm.com>
-Message-ID: <CA+sq2Cc3cjjPcw0F1D_BOu0j3x+MUNO27MeRguj6BpQ+t11_HQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Apr 2017 16:54:54 +0100
+Subject: [PATCH] iommu: arm-smmu: correct sid to mask
+In-Reply-To: <1492765416-30835-1-git-send-email-peng.fan@nxp.com>
+References: <1492765416-30835-1-git-send-email-peng.fan@nxp.com>
+Message-ID: <20170424155453.GP12323@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 8:14 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Apr 17, 2017 at 05:27:26PM +0530, sunil.kovvuri at gmail.com wrote:
->> From: Sunil Goutham <sgoutham@cavium.com>
->>
->> For software initiated address translation, when domain type is
->> IOMMU_DOMAIN_IDENTITY i.e SMMU is bypassed, mimic HW behavior
->> i.e return the same IOVA as translated address.
->>
->> This patch is an extension to Will Deacon's patchset
->> "Implement SMMU passthrough using the default domain".
->
-> Are you actually seeing an issue here? If so, why isn't SMMUv3 affected too?
-Yes and SMMUv3 should also be effected but as of now I don't see any use case.
-If needed, i can re-submit the patch with changes in SMMUv3 as well.
+On Fri, Apr 21, 2017 at 05:03:36PM +0800, Peng Fan wrote:
+> From code "SMR mask 0x%x out of range for SMMU",
+> so, we need to use mask, not sid.
+> 
+> Signed-off-by: Peng Fan <peng.fan@nxp.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index b493c99..5a06de2 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1467,7 +1467,7 @@ static int arm_smmu_add_device(struct device *dev)
+>  		}
+>  		if (mask & ~smmu->smr_mask_mask) {
+>  			dev_err(dev, "SMR mask 0x%x out of range for SMMU (0x%x)\n",
+> -				sid, smmu->smr_mask_mask);
+> +				mask, smmu->smr_mask_mask);
+>  			goto out_free;
 
->
->> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
->> ---
->>  drivers/iommu/arm-smmu.c | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index 41afb07..2f4a130 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -1405,6 +1405,9 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
->>       struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
->>       struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
->>
->> +     if (domain->type == IOMMU_DOMAIN_IDENTITY)
->> +             return iova;
->> +
->>       if (!ops)
->>               return 0;
->
-> I'd have thought ops would be NULL, since arm_smmu_init_domain_context
-> doesn't allocate them for an identity domain.
-Yes ops is set to NULL.
+Looks like a copy-paste error to me:
 
->
-> I don't understand this patch. Please can you explain the problem more
-> clearly?
-AFAIK for any driver outside IOMMU there is only one way to identify
-if device is attached to
-IOMMU or not and that is by checking iommu_domain. And I don't think
-it would be appropriate
-for the driver to check domain->type before calling 'iommu_iova_to_phys()' API.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-The difference between IOMMU disabled and IOMMU being in passthrough
-mode is that, in the
-later case device is still attached to default domain but in former's
-case it's NULL. So there is no
-way to differentiate for the external driver whether IOMMU is in
-passthrough mode or DMA mode.
-
-And since ops is NULL in passthrough mode, 'iommu_iova_to_phys()' will
-return zero.
-
-Use case for your reference
-https://lkml.org/lkml/2017/3/7/299
-This driver is for a NIC interface on platform which supports SMMUv2.
-
-Let me know if any more details are needed.
+Joerg: do you mind picking this one up, please?
 
 Thanks,
-Sunil.
 
->
-> Will
+Will
