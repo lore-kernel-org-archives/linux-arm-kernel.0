@@ -1,53 +1,70 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Apr 2017 16:40:23 +0100
-Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
-In-Reply-To: <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
-References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
- <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
- <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
- <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
- <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
-Message-ID: <20170424154023.GM12323@arm.com>
+Date: Mon, 24 Apr 2017 16:45:30 +0100
+Subject: [PATCH v2] arm64: perf: Use only exclude_kernel attribute when
+ kernel is running in HYP
+In-Reply-To: <CAFpQJXVSsg8CX28vEo2LzmOi3pknHiH233spMD6ip4LZO4vw=Q@mail.gmail.com>
+References: <1492623846-29335-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170420084928.GC31436@leverpostej>
+ <CAFpQJXVSsg8CX28vEo2LzmOi3pknHiH233spMD6ip4LZO4vw=Q@mail.gmail.com>
+Message-ID: <20170424154530.GO12323@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 11:33:14AM +0100, Catalin Marinas wrote:
-> On Tue, Apr 18, 2017 at 09:01:52PM +0100, Peter Maydell wrote:
-> > On 18 April 2017 at 18:01, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > On Thu, Apr 13, 2017 at 08:33:52PM +0800, dongbo (E) wrote:
-> > >> From: Dong Bo <dongbo4@huawei.com>
-> > >>
-> > >> In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
-> > >> the flag is propagated to its child processes, even the elf
-> > >> files are marked as not requiring executable stack. It may
-> > >> cause superfluous operations on some arch, e.g.
-> > >> __sync_icache_dcache on aarch64 due to a PROT_READ mmap is
-> > >> also marked as PROT_EXEC.
-> > 
-> > > That's affecting most architectures with a risk of ABI breakage. We
-> > > could do it on arm64 only, though I'm not yet clear on the ABI
-> > > implications (at a first look, there shouldn't be any).
-> > 
-> > Is there a reason why it isn't just straightforwardly a bug
-> > (which we could fix) to make READ_IMPLIES_EXEC propagate to
-> > child processes?
+On Thu, Apr 20, 2017 at 02:56:50PM +0530, Ganapatrao Kulkarni wrote:
+> On Thu, Apr 20, 2017 at 2:19 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Apr 19, 2017 at 11:14:06PM +0530, Ganapatrao Kulkarni wrote:
+> >> commit d98ecda (arm64: perf: Count EL2 events if the kernel is running in HYP)
+> >> is returning error for perf syscall with mixed attribute set for exclude_kernel
+> >> and exclude_hv. This change is breaking some applications (observed with hhvm)
+> >> when ran on VHE enabled platforms.
+> >>
+> >> Adding fix to consider only exclude_kernel attribute when kernel is
+> >> running in HYP. Also adding sysfs file to notify the bhehaviour
+> >> of attribute exclude_hv.
+> >>
+> >> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> >> ---
+> >>
+> >> Changelog:
+> >>
+> >> V2:
+> >>  - Changes as per Will Deacon's suggestion.
+> >>
+> >> V1: Initial patch
+> >>
+> >>  arch/arm64/kernel/perf_event.c | 28 ++++++++++++++++++++++++----
+> >>  include/linux/perf/arm_pmu.h   |  1 +
+> >>  2 files changed, 25 insertions(+), 4 deletions(-)
+> >>
+> >> @@ -871,14 +890,13 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+> >>
+> >>       if (attr->exclude_idle)
+> >>               return -EPERM;
+> >> -     if (is_kernel_in_hyp_mode() &&
+> >> -         attr->exclude_kernel != attr->exclude_hv)
+> >> -             return -EINVAL;
+> >> +     if (is_kernel_in_hyp_mode() && !attr->exclude_kernel)
+> >> +             config_base |= ARMV8_PMU_INCLUDE_EL2;
+> >>       if (attr->exclude_user)
+> >>               config_base |= ARMV8_PMU_EXCLUDE_EL0;
+> >>       if (!is_kernel_in_hyp_mode() && attr->exclude_kernel)
+> >>               config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> >> -     if (!attr->exclude_hv)
+> >> +     if (!is_kernel_in_hyp_mode() && !attr->exclude_hv)
+> >>               config_base |= ARMV8_PMU_INCLUDE_EL2;
+> >
+> > This isn't quite what Will suggested.
+> >
+> > The idea was that userspace would read sysfs, then use that to determine
+> > the correct exclusion parameters [1,2]. This logic was not expected to
+> > change; it correctly validates whether we can provide what the user
+> > requests.
 > 
-> While I agree that it looks like a bug, if there are user programs
-> relying on such bug we call it "ABI". On arm64, I don't think there is
-> anything relying on inheriting READ_IMPLIES_EXEC but I wouldn't change
-> the compat task handling without the corresponding change in arch/arm.
-> 
-> > AFAICT this should be per-process: just because
-> > init happens not to have been (re)compiled to permit non-executable
-> > stacks doesn't mean every process on the system needs to have
-> > an executable stack.
-> 
-> I think this also affects the heap if brk(2) is used (via
-> VM_DATA_DEFAULT_FLAGS though I guess malloc mostly uses mmap these
-> days).
+> OK, if you are ok with sysfs part, i can send next version with that
+> change only?.
 
-I think it also affects mprotect, which is more worrying imo, particularly
-for things like JIT code that is ported from 32-bit (although a quick look
-at v8, ionmonkey and art suggests they all pass PROT_EXEC when needed).
+I think the sysfs part is still a little dodgy, since you still expose the
+"exclude_hv" file with a value of 0 when not running at EL2, which would
+imply that exclude_hv is forced to zero. I don't think that's correct.
 
 Will
