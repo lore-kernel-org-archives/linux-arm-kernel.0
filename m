@@ -1,39 +1,37 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Mon, 24 Apr 2017 11:31:43 +0000
-Subject: [PATCH] arm64: pmuv3: Support v8.1 PMUv3 extension
-Message-ID: <1493033503-4712-1-git-send-email-jnair@caviumnetworks.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 24 Apr 2017 08:37:05 -0300
+Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
+In-Reply-To: <20170424112906.GR26900@vireshk-i7>
+References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
+ <20170424040709.GG26900@vireshk-i7>
+ <CAOMZO5B4_xrLcWQGF=yRfj-14XQKudzjyr2roGRkzofkHCfuHg@mail.gmail.com>
+ <20170424112906.GR26900@vireshk-i7>
+Message-ID: <CAOMZO5BpAsJAKv-p=WPevUnx71fxbLtunJe-0ijVT7T9m7AMSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PMUVer field can have a value 4 for PMUv3 which supports 16 bit
-evtCount field (this is documented in ARM Architecture Reference Manual
-Supplement ARMv8.1).
+On Mon, Apr 24, 2017 at 8:29 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
-The current check for PMUVer to be equal to 1 fails on ThunderX2 which
-has value 4 in PMUVer field. Fix this.
+> So clearly the system isn't changing the frequency a lot here and you stayed at
+> the min freq for ever. Please give output of this as well:
+>
+> grep . /sys/devices/system/cpu/cpufreq/ondemand/*
 
-Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
----
+#  grep . /sys/devices/system/cpu/cpufreq/ondemand/*
+/sys/devices/system/cpu/cpufreq/ondemand/ignore_nice_load:0
+/sys/devices/system/cpu/cpufreq/ondemand/io_is_busy:0
+/sys/devices/system/cpu/cpufreq/ondemand/min_sampling_rate:10000
+/sys/devices/system/cpu/cpufreq/ondemand/powersave_bias:0
+/sys/devices/system/cpu/cpufreq/ondemand/sampling_down_factor:1
+/sys/devices/system/cpu/cpufreq/ondemand/sampling_rate:109000
+/sys/devices/system/cpu/cpufreq/ondemand/up_threshold:95
 
-This applies on top of the current arm64 tree and fixes a breakage due
-to the  ACPI perf patches.
+> I am also worried if the interrupts from the touchscreen will be enough to boost
+> the frequency of the CPU ?
 
+It does not seem that the interrupts from the touchscreen boost the
+frequency of the CPU.
 
- arch/arm64/kernel/perf_event.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+When I keep touching the panel, the CPU frequency stays at 396 MHz.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 98c7493..5388ed8 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -972,7 +972,7 @@ static void __armv8pmu_probe_pmu(void *info)
- 	dfr0 = read_sysreg(id_aa64dfr0_el1);
- 	pmuver = cpuid_feature_extract_unsigned_field(dfr0,
- 			ID_AA64DFR0_PMUVER_SHIFT);
--	if (pmuver != 1)
-+	if (pmuver != 1 && pmuver != 4)
- 		return;
- 
- 	probe->present = true;
--- 
-2.7.4
+Thanks
