@@ -1,66 +1,49 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Mon, 24 Apr 2017 14:21:54 -0400
-Subject: [PATCH 1/3 v2] xen: Export xen_reboot
-In-Reply-To: <20170424175839.5262-2-julien.grall@arm.com>
-References: <20170424175839.5262-1-julien.grall@arm.com>
- <20170424175839.5262-2-julien.grall@arm.com>
-Message-ID: <41fd4caf-7554-7d54-6332-d227228a13ea@oracle.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Mon, 24 Apr 2017 11:22:34 -0700
+Subject: linux-next: manual merge of the pm tree with the arm-soc tree
+In-Reply-To: <c97828b4-7f19-93d1-6f23-d86e089cea87@ti.com>
+References: <20170421105405.6a690b35@canb.auug.org.au>
+ <CAK8P3a3kHO1NZFJXvDwWO625aEmXoo2540FRKe+YYzoYE9NCSg@mail.gmail.com>
+ <4b58d5ab-c924-97af-728f-b9f524e62a53@oracle.com>
+ <CAK8P3a0cVMt3y_oYH70V-ekPvUMeeBApSvybpRftSupzYy1FWQ@mail.gmail.com>
+ <e2f9efab-291f-1436-2176-0fff3f2aae3f@oracle.com>
+ <CAK8P3a1mPgM4XmS398DPsSbyCyD=12xQfUrF_HRqyd52_21o7Q@mail.gmail.com>
+ <c3dfaceb-41ba-b13d-f47e-a279c3e2f6b9@oracle.com>
+ <c97828b4-7f19-93d1-6f23-d86e089cea87@ti.com>
+Message-ID: <9d60286d-86ae-93a0-04ce-0037d1105bba@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2017 01:58 PM, Julien Grall wrote:
-> The helper xen_reboot will be called by the EFI code in a later patch.
->
-> Note that the ARM version does not yet exist and will be added in a
-> later patch too.
->
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
+On 4/24/2017 11:02 AM, Dave Gerlach wrote:
+> On 04/21/2017 04:54 PM, Santosh Shilimkar wrote:
+>> +Dave,
+>>
 
-I don't think these changes are worth a whole patch. They can be folded
-into the third patch.
+[...]
 
--boris
+>>> Ok, good, thanks for checking! They are however the commits that
+>>> contain the silly https://urldefense.proofpoint.com URLs. Can you
+>>> send a follow-up patch to fix these and use the regular
+>>> https://urldefense.proofpoint.com/v2/url?u=http-3A__www.ti.org&d=DwIBaQ&c=RoP1YumCXCgaWHvlZYR8PQcxBKCX5YTpkKY057SbK10&r=XBn1JQGPwR8CsE7xpP3wPlG6DQU7qw8ym65xieNZ4hY&m=vFHOEb7p2FxbH00YRQq4WnRiu2BKHADn0gl6e6DoNFQ&s=7mfiIp2Ywy9_ppWKjEGlrswiKRndv8_I7zGVF9uyT0w&e=
+>>>
+>>>
+>>> URL that is in linux-next?
+>>>
+>> Dave,
+>> Any reason you changed these URLs in last version ?
+>> Can you please fixup these URLs to along with DT defines.
+>
+> I didn't change any of the URLs in the patches, I am not sure what those
+> URLs are. In the patches I sent the URLs are fine, and I see them normal
+> on patchwork too:
+> https://urldefense.proofpoint.com/v2/url?u=https-3A__patchwork.kernel.org_patch_9660785_&d=DwICaQ&c=RoP1YumCXCgaWHvlZYR8PQcxBKCX5YTpkKY057SbK10&r=XBn1JQGPwR8CsE7xpP3wPlG6DQU7qw8ym65xieNZ4hY&m=eK4-xq3xbWwYHfuVa6ee48pvTCWUv5X5PHM285eHMLQ&s=uCfKZ0Z0T8Aaf4ircFilcu8zRVDU8XyGdbsq4OW3GaE&e=
+>
+> Is there something that automatically changes those? I don't want to
+> send another patch for it to just get mangled again.
+>
+Looks like thats the case as one of my Oracle colleague pointed out.
+I will send you off-list an email to get correct URL and update the git 
+tree accordingly.
 
->
-> ---
->
-> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> Cc: Juergen Gross <jgross@suse.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: "H. Peter Anvin" <hpa@zytor.com>
-> Cc: x86 at kernel.org
->
->     Changes in v2:
->         - Patch added
-> ---
->  arch/x86/xen/enlighten.c | 2 +-
->  include/xen/xen-ops.h    | 2 ++
->  2 files changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
-> index ec1d5c46e58f..563f2d963a04 100644
-> --- a/arch/x86/xen/enlighten.c
-> +++ b/arch/x86/xen/enlighten.c
-> @@ -1294,7 +1294,7 @@ static const struct pv_cpu_ops xen_cpu_ops __initconst = {
->  	.end_context_switch = xen_end_context_switch,
->  };
->  
-> -static void xen_reboot(int reason)
-> +void xen_reboot(int reason)
->  {
->  	struct sched_shutdown r = { .reason = reason };
->  	int cpu;
-> diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
-> index b5486e648607..fc5ddb472f86 100644
-> --- a/include/xen/xen-ops.h
-> +++ b/include/xen/xen-ops.h
-> @@ -22,6 +22,8 @@ void xen_timer_resume(void);
->  void xen_arch_resume(void);
->  void xen_arch_suspend(void);
->  
-> +void xen_reboot(int reason);
-> +
->  void xen_resume_notifier_register(struct notifier_block *nb);
->  void xen_resume_notifier_unregister(struct notifier_block *nb);
->  
+Regards,
+Santosh
