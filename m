@@ -1,93 +1,79 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 24 Apr 2017 18:40:20 +0200
-Subject: [PATCH 1/4] pinctrl: stm32: set pin to gpio input when used as
- interrupt
-In-Reply-To: <CACRpkdYZixkJroS-gQxYL6xW47-J9UiNv4hOO9F-1b2eYLr8XQ@mail.gmail.com>
-References: <1491577811-26989-1-git-send-email-alexandre.torgue@st.com>
- <1491577811-26989-2-git-send-email-alexandre.torgue@st.com>
- <CACRpkdYZixkJroS-gQxYL6xW47-J9UiNv4hOO9F-1b2eYLr8XQ@mail.gmail.com>
-Message-ID: <e9d8c988-0bdd-0c82-2c56-6a31d052f0e6@st.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Apr 2017 17:40:16 +0100
+Subject: [Bug] VCHIQ functional test broken
+In-Reply-To: <696fb1c1-7751-caf0-e0d9-9c67b059b4cc@i2se.com>
+References: <331235003.222371.1491934205807@email.1und1.de>
+ <685482264.60263.1492105308873@email.1und1.de>
+ <20170413222915.GF17774@n2100.armlinux.org.uk>
+ <20170414074104.GA8704@laptop> <87pog7x7c5.fsf@eliezer.anholt.net>
+ <20170420195822.GA22677@laptop>
+ <696fb1c1-7751-caf0-e0d9-9c67b059b4cc@i2se.com>
+Message-ID: <20170424164015.GP17774@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, Apr 24, 2017 at 06:12:09PM +0200, Stefan Wahren wrote:
+> Am 20.04.2017 um 21:58 schrieb Rabin Vincent:
+> > On Thu, Apr 20, 2017 at 11:27:38AM -0700, Eric Anholt wrote:
+> >> I'm confused by what you're saying here.  The driver has already been
+> >> converted to not use dmac_map_area (commit
+> >> cf9caf1929882b66922aee698e99e6c8f357bee5), and uses dma_map_sg instead,
+> >> matching the radeon driver you give as a model as far as I can see.
+> >> That commit is in v4.11-rc6 from Stefan's regression report.
+> > Right.  Sorry.  I must have had an old tag checked out when I looked at
+> > the driver earlier.  The DMA API usage in the driver in v4.11-rc6 and
+> > current master looks fine, except for one thing:
+> >
+> > The flush in flush_dcache_page() (from get_user_pages()) was done with a
+> > v6_flush_kern_dcache_page() which always did a clean+invalidate while
+> > the DMA API only does what is required by the direction, which is only a
+> > invalidate for DMA_FROM_DEVICE.  Since the driver calls dma_from_sg() on
+> > the entire page, even if userspace sent in an offset into the page,
+> > unrelated data in userspace may be thrown away.
+> >
+> > Does changing the dma API calls to always use DMA_BIDIRECTIONAL make the
+> > test pass?
+> 
+> Unfortunately not (at least not that simple).
+> 
+> Do we need special DMA mapping attributes here ? Or a dma_sync_sg_for_* ?
 
-On 04/24/2017 02:36 PM, Linus Walleij wrote:
-> On Fri, Apr 7, 2017 at 5:10 PM, Alexandre TORGUE
-> <alexandre.torgue@st.com> wrote:
->
->> This patch ensures that pin is correctly set as gpio input when it is used
->> as an interrupt.
->>
->> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
-> (...)
->
->> +static int stm32_gpio_irq_request_resources(struct irq_data *irq_data)
->> +{
->> +       struct stm32_gpio_bank *bank = irq_data->domain->host_data;
->> +       u32 ret;
->> +
->> +       if (!gpiochip_is_requested(&bank->gpio_chip, irq_data->hwirq)) {
->> +               ret = stm32_gpio_request(&bank->gpio_chip, irq_data->hwirq);
->> +               if (ret)
->> +                       return ret;
->> +       }
->
-> This is wrong. You should only use gpiochip_lock_as_irq(), because of the
-> following in Documentation/gpio/driver.txt:
->
-> ---------------
-> It is legal for any IRQ consumer to request an IRQ from any irqchip no matter
-> if that is a combined GPIO+IRQ driver. The basic premise is that gpio_chip and
-> irq_chip are orthogonal, and offering their services independent of each
-> other.
-> (...)
-> So always prepare the hardware and make it ready for action in respective
-> callbacks from the GPIO and irqchip APIs. Do not rely on gpiod_to_irq() having
-> been called first.
+I had a look at the driver when you first reported the problem, but I
+don't see an obvious problem.
 
-Ok, so actually the action to set pin in input mode is necessary in 
-stm32_gpio_irq_request_resources.
+In drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c, I
+see it using get_user_pages(), generating a scatterlist, which it then
+uses dma_map_sg() with.  It then goes on to populate the DMA coherent
+buffer that it allocated with the DMA addresses of these buffers.
 
-I'll fix it in V2.
+The tear-down looks sane too - free_pagelist() looks like it correctly
+unmaps the scatterlist, marks the pages dirty if necessary, puts the
+pages and frees the DMA coherent memory.
 
+Since you're running on a PIPT cache, the only possible issue is whether
+there's a lifetime mismatch between what happens here, and what you're
+doing with the pages in userspace.  All the rules wrt the DMA API apply
+to these userspace pages, just as these same rules apply in kernel space.
+Once you have called dma_map_sg() on them, any CPU access (whether
+explicit or speculative) will cause cache lines to be populated, and
+possibly marked dirty, which can have the effect of corrupting the data
+unless it is unmapped prior to the accesses you care about.
 
->
-> This orthogonality leads to ambiguities that we need to solve: if there is
-> competition inside the subsystem which side is using the resource (a certain
-> GPIO line and register for example) it needs to deny certain operations and
-> keep track of usage inside of the gpiolib subsystem. This is why the API
-> below exists.
->
-> Locking IRQ usage
-> -----------------
-> Input GPIOs can be used as IRQ signals. When this happens, a driver is requested
-> to mark the GPIO as being used as an IRQ:
->
->         int gpiochip_lock_as_irq(struct gpio_chip *chip, unsigned int offset)
->
-> This will prevent the use of non-irq related GPIO APIs until the GPIO IRQ lock
-> is released:
->
->         void gpiochip_unlock_as_irq(struct gpio_chip *chip, unsigned int offset)
->
-> When implementing an irqchip inside a GPIO driver, these two functions should
-> typically be called in the .startup() and .shutdown() callbacks from the
-> irqchip.
->
-> When using the gpiolib irqchip helpers, these callback are automatically
-> assigned.
-> --------------
->
-> It is because of easy to make errors like this that I prefer that people try
-> to use GPIOLIB_IRQCHIP helpers insteaf of rolling their own irqchip code.
+What I can't see is how changing flush_dcache_page() has possibly broken
+this: it seems to imply that you're getting flush_dcache_page() somehow
+called inbetween mapping it for DMA, using it for DMA and CPU accesses
+occuring.  However, the driver doesn't call flush_dcache_page() other
+than through get_user_pages() - and since dma_map_sg() is used in that
+path, it should be fine.
 
-I understand. It was difficult in our case due to design.
+So, I don't have much to offer.
 
-Thanks for review.
-Alex
+However, flush_dcache_page() is probably still a tad heavy - it currently
+flushes to the point of coherency, but it's really about making sure that
+the user vs kernel mappings are coherent, not about device coherency.
+That's the role of the DMA API.
 
->
-> Yours,
-> Linus Walleij
->
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
