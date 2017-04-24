@@ -1,60 +1,33 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Mon, 24 Apr 2017 18:58:37 +0100
-Subject: [PATCH 1/3 v2] xen: Export xen_reboot
-In-Reply-To: <20170424175839.5262-1-julien.grall@arm.com>
-References: <20170424175839.5262-1-julien.grall@arm.com>
-Message-ID: <20170424175839.5262-2-julien.grall@arm.com>
+Date: Mon, 24 Apr 2017 18:58:36 +0100
+Subject: [PATCH 0/3 v2] xen: Implement EFI reset_system callback
+Message-ID: <20170424175839.5262-1-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The helper xen_reboot will be called by the EFI code in a later patch.
+Hi all,
 
-Note that the ARM version does not yet exist and will be added in a
-later patch too.
+This small patch series implements EFI reset_system callback when using EFI
+Xen. Without this, it will not be possible to reboot/power off ARM64 DOM0
+when using ACPI.
 
-Signed-off-by: Julien Grall <julien.grall@arm.com>
-
----
+Cheers,
 
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 Cc: Juergen Gross <jgross@suse.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: x86 at kernel.org
 
-    Changes in v2:
-        - Patch added
----
- arch/x86/xen/enlighten.c | 2 +-
- include/xen/xen-ops.h    | 2 ++
- 2 files changed, 3 insertions(+), 1 deletion(-)
+Julien Grall (3):
+  xen: Export xen_reboot
+  arm/xen: Consolidate calls to shutdown hypercall in a single helper
+  xen: Implement EFI reset_system callback
 
-diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
-index ec1d5c46e58f..563f2d963a04 100644
---- a/arch/x86/xen/enlighten.c
-+++ b/arch/x86/xen/enlighten.c
-@@ -1294,7 +1294,7 @@ static const struct pv_cpu_ops xen_cpu_ops __initconst = {
- 	.end_context_switch = xen_end_context_switch,
- };
- 
--static void xen_reboot(int reason)
-+void xen_reboot(int reason)
- {
- 	struct sched_shutdown r = { .reason = reason };
- 	int cpu;
-diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
-index b5486e648607..fc5ddb472f86 100644
---- a/include/xen/xen-ops.h
-+++ b/include/xen/xen-ops.h
-@@ -22,6 +22,8 @@ void xen_timer_resume(void);
- void xen_arch_resume(void);
- void xen_arch_suspend(void);
- 
-+void xen_reboot(int reason);
-+
- void xen_resume_notifier_register(struct notifier_block *nb);
- void xen_resume_notifier_unregister(struct notifier_block *nb);
- 
+ arch/arm/xen/efi.c       |  2 +-
+ arch/arm/xen/enlighten.c | 16 ++++++++++------
+ arch/x86/xen/efi.c       |  2 +-
+ arch/x86/xen/enlighten.c |  2 +-
+ drivers/xen/efi.c        | 18 ++++++++++++++++++
+ include/xen/xen-ops.h    |  5 +++++
+ 6 files changed, 36 insertions(+), 9 deletions(-)
+
 -- 
 2.11.0
