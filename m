@@ -1,68 +1,60 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 24 Apr 2017 10:26:49 +0200
-Subject: [PATCH] arm64: dts: rockchip: update cpu opp table for rk3399 op1
-In-Reply-To: <1493014730-9670-1-git-send-email-wxt@rock-chips.com>
-References: <1493014730-9670-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <2250946.xrPjMl5Kf1@diego>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 24 Apr 2017 17:30:35 +0900
+Subject: [PATCH V5 3/7] ARM: exynos: Use - instead of @ for DT OPP entries
+In-Reply-To: <20170420160930.halyszjunt4q2634@kozik-lap>
+References: <cover.1492685450.git.viresh.kumar@linaro.org>
+ <8fd1dcd1bfa2011411dceab82bcd1587fe913cd1.1492685450.git.viresh.kumar@linaro.org>
+ <20170420160930.halyszjunt4q2634@kozik-lap>
+Message-ID: <CAK7LNAQChtyRzKoSWCFakg+3_Qp_NZoXP1pEt6edDQrnL9FQ2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+2017-04-21 1:09 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
+> On Thu, Apr 20, 2017 at 04:25:07PM +0530, Viresh Kumar wrote:
+>> Compiling the DT file with W=1, DTC warns like follows:
+>>
+>> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+>> unit name, but no reg property
+>>
+>> Fix this by replacing '@' with '-' as the OPP nodes will never have a
+>> "reg" property.
+>>
+>> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> ---
+>>  .../devicetree/bindings/devfreq/exynos-bus.txt     | 46 +++++++--------
+>>  arch/arm/boot/dts/exynos3250.dtsi                  | 46 +++++++--------
+>>  arch/arm/boot/dts/exynos4210.dtsi                  | 32 +++++------
+>>  arch/arm/boot/dts/exynos4412-prime.dtsi            |  4 +-
+>>  arch/arm/boot/dts/exynos4412.dtsi                  | 66 +++++++++++-----------
+>>  arch/arm/boot/dts/exynos5420.dtsi                  | 40 ++++++-------
+>>  arch/arm/boot/dts/exynos5800.dtsi                  | 56 +++++++++---------
+>>  arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi     | 48 ++++++++--------
+>>  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 50 ++++++++--------
+>>  9 files changed, 194 insertions(+), 194 deletions(-)
+>
+>
+> Thanks, split ARM64 from ARM and applied (for v4.12). arm-soc keeps DTS
+> separated between ARM architectures. Technically this should require a
+> resend but we had way too many resends for this simple patch.
+>
 
-Am Montag, 24. April 2017, 14:18:50 CEST schrieb Caesar Wang:
-> Update the cpu opp table for rk3399 op1.
 
-Ideally this should contain something about the "why".
-Are these new voltage settings safer to operate under?
+Minor note:
 
-No need to resend, please just clarify the reason.
+For arm64 part, Krzysztof's Signed-off-by is doubled.
+(commit 5dccc9873c4af60f4478b3ef54267353f25cc301)
 
 
-Thanks
-Heiko
 
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
-> 
->  arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
-> b/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi index dd82e16..92bd615
-> 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
-> @@ -52,27 +52,27 @@
->  		};
->  		opp01 {
->  			opp-hz = /bits/ 64 <600000000>;
-> -			opp-microvolt = <800000>;
-> +			opp-microvolt = <825000>;
->  		};
->  		opp02 {
->  			opp-hz = /bits/ 64 <816000000>;
-> -			opp-microvolt = <800000>;
-> +			opp-microvolt = <850000>;
->  		};
->  		opp03 {
->  			opp-hz = /bits/ 64 <1008000000>;
-> -			opp-microvolt = <875000>;
-> +			opp-microvolt = <900000>;
->  		};
->  		opp04 {
->  			opp-hz = /bits/ 64 <1200000000>;
-> -			opp-microvolt = <925000>;
-> +			opp-microvolt = <975000>;
->  		};
->  		opp05 {
->  			opp-hz = /bits/ 64 <1416000000>;
-> -			opp-microvolt = <1050000>;
-> +			opp-microvolt = <1100000>;
->  		};
->  		opp06 {
->  			opp-hz = /bits/ 64 <1512000000>;
-> -			opp-microvolt = <1125000>;
-> +			opp-microvolt = <1150000>;
->  		};
->  	};
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
