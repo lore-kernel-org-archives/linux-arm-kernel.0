@@ -1,91 +1,58 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Mon, 24 Apr 2017 21:50:32 +0530
-Subject: [PATCH] iommu/arm-smmu: Return IOVA in iova_to_phys when SMMU is
- bypassed
-In-Reply-To: <20170424160030.GQ12323@arm.com>
-References: <1492430246-17267-1-git-send-email-sunil.kovvuri@gmail.com>
- <20170424144429.GI12323@arm.com>
- <CA+sq2Cc3cjjPcw0F1D_BOu0j3x+MUNO27MeRguj6BpQ+t11_HQ@mail.gmail.com>
- <20170424160030.GQ12323@arm.com>
-Message-ID: <CA+sq2CfOZsAWhqLV-SNajUo+SNobNX9TFJfgZr76NOzz5h+RCg@mail.gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Mon, 24 Apr 2017 16:40:09 +0000
+Subject: [PATCH] arm64: pmuv3: Support v8.1 PMUv3 extension
+In-Reply-To: <20170424140348.GB5767@leverpostej>
+References: <1493033503-4712-1-git-send-email-jnair@caviumnetworks.com>
+ <20170424125747.GA5767@leverpostej>
+ <20170424133929.GA4952@localhost>
+ <20170424140348.GB5767@leverpostej>
+Message-ID: <20170424164008.GA4657@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 9:30 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Apr 24, 2017 at 09:23:16PM +0530, Sunil Kovvuri wrote:
->> On Mon, Apr 24, 2017 at 8:14 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Mon, Apr 17, 2017 at 05:27:26PM +0530, sunil.kovvuri at gmail.com wrote:
->> >> From: Sunil Goutham <sgoutham@cavium.com>
->> >>
->> >> For software initiated address translation, when domain type is
->> >> IOMMU_DOMAIN_IDENTITY i.e SMMU is bypassed, mimic HW behavior
->> >> i.e return the same IOVA as translated address.
->> >>
->> >> This patch is an extension to Will Deacon's patchset
->> >> "Implement SMMU passthrough using the default domain".
->> >
->> > Are you actually seeing an issue here? If so, why isn't SMMUv3 affected too?
->> Yes and SMMUv3 should also be effected but as of now I don't see any use case.
->> If needed, i can re-submit the patch with changes in SMMUv3 as well.
->
-> Yes, please.
->
->> >> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
->> >> ---
->> >>  drivers/iommu/arm-smmu.c | 3 +++
->> >>  1 file changed, 3 insertions(+)
->> >>
->> >> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> >> index 41afb07..2f4a130 100644
->> >> --- a/drivers/iommu/arm-smmu.c
->> >> +++ b/drivers/iommu/arm-smmu.c
->> >> @@ -1405,6 +1405,9 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
->> >>       struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
->> >>       struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
->> >>
->> >> +     if (domain->type == IOMMU_DOMAIN_IDENTITY)
->> >> +             return iova;
->> >> +
->> >>       if (!ops)
->> >>               return 0;
->> >
->> > I'd have thought ops would be NULL, since arm_smmu_init_domain_context
->> > doesn't allocate them for an identity domain.
->> Yes ops is set to NULL.
->
-> Argh, sorry, I completely overlooked that we return 0 in that case, rather
-> than the iova.
->
->> > I don't understand this patch. Please can you explain the problem more
->> > clearly?
->> AFAIK for any driver outside IOMMU there is only one way to identify
->> if device is attached to
->> IOMMU or not and that is by checking iommu_domain. And I don't think
->> it would be appropriate
->> for the driver to check domain->type before calling 'iommu_iova_to_phys()' API.
->>
->> The difference between IOMMU disabled and IOMMU being in passthrough
->> mode is that, in the
->> later case device is still attached to default domain but in former's
->> case it's NULL. So there is no
->> way to differentiate for the external driver whether IOMMU is in
->> passthrough mode or DMA mode.
->>
->> And since ops is NULL in passthrough mode, 'iommu_iova_to_phys()' will
->> return zero.
->>
->> Use case for your reference
->> https://lkml.org/lkml/2017/3/7/299
->> This driver is for a NIC interface on platform which supports SMMUv2.
->
-> Blimey, that driver is horrible, but I take your point on the API. Please
-> repost, fixing SMMUv3 at the same time.
+On Mon, Apr 24, 2017 at 03:03:48PM +0100, Mark Rutland wrote:
+> On Mon, Apr 24, 2017 at 01:39:30PM +0000, Jayachandran C wrote:
+> > The v8.1 supplement is quite clear on the field definition:
+> >
+> > PMUVer, bits [11:8]
+> > ....
+> > Defined values are:
+> >       0000 Performance Monitors extension System registers not implemented.
+> >       0001 Performance Monitors extension System registers implemented, PMUv3.
+> >       0100 Performance Monitors extension System registers implemented, PMUv3, with a 16-bit
+> >            evtCount field, and if EL2 is implemented, the addition of the MDCR_EL2.HPMD bit.
+> >       1111 IMPLEMENTATION DEFINED form of performance monitors supported, PMUv3 not
+> >            supported.
+> >         All other values are reserved.
+> >         In ARMv8-A the permitted values are 0b0000, 0b0001 and 0b1111.
+> >         In ARMv8.1 the permitted values are 0b0000, 0b0100 and 0b1111.
+> >
+> > I changed the code to strictly do this. We have to exclude 0xf, since that is not PMUv3.
+> > And we cannot predict what the reserved values will represent, so it is best to skip them
+> > until they are defined to be PMUv3 compatible.
+> 
+> My understanding is that ID_AA64DFR0.PMUVer is intended to be covered by
+> the usual ID register principles, and thus at least 0x2-0x7 are reserved
+> for architected backwards compatible extensions to PMUv3.
+> 
+> See ARM DDI 0487B.a, D7.1.4, "Principles of the ID scheme for fields in
+> ID registers". It is explicitly stated that the scheme applies to
+> ID_AA64DFR0.
+> 
+> Per those rules, we should check >= the minimum PMUv3 implemented value,
+> i.e. val >= 1. Due to both 0x0 and 0xF meaning PMUv3 isn't implemented,
+> it's not clear if the fields should be treated as if it were signed or
+> unsigned, and I'm awaiting clarification on this.
 
-Sure, will re-submit the patch with SMMUv3 changes.
+Thanks for the reference. Since 0xf means that there is a PMU (but it is
+not PMUv3), this looks like an unsigned ID with a special case.
 
-On a separate note, if you have time, I would definitely like to know
-your feedback and what's horrible in that driver, probably in a different
-email to keep that out of scope of this patch.
+> Either way, I believe that 0x1-0x7 must all be compatible with baseline
+> PMUv3 per the ID scheme principles.
+
+In case you don't get authoritative information on this, can you please
+merge a version which does either 'if (pmuver < 1 || pmuver == 0xf)' or
+'if (pmuver < 1 || pmuver > 7)' to the patchset?
 
 Thanks,
-Sunil.
+JC.
