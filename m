@@ -1,139 +1,36 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 24 Apr 2017 09:58:23 -0700
-Subject: [PATCH] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS mmaping
- code
-In-Reply-To: <20170421161234.GD5312@e104818-lin.cambridge.arm.com>
-References: <CGME20170329100540eucas1p22d428e33aa678cbef0a24dd249820451@eucas1p2.samsung.com>
- <1490781926-6209-1-git-send-email-a.hajda@samsung.com>
- <15b1be13-625f-db74-d213-ad1df86f7eb5@arm.com>
- <20170421161234.GD5312@e104818-lin.cambridge.arm.com>
-Message-ID: <a344c9c8-8a1f-cfc4-4dcd-1b49f3e1ac6c@redhat.com>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Mon, 24 Apr 2017 19:06:29 +0200 (CEST)
+Subject: [PATCH 4/5 v3] usb: host: fotg2: add Gemini-specific handling
+In-Reply-To: <20170421204058.6206-4-linus.walleij@linaro.org>
+References: <20170421204058.6206-1-linus.walleij@linaro.org>
+ <20170421204058.6206-4-linus.walleij@linaro.org>
+Message-ID: <alpine.LNX.2.00.1704241853240.15211@T420s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2017 09:12 AM, Catalin Marinas wrote:
-> On Wed, Mar 29, 2017 at 01:55:32PM +0100, Robin Murphy wrote:
->> On 29/03/17 11:05, Andrzej Hajda wrote:
->>> In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
->>> is invalid. __iommu_mmap_attrs and __iommu_get_sgtable cannot use
->>> it. In first case temporary pages array is passed to iommu_dma_mmap,
->>> in 2nd case single entry sg table is created directly instead
->>> of calling helper.
->>>
->>> Fixes: 44176bb ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
->>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
->>> ---
->>> Hi,
->>>
->>> I am not familiar with this framework so please don't be too cruel ;)
->>> Alternative solution I see is to always create vm_area->pages,
->>> I do not know which approach is preferred.
->>>
->>> Regards
->>> Andrzej
->>> ---
->>>  arch/arm64/mm/dma-mapping.c | 40 ++++++++++++++++++++++++++++++++++++++--
->>>  1 file changed, 38 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->>> index f7b5401..bba2bc8 100644
->>> --- a/arch/arm64/mm/dma-mapping.c
->>> +++ b/arch/arm64/mm/dma-mapping.c
->>> @@ -704,7 +704,30 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
->>>  		return ret;
->>>  
->>>  	area = find_vm_area(cpu_addr);
->>> -	if (WARN_ON(!area || !area->pages))
->>> +	if (WARN_ON(!area))
->>
->> From the look of things, it doesn't seem strictly necessary to change
->> this, but whether that's a good thing is another matter. I'm not sure
->> that dma_common_contiguous_remap() should really be leaving a dangling
->> pointer in area->pages as it apparently does... :/
+Hi Linus
+
+On Fri, 21 Apr 2017, Linus Walleij wrote:
+
+> The Cortina Systems Gemini has bolted on a PHY inside the
+> silicon that can be handled by six bits in a MISC register in
+> the system controller.
 > 
-> On this specific point, I don't think area->pages should be set either
-> (cc'ing Laura). As in the vmalloc vs vmap case, area->pages when pages
-> need to be freed (via vfree), which is not the case here. The
-> dma_common_pages_remap() would need to set area->pages when called
-> directly from the iommu DMA ops. Proposal below, not tested with the
-> iommu ops. I assume the patch would cause __iommu_mmap_attrs() to return
-> -ENXIO if DMA_ATTR_FORCE_CONTIGUOUS is set.
+> If we are running on Gemini, look up a syscon regmap through
+> a phandle and enable VBUS and optionally the Mini-B connector.
 > 
-> ------------8<---------------------------------
-> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-> index efd71cf4fdea..ab7071041141 100644
-> --- a/drivers/base/dma-mapping.c
-> +++ b/drivers/base/dma-mapping.c
-> @@ -277,8 +277,8 @@ EXPORT_SYMBOL(dma_common_mmap);
->   * remaps an array of PAGE_SIZE pages into another vm_area
->   * Cannot be used in non-sleeping contexts
->   */
-> -void *dma_common_pages_remap(struct page **pages, size_t size,
-> -			unsigned long vm_flags, pgprot_t prot,
-> +static struct vm_struct *__dma_common_pages_remap(struct page **pages,
-> +			size_t size, unsigned long vm_flags, pgprot_t prot,
->  			const void *caller)
->  {
->  	struct vm_struct *area;
-> @@ -287,13 +287,26 @@ void *dma_common_pages_remap(struct page **pages, size_t size,
->  	if (!area)
->  		return NULL;
->  
-> -	area->pages = pages;
-> -
->  	if (map_vm_area(area, prot, pages)) {
->  		vunmap(area->addr);
->  		return NULL;
->  	}
->  
-> +	return area;
-> +}
-> +
-> +void *dma_common_pages_remap(struct page **pages, size_t size,
-> +			unsigned long vm_flags, pgprot_t prot,
-> +			const void *caller)
-> +{
-> +	struct vm_struct *area;
-> +
-> +	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
-> +	if (!area)
-> +		return NULL;
-> +
-> +	area->pages = pages;
-> +
->  	return area->addr;
->  }
->  
-> @@ -308,7 +321,7 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
->  {
->  	int i;
->  	struct page **pages;
-> -	void *ptr;
-> +	struct vm_struct *area;
->  	unsigned long pfn;
->  
->  	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
-> @@ -318,11 +331,13 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
->  	for (i = 0, pfn = page_to_pfn(page); i < (size >> PAGE_SHIFT); i++)
->  		pages[i] = pfn_to_page(pfn + i);
->  
-> -	ptr = dma_common_pages_remap(pages, size, vm_flags, prot, caller);
-> +	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
->  
->  	kfree(pages);
->  
-> -	return ptr;
-> +	if (!area)
-> +		return NULL;
-> +	return area->addr;
->  }
->  
->  /*
+> If the device is flagged as "wakeup-source" using the standard
+> DT bindings, we also enable this in the global controller for
+> respective port.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/usb/host/Kconfig       |  1 +
+>  drivers/usb/host/fotg210-hcd.c | 76 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 77 insertions(+)
 > 
 
->From a quick glance, this looks okay. I can give a proper tag when
-the fix to allow mmaping comes in since I'm guessing -ENXIO is not the
-end goal.
+please wait for a while, I'm working on some glue code to support both 
+host and device mode on FOTG.
 
-Thanks,
-Laura
+Hans Ulli Kroll
