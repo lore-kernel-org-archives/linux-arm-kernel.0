@@ -1,71 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 24 Apr 2017 12:55:21 +0200
-Subject: [PATCH RFC 0/5] *** SPI Slave mode support ***
-In-Reply-To: <58F06092.9080409@mentor.com>
-References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
- <20170413125929.dygodgj6c35ydh5p@sirena.org.uk>
- <CAMuHMdUm=90ddNWM5KWqT+W0hqZ-QO6vPHj5OisbYquDYq1ZmA@mail.gmail.com>
- <58F06092.9080409@mentor.com>
-Message-ID: <CAMuHMdXa_O6RsqUciiNWQ0Zp6dniS47AUmPN9UWAWitP0csx=Q@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 24 Apr 2017 12:02:39 +0100
+Subject: [GIT PULL] Immutable branch between MFD and IIO due for the
+ v4.12 merge window
+In-Reply-To: <0f30afec-ff42-e125-96d6-35893324f7ef@kernel.org>
+References: <20170404063441.7656-1-quentin.schulz@free-electrons.com>
+ <20170411100528.2zif3fyi7uoyw33n@dell>
+ <0f30afec-ff42-e125-96d6-35893324f7ef@kernel.org>
+Message-ID: <20170424110239.cv5nylgvymhwvg4w@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiada,
+On Fri, 14 Apr 2017, Jonathan Cameron wrote:
 
-On Fri, Apr 14, 2017 at 7:39 AM, Jiada Wang <jiada_wang@mentor.com> wrote:
-> On 04/13/2017 12:47 PM, Geert Uytterhoeven wrote:
->> On Thu, Apr 13, 2017 at 2:59 PM, Mark Brown<broonie@kernel.org>  wrote:
->>> On Thu, Apr 13, 2017 at 05:13:59AM -0700, jiada_wang at mentor.com wrote:
->>>> From: Jiada Wang<jiada_wang@mentor.com>
->>>>
->>>> v1:
->>>>    add Slave mode support in SPI core
->>>>    spidev create slave device when SPI controller work in slave mode
->>>>    spi-imx support to work in slave mode
->>>
->>> Adding Geert who also had a series doing this in progress that was
->>> getting very near to being merged.
->>
->> Thank you!
->>
->> Actually my plan is to fix the last remaining issues and resubmit for
->> v4.13.
->
-> I noticed your patch set for SPI slave support,
-> (I am sure you can find out some of the change
-> in this patch set is based on your work).
-> we have similar requirement to add slave mode support to ecspi IP on imx6
-> Soc.
->
-> Our use case is to use spidev as an interface to communicate with external
-> SPI master devices.
-> meanwhile the SPI bus controller can also act as master device to send data
-> to other
-> SPI slave devices on the board.
+> On 11/04/17 11:05, Lee Jones wrote:
+> > Enjoy!
+> > 
+> > The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> > 
+> >   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-iio-v4.12
+> > 
+> > for you to fetch changes up to f2499ab450d3052097ba53a7d763f767935c0c59:
+> > 
+> >   iio: adc: add support for X-Powers AXP20X and AXP22X PMICs ADCs (2017-04-11 11:02:33 +0100)
+> > 
+> > ----------------------------------------------------------------
+> > Immutable branch between MFD and IIO due for the v4.12 merge window
+> > 
+> > ----------------------------------------------------------------
+> > Quentin Schulz (1):
+> >       iio: adc: add support for X-Powers AXP20X and AXP22X PMICs ADCs
+> > 
+> >  drivers/iio/adc/Kconfig      |  10 +
+> >  drivers/iio/adc/Makefile     |   1 +
+> >  drivers/iio/adc/axp20x_adc.c | 617 +++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 628 insertions(+)
+> >  create mode 100644 drivers/iio/adc/axp20x_adc.c
+> > 
+> Hi Lee, 
+> 
+> Thanks for doing this, but the reason it was going to go through your
+> tree in the first place was a dependency on
+> commit 4707274714ef ("mfd: axp20x: Correct name of temperature data ADC registers")
+> 
+> Not present in the immutable branch.
+> 
+> There isn't much time for anything else going on around this driver though
+> so other than a possible merge conflict on the Kconfig and Makefile shouldn't
+> matter if this just goes through mfd. (famous last words ;)
 
-That sounds a bit hackish to me. SPI was never meant to be a multi-master bus.
-While it can be done, you will need external synchronization (signals) to
-avoid conflicts between the SPI masters.
+It's not as though you committed it to text and sent it out to a
+public mailing list for us all to reference though is it?  Doh!
 
-> I found in your implementation, SPI bus controller is limited to either work
-> in master mode or
-> slave mode, is there any reasoning to not configure SPI mode based on SPI
-> devices use case?
-
-If you really need both master and slave support, you can use 2 subnodes
-in DT, the first representing the master, the second the slave.
-
-Mark, what's your opinion about this?
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
