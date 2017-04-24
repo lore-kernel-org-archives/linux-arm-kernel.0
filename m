@@ -1,36 +1,64 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 24 Apr 2017 18:12:09 +0200
-Subject: [Bug] VCHIQ functional test broken
-In-Reply-To: <20170420195822.GA22677@laptop>
-References: <331235003.222371.1491934205807@email.1und1.de>
- <685482264.60263.1492105308873@email.1und1.de>
- <20170413222915.GF17774@n2100.armlinux.org.uk> <20170414074104.GA8704@laptop>
- <87pog7x7c5.fsf@eliezer.anholt.net> <20170420195822.GA22677@laptop>
-Message-ID: <696fb1c1-7751-caf0-e0d9-9c67b059b4cc@i2se.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 24 Apr 2017 17:14:42 +0100
+Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
+In-Reply-To: <20170424155841.GH25449@e104818-lin.cambridge.arm.com>
+References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
+ <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
+ <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
+ <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
+ <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
+ <20170424154023.GM12323@arm.com>
+ <20170424155841.GH25449@e104818-lin.cambridge.arm.com>
+Message-ID: <20170424161441.GI25449@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 20.04.2017 um 21:58 schrieb Rabin Vincent:
-> On Thu, Apr 20, 2017 at 11:27:38AM -0700, Eric Anholt wrote:
->> I'm confused by what you're saying here.  The driver has already been
->> converted to not use dmac_map_area (commit
->> cf9caf1929882b66922aee698e99e6c8f357bee5), and uses dma_map_sg instead,
->> matching the radeon driver you give as a model as far as I can see.
->> That commit is in v4.11-rc6 from Stefan's regression report.
-> Right.  Sorry.  I must have had an old tag checked out when I looked at
-> the driver earlier.  The DMA API usage in the driver in v4.11-rc6 and
-> current master looks fine, except for one thing:
->
-> The flush in flush_dcache_page() (from get_user_pages()) was done with a
-> v6_flush_kern_dcache_page() which always did a clean+invalidate while
-> the DMA API only does what is required by the direction, which is only a
-> invalidate for DMA_FROM_DEVICE.  Since the driver calls dma_from_sg() on
-> the entire page, even if userspace sent in an offset into the page,
-> unrelated data in userspace may be thrown away.
->
-> Does changing the dma API calls to always use DMA_BIDIRECTIONAL make the
-> test pass?
+On Mon, Apr 24, 2017 at 04:58:41PM +0100, Catalin Marinas wrote:
+> On Mon, Apr 24, 2017 at 04:40:23PM +0100, Will Deacon wrote:
+> > On Wed, Apr 19, 2017 at 11:33:14AM +0100, Catalin Marinas wrote:
+> > > On Tue, Apr 18, 2017 at 09:01:52PM +0100, Peter Maydell wrote:
+> > > > On 18 April 2017 at 18:01, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > > > > On Thu, Apr 13, 2017 at 08:33:52PM +0800, dongbo (E) wrote:
+> > > > >> From: Dong Bo <dongbo4@huawei.com>
+> > > > >>
+> > > > >> In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
+> > > > >> the flag is propagated to its child processes, even the elf
+> > > > >> files are marked as not requiring executable stack. It may
+> > > > >> cause superfluous operations on some arch, e.g.
+> > > > >> __sync_icache_dcache on aarch64 due to a PROT_READ mmap is
+> > > > >> also marked as PROT_EXEC.
+> > > > 
+> > > > > That's affecting most architectures with a risk of ABI breakage. We
+> > > > > could do it on arm64 only, though I'm not yet clear on the ABI
+> > > > > implications (at a first look, there shouldn't be any).
+> > > > 
+> > > > Is there a reason why it isn't just straightforwardly a bug
+> > > > (which we could fix) to make READ_IMPLIES_EXEC propagate to
+> > > > child processes?
+> > > 
+> > > While I agree that it looks like a bug, if there are user programs
+> > > relying on such bug we call it "ABI". On arm64, I don't think there is
+> > > anything relying on inheriting READ_IMPLIES_EXEC but I wouldn't change
+> > > the compat task handling without the corresponding change in arch/arm.
+> > > 
+> > > > AFAICT this should be per-process: just because
+> > > > init happens not to have been (re)compiled to permit non-executable
+> > > > stacks doesn't mean every process on the system needs to have
+> > > > an executable stack.
+> > > 
+> > > I think this also affects the heap if brk(2) is used (via
+> > > VM_DATA_DEFAULT_FLAGS though I guess malloc mostly uses mmap these
+> > > days).
+> > 
+> > I think it also affects mprotect, which is more worrying imo, particularly
+> > for things like JIT code that is ported from 32-bit (although a quick look
+> > at v8, ionmonkey and art suggests they all pass PROT_EXEC when needed).
+> 
+> As Peter said, the default behaviour is READ_IMPLIES_EXEC off,
 
-Unfortunately not (at least not that simple).
+For the record, just to clarify the "default" behaviour: what I meant is
+that the (newish) toolchain always generates the GNU_STACK header which
+disables the executable stack (and therefore READ_IMPLIES_EXEC is off).
 
-Do we need special DMA mapping attributes here ? Or a dma_sync_sg_for_* ?
+-- 
+Catalin
