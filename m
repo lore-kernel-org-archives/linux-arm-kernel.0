@@ -1,49 +1,39 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 24 Apr 2017 16:59:06 +0530
-Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
-In-Reply-To: <CAOMZO5B4_xrLcWQGF=yRfj-14XQKudzjyr2roGRkzofkHCfuHg@mail.gmail.com>
-References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
- <20170424040709.GG26900@vireshk-i7>
- <CAOMZO5B4_xrLcWQGF=yRfj-14XQKudzjyr2roGRkzofkHCfuHg@mail.gmail.com>
-Message-ID: <20170424112906.GR26900@vireshk-i7>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Mon, 24 Apr 2017 11:31:43 +0000
+Subject: [PATCH] arm64: pmuv3: Support v8.1 PMUv3 extension
+Message-ID: <1493033503-4712-1-git-send-email-jnair@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24-04-17, 08:20, Fabio Estevam wrote:
-> Here it goes, thanks.
-> 
-> # grep . /sys/devices/system/cpu/cpufreq/policy0/*
-> /sys/devices/system/cpu/cpufreq/policy0/affected_cpus:0 1 2 3
-> /sys/devices/system/cpu/cpufreq/policy0/cpuinfo_cur_freq:396000
-> /sys/devices/system/cpu/cpufreq/policy0/cpuinfo_max_freq:996000
-> /sys/devices/system/cpu/cpufreq/policy0/cpuinfo_min_freq:396000
-> /sys/devices/system/cpu/cpufreq/policy0/cpuinfo_transition_latency:109036
-> /sys/devices/system/cpu/cpufreq/policy0/related_cpus:0 1 2 3
-> /sys/devices/system/cpu/cpufreq/policy0/scaling_available_frequencies:396000
-> 792000 996000
-> /sys/devices/system/cpu/cpufreq/policy0/scaling_available_governors:ondemand
-> performance
-> /sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq:396000
-> /sys/devices/system/cpu/cpufreq/policy0/scaling_driver:imx6q-cpufreq
-> /sys/devices/system/cpu/cpufreq/policy0/scaling_governor:ondemand
-> /sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq:996000
-> /sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq:396000
-> /sys/devices/system/cpu/cpufreq/policy0/scaling_setspeed:<unsupported>
-> 
-> # grep . /sys/devices/system/cpu/cpufreq/policy0/stats/*
-> grep: /sys/devices/system/cpu/cpufreq/policy0/stats/reset: Permission denied
-> /sys/devices/system/cpu/cpufreq/policy0/stats/time_in_state:396000 2869
-> /sys/devices/system/cpu/cpufreq/policy0/stats/time_in_state:792000 76
-> /sys/devices/system/cpu/cpufreq/policy0/stats/time_in_state:996000 33
-> /sys/devices/system/cpu/cpufreq/policy0/stats/total_trans:8
+The PMUVer field can have a value 4 for PMUv3 which supports 16 bit
+evtCount field (this is documented in ARM Architecture Reference Manual
+Supplement ARMv8.1).
 
-So clearly the system isn't changing the frequency a lot here and you stayed at
-the min freq for ever. Please give output of this as well:
+The current check for PMUVer to be equal to 1 fails on ThunderX2 which
+has value 4 in PMUVer field. Fix this.
 
-grep . /sys/devices/system/cpu/cpufreq/ondemand/*
+Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+---
 
-I am also worried if the interrupts from the touchscreen will be enough to boost
-the frequency of the CPU ?
+This applies on top of the current arm64 tree and fixes a breakage due
+to the  ACPI perf patches.
 
+
+ arch/arm64/kernel/perf_event.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 98c7493..5388ed8 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -972,7 +972,7 @@ static void __armv8pmu_probe_pmu(void *info)
+ 	dfr0 = read_sysreg(id_aa64dfr0_el1);
+ 	pmuver = cpuid_feature_extract_unsigned_field(dfr0,
+ 			ID_AA64DFR0_PMUVER_SHIFT);
+-	if (pmuver != 1)
++	if (pmuver != 1 && pmuver != 4)
+ 		return;
+ 
+ 	probe->present = true;
 -- 
-viresh
+2.7.4
