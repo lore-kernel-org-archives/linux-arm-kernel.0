@@ -1,79 +1,128 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Apr 2017 17:40:16 +0100
-Subject: [Bug] VCHIQ functional test broken
-In-Reply-To: <696fb1c1-7751-caf0-e0d9-9c67b059b4cc@i2se.com>
-References: <331235003.222371.1491934205807@email.1und1.de>
- <685482264.60263.1492105308873@email.1und1.de>
- <20170413222915.GF17774@n2100.armlinux.org.uk>
- <20170414074104.GA8704@laptop> <87pog7x7c5.fsf@eliezer.anholt.net>
- <20170420195822.GA22677@laptop>
- <696fb1c1-7751-caf0-e0d9-9c67b059b4cc@i2se.com>
-Message-ID: <20170424164015.GP17774@n2100.armlinux.org.uk>
+From: m.bielski@virtualopensystems.com (Maciej Bielski)
+Date: Mon, 24 Apr 2017 18:44:39 +0200
+Subject: [PATCH 3/5] Memory hotplug support for arm64 platform (v2)
+In-Reply-To: <20170411155843.GC32267@leverpostej>
+References: <cover.1491920513.git.ar@linux.vnet.ibm.com>
+ <50119579bdbb23a4d888d13b0a46cb2e027839ed.1491920513.git.ar@linux.vnet.ibm.com>
+ <20170411155843.GC32267@leverpostej>
+Message-ID: <20170424164439.GA7477@tpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 06:12:09PM +0200, Stefan Wahren wrote:
-> Am 20.04.2017 um 21:58 schrieb Rabin Vincent:
-> > On Thu, Apr 20, 2017 at 11:27:38AM -0700, Eric Anholt wrote:
-> >> I'm confused by what you're saying here.  The driver has already been
-> >> converted to not use dmac_map_area (commit
-> >> cf9caf1929882b66922aee698e99e6c8f357bee5), and uses dma_map_sg instead,
-> >> matching the radeon driver you give as a model as far as I can see.
-> >> That commit is in v4.11-rc6 from Stefan's regression report.
-> > Right.  Sorry.  I must have had an old tag checked out when I looked at
-> > the driver earlier.  The DMA API usage in the driver in v4.11-rc6 and
-> > current master looks fine, except for one thing:
-> >
-> > The flush in flush_dcache_page() (from get_user_pages()) was done with a
-> > v6_flush_kern_dcache_page() which always did a clean+invalidate while
-> > the DMA API only does what is required by the direction, which is only a
-> > invalidate for DMA_FROM_DEVICE.  Since the driver calls dma_from_sg() on
-> > the entire page, even if userspace sent in an offset into the page,
-> > unrelated data in userspace may be thrown away.
-> >
-> > Does changing the dma API calls to always use DMA_BIDIRECTIONAL make the
-> > test pass?
+Hi Mark,
+
+Thank you for having a look on the code and providing comments. Same to others
+that replied to the whole patchset. To the large extent, first purpose of this code
+was to just to implement the functionality and I am totally aware that it may
+be suboptimal at some places and therefore your feedback is very much
+appreciated.
+
+More answers below.
+
+On Tue, Apr 11, 2017 at 04:58:43PM +0100, Mark Rutland wrote:
+> Hi,
 > 
-> Unfortunately not (at least not that simple).
+> On Tue, Apr 11, 2017 at 03:55:22PM +0100, Andrea Reale wrote:
+> > From: Maciej Bielski <m.bielski@virtualopensystems.com>
+> > 
+> > This is a second and improved version of the patch previously released
+> > in [3].
+> > 
+> > It builds on the work by Scott Branden [2] and, henceforth,
+> > it needs to be applied on top of Scott's patches [2].
+> > Comments are very welcome.
+> > 
+> > Changes from the original patchset and known issues:
+> > 
+> > - Compared to Scott's original patchset, this work adds the mapping of
+> >   the new hotplugged pages into the kernel page tables. This is done by
+> >   copying the old swapper_pg_dir over a new page, adding the new mappings,
+> >   and then switching to the newly built pg_dir (see `hotplug_paging` in
+> >   arch/arm64/mmu.c). There might be better ways to to this: suggestions
+> >   are more than welcome.
 > 
-> Do we need special DMA mapping attributes here ? Or a dma_sync_sg_for_* ?
+> For this reply, I'm just going to focus on the PGD replacement.
+> 
+> It's not clear to me if we need to swap the PGD, since everything we do
+> here is strictly additive and non-conflicting, and it should be safe to
+> add things to the swapper_pg_dir live.
+> 
+> However, assuming there's something I've missed, I have some comments
+> below.
+> 
+> [...]
 
-I had a look at the driver when you first reported the problem, but I
-don't see an obvious problem.
+For one CPU it should work, I have quickly checked on QEMU. More concerns
+regarding multiple CPUs below(*).
 
-In drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c, I
-see it using get_user_pages(), generating a scatterlist, which it then
-uses dma_map_sg() with.  It then goes on to populate the DMA coherent
-buffer that it allocated with the DMA addresses of these buffers.
+> 
+> > +#ifdef CONFIG_MEMORY_HOTPLUG
+> > +
+> > +/*
+> > + * hotplug_paging() is used by memory hotplug to build new page tables
+> > + * for hot added memory.
+> > + */
+> > +void hotplug_paging(phys_addr_t start, phys_addr_t size)
+> > +{
+> > +
+> > +	struct page *pg;
+> > +	phys_addr_t pgd_phys = pgd_pgtable_alloc();
+> > +	pgd_t *pgd = pgd_set_fixmap(pgd_phys);
+> > +
+> > +	memcpy(pgd, swapper_pg_dir, PAGE_SIZE);
+> 
+> s/PAGE_SIZE/PGD_SIZE/ (and below, too).
+> 
+> See commit 12f043ff2b28fa64 ("arm64: fix warning about swapper_pg_dir
+> overflow").
+> 
 
-The tear-down looks sane too - free_pagelist() looks like it correctly
-unmaps the scatterlist, marks the pages dirty if necessary, puts the
-pages and frees the DMA coherent memory.
+Noted, thanks.
 
-Since you're running on a PIPT cache, the only possible issue is whether
-there's a lifetime mismatch between what happens here, and what you're
-doing with the pages in userspace.  All the rules wrt the DMA API apply
-to these userspace pages, just as these same rules apply in kernel space.
-Once you have called dma_map_sg() on them, any CPU access (whether
-explicit or speculative) will cause cache lines to be populated, and
-possibly marked dirty, which can have the effect of corrupting the data
-unless it is unmapped prior to the accesses you care about.
+> > +
+> > +	__create_pgd_mapping(pgd, start, __phys_to_virt(start), size,
+> > +		PAGE_KERNEL, pgd_pgtable_alloc, false);
+> > +
+> > +	cpu_replace_ttbr1(__va(pgd_phys));
+> 
+> Other CPUs may be online at this point, and cpu_replace_ttbr1() was only
+> intended for UP operation. Other CPUs will still have swapper_pg_dir in
+> their TTBR1_EL1 at this point in time...
+> 
+> > +	memcpy(swapper_pg_dir, pgd, PAGE_SIZE);
+> 
+> ... which this will alter, in an unsafe fashion.
+> 
+> The other CPUs are live, and might be altering swapper. e.g. one might
+> be using the fixmap to alter code. We will need some stop_machine()-like
+> machinery here to synchronise with other CPUs, ensuring that they don't
+> have swapper_pg_dir live.
 
-What I can't see is how changing flush_dcache_page() has possibly broken
-this: it seems to imply that you're getting flush_dcache_page() somehow
-called inbetween mapping it for DMA, using it for DMA and CPU accesses
-occuring.  However, the driver doesn't call flush_dcache_page() other
-than through get_user_pages() - and since dma_map_sg() is used in that
-path, it should be fine.
+(*)
+I am familiar with stop_machine(), for example it is done at later stage, when
+pages are onlined (inside build_all_zonelists). But do you think that we should
+check if swapper_pg_dir is under modification before stopping (and optionally
+wait until this modification is finished)? Is there a mechanism to serialize
+the write access to swapper_pg_dir?
 
-So, I don't have much to offer.
+> 
+> Unfortunately, we can't change other to the temporary pgdir in a cross
+> call, then fix things up, then do another cross call. If any exception
+> is taken when we're in the temporary pgdir, __uaccess_ttbr0_disable will
+> install junk into TTBR0, and we risk the usual set of pain junk TLBs
+> entail.
+> 
+> We appear to have a latent bug at boot time along those lines, when
+> setting up the page tables and initialising KASAN. I'll see about
+> cleaning that up.
 
-However, flush_dcache_page() is probably still a tad heavy - it currently
-flushes to the point of coherency, but it's really about making sure that
-the user vs kernel mappings are coherent, not about device coherency.
-That's the role of the DMA API.
+Great, thank you for any hints.
+
+> 
+> Thanks,
+> Mark.
+
+Best regards,
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Maciej Bielski
