@@ -1,69 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Apr 2017 17:05:19 +0100
-Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
-In-Reply-To: <20170424155841.GH25449@e104818-lin.cambridge.arm.com>
-References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
- <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
- <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
- <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
- <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
- <20170424154023.GM12323@arm.com>
- <20170424155841.GH25449@e104818-lin.cambridge.arm.com>
-Message-ID: <20170424160519.GR12323@arm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 24 Apr 2017 18:06:10 +0200
+Subject: [PATCH v2 6/7] ARM: Kconfig: Introduce MACH_STM32F469 flag
+In-Reply-To: <CACRpkdZmWFKaZWB8qZaH=jB61xdwvJ=TC8idYH9kJdi=HEZRAA@mail.gmail.com>
+References: <1491568984-20169-1-git-send-email-alexandre.torgue@st.com>
+ <1491568984-20169-7-git-send-email-alexandre.torgue@st.com>
+ <CACRpkdZmWFKaZWB8qZaH=jB61xdwvJ=TC8idYH9kJdi=HEZRAA@mail.gmail.com>
+Message-ID: <a45e5791-cca1-79b8-a368-6d113c933ec3@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 04:58:41PM +0100, Catalin Marinas wrote:
-> On Mon, Apr 24, 2017 at 04:40:23PM +0100, Will Deacon wrote:
-> > On Wed, Apr 19, 2017 at 11:33:14AM +0100, Catalin Marinas wrote:
-> > > On Tue, Apr 18, 2017 at 09:01:52PM +0100, Peter Maydell wrote:
-> > > > On 18 April 2017 at 18:01, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > > > On Thu, Apr 13, 2017 at 08:33:52PM +0800, dongbo (E) wrote:
-> > > > >> From: Dong Bo <dongbo4@huawei.com>
-> > > > >>
-> > > > >> In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
-> > > > >> the flag is propagated to its child processes, even the elf
-> > > > >> files are marked as not requiring executable stack. It may
-> > > > >> cause superfluous operations on some arch, e.g.
-> > > > >> __sync_icache_dcache on aarch64 due to a PROT_READ mmap is
-> > > > >> also marked as PROT_EXEC.
-> > > > 
-> > > > > That's affecting most architectures with a risk of ABI breakage. We
-> > > > > could do it on arm64 only, though I'm not yet clear on the ABI
-> > > > > implications (at a first look, there shouldn't be any).
-> > > > 
-> > > > Is there a reason why it isn't just straightforwardly a bug
-> > > > (which we could fix) to make READ_IMPLIES_EXEC propagate to
-> > > > child processes?
-> > > 
-> > > While I agree that it looks like a bug, if there are user programs
-> > > relying on such bug we call it "ABI". On arm64, I don't think there is
-> > > anything relying on inheriting READ_IMPLIES_EXEC but I wouldn't change
-> > > the compat task handling without the corresponding change in arch/arm.
-> > > 
-> > > > AFAICT this should be per-process: just because
-> > > > init happens not to have been (re)compiled to permit non-executable
-> > > > stacks doesn't mean every process on the system needs to have
-> > > > an executable stack.
-> > > 
-> > > I think this also affects the heap if brk(2) is used (via
-> > > VM_DATA_DEFAULT_FLAGS though I guess malloc mostly uses mmap these
-> > > days).
-> > 
-> > I think it also affects mprotect, which is more worrying imo, particularly
-> > for things like JIT code that is ported from 32-bit (although a quick look
-> > at v8, ionmonkey and art suggests they all pass PROT_EXEC when needed).
-> 
-> As Peter said, the default behaviour is READ_IMPLIES_EXEC off, so JIT
-> code must already pass PROT_EXEC if it wants executable permission. The
-> question is whether any user code relies on READ_IMPLIES_EXEC being
-> passed down to child processes. I don't think so but I would be
-> reluctant to make an such cross-arch change (happy to do it for arm64
-> though).
+Hi
 
-I was thinking of the case where init has an executable stack, but that's
-not the common case and such code would be broken under a different init
-anyway, so I agree that we should make this change for arm64 (but not compat
-without arch/arm/).
+On 04/24/2017 02:30 PM, Linus Walleij wrote:
+> On Fri, Apr 7, 2017 at 2:43 PM, Alexandre TORGUE
+> <alexandre.torgue@st.com> wrote:
+>
+>> This patch introduces the MACH_STM32F469 to make possible to only select
+>> STM32F469 pinctrl driver
+>>
+>> By default, all the MACH_STM32Fxxx flags will be set with STM32 defconfig.
+>>
+>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Please funnel this through the ARM SoC tree.
 
-Will
+Yes, I'll merge it in future pull request.
+Thanks for the series.
+
+Regards
+Alex
+
+>
+> Yours,
+> Linus Walleij
+>
