@@ -1,32 +1,38 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 24 Apr 2017 09:45:24 +0200
-Subject: [PATCH 21/29] clocksource: Add missing line break to error
- messages
-In-Reply-To: <1492374441-23336-21-git-send-email-daniel.lezcano@linaro.org>
-References: <20170416202542.GV2078@mai>
- <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
- <1492374441-23336-21-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20170424074524.2rdxtbi6n6czq6sf@pengutronix.de>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 24 Apr 2017 09:54:07 +0200
+Subject: [PATCH v3 3/3] MAINTAINERS: add a maintainer for the Inside Secure
+ crypto driver
+In-Reply-To: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
+References: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170424075407.19730-4-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+A new cryptographic engine driver was added in
+drivers/crypto/inside-secure. Add myself as a maintainer for this
+driver.
 
-On Sun, Apr 16, 2017 at 10:27:11PM +0200, Daniel Lezcano wrote:
->  drivers/clocksource/time-efm32.c          |  2 +-
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-For efm32:
-
-	Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
-(if it's not too late yet).
-
-For efm32 (and I guess for others, too) this was introduced by the
-"Convert init function to return error" series.
-
-Best regards
-Uwe
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index c265a5fe4848..7240b9bca638 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6487,6 +6487,12 @@ F:	Documentation/input/multi-touch-protocol.txt
+ F:	drivers/input/input-mt.c
+ K:	\b(ABS|SYN)_MT_
+ 
++INSIDE SECURE CRYPTO DRIVER
++M:	Antoine Tenart <antoine.tenart@free-electrons.com>
++F:	drivers/crypto/inside-secure/
++S:	Maintained
++L:	linux-crypto at vger.kernel.org
++
+ INTEL ASoC BDW/HSW DRIVERS
+ M:	Jie Yang <yang.jie@linux.intel.com>
+ L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.11.0
