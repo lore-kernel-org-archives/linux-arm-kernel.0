@@ -1,139 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Apr 2017 16:51:25 +0100
-Subject: [PATCH] arm64: fix the overlap between the kernel image and
- vmalloc address
-In-Reply-To: <58FDFD90.8050300@huawei.com>
-References: <1493025729-21505-1-git-send-email-zhongjiang@huawei.com>
- <20170424104456.GA4343@leverpostej> <58FDFD90.8050300@huawei.com>
-Message-ID: <20170424155125.GA5972@leverpostej>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Mon, 24 Apr 2017 21:23:16 +0530
+Subject: [PATCH] iommu/arm-smmu: Return IOVA in iova_to_phys when SMMU is
+ bypassed
+In-Reply-To: <20170424144429.GI12323@arm.com>
+References: <1492430246-17267-1-git-send-email-sunil.kovvuri@gmail.com>
+ <20170424144429.GI12323@arm.com>
+Message-ID: <CA+sq2Cc3cjjPcw0F1D_BOu0j3x+MUNO27MeRguj6BpQ+t11_HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 09:28:48PM +0800, zhong jiang wrote:
-> On 2017/4/24 18:44, Mark Rutland wrote:
-> > So the issue is that we have the callchain below for a kernel image
-> > address:
-> >
-> > read_kcore()
-> > ->is_vmalloc_or_module_addr() // returns true
-> > ->vread()
-> > -->aligned_vread()
-> > --->vmalloc_to_page()
-> >
-> > In is_vmalloc{,or_module}_addr() we just check the addr against
-> > VMALLOC_START and VMALLOC_END, so they will return true for a kernel
-> > image address.
-> >
-> > Then, we call vmalloc_to_page(). While this only handles mappings made
-> > at page granularity, the kernel image mapping may have used sections. So
-> > this tries a bogus walk to the pte level.
+On Mon, Apr 24, 2017 at 8:14 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Apr 17, 2017 at 05:27:26PM +0530, sunil.kovvuri at gmail.com wrote:
+>> From: Sunil Goutham <sgoutham@cavium.com>
+>>
+>> For software initiated address translation, when domain type is
+>> IOMMU_DOMAIN_IDENTITY i.e SMMU is bypassed, mimic HW behavior
+>> i.e return the same IOVA as translated address.
+>>
+>> This patch is an extension to Will Deacon's patchset
+>> "Implement SMMU passthrough using the default domain".
+>
+> Are you actually seeing an issue here? If so, why isn't SMMUv3 affected too?
+Yes and SMMUv3 should also be effected but as of now I don't see any use case.
+If needed, i can re-submit the patch with changes in SMMUv3 as well.
 
-> > Should we special-case kernel image handling, e.g. with new
-> > is_kernel_image_addr() / kernel_image_to_page() helpers?
+>
+>> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+>> ---
+>>  drivers/iommu/arm-smmu.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 41afb07..2f4a130 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -1405,6 +1405,9 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
+>>       struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>>       struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
+>>
+>> +     if (domain->type == IOMMU_DOMAIN_IDENTITY)
+>> +             return iova;
+>> +
+>>       if (!ops)
+>>               return 0;
+>
+> I'd have thought ops would be NULL, since arm_smmu_init_domain_context
+> doesn't allocate them for an identity domain.
+Yes ops is set to NULL.
 
->   yes ,  it seems to the best way to implents it  without performance back.
+>
+> I don't understand this patch. Please can you explain the problem more
+> clearly?
+AFAIK for any driver outside IOMMU there is only one way to identify
+if device is attached to
+IOMMU or not and that is by checking iommu_domain. And I don't think
+it would be appropriate
+for the driver to check domain->type before calling 'iommu_iova_to_phys()' API.
 
-> The following patch is the implment. Any thought?
-> 
-> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
-> 
->   diff --git a/include/linux/mm.h b/include/linux/mm.h
-> index b84615b..851ac35 100644
-> --- a/include/linux/mm.h
-> +++ b/include/linux/mm.h
-> @@ -475,6 +475,15 @@ static inline bool is_vmalloc_addr(const void *x)
->         return false;
->  #endif
->  }
-> +
-> +static inline bool is_kernel_image_addr(const void *x)
-> +{
-> +       unsigned long addr = (unsigned long)x;
-> +
-> +       return addr >= (unsigned long)_stext && addr < (unsigned long)_end;
-> +
-> +}
-> +
->  #ifdef CONFIG_MMU
->  extern int is_vmalloc_or_module_addr(const void *x);
->  #else
-> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-> index 3ca82d4..9a9ef65 100644
-> --- a/mm/vmalloc.c
-> +++ b/mm/vmalloc.c
-> @@ -229,6 +229,42 @@ int is_vmalloc_or_module_addr(const void *x)
->         return is_vmalloc_addr(x);
->  }
-> 
-> +static struct page *kernel_image_to_page(const void *kernel_addr, pgd_t *pgd)
-> +{
-> +       unsigned long addr = (unsigned long)kernel_addr;
-> +       struct page *page = NULL;
-> +       pud_t *pud;
-> +       pmd_t *pmd;
-> +       pte_t *pte;
-> +
-> +       if (pgd_none(*pgd))
-> +               goto out;
-> +
-> +       pud = pud_offset(pgd, addr);
-> +       if (pud_none(*pud))
-> +               goto out;
-> +
-> +       if (pud_sect(*pud))
-> +               return pud_page(*pud);
+The difference between IOMMU disabled and IOMMU being in passthrough
+mode is that, in the
+later case device is still attached to default domain but in former's
+case it's NULL. So there is no
+way to differentiate for the external driver whether IOMMU is in
+passthrough mode or DMA mode.
 
-The *_sect() helpers are arch-specific, so we cannot use them in generic
-code. This would need to be architecture-specific.
+And since ops is NULL in passthrough mode, 'iommu_iova_to_phys()' will
+return zero.
 
-Secondly, this will return head page of the section regardless of which
-page in the section the address corresponds to
+Use case for your reference
+https://lkml.org/lkml/2017/3/7/299
+This driver is for a NIC interface on platform which supports SMMUv2.
 
-> +
-> +       pmd = pmd_offset(*pmd, addr);
-> +       if (pmd_none(*pmd))
-> +               goto out;
-> +
-> +       if (pmd_sect(*pmd))
-> +               return pmd_page(*pmd);
-
-Likewise on both counts.
-
-> +
-> +       pte = pte_offset_kernel(pmd, addr);
-> +       if (pte_none(*pte))
-> +               goto out;
-> +
-> +       page = pte_page(*pte);
-> +
-> +out:
-> +       return page;
-> +
-> +}
-
-Given we know what the address should map to, I don't think we need to
-walk the page tables here. I think this can be:
-
-static struct page *kernel_image_to_page(const void *addr)
-{
-	return virt_to_page(lm_alias(vmalloc_addr));
-}
-
-> +
->  /*
->    * Walk a vmap address to the struct page it maps.
->    */
-> @@ -244,6 +280,9 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
->          */
->         VIRTUAL_BUG_ON(!is_vmalloc_or_module_addr(vmalloc_addr));
-> 
-> +       if (is_kernel_image_addr(vmalloc_addr))
-> +               return kernel_image_to_page(vmalloc_addr, pgd);
-
-It's not clear to me that this is the right place for this to live.
-
-It might be best to code the kernel image logic directly in kcore (and
-kmem), assuming everyone's OK with that approach.
+Let me know if any more details are needed.
 
 Thanks,
-Mark.
+Sunil.
+
+>
+> Will
