@@ -1,66 +1,50 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 24 Apr 2017 12:35:39 +0200
-Subject: [PATCH] arm64: dts: rockchip: update cpu opp table for rk3399 op1
-In-Reply-To: <9edc6ebc-8aab-03df-49b2-759ed8581a6c@163.com>
-References: <1493014730-9670-1-git-send-email-wxt@rock-chips.com>
- <3119382.DFiP2J6FnE@diego> <9edc6ebc-8aab-03df-49b2-759ed8581a6c@163.com>
-Message-ID: <1552813.CRZkXFJCNX@diego>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Mon, 24 Apr 2017 11:43:52 +0100
+Subject: [PATCH v2 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <b8cf7acd-83e9-49fb-0800-19a76b8dcce5@collabora.com>
+References: <cover.1491118230.git.guillaume.tucker@collabora.com>
+ <db45d0d68957d699f13a0d92f4f84d8ebfd0270e.1491118230.git.guillaume.tucker@collabora.com>
+ <20170404020056.d7osj7rmog22xbjd@rob-hp-laptop>
+ <b8cf7acd-83e9-49fb-0800-19a76b8dcce5@collabora.com>
+Message-ID: <32edad9f-a568-c67d-060d-055517d6782f@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 24. April 2017, 18:25:49 CEST schrieb Caesar Wang:
-> ? 2017?04?24? 17:15, Heiko St?bner ??:
-> > Am Montag, 24. April 2017, 16:49:08 CEST schrieb Caesar Wang:
-> >> ? 2017?04?24? 16:26, Heiko St?bner ??:
-> >>> Hi Caesar,
-> >>> 
-> >>> Am Montag, 24. April 2017, 14:18:50 CEST schrieb Caesar Wang:
-> >>>> Update the cpu opp table for rk3399 op1.
-> >>> 
-> >>> Ideally this should contain something about the "why".
-> >>> Are these new voltage settings safer to operate under?
-> >> 
-> >> The before opp table is for earlier batch of rk3399 SoCs,  that's no
-> >> enough for the current and
-> >> newer batch of rk3399 op1. In order to suit for the rk3399 op1, we need
-> >> to little voltages changed.
-> > 
-> > just to make sure, this is also safe for all the non-chromebook rk3399
-> > socs
-> > (like the firefly and tv-boxes, etc), right?
-> 
-> No,  just for chromebook.
-> 
-> Maybe, we need support two table for rk3399 SoCs.
-> For chromebook supporting 2GHz frequency and others support 1.8GHz
-> frequency.
+On 18/04/17 10:15, Guillaume Tucker wrote:
+> Hi Rob,
+>
+> On 04/04/17 03:00, Rob Herring wrote:
+>> On Sun, Apr 02, 2017 at 08:59:44AM +0100, Guillaume Tucker wrote:
 
-Definitly. So please move the chromebook opp-table to something like a rk3399-
-op1-opp.dtsi and adapt rk3399-opp.dtsi to be safe for all rk3399 variants.
+>>> +- operating-points : Refer to Documentation/devicetree/bindings/power/opp.txt
+>>> +  for details.
+>>
+>> Is this going to be sufficient vs. operating-points-v2? Or should it be
+>> a power domain with OPPs?
+>
+> In principle, switching to operating-points-v2 should be very
+> straightforward.  I have smoke-tested the driver with an
+> operating-points-v2 table and a phandle to it inside the gpu node
+> in place of operating-points and it seems to be working fine.  At
+> least it parsed the OPPs and got initialised correctly.
+>
+> My understanding is that operating-points (v1) are not deprecated
+> so we could keep the bindings as-is, but please let me know
+> otherwise and I can try to address that in my next patch version.
+> In the documentation, it should only be the case of replacing
+> operating-points with operating-points-v2.
 
+While the opp bindings documentation doesn't mention anything
+about operating-points being deprecated, the code and comments in
+of.c are pretty clear about this:
 
-Thanks
-Heiko
+	/*
+	 * OPPs have two version of bindings now. The older one is deprecated,
+	 * try for the new binding first.
+	 */
 
-> 
-> For example:
-> ....
->    opp03 {
->                opp-hz = /bits/ 64 <1008000000>;
->                opp-microvolt = <925000 925000 1350000>;
->                opp-microvolt-l0 = <925000 925000 1350000>;
->                opp-microvolt-l1 = <900000 900000 1350000>;
->            };
-> ....
-> 
-> 
-> 
-> -Caesar
-> 
-> > Thanks
-> > Heiko
-> > 
-> > _______________________________________________
-> > Linux-rockchip mailing list
-> > Linux-rockchip at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-rockchip
+So I shall use operating-points-v2 in my patch v4.
+
+Thanks,
+Guillaume
