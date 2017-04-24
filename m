@@ -1,9 +1,9 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon, 24 Apr 2017 16:16:24 +0200
-Subject: [PATCH 4/9] crypto: marvell - Use IPAD/OPAD constant
+Date: Mon, 24 Apr 2017 16:16:23 +0200
+Subject: [PATCH 3/9] crypto: ixp4xx - Use IPAD/OPAD constant
 In-Reply-To: <20170424141629.27155-1-clabbe.montjoie@gmail.com>
 References: <20170424141629.27155-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170424141629.27155-4-clabbe.montjoie@gmail.com>
+Message-ID: <20170424141629.27155-3-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,23 +12,21 @@ define.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/crypto/marvell/hash.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/crypto/ixp4xx_crypto.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
-index 77c0fb9..a6df61f 100644
---- a/drivers/crypto/marvell/hash.c
-+++ b/drivers/crypto/marvell/hash.c
-@@ -1164,8 +1164,8 @@ static int mv_cesa_ahmac_pad_init(struct ahash_request *req,
- 	memcpy(opad, ipad, blocksize);
+diff --git a/drivers/crypto/ixp4xx_crypto.c b/drivers/crypto/ixp4xx_crypto.c
+index 771dd26..3b7680c 100644
+--- a/drivers/crypto/ixp4xx_crypto.c
++++ b/drivers/crypto/ixp4xx_crypto.c
+@@ -90,8 +90,6 @@
+ #define CTL_FLAG_PERFORM_AEAD	0x0008
+ #define CTL_FLAG_MASK		0x000f
  
- 	for (i = 0; i < blocksize; i++) {
--		ipad[i] ^= 0x36;
--		opad[i] ^= 0x5c;
-+		ipad[i] ^= HMAC_IPAD_VALUE;
-+		opad[i] ^= HMAC_OPAD_VALUE;
- 	}
+-#define HMAC_IPAD_VALUE   0x36
+-#define HMAC_OPAD_VALUE   0x5C
+ #define HMAC_PAD_BLOCKLEN SHA1_BLOCK_SIZE
  
- 	return 0;
+ #define MD5_DIGEST_SIZE   16
 -- 
 2.10.2
