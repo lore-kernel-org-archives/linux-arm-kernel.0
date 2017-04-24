@@ -1,39 +1,42 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 24 Apr 2017 11:16:56 +0100
-Subject: [PATCH v4 6/7] ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
-In-Reply-To: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
-References: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1493029017-31382-7-git-send-email-vladimir.murzin@arm.com>
+From: eddie.cai.linux@gmail.com (Eddie Cai)
+Date: Mon, 24 Apr 2017 18:29:26 +0800
+Subject: [PATCH] arm64: dts: rockchip: update cpu opp table for rk3399 op1
+In-Reply-To: <3119382.DFiP2J6FnE@diego>
+References: <1493014730-9670-1-git-send-email-wxt@rock-chips.com>
+ <2250946.xrPjMl5Kf1@diego>
+ <f4c389af-5b1f-9197-0df4-f8407ed8622a@rock-chips.com>
+ <3119382.DFiP2J6FnE@diego>
+Message-ID: <CAJrj+DPzj0hieOHHpoxL4_uPUyaOa7LADJw+4_82VDZiPKxy1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, we have dedicated non-cacheable region for consistent DMA
-operations. However, that region can still be marked as bufferable by
-MPU, so it'd be safer to have barriers by default.
+Hi Heiko
 
-Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Tested-by: Andras Szemzo <sza@esh.hu>
-Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/mm/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index d731f28..7e357c6 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -1049,8 +1049,8 @@ config ARM_L1_CACHE_SHIFT
- 	default 5
- 
- config ARM_DMA_MEM_BUFFERABLE
--	bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K) && !CPU_V7
--	default y if CPU_V6 || CPU_V6K || CPU_V7
-+	bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K || CPU_V7M) && !CPU_V7
-+	default y if CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M
- 	help
- 	  Historically, the kernel has used strongly ordered mappings to
- 	  provide DMA coherent memory.  With the advent of ARMv7, mapping
--- 
-2.0.0
+2017-04-24 17:15 GMT+08:00 Heiko St?bner <heiko@sntech.de>:
+> Am Montag, 24. April 2017, 16:49:08 CEST schrieb Caesar Wang:
+>> ? 2017?04?24? 16:26, Heiko St?bner ??:
+>> > Hi Caesar,
+>> >
+>> > Am Montag, 24. April 2017, 14:18:50 CEST schrieb Caesar Wang:
+>> >> Update the cpu opp table for rk3399 op1.
+>> >
+>> > Ideally this should contain something about the "why".
+>> > Are these new voltage settings safer to operate under?
+>>
+>> The before opp table is for earlier batch of rk3399 SoCs,  that's no
+>> enough for the current and
+>> newer batch of rk3399 op1. In order to suit for the rk3399 op1, we need
+>> to little voltages changed.
+>
+> just to make sure, this is also safe for all the non-chromebook rk3399 socs
+> (like the firefly and tv-boxes, etc), right?
+This is only for op1. other 3399s should have a different opp table
+>
+>
+> Thanks
+> Heiko
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
