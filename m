@@ -1,57 +1,68 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 24 Apr 2017 11:16:10 +0200
-Subject: [PATCH V3 2/2] ARM64: dts: hi6220-hikey: Add clock binding for
- the pmic mfd
-In-Reply-To: <20170424085944.aa5dsc4g6bwm5rgi@dell>
-References: <1492449567-31399-1-git-send-email-daniel.lezcano@linaro.org>
- <1492449567-31399-2-git-send-email-daniel.lezcano@linaro.org>
- <20170422020233.GA7065@codeaurora.org>
- <370c36f9-e6fc-416c-776b-edc1e42d7ddc@linaro.org>
- <20170424085944.aa5dsc4g6bwm5rgi@dell>
-Message-ID: <20170424091609.GA2137@mai>
+Date: Mon, 24 Apr 2017 11:18:01 +0200
+Subject: [PATCH v3 15/18] arm64: arch_timer: Enable CNTVCT_EL0 trap if
+ workaround is enabled
+In-Reply-To: <58FDC1F5.3000401@huawei.com>
+References: <20170404171826.25030-1-marc.zyngier@arm.com>
+ <20170404171826.25030-16-marc.zyngier@arm.com>
+ <58FDB05B.6020108@huawei.com>
+ <95ac3477-436a-22ad-80f4-d4bed6c73e1c@arm.com>
+ <AF3DCEF48831C6498A12720ADD13CD7F2A5DACA8@dggeml506-mbs.china.huawei.com>
+ <493e2b26-96a2-4b92-fd4b-f6f7d5c89fb5@arm.com>
+ <58FDC1F5.3000401@huawei.com>
+Message-ID: <20170424091801.GB2137@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 09:59:44AM +0100, Lee Jones wrote:
-> On Sat, 22 Apr 2017, Daniel Lezcano wrote:
+On Mon, Apr 24, 2017 at 05:14:29PM +0800, Hanjun Guo wrote:
+> On 2017/4/24 16:40, Marc Zyngier wrote:
+> > On 24/04/17 09:25, Lixiaoping (Timmy) wrote:
+> >> Hi Marc,
+> >>
+> >> Sorry about previous email's confidential info. Please forget it.
+> >>
+> >> +#define ESR_ELx_SYS64_ISS_SYS_CNTFRQ	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 14, 0, 0) | \
+> >> +					 ESR_ELx_SYS64_ISS_DIR_READ)
+> >>
+> >> I think (3, 3, 14, 0, 0) should be (3, 3, 0, 14, 0)?
+> > Thanks for spotting this. I assumed that the sys_reg() and
+> > SR_ELx_SYS64_ISS_SYS_VAL() macros took their arguments in the same 
+> > order. That would have been too easy... ;-)
+> >
+> > Amended patch below, please let me know if it works for you.
+> >
+> > Thanks,
+> >
+> > 	M.
+> >
+> > >From 4444c86a97c1a487e12c319fdc197c88631d72b5 Mon Sep 17 00:00:00 2001
+> > From: Marc Zyngier <marc.zyngier@arm.com>
+> > Date: Mon, 24 Apr 2017 09:04:03 +0100
+> > Subject: [PATCH] arm64: Add CNTFRQ_EL0 trap handler
+> >
+> > We now trap accesses to CNTVCT_EL0 when the counter is broken
+> > enough to require the kernel to mediate the access. But it
+> > turns out that some existing userspace (such as OpenMPI) do
+> > probe for the counter frequency, leading to an UNDEF exception
+> > as CNTVCT_EL0 and CNTFRQ_EL0 share the same control bit.
+> >
+> > The fix is to handle the exception the same way we do for CNTVCT_EL0.
+> >
+> > Fixes: a86bd139f2ae ("arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround is enabled")
+> > Reported-by: Hanjun Guo <guohanjun@huawei.com>
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
 > 
-> > On 22/04/2017 04:02, Stephen Boyd wrote:
-> > > On 04/17, Daniel Lezcano wrote:
-> > >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > >> ---
-> > >>  Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt | 6 ++++++
-> > >>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts             | 1 +
-> > >>  2 files changed, 7 insertions(+)
-> > >>
-> > > 
-> > > I take it this goes through arm-soc? Not sure why I'm on To:
-> > > line.
-> > 
-> > Probably it should go through Lee's tree.
+> I tested this patch and the undefined instruction error is gone, I can
+> get the FREQ in the user space now, thank you very much for the quick
+> response.
 > 
-> Unlikely.
-> 
-> The document and the DTS change should really have gone separately,
-> but to save you from having to mess around so close to the merge window:
-> 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+> Tested-by: Hanjun Guo <guohanjun@huawei.com>
+> Reviewed-by: Hanjun Guo <guohanjun@huawei.com>
 
-Thanks Lee.
-
-Usually, I take the DT changes (including doc) with the timers changes with the
-maintainer and Rob's blessing. So the DT and the driver changes are aligned in
-my tree and make the submission changes easier.
-
-I agree mixing the patches for different destinations into a single patchset is
-fuzzy, I will take care next time to separate the patches.
+Thanks for providing so quickly a fix and test it.
 
   -- Daniel
-
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
 
 -- 
 
