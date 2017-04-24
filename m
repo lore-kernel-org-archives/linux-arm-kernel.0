@@ -1,34 +1,75 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon, 24 Apr 2017 16:16:28 +0200
-Subject: [PATCH 8/9] crypto: mediatek - Use IPAD/OPAD constant
-In-Reply-To: <20170424141629.27155-1-clabbe.montjoie@gmail.com>
-References: <20170424141629.27155-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170424141629.27155-8-clabbe.montjoie@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 24 Apr 2017 09:20:40 -0500
+Subject: [RFC PATH] of/pci/dma: fix DMA configruation for PCI masters
+In-Reply-To: <1492848487-11768-1-git-send-email-oza.oza@broadcom.com>
+References: <1492848487-11768-1-git-send-email-oza.oza@broadcom.com>
+Message-ID: <CAL_JsqKg9YuDd21eaoDXKfLUqyD05nWz7=SqxTKAL-Dcpp6MZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch simply replace all occurrence of HMAC IPAD/OPAD value by their
-define.
+On Sat, Apr 22, 2017 at 3:08 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
+> current device frmework and of framework integration assumes dma-ranges
+> in a way where memory-mapped devices define their dma-ranges.
+> dma-ranges: (child-bus-address, parent-bus-address, length).
+>
+> but iproc based SOCs and other SOCs(suc as rcar) have PCI world dma-ranges.
+> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+>
+> of_dma_configure is specifically witten to take care of memory mapped devices.
+> but no implementation exists for pci to take care of pcie based memory ranges.
+> in fact pci world doesnt seem to define standard dma-ranges
+>
+> this patch served following purposes
+>
+> 1) exposes intrface to the pci host driver for thir inbound memory ranges
+>
+> 2) provide an interface to callers such as of_dma_get_ranges.
+> so then the returned size get best possible (largest) dma_mask.
+> for e.g.
+> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+> we should get dev->coherent_dma_mask=0x7fffffffff.
+>
+> 3) this patch handles multiple inbound windows and dma-ranges.
+> it is left to the caller, how it wants to use them.
+> the new function returns the resources in a standard and unform way
+>
+> 4) this way the callers of of_dma_get_ranges does not need to change.
+> and
+>
+> 5) leaves scope of adding PCI flag handling for inbound memory
+> by the new function.
+>
+> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+>
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 02b2903..ec21191 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -6,6 +6,7 @@
+>  #include <linux/ioport.h>
+>  #include <linux/module.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_pci.h>
+>  #include <linux/pci.h>
+>  #include <linux/pci_regs.h>
+>  #include <linux/sizes.h>
+> @@ -829,10 +830,30 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
+>         int len, naddr, nsize, pna;
+>         int ret = 0;
+>         u64 dmaaddr;
+> +       struct resource_entry *window;
+> +       LIST_HEAD(res);
+>
+>         if (!node)
+>                 return -EINVAL;
+>
+> +       if (strcmp(np->name, "pci")) {
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- drivers/crypto/mediatek/mtk-sha.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Using the name is not reliable though I did recently add a dtc check
+for this. Of course, 'pcie' is valid too (and probably should be used
+for what you are testing). type is what you want to use here. We
+already have bus matching function and bus specific handlers in
+address.c. Whatever solution you come up with should be integrated
+with the existing bus specific handlers.
 
-diff --git a/drivers/crypto/mediatek/mtk-sha.c b/drivers/crypto/mediatek/mtk-sha.c
-index 2226f12..cbcb522 100644
---- a/drivers/crypto/mediatek/mtk-sha.c
-+++ b/drivers/crypto/mediatek/mtk-sha.c
-@@ -825,8 +825,8 @@ static int mtk_sha_setkey(struct crypto_ahash *tfm, const u8 *key,
- 	memcpy(bctx->opad, bctx->ipad, bs);
- 
- 	for (i = 0; i < bs; i++) {
--		bctx->ipad[i] ^= 0x36;
--		bctx->opad[i] ^= 0x5c;
-+		bctx->ipad[i] ^= HMAC_IPAD_VALUE;
-+		bctx->opad[i] ^= HMAC_OPAD_VALUE;
- 	}
- 
- 	return 0;
--- 
-2.10.2
+Rob
