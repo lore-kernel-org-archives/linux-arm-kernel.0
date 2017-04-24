@@ -1,54 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Apr 2017 14:49:36 -0700
-Subject: [PATCHv2 3/9] dt-bindings: clk: add omap4 clkctrl definitions
-In-Reply-To: <1489741781-12816-4-git-send-email-t-kristo@ti.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
- <1489741781-12816-4-git-send-email-t-kristo@ti.com>
-Message-ID: <20170424214936.GF3780@atomide.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 24 Apr 2017 14:50:21 -0700
+Subject: [PATCH 1/2] net: dsa: b53: Add compatible strings for the
+ Cygnus-family BCM11360.
+In-Reply-To: <20170424215022.30382-1-eric@anholt.net>
+References: <20170424215022.30382-1-eric@anholt.net>
+Message-ID: <20170424215022.30382-2-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+Cygnus is a small family of SoCs, of which we currently have
+devicetree for BCM11360 and BCM58300.  The 11360's B53 is mostly the
+same as 58xx, just requiring a tiny bit of setup that was previously
+missing.
 
-* Tero Kristo <t-kristo@ti.com> [170317 02:12]:
-> Contains offsets for all omap4 clkctrl main and optional clocks.
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ Documentation/devicetree/bindings/net/dsa/b53.txt | 3 +++
+ drivers/net/dsa/b53/b53_srab.c                    | 2 ++
+ 2 files changed, 5 insertions(+)
 
-Can you please sort these by the clock controller instance and
-add comments to this file to make easier to read?
-
-This way it will be easy to see how the clocks are grouped
-just by looking at this file :)
-
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/omap4.h
-...
-> +#define OMAP4_CLKCTRL_OFFSET	0x20
-> +#define OMAP4_CLKCTRL_INDEX(offset)	((offset) - OMAP4_CLKCTRL_OFFSET)
-...
-
-Something like below for example:
-
-/* abe clocks */
-#define OMAP4_L4_ABE_CLKCTRL    OMAP4_CLKCTRL_INDEX(0x20)
-> +#define OMAP4_MCPDM_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x30)
-> +#define OMAP4_DMIC_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x38)
-> +#define OMAP4_MCASP_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x40)
-> +#define OMAP4_MCBSP1_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x48)
-> +#define OMAP4_MCBSP2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x50)
-> +#define OMAP4_MCBSP3_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x58)
-> +#define OMAP4_SLIMBUS1_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x60)
-> +#define OMAP4_TIMER5_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x68)
-> +#define OMAP4_TIMER6_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x70)
-> +#define OMAP4_TIMER7_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x78)
-> +#define OMAP4_TIMER8_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x80)
-> +#define OMAP4_WD_TIMER3_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x88)
-...
-
-/* l3_2 clocks */
-> +#define OMAP4_L3_MAIN_2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-> +#define OMAP4_GPMC_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x28)
-...
-
-Regards,
-
-Tony
+diff --git a/Documentation/devicetree/bindings/net/dsa/b53.txt b/Documentation/devicetree/bindings/net/dsa/b53.txt
+index d6c6e41648d4..49c93d3c0839 100644
+--- a/Documentation/devicetree/bindings/net/dsa/b53.txt
++++ b/Documentation/devicetree/bindings/net/dsa/b53.txt
+@@ -29,6 +29,9 @@ Required properties:
+       "brcm,bcm58625-srab"
+       "brcm,bcm88312-srab" and the mandatory "brcm,nsp-srab string
+ 
++  For the BCM11360 SoC, must be:
++      "brcm,bcm11360-srab" and the mandatory "brcm,cygnus-srab string
++
+   For the BCM63xx/33xx SoCs with an integrated switch, must be one of:
+       "brcm,bcm3384-switch"
+       "brcm,bcm6328-switch"
+diff --git a/drivers/net/dsa/b53/b53_srab.c b/drivers/net/dsa/b53/b53_srab.c
+index 8a62b6a69703..c37ffd1b6833 100644
+--- a/drivers/net/dsa/b53/b53_srab.c
++++ b/drivers/net/dsa/b53/b53_srab.c
+@@ -364,6 +364,7 @@ static const struct of_device_id b53_srab_of_match[] = {
+ 	{ .compatible = "brcm,bcm53018-srab" },
+ 	{ .compatible = "brcm,bcm53019-srab" },
+ 	{ .compatible = "brcm,bcm5301x-srab" },
++	{ .compatible = "brcm,bcm11360-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ .compatible = "brcm,bcm58522-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ .compatible = "brcm,bcm58525-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ .compatible = "brcm,bcm58535-srab", .data = (void *)BCM58XX_DEVICE_ID },
+@@ -371,6 +372,7 @@ static const struct of_device_id b53_srab_of_match[] = {
+ 	{ .compatible = "brcm,bcm58623-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ .compatible = "brcm,bcm58625-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ .compatible = "brcm,bcm88312-srab", .data = (void *)BCM58XX_DEVICE_ID },
++	{ .compatible = "brcm,cygnus-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ .compatible = "brcm,nsp-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ /* sentinel */ },
+ };
+-- 
+2.11.0
