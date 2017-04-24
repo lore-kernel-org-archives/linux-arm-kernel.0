@@ -1,48 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Apr 2017 10:51:09 +0200
-Subject: [PATCH v5 02/11] clk: sunxi-ng: add support for DE2 CCU
-In-Reply-To: <20170423103754.50012-3-icenowy@aosc.io>
-References: <20170423103754.50012-1-icenowy@aosc.io>
- <20170423103754.50012-3-icenowy@aosc.io>
-Message-ID: <20170424085109.p44bmzbyjkuf7ckv@lukather>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 24 Apr 2017 10:51:55 +0200
+Subject: [PATCH] arm64: dts: r8a7795: update PFC node name to pin-controller
+Message-ID: <1493023915-21658-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The device trees for Renesas SoCs use either pfc or pin-controller
+as the node name for the PFC device. This patch is intended to take a step
+towards unifying the node name used as pin-controller which appears to
+be more the more generic of the two and thus more in keeping with the DT
+specs.
 
-On Sun, Apr 23, 2017 at 06:37:45PM +0800, Icenowy Zheng wrote:
-> +static const struct of_device_id sunxi_de2_clk_ids[] = {
-> +	{
-> +		.compatible = "allwinner,sun8i-a83t-de2-clk",
-> +		.data = &sun8i_a83t_de2_clk_desc,
-> +	},
-> +	{
-> +		.compatible = "allwinner,sun50i-h5-de2-clk",
-> +		.data = &sun50i_a64_de2_clk_desc,
-> +	},
-> +	/*
-> +	 * The Allwinner A64 SoC needs some bit to be poke in syscon to make
-> +	 * DE2 really working.
-> +	 * So there's currently no A64 compatible here.
-> +	 * H5 shares the same reset line with A64, so here H5 is using the
-> +	 * clock description of A64.
-> +	 */
-> +	{ }
-> +};
+My analysis is that this is a user-visible change to the extent that kernel
+logs, and sysfs entries change from e6060000.pfc and pfc at e6060000 to
+e6060000.pin-controller and pin-controller at e6060000.
 
-So that A64 driver would require more than just what you defined in
-the binding in order to operate?
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+Before:
+/sys/kernel/debug/pinctrl/e6060000.pfc
+/sys/devices/platform/soc/e6060000.pfc
+/sys/firmware/devicetree/base/soc/pfc at e6060000
+/sys/bus/platform/devices/e6060000.pfc
+/sys/bus/platform/drivers/sh-pfc
+/sys/bus/platform/drivers/sh-pfc/e6060000.pfc
 
-Maxime
+After:
+/sys/kernel/debug/pinctrl/e6060000.pin-controller
+/sys/devices/platform/soc/e6060000.pin-controller
+/sys/firmware/devicetree/base/soc/pin-controller at e6060000
+/sys/bus/platform/devices/e6060000.pin-controller
+/sys/bus/platform/drivers/sh-pfc
+/sys/bus/platform/drivers/sh-pfc/e6060000.pin-controller
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index e99d6443b3e4..7d87dff70ac8 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -398,7 +398,7 @@
+ 			#power-domain-cells = <1>;
+ 		};
+ 
+-		pfc: pfc at e6060000 {
++		pfc: pin-controller at e6060000 {
+ 			compatible = "renesas,pfc-r8a7795";
+ 			reg = <0 0xe6060000 0 0x50c>;
+ 		};
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170424/f955f91c/attachment-0001.sig>
+2.7.0.rc3.207.g0ac5344
