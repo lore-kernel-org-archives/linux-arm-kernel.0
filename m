@@ -1,51 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Apr 2017 22:19:53 +0200
-Subject: [PATCH V3 2/2] ARM64: dts: hi6220-hikey: Add clock binding for
- the pmic mfd
-In-Reply-To: <20170424201139.GF2137@mai>
-References: <1492449567-31399-1-git-send-email-daniel.lezcano@linaro.org>
- <1492449567-31399-2-git-send-email-daniel.lezcano@linaro.org>
- <20170422020233.GA7065@codeaurora.org>
- <370c36f9-e6fc-416c-776b-edc1e42d7ddc@linaro.org>
- <20170424085944.aa5dsc4g6bwm5rgi@dell> <20170424201139.GF2137@mai>
-Message-ID: <CAK8P3a24Y+HO=XcGjcXb65PyKkzKRsLJiKQTpntYvpaUuew8Jw@mail.gmail.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Mon, 24 Apr 2017 15:22:01 -0500
+Subject: [PATCH v2 1/4] ARM: dts: keystone-k2g: Remove skeleton.dtsi
+In-Reply-To: <20170424202204.24170-1-fcooper@ti.com>
+References: <20170424202204.24170-1-fcooper@ti.com>
+Message-ID: <20170424202204.24170-2-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 10:11 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On Mon, Apr 24, 2017 at 09:59:44AM +0100, Lee Jones wrote:
->> On Sat, 22 Apr 2017, Daniel Lezcano wrote:
->>
->> > On 22/04/2017 04:02, Stephen Boyd wrote:
->> > > On 04/17, Daniel Lezcano wrote:
->> > >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> > >> ---
->> > >>  Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt | 6 ++++++
->> > >>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts             | 1 +
->> > >>  2 files changed, 7 insertions(+)
->> > >>
->> > >
->> > > I take it this goes through arm-soc? Not sure why I'm on To:
->> > > line.
->> >
->> > Probably it should go through Lee's tree.
->>
->> Unlikely.
->>
->> The document and the DTS change should really have gone separately,
->> but to save you from having to mess around so close to the merge window:
->>
->> Acked-by: Lee Jones <lee.jones@linaro.org>
->
-> So who is supposed to take this patch? Xu? Rob?
+Adding the unit address to the memory node was causing the below error:
+Warning (reg_format): "reg" property in /memory has invalid length
+(8 bytes) (#address-cells == 2, #size-cells == 2)
 
-The DTS file changes should normally go through the platform maintainer
-and from there to arm-soc, to minimize the risk for patch conflicts.
+Further debugging showed that this was due to the memory node added by
+default to skeleton.dtsi which was being included in keystone-k2g.dtsi.
+Adding a missing node was all that was needed to remove this deprecated
+dtsi file from the SoC dtsi. With skeleton.dtsi removed the dtc compiler
+no longer complained about including the unit address for the memory node.
 
-For binding changes, conflicts are much rarer, so we any of the tree
-(arm-soc, driver subsystem, or devicetree) works equally well IMHO.
-In this particular case,keeping the two together is best, so please send
-it to Wei Xu with the added chagnelog and Acks.
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+---
+ arch/arm/boot/dts/keystone-k2g.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-       Arnd
+diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+index f59567f..a789f75 100644
+--- a/arch/arm/boot/dts/keystone-k2g.dtsi
++++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+@@ -15,7 +15,6 @@
+ 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/pinctrl/keystone.h>
+-#include "skeleton.dtsi"
+ 
+ / {
+ 	compatible = "ti,k2g","ti,keystone";
+@@ -24,6 +23,8 @@
+ 	#size-cells = <2>;
+ 	interrupt-parent = <&gic>;
+ 
++	chosen { };
++
+ 	aliases {
+ 		serial0 = &uart0;
+ 	};
+-- 
+2.10.0
