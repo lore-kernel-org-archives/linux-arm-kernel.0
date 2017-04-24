@@ -1,108 +1,77 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 24 Apr 2017 19:42:27 +0200 (CEST)
-Subject: [Bug] VCHIQ functional test broken
-In-Reply-To: <20170424164015.GP17774@n2100.armlinux.org.uk>
-References: <331235003.222371.1491934205807@email.1und1.de>
- <685482264.60263.1492105308873@email.1und1.de>
- <20170413222915.GF17774@n2100.armlinux.org.uk>
- <20170414074104.GA8704@laptop> <87pog7x7c5.fsf@eliezer.anholt.net>
- <20170420195822.GA22677@laptop>
- <696fb1c1-7751-caf0-e0d9-9c67b059b4cc@i2se.com>
- <20170424164015.GP17774@n2100.armlinux.org.uk>
-Message-ID: <1058502523.15283.1493055747531@email.1und1.de>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Mon, 24 Apr 2017 17:45:26 +0000
+Subject: [PATCH] arm64: pmuv3: Support v8.1 PMUv3 extension
+In-Reply-To: <20170424164507.GB5972@leverpostej>
+References: <1493033503-4712-1-git-send-email-jnair@caviumnetworks.com>
+ <20170424125747.GA5767@leverpostej>
+ <20170424133929.GA4952@localhost>
+ <20170424140348.GB5767@leverpostej>
+ <20170424164008.GA4657@localhost>
+ <20170424164507.GB5972@leverpostej>
+Message-ID: <20170424174526.GB4657@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> Russell King - ARM Linux <linux@armlinux.org.uk> hat am 24. April 2017 um 18:40 geschrieben:
-> 
-> 
-> On Mon, Apr 24, 2017 at 06:12:09PM +0200, Stefan Wahren wrote:
-> > Am 20.04.2017 um 21:58 schrieb Rabin Vincent:
-> > > On Thu, Apr 20, 2017 at 11:27:38AM -0700, Eric Anholt wrote:
-> > >> I'm confused by what you're saying here.  The driver has already been
-> > >> converted to not use dmac_map_area (commit
-> > >> cf9caf1929882b66922aee698e99e6c8f357bee5), and uses dma_map_sg instead,
-> > >> matching the radeon driver you give as a model as far as I can see.
-> > >> That commit is in v4.11-rc6 from Stefan's regression report.
-> > > Right.  Sorry.  I must have had an old tag checked out when I looked at
-> > > the driver earlier.  The DMA API usage in the driver in v4.11-rc6 and
-> > > current master looks fine, except for one thing:
-> > >
-> > > The flush in flush_dcache_page() (from get_user_pages()) was done with a
-> > > v6_flush_kern_dcache_page() which always did a clean+invalidate while
-> > > the DMA API only does what is required by the direction, which is only a
-> > > invalidate for DMA_FROM_DEVICE.  Since the driver calls dma_from_sg() on
-> > > the entire page, even if userspace sent in an offset into the page,
-> > > unrelated data in userspace may be thrown away.
-> > >
-> > > Does changing the dma API calls to always use DMA_BIDIRECTIONAL make the
-> > > test pass?
+On Mon, Apr 24, 2017 at 05:45:08PM +0100, Mark Rutland wrote:
+> On Mon, Apr 24, 2017 at 04:40:09PM +0000, Jayachandran C wrote:
+> > On Mon, Apr 24, 2017 at 03:03:48PM +0100, Mark Rutland wrote:
+> > > On Mon, Apr 24, 2017 at 01:39:30PM +0000, Jayachandran C wrote:
+> > > > The v8.1 supplement is quite clear on the field definition:
+> > > >
+> > > > PMUVer, bits [11:8]
+> > > > ....
+> > > > Defined values are:
+> > > >       0000 Performance Monitors extension System registers not implemented.
+> > > >       0001 Performance Monitors extension System registers implemented, PMUv3.
+> > > >       0100 Performance Monitors extension System registers implemented, PMUv3, with a 16-bit
+> > > >            evtCount field, and if EL2 is implemented, the addition of the MDCR_EL2.HPMD bit.
+> > > >       1111 IMPLEMENTATION DEFINED form of performance monitors supported, PMUv3 not
+> > > >            supported.
+> > > >         All other values are reserved.
+> > > >         In ARMv8-A the permitted values are 0b0000, 0b0001 and 0b1111.
+> > > >         In ARMv8.1 the permitted values are 0b0000, 0b0100 and 0b1111.
+> > > >
+> > > > I changed the code to strictly do this. We have to exclude 0xf, since that is not PMUv3.
+> > > > And we cannot predict what the reserved values will represent, so it is best to skip them
+> > > > until they are defined to be PMUv3 compatible.
+> > > 
+> > > My understanding is that ID_AA64DFR0.PMUVer is intended to be covered by
+> > > the usual ID register principles, and thus at least 0x2-0x7 are reserved
+> > > for architected backwards compatible extensions to PMUv3.
+> > > 
+> > > See ARM DDI 0487B.a, D7.1.4, "Principles of the ID scheme for fields in
+> > > ID registers". It is explicitly stated that the scheme applies to
+> > > ID_AA64DFR0.
+> > > 
+> > > Per those rules, we should check >= the minimum PMUv3 implemented value,
+> > > i.e. val >= 1. Due to both 0x0 and 0xF meaning PMUv3 isn't implemented,
+> > > it's not clear if the fields should be treated as if it were signed or
+> > > unsigned, and I'm awaiting clarification on this.
 > > 
-> > Unfortunately not (at least not that simple).
+> > Thanks for the reference. Since 0xf means that there is a PMU (but it is
+> > not PMUv3), this looks like an unsigned ID with a special case.
 > > 
-> > Do we need special DMA mapping attributes here ? Or a dma_sync_sg_for_* ?
+> > > Either way, I believe that 0x1-0x7 must all be compatible with baseline
+> > > PMUv3 per the ID scheme principles.
+> > 
+> > In case you don't get authoritative information on this, can you please
+> > merge a version which does either 'if (pmuver < 1 || pmuver == 0xf)' or
+> > 'if (pmuver < 1 || pmuver > 7)' to the patchset?
 > 
-> I had a look at the driver when you first reported the problem, but I
-> don't see an obvious problem.
+> Sure, that's what I proposed:
 > 
-> In drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c, I
-> see it using get_user_pages(), generating a scatterlist, which it then
-> uses dma_map_sg() with.  It then goes on to populate the DMA coherent
-> buffer that it allocated with the DMA addresses of these buffers.
+>         pmuver = cpuid_feature_extract_signed_field(dfr0,
+>                         ID_AA64DFR0_PMUVER_SHIFT);
+>         if (pmuver < 1)
+>                 return;
 > 
-> The tear-down looks sane too - free_pagelist() looks like it correctly
-> unmaps the scatterlist, marks the pages dirty if necessary, puts the
-> pages and frees the DMA coherent memory.
-> 
-> Since you're running on a PIPT cache, the only possible issue is whether
-> there's a lifetime mismatch between what happens here, and what you're
-> doing with the pages in userspace.  All the rules wrt the DMA API apply
-> to these userspace pages, just as these same rules apply in kernel space.
-> Once you have called dma_map_sg() on them, any CPU access (whether
-> explicit or speculative) will cause cache lines to be populated, and
-> possibly marked dirty, which can have the effect of corrupting the data
-> unless it is unmapped prior to the accesses you care about.
+> Note that it treats the value as signed, so it will accept 0x1-0x7, and
+> return for 0x0 or 0x8-0xf.
 
-Just for the records, the link to the userspace program:
+Ok, we will need to change the type of pmuver to int as well.
 
-https://github.com/raspberrypi/userland/blob/master/interface/vchiq_arm/vchiq_test.c
+But even then, I think the reasonable interpretation of the current spec
+is that the field is unsigned. Your original 'if (pmuver < 1 || pmuver == 0xf)'
+is the least surprising way of writing it.
 
-Maybe there is an issue in the ioctl
-
-> 
-> What I can't see is how changing flush_dcache_page() has possibly broken
-> this: it seems to imply that you're getting flush_dcache_page() somehow
-> called inbetween mapping it for DMA, using it for DMA and CPU accesses
-> occuring.  However, the driver doesn't call flush_dcache_page() other
-> than through get_user_pages() - and since dma_map_sg() is used in that
-> path, it should be fine.
-> 
-> So, I don't have much to offer.
-> 
-> However, flush_dcache_page() is probably still a tad heavy - it currently
-> flushes to the point of coherency, but it's really about making sure that
-> the user vs kernel mappings are coherent, not about device coherency.
-> That's the role of the DMA API.
-
-Currently i don't care too much about performance. More important is to fix this regression, because i'm not able to verify the function of this driver efficiently.
-
-I'm thinking about 2 options:
-
-1) add a force parameter to flush_dcache_page() which make it possible to override the new logic
-2) create a second version of flush_dcache_page() with the old behavior
-
-But first of all i need to figure out which parts of flush_dcache_page() are really necessary.
-
-Many thanks anyway
-
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+JC.
