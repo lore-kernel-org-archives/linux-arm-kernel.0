@@ -1,82 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Apr 2017 17:00:30 +0100
-Subject: [PATCH] iommu/arm-smmu: Return IOVA in iova_to_phys when SMMU is
- bypassed
-In-Reply-To: <CA+sq2Cc3cjjPcw0F1D_BOu0j3x+MUNO27MeRguj6BpQ+t11_HQ@mail.gmail.com>
-References: <1492430246-17267-1-git-send-email-sunil.kovvuri@gmail.com>
- <20170424144429.GI12323@arm.com>
- <CA+sq2Cc3cjjPcw0F1D_BOu0j3x+MUNO27MeRguj6BpQ+t11_HQ@mail.gmail.com>
-Message-ID: <20170424160030.GQ12323@arm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue, 25 Apr 2017 00:00:53 +0800
+Subject: [PATCH v4 00/10] AXP803 PMIC support for Pine64
+Message-ID: <20170424160103.9447-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 09:23:16PM +0530, Sunil Kovvuri wrote:
-> On Mon, Apr 24, 2017 at 8:14 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Apr 17, 2017 at 05:27:26PM +0530, sunil.kovvuri at gmail.com wrote:
-> >> From: Sunil Goutham <sgoutham@cavium.com>
-> >>
-> >> For software initiated address translation, when domain type is
-> >> IOMMU_DOMAIN_IDENTITY i.e SMMU is bypassed, mimic HW behavior
-> >> i.e return the same IOVA as translated address.
-> >>
-> >> This patch is an extension to Will Deacon's patchset
-> >> "Implement SMMU passthrough using the default domain".
-> >
-> > Are you actually seeing an issue here? If so, why isn't SMMUv3 affected too?
-> Yes and SMMUv3 should also be effected but as of now I don't see any use case.
-> If needed, i can re-submit the patch with changes in SMMUv3 as well.
+The Pine64 (including Pine64+) boards have an AXP803 PMIC, which is a PMIC
+similar to AXP288, but tweaked to use with Allwinner SoCs rather than Intel
+tablets (with DCIN and Vbus re-splitted like other AXP PMICs, and RSB bus
+support added).
 
-Yes, please.
+This patchset adds support for it and enabled it in Pine64 device tree.
 
-> >> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-> >> ---
-> >>  drivers/iommu/arm-smmu.c | 3 +++
-> >>  1 file changed, 3 insertions(+)
-> >>
-> >> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> >> index 41afb07..2f4a130 100644
-> >> --- a/drivers/iommu/arm-smmu.c
-> >> +++ b/drivers/iommu/arm-smmu.c
-> >> @@ -1405,6 +1405,9 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
-> >>       struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-> >>       struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
-> >>
-> >> +     if (domain->type == IOMMU_DOMAIN_IDENTITY)
-> >> +             return iova;
-> >> +
-> >>       if (!ops)
-> >>               return 0;
-> >
-> > I'd have thought ops would be NULL, since arm_smmu_init_domain_context
-> > doesn't allocate them for an identity domain.
-> Yes ops is set to NULL.
+The basical part of AXP803 MFD driver is already applied, according to Lee.
 
-Argh, sorry, I completely overlooked that we return 0 in that case, rather
-than the iova.
+Thus this patchset is now still two parts, but a bit different to older
+revisions:
 
-> > I don't understand this patch. Please can you explain the problem more
-> > clearly?
-> AFAIK for any driver outside IOMMU there is only one way to identify
-> if device is attached to
-> IOMMU or not and that is by checking iommu_domain. And I don't think
-> it would be appropriate
-> for the driver to check domain->type before calling 'iommu_iova_to_phys()' API.
-> 
-> The difference between IOMMU disabled and IOMMU being in passthrough
-> mode is that, in the
-> later case device is still attached to default domain but in former's
-> case it's NULL. So there is no
-> way to differentiate for the external driver whether IOMMU is in
-> passthrough mode or DMA mode.
-> 
-> And since ops is NULL in passthrough mode, 'iommu_iova_to_phys()' will
-> return zero.
-> 
-> Use case for your reference
-> https://lkml.org/lkml/2017/3/7/299
-> This driver is for a NIC interface on platform which supports SMMUv2.
+- Part1: from PATCH 1/10 to PATCH 5/10, which focus on enabling AXP803 in
+  the device tree: the RSB bus, the R_INTC interrupt controller (for the
+  NMI line, which is connected to AXP803 on Pine64), and finally the basical
+  AXP803 node.
+- Part2: from PATCH 5/10 to PATCH 10/10, which are enabling the regulator
+  function of the AXP803 PMIC. Finally Wi-Fi function is added
+  as a usage of regulators function.
 
-Blimey, that driver is horrible, but I take your point on the API. Please
-repost, fixing SMMUv3 at the same time.
+PATCH 1 adds RSB device nodes, which is used for the communication between
+A64 and AXP803.
 
-Will
+PATCH 2 adds device tree binding of A64 R_INTC.
+
+PATCH 3 really adds support for A64 R_INTC in NMI driver.
+
+PATCH 4 adds R_INTC node in A64 device tree.
+
+PATCH 5 adds AXP803 node to the Pine64 device tree by using already
+applied drivers/bindings.
+
+PATCH 6 adds support for AXP803 regulators in AXP20x regulatoe driver.
+(The binding is already applied)
+
+PATCH 7 enables the AXP803 regulator cell in MFD driver.
+
+PATCH 8 adds a DTSI file for AXP803, like other older AXP PMICs.
+
+PATCH 9 enables AXP803 regulators in Pine64 device tree.
+
+PATCH 10 enables Wi-Fi for Pine64.
+
+Icenowy Zheng (10):
+  arm64: allwinner: a64: enable RSB on A64
+  irqchip/sunxi-nmi: add A64 R_INTC to the binding doc
+  irqchip/sunxi-nmi: add support for the NMI in A64 R_INTC
+  arm64: allwinner: a64: add NMI (R_INTC) controller on A64
+  arm64: allwinner: a64: add AXP803 node to Pine64 device tree
+  regulator: axp20x-regulator: add support for AXP803
+  mfd: axp20x: add axp20x-regulator cell for AXP803
+  arm64: allwinner: a64: add DTSI file for AXP803 PMIC
+  arm64: allwinner: a64: enable AXP803 regulators for Pine64
+  arm64: allwinner: a64: enable Wi-Fi for Pine64
+
+ .../interrupt-controller/allwinner,sunxi-nmi.txt   |   7 +-
+ arch/arm64/boot/dts/allwinner/axp803.dtsi          | 150 ++++++++++++++++++++
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 136 ++++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  27 ++++
+ drivers/irqchip/irq-sunxi-nmi.c                    |  13 ++
+ drivers/mfd/axp20x.c                               |   3 +-
+ drivers/regulator/axp20x-regulator.c               | 153 ++++++++++++++++++---
+ include/linux/mfd/axp20x.h                         |  37 +++++
+ 8 files changed, 501 insertions(+), 25 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/axp803.dtsi
+
+-- 
+2.12.2
