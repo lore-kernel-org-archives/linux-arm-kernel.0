@@ -1,49 +1,51 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Apr 2017 18:00:09 +0100
-Subject: [PATCH] arm64: Add ASM modifier for xN register operands
-In-Reply-To: <20170420183053.718-1-mka@chromium.org>
-References: <20170420183053.718-1-mka@chromium.org>
-Message-ID: <20170424170009.GT12323@arm.com>
+Date: Mon, 24 Apr 2017 18:05:18 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Increase SMMU CMD queue poll timeout
+In-Reply-To: <CA+sq2CeyVm4pcAVME7OAFVxpOcSJc5CsP0vz3ypDkSxdx0SKnQ@mail.gmail.com>
+References: <1493035176-3633-1-git-send-email-gakula@caviumnetworks.com>
+ <20170424160841.GS12323@arm.com>
+ <CA+sq2CeyVm4pcAVME7OAFVxpOcSJc5CsP0vz3ypDkSxdx0SKnQ@mail.gmail.com>
+Message-ID: <20170424170518.GU12323@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
-
-On Thu, Apr 20, 2017 at 11:30:53AM -0700, Matthias Kaehlcke wrote:
-> Many inline assembly statements don't include the 'x' modifier when
-> using xN registers as operands. This is perfectly valid, however it
-> causes clang to raise warnings like this:
+On Mon, Apr 24, 2017 at 10:26:53PM +0530, Sunil Kovvuri wrote:
+> On Mon, Apr 24, 2017 at 9:38 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Apr 24, 2017 at 05:29:36PM +0530, Geetha sowjanya wrote:
+> >> From: Geetha <gakula@cavium.com>
+> >>
+> >> When large memory is being unmapped, huge no of tlb invalidation cmds are
+> >> submitted followed by a SYNC command. This sometimes hits CMD queue full and
+> >> poll on queue drain is being timedout throwing error message 'CMD_SYNC timeout'.
+> >>
+> >> Although there is no functional issue, error message confuses user. Hence increased
+> >> poll timeout to 500us
+> >
+> > Hmm, what are you doing to unmap that much? Is this VFIO teardown? Do you
+> > have 7c6d90e2bb1a ("iommu/io-pgtable-arm: Fix iova_to_phys for block
+> > entries") applied?
 > 
-> warning: value size does not match register size specified by the
->   constraint and modifier [-Wasm-operand-widths]
-> ...
-> arch/arm64/include/asm/barrier.h:62:23: note: expanded from macro
->   '__smp_store_release'
->     asm volatile ("stlr %1, %0"
+> Yes it's VFIO teardown and again yes the above fix is applied.
+> But i didn't get how above fix is related.
+> TLB invalidation commands are submitted at 'arm_smmu_tlb_inv_range_nosync()'
+> and it's a loop over granule size.
+> 
+> 1357         do {
+> 1358                 arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+> 1359                 cmd.tlbi.addr += granule;
+> 1360         } while (size -= granule);
+> 
+> So if invalidation size is big then huge no of invalidation commands
+> will be submitted
+> irrespective of fix that you pointed above, right ?
 
-If I understand this correctly, then the warning is emitted when we pass
-in a value smaller than 64-bit, but refer to %<n> without a modifier
-in the inline asm.
+VFIO has some logic to batch up invalidations, but this didn't work properly
+for us without the fix above. However, I guess you have a huge memory range
+that's mapped with 2M sections or something, so there are still loads of
+entries to invalidate.
 
-However, if that's the case then I don't understand why:
-
-> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> index 0c00c87bb9dd..021e1733da0c 100644
-> --- a/arch/arm64/include/asm/io.h
-> +++ b/arch/arm64/include/asm/io.h
-> @@ -39,33 +39,33 @@
->  #define __raw_writeb __raw_writeb
->  static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
->  {
-> -	asm volatile("strb %w0, [%1]" : : "rZ" (val), "r" (addr));
-> +	asm volatile("strb %w0, [%x1]" : : "rZ" (val), "r" (addr));
-
-is necessary. addr is a pointer type, so is 64-bit.
-
-Given that the scattergun nature of this patch implies that you've been
-fixing the places where warnings are reported, then I'm confused as to
-why a warning is generated for the case above.
-
-What am I missing?
+I would much prefer it if VFIO could just teardown the whole address space
+so that we could do an invalidate all, but there's a chicken-and-egg problem
+with page accounting iirc.
 
 Will
