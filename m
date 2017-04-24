@@ -1,50 +1,41 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 24 Apr 2017 10:57:32 +0200
-Subject: [PATCH v3 2/3] crypto: inside-secure: add SafeXcel EIP197 crypto
- engine driver
-In-Reply-To: <8ff65d6a5e5e4d388d3c5a384e4f5fd6@IL-EXCH01.marvell.com>
-References: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
- <20170424075407.19730-3-antoine.tenart@free-electrons.com>
- <8ff65d6a5e5e4d388d3c5a384e4f5fd6@IL-EXCH01.marvell.com>
-Message-ID: <20170424085731.wbg53t5lcler4mng@kwain>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 24 Apr 2017 09:59:44 +0100
+Subject: [PATCH V3 2/2] ARM64: dts: hi6220-hikey: Add clock binding for
+ the pmic mfd
+In-Reply-To: <370c36f9-e6fc-416c-776b-edc1e42d7ddc@linaro.org>
+References: <1492449567-31399-1-git-send-email-daniel.lezcano@linaro.org>
+ <1492449567-31399-2-git-send-email-daniel.lezcano@linaro.org>
+ <20170422020233.GA7065@codeaurora.org>
+ <370c36f9-e6fc-416c-776b-edc1e42d7ddc@linaro.org>
+Message-ID: <20170424085944.aa5dsc4g6bwm5rgi@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Igal,
+On Sat, 22 Apr 2017, Daniel Lezcano wrote:
 
-On Mon, Apr 24, 2017 at 08:50:32AM +0000, Igal Liberman wrote:
-> [...]
+> On 22/04/2017 04:02, Stephen Boyd wrote:
+> > On 04/17, Daniel Lezcano wrote:
+> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >> ---
+> >>  Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt | 6 ++++++
+> >>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts             | 1 +
+> >>  2 files changed, 7 insertions(+)
+> >>
+> > 
+> > I take it this goes through arm-soc? Not sure why I'm on To:
+> > line.
 > 
-> > +	priv->clk = of_clk_get(dev->of_node, 0);
-> > +	if (!IS_ERR(priv->clk)) {
-> > +		ret = clk_prepare_enable(priv->clk);
-> > +		if (ret) {
-> > +			dev_err(dev, "unable to enable clk (%d)\n", ret);
-> > +			return ret;
-> > +		}
-> > +	} else {
-> > +		/* The clock isn't mandatory */
-> > +		if (PTR_ERR(priv->clk) == -EPROBE_DEFER)
-> > +			return -EPROBE_DEFER;
-> > +	}
-> > +
-> > +	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64));
-> 
-> The correct address width of the engine in Marvell SoCs is 40bit.
+> Probably it should go through Lee's tree.
 
-Oops. I'll update.
+Unlikely.
 
-Thanks!
-Antoine
+The document and the DTS change should really have gone separately,
+but to save you from having to mess around so close to the merge window:
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170424/4f99b7e5/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
