@@ -1,25 +1,47 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Mon, 24 Apr 2017 14:23:03 -0400
-Subject: [PATCH 3/3 v2] xen: Implement EFI reset_system callback
-In-Reply-To: <20170424175839.5262-4-julien.grall@arm.com>
-References: <20170424175839.5262-1-julien.grall@arm.com>
- <20170424175839.5262-4-julien.grall@arm.com>
-Message-ID: <13e9e915-ecd8-0664-6789-d6e7887182e6@oracle.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 24 Apr 2017 20:23:35 +0200
+Subject: [GIT PULL 2/2] arm64 dts: exynos: Last round for v4.12, fixed
+In-Reply-To: <20170421164050.7404-2-krzk@kernel.org>
+References: <20170421164050.7404-2-krzk@kernel.org>
+Message-ID: <20170424182335.5019-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2017 01:58 PM, Julien Grall wrote:
-> When rebooting DOM0 with ACPI on ARM64, the kernel is crashing with the stack
-> trace [1].
->
-> This is happening because when EFI runtimes are enabled, the reset code
-> (see machine_restart) will first try to use EFI restart method.
->
-> However, the EFI restart code is expecting the reset_system callback to
-> be always set. This is not the case for Xen and will lead to crash.
->
-> The EFI restart helper is used in multiple places and some of them don't
-> not have fallback (see machine_power_off). So implement reset_system
-> callback as a call to xen_reboot when using EFI Xen.
+Hi,
 
-Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+On top of previous pull request.
+
+Fixed previous pull because of my doubled Signed-off-by in one comit.
+
+Best regards,
+Krzysztof
+
+
+The following changes since commit e3c07546747cdec07ff15c984bc6cebc9c9f788c:
+
+  arm64: dts: exynos: Add the burst and esc clock frequency properties to DSI node (2017-03-08 08:55:39 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.12-3
+
+for you to fetch changes up to 684c581f10f5e21976d9dcd85a190f37ddc843dd:
+
+  arm64: dts: exynos: Use - instead of @ for DT OPP entries (2017-04-24 20:19:32 +0200)
+
+----------------------------------------------------------------
+Second update of Samsung DeviceTree ARM64 for v4.12:
+ - Fix DTC warnings in Exynos ARM64 Device Tree sources.
+ - Add panel node to TM2E board.
+
+----------------------------------------------------------------
+Hoegeun Kwon (1):
+      arm64: dts: exynos: Add support for s6e3hf2 panel device on TM2e board
+
+Viresh Kumar (1):
+      arm64: dts: exynos: Use - instead of @ for DT OPP entries
+
+ arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi | 48 ++++++++++++-------------
+ arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts | 11 ++++++
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi     | 50 +++++++++++++-------------
+ 3 files changed, 60 insertions(+), 49 deletions(-)
