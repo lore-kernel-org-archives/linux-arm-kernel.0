@@ -1,67 +1,78 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Apr 2017 10:33:29 +0100
-Subject: [PATCH v3 15/18] arm64: arch_timer: Enable CNTVCT_EL0 trap if
- workaround is enabled
-In-Reply-To: <58FDC1F5.3000401@huawei.com>
-References: <20170404171826.25030-1-marc.zyngier@arm.com>
- <20170404171826.25030-16-marc.zyngier@arm.com> <58FDB05B.6020108@huawei.com>
- <95ac3477-436a-22ad-80f4-d4bed6c73e1c@arm.com>
- <AF3DCEF48831C6498A12720ADD13CD7F2A5DACA8@dggeml506-mbs.china.huawei.com>
- <493e2b26-96a2-4b92-fd4b-f6f7d5c89fb5@arm.com> <58FDC1F5.3000401@huawei.com>
-Message-ID: <d7c03009-3b21-0bce-74f5-b11dd359eb97@arm.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Mon, 24 Apr 2017 11:34:29 +0200
+Subject: [PATCH 1/1] PCI: Add MCFG quirk for 2nd node of Cavium ThunderX
+ pass2.x host controller
+In-Reply-To: <20170421165614.GA17916@bhelgaas-glaptop.roam.corp.google.com>
+References: <1490789773-21506-1-git-send-email-tn@semihalf.com>
+ <20170421165614.GA17916@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170424093429.GT16981@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/17 10:14, Hanjun Guo wrote:
-> On 2017/4/24 16:40, Marc Zyngier wrote:
->> On 24/04/17 09:25, Lixiaoping (Timmy) wrote:
->>> Hi Marc,
->>>
->>> Sorry about previous email's confidential info. Please forget it.
->>>
->>> +#define ESR_ELx_SYS64_ISS_SYS_CNTFRQ	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 14, 0, 0) | \
->>> +					 ESR_ELx_SYS64_ISS_DIR_READ)
->>>
->>> I think (3, 3, 14, 0, 0) should be (3, 3, 0, 14, 0)?
->> Thanks for spotting this. I assumed that the sys_reg() and
->> SR_ELx_SYS64_ISS_SYS_VAL() macros took their arguments in the same 
->> order. That would have been too easy... ;-)
->>
->> Amended patch below, please let me know if it works for you.
->>
->> Thanks,
->>
->> 	M.
->>
->> >From 4444c86a97c1a487e12c319fdc197c88631d72b5 Mon Sep 17 00:00:00 2001
->> From: Marc Zyngier <marc.zyngier@arm.com>
->> Date: Mon, 24 Apr 2017 09:04:03 +0100
->> Subject: [PATCH] arm64: Add CNTFRQ_EL0 trap handler
->>
->> We now trap accesses to CNTVCT_EL0 when the counter is broken
->> enough to require the kernel to mediate the access. But it
->> turns out that some existing userspace (such as OpenMPI) do
->> probe for the counter frequency, leading to an UNDEF exception
->> as CNTVCT_EL0 and CNTFRQ_EL0 share the same control bit.
->>
->> The fix is to handle the exception the same way we do for CNTVCT_EL0.
->>
->> Fixes: a86bd139f2ae ("arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround is enabled")
->> Reported-by: Hanjun Guo <guohanjun@huawei.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
+On 21.04.17 11:56:14, Bjorn Helgaas wrote:
+> On Wed, Mar 29, 2017 at 02:16:13PM +0200, Tomasz Nowicki wrote:
+> > Currently SoCs pass2.x do not emulate EA headers for ACPI boot method at all.
+> > However, for pass2.x some devices (like EDAC) advertise incorrect base addresses
+> > in their BARs which results in driver probe failure during resource request.
+> > Since all problematic blocks are on 2nd NUMA node under domain 10 add necessary
+> > quirk entry to obtain BAR addresses correction using EA header emulation.
+> > 
+> > Fixes: 44f22bd91e88 ("PCI: Add MCFG quirks for Cavium ThunderX pass2.x host controller")
+> > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> > CC: stable at vger.kernel.org	# v4.10+
 > 
-> I tested this patch and the undefined instruction error is gone, I can
-> get the FREQ in the user space now, thank you very much for the quick
-> response.
+> Sorry Tomasz, I must have mistakenly marked this "accepted" in
+> patchwork, so it fell off my to-do list.  It's too late to get this in
+> v4.11, but I can still apply it for v4.12.
 > 
-> Tested-by: Hanjun Guo <guohanjun@huawei.com>
-> Reviewed-by: Hanjun Guo <guohanjun@huawei.com>
+> I put it on my pci/host-thunder branch with Robert's ack.  I added a preceding
+> patch to tidy up whitespace, which makes this patch look like just:
+> 
+>         /* SoC pass2.x */
+>         THUNDER_PEM_QUIRK(1, 0),
+>         THUNDER_PEM_QUIRK(1, 1),
+> +       THUNDER_ECAM_QUIRK(1, 10),
+> 
+> Please double-check it to make sure this is what you need.
 
-Thanks for giving it a go. Catalin, can you queue this via the arm64 tree?
+Bjorn,
+
+since the second is marked stable there will be conflicts when
+applying it to stable (or built errors). The best would be to change
+order of both (128cd6e8249f^, 128cd6e8249f) for smooth backporting
+which makes it then more close to Tomasz's version again.
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-Robert
+
+> 
+> > ---
+> >  drivers/acpi/pci_mcfg.c | 7 ++++---
+> >  1 file changed, 4 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> > index a6a4cea..a0a391e 100644
+> > --- a/drivers/acpi/pci_mcfg.c
+> > +++ b/drivers/acpi/pci_mcfg.c
+> > @@ -90,13 +90,14 @@ static struct mcfg_fixup mcfg_quirks[] = {
+> >  	  &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x894057000000UL, node) },  \
+> >  	{ "CAVIUM", "THUNDERX", rev, 9 + (10 * (node)), MCFG_BUS_ANY,	    \
+> >  	  &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x89808f000000UL, node) }
+> > +#define THUNDER_ECAM_QUIRK(rev, seg)					\
+> > +	{ "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,			\
+> > +	&pci_thunder_ecam_ops }
+> >  	/* SoC pass2.x */
+> >  	THUNDER_PEM_QUIRK(1, 0),
+> >  	THUNDER_PEM_QUIRK(1, 1),
+> > +	THUNDER_ECAM_QUIRK(1, 10),
+> >  
+> > -#define THUNDER_ECAM_QUIRK(rev, seg)					\
+> > -	{ "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,			\
+> > -	&pci_thunder_ecam_ops }
+> >  	/* SoC pass1.x */
+> >  	THUNDER_PEM_QUIRK(2, 0),	/* off-chip devices */
+> >  	THUNDER_PEM_QUIRK(2, 1),	/* off-chip devices */
+> > -- 
+> > 2.7.4
+> > 
