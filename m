@@ -1,45 +1,48 @@
-From: igall@marvell.com (Igal Liberman)
-Date: Mon, 24 Apr 2017 08:50:32 +0000
-Subject: [PATCH v3 2/3] crypto: inside-secure: add SafeXcel EIP197 crypto
- engine driver
-In-Reply-To: <20170424075407.19730-3-antoine.tenart@free-electrons.com>
-References: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
- <20170424075407.19730-3-antoine.tenart@free-electrons.com>
-Message-ID: <8ff65d6a5e5e4d388d3c5a384e4f5fd6@IL-EXCH01.marvell.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Apr 2017 10:51:09 +0200
+Subject: [PATCH v5 02/11] clk: sunxi-ng: add support for DE2 CCU
+In-Reply-To: <20170423103754.50012-3-icenowy@aosc.io>
+References: <20170423103754.50012-1-icenowy@aosc.io>
+ <20170423103754.50012-3-icenowy@aosc.io>
+Message-ID: <20170424085109.p44bmzbyjkuf7ckv@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Hi,
 
-> +	priv->clk = of_clk_get(dev->of_node, 0);
-> +	if (!IS_ERR(priv->clk)) {
-> +		ret = clk_prepare_enable(priv->clk);
-> +		if (ret) {
-> +			dev_err(dev, "unable to enable clk (%d)\n", ret);
-> +			return ret;
-> +		}
-> +	} else {
-> +		/* The clock isn't mandatory */
-> +		if (PTR_ERR(priv->clk) == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
-> +	}
-> +
-> +	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64));
+On Sun, Apr 23, 2017 at 06:37:45PM +0800, Icenowy Zheng wrote:
+> +static const struct of_device_id sunxi_de2_clk_ids[] = {
+> +	{
+> +		.compatible = "allwinner,sun8i-a83t-de2-clk",
+> +		.data = &sun8i_a83t_de2_clk_desc,
+> +	},
+> +	{
+> +		.compatible = "allwinner,sun50i-h5-de2-clk",
+> +		.data = &sun50i_a64_de2_clk_desc,
+> +	},
+> +	/*
+> +	 * The Allwinner A64 SoC needs some bit to be poke in syscon to make
+> +	 * DE2 really working.
+> +	 * So there's currently no A64 compatible here.
+> +	 * H5 shares the same reset line with A64, so here H5 is using the
+> +	 * clock description of A64.
+> +	 */
+> +	{ }
+> +};
 
-The correct address width of the engine in Marvell SoCs is 40bit.
+So that A64 driver would require more than just what you defined in
+the binding in order to operate?
 
-> +	if (ret)
-> +		goto err_clk;
-> +
-> +	priv->context_pool = dmam_pool_create("safexcel-context", dev,
-> +					      sizeof(struct
-> safexcel_context_record),
-> +					      1, 0);
-> +	if (!priv->context_pool) {
-> +		ret = -ENOMEM;
-> +		goto err_clk;
-> +	}
-> +
+Maxime
 
-Thanks,
-Igal
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170424/f955f91c/attachment-0001.sig>
