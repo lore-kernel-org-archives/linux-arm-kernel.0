@@ -1,51 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Apr 2017 18:05:18 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Increase SMMU CMD queue poll timeout
-In-Reply-To: <CA+sq2CeyVm4pcAVME7OAFVxpOcSJc5CsP0vz3ypDkSxdx0SKnQ@mail.gmail.com>
-References: <1493035176-3633-1-git-send-email-gakula@caviumnetworks.com>
- <20170424160841.GS12323@arm.com>
- <CA+sq2CeyVm4pcAVME7OAFVxpOcSJc5CsP0vz3ypDkSxdx0SKnQ@mail.gmail.com>
-Message-ID: <20170424170518.GU12323@arm.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 24 Apr 2017 12:05:05 -0500
+Subject: [PATCH 1/1] PCI: Add MCFG quirk for 2nd node of Cavium ThunderX
+ pass2.x host controller
+In-Reply-To: <20170424093429.GT16981@rric.localdomain>
+References: <1490789773-21506-1-git-send-email-tn@semihalf.com>
+ <20170421165614.GA17916@bhelgaas-glaptop.roam.corp.google.com>
+ <20170424093429.GT16981@rric.localdomain>
+Message-ID: <CAErSpo4-a4jKEpxZX3YKeAzE-oVdE3gtRDGSx7nrGuVzK9OKGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 10:26:53PM +0530, Sunil Kovvuri wrote:
-> On Mon, Apr 24, 2017 at 9:38 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Apr 24, 2017 at 05:29:36PM +0530, Geetha sowjanya wrote:
-> >> From: Geetha <gakula@cavium.com>
-> >>
-> >> When large memory is being unmapped, huge no of tlb invalidation cmds are
-> >> submitted followed by a SYNC command. This sometimes hits CMD queue full and
-> >> poll on queue drain is being timedout throwing error message 'CMD_SYNC timeout'.
-> >>
-> >> Although there is no functional issue, error message confuses user. Hence increased
-> >> poll timeout to 500us
-> >
-> > Hmm, what are you doing to unmap that much? Is this VFIO teardown? Do you
-> > have 7c6d90e2bb1a ("iommu/io-pgtable-arm: Fix iova_to_phys for block
-> > entries") applied?
-> 
-> Yes it's VFIO teardown and again yes the above fix is applied.
-> But i didn't get how above fix is related.
-> TLB invalidation commands are submitted at 'arm_smmu_tlb_inv_range_nosync()'
-> and it's a loop over granule size.
-> 
-> 1357         do {
-> 1358                 arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-> 1359                 cmd.tlbi.addr += granule;
-> 1360         } while (size -= granule);
-> 
-> So if invalidation size is big then huge no of invalidation commands
-> will be submitted
-> irrespective of fix that you pointed above, right ?
+On Mon, Apr 24, 2017 at 4:34 AM, Robert Richter
+<robert.richter@cavium.com> wrote:
+> On 21.04.17 11:56:14, Bjorn Helgaas wrote:
+>> On Wed, Mar 29, 2017 at 02:16:13PM +0200, Tomasz Nowicki wrote:
+>> > Currently SoCs pass2.x do not emulate EA headers for ACPI boot method at all.
+>> > However, for pass2.x some devices (like EDAC) advertise incorrect base addresses
+>> > in their BARs which results in driver probe failure during resource request.
+>> > Since all problematic blocks are on 2nd NUMA node under domain 10 add necessary
+>> > quirk entry to obtain BAR addresses correction using EA header emulation.
+>> >
+>> > Fixes: 44f22bd91e88 ("PCI: Add MCFG quirks for Cavium ThunderX pass2.x host controller")
+>> > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> > CC: stable at vger.kernel.org  # v4.10+
+>>
+>> Sorry Tomasz, I must have mistakenly marked this "accepted" in
+>> patchwork, so it fell off my to-do list.  It's too late to get this in
+>> v4.11, but I can still apply it for v4.12.
+>>
+>> I put it on my pci/host-thunder branch with Robert's ack.  I added a preceding
+>> patch to tidy up whitespace, which makes this patch look like just:
+>>
+>>         /* SoC pass2.x */
+>>         THUNDER_PEM_QUIRK(1, 0),
+>>         THUNDER_PEM_QUIRK(1, 1),
+>> +       THUNDER_ECAM_QUIRK(1, 10),
+>>
+>> Please double-check it to make sure this is what you need.
+>
+> Bjorn,
+>
+> since the second is marked stable there will be conflicts when
+> applying it to stable (or built errors). The best would be to change
+> order of both (128cd6e8249f^, 128cd6e8249f) for smooth backporting
+> which makes it then more close to Tomasz's version again.
 
-VFIO has some logic to batch up invalidations, but this didn't work properly
-for us without the fix above. However, I guess you have a huge memory range
-that's mapped with 2M sections or something, so there are still loads of
-entries to invalidate.
+Thanks, I should have noticed that.  Could go either way; I just
+marked 128cd6e8249f^ for stable as well, since it seemed marginally
+easier to read to split the whitespace changes from the real change.
 
-I would much prefer it if VFIO could just teardown the whole address space
-so that we could do an invalidate all, but there's a chicken-and-egg problem
-with page accounting iirc.
-
-Will
+>> > ---
+>> >  drivers/acpi/pci_mcfg.c | 7 ++++---
+>> >  1 file changed, 4 insertions(+), 3 deletions(-)
+>> >
+>> > diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+>> > index a6a4cea..a0a391e 100644
+>> > --- a/drivers/acpi/pci_mcfg.c
+>> > +++ b/drivers/acpi/pci_mcfg.c
+>> > @@ -90,13 +90,14 @@ static struct mcfg_fixup mcfg_quirks[] = {
+>> >       &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x894057000000UL, node) },  \
+>> >     { "CAVIUM", "THUNDERX", rev, 9 + (10 * (node)), MCFG_BUS_ANY,       \
+>> >       &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x89808f000000UL, node) }
+>> > +#define THUNDER_ECAM_QUIRK(rev, seg)                                       \
+>> > +   { "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,                 \
+>> > +   &pci_thunder_ecam_ops }
+>> >     /* SoC pass2.x */
+>> >     THUNDER_PEM_QUIRK(1, 0),
+>> >     THUNDER_PEM_QUIRK(1, 1),
+>> > +   THUNDER_ECAM_QUIRK(1, 10),
+>> >
+>> > -#define THUNDER_ECAM_QUIRK(rev, seg)                                       \
+>> > -   { "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,                 \
+>> > -   &pci_thunder_ecam_ops }
+>> >     /* SoC pass1.x */
+>> >     THUNDER_PEM_QUIRK(2, 0),        /* off-chip devices */
+>> >     THUNDER_PEM_QUIRK(2, 1),        /* off-chip devices */
+>> > --
+>> > 2.7.4
+>> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
