@@ -1,26 +1,22 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 24 Apr 2017 14:50:20 -0700
-Subject: [PATCH 0/2] net: dsa: b53: BCM11360 support
-Message-ID: <20170424215022.30382-1-eric@anholt.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 24 Apr 2017 14:51:13 -0700
+Subject: [PATCH 1/2] net: dsa: b53: Add compatible strings for the
+ Cygnus-family BCM11360.
+In-Reply-To: <20170424215022.30382-2-eric@anholt.net>
+References: <20170424215022.30382-1-eric@anholt.net>
+ <20170424215022.30382-2-eric@anholt.net>
+Message-ID: <b3aa7bcb-cd11-2159-f6c0-9888dff22e28@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This little patch series follows on from Florian's fixes that he just
-sent, and enables the ethernet on the 911360_EP board.
+On 04/24/2017 02:50 PM, Eric Anholt wrote:
+> Cygnus is a small family of SoCs, of which we currently have
+> devicetree for BCM11360 and BCM58300.  The 11360's B53 is mostly the
+> same as 58xx, just requiring a tiny bit of setup that was previously
+> missing.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-Without Florian's fixes, the controller comes up and forwarding
-happens between eth1 and eth2, but the CPU's eth0 packets don't get
-forwarded.
-
-Eric Anholt (2):
-  net: dsa: b53: Add compatible strings for the Cygnus-family BCM11360.
-  ARM: dts: Add the ethernet and ethernet PHY to the cygnus core DT.
-
- Documentation/devicetree/bindings/net/dsa/b53.txt |  3 ++
- arch/arm/boot/dts/bcm-cygnus.dtsi                 | 60 +++++++++++++++++++++++
- arch/arm/boot/dts/bcm911360_entphn.dts            |  8 +++
- drivers/net/dsa/b53/b53_srab.c                    |  2 +
- 4 files changed, 73 insertions(+)
-
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 -- 
-2.11.0
+Florian
