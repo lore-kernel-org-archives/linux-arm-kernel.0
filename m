@@ -1,38 +1,152 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 24 Apr 2017 09:04:19 +0100
-Subject: [PATCH v2] crypto: arm64/sha: Add constant operand modifier to
- ASM_EXPORT
-In-Reply-To: <20170424080056.GA20285@gondor.apana.org.au>
-References: <20170405183458.193068-1-mka@chromium.org>
- <CAP=VYLpejcYwXUMtCCkXmjXw=T1tBJLn21aVi-9v_VGmEinjRg@mail.gmail.com>
- <CAKv+Gu_DHBT=2YA9h+ao3pZXgEV5KsO9ia+J90wtLuDX=a4+eg@mail.gmail.com>
- <20170418173401.GA128305@google.com>
- <20170424080056.GA20285@gondor.apana.org.au>
-Message-ID: <CAKv+Gu8bpEiM_idZeJBpAvqBy-a7+ivQmoyuYHW-Z05rZHNhkA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Apr 2017 09:13:16 +0100
+Subject: [PATCH v3 15/18] arm64: arch_timer: Enable CNTVCT_EL0 trap if
+ workaround is enabled
+In-Reply-To: <58FDB05B.6020108@huawei.com>
+References: <20170404171826.25030-1-marc.zyngier@arm.com>
+ <20170404171826.25030-16-marc.zyngier@arm.com> <58FDB05B.6020108@huawei.com>
+Message-ID: <95ac3477-436a-22ad-80f4-d4bed6c73e1c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 April 2017 at 09:00, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Tue, Apr 18, 2017 at 10:34:01AM -0700, Matthias Kaehlcke wrote:
->> El Tue, Apr 18, 2017 at 04:35:02PM +0100 Ard Biesheuvel ha dit:
+On 24/04/17 08:59, Hanjun Guo wrote:
+> Hi Marc,
+> 
+> On 2017/4/5 1:18, Marc Zyngier wrote:
+>> Userspace being allowed to use read CNTVCT_EL0 anytime (and not
+>> only in the VDSO), we need to enable trapping whenever a cntvct
+>> workaround is enabled on a given CPU.
 >>
->> > On 18 April 2017 at 15:47, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
->> > > On Wed, Apr 5, 2017 at 2:34 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
->> > >> The operand is an integer constant, make the constness explicit by
->> > >> adding the modifier. This is needed for clang to generate valid code
->> > >> and also works with gcc.
->> > >
->> > > Actually it doesn't work with all gcc.  I've got an older arm64 toolchain that I
->> > > only use for syntax checking (and hence I don't care if it is the latest and
->> > > greatest) and this commit breaks it:
->> > >
->> > > arch/arm64/crypto/sha1-ce-glue.c:21:2: error: invalid 'asm': invalid
->> > > operand prefix '%c'
->> > >   asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/clocksource/arm_arch_timer.c | 45 +++++++++++++++++++++++++-----------
+>>  1 file changed, 32 insertions(+), 13 deletions(-)
 >>
->> Sorry about that :(
->
-> So what's the consensus? Should I revert this patch?
->
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> [...]
+>>  #else
+>>  #define arch_timer_check_ool_workaround(t,a)		do { } while(0)
+>>  #define erratum_set_next_event_tval_virt(...)		({BUG(); 0;})
+>>  #define erratum_set_next_event_tval_phys(...)		({BUG(); 0;})
+>>  #define erratum_handler(fn, r, ...)			({false;})
+>> +#define arch_timer_this_cpu_has_cntvct_wa()		({false;})
+>>  #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+>>  
+>>  static __always_inline irqreturn_t timer_handler(const int access,
+>> @@ -660,15 +680,23 @@ static void arch_counter_set_user_access(void)
+>>  {
+>>  	u32 cntkctl = arch_timer_get_cntkctl();
+>>  
+>> -	/* Disable user access to the timers and the physical counter */
+>> +	/* Disable user access to the timers and both counters */
+>>  	/* Also disable virtual event stream */
+>>  	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
+>>  			| ARCH_TIMER_USR_VT_ACCESS_EN
+>> +		        | ARCH_TIMER_USR_VCT_ACCESS_EN
+>>  			| ARCH_TIMER_VIRT_EVT_EN
+>>  			| ARCH_TIMER_USR_PCT_ACCESS_EN);
+>>  
+>> -	/* Enable user access to the virtual counter */
+>> -	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+>> +	/*
+>> +	 * Enable user access to the virtual counter if it doesn't
+>> +	 * need to be workaround. The vdso may have been already
+>> +	 * disabled though.
+>> +	 */
+>> +	if (arch_timer_this_cpu_has_cntvct_wa())
+>> +		pr_info("CPU%d: Trapping CNTVCT access\n", smp_processor_id());
+>> +	else
+>> +		cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+> 
+> Since CNTVCT_EL0 and CNTFRQ_EL0 share the same control register,then we
+> need to trap CNTFRQ_EL0 as well.
+> 
+> We hit an "undefined instruction" when running Open MPI, which
+> read CNTFRQ_EL0 in the user space:
+> 
+> https://github.com/open-mpi/ompi/blob/5b40fd267f9ddc6463051e402382a988637c3bb3/opal/include/opal/sys/arm64/timer.h
+> 
+> static inline opal_timer_t
+> opal_sys_timer_freq(void) { opal_timer_t freq; __asm__ __volatile__
+> ("mrs %0, CNTFRQ_EL0" : "=r" (freq)); return (opal_timer_t)(freq); }
+> Please take look :) Thanks Hanjun
 
-Yes please.
+Ah, nice :-/ ... Can you please give the patch below a shot?
+
+Thanks,
+
+	M.
+
+>From 3f13e53878356057bde3e023614789d6c6b73628 Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Mon, 24 Apr 2017 09:04:03 +0100
+Subject: [PATCH] arm64: Add CNTFRQ_EL0 trap handler
+
+We now trap accesses to CNTVCT_EL0 when the counter is broken
+enough to require the kernel to mediate the access. But it
+turns out that some existing userspace (such as OpenMPI) do
+probe for the counter frequency, leading to an UNDEF exception
+as CNTVCT_EL0 and CNTFRQ_EL0 share the same control bit.
+
+The fix is to handle the exception the same way we do for CNTVCT_EL0.
+
+Fixes: a86bd139f2ae ("arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround is enabled")
+Reported-by: Hanjun Guo <guohanjun@huawei.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/esr.h |  4 ++++
+ arch/arm64/kernel/traps.c    | 14 ++++++++++++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index ad42e79a5d4d..8ea134f88fda 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -177,6 +177,10 @@
+ 
+ #define ESR_ELx_SYS64_ISS_SYS_CNTVCT	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 2, 14, 0) | \
+ 					 ESR_ELx_SYS64_ISS_DIR_READ)
++
++#define ESR_ELx_SYS64_ISS_SYS_CNTFRQ	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 14, 0, 0) | \
++					 ESR_ELx_SYS64_ISS_DIR_READ)
++
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+ 
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 1de444e6c669..d4d6ae02cd55 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -513,6 +513,14 @@ static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
+ 	regs->pc += 4;
+ }
+ 
++static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
++{
++	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++
++	pt_regs_write_reg(regs, rt, read_sysreg(cntfrq_el0));
++	regs->pc += 4;
++}
++
+ struct sys64_hook {
+ 	unsigned int esr_mask;
+ 	unsigned int esr_val;
+@@ -537,6 +545,12 @@ static struct sys64_hook sys64_hooks[] = {
+ 		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTVCT,
+ 		.handler = cntvct_read_handler,
+ 	},
++	{
++		/* Trap read access to CNTFRQ_EL0 */
++		.esr_mask = ESR_ELx_SYS64_ISS_SYS_OP_MASK,
++		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTFRQ,
++		.handler = cntfrq_read_handler,
++	},
+ 	{},
+ };
+ 
+-- 
+2.11.0
+
+-- 
+Jazz is not dead. It just smells funny...
