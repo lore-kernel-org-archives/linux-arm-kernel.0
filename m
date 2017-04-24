@@ -1,48 +1,86 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Mon, 24 Apr 2017 16:57:45 -0700
-Subject: [PATCH 1/2] net: dsa: b53: Add compatible strings for the
- Cygnus-family BCM11360.
-In-Reply-To: <8760hte4zw.fsf@eliezer.anholt.net>
-References: <20170424215022.30382-1-eric@anholt.net>
- <20170424215022.30382-2-eric@anholt.net>
- <a2f4f0c9-feea-291b-dae5-f4ed10f9c547@broadcom.com>
- <8760hte4zw.fsf@eliezer.anholt.net>
-Message-ID: <8054ec9e-73d0-af1a-bb9a-fcdac782dc9c@broadcom.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 24 Apr 2017 16:59:58 -0700
+Subject: [PATCH 4/5] Hot-remove implementation for arm64
+In-Reply-To: <20170421100500.GB20029@samekh>
+References: <cover.1491920513.git.ar@linux.vnet.ibm.com>
+ <897973dd5d3fc91c70aba4b44350099a61c3a12c.1491920513.git.ar@linux.vnet.ibm.com>
+ <20170411171210.GD32267@leverpostej> <20170414140158.GA17950@samekh>
+ <20170418182125.GL17866@leverpostej>
+ <CAKv+Gu9YYoFmFwpVgrOvD+eMHAKPmG_zgTz5f7JMT6iGqgLHGw@mail.gmail.com>
+ <535ba380-56e8-db3d-25c5-14d51e48105f@redhat.com>
+ <20170421100500.GB20029@samekh>
+Message-ID: <3a5afc84-b920-e164-c05a-2c6a3e05bf84@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 17-04-24 04:54 PM, Eric Anholt wrote:
-> Scott Branden <scott.branden@broadcom.com> writes:
->
->> Minor comment in line
+On 04/21/2017 03:05 AM, Andrea Reale wrote:
+> Hi all,
+> 
+> thanks for taking the time to comment. Replies in-line.
+> 
+> On Wed, Apr 19, 2017 at 08:53:13AM -0700, Laura Abbott wrote:
+>> On 04/18/2017 11:48 AM, Ard Biesheuvel wrote:
+>>> On 18 April 2017 at 19:21, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>> On Fri, Apr 14, 2017 at 03:01:58PM +0100, Andrea Reale wrote:
+> 
+> [...]
+> 
+>>>>
+>>>> From a quick scan, I see that it's necessary to use pgtable_page_ctor()
+>>>> for pages that will be used for userspace page tables, but it's not
+>>>> clear to me if it's ever necessary for pages used for kernel page
+>>>> tables.
+>>>>
+>>>> If it is, we appear to have a bug on arm64.
+>>>>
+>>>> Laura, Ard, thoughts?
+>>>>
+>>>
+>>> The generic apply_to_page_range() will expect the PTE lock to be
+>>> initialized for page table pages that are not part of init_mm. For
+>>> arm64, that is precisely efi_mm as far as I am aware. For EFI, the
+>>> locking is unnecessary but does no harm (the permissions are set once
+>>> via apply_to_page_range() at boot), so I added this call when adding
+>>> support for strict permissions in EFI rt services mappings.
+>>>
+>>> So I think it is appropriate for create_pgd_mapping() to be in charge
+>>> of calling the ctor(). We simply have no destroy_pgd_mapping()
+>>> counterpart that would be the place for the dtor() call, given that we
+>>> never take down EFI rt services mappi >
+>>> Whether it makes sense or not to lock/unlock in apply_to_page_range()
+>>> is something I did not spend any brain cycles on at the time.
+>>>
 >>
->> On 17-04-24 02:50 PM, Eric Anholt wrote:
->>> Cygnus is a small family of SoCs, of which we currently have
->>> devicetree for BCM11360 and BCM58300.  The 11360's B53 is mostly the
->>> same as 58xx, just requiring a tiny bit of setup that was previously
->>> missing.
->>>
->>> Signed-off-by: Eric Anholt <eric@anholt.net>
->>> ---
->>>  Documentation/devicetree/bindings/net/dsa/b53.txt | 3 +++
->>>  drivers/net/dsa/b53/b53_srab.c                    | 2 ++
->>>  2 files changed, 5 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/net/dsa/b53.txt b/Documentation/devicetree/bindings/net/dsa/b53.txt
->>> index d6c6e41648d4..49c93d3c0839 100644
->>> --- a/Documentation/devicetree/bindings/net/dsa/b53.txt
->>> +++ b/Documentation/devicetree/bindings/net/dsa/b53.txt
->>> @@ -29,6 +29,9 @@ Required properties:
->>>        "brcm,bcm58625-srab"
->>>        "brcm,bcm88312-srab" and the mandatory "brcm,nsp-srab string
->>>
->>> +  For the BCM11360 SoC, must be:
->>> +      "brcm,bcm11360-srab" and the mandatory "brcm,cygnus-srab string
->>> +
->> place in alphabetical order in the doc?
->
-> Moved it above BCM5310x now.  I hope that's what you meant.
->
-Yes, sorry for not being more clear.
+>> Agreed there shouldn't be a problem right now. I do think the locking is
+>> appropriate in apply_to_page_range given what other functions also get
+>> locked.
+>>
+>> I really wish this were less asymmetrical though since it get hard
+>> to reason about. It looks like hotplug_paging will call the ctor,
+>> so is there an issue with calling hot-remove on memory that was once
+>> hot-added or is that not a concern?
+>>
+>> Thanks,
+>> Laura
+> 
+> I think the confusion comes from the fact that, in hotplug_paging, we are
+> passing pgd_pgtable_alloc as the page allocator for __create_pgd_mapping,
+> which always calls the ctor.
+> 
+> If I got things right (but, please, correct me if I am wrong), we don't
+> need to get the pte_lock that the ctor gets since - in hotplug - we are
+> adding to init_mm.
+> 
+> Moreover, I am just realizing that calling the dtor while hot-removing
+> might create problems when removing memory that *was not* previously
+> hotplugged, as we are calling a dtor on something that was never
+> ctor'ed. Is that what you were hinting at, Laura?
+> 
+> Thanks and best regards,
+> Andrea
+> 
+
+Yes, that was what I was thinking.
+
+Thanks,
+Laura
