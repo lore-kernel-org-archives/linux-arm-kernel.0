@@ -1,50 +1,83 @@
-From: oss@buserror.net (Scott Wood)
-Date: Sun, 23 Apr 2017 20:47:41 -0500
-Subject: [PATCH v2 07/11] soc/fsl/qbman: Rework ioremap() calls for ARM/PPC
-In-Reply-To: <1492634930-10765-8-git-send-email-roy.pledge@nxp.com>
-References: <1492634930-10765-1-git-send-email-roy.pledge@nxp.com>
- <1492634930-10765-8-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1492998461.25397.16.camel@buserror.net>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Mon, 24 Apr 2017 11:17:47 +0900
+Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
+In-Reply-To: <20170421120627.GO3452@pathway.suse.cz>
+References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+ <1461239325-22779-2-git-send-email-pmladek@suse.com>
+ <20170419131341.76bc7634@gandalf.local.home>
+ <20170420033112.GB542@jagdpanzerIV.localdomain>
+ <20170420131154.GL3452@pathway.suse.cz>
+ <20170421015724.GA586@jagdpanzerIV.localdomain>
+ <20170421120627.GO3452@pathway.suse.cz>
+Message-ID: <20170424021747.GA630@jagdpanzerIV.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-04-19 at 16:48 -0400, Roy Pledge wrote:
-> Rework ioremap() for PPC and ARM. The PPC devices require a
-> non-coherent mapping while ARM will work with a non-cachable/write
-> combine mapping.
+On (04/21/17 14:06), Petr Mladek wrote:
+[..]
+> > I agree that this_cpu_read(printk_context) covers slightly more than
+> > logbuf_lock scope, so we may get positive this_cpu_read(printk_context)
+> > with unlocked logbuf_lock, but I don't tend to think that it's a big
+> > problem.
 > 
-> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
-> ---
-> ?drivers/soc/fsl/qbman/bman_portal.c | 16 +++++++++++++---
-> ?drivers/soc/fsl/qbman/qman_portal.c | 16 +++++++++++++---
-> ?2 files changed, 26 insertions(+), 6 deletions(-)
+> PRINTK_SAFE_CONTEXT is set also in call_console_drivers().
+> It might take rather long and logbuf_lock is availe. So, it is
+> noticeable source of false positives.
+
+yes, agree.
+
+probably we need additional printk_safe annotations for
+		"logbuf_lock is locked from _this_ CPU"
+
+false positives there can be very painful.
+
+[..]
+> 	if (raw_spin_is_locked(&logbuf_lock))
+> 		this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
+> 	else
+> 		this_cpu_or(printk_context, PRINTK_NMI_DEFERRED_CONTEXT_MASK);
+
+well, if everyone is fine with logbuf_lock access from every CPU from every
+NMI then I won't object either. but may be it makes sense to reduce the
+possibility of false positives. Steven is loosing critically important logs,
+after all.
+
+
+by the way,
+does this `nmi_print_seq' bypass even fix anything for Steven? it sort of
+can, in theory, but just in theory. so may be we need direct message flush
+from NMI handler (printk->console_unlock), which will be a really big problem.
+
+logbuf might not be big enough for 4890096 messages (Steven's report
+mentions "Lost 4890096 message(s)!"). we are counting on the fact that
+in case of `nmi_print_seq' bypass some other CPU will call console_unlock()
+and print pending logbuf messages, but this is not guaranteed and the
+messages can be dropped even from logbuf.
+
+I don't know,
+should we try to queue printk_deferred irq_work for all online CPUs from
+vprintk_nmi() when it bypasses printk_safe_log_store()? in order to minimize
+possibilities of logbuf overflow. printk_deferred() will queue work on
+vprintk_nmi() CPU, sure, but we don't know how many messages we are going
+to add to logbuf from NMI.
+
+
+> > @@ -303,7 +303,10 @@ static int vprintk_nmi(const char *fmt, va_list args)
+> >  {
+> >         struct printk_safe_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
+> >  
+> > -       return printk_safe_log_store(s, fmt, args);
+> > +       if (this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK)
+> > +               return printk_safe_log_store(s, fmt, args);
+> > +
+> > +       return vprintk_emit(0, LOGLEVEL_SCHED, NULL, 0, fmt, args);
+> >  }
 > 
-> diff --git a/drivers/soc/fsl/qbman/bman_portal.c
-> b/drivers/soc/fsl/qbman/bman_portal.c
-> index 8354d4d..a661f30 100644
-> --- a/drivers/soc/fsl/qbman/bman_portal.c
-> +++ b/drivers/soc/fsl/qbman/bman_portal.c
-> @@ -125,7 +125,18 @@ static int bman_portal_probe(struct platform_device
-> *pdev)
-> ?	}
-> ?	pcfg->irq = irq;
-> ?
-> -	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]),
-> 0);
-> +#ifdef CONFIG_PPC
-> +	/* PPC requires a cacheable/non-coherent mapping of the portal */
-> +	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]),
-> +			??(pgprot_val(PAGE_KERNEL) & ~_PAGE_COHERENT));
-> +#else
-> +	/*
-> +	?* For ARM we can use write combine mapping.??A cacheable/non
-> shareable
-> +	?* mapping will perform better but equires additional platform
-> +	?* support which is not currently available
-> +	?*/
+> It looks simple but some things are missing. It will be used also
+> outside panic/oops, so it should queue the irq_work to flush the console.
 
-s/equires/requires/
+you are right. I thought about moving irq_work to vprintk_emit(), but
+completely forgot about it. without that missing bit the proposed two-liner
+is not complete.
 
-Would be nice to describe the platform support that is required.
-
--Scott
+	-ss
