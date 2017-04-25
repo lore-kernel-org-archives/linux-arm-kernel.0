@@ -1,83 +1,105 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Apr 2017 18:35:46 +0100
-Subject: [PATCH] ARM/shmem: Drop page coloring align for non-VIPT CPUs
-In-Reply-To: <571024bf-892d-4d08-dd9e-654b1e28c23e@virtuozzo.com>
-References: <20170414100953.4703-1-dsafonov@virtuozzo.com>
- <571024bf-892d-4d08-dd9e-654b1e28c23e@virtuozzo.com>
-Message-ID: <20170425173546.GS17774@n2100.armlinux.org.uk>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Tue, 25 Apr 2017 10:39:37 -0700
+Subject: [PATCH v2] crypto: arm64/sha: Add constant operand modifier to
+ ASM_EXPORT
+In-Reply-To: <CAKv+Gu_DHBT=2YA9h+ao3pZXgEV5KsO9ia+J90wtLuDX=a4+eg@mail.gmail.com>
+References: <20170405183458.193068-1-mka@chromium.org>
+ <CAP=VYLpejcYwXUMtCCkXmjXw=T1tBJLn21aVi-9v_VGmEinjRg@mail.gmail.com>
+ <CAKv+Gu_DHBT=2YA9h+ao3pZXgEV5KsO9ia+J90wtLuDX=a4+eg@mail.gmail.com>
+Message-ID: <20170425173937.GN128305@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 08:19:21PM +0300, Dmitry Safonov wrote:
-> On 04/14/2017 01:09 PM, Dmitry Safonov wrote:
-> >On ARMv6 CPUs with VIPT caches there are aliasing issues: if two
-> >different cache line indexes correspond to the same physical
-> >address, then changes made to one of the alias might be lost
-> >or they can overwrite each other. To overcome aliasing issues,
-> >the align for shared mappings was introduced with:
-> >
-> >commit 4197692eef113eeb8e3e413cc70993a5e667e5b8
-> >Author: Russell King <rmk@flint.arm.linux.org.uk>
-> >Date:   Wed Apr 28 22:22:33 2004 +0100
-> >
-> >     [ARM] Fix shared mmap()ings for ARM VIPT caches.
-> >
-> >     This allows us to appropriately align shared mappings on VIPT caches
-> >     with aliasing issues.
-> >
-> >Which introduced 4 pages align with SHMLBA, which resulted in
-> >unique physical address after any tag in cache (because two upper bits
-> >corresponding to page address get unused in tags).
-> >
-> >As this workaround is not needed by non-VIPT caches (like most armv7
-> >CPUs which have PIPT caches), ARM mmap() code checks if cache is VIPT
-> >aliasing for MAP_SHARED.
-> >
-> >The problem here is in shmat() syscall:
-> >1. if shmaddr is NULL then do_shmat() uses arch_get_unmapped_area()
-> >    to allocate shared mapping.
-> >2. if shmaddr is specified then do_shmat() checks that address has
-> >    SHMLBA alignment regardless to CPU cache aliasing.
-> >
-> >Which results on ARMv7 CPUs that shmat() with NULL shmaddr may return
-> >non-SHMLBA aligned address (page-aligned), but shmat() with the same
-> >address will fail.
-> >
-> >That is not critical issue for CRIU as after shmat() with NULL address,
+Hi,
 
-CRIU?  Please try to keep use of acronyms to a minimum.
+El Tue, Apr 18, 2017 at 04:35:02PM +0100 Ard Biesheuvel ha dit:
 
-> >we can mremap() resulted shmem to restore shared memory mappings on the
-> >same address where they were on checkpointing.
-> >But it's still worth fixing because we can't reliably tell from
-> >userspace if the platform has VIPT cache, and so this mremap()
-> >workaround is done with HUGE warning that restoring application, that
-> >uses SHMBLA-unaligned shmem on ARMv6 CPU with VIPT cache may result
-> >in data corruptions.
+> On 18 April 2017 at 15:47, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
+> > On Wed, Apr 5, 2017 at 2:34 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
+> >> The operand is an integer constant, make the constness explicit by
+> >> adding the modifier. This is needed for clang to generate valid code
+> >> and also works with gcc.
 > >
-> >I also changed SHMLBA build-time check to init-time WARN_ON(), as
-> >it's not constant afterward.
+> > Actually it doesn't work with all gcc.  I've got an older arm64 toolchain that I
+> > only use for syntax checking (and hence I don't care if it is the latest and
+> > greatest) and this commit breaks it:
+> >
+> > arch/arm64/crypto/sha1-ce-glue.c:21:2: error: invalid 'asm': invalid
+> > operand prefix '%c'
+> >   asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
+> >
+> > I'm currently reverting this change locally so I can continue to use the old
+> > toolchain:
+> >
+> > $ aarch64-linux-gnu-gcc --version
+> > aarch64-linux-gnu-gcc (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro
+> > GCC 2013.11) 4.8.3 20131202 (prerelease)
+> > Copyright (C) 2013 Free Software Foundation, Inc.
+> >
+> > $ aarch64-linux-gnu-as --version
+> > GNU assembler (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro GCC
+> > 2013.11) 2.24.0.20131220
+> > Copyright 2013 Free Software Foundation, Inc.
+> >
+> > Maybe it is finally too old and nobody cares, but I thought it worth a mention.
+> >
+> 
+> Thanks for the report. I think we care more about GCC 4.8 than about
+> Clang, which argues for reverting this patch.
+> 
+> I understand these issues must be frustrating if you are working on
+> this stuff, but to me, it is not entirely obvious why we want to
+> support Clang in the first place (i.e., what does it buy you if your
+> distro/environment is not already using Clang for userland), and why
+> the burden is on Linux to make modifications to support Clang,
+> especially when it comes to GCC extensions such as inline assembly
+> syntax.
+> 
+> It is ultimately up to the maintainers to decide what to do with this
+> patch, but my vote would be to revert it, especially given that the %c
+> placeholder prefix is not documented anywhere, and appears to simply
+> trigger some GCC internals that happen to do the right thing in this
+> case.
+> 
+> However, the I -> i change is arguably an improvement, and considering
+> that the following
+> 
+> asm("foo: .long %0" :: "i"(some value))
+> 
+> doesn't compile with clang either, I suggest you (Matthias) file a bug
+> against Clang to get this fixed, and we can propose another patch just
+> for the I->i change.
 
-I'm not happy with this.  SHMLBA is defined by POSIX to be a constant,
-which means that if we want to have any kind of binary compatibility
-between different architecture versions, SHMLBA must be constant across
-all variants of the architecture.
+I consulted with folks with more expertise in this area than myself.
+This is their analysis of the situation:
 
-Making it dependent on the cache architecture means that userspace's
-assumptions can be broken.  Increasing it is not an issue (since SHMLBA
-is defined to be the address multiple - an address that is aligned to
-4-page is also by definition aligned to 1-page.)  So what I did back in
-2004 wasn't a problem.
+"The ARM ARM specifies that the correct AArch64 instruction assembly
+syntax is to have a hash sign (#) before an immediate.
 
-However, reducing it (as you're now suggesting) is - newly built programs
-are built today with:
+Therefore, every time an inline assembly constraint is used that
+specifies to print an immediate (like 'i' or 'I'), the immediate
+(e.g. 42) should be printed with the hash (e.g. #42).
 
-#define SHMLBA              (__getpagesize () << 2)
+Therefore, if you're using an immediate constraint where the hash sign
+must not be printed, you have to use the "c" operand modifier. The "c"
+operand modifier apparently got introduced to gcc after the 4.8
+release.
 
-so we must not allow the kernel to return addresses that violate that.
-As I say, we can't reduce SHMLBA now.
+The binutils assembler and the clang integrated assembler accept
+immediates without the hash sign as a non-official extension. Some of
+the immediate constraints on gcc seem to not print out the hash sign
+either; which is why the variant in the linux kernel works with gcc.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+In summary, it seems to me that the inline assembly with the %c0
+operand is the correct one and gcc 4.8 is simply too old to support
+this."
+
+If the above is correct it seems that the solution is not to "fix"
+clang, but to use different instructions for gcc<=4.8 and newer
+compilers. I am aware that this is not a popular option.
+
+What do you think?
+
+Thanks
+
+Matthias
