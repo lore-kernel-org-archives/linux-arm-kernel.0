@@ -1,155 +1,54 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 25 Apr 2017 08:53:40 +0200
-Subject: [PATCH v3 2/3] crypto: inside-secure: add SafeXcel EIP197 crypto
- engine driver
-In-Reply-To: <2475079.gcOV5qCq7E@tauon.chronox.de>
-References: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
- <20170424075407.19730-3-antoine.tenart@free-electrons.com>
- <2475079.gcOV5qCq7E@tauon.chronox.de>
-Message-ID: <20170425065340.xdhmilo5caswkmxp@kwain>
+From: dongbo4@huawei.com (dongbo (E))
+Date: Tue, 25 Apr 2017 14:58:01 +0800
+Subject: [PATCH REPOST] fs: Preventing READ_IMPLIES_EXEC Propagation
+In-Reply-To: <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
+References: <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
+Message-ID: <481124c6-07ba-4cb8-ca56-fb228b05f796@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephan,
+From: Dong Bo <dongbo4@huawei.com>
 
-On Mon, Apr 24, 2017 at 02:59:05PM +0200, Stephan M?ller wrote:
-> Am Montag, 24. April 2017, 09:54:06 CEST schrieb Antoine Tenart:
-> 
-> > +struct safexcel_cipher_ctx {
-> > +	struct safexcel_context base;
-> > +	struct safexcel_crypto_priv *priv;
-> > +
-> > +	enum safexcel_cipher_direction direction;
-> > +	u32 mode;
-> > +
-> > +	__le32 key[8];
-> 
-> Can you please help me find the location where this memory is zeroized when 
-> released?
+In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
+the flag is propagated to its child processes, even the elf
+files are marked as not requiring executable stack. It may
+cause superfluous operations on some arch, e.g.
+__sync_icache_dcache on aarch64 due to a PROT_READ mmap is
+also marked as PROT_EXEC.
 
-It's not, I'll fix this.
+This patch was originally posted and discussed here:
+https://patchwork.kernel.org/patch/9685891/
 
-> > +static void safexcel_cipher_token(struct safexcel_cipher_ctx *ctx,
-> > +				  struct crypto_async_request *async,
-> > +				  struct safexcel_command_desc *cdesc,
-> > +				  u32 length)
-> > +{
-> > +	struct ablkcipher_request *req = ablkcipher_request_cast(async);
-> > +	struct safexcel_token *token;
-> > +	unsigned offset = 0;
-> > +
-> > +	if (ctx->mode == CONTEXT_CONTROL_CRYPTO_MODE_CBC) {
-> > +		offset = AES_BLOCK_SIZE / sizeof(u32);
-> > +		memcpy(cdesc->control_data.token, req->info, AES_BLOCK_SIZE);
-> > +
-> > +		cdesc->control_data.options |= EIP197_OPTION_4_TOKEN_IV_CMD;
-> > +	}
-> > +
-> > +	token = (struct safexcel_token *)(cdesc->control_data.token + offset);
-> > +
-> > +	token[0].opcode = EIP197_TOKEN_OPCODE_DIRECTION;
-> > +	token[0].packet_length = length;
-> > +	token[0].stat = EIP197_TOKEN_STAT_LAST_PACKET;
-> > +	token[0].instructions = EIP197_TOKEN_INS_LAST |
-> > +				EIP197_TOKEN_INS_TYPE_CRYTO |
-> > +				EIP197_TOKEN_INS_TYPE_OUTPUT;
-> > +}
-> > +
-> > +static int safexcel_aes_setkey(struct crypto_ablkcipher *ctfm, const u8
-> > *key, +			       unsigned int len)
-> > +{
-> 
-> You still use ablkcipher. I thought that it is on its way out in favor of the 
-> skcipher API. Why do you stick to ablkcipher?
-> 
-> Note, a change could be as simple as s/ablkcipher/skcipher/g
+Signed-off-by: Dong Bo <dongbo4@huawei.com>
+---
+ fs/binfmt_elf.c       | 2 ++
+ fs/binfmt_elf_fdpic.c | 2 ++
+ 2 files changed, 4 insertions(+)
 
-Because I wasn't aware of this :) I'll update.
+diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
+index 5075fd5..c52e670 100644
+--- a/fs/binfmt_elf.c
++++ b/fs/binfmt_elf.c
+@@ -863,6 +863,8 @@ static int load_elf_binary(struct linux_binprm *bprm)
+ 	SET_PERSONALITY2(loc->elf_ex, &arch_state);
+ 	if (elf_read_implies_exec(loc->elf_ex, executable_stack))
+ 		current->personality |= READ_IMPLIES_EXEC;
++	else
++		current->personality &= ~READ_IMPLIES_EXEC;
+  	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
+ 		current->flags |= PF_RANDOMIZE;
+diff --git a/fs/binfmt_elf_fdpic.c b/fs/binfmt_elf_fdpic.c
+index cf93a4f..c4bc4d0 100644
+--- a/fs/binfmt_elf_fdpic.c
++++ b/fs/binfmt_elf_fdpic.c
+@@ -354,6 +354,8 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm)
+ 		set_personality(PER_LINUX);
+ 	if (elf_read_implies_exec(&exec_params.hdr, executable_stack))
+ 		current->personality |= READ_IMPLIES_EXEC;
++	else
++		current->personality &= ~READ_IMPLIES_EXEC;
+  	setup_new_exec(bprm);
+ -- 1.9.1
 
-> > +	struct crypto_tfm *tfm = crypto_ablkcipher_tfm(ctfm);
-> > +	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(tfm);
-> > +	struct crypto_aes_ctx aes;
-> > +	int ret, i;
-> > +
-> > +	ret = crypto_aes_expand_key(&aes, key, len);
-> > +	if (ret) {
-> > +		crypto_ablkcipher_set_flags(ctfm, CRYPTO_TFM_RES_BAD_KEY_LEN);
-> > +		return ret;
-> > +	}
-> > +
-> > +	for (i = 0; i < len / sizeof(u32); i++) {
-> > +		if (ctx->key[i] != cpu_to_le32(aes.key_enc[i])) {
-> > +			ctx->base.needs_inv = true;
-> > +			break;
-> > +		}
-> > +	}
-> > +
-> > +	for (i = 0; i < len / sizeof(u32); i++)
-> > +		ctx->key[i] = cpu_to_le32(aes.key_enc[i]);
-> > +
-> > +	ctx->key_len = len;
-> 
-> memzero_explicit(aes)?
 
-OK, I'll update.
-
-> > +static int safexcel_aes_send(struct crypto_async_request *async,
-> > +			     int ring, struct safexcel_request *request,
-> > +			     int *commands, int *results)
-> > +{
-> > +	struct ablkcipher_request *req = ablkcipher_request_cast(async);
-> > +	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
-> > +	struct safexcel_crypto_priv *priv = ctx->priv;
-> > +	struct safexcel_command_desc *cdesc;
-> > +	struct safexcel_result_desc *rdesc;
-> > +	struct scatterlist *sg;
-> > +	int nr_src, nr_dst, n_cdesc = 0, n_rdesc = 0, queued = req->nbytes;
-> > +	int i, ret = 0;
-> > +
-> > +	request->req = &req->base;
-> > +
-> > +	if (req->src == req->dst) {
-> > +		nr_src = dma_map_sg(priv->dev, req->src,
-> > +				    sg_nents_for_len(req->src, req->nbytes),
-> > +				    DMA_BIDIRECTIONAL);
-> > +		nr_dst = nr_src;
-> > +		if (!nr_src)
-> > +			return -EINVAL;
-> > +	} else {
-> > +		nr_src = dma_map_sg(priv->dev, req->src,
-> > +				    sg_nents_for_len(req->src, req->nbytes),
-> > +				    DMA_TO_DEVICE);
-> > +		if (!nr_src)
-> > +			return -EINVAL;
-> > +
-> > +		nr_dst = dma_map_sg(priv->dev, req->dst,
-> > +				    sg_nents_for_len(req->dst, req->nbytes),
-> > +				    DMA_FROM_DEVICE);
-> > +		if (!nr_dst) {
-> > +			dma_unmap_sg(priv->dev, req->src,
-> > +				     sg_nents_for_len(req->src, req->nbytes),
-> > +				     DMA_TO_DEVICE);
-> > +			return -EINVAL;
-> > +		}
-> > +	}
-> > +
-> > +	memcpy(ctx->base.ctxr->data, ctx->key, ctx->key_len);
-> 
-> Is ctxr->data properly zeroized?
-
-No, I'll update.
-
-Thanks for the review!
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170425/4970b066/attachment-0001.sig>
+.
