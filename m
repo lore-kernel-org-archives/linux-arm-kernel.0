@@ -1,25 +1,24 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 25 Apr 2017 18:27:05 +0200
-Subject: [PATCH/RFC 1/2] clk: renesas: Rework Kconfig and Makefile logic
+Date: Tue, 25 Apr 2017 18:27:06 +0200
+Subject: [PATCH/RFC 2/2] soc: renesas: Rework Kconfig and Makefile logic
 In-Reply-To: <1493137626-21404-1-git-send-email-geert+renesas@glider.be>
 References: <1493137626-21404-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1493137626-21404-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1493137626-21404-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The goals are to:
   - Allow precise control over and automatic selection of which
-    (sub)drivers are used for which SoC (which may change in the
-    future),
+    (sub)drivers are used for which SoC,
   - Allow adding support for new SoCs easily,
   - Allow compile-testing of all (sub)drivers,
-  - Keep driver selection logic in the subsystem-specific Kconfig
+  - Keep driver selection logic in the subsystem-specific Kconfig,
     independent from the architecture-specific Kconfig (i.e. no "select"
     from arch/arm64/Kconfig.platforms), to avoid dependencies.
 
 This is implemented by:
   - Introducing Kconfig symbols for all drivers and sub-drivers,
-  - Introducing the Kconfig symbol CLK_RENESAS, which is enabled
+  - Introducing the Kconfig symbol SOC_RENESAS, which is enabled
     automatically when building for a Renesas ARM platform, and which
     enables all required drivers without interaction of the user, based
     on SoC-specific ARCH_* symbols,
@@ -27,259 +26,215 @@ This is implemented by:
     COMPILE_TEST is enabled,
   - Using the new Kconfig symbols instead of the ARCH_* symbols to
     control compilation in the Makefile,
-  - Always entering drivers/clk/renesas/ during the build.
+  - Always entering drivers/soc/renesas/ during the build.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-This rework was sparked by a discussion with Olof about the Renesas
-clock driver dependencies.
+ drivers/soc/Kconfig                  |  1 +
+ drivers/soc/Makefile                 |  2 +-
+ drivers/soc/renesas/Kconfig          | 63 ++++++++++++++++++++++++++++++++++++
+ drivers/soc/renesas/Makefile         | 31 +++++++++---------
+ drivers/soc/renesas/rcar-sysc.c      | 24 +++++++-------
+ include/linux/soc/renesas/rcar-rst.h |  3 +-
+ 6 files changed, 92 insertions(+), 32 deletions(-)
+ create mode 100644 drivers/soc/renesas/Kconfig
 
-For now, some of the 'bool "foo clock support" if COMPILE_TEST' will
-need to be replaced by 'bool', as compile-testing all drivers depends on
-independent fixes, some in other subsystems.
-
-Before anyone responds "But the CLK_R8A779[0-4] symbols can be removed,
-just select CLK_RCAR_GEN2 directly!": the latter will go away, as the
-shared R-Car Gen2 clock driver (which depends on describing most clocks
-in DT, which is error prone, inflexible, and which prevents implementing
-module reset support) will be replaced by SoC-specific drivers using the
-CPG/MSSR driver core, as is already done on R-Car Gen3 and on RZ/G.
-Compatibility with old DTBs will be preserved through a new Kconfig
-option.
----
- drivers/clk/Makefile                   |   2 +-
- drivers/clk/renesas/Kconfig            | 129 ++++++++++++++++++++++++++++-----
- drivers/clk/renesas/Makefile           |  37 +++++-----
- drivers/clk/renesas/renesas-cpg-mssr.c |   8 +-
- 4 files changed, 137 insertions(+), 39 deletions(-)
-
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 92c12b86c2e86f20..6d341c802b299241 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -74,7 +74,7 @@ obj-$(CONFIG_COMMON_CLK_NXP)		+= nxp/
- obj-$(CONFIG_MACH_PISTACHIO)		+= pistachio/
- obj-$(CONFIG_COMMON_CLK_PXA)		+= pxa/
- obj-$(CONFIG_COMMON_CLK_QCOM)		+= qcom/
--obj-$(CONFIG_ARCH_RENESAS)		+= renesas/
-+obj-y					+= renesas/
- obj-$(CONFIG_ARCH_ROCKCHIP)		+= rockchip/
- obj-$(CONFIG_COMMON_CLK_SAMSUNG)	+= samsung/
- obj-$(CONFIG_ARCH_SIRF)			+= sirf/
-diff --git a/drivers/clk/renesas/Kconfig b/drivers/clk/renesas/Kconfig
-index 2586dfa0026bb015..ec17edc6c4ab2e2a 100644
---- a/drivers/clk/renesas/Kconfig
-+++ b/drivers/clk/renesas/Kconfig
-@@ -1,20 +1,115 @@
-+config CLK_RENESAS
-+	bool "Renesas SoC clock support" if COMPILE_TEST && !ARCH_RENESAS
+diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+index f09023f7ab119025..de4fcdbae2a8fa03 100644
+--- a/drivers/soc/Kconfig
++++ b/drivers/soc/Kconfig
+@@ -4,6 +4,7 @@ source "drivers/soc/bcm/Kconfig"
+ source "drivers/soc/fsl/Kconfig"
+ source "drivers/soc/mediatek/Kconfig"
+ source "drivers/soc/qcom/Kconfig"
++source "drivers/soc/renesas/Kconfig"
+ source "drivers/soc/rockchip/Kconfig"
+ source "drivers/soc/samsung/Kconfig"
+ source "drivers/soc/sunxi/Kconfig"
+diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+index 05eae52a30b45133..59d8c937f4a8748e 100644
+--- a/drivers/soc/Makefile
++++ b/drivers/soc/Makefile
+@@ -8,7 +8,7 @@ obj-$(CONFIG_MACH_DOVE)		+= dove/
+ obj-y				+= fsl/
+ obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
+ obj-$(CONFIG_ARCH_QCOM)		+= qcom/
+-obj-$(CONFIG_ARCH_RENESAS)	+= renesas/
++obj-y				+= renesas/
+ obj-$(CONFIG_ARCH_ROCKCHIP)	+= rockchip/
+ obj-$(CONFIG_SOC_SAMSUNG)	+= samsung/
+ obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
+diff --git a/drivers/soc/renesas/Kconfig b/drivers/soc/renesas/Kconfig
+new file mode 100644
+index 0000000000000000..87a4be46bd9834c1
+--- /dev/null
++++ b/drivers/soc/renesas/Kconfig
+@@ -0,0 +1,63 @@
++config SOC_RENESAS
++	bool "Renesas SoC driver support" if COMPILE_TEST && !ARCH_RENESAS
 +	default y if ARCH_RENESAS
-+	select CLK_EMEV2 if ARCH_EMEV2
-+	select CLK_RZA1 if ARCH_R7S72100
-+	select CLK_R8A73A4 if ARCH_R8A73A4
-+	select CLK_R8A7740 if ARCH_R8A7740
-+	select CLK_R8A7743 if ARCH_R8A7743
-+	select CLK_R8A7745 if ARCH_R8A7745
-+	select CLK_R8A7778 if ARCH_R8A7778
-+	select CLK_R8A7779 if ARCH_R8A7779
-+	select CLK_R8A7790 if ARCH_R8A7790
-+	select CLK_R8A7791 if ARCH_R8A7791 || ARCH_R8A7793
-+	select CLK_R8A7792 if ARCH_R8A7792
-+	select CLK_R8A7794 if ARCH_R8A7794
-+	select CLK_R8A7795 if ARCH_R8A7795
-+	select CLK_R8A7796 if ARCH_R8A7796
-+	select CLK_SH73A0 if ARCH_SH73A0
++	select SOC_BUS
++	select RST_RCAR if ARCH_RCAR_GEN1 || ARCH_RCAR_GEN2 || \
++			   ARCH_R8A7795 || ARCH_R8A7796
++	select SYSC_R8A7743 if ARCH_R8A7743
++	select SYSC_R8A7745 if ARCH_R8A7745
++	select SYSC_R8A7779 if ARCH_R8A7779
++	select SYSC_R8A7790 if ARCH_R8A7790
++	select SYSC_R8A7791 if ARCH_R8A7791 || ARCH_R8A7793
++	select SYSC_R8A7792 if ARCH_R8A7792
++	select SYSC_R8A7794 if ARCH_R8A7794
++	select SYSC_R8A7795 if ARCH_R8A7795
++	select SYSC_R8A7796 if ARCH_R8A7796
 +
-+if CLK_RENESAS
++if SOC_RENESAS
 +
 +# SoC
-+config CLK_EMEV2
-+	bool "Emma Mobile EV2 clock support" if COMPILE_TEST
++config SYSC_R8A7743
++	bool "RZ/G1M System Controller support" if COMPILE_TEST
++	select SYSC_RCAR
 +
-+config CLK_RZA1
-+	bool "RZ/A1H clock support" if COMPILE_TEST
-+	select CLK_RENESAS_CPG_MSTP
++config SYSC_R8A7745
++	bool "RZ/G1E System Controller support" if COMPILE_TEST
++	select SYSC_RCAR
 +
-+config CLK_R8A73A4
-+	bool "R-Mobile APE6 clock support" if COMPILE_TEST
-+	select CLK_RENESAS_CPG_MSTP
-+	select CLK_RENESAS_DIV6
++config SYSC_R8A7779
++	bool "R-Car H1 System Controller support" if COMPILE_TEST
++	select SYSC_RCAR
 +
-+config CLK_R8A7740
-+	bool "R-Mobile A1 clock support" if COMPILE_TEST
-+	select CLK_RENESAS_CPG_MSTP
-+	select CLK_RENESAS_DIV6
++config SYSC_R8A7790
++	bool "R-Car H2 System Controller support" if COMPILE_TEST
++	select SYSC_RCAR
 +
-+config CLK_R8A7743
-+	bool "RZ/G1M clock support" if COMPILE_TEST
-+	select CLK_RCAR_GEN2_CPG
++config SYSC_R8A7791
++	bool "R-Car M2-W/N System Controller support" if COMPILE_TEST
++	select SYSC_RCAR
 +
-+config CLK_R8A7745
-+	bool "RZ/G1E clock support" if COMPILE_TEST
-+	select CLK_RCAR_GEN2_CPG
++config SYSC_R8A7792
++	bool "R-Car V2H System Controller support" if COMPILE_TEST
++	select SYSC_RCAR
 +
-+config CLK_R8A7778
-+	bool "R-Car M1A clock support" if COMPILE_TEST
-+	select CLK_RENESAS_CPG_MSTP
++config SYSC_R8A7794
++	bool "R-Car E2 System Controller support" if COMPILE_TEST
++	select SYSC_RCAR
 +
-+config CLK_R8A7779
-+	bool "R-Car H1 clock support" if COMPILE_TEST
-+	select CLK_RENESAS_CPG_MSTP
++config SYSC_R8A7795
++	bool "R-Car H3 System Controller support" if COMPILE_TEST
++	select SYSC_RCAR
 +
-+config CLK_R8A7790
-+	bool "R-Car H2 clock support" if COMPILE_TEST
-+	select CLK_RCAR_GEN2
-+	select CLK_RENESAS_DIV6
-+
-+config CLK_R8A7791
-+	bool "R-Car M2-W/N clock support" if COMPILE_TEST
-+	select CLK_RCAR_GEN2
-+	select CLK_RENESAS_DIV6
-+
-+config CLK_R8A7792
-+	bool "R-Car V2H clock support" if COMPILE_TEST
-+	select CLK_RCAR_GEN2
-+
-+config CLK_R8A7794
-+	bool "R-Car E2 clock support" if COMPILE_TEST
-+	select CLK_RCAR_GEN2
-+	select CLK_RENESAS_DIV6
-+
-+config CLK_R8A7795
-+	bool "R-Car H3 clock support" if COMPILE_TEST
-+	select CLK_RCAR_GEN3_CPG
-+
-+config CLK_R8A7796
-+	bool "R-Car M3-W clock support" if COMPILE_TEST
-+	select CLK_RCAR_GEN3_CPG
-+
-+config CLK_SH73A0
-+	bool "SH-Mobile AG5 clock support" if COMPILE_TEST
-+	select CLK_RENESAS_CPG_MSTP
-+	select CLK_RENESAS_DIV6
-+
++config SYSC_R8A7796
++	bool "R-Car M3-W System Controller support" if COMPILE_TEST
++	select SYSC_RCAR
 +
 +# Family
-+config CLK_RCAR_GEN2
-+	bool "R-Car Gen2 clock support" if COMPILE_TEST
-+	select CLK_RENESAS_CPG_MSTP
-+	select CLK_RENESAS_DIV6
++config RST_RCAR
++	bool "R-Car Reset Controller support" if COMPILE_TEST
 +
-+config CLK_RCAR_GEN2_CPG
-+	bool "R-Car Gen2 CPG clock support" if COMPILE_TEST
-+	select CLK_RENESAS_CPG_MSSR
++config SYSC_RCAR
++	bool "R-Car System Controller support" if COMPILE_TEST
 +
-+config CLK_RCAR_GEN3_CPG
-+	bool "R-Car Gen3 CPG clock support" if COMPILE_TEST
-+	select CLK_RENESAS_CPG_MSSR
-+
-+
-+# Generic
- config CLK_RENESAS_CPG_MSSR
--	bool
--	default y if ARCH_R8A7743
--	default y if ARCH_R8A7745
--	default y if ARCH_R8A7795
--	default y if ARCH_R8A7796
-+	bool "CPG/MSSR clock support" if COMPILE_TEST
-+	select CLK_RENESAS_DIV6
++endif # SOC_RENESAS
+diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
+index d9115cb5ed9dae78..1a1a297b26a79613 100644
+--- a/drivers/soc/renesas/Makefile
++++ b/drivers/soc/renesas/Makefile
+@@ -1,18 +1,17 @@
+-obj-$(CONFIG_SOC_BUS)		+= renesas-soc.o
++# Generic, must be first because of soc_device_register()
++obj-$(CONFIG_SOC_RENESAS)	+= renesas-soc.o
  
- config CLK_RENESAS_CPG_MSTP
--	bool
--	default y if ARCH_R7S72100
--	default y if ARCH_R8A73A4
--	default y if ARCH_R8A7740
--	default y if ARCH_R8A7778
--	default y if ARCH_R8A7779
--	default y if ARCH_R8A7790
--	default y if ARCH_R8A7791
--	default y if ARCH_R8A7792
--	default y if ARCH_R8A7793
--	default y if ARCH_R8A7794
--	default y if ARCH_SH73A0
-+	bool "MSTP clock support" if COMPILE_TEST
-+
-+config CLK_RENESAS_DIV6
-+	bool "DIV6 clock support" if COMPILE_TEST
-+
-+endif # CLK_RENESAS
-diff --git a/drivers/clk/renesas/Makefile b/drivers/clk/renesas/Makefile
-index 5b8fccf574787632..aa24c2f5078ca333 100644
---- a/drivers/clk/renesas/Makefile
-+++ b/drivers/clk/renesas/Makefile
-@@ -1,19 +1,22 @@
--obj-$(CONFIG_ARCH_EMEV2)		+= clk-emev2.o
--obj-$(CONFIG_ARCH_R7S72100)		+= clk-rz.o
--obj-$(CONFIG_ARCH_R8A73A4)		+= clk-r8a73a4.o clk-div6.o
--obj-$(CONFIG_ARCH_R8A7740)		+= clk-r8a7740.o clk-div6.o
--obj-$(CONFIG_ARCH_R8A7743)		+= r8a7743-cpg-mssr.o rcar-gen2-cpg.o
--obj-$(CONFIG_ARCH_R8A7745)		+= r8a7745-cpg-mssr.o rcar-gen2-cpg.o
--obj-$(CONFIG_ARCH_R8A7778)		+= clk-r8a7778.o
--obj-$(CONFIG_ARCH_R8A7779)		+= clk-r8a7779.o
--obj-$(CONFIG_ARCH_R8A7790)		+= clk-rcar-gen2.o clk-div6.o
--obj-$(CONFIG_ARCH_R8A7791)		+= clk-rcar-gen2.o clk-div6.o
--obj-$(CONFIG_ARCH_R8A7792)		+= clk-rcar-gen2.o
--obj-$(CONFIG_ARCH_R8A7793)		+= clk-rcar-gen2.o clk-div6.o
--obj-$(CONFIG_ARCH_R8A7794)		+= clk-rcar-gen2.o clk-div6.o
--obj-$(CONFIG_ARCH_R8A7795)		+= r8a7795-cpg-mssr.o rcar-gen3-cpg.o
--obj-$(CONFIG_ARCH_R8A7796)		+= r8a7796-cpg-mssr.o rcar-gen3-cpg.o
--obj-$(CONFIG_ARCH_SH73A0)		+= clk-sh73a0.o clk-div6.o
+-obj-$(CONFIG_ARCH_RCAR_GEN1)	+= rcar-rst.o
+-obj-$(CONFIG_ARCH_RCAR_GEN2)	+= rcar-rst.o
+-obj-$(CONFIG_ARCH_R8A7795)	+= rcar-rst.o
+-obj-$(CONFIG_ARCH_R8A7796)	+= rcar-rst.o
 +# SoC
-+obj-$(CONFIG_CLK_EMEV2)			+= clk-emev2.o
-+obj-$(CONFIG_CLK_RZA1)			+= clk-rz.o
-+obj-$(CONFIG_CLK_R8A73A4)		+= clk-r8a73a4.o
-+obj-$(CONFIG_CLK_R8A7740)		+= clk-r8a7740.o
-+obj-$(CONFIG_CLK_R8A7743)		+= r8a7743-cpg-mssr.o
-+obj-$(CONFIG_CLK_R8A7745)		+= r8a7745-cpg-mssr.o
-+obj-$(CONFIG_CLK_R8A7778)		+= clk-r8a7778.o
-+obj-$(CONFIG_CLK_R8A7779)		+= clk-r8a7779.o
-+obj-$(CONFIG_CLK_R8A7795)		+= r8a7795-cpg-mssr.o
-+obj-$(CONFIG_CLK_R8A7796)		+= r8a7796-cpg-mssr.o
-+obj-$(CONFIG_CLK_SH73A0)		+= clk-sh73a0.o
++obj-$(CONFIG_SYSC_R8A7743)	+= r8a7743-sysc.o
++obj-$(CONFIG_SYSC_R8A7745)	+= r8a7745-sysc.o
++obj-$(CONFIG_SYSC_R8A7779)	+= r8a7779-sysc.o
++obj-$(CONFIG_SYSC_R8A7790)	+= r8a7790-sysc.o
++obj-$(CONFIG_SYSC_R8A7791)	+= r8a7791-sysc.o
++obj-$(CONFIG_SYSC_R8A7792)	+= r8a7792-sysc.o
++obj-$(CONFIG_SYSC_R8A7794)	+= r8a7794-sysc.o
++obj-$(CONFIG_SYSC_R8A7795)	+= r8a7795-sysc.o
++obj-$(CONFIG_SYSC_R8A7796)	+= r8a7796-sysc.o
  
--obj-$(CONFIG_CLK_RENESAS_CPG_MSSR)	+= renesas-cpg-mssr.o clk-div6.o
+-obj-$(CONFIG_ARCH_R8A7743)	+= rcar-sysc.o r8a7743-sysc.o
+-obj-$(CONFIG_ARCH_R8A7745)	+= rcar-sysc.o r8a7745-sysc.o
+-obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o r8a7779-sysc.o
+-obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o r8a7790-sysc.o
+-obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o r8a7791-sysc.o
+-obj-$(CONFIG_ARCH_R8A7792)	+= rcar-sysc.o r8a7792-sysc.o
+-# R-Car M2-N is identical to R-Car M2-W w.r.t. power domains.
+-obj-$(CONFIG_ARCH_R8A7793)	+= rcar-sysc.o r8a7791-sysc.o
+-obj-$(CONFIG_ARCH_R8A7794)	+= rcar-sysc.o r8a7794-sysc.o
+-obj-$(CONFIG_ARCH_R8A7795)	+= rcar-sysc.o r8a7795-sysc.o
+-obj-$(CONFIG_ARCH_R8A7796)	+= rcar-sysc.o r8a7796-sysc.o
 +# Family
-+obj-$(CONFIG_CLK_RCAR_GEN2)		+= clk-rcar-gen2.o
-+obj-$(CONFIG_CLK_RCAR_GEN2_CPG)		+= rcar-gen2-cpg.o
-+obj-$(CONFIG_CLK_RCAR_GEN3_CPG)		+= rcar-gen3-cpg.o
-+
-+# Generic
-+obj-$(CONFIG_CLK_RENESAS_CPG_MSSR)	+= renesas-cpg-mssr.o
- obj-$(CONFIG_CLK_RENESAS_CPG_MSTP)	+= clk-mstp.o
-+obj-$(CONFIG_CLK_RENESAS_DIV6)		+= clk-div6.o
-diff --git a/drivers/clk/renesas/renesas-cpg-mssr.c b/drivers/clk/renesas/renesas-cpg-mssr.c
-index 1799e160c88f8299..4b281a8d06edf1d3 100644
---- a/drivers/clk/renesas/renesas-cpg-mssr.c
-+++ b/drivers/clk/renesas/renesas-cpg-mssr.c
-@@ -627,25 +627,25 @@ static inline int cpg_mssr_reset_controller_register(struct cpg_mssr_priv *priv)
++obj-$(CONFIG_RST_RCAR)		+= rcar-rst.o
++obj-$(CONFIG_SYSC_RCAR)		+= rcar-sysc.o
+diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
+index 528a13742aeb98d8..dcad5c42a5e81c87 100644
+--- a/drivers/soc/renesas/rcar-sysc.c
++++ b/drivers/soc/renesas/rcar-sysc.c
+@@ -275,35 +275,33 @@ static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
+ }
  
- 
- static const struct of_device_id cpg_mssr_match[] = {
+ static const struct of_device_id rcar_sysc_matches[] = {
 -#ifdef CONFIG_ARCH_R8A7743
-+#ifdef CONFIG_CLK_R8A7743
- 	{
- 		.compatible = "renesas,r8a7743-cpg-mssr",
- 		.data = &r8a7743_cpg_mssr_info,
- 	},
++#ifdef CONFIG_SYSC_R8A7743
+ 	{ .compatible = "renesas,r8a7743-sysc", .data = &r8a7743_sysc_info },
  #endif
 -#ifdef CONFIG_ARCH_R8A7745
-+#ifdef CONFIG_CLK_R8A7745
- 	{
- 		.compatible = "renesas,r8a7745-cpg-mssr",
- 		.data = &r8a7745_cpg_mssr_info,
- 	},
++#ifdef CONFIG_SYSC_R8A7745
+ 	{ .compatible = "renesas,r8a7745-sysc", .data = &r8a7745_sysc_info },
+ #endif
+-#ifdef CONFIG_ARCH_R8A7779
++#ifdef CONFIG_SYSC_R8A7779
+ 	{ .compatible = "renesas,r8a7779-sysc", .data = &r8a7779_sysc_info },
+ #endif
+-#ifdef CONFIG_ARCH_R8A7790
++#ifdef CONFIG_SYSC_R8A7790
+ 	{ .compatible = "renesas,r8a7790-sysc", .data = &r8a7790_sysc_info },
+ #endif
+-#ifdef CONFIG_ARCH_R8A7791
++#ifdef CONFIG_SYSC_R8A7791
+ 	{ .compatible = "renesas,r8a7791-sysc", .data = &r8a7791_sysc_info },
+-#endif
+-#ifdef CONFIG_ARCH_R8A7792
+-	{ .compatible = "renesas,r8a7792-sysc", .data = &r8a7792_sysc_info },
+-#endif
+-#ifdef CONFIG_ARCH_R8A7793
+ 	/* R-Car M2-N is identical to R-Car M2-W w.r.t. power domains. */
+ 	{ .compatible = "renesas,r8a7793-sysc", .data = &r8a7791_sysc_info },
+ #endif
+-#ifdef CONFIG_ARCH_R8A7794
++#ifdef CONFIG_SYSC_R8A7792
++	{ .compatible = "renesas,r8a7792-sysc", .data = &r8a7792_sysc_info },
++#endif
++#ifdef CONFIG_SYSC_R8A7794
+ 	{ .compatible = "renesas,r8a7794-sysc", .data = &r8a7794_sysc_info },
  #endif
 -#ifdef CONFIG_ARCH_R8A7795
-+#ifdef CONFIG_CLK_R8A7795
- 	{
- 		.compatible = "renesas,r8a7795-cpg-mssr",
- 		.data = &r8a7795_cpg_mssr_info,
- 	},
++#ifdef CONFIG_SYSC_R8A7795
+ 	{ .compatible = "renesas,r8a7795-sysc", .data = &r8a7795_sysc_info },
  #endif
 -#ifdef CONFIG_ARCH_R8A7796
-+#ifdef CONFIG_CLK_R8A7796
- 	{
- 		.compatible = "renesas,r8a7796-cpg-mssr",
- 		.data = &r8a7796_cpg_mssr_info,
++#ifdef CONFIG_SYSC_R8A7796
+ 	{ .compatible = "renesas,r8a7796-sysc", .data = &r8a7796_sysc_info },
+ #endif
+ 	{ /* sentinel */ }
+diff --git a/include/linux/soc/renesas/rcar-rst.h b/include/linux/soc/renesas/rcar-rst.h
+index 787e7ad53d45f61c..2c231f2280a6dc50 100644
+--- a/include/linux/soc/renesas/rcar-rst.h
++++ b/include/linux/soc/renesas/rcar-rst.h
+@@ -1,8 +1,7 @@
+ #ifndef __LINUX_SOC_RENESAS_RCAR_RST_H__
+ #define __LINUX_SOC_RENESAS_RCAR_RST_H__
+ 
+-#if defined(CONFIG_ARCH_RCAR_GEN1) || defined(CONFIG_ARCH_RCAR_GEN2) || \
+-    defined(CONFIG_ARCH_R8A7795) || defined(CONFIG_ARCH_R8A7796)
++#ifdef CONFIG_RST_RCAR
+ int rcar_rst_read_mode_pins(u32 *mode);
+ #else
+ static inline int rcar_rst_read_mode_pins(u32 *mode) { return -ENODEV; }
 -- 
 2.7.4
