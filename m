@@ -1,109 +1,50 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 25 Apr 2017 19:12:09 +0200
-Subject: [PATCH] clk: sunxi-ng: Fix dependency on sunxi_gate
-Message-ID: <20170425171209.6229-1-clabbe.montjoie@gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 25 Apr 2017 19:21:54 +0200
+Subject: [PATCH V15 06/11] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <1492556723-9189-7-git-send-email-tbaicar@codeaurora.org>
+References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
+ <1492556723-9189-7-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20170425172154.ggg56j52inf3522e@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_SUNXI_CCU is set but no other SUNXI_CCU is selected i got
-the following build error:
-drivers/built-in.o: In function `ccu_pll_notifier_cb':
-drivers/clk/sunxi-ng/ccu_common.c:71: undefined reference to `ccu_gate_helper_disable'
-drivers/clk/sunxi-ng/ccu_common.c:73: undefined reference to `ccu_gate_helper_enable'
+On Tue, Apr 18, 2017 at 05:05:18PM -0600, Tyler Baicar wrote:
+> ARM APEI extension proposal added SEA (Synchronous External Abort)
+> notification type for ARMv8.
+> Add a new GHES error source handling function for SEA. If an error
+> source's notification type is SEA, then this function can be registered
+> into the SEA exception handler. That way GHES will parse and report
+> SEA exceptions when they occur.
+> An SEA can interrupt code that had interrupts masked and is treated as
+> an NMI. To aid this the page of address space for mapping APEI buffers
+> while in_nmi() is always reserved, and ghes_ioremap_pfn_nmi() is
+> changed to use the helper methods to find the prot_t to map with in
+> the same way as ghes_ioremap_pfn_irq().
 
-The problem is the function ccu_pll_notifier_cb in ccu_common.c need
-some function from ccu_gate.c which is not compiled since SUNXI_CCU_GATE
-is not selected.
+...
 
-This patch remove SUNXI_CCU_GATE and compile ccu_gate.c unconditionnaly
-since all other combination of options select SUNXI_CCU_GATE finally.
+> @@ -518,6 +520,17 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>  	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>  		inf->name, esr, addr);
+>  
+> +	/*
+> +	 * Synchronous aborts may interrupt code which had interrupts masked.
+> +	 * Before calling out into the wider kernel tell the interested
+> +	 * subsystems.
+> +	 */
+> +	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+> +		nmi_enter();
+> +		ghes_notify_sea();
+> +		nmi_exit();
+> +	}
 
-Fixes: 02ae2bc6febd ("clk: sunxi-ng: Add clk notifier to gate then ungate PLL clocks")
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- drivers/clk/sunxi-ng/Kconfig  | 11 -----------
- drivers/clk/sunxi-ng/Makefile |  2 +-
- 2 files changed, 1 insertion(+), 12 deletions(-)
+Well, the other GHES notification methods use a notifier:
+ghes_notify_sci, ghes_notify_nmi. You probably should do that too
+instead of calling straight into a driver from arch code.
 
-diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-index 8bee225..d7842f9 100644
---- a/drivers/clk/sunxi-ng/Kconfig
-+++ b/drivers/clk/sunxi-ng/Kconfig
-@@ -15,9 +15,6 @@ config SUNXI_CCU_DIV
- config SUNXI_CCU_FRAC
- 	bool
- 
--config SUNXI_CCU_GATE
--	bool
--
- config SUNXI_CCU_MUX
- 	bool
- 
-@@ -32,24 +29,19 @@ config SUNXI_CCU_PHASE
- 
- config SUNXI_CCU_NK
- 	bool
--	select SUNXI_CCU_GATE
- 
- config SUNXI_CCU_NKM
- 	bool
--	select SUNXI_CCU_GATE
- 
- config SUNXI_CCU_NKMP
- 	bool
--	select SUNXI_CCU_GATE
- 
- config SUNXI_CCU_NM
- 	bool
- 	select SUNXI_CCU_FRAC
--	select SUNXI_CCU_GATE
- 
- config SUNXI_CCU_MP
- 	bool
--	select SUNXI_CCU_GATE
- 	select SUNXI_CCU_MUX
- 
- # SoC Drivers
-@@ -119,7 +111,6 @@ config SUN8I_A33_CCU
- config SUN8I_A83T_CCU
- 	bool "Support for the Allwinner A83T CCU"
- 	select SUNXI_CCU_DIV
--	select SUNXI_CCU_GATE
- 	select SUNXI_CCU_NKMP
- 	select SUNXI_CCU_NM
- 	select SUNXI_CCU_MP
-@@ -154,7 +145,6 @@ config SUN9I_A80_CCU
- 	bool "Support for the Allwinner A80 CCU"
- 	select SUNXI_CCU_DIV
- 	select SUNXI_CCU_MULT
--	select SUNXI_CCU_GATE
- 	select SUNXI_CCU_NKMP
- 	select SUNXI_CCU_NM
- 	select SUNXI_CCU_MP
-@@ -165,7 +155,6 @@ config SUN9I_A80_CCU
- config SUN8I_R_CCU
- 	bool "Support for Allwinner SoCs' PRCM CCUs"
- 	select SUNXI_CCU_DIV
--	select SUNXI_CCU_GATE
- 	default MACH_SUN8I || (ARCH_SUNXI && ARM64)
- 
- endif
-diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index 78028c8..52aab41 100644
---- a/drivers/clk/sunxi-ng/Makefile
-+++ b/drivers/clk/sunxi-ng/Makefile
-@@ -1,11 +1,11 @@
- # Common objects
- obj-$(CONFIG_SUNXI_CCU)		+= ccu_common.o
- obj-$(CONFIG_SUNXI_CCU)		+= ccu_reset.o
-+obj-$(CONFIG_SUNXI_CCU)		+= ccu_gate.o
- 
- # Base clock types
- obj-$(CONFIG_SUNXI_CCU_DIV)	+= ccu_div.o
- obj-$(CONFIG_SUNXI_CCU_FRAC)	+= ccu_frac.o
--obj-$(CONFIG_SUNXI_CCU_GATE)	+= ccu_gate.o
- obj-$(CONFIG_SUNXI_CCU_MUX)	+= ccu_mux.o
- obj-$(CONFIG_SUNXI_CCU_MULT)	+= ccu_mult.o
- obj-$(CONFIG_SUNXI_CCU_PHASE)	+= ccu_phase.o
 -- 
-2.10.2
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
