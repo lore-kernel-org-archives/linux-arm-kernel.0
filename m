@@ -1,26 +1,56 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 25 Apr 2017 13:51:22 +0100
-Subject: [PATCH 1/2] xen/arm, arm64: fix xen_dma_ops after 815dd18
- "Consolidate get_dma_ops..."
-In-Reply-To: <alpine.DEB.2.10.1704241214100.16723@sstabellini-ThinkPad-X260>
-References: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
- <20170418142126.GE27592@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.10.1704191023120.31486@sstabellini-ThinkPad-X260>
- <alpine.DEB.2.10.1704241214100.16723@sstabellini-ThinkPad-X260>
-Message-ID: <f0667d8c-1c17-8d5f-a5d7-1e0d014e86ec@arm.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Tue, 25 Apr 2017 14:51:43 +0200
+Subject: support autofocus / autogain in libv4l2
+In-Reply-To: <20170425122820.GD7926@amd>
+References: <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
+ <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
+ <20170424224724.5bb52382@vento.lan> <20170425080538.GA30380@amd>
+ <20170425080815.GD30553@pali> <20170425112330.GB7926@amd>
+ <20170425113009.GH30553@pali> <20170425122820.GD7926@amd>
+Message-ID: <20170425125143.GJ30553@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
+On Tuesday 25 April 2017 14:28:20 Pavel Machek wrote:
+> On Tue 2017-04-25 13:30:09, Pali Roh?r wrote:
+> > On Tuesday 25 April 2017 13:23:30 Pavel Machek wrote:
+> > > Hi!
+> > > On Tue 2017-04-25 10:08:15, Pali Roh?r wrote:
+> > > > On Tuesday 25 April 2017 10:05:38 Pavel Machek wrote:
+> > > > > > > It would be nice if more than one application could be accessing the
+> > > > > > > camera at the same time... (I.e. something graphical running preview
+> > > > > > > then using command line tool to grab a picture.) This one is
+> > > > > > > definitely not solveable inside a library...
+> > > > > > 
+> > > > > > Someone once suggested to have something like pulseaudio for V4L.
+> > > > > > For such usage, a server would be interesting. Yet, I would code it
+> > > > > > in a way that applications using libv4l will talk with such daemon
+> > > > > > in a transparent way.
+> > > > > 
+> > > > > Yes, we need something like pulseaudio for V4L. And yes, we should
+> > > > > make it transparent for applications using libv4l.
+> > > > 
+> > > > IIRC there is already some effort in writing such "video" server which
+> > > > would support accessing more application into webcam video, like
+> > > > pulseaudio server for accessing more applications to microphone input.
+> > > 
+> > > Do you have project name / url / something?
+> > 
+> > Pinos (renamed from PulseVideo)
+> > 
+> > https://blogs.gnome.org/uraeus/2015/06/30/introducing-pulse-video/
+> > https://cgit.freedesktop.org/~wtay/pinos/
+> > 
+> > But from git history it looks like it is probably dead now...
+> 
+> Actually, last commit is an hour ago on "work" branch. Seems alive to
+> me ;-).
 
-On 24/04/17 20:16, Stefano Stabellini wrote:
-> Given the outstanding regression we need to fix as soon as possible,
-> I'll queue these patches on the xentip tree for 4.12.
+Great! I just (blindly) looked at master branch and it is old...
 
-It looks like there is another rc for 4.11. I am wondering whether you 
-could try to send a pull request to Linus so it can be fixed in 4.11?
-
-Cheers,
+> Thanks for pointer...
+> 									Pavel
 
 -- 
-Julien Grall
+Pali Roh?r
+pali.rohar at gmail.com
