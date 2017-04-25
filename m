@@ -1,81 +1,86 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 25 Apr 2017 14:52:41 +0200
-Subject: [PATCH V9 1/3] irq: Allow to pass the IRQF_TIMER flag with
- percpu irq request
-In-Reply-To: <20170425102230.GJ4104@cbox>
-References: <1493042494-14057-1-git-send-email-daniel.lezcano@linaro.org>
- <398f3f3d-c567-0f1f-1a43-9b8d5805d5fd@arm.com>
- <20170424185909.GD2137@mai>
- <92e2a022-93d4-d4f3-78af-c9b5d51bb867@arm.com>
- <20170424195948.GE2137@mai>
- <16042494-2e67-e1a5-b9f6-af57e349d8a7@arm.com>
- <20170425083451.GA16888@mai>
- <f840e9d2-8aac-dc1d-6468-44f7658b55b1@arm.com>
- <20170425094927.GB16888@mai> <20170425102230.GJ4104@cbox>
-Message-ID: <20170425125241.GD16888@mai>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Tue, 25 Apr 2017 13:03:47 +0000
+Subject: [PATCH v5 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
+In-Reply-To: <20170421175705.GB17916@bhelgaas-glaptop.roam.corp.google.com>
+References: <1492115445-4069-1-git-send-email-jnair@caviumnetworks.com>
+ <1492115445-4069-3-git-send-email-jnair@caviumnetworks.com>
+ <20170414001911.GA13163@bhelgaas-glaptop.roam.corp.google.com>
+ <20170414210646.GA5346@localhost>
+ <CAErSpo731xSzrnKF+G+8SA_UUHy7ROA1V9oFkpwKi85GQf9VAg@mail.gmail.com>
+ <20170417174712.GA7575@localhost>
+ <CAErSpo6+do8GXon3EzZAUpqc2TFsA0BDwWBULqZCd1ayCJhD6w@mail.gmail.com>
+ <20170421170414.GA2429@localhost>
+ <20170421175705.GB17916@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170425130346.GA30542@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 12:22:30PM +0200, Christoffer Dall wrote:
-> On Tue, Apr 25, 2017 at 11:49:27AM +0200, Daniel Lezcano wrote:
+On Fri, Apr 21, 2017 at 12:57:05PM -0500, Bjorn Helgaas wrote:
+> On Fri, Apr 21, 2017 at 05:05:41PM +0000, Jayachandran C wrote:
+> > On Fri, Apr 21, 2017 at 10:48:15AM -0500, Bjorn Helgaas wrote:
+> > > On Mon, Apr 17, 2017 at 12:47 PM, Jayachandran C
+> > > <jnair@caviumnetworks.com> wrote:
+> > > > On Fri, Apr 14, 2017 at 09:00:06PM -0500, Bjorn Helgaas wrote:
 > 
-> [...]
-> 
+> > > >> Could you collect "lspci -vv" output from this system?  I'd like to
+> > > >> archive that as background for this IOMMU issue and the ASPM tweaks I
+> > > >> suspect we'll have to do.  I *wish* we had more information about that
+> > > >> VIA thing, because I suspect we could get rid of it if we had more
+> > > >> details.
+> > > >
+> > > > The full logs are slightly large, so I have kept them at:
+> > > > https://github.com/jchandra-cavm/thunderx2/blob/master/logs/
+> > > > The lspci -vv output is lspci-vv.txt and lspci -tvn output is lspci-tvn.txt
+> > > >
+> > > > The output is from 2 socket system, the cards are not on the first slot
+> > > > like the example above, so the bus and device numbers are different.
 > > > 
-> > > The idle code is very much *not* aware of anything concerning that guest
-> > > timer.
+> > > Can somebody with this system collect the "lspci -xxxx" output as well?
+> > > 
+> > > I'm making some lspci changes to handle the PCI-to-PCIe bridge
+> > > correctly, and I can use the "lspci -xxxx" output to create an lspci
+> > > test case.
 > > 
-> > Just for my own curiosity, if there are two VM (VM1 and VM2). VM1 sets a timer1
-> > at <time> and exits, VM2 runs and sets a timer2 at <time+delta>.
+> > [Sorry was AFK for a few days]
 > > 
-> > The timer1 for VM1 is supposed to expire while VM2 is running. IIUC the virtual
-> > timer is under control of VM2 and will expire at <time+delta>.
-> > 
-> > Is the host wake up with the SW timer and switch in VM1 which in turn restores
-> > the timer and jump in the virtual timer irq handler?
-> >  
-> The thing that may be missing here is that a VCPU thread (more of which
-> in a collection is a VM) is just a thread from the point of view of
-> Linux, and whether or not a guest schedules a timer, should not effect
-> the scheduler's decision to run a given thread, if the thread is
-> runnable.
+> > I have updated the above directory with the log. Also tested your next branch
+> > and it works fine on ThunderX2.
 > 
-> Whenever we run a VCPU thread, we look at its timer state (in software)
-> and calculate if the guest should see a timer interrupt and inject such
-> a one (the hardware arch timer is not involved in this process at all).
+> Thanks!
 > 
-> We use timers in exactly two scenarios:
+> With regard to my lspci changes, they add "Slot-" here:
 > 
->  1. The hardware arch timers are used to force an exit to the host when
->     the guest programmed the timer, so we can do the calculation in
->     software I mentioned above and inject a virtual software-generated
->     interrupt when the guest expects to see one.
+>    01:0a.0 PCI bridge: Broadcom Corporation Device 9039
+>    ...
+>   -   Capabilities: [40] Express (v2) PCI/PCI-X to PCI-Express Bridge, MSI 00
+>   +   Capabilities: [40] Express (v2) PCI/PCI-X to PCI-Express Bridge (Slot-), MSI 00
 > 
->  2. The guest goes to sleep (WFI) but has programmed a timer to be woken
->     up at some point.  KVM handles a WFI by blocking the VCPU thread,
->     which basically means making the thread interruptible and putting it
->     on a waitqueue.  In this case we schedule a software timer to make
->     the thread runnable again when the software timer fires (and the
->     scheduler runs that thread when it wants to after that).
-> 
-> If you have a VCPU thread from VM1 blocked, and you run a VCPU thread
-> from VM2, then the VCPU thread from VM2 will program the hardware arch
-> timer with the context of the VM2 VCPU thread while running, and this
-> has nothing to do with the VCPU thread from VM1 at this point, because
-> it relies on the host Linux time keeping infrastructure to become
-> runnable some time in the future, and running a guest naturally doesn't
-> mess with the host's time keeping.
-> 
-> Hope this helps,
+> for all your PCI-to-PCIe bridges.  I assume the "Slot-" is correct, i.e.,
+> the link is not connected to a slot, right?  This comes from the "Slot
+> Implemented" bit in the PCIe Capabilities Register.
 
-Yes, definitively. Thanks for the detailed description.
+Yes, Slot- should be correct.
+ 
+> I did notice that all the Root Port devices claim to *not* be connected to
+> slots, which doesn't seem right.  For example,
+> 
+>   12:00.0 PCI bridge: Broadcom Corporation Device 9084
+>       Bus: primary=12, secondary=13, subordinate=14, sec-latency=0
+>       Capabilities: [ac] Express (v2) Root Port (Slot-), MSI 00
+> 
+>   13:00.0 Ethernet controller: Intel Corporation 82599EB 10-Gigabit SFI/SFP+ Network Connection
+> 
+> It seems strange because the 12:00.0 Root Port looks like it probably
+> *does* lead to a slot where the NIC is plugged in.  Or is that NIC really
+> soldered down?
+> 
+> But I assume there are *some* PCIe slots, so at some of those Root Ports
+> should advertise "Slot+" (which by itself does not imply hotplug support,
+> if that's the concern).
 
-  -- Daniel
+The Root Ports are connected to a slot, so I am not sure why the slot implemented
+bit is not set. There seems to be nothing useful in the slot capabilites, so this
+may be ok for now. I have reported this to the hardware team.
 
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks for the review and the comments,
+JC.
