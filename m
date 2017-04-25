@@ -1,67 +1,136 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 25 Apr 2017 10:05:31 -0600
-Subject: [PATCH V15 04/11] efi: parse ARM processor error
-In-Reply-To: <20170424175240.3nvhbxzwicxnk6og@pd.tnic>
-References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
- <1492556723-9189-5-git-send-email-tbaicar@codeaurora.org>
- <20170421175527.fjwnqd22jz7br5yu@pd.tnic>
- <e54c9893-446f-9e77-b78b-2548d394719b@codeaurora.org>
- <20170424175240.3nvhbxzwicxnk6og@pd.tnic>
-Message-ID: <b39e05d4-fcec-ec26-5aa9-895655eb513c@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 25 Apr 2017 17:10:37 +0100
+Subject: [patch V2 00/24] cpu/hotplug: Convert get_online_cpus() to a
+ percpu_rwsem
+In-Reply-To: <20170418170442.665445272@linutronix.de>
+References: <20170418170442.665445272@linutronix.de>
+Message-ID: <20170425161037.GA27156@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/2017 11:52 AM, Borislav Petkov wrote:
-> On Fri, Apr 21, 2017 at 12:22:09PM -0600, Baicar, Tyler wrote:
->> I guess it's not really needed. It just may be useful considering there can
->> be numerous error info structures, numerous context info structures, and a
->> variable length vendor information section. I can move this print to only in
->> the length check failure cases.
-> And? Why does the user care?
->
-> I mean, it is good for debugging when you wanna see you're parsing the
-> error info data properly but otherwise it doesn't improve the error
-> reporting one bit.
-I'll move this to just happen when the length check fails.
->> Because these are part of the error information structure. I wouldn't think
->> FW would populate error information structures that are different versions
->> in the same processor error, but it could be possible from the spec (at
->> least once there are different versions of the table).
-> Same argument as above.
-I can remove it then.
->
->> There is an error information 64 bit value in the ARM processor error
->> information structure. (UEFI spec 2.6 table 261)
-> So that's IP-dependent and explained in the following tables. Any plans
-> on decoding that too?
-Yes, I do plan on adding further decoding for these values in the future.
->
->> Why's that? Dumping this vendor specific error information is similar to the
->> unrecognized CPER section reporting which is also meant for vendor specific
->> information https://lkml.org/lkml/2017/4/18/751
-> And how do those naked bytes help the user understand the error happening?
->
-> Even in your example you have:
->
-> [  140.739210] {1}[Hardware Error]:   00000000: 4d415201 4d492031 453a4d45 435f4343  .RAM1 IMEM:ECC_C
-> [  140.739214] {1}[Hardware Error]:   00000010: 53515f45 44525f42 00000000 00000000  E_QSB_RD........
->
-> Which looks like some correctable ECC DRAM error and is actually begging
-> to be decoded in a human-readable form. So let's do that completely and
-> not dump partially decoded information.
-That seems like something that should be done outside of these patches 
-(if added to the kernel at all). The decoding for this information would 
-all be vendor specific, so I'm not sure if we want to pollute the EFI 
-code with vendor specific error decoding. Currently we are using the RAS 
-Daemon user space tool for the decoding of this information since 
-vendors can easily pick up this tool and add an extension for their 
-vendor specific parsing. These prints will only happen when the firmware 
-supports the vendor specific error information anyway.
+Hi,
+
+This series appears to break boot on some arm64 platforms, seen with
+next-20170424. More info below.
+
+On Tue, Apr 18, 2017 at 07:04:42PM +0200, Thomas Gleixner wrote:
+> get_online_cpus() is used in hot pathes in mainline and even more so in
+> RT. That can show up badly under certain conditions because every locker
+> contends on a global mutex. RT has it's own homebrewn mitigation which is
+> an (badly done) open coded implementation of percpu_rwsems with recursion
+> support.
+> 
+> The proper replacement for that are percpu_rwsems, but that requires to
+> remove recursion support.
+> 
+> The conversion unearthed real locking issues which were previously not
+> visible because the get_online_cpus() lockdep annotation was implemented
+> with recursion support which prevents lockdep from tracking full dependency
+> chains. These potential deadlocks are not related to recursive calls, they
+> trigger on the first invocation because lockdep now has the full dependency
+> chains available.
+
+Catalin spotted next-20170424 wouldn't boot on a Juno system, where we see the
+following splat (repeated forever) when we try to bring up the first secondary
+CPU:
+
+[    0.213406] smp: Bringing up secondary CPUs ...
+[    0.250326] CPU features: enabling workaround for ARM erratum 832075
+[    0.250334] BUG: scheduling while atomic: swapper/1/0/0x00000002
+[    0.250337] Modules linked in:
+[    0.250346] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.11.0-rc7-next-20170424 #2
+[    0.250349] Hardware name: ARM Juno development board (r1) (DT)
+[    0.250353] Call trace:
+[    0.250365] [<ffff000008088510>] dump_backtrace+0x0/0x238
+[    0.250371] [<ffff00000808880c>] show_stack+0x14/0x20
+[    0.250377] [<ffff00000839d854>] dump_stack+0x9c/0xc0
+[    0.250384] [<ffff0000080e3540>] __schedule_bug+0x50/0x70
+[    0.250391] [<ffff000008932ecc>] __schedule+0x52c/0x5a8
+[    0.250395] [<ffff000008932f80>] schedule+0x38/0xa0
+[    0.250400] [<ffff000008935e8c>] rwsem_down_read_failed+0xc4/0x108
+[    0.250407] [<ffff0000080fe8e0>] __percpu_down_read+0x100/0x118
+[    0.250414] [<ffff0000080c0b60>] get_online_cpus+0x70/0x78
+[    0.250420] [<ffff0000081749e8>] static_key_enable+0x28/0x48
+[    0.250425] [<ffff00000808de90>] update_cpu_capabilities+0x78/0xf8
+[    0.250430] [<ffff00000808d14c>] update_cpu_errata_workarounds+0x1c/0x28
+[    0.250435] [<ffff00000808e004>] check_local_cpu_capabilities+0xf4/0x128
+[    0.250440] [<ffff00000808e894>] secondary_start_kernel+0x8c/0x118
+[    0.250444] [<000000008093d1b4>] 0x8093d1b4
+
+I can reproduce this with the current head of the linux-tip smp/hotplug
+branch (commit 77c60400c82bd993), with arm64 defconfig on a Juno R1
+system.
+
+When we bring the secondary CPU online, we detect an erratum that wasn't
+present on the boot CPU, and try to enable a static branch we use to
+track the erratum. The call to static_branch_enable() blows up as above.
+
+I see that we now have static_branch_disable_cpuslocked(), but we don't
+have an equivalent for enable. I'm not sure what we should be doing
+here.
 
 Thanks,
-Tyler
+Mark.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+> The following patch series addresses this by
+> 
+>  - Cleaning up places which call get_online_cpus() nested
+> 
+>  - Replacing a few instances with cpu_hotplug_disable() to prevent circular
+>    locking dependencies.
+> 
+> The series depends on
+> 
+>     git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git sched/core
+>   plus
+>     Linus tree merged in to avoid conflicts
+> 
+> It's available in git from
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git WIP.hotplug
+> 
+> Changes since V1:
+> 
+>   - Fixed fallout reported by kbuild bot
+>   - Repaired the recursive call in perf
+>   - Repaired the interaction with jumplabels (Peter Zijlstra)
+>   - Renamed _locked to _cpuslocked
+>   - Picked up Acked-bys
+> 
+> Thanks,
+> 
+> 	tglx
+> 
+> -------
+>  arch/arm/kernel/hw_breakpoint.c               |    5 
+>  arch/mips/kernel/jump_label.c                 |    2 
+>  arch/powerpc/kvm/book3s_hv.c                  |    8 -
+>  arch/powerpc/platforms/powernv/subcore.c      |    3 
+>  arch/s390/kernel/time.c                       |    2 
+>  arch/x86/events/core.c                        |    1 
+>  arch/x86/events/intel/cqm.c                   |   12 -
+>  arch/x86/kernel/cpu/mtrr/main.c               |    2 
+>  b/arch/sparc/kernel/jump_label.c              |    2 
+>  b/arch/tile/kernel/jump_label.c               |    2 
+>  b/arch/x86/events/intel/core.c                |    4 
+>  b/arch/x86/kernel/jump_label.c                |    2 
+>  b/kernel/jump_label.c                         |   31 ++++-
+>  drivers/acpi/processor_driver.c               |    4 
+>  drivers/cpufreq/cpufreq.c                     |    9 -
+>  drivers/hwtracing/coresight/coresight-etm3x.c |   12 -
+>  drivers/hwtracing/coresight/coresight-etm4x.c |   12 -
+>  drivers/pci/pci-driver.c                      |   47 ++++---
+>  include/linux/cpu.h                           |    2 
+>  include/linux/cpuhotplug.h                    |   29 ++++
+>  include/linux/jump_label.h                    |    3 
+>  include/linux/padata.h                        |    3 
+>  include/linux/pci.h                           |    1 
+>  include/linux/stop_machine.h                  |   26 +++-
+>  kernel/cpu.c                                  |  157 ++++++++------------------
+>  kernel/events/core.c                          |    9 -
+>  kernel/padata.c                               |   39 +++---
+>  kernel/stop_machine.c                         |    7 -
+>  28 files changed, 228 insertions(+), 208 deletions(-)
+> 
+> 
+> 
