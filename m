@@ -1,60 +1,35 @@
-From: hongxing.zhu@nxp.com (Richard Zhu)
-Date: Tue, 25 Apr 2017 06:09:54 +0000
-Subject: [PATCH] PCI: imx6: fix spelling mistake: "contol" -> "control"
-In-Reply-To: <20170421070230.16582-1-colin.king@canonical.com>
-References: <20170421070230.16582-1-colin.king@canonical.com>
-Message-ID: <AM5PR0402MB28502178051215CE9C1EBAD08C1E0@AM5PR0402MB2850.eurprd04.prod.outlook.com>
+From: dongbo4@huawei.com (dongbo (E))
+Date: Tue, 25 Apr 2017 14:11:29 +0800
+Subject: [PATCH] arm64: Preventing READ_IMPLIES_EXEC propagation
+In-Reply-To: <1493102296-229934-1-git-send-email-zhangshaokun@hisilicon.com>
+References: <1493102296-229934-1-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <d4205c8c-c8cd-ef35-a6bd-3444a7b3ac48@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Dong Bo <dongbo4@huawei.com>
 
-> -----Original Message-----
-> From: Colin King [mailto:colin.king at canonical.com]
-> Sent: Friday, April 21, 2017 3:03 PM
-> To: Richard Zhu <hongxing.zhu@nxp.com>; Lucas Stach
-> <l.stach@pengutronix.de>; Bjorn Helgaas <bhelgaas@google.com>; linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Subject: [PATCH] PCI: imx6: fix spelling mistake: "contol" -> "control"
-> 
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> trivial fix to spelling mistake in dev_err message
-> 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-Acked-by: Richard Zhu <hongxing.Zhu@nxp.com>
+Once the READ_IMPLIES_EXEC flag is set on arm64, the flag is
+propagated to its child processes, even the ELF files are
+marked as not requiring executable stack.
 
-Best Regards
-hongxing zhu
-Email: hongxing.zhu at nxp.com
+Signed-off-by: Dong Bo <dongbo4@huawei.com>
+---
+ arch/arm64/include/asm/elf.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-> ---
->  drivers/pci/dwc/pci-imx6.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c index
-> 102edcf1e261..129717ae5022 100644
-> --- a/drivers/pci/dwc/pci-imx6.c
-> +++ b/drivers/pci/dwc/pci-imx6.c
-> @@ -726,13 +726,13 @@ static int imx6_pcie_probe(struct platform_device
-> *pdev)
->  		imx6_pcie->pciephy_reset = devm_reset_control_get(dev,
->  								  "pciephy");
->  		if (IS_ERR(imx6_pcie->pciephy_reset)) {
-> -			dev_err(dev, "Failed to get PCIEPHY reset contol\n");
-> +			dev_err(dev, "Failed to get PCIEPHY reset control\n");
->  			return PTR_ERR(imx6_pcie->pciephy_reset);
->  		}
-> 
->  		imx6_pcie->apps_reset = devm_reset_control_get(dev,
-> "apps");
->  		if (IS_ERR(imx6_pcie->apps_reset)) {
-> -			dev_err(dev, "Failed to get PCIE APPS reset
-> contol\n");
-> +			dev_err(dev, "Failed to get PCIE APPS reset
-> control\n");
->  			return PTR_ERR(imx6_pcie->apps_reset);
->  		}
->  		break;
-> --
-> 2.11.0
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index 5d17004..5941e7f 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -142,6 +142,7 @@
+ ({									\
+ 	clear_bit(TIF_32BIT, &current->mm->context.flags);		\
+ 	clear_thread_flag(TIF_32BIT);					\
++	current->personality &= ~READ_IMPLIES_EXEC;			\
+ })
+  /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
+-- 
+1.9.1
+
+.
