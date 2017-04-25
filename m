@@ -1,151 +1,20 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 25 Apr 2017 08:33:05 +0200
-Subject: [PATCH v7 1/4] syscalls: Restore address limit after a syscall
-In-Reply-To: <20170410164420.64003-1-thgarnie@google.com>
-References: <20170410164420.64003-1-thgarnie@google.com>
-Message-ID: <20170425063305.hwjuxupa37rwe6zj@gmail.com>
+From: eddie.cai.linux@gmail.com (Eddie Cai)
+Date: Tue, 25 Apr 2017 14:41:08 +0800
+Subject: [PATCH V2  0/2] correct ids for clk_testout
+Message-ID: <1493102470-22965-1-git-send-email-eddie.cai.linux@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+we use clk_testout1 and clk_testout2 for camera. e.g. mipi 24M mclk. the ids of
+clk_testout1 and clk_testout2 is wrong. it's time to correct it. 
 
-* Thomas Garnier <thgarnie@google.com> wrote:
+Eddie Cai (2):
+  clk: rockchip: add ids for camera
+  clk: rockchip: fix the incorrect ids
 
-> This patch ensures a syscall does not return to user-mode with a kernel
-> address limit. If that happened, a process can corrupt kernel-mode
-> memory and elevate privileges.
+ drivers/clk/rockchip/clk-rk3399.c      | 4 ++--
+ include/dt-bindings/clock/rk3399-cru.h | 2 ++
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-Don't start changelogs with 'This patch' - it's obvious that we are talking about 
-this patch. Writing:
-
-   Ensure that a syscall does not return to user-mode with a kernel address limit. 
-   If that happens, a process can corrupt kernel-mode memory and elevate 
-   privileges.
-
-also note the spelling fix I did. (There's another spelling error elsewhere in 
-this changelog as well.)
-
-Please read changelogs!
-
-> For example, it would mitigation this bug:
-> 
-> - https://bugs.chromium.org/p/project-zero/issues/detail?id=990
-> 
-> The CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE option is also
-> added so each architecture can optimize this change.
-
-As I pointed it out in my previous reply this Kconfig name is awfully long - but 
-it should have been obvious when this changelog was written ...
-
-> Signed-off-by: Thomas Garnier <thgarnie@google.com>
-> Tested-by: Kees Cook <keescook@chromium.org>
-> ---
-> Based on next-20170410
-> ---
->  arch/s390/Kconfig        |  1 +
->  include/linux/syscalls.h | 26 +++++++++++++++++++++++++-
->  init/Kconfig             |  6 ++++++
->  kernel/sys.c             | 13 +++++++++++++
->  4 files changed, 45 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-> index d25435d94b6e..489a0cc6e46b 100644
-> --- a/arch/s390/Kconfig
-> +++ b/arch/s390/Kconfig
-> @@ -103,6 +103,7 @@ config S390
->  	select ARCH_INLINE_WRITE_UNLOCK_BH
->  	select ARCH_INLINE_WRITE_UNLOCK_IRQ
->  	select ARCH_INLINE_WRITE_UNLOCK_IRQRESTORE
-> +	select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
->  	select ARCH_SAVE_PAGE_KEYS if HIBERNATION
->  	select ARCH_SUPPORTS_ATOMIC_RMW
->  	select ARCH_SUPPORTS_DEFERRED_STRUCT_PAGE_INIT
-> diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-> index 980c3c9b06f8..801a7a74fe28 100644
-> --- a/include/linux/syscalls.h
-> +++ b/include/linux/syscalls.h
-> @@ -191,6 +191,27 @@ extern struct trace_event_functions exit_syscall_print_funcs;
->  	SYSCALL_METADATA(sname, x, __VA_ARGS__)			\
->  	__SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
->  
-> +
-> +/*
-> + * Called before coming back to user-mode. Returning to user-mode with an
-> + * address limit different than USER_DS can allow to overwrite kernel memory.
-> + */
-> +static inline void verify_pre_usermode_state(void) {
-> +	BUG_ON(!segment_eq(get_fs(), USER_DS));
-> +}
-
-Non-standard coding style.
-
-> +
-> +#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
-> +#define __CHECK_USER_CALLER() \
-> +	bool user_caller = segment_eq(get_fs(), USER_DS)
-> +#define __VERIFY_PRE_USERMODE_STATE() \
-> +	if (user_caller) verify_pre_usermode_state()
-> +#else
-> +#define __CHECK_USER_CALLER()
-> +#define __VERIFY_PRE_USERMODE_STATE()
-> +asmlinkage void address_limit_check_failed(void);
-> +#endif
-> +
-> +
->  #define __PROTECT(...) asmlinkage_protect(__VA_ARGS__)
->  #define __SYSCALL_DEFINEx(x, name, ...)					\
->  	asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))	\
-> @@ -199,7 +220,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
->  	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));	\
->  	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))	\
->  	{								\
-> -		long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
-> +		long ret;						\
-> +		__CHECK_USER_CALLER();					\
-> +		ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
-> +		__VERIFY_PRE_USERMODE_STATE();				\
->  		__MAP(x,__SC_TEST,__VA_ARGS__);				\
->  		__PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));	\
->  		return ret;						\
-
-BTW., the '__VERIFY_PRE_USERMODE_STATE()' name is highly misleading: the 'pre' 
-prefix suggests that this is done before a system call - while it's done 
-afterwards.
-
-The solution is to not try to specify the exact call placement in the name, just 
-describe the functionality (and harmonize along the common prefix).
-
-> +config ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
-> +	bool
-> +	help
-> +	  Disable the generic pre-usermode state verification. Allow each
-> +	  architecture to optimize how and when the verification is done.
-> +
-
-Please name the Kconfig symbols something like this:
-
-	CONFIG_ADDR_LIMIT_CHECK
-	CONFIG_ADDR_LIMIT_CHECK_ARCH
-
-or so, which tells us whether the check is done by the architecture code, without 
-breaking the col80 limit with a single Kconfig name.
-
-BTW:
-
-> +#ifdef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
-> +/*
-> + * This function is called when an architecture specific implementation detected
-> + * an invalid address limit. The generic user-mode state checker will finish on
-> + * the appropriate BUG_ON.
-> + */
-> +asmlinkage void address_limit_check_failed(void)
-> +{
-> +	verify_pre_usermode_state();
-> +	panic("address_limit_check_failed called with a valid user-mode state");
-
-It's very unconstructive to unconditionally panic the system, just because some 
-kernel code leaked the address limit! Do a warn-once printout and kill the current 
-task (i.e. don't continue execution), but don't crash everything else!
-
-Thanks,
-
-	Ingo
+-- 
+1.9.1
