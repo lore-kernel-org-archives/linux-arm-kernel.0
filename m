@@ -1,44 +1,47 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 25 Apr 2017 15:33:32 -0700
-Subject: [PATCH 3/3] arm64: Silence first allocation with
- CONFIG_ARM64_MODULE_PLTS=y
-In-Reply-To: <20170425223332.6999-1-f.fainelli@gmail.com>
-References: <20170425223332.6999-1-f.fainelli@gmail.com>
-Message-ID: <20170425223332.6999-7-f.fainelli@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 25 Apr 2017 23:48:30 +0100
+Subject: [v2,1/2] ARM: module: split core and init PLT sections
+In-Reply-To: <4e82258a-92b5-6ff2-49ee-484cd772650a@gmail.com>
+References: <1487715177-30790-2-git-send-email-ard.biesheuvel@linaro.org>
+ <4e82258a-92b5-6ff2-49ee-484cd772650a@gmail.com>
+Message-ID: <CAKv+Gu9TquX=z=Z39+uXWbj2q7Tp8zj=+=2m0q-vde_OhAukvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_ARM64_MODULE_PLTS is enabled, the first allocation using the
-module space fails, because the module is too big, and then the module
-allocation is attempted from vmalloc space. Silence the first allocation
-failure in that case by setting __GFP_NOWARN.
+On 25 April 2017 at 23:30, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 02/21/2017 02:12 PM, Ard Biesheuvel wrote:
+>> Since commit 35fa91eed817 ("ARM: kernel: merge core and init PLTs"),
+>> the ARM module PLT code allocates all PLT entries in a single core
+>> section, since the overhead of having a separate init PLT section is
+>> not justified by the small number of PLT entries usually required for
+>> init code.
+>>
+>> However, the core and init module regions are allocated independently,
+>> and there is a corner case where the core region may be allocated from
+>> the VMALLOC region if the dedicated module region is exhausted, but the
+>> init region, being much smaller, can still be allocated from the module
+>> region. This puts the PLT entries out of reach of the relocated branch
+>> instructions, defeating the whole purpose of PLTs.
+>>
+>> So split the core and init PLT regions, and name the latter ".init.plt"
+>> so it gets allocated along with (and sufficiently close to) the .init
+>> sections that it serves. Also, given that init PLT entries may need to
+>> be emitted for branches that target the core module, modify the logic
+>> that disregards defined symbols to only disregard symbols that are
+>> defined in the same section.
+>>
+>> Fixes: 35fa91eed817 ("ARM: kernel: merge core and init PLTs")
+>> Reported-by: Angus Clark <angus@angusclark.org>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> Ard, has this been submitted to Russell's patch tracker? If not, can you
+> do it?
+>
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm64/kernel/module.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+It's already queued for v4.12:
 
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index 7f316982ce00..58bd5cfdd544 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -32,11 +32,16 @@
- 
- void *module_alloc(unsigned long size)
- {
-+	gfp_t gfp_mask = GFP_KERNEL;
- 	void *p;
- 
-+#if IS_ENABLED(CONFIG_ARM64_MODULE_PLTS)
-+	/* Silence the initial allocation */
-+	gfp_mask |= __GFP_NOWARN;
-+#endif
- 	p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
- 				module_alloc_base + MODULES_VSIZE,
--				GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
-+				gfp_mask, PAGE_KERNEL_EXEC, 0,
- 				NUMA_NO_NODE, __builtin_return_address(0));
- 
- 	if (!p && IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
--- 
-2.9.3
+b7ede5a1f5905ac394cc8e61712a13e3c5cb7b8f
+ARM: 8662/1: module: split core and init PLT sections
+
+Regards,
+Ard.
