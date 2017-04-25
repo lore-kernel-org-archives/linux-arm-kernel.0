@@ -1,141 +1,125 @@
 From: dsafonov@virtuozzo.com (Dmitry Safonov)
-Date: Tue, 25 Apr 2017 20:18:17 +0300
-Subject: [PATCHv2] ARM32: Support mremap() for sigpage/vDSO
-In-Reply-To: <20170414132529.8337-1-dsafonov@virtuozzo.com>
-References: <20170414132529.8337-1-dsafonov@virtuozzo.com>
-Message-ID: <871579ef-ee9a-c321-80e4-47836bb0e472@virtuozzo.com>
+Date: Tue, 25 Apr 2017 20:19:21 +0300
+Subject: [PATCH] ARM/shmem: Drop page coloring align for non-VIPT CPUs
+In-Reply-To: <20170414100953.4703-1-dsafonov@virtuozzo.com>
+References: <20170414100953.4703-1-dsafonov@virtuozzo.com>
+Message-ID: <571024bf-892d-4d08-dd9e-654b1e28c23e@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2017 04:25 PM, Dmitry Safonov wrote:
-> CRIU restores application mappings on the same place where they
-> were before Checkpoint. That means, that we need to move vDSO
-> and sigpage during restore on exactly the same place where
-> they were before C/R.
+On 04/14/2017 01:09 PM, Dmitry Safonov wrote:
+> On ARMv6 CPUs with VIPT caches there are aliasing issues: if two
+> different cache line indexes correspond to the same physical
+> address, then changes made to one of the alias might be lost
+> or they can overwrite each other. To overcome aliasing issues,
+> the align for shared mappings was introduced with:
 > 
-> Make mremap() code update mm->context.{sigpage,vdso} pointers
-> during VMA move. Sigpage is used for landing after handling
-> a signal - if the pointer is not updated during moving, the
-> application might crash on any signal after mremap().
+> commit 4197692eef113eeb8e3e413cc70993a5e667e5b8
+> Author: Russell King <rmk@flint.arm.linux.org.uk>
+> Date:   Wed Apr 28 22:22:33 2004 +0100
 > 
-> vDSO pointer on ARM32 is used only for setting auxv at this moment,
-> update it during mremap() in case of future usage.
+>      [ARM] Fix shared mmap()ings for ARM VIPT caches.
 > 
-> Without those updates, current work of CRIU on ARM32 is not reliable.
-> Historically, we error Checkpointing if we find vDSO page on ARM32
-> and suggest user to disable CONFIG_VDSO.
-> But that's not correct - it goes from x86 where signal processing
-> is ended in vDSO blob. For arm32 it's sigpage, which is not disabled
-> with `CONFIG_VDSO=n'.
+>      This allows us to appropriately align shared mappings on VIPT caches
+>      with aliasing issues.
 > 
-> Looks like C/R was working by luck - because userspace on ARM32 at
-> this moment always sets SA_RESTORER.
+> Which introduced 4 pages align with SHMLBA, which resulted in
+> unique physical address after any tag in cache (because two upper bits
+> corresponding to page address get unused in tags).
+> 
+> As this workaround is not needed by non-VIPT caches (like most armv7
+> CPUs which have PIPT caches), ARM mmap() code checks if cache is VIPT
+> aliasing for MAP_SHARED.
+> 
+> The problem here is in shmat() syscall:
+> 1. if shmaddr is NULL then do_shmat() uses arch_get_unmapped_area()
+>     to allocate shared mapping.
+> 2. if shmaddr is specified then do_shmat() checks that address has
+>     SHMLBA alignment regardless to CPU cache aliasing.
+> 
+> Which results on ARMv7 CPUs that shmat() with NULL shmaddr may return
+> non-SHMLBA aligned address (page-aligned), but shmat() with the same
+> address will fail.
+> 
+> That is not critical issue for CRIU as after shmat() with NULL address,
+> we can mremap() resulted shmem to restore shared memory mappings on the
+> same address where they were on checkpointing.
+> But it's still worth fixing because we can't reliably tell from
+> userspace if the platform has VIPT cache, and so this mremap()
+> workaround is done with HUGE warning that restoring application, that
+> uses SHMBLA-unaligned shmem on ARMv6 CPU with VIPT cache may result
+> in data corruptions.
+> 
+> I also changed SHMLBA build-time check to init-time WARN_ON(), as
+> it's not constant afterward.
+> 
+> This is resend of the patch from discussion:
+> http://www.spinics.net/lists/arm-kernel/msg258870.html
 > 
 > Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Russell King <linux@armlinux.org.uk>
 > Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Andy Lutomirski <luto@amacapital.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Russell King <rmk+kernel@armlinux.org.uk>
+> Cc: Christopher Covington <cov@codeaurora.org>
 > Cc: Cyrill Gorcunov <gorcunov@openvz.org>
 > Cc: Pavel Emelyanov <xemul@virtuozzo.com>
-> Cc: Christopher Covington <cov@codeaurora.org>
+> Suggested-by: Russell King <rmk+kernel@armlinux.org.uk>
 > Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
 > ---
-> v2: (buildbot) Fix (unsinged long) to (void*) cast warning.
-> 
->   arch/arm/kernel/process.c |  8 ++++++++
->   arch/arm/kernel/vdso.c    | 18 ++++++++++++++++++
->   arch/x86/entry/vdso/vma.c |  3 ---
->   mm/mmap.c                 |  4 ++++
->   4 files changed, 30 insertions(+), 3 deletions(-)
+>   arch/arm/include/asm/shmparam.h | 8 ++++----
+>   arch/arm/mm/copypage-v6.c       | 5 +----
+>   2 files changed, 5 insertions(+), 8 deletions(-)
 
 Ping?
 
 > 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 939e8b58c59d..1e6039cac68d 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -404,9 +404,17 @@ static unsigned long sigpage_addr(const struct mm_struct *mm,
->   static struct page *signal_page;
->   extern struct page *get_signal_page(void);
+> diff --git a/arch/arm/include/asm/shmparam.h b/arch/arm/include/asm/shmparam.h
+> index a5223b3a9bf9..6e1a72cbdf78 100644
+> --- a/arch/arm/include/asm/shmparam.h
+> +++ b/arch/arm/include/asm/shmparam.h
+> @@ -1,16 +1,16 @@
+>   #ifndef _ASMARM_SHMPARAM_H
+>   #define _ASMARM_SHMPARAM_H
 >   
-> +static int sigpage_mremap(const struct vm_special_mapping *sm,
-> +		struct vm_area_struct *new_vma)
-> +{
-> +	current->mm->context.sigpage = new_vma->vm_start;
-> +	return 0;
-> +}
+> +#include <asm/cachetype.h>
 > +
->   static const struct vm_special_mapping sigpage_mapping = {
->   	.name = "[sigpage]",
->   	.pages = &signal_page,
-> +	.mremap = sigpage_mremap,
->   };
+>   /*
+>    * This should be the size of the virtually indexed cache/ways,
+>    * or page size, whichever is greater since the cache aliases
+>    * every size/ways bytes.
+>    */
+> -#define	SHMLBA	(4 * PAGE_SIZE)		 /* attach addr a multiple of this */
+> +#define	SHMLBA (cache_is_vipt_aliasing() ? 4 * PAGE_SIZE : PAGE_SIZE)
 >   
->   int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
-> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-> index 53cf86cf2d1a..a4d6dc0f2427 100644
-> --- a/arch/arm/kernel/vdso.c
-> +++ b/arch/arm/kernel/vdso.c
-> @@ -54,8 +54,26 @@ static const struct vm_special_mapping vdso_data_mapping = {
->   	.pages = &vdso_data_page,
->   };
+> -/*
+> - * Enforce SHMLBA in shmat
+> - */
+> +/* Enforce SHMLBA in shmat */
+>   #define __ARCH_FORCE_SHMLBA
 >   
-> +static int vdso_mremap(const struct vm_special_mapping *sm,
-> +		struct vm_area_struct *new_vma)
-> +{
-> +	unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
-> +	unsigned long vdso_size;
-> +
-> +	/* without VVAR page */
-> +	vdso_size = (vdso_total_pages - 1) << PAGE_SHIFT;
-> +
-> +	if (vdso_size != new_size)
-> +		return -EINVAL;
-> +
-> +	current->mm->context.vdso = new_vma->vm_start;
-> +
-> +	return 0;
-> +}
-> +
->   static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
->   	.name = "[vdso]",
-> +	.mremap = vdso_mremap,
->   };
+>   #endif /* _ASMARM_SHMPARAM_H */
+> diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
+> index 70423345da26..9b22c530e8b6 100644
+> --- a/arch/arm/mm/copypage-v6.c
+> +++ b/arch/arm/mm/copypage-v6.c
+> @@ -20,10 +20,6 @@
 >   
->   struct elfinfo {
-> diff --git a/arch/x86/entry/vdso/vma.c b/arch/x86/entry/vdso/vma.c
-> index 226ca70dc6bd..363730caa60e 100644
-> --- a/arch/x86/entry/vdso/vma.c
-> +++ b/arch/x86/entry/vdso/vma.c
-> @@ -77,9 +77,6 @@ static int vdso_mremap(const struct vm_special_mapping *sm,
->   	if (image->size != new_size)
->   		return -EINVAL;
+>   #include "mm.h"
 >   
-> -	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
-> -		return -EFAULT;
+> -#if SHMLBA > 16384
+> -#error FIX ME
+> -#endif
 > -
->   	vdso_fix_landing(image, new_vma);
->   	current->mm->context.vdso = (void __user *)new_vma->vm_start;
+>   static DEFINE_RAW_SPINLOCK(v6_lock);
 >   
-> diff --git a/mm/mmap.c b/mm/mmap.c
-> index bfbe8856d134..534aef99cfe9 100644
-> --- a/mm/mmap.c
-> +++ b/mm/mmap.c
-> @@ -3152,8 +3152,12 @@ static int special_mapping_mremap(struct vm_area_struct *new_vma)
+>   /*
+> @@ -129,6 +125,7 @@ struct cpu_user_fns v6_user_fns __initdata = {
+>   
+>   static int __init v6_userpage_init(void)
 >   {
->   	struct vm_special_mapping *sm = new_vma->vm_private_data;
->   
-> +	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
-> +		return -EFAULT;
-> +
->   	if (sm->mremap)
->   		return sm->mremap(sm, new_vma);
-> +
->   	return 0;
->   }
->   
+> +	WARN_ON(SHMLBA > 16384);
+>   	if (cache_is_vipt_aliasing()) {
+>   		cpu_user.cpu_clear_user_highpage = v6_clear_user_highpage_aliasing;
+>   		cpu_user.cpu_copy_user_highpage = v6_copy_user_highpage_aliasing;
 > 
 
 
