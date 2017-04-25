@@ -1,17 +1,17 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 25 Apr 2017 15:33:27 -0700
-Subject: [PATCH 1/2] ARM: Silence first allocation with
+Date: Tue, 25 Apr 2017 15:33:28 -0700
+Subject: [PATCH 1/2] ARM: Silence non PLT allocation with
  CONFIG_ARM_MODULE_PLTS=y
 In-Reply-To: <20170425223332.6999-1-f.fainelli@gmail.com>
 References: <20170425223332.6999-1-f.fainelli@gmail.com>
-Message-ID: <20170425223332.6999-2-f.fainelli@gmail.com>
+Message-ID: <20170425223332.6999-3-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 When CONFIG_ARM_MODULE_PLTS is enabled, the first allocation using the
 module space fails, because the module is too big, and then the module
 allocation is attempted from vmalloc space. Silence the first allocation
-failure in that case by setting __GFP_NOWARN.
+failure in that case, since that scares people out.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
