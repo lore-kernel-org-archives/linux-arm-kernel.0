@@ -1,139 +1,188 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Apr 2017 19:06:30 +0100
-Subject: [PATCH v2] crypto: arm64/sha: Add constant operand modifier to
- ASM_EXPORT
-In-Reply-To: <20170425173937.GN128305@google.com>
-References: <20170405183458.193068-1-mka@chromium.org>
- <CAP=VYLpejcYwXUMtCCkXmjXw=T1tBJLn21aVi-9v_VGmEinjRg@mail.gmail.com>
- <CAKv+Gu_DHBT=2YA9h+ao3pZXgEV5KsO9ia+J90wtLuDX=a4+eg@mail.gmail.com>
- <20170425173937.GN128305@google.com>
-Message-ID: <CAKv+Gu-5G-o_jRXdJS0u_AHpjZ1Zg7dAVvD0cXn9nyC7oD==YA@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 25 Apr 2017 20:11:09 +0200 (CEST)
+Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
+In-Reply-To: <1998517910.54108.1492894253010@email.1und1.de>
+References: <1795308650.27171.9a53158f-312d-40ce-80ce-8bf792d8db34.open-xchange@email.1und1.de>
+ <172093673.40121.1492427140661@email.1und1.de>
+ <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
+ <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
+ <186569458.91967.1492547106553@email.1und1.de>
+ <CAD=FV=VHkJFrsJDmMytbUw=WjKQaGZ-8Ewfy5bPCA82AWS4O2Q@mail.gmail.com>
+ <212870399.174480.1492633502649@email.1und1.de>
+ <87mvbaykn1.fsf@eliezer.anholt.net>
+ <1998517910.54108.1492894253010@email.1und1.de>
+Message-ID: <2127594073.298820.1493143869792@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 April 2017 at 18:39, Matthias Kaehlcke <mka@chromium.org> wrote:
+> Stefan Wahren <stefan.wahren@i2se.com> hat am 22. April 2017 um 22:50 geschrieben:
+> 
+> 
 > Hi,
->
-> El Tue, Apr 18, 2017 at 04:35:02PM +0100 Ard Biesheuvel ha dit:
->
->> On 18 April 2017 at 15:47, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
->> > On Wed, Apr 5, 2017 at 2:34 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
->> >> The operand is an integer constant, make the constness explicit by
->> >> adding the modifier. This is needed for clang to generate valid code
->> >> and also works with gcc.
->> >
->> > Actually it doesn't work with all gcc.  I've got an older arm64 toolchain that I
->> > only use for syntax checking (and hence I don't care if it is the latest and
->> > greatest) and this commit breaks it:
->> >
->> > arch/arm64/crypto/sha1-ce-glue.c:21:2: error: invalid 'asm': invalid
->> > operand prefix '%c'
->> >   asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
->> >
->> > I'm currently reverting this change locally so I can continue to use the old
->> > toolchain:
->> >
->> > $ aarch64-linux-gnu-gcc --version
->> > aarch64-linux-gnu-gcc (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro
->> > GCC 2013.11) 4.8.3 20131202 (prerelease)
->> > Copyright (C) 2013 Free Software Foundation, Inc.
->> >
->> > $ aarch64-linux-gnu-as --version
->> > GNU assembler (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro GCC
->> > 2013.11) 2.24.0.20131220
->> > Copyright 2013 Free Software Foundation, Inc.
->> >
->> > Maybe it is finally too old and nobody cares, but I thought it worth a mention.
->> >
->>
->> Thanks for the report. I think we care more about GCC 4.8 than about
->> Clang, which argues for reverting this patch.
->>
->> I understand these issues must be frustrating if you are working on
->> this stuff, but to me, it is not entirely obvious why we want to
->> support Clang in the first place (i.e., what does it buy you if your
->> distro/environment is not already using Clang for userland), and why
->> the burden is on Linux to make modifications to support Clang,
->> especially when it comes to GCC extensions such as inline assembly
->> syntax.
->>
->> It is ultimately up to the maintainers to decide what to do with this
->> patch, but my vote would be to revert it, especially given that the %c
->> placeholder prefix is not documented anywhere, and appears to simply
->> trigger some GCC internals that happen to do the right thing in this
->> case.
->>
->> However, the I -> i change is arguably an improvement, and considering
->> that the following
->>
->> asm("foo: .long %0" :: "i"(some value))
->>
->> doesn't compile with clang either, I suggest you (Matthias) file a bug
->> against Clang to get this fixed, and we can propose another patch just
->> for the I->i change.
->
-> I consulted with folks with more expertise in this area than myself.
-> This is their analysis of the situation:
->
-> "The ARM ARM specifies that the correct AArch64 instruction assembly
-> syntax is to have a hash sign (#) before an immediate.
->
+> 
+> > Eric Anholt <eric@anholt.net> hat am 20. April 2017 um 20:54 geschrieben:
+> > 
+> > 
+> > Stefan Wahren <stefan.wahren@i2se.com> writes:
+> > 
+> > > Hi,
+> > >
+> > >> Doug Anderson <dianders@chromium.org> hat am 18. April 2017 um 22:41 geschrieben:
+> > >> 
+> > >> 
+> > >> It's hard to know for sure that all of this time is really in
+> > >> urb_enqueue().  Possible we could have task switched out and been
+> > >> blocked elsewhere.  Using ftrace to get more fine-grained timings
+> > >> would be useful.  ktime_get(), ktime_sub(), and ktime_to_us() are your
+> > >> friends here if you want to use trace_printk.
+> > >
+> > > i'm a newbie to ftrace, so i hope this would be helpful.
+> > >
+> > > # connect PL2303 to the onboard hub
+> > > # echo 0 > options/sleep-time
+> > > # echo 0 > function_profile_enabled
+> > > # echo 1 > function_profile_enabled
+> > > # ./usb_test
+> > > # Waiting for at least 20 seconds and then disconnect PL2303
+> > > # echo 0 > function_profile_enabled
+> > > # cat trace_stat/function0
+> > >
+> > >   Function                               Hit    Time            Avg             s^2
+> > >   --------                               ---    ----            ---             ---
+> > >   bcm2835_handle_irq                  361347    219567633 us     607.636 us      1485199 us  
+> > >   __handle_domain_irq                1082482    212639551 us     196.437 us      3642030 us  
+> > >   generic_handle_irq                 1082482    100592051 us     92.927 us       50511334 us 
+> > >   irq_exit                           1082482    98197771 us     90.715 us       29649040 us 
+> > >   handle_level_irq                   1082482    95812379 us     88.511 us       51910093 us 
+> > 
+> > If I'm reading this output right, we're spending half of our interrupt
+> > processing time in irq_exit(), so even if dwc2's interrupt was free (the
+> > generic_handle_irq() chain), we'd be eating about half the CPU getting
+> > back out of the interrupt handler, right?
+> > 
+> > I don't really know anything about DWC2 or USB, but is there any way we
+> > could mitigate the interrupt frequency with this hardware?  If nothing
+> > else, could we loop reading gintsts until it reads back 0?
+> 
+> first of all i updated my kernel to 4.11rc7 and the issue still occures. Today i had some time to investigate this issue further and i made some interesting observations:
+> 
+> 1. The lockup doesn't occure always after starting usb_test. In rare cases i was able to run the program without lockup.
+> 2. In case the lockup occured we are always able to "rescue" the BCM2835 from this state by sending some serial data to the PL2303.
 
-It does not specify that at all:
+Based on this scenario i patched the interrupt routine to detect the interrupt storm and normal condition. So i can dump the global and host registers in both situations (bad and goodcase).
 
-"""
-The A64 assembly language does not require the # character to
-introduce constant immediate operands, but an assembler must allow
-immediate values introduced with or without the # character. ARM
-recommends that an A64 disassembler outputs a # before an immediate
-operand.
-"""
-(ARM DDI 0487A.g page C1-121)
+Here is the diff between both register dumps, maybe someone see something interesting:
 
-IOW, it only /recommends/ the # sign for *dis*assemblers. Big difference.
-
-> Therefore, every time an inline assembly constraint is used that
-> specifies to print an immediate (like 'i' or 'I'), the immediate
-> (e.g. 42) should be printed with the hash (e.g. #42).
->
-> Therefore, if you're using an immediate constraint where the hash sign
-> must not be printed, you have to use the "c" operand modifier. The "c"
-> operand modifier apparently got introduced to gcc after the 4.8
-> release.
->
-
-My problem with the %c modifier is that it is completely undocumented,
-and appears in an internal GCC code generation code path. IOW, the GCC
-developers could also remove it at any time (although this is highly
-unlikely, of course)
-
-> The binutils assembler and the clang integrated assembler accept
-> immediates without the hash sign as a non-official extension.
-
-Nope. *That* is mandated by the ARM ARM, see above.
-
-> Some of
-> the immediate constraints on gcc seem to not print out the hash sign
-> either; which is why the variant in the linux kernel works with gcc.
->
-
-Yes, and since it is perfectly legal for the "i" constraint not to
-have a #, I don't understand what the big deal is tbh.
-
-> In summary, it seems to me that the inline assembly with the %c0
-> operand is the correct one and gcc 4.8 is simply too old to support
-> this."
->
-
-OK, so we're back to having to choose between GCC 4.8 and Clang.
-
-> If the above is correct it seems that the solution is not to "fix"
-> clang, but to use different instructions for gcc<=4.8 and newer
-> compilers. I am aware that this is not a popular option.
->
-> What do you think?
->
-
-Perhaps I should just rework the code not to rely on inline asm at all.
-
-I will take a look,
+--- badcase.txt	2017-04-25 18:02:59.000000000 +0000
++++ goodcase.txt	2017-04-25 18:02:59.000000000 +0000
+@@ -4,12 +4,12 @@
+  dwc2_dump_global_registers: GAHBCFG	 @0xCC850008 : 0x00000031
+  dwc2_dump_global_registers: GUSBCFG	 @0xCC85000C : 0x20001700
+  dwc2_dump_global_registers: GRSTCTL	 @0xCC850010 : 0x80000000
+- dwc2_dump_global_registers: GINTSTS	 @0xCC850014 : 0x06000021
++ dwc2_dump_global_registers: GINTSTS	 @0xCC850014 : 0x06000029
+  dwc2_dump_global_registers: GINTMSK	 @0xCC850018 : 0xF300080E
+- dwc2_dump_global_registers: GRXSTSR	 @0xCC85001C : 0x00070044
++ dwc2_dump_global_registers: GRXSTSR	 @0xCC85001C : 0x000F0001
+  dwc2_dump_global_registers: GRXFSIZ	 @0xCC850024 : 0x00000306
+  dwc2_dump_global_registers: GNPTXFSIZ	 @0xCC850028 : 0x01000306
+- dwc2_dump_global_registers: GNPTXSTS	 @0xCC85002C : 0x1D080100
++ dwc2_dump_global_registers: GNPTXSTS	 @0xCC85002C : 0x18080100
+  dwc2_dump_global_registers: GI2CCTL	 @0xCC850030 : 0x00000000
+  dwc2_dump_global_registers: GPVNDCTL	 @0xCC850034 : 0x00000000
+  dwc2_dump_global_registers: GGPIO	 @0xCC850038 : 0x00000000
+@@ -27,64 +27,64 @@
+  dwc2_dump_host_registers: Host Global Registers
+  dwc2_dump_host_registers: HCFG	 @0xCC850400 : 0x00000000
+  dwc2_dump_host_registers: HFIR	 @0xCC850404 : 0x00001D4B
+- dwc2_dump_host_registers: HFNUM	 @0xCC850408 : 0x0BF03CA1
+- dwc2_dump_host_registers: HPTXSTS	 @0xCC850410 : 0x29080200
+- dwc2_dump_host_registers: HAINT	 @0xCC850414 : 0x00000002
+- dwc2_dump_host_registers: HAINTMSK	 @0xCC850418 : 0x00000002
++ dwc2_dump_host_registers: HFNUM	 @0xCC850408 : 0x029F3421
++ dwc2_dump_host_registers: HPTXSTS	 @0xCC850410 : 0x25080200
++ dwc2_dump_host_registers: HAINT	 @0xCC850414 : 0x00000001
++ dwc2_dump_host_registers: HAINTMSK	 @0xCC850418 : 0x00000001
+  dwc2_dump_host_registers: HPRT0	 @0xCC850440 : 0x00001005
+  dwc2_dump_host_registers: Host Channel 0 Specific Registers
+- dwc2_dump_host_registers: HCCHAR	 @0xCC850500 : 0x01189840
+- dwc2_dump_host_registers: HCSPLT	 @0xCC850504 : 0x8001C102
+- dwc2_dump_host_registers: HCINT	 @0xCC850508 : 0x00000000
+- dwc2_dump_host_registers: HCINTMSK	 @0xCC85050C : 0x00000000
+- dwc2_dump_host_registers: HCTSIZ	 @0xCC850510 : 0x00080040
+- dwc2_dump_host_registers: HCDMA	 @0xCC850514 : 0x4A07D300
++ dwc2_dump_host_registers: HCCHAR	 @0xCC850500 : 0x013C880A
++ dwc2_dump_host_registers: HCSPLT	 @0xCC850504 : 0x8000C102
++ dwc2_dump_host_registers: HCINT	 @0xCC850508 : 0x00000022
++ dwc2_dump_host_registers: HCINTMSK	 @0xCC85050C : 0x00000006
++ dwc2_dump_host_registers: HCTSIZ	 @0xCC850510 : 0x4008000A
++ dwc2_dump_host_registers: HCDMA	 @0xCC850514 : 0x4A093840
+  dwc2_dump_host_registers: Host Channel 1 Specific Registers
+  dwc2_dump_host_registers: HCCHAR	 @0xCC850520 : 0x01189840
+  dwc2_dump_host_registers: HCSPLT	 @0xCC850524 : 0x8000C102
+- dwc2_dump_host_registers: HCINT	 @0xCC850528 : 0x00000022
+- dwc2_dump_host_registers: HCINTMSK	 @0xCC85052C : 0x00000006
++ dwc2_dump_host_registers: HCINT	 @0xCC850528 : 0x00000000
++ dwc2_dump_host_registers: HCINTMSK	 @0xCC85052C : 0x00000000
+  dwc2_dump_host_registers: HCTSIZ	 @0xCC850530 : 0x00080040
+- dwc2_dump_host_registers: HCDMA	 @0xCC850534 : 0x4A07D300
++ dwc2_dump_host_registers: HCDMA	 @0xCC850534 : 0x4A07D500
+  dwc2_dump_host_registers: Host Channel 2 Specific Registers
+  dwc2_dump_host_registers: HCCHAR	 @0xCC850540 : 0x01189840
+  dwc2_dump_host_registers: HCSPLT	 @0xCC850544 : 0x8001C102
+  dwc2_dump_host_registers: HCINT	 @0xCC850548 : 0x00000000
+  dwc2_dump_host_registers: HCINTMSK	 @0xCC85054C : 0x00000000
+  dwc2_dump_host_registers: HCTSIZ	 @0xCC850550 : 0x00080040
+- dwc2_dump_host_registers: HCDMA	 @0xCC850554 : 0x4A07D300
++ dwc2_dump_host_registers: HCDMA	 @0xCC850554 : 0x4A07D500
+  dwc2_dump_host_registers: Host Channel 3 Specific Registers
+- dwc2_dump_host_registers: HCCHAR	 @0xCC850560 : 0x01189840
+- dwc2_dump_host_registers: HCSPLT	 @0xCC850564 : 0x8001C102
++ dwc2_dump_host_registers: HCCHAR	 @0xCC850560 : 0x00D08040
++ dwc2_dump_host_registers: HCSPLT	 @0xCC850564 : 0x00000000
+  dwc2_dump_host_registers: HCINT	 @0xCC850568 : 0x00000000
+  dwc2_dump_host_registers: HCINTMSK	 @0xCC85056C : 0x00000000
+- dwc2_dump_host_registers: HCTSIZ	 @0xCC850570 : 0x00080040
+- dwc2_dump_host_registers: HCDMA	 @0xCC850574 : 0x4A07D300
++ dwc2_dump_host_registers: HCTSIZ	 @0xCC850570 : 0x8000003C
++ dwc2_dump_host_registers: HCDMA	 @0xCC850574 : 0x4A3B7544
+  dwc2_dump_host_registers: Host Channel 4 Specific Registers
+- dwc2_dump_host_registers: HCCHAR	 @0xCC850580 : 0x01189840
+- dwc2_dump_host_registers: HCSPLT	 @0xCC850584 : 0x8001C102
++ dwc2_dump_host_registers: HCCHAR	 @0xCC850580 : 0x00D00040
++ dwc2_dump_host_registers: HCSPLT	 @0xCC850584 : 0x00000000
+  dwc2_dump_host_registers: HCINT	 @0xCC850588 : 0x00000000
+  dwc2_dump_host_registers: HCINTMSK	 @0xCC85058C : 0x00000000
+- dwc2_dump_host_registers: HCTSIZ	 @0xCC850590 : 0x00080040
+- dwc2_dump_host_registers: HCDMA	 @0xCC850594 : 0x4A07D300
++ dwc2_dump_host_registers: HCTSIZ	 @0xCC850590 : 0x20000008
++ dwc2_dump_host_registers: HCDMA	 @0xCC850594 : 0x4A3B74C8
+  dwc2_dump_host_registers: Host Channel 5 Specific Registers
+  dwc2_dump_host_registers: HCCHAR	 @0xCC8505A0 : 0x01189840
+  dwc2_dump_host_registers: HCSPLT	 @0xCC8505A4 : 0x8000C102
+  dwc2_dump_host_registers: HCINT	 @0xCC8505A8 : 0x00000000
+  dwc2_dump_host_registers: HCINTMSK	 @0xCC8505AC : 0x00000000
+  dwc2_dump_host_registers: HCTSIZ	 @0xCC8505B0 : 0x00080040
+- dwc2_dump_host_registers: HCDMA	 @0xCC8505B4 : 0x4A07D300
++ dwc2_dump_host_registers: HCDMA	 @0xCC8505B4 : 0x4A07D500
+  dwc2_dump_host_registers: Host Channel 6 Specific Registers
+- dwc2_dump_host_registers: HCCHAR	 @0xCC8505C0 : 0x01189840
+- dwc2_dump_host_registers: HCSPLT	 @0xCC8505C4 : 0x8001C102
++ dwc2_dump_host_registers: HCCHAR	 @0xCC8505C0 : 0x00D00040
++ dwc2_dump_host_registers: HCSPLT	 @0xCC8505C4 : 0x00000000
+  dwc2_dump_host_registers: HCINT	 @0xCC8505C8 : 0x00000000
+  dwc2_dump_host_registers: HCINTMSK	 @0xCC8505CC : 0x00000000
+- dwc2_dump_host_registers: HCTSIZ	 @0xCC8505D0 : 0x00080040
+- dwc2_dump_host_registers: HCDMA	 @0xCC8505D4 : 0x4A07D300
++ dwc2_dump_host_registers: HCTSIZ	 @0xCC8505D0 : 0x00000000
++ dwc2_dump_host_registers: HCDMA	 @0xCC8505D4 : 0x4B080000
+  dwc2_dump_host_registers: Host Channel 7 Specific Registers
+- dwc2_dump_host_registers: HCCHAR	 @0xCC8505E0 : 0x01189840
++ dwc2_dump_host_registers: HCCHAR	 @0xCC8505E0 : 0x013C880A
+  dwc2_dump_host_registers: HCSPLT	 @0xCC8505E4 : 0x8001C102
+  dwc2_dump_host_registers: HCINT	 @0xCC8505E8 : 0x00000000
+  dwc2_dump_host_registers: HCINTMSK	 @0xCC8505EC : 0x00000000
+- dwc2_dump_host_registers: HCTSIZ	 @0xCC8505F0 : 0x00080040
+- dwc2_dump_host_registers: HCDMA	 @0xCC8505F4 : 0x4A07D300
++ dwc2_dump_host_registers: HCTSIZ	 @0xCC8505F0 : 0x4008000A
++ dwc2_dump_host_registers: HCDMA	 @0xCC8505F4 : 0x4A093840
