@@ -1,122 +1,140 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Tue, 25 Apr 2017 07:12:56 -0700
-Subject: [PATCH v7 1/4] syscalls: Restore address limit after a syscall
-In-Reply-To: <20170425062324.pdpi5v7ypobw74ki@gmail.com>
-References: <20170410164420.64003-1-thgarnie@google.com>
- <CAGXu5j+J67zC9tcncacHTDvXKMF3HZuPCivk-Uz4J6h-cEv-qQ@mail.gmail.com>
- <20170425062324.pdpi5v7ypobw74ki@gmail.com>
-Message-ID: <CAJcbSZGY3JmZankf+d6=gfg9gBWUoVUkWLDnCzaC81scPm+uBA@mail.gmail.com>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Tue, 25 Apr 2017 22:11:56 +0800
+Subject: [PATCH] arm64: fix the overlap between the kernel image and
+ vmalloc address
+In-Reply-To: <20170424155125.GA5972@leverpostej>
+References: <1493025729-21505-1-git-send-email-zhongjiang@huawei.com>
+ <20170424104456.GA4343@leverpostej> <58FDFD90.8050300@huawei.com>
+ <20170424155125.GA5972@leverpostej>
+Message-ID: <58FF592C.2070008@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 11:23 PM, Ingo Molnar <mingo@kernel.org> wrote:
->
-> * Kees Cook <keescook@chromium.org> wrote:
->
->> On Mon, Apr 10, 2017 at 9:44 AM, Thomas Garnier <thgarnie@google.com> wrote:
->> > This patch ensures a syscall does not return to user-mode with a kernel
->> > address limit. If that happened, a process can corrupt kernel-mode
->> > memory and elevate privileges.
->> >
->> > For example, it would mitigation this bug:
->> >
->> > - https://bugs.chromium.org/p/project-zero/issues/detail?id=990
->> >
->> > The CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE option is also
->> > added so each architecture can optimize this change.
->> >
->> > Signed-off-by: Thomas Garnier <thgarnie@google.com>
->> > Tested-by: Kees Cook <keescook@chromium.org>
+On 2017/4/24 23:51, Mark Rutland wrote:
+> On Mon, Apr 24, 2017 at 09:28:48PM +0800, zhong jiang wrote:
+>> On 2017/4/24 18:44, Mark Rutland wrote:
+>>> So the issue is that we have the callchain below for a kernel image
+>>> address:
+>>>
+>>> read_kcore()
+>>> ->is_vmalloc_or_module_addr() // returns true
+>>> ->vread()
+>>> -->aligned_vread()
+>>> --->vmalloc_to_page()
+>>>
+>>> In is_vmalloc{,or_module}_addr() we just check the addr against
+>>> VMALLOC_START and VMALLOC_END, so they will return true for a kernel
+>>> image address.
+>>>
+>>> Then, we call vmalloc_to_page(). While this only handles mappings made
+>>> at page granularity, the kernel image mapping may have used sections. So
+>>> this tries a bogus walk to the pte level.
+>>> Should we special-case kernel image handling, e.g. with new
+>>> is_kernel_image_addr() / kernel_image_to_page() helpers?
+>>   yes ,  it seems to the best way to implents it  without performance back.
+>> The following patch is the implment. Any thought?
 >>
->> Ingo, I think this series is ready. Can you pull it? (And if not, what
->> should next steps be?)
+>> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+>>
+>>   diff --git a/include/linux/mm.h b/include/linux/mm.h
+>> index b84615b..851ac35 100644
+>> --- a/include/linux/mm.h
+>> +++ b/include/linux/mm.h
+>> @@ -475,6 +475,15 @@ static inline bool is_vmalloc_addr(const void *x)
+>>         return false;
+>>  #endif
+>>  }
+>> +
+>> +static inline bool is_kernel_image_addr(const void *x)
+>> +{
+>> +       unsigned long addr = (unsigned long)x;
+>> +
+>> +       return addr >= (unsigned long)_stext && addr < (unsigned long)_end;
+>> +
+>> +}
+>> +
+>>  #ifdef CONFIG_MMU
+>>  extern int is_vmalloc_or_module_addr(const void *x);
+>>  #else
+>> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+>> index 3ca82d4..9a9ef65 100644
+>> --- a/mm/vmalloc.c
+>> +++ b/mm/vmalloc.c
+>> @@ -229,6 +229,42 @@ int is_vmalloc_or_module_addr(const void *x)
+>>         return is_vmalloc_addr(x);
+>>  }
+>>
+>> +static struct page *kernel_image_to_page(const void *kernel_addr, pgd_t *pgd)
+>> +{
+>> +       unsigned long addr = (unsigned long)kernel_addr;
+>> +       struct page *page = NULL;
+>> +       pud_t *pud;
+>> +       pmd_t *pmd;
+>> +       pte_t *pte;
+>> +
+>> +       if (pgd_none(*pgd))
+>> +               goto out;
+>> +
+>> +       pud = pud_offset(pgd, addr);
+>> +       if (pud_none(*pud))
+>> +               goto out;
+>> +
+>> +       if (pud_sect(*pud))
+>> +               return pud_page(*pud);
+> The *_sect() helpers are arch-specific, so we cannot use them in generic
+> code. This would need to be architecture-specific.
 >
-> I have some feedback for other patches in this series, plus for this one as well:
->
->> > +/*
->> > + * Called before coming back to user-mode. Returning to user-mode with an
->> > + * address limit different than USER_DS can allow to overwrite kernel memory.
->> > + */
->> > +static inline void verify_pre_usermode_state(void) {
->> > +       BUG_ON(!segment_eq(get_fs(), USER_DS));
->> > +}
->
-> That's not standard kernel coding style.
->
-> Also, patch titles should start with a verb - 75% of the series doesn't.
+> Secondly, this will return head page of the section regardless of which
+> page in the section the address corresponds to
+  yes,   the code is too harry to finish.  it is so mess.  we will send the formal patch later.
+  if you still accept the approach.
 
-Will fix both.
-
+ Thanks
+ zhongjiang
+>> +
+>> +       pmd = pmd_offset(*pmd, addr);
+>> +       if (pmd_none(*pmd))
+>> +               goto out;
+>> +
+>> +       if (pmd_sect(*pmd))
+>> +               return pmd_page(*pmd);
+> Likewise on both counts.
 >
->> > +#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
->> > +#define __CHECK_USER_CALLER() \
->> > +       bool user_caller = segment_eq(get_fs(), USER_DS)
->> > +#define __VERIFY_PRE_USERMODE_STATE() \
->> > +       if (user_caller) verify_pre_usermode_state()
->> > +#else
->> > +#define __CHECK_USER_CALLER()
->> > +#define __VERIFY_PRE_USERMODE_STATE()
->> > +asmlinkage void address_limit_check_failed(void);
->> > +#endif
+>> +
+>> +       pte = pte_offset_kernel(pmd, addr);
+>> +       if (pte_none(*pte))
+>> +               goto out;
+>> +
+>> +       page = pte_page(*pte);
+>> +
+>> +out:
+>> +       return page;
+>> +
+>> +}
+> Given we know what the address should map to, I don't think we need to
+> walk the page tables here. I think this can be:
 >
->> > +#ifdef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+> static struct page *kernel_image_to_page(const void *addr)
+> {
+> 	return virt_to_page(lm_alias(vmalloc_addr));
+> }
 >
-> That Kconfig name is way too long.
+>> +
+>>  /*
+>>    * Walk a vmap address to the struct page it maps.
+>>    */
+>> @@ -244,6 +280,9 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
+>>          */
+>>         VIRTUAL_BUG_ON(!is_vmalloc_or_module_addr(vmalloc_addr));
+>>
+>> +       if (is_kernel_image_addr(vmalloc_addr))
+>> +               return kernel_image_to_page(vmalloc_addr, pgd);
+> It's not clear to me that this is the right place for this to live.
 >
-> Plus please don't put logical operations into Kconfig names.
->
->> > +/*
->> > + * This function is called when an architecture specific implementation detected
->> > + * an invalid address limit. The generic user-mode state checker will finish on
->> > + * the appropriate BUG_ON.
->> > + */
->> > +asmlinkage void address_limit_check_failed(void)
->> > +{
->> > +       verify_pre_usermode_state();
->> > +       panic("address_limit_check_failed called with a valid user-mode state");
->> > +}
->> > +#endif
->
-> Awful naming all around:
->
->         verify_pre_usermode_state()
->         address_limit_check_failed()
->
-> Both names start with very common names that makes one read these again and again.
-> (And yes, there's lots of bad names in the kernel, but we should not follow bad
-> examples.)
->
-> Best practice for such functionality is to use a common prefix that is both easy
-> to recognize and easy to skip. For example we could use 'addr_limit_check' as the
-> prefix:
->
->         addr_limit_check_failed()
->         addr_limit_check_syscall()
->
-> No need to over-specify it that it's a "pre" check - it's obvious from existing
-> implementation and should be documented in the function itself for new
-> implementations.
->
-> Harmonize the Kconfig namespace to the common prefix as well, i.e. use something
-> like:
->
->         CONFIG_ADDR_LIMIT_CHECK
->
-> No need to add 'ARCH' I think - an architecture that enables this should get it
-> unconditionally.
->
-> etc.
->
-> It's all cobbled together I'm afraid and will need more iterations.
-
-Make sense. Thanks for the feedback.
-
+> It might be best to code the kernel image logic directly in kcore (and
+> kmem), assuming everyone's OK with that approach.
 >
 > Thanks,
+> Mark.
+> .
 >
->         Ingo
-
-
-
--- 
-Thomas
