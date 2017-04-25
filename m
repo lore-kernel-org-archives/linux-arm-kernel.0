@@ -1,42 +1,40 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 26 Apr 2017 00:11:32 +0200
-Subject: [PATCH 1/2] pinctrl: rockchip: remove unneeded (void *) casts in
- of_match_table
-In-Reply-To: <1493156063-8446-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1493156063-8446-1-git-send-email-yamada.masahiro@socionext.com>
- <1493156063-8446-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <59735505.eYpuzA7ihW@diego>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 25 Apr 2017 15:30:55 -0700
+Subject: [v2,1/2] ARM: module: split core and init PLT sections
+In-Reply-To: <1487715177-30790-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1487715177-30790-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <4e82258a-92b5-6ff2-49ee-484cd772650a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Mittwoch, 26. April 2017, 06:34:22 CEST schrieb Masahiro Yamada:
-> of_device_id::data is an opaque pointer.  No explicit cast is needed.
+On 02/21/2017 02:12 PM, Ard Biesheuvel wrote:
+> Since commit 35fa91eed817 ("ARM: kernel: merge core and init PLTs"),
+> the ARM module PLT code allocates all PLT entries in a single core
+> section, since the overhead of having a separate init PLT section is
+> not justified by the small number of PLT entries usually required for
+> init code.
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+> However, the core and init module regions are allocated independently,
+> and there is a corner case where the core region may be allocated from
+> the VMALLOC region if the dedicated module region is exhausted, but the
+> init region, being much smaller, can still be allocated from the module
+> region. This puts the PLT entries out of reach of the relocated branch
+> instructions, defeating the whole purpose of PLTs.
 > 
->  drivers/pinctrl/pinctrl-rockchip.c | 20 ++++++++++----------
->  1 file changed, 10 insertions(+), 10 deletions(-)
+> So split the core and init PLT regions, and name the latter ".init.plt"
+> so it gets allocated along with (and sufficiently close to) the .init
+> sections that it serves. Also, given that init PLT entries may need to
+> be emitted for branches that target the core module, modify the logic
+> that disregards defined symbols to only disregard symbols that are
+> defined in the same section.
 > 
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> b/drivers/pinctrl/pinctrl-rockchip.c index 7813599..da1a38f 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -2769,25 +2769,25 @@ static struct rockchip_pin_ctrl rk3399_pin_ctrl = {
-> 
->  static const struct of_device_id rockchip_pinctrl_dt_match[] = {
->  	{ .compatible = "rockchip,rk1108-pinctrl",
-> -		.data = (void *)&rk1108_pin_ctrl },
-> +		.data = &rk1108_pin_ctrl },
+> Fixes: 35fa91eed817 ("ARM: kernel: merge core and init PLTs")
+> Reported-by: Angus Clark <angus@angusclark.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-You should base your pinctrl-patches on top of Linus' branch, especially
-as the rk1108->rv1108 is in there:
-https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/commit/drivers/pinctrl/pinctrl-rockchip.c?h=for-next&id=b9c6dcab265e93c47bdcd99ab7c6acda90ed669b
+Ard, has this been submitted to Russell's patch tracker? If not, can you
+do it?
 
-With the above fixed:
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-
-
-Heiko
+Thanks a bunch!
+-- 
+Florian
