@@ -1,8 +1,8 @@
 From: zhongjiang@huawei.com (zhongjiang)
-Date: Tue, 25 Apr 2017 23:03:08 +0800
+Date: Tue, 25 Apr 2017 23:09:56 +0800
 Subject: [PATCH v2] arm64: fix the overlap between the kernel image and
  vmalloc address
-Message-ID: <1493132588-39904-1-git-send-email-zhongjiang@huawei.com>
+Message-ID: <1493132996-63912-1-git-send-email-zhongjiang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -112,7 +112,7 @@ v2
  2 files changed, 22 insertions(+)
 
 diff --git a/include/linux/mm.h b/include/linux/mm.h
-index 6ad0ef6..2b45b46 100644
+index 6ad0ef6..1cc8156 100644
 --- a/include/linux/mm.h
 +++ b/include/linux/mm.h
 @@ -509,6 +509,14 @@ static inline bool is_vmalloc_addr(const void *x)
@@ -124,7 +124,7 @@ index 6ad0ef6..2b45b46 100644
 +{
 +	unsigned long addr = (unsigned long)x;
 +
-+	return addr >= (unsigned long)_stext && add < (unsigned long)_end;
++	return addr >= (unsigned long)_stext && addr < (unsigned long)_end;
 +}
 +
  #ifdef CONFIG_MMU
