@@ -1,59 +1,59 @@
-From: nicolas@ndufresne.ca (Nicolas Dufresne)
-Date: Tue, 25 Apr 2017 12:51:11 -0400
-Subject: support autofocus / autogain in libv4l2
-In-Reply-To: <20170425080815.GD30553@pali>
-References: <1487074823-28274-1-git-send-email-sakari.ailus@linux.intel.com>
- <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
- <20170414232332.63850d7b@vento.lan>
- <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
- <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
- <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
- <20170424224724.5bb52382@vento.lan> <20170425080538.GA30380@amd>
- <20170425080815.GD30553@pali>
-Message-ID: <1493139071.19105.14.camel@ndufresne.ca>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 25 Apr 2017 09:45:05 -0700
+Subject: [PATCH] ARM: dts: Add devicetree for the Raspberry Pi 3,
+ for arm32 (v5)
+In-Reply-To: <68d88bf7-1f47-4056-3b70-7b97d9a02953@i2se.com>
+References: <20170424200037.25615-1-eric@anholt.net>
+ <68d88bf7-1f47-4056-3b70-7b97d9a02953@i2se.com>
+Message-ID: <87d1c0phbi.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mardi 25 avril 2017 ? 10:08 +0200, Pali Roh?r a ?crit?:
-> On Tuesday 25 April 2017 10:05:38 Pavel Machek wrote:
-> > > > It would be nice if more than one application could be
-> > > > accessing the
-> > > > camera at the same time... (I.e. something graphical running
-> > > > preview
-> > > > then using command line tool to grab a picture.) This one is
-> > > > definitely not solveable inside a library...
-> > > 
-> > > Someone once suggested to have something like pulseaudio for V4L.
-> > > For such usage, a server would be interesting. Yet, I would code
-> > > it
-> > > in a way that applications using libv4l will talk with such
-> > > daemon
-> > > in a transparent way.
-> > 
-> > Yes, we need something like pulseaudio for V4L. And yes, we should
-> > make it transparent for applications using libv4l.
-> 
-> IIRC there is already some effort in writing such "video" server
-> which
-> would support accessing more application into webcam video, like
-> pulseaudio server for accessing more applications to microphone
-> input.
-> 
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-Because references are nice:
+> Am 24.04.2017 um 22:00 schrieb Eric Anholt:
+>> Raspbian and Fedora have decided to support the Pi3 in 32-bit mode for
+>> now, so it's useful to be able to test that mode on an upstream
+>> kernel.  It's also been useful for me to use the same board for 32-bit
+>> and 64-bit development.
+>>
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> ---
+>>  arch/arm/boot/dts/Makefile            | 1 +
+>>  arch/arm/boot/dts/bcm2837-rpi-3.b.dts | 1 +
+>>  2 files changed, 2 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3.b.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 011808490fed..eded842d9978 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -72,6 +72,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+>>  	bcm2835-rpi-b-plus.dtb \
+>>  	bcm2835-rpi-a-plus.dtb \
+>>  	bcm2836-rpi-2-b.dtb \
+>> +	bcm2837-rpi-3-b.dtb \
+>>  	bcm2835-rpi-zero.dtb
+>>  dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>>  	bcm4708-asus-rt-ac56u.dtb \
+>> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3.b.dts b/arch/arm/boot/dts/bcm2837-rpi-3.b.dts
+>> new file mode 100644
+>> index 000000000000..8c8aa4d1e9b3
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/bcm2837-rpi-3.b.dts
+>> @@ -0,0 +1 @@
+>> +#include "arm64/broadcom/bcm2837-rpi-3.b.dts"
+>
+> Looks like a typo in the dts filename and in the include ( dot instead
+> of dash ).
 
-https://blogs.gnome.org/uraeus/2015/06/30/introducing-pulse-video/
-https://gstconf.ubicast.tv/videos/camera-sharing-and-sandboxing-with-pinos/
-
-And why the internals are not going to be implemented using GStreamer in the end:
-https://gstconf.ubicast.tv/videos/keep-calm-and-refactor-about-the-essence-of-gstreamer/
-
-regards,
-Nicolas
+Sorry about that, everyone.  I remember doing builds of the patch, but
+maybe things succeeded because there was already a .dtb present in my
+tree or something.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 181 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170425/c6b3f95c/attachment-0001.sig>
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170425/e8afe944/attachment.sig>
