@@ -1,49 +1,47 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 25 Apr 2017 13:23:30 +0200
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Tue, 25 Apr 2017 13:30:09 +0200
 Subject: support autofocus / autogain in libv4l2
-In-Reply-To: <20170425080815.GD30553@pali>
-References: <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
- <20170414232332.63850d7b@vento.lan>
+In-Reply-To: <20170425112330.GB7926@amd>
+References: <20170414232332.63850d7b@vento.lan>
  <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
  <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
  <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
  <20170424224724.5bb52382@vento.lan> <20170425080538.GA30380@amd>
- <20170425080815.GD30553@pali>
-Message-ID: <20170425112330.GB7926@amd>
+ <20170425080815.GD30553@pali> <20170425112330.GB7926@amd>
+Message-ID: <20170425113009.GH30553@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-On Tue 2017-04-25 10:08:15, Pali Roh?r wrote:
-> On Tuesday 25 April 2017 10:05:38 Pavel Machek wrote:
-> > > > It would be nice if more than one application could be accessing the
-> > > > camera at the same time... (I.e. something graphical running preview
-> > > > then using command line tool to grab a picture.) This one is
-> > > > definitely not solveable inside a library...
+On Tuesday 25 April 2017 13:23:30 Pavel Machek wrote:
+> Hi!
+> On Tue 2017-04-25 10:08:15, Pali Roh?r wrote:
+> > On Tuesday 25 April 2017 10:05:38 Pavel Machek wrote:
+> > > > > It would be nice if more than one application could be accessing the
+> > > > > camera at the same time... (I.e. something graphical running preview
+> > > > > then using command line tool to grab a picture.) This one is
+> > > > > definitely not solveable inside a library...
+> > > > 
+> > > > Someone once suggested to have something like pulseaudio for V4L.
+> > > > For such usage, a server would be interesting. Yet, I would code it
+> > > > in a way that applications using libv4l will talk with such daemon
+> > > > in a transparent way.
 > > > 
-> > > Someone once suggested to have something like pulseaudio for V4L.
-> > > For such usage, a server would be interesting. Yet, I would code it
-> > > in a way that applications using libv4l will talk with such daemon
-> > > in a transparent way.
+> > > Yes, we need something like pulseaudio for V4L. And yes, we should
+> > > make it transparent for applications using libv4l.
 > > 
-> > Yes, we need something like pulseaudio for V4L. And yes, we should
-> > make it transparent for applications using libv4l.
+> > IIRC there is already some effort in writing such "video" server which
+> > would support accessing more application into webcam video, like
+> > pulseaudio server for accessing more applications to microphone input.
 > 
-> IIRC there is already some effort in writing such "video" server which
-> would support accessing more application into webcam video, like
-> pulseaudio server for accessing more applications to microphone input.
+> Do you have project name / url / something?
 
-Do you have project name / url / something?
+Pinos (renamed from PulseVideo)
 
-Thanks,
-									Pavel
+https://blogs.gnome.org/uraeus/2015/06/30/introducing-pulse-video/
+https://cgit.freedesktop.org/~wtay/pinos/
+
+But from git history it looks like it is probably dead now...
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170425/b6562bbd/attachment.sig>
+Pali Roh?r
+pali.rohar at gmail.com
