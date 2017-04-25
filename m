@@ -1,49 +1,109 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 25 Apr 2017 10:13:51 -0700
-Subject: [PATCH 2/2] arm64: pmu: Wire-up L2 cache events for ARMv8 PMUv3
-In-Reply-To: <20170425124427.GI24484@arm.com>
-References: <20170420190546.7453-1-f.fainelli@gmail.com>
- <20170420190546.7453-4-f.fainelli@gmail.com> <20170425124427.GI24484@arm.com>
-Message-ID: <28edde78-b965-8136-1c95-11b9182de405@gmail.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Tue, 25 Apr 2017 19:12:09 +0200
+Subject: [PATCH] clk: sunxi-ng: Fix dependency on sunxi_gate
+Message-ID: <20170425171209.6229-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2017 05:44 AM, Will Deacon wrote:
-> Hi Florian,
-> 
-> On Thu, Apr 20, 2017 at 12:05:46PM -0700, Florian Fainelli wrote:
->> The ARMv8 PMUv3 cache map did not include the L2 cache events, add
->> them.
->>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->>  arch/arm64/kernel/perf_event.c | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
->> index 4f011cdd756d..a664c575f3fd 100644
->> --- a/arch/arm64/kernel/perf_event.c
->> +++ b/arch/arm64/kernel/perf_event.c
->> @@ -264,6 +264,11 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
->>  	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE,
->>  	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL,
->>  
->> +	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
->> +	[C(LL)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
->> +	[C(LL)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
->> +	[C(LL)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
-> 
-> I don't think this is correct in general. 'LL' stands for "last-level",
-> which may be L3 or even a system cache in the interconnect. Tying that to L2
-> is the wrong thing to do from perf's generic event perspective.
-> 
-> I'm ok with what you're proposing for A53 (where the PMU can only count
-> events out to the L2), but I'm reluctant to make this change for the generic
-> PMUv3 events.
+When CONFIG_SUNXI_CCU is set but no other SUNXI_CCU is selected i got
+the following build error:
+drivers/built-in.o: In function `ccu_pll_notifier_cb':
+drivers/clk/sunxi-ng/ccu_common.c:71: undefined reference to `ccu_gate_helper_disable'
+drivers/clk/sunxi-ng/ccu_common.c:73: undefined reference to `ccu_gate_helper_enable'
 
-That makes sense, shall I resubmit the first patch by itself or can you
-or Catalin take it as-is?
+The problem is the function ccu_pll_notifier_cb in ccu_common.c need
+some function from ccu_gate.c which is not compiled since SUNXI_CCU_GATE
+is not selected.
 
-Thanks!
+This patch remove SUNXI_CCU_GATE and compile ccu_gate.c unconditionnaly
+since all other combination of options select SUNXI_CCU_GATE finally.
+
+Fixes: 02ae2bc6febd ("clk: sunxi-ng: Add clk notifier to gate then ungate PLL clocks")
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ drivers/clk/sunxi-ng/Kconfig  | 11 -----------
+ drivers/clk/sunxi-ng/Makefile |  2 +-
+ 2 files changed, 1 insertion(+), 12 deletions(-)
+
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index 8bee225..d7842f9 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -15,9 +15,6 @@ config SUNXI_CCU_DIV
+ config SUNXI_CCU_FRAC
+ 	bool
+ 
+-config SUNXI_CCU_GATE
+-	bool
+-
+ config SUNXI_CCU_MUX
+ 	bool
+ 
+@@ -32,24 +29,19 @@ config SUNXI_CCU_PHASE
+ 
+ config SUNXI_CCU_NK
+ 	bool
+-	select SUNXI_CCU_GATE
+ 
+ config SUNXI_CCU_NKM
+ 	bool
+-	select SUNXI_CCU_GATE
+ 
+ config SUNXI_CCU_NKMP
+ 	bool
+-	select SUNXI_CCU_GATE
+ 
+ config SUNXI_CCU_NM
+ 	bool
+ 	select SUNXI_CCU_FRAC
+-	select SUNXI_CCU_GATE
+ 
+ config SUNXI_CCU_MP
+ 	bool
+-	select SUNXI_CCU_GATE
+ 	select SUNXI_CCU_MUX
+ 
+ # SoC Drivers
+@@ -119,7 +111,6 @@ config SUN8I_A33_CCU
+ config SUN8I_A83T_CCU
+ 	bool "Support for the Allwinner A83T CCU"
+ 	select SUNXI_CCU_DIV
+-	select SUNXI_CCU_GATE
+ 	select SUNXI_CCU_NKMP
+ 	select SUNXI_CCU_NM
+ 	select SUNXI_CCU_MP
+@@ -154,7 +145,6 @@ config SUN9I_A80_CCU
+ 	bool "Support for the Allwinner A80 CCU"
+ 	select SUNXI_CCU_DIV
+ 	select SUNXI_CCU_MULT
+-	select SUNXI_CCU_GATE
+ 	select SUNXI_CCU_NKMP
+ 	select SUNXI_CCU_NM
+ 	select SUNXI_CCU_MP
+@@ -165,7 +155,6 @@ config SUN9I_A80_CCU
+ config SUN8I_R_CCU
+ 	bool "Support for Allwinner SoCs' PRCM CCUs"
+ 	select SUNXI_CCU_DIV
+-	select SUNXI_CCU_GATE
+ 	default MACH_SUN8I || (ARCH_SUNXI && ARM64)
+ 
+ endif
+diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+index 78028c8..52aab41 100644
+--- a/drivers/clk/sunxi-ng/Makefile
++++ b/drivers/clk/sunxi-ng/Makefile
+@@ -1,11 +1,11 @@
+ # Common objects
+ obj-$(CONFIG_SUNXI_CCU)		+= ccu_common.o
+ obj-$(CONFIG_SUNXI_CCU)		+= ccu_reset.o
++obj-$(CONFIG_SUNXI_CCU)		+= ccu_gate.o
+ 
+ # Base clock types
+ obj-$(CONFIG_SUNXI_CCU_DIV)	+= ccu_div.o
+ obj-$(CONFIG_SUNXI_CCU_FRAC)	+= ccu_frac.o
+-obj-$(CONFIG_SUNXI_CCU_GATE)	+= ccu_gate.o
+ obj-$(CONFIG_SUNXI_CCU_MUX)	+= ccu_mux.o
+ obj-$(CONFIG_SUNXI_CCU_MULT)	+= ccu_mult.o
+ obj-$(CONFIG_SUNXI_CCU_PHASE)	+= ccu_phase.o
 -- 
-Florian
+2.10.2
