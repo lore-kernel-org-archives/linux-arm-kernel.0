@@ -1,35 +1,65 @@
-From: nicolas@ndufresne.ca (Nicolas Dufresne)
-Date: Tue, 25 Apr 2017 12:55:27 -0400
-Subject: support autofocus / autogain in libv4l2
-In-Reply-To: <20170425113009.GH30553@pali>
-References: <20170414232332.63850d7b@vento.lan>
- <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
- <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
- <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
- <20170424224724.5bb52382@vento.lan> <20170425080538.GA30380@amd>
- <20170425080815.GD30553@pali> <20170425112330.GB7926@amd>
- <20170425113009.GH30553@pali>
-Message-ID: <1493139327.19105.18.camel@ndufresne.ca>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 25 Apr 2017 19:57:59 +0300
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
+Message-ID: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mardi 25 avril 2017 ? 13:30 +0200, Pali Roh?r a ?crit?:
-> Pinos (renamed from PulseVideo)
-> 
-> https://blogs.gnome.org/uraeus/2015/06/30/introducing-pulse-video/
-> https://cgit.freedesktop.org/~wtay/pinos/
-> 
-> But from git history it looks like it is probably dead now...
+The board file for imx6sx-dbg overrides cpufreq operating points to use
+higher voltages. This is done because the board has a shared rail for
+VDD_ARM_IN and VDD_SOC_IN and when using LDO bypass the shared voltage
+needs to be a value suitable for both ARM and SOC.
 
-This is also incorrect. See "work" branch. It is still a one man show,
-code being aggressively re-factored. I suspect this will be the case
-until the "form" is considered acceptable.
+This was introduced in:
 
-Nicolas
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170425/7a9df95e/attachment.sig>
+commit 54183bd7f766 ("ARM: imx6sx-sdb: add revb board and make it default")
+
+This only only applies to LDO bypass mode, a feature not present in
+upstream. When LDOs are enabled the effect is to use higher voltages than
+necesarry for no good reason.
+
+Setting these higher voltages can make some boards fail to boot with ugly
+semi-random crashes, reminiscent of memory corruption. These failures
+happen the first time the lowest idle state is used. Remove the OPP
+override in order to fix those crashes.
+
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+
+---
+It's not clear exactly why the crashes happen. Perhaps waking up from idle
+draws more power than is available? Removing this override is a correct
+change anyway so maybe there is no need to investigate deeper.
+
+ arch/arm/boot/dts/imx6sx-sdb.dts | 17 -----------------
+ 1 file changed, 17 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+index 5bb8fd5..d71da30 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -12,23 +12,6 @@
+ 	model = "Freescale i.MX6 SoloX SDB RevB Board";
+ };
+ 
+-&cpu0 {
+-	operating-points = <
+-		/* kHz    uV */
+-		996000  1250000
+-		792000  1175000
+-		396000  1175000
+-		198000  1175000
+-		>;
+-	fsl,soc-operating-points = <
+-		/* ARM kHz      SOC uV */
+-		996000	1250000
+-		792000	1175000
+-		396000	1175000
+-		198000  1175000
+-	>;
+-};
+-
+ &i2c1 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+-- 
+2.7.4
