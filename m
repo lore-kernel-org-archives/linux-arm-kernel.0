@@ -1,112 +1,75 @@
-From: markus.mayer@broadcom.com (Markus Mayer)
-Date: Tue, 25 Apr 2017 12:29:40 -0700
-Subject: [PATCH 1/2] dt/bindings: Add bindings for Broadcom STB DRAM
- Sensors
-In-Reply-To: <20170418201702.57019-2-code@mmayer.net>
-References: <20170418201702.57019-1-code@mmayer.net>
- <20170418201702.57019-2-code@mmayer.net>
-Message-ID: <CAGt4E5susQWWNZPbNh8AoWtK-4yu50VL=GqOw+_2w_FA+2V68Q@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 25 Apr 2017 21:30:12 +0200
+Subject: [PATCH] [RFC] ARM: dts: imx6sx-sdb: Drop OPP hackery
+In-Reply-To: <20170425164224.26537-1-marex@denx.de>
+References: <20170425164224.26537-1-marex@denx.de>
+Message-ID: <a75000d6-aa53-92e3-c43a-58b49f18ff7e@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On 04/25/2017 06:42 PM, Marek Vasut wrote:
+> The imx6sx-sdb has one power supply that drives both VDDARM_IN
+> and VDDSOC_IN, which is the sw1a regulator on the PFUZE PMIC.
+> Connect both inputs to the sw1a regulator on the PMIC and drop
+> the OPP hackery which is no longer needed as the power framework
+> will take care of the regulator configuration as needed.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
 
-On 18 April 2017 at 13:17, Markus Mayer <code@mmayer.net> wrote:
-> From: Markus Mayer <mmayer@broadcom.com>
->
-> Provide bindings for the Broadcom STB DDR PHY Front End (DPFE).
++CC Leonard
 
-Would you be able to have a look at this binding? The driver won't be
-upstreamed as hwmon driver (as per Guenter's comments). I am currently
-converting the driver to a "soc" driver instead, but the proposed
-binding remains unchanged.
-
-If you have comments or suggestions, I would like to incorporate them
-with the new series I will be sending out.
-
-Thanks,
--Markus
-
-> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
 > ---
->  .../devicetree/bindings/hwmon/brcmstb-dpfe.txt     | 68 ++++++++++++++++++++++
->  1 file changed, 68 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt
->
-> diff --git a/Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt b/Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt
-> new file mode 100644
-> index 0000000..3519197
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt
-> @@ -0,0 +1,68 @@
-> +DDR PHY Front End (DPFE) for Broadcom STB
-> +=========================================
+> Note: Fabio, if you have a chance, please give this a spin and see
+>       if this works.
+> ---
+>  arch/arm/boot/dts/imx6sx-sdb.dts | 25 ++++++++-----------------
+>  1 file changed, 8 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+> index 5bb8fd57e7f5..c0139d7e497a 100644
+> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
+> +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+> @@ -12,23 +12,6 @@
+>  	model = "Freescale i.MX6 SoloX SDB RevB Board";
+>  };
+>  
+> -&cpu0 {
+> -	operating-points = <
+> -		/* kHz    uV */
+> -		996000  1250000
+> -		792000  1175000
+> -		396000  1175000
+> -		198000  1175000
+> -		>;
+> -	fsl,soc-operating-points = <
+> -		/* ARM kHz      SOC uV */
+> -		996000	1250000
+> -		792000	1175000
+> -		396000	1175000
+> -		198000  1175000
+> -	>;
+> -};
+> -
+>  &i2c1 {
+>  	clock-frequency = <100000>;
+>  	pinctrl-names = "default";
+> @@ -145,3 +128,11 @@
+>  		reg = <1>;
+>  	};
+>  };
 > +
-> +DPFE and the DPFE firmware provide an interface for the host CPU to
-> +communicate with the DCPU, which resides inside the DDR PHY.
+> +&reg_arm {
+> +	vin-supply = <&sw1a_reg>;
+> +};
 > +
-> +There are three memory regions for interacting with the DCPU.
-> +
-> +The DCPU Register Space
-> +-----------------------
-> +
-> +Required properties:
-> +  - compatible: must be one of brcm,bcm7271-dpfe-cpu, brcm,dpfe-cpu-v12.0.0.0
-> +    or brcm,dpfe-cpu
-> +  - reg: must reference the start address and length of the DCPU register
-> +    space
-> +
-> +Optional properties:
-> +  - cell-index: the index of the DPFE instance; will default to 0 if not set
-> +
-> +Example:
-> +       dpfe_cpu0: dpfe-cpu at f1132000 {
-> +               compatible = "brcm,bcm7271-dpfe-cpu",
-> +                       "brcm,dpfe-cpu-v12.0.0.0",
-> +                       "brcm,dpfe-cpu";
-> +               reg = <0xf1132000 0x180>;
-> +               cell-index = <0>;
-> +       };
-> +
-> +The DCPU Data Memory Space
-> +--------------------------
-> +
-> +Required properties:
-> +  - compatible: must be one of brcm,bcm7271-dpfe-dmem, brcm,dpfe-dmem-v12.0.0.0
-> +    or brcm,dpfe-dmem
-> +  - reg: must reference the start address and length of the DCPU DMEM space
-> +
-> +Optional properties:
-> +  - cell-index: the index of the DPFE instance; will default to 0 if not set
-> +
-> +Example:
-> +       dpfe_dmem0: dpfe-dmem at f1134000 {
-> +               compatible = "brcm,bcm7271-dpfe-dmem",
-> +                       "brcm,dpfe-dmem-v12.0.0.0",
-> +                       "brcm,dpfe-dmem";
-> +               reg = <0xf1134000 0x1000>;
-> +               cell-index = <0>;
-> +       };
-> +
-> +The DCPU Instruction Memory Space
-> +---------------------------------
-> +
-> +Required properties:
-> +  - compatible: must be one of brcm,bcm7271-dpfe-imem, brcm,dpfe-imem-v12.0.0.0
-> +    or brcm,dpfe-imem
-> +  - reg: must reference the start address and length of the DCPU IMEM space
-> +
-> +Optional properties:
-> +  - cell-index: the index of the DPFE instance; will default to 0 if not set
-> +
-> +Example:
-> +       dpfe_imem0: dpfe-imem at f1138000 {
-> +               compatible = "brcm,bcm7271-dpfe-imem",
-> +                       "brcm,dpfe-imem-v12.0.0.0",
-> +                       "brcm,dpfe-imem";
-> +               reg = <0xf1138000 0x4000>;
-> +               cell-index = <0>;
-> +       };
-> --
-> 2.7.4
->
+> +&reg_soc {
+> +	vin-supply = <&sw1a_reg>;
+> +};
+> 
+
+
+-- 
+Best regards,
+Marek Vasut
