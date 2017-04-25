@@ -1,73 +1,113 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Apr 2017 08:57:17 +0100
-Subject: [PATCH v4 07/10] mfd: axp20x: add axp20x-regulator cell for AXP803
-In-Reply-To: <20170424160103.9447-8-icenowy@aosc.io>
-References: <20170424160103.9447-1-icenowy@aosc.io>
- <20170424160103.9447-8-icenowy@aosc.io>
-Message-ID: <20170425075717.l4x3qektdgt6kaiq@dell>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 25 Apr 2017 10:03:24 +0200
+Subject: [PATCH 1/2 v5] ARM: dts: add XOADC and IIO HWMON to MSM8660/APQ8060
+Message-ID: <20170425080324.3876-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Apr 2017, Icenowy Zheng wrote:
+This adds the PM8058 XOADC node to the PM8058 PMIC node,
+defines the 16 channels and further also define an IIO HWMON
+node for the channels that are used for housekeeping of
+voltages and die temperature for the PMIC chip die.
 
-> As axp20x-regulator now supports AXP803, add a cell for it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes in v4:
-> - Added a trailing comma for new cell, for easier further cell addition.
-> Changes in v3:
-> - Make the new cell one-liner.
-> 
->  drivers/mfd/axp20x.c                 | 3 ++-
->  drivers/regulator/axp20x-regulator.c | 6 +++---
+Tested on the APQ8060 DragonBoard:
+cd /sys/class/hwmon/hwmon0
+cat in2_input
+4773 (DC mains ~5V)
+cat in4_input
+625  (0.625V reference voltage)
+cat in5_input
+1250 (1.25V reference voltage)
+cat temp1_input
+35852 (die temperature)
 
-These 2 changes are orthogonal, thus there is no reason to send them
-bundled into a single patch.  Doing so complicates things greatly.
-Please resubmit the two changes separately, so that they may be
-absorbed by our respective subsystems.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v5:
+- Switch to the twocell addressing scheme specified in the new
+  bindings.
+- The bindings and IIO driver are both queued for v4.12 in the
+  IIO tree and pending in linux-next
+---
+ arch/arm/boot/dts/qcom-msm8660.dtsi | 59 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
 
->  2 files changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 1dc6235778eb..917b6ddc4f15 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -848,7 +848,8 @@ static struct mfd_cell axp803_cells[] = {
->  		.name			= "axp20x-pek",
->  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
->  		.resources		= axp803_pek_resources,
-> -	}
-> +	},
-> +	{	.name			= "axp20x-regulator" },
->  };
->  
->  static struct mfd_cell axp806_cells[] = {
-> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-> index 9356ec8a9a1f..e2608fe770b9 100644
-> --- a/drivers/regulator/axp20x-regulator.c
-> +++ b/drivers/regulator/axp20x-regulator.c
-> @@ -311,13 +311,13 @@ static const struct regulator_desc axp803_regulators[] = {
->  		 AXP803_FLDO1_V_OUT, 0x0f, AXP22X_PWR_OUT_CTRL3, BIT(2)),
->  	AXP_DESC(AXP803, FLDO2, "fldo2", "fldoin", 700, 1450, 50,
->  		 AXP803_FLDO2_V_OUT, 0x0f, AXP22X_PWR_OUT_CTRL3, BIT(3)),
-> -	AXP_DESC_IO(AXP803, LDO_IO0, "ldo_io0", "ips", 700, 3300, 100,
-> +	AXP_DESC_IO(AXP803, LDO_IO0, "ldo-io0", "ips", 700, 3300, 100,
->  		    AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
->  		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
-> -	AXP_DESC_IO(AXP803, LDO_IO1, "ldo_io1", "ips", 700, 3300, 100,
-> +	AXP_DESC_IO(AXP803, LDO_IO1, "ldo-io1", "ips", 700, 3300, 100,
->  		    AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
->  		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
-> -	AXP_DESC_FIXED(AXP803, RTC_LDO, "rtc_ldo", "ips", 3000),
-> +	AXP_DESC_FIXED(AXP803, RTC_LDO, "rtc-ldo", "ips", 3000),
->  };
->  
->  static const struct regulator_linear_range axp806_dcdca_ranges[] = {
-
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index 91c9a62ae725..3934a123b182 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -63,6 +63,22 @@
+ 		};
+ 	};
+ 
++	/*
++	 * These channels from the ADC are simply hardware monitors.
++	 * That is why the ADC is referred to as "HKADC" - HouseKeeping
++	 * ADC.
++	 */
++	iio-hwmon {
++		compatible = "iio-hwmon";
++		io-channels = <&xoadc 0x00 0x01>, /* Battery */
++			    <&xoadc 0x00 0x01>, /* DC in (charger) */
++			    <&xoadc 0x00 0x04>, /* VPH the main system voltage */
++			    <&xoadc 0x00 0x0b>, /* Die temperature */
++			    <&xoadc 0x00 0x0c>, /* Reference voltage 1.25V */
++			    <&xoadc 0x00 0x0d>, /* Reference voltage 0.625V */
++			    <&xoadc 0x00 0x0e>; /* Reference voltage 0.325V */
++	};
++
+ 	soc: soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -267,6 +283,49 @@
+ 					row-hold = <91500>;
+ 				};
+ 
++				xoadc: xoadc at 197 {
++					compatible = "qcom,pm8058-adc";
++					reg = <0x197>;
++					interrupts-extended = <&pm8058 76 IRQ_TYPE_EDGE_RISING>;
++					#address-cells = <2>;
++					#size-cells = <0>;
++					#io-channel-cells = <2>;
++
++					vcoin: adc-channel at 00 {
++						reg = <0x00 0x00>;
++					};
++					vbat: adc-channel at 01 {
++						reg = <0x00 0x01>;
++					};
++					dcin: adc-channel at 02 {
++						reg = <0x00 0x02>;
++					};
++					ichg: adc-channel at 30 {
++						reg = <0x00 0x03>;
++					};
++					vph_pwr: adc-channel at 04 {
++						reg = <0x00 0x04>;
++					};
++					usb_vbus: adc-channel at 0a {
++						reg = <0x00 0x0a>;
++					};
++					die_temp: adc-channel at 0b {
++						reg = <0x00 0x0b>;
++					};
++					ref_625mv: adc-channel at 0c {
++						reg = <0x00 0x0c>;
++					};
++					ref_1250mv: adc-channel at 0d {
++						reg = <0x00 0x0d>;
++					};
++					ref_325mv: adc-channel at 0e {
++						reg = <0x00 0x0e>;
++					};
++					ref_muxoff: adc-channel at 0f {
++						reg = <0x00 0x0f>;
++					};
++				};
++
+ 				rtc at 1e8 {
+ 					compatible = "qcom,pm8058-rtc";
+ 					reg = <0x1e8>;
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.9.3
