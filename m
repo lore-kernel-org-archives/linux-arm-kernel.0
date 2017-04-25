@@ -1,71 +1,93 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue, 25 Apr 2017 11:43:07 -0400
-Subject: [PATCH 2/2] ARM: dts: Add the ethernet and ethernet PHY to the
- cygnus core DT.
-In-Reply-To: <44d0c48c-d80f-271e-0e19-ac87a53e2e53@cogentembedded.com>
-References: <20170424215022.30382-1-eric@anholt.net>
- <20170424215022.30382-3-eric@anholt.net>
- <f870339f-2fa1-411d-5ce8-adbe8802d8a8@cogentembedded.com>
- <CAC3K-4qn5oCXvyMCkFESGqMHqHXGiNUW6wfRx2LUZ8qZ39qroQ@mail.gmail.com>
- <44d0c48c-d80f-271e-0e19-ac87a53e2e53@cogentembedded.com>
-Message-ID: <CAC3K-4q2uPyypz9rA5binx6iOEsMF6tWeRmLbrDAug8cpoWgrg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 25 Apr 2017 16:46:02 +0100
+Subject: Applied "regulator: arizona-ldo1: Make arizona_ldo1 independent of
+ struct arizona" to the regulator tree
+In-Reply-To: <1492512234-19210-8-git-send-email-rf@opensource.wolfsonmicro.com>
+Message-ID: <E1d32fC-0001qC-0e@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 11:23 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Hello!
->
-> On 04/25/2017 06:15 PM, Jon Mason wrote:
->
->>>> Cygnus has a single amac controller connected to the B53 switch with 2
->>>> PHYs.  On the BCM911360_EP platform, those two PHYs are connected to
->>>> the external ethernet jacks.
->
->
-> [...]
->
->>>> Signed-off-by: Eric Anholt <eric@anholt.net>
->>>> ---
->>>>  arch/arm/boot/dts/bcm-cygnus.dtsi      | 60
->>>> ++++++++++++++++++++++++++++++++++
->>>>  arch/arm/boot/dts/bcm911360_entphn.dts |  8 +++++
->>>>  2 files changed, 68 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi
->>>> b/arch/arm/boot/dts/bcm-cygnus.dtsi
->>>> index 009f1346b817..318899df9972 100644
->>>> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
->>>> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
->
-> [...]
->>>>
->>>> @@ -295,6 +345,16 @@
->>>>                         status = "disabled";
->>>>                 };
->>>>
->>>> +               eth0: enet at 18042000 {
->>>> +                       compatible = "brcm,amac";
->>>> +                       reg = <0x18042000 0x1000>,
->>>> +                             <0x18110000 0x1000>;
->>>> +                       reg-names = "amac_base", "idm_base";
->>>
->>>
->>>
->>>    I don't think "_base" suffixes are necessary here.
->>
->>
->> 100% necessary, per the driver.  See
->> drivers/net/ethernet/broadcom/bgmac-platform.c
->
->
->    I'd recommend to fix the driver/bindings then...
+The patch
 
-They're already in use in other device trees.  So, we'd need to
-support backward compatibility on them, thus removing any real benefit
-to changing them.
+   regulator: arizona-ldo1: Make arizona_ldo1 independent of struct arizona
 
+has been applied to the regulator tree at
 
->
-> MBR, Sergei
->
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 80a55f41aef4ee808f53f1a356491d7eaeefdd3c Mon Sep 17 00:00:00 2001
+From: Richard Fitzgerald <rf@opensource.wolfsonmicro.com>
+Date: Tue, 18 Apr 2017 11:43:53 +0100
+Subject: [PATCH] regulator: arizona-ldo1: Make arizona_ldo1 independent of
+ struct arizona
+
+In preparation for supporting Madera codecs, remove the dependency on
+struct arizona in the regulator callbacks and struct arizona_ldo1.
+
+Signed-off-by: Richard Fitzgerald <rf@opensource.wolfsonmicro.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/regulator/arizona-ldo1.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/regulator/arizona-ldo1.c b/drivers/regulator/arizona-ldo1.c
+index f5bc75ab85fa..678f81fda22a 100644
+--- a/drivers/regulator/arizona-ldo1.c
++++ b/drivers/regulator/arizona-ldo1.c
+@@ -33,7 +33,7 @@
+ 
+ struct arizona_ldo1 {
+ 	struct regulator_dev *regulator;
+-	struct arizona *arizona;
++	struct regmap *regmap;
+ 
+ 	struct regulator_consumer_supply supply;
+ 	struct regulator_init_data init_data;
+@@ -67,7 +67,7 @@ static int arizona_ldo1_hc_set_voltage_sel(struct regulator_dev *rdev,
+ 					   unsigned sel)
+ {
+ 	struct arizona_ldo1 *ldo = rdev_get_drvdata(rdev);
+-	struct regmap *regmap = ldo->arizona->regmap;
++	struct regmap *regmap = ldo->regmap;
+ 	unsigned int val;
+ 	int ret;
+ 
+@@ -93,7 +93,7 @@ static int arizona_ldo1_hc_set_voltage_sel(struct regulator_dev *rdev,
+ static int arizona_ldo1_hc_get_voltage_sel(struct regulator_dev *rdev)
+ {
+ 	struct arizona_ldo1 *ldo = rdev_get_drvdata(rdev);
+-	struct regmap *regmap = ldo->arizona->regmap;
++	struct regmap *regmap = ldo->regmap;
+ 	unsigned int val;
+ 	int ret;
+ 
+@@ -247,7 +247,7 @@ static int arizona_ldo1_probe(struct platform_device *pdev)
+ 	if (!ldo1)
+ 		return -ENOMEM;
+ 
+-	ldo1->arizona = arizona;
++	ldo1->regmap = arizona->regmap;
+ 
+ 	/*
+ 	 * Since the chip usually supplies itself we provide some
+-- 
+2.11.0
