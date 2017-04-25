@@ -1,9 +1,9 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Tue, 25 Apr 2017 13:54:50 +0000
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 25 Apr 2017 15:05:39 +0100
 Subject: [PATCH] arm64: pmuv3: handle pmuv3+
 In-Reply-To: <1493118530-5314-1-git-send-email-mark.rutland@arm.com>
 References: <1493118530-5314-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170425135419.GA4568@localhost>
+Message-ID: <20170425140538.GO24484@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,8 +28,16 @@ On Tue, Apr 25, 2017 at 12:08:50PM +0100, Mark Rutland wrote:
 > ---
 >  arch/arm64/kernel/perf_event.c | 7 ++++---
 >  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+
 > Will, would you be happy to queue this fixup for v4.12?
+
+Catalin: please can you pick this up via arm64 with my Ack and
+Jayachandran's tested-by?
+
+Will
+
 > 
 > Thanks,
 > Mark.
@@ -56,12 +64,6 @@ On Tue, Apr 25, 2017 at 12:08:50PM +0100, Mark Rutland wrote:
 >  		return;
 >  
 >  	probe->present = true;
-
-The fixes the issue. So FWIW,
-
-Tested-by: Jayachandran C <jnair@caviumnetworks.com>
-
-Would appreciate it if this is queued with the ACPI PMU patchset which caused
-the problem.
-
-JC.
+> -- 
+> 1.9.1
+> 
