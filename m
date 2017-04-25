@@ -1,146 +1,84 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Apr 2017 10:03:32 +0200
-Subject: [PATCH 2/2 v5] ARM: dts: Qualcomm APQ8060 DragonBoard ALS sensor
-Message-ID: <20170425080332.3923-1-linus.walleij@linaro.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 25 Apr 2017 10:05:38 +0200
+Subject: support autofocus / autogain in libv4l2
+In-Reply-To: <20170424224724.5bb52382@vento.lan>
+References: <1487074823-28274-1-git-send-email-sakari.ailus@linux.intel.com>
+ <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
+ <20170414232332.63850d7b@vento.lan>
+ <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
+ <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
+ <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
+ <20170424224724.5bb52382@vento.lan>
+Message-ID: <20170425080538.GA30380@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Capella CM3605 ambient light and proximity sensor
-to the APQ8060 DragonBoard device tree. Notice that we also set
-up pin config for the AOUT line and GPIO lines, and that we set
-the default trigger on the infrared LED to associate with the
-"cm3605" trigger so the IR LED is controlled by this the CM3605
-driver.
+Hi!
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v5:
-- Switch to the twocell addressing scheme specified in the new
-  bindings.
-- The bindings and IIO driver are both queued for v4.12 in the
-  IIO tree and pending in linux-next
----
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 80 ++++++++++++++++++++++++++
- 1 file changed, 80 insertions(+)
+> > > > For focus to be useful, we need autofocus implmented
+> > > > somewhere. Unfortunately, v4l framework does not seem to provide good
+> > > > place where to put autofocus. I believe, long-term, we'll need some
+> > > > kind of "video server" providing this kind of services.
+> > > > 
+> > > > Anyway, we probably don't want autofocus in kernel (even through some
+> > > > cameras do it in hardware), and we probably don't want autofocus in
+> > > > each and every user application.
+> > > > 
+> > > > So what remains is libv4l2.   
+> > > 
+> > > IMO, the best place for autofocus is at libv4l2. Putting it on a
+> > > separate "video server" application looks really weird for me.  
+> > 
+> > Well... let me see. libraries are quite limited -- it is hard to open
+> > files, or use threads/have custom main loop. It may be useful to
+> > switch resolutions -- do autofocus/autogain at lower resolution, then
+> > switch to high one for taking picture. It would be good to have that
+> > in "system" code, but I'm not at all sure libv4l2 design will allow
+> > that.
+> 
+> I don't see why it would be hard to open files or have threads inside
+> a library. There are several libraries that do that already, specially
+> the ones designed to be used on multimidia apps.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-index 39d9e6ddefed..355b3b9c31bc 100644
---- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-+++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-@@ -23,6 +23,7 @@
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
-+#include <dt-bindings/pinctrl/qcom,pmic-mpp.h>
- #include "qcom-msm8660.dtsi"
- 
- / {
-@@ -83,6 +84,25 @@
- 		};
- 	};
- 
-+	/*
-+	 * Capella CM3605 light and proximity sensor mounted directly
-+	 * on the sensor board.
-+	 */
-+	cm3605 {
-+		compatible = "capella,cm3605";
-+		vdd-supply = <&pm8058_l14>; // 2.85V
-+		aset-gpios = <&pm8058_gpio 35 GPIO_ACTIVE_LOW>;
-+		capella,aset-resistance-ohms = <100000>;
-+		/* GPIO34 has interrupt 225 on the PM8058 */
-+		/* Trig on both edges - getting close or far away */
-+		interrupts-extended = <&pm8058 225 IRQ_TYPE_EDGE_BOTH>;
-+		/* MPP05 analog input to the XOADC */
-+		io-channels = <&xoadc 0x00 0x05>;
-+		io-channel-names = "aout";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&dragon_cm3605_gpios>, <&dragon_cm3605_mpps>;
-+	};
-+
- 	soc {
- 		pinctrl at 800000 {
- 			/* eMMMC pins, all 8 data lines connected */
-@@ -317,6 +337,24 @@
- 							power-source = <PM8058_GPIO_S3>;
- 						};
- 					};
-+					dragon_cm3605_gpios: cm3605-gpios {
-+						/* Pin 34 connected to the proxy IRQ */
-+						pinconf_gpio34 {
-+							pins = "gpio34";
-+							function = "normal";
-+							input-enable;
-+							bias-disable;
-+							power-source = <PM8058_GPIO_S3>;
-+						};
-+						/* Pin 35 connected to ASET */
-+						pinconf_gpio35 {
-+							pins = "gpio35";
-+							function = "normal";
-+							output-high;
-+							bias-disable;
-+							power-source = <PM8058_GPIO_S3>;
-+						};
-+					};
- 					dragon_veth_gpios: veth-gpios {
- 						pinconf {
- 							pins = "gpio40";
-@@ -327,6 +365,47 @@
- 					};
- 				};
- 
-+				mpps at 50 {
-+					dragon_cm3605_mpps: cm3605-mpps {
-+						pinconf {
-+							pins = "mpp5";
-+							function = "analog";
-+							input-enable;
-+							bias-high-impedance;
-+							/* Let's use channel 5 */
-+							qcom,amux-route = <PMIC_MPP_AMUX_ROUTE_CH5>;
-+							power-source = <PM8058_GPIO_S3>;
-+						};
-+					};
-+				};
-+
-+				xoadc at 197 {
-+					/* Reference voltage 2.2 V */
-+					xoadc-ref-supply = <&pm8058_l18>;
-+
-+					/* Board-specific channels */
-+					mpp5 at 05 {
-+						/* Connected to AOUT of ALS sensor */
-+						reg = <0x00 0x05>;
-+					};
-+					mpp6 at 06 {
-+						/* Connected to test point TP43 */
-+						reg = <0x00 0x06>;
-+					};
-+					mpp7 at 07 {
-+						/* Connected to battery thermistor */
-+						reg = <0x00 0x07>;
-+					};
-+					mpp8 at 08 {
-+						/* Connected to battery ID detector */
-+						reg = <0x00 0x08>;
-+					};
-+					mpp9 at 09 {
-+						/* Connected to XO thermistor */
-+						reg = <0x00 0x09>;
-+					};
-+				};
-+
- 				led at 48 {
- 					/*
- 					 * The keypad LED @0x48 is routed to
-@@ -340,6 +419,7 @@
- 					reg = <0x48>;
- 					label = "pm8058:infrared:proximitysensor";
- 					default-state = "off";
-+					linux,default-trigger = "cm3605";
- 				};
- 				led at 131 {
- 					compatible = "qcom,pm8058-led";
+Well, fd's are hard, because application can do fork() and now
+interesting stuff happens. Threads are tricky, because now you have
+locking etc.
+
+libv4l2 is designed to be LD_PRELOADED. That is not really feasible
+with "complex" library.
+
+> > It would be good if application could say "render live camera into
+> > this window" and only care about user interface, then say "give me a
+> > high resolution jpeg". But that would require main loop in the
+> > library...
+> 
+> Nothing prevents writing an upper layer on the top of libv4l in
+> order to provide such kind of functions.
+
+Agreed.
+
+> > It would be nice if more than one application could be accessing the
+> > camera at the same time... (I.e. something graphical running preview
+> > then using command line tool to grab a picture.) This one is
+> > definitely not solveable inside a library...
+> 
+> Someone once suggested to have something like pulseaudio for V4L.
+> For such usage, a server would be interesting. Yet, I would code it
+> in a way that applications using libv4l will talk with such daemon
+> in a transparent way.
+
+Yes, we need something like pulseaudio for V4L. And yes, we should
+make it transparent for applications using libv4l.
+
+Regards,
+									Pavel
 -- 
-2.9.3
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170425/576eccb4/attachment.sig>
