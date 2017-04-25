@@ -1,31 +1,57 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Tue, 25 Apr 2017 10:54:21 +0900
-Subject: [PATCH] arm64: dts: exynos: Remove the te-gpios property in the TM2
- boards
-References: <CGME20170425015437epcas5p43549d47e69519f43d89ba2de496ba451@epcas5p4.samsung.com>
-Message-ID: <1493085261-3488-1-git-send-email-hoegeun.kwon@samsung.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Mon, 24 Apr 2017 22:57:38 -0300
+Subject: support autofocus / autogain in libv4l2
+In-Reply-To: <20170424220701.GA27846@amd>
+References: <1487074823-28274-1-git-send-email-sakari.ailus@linux.intel.com>
+ <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
+ <20170414232332.63850d7b@vento.lan>
+ <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
+ <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
+ <20170424103802.00d3b554@vento.lan> <20170424220701.GA27846@amd>
+Message-ID: <20170424225731.7532e368@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The decon uses HW-TRIGGER, so TE interrupt is not necessary.
-Therefore, remove the te-gpios property in the TM2 dts.
+Em Tue, 25 Apr 2017 00:07:01 +0200
+Pavel Machek <pavel@ucw.cz> escreveu:
 
-Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
----
- arch/arm64/boot/dts/exynos/exynos5433-tm2.dts | 1 -
- 1 file changed, 1 deletion(-)
+> Hi!
+> 
+> > Please don't add a new application under lib/. It is fine if you want
+> > some testing application, if the ones there aren't enough, but please
+> > place it under contrib/test/.
+> > 
+> > You should likely take a look at v4l2grab first, as it could have
+> > almost everything you would need.  
+> 
+> I really need some kind of video output. v4l2grab is not useful
+> there. v4l2gl might be, but I don't think I have enough dependencies.
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-index 3ff9527..23191eb 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-+++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-@@ -60,7 +60,6 @@
- 		vci-supply = <&ldo28_reg>;
- 		reset-gpios = <&gpg0 0 GPIO_ACTIVE_LOW>;
- 		enable-gpios = <&gpf1 5 GPIO_ACTIVE_HIGH>;
--		te-gpios = <&gpf1 3 GPIO_ACTIVE_HIGH>;
- 	};
- };
- 
--- 
-1.9.1
+Well, you could use some app to show the snaps that v4l2grab takes.
+
+Yeah, compiling v4l2gl on N9 can indeed be complex. I suspect that it 
+shouldn't hard to compile xawtv there (probably disabling some optional
+features).
+
+> Umm, and it looks like libv4l can not automatically convert from
+> GRBG10.. and if it could, going through RGB24 would probably be too
+> slow on this device :-(.
+
+I suspect it shouldn't be hard to add support for GRBG10. It already
+supports 8 and 16 bits Bayer formats, at lib/libv4lconvert/bayer.c
+(to both RGB and YUV formats).
+
+How it would preform is another question ;)
+
+> > IMO, the above belongs to a separate processing module under
+> > 	lib/libv4lconvert/processing/  
+> 
+> Is there an example using autogain/autowhitebalance from
+> libv4lconvert?
+
+Well, if you plug a USB camera without those controls, it should
+automatically expose controls for it, as if the device had such
+controls.
+
+Thanks,
+Mauro
