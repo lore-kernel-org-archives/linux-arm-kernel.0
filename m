@@ -1,115 +1,92 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Tue, 25 Apr 2017 15:44:30 +0200
-Subject: [PATCH v2 2/2] arm64: process: dump memory around registers when
- displaying regs
-In-Reply-To: <20170425134430.5545-1-enric.balletbo@collabora.com>
-References: <20170425134430.5545-1-enric.balletbo@collabora.com>
-Message-ID: <20170425134430.5545-2-enric.balletbo@collabora.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 25 Apr 2017 15:53:24 +0200
+Subject: [PATCH V9 1/3] irq: Allow to pass the IRQF_TIMER flag with percpu
+ irq request
+In-Reply-To: <a4faf3bb-1641-8b6d-3e15-9f8ef46c9411@arm.com>
+References: <1493042494-14057-1-git-send-email-daniel.lezcano@linaro.org>
+ <398f3f3d-c567-0f1f-1a43-9b8d5805d5fd@arm.com> <20170424185909.GD2137@mai>
+ <92e2a022-93d4-d4f3-78af-c9b5d51bb867@arm.com> <20170424195948.GE2137@mai>
+ <16042494-2e67-e1a5-b9f6-af57e349d8a7@arm.com> <20170425083451.GA16888@mai>
+ <f840e9d2-8aac-dc1d-6468-44f7658b55b1@arm.com> <20170425094927.GB16888@mai>
+ <c98a5ff3-c2ea-5f94-d136-391bd7c224f3@arm.com> <20170425125103.GC16888@mai>
+ <a4faf3bb-1641-8b6d-3e15-9f8ef46c9411@arm.com>
+Message-ID: <7581d0d6-85ae-dca8-d2d6-4993e2560894@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Greg Hackmann <ghackmann@google.com>
+On 25/04/2017 15:22, Marc Zyngier wrote:
+> On 25/04/17 13:51, Daniel Lezcano wrote:
+>> On Tue, Apr 25, 2017 at 11:21:21AM +0100, Marc Zyngier wrote:
+>>> On 25/04/17 10:49, Daniel Lezcano wrote:
+>>>> On Tue, Apr 25, 2017 at 10:10:12AM +0100, Marc Zyngier wrote:
+>>>
+>>> [...]
+>>>
+>>>>>> +static inline void setup_timings(struct irq_desc *desc, struct irqaction *act)
+>>>>>> +{
+>>>>>> +	/*
+>>>>>> +	 * We don't need the measurement because the idle code already
+>>>>>> +	 * knows the next expiry event.
+>>>>>> +	 */
+>>>>>> +	if (act->flags & __IRQF_TIMER)
+>>>>>> +		return;
+>>>>>
+>>>>> And that's where this is really wrong for the KVM guest timer. As I
+>>>>> said, this timer is under complete control of the guest, and the rest of
+>>>>> the system doesn't know about it. KVM itself will only find out when the
+>>>>> vcpu does a VM exit for a reason or another, and will just save/restore
+>>>>> the state in order to be able to give the timer to another guest.
+>>>>>
+>>>>> The idle code is very much *not* aware of anything concerning that guest
+>>>>> timer.
+>>>>
+>>>> Just for my own curiosity, if there are two VM (VM1 and VM2). VM1 sets a timer1
+>>>> at <time> and exits, VM2 runs and sets a timer2 at <time+delta>.
+>>>>
+>>>> The timer1 for VM1 is supposed to expire while VM2 is running. IIUC the virtual
+>>>> timer is under control of VM2 and will expire at <time+delta>.
+>>>>
+>>>> Is the host wake up with the SW timer and switch in VM1 which in turn restores
+>>>> the timer and jump in the virtual timer irq handler?
+>>>
+>>> Indeed. The SW timer causes VM1 to wake-up, either on the same CPU
+>>> (preempting VM2) or on another. The timer is then restored with the
+>>> pending virtual interrupt injected, and the guest does what it has to
+>>> with it.
+>>
+>> Thanks for clarification.
+>>
+>> So there is a virtual timer with real registers / interruption (waking up the
+>> host) for the running VMs and SW timers for non-running VMs.
+>>
+>> What is the benefit of having such mechanism instead of real timers injecting
+>> interrupts in the VM without the virtual timer + save/restore? Efficiency in
+>> the running VMs when setting up timers (saving privileges change overhead)?
+> 
+> 
+> You can't dedicate HW resources to virtual CPUs. It just doesn't scale.
+> Also, injecting HW interrupts in a guest is pretty hard work, and for
+> multiple reasons:
+>   - the host needs to be in control of interrupt delivery (don't hog the
+> CPU with guest interrupts)
+>   - you want to be able to remap interrupts (id X on the host becomes id
+> Y on the guest),
+>   - you want to deal with migrating vcpus,
+>   - you want deliver an interrupt to a vcpu that is *not* running.
+> 
+> It *is* doable, but it is not cheap at all from a HW point of view.
 
-Dump a block of kernel memory from around the registers in the kernel oops
-dump. This is behind a config option (DEBUG_AROUND_REGS), since it adds
-a bunch of noise to the kernel logs (which someone can find valuable but
-not everyone else will).
 
-This is extremely useful in diagnosing remote crashes, and is based heavily
-on original work by Michael Davidson <md@google.com> and San Mehat
-<san@google.com>.
+Ok, I see.
 
-Signed-off-by: Greg Hackmann <ghackmann@google.com>
-[rework to use dump_mem]
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
-Same as 1/2 but for arm64 architecture.
+Thanks!
 
-Changes since v1:
- - Did not exists.
----
- arch/arm64/include/asm/traps.h |  3 +++
- arch/arm64/kernel/process.c    | 26 ++++++++++++++++++++++++++
- arch/arm64/kernel/traps.c      |  4 ++--
- 3 files changed, 31 insertions(+), 2 deletions(-)
+  -- Daniel
 
-diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
-index 02e9035..140f642 100644
---- a/arch/arm64/include/asm/traps.h
-+++ b/arch/arm64/include/asm/traps.h
-@@ -60,4 +60,7 @@ static inline int in_exception_text(unsigned long ptr)
- 	return in ? : __in_irqentry_text(ptr);
- }
- 
-+void dump_mem(const char *lvl, const char *str, unsigned long bottom,
-+	      unsigned long top);
-+
- #endif
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index ae2a835..5ee2f48 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -58,6 +58,7 @@
- #include <asm/mmu_context.h>
- #include <asm/processor.h>
- #include <asm/stacktrace.h>
-+#include <asm/traps.h>
- 
- #ifdef CONFIG_CC_STACKPROTECTOR
- #include <linux/stackprotector.h>
-@@ -170,6 +171,28 @@ void machine_restart(char *cmd)
- 	while (1);
- }
- 
-+/*
-+ * Dump a block of kernel memory from around the given address
-+ */
-+static void __show_regs_extra_data(struct pt_regs *regs, int nbytes)
-+{
-+#ifdef CONFIG_DEBUG_AROUND_REGS
-+	int i;
-+
-+	dump_mem("", "PC ", regs->pc - nbytes, regs->pc + nbytes);
-+	dump_mem("", "LR ", regs->regs[30] - nbytes, regs->regs[30] + nbytes);
-+	dump_mem("", "SP ", regs->sp - nbytes, regs->sp + nbytes);
-+
-+	for (i = 0; i < 30; i++) {
-+		char name[4];
-+
-+		snprintf(name, sizeof(name), "X%u", i);
-+		dump_mem("", name, regs->regs[i] - nbytes,
-+			 regs->regs[i] + nbytes);
-+	}
-+#endif
-+}
-+
- void __show_regs(struct pt_regs *regs)
- {
- 	int i, top_reg;
-@@ -205,6 +228,9 @@ void __show_regs(struct pt_regs *regs)
- 
- 		pr_cont("\n");
- 	}
-+
-+	if (!user_mode(regs))
-+		__show_regs_extra_data(regs, 128);
- }
- 
- void show_regs(struct pt_regs * regs)
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 1de444e..6d07675 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -59,8 +59,8 @@ int show_unhandled_signals = 1;
- /*
-  * Dump out the contents of some kernel memory nicely...
-  */
--static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
--		     unsigned long top)
-+void dump_mem(const char *lvl, const char *str, unsigned long bottom,
-+	      unsigned long top)
- {
- 	unsigned long first;
- 	mm_segment_t fs;
+
 -- 
-2.9.3
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
