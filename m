@@ -1,74 +1,36 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 25 Apr 2017 23:25:04 +0800
-Subject: [PATCH 2/3] drm/sun4i: Set TCON clock inside sun4i_tconX_mode_set
+Date: Tue, 25 Apr 2017 23:25:05 +0800
+Subject: [PATCH 3/3] drm/sun4i: backend: Clarify sun4i_backend_layer_enable
+ debug message
 In-Reply-To: <20170425152505.6796-1-wens@csie.org>
 References: <20170425152505.6796-1-wens@csie.org>
-Message-ID: <20170425152505.6796-3-wens@csie.org>
+Message-ID: <20170425152505.6796-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we are configuring the TCON's dot clock or special clock
-directly from the encoder mode_set functions. Since we already
-provide mode_set helper functions for the TCON's 2 channels, we
-can set the respective clock from those helpers, and reduce the
-exposure of the TCON's internals.
+sun4i_backend_layer_enable can be called to enable or disable a layer.
+However the debug message always says "Enable", which is confusing.
+
+This patch makes the debug message vary according to the enable state.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_rgb.c  | 2 --
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 6 ++++++
- drivers/gpu/drm/sun4i/sun4i_tv.c   | 2 --
- 3 files changed, 6 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index 1147451eb993..51ece4c39d7e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -175,8 +175,6 @@ static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index e9eca057ff35..e53107418add 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -73,7 +73,8 @@ void sun4i_backend_layer_enable(struct sun4i_backend *backend,
+ {
+ 	u32 val;
  
- 	sun4i_tcon0_mode_set(tcon, mode);
+-	DRM_DEBUG_DRIVER("Enabling layer %d\n", layer);
++	DRM_DEBUG_DRIVER("%sabling layer %d\n", enable ? "En" : "Dis",
++			 layer);
  
--	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
--
- 	/* FIXME: This seems to be board specific */
- 	clk_set_phase(tcon->dclk, 120);
- }
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 8301389c411d..29fd829aa54c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -131,6 +131,9 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
- 	u8 clk_delay;
- 	u32 val = 0;
- 
-+	/* Configure the dot clock */
-+	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
-+
- 	/* Adjust clock delay */
- 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
- 	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
-@@ -206,6 +209,9 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
- 
- 	WARN_ON(!tcon->quirks->has_channel_1);
- 
-+	/* Configure the dot clock */
-+	clk_set_rate(tcon->sclk1, mode->crtc_clock * 1000);
-+
- 	/* Adjust clock delay */
- 	clk_delay = sun4i_tcon_get_clk_delay(mode, 1);
- 	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-index 49c49431a053..542da220818b 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-@@ -486,8 +486,6 @@ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
- 		      SUN4I_TVE_RESYNC_FIELD : 0));
- 
- 	regmap_write(tv->regs, SUN4I_TVE_SLAVE_REG, 0);
--
--	clk_set_rate(tcon->sclk1, mode->crtc_clock * 1000);
- }
- 
- static struct drm_encoder_helper_funcs sun4i_tv_helper_funcs = {
+ 	if (enable)
+ 		val = SUN4I_BACKEND_MODCTL_LAY_EN(layer);
 -- 
 2.11.0
