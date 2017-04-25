@@ -1,35 +1,60 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Tue, 25 Apr 2017 13:47:55 +0800
-Subject: [linux-sunxi] [PATCH v4 07/10] mfd: axp20x: add axp20x-regulator
- cell for AXP803
-In-Reply-To: <CAGb2v673CL6TaZxkNR9SZDiG5G3cMqU1-=XeMj5gyDbQq4YzVA@mail.gmail.com>
-References: <20170424160103.9447-1-icenowy@aosc.io>
- <20170424160103.9447-8-icenowy@aosc.io>
- <CAGb2v673CL6TaZxkNR9SZDiG5G3cMqU1-=XeMj5gyDbQq4YzVA@mail.gmail.com>
-Message-ID: <135a9d075cdd4138db1a8937e5a1413f@aosc.io>
+From: hongxing.zhu@nxp.com (Richard Zhu)
+Date: Tue, 25 Apr 2017 06:09:54 +0000
+Subject: [PATCH] PCI: imx6: fix spelling mistake: "contol" -> "control"
+In-Reply-To: <20170421070230.16582-1-colin.king@canonical.com>
+References: <20170421070230.16582-1-colin.king@canonical.com>
+Message-ID: <AM5PR0402MB28502178051215CE9C1EBAD08C1E0@AM5PR0402MB2850.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-04-25 10:17?Chen-Yu Tsai ???
-> On Tue, Apr 25, 2017 at 12:01 AM, Icenowy Zheng <icenowy@aosc.io> 
-> wrote:
->> As axp20x-regulator now supports AXP803, add a cell for it.
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> Acked-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->> Changes in v4:
->> - Added a trailing comma for new cell, for easier further cell 
->> addition.
->> Changes in v3:
->> - Make the new cell one-liner.
->> 
->>  drivers/mfd/axp20x.c                 | 3 ++-
->>  drivers/regulator/axp20x-regulator.c | 6 +++---
-> 
-> Squashed in wrong patch?
 
-Oh seems so...
-
+> -----Original Message-----
+> From: Colin King [mailto:colin.king at canonical.com]
+> Sent: Friday, April 21, 2017 3:03 PM
+> To: Richard Zhu <hongxing.zhu@nxp.com>; Lucas Stach
+> <l.stach@pengutronix.de>; Bjorn Helgaas <bhelgaas@google.com>; linux-
+> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Subject: [PATCH] PCI: imx6: fix spelling mistake: "contol" -> "control"
 > 
-> ChenYu
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> trivial fix to spelling mistake in dev_err message
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Acked-by: Richard Zhu <hongxing.Zhu@nxp.com>
+
+Best Regards
+hongxing zhu
+Email: hongxing.zhu at nxp.com
+
+> ---
+>  drivers/pci/dwc/pci-imx6.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c index
+> 102edcf1e261..129717ae5022 100644
+> --- a/drivers/pci/dwc/pci-imx6.c
+> +++ b/drivers/pci/dwc/pci-imx6.c
+> @@ -726,13 +726,13 @@ static int imx6_pcie_probe(struct platform_device
+> *pdev)
+>  		imx6_pcie->pciephy_reset = devm_reset_control_get(dev,
+>  								  "pciephy");
+>  		if (IS_ERR(imx6_pcie->pciephy_reset)) {
+> -			dev_err(dev, "Failed to get PCIEPHY reset contol\n");
+> +			dev_err(dev, "Failed to get PCIEPHY reset control\n");
+>  			return PTR_ERR(imx6_pcie->pciephy_reset);
+>  		}
+> 
+>  		imx6_pcie->apps_reset = devm_reset_control_get(dev,
+> "apps");
+>  		if (IS_ERR(imx6_pcie->apps_reset)) {
+> -			dev_err(dev, "Failed to get PCIE APPS reset
+> contol\n");
+> +			dev_err(dev, "Failed to get PCIE APPS reset
+> control\n");
+>  			return PTR_ERR(imx6_pcie->apps_reset);
+>  		}
+>  		break;
+> --
+> 2.11.0
