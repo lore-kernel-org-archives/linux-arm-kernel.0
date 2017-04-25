@@ -1,95 +1,67 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Mon, 24 Apr 2017 22:47:31 -0300
-Subject: support autofocus / autogain in libv4l2
-In-Reply-To: <20170424212914.GA20780@amd>
-References: <1487074823-28274-1-git-send-email-sakari.ailus@linux.intel.com>
- <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
- <20170414232332.63850d7b@vento.lan>
- <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
- <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
- <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
-Message-ID: <20170424224724.5bb52382@vento.lan>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Tue, 25 Apr 2017 03:51:58 +0200
+Subject: [PATCH] [media] pxa_camera: fix module remove codepath for v4l2 clock
+Message-ID: <4391b498-0a75-ff42-6a7e-65aef0fada07@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, 24 Apr 2017 23:29:14 +0200
-Pavel Machek <pavel@ucw.cz> escreveu:
+The conversion from soc_camera omitted a correct handling of the clock
+gating for a sensor. When the pxa_camera driver module was removed it
+tried to unregister clk, but this caused a similar warning:
 
-> Hi!
-> 
-> > > For focus to be useful, we need autofocus implmented
-> > > somewhere. Unfortunately, v4l framework does not seem to provide good
-> > > place where to put autofocus. I believe, long-term, we'll need some
-> > > kind of "video server" providing this kind of services.
-> > > 
-> > > Anyway, we probably don't want autofocus in kernel (even through some
-> > > cameras do it in hardware), and we probably don't want autofocus in
-> > > each and every user application.
-> > > 
-> > > So what remains is libv4l2.   
-> > 
-> > IMO, the best place for autofocus is at libv4l2. Putting it on a
-> > separate "video server" application looks really weird for me.  
-> 
-> Well... let me see. libraries are quite limited -- it is hard to open
-> files, or use threads/have custom main loop. It may be useful to
-> switch resolutions -- do autofocus/autogain at lower resolution, then
-> switch to high one for taking picture. It would be good to have that
-> in "system" code, but I'm not at all sure libv4l2 design will allow
-> that.
+  WARNING: CPU: 0 PID: 6740 at drivers/media/v4l2-core/v4l2-clk.c:278
+  v4l2_clk_unregister(): Refusing to unregister ref-counted 0-0030 clock!
 
-I don't see why it would be hard to open files or have threads inside
-a library. There are several libraries that do that already, specially
-the ones designed to be used on multimidia apps.
+The clock was at time still refcounted by the sensor driver. Before
+the removing of the pxa_camera the clock must be dropped by the sensor
+driver. This should be triggered by v4l2_async_notifier_unregister() call
+which removes sensor driver module too, calls unbind() function and then
+tries to probe sensor driver again. Inside unbind() we can safely
+unregister the v4l2 clock as the sensor driver got removed. The original
+v4l2_clk_unregister() should be put inside test as the clock can be
+already unregistered from unbind(). If there was not any bound sensor
+the clock is still present.
 
-Resolution switch can indeed be a problem on devices that use MC
-and subdev API, as a plugin would be required to teach the library
-about N9 specifics (or the Kernel API should be improved to let
-a generic application to better detect the hardware capabilities).
+The codepath is practically a copy from the old soc_camera. The bug was
+tested with a pxa_camera+ov9640 combination during the conversion
+of the ov9640 from the soc_camera.
 
-> It would be good if application could say "render live camera into
-> this window" and only care about user interface, then say "give me a
-> high resolution jpeg". But that would require main loop in the
-> library...
+Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+---
+ drivers/media/platform/pxa_camera.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-Nothing prevents writing an upper layer on the top of libv4l in
-order to provide such kind of functions.
-
-> It would be nice if more than one application could be accessing the
-> camera at the same time... (I.e. something graphical running preview
-> then using command line tool to grab a picture.) This one is
-> definitely not solveable inside a library...
-
-Someone once suggested to have something like pulseaudio for V4L.
-For such usage, a server would be interesting. Yet, I would code it
-in a way that applications using libv4l will talk with such daemon
-in a transparent way.
-
-> > The above looks really odd. Why do you want to make libv4l2 dependent
-> > on sdl?  
-> 
-> I don't, but I had some nasty problems with linker; this should really
-> go into application but it refused to link. Scary libtool.
-
-That's weird. 
-
-
-> > If you're adding a SDL-specific application, you'll need to add the 
-> > needed autoconf bits to detect if SDL devel package is installed,
-> > auto-disabling it if not.
-> > 
-> > Yet, I don't think that SDL should be part of the library, but,
-> > instead, part of some application.  
-> 
-> Agreed. libtool prevented me from doing the right thing.
-
-if you add libSDL detection at configure.ac, you likely won't need to
-deal with libtool.
-
-On a quick look at web, it seems that there's a m4 module that does
-the right thing, according with:
-	https://wiki.libsdl.org/FAQLinux
-
-
-Thanks,
-Mauro
+diff --git a/drivers/media/platform/pxa_camera.c b/drivers/media/platform/pxa_camera.c
+index 929006f65cc7..6615f80fe059 100644
+--- a/drivers/media/platform/pxa_camera.c
++++ b/drivers/media/platform/pxa_camera.c
+@@ -2177,6 +2177,12 @@ static void pxa_camera_sensor_unbind(struct v4l2_async_notifier *notifier,
+ 	pxa_dma_stop_channels(pcdev);
+ 
+ 	pxa_camera_destroy_formats(pcdev);
++
++	if (pcdev->mclk_clk) {
++		v4l2_clk_unregister(pcdev->mclk_clk);
++		pcdev->mclk_clk = NULL;
++	}
++
+ 	video_unregister_device(&pcdev->vdev);
+ 	pcdev->sensor = NULL;
+ 
+@@ -2501,7 +2507,13 @@ static int pxa_camera_remove(struct platform_device *pdev)
+ 	dma_release_channel(pcdev->dma_chans[1]);
+ 	dma_release_channel(pcdev->dma_chans[2]);
+ 
+-	v4l2_clk_unregister(pcdev->mclk_clk);
++	v4l2_async_notifier_unregister(&pcdev->notifier);
++
++	if (pcdev->mclk_clk) {
++		v4l2_clk_unregister(pcdev->mclk_clk);
++		pcdev->mclk_clk = NULL;
++	}
++
+ 	v4l2_device_unregister(&pcdev->v4l2_dev);
+ 
+ 	dev_info(&pdev->dev, "PXA Camera driver unloaded\n");
+-- 
+2.11.0
