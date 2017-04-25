@@ -1,23 +1,21 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 25 Apr 2017 23:04:53 +0200
-Subject: [PATCH V2  0/2] correct ids for clk_testout
-In-Reply-To: <1493102470-22965-1-git-send-email-eddie.cai.linux@gmail.com>
-References: <1493102470-22965-1-git-send-email-eddie.cai.linux@gmail.com>
-Message-ID: <5003001.RcGOJBte3U@diego>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 26 Apr 2017 06:34:21 +0900
+Subject: [PATCH 0/2] pinctrl: trivial: remove unneeded (void *) casts in
+ of_match_table
+Message-ID: <1493156063-8446-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eddie,
-
-Am Dienstag, 25. April 2017, 14:41:08 CEST schrieb Eddie Cai:
-> we use clk_testout1 and clk_testout2 for camera. e.g. mipi 24M mclk. the ids
-> of clk_testout1 and clk_testout2 is wrong. it's time to correct it.
-
-Just to say, patches look good - thanks for explaining what the clocks are 
-going to be used for.
-
-I'll apply them after 4.12-rc1 is released (in roughly 2.5 weeks), due to
-needing a stable base for the clock-ids.
 
 
-Heiko
+
+Masahiro Yamada (2):
+  pinctrl: rockchip: remove unneeded (void *) casts in of_match_table
+  pinctrl: samsung: remove unneeded (void *) casts in of_match_table
+
+ drivers/pinctrl/pinctrl-rockchip.c        | 20 ++++++++++----------
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 20 ++++++++++----------
+ 2 files changed, 20 insertions(+), 20 deletions(-)
+
+-- 
+2.7.4
