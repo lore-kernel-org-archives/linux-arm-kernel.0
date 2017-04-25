@@ -1,57 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 25 Apr 2017 12:08:50 +0100
-Subject: [PATCH] arm64: pmuv3: handle pmuv3+
-Message-ID: <1493118530-5314-1-git-send-email-mark.rutland@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 25 Apr 2017 16:43:01 +0530
+Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
+In-Reply-To: <CAOMZO5BgjgxGhJ7zGV-gjs0QHmJMgkNryFqTYA=vGPz8KWDijg@mail.gmail.com>
+References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
+ <20170424040709.GG26900@vireshk-i7>
+ <CAOMZO5B4_xrLcWQGF=yRfj-14XQKudzjyr2roGRkzofkHCfuHg@mail.gmail.com>
+ <20170424112906.GR26900@vireshk-i7>
+ <CAOMZO5BpAsJAKv-p=WPevUnx71fxbLtunJe-0ijVT7T9m7AMSQ@mail.gmail.com>
+ <20170424114343.GS26900@vireshk-i7>
+ <CAOMZO5AkTKjU5kw0gszLVdVOc_Sb_sWhr65heE==kyw=5rcN-g@mail.gmail.com>
+ <20170425050633.GV26900@vireshk-i7>
+ <CAOMZO5BgjgxGhJ7zGV-gjs0QHmJMgkNryFqTYA=vGPz8KWDijg@mail.gmail.com>
+Message-ID: <20170425111301.GC1928@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f1b36dcb5c316c27 ("arm64: pmuv3: handle !PMUv3 when probing") is
-a little too restrictive, and prevents the use of of backwards
-compatible PMUv3 extenstions, which have a PMUver value other than 1.
+On 25-04-17, 08:09, Fabio Estevam wrote:
+> Hi Viresh,
+> 
+> On Tue, Apr 25, 2017 at 2:06 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> 
+> > Honestly, I don't have a clue on how can we fix it for you now :)
+> >
+> > @Rafael: Any idea apart from running at max all the time?
+> >
+> > what touchscreen driver are you using btw? Just curious to see if there is any
+> > bug in there. Handling touchscreen events shouldn't require us to run at max
+> > freq.
+> 
+> imx6q-sabresd board uses a drivers/input/touchscreen/egalax_ts.c touchscreen.
+> 
+> >
+> > @shawn: Saw something similar ever ?
+> 
+> I do not see the problem with the NXP kernel, but was not able to
+> identify what makes the touchscreen not to fail at 396MHz in their
+> kernel.
 
-For instance, ARMv8.1 PMU extensions (as implemented by ThunderX2) are
-reported with PMUver value 4.
+@Shawn/Sascha: Can you guys help here? This looks to be some imx
+specific stuff now.
 
-Per the usual ID register principles, at least 0x1-0x7 imply a
-PMUv3-compatible PMU. It's not currently clear whether 0x8-0xe imply the
-same.
-
-For the time being, treat the value as signed, and with 0x1-0x7 treated
-as meaning PMUv3 is implemented. This may be relaxed by future patches.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Jayachandran C <jnair@caviumnetworks.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/perf_event.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-Will, would you be happy to queue this fixup for v4.12?
-
-Thanks,
-Mark.
-
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 98c7493..5f64d19 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -966,13 +966,14 @@ static void __armv8pmu_probe_pmu(void *info)
- {
- 	struct armv8pmu_probe_info *probe = info;
- 	struct arm_pmu *cpu_pmu = probe->pmu;
--	u64 dfr0, pmuver;
-+	u64 dfr0;
- 	u32 pmceid[2];
-+	int pmuver;
- 
- 	dfr0 = read_sysreg(id_aa64dfr0_el1);
--	pmuver = cpuid_feature_extract_unsigned_field(dfr0,
-+	pmuver = cpuid_feature_extract_signed_field(dfr0,
- 			ID_AA64DFR0_PMUVER_SHIFT);
--	if (pmuver != 1)
-+	if (pmuver < 1)
- 		return;
- 
- 	probe->present = true;
 -- 
-1.9.1
+viresh
