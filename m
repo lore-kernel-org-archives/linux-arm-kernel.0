@@ -1,86 +1,81 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Tue, 25 Apr 2017 13:03:47 +0000
-Subject: [PATCH v5 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
-In-Reply-To: <20170421175705.GB17916@bhelgaas-glaptop.roam.corp.google.com>
-References: <1492115445-4069-1-git-send-email-jnair@caviumnetworks.com>
- <1492115445-4069-3-git-send-email-jnair@caviumnetworks.com>
- <20170414001911.GA13163@bhelgaas-glaptop.roam.corp.google.com>
- <20170414210646.GA5346@localhost>
- <CAErSpo731xSzrnKF+G+8SA_UUHy7ROA1V9oFkpwKi85GQf9VAg@mail.gmail.com>
- <20170417174712.GA7575@localhost>
- <CAErSpo6+do8GXon3EzZAUpqc2TFsA0BDwWBULqZCd1ayCJhD6w@mail.gmail.com>
- <20170421170414.GA2429@localhost>
- <20170421175705.GB17916@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170425130346.GA30542@localhost>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Tue, 25 Apr 2017 14:16:17 +0100
+Subject: [PATCH v4 2/5] ARM: dts: rockchip: add ARM Mali GPU node for rk3288
+In-Reply-To: <cover.1493125299.git.guillaume.tucker@collabora.com>
+References: <cover.1493125299.git.guillaume.tucker@collabora.com>
+Message-ID: <a63b581014030f635835109901c29a86041cd766.1493125299.git.guillaume.tucker@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 12:57:05PM -0500, Bjorn Helgaas wrote:
-> On Fri, Apr 21, 2017 at 05:05:41PM +0000, Jayachandran C wrote:
-> > On Fri, Apr 21, 2017 at 10:48:15AM -0500, Bjorn Helgaas wrote:
-> > > On Mon, Apr 17, 2017 at 12:47 PM, Jayachandran C
-> > > <jnair@caviumnetworks.com> wrote:
-> > > > On Fri, Apr 14, 2017 at 09:00:06PM -0500, Bjorn Helgaas wrote:
-> 
-> > > >> Could you collect "lspci -vv" output from this system?  I'd like to
-> > > >> archive that as background for this IOMMU issue and the ASPM tweaks I
-> > > >> suspect we'll have to do.  I *wish* we had more information about that
-> > > >> VIA thing, because I suspect we could get rid of it if we had more
-> > > >> details.
-> > > >
-> > > > The full logs are slightly large, so I have kept them at:
-> > > > https://github.com/jchandra-cavm/thunderx2/blob/master/logs/
-> > > > The lspci -vv output is lspci-vv.txt and lspci -tvn output is lspci-tvn.txt
-> > > >
-> > > > The output is from 2 socket system, the cards are not on the first slot
-> > > > like the example above, so the bus and device numbers are different.
-> > > 
-> > > Can somebody with this system collect the "lspci -xxxx" output as well?
-> > > 
-> > > I'm making some lspci changes to handle the PCI-to-PCIe bridge
-> > > correctly, and I can use the "lspci -xxxx" output to create an lspci
-> > > test case.
-> > 
-> > [Sorry was AFK for a few days]
-> > 
-> > I have updated the above directory with the log. Also tested your next branch
-> > and it works fine on ThunderX2.
-> 
-> Thanks!
-> 
-> With regard to my lspci changes, they add "Slot-" here:
-> 
->    01:0a.0 PCI bridge: Broadcom Corporation Device 9039
->    ...
->   -   Capabilities: [40] Express (v2) PCI/PCI-X to PCI-Express Bridge, MSI 00
->   +   Capabilities: [40] Express (v2) PCI/PCI-X to PCI-Express Bridge (Slot-), MSI 00
-> 
-> for all your PCI-to-PCIe bridges.  I assume the "Slot-" is correct, i.e.,
-> the link is not connected to a slot, right?  This comes from the "Slot
-> Implemented" bit in the PCIe Capabilities Register.
+Add Mali GPU device tree node for the rk3288 SoC, with devfreq
+opp table.
 
-Yes, Slot- should be correct.
+Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
+---
+ arch/arm/boot/dts/rk3288.dtsi | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index df8a0dbe9d91..35969041eae2 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -43,6 +43,7 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
+ #include <dt-bindings/clock/rk3288-cru.h>
++#include <dt-bindings/power/rk3288-power.h>
+ #include <dt-bindings/thermal/thermal.h>
+ #include <dt-bindings/power/rk3288-power.h>
+ #include <dt-bindings/soc/rockchip,boot-mode.h>
+@@ -1117,6 +1118,48 @@
+ 		};
+ 	};
  
-> I did notice that all the Root Port devices claim to *not* be connected to
-> slots, which doesn't seem right.  For example,
-> 
->   12:00.0 PCI bridge: Broadcom Corporation Device 9084
->       Bus: primary=12, secondary=13, subordinate=14, sec-latency=0
->       Capabilities: [ac] Express (v2) Root Port (Slot-), MSI 00
-> 
->   13:00.0 Ethernet controller: Intel Corporation 82599EB 10-Gigabit SFI/SFP+ Network Connection
-> 
-> It seems strange because the 12:00.0 Root Port looks like it probably
-> *does* lead to a slot where the NIC is plugged in.  Or is that NIC really
-> soldered down?
-> 
-> But I assume there are *some* PCIe slots, so at some of those Root Ports
-> should advertise "Slot+" (which by itself does not imply hotplug support,
-> if that's the concern).
-
-The Root Ports are connected to a slot, so I am not sure why the slot implemented
-bit is not set. There seems to be nothing useful in the slot capabilites, so this
-may be ok for now. I have reported this to the hardware team.
-
-Thanks for the review and the comments,
-JC.
++	gpu: mali at ffa30000 {
++		compatible = "rockchip,rk3288-mali", "arm,mali-t760", "arm,mali-midgard";
++		reg = <0xffa30000 0x10000>;
++		interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "job", "mmu", "gpu";
++		clocks = <&cru ACLK_GPU>;
++		operating-points-v2 = <&gpu_opp_table>;
++		power-domains = <&power RK3288_PD_GPU>;
++		status = "disabled";
++	};
++
++	gpu_opp_table: opp_table0 {
++		compatible = "operating-points-v2";
++
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++			opp-microvolt = <950000>;
++		};
++		opp at 200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++			opp-microvolt = <950000>;
++		};
++		opp at 300000000 {
++			opp-hz = /bits/ 64 <300000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp at 400000000 {
++			opp-hz = /bits/ 64 <400000000>;
++			opp-microvolt = <1100000>;
++		};
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <1200000>;
++		};
++		opp at 600000000 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <1250000>;
++		};
++	};
++
+ 	qos_gpu_r: qos at ffaa0000 {
+ 		compatible = "syscon";
+ 		reg = <0xffaa0000 0x20>;
+-- 
+2.11.0
