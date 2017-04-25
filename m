@@ -1,38 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 25 Apr 2017 08:09:22 -0300
-Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
-In-Reply-To: <20170425050633.GV26900@vireshk-i7>
-References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
- <20170424040709.GG26900@vireshk-i7>
- <CAOMZO5B4_xrLcWQGF=yRfj-14XQKudzjyr2roGRkzofkHCfuHg@mail.gmail.com>
- <20170424112906.GR26900@vireshk-i7>
- <CAOMZO5BpAsJAKv-p=WPevUnx71fxbLtunJe-0ijVT7T9m7AMSQ@mail.gmail.com>
- <20170424114343.GS26900@vireshk-i7>
- <CAOMZO5AkTKjU5kw0gszLVdVOc_Sb_sWhr65heE==kyw=5rcN-g@mail.gmail.com>
- <20170425050633.GV26900@vireshk-i7>
-Message-ID: <CAOMZO5BgjgxGhJ7zGV-gjs0QHmJMgkNryFqTYA=vGPz8KWDijg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Apr 2017 13:09:27 +0200
+Subject: [RFC] usb: chipidea: set dma_ops for the created ci_hdrc
+ platform_device
+In-Reply-To: <20170425180151.0f03ca0e@xhacker>
+References: <20170425180151.0f03ca0e@xhacker>
+Message-ID: <CAK8P3a09fJCexChnoEyBpLK17rHaQTz9G+7iZWRocZGykyxsWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
-
-On Tue, Apr 25, 2017 at 2:06 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-
-> Honestly, I don't have a clue on how can we fix it for you now :)
+On Tue, Apr 25, 2017 at 12:01 PM, Jisheng Zhang <jszhang@marvell.com> wrote:
+> Hi all,
 >
-> @Rafael: Any idea apart from running at max all the time?
+> After commit 1dccb598df549 ("arm64: simplify dma_get_ops"), the chipidea
+> driver can't work any more on Marvell Berlin arm64 platforms, the reason
+> is the created ci_hdrc platform_device's dma_ops is dummy_dma_ops, so all
+> dma related operations will fail. The fix I can think of would be something
+> as below:
 >
-> what touchscreen driver are you using btw? Just curious to see if there is any
-> bug in there. Handling touchscreen events shouldn't require us to run at max
-> freq.
+> And I noticed that dwc3 has the same issue[1], and as pointed out in its
+> discussion, the patch can't fix None-DT platforms, so could you please
+> guide me what's the proper fix which can be mainlined?
 
-imx6q-sabresd board uses a drivers/input/touchscreen/egalax_ts.c touchscreen.
+I think the right solution is:
 
->
-> @shawn: Saw something similar ever ?
+- Set the "sysdev" pointer tin the USB device o the device structure that
+  was created by DT or the legacy board file and remove the manual
+  setting of dma_mask,  parms and the dma_configure. This should
+  make everything work as expected in case of DT
 
-I do not see the problem with the NXP kernel, but was not able to
-identify what makes the touchscreen not to fail at 396MHz in their
-kernel.
+- For any legacy board files, set the mask/parms and map_ops at
+  the point where the device originally created.
 
-Thanks
+      Arnd
