@@ -1,39 +1,40 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 25 Apr 2017 23:25:02 +0800
-Subject: [PATCH 0/3] drm/sun4i: More cleanups and fixes
-Message-ID: <20170425152505.6796-1-wens@csie.org>
+Date: Tue, 25 Apr 2017 23:25:03 +0800
+Subject: [PATCH 1/3] drm/sun4i: Drop unused tcon pointer
+In-Reply-To: <20170425152505.6796-1-wens@csie.org>
+References: <20170425152505.6796-1-wens@csie.org>
+Message-ID: <20170425152505.6796-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+The sun4i DRM driver now uses 2 lists to track backends and tcons.
+During the switch, the original tcon pointer was not removed.
 
-The subject is probably getting old. Here are a few more cleanups.
+As it is now unused, remove it, so other new drivers can't accidentally
+use it.
 
-Patch 1 should have been part of the patch
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+
+As mentioned in the cover letter, please squash this into the patch
 
     drm/sun4i: Use lists to track registered display backends and TCONs
 
-from my multiple pipeline support series. Please squash it in if you can.
+---
+ drivers/gpu/drm/sun4i/sun4i_drv.h | 1 -
+ 1 file changed, 1 deletion(-)
 
-Patch 2 just moves setting the TCON clocks back inside the TCON driver.
-
-Patch 3 cleans up a DRM driver debug message.
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (3):
-  drm/sun4i: Drop unused tcon pointer
-  drm/sun4i: Set TCON clock inside sun4i_tconX_mode_set
-  drm/sun4i: backend: Clarify sun4i_backend_layer_enable debug message
-
- drivers/gpu/drm/sun4i/sun4i_backend.c | 3 ++-
- drivers/gpu/drm/sun4i/sun4i_drv.h     | 1 -
- drivers/gpu/drm/sun4i/sun4i_rgb.c     | 2 --
- drivers/gpu/drm/sun4i/sun4i_tcon.c    | 6 ++++++
- drivers/gpu/drm/sun4i/sun4i_tv.c      | 2 --
- 5 files changed, 8 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
+index 835bdb5cc0c2..250c29017ef5 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.h
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
+@@ -20,7 +20,6 @@
+ struct sun4i_drv {
+ 	struct list_head	backend_list;
+ 	struct list_head	tcon_list;
+-	struct sun4i_tcon	*tcon;
+ 
+ 	struct drm_fbdev_cma	*fbdev;
+ };
 -- 
 2.11.0
