@@ -1,200 +1,76 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 25 Apr 2017 10:43:42 +0200
-Subject: [PATCH 2/2] reset: Add a Gemini reset controller
-In-Reply-To: <20170424192802.27430-1-linus.walleij@linaro.org>
-References: <20170424192802.27430-1-linus.walleij@linaro.org>
-Message-ID: <1493109822.2394.15.camel@pengutronix.de>
+From: yangbo.lu@nxp.com (Y.B. Lu)
+Date: Tue, 25 Apr 2017 09:01:28 +0000
+Subject: [PATCH 0/3] Add eSDHC UHS-I/HS200 mode support for
+ ls1012a/ls1046a/ls208xa
+In-Reply-To: <CAPDyKFp_TWSj7FH6KagU4gz+A9CR-thwU9b1WaSEgupZMBAyaQ@mail.gmail.com>
+References: <1492746756-12024-1-git-send-email-yangbo.lu@nxp.com>
+ <CAPDyKFp_TWSj7FH6KagU4gz+A9CR-thwU9b1WaSEgupZMBAyaQ@mail.gmail.com>
+Message-ID: <DB6PR0401MB253641C6AB25737F9F57EE8DF81E0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-thank you for the patch. A few comments and questions below:
-
-On Mon, 2017-04-24 at 21:28 +0200, Linus Walleij wrote:
-> The Cortina Systems Gemini reset controller is a simple
-> 32bit register with self-deasserting reset lines. It is
-> accessed using regmap over syscon.
+> -----Original Message-----
+> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
+> Sent: Tuesday, April 25, 2017 4:17 AM
+> To: Y.B. Lu
+> Cc: linux-arm-kernel at lists.infradead.org; Shawn Guo; Catalin Marinas;
+> Xiaobo Xie
+> Subject: Re: [PATCH 0/3] Add eSDHC UHS-I/HS200 mode support for
+> ls1012a/ls1046a/ls208xa
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/reset/Kconfig        |   7 +++
->  drivers/reset/Makefile       |   1 +
->  drivers/reset/reset-gemini.c | 112 +++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 120 insertions(+)
->  create mode 100644 drivers/reset/reset-gemini.c
+> On 21 April 2017 at 05:52, Yangbo Lu <yangbo.lu@nxp.com> wrote:
+> > This patch is to add eSDHC UHS-I/HS200 mode support for
+> ls1012a/ls1046a/ls208xa.
+> > Because eSDHC is not a standard SD controller, the specific speed mode
+> > support depends on board's peripheral circuit for eSDHC. So, we have
+> > to add these speed modes support on board dts file.
+> >
+> > In additon, these dts patches depends on esdhc driver patches which
+> > just had been merged on mmc.git. Otherwise, the UHS-I SD card and eMMC
+> > HS200 card would fail to be initialized, but other cards still could
+> work fine.
+> > https://patchwork.kernel.org/patch/9689875/
+> > https://patchwork.kernel.org/patch/9689877/
+> > https://patchwork.kernel.org/patch/9689879/
+> > https://patchwork.kernel.org/patch/9689887/
+> > https://patchwork.kernel.org/patch/9689885/
+> >
+> > Yangbo Lu (3):
+> >   arm64: dts: ls1046a: support SD UHS-I and eMMC HS200 on RDB
+> >   arm64: dts: ls208xa: support SD UHS-I on RDB and eMMC HS200 on QDS
+> >   arm64: dts: ls1012a: add eSDHC nodes
+> >
+> >  arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  |  8 +++++++
+> > arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts  | 13 +++++++++++
+> >  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 25
+> ++++++++++++++++++++++
+> >  arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts  |  8 +++++++
+> >  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     |  4 ++--
+> >  arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi |  1 +
+> > arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi |  4 ++++
+> >  arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |  2 +-
+> >  8 files changed, 62 insertions(+), 3 deletions(-)
+> >
+> > --
+> > 2.1.0.27.g96db324
+> >
 > 
-> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-> index f4cdfe94b9ec..a82e1a78de25 100644
-> --- a/drivers/reset/Kconfig
-> +++ b/drivers/reset/Kconfig
-> @@ -27,6 +27,13 @@ config RESET_BERLIN
->  	help
->  	  This enables the reset controller driver for Marvell Berlin SoCs.
->  
-> +config RESET_GEMINI
-> +	bool "Gemini Reset Driver" if COMPILE_TEST
-> +	default ARCH_GEMINI
-> +	select MFD_SYSCON
-> +	help
-> +	  This enables the reset controller driver for Cortina Systems Gemini.
-> +
->  config RESET_LPC18XX
->  	bool "LPC18xx/43xx Reset Driver" if COMPILE_TEST
->  	default ARCH_LPC18XX
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> index 2cd3f6c45165..99e90ad18545 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -4,6 +4,7 @@ obj-$(CONFIG_ARCH_STI) += sti/
->  obj-$(CONFIG_ARCH_TEGRA) += tegra/
->  obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
->  obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
-> +obj-$(CONFIG_RESET_GEMINI) += reset-gemini.o
->  obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
->  obj-$(CONFIG_RESET_MESON) += reset-meson.o
->  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
-> diff --git a/drivers/reset/reset-gemini.c b/drivers/reset/reset-gemini.c
-> new file mode 100644
-> index 000000000000..481facbb2709
-> --- /dev/null
-> +++ b/drivers/reset/reset-gemini.c
-> @@ -0,0 +1,112 @@
-> +/*
-> + * Cortina Gemini Reset controller driver
-> + * Copyright (c) 2017 Linus Walleij <linus.walleij@linaro.org>
+> By curiosity I tried applying these to my mmc tree, but they don't apply.
+> So I can pick them, even with acks.
+> Also it's too difficult for me to host an immutable branch with the
+> relevant sdhci-esdc changes, because of additional sdhci dependencies.
+> 
+> Perhaps just easier to pick this for 4.13 or 4.12 rc2.
 
-No license statement, choice or oversight?
+[Lu Yangbo-B47093] Hi Uffe, I agree.
+These patches are based on Shawn's tree which has the latest layerscape board dts.
+Actually I'm not sure which git tree I should send these patches to according to MAINTAINERS, but I saw Shawn had merged some layerscape board dts before.
 
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/regmap.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset-controller.h>
-> +
-> +/**
-> + * struct gemini_reset - gemini reset controller
-> + * @map: regmap to access the containing system controller
-> + * @dev: pointer back to device
-> + * @rcdev: reset controller device
-> + */
-> +struct gemini_reset {
-> +	struct regmap *map;
-> +	struct device *dev;
+Hi Shawn,
+Am I right to send these patches to you for reviewing? Which git tree do you recommend I should send these patches to?
 
-dev is unused, can be dropped.
+Thanks.
 
-> +	struct reset_controller_dev rcdev;
-> +};
-> +
-> +#define GEMINI_GLOBAL_SOFT_RESET 0x0c
-> +
-> +#define to_gemini_reset(p) \
-> +	container_of((p), struct gemini_reset, rcdev)
-> +
-> +/*
-> + * This is a self-deasserting reset controller.
-> + */
-> +static int gemini_reset(struct reset_controller_dev *rcdev,
-> +			unsigned long id)
-> +{
-> +	struct gemini_reset *gr = to_gemini_reset(rcdev);
-> +
-> +	/* Manual says to always set BIT 30 to 1 */
-> +	return regmap_write(gr->map,
-> +			    GEMINI_GLOBAL_SOFT_RESET,
-> +			    BIT(30) | BIT(id));
-
-BIT(30) is called CPU1 reset in the DT binding, maybe add a #define?
-
-> +}
-> +
-> +static int gemini_reset_status(struct reset_controller_dev *rcdev,
-> +			     unsigned long id)
-> +{
-> +	struct gemini_reset *gr = to_gemini_reset(rcdev);
-> +	u32 val;
-> +	int ret;
-> +
-> +	ret = regmap_read(gr->map, GEMINI_GLOBAL_SOFT_RESET, &val);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return !!(val & BIT(id));
-> +}
-> +
-> +static const struct reset_control_ops gemini_reset_ops = {
-> +	.reset = gemini_reset,
-> +	.status = gemini_reset_status,
-> +};
-> +
-> +static int gemini_reset_probe(struct platform_device *pdev)
-> +{
-> +	struct gemini_reset *gr;
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *np = dev->of_node;
-> +	struct device_node *parent_np = np->parent;
-> +	int ret;
-> +
-> +	if (!parent_np) {
-
-Is this even possible?
-
-> +		dev_err(dev, "missing parent node\n");
-> +		return -ENODEV;
-> +	}
->+
-> +	gr = devm_kzalloc(dev, sizeof(*gr), GFP_KERNEL);
-> +	if (!gr)
-> +		return -ENOMEM;
-> +
-> +	gr->dev = dev;
-
-Can be dropped.
-
-> +	gr->map = syscon_node_to_regmap(parent_np);
-> +	if (IS_ERR(gr->map)) {
-> +		dev_err(dev, "unable to get regmap");
-
-It might be helpful to print the error code here.
-
-> +		return PTR_ERR(gr->map);
-> +	}
-> +	gr->rcdev.owner = THIS_MODULE;
-> +	gr->rcdev.nr_resets = 32;
-> +	gr->rcdev.ops = &gemini_reset_ops;
-> +	gr->rcdev.of_node = pdev->dev.of_node;
-> +
-> +	ret = devm_reset_controller_register(&pdev->dev, &gr->rcdev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	dev_info(dev, "registered Gemini reset controller\n");
-
-This is a bit verbose. I'd remove it and shorten the last part to:
-
-	return devm_reset_controller_register(&pdev->dev, &gr->rcdev);
-
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id gemini_reset_dt_ids[] = {
-> +	{ .compatible = "cortina,gemini-reset", },
-> +	{ /* sentinel */ },
-> +};
-> +
-> +static struct platform_driver gemini_reset_driver = {
-> +	.probe	= gemini_reset_probe,
-> +	.driver = {
-> +		.name		= "gemini-reset",
-> +		.of_match_table	= gemini_reset_dt_ids,
-> +	},
-> +};
-> +builtin_platform_driver(gemini_reset_driver);
-
-regards
-Philipp
+> 
+> Kind regards
+> Uffe
