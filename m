@@ -1,57 +1,47 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Tue, 25 Apr 2017 15:27:52 +0530
-Subject: [PATCH v2] iommu/arm-smmu: Return IOVA in iova_to_phys when SMMU is
- bypassed
-Message-ID: <1493114272-30093-1-git-send-email-sunil.kovvuri@gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 25 Apr 2017 18:01:51 +0800
+Subject: [RFC] usb: chipidea: set dma_ops for the created ci_hdrc
+ platform_device
+Message-ID: <20170425180151.0f03ca0e@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+Hi all,
 
-For software initiated address translation, when domain type is
-IOMMU_DOMAIN_IDENTITY i.e SMMU is bypassed, mimic HW behavior
-i.e return the same IOVA as translated address.
+After commit 1dccb598df549 ("arm64: simplify dma_get_ops"), the chipidea
+driver can't work any more on Marvell Berlin arm64 platforms, the reason
+is the created ci_hdrc platform_device's dma_ops is dummy_dma_ops, so all
+dma related operations will fail. The fix I can think of would be something
+as below:
 
-This patch is an extension to Will Deacon's patchset
-"Implement SMMU passthrough using the default domain".
+And I noticed that dwc3 has the same issue[1], and as pointed out in its
+discussion, the patch can't fix None-DT platforms, so could you please
+guide me what's the proper fix which can be mainlined?
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
+Any suggestion is appreciated!
 
-V2
-- As per Will's suggestion applied fix to SMMUv3 driver as well.
+Thanks,
+Jisheng
 
- drivers/iommu/arm-smmu-v3.c | 3 +++
- drivers/iommu/arm-smmu.c    | 3 +++
- 2 files changed, 6 insertions(+)
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/425079.html
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 05b4592..d412bdd 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1714,6 +1714,9 @@ arm_smmu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
- 	struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 047afdbb7049..acb80457603c 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -62,6 +62,7 @@
+ #include <linux/usb/chipidea.h>
+ #include <linux/usb/of.h>
+ #include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/usb/ehci_def.h>
  
-+	if (domain->type == IOMMU_DOMAIN_IDENTITY)
-+		return iova;
-+
- 	if (!ops)
- 		return 0;
+@@ -786,6 +787,7 @@ struct platform_device *ci_hdrc_add_device(struct device *dev,
+ 	pdev->dev.dma_mask = dev->dma_mask;
+ 	pdev->dev.dma_parms = dev->dma_parms;
+ 	dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
++	of_dma_configure(&pdev->dev, dev->of_node);
  
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index bfab4f7..81088cd 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1459,6 +1459,9 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
- 	struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
- 
-+	if (domain->type == IOMMU_DOMAIN_IDENTITY)
-+		return iova;
-+
- 	if (!ops)
- 		return 0;
- 
--- 
-2.7.4
+ 	ret = platform_device_add_resources(pdev, res, nres);
+ 	if (ret)
