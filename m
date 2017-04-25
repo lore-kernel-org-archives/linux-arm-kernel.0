@@ -1,51 +1,72 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 25 Apr 2017 12:41:28 +0300
-Subject: [PATCH 2/2] ARM: dts: Add the ethernet and ethernet PHY to the
- cygnus core DT.
-In-Reply-To: <20170424215022.30382-3-eric@anholt.net>
-References: <20170424215022.30382-1-eric@anholt.net>
- <20170424215022.30382-3-eric@anholt.net>
-Message-ID: <86e911e7-ca92-af6e-8efb-812ee1939320@cogentembedded.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 25 Apr 2017 17:43:11 +0800
+Subject: [PATCH] usb: chipidea: properly handle host or gadget initialization
+ failure
+Message-ID: <20170425094311.361-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/25/2017 12:50 AM, Eric Anholt wrote:
+If ci_hdrc_host_init() or ci_hdrc_gadget_init() returns error and the
+error != -ENXIO, as Peter pointed out, "it stands for initialization
+for host or gadget has failed", so we'd better return failure rather
+continue.
 
-> Cygnus has a single amac controller connected to the B53 switch with 2
-> PHYs.  On the BCM911360_EP platform, those two PHYs are connected to
-> the external ethernet jacks.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  arch/arm/boot/dts/bcm-cygnus.dtsi      | 60 ++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/bcm911360_entphn.dts |  8 +++++
->  2 files changed, 68 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-> index 009f1346b817..318899df9972 100644
-> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-[...]
-> @@ -295,6 +345,16 @@
->  			status = "disabled";
->  		};
->
-> +		eth0: enet at 18042000 {
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/usb/chipidea/core.c | 25 +++++++++++++++++++------
+ 1 file changed, 19 insertions(+), 6 deletions(-)
 
-    Oh, and this one should be named "ethernet", according to the DT spec.
-
-> +			compatible = "brcm,amac";
-> +			reg = <0x18042000 0x1000>,
-> +			      <0x18110000 0x1000>;
-> +			reg-names = "amac_base", "idm_base";
-> +			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
-> +			max-speed = <1000>;
-> +			status = "disabled";
-> +		};
-> +
->  		nand: nand at 18046000 {
->  			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
->  			reg = <0x18046000 0x600>, <0xf8105408 0x600>,
-[...]
-
-MBR, Sergei
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 79ad8e91632e..047afdbb7049 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -930,20 +930,28 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	/* initialize role(s) before the interrupt is requested */
+ 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
+ 		ret = ci_hdrc_host_init(ci);
+-		if (ret)
+-			dev_info(dev, "doesn't support host\n");
++		if (ret) {
++			if (ret == -ENXIO)
++				dev_info(dev, "doesn't support host\n");
++			else
++				goto deinit_phy;
++		}
+ 	}
+ 
+ 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
+ 		ret = ci_hdrc_gadget_init(ci);
+-		if (ret)
+-			dev_info(dev, "doesn't support gadget\n");
++		if (ret) {
++			if (ret == -ENXIO)
++				dev_info(dev, "doesn't support gadget\n");
++			else
++				goto deinit_host;
++		}
+ 	}
+ 
+ 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
+ 		dev_err(dev, "no supported roles\n");
+ 		ret = -ENODEV;
+-		goto deinit_phy;
++		goto deinit_gadget;
+ 	}
+ 
+ 	if (ci->is_otg && ci->roles[CI_ROLE_GADGET]) {
+@@ -1013,7 +1021,12 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 		return 0;
+ 
+ stop:
+-	ci_role_destroy(ci);
++	if (ci->is_otg)
++		ci_hdrc_otg_destroy(ci);
++deinit_gadget:
++	ci_hdrc_gadget_destroy(ci);
++deinit_host:
++	ci_hdrc_host_destroy(ci);
+ deinit_phy:
+ 	ci_usb_phy_exit(ci);
+ ulpi_exit:
+-- 
+2.11.0
