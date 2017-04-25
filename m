@@ -1,44 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 25 Apr 2017 14:02:51 -0300
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
-In-Reply-To: <CAOMZO5BsgXRfgZ0hszk2Vgo2keVDHH1BLbJTbW+awMS2cBoNow@mail.gmail.com>
-References: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
- <CAOMZO5BsgXRfgZ0hszk2Vgo2keVDHH1BLbJTbW+awMS2cBoNow@mail.gmail.com>
-Message-ID: <CAOMZO5CKUsEr1yf5RrsPLipNtLC_6sK0dPjT2M-eN-uo8hEbrQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 25 Apr 2017 10:13:51 -0700
+Subject: [PATCH 2/2] arm64: pmu: Wire-up L2 cache events for ARMv8 PMUv3
+In-Reply-To: <20170425124427.GI24484@arm.com>
+References: <20170420190546.7453-1-f.fainelli@gmail.com>
+ <20170420190546.7453-4-f.fainelli@gmail.com> <20170425124427.GI24484@arm.com>
+Message-ID: <28edde78-b965-8136-1c95-11b9182de405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 2:02 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Leonard,
->
-> On Tue, Apr 25, 2017 at 1:57 PM, Leonard Crestez
-> <leonard.crestez@nxp.com> wrote:
->> The board file for imx6sx-dbg overrides cpufreq operating points to use
->> higher voltages. This is done because the board has a shared rail for
->> VDD_ARM_IN and VDD_SOC_IN and when using LDO bypass the shared voltage
->> needs to be a value suitable for both ARM and SOC.
+On 04/25/2017 05:44 AM, Will Deacon wrote:
+> Hi Florian,
+> 
+> On Thu, Apr 20, 2017 at 12:05:46PM -0700, Florian Fainelli wrote:
+>> The ARMv8 PMUv3 cache map did not include the L2 cache events, add
+>> them.
 >>
->> This was introduced in:
->>
->> commit 54183bd7f766 ("ARM: imx6sx-sdb: add revb board and make it default")
->>
->> This only only applies to LDO bypass mode, a feature not present in
->> upstream. When LDOs are enabled the effect is to use higher voltages than
->> necesarry for no good reason.
->>
->> Setting these higher voltages can make some boards fail to boot with ugly
->> semi-random crashes, reminiscent of memory corruption. These failures
->> happen the first time the lowest idle state is used. Remove the OPP
->> override in order to fix those crashes.
->>
->> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
->>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 >> ---
->> It's not clear exactly why the crashes happen. Perhaps waking up from idle
->> draws more power than is available? Removing this override is a correct
->> change anyway so maybe there is no need to investigate deeper.
->
-> Marek just sent a similar one a few minutes ago:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/503230.html
+>>  arch/arm64/kernel/perf_event.c | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+>> index 4f011cdd756d..a664c575f3fd 100644
+>> --- a/arch/arm64/kernel/perf_event.c
+>> +++ b/arch/arm64/kernel/perf_event.c
+>> @@ -264,6 +264,11 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+>>  	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE,
+>>  	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL,
+>>  
+>> +	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
+>> +	[C(LL)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
+>> +	[C(LL)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
+>> +	[C(LL)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
+> 
+> I don't think this is correct in general. 'LL' stands for "last-level",
+> which may be L3 or even a system cache in the interconnect. Tying that to L2
+> is the wrong thing to do from perf's generic event perspective.
+> 
+> I'm ok with what you're proposing for A53 (where the PMU can only count
+> events out to the L2), but I'm reluctant to make this change for the generic
+> PMUv3 events.
 
-Forgot to add Marek.
+That makes sense, shall I resubmit the first patch by itself or can you
+or Catalin take it as-is?
+
+Thanks!
+-- 
+Florian
