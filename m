@@ -1,10 +1,10 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 26 Apr 2017 06:34:23 +0900
-Subject: [PATCH 2/2] pinctrl: samsung: remove unneeded (void *) casts in
+Date: Wed, 26 Apr 2017 06:34:22 +0900
+Subject: [PATCH 1/2] pinctrl: rockchip: remove unneeded (void *) casts in
  of_match_table
 In-Reply-To: <1493156063-8446-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1493156063-8446-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1493156063-8446-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1493156063-8446-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,48 +13,48 @@ of_device_id::data is an opaque pointer.  No explicit cast is needed.
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- drivers/pinctrl/samsung/pinctrl-samsung.c | 20 ++++++++++----------
+ drivers/pinctrl/pinctrl-rockchip.c | 20 ++++++++++----------
  1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index d7aa22c..3b62283 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -1192,25 +1192,25 @@ static int __maybe_unused samsung_pinctrl_resume(struct device *dev)
- static const struct of_device_id samsung_pinctrl_dt_match[] = {
- #ifdef CONFIG_PINCTRL_EXYNOS
- 	{ .compatible = "samsung,exynos3250-pinctrl",
--		.data = (void *)exynos3250_pin_ctrl },
-+		.data = exynos3250_pin_ctrl },
- 	{ .compatible = "samsung,exynos4210-pinctrl",
--		.data = (void *)exynos4210_pin_ctrl },
-+		.data = exynos4210_pin_ctrl },
- 	{ .compatible = "samsung,exynos4x12-pinctrl",
--		.data = (void *)exynos4x12_pin_ctrl },
-+		.data = exynos4x12_pin_ctrl },
- 	{ .compatible = "samsung,exynos5250-pinctrl",
--		.data = (void *)exynos5250_pin_ctrl },
-+		.data = exynos5250_pin_ctrl },
- 	{ .compatible = "samsung,exynos5260-pinctrl",
--		.data = (void *)exynos5260_pin_ctrl },
-+		.data = exynos5260_pin_ctrl },
- 	{ .compatible = "samsung,exynos5410-pinctrl",
--		.data = (void *)exynos5410_pin_ctrl },
-+		.data = exynos5410_pin_ctrl },
- 	{ .compatible = "samsung,exynos5420-pinctrl",
--		.data = (void *)exynos5420_pin_ctrl },
-+		.data = exynos5420_pin_ctrl },
- 	{ .compatible = "samsung,exynos5433-pinctrl",
--		.data = (void *)exynos5433_pin_ctrl },
-+		.data = exynos5433_pin_ctrl },
- 	{ .compatible = "samsung,s5pv210-pinctrl",
--		.data = (void *)s5pv210_pin_ctrl },
-+		.data = s5pv210_pin_ctrl },
- 	{ .compatible = "samsung,exynos7-pinctrl",
--		.data = (void *)exynos7_pin_ctrl },
-+		.data = exynos7_pin_ctrl },
- #endif
- #ifdef CONFIG_PINCTRL_S3C64XX
- 	{ .compatible = "samsung,s3c64xx-pinctrl",
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index 7813599..da1a38f 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -2769,25 +2769,25 @@ static struct rockchip_pin_ctrl rk3399_pin_ctrl = {
+ 
+ static const struct of_device_id rockchip_pinctrl_dt_match[] = {
+ 	{ .compatible = "rockchip,rk1108-pinctrl",
+-		.data = (void *)&rk1108_pin_ctrl },
++		.data = &rk1108_pin_ctrl },
+ 	{ .compatible = "rockchip,rk2928-pinctrl",
+-		.data = (void *)&rk2928_pin_ctrl },
++		.data = &rk2928_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3036-pinctrl",
+-		.data = (void *)&rk3036_pin_ctrl },
++		.data = &rk3036_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3066a-pinctrl",
+-		.data = (void *)&rk3066a_pin_ctrl },
++		.data = &rk3066a_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3066b-pinctrl",
+-		.data = (void *)&rk3066b_pin_ctrl },
++		.data = &rk3066b_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3188-pinctrl",
+-		.data = (void *)&rk3188_pin_ctrl },
++		.data = &rk3188_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3228-pinctrl",
+-		.data = (void *)&rk3228_pin_ctrl },
++		.data = &rk3228_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3288-pinctrl",
+-		.data = (void *)&rk3288_pin_ctrl },
++		.data = &rk3288_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3368-pinctrl",
+-		.data = (void *)&rk3368_pin_ctrl },
++		.data = &rk3368_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3399-pinctrl",
+-		.data = (void *)&rk3399_pin_ctrl },
++		.data = &rk3399_pin_ctrl },
+ 	{},
+ };
+ 
 -- 
 2.7.4
