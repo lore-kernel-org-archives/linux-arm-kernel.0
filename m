@@ -1,24 +1,54 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue, 25 Apr 2017 16:49:09 -0400
-Subject: [PATCH 0/2] thermal: broadcom: Add NSP Thermal Support
-Message-ID: <1493153351-12698-1-git-send-email-jon.mason@broadcom.com>
+Date: Tue, 25 Apr 2017 16:49:10 -0400
+Subject: [PATCH 1/2] thermal: broadcom: Allow for NSP to use ns-thermal driver
+In-Reply-To: <1493153351-12698-1-git-send-email-jon.mason@broadcom.com>
+References: <1493153351-12698-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <1493153351-12698-2-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for NSP to the existing Northstar thermal driver.
-This code is based on patches currently in the Linux SoC Thermal git
-tree.  Specfically,
-https://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git/commit/?h=linus&id=a94cb7eeecc4104a6874339f90c5d0647359c102
+Change the iProc Kconfig to select THERMAL and THERMAL_OF, which allows
+the ns-thermal driver to be selected via menuconfig.  Also, change the
+ns-thermal driver to work on any iProc based SoC.  Finally, tweak the
+Kconfig description to mention support for NSP and make the default on
+for iProc based platforms.
 
+Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+---
+ arch/arm/mach-bcm/Kconfig        | 2 ++
+ drivers/thermal/broadcom/Kconfig | 9 +++++----
+ 2 files changed, 7 insertions(+), 4 deletions(-)
 
-Jon Mason (2):
-  thermal: broadcom: Allow for NSP to use ns-thermal driver
-  ARM: dts: NSP: Add Thermal Support
-
- arch/arm/boot/dts/bcm-nsp.dtsi   | 26 ++++++++++++++++++++++++++
- arch/arm/mach-bcm/Kconfig        |  2 ++
- drivers/thermal/broadcom/Kconfig |  9 +++++----
- 3 files changed, 33 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index a0e66d8..da2bfeb 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -19,6 +19,8 @@ config ARCH_BCM_IPROC
+ 	select GPIOLIB
+ 	select ARM_AMBA
+ 	select PINCTRL
++	select THERMAL
++	select THERMAL_OF
+ 	help
+ 	  This enables support for systems based on Broadcom IPROC architected SoCs.
+ 	  The IPROC complex contains one or more ARM CPUs along with common
+diff --git a/drivers/thermal/broadcom/Kconfig b/drivers/thermal/broadcom/Kconfig
+index f0dea8a..26d706c 100644
+--- a/drivers/thermal/broadcom/Kconfig
++++ b/drivers/thermal/broadcom/Kconfig
+@@ -1,8 +1,9 @@
+ config BCM_NS_THERMAL
+ 	tristate "Northstar thermal driver"
+ 	depends on ARCH_BCM_IPROC || COMPILE_TEST
++	default ARCH_BCM_IPROC
+ 	help
+-	  Northstar is a family of SoCs that includes e.g. BCM4708, BCM47081,
+-	  BCM4709 and BCM47094. It contains DMU (Device Management Unit) block
+-	  with a thermal sensor that allows checking CPU temperature. This
+-	  driver provides support for it.
++	  Support for the Northstar and Northstar Plus family of SoCs (e.g.
++	  BCM4708, BCM4709, BCM5301x, BCM95852X, etc). It contains DMU (Device
++	  Management Unit) block with a thermal sensor that allows checking CPU
++	  temperature.
 -- 
 2.7.4
