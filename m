@@ -1,164 +1,64 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 25 Apr 2017 10:24:13 +0100
-Subject: [linux-sunxi] [PATCH v4 09/10] arm64: allwinner: a64: enable
- AXP803 regulators for Pine64
-In-Reply-To: <20170424160103.9447-10-icenowy@aosc.io>
-References: <20170424160103.9447-1-icenowy@aosc.io>
- <20170424160103.9447-10-icenowy@aosc.io>
-Message-ID: <8c7864f1-a0d7-b87f-f9d6-5201cc773609@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 25 Apr 2017 10:22:23 +0100
+Subject: [RFC] minimum gcc version for kernel: raise to gcc-4.3 or 4.6?
+In-Reply-To: <CAGXu5jLPRYi+HK=07Zndc8szEKD4mZCqaHJFnHmmoYr7tA1xPw@mail.gmail.com>
+References: <20161216105634.235457-1-arnd@arndb.de>
+ <3302470.IDcDrWa0u6@wuerfel>
+ <CAGXu5jLPRYi+HK=07Zndc8szEKD4mZCqaHJFnHmmoYr7tA1xPw@mail.gmail.com>
+Message-ID: <cd617c59-b922-3a61-1eb9-71144ce4c77a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 16/04/17 20:52, Kees Cook wrote:
+> Was there a conclusion to this discussion? I didn't see anything
+> definitive in the thread...
+>
+> Notes below...
+>
+> On Fri, Dec 16, 2016 at 3:14 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> [Fixed linux-arm-kernel mailing list address, sorry for the duplicate,
+>>  I'm not reposting all the ugly patches though, unless someone really
+>>  wants them, https://lkml.org/lkml/2016/12/16/174 has a copy]
+>>
+>> On Friday, December 16, 2016 11:56:21 AM CET Arnd Bergmann wrote:
+>>> I had some fun doing build testing with older gcc versions, building
+>>> every release from 4.0 through 7.0 and running that on my randconfig
+>>> setup to see what comes out.
+>>>
+>>> First of all, gcc-4.9 and higher is basically warning-free everywhere,
+>>> although gcc-7 introduces some interesting new warnings (I have started
+>>> doing patches for those as well). gcc-4.8 is probably good, too, and
+>>> gcc-4.6 and 4.7 at least don't produce build failures in general, though
+>>> the level of false-positive warnings increases (we could decide to turn
+>>> those off for older compilers for build test purposes).
+>>>
+>>> In gcc-4.5 and below, dead code elimination is not as good as later,
+>>> causing a couple of link errors, and some of them have no good workaround
+>>> (see patch 1). It would be nice to declare that version too old, but
+>>> several older distros that are still in wide use ship with compilers
+>>> earlier than 4.6:
+>>>
+>>>  RHEL6:               gcc-4.4
+>
+> This appears to have support until July 31, 2018. (Though it's using a
+> 2.6 kernel.)
+>
+>>>  Debian 6:    gcc-4.4
+>
+> This went fully unsupported on Feb 29, 2016.
+>
+>>>  Ubuntu 10.04:        gcc-4.4
+>
+> This went fully unsupported on Apr 30, 2015.
+>
+>>>  SLES11:      gcc-4.3
+>
+> General support ends Mar 31 2019, fully unsupported 31 Mar 2022. (And
+> like RHEL6 is using a 2.6 kernel.)
 
-On 24/04/17 17:01, Icenowy Zheng wrote:
-> Add support of AXP803 regulators in the Pine64 device tree, in order to
-> enable many future functionalities, e.g. Wi-Fi.
+fyi, SLES11 upgraded to kernel 3.0, in SP2.
 
-In general that's quite some code to just achieve some device power
-plane switching, but that's another discussion, I guess ;-)
+https://www.novell.com/support/kb/doc.php?id=3594951
 
-To me this patch here like a lot of churn to be duplicated in each
-board's DT.
-Can't we provide some sane defaults, either in axp803.dtsi or in an
-extra file (allwinner-ref-axp803.dtsi?), and only overwrite them in a
-board's DT if a board deviates?
-Because it seems like many boards are actually based on some Allwinner
-reference design and use very similar, if not identical settings.
-
-Also one thing below ...
-
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 109 +++++++++++++++++++++
->  1 file changed, 109 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> index 3e1b44292534..abc1879e91f2 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> @@ -106,6 +106,115 @@
->  	};
->  };
->  
-> +#include "axp803.dtsi"
-> +
-> +&reg_aldo1 {
-> +	regulator-min-microvolt = <2800000>;
-> +	regulator-max-microvolt = <2800000>;
-> +	regulator-name = "vcc-csi";
-> +};
-> +
-> +&reg_aldo2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1800000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-pl";
-> +};
-> +
-> +&reg_aldo3 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <2700000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-pll-avcc";
-> +};
-> +
-> +&reg_dc1sw {
-> +	regulator-name = "vcc-phy";
-> +};
-> +
-> +&reg_dcdc1 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-3v3";
-> +};
-> +
-> +&reg_dcdc2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1000000>;
-> +	regulator-max-microvolt = <1300000>;
-> +	regulator-name = "vdd-cpux";
-> +};
-> +
-> +/* DCDC3 is polyphased with DCDC2 */
-> +
-> +&reg_dcdc5 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1500000>;
-> +	regulator-max-microvolt = <1500000>;
-
-On the Pine64 there is DDR3L DRAM, running at 1.35V.
-
-Cheers,
-Andre.
-
-
-> +	regulator-name = "vcc-dram";
-> +};
-> +
-> +&reg_dcdc6 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1100000>;
-> +	regulator-max-microvolt = <1100000>;
-> +	regulator-name = "vdd-sys";
-> +};
-> +
-> +&reg_dldo1 {
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-hdmi";
-> +};
-> +
-> +&reg_dldo2 {
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-mipi";
-> +};
-> +
-> +&reg_dldo3 {
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "avdd-csi";
-> +};
-> +
-> +&reg_dldo4 {
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-wifi";
-> +};
-> +
-> +&reg_eldo1 {
-> +	regulator-min-microvolt = <1800000>;
-> +	regulator-max-microvolt = <1800000>;
-> +	regulator-name = "cpvdd";
-> +};
-> +
-> +&reg_eldo3 {
-> +	regulator-min-microvolt = <1800000>;
-> +	regulator-max-microvolt = <1800000>;
-> +	regulator-name = "vdd-1v8-csi";
-> +};
-> +
-> +&reg_fldo1 {
-> +	regulator-min-microvolt = <1200000>;
-> +	regulator-max-microvolt = <1200000>;
-> +	regulator-name = "vcc-1v2-hsic";
-> +};
-> +
-> +&reg_fldo2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1100000>;
-> +	regulator-max-microvolt = <1100000>;
-> +	regulator-name = "vdd-cpus";
-> +};
-> +
-> +&reg_rtc_ldo {
-> +	regulator-name = "vcc-rtc";
-> +};
-> +
->  &uart0 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&uart0_pins_a>;
-> 
+Cheers
+Suzuki
