@@ -1,45 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Apr 2017 17:53:21 +0100
-Subject: [PATCH] arm64: Preventing READ_IMPLIES_EXEC propagation
-In-Reply-To: <d4205c8c-c8cd-ef35-a6bd-3444a7b3ac48@huawei.com>
-References: <1493102296-229934-1-git-send-email-zhangshaokun@hisilicon.com>
- <d4205c8c-c8cd-ef35-a6bd-3444a7b3ac48@huawei.com>
-Message-ID: <20170425165320.GT24484@arm.com>
+From: nicolas@ndufresne.ca (Nicolas Dufresne)
+Date: Tue, 25 Apr 2017 12:53:27 -0400
+Subject: support autofocus / autogain in libv4l2
+In-Reply-To: <20170425080538.GA30380@amd>
+References: <1487074823-28274-1-git-send-email-sakari.ailus@linux.intel.com>
+ <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
+ <20170414232332.63850d7b@vento.lan>
+ <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
+ <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
+ <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
+ <20170424224724.5bb52382@vento.lan> <20170425080538.GA30380@amd>
+Message-ID: <1493139207.19105.16.camel@ndufresne.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 02:11:29PM +0800, dongbo (E) wrote:
-> From: Dong Bo <dongbo4@huawei.com>
+Le mardi 25 avril 2017 ? 10:05 +0200, Pavel Machek a ?crit?:
+> Well, fd's are hard, because application can do fork() and now
+> interesting stuff happens. Threads are tricky, because now you have
+> locking etc.
 > 
-> Once the READ_IMPLIES_EXEC flag is set on arm64, the flag is
-> propagated to its child processes, even the ELF files are
-> marked as not requiring executable stack.
-> 
-> Signed-off-by: Dong Bo <dongbo4@huawei.com>
-> ---
->  arch/arm64/include/asm/elf.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> index 5d17004..5941e7f 100644
-> --- a/arch/arm64/include/asm/elf.h
-> +++ b/arch/arm64/include/asm/elf.h
-> @@ -142,6 +142,7 @@
->  ({									\
->  	clear_bit(TIF_32BIT, &current->mm->context.flags);		\
->  	clear_thread_flag(TIF_32BIT);					\
-> +	current->personality &= ~READ_IMPLIES_EXEC;			\
->  })
->   /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
+> libv4l2 is designed to be LD_PRELOADED. That is not really feasible
+> with "complex" library.
 
-This looks good to me:
+That is incorrect. The library propose an API where you simply replace
+certain low level calls, like ioctl -> v4l2_ioctl, open -> v4l2_open().
+You have to do that explicitly in your existing code. It does not
+abstract the API itself unlike libdrm.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-We might also want a comment in the compat code to say that we inherit
-the flag to follow the arch/arm/ behaviour.
-
-Anyway, I'd like to see this sit in -next for a bit, so would rather hold
-this off until 4.12.
-
-Will
+Nicolas
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170425/82d4ed25/attachment.sig>
