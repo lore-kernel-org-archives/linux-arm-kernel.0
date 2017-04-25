@@ -1,64 +1,82 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 25 Apr 2017 13:14:56 +0100
-Subject: Tegra baseline test results for v4.11-rc6
-In-Reply-To: <7ef3c6bd-0f47-4277-eff5-940af68c858f@nvidia.com>
-References: <7ef3c6bd-0f47-4277-eff5-940af68c858f@nvidia.com>
-Message-ID: <52cc6e7c-4643-8d53-6749-6cd64cb23ff5@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Apr 2017 14:18:19 +0200
+Subject: [PATCH 2/2] dt-bindings: pcie: Add documentation for Mediatek PCIe
+In-Reply-To: <1492935543-18190-3-git-send-email-ryder.lee@mediatek.com>
+References: <1492935543-18190-1-git-send-email-ryder.lee@mediatek.com>
+ <1492935543-18190-3-git-send-email-ryder.lee@mediatek.com>
+Message-ID: <CAK8P3a1vgi9VBZfRNq0dDKzmfe8FkHQtgz6fEXW9fyUnBHtaQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Apr 23, 2017 at 10:19 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> Add documentation for PCIe host driver available in MT7623
+> series SoCs.
+>
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+>  .../bindings/pci/mediatek,mt7623-pcie.txt          | 153 +++++++++++++++++++++
+>  1 file changed, 153 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+>
+> diff --git a/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+> new file mode 100644
+> index 0000000..ee93ba2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+> @@ -0,0 +1,153 @@
+> +Mediatek MT7623 PCIe controller
+> +
+> +Required properties:
+> +- compatible: Should contain "mediatek,mt7623-pcie".
 
-On 25/04/17 13:03, Jon Hunter wrote:
-> Here are some basic Tegra test results for Linux v4.11-rc6.
-> Logs and other details at:
-> 
->     https://nvtb.github.io//linux/test_v4.11-rc6/20170411053103/
-> 
-> 
-> Test summary
-> ------------
-> 
-> Build: zImage:
->     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-> 
-> Build: Image:
->     Pass: ( 1/ 1): defconfig
-> 
-> Boot to userspace: defconfig:
->     Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-> 		   tegra210-p2371-0000, tegra210-smaug
-> 
-> Boot to userspace: multi_v7_defconfig:
->     Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-> 		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-> 
-> Boot to userspace: tegra_defconfig:
->     Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-> 		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-> 
-> PM: System suspend: multi_v7_defconfig:
->     Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-> 		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-> 
-> PM: System suspend: tegra_defconfig:
->     FAIL: ( 1/ 5): tegra124-nyan-big
->     Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-> 		   tegra20-trimslice, tegra30-beaver
+Did mediatek license the IP block from someone else or was it
+developed in-house? Is there a name and/or version identifier
+for the block itself other than identifying it as the one in mt7623?
 
-The above suspend failure for nyan-big bisected to commit ce612879ddc7
-("mm: move pcp and lru-pcp draining into single wq"). There have been
-other reports of this breaking suspend [0] and has since been fixed [1]
-for v4.11-rc7.
+> +- device_type: Must be "pci"
+> +- reg: Base addresses and lengths of the pcie controller.
+> +- interrupts: A list of interrupt outputs of the controller.
 
-Interestingly this only was causing problems for tegra with XHCI enabled
-(in tegra_defconfig). I am seeing some random usb resets during resume
-with XHCI and so if anyone sees any such problems let me know.
+Please be more specific about what each interrupt is for, and how
+many there are.
 
-Cheers
-Jon
+> +Required properties:
+> +- device_type: Must be "pci"
+> +- assigned-addresses: Address and size of the port configuration registers
+> +- reg: Only the first four bytes are used to refer to the correct bus number
+> +  and device number.
+> +- #address-cells: Must be 3
+> +- #size-cells: Must be 2
+> +- ranges: Sub-ranges distributed from the PCIe controller node. An empty
+> +  property is sufficient.
+> +- clocks: Must contain an entry for each entry in clock-names.
+> +  See ../clocks/clock-bindings.txt for details.
+> +- clock-names: Must include the following entries:
+> +  - sys_ck
+> +- resets: Must contain an entry for each entry in reset-names.
+> +  See ../reset/reset.txt for details.
 
-[0] http://marc.info/?l=linux-kernel&m=149254544031358&w=2
-[1] http://marc.info/?l=linux-kernel&m=149258864408467&w=2
+This seems odd: you have a device that is simply identified as "pci"
+without any more specific ID, but you require additional properties
+(clocks, reset, ...) that are not part of the standard PCI binding.
 
--- 
-nvpublic
+Can you clarify how the port devices related to the root device in
+this hardware design?
+
+Have you considered moving the nonstandard properties into the host
+bridge node and having that device deal with setting up the links
+to the other drivers? That way we could use the regular pcie
+port driver for the children.
+
+> +- reset-names: Must include the following entries:
+> +  - pcie-reset
+> +- num-lanes: Number of lanes to use for this port.
+> +- phys: Must contain an entry for each entry in phy-names.
+> +- phy-names: Must include an entry for each sub node. Entries are of the form
+> +  "pcie-phyN": where N ranges from 0 to the value specified for port number.
+> +  See ../phy/phy-mt7623-pcie.txt for details.
+
+I think the name should not include the number of the port but rather
+be always the same here.
+
+      Arnd
