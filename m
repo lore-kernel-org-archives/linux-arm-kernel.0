@@ -1,73 +1,105 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 25 Apr 2017 15:39:23 +0100
-Subject: [kvmtool PATCH v10 06/15] PCI: Only allocate IRQ routing entry when
- available
+Date: Tue, 25 Apr 2017 15:39:25 +0100
+Subject: [kvmtool PATCH v10 08/15] arm: allow vGICv3 emulation
 In-Reply-To: <20170425143932.17235-1-andre.przywara@arm.com>
 References: <20170425143932.17235-1-andre.przywara@arm.com>
-Message-ID: <20170425143932.17235-7-andre.przywara@arm.com>
+Message-ID: <20170425143932.17235-9-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we need to inject an MSI into the guest, we rely at the moment on a
-working GSI MSI routing functionality. However we can get away without
-IRQ routing, if the host supports MSI injection via the KVM_SIGNAL_MSI
-ioctl.
-So we try the GSI routing first, but if that fails due to a missing
-IRQ routing functionality, we fall back to KVM_SIGNAL_MSI (if that is
-supported).
+From: Vladimir Murzin <vladimir.murzin@arm.com>
 
+KVM/arm recently got support for vGICv3 (and vITS), which is evident
+in the updated header file. So as now ARM has feature parity when it
+comes to the GIC emulation, we can remove the special defines we had
+in place to allow compilation for ARM(32).
+For simplicity we now use 64K sized GIC regions everywhere, as GICv3
+mandates them.
+[Andre: some update, reword commit message]
+
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virtio/pci.c | 29 ++++++++++++++++++++++++++---
- 1 file changed, 26 insertions(+), 3 deletions(-)
+ arm/aarch32/arm-cpu.c              | 2 +-
+ arm/aarch32/include/kvm/kvm-arch.h | 3 ---
+ arm/aarch64/include/kvm/kvm-arch.h | 3 ---
+ arm/gic.c                          | 9 ---------
+ arm/include/arm-common/kvm-arch.h  | 2 ++
+ 5 files changed, 3 insertions(+), 16 deletions(-)
 
-diff --git a/virtio/pci.c b/virtio/pci.c
-index e9f36c7..04176c1 100644
---- a/virtio/pci.c
-+++ b/virtio/pci.c
-@@ -193,8 +193,20 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
+diff --git a/arm/aarch32/arm-cpu.c b/arm/aarch32/arm-cpu.c
+index 27a8e17..16bba55 100644
+--- a/arm/aarch32/arm-cpu.c
++++ b/arm/aarch32/arm-cpu.c
+@@ -12,7 +12,7 @@ static void generate_fdt_nodes(void *fdt, struct kvm *kvm)
+ {
+ 	int timer_interrupts[4] = {13, 14, 11, 10};
  
- 			gsi = irq__add_msix_route(kvm,
- 						  &vpci->msix_table[vec].msg);
--			if (gsi >= 0)
--				vpci->config_gsi = gsi;
-+			/*
-+			 * We don't need IRQ routing if we can use
-+			 * MSI injection via the KVM_SIGNAL_MSI ioctl.
-+			 */
-+			if (gsi == -ENXIO &&
-+			    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
-+				break;
-+
-+			if (gsi < 0) {
-+				die("failed to configure MSIs");
-+				break;
-+			}
-+
-+			vpci->config_gsi = gsi;
- 			break;
- 		case VIRTIO_MSI_QUEUE_VECTOR:
- 			vec = ioport__read16(data);
-@@ -205,8 +217,19 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
+-	gic__generate_fdt_nodes(fdt, IRQCHIP_GICV2);
++	gic__generate_fdt_nodes(fdt, kvm->cfg.arch.irqchip);
+ 	timer__generate_fdt_nodes(fdt, kvm, timer_interrupts);
+ }
  
- 			gsi = irq__add_msix_route(kvm,
- 						  &vpci->msix_table[vec].msg);
--			if (gsi < 0)
-+			/*
-+			 * We don't need IRQ routing if we can use
-+			 * MSI injection via the KVM_SIGNAL_MSI ioctl.
-+			 */
-+			if (gsi == -ENXIO &&
-+			    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
- 				break;
-+
-+			if (gsi < 0) {
-+				die("failed to configure MSIs");
-+				break;
-+			}
-+
- 			vpci->gsis[vpci->queue_selector] = gsi;
- 			if (vdev->ops->notify_vq_gsi)
- 				vdev->ops->notify_vq_gsi(kvm, vpci->dev,
+diff --git a/arm/aarch32/include/kvm/kvm-arch.h b/arm/aarch32/include/kvm/kvm-arch.h
+index 1632e3c..cd31e72 100644
+--- a/arm/aarch32/include/kvm/kvm-arch.h
++++ b/arm/aarch32/include/kvm/kvm-arch.h
+@@ -1,9 +1,6 @@
+ #ifndef KVM__KVM_ARCH_H
+ #define KVM__KVM_ARCH_H
+ 
+-#define ARM_GIC_DIST_SIZE	0x1000
+-#define ARM_GIC_CPUI_SIZE	0x2000
+-
+ #define ARM_KERN_OFFSET(...)	0x8000
+ 
+ #define ARM_MAX_MEMORY(...)	ARM_LOMAP_MAX_MEMORY
+diff --git a/arm/aarch64/include/kvm/kvm-arch.h b/arm/aarch64/include/kvm/kvm-arch.h
+index 4925736..9de623a 100644
+--- a/arm/aarch64/include/kvm/kvm-arch.h
++++ b/arm/aarch64/include/kvm/kvm-arch.h
+@@ -1,9 +1,6 @@
+ #ifndef KVM__KVM_ARCH_H
+ #define KVM__KVM_ARCH_H
+ 
+-#define ARM_GIC_DIST_SIZE	0x10000
+-#define ARM_GIC_CPUI_SIZE	0x20000
+-
+ #define ARM_KERN_OFFSET(kvm)	((kvm)->cfg.arch.aarch32_guest	?	\
+ 				0x8000				:	\
+ 				0x80000)
+diff --git a/arm/gic.c b/arm/gic.c
+index ff032d2..8479b89 100644
+--- a/arm/gic.c
++++ b/arm/gic.c
+@@ -9,15 +9,6 @@
+ #include <linux/kernel.h>
+ #include <linux/kvm.h>
+ 
+-/* Those names are not defined for ARM (yet) */
+-#ifndef KVM_VGIC_V3_ADDR_TYPE_DIST
+-#define KVM_VGIC_V3_ADDR_TYPE_DIST 2
+-#endif
+-
+-#ifndef KVM_VGIC_V3_ADDR_TYPE_REDIST
+-#define KVM_VGIC_V3_ADDR_TYPE_REDIST 3
+-#endif
+-
+ static int gic_fd = -1;
+ static u64 gic_redists_base;
+ static u64 gic_redists_size;
+diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
+index 0f5fb7f..c83c45f 100644
+--- a/arm/include/arm-common/kvm-arch.h
++++ b/arm/include/arm-common/kvm-arch.h
+@@ -18,6 +18,8 @@
+ #define ARM_GIC_DIST_BASE	(ARM_AXI_AREA - ARM_GIC_DIST_SIZE)
+ #define ARM_GIC_CPUI_BASE	(ARM_GIC_DIST_BASE - ARM_GIC_CPUI_SIZE)
+ #define ARM_GIC_SIZE		(ARM_GIC_DIST_SIZE + ARM_GIC_CPUI_SIZE)
++#define ARM_GIC_DIST_SIZE	0x10000
++#define ARM_GIC_CPUI_SIZE	0x20000
+ 
+ #define ARM_IOPORT_SIZE		(ARM_MMIO_AREA - ARM_IOPORT_AREA)
+ #define ARM_VIRTIO_MMIO_SIZE	(ARM_AXI_AREA - (ARM_MMIO_AREA + ARM_GIC_SIZE))
 -- 
 2.9.0
