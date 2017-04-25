@@ -1,50 +1,40 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 24 Apr 2017 21:14:59 -0700
-Subject: [PATCH] ARM: dts: Add devicetree for the Raspberry Pi 3, for
- arm32 (v5)
-In-Reply-To: <20170424200037.25615-1-eric@anholt.net>
-References: <20170424200037.25615-1-eric@anholt.net>
-Message-ID: <881bbae2-9add-051d-74df-518a2e7db4d1@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 25 Apr 2017 10:36:33 +0530
+Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
+In-Reply-To: <CAOMZO5AkTKjU5kw0gszLVdVOc_Sb_sWhr65heE==kyw=5rcN-g@mail.gmail.com>
+References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
+ <20170424040709.GG26900@vireshk-i7>
+ <CAOMZO5B4_xrLcWQGF=yRfj-14XQKudzjyr2roGRkzofkHCfuHg@mail.gmail.com>
+ <20170424112906.GR26900@vireshk-i7>
+ <CAOMZO5BpAsJAKv-p=WPevUnx71fxbLtunJe-0ijVT7T9m7AMSQ@mail.gmail.com>
+ <20170424114343.GS26900@vireshk-i7>
+ <CAOMZO5AkTKjU5kw0gszLVdVOc_Sb_sWhr65heE==kyw=5rcN-g@mail.gmail.com>
+Message-ID: <20170425050633.GV26900@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 04/24/2017 01:00 PM, Eric Anholt wrote:
-> Raspbian and Fedora have decided to support the Pi3 in 32-bit mode for
-> now, so it's useful to be able to test that mode on an upstream
-> kernel.  It's also been useful for me to use the same board for 32-bit
-> and 64-bit development.
+On 24-04-17, 08:51, Fabio Estevam wrote:
+> On Mon, Apr 24, 2017 at 8:43 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  arch/arm/boot/dts/Makefile            | 1 +
->  arch/arm/boot/dts/bcm2837-rpi-3.b.dts | 1 +
->  2 files changed, 2 insertions(+)
->  create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3.b.dts
+> > 110 ms is your sampling rate right now. Looks too high.
+> >
+> > Try doing this:
+> >
+> > echo 10000 > /sys/devices/system/cpu/cpufreq/ondemand/sampling_rate
+> >
+> > and retry your tests.
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 011808490fed..eded842d9978 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -72,6 +72,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
->  	bcm2835-rpi-b-plus.dtb \
->  	bcm2835-rpi-a-plus.dtb \
->  	bcm2836-rpi-2-b.dtb \
-> +	bcm2837-rpi-3-b.dtb \
->  	bcm2835-rpi-zero.dtb
->  dtb-$(CONFIG_ARCH_BCM_5301X) += \
->  	bcm4708-asus-rt-ac56u.dtb \
-> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3.b.dts b/arch/arm/boot/dts/bcm2837-rpi-3.b.dts
-> new file mode 100644
-> index 000000000000..8c8aa4d1e9b3
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm2837-rpi-3.b.dts
-> @@ -0,0 +1 @@
-> +#include "arm64/broadcom/bcm2837-rpi-3.b.dts"
+> Tried 10ms and also 1ms, but touchscreen also failed in both cases.
 
-Sounds like this should be
-../arm64/boot/dts/broadcom/bcm2837-rpi-3.b.dts are reported by the
-kbuild test robot?
+Honestly, I don't have a clue on how can we fix it for you now :)
+
+@Rafael: Any idea apart from running at max all the time?
+
+what touchscreen driver are you using btw? Just curious to see if there is any
+bug in there. Handling touchscreen events shouldn't require us to run at max
+freq.
+
+@shawn: Saw something similar ever ?
+
 -- 
-Florian
+viresh
