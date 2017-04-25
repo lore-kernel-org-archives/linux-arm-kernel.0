@@ -1,50 +1,25 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 25 Apr 2017 19:21:54 +0200
-Subject: [PATCH V15 06/11] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <1492556723-9189-7-git-send-email-tbaicar@codeaurora.org>
-References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
- <1492556723-9189-7-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170425172154.ggg56j52inf3522e@pd.tnic>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Tue, 25 Apr 2017 10:22:00 -0700 (PDT)
+Subject: [PATCH 1/2] xen/arm, arm64: fix xen_dma_ops after 815dd18
+ "Consolidate get_dma_ops..."
+In-Reply-To: <f0667d8c-1c17-8d5f-a5d7-1e0d014e86ec@arm.com>
+References: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
+ <20170418142126.GE27592@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.10.1704191023120.31486@sstabellini-ThinkPad-X260>
+ <alpine.DEB.2.10.1704241214100.16723@sstabellini-ThinkPad-X260>
+ <f0667d8c-1c17-8d5f-a5d7-1e0d014e86ec@arm.com>
+Message-ID: <alpine.DEB.2.10.1704251021380.2875@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 05:05:18PM -0600, Tyler Baicar wrote:
-> ARM APEI extension proposal added SEA (Synchronous External Abort)
-> notification type for ARMv8.
-> Add a new GHES error source handling function for SEA. If an error
-> source's notification type is SEA, then this function can be registered
-> into the SEA exception handler. That way GHES will parse and report
-> SEA exceptions when they occur.
-> An SEA can interrupt code that had interrupts masked and is treated as
-> an NMI. To aid this the page of address space for mapping APEI buffers
-> while in_nmi() is always reserved, and ghes_ioremap_pfn_nmi() is
-> changed to use the helper methods to find the prot_t to map with in
-> the same way as ghes_ioremap_pfn_irq().
+On Tue, 25 Apr 2017, Julien Grall wrote:
+> Hi Stefano,
+> 
+> On 24/04/17 20:16, Stefano Stabellini wrote:
+> > Given the outstanding regression we need to fix as soon as possible,
+> > I'll queue these patches on the xentip tree for 4.12.
+> 
+> It looks like there is another rc for 4.11. I am wondering whether you could
+> try to send a pull request to Linus so it can be fixed in 4.11?
 
-...
-
-> @@ -518,6 +520,17 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->  	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->  		inf->name, esr, addr);
->  
-> +	/*
-> +	 * Synchronous aborts may interrupt code which had interrupts masked.
-> +	 * Before calling out into the wider kernel tell the interested
-> +	 * subsystems.
-> +	 */
-> +	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
-> +		nmi_enter();
-> +		ghes_notify_sea();
-> +		nmi_exit();
-> +	}
-
-Well, the other GHES notification methods use a notifier:
-ghes_notify_sci, ghes_notify_nmi. You probably should do that too
-instead of calling straight into a driver from arch code.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+No, especially without input from Russell.
