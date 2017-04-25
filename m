@@ -1,55 +1,31 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Tue, 25 Apr 2017 09:35:21 -0500
-Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
-In-Reply-To: <CAOMZO5CPtKAh6wMJ06BO4YFLPmOTvrpv5Q_3RJoj9dup46ukTQ@mail.gmail.com>
-References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
- <20170424040709.GG26900@vireshk-i7>
- <CAOMZO5B4_xrLcWQGF=yRfj-14XQKudzjyr2roGRkzofkHCfuHg@mail.gmail.com>
- <20170424112906.GR26900@vireshk-i7>
- <CAOMZO5BpAsJAKv-p=WPevUnx71fxbLtunJe-0ijVT7T9m7AMSQ@mail.gmail.com>
- <20170424114343.GS26900@vireshk-i7>
- <CAOMZO5AkTKjU5kw0gszLVdVOc_Sb_sWhr65heE==kyw=5rcN-g@mail.gmail.com>
- <20170425050633.GV26900@vireshk-i7>
- <CAOMZO5BgjgxGhJ7zGV-gjs0QHmJMgkNryFqTYA=vGPz8KWDijg@mail.gmail.com>
- <20170425111301.GC1928@vireshk-i7>
- <CAHCN7xJVicKuAc0dDbzBg4h2d1UUP66iKkSsWN_f=rPd4mOZSw@mail.gmail.com>
- <CAOMZO5CPtKAh6wMJ06BO4YFLPmOTvrpv5Q_3RJoj9dup46ukTQ@mail.gmail.com>
-Message-ID: <CAHCN7x+6KwOZdC1MaNQGdXWFjJ18hYp3kc73JADDMC4DOFn+yQ@mail.gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Tue, 25 Apr 2017 14:35:42 +0000
+Subject: [PATCH -next] crypto: stm32 - Fix OF module alias information
+Message-ID: <20170425143542.1069-1-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 8:43 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Adam,
->
-> On Tue, Apr 25, 2017 at 9:41 AM, Adam Ford <aford173@gmail.com> wrote:
->
->> I don't have that board, so I can't test, but I have seen other issues on my
->> imx6 board where operating at 'performance' instead of on-demand worked
->> better for me as well in different areas.   I was assuming it was something
->
-> What are the issues you observed with 'on-demand' on your mx6 board?
->
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
-My board does not always wake from sleep, and I was having some issues
-on reboot unless I ran at 'performance' and that is what made me think
-my board was having voltage dips too low.
+The module alias information passed to MODULE_DEVICE_TABLE()
+should use stm32_dt_ids instead of undefined sti_dt_ids.
 
->> regarding the voltage levels of various regulators for my board, and I am
->> going to run tests on my board by playing with regulators on my device tree
->> to make sure they are properly regulating to the right voltages.  Since
->> 'performance' runs the processor at both a higher speed and higher voltage,
->> it's conceivable to me that something is just below some limit/level and
->> needs some minor adjustment. At least that is my theory with my board
->> issues.  Have you looked considered that possibility?
->
-> One test I have already tried was to run all other cpufreq operating
-> points with the same ARM and SOC-PU voltages as the 996MHz.
->
-> Still in this case I do see touchscreen failure.
+Fixes: b51dbe90912a ("crypto: stm32 - Support for STM32 CRC32 crypto module")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/crypto/stm32/stm32_crc32.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I have a touch screen (using tsc2004 touch controller) on my board.  I
-can run some tests if you tell me how you're able to reproduce your
-issue.  I can at least confirm whether or not I see it too.  I won't
-be able to do it until later tonight or tomorrow however.
-
-adam
+diff --git a/drivers/crypto/stm32/stm32_crc32.c b/drivers/crypto/stm32/stm32_crc32.c
+index 7652822..ec83b1e 100644
+--- a/drivers/crypto/stm32/stm32_crc32.c
++++ b/drivers/crypto/stm32/stm32_crc32.c
+@@ -306,7 +306,7 @@ static const struct of_device_id stm32_dt_ids[] = {
+ 	{ .compatible = "st,stm32f7-crc", },
+ 	{},
+ };
+-MODULE_DEVICE_TABLE(of, sti_dt_ids);
++MODULE_DEVICE_TABLE(of, stm32_dt_ids);
+ 
+ static struct platform_driver stm32_crc_driver = {
+ 	.probe  = stm32_crc_probe,
