@@ -1,146 +1,79 @@
-From: dsafonov@virtuozzo.com (Dmitry Safonov)
-Date: Tue, 25 Apr 2017 20:51:58 +0300
-Subject: [PATCH] ARM/shmem: Drop page coloring align for non-VIPT CPUs
-In-Reply-To: <20170425173546.GS17774@n2100.armlinux.org.uk>
-References: <20170414100953.4703-1-dsafonov@virtuozzo.com>
- <571024bf-892d-4d08-dd9e-654b1e28c23e@virtuozzo.com>
- <20170425173546.GS17774@n2100.armlinux.org.uk>
-Message-ID: <ac361ece-dd05-b341-bae5-352dcffcec14@virtuozzo.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 25 Apr 2017 18:57:39 +0100
+Subject: [RFC PATCH] drivers: dma-mapping: Do not attempt to create a
+ scatterlist for from_coherent buffers
+Message-ID: <1493143059-2113-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2017 08:35 PM, Russell King - ARM Linux wrote:
-> On Tue, Apr 25, 2017 at 08:19:21PM +0300, Dmitry Safonov wrote:
->> On 04/14/2017 01:09 PM, Dmitry Safonov wrote:
->>> On ARMv6 CPUs with VIPT caches there are aliasing issues: if two
->>> different cache line indexes correspond to the same physical
->>> address, then changes made to one of the alias might be lost
->>> or they can overwrite each other. To overcome aliasing issues,
->>> the align for shared mappings was introduced with:
->>>
->>> commit 4197692eef113eeb8e3e413cc70993a5e667e5b8
->>> Author: Russell King <rmk@flint.arm.linux.org.uk>
->>> Date:   Wed Apr 28 22:22:33 2004 +0100
->>>
->>>      [ARM] Fix shared mmap()ings for ARM VIPT caches.
->>>
->>>      This allows us to appropriately align shared mappings on VIPT caches
->>>      with aliasing issues.
->>>
->>> Which introduced 4 pages align with SHMLBA, which resulted in
->>> unique physical address after any tag in cache (because two upper bits
->>> corresponding to page address get unused in tags).
->>>
->>> As this workaround is not needed by non-VIPT caches (like most armv7
->>> CPUs which have PIPT caches), ARM mmap() code checks if cache is VIPT
->>> aliasing for MAP_SHARED.
->>>
->>> The problem here is in shmat() syscall:
->>> 1. if shmaddr is NULL then do_shmat() uses arch_get_unmapped_area()
->>>     to allocate shared mapping.
->>> 2. if shmaddr is specified then do_shmat() checks that address has
->>>     SHMLBA alignment regardless to CPU cache aliasing.
->>>
->>> Which results on ARMv7 CPUs that shmat() with NULL shmaddr may return
->>> non-SHMLBA aligned address (page-aligned), but shmat() with the same
->>> address will fail.
->>>
->>> That is not critical issue for CRIU as after shmat() with NULL address,
-> 
-> CRIU?  Please try to keep use of acronyms to a minimum.
+Memory returned by dma_alloc_from_coherent() is not backed by struct
+page and creating a scatterlist would use invalid page pointers. The
+patch introduces the dma_vaddr_from_coherent() function and the
+corresponding check in dma_get_sgtable_attrs().
 
-Ok.
+Fixes: d2b7428eb0ca ("common: dma-mapping: introduce dma_get_sgtable() function")
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
 
-> 
->>> we can mremap() resulted shmem to restore shared memory mappings on the
->>> same address where they were on checkpointing.
->>> But it's still worth fixing because we can't reliably tell from
->>> userspace if the platform has VIPT cache, and so this mremap()
->>> workaround is done with HUGE warning that restoring application, that
->>> uses SHMBLA-unaligned shmem on ARMv6 CPU with VIPT cache may result
->>> in data corruptions.
->>>
->>> I also changed SHMLBA build-time check to init-time WARN_ON(), as
->>> it's not constant afterward.
-> 
-> I'm not happy with this.  SHMLBA is defined by POSIX to be a constant,
-> which means that if we want to have any kind of binary compatibility
-> between different architecture versions, SHMLBA must be constant across
-> all variants of the architecture.
-> 
-> Making it dependent on the cache architecture means that userspace's
-> assumptions can be broken.  Increasing it is not an issue (since SHMLBA
-> is defined to be the address multiple - an address that is aligned to
-> 4-page is also by definition aligned to 1-page.)  So what I did back in
-> 2004 wasn't a problem.
-> 
-> However, reducing it (as you're now suggesting) is - newly built programs
-> are built today with:
-> 
-> #define SHMLBA              (__getpagesize () << 2)
-> 
-> so we must not allow the kernel to return addresses that violate that.
-> As I say, we can't reduce SHMLBA now.
+In a recent discussion around the iommu DMA ops on arm64, Russell
+pointed out that dma_get_sgtable is not safe since the coherent DMA
+memory is not always backed by struct page. Russell has queued an
+arm-specific patch checking for pfn_valid() but I thought I'd make a
+more generic fix. This patch aims to bring the dma_get_sgtable() API in
+line with the dma_alloc/mmap/free with respect to the from_coherent
+memory.
 
-Thanks for the reply!
-Hmm, so what do you think if we align then shmat(smid, NULL, shmflg)
-allocations also? (with 0 == shmaddr)
+ drivers/base/dma-coherent.c | 9 +++++++++
+ include/linux/dma-mapping.h | 5 +++++
+ 2 files changed, 14 insertions(+)
 
-Something like below:
-
---- >8 ---
-diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
-index 2239fde10b80..ac52f066f47f 100644
---- a/arch/arm/mm/mmap.c
-+++ b/arch/arm/mm/mmap.c
-@@ -59,21 +59,15 @@ arch_get_unmapped_area(struct file *filp, unsigned 
-long addr,
-  	struct mm_struct *mm = current->mm;
-  	struct vm_area_struct *vma;
-  	int do_align = 0;
--	int aliasing = cache_is_vipt_aliasing();
-  	struct vm_unmapped_area_info info;
-
--	/*
--	 * We only need to do colour alignment if either the I or D
--	 * caches alias.
--	 */
--	if (aliasing)
--		do_align = filp || (flags & MAP_SHARED);
-+	do_align = filp || (flags & MAP_SHARED);
-
-  	/*
-  	 * We enforce the MAP_FIXED case.
-  	 */
-  	if (flags & MAP_FIXED) {
--		if (aliasing && flags & MAP_SHARED &&
-+		if (flags & MAP_SHARED &&
-  		    (addr - (pgoff << PAGE_SHIFT)) & (SHMLBA - 1))
-  			return -EINVAL;
-  		return addr;
-@@ -112,22 +106,16 @@ arch_get_unmapped_area_topdown(struct file *filp, 
-const unsigned long addr0,
-  	struct mm_struct *mm = current->mm;
-  	unsigned long addr = addr0;
-  	int do_align = 0;
--	int aliasing = cache_is_vipt_aliasing();
-  	struct vm_unmapped_area_info info;
-
--	/*
--	 * We only need to do colour alignment if either the I or D
--	 * caches alias.
--	 */
--	if (aliasing)
--		do_align = filp || (flags & MAP_SHARED);
-+	do_align = filp || (flags & MAP_SHARED);
-
-  	/* requested length too big for entire address space */
-  	if (len > TASK_SIZE)
-  		return -ENOMEM;
-
-  	if (flags & MAP_FIXED) {
--		if (aliasing && flags & MAP_SHARED &&
-+		if (flags & MAP_SHARED &&
-  		    (addr - (pgoff << PAGE_SHIFT)) & (SHMLBA - 1))
-  			return -EINVAL;
-  		return addr;
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index 640a7e63c453..1d2cdbefb850 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -279,6 +279,15 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
+ }
+ EXPORT_SYMBOL(dma_mmap_from_coherent);
+ 
++int dma_vaddr_from_coherent(struct device *dev, void *vaddr, size_t size)
++{
++	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
++
++	return mem && vaddr >= mem->virt_base &&
++		vaddr + size <= (mem->virt_base + (mem->size << PAGE_SHIFT));
++}
++EXPORT_SYMBOL(dma_vaddr_from_coherent);
++
+ /*
+  * Support for reserved memory regions defined in device tree
+  */
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index 0977317c6835..4dc99c6db184 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -164,10 +164,12 @@ int dma_release_from_coherent(struct device *dev, int order, void *vaddr);
+ 
+ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
+ 			    void *cpu_addr, size_t size, int *ret);
++int dma_vaddr_from_coherent(struct device *dev, void *vaddr, size_t size);
+ #else
+ #define dma_alloc_from_coherent(dev, size, handle, ret) (0)
+ #define dma_release_from_coherent(dev, order, vaddr) (0)
+ #define dma_mmap_from_coherent(dev, vma, vaddr, order, ret) (0)
++#define dma_vaddr_from_coherent(dev, vaddr, size) (0)
+ #endif /* CONFIG_HAVE_GENERIC_DMA_COHERENT */
+ 
+ #ifdef CONFIG_HAS_DMA
+@@ -461,6 +463,9 @@ dma_get_sgtable_attrs(struct device *dev, struct sg_table *sgt, void *cpu_addr,
+ {
+ 	const struct dma_map_ops *ops = get_dma_ops(dev);
+ 	BUG_ON(!ops);
++	/* dma_alloc_from_coherent() memory is not backed by struct page */
++	if (dma_vaddr_from_coherent(dev, cpu_addr, size))
++		return -ENXIO;
+ 	if (ops->get_sgtable)
+ 		return ops->get_sgtable(dev, sgt, cpu_addr, dma_addr, size,
+ 					attrs);
