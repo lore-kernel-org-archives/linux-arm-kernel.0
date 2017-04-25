@@ -1,60 +1,151 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 25 Apr 2017 14:28:20 +0200
-Subject: support autofocus / autogain in libv4l2
-In-Reply-To: <20170425113009.GH30553@pali>
-References: <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
- <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
- <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
- <20170424224724.5bb52382@vento.lan> <20170425080538.GA30380@amd>
- <20170425080815.GD30553@pali> <20170425112330.GB7926@amd>
- <20170425113009.GH30553@pali>
-Message-ID: <20170425122820.GD7926@amd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Apr 2017 14:38:39 +0200
+Subject: [PATCH 1/2] PCI: mediatek: Add Mediatek PCIe host controller
+ support
+In-Reply-To: <1492935543-18190-2-git-send-email-ryder.lee@mediatek.com>
+References: <1492935543-18190-1-git-send-email-ryder.lee@mediatek.com>
+ <1492935543-18190-2-git-send-email-ryder.lee@mediatek.com>
+Message-ID: <CAK8P3a39TFkJ5=jp8me+Dyg-Qi-N_1ZKxpJGvnhmPEo4csnFCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2017-04-25 13:30:09, Pali Roh?r wrote:
-> On Tuesday 25 April 2017 13:23:30 Pavel Machek wrote:
-> > Hi!
-> > On Tue 2017-04-25 10:08:15, Pali Roh?r wrote:
-> > > On Tuesday 25 April 2017 10:05:38 Pavel Machek wrote:
-> > > > > > It would be nice if more than one application could be accessing the
-> > > > > > camera at the same time... (I.e. something graphical running preview
-> > > > > > then using command line tool to grab a picture.) This one is
-> > > > > > definitely not solveable inside a library...
-> > > > > 
-> > > > > Someone once suggested to have something like pulseaudio for V4L.
-> > > > > For such usage, a server would be interesting. Yet, I would code it
-> > > > > in a way that applications using libv4l will talk with such daemon
-> > > > > in a transparent way.
-> > > > 
-> > > > Yes, we need something like pulseaudio for V4L. And yes, we should
-> > > > make it transparent for applications using libv4l.
-> > > 
-> > > IIRC there is already some effort in writing such "video" server which
-> > > would support accessing more application into webcam video, like
-> > > pulseaudio server for accessing more applications to microphone input.
-> > 
-> > Do you have project name / url / something?
-> 
-> Pinos (renamed from PulseVideo)
-> 
-> https://blogs.gnome.org/uraeus/2015/06/30/introducing-pulse-video/
-> https://cgit.freedesktop.org/~wtay/pinos/
-> 
-> But from git history it looks like it is probably dead now...
+On Sun, Apr 23, 2017 at 10:19 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
 
-Actually, last commit is an hour ago on "work" branch. Seems alive to
-me ;-).
+> +static inline bool mtk_pcie_link_is_up(struct mtk_pcie_port *port)
+> +{
+> +       return !!(readl_relaxed(port->base + PCIE_LINK_STATUS) &
+> +                 PCIE_PORT_LINKUP);
+> +}
 
-Thanks for pointer...
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170425/cdcc4df0/attachment.sig>
+If this is not performance critical, please use the regular readl() instead
+of readl_relaxed().
+
+> +static bool mtk_pcie_valid_device(struct mtk_pcie *pcie,
+> +                                 struct pci_bus *bus, int devfn)
+> +{
+> +       struct mtk_pcie_port *port;
+> +       struct pci_dev *dev;
+> +       struct pci_bus *pbus;
+> +
+> +       /* if there is no link, then there is no device */
+> +       list_for_each_entry(port, &pcie->ports, list) {
+> +               if (bus->number == 0 && port->index == PCI_SLOT(devfn) &&
+> +                   mtk_pcie_link_is_up(port)) {
+> +                       return true;
+> +               } else if (bus->number != 0) {
+> +                       pbus = bus;
+> +                       do {
+> +                               dev = pbus->self;
+> +                               if (port->index == PCI_SLOT(dev->devfn) &&
+> +                                   mtk_pcie_link_is_up(port)) {
+> +                                       return true;
+> +                               }
+> +                               pbus = dev->bus;
+> +                       } while (dev->bus->number != 0);
+> +               }
+> +       }
+> +
+> +       return false;
+> +}
+
+
+
+
+> +static int mtk_pcie_hw_rd_cfg(struct mtk_pcie *pcie, u32 bus, u32 devfn,
+> +                             int where, int size, u32 *val)
+> +{
+> +       writel(PCIE_CONF_ADDR(where, PCI_FUNC(devfn), PCI_SLOT(devfn), bus),
+> +              pcie->base + PCIE_CFG_ADDR);
+> +
+> +       *val = 0;
+> +
+> +       switch (size) {
+> +       case 1:
+> +               *val = readb(pcie->base + PCIE_CFG_DATA + (where & 3));
+> +               break;
+> +       case 2:
+> +               *val = readw(pcie->base + PCIE_CFG_DATA + (where & 2));
+> +               break;
+> +       case 4:
+> +               *val = readl(pcie->base + PCIE_CFG_DATA);
+> +               break;
+> +       }
+> +
+> +       return PCIBIOS_SUCCESSFUL;
+> +}
+
+This is a fairly standard set of read/write operations. Can you change
+the pci_ops
+to use pci_generic_config_read/pci_generic_config_write and an appropriate
+map function instead?
+
+> +static int mtk_pcie_enable_ports(struct mtk_pcie *pcie)
+> +{
+> +       struct device *dev = pcie->dev;
+> +       struct mtk_pcie_port *port, *tmp;
+> +       int err, linkup = 0;
+> +
+> +       list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
+> +               err = clk_prepare_enable(port->sys_ck);
+> +               if (err) {
+> +                       dev_err(dev, "failed to enable port%d clock\n",
+> +                               port->index);
+> +                       continue;
+> +               }
+> +
+> +               /* assert RC */
+> +               reset_control_assert(port->reset);
+> +               /* de-assert RC */
+> +               reset_control_deassert(port->reset);
+> +
+> +               /* power on PHY */
+> +               err = phy_power_on(port->phy);
+> +               if (err) {
+> +                       dev_err(dev, "failed to power on port%d phy\n",
+> +                               port->index);
+> +                       goto err_phy_on;
+> +               }
+> +
+> +               mtk_pcie_assert_ports(port);
+> +
+
+Similar to the comment I had for the binding, I wonder if it would be
+better to keep all the information about the ports in one place and
+then just deal with it at the root level.
+
+Alternatively, we could decide to standardize on the properties
+you have added to the pcie port node, but then I would handle
+them in the pcieport driver rather than in the host bridge driver.
+
+> +/*
+> + * This IP lacks interrupt status register to check or map INTx from
+> + * different devices at the same time.
+> + */
+> +static int __init mtk_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+> +{
+> +       struct mtk_pcie *pcie = dev->bus->sysdata;
+> +       struct mtk_pcie_port *port;
+> +
+> +       list_for_each_entry(port, &pcie->ports, list)
+> +               if (port->index == slot)
+> +                       return port->irq;
+> +
+> +       return -1;
+> +}
+
+This looks odd, what is it needed for specifically? It looks like
+it's broken for devices behind bridges, and the interrupt mapping
+should normally come from the interrupt-map property, without
+the need for a driver specific map_irq override.
+
+> +static int mtk_pcie_register_ports(struct mtk_pcie *pcie)
+> +{
+> +       struct pci_bus *bus, *child;
+> +
+> +       bus = pci_scan_root_bus(pcie->dev, 0, &mtk_pcie_ops, pcie,
+> +                               &pcie->resources);
+
+Can you use the new pci_register_host_bridge() method instead of
+pci_scan_root_bus() here?
+
+       ARnd
