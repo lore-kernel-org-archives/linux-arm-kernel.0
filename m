@@ -1,41 +1,157 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 25 Apr 2017 10:43:09 -0300
-Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
-In-Reply-To: <CAHCN7xJVicKuAc0dDbzBg4h2d1UUP66iKkSsWN_f=rPd4mOZSw@mail.gmail.com>
-References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
- <20170424040709.GG26900@vireshk-i7>
- <CAOMZO5B4_xrLcWQGF=yRfj-14XQKudzjyr2roGRkzofkHCfuHg@mail.gmail.com>
- <20170424112906.GR26900@vireshk-i7>
- <CAOMZO5BpAsJAKv-p=WPevUnx71fxbLtunJe-0ijVT7T9m7AMSQ@mail.gmail.com>
- <20170424114343.GS26900@vireshk-i7>
- <CAOMZO5AkTKjU5kw0gszLVdVOc_Sb_sWhr65heE==kyw=5rcN-g@mail.gmail.com>
- <20170425050633.GV26900@vireshk-i7>
- <CAOMZO5BgjgxGhJ7zGV-gjs0QHmJMgkNryFqTYA=vGPz8KWDijg@mail.gmail.com>
- <20170425111301.GC1928@vireshk-i7>
- <CAHCN7xJVicKuAc0dDbzBg4h2d1UUP66iKkSsWN_f=rPd4mOZSw@mail.gmail.com>
-Message-ID: <CAOMZO5CPtKAh6wMJ06BO4YFLPmOTvrpv5Q_3RJoj9dup46ukTQ@mail.gmail.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Tue, 25 Apr 2017 15:44:29 +0200
+Subject: [PATCH v2 1/2] arm: process: dump memory around registers when
+ displaying regs
+Message-ID: <20170425134430.5545-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adam,
+Dump a block of kernel memory from around the registers in the kernel oops
+dump. This is behind a config option (DEBUG_AROUND_REGS), since it adds
+a bunch of noise to the kernel logs (which someone can find valuable but
+not everyone else will).
 
-On Tue, Apr 25, 2017 at 9:41 AM, Adam Ford <aford173@gmail.com> wrote:
+This is extremely useful in diagnosing remote crashes, and is based heavily
+on original work by Michael Davidson <md@google.com> and San Mehat
+<san@google.com>.
 
-> I don't have that board, so I can't test, but I have seen other issues on my
-> imx6 board where operating at 'performance' instead of on-demand worked
-> better for me as well in different areas.   I was assuming it was something
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+This is a second version of a patch that was initially sent by John Stultz
+in 2010[1], current version is a rework trying to address the feedback
+received in the first version. We're still carrying this patch on recent
+chromeos kernels and find it useful. This is a second attempt to try
+to get this acceptable, so waiting for your feedback, and I hope I'll be
+able to do the modifications needed.
 
-What are the issues you observed with 'on-demand' on your mx6 board?
+Changes since v1:
+ - Use dump_mem() to dump memory.
+ - Put the code behind a config option.
 
-> regarding the voltage levels of various regulators for my board, and I am
-> going to run tests on my board by playing with regulators on my device tree
-> to make sure they are properly regulating to the right voltages.  Since
-> 'performance' runs the processor at both a higher speed and higher voltage,
-> it's conceivable to me that something is just below some limit/level and
-> needs some minor adjustment. At least that is my theory with my board
-> issues.  Have you looked considered that possibility?
+[1] http://www.spinics.net/lists/arm-kernel/msg107477.html
+---
+ arch/arm/include/asm/traps.h |  1 +
+ arch/arm/kernel/process.c    | 34 ++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/traps.c      |  6 ++----
+ lib/Kconfig.debug            | 11 +++++++++++
+ 4 files changed, 48 insertions(+), 4 deletions(-)
 
-One test I have already tried was to run all other cpufreq operating
-points with the same ARM and SOC-PU voltages as the 996MHz.
-
-Still in this case I do see touchscreen failure.
+diff --git a/arch/arm/include/asm/traps.h b/arch/arm/include/asm/traps.h
+index f555bb3..24e65c2 100644
+--- a/arch/arm/include/asm/traps.h
++++ b/arch/arm/include/asm/traps.h
+@@ -47,6 +47,7 @@ static inline int in_exception_text(unsigned long ptr)
+ }
+ 
+ extern void __init early_trap_init(void *);
++extern void dump_mem(const char *lvl, const char *str, unsigned long bottom, unsigned long top);
+ extern void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame);
+ extern void ptrace_break(struct task_struct *tsk, struct pt_regs *regs);
+ 
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 939e8b5..3894cf2 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -34,6 +34,7 @@
+ 
+ #include <asm/processor.h>
+ #include <asm/thread_notify.h>
++#include <asm/traps.h>
+ #include <asm/stacktrace.h>
+ #include <asm/system_misc.h>
+ #include <asm/mach/time.h>
+@@ -94,6 +95,37 @@ void arch_cpu_idle_exit(void)
+ 	ledtrig_cpu(CPU_LED_IDLE_END);
+ }
+ 
++/*
++ * Dump a block of kernel memory from around the given address
++ */
++static void __show_regs_extra_data(struct pt_regs *regs, int nbytes)
++{
++#ifdef CONFIG_DEBUG_AROUND_REGS
++	struct map_regs {
++		unsigned long reg;
++		const char *name;
++	};
++	struct map_regs map_dump[] = {
++		{ regs->ARM_pc, "PC " }, { regs->ARM_lr, "LR " },
++		{ regs->ARM_sp, "SP " }, { regs->ARM_ip, "IP " },
++		{ regs->ARM_fp, "FP " }, { regs->ARM_r0, "R0 " },
++		{ regs->ARM_r1, "R1 " }, { regs->ARM_r2, "R2 " },
++		{ regs->ARM_r3, "R3 " }, { regs->ARM_r4, "R4 " },
++		{ regs->ARM_r5, "R5 " }, { regs->ARM_r6, "R6 " },
++		{ regs->ARM_r7, "R7 " }, { regs->ARM_r8, "R8 " },
++		{ regs->ARM_r9, "R9 " }, { regs->ARM_r10, "R10 " },
++		{ -1, NULL },
++	};
++	struct map_regs *map = map_dump;
++
++	while (map->name) {
++		dump_mem("", map->name, map->reg - nbytes,
++			 map->reg + nbytes);
++		map++;
++	}
++#endif
++}
++
+ void __show_regs(struct pt_regs *regs)
+ {
+ 	unsigned long flags;
+@@ -185,6 +217,8 @@ void __show_regs(struct pt_regs *regs)
+ 		printk("Control: %08x%s\n", ctrl, buf);
+ 	}
+ #endif
++
++	__show_regs_extra_data(regs, 128);
+ }
+ 
+ void show_regs(struct pt_regs * regs)
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 948c648..f4ee05b 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -62,8 +62,6 @@ static int __init user_debug_setup(char *str)
+ __setup("user_debug=", user_debug_setup);
+ #endif
+ 
+-static void dump_mem(const char *, const char *, unsigned long, unsigned long);
+-
+ void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame)
+ {
+ #ifdef CONFIG_KALLSYMS
+@@ -115,8 +113,8 @@ static int verify_stack(unsigned long sp)
+ /*
+  * Dump out the contents of some memory nicely...
+  */
+-static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+-		     unsigned long top)
++void dump_mem(const char *lvl, const char *str, unsigned long bottom,
++	      unsigned long top)
+ {
+ 	unsigned long first;
+ 	mm_segment_t fs;
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index 77fadfa..b72d4ce6 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -726,6 +726,17 @@ config DEBUG_STACKOVERFLOW
+ 
+ 	  If in doubt, say "N".
+ 
++config DEBUG_AROUND_REGS
++	bool "Dump a block of kernel memory from around registers"
++	depends on DEBUG_KERNEL
++	help
++	  Say Y here to dump a block of kernel memory around the registers
++	  in the kernel oops dump. This is useful in diagnosing remote
++	  crashes.
++
++	  Note that selecting this option will increase significally the
++	  information in the oops dump. Most people should say N here.
++
+ source "lib/Kconfig.kmemcheck"
+ 
+ source "lib/Kconfig.kasan"
+-- 
+2.9.3
