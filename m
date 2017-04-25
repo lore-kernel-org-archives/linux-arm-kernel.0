@@ -1,35 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 25 Apr 2017 10:07:38 +0200
-Subject: [PATCH RFC 0/5] *** SPI Slave mode support ***
-In-Reply-To: <58FF0127.7070703@mentor.com>
-References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
- <20170413125929.dygodgj6c35ydh5p@sirena.org.uk>
- <CAMuHMdUm=90ddNWM5KWqT+W0hqZ-QO6vPHj5OisbYquDYq1ZmA@mail.gmail.com>
- <58F06092.9080409@mentor.com>
- <CAMuHMdXa_O6RsqUciiNWQ0Zp6dniS47AUmPN9UWAWitP0csx=Q@mail.gmail.com>
- <58FDF430.5090306@mentor.com>
- <CAMuHMdVQS494-BAc-W-XOOLK8Xow85n+Cgih0FG+t4QxCFxhMA@mail.gmail.com>
- <58FF0127.7070703@mentor.com>
-Message-ID: <20170425080738.cb6jaqvktgpir7zq@pengutronix.de>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Tue, 25 Apr 2017 10:08:15 +0200
+Subject: support autofocus / autogain in libv4l2
+In-Reply-To: <20170425080538.GA30380@amd>
+References: <1487074823-28274-1-git-send-email-sakari.ailus@linux.intel.com>
+ <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
+ <20170414232332.63850d7b@vento.lan>
+ <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
+ <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
+ <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
+ <20170424224724.5bb52382@vento.lan> <20170425080538.GA30380@amd>
+Message-ID: <20170425080815.GD30553@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jiada,
+On Tuesday 25 April 2017 10:05:38 Pavel Machek wrote:
+> > > It would be nice if more than one application could be accessing the
+> > > camera at the same time... (I.e. something graphical running preview
+> > > then using command line tool to grab a picture.) This one is
+> > > definitely not solveable inside a library...
+> > 
+> > Someone once suggested to have something like pulseaudio for V4L.
+> > For such usage, a server would be interesting. Yet, I would code it
+> > in a way that applications using libv4l will talk with such daemon
+> > in a transparent way.
+> 
+> Yes, we need something like pulseaudio for V4L. And yes, we should
+> make it transparent for applications using libv4l.
 
-On Tue, Apr 25, 2017 at 12:56:23AM -0700, Jiada Wang wrote:
-> the use case of
-> "A (master) <=> B (slave)", "B (master) <=> C(slave)", do share MISO and
-> MOSI lines,
-> but there is no SS line between A and C. so for each SPI slave device, there
-> is only one
-> master device.
-
-So you need a mutex to make A not use the bus while B communicates to C.
-Otherwise you have two drivers on MOSI (A and B) and MISO (B and C).
-
-Best regards
-Uwe
+IIRC there is already some effort in writing such "video" server which
+would support accessing more application into webcam video, like
+pulseaudio server for accessing more applications to microphone input.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Pali Roh?r
+pali.rohar at gmail.com
