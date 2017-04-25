@@ -1,23 +1,60 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 25 Apr 2017 14:26:51 +0200
-Subject: [PATCH] iommu: arm-smmu: correct sid to mask
-In-Reply-To: <20170424155453.GP12323@arm.com>
-References: <1492765416-30835-1-git-send-email-peng.fan@nxp.com>
- <20170424155453.GP12323@arm.com>
-Message-ID: <20170425122651.GI7266@8bytes.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 25 Apr 2017 14:28:20 +0200
+Subject: support autofocus / autogain in libv4l2
+In-Reply-To: <20170425113009.GH30553@pali>
+References: <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
+ <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
+ <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
+ <20170424224724.5bb52382@vento.lan> <20170425080538.GA30380@amd>
+ <20170425080815.GD30553@pali> <20170425112330.GB7926@amd>
+ <20170425113009.GH30553@pali>
+Message-ID: <20170425122820.GD7926@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 04:54:54PM +0100, Will Deacon wrote:
-> On Fri, Apr 21, 2017 at 05:03:36PM +0800, Peng Fan wrote:
-> > -				sid, smmu->smr_mask_mask);
-> > +				mask, smmu->smr_mask_mask);
-> >  			goto out_free;
+On Tue 2017-04-25 13:30:09, Pali Roh?r wrote:
+> On Tuesday 25 April 2017 13:23:30 Pavel Machek wrote:
+> > Hi!
+> > On Tue 2017-04-25 10:08:15, Pali Roh?r wrote:
+> > > On Tuesday 25 April 2017 10:05:38 Pavel Machek wrote:
+> > > > > > It would be nice if more than one application could be accessing the
+> > > > > > camera at the same time... (I.e. something graphical running preview
+> > > > > > then using command line tool to grab a picture.) This one is
+> > > > > > definitely not solveable inside a library...
+> > > > > 
+> > > > > Someone once suggested to have something like pulseaudio for V4L.
+> > > > > For such usage, a server would be interesting. Yet, I would code it
+> > > > > in a way that applications using libv4l will talk with such daemon
+> > > > > in a transparent way.
+> > > > 
+> > > > Yes, we need something like pulseaudio for V4L. And yes, we should
+> > > > make it transparent for applications using libv4l.
+> > > 
+> > > IIRC there is already some effort in writing such "video" server which
+> > > would support accessing more application into webcam video, like
+> > > pulseaudio server for accessing more applications to microphone input.
+> > 
+> > Do you have project name / url / something?
 > 
-> Looks like a copy-paste error to me:
+> Pinos (renamed from PulseVideo)
 > 
-> Acked-by: Will Deacon <will.deacon@arm.com>
+> https://blogs.gnome.org/uraeus/2015/06/30/introducing-pulse-video/
+> https://cgit.freedesktop.org/~wtay/pinos/
 > 
-> Joerg: do you mind picking this one up, please?
+> But from git history it looks like it is probably dead now...
 
-Applied, thanks.
+Actually, last commit is an hour ago on "work" branch. Seems alive to
+me ;-).
+
+Thanks for pointer...
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170425/cdcc4df0/attachment.sig>
