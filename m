@@ -1,50 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 25 Apr 2017 09:06:36 +0200
-Subject: [RFC] minimum gcc version for kernel: raise to gcc-4.3 or 4.6?
-In-Reply-To: <CAGXu5jKCSFVhGSD5mGLiAo6-G+k24g2Y=9p8Kr2-SffAY=uEBQ@mail.gmail.com>
-References: <20161216105634.235457-1-arnd@arndb.de>
- <3302470.IDcDrWa0u6@wuerfel>
- <CAGXu5jLPRYi+HK=07Zndc8szEKD4mZCqaHJFnHmmoYr7tA1xPw@mail.gmail.com>
- <CAK8P3a2C2WhWjzF=HrzU15Ncg0juR+nstZukBEpqCrVNW5pnDA@mail.gmail.com>
- <CAGXu5jLTR+dY_Ayyix5Tg0Yn9LBFAt=j56MQVdJVGue-R-CizA@mail.gmail.com>
- <CAK8P3a114EVbnhbObfq-4pZp8XCT4fWzMXD+WkRi7iPXs1vFMA@mail.gmail.com>
- <CAGXu5jJpofLF0qAf0-2iNTesZt-X704Q7L=DpQYdtHY5n2HD0w@mail.gmail.com>
- <alpine.LFD.2.20.1704220400380.32200@eddie.linux-mips.org>
- <CAK8P3a28fi0GRcz1yLq+wRkaBBO_w74NnBCY7f3myg78JpaCCQ@mail.gmail.com>
- <CAMuHMdWTiurUSacddYXgW69=QwOrZDV3Zt2DezJauPy8j-GMHw@mail.gmail.com>
- <CAK8P3a32Y0AiKyVaotYb14uZZ1jM=nwhFD1vyP56epW1Y9KqSw@mail.gmail.com>
- <alpine.LFD.2.20.1704241249350.32200@eddie.linux-mips.org>
- <CAK8P3a03BTEBgz87k_dhJuqzOYQm_S5FFDrFgcBAE5FCH-e=dQ@mail.gmail.com>
- <alpine.LFD.2.20.1704241908260.32200@eddie.linux-mips.org>
- <CAK8P3a0HQUqtL=9pgPEreQJaA0AksiR06B4oAwvbYnJeA-2i7w@mail.gmail.com>
- <CAGXu5jKCSFVhGSD5mGLiAo6-G+k24g2Y=9p8Kr2-SffAY=uEBQ@mail.gmail.com>
-Message-ID: <CAMuHMdV+6O1CAb=+r2x=ANy_NkD3C6EzYCpawuXaf2ynvpsn2Q@mail.gmail.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 25 Apr 2017 16:12:23 +0900
+Subject: [PATCH] arm64: dts: exynos: Remove the te-gpios property in the
+ TM2 boards
+In-Reply-To: <1493085261-3488-1-git-send-email-hoegeun.kwon@samsung.com>
+References: <CGME20170425015437epcas5p43549d47e69519f43d89ba2de496ba451@epcas5p4.samsung.com>
+ <1493085261-3488-1-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <58FEF6D7.7090205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 10:52 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Mon, Apr 24, 2017 at 1:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> How about this approach then:
->>
->> - To keep it simple, we update the README.rst to say that a minimum
->>   gcc-4.3 is required, while recommending gcc-4.9 for all architectures
->> - Support for gcc-4.0 and earlier gets removed from linux/compiler.h,
->>   and instead we add a summary of what I found, explaining that
->>   gcc-4.1 has active users on a few architectures.
->> - We make the Makefile show a warning once during compilation for
->>   gcc earlier than 4.3.
->
-> This sounds good to me!
 
-+1
 
-Gr{oetje,eeting}s,
+2017? 04? 25? 10:54? Hoegeun Kwon ?(?) ? ?:
+> The decon uses HW-TRIGGER, so TE interrupt is not necessary.
+> Therefore, remove the te-gpios property in the TM2 dts.
+> 
+> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> index 3ff9527..23191eb 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+> @@ -60,7 +60,6 @@
+>  		vci-supply = <&ldo28_reg>;
+>  		reset-gpios = <&gpg0 0 GPIO_ACTIVE_LOW>;
+>  		enable-gpios = <&gpf1 5 GPIO_ACTIVE_HIGH>;
+> -		te-gpios = <&gpf1 3 GPIO_ACTIVE_HIGH>;
 
-                        Geert
+Reviewed-by: Inki Dae <inki.dae@samsung.com>
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Thanks,
+Inki Dae
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>  	};
+>  };
+>  
+> 
