@@ -1,73 +1,67 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 25 Apr 2017 13:45:13 -0500
-Subject: [PATCH V8 4/5] PCI/ASPM: save power on values during bridge init
-In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B2846676C7EF@IRSMSX101.ger.corp.intel.com>
-References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
- <1491627351-1111-5-git-send-email-okaya@codeaurora.org>
- <CACK8Z6GXfMWxakNQnvMToig9z9McnJKeYFc2BAAFy7ys8=PUWg@mail.gmail.com>
- <d3857812-7e03-4b62-f7cb-ac0d139b6123@codeaurora.org>
- <20170414214452.GA21870@bhelgaas-glaptop.roam.corp.google.com>
- <66168dde-7719-6f74-3f06-8e4724dd2918@codeaurora.org>
- <CAErSpo7p_2dTDTC7J4HdQUw_5GH8081dUZ=XVqd=sRLrA_FJnA@mail.gmail.com>
- <c0c2f48f-d725-058e-a1ad-92ab4b6e7fb3@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B2846676C7EF@IRSMSX101.ger.corp.intel.com>
-Message-ID: <CAErSpo7TO1rfG6MDYuohyXL4WbaGCJdV8y3Ke-uL6VjGRb1hvw@mail.gmail.com>
+From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
+Date: Tue, 25 Apr 2017 20:49:05 +0200
+Subject: [PATCH 1/2] kvm: Fix mmu_notifier release race
+In-Reply-To: <1493028624-29837-2-git-send-email-suzuki.poulose@arm.com>
+References: <1493028624-29837-1-git-send-email-suzuki.poulose@arm.com>
+ <1493028624-29837-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20170425184904.GI5713@potion>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 2:46 AM, Patel, Mayurkumar
-<mayurkumar.patel@intel.com> wrote:
-> Hi Bjorn/Kaya,
->
->
->>
->>On 4/17/2017 12:38 PM, Bjorn Helgaas wrote:
->>>> Like you said, what do we do by default is the question. Should we opt
->>>> for safe like we are doing, or try to save some power.
->>> I think safety is paramount.  Every user should be able to boot safely
->>> without any kernel parameters.  We don't want users to have a problem
->>> booting and then have to search for a workaround like booting with
->>> "pcie_aspm=off".  Most users will never do that.
->>>
->>
->>OK, no problem with leaving the behavior as it is.
->>
->>My initial approach was #2. We knew this way that user had full control
->>over the ASPM policy by changing the BIOS option. Then, Mayurkumar
->>complained that ASPM is not enabled following a hotplug insertion to an
->>empty slot. That's when I switched to #3 as it sounded like a good thing
->>to have for us.
->>
->>> Here's a long-term strawman proposal, see what you think:
->>>
->>>   - Deprecate CONFIG_PCIEASPM_DEFAULT, CONFIG_PCIEASPM_POWERSAVE, etc.
->>>   - Default aspm_policy is POLICY_DEFAULT always.
->>>   - POLICY_DEFAULT means Linux doesn't touch anything: if BIOS enabled
->>> ASPM, we leave it that way; we leave ASPM disabled on hot-added
->>> devices.
->>
-> I am also ok with leaving the same behavior as now.
-> But still following is something open I feel besides, Which may be there in your comments redundantly.
-> The current problem is, pcie_aspm_exit_link_state() disables the ASPM configuration even
-> if POLICY_DEFAULT was set.
+2017-04-24 11:10+0100, Suzuki K Poulose:
+> The KVM uses mmu_notifier (wherever available) to keep track
+> of the changes to the mm of the guest. The guest shadow page
+> tables are released when the VM exits via mmu_notifier->ops.release().
+> There is a rare chance that the mmu_notifier->release could be
+> called more than once via two different paths, which could end
+> up in use-after-free of kvm instance (such as [0]).
+> 
+> e.g:
+> 
+> thread A                                        thread B
+> -------                                         --------------
+> 
+>  get_signal->                                   kvm_destroy_vm()->
+>  do_exit->                                        mmu_notifier_unregister->
+>  exit_mm->                                        kvm_arch_flush_shadow_all()->
+>  exit_mmap->                                      spin_lock(&kvm->mmu_lock)
+>  mmu_notifier_release->                           ....
+>   kvm_arch_flush_shadow_all()->                   .....
+>   ... spin_lock(&kvm->mmu_lock)                   .....
+>                                                   spin_unlock(&kvm->mmu_lock)
+>                                                 kvm_arch_free_kvm()
+>    *** use after free of kvm ***
 
-We call pcie_aspm_exit_link_state() when removing an endpoint.  When
-we remove an endpoint, I think disabling ASPM is the right thing to
-do.  The spec (PCIe r3.1, sec 5.4.1.3) says "Software must not enable
-L0s in either direction on a given Link unless components on both
-sides of the Link each support L0s; otherwise, the result is
-undefined."
+I don't understand this race ...
+a piece of code in mmu_notifier_unregister() says:
 
-> I am seeing already following problem(or may be influence) with it. The Endpoint I have does not have
-> does not have "Presence detect change" mechanism. Hot plug is working with Link status events.
-> When link is in L1 or L1SS and if EP is powered off, no Link status change event are triggered (It might be
-> the expected behavior in L1 or L1SS).  When next time EP is powered on there are link down and
-> link up events coming one after other. BIOS enables ASPM on Root port and Endpoint, but while
-> processing link status down, pcie_aspm_exit_link_state() clears the ASPM already which were enabled by BIOS.
-> If we want to follow above approach then shall we consider having something similar as following?
+  	/*
+  	 * Wait for any running method to finish, of course including
+  	 * ->release if it was run by mmu_notifier_release instead of us.
+  	 */
+  	synchronize_srcu(&srcu);
 
-The proposal was to leave ASPM disabled on hot-added devices.  If the
-endpoint was powered off and powered back on again, I think that
-device looks like a hot-added device, doesn't it?
+and code before that removes the notifier from the list, so it cannot be
+called after we pass this point.  mmu_notifier_release() does roughly
+the same and explains it as:
 
-Bjorn
+  	/*
+  	 * synchronize_srcu here prevents mmu_notifier_release from returning to
+  	 * exit_mmap (which would proceed with freeing all pages in the mm)
+  	 * until the ->release method returns, if it was invoked by
+  	 * mmu_notifier_unregister.
+  	 *
+  	 * The mmu_notifier_mm can't go away from under us because one mm_count
+  	 * is held by exit_mmap.
+  	 */
+  	synchronize_srcu(&srcu);
+
+The call of mmu_notifier->release is protected by srcu in both cases and
+while it seems possible that mmu_notifier->release would be called
+twice, I don't see a combination that could result in use-after-free
+from mmu_notifier_release after mmu_notifier_unregister() has returned.
+
+Doesn't [2/2] solve the exact same issue (that the release method cannot
+be called twice in parallel)?
+
+Thanks.
