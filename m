@@ -1,36 +1,74 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 25 Apr 2017 12:24:05 -0300
-Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
-In-Reply-To: <CAHCN7x+6KwOZdC1MaNQGdXWFjJ18hYp3kc73JADDMC4DOFn+yQ@mail.gmail.com>
-References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
- <20170424040709.GG26900@vireshk-i7>
- <CAOMZO5B4_xrLcWQGF=yRfj-14XQKudzjyr2roGRkzofkHCfuHg@mail.gmail.com>
- <20170424112906.GR26900@vireshk-i7>
- <CAOMZO5BpAsJAKv-p=WPevUnx71fxbLtunJe-0ijVT7T9m7AMSQ@mail.gmail.com>
- <20170424114343.GS26900@vireshk-i7>
- <CAOMZO5AkTKjU5kw0gszLVdVOc_Sb_sWhr65heE==kyw=5rcN-g@mail.gmail.com>
- <20170425050633.GV26900@vireshk-i7>
- <CAOMZO5BgjgxGhJ7zGV-gjs0QHmJMgkNryFqTYA=vGPz8KWDijg@mail.gmail.com>
- <20170425111301.GC1928@vireshk-i7>
- <CAHCN7xJVicKuAc0dDbzBg4h2d1UUP66iKkSsWN_f=rPd4mOZSw@mail.gmail.com>
- <CAOMZO5CPtKAh6wMJ06BO4YFLPmOTvrpv5Q_3RJoj9dup46ukTQ@mail.gmail.com>
- <CAHCN7x+6KwOZdC1MaNQGdXWFjJ18hYp3kc73JADDMC4DOFn+yQ@mail.gmail.com>
-Message-ID: <CAOMZO5AJQ2TJvyuiBLLeS9zZMufMxyuNw+MA+NtZPCzzWJ0NXA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 25 Apr 2017 23:25:04 +0800
+Subject: [PATCH 2/3] drm/sun4i: Set TCON clock inside sun4i_tconX_mode_set
+In-Reply-To: <20170425152505.6796-1-wens@csie.org>
+References: <20170425152505.6796-1-wens@csie.org>
+Message-ID: <20170425152505.6796-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 11:35 AM, Adam Ford <aford173@gmail.com> wrote:
+Currently we are configuring the TCON's dot clock or special clock
+directly from the encoder mode_set functions. Since we already
+provide mode_set helper functions for the TCON's 2 channels, we
+can set the respective clock from those helpers, and reduce the
+exposure of the TCON's internals.
 
-> I have a touch screen (using tsc2004 touch controller) on my board.  I
-> can run some tests if you tell me how you're able to reproduce your
-> issue.  I can at least confirm whether or not I see it too.  I won't
-> be able to do it until later tonight or tomorrow however.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/gpu/drm/sun4i/sun4i_rgb.c  | 2 --
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 6 ++++++
+ drivers/gpu/drm/sun4i/sun4i_tv.c   | 2 --
+ 3 files changed, 6 insertions(+), 4 deletions(-)
 
-Just run:
-
-evtest /dev/input/eventX to capture the touchscreen events and keep
-touching the screen.
-
-After some random time (1-2 minutes) evtest will stop capturing the events.
-
-Thanks
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index 1147451eb993..51ece4c39d7e 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -175,8 +175,6 @@ static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
+ 
+ 	sun4i_tcon0_mode_set(tcon, mode);
+ 
+-	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
+-
+ 	/* FIXME: This seems to be board specific */
+ 	clk_set_phase(tcon->dclk, 120);
+ }
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 8301389c411d..29fd829aa54c 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -131,6 +131,9 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+ 	u8 clk_delay;
+ 	u32 val = 0;
+ 
++	/* Configure the dot clock */
++	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
++
+ 	/* Adjust clock delay */
+ 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
+@@ -206,6 +209,9 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+ 
+ 	WARN_ON(!tcon->quirks->has_channel_1);
+ 
++	/* Configure the dot clock */
++	clk_set_rate(tcon->sclk1, mode->crtc_clock * 1000);
++
+ 	/* Adjust clock delay */
+ 	clk_delay = sun4i_tcon_get_clk_delay(mode, 1);
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
+index 49c49431a053..542da220818b 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
+@@ -486,8 +486,6 @@ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
+ 		      SUN4I_TVE_RESYNC_FIELD : 0));
+ 
+ 	regmap_write(tv->regs, SUN4I_TVE_SLAVE_REG, 0);
+-
+-	clk_set_rate(tcon->sclk1, mode->crtc_clock * 1000);
+ }
+ 
+ static struct drm_encoder_helper_funcs sun4i_tv_helper_funcs = {
+-- 
+2.11.0
