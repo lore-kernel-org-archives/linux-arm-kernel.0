@@ -1,109 +1,62 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 25 Apr 2017 12:38:13 -0700
-Subject: [PATCH] arm64: Do not leave an invalid area->pages pointer in
- dma_common_contiguous_remap()
-In-Reply-To: <1493144543-2497-1-git-send-email-catalin.marinas@arm.com>
-References: <1493144543-2497-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <ec8459d4-7970-9d01-3115-5c647c2a4559@redhat.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 25 Apr 2017 22:39:54 +0300
+Subject: [PATCH] [RFC] ARM: dts: imx6sx-sdb: Drop OPP hackery
+In-Reply-To: <a75000d6-aa53-92e3-c43a-58b49f18ff7e@denx.de>
+References: <20170425164224.26537-1-marex@denx.de>
+ <a75000d6-aa53-92e3-c43a-58b49f18ff7e@denx.de>
+Message-ID: <1493149194.20997.3.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2017 11:22 AM, Catalin Marinas wrote:
-> The dma_common_pages_remap() function allocates a vm_struct object and
-> initialises the pages pointer to value passed as argument. However, when
-> this function is called dma_common_contiguous_remap(), the pages array
-> is only temporarily allocated, being freed shortly after
-> dma_common_contiguous_remap() returns. Architecture code checking the
-> validity of an area->pages pointer would incorrectly dereference already
-> freed pointers. This has been exposed by the arm64 commit 44176bb38fa4
-> ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU").
+On Tue, 2017-04-25 at 21:30 +0200, Marek Vasut wrote:
+> On 04/25/2017 06:42 PM, Marek Vasut wrote:
+> > The imx6sx-sdb has one power supply that drives both VDDARM_IN
+> > and VDDSOC_IN, which is the sw1a regulator on the PFUZE PMIC.
+> > Connect both inputs to the sw1a regulator on the PMIC and drop
+> > the OPP hackery which is no longer needed as the power framework
+> > will take care of the regulator configuration as needed.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
 > 
-> Fixes: 513510ddba96 ("common: dma-mapping: introduce common remapping functions")
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Reported-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> +CC Leonard
 
-Acked-by: Laura Abbott <labbott@redhat.com>
+Tested-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-> ---
-> 
-> This is for correctness since once the arm64's mmap and get_sgtable ops
-> are fixed for DMA_ATTR_FORCE_CONTIGUOUS, we would no longer see the
-> issue. Anyway, it's better to get this fixed in case others trip over a
-> similar issue. I added a "Fixes" tag for completeness but I'm not sure
-> it's worth back-porting.
-> 
->  drivers/base/dma-mapping.c | 29 ++++++++++++++++++++++-------
->  1 file changed, 22 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-> index efd71cf4fdea..ab7071041141 100644
-> --- a/drivers/base/dma-mapping.c
-> +++ b/drivers/base/dma-mapping.c
-> @@ -277,8 +277,8 @@ EXPORT_SYMBOL(dma_common_mmap);
->   * remaps an array of PAGE_SIZE pages into another vm_area
->   * Cannot be used in non-sleeping contexts
->   */
-> -void *dma_common_pages_remap(struct page **pages, size_t size,
-> -			unsigned long vm_flags, pgprot_t prot,
-> +static struct vm_struct *__dma_common_pages_remap(struct page **pages,
-> +			size_t size, unsigned long vm_flags, pgprot_t prot,
->  			const void *caller)
->  {
->  	struct vm_struct *area;
-> @@ -287,13 +287,26 @@ void *dma_common_pages_remap(struct page **pages, size_t size,
->  	if (!area)
->  		return NULL;
->  
-> -	area->pages = pages;
-> -
->  	if (map_vm_area(area, prot, pages)) {
->  		vunmap(area->addr);
->  		return NULL;
->  	}
->  
-> +	return area;
-> +}
-> +
-> +void *dma_common_pages_remap(struct page **pages, size_t size,
-> +			unsigned long vm_flags, pgprot_t prot,
-> +			const void *caller)
-> +{
-> +	struct vm_struct *area;
-> +
-> +	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
-> +	if (!area)
-> +		return NULL;
-> +
-> +	area->pages = pages;
-> +
->  	return area->addr;
->  }
->  
-> @@ -308,7 +321,7 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
->  {
->  	int i;
->  	struct page **pages;
-> -	void *ptr;
-> +	struct vm_struct *area;
->  	unsigned long pfn;
->  
->  	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
-> @@ -318,11 +331,13 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
->  	for (i = 0, pfn = page_to_pfn(page); i < (size >> PAGE_SHIFT); i++)
->  		pages[i] = pfn_to_page(pfn + i);
->  
-> -	ptr = dma_common_pages_remap(pages, size, vm_flags, prot, caller);
-> +	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
->  
->  	kfree(pages);
->  
-> -	return ptr;
-> +	if (!area)
-> +		return NULL;
-> +	return area->addr;
->  }
->  
->  /*
-> 
+The OPP hack only applies to LDO bypass mode and that is not in
+upstream. When LDOs are enabled the effect is to use higher voltages
+than necessary for no good reason.
+
+Setting these higher voltages can make some boards (for example Rev B)
+fail to boot with ugly semi-random crashes reminiscent of memory
+corruption. These failures happen the first time the lowest idle state
+is used. This patch fixes those crashes.
+
+It's not clear exactly why the crashes happen. Perhaps waking up from
+idle draws more power than is available? I don't think it matters.
+
+I sent a very similar patch a few minutes after this one:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/503241
+.html
+
+> > @@ -145,3 +128,11 @@
+> >  		reg = <1>;
+> >  	};
+> >  };
+> > +
+> > +&reg_arm {
+> > +	vin-supply = <&sw1a_reg>;
+> > +};
+> > +
+> > +&reg_soc {
+> > +	vin-supply = <&sw1a_reg>;
+> > +};
+
+This is also good, it will result in lower voltages will result in
+lower voltages on VDD_ARM_SOC_IN rather than a fixed 1375 mV.
+
+-- 
+Regards,
+Leonard
