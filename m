@@ -1,73 +1,62 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 25 Apr 2017 15:39:22 +0100
-Subject: [kvmtool PATCH v10 05/15] virtio: fix endianness check for vhost
- support
-In-Reply-To: <20170425143932.17235-1-andre.przywara@arm.com>
-References: <20170425143932.17235-1-andre.przywara@arm.com>
-Message-ID: <20170425143932.17235-6-andre.przywara@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 25 Apr 2017 15:51:38 +0100
+Subject: [PATCH] arm64: fix the overlap between the kernel image and
+ vmalloc address
+In-Reply-To: <ffd0a3c5-5d89-4bbd-9995-c545bccaa8f6@redhat.com>
+References: <1493025729-21505-1-git-send-email-zhongjiang@huawei.com>
+ <20170424104456.GA4343@leverpostej> <58FDFD90.8050300@huawei.com>
+ <20170424155125.GA5972@leverpostej>
+ <ffd0a3c5-5d89-4bbd-9995-c545bccaa8f6@redhat.com>
+Message-ID: <20170425145138.GE3792@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we deny any VHOST_* functionality if the architecture
-supports guests with different endianness than the host. Most of the
-time even on those architectures the endianness of guest and host are
-the same, though, so we are denying the glory of VHOST needlessly.
-Switch from compile time determination to a run time scheme, which
-takes the actual endianness of the guest into account.
-For this we change the semantics of VIRTIO_ENDIAN_HOST to return the
-actual endianness of the host (the endianness of kvmtool at compile
-time, really). The actual check in vhost_net now compares this against
-the guest endianness.
-This enables vhost support on ARM and ARM64.
+On Mon, Apr 24, 2017 at 10:52:08AM -0700, Laura Abbott wrote:
+> On 04/24/2017 08:51 AM, Mark Rutland wrote:
+> > On Mon, Apr 24, 2017 at 09:28:48PM +0800, zhong jiang wrote:
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- include/kvm/virtio.h | 9 +++++++--
- virtio/net.c         | 2 +-
- 2 files changed, 8 insertions(+), 3 deletions(-)
+> >>  /*
+> >>    * Walk a vmap address to the struct page it maps.
+> >>    */
+> >> @@ -244,6 +280,9 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
+> >>          */
+> >>         VIRTUAL_BUG_ON(!is_vmalloc_or_module_addr(vmalloc_addr));
+> >>
+> >> +       if (is_kernel_image_addr(vmalloc_addr))
+> >> +               return kernel_image_to_page(vmalloc_addr, pgd);
+> > 
+> > It's not clear to me that this is the right place for this to live.
+> > 
+> > It might be best to code the kernel image logic directly in kcore (and
+> > kmem), assuming everyone's OK with that approach.
+> > 
+> 
+> That will fix kcore and kmem but this will show up in other places too.
 
-diff --git a/include/kvm/virtio.h b/include/kvm/virtio.h
-index 8324ba7..00a791a 100644
---- a/include/kvm/virtio.h
-+++ b/include/kvm/virtio.h
-@@ -17,10 +17,15 @@
- #define VIRTIO_PCI_O_CONFIG	0
- #define VIRTIO_PCI_O_MSIX	1
- 
--#define VIRTIO_ENDIAN_HOST	0
- #define VIRTIO_ENDIAN_LE	(1 << 0)
- #define VIRTIO_ENDIAN_BE	(1 << 1)
- 
-+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-+#define VIRTIO_ENDIAN_HOST VIRTIO_ENDIAN_LE
-+#else
-+#define VIRTIO_ENDIAN_HOST VIRTIO_ENDIAN_BE
-+#endif
-+
- struct virt_queue {
- 	struct vring	vring;
- 	u32		pfn;
-@@ -40,7 +45,7 @@ struct virt_queue {
- #define VIRTIO_RING_ENDIAN VIRTIO_ENDIAN_HOST
- #endif
- 
--#if (VIRTIO_RING_ENDIAN & (VIRTIO_ENDIAN_LE | VIRTIO_ENDIAN_BE))
-+#if VIRTIO_RING_ENDIAN != VIRTIO_ENDIAN_HOST
- 
- static inline __u16 __virtio_g2h_u16(u16 endian, __u16 val)
- {
-diff --git a/virtio/net.c b/virtio/net.c
-index ffa83ab..9fb9f1e 100644
---- a/virtio/net.c
-+++ b/virtio/net.c
-@@ -530,7 +530,7 @@ static int init_vq(struct kvm *kvm, void *dev, u32 vq, u32 page_size, u32 align,
- 	}
- 
- 	if (queue->endian != VIRTIO_ENDIAN_HOST)
--		die_perror("VHOST requires VIRTIO_ENDIAN_HOST");
-+		die_perror("VHOST requires the same endianness in guest and host");
- 
- 	state.num = queue->vring.num;
- 	r = ioctl(ndev->vhost_fd, VHOST_SET_VRING_NUM, &state);
--- 
-2.9.0
+True.
+
+> We've gone through and made sure that virt_addr_valid returns
+> true if and only if virt_to_page returns a valid address. I don't know
+> if we can make as strong a claim about is_vmalloc_addr and
+> vmalloc_to_page in all cases but is_vmalloc_addr should not return true
+> for the kernel image. That would at least let kcore fall back to
+> kern_addr_valid which should correctly handle the kernel image.
+
+That would largely be my preference.
+
+My fear is that other users of is_vmalloc_addr() are doing the right
+thing for the kernel image today (e.g. not doing virt_to_phys()),
+because they see it as a vmalloc addr.
+
+So we might have to audit all of those.
+
+> The suggestion to move the kernel image out of VMALLOC_START/VMALLOC_END
+> seems like the best approach although I haven't tried a prototype
+> at all.
+
+Given that (AFAICT) we're the only architecture that puts the kernel in
+the vmalloc area, I agree that this is likely to be the simplest correct
+approach. The interaction with KASLR is somewhat unfortunate.
+
+Thanks,
+Mark.
