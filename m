@@ -1,31 +1,28 @@
-From: majun258@huawei.com (Majun)
-Date: Tue, 25 Apr 2017 10:16:03 +0800
-Subject: [PATCH] irqchip/mbigen: Fix the clear register offset
-Message-ID: <1493086563-36396-1-git-send-email-majun258@huawei.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 25 Apr 2017 10:17:09 +0800
+Subject: [linux-sunxi] [PATCH v4 07/10] mfd: axp20x: add axp20x-regulator
+ cell for AXP803
+In-Reply-To: <20170424160103.9447-8-icenowy@aosc.io>
+References: <20170424160103.9447-1-icenowy@aosc.io>
+ <20170424160103.9447-8-icenowy@aosc.io>
+Message-ID: <CAGb2v673CL6TaZxkNR9SZDiG5G3cMqU1-=XeMj5gyDbQq4YzVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: MaJun <majun258@huawei.com>
+On Tue, Apr 25, 2017 at 12:01 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> As axp20x-regulator now supports AXP803, add a cell for it.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes in v4:
+> - Added a trailing comma for new cell, for easier further cell addition.
+> Changes in v3:
+> - Make the new cell one-liner.
+>
+>  drivers/mfd/axp20x.c                 | 3 ++-
+>  drivers/regulator/axp20x-regulator.c | 6 +++---
 
-Don't minus reserved interrupts (64) when get the clear register offset,because
-the clear register space includes the space of these 64 interrupts.
+Squashed in wrong patch?
 
-Signed-off-by: MaJun <majun258@huawei.com>
----
- drivers/irqchip/irq-mbigen.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-index 061cdb8..75818a5 100644
---- a/drivers/irqchip/irq-mbigen.c
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -108,7 +108,6 @@ static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
- {
- 	unsigned int ofst;
- 
--	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
- 	ofst = hwirq / 32 * 4;
- 
- 	*mask = 1 << (hwirq % 32);
--- 
-1.7.12.4
+ChenYu
