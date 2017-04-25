@@ -1,198 +1,82 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 25 Apr 2017 10:34:51 +0200
-Subject: [PATCH V9 1/3] irq: Allow to pass the IRQF_TIMER flag with
- percpu irq request
-In-Reply-To: <16042494-2e67-e1a5-b9f6-af57e349d8a7@arm.com>
-References: <1493042494-14057-1-git-send-email-daniel.lezcano@linaro.org>
- <398f3f3d-c567-0f1f-1a43-9b8d5805d5fd@arm.com>
- <20170424185909.GD2137@mai>
- <92e2a022-93d4-d4f3-78af-c9b5d51bb867@arm.com>
- <20170424195948.GE2137@mai>
- <16042494-2e67-e1a5-b9f6-af57e349d8a7@arm.com>
-Message-ID: <20170425083451.GA16888@mai>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue, 25 Apr 2017 16:37:53 +0800
+Subject: [linux-sunxi] Re: [PATCH v4 07/10] mfd: axp20x: add
+ axp20x-regulator cell for AXP803
+In-Reply-To: <20170425075717.l4x3qektdgt6kaiq@dell>
+References: <20170424160103.9447-1-icenowy@aosc.io>
+ <20170424160103.9447-8-icenowy@aosc.io>
+ <20170425075717.l4x3qektdgt6kaiq@dell>
+Message-ID: <D61CDE77-940B-4286-A70D-955DBCEB8215@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 08:38:56AM +0100, Marc Zyngier wrote:
-> On 24/04/17 20:59, Daniel Lezcano wrote:
-> > On Mon, Apr 24, 2017 at 08:14:54PM +0100, Marc Zyngier wrote:
-> >> On 24/04/17 19:59, Daniel Lezcano wrote:
-> >>> On Mon, Apr 24, 2017 at 07:46:43PM +0100, Marc Zyngier wrote:
-> >>>> On 24/04/17 15:01, Daniel Lezcano wrote:
-> >>>>> In the next changes, we track when the interrupts occur in order to
-> >>>>> statistically compute when is supposed to happen the next interrupt.
-> >>>>>
-> >>>>> In all the interruptions, it does not make sense to store the timer interrupt
-> >>>>> occurences and try to predict the next interrupt as when know the expiration
-> >>>>> time.
-> >>>>>
-> >>>>> The request_irq() has a irq flags parameter and the timer drivers use it to
-> >>>>> pass the IRQF_TIMER flag, letting us know the interrupt is coming from a timer.
-> >>>>> Based on this flag, we can discard these interrupts when tracking them.
-> >>>>>
-> >>>>> But, the API request_percpu_irq does not allow to pass a flag, hence specifying
-> >>>>> if the interrupt type is a timer.
-> >>>>>
-> >>>>> Add a function request_percpu_irq_flags() where we can specify the flags. The
-> >>>>> request_percpu_irq() function is changed to be a wrapper to
-> >>>>> request_percpu_irq_flags() passing a zero flag parameter.
-> >>>>>
-> >>>>> Change the timers using request_percpu_irq() to use request_percpu_irq_flags()
-> >>>>> instead with the IRQF_TIMER flag set.
-> >>>>>
-> >>>>> For now, in order to prevent a misusage of this parameter, only the IRQF_TIMER
-> >>>>> flag (or zero) is a valid parameter to be passed to the
-> >>>>> request_percpu_irq_flags() function.
-> >>>>
-> >>>> [...]
-> >>>>
-> >>>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> >>>>> index 35d7100..602e0a8 100644
-> >>>>> --- a/virt/kvm/arm/arch_timer.c
-> >>>>> +++ b/virt/kvm/arm/arch_timer.c
-> >>>>> @@ -523,8 +523,9 @@ int kvm_timer_hyp_init(void)
-> >>>>>  		host_vtimer_irq_flags = IRQF_TRIGGER_LOW;
-> >>>>>  	}
-> >>>>>  
-> >>>>> -	err = request_percpu_irq(host_vtimer_irq, kvm_arch_timer_handler,
-> >>>>> -				 "kvm guest timer", kvm_get_running_vcpus());
-> >>>>> +	err = request_percpu_irq_flags(host_vtimer_irq, kvm_arch_timer_handler,
-> >>>>> +				       IRQF_TIMER, "kvm guest timer",
-> >>>>> +				       kvm_get_running_vcpus());
-> >>>>>  	if (err) {
-> >>>>>  		kvm_err("kvm_arch_timer: can't request interrupt %d (%d)\n",
-> >>>>>  			host_vtimer_irq, err);
-> >>>>>
-> >>>>
-> >>>> How is that useful? This timer is controlled by the guest OS, and not
-> >>>> the host kernel. Can you explain how you intend to make use of that
-> >>>> information in this case?
-> >>>
-> >>> Isn't it a source of interruption on the host kernel?
-> >>
-> >> Only to cause an exit of the VM, and not under the control of the host.
-> >> This isn't triggering any timer related action on the host code either.
-> >>
-> >> Your patch series seems to assume some kind of predictability of the
-> >> timer interrupt, which can make sense on the host. Here, this interrupt
-> >> is shared among *all* guests running on this system.
-> >>
-> >> Maybe you could explain why you think this interrupt is relevant to what
-> >> you're trying to achieve?
-> > 
-> > If this interrupt does not happen on the host, we don't care.
-> 
-> All interrupts happen on the host. There is no such thing as a HW 
-> interrupt being directly delivered to a guest (at least so far). The 
-> timer is under control of the guest, which uses as it sees fit. When 
-> the HW timer expires, the interrupt fires on the host, which re-inject 
-> the interrupt in the guest.
 
-Ah, thanks for the clarification. Interesting.
 
-How can the host know which guest to re-inject the interrupt?
+? 2017?4?25? GMT+08:00 ??3:57:17, Lee Jones <lee.jones@linaro.org> ??:
+>On Tue, 25 Apr 2017, Icenowy Zheng wrote:
+>
+>> As axp20x-regulator now supports AXP803, add a cell for it.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> Acked-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>> Changes in v4:
+>> - Added a trailing comma for new cell, for easier further cell
+>addition.
+>> Changes in v3:
+>> - Make the new cell one-liner.
+>> 
+>>  drivers/mfd/axp20x.c                 | 3 ++-
+>>  drivers/regulator/axp20x-regulator.c | 6 +++---
+>
+>These 2 changes are orthogonal, thus there is no reason to send them
+>bundled into a single patch.  Doing so complicates things greatly.
+>Please resubmit the two changes separately, so that they may be
+>absorbed by our respective subsystems.
 
-> > The flag IRQF_TIMER is used by the spurious irq handler in the try_one_irq()
-> > function. However the per cpu timer interrupt will be discarded in the function
-> > before because it is per cpu.
-> 
-> Right. That's not because this is a timer, but because it is per-cpu. 
-> So why do we need this IRQF_TIMER flag, instead of fixing try_one_irq()?
+Yes. As Chen-Yu said, I wrongly squashed the regulator renaming patch here...
 
-When a timer is not per cpu, (eg. request_irq), we need this flag, no?
+It should be squashed into the regulator patch.
 
-> > IMO, for consistency reason, adding the IRQF_TIMER makes sense. Other than
-> > that, as the interrupt is not happening on the host, this flag won't be used.
-> > 
-> > Do you want to drop this change?
-> 
-> No, I'd like to understand the above. Why isn't the following patch 
-> doing the right thing?
+Sorry for it.
 
-Actually, the explanation is in the next patch of the series (2/3)
-
-[ ... ]
-
-+static inline void setup_timings(struct irq_desc *desc, struct irqaction *act)
-+{
-+	/*
-+	 * We don't need the measurement because the idle code already
-+	 * knows the next expiry event.
-+	 */
-+	if (act->flags & __IRQF_TIMER)
-+		return;
-+
-+	desc->istate |= IRQS_TIMINGS;
-+}
-
-[ ... ]
-
-+/*
-+ * The function record_irq_time is only called in one place in the
-+ * interrupts handler. We want this function always inline so the code
-+ * inside is embedded in the function and the static key branching
-+ * code can act at the higher level. Without the explicit
-+ * __always_inline we can end up with a function call and a small
-+ * overhead in the hotpath for nothing.
-+ */
-+static __always_inline void record_irq_time(struct irq_desc *desc)
-+{
-+	if (!static_branch_likely(&irq_timing_enabled))
-+		return;
-+
-+	if (desc->istate & IRQS_TIMINGS) {
-+		struct irq_timings *timings = this_cpu_ptr(&irq_timings);
-+
-+		timings->values[timings->count & IRQ_TIMINGS_MASK] =
-+			irq_timing_encode(local_clock(),
-+					  irq_desc_get_irq(desc));
-+
-+		timings->count++;
-+	}
-+}
-
-[ ...?]
-
-The purpose is to predict the next event interrupts on the system which are
-source of wake up. For now, this patchset is focused on interrupts (discarding
-timer interrupts).
-
-The following article gives more details: https://lwn.net/Articles/673641/
-
-When the interrupt is setup, we tag it except if it is a timer. So with this
-patch there is another usage of the IRQF_TIMER where we will be ignoring
-interrupt coming from a timer.
-
-As the timer interrupt is delivered to the host, we should not measure it as it
-is a timer and set this flag.
-
-The needed information is: "what is the earliest VM timer?". If this
-information is already available then there is nothing more to do, otherwise we
-should add it in the future.
-
-> diff --git a/kernel/irq/spurious.c b/kernel/irq/spurious.c
-> index 061ba7eed4ed..a4a81c6c7602 100644
-> --- a/kernel/irq/spurious.c
-> +++ b/kernel/irq/spurious.c
-> @@ -72,6 +72,7 @@ static int try_one_irq(struct irq_desc *desc, bool force)
->  	 * marked polled are excluded from polling.
->  	 */
->  	if (irq_settings_is_per_cpu(desc) ||
-> +	    irq_settings_is_per_cpu_devid(desc) ||
->  	    irq_settings_is_nested_thread(desc) ||
->  	    irq_settings_is_polled(desc))
->  		goto out;
-> 
-> Thanks,
-> 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
-
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+>
+>>  2 files changed, 5 insertions(+), 4 deletions(-)
+>> 
+>> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+>> index 1dc6235778eb..917b6ddc4f15 100644
+>> --- a/drivers/mfd/axp20x.c
+>> +++ b/drivers/mfd/axp20x.c
+>> @@ -848,7 +848,8 @@ static struct mfd_cell axp803_cells[] = {
+>>  		.name			= "axp20x-pek",
+>>  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+>>  		.resources		= axp803_pek_resources,
+>> -	}
+>> +	},
+>> +	{	.name			= "axp20x-regulator" },
+>>  };
+>>  
+>>  static struct mfd_cell axp806_cells[] = {
+>> diff --git a/drivers/regulator/axp20x-regulator.c
+>b/drivers/regulator/axp20x-regulator.c
+>> index 9356ec8a9a1f..e2608fe770b9 100644
+>> --- a/drivers/regulator/axp20x-regulator.c
+>> +++ b/drivers/regulator/axp20x-regulator.c
+>> @@ -311,13 +311,13 @@ static const struct regulator_desc
+>axp803_regulators[] = {
+>>  		 AXP803_FLDO1_V_OUT, 0x0f, AXP22X_PWR_OUT_CTRL3, BIT(2)),
+>>  	AXP_DESC(AXP803, FLDO2, "fldo2", "fldoin", 700, 1450, 50,
+>>  		 AXP803_FLDO2_V_OUT, 0x0f, AXP22X_PWR_OUT_CTRL3, BIT(3)),
+>> -	AXP_DESC_IO(AXP803, LDO_IO0, "ldo_io0", "ips", 700, 3300, 100,
+>> +	AXP_DESC_IO(AXP803, LDO_IO0, "ldo-io0", "ips", 700, 3300, 100,
+>>  		    AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
+>>  		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
+>> -	AXP_DESC_IO(AXP803, LDO_IO1, "ldo_io1", "ips", 700, 3300, 100,
+>> +	AXP_DESC_IO(AXP803, LDO_IO1, "ldo-io1", "ips", 700, 3300, 100,
+>>  		    AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
+>>  		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
+>> -	AXP_DESC_FIXED(AXP803, RTC_LDO, "rtc_ldo", "ips", 3000),
+>> +	AXP_DESC_FIXED(AXP803, RTC_LDO, "rtc-ldo", "ips", 3000),
+>>  };
+>>  
+>>  static const struct regulator_linear_range axp806_dcdca_ranges[] = {
