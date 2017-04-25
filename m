@@ -1,56 +1,38 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 25 Apr 2017 11:43:32 +0100
-Subject: [PATCH v5 02/22] KVM: arm/arm64: Add GICV3 pending table save API
- documentation
-In-Reply-To: <1492164934-988-3-git-send-email-eric.auger@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-3-git-send-email-eric.auger@redhat.com>
-Message-ID: <CAFEAcA_0N9Jx5ym+=jjmxAzSaXPjt-m+gW1cq90of8Qhw3LOzg@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 25 Apr 2017 08:09:22 -0300
+Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
+In-Reply-To: <20170425050633.GV26900@vireshk-i7>
+References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
+ <20170424040709.GG26900@vireshk-i7>
+ <CAOMZO5B4_xrLcWQGF=yRfj-14XQKudzjyr2roGRkzofkHCfuHg@mail.gmail.com>
+ <20170424112906.GR26900@vireshk-i7>
+ <CAOMZO5BpAsJAKv-p=WPevUnx71fxbLtunJe-0ijVT7T9m7AMSQ@mail.gmail.com>
+ <20170424114343.GS26900@vireshk-i7>
+ <CAOMZO5AkTKjU5kw0gszLVdVOc_Sb_sWhr65heE==kyw=5rcN-g@mail.gmail.com>
+ <20170425050633.GV26900@vireshk-i7>
+Message-ID: <CAOMZO5BgjgxGhJ7zGV-gjs0QHmJMgkNryFqTYA=vGPz8KWDijg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 April 2017 at 11:15, Eric Auger <eric.auger@redhat.com> wrote:
-> Add description for how to save GICV3 LPI pending bit into
-> guest RAM pending tables.
->
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->
-> ---
-> v5: creation
-> ---
->  Documentation/virtual/kvm/devices/arm-vgic-v3.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-> index c1a2461..9293b45 100644
-> --- a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-> +++ b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-> @@ -167,11 +167,17 @@ Groups:
->      KVM_DEV_ARM_VGIC_CTRL_INIT
->        request the initialization of the VGIC, no additional parameter in
->        kvm_device_attr.addr.
-> +    KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
-> +      save all LPI pending bits into guest RAM pending tables.
-> +
-> +      The first kB of the pending table is not altered by this operation.
->    Errors:
->      -ENXIO: VGIC not properly configured as required prior to calling
->       this attribute
->      -ENODEV: no online VCPU
->      -ENOMEM: memory shortage when allocating vgic internal data
-> +    -EFAULT: Invalid guest ram access
-> +    -EBUSY:  One or more VCPUS are running
->
->
->    KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
-> --
-> 2.5.5
+Hi Viresh,
 
-When does the -EFAULT return happen? (if the guest points GITS_BASER<n>
-etc at invalid memory, presumably?) How does the QEMU migration code
-handle this case? Failing migration because the guest has done something
-silly doesn't seem too palatable, but trying to avoid that could be
-more effort than an obscure corner case really merits.
+On Tue, Apr 25, 2017 at 2:06 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
-thanks
--- PMM
+> Honestly, I don't have a clue on how can we fix it for you now :)
+>
+> @Rafael: Any idea apart from running at max all the time?
+>
+> what touchscreen driver are you using btw? Just curious to see if there is any
+> bug in there. Handling touchscreen events shouldn't require us to run at max
+> freq.
+
+imx6q-sabresd board uses a drivers/input/touchscreen/egalax_ts.c touchscreen.
+
+>
+> @shawn: Saw something similar ever ?
+
+I do not see the problem with the NXP kernel, but was not able to
+identify what makes the touchscreen not to fail at 396MHz in their
+kernel.
+
+Thanks
