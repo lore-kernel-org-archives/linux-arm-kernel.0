@@ -1,61 +1,23 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue, 25 Apr 2017 16:49:11 -0400
-Subject: [PATCH 2/2] ARM: dts: NSP: Add Thermal Support
-In-Reply-To: <1493153351-12698-1-git-send-email-jon.mason@broadcom.com>
-References: <1493153351-12698-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1493153351-12698-3-git-send-email-jon.mason@broadcom.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 25 Apr 2017 23:04:53 +0200
+Subject: [PATCH V2  0/2] correct ids for clk_testout
+In-Reply-To: <1493102470-22965-1-git-send-email-eddie.cai.linux@gmail.com>
+References: <1493102470-22965-1-git-send-email-eddie.cai.linux@gmail.com>
+Message-ID: <5003001.RcGOJBte3U@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add thermal support via the ns-thermal driver and create a single
-thermal zone for the entire SoC.
+Hi Eddie,
 
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+Am Dienstag, 25. April 2017, 14:41:08 CEST schrieb Eddie Cai:
+> we use clk_testout1 and clk_testout2 for camera. e.g. mipi 24M mclk. the ids
+> of clk_testout1 and clk_testout2 is wrong. it's time to correct it.
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 832795b..be6fcfb 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -383,6 +383,12 @@
- 			      <0x3f408 0x04>;
- 		};
- 
-+		thermal: thermal at 3f2c0 {
-+			compatible = "brcm,ns-thermal";
-+			reg = <0x3f2c0 0x10>;
-+			#thermal-sensor-cells = <0>;
-+		};
-+
- 		sata_phy: sata_phy at 40100 {
- 			compatible = "brcm,iproc-nsp-sata-phy";
- 			reg = <0x40100 0x340>;
-@@ -533,4 +539,24 @@
- 			brcm,pcie-msi-inten;
- 		};
- 	};
-+
-+	thermal-zones {
-+		cpu-thermal {
-+			polling-delay-passive = <0>;
-+			polling-delay = <1000>;
-+			coefficients = <(-556) 418000>;
-+			thermal-sensors = <&thermal>;
-+
-+			trips {
-+				cpu-crit {
-+					temperature     = <125000>;
-+					hysteresis      = <0>;
-+					type            = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+			};
-+		};
-+	};
- };
--- 
-2.7.4
+Just to say, patches look good - thanks for explaining what the clocks are 
+going to be used for.
+
+I'll apply them after 4.12-rc1 is released (in roughly 2.5 weeks), due to
+needing a stable base for the clock-ids.
+
+
+Heiko
