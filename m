@@ -1,151 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Apr 2017 14:38:39 +0200
-Subject: [PATCH 1/2] PCI: mediatek: Add Mediatek PCIe host controller
- support
-In-Reply-To: <1492935543-18190-2-git-send-email-ryder.lee@mediatek.com>
-References: <1492935543-18190-1-git-send-email-ryder.lee@mediatek.com>
- <1492935543-18190-2-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <CAK8P3a39TFkJ5=jp8me+Dyg-Qi-N_1ZKxpJGvnhmPEo4csnFCw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 25 Apr 2017 13:44:28 +0100
+Subject: [PATCH 2/2] arm64: pmu: Wire-up L2 cache events for ARMv8 PMUv3
+In-Reply-To: <20170420190546.7453-4-f.fainelli@gmail.com>
+References: <20170420190546.7453-1-f.fainelli@gmail.com>
+ <20170420190546.7453-4-f.fainelli@gmail.com>
+Message-ID: <20170425124427.GI24484@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 23, 2017 at 10:19 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+Hi Florian,
 
-> +static inline bool mtk_pcie_link_is_up(struct mtk_pcie_port *port)
-> +{
-> +       return !!(readl_relaxed(port->base + PCIE_LINK_STATUS) &
-> +                 PCIE_PORT_LINKUP);
-> +}
+On Thu, Apr 20, 2017 at 12:05:46PM -0700, Florian Fainelli wrote:
+> The ARMv8 PMUv3 cache map did not include the L2 cache events, add
+> them.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm64/kernel/perf_event.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 4f011cdd756d..a664c575f3fd 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -264,6 +264,11 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+>  	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE,
+>  	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL,
+>  
+> +	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
+> +	[C(LL)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
+> +	[C(LL)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
+> +	[C(LL)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
 
-If this is not performance critical, please use the regular readl() instead
-of readl_relaxed().
+I don't think this is correct in general. 'LL' stands for "last-level",
+which may be L3 or even a system cache in the interconnect. Tying that to L2
+is the wrong thing to do from perf's generic event perspective.
 
-> +static bool mtk_pcie_valid_device(struct mtk_pcie *pcie,
-> +                                 struct pci_bus *bus, int devfn)
-> +{
-> +       struct mtk_pcie_port *port;
-> +       struct pci_dev *dev;
-> +       struct pci_bus *pbus;
-> +
-> +       /* if there is no link, then there is no device */
-> +       list_for_each_entry(port, &pcie->ports, list) {
-> +               if (bus->number == 0 && port->index == PCI_SLOT(devfn) &&
-> +                   mtk_pcie_link_is_up(port)) {
-> +                       return true;
-> +               } else if (bus->number != 0) {
-> +                       pbus = bus;
-> +                       do {
-> +                               dev = pbus->self;
-> +                               if (port->index == PCI_SLOT(dev->devfn) &&
-> +                                   mtk_pcie_link_is_up(port)) {
-> +                                       return true;
-> +                               }
-> +                               pbus = dev->bus;
-> +                       } while (dev->bus->number != 0);
-> +               }
-> +       }
-> +
-> +       return false;
-> +}
+I'm ok with what you're proposing for A53 (where the PMU can only count
+events out to the L2), but I'm reluctant to make this change for the generic
+PMUv3 events.
 
-
-
-
-> +static int mtk_pcie_hw_rd_cfg(struct mtk_pcie *pcie, u32 bus, u32 devfn,
-> +                             int where, int size, u32 *val)
-> +{
-> +       writel(PCIE_CONF_ADDR(where, PCI_FUNC(devfn), PCI_SLOT(devfn), bus),
-> +              pcie->base + PCIE_CFG_ADDR);
-> +
-> +       *val = 0;
-> +
-> +       switch (size) {
-> +       case 1:
-> +               *val = readb(pcie->base + PCIE_CFG_DATA + (where & 3));
-> +               break;
-> +       case 2:
-> +               *val = readw(pcie->base + PCIE_CFG_DATA + (where & 2));
-> +               break;
-> +       case 4:
-> +               *val = readl(pcie->base + PCIE_CFG_DATA);
-> +               break;
-> +       }
-> +
-> +       return PCIBIOS_SUCCESSFUL;
-> +}
-
-This is a fairly standard set of read/write operations. Can you change
-the pci_ops
-to use pci_generic_config_read/pci_generic_config_write and an appropriate
-map function instead?
-
-> +static int mtk_pcie_enable_ports(struct mtk_pcie *pcie)
-> +{
-> +       struct device *dev = pcie->dev;
-> +       struct mtk_pcie_port *port, *tmp;
-> +       int err, linkup = 0;
-> +
-> +       list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
-> +               err = clk_prepare_enable(port->sys_ck);
-> +               if (err) {
-> +                       dev_err(dev, "failed to enable port%d clock\n",
-> +                               port->index);
-> +                       continue;
-> +               }
-> +
-> +               /* assert RC */
-> +               reset_control_assert(port->reset);
-> +               /* de-assert RC */
-> +               reset_control_deassert(port->reset);
-> +
-> +               /* power on PHY */
-> +               err = phy_power_on(port->phy);
-> +               if (err) {
-> +                       dev_err(dev, "failed to power on port%d phy\n",
-> +                               port->index);
-> +                       goto err_phy_on;
-> +               }
-> +
-> +               mtk_pcie_assert_ports(port);
-> +
-
-Similar to the comment I had for the binding, I wonder if it would be
-better to keep all the information about the ports in one place and
-then just deal with it at the root level.
-
-Alternatively, we could decide to standardize on the properties
-you have added to the pcie port node, but then I would handle
-them in the pcieport driver rather than in the host bridge driver.
-
-> +/*
-> + * This IP lacks interrupt status register to check or map INTx from
-> + * different devices at the same time.
-> + */
-> +static int __init mtk_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
-> +{
-> +       struct mtk_pcie *pcie = dev->bus->sysdata;
-> +       struct mtk_pcie_port *port;
-> +
-> +       list_for_each_entry(port, &pcie->ports, list)
-> +               if (port->index == slot)
-> +                       return port->irq;
-> +
-> +       return -1;
-> +}
-
-This looks odd, what is it needed for specifically? It looks like
-it's broken for devices behind bridges, and the interrupt mapping
-should normally come from the interrupt-map property, without
-the need for a driver specific map_irq override.
-
-> +static int mtk_pcie_register_ports(struct mtk_pcie *pcie)
-> +{
-> +       struct pci_bus *bus, *child;
-> +
-> +       bus = pci_scan_root_bus(pcie->dev, 0, &mtk_pcie_ops, pcie,
-> +                               &pcie->resources);
-
-Can you use the new pci_register_host_bridge() method instead of
-pci_scan_root_bus() here?
-
-       ARnd
+Will
