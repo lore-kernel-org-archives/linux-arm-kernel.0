@@ -1,49 +1,73 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 25 Apr 2017 15:39:32 +0100
-Subject: [kvmtool PATCH v10 15/15] arm64: enable GICv3-ITS emulation
+Date: Tue, 25 Apr 2017 15:39:22 +0100
+Subject: [kvmtool PATCH v10 05/15] virtio: fix endianness check for vhost
+ support
 In-Reply-To: <20170425143932.17235-1-andre.przywara@arm.com>
 References: <20170425143932.17235-1-andre.przywara@arm.com>
-Message-ID: <20170425143932.17235-16-andre.przywara@arm.com>
+Message-ID: <20170425143932.17235-6-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With everything in place for the ITS emulation add a new option to the
---irqchip parameter to allow the user to specify --irqchip=gicv3-its
-to enable the ITS emulation.
-This will trigger creating the FDT node and an ITS register frame to
-tell the kernel we want ITS emulation in the guest.
+Currently we deny any VHOST_* functionality if the architecture
+supports guests with different endianness than the host. Most of the
+time even on those architectures the endianness of guest and host are
+the same, though, so we are denying the glory of VHOST needlessly.
+Switch from compile time determination to a run time scheme, which
+takes the actual endianness of the guest into account.
+For this we change the semantics of VIRTIO_ENDIAN_HOST to return the
+actual endianness of the host (the endianness of kvmtool at compile
+time, really). The actual check in vhost_net now compares this against
+the guest endianness.
+This enables vhost support on ARM and ARM64.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arm/gic.c                                | 2 ++
- arm/include/arm-common/kvm-config-arch.h | 2 +-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ include/kvm/virtio.h | 9 +++++++--
+ virtio/net.c         | 2 +-
+ 2 files changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arm/gic.c b/arm/gic.c
-index d9c3175..9de6a9c 100644
---- a/arm/gic.c
-+++ b/arm/gic.c
-@@ -26,6 +26,8 @@ int irqchip_parser(const struct option *opt, const char *arg, int unset)
- 		*type = IRQCHIP_GICV2;
- 	} else if (!strcmp(arg, "gicv3")) {
- 		*type = IRQCHIP_GICV3;
-+	} else if (!strcmp(arg, "gicv3-its")) {
-+		*type = IRQCHIP_GICV3_ITS;
- 	} else {
- 		pr_err("irqchip: unknown type \"%s\"\n", arg);
- 		return -1;
-diff --git a/arm/include/arm-common/kvm-config-arch.h b/arm/include/arm-common/kvm-config-arch.h
-index ed626b5..b48e720 100644
---- a/arm/include/arm-common/kvm-config-arch.h
-+++ b/arm/include/arm-common/kvm-config-arch.h
-@@ -27,7 +27,7 @@ int irqchip_parser(const struct option *opt, const char *arg, int unset);
- 		    "Force virtio devices to use PCI as their default "		\
- 		    "transport"),						\
-         OPT_CALLBACK('\0', "irqchip", &(cfg)->irqchip,				\
--		     "[gicv2|gicv3]",					\
-+		     "[gicv2|gicv3|gicv3-its]",					\
- 		     "Type of interrupt controller to emulate in the guest",	\
- 		     irqchip_parser, NULL),
+diff --git a/include/kvm/virtio.h b/include/kvm/virtio.h
+index 8324ba7..00a791a 100644
+--- a/include/kvm/virtio.h
++++ b/include/kvm/virtio.h
+@@ -17,10 +17,15 @@
+ #define VIRTIO_PCI_O_CONFIG	0
+ #define VIRTIO_PCI_O_MSIX	1
  
+-#define VIRTIO_ENDIAN_HOST	0
+ #define VIRTIO_ENDIAN_LE	(1 << 0)
+ #define VIRTIO_ENDIAN_BE	(1 << 1)
+ 
++#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++#define VIRTIO_ENDIAN_HOST VIRTIO_ENDIAN_LE
++#else
++#define VIRTIO_ENDIAN_HOST VIRTIO_ENDIAN_BE
++#endif
++
+ struct virt_queue {
+ 	struct vring	vring;
+ 	u32		pfn;
+@@ -40,7 +45,7 @@ struct virt_queue {
+ #define VIRTIO_RING_ENDIAN VIRTIO_ENDIAN_HOST
+ #endif
+ 
+-#if (VIRTIO_RING_ENDIAN & (VIRTIO_ENDIAN_LE | VIRTIO_ENDIAN_BE))
++#if VIRTIO_RING_ENDIAN != VIRTIO_ENDIAN_HOST
+ 
+ static inline __u16 __virtio_g2h_u16(u16 endian, __u16 val)
+ {
+diff --git a/virtio/net.c b/virtio/net.c
+index ffa83ab..9fb9f1e 100644
+--- a/virtio/net.c
++++ b/virtio/net.c
+@@ -530,7 +530,7 @@ static int init_vq(struct kvm *kvm, void *dev, u32 vq, u32 page_size, u32 align,
+ 	}
+ 
+ 	if (queue->endian != VIRTIO_ENDIAN_HOST)
+-		die_perror("VHOST requires VIRTIO_ENDIAN_HOST");
++		die_perror("VHOST requires the same endianness in guest and host");
+ 
+ 	state.num = queue->vring.num;
+ 	r = ioctl(ndev->vhost_fd, VHOST_SET_VRING_NUM, &state);
 -- 
 2.9.0
