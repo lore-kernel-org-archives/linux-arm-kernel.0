@@ -1,88 +1,100 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue, 25 Apr 2017 11:15:43 -0400
-Subject: [PATCH 2/2] ARM: dts: Add the ethernet and ethernet PHY to the
- cygnus core DT.
-In-Reply-To: <f870339f-2fa1-411d-5ce8-adbe8802d8a8@cogentembedded.com>
-References: <20170424215022.30382-1-eric@anholt.net>
- <20170424215022.30382-3-eric@anholt.net>
- <f870339f-2fa1-411d-5ce8-adbe8802d8a8@cogentembedded.com>
-Message-ID: <CAC3K-4qn5oCXvyMCkFESGqMHqHXGiNUW6wfRx2LUZ8qZ39qroQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 25 Apr 2017 16:18:44 +0100
+Subject: [PATCH] arm64: fix the overlap between the kernel image and
+ vmalloc address
+In-Reply-To: <20170425150212.GF3792@leverpostej>
+References: <1493025729-21505-1-git-send-email-zhongjiang@huawei.com>
+ <20170424104456.GA4343@leverpostej> <58FDFD90.8050300@huawei.com>
+ <20170424155125.GA5972@leverpostej>
+ <ffd0a3c5-5d89-4bbd-9995-c545bccaa8f6@redhat.com>
+ <CAKv+Gu9RuJC9LgsEDSf91x4gV+VoRTLTjA9hGoPAu1ZkFDODmA@mail.gmail.com>
+ <20170425150212.GF3792@leverpostej>
+Message-ID: <CAKv+Gu_i4M=RJmofMRoq63rR6GBf42W36FtomhTC9-o9g-sAiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 5:40 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Hello.
+On 25 April 2017 at 16:02, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Apr 24, 2017 at 06:56:43PM +0100, Ard Biesheuvel wrote:
+>> On 24 April 2017 at 18:52, Laura Abbott <labbott@redhat.com> wrote:
+>> > On 04/24/2017 08:51 AM, Mark Rutland wrote:
+>> >> On Mon, Apr 24, 2017 at 09:28:48PM +0800, zhong jiang wrote:
 >
-> On 4/25/2017 12:50 AM, Eric Anholt wrote:
->
->> Cygnus has a single amac controller connected to the B53 switch with 2
->> PHYs.  On the BCM911360_EP platform, those two PHYs are connected to
->> the external ethernet jacks.
->
->
->    My spell checker trips on "amac" and "ethernet" -- perhaps they need
-> capitalization?
->
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> ---
->>  arch/arm/boot/dts/bcm-cygnus.dtsi      | 60
->> ++++++++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/bcm911360_entphn.dts |  8 +++++
->>  2 files changed, 68 insertions(+)
+>> >> static struct page *kernel_image_to_page(const void *addr)
+>> >> {
+>> >>       return virt_to_page(lm_alias(vmalloc_addr));
+>> >> }
+>> >>
+>> >>> +
+>> >>>  /*
+>> >>>    * Walk a vmap address to the struct page it maps.
+>> >>>    */
+>> >>> @@ -244,6 +280,9 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
+>> >>>          */
+>> >>>         VIRTUAL_BUG_ON(!is_vmalloc_or_module_addr(vmalloc_addr));
+>> >>>
+>> >>> +       if (is_kernel_image_addr(vmalloc_addr))
+>> >>> +               return kernel_image_to_page(vmalloc_addr, pgd);
+>> >>
+>> >> It's not clear to me that this is the right place for this to live.
+>> >>
+>> >> It might be best to code the kernel image logic directly in kcore (and
+>> >> kmem), assuming everyone's OK with that approach.
+>> >>
+>> >
+>> > That will fix kcore and kmem but this will show up in other places too.
+>> > We've gone through and made sure that virt_addr_valid returns
+>> > true if and only if virt_to_page returns a valid address. I don't know
+>> > if we can make as strong a claim about is_vmalloc_addr and
+>> > vmalloc_to_page in all cases but is_vmalloc_addr should not return true
+>> > for the kernel image. That would at least let kcore fall back to
+>> > kern_addr_valid which should correctly handle the kernel image.
+>> > The suggestion to move the kernel image out of VMALLOC_START/VMALLOC_END
+>> > seems like the best approach although I haven't tried a prototype
+>> > at all.
 >>
->> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi
->> b/arch/arm/boot/dts/bcm-cygnus.dtsi
->> index 009f1346b817..318899df9972 100644
->> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
->> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
->> @@ -142,6 +142,56 @@
->>                         interrupts = <0>;
->>                 };
->>
->> +               mdio: mdio at 18002000 {
->> +                       compatible = "brcm,iproc-mdio";
->> +                       reg = <0x18002000 0x8>;
->> +                       #size-cells = <1>;
->> +                       #address-cells = <0>;
->> +
->> +                       gphy0: eth-gphy at 0 {
+>> Moving the kernel into the vmalloc region was kind of the point, for
+>> KASLR. Undoing that means either disabling KASLR, or splitting the
+>> vmalloc region into a KASLR region only for the kernel, and a vmalloc
+>> region like we had when vmlinux lived in the linear region.
 >
+> AFAICT, x86 don't place the kernel in the vmalloc region for its KASLR
+> implementation. Is that just to avoid the issues that we're seeing, or
+> are there aother constraints on x86?
 >
->    The node anmes must be generic, the DT spec has standardized
-> "ethernet-phy" name for this case.
->
->> +                               reg = <0>;
->> +                               max-speed = <1000>;
->> +                       };
->> +
->> +                       gphy1: eth-gphy at 1 {
->> +                               reg = <1>;
->> +                               max-speed = <1000>;
->> +                       };
->> +               };
->
-> [...]
->>
->> @@ -295,6 +345,16 @@
->>                         status = "disabled";
->>                 };
->>
->> +               eth0: enet at 18042000 {
->> +                       compatible = "brcm,amac";
->> +                       reg = <0x18042000 0x1000>,
->> +                             <0x18110000 0x1000>;
->> +                       reg-names = "amac_base", "idm_base";
->
->
->    I don't think "_base" suffixes are necessary here.
 
-100% necessary, per the driver.  See
-drivers/net/ethernet/broadcom/bgmac-platform.c
+Given how a lot of architectures put kernel modules in the vmalloc
+space, I don't think there is generally an issue with putting the
+kernel there as well, other than what we are currently experiencing.
 
+As discussed, ioremap regions are also likely to be mapped using block
+mappings these days, and also reside between VMALLOC_START and
+VMALLOC_END.
 
+So in my opinion, since
+a) we already put text and data in the vmalloc region, and
+b) we already use block mappings in the vmalloc region
+
+putting the kernel there is only a minor variation of what we already
+have to deal with, and so I don't think there is anything wrong with
+it. We simply have to tweak some tests here and there, but nothing
+fundamental afaict.
+
+>> In general, I think we should be able to deal with different kinds of
+>> mappings with different granularity in the vmalloc region. If
+>> necessary, we could introduce a VM_xxx flag for the kernel to
+>> distinguish such regions from ordinary VM_MAP regions.
 >
-> [...]
+> I don't think that vmalloc_to_page() should have to deal with anything
+> other than the usual page-granular memory mappings in the vmalloc area,
+> as it currently does. We'd have to write a page table walker per-arch
+> for that to work, and the only thing it would benefit is arm64's kernel
+> image mapping.
 >
-> MBR, Sergei
+> Adding VM_xxx (e.g. VM_KERNEL) sounds sane to me regardless of anything
+> else.
 >
+> That still leaves the question as to what is_vmalloc_addr(addr) (should)
+> imply about addr, though.
+>
+> Thanks,
+> Mark.
