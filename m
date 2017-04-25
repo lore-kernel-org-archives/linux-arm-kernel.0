@@ -1,82 +1,200 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 25 Apr 2017 16:37:53 +0800
-Subject: [linux-sunxi] Re: [PATCH v4 07/10] mfd: axp20x: add
- axp20x-regulator cell for AXP803
-In-Reply-To: <20170425075717.l4x3qektdgt6kaiq@dell>
-References: <20170424160103.9447-1-icenowy@aosc.io>
- <20170424160103.9447-8-icenowy@aosc.io>
- <20170425075717.l4x3qektdgt6kaiq@dell>
-Message-ID: <D61CDE77-940B-4286-A70D-955DBCEB8215@aosc.io>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 25 Apr 2017 10:43:42 +0200
+Subject: [PATCH 2/2] reset: Add a Gemini reset controller
+In-Reply-To: <20170424192802.27430-1-linus.walleij@linaro.org>
+References: <20170424192802.27430-1-linus.walleij@linaro.org>
+Message-ID: <1493109822.2394.15.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
 
+thank you for the patch. A few comments and questions below:
 
-? 2017?4?25? GMT+08:00 ??3:57:17, Lee Jones <lee.jones@linaro.org> ??:
->On Tue, 25 Apr 2017, Icenowy Zheng wrote:
->
->> As axp20x-regulator now supports AXP803, add a cell for it.
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> Acked-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->> Changes in v4:
->> - Added a trailing comma for new cell, for easier further cell
->addition.
->> Changes in v3:
->> - Make the new cell one-liner.
->> 
->>  drivers/mfd/axp20x.c                 | 3 ++-
->>  drivers/regulator/axp20x-regulator.c | 6 +++---
->
->These 2 changes are orthogonal, thus there is no reason to send them
->bundled into a single patch.  Doing so complicates things greatly.
->Please resubmit the two changes separately, so that they may be
->absorbed by our respective subsystems.
+On Mon, 2017-04-24 at 21:28 +0200, Linus Walleij wrote:
+> The Cortina Systems Gemini reset controller is a simple
+> 32bit register with self-deasserting reset lines. It is
+> accessed using regmap over syscon.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/reset/Kconfig        |   7 +++
+>  drivers/reset/Makefile       |   1 +
+>  drivers/reset/reset-gemini.c | 112 +++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 120 insertions(+)
+>  create mode 100644 drivers/reset/reset-gemini.c
+> 
+> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+> index f4cdfe94b9ec..a82e1a78de25 100644
+> --- a/drivers/reset/Kconfig
+> +++ b/drivers/reset/Kconfig
+> @@ -27,6 +27,13 @@ config RESET_BERLIN
+>  	help
+>  	  This enables the reset controller driver for Marvell Berlin SoCs.
+>  
+> +config RESET_GEMINI
+> +	bool "Gemini Reset Driver" if COMPILE_TEST
+> +	default ARCH_GEMINI
+> +	select MFD_SYSCON
+> +	help
+> +	  This enables the reset controller driver for Cortina Systems Gemini.
+> +
+>  config RESET_LPC18XX
+>  	bool "LPC18xx/43xx Reset Driver" if COMPILE_TEST
+>  	default ARCH_LPC18XX
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> index 2cd3f6c45165..99e90ad18545 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -4,6 +4,7 @@ obj-$(CONFIG_ARCH_STI) += sti/
+>  obj-$(CONFIG_ARCH_TEGRA) += tegra/
+>  obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
+>  obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
+> +obj-$(CONFIG_RESET_GEMINI) += reset-gemini.o
+>  obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
+>  obj-$(CONFIG_RESET_MESON) += reset-meson.o
+>  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+> diff --git a/drivers/reset/reset-gemini.c b/drivers/reset/reset-gemini.c
+> new file mode 100644
+> index 000000000000..481facbb2709
+> --- /dev/null
+> +++ b/drivers/reset/reset-gemini.c
+> @@ -0,0 +1,112 @@
+> +/*
+> + * Cortina Gemini Reset controller driver
+> + * Copyright (c) 2017 Linus Walleij <linus.walleij@linaro.org>
 
-Yes. As Chen-Yu said, I wrongly squashed the regulator renaming patch here...
+No license statement, choice or oversight?
 
-It should be squashed into the regulator patch.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reset-controller.h>
+> +
+> +/**
+> + * struct gemini_reset - gemini reset controller
+> + * @map: regmap to access the containing system controller
+> + * @dev: pointer back to device
+> + * @rcdev: reset controller device
+> + */
+> +struct gemini_reset {
+> +	struct regmap *map;
+> +	struct device *dev;
 
-Sorry for it.
+dev is unused, can be dropped.
 
->
->>  2 files changed, 5 insertions(+), 4 deletions(-)
->> 
->> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
->> index 1dc6235778eb..917b6ddc4f15 100644
->> --- a/drivers/mfd/axp20x.c
->> +++ b/drivers/mfd/axp20x.c
->> @@ -848,7 +848,8 @@ static struct mfd_cell axp803_cells[] = {
->>  		.name			= "axp20x-pek",
->>  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
->>  		.resources		= axp803_pek_resources,
->> -	}
->> +	},
->> +	{	.name			= "axp20x-regulator" },
->>  };
->>  
->>  static struct mfd_cell axp806_cells[] = {
->> diff --git a/drivers/regulator/axp20x-regulator.c
->b/drivers/regulator/axp20x-regulator.c
->> index 9356ec8a9a1f..e2608fe770b9 100644
->> --- a/drivers/regulator/axp20x-regulator.c
->> +++ b/drivers/regulator/axp20x-regulator.c
->> @@ -311,13 +311,13 @@ static const struct regulator_desc
->axp803_regulators[] = {
->>  		 AXP803_FLDO1_V_OUT, 0x0f, AXP22X_PWR_OUT_CTRL3, BIT(2)),
->>  	AXP_DESC(AXP803, FLDO2, "fldo2", "fldoin", 700, 1450, 50,
->>  		 AXP803_FLDO2_V_OUT, 0x0f, AXP22X_PWR_OUT_CTRL3, BIT(3)),
->> -	AXP_DESC_IO(AXP803, LDO_IO0, "ldo_io0", "ips", 700, 3300, 100,
->> +	AXP_DESC_IO(AXP803, LDO_IO0, "ldo-io0", "ips", 700, 3300, 100,
->>  		    AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
->>  		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
->> -	AXP_DESC_IO(AXP803, LDO_IO1, "ldo_io1", "ips", 700, 3300, 100,
->> +	AXP_DESC_IO(AXP803, LDO_IO1, "ldo-io1", "ips", 700, 3300, 100,
->>  		    AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
->>  		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
->> -	AXP_DESC_FIXED(AXP803, RTC_LDO, "rtc_ldo", "ips", 3000),
->> +	AXP_DESC_FIXED(AXP803, RTC_LDO, "rtc-ldo", "ips", 3000),
->>  };
->>  
->>  static const struct regulator_linear_range axp806_dcdca_ranges[] = {
+> +	struct reset_controller_dev rcdev;
+> +};
+> +
+> +#define GEMINI_GLOBAL_SOFT_RESET 0x0c
+> +
+> +#define to_gemini_reset(p) \
+> +	container_of((p), struct gemini_reset, rcdev)
+> +
+> +/*
+> + * This is a self-deasserting reset controller.
+> + */
+> +static int gemini_reset(struct reset_controller_dev *rcdev,
+> +			unsigned long id)
+> +{
+> +	struct gemini_reset *gr = to_gemini_reset(rcdev);
+> +
+> +	/* Manual says to always set BIT 30 to 1 */
+> +	return regmap_write(gr->map,
+> +			    GEMINI_GLOBAL_SOFT_RESET,
+> +			    BIT(30) | BIT(id));
+
+BIT(30) is called CPU1 reset in the DT binding, maybe add a #define?
+
+> +}
+> +
+> +static int gemini_reset_status(struct reset_controller_dev *rcdev,
+> +			     unsigned long id)
+> +{
+> +	struct gemini_reset *gr = to_gemini_reset(rcdev);
+> +	u32 val;
+> +	int ret;
+> +
+> +	ret = regmap_read(gr->map, GEMINI_GLOBAL_SOFT_RESET, &val);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return !!(val & BIT(id));
+> +}
+> +
+> +static const struct reset_control_ops gemini_reset_ops = {
+> +	.reset = gemini_reset,
+> +	.status = gemini_reset_status,
+> +};
+> +
+> +static int gemini_reset_probe(struct platform_device *pdev)
+> +{
+> +	struct gemini_reset *gr;
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +	struct device_node *parent_np = np->parent;
+> +	int ret;
+> +
+> +	if (!parent_np) {
+
+Is this even possible?
+
+> +		dev_err(dev, "missing parent node\n");
+> +		return -ENODEV;
+> +	}
+>+
+> +	gr = devm_kzalloc(dev, sizeof(*gr), GFP_KERNEL);
+> +	if (!gr)
+> +		return -ENOMEM;
+> +
+> +	gr->dev = dev;
+
+Can be dropped.
+
+> +	gr->map = syscon_node_to_regmap(parent_np);
+> +	if (IS_ERR(gr->map)) {
+> +		dev_err(dev, "unable to get regmap");
+
+It might be helpful to print the error code here.
+
+> +		return PTR_ERR(gr->map);
+> +	}
+> +	gr->rcdev.owner = THIS_MODULE;
+> +	gr->rcdev.nr_resets = 32;
+> +	gr->rcdev.ops = &gemini_reset_ops;
+> +	gr->rcdev.of_node = pdev->dev.of_node;
+> +
+> +	ret = devm_reset_controller_register(&pdev->dev, &gr->rcdev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	dev_info(dev, "registered Gemini reset controller\n");
+
+This is a bit verbose. I'd remove it and shorten the last part to:
+
+	return devm_reset_controller_register(&pdev->dev, &gr->rcdev);
+
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id gemini_reset_dt_ids[] = {
+> +	{ .compatible = "cortina,gemini-reset", },
+> +	{ /* sentinel */ },
+> +};
+> +
+> +static struct platform_driver gemini_reset_driver = {
+> +	.probe	= gemini_reset_probe,
+> +	.driver = {
+> +		.name		= "gemini-reset",
+> +		.of_match_table	= gemini_reset_dt_ids,
+> +	},
+> +};
+> +builtin_platform_driver(gemini_reset_driver);
+
+regards
+Philipp
