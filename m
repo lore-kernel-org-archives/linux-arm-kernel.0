@@ -1,195 +1,100 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 25 Apr 2017 10:10:12 +0100
-Subject: [PATCH V9 1/3] irq: Allow to pass the IRQF_TIMER flag with percpu
- irq request
-In-Reply-To: <20170425083451.GA16888@mai>
-References: <1493042494-14057-1-git-send-email-daniel.lezcano@linaro.org>
- <398f3f3d-c567-0f1f-1a43-9b8d5805d5fd@arm.com> <20170424185909.GD2137@mai>
- <92e2a022-93d4-d4f3-78af-c9b5d51bb867@arm.com> <20170424195948.GE2137@mai>
- <16042494-2e67-e1a5-b9f6-af57e349d8a7@arm.com> <20170425083451.GA16888@mai>
-Message-ID: <f840e9d2-8aac-dc1d-6468-44f7658b55b1@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 25 Apr 2017 17:11:34 +0800
+Subject: [PATCH] usb: chipidea: udc: fix NULL pointer dereference if
+ udc_start failed
+In-Reply-To: <20170425082948.GB873@b29397-desktop>
+References: <20170424123551.2465-1-jszhang@marvell.com>
+ <20170425082948.GB873@b29397-desktop>
+Message-ID: <20170425171134.6a983841@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/17 09:34, Daniel Lezcano wrote:
-> On Tue, Apr 25, 2017 at 08:38:56AM +0100, Marc Zyngier wrote:
->> On 24/04/17 20:59, Daniel Lezcano wrote:
->>> On Mon, Apr 24, 2017 at 08:14:54PM +0100, Marc Zyngier wrote:
->>>> On 24/04/17 19:59, Daniel Lezcano wrote:
->>>>> On Mon, Apr 24, 2017 at 07:46:43PM +0100, Marc Zyngier wrote:
->>>>>> On 24/04/17 15:01, Daniel Lezcano wrote:
->>>>>>> In the next changes, we track when the interrupts occur in order to
->>>>>>> statistically compute when is supposed to happen the next interrupt.
->>>>>>>
->>>>>>> In all the interruptions, it does not make sense to store the timer interrupt
->>>>>>> occurences and try to predict the next interrupt as when know the expiration
->>>>>>> time.
->>>>>>>
->>>>>>> The request_irq() has a irq flags parameter and the timer drivers use it to
->>>>>>> pass the IRQF_TIMER flag, letting us know the interrupt is coming from a timer.
->>>>>>> Based on this flag, we can discard these interrupts when tracking them.
->>>>>>>
->>>>>>> But, the API request_percpu_irq does not allow to pass a flag, hence specifying
->>>>>>> if the interrupt type is a timer.
->>>>>>>
->>>>>>> Add a function request_percpu_irq_flags() where we can specify the flags. The
->>>>>>> request_percpu_irq() function is changed to be a wrapper to
->>>>>>> request_percpu_irq_flags() passing a zero flag parameter.
->>>>>>>
->>>>>>> Change the timers using request_percpu_irq() to use request_percpu_irq_flags()
->>>>>>> instead with the IRQF_TIMER flag set.
->>>>>>>
->>>>>>> For now, in order to prevent a misusage of this parameter, only the IRQF_TIMER
->>>>>>> flag (or zero) is a valid parameter to be passed to the
->>>>>>> request_percpu_irq_flags() function.
->>>>>>
->>>>>> [...]
->>>>>>
->>>>>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->>>>>>> index 35d7100..602e0a8 100644
->>>>>>> --- a/virt/kvm/arm/arch_timer.c
->>>>>>> +++ b/virt/kvm/arm/arch_timer.c
->>>>>>> @@ -523,8 +523,9 @@ int kvm_timer_hyp_init(void)
->>>>>>>  		host_vtimer_irq_flags = IRQF_TRIGGER_LOW;
->>>>>>>  	}
->>>>>>>  
->>>>>>> -	err = request_percpu_irq(host_vtimer_irq, kvm_arch_timer_handler,
->>>>>>> -				 "kvm guest timer", kvm_get_running_vcpus());
->>>>>>> +	err = request_percpu_irq_flags(host_vtimer_irq, kvm_arch_timer_handler,
->>>>>>> +				       IRQF_TIMER, "kvm guest timer",
->>>>>>> +				       kvm_get_running_vcpus());
->>>>>>>  	if (err) {
->>>>>>>  		kvm_err("kvm_arch_timer: can't request interrupt %d (%d)\n",
->>>>>>>  			host_vtimer_irq, err);
->>>>>>>
->>>>>>
->>>>>> How is that useful? This timer is controlled by the guest OS, and not
->>>>>> the host kernel. Can you explain how you intend to make use of that
->>>>>> information in this case?
->>>>>
->>>>> Isn't it a source of interruption on the host kernel?
->>>>
->>>> Only to cause an exit of the VM, and not under the control of the host.
->>>> This isn't triggering any timer related action on the host code either.
->>>>
->>>> Your patch series seems to assume some kind of predictability of the
->>>> timer interrupt, which can make sense on the host. Here, this interrupt
->>>> is shared among *all* guests running on this system.
->>>>
->>>> Maybe you could explain why you think this interrupt is relevant to what
->>>> you're trying to achieve?
->>>
->>> If this interrupt does not happen on the host, we don't care.
->>
->> All interrupts happen on the host. There is no such thing as a HW 
->> interrupt being directly delivered to a guest (at least so far). The 
->> timer is under control of the guest, which uses as it sees fit. When 
->> the HW timer expires, the interrupt fires on the host, which re-inject 
->> the interrupt in the guest.
-> 
-> Ah, thanks for the clarification. Interesting.
-> 
-> How can the host know which guest to re-inject the interrupt?
+Hi Peter,
 
-The timer can only fire when the vcpu is running. If it is not running,
-a software timer is queued, with a pointer to the vcpu struct.
+On Tue, 25 Apr 2017 16:29:48 +0800 Peter Chen wrote:
 
->>> The flag IRQF_TIMER is used by the spurious irq handler in the try_one_irq()
->>> function. However the per cpu timer interrupt will be discarded in the function
->>> before because it is per cpu.
->>
->> Right. That's not because this is a timer, but because it is per-cpu. 
->> So why do we need this IRQF_TIMER flag, instead of fixing try_one_irq()?
+> On Mon, Apr 24, 2017 at 12:35:51PM +0000, Jisheng Zhang wrote:
+> > Fix below NULL pointer dereference. we set ci->roles[CI_ROLE_GADGET]
+> > too early in ci_hdrc_gadget_init(), if udc_start() fails due to some
+> > reason, the ci->roles[CI_ROLE_GADGET] check in  ci_hdrc_gadget_destroy
+> > can't protect us.
+> > 
+> > We fix this issue by only setting ci->roles[CI_ROLE_GADGET] if
+> > udc_start() succeed.
+> > 
+> > [    1.398550] Unable to handle kernel NULL pointer dereference at
+> > virtual address 00000000
+> > ...
+> > [    1.448600] PC is at dma_pool_free+0xb8/0xf0
+> > [    1.453012] LR is at dma_pool_free+0x28/0xf0
+> > [    2.113369] [<ffffff80081817d8>] dma_pool_free+0xb8/0xf0
+> > [    2.118857] [<ffffff800841209c>] destroy_eps+0x4c/0x68
+> > [    2.124165] [<ffffff8008413770>] ci_hdrc_gadget_destroy+0x28/0x50
+> > [    2.130461] [<ffffff800840fa30>] ci_hdrc_probe+0x588/0x7e8
+> > [    2.136129] [<ffffff8008380fb8>] platform_drv_probe+0x50/0xb8
+> > [    2.142066] [<ffffff800837f494>] driver_probe_device+0x1fc/0x2a8
+> > [    2.148270] [<ffffff800837f68c>] __device_attach_driver+0x9c/0xf8
+> > [    2.154563] [<ffffff800837d570>] bus_for_each_drv+0x58/0x98
+> > [    2.160317] [<ffffff800837f174>] __device_attach+0xc4/0x138
+> > [    2.166072] [<ffffff800837f738>] device_initial_probe+0x10/0x18
+> > [    2.172185] [<ffffff800837e58c>] bus_probe_device+0x94/0xa0
+> > [    2.177940] [<ffffff800837c560>] device_add+0x3f0/0x560
+> > [    2.183337] [<ffffff8008380d20>] platform_device_add+0x180/0x240
+> > [    2.189541] [<ffffff800840f0e8>] ci_hdrc_add_device+0x440/0x4f8
+> > [    2.195654] [<ffffff8008414194>] ci_hdrc_usb2_probe+0x13c/0x2d8
+> > [    2.201769] [<ffffff8008380fb8>] platform_drv_probe+0x50/0xb8
+> > [    2.207705] [<ffffff800837f494>] driver_probe_device+0x1fc/0x2a8
+> > [    2.213910] [<ffffff800837f5ec>] __driver_attach+0xac/0xb0
+> > [    2.219575] [<ffffff800837d4b0>] bus_for_each_dev+0x60/0xa0
+> > [    2.225329] [<ffffff800837ec80>] driver_attach+0x20/0x28
+> > [    2.230816] [<ffffff800837e880>] bus_add_driver+0x1d0/0x238
+> > [    2.236571] [<ffffff800837fdb0>] driver_register+0x60/0xf8
+> > [    2.242237] [<ffffff8008380ef4>] __platform_driver_register+0x44/0x50
+> > [    2.248891] [<ffffff80086fd440>] ci_hdrc_usb2_driver_init+0x18/0x20
+> > [    2.255365] [<ffffff8008082950>] do_one_initcall+0x38/0x128
+> > [    2.261121] [<ffffff80086e0d00>] kernel_init_freeable+0x1ac/0x250
+> > [    2.267414] [<ffffff800852f0b8>] kernel_init+0x10/0x100
+> > [    2.272810] [<ffffff8008082680>] ret_from_fork+0x10/0x50
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  drivers/usb/chipidea/udc.c | 8 ++++++--
+> >  1 file changed, 6 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> > index f88e9157fad0..60a786c87c06 100644
+> > --- a/drivers/usb/chipidea/udc.c
+> > +++ b/drivers/usb/chipidea/udc.c
+> > @@ -1984,6 +1984,7 @@ static void udc_id_switch_for_host(struct ci_hdrc *ci)
+> >  int ci_hdrc_gadget_init(struct ci_hdrc *ci)
+> >  {
+> >  	struct ci_role_driver *rdrv;
+> > +	int ret;
+> >  
+> >  	if (!hw_read(ci, CAP_DCCPARAMS, DCCPARAMS_DC))
+> >  		return -ENXIO;
+> > @@ -1996,7 +1997,10 @@ int ci_hdrc_gadget_init(struct ci_hdrc *ci)
+> >  	rdrv->stop	= udc_id_switch_for_host;
+> >  	rdrv->irq	= udc_irq;
+> >  	rdrv->name	= "gadget";
+> > -	ci->roles[CI_ROLE_GADGET] = rdrv;
+> >  
+> > -	return udc_start(ci);
+> > +	ret = udc_start(ci);
+> > +	if (!ret)
+> > +		ci->roles[CI_ROLE_GADGET] = rdrv;
+> > +
+> > +	return ret;
+> >  }
+> > --   
 > 
-> When a timer is not per cpu, (eg. request_irq), we need this flag, no?
+> Thanks for fixing it. In fact, we'd better return failure if
+> ret && ret != -ENXIO at probe, it stands for initialization
+> for host or gadget has failed.
+> 
 
-Sure, but in this series, they all seem to be per-cpu.
+I got your meaning. I'll cook v2. I don't have preference, since either
+one can fix the issue.
 
->>> IMO, for consistency reason, adding the IRQF_TIMER makes sense. Other than
->>> that, as the interrupt is not happening on the host, this flag won't be used.
->>>
->>> Do you want to drop this change?
->>
->> No, I'd like to understand the above. Why isn't the following patch 
->> doing the right thing?
-> 
-> Actually, the explanation is in the next patch of the series (2/3)
-> 
-> [ ... ]
-> 
-> +static inline void setup_timings(struct irq_desc *desc, struct irqaction *act)
-> +{
-> +	/*
-> +	 * We don't need the measurement because the idle code already
-> +	 * knows the next expiry event.
-> +	 */
-> +	if (act->flags & __IRQF_TIMER)
-> +		return;
-
-And that's where this is really wrong for the KVM guest timer. As I
-said, this timer is under complete control of the guest, and the rest of
-the system doesn't know about it. KVM itself will only find out when the
-vcpu does a VM exit for a reason or another, and will just save/restore
-the state in order to be able to give the timer to another guest.
-
-The idle code is very much *not* aware of anything concerning that guest
-timer.
-
-> +
-> +	desc->istate |= IRQS_TIMINGS;
-> +}
-> 
-> [ ... ]
-> 
-> +/*
-> + * The function record_irq_time is only called in one place in the
-> + * interrupts handler. We want this function always inline so the code
-> + * inside is embedded in the function and the static key branching
-> + * code can act at the higher level. Without the explicit
-> + * __always_inline we can end up with a function call and a small
-> + * overhead in the hotpath for nothing.
-> + */
-> +static __always_inline void record_irq_time(struct irq_desc *desc)
-> +{
-> +	if (!static_branch_likely(&irq_timing_enabled))
-> +		return;
-> +
-> +	if (desc->istate & IRQS_TIMINGS) {
-> +		struct irq_timings *timings = this_cpu_ptr(&irq_timings);
-> +
-> +		timings->values[timings->count & IRQ_TIMINGS_MASK] =
-> +			irq_timing_encode(local_clock(),
-> +					  irq_desc_get_irq(desc));
-> +
-> +		timings->count++;
-> +	}
-> +}
-> 
-> [ ... ]
-> 
-> The purpose is to predict the next event interrupts on the system which are
-> source of wake up. For now, this patchset is focused on interrupts (discarding
-> timer interrupts).
-> 
-> The following article gives more details: https://lwn.net/Articles/673641/
-> 
-> When the interrupt is setup, we tag it except if it is a timer. So with this
-> patch there is another usage of the IRQF_TIMER where we will be ignoring
-> interrupt coming from a timer.
-> 
-> As the timer interrupt is delivered to the host, we should not measure it as it
-> is a timer and set this flag.
-> 
-> The needed information is: "what is the earliest VM timer?". If this
-> information is already available then there is nothing more to do, otherwise we
-> should add it in the future.
-
-This information is not readily available. You can only find it when it
-is too late (timer has already fired) or when it is not relevant anymore
-(guest is sleeping and we've queued a SW timer for it).
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks for your suggestion,
+Jisheng
