@@ -1,81 +1,73 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 25 Apr 2017 15:39:30 +0100
-Subject: [kvmtool PATCH v10 13/15] arm: setup SPI IRQ routing tables
+Date: Tue, 25 Apr 2017 15:39:28 +0100
+Subject: [kvmtool PATCH v10 11/15] add kvm__supports_vm_extension()
 In-Reply-To: <20170425143932.17235-1-andre.przywara@arm.com>
 References: <20170425143932.17235-1-andre.przywara@arm.com>
-Message-ID: <20170425143932.17235-14-andre.przywara@arm.com>
+Message-ID: <20170425143932.17235-12-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we soon start using GSI routing on ARM platforms too, we have
-to setup the initial SPI routing table. Before the first call to
-KVM_SET_GSI_ROUTING, the kernel holds this table internally, but this
-is overwritten with the ioctl, so we have to explicitly set it up
-here.
-The routing is actually not used for IRQs triggered by KVM_IRQ_LINE,
-but it needs to be here anyway. We use a simple 1:1 mapping.
+KVM capabilities can be per-VM, in this case the ioctl should be
+issued on the VM file descriptor, not on the system fd.
+Since this feature is guarded by a (system) capability itself, wrap
+the call into a function of its own.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arm/gic.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ include/kvm/kvm.h |  1 +
+ kvm.c             | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+)
 
-diff --git a/arm/gic.c b/arm/gic.c
-index 651ede7..d9c3175 100644
---- a/arm/gic.c
-+++ b/arm/gic.c
-@@ -10,6 +10,8 @@
- #include <linux/kvm.h>
- #include <linux/sizes.h>
- 
-+#define IRQCHIP_GIC 0
-+
- static int gic_fd = -1;
- static u64 gic_redists_base;
- static u64 gic_redists_size;
-@@ -32,6 +34,34 @@ int irqchip_parser(const struct option *opt, const char *arg, int unset)
- 	return 0;
+diff --git a/include/kvm/kvm.h b/include/kvm/kvm.h
+index 4a76ec2..a76a25d 100644
+--- a/include/kvm/kvm.h
++++ b/include/kvm/kvm.h
+@@ -129,6 +129,7 @@ static inline bool host_ptr_in_ram(struct kvm *kvm, void *p)
  }
  
-+static int irq__routing_init(struct kvm *kvm)
+ bool kvm__supports_extension(struct kvm *kvm, unsigned int extension);
++bool kvm__supports_vm_extension(struct kvm *kvm, unsigned int extension);
+ 
+ static inline void kvm__set_thread_name(const char *name)
+ {
+diff --git a/kvm.c b/kvm.c
+index 7fa76f7..665ed14 100644
+--- a/kvm.c
++++ b/kvm.c
+@@ -93,6 +93,34 @@ const char *kvm__get_dir(void)
+ 	return kvm_dir;
+ }
+ 
++bool kvm__supports_vm_extension(struct kvm *kvm, unsigned int extension)
 +{
-+	int r;
-+	int irqlines = ALIGN(irq__get_nr_allocated_lines(), 32);
++	static int supports_vm_ext_check = 0;
++	int ret;
 +
-+	/*
-+	 * This describes the default routing that the kernel uses without
-+	 * any routing explicitly set up via KVM_SET_GSI_ROUTING. So we
-+	 * don't need to commit these setting right now. The first actual
-+	 * user (MSI routing) will engage these mappings then.
-+	 */
-+	for (next_gsi = 0; next_gsi < irqlines; next_gsi++) {
-+		r = irq__allocate_routing_entry();
-+		if (r)
-+			return r;
-+
-+		irq_routing->entries[irq_routing->nr++] =
-+			(struct kvm_irq_routing_entry) {
-+				.gsi = next_gsi,
-+				.type = KVM_IRQ_ROUTING_IRQCHIP,
-+				.u.irqchip.irqchip = IRQCHIP_GIC,
-+				.u.irqchip.pin = next_gsi,
-+		};
++	switch (supports_vm_ext_check) {
++	case 0:
++		ret = ioctl(kvm->sys_fd, KVM_CHECK_EXTENSION,
++			    KVM_CAP_CHECK_EXTENSION_VM);
++		if (ret <= 0) {
++			supports_vm_ext_check = -1;
++			return false;
++		}
++		supports_vm_ext_check = 1;
++		/* fall through */
++	case 1:
++		break;
++	case -1:
++		return false;
 +	}
 +
-+	return 0;
++	ret = ioctl(kvm->vm_fd, KVM_CHECK_EXTENSION, extension);
++	if (ret < 0)
++		return false;
++
++	return ret;
 +}
 +
- static int gic__create_its_frame(struct kvm *kvm, u64 its_frame_addr)
+ bool kvm__supports_extension(struct kvm *kvm, unsigned int extension)
  {
- 	struct kvm_create_device its_device = {
-@@ -239,6 +269,8 @@ static int gic__init_gic(struct kvm *kvm)
- 			return ret;
- 	}
- 
-+	irq__routing_init(kvm);
-+
- 	if (!ioctl(gic_fd, KVM_HAS_DEVICE_ATTR, &vgic_init_attr)) {
- 		ret = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &vgic_init_attr);
- 		if (ret)
+ 	int ret;
 -- 
 2.9.0
