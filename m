@@ -1,105 +1,54 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Tue, 25 Apr 2017 10:39:37 -0700
-Subject: [PATCH v2] crypto: arm64/sha: Add constant operand modifier to
- ASM_EXPORT
-In-Reply-To: <CAKv+Gu_DHBT=2YA9h+ao3pZXgEV5KsO9ia+J90wtLuDX=a4+eg@mail.gmail.com>
-References: <20170405183458.193068-1-mka@chromium.org>
- <CAP=VYLpejcYwXUMtCCkXmjXw=T1tBJLn21aVi-9v_VGmEinjRg@mail.gmail.com>
- <CAKv+Gu_DHBT=2YA9h+ao3pZXgEV5KsO9ia+J90wtLuDX=a4+eg@mail.gmail.com>
-Message-ID: <20170425173937.GN128305@google.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Tue, 25 Apr 2017 11:41:39 -0600
+Subject: [PATCH V15 06/11] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <20170425172154.ggg56j52inf3522e@pd.tnic>
+References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
+ <1492556723-9189-7-git-send-email-tbaicar@codeaurora.org>
+ <20170425172154.ggg56j52inf3522e@pd.tnic>
+Message-ID: <6d7249d3-e0b2-afa7-b5fa-8e85c40d8a13@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 4/25/2017 11:21 AM, Borislav Petkov wrote:
+> On Tue, Apr 18, 2017 at 05:05:18PM -0600, Tyler Baicar wrote:
+>> ARM APEI extension proposal added SEA (Synchronous External Abort)
+>> notification type for ARMv8.
+>> Add a new GHES error source handling function for SEA. If an error
+>> source's notification type is SEA, then this function can be registered
+>> into the SEA exception handler. That way GHES will parse and report
+>> SEA exceptions when they occur.
+>> An SEA can interrupt code that had interrupts masked and is treated as
+>> an NMI. To aid this the page of address space for mapping APEI buffers
+>> while in_nmi() is always reserved, and ghes_ioremap_pfn_nmi() is
+>> changed to use the helper methods to find the prot_t to map with in
+>> the same way as ghes_ioremap_pfn_irq().
+> ...
+>
+>> @@ -518,6 +520,17 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>   	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>>   		inf->name, esr, addr);
+>>   
+>> +	/*
+>> +	 * Synchronous aborts may interrupt code which had interrupts masked.
+>> +	 * Before calling out into the wider kernel tell the interested
+>> +	 * subsystems.
+>> +	 */
+>> +	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+>> +		nmi_enter();
+>> +		ghes_notify_sea();
+>> +		nmi_exit();
+>> +	}
+> Well, the other GHES notification methods use a notifier:
+> ghes_notify_sci, ghes_notify_nmi. You probably should do that too
+> instead of calling straight into a driver from arch code.
+I originally had this as a notifier, but Will requested to remove the 
+notifier. That conversation is here: https://lkml.org/lkml/2017/1/18/1018
 
-El Tue, Apr 18, 2017 at 04:35:02PM +0100 Ard Biesheuvel ha dit:
+Thanks,
+Tyler
 
-> On 18 April 2017 at 15:47, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
-> > On Wed, Apr 5, 2017 at 2:34 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
-> >> The operand is an integer constant, make the constness explicit by
-> >> adding the modifier. This is needed for clang to generate valid code
-> >> and also works with gcc.
-> >
-> > Actually it doesn't work with all gcc.  I've got an older arm64 toolchain that I
-> > only use for syntax checking (and hence I don't care if it is the latest and
-> > greatest) and this commit breaks it:
-> >
-> > arch/arm64/crypto/sha1-ce-glue.c:21:2: error: invalid 'asm': invalid
-> > operand prefix '%c'
-> >   asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
-> >
-> > I'm currently reverting this change locally so I can continue to use the old
-> > toolchain:
-> >
-> > $ aarch64-linux-gnu-gcc --version
-> > aarch64-linux-gnu-gcc (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro
-> > GCC 2013.11) 4.8.3 20131202 (prerelease)
-> > Copyright (C) 2013 Free Software Foundation, Inc.
-> >
-> > $ aarch64-linux-gnu-as --version
-> > GNU assembler (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro GCC
-> > 2013.11) 2.24.0.20131220
-> > Copyright 2013 Free Software Foundation, Inc.
-> >
-> > Maybe it is finally too old and nobody cares, but I thought it worth a mention.
-> >
-> 
-> Thanks for the report. I think we care more about GCC 4.8 than about
-> Clang, which argues for reverting this patch.
-> 
-> I understand these issues must be frustrating if you are working on
-> this stuff, but to me, it is not entirely obvious why we want to
-> support Clang in the first place (i.e., what does it buy you if your
-> distro/environment is not already using Clang for userland), and why
-> the burden is on Linux to make modifications to support Clang,
-> especially when it comes to GCC extensions such as inline assembly
-> syntax.
-> 
-> It is ultimately up to the maintainers to decide what to do with this
-> patch, but my vote would be to revert it, especially given that the %c
-> placeholder prefix is not documented anywhere, and appears to simply
-> trigger some GCC internals that happen to do the right thing in this
-> case.
-> 
-> However, the I -> i change is arguably an improvement, and considering
-> that the following
-> 
-> asm("foo: .long %0" :: "i"(some value))
-> 
-> doesn't compile with clang either, I suggest you (Matthias) file a bug
-> against Clang to get this fixed, and we can propose another patch just
-> for the I->i change.
-
-I consulted with folks with more expertise in this area than myself.
-This is their analysis of the situation:
-
-"The ARM ARM specifies that the correct AArch64 instruction assembly
-syntax is to have a hash sign (#) before an immediate.
-
-Therefore, every time an inline assembly constraint is used that
-specifies to print an immediate (like 'i' or 'I'), the immediate
-(e.g. 42) should be printed with the hash (e.g. #42).
-
-Therefore, if you're using an immediate constraint where the hash sign
-must not be printed, you have to use the "c" operand modifier. The "c"
-operand modifier apparently got introduced to gcc after the 4.8
-release.
-
-The binutils assembler and the clang integrated assembler accept
-immediates without the hash sign as a non-official extension. Some of
-the immediate constraints on gcc seem to not print out the hash sign
-either; which is why the variant in the linux kernel works with gcc.
-
-In summary, it seems to me that the inline assembly with the %c0
-operand is the correct one and gcc 4.8 is simply too old to support
-this."
-
-If the above is correct it seems that the solution is not to "fix"
-clang, but to use different instructions for gcc<=4.8 and newer
-compilers. I am aware that this is not a popular option.
-
-What do you think?
-
-Thanks
-
-Matthias
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
