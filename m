@@ -1,34 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Apr 2017 13:09:27 +0200
-Subject: [RFC] usb: chipidea: set dma_ops for the created ci_hdrc
- platform_device
-In-Reply-To: <20170425180151.0f03ca0e@xhacker>
-References: <20170425180151.0f03ca0e@xhacker>
-Message-ID: <CAK8P3a09fJCexChnoEyBpLK17rHaQTz9G+7iZWRocZGykyxsWA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 25 Apr 2017 12:08:50 +0100
+Subject: [PATCH] arm64: pmuv3: handle pmuv3+
+Message-ID: <1493118530-5314-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 12:01 PM, Jisheng Zhang <jszhang@marvell.com> wrote:
-> Hi all,
->
-> After commit 1dccb598df549 ("arm64: simplify dma_get_ops"), the chipidea
-> driver can't work any more on Marvell Berlin arm64 platforms, the reason
-> is the created ci_hdrc platform_device's dma_ops is dummy_dma_ops, so all
-> dma related operations will fail. The fix I can think of would be something
-> as below:
->
-> And I noticed that dwc3 has the same issue[1], and as pointed out in its
-> discussion, the patch can't fix None-DT platforms, so could you please
-> guide me what's the proper fix which can be mainlined?
+Commit f1b36dcb5c316c27 ("arm64: pmuv3: handle !PMUv3 when probing") is
+a little too restrictive, and prevents the use of of backwards
+compatible PMUv3 extenstions, which have a PMUver value other than 1.
 
-I think the right solution is:
+For instance, ARMv8.1 PMU extensions (as implemented by ThunderX2) are
+reported with PMUver value 4.
 
-- Set the "sysdev" pointer tin the USB device o the device structure that
-  was created by DT or the legacy board file and remove the manual
-  setting of dma_mask,  parms and the dma_configure. This should
-  make everything work as expected in case of DT
+Per the usual ID register principles, at least 0x1-0x7 imply a
+PMUv3-compatible PMU. It's not currently clear whether 0x8-0xe imply the
+same.
 
-- For any legacy board files, set the mask/parms and map_ops at
-  the point where the device originally created.
+For the time being, treat the value as signed, and with 0x1-0x7 treated
+as meaning PMUv3 is implemented. This may be relaxed by future patches.
 
-      Arnd
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Jayachandran C <jnair@caviumnetworks.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/perf_event.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+Will, would you be happy to queue this fixup for v4.12?
+
+Thanks,
+Mark.
+
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 98c7493..5f64d19 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -966,13 +966,14 @@ static void __armv8pmu_probe_pmu(void *info)
+ {
+ 	struct armv8pmu_probe_info *probe = info;
+ 	struct arm_pmu *cpu_pmu = probe->pmu;
+-	u64 dfr0, pmuver;
++	u64 dfr0;
+ 	u32 pmceid[2];
++	int pmuver;
+ 
+ 	dfr0 = read_sysreg(id_aa64dfr0_el1);
+-	pmuver = cpuid_feature_extract_unsigned_field(dfr0,
++	pmuver = cpuid_feature_extract_signed_field(dfr0,
+ 			ID_AA64DFR0_PMUVER_SHIFT);
+-	if (pmuver != 1)
++	if (pmuver < 1)
+ 		return;
+ 
+ 	probe->present = true;
+-- 
+1.9.1
