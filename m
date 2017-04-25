@@ -1,75 +1,93 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 25 Apr 2017 10:20:41 +0200
-Subject: support autofocus / autogain in libv4l2
-In-Reply-To: <20170424225731.7532e368@vento.lan>
-References: <1487074823-28274-1-git-send-email-sakari.ailus@linux.intel.com>
- <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
- <20170414232332.63850d7b@vento.lan>
- <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
- <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
- <20170424103802.00d3b554@vento.lan> <20170424220701.GA27846@amd>
- <20170424225731.7532e368@vento.lan>
-Message-ID: <20170425082041.GB30380@amd>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Tue, 25 Apr 2017 16:29:48 +0800
+Subject: [PATCH] usb: chipidea: udc: fix NULL pointer dereference if
+ udc_start failed
+In-Reply-To: <20170424123551.2465-1-jszhang@marvell.com>
+References: <20170424123551.2465-1-jszhang@marvell.com>
+Message-ID: <20170425082948.GB873@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > Please don't add a new application under lib/. It is fine if you want
-> > > some testing application, if the ones there aren't enough, but please
-> > > place it under contrib/test/.
-> > > 
-> > > You should likely take a look at v4l2grab first, as it could have
-> > > almost everything you would need.  
-> > 
-> > I really need some kind of video output. v4l2grab is not useful
-> > there. v4l2gl might be, but I don't think I have enough dependencies.
+On Mon, Apr 24, 2017 at 12:35:51PM +0000, Jisheng Zhang wrote:
+> Fix below NULL pointer dereference. we set ci->roles[CI_ROLE_GADGET]
+> too early in ci_hdrc_gadget_init(), if udc_start() fails due to some
+> reason, the ci->roles[CI_ROLE_GADGET] check in  ci_hdrc_gadget_destroy
+> can't protect us.
 > 
-> Well, you could use some app to show the snaps that v4l2grab takes.
-
-That would be too slow :-(.
-
-> Yeah, compiling v4l2gl on N9 can indeed be complex. I suspect that it 
-> shouldn't hard to compile xawtv there (probably disabling some optional
-> features).
-
-I do have mplayer working, but that one is not linked against libv4l2
-:-(.
-
-> > Umm, and it looks like libv4l can not automatically convert from
-> > GRBG10.. and if it could, going through RGB24 would probably be too
-> > slow on this device :-(.
+> We fix this issue by only setting ci->roles[CI_ROLE_GADGET] if
+> udc_start() succeed.
 > 
-> I suspect it shouldn't be hard to add support for GRBG10. It already
-> supports 8 and 16 bits Bayer formats, at lib/libv4lconvert/bayer.c
-> (to both RGB and YUV formats).
-
-Is 16bit bayer a recent development? I can't see it in
-
-commit 374806e868f5a7a48ecffde4c6a1abfcfa5ccd65
-Author: Hans Verkuil <hans.verkuil@cisco.com>
-Date:   Fri Apr 22 09:31:57 2016 +0200
-
-> > Is there an example using autogain/autowhitebalance from
-> > libv4lconvert?
+> [    1.398550] Unable to handle kernel NULL pointer dereference at
+> virtual address 00000000
+> ...
+> [    1.448600] PC is at dma_pool_free+0xb8/0xf0
+> [    1.453012] LR is at dma_pool_free+0x28/0xf0
+> [    2.113369] [<ffffff80081817d8>] dma_pool_free+0xb8/0xf0
+> [    2.118857] [<ffffff800841209c>] destroy_eps+0x4c/0x68
+> [    2.124165] [<ffffff8008413770>] ci_hdrc_gadget_destroy+0x28/0x50
+> [    2.130461] [<ffffff800840fa30>] ci_hdrc_probe+0x588/0x7e8
+> [    2.136129] [<ffffff8008380fb8>] platform_drv_probe+0x50/0xb8
+> [    2.142066] [<ffffff800837f494>] driver_probe_device+0x1fc/0x2a8
+> [    2.148270] [<ffffff800837f68c>] __device_attach_driver+0x9c/0xf8
+> [    2.154563] [<ffffff800837d570>] bus_for_each_drv+0x58/0x98
+> [    2.160317] [<ffffff800837f174>] __device_attach+0xc4/0x138
+> [    2.166072] [<ffffff800837f738>] device_initial_probe+0x10/0x18
+> [    2.172185] [<ffffff800837e58c>] bus_probe_device+0x94/0xa0
+> [    2.177940] [<ffffff800837c560>] device_add+0x3f0/0x560
+> [    2.183337] [<ffffff8008380d20>] platform_device_add+0x180/0x240
+> [    2.189541] [<ffffff800840f0e8>] ci_hdrc_add_device+0x440/0x4f8
+> [    2.195654] [<ffffff8008414194>] ci_hdrc_usb2_probe+0x13c/0x2d8
+> [    2.201769] [<ffffff8008380fb8>] platform_drv_probe+0x50/0xb8
+> [    2.207705] [<ffffff800837f494>] driver_probe_device+0x1fc/0x2a8
+> [    2.213910] [<ffffff800837f5ec>] __driver_attach+0xac/0xb0
+> [    2.219575] [<ffffff800837d4b0>] bus_for_each_dev+0x60/0xa0
+> [    2.225329] [<ffffff800837ec80>] driver_attach+0x20/0x28
+> [    2.230816] [<ffffff800837e880>] bus_add_driver+0x1d0/0x238
+> [    2.236571] [<ffffff800837fdb0>] driver_register+0x60/0xf8
+> [    2.242237] [<ffffff8008380ef4>] __platform_driver_register+0x44/0x50
+> [    2.248891] [<ffffff80086fd440>] ci_hdrc_usb2_driver_init+0x18/0x20
+> [    2.255365] [<ffffff8008082950>] do_one_initcall+0x38/0x128
+> [    2.261121] [<ffffff80086e0d00>] kernel_init_freeable+0x1ac/0x250
+> [    2.267414] [<ffffff800852f0b8>] kernel_init+0x10/0x100
+> [    2.272810] [<ffffff8008082680>] ret_from_fork+0x10/0x50
 > 
-> Well, if you plug a USB camera without those controls, it should
-> automatically expose controls for it, as if the device had such
-> controls.
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  drivers/usb/chipidea/udc.c | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> index f88e9157fad0..60a786c87c06 100644
+> --- a/drivers/usb/chipidea/udc.c
+> +++ b/drivers/usb/chipidea/udc.c
+> @@ -1984,6 +1984,7 @@ static void udc_id_switch_for_host(struct ci_hdrc *ci)
+>  int ci_hdrc_gadget_init(struct ci_hdrc *ci)
+>  {
+>  	struct ci_role_driver *rdrv;
+> +	int ret;
+>  
+>  	if (!hw_read(ci, CAP_DCCPARAMS, DCCPARAMS_DC))
+>  		return -ENXIO;
+> @@ -1996,7 +1997,10 @@ int ci_hdrc_gadget_init(struct ci_hdrc *ci)
+>  	rdrv->stop	= udc_id_switch_for_host;
+>  	rdrv->irq	= udc_irq;
+>  	rdrv->name	= "gadget";
+> -	ci->roles[CI_ROLE_GADGET] = rdrv;
+>  
+> -	return udc_start(ci);
+> +	ret = udc_start(ci);
+> +	if (!ret)
+> +		ci->roles[CI_ROLE_GADGET] = rdrv;
+> +
+> +	return ret;
+>  }
+> -- 
 
-And settings are persistent, so I can enable autogain, then lauch
-something like xawtv, and it will automatically get autogain? Ok,
-good.
+Thanks for fixing it. In fact, we'd better return failure if
+ret && ret != -ENXIO at probe, it stands for initialization
+for host or gadget has failed.
 
-Regards,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170425/23ad62a6/attachment.sig>
+
+Best Regards,
+Peter Chen
