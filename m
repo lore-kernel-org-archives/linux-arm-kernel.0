@@ -1,45 +1,109 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 25 Apr 2017 08:22:31 +0200
-Subject: [PATCH] ARM: dts: Add devicetree for the Raspberry Pi 3, for
- arm32 (v5)
-In-Reply-To: <20170424200037.25615-1-eric@anholt.net>
-References: <20170424200037.25615-1-eric@anholt.net>
-Message-ID: <68d88bf7-1f47-4056-3b70-7b97d9a02953@i2se.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 25 Apr 2017 08:23:24 +0200
+Subject: [PATCH v7 1/4] syscalls: Restore address limit after a syscall
+In-Reply-To: <CAGXu5j+J67zC9tcncacHTDvXKMF3HZuPCivk-Uz4J6h-cEv-qQ@mail.gmail.com>
+References: <20170410164420.64003-1-thgarnie@google.com>
+ <CAGXu5j+J67zC9tcncacHTDvXKMF3HZuPCivk-Uz4J6h-cEv-qQ@mail.gmail.com>
+Message-ID: <20170425062324.pdpi5v7ypobw74ki@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 24.04.2017 um 22:00 schrieb Eric Anholt:
-> Raspbian and Fedora have decided to support the Pi3 in 32-bit mode for
-> now, so it's useful to be able to test that mode on an upstream
-> kernel.  It's also been useful for me to use the same board for 32-bit
-> and 64-bit development.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  arch/arm/boot/dts/Makefile            | 1 +
->  arch/arm/boot/dts/bcm2837-rpi-3.b.dts | 1 +
->  2 files changed, 2 insertions(+)
->  create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3.b.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 011808490fed..eded842d9978 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -72,6 +72,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
->  	bcm2835-rpi-b-plus.dtb \
->  	bcm2835-rpi-a-plus.dtb \
->  	bcm2836-rpi-2-b.dtb \
-> +	bcm2837-rpi-3-b.dtb \
->  	bcm2835-rpi-zero.dtb
->  dtb-$(CONFIG_ARCH_BCM_5301X) += \
->  	bcm4708-asus-rt-ac56u.dtb \
-> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3.b.dts b/arch/arm/boot/dts/bcm2837-rpi-3.b.dts
-> new file mode 100644
-> index 000000000000..8c8aa4d1e9b3
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm2837-rpi-3.b.dts
-> @@ -0,0 +1 @@
-> +#include "arm64/broadcom/bcm2837-rpi-3.b.dts"
 
-Looks like a typo in the dts filename and in the include ( dot instead
-of dash ).
+* Kees Cook <keescook@chromium.org> wrote:
+
+> On Mon, Apr 10, 2017 at 9:44 AM, Thomas Garnier <thgarnie@google.com> wrote:
+> > This patch ensures a syscall does not return to user-mode with a kernel
+> > address limit. If that happened, a process can corrupt kernel-mode
+> > memory and elevate privileges.
+> >
+> > For example, it would mitigation this bug:
+> >
+> > - https://bugs.chromium.org/p/project-zero/issues/detail?id=990
+> >
+> > The CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE option is also
+> > added so each architecture can optimize this change.
+> >
+> > Signed-off-by: Thomas Garnier <thgarnie@google.com>
+> > Tested-by: Kees Cook <keescook@chromium.org>
+> 
+> Ingo, I think this series is ready. Can you pull it? (And if not, what
+> should next steps be?)
+
+I have some feedback for other patches in this series, plus for this one as well:
+
+> > +/*
+> > + * Called before coming back to user-mode. Returning to user-mode with an
+> > + * address limit different than USER_DS can allow to overwrite kernel memory.
+> > + */
+> > +static inline void verify_pre_usermode_state(void) {
+> > +       BUG_ON(!segment_eq(get_fs(), USER_DS));
+> > +}
+
+That's not standard kernel coding style.
+
+Also, patch titles should start with a verb - 75% of the series doesn't.
+
+> > +#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+> > +#define __CHECK_USER_CALLER() \
+> > +       bool user_caller = segment_eq(get_fs(), USER_DS)
+> > +#define __VERIFY_PRE_USERMODE_STATE() \
+> > +       if (user_caller) verify_pre_usermode_state()
+> > +#else
+> > +#define __CHECK_USER_CALLER()
+> > +#define __VERIFY_PRE_USERMODE_STATE()
+> > +asmlinkage void address_limit_check_failed(void);
+> > +#endif
+
+> > +#ifdef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+
+That Kconfig name is way too long.
+
+Plus please don't put logical operations into Kconfig names.
+
+> > +/*
+> > + * This function is called when an architecture specific implementation detected
+> > + * an invalid address limit. The generic user-mode state checker will finish on
+> > + * the appropriate BUG_ON.
+> > + */
+> > +asmlinkage void address_limit_check_failed(void)
+> > +{
+> > +       verify_pre_usermode_state();
+> > +       panic("address_limit_check_failed called with a valid user-mode state");
+> > +}
+> > +#endif
+
+Awful naming all around:
+
+	verify_pre_usermode_state()
+	address_limit_check_failed()
+
+Both names start with very common names that makes one read these again and again. 
+(And yes, there's lots of bad names in the kernel, but we should not follow bad 
+examples.)
+
+Best practice for such functionality is to use a common prefix that is both easy 
+to recognize and easy to skip. For example we could use 'addr_limit_check' as the 
+prefix:
+
+	addr_limit_check_failed()
+	addr_limit_check_syscall()
+
+No need to over-specify it that it's a "pre" check - it's obvious from existing 
+implementation and should be documented in the function itself for new 
+implementations.
+
+Harmonize the Kconfig namespace to the common prefix as well, i.e. use something 
+like:
+
+	CONFIG_ADDR_LIMIT_CHECK
+
+No need to add 'ARCH' I think - an architecture that enables this should get it 
+unconditionally.
+
+etc.
+
+It's all cobbled together I'm afraid and will need more iterations.
+
+Thanks,
+
+	Ingo
