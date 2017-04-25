@@ -1,95 +1,73 @@
-From: jiada_wang@mentor.com (Jiada Wang)
-Date: Tue, 25 Apr 2017 00:56:23 -0700
-Subject: [PATCH RFC 0/5] *** SPI Slave mode support ***
-In-Reply-To: <CAMuHMdVQS494-BAc-W-XOOLK8Xow85n+Cgih0FG+t4QxCFxhMA@mail.gmail.com>
-References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
- <20170413125929.dygodgj6c35ydh5p@sirena.org.uk>
- <CAMuHMdUm=90ddNWM5KWqT+W0hqZ-QO6vPHj5OisbYquDYq1ZmA@mail.gmail.com>
- <58F06092.9080409@mentor.com>
- <CAMuHMdXa_O6RsqUciiNWQ0Zp6dniS47AUmPN9UWAWitP0csx=Q@mail.gmail.com>
- <58FDF430.5090306@mentor.com>
- <CAMuHMdVQS494-BAc-W-XOOLK8Xow85n+Cgih0FG+t4QxCFxhMA@mail.gmail.com>
-Message-ID: <58FF0127.7070703@mentor.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 25 Apr 2017 08:57:17 +0100
+Subject: [PATCH v4 07/10] mfd: axp20x: add axp20x-regulator cell for AXP803
+In-Reply-To: <20170424160103.9447-8-icenowy@aosc.io>
+References: <20170424160103.9447-1-icenowy@aosc.io>
+ <20170424160103.9447-8-icenowy@aosc.io>
+Message-ID: <20170425075717.l4x3qektdgt6kaiq@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert
+On Tue, 25 Apr 2017, Icenowy Zheng wrote:
 
-On 04/24/2017 06:10 AM, Geert Uytterhoeven wrote:
-> Hi Jiada,
->
-> On Mon, Apr 24, 2017 at 2:48 PM, Jiada Wang<jiada_wang@mentor.com>  wrote:
->> On 04/24/2017 03:55 AM, Geert Uytterhoeven wrote:
->>> On Fri, Apr 14, 2017 at 7:39 AM, Jiada Wang<jiada_wang@mentor.com>   wrote:
->>>> On 04/13/2017 12:47 PM, Geert Uytterhoeven wrote:
->>>>> On Thu, Apr 13, 2017 at 2:59 PM, Mark Brown<broonie@kernel.org>    wrote:
->>>>>> On Thu, Apr 13, 2017 at 05:13:59AM -0700, jiada_wang at mentor.com wrote:
->>>>>>> From: Jiada Wang<jiada_wang@mentor.com>
->>>>>>>
->>>>>>> v1:
->>>>>>>      add Slave mode support in SPI core
->>>>>>>      spidev create slave device when SPI controller work in slave mode
->>>>>>>      spi-imx support to work in slave mode
->>>>>> Adding Geert who also had a series doing this in progress that was
->>>>>> getting very near to being merged.
->>>>> Thank you!
->>>>>
->>>>> Actually my plan is to fix the last remaining issues and resubmit for
->>>>> v4.13.
->>>> I noticed your patch set for SPI slave support,
->>>> (I am sure you can find out some of the change
->>>> in this patch set is based on your work).
->>>> we have similar requirement to add slave mode support to ecspi IP on imx6
->>>> Soc.
->>>>
->>>> Our use case is to use spidev as an interface to communicate with
->>>> external
->>>> SPI master devices.
->>>> meanwhile the SPI bus controller can also act as master device to send
->>>> data
->>>> to other
->>>> SPI slave devices on the board.
->>> That sounds a bit hackish to me. SPI was never meant to be a multi-master
->>> bus.
->>> While it can be done, you will need external synchronization (signals) to
->>> avoid conflicts between the SPI masters.
->> It doesn't need to be a multi-master bus,
->> for example A is master device for slave device B.
->> while B has its own slave device C
->> for each SPI connection A<=>  B, and B<=>  C, there is only one master
->> device.
->>
->> and I think from use case point of view, it's very normal,
->> one CPU upon receives command from external SPI master device,
->> it writes data to its own slave device (EEPROM) connected to it.
-> So "A<=>  B" and "B<=>  C" are two distinct SPI buses?
-> Or do they share some signals?
->
-> Your comment seems to suggest otherwise:
-the use case of
-"A (master) <=> B (slave)", "B (master) <=> C(slave)", do share MISO and 
-MOSI lines,
-but there is no SS line between A and C. so for each SPI slave device, 
-there is only one
-master device.
+> As axp20x-regulator now supports AXP803, add a cell for it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes in v4:
+> - Added a trailing comma for new cell, for easier further cell addition.
+> Changes in v3:
+> - Make the new cell one-liner.
+> 
+>  drivers/mfd/axp20x.c                 | 3 ++-
+>  drivers/regulator/axp20x-regulator.c | 6 +++---
 
-so I think the question becomes whether the above mentioned hardware 
-setup is valid or not.
+These 2 changes are orthogonal, thus there is no reason to send them
+bundled into a single patch.  Doing so complicates things greatly.
+Please resubmit the two changes separately, so that they may be
+absorbed by our respective subsystems.
 
-Thanks,
-Jiada
->>>> I found in your implementation, SPI bus controller is limited to either work in master mode or
->>>> slave mode, is there any reasoning to not configure SPI mode based on SPI devices use case?
-> If they are distinct, it should work. Then B has two SPI controllers: one slave
-> controller controlled by A, and one master controller to control C.
->
-> Gr{oetje,eeting}s,
->
->                          Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                  -- Linus Torvalds
+>  2 files changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 1dc6235778eb..917b6ddc4f15 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -848,7 +848,8 @@ static struct mfd_cell axp803_cells[] = {
+>  		.name			= "axp20x-pek",
+>  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+>  		.resources		= axp803_pek_resources,
+> -	}
+> +	},
+> +	{	.name			= "axp20x-regulator" },
+>  };
+>  
+>  static struct mfd_cell axp806_cells[] = {
+> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+> index 9356ec8a9a1f..e2608fe770b9 100644
+> --- a/drivers/regulator/axp20x-regulator.c
+> +++ b/drivers/regulator/axp20x-regulator.c
+> @@ -311,13 +311,13 @@ static const struct regulator_desc axp803_regulators[] = {
+>  		 AXP803_FLDO1_V_OUT, 0x0f, AXP22X_PWR_OUT_CTRL3, BIT(2)),
+>  	AXP_DESC(AXP803, FLDO2, "fldo2", "fldoin", 700, 1450, 50,
+>  		 AXP803_FLDO2_V_OUT, 0x0f, AXP22X_PWR_OUT_CTRL3, BIT(3)),
+> -	AXP_DESC_IO(AXP803, LDO_IO0, "ldo_io0", "ips", 700, 3300, 100,
+> +	AXP_DESC_IO(AXP803, LDO_IO0, "ldo-io0", "ips", 700, 3300, 100,
+>  		    AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
+>  		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
+> -	AXP_DESC_IO(AXP803, LDO_IO1, "ldo_io1", "ips", 700, 3300, 100,
+> +	AXP_DESC_IO(AXP803, LDO_IO1, "ldo-io1", "ips", 700, 3300, 100,
+>  		    AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
+>  		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
+> -	AXP_DESC_FIXED(AXP803, RTC_LDO, "rtc_ldo", "ips", 3000),
+> +	AXP_DESC_FIXED(AXP803, RTC_LDO, "rtc-ldo", "ips", 3000),
+>  };
+>  
+>  static const struct regulator_linear_range axp806_dcdca_ranges[] = {
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
