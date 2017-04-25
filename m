@@ -1,73 +1,114 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 25 Apr 2017 15:39:28 +0100
-Subject: [kvmtool PATCH v10 11/15] add kvm__supports_vm_extension()
+Date: Tue, 25 Apr 2017 15:39:31 +0100
+Subject: [kvmtool PATCH v10 14/15] extend GSI IRQ routing to take a device ID
 In-Reply-To: <20170425143932.17235-1-andre.przywara@arm.com>
 References: <20170425143932.17235-1-andre.przywara@arm.com>
-Message-ID: <20170425143932.17235-12-andre.przywara@arm.com>
+Message-ID: <20170425143932.17235-15-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM capabilities can be per-VM, in this case the ioctl should be
-issued on the VM file descriptor, not on the system fd.
-Since this feature is guarded by a (system) capability itself, wrap
-the call into a function of its own.
+For ITS emulation we need the device ID along with the MSI payload
+and doorbell address to identify an MSI, so we need to put it in the
+GSI IRQ routing table too.
+There is a per-VM capability by which the kernel signals the need for
+a device ID, so check this and put the device ID into the routing
+table if needed.
+For PCI devices we take the bus/device/function triplet and and that
+to the routing setup call.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/kvm.h |  1 +
- kvm.c             | 28 ++++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
+ hw/pci-shmem.c    |  3 ++-
+ include/kvm/irq.h |  2 +-
+ irq.c             | 10 ++++++++--
+ virtio/pci.c      |  6 ++++--
+ 4 files changed, 15 insertions(+), 6 deletions(-)
 
-diff --git a/include/kvm/kvm.h b/include/kvm/kvm.h
-index 4a76ec2..a76a25d 100644
---- a/include/kvm/kvm.h
-+++ b/include/kvm/kvm.h
-@@ -129,6 +129,7 @@ static inline bool host_ptr_in_ram(struct kvm *kvm, void *p)
+diff --git a/hw/pci-shmem.c b/hw/pci-shmem.c
+index 7ce98cb..512b5b0 100644
+--- a/hw/pci-shmem.c
++++ b/hw/pci-shmem.c
+@@ -135,7 +135,8 @@ int pci_shmem__get_local_irqfd(struct kvm *kvm)
+ 			return fd;
+ 
+ 		if (pci_shmem_pci_device.msix.ctrl & cpu_to_le16(PCI_MSIX_FLAGS_ENABLE)) {
+-			gsi = irq__add_msix_route(kvm, &msix_table[0].msg);
++			gsi = irq__add_msix_route(kvm, &msix_table[0].msg,
++						  pci_shmem_device.dev_num << 3);
+ 			if (gsi < 0)
+ 				return gsi;
+ 		} else {
+diff --git a/include/kvm/irq.h b/include/kvm/irq.h
+index f35eb7e..ee059e3 100644
+--- a/include/kvm/irq.h
++++ b/include/kvm/irq.h
+@@ -20,7 +20,7 @@ int irq__init(struct kvm *kvm);
+ int irq__exit(struct kvm *kvm);
+ 
+ int irq__allocate_routing_entry(void);
+-int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg);
++int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg, u32 device_id);
+ void irq__update_msix_route(struct kvm *kvm, u32 gsi, struct msi_msg *msg);
+ 
+ #endif
+diff --git a/irq.c b/irq.c
+index 6ec71c3..4404062 100644
+--- a/irq.c
++++ b/irq.c
+@@ -66,7 +66,7 @@ static bool check_for_irq_routing(struct kvm *kvm)
+ 	return has_irq_routing > 0;
  }
  
- bool kvm__supports_extension(struct kvm *kvm, unsigned int extension);
-+bool kvm__supports_vm_extension(struct kvm *kvm, unsigned int extension);
- 
- static inline void kvm__set_thread_name(const char *name)
+-int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg)
++int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg, u32 device_id)
  {
-diff --git a/kvm.c b/kvm.c
-index 7fa76f7..665ed14 100644
---- a/kvm.c
-+++ b/kvm.c
-@@ -93,6 +93,34 @@ const char *kvm__get_dir(void)
- 	return kvm_dir;
- }
+ 	int r;
  
-+bool kvm__supports_vm_extension(struct kvm *kvm, unsigned int extension)
-+{
-+	static int supports_vm_ext_check = 0;
-+	int ret;
-+
-+	switch (supports_vm_ext_check) {
-+	case 0:
-+		ret = ioctl(kvm->sys_fd, KVM_CHECK_EXTENSION,
-+			    KVM_CAP_CHECK_EXTENSION_VM);
-+		if (ret <= 0) {
-+			supports_vm_ext_check = -1;
-+			return false;
-+		}
-+		supports_vm_ext_check = 1;
-+		/* fall through */
-+	case 1:
-+		break;
-+	case -1:
-+		return false;
+@@ -77,7 +77,7 @@ int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg)
+ 	if (r)
+ 		return r;
+ 
+-	irq_routing->entries[irq_routing->nr++] =
++	irq_routing->entries[irq_routing->nr] =
+ 		(struct kvm_irq_routing_entry) {
+ 			.gsi = next_gsi,
+ 			.type = KVM_IRQ_ROUTING_MSI,
+@@ -86,6 +86,12 @@ int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg)
+ 			.u.msi.data = msg->data,
+ 		};
+ 
++	if (kvm->msix_needs_devid) {
++		irq_routing->entries[irq_routing->nr].flags = KVM_MSI_VALID_DEVID;
++		irq_routing->entries[irq_routing->nr].u.msi.devid = device_id;
 +	}
++	irq_routing->nr++;
 +
-+	ret = ioctl(kvm->vm_fd, KVM_CHECK_EXTENSION, extension);
-+	if (ret < 0)
-+		return false;
-+
-+	return ret;
-+}
-+
- bool kvm__supports_extension(struct kvm *kvm, unsigned int extension)
- {
- 	int ret;
+ 	r = ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
+ 	if (r)
+ 		return r;
+diff --git a/virtio/pci.c b/virtio/pci.c
+index f0e884c..46473b0 100644
+--- a/virtio/pci.c
++++ b/virtio/pci.c
+@@ -192,7 +192,8 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
+ 				break;
+ 
+ 			gsi = irq__add_msix_route(kvm,
+-						  &vpci->msix_table[vec].msg);
++						  &vpci->msix_table[vec].msg,
++						  vpci->dev_hdr.dev_num << 3);
+ 			/*
+ 			 * We don't need IRQ routing if we can use
+ 			 * MSI injection via the KVM_SIGNAL_MSI ioctl.
+@@ -216,7 +217,8 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
+ 				break;
+ 
+ 			gsi = irq__add_msix_route(kvm,
+-						  &vpci->msix_table[vec].msg);
++						  &vpci->msix_table[vec].msg,
++						  vpci->dev_hdr.dev_num << 3);
+ 			/*
+ 			 * We don't need IRQ routing if we can use
+ 			 * MSI injection via the KVM_SIGNAL_MSI ioctl.
 -- 
 2.9.0
