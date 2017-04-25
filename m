@@ -1,28 +1,32 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 25 Apr 2017 10:17:09 +0800
-Subject: [linux-sunxi] [PATCH v4 07/10] mfd: axp20x: add axp20x-regulator
- cell for AXP803
-In-Reply-To: <20170424160103.9447-8-icenowy@aosc.io>
-References: <20170424160103.9447-1-icenowy@aosc.io>
- <20170424160103.9447-8-icenowy@aosc.io>
-Message-ID: <CAGb2v673CL6TaZxkNR9SZDiG5G3cMqU1-=XeMj5gyDbQq4YzVA@mail.gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Tue, 25 Apr 2017 03:16:16 +0000
+Subject: [PATCH -next] drm/rockchip: cdn-dp: fix return value check in
+ cdn_dp_probe()
+Message-ID: <20170425031616.12664-1-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 12:01 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> As axp20x-regulator now supports AXP803, add a cell for it.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes in v4:
-> - Added a trailing comma for new cell, for easier further cell addition.
-> Changes in v3:
-> - Make the new cell one-liner.
->
->  drivers/mfd/axp20x.c                 | 3 ++-
->  drivers/regulator/axp20x-regulator.c | 6 +++---
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
-Squashed in wrong patch?
+Fix the retrn value check which testing the wrong variable
+in cdn_dp_probe().
 
-ChenYu
+Fixes: 1a0f7ed3abe2 ("drm/rockchip: cdn-dp: add cdn DP support for rk3399")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/gpu/drm/rockchip/cdn-dp-core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+index 9ab67a6..6a4a113 100644
+--- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
++++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+@@ -1198,7 +1198,7 @@ static int cdn_dp_probe(struct platform_device *pdev)
+ 			continue;
+ 
+ 		port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
+-		if (!dp)
++		if (!port)
+ 			return -ENOMEM;
+ 
+ 		port->extcon = extcon;
