@@ -1,61 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 25 Apr 2017 19:35:56 +0100
-Subject: [RFC PATCH] drivers: dma-mapping: Do not attempt to create a
- scatterlist for from_coherent buffers
-In-Reply-To: <20170425180525.GT17774@n2100.armlinux.org.uk>
-References: <1493143059-2113-1-git-send-email-catalin.marinas@arm.com>
- <20170425180525.GT17774@n2100.armlinux.org.uk>
-Message-ID: <20170425183556.GB18677@e104818-lin.cambridge.arm.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 25 Apr 2017 13:45:13 -0500
+Subject: [PATCH V8 4/5] PCI/ASPM: save power on values during bridge init
+In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B2846676C7EF@IRSMSX101.ger.corp.intel.com>
+References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
+ <1491627351-1111-5-git-send-email-okaya@codeaurora.org>
+ <CACK8Z6GXfMWxakNQnvMToig9z9McnJKeYFc2BAAFy7ys8=PUWg@mail.gmail.com>
+ <d3857812-7e03-4b62-f7cb-ac0d139b6123@codeaurora.org>
+ <20170414214452.GA21870@bhelgaas-glaptop.roam.corp.google.com>
+ <66168dde-7719-6f74-3f06-8e4724dd2918@codeaurora.org>
+ <CAErSpo7p_2dTDTC7J4HdQUw_5GH8081dUZ=XVqd=sRLrA_FJnA@mail.gmail.com>
+ <c0c2f48f-d725-058e-a1ad-92ab4b6e7fb3@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846676C7EF@IRSMSX101.ger.corp.intel.com>
+Message-ID: <CAErSpo7TO1rfG6MDYuohyXL4WbaGCJdV8y3Ke-uL6VjGRb1hvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 07:05:26PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Apr 25, 2017 at 06:57:39PM +0100, Catalin Marinas wrote:
-> > Memory returned by dma_alloc_from_coherent() is not backed by struct
-> > page and creating a scatterlist would use invalid page pointers. The
-> > patch introduces the dma_vaddr_from_coherent() function and the
-> > corresponding check in dma_get_sgtable_attrs().
-> > 
-> > Fixes: d2b7428eb0ca ("common: dma-mapping: introduce dma_get_sgtable() function")
-> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > ---
-> > 
-> > In a recent discussion around the iommu DMA ops on arm64, Russell
-> > pointed out that dma_get_sgtable is not safe since the coherent DMA
-> > memory is not always backed by struct page. Russell has queued an
-> > arm-specific patch checking for pfn_valid() but I thought I'd make a
-> > more generic fix. This patch aims to bring the dma_get_sgtable() API in
-> > line with the dma_alloc/mmap/free with respect to the from_coherent
-> > memory.
-> 
-> Sorry, I don't think this is the correct approach.
-> 
-> You're assuming that 'vaddr' will always be a valid lowmem address.
-> That isn't always the case - some dma coherent allocations provide
-> remapped memory.
+On Fri, Apr 21, 2017 at 2:46 AM, Patel, Mayurkumar
+<mayurkumar.patel@intel.com> wrote:
+> Hi Bjorn/Kaya,
+>
+>
+>>
+>>On 4/17/2017 12:38 PM, Bjorn Helgaas wrote:
+>>>> Like you said, what do we do by default is the question. Should we opt
+>>>> for safe like we are doing, or try to save some power.
+>>> I think safety is paramount.  Every user should be able to boot safely
+>>> without any kernel parameters.  We don't want users to have a problem
+>>> booting and then have to search for a workaround like booting with
+>>> "pcie_aspm=off".  Most users will never do that.
+>>>
+>>
+>>OK, no problem with leaving the behavior as it is.
+>>
+>>My initial approach was #2. We knew this way that user had full control
+>>over the ASPM policy by changing the BIOS option. Then, Mayurkumar
+>>complained that ASPM is not enabled following a hotplug insertion to an
+>>empty slot. That's when I switched to #3 as it sounded like a good thing
+>>to have for us.
+>>
+>>> Here's a long-term strawman proposal, see what you think:
+>>>
+>>>   - Deprecate CONFIG_PCIEASPM_DEFAULT, CONFIG_PCIEASPM_POWERSAVE, etc.
+>>>   - Default aspm_policy is POLICY_DEFAULT always.
+>>>   - POLICY_DEFAULT means Linux doesn't touch anything: if BIOS enabled
+>>> ASPM, we leave it that way; we leave ASPM disabled on hot-added
+>>> devices.
+>>
+> I am also ok with leaving the same behavior as now.
+> But still following is something open I feel besides, Which may be there in your comments redundantly.
+> The current problem is, pcie_aspm_exit_link_state() disables the ASPM configuration even
+> if POLICY_DEFAULT was set.
 
-I'm not assuming lowmem. The only thing this patch does is that if the
-memory came from the dma_declare_coherent range, it returns -ENXIO. This
-is in line with the dma_free_attrs() for example, which calls
-dma_release_from_coherent(), but for sgtable this wouldn't make sense,
-hence -ENXIO.
+We call pcie_aspm_exit_link_state() when removing an endpoint.  When
+we remove an endpoint, I think disabling ASPM is the right thing to
+do.  The spec (PCIe r3.1, sec 5.4.1.3) says "Software must not enable
+L0s in either direction on a given Link unless components on both
+sides of the Link each support L0s; otherwise, the result is
+undefined."
 
-I agree with you that vaddr can be remapped (which is the case on arm64
-as well) but it's the responsibility of the arch-specific
-dma_ops->get_sgtable() to handle it properly (vmalloc_to_page etc.). The
-fall-back dma_common_get_sgtable() does assume lowmem but it doesn't
-mean that the arch DMA ops need to use it.
+> I am seeing already following problem(or may be influence) with it. The Endpoint I have does not have
+> does not have "Presence detect change" mechanism. Hot plug is working with Link status events.
+> When link is in L1 or L1SS and if EP is powered off, no Link status change event are triggered (It might be
+> the expected behavior in L1 or L1SS).  When next time EP is powered on there are link down and
+> link up events coming one after other. BIOS enables ASPM on Root port and Endpoint, but while
+> processing link status down, pcie_aspm_exit_link_state() clears the ASPM already which were enabled by BIOS.
+> If we want to follow above approach then shall we consider having something similar as following?
 
-> The reason for dma_get_sgtable() existing is to coerce the DMA
-> coherent memory into a scatterlist so that it can be passed through
-> the dma_buf API - that's where the problem lies.  The dma_buf API
-> needs fixing so that coherent memory can be sanely passed, and
-> dma_get_sgtable() needs to be put out of its misery.
+The proposal was to leave ASPM disabled on hot-added devices.  If the
+endpoint was powered off and powered back on again, I think that
+device looks like a hot-added device, doesn't it?
 
-I agree but didn't dare to dig into this ;).
-
--- 
-Catalin
+Bjorn
