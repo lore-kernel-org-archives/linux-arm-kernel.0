@@ -1,36 +1,39 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 25 Apr 2017 23:25:05 +0800
-Subject: [PATCH 3/3] drm/sun4i: backend: Clarify sun4i_backend_layer_enable
- debug message
-In-Reply-To: <20170425152505.6796-1-wens@csie.org>
-References: <20170425152505.6796-1-wens@csie.org>
-Message-ID: <20170425152505.6796-4-wens@csie.org>
+Date: Tue, 25 Apr 2017 23:25:02 +0800
+Subject: [PATCH 0/3] drm/sun4i: More cleanups and fixes
+Message-ID: <20170425152505.6796-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun4i_backend_layer_enable can be called to enable or disable a layer.
-However the debug message always says "Enable", which is confusing.
+Hi Maxime,
 
-This patch makes the debug message vary according to the enable state.
+The subject is probably getting old. Here are a few more cleanups.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
+Patch 1 should have been part of the patch
+
+    drm/sun4i: Use lists to track registered display backends and TCONs
+
+from my multiple pipeline support series. Please squash it in if you can.
+
+Patch 2 just moves setting the TCON clocks back inside the TCON driver.
+
+Patch 3 cleans up a DRM driver debug message.
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (3):
+  drm/sun4i: Drop unused tcon pointer
+  drm/sun4i: Set TCON clock inside sun4i_tconX_mode_set
+  drm/sun4i: backend: Clarify sun4i_backend_layer_enable debug message
+
  drivers/gpu/drm/sun4i/sun4i_backend.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.h     | 1 -
+ drivers/gpu/drm/sun4i/sun4i_rgb.c     | 2 --
+ drivers/gpu/drm/sun4i/sun4i_tcon.c    | 6 ++++++
+ drivers/gpu/drm/sun4i/sun4i_tv.c      | 2 --
+ 5 files changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index e9eca057ff35..e53107418add 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -73,7 +73,8 @@ void sun4i_backend_layer_enable(struct sun4i_backend *backend,
- {
- 	u32 val;
- 
--	DRM_DEBUG_DRIVER("Enabling layer %d\n", layer);
-+	DRM_DEBUG_DRIVER("%sabling layer %d\n", enable ? "En" : "Dis",
-+			 layer);
- 
- 	if (enable)
- 		val = SUN4I_BACKEND_MODCTL_LAY_EN(layer);
 -- 
 2.11.0
