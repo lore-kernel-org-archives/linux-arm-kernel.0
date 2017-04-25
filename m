@@ -1,100 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Apr 2017 16:18:44 +0100
-Subject: [PATCH] arm64: fix the overlap between the kernel image and
- vmalloc address
-In-Reply-To: <20170425150212.GF3792@leverpostej>
-References: <1493025729-21505-1-git-send-email-zhongjiang@huawei.com>
- <20170424104456.GA4343@leverpostej> <58FDFD90.8050300@huawei.com>
- <20170424155125.GA5972@leverpostej>
- <ffd0a3c5-5d89-4bbd-9995-c545bccaa8f6@redhat.com>
- <CAKv+Gu9RuJC9LgsEDSf91x4gV+VoRTLTjA9hGoPAu1ZkFDODmA@mail.gmail.com>
- <20170425150212.GF3792@leverpostej>
-Message-ID: <CAKv+Gu_i4M=RJmofMRoq63rR6GBf42W36FtomhTC9-o9g-sAiw@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 25 Apr 2017 17:21:59 +0200
+Subject: [PATCH] usb: chipidea: udc: fix NULL pointer dereference if
+ udc_start failed
+In-Reply-To: <HE1PR04MB1450634CE9C1D7FACC37DB4A8B1E0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+References: <20170424123551.2465-1-jszhang@marvell.com>
+ <20170425082948.GB873@b29397-desktop> <20170425171134.6a983841@xhacker>
+ <HE1PR04MB1450634CE9C1D7FACC37DB4A8B1E0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+Message-ID: <0ac4bc53-dd26-0b90-c84e-a94d01a6d5e4@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 April 2017 at 16:02, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Apr 24, 2017 at 06:56:43PM +0100, Ard Biesheuvel wrote:
->> On 24 April 2017 at 18:52, Laura Abbott <labbott@redhat.com> wrote:
->> > On 04/24/2017 08:51 AM, Mark Rutland wrote:
->> >> On Mon, Apr 24, 2017 at 09:28:48PM +0800, zhong jiang wrote:
->
->> >> static struct page *kernel_image_to_page(const void *addr)
->> >> {
->> >>       return virt_to_page(lm_alias(vmalloc_addr));
->> >> }
->> >>
->> >>> +
->> >>>  /*
->> >>>    * Walk a vmap address to the struct page it maps.
->> >>>    */
->> >>> @@ -244,6 +280,9 @@ struct page *vmalloc_to_page(const void *vmalloc_addr)
->> >>>          */
->> >>>         VIRTUAL_BUG_ON(!is_vmalloc_or_module_addr(vmalloc_addr));
->> >>>
->> >>> +       if (is_kernel_image_addr(vmalloc_addr))
->> >>> +               return kernel_image_to_page(vmalloc_addr, pgd);
->> >>
->> >> It's not clear to me that this is the right place for this to live.
->> >>
->> >> It might be best to code the kernel image logic directly in kcore (and
->> >> kmem), assuming everyone's OK with that approach.
->> >>
->> >
->> > That will fix kcore and kmem but this will show up in other places too.
->> > We've gone through and made sure that virt_addr_valid returns
->> > true if and only if virt_to_page returns a valid address. I don't know
->> > if we can make as strong a claim about is_vmalloc_addr and
->> > vmalloc_to_page in all cases but is_vmalloc_addr should not return true
->> > for the kernel image. That would at least let kcore fall back to
->> > kern_addr_valid which should correctly handle the kernel image.
->> > The suggestion to move the kernel image out of VMALLOC_START/VMALLOC_END
->> > seems like the best approach although I haven't tried a prototype
->> > at all.
+Am 25.04.2017 um 11:20 schrieb Peter Chen:
+>  
+>>>> diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+>>>> index f88e9157fad0..60a786c87c06 100644
+>>>> --- a/drivers/usb/chipidea/udc.c
+>>>> +++ b/drivers/usb/chipidea/udc.c
+>>>> @@ -1984,6 +1984,7 @@ static void udc_id_switch_for_host(struct
+>>>> ci_hdrc *ci)  int ci_hdrc_gadget_init(struct ci_hdrc *ci)  {
+>>>>  	struct ci_role_driver *rdrv;
+>>>> +	int ret;
+>>>>
+>>>>  	if (!hw_read(ci, CAP_DCCPARAMS, DCCPARAMS_DC))
+>>>>  		return -ENXIO;
+>>>> @@ -1996,7 +1997,10 @@ int ci_hdrc_gadget_init(struct ci_hdrc *ci)
+>>>>  	rdrv->stop	= udc_id_switch_for_host;
+>>>>  	rdrv->irq	= udc_irq;
+>>>>  	rdrv->name	= "gadget";
+>>>> -	ci->roles[CI_ROLE_GADGET] = rdrv;
+>>>>
+>>>> -	return udc_start(ci);
+>>>> +	ret = udc_start(ci);
+>>>> +	if (!ret)
+>>>> +		ci->roles[CI_ROLE_GADGET] = rdrv;
+>>>> +
+>>>> +	return ret;
+>>>>  }
+>>>> --
+>>> Thanks for fixing it. In fact, we'd better return failure if ret &&
+>>> ret != -ENXIO at probe, it stands for initialization for host or
+>>> gadget has failed.
+>>>
+>> I got your meaning. I'll cook v2. I don't have preference, since either one can fix the
+>> issue.
 >>
->> Moving the kernel into the vmalloc region was kind of the point, for
->> KASLR. Undoing that means either disabling KASLR, or splitting the
->> vmalloc region into a KASLR region only for the kernel, and a vmalloc
->> region like we had when vmlinux lived in the linear region.
->
-> AFAICT, x86 don't place the kernel in the vmalloc region for its KASLR
-> implementation. Is that just to avoid the issues that we're seeing, or
-> are there aother constraints on x86?
->
+> Both are needed, you don't need to send this one again. Only a new one, thanks.
 
-Given how a lot of architectures put kernel modules in the vmalloc
-space, I don't think there is generally an issue with putting the
-kernel there as well, other than what we are currently experiencing.
+I'm not sure how easy it is to reproduce the issue.
 
-As discussed, ioremap regions are also likely to be mapped using block
-mappings these days, and also reside between VMALLOC_START and
-VMALLOC_END.
+Shouldn't make a Fixes tag sense at least?
 
-So in my opinion, since
-a) we already put text and data in the vmalloc region, and
-b) we already use block mappings in the vmalloc region
-
-putting the kernel there is only a minor variation of what we already
-have to deal with, and so I don't think there is anything wrong with
-it. We simply have to tweak some tests here and there, but nothing
-fundamental afaict.
-
->> In general, I think we should be able to deal with different kinds of
->> mappings with different granularity in the vmalloc region. If
->> necessary, we could introduce a VM_xxx flag for the kernel to
->> distinguish such regions from ordinary VM_MAP regions.
 >
-> I don't think that vmalloc_to_page() should have to deal with anything
-> other than the usual page-granular memory mappings in the vmalloc area,
-> as it currently does. We'd have to write a page table walker per-arch
-> for that to work, and the only thing it would benefit is arm64's kernel
-> image mapping.
+> Peter
 >
-> Adding VM_xxx (e.g. VM_KERNEL) sounds sane to me regardless of anything
-> else.
->
-> That still leaves the question as to what is_vmalloc_addr(addr) (should)
-> imply about addr, though.
->
-> Thanks,
-> Mark.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
