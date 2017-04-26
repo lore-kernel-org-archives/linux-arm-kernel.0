@@ -1,110 +1,117 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Apr 2017 12:17:59 +0100
-Subject: [RFC/RFT PATCH 08/18] PCI: designware: Convert PCI scan API to
- pci_scan_root_bus_bridge()
+Date: Wed, 26 Apr 2017 12:18:02 +0100
+Subject: [RFC/RFT PATCH 11/18] PCI: Remove pci_scan_root_bus_msi()
 In-Reply-To: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
 References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170426111809.19922-9-lorenzo.pieralisi@arm.com>
+Message-ID: <20170426111809.19922-12-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The introduction of pci_scan_root_bus_bridge() provides a PCI core
-API to scan a PCI root bus backed by an already initialized
-struct pci_host_bridge object, which simplifies the bus scan
-interface and makes the PCI scan root bus interface easier to
-generalize as members are added to the struct pci_host_bridge().
+The pci_scan_root_bus_bridge() function allows passing a parameterized
+struct pci_host_bridge and scanning the resulting PCI bus; since the
+struct msi_controller is part of the struct pci_host_bridge and the
+struct pci_host_bridge can now be passed to pci_scan_root_bus_bridge()
+explicitly, there is no need for a scan interface with a MSI controller
+parameter.
 
-Convert PCI designware host code to pci_scan_root_bus_bridge() to
-improve the PCI root bus scanning interface.
+With all PCI host controller drivers and platform code relying
+on pci_scan_root_bus_msi() converted over to pci_scan_root_bus_bridge()
+the pci_scan_root_bus_msi() becomes obsolete and can be removed.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Jingoo Han <jingoohan1@gmail.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Joao Pinto <Joao.Pinto@synopsys.com>
 ---
- drivers/pci/dwc/pcie-designware-host.c | 36 +++++++++++++++++++++-------------
- 1 file changed, 22 insertions(+), 14 deletions(-)
+ drivers/pci/probe.c | 27 +++++----------------------
+ include/linux/pci.h |  4 ----
+ 2 files changed, 5 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
-index 5ba3349..e43c21a 100644
---- a/drivers/pci/dwc/pcie-designware-host.c
-+++ b/drivers/pci/dwc/pcie-designware-host.c
-@@ -279,9 +279,9 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	struct device_node *np = dev->of_node;
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct pci_bus *bus, *child;
-+	struct pci_host_bridge *bridge;
- 	struct resource *cfg_res;
- 	int i, ret;
--	LIST_HEAD(res);
- 	struct resource_entry *win, *tmp;
- 
- 	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
-@@ -294,16 +294,21 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 		dev_err(dev, "missing *config* reg space\n");
- 	}
- 
--	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base);
-+	bridge = pci_alloc_host_bridge(0);
-+	if (!bridge)
-+		return  -ENOMEM;
-+
-+	ret = of_pci_get_host_bridge_resources(np, 0, 0xff,
-+					&bridge->windows, &pp->io_base);
- 	if (ret)
- 		return ret;
- 
--	ret = devm_request_pci_bus_resources(dev, &res);
-+	ret = devm_request_pci_bus_resources(dev, &bridge->windows);
- 	if (ret)
- 		goto error;
- 
- 	/* Get the I/O and memory ranges from DT */
--	resource_list_for_each_entry_safe(win, tmp, &res) {
-+	resource_list_for_each_entry_safe(win, tmp, &bridge->windows) {
- 		switch (resource_type(win->res)) {
- 		case IORESOURCE_IO:
- 			ret = pci_remap_iospace(win->res, pp->io_base);
-@@ -397,19 +402,22 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 		pp->ops->host_init(pp);
- 
- 	pp->root_bus_nr = pp->busn->start;
-+
-+	bridge->dev.parent = dev;
-+	bridge->sysdata = pp;
-+	bridge->busnr = pp->root_bus_nr;
-+	bridge->ops = &dw_pcie_ops;
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
--		bus = pci_scan_root_bus_msi(dev, pp->root_bus_nr,
--					    &dw_pcie_ops, pp, &res,
--					    &dw_pcie_msi_chip);
-+		bridge->msi = &dw_pcie_msi_chip;
- 		dw_pcie_msi_chip.dev = dev;
--	} else
--		bus = pci_scan_root_bus(dev, pp->root_bus_nr, &dw_pcie_ops,
--					pp, &res);
--	if (!bus) {
--		ret = -ENOMEM;
--		goto error;
- 	}
- 
-+	ret = pci_scan_root_bus_bridge(bridge);
-+	if (ret)
-+		goto error;
-+
-+	bus = bridge->bus;
-+
- 	if (pp->ops->scan_bus)
- 		pp->ops->scan_bus(pp);
- 
-@@ -428,7 +436,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	return 0;
- 
- error:
--	pci_free_resource_list(&res);
-+	pci_free_host_bridge(bridge);
- 	return ret;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index c7a7f72..de259f3 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -2311,9 +2311,8 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
+ {
  }
  
+-static struct pci_bus *pci_create_root_bus_msi(struct device *parent,
+-		int bus, struct pci_ops *ops, void *sysdata,
+-		struct list_head *resources, struct msi_controller *msi)
++struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
++		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+ {
+ 	int error;
+ 	struct pci_host_bridge *bridge;
+@@ -2328,7 +2327,6 @@ static struct pci_bus *pci_create_root_bus_msi(struct device *parent,
+ 	bridge->sysdata = sysdata;
+ 	bridge->busnr = bus;
+ 	bridge->ops = ops;
+-	bridge->msi = msi;
+ 
+ 	error = pci_register_host_bridge(bridge);
+ 	if (error < 0)
+@@ -2340,13 +2338,6 @@ static struct pci_bus *pci_create_root_bus_msi(struct device *parent,
+ 	kfree(bridge);
+ 	return NULL;
+ }
+-
+-struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+-		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+-{
+-	return pci_create_root_bus_msi(parent, bus, ops, sysdata, resources,
+-				       NULL);
+-}
+ EXPORT_SYMBOL_GPL(pci_create_root_bus);
+ 
+ int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
+@@ -2450,9 +2441,8 @@ int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge)
+ 	return 0;
+ }
+ 
+-struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
+-		struct pci_ops *ops, void *sysdata,
+-		struct list_head *resources, struct msi_controller *msi)
++struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
++		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+ {
+ 	struct resource_entry *window;
+ 	bool found = false;
+@@ -2465,7 +2455,7 @@ struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
+ 			break;
+ 		}
+ 
+-	b = pci_create_root_bus_msi(parent, bus, ops, sysdata, resources, msi);
++	b = pci_create_root_bus(parent, bus, ops, sysdata, resources);
+ 	if (!b)
+ 		return NULL;
+ 
+@@ -2483,13 +2473,6 @@ struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
+ 
+ 	return b;
+ }
+-
+-struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+-		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+-{
+-	return pci_scan_root_bus_msi(parent, bus, ops, sysdata, resources,
+-				     NULL);
+-}
+ EXPORT_SYMBOL(pci_scan_root_bus);
+ 
+ struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 757779a..6aa0090 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -840,10 +840,6 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
+ int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
+ void pci_bus_release_busn_res(struct pci_bus *b);
+-struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
+-				      struct pci_ops *ops, void *sysdata,
+-				      struct list_head *resources,
+-				      struct msi_controller *msi);
+ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+ 					     struct pci_ops *ops, void *sysdata,
+ 					     struct list_head *resources);
 -- 
 2.10.0
