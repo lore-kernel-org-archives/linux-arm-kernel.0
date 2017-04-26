@@ -1,44 +1,133 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 26 Apr 2017 12:32:04 +0100
-Subject: [PATCH v2 2/2] arm64: module: split core and init PLT sections
-In-Reply-To: <1487715177-30790-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1487715177-30790-1-git-send-email-ard.biesheuvel@linaro.org>
- <1487715177-30790-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170426113203.GB9406@e104818-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 26 Apr 2017 12:18:05 +0100
+Subject: [RFC/RFT PATCH 14/18] PCI: Add pci_assign_irq() function and have
+ pci_fixup_irqs() use it
+In-Reply-To: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
+References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170426111809.19922-15-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2017 at 10:12:57PM +0000, Ard Biesheuvel wrote:
-> The arm64 module PLT code allocates all PLT entries in a single core
-> section, since the overhead of having a separate init PLT section is
-> not justified by the small number of PLT entries usually required for
-> init code.
-> 
-> However, the core and init module regions are allocated independently,
-> and there is a corner case where the core region may be allocated from
-> the VMALLOC region if the dedicated module region is exhausted, but the
-> init region, being much smaller, can still be allocated from the module
-> region. This leads to relocation failures if the distance between those
-> regions exceeds 128 MB. (In fact, this corner case is highly unlikely to
-> occur on arm64, but the issue has been observed on ARM, whose module
-> region is much smaller).
-> 
-> So split the core and init PLT regions, and name the latter ".init.plt"
-> so it gets allocated along with (and sufficiently close to) the .init
-> sections that it serves. Also, given that init PLT entries may need to
-> be emitted for branches that target the core module, modify the logic
-> that disregards defined symbols to only disregard symbols that are
-> defined in the same section as the relocated branch instruction.
-> 
-> Since there may now be two PLT entries associated with each entry in
-> the symbol table, we can no longer hijack the symbol::st_size fields
-> to record the addresses of PLT entries as we emit them for zero-addend
-> relocations. So instead, perform an explicit comparison to check for
-> duplicate entries.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+From: Matthew Minter <matt@masarand.com>
 
-I forgot about this patch. I'll queue it for 4.12. Thanks.
+Here we delete the static pdev_fixup_irq() function which is currently
+what pci_fixup_irqs() uses to actually assign the irqs and replace it
+with the pci_assign_irq() function which changes the interface and
+makes use of the new function pointers stored in the host bridge
+structure.
 
+Eventually this will allow pci_fixup_irqs() to be removed entirely
+and the new deferred assignment code path will call pci_assign_irq
+directly. However to ensure current users continue to work a
+new implementation of pci_fixup_irqs() is introduced which simply
+wraps the functionality of pci_assign_irq().
+
+Signed-off-by: Matthew Minter <matt@masarand.com>
+[lorenzo.pieralisi at arm.com: reworked comments/log]
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ drivers/pci/setup-irq.c | 45 +++++++++++++++++++++++++++++++++++----------
+ include/linux/pci.h     |  1 +
+ 2 files changed, 36 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+index 95c225b..5eeee79 100644
+--- a/drivers/pci/setup-irq.c
++++ b/drivers/pci/setup-irq.c
+@@ -15,6 +15,7 @@
+ #include <linux/errno.h>
+ #include <linux/ioport.h>
+ #include <linux/cache.h>
++#include "pci.h"
+ 
+ void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
+ {
+@@ -22,12 +23,17 @@ void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
+ 	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
+ }
+ 
+-static void pdev_fixup_irq(struct pci_dev *dev,
+-			   u8 (*swizzle)(struct pci_dev *, u8 *),
+-			   int (*map_irq)(const struct pci_dev *, u8, u8))
++void pci_assign_irq(struct pci_dev *dev)
+ {
+-	u8 pin, slot;
++	u8 pin;
++	u8 slot = -1;
+ 	int irq = 0;
++	struct pci_host_bridge *hbrg = pci_find_host_bridge(dev->bus);
++
++	if (!(hbrg->map_irq)) {
++		dev_dbg(&dev->dev, "runtime irq mapping not provided by arch\n");
++		return;
++	}
+ 
+ 	/* If this device is not on the primary bus, we need to figure out
+ 	   which interrupt pin it will come in on.   We know which slot it
+@@ -40,17 +46,22 @@ static void pdev_fixup_irq(struct pci_dev *dev,
+ 	if (pin > 4)
+ 		pin = 1;
+ 
+-	if (pin != 0) {
++	if (pin) {
+ 		/* Follow the chain of bridges, swizzling as we go.  */
+-		slot = (*swizzle)(dev, &pin);
++		if (hbrg->swizzle_irq)
++			slot = (*(hbrg->swizzle_irq))(dev, &pin);
+ 
+-		irq = (*map_irq)(dev, slot, pin);
++		/*
++		 * If a swizzling function is not used map_irq must
++		 * ignore slot
++		 */
++		irq = (*(hbrg->map_irq))(dev, slot, pin);
+ 		if (irq == -1)
+ 			irq = 0;
+ 	}
+ 	dev->irq = irq;
+ 
+-	dev_dbg(&dev->dev, "fixup irq: got %d\n", dev->irq);
++	dev_dbg(&dev->dev, "assign irq: got %d\n", dev->irq);
+ 
+ 	/* Always tell the device, so the driver knows what is
+ 	   the real IRQ to use; the device does not use it. */
+@@ -60,9 +71,23 @@ static void pdev_fixup_irq(struct pci_dev *dev,
+ void pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
+ 		    int (*map_irq)(const struct pci_dev *, u8, u8))
+ {
++	/*
++	 * Implement pci_fixup_irqs() through pci_assign_irq().
++	 * This code should be remove eventually, it is a wrapper
++	 * around pci_assign_irq() interface to keep current
++	 * pci_fixup_irqs() behaviour unchanged on architecture
++	 * code still relying on its interface.
++	 */
+ 	struct pci_dev *dev = NULL;
++	struct pci_host_bridge *hbrg = NULL;
+ 
+-	for_each_pci_dev(dev)
+-		pdev_fixup_irq(dev, swizzle, map_irq);
++	for_each_pci_dev(dev) {
++		hbrg = pci_find_host_bridge(dev->bus);
++		hbrg->swizzle_irq = swizzle;
++		hbrg->map_irq = map_irq;
++		pci_assign_irq(dev);
++		hbrg->swizzle_irq = NULL;
++		hbrg->map_irq = NULL;
++	}
+ }
+ EXPORT_SYMBOL_GPL(pci_fixup_irqs);
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 722a770..688c669 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1152,6 +1152,7 @@ void pdev_enable_device(struct pci_dev *);
+ int pci_enable_resources(struct pci_dev *, int mask);
+ void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
+ 		    int (*)(const struct pci_dev *, u8, u8));
++void pci_assign_irq(struct pci_dev *dev);
+ struct resource *pci_find_resource(struct pci_dev *dev, struct resource *res);
+ #define HAVE_PCI_REQ_REGIONS	2
+ int __must_check pci_request_regions(struct pci_dev *, const char *);
 -- 
-Catalin
+2.10.0
