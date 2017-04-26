@@ -1,65 +1,117 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 26 Apr 2017 16:25:26 +0800
-Subject: [PATCH] usb: chipidea: udc: fix NULL pointer dereference if
- udc_start failed
-In-Reply-To: <0ac4bc53-dd26-0b90-c84e-a94d01a6d5e4@i2se.com>
-References: <20170424123551.2465-1-jszhang@marvell.com>
- <20170425082948.GB873@b29397-desktop>	<20170425171134.6a983841@xhacker>
- <HE1PR04MB1450634CE9C1D7FACC37DB4A8B1E0@HE1PR04MB1450.eurprd04.prod.outlook.com>
- <0ac4bc53-dd26-0b90-c84e-a94d01a6d5e4@i2se.com>
-Message-ID: <20170426162526.7c8ef827@xhacker>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Wed, 26 Apr 2017 16:34:28 +0800
+Subject: [PATCH] usb: chipidea: properly handle host or gadget
+ initialization failure
+In-Reply-To: <20170425094311.361-1-jszhang@marvell.com>
+References: <20170425094311.361-1-jszhang@marvell.com>
+Message-ID: <20170426083428.GA4375@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Apr 2017 17:21:59 +0200
-Stefan Wahren <stefan.wahren@i2se.com> wrote:
-
-> Am 25.04.2017 um 11:20 schrieb Peter Chen:
-> >    
-> >>>> diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-> >>>> index f88e9157fad0..60a786c87c06 100644
-> >>>> --- a/drivers/usb/chipidea/udc.c
-> >>>> +++ b/drivers/usb/chipidea/udc.c
-> >>>> @@ -1984,6 +1984,7 @@ static void udc_id_switch_for_host(struct
-> >>>> ci_hdrc *ci)  int ci_hdrc_gadget_init(struct ci_hdrc *ci)  {
-> >>>>  	struct ci_role_driver *rdrv;
-> >>>> +	int ret;
-> >>>>
-> >>>>  	if (!hw_read(ci, CAP_DCCPARAMS, DCCPARAMS_DC))
-> >>>>  		return -ENXIO;
-> >>>> @@ -1996,7 +1997,10 @@ int ci_hdrc_gadget_init(struct ci_hdrc *ci)
-> >>>>  	rdrv->stop	= udc_id_switch_for_host;
-> >>>>  	rdrv->irq	= udc_irq;
-> >>>>  	rdrv->name	= "gadget";
-> >>>> -	ci->roles[CI_ROLE_GADGET] = rdrv;
-> >>>>
-> >>>> -	return udc_start(ci);
-> >>>> +	ret = udc_start(ci);
-> >>>> +	if (!ret)
-> >>>> +		ci->roles[CI_ROLE_GADGET] = rdrv;
-> >>>> +
-> >>>> +	return ret;
-> >>>>  }
-> >>>> --  
-> >>> Thanks for fixing it. In fact, we'd better return failure if ret &&
-> >>> ret != -ENXIO at probe, it stands for initialization for host or
-> >>> gadget has failed.
-> >>>  
-> >> I got your meaning. I'll cook v2. I don't have preference, since either one can fix the
-> >> issue.
-> >>  
-> > Both are needed, you don't need to send this one again. Only a new one, thanks.  
+On Tue, Apr 25, 2017 at 05:43:11PM +0800, Jisheng Zhang wrote:
+> If ci_hdrc_host_init() or ci_hdrc_gadget_init() returns error and the
+> error != -ENXIO, as Peter pointed out, "it stands for initialization
+> for host or gadget has failed", so we'd better return failure rather
+> continue.
 > 
-> I'm not sure how easy it is to reproduce the issue.
-
-It's easy to reproduce it (100%) on arm64 platforms after commit
-1dccb598df549 ("arm64: simplify dma_get_ops"). This commit could
-make all dma related operations failed, then udc_start() would fail
-with -ENOMEM.
-
-On other platforms, it's not easy.
-
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  drivers/usb/chipidea/core.c | 25 +++++++++++++++++++------
+>  1 file changed, 19 insertions(+), 6 deletions(-)
 > 
-> Shouldn't make a Fixes tag sense at least?
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index 79ad8e91632e..047afdbb7049 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -930,20 +930,28 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+>  	/* initialize role(s) before the interrupt is requested */
+>  	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
+>  		ret = ci_hdrc_host_init(ci);
+> -		if (ret)
+> -			dev_info(dev, "doesn't support host\n");
+> +		if (ret) {
+> +			if (ret == -ENXIO)
+> +				dev_info(dev, "doesn't support host\n");
+> +			else
+> +				goto deinit_phy;
+> +		}
+>  	}
+>  
+>  	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
+>  		ret = ci_hdrc_gadget_init(ci);
+> -		if (ret)
+> -			dev_info(dev, "doesn't support gadget\n");
+> +		if (ret) {
+> +			if (ret == -ENXIO)
+> +				dev_info(dev, "doesn't support gadget\n");
+> +			else
+> +				goto deinit_host;
+> +		}
+>  	}
+>  
+>  	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
+>  		dev_err(dev, "no supported roles\n");
+>  		ret = -ENODEV;
+> -		goto deinit_phy;
+> +		goto deinit_gadget;
+>  	}
+>  
+>  	if (ci->is_otg && ci->roles[CI_ROLE_GADGET]) {
+> @@ -1013,7 +1021,12 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+>  		return 0;
+>  
+>  stop:
+> -	ci_role_destroy(ci);
+> +	if (ci->is_otg)
+> +		ci_hdrc_otg_destroy(ci);
+> +deinit_gadget:
+> +	ci_hdrc_gadget_destroy(ci);
+> +deinit_host:
+> +	ci_hdrc_host_destroy(ci);
+>  deinit_phy:
+>  	ci_usb_phy_exit(ci);
+>  ulpi_exit:
+> -- 
+> 2.11.0
+> 
 
-maybe 3f124d233e97 ("usb: chipidea: add role init and destroy APIs"
+You change is ok, there are more things need to change for this issue,
+would you mind adding below changes to your patch, and send v2. Below
+changes are based on your changes.
+
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index c55bcdd..4cad8a9 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -818,7 +818,7 @@ static inline void ci_role_destroy(struct ci_hdrc *ci)
+ {
+ 	ci_hdrc_gadget_destroy(ci);
+ 	ci_hdrc_host_destroy(ci);
+-	if (ci->is_otg)
++	if (ci->is_otg && ci->roles[CI_ROLE_GADGET])
+ 		ci_hdrc_otg_destroy(ci);
+ }
+ 
+@@ -1005,7 +1005,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 		ret = ci_hdrc_otg_init(ci);
+ 		if (ret) {
+ 			dev_err(dev, "init otg fails, ret = %d\n", ret);
+-			goto stop;
++			goto deinit_gadget;
+ 		}
+ 	}
+ 
+@@ -1075,7 +1075,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ remove_debug:
+ 	dbg_remove_files(ci);
+ stop:
+-	if (ci->is_otg)
++	if (ci->is_otg && ci->roles[CI_ROLE_GADGET])
+ 		ci_hdrc_otg_destroy(ci);
+ deinit_gadget:
+ 	ci_hdrc_gadget_destroy(ci);
+
+-- 
+
+Best Regards,
+Peter Chen
