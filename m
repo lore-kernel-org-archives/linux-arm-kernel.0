@@ -1,78 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 26 Apr 2017 17:12:57 +0200
-Subject: [RFC/RFT PATCH 07/18] ARM: PCI: orion5x: Convert PCI scan API to
- pci_scan_root_bus_bridge()
-In-Reply-To: <20170426111809.19922-8-lorenzo.pieralisi@arm.com>
-References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
- <20170426111809.19922-8-lorenzo.pieralisi@arm.com>
-Message-ID: <20170426151257.GA4489@lunn.ch>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 26 Apr 2017 23:20:14 +0800
+Subject: [PATCH v5 01/10] arm64: allwinner: a64: enable RSB on A64
+In-Reply-To: <20170426152023.41567-1-icenowy@aosc.io>
+References: <20170426152023.41567-1-icenowy@aosc.io>
+Message-ID: <20170426152023.41567-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 12:17:58PM +0100, Lorenzo Pieralisi wrote:
-> The introduction of pci_scan_root_bus_bridge() provides a PCI core
-> API to scan a PCI root bus backed by an already initialized
-> struct pci_host_bridge object, which simplifies the bus scan
-> interface and makes the PCI scan root bus interface easier to
-> generalize as members are added to the struct pci_host_bridge().
-> 
-> Convert ARM orion5x platform code to pci_scan_root_bus_bridge() to
-> improve the PCI root bus scanning interface.
+Allwinner A64 have a RSB controller like the one on A23/A33 SoCs.
 
-Hi Lorenzo
+Add it and its pinmux.
 
-Maybe there is something not right here.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+---
+Changes in v2:
+- Removed bonus properties in pio node.
+- Added Chen-Yu's ACK.
 
-With plain 4.11-rc7 i get:
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-root at orion5x:~# lspci -v
-0000:00:00.0 Memory controller: Marvell Technology Group Ltd. 88f5182 [Orion-NAS] ARM SoC (rev 02)
-        Subsystem: Marvell Technology Group Ltd. Device 11ab
-        Flags: bus master, fast devsel, latency 0, IRQ 12
-        Memory at <ignored> (64-bit, prefetchable)
-        Capabilities: [40] Power Management version 2
-        Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
-        Capabilities: [60] Express Root Port (Slot-), MSI 00
-
-0001:01:00.0 Memory controller: Marvell Technology Group Ltd. 88f5182 [Orion-NAS] ARM SoC (rev 02)
-        Flags: bus master, fast Back2Back, 66MHz, medium devsel, latency 0
-        BIST result: 00
-        Memory at <unassigned> (64-bit, prefetchable)
-        Memory at <ignored> (64-bit, prefetchable)
-        Memory at <ignored> (64-bit, non-prefetchable)
-        Expansion ROM at <ignored> [disabled]
-        Capabilities: [40] Power Management version 2
-        Capabilities: [48] Vital Product Data
-        Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
-        Capabilities: [60] PCI-X non-bridge device
-        Capabilities: [68] CompactPCI hot-swap <?>
-
-However, with your patches applied i get:
-
-0000:00:00.0 Memory controller: Marvell Technology Group Ltd. 88f5182 [Orion-NAS] ARM SoC (rev 02)
-        Subsystem: Marvell Technology Group Ltd. Device 11ab
-        Flags: bus master, fast devsel, latency 0
-        Memory at <ignored> (64-bit, prefetchable)
-        Capabilities: [40] Power Management version 2
-        Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
-        Capabilities: [60] Express Root Port (Slot-), MSI 00
-
-0001:01:00.0 Memory controller: Marvell Technology Group Ltd. 88f5182 [Orion-NAS] ARM SoC (rev 02)
-        Flags: bus master, fast Back2Back, 66MHz, medium devsel, latency 0
-        BIST result: 00
-        Memory at <unassigned> (64-bit, prefetchable)
-        Memory at <ignored> (64-bit, prefetchable)
-        Memory at <ignored> (64-bit, non-prefetchable)
-        Expansion ROM at <ignored> [disabled]
-        Capabilities: [40] Power Management version 2
-        Capabilities: [48] Vital Product Data
-        Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
-        Capabilities: [60] PCI-X non-bridge device
-        Capabilities: [68] CompactPCI hot-swap <?>
-
-Note that IRQ 12 has disappeared from Flags: on 0000:00:00.0.
-
-Since there are no actual PCI devices on this bus, i cannot test if
-interrupts are broken.
-
-	   Andrew
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index c7f669f5884f..05ec9fc5e81f 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -422,6 +422,25 @@
+ 			#gpio-cells = <3>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
++
++			r_rsb_pins: rsb at 0 {
++				pins = "PL0", "PL1";
++				function = "s_rsb";
++			};
++		};
++
++		r_rsb: rsb at 1f03400 {
++			compatible = "allwinner,sun8i-a23-rsb";
++			reg = <0x01f03400 0x400>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&r_ccu 6>;
++			clock-frequency = <3000000>;
++			resets = <&r_ccu 2>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&r_rsb_pins>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 	};
+ };
+-- 
+2.12.2
