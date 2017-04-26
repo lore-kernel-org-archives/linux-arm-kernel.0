@@ -1,37 +1,64 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 26 Apr 2017 17:25:50 +0800
-Subject: [PATCH v2 06/30] arm: dts: mt7623: add clock-frequency to the a7
- timer node to mt7623.dtsi
+Date: Wed, 26 Apr 2017 17:25:51 +0800
+Subject: [PATCH v2 07/30] arm: dts: mt7623: add pinctrl nodes to the mt7623
+ dtsi file
 In-Reply-To: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
 References: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
-Message-ID: <1493198774-4478-7-git-send-email-sean.wang@mediatek.com>
+Message-ID: <1493198774-4478-8-git-send-email-sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: John Crispin <john@phrozen.org>
 
-We need to tell the driver what the timers frequency is and that the core
-has not be configured by the bootrom. Not doing so makes the unit not
-boot.
+Add pin controller node to the mt7623.dtsi file
 
 Signed-off-by: John Crispin <john@phrozen.org>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- arch/arm/boot/dts/mt7623.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/mt7623.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
 diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index adb2393..3cc0a3a 100644
+index 3cc0a3a..1942bc7 100644
 --- a/arch/arm/boot/dts/mt7623.dtsi
 +++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -77,6 +77,8 @@
- 			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
- 			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
- 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		clock-frequency = <13000000>;
-+		arm,cpu-registers-not-fw-configured;
+@@ -15,7 +15,10 @@
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/clock/mt2701-clk.h>
++#include <dt-bindings/pinctrl/mt7623-pinfunc.h>
+ #include <dt-bindings/power/mt2701-power.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/phy/phy.h>
+ #include <dt-bindings/reset/mt2701-resets.h>
+ #include "skeleton64.dtsi"
+ 
+@@ -107,6 +110,26 @@
+ 		#reset-cells = <1>;
  	};
  
- 	topckgen: syscon at 10000000 {
++	pio: pinctrl at 10005000 {
++		compatible = "mediatek,mt7623-pinctrl",
++			     "mediatek,mt2701-pinctrl";
++		reg = <0 0x1000b000 0 0x1000>;
++		mediatek,pctl-regmap = <&syscfg_pctl_a>;
++		pins-are-numbered;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		interrupt-parent = <&gic>;
++		#interrupt-cells = <2>;
++		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	syscfg_pctl_a: syscfg at 10005000 {
++		compatible = "mediatek,mt7623-pctl-a-syscfg", "syscon";
++		reg = <0 0x10005000 0 0x1000>;
++	};
++
+ 	scpsys: scpsys at 10006000 {
+ 		compatible = "mediatek,mt7623-scpsys",
+ 			     "mediatek,mt2701-scpsys",
 -- 
 1.9.1
