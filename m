@@ -1,26 +1,24 @@
 From: bjsprakash.linux@gmail.com (Prakash B)
-Date: Wed, 26 Apr 2017 17:05:15 +0530
-Subject: [PATCH v5 21/22] KVM: arm64: vgic-its: Fix pending table sync
-In-Reply-To: <1492164934-988-22-git-send-email-eric.auger@redhat.com>
+Date: Wed, 26 Apr 2017 17:05:47 +0530
+Subject: [PATCH v5 22/22] KVM: arm64: vgic-v3:
+ KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
+In-Reply-To: <1492164934-988-23-git-send-email-eric.auger@redhat.com>
 References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-22-git-send-email-eric.auger@redhat.com>
-Message-ID: <CACJhumdH=duE3qPqvH5yC2=Tvthk_dz4TqTaw-gy+oiZi9bYMQ@mail.gmail.com>
+ <1492164934-988-23-git-send-email-eric.auger@redhat.com>
+Message-ID: <CACJhumdp33HYaidM9BEmV42+T7Os3CttBCNL7gei-jK0vSPSAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Apr 14, 2017 at 3:45 PM, Eric Auger <eric.auger@redhat.com> wrote:
-> In its_sync_lpi_pending_table() we currently ignore the
-> target_vcpu of the LPIs. We sync the pending bit found in
-> the vcpu pending table even if the LPI is not targeting it.
+> This patch adds a new attribute to GICV3 KVM device
+> KVM_DEV_ARM_VGIC_GRP_CTRL group. This Allows the userspace to
+> flush all GICR pending tables into guest RAM. At the moment
+> we do not offer any restore control as the sync is implicit.
 >
-> Also in vgic_its_cmd_handle_invall() we are supposed to
-> read the config table data for the LPIs associated to the
-> collection ID. At the moment we refresh all LPI config
-> information.
->
-> This patch passes a vpcu to vgic_copy_lpi_list() so that
-> this latter returns a snapshot of the LPIs targeting this
-> CPU and only those.
+> As we need the PENDBASER_ADDRESS() in vgic-v3, let's move its
+> definition in the irqchip header. We restore the full length
+> of the field, ie [51:16]. Same for PROPBASER_ADDRESS with full
+> field length of [51:12].
 >
 > Signed-off-by: Eric Auger <eric.auger@redhat.com>
 Tested-by: Prakash, Brahmajyosyula <Brahmajyosyula.Prakash@cavium.com>
