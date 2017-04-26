@@ -1,152 +1,45 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Wed, 26 Apr 2017 09:17:51 -0700
-Subject: [PATCH 1/2] kvm: Fix mmu_notifier release race
-In-Reply-To: <c1232b1d-ad82-794b-1b86-4d0cc0d4cd7f@arm.com>
-References: <1493028624-29837-1-git-send-email-suzuki.poulose@arm.com>
- <1493028624-29837-2-git-send-email-suzuki.poulose@arm.com>
- <20170425184904.GI5713@potion>
- <c1232b1d-ad82-794b-1b86-4d0cc0d4cd7f@arm.com>
-Message-ID: <20170426161751.GV3956@linux.vnet.ibm.com>
+From: alexander.duyck@gmail.com (Alexander Duyck)
+Date: Wed, 26 Apr 2017 09:18:33 -0700
+Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
+ ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+In-Reply-To: <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
+References: <20170401.112603.1991545644693496714.davem@davemloft.net>
+ <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
+ <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
+ <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
+ <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
+Message-ID: <CAKgT0Uc4L=GgYbpO-Fm9OfN+_fLypbDP1c+X4T_ta90ecQiyGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 05:03:44PM +0100, Suzuki K Poulose wrote:
-> On 25/04/17 19:49, Radim Kr?m?? wrote:
-> >2017-04-24 11:10+0100, Suzuki K Poulose:
-> >>The KVM uses mmu_notifier (wherever available) to keep track
-> >>of the changes to the mm of the guest. The guest shadow page
-> >>tables are released when the VM exits via mmu_notifier->ops.release().
-> >>There is a rare chance that the mmu_notifier->release could be
-> >>called more than once via two different paths, which could end
-> >>up in use-after-free of kvm instance (such as [0]).
-> >>
-> >>e.g:
-> >>
-> >>thread A                                        thread B
-> >>-------                                         --------------
-> >>
-> >> get_signal->                                   kvm_destroy_vm()->
-> >> do_exit->                                        mmu_notifier_unregister->
-> >> exit_mm->                                        kvm_arch_flush_shadow_all()->
-> >> exit_mmap->                                      spin_lock(&kvm->mmu_lock)
-> >> mmu_notifier_release->                           ....
-> >>  kvm_arch_flush_shadow_all()->                   .....
-> >>  ... spin_lock(&kvm->mmu_lock)                   .....
-> >>                                                  spin_unlock(&kvm->mmu_lock)
-> >>                                                kvm_arch_free_kvm()
-> >>   *** use after free of kvm ***
-> >
-> >I don't understand this race ...
-> >a piece of code in mmu_notifier_unregister() says:
-> >
-> >  	/*
-> >  	 * Wait for any running method to finish, of course including
-> >  	 * ->release if it was run by mmu_notifier_release instead of us.
-> >  	 */
-> >  	synchronize_srcu(&srcu);
-> >
-> >and code before that removes the notifier from the list, so it cannot be
-> >called after we pass this point.  mmu_notifier_release() does roughly
-> >the same and explains it as:
-> >
-> >  	/*
-> >  	 * synchronize_srcu here prevents mmu_notifier_release from returning to
-> >  	 * exit_mmap (which would proceed with freeing all pages in the mm)
-> >  	 * until the ->release method returns, if it was invoked by
-> >  	 * mmu_notifier_unregister.
-> >  	 *
-> >  	 * The mmu_notifier_mm can't go away from under us because one mm_count
-> >  	 * is held by exit_mmap.
-> >  	 */
-> >  	synchronize_srcu(&srcu);
-> >
-> >The call of mmu_notifier->release is protected by srcu in both cases and
-> >while it seems possible that mmu_notifier->release would be called
-> >twice, I don't see a combination that could result in use-after-free
-> >from mmu_notifier_release after mmu_notifier_unregister() has returned.
-> 
-> Thanks for bringing it up. Even I am wondering why this is triggered ! (But it
-> does get triggered for sure !!)
-> 
-> The only difference I can spot with _unregister & _release paths are the way
-> we use src_read_lock across the deletion of the entry from the list.
-> 
-> In mmu_notifier_unregister() we do :
-> 
->                 id = srcu_read_lock(&srcu);
->                 /*
->                  * exit_mmap will block in mmu_notifier_release to guarantee
->                  * that ->release is called before freeing the pages.
->                  */
->                 if (mn->ops->release)
->                         mn->ops->release(mn, mm);
->                 srcu_read_unlock(&srcu, id);
-> 
-> ## Releases the srcu lock here and then goes on to grab the spin_lock.
-> 
->                 spin_lock(&mm->mmu_notifier_mm->lock);
->                 /*
->                  * Can not use list_del_rcu() since __mmu_notifier_release
->                  * can delete it before we hold the lock.
->                  */
->                 hlist_del_init_rcu(&mn->hlist);
->                 spin_unlock(&mm->mmu_notifier_mm->lock);
-> 
-> While in mmu_notifier_release() we hold it until the node(s) are deleted from the
-> list :
->         /*
->          * SRCU here will block mmu_notifier_unregister until
->          * ->release returns.
->          */
->         id = srcu_read_lock(&srcu);
->         hlist_for_each_entry_rcu(mn, &mm->mmu_notifier_mm->list, hlist)
->                 /*
->                  * If ->release runs before mmu_notifier_unregister it must be
->                  * handled, as it's the only way for the driver to flush all
->                  * existing sptes and stop the driver from establishing any more
->                  * sptes before all the pages in the mm are freed.
->                  */
->                 if (mn->ops->release)
->                         mn->ops->release(mn, mm);
-> 
->         spin_lock(&mm->mmu_notifier_mm->lock);
->         while (unlikely(!hlist_empty(&mm->mmu_notifier_mm->list))) {
->                 mn = hlist_entry(mm->mmu_notifier_mm->list.first,
->                                  struct mmu_notifier,
->                                  hlist);
->                 /*
->                  * We arrived before mmu_notifier_unregister so
->                  * mmu_notifier_unregister will do nothing other than to wait
->                  * for ->release to finish and for mmu_notifier_unregister to
->                  * return.
->                  */
->                 hlist_del_init_rcu(&mn->hlist);
->         }
->         spin_unlock(&mm->mmu_notifier_mm->lock);
->         srcu_read_unlock(&srcu, id);
-> 
-> ## The lock is release only after the deletion of the node.
-> 
-> Both are followed by a synchronize_srcu(). Now, I am wondering if the unregister path
-> could potentially miss SRCU read lock held in _release() path and go onto finish the
-> synchronize_srcu before the item is deleted ? May be we should do the read_unlock
-> after the deletion of the node in _unregister (like we do in the _release()) ?
-> 
-> >
-> >Doesn't [2/2] solve the exact same issue (that the release method cannot
-> >be called twice in parallel)?
-> 
-> Not really. This could be a race between a release() and one of the other notifier
-> callbacks. e.g, In [0], we were hitting a use-after-free in kvm_unmap_hva() where,
-> the unregister could have succeeded and released the KVM.
-> 
-> 
-> [0] http://lkml.kernel.org/r/febea966-3767-21ff-3c40-1a76d1399138 at suse.de
-> 
-> In effect this all could be due to the same reason, the synchronize in unregister
-> missing another reader.
+On Wed, Apr 26, 2017 at 2:26 AM, Ding Tianhong <dingtianhong@huawei.com> wrote:
+> Hi Amir:
+>
+> It is really glad to hear that the mlx5 will support RO mode this year, if so, do you agree that enable it dynamic by ethtool -s xxx,
+> we have try it several month ago but there was only one drivers would use it at that time so the maintainer against it, it mlx5 would support RO,
+> we could try to restart this solution, what do you think about it. :)
+>
+> Thanks
+> Ding
 
-If this is at all reproducible, I suggest use of ftrace or event tracing
-to work out exactly what is happening.
+Hi Ding,
 
-							Thanx, Paul
+Enabing relaxed ordering really doesn't have any place in ethtool. It
+is a PCIe attribute that you are essentially wanting to enable.
+
+It might be worth while to take a look at updating the PCIe code path
+to handle this. Really what we should probably do is guarantee that
+the architectures that need relaxed ordering are setting it in the
+PCIe Device Control register and that the ones that don't are clearing
+the bit. It's possible that this is already occurring, but I don't
+know the state of handling those bits is in the kernel. Once we can
+guarantee that we could use that to have the drivers determine their
+behavior in regards to relaxed ordering. For example in the case of
+igb/ixgbe we could probably change the behavior so that it will bey
+default try to use relaxed ordering but if it is not enabled in PCIe
+Device Control register the hardware should not request to use it. It
+would simplify things in the drivers and allow for each architecture
+to control things as needed in their PCIe code.
+
+- Alex
