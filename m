@@ -1,117 +1,34 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Wed, 26 Apr 2017 16:34:28 +0800
-Subject: [PATCH] usb: chipidea: properly handle host or gadget
- initialization failure
-In-Reply-To: <20170425094311.361-1-jszhang@marvell.com>
-References: <20170425094311.361-1-jszhang@marvell.com>
-Message-ID: <20170426083428.GA4375@b29397-desktop>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 26 Apr 2017 09:44:34 +0100
+Subject: [PATCH v5 02/22] KVM: arm/arm64: Add GICV3 pending table save API
+ documentation
+In-Reply-To: <a5ab9181-8398-f62b-12f1-032961b12c28@redhat.com>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-3-git-send-email-eric.auger@redhat.com>
+ <CAFEAcA_0N9Jx5ym+=jjmxAzSaXPjt-m+gW1cq90of8Qhw3LOzg@mail.gmail.com>
+ <a5ab9181-8398-f62b-12f1-032961b12c28@redhat.com>
+Message-ID: <CAFEAcA-u-sH+v-Pnr_3gRC3iSJP0ZK68+GqkDzmi3xe1-B2WAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 05:43:11PM +0800, Jisheng Zhang wrote:
-> If ci_hdrc_host_init() or ci_hdrc_gadget_init() returns error and the
-> error != -ENXIO, as Peter pointed out, "it stands for initialization
-> for host or gadget has failed", so we'd better return failure rather
-> continue.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  drivers/usb/chipidea/core.c | 25 +++++++++++++++++++------
->  1 file changed, 19 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index 79ad8e91632e..047afdbb7049 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -930,20 +930,28 @@ static int ci_hdrc_probe(struct platform_device *pdev)
->  	/* initialize role(s) before the interrupt is requested */
->  	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
->  		ret = ci_hdrc_host_init(ci);
-> -		if (ret)
-> -			dev_info(dev, "doesn't support host\n");
-> +		if (ret) {
-> +			if (ret == -ENXIO)
-> +				dev_info(dev, "doesn't support host\n");
-> +			else
-> +				goto deinit_phy;
-> +		}
->  	}
->  
->  	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_PERIPHERAL) {
->  		ret = ci_hdrc_gadget_init(ci);
-> -		if (ret)
-> -			dev_info(dev, "doesn't support gadget\n");
-> +		if (ret) {
-> +			if (ret == -ENXIO)
-> +				dev_info(dev, "doesn't support gadget\n");
-> +			else
-> +				goto deinit_host;
-> +		}
->  	}
->  
->  	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
->  		dev_err(dev, "no supported roles\n");
->  		ret = -ENODEV;
-> -		goto deinit_phy;
-> +		goto deinit_gadget;
->  	}
->  
->  	if (ci->is_otg && ci->roles[CI_ROLE_GADGET]) {
-> @@ -1013,7 +1021,12 @@ static int ci_hdrc_probe(struct platform_device *pdev)
->  		return 0;
->  
->  stop:
-> -	ci_role_destroy(ci);
-> +	if (ci->is_otg)
-> +		ci_hdrc_otg_destroy(ci);
-> +deinit_gadget:
-> +	ci_hdrc_gadget_destroy(ci);
-> +deinit_host:
-> +	ci_hdrc_host_destroy(ci);
->  deinit_phy:
->  	ci_usb_phy_exit(ci);
->  ulpi_exit:
-> -- 
-> 2.11.0
-> 
+On 26 April 2017 at 09:26, Auger Eric <eric.auger@redhat.com> wrote:
+> On 25/04/2017 12:43, Peter Maydell wrote:
+>> When does the -EFAULT return happen? (if the guest points GITS_BASER<n>
+>> etc at invalid memory, presumably?)
+>
+> Yes that's correct, when GICR_PENDBASER contains a bad GPA.
+>
+>>  How does the QEMU migration code
+>> handle this case? Failing migration because the guest has done something
+>> silly doesn't seem too palatable, but trying to avoid that could be
+>> more effort than an obscure corner case really merits.
+>
+> The kvm_device_access will cause an abort() as for other errors returned
+> by kvm_device_ioctl().
 
-You change is ok, there are more things need to change for this issue,
-would you mind adding below changes to your patch, and send v2. Below
-changes are based on your changes.
+That's pretty nasty. Guests shouldn't be able to provoke QEMU
+into abort()ing, ideally. We don't necessarily have to produce
+a successful migration, but we should at least fail it cleanly.
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index c55bcdd..4cad8a9 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -818,7 +818,7 @@ static inline void ci_role_destroy(struct ci_hdrc *ci)
- {
- 	ci_hdrc_gadget_destroy(ci);
- 	ci_hdrc_host_destroy(ci);
--	if (ci->is_otg)
-+	if (ci->is_otg && ci->roles[CI_ROLE_GADGET])
- 		ci_hdrc_otg_destroy(ci);
- }
- 
-@@ -1005,7 +1005,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 		ret = ci_hdrc_otg_init(ci);
- 		if (ret) {
- 			dev_err(dev, "init otg fails, ret = %d\n", ret);
--			goto stop;
-+			goto deinit_gadget;
- 		}
- 	}
- 
-@@ -1075,7 +1075,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- remove_debug:
- 	dbg_remove_files(ci);
- stop:
--	if (ci->is_otg)
-+	if (ci->is_otg && ci->roles[CI_ROLE_GADGET])
- 		ci_hdrc_otg_destroy(ci);
- deinit_gadget:
- 	ci_hdrc_gadget_destroy(ci);
-
--- 
-
-Best Regards,
-Peter Chen
+thanks
+-- PMM
