@@ -1,48 +1,52 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Wed, 26 Apr 2017 10:17:05 -0700 (PDT)
-Subject: [PATCH 1/2] xen/arm, arm64: fix xen_dma_ops after 815dd18
- "Consolidate get_dma_ops..."
-In-Reply-To: <20170426171348.GE9406@e104818-lin.cambridge.arm.com>
-References: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
- <20170418142126.GE27592@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.10.1704191023120.31486@sstabellini-ThinkPad-X260>
- <alpine.DEB.2.10.1704241214100.16723@sstabellini-ThinkPad-X260>
- <f0667d8c-1c17-8d5f-a5d7-1e0d014e86ec@arm.com>
- <alpine.DEB.2.10.1704251021380.2875@sstabellini-ThinkPad-X260>
- <20170426111906.GA9406@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.10.1704260959440.2875@sstabellini-ThinkPad-X260>
- <20170426171348.GE9406@e104818-lin.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.10.1704261016450.2875@sstabellini-ThinkPad-X260>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Wed, 26 Apr 2017 13:24:48 -0400
+Subject: [PATCH v4 00/21] PCI: fix config space memory mappings
+In-Reply-To: <361fde15-5ba3-d33b-f946-003e89ba071f@huawei.com>
+References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
+ <2e24e205-d761-9172-9463-4a53e1a0de4d@jonmasters.org>
+ <361fde15-5ba3-d33b-f946-003e89ba071f@huawei.com>
+Message-ID: <000501d2beb2$023b9100$06b2b300$@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Apr 2017, Catalin Marinas wrote:
-> On Wed, Apr 26, 2017 at 10:00:30AM -0700, Stefano Stabellini wrote:
-> > On Wed, 26 Apr 2017, Catalin Marinas wrote:
-> > > On Tue, Apr 25, 2017 at 10:22:00AM -0700, Stefano Stabellini wrote:
-> > > > On Tue, 25 Apr 2017, Julien Grall wrote:
-> > > > > On 24/04/17 20:16, Stefano Stabellini wrote:
-> > > > > > Given the outstanding regression we need to fix as soon as possible,
-> > > > > > I'll queue these patches on the xentip tree for 4.12.
-> > > > > 
-> > > > > It looks like there is another rc for 4.11. I am wondering whether you could
-> > > > > try to send a pull request to Linus so it can be fixed in 4.11?
-> > > > 
-> > > > No, especially without input from Russell.
-> > > 
-> > > You could add a "Fixes" tag to the first patch so that it gets
-> > > back-ported to 4.11.x once it hits mainline (the second patch is just
-> > > cosmetic):
-> > > 
-> > > Fixes: 815dd18788fe ("treewide: Consolidate get_dma_ops() implementations")
-> > 
-> > I did add:
-> > 
-> >   Cc: <stable@vger.kernel.org>        [4.11+]
-> > 
-> > I thought that would be enough to trigger a backport?
+On Wednesday, April 26, 2017 6:54 AM, Dongdong Liu wrote;
 > 
-> Either would do. I didn't see it in the patch you posted, that's why I
-> mentioned it.
+> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+> 
+> I tested the patchset on HiSilicon ARM64 D05 board.It works ok with 82599
+> netcard.
 
-Thanks, I appreciated it!
+Thank you for testing these patches. HiSilicon PCIe may use Designware-based
+PCIe controller. In my opinion, other Designware-based PCIe controller will
+work properly.
+
+To Dongdong Liu, Khuong Dinh, and other people,
+If possible, can you check the output of 'lspci -v'?
+If you find something different, please share it with us.
+Good luck.
+
+Best regards,
+Jingoo Han
+
+> 
+> Thanks,
+> Dongdong
+> ? 2017/4/25 14:40, Jon Masters ??:
+> > On 04/19/2017 12:48 PM, Lorenzo Pieralisi wrote:
+> >
+> >> On some platforms (ie ARM/ARM64) ioremap fails to comply with the PCI
+> >> configuration non-posted write transactions requirement, because it
+> >> provides a memory mapping that issues "bufferable" or, in PCI terms
+> >> "posted" write transactions. Likewise, the current pci_remap_iospace()
+> >> implementation maps the physical address range that the PCI translates
+> >> to I/O space cycles to virtual address space through pgprot_device()
+> >> attributes that on eg ARM64 provides a memory mapping issuing
+> >> posted writes transactions, which is not PCI specifications compliant.
+> >
+> > Side note that I've pinged all of the ARM server vendors and asked them
+> > to verify this patch series on their platforms.
+> >
+> > Jon.
+> >
+> > .
+> >
