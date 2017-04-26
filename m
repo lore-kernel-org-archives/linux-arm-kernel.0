@@ -1,65 +1,48 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Wed, 26 Apr 2017 07:09:14 -0700
-Subject: [PATCH v7 1/4] syscalls: Restore address limit after a syscall
-In-Reply-To: <20170426081229.6wnugrs7w3at4xry@gmail.com>
-References: <20170410164420.64003-1-thgarnie@google.com>
- <20170425063305.hwjuxupa37rwe6zj@gmail.com>
- <CAJcbSZH7Y6iBy3T3iWyh_AaFJ+TidP7E9iQEuCbShQrcTKGoyw@mail.gmail.com>
- <20170426081229.6wnugrs7w3at4xry@gmail.com>
-Message-ID: <CAJcbSZGKknsc6YdwFjd-JHnXA0wjEpU7rCYjJCezQ7bwAxMn1A@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 26 Apr 2017 15:14:16 +0100
+Subject: Updating kernel.org cross compilers?
+Message-ID: <92b5ff36-ad2b-10bc-de4f-4774babd9625@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 1:12 AM, Ingo Molnar <mingo@kernel.org> wrote:
->
-> * Thomas Garnier <thgarnie@google.com> wrote:
->
->> >> +#ifdef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
->> >> +/*
->> >> + * This function is called when an architecture specific implementation detected
->> >> + * an invalid address limit. The generic user-mode state checker will finish on
->> >> + * the appropriate BUG_ON.
->> >> + */
->> >> +asmlinkage void address_limit_check_failed(void)
->> >> +{
->> >> +     verify_pre_usermode_state();
->> >> +     panic("address_limit_check_failed called with a valid user-mode state");
->> >
->> > It's very unconstructive to unconditionally panic the system, just because some
->> > kernel code leaked the address limit! Do a warn-once printout and kill the current
->> > task (i.e. don't continue execution), but don't crash everything else!
->>
->> The original change did not crash the kernel for this exact reason.
->> Through reviews, there was an overall agreement that the kernel should
->> not continue in this state.
->
-> Ok, I guess we can try that - but the panic message is still pretty misleading:
->
->         panic("address_limit_check_failed called with a valid user-mode state");
->
-> ... so it was called with a _valid_ user-mode state, and we crash due to something
-> valid? Huh?
+Hi!
 
-Yes the message is accurate but I agree that it is misleading and I
-will improve it. The address_limit_check_failed function is called by
-assembly code on different architectures once the state was detected
-as invalid. Instead of crashing at different places, we redirect to
-the generic handler (verify_pre_usermode_state) that will crash on the
-appropriate BUG_ON line. The address_limit_check_failed function is
-not supposed to comeback, the panic call is just a safe guard.
+(Tony: I've seen you redirecting to "Chris" in an older email, but the
+web archive doesn't have his email address)
 
->
-> ( Also, the style rule applies to kernel messages as well: function names should
->   be referred to as "function_name()". )
+It seems that many people (even outside the Linux kernel community) use
+the cross compilers provided at kernel.org/pub/tools/crosstool.
+The latest compiler I find there is 4.9.0, which celebrated its third
+birthday at the weekend, also has been superseded by 4.9.4 meanwhile.
 
-Will change.
+So I took Segher's buildall scripts from [1] and threw binutils 2.28 and
+GCC 6.3.0 at them. After removing --enable-sjlj-exceptions from
+build-gcc and adding --disable-multilib (for building x86-64 on a x86-64
+box without 32-bit libs) I was able to build (bare-metal) toolchains for
+all architectures except arc, m68k, tilegx and tilepro.
+Now my understanding is that a baremetal/stage 1 compiler should be
+build with "all-gcc" instead of the implicit "all" make target, and
+"install-gcc" instead of "install". And indeed adding this to build-gcc
+makes all toolchains build now - except arc, which needs an explicit
+"--with-cpu=arc700" on the GCC configure command line.
 
->
-> Thanks,
->
->         Ingo
+So after those changes, the sequence:
+$ ./buildall --toolchain
+$ PATH=$PATH:/opt/cross/bin
+$ ./buildall --kernel
+worked reasonably well for me (binutils 2.28, GCC 6.3.0, Linux 4.11-rc8
+on an Intel host with Ubuntu 14.04.5). Just tilegx/pro is still broken
+due to toolchain issues.
 
+So I wonder what the process is to get those compilers updated?
 
+And what is a good build setup, so that the binaries run on as many
+systems as possible?
 
--- 
-Thomas
+Also the web page (https://www.kernel.org/pub/tools/crosstool) seems to
+only link outdated builds (4.6.3, mostly), is that on purpose?
+
+Cheers,
+Andre.
+
+[1] http://git.infradead.org/users/segher/buildall.git/
