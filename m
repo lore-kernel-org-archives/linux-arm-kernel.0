@@ -1,41 +1,43 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 26 Apr 2017 23:20:15 +0800
-Subject: [PATCH v5 02/10] irqchip/sunxi-nmi: add A64 R_INTC to the binding doc
+Date: Wed, 26 Apr 2017 23:20:18 +0800
+Subject: [PATCH v5 05/10] arm64: allwinner: a64: add AXP803 node to Pine64
+ device tree
 In-Reply-To: <20170426152023.41567-1-icenowy@aosc.io>
 References: <20170426152023.41567-1-icenowy@aosc.io>
-Message-ID: <20170426152023.41567-3-icenowy@aosc.io>
+Message-ID: <20170426152023.41567-6-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 NMI driver seems to be using wrong base address.
+The Pine64 (including Pine64+) boards have an AXP803 as its main PMIC.
 
-As we're going to convert to use a correct NMI base address (and
-correctly name it to R_INTC as the datasheet suggests), add a new
-compatible string for the "correct" R_INTC, which we will use for A64
-SoC.
+Add its device node.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- .../bindings/interrupt-controller/allwinner,sunxi-nmi.txt          | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
-index 81cd3692405e..fea0c6a6211f 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
-@@ -3,8 +3,11 @@ Allwinner Sunxi NMI Controller
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index c680ed385da3..3e1b44292534 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -95,6 +95,17 @@
+ 	status = "okay";
+ };
  
- Required properties:
- 
--- compatible : should be "allwinner,sun7i-a20-sc-nmi" or
--  "allwinner,sun6i-a31-sc-nmi" or "allwinner,sun9i-a80-nmi"
-+- compatible : should be one of:
-+	"allwinner,sun6i-a31-sc-nmi"
-+	"allwinner,sun7i-a20-sc-nmi"
-+	"allwinner,sun9i-a80-nmi"
-+	"allwinner,sun50i-a64-r-intc"
- - reg : Specifies base physical address and size of the registers.
- - interrupt-controller : Identifies the node as an interrupt controller
- - #interrupt-cells : Specifies the number of cells needed to encode an
++&r_rsb {
++	status = "okay";
++
++	axp803: pmic at 3a3 {
++		compatible = "x-powers,axp803";
++		reg = <0x3a3>;
++		interrupt-parent = <&r_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.12.2
