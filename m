@@ -1,41 +1,160 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 26 Apr 2017 06:14:21 -0700
-Subject: [PATCH v5 02/22] KVM: arm/arm64: Add GICV3 pending table save
- API documentation
-In-Reply-To: <CAFEAcA8t0Y-UBu_Fx_YTsmnw8zvd4fctTfobdb-akjdx_81PWA@mail.gmail.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-3-git-send-email-eric.auger@redhat.com>
- <CAFEAcA_0N9Jx5ym+=jjmxAzSaXPjt-m+gW1cq90of8Qhw3LOzg@mail.gmail.com>
- <a5ab9181-8398-f62b-12f1-032961b12c28@redhat.com>
- <CAFEAcA-u-sH+v-Pnr_3gRC3iSJP0ZK68+GqkDzmi3xe1-B2WAQ@mail.gmail.com>
- <20170426084830.GB2098@work-vm>
- <4dc866a0-582c-af69-916f-eb435988b5ec@redhat.com>
- <20170426130020.GM4104@cbox>
- <CAFEAcA8t0Y-UBu_Fx_YTsmnw8zvd4fctTfobdb-akjdx_81PWA@mail.gmail.com>
-Message-ID: <20170426131421.GA50776@lvm>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 26 Apr 2017 15:23:37 +0200
+Subject: [patch] autogain support for bayer10 format (was Re: [patch]
+ propagating controls in libv4l2)
+In-Reply-To: <20170426081330.6ca10e42@vento.lan>
+References: <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
+ <20170414232332.63850d7b@vento.lan>
+ <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
+ <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
+ <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
+ <20170424224724.5bb52382@vento.lan> <20170426105300.GA857@amd>
+ <20170426081330.6ca10e42@vento.lan>
+Message-ID: <20170426132337.GA6482@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 02:01:55PM +0100, Peter Maydell wrote:
-> On 26 April 2017 at 14:00, Christoffer Dall <cdall@linaro.org> wrote:
-> > Alternatively we should mark a pending error notification to the guest
-> > in KVM, so that when the guest boots it gets something like an SError
-> > instead, given that presumably the guest wrote the weird value.  Except
-> > of course if the problem is caused by QEMU fudging with the register
-> > value for the PENDBASER.
+Hi!
+
+> > > I don't see why it would be hard to open files or have threads inside
+> > > a library. There are several libraries that do that already, specially
+> > > the ones designed to be used on multimidia apps.  
+> > 
+> > Well, This is what the libv4l2 says:
+> > 
+> >    This file implements libv4l2, which offers v4l2_ prefixed versions
+> >    of
+> >       open/close/etc. The API is 100% the same as directly opening
+> >    /dev/videoX
+> >       using regular open/close/etc, the big difference is that format
+> >    conversion
+> >    
+> > but if I open additional files in v4l2_open(), API is no longer the
+> > same, as unix open() is defined to open just one file descriptor.
+> > 
+> > Now. There is autogain support in libv4lconvert, but it expects to use
+> > same fd for camera and for the gain... which does not work with
+> > subdevs.
+> > 
+> > Of course, opening subdevs by name like this is not really
+> > acceptable. But can you suggest a method that is?
 > 
-> If we have scope for complaining at the guest we should do it at
-> the point where the guest sets PENDBASER in the first place...
+> There are two separate things here:
 > 
+> 1) Autofoucs for a device that doesn't use subdev API
+> 2) libv4l2 support for devices that require MC and subdev API
 
-Is that what the hardware would have done?
+Actually there are three: 0) autogain. Unfortunately, I need autogain
+first before autofocus has a chance...
 
-Also, userspace could restore a bogus value in the PENDBASER (even
-though the guest wrote something sane), so maybe we should just keep
-this as is and handle it nicely in QEMU?
+And that means... bayer10 support for autogain.
 
-Thanks,
--Christoffer
+Plus, I changed avg_lum to long long. Quick calculation tells me int
+could overflow with few megapixel sensor.
 
-> thanks
-> -- PMM
+Oh, btw http://ytse.tricolour.net/docs/LowLightOptimization.html no
+longer works.
+
+Regards,
+								Pavel
+
+diff --git a/lib/libv4lconvert/processing/autogain.c b/lib/libv4lconvert/processing/autogain.c
+index c6866d6..0b52d0f 100644
+--- a/lib/libv4lconvert/processing/autogain.c
++++ b/lib/libv4lconvert/processing/autogain.c
+@@ -68,6 +71,41 @@ static void autogain_adjust(struct v4l2_queryctrl *ctrl, int *value,
+ 	}
+ }
+ 
++static int get_luminosity_bayer10(uint16_t *buf, const struct v4l2_format *fmt)
++{
++	long long avg_lum = 0;
++	int x, y;
++	
++	buf += fmt->fmt.pix.height * fmt->fmt.pix.bytesperline / 4 +
++		fmt->fmt.pix.width / 4;
++
++	for (y = 0; y < fmt->fmt.pix.height / 2; y++) {
++		for (x = 0; x < fmt->fmt.pix.width / 2; x++)
++			avg_lum += *buf++;
++		buf += fmt->fmt.pix.bytesperline - fmt->fmt.pix.width / 2;
++	}
++	avg_lum /= fmt->fmt.pix.height * fmt->fmt.pix.width / 4;
++	avg_lum /= 4;
++	return avg_lum;
++}
++
++static int get_luminosity_bayer8(unsigned char *buf, const struct v4l2_format *fmt)
++{
++	long long avg_lum = 0;
++	int x, y;
++	
++	buf += fmt->fmt.pix.height * fmt->fmt.pix.bytesperline / 4 +
++		fmt->fmt.pix.width / 4;
++
++	for (y = 0; y < fmt->fmt.pix.height / 2; y++) {
++		for (x = 0; x < fmt->fmt.pix.width / 2; x++)
++			avg_lum += *buf++;
++		buf += fmt->fmt.pix.bytesperline - fmt->fmt.pix.width / 2;
++	}
++	avg_lum /= fmt->fmt.pix.height * fmt->fmt.pix.width / 4;
++	return avg_lum;
++}
++
+ /* auto gain and exposure algorithm based on the knee algorithm described here:
+ http://ytse.tricolour.net/docs/LowLightOptimization.html */
+ static int autogain_calculate_lookup_tables(
+@@ -100,17 +142,16 @@ static int autogain_calculate_lookup_tables(
+ 	switch (fmt->fmt.pix.pixelformat) {
++	case V4L2_PIX_FMT_SGBRG10:
++	case V4L2_PIX_FMT_SGRBG10:
++	case V4L2_PIX_FMT_SBGGR10:
++	case V4L2_PIX_FMT_SRGGB10:
++		avg_lum = get_luminosity_bayer10((void *) buf, fmt);
++		break;
++
+ 	case V4L2_PIX_FMT_SGBRG8:
+ 	case V4L2_PIX_FMT_SGRBG8:
+ 	case V4L2_PIX_FMT_SBGGR8:
+ 	case V4L2_PIX_FMT_SRGGB8:
+-		buf += fmt->fmt.pix.height * fmt->fmt.pix.bytesperline / 4 +
+-			fmt->fmt.pix.width / 4;
+-
+-		for (y = 0; y < fmt->fmt.pix.height / 2; y++) {
+-			for (x = 0; x < fmt->fmt.pix.width / 2; x++)
+-				avg_lum += *buf++;
+-			buf += fmt->fmt.pix.bytesperline - fmt->fmt.pix.width / 2;
+-		}
+-		avg_lum /= fmt->fmt.pix.height * fmt->fmt.pix.width / 4;
++		avg_lum = get_luminosity_bayer8(buf, fmt);
+ 		break;
+ 
+ 	case V4L2_PIX_FMT_RGB24:
+diff --git a/lib/libv4lconvert/processing/libv4lprocessing.c b/lib/libv4lconvert/processing/libv4lprocessing.c
+index b061f50..b98d024 100644
+--- a/lib/libv4lconvert/processing/libv4lprocessing.c
++++ b/lib/libv4lconvert/processing/libv4lprocessing.c
+@@ -164,6 +165,10 @@ void v4lprocessing_processing(struct v4lprocessing_data *data,
+ 	case V4L2_PIX_FMT_SGRBG8:
+ 	case V4L2_PIX_FMT_SBGGR8:
+ 	case V4L2_PIX_FMT_SRGGB8:
++	case V4L2_PIX_FMT_SGBRG10:
++	case V4L2_PIX_FMT_SGRBG10:
++	case V4L2_PIX_FMT_SBGGR10:
++	case V4L2_PIX_FMT_SRGGB10:
+ 	case V4L2_PIX_FMT_RGB24:
+ 	case V4L2_PIX_FMT_BGR24:
+ 		break;
+
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170426/7ba6278a/attachment-0001.sig>
