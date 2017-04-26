@@ -1,59 +1,59 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 26 Apr 2017 11:19:51 +0200
-Subject: [PATCH] reset: sti: Use devm_kcalloc() in
- syscfg_reset_controller_register()
-In-Reply-To: <e10a20a2-cfea-5b42-db3a-41b6eb08d7e4@users.sourceforge.net>
-References: <e10a20a2-cfea-5b42-db3a-41b6eb08d7e4@users.sourceforge.net>
-Message-ID: <1493198391.3653.4.camel@pengutronix.de>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Wed, 26 Apr 2017 14:50:04 +0530
+Subject: [PATCH] iommu/arm-smmu-v3: Increase SMMU CMD queue poll timeout
+In-Reply-To: <20170424170518.GU12323@arm.com>
+References: <1493035176-3633-1-git-send-email-gakula@caviumnetworks.com>
+ <20170424160841.GS12323@arm.com>
+ <CA+sq2CeyVm4pcAVME7OAFVxpOcSJc5CsP0vz3ypDkSxdx0SKnQ@mail.gmail.com>
+ <20170424170518.GU12323@arm.com>
+Message-ID: <CA+sq2CfNYKs8Ub4bWTM1GRGO=06N-Tn7BkehwJE6LpZvC0=R=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-04-26 at 10:05 +0200, SF Markus Elfring wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Wed, 26 Apr 2017 09:50:34 +0200
-> 
-> * A multiplication for the size determination of a memory allocation
->   indicated that an array data structure should be processed.
->   Thus use the corresponding function "devm_kcalloc".
-> 
-> * Replace the specification of a data structure by a pointer dereference
->   to make the corresponding size determination a bit safer according to
->   the Linux coding style convention.
-> 
-> * Delete the local variable "size" which became unnecessary with
->   this refactoring.
-> 
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> ---
->  drivers/reset/sti/reset-syscfg.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/reset/sti/reset-syscfg.c b/drivers/reset/sti/reset-syscfg.c
-> index 9bd57a5eee72..7e0f2aa55ba7 100644
-> --- a/drivers/reset/sti/reset-syscfg.c
-> +++ b/drivers/reset/sti/reset-syscfg.c
-> @@ -145,16 +145,14 @@ static int syscfg_reset_controller_register(struct device *dev,
->  				const struct syscfg_reset_controller_data *data)
->  {
->  	struct syscfg_reset_controller *rc;
-> -	size_t size;
->  	int i, err;
->  
->  	rc = devm_kzalloc(dev, sizeof(*rc), GFP_KERNEL);
->  	if (!rc)
->  		return -ENOMEM;
->  
-> -	size = sizeof(struct syscfg_reset_channel) * data->nr_channels;
-> -
-> -	rc->channels = devm_kzalloc(dev, size, GFP_KERNEL);
-> +	rc->channels = devm_kcalloc(dev, data->nr_channels,
-> +				    sizeof(*rc->channels), GFP_KERNEL);
->  	if (!rc->channels)
->  		return -ENOMEM;
->  
+On Mon, Apr 24, 2017 at 10:35 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Apr 24, 2017 at 10:26:53PM +0530, Sunil Kovvuri wrote:
+>> On Mon, Apr 24, 2017 at 9:38 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Mon, Apr 24, 2017 at 05:29:36PM +0530, Geetha sowjanya wrote:
+>> >> From: Geetha <gakula@cavium.com>
+>> >>
+>> >> When large memory is being unmapped, huge no of tlb invalidation cmds are
+>> >> submitted followed by a SYNC command. This sometimes hits CMD queue full and
+>> >> poll on queue drain is being timedout throwing error message 'CMD_SYNC timeout'.
+>> >>
+>> >> Although there is no functional issue, error message confuses user. Hence increased
+>> >> poll timeout to 500us
+>> >
+>> > Hmm, what are you doing to unmap that much? Is this VFIO teardown? Do you
+>> > have 7c6d90e2bb1a ("iommu/io-pgtable-arm: Fix iova_to_phys for block
+>> > entries") applied?
+>>
+>> Yes it's VFIO teardown and again yes the above fix is applied.
+>> But i didn't get how above fix is related.
+>> TLB invalidation commands are submitted at 'arm_smmu_tlb_inv_range_nosync()'
+>> and it's a loop over granule size.
+>>
+>> 1357         do {
+>> 1358                 arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+>> 1359                 cmd.tlbi.addr += granule;
+>> 1360         } while (size -= granule);
+>>
+>> So if invalidation size is big then huge no of invalidation commands
+>> will be submitted
+>> irrespective of fix that you pointed above, right ?
+>
+> VFIO has some logic to batch up invalidations, but this didn't work properly
+> for us without the fix above. However, I guess you have a huge memory range
+> that's mapped with 2M sections or something, so there are still loads of
+> entries to invalidate.
+>
+> I would much prefer it if VFIO could just teardown the whole address space
+> so that we could do an invalidate all, but there's a chicken-and-egg problem
+> with page accounting iirc.
+>
 
-Thank you, I have applied this to the reset/next branch. The same change
-could be made in the ti-syscon reset driver.
+We can definitely look into this from VFIO perspective but for now I am guessing
+this patch is fine, as no functionality is being changed.
+What do you say ?
 
-regards
-Philipp
+Thanks,
+Sunil.
