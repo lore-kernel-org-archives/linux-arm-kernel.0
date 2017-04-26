@@ -1,57 +1,71 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Apr 2017 10:00:24 +0200
-Subject: [PATCH] ARM: dts: silk: Enable UHS-I SDR-50
-Message-ID: <20170426080024.8391-1-horms+renesas@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 26 Apr 2017 09:01:03 +0100
+Subject: [PATCH] irqchip/mbigen: Fix the clear register offset
+In-Reply-To: <68214147-bc4d-c542-ce40-78f69a63e53d@linaro.org>
+References: <1493086563-36396-1-git-send-email-majun258@huawei.com>
+ <68214147-bc4d-c542-ce40-78f69a63e53d@linaro.org>
+Message-ID: <07081162-ca52-fa46-00e6-e72e1b4fd092@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI1.
+On 26/04/17 04:10, Hanjun Guo wrote:
+> Hi Majun,
+> 
+> On 2017/4/25 10:16, Majun wrote:
+>> From: MaJun <majun258@huawei.com>
+>>
+>> Don't minus reserved interrupts (64) when get the clear register offset,because
+>> the clear register space includes the space of these 64 interrupts.
+> 
+> Could you mention the background that there is a timeout mechanism
+> to clear the register in the mbigen to make the code work even we clear
+> the wrong (and noneffective) register? that will help for review I
+> think.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-* Compile tested only; no access to silk board
+A timeout? So if you don't clear the interrupt in a timely manner, it
+will still bypass the masking? That feels very wrong. How is this
+timeout configured? Can it be entirely disabled?
 
-v3
-* Added missing pinctrl-1 to sdhi0
+> 
+>>
+>> Signed-off-by: MaJun <majun258@huawei.com>
+>> ---
+>>  drivers/irqchip/irq-mbigen.c | 1 -
+>>  1 file changed, 1 deletion(-)
+>>
+>> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+>> index 061cdb8..75818a5 100644
+>> --- a/drivers/irqchip/irq-mbigen.c
+>> +++ b/drivers/irqchip/irq-mbigen.c
+>> @@ -108,7 +108,6 @@ static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
+>>  {
+>>  	unsigned int ofst;
+>>
+>> -	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
+>>  	ofst = hwirq / 32 * 4;
+>>
+>>  	*mask = 1 << (hwirq % 32);
+> 
+> How about following to save more lines of code:
+> 
+> --- a/drivers/irqchip/irq-mbigen.c
+> +++ b/drivers/irqchip/irq-mbigen.c
+> @@ -106,10 +106,7 @@ static inline void 
+> get_mbigen_type_reg(irq_hw_number_t hwirq,
+>   static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
+>                                          u32 *mask, u32 *addr)
+>   {
+> -       unsigned int ofst;
+> -
+> -       hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
+> -       ofst = hwirq / 32 * 4;
+> +       unsigned int ofst = hwirq / 32 * 4;
+> 
+>          *mask = 1 << (hwirq % 32);
+>          *addr = ofst + REG_MBIGEN_CLEAR_OFFSET;
 
-v2
-* Correct mangled addition of sdhi*_pins
----
- arch/arm/boot/dts/r8a7794-silk.dts | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+Well, this is not a code deletion contest... ;-)
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index 4cb5278d104d..8b416c385df7 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -196,6 +196,13 @@
- 	sdhi1_pins: sd1 {
- 		groups = "sdhi1_data4", "sdhi1_ctrl";
- 		function = "sdhi1";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi1_pins_uhs: sd1_uhs {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+		power-source = <1800>;
- 	};
- 
- 	qspi_pins: qspi {
-@@ -338,11 +345,13 @@
- 
- &sdhi1 {
- 	pinctrl-0 = <&sdhi1_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi0_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi1>;
- 	vqmmc-supply = <&vccq_sdhi1>;
- 	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
+	M.
 -- 
-2.12.2.816.g2cccc81164
+Jazz is not dead. It just smells funny...
