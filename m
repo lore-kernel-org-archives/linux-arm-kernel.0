@@ -1,31 +1,27 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Wed, 26 Apr 2017 09:17:50 +0200
-Subject: [PATCH] serial: imx: Enable RTSD only when needed
-In-Reply-To: <CAOMZO5Anz_C-pxPke_mqCtD_D9LBxTRWSk5fAZrr6KaMeMZGqQ@mail.gmail.com>
-References: <20170412133015.23185-1-romain.perier@collabora.com>
- <CAOMZO5Anz_C-pxPke_mqCtD_D9LBxTRWSk5fAZrr6KaMeMZGqQ@mail.gmail.com>
-Message-ID: <77d20ce7-d953-6de1-330a-b7a29811ca8f@collabora.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 26 Apr 2017 09:21:45 +0200
+Subject: [PATCH 2/2] pinctrl: samsung: remove unneeded (void *) casts in
+ of_match_table
+In-Reply-To: <1493156063-8446-3-git-send-email-yamada.masahiro@socionext.com>
+References: <1493156063-8446-1-git-send-email-yamada.masahiro@socionext.com>
+ <1493156063-8446-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAJKOXPdfYjBw=LSfLOJ_CY2+bhY5QA--GbUHfqz3yBuydsO8Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+On Tue, Apr 25, 2017 at 11:34 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> of_device_id::data is an opaque pointer.  No explicit cast is needed.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
+>  drivers/pinctrl/samsung/pinctrl-samsung.c | 20 ++++++++++----------
+>  1 file changed, 10 insertions(+), 10 deletions(-)
 
+Looks correct. It is too late for me for v4.12 so I will pick it up
+for v4.13. For my reference:
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Le 12/04/2017 ? 15:38, Fabio Estevam a ?crit :
-> On Wed, Apr 12, 2017 at 10:30 AM, Romain Perier
-> <romain.perier@collabora.com> wrote:
->> From: Nandor Han <nandor.han@ge.com>
->>
->> Currently, this IRQ is always enabled. Some devices might mux these pins
->> to other I/Os, like I2C. This could lead to spurious interrupts.
->>
->> This commit makes this IRQ optional, by using the field have_rtscts.
->>
->> Signed-off-by: Nandor Han <nandor.han@ge.com>
->> Signed-off-by: Romain Perier <romain.perier@collabora.com>
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-
-No more feedback on this patch ?
-
-Regards,
-Romain
+Best regards,
+Krzysztof
