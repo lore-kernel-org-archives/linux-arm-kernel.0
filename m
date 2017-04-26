@@ -1,57 +1,61 @@
-From: chunhui.li@mediatek.com (Chunhui Li)
-Date: Wed, 26 Apr 2017 11:08:59 +0800
-Subject: [PATCH] fs: seq_buf_alloc use vmalloc for high order allocations
-Message-ID: <20170426030859.15420-1-chunhui.li@mediatek.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 26 Apr 2017 11:10:09 +0800
+Subject: [PATCH] irqchip/mbigen: Fix the clear register offset
+In-Reply-To: <1493086563-36396-1-git-send-email-majun258@huawei.com>
+References: <1493086563-36396-1-git-send-email-majun258@huawei.com>
+Message-ID: <68214147-bc4d-c542-ce40-78f69a63e53d@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "chunhui.li" <chunhui.li@mediatek.com>
+Hi Majun,
 
-Hi Sirs,
+On 2017/4/25 10:16, Majun wrote:
+> From: MaJun <majun258@huawei.com>
+>
+> Don't minus reserved interrupts (64) when get the clear register offset,because
+> the clear register space includes the space of these 64 interrupts.
 
-I sent this patch on 2017.4.5 but got no response, could you please check it? 
-Maybe you have concern about the patch, your comments and suggestions are welcome!  
+Could you mention the background that there is a timeout mechanism
+to clear the register in the mbigen to make the code work even we clear
+the wrong (and noneffective) register? that will help for review I
+think.
 
-Best Regards
+>
+> Signed-off-by: MaJun <majun258@huawei.com>
+> ---
+>  drivers/irqchip/irq-mbigen.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+> index 061cdb8..75818a5 100644
+> --- a/drivers/irqchip/irq-mbigen.c
+> +++ b/drivers/irqchip/irq-mbigen.c
+> @@ -108,7 +108,6 @@ static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
+>  {
+>  	unsigned int ofst;
+>
+> -	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
+>  	ofst = hwirq / 32 * 4;
+>
+>  	*mask = 1 << (hwirq % 32);
 
-For high order allocations, use vmalloc() to reduce physically
-contiguous memory consumption and avoid memory fragmentation issues
+How about following to save more lines of code:
 
-Signed-off-by: chunhui.li <chunhui.li@mediatek.com>
----
- fs/seq_file.c | 16 +++++++---------
- 1 file changed, 7 insertions(+), 9 deletions(-)
+--- a/drivers/irqchip/irq-mbigen.c
++++ b/drivers/irqchip/irq-mbigen.c
+@@ -106,10 +106,7 @@ static inline void 
+get_mbigen_type_reg(irq_hw_number_t hwirq,
+  static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
+                                         u32 *mask, u32 *addr)
+  {
+-       unsigned int ofst;
+-
+-       hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
+-       ofst = hwirq / 32 * 4;
++       unsigned int ofst = hwirq / 32 * 4;
 
-diff --git a/fs/seq_file.c b/fs/seq_file.c
-index ca69fb9..4527e79 100644
---- a/fs/seq_file.c
-+++ b/fs/seq_file.c
-@@ -26,19 +26,17 @@ static void seq_set_overflow(struct seq_file *m)
- static void *seq_buf_alloc(unsigned long size)
- {
- 	void *buf;
--	gfp_t gfp = GFP_KERNEL;
- 
- 	/*
--	 * For high order allocations, use __GFP_NORETRY to avoid oom-killing -
--	 * it's better to fall back to vmalloc() than to kill things.  For small
--	 * allocations, just use GFP_KERNEL which will oom kill, thus no need
--	 * for vmalloc fallback.
--	 */
-+	 * For high order allocations, use vmalloc() to reduce physically
-+	 * contiguous memory usage and avoid memory fragmentation issue.
-+	 * For small allocations, just use GFP_KERNEL
-+	 * which will oom kill, thus no need for vmalloc fallback.
-+	 */
- 	if (size > PAGE_SIZE)
--		gfp |= __GFP_NORETRY | __GFP_NOWARN;
--	buf = kmalloc(size, gfp);
--	if (!buf && size > PAGE_SIZE)
- 		buf = vmalloc(size);
-+	else
-+		buf = kmalloc(size, GFP_KERNEL);
- 	return buf;
- }
- 
--- 
-2.9.2
+         *mask = 1 << (hwirq % 32);
+         *addr = ofst + REG_MBIGEN_CLEAR_OFFSET;
+
+Thanks
+Hanjun
