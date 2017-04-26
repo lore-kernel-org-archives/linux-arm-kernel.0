@@ -1,34 +1,36 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 26 Apr 2017 09:44:34 +0100
-Subject: [PATCH v5 02/22] KVM: arm/arm64: Add GICV3 pending table save API
- documentation
-In-Reply-To: <a5ab9181-8398-f62b-12f1-032961b12c28@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-3-git-send-email-eric.auger@redhat.com>
- <CAFEAcA_0N9Jx5ym+=jjmxAzSaXPjt-m+gW1cq90of8Qhw3LOzg@mail.gmail.com>
- <a5ab9181-8398-f62b-12f1-032961b12c28@redhat.com>
-Message-ID: <CAFEAcA-u-sH+v-Pnr_3gRC3iSJP0ZK68+GqkDzmi3xe1-B2WAQ@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 26 Apr 2017 16:41:02 +0800
+Subject: [RFC] usb: chipidea: set dma_ops for the created ci_hdrc
+ platform_device
+In-Reply-To: <CAK8P3a09fJCexChnoEyBpLK17rHaQTz9G+7iZWRocZGykyxsWA@mail.gmail.com>
+References: <20170425180151.0f03ca0e@xhacker>
+ <CAK8P3a09fJCexChnoEyBpLK17rHaQTz9G+7iZWRocZGykyxsWA@mail.gmail.com>
+Message-ID: <20170426164102.5bd1a48b@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 April 2017 at 09:26, Auger Eric <eric.auger@redhat.com> wrote:
-> On 25/04/2017 12:43, Peter Maydell wrote:
->> When does the -EFAULT return happen? (if the guest points GITS_BASER<n>
->> etc at invalid memory, presumably?)
->
-> Yes that's correct, when GICR_PENDBASER contains a bad GPA.
->
->>  How does the QEMU migration code
->> handle this case? Failing migration because the guest has done something
->> silly doesn't seem too palatable, but trying to avoid that could be
->> more effort than an obscure corner case really merits.
->
-> The kvm_device_access will cause an abort() as for other errors returned
-> by kvm_device_ioctl().
 
-That's pretty nasty. Guests shouldn't be able to provoke QEMU
-into abort()ing, ideally. We don't necessarily have to produce
-a successful migration, but we should at least fail it cleanly.
+On Tue, 25 Apr 2017 13:09:27 +0200 Arnd Bergmann wrote:
 
-thanks
--- PMM
+> On Tue, Apr 25, 2017 at 12:01 PM, Jisheng Zhang <jszhang@marvell.com> wrote:
+> > Hi all,
+> >
+> > After commit 1dccb598df549 ("arm64: simplify dma_get_ops"), the chipidea
+> > driver can't work any more on Marvell Berlin arm64 platforms, the reason
+> > is the created ci_hdrc platform_device's dma_ops is dummy_dma_ops, so all
+> > dma related operations will fail. The fix I can think of would be something
+> > as below:
+> >
+> > And I noticed that dwc3 has the same issue[1], and as pointed out in its
+> > discussion, the patch can't fix None-DT platforms, so could you please
+> > guide me what's the proper fix which can be mainlined?  
+> 
+> I think the right solution is:
+> 
+> - Set the "sysdev" pointer tin the USB device o the device structure that
+>   was created by DT or the legacy board file and remove the manual
+>   setting of dma_mask,  parms and the dma_configure. This should
+>   make everything work as expected in case of DT
+> 
+
+oh yeah! I see a proper fix in linux-next tree, thanks for fixing it.
