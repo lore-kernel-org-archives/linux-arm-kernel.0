@@ -1,156 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 26 Apr 2017 18:12:10 +0100
-Subject: [PATCH] perf evsel: Fix to perf-stat malloc corruption on arm64
- platforms
-In-Reply-To: <20170426145057.GK27156@leverpostej>
-References: <1493198780-25415-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170426145057.GK27156@leverpostej>
-Message-ID: <20170426171208.GC23669@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 26 Apr 2017 18:13:48 +0100
+Subject: [PATCH 1/2] xen/arm, arm64: fix xen_dma_ops after 815dd18
+ "Consolidate get_dma_ops..."
+In-Reply-To: <alpine.DEB.2.10.1704260959440.2875@sstabellini-ThinkPad-X260>
+References: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
+ <20170418142126.GE27592@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.10.1704191023120.31486@sstabellini-ThinkPad-X260>
+ <alpine.DEB.2.10.1704241214100.16723@sstabellini-ThinkPad-X260>
+ <f0667d8c-1c17-8d5f-a5d7-1e0d014e86ec@arm.com>
+ <alpine.DEB.2.10.1704251021380.2875@sstabellini-ThinkPad-X260>
+ <20170426111906.GA9406@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.10.1704260959440.2875@sstabellini-ThinkPad-X260>
+Message-ID: <20170426171348.GE9406@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 03:50:57PM +0100, Mark Rutland wrote:
-> Hi Ganapatrao,
+On Wed, Apr 26, 2017 at 10:00:30AM -0700, Stefano Stabellini wrote:
+> On Wed, 26 Apr 2017, Catalin Marinas wrote:
+> > On Tue, Apr 25, 2017 at 10:22:00AM -0700, Stefano Stabellini wrote:
+> > > On Tue, 25 Apr 2017, Julien Grall wrote:
+> > > > On 24/04/17 20:16, Stefano Stabellini wrote:
+> > > > > Given the outstanding regression we need to fix as soon as possible,
+> > > > > I'll queue these patches on the xentip tree for 4.12.
+> > > > 
+> > > > It looks like there is another rc for 4.11. I am wondering whether you could
+> > > > try to send a pull request to Linus so it can be fixed in 4.11?
+> > > 
+> > > No, especially without input from Russell.
+> > 
+> > You could add a "Fixes" tag to the first patch so that it gets
+> > back-ported to 4.11.x once it hits mainline (the second patch is just
+> > cosmetic):
+> > 
+> > Fixes: 815dd18788fe ("treewide: Consolidate get_dma_ops() implementations")
 > 
-> Thanks for tracking this down.
+> I did add:
 > 
-> On Wed, Apr 26, 2017 at 02:56:20PM +0530, Ganapatrao Kulkarni wrote:
-> > In some cases, ncpus used for perf_evsel__alloc_fd and for
-> > perf_evsel__close are not the same, this is causing memory
-> > overwrite/corruption.
+>   Cc: <stable@vger.kernel.org>        [4.11+]
 > 
-> It would be good if we could enumerate when this occurs.
-> 
-> From what I can tell, the problem occurs when opening a thread-bound
-> event on PMU with a cpus/cpumask in sysfs.
-> 
-> For perf-stat we create events using create_perf_stat_counter(). There
-> we see !target_has_cpu(), so we call perf_evsel__open_per_thread(). Thus
-> perf_evsel__open() is passed NULL cpus, and creates an empty cpu_map. As
-> cpus->nr = 1, we get 1 * nthreads fds allocated, and open events for
-> each of these.
-> 
-> Later, we try to close events using perf_evlist__close(). This doesn't
-> take target_has_cpu() into account, but sees evsel->cpus is non-NULL
-> (since the PMU had a cpus/cpumask file), and tries to close events for
-> cpus->nr * nthreads, and goes out-of-bounds of the fd array.
+> I thought that would be enough to trigger a backport?
 
-Looking further, I introduced this inconsistency in commit:
+Either would do. I didn't see it in the patch you posted, that's why I
+mentioned it.
 
-  3df33eff2ba96be4 ("perf stat: Avoid skew when reading events ")
-
-To fix that, perf-stat needs to control the closing of its events, to
-match what it does when opening them. I've spun the below to do that,
-introducing new helpers to make it clear.
-
-Does that work for you?
-
-Thanks,
-Mark.
-
----->8----
-diff --git a/tools/perf/builtin-stat.c b/tools/perf/builtin-stat.c
-index 13b5499..638aefa 100644
---- a/tools/perf/builtin-stat.c
-+++ b/tools/perf/builtin-stat.c
-@@ -346,6 +346,28 @@ static void read_counters(void)
- 	}
- }
- 
-+/*
-+ * Close all evnt FDs we open in __run_perf_stat() and
-+ * create_perf_stat_counter(), taking care to match the number of threads and CPUs.
-+ *
-+ * Note that perf_evlist__close(evsel_list) is not equivalent, as it doesn't
-+ * take the target into account.
-+ */
-+static void close_counters(void)
-+{
-+	bool per_cpu = target__has_cpu(&target);
-+	struct perf_evsel *evsel;
-+
-+	evlist__for_each_entry(evsel_list, evsel) {
-+		if (per_cpu)
-+			perf_evsel__close_per_cpu(evsel,
-+						  perf_evsel__cpus(evsel));
-+		else
-+			perf_evsel__close_per_thread(evsel,
-+						     evsel_list->threads);
-+	}
-+}
-+
- static void process_interval(void)
- {
- 	struct timespec ts, rs;
-@@ -686,7 +708,7 @@ static int __run_perf_stat(int argc, const char **argv)
- 	 * group leaders.
- 	 */
- 	read_counters();
--	perf_evlist__close(evsel_list);
-+	close_counters();
- 
- 	return WEXITSTATUS(status);
- }
-diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-index ac59710..726ceca 100644
---- a/tools/perf/util/evsel.c
-+++ b/tools/perf/util/evsel.c
-@@ -1670,6 +1670,18 @@ int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
- 	return err;
- }
- 
-+int perf_evsel__open_per_cpu(struct perf_evsel *evsel,
-+			     struct cpu_map *cpus)
-+{
-+	return perf_evsel__open(evsel, cpus, NULL);
-+}
-+
-+int perf_evsel__open_per_thread(struct perf_evsel *evsel,
-+				struct thread_map *threads)
-+{
-+	return perf_evsel__open(evsel, NULL, threads);
-+}
-+
- void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads)
- {
- 	if (evsel->fd == NULL)
-@@ -1679,16 +1691,18 @@ void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads)
- 	perf_evsel__free_fd(evsel);
- }
- 
--int perf_evsel__open_per_cpu(struct perf_evsel *evsel,
--			     struct cpu_map *cpus)
-+void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
-+			       struct cpu_map *cpus)
- {
--	return perf_evsel__open(evsel, cpus, NULL);
-+	int ncpus = cpus ? cpus->nr : 1;
-+	perf_evsel__close(evsel, ncpus, 1);
- }
- 
--int perf_evsel__open_per_thread(struct perf_evsel *evsel,
--				struct thread_map *threads)
-+void perf_evsel__close_per_thread(struct perf_evsel *evsel,
-+				  struct thread_map *threads)
- {
--	return perf_evsel__open(evsel, NULL, threads);
-+	int nthreads = threads ? threads->nr : 1;
-+	perf_evsel__close(evsel, 1, nthreads);
- }
- 
- static int perf_evsel__parse_id_sample(const struct perf_evsel *evsel,
-diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
-index 06ef6f2..02bea43 100644
---- a/tools/perf/util/evsel.h
-+++ b/tools/perf/util/evsel.h
-@@ -252,6 +252,10 @@ int perf_evsel__open_per_thread(struct perf_evsel *evsel,
- 				struct thread_map *threads);
- int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
- 		     struct thread_map *threads);
-+void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
-+			       struct cpu_map *cpus);
-+void perf_evsel__close_per_thread(struct perf_evsel *evsel,
-+				  struct thread_map *threads);
- void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads);
- 
- struct perf_sample;
+-- 
+Catalin
