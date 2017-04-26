@@ -1,194 +1,197 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 26 Apr 2017 14:31:20 +0200
-Subject: [PATCH v5 01/22] KVM: arm/arm64: Add ITS save/restore API
- documentation
-In-Reply-To: <1492164934-988-2-git-send-email-eric.auger@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-2-git-send-email-eric.auger@redhat.com>
-Message-ID: <20170426123120.GL4104@cbox>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Wed, 26 Apr 2017 12:35:46 +0000
+Subject: [PATCH 2/2] dmaengine: Add STM32 MDMA driver
+In-Reply-To: <20170406070805.GG4094@localhost>
+References: <1489417599-31308-1-git-send-email-cedric.madianga@gmail.com>
+ <1489417599-31308-3-git-send-email-cedric.madianga@gmail.com>
+ <20170406070805.GG4094@localhost>
+Message-ID: <d1d92f79-ce3c-e057-7f47-1fd5e42fa5dc@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 14, 2017 at 12:15:13PM +0200, Eric Auger wrote:
-> Add description for how to access ITS registers and how to save/restore
-> ITS tables into/from memory.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> v4 -> v5:
-> - take into account Christoffer's comments
-> - pending table save on GICV3 side now
-> 
-> v3 -> v4:
-> - take into account Peter's comments:
->   - typos
->   - KVM_DEV_ARM_VGIC_GRP_ITS_TABLES kvm_device_attr = 0
->   - add a validity bit in DTE
->   - document all fields in CTE and ITE
->   - document ABI revision
-> - take into account Andre's comments:
->   - document restrictions about GITS_CREADR writing and GITS_IIDR
->   - document -EBUSY error if one or more VCPUS are runnning
->   - document 64b registers only can be accessed with 64b access
-> - itt_addr field matches bits [51:8] of the itt_addr
-> 
-> v1 -> v2:
-> - DTE and ITE now are 8 bytes
-> - DTE and ITE now indexed by deviceid/eventid
-> - use ITE name instead of ITTE
-> - mentions ITT_addr matches bits [51:8] of the actual address
-> - mentions LE layout
-> ---
->  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 99 ++++++++++++++++++++++
->  1 file changed, 99 insertions(+)
-> 
-> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> index 6081a5b..b5f010d 100644
-> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> @@ -32,7 +32,106 @@ Groups:
->      KVM_DEV_ARM_VGIC_CTRL_INIT
->        request the initialization of the ITS, no additional parameter in
->        kvm_device_attr.addr.
-> +
-> +    KVM_DEV_ARM_ITS_SAVE_TABLES
-> +      save the ITS table data into guest RAM, at the location provisioned
-> +      by the guest in corresponding registers/table entries.
-> +
-> +      The layout of the tables in guest memory defines an ABI. The entries
-> +      are laid out in little endian format as described in the last paragraph.
-> +
-> +    KVM_DEV_ARM_ITS_RESTORE_TABLES
-> +      restore the ITS tables from guest RAM to ITS internal structures.
-> +
-> +      The GICV3 must be restored before the ITS and all ITS registers but
-> +      the GITS_CTLR must be restored before restoring the ITS tables.
-> +
-> +      The GITS_IIDR read-only register must also be restored before
-> +      the table restore as the IIDR revision field encodes the ABI revision.
-> +
+On 04/06/2017 09:08 AM, Vinod Koul wrote:
+> On Mon, Mar 13, 2017 at 04:06:39PM +0100, M'boumba Cedric Madianga wrote:
+>> This patch adds the driver for the STM32 MDMA controller.
+>
+> Again pls do describe the controller
 
-what is the expected sequence of operations.  For example, to restore
-the ITS, do I call KVM_DEV_ARM_VGIC_CTRL_INIT first, then restore all
-the memory and registers, and finally call KVM_DEV_ARM_ITS_RESTORE_TABLES?
+OK. I will add a more detail description with V2
 
-Is there any interaction between when you call KVM_DEV_ARM_ITS_RESTORE_TABLES
-and restore GITS_CTLR (which enables the ITS)?
+>
+>> +#include <linux/clk.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/dmaengine.h>
+>> +#include <linux/dma-mapping.h>
+>> +#include <linux/dmapool.h>
+>> +#include <linux/err.h>
+>> +#include <linux/init.h>
+>> +#include <linux/iopoll.h>
+>> +#include <linux/jiffies.h>
+>> +#include <linux/list.h>
+>> +#include <linux/log2.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/of_dma.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/reset.h>
+>> +#include <linux/sched.h>
+>
+> why do you need sched.h, i am sure many of these may not be required, pls
+> check
 
->    Errors:
->      -ENXIO:  ITS not properly configured as required prior to setting
->               this attribute
->      -ENOMEM: Memory shortage when allocating ITS internal data
-> +    -EINVAL: Inconsistent restored data
-> +    -EFAULT: Invalid guest ram access
-> +    -EBUSY:  One or more VCPUS are running
-> +
-> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-> +  Attributes:
-> +      The attr field of kvm_device_attr encodes the offset of the
-> +      ITS register, relative to the ITS control frame base address
-> +      (ITS_base).
-> +
-> +      kvm_device_attr.addr points to a __u64 value whatever the width
-> +      of the addressed register (32/64 bits). 64 bit registers can only
-> +      be accessed with full length.
-> +
-> +      Writes to read-only registers are ignored by the kernel except for:
-> +      - GITS_READR. It needs to be restored otherwise commands in the queue
-> +        will be re-executed after restoring CWRITER. GITS_READR must be restored
-> +        before restoring the GITS_CTLR which is likely to enable the ITS.
-> +        Also it needs to be restored after GITS_CBASER since a write to
-> +        GITS_CBASER resets GITS_CREADR.
-> +      - GITS_IIDR. Its Revision field encodes the table layout ABI revision.
-> +        In the future we might implement direct injection of virtual LPIS.
-> +        This will require an upgrade of the table layout and an evolution of
-> +        the ABI. GITS_IIDR must be restored before the table restoration.
-> +
-> +      For other registers, getting or setting a register has the same
-> +      effect as reading/writing the register on real hardware.
-> +  Errors:
-> +    -ENXIO: Offset does not correspond to any supported register
-> +    -EFAULT: Invalid user pointer for attr->addr
-> +    -EINVAL: Offset is not 64-bit aligned
-> +    -EBUSY: one or more VCPUS are running
+Correct ! not needed. I'll get rid of it in V2
 
+>
+>> +static int stm32_mdma_get_width(struct stm32_mdma_chan *chan,
+>> +				enum dma_slave_buswidth width)
+>> +{
+>> +	switch (width) {
+>> +	case DMA_SLAVE_BUSWIDTH_1_BYTE:
+>> +		return STM32_MDMA_BYTE;
+>> +	case DMA_SLAVE_BUSWIDTH_2_BYTES:
+>> +		return STM32_MDMA_HALF_WORD;
+>> +	case DMA_SLAVE_BUSWIDTH_4_BYTES:
+>> +		return STM32_MDMA_WORD;
+>> +	case DMA_SLAVE_BUSWIDTH_8_BYTES:
+>> +		return STM32_MDMA_DOUBLE_WORD;
+>
+> IIUC we can do this with ffs()
 
-It may be helpful to state the ordering requirements somewhere:
+I don't believe we can do that. This function translates DMA_SLAVE enum 
+into internal register representation.
 
-Restoring the ITS:
-------------------
-Restoring the ITS requires certain things to happen in order.
-Specifically:
- 1. Initialize the ITS (KVM_DEV_ARM_VGIC_CTRL_INIT)
- 2. Restore GITS_IIDR
- 3. Restore GITS_CBASER
- 4. Restore GITS_READR
- 5. Restore remainin registers except GITS_CTLR
- 6. Make sure all guest memory is restored
- 7. Load the ITS table data (KVM_DEV_ARM_ITS_RESTORE_TABLES)
+>
+>
+>> +	default:
+>> +		dev_err(chan2dev(chan), "Dma bus width not supported\n");
+>> +		return -EINVAL;
+>> +	}
+>> +}
+>> +
+>> +static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 tlen)
+>> +{
+>> +	enum dma_slave_buswidth max_width = DMA_SLAVE_BUSWIDTH_8_BYTES;
+>> +
+>> +	while ((buf_len <= max_width || buf_len % max_width ||
+>> +		tlen < max_width) && max_width > DMA_SLAVE_BUSWIDTH_1_BYTE)
+>> +		max_width = max_width >> 1;
+>
+> 1. this is hard to read
+> 2. sound like this can be optimized :)
+>
 
+Ok. I will revise the check if improvements can be done
 
-> +
-> + ITS Table ABI REV0:
-> + -------------------
-> +
-> + Revision 0 of the ABI only supports physical LPIs.
-> +
-> + The device table and ITT are indexed by the deviceid and eventid,
-> + respectively. The collection table is not indexed by collectionid:
-> + CTE are written in the table in the order of collection creation. All
-> + entries are 8 bytes.
-> +
-> + Device Table Entry (DTE):
-> +
-> + bits:     | 63| 62 ... 49 | 48 ... 5 | 4 ... 0 |
-> + values:   | V |   next    | ITT_addr |  Size   |
-> +
-> + where;
-> + - V indicates whether the entry is valid. If not, other fields
-> +   are not meaningful.
-> + - next: equals to 0 if this entry is the last one; otherwise it
-> +   corresponds to the deviceid offset to the next DTE, capped by
-> +   2^14 -1.
-> + - ITT_addr matches bits [51:8] of the ITT address (256B aligned).
+>> +
+>> +	return max_width;
+>> +}
+>> +
+>> +static u32 stm32_mdma_get_best_burst(u32 buf_len, u32 tlen, u32 max_burst,
+>> +				     enum dma_slave_buswidth width)
+>> +{
+>> +	u32 best_burst = max_burst;
+>> +	u32 burst_len = best_burst * width;
+>> +
+>> +	if (buf_len % tlen)
+>> +		return 0;
+>> +
+>> +	while ((tlen < burst_len && best_burst > 1) ||
+>> +	       (burst_len > 0 && tlen % burst_len)) {
+>> +		best_burst = best_burst >> 1;
+>> +		burst_len = best_burst * width;
+>
+> same thing here too
 
-I assume the B here is bytes.  Where does this requirement come from?
+Ok. I will revise the check if improvements can be done
 
-> + - Size specifies the supported number of bits for the deviceid,
-> +   minus one
+>
+>> +
+>> +	return (best_burst > 1) ? best_burst : 0;
+>> +}
+>> +
+>> +static int stm32_mdma_disable_chan(struct stm32_mdma_chan *chan)
+>> +{
+>> +	struct stm32_mdma_device *dmadev = stm32_mdma_get_dev(chan);
+>> +	u32 ccr, cisr, id, reg;
+>> +	int ret;
+>> +
+>> +	id = chan->id;
+>> +	reg = STM32_MDMA_CCR(id);
+>> +
+>> +	/* Disable interrupts */
+>> +	stm32_mdma_clr_bits(dmadev, reg, STM32_MDMA_CCR_IRQ_MASK);
+>> +
+>> +	ccr = stm32_mdma_read(dmadev, reg);
+>> +	if (ccr & STM32_MDMA_CCR_EN) {
+>> +		stm32_mdma_clr_bits(dmadev, reg, STM32_MDMA_CCR_EN);
+>> +
+>> +		/* Ensure that any ongoing transfer has been completed */
+>> +		ret = readl_relaxed_poll_timeout_atomic(
+>
+> why not simple readl
 
-deviceid or eventid?
+When Channel enable(CCR_EN) is reset by SW, it is recommended to wait 
+for the CTCIF (Channel Transfer Complete interrupt flag) = 1, in order 
+to ensure that any ongoing buffer transfer has been completed, before 
+reprogramming the channel.
+Moreover since this function might be called under interruption context 
+(a DMA Client may call dmaengine_terminate_all() for instance) function 
+cannot allow sleep. Timeout is for cases when IP is stuck and channel 
+cannot be disabled
 
-> +
-> + Collection Table Entry (CTE):
-> +
-> + bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
-> + values:   | V |    RES0    |  RDBase   |    ICID     |
-> +
-> + where:
-> + - V indicates whether the entry is valid. If not, other fields are
-> +   not meaningful.
-> + - RES0: reserved field with Should-Be-Zero-or-Preserved behavior.
-> + - RDBase is the PE number (GICR_TYPER.Processor_Number semantic),
-> + - ICID is the collection ID
-> +
-> + Interrupt Translation Entry (ITE):
-> +
-> + bits:     | 63 ... 48 | 47 ... 16 | 15 ... 0 |
-> + values:   |    next   |   pINTID  |  ICID    |
-> +
-> + where:
-> + - next: equals to 0 if this entry is the last one; otherwise it corresponds
-> +   to the eventid offset to the next ITE capped by 2^16 -1.
-> + - pINTID is the physical LPI ID; if zero, it means the entry is not valid
-> +   and other fields are not meaningful.
-> + - ICID is the collection ID
-> +
-> -- 
-> 2.5.5
-> 
+>> +static void stm32_mdma_set_dst_bus(struct stm32_mdma_device *dmadev, u32 *ctbr,
+>> +				   u32 dst_addr)
+>> +{
+>> +	u32 mask;
+>> +	int i;
+>> +
+>> +	/* Check if memory device is on AHB or AXI */
+>> +	*ctbr &= ~STM32_MDMA_CTBR_DBUS;
+>> +	mask = dst_addr & 0xF0000000;
+>> +	for (i = 0; i < dmadev->nr_ahb_addr_masks; i++) {
+>> +		if (mask == dmadev->ahb_addr_masks[i]) {
+>> +			*ctbr |= STM32_MDMA_CTBR_DBUS;
+>> +			break;
+>> +		}
+>> +	}
+>> +}
+>> +
+>> +static void stm32_mdma_set_src_bus(struct stm32_mdma_device *dmadev, u32 *ctbr,
+>> +				   u32 src_addr)
+>> +{
+>> +	u32 mask;
+>> +	int i;
+>> +
+>> +	/* Check if memory device is on AHB or AXI */
+>> +	*ctbr &= ~STM32_MDMA_CTBR_SBUS;
+>> +	mask = src_addr & 0xF0000000;
+>> +	for (i = 0; i < dmadev->nr_ahb_addr_masks; i++) {
+>> +		if (mask == dmadev->ahb_addr_masks[i]) {
+>> +			*ctbr |= STM32_MDMA_CTBR_SBUS;
+>> +			break;
+>> +		}
+>> +	}
+>
+> these too look awfully same..
 
-Besides the minor suggestions above:
+Ok. I will create a common function then.
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+>
+>> +static int __init stm32_mdma_init(void)
+>> +{
+>> +	return platform_driver_probe(&stm32_mdma_driver, stm32_mdma_probe);
+>> +}
+>> +
+>> +subsys_initcall(stm32_mdma_init);
+>
+> why subsys?
+>
+
+subsys_initcall level is to ensure MDMA is going to be probed before its 
+clients
+
+>> --
+>> 1.9.1
+>>
+>
