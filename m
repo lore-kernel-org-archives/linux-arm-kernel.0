@@ -1,58 +1,110 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Apr 2017 12:17:52 +0100
-Subject: [RFC/RFT PATCH 01/18] PCI: Initialize bridge release function at
- bridge allocation
-In-Reply-To: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
-References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170426111809.19922-2-lorenzo.pieralisi@arm.com>
+Date: Wed, 26 Apr 2017 12:17:51 +0100
+Subject: [RFC/RFT PATCH 00/18] PCI: ARM/ARM64: remove pci_fixup_irqs() usage
+Message-ID: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The introduction of pci_register_host_bridge() kernel interface
-allows PCI host controller drivers to create the struct pci_host_bridge
-object, initialize it and register it with the kernel so that its
-corresponding PCI bus can be scanned and its devices probed.
+Current pci_fixup_irqs() usage on ARM/ARM64 host controller drivers is
+flawed in that pci_fixup_irqs() allocates IRQs for all PCI devices present
+in a system; those PCI devices possibly belong to different PCI bus trees
+(and possibly rooted at different host bridges) and may well be enabled
+(ie probed and bound to a driver) by the time pci_fixup_irqs() is called
+when probing a given host bridge driver.
 
-The host bridge device release function pci_release_host_bridge_dev is a
-static function common for all struct pci_host_bridge allocated objects,
-so in its current form cannot be used by PCI host bridge controllers
-drivers to initialize the allocated struct pci_host_bridge, which
-leaves struct pci_host_bridge devices release function uninitialized.
+Furthermore, current kernel code relying on pci_fixup_irqs() to
+assign legacy PCI IRQs to devices does not work at all for
+hotplugged devices in that the code carrying out the IRQ fixup
+is called at host bridge driver probe time, which just cannot take
+into account devices hotplugged after system has booted.
 
-Since pci_release_host_bridge_dev is a function common to all PCI
-host bridge objects, initialize it in pci_alloc_host_bridge() (ie
-common host bridge allocation interface) so that all struct
-pci_host_bridge objects have their release function initialized by
-default at allocation time, removing the need for exporting the
-common pci_release_host_bridge_dev function to other compilation
-units.
+By leveraging Matthew Minter's patch series (and its purpose):
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+http://lkml.kernel.org/r/1445576642-29624-2-git-send-email-matt at masarand.com
+
+this series[1] adds IRQs mapping and swizzling primitives to
+the struct pci_host_bridge which allows IRQs to be allocated for
+for a device at probe time with host bridge specific functions,
+fixing the aforementioned limitations.
+
+Current series remove pci_fixup_irqs() usage on ARM/ARM64; removal
+can be extended to other architectures provided the IRQs map/swizzle
+functions are set-up properly in the respective host bridges
+set-up/probe paths.
+
+Tested on kvmtool with PCI host generic.
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git pci/pci-fixup-irqs-removal
+
 Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Pratyush Anand <pratyush.anand@gmail.com>
+Cc: Jingoo Han <jingoohan1@gmail.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
----
- drivers/pci/probe.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Cc: Rob Herring <robh@kernel.org>
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Mingkai Hu <mingkai.hu@freescale.com>
+Cc: Tanmay Inamdar <tinamdar@apm.com>
+Cc: Murali Karicheri <m-karicheri2@ti.com>
+Cc: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
+Cc: Wenrui Li <wenrui.li@rock-chips.com>
+Cc: Shawn Lin <shawn.lin@rock-chips.com>
+Cc: Minghuan Lian <minghuan.Lian@freescale.com>
+Cc: Matthew Minter <matt@masarand.com>
+Cc: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Joao Pinto <Joao.Pinto@synopsys.com>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: Stanimir Varbanov <svarbanov@mm-sol.com>
+Cc: Zhou Wang <wangzhou1@hisilicon.com>
+Cc: Roy Zang <tie-fei.zang@freescale.com>
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index dfc9a27..d0ddb69 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -531,6 +531,7 @@ struct pci_host_bridge *pci_alloc_host_bridge(size_t priv)
- 		return NULL;
- 
- 	INIT_LIST_HEAD(&bridge->windows);
-+	bridge->dev.release = pci_release_host_bridge_dev;
- 
- 	return bridge;
- }
-@@ -2317,7 +2318,6 @@ static struct pci_bus *pci_create_root_bus_msi(struct device *parent,
- 		return NULL;
- 
- 	bridge->dev.parent = parent;
--	bridge->dev.release = pci_release_host_bridge_dev;
- 
- 	list_splice_init(resources, &bridge->windows);
- 	bridge->sysdata = sysdata;
+Lorenzo Pieralisi (13):
+  PCI: Initialize bridge release function at bridge allocation
+  PCI: Add pci_free_host_bridge interface
+  PCI: Introduce pci_scan_root_bus_bridge()
+  ARM: PCI: bios32: Convert PCI scan API to pci_scan_root_bus_bridge()
+  ARM: PCI: dove: Convert PCI scan API to pci_scan_root_bus_bridge()
+  ARM: PCI: iop13xx: Convert PCI scan API to pci_scan_root_bus_bridge()
+  ARM: PCI: orion5x: Convert PCI scan API to pci_scan_root_bus_bridge()
+  PCI: designware: Convert PCI scan API to pci_scan_root_bus_bridge()
+  PCI: aardvark: Convert PCI scan API to pci_scan_root_bus_bridge()
+  PCI: rcar: Convert PCI scan API to pci_scan_root_bus_bridge()
+  PCI: Remove pci_scan_root_bus_msi()
+  ARM: PCI: Remove pci_fixup_irqs() call for bios32 host controllers
+  ARM/ARM64: PCI: Drop pci_fixup_irqs() usage for DT based host
+    controllers
+
+Matthew Minter (5):
+  PCI: Build setup-irq.o on all arches
+  PCI: Add IRQ mapping function pointers to pci_host_bridge struct
+  PCI: Add pci_assign_irq() function and have pci_fixup_irqs() use it
+  OF/PCI: Update of_irq_parse_and_map_pci() comment
+  PCI: Add a call to pci_assign_irq() in pci_device_probe()
+
+ arch/arm/kernel/bios32.c               | 63 ++++++++++++++++++++++-----
+ arch/arm/mach-dove/pcie.c              | 36 ++++++++++++----
+ arch/arm/mach-iop13xx/pci.c            | 36 +++++++++++++---
+ arch/arm/mach-orion5x/pci.c            | 47 ++++++++++++++------
+ arch/arm64/kernel/pci.c                | 32 +++++++++++---
+ drivers/of/of_pci_irq.c                |  3 +-
+ drivers/pci/Makefile                   | 17 +-------
+ drivers/pci/dwc/pcie-designware-host.c | 41 +++++++++---------
+ drivers/pci/host/pci-aardvark.c        | 33 +++++++++++---
+ drivers/pci/host/pci-host-common.c     |  4 --
+ drivers/pci/host/pci-tegra.c           |  3 +-
+ drivers/pci/host/pci-versatile.c       |  1 -
+ drivers/pci/host/pcie-altera.c         |  1 -
+ drivers/pci/host/pcie-iproc.c          | 43 ++++++++++++-------
+ drivers/pci/host/pcie-rcar.c           | 28 +++++++-----
+ drivers/pci/host/pcie-xilinx.c         |  3 --
+ drivers/pci/pci-driver.c               |  2 +
+ drivers/pci/probe.c                    | 78 ++++++++++++++++++++++------------
+ drivers/pci/setup-irq.c                | 45 +++++++++++++++-----
+ include/linux/pci.h                    |  9 ++--
+ 20 files changed, 363 insertions(+), 162 deletions(-)
+
 -- 
 2.10.0
