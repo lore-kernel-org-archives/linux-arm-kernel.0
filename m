@@ -1,45 +1,47 @@
-From: alexander.duyck@gmail.com (Alexander Duyck)
-Date: Wed, 26 Apr 2017 09:18:33 -0700
-Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
- ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
-In-Reply-To: <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
-References: <20170401.112603.1991545644693496714.davem@davemloft.net>
- <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
- <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
- <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
- <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
-Message-ID: <CAKgT0Uc4L=GgYbpO-Fm9OfN+_fLypbDP1c+X4T_ta90ecQiyGQ@mail.gmail.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Wed, 26 Apr 2017 18:52:19 +0200
+Subject: [PATCH] soc: mediatek: Use devm_kcalloc() in init_scp()
+Message-ID: <bb0b7d0d-a2e7-3415-2c15-961a05493e08@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 2:26 AM, Ding Tianhong <dingtianhong@huawei.com> wrote:
-> Hi Amir:
->
-> It is really glad to hear that the mlx5 will support RO mode this year, if so, do you agree that enable it dynamic by ethtool -s xxx,
-> we have try it several month ago but there was only one drivers would use it at that time so the maintainer against it, it mlx5 would support RO,
-> we could try to restart this solution, what do you think about it. :)
->
-> Thanks
-> Ding
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Wed, 26 Apr 2017 18:33:15 +0200
 
-Hi Ding,
+Multiplications for the size determination of memory allocations
+indicated that array data structures should be processed.
+Thus use the corresponding function "devm_kcalloc".
 
-Enabing relaxed ordering really doesn't have any place in ethtool. It
-is a PCIe attribute that you are essentially wanting to enable.
+This issue was detected by using the Coccinelle software.
 
-It might be worth while to take a look at updating the PCIe code path
-to handle this. Really what we should probably do is guarantee that
-the architectures that need relaxed ordering are setting it in the
-PCIe Device Control register and that the ones that don't are clearing
-the bit. It's possible that this is already occurring, but I don't
-know the state of handling those bits is in the kernel. Once we can
-guarantee that we could use that to have the drivers determine their
-behavior in regards to relaxed ordering. For example in the case of
-igb/ixgbe we could probably change the behavior so that it will bey
-default try to use relaxed ordering but if it is not enabled in PCIe
-Device Control register the hardware should not request to use it. It
-would simplify things in the drivers and allow for each architecture
-to control things as needed in their PCIe code.
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/soc/mediatek/mtk-scpsys.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-- Alex
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index beb79162369a..9abf2b067ec6 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -365,15 +365,14 @@ static struct scp *init_scp(struct platform_device *pdev,
+ 	if (IS_ERR(scp->base))
+ 		return ERR_CAST(scp->base);
+ 
+-	scp->domains = devm_kzalloc(&pdev->dev,
+-				sizeof(*scp->domains) * num, GFP_KERNEL);
++	scp->domains = devm_kcalloc(&pdev->dev, num, sizeof(*scp->domains),
++				    GFP_KERNEL);
+ 	if (!scp->domains)
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	pd_data = &scp->pd_data;
+-
+-	pd_data->domains = devm_kzalloc(&pdev->dev,
+-			sizeof(*pd_data->domains) * num, GFP_KERNEL);
++	pd_data->domains = devm_kcalloc(&pdev->dev, num,
++					sizeof(*pd_data->domains), GFP_KERNEL);
+ 	if (!pd_data->domains)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-- 
+2.12.2
