@@ -1,38 +1,68 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 26 Apr 2017 09:48:33 +0530
-Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
-In-Reply-To: <CAOMZO5AJQ2TJvyuiBLLeS9zZMufMxyuNw+MA+NtZPCzzWJ0NXA@mail.gmail.com>
-References: <CAOMZO5BpAsJAKv-p=WPevUnx71fxbLtunJe-0ijVT7T9m7AMSQ@mail.gmail.com>
- <20170424114343.GS26900@vireshk-i7>
- <CAOMZO5AkTKjU5kw0gszLVdVOc_Sb_sWhr65heE==kyw=5rcN-g@mail.gmail.com>
- <20170425050633.GV26900@vireshk-i7>
- <CAOMZO5BgjgxGhJ7zGV-gjs0QHmJMgkNryFqTYA=vGPz8KWDijg@mail.gmail.com>
- <20170425111301.GC1928@vireshk-i7>
- <CAHCN7xJVicKuAc0dDbzBg4h2d1UUP66iKkSsWN_f=rPd4mOZSw@mail.gmail.com>
- <CAOMZO5CPtKAh6wMJ06BO4YFLPmOTvrpv5Q_3RJoj9dup46ukTQ@mail.gmail.com>
- <CAHCN7x+6KwOZdC1MaNQGdXWFjJ18hYp3kc73JADDMC4DOFn+yQ@mail.gmail.com>
- <CAOMZO5AJQ2TJvyuiBLLeS9zZMufMxyuNw+MA+NtZPCzzWJ0NXA@mail.gmail.com>
-Message-ID: <20170426041833.GD1928@vireshk-i7>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 26 Apr 2017 06:51:53 +0100
+Subject: [GIT PULL] Immutable branch between MFD and IIO due for the v4.12
+ merge window
+In-Reply-To: <20170424110239.cv5nylgvymhwvg4w@dell>
+References: <20170404063441.7656-1-quentin.schulz@free-electrons.com>
+ <20170411100528.2zif3fyi7uoyw33n@dell>
+ <0f30afec-ff42-e125-96d6-35893324f7ef@kernel.org>
+ <20170424110239.cv5nylgvymhwvg4w@dell>
+Message-ID: <64e7d5f8-0134-9a1c-6e2c-3e67cbafb01d@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25-04-17, 12:24, Fabio Estevam wrote:
-> On Tue, Apr 25, 2017 at 11:35 AM, Adam Ford <aford173@gmail.com> wrote:
+On 24/04/17 12:02, Lee Jones wrote:
+> On Fri, 14 Apr 2017, Jonathan Cameron wrote:
 > 
-> > I have a touch screen (using tsc2004 touch controller) on my board.  I
-> > can run some tests if you tell me how you're able to reproduce your
-> > issue.  I can at least confirm whether or not I see it too.  I won't
-> > be able to do it until later tonight or tomorrow however.
+>> On 11/04/17 11:05, Lee Jones wrote:
+>>> Enjoy!
+>>>
+>>> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+>>>
+>>>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-iio-v4.12
+>>>
+>>> for you to fetch changes up to f2499ab450d3052097ba53a7d763f767935c0c59:
+>>>
+>>>   iio: adc: add support for X-Powers AXP20X and AXP22X PMICs ADCs (2017-04-11 11:02:33 +0100)
+>>>
+>>> ----------------------------------------------------------------
+>>> Immutable branch between MFD and IIO due for the v4.12 merge window
+>>>
+>>> ----------------------------------------------------------------
+>>> Quentin Schulz (1):
+>>>       iio: adc: add support for X-Powers AXP20X and AXP22X PMICs ADCs
+>>>
+>>>  drivers/iio/adc/Kconfig      |  10 +
+>>>  drivers/iio/adc/Makefile     |   1 +
+>>>  drivers/iio/adc/axp20x_adc.c | 617 +++++++++++++++++++++++++++++++++++++++++++
+>>>  3 files changed, 628 insertions(+)
+>>>  create mode 100644 drivers/iio/adc/axp20x_adc.c
+>>>
+>> Hi Lee, 
+>>
+>> Thanks for doing this, but the reason it was going to go through your
+>> tree in the first place was a dependency on
+>> commit 4707274714ef ("mfd: axp20x: Correct name of temperature data ADC registers")
+>>
+>> Not present in the immutable branch.
+>>
+>> There isn't much time for anything else going on around this driver though
+>> so other than a possible merge conflict on the Kconfig and Makefile shouldn't
+>> matter if this just goes through mfd. (famous last words ;)
 > 
-> Just run:
+> It's not as though you committed it to text and sent it out to a
+> public mailing list for us all to reference though is it?  Doh!
 > 
-> evtest /dev/input/eventX to capture the touchscreen events and keep
-> touching the screen.
-> 
-> After some random time (1-2 minutes) evtest will stop capturing the events.
+It came up in the original discussions (which was the only reason I knew).
+Chen-Yu Tsai in email:
 
-And set the governor to Powersave to make sure we are running on
-lowest OPP.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/495789.html
 
--- 
-viresh
+Quentin did put a link in his request that you take it, but removing the
+need to click would have been better!
+
+Jonathan
