@@ -1,84 +1,166 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 27 Apr 2017 00:51:50 +0200
-Subject: [patch] autogain support for bayer10 format (was Re: [patch]
- propagating controls in libv4l2)
-In-Reply-To: <cedfd68d-d0fe-6fa8-2676-b61f3ddda652@gmail.com>
-References: <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
- <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
- <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
- <20170424224724.5bb52382@vento.lan> <20170426105300.GA857@amd>
- <20170426081330.6ca10e42@vento.lan> <20170426132337.GA6482@amd>
- <cedfd68d-d0fe-6fa8-2676-b61f3ddda652@gmail.com>
-Message-ID: <20170426225150.GA4188@amd>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 26 Apr 2017 16:28:44 -0700
+Subject: Duplicate .plt sections warning with CONFIG_ARM_MODULE_PLTS
+In-Reply-To: <CAKv+Gu8h9-MRKm6gxn79voW6sR0EQ5e2zNLRwh2vfew8Sfr42w@mail.gmail.com>
+References: <1fb01fb6-3306-1d96-1da0-5b732555dfaf@gmail.com>
+ <CAKv+Gu8h9-MRKm6gxn79voW6sR0EQ5e2zNLRwh2vfew8Sfr42w@mail.gmail.com>
+Message-ID: <6bd5005b-61d1-d2f9-fb0f-5ce200bfffd9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> >>There are two separate things here:
-> >>
-> >>1) Autofoucs for a device that doesn't use subdev API
-> >>2) libv4l2 support for devices that require MC and subdev API
-> >
-> >Actually there are three: 0) autogain. Unfortunately, I need autogain
-> >first before autofocus has a chance...
-> >
-> >And that means... bayer10 support for autogain.
-> >
-> >Plus, I changed avg_lum to long long. Quick calculation tells me int
-> >could overflow with few megapixel sensor.
-> >
-> >Oh, btw http://ytse.tricolour.net/docs/LowLightOptimization.html no
-> >longer works.
-> >
-> >Regards,
-> >								Pavel
-> >
-> >diff --git a/lib/libv4lconvert/processing/autogain.c b/lib/libv4lconvert/processing/autogain.c
-> >index c6866d6..0b52d0f 100644
-> >--- a/lib/libv4lconvert/processing/autogain.c
-> >+++ b/lib/libv4lconvert/processing/autogain.c
-> >@@ -68,6 +71,41 @@ static void autogain_adjust(struct v4l2_queryctrl *ctrl, int *value,
-> > 	}
-> > }
-> >
-> >+static int get_luminosity_bayer10(uint16_t *buf, const struct v4l2_format *fmt)
-> >+{
-> >+	long long avg_lum = 0;
-> >+	int x, y;
-> >+	
-> >+	buf += fmt->fmt.pix.height * fmt->fmt.pix.bytesperline / 4 +
-> >+		fmt->fmt.pix.width / 4;
-> >+
-> >+	for (y = 0; y < fmt->fmt.pix.height / 2; y++) {
-> >+		for (x = 0; x < fmt->fmt.pix.width / 2; x++)
+On 04/26/2017 12:33 AM, Ard Biesheuvel wrote:
+> On 26 April 2017 at 00:35, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> Hi Ard,
+>>
+>> While using CONFIG_ARM_MODULES_PLTS=y along with a large kernel module,
+>> I was able to have the kernel/module.c::add_sect_attrs() to complain
+>> about duplicate .plt sections found, each section gets its own sysfs
+>> attribute created under /sys/module/<modname>/sections/<sectname>
+>>
+>> And indeed the module has the following section headers and contents
+>> (see below). Is this something that looks legit or should we patch
+>> kernel/module.c to detect such duplicates and generate unique sysfs
+>> attribute section names instead? There does not appear to be any
+>> functional issue with that.
+>>
 > 
-> That would take some time :). AIUI, we have NEON support in ARM kernels
-> (CONFIG_KERNEL_MODE_NEON), I wonder if it makes sense (me) to convert the
-> above loop to NEON-optimized when it comes to it? Are there any drawbacks in
-> using NEON code in kernel?
+> Does it happen with a clean build?
 
-Well, thanks for offer. This is actualy libv4l2.
+Yes it does, it was not quite the problem see below.
 
-But I'd say NEON conversion is not neccessary anytime soon. First,
-this is just trying to get average luminosity. We can easily skip
-quite a lot of pixels, and still get reasonable answer.
+> The .plt/.init.plt sections are
+> declared in the linker scripts, and so no module object should have
+> any such sections until the relocatable link occurs that combines them
+> all into a .ko, and it is at this point that these sections are
+> declared.
 
-Second, omap3isp actually has a hardware block computing statistics
-for us. We just don't use it for simplicity.
+It turned out that the module build I was debugging was built in a
+strange way with a first step producing foo.o_shipped, which (semi)
+manually pulling into the kernel's linker scripts, and then,
+foo.o_shipped was used to link foo.ko which then again got the linker
+scripts from the kernel. This is how we ended up with the two .plt and
+two .init.plt sections being present in foo.ko.
 
-(But if you want to play with camera, I'll get you patches; there's
-ton of work to be done, both kernel and userspace :-).
+Thanks!
 
-Regards,
-								Pavel
+> 
+> 
+>> Thanks!
+>>
+>> Contents of section .plt:
+>>  0000 00                                   .
+>> Contents of section .init.plt:
+>>  0001 00                                   .
+>> Contents of section .plt:
+>>  0000 00
+>>
+>> Section Headers:
+>>   [Nr] Name              Type            Addr     Off    Size   ES Flg
+>> Lk Inf Al
+>>   [ 0]                   NULL            00000000 000000 000000 00
+>> 0   0  0
+>>   [ 1] .text             PROGBITS        00000000 000034 48d360 00  AX
+>> 0   0  4
+>>   [ 2] .rel.text         REL             00000000 68d0c4 14a980 08
+>> 48   1  4
+>>   [ 3] .text.unlikely    PROGBITS        00000000 48d394 001a30 00  AX
+>> 0   0  4
+>>   [ 4] .rel.text.unlikel REL             00000000 7d7a44 000700 08
+>> 48   3  4
+>>   [ 5] .rodata           PROGBITS        00000000 48edc8 0b1fa4 00   A
+>> 0   0  8
+>>   [ 6] .rel.rodata       REL             00000000 7d8144 025938 08
+>> 48   5  4
+>>   [ 7] .rodata.str1.1    PROGBITS        00000000 540d6c 10b88a 01 AMS
+>> 0   0  1
+>>   [ 8] .ARM.extab.text.u PROGBITS        00000000 64c5f8 000060 00   A
+>> 0   0  4
+>>   [ 9] .ARM.exidx.text.u ARM_EXIDX       00000000 64c658 000090 00  AL
+>> 3   0  4
+>>   [10] .rel.ARM.exidx.te REL             00000000 7fda7c 000148 08
+>> 48   9  4
+>>   [11] __ksymtab_strings PROGBITS        00000000 64c6e8 00da64 00   A
+>> 0   0  1
+>>   [12] .modinfo          PROGBITS        00000000 65a14c 0000a0 00   A
+>> 0   0  4
+>>   [13] __param           PROGBITS        00000000 65a1ec 000020 00   A
+>> 0   0  4
+>>   [14] .rel__param       REL             00000000 7fdbc4 000030 08
+>> 48  13  4
+>>   [15] .alt.smp.init     PROGBITS        00000000 65a20c 000028 00   A
+>> 0   0  4
+>>   [16] .rel.alt.smp.init REL             00000000 7fdbf4 000028 08
+>> 48  15  4
+>>   [17] __ex_table        PROGBITS        00000000 65a238 000008 00   A
+>> 0   0  8
+>>   [18] .rel__ex_table    REL             00000000 7fdc1c 000010 08
+>> 48  17  4
+>>   [19] .ARM.extab        PROGBITS        00000000 65a240 002730 00   A
+>> 0   0  4
+>>   [20] .ARM.exidx        ARM_EXIDX       00000000 65c970 01b658 00  AL
+>> 1   0  4
+>>   [21] .rel.ARM.exidx    REL             00000000 7fdc2c 01f798 08
+>> 48  20  4
+>>   [22] __versions        PROGBITS        00000000 677fc8 001840 00   A
+>> 0   0  4
+>>   [23] .note.gnu.build-i NOTE            00000000 679808 000048 00   A
+>> 0   0  4
+>>   [24] .plt              PROGBITS        00000000 679850 000001 00  WA
+>> 0   0  1
+>>   [25] .init.plt         PROGBITS        00000001 679851 000001 00  WA
+>> 0   0  1
+>>   [26] .plt              PROGBITS        00000000 679852 000001 00  WA
+>> 0   0  1
+>>   [27] .data             PROGBITS        00000000 679854 0039e8 00  WA
+>> 0   0  4
+>>   [28] .rel.data         REL             00000000 81d3c4 001ca0 08
+>> 48  27  4
+>>   [29] .init.plt         PROGBITS        00000000 67d23c 000001 00  WA
+>> 0   0  1
+>>   [30] .gnu.linkonce.thi PROGBITS        00000000 67d240 000168 00  WA
+>> 0   0  4
+>>   [31] .rel.gnu.linkonce REL             00000000 81f064 000010 08
+>> 48  30  4
+>>   [32] .bss              NOBITS          00000000 67d3a8 04dbac 00  WA
+>> 0   0  8
+>>   [33] .comment          PROGBITS        00000000 67d3a8 009106 01  MS
+>> 0   0  1
+>>   [34] .note.GNU-stack   PROGBITS        00000000 6864ae 000000 00   X
+>> 0   0  1
+>>   [35] .ARM.attributes   ARM_ATTRIBUTES  00000000 6864ae 000031 00
+>> 0   0  1
+>>   [36] __ksymtab         PROGBITS        00000000 6864e0 0036b8 00   A
+>> 0   0  4
+>>   [37] .rel__ksymtab     REL             00000000 81f074 006d70 08
+>> 48  36  4
+>>   [38] __kcrctab         PROGBITS        00000000 689b98 001b5c 00   A
+>> 0   0  4
+>>   [39] .rel__kcrctab     REL             00000000 825de4 0036b8 08
+>> 48  38  4
+>>   [40] .debug_info       PROGBITS        00000000 68b6f4 000490 00
+>> 0   0  1
+>>   [41] .rel.debug_info   REL             00000000 82949c 000408 08
+>> 48  40  4
+>>   [42] .debug_abbrev     PROGBITS        00000000 68bb84 0000f8 00
+>> 0   0  1
+>>   [43] .debug_aranges    PROGBITS        00000000 68bc7c 000018 00
+>> 0   0  1
+>>   [44] .rel.debug_arange REL             00000000 8298a4 000008 08
+>> 48  43  4
+>>   [45] .debug_line       PROGBITS        00000000 68bc94 000190 00
+>> 0   0  1
+>>   [46] .debug_str        PROGBITS        00000000 68be24 000900 01  MS
+>> 0   0  1
+>>   [47] .shstrtab         STRTAB          00000000 68c724 0001cd 00
+>> 0   0  1
+>>   [48] .symtab           SYMTAB          00000000 8298ac 0ffc50 10
+>> 49 49732  4
+>>   [49] .strtab           STRTAB          00000000 9294fc 0f5791 00
+>> 0   0  1
+>>
+>> --
+>> Florian
+
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170427/664aa13a/attachment.sig>
+Florian
