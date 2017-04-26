@@ -1,540 +1,91 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 26 Apr 2017 17:26:14 +0800
-Subject: [PATCH v2 30/30] arm: dts: mt7623: add dts file for Bananapi R2
- (BPI-R2) board
-In-Reply-To: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
-References: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
-Message-ID: <1493198774-4478-31-git-send-email-sean.wang@mediatek.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Wed, 26 Apr 2017 17:26:37 +0800
+Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
+ ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+In-Reply-To: <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
+References: <20170401.112603.1991545644693496714.davem@davemloft.net>
+ <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
+ <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
+ <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
+Message-ID: <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Hi Amir:
 
-Add support for the Bananapi R2 (BPI-R2) development board from
-Sinovoip. Detailed hardware information for BPI-R2 which could be
-found on http://www.banana-pi.org/r2.html
+It is really glad to hear that the mlx5 will support RO mode this year, if so, do you agree that enable it dynamic by ethtool -s xxx,
+we have try it several month ago but there was only one drivers would use it at that time so the maintainer against it, it mlx5 would support RO,
+we could try to restart this solution, what do you think about it. :)
 
-The patch currently only adds Mediatek GMAC, MT7530 Switch, the crypto
-engine, USB, IR, I2S, I2C, UART, SPI, PWM, GPIO keys, GPIO LEDs and
-PMIC LEDs. As to the other missing hardware and peripherals, they would
-be added and integrated continuously.
+Thanks
+Ding
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- Documentation/devicetree/bindings/arm/mediatek.txt |   2 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      | 478 +++++++++++++++++++++
- 3 files changed, 481 insertions(+)
- create mode 100644 arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index 7f7c804..234c1dc 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -41,6 +41,8 @@ Supported boards:
- - Reference  board for MT7623N with NAND:
-     Required root node properties:
-       - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623n";
-+- Bananapi BPI-R2 board:
-+      - compatible = "bananapi,bpi-r2", "mediatek,mt7623n";
- - MTK mt8127 tablet moose EVB:
-     Required root node properties:
-       - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 5249d24..2831069 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1004,6 +1004,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
- 	mt6589-aquaris5.dtb \
- 	mt6592-evb.dtb \
- 	mt7623n-rfb-nand.dtb \
-+	mt7623n-bananapi-bpi-r2.dtb \
- 	mt8127-moose.dtb \
- 	mt8135-evbp1.dtb
- dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
-diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-new file mode 100644
-index 0000000..a06bf0c
---- /dev/null
-+++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-@@ -0,0 +1,478 @@
-+/*
-+ * Copyright 2017 Sean Wang <sean.wang@mediatek.com>
-+ *
-+ * Sean Wang <sean.wang@mediatek.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include <dt-bindings/input/input.h>
-+#include "mt7623-mt6323.dtsi"
-+
-+/ {
-+	model = "Bananapi BPI-R2";
-+	compatible = "bananapi,bpi-r2", "mediatek,mt7623n";
-+
-+	aliases {
-+		serial2 = &uart2;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial2:115200n8";
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&key_pins_a>;
-+
-+		factory {
-+			label = "factory";
-+			linux,code = <BTN_0>;
-+			gpios = <&pio 256 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		wps {
-+			label = "wps";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&pio 257 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_a>;
-+
-+		red {
-+			label = "bpi-r2:pio:red";
-+			gpios = <&pio 239 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		green {
-+			label = "bpi-r2:pio:green";
-+			gpios = <&pio 240 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		blue {
-+			label = "bpi-r2:pio:blue";
-+			gpios = <&pio 241 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+	};
-+
-+	memory at 80000000 {
-+		reg = <0 0x80000000 0 0x40000000>;
-+	};
-+
-+	sound:sound {
-+		compatible = "mediatek,mt2701-wm8960-machine";
-+		mediatek,platform = <&afe>;
-+		audio-routing =
-+			"Headphone", "HP_L",
-+			"Headphone", "HP_R",
-+			"LINPUT1", "AMIC",
-+			"RINPUT1", "AMIC";
-+		mediatek,audio-codec = <&wm8960>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2s0_pins_a>;
-+	};
-+};
-+
-+&pio {
-+	cir_pins_a:cir at 0 {
-+		pins_cir {
-+			pinmux = <MT7623_PIN_46_IR_FUNC_IR>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c0_pins_a: i2c at 0 {
-+		pins_i2c0 {
-+			pinmux = <MT7623_PIN_75_SDA0_FUNC_SDA0>,
-+				 <MT7623_PIN_76_SCL0_FUNC_SCL0>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c1_pins_a: i2c at 1 {
-+		pin_i2c1 {
-+			pinmux = <MT7623_PIN_57_SDA1_FUNC_SDA1>,
-+				 <MT7623_PIN_58_SCL1_FUNC_SCL1>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2s0_pins_a: i2s at 0 {
-+		pin_i2s0 {
-+			pinmux = <MT7623_PIN_49_I2S0_DATA_FUNC_I2S0_DATA>,
-+				 <MT7623_PIN_72_I2S0_DATA_IN_FUNC_I2S0_DATA_IN>,
-+				 <MT7623_PIN_73_I2S0_LRCK_FUNC_I2S0_LRCK>,
-+				 <MT7623_PIN_74_I2S0_BCK_FUNC_I2S0_BCK>,
-+				 <MT7623_PIN_126_I2S0_MCLK_FUNC_I2S0_MCLK>;
-+			drive-strength = <MTK_DRIVE_12mA>;
-+			bias-pull-down;
-+		};
-+	};
-+
-+	i2s1_pins_a: i2s at 1 {
-+		pin_i2s1 {
-+			pinmux = <MT7623_PIN_33_I2S1_DATA_FUNC_I2S1_DATA>,
-+				 <MT7623_PIN_34_I2S1_DATA_IN_FUNC_I2S1_DATA_IN>,
-+				 <MT7623_PIN_35_I2S1_BCK_FUNC_I2S1_BCK>,
-+				 <MT7623_PIN_36_I2S1_LRCK_FUNC_I2S1_LRCK>,
-+				 <MT7623_PIN_37_I2S1_MCLK_FUNC_I2S1_MCLK>;
-+			drive-strength = <MTK_DRIVE_12mA>;
-+			bias-pull-down;
-+		};
-+	};
-+
-+	key_pins_a: keys at 0 {
-+		pins_keys {
-+			pinmux = <MT7623_PIN_256_GPIO256_FUNC_GPIO256>,
-+				 <MT7623_PIN_257_GPIO257_FUNC_GPIO257> ;
-+			input-enable;
-+		};
-+	};
-+
-+	led_pins_a: leds at 0 {
-+		pins_leds {
-+			pinmux = <MT7623_PIN_239_EXT_SDIO0_FUNC_GPIO239>,
-+				 <MT7623_PIN_240_EXT_XCS_FUNC_GPIO240>,
-+				 <MT7623_PIN_241_EXT_SCK_FUNC_GPIO241>;
-+		};
-+	};
-+
-+	mmc0_pins_default: mmc0default {
-+		pins_cmd_dat {
-+			pinmux = <MT7623_PIN_111_MSDC0_DAT7_FUNC_MSDC0_DAT7>,
-+				 <MT7623_PIN_112_MSDC0_DAT6_FUNC_MSDC0_DAT6>,
-+				 <MT7623_PIN_113_MSDC0_DAT5_FUNC_MSDC0_DAT5>,
-+				 <MT7623_PIN_114_MSDC0_DAT4_FUNC_MSDC0_DAT4>,
-+				 <MT7623_PIN_118_MSDC0_DAT3_FUNC_MSDC0_DAT3>,
-+				 <MT7623_PIN_119_MSDC0_DAT2_FUNC_MSDC0_DAT2>,
-+				 <MT7623_PIN_120_MSDC0_DAT1_FUNC_MSDC0_DAT1>,
-+				 <MT7623_PIN_121_MSDC0_DAT0_FUNC_MSDC0_DAT0>,
-+				 <MT7623_PIN_116_MSDC0_CMD_FUNC_MSDC0_CMD>;
-+			input-enable;
-+			bias-pull-up;
-+		};
-+
-+		pins_clk {
-+			pinmux = <MT7623_PIN_117_MSDC0_CLK_FUNC_MSDC0_CLK>;
-+			bias-pull-down;
-+		};
-+
-+		pins_rst {
-+			pinmux = <MT7623_PIN_115_MSDC0_RSTB_FUNC_MSDC0_RSTB>;
-+			bias-pull-up;
-+		};
-+	};
-+
-+	mmc0_pins_uhs: mmc0 {
-+		pins_cmd_dat {
-+			pinmux = <MT7623_PIN_111_MSDC0_DAT7_FUNC_MSDC0_DAT7>,
-+				 <MT7623_PIN_112_MSDC0_DAT6_FUNC_MSDC0_DAT6>,
-+				 <MT7623_PIN_113_MSDC0_DAT5_FUNC_MSDC0_DAT5>,
-+				 <MT7623_PIN_114_MSDC0_DAT4_FUNC_MSDC0_DAT4>,
-+				 <MT7623_PIN_118_MSDC0_DAT3_FUNC_MSDC0_DAT3>,
-+				 <MT7623_PIN_119_MSDC0_DAT2_FUNC_MSDC0_DAT2>,
-+				 <MT7623_PIN_120_MSDC0_DAT1_FUNC_MSDC0_DAT1>,
-+				 <MT7623_PIN_121_MSDC0_DAT0_FUNC_MSDC0_DAT0>,
-+				 <MT7623_PIN_116_MSDC0_CMD_FUNC_MSDC0_CMD>;
-+			input-enable;
-+			drive-strength = <MTK_DRIVE_2mA>;
-+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
-+		};
-+
-+		pins_clk {
-+			pinmux = <MT7623_PIN_117_MSDC0_CLK_FUNC_MSDC0_CLK>;
-+			drive-strength = <MTK_DRIVE_2mA>;
-+			bias-pull-down = <MTK_PUPD_SET_R1R0_01>;
-+		};
-+
-+		pins_rst {
-+			pinmux = <MT7623_PIN_115_MSDC0_RSTB_FUNC_MSDC0_RSTB>;
-+			bias-pull-up;
-+		};
-+	};
-+
-+	mmc1_pins_default: mmc1default {
-+		pins_cmd_dat {
-+			pinmux = <MT7623_PIN_107_MSDC1_DAT0_FUNC_MSDC1_DAT0>,
-+				 <MT7623_PIN_108_MSDC1_DAT1_FUNC_MSDC1_DAT1>,
-+				 <MT7623_PIN_109_MSDC1_DAT2_FUNC_MSDC1_DAT2>,
-+				 <MT7623_PIN_110_MSDC1_DAT3_FUNC_MSDC1_DAT3>,
-+				 <MT7623_PIN_105_MSDC1_CMD_FUNC_MSDC1_CMD>;
-+			input-enable;
-+			drive-strength = <MTK_DRIVE_4mA>;
-+			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
-+		};
-+
-+		pins_clk {
-+			pinmux = <MT7623_PIN_106_MSDC1_CLK_FUNC_MSDC1_CLK>;
-+			bias-pull-down;
-+			drive-strength = <MTK_DRIVE_4mA>;
-+		};
-+	};
-+
-+	mmc1_pins_uhs: mmc1 {
-+		pins_cmd_dat {
-+			pinmux = <MT7623_PIN_107_MSDC1_DAT0_FUNC_MSDC1_DAT0>,
-+				 <MT7623_PIN_108_MSDC1_DAT1_FUNC_MSDC1_DAT1>,
-+				 <MT7623_PIN_109_MSDC1_DAT2_FUNC_MSDC1_DAT2>,
-+				 <MT7623_PIN_110_MSDC1_DAT3_FUNC_MSDC1_DAT3>,
-+				 <MT7623_PIN_105_MSDC1_CMD_FUNC_MSDC1_CMD>;
-+			input-enable;
-+			drive-strength = <MTK_DRIVE_4mA>;
-+			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
-+		};
-+
-+		pins_clk {
-+			pinmux = <MT7623_PIN_106_MSDC1_CLK_FUNC_MSDC1_CLK>;
-+			drive-strength = <MTK_DRIVE_4mA>;
-+			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
-+		};
-+	};
-+
-+	spi0_pins_a: spi at 0 {
-+		pins_spi {
-+			pinmux = <MT7623_PIN_53_SPI0_CSN_FUNC_SPI0_CS>,
-+				<MT7623_PIN_54_SPI0_CK_FUNC_SPI0_CK>,
-+				<MT7623_PIN_55_SPI0_MI_FUNC_SPI0_MI>,
-+				<MT7623_PIN_56_SPI0_MO_FUNC_SPI0_MO>;
-+			bias-disable;
-+		};
-+	};
-+
-+	pwm_pins_a: pwm at 0 {
-+		pins_pwm {
-+			pinmux = <MT7623_PIN_203_PWM0_FUNC_PWM0>,
-+				 <MT7623_PIN_204_PWM1_FUNC_PWM1>,
-+				 <MT7623_PIN_205_PWM2_FUNC_PWM2>,
-+				 <MT7623_PIN_206_PWM3_FUNC_PWM3>,
-+				 <MT7623_PIN_207_PWM4_FUNC_PWM4>;
-+		};
-+	};
-+
-+	uart0_pins_a: uart at 0 {
-+		pins_dat {
-+			pinmux = <MT7623_PIN_79_URXD0_FUNC_URXD0>,
-+				 <MT7623_PIN_80_UTXD0_FUNC_UTXD0>;
-+		};
-+	};
-+
-+	uart1_pins_a: uart at 1 {
-+		pins_dat {
-+			pinmux = <MT7623_PIN_81_URXD1_FUNC_URXD1>,
-+				 <MT7623_PIN_82_UTXD1_FUNC_UTXD1>;
-+		};
-+	};
-+};
-+
-+&cir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&cir_pins_a>;
-+	status = "okay";
-+};
-+
-+&crypto {
-+	status = "okay";
-+};
-+
-+&eth {
-+	status = "okay";
-+	gmac0: mac at 0 {
-+		compatible = "mediatek,eth-mac";
-+		reg = <0>;
-+		phy-mode = "trgmii";
-+		fixed-link {
-+			speed = <1000>;
-+			full-duplex;
-+			pause;
-+		};
-+	};
-+
-+	mdio: mdio-bus {
-+		switch at 0 {
-+			compatible = "mediatek,mt7530";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+
-+			pinctrl-names = "default";
-+			reset-gpios = <&pio 33 0>;
-+			core-supply = <&mt6323_vpa_reg>;
-+			io-supply = <&mt6323_vemc3v3_reg>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+				port at 0 {
-+					reg = <0>;
-+					label = "lan0";
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					label = "lan1";
-+				};
-+
-+				port at 2 {
-+					reg = <2>;
-+					label = "lan2";
-+				};
-+
-+				port at 3 {
-+					reg = <3>;
-+					label = "lan3";
-+				};
-+
-+				port at 4 {
-+					reg = <4>;
-+					label = "wan";
-+				};
-+
-+				port at 6 {
-+					reg = <6>;
-+					label = "cpu";
-+					ethernet = <&gmac0>;
-+					phy-mode = "rgmii";
-+					fixed-link {
-+						speed = <1000>;
-+						full-duplex;
-+					};
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&pwrap {
-+	mt6323 {
-+		mt6323led: led {
-+			compatible = "mediatek,mt6323-led";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			led at 0 {
-+				reg = <0>;
-+				label = "bpi-r2:isink:green";
-+				default-state = "off";
-+			};
-+			led at 1 {
-+				reg = <1>;
-+				label = "bpi-r2:isink:red";
-+				default-state = "off";
-+			};
-+			led at 2 {
-+				reg = <2>;
-+				label = "bpi-r2:isink:blue";
-+				default-state = "off";
-+			};
-+		};
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+
-+	wm8960: wm8960 at 1a {
-+		compatible = "wlf,wm8960";
-+		reg = <0x1a>;
-+	};
-+};
-+
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm_pins_a>;
-+	status = "okay";
-+};
-+
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "disabled";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_a>;
-+	status = "disabled";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&u3phy1 {
-+	status = "okay";
-+};
-+
-+&u3phy2 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	vusb33-supply = <&mt6323_vusb_reg>;
-+	status = "okay";
-+};
-+
-+&usb2 {
-+	vusb33-supply = <&mt6323_vusb_reg>;
-+	status = "okay";
-+};
--- 
-1.9.1
+On 2017/4/19 4:17, Amir Ancel wrote:
+> Hi,
+> 
+> mlx5 driver is planned to have RO support this year.
+> 
+> I believe drivers should be able to query whether the arch support it or not and enable it in the network adapter accordingly.
+> 
+>  
+> 
+> -Amir
+> 
+> ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+> *From:* netdev-owner at vger.kernel.org <netdev-owner@vger.kernel.org> on behalf of David Laight <David.Laight@ACULAB.COM>
+> *Sent:* Tuesday, April 18, 2017 4:25:44 PM
+> *To:* 'Gabriele Paoloni'; davem at davemloft.net
+> *Cc:* Catalin Marinas; Will Deacon; Mark Rutland; Robin Murphy; jeffrey.t.kirsher at intel.com; alexander.duyck at gmail.com; linux-arm-kernel at lists.infradead.org; netdev at vger.kernel.org; Dingtianhong; Linuxarm
+> *Subject:* RE: Re: [PATCH net-next 1/4] ixgbe: sparc: rename the ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+>  
+> From: Gabriele Paoloni
+>> Sent: 13 April 2017 10:11
+>> > > Till now only the Intel ixgbe could support enable
+>> > > Relaxed ordering in the drivers for special architecture,
+>> > > but the ARCH_WANT_RELAX_ORDER is looks like a general name
+>> > > for all arch, so rename to a specific name for intel
+>> > > card looks more appropriate.
+>> > >
+>> > > Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>> >
+>> > This is not a driver specific facility.
+>> >
+>> > Any driver can test this symbol and act accordingly.
+>> >
+>> > Just because IXGBE is the first and only user, doesn't mean
+>> > the facility is driver specific.
+>> 
+>> 
+>> Please correct me if I am wrong but my understanding is that the standard
+>> way to enable/disable relaxed ordering is to set/clear bit 4 of the Device
+>> Control Register (PCI_EXP_DEVCTL_RELAX_EN 0x0010 /* Enable relaxed
+>> ordering */).
+>> Now I have looked up for all drivers either enabling or disabling relaxed
+>> ordering and none of them seems to need a symbol to decide whether to
+>> enable it or not.
+>> Also it seems to me enabling/disabling relaxed ordering is never bound to the
+>> host architecture.
+>> 
+>> So why this should be (or it is expected to be) a generic symbol?
+>> Wouldn't it be more correct to have this as a driver specific symbol now and
+>> move it to a generic one later once we have other drivers requiring it?
+> 
+> 'Relaxed ordering' is a bit in the TLP header.
+> A device (like the ixgbe hardware) can set it for some transactions and
+> still have the transactions 'ordered enough' for the driver to work.
+> (If all transactions have 'relaxed ordering' set then I suspect it is
+> almost impossible to write a working driver.)
+> The host side could (probably does) have a bit to enable 'relaxed ordering',
+> it could also enforce stronger ordering than required by the PCIe spec
+> (eg keeping reads in order).
+> 
+> Clearly, on some sparc64 systems, ixgbe needs to use 'relaxed ordering'.
+> To me this requires two separate bits be enabled:
+> 1) to the ixgbe driver to generate the 'relaxed' TLP.
+> 2) to the host to actually act on them.
+> If the ixgbe driver works when both are enabled why have options to
+> disable either (except for bug-finding)?
+> 
+>         David
+> 
