@@ -1,127 +1,185 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Wed, 26 Apr 2017 16:13:29 +0530
-Subject: [PATCH v2] iommu/arm-smmu: Return IOVA in iova_to_phys when SMMU
- is bypassed
-In-Reply-To: <20170426100150.GE21744@arm.com>
-References: <1493114272-30093-1-git-send-email-sunil.kovvuri@gmail.com>
- <20170426100150.GE21744@arm.com>
-Message-ID: <CA+sq2Ce2UVi04VtD4KLDsNk2baN1kq_vN2KOrEt9a_cB0gJ0vw@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 26 Apr 2017 12:53:00 +0200
+Subject: [patch] propagating controls in libv4l2 was Re: support autofocus /
+ autogain in libv4l2
+In-Reply-To: <20170424224724.5bb52382@vento.lan>
+References: <1487074823-28274-1-git-send-email-sakari.ailus@linux.intel.com>
+ <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
+ <20170414232332.63850d7b@vento.lan>
+ <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
+ <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
+ <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
+ <20170424224724.5bb52382@vento.lan>
+Message-ID: <20170426105300.GA857@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 3:31 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Sunil,
->
-> On Tue, Apr 25, 2017 at 03:27:52PM +0530, sunil.kovvuri at gmail.com wrote:
->> From: Sunil Goutham <sgoutham@cavium.com>
->>
->> For software initiated address translation, when domain type is
->> IOMMU_DOMAIN_IDENTITY i.e SMMU is bypassed, mimic HW behavior
->> i.e return the same IOVA as translated address.
->>
->> This patch is an extension to Will Deacon's patchset
->> "Implement SMMU passthrough using the default domain".
->>
->> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
->> ---
->>
->> V2
->> - As per Will's suggestion applied fix to SMMUv3 driver as well.
->
-> This follows what the AMD driver does, so:
->
-> Acked-by: Will Deacon <will.deacon@arm.com>
+Hi!
+
+> > > IMO, the best place for autofocus is at libv4l2. Putting it on a
+> > > separate "video server" application looks really weird for me.  
+> > 
+> > Well... let me see. libraries are quite limited -- it is hard to open
+> > files, or use threads/have custom main loop. It may be useful to
+> > switch resolutions -- do autofocus/autogain at lower resolution, then
+> > switch to high one for taking picture. It would be good to have that
+> > in "system" code, but I'm not at all sure libv4l2 design will allow
+> > that.
+> 
+> I don't see why it would be hard to open files or have threads inside
+> a library. There are several libraries that do that already, specially
+> the ones designed to be used on multimidia apps.
+
+Well, This is what the libv4l2 says:
+
+   This file implements libv4l2, which offers v4l2_ prefixed versions
+   of
+      open/close/etc. The API is 100% the same as directly opening
+   /dev/videoX
+      using regular open/close/etc, the big difference is that format
+   conversion
+   
+but if I open additional files in v4l2_open(), API is no longer the
+same, as unix open() is defined to open just one file descriptor.
+
+Now. There is autogain support in libv4lconvert, but it expects to use
+same fd for camera and for the gain... which does not work with
+subdevs.
+
+Of course, opening subdevs by name like this is not really
+acceptable. But can you suggest a method that is?
 
 Thanks,
+								Pavel
 
->
-> but I still think that having drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-> poke around with the physical address to get at the struct pages underlying
-> a DMA buffer is really dodgy.
+commit 4cf9d10ead014c0db25452e4bb9cd144632407c3
+Author: Pavel <pavel@ucw.cz>
+Date:   Wed Apr 26 11:38:04 2017 +0200
 
-Driver is not dealing with page structures to be precise, just like
-for any other NIC device, driver needs to know the virtual address
-of the packet to where it's DMA'ed, so that SKB if framed and
-handed over to network stack. Due to reasons mentioned below,
-in this driver it's not possible to maintain a list of DMA addresses to
-Virtual address mappings. Hence using IOMMU API, DMA address
-is translated to physical address and finally to virtual address. I don't
-see anything dodgy here.
+    Add subdevices.
 
-> Is there no way this can be avoided, perhaps by tracking the pages some other way
+diff --git a/lib/libv4l2/libv4l2-priv.h b/lib/libv4l2/libv4l2-priv.h
+index 343db5e..a6bc48e 100644
+--- a/lib/libv4l2/libv4l2-priv.h
++++ b/lib/libv4l2/libv4l2-priv.h
+@@ -26,6 +26,7 @@
+ #include "../libv4lconvert/libv4lsyscall-priv.h"
+ 
+ #define V4L2_MAX_DEVICES 16
++#define V4L2_MAX_SUBDEVS 8
+ /* Warning when making this larger the frame_queued and frame_mapped members of
+    the v4l2_dev_info struct can no longer be a bitfield, so the code needs to
+    be adjusted! */
+@@ -104,6 +105,7 @@ struct v4l2_dev_info {
+ 	void *plugin_library;
+ 	void *dev_ops_priv;
+ 	const struct libv4l_dev_ops *dev_ops;
++        int subdev_fds[V4L2_MAX_SUBDEVS];
+ };
+ 
+ /* From v4l2-plugin.c */
+diff --git a/lib/libv4l2/libv4l2.c b/lib/libv4l2/libv4l2.c
+index 0ba0a88..edc9642 100644
+--- a/lib/libv4l2/libv4l2.c
++++ b/lib/libv4l2/libv4l2.c
+@@ -1,3 +1,4 @@
++/* -*- c-file-style: "linux" -*- */
+ /*
+ #             (C) 2008 Hans de Goede <hdegoede@redhat.com>
+ 
+@@ -789,18 +790,25 @@ no_capture:
+ 
+ 	/* Note we always tell v4lconvert to optimize src fmt selection for
+ 	   our default fps, the only exception is the app explicitly selecting
+-	   a fram erate using the S_PARM ioctl after a S_FMT */
++	   a frame rate using the S_PARM ioctl after a S_FMT */
+ 	if (devices[index].convert)
+ 		v4lconvert_set_fps(devices[index].convert, V4L2_DEFAULT_FPS);
+ 	v4l2_update_fps(index, &parm);
+ 
++	devices[index].subdev_fds[0] = SYS_OPEN("/dev/video_sensor", O_RDWR, 0);
++	devices[index].subdev_fds[1] = SYS_OPEN("/dev/video_focus", O_RDWR, 0);
++	devices[index].subdev_fds[2] = -1;
++
++	printf("Sensor: %d, focus: %d\n", devices[index].subdev_fds[0], 
++	       devices[index].subdev_fds[1]);
++
+ 	V4L2_LOG("open: %d\n", fd);
+ 
+ 	return fd;
+ }
+ 
+ /* Is this an fd for which we are emulating v4l1 ? */
+-static int v4l2_get_index(int fd)
++int v4l2_get_index(int fd)
+ {
+ 	int index;
+ 
 
-I have explained that in the commit message
---
-    Also VNIC doesn't have a seperate receive buffer ring per receive
-    queue, so there is no 1:1 descriptor index matching between CQE_RX
-    and the index in buffer ring from where a buffer has been used for
-    DMA'ing. Unlike other NICs, here it's not possible to maintain dma
-    address to virt address mappings within the driver. This leaves us
-    no other choice but to use IOMMU's IOVA address conversion API to
-    get buffer's virtual address which can be given to network stack
-    for processing.
---
+commit 1d6a9ce121f53e8f2e38549eed597a3c3dea5233
+Author: Pavel <pavel@ucw.cz>
+Date:   Wed Apr 26 12:34:04 2017 +0200
 
->(although I don't understand why you're having to mess with the page reference
->counts to start with)?
-Not sure why you say it's a mess, adjusting page reference counts is quite
-common if you check other NIC drivers. On ARM64 especially when using
-64KB pages, if we have only one packet buffer for each page then we
-will have to set aside a whole lot of memory which sometimes is not possible
-on embedded platforms. Hence multiple pkt buffers per page, and page reference
-is set accordingly.
+    Enable ioctl propagation.
 
->
-> At least, I think you should be checking the domain type in
-> nicvf_iova_to_phys, which clearly expects a DMA domain if one exists at all.
+diff --git a/lib/libv4l2/libv4l2.c b/lib/libv4l2/libv4l2.c
+index edc9642..6dab661 100644
+--- a/lib/libv4l2/libv4l2.c
++++ b/lib/libv4l2/libv4l2.c
+@@ -1064,6 +1064,23 @@ static int v4l2_s_fmt(int index, struct v4l2_format *dest_fmt)
+ 	return 0;
+ }
+ 
++static int v4l2_propagate_ioctl(int index, unsigned long request, void *arg)
++{
++	int i = 0;
++	int result;
++	while (1) {
++		if (devices[index].subdev_fds[i] == -1)
++			return -1;
++		printf("g_ctrl failed, trying...\n");
++		result = SYS_IOCTL(devices[index].subdev_fds[i], request, arg);
++		printf("subdev %d result %d\n", i, result);
++		if (result == 0)
++			return 0;
++		i++;
++	}
++	return -1;
++}
++
+ int v4l2_ioctl(int fd, unsigned long int request, ...)
+ {
+ 	void *arg;
+@@ -1193,14 +1210,20 @@ no_capture_request:
+ 	switch (request) {
+ 	case VIDIOC_QUERYCTRL:
+ 		result = v4lconvert_vidioc_queryctrl(devices[index].convert, arg);
++		if (result == -1)
++			result = v4l2_propagate_ioctl(index, request, arg);
+ 		break;
+ 
+ 	case VIDIOC_G_CTRL:
+ 		result = v4lconvert_vidioc_g_ctrl(devices[index].convert, arg);
++		if (result == -1)
++			result = v4l2_propagate_ioctl(index, request, arg);
+ 		break;
+ 
+ 	case VIDIOC_S_CTRL:
+ 		result = v4lconvert_vidioc_s_ctrl(devices[index].convert, arg);
++		if (result == -1)
++			result = v4l2_propagate_ioctl(index, request, arg);
+ 		break;
+ 
+ 	case VIDIOC_G_EXT_CTRLS:
 
-Probably, but I don't think network maintainers would be okay with it, since
-such stuff should be hidden from a network driver's point of view. In reverse
-the argument can be that NIC driver shouldn't even have to check if domain
-is set or not.
 
-Thanks,
-Sunil.
-
->
-> Joerg: sorry, this is another one for you to pick up if possible.
->
-> Cheers,
->
-> Will
->
->>  drivers/iommu/arm-smmu-v3.c | 3 +++
->>  drivers/iommu/arm-smmu.c    | 3 +++
->>  2 files changed, 6 insertions(+)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 05b4592..d412bdd 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -1714,6 +1714,9 @@ arm_smmu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
->>       struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
->>       struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
->>
->> +     if (domain->type == IOMMU_DOMAIN_IDENTITY)
->> +             return iova;
->> +
->>       if (!ops)
->>               return 0;
->>
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index bfab4f7..81088cd 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -1459,6 +1459,9 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
->>       struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
->>       struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
->>
->> +     if (domain->type == IOMMU_DOMAIN_IDENTITY)
->> +             return iova;
->> +
->>       if (!ops)
->>               return 0;
->>
->> --
->> 2.7.4
->>
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170426/d174a739/attachment-0001.sig>
