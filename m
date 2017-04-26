@@ -1,187 +1,113 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Wed, 26 Apr 2017 16:10:00 +0800
-Subject: [PATCH 1/2] PCI: mediatek: Add Mediatek PCIe host controller
- support
-In-Reply-To: <CAK8P3a39TFkJ5=jp8me+Dyg-Qi-N_1ZKxpJGvnhmPEo4csnFCw@mail.gmail.com>
+Date: Wed, 26 Apr 2017 16:10:05 +0800
+Subject: [SPAM]Re: [PATCH 2/2] dt-bindings: pcie: Add documentation for
+ Mediatek PCIe
+In-Reply-To: <CAK8P3a1vgi9VBZfRNq0dDKzmfe8FkHQtgz6fEXW9fyUnBHtaQQ@mail.gmail.com>
 References: <1492935543-18190-1-git-send-email-ryder.lee@mediatek.com>
- <1492935543-18190-2-git-send-email-ryder.lee@mediatek.com>
- <CAK8P3a39TFkJ5=jp8me+Dyg-Qi-N_1ZKxpJGvnhmPEo4csnFCw@mail.gmail.com>
-Message-ID: <1493194200.27023.79.camel@mtkswgap22>
+ <1492935543-18190-3-git-send-email-ryder.lee@mediatek.com>
+ <CAK8P3a1vgi9VBZfRNq0dDKzmfe8FkHQtgz6fEXW9fyUnBHtaQQ@mail.gmail.com>
+Message-ID: <1493194205.27023.80.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi
 
-On Tue, 2017-04-25 at 14:38 +0200, Arnd Bergmann wrote:
+On Tue, 2017-04-25 at 14:18 +0200, Arnd Bergmann wrote:
 > On Sun, Apr 23, 2017 at 10:19 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> > Add documentation for PCIe host driver available in MT7623
+> > series SoCs.
+> >
+> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > ---
+> >  .../bindings/pci/mediatek,mt7623-pcie.txt          | 153 +++++++++++++++++++++
+> >  1 file changed, 153 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+> > new file mode 100644
+> > index 0000000..ee93ba2
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+> > @@ -0,0 +1,153 @@
+> > +Mediatek MT7623 PCIe controller
+> > +
+> > +Required properties:
+> > +- compatible: Should contain "mediatek,mt7623-pcie".
 > 
-> > +static inline bool mtk_pcie_link_is_up(struct mtk_pcie_port *port)
-> > +{
-> > +       return !!(readl_relaxed(port->base + PCIE_LINK_STATUS) &
-> > +                 PCIE_PORT_LINKUP);
-> > +}
+> Did mediatek license the IP block from someone else or was it
+> developed in-house? Is there a name and/or version identifier
+> for the block itself other than identifying it as the one in mt7623?
+
+Originally, it license from synopsys. Our designer add a wrapper to hide
+the DBI detail so that we cannot use them directly. Perhaps I can call
+it "mediatek,gen2v1-pcie", because we have a plan to upstream a in-house
+Gen2 IP in the future.
+
+> > +- device_type: Must be "pci"
+> > +- reg: Base addresses and lengths of the pcie controller.
+> > +- interrupts: A list of interrupt outputs of the controller.
 > 
-> If this is not performance critical, please use the regular readl() instead
-> of readl_relaxed().
+> Please be more specific about what each interrupt is for, and how
+> many there are.
 
-I will correct it.
+OK.
 
-> > +static bool mtk_pcie_valid_device(struct mtk_pcie *pcie,
-> > +                                 struct pci_bus *bus, int devfn)
-> > +{
-> > +       struct mtk_pcie_port *port;
-> > +       struct pci_dev *dev;
-> > +       struct pci_bus *pbus;
-> > +
-> > +       /* if there is no link, then there is no device */
-> > +       list_for_each_entry(port, &pcie->ports, list) {
-> > +               if (bus->number == 0 && port->index == PCI_SLOT(devfn) &&
-> > +                   mtk_pcie_link_is_up(port)) {
-> > +                       return true;
-> > +               } else if (bus->number != 0) {
-> > +                       pbus = bus;
-> > +                       do {
-> > +                               dev = pbus->self;
-> > +                               if (port->index == PCI_SLOT(dev->devfn) &&
-> > +                                   mtk_pcie_link_is_up(port)) {
-> > +                                       return true;
-> > +                               }
-> > +                               pbus = dev->bus;
-> > +                       } while (dev->bus->number != 0);
-> > +               }
-> > +       }
-> > +
-> > +       return false;
-> > +}
+> > +Required properties:
+> > +- device_type: Must be "pci"
+> > +- assigned-addresses: Address and size of the port configuration registers
+> > +- reg: Only the first four bytes are used to refer to the correct bus number
+> > +  and device number.
+> > +- #address-cells: Must be 3
+> > +- #size-cells: Must be 2
+> > +- ranges: Sub-ranges distributed from the PCIe controller node. An empty
+> > +  property is sufficient.
+> > +- clocks: Must contain an entry for each entry in clock-names.
+> > +  See ../clocks/clock-bindings.txt for details.
+> > +- clock-names: Must include the following entries:
+> > +  - sys_ck
+> > +- resets: Must contain an entry for each entry in reset-names.
+> > +  See ../reset/reset.txt for details.
 > 
+> This seems odd: you have a device that is simply identified as "pci"
+> without any more specific ID, but you require additional properties
+> (clocks, reset, ...) that are not part of the standard PCI binding.
 > 
+> Can you clarify how the port devices related to the root device in
+> this hardware design?
+
+I will write clarify like this:
+
+PCIe subsys includes one Host/PCI bridge and 3 PCIe MAC port. There
+are 3 bus master for data access and 1 slave for configuration and
+status register access. Each port has PIPE interface to PHY and
+
+> Have you considered moving the nonstandard properties into the host
+> bridge node and having that device deal with setting up the links
+> to the other drivers? That way we could use the regular pcie
+> port driver for the children.
 > 
+
+OK, but I still want to use port->reset to catch reset properties in
+driver.
+ 
+> > +- reset-names: Must include the following entries:
+> > +  - pcie-reset
+> > +- num-lanes: Number of lanes to use for this port.
+> > +- phys: Must contain an entry for each entry in phy-names.
+> > +- phy-names: Must include an entry for each sub node. Entries are of the form
+> > +  "pcie-phyN": where N ranges from 0 to the value specified for port number.
+> > +  See ../phy/phy-mt7623-pcie.txt for details.
 > 
-> > +static int mtk_pcie_hw_rd_cfg(struct mtk_pcie *pcie, u32 bus, u32 devfn,
-> > +                             int where, int size, u32 *val)
-> > +{
-> > +       writel(PCIE_CONF_ADDR(where, PCI_FUNC(devfn), PCI_SLOT(devfn), bus),
-> > +              pcie->base + PCIE_CFG_ADDR);
-> > +
-> > +       *val = 0;
-> > +
-> > +       switch (size) {
-> > +       case 1:
-> > +               *val = readb(pcie->base + PCIE_CFG_DATA + (where & 3));
-> > +               break;
-> > +       case 2:
-> > +               *val = readw(pcie->base + PCIE_CFG_DATA + (where & 2));
-> > +               break;
-> > +       case 4:
-> > +               *val = readl(pcie->base + PCIE_CFG_DATA);
-> > +               break;
-> > +       }
-> > +
-> > +       return PCIBIOS_SUCCESSFUL;
-> > +}
+> I think the name should not include the number of the port but rather
+> be always the same here.
 > 
-> This is a fairly standard set of read/write operations. Can you change
-> the pci_ops
-> to use pci_generic_config_read/pci_generic_config_write and an appropriate
-> map function instead?
 
-OK I will add a .map_bus() like this:
-{ .
+Hmm, I think it's better to keep the name here. It's more readable for
+user to understand the relationship between port0 and phy0.
 
-  writel(PCIE_CONF_ADDR(where, fun, slot, bus), base + PCIE_CFG_ADDR);
-
-  return base + PCIE_CFG_DATA + (where & 3);
-
-}
-> > +static int mtk_pcie_enable_ports(struct mtk_pcie *pcie)
-> > +{
-> > +       struct device *dev = pcie->dev;
-> > +       struct mtk_pcie_port *port, *tmp;
-> > +       int err, linkup = 0;
-> > +
-> > +       list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
-> > +               err = clk_prepare_enable(port->sys_ck);
-> > +               if (err) {
-> > +                       dev_err(dev, "failed to enable port%d clock\n",
-> > +                               port->index);
-> > +                       continue;
-> > +               }
-> > +
-> > +               /* assert RC */
-> > +               reset_control_assert(port->reset);
-> > +               /* de-assert RC */
-> > +               reset_control_deassert(port->reset);
-> > +
-> > +               /* power on PHY */
-> > +               err = phy_power_on(port->phy);
-> > +               if (err) {
-> > +                       dev_err(dev, "failed to power on port%d phy\n",
-> > +                               port->index);
-> > +                       goto err_phy_on;
-> > +               }
-> > +
-> > +               mtk_pcie_assert_ports(port);
-> > +
+>       Arnd
 > 
-> Similar to the comment I had for the binding, I wonder if it would be
-> better to keep all the information about the ports in one place and
-> then just deal with it at the root level.
-> 
-> Alternatively, we could decide to standardize on the properties
-> you have added to the pcie port node, but then I would handle
-> them in the pcieport driver rather than in the host bridge driver.
-
-Sorry, I'm not sure what you want me to do here.
-
-I could move all clock operation in root level. But we need to keep the
-reset and PHY operation sequence in the loop, In addition, we could
-easily free resources if ports link fail.
-
-How about moving this function to mtk_pcie_parse_and_add_res()? 
-
-
-> > +/*
-> > + * This IP lacks interrupt status register to check or map INTx from
-> > + * different devices at the same time.
-> > + */
-> > +static int __init mtk_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
-> > +{
-> > +       struct mtk_pcie *pcie = dev->bus->sysdata;
-> > +       struct mtk_pcie_port *port;
-> > +
-> > +       list_for_each_entry(port, &pcie->ports, list)
-> > +               if (port->index == slot)
-> > +                       return port->irq;
-> > +
-> > +       return -1;
-> > +}
-> 
-> This looks odd, what is it needed for specifically? It looks like
-> it's broken for devices behind bridges, and the interrupt mapping
-> should normally come from the interrupt-map property, without
-> the need for a driver specific map_irq override.
-
-Our hardware just has a GIC for each port and lacks interrupt status for
-host driver to distinguish INTx. So I return port IRQ here.
-
-
-> > +static int mtk_pcie_register_ports(struct mtk_pcie *pcie)
-> > +{
-> > +       struct pci_bus *bus, *child;
-> > +
-> > +       bus = pci_scan_root_bus(pcie->dev, 0, &mtk_pcie_ops, pcie,
-> > +                               &pcie->resources);
-> 
-> Can you use the new pci_register_host_bridge() method instead of
-> pci_scan_root_bus() here?
-
-May I know what's difference between pci_scan_root_bus() and using
-pci_register_host_bridge() directly? What situation should we use it?
-It seems that just tegra use this new method currently.
-
-I'm not sure whether I can still use pci_scan_root_bus() here? 
-
->        ARnd
-
-
-Thanks for the review!
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
