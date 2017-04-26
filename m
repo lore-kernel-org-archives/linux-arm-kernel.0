@@ -1,133 +1,78 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Apr 2017 12:18:05 +0100
-Subject: [RFC/RFT PATCH 14/18] PCI: Add pci_assign_irq() function and have
- pci_fixup_irqs() use it
+Date: Wed, 26 Apr 2017 12:18:01 +0100
+Subject: [RFC/RFT PATCH 10/18] PCI: rcar: Convert PCI scan API to
+ pci_scan_root_bus_bridge()
 In-Reply-To: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
 References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170426111809.19922-15-lorenzo.pieralisi@arm.com>
+Message-ID: <20170426111809.19922-11-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthew Minter <matt@masarand.com>
+The introduction of pci_scan_root_bus_bridge() provides a PCI core
+API to scan a PCI root bus backed by an already initialized
+struct pci_host_bridge object, which simplifies the bus scan
+interface and makes the PCI scan root bus interface easier to
+generalize as members are added to the struct pci_host_bridge().
 
-Here we delete the static pdev_fixup_irq() function which is currently
-what pci_fixup_irqs() uses to actually assign the irqs and replace it
-with the pci_assign_irq() function which changes the interface and
-makes use of the new function pointers stored in the host bridge
-structure.
+Convert PCI rcar host code to pci_scan_root_bus_bridge() to
+improve the PCI root bus scanning interface.
 
-Eventually this will allow pci_fixup_irqs() to be removed entirely
-and the new deferred assignment code path will call pci_assign_irq
-directly. However to ensure current users continue to work a
-new implementation of pci_fixup_irqs() is introduced which simply
-wraps the functionality of pci_assign_irq().
-
-Signed-off-by: Matthew Minter <matt@masarand.com>
-[lorenzo.pieralisi at arm.com: reworked comments/log]
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Simon Horman <horms@verge.net.au>
 ---
- drivers/pci/setup-irq.c | 45 +++++++++++++++++++++++++++++++++++----------
- include/linux/pci.h     |  1 +
- 2 files changed, 36 insertions(+), 10 deletions(-)
+ drivers/pci/host/pcie-rcar.c | 28 ++++++++++++++++++----------
+ 1 file changed, 18 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
-index 95c225b..5eeee79 100644
---- a/drivers/pci/setup-irq.c
-+++ b/drivers/pci/setup-irq.c
-@@ -15,6 +15,7 @@
- #include <linux/errno.h>
- #include <linux/ioport.h>
- #include <linux/cache.h>
-+#include "pci.h"
- 
- void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
+diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+index cb07c45..051b4db 100644
+--- a/drivers/pci/host/pcie-rcar.c
++++ b/drivers/pci/host/pcie-rcar.c
+@@ -451,27 +451,35 @@ static int rcar_pcie_enable(struct rcar_pcie *pcie)
  {
-@@ -22,12 +23,17 @@ void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
- 	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
- }
- 
--static void pdev_fixup_irq(struct pci_dev *dev,
--			   u8 (*swizzle)(struct pci_dev *, u8 *),
--			   int (*map_irq)(const struct pci_dev *, u8, u8))
-+void pci_assign_irq(struct pci_dev *dev)
- {
--	u8 pin, slot;
-+	u8 pin;
-+	u8 slot = -1;
- 	int irq = 0;
-+	struct pci_host_bridge *hbrg = pci_find_host_bridge(dev->bus);
+ 	struct device *dev = pcie->dev;
+ 	struct pci_bus *bus, *child;
+-	LIST_HEAD(res);
++	struct pci_host_bridge *bridge;
++	int ret;
 +
-+	if (!(hbrg->map_irq)) {
-+		dev_dbg(&dev->dev, "runtime irq mapping not provided by arch\n");
-+		return;
-+	}
++	bridge = pci_alloc_host_bridge(0);
++	if (!bridge)
++		return -ENOMEM;
  
- 	/* If this device is not on the primary bus, we need to figure out
- 	   which interrupt pin it will come in on.   We know which slot it
-@@ -40,17 +46,22 @@ static void pdev_fixup_irq(struct pci_dev *dev,
- 	if (pin > 4)
- 		pin = 1;
+ 	/* Try setting 5 GT/s link speed */
+ 	rcar_pcie_force_speedup(pcie);
  
--	if (pin != 0) {
-+	if (pin) {
- 		/* Follow the chain of bridges, swizzling as we go.  */
--		slot = (*swizzle)(dev, &pin);
-+		if (hbrg->swizzle_irq)
-+			slot = (*(hbrg->swizzle_irq))(dev, &pin);
+-	rcar_pcie_setup(&res, pcie);
++	rcar_pcie_setup(&bridge->windows, pcie);
  
--		irq = (*map_irq)(dev, slot, pin);
-+		/*
-+		 * If a swizzling function is not used map_irq must
-+		 * ignore slot
-+		 */
-+		irq = (*(hbrg->map_irq))(dev, slot, pin);
- 		if (irq == -1)
- 			irq = 0;
+ 	pci_add_flags(PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS);
+ 
++	bridge->dev.parent = dev;
++	bridge->sysdata = pcie;
++	bridge->busnr = pcie->root_bus_nr;
++	bridge->ops = &rcar_pcie_ops;
+ 	if (IS_ENABLED(CONFIG_PCI_MSI))
+-		bus = pci_scan_root_bus_msi(dev, pcie->root_bus_nr,
+-				&rcar_pcie_ops, pcie, &res, &pcie->msi.chip);
+-	else
+-		bus = pci_scan_root_bus(dev, pcie->root_bus_nr,
+-				&rcar_pcie_ops, pcie, &res);
++		bridge->msi = &pcie->msi.chip;
+ 
+-	if (!bus) {
+-		dev_err(dev, "Scanning rootbus failed");
+-		return -ENODEV;
++	ret = pci_scan_root_bus_bridge(bridge);
++	if (ret < 0) {
++		kfree(bridge);
++		return ret;
  	}
- 	dev->irq = irq;
  
--	dev_dbg(&dev->dev, "fixup irq: got %d\n", dev->irq);
-+	dev_dbg(&dev->dev, "assign irq: got %d\n", dev->irq);
++	bus = bridge->bus;
++
+ 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
  
- 	/* Always tell the device, so the driver knows what is
- 	   the real IRQ to use; the device does not use it. */
-@@ -60,9 +71,23 @@ static void pdev_fixup_irq(struct pci_dev *dev,
- void pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
- 		    int (*map_irq)(const struct pci_dev *, u8, u8))
- {
-+	/*
-+	 * Implement pci_fixup_irqs() through pci_assign_irq().
-+	 * This code should be remove eventually, it is a wrapper
-+	 * around pci_assign_irq() interface to keep current
-+	 * pci_fixup_irqs() behaviour unchanged on architecture
-+	 * code still relying on its interface.
-+	 */
- 	struct pci_dev *dev = NULL;
-+	struct pci_host_bridge *hbrg = NULL;
- 
--	for_each_pci_dev(dev)
--		pdev_fixup_irq(dev, swizzle, map_irq);
-+	for_each_pci_dev(dev) {
-+		hbrg = pci_find_host_bridge(dev->bus);
-+		hbrg->swizzle_irq = swizzle;
-+		hbrg->map_irq = map_irq;
-+		pci_assign_irq(dev);
-+		hbrg->swizzle_irq = NULL;
-+		hbrg->map_irq = NULL;
-+	}
- }
- EXPORT_SYMBOL_GPL(pci_fixup_irqs);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 722a770..688c669 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1152,6 +1152,7 @@ void pdev_enable_device(struct pci_dev *);
- int pci_enable_resources(struct pci_dev *, int mask);
- void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
- 		    int (*)(const struct pci_dev *, u8, u8));
-+void pci_assign_irq(struct pci_dev *dev);
- struct resource *pci_find_resource(struct pci_dev *dev, struct resource *res);
- #define HAVE_PCI_REQ_REGIONS	2
- int __must_check pci_request_regions(struct pci_dev *, const char *);
+ 	pci_bus_size_bridges(bus);
 -- 
 2.10.0
