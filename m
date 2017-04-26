@@ -1,48 +1,89 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 26 Apr 2017 14:26:40 +0100
-Subject: [PATCH v5 02/22] KVM: arm/arm64: Add GICV3 pending table save API
- documentation
-In-Reply-To: <20170426131421.GA50776@lvm>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-3-git-send-email-eric.auger@redhat.com>
- <CAFEAcA_0N9Jx5ym+=jjmxAzSaXPjt-m+gW1cq90of8Qhw3LOzg@mail.gmail.com>
- <a5ab9181-8398-f62b-12f1-032961b12c28@redhat.com>
- <CAFEAcA-u-sH+v-Pnr_3gRC3iSJP0ZK68+GqkDzmi3xe1-B2WAQ@mail.gmail.com>
- <20170426084830.GB2098@work-vm>
- <4dc866a0-582c-af69-916f-eb435988b5ec@redhat.com>
- <20170426130020.GM4104@cbox>
- <CAFEAcA8t0Y-UBu_Fx_YTsmnw8zvd4fctTfobdb-akjdx_81PWA@mail.gmail.com>
- <20170426131421.GA50776@lvm>
-Message-ID: <CAFEAcA-3QL-1=RYhZ-xo0rgYTjRvxhWJfBVrT1f2G_j5t8Wj7A@mail.gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Wed, 26 Apr 2017 13:41:42 +0000
+Subject: [PATCH v2] arm64: perf: Use only exclude_kernel attribute when
+ kernel is running in HYP
+In-Reply-To: <20170426101021.GF21744@arm.com>
+References: <1492623846-29335-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170420084928.GC31436@leverpostej>
+ <CAFpQJXVSsg8CX28vEo2LzmOi3pknHiH233spMD6ip4LZO4vw=Q@mail.gmail.com>
+ <20170424154530.GO12323@arm.com>
+ <CAFpQJXWX=0GQ5hse4E_OSdnYhMOA7CvqeoHe9AdMsyoZJmrPQQ@mail.gmail.com>
+ <20170425165259.GS24484@arm.com>
+ <CA+7sy7D-ZB84xQ2pE-io1v7pmnAuWUszh1B=Zq+Ezup=sysQ2g@mail.gmail.com>
+ <CY4PR07MB3415C0CEBB9D3DF0C249DC6793110@CY4PR07MB3415.namprd07.prod.outlook.com>
+ <20170426101021.GF21744@arm.com>
+Message-ID: <20170426134141.GA6417@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 April 2017 at 14:14, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Wed, Apr 26, 2017 at 02:01:55PM +0100, Peter Maydell wrote:
->> On 26 April 2017 at 14:00, Christoffer Dall <cdall@linaro.org> wrote:
->> > Alternatively we should mark a pending error notification to the guest
->> > in KVM, so that when the guest boots it gets something like an SError
->> > instead, given that presumably the guest wrote the weird value.  Except
->> > of course if the problem is caused by QEMU fudging with the register
->> > value for the PENDBASER.
->>
->> If we have scope for complaining at the guest we should do it at
->> the point where the guest sets PENDBASER in the first place...
->>
->
-> Is that what the hardware would have done?
+On Wed, Apr 26, 2017 at 11:10:21AM +0100, Will Deacon wrote:
+> On Wed, Apr 26, 2017 at 07:22:46AM +0000, Pinski, Andrew wrote:
+> > On 4/25/2017 11:53 PM, Jayachandran C. wrote:
+> > > On Tue, Apr 25, 2017 at 10:23 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > >> On Tue, Apr 25, 2017 at 09:13:40AM +0530, Ganapatrao Kulkarni wrote:
+> > >>> On Mon, Apr 24, 2017 at 9:15 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > >>>> On Thu, Apr 20, 2017 at 02:56:50PM +0530, Ganapatrao Kulkarni wrote:
+> > >>>>> OK, if you are ok with sysfs part, i can send next version with that
+> > >>>>> change only?.
+> > >>>> I think the sysfs part is still a little dodgy, since you still expose the
+> > >>>> "exclude_hv" file with a value of 0 when not running at EL2, which would
+> > >>>> imply that exclude_hv is forced to zero. I don't think that's correct.
+> > >>> okay, i can make exclude_hv visible only when kernel booted in EL2.
+> > >>> is it ok to have empty directory "attr" when kernel booted to EL1?
+> > >>> attr can be place holder for any other miscellaneous attributes, that
+> > >>> can be added in future.
+> > >> Sounds good to me, although I'll seek comment from the other perf folks
+> > >> before merging anything with ABI implications.
+> > > Do you really think this is the solution given:
+> > > - this is an arm64 specific sysfs interface that is tied to the perf API
+> 
+> That's why I want feedback from others. The intention would be that this can
+> be used by other PMUs as well, since it's not uncommon that parts of the
+> sizeable perf_event_attr structure are not used by a given PMU.
+> 
+> > > - the perf API documentation has to be updated for this
+> 
+> So? If having to update documentation means we shouldn't change the kernel,
+> then we may as well all find new jobs.
+> 
+> > > - All the applications that use the perf API have to be modified to
+> > > check this sysfs interface
+> > > - If the application fails to do so, a very narrow corner case
+> > > (exclude_hv != exclude_kernel and VHE enabled) fails.
+> 
+> See below, but apparently people care about it.
+> 
+> > > Any application that really cares can already do see if exclude_hv !=
+> > > exclude_kernel case works by calling perf_open_event() with those
+> > > options and checking the return value.
+> 
+> That's a good point: there is *something* userspace can do, although that
+> would be arm64-specific and doesn't really help with the state-space
+> explosion you get with combinations of invalid/unused perf_event_attr
+> fields.
+> 
+> > An example of an application which needs to changed is HHVM. Currently 
+> > it sets exclude_hv to true but exclude_kernel to false as it does not 
+> > care about the hypervisor associated perf events associated with the 
+> > code, only the kernel and userspace associated evnts.
+> > Yes we could submit a patch to use the sysfs interface to check but it 
+> > would look funny and the facebook folks might reject the patch as it is 
+> > ARM64 specific in generic code.  Note this is how all of this discussion 
+> > started was HHVM's call to perf_open_event was failing.
+> 
+> Hmm, if you're saying that HHVM won't be changed to use the sysfs stuff,
+> then why are we bothering?
+> 
+> Not sure where this leaves us.
 
-I think it's UNPREDICTABLE to enable the GIC with a bogus PENDBASER,
-but I can't find the bit in the spec that actually says that.
-I don't know what hardware actually does, but I imagine it will
-only notice that it's been handed bogus memory at the point where
-it tries to use it.
+If my understanding is correct, the sysfs suggestion above is going to
+add API complexity without solving the issue. Ignoring the exclude_hv if
+it cannot be honored would be a better solution.
 
-> Also, userspace could restore a bogus value in the PENDBASER (even
-> though the guest wrote something sane), so maybe we should just keep
-> this as is and handle it nicely in QEMU?
+If that is not acceptable (which seems to be the case - but I do not
+see a reason for that), I think the better option for the application
+is to check if the platform supports the mode exclusion it wants by
+using the perf_event_open API itself.
 
-Yeah, I don't have a strong objection to doing it that way round.
-
-thanks
--- PMM
+Thanks,
+JC.
