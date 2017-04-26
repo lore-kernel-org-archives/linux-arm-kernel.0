@@ -1,78 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 26 Apr 2017 15:50:57 +0100
-Subject: [PATCH] perf evsel: Fix to perf-stat malloc corruption on arm64
- platforms
-In-Reply-To: <1493198780-25415-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1493198780-25415-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20170426145057.GK27156@leverpostej>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 26 Apr 2017 17:12:57 +0200
+Subject: [RFC/RFT PATCH 07/18] ARM: PCI: orion5x: Convert PCI scan API to
+ pci_scan_root_bus_bridge()
+In-Reply-To: <20170426111809.19922-8-lorenzo.pieralisi@arm.com>
+References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
+ <20170426111809.19922-8-lorenzo.pieralisi@arm.com>
+Message-ID: <20170426151257.GA4489@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ganapatrao,
-
-Thanks for tracking this down.
-
-On Wed, Apr 26, 2017 at 02:56:20PM +0530, Ganapatrao Kulkarni wrote:
-> In some cases, ncpus used for perf_evsel__alloc_fd and for
-> perf_evsel__close are not the same, this is causing memory
-> overwrite/corruption.
-
-It would be good if we could enumerate when this occurs.
-
->From what I can tell, the problem occurs when opening a thread-bound
-event on PMU with a cpus/cpumask in sysfs.
-
-For perf-stat we create events using create_perf_stat_counter(). There
-we see !target_has_cpu(), so we call perf_evsel__open_per_thread(). Thus
-perf_evsel__open() is passed NULL cpus, and creates an empty cpu_map. As
-cpus->nr = 1, we get 1 * nthreads fds allocated, and open events for
-each of these.
-
-Later, we try to close events using perf_evlist__close(). This doesn't
-take target_has_cpu() into account, but sees evsel->cpus is non-NULL
-(since the PMU had a cpus/cpumask file), and tries to close events for
-cpus->nr * nthreads, and goes out-of-bounds of the fd array.
-
+On Wed, Apr 26, 2017 at 12:17:58PM +0100, Lorenzo Pieralisi wrote:
+> The introduction of pci_scan_root_bus_bridge() provides a PCI core
+> API to scan a PCI root bus backed by an already initialized
+> struct pci_host_bridge object, which simplifies the bus scan
+> interface and makes the PCI scan root bus interface easier to
+> generalize as members are added to the struct pci_host_bridge().
 > 
-> Fixing issue by using same ncpus in perf_evsel__alloc_fd.
-> 
-> This bug is more evident on arm64 platforms, which uses
-> cpu_map(cpus) for PMU core devices.
-> 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  tools/perf/util/evsel.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-> index ac59710..0dc94d7 100644
-> --- a/tools/perf/util/evsel.c
-> +++ b/tools/perf/util/evsel.c
-> @@ -1489,7 +1489,9 @@ int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
->  		nthreads = threads->nr;
->  
->  	if (evsel->fd == NULL &&
-> -	    perf_evsel__alloc_fd(evsel, cpus->nr, nthreads) < 0)
-> +	    perf_evsel__alloc_fd(evsel,
-> +				evsel->cpus ? evsel->cpus->nr : cpus->nr,
-> +				nthreads) < 0)
+> Convert ARM orion5x platform code to pci_scan_root_bus_bridge() to
+> improve the PCI root bus scanning interface.
 
-Unfortunately, I don't think this is the right fix.
+Hi Lorenzo
 
-Looking@the logic I added in commit:
+Maybe there is something not right here.
 
-  9f21b815be863218 ("perf evlist: Only open events on CPUs an evsel permit").
+With plain 4.11-rc7 i get:
 
-... in some cases (e.g. when using perf record with cpu-bound events),
-evsel->cpus may contain a subset of evlist->cpus, and thus the use of
-evsel->cpus->nr here may lower the number of entries allocated, such
-that the manipulation of fds will go out-of-bounds.
+root at orion5x:~# lspci -v
+0000:00:00.0 Memory controller: Marvell Technology Group Ltd. 88f5182 [Orion-NAS] ARM SoC (rev 02)
+        Subsystem: Marvell Technology Group Ltd. Device 11ab
+        Flags: bus master, fast devsel, latency 0, IRQ 12
+        Memory at <ignored> (64-bit, prefetchable)
+        Capabilities: [40] Power Management version 2
+        Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
+        Capabilities: [60] Express Root Port (Slot-), MSI 00
 
-I think that to properly solve this, we need a more invasive rework,
-ensuring that open/manipulation/close always deal with the same set of
-cpus and threads for a given evsel.
+0001:01:00.0 Memory controller: Marvell Technology Group Ltd. 88f5182 [Orion-NAS] ARM SoC (rev 02)
+        Flags: bus master, fast Back2Back, 66MHz, medium devsel, latency 0
+        BIST result: 00
+        Memory at <unassigned> (64-bit, prefetchable)
+        Memory at <ignored> (64-bit, prefetchable)
+        Memory at <ignored> (64-bit, non-prefetchable)
+        Expansion ROM at <ignored> [disabled]
+        Capabilities: [40] Power Management version 2
+        Capabilities: [48] Vital Product Data
+        Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
+        Capabilities: [60] PCI-X non-bridge device
+        Capabilities: [68] CompactPCI hot-swap <?>
 
-I'm taking a look into that now.
+However, with your patches applied i get:
 
-Thanks,
-Mark.
+0000:00:00.0 Memory controller: Marvell Technology Group Ltd. 88f5182 [Orion-NAS] ARM SoC (rev 02)
+        Subsystem: Marvell Technology Group Ltd. Device 11ab
+        Flags: bus master, fast devsel, latency 0
+        Memory at <ignored> (64-bit, prefetchable)
+        Capabilities: [40] Power Management version 2
+        Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
+        Capabilities: [60] Express Root Port (Slot-), MSI 00
+
+0001:01:00.0 Memory controller: Marvell Technology Group Ltd. 88f5182 [Orion-NAS] ARM SoC (rev 02)
+        Flags: bus master, fast Back2Back, 66MHz, medium devsel, latency 0
+        BIST result: 00
+        Memory at <unassigned> (64-bit, prefetchable)
+        Memory at <ignored> (64-bit, prefetchable)
+        Memory at <ignored> (64-bit, non-prefetchable)
+        Expansion ROM at <ignored> [disabled]
+        Capabilities: [40] Power Management version 2
+        Capabilities: [48] Vital Product Data
+        Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
+        Capabilities: [60] PCI-X non-bridge device
+        Capabilities: [68] CompactPCI hot-swap <?>
+
+Note that IRQ 12 has disappeared from Flags: on 0000:00:00.0.
+
+Since there are no actual PCI devices on this bus, i cannot test if
+interrupts are broken.
+
+	   Andrew
