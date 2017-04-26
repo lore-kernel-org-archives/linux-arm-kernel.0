@@ -1,71 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Apr 2017 09:01:03 +0100
-Subject: [PATCH] irqchip/mbigen: Fix the clear register offset
-In-Reply-To: <68214147-bc4d-c542-ce40-78f69a63e53d@linaro.org>
-References: <1493086563-36396-1-git-send-email-majun258@huawei.com>
- <68214147-bc4d-c542-ce40-78f69a63e53d@linaro.org>
-Message-ID: <07081162-ca52-fa46-00e6-e72e1b4fd092@arm.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Wed, 26 Apr 2017 10:05:27 +0200
+Subject: [PATCH] reset: sti: Use devm_kcalloc() in
+ syscfg_reset_controller_register()
+Message-ID: <e10a20a2-cfea-5b42-db3a-41b6eb08d7e4@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/04/17 04:10, Hanjun Guo wrote:
-> Hi Majun,
-> 
-> On 2017/4/25 10:16, Majun wrote:
->> From: MaJun <majun258@huawei.com>
->>
->> Don't minus reserved interrupts (64) when get the clear register offset,because
->> the clear register space includes the space of these 64 interrupts.
-> 
-> Could you mention the background that there is a timeout mechanism
-> to clear the register in the mbigen to make the code work even we clear
-> the wrong (and noneffective) register? that will help for review I
-> think.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Wed, 26 Apr 2017 09:50:34 +0200
 
-A timeout? So if you don't clear the interrupt in a timely manner, it
-will still bypass the masking? That feels very wrong. How is this
-timeout configured? Can it be entirely disabled?
+* A multiplication for the size determination of a memory allocation
+  indicated that an array data structure should be processed.
+  Thus use the corresponding function "devm_kcalloc".
 
-> 
->>
->> Signed-off-by: MaJun <majun258@huawei.com>
->> ---
->>  drivers/irqchip/irq-mbigen.c | 1 -
->>  1 file changed, 1 deletion(-)
->>
->> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
->> index 061cdb8..75818a5 100644
->> --- a/drivers/irqchip/irq-mbigen.c
->> +++ b/drivers/irqchip/irq-mbigen.c
->> @@ -108,7 +108,6 @@ static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
->>  {
->>  	unsigned int ofst;
->>
->> -	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
->>  	ofst = hwirq / 32 * 4;
->>
->>  	*mask = 1 << (hwirq % 32);
-> 
-> How about following to save more lines of code:
-> 
-> --- a/drivers/irqchip/irq-mbigen.c
-> +++ b/drivers/irqchip/irq-mbigen.c
-> @@ -106,10 +106,7 @@ static inline void 
-> get_mbigen_type_reg(irq_hw_number_t hwirq,
->   static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
->                                          u32 *mask, u32 *addr)
->   {
-> -       unsigned int ofst;
-> -
-> -       hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
-> -       ofst = hwirq / 32 * 4;
-> +       unsigned int ofst = hwirq / 32 * 4;
-> 
->          *mask = 1 << (hwirq % 32);
->          *addr = ofst + REG_MBIGEN_CLEAR_OFFSET;
+* Replace the specification of a data structure by a pointer dereference
+  to make the corresponding size determination a bit safer according to
+  the Linux coding style convention.
 
-Well, this is not a code deletion contest... ;-)
+* Delete the local variable "size" which became unnecessary with
+  this refactoring.
 
-	M.
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/reset/sti/reset-syscfg.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/reset/sti/reset-syscfg.c b/drivers/reset/sti/reset-syscfg.c
+index 9bd57a5eee72..7e0f2aa55ba7 100644
+--- a/drivers/reset/sti/reset-syscfg.c
++++ b/drivers/reset/sti/reset-syscfg.c
+@@ -145,16 +145,14 @@ static int syscfg_reset_controller_register(struct device *dev,
+ 				const struct syscfg_reset_controller_data *data)
+ {
+ 	struct syscfg_reset_controller *rc;
+-	size_t size;
+ 	int i, err;
+ 
+ 	rc = devm_kzalloc(dev, sizeof(*rc), GFP_KERNEL);
+ 	if (!rc)
+ 		return -ENOMEM;
+ 
+-	size = sizeof(struct syscfg_reset_channel) * data->nr_channels;
+-
+-	rc->channels = devm_kzalloc(dev, size, GFP_KERNEL);
++	rc->channels = devm_kcalloc(dev, data->nr_channels,
++				    sizeof(*rc->channels), GFP_KERNEL);
+ 	if (!rc->channels)
+ 		return -ENOMEM;
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.12.2
