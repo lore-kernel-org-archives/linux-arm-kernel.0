@@ -1,69 +1,106 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Apr 2017 12:17:53 +0100
-Subject: [RFC/RFT PATCH 02/18] PCI: Add pci_free_host_bridge interface
+Date: Wed, 26 Apr 2017 12:17:54 +0100
+Subject: [RFC/RFT PATCH 03/18] PCI: Introduce pci_scan_root_bus_bridge()
 In-Reply-To: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
 References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170426111809.19922-3-lorenzo.pieralisi@arm.com>
+Message-ID: <20170426111809.19922-4-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a52d1443bba1 ("PCI: Export host bridge registration interface")
-exported the pci_alloc_host_bridge() interface so that PCI host
-controllers drivers can make use of it.
+Current pci_scan_root_bus() interface is made up of two main
+code paths:
 
-Introduce pci_alloc_host_bridge() kernel counterpart to free the
-host bridge data structures, pci_free_host_bridge(), export it
-and update kernel functions releasing host bridge objects allocated
-memory to make use of it.
+- pci_create_root_bus()
+- pci_scan_child_bus()
+
+pci_create_root_bus() is a wrapper function that allows to create
+a struct pci_host_bridge structure, initialize it with the passed
+parameters and register it with the kernel.
+
+As the struct pci_host_bridge require additional struct members,
+pci_create_root_bus() parameters list has grown in time, making
+it unwieldy to add further parameters to it in case the struct
+pci_host_bridge gains more members fields to augment its functionality.
+
+Since PCI core code provides functions to allocate struct
+pci_host_bridge, instead of forcing the pci_create_root_bus() interface
+to add new parameters to cater for new struct pci_host_bridge
+functionality, it is more suitable to add an interface in PCI
+core code to scan a PCI bus straight from a struct pci_host_bridge
+created and customized by each specific PCI host controller driver.
+
+Add a pci_scan_root_bus_bridge() function to allow PCI host controller
+drivers to create and initialize struct pci_host_bridge and scan
+the resulting bus.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/probe.c | 11 ++++++++---
+ drivers/pci/probe.c | 38 ++++++++++++++++++++++++++++++++++++++
  include/linux/pci.h |  1 +
- 2 files changed, 9 insertions(+), 3 deletions(-)
+ 2 files changed, 39 insertions(+)
 
 diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index d0ddb69..7e4ffc4 100644
+index 7e4ffc4..c7a7f72 100644
 --- a/drivers/pci/probe.c
 +++ b/drivers/pci/probe.c
-@@ -517,9 +517,7 @@ static void pci_release_host_bridge_dev(struct device *dev)
- 	if (bridge->release_fn)
- 		bridge->release_fn(bridge);
- 
--	pci_free_resource_list(&bridge->windows);
--
--	kfree(bridge);
-+	pci_free_host_bridge(bridge);
+@@ -2412,6 +2412,44 @@ void pci_bus_release_busn_res(struct pci_bus *b)
+ 			res, ret ? "can not be" : "is");
  }
  
- struct pci_host_bridge *pci_alloc_host_bridge(size_t priv)
-@@ -537,6 +535,13 @@ struct pci_host_bridge *pci_alloc_host_bridge(size_t priv)
- }
- EXPORT_SYMBOL(pci_alloc_host_bridge);
- 
-+void pci_free_host_bridge(struct pci_host_bridge *bridge)
++int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge)
 +{
-+	pci_free_resource_list(&bridge->windows);
++	struct resource_entry *window;
++	bool found = false;
++	struct pci_bus *b;
++	int max, bus, ret;
 +
-+	kfree(bridge);
++	if (!bridge)
++		return -EINVAL;
++
++	resource_list_for_each_entry(window, &bridge->windows)
++		if (window->res->flags & IORESOURCE_BUS) {
++			found = true;
++			break;
++		}
++
++	ret = pci_register_host_bridge(bridge);
++	if (ret < 0)
++		return ret;
++
++	b = bridge->bus;
++	bus = bridge->busnr;
++
++	if (!found) {
++		dev_info(&b->dev,
++		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
++			bus);
++		pci_bus_insert_busn_res(b, bus, 255);
++	}
++
++	max = pci_scan_child_bus(b);
++
++	if (!found)
++		pci_bus_update_busn_res_end(b, max);
++
++	return 0;
 +}
-+EXPORT_SYMBOL(pci_free_host_bridge);
- static const unsigned char pcix_bus_speed[] = {
- 	PCI_SPEED_UNKNOWN,		/* 0 */
- 	PCI_SPEED_66MHz_PCIX,		/* 1 */
++
+ struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
+ 		struct pci_ops *ops, void *sysdata,
+ 		struct list_head *resources, struct msi_controller *msi)
 diff --git a/include/linux/pci.h b/include/linux/pci.h
-index eb3da1a..99878a9 100644
+index 99878a9..757779a 100644
 --- a/include/linux/pci.h
 +++ b/include/linux/pci.h
-@@ -450,6 +450,7 @@ static inline struct pci_host_bridge *pci_host_bridge_from_priv(void *priv)
- }
- 
- struct pci_host_bridge *pci_alloc_host_bridge(size_t priv);
-+void pci_free_host_bridge(struct pci_host_bridge *bridge);
- int pci_register_host_bridge(struct pci_host_bridge *bridge);
- struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus);
- 
+@@ -847,6 +847,7 @@ struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
+ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+ 					     struct pci_ops *ops, void *sysdata,
+ 					     struct list_head *resources);
++int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge);
+ struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
+ 				int busnr);
+ void pcie_update_link_speed(struct pci_bus *bus, u16 link_status);
 -- 
 2.10.0
