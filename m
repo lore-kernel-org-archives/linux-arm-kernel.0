@@ -1,32 +1,66 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 26 Apr 2017 15:04:43 -0700
-Subject: [PATCH 1/2] wcn36xx: Pass used skb to ieee80211_tx_status()
-Message-ID: <20170426220444.10539-1-bjorn.andersson@linaro.org>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 27 Apr 2017 00:34:01 +0200
+Subject: [PATCH v2] arm: bitops: Align prototypes to generic API
+In-Reply-To: <20170424042033.GC6263@localhost>
+References: <20170421084033.5c987e13@canb.auug.org.au>
+ <9858a4ed-bdd9-bd6c-d8a4-e9e6bd539904@free.fr>
+ <20170421181230.05dcf937@canb.auug.org.au>
+ <20170421234315.GO17774@n2100.armlinux.org.uk>
+ <f89b6045-8c09-f6c4-3893-84f172260926@free.fr>
+ <20170424042033.GC6263@localhost>
+Message-ID: <f3eb1c46-a413-955a-0cfa-c297691e2b23@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the tx skbs are collected they should be passed to
-ieee80211_tx_status() rather than ieee80211_free_txskb(), as the prior
-will take care of monitoring and LED triggers while the latter will
-consider the skb dropped.
+From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+include/asm-generic/bitops/find.h declares:
+
+extern unsigned long
+find_first_zero_bit(const unsigned long *addr, unsigned long size);
+
+while arch/arm/include/asm/bitops.h declares:
+
+#define find_first_zero_bit(p,sz)	_find_first_zero_bit_le(p,sz)
+extern int _find_first_zero_bit_le(const void * p, unsigned size);
+
+Align the arm prototypes to the generic API, to have gcc report
+inadequate arguments, such as pointer to u32.
+
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 ---
- drivers/net/wireless/ath/wcn36xx/dxe.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The patch fixing drivers/dma/sun4i-dma.c
+("dmaengine: sun4i: fix invalid argument")
+has landed on linux-next (thanks Vinod)
+as 57192245bc074710ea1a128d39ecc429455ac815
+---
+ arch/arm/include/asm/bitops.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/wireless/ath/wcn36xx/dxe.c b/drivers/net/wireless/ath/wcn36xx/dxe.c
-index 87dfdaf9044c..938b7bd733cf 100644
---- a/drivers/net/wireless/ath/wcn36xx/dxe.c
-+++ b/drivers/net/wireless/ath/wcn36xx/dxe.c
-@@ -371,7 +371,7 @@ static void reap_tx_dxes(struct wcn36xx *wcn, struct wcn36xx_dxe_ch *ch)
- 			info = IEEE80211_SKB_CB(ctl->skb);
- 			if (!(info->flags & IEEE80211_TX_CTL_REQ_TX_STATUS)) {
- 				/* Keep frame until TX status comes */
--				ieee80211_free_txskb(wcn->hw, ctl->skb);
-+				ieee80211_tx_status(wcn->hw, ctl->skb);
- 			}
- 			spin_lock(&ctl->skb_lock);
- 			if (wcn->queues_stopped) {
+diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+index e943e6cee254..f308c8c40cb9 100644
+--- a/arch/arm/include/asm/bitops.h
++++ b/arch/arm/include/asm/bitops.h
+@@ -159,16 +159,16 @@ extern int _test_and_change_bit(int nr, volatile unsigned long * p);
+ /*
+  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
+  */
+-extern int _find_first_zero_bit_le(const void * p, unsigned size);
+-extern int _find_next_zero_bit_le(const void * p, int size, int offset);
++extern int _find_first_zero_bit_le(const unsigned long *p, unsigned size);
++extern int _find_next_zero_bit_le(const unsigned long *p, int size, int offset);
+ extern int _find_first_bit_le(const unsigned long *p, unsigned size);
+ extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
+ 
+ /*
+  * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
+  */
+-extern int _find_first_zero_bit_be(const void * p, unsigned size);
+-extern int _find_next_zero_bit_be(const void * p, int size, int offset);
++extern int _find_first_zero_bit_be(const unsigned long *p, unsigned size);
++extern int _find_next_zero_bit_be(const unsigned long *p, int size, int offset);
+ extern int _find_first_bit_be(const unsigned long *p, unsigned size);
+ extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
+ 
 -- 
-2.12.0
+2.11.0
