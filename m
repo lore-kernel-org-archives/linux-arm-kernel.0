@@ -1,36 +1,23 @@
-From: liudongdong3@huawei.com (Dongdong Liu)
-Date: Wed, 26 Apr 2017 18:53:30 +0800
-Subject: [PATCH v4 00/21] PCI: fix config space memory mappings
-In-Reply-To: <2e24e205-d761-9172-9463-4a53e1a0de4d@jonmasters.org>
-References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
- <2e24e205-d761-9172-9463-4a53e1a0de4d@jonmasters.org>
-Message-ID: <361fde15-5ba3-d33b-f946-003e89ba071f@huawei.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Wed, 26 Apr 2017 13:00:04 +0200
+Subject: reset: Use devm_kcalloc() in ti_syscon_reset_probe()?
+In-Reply-To: <1493198391.3653.4.camel@pengutronix.de>
+References: <e10a20a2-cfea-5b42-db3a-41b6eb08d7e4@users.sourceforge.net>
+ <1493198391.3653.4.camel@pengutronix.de>
+Message-ID: <5a59a0ca-488a-8d19-2681-ff516c3622e6@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> Thank you, I have applied this to the reset/next branch.
 
-Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+Thanks for your acceptance.
 
-I tested the patchset on HiSilicon ARM64 D05 board.It works ok with 82599 netcard.
 
-Thanks,
-Dongdong
-? 2017/4/25 14:40, Jon Masters ??:
-> On 04/19/2017 12:48 PM, Lorenzo Pieralisi wrote:
->
->> On some platforms (ie ARM/ARM64) ioremap fails to comply with the PCI
->> configuration non-posted write transactions requirement, because it
->> provides a memory mapping that issues "bufferable" or, in PCI terms
->> "posted" write transactions. Likewise, the current pci_remap_iospace()
->> implementation maps the physical address range that the PCI translates
->> to I/O space cycles to virtual address space through pgprot_device()
->> attributes that on eg ARM64 provides a memory mapping issuing
->> posted writes transactions, which is not PCI specifications compliant.
->
-> Side note that I've pinged all of the ARM server vendors and asked them
-> to verify this patch series on their platforms.
->
-> Jon.
->
-> .
->
+> The same change could be made in the ti-syscon reset driver.
+
+I was unsure if a similar source code adjustments would be worthwhile there.
+If you would like to be more strict with consistent usage of Linux functions
+for array allocations, there are various further update candidates to consider.
+
+Regards,
+Markus
