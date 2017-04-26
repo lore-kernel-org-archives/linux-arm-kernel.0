@@ -1,68 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Apr 2017 10:48:46 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Increase SMMU CMD queue poll timeout
-In-Reply-To: <CA+sq2CfNYKs8Ub4bWTM1GRGO=06N-Tn7BkehwJE6LpZvC0=R=Q@mail.gmail.com>
-References: <1493035176-3633-1-git-send-email-gakula@caviumnetworks.com>
- <20170424160841.GS12323@arm.com>
- <CA+sq2CeyVm4pcAVME7OAFVxpOcSJc5CsP0vz3ypDkSxdx0SKnQ@mail.gmail.com>
- <20170424170518.GU12323@arm.com>
- <CA+sq2CfNYKs8Ub4bWTM1GRGO=06N-Tn7BkehwJE6LpZvC0=R=Q@mail.gmail.com>
-Message-ID: <20170426094846.GD21744@arm.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 26 Apr 2017 11:57:16 +0200
+Subject: [PATCH v5 02/22] KVM: arm/arm64: Add GICV3 pending table save API
+ documentation
+In-Reply-To: <20170426084830.GB2098@work-vm>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-3-git-send-email-eric.auger@redhat.com>
+ <CAFEAcA_0N9Jx5ym+=jjmxAzSaXPjt-m+gW1cq90of8Qhw3LOzg@mail.gmail.com>
+ <a5ab9181-8398-f62b-12f1-032961b12c28@redhat.com>
+ <CAFEAcA-u-sH+v-Pnr_3gRC3iSJP0ZK68+GqkDzmi3xe1-B2WAQ@mail.gmail.com>
+ <20170426084830.GB2098@work-vm>
+Message-ID: <4dc866a0-582c-af69-916f-eb435988b5ec@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 02:50:04PM +0530, Sunil Kovvuri wrote:
-> On Mon, Apr 24, 2017 at 10:35 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Apr 24, 2017 at 10:26:53PM +0530, Sunil Kovvuri wrote:
-> >> On Mon, Apr 24, 2017 at 9:38 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >> > On Mon, Apr 24, 2017 at 05:29:36PM +0530, Geetha sowjanya wrote:
-> >> >> From: Geetha <gakula@cavium.com>
-> >> >>
-> >> >> When large memory is being unmapped, huge no of tlb invalidation cmds are
-> >> >> submitted followed by a SYNC command. This sometimes hits CMD queue full and
-> >> >> poll on queue drain is being timedout throwing error message 'CMD_SYNC timeout'.
-> >> >>
-> >> >> Although there is no functional issue, error message confuses user. Hence increased
-> >> >> poll timeout to 500us
-> >> >
-> >> > Hmm, what are you doing to unmap that much? Is this VFIO teardown? Do you
-> >> > have 7c6d90e2bb1a ("iommu/io-pgtable-arm: Fix iova_to_phys for block
-> >> > entries") applied?
-> >>
-> >> Yes it's VFIO teardown and again yes the above fix is applied.
-> >> But i didn't get how above fix is related.
-> >> TLB invalidation commands are submitted at 'arm_smmu_tlb_inv_range_nosync()'
-> >> and it's a loop over granule size.
-> >>
-> >> 1357         do {
-> >> 1358                 arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-> >> 1359                 cmd.tlbi.addr += granule;
-> >> 1360         } while (size -= granule);
-> >>
-> >> So if invalidation size is big then huge no of invalidation commands
-> >> will be submitted
-> >> irrespective of fix that you pointed above, right ?
-> >
-> > VFIO has some logic to batch up invalidations, but this didn't work properly
-> > for us without the fix above. However, I guess you have a huge memory range
-> > that's mapped with 2M sections or something, so there are still loads of
-> > entries to invalidate.
-> >
-> > I would much prefer it if VFIO could just teardown the whole address space
-> > so that we could do an invalidate all, but there's a chicken-and-egg problem
-> > with page accounting iirc.
-> >
+Hi Peter, Dave,
+
+On 26/04/2017 10:48, Dr. David Alan Gilbert wrote:
+> * Peter Maydell (peter.maydell at linaro.org) wrote:
+>> On 26 April 2017 at 09:26, Auger Eric <eric.auger@redhat.com> wrote:
+>>> On 25/04/2017 12:43, Peter Maydell wrote:
+>>>> When does the -EFAULT return happen? (if the guest points GITS_BASER<n>
+>>>> etc at invalid memory, presumably?)
+>>>
+>>> Yes that's correct, when GICR_PENDBASER contains a bad GPA.
+>>>
+>>>>  How does the QEMU migration code
+>>>> handle this case? Failing migration because the guest has done something
+>>>> silly doesn't seem too palatable, but trying to avoid that could be
+>>>> more effort than an obscure corner case really merits.
+>>>
+>>> The kvm_device_access will cause an abort() as for other errors returned
+>>> by kvm_device_ioctl().
+>>
+>> That's pretty nasty. Guests shouldn't be able to provoke QEMU
+>> into abort()ing, ideally. We don't necessarily have to produce
+>> a successful migration, but we should at least fail it cleanly.
 > 
-> We can definitely look into this from VFIO perspective but for now I am guessing
-> this patch is fine, as no functionality is being changed.
-> What do you say ?
+> Yes, no abort()'s during migration due to guest behaviour.
+> They always end up coming back around to being filed as migration
+> bugs and people worry why they've got cores.
+> 
+> Ideally log a message into stderr to say that the guest state
+> is inconsistent so that when someone comes to debug it then they
+> can see it's obvious.
 
-Thinking about it some more, I'd rather we rework the polling loop so that:
+OK I agree. I will respin the QEMU part accordingly and in that
+situation I won't abort and will print a message.
 
-1. It's structured more like the arm-smmu.c TLB loop queued for 4.11
-   (so we don't udelay(1) if the thing doesn't sync immediately)
+Thanks
 
-2. Have a larger timeout for the drain case, which I think is what you're
-   running into. This could even be 1s, like arm-smmu.c.
-
-Will
+Eric
+> 
+> Dave
+> 
+>> thanks
+>> -- PMM
+> --
+> Dr. David Alan Gilbert / dgilbert at redhat.com / Manchester, UK
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
