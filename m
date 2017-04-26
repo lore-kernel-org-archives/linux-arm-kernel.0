@@ -1,41 +1,55 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 26 Apr 2017 17:26:01 +0800
-Subject: [PATCH v2 17/30] arm: dts: mt7623: add ir nodes to the mt7623.dtsi
- file
+Date: Wed, 26 Apr 2017 17:26:10 +0800
+Subject: [PATCH v2 26/30] arm: dts: mt7623: cleanup the mt7623n rfb uart nodes
 In-Reply-To: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
 References: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
-Message-ID: <1493198774-4478-18-git-send-email-sean.wang@mediatek.com>
+Message-ID: <1493198774-4478-27-git-send-email-sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+From: John Crispin <john@phrozen.org>
 
-Add ir nodes to the mt7623.dtsi file.
+This patch does a cleanup of the uart nodes in the dts file of the RFB. It
+adds aliases, enables 2 more uarts and explicitly sets the uart mode of the
+console.
 
+Signed-off-by: John Crispin <john@phrozen.org>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- arch/arm/boot/dts/mt7623.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/mt7623n-rfb.dtsi | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index ad7c50a..76e0840 100644
---- a/arch/arm/boot/dts/mt7623.dtsi
-+++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -171,6 +171,15 @@
- 		clock-names = "spi", "wrap";
+diff --git a/arch/arm/boot/dts/mt7623n-rfb.dtsi b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+index c526116..4963e6a 100644
+--- a/arch/arm/boot/dts/mt7623n-rfb.dtsi
++++ b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+@@ -16,12 +16,26 @@
+ 
+ / {
+ 	chosen {
+-		stdout-path = &uart2;
++		stdout-path = "serial2:115200n8";
  	};
  
-+	cir: cir at 0x10013000 {
-+		compatible = "mediatek,mt7623-cir";
-+		reg = <0 0x10013000 0 0x1000>;
-+		interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&infracfg CLK_INFRA_IRRX>;
-+		clock-names = "clk";
-+		status = "disabled";
-+	};
+ 	memory at 80000000 {
+ 		reg = <0 0x80000000 0 0x40000000>;
+ 	};
 +
- 	sysirq: interrupt-controller at 10200100 {
- 		compatible = "mediatek,mt7623-sysirq",
- 			     "mediatek,mt6577-sysirq";
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
+ };
+ 
+ &uart2 {
 -- 
 1.9.1
