@@ -1,73 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 26 Apr 2017 10:11:55 +0200
-Subject: [PATCH/RFC 0/5] arm64: dts: renesas: Break out common board
- support
-In-Reply-To: <20170426080642.GK25517@verge.net.au>
-References: <1492779321-23939-1-git-send-email-geert+renesas@glider.be>
- <20170426080642.GK25517@verge.net.au>
-Message-ID: <CAMuHMdXbe=rkeS+-teg7nqbjULWY0_5pBO1XEzCGdYA4gB57oA@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 26 Apr 2017 10:12:29 +0200
+Subject: [PATCH v7 1/4] syscalls: Restore address limit after a syscall
+In-Reply-To: <CAJcbSZH7Y6iBy3T3iWyh_AaFJ+TidP7E9iQEuCbShQrcTKGoyw@mail.gmail.com>
+References: <20170410164420.64003-1-thgarnie@google.com>
+ <20170425063305.hwjuxupa37rwe6zj@gmail.com>
+ <CAJcbSZH7Y6iBy3T3iWyh_AaFJ+TidP7E9iQEuCbShQrcTKGoyw@mail.gmail.com>
+Message-ID: <20170426081229.6wnugrs7w3at4xry@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
 
-CC Vladimir (which I forgot to CC initially, sorry for that)
+* Thomas Garnier <thgarnie@google.com> wrote:
 
-On Wed, Apr 26, 2017 at 10:06 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Apr 21, 2017 at 02:55:16PM +0200, Geert Uytterhoeven wrote:
->> The Renesas Salvator-X and ULCB development board can be equipped with
->> either an R-Car H3 or M3-W SiP, which are pin-compatible.  All boards
->> use separate DTBs, but currently there's no sharing of board-specific
->> devices in DTS.
->>
->> This series reduces duplication by extracting common board support into
->> their own .dtsi files.  As the level of support varies across boards and
->> SoCs, this requires the addition of a few external clocks and
->> placeholder devices on R-Car M3-W, so the common board support DTS can
->> refer to them.
->>
->>   - Patches 1 and 2 add the external audio and PCIe bus clocks on R-Car
->>     M3-W, which are present in r8a7795.dtsi, and used in
->>     r8a7795-salvator-x.dts,
->>   - RFC patch 3 adds placeholders for devices that are not yet supported
->>     and/or tested on R-Car M3-W, but used on R-Car H3,
->>   - RFC patch 4 extracts common Salvator-X board support,
->>   - RFC patch 5 extracts common ULCB board support.
->>
->> For R-Car H3 based boards, there are no functional changes.
->> For R-Car M3-W based boards, some new devices are now described in DT.
->>
->> Dependencies:
->>   - renesas-devel-20170420-v4.11-rc7,
->>   - Patches 1 and 2 can be applied as-is,
->>   - Patches 4 and 5 depend on "[PATCH 0/8] arm64: dts: renesas: Break
->>     out R-Car H3 and M3-W SiP"
->>     (http://www.spinics.net/lists/devicetree/msg173820.html).
->>
->> DTB changes have been inspected using scripts/dtc/dtx_diff.
->> This has been tested on Salvator-X (both H3 and M3-W).
->> This has not been tested on H3ULCB and M3ULCB due to lack of hardware.
->>
->> Thanks for your comments!
->
-> Thanks for tackling this important problem. I have looked over the changes
-> and they seem nice to me. I would, however, be more comfortable applying
-> them if they were rested on the ULCB boards.
+> >> +#ifdef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+> >> +/*
+> >> + * This function is called when an architecture specific implementation detected
+> >> + * an invalid address limit. The generic user-mode state checker will finish on
+> >> + * the appropriate BUG_ON.
+> >> + */
+> >> +asmlinkage void address_limit_check_failed(void)
+> >> +{
+> >> +     verify_pre_usermode_state();
+> >> +     panic("address_limit_check_failed called with a valid user-mode state");
+> >
+> > It's very unconstructive to unconditionally panic the system, just because some
+> > kernel code leaked the address limit! Do a warn-once printout and kill the current
+> > task (i.e. don't continue execution), but don't crash everything else!
+> 
+> The original change did not crash the kernel for this exact reason.
+> Through reviews, there was an overall agreement that the kernel should
+> not continue in this state.
 
-tested?
+Ok, I guess we can try that - but the panic message is still pretty misleading:
 
-I've pushed a branch for testing to topic/rcar3-dtsi-sharing in
-git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
+	panic("address_limit_check_failed called with a valid user-mode state");
 
-Thanks!
+... so it was called with a _valid_ user-mode state, and we crash due to something 
+valid? Huh?
 
-Gr{oetje,eeting}s,
+( Also, the style rule applies to kernel messages as well: function names should 
+  be referred to as "function_name()". )
 
-                        Geert
+Thanks,
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Ingo
