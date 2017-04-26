@@ -1,54 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Apr 2017 14:03:15 +0200
-Subject: [PATCH v4 5/7] pinctrl: aramda-37xx: Add irqchip support
-In-Reply-To: <87zif38qu2.fsf@free-electrons.com>
-References: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
- <70ffe3343c13d01737bf74e5de4898d0c0be07a0.1491405475.git-series.gregory.clement@free-electrons.com>
- <CACRpkdZ=mVXBbVf1iHg8nQ6pYUkvpB+egH+stoMrkD8V_vaYpg@mail.gmail.com>
- <87zif38qu2.fsf@free-electrons.com>
-Message-ID: <CACRpkdYYRe4A+Zj+fDpC9SA1pgaVSgewYGB_vCNoWNRXWTtTGQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 26 Apr 2017 12:32:04 +0100
+Subject: [PATCH v2 2/2] arm64: module: split core and init PLT sections
+In-Reply-To: <1487715177-30790-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1487715177-30790-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1487715177-30790-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170426113203.GB9406@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 11:23 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
->  On lun., avril 24 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Tue, Feb 21, 2017 at 10:12:57PM +0000, Ard Biesheuvel wrote:
+> The arm64 module PLT code allocates all PLT entries in a single core
+> section, since the overhead of having a separate init PLT section is
+> not justified by the small number of PLT entries usually required for
+> init code.
+> 
+> However, the core and init module regions are allocated independently,
+> and there is a corner case where the core region may be allocated from
+> the VMALLOC region if the dedicated module region is exhausted, but the
+> init region, being much smaller, can still be allocated from the module
+> region. This leads to relocation failures if the distance between those
+> regions exceeds 128 MB. (In fact, this corner case is highly unlikely to
+> occur on arm64, but the issue has been observed on ARM, whose module
+> region is much smaller).
+> 
+> So split the core and init PLT regions, and name the latter ".init.plt"
+> so it gets allocated along with (and sufficiently close to) the .init
+> sections that it serves. Also, given that init PLT entries may need to
+> be emitted for branches that target the core module, modify the logic
+> that disregards defined symbols to only disregard symbols that are
+> defined in the same section as the relocated branch instruction.
+> 
+> Since there may now be two PLT entries associated with each entry in
+> the symbol table, we can no longer hijack the symbol::st_size fields
+> to record the addresses of PLT entries as we emit them for zero-addend
+> relocations. So instead, perform an explicit comparison to check for
+> duplicate entries.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
->>> +               spin_lock_irqsave(&info->irq_lock, flags);
->>> +               status = readl_relaxed(info->base + IRQ_STATUS + 4 * i);
->>> +               /* Manage only the interrupt that was enabled */
->>> +               status &= readl_relaxed(info->base + IRQ_EN + 4 * i);
->>> +               spin_unlock_irqrestore(&info->irq_lock, flags);
->>> +               while (status) {
->>> +                       u32 hwirq = ffs(status) - 1;
->>> +                       u32 virq = irq_find_mapping(d, hwirq +
->>> +                                                    i * GPIO_PER_REG);
->>> +
->>> +                       generic_handle_irq(virq);
->>> +                       status &= ~BIT(hwirq);
->>> +               }
->>
->> You hae a problem here is a new IRQ appears while you are inside
->> of this loop. You need to re-read the status register for each iteration
->> (and &= with the IRQ_EN I guess).
->
-> If a new IRQ appears during the loop, then the irq handler will be
-> called again because the cause of this new IRQ won't have been acked
-> yet. So I think we're fine here.
+I forgot about this patch. I'll queue it for 4.12. Thanks.
 
-That *might* be true. It is true if the CPU gets a level IRQ from the
-GPIO controller. But hardware dealing with edge IRQs can be very
-quirky here, and just send a pulse on the line to the CPU if the
-CPU-bound IRQ is also just edge triggered. And then that
-pulse would potentially be missed while dealing with the current
-IRQ in this handler. (And exactly this happened to us on other
-hardware.)
-
-But anyway: why let the irq handler be called again if you can avoid it?
-
-You would avoid a double context switch by just checking it again
-in the loop before exiting the handler. And that can be really nice
-for latency-sensitive stuff.
-
-Yours,
-Linus Walleij
+-- 
+Catalin
