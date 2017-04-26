@@ -1,113 +1,73 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Wed, 26 Apr 2017 16:10:05 +0800
-Subject: [SPAM]Re: [PATCH 2/2] dt-bindings: pcie: Add documentation for
- Mediatek PCIe
-In-Reply-To: <CAK8P3a1vgi9VBZfRNq0dDKzmfe8FkHQtgz6fEXW9fyUnBHtaQQ@mail.gmail.com>
-References: <1492935543-18190-1-git-send-email-ryder.lee@mediatek.com>
- <1492935543-18190-3-git-send-email-ryder.lee@mediatek.com>
- <CAK8P3a1vgi9VBZfRNq0dDKzmfe8FkHQtgz6fEXW9fyUnBHtaQQ@mail.gmail.com>
-Message-ID: <1493194205.27023.80.camel@mtkswgap22>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 26 Apr 2017 10:11:55 +0200
+Subject: [PATCH/RFC 0/5] arm64: dts: renesas: Break out common board
+ support
+In-Reply-To: <20170426080642.GK25517@verge.net.au>
+References: <1492779321-23939-1-git-send-email-geert+renesas@glider.be>
+ <20170426080642.GK25517@verge.net.au>
+Message-ID: <CAMuHMdXbe=rkeS+-teg7nqbjULWY0_5pBO1XEzCGdYA4gB57oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Simon,
 
-On Tue, 2017-04-25 at 14:18 +0200, Arnd Bergmann wrote:
-> On Sun, Apr 23, 2017 at 10:19 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> > Add documentation for PCIe host driver available in MT7623
-> > series SoCs.
-> >
-> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> > ---
-> >  .../bindings/pci/mediatek,mt7623-pcie.txt          | 153 +++++++++++++++++++++
-> >  1 file changed, 153 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
-> > new file mode 100644
-> > index 0000000..ee93ba2
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
-> > @@ -0,0 +1,153 @@
-> > +Mediatek MT7623 PCIe controller
-> > +
-> > +Required properties:
-> > +- compatible: Should contain "mediatek,mt7623-pcie".
-> 
-> Did mediatek license the IP block from someone else or was it
-> developed in-house? Is there a name and/or version identifier
-> for the block itself other than identifying it as the one in mt7623?
+CC Vladimir (which I forgot to CC initially, sorry for that)
 
-Originally, it license from synopsys. Our designer add a wrapper to hide
-the DBI detail so that we cannot use them directly. Perhaps I can call
-it "mediatek,gen2v1-pcie", because we have a plan to upstream a in-house
-Gen2 IP in the future.
+On Wed, Apr 26, 2017 at 10:06 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Apr 21, 2017 at 02:55:16PM +0200, Geert Uytterhoeven wrote:
+>> The Renesas Salvator-X and ULCB development board can be equipped with
+>> either an R-Car H3 or M3-W SiP, which are pin-compatible.  All boards
+>> use separate DTBs, but currently there's no sharing of board-specific
+>> devices in DTS.
+>>
+>> This series reduces duplication by extracting common board support into
+>> their own .dtsi files.  As the level of support varies across boards and
+>> SoCs, this requires the addition of a few external clocks and
+>> placeholder devices on R-Car M3-W, so the common board support DTS can
+>> refer to them.
+>>
+>>   - Patches 1 and 2 add the external audio and PCIe bus clocks on R-Car
+>>     M3-W, which are present in r8a7795.dtsi, and used in
+>>     r8a7795-salvator-x.dts,
+>>   - RFC patch 3 adds placeholders for devices that are not yet supported
+>>     and/or tested on R-Car M3-W, but used on R-Car H3,
+>>   - RFC patch 4 extracts common Salvator-X board support,
+>>   - RFC patch 5 extracts common ULCB board support.
+>>
+>> For R-Car H3 based boards, there are no functional changes.
+>> For R-Car M3-W based boards, some new devices are now described in DT.
+>>
+>> Dependencies:
+>>   - renesas-devel-20170420-v4.11-rc7,
+>>   - Patches 1 and 2 can be applied as-is,
+>>   - Patches 4 and 5 depend on "[PATCH 0/8] arm64: dts: renesas: Break
+>>     out R-Car H3 and M3-W SiP"
+>>     (http://www.spinics.net/lists/devicetree/msg173820.html).
+>>
+>> DTB changes have been inspected using scripts/dtc/dtx_diff.
+>> This has been tested on Salvator-X (both H3 and M3-W).
+>> This has not been tested on H3ULCB and M3ULCB due to lack of hardware.
+>>
+>> Thanks for your comments!
+>
+> Thanks for tackling this important problem. I have looked over the changes
+> and they seem nice to me. I would, however, be more comfortable applying
+> them if they were rested on the ULCB boards.
 
-> > +- device_type: Must be "pci"
-> > +- reg: Base addresses and lengths of the pcie controller.
-> > +- interrupts: A list of interrupt outputs of the controller.
-> 
-> Please be more specific about what each interrupt is for, and how
-> many there are.
+tested?
 
-OK.
+I've pushed a branch for testing to topic/rcar3-dtsi-sharing in
+git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
 
-> > +Required properties:
-> > +- device_type: Must be "pci"
-> > +- assigned-addresses: Address and size of the port configuration registers
-> > +- reg: Only the first four bytes are used to refer to the correct bus number
-> > +  and device number.
-> > +- #address-cells: Must be 3
-> > +- #size-cells: Must be 2
-> > +- ranges: Sub-ranges distributed from the PCIe controller node. An empty
-> > +  property is sufficient.
-> > +- clocks: Must contain an entry for each entry in clock-names.
-> > +  See ../clocks/clock-bindings.txt for details.
-> > +- clock-names: Must include the following entries:
-> > +  - sys_ck
-> > +- resets: Must contain an entry for each entry in reset-names.
-> > +  See ../reset/reset.txt for details.
-> 
-> This seems odd: you have a device that is simply identified as "pci"
-> without any more specific ID, but you require additional properties
-> (clocks, reset, ...) that are not part of the standard PCI binding.
-> 
-> Can you clarify how the port devices related to the root device in
-> this hardware design?
+Thanks!
 
-I will write clarify like this:
+Gr{oetje,eeting}s,
 
-PCIe subsys includes one Host/PCI bridge and 3 PCIe MAC port. There
-are 3 bus master for data access and 1 slave for configuration and
-status register access. Each port has PIPE interface to PHY and
+                        Geert
 
-> Have you considered moving the nonstandard properties into the host
-> bridge node and having that device deal with setting up the links
-> to the other drivers? That way we could use the regular pcie
-> port driver for the children.
-> 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-OK, but I still want to use port->reset to catch reset properties in
-driver.
- 
-> > +- reset-names: Must include the following entries:
-> > +  - pcie-reset
-> > +- num-lanes: Number of lanes to use for this port.
-> > +- phys: Must contain an entry for each entry in phy-names.
-> > +- phy-names: Must include an entry for each sub node. Entries are of the form
-> > +  "pcie-phyN": where N ranges from 0 to the value specified for port number.
-> > +  See ../phy/phy-mt7623-pcie.txt for details.
-> 
-> I think the name should not include the number of the port but rather
-> be always the same here.
-> 
-
-Hmm, I think it's better to keep the name here. It's more readable for
-user to understand the relationship between port0 and phy0.
-
->       Arnd
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
