@@ -1,112 +1,73 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Apr 2017 17:13:35 +0100
-Subject: [RFC/RFT PATCH 07/18] ARM: PCI: orion5x: Convert PCI scan API to
- pci_scan_root_bus_bridge()
-In-Reply-To: <20170426151257.GA4489@lunn.ch>
-References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
- <20170426111809.19922-8-lorenzo.pieralisi@arm.com>
- <20170426151257.GA4489@lunn.ch>
-Message-ID: <20170426161335.GA12240@red-moon>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 26 Apr 2017 17:15:53 +0100
+Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
+In-Reply-To: <a87748e4-21e7-f65a-5be1-fe4f60bdfbef@st.com>
+References: <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
+ <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
+ <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
+ <73caede5-ea6f-8b2b-2270-227f7ef31823@st.com>
+ <20170411211040.htrcedus3c57fbed@sirena.org.uk>
+ <86a179ad-7961-18f7-8050-25e0e584c77d@st.com>
+ <20170412113251.nfyk5sw6c5pnpmwr@sirena.org.uk>
+ <d886a9c7-ca46-f37a-0e82-6ed8d7a4e052@st.com>
+ <20170412153831.r2urwvfseipfsrsi@sirena.org.uk>
+ <a87748e4-21e7-f65a-5be1-fe4f60bdfbef@st.com>
+Message-ID: <20170426161553.oc5pozga53ttypyq@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 05:12:57PM +0200, Andrew Lunn wrote:
-> On Wed, Apr 26, 2017 at 12:17:58PM +0100, Lorenzo Pieralisi wrote:
-> > The introduction of pci_scan_root_bus_bridge() provides a PCI core
-> > API to scan a PCI root bus backed by an already initialized
-> > struct pci_host_bridge object, which simplifies the bus scan
-> > interface and makes the PCI scan root bus interface easier to
-> > generalize as members are added to the struct pci_host_bridge().
-> > 
-> > Convert ARM orion5x platform code to pci_scan_root_bus_bridge() to
-> > improve the PCI root bus scanning interface.
-> 
-> Hi Lorenzo
-> 
-> Maybe there is something not right here.
-> 
-> With plain 4.11-rc7 i get:
-> 
-> root at orion5x:~# lspci -v
-> 0000:00:00.0 Memory controller: Marvell Technology Group Ltd. 88f5182 [Orion-NAS] ARM SoC (rev 02)
->         Subsystem: Marvell Technology Group Ltd. Device 11ab
->         Flags: bus master, fast devsel, latency 0, IRQ 12
->         Memory at <ignored> (64-bit, prefetchable)
->         Capabilities: [40] Power Management version 2
->         Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
->         Capabilities: [60] Express Root Port (Slot-), MSI 00
-> 
-> 0001:01:00.0 Memory controller: Marvell Technology Group Ltd. 88f5182 [Orion-NAS] ARM SoC (rev 02)
->         Flags: bus master, fast Back2Back, 66MHz, medium devsel, latency 0
->         BIST result: 00
->         Memory at <unassigned> (64-bit, prefetchable)
->         Memory at <ignored> (64-bit, prefetchable)
->         Memory at <ignored> (64-bit, non-prefetchable)
->         Expansion ROM at <ignored> [disabled]
->         Capabilities: [40] Power Management version 2
->         Capabilities: [48] Vital Product Data
->         Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
->         Capabilities: [60] PCI-X non-bridge device
->         Capabilities: [68] CompactPCI hot-swap <?>
-> 
-> However, with your patches applied i get:
-> 
-> 0000:00:00.0 Memory controller: Marvell Technology Group Ltd. 88f5182 [Orion-NAS] ARM SoC (rev 02)
->         Subsystem: Marvell Technology Group Ltd. Device 11ab
->         Flags: bus master, fast devsel, latency 0
->         Memory at <ignored> (64-bit, prefetchable)
->         Capabilities: [40] Power Management version 2
->         Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
->         Capabilities: [60] Express Root Port (Slot-), MSI 00
-> 
-> 0001:01:00.0 Memory controller: Marvell Technology Group Ltd. 88f5182 [Orion-NAS] ARM SoC (rev 02)
->         Flags: bus master, fast Back2Back, 66MHz, medium devsel, latency 0
->         BIST result: 00
->         Memory at <unassigned> (64-bit, prefetchable)
->         Memory at <ignored> (64-bit, prefetchable)
->         Memory at <ignored> (64-bit, non-prefetchable)
->         Expansion ROM at <ignored> [disabled]
->         Capabilities: [40] Power Management version 2
->         Capabilities: [48] Vital Product Data
->         Capabilities: [50] MSI: Enable- Count=1/1 Maskable- 64bit+
->         Capabilities: [60] PCI-X non-bridge device
->         Capabilities: [68] CompactPCI hot-swap <?>
-> 
-> Note that IRQ 12 has disappeared from Flags: on 0000:00:00.0.
+On Thu, Apr 13, 2017 at 08:01:34AM +0000, Olivier MOYSAN wrote:
 
-Thank you for testing it, that's exactly what we need.
+> 1) 2 static dais NOT exclusive
+> 	- dai tx
+> 	- dai rx
+> The IP exhibits a mode register, where you select mode TX, RX or FD.
+> There are 2 two options to manage this register.
+> option 1:
+> 	start first channel with mode RX or TX
+> 	when second channel is started, mode has to be changed to FD.
+> 	Transfers have to be stopped before changing configuration
+> 	registers, so this leads to cuts in audio stream.
+> option 2:
+> 	start a first channel with mode FD.
+> 	In this case, we may have unpredictable behavior for the stream
+> 	which is not already started. probably underrun/overrun.
+> So, this solution rises problem for full-duplex management.
 
-To check if the plumbing is working (ie to check I have not messed
-up the bus scan API rework), mind testing the patch below please
-and report back (it applies on top of this series) ?
+> 2) 3 static dais exclusive
+> 	- dai tx
+> 	- dai rx
+> 	- dai rx-tx (fd)
+> This is the current implementation.
+> The choice of the dai is done at probe time. It is provided by DT 
+> through sound-dai parameter.
+> When dai fd is selected, after starting first stream, we assume that
+> second stream will be started. In this case we wait for second stream
+> to be available before enabling IP and starting transfers.
 
-Thanks !
-Lorenzo
+> 3) 1 dynamic dai
+> 	- dai rx or tx or fd (according to dma conf in IP node)
+> Here the driver exposes only a single dai constructed from dma 
+> configuration provided by IP DT node.
+> This allows to get ride of sound-dai parameter.
 
--- >8 --
-diff --git a/drivers/pci/pci-driver.c b/drivers/pci/pci-driver.c
-index 4632fa4..afa7271 100644
---- a/drivers/pci/pci-driver.c
-+++ b/drivers/pci/pci-driver.c
-@@ -400,8 +400,6 @@ static int pci_device_probe(struct device *dev)
- 	struct pci_dev *pci_dev = to_pci_dev(dev);
- 	struct pci_driver *drv = to_pci_driver(dev->driver);
- 
--	pci_assign_irq(pci_dev);
--
- 	error = pcibios_alloc_irq(pci_dev);
- 	if (error < 0)
- 		return error;
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index de259f3..dc9a1b6 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1967,6 +1967,8 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- 	ret = pcibios_add_device(dev);
- 	WARN_ON(ret < 0);
- 
-+	pci_assign_irq(dev);
-+
- 	/* Setup MSI irq domain */
- 	pci_set_msi_domain(dev);
- 
+None of these options reflect how normal I2S controllers present
+themselves in DT.  To repeat, you should present a single bidirectional
+DAI for the single physical bidirectional I2S controller that your
+hardware has.
+
+If it's not possible to figure out a way to make the controller support
+simultaneous playback and record with the two started independently then
+the driver should just return an error if userspace tries to start the
+second direction up.  This will severely limit the utility of the driver
+as Linux generally treats playback and record independently but that's
+going to apply just as much with any of the options involving multiple
+DAIs or configuration in DT.  You might be able to do something with
+feeding it dummy data I guess?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170426/48459d98/attachment-0001.sig>
