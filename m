@@ -1,106 +1,87 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Apr 2017 12:17:54 +0100
-Subject: [RFC/RFT PATCH 03/18] PCI: Introduce pci_scan_root_bus_bridge()
+Date: Wed, 26 Apr 2017 12:17:55 +0100
+Subject: [RFC/RFT PATCH 04/18] ARM: PCI: bios32: Convert PCI scan API to
+ pci_scan_root_bus_bridge()
 In-Reply-To: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
 References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170426111809.19922-4-lorenzo.pieralisi@arm.com>
+Message-ID: <20170426111809.19922-5-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current pci_scan_root_bus() interface is made up of two main
-code paths:
+The introduction of pci_scan_root_bus_bridge() provides a PCI core
+API to scan a PCI root bus backed by an already initialized
+struct pci_host_bridge object, which simplifies the bus scan
+interface and makes the PCI scan root bus interface easier to
+generalize as members are added to the struct pci_host_bridge).
 
-- pci_create_root_bus()
-- pci_scan_child_bus()
-
-pci_create_root_bus() is a wrapper function that allows to create
-a struct pci_host_bridge structure, initialize it with the passed
-parameters and register it with the kernel.
-
-As the struct pci_host_bridge require additional struct members,
-pci_create_root_bus() parameters list has grown in time, making
-it unwieldy to add further parameters to it in case the struct
-pci_host_bridge gains more members fields to augment its functionality.
-
-Since PCI core code provides functions to allocate struct
-pci_host_bridge, instead of forcing the pci_create_root_bus() interface
-to add new parameters to cater for new struct pci_host_bridge
-functionality, it is more suitable to add an interface in PCI
-core code to scan a PCI bus straight from a struct pci_host_bridge
-created and customized by each specific PCI host controller driver.
-
-Add a pci_scan_root_bus_bridge() function to allow PCI host controller
-drivers to create and initialize struct pci_host_bridge and scan
-the resulting bus.
+Convert ARM bios32 code to pci_scan_root_bus_bridge() to improve
+the PCI root bus scanning interface.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Russell King <linux@armlinux.org.uk>
 ---
- drivers/pci/probe.c | 38 ++++++++++++++++++++++++++++++++++++++
- include/linux/pci.h |  1 +
- 2 files changed, 39 insertions(+)
+ arch/arm/kernel/bios32.c | 34 ++++++++++++++++++++++++++--------
+ 1 file changed, 26 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 7e4ffc4..c7a7f72 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -2412,6 +2412,44 @@ void pci_bus_release_busn_res(struct pci_bus *b)
- 			res, ret ? "can not be" : "is");
- }
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 2f0e077..e2095f5 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -473,7 +473,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 		ret = hw->setup(nr, sys);
  
-+int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge)
-+{
-+	struct resource_entry *window;
-+	bool found = false;
-+	struct pci_bus *b;
-+	int max, bus, ret;
+ 		if (ret > 0) {
+-			struct pci_host_bridge *host_bridge;
++			struct pci_host_bridge *bridge;
+ 
+ 			ret = pcibios_init_resource(nr, sys, hw->io_optional);
+ 			if (ret)  {
+@@ -483,10 +483,31 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 
+ 			if (hw->scan)
+ 				sys->bus = hw->scan(nr, sys);
+-			else
+-				sys->bus = pci_scan_root_bus_msi(parent,
+-					sys->busnr, hw->ops, sys,
+-					&sys->resources, hw->msi_ctrl);
++			else {
++				bridge = pci_alloc_host_bridge(0);
++				if (!bridge) {
++					kfree(sys);
++					break;
++				}
 +
-+	if (!bridge)
-+		return -EINVAL;
++				list_splice_init(&sys->resources,
++						 &bridge->windows);
++				bridge->dev.parent = parent;
++				bridge->sysdata = sys;
++				bridge->busnr = sys->busnr;
++				bridge->ops = hw->ops;
++				bridge->msi = hw->msi_ctrl;
++				bridge->align_resource =
++						hw->align_resource;
 +
-+	resource_list_for_each_entry(window, &bridge->windows)
-+		if (window->res->flags & IORESOURCE_BUS) {
-+			found = true;
-+			break;
-+		}
++				ret = pci_scan_root_bus_bridge(bridge);
++				if (ret < 0) {
++					pci_free_host_bridge(bridge);
++					break;
++				}
 +
-+	ret = pci_register_host_bridge(bridge);
-+	if (ret < 0)
-+		return ret;
-+
-+	b = bridge->bus;
-+	bus = bridge->busnr;
-+
-+	if (!found) {
-+		dev_info(&b->dev,
-+		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
-+			bus);
-+		pci_bus_insert_busn_res(b, bus, 255);
-+	}
-+
-+	max = pci_scan_child_bus(b);
-+
-+	if (!found)
-+		pci_bus_update_busn_res_end(b, max);
-+
-+	return 0;
-+}
-+
- struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
- 		struct pci_ops *ops, void *sysdata,
- 		struct list_head *resources, struct msi_controller *msi)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 99878a9..757779a 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -847,6 +847,7 @@ struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
- struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
- 					     struct pci_ops *ops, void *sysdata,
- 					     struct list_head *resources);
-+int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge);
- struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
- 				int busnr);
- void pcie_update_link_speed(struct pci_bus *bus, u16 link_status);
++				sys->bus = bridge->bus;
++			}
+ 
+ 			if (WARN(!sys->bus, "PCI: unable to scan bus!")) {
+ 				kfree(sys);
+@@ -496,9 +517,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 			busnr = sys->bus->busn_res.end + 1;
+ 
+ 			list_add(&sys->node, head);
+-
+-			host_bridge = pci_find_host_bridge(sys->bus);
+-			host_bridge->align_resource = hw->align_resource;
+ 		} else {
+ 			kfree(sys);
+ 			if (ret < 0)
 -- 
 2.10.0
