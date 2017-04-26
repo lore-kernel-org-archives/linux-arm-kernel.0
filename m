@@ -1,65 +1,82 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 26 Apr 2017 11:57:16 +0200
-Subject: [PATCH v5 02/22] KVM: arm/arm64: Add GICV3 pending table save API
- documentation
-In-Reply-To: <20170426084830.GB2098@work-vm>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-3-git-send-email-eric.auger@redhat.com>
- <CAFEAcA_0N9Jx5ym+=jjmxAzSaXPjt-m+gW1cq90of8Qhw3LOzg@mail.gmail.com>
- <a5ab9181-8398-f62b-12f1-032961b12c28@redhat.com>
- <CAFEAcA-u-sH+v-Pnr_3gRC3iSJP0ZK68+GqkDzmi3xe1-B2WAQ@mail.gmail.com>
- <20170426084830.GB2098@work-vm>
-Message-ID: <4dc866a0-582c-af69-916f-eb435988b5ec@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 26 Apr 2017 11:01:50 +0100
+Subject: [PATCH v2] iommu/arm-smmu: Return IOVA in iova_to_phys when SMMU
+ is bypassed
+In-Reply-To: <1493114272-30093-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1493114272-30093-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <20170426100150.GE21744@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter, Dave,
+Hi Sunil,
 
-On 26/04/2017 10:48, Dr. David Alan Gilbert wrote:
-> * Peter Maydell (peter.maydell at linaro.org) wrote:
->> On 26 April 2017 at 09:26, Auger Eric <eric.auger@redhat.com> wrote:
->>> On 25/04/2017 12:43, Peter Maydell wrote:
->>>> When does the -EFAULT return happen? (if the guest points GITS_BASER<n>
->>>> etc at invalid memory, presumably?)
->>>
->>> Yes that's correct, when GICR_PENDBASER contains a bad GPA.
->>>
->>>>  How does the QEMU migration code
->>>> handle this case? Failing migration because the guest has done something
->>>> silly doesn't seem too palatable, but trying to avoid that could be
->>>> more effort than an obscure corner case really merits.
->>>
->>> The kvm_device_access will cause an abort() as for other errors returned
->>> by kvm_device_ioctl().
->>
->> That's pretty nasty. Guests shouldn't be able to provoke QEMU
->> into abort()ing, ideally. We don't necessarily have to produce
->> a successful migration, but we should at least fail it cleanly.
+On Tue, Apr 25, 2017 at 03:27:52PM +0530, sunil.kovvuri at gmail.com wrote:
+> From: Sunil Goutham <sgoutham@cavium.com>
 > 
-> Yes, no abort()'s during migration due to guest behaviour.
-> They always end up coming back around to being filed as migration
-> bugs and people worry why they've got cores.
+> For software initiated address translation, when domain type is
+> IOMMU_DOMAIN_IDENTITY i.e SMMU is bypassed, mimic HW behavior
+> i.e return the same IOVA as translated address.
 > 
-> Ideally log a message into stderr to say that the guest state
-> is inconsistent so that when someone comes to debug it then they
-> can see it's obvious.
+> This patch is an extension to Will Deacon's patchset
+> "Implement SMMU passthrough using the default domain".
+> 
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> ---
+> 
+> V2
+> - As per Will's suggestion applied fix to SMMUv3 driver as well.
 
-OK I agree. I will respin the QEMU part accordingly and in that
-situation I won't abort and will print a message.
+This follows what the AMD driver does, so:
 
-Thanks
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Eric
+but I still think that having drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+poke around with the physical address to get at the struct pages underlying
+a DMA buffer is really dodgy. Is there no way this can be avoided, perhaps
+by tracking the pages some other way (although I don't understand why you're
+having to mess with the page reference counts to start with)?
+
+At least, I think you should be checking the domain type in
+nicvf_iova_to_phys, which clearly expects a DMA domain if one exists at all.
+
+Joerg: sorry, this is another one for you to pick up if possible.
+
+Cheers,
+
+Will
+
+>  drivers/iommu/arm-smmu-v3.c | 3 +++
+>  drivers/iommu/arm-smmu.c    | 3 +++
+>  2 files changed, 6 insertions(+)
 > 
-> Dave
-> 
->> thanks
->> -- PMM
-> --
-> Dr. David Alan Gilbert / dgilbert at redhat.com / Manchester, UK
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 05b4592..d412bdd 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1714,6 +1714,9 @@ arm_smmu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
+>  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>  	struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
+>  
+> +	if (domain->type == IOMMU_DOMAIN_IDENTITY)
+> +		return iova;
+> +
+>  	if (!ops)
+>  		return 0;
+>  
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index bfab4f7..81088cd 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1459,6 +1459,9 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
+>  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>  	struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
+>  
+> +	if (domain->type == IOMMU_DOMAIN_IDENTITY)
+> +		return iova;
+> +
+>  	if (!ops)
+>  		return 0;
+>  
+> -- 
+> 2.7.4
 > 
