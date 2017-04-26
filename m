@@ -1,50 +1,34 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 26 Apr 2017 17:25:59 +0800
-Subject: [PATCH v2 15/30] arm: dts: mt7623: add ethernet nodes to the
- mt7623.dtsi file
+Date: Wed, 26 Apr 2017 17:26:07 +0800
+Subject: [PATCH v2 23/30] arm: dts: mt7623: add Sean as one of authors for
+ mt7623.dtsi files
 In-Reply-To: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
 References: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
-Message-ID: <1493198774-4478-16-git-send-email-sean.wang@mediatek.com>
+Message-ID: <1493198774-4478-24-git-send-email-sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Add ethernet nodes to the mt7623.dtsi file.
+Add Sean as one of the authors for the mt7623.dtsi
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- arch/arm/boot/dts/mt7623.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/mt7623.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index cfafaea..c4be7a5 100644
+index d33d535..d81158b2 100644
 --- a/arch/arm/boot/dts/mt7623.dtsi
 +++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -485,4 +485,24 @@
- 		reg = <0 0x1b000000 0 0x1000>;
- 		#clock-cells = <1>;
- 	};
-+
-+	eth: ethernet at 1b100000 {
-+		compatible = "mediatek,mt2701-eth", "syscon";
-+		reg = <0 0x1b100000 0 0x20000>;
-+		interrupts = <GIC_SPI 200 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 199 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
-+			 <&ethsys CLK_ETHSYS_ESW>,
-+			 <&ethsys CLK_ETHSYS_GP1>,
-+			 <&ethsys CLK_ETHSYS_GP2>,
-+			 <&apmixedsys CLK_APMIXED_TRGPLL>;
-+		clock-names = "ethif", "esw", "gp1", "gp2", "trgpll";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
-+		mediatek,ethsys = <&ethsys>;
-+		mediatek,pctl = <&syscfg_pctl_a>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
- };
+@@ -1,6 +1,7 @@
+ /*
+- * Copyright (c) 2016 MediaTek Inc.
++ * Copyright (c) 2017 MediaTek Inc.
+  * Author: John Crispin <john@phrozen.org>
++ *	   Sean Wang <sean.wang@mediatek.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
 -- 
 1.9.1
