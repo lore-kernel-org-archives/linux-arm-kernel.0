@@ -1,197 +1,271 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Wed, 26 Apr 2017 12:35:46 +0000
-Subject: [PATCH 2/2] dmaengine: Add STM32 MDMA driver
-In-Reply-To: <20170406070805.GG4094@localhost>
-References: <1489417599-31308-1-git-send-email-cedric.madianga@gmail.com>
- <1489417599-31308-3-git-send-email-cedric.madianga@gmail.com>
- <20170406070805.GG4094@localhost>
-Message-ID: <d1d92f79-ce3c-e057-7f47-1fd5e42fa5dc@st.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 26 Apr 2017 15:39:47 +0300
+Subject: [PATCH 3/3] arm64/locking: qspinlocks and qrwlocks support
+In-Reply-To: <20170420190530.GA6873@worktop>
+References: <1491860104-4103-1-git-send-email-ynorov@caviumnetworks.com>
+ <1491860104-4103-4-git-send-email-ynorov@caviumnetworks.com>
+ <20170413181212.y3ezah76qoztxhnn@hirez.programming.kicks-ass.net>
+ <20170420182318.4ddtfiobxz6hgbo4@yury-N73SV>
+ <20170420190530.GA6873@worktop>
+Message-ID: <20170426123947.ogap6xgg7xc5wsd4@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2017 09:08 AM, Vinod Koul wrote:
-> On Mon, Mar 13, 2017 at 04:06:39PM +0100, M'boumba Cedric Madianga wrote:
->> This patch adds the driver for the STM32 MDMA controller.
->
-> Again pls do describe the controller
+On Thu, Apr 20, 2017 at 09:05:30PM +0200, Peter Zijlstra wrote:
+> On Thu, Apr 20, 2017 at 09:23:18PM +0300, Yury Norov wrote:
+> > Is there some test to reproduce the locking failure for the case.
+> 
+> Possibly sysvsem stress before commit:
+> 
+>   27d7be1801a4 ("ipc/sem.c: avoid using spin_unlock_wait()")
+> 
+> Although a similar scheme is also used in nf_conntrack, see commit:
+> 
+>   b316ff783d17 ("locking/spinlock, netfilter: Fix nf_conntrack_lock() barriers")
+> 
+> > I
+> > ask because I run loctorture for many hours on my qemu (emulating
+> > cortex-a57), and I see no failures in the test reports. And Jan did it
+> > on ThunderX, and Adam on QDF2400 without any problems. So even if I
+> > rework those functions, how could I check them for correctness?
+> 
+> Running them doesn't prove them correct. Memory ordering bugs have been
+> in the kernel for many years without 'ever' triggering. This is stuff
+> you have to think about.
+> 
+> > Anyway, regarding the queued_spin_unlock_wait(), is my understanding
+> > correct that you assume adding smp_mb() before entering the for(;;)
+> > cycle, and using ldaxr/strxr instead of atomic_read()?
+> 
+> You'll have to ask Will, I always forget the arm64 details.
 
-OK. I will add a more detail description with V2
+So, below is what I have. For queued_spin_unlock_wait() the generated
+code is looking like this:
+ffff0000080983a0 <queued_spin_unlock_wait>:
+ffff0000080983a0:       d5033bbf        dmb     ish
+ffff0000080983a4:       b9400007        ldr     w7, [x0]
+ffff0000080983a8:       350000c7        cbnz    w7, ffff0000080983c0 <queued_spin_unlock_wait+0x20>
+ffff0000080983ac:       1400000e        b       ffff0000080983e4 <queued_spin_unlock_wait+0x44>
+ffff0000080983b0:       d503203f        yield
+ffff0000080983b4:       d5033bbf        dmb     ish
+ffff0000080983b8:       b9400007        ldr     w7, [x0]
+ffff0000080983bc:       34000147        cbz     w7, ffff0000080983e4 <queued_spin_unlock_wait+0x44>
+ffff0000080983c0:       f2401cff        tst     x7, #0xff
+ffff0000080983c4:       54ffff60        b.eq    ffff0000080983b0 <queued_spin_unlock_wait+0x10>
+ffff0000080983c8:       14000003        b       ffff0000080983d4 <queued_spin_unlock_wait+0x34>
+ffff0000080983cc:       d503201f        nop
+ffff0000080983d0:       d503203f        yield
+ffff0000080983d4:       d5033bbf        dmb     ish
+ffff0000080983d8:       b9400007        ldr     w7, [x0]
+ffff0000080983dc:       f2401cff        tst     x7, #0xff
+ffff0000080983e0:       54ffff81        b.ne    ffff0000080983d0 <queued_spin_unlock_wait+0x30>
+ffff0000080983e4:       d50339bf        dmb     ishld
+ffff0000080983e8:       d65f03c0        ret
+ffff0000080983ec:       d503201f        nop
 
->
->> +#include <linux/clk.h>
->> +#include <linux/delay.h>
->> +#include <linux/dmaengine.h>
->> +#include <linux/dma-mapping.h>
->> +#include <linux/dmapool.h>
->> +#include <linux/err.h>
->> +#include <linux/init.h>
->> +#include <linux/iopoll.h>
->> +#include <linux/jiffies.h>
->> +#include <linux/list.h>
->> +#include <linux/log2.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_device.h>
->> +#include <linux/of_dma.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/reset.h>
->> +#include <linux/sched.h>
->
-> why do you need sched.h, i am sure many of these may not be required, pls
-> check
+If I understand the documentation correctly, it's enough to check the lock
+properly. If not - please give me the clue. Will?
 
-Correct ! not needed. I'll get rid of it in V2
+Yury
 
->
->> +static int stm32_mdma_get_width(struct stm32_mdma_chan *chan,
->> +				enum dma_slave_buswidth width)
->> +{
->> +	switch (width) {
->> +	case DMA_SLAVE_BUSWIDTH_1_BYTE:
->> +		return STM32_MDMA_BYTE;
->> +	case DMA_SLAVE_BUSWIDTH_2_BYTES:
->> +		return STM32_MDMA_HALF_WORD;
->> +	case DMA_SLAVE_BUSWIDTH_4_BYTES:
->> +		return STM32_MDMA_WORD;
->> +	case DMA_SLAVE_BUSWIDTH_8_BYTES:
->> +		return STM32_MDMA_DOUBLE_WORD;
->
-> IIUC we can do this with ffs()
-
-I don't believe we can do that. This function translates DMA_SLAVE enum 
-into internal register representation.
-
->
->
->> +	default:
->> +		dev_err(chan2dev(chan), "Dma bus width not supported\n");
->> +		return -EINVAL;
->> +	}
->> +}
->> +
->> +static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 tlen)
->> +{
->> +	enum dma_slave_buswidth max_width = DMA_SLAVE_BUSWIDTH_8_BYTES;
->> +
->> +	while ((buf_len <= max_width || buf_len % max_width ||
->> +		tlen < max_width) && max_width > DMA_SLAVE_BUSWIDTH_1_BYTE)
->> +		max_width = max_width >> 1;
->
-> 1. this is hard to read
-> 2. sound like this can be optimized :)
->
-
-Ok. I will revise the check if improvements can be done
-
->> +
->> +	return max_width;
->> +}
->> +
->> +static u32 stm32_mdma_get_best_burst(u32 buf_len, u32 tlen, u32 max_burst,
->> +				     enum dma_slave_buswidth width)
->> +{
->> +	u32 best_burst = max_burst;
->> +	u32 burst_len = best_burst * width;
->> +
->> +	if (buf_len % tlen)
->> +		return 0;
->> +
->> +	while ((tlen < burst_len && best_burst > 1) ||
->> +	       (burst_len > 0 && tlen % burst_len)) {
->> +		best_burst = best_burst >> 1;
->> +		burst_len = best_burst * width;
->
-> same thing here too
-
-Ok. I will revise the check if improvements can be done
-
->
->> +
->> +	return (best_burst > 1) ? best_burst : 0;
->> +}
->> +
->> +static int stm32_mdma_disable_chan(struct stm32_mdma_chan *chan)
->> +{
->> +	struct stm32_mdma_device *dmadev = stm32_mdma_get_dev(chan);
->> +	u32 ccr, cisr, id, reg;
->> +	int ret;
->> +
->> +	id = chan->id;
->> +	reg = STM32_MDMA_CCR(id);
->> +
->> +	/* Disable interrupts */
->> +	stm32_mdma_clr_bits(dmadev, reg, STM32_MDMA_CCR_IRQ_MASK);
->> +
->> +	ccr = stm32_mdma_read(dmadev, reg);
->> +	if (ccr & STM32_MDMA_CCR_EN) {
->> +		stm32_mdma_clr_bits(dmadev, reg, STM32_MDMA_CCR_EN);
->> +
->> +		/* Ensure that any ongoing transfer has been completed */
->> +		ret = readl_relaxed_poll_timeout_atomic(
->
-> why not simple readl
-
-When Channel enable(CCR_EN) is reset by SW, it is recommended to wait 
-for the CTCIF (Channel Transfer Complete interrupt flag) = 1, in order 
-to ensure that any ongoing buffer transfer has been completed, before 
-reprogramming the channel.
-Moreover since this function might be called under interruption context 
-(a DMA Client may call dmaengine_terminate_all() for instance) function 
-cannot allow sleep. Timeout is for cases when IP is stuck and channel 
-cannot be disabled
-
->> +static void stm32_mdma_set_dst_bus(struct stm32_mdma_device *dmadev, u32 *ctbr,
->> +				   u32 dst_addr)
->> +{
->> +	u32 mask;
->> +	int i;
->> +
->> +	/* Check if memory device is on AHB or AXI */
->> +	*ctbr &= ~STM32_MDMA_CTBR_DBUS;
->> +	mask = dst_addr & 0xF0000000;
->> +	for (i = 0; i < dmadev->nr_ahb_addr_masks; i++) {
->> +		if (mask == dmadev->ahb_addr_masks[i]) {
->> +			*ctbr |= STM32_MDMA_CTBR_DBUS;
->> +			break;
->> +		}
->> +	}
->> +}
->> +
->> +static void stm32_mdma_set_src_bus(struct stm32_mdma_device *dmadev, u32 *ctbr,
->> +				   u32 src_addr)
->> +{
->> +	u32 mask;
->> +	int i;
->> +
->> +	/* Check if memory device is on AHB or AXI */
->> +	*ctbr &= ~STM32_MDMA_CTBR_SBUS;
->> +	mask = src_addr & 0xF0000000;
->> +	for (i = 0; i < dmadev->nr_ahb_addr_masks; i++) {
->> +		if (mask == dmadev->ahb_addr_masks[i]) {
->> +			*ctbr |= STM32_MDMA_CTBR_SBUS;
->> +			break;
->> +		}
->> +	}
->
-> these too look awfully same..
-
-Ok. I will create a common function then.
-
->
->> +static int __init stm32_mdma_init(void)
->> +{
->> +	return platform_driver_probe(&stm32_mdma_driver, stm32_mdma_probe);
->> +}
->> +
->> +subsys_initcall(stm32_mdma_init);
->
-> why subsys?
->
-
-subsys_initcall level is to ensure MDMA is going to be probed before its 
-clients
-
->> --
->> 1.9.1
->>
->
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 22dbde97eefa..2d80161ee367 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -25,6 +25,8 @@ config ARM64
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+ 	select ARCH_WANT_FRAME_POINTERS
+ 	select ARCH_HAS_UBSAN_SANITIZE_ALL
++	select ARCH_USE_QUEUED_SPINLOCKS
++	select ARCH_USE_QUEUED_RWLOCKS
+ 	select ARM_AMBA
+ 	select ARM_ARCH_TIMER
+ 	select ARM_GIC
+diff --git a/arch/arm64/include/asm/qrwlock.h b/arch/arm64/include/asm/qrwlock.h
+new file mode 100644
+index 000000000000..626f6ebfb52d
+--- /dev/null
++++ b/arch/arm64/include/asm/qrwlock.h
+@@ -0,0 +1,7 @@
++#ifndef _ASM_ARM64_QRWLOCK_H
++#define _ASM_ARM64_QRWLOCK_H
++
++#include <asm-generic/qrwlock_types.h>
++#include <asm-generic/qrwlock.h>
++
++#endif /* _ASM_ARM64_QRWLOCK_H */
+diff --git a/arch/arm64/include/asm/qspinlock.h b/arch/arm64/include/asm/qspinlock.h
+new file mode 100644
+index 000000000000..09ef4f13f549
+--- /dev/null
++++ b/arch/arm64/include/asm/qspinlock.h
+@@ -0,0 +1,42 @@
++#ifndef _ASM_ARM64_QSPINLOCK_H
++#define _ASM_ARM64_QSPINLOCK_H
++
++#include <asm-generic/qspinlock_types.h>
++#include <asm/atomic.h>
++
++extern void queued_spin_unlock_wait(struct qspinlock *lock);
++#define queued_spin_unlock_wait queued_spin_unlock_wait
++
++#define	queued_spin_unlock queued_spin_unlock
++/**
++ * queued_spin_unlock - release a queued spinlock
++ * @lock : Pointer to queued spinlock structure
++ *
++ * A smp_store_release() on the least-significant byte.
++ */
++static __always_inline void queued_spin_unlock(struct qspinlock *lock)
++{
++	smp_store_release((u8 *)lock, 0);
++}
++
++#define queued_spin_is_locked queued_spin_is_locked
++/**
++ * queued_spin_is_locked - is the spinlock locked?
++ * @lock: Pointer to queued spinlock structure
++ * Return: 1 if it is locked, 0 otherwise
++ */
++static __always_inline int queued_spin_is_locked(struct qspinlock *lock)
++{
++	/*
++	 * See queued_spin_unlock_wait().
++	 *
++	 * Any !0 state indicates it is locked, even if _Q_LOCKED_VAL
++	 * isn't immediately observable.
++	 */
++	smp_mb();
++	return atomic_read(&lock->val);
++}
++
++#include <asm-generic/qspinlock.h>
++
++#endif /* _ASM_ARM64_QSPINLOCK_H */
+diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
+index cae331d553f8..37713397e0c5 100644
+--- a/arch/arm64/include/asm/spinlock.h
++++ b/arch/arm64/include/asm/spinlock.h
+@@ -20,6 +20,10 @@
+ #include <asm/spinlock_types.h>
+ #include <asm/processor.h>
+ 
++#ifdef CONFIG_QUEUED_SPINLOCKS
++#include <asm/qspinlock.h>
++#else
++
+ /*
+  * Spinlock implementation.
+  *
+@@ -187,6 +191,12 @@ static inline int arch_spin_is_contended(arch_spinlock_t *lock)
+ }
+ #define arch_spin_is_contended	arch_spin_is_contended
+ 
++#endif /* CONFIG_QUEUED_SPINLOCKS */
++
++#ifdef CONFIG_QUEUED_RWLOCKS
++#include <asm/qrwlock.h>
++#else
++
+ /*
+  * Write lock implementation.
+  *
+@@ -351,6 +361,8 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
+ /* read_can_lock - would read_trylock() succeed? */
+ #define arch_read_can_lock(x)		((x)->lock < 0x80000000)
+ 
++#endif /* CONFIG_QUEUED_RWLOCKS */
++
+ #define arch_read_lock_flags(lock, flags) arch_read_lock(lock)
+ #define arch_write_lock_flags(lock, flags) arch_write_lock(lock)
+ 
+diff --git a/arch/arm64/include/asm/spinlock_types.h b/arch/arm64/include/asm/spinlock_types.h
+index 55be59a35e3f..0f0f1561ab6a 100644
+--- a/arch/arm64/include/asm/spinlock_types.h
++++ b/arch/arm64/include/asm/spinlock_types.h
+@@ -16,9 +16,9 @@
+ #ifndef __ASM_SPINLOCK_TYPES_H
+ #define __ASM_SPINLOCK_TYPES_H
+ 
+-#if !defined(__LINUX_SPINLOCK_TYPES_H) && !defined(__ASM_SPINLOCK_H)
+-# error "please don't include this file directly"
+-#endif
++#ifdef CONFIG_QUEUED_SPINLOCKS
++#include <asm-generic/qspinlock_types.h>
++#else
+ 
+ #include <linux/types.h>
+ 
+@@ -36,10 +36,18 @@ typedef struct {
+ 
+ #define __ARCH_SPIN_LOCK_UNLOCKED	{ 0 , 0 }
+ 
++#endif /* CONFIG_QUEUED_SPINLOCKS */
++
++#ifdef CONFIG_QUEUED_RWLOCKS
++#include <asm-generic/qrwlock_types.h>
++#else
++
+ typedef struct {
+ 	volatile unsigned int lock;
+ } arch_rwlock_t;
+ 
+ #define __ARCH_RW_LOCK_UNLOCKED		{ 0 }
+ 
++#endif /* CONFIG_QUEUED_RWLOCKS */
++
+ #endif
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 9d56467dc223..f48f6256e893 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -56,6 +56,7 @@ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
+ arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
+ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+ arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
++arm64-obj-$(CONFIG_QUEUED_SPINLOCKS)	+= qspinlock.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/ probes/
+ obj-$(CONFIG_ARM64_ILP32)		+= vdso-ilp32/
+diff --git a/arch/arm64/kernel/qspinlock.c b/arch/arm64/kernel/qspinlock.c
+new file mode 100644
+index 000000000000..924f19953adb
+--- /dev/null
++++ b/arch/arm64/kernel/qspinlock.c
+@@ -0,0 +1,34 @@
++#include <asm/qspinlock.h>
++#include <asm/processor.h>
++
++void queued_spin_unlock_wait(struct qspinlock *lock)
++{
++	u32 val;
++
++	for (;;) {
++		smp_mb();
++		val = atomic_read(&lock->val);
++
++		if (!val) /* not locked, we're done */
++			goto done;
++
++		if (val & _Q_LOCKED_MASK) /* locked, go wait for unlock */
++			break;
++
++		/* not locked, but pending, wait until we observe the lock */
++		cpu_relax();
++	}
++
++	for (;;) {
++		smp_mb();
++		val = atomic_read(&lock->val);
++		if (!(val & _Q_LOCKED_MASK)) /* any unlock is good */
++			break;
++
++		cpu_relax();
++	}
++
++done:
++	smp_acquire__after_ctrl_dep();
++}
++EXPORT_SYMBOL(queued_spin_unlock_wait);
+-- 
+2.11.0
