@@ -1,74 +1,65 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 26 Apr 2017 10:26:24 +0200
-Subject: [PATCH v5 02/22] KVM: arm/arm64: Add GICV3 pending table save API
- documentation
-In-Reply-To: <CAFEAcA_0N9Jx5ym+=jjmxAzSaXPjt-m+gW1cq90of8Qhw3LOzg@mail.gmail.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-3-git-send-email-eric.auger@redhat.com>
- <CAFEAcA_0N9Jx5ym+=jjmxAzSaXPjt-m+gW1cq90of8Qhw3LOzg@mail.gmail.com>
-Message-ID: <a5ab9181-8398-f62b-12f1-032961b12c28@redhat.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 26 Apr 2017 16:25:26 +0800
+Subject: [PATCH] usb: chipidea: udc: fix NULL pointer dereference if
+ udc_start failed
+In-Reply-To: <0ac4bc53-dd26-0b90-c84e-a94d01a6d5e4@i2se.com>
+References: <20170424123551.2465-1-jszhang@marvell.com>
+ <20170425082948.GB873@b29397-desktop>	<20170425171134.6a983841@xhacker>
+ <HE1PR04MB1450634CE9C1D7FACC37DB4A8B1E0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+ <0ac4bc53-dd26-0b90-c84e-a94d01a6d5e4@i2se.com>
+Message-ID: <20170426162526.7c8ef827@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Tue, 25 Apr 2017 17:21:59 +0200
+Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
-On 25/04/2017 12:43, Peter Maydell wrote:
-> On 14 April 2017 at 11:15, Eric Auger <eric.auger@redhat.com> wrote:
->> Add description for how to save GICV3 LPI pending bit into
->> guest RAM pending tables.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->> v5: creation
->> ---
->>  Documentation/virtual/kvm/devices/arm-vgic-v3.txt | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
->> index c1a2461..9293b45 100644
->> --- a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
->> +++ b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
->> @@ -167,11 +167,17 @@ Groups:
->>      KVM_DEV_ARM_VGIC_CTRL_INIT
->>        request the initialization of the VGIC, no additional parameter in
->>        kvm_device_attr.addr.
->> +    KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
->> +      save all LPI pending bits into guest RAM pending tables.
->> +
->> +      The first kB of the pending table is not altered by this operation.
->>    Errors:
->>      -ENXIO: VGIC not properly configured as required prior to calling
->>       this attribute
->>      -ENODEV: no online VCPU
->>      -ENOMEM: memory shortage when allocating vgic internal data
->> +    -EFAULT: Invalid guest ram access
->> +    -EBUSY:  One or more VCPUS are running
->>
->>
->>    KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
->> --
->> 2.5.5
+> Am 25.04.2017 um 11:20 schrieb Peter Chen:
+> >    
+> >>>> diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> >>>> index f88e9157fad0..60a786c87c06 100644
+> >>>> --- a/drivers/usb/chipidea/udc.c
+> >>>> +++ b/drivers/usb/chipidea/udc.c
+> >>>> @@ -1984,6 +1984,7 @@ static void udc_id_switch_for_host(struct
+> >>>> ci_hdrc *ci)  int ci_hdrc_gadget_init(struct ci_hdrc *ci)  {
+> >>>>  	struct ci_role_driver *rdrv;
+> >>>> +	int ret;
+> >>>>
+> >>>>  	if (!hw_read(ci, CAP_DCCPARAMS, DCCPARAMS_DC))
+> >>>>  		return -ENXIO;
+> >>>> @@ -1996,7 +1997,10 @@ int ci_hdrc_gadget_init(struct ci_hdrc *ci)
+> >>>>  	rdrv->stop	= udc_id_switch_for_host;
+> >>>>  	rdrv->irq	= udc_irq;
+> >>>>  	rdrv->name	= "gadget";
+> >>>> -	ci->roles[CI_ROLE_GADGET] = rdrv;
+> >>>>
+> >>>> -	return udc_start(ci);
+> >>>> +	ret = udc_start(ci);
+> >>>> +	if (!ret)
+> >>>> +		ci->roles[CI_ROLE_GADGET] = rdrv;
+> >>>> +
+> >>>> +	return ret;
+> >>>>  }
+> >>>> --  
+> >>> Thanks for fixing it. In fact, we'd better return failure if ret &&
+> >>> ret != -ENXIO at probe, it stands for initialization for host or
+> >>> gadget has failed.
+> >>>  
+> >> I got your meaning. I'll cook v2. I don't have preference, since either one can fix the
+> >> issue.
+> >>  
+> > Both are needed, you don't need to send this one again. Only a new one, thanks.  
 > 
-> When does the -EFAULT return happen? (if the guest points GITS_BASER<n>
-> etc at invalid memory, presumably?)
-Yes that's correct, when GICR_PENDBASER contains a bad GPA.
- How does the QEMU migration code
-> handle this case? Failing migration because the guest has done something
-> silly doesn't seem too palatable, but trying to avoid that could be
-> more effort than an obscure corner case really merits.
-The kvm_device_access will cause an abort() as for other errors returned
-by kvm_device_ioctl().
+> I'm not sure how easy it is to reproduce the issue.
 
-Thanks
+It's easy to reproduce it (100%) on arm64 platforms after commit
+1dccb598df549 ("arm64: simplify dma_get_ops"). This commit could
+make all dma related operations failed, then udc_start() would fail
+with -ENOMEM.
 
-Eric
+On other platforms, it's not easy.
+
 > 
-> thanks
-> -- PMM
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Shouldn't make a Fixes tag sense at least?
+
+maybe 3f124d233e97 ("usb: chipidea: add role init and destroy APIs"
