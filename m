@@ -1,34 +1,61 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 26 Apr 2017 10:25:40 -0700
+Date: Wed, 26 Apr 2017 10:26:44 -0700
 Subject: [PATCH v2 2/2] ARM: dts: Add the ethernet and ethernet PHY to the
  cygnus core DT.
-In-Reply-To: <20170426004907.GA9453@lunn.ch>
+In-Reply-To: <0cb00eb7-41d0-0390-4687-d966499ed9f4@gmail.com>
 References: <20170425235357.7690-1-eric@anholt.net>
- <20170425235357.7690-2-eric@anholt.net> <20170426004907.GA9453@lunn.ch>
-Message-ID: <87vaprjd2j.fsf@eliezer.anholt.net>
+ <20170425235357.7690-2-eric@anholt.net>
+ <0cb00eb7-41d0-0390-4687-d966499ed9f4@gmail.com>
+Message-ID: <87r30fjd0r.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Lunn <andrew@lunn.ch> writes:
+Florian Fainelli <f.fainelli@gmail.com> writes:
 
->> +		eth0: ethernet at 18042000 {
->> +			compatible = "brcm,amac";
->> +			reg = <0x18042000 0x1000>,
->> +			      <0x18110000 0x1000>;
->> +			reg-names = "amac_base", "idm_base";
->> +			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
->> +			max-speed = <1000>;
+> On 04/25/2017 04:53 PM, Eric Anholt wrote:
+>> Cygnus has a single AMAC controller connected to the B53 switch with 2
+>> PHYs.  On the BCM911360_EP platform, those two PHYs are connected to
+>> the external ethernet jacks.
+>> 
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>> 
+>> v2: Call the node "switch", just call the ports "port" (suggestions by
+>>     Florian), drop max-speed on the phys (suggestion by Andrew Lunn),
+>>     call the other nodes "ethernet" and "ethernet-phy" (suggestions by
+>>     Sergei Shtylyov)
+>> 
+>>  arch/arm/boot/dts/bcm-cygnus.dtsi      | 58 ++++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/bcm911360_entphn.dts |  8 +++++
+>>  2 files changed, 66 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+>> index 009f1346b817..9fd89be0f5e0 100644
+>> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
+>> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+>> @@ -142,6 +142,54 @@
+>>  			interrupts = <0>;
+>>  		};
+>>  
+>> +		mdio: mdio at 18002000 {
+>> +			compatible = "brcm,iproc-mdio";
+>> +			reg = <0x18002000 0x8>;
+>> +			#size-cells = <1>;
+>> +			#address-cells = <0>;
 >
-> Hi Eric
+> Sorry for not noticing earlier, since you override this correctly in the
+> board-level DTS file can you put a:
 >
-> Sorry i missed this the first time. Does this Ethernet controller do >
-> 1Gbps? Does this max-speed do anything useful?
+> 			status = "disabled"
+>
+> property in there by default?
 
-It doesn't look like it.  Dropped.
+Done.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170426/66f27462/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170426/e5d1c373/attachment-0001.sig>
