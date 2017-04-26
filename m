@@ -1,106 +1,164 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed, 26 Apr 2017 16:38:47 -0700
-Subject: [PATCH net-next 1/9] drivers: net: xgene: Protect indirect MAC access
+Date: Wed, 26 Apr 2017 16:38:49 -0700
+Subject: [PATCH net-next 3/9] drivers: net: xgene: Refactor statistics error
+ parsing code
 In-Reply-To: <1493249935-30759-1-git-send-email-isubramanian@apm.com>
 References: <1493249935-30759-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1493249935-30759-2-git-send-email-isubramanian@apm.com>
+Message-ID: <1493249935-30759-4-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Quan Nguyen <qnguyen@apm.com>
 
-This patch adds lock to protect indirect mac access sequence.
+This patch fixes the tx error counters and adds more rx error counters.
 
 Signed-off-by: Quan Nguyen <qnguyen@apm.com>
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 2 ++
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c  | 1 +
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h  | 1 +
- drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c | 7 ++++++-
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c | 2 ++
- 5 files changed, 12 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c   |  6 ------
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h   |  2 --
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 26 +++++++++++++++---------
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h |  2 ++
+ 4 files changed, 18 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-index 2a835e0..3697ba7 100644
+index 3697ba7..06bef14 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-@@ -365,9 +365,11 @@ static void xgene_enet_rd_mcx_mac(struct xgene_enet_pdata *pdata,
- 	cmd = pdata->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
- 	cmd_done = pdata->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
- 
-+	spin_lock(&pdata->mac_lock);
- 	if (!xgene_enet_rd_indirect(addr, rd, cmd, cmd_done, rd_addr, rd_data))
- 		netdev_err(pdata->ndev, "MCX mac read failed, addr: %04x\n",
- 			   rd_addr);
-+	spin_unlock(&pdata->mac_lock);
+@@ -205,30 +205,24 @@ static u32 xgene_enet_ring_len(struct xgene_enet_desc_ring *ring)
  }
  
- static void xgene_gmac_set_mac_addr(struct xgene_enet_pdata *pdata)
+ void xgene_enet_parse_error(struct xgene_enet_desc_ring *ring,
+-			    struct xgene_enet_pdata *pdata,
+ 			    enum xgene_enet_err_code status)
+ {
+ 	switch (status) {
+ 	case INGRESS_CRC:
+ 		ring->rx_crc_errors++;
+-		ring->rx_dropped++;
+ 		break;
+ 	case INGRESS_CHECKSUM:
+ 	case INGRESS_CHECKSUM_COMPUTE:
+ 		ring->rx_errors++;
+-		ring->rx_dropped++;
+ 		break;
+ 	case INGRESS_TRUNC_FRAME:
+ 		ring->rx_frame_errors++;
+-		ring->rx_dropped++;
+ 		break;
+ 	case INGRESS_PKT_LEN:
+ 		ring->rx_length_errors++;
+-		ring->rx_dropped++;
+ 		break;
+ 	case INGRESS_PKT_UNDER:
+ 		ring->rx_frame_errors++;
+-		ring->rx_dropped++;
+ 		break;
+ 	case INGRESS_FIFO_OVERRUN:
+ 		ring->rx_fifo_errors++;
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+index d250bfe..c6b5bbd 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+@@ -380,9 +380,7 @@ static inline u16 xgene_enet_get_numslots(u16 id, u32 size)
+ }
+ 
+ void xgene_enet_parse_error(struct xgene_enet_desc_ring *ring,
+-			    struct xgene_enet_pdata *pdata,
+ 			    enum xgene_enet_err_code status);
+-
+ int xgene_enet_mdio_config(struct xgene_enet_pdata *pdata);
+ void xgene_enet_mdio_remove(struct xgene_enet_pdata *pdata);
+ bool xgene_ring_mgr_init(struct xgene_enet_pdata *p);
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index 5f37ed3..9a28ac3 100644
+index e4f2ef2..3f24b83 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -2055,6 +2055,7 @@ static int xgene_enet_probe(struct platform_device *pdev)
- 		goto err;
+@@ -246,9 +246,9 @@ static int xgene_enet_tx_completion(struct xgene_enet_desc_ring *cp_ring,
+ 	skb_frag_t *frag;
+ 	dma_addr_t *frag_dma_addr;
+ 	u16 skb_index;
+-	u8 status;
+-	int i, ret = 0;
+ 	u8 mss_index;
++	u8 status;
++	int i;
  
- 	xgene_enet_setup_ops(pdata);
-+	spin_lock_init(&pdata->mac_lock);
+ 	skb_index = GET_VAL(USERINFO, le64_to_cpu(raw_desc->m0));
+ 	skb = cp_ring->cp_skb[skb_index];
+@@ -275,19 +275,17 @@ static int xgene_enet_tx_completion(struct xgene_enet_desc_ring *cp_ring,
+ 	/* Checking for error */
+ 	status = GET_VAL(LERR, le64_to_cpu(raw_desc->m0));
+ 	if (unlikely(status > 2)) {
+-		xgene_enet_parse_error(cp_ring, netdev_priv(cp_ring->ndev),
+-				       status);
+-		ret = -EIO;
++		cp_ring->tx_dropped++;
++		cp_ring->tx_errors++;
+ 	}
  
- 	if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
- 		ndev->features |= NETIF_F_TSO | NETIF_F_RXCSUM;
+ 	if (likely(skb)) {
+ 		dev_kfree_skb_any(skb);
+ 	} else {
+ 		netdev_err(cp_ring->ndev, "completion skb is NULL\n");
+-		ret = -EIO;
+ 	}
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ static int xgene_enet_setup_mss(struct net_device *ndev, u32 mss)
+@@ -711,7 +709,8 @@ static int xgene_enet_rx_frame(struct xgene_enet_desc_ring *rx_ring,
+ 		if (!xgene_enet_errata_10GE_8(skb, datalen, status)) {
+ 			dev_kfree_skb_any(skb);
+ 			xgene_enet_free_pagepool(page_pool, raw_desc, exp_desc);
+-			xgene_enet_parse_error(rx_ring, pdata, status);
++			xgene_enet_parse_error(rx_ring, status);
++			rx_ring->rx_dropped++;
+ 			goto out;
+ 		}
+ 	}
+@@ -1477,6 +1476,8 @@ static void xgene_enet_get_stats64(
+ 		if (ring) {
+ 			stats->tx_packets += ring->tx_packets;
+ 			stats->tx_bytes += ring->tx_bytes;
++			stats->tx_dropped += ring->tx_dropped;
++			stats->tx_errors += ring->tx_errors;
+ 		}
+ 	}
+ 
+@@ -1485,11 +1486,16 @@ static void xgene_enet_get_stats64(
+ 		if (ring) {
+ 			stats->rx_packets += ring->rx_packets;
+ 			stats->rx_bytes += ring->rx_bytes;
+-			stats->rx_errors += ring->rx_length_errors +
++			stats->rx_dropped += ring->rx_dropped;
++			stats->rx_errors += ring->rx_errors +
++				ring->rx_length_errors +
+ 				ring->rx_crc_errors +
+ 				ring->rx_frame_errors +
+ 				ring->rx_fifo_errors;
+-			stats->rx_dropped += ring->rx_dropped;
++			stats->rx_length_errors += ring->rx_length_errors;
++			stats->rx_crc_errors += ring->rx_crc_errors;
++			stats->rx_frame_errors += ring->rx_frame_errors;
++			stats->rx_fifo_errors += ring->rx_fifo_errors;
+ 		}
+ 	}
+ }
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-index 0d4be24..827b33d 100644
+index 5e6fd71..3bf6638 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-@@ -221,6 +221,7 @@ struct xgene_enet_pdata {
- 	struct xgene_enet_cle cle;
- 	struct rtnl_link_stats64 stats;
- 	const struct xgene_mac_ops *mac_ops;
-+	spinlock_t mac_lock; /* mac lock */
- 	const struct xgene_port_ops *port_ops;
- 	struct xgene_ring_ops *ring_ops;
- 	const struct xgene_cle_ops *cle_ops;
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-index a8e063b..4dd41f5 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-@@ -130,6 +130,7 @@ static u32 xgene_enet_rd_indirect(struct xgene_indirect_ctl *ctl, u32 rd_addr)
- 
- static u32 xgene_enet_rd_mac(struct xgene_enet_pdata *p, u32 rd_addr)
- {
-+	u32 val;
- 	struct xgene_indirect_ctl ctl = {
- 		.addr = p->mcx_mac_addr + MAC_ADDR_REG_OFFSET,
- 		.ctl = p->mcx_mac_addr + MAC_READ_REG_OFFSET,
-@@ -137,7 +138,11 @@ static u32 xgene_enet_rd_mac(struct xgene_enet_pdata *p, u32 rd_addr)
- 		.cmd_done = p->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET
- 	};
- 
--	return xgene_enet_rd_indirect(&ctl, rd_addr);
-+	spin_lock(&p->mac_lock);
-+	val = xgene_enet_rd_indirect(&ctl, rd_addr);
-+	spin_unlock(&p->mac_lock);
-+
-+	return val;
- }
- 
- static int xgene_enet_ecc_init(struct xgene_enet_pdata *p)
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-index 423240c..9a2d0ca 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-@@ -158,9 +158,11 @@ static void xgene_enet_rd_mac(struct xgene_enet_pdata *pdata,
- 	cmd = pdata->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
- 	cmd_done = pdata->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
- 
-+	spin_lock(&pdata->mac_lock);
- 	if (!xgene_enet_rd_indirect(addr, rd, cmd, cmd_done, rd_addr, rd_data))
- 		netdev_err(pdata->ndev, "MCX mac read failed, addr: %04x\n",
- 			   rd_addr);
-+	spin_unlock(&pdata->mac_lock);
- }
- 
- static bool xgene_enet_rd_pcs(struct xgene_enet_pdata *pdata,
+@@ -138,6 +138,8 @@ struct xgene_enet_desc_ring {
+ 	__le64 *exp_bufs;
+ 	u64 tx_packets;
+ 	u64 tx_bytes;
++	u64 tx_dropped;
++	u64 tx_errors;
+ 	u64 rx_packets;
+ 	u64 rx_bytes;
+ 	u64 rx_dropped;
 -- 
 1.9.1
