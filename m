@@ -1,10 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Apr 2017 12:17:58 +0100
-Subject: [RFC/RFT PATCH 07/18] ARM: PCI: orion5x: Convert PCI scan API to
+Date: Wed, 26 Apr 2017 12:17:57 +0100
+Subject: [RFC/RFT PATCH 06/18] ARM: PCI: iop13xx: Convert PCI scan API to
  pci_scan_root_bus_bridge()
 In-Reply-To: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
 References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170426111809.19922-8-lorenzo.pieralisi@arm.com>
+Message-ID: <20170426111809.19922-7-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,35 +14,35 @@ struct pci_host_bridge object, which simplifies the bus scan
 interface and makes the PCI scan root bus interface easier to
 generalize as members are added to the struct pci_host_bridge().
 
-Convert ARM orion5x platform code to pci_scan_root_bus_bridge() to
+Convert ARM iop13xx platform code to pci_scan_root_bus_bridge() to
 improve the PCI root bus scanning interface.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Russell King <linux@armlinux.org.uk>
-Cc: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-orion5x/pci.c | 29 +++++++++++++++++++++++------
- 1 file changed, 23 insertions(+), 6 deletions(-)
+ arch/arm/mach-iop13xx/pci.c | 34 +++++++++++++++++++++++++++-------
+ 1 file changed, 27 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-orion5x/pci.c b/arch/arm/mach-orion5x/pci.c
-index ecb998e..6dc4c89 100644
---- a/arch/arm/mach-orion5x/pci.c
-+++ b/arch/arm/mach-orion5x/pci.c
-@@ -557,13 +557,30 @@ int __init orion5x_pci_sys_setup(int nr, struct pci_sys_data *sys)
- 
- struct pci_bus __init *orion5x_pci_sys_scan_bus(int nr, struct pci_sys_data *sys)
+diff --git a/arch/arm/mach-iop13xx/pci.c b/arch/arm/mach-iop13xx/pci.c
+index 204eb44..b0a8ded 100644
+--- a/arch/arm/mach-iop13xx/pci.c
++++ b/arch/arm/mach-iop13xx/pci.c
+@@ -506,8 +506,9 @@ iop13xx_pci_abort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+  */
+ struct pci_bus *iop13xx_scan_bus(int nr, struct pci_sys_data *sys)
  {
--	if (nr == 0)
--		return pci_scan_root_bus(NULL, sys->busnr, &pcie_ops, sys,
--					 &sys->resources);
+-	int which_atu;
++	int which_atu, ret;
+ 	struct pci_bus *bus = NULL;
 +	struct pci_host_bridge *bridge;
-+	int ret = -ENODEV;
  
--	if (nr == 1 && !orion5x_pci_disabled)
--		return pci_scan_root_bus(NULL, sys->busnr, &pci_ops, sys,
--					 &sys->resources);
+ 	switch (init_atu) {
+ 	case IOP13XX_INIT_ATU_ATUX:
+@@ -528,6 +529,15 @@ struct pci_bus *iop13xx_scan_bus(int nr, struct pci_sys_data *sys)
+ 		return NULL;
+ 	}
+ 
 +	bridge = pci_alloc_host_bridge(0);
 +	if (!bridge)
 +		return NULL;
@@ -52,20 +52,39 @@ index ecb998e..6dc4c89 100644
 +	bridge->sysdata = sys;
 +	bridge->busnr = sys->busnr;
 +
-+	if (nr == 0) {
-+		bridge->ops = &pcie_ops;
-+		ret = pci_scan_root_bus_bridge(bridge);
-+	}
-+
-+	if (nr == 1 && !orion5x_pci_disabled) {
-+		bridge->ops = &pci_ops;
-+		ret = pci_scan_root_bus_bridge(bridge);
-+	}
-+
-+	if (!ret)
-+		return bridge->bus;
+ 	switch (which_atu) {
+ 	case IOP13XX_INIT_ATU_ATUX:
+ 		if (time_after_eq(jiffies + msecs_to_jiffies(1000),
+@@ -535,14 +545,24 @@ struct pci_bus *iop13xx_scan_bus(int nr, struct pci_sys_data *sys)
+ 			while(time_before(jiffies, atux_trhfa_timeout))
+ 				udelay(100);
  
- 	BUG();
- 	return NULL;
+-		bus = pci_bus_atux = pci_scan_root_bus(NULL, sys->busnr,
+-						       &iop13xx_atux_ops,
+-						       sys, &sys->resources);
++		bridge->ops = &iop13xx_atux_ops;
++		ret = pci_scan_root_bus_bridge(bridge);
++		if (ret < 0) {
++			pci_free_host_bridge(bridge);
++			return NULL;
++		}
++
++		bus = pci_bus_atux = bridge->bus;
+ 		break;
+ 	case IOP13XX_INIT_ATU_ATUE:
+-		bus = pci_bus_atue = pci_scan_root_bus(NULL, sys->busnr,
+-						       &iop13xx_atue_ops,
+-						       sys, &sys->resources);
++		bridge->ops = &iop13xx_atue_ops;
++		ret = pci_scan_root_bus_bridge(bridge);
++		if (ret < 0) {
++			pci_free_host_bridge(bridge);
++			return NULL;
++		}
++
++		bus = pci_bus_atue = bridge->bus;
+ 		break;
+ 	}
+ 
 -- 
 2.10.0
