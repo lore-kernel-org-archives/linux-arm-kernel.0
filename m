@@ -1,183 +1,75 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 26 Apr 2017 23:20:21 +0800
-Subject: [PATCH v5 08/10] arm64: allwinner: a64: add DTSI file for AXP803 PMIC
-In-Reply-To: <20170426152023.41567-1-icenowy@aosc.io>
-References: <20170426152023.41567-1-icenowy@aosc.io>
-Message-ID: <20170426152023.41567-9-icenowy@aosc.io>
+Date: Wed, 26 Apr 2017 23:20:13 +0800
+Subject: [PATCH v5 00/10] AXP803 PMIC support for Pine64
+Message-ID: <20170426152023.41567-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As nearly all A64 boards are using AXP803 PMIC, add a DTSI file for it,
-like the old DTSI files for AXP20x/22x, for the common parts of the
-PMIC.
+The Pine64 (including Pine64+) boards have an AXP803 PMIC, which is a PMIC
+similar to AXP288, but tweaked to use with Allwinner SoCs rather than Intel
+tablets (with DCIN and Vbus re-splitted like other AXP PMICs, and RSB bus
+support added).
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Acked-by: Mark Brown <broonie@kernel.org>
----
-Changes in v5:
-- Added Mark Brown's ACK.
-Changes in v4:
-- Re-sorted the nodes.
+This patchset adds support for it and enabled it in Pine64 device tree.
 
- arch/arm64/boot/dts/allwinner/axp803.dtsi | 150 ++++++++++++++++++++++++++++++
- 1 file changed, 150 insertions(+)
+The basical part of AXP803 MFD driver is already applied, according to Lee.
+
+Thus this patchset is now still two parts, but a bit different to older
+revisions:
+
+- Part1: from PATCH 1/10 to PATCH 5/10, which focus on enabling AXP803 in
+  the device tree: the RSB bus, the R_INTC interrupt controller (for the
+  NMI line, which is connected to AXP803 on Pine64), and finally the basical
+  AXP803 node.
+- Part2: from PATCH 5/10 to PATCH 10/10, which are enabling the regulator
+  function of the AXP803 PMIC. Finally Wi-Fi function is added
+  as a usage of regulators function.
+
+PATCH 1 adds RSB device nodes, which is used for the communication between
+A64 and AXP803.
+
+PATCH 2 adds device tree binding of A64 R_INTC.
+
+PATCH 3 really adds support for A64 R_INTC in NMI driver.
+
+PATCH 4 adds R_INTC node in A64 device tree.
+
+PATCH 5 adds AXP803 node to the Pine64 device tree by using already
+applied drivers/bindings.
+
+PATCH 6 adds support for AXP803 regulators in AXP20x regulatoe driver.
+(The binding is already applied)
+
+PATCH 7 enables the AXP803 regulator cell in MFD driver.
+
+PATCH 8 adds a DTSI file for AXP803, like other older AXP PMICs.
+
+PATCH 9 enables AXP803 regulators in Pine64 device tree.
+
+PATCH 10 enables Wi-Fi for Pine64.
+
+Icenowy Zheng (10):
+  arm64: allwinner: a64: enable RSB on A64
+  irqchip/sunxi-nmi: add A64 R_INTC to the binding doc
+  irqchip/sunxi-nmi: add support for the NMI in A64 R_INTC
+  arm64: allwinner: a64: add NMI (R_INTC) controller on A64
+  arm64: allwinner: a64: add AXP803 node to Pine64 device tree
+  regulator: axp20x-regulator: add support for AXP803
+  mfd: axp20x: add axp20x-regulator cell for AXP803
+  arm64: allwinner: a64: add DTSI file for AXP803 PMIC
+  arm64: allwinner: a64: enable AXP803 regulators for Pine64
+  arm64: allwinner: a64: enable Wi-Fi for Pine64
+
+ .../interrupt-controller/allwinner,sunxi-nmi.txt   |   7 +-
+ arch/arm64/boot/dts/allwinner/axp803.dtsi          | 150 ++++++++++++++++++++
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 136 ++++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  27 ++++
+ drivers/irqchip/irq-sunxi-nmi.c                    |  13 ++
+ drivers/mfd/axp20x.c                               |   3 +-
+ drivers/regulator/axp20x-regulator.c               | 153 ++++++++++++++++++---
+ include/linux/mfd/axp20x.h                         |  37 +++++
+ 8 files changed, 501 insertions(+), 25 deletions(-)
  create mode 100644 arch/arm64/boot/dts/allwinner/axp803.dtsi
 
-diff --git a/arch/arm64/boot/dts/allwinner/axp803.dtsi b/arch/arm64/boot/dts/allwinner/axp803.dtsi
-new file mode 100644
-index 000000000000..ff8af52743ff
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/axp803.dtsi
-@@ -0,0 +1,150 @@
-+/*
-+ * Copyright 2017 Icenowy Zheng <icenowy@aosc.xyz>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/*
-+ * AXP803 Integrated Power Management Chip
-+ * http://files.pine64.org/doc/datasheet/pine64/AXP803_Datasheet_V1.0.pdf
-+ */
-+
-+&axp803 {
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+
-+	regulators {
-+		/* Default work frequency for buck regulators */
-+		x-powers,dcdc-freq = <3000>;
-+
-+		reg_aldo1: aldo1 {
-+			regulator-name = "aldo1";
-+		};
-+
-+		reg_aldo2: aldo2 {
-+			regulator-name = "aldo2";
-+		};
-+
-+		reg_aldo3: aldo3 {
-+			regulator-name = "aldo3";
-+		};
-+
-+		reg_dc1sw: dc1sw {
-+			regulator-name = "dc1sw";
-+		};
-+
-+		reg_dcdc1: dcdc1 {
-+			regulator-name = "dcdc1";
-+		};
-+
-+		reg_dcdc2: dcdc2 {
-+			regulator-name = "dcdc2";
-+		};
-+
-+		reg_dcdc3: dcdc3 {
-+			regulator-name = "dcdc3";
-+		};
-+
-+		reg_dcdc4: dcdc4 {
-+			regulator-name = "dcdc4";
-+		};
-+
-+		reg_dcdc5: dcdc5 {
-+			regulator-name = "dcdc5";
-+		};
-+
-+		reg_dcdc6: dcdc6 {
-+			regulator-name = "dcdc6";
-+		};
-+
-+		reg_dldo1: dldo1 {
-+			regulator-name = "dldo1";
-+		};
-+
-+		reg_dldo2: dldo2 {
-+			regulator-name = "dldo2";
-+		};
-+
-+		reg_dldo3: dldo3 {
-+			regulator-name = "dldo3";
-+		};
-+
-+		reg_dldo4: dldo4 {
-+			regulator-name = "dldo4";
-+		};
-+
-+		reg_eldo1: eldo1 {
-+			regulator-name = "eldo1";
-+		};
-+
-+		reg_eldo2: eldo2 {
-+			regulator-name = "eldo2";
-+		};
-+
-+		reg_eldo3: eldo3 {
-+			regulator-name = "eldo3";
-+		};
-+
-+		reg_fldo1: fldo1 {
-+			regulator-name = "fldo1";
-+		};
-+
-+		reg_fldo2: fldo2 {
-+			regulator-name = "fldo2";
-+		};
-+
-+		reg_ldo_io0: ldo-io0 {
-+			regulator-name = "ldo-io0";
-+			status = "disabled";
-+		};
-+
-+		reg_ldo_io1: ldo-io1 {
-+			regulator-name = "ldo-io1";
-+			status = "disabled";
-+		};
-+
-+		reg_rtc_ldo: rtc-ldo {
-+			/* RTC_LDO is a fixed, always-on regulator */
-+			regulator-always-on;
-+			regulator-min-microvolt = <3000000>;
-+			regulator-max-microvolt = <3000000>;
-+			regulator-name = "rtc-ldo";
-+		};
-+	};
-+};
 -- 
 2.12.2
