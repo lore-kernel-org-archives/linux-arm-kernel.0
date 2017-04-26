@@ -1,162 +1,221 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Wed, 26 Apr 2017 18:43:54 +0300
-Subject: [patch] autogain support for bayer10 format (was Re: [patch]
- propagating controls in libv4l2)
-In-Reply-To: <20170426132337.GA6482@amd>
-References: <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
- <20170414232332.63850d7b@vento.lan>
- <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
- <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
- <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
- <20170424224724.5bb52382@vento.lan> <20170426105300.GA857@amd>
- <20170426081330.6ca10e42@vento.lan> <20170426132337.GA6482@amd>
-Message-ID: <cedfd68d-d0fe-6fa8-2676-b61f3ddda652@gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 26 Apr 2017 17:48:32 +0200
+Subject: [PATCH v5 01/22] KVM: arm/arm64: Add ITS save/restore API
+ documentation
+In-Reply-To: <20170426123120.GL4104@cbox>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-2-git-send-email-eric.auger@redhat.com>
+ <20170426123120.GL4104@cbox>
+Message-ID: <88a194fa-9143-960e-e0a6-6b5c388cef82@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Christoffer,
 
-On 26.04.2017 16:23, Pavel Machek wrote:
-> Hi!
->
->>>> I don't see why it would be hard to open files or have threads inside
->>>> a library. There are several libraries that do that already, specially
->>>> the ones designed to be used on multimidia apps.
->>>
->>> Well, This is what the libv4l2 says:
->>>
->>>    This file implements libv4l2, which offers v4l2_ prefixed versions
->>>    of
->>>       open/close/etc. The API is 100% the same as directly opening
->>>    /dev/videoX
->>>       using regular open/close/etc, the big difference is that format
->>>    conversion
->>>
->>> but if I open additional files in v4l2_open(), API is no longer the
->>> same, as unix open() is defined to open just one file descriptor.
->>>
->>> Now. There is autogain support in libv4lconvert, but it expects to use
->>> same fd for camera and for the gain... which does not work with
->>> subdevs.
->>>
->>> Of course, opening subdevs by name like this is not really
->>> acceptable. But can you suggest a method that is?
+On 26/04/2017 14:31, Christoffer Dall wrote:
+> On Fri, Apr 14, 2017 at 12:15:13PM +0200, Eric Auger wrote:
+>> Add description for how to access ITS registers and how to save/restore
+>> ITS tables into/from memory.
 >>
->> There are two separate things here:
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 >>
->> 1) Autofoucs for a device that doesn't use subdev API
->> 2) libv4l2 support for devices that require MC and subdev API
->
-> Actually there are three: 0) autogain. Unfortunately, I need autogain
-> first before autofocus has a chance...
->
-> And that means... bayer10 support for autogain.
->
-> Plus, I changed avg_lum to long long. Quick calculation tells me int
-> could overflow with few megapixel sensor.
->
-> Oh, btw http://ytse.tricolour.net/docs/LowLightOptimization.html no
-> longer works.
->
-> Regards,
-> 								Pavel
->
-> diff --git a/lib/libv4lconvert/processing/autogain.c b/lib/libv4lconvert/processing/autogain.c
-> index c6866d6..0b52d0f 100644
-> --- a/lib/libv4lconvert/processing/autogain.c
-> +++ b/lib/libv4lconvert/processing/autogain.c
-> @@ -68,6 +71,41 @@ static void autogain_adjust(struct v4l2_queryctrl *ctrl, int *value,
->  	}
->  }
->
-> +static int get_luminosity_bayer10(uint16_t *buf, const struct v4l2_format *fmt)
-> +{
-> +	long long avg_lum = 0;
-> +	int x, y;
-> +	
-> +	buf += fmt->fmt.pix.height * fmt->fmt.pix.bytesperline / 4 +
-> +		fmt->fmt.pix.width / 4;
-> +
-> +	for (y = 0; y < fmt->fmt.pix.height / 2; y++) {
-> +		for (x = 0; x < fmt->fmt.pix.width / 2; x++)
+>> ---
+>> v4 -> v5:
+>> - take into account Christoffer's comments
+>> - pending table save on GICV3 side now
+>>
+>> v3 -> v4:
+>> - take into account Peter's comments:
+>>   - typos
+>>   - KVM_DEV_ARM_VGIC_GRP_ITS_TABLES kvm_device_attr = 0
+>>   - add a validity bit in DTE
+>>   - document all fields in CTE and ITE
+>>   - document ABI revision
+>> - take into account Andre's comments:
+>>   - document restrictions about GITS_CREADR writing and GITS_IIDR
+>>   - document -EBUSY error if one or more VCPUS are runnning
+>>   - document 64b registers only can be accessed with 64b access
+>> - itt_addr field matches bits [51:8] of the itt_addr
+>>
+>> v1 -> v2:
+>> - DTE and ITE now are 8 bytes
+>> - DTE and ITE now indexed by deviceid/eventid
+>> - use ITE name instead of ITTE
+>> - mentions ITT_addr matches bits [51:8] of the actual address
+>> - mentions LE layout
+>> ---
+>>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 99 ++++++++++++++++++++++
+>>  1 file changed, 99 insertions(+)
+>>
+>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>> index 6081a5b..b5f010d 100644
+>> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>> @@ -32,7 +32,106 @@ Groups:
+>>      KVM_DEV_ARM_VGIC_CTRL_INIT
+>>        request the initialization of the ITS, no additional parameter in
+>>        kvm_device_attr.addr.
+>> +
+>> +    KVM_DEV_ARM_ITS_SAVE_TABLES
+>> +      save the ITS table data into guest RAM, at the location provisioned
+>> +      by the guest in corresponding registers/table entries.
+>> +
+>> +      The layout of the tables in guest memory defines an ABI. The entries
+>> +      are laid out in little endian format as described in the last paragraph.
+>> +
+>> +    KVM_DEV_ARM_ITS_RESTORE_TABLES
+>> +      restore the ITS tables from guest RAM to ITS internal structures.
+>> +
+>> +      The GICV3 must be restored before the ITS and all ITS registers but
+>> +      the GITS_CTLR must be restored before restoring the ITS tables.
+>> +
+>> +      The GITS_IIDR read-only register must also be restored before
+>> +      the table restore as the IIDR revision field encodes the ABI revision.
+>> +
+> 
+> what is the expected sequence of operations.  For example, to restore
+> the ITS, do I call KVM_DEV_ARM_VGIC_CTRL_INIT first, then restore all
+> the memory and registers, and finally call KVM_DEV_ARM_ITS_RESTORE_TABLES?
+Yes KVM_DEV_ARM_VGIC_CTRL_INIT comes first, then restore all registers
+except GITS_CTLR, then table restore, then GITS_CTLR
+> 
+> Is there any interaction between when you call KVM_DEV_ARM_ITS_RESTORE_TABLES
+> and restore GITS_CTLR (which enables the ITS)?
 
-That would take some time :). AIUI, we have NEON support in ARM kernels 
-(CONFIG_KERNEL_MODE_NEON), I wonder if it makes sense (me) to convert 
-the above loop to NEON-optimized when it comes to it? Are there any 
-drawbacks in using NEON code in kernel?
+Yep, when GITS_CTLR is set, LPIs may be enabled and this on that event
+that the pending table is read. But the whole pending table is not read
+as we only iterate on registered LPIs. So the ITT must have been
+restored previously.
 
-> +			avg_lum += *buf++;
-> +		buf += fmt->fmt.pix.bytesperline - fmt->fmt.pix.width / 2;
-> +	}
-> +	avg_lum /= fmt->fmt.pix.height * fmt->fmt.pix.width / 4;
-> +	avg_lum /= 4;
-> +	return avg_lum;
-> +}
-> +
-> +static int get_luminosity_bayer8(unsigned char *buf, const struct v4l2_format *fmt)
-> +{
-> +	long long avg_lum = 0;
-> +	int x, y;
-> +	
-> +	buf += fmt->fmt.pix.height * fmt->fmt.pix.bytesperline / 4 +
-> +		fmt->fmt.pix.width / 4;
-> +
-> +	for (y = 0; y < fmt->fmt.pix.height / 2; y++) {
-> +		for (x = 0; x < fmt->fmt.pix.width / 2; x++)
+I became aware that the pending table sync is done twice, once in the
+pending table restore,  and once in the GITS_CTLR restore. So if we
+leave this order specification, I should be able to remove the sync on
+table restore. This was the original reason why GITS_CTLR restore has
+been done at the very end.
+> 
+>>    Errors:
+>>      -ENXIO:  ITS not properly configured as required prior to setting
+>>               this attribute
+>>      -ENOMEM: Memory shortage when allocating ITS internal data
+>> +    -EINVAL: Inconsistent restored data
+>> +    -EFAULT: Invalid guest ram access
+>> +    -EBUSY:  One or more VCPUS are running
+>> +
+>> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+>> +  Attributes:
+>> +      The attr field of kvm_device_attr encodes the offset of the
+>> +      ITS register, relative to the ITS control frame base address
+>> +      (ITS_base).
+>> +
+>> +      kvm_device_attr.addr points to a __u64 value whatever the width
+>> +      of the addressed register (32/64 bits). 64 bit registers can only
+>> +      be accessed with full length.
+>> +
+>> +      Writes to read-only registers are ignored by the kernel except for:
+>> +      - GITS_READR. It needs to be restored otherwise commands in the queue
+>> +        will be re-executed after restoring CWRITER. GITS_READR must be restored
+>> +        before restoring the GITS_CTLR which is likely to enable the ITS.
+>> +        Also it needs to be restored after GITS_CBASER since a write to
+>> +        GITS_CBASER resets GITS_CREADR.
+>> +      - GITS_IIDR. Its Revision field encodes the table layout ABI revision.
+>> +        In the future we might implement direct injection of virtual LPIS.
+>> +        This will require an upgrade of the table layout and an evolution of
+>> +        the ABI. GITS_IIDR must be restored before the table restoration.
+>> +
+>> +      For other registers, getting or setting a register has the same
+>> +      effect as reading/writing the register on real hardware.
+>> +  Errors:
+>> +    -ENXIO: Offset does not correspond to any supported register
+>> +    -EFAULT: Invalid user pointer for attr->addr
+>> +    -EINVAL: Offset is not 64-bit aligned
+>> +    -EBUSY: one or more VCPUS are running
+> 
+> 
+> It may be helpful to state the ordering requirements somewhere:
+> 
+> Restoring the ITS:
+> ------------------
+> Restoring the ITS requires certain things to happen in order.
+> Specifically:
+>  1. Initialize the ITS (KVM_DEV_ARM_VGIC_CTRL_INIT)
+>  2. Restore GITS_IIDR
+>  3. Restore GITS_CBASER
+>  4. Restore GITS_READR
+>  5. Restore remainin registers except GITS_CTLR
+>  6. Make sure all guest memory is restored
+>  7. Load the ITS table data (KVM_DEV_ARM_ITS_RESTORE_TABLES)
 
-ditto.
+OK I will try to fit that description somewhere.
 
-> +			avg_lum += *buf++;
-> +		buf += fmt->fmt.pix.bytesperline - fmt->fmt.pix.width / 2;
-> +	}
-> +	avg_lum /= fmt->fmt.pix.height * fmt->fmt.pix.width / 4;
-> +	return avg_lum;
-> +}
-> +
->  /* auto gain and exposure algorithm based on the knee algorithm described here:
->  http://ytse.tricolour.net/docs/LowLightOptimization.html */
->  static int autogain_calculate_lookup_tables(
-> @@ -100,17 +142,16 @@ static int autogain_calculate_lookup_tables(
->  	switch (fmt->fmt.pix.pixelformat) {
-> +	case V4L2_PIX_FMT_SGBRG10:
-> +	case V4L2_PIX_FMT_SGRBG10:
-> +	case V4L2_PIX_FMT_SBGGR10:
-> +	case V4L2_PIX_FMT_SRGGB10:
-> +		avg_lum = get_luminosity_bayer10((void *) buf, fmt);
-> +		break;
-> +
->  	case V4L2_PIX_FMT_SGBRG8:
->  	case V4L2_PIX_FMT_SGRBG8:
->  	case V4L2_PIX_FMT_SBGGR8:
->  	case V4L2_PIX_FMT_SRGGB8:
-> -		buf += fmt->fmt.pix.height * fmt->fmt.pix.bytesperline / 4 +
-> -			fmt->fmt.pix.width / 4;
-> -
-> -		for (y = 0; y < fmt->fmt.pix.height / 2; y++) {
-> -			for (x = 0; x < fmt->fmt.pix.width / 2; x++)
-> -				avg_lum += *buf++;
-> -			buf += fmt->fmt.pix.bytesperline - fmt->fmt.pix.width / 2;
-> -		}
-> -		avg_lum /= fmt->fmt.pix.height * fmt->fmt.pix.width / 4;
-> +		avg_lum = get_luminosity_bayer8(buf, fmt);
->  		break;
->
->  	case V4L2_PIX_FMT_RGB24:
-> diff --git a/lib/libv4lconvert/processing/libv4lprocessing.c b/lib/libv4lconvert/processing/libv4lprocessing.c
-> index b061f50..b98d024 100644
-> --- a/lib/libv4lconvert/processing/libv4lprocessing.c
-> +++ b/lib/libv4lconvert/processing/libv4lprocessing.c
-> @@ -164,6 +165,10 @@ void v4lprocessing_processing(struct v4lprocessing_data *data,
->  	case V4L2_PIX_FMT_SGRBG8:
->  	case V4L2_PIX_FMT_SBGGR8:
->  	case V4L2_PIX_FMT_SRGGB8:
-> +	case V4L2_PIX_FMT_SGBRG10:
-> +	case V4L2_PIX_FMT_SGRBG10:
-> +	case V4L2_PIX_FMT_SBGGR10:
-> +	case V4L2_PIX_FMT_SRGGB10:
->  	case V4L2_PIX_FMT_RGB24:
->  	case V4L2_PIX_FMT_BGR24:
->  		break;
->
->
->
+> 
+> 
+>> +
+>> + ITS Table ABI REV0:
+>> + -------------------
+>> +
+>> + Revision 0 of the ABI only supports physical LPIs.
+>> +
+>> + The device table and ITT are indexed by the deviceid and eventid,
+>> + respectively. The collection table is not indexed by collectionid:
+>> + CTE are written in the table in the order of collection creation. All
+>> + entries are 8 bytes.
+>> +
+>> + Device Table Entry (DTE):
+>> +
+>> + bits:     | 63| 62 ... 49 | 48 ... 5 | 4 ... 0 |
+>> + values:   | V |   next    | ITT_addr |  Size   |
+>> +
+>> + where;
+>> + - V indicates whether the entry is valid. If not, other fields
+>> +   are not meaningful.
+>> + - next: equals to 0 if this entry is the last one; otherwise it
+>> +   corresponds to the deviceid offset to the next DTE, capped by
+>> +   2^14 -1.
+>> + - ITT_addr matches bits [51:8] of the ITT address (256B aligned).
+> 
+> I assume the B here is bytes.  Where does this requirement come from?
+Yes this is 256 byte aligned. I guess this is to save memory as the ITT
+is devised to encode a small range of eventids.
+> 
+>> + - Size specifies the supported number of bits for the deviceid,
+>> +   minus one
+> 
+> deviceid or eventid?
+oups eventid thanks.
+> 
+>> +
+>> + Collection Table Entry (CTE):
+>> +
+>> + bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
+>> + values:   | V |    RES0    |  RDBase   |    ICID     |
+>> +
+>> + where:
+>> + - V indicates whether the entry is valid. If not, other fields are
+>> +   not meaningful.
+>> + - RES0: reserved field with Should-Be-Zero-or-Preserved behavior.
+>> + - RDBase is the PE number (GICR_TYPER.Processor_Number semantic),
+>> + - ICID is the collection ID
+>> +
+>> + Interrupt Translation Entry (ITE):
+>> +
+>> + bits:     | 63 ... 48 | 47 ... 16 | 15 ... 0 |
+>> + values:   |    next   |   pINTID  |  ICID    |
+>> +
+>> + where:
+>> + - next: equals to 0 if this entry is the last one; otherwise it corresponds
+>> +   to the eventid offset to the next ITE capped by 2^16 -1.
+>> + - pINTID is the physical LPI ID; if zero, it means the entry is not valid
+>> +   and other fields are not meaningful.
+>> + - ICID is the collection ID
+>> +
+>> -- 
+>> 2.5.5
+>>
+> 
+> Besides the minor suggestions above:
+> 
+> Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Thanks
+
+Eric
+> 
