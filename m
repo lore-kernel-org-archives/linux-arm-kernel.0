@@ -1,68 +1,127 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 26 Apr 2017 11:32:36 +0100
-Subject: [patch V2 00/24] cpu/hotplug: Convert get_online_cpus() to a
- percpu_rwsem
-In-Reply-To: <bad40d9a-2c81-5a6c-2c12-3bf7094549de@arm.com>
-References: <20170418170442.665445272@linutronix.de>
- <20170425161037.GA27156@leverpostej>
- <20170425172838.mr3kyccsdteyjso5@linutronix.de>
- <20170426085958.GC27156@leverpostej>
- <bad40d9a-2c81-5a6c-2c12-3bf7094549de@arm.com>
-Message-ID: <20170426103236.GI27156@leverpostej>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Wed, 26 Apr 2017 16:13:29 +0530
+Subject: [PATCH v2] iommu/arm-smmu: Return IOVA in iova_to_phys when SMMU
+ is bypassed
+In-Reply-To: <20170426100150.GE21744@arm.com>
+References: <1493114272-30093-1-git-send-email-sunil.kovvuri@gmail.com>
+ <20170426100150.GE21744@arm.com>
+Message-ID: <CA+sq2Ce2UVi04VtD4KLDsNk2baN1kq_vN2KOrEt9a_cB0gJ0vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 10:40:47AM +0100, Suzuki K Poulose wrote:
-> On 26/04/17 09:59, Mark Rutland wrote:
-
-> >We only call cpus_set_cap() in the secondary boot path, where we know
-> >that the rwsem is held by the thread orchestrating the onlining. Thus,
-> >we can use the new static_branch_enable_cpuslocked() in cpus_set_cap(),
-> >avoiding the above.
-> 
-> Correction, we could call cpus_set_cap() from setup_cpu_features()
-> for updating the system global capabilities, where we may not hold the
-> cpu_hotplug_lock. 
-
-Argh, yes, I missed that when scanning.
-
-> So we could end up calling static_branch_enable_cpuslocked()
-> without actually holding the lock. Should we do a cpu_hotplug_begin/done in
-> setup_cpu_feature_capabilities ? I agree it doesn't look that nice. Thoughts ?
-
-I agree that's hideous, but it looks like the only choice given the
-hotplug rwsem cahnges. :/
-
-I can spin a v2 with that and the typo fixes.
+On Wed, Apr 26, 2017 at 3:31 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Sunil,
+>
+> On Tue, Apr 25, 2017 at 03:27:52PM +0530, sunil.kovvuri at gmail.com wrote:
+>> From: Sunil Goutham <sgoutham@cavium.com>
+>>
+>> For software initiated address translation, when domain type is
+>> IOMMU_DOMAIN_IDENTITY i.e SMMU is bypassed, mimic HW behavior
+>> i.e return the same IOVA as translated address.
+>>
+>> This patch is an extension to Will Deacon's patchset
+>> "Implement SMMU passthrough using the default domain".
+>>
+>> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+>> ---
+>>
+>> V2
+>> - As per Will's suggestion applied fix to SMMUv3 driver as well.
+>
+> This follows what the AMD driver does, so:
+>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
 Thanks,
-Mark.
 
-> 
-> Suzuki
-> 
-> >		
-> >Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> >Reported-by: Catalin Marinas <catalin.marinas@arm.com>
-> >Suggested-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> >Cc: Will Deacon <will.deacon@arm.com>
-> >Cc: Suzuki Poulose <suzuki,poulose@arm.com>
-> >---
-> > arch/arm64/include/asm/cpufeature.h | 2 +-
-> > 1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> >diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> >index f31c48d..349b5cd 100644
-> >--- a/arch/arm64/include/asm/cpufeature.h
-> >+++ b/arch/arm64/include/asm/cpufeature.h
-> >@@ -145,7 +145,7 @@ static inline void cpus_set_cap(unsigned int num)
-> > 			num, ARM64_NCAPS);
-> > 	} else {
-> > 		__set_bit(num, cpu_hwcaps);
-> >-		static_branch_enable(&cpu_hwcap_keys[num]);
-> >+		static_branch_enable_cpuslocked(&cpu_hwcap_keys[num]);
-> > 	}
-> > }
-> >
-> >
-> 
+>
+> but I still think that having drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+> poke around with the physical address to get at the struct pages underlying
+> a DMA buffer is really dodgy.
+
+Driver is not dealing with page structures to be precise, just like
+for any other NIC device, driver needs to know the virtual address
+of the packet to where it's DMA'ed, so that SKB if framed and
+handed over to network stack. Due to reasons mentioned below,
+in this driver it's not possible to maintain a list of DMA addresses to
+Virtual address mappings. Hence using IOMMU API, DMA address
+is translated to physical address and finally to virtual address. I don't
+see anything dodgy here.
+
+> Is there no way this can be avoided, perhaps by tracking the pages some other way
+
+I have explained that in the commit message
+--
+    Also VNIC doesn't have a seperate receive buffer ring per receive
+    queue, so there is no 1:1 descriptor index matching between CQE_RX
+    and the index in buffer ring from where a buffer has been used for
+    DMA'ing. Unlike other NICs, here it's not possible to maintain dma
+    address to virt address mappings within the driver. This leaves us
+    no other choice but to use IOMMU's IOVA address conversion API to
+    get buffer's virtual address which can be given to network stack
+    for processing.
+--
+
+>(although I don't understand why you're having to mess with the page reference
+>counts to start with)?
+Not sure why you say it's a mess, adjusting page reference counts is quite
+common if you check other NIC drivers. On ARM64 especially when using
+64KB pages, if we have only one packet buffer for each page then we
+will have to set aside a whole lot of memory which sometimes is not possible
+on embedded platforms. Hence multiple pkt buffers per page, and page reference
+is set accordingly.
+
+>
+> At least, I think you should be checking the domain type in
+> nicvf_iova_to_phys, which clearly expects a DMA domain if one exists at all.
+
+Probably, but I don't think network maintainers would be okay with it, since
+such stuff should be hidden from a network driver's point of view. In reverse
+the argument can be that NIC driver shouldn't even have to check if domain
+is set or not.
+
+Thanks,
+Sunil.
+
+>
+> Joerg: sorry, this is another one for you to pick up if possible.
+>
+> Cheers,
+>
+> Will
+>
+>>  drivers/iommu/arm-smmu-v3.c | 3 +++
+>>  drivers/iommu/arm-smmu.c    | 3 +++
+>>  2 files changed, 6 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 05b4592..d412bdd 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -1714,6 +1714,9 @@ arm_smmu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
+>>       struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>>       struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
+>>
+>> +     if (domain->type == IOMMU_DOMAIN_IDENTITY)
+>> +             return iova;
+>> +
+>>       if (!ops)
+>>               return 0;
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index bfab4f7..81088cd 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -1459,6 +1459,9 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
+>>       struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>>       struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
+>>
+>> +     if (domain->type == IOMMU_DOMAIN_IDENTITY)
+>> +             return iova;
+>> +
+>>       if (!ops)
+>>               return 0;
+>>
+>> --
+>> 2.7.4
+>>
