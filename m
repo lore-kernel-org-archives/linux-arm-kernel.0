@@ -1,91 +1,117 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 26 Apr 2017 17:26:37 +0800
-Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
- ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
-In-Reply-To: <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
-References: <20170401.112603.1991545644693496714.davem@davemloft.net>
- <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
- <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
- <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
-Message-ID: <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 26 Apr 2017 10:40:47 +0100
+Subject: [patch V2 00/24] cpu/hotplug: Convert get_online_cpus() to a
+ percpu_rwsem
+In-Reply-To: <20170426085958.GC27156@leverpostej>
+References: <20170418170442.665445272@linutronix.de>
+ <20170425161037.GA27156@leverpostej>
+ <20170425172838.mr3kyccsdteyjso5@linutronix.de>
+ <20170426085958.GC27156@leverpostej>
+Message-ID: <bad40d9a-2c81-5a6c-2c12-3bf7094549de@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amir:
+On 26/04/17 09:59, Mark Rutland wrote:
+> On Tue, Apr 25, 2017 at 07:28:38PM +0200, Sebastian Siewior wrote:
+>> On 2017-04-25 17:10:37 [+0100], Mark Rutland wrote:
+>>> When we bring the secondary CPU online, we detect an erratum that wasn't
+>>> present on the boot CPU, and try to enable a static branch we use to
+>>> track the erratum. The call to static_branch_enable() blows up as above.
+>>
+>> this (cpus_set_cap()) seems only to be used used in CPU up part.
+>>
+>>> I see that we now have static_branch_disable_cpuslocked(), but we don't
+>>> have an equivalent for enable. I'm not sure what we should be doing
+>>> here.
+>>
+>> We should introduce static_branch_enable_cpuslocked(). Does this work
+>> for you (after s/static_branch_enable/static_branch_enable_cpuslocked/
+>> in cpus_set_cap()) ?:
+>
+> The patch you linked worked for me, given the below patch for arm64 to
+> make use of static_branch_enable_cpuslocked().
+>
+> Catalin/Will, are you happy for this to go via the tip tree with the
+> other hotplug locking changes?
+>
+> Thanks,
+> Mark.
+>
+> ---->8----
+> From 03c98baf0a9fcdfb87145bfb3f108d49a721dad6 Mon Sep 17 00:00:00 2001
+> From: Mark Rutland <mark.rutland@arm.com>
+> Date: Wed, 26 Apr 2017 09:46:47 +0100
+> Subject: [PATCH] arm64: cpufeature: use static_branch_enable_cpuslocked()
+>
+> Recently, the hotplug locking was conveted to use a percpu rwsem. Unlike
+> the existing {get,put}_online_cpus() logic, this can't nest.
+> Unfortunately, in arm64's secondary boot path we can end up nesting via
+> static_branch_enable() in cpus_set_cap() when we detect an erratum.
+>
+> This leads to a stream of messages as below, where the secondary
+> attempts to schedule befroe it has been fully onlined. As the CPU
 
-It is really glad to hear that the mlx5 will support RO mode this year, if so, do you agree that enable it dynamic by ethtool -s xxx,
-we have try it several month ago but there was only one drivers would use it at that time so the maintainer against it, it mlx5 would support RO,
-we could try to restart this solution, what do you think about it. :)
+nit: s/befroe/before/
 
-Thanks
-Ding
+> orchsetrating the onlining holds the rswem, this hangs the system.
+s/orchsetrating/orchestrating/
 
-On 2017/4/19 4:17, Amir Ancel wrote:
-> Hi,
-> 
-> mlx5 driver is planned to have RO support this year.
-> 
-> I believe drivers should be able to query whether the arch support it or not and enable it in the network adapter accordingly.
-> 
->  
-> 
-> -Amir
-> 
-> ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-> *From:* netdev-owner at vger.kernel.org <netdev-owner@vger.kernel.org> on behalf of David Laight <David.Laight@ACULAB.COM>
-> *Sent:* Tuesday, April 18, 2017 4:25:44 PM
-> *To:* 'Gabriele Paoloni'; davem at davemloft.net
-> *Cc:* Catalin Marinas; Will Deacon; Mark Rutland; Robin Murphy; jeffrey.t.kirsher at intel.com; alexander.duyck at gmail.com; linux-arm-kernel at lists.infradead.org; netdev at vger.kernel.org; Dingtianhong; Linuxarm
-> *Subject:* RE: Re: [PATCH net-next 1/4] ixgbe: sparc: rename the ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
->  
-> From: Gabriele Paoloni
->> Sent: 13 April 2017 10:11
->> > > Till now only the Intel ixgbe could support enable
->> > > Relaxed ordering in the drivers for special architecture,
->> > > but the ARCH_WANT_RELAX_ORDER is looks like a general name
->> > > for all arch, so rename to a specific name for intel
->> > > card looks more appropriate.
->> > >
->> > > Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> >
->> > This is not a driver specific facility.
->> >
->> > Any driver can test this symbol and act accordingly.
->> >
->> > Just because IXGBE is the first and only user, doesn't mean
->> > the facility is driver specific.
->> 
->> 
->> Please correct me if I am wrong but my understanding is that the standard
->> way to enable/disable relaxed ordering is to set/clear bit 4 of the Device
->> Control Register (PCI_EXP_DEVCTL_RELAX_EN 0x0010 /* Enable relaxed
->> ordering */).
->> Now I have looked up for all drivers either enabling or disabling relaxed
->> ordering and none of them seems to need a symbol to decide whether to
->> enable it or not.
->> Also it seems to me enabling/disabling relaxed ordering is never bound to the
->> host architecture.
->> 
->> So why this should be (or it is expected to be) a generic symbol?
->> Wouldn't it be more correct to have this as a driver specific symbol now and
->> move it to a generic one later once we have other drivers requiring it?
-> 
-> 'Relaxed ordering' is a bit in the TLP header.
-> A device (like the ixgbe hardware) can set it for some transactions and
-> still have the transactions 'ordered enough' for the driver to work.
-> (If all transactions have 'relaxed ordering' set then I suspect it is
-> almost impossible to write a working driver.)
-> The host side could (probably does) have a bit to enable 'relaxed ordering',
-> it could also enforce stronger ordering than required by the PCIe spec
-> (eg keeping reads in order).
-> 
-> Clearly, on some sparc64 systems, ixgbe needs to use 'relaxed ordering'.
-> To me this requires two separate bits be enabled:
-> 1) to the ixgbe driver to generate the 'relaxed' TLP.
-> 2) to the host to actually act on them.
-> If the ixgbe driver works when both are enabled why have options to
-> disable either (except for bug-finding)?
-> 
->         David
-> 
+>
+> [    0.250334] BUG: scheduling while atomic: swapper/1/0/0x00000002
+> [    0.250337] Modules linked in:
+> [    0.250346] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.11.0-rc7-next-20170424 #2
+> [    0.250349] Hardware name: ARM Juno development board (r1) (DT)
+> [    0.250353] Call trace:
+> [    0.250365] [<ffff000008088510>] dump_backtrace+0x0/0x238
+> [    0.250371] [<ffff00000808880c>] show_stack+0x14/0x20
+> [    0.250377] [<ffff00000839d854>] dump_stack+0x9c/0xc0
+> [    0.250384] [<ffff0000080e3540>] __schedule_bug+0x50/0x70
+> [    0.250391] [<ffff000008932ecc>] __schedule+0x52c/0x5a8
+> [    0.250395] [<ffff000008932f80>] schedule+0x38/0xa0
+> [    0.250400] [<ffff000008935e8c>] rwsem_down_read_failed+0xc4/0x108
+> [    0.250407] [<ffff0000080fe8e0>] __percpu_down_read+0x100/0x118
+> [    0.250414] [<ffff0000080c0b60>] get_online_cpus+0x70/0x78
+> [    0.250420] [<ffff0000081749e8>] static_key_enable+0x28/0x48
+> [    0.250425] [<ffff00000808de90>] update_cpu_capabilities+0x78/0xf8
+> [    0.250430] [<ffff00000808d14c>] update_cpu_errata_workarounds+0x1c/0x28
+> [    0.250435] [<ffff00000808e004>] check_local_cpu_capabilities+0xf4/0x128
+> [    0.250440] [<ffff00000808e894>] secondary_start_kernel+0x8c/0x118
+> [    0.250444] [<000000008093d1b4>] 0x8093d1b4
+>
+> We only call cpus_set_cap() in the secondary boot path, where we know
+> that the rwsem is held by the thread orchestrating the onlining. Thus,
+> we can use the new static_branch_enable_cpuslocked() in cpus_set_cap(),
+> avoiding the above.
+
+Correction, we could call cpus_set_cap() from setup_cpu_features()
+for updating the system global capabilities, where we may not hold the
+cpu_hotplug_lock. So we could end up calling static_branch_enable_cpuslocked()
+without actually holding the lock. Should we do a cpu_hotplug_begin/done in
+setup_cpu_feature_capabilities ? I agree it doesn't look that nice. Thoughts ?
+
+Suzuki
+
+> 		
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reported-by: Catalin Marinas <catalin.marinas@arm.com>
+> Suggested-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Suzuki Poulose <suzuki,poulose@arm.com>
+> ---
+>  arch/arm64/include/asm/cpufeature.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index f31c48d..349b5cd 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -145,7 +145,7 @@ static inline void cpus_set_cap(unsigned int num)
+>  			num, ARM64_NCAPS);
+>  	} else {
+>  		__set_bit(num, cpu_hwcaps);
+> -		static_branch_enable(&cpu_hwcap_keys[num]);
+> +		static_branch_enable_cpuslocked(&cpu_hwcap_keys[num]);
+>  	}
+>  }
+>
+>
