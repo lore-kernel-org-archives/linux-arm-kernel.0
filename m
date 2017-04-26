@@ -1,109 +1,101 @@
-From: Andrew.Pinski@cavium.com (Pinski, Andrew)
-Date: Wed, 26 Apr 2017 07:22:46 +0000
-Subject: [PATCH v2] arm64: perf: Use only exclude_kernel attribute when
- kernel is running in HYP
-In-Reply-To: <CA+7sy7D-ZB84xQ2pE-io1v7pmnAuWUszh1B=Zq+Ezup=sysQ2g@mail.gmail.com>
-References: <1492623846-29335-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170420084928.GC31436@leverpostej>
- <CAFpQJXVSsg8CX28vEo2LzmOi3pknHiH233spMD6ip4LZO4vw=Q@mail.gmail.com>
- <20170424154530.GO12323@arm.com>
- <CAFpQJXWX=0GQ5hse4E_OSdnYhMOA7CvqeoHe9AdMsyoZJmrPQQ@mail.gmail.com>
- <20170425165259.GS24484@arm.com>
- <CA+7sy7D-ZB84xQ2pE-io1v7pmnAuWUszh1B=Zq+Ezup=sysQ2g@mail.gmail.com>
-Message-ID: <CY4PR07MB3415C0CEBB9D3DF0C249DC6793110@CY4PR07MB3415.namprd07.prod.outlook.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 26 Apr 2017 09:25:38 +0200
+Subject: [RFC PATCH 30/30] vfio: Allow to bind foreign task
+In-Reply-To: <20170227195441.5170-31-jean-philippe.brucker@arm.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-31-jean-philippe.brucker@arm.com>
+Message-ID: <b937914a-d215-8223-0846-65271a568170@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/25/2017 11:53 PM, Jayachandran C. wrote:
-> Hi Will,
+On 27.02.2017 20:54, Jean-Philippe Brucker wrote:
+> Let the process that owns the device create an address space bond on
+> behalf of another process. We add a pid argument to the BIND_TASK ioctl,
+> allowing the caller to bind a foreign task. The expected program flow in
+> this case is:
 >
-> On Tue, Apr 25, 2017 at 10:23 PM, Will Deacon <will.deacon@arm.com> wrote:
->> On Tue, Apr 25, 2017 at 09:13:40AM +0530, Ganapatrao Kulkarni wrote:
->>> On Mon, Apr 24, 2017 at 9:15 PM, Will Deacon <will.deacon@arm.com> wrote:
->>>> On Thu, Apr 20, 2017 at 02:56:50PM +0530, Ganapatrao Kulkarni wrote:
->>>>> On Thu, Apr 20, 2017 at 2:19 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>>>> On Wed, Apr 19, 2017 at 11:14:06PM +0530, Ganapatrao Kulkarni wrote:
->>>>>>> commit d98ecda (arm64: perf: Count EL2 events if the kernel is running in HYP)
->>>>>>> is returning error for perf syscall with mixed attribute set for exclude_kernel
->>>>>>> and exclude_hv. This change is breaking some applications (observed with hhvm)
->>>>>>> when ran on VHE enabled platforms.
->>>>>>>
->>>>>>> Adding fix to consider only exclude_kernel attribute when kernel is
->>>>>>> running in HYP. Also adding sysfs file to notify the bhehaviour
->>>>>>> of attribute exclude_hv.
->>>>>>>
->>>>>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->>>>>>> ---
->>>>>>>
->>>>>>> Changelog:
->>>>>>>
->>>>>>> V2:
->>>>>>>   - Changes as per Will Deacon's suggestion.
->>>>>>>
->>>>>>> V1: Initial patch
->>>>>>>
->>>>>>>   arch/arm64/kernel/perf_event.c | 28 ++++++++++++++++++++++++----
->>>>>>>   include/linux/perf/arm_pmu.h   |  1 +
->>>>>>>   2 files changed, 25 insertions(+), 4 deletions(-)
->>>>>>>
->>>>>>> @@ -871,14 +890,13 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
->>>>>>>
->>>>>>>        if (attr->exclude_idle)
->>>>>>>                return -EPERM;
->>>>>>> -     if (is_kernel_in_hyp_mode() &&
->>>>>>> -         attr->exclude_kernel != attr->exclude_hv)
->>>>>>> -             return -EINVAL;
->>>>>>> +     if (is_kernel_in_hyp_mode() && !attr->exclude_kernel)
->>>>>>> +             config_base |= ARMV8_PMU_INCLUDE_EL2;
->>>>>>>        if (attr->exclude_user)
->>>>>>>                config_base |= ARMV8_PMU_EXCLUDE_EL0;
->>>>>>>        if (!is_kernel_in_hyp_mode() && attr->exclude_kernel)
->>>>>>>                config_base |= ARMV8_PMU_EXCLUDE_EL1;
->>>>>>> -     if (!attr->exclude_hv)
->>>>>>> +     if (!is_kernel_in_hyp_mode() && !attr->exclude_hv)
->>>>>>>                config_base |= ARMV8_PMU_INCLUDE_EL2;
->>>>>> This isn't quite what Will suggested.
->>>>>>
->>>>>> The idea was that userspace would read sysfs, then use that to determine
->>>>>> the correct exclusion parameters [1,2]. This logic was not expected to
->>>>>> change; it correctly validates whether we can provide what the user
->>>>>> requests.
->>>>> OK, if you are ok with sysfs part, i can send next version with that
->>>>> change only?.
->>>> I think the sysfs part is still a little dodgy, since you still expose the
->>>> "exclude_hv" file with a value of 0 when not running at EL2, which would
->>>> imply that exclude_hv is forced to zero. I don't think that's correct.
->>> okay, i can make exclude_hv visible only when kernel booted in EL2.
->>> is it ok to have empty directory "attr" when kernel booted to EL1?
->>> attr can be place holder for any other miscellaneous attributes, that
->>> can be added in future.
->> Sounds good to me, although I'll seek comment from the other perf folks
->> before merging anything with ABI implications.
-> Do you really think this is the solution given:
-> - this is an arm64 specific sysfs interface that is tied to the perf API
-> - the perf API documentation has to be updated for this
-> - All the applications that use the perf API have to be modified to
-> check this sysfs interface
-> - If the application fails to do so, a very narrow corner case
-> (exclude_hv != exclude_kernel and VHE enabled) fails.
+> * Process A creates the VFIO context and initializes the device.
+> * Process B asks A to bind its address space.
+> * Process A issues an ioctl to the VFIO device fd with BIND_TASK(pid).
+>   It may communicate the given PASID back to process B or keep track of it
+>   internally.
+> * Process B asks A to perform transactions on its virtual address.
+> * Process A launches transaction tagged with the given PASID.
 >
-> Any application that really cares can already do see if exclude_hv !=
-> exclude_kernel case works by calling perf_open_event() with those
-> options and checking the return value.
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> ---
+>  drivers/vfio/vfio.c       | 35 +++++++++++++++++++++++++++++++++--
+>  include/uapi/linux/vfio.h | 15 +++++++++++++++
+>  2 files changed, 48 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
+> index c4505d8f4c61..ecc5d07e3dbb 100644
+> --- a/drivers/vfio/vfio.c
+> +++ b/drivers/vfio/vfio.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/module.h>
+>  #include <linux/mutex.h>
+>  #include <linux/pci.h>
+> +#include <linux/ptrace.h>
+>  #include <linux/rwsem.h>
+>  #include <linux/sched.h>
+>  #include <linux/slab.h>
+> @@ -1660,7 +1661,7 @@ static long vfio_svm_ioctl(struct vfio_device *device, unsigned int cmd,
+>  	struct vfio_device_svm svm;
+>  	struct vfio_task *vfio_task;
+>
+> -	minsz = offsetofend(struct vfio_device_svm, pasid);
+> +	minsz = offsetofend(struct vfio_device_svm, pid);
+>
+>  	if (copy_from_user(&svm, (void __user *)arg, minsz))
+>  		return -EFAULT;
+> @@ -1669,9 +1670,39 @@ static long vfio_svm_ioctl(struct vfio_device *device, unsigned int cmd,
+>  		return -EINVAL;
+>
+>  	if (cmd == VFIO_DEVICE_BIND_TASK) {
+> -		struct task_struct *task = current;
+> +		struct mm_struct *mm;
+> +		struct task_struct *task;
+> +
+> +		if (svm.flags & ~VFIO_SVM_PID)
+> +			return -EINVAL;
+> +
+> +		if (svm.flags & VFIO_SVM_PID) {
+> +			rcu_read_lock();
+> +			task = find_task_by_vpid(svm.pid);
+> +			if (task)
+> +				get_task_struct(task);
+> +			rcu_read_unlock();
+> +			if (!task)
+> +				return -ESRCH;
+> +
+> +			/*
+> +			 * Ensure process has RW access on the task's mm
+> +			 * FIXME:
+> +			 * - I think this ought to be in the IOMMU API
+> +			 * - I'm assuming permission is never revoked during the
+> +			 *   task's lifetime. Might be mistaken.
+> +			 */
+> +			mm = mm_access(task, PTRACE_MODE_ATTACH_REALCREDS);
+> +			if (!mm || IS_ERR(mm))
 
-An example of an application which needs to changed is HHVM. Currently 
-it sets exclude_hv to true but exclude_kernel to false as it does not 
-care about the hypervisor associated perf events associated with the 
-code, only the kernel and userspace associated evnts.
-Yes we could submit a patch to use the sysfs interface to check but it 
-would look funny and the facebook folks might reject the patch as it is 
-ARM64 specific in generic code.  Note this is how all of this discussion 
-started was HHVM's call to perf_open_event was failing.
+I know this is RFC patch but considering we will keep this as is, we 
+need here:
++put_task_struct(task);
+
+
+> +				return IS_ERR(mm) ? PTR_ERR(mm) : -ESRCH;
+> +			mmput(mm);
+> +		} else {
+> +			get_task_struct(current);
+> +			task = current;
+> +		}
+>
+>  		ret = iommu_bind_task(device->dev, task, &svm.pasid, 0, NULL);
+> +		put_task_struct(task);
+>  		if (ret)
+>  			return ret;
+>
 
 Thanks,
-Andrew Pinski
-
->
-> Hope I am mistake here, otherwise this does not sound like a good idea.
->
-> JC.
+Tomasz
