@@ -1,174 +1,69 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 26 Apr 2017 07:29:46 +0100
-Subject: [PATCH 2/3] iio: adc: meson-saradc: add Meson8b SoC compatibility
-In-Reply-To: <20170417182820.26670-3-martin.blumenstingl@googlemail.com>
+Date: Wed, 26 Apr 2017 07:31:28 +0100
+Subject: [PATCH 3/3] iio: adc: meson-saradc: mark all meson_sar_adc_data
+ static and const
+In-Reply-To: <20170417182820.26670-4-martin.blumenstingl@googlemail.com>
 References: <20170417182820.26670-1-martin.blumenstingl@googlemail.com>
- <20170417182820.26670-3-martin.blumenstingl@googlemail.com>
-Message-ID: <bcaf354e-9e6b-a45a-6822-3efeb99058cf@kernel.org>
+ <20170417182820.26670-4-martin.blumenstingl@googlemail.com>
+Message-ID: <c1dd71e0-8c25-17ac-b113-291ebbdd5972@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 17/04/17 19:28, Martin Blumenstingl wrote:
-> Meson GX SoCs however use some magic bits to prevent simultaneous (=
-> conflicting, because only consumer should use the FIFO buffer with the
-> ADC results) usage by the Linux kernel and the bootloader (the BL30
-> bootloader uses the SAR ADC to read the CPU temperature).
-> This patch changes guards all BL30 functionality so it is skipped on
-> SoCs which don't have it. Since the hardware itself doesn't know whether
-> BL30 is available the internal meson_sar_adc_data is extended so this
-> information can be provided per of_device_id.data inside the driver.
-> 
-> Additionally the clocks "adc_clk" and "adc_sel" are not provided by the
-> clock-controller itself. "adc_sel" is not available at all. "adc_clk"
-> is provided by the SAR ADC IP block itself on Meson8b (and earlier).
-> This is already supported by the meson_saradc driver.
-> 
-> Finally a new of_device_id for the Meson8b SoC is added so it can be
-> wired up in the corresponding DT.
+> These are only passed as of_device_id.data and never modified. Thus we
+> can mark them as static const, just like the of_device_id instances
+> where they are used.
 > 
 > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Fine apart from what superficially looks like a cut and paste error inline...
+Reordering the patches would make this simpler as you'd only have
+to do the existing ones.
+
+Not a bit issue though so you could just not bother...
 
 Jonathan
 > ---
->  drivers/iio/adc/meson_saradc.c | 80 +++++++++++++++++++++++++++++-------------
->  1 file changed, 56 insertions(+), 24 deletions(-)
+>  drivers/iio/adc/meson_saradc.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
 > 
 > diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
-> index dd4190b50df6..cf13691009ee 100644
+> index cf13691009ee..8f742b71b165 100644
 > --- a/drivers/iio/adc/meson_saradc.c
 > +++ b/drivers/iio/adc/meson_saradc.c
-> @@ -220,6 +220,7 @@ enum meson_sar_adc_chan7_mux_sel {
->  };
->  
->  struct meson_sar_adc_data {
-> +	bool					has_bl30_integration;
->  	unsigned int				resolution;
->  	const char				*name;
->  };
-> @@ -437,19 +438,24 @@ static int meson_sar_adc_lock(struct iio_dev *indio_dev)
->  
->  	mutex_lock(&indio_dev->mlock);
->  
-> -	/* prevent BL30 from using the SAR ADC while we are using it */
-> -	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
-> -			   MESON_SAR_ADC_DELAY_KERNEL_BUSY,
-> -			   MESON_SAR_ADC_DELAY_KERNEL_BUSY);
-> -
-> -	/* wait until BL30 releases it's lock (so we can use the SAR ADC) */
-> -	do {
-> -		udelay(1);
-> -		regmap_read(priv->regmap, MESON_SAR_ADC_DELAY, &val);
-> -	} while (val & MESON_SAR_ADC_DELAY_BL30_BUSY && timeout--);
-> -
-> -	if (timeout < 0)
-> -		return -ETIMEDOUT;
-> +	if (priv->data->has_bl30_integration) {
-> +		/* prevent BL30 from using the SAR ADC while we are using it */
-> +		regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
-> +				MESON_SAR_ADC_DELAY_KERNEL_BUSY,
-> +				MESON_SAR_ADC_DELAY_KERNEL_BUSY);
-> +
-> +		/*
-> +		 * wait until BL30 releases it's lock (so we can use the SAR
-> +		 * ADC)
-> +		 */
-> +		do {
-> +			udelay(1);
-> +			regmap_read(priv->regmap, MESON_SAR_ADC_DELAY, &val);
-> +		} while (val & MESON_SAR_ADC_DELAY_BL30_BUSY && timeout--);
-> +
-> +		if (timeout < 0)
-> +			return -ETIMEDOUT;
-> +	}
->  
->  	return 0;
->  }
-> @@ -458,9 +464,10 @@ static void meson_sar_adc_unlock(struct iio_dev *indio_dev)
->  {
->  	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
->  
-> -	/* allow BL30 to use the SAR ADC again */
-> -	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
-> -			   MESON_SAR_ADC_DELAY_KERNEL_BUSY, 0);
-> +	if (priv->data->has_bl30_integration)
-> +		/* allow BL30 to use the SAR ADC again */
-> +		regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
-> +				MESON_SAR_ADC_DELAY_KERNEL_BUSY, 0);
->  
->  	mutex_unlock(&indio_dev->mlock);
->  }
-> @@ -614,14 +621,16 @@ static int meson_sar_adc_init(struct iio_dev *indio_dev)
->  	 */
->  	meson_sar_adc_set_chan7_mux(indio_dev, CHAN7_MUX_CH7_INPUT);
->  
-> -	/*
-> -	 * leave sampling delay and the input clocks as configured by BL30 to
-> -	 * make sure BL30 gets the values it expects when reading the
-> -	 * temperature sensor.
-> -	 */
-> -	regmap_read(priv->regmap, MESON_SAR_ADC_REG3, &regval);
-> -	if (regval & MESON_SAR_ADC_REG3_BL30_INITIALIZED)
-> -		return 0;
-> +	if (priv->data->has_bl30_integration) {
-> +		/*
-> +		 * leave sampling delay and the input clocks as configured by
-> +		 * BL30 to make sure BL30 gets the values it expects when
-> +		 * reading the temperature sensor.
-> +		 */
-> +		regmap_read(priv->regmap, MESON_SAR_ADC_REG3, &regval);
-> +		if (regval & MESON_SAR_ADC_REG3_BL30_INITIALIZED)
-> +			return 0;
-> +	}
->  
->  	meson_sar_adc_stop_sample_engine(indio_dev);
->  
-> @@ -834,23 +843,46 @@ static const struct iio_info meson_sar_adc_iio_info = {
+> @@ -843,31 +843,31 @@ static const struct iio_info meson_sar_adc_iio_info = {
 >  	.driver_module = THIS_MODULE,
 >  };
 >  
-> +struct meson_sar_adc_data meson_sar_adc_meson8_data = {
-> +	.has_bl30_integration = false,
-> +	.resolution = 10,
-> +	.name = "meson-meson8b-saradc",
-Not meson-meson8-saradc?
-> +};
-> +
-> +struct meson_sar_adc_data meson_sar_adc_meson8b_data = {
-> +	.has_bl30_integration = false,
-> +	.resolution = 10,
-> +	.name = "meson-meson8b-saradc",
-> +};
-> +
->  struct meson_sar_adc_data meson_sar_adc_gxbb_data = {
-> +	.has_bl30_integration = true,
+> -struct meson_sar_adc_data meson_sar_adc_meson8_data = {
+> +static const struct meson_sar_adc_data meson_sar_adc_meson8_data = {
+>  	.has_bl30_integration = false,
+>  	.resolution = 10,
+>  	.name = "meson-meson8b-saradc",
+>  };
+>  
+> -struct meson_sar_adc_data meson_sar_adc_meson8b_data = {
+> +static const struct meson_sar_adc_data meson_sar_adc_meson8b_data = {
+>  	.has_bl30_integration = false,
+>  	.resolution = 10,
+>  	.name = "meson-meson8b-saradc",
+>  };
+>  
+> -struct meson_sar_adc_data meson_sar_adc_gxbb_data = {
+> +static const struct meson_sar_adc_data meson_sar_adc_gxbb_data = {
+>  	.has_bl30_integration = true,
 >  	.resolution = 10,
 >  	.name = "meson-gxbb-saradc",
 >  };
 >  
->  struct meson_sar_adc_data meson_sar_adc_gxl_data = {
-> +	.has_bl30_integration = true,
+> -struct meson_sar_adc_data meson_sar_adc_gxl_data = {
+> +static const struct meson_sar_adc_data meson_sar_adc_gxl_data = {
+>  	.has_bl30_integration = true,
 >  	.resolution = 12,
 >  	.name = "meson-gxl-saradc",
 >  };
 >  
->  struct meson_sar_adc_data meson_sar_adc_gxm_data = {
-> +	.has_bl30_integration = true,
+> -struct meson_sar_adc_data meson_sar_adc_gxm_data = {
+> +static const struct meson_sar_adc_data meson_sar_adc_gxm_data = {
+>  	.has_bl30_integration = true,
 >  	.resolution = 12,
 >  	.name = "meson-gxm-saradc",
->  };
->  
->  static const struct of_device_id meson_sar_adc_of_match[] = {
->  	{
-> +		.compatible = "amlogic,meson8-saradc",
-> +		.data = &meson_sar_adc_meson8_data,
-> +	},
-> +	{
-> +		.compatible = "amlogic,meson8b-saradc",
-> +		.data = &meson_sar_adc_meson8b_data,
-> +	},
-> +	{
->  		.compatible = "amlogic,meson-gxbb-saradc",
->  		.data = &meson_sar_adc_gxbb_data,
->  	}, {
 > 
