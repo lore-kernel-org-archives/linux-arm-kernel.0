@@ -1,62 +1,49 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 26 Apr 2017 10:26:42 -0700
-Subject: [PATCH v2 2/2] ARM: dts: Add the ethernet and ethernet PHY to the
- cygnus core DT.
-In-Reply-To: <0cb00eb7-41d0-0390-4687-d966499ed9f4@gmail.com>
-References: <20170425235357.7690-1-eric@anholt.net>
- <20170425235357.7690-2-eric@anholt.net>
- <0cb00eb7-41d0-0390-4687-d966499ed9f4@gmail.com>
-Message-ID: <87shkvjd0t.fsf@eliezer.anholt.net>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 26 Apr 2017 10:39:49 -0700
+Subject: [PATCH] ARM: Fix __show_regs output timestamps
+Message-ID: <61817479ac8c4c6c8be702d2e2136fddac1b1821.1493228290.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian Fainelli <f.fainelli@gmail.com> writes:
+Multiple line formats are not preferred as the second and
+subsequent lines may not have timestamps.
 
-> On 04/25/2017 04:53 PM, Eric Anholt wrote:
->> Cygnus has a single AMAC controller connected to the B53 switch with 2
->> PHYs.  On the BCM911360_EP platform, those two PHYs are connected to
->> the external ethernet jacks.
->> 
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->> 
->> v2: Call the node "switch", just call the ports "port" (suggestions by
->>     Florian), drop max-speed on the phys (suggestion by Andrew Lunn),
->>     call the other nodes "ethernet" and "ethernet-phy" (suggestions by
->>     Sergei Shtylyov)
->> 
->>  arch/arm/boot/dts/bcm-cygnus.dtsi      | 58 ++++++++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/bcm911360_entphn.dts |  8 +++++
->>  2 files changed, 66 insertions(+)
->> 
->> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
->> index 009f1346b817..9fd89be0f5e0 100644
->> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
->> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
->> @@ -142,6 +142,54 @@
->>  			interrupts = <0>;
->>  		};
->>  
->> +		mdio: mdio at 18002000 {
->> +			compatible = "brcm,iproc-mdio";
->> +			reg = <0x18002000 0x8>;
->> +			#size-cells = <1>;
->> +			#address-cells = <0>;
->
-> Sorry for not noticing earlier, since you override this correctly in the
-> board-level DTS file can you put a:
->
-> 			status = "disabled"
->
-> property in there by default?
+Lacking timestamps makes reading the output a bit difficult.
+This also makes arm/arm64 output more similar.
 
-I didn't have the override in the board file either, just switch and
-ethernet.  Fixed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170426/4bef529a/attachment-0001.sig>
+Previous:
+
+[ 1514.093231] pc : [<bf79c304>]    lr : [<bf79ced8>]    psr: a00f0013
+sp : ecdd7e20  ip : 00000000  fp : ffffffff
+
+New:
+
+[ 1514.093231] pc : [<bf79c304>]    lr : [<bf79ced8>]    psr: a00f0013
+[ 1514.105316] sp : ecdd7e20  ip : 00000000  fp : ffffffff
+
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ arch/arm/kernel/process.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 939e8b58c59d..151cece4a293 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -123,10 +123,10 @@ void __show_regs(struct pt_regs *regs)
+ 
+ 	print_symbol("PC is at %s\n", instruction_pointer(regs));
+ 	print_symbol("LR is at %s\n", regs->ARM_lr);
+-	printk("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n"
+-	       "sp : %08lx  ip : %08lx  fp : %08lx\n",
+-		regs->ARM_pc, regs->ARM_lr, regs->ARM_cpsr,
+-		regs->ARM_sp, regs->ARM_ip, regs->ARM_fp);
++	printk("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n",
++	       regs->ARM_pc, regs->ARM_lr, regs->ARM_cpsr);
++	printk("sp : %08lx  ip : %08lx  fp : %08lx\n",
++	       regs->ARM_sp, regs->ARM_ip, regs->ARM_fp);
+ 	printk("r10: %08lx  r9 : %08lx  r8 : %08lx\n",
+ 		regs->ARM_r10, regs->ARM_r9,
+ 		regs->ARM_r8);
+-- 
+2.10.0.rc2.1.g053435c
