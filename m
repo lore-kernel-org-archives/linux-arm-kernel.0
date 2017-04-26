@@ -1,59 +1,55 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Wed, 26 Apr 2017 14:50:04 +0530
-Subject: [PATCH] iommu/arm-smmu-v3: Increase SMMU CMD queue poll timeout
-In-Reply-To: <20170424170518.GU12323@arm.com>
-References: <1493035176-3633-1-git-send-email-gakula@caviumnetworks.com>
- <20170424160841.GS12323@arm.com>
- <CA+sq2CeyVm4pcAVME7OAFVxpOcSJc5CsP0vz3ypDkSxdx0SKnQ@mail.gmail.com>
- <20170424170518.GU12323@arm.com>
-Message-ID: <CA+sq2CfNYKs8Ub4bWTM1GRGO=06N-Tn7BkehwJE6LpZvC0=R=Q@mail.gmail.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Wed, 26 Apr 2017 09:23:34 +0000
+Subject: [PATCH 3/5] dt-bindings: stm32-dma: Add property to handle STM32
+ DMAMUX
+In-Reply-To: <20170320213722.oj3ipmslbw2mp27d@rob-hp-laptop>
+References: <1489414561-28912-1-git-send-email-cedric.madianga@gmail.com>
+ <1489414561-28912-4-git-send-email-cedric.madianga@gmail.com>
+ <20170320213722.oj3ipmslbw2mp27d@rob-hp-laptop>
+Message-ID: <b79dbe72-385f-3e6c-f984-8a724f7610bd@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 10:35 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Apr 24, 2017 at 10:26:53PM +0530, Sunil Kovvuri wrote:
->> On Mon, Apr 24, 2017 at 9:38 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Mon, Apr 24, 2017 at 05:29:36PM +0530, Geetha sowjanya wrote:
->> >> From: Geetha <gakula@cavium.com>
->> >>
->> >> When large memory is being unmapped, huge no of tlb invalidation cmds are
->> >> submitted followed by a SYNC command. This sometimes hits CMD queue full and
->> >> poll on queue drain is being timedout throwing error message 'CMD_SYNC timeout'.
->> >>
->> >> Although there is no functional issue, error message confuses user. Hence increased
->> >> poll timeout to 500us
->> >
->> > Hmm, what are you doing to unmap that much? Is this VFIO teardown? Do you
->> > have 7c6d90e2bb1a ("iommu/io-pgtable-arm: Fix iova_to_phys for block
->> > entries") applied?
+On 03/20/2017 10:37 PM, Rob Herring wrote:
+> On Mon, Mar 13, 2017 at 03:15:59PM +0100, M'boumba Cedric Madianga wrote:
+>> This patch adds an optional property needed for STM32 DMA controller
+>> addressed via STM32 DMAMUX.
 >>
->> Yes it's VFIO teardown and again yes the above fix is applied.
->> But i didn't get how above fix is related.
->> TLB invalidation commands are submitted at 'arm_smmu_tlb_inv_range_nosync()'
->> and it's a loop over granule size.
+>> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+>> ---
+>>  Documentation/devicetree/bindings/dma/stm32-dma.txt | 3 +++
+>>  1 file changed, 3 insertions(+)
 >>
->> 1357         do {
->> 1358                 arm_smmu_cmdq_issue_cmd(smmu, &cmd);
->> 1359                 cmd.tlbi.addr += granule;
->> 1360         } while (size -= granule);
->>
->> So if invalidation size is big then huge no of invalidation commands
->> will be submitted
->> irrespective of fix that you pointed above, right ?
+>> diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+>> index 4408af6..7b5e91a 100644
+>> --- a/Documentation/devicetree/bindings/dma/stm32-dma.txt
+>> +++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+>> @@ -16,6 +16,9 @@ Optional properties:
+>>  - resets: Reference to a reset controller asserting the DMA controller
+>>  - st,mem2mem: boolean; if defined, it indicates that the controller supports
+>>    memory-to-memory transfer
+>> +- st,dmamux: boolean; if defined, it indicates that the controller is behind a
+>> +  DMA multiplexer. In that case, using dma instances doesn't work for DMA
+>> +  clients. They have to use dma-router instances.
 >
-> VFIO has some logic to batch up invalidations, but this didn't work properly
-> for us without the fix above. However, I guess you have a huge memory range
-> that's mapped with 2M sections or something, so there are still loads of
-> entries to invalidate.
+> This should not be needed for the same reason we don't need anything
+> like this for chained interrupt controllers.
 >
-> I would much prefer it if VFIO could just teardown the whole address space
-> so that we could do an invalidate all, but there's a chicken-and-egg problem
-> with page accounting iirc.
+> Also, the compatible string should be specific enough to provide this
+> information.
 >
+> Rob
 
-We can definitely look into this from VFIO perspective but for now I am guessing
-this patch is fine, as no functionality is being changed.
-What do you say ?
+I don't understand what you're meant here. Our DMAs can work with or 
+without DMAMUX driver. Driver uses this binding to use it or not.
 
-Thanks,
-Sunil.
+Py
+
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
