@@ -1,12 +1,12 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 26 Apr 2017 10:26:44 -0700
+Date: Wed, 26 Apr 2017 10:26:42 -0700
 Subject: [PATCH v2 2/2] ARM: dts: Add the ethernet and ethernet PHY to the
  cygnus core DT.
 In-Reply-To: <0cb00eb7-41d0-0390-4687-d966499ed9f4@gmail.com>
 References: <20170425235357.7690-1-eric@anholt.net>
  <20170425235357.7690-2-eric@anholt.net>
  <0cb00eb7-41d0-0390-4687-d966499ed9f4@gmail.com>
-Message-ID: <87r30fjd0r.fsf@eliezer.anholt.net>
+Message-ID: <87shkvjd0t.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -51,11 +51,12 @@ Florian Fainelli <f.fainelli@gmail.com> writes:
 >
 > property in there by default?
 
-Done.
+I didn't have the override in the board file either, just switch and
+ethernet.  Fixed.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170426/e5d1c373/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170426/4bef529a/attachment-0001.sig>
