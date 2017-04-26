@@ -1,49 +1,194 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 26 Apr 2017 10:39:49 -0700
-Subject: [PATCH] ARM: Fix __show_regs output timestamps
-Message-ID: <61817479ac8c4c6c8be702d2e2136fddac1b1821.1493228290.git.joe@perches.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 26 Apr 2017 23:49:46 +0530
+Subject: [PATCH] perf evsel: Fix to perf-stat malloc corruption on arm64
+ platforms
+In-Reply-To: <20170426171208.GC23669@leverpostej>
+References: <1493198780-25415-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170426145057.GK27156@leverpostej> <20170426171208.GC23669@leverpostej>
+Message-ID: <CAFpQJXX7HaKQ8t85mB2Fqn-6wHhb_GR+2sOi23HQZnRgUw-Y4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiple line formats are not preferred as the second and
-subsequent lines may not have timestamps.
+Hi Mark,
 
-Lacking timestamps makes reading the output a bit difficult.
-This also makes arm/arm64 output more similar.
+On Wed, Apr 26, 2017 at 10:42 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Apr 26, 2017 at 03:50:57PM +0100, Mark Rutland wrote:
+>> Hi Ganapatrao,
+>>
+>> Thanks for tracking this down.
+>>
+>> On Wed, Apr 26, 2017 at 02:56:20PM +0530, Ganapatrao Kulkarni wrote:
+>> > In some cases, ncpus used for perf_evsel__alloc_fd and for
+>> > perf_evsel__close are not the same, this is causing memory
+>> > overwrite/corruption.
+>>
+>> It would be good if we could enumerate when this occurs.
+>>
+>> From what I can tell, the problem occurs when opening a thread-bound
+>> event on PMU with a cpus/cpumask in sysfs.
+>>
+>> For perf-stat we create events using create_perf_stat_counter(). There
+>> we see !target_has_cpu(), so we call perf_evsel__open_per_thread(). Thus
+>> perf_evsel__open() is passed NULL cpus, and creates an empty cpu_map. As
+>> cpus->nr = 1, we get 1 * nthreads fds allocated, and open events for
+>> each of these.
+>>
+>> Later, we try to close events using perf_evlist__close(). This doesn't
+>> take target_has_cpu() into account, but sees evsel->cpus is non-NULL
+>> (since the PMU had a cpus/cpumask file), and tries to close events for
+>> cpus->nr * nthreads, and goes out-of-bounds of the fd array.
+>
+> Looking further, I introduced this inconsistency in commit:
+>
+>   3df33eff2ba96be4 ("perf stat: Avoid skew when reading events ")
+>
+> To fix that, perf-stat needs to control the closing of its events, to
+> match what it does when opening them. I've spun the below to do that,
+> introducing new helpers to make it clear.
+>
+> Does that work for you?
+>
+> Thanks,
+> Mark.
+>
+> ---->8----
+> diff --git a/tools/perf/builtin-stat.c b/tools/perf/builtin-stat.c
+> index 13b5499..638aefa 100644
+> --- a/tools/perf/builtin-stat.c
+> +++ b/tools/perf/builtin-stat.c
+> @@ -346,6 +346,28 @@ static void read_counters(void)
+>         }
+>  }
+>
+> +/*
+> + * Close all evnt FDs we open in __run_perf_stat() and
+> + * create_perf_stat_counter(), taking care to match the number of threads and CPUs.
+> + *
+> + * Note that perf_evlist__close(evsel_list) is not equivalent, as it doesn't
+> + * take the target into account.
+> + */
+> +static void close_counters(void)
+> +{
+> +       bool per_cpu = target__has_cpu(&target);
+> +       struct perf_evsel *evsel;
+> +
+> +       evlist__for_each_entry(evsel_list, evsel) {
+> +               if (per_cpu)
+> +                       perf_evsel__close_per_cpu(evsel,
+> +                                                 perf_evsel__cpus(evsel));
+> +               else
+> +                       perf_evsel__close_per_thread(evsel,
+> +                                                    evsel_list->threads);
+> +       }
+> +}
+> +
+>  static void process_interval(void)
+>  {
+>         struct timespec ts, rs;
+> @@ -686,7 +708,7 @@ static int __run_perf_stat(int argc, const char **argv)
+>          * group leaders.
+>          */
+>         read_counters();
+> -       perf_evlist__close(evsel_list);
+> +       close_counters();
+>
+>         return WEXITSTATUS(status);
+>  }
+> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+> index ac59710..726ceca 100644
+> --- a/tools/perf/util/evsel.c
+> +++ b/tools/perf/util/evsel.c
+> @@ -1670,6 +1670,18 @@ int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
+>         return err;
+>  }
+>
+> +int perf_evsel__open_per_cpu(struct perf_evsel *evsel,
+> +                            struct cpu_map *cpus)
+> +{
+> +       return perf_evsel__open(evsel, cpus, NULL);
+> +}
+> +
+> +int perf_evsel__open_per_thread(struct perf_evsel *evsel,
+> +                               struct thread_map *threads)
+> +{
+> +       return perf_evsel__open(evsel, NULL, threads);
+> +}
+> +
+>  void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads)
+>  {
+>         if (evsel->fd == NULL)
+> @@ -1679,16 +1691,18 @@ void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads)
+>         perf_evsel__free_fd(evsel);
+>  }
+>
+> -int perf_evsel__open_per_cpu(struct perf_evsel *evsel,
+> -                            struct cpu_map *cpus)
+> +void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
+> +                              struct cpu_map *cpus)
+>  {
+> -       return perf_evsel__open(evsel, cpus, NULL);
+> +       int ncpus = cpus ? cpus->nr : 1;
+> +       perf_evsel__close(evsel, ncpus, 1);
+>  }
+>
+> -int perf_evsel__open_per_thread(struct perf_evsel *evsel,
+> -                               struct thread_map *threads)
+> +void perf_evsel__close_per_thread(struct perf_evsel *evsel,
+> +                                 struct thread_map *threads)
+>  {
+> -       return perf_evsel__open(evsel, NULL, threads);
+> +       int nthreads = threads ? threads->nr : 1;
+> +       perf_evsel__close(evsel, 1, nthreads);
+>  }
+>
+>  static int perf_evsel__parse_id_sample(const struct perf_evsel *evsel,
+> diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
+> index 06ef6f2..02bea43 100644
+> --- a/tools/perf/util/evsel.h
+> +++ b/tools/perf/util/evsel.h
+> @@ -252,6 +252,10 @@ int perf_evsel__open_per_thread(struct perf_evsel *evsel,
+>                                 struct thread_map *threads);
+>  int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
+>                      struct thread_map *threads);
+> +void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
+> +                              struct cpu_map *cpus);
+> +void perf_evsel__close_per_thread(struct perf_evsel *evsel,
+> +                                 struct thread_map *threads);
+>  void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads);
+>
+>  struct perf_sample;
 
-Previous:
+this diff looks to me doing same as mine.
+i think below diff should be more appropriate fix to this issue?
 
-[ 1514.093231] pc : [<bf79c304>]    lr : [<bf79ced8>]    psr: a00f0013
-sp : ecdd7e20  ip : 00000000  fp : ffffffff
+when open allocates and uses dummy cpus, there is no point in holding
+old unused one.
+instead it should free and link to dummy cpus which is created with 1 CPU.
+same will be used by close.
 
-New:
+i did quick testing on both x86 and arm64.
+testing looks ok, may need more testing!
 
-[ 1514.093231] pc : [<bf79c304>]    lr : [<bf79ced8>]    psr: a00f0013
-[ 1514.105316] sp : ecdd7e20  ip : 00000000  fp : ffffffff
+diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+index ac59710..b1aab0a 100644
+--- a/tools/perf/util/evsel.c
++++ b/tools/perf/util/evsel.c
+@@ -1466,9 +1466,13 @@ int perf_evsel__open(struct perf_evsel *evsel,
+struct cpu_map *cpus,
+                        empty_cpu_map = cpu_map__dummy_new();
+                        if (empty_cpu_map == NULL)
+                                return -ENOMEM;
++               } else {
++                       cpu_map__get(empty_cpu_map);
+                }
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- arch/arm/kernel/process.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+                cpus = empty_cpu_map;
++               cpu_map__put(evsel->cpus);
++               evsel->cpus = cpus;
+        }
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 939e8b58c59d..151cece4a293 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -123,10 +123,10 @@ void __show_regs(struct pt_regs *regs)
- 
- 	print_symbol("PC is at %s\n", instruction_pointer(regs));
- 	print_symbol("LR is at %s\n", regs->ARM_lr);
--	printk("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n"
--	       "sp : %08lx  ip : %08lx  fp : %08lx\n",
--		regs->ARM_pc, regs->ARM_lr, regs->ARM_cpsr,
--		regs->ARM_sp, regs->ARM_ip, regs->ARM_fp);
-+	printk("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n",
-+	       regs->ARM_pc, regs->ARM_lr, regs->ARM_cpsr);
-+	printk("sp : %08lx  ip : %08lx  fp : %08lx\n",
-+	       regs->ARM_sp, regs->ARM_ip, regs->ARM_fp);
- 	printk("r10: %08lx  r9 : %08lx  r8 : %08lx\n",
- 		regs->ARM_r10, regs->ARM_r9,
- 		regs->ARM_r8);
--- 
-2.10.0.rc2.1.g053435c
+        if (threads == NULL) {
+gkulkarni at localhost>perf>>
+
+thanks
+Ganapat
