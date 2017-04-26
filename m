@@ -1,75 +1,68 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Wed, 26 Apr 2017 17:05:02 +0800
-Subject: [PATCH] usb: chipidea: udc: fix NULL pointer dereference if
- udc_start failed
-In-Reply-To: <20170426162526.7c8ef827@xhacker>
-References: <20170424123551.2465-1-jszhang@marvell.com>
- <20170425082948.GB873@b29397-desktop>
- <20170425171134.6a983841@xhacker>
- <HE1PR04MB1450634CE9C1D7FACC37DB4A8B1E0@HE1PR04MB1450.eurprd04.prod.outlook.com>
- <0ac4bc53-dd26-0b90-c84e-a94d01a6d5e4@i2se.com>
- <20170426162526.7c8ef827@xhacker>
-Message-ID: <20170426090502.GB4375@b29397-desktop>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Wed, 26 Apr 2017 14:42:38 +0530
+Subject: [PATCH v2] iommu/arm-smmu: Return IOVA in iova_to_phys when SMMU
+ is bypassed
+In-Reply-To: <1493114272-30093-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1493114272-30093-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <CA+sq2CcUqPqkKU7bZb_SKPJagVRQDXqFE0FA0tt_FDuWt26zwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 04:25:26PM +0800, Jisheng Zhang wrote:
-> On Tue, 25 Apr 2017 17:21:59 +0200
-> Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> 
-> > Am 25.04.2017 um 11:20 schrieb Peter Chen:
-> > >    
-> > >>>> diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-> > >>>> index f88e9157fad0..60a786c87c06 100644
-> > >>>> --- a/drivers/usb/chipidea/udc.c
-> > >>>> +++ b/drivers/usb/chipidea/udc.c
-> > >>>> @@ -1984,6 +1984,7 @@ static void udc_id_switch_for_host(struct
-> > >>>> ci_hdrc *ci)  int ci_hdrc_gadget_init(struct ci_hdrc *ci)  {
-> > >>>>  	struct ci_role_driver *rdrv;
-> > >>>> +	int ret;
-> > >>>>
-> > >>>>  	if (!hw_read(ci, CAP_DCCPARAMS, DCCPARAMS_DC))
-> > >>>>  		return -ENXIO;
-> > >>>> @@ -1996,7 +1997,10 @@ int ci_hdrc_gadget_init(struct ci_hdrc *ci)
-> > >>>>  	rdrv->stop	= udc_id_switch_for_host;
-> > >>>>  	rdrv->irq	= udc_irq;
-> > >>>>  	rdrv->name	= "gadget";
-> > >>>> -	ci->roles[CI_ROLE_GADGET] = rdrv;
-> > >>>>
-> > >>>> -	return udc_start(ci);
-> > >>>> +	ret = udc_start(ci);
-> > >>>> +	if (!ret)
-> > >>>> +		ci->roles[CI_ROLE_GADGET] = rdrv;
-> > >>>> +
-> > >>>> +	return ret;
-> > >>>>  }
-> > >>>> --  
-> > >>> Thanks for fixing it. In fact, we'd better return failure if ret &&
-> > >>> ret != -ENXIO at probe, it stands for initialization for host or
-> > >>> gadget has failed.
-> > >>>  
-> > >> I got your meaning. I'll cook v2. I don't have preference, since either one can fix the
-> > >> issue.
-> > >>  
-> > > Both are needed, you don't need to send this one again. Only a new one, thanks.  
-> > 
-> > I'm not sure how easy it is to reproduce the issue.
-> 
-> It's easy to reproduce it (100%) on arm64 platforms after commit
-> 1dccb598df549 ("arm64: simplify dma_get_ops"). This commit could
-> make all dma related operations failed, then udc_start() would fail
-> with -ENOMEM.
-> 
-> On other platforms, it's not easy.
-> 
-> > 
-> > Shouldn't make a Fixes tag sense at least?
-> 
-> maybe 3f124d233e97 ("usb: chipidea: add role init and destroy APIs"
+On Tue, Apr 25, 2017 at 3:27 PM,  <sunil.kovvuri@gmail.com> wrote:
+> From: Sunil Goutham <sgoutham@cavium.com>
+>
+> For software initiated address translation, when domain type is
+> IOMMU_DOMAIN_IDENTITY i.e SMMU is bypassed, mimic HW behavior
+> i.e return the same IOVA as translated address.
+>
+> This patch is an extension to Will Deacon's patchset
+> "Implement SMMU passthrough using the default domain".
+>
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> ---
+>
+> V2
+> - As per Will's suggestion applied fix to SMMUv3 driver as well.
+>
+>  drivers/iommu/arm-smmu-v3.c | 3 +++
+>  drivers/iommu/arm-smmu.c    | 3 +++
+>  2 files changed, 6 insertions(+)
+>
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 05b4592..d412bdd 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1714,6 +1714,9 @@ arm_smmu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
+>         struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>         struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
+>
+> +       if (domain->type == IOMMU_DOMAIN_IDENTITY)
+> +               return iova;
+> +
+>         if (!ops)
+>                 return 0;
+>
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index bfab4f7..81088cd 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1459,6 +1459,9 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
+>         struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>         struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
+>
+> +       if (domain->type == IOMMU_DOMAIN_IDENTITY)
+> +               return iova;
+> +
+>         if (!ops)
+>                 return 0;
+>
+> --
+> 2.7.4
+>
 
-I will cc stable, thanks.
+Will,
 
--- 
+if you are okay with the patch, can you please ACK.
 
-Best Regards,
-Peter Chen
+Thanks,
+Sunil.
