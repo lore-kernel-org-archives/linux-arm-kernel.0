@@ -1,100 +1,151 @@
-From: c.jayachandran@gmail.com (Jayachandran C.)
-Date: Wed, 26 Apr 2017 12:23:39 +0530
-Subject: [PATCH v2] arm64: perf: Use only exclude_kernel attribute when
- kernel is running in HYP
-In-Reply-To: <20170425165259.GS24484@arm.com>
-References: <1492623846-29335-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170420084928.GC31436@leverpostej>
- <CAFpQJXVSsg8CX28vEo2LzmOi3pknHiH233spMD6ip4LZO4vw=Q@mail.gmail.com>
- <20170424154530.GO12323@arm.com>
- <CAFpQJXWX=0GQ5hse4E_OSdnYhMOA7CvqeoHe9AdMsyoZJmrPQQ@mail.gmail.com>
- <20170425165259.GS24484@arm.com>
-Message-ID: <CA+7sy7D-ZB84xQ2pE-io1v7pmnAuWUszh1B=Zq+Ezup=sysQ2g@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 26 Apr 2017 08:53:40 +0200
+Subject: [RFC PATCH 29/30] vfio: Add support for Shared Virtual Memory
+In-Reply-To: <20170227195441.5170-30-jean-philippe.brucker@arm.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-30-jean-philippe.brucker@arm.com>
+Message-ID: <f5745241-83b0-0945-7616-4b59d7ebcd48@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Jean,
 
-On Tue, Apr 25, 2017 at 10:23 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Apr 25, 2017 at 09:13:40AM +0530, Ganapatrao Kulkarni wrote:
->> On Mon, Apr 24, 2017 at 9:15 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Thu, Apr 20, 2017 at 02:56:50PM +0530, Ganapatrao Kulkarni wrote:
->> >> On Thu, Apr 20, 2017 at 2:19 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> >> > On Wed, Apr 19, 2017 at 11:14:06PM +0530, Ganapatrao Kulkarni wrote:
->> >> >> commit d98ecda (arm64: perf: Count EL2 events if the kernel is running in HYP)
->> >> >> is returning error for perf syscall with mixed attribute set for exclude_kernel
->> >> >> and exclude_hv. This change is breaking some applications (observed with hhvm)
->> >> >> when ran on VHE enabled platforms.
->> >> >>
->> >> >> Adding fix to consider only exclude_kernel attribute when kernel is
->> >> >> running in HYP. Also adding sysfs file to notify the bhehaviour
->> >> >> of attribute exclude_hv.
->> >> >>
->> >> >> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> >> >> ---
->> >> >>
->> >> >> Changelog:
->> >> >>
->> >> >> V2:
->> >> >>  - Changes as per Will Deacon's suggestion.
->> >> >>
->> >> >> V1: Initial patch
->> >> >>
->> >> >>  arch/arm64/kernel/perf_event.c | 28 ++++++++++++++++++++++++----
->> >> >>  include/linux/perf/arm_pmu.h   |  1 +
->> >> >>  2 files changed, 25 insertions(+), 4 deletions(-)
->> >> >>
->> >> >> @@ -871,14 +890,13 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
->> >> >>
->> >> >>       if (attr->exclude_idle)
->> >> >>               return -EPERM;
->> >> >> -     if (is_kernel_in_hyp_mode() &&
->> >> >> -         attr->exclude_kernel != attr->exclude_hv)
->> >> >> -             return -EINVAL;
->> >> >> +     if (is_kernel_in_hyp_mode() && !attr->exclude_kernel)
->> >> >> +             config_base |= ARMV8_PMU_INCLUDE_EL2;
->> >> >>       if (attr->exclude_user)
->> >> >>               config_base |= ARMV8_PMU_EXCLUDE_EL0;
->> >> >>       if (!is_kernel_in_hyp_mode() && attr->exclude_kernel)
->> >> >>               config_base |= ARMV8_PMU_EXCLUDE_EL1;
->> >> >> -     if (!attr->exclude_hv)
->> >> >> +     if (!is_kernel_in_hyp_mode() && !attr->exclude_hv)
->> >> >>               config_base |= ARMV8_PMU_INCLUDE_EL2;
->> >> >
->> >> > This isn't quite what Will suggested.
->> >> >
->> >> > The idea was that userspace would read sysfs, then use that to determine
->> >> > the correct exclusion parameters [1,2]. This logic was not expected to
->> >> > change; it correctly validates whether we can provide what the user
->> >> > requests.
->> >>
->> >> OK, if you are ok with sysfs part, i can send next version with that
->> >> change only?.
->> >
->> > I think the sysfs part is still a little dodgy, since you still expose the
->> > "exclude_hv" file with a value of 0 when not running at EL2, which would
->> > imply that exclude_hv is forced to zero. I don't think that's correct.
->>
->> okay, i can make exclude_hv visible only when kernel booted in EL2.
->> is it ok to have empty directory "attr" when kernel booted to EL1?
->> attr can be place holder for any other miscellaneous attributes, that
->> can be added in future.
+On 27.02.2017 20:54, Jean-Philippe Brucker wrote:
+> Add two new ioctl for VFIO devices. VFIO_DEVICE_BIND_TASK creates a bond
+> between a device and a process address space, identified by a
+> device-specific ID named PASID. This allows the device to target DMA
+> transactions at the process virtual addresses without a need for mapping
+> and unmapping buffers explicitly in the IOMMU. The process page tables are
+> shared with the IOMMU, and mechanisms such as PCI ATS/PRI may be used to
+> handle faults. VFIO_DEVICE_UNBIND_TASK removed a bond identified by a
+> PASID.
 >
-> Sounds good to me, although I'll seek comment from the other perf folks
-> before merging anything with ABI implications.
+> Also add a capability flag in device info to detect whether the system and
+> the device support SVM.
+>
+> Users need to specify the state of a PASID when unbinding, with flags
+> VFIO_PASID_RELEASE_FLUSHED and VFIO_PASID_RELEASE_CLEAN. Even for PCI,
+> PASID invalidation is specific to each device and only partially covered
+> by the specification:
+>
+> * Device must have an implementation-defined mechanism for stopping the
+>   use of a PASID. When this mechanism finishes, the device has stopped
+>   issuing transactions for this PASID and all transactions for this PASID
+>   have been flushed to the IOMMU.
+>
+> * Device may either wait for all outstanding PRI requests for this PASID
+>   to finish, or issue a Stop Marker message, a barrier that separates PRI
+>   requests affecting this instance of the PASID from PRI requests
+>   affecting the next instance. In the first case, we say that the PASID is
+>   "clean", in the second case it is "flushed" (and the IOMMU has to wait
+>   for the Stop Marker before reassigning the PASID.)
+>
+> We expect similar distinctions for platform devices. Ideally there should
+> be a callback for each PCI device, allowing the IOMMU to ask the device to
+> stop using a PASID. When the callback returns, the PASID is either flushed
+> or clean and the return value tells which.
+>
+> For the moment I don't know how to implement this callback for PCI, so if
+> the user forgets to call unbind with either "clean" or "flushed", the
+> PASID is never reused. For platform devices, it might be simpler to
+> implement since we could associate an invalidate_pasid callback to a DT
+> compatible string, as is currently done for reset.
+>
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> ---
+>  drivers/vfio/pci/vfio_pci.c |  24 ++++++++++
+>  drivers/vfio/vfio.c         | 104 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/uapi/linux/vfio.h   |  55 +++++++++++++++++++++++
+>  3 files changed, 183 insertions(+)
+>
+> diff --git a/drivers/vfio/pci/vfio_pci.c b/drivers/vfio/pci/vfio_pci.c
+> index 324c52e3a1a4..3d7733f94891 100644
+> --- a/drivers/vfio/pci/vfio_pci.c
+> +++ b/drivers/vfio/pci/vfio_pci.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/mutex.h>
+>  #include <linux/notifier.h>
+>  #include <linux/pci.h>
+> +#include <linux/pci-ats.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/slab.h>
+>  #include <linux/types.h>
+> @@ -623,6 +624,26 @@ int vfio_pci_register_dev_region(struct vfio_pci_device *vdev,
+>  	return 0;
+>  }
+>
 
-Do you really think this is the solution given:
-- this is an arm64 specific sysfs interface that is tied to the perf API
-- the perf API documentation has to be updated for this
-- All the applications that use the perf API have to be modified to
-check this sysfs interface
-- If the application fails to do so, a very narrow corner case
-(exclude_hv != exclude_kernel and VHE enabled) fails.
+[...]
 
-Any application that really cares can already do see if exclude_hv !=
-exclude_kernel case works by calling perf_open_event() with those
-options and checking the return value.
+>
+>  	kfree(device);
+> @@ -1622,6 +1651,75 @@ static int vfio_device_fops_release(struct inode *inode, struct file *filep)
+>  	return 0;
+>  }
+>
+> +static long vfio_svm_ioctl(struct vfio_device *device, unsigned int cmd,
+> +			   unsigned long arg)
+> +{
+> +	int ret;
+> +	unsigned long minsz;
+> +
+> +	struct vfio_device_svm svm;
+> +	struct vfio_task *vfio_task;
+> +
+> +	minsz = offsetofend(struct vfio_device_svm, pasid);
+> +
+> +	if (copy_from_user(&svm, (void __user *)arg, minsz))
+> +		return -EFAULT;
+> +
+> +	if (svm.argsz < minsz)
+> +		return -EINVAL;
+> +
+> +	if (cmd == VFIO_DEVICE_BIND_TASK) {
+> +		struct task_struct *task = current;
+> +
+> +		ret = iommu_bind_task(device->dev, task, &svm.pasid, 0, NULL);
+> +		if (ret)
+> +			return ret;
+> +
+> +		vfio_task = kzalloc(sizeof(*vfio_task), GFP_KERNEL);
+> +		if (!vfio_task) {
+> +			iommu_unbind_task(device->dev, svm.pasid,
+> +					  IOMMU_PASID_CLEAN);
+> +			return -ENOMEM;
+> +		}
+> +
+> +		vfio_task->pasid = svm.pasid;
+> +
+> +		mutex_lock(&device->tasks_lock);
+> +		list_add(&vfio_task->list, &device->tasks);
+> +		mutex_unlock(&device->tasks_lock);
+> +
+> +	} else {
+> +		int flags = 0;
+> +
+> +		if (svm.flags & ~(VFIO_SVM_PASID_RELEASE_FLUSHED |
+> +				  VFIO_SVM_PASID_RELEASE_CLEAN))
+> +			return -EINVAL;
+> +
+> +		if (svm.flags & VFIO_SVM_PASID_RELEASE_FLUSHED)
+> +			flags = IOMMU_PASID_FLUSHED;
+> +		else if (svm.flags & VFIO_SVM_PASID_RELEASE_CLEAN)
+> +			flags = IOMMU_PASID_CLEAN;
+> +
+> +		mutex_lock(&device->tasks_lock);
+> +		list_for_each_entry(vfio_task, &device->tasks, list) {
+> +			if (vfio_task->pasid != svm.pasid)
+> +				continue;
+> +
+> +			ret = iommu_unbind_task(device->dev, svm.pasid, flags);
+> +			if (ret)
+> +				dev_warn(device->dev, "failed to unbind PASID %u\n",
+> +					 vfio_task->pasid);
+> +
+> +			list_del(&vfio_task->list);
+> +			kfree(vfio_task);
 
-Hope I am mistake here, otherwise this does not sound like a good idea.
+Please use list_for_each_entry_safe.
 
-JC.
+Thanks,
+Tomasz
