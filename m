@@ -1,36 +1,111 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Apr 2017 13:09:45 +0200
-Subject: [PATCH] mtd: spi-nor: stm32: remove broken MODULE_ALIAS
-Message-ID: <20170427111001.2587551-1-arnd@arndb.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 27 Apr 2017 04:27:25 -0700
+Subject: [PATCH v5 08/22] KVM: arm64: vgic-its: Implement
+ vgic_mmio_uaccess_write_its_creadr
+In-Reply-To: <1492164934-988-9-git-send-email-eric.auger@redhat.com>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-9-git-send-email-eric.auger@redhat.com>
+Message-ID: <20170427112725.GJ50776@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MODULE_ALIAS statement refers to a macro that has never been defined
-in this driver, causing a build error:
+On Fri, Apr 14, 2017 at 12:15:20PM +0200, Eric Auger wrote:
+> GITS_CREADR needs to be restored so let's implement the associated
+> uaccess_write_its callback. The write only is allowed if the its
+> is disabled.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
+> ---
+> v4 -> v5:
+> - keep Stalled bit
+> - vgic_mmio_uaccess_write_its_creadr can now return an error
+> 
+> v3 -> v4:
+> - REGISTER_ITS_DESC_UACCESS now introduced in this patch
+> - we now check the its is disabled
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 42 ++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 40 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index a9a2c12..79ed1c2 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1213,6 +1213,33 @@ static unsigned long vgic_mmio_read_its_creadr(struct kvm *kvm,
+>  	return extract_bytes(its->creadr, addr & 0x7, len);
+>  }
+>  
+> +static int vgic_mmio_uaccess_write_its_creadr(struct kvm *kvm,
+> +					      struct vgic_its *its,
+> +					      gpa_t addr, unsigned int len,
+> +					      unsigned long val)
+> +{
+> +	int ret = 0;
+> +	u32 reg;
+> +
+> +	mutex_lock(&its->cmd_lock);
+> +
+> +	if (its->enabled) {
+> +		ret = -EBUSY;
+> +		goto out;
+> +	}
+> +
+> +	reg = update_64bit_reg(its->creadr, addr & 7, len, val);
 
-drivers/mtd/spi-nor/stm32-quadspi.c:694:150: error: expected ',' or ';' before 'DRIVER_NAME'
+you theoretically don't need this, since you prevent 32-bit accesses to
+this register, but I guess it doesn't hurt...
 
-Unless there is a specific alias we need other then the driver name,
-we don't need an alias here and can simply remove the line to fix the
-build.
+> +	if (ITS_CMD_OFFSET(reg) >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
 
-Fixes: dc5e400611c5 ("mtd: spi-nor: add driver for STM32 quad spi flash controller")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/mtd/spi-nor/stm32-quadspi.c | 1 -
- 1 file changed, 1 deletion(-)
+can the creadr value be unaligned to the command size?  I don't think
+you check that anywhere here?
 
-diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
-index 90d9152ddf98..1056e7408d2a 100644
---- a/drivers/mtd/spi-nor/stm32-quadspi.c
-+++ b/drivers/mtd/spi-nor/stm32-quadspi.c
-@@ -691,7 +691,6 @@ static struct platform_driver stm32_qspi_driver = {
- };
- module_platform_driver(stm32_qspi_driver);
- 
--MODULE_ALIAS("platform:" DRIVER_NAME);
- MODULE_AUTHOR("Ludovic Barre <ludovic.barre@st.com>");
- MODULE_DESCRIPTION("STMicroelectronics STM32 quad spi driver");
- MODULE_LICENSE("GPL v2");
--- 
-2.9.0
+Thanks,
+-Christoffer
+
+> +
+> +	its->creadr = reg;
+> +out:
+> +	mutex_unlock(&its->cmd_lock);
+> +	return ret;
+> +}
+> +
+>  #define BASER_INDEX(addr) (((addr) / sizeof(u64)) & 0x7)
+>  static unsigned long vgic_mmio_read_its_baser(struct kvm *kvm,
+>  					      struct vgic_its *its,
+> @@ -1317,6 +1344,16 @@ static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
+>  	.its_write = wr,					\
+>  }
+>  
+> +#define REGISTER_ITS_DESC_UACCESS(off, rd, wr, uwr, length, acc)\
+> +{								\
+> +	.reg_offset = off,					\
+> +	.len = length,						\
+> +	.access_flags = acc,					\
+> +	.its_read = rd,						\
+> +	.its_write = wr,					\
+> +	.uaccess_its_write = uwr,				\
+> +}
+> +
+>  static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+>  			      gpa_t addr, unsigned int len, unsigned long val)
+>  {
+> @@ -1339,8 +1376,9 @@ static struct vgic_register_region its_registers[] = {
+>  	REGISTER_ITS_DESC(GITS_CWRITER,
+>  		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+> -	REGISTER_ITS_DESC(GITS_CREADR,
+> -		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
+> +	REGISTER_ITS_DESC_UACCESS(GITS_CREADR,
+> +		vgic_mmio_read_its_creadr, its_mmio_write_wi,
+> +		vgic_mmio_uaccess_write_its_creadr, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_ITS_DESC(GITS_BASER,
+>  		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
+> -- 
+> 2.5.5
+> 
