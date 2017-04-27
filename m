@@ -1,94 +1,74 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Thu, 27 Apr 2017 22:07:34 +0530
-Subject: [PATCH 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
-In-Reply-To: <20170427133910.GB31368@rric.localdomain>
-References: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
- <20170427133910.GB31368@rric.localdomain>
-Message-ID: <CA+sq2CfX+rrJniu7Fe0E47mF+nWkdx94=8buGtrP8zBdFrXV+Q@mail.gmail.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 27 Apr 2017 09:38:36 -0700
+Subject: [PATCH 2/2] ARM: dts: NSP: Add Thermal Support
+In-Reply-To: <1493153351-12698-3-git-send-email-jon.mason@broadcom.com>
+References: <1493153351-12698-1-git-send-email-jon.mason@broadcom.com>
+ <1493153351-12698-3-git-send-email-jon.mason@broadcom.com>
+Message-ID: <20170427163834.GD18276@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 7:09 PM, Robert Richter
-<robert.richter@cavium.com> wrote:
-> On 27.04.17 17:16:21, Geetha sowjanya wrote:
->> From: Geetha <gakula@cavium.com>
->>
->> Cavium CN99xx SMMUv3 implementation has two Silicon Erratas.
->> 1. Errata ID #74
->>    SMMU register alias Page 1 is not implemented
->> 2. Errata ID #126
->>    SMMU doesnt support unique IRQ lines for gerror, eventq and cmdq-sync
->>
->> The following patchset does software workaround for these two erratas.
->>
->> This series is based on RFC patch.
->> https://www.spinics.net/lists/arm-kernel/msg575739.html
->>
->> As suggested by Will Deacon, code is modified to use silicon id to
->> enable errata#74 workaround.
->
-> Can we go with the previous series [1] and:
->
->  * drop the iort model numbering part,
->
->  * add an enablement function that enables flags (smmu->options)
->    depending on midr values (which replaces the macro code)?
+On Tue, Apr 25, 2017 at 04:49:11PM -0400, Jon Mason wrote:
+> Add thermal support via the ns-thermal driver and create a single
+> thermal zone for the entire SoC.
+> 
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 
-I don't see how it is efficient and consistent, if we take data from DT
-for non-ACPI mode and read CPU ID from MIDR for ACPI mode.
+Acked-by: Eduardo Valentin <edubezval@gmail.com>
 
-Thanks,
-Sunil.
-
->
-> E.g.:
->
-> static void acpi_smmu_enable_cavium(struct arm_smmu_device *smmu)
-> {
->         u32 cpu_model;
->
->         if (!IS_ENABLED(CONFIG_ARM64))
->                 return;
->
->         cpu_model = read_cpuid_id() & MIDR_CPU_MODEL_MASK;
->         switch (cpu_model) {
->         case ...:
->         case ...:
->                 break;
->         default:
->                 /* No Cavium CN99xx SMMU v3 */
->                 return;
->         }
->
->         smmu->options |= (ARM_SMMU_OPT_PAGE0_REGS_ONLY |
->                          ARM_SMMU_OPT_USE_SHARED_IRQS);
-> }
->
-> -Robert
->
->
-> [1] [RFC PATCH 0/7] Cavium CN99xx SMMUv3 Errata workarounds
->     https://marc.info/?l=linux-acpi&m=149192179623708&w=2
->
->>
->> Linu Cherian (1):
->>   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #74
->>
->> Geetha (2):
->>   arm64: Add MIDR values for Cavium cn99xx SoCs
->>   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
->>
->>  Documentation/arm64/silicon-errata.txt |  2 ++
->>  arch/arm64/include/asm/cputype.h       |  3 ++
->>  drivers/acpi/arm64/iort.c              | 14 +++++++-
->>  drivers/iommu/arm-smmu-v3.c            | 64 +++++++++++++++++++++++++++++-----
->>  4 files changed, 73 insertions(+), 10 deletions(-)
->>
->> --
->> 1.9.1
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> ---
+>  arch/arm/boot/dts/bcm-nsp.dtsi | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+> index 832795b..be6fcfb 100644
+> --- a/arch/arm/boot/dts/bcm-nsp.dtsi
+> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+> @@ -383,6 +383,12 @@
+>  			      <0x3f408 0x04>;
+>  		};
+>  
+> +		thermal: thermal at 3f2c0 {
+> +			compatible = "brcm,ns-thermal";
+> +			reg = <0x3f2c0 0x10>;
+> +			#thermal-sensor-cells = <0>;
+> +		};
+> +
+>  		sata_phy: sata_phy at 40100 {
+>  			compatible = "brcm,iproc-nsp-sata-phy";
+>  			reg = <0x40100 0x340>;
+> @@ -533,4 +539,24 @@
+>  			brcm,pcie-msi-inten;
+>  		};
+>  	};
+> +
+> +	thermal-zones {
+> +		cpu-thermal {
+> +			polling-delay-passive = <0>;
+> +			polling-delay = <1000>;
+> +			coefficients = <(-556) 418000>;
+> +			thermal-sensors = <&thermal>;
+> +
+> +			trips {
+> +				cpu-crit {
+> +					temperature     = <125000>;
+> +					hysteresis      = <0>;
+> +					type            = "critical";
+> +				};
+> +			};
+> +
+> +			cooling-maps {
+> +			};
+> +		};
+> +	};
+>  };
+> -- 
+> 2.7.4
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170427/0f0f5b1a/attachment.sig>
