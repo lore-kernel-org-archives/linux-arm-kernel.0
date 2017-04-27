@@ -1,161 +1,52 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 27 Apr 2017 10:31:46 -0700
-Subject: [PATCH v5 15/22] KVM: arm64: vgic-its: vgic_its_alloc_ite/device
-In-Reply-To: <1492164934-988-16-git-send-email-eric.auger@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-16-git-send-email-eric.auger@redhat.com>
-Message-ID: <20170427173146.GS50776@lvm>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 27 Apr 2017 18:36:42 +0100
+Subject: [PATCH 2/2] arm64: pmu: Wire-up L2 cache events for ARMv8 PMUv3
+In-Reply-To: <28edde78-b965-8136-1c95-11b9182de405@gmail.com>
+References: <20170420190546.7453-1-f.fainelli@gmail.com>
+ <20170420190546.7453-4-f.fainelli@gmail.com>
+ <20170425124427.GI24484@arm.com>
+ <28edde78-b965-8136-1c95-11b9182de405@gmail.com>
+Message-ID: <20170427173642.GM1890@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 14, 2017 at 12:15:27PM +0200, Eric Auger wrote:
-> Add two new helpers to allocate an its ite and an its device.
-> This will avoid duplication on restore path.
+On Tue, Apr 25, 2017 at 10:13:51AM -0700, Florian Fainelli wrote:
+> On 04/25/2017 05:44 AM, Will Deacon wrote:
+> > Hi Florian,
+> > 
+> > On Thu, Apr 20, 2017 at 12:05:46PM -0700, Florian Fainelli wrote:
+> >> The ARMv8 PMUv3 cache map did not include the L2 cache events, add
+> >> them.
+> >>
+> >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> >> ---
+> >>  arch/arm64/kernel/perf_event.c | 5 +++++
+> >>  1 file changed, 5 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> >> index 4f011cdd756d..a664c575f3fd 100644
+> >> --- a/arch/arm64/kernel/perf_event.c
+> >> +++ b/arch/arm64/kernel/perf_event.c
+> >> @@ -264,6 +264,11 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+> >>  	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE,
+> >>  	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL,
+> >>  
+> >> +	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
+> >> +	[C(LL)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
+> >> +	[C(LL)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
+> >> +	[C(LL)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
+> > 
+> > I don't think this is correct in general. 'LL' stands for "last-level",
+> > which may be L3 or even a system cache in the interconnect. Tying that to L2
+> > is the wrong thing to do from perf's generic event perspective.
+> > 
+> > I'm ok with what you're proposing for A53 (where the PMU can only count
+> > events out to the L2), but I'm reluctant to make this change for the generic
+> > PMUv3 events.
 > 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> ---
-> 
-> v4 -> v5:
-> - add Marc's A-b
-> 
-> v3 -> v4:
-> - fix allocation
-> - add comment about its_lock mutex hold
-> 
-> v1 -> v2:
-> - report itt_size fix and remove ITE_SIZE
-> - s/itte/ite/g
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 73 ++++++++++++++++++++++++++++++--------------
->  1 file changed, 50 insertions(+), 23 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 55267ab..56c5123 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -742,6 +742,27 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
->  	kfree(collection);
->  }
->  
-> +/* Must be called with its_lock mutex held */
-> +static int vgic_its_alloc_ite(struct its_device *device,
-> +			       struct its_ite **itep,
-> +			       struct its_collection *collection,
-> +			       u32 lpi_id, u32 event_id)
-> +{
-> +	struct its_ite *ite;
-> +
-> +	ite = kzalloc(sizeof(*ite), GFP_KERNEL);
-> +	if (!ite)
-> +		return -ENOMEM;
-> +
-> +	ite->event_id	= event_id;
-> +	ite->collection = collection;
-> +	ite->lpi = lpi_id;
-> +
-> +	list_add_tail(&ite->ite_list, &device->itt_head);
-> +	*itep = ite;
-> +	return 0;
-> +}
+> That makes sense, shall I resubmit the first patch by itself or can you
+> or Catalin take it as-is?
 
-This static function should just return a 'struct its_ite *itep' and on
-error you can return ERR_PTR(-ENOMEM).
+I'll talk to Catalin tomorrow and try to get the A53 bit queued.
 
-> +
->  /*
->   * The MAPTI and MAPI commands map LPIs to ITTEs.
->   * Must be called with its_lock mutex held.
-> @@ -755,7 +776,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->  	struct its_ite *ite;
->  	struct its_device *device;
->  	struct its_collection *collection, *new_coll = NULL;
-> -	int lpi_nr;
-> +	int lpi_nr, ret;
->  	struct vgic_irq *irq;
->  
->  	device = find_its_device(its, device_id);
-> @@ -785,19 +806,13 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->  		new_coll = collection;
->  	}
->  
-> -	ite = kzalloc(sizeof(struct its_ite), GFP_KERNEL);
-> -	if (!ite) {
-> +	ret = vgic_its_alloc_ite(device, &ite, collection, lpi_nr, event_id);
-> +	if (ret) {
->  		if (new_coll)
->  			vgic_its_free_collection(its, coll_id);
-> -		return -ENOMEM;
-> +		return ret;
->  	}
->  
-> -	ite->event_id	= event_id;
-> -	list_add_tail(&ite->ite_list, &device->itt_head);
-> -
-> -	ite->collection = collection;
-> -	ite->lpi = lpi_nr;
-> -
->  	irq = vgic_add_lpi(kvm, lpi_nr);
->  	if (IS_ERR(irq)) {
->  		if (new_coll)
-> @@ -836,6 +851,29 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
->  	kfree(device);
->  }
->  
-> +/* Must be called with its_lock mutex held */
-> +static int vgic_its_alloc_device(struct vgic_its *its,
-> +				 struct its_device **devp,
-> +				 u32 device_id, gpa_t itt_addr,
-> +				 u8 nb_eventid_bits)
-> +{
-> +	struct its_device *device;
-> +
-> +	device = kzalloc(sizeof(*device), GFP_KERNEL);
-> +	if (!device)
-> +		return -ENOMEM;
-> +
-> +	device->device_id = device_id;
-> +	device->itt_addr = itt_addr;
-> +	device->nb_eventid_bits = nb_eventid_bits;
-> +	INIT_LIST_HEAD(&device->itt_head);
-> +
-> +	list_add_tail(&device->dev_list, &its->device_list);
-> +	*devp = device;
-> +
-> +	return 0;
-> +}
-
-also here, return ERR_PTR
-
-> +
->  /*
->   * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
->   * Must be called with the its_lock mutex held.
-> @@ -872,19 +910,8 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->  	if (!valid)
->  		return 0;
->  
-> -	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
-> -	if (!device)
-> -		return -ENOMEM;
-> -
-> -	device->device_id = device_id;
-> -	device->nb_eventid_bits = nb_eventid_bits;
-> -	device->itt_addr = itt_addr;
-> -
-> -	INIT_LIST_HEAD(&device->itt_head);
-> -
-> -	list_add_tail(&device->dev_list, &its->device_list);
-> -
-> -	return 0;
-> +	return vgic_its_alloc_device(its, &device, device_id,
-> +				     itt_addr, nb_eventid_bits);
->  }
->  
->  /*
-> -- 
-> 2.5.5
-> 
-Thanks,
--Christoffer
+Will
