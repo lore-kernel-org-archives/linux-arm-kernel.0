@@ -1,52 +1,75 @@
-From: leedom@chelsio.com (Casey Leedom)
-Date: Thu, 27 Apr 2017 20:34:57 +0000
-Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
- ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
-In-Reply-To: <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170401.112603.1991545644693496714.davem@davemloft.net>
- <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
- <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
- <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
- <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
- <CAKgT0Uc4L=GgYbpO-Fm9OfN+_fLypbDP1c+X4T_ta90ecQiyGQ@mail.gmail.com>,
- <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <MWHPR12MB1600CB0756EA24211C93E053C8100@MWHPR12MB1600.namprd12.prod.outlook.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Thu, 27 Apr 2017 13:35:14 -0700
+Subject: [PATCH] arm64: prefetch: Change assembly to be compatible with
+ gcc and clang
+In-Reply-To: <20170424133447.GA12323@arm.com>
+References: <20170419212211.95803-1-mka@chromium.org>
+ <20170420084206.GB31436@leverpostej>
+ <20170424133447.GA12323@arm.com>
+Message-ID: <20170427203514.GR128305@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-| From: Bjorn Helgaas <helgaas@kernel.org>
-| Sent: Thursday, April 27, 2017 10:19 AM
-|
-| Are you hinting that the PCI core or arch code could actually *enable*
-| Relaxed Ordering without the driver doing anything?  Is it safe to do that?
-| Is there such a thing as a device that is capable of using RO, but where the
-| driver must be aware of it being enabled, so it programs the device
-| appropriately?
+Hi,
 
-  I forgot to reply to this portion of Bjorn's email.
+Thanks for your comments!
 
-  The PCI Configuration Space PCI Capability Device Control[Enable Relaxed
-Ordering] bit governs enabling the _ability_ for the PCIe Device to send
-TLPs with the Relaxed Ordering Attribute set.  It does not _cause_ RO to be
-set on TLPs.  Doing that would almost certainly cause Data Corruption Bugs
-since you only want a subset of TLPs to have RO set.
+El Mon, Apr 24, 2017 at 02:34:47PM +0100 Will Deacon ha dit:
 
-  For instance, we typically use RO for Ingress Packet Data delivery but
-non-RO for messages notifying the Host that an Ingress Packet has been
-delivered.  This ensures that the "Ingress Packet Delivered" non-RO TLP is
-processed _after_ any preceding RO TLPs delivering the actual Ingress Packet
-Data.
+> On Thu, Apr 20, 2017 at 09:42:07AM +0100, Mark Rutland wrote:
+> > On Wed, Apr 19, 2017 at 02:22:11PM -0700, Matthias Kaehlcke wrote:
+> > > clang fails to build with the current code:
+> > > 
+> > > arch/arm64/include/asm/processor.h:172:15: error: invalid operand in
+> > > inline asm: 'prfm pldl1keep, ${0:a}'
+> > > 
+> > > Apparently clang does not support the 'a' modifier. Change the
+> > > constraint from 'p' ('An operand that is a valid memory address is
+> > > allowed') to 'Q' ('A memory address which uses a single base register
+> > > with no offset'), which works for both gcc and clang.
+> > 
+> > It looks like the current %a0 template and p constraint were inherited
+> > from arch/arm, as they've been there from day one on arm64.
+> > 
+> > Looking at the arch/arm history, the "a" operand modifier and "p"
+> > constraint were introduced in commit:
+> > 
+> >   16f719de62809e22 ("[ARM] 5196/1: fix inline asm constraints for preload")
+> > 
+> > ... so as to avoid GCC assuming prefetch of a pointer implied it was not
+> > NULL. Until that point, we'd used no operand modifier and "o"
+> > constraint.
+> > 
+> > It's not clear to me whether "o", "p", and "Q" constraints differ in
+> > this regard on AArch64, or if the issue regarding NULL is still
+> > relevant. The GCC docs say the "p" constraint is used for "a valid
+> > memory address", which does sound like it shouldn't be NULL.
+> > 
+> > Otherwise, this does look consistent with what we do elsewhere.
+> 
+> I really don't like using 'Q' here, for two reasons:
+> 
+> 1. It means we likely allocate a register where we don't need to, because
+>    we're going to need to use [Xn] as the addressing mode, which means
+>    adding any immediate offsets.
+> 
+> 2. As you mention, 16f719de62809e22 says that GCC will use this as an
+>    indication that the address is non-NULL.
+> 
+> We also can't just remove the 'a', because that will result in assembly
+> failures. I haven't dug into exactly why, but I suspect it's because "p"
+> can generate a label, which then won't assemble if surrounded by '[]'.
 
-  In the above scenario, if one were to turn off Enable Relaxed Ordering via
-the PCIe Capability, then the on-chip PCIe engine would simply never send a
-TLP with the Relaxed Ordering Attribute set, regardless of any other chip
-programming.
+I was suggested to use the intrinsic __pldx() from ACLE, however it
+isn't supported by gcc and there seem to be no other uses of ACLE in
+the kernel. For clang it should be possible to use its
+__builtin_arm_prefetch(), however I suspect that the compiler
+dependency wouldn't be well received.
 
-  And finally, just to be absolutely clear, using Relaxed Ordering isn't and
-"Architecture Thing".  It's a PCIe Fabric End Point Thing.  Many End Points
-simply ignore the Relaxed Ordering Attribute (except to reflect it back in
-Response TLPs).  In this sense, Relaxed Ordering simply provides
-potentially useful optimization information to the PCIe End Point.
+I guess another option is to get clang to support the 'a' modifier,
+though it seems to be another modifier that is undocumented (I only
+saw it mentioned in some ancient gcc documentation).
 
-Casey
+Cheers
+
+Matthias
