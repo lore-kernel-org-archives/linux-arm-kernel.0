@@ -1,55 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 27 Apr 2017 18:17:31 +0100
-Subject: [PATCH] arm64: cpufeature: use static_branch_enable_cpuslocked()
-In-Reply-To: <2e321402-7042-9d5b-aa85-52b0e6f1e20c@arm.com>
-References: <20170426085958.GC27156@leverpostej>
- <bad40d9a-2c81-5a6c-2c12-3bf7094549de@arm.com>
- <20170426103236.GI27156@leverpostej>
- <20170427082719.3wyru4bk67kdmflb@linutronix.de>
- <20170427095744.GB31337@leverpostej>
- <alpine.DEB.2.20.1704271200420.4607@nanos>
- <20170427123056.GD31337@leverpostej>
- <20170427154806.GA6646@leverpostej>
- <20170427163546.GA30972@e107814-lin.cambridge.arm.com>
- <2e321402-7042-9d5b-aa85-52b0e6f1e20c@arm.com>
-Message-ID: <20170427171730.GB7114@leverpostej>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 27 Apr 2017 12:19:38 -0500
+Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
+ ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+In-Reply-To: <CAKgT0Uc4L=GgYbpO-Fm9OfN+_fLypbDP1c+X4T_ta90ecQiyGQ@mail.gmail.com>
+References: <20170401.112603.1991545644693496714.davem@davemloft.net>
+ <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
+ <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
+ <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
+ <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
+ <CAKgT0Uc4L=GgYbpO-Fm9OfN+_fLypbDP1c+X4T_ta90ecQiyGQ@mail.gmail.com>
+Message-ID: <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 06:03:35PM +0100, Suzuki K Poulose wrote:
-> On 27/04/17 17:35, Suzuki K Poulose wrote:
-> >@@ -1092,7 +1093,9 @@ void check_local_cpu_capabilities(void)
+[+cc Casey]
+
+On Wed, Apr 26, 2017 at 09:18:33AM -0700, Alexander Duyck wrote:
+> On Wed, Apr 26, 2017 at 2:26 AM, Ding Tianhong <dingtianhong@huawei.com> wrote:
+> > Hi Amir:
 > >
-> > static void __init setup_feature_capabilities(void)
-> > {
-> >-	update_cpu_capabilities(arm64_features, "detected feature:");
-> >+	get_online_cpus();
-> >+	update_cpu_capabilities(arm6_features, "detected feature:");
+> > It is really glad to hear that the mlx5 will support RO mode this year, if so, do you agree that enable it dynamic by ethtool -s xxx,
+> > we have try it several month ago but there was only one drivers would use it at that time so the maintainer against it, it mlx5 would support RO,
+> > we could try to restart this solution, what do you think about it. :)
+> >
+> > Thanks
+> > Ding
 > 
-> s/arm6_features/arm64_features
+> Hi Ding,
 > 
-> And we need the following hunk:
+> Enabing relaxed ordering really doesn't have any place in ethtool. It
+> is a PCIe attribute that you are essentially wanting to enable.
 > 
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 62bdab4..19c359a 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -1086,7 +1086,7 @@ void check_local_cpu_capabilities(void)
->          * advertised capabilities.
->          */
->         if (!sys_caps_initialised)
-> -               update_cpu_errata_workarounds();
-> +               update_secondary_cpu_errata_workarounds();
->         else
->                 verify_local_cpu_capabilities();
->  }
-> 
-> Sorry about that.
+> It might be worth while to take a look at updating the PCIe code path
+> to handle this. Really what we should probably do is guarantee that
+> the architectures that need relaxed ordering are setting it in the
+> PCIe Device Control register and that the ones that don't are clearing
+> the bit. It's possible that this is already occurring, but I don't
+> know the state of handling those bits is in the kernel. Once we can
+> guarantee that we could use that to have the drivers determine their
+> behavior in regards to relaxed ordering. For example in the case of
+> igb/ixgbe we could probably change the behavior so that it will bey
+> default try to use relaxed ordering but if it is not enabled in PCIe
+> Device Control register the hardware should not request to use it. It
+> would simplify things in the drivers and allow for each architecture
+> to control things as needed in their PCIe code.
 
-No worries; thanks for the fixups.
+I thought Relaxed Ordering was an optimization.  Are there cases where
+it is actually required for correct behavior?
 
-With those this is working for me, so I'll send this and Sebastian's
-patch (with Ccs) as a new series.
+The PCI core doesn't currently do anything with Relaxed Ordering.
+Some drivers enable/disable it directly.  I think it would probably be
+better if the core provided an interface for this.  One reason is
+because I think Casey has identified some systems where Relaxed
+Ordering doesn't work correctly, and I'd rather deal with them once in
+the core than in every driver.
 
-> 
-> Suzuki
+Are you hinting that the PCI core or arch code could actually *enable*
+Relaxed Ordering without the driver doing anything?  Is it safe to do
+that?  Is there such a thing as a device that is capable of using RO,
+but where the driver must be aware of it being enabled, so it programs
+the device appropriately?
+
+Bjorn
