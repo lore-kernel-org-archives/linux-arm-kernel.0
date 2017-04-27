@@ -1,79 +1,52 @@
-From: houlong.wei@mediatek.com (houlong wei)
-Date: Thu, 27 Apr 2017 14:11:52 +0800
-Subject: [PATCH] [media] mtk-mdp: Fix g_/s_selection capture/compose logic
-In-Reply-To: <CAOMLVLiLkZsBfezx6b9Xq=kyPjUZOXwHC4LfHh1=wy6Ynt=zSQ@mail.gmail.com>
-References: <1492057130-1194-1-git-send-email-minghsiu.tsai@mediatek.com>
- <CAOMLVLiLkZsBfezx6b9Xq=kyPjUZOXwHC4LfHh1=wy6Ynt=zSQ@mail.gmail.com>
-Message-ID: <1493273512.8340.4.camel@mhfsdcap03>
+From: jiada_wang@mentor.com (Jiada Wang)
+Date: Wed, 26 Apr 2017 23:43:18 -0700
+Subject: [PATCH RFC 0/5] *** SPI Slave mode support ***
+In-Reply-To: <20170425103113.lxpwoq6sbxvg3ihl@sirena.org.uk>
+References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
+ <20170413125929.dygodgj6c35ydh5p@sirena.org.uk>
+ <CAMuHMdUm=90ddNWM5KWqT+W0hqZ-QO6vPHj5OisbYquDYq1ZmA@mail.gmail.com>
+ <58F06092.9080409@mentor.com>
+ <CAMuHMdXa_O6RsqUciiNWQ0Zp6dniS47AUmPN9UWAWitP0csx=Q@mail.gmail.com>
+ <20170425103113.lxpwoq6sbxvg3ihl@sirena.org.uk>
+Message-ID: <59019306.2050309@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-04-13 at 14:50 +0800, Wu-Cheng Li (???) wrote:
-> Reviewed-by: Wu-Cheng Li <wuchengli@chromium.org>
-> 
-> On Thu, Apr 13, 2017 at 12:18 PM, Minghsiu Tsai
-> <minghsiu.tsai@mediatek.com> wrote:
-> > From: Daniel Kurtz <djkurtz@chromium.org>
-> >
-> > Experiments show that the:
-> >  (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
-> >  (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
-> >
-> > Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-Acked-by:Houlong Wei <houlong.wei@mediatek.com>
-> >
-> > ---
-> >  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 18 +++++++++---------
-> >  1 file changed, 9 insertions(+), 9 deletions(-)
-> >
-> > diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> > index 13afe48..8ab7ca0 100644
-> > --- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> > +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> > @@ -837,12 +837,12 @@ static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
-> >         struct mtk_mdp_ctx *ctx = fh_to_ctx(fh);
-> >         bool valid = false;
-> >
-> > -       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
-> > -               if (mtk_mdp_is_target_compose(s->target))
-> > -                       valid = true;
-> > -       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-> > +       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
-> >                 if (mtk_mdp_is_target_crop(s->target))
-> >                         valid = true;
-> > +       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
-> > +               if (mtk_mdp_is_target_compose(s->target))
-> > +                       valid = true;
-> >         }
-> >         if (!valid) {
-> >                 mtk_mdp_dbg(1, "[%d] invalid type:%d,%u", ctx->id, s->type,
-> > @@ -907,12 +907,12 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
-> >         int ret;
-> >         bool valid = false;
-> >
-> > -       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
-> > -               if (s->target == V4L2_SEL_TGT_COMPOSE)
-> > -                       valid = true;
-> > -       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-> > +       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
-> >                 if (s->target == V4L2_SEL_TGT_CROP)
-> >                         valid = true;
-> > +       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
-> > +               if (s->target == V4L2_SEL_TGT_COMPOSE)
-> > +                       valid = true;
-> >         }
-> >         if (!valid) {
-> >                 mtk_mdp_dbg(1, "[%d] invalid type:%d,%u", ctx->id, s->type,
-> > @@ -925,7 +925,7 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
-> >         if (ret)
-> >                 return ret;
-> >
-> > -       if (mtk_mdp_is_target_crop(s->target))
-> > +       if (mtk_mdp_is_target_compose(s->target))
-> >                 frame = &ctx->s_frame;
-> >         else
-> >                 frame = &ctx->d_frame;
-> > --
-> > 1.9.1
-> >
+Hello Geert and Mark
+
+On 04/25/2017 03:31 AM, Mark Brown wrote:
+> On Mon, Apr 24, 2017 at 12:55:21PM +0200, Geert Uytterhoeven wrote:
+>> On Fri, Apr 14, 2017 at 7:39 AM, Jiada Wang<jiada_wang@mentor.com>  wrote:
+>>> Our use case is to use spidev as an interface to communicate with external
+>>> SPI master devices.
+>>> meanwhile the SPI bus controller can also act as master device to send data
+>>> to other
+>>> SPI slave devices on the board.
+>> That sounds a bit hackish to me. SPI was never meant to be a multi-master bus.
+>> While it can be done, you will need external synchronization (signals) to
+>> avoid conflicts between the SPI masters.
+>>> I found in your implementation, SPI bus controller is limited to either work
+>>> in master mode or
+>>> slave mode, is there any reasoning to not configure SPI mode based on SPI
+>>> devices use case?
+>> If you really need both master and slave support, you can use 2 subnodes
+>> in DT, the first representing the master, the second the slave.
+>> Mark, what's your opinion about this?
+> That sounds like a mess...   we *could* put the slave flag on the device
+> rather than the controller I guess but there's also going to need to be
+> something representing whatever avoids collisions on the bus somewhere.
+The reason I gave the example use case is want to point out that
+with Geert's patch set, a SPI device (with only one controller) can no 
+longer
+act as master and slave at the same time. because IMO as a SPI core 
+function,
+it needs to cover all the use cases, and to be as generic as possible.
+
+BUT if you think the use case don't need to be supported from SPI core,
+then I don't have objection either, I will only submit imx SPI slave 
+support patch,
+after your SPI slave support patch set been applied
+
+
+Thanks,
+Jiada
