@@ -1,84 +1,94 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 27 Apr 2017 09:37:00 -0700
-Subject: [PATCH 1/2] thermal: broadcom: Allow for NSP to use ns-thermal
- driver
-In-Reply-To: <1493153351-12698-2-git-send-email-jon.mason@broadcom.com>
-References: <1493153351-12698-1-git-send-email-jon.mason@broadcom.com>
- <1493153351-12698-2-git-send-email-jon.mason@broadcom.com>
-Message-ID: <20170427163658.GC18276@localhost.localdomain>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Thu, 27 Apr 2017 22:07:34 +0530
+Subject: [PATCH 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
+In-Reply-To: <20170427133910.GB31368@rric.localdomain>
+References: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
+ <20170427133910.GB31368@rric.localdomain>
+Message-ID: <CA+sq2CfX+rrJniu7Fe0E47mF+nWkdx94=8buGtrP8zBdFrXV+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Jason,
+On Thu, Apr 27, 2017 at 7:09 PM, Robert Richter
+<robert.richter@cavium.com> wrote:
+> On 27.04.17 17:16:21, Geetha sowjanya wrote:
+>> From: Geetha <gakula@cavium.com>
+>>
+>> Cavium CN99xx SMMUv3 implementation has two Silicon Erratas.
+>> 1. Errata ID #74
+>>    SMMU register alias Page 1 is not implemented
+>> 2. Errata ID #126
+>>    SMMU doesnt support unique IRQ lines for gerror, eventq and cmdq-sync
+>>
+>> The following patchset does software workaround for these two erratas.
+>>
+>> This series is based on RFC patch.
+>> https://www.spinics.net/lists/arm-kernel/msg575739.html
+>>
+>> As suggested by Will Deacon, code is modified to use silicon id to
+>> enable errata#74 workaround.
+>
+> Can we go with the previous series [1] and:
+>
+>  * drop the iort model numbering part,
+>
+>  * add an enablement function that enables flags (smmu->options)
+>    depending on midr values (which replaces the macro code)?
 
-On Tue, Apr 25, 2017 at 04:49:10PM -0400, Jon Mason wrote:
-> Change the iProc Kconfig to select THERMAL and THERMAL_OF, which allows
-> the ns-thermal driver to be selected via menuconfig.  Also, change the
-> ns-thermal driver to work on any iProc based SoC.  Finally, tweak the
-> Kconfig description to mention support for NSP and make the default on
-> for iProc based platforms.
+I don't see how it is efficient and consistent, if we take data from DT
+for non-ACPI mode and read CPU ID from MIDR for ACPI mode.
 
+Thanks,
+Sunil.
 
-Thanks for the patch, but..
-> 
-> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-> ---
->  arch/arm/mach-bcm/Kconfig        | 2 ++
->  drivers/thermal/broadcom/Kconfig | 9 +++++----
->  2 files changed, 7 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index a0e66d8..da2bfeb 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -19,6 +19,8 @@ config ARCH_BCM_IPROC
->  	select GPIOLIB
->  	select ARM_AMBA
->  	select PINCTRL
-> +	select THERMAL
-> +	select THERMAL_OF
->  	help
->  	  This enables support for systems based on Broadcom IPROC architected SoCs.
->  	  The IPROC complex contains one or more ARM CPUs along with common
-
-It would be better if this is split and sent through your arch tree, to
-avoid conflicts. I could also pick it if you get an ack from one of your
-maintainers. Still, first option is preferable.
-
-> diff --git a/drivers/thermal/broadcom/Kconfig b/drivers/thermal/broadcom/Kconfig
-> index f0dea8a..26d706c 100644
-> --- a/drivers/thermal/broadcom/Kconfig
-> +++ b/drivers/thermal/broadcom/Kconfig
-> @@ -1,8 +1,9 @@
->  config BCM_NS_THERMAL
->  	tristate "Northstar thermal driver"
->  	depends on ARCH_BCM_IPROC || COMPILE_TEST
-> +	default ARCH_BCM_IPROC
-
-Not sure if this is really what you wanted. Based on your commit log
-message, you meant the following, perhaps?
-
- +	default y if ARCH_BCM_IPROC
-
->  	help
-> -	  Northstar is a family of SoCs that includes e.g. BCM4708, BCM47081,
-> -	  BCM4709 and BCM47094. It contains DMU (Device Management Unit) block
-> -	  with a thermal sensor that allows checking CPU temperature. This
-> -	  driver provides support for it.
-> +	  Support for the Northstar and Northstar Plus family of SoCs (e.g.
-> +	  BCM4708, BCM4709, BCM5301x, BCM95852X, etc). It contains DMU (Device
-
-Did we look BCM47094 somehow on this patch?
-
-> +	  Management Unit) block with a thermal sensor that allows checking CPU
-> +	  temperature.
-> -- 
-> 2.7.4
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170427/c74ae1b8/attachment.sig>
+>
+> E.g.:
+>
+> static void acpi_smmu_enable_cavium(struct arm_smmu_device *smmu)
+> {
+>         u32 cpu_model;
+>
+>         if (!IS_ENABLED(CONFIG_ARM64))
+>                 return;
+>
+>         cpu_model = read_cpuid_id() & MIDR_CPU_MODEL_MASK;
+>         switch (cpu_model) {
+>         case ...:
+>         case ...:
+>                 break;
+>         default:
+>                 /* No Cavium CN99xx SMMU v3 */
+>                 return;
+>         }
+>
+>         smmu->options |= (ARM_SMMU_OPT_PAGE0_REGS_ONLY |
+>                          ARM_SMMU_OPT_USE_SHARED_IRQS);
+> }
+>
+> -Robert
+>
+>
+> [1] [RFC PATCH 0/7] Cavium CN99xx SMMUv3 Errata workarounds
+>     https://marc.info/?l=linux-acpi&m=149192179623708&w=2
+>
+>>
+>> Linu Cherian (1):
+>>   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #74
+>>
+>> Geetha (2):
+>>   arm64: Add MIDR values for Cavium cn99xx SoCs
+>>   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
+>>
+>>  Documentation/arm64/silicon-errata.txt |  2 ++
+>>  arch/arm64/include/asm/cputype.h       |  3 ++
+>>  drivers/acpi/arm64/iort.c              | 14 +++++++-
+>>  drivers/iommu/arm-smmu-v3.c            | 64 +++++++++++++++++++++++++++++-----
+>>  4 files changed, 73 insertions(+), 10 deletions(-)
+>>
+>> --
+>> 1.9.1
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
