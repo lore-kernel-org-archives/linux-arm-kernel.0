@@ -1,40 +1,75 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 27 Apr 2017 10:31:18 -0400
-Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
-In-Reply-To: <20170427133819.GW3452@pathway.suse.cz>
-References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
- <1461239325-22779-2-git-send-email-pmladek@suse.com>
- <20170419131341.76bc7634@gandalf.local.home>
- <20170420033112.GB542@jagdpanzerIV.localdomain>
- <20170420131154.GL3452@pathway.suse.cz>
- <20170421015724.GA586@jagdpanzerIV.localdomain>
- <20170421120627.GO3452@pathway.suse.cz>
- <20170424021747.GA630@jagdpanzerIV.localdomain>
- <20170427133819.GW3452@pathway.suse.cz>
-Message-ID: <20170427103118.56351d30@gandalf.local.home>
+From: cyrille.pitchen@wedev4u.fr (Cyrille Pitchen)
+Date: Thu, 27 Apr 2017 16:32:20 +0200
+Subject: [PATCH] mtd: spi-nor: stm32: remove broken MODULE_ALIAS
+In-Reply-To: <dc7d8b5e-0f0e-1593-4c6b-0c93a828818c@st.com>
+References: <20170427111001.2587551-1-arnd@arndb.de>
+ <dc7d8b5e-0f0e-1593-4c6b-0c93a828818c@st.com>
+Message-ID: <48e14a7d-d105-3773-626f-04446a19254d@wedev4u.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Apr 2017 15:38:19 +0200
-Petr Mladek <pmladek@suse.com> wrote:
+Le 27/04/2017 ? 14:17, Ludovic BARRE a ?crit :
+> thanks a lot Arnd
+>
 
-> > by the way,
-> > does this `nmi_print_seq' bypass even fix anything for Steven?  
+Indeed, thanks Arnd!
+
+Since commit ("mtd: spi-nor: add driver for STM32 quad spi flash
+controller") was included with the spi-nor PR for 4.12 I've sent
+yesterday to Brian, I will check with him to know how he wants us to
+proceed:
+
+- If Brian has not started yet to review the PR and if he agrees on
+that, I can rework a little bit the history in github/spi-nor to squash
+Arnd's patch into Ludovic's one.
+Ludovic's patch is already in linux-next but not yet in any release
+candiate.
+
+- or I can send an new PR keeping the fixup patch aside.
+
+Best regards,
+
+Cyrille
+
+
+> Oops, I've not tested in Module :-(.
+> Just tested in built-in, and used bind/unbind and device tree overlays.
 > 
-> I think that this is the most important question.
+> BR
+> Ludo
+> On 04/27/2017 01:09 PM, Arnd Bergmann wrote:
+>> The MODULE_ALIAS statement refers to a macro that has never been defined
+>> in this driver, causing a build error:
+>>
+>> drivers/mtd/spi-nor/stm32-quadspi.c:694:150: error: expected ',' or
+>> ';' before 'DRIVER_NAME'
+>>
+>> Unless there is a specific alias we need other then the driver name,
+>> we don't need an alias here and can simply remove the line to fix the
+>> build.
+>>
+>> Fixes: dc5e400611c5 ("mtd: spi-nor: add driver for STM32 quad spi
+>> flash controller")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>>   drivers/mtd/spi-nor/stm32-quadspi.c | 1 -
+>>   1 file changed, 1 deletion(-)
+>>
+>> diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c
+>> b/drivers/mtd/spi-nor/stm32-quadspi.c
+>> index 90d9152ddf98..1056e7408d2a 100644
+>> --- a/drivers/mtd/spi-nor/stm32-quadspi.c
+>> +++ b/drivers/mtd/spi-nor/stm32-quadspi.c
+>> @@ -691,7 +691,6 @@ static struct platform_driver stm32_qspi_driver = {
+>>   };
+>>   module_platform_driver(stm32_qspi_driver);
+>>   -MODULE_ALIAS("platform:" DRIVER_NAME);
+>>   MODULE_AUTHOR("Ludovic Barre <ludovic.barre@st.com>");
+>>   MODULE_DESCRIPTION("STMicroelectronics STM32 quad spi driver");
+>>   MODULE_LICENSE("GPL v2");
 > 
-> Steven, does the patch from
-> https://lkml.kernel.org/r/20170420131154.GL3452 at pathway.suse.cz
-> help you to see the debug messages, please?
-
-You'll have to wait for a bit. The box that I was debugging takes 45
-minutes to reboot. And I don't have much more time to play on it before
-I have to give it back. I already found the bug I was looking for and
-I'm trying not to crash it again (due to the huge bring up time).
-
-When I get a chance, I'll see if I can insert a trigger to crash the
-kernel from NMI on another box and see if this patch helps.
-
-Thanks,
-
--- Steve
+> 
+> ______________________________________________________
+> Linux MTD discussion mailing list
+> http://lists.infradead.org/mailman/listinfo/linux-mtd/
+> 
