@@ -1,130 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Apr 2017 21:06:32 +0200
-Subject: [SPAM]Re: [PATCH 2/2] dt-bindings: pcie: Add documentation for
- Mediatek PCIe
-In-Reply-To: <1493194205.27023.80.camel@mtkswgap22>
-References: <1492935543-18190-1-git-send-email-ryder.lee@mediatek.com>
- <1492935543-18190-3-git-send-email-ryder.lee@mediatek.com>
- <CAK8P3a1vgi9VBZfRNq0dDKzmfe8FkHQtgz6fEXW9fyUnBHtaQQ@mail.gmail.com>
- <1493194205.27023.80.camel@mtkswgap22>
-Message-ID: <CAK8P3a0vD8s_3R+jS=JdUXX3X05SkCk-mipMA6UxWYQZe6vLUQ@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 27 Apr 2017 21:18:50 +0200
+Subject: [PATCH v5 12/22] KVM: arm64: vgic-its: Interpret MAPD ITT_addr
+ field
+In-Reply-To: <20170427180911.GU50776@lvm>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-13-git-send-email-eric.auger@redhat.com>
+ <20170427164356.GP50776@lvm>
+ <5f187dbf-6167-7bd3-4a8e-37545941d05c@redhat.com>
+ <20170427180911.GU50776@lvm>
+Message-ID: <6f7d1fdf-b40a-b851-6d2d-145487ae4e19@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 10:10 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> Hi
->
-> On Tue, 2017-04-25 at 14:18 +0200, Arnd Bergmann wrote:
->> On Sun, Apr 23, 2017 at 10:19 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
->> > Add documentation for PCIe host driver available in MT7623
->> > series SoCs.
->> >
->> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
->> > ---
->> >  .../bindings/pci/mediatek,mt7623-pcie.txt          | 153 +++++++++++++++++++++
->> >  1 file changed, 153 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
->> > new file mode 100644
->> > index 0000000..ee93ba2
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
->> > @@ -0,0 +1,153 @@
->> > +Mediatek MT7623 PCIe controller
->> > +
->> > +Required properties:
->> > +- compatible: Should contain "mediatek,mt7623-pcie".
+Hi,
+
+On 27/04/2017 20:09, Christoffer Dall wrote:
+> On Thu, Apr 27, 2017 at 07:44:25PM +0200, Auger Eric wrote:
+>> Hi,
 >>
->> Did mediatek license the IP block from someone else or was it
->> developed in-house? Is there a name and/or version identifier
->> for the block itself other than identifying it as the one in mt7623?
->
-> Originally, it license from synopsys. Our designer add a wrapper to hide
-> the DBI detail so that we cannot use them directly. Perhaps I can call
-> it "mediatek,gen2v1-pcie", because we have a plan to upstream a in-house
-> Gen2 IP in the future.
-
-Ok, so this is the same hardware that drivers/pci/dwc/ handles, but
-it needs a separate driver because the wrapper that was added uses
-a completely different register layout, right?
-
-Are any of the registers the same at all, e.g. for MSI handling?
-
->> > +Required properties:
->> > +- device_type: Must be "pci"
->> > +- assigned-addresses: Address and size of the port configuration registers
->> > +- reg: Only the first four bytes are used to refer to the correct bus number
->> > +  and device number.
->> > +- #address-cells: Must be 3
->> > +- #size-cells: Must be 2
->> > +- ranges: Sub-ranges distributed from the PCIe controller node. An empty
->> > +  property is sufficient.
->> > +- clocks: Must contain an entry for each entry in clock-names.
->> > +  See ../clocks/clock-bindings.txt for details.
->> > +- clock-names: Must include the following entries:
->> > +  - sys_ck
->> > +- resets: Must contain an entry for each entry in reset-names.
->> > +  See ../reset/reset.txt for details.
+>> On 27/04/2017 18:43, Christoffer Dall wrote:
+>>> On Fri, Apr 14, 2017 at 12:15:24PM +0200, Eric Auger wrote:
+>>>> Up to now the MAPD ITT_addr had been ignored. We will need it
+>>>> for save/restore. Let's record it in the its_device struct.
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>>>
+>>>> ---
+>>>> v4 -> v5:
+>>>> - its_cmd_get_ittaddr macro now returns the actual ITT GPA
+>>>>
+>>>> v3 -> v4:
+>>>> - in vgic_its_cmd_handle_mapd, itt_addr directly is shifted
+>>>> - correct ittaddr bitmask to support 48bit GPA
+>>>> ---
+>>>>  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
+>>>>  1 file changed, 4 insertions(+)
+>>>>
+>>>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>>>> index 0f3c8f3..757598d 100644
+>>>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>>>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>>>> @@ -106,6 +106,7 @@ struct its_device {
+>>>>  	/* the head for the list of ITTEs */
+>>>>  	struct list_head itt_head;
+>>>>  	u32 nb_eventid_bits;
+>>>> +	gpa_t itt_addr;
+>>>>  	u32 device_id;
+>>>>  };
+>>>>  
+>>>> @@ -569,6 +570,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
+>>>>  #define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
+>>>>  #define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
+>>>>  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
+>>>> +#define its_cmd_get_ittaddr(cmd)	(its_cmd_mask_field(cmd, 2,  8, 47) << 8)
+>>>
+>>> Why 47?  The ITT_addr field is bits [51:8] unless I'm looking at
+>>> something wrong?
 >>
->> This seems odd: you have a device that is simply identified as "pci"
->> without any more specific ID, but you require additional properties
->> (clocks, reset, ...) that are not part of the standard PCI binding.
+>> Initially I limited to 48 bits since I found in the code:
 >>
->> Can you clarify how the port devices related to the root device in
->> this hardware design?
->
-> I will write clarify like this:
->
-> PCIe subsys includes one Host/PCI bridge and 3 PCIe MAC port. There
-> are 3 bus master for data access and 1 slave for configuration and
-> status register access. Each port has PIPE interface to PHY and
-
-If I understand this right, then each of the ports in your hardware
-is what we normally drive using the drivers/pci/dwc/ driver framework,
-but your implementation actually made it more PCI standard compliant
-by implementing the normal PCIe host bridge registers for all ports
-combined, something that most others don't.
-
->> Have you considered moving the nonstandard properties into the host
->> bridge node and having that device deal with setting up the links
->> to the other drivers? That way we could use the regular pcie
->> port driver for the children.
+>> /*
+>>  * We only implement 48 bits of PA at the moment, although the ITS
+>>  * supports more. Let's be restrictive here.
+>>  */
+>> #define BASER_ADDRESS(x)        ((x) & GENMASK_ULL(47, 16))
+>> #define CBASER_ADDRESS(x)       ((x) & GENMASK_ULL(47, 12))
 >>
->
-> OK, but I still want to use port->reset to catch reset properties in
-> driver.
+>> But practically as I encode the ITT addr field on 52 bits now in the DTE
+>> there is no reason anymore.
+> 
+> Well, regardless, shouldn't you be bassing 44 to its_cmd_mask_field(),
+> because you're shifting left 8 bits afterwards?
 
-Do you mean in drivers/pci/pcie/portdrv_pci.c? I see that it
-has a function called pcie_portdrv_slot_reset(), but I don't see
-how that relates to your reset line at the moment. Is this
-something you have submitted in a different series?
+Hum yes that's correct. Andre already warned me against that mistake :-(
 
-Or do you mean in this host driver? The problem I see with
-that approach is that the port device is owned by portdrv_pci,
-so the host bridge driver should not look at the properties of
-the port.
+Thanks
 
->> > +- reset-names: Must include the following entries:
->> > +  - pcie-reset
->> > +- num-lanes: Number of lanes to use for this port.
->> > +- phys: Must contain an entry for each entry in phy-names.
->> > +- phy-names: Must include an entry for each sub node. Entries are of the form
->> > +  "pcie-phyN": where N ranges from 0 to the value specified for port number.
->> > +  See ../phy/phy-mt7623-pcie.txt for details.
->>
->> I think the name should not include the number of the port but rather
->> be always the same here.
->>
->
-> Hmm, I think it's better to keep the name here. It's more readable for
-> user to understand the relationship between port0 and phy0.
-
-No, I would argue that it's confusing for the reader because it
-is different from how most other DT bindings work: In each device
-node, you tend to have a set of properties with well-known names
-that are documented. When your reference is called "pcie-phy1"
-in one node and "pcie-phy2", I would interpret that as both ports
-having two phys each, but only one of them being used.
-
-       Arnd
+Eric
+> 
+> Thanks,
+> -Christoffer
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
