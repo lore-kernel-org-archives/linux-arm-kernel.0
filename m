@@ -1,72 +1,267 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 27 Apr 2017 11:42:48 -0400
-Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
-In-Reply-To: <20170427152807.GY3452@pathway.suse.cz>
-References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
- <1461239325-22779-2-git-send-email-pmladek@suse.com>
- <20170419131341.76bc7634@gandalf.local.home>
- <20170420033112.GB542@jagdpanzerIV.localdomain>
- <20170420131154.GL3452@pathway.suse.cz>
- <20170421015724.GA586@jagdpanzerIV.localdomain>
- <20170421120627.GO3452@pathway.suse.cz>
- <20170424021747.GA630@jagdpanzerIV.localdomain>
- <20170427133819.GW3452@pathway.suse.cz>
- <20170427103118.56351d30@gandalf.local.home>
- <20170427152807.GY3452@pathway.suse.cz>
-Message-ID: <20170427114248.1d751efd@gandalf.local.home>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Thu, 27 Apr 2017 21:16:41 +0530
+Subject: [PATCH] perf evsel: Fix to perf-stat malloc corruption on arm64
+ platforms
+In-Reply-To: <20170427143438.GE31337@leverpostej>
+References: <1493198780-25415-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170426145057.GK27156@leverpostej> <20170426171208.GC23669@leverpostej>
+ <CAFpQJXX7HaKQ8t85mB2Fqn-6wHhb_GR+2sOi23HQZnRgUw-Y4g@mail.gmail.com>
+ <20170427143438.GE31337@leverpostej>
+Message-ID: <CAFpQJXWjx3uVG-6UNiJzmdc4FFw8kea2A5aJZquxVRXq8BR1VQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Apr 2017 17:28:07 +0200
-Petr Mladek <pmladek@suse.com> wrote:
+On Thu, Apr 27, 2017 at 8:04 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Apr 26, 2017 at 11:49:46PM +0530, Ganapatrao Kulkarni wrote:
+>> On Wed, Apr 26, 2017 at 10:42 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > diff --git a/tools/perf/builtin-stat.c b/tools/perf/builtin-stat.c
+>> > index 13b5499..638aefa 100644
+>> > --- a/tools/perf/builtin-stat.c
+>> > +++ b/tools/perf/builtin-stat.c
+>> > @@ -346,6 +346,28 @@ static void read_counters(void)
+>> >         }
+>> >  }
+>> >
+>> > +/*
+>> > + * Close all evnt FDs we open in __run_perf_stat() and
+>> > + * create_perf_stat_counter(), taking care to match the number of threads and CPUs.
+>> > + *
+>> > + * Note that perf_evlist__close(evsel_list) is not equivalent, as it doesn't
+>> > + * take the target into account.
+>> > + */
+>> > +static void close_counters(void)
+>> > +{
+>> > +       bool per_cpu = target__has_cpu(&target);
+>> > +       struct perf_evsel *evsel;
+>> > +
+>> > +       evlist__for_each_entry(evsel_list, evsel) {
+>> > +               if (per_cpu)
+>> > +                       perf_evsel__close_per_cpu(evsel,
+>> > +                                                 perf_evsel__cpus(evsel));
+>> > +               else
+>> > +                       perf_evsel__close_per_thread(evsel,
+>> > +                                                    evsel_list->threads);
+>> > +       }
+>> > +}
+>> > +
+>> >  static void process_interval(void)
+>> >  {
+>> >         struct timespec ts, rs;
+>> > @@ -686,7 +708,7 @@ static int __run_perf_stat(int argc, const char **argv)
+>> >          * group leaders.
+>> >          */
+>> >         read_counters();
+>> > -       perf_evlist__close(evsel_list);
+>> > +       close_counters();
+>> >
+>> >         return WEXITSTATUS(status);
+>> >  }
+>> > diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+>> > index ac59710..726ceca 100644
+>> > --- a/tools/perf/util/evsel.c
+>> > +++ b/tools/perf/util/evsel.c
+>> > @@ -1670,6 +1670,18 @@ int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
+>> >         return err;
+>> >  }
+>> >
+>> > +int perf_evsel__open_per_cpu(struct perf_evsel *evsel,
+>> > +                            struct cpu_map *cpus)
+>> > +{
+>> > +       return perf_evsel__open(evsel, cpus, NULL);
+>> > +}
+>> > +
+>> > +int perf_evsel__open_per_thread(struct perf_evsel *evsel,
+>> > +                               struct thread_map *threads)
+>> > +{
+>> > +       return perf_evsel__open(evsel, NULL, threads);
+>> > +}
+>> > +
+>> >  void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads)
+>> >  {
+>> >         if (evsel->fd == NULL)
+>> > @@ -1679,16 +1691,18 @@ void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads)
+>> >         perf_evsel__free_fd(evsel);
+>> >  }
+>> >
+>> > -int perf_evsel__open_per_cpu(struct perf_evsel *evsel,
+>> > -                            struct cpu_map *cpus)
+>> > +void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
+>> > +                              struct cpu_map *cpus)
+>> >  {
+>> > -       return perf_evsel__open(evsel, cpus, NULL);
+>> > +       int ncpus = cpus ? cpus->nr : 1;
+>> > +       perf_evsel__close(evsel, ncpus, 1);
+>> >  }
+>> >
+>> > -int perf_evsel__open_per_thread(struct perf_evsel *evsel,
+>> > -                               struct thread_map *threads)
+>> > +void perf_evsel__close_per_thread(struct perf_evsel *evsel,
+>> > +                                 struct thread_map *threads)
+>> >  {
+>> > -       return perf_evsel__open(evsel, NULL, threads);
+>> > +       int nthreads = threads ? threads->nr : 1;
+>> > +       perf_evsel__close(evsel, 1, nthreads);
+>> >  }
+>> >
+>> >  static int perf_evsel__parse_id_sample(const struct perf_evsel *evsel,
+>> > diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
+>> > index 06ef6f2..02bea43 100644
+>> > --- a/tools/perf/util/evsel.h
+>> > +++ b/tools/perf/util/evsel.h
+>> > @@ -252,6 +252,10 @@ int perf_evsel__open_per_thread(struct perf_evsel *evsel,
+>> >                                 struct thread_map *threads);
+>> >  int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
+>> >                      struct thread_map *threads);
+>> > +void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
+>> > +                              struct cpu_map *cpus);
+>> > +void perf_evsel__close_per_thread(struct perf_evsel *evsel,
+>> > +                                 struct thread_map *threads);
+>> >  void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads);
+>> >
+>> >  struct perf_sample;
+>>
+>> this diff looks to me doing same as mine.
+>
+> Be careful when reading the diff above; the open functions have been
+> moved, but have not changed.
+>
+> I've only changed the close path, whereas your proposal changed the open
+> path. Those are not equivalent changes.
+>
+>> i think below diff should be more appropriate fix to this issue?
+>>
+>> when open allocates and uses dummy cpus, there is no point in holding
+>> old unused one.  instead it should free and link to dummy cpus which
+>> is created with 1 CPU.  same will be used by close.
+>>
+>> i did quick testing on both x86 and arm64.  testing looks ok, may need
+>> more testing!
+>>
+>> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+>> index ac59710..b1aab0a 100644
+>> --- a/tools/perf/util/evsel.c
+>> +++ b/tools/perf/util/evsel.c
+>> @@ -1466,9 +1466,13 @@ int perf_evsel__open(struct perf_evsel *evsel,
+>> struct cpu_map *cpus,
+>>                         empty_cpu_map = cpu_map__dummy_new();
+>>                         if (empty_cpu_map == NULL)
+>>                                 return -ENOMEM;
+>> +               } else {
+>> +                       cpu_map__get(empty_cpu_map);
+>>                 }
+>>
+>>                 cpus = empty_cpu_map;
+>> +               cpu_map__put(evsel->cpus);
+>> +               evsel->cpus = cpus;
+>>         }
+>>
+>>         if (threads == NULL) {
+>
+> Unfortunately, I believe that might break the logic added in commit:
+>
+>   9f21b815be863218 ("perf evlist: Only open events on CPUs an evsel permits")
+>
+> ... since the evsel->cpus would now not represent the PMUs CPUs.
+>
+> As I'd mentioned in my prior reply, I think in order to use the cpu_maps
+> consistently we need to do a bigger rework of the way cpu_maps are used,
+> in order to separate the PMU CPUs from the requested event CPUs, etc.
+> while taking all of these into account.
+>
+> Could you please give my diff a go?
+
+i tried your diff, and testing looks ok.
+below is the cleanly merged diff on top of latest commit
+f832460 Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/sparc
+
+diff --git a/tools/perf/builtin-stat.c b/tools/perf/builtin-stat.c
+index 13b5499..4be2980 100644
+--- a/tools/perf/builtin-stat.c
++++ b/tools/perf/builtin-stat.c
+@@ -346,6 +346,28 @@ static void read_counters(void)
+  }
+ }
+
++/*
++ * Close all evnt FDs we open in __run_perf_stat() and
++ * create_perf_stat_counter(), taking care to match the number of
+threads and CPUs.
++ *
++ * Note that perf_evlist__close(evsel_list) is not equivalent, as it doesn't
++ * take the target into account.
++ */
++static void close_counters(void)
++{
++       bool per_cpu = target__has_cpu(&target);
++       struct perf_evsel *evsel;
++
++       evlist__for_each_entry(evsel_list, evsel) {
++               if (per_cpu)
++                       perf_evsel__close_per_cpu(evsel,
++                                                 perf_evsel__cpus(evsel));
++               else
++                       perf_evsel__close_per_thread(evsel,
++                                                    evsel_list->threads);
++       }
++}
++
+ static void process_interval(void)
+ {
+  struct timespec ts, rs;
+@@ -686,7 +708,7 @@ static int __run_perf_stat(int argc, const char **argv)
+  * group leaders.
+  */
+  read_counters();
+- perf_evlist__close(evsel_list);
++ close_counters();
+
+  return WEXITSTATUS(status);
+ }
+diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+index ac59710..ecd9778 100644
+--- a/tools/perf/util/evsel.c
++++ b/tools/perf/util/evsel.c
+@@ -1691,6 +1691,20 @@ int perf_evsel__open_per_thread(struct perf_evsel *evsel,
+  return perf_evsel__open(evsel, NULL, threads);
+ }
+
++void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
++                              struct cpu_map *cpus)
++ {
++       int ncpus = cpus ? cpus->nr : 1;
++       perf_evsel__close(evsel, ncpus, 1);
++ }
++
++void perf_evsel__close_per_thread(struct perf_evsel *evsel,
++                                 struct thread_map *threads)
++ {
++       int nthreads = threads ? threads->nr : 1;
++       perf_evsel__close(evsel, 1, nthreads);
++ }
++
+ static int perf_evsel__parse_id_sample(const struct perf_evsel *evsel,
+        const union perf_event *event,
+        struct perf_sample *sample)
+diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
+index 06ef6f2..6779bd2 100644
+--- a/tools/perf/util/evsel.h
++++ b/tools/perf/util/evsel.h
+@@ -250,6 +250,10 @@ int perf_evsel__open_per_cpu(struct perf_evsel *evsel,
+      struct cpu_map *cpus);
+ int perf_evsel__open_per_thread(struct perf_evsel *evsel,
+  struct thread_map *threads);
++void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
++                              struct cpu_map *cpus);
++void perf_evsel__close_per_thread(struct perf_evsel *evsel,
++                                 struct thread_map *threads);
+ int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
+      struct thread_map *threads);
+ void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads);
 
 
-> > When I get a chance, I'll see if I can insert a trigger to crash the
-> > kernel from NMI on another box and see if this patch helps.  
-> 
-> I actually tested it here using this hack:
-> 
-> diff --cc lib/nmi_backtrace.c
-> index d531f85c0c9b,0bc0a3535a8a..000000000000
-> --- a/lib/nmi_backtrace.c
-> +++ b/lib/nmi_backtrace.c
-> @@@ -89,8 -90,7 +90,9 @@@ bool nmi_cpu_backtrace(struct pt_regs *
->         int cpu = smp_processor_id();
->   
->         if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
->  +              if (in_nmi())
->  +                      panic("Simulating panic in NMI\n");
-> +               arch_spin_lock(&lock);
+>
+> Thanks,
+> Mark.
 
-I was going to create a ftrace trigger, to crash on demand, but this
-may do as well.
-
->                 if (regs && cpu_in_idle(instruction_pointer(regs))) {
->                         pr_warn("NMI backtrace for cpu %d skipped: idling at pc %#lx\n",
->                                 cpu, instruction_pointer(regs));
-> 
-> and triggered by:
-> 
->    echo  l > /proc/sysrq-trigger
-> 
-> The patch really helped to see much more (all) messages from the ftrace
-> buffers in NMI mode.
-> 
-> But the test is a bit artifical. The patch might not help when there
-> is a big printk() activity on the system when the panic() is
-> triggered. We might wrongly use the small per-CPU buffer when
-> the logbuf_lock is tested and taken on another CPU at the same time.
-> It means that it will not always help.
-> 
-> I personally think that the patch might be good enough. I am not sure
-> if a perfect (more comlpex) solution is worth it.
-
-I wasn't asking for perfect, as the previous solutions never were
-either. I just want an optimistic dump if possible.
-
-I'll try to get some time today to test this, and let you know. But it
-wont be on the machine that I originally had the issue with.
-
-Thanks,
-
--- Steve
+thanks
+Ganapat
