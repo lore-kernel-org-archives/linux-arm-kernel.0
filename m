@@ -1,20 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Apr 2017 21:43:44 +0200
-Subject: [GIT PULL] arm64: dts: juno: fixes for v4.12
-In-Reply-To: <42ac5309-62aa-1c5e-3cbb-cb40d68e8b9b@arm.com>
-References: <42ac5309-62aa-1c5e-3cbb-cb40d68e8b9b@arm.com>
-Message-ID: <CAK8P3a2hruXOPMcvz-S=P6UihebqXdhHZF1P=-gifbZ74Daxdg@mail.gmail.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Thu, 27 Apr 2017 21:45:17 +0200
+Subject: [PATCH 0/2] hwtracing-coresight: Fine-tuning for two function
+ implementations
+Message-ID: <52619d05-65c4-149d-f355-cf9c037a0c9b@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 20, 2017 at 6:30 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> Hi ARM SoC team,
->
-> Sorry for the late pull request, but this contains only fixes
-> that were found when I tested linux-next.
->
-> Please pull!
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Thu, 27 Apr 2017 21:34:32 +0200
 
-Pulled into next/dt64, thanks,
+Two update suggestions were taken into account
+from static source code analysis.
 
-       Arnd
+Markus Elfring (2):
+  Use devm_kcalloc() in stm_probe()
+  Use devm_kcalloc() in of_coresight_alloc_memory()
+
+ drivers/hwtracing/coresight/coresight-stm.c | 6 +++---
+ drivers/hwtracing/coresight/of_coresight.c  | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+-- 
+2.12.2
