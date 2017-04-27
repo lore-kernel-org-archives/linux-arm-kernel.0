@@ -1,113 +1,120 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 27 Apr 2017 11:34:21 -0700
-Subject: [PATCH 0/3 v3] ARM/ARM64: silence large module first time
- allocation
-In-Reply-To: <56EE35F5-97F9-4EA4-894B-581E7AE09A78@linaro.org>
-References: <20170427181902.28829-1-f.fainelli@gmail.com>
- <56EE35F5-97F9-4EA4-894B-581E7AE09A78@linaro.org>
-Message-ID: <d12fa030-9d81-6740-dabf-d3305259f38e@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Apr 2017 20:55:21 +0200
+Subject: [PATCH 1/2] PCI: mediatek: Add Mediatek PCIe host controller
+ support
+In-Reply-To: <1493194200.27023.79.camel@mtkswgap22>
+References: <1492935543-18190-1-git-send-email-ryder.lee@mediatek.com>
+ <1492935543-18190-2-git-send-email-ryder.lee@mediatek.com>
+ <CAK8P3a39TFkJ5=jp8me+Dyg-Qi-N_1ZKxpJGvnhmPEo4csnFCw@mail.gmail.com>
+ <1493194200.27023.79.camel@mtkswgap22>
+Message-ID: <CAK8P3a0DjPL8uWuXfCmEwt05SCPJ0yEQTAJmZAPtFDEfsn4a1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2017 11:24 AM, Ard Biesheuvel wrote:
-> 
->> On 27 Apr 2017, at 19:18, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>
->> With kernels built with CONFIG_ARM{,64}_MODULES_PLTS=y, the first allocation
->> done from module space will fail, produce a general OOM allocation and also a
->> vmap warning. The second allocation from vmalloc space may or may not be
->> successful, but is actually the one we are interested about in these cases.
->>
->> This patch series passed __GFP_NOWARN to silence such allocations from the
->> ARM/ARM64 module loader's first time allocation when the MODULES_PLT option is
->> enabled, and also makes alloc_vmap_area() react to the caller setting
->> __GFP_NOWARN to silence "vmap allocation for size..." messages.
->>
->>
->> Changes in v3:
->> - check for __GFP_NOWARN not set where the check for printk_ratelimited()
->>  is done, add Michal's Acked-by
->>
->> - use C conditionals and not CPP conditionals for IS_ENABLED(), add Ard's
->>  Reviewed-by tag
->>
-> 
-> Ok these look fine now. But are you sure that omitting the single pr_warn() gets rid of all of that?
-> Or do we need more patches on top?
+On Wed, Apr 26, 2017 at 10:10 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> On Tue, 2017-04-25 at 14:38 +0200, Arnd Bergmann wrote:
+>> On Sun, Apr 23, 2017 at 10:19 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
 
-Since the caller now set __GFP_NOWARN, this propagates correctly to all
-functions called from alloc_vmap_area() like kmalloc_node(). With the
-patches applied, I only get the stuff that I would expect:
+>> > +static int mtk_pcie_enable_ports(struct mtk_pcie *pcie)
+>> > +{
+>> > +       struct device *dev = pcie->dev;
+>> > +       struct mtk_pcie_port *port, *tmp;
+>> > +       int err, linkup = 0;
+>> > +
+>> > +       list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
+>> > +               err = clk_prepare_enable(port->sys_ck);
+>> > +               if (err) {
+>> > +                       dev_err(dev, "failed to enable port%d clock\n",
+>> > +                               port->index);
+>> > +                       continue;
+>> > +               }
+>> > +
+>> > +               /* assert RC */
+>> > +               reset_control_assert(port->reset);
+>> > +               /* de-assert RC */
+>> > +               reset_control_deassert(port->reset);
+>> > +
+>> > +               /* power on PHY */
+>> > +               err = phy_power_on(port->phy);
+>> > +               if (err) {
+>> > +                       dev_err(dev, "failed to power on port%d phy\n",
+>> > +                               port->index);
+>> > +                       goto err_phy_on;
+>> > +               }
+>> > +
+>> > +               mtk_pcie_assert_ports(port);
+>> > +
+>>
+>> Similar to the comment I had for the binding, I wonder if it would be
+>> better to keep all the information about the ports in one place and
+>> then just deal with it at the root level.
+>>
+>> Alternatively, we could decide to standardize on the properties
+>> you have added to the pcie port node, but then I would handle
+>> them in the pcieport driver rather than in the host bridge driver.
+>
+> Sorry, I'm not sure what you want me to do here.
+>
+> I could move all clock operation in root level. But we need to keep the
+> reset and PHY operation sequence in the loop, In addition, we could
+> easily free resources if ports link fail.
+>
+> How about moving this function to mtk_pcie_parse_and_add_res()?
 
-# echo 8 7 4 1 > /proc/sys/kernel/printk
-# insmod huge.ko
-[   59.285547] huge: loading out-of-tree module taints kernel.
-[   59.328553] big_init: I am a big module using 3932160 bytes of data!
-#
+That could work, please try it out and see if the code gets better or
+worse. This may depend on what we end up doing with the DT
+properties.
 
-> 
-> 
->> Changes in v2:
+>> > +/*
+>> > + * This IP lacks interrupt status register to check or map INTx from
+>> > + * different devices at the same time.
+>> > + */
+>> > +static int __init mtk_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+>> > +{
+>> > +       struct mtk_pcie *pcie = dev->bus->sysdata;
+>> > +       struct mtk_pcie_port *port;
+>> > +
+>> > +       list_for_each_entry(port, &pcie->ports, list)
+>> > +               if (port->index == slot)
+>> > +                       return port->irq;
+>> > +
+>> > +       return -1;
+>> > +}
 >>
->> - check __GFP_NOWARN out of the printk_ratelimited() check (Michal)
->>
->> Here is an example of what we would get without these two patches, pretty
->> scary huh?
->>
->> # insmod /mnt/nfs/huge.ko 
->> [   22.114143] random: nonblocking pool is initialized
->> [   22.183575] vmap allocation for size 15736832 failed: use vmalloc=<size> to increase size.
->> [   22.191873] vmalloc: allocation failure: 15729534 bytes
->> [   22.197112] insmod: page allocation failure: order:0, mode:0xd0
->> [   22.203048] CPU: 2 PID: 1506 Comm: insmod Tainted: G           O    4.1.20-1.9pre-01082-gbbbff07bc3ce #9
->> [   22.212536] Hardware name: Broadcom STB (Flattened Device Tree)
->> [   22.218480] [<c0017eec>] (unwind_backtrace) from [<c00135c8>] (show_stack+0x10/0x14)
->> [   22.226238] [<c00135c8>] (show_stack) from [<c0638684>] (dump_stack+0x90/0xa4)
->> [   22.233473] [<c0638684>] (dump_stack) from [<c00aae1c>] (warn_alloc_failed+0x104/0x144)
->> [   22.241490] [<c00aae1c>] (warn_alloc_failed) from [<c00d72e0>] (__vmalloc_node_range+0x170/0x218)
->> [   22.250375] [<c00d72e0>] (__vmalloc_node_range) from [<c00147d0>] (module_alloc+0x50/0xac)
->> [   22.258651] [<c00147d0>] (module_alloc) from [<c008ae2c>] (module_alloc_update_bounds+0xc/0x6c)
->> [   22.267360] [<c008ae2c>] (module_alloc_update_bounds) from [<c008b778>] (load_module+0x8ec/0x2058)
->> [   22.276329] [<c008b778>] (load_module) from [<c008cfd4>] (SyS_init_module+0xf0/0x174)
->> [   22.284170] [<c008cfd4>] (SyS_init_module) from [<c0010140>] (ret_fast_syscall+0x0/0x3c)
->> [   22.292277] Mem-Info:
->> [   22.294567] active_anon:5236 inactive_anon:1773 isolated_anon:0
->> [   22.294567]  active_file:1 inactive_file:3822 isolated_file:0
->> [   22.294567]  unevictable:0 dirty:0 writeback:0 unstable:0
->> [   22.294567]  slab_reclaimable:238 slab_unreclaimable:1594
->> [   22.294567]  mapped:855 shmem:2950 pagetables:36 bounce:0
->> [   22.294567]  free:39031 free_pcp:198 free_cma:3928
->> [   22.327196] DMA free:156124kB min:1880kB low:2348kB high:2820kB active_anon:20944kB inactive_anon:7092kB active_file:4kB inactive_file:15288kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:262144kB managed:227676kB mlocked:0kB dirty:0kB writeback:0kB mapped:3420kB shmem:11800kB slab_reclaimable:952kB slab_unreclaimable:6376kB kernel_stack:560kB pagetables:144kB unstable:0kB bounce:0kB free_pcp:792kB local_pcp:68kB free_cma:15712kB writeback_tmp:0kB pages_scanned:0 all_unreclaimable? no
->> [   22.371631] lowmem_reserve[]: 0 0 0 0
->> [   22.375372] HighMem free:0kB min:128kB low:128kB high:128kB active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:2883584kB managed:0kB mlocked:0kB dirty:0kB writeback:0kB mapped:0kB shmem:0kB slab_reclaimable:0kB slab_unreclaimable:0kB kernel_stack:0kB pagetables:0kB unstable:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB writeback_tmp:0kB pages_scanned:0 all_unreclaimable? yes
->> [   22.416249] lowmem_reserve[]: 0 0 0 0
->> [   22.419986] DMA: 3*4kB (UEM) 4*8kB (UE) 1*16kB (M) 4*32kB (UEMC) 3*64kB (EMC) 1*128kB (E) 4*256kB (UEMC) 2*512kB (UE) 2*1024kB (MC) 4*2048kB (UEMC) 35*4096kB (MRC) = 156156kB
->> [   22.435922] HighMem: 0*4kB 0*8kB 0*16kB 0*32kB 0*64kB 0*128kB 0*256kB 0*512kB 0*1024kB 0*2048kB 0*4096kB = 0kB
->> [   22.446130] 6789 total pagecache pages
->> [   22.449889] 0 pages in swap cache
->> [   22.453212] Swap cache stats: add 0, delete 0, find 0/0
->> [   22.458447] Free swap  = 0kB
->> [   22.461334] Total swap = 0kB
->> [   22.464222] 786432 pages RAM
->> [   22.467110] 720896 pages HighMem/MovableOnly
->> [   22.471388] 725417 pages reserved
->> [   22.474711] 4096 pages cma reserved
->> [   22.511310] big_init: I am a big module using 3932160 bytes of data!
->>
->> Florian Fainelli (3):
->>  mm: Silence vmap() allocation failures based on caller gfp_flags
->>  ARM: Silence first allocation with CONFIG_ARM_MODULE_PLTS=y
->>  arm64: Silence first allocation with CONFIG_ARM64_MODULE_PLTS=y
->>
->> arch/arm/kernel/module.c   | 11 +++++++++--
->> arch/arm64/kernel/module.c |  7 ++++++-
->> mm/vmalloc.c               |  2 +-
->> 3 files changed, 16 insertions(+), 4 deletions(-)
->>
->> -- 
->> 2.9.3
->>
+>> This looks odd, what is it needed for specifically? It looks like
+>> it's broken for devices behind bridges, and the interrupt mapping
+>> should normally come from the interrupt-map property, without
+>> the need for a driver specific map_irq override.
+>
+> Our hardware just has a GIC for each port and lacks interrupt status for
+> host driver to distinguish INTx. So I return port IRQ here.
 
+You should still be able to express this with standard interrupt-map
+DT property, without having to resort to your own map_irq
+callback handler.
 
--- 
-Florian
+In the interrupt-map-mask, you can ignore the interrupt line
+only list the devfn of the root ports for each entry.
+
+>> > +static int mtk_pcie_register_ports(struct mtk_pcie *pcie)
+>> > +{
+>> > +       struct pci_bus *bus, *child;
+>> > +
+>> > +       bus = pci_scan_root_bus(pcie->dev, 0, &mtk_pcie_ops, pcie,
+>> > +                               &pcie->resources);
+>>
+>> Can you use the new pci_register_host_bridge() method instead of
+>> pci_scan_root_bus() here?
+>
+> May I know what's difference between pci_scan_root_bus() and using
+> pci_register_host_bridge() directly? What situation should we use it?
+> It seems that just tegra use this new method currently.
+
+We introduced the new function for tegra for now, in the long run
+I would hope we can convert all other drivers to it as well, to make it
+easier to add further parameters.
+
+The new function also has a cleaner way of dealing with the memory
+allocations, similar to how other subsystems work.
+
+     Arnd
