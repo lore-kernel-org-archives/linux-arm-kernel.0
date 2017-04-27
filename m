@@ -1,88 +1,46 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 27 Apr 2017 21:18:50 +0200
-Subject: [PATCH v5 12/22] KVM: arm64: vgic-its: Interpret MAPD ITT_addr
- field
-In-Reply-To: <20170427180911.GU50776@lvm>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-13-git-send-email-eric.auger@redhat.com>
- <20170427164356.GP50776@lvm>
- <5f187dbf-6167-7bd3-4a8e-37545941d05c@redhat.com>
- <20170427180911.GU50776@lvm>
-Message-ID: <6f7d1fdf-b40a-b851-6d2d-145487ae4e19@redhat.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 27 Apr 2017 21:20:11 +0200
+Subject: [PATCH] [media] pxa_camera: fix module remove codepath for v4l2
+ clock
+In-Reply-To: <4391b498-0a75-ff42-6a7e-65aef0fada07@tul.cz> (Petr Cvek's
+ message of "Tue, 25 Apr 2017 03:51:58 +0200")
+References: <4391b498-0a75-ff42-6a7e-65aef0fada07@tul.cz>
+Message-ID: <87efwd1wus.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-On 27/04/2017 20:09, Christoffer Dall wrote:
-> On Thu, Apr 27, 2017 at 07:44:25PM +0200, Auger Eric wrote:
->> Hi,
->>
->> On 27/04/2017 18:43, Christoffer Dall wrote:
->>> On Fri, Apr 14, 2017 at 12:15:24PM +0200, Eric Auger wrote:
->>>> Up to now the MAPD ITT_addr had been ignored. We will need it
->>>> for save/restore. Let's record it in the its_device struct.
->>>>
->>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>>
->>>> ---
->>>> v4 -> v5:
->>>> - its_cmd_get_ittaddr macro now returns the actual ITT GPA
->>>>
->>>> v3 -> v4:
->>>> - in vgic_its_cmd_handle_mapd, itt_addr directly is shifted
->>>> - correct ittaddr bitmask to support 48bit GPA
->>>> ---
->>>>  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
->>>>  1 file changed, 4 insertions(+)
->>>>
->>>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->>>> index 0f3c8f3..757598d 100644
->>>> --- a/virt/kvm/arm/vgic/vgic-its.c
->>>> +++ b/virt/kvm/arm/vgic/vgic-its.c
->>>> @@ -106,6 +106,7 @@ struct its_device {
->>>>  	/* the head for the list of ITTEs */
->>>>  	struct list_head itt_head;
->>>>  	u32 nb_eventid_bits;
->>>> +	gpa_t itt_addr;
->>>>  	u32 device_id;
->>>>  };
->>>>  
->>>> @@ -569,6 +570,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
->>>>  #define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
->>>>  #define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
->>>>  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
->>>> +#define its_cmd_get_ittaddr(cmd)	(its_cmd_mask_field(cmd, 2,  8, 47) << 8)
->>>
->>> Why 47?  The ITT_addr field is bits [51:8] unless I'm looking at
->>> something wrong?
->>
->> Initially I limited to 48 bits since I found in the code:
->>
->> /*
->>  * We only implement 48 bits of PA at the moment, although the ITS
->>  * supports more. Let's be restrictive here.
->>  */
->> #define BASER_ADDRESS(x)        ((x) & GENMASK_ULL(47, 16))
->> #define CBASER_ADDRESS(x)       ((x) & GENMASK_ULL(47, 12))
->>
->> But practically as I encode the ITT addr field on 52 bits now in the DTE
->> there is no reason anymore.
-> 
-> Well, regardless, shouldn't you be bassing 44 to its_cmd_mask_field(),
-> because you're shifting left 8 bits afterwards?
+> The conversion from soc_camera omitted a correct handling of the clock
+> gating for a sensor. When the pxa_camera driver module was removed it
+> tried to unregister clk, but this caused a similar warning:
+>
+>   WARNING: CPU: 0 PID: 6740 at drivers/media/v4l2-core/v4l2-clk.c:278
+>   v4l2_clk_unregister(): Refusing to unregister ref-counted 0-0030 clock!
+>
+> The clock was at time still refcounted by the sensor driver. Before
+> the removing of the pxa_camera the clock must be dropped by the sensor
+> driver. This should be triggered by v4l2_async_notifier_unregister() call
+> which removes sensor driver module too, calls unbind() function and then
+> tries to probe sensor driver again. Inside unbind() we can safely
+> unregister the v4l2 clock as the sensor driver got removed. The original
+> v4l2_clk_unregister() should be put inside test as the clock can be
+> already unregistered from unbind(). If there was not any bound sensor
+> the clock is still present.
+>
+> The codepath is practically a copy from the old soc_camera. The bug was
+> tested with a pxa_camera+ov9640 combination during the conversion
+> of the ov9640 from the soc_camera.
+>
+> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 
-Hum yes that's correct. Andre already warned me against that mistake :-(
+Yeah, it's way better with this patch, especially the insmod/rmmod/insmod/rmmod
+test.
 
-Thanks
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Eric
-> 
-> Thanks,
-> -Christoffer
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Cheers.
+
+--
+Robert
