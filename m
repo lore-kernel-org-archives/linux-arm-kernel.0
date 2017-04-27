@@ -1,46 +1,196 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 27 Apr 2017 21:20:11 +0200
-Subject: [PATCH] [media] pxa_camera: fix module remove codepath for v4l2
- clock
-In-Reply-To: <4391b498-0a75-ff42-6a7e-65aef0fada07@tul.cz> (Petr Cvek's
- message of "Tue, 25 Apr 2017 03:51:58 +0200")
-References: <4391b498-0a75-ff42-6a7e-65aef0fada07@tul.cz>
-Message-ID: <87efwd1wus.fsf@belgarion.home>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 27 Apr 2017 21:24:57 +0200
+Subject: [PATCH v5 16/22] KVM: arm64: vgic-its: Add infrastructure for
+ table lookup
+In-Reply-To: <20170427180641.GT50776@lvm>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-17-git-send-email-eric.auger@redhat.com>
+ <20170427180641.GT50776@lvm>
+Message-ID: <58f99f7e-15ea-221d-e7ec-911f64148644@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+Hi,
 
-> The conversion from soc_camera omitted a correct handling of the clock
-> gating for a sensor. When the pxa_camera driver module was removed it
-> tried to unregister clk, but this caused a similar warning:
->
->   WARNING: CPU: 0 PID: 6740 at drivers/media/v4l2-core/v4l2-clk.c:278
->   v4l2_clk_unregister(): Refusing to unregister ref-counted 0-0030 clock!
->
-> The clock was at time still refcounted by the sensor driver. Before
-> the removing of the pxa_camera the clock must be dropped by the sensor
-> driver. This should be triggered by v4l2_async_notifier_unregister() call
-> which removes sensor driver module too, calls unbind() function and then
-> tries to probe sensor driver again. Inside unbind() we can safely
-> unregister the v4l2 clock as the sensor driver got removed. The original
-> v4l2_clk_unregister() should be put inside test as the clock can be
-> already unregistered from unbind(). If there was not any bound sensor
-> the clock is still present.
->
-> The codepath is practically a copy from the old soc_camera. The bug was
-> tested with a pxa_camera+ov9640 combination during the conversion
-> of the ov9640 from the soc_camera.
->
-> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+On 27/04/2017 20:06, Christoffer Dall wrote:
+> On Fri, Apr 14, 2017 at 12:15:28PM +0200, Eric Auger wrote:
+>> Add a generic lookup_table() helper whose role consists in
+>> scanning a contiguous table located in guest RAM and applying
+>> a callback on each entry. Entries can be handled as linked lists
+>> since the callback may return an offset to the next entry and
+>> also tell that an entry is the last one.
+>>
+>> Helper functions also are added to compute the device/event ID
+>> offset to the next DTE/ITE.
+>>
+>> compute_next_devid_offset, compute_next_eventid_offset and
+>> lookup_table will become static in subsequent patches
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>> v4 -> v5:
+>> - use kvm_read_guest
+>>
+>> v3 -> v4:
+>> - remove static to avoid compilation warning
+>> - correct size computation in looup_table()
+>> - defines now encode the number of bits used for devid and eventid offsets
+>> - use BIT() - 1 to encode the max offets
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 93 insertions(+)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 56c5123..c22b35d 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -195,6 +195,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+>>  
+>>  #define VITS_TYPER_IDBITS 16
+>>  #define VITS_TYPER_DEVBITS 16
+>> +#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
+>> +#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
+>>  
+>>  /*
+>>   * Finds and returns a collection in the ITS collection table.
+>> @@ -1674,6 +1676,97 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+>>  	return ret;
+>>  }
+>>  
+>> +u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
+>> +{
+>> +	struct list_head *e = &dev->dev_list;
+>> +	struct its_device *next;
+>> +	u32 next_offset;
+>> +
+>> +	if (e->next == h)
+>> +		return 0;
+>> +	next = list_entry(e->next, struct its_device, dev_list);
+>> +	next_offset = next->device_id - dev->device_id;
+>> +
+>> +	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
+>> +}
+>> +
+>> +u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
+>> +{
+>> +	struct list_head *e = &ite->ite_list;
+>> +	struct its_ite *next;
+>> +	u32 next_offset;
+>> +
+>> +	if (e->next == h)
+>> +		return 0;
+>> +	next = list_entry(e->next, struct its_ite, ite_list);
+>> +	next_offset = next->event_id - ite->event_id;
+>> +
+>> +	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
+>> +}
+>> +
+>> +/**
+>> + * entry_fn_t - Callback called on a table entry restore path
+>> + * @its: its handle
+>> + * @id: id of the entry
+>> + * @entry: pointer to the entry
+>> + * @opaque: pointer to an opaque data
+>> + * @next_offset: minimal ID offset to the next entry. 0 if this
+>> + * entry is the last one, 1 if the entry is invalid, >= 1 if an
+>> + * entry's next_offset field was truly decoded
+>> + *
+>> + * Return: < 0 on error, 0 otherwise
+>> + */
+>> +typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+>> +			  void *opaque, u32 *next_offset);
+>> +
+>> +/**
+>> + * lookup_table - scan a contiguous table in guest RAM and applies a function
+>> + * to each entry
+>> + *
+>> + * @its: its handle
+>> + * @base: base gpa of the table
+>> + * @size: size of the table in bytes
+>> + * @esz: entry size in bytes
+>> + * @start_id: first entry's ID
+> 
+> I'm a little confused.  Why is this not 0?
+Because this is meant to be called on a second-level table as well
+(device table). In that case the start ID != 0.
+> 
+>> + * @fn: function to apply on each entry
+>> + *
+>> + * Return: < 0 on error, 1 if last element identified, 0 otherwise
+> 
+> How can you scan the entire table and not find the last element?
+This happens on 2d level tables. The last element might be in another 2d
+level table.
+> 
+>> + */
+>> +int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>> +		 int start_id, entry_fn_t fn, void *opaque)
+> 
+> Is this really a lookup?  I think this should be called
+> 'scan_its_table'.
+ok no strong opinion here.
+> 
+>> +{
+>> +	void *entry = kzalloc(esz, GFP_KERNEL);
+>> +	struct kvm *kvm = its->dev->kvm;
+>> +	unsigned long len = size;
+>> +	u32 id = start_id;
+> 
+> why are ids u32 and not just an unsigned long?
+will change that.
+> 
+>> +	gpa_t gpa = base;
+>> +	int ret;
+>> +
+>> +	while (len > 0) {
+>> +		u32 next_offset;
+>> +		size_t byte_offset;
+>> +
+>> +		ret = kvm_read_guest(kvm, gpa, entry, esz);
+>> +		if (ret)
+>> +			goto out;
+>> +
+>> +		ret = fn(its, id, entry, opaque, &next_offset);
+>> +		if (ret < 0 || (!ret && !next_offset))
+>> +			goto out;
+>> +
+>> +		byte_offset = next_offset * esz;
+>> +		id += next_offset;
+>> +		gpa += byte_offset;
+>> +		len -= byte_offset;
+>> +	}
+>> +	kfree(entry);
+>> +	return 0;
+>> +
+> 
+> here you can just set 'ret = 0;'
+> 
+>> +out:
+>> +	kfree(entry);
+>> +	return (ret < 0 ? ret : 1);
+> 
+> and then here you can do 'return (ret <= 0 ? ret : 1)'
+> but I actually think it's nicer to just write:
+> 
+> 	if (ret <= 0)
+> 		return ret;
+> 	return 1;
+OK
 
-Yeah, it's way better with this patch, especially the insmod/rmmod/insmod/rmmod
-test.
+thanks
 
-Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
-Cheers.
-
---
-Robert
+Eric
+> 
+>> +}
+>> +
+>>  /**
+>>   * vgic_its_save_device_tables - Save the device table and all ITT
+>>   * into guest RAM
+>> -- 
+>> 2.5.5
+>>
+> 
+> Thanks,
+> -Christoffer
+> 
