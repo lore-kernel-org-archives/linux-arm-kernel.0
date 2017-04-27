@@ -1,79 +1,52 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 27 Apr 2017 15:39:10 +0200
-Subject: [PATCH 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
-In-Reply-To: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
-References: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <20170427133910.GB31368@rric.localdomain>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 27 Apr 2017 14:55:14 +0100
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <20170423014546.GA2704@dhcp-whq-twvpn-1-vpnpool-10-159-153-149.vpn.oracle.com>
+References: <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
+ <20170330100524.GA22801@red-moon>
+ <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
+ <CAKv+Gu8YjySTDMgsrtGqEPMOtVhHc8gvTHZ4C5Ga8OTYdC9R3A@mail.gmail.com>
+ <ae87ae28-f50d-095f-576e-f3fd7f96dea2@codeaurora.org>
+ <CAKv+Gu8x0rQUnTUorknW-mW9LFgrxFYsXyy4LU_w9JbA-m_sjA@mail.gmail.com>
+ <CAKv+Gu9Su0F9CSRe=sxomuDDH7c2szO6Z8dpqOQ=t_1Vn3JD3g@mail.gmail.com>
+ <20170410165328.GA5248@red-moon>
+ <CAKv+Gu-AN-OwnAJG5dt0Qg4GU8HxZBowTSA0H3LhNA3nHfrsQg@mail.gmail.com>
+ <CAKv+Gu9dS4OhLbBw59yKYQmoJ8SpFexzk9yH=XfXnzn8NJ4mcg@mail.gmail.com>
+ <20170423014546.GA2704@dhcp-whq-twvpn-1-vpnpool-10-159-153-149.vpn.oracle.com>
+Message-ID: <CAKv+Gu_n7xP-2RtF44GVzwyoMXDOeF-bR43yStwp2y+oBNs4jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.04.17 17:16:21, Geetha sowjanya wrote:
-> From: Geetha <gakula@cavium.com>
-> 
-> Cavium CN99xx SMMUv3 implementation has two Silicon Erratas.
-> 1. Errata ID #74
->    SMMU register alias Page 1 is not implemented
-> 2. Errata ID #126
->    SMMU doesnt support unique IRQ lines for gerror, eventq and cmdq-sync
-> 
-> The following patchset does software workaround for these two erratas.
-> 
-> This series is based on RFC patch.  
-> https://www.spinics.net/lists/arm-kernel/msg575739.html
-> 
-> As suggested by Will Deacon, code is modified to use silicon id to
-> enable errata#74 workaround.
+On 23 April 2017 at 02:45, Yinghai Lu <yinghai@kernel.org> wrote:
+> On Mon, Apr 10, 2017 at 06:29:27PM +0100, Ard Biesheuvel wrote:
+>>  /*
+>> @@ -208,8 +208,8 @@ struct pci_bus *pci_acpi_scan_root(struct
+>> acpi_pci_root *root)
+>>         if (!bus)
+>>                 return NULL;
+>>
+>> -       pci_bus_size_bridges(bus);
+>> -       pci_bus_assign_resources(bus);
+>> +       pci_assign_unassigned_root_bus_resources(bus);
+>> +       pci_bus_claim_resources(bus);
+>>
+>>         list_for_each_entry(child, &bus->children, node)
+>>                 pcie_bus_configure_settings(child);
+>>
+>
+> looks like those two lines are reversed. you should use:
+>                 pcibios_resource_survey_bus(bus);
+>                 pci_assign_unassigned_root_bus_resources(bus);
+>
+> please check x86 pcibios_resource_survey_bus() definition in
+>         arch/x86/pci/i386.c
+>
+> but pci_bus_claim_resources() should work too.
+>
 
-Can we go with the previous series [1] and:
+Thanks Yinghai
 
- * drop the iort model numbering part,
-
- * add an enablement function that enables flags (smmu->options)
-   depending on midr values (which replaces the macro code)?
-
-E.g.:
-
-static void acpi_smmu_enable_cavium(struct arm_smmu_device *smmu)
-{
-	u32 cpu_model;
-
-	if (!IS_ENABLED(CONFIG_ARM64))
-		return;
-
-	cpu_model = read_cpuid_id() & MIDR_CPU_MODEL_MASK;
-	switch (cpu_model) {
-	case ...:
-	case ...:
-		break;
-	default:
-		/* No Cavium CN99xx SMMU v3 */
-		return;
-	}
-
-	smmu->options |= (ARM_SMMU_OPT_PAGE0_REGS_ONLY |
-		      	 ARM_SMMU_OPT_USE_SHARED_IRQS);
-}
-
--Robert
-
-
-[1] [RFC PATCH 0/7] Cavium CN99xx SMMUv3 Errata workarounds
-    https://marc.info/?l=linux-acpi&m=149192179623708&w=2
-
-> 
-> Linu Cherian (1):
->   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #74
-> 
-> Geetha (2):
->   arm64: Add MIDR values for Cavium cn99xx SoCs
->   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
-> 
->  Documentation/arm64/silicon-errata.txt |  2 ++
->  arch/arm64/include/asm/cputype.h       |  3 ++
->  drivers/acpi/arm64/iort.c              | 14 +++++++-
->  drivers/iommu/arm-smmu-v3.c            | 64 +++++++++++++++++++++++++++++-----
->  4 files changed, 73 insertions(+), 10 deletions(-)
-> 
-> -- 
-> 1.9.1
-> 
+pcibios_resource_survey_bus() is actually an empty function on arm64,
+but I guess that is where logic should go that checks the state of the
+BARs before trying to claim anything?
