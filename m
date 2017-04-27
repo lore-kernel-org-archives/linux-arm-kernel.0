@@ -1,51 +1,46 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed, 26 Apr 2017 21:12:16 -0700
-Subject: [PATCH net-next 1/9] drivers: net: xgene: Protect indirect MAC
- access
-In-Reply-To: <d23578a5-fedd-accd-c49b-12200440b9ca@gmail.com>
-References: <1493249935-30759-1-git-send-email-isubramanian@apm.com>
- <1493249935-30759-2-git-send-email-isubramanian@apm.com>
- <d23578a5-fedd-accd-c49b-12200440b9ca@gmail.com>
-Message-ID: <CAKh23FnsvzvhwbxW0qp=NUnAs-YAs4858_A6-5+0o0NPL4=THQ@mail.gmail.com>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Thu, 27 Apr 2017 06:22:54 +0200 (CEST)
+Subject: [PATCH 1/1] rtc: gemini: add return value validation
+In-Reply-To: <1492951687-16777-1-git-send-email-bianpan201602@163.com>
+References: <1492951687-16777-1-git-send-email-bianpan201602@163.com>
+Message-ID: <alpine.LNX.2.00.1704270620490.16259@T520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 5:06 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 04/26/2017 04:38 PM, Iyappan Subramanian wrote:
->> From: Quan Nguyen <qnguyen@apm.com>
->>
->> This patch adds lock to protect indirect mac access sequence.
->>
->> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
->> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
->> ---
->>  drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 2 ++
->>  drivers/net/ethernet/apm/xgene/xgene_enet_main.c  | 1 +
->>  drivers/net/ethernet/apm/xgene/xgene_enet_main.h  | 1 +
->>  drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c | 7 ++++++-
->>  drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c | 2 ++
->>  5 files changed, 12 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
->> index 2a835e0..3697ba7 100644
->> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
->> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
->> @@ -365,9 +365,11 @@ static void xgene_enet_rd_mcx_mac(struct xgene_enet_pdata *pdata,
->>       cmd = pdata->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
->>       cmd_done = pdata->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
->>
->> +     spin_lock(&pdata->mac_lock);
->>       if (!xgene_enet_rd_indirect(addr, rd, cmd, cmd_done, rd_addr, rd_data))
->>               netdev_err(pdata->ndev, "MCX mac read failed, addr: %04x\n",
->>                          rd_addr);
->> +     spin_unlock(&pdata->mac_lock);
->
-> Why not fold the spinlock manipulation within xgenet_enet_rd_indirect()?
-> That way the caller does not have to know that acquiring the spinlock is
-> required and you avoid potential bugs in the future where you are
-> missing the spinlock on indirect accesses?
+HI Pan,
 
-Thanks.  We'll do that and post the next version.
+On Sun, 23 Apr 2017, Pan Bian wrote:
 
-> --
-> Florian
+> From: Pan Bian <bianpan2016@163.com>
+> 
+> Function devm_ioremap() will return a NULL pointer if it fails to remap
+> IO address, and its return value should be validated before it is used.
+> However, in function gemini_rtc_probe(), its return value is not
+> checked. This may result in bad memory access bugs on future access,
+> e.g. calling the function gemini_rtc_read_time().
+> 
+> Signed-off-by: Pan Bian <bianpan2016@163.com>
+> ---
+>  drivers/rtc/rtc-gemini.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/rtc/rtc-gemini.c b/drivers/rtc/rtc-gemini.c
+> index ccf0dba..5279390 100644
+> --- a/drivers/rtc/rtc-gemini.c
+> +++ b/drivers/rtc/rtc-gemini.c
+> @@ -139,6 +139,8 @@ static int gemini_rtc_probe(struct platform_device *pdev)
+>  
+>  	rtc->rtc_base = devm_ioremap(dev, res->start,
+>  				     resource_size(res));
+> +	if (!rtc->rtc_base)
+> +		return -ENOMEM;
+>  
+>  	ret = devm_request_irq(dev, rtc->rtc_irq, gemini_rtc_interrupt,
+>  			       IRQF_SHARED, pdev->name, dev);
+> -- 
+> 1.9.1
+> 
+> 
+> 
+
+Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
