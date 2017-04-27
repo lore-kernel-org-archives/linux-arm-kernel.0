@@ -1,113 +1,108 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 27 Apr 2017 07:57:09 -0700
-Subject: [PATCH v5 10/22] KVM: arm64: vgic-its: Implement
- vgic_mmio_uaccess_write_its_iidr
-In-Reply-To: <1492164934-988-11-git-send-email-eric.auger@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-11-git-send-email-eric.auger@redhat.com>
-Message-ID: <20170427145709.GM50776@lvm>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Thu, 27 Apr 2017 17:11:17 +0200
+Subject: [PATCH] [media] atmel-isc: Set the default DMA memory burst size
+In-Reply-To: <20170420085130.24326-1-songjun.wu@microchip.com>
+References: <20170420085130.24326-1-songjun.wu@microchip.com>
+Message-ID: <be3db6e6-cb3f-b315-d809-4620b00b31df@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 14, 2017 at 12:15:22PM +0200, Eric Auger wrote:
-> The GITS_IIDR revision field is used to encode the migration ABI
-> revision. So we need to restore it to check the table layout is
-> readable by the destination.
+Le 20/04/2017 ? 10:51, Songjun Wu a ?crit :
+> Sometimes 'DMA single access' is not enough to transfer
+> a frame of image, '8-beat burst access' is set as the
+> default DMA memory burst size.
 > 
-> By writing the IIDR, userspace thus force the ABI revision to be
+> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
 
-forces
+Seems okay:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-> used and this msut be less or equal than the max revision KVM supports.
 
-must
-
-less than or equal to
-
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
 > ---
-> v4 -> v5
-> - rename user_revision into abi_rev and REV into MAX_ABI_REV
-> - IIDR reports abi_rev set by userspace if any.
-> - If value set by userspace exceeds the max supported revision, an
->   error is reported.
-> - add some defines
 > 
-> v4: creation
-> ---
->  include/linux/irqchip/arm-gic-v3.h |  4 ++++
->  virt/kvm/arm/vgic/vgic-its.c       | 23 ++++++++++++++++++++---
->  2 files changed, 24 insertions(+), 3 deletions(-)
+>  drivers/media/platform/atmel/atmel-isc.c | 23 ++++++++++++-----------
+>  1 file changed, 12 insertions(+), 11 deletions(-)
 > 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 9648bad..54c20bd 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -241,6 +241,10 @@
->  #define GITS_TYPER_PTA			(1UL << 19)
->  #define GITS_TYPER_HWCOLLCNT_SHIFT	24
+> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
+> index c4b2115559a5..78d966233f80 100644
+> --- a/drivers/media/platform/atmel/atmel-isc.c
+> +++ b/drivers/media/platform/atmel/atmel-isc.c
+> @@ -239,13 +239,11 @@ static struct isc_format isc_formats[] = {
 >  
-> +#define GITS_IIDR_REV_SHIFT		12
-> +#define GITS_IIDR_REV(r)		(((r) >> GITS_IIDR_REV_SHIFT) & 0xf)
-> +#define GITS_IIDR_PRODUCTID_SHIFT	24
-> +
->  #define GITS_CBASER_VALID			(1ULL << 63)
->  #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
->  #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 69ecfe4..1b5797e 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -401,7 +401,23 @@ static unsigned long vgic_mmio_read_its_iidr(struct kvm *kvm,
->  					     struct vgic_its *its,
->  					     gpa_t addr, unsigned int len)
->  {
-> -	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-> +	return (PRODUCT_ID_KVM << GITS_IIDR_PRODUCTID_SHIFT) |
-> +	       (its->abi_rev << GITS_IIDR_REV_SHIFT) | IMPLEMENTER_ARM;
-> +}
-> +
-> +static int vgic_mmio_uaccess_write_its_iidr(struct kvm *kvm,
-> +					    struct vgic_its *its,
-> +					    gpa_t addr, unsigned int len,
-> +					    unsigned long val)
-> +{
-> +	u64 tmp = 0;
-> +
-> +	tmp = update_64bit_reg(tmp, addr & 3, len, val);
-
-but the IIDR is not a 64bit register?
-
-> +	tmp = GITS_IIDR_REV(tmp);
-
-You should be able to call rev = GITS_IIDR_REV(val) and be done.
-
-> +
-> +	if (tmp > MAX_ABI_REV)
-> +		return -EINVAL;
-> +	return vgic_its_set_abi(its, tmp);
+>  	{ V4L2_PIX_FMT_YUV420, 0x0, 12,
+>  	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_YYCC,
+> -	  ISC_DCFG_IMODE_YC420P | ISC_DCFG_YMBSIZE_BEATS8 |
+> -	  ISC_DCFG_CMBSIZE_BEATS8, ISC_DCTRL_DVIEW_PLANAR, 0x7fb,
+> +	  ISC_DCFG_IMODE_YC420P, ISC_DCTRL_DVIEW_PLANAR, 0x7fb,
+>  	  false, false },
+>  	{ V4L2_PIX_FMT_YUV422P, 0x0, 16,
+>  	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_YYCC,
+> -	  ISC_DCFG_IMODE_YC422P | ISC_DCFG_YMBSIZE_BEATS8 |
+> -	  ISC_DCFG_CMBSIZE_BEATS8, ISC_DCTRL_DVIEW_PLANAR, 0x3fb,
+> +	  ISC_DCFG_IMODE_YC422P, ISC_DCTRL_DVIEW_PLANAR, 0x3fb,
+>  	  false, false },
+>  	{ V4L2_PIX_FMT_RGB565, MEDIA_BUS_FMT_RGB565_2X8_LE, 16,
+>  	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_RGB565,
+> @@ -700,8 +698,10 @@ static void isc_set_histogram(struct isc_device *isc)
 >  }
 >  
->  static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
-> @@ -1382,8 +1398,9 @@ static struct vgic_register_region its_registers[] = {
->  	REGISTER_ITS_DESC(GITS_CTLR,
->  		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
->  		VGIC_ACCESS_32bit),
-> -	REGISTER_ITS_DESC(GITS_IIDR,
-> -		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
-> +	REGISTER_ITS_DESC_UACCESS(GITS_IIDR,
-> +		vgic_mmio_read_its_iidr, its_mmio_write_wi,
-> +		vgic_mmio_uaccess_write_its_iidr, 4,
->  		VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_TYPER,
->  		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
-> -- 
-> 2.5.5
+>  static inline void isc_get_param(const struct isc_format *fmt,
+> -				     u32 *rlp_mode, u32 *dcfg_imode)
+> +				  u32 *rlp_mode, u32 *dcfg)
+>  {
+> +	*dcfg = ISC_DCFG_YMBSIZE_BEATS8;
+> +
+>  	switch (fmt->fourcc) {
+>  	case V4L2_PIX_FMT_SBGGR10:
+>  	case V4L2_PIX_FMT_SGBRG10:
+> @@ -712,11 +712,11 @@ static inline void isc_get_param(const struct isc_format *fmt,
+>  	case V4L2_PIX_FMT_SGRBG12:
+>  	case V4L2_PIX_FMT_SRGGB12:
+>  		*rlp_mode = fmt->reg_rlp_mode;
+> -		*dcfg_imode = fmt->reg_dcfg_imode;
+> +		*dcfg |= fmt->reg_dcfg_imode;
+>  		break;
+>  	default:
+>  		*rlp_mode = ISC_RLP_CFG_MODE_DAT8;
+> -		*dcfg_imode = ISC_DCFG_IMODE_PACKED8;
+> +		*dcfg |= ISC_DCFG_IMODE_PACKED8;
+>  		break;
+>  	}
+>  }
+> @@ -726,18 +726,19 @@ static int isc_configure(struct isc_device *isc)
+>  	struct regmap *regmap = isc->regmap;
+>  	const struct isc_format *current_fmt = isc->current_fmt;
+>  	struct isc_subdev_entity *subdev = isc->current_subdev;
+> -	u32 pfe_cfg0, rlp_mode, dcfg_imode, mask, pipeline;
+> +	u32 pfe_cfg0, rlp_mode, dcfg, mask, pipeline;
+>  
+>  	if (sensor_is_preferred(current_fmt)) {
+>  		pfe_cfg0 = current_fmt->reg_bps;
+>  		pipeline = 0x0;
+> -		isc_get_param(current_fmt, &rlp_mode, &dcfg_imode);
+> +		isc_get_param(current_fmt, &rlp_mode, &dcfg);
+>  		isc->ctrls.hist_stat = HIST_INIT;
+>  	} else {
+>  		pfe_cfg0  = isc->raw_fmt->reg_bps;
+>  		pipeline = current_fmt->pipeline;
+>  		rlp_mode = current_fmt->reg_rlp_mode;
+> -		dcfg_imode = current_fmt->reg_dcfg_imode;
+> +		dcfg = current_fmt->reg_dcfg_imode | ISC_DCFG_YMBSIZE_BEATS8 |
+> +		       ISC_DCFG_CMBSIZE_BEATS8;
+>  	}
+>  
+>  	pfe_cfg0  |= subdev->pfe_cfg0 | ISC_PFE_CFG0_MODE_PROGRESSIVE;
+> @@ -750,7 +751,7 @@ static int isc_configure(struct isc_device *isc)
+>  	regmap_update_bits(regmap, ISC_RLP_CFG, ISC_RLP_CFG_MODE_MASK,
+>  			   rlp_mode);
+>  
+> -	regmap_update_bits(regmap, ISC_DCFG, ISC_DCFG_IMODE_MASK, dcfg_imode);
+> +	regmap_write(regmap, ISC_DCFG, dcfg);
+>  
+>  	/* Set the pipeline */
+>  	isc_set_pipeline(isc, pipeline);
 > 
 
-Besides these smaller details, this looks ok to me.
 
-Thanks,
--Christoffer
+-- 
+Nicolas Ferre
