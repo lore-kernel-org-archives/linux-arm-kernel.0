@@ -1,55 +1,49 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Thu, 27 Apr 2017 17:42:10 +0300
-Subject: [PATCH] [media] mtk-mdp: Fix g_/s_selection capture/compose logic
-In-Reply-To: <1492057130-1194-1-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1492057130-1194-1-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <a8c1da24-d812-7c4d-a05d-34cb90edddf5@linaro.org>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Thu, 27 Apr 2017 16:42:12 +0200
+Subject: [PATCH 1/3] mm: Silence vmap() allocation failures based on
+ caller gfp_flags
+In-Reply-To: <20170425223332.6999-4-f.fainelli@gmail.com>
+References: <20170425223332.6999-1-f.fainelli@gmail.com>
+ <20170425223332.6999-4-f.fainelli@gmail.com>
+Message-ID: <20170427144211.GL4706@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04/13/2017 07:18 AM, Minghsiu Tsai wrote:
-> From: Daniel Kurtz <djkurtz@chromium.org>
+On Tue 25-04-17 15:33:29, Florian Fainelli wrote:
+> If the caller has set __GFP_NOWARN don't print the following message:
+> vmap allocation for size 15736832 failed: use vmalloc=<size> to increase
+> size.
 > 
-> Experiments show that the:
->  (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
->  (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
+> This can happen with the ARM/Linux module loader built with
+> CONFIG_ARM_MODULE_PLTS=y which does a first attempt at loading a large
+> module from module space, then falls back to vmalloc space.
 > 
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 > ---
->  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
+>  mm/vmalloc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> index 13afe48..8ab7ca0 100644
-> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> @@ -837,12 +837,12 @@ static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
->  	struct mtk_mdp_ctx *ctx = fh_to_ctx(fh);
->  	bool valid = false;
->  
-> -	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
-> -		if (mtk_mdp_is_target_compose(s->target))
-> -			valid = true;
-> -	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-> +	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
->  		if (mtk_mdp_is_target_crop(s->target))
->  			valid = true;
-> +	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
-> +		if (mtk_mdp_is_target_compose(s->target))
-> +			valid = true;
+> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+> index 0b057628a7ba..5a788eb58741 100644
+> --- a/mm/vmalloc.c
+> +++ b/mm/vmalloc.c
+> @@ -521,7 +521,7 @@ static struct vmap_area *alloc_vmap_area(unsigned long size,
+>  		}
 >  	}
+>  
+> -	if (printk_ratelimit())
+> +	if (printk_ratelimit() && !(gfp_mask & __GFP_NOWARN))
 
-Using MPLANE formats in g/s_selection violates the v4l2 spec. See [1].
+Are you sure about this ordering? Should NOWARN requests alter the
+ratelimit state?
 
-<snip>
+>  		pr_warn("vmap allocation for size %lu failed: use vmalloc=<size> to increase size\n",
+>  			size);
+>  	kfree(va);
+> -- 
+> 2.9.3
+> 
 
 -- 
-regards,
-Stan
-
-[1]
-https://linuxtv.org/downloads/v4l-dvb-apis/uapi/v4l/vidioc-g-selection.html
+Michal Hocko
+SUSE Labs
