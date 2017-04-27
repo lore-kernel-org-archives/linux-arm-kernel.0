@@ -1,74 +1,303 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 27 Apr 2017 09:43:56 -0700
-Subject: [PATCH v5 12/22] KVM: arm64: vgic-its: Interpret MAPD ITT_addr
- field
-In-Reply-To: <1492164934-988-13-git-send-email-eric.auger@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-13-git-send-email-eric.auger@redhat.com>
-Message-ID: <20170427164356.GP50776@lvm>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Thu, 27 Apr 2017 11:47:58 -0500
+Subject: [PATCH] arm64: dts: freescale: update the copyright claims
+Message-ID: <1493311678-6207-1-git-send-email-leoyang.li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 14, 2017 at 12:15:24PM +0200, Eric Auger wrote:
-> Up to now the MAPD ITT_addr had been ignored. We will need it
-> for save/restore. Let's record it in the its_device struct.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> v4 -> v5:
-> - its_cmd_get_ittaddr macro now returns the actual ITT GPA
-> 
-> v3 -> v4:
-> - in vgic_its_cmd_handle_mapd, itt_addr directly is shifted
-> - correct ittaddr bitmask to support 48bit GPA
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 0f3c8f3..757598d 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -106,6 +106,7 @@ struct its_device {
->  	/* the head for the list of ITTEs */
->  	struct list_head itt_head;
->  	u32 nb_eventid_bits;
-> +	gpa_t itt_addr;
->  	u32 device_id;
->  };
->  
-> @@ -569,6 +570,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
->  #define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
->  #define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
->  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
-> +#define its_cmd_get_ittaddr(cmd)	(its_cmd_mask_field(cmd, 2,  8, 47) << 8)
+Update the copyright claims to comply with company policy.
 
-Why 47?  The ITT_addr field is bits [51:8] unless I'm looking at
-something wrong?
+Signed-off-by: Li Yang <leoyang.li@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts  | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts  | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts  | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts  | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts  | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts  | 3 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts  | 3 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-simu.dts | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts  | 3 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts  | 3 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi     | 3 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi | 3 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi | 3 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     | 3 ++-
+ 20 files changed, 28 insertions(+), 20 deletions(-)
 
->  #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
->  #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
->  
-> @@ -840,6 +842,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->  	u32 device_id = its_cmd_get_deviceid(its_cmd);
->  	bool valid = its_cmd_get_validbit(its_cmd);
->  	u8 nb_eventid_bits = its_cmd_get_size(its_cmd);
-> +	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
->  	struct its_device *device;
->  
->  	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
-> @@ -871,6 +874,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->  
->  	device->device_id = device_id;
->  	device->nb_eventid_bits = nb_eventid_bits;
-> +	device->itt_addr = itt_addr;
->  
->  	INIT_LIST_HEAD(&device->itt_head);
->  
-> -- 
-> 2.5.5
-> 
-
-Thanks,
--Christoffer
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
+index 17fae81..7286b1e 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree file for Freescale LS1012A Freedom Board.
+  *
+- * Copyright 2016, Freescale Semiconductor
++ * Copyright 2016 Freescale Semiconductor, Inc.
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPLv2 or the X11 license, at your option. Note that this dual
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
+index e2a93d5..40ef468 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree file for Freescale LS1012A QDS Board.
+  *
+- * Copyright 2016, Freescale Semiconductor
++ * Copyright 2016 Freescale Semiconductor, Inc.
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPLv2 or the X11 license, at your option. Note that this dual
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
+index ed77f6b..65d4313 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree file for Freescale LS1012A RDB Board.
+  *
+- * Copyright 2016, Freescale Semiconductor
++ * Copyright 2016 Freescale Semiconductor, Inc.
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPLv2 or the X11 license, at your option. Note that this dual
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+index b497ac1..ae47156 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree Include file for Freescale Layerscape-1012A family SoC.
+  *
+- * Copyright 2016, Freescale Semiconductor
++ * Copyright 2016 Freescale Semiconductor, Inc.
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPLv2 or the X11 license, at your option. Note that this dual
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+index 0989d63..a5f1306 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree Include file for Freescale Layerscape-1043A family SoC.
+  *
+- * Copyright 2014-2015, Freescale Semiconductor
++ * Copyright 2014-2015 Freescale Semiconductor, Inc.
+  *
+  * Mingkai Hu <Mingkai.hu@freescale.com>
+  *
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+index c37110b..d64370e 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree Include file for Freescale Layerscape-1043A family SoC.
+  *
+- * Copyright 2014-2015, Freescale Semiconductor
++ * Copyright 2014-2015 Freescale Semiconductor, Inc.
+  *
+  * Mingkai Hu <Mingkai.hu@freescale.com>
+  *
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index 45cface..595da1a 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree Include file for Freescale Layerscape-1043A family SoC.
+  *
+- * Copyright 2014-2015, Freescale Semiconductor
++ * Copyright 2014-2015 Freescale Semiconductor, Inc.
+  *
+  * Mingkai Hu <Mingkai.hu@freescale.com>
+  *
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+index 290e5b0..0effea0 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree Include file for Freescale Layerscape-1046A family SoC.
+  *
+- * Copyright 2016, Freescale Semiconductor, Inc.
++ * Copyright 2016 Freescale Semiconductor, Inc.
+  *
+  * Shaohui Xie <Shaohui.Xie@nxp.com>
+  *
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+index d1ccc00..c5361e9 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree Include file for Freescale Layerscape-1046A family SoC.
+  *
+- * Copyright 2016, Freescale Semiconductor, Inc.
++ * Copyright 2016 Freescale Semiconductor, Inc.
+  *
+  * Mingkai Hu <mingkai.hu@nxp.com>
+  *
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index f4b8b7e..d67557f 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree Include file for Freescale Layerscape-1046A family SoC.
+  *
+- * Copyright 2016, Freescale Semiconductor, Inc.
++ * Copyright 2016 Freescale Semiconductor, Inc.
+  *
+  * Mingkai Hu <mingkai.hu@nxp.com>
+  *
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
+index c1e76df..ed209cd 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree file for Freescale LS2080a QDS Board.
+  *
+- * Copyright (C) 2015-17, Freescale Semiconductor
++ * Copyright 2015-2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
+  *
+  * Abhimanyu Saini <abhimanyu.saini@nxp.com>
+  * Bhupesh Sharma <bhupesh.sharma@freescale.com>
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
+index 18ad195..67ec3f9 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree file for Freescale LS2080a RDB Board.
+  *
+- * Copyright (C) 2016-17, Freescale Semiconductor
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
+  *
+  * Abhimanyu Saini <abhimanyu.saini@nxp.com>
+  * Bhupesh Sharma <bhupesh.sharma@freescale.com>
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-simu.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-simu.dts
+index 290604b..3ee718f 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-simu.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-simu.dts
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree file for Freescale LS2080a software Simulator model
+  *
+- * Copyright (C) 2014-2015, Freescale Semiconductor
++ * Copyright 2014-2015 Freescale Semiconductor, Inc.
+  *
+  * Bhupesh Sharma <bhupesh.sharma@freescale.com>
+  *
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 46a26c0..d789c68 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree Include file for Freescale Layerscape-2080A family SoC.
+  *
+- * Copyright (C) 2014-2016, Freescale Semiconductor
++ * Copyright 2014-2016 Freescale Semiconductor, Inc.
+  *
+  * Abhimanyu Saini <abhimanyu.saini@nxp.com>
+  * Bhupesh Sharma <bhupesh.sharma@freescale.com>
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts
+index ebcd6ee..4a1df5c 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree file for Freescale LS2088A QDS Board.
+  *
+- * Copyright (C) 2016-17, Freescale Semiconductor
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
+  *
+  * Abhimanyu Saini <abhimanyu.saini@nxp.com>
+  *
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts
+index 5992dc1..a76d4b4 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree file for Freescale LS2088A RDB Board.
+  *
+- * Copyright (C) 2016-17, Freescale Semiconductor
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
+  *
+  * Abhimanyu Saini <abhimanyu.saini@nxp.com>
+  *
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+index 33ce404..5c695c6 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree Include file for Freescale Layerscape-2088A family SoC.
+  *
+- * Copyright (C) 2016-17, Freescale Semiconductor
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
+  *
+  * Abhimanyu Saini <abhimanyu.saini@nxp.com>
+  *
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
+index 8b62048..c4282d9 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree file for Freescale LS2080A QDS Board.
+  *
+- * Copyright (C) 2016-17, Freescale Semiconductor
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
+  *
+  * Abhimanyu Saini <abhimanyu.saini@nxp.com>
+  *
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
+index 3737587..9a1d0d2 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree file for Freescale LS2080A RDB Board.
+  *
+- * Copyright (C) 2016-17, Freescale Semiconductor
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
+  *
+  * Abhimanyu Saini <abhimanyu.saini@nxp.com>
+  *
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+index abb2fff..6e531b9 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree Include file for Freescale Layerscape-2080A family SoC.
+  *
+- * Copyright (C) 2016-2017, Freescale Semiconductor
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
+  *
+  * Abhimanyu Saini <abhimanyu.saini@nxp.com>
+  *
+-- 
+1.9.0
