@@ -1,134 +1,88 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 27 Apr 2017 09:25:28 -0700
-Subject: [PATCH v5 11/22] KVM: arm64: vgic-its: Interpret MAPD Size field
- and check related errors
-In-Reply-To: <1492164934-988-12-git-send-email-eric.auger@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-12-git-send-email-eric.auger@redhat.com>
-Message-ID: <20170427162528.GN50776@lvm>
+From: kristina.martsenko@arm.com (Kristina Martsenko)
+Date: Thu, 27 Apr 2017 17:33:51 +0100
+Subject: [PATCH 1/4] arm64: traps: fix userspace cache maintenance
+ emulation on a tagged pointer
+In-Reply-To: <f5ef088a-7d95-a43a-843e-064f8e13d2a7@arm.com>
+References: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
+ <1492712234-4950-2-git-send-email-kristina.martsenko@arm.com>
+ <f5ef088a-7d95-a43a-843e-064f8e13d2a7@arm.com>
+Message-ID: <fefff31c-9d81-4b4d-4ffb-44ce78624b2f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 14, 2017 at 12:15:23PM +0200, Eric Auger wrote:
-> Up to now the MAPD's ITT size field has been ignored. It encodes
-> the number of eventid bit minus 1. It should be used to check
-> the eventid when a MAPTI command is issued on a device. Let's
-> store the number of eventid bits in the its_device and do the
-> check on MAPTI. Also make sure the ITT size field does
-> not exceed the GITS_TYPER IDBITS field.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> v4 -> v5:
-> - its_cmd_get_size macro now returns the actual number of eventid bits
-> - use GIC_ENCODE_SZ macro to encode ID_bits
-> 
-> v3 -> v4:
-> - VITS_TYPER_IDBITS set to 16 to be homogeneous with VITS_ESZ definition
->   and correct users
-> - nb_eventid_bits correspond to the actual number of eventid bits
-> ---
->  include/linux/irqchip/arm-gic-v3.h |  2 ++
->  virt/kvm/arm/vgic/vgic-its.c       | 15 ++++++++++++++-
->  2 files changed, 16 insertions(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 54c20bd..0c6798c 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -345,9 +345,11 @@
->  #define E_ITS_INT_UNMAPPED_INTERRUPT		0x010307
->  #define E_ITS_CLEAR_UNMAPPED_INTERRUPT		0x010507
->  #define E_ITS_MAPD_DEVICE_OOR			0x010801
-> +#define E_ITS_MAPD_ITTSIZE_OOR			0x010802
->  #define E_ITS_MAPC_PROCNUM_OOR			0x010902
->  #define E_ITS_MAPC_COLLECTION_OOR		0x010903
->  #define E_ITS_MAPTI_UNMAPPED_DEVICE		0x010a04
-> +#define E_ITS_MAPTI_ID_OOR			0x010a05
->  #define E_ITS_MAPTI_PHYSICALID_OOR		0x010a06
->  #define E_ITS_INV_UNMAPPED_INTERRUPT		0x010c07
->  #define E_ITS_INVALL_UNMAPPED_COLLECTION	0x010d09
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 1b5797e..0f3c8f3 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -105,6 +105,7 @@ struct its_device {
->  
->  	/* the head for the list of ITTEs */
->  	struct list_head itt_head;
-> +	u32 nb_eventid_bits;
+Hi Andre,
 
-what does nb_ mean?
-
->  	u32 device_id;
->  };
->  
-> @@ -191,6 +192,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
->  
->  #define GIC_LPI_OFFSET 8192
->  
-> +#define VITS_TYPER_IDBITS 16
-> +
->  /*
->   * Finds and returns a collection in the ITS collection table.
->   * Must be called with the its_lock mutex held.
-> @@ -391,7 +394,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
->  	 * DevBits low - as least for the time being.
->  	 */
->  	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
-> -	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
-> +	reg |= GIC_ENCODE_SZ(VITS_TYPER_IDBITS, 5) << GITS_TYPER_IDBITS_SHIFT;
->  	reg |= GIC_ENCODE_SZ(abi->ite_esz, 4) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
->  
->  	return extract_bytes(reg, addr & 7, len);
-> @@ -562,6 +565,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
->  
->  #define its_cmd_get_command(cmd)	its_cmd_mask_field(cmd, 0,  0,  8)
->  #define its_cmd_get_deviceid(cmd)	its_cmd_mask_field(cmd, 0, 32, 32)
-> +#define its_cmd_get_size(cmd)		(its_cmd_mask_field(cmd, 1,  0,  5) + 1)
->  #define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
->  #define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
->  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
-> @@ -752,6 +756,9 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->  	if (!device)
->  		return E_ITS_MAPTI_UNMAPPED_DEVICE;
->  
-> +	if (event_id >= BIT_ULL(device->nb_eventid_bits))
-> +		return E_ITS_MAPTI_ID_OOR;
-> +
->  	if (its_cmd_get_command(its_cmd) == GITS_CMD_MAPTI)
->  		lpi_nr = its_cmd_get_physical_id(its_cmd);
->  	else
-> @@ -832,11 +839,15 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->  {
->  	u32 device_id = its_cmd_get_deviceid(its_cmd);
->  	bool valid = its_cmd_get_validbit(its_cmd);
-> +	u8 nb_eventid_bits = its_cmd_get_size(its_cmd);
->  	struct its_device *device;
->  
->  	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
->  		return E_ITS_MAPD_DEVICE_OOR;
->  
-> +	if (valid && nb_eventid_bits > VITS_TYPER_IDBITS)
-> +		return E_ITS_MAPD_ITTSIZE_OOR;
-> +
->  	device = find_its_device(its, device_id);
->  
->  	/*
-> @@ -859,6 +870,8 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->  		return -ENOMEM;
->  
->  	device->device_id = device_id;
-> +	device->nb_eventid_bits = nb_eventid_bits;
-> +
->  	INIT_LIST_HEAD(&device->itt_head);
->  
->  	list_add_tail(&device->dev_list, &its->device_list);
-> -- 
-> 2.5.5
+On 21/04/17 11:59, Andre Przywara wrote:
+> On 20/04/17 19:17, Kristina Martsenko wrote:
+>> When we emulate userspace cache maintenance in the kernel, we can
+>> currently send the task a SIGSEGV even though the maintenance was done
+>> on a valid address. This happens if the address has a non-zero address
+>> tag, and happens to not be mapped in.
+>>
+>> When we get the address from a user register, we don't currently remove
+>> the address tag before performing cache maintenance on it. If the
+>> maintenance faults, we end up in either __do_page_fault, where find_vma
+>> can't find the VMA if the address has a tag, or in do_translation_fault,
+>> where the tagged address will appear to be above TASK_SIZE. In both
+>> cases, the address is not mapped in, and the task is sent a SIGSEGV.
 > 
+> Right, well spotted!
+> So thanks for the patch, which I think is correct. But ...
 
-Otherwise:
+Thanks for taking a look.
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+>> This patch removes the tag from the address before using it. With this
+>> patch, the fault is handled correctly, the address gets mapped in, and
+>> the cache maintenance succeeds.
+> 
+> Looking more closely at this code, I see that we actually don't use the
+> address parameter in the force_signal_inject() function. Instead we
+> always put the PC address into the siginfo structure, which is wrong in
+> case this SEGV is triggered by an invalid address of a cache maintenance
+> operation.
+
+I agree this is a bug in existing code, as it means we currently put a
+different address into the siginfo structure when we emulate cache
+maintenance, compared to when we don't emulate it.
+
+I think the bug is independent of this series though, and the fix should
+be sent as a separate patch/series, as it is not blocking this series
+and doesn't involve address tags.
+
+> I made a simple patch to fix this (using the address argument and
+> explicitly passing the PC in when we fault on an invalid instruction).
+
+Sounds about right to me. Although I noticed that swp emulation also
+goes through arm64_notify_segfault. I think the behaviour for swp
+emulation should stay the same as in arch/arm/ set_segfault(), i.e.
+faulting address used in find_vma, but PC passed in siginfo. Unless
+that's a bug in arch/arm/ (for a non-emulated swp, they seem to pass the
+faulting address in siginfo instead).
+
+> But now we would pass the untagged address back into userland. I am not
+> sure this is a real problem, since we don't promise anything in case of
+> tagged pointers, if I got this correctly.
+
+Yes, as documented in Documentation/arm64/tagged-pointers.txt, we do not
+guarantee that the tag is preserved when delivering a signal.
+
+> But also our untagged_addr() macro seems to not cover all cases
+> correctly, for instance passing in 0x00ffffffffff5678 (which is an
+> invalid, but untagged address) would extend to some probably valid
+> kernel pointer. And although this would fail our user space address
+> check, we would return a wrong address (with all the upper bits being 1)
+> in siginfo.
+> 
+> Do we care about this?
+> What would be the best fix for the untagged_addr macro? Is that macro
+> actually the proper place to fix this issue?
+
+I don't know if we care, but personally I think that if
+force_signal_inject is fixed, then untagged_addr should be fixed along
+with it. I think the macro is the right place to fix it, by only sign
+extending if bit 55 is 0. That way it will turn a tagged address into an
+untagged address, and will not change a non-tagged address. (This is
+also what clear_address_tag in patch #3 of this series does.)
+
+Thanks,
+Kristina
