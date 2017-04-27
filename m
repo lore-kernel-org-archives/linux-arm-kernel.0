@@ -1,55 +1,49 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 27 Apr 2017 21:47:38 +0200
-Subject: [PATCH 2/2] of_coresight: Use devm_kcalloc() in
- of_coresight_alloc_memory()
-In-Reply-To: <52619d05-65c4-149d-f355-cf9c037a0c9b@users.sourceforge.net>
-References: <52619d05-65c4-149d-f355-cf9c037a0c9b@users.sourceforge.net>
-Message-ID: <f053b2f8-9c35-a5fc-5260-dfee273faf53@users.sourceforge.net>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 27 Apr 2017 21:48:42 +0200
+Subject: [GIT PULL 2/2] arm64 dts: exynos: Last round for v4.12
+In-Reply-To: <CAK8P3a1HA6cio=hboc7=BYwJn-i6RzCP1uzcCVvcQwt4wtB3Tw@mail.gmail.com>
+References: <20170421164050.7404-1-krzk@kernel.org>
+ <20170421164050.7404-2-krzk@kernel.org>
+ <CAK8P3a1HA6cio=hboc7=BYwJn-i6RzCP1uzcCVvcQwt4wtB3Tw@mail.gmail.com>
+Message-ID: <20170427194842.exdjbaqta75bs2jy@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 27 Apr 2017 21:29:12 +0200
+On Thu, Apr 27, 2017 at 09:46:03PM +0200, Arnd Bergmann wrote:
+> On Fri, Apr 21, 2017 at 6:40 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > The following changes since commit e3c07546747cdec07ff15c984bc6cebc9c9f788c:
+> >
+> >   arm64: dts: exynos: Add the burst and esc clock frequency properties to DSI node (2017-03-08 08:55:39 +0200)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.12-2
+> >
+> > for you to fetch changes up to 5dccc9873c4af60f4478b3ef54267353f25cc301:
+> >
+> >   arm64: dts: exynos: Use - instead of @ for DT OPP entries (2017-04-20 18:10:05 +0200)
+> >
+> > ----------------------------------------------------------------
+> > Second update of  Samsung DeviceTree ARM64 for v4.12:
+> >  - Fix DTC warnings in Exynos ARM64 Device Tree sources.
+> >  - Add panel node to TM2E board.
+> >
+> > ----------------------------------------------------------------
+> > Hoegeun Kwon (1):
+> >       arm64: dts: exynos: Add support for s6e3hf2 panel device on TM2e board
+> >
+> > Viresh Kumar (1):
+> >       arm64: dts: exynos: Use - instead of @ for DT OPP entries
+> >
+> >  arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi | 48 ++++++++++++-------------
+> >  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts | 11 ++++++
+> >  arch/arm64/boot/dts/exynos/exynos5433.dtsi     | 50 +++++++++++++-------------
+> >  3 files changed, 60 insertions(+), 49 deletions(-)
+> 
+> I pulled the updated version into next/dt64, thanks,
 
-Multiplications for the size determination of memory allocations
-indicated that array data structures should be processed.
-Thus use the corresponding function "devm_kcalloc".
+Thanks! Do not forget also about next/dt (this wasn't updated so just
+tags/samsung-dt-4.12-2).
 
-This issue was detected by using the Coccinelle software.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/hwtracing/coresight/of_coresight.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index 09142e99e915..1e622912cd0f 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -78,21 +78,21 @@ static int of_coresight_alloc_memory(struct device *dev,
- 			struct coresight_platform_data *pdata)
- {
- 	/* List of output port on this component */
--	pdata->outports = devm_kzalloc(dev, pdata->nr_outport *
-+	pdata->outports = devm_kcalloc(dev, pdata->nr_outport,
- 				       sizeof(*pdata->outports),
- 				       GFP_KERNEL);
- 	if (!pdata->outports)
- 		return -ENOMEM;
- 
- 	/* Children connected to this component via @outports */
--	pdata->child_names = devm_kzalloc(dev, pdata->nr_outport *
-+	pdata->child_names = devm_kcalloc(dev, pdata->nr_outport,
- 					  sizeof(*pdata->child_names),
- 					  GFP_KERNEL);
- 	if (!pdata->child_names)
- 		return -ENOMEM;
- 
- 	/* Port number on the child this component is connected to */
--	pdata->child_ports = devm_kzalloc(dev, pdata->nr_outport *
-+	pdata->child_ports = devm_kcalloc(dev, pdata->nr_outport,
- 					  sizeof(*pdata->child_ports),
- 					  GFP_KERNEL);
- 	if (!pdata->child_ports)
--- 
-2.12.2
+Best regards,
+Krzysztof
