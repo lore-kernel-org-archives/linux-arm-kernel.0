@@ -1,100 +1,81 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 27 Apr 2017 19:44:25 +0200
-Subject: [PATCH v5 12/22] KVM: arm64: vgic-its: Interpret MAPD ITT_addr
- field
-In-Reply-To: <20170427164356.GP50776@lvm>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-13-git-send-email-eric.auger@redhat.com>
- <20170427164356.GP50776@lvm>
-Message-ID: <5f187dbf-6167-7bd3-4a8e-37545941d05c@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 27 Apr 2017 18:44:36 +0100
+Subject: [PATCHv2 1/2] jump_label: Provide
+ static_key_[enable|/slow_inc]_cpuslocked()
+In-Reply-To: <1493315077-19496-1-git-send-email-mark.rutland@arm.com>
+References: <1493315077-19496-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1493315077-19496-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-On 27/04/2017 18:43, Christoffer Dall wrote:
-> On Fri, Apr 14, 2017 at 12:15:24PM +0200, Eric Auger wrote:
->> Up to now the MAPD ITT_addr had been ignored. We will need it
->> for save/restore. Let's record it in the its_device struct.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->> v4 -> v5:
->> - its_cmd_get_ittaddr macro now returns the actual ITT GPA
->>
->> v3 -> v4:
->> - in vgic_its_cmd_handle_mapd, itt_addr directly is shifted
->> - correct ittaddr bitmask to support 48bit GPA
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 0f3c8f3..757598d 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -106,6 +106,7 @@ struct its_device {
->>  	/* the head for the list of ITTEs */
->>  	struct list_head itt_head;
->>  	u32 nb_eventid_bits;
->> +	gpa_t itt_addr;
->>  	u32 device_id;
->>  };
->>  
->> @@ -569,6 +570,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
->>  #define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
->>  #define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
->>  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
->> +#define its_cmd_get_ittaddr(cmd)	(its_cmd_mask_field(cmd, 2,  8, 47) << 8)
-> 
-> Why 47?  The ITT_addr field is bits [51:8] unless I'm looking at
-> something wrong?
+Provide static_key_[enable|slow_inc]_cpuslocked() variant that
+don't take cpu_hotplug_lock().
 
-Initially I limited to 48 bits since I found in the code:
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Sebastian Siewior <bigeasy@linutronix.de>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: jbaron at akamai.com
+---
+ include/linux/jump_label.h |  7 +++++++
+ kernel/jump_label.c        | 10 ++++++++++
+ 2 files changed, 17 insertions(+)
 
-/*
- * We only implement 48 bits of PA at the moment, although the ITS
- * supports more. Let's be restrictive here.
- */
-#define BASER_ADDRESS(x)        ((x) & GENMASK_ULL(47, 16))
-#define CBASER_ADDRESS(x)       ((x) & GENMASK_ULL(47, 12))
-
-But practically as I encode the ITT addr field on 52 bits now in the DTE
-there is no reason anymore.
-
-Thanks
-
-Eric
-> 
->>  #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
->>  #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
->>  
->> @@ -840,6 +842,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->>  	u32 device_id = its_cmd_get_deviceid(its_cmd);
->>  	bool valid = its_cmd_get_validbit(its_cmd);
->>  	u8 nb_eventid_bits = its_cmd_get_size(its_cmd);
->> +	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
->>  	struct its_device *device;
->>  
->>  	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
->> @@ -871,6 +874,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->>  
->>  	device->device_id = device_id;
->>  	device->nb_eventid_bits = nb_eventid_bits;
->> +	device->itt_addr = itt_addr;
->>  
->>  	INIT_LIST_HEAD(&device->itt_head);
->>  
->> -- 
->> 2.5.5
->>
-> 
-> Thanks,
-> -Christoffer
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
+index d7b17d1..c80d8b1 100644
+--- a/include/linux/jump_label.h
++++ b/include/linux/jump_label.h
+@@ -164,6 +164,7 @@ extern void arch_jump_label_transform_static(struct jump_entry *entry,
+ extern void jump_label_apply_nops(struct module *mod);
+ extern int static_key_count(struct static_key *key);
+ extern void static_key_enable(struct static_key *key);
++extern void static_key_enable_cpuslocked(struct static_key *key);
+ extern void static_key_disable(struct static_key *key);
+ extern void static_key_disable_cpuslocked(struct static_key *key);
+ 
+@@ -252,6 +253,11 @@ static inline void static_key_enable(struct static_key *key)
+ 		static_key_slow_inc(key);
+ }
+ 
++static inline void static_key_enable_cpuslocked(struct static_key *key)
++{
++	static_key_enable(key);
++}
++
+ static inline void static_key_disable(struct static_key *key)
+ {
+ 	int count = static_key_count(key);
+@@ -429,6 +435,7 @@ struct static_key_false {
+  */
+ 
+ #define static_branch_enable(x)			static_key_enable(&(x)->key)
++#define static_branch_enable_cpuslocked(x)	static_key_enable_cpuslocked(&(x)->key)
+ #define static_branch_disable(x)		static_key_disable(&(x)->key)
+ #define static_branch_disable_cpuslocked(x)	static_key_disable_cpuslocked(&(x)->key)
+ 
+diff --git a/kernel/jump_label.c b/kernel/jump_label.c
+index d71124e..6343f4c 100644
+--- a/kernel/jump_label.c
++++ b/kernel/jump_label.c
+@@ -90,6 +90,16 @@ void static_key_enable(struct static_key *key)
+ }
+ EXPORT_SYMBOL_GPL(static_key_enable);
+ 
++void static_key_enable_cpuslocked(struct static_key *key)
++{
++	int count = static_key_count(key);
++
++	WARN_ON_ONCE(count < 0 || count > 1);
++
++	if (!count)
++		static_key_slow_inc_cpuslocked(key);
++}
++
+ void static_key_disable(struct static_key *key)
+ {
+ 	int count = static_key_count(key);
+-- 
+1.9.1
