@@ -1,173 +1,148 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 27 Apr 2017 15:34:39 +0100
-Subject: [PATCH] perf evsel: Fix to perf-stat malloc corruption on arm64
- platforms
-In-Reply-To: <CAFpQJXX7HaKQ8t85mB2Fqn-6wHhb_GR+2sOi23HQZnRgUw-Y4g@mail.gmail.com>
-References: <1493198780-25415-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170426145057.GK27156@leverpostej>
- <20170426171208.GC23669@leverpostej>
- <CAFpQJXX7HaKQ8t85mB2Fqn-6wHhb_GR+2sOi23HQZnRgUw-Y4g@mail.gmail.com>
-Message-ID: <20170427143438.GE31337@leverpostej>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 27 Apr 2017 16:41:54 +0200
+Subject: [PATCH 1/3] ARM: at91: pm: Add sama5d2 backup mode
+In-Reply-To: <CAMiSF3AZ9i2ywtTMYxjK8amaLEuez_0H_Jzy_pPS15CAe_FMRg@mail.gmail.com>
+References: <20170426160419.22401-1-alexandre.belloni@free-electrons.com>
+ <CAMiSF3AZ9i2ywtTMYxjK8amaLEuez_0H_Jzy_pPS15CAe_FMRg@mail.gmail.com>
+Message-ID: <20170427144154.kxlsb42yug5mve67@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 11:49:46PM +0530, Ganapatrao Kulkarni wrote:
-> On Wed, Apr 26, 2017 at 10:42 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > diff --git a/tools/perf/builtin-stat.c b/tools/perf/builtin-stat.c
-> > index 13b5499..638aefa 100644
-> > --- a/tools/perf/builtin-stat.c
-> > +++ b/tools/perf/builtin-stat.c
-> > @@ -346,6 +346,28 @@ static void read_counters(void)
-> >         }
-> >  }
-> >
-> > +/*
-> > + * Close all evnt FDs we open in __run_perf_stat() and
-> > + * create_perf_stat_counter(), taking care to match the number of threads and CPUs.
-> > + *
-> > + * Note that perf_evlist__close(evsel_list) is not equivalent, as it doesn't
-> > + * take the target into account.
-> > + */
-> > +static void close_counters(void)
+On 27/04/2017 at 15:34:07 +0200, Romain Izard wrote:
+> Hello Alexandre,
+> 
+> This series might also be of interest for the linux-pm mailing list.
+> 
+
+I don't think they care enough to review that.
+
+> 2017-04-26 18:04 GMT+02:00 Alexandre Belloni
+> > diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+> > index cfd8f60a9268..87fe17dbdb56 100644
+> > --- a/arch/arm/mach-at91/Makefile
+> > +++ b/arch/arm/mach-at91/Makefile
+> > @@ -14,6 +14,10 @@ obj-$(CONFIG_PM)             += pm_suspend.o
+> >  ifeq ($(CONFIG_CPU_V7),y)
+> >  AFLAGS_pm_suspend.o := -march=armv7-a
+> >  endif
+> > +# Backup mode will not compile for ARMv5 because of movt
+> > +ifeq ($(CONFIG_SOC_SAMA5D2),y)
+> > +AFLAGS_pm_suspend.o += -DBACKUP_MODE
+> > +endif
+> >  ifeq ($(CONFIG_PM_DEBUG),y)
+> >  CFLAGS_pm.o += -DDEBUG
+> >  endif
+> 
+> We can rewrite the assembly to avoid using movt, and remove some ifdefs
+> from the code.
+> 
+
+I'm kind of balanced there because I'm wondering whether we should
+better separate what is in that assembly file because there are part of
+it that have no chance to run on some platforms anyway.
+
+But your solution is correct, I'll remove that.
+
+> > +static void __init at91_pm_bu_sram_init(void)
 > > +{
-> > +       bool per_cpu = target__has_cpu(&target);
-> > +       struct perf_evsel *evsel;
+> > +       struct gen_pool *sram_pool;
+> > +       struct device_node *node;
+> > +       struct platform_device *pdev = NULL;
 > > +
-> > +       evlist__for_each_entry(evsel_list, evsel) {
-> > +               if (per_cpu)
-> > +                       perf_evsel__close_per_cpu(evsel,
-> > +                                                 perf_evsel__cpus(evsel));
-> > +               else
-> > +                       perf_evsel__close_per_thread(evsel,
-> > +                                                    evsel_list->threads);
+> > +       pm_bu = NULL;
+> > +
+> > +       for_each_compatible_node(node, NULL, "atmel,sama5d2-securam") {
+> > +               pdev = of_find_device_by_node(node);
+> > +               if (pdev) {
+> > +                       of_node_put(node);
+> > +                       break;
+> > +               }
 > > +       }
+> > +
+> 
+> Do we really need to iterate over compatible nodes ?
+> 
+
+You're right, this can probably be avoided.
+
+> > +       if (!pdev) {
+> > +               pr_warn("%s: failed to find securam device!\n", __func__);
+> > +               return;
+> > +       }
+> > +
+> > +       sram_pool = gen_pool_get(&pdev->dev, NULL);
+> > +       if (!sram_pool) {
+> > +               pr_warn("%s: securam pool unavailable!\n", __func__);
+> > +               return;
+> > +       }
+> > +
+> > +       pm_bu = (void *)gen_pool_alloc(sram_pool, sizeof(struct at91_pm_bu));
+> > +       if (!pm_bu) {
+> > +               pr_warn("%s: unable to alloc securam!\n", __func__);
+> > +               return;
+> > +       }
+> > +
+> > +       pm_bu->suspended = 0;
+> > +       pm_bu->canary = virt_to_phys(&canary);
+> > +       pm_bu->resume = virt_to_phys(cpu_resume);
 > > +}
 > > +
-> >  static void process_interval(void)
-> >  {
-> >         struct timespec ts, rs;
-> > @@ -686,7 +708,7 @@ static int __run_perf_stat(int argc, const char **argv)
-> >          * group leaders.
-> >          */
-> >         read_counters();
-> > -       perf_evlist__close(evsel_list);
-> > +       close_counters();
-> >
-> >         return WEXITSTATUS(status);
-> >  }
-> > diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-> > index ac59710..726ceca 100644
-> > --- a/tools/perf/util/evsel.c
-> > +++ b/tools/perf/util/evsel.c
-> > @@ -1670,6 +1670,18 @@ int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
-> >         return err;
-> >  }
-> >
-> > +int perf_evsel__open_per_cpu(struct perf_evsel *evsel,
-> > +                            struct cpu_map *cpus)
-> > +{
-> > +       return perf_evsel__open(evsel, cpus, NULL);
-> > +}
+> 
+> at91_pm_bu_sram_init and at91_dt_shdwc are necessary to use backup mode.
+> But those functions do not return error codes, and do no cleanup in case
+> of error.  I believe that it would be simpler if we only had a single
+> function.
+> 
+
+Yeah, this is kind of solved by adding the fallback in a latter patch
+but I agree it can be done better.
+
+> > diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+> > index 96781daa671a..b5ffa8e1f203 100644
+> > --- a/arch/arm/mach-at91/pm_suspend.S
+> > +++ b/arch/arm/mach-at91/pm_suspend.S
+> > @@ -97,15 +97,74 @@ ENTRY(at91_pm_suspend_in_sram)
+> >         str     tmp1, .memtype
+> >         ldr     tmp1, [r0, #PM_DATA_MODE]
+> >         str     tmp1, .pm_mode
+> > +       ldr     tmp1, [r0, #PM_DATA_SHDWC]
+> > +#if defined(BACKUP_MODE)
+> > +       str     tmp1, .shdwc
+> > +       cmp     tmp1, #0
+> > +       ldrne   tmp2, [tmp1, #0]
+> > +       ldr     tmp1, [r0, #PM_DATA_SFRBU]
+> > +       str     tmp1, .sfr
+> > +       cmp     tmp1, #0
+> > +       ldrne   tmp2, [tmp1, #0x10]
+> > +#endif
+> 
+> If I understand this well, we are doing this to fill the TLB in advance
+> before the external RAM is put in self-refresh. It might be worthy of a
+> comment. Moreover, .pm_mode and .memtype do not need to be protected as
+> they are accessed during the at91_sramc_self_refresh, but .pmc_base
+> may need to be loaded in the TLB as well.
+
+We never had issue with .pmc_base because it is used in the C part of
+the code, right before calling the assembly.
+I'll add a comment.
+
+> 
+> > +#if defined(BACKUP_MODE)
+> > +ENTRY(at91_backup_mode)
+> > +       #if 0
+> > +       /* Read LPR */
+> > +       ldr     r2, .sramc_base
+> > +       ldr     r3, [r2, #AT91_DDRSDRC_LPR]
+> > +       #endif
 > > +
-> > +int perf_evsel__open_per_thread(struct perf_evsel *evsel,
-> > +                               struct thread_map *threads)
-> > +{
-> > +       return perf_evsel__open(evsel, NULL, threads);
-> > +}
-> > +
-> >  void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads)
-> >  {
-> >         if (evsel->fd == NULL)
-> > @@ -1679,16 +1691,18 @@ void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads)
-> >         perf_evsel__free_fd(evsel);
-> >  }
-> >
-> > -int perf_evsel__open_per_cpu(struct perf_evsel *evsel,
-> > -                            struct cpu_map *cpus)
-> > +void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
-> > +                              struct cpu_map *cpus)
-> >  {
-> > -       return perf_evsel__open(evsel, cpus, NULL);
-> > +       int ncpus = cpus ? cpus->nr : 1;
-> > +       perf_evsel__close(evsel, ncpus, 1);
-> >  }
-> >
-> > -int perf_evsel__open_per_thread(struct perf_evsel *evsel,
-> > -                               struct thread_map *threads)
-> > +void perf_evsel__close_per_thread(struct perf_evsel *evsel,
-> > +                                 struct thread_map *threads)
-> >  {
-> > -       return perf_evsel__open(evsel, NULL, threads);
-> > +       int nthreads = threads ? threads->nr : 1;
-> > +       perf_evsel__close(evsel, 1, nthreads);
-> >  }
-> >
-> >  static int perf_evsel__parse_id_sample(const struct perf_evsel *evsel,
-> > diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
-> > index 06ef6f2..02bea43 100644
-> > --- a/tools/perf/util/evsel.h
-> > +++ b/tools/perf/util/evsel.h
-> > @@ -252,6 +252,10 @@ int perf_evsel__open_per_thread(struct perf_evsel *evsel,
-> >                                 struct thread_map *threads);
-> >  int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
-> >                      struct thread_map *threads);
-> > +void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
-> > +                              struct cpu_map *cpus);
-> > +void perf_evsel__close_per_thread(struct perf_evsel *evsel,
-> > +                                 struct thread_map *threads);
-> >  void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads);
-> >
-> >  struct perf_sample;
 > 
-> this diff looks to me doing same as mine.
-
-Be careful when reading the diff above; the open functions have been
-moved, but have not changed.
-
-I've only changed the close path, whereas your proposal changed the open
-path. Those are not equivalent changes.
-
-> i think below diff should be more appropriate fix to this issue?
+> Do we need to keep this commented code ?
 > 
-> when open allocates and uses dummy cpus, there is no point in holding
-> old unused one.  instead it should free and link to dummy cpus which
-> is created with 1 CPU.  same will be used by close.
-> 
-> i did quick testing on both x86 and arm64.  testing looks ok, may need
-> more testing!
-> 
-> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-> index ac59710..b1aab0a 100644
-> --- a/tools/perf/util/evsel.c
-> +++ b/tools/perf/util/evsel.c
-> @@ -1466,9 +1466,13 @@ int perf_evsel__open(struct perf_evsel *evsel,
-> struct cpu_map *cpus,
->                         empty_cpu_map = cpu_map__dummy_new();
->                         if (empty_cpu_map == NULL)
->                                 return -ENOMEM;
-> +               } else {
-> +                       cpu_map__get(empty_cpu_map);
->                 }
-> 
->                 cpus = empty_cpu_map;
-> +               cpu_map__put(evsel->cpus);
-> +               evsel->cpus = cpus;
->         }
-> 
->         if (threads == NULL) {
 
-Unfortunately, I believe that might break the logic added in commit:
+Nope, leftover from development
 
-  9f21b815be863218 ("perf evlist: Only open events on CPUs an evsel permits")
 
-... since the evsel->cpus would now not represent the PMUs CPUs.
-
-As I'd mentioned in my prior reply, I think in order to use the cpu_maps
-consistently we need to do a bigger rework of the way cpu_maps are used,
-in order to separate the PMU CPUs from the requested event CPUs, etc.
-while taking all of these into account.
-
-Could you please give my diff a go?
-
-Thanks,
-Mark.
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
