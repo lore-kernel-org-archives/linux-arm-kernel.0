@@ -1,134 +1,38 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Thu, 27 Apr 2017 15:52:21 -0700
-Subject: [PATCH v2] arm64: Add ASM modifier for xN register operands
-In-Reply-To: <20170427110256.GC31337@leverpostej>
-References: <20170426214616.142580-1-mka@chromium.org>
- <20170427110256.GC31337@leverpostej>
-Message-ID: <20170427225221.GS128305@google.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Thu, 27 Apr 2017 16:10:02 -0700
+Subject: [PATCH v2 1/3] ARM: BCM: Enable thermal support for iProc SoCs
+In-Reply-To: <1493328194-1766-2-git-send-email-jon.mason@broadcom.com>
+References: <1493328194-1766-1-git-send-email-jon.mason@broadcom.com>
+ <1493328194-1766-2-git-send-email-jon.mason@broadcom.com>
+Message-ID: <bceb9b66-c769-faf3-9288-26581b5d5dc6@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
-Thanks for your comments.
 
-El Thu, Apr 27, 2017 at 12:02:56PM +0100 Mark Rutland ha dit:
-
-> Hi,
-> 
-> On Wed, Apr 26, 2017 at 02:46:16PM -0700, Matthias Kaehlcke wrote:
-> > Many inline assembly statements don't include the 'x' modifier when
-> > using xN registers as operands. This is perfectly valid, however it
-> > causes clang to raise warnings like this:
-> > 
-> > warning: value size does not match register size specified by the
-> >   constraint and modifier [-Wasm-operand-widths]
-> > ...
-> > arch/arm64/include/asm/barrier.h:62:23: note: expanded from macro
-> >   '__smp_store_release'
-> >     asm volatile ("stlr %1, %0"
-> > 
-> > Add the modifiers to keep clang happy.
-> 
-> If we're going to make this consistent, it would make sense to similarly
-> annotate 'w' regs. That will make it easier going forward to enforce a
-> policy that registers are suitably annotated.
-
-Ok
-
-> Also, there's a risk that we silently mask a bug here, for which clang's
-> warning is legitimate, so we need to review this very carefully...
+On 17-04-27 02:23 PM, Jon Mason wrote:
+> Change the iProc Kconfig to select THERMAL and THERMAL_OF, which allows
+> the ns-thermal driver to be selected via menuconfig.
 >
-> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> > ---
-> > Changes in v2:
-> > - also add modifiers to multiline ASM statements in include/asm/
-> >   {atomic_ll_sc.h,irqflags.h,pgtable.h,uaccess.h,word-at-a-time.h}
-> >   that were missed on v1
-> > 
-> >  arch/arm64/include/asm/arch_gicv3.h     |  2 +-
-> >  arch/arm64/include/asm/atomic_ll_sc.h   | 36 ++++++++++++++++-----------------
-> >  arch/arm64/include/asm/barrier.h        |  4 ++--
-> >  arch/arm64/include/asm/io.h             | 24 +++++++++++-----------
-> >  arch/arm64/include/asm/irqflags.h       | 10 ++++-----
-> >  arch/arm64/include/asm/kvm_hyp.h        | 10 ++++-----
-> >  arch/arm64/include/asm/kvm_mmu.h        | 12 +++++------
-> >  arch/arm64/include/asm/percpu.h         |  4 ++--
-> >  arch/arm64/include/asm/pgtable.h        | 20 +++++++++---------
-> >  arch/arm64/include/asm/sysreg.h         |  4 ++--
-> >  arch/arm64/include/asm/uaccess.h        | 14 ++++++-------
-> >  arch/arm64/include/asm/word-at-a-time.h | 14 ++++++-------
-> >  arch/arm64/kernel/armv8_deprecated.c    |  4 ++--
-> >  arch/arm64/kernel/probes/kprobes.c      |  2 +-
-> >  arch/arm64/kvm/hyp/switch.c             |  4 ++--
-> >  15 files changed, 82 insertions(+), 82 deletions(-)
-> 
-> ... to that end, could you split these into a few patches?
-> 
-> That way, knowledgeable people can focus their review on the code they
-> understand.
-> 
-> That doesn't need to be a patch per file; all the KVM bits can be
-> collated in one patch, for example. However, the atomics, kvm, and
-> uaccess+word-at-a-time bits should certainly be separate patches given
-> their (existing) complexity.
-
-I agree the patch is too large, I considered to split it up but wasn't
-sure where to draw the line(s). Will try to find halfway reasonable
-batches :)
-
-> Otherwise, I have a couple of comments below.
-> 
-> > diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-> > index f37e3a21f6e7..ba54e5bee885 100644
-> > --- a/arch/arm64/include/asm/arch_gicv3.h
-> > +++ b/arch/arm64/include/asm/arch_gicv3.h
-> > @@ -166,7 +166,7 @@ static inline void gic_write_sre(u32 val)
-> >  
-> >  static inline void gic_write_bpr1(u32 val)
-> >  {
-> > -	asm volatile("msr_s " __stringify(ICC_BPR1_EL1) ", %0" : : "r" (val));
-> > +	asm volatile("msr_s " __stringify(ICC_BPR1_EL1) ", %x0" : : "r" (val));
-> >  }
-> 
-> Please make this use write_sysreg_s() instead, i.e.
-> 
-> static inline void gic_write_bpr1(u32 val)
-> {
-> 	write_sysreg_s(var, ICC_BPR1_EL1);
-> }
-> 
-> ... that uses the 'x' modifier internally, and it's what we do for the
-> other GIC sysreg accesors.
-> 
-> This accessor was missed by commit:
-> 
->   d44ffa5ae70a15a1 ("irqchip/gic-v3: Convert arm64 GIC accessors to {read,write}_sysreg_s")
-> 
-> ... because it was added concurrently by commitL
-> 
->   91ef84428a86b75a ("irqchip/gic-v3: Reset BPR during initialization")
-> 
-> ... i.e. it was not deliberately omitted.
-
-Will do
-
-> [...]
-> 
-> > -	asm volatile("strb %w0, [%1]" : : "rZ" (val), "r" (addr));
-> > +	asm volatile("strb %w0, [%x1]" : : "rZ" (val), "r" (addr));
-> 
-> In general, the '[%xN]' pattern looks *very* suspicious to me. Any
-> address must be 64-bit, so this would mask a legitimate warning.
-> 
-> Given the prototype of this function the code if fine either way, but
-> were we to refactor things (e.g. making this a macro), that might not be
-> true.
-> 
-> ... so I'm not sure it make sense to alter instances used for addresses.
-
-Good point, I'll leave instances dealing with addresses untouched for now.
-
-Cheers
-
-Matthias
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> ---
+>  arch/arm/mach-bcm/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index a0e66d8..da2bfeb 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -19,6 +19,8 @@ config ARCH_BCM_IPROC
+>  	select GPIOLIB
+>  	select ARM_AMBA
+>  	select PINCTRL
+> +	select THERMAL
+> +	select THERMAL_OF
+This is NSP specific at this point.  Also, If it increases code size in 
+any way it shouldn't be selected for all IPROC SoCS.  I'd rather this 
+was just selected via defconfig
+>  	help
+>  	  This enables support for systems based on Broadcom IPROC architected SoCs.
+>  	  The IPROC complex contains one or more ARM CPUs along with common
+>
