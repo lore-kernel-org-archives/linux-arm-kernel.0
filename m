@@ -1,78 +1,83 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Thu, 27 Apr 2017 01:17:12 +0000
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
-In-Reply-To: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
-References: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
-Message-ID: <HE1PR04MB1450DA079FC35180FBE305388B100@HE1PR04MB1450.eurprd04.prod.outlook.com>
+From: majun258@huawei.com (majun (Euler7))
+Date: Thu, 27 Apr 2017 09:27:14 +0800
+Subject: [PATCH] irqchip/mbigen: Fix the clear register offset
+In-Reply-To: <07081162-ca52-fa46-00e6-e72e1b4fd092@arm.com>
+References: <1493086563-36396-1-git-send-email-majun258@huawei.com>
+ <68214147-bc4d-c542-ce40-78f69a63e53d@linaro.org>
+ <07081162-ca52-fa46-00e6-e72e1b4fd092@arm.com>
+Message-ID: <590148F2.1030502@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
->
->The board file for imx6sx-dbg overrides cpufreq operating points to use higher
->voltages. This is done because the board has a shared rail for VDD_ARM_IN and
->VDD_SOC_IN and when using LDO bypass the shared voltage needs to be a value
->suitable for both ARM and SOC.
->
->This was introduced in:
->
->commit 54183bd7f766 ("ARM: imx6sx-sdb: add revb board and make it default")
->
->This only only applies to LDO bypass mode, a feature not present in upstream. When
->LDOs are enabled the effect is to use higher voltages than necesarry for no good
->reason.
->
->Setting these higher voltages can make some boards fail to boot with ugly semi-
->random crashes, reminiscent of memory corruption. These failures happen the first
->time the lowest idle state is used. Remove the OPP override in order to fix those
->crashes.
->
+Hi Marc:
 
-Add Anson and Robin
+? 2017/4/26 16:01, Marc Zyngier ??:
+> On 26/04/17 04:10, Hanjun Guo wrote:
+>> Hi Majun,
+>>
+>> On 2017/4/25 10:16, Majun wrote:
+>>> From: MaJun <majun258@huawei.com>
+>>>
+>>> Don't minus reserved interrupts (64) when get the clear register offset,because
+>>> the clear register space includes the space of these 64 interrupts.
+>>
+>> Could you mention the background that there is a timeout mechanism
+>> to clear the register in the mbigen to make the code work even we clear
+>> the wrong (and noneffective) register? that will help for review I
+>> think.
+> 
+> A timeout? So if you don't clear the interrupt in a timely manner, it
+> will still bypass the masking? That feels very wrong. How is this
+> timeout configured? Can it be entirely disabled?
 
-This code has existed more than 2 years, it is strange why the bug has not reported both
-for internal user and external user. I run upstream kernel using imx6sx-sdb revB very often
-at recent years, but not meet this issue. How to trigger this unstable issue, anything needs
-to change at u-boot?
+You are right. The timeout should be turn off usually, it's just a debug or
+testing function in our chip. Because of configuration mistake in BIOS, this function
+is turned on now and covered the bug in clear offset calculate.
+Now, it's time to fix this.
 
-Peter 
+Thanks
+MaJun
 
->Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
->
->---
->It's not clear exactly why the crashes happen. Perhaps waking up from idle draws
->more power than is available? Removing this override is a correct change anyway so
->maybe there is no need to investigate deeper.
->
-> arch/arm/boot/dts/imx6sx-sdb.dts | 17 -----------------
-> 1 file changed, 17 deletions(-)
->
->diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
->index 5bb8fd5..d71da30 100644
->--- a/arch/arm/boot/dts/imx6sx-sdb.dts
->+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
->@@ -12,23 +12,6 @@
-> 	model = "Freescale i.MX6 SoloX SDB RevB Board";  };
->
->-&cpu0 {
->-	operating-points = <
->-		/* kHz    uV */
->-		996000  1250000
->-		792000  1175000
->-		396000  1175000
->-		198000  1175000
->-		>;
->-	fsl,soc-operating-points = <
->-		/* ARM kHz      SOC uV */
->-		996000	1250000
->-		792000	1175000
->-		396000	1175000
->-		198000  1175000
->-	>;
->-};
->-
-> &i2c1 {
-> 	clock-frequency = <100000>;
-> 	pinctrl-names = "default";
->--
->2.7.4
+> 
+>>
+>>>
+>>> Signed-off-by: MaJun <majun258@huawei.com>
+>>> ---
+>>>  drivers/irqchip/irq-mbigen.c | 1 -
+>>>  1 file changed, 1 deletion(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+>>> index 061cdb8..75818a5 100644
+>>> --- a/drivers/irqchip/irq-mbigen.c
+>>> +++ b/drivers/irqchip/irq-mbigen.c
+>>> @@ -108,7 +108,6 @@ static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
+>>>  {
+>>>  	unsigned int ofst;
+>>>
+>>> -	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
+>>>  	ofst = hwirq / 32 * 4;
+>>>
+>>>  	*mask = 1 << (hwirq % 32);
+>>
+>> How about following to save more lines of code:
+>>
+>> --- a/drivers/irqchip/irq-mbigen.c
+>> +++ b/drivers/irqchip/irq-mbigen.c
+>> @@ -106,10 +106,7 @@ static inline void 
+>> get_mbigen_type_reg(irq_hw_number_t hwirq,
+>>   static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
+>>                                          u32 *mask, u32 *addr)
+>>   {
+>> -       unsigned int ofst;
+>> -
+>> -       hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
+>> -       ofst = hwirq / 32 * 4;
+>> +       unsigned int ofst = hwirq / 32 * 4;
+>>
+>>          *mask = 1 << (hwirq % 32);
+>>          *addr = ofst + REG_MBIGEN_CLEAR_OFFSET;
+> 
+> Well, this is not a code deletion contest... ;-)
+> 
+> 	M.
+> 
