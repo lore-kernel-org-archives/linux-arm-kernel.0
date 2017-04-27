@@ -1,63 +1,130 @@
-From: leedom@chelsio.com (Casey Leedom)
-Date: Thu, 27 Apr 2017 19:00:27 +0000
-Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
- ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
-In-Reply-To: <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170401.112603.1991545644693496714.davem@davemloft.net>
- <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
- <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
- <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
- <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
- <CAKgT0Uc4L=GgYbpO-Fm9OfN+_fLypbDP1c+X4T_ta90ecQiyGQ@mail.gmail.com>,
- <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <MWHPR12MB1600F53E6E09C9B3F99D255EC8100@MWHPR12MB1600.namprd12.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Apr 2017 21:06:32 +0200
+Subject: [SPAM]Re: [PATCH 2/2] dt-bindings: pcie: Add documentation for
+ Mediatek PCIe
+In-Reply-To: <1493194205.27023.80.camel@mtkswgap22>
+References: <1492935543-18190-1-git-send-email-ryder.lee@mediatek.com>
+ <1492935543-18190-3-git-send-email-ryder.lee@mediatek.com>
+ <CAK8P3a1vgi9VBZfRNq0dDKzmfe8FkHQtgz6fEXW9fyUnBHtaQQ@mail.gmail.com>
+ <1493194205.27023.80.camel@mtkswgap22>
+Message-ID: <CAK8P3a0vD8s_3R+jS=JdUXX3X05SkCk-mipMA6UxWYQZe6vLUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Thanks for adding me to the Cc list Bjorn.  Hopefully my message will make
-it out to the netdev and linux-pci lists -- I'm not currently subscribed to
-them.  I've explicitly marked this message to be sent in plain text but
-modern email agents suck with respect to this. (sigh) I have officially
-become a curmudgeon. 
+On Wed, Apr 26, 2017 at 10:10 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> Hi
+>
+> On Tue, 2017-04-25 at 14:18 +0200, Arnd Bergmann wrote:
+>> On Sun, Apr 23, 2017 at 10:19 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+>> > Add documentation for PCIe host driver available in MT7623
+>> > series SoCs.
+>> >
+>> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+>> > ---
+>> >  .../bindings/pci/mediatek,mt7623-pcie.txt          | 153 +++++++++++++++++++++
+>> >  1 file changed, 153 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+>> > new file mode 100644
+>> > index 0000000..ee93ba2
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+>> > @@ -0,0 +1,153 @@
+>> > +Mediatek MT7623 PCIe controller
+>> > +
+>> > +Required properties:
+>> > +- compatible: Should contain "mediatek,mt7623-pcie".
+>>
+>> Did mediatek license the IP block from someone else or was it
+>> developed in-house? Is there a name and/or version identifier
+>> for the block itself other than identifying it as the one in mt7623?
+>
+> Originally, it license from synopsys. Our designer add a wrapper to hide
+> the DBI detail so that we cannot use them directly. Perhaps I can call
+> it "mediatek,gen2v1-pcie", because we have a plan to upstream a in-house
+> Gen2 IP in the future.
 
-  So, officially, Relaxed Ordering should be a Semantic Noop as far as PCIe
-transfers are concerned, as long as you don't care what order the PCIe
-Transaction Layer Packets are processed in by the target PCIe Fabric End
-Point.
+Ok, so this is the same hardware that drivers/pci/dwc/ handles, but
+it needs a separate driver because the wrapper that was added uses
+a completely different register layout, right?
 
-  Basically, if you have some number of back-to-back PCIe TLPs between two
-Fabric End Points {A} -> {B} which have the Relaxed Ordering Attribute set,
-the End Point {B} receiving these RO TLPs may process them in any order it
-likes.  When a TLP without Relaxed Ordering is sent {A} -> {B}, all
-preceding TLPs with Relaxed Ordering set must be processed by {B} prior to
-processing the TLP without Relaxed Ordering set.  In this sense, a TLP
-without Relaxed Ordering set is something akin to a "memory barrier".
+Are any of the registers the same at all, e.g. for MSI handling?
 
-  All of this is covered in Section 2.4.1 of the PCIe 3.0 Specification (PCI
-Express(r) Base Specification Revision 3.0 November 10, 2010).
+>> > +Required properties:
+>> > +- device_type: Must be "pci"
+>> > +- assigned-addresses: Address and size of the port configuration registers
+>> > +- reg: Only the first four bytes are used to refer to the correct bus number
+>> > +  and device number.
+>> > +- #address-cells: Must be 3
+>> > +- #size-cells: Must be 2
+>> > +- ranges: Sub-ranges distributed from the PCIe controller node. An empty
+>> > +  property is sufficient.
+>> > +- clocks: Must contain an entry for each entry in clock-names.
+>> > +  See ../clocks/clock-bindings.txt for details.
+>> > +- clock-names: Must include the following entries:
+>> > +  - sys_ck
+>> > +- resets: Must contain an entry for each entry in reset-names.
+>> > +  See ../reset/reset.txt for details.
+>>
+>> This seems odd: you have a device that is simply identified as "pci"
+>> without any more specific ID, but you require additional properties
+>> (clocks, reset, ...) that are not part of the standard PCI binding.
+>>
+>> Can you clarify how the port devices related to the root device in
+>> this hardware design?
+>
+> I will write clarify like this:
+>
+> PCIe subsys includes one Host/PCI bridge and 3 PCIe MAC port. There
+> are 3 bus master for data access and 1 slave for configuration and
+> status register access. Each port has PIPE interface to PHY and
 
-  The advantage of using Relaxed Ordering (which is heavily used when
-sending data to Graphics Cards as I understand it), is that the PCIe
-Endpoint can potentially optimize the processing order of RO TLPs with
-things like a local multi-channel Memory Controller in order to achieve the
-highest transfer bandwidth possible.
+If I understand this right, then each of the ports in your hardware
+is what we normally drive using the drivers/pci/dwc/ driver framework,
+but your implementation actually made it more PCI standard compliant
+by implementing the normal PCIe host bridge registers for all ports
+combined, something that most others don't.
 
-  However, we have discovered at least two PCIe 3.0 Root Complex
-implementations which have problems with TLPs directed at them with the
-Relaxed Ordering Attribute set and I'm in the process of working up a Linux
-Kernel PCI "Quirk" to allow those PCIe End Points to be marked as "not being
-advisable to send RO TLPs to".  These problems range from "mere" Performance
-Problems to outright Data Corruption.  I'm working with the vendors of these
-...  "problematic" Root Complex implementations and hope to have this patch
-submitted to the linux-pci list by tomorrow.
+>> Have you considered moving the nonstandard properties into the host
+>> bridge node and having that device deal with setting up the links
+>> to the other drivers? That way we could use the regular pcie
+>> port driver for the children.
+>>
+>
+> OK, but I still want to use port->reset to catch reset properties in
+> driver.
 
-  By the way, it's important to note that just because, say, a Root Complex
-has problems with RO TLPs directed at it, that doesn't mean that you want to
-avoid all use of Relaxed Ordering within the PCIe Fabric.  For instance,
-with the vendor whose Root Complex has a Performance Problem with RO TLPs
-directed at it, it's perfectly reasonable -- and desired -- to use Relaxed
-Ordering in Peer-to-Peer traffic.  Say for instance, with an NVMe <->
-Ethernet application.
+Do you mean in drivers/pci/pcie/portdrv_pci.c? I see that it
+has a function called pcie_portdrv_slot_reset(), but I don't see
+how that relates to your reset line at the moment. Is this
+something you have submitted in a different series?
 
-Casey
+Or do you mean in this host driver? The problem I see with
+that approach is that the port device is owned by portdrv_pci,
+so the host bridge driver should not look at the properties of
+the port.
+
+>> > +- reset-names: Must include the following entries:
+>> > +  - pcie-reset
+>> > +- num-lanes: Number of lanes to use for this port.
+>> > +- phys: Must contain an entry for each entry in phy-names.
+>> > +- phy-names: Must include an entry for each sub node. Entries are of the form
+>> > +  "pcie-phyN": where N ranges from 0 to the value specified for port number.
+>> > +  See ../phy/phy-mt7623-pcie.txt for details.
+>>
+>> I think the name should not include the number of the port but rather
+>> be always the same here.
+>>
+>
+> Hmm, I think it's better to keep the name here. It's more readable for
+> user to understand the relationship between port0 and phy0.
+
+No, I would argue that it's confusing for the reader because it
+is different from how most other DT bindings work: In each device
+node, you tend to have a set of properties with well-known names
+that are documented. When your reference is called "pcie-phy1"
+in one node and "pcie-phy2", I would interpret that as both ports
+having two phys each, but only one of them being used.
+
+       Arnd
