@@ -1,68 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 27 Apr 2017 13:30:57 +0100
-Subject: [patch V2 00/24] cpu/hotplug: Convert get_online_cpus() to a
- percpu_rwsem
-In-Reply-To: <alpine.DEB.2.20.1704271200420.4607@nanos>
-References: <20170418170442.665445272@linutronix.de>
- <20170425161037.GA27156@leverpostej>
- <20170425172838.mr3kyccsdteyjso5@linutronix.de>
- <20170426085958.GC27156@leverpostej>
- <bad40d9a-2c81-5a6c-2c12-3bf7094549de@arm.com>
- <20170426103236.GI27156@leverpostej>
- <20170427082719.3wyru4bk67kdmflb@linutronix.de>
- <20170427095744.GB31337@leverpostej>
- <alpine.DEB.2.20.1704271200420.4607@nanos>
-Message-ID: <20170427123056.GD31337@leverpostej>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu, 27 Apr 2017 14:33:05 +0200
+Subject: [PATCH] arm64: Print DT machine model in setup_machine_fdt()
+Message-ID: <1493296385-14140-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 12:01:57PM +0200, Thomas Gleixner wrote:
-> On Thu, 27 Apr 2017, Mark Rutland wrote:
-> 
-> > On Thu, Apr 27, 2017 at 10:27:20AM +0200, Sebastian Siewior wrote:
-> > > On 2017-04-26 11:32:36 [+0100], Mark Rutland wrote:
-> > > > > So we could end up calling static_branch_enable_cpuslocked()
-> > > > > without actually holding the lock. Should we do a cpu_hotplug_begin/done in
-> > > > > setup_cpu_feature_capabilities ? I agree it doesn't look that nice. Thoughts ?
-> > > > 
-> > > > I agree that's hideous, but it looks like the only choice given the
-> > > > hotplug rwsem cahnges. :/
-> > > 
-> > > would work for you to provide a locked and unlocked version?
-> > 
-> > Maybe. Today we have:
-> > 
-> > // rwsem unlocked
-> > start_kernel()
-> > ->smp_prepare_boot_cpu()
-> > -->update_cpu_errata_workarounds()
-> > --->update_cpu_capabilities()
-> > 
-> > // rwsem locked (by other CPU)
-> > secondary_start_kernel()
-> > ->check_local_cpu_capabilities()
-> > -->update_cpu_errata_workarounds()
-> > --->update_cpu_capabilities() 
-> > 
-> > With the common chain:
-> > 
-> > update_cpu_capabilities()
-> > ->cpus_set_cap()
-> > -->static_branch_enable()
-> > 
-> > ... so we could add a update_cpu_capabilities{,_cpuslocked}(), and say
-> > that cpus_set_cap() expects the hotplug rswem to be locked, as per the
-> > below diff.
-> 
-> You just can take the rwsen in smp_prepare_boot_cpu(), so you don't need
-> that conditional thingy at all. Hmm?
+On arm32, the machine model specified in the device tree is printed
+during boot-up, courtesy of of_flat_dt_match_machine().
 
-True.
+On arm64, of_flat_dt_match_machine() is not called, and the machine
+model information is not available from the kernel log.
 
-Given it's a bit further up the callchain, it's probably worth a
-comment, but it will work.
+Print the machine model to make it easier to derive the machine model
+from an arbitrary kernel boot log.
 
-I'll spin a v3 to that effect shortly.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+I have scripts to save kernel boot logs, and compare logs[*] for
+subsequent boots on the same machine.  Having a way to extract the
+machine model from an arbitrary kernel boot log makes this easier.
 
-Thanks,
-Mark.
+Yes, I'm also a big fan of CONFIG_LOCALVERSION_AUTO and
+CONFIG_LOCALVERSION.
+
+[*] and clock and PM domain lists...
+---
+ arch/arm64/kernel/setup.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 28855ec1be95e113..2c822ef94f341417 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -180,6 +180,7 @@ static void __init smp_build_mpidr_hash(void)
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ {
+ 	void *dt_virt = fixmap_remap_fdt(dt_phys);
++	const char *name;
+ 
+ 	if (!dt_virt || !early_init_dt_scan(dt_virt)) {
+ 		pr_crit("\n"
+@@ -192,7 +193,9 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ 			cpu_relax();
+ 	}
+ 
+-	dump_stack_set_arch_desc("%s (DT)", of_flat_dt_get_machine_name());
++	name = of_flat_dt_get_machine_name();
++	pr_info("Machine model: %s\n", name);
++	dump_stack_set_arch_desc("%s (DT)", name);
+ }
+ 
+ static void __init request_standard_resources(void)
+-- 
+2.7.4
