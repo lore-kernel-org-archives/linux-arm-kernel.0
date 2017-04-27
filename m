@@ -1,99 +1,100 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Thu, 27 Apr 2017 13:42:25 -0400
-Subject: [PATCH 1/2] thermal: broadcom: Allow for NSP to use ns-thermal
- driver
-In-Reply-To: <20170427163658.GC18276@localhost.localdomain>
-References: <1493153351-12698-1-git-send-email-jon.mason@broadcom.com>
- <1493153351-12698-2-git-send-email-jon.mason@broadcom.com>
- <20170427163658.GC18276@localhost.localdomain>
-Message-ID: <CAC3K-4pr4LY-9unHNxMDN9YmCYHKekUo66813OUdiKkQH4QzVw@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 27 Apr 2017 19:44:25 +0200
+Subject: [PATCH v5 12/22] KVM: arm64: vgic-its: Interpret MAPD ITT_addr
+ field
+In-Reply-To: <20170427164356.GP50776@lvm>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-13-git-send-email-eric.auger@redhat.com>
+ <20170427164356.GP50776@lvm>
+Message-ID: <5f187dbf-6167-7bd3-4a8e-37545941d05c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 12:37 PM, Eduardo Valentin <edubezval@gmail.com> wrote:
-> Hey Jason,
+Hi,
 
-It's Jon :)
-
->
-> On Tue, Apr 25, 2017 at 04:49:10PM -0400, Jon Mason wrote:
->> Change the iProc Kconfig to select THERMAL and THERMAL_OF, which allows
->> the ns-thermal driver to be selected via menuconfig.  Also, change the
->> ns-thermal driver to work on any iProc based SoC.  Finally, tweak the
->> Kconfig description to mention support for NSP and make the default on
->> for iProc based platforms.
->
->
-> Thanks for the patch, but..
+On 27/04/2017 18:43, Christoffer Dall wrote:
+> On Fri, Apr 14, 2017 at 12:15:24PM +0200, Eric Auger wrote:
+>> Up to now the MAPD ITT_addr had been ignored. We will need it
+>> for save/restore. Let's record it in the its_device struct.
 >>
->> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
 >> ---
->>  arch/arm/mach-bcm/Kconfig        | 2 ++
->>  drivers/thermal/broadcom/Kconfig | 9 +++++----
->>  2 files changed, 7 insertions(+), 4 deletions(-)
+>> v4 -> v5:
+>> - its_cmd_get_ittaddr macro now returns the actual ITT GPA
 >>
->> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
->> index a0e66d8..da2bfeb 100644
->> --- a/arch/arm/mach-bcm/Kconfig
->> +++ b/arch/arm/mach-bcm/Kconfig
->> @@ -19,6 +19,8 @@ config ARCH_BCM_IPROC
->>       select GPIOLIB
->>       select ARM_AMBA
->>       select PINCTRL
->> +     select THERMAL
->> +     select THERMAL_OF
->>       help
->>         This enables support for systems based on Broadcom IPROC architected SoCs.
->>         The IPROC complex contains one or more ARM CPUs along with common
->
-> It would be better if this is split and sent through your arch tree, to
-> avoid conflicts. I could also pick it if you get an ack from one of your
-> maintainers. Still, first option is preferable.
-
-Sure, I'll be happy to split this off.  I should've thought to split
-it up before sending.  Thanks for the suggestion.
-
->
->> diff --git a/drivers/thermal/broadcom/Kconfig b/drivers/thermal/broadcom/Kconfig
->> index f0dea8a..26d706c 100644
->> --- a/drivers/thermal/broadcom/Kconfig
->> +++ b/drivers/thermal/broadcom/Kconfig
->> @@ -1,8 +1,9 @@
->>  config BCM_NS_THERMAL
->>       tristate "Northstar thermal driver"
->>       depends on ARCH_BCM_IPROC || COMPILE_TEST
->> +     default ARCH_BCM_IPROC
->
-> Not sure if this is really what you wanted. Based on your commit log
-> message, you meant the following, perhaps?
->
->  +      default y if ARCH_BCM_IPROC
-
-IIUC, my original default works, as we have used it frequently in
-other places in the kernel.
-grep -rI "default ARCH_BCM_IPROC" * | wc -l
-15
-
-However, if the above is preferred (or the other 15 massively broken),
-I'll be happy to do it that way.
-
-
->>       help
->> -       Northstar is a family of SoCs that includes e.g. BCM4708, BCM47081,
->> -       BCM4709 and BCM47094. It contains DMU (Device Management Unit) block
->> -       with a thermal sensor that allows checking CPU temperature. This
->> -       driver provides support for it.
->> +       Support for the Northstar and Northstar Plus family of SoCs (e.g.
->> +       BCM4708, BCM4709, BCM5301x, BCM95852X, etc). It contains DMU (Device
->
-> Did we look BCM47094 somehow on this patch?
-
-Naa, just trying to be more concise, while adding the NSP products to
-the list..  BCM47094 is a type of BCM4709.  So, it is still there :)
-
->
->> +       Management Unit) block with a thermal sensor that allows checking CPU
->> +       temperature.
->> --
->> 2.7.4
+>> v3 -> v4:
+>> - in vgic_its_cmd_handle_mapd, itt_addr directly is shifted
+>> - correct ittaddr bitmask to support 48bit GPA
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
+>>  1 file changed, 4 insertions(+)
 >>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 0f3c8f3..757598d 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -106,6 +106,7 @@ struct its_device {
+>>  	/* the head for the list of ITTEs */
+>>  	struct list_head itt_head;
+>>  	u32 nb_eventid_bits;
+>> +	gpa_t itt_addr;
+>>  	u32 device_id;
+>>  };
+>>  
+>> @@ -569,6 +570,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
+>>  #define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
+>>  #define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
+>>  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
+>> +#define its_cmd_get_ittaddr(cmd)	(its_cmd_mask_field(cmd, 2,  8, 47) << 8)
+> 
+> Why 47?  The ITT_addr field is bits [51:8] unless I'm looking at
+> something wrong?
+
+Initially I limited to 48 bits since I found in the code:
+
+/*
+ * We only implement 48 bits of PA at the moment, although the ITS
+ * supports more. Let's be restrictive here.
+ */
+#define BASER_ADDRESS(x)        ((x) & GENMASK_ULL(47, 16))
+#define CBASER_ADDRESS(x)       ((x) & GENMASK_ULL(47, 12))
+
+But practically as I encode the ITT addr field on 52 bits now in the DTE
+there is no reason anymore.
+
+Thanks
+
+Eric
+> 
+>>  #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
+>>  #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
+>>  
+>> @@ -840,6 +842,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>>  	u32 device_id = its_cmd_get_deviceid(its_cmd);
+>>  	bool valid = its_cmd_get_validbit(its_cmd);
+>>  	u8 nb_eventid_bits = its_cmd_get_size(its_cmd);
+>> +	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
+>>  	struct its_device *device;
+>>  
+>>  	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
+>> @@ -871,6 +874,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>>  
+>>  	device->device_id = device_id;
+>>  	device->nb_eventid_bits = nb_eventid_bits;
+>> +	device->itt_addr = itt_addr;
+>>  
+>>  	INIT_LIST_HEAD(&device->itt_head);
+>>  
+>> -- 
+>> 2.5.5
+>>
+> 
+> Thanks,
+> -Christoffer
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
