@@ -1,73 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Apr 2017 19:06:48 +0100
-Subject: [PATCH] arm64: KVM: Fix decoding of Rt/Rt2 when trapping AArch32 CP
- accesses
-Message-ID: <20170427180648.25159-1-marc.zyngier@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 27 Apr 2017 19:07:25 +0100
+Subject: [PATCH v2 3/3] arm64: Silence first allocation with
+ CONFIG_ARM64_MODULE_PLTS=y
+In-Reply-To: <20170427173900.2538-4-f.fainelli@gmail.com>
+References: <20170427173900.2538-1-f.fainelli@gmail.com>
+ <20170427173900.2538-4-f.fainelli@gmail.com>
+Message-ID: <C103C078-3462-43D9-AEF5-5DEC3A74CA7E@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our 32bit CP14/15 handling inherited some of the ARMv7 code for handling
-the trapped system registers, completely missing the fact that the
-fields for Rt and Rt2 are now 5 bit wide, and not 4...
 
-Let's fix it, and provide an accessor for the most common Rt case.
+> On 27 Apr 2017, at 18:39, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> 
+> When CONFIG_ARM64_MODULE_PLTS is enabled, the first allocation using the
+> module space fails, because the module is too big, and then the module
+> allocation is attempted from vmalloc space. Silence the first allocation
+> failure in that case by setting __GFP_NOWARN.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+> arch/arm64/kernel/module.c | 7 ++++++-
+> 1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+> index 7f316982ce00..58bd5cfdd544 100644
+> --- a/arch/arm64/kernel/module.c
+> +++ b/arch/arm64/kernel/module.c
+> @@ -32,11 +32,16 @@
+> 
+> void *module_alloc(unsigned long size)
+> {
+> +    gfp_t gfp_mask = GFP_KERNEL;
+>    void *p;
+> 
+> +#if IS_ENABLED(CONFIG_ARM64_MODULE_PLTS)
+> +    /* Silence the initial allocation */
+> +    gfp_mask |= __GFP_NOWARN;
+> +#endif
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/kvm_emulate.h | 6 ++++++
- arch/arm64/kvm/sys_regs.c            | 8 ++++----
- 2 files changed, 10 insertions(+), 4 deletions(-)
+Please use IS_ENABLED() instead here
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index f5ea0ba70f07..fe39e6841326 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -240,6 +240,12 @@ static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
- 	return kvm_vcpu_get_hsr(vcpu) & ESR_ELx_FSC_TYPE;
- }
- 
-+static inline int kvm_vcpu_sys_get_rt(struct kvm_vcpu *vcpu)
-+{
-+	u32 esr = kvm_vcpu_get_hsr(vcpu);
-+	return (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
-+}
-+
- static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
- {
- 	return vcpu_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index efbe9e8e7a78..0fe27024a2e1 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1529,8 +1529,8 @@ static int kvm_handle_cp_64(struct kvm_vcpu *vcpu,
- {
- 	struct sys_reg_params params;
- 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
--	int Rt = (hsr >> 5) & 0xf;
--	int Rt2 = (hsr >> 10) & 0xf;
-+	int Rt = kvm_vcpu_sys_get_rt(vcpu);
-+	int Rt2 = (hsr >> 10) & 0x1f;
- 
- 	params.is_aarch32 = true;
- 	params.is_32bit = false;
-@@ -1586,7 +1586,7 @@ static int kvm_handle_cp_32(struct kvm_vcpu *vcpu,
- {
- 	struct sys_reg_params params;
- 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
--	int Rt  = (hsr >> 5) & 0xf;
-+	int Rt  = kvm_vcpu_sys_get_rt(vcpu);
- 
- 	params.is_aarch32 = true;
- 	params.is_32bit = true;
-@@ -1688,7 +1688,7 @@ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
- 	struct sys_reg_params params;
- 	unsigned long esr = kvm_vcpu_get_hsr(vcpu);
--	int Rt = (esr >> 5) & 0x1f;
-+	int Rt = kvm_vcpu_sys_get_rt(vcpu);
- 	int ret;
- 
- 	trace_kvm_handle_sys_reg(esr);
--- 
-2.11.0
+>    p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
+>                module_alloc_base + MODULES_VSIZE,
+> -                GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
+> +                gfp_mask, PAGE_KERNEL_EXEC, 0,
+>                NUMA_NO_NODE, __builtin_return_address(0));
+> 
+>    if (!p && IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
+> -- 
+> 2.9.3
+> 
+
+Other than that, and with Michal's nit addressed:
+
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
