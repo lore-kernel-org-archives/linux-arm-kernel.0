@@ -1,38 +1,41 @@
 From: gakula@caviumnetworks.com (Geetha sowjanya)
-Date: Thu, 27 Apr 2017 17:16:21 +0530
-Subject: [PATCH 0/3] Cavium ThunderX2 SMMUv3 errata workarounds
-Message-ID: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
+Date: Thu, 27 Apr 2017 17:16:22 +0530
+Subject: [PATCH 1/3] arm64: Add MIDR values for Cavium cn99xx SoCs
+In-Reply-To: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
+References: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <1493293584-20287-2-git-send-email-gakula@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geetha <gakula@cavium.com>
 
-Cavium CN99xx SMMUv3 implementation has two Silicon Erratas.
-1. Errata ID #74
-   SMMU register alias Page 1 is not implemented
-2. Errata ID #126
-   SMMU doesnt support unique IRQ lines for gerror, eventq and cmdq-sync
+Add MIDR values for Cavium cn99xx SoCs
 
-The following patchset does software workaround for these two erratas.
+Signed-off-by: Geetha <gakula@cavium.com>
+---
+ arch/arm64/include/asm/cputype.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-This series is based on RFC patch.  
-https://www.spinics.net/lists/arm-kernel/msg575739.html
-
-As suggested by Will Deacon, code is modified to use silicon id to
-enable errata#74 workaround.
-
-Linu Cherian (1):
-  iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #74
-
-Geetha (2):
-  arm64: Add MIDR values for Cavium cn99xx SoCs
-  iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
-
- Documentation/arm64/silicon-errata.txt |  2 ++
- arch/arm64/include/asm/cputype.h       |  3 ++
- drivers/acpi/arm64/iort.c              | 14 +++++++-
- drivers/iommu/arm-smmu-v3.c            | 64 +++++++++++++++++++++++++++++-----
- 4 files changed, 73 insertions(+), 10 deletions(-)
-
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index fc50271..066fad0 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -85,6 +85,7 @@
+ 
+ #define CAVIUM_CPU_PART_THUNDERX	0x0A1
+ #define CAVIUM_CPU_PART_THUNDERX_81XX	0x0A2
++#define CAVIUM_CPU_PART_THUNDERX_99XX	0x0AF
+ 
+ #define BRCM_CPU_PART_VULCAN		0x516
+ 
+@@ -94,6 +95,8 @@
+ #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
+ #define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
+ #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
++#define MIDR_THUNDERX_99XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_99XX)
++#define MIDR_BRCM_VULCAN MIDR_CPU_MODEL(ARM_CPU_IMP_BRCM, BRCM_CPU_PART_VULCAN)
+ #define MIDR_QCOM_FALKOR_V1 MIDR_CPU_MODEL(ARM_CPU_IMP_QCOM, QCOM_CPU_PART_FALKOR_V1)
+ 
+ #ifndef __ASSEMBLY__
 -- 
 1.9.1
