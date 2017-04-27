@@ -1,43 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Apr 2017 21:46:03 +0200
-Subject: [GIT PULL 2/2] arm64 dts: exynos: Last round for v4.12
-In-Reply-To: <20170421164050.7404-2-krzk@kernel.org>
-References: <20170421164050.7404-1-krzk@kernel.org>
- <20170421164050.7404-2-krzk@kernel.org>
-Message-ID: <CAK8P3a1HA6cio=hboc7=BYwJn-i6RzCP1uzcCVvcQwt4wtB3Tw@mail.gmail.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Thu, 27 Apr 2017 21:46:28 +0200
+Subject: [PATCH 1/2] coresight-stm: Use devm_kcalloc() in stm_probe()
+In-Reply-To: <52619d05-65c4-149d-f355-cf9c037a0c9b@users.sourceforge.net>
+References: <52619d05-65c4-149d-f355-cf9c037a0c9b@users.sourceforge.net>
+Message-ID: <47e6431f-1093-3a58-3ca4-406284c081aa@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 6:40 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> The following changes since commit e3c07546747cdec07ff15c984bc6cebc9c9f788c:
->
->   arm64: dts: exynos: Add the burst and esc clock frequency properties to DSI node (2017-03-08 08:55:39 +0200)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.12-2
->
-> for you to fetch changes up to 5dccc9873c4af60f4478b3ef54267353f25cc301:
->
->   arm64: dts: exynos: Use - instead of @ for DT OPP entries (2017-04-20 18:10:05 +0200)
->
-> ----------------------------------------------------------------
-> Second update of  Samsung DeviceTree ARM64 for v4.12:
->  - Fix DTC warnings in Exynos ARM64 Device Tree sources.
->  - Add panel node to TM2E board.
->
-> ----------------------------------------------------------------
-> Hoegeun Kwon (1):
->       arm64: dts: exynos: Add support for s6e3hf2 panel device on TM2e board
->
-> Viresh Kumar (1):
->       arm64: dts: exynos: Use - instead of @ for DT OPP entries
->
->  arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi | 48 ++++++++++++-------------
->  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts | 11 ++++++
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi     | 50 +++++++++++++-------------
->  3 files changed, 60 insertions(+), 49 deletions(-)
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Thu, 27 Apr 2017 21:18:57 +0200
 
-I pulled the updated version into next/dt64, thanks,
+* A multiplication for the size determination of a memory allocation
+  indicated that an array data structure should be processed.
+  Thus use the corresponding function "devm_kcalloc".
 
-       Arnd
+  This issue was detected by using the Coccinelle software.
+
+* Delete the local variable "bitmap_size" which became unnecessary
+  with this refactoring.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/hwtracing/coresight/coresight-stm.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+index 93fc26f01bab..bbb5275bf0d2 100644
+--- a/drivers/hwtracing/coresight/coresight-stm.c
++++ b/drivers/hwtracing/coresight/coresight-stm.c
+@@ -799,7 +799,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
+ 	struct stm_drvdata *drvdata;
+ 	struct resource *res = &adev->res;
+ 	struct resource ch_res;
+-	size_t res_size, bitmap_size;
++	size_t res_size;
+ 	struct coresight_desc desc = { 0 };
+ 	struct device_node *np = adev->dev.of_node;
+ 
+@@ -848,9 +848,9 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
+ 		res_size = min((resource_size_t)(drvdata->numsp *
+ 				 BYTES_PER_CHANNEL), resource_size(res));
+ 	}
+-	bitmap_size = BITS_TO_LONGS(drvdata->numsp) * sizeof(long);
+ 
+-	guaranteed = devm_kzalloc(dev, bitmap_size, GFP_KERNEL);
++	guaranteed = devm_kcalloc(dev, BITS_TO_LONGS(drvdata->numsp),
++				  sizeof(long), GFP_KERNEL);
+ 	if (!guaranteed)
+ 		return -ENOMEM;
+ 	drvdata->chs.guaranteed = guaranteed;
+-- 
+2.12.2
