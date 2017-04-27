@@ -1,44 +1,99 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 27 Apr 2017 10:39:00 -0700
-Subject: [PATCH v2 3/3] arm64: Silence first allocation with
- CONFIG_ARM64_MODULE_PLTS=y
-In-Reply-To: <20170427173900.2538-1-f.fainelli@gmail.com>
-References: <20170427173900.2538-1-f.fainelli@gmail.com>
-Message-ID: <20170427173900.2538-4-f.fainelli@gmail.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Thu, 27 Apr 2017 13:42:25 -0400
+Subject: [PATCH 1/2] thermal: broadcom: Allow for NSP to use ns-thermal
+ driver
+In-Reply-To: <20170427163658.GC18276@localhost.localdomain>
+References: <1493153351-12698-1-git-send-email-jon.mason@broadcom.com>
+ <1493153351-12698-2-git-send-email-jon.mason@broadcom.com>
+ <20170427163658.GC18276@localhost.localdomain>
+Message-ID: <CAC3K-4pr4LY-9unHNxMDN9YmCYHKekUo66813OUdiKkQH4QzVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_ARM64_MODULE_PLTS is enabled, the first allocation using the
-module space fails, because the module is too big, and then the module
-allocation is attempted from vmalloc space. Silence the first allocation
-failure in that case by setting __GFP_NOWARN.
+On Thu, Apr 27, 2017 at 12:37 PM, Eduardo Valentin <edubezval@gmail.com> wrote:
+> Hey Jason,
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm64/kernel/module.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+It's Jon :)
 
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index 7f316982ce00..58bd5cfdd544 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -32,11 +32,16 @@
- 
- void *module_alloc(unsigned long size)
- {
-+	gfp_t gfp_mask = GFP_KERNEL;
- 	void *p;
- 
-+#if IS_ENABLED(CONFIG_ARM64_MODULE_PLTS)
-+	/* Silence the initial allocation */
-+	gfp_mask |= __GFP_NOWARN;
-+#endif
- 	p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
- 				module_alloc_base + MODULES_VSIZE,
--				GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
-+				gfp_mask, PAGE_KERNEL_EXEC, 0,
- 				NUMA_NO_NODE, __builtin_return_address(0));
- 
- 	if (!p && IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
--- 
-2.9.3
+>
+> On Tue, Apr 25, 2017 at 04:49:10PM -0400, Jon Mason wrote:
+>> Change the iProc Kconfig to select THERMAL and THERMAL_OF, which allows
+>> the ns-thermal driver to be selected via menuconfig.  Also, change the
+>> ns-thermal driver to work on any iProc based SoC.  Finally, tweak the
+>> Kconfig description to mention support for NSP and make the default on
+>> for iProc based platforms.
+>
+>
+> Thanks for the patch, but..
+>>
+>> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+>> ---
+>>  arch/arm/mach-bcm/Kconfig        | 2 ++
+>>  drivers/thermal/broadcom/Kconfig | 9 +++++----
+>>  2 files changed, 7 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+>> index a0e66d8..da2bfeb 100644
+>> --- a/arch/arm/mach-bcm/Kconfig
+>> +++ b/arch/arm/mach-bcm/Kconfig
+>> @@ -19,6 +19,8 @@ config ARCH_BCM_IPROC
+>>       select GPIOLIB
+>>       select ARM_AMBA
+>>       select PINCTRL
+>> +     select THERMAL
+>> +     select THERMAL_OF
+>>       help
+>>         This enables support for systems based on Broadcom IPROC architected SoCs.
+>>         The IPROC complex contains one or more ARM CPUs along with common
+>
+> It would be better if this is split and sent through your arch tree, to
+> avoid conflicts. I could also pick it if you get an ack from one of your
+> maintainers. Still, first option is preferable.
+
+Sure, I'll be happy to split this off.  I should've thought to split
+it up before sending.  Thanks for the suggestion.
+
+>
+>> diff --git a/drivers/thermal/broadcom/Kconfig b/drivers/thermal/broadcom/Kconfig
+>> index f0dea8a..26d706c 100644
+>> --- a/drivers/thermal/broadcom/Kconfig
+>> +++ b/drivers/thermal/broadcom/Kconfig
+>> @@ -1,8 +1,9 @@
+>>  config BCM_NS_THERMAL
+>>       tristate "Northstar thermal driver"
+>>       depends on ARCH_BCM_IPROC || COMPILE_TEST
+>> +     default ARCH_BCM_IPROC
+>
+> Not sure if this is really what you wanted. Based on your commit log
+> message, you meant the following, perhaps?
+>
+>  +      default y if ARCH_BCM_IPROC
+
+IIUC, my original default works, as we have used it frequently in
+other places in the kernel.
+grep -rI "default ARCH_BCM_IPROC" * | wc -l
+15
+
+However, if the above is preferred (or the other 15 massively broken),
+I'll be happy to do it that way.
+
+
+>>       help
+>> -       Northstar is a family of SoCs that includes e.g. BCM4708, BCM47081,
+>> -       BCM4709 and BCM47094. It contains DMU (Device Management Unit) block
+>> -       with a thermal sensor that allows checking CPU temperature. This
+>> -       driver provides support for it.
+>> +       Support for the Northstar and Northstar Plus family of SoCs (e.g.
+>> +       BCM4708, BCM4709, BCM5301x, BCM95852X, etc). It contains DMU (Device
+>
+> Did we look BCM47094 somehow on this patch?
+
+Naa, just trying to be more concise, while adding the NSP products to
+the list..  BCM47094 is a type of BCM4709.  So, it is still there :)
+
+>
+>> +       Management Unit) block with a thermal sensor that allows checking CPU
+>> +       temperature.
+>> --
+>> 2.7.4
+>>
