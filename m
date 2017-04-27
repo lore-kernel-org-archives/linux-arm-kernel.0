@@ -1,39 +1,45 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 27 Apr 2017 11:19:00 -0700
-Subject: [PATCH v3 1/3] mm: Silence vmap() allocation failures based on caller
- gfp_flags
+Date: Thu, 27 Apr 2017 11:19:02 -0700
+Subject: [PATCH v3 3/3] arm64: Silence first allocation with
+ CONFIG_ARM64_MODULE_PLTS=y
 In-Reply-To: <20170427181902.28829-1-f.fainelli@gmail.com>
 References: <20170427181902.28829-1-f.fainelli@gmail.com>
-Message-ID: <20170427181902.28829-2-f.fainelli@gmail.com>
+Message-ID: <20170427181902.28829-4-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the caller has set __GFP_NOWARN don't print the following message:
-vmap allocation for size 15736832 failed: use vmalloc=<size> to increase
-size.
+When CONFIG_ARM64_MODULE_PLTS is enabled, the first allocation using the
+module space fails, because the module is too big, and then the module
+allocation is attempted from vmalloc space. Silence the first allocation
+failure in that case by setting __GFP_NOWARN.
 
-This can happen with the ARM/Linux or ARM64/Linux module loader built
-with CONFIG_ARM{,64}_MODULE_PLTS=y which does a first attempt at loading
-a large module from module space, then falls back to vmalloc space.
-
-Acked-by: Michal Hocko <mhocko@suse.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- mm/vmalloc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/module.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index 0b057628a7ba..b74f1d01ef76 100644
---- a/mm/vmalloc.c
-+++ b/mm/vmalloc.c
-@@ -521,7 +521,7 @@ static struct vmap_area *alloc_vmap_area(unsigned long size,
- 		}
- 	}
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index 7f316982ce00..093c13541efb 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -32,11 +32,16 @@
  
--	if (printk_ratelimit())
-+	if (!(gfp_mask & __GFP_NOWARN) && printk_ratelimit())
- 		pr_warn("vmap allocation for size %lu failed: use vmalloc=<size> to increase size\n",
- 			size);
- 	kfree(va);
+ void *module_alloc(unsigned long size)
+ {
++	gfp_t gfp_mask = GFP_KERNEL;
+ 	void *p;
+ 
++	/* Silence the initial allocation */
++	if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
++		gfp_mask |= __GFP_NOWARN;
++
+ 	p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
+ 				module_alloc_base + MODULES_VSIZE,
+-				GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
++				gfp_mask, PAGE_KERNEL_EXEC, 0,
+ 				NUMA_NO_NODE, __builtin_return_address(0));
+ 
+ 	if (!p && IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
 -- 
 2.9.3
