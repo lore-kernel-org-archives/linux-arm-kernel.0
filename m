@@ -1,147 +1,95 @@
-From: krh@bitplanet.net (Kristian H. Kristensen)
-Date: Thu, 27 Apr 2017 14:31:53 -0700
-Subject: [PATCH] drm/rockchip: Set line flag config register in
- vop_crtc_enable
-In-Reply-To: <1493276057-4516-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1493276057-4516-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <rdisefwdbkqe.fsf@hawkmoon.pdx.corp.google.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 27 Apr 2017 16:57:37 -0500
+Subject: [PATCH 1/2] dt/bindings: Add bindings for Broadcom STB DRAM
+ Sensors
+In-Reply-To: <CAGt4E5uu1Ty0ReaiBZ0kcR_-jnqJQL8vgU4Y9mL64FP7f+=T7Q@mail.gmail.com>
+References: <20170418201702.57019-1-code@mmayer.net>
+ <20170418201702.57019-2-code@mmayer.net>
+ <CAGt4E5susQWWNZPbNh8AoWtK-4yu50VL=GqOw+_2w_FA+2V68Q@mail.gmail.com>
+ <CAGt4E5uu1Ty0ReaiBZ0kcR_-jnqJQL8vgU4Y9mL64FP7f+=T7Q@mail.gmail.com>
+Message-ID: <20170427215737.dmnj4u2e4tfc6vfv@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jeffy Chen <jeffy.chen@rock-chips.com> writes:
+On Thu, Apr 27, 2017 at 11:28:37AM -0700, Markus Mayer wrote:
+> On 25 April 2017 at 12:29, Markus Mayer <markus.mayer@broadcom.com> wrote:
+> > Hi Rob,
+> >
+> > On 18 April 2017 at 13:17, Markus Mayer <code@mmayer.net> wrote:
+> >> From: Markus Mayer <mmayer@broadcom.com>
+> >>
+> >> Provide bindings for the Broadcom STB DDR PHY Front End (DPFE).
+> >
+> > Would you be able to have a look at this binding? The driver won't be
+> > upstreamed as hwmon driver (as per Guenter's comments). I am currently
+> > converting the driver to a "soc" driver instead, but the proposed
+> > binding remains unchanged.
+> >
+> > If you have comments or suggestions, I would like to incorporate them
+> > with the new series I will be sending out.
+> 
+> To explain a bit more what we are looking for: we had a internal
+> discussions how to structure this binding and are looking for some
+> guidance.
+> 
+> Should we create three different nodes for the three different memory
+> areas (dpfe-cpu at ..., dpfe-dmem at ..., dpfe-imem at ...), each with a single
+> "reg" property (which is the proposal below) or should this be one
+> single property with 3 "reg" cells, i.e. something like this:
 
-> We need to set vop config done after update line flag config, it's a
-> new requirement for chips newer than rk3368.
->
-> Since we would only use line flag irq for vact_end, let's move it to
-> vop_crtc_enable.
->
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->
-> ---
->
->  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c |  4 ++--
->  drivers/gpu/drm/rockchip/rockchip_drm_drv.h     |  3 +--
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c     | 20 +++++++++-----------
->  3 files changed, 12 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> index d8fa7a9..9bfdbc6 100644
-> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> @@ -115,8 +115,8 @@ static void analogix_dp_psr_work(struct work_struct *work)
->  
->  	vact_end = crtc->mode.vtotal - crtc->mode.vsync_start + crtc->mode.vdisplay;
+Either way could be okay. It is conceptually 1 thing or 3?
 
-We don't need vact_end anymore here.
+> 
+> dpfe-cpu at f1132000 {
+>     ...
+>     reg = <0xf1132000 0x180     /* register space */
+>            0xf1134000 0x1000    /* data memory */
+>            0xf1138000 0x4000>;  /* instruction memory */
+>     ...
+> };
+> 
+> Regards,
+> -Markus
+> 
+> >> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+> >> ---
+> >>  .../devicetree/bindings/hwmon/brcmstb-dpfe.txt     | 68 ++++++++++++++++++++++
+> >>  1 file changed, 68 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt b/Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt
+> >> new file mode 100644
+> >> index 0000000..3519197
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt
+> >> @@ -0,0 +1,68 @@
+> >> +DDR PHY Front End (DPFE) for Broadcom STB
+> >> +=========================================
+> >> +
+> >> +DPFE and the DPFE firmware provide an interface for the host CPU to
+> >> +communicate with the DCPU, which resides inside the DDR PHY.
+> >> +
+> >> +There are three memory regions for interacting with the DCPU.
+> >> +
+> >> +The DCPU Register Space
+> >> +-----------------------
+> >> +
+> >> +Required properties:
+> >> +  - compatible: must be one of brcm,bcm7271-dpfe-cpu, brcm,dpfe-cpu-v12.0.0.0
+> >> +    or brcm,dpfe-cpu
 
-Kristian
+3 compatibles is a bit excessive. You can always use 
+brcm,bcm7271-dpfe-cpu as a fallback for other chips. I wouldn't expect a 
+DDR phy to be around a long time without changes given process and DDR 
+technology changes.
 
-> -	ret = rockchip_drm_wait_line_flag(dp->encoder.crtc, vact_end,
-> -					  PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
-> +	ret = rockchip_drm_wait_vact_end(dp->encoder.crtc,
-> +					 PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
->  	if (ret) {
->  		dev_err(dp->dev, "line flag interrupt did not arrive\n");
->  		return;
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> index a48fcce..47905fa 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> @@ -62,8 +62,7 @@ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
->  				   struct device *dev);
->  void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
->  				    struct device *dev);
-> -int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
-> -				unsigned int mstimeout);
-> +int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout);
->  
->  extern struct platform_driver cdn_dp_driver;
->  extern struct platform_driver dw_hdmi_rockchip_pltfm_driver;
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index 3f7a82d..40a5e6e 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -468,7 +468,7 @@ static bool vop_line_flag_irq_is_enabled(struct vop *vop)
->  	return !!line_flag_irq;
->  }
->  
-> -static void vop_line_flag_irq_enable(struct vop *vop, int line_num)
-> +static void vop_line_flag_irq_enable(struct vop *vop)
->  {
->  	unsigned long flags;
->  
-> @@ -477,7 +477,6 @@ static void vop_line_flag_irq_enable(struct vop *vop, int line_num)
->  
->  	spin_lock_irqsave(&vop->irq_lock, flags);
->  
-> -	VOP_CTRL_SET(vop, line_flag_num[0], line_num);
->  	VOP_INTR_SET_TYPE(vop, clear, LINE_FLAG_INTR, 1);
->  	VOP_INTR_SET_TYPE(vop, enable, LINE_FLAG_INTR, 1);
->  
-> @@ -981,6 +980,8 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
->  	VOP_CTRL_SET(vop, vact_st_end, val);
->  	VOP_CTRL_SET(vop, vpost_st_end, val);
->  
-> +	VOP_CTRL_SET(vop, line_flag_num[0], vact_end);
-> +
->  	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
->  
->  	VOP_CTRL_SET(vop, standby, 0);
-> @@ -1507,19 +1508,16 @@ static void vop_win_init(struct vop *vop)
->  }
->  
->  /**
-> - * rockchip_drm_wait_line_flag - acqiure the give line flag event
-> + * rockchip_drm_wait_vact_end
->   * @crtc: CRTC to enable line flag
-> - * @line_num: interested line number
->   * @mstimeout: millisecond for timeout
->   *
-> - * Driver would hold here until the interested line flag interrupt have
-> - * happened or timeout to wait.
-> + * Wait for vact_end line flag irq or timeout.
->   *
->   * Returns:
->   * Zero on success, negative errno on failure.
->   */
-> -int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
-> -				unsigned int mstimeout)
-> +int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout)
->  {
->  	struct vop *vop = to_vop(crtc);
->  	unsigned long jiffies_left;
-> @@ -1527,14 +1525,14 @@ int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
->  	if (!crtc || !vop->is_enabled)
->  		return -ENODEV;
->  
-> -	if (line_num > crtc->mode.vtotal || mstimeout <= 0)
-> +	if (mstimeout <= 0)
->  		return -EINVAL;
->  
->  	if (vop_line_flag_irq_is_enabled(vop))
->  		return -EBUSY;
->  
->  	reinit_completion(&vop->line_flag_completion);
-> -	vop_line_flag_irq_enable(vop, line_num);
-> +	vop_line_flag_irq_enable(vop);
->  
->  	jiffies_left = wait_for_completion_timeout(&vop->line_flag_completion,
->  						   msecs_to_jiffies(mstimeout));
-> @@ -1547,7 +1545,7 @@ int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
->  
->  	return 0;
->  }
-> -EXPORT_SYMBOL(rockchip_drm_wait_line_flag);
-> +EXPORT_SYMBOL(rockchip_drm_wait_vact_end);
->  
->  static int vop_bind(struct device *dev, struct device *master, void *data)
->  {
-> -- 
-> 2.1.4
->
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> >> +  - reg: must reference the start address and length of the DCPU register
+> >> +    space
+> >> +
+> >> +Optional properties:
+> >> +  - cell-index: the index of the DPFE instance; will default to 0 if not set
+
+Don't use cell-index. It's not a valid property for FDT (only real 
+OpenFirmware).
+
+Rob
