@@ -1,52 +1,103 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 27 Apr 2017 14:55:14 +0100
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <20170423014546.GA2704@dhcp-whq-twvpn-1-vpnpool-10-159-153-149.vpn.oracle.com>
-References: <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
- <20170330100524.GA22801@red-moon>
- <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
- <CAKv+Gu8YjySTDMgsrtGqEPMOtVhHc8gvTHZ4C5Ga8OTYdC9R3A@mail.gmail.com>
- <ae87ae28-f50d-095f-576e-f3fd7f96dea2@codeaurora.org>
- <CAKv+Gu8x0rQUnTUorknW-mW9LFgrxFYsXyy4LU_w9JbA-m_sjA@mail.gmail.com>
- <CAKv+Gu9Su0F9CSRe=sxomuDDH7c2szO6Z8dpqOQ=t_1Vn3JD3g@mail.gmail.com>
- <20170410165328.GA5248@red-moon>
- <CAKv+Gu-AN-OwnAJG5dt0Qg4GU8HxZBowTSA0H3LhNA3nHfrsQg@mail.gmail.com>
- <CAKv+Gu9dS4OhLbBw59yKYQmoJ8SpFexzk9yH=XfXnzn8NJ4mcg@mail.gmail.com>
- <20170423014546.GA2704@dhcp-whq-twvpn-1-vpnpool-10-159-153-149.vpn.oracle.com>
-Message-ID: <CAKv+Gu_n7xP-2RtF44GVzwyoMXDOeF-bR43yStwp2y+oBNs4jg@mail.gmail.com>
+From: gregkh@linuxfoundation.org (gregkh)
+Date: Thu, 27 Apr 2017 16:04:55 +0200
+Subject: stable/linux-3.18.y build: 204 builds: 5 failed, 199 passed, 35
+ errors, 212 warnings (v3.18.49)
+In-Reply-To: <CAK8P3a0QN_8PPGaMYA8GZG6axseRLcJq=--1NgfOAPaEGgiAjg@mail.gmail.com>
+References: <58f8ea00.84621c0a.da7d6.1c19@mx.google.com>
+ <CAK8P3a3QsSMtc7AWjVjtM+tW8ARt1Ygw53=CSjgbG6Pvpq0QvQ@mail.gmail.com>
+ <20170427103348.GA9881@kroah.com>
+ <CAK8P3a0QN_8PPGaMYA8GZG6axseRLcJq=--1NgfOAPaEGgiAjg@mail.gmail.com>
+Message-ID: <20170427140455.GA1919@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2017 at 02:45, Yinghai Lu <yinghai@kernel.org> wrote:
-> On Mon, Apr 10, 2017 at 06:29:27PM +0100, Ard Biesheuvel wrote:
->>  /*
->> @@ -208,8 +208,8 @@ struct pci_bus *pci_acpi_scan_root(struct
->> acpi_pci_root *root)
->>         if (!bus)
->>                 return NULL;
->>
->> -       pci_bus_size_bridges(bus);
->> -       pci_bus_assign_resources(bus);
->> +       pci_assign_unassigned_root_bus_resources(bus);
->> +       pci_bus_claim_resources(bus);
->>
->>         list_for_each_entry(child, &bus->children, node)
->>                 pcie_bus_configure_settings(child);
->>
->
-> looks like those two lines are reversed. you should use:
->                 pcibios_resource_survey_bus(bus);
->                 pci_assign_unassigned_root_bus_resources(bus);
->
-> please check x86 pcibios_resource_survey_bus() definition in
->         arch/x86/pci/i386.c
->
-> but pci_bus_claim_resources() should work too.
->
+On Thu, Apr 27, 2017 at 01:40:22PM +0200, Arnd Bergmann wrote:
+> On Thu, Apr 27, 2017 at 12:33 PM, gregkh <gregkh@linuxfoundation.org> wrote:
+> > On Fri, Apr 21, 2017 at 04:27:14PM +0200, Arnd Bergmann wrote:
+> >> On Thu, Apr 20, 2017 at 7:04 PM, kernelci.org bot <bot@kernelci.org> wrote:
+> >> > stable/linux-3.18.y build: 204 builds: 5 failed, 199 passed, 35 errors, 212 warnings (v3.18.49)
+> >>
+> >> I've gone through all these now and found a fix. In three cases, there is no
+> >> fix yet since the respective drivers got removed before the warning was
+> >> noticed. Do we have a policy for how to deal with those? Should I just
+> >> send patches to address the warnings for 3.18?
+> >
+> > I've wondered about this, and yeah, I would like to see the number drop
+> > to 0 if at all possible (the scsi driver will not change), so i'll be
+> > glad to take patches for the code that is no longer in upstream.
+> 
+> Ok, I'll have a go at this after the build report.
+> 
+> >> > drivers/scsi/advansys.c:71:2: warning: #warning this driver is still not
+> >> > properly converted to the DMA API [-Wcpp]
+> >>
+> >> The driver was properly converted in v4.2 and the warning removed, but the
+> >> conversion would be outside of stable-kernel-rules.
+> >
+> > Yeah, this one is going to have to stay as-is :(
+> 
+> How about just shutting up the #warning then, based on the argument that
+> the warning isn't helping anyone fix it, and all the other drivers that had not
+> been converted at the time don't come with a #warning?
 
-Thanks Yinghai
+Yes, I'll take a patch for that, especially as the driver is now fixed
+in newer kernels.
 
-pcibios_resource_survey_bus() is actually an empty function on arm64,
-but I guess that is where logic should go that checks the state of the
-BARs before trying to claim anything?
+> >> aebac99384f7 ("MIPS: kernel: entry.S: Set correct ISA level for mips_ihb")
+> >
+> > That was in 3.18.14, what kernel are you looking at here???
+> 
+> For most of the changes, I tried looking at 'git log v3.18..stable/linux-4.4.y'
+> and immediately found the obvious fix. If that didn't help, I tried a few other
+> things, but I usually did not look in 3.18.y to see if it was already there
+> if I found something at first that looked obviously right.
+> 
+> This is another case where I confused the patch that introduced the
+> warning with the one that fixed it. This one requires a another patch that
+> got merged into 3.20:
+> 
+> be5136988e25 ("MIPS: asm: compiler: Add new macros to set ISA and arch
+> asm annotations")
+
+There was no "3.20", it was "4.0" :)
+
+Thanks, I've applied this now.
+
+> >> > cerfcube_defconfig (arm) ? PASS, 0 errors, 2 warnings, 0 section mismatches
+> >> >
+> >> > Warnings:
+> >> > fs/nfsd/nfs4state.c:3781:3: warning: 'old_deny_bmap' may be used
+> >> > uninitialized in this function [-Wmaybe-uninitialized]
+> >>
+> >> 5368e1a6 ("nfsd: work around a gcc-5.1 warning")
+> 
+> It's a copy-paste mistake, missing the first digits of the commit ID,
+> I found the correct one now:
+> 
+> 6ac75368e1a6 nfsd: work around a gcc-5.1 warning
+
+Now applied.
+
+> > That commit id isn't in Linus's tree, where did you get it from?
+> >> > defconfig+CONFIG_LKDTM=y (mips) ? PASS, 0 errors, 3 warnings, 0 section
+> >> > mismatches
+> >> >
+> >> > Warnings:
+> >> > include/asm-generic/div64.h:43:28: warning: comparison of distinct pointer
+> >> > types lacks a cast
+> >> > include/asm-generic/div64.h:43:28: warning: comparison of distinct pointer
+> >> > types lacks a cast
+> >>
+> >> 2ae83bf93882 ("[CIFS] Fix setting time before epoch (negative time values)")
+> >
+> > That was in 3.17, are you sure you are looking at 3.18 like the subject
+> > says???
+> 
+> Another similar mistake on my end, 2ae83bf93882 introduced the problem,
+> the fix we need was
+> 
+> 97c7134ae22f ("Fix signed/unsigned pointer warning")
+
+Looks good, also now applied, thanks.
+
+greg k-h
