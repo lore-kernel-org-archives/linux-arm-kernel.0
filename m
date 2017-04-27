@@ -1,209 +1,223 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 27 Apr 2017 09:38:52 -0700
-Subject: [PATCH v5 01/22] KVM: arm/arm64: Add ITS save/restore API
- documentation
-In-Reply-To: <c3dd2ad2-b068-f158-10d7-53e27bd2b1bf@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-2-git-send-email-eric.auger@redhat.com>
- <20170426123120.GL4104@cbox>
- <88a194fa-9143-960e-e0a6-6b5c388cef82@redhat.com>
- <20170427085709.GB50776@lvm>
- <db5d0eb9-67eb-8b9a-50ca-816d217b3f53@redhat.com>
- <20170427110223.GH50776@lvm>
- <d0aa6771-a8c3-276e-0f70-d709cdf678d6@redhat.com>
- <20170427144516.GL50776@lvm>
- <c3dd2ad2-b068-f158-10d7-53e27bd2b1bf@redhat.com>
-Message-ID: <20170427163852.GO50776@lvm>
+From: kdinh@apm.com (Khuong Dinh)
+Date: Thu, 27 Apr 2017 09:42:16 -0700
+Subject: [PATCH v4 00/21] PCI: fix config space memory mappings
+In-Reply-To: <745824fc-016a-38b2-01a3-398399d4c80a@huawei.com>
+References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
+ <2e24e205-d761-9172-9463-4a53e1a0de4d@jonmasters.org>
+ <361fde15-5ba3-d33b-f946-003e89ba071f@huawei.com>
+ <000501d2beb2$023b9100$06b2b300$@gmail.com>
+ <745824fc-016a-38b2-01a3-398399d4c80a@huawei.com>
+Message-ID: <CAAsHzqtOR-Sv0ocU86fUoJEJSFkMKXPXrGPa9JV-G_5tPTFXBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 05:29:35PM +0200, Auger Eric wrote:
-> 
-> 
-> On 27/04/2017 16:45, Christoffer Dall wrote:
-> > Hi Eric,
-> > 
-> > On Thu, Apr 27, 2017 at 02:51:00PM +0200, Auger Eric wrote:
-> >> On 27/04/2017 13:02, Christoffer Dall wrote:
-> >>> On Thu, Apr 27, 2017 at 11:33:39AM +0200, Auger Eric wrote:
-> >>>> On 27/04/2017 10:57, Christoffer Dall wrote:
-> >>>>> On Wed, Apr 26, 2017 at 05:48:32PM +0200, Auger Eric wrote:
-> >>>>>> On 26/04/2017 14:31, Christoffer Dall wrote:
-> >>>>>>> On Fri, Apr 14, 2017 at 12:15:13PM +0200, Eric Auger wrote:
-> >>>>>>>> Add description for how to access ITS registers and how to save/restore
-> >>>>>>>> ITS tables into/from memory.
-> >>>>>>>>
-> >>>>>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> >>>>>>>>
-> >>>>>>>> ---
-> >>>>>>>> v4 -> v5:
-> >>>>>>>> - take into account Christoffer's comments
-> >>>>>>>> - pending table save on GICV3 side now
-> >>>>>>>>
-> >>>>>>>> v3 -> v4:
-> >>>>>>>> - take into account Peter's comments:
-> >>>>>>>>   - typos
-> >>>>>>>>   - KVM_DEV_ARM_VGIC_GRP_ITS_TABLES kvm_device_attr = 0
-> >>>>>>>>   - add a validity bit in DTE
-> >>>>>>>>   - document all fields in CTE and ITE
-> >>>>>>>>   - document ABI revision
-> >>>>>>>> - take into account Andre's comments:
-> >>>>>>>>   - document restrictions about GITS_CREADR writing and GITS_IIDR
-> >>>>>>>>   - document -EBUSY error if one or more VCPUS are runnning
-> >>>>>>>>   - document 64b registers only can be accessed with 64b access
-> >>>>>>>> - itt_addr field matches bits [51:8] of the itt_addr
-> >>>>>>>>
-> >>>>>>>> v1 -> v2:
-> >>>>>>>> - DTE and ITE now are 8 bytes
-> >>>>>>>> - DTE and ITE now indexed by deviceid/eventid
-> >>>>>>>> - use ITE name instead of ITTE
-> >>>>>>>> - mentions ITT_addr matches bits [51:8] of the actual address
-> >>>>>>>> - mentions LE layout
-> >>>>>>>> ---
-> >>>>>>>>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 99 ++++++++++++++++++++++
-> >>>>>>>>  1 file changed, 99 insertions(+)
-> >>>>>>>>
-> >>>>>>>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> >>>>>>>> index 6081a5b..b5f010d 100644
-> >>>>>>>> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> >>>>>>>> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> >>>>>>>> @@ -32,7 +32,106 @@ Groups:
-> >>>>>>>>      KVM_DEV_ARM_VGIC_CTRL_INIT
-> >>>>>>>>        request the initialization of the ITS, no additional parameter in
-> >>>>>>>>        kvm_device_attr.addr.
-> >>>>>>>> +
-> >>>>>>>> +    KVM_DEV_ARM_ITS_SAVE_TABLES
-> >>>>>>>> +      save the ITS table data into guest RAM, at the location provisioned
-> >>>>>>>> +      by the guest in corresponding registers/table entries.
-> >>>>>>>> +
-> >>>>>>>> +      The layout of the tables in guest memory defines an ABI. The entries
-> >>>>>>>> +      are laid out in little endian format as described in the last paragraph.
-> >>>>>>>> +
-> >>>>>>>> +    KVM_DEV_ARM_ITS_RESTORE_TABLES
-> >>>>>>>> +      restore the ITS tables from guest RAM to ITS internal structures.
-> >>>>>>>> +
-> >>>>>>>> +      The GICV3 must be restored before the ITS and all ITS registers but
-> >>>>>>>> +      the GITS_CTLR must be restored before restoring the ITS tables.
-> >>>>>>>> +
-> >>>>>>>> +      The GITS_IIDR read-only register must also be restored before
-> >>>>>>>> +      the table restore as the IIDR revision field encodes the ABI revision.
-> >>>>>>>> +
-> >>>>>>>
-> >>>>>>> what is the expected sequence of operations.  For example, to restore
-> >>>>>>> the ITS, do I call KVM_DEV_ARM_VGIC_CTRL_INIT first, then restore all
-> >>>>>>> the memory and registers, and finally call KVM_DEV_ARM_ITS_RESTORE_TABLES?
-> >>>>>> Yes KVM_DEV_ARM_VGIC_CTRL_INIT comes first, then restore all registers
-> >>>>>> except GITS_CTLR, then table restore, then GITS_CTLR
-> >>>>>>>
-> >>>>>>> Is there any interaction between when you call KVM_DEV_ARM_ITS_RESTORE_TABLES
-> >>>>>>> and restore GITS_CTLR (which enables the ITS)?
-> >>>>>>
-> >>>>>> Yep, when GITS_CTLR is set, LPIs may be enabled and this on that event
-> >>>>>> that the pending table is read. But the whole pending table is not read
-> >>>>>> as we only iterate on registered LPIs. So the ITT must have been
-> >>>>>> restored previously.
-> >>>>>>
-> >>>>>> I became aware that the pending table sync is done twice, once in the
-> >>>>>> pending table restore,  and once in the GITS_CTLR restore. So if we
-> >>>>>> leave this order specification, I should be able to remove the sync on
-> >>>>>> table restore. This was the original reason why GITS_CTLR restore has
-> >>>>>> been done at the very end.
-> >>>>>
-> >>>>> I'm sorry, I'm a bit confused.  Do we not need
-> >>>>> KVM_DEV_ARM_ITS_RESTORE_TABLES at all then?
-> >>>>
-> >>>> Yes you do. I was talking about the RDIST pending table sync. The save
-> >>>> is explicit using GICV3 device KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES.
-> >>>> However the sync is implicit on GITS_CTLR restore if LPIs are enabled.
-> >>>> and today I do it also on ITS device KVM_DEV_ARM_ITS_RESTORE_TABLES
-> >>>> which is not requested I think since GITS_CTLR restore does it already.
-> >>>
-> >>> Shouldn't restoring the pending tables happen when restoring some
-> >>> redeistributor state and not anything related to the ITS?
-> >>
-> >> Marc wrote:
-> >> "
-> >> I don't think you necessarily need a coarse map. When restoring the ITS
-> >> tables, you can always read the pending bit when creating the LPI
-> >> structure (it has been written to RAM at save time). Note that we
-> >> already do something like this in vgic_enable_lpis().
-> >> "
-> >>
-> >> This is currently what is implemented I think. the pending tables are
-> >> currently sync'ed on GITS_CTLR set (if LPI are enabled) + erroneously
-> >> also on on ITS table restore
-> >>
-> >> The problematic is: Either you know in advance which LPI INTIDare used
-> >> or you need to parse the whole pending table (possibly using the 1st kB
-> >> as coarse mapping).
-> >>
-> >> If you don't know the LPI INTIDs in advance it is only possible to
-> >> restore the pending bit of pending LPIs. At that time you would
-> >> re-allocate those pending LPI (vgic_add_lpi) and when you restore the
-> >> ITS ITT you would do the same for those which were not pending. Looks
-> >> really heavy to me: coarse mapping + dual vgic_add_lpi path.
-> >>
-> >> Otherwise we would need to add another dependency between RDIST pending
-> >> table restore and ITS table restore but this looks even more weird, no?
-> >>
-> >>
-> > So I just sat down with Andre and Marc and we tried to work through this
-> > and came up with the best scheme.  I apologize in advance for the
-> > one-way nature of this e-mail, and I am of course open to discussing the
-> > following proposal again if you do not agree.
-> > 
-> > What I think this document should say, is that the following ordering
-> > must be followed when restoring the GIC and the ITS:
-> > 
-> >   First, restore all guest memory
-> > 
-> >   Second, restore ALL redistributors
-> > 
-> >   Third, restore the ITS, in the following order:
-> >     1. Initialize the ITS (KVM_DEV_ARM_VGIC_CTRL_INIT)
-> >     2. Restore GITS_CBASER
-> >     3. Restore all other GITS_ registers, except GITS_CTLR!
-> >     4. Load the ITS table data (KVM_DEV_ARM_ITS_RESTORE_TABLES)
-> >     5. Restore GITS_CTLR
-> > 
-> > The rationale is that we really want the redistributor and the ITS
-> > restore to be independent and follow the architecture.  This means that
-> > our ABI for the redistributor should still work without restoring an ITS
-> > (if we ever decide to support LPIs for KVM without the ITS).
-> 
-> OK. Note I already mentioned that GICv3 must be restored before the ITS.
-> To me this comprised the RDIST.
+Hi,
+  They're same before and after applying the patch.
+  It was tested with X-Gene 1 and X-Gene 2 with DT (Device Tree) and ACPI boot.
 
-Possibly, but I think it's good to write out the whole thing so we
-clearly understand the flow.  That could better be achieved by
-correcting my proposed text above to say something like "Second, restore
-ALL redistributors to ensure the pending and configuration tables can be
-read."
+  X-Gene 1 - DT :
+[root@(none) ~]# lspci -s 01:00.0 -v
+01:00.0 Ethernet controller: Intel Corporation 82574L Gigabit Network Connection
+        Subsystem: Intel Corporation Gigabit CT Desktop Adapter
+        Flags: bus master, fast devsel, latency 0, IRQ 68
+        Memory at e1800c0000 (32-bit, non-prefetchable) [size=128K]
+        Memory at e180000000 (32-bit, non-prefetchable) [size=512K]
+        I/O ports at 1000 [disabled] [size=32]
+        Memory at e1800e0000 (32-bit, non-prefetchable) [size=16K]
+        Expansion ROM at e180080000 [disabled] [size=256K]
+        Capabilities: [c8] Power Management version 2
+        Capabilities: [d0] MSI: Enable- Count=1/1 Maskable- 64bit+
+        Capabilities: [e0] Express Endpoint, MSI 00
+        Capabilities: [a0] MSI-X: Enable+ Count=5 Masked-
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [140] Device Serial Number 00-1b-21-ff-ff-4f-68-3d
+        Kernel driver in use: e1000e
 
-> 
-> I understand the above description of the ordering comes in addition to
-> the existing text, right? 
+  X-Gene 1 - ACPI :
+[root@(none) ~]# lspci -s 01:00.0 -v
+01:00.0 Ethernet controller: Intel Corporation 82574L Gigabit Network Connection
+        Subsystem: Intel Corporation Gigabit CT Desktop Adapter
+        Flags: bus master, fast devsel, latency 0, IRQ 117
+        Memory at e0400c0000 (32-bit, non-prefetchable) [size=128K]
+        Memory at e040000000 (32-bit, non-prefetchable) [size=512K]
+        I/O ports at 1000 [disabled] [size=32]
+        Memory at e0400e0000 (32-bit, non-prefetchable) [size=16K]
+        Expansion ROM at e040080000 [disabled] [size=256K]
+        Capabilities: [c8] Power Management version 2
+        Capabilities: [d0] MSI: Enable- Count=1/1 Maskable- 64bit+
+        Capabilities: [e0] Express Endpoint, MSI 00
+        Capabilities: [a0] MSI-X: Enable- Count=5 Masked-
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [140] Device Serial Number 00-1b-21-ff-ff-4f-68-3d
+        Kernel driver in use: e1000e
 
-Yes
+ X-Gene 2 - DT :
+[root@(none) ~]# lspci -s 0000:01:00.0 -v
+0000:01:00.0 Ethernet controller: Intel Corporation 82572EI Gigabit
+Ethernet Controller (Copper) (rev 06)
+        Subsystem: Intel Corporation PRO/1000 PT Desktop Adapter
+        Flags: bus master, fast devsel, latency 0, IRQ 49
+        Memory at c120000000 (32-bit, non-prefetchable) [size=128K]
+        Memory at c120020000 (32-bit, non-prefetchable) [size=128K]
+        I/O ports at 1000 [disabled] [size=32]
+        Expansion ROM at c120040000 [disabled] [size=128K]
+        Capabilities: [c8] Power Management version 2
+        Capabilities: [d0] MSI: Enable+ Count=1/1 Maskable- 64bit+
+        Capabilities: [e0] Express Endpoint, MSI 00
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [140] Device Serial Number 00-1b-21-ff-ff-1e-84-4e
+        Kernel driver in use: e1000e
 
-> in other words I keep the GITS_READR,
-> GITS_IIDR specific text as well as KVM_DEV_ARM_ITS_SAVE/RESTORE_TABLES
-> section.
-> 
+ X-Gene 2 - ACPI :
+[root@(none) ~]# lspci -s 0000:01:00.0 -v
+0000:01:00.0 Ethernet controller: Intel Corporation 82572EI Gigabit
+Ethernet Controller (Copper) (rev 06)
+        Subsystem: Intel Corporation PRO/1000 PT Desktop Adapter
+        Flags: bus master, fast devsel, latency 0, IRQ 93
+        Memory at c040000000 (32-bit, non-prefetchable) [size=128K]
+        Memory at c040020000 (32-bit, non-prefetchable) [size=128K]
+        I/O ports at 1000 [disabled] [size=32]
+        Expansion ROM at c040040000 [disabled] [size=128K]
+        Capabilities: [c8] Power Management version 2
+        Capabilities: [d0] MSI: Enable+ Count=1/1 Maskable- 64bit+
+        Capabilities: [e0] Express Endpoint, MSI 00
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [140] Device Serial Number 00-1b-21-ff-ff-1e-84-4e
+        Kernel driver in use: e1000e
 
-Yes.  But you don't need to do any reading of the pending table on any
-of the restore operations.
+Best regards,
+Khuong Dinh
 
-Btw., I think it's GITS_CREADR, not GITS_READR.
+On Wed, Apr 26, 2017 at 6:46 PM, Dongdong Liu <liudongdong3@huawei.com> wrote:
+>
+>
+> ? 2017/4/27 1:24, Jingoo Han ??:
+>>
+>> On Wednesday, April 26, 2017 6:54 AM, Dongdong Liu wrote;
+>>>
+>>>
+>>> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+>>>
+>>> I tested the patchset on HiSilicon ARM64 D05 board.It works ok with 82599
+>>> netcard.
+>>
+>>
+>> Thank you for testing these patches. HiSilicon PCIe may use
+>> Designware-based
+>> PCIe controller. In my opinion, other Designware-based PCIe controller
+>> will
+>> work properly.
+>>
+>> To Dongdong Liu, Khuong Dinh, and other people,
+>> If possible, can you check the output of 'lspci -v'?
+>> If you find something different, please share it with us.
+>> Good luck.
+>
+>
+> root@(none)$ ./lspci -v
+> 0002:80:00.0 Class 0604: Device 19e5:1610 (rev 01)
+>         Flags: bus master, fast devsel, latency 0
+>         Memory at a9e00000 (32-bit, non-prefetchable) [size=64K]
+>         Bus: primary=80, secondary=81, subordinate=82, sec-latency=0
+>         I/O behind bridge: 00000000-00001fff
+>         Memory behind bridge: a8800000-a8ffffff
+>         Prefetchable memory behind bridge: 00000000a9000000-00000000a9dfffff
+>         Capabilities: [40] Power Management version 3
+>         Capabilities: [50] MSI: Enable- Count=1/32 Maskable+ 64bit+
+>         Capabilities: [70] Express Root Port (Slot-), MSI 00
+>         Capabilities: [100] Advanced Error Reporting
+>         Capabilities: [158] #19
+>         Capabilities: [178] #17
+>         Kernel driver in use: pcieport
+>
+> 0002:81:00.0 Class 0200: Device 8086:10fb (rev 01)
+>         Flags: bus master, fast devsel, latency 0, IRQ 255
+>         Memory at a9000000 (64-bit, prefetchable) [size=4M]
+>         I/O ports at 1000 [disabled] [size=32]
+>         Memory at a9800000 (64-bit, prefetchable) [size=16K]
+>         Expansion ROM at a8800000 [disabled] [size=4M]
+>         Capabilities: [40] Power Management version 3
+>         Capabilities: [50] MSI: Enable- Count=1/1 Maskable+ 64bit+
+>         Capabilities: [70] MSI-X: Enable+ Count=64 Masked-
+>         Capabilities: [a0] Express Endpoint, MSI 00
+>         Capabilities: [e0] Vital Product Data
+>         Capabilities: [100] Advanced Error Reporting
+>         Capabilities: [140] Device Serial Number 9c-37-f4-ff-ff-7b-5b-a0
+>         Capabilities: [150] Alternative Routing-ID Interpretation (ARI)
+>         Capabilities: [160] Single Root I/O Virtualization (SR-IOV)
+>         Kernel driver in use: ixgbe
+>
+> 0002:81:00.1 Class 0200: Device 8086:10fb (rev 01)
+>         Flags: bus master, fast devsel, latency 0, IRQ 255
+>         Memory at a9400000 (64-bit, prefetchable) [size=4M]
+>         I/O ports at 1020 [disabled] [size=32]
+>         Memory at a9a04000 (64-bit, prefetchable) [size=16K]
+>         Expansion ROM at a8c00000 [disabled] [size=4M]
+>         Capabilities: [40] Power Management version 3
+>         Capabilities: [50] MSI: Enable- Count=1/1 Maskable+ 64bit+
+>         Capabilities: [70] MSI-X: Enable+ Count=64 Masked-
+>         Capabilities: [a0] Express Endpoint, MSI 00
+>         Capabilities: [e0] Vital Product Data
+>         Capabilities: [100] Advanced Error Reporting
+>         Capabilities: [140] Device Serial Number 9c-37-f4-ff-ff-7b-5b-a0
+>         Capabilities: [150] Alternative Routing-ID Interpretation (ARI)
+>         Capabilities: [160] Single Root I/O Virtualization (SR-IOV)
+>         Kernel driver in use: ixgbe
+>
+> 0004:88:00.0 Class 0604: Device 19e5:1610 (rev 01)
+>         Flags: bus master, fast devsel, latency 0
+>         Memory at 8a9000000 (32-bit, non-prefetchable) [size=64K]
+>         Bus: primary=88, secondary=89, subordinate=89, sec-latency=0
+>         Capabilities: [40] Power Management version 3
+>         Capabilities: [50] MSI: Enable- Count=1/32 Maskable+ 64bit+
+>         Capabilities: [70] Express Root Port (Slot-), MSI 00
+>         Capabilities: [100] Advanced Error Reporting
+>         Capabilities: [158] #19
+>         Capabilities: [178] #17
+>         Kernel driver in use: pcieport
+>
+> Thanks,
+> Dongdong
+>>
+>>
+>> Best regards,
+>> Jingoo Han
+>>
+>>>
+>>> Thanks,
+>>> Dongdong
+>>> ? 2017/4/25 14:40, Jon Masters ??:
+>>>>
+>>>> On 04/19/2017 12:48 PM, Lorenzo Pieralisi wrote:
+>>>>
+>>>>> On some platforms (ie ARM/ARM64) ioremap fails to comply with the PCI
+>>>>> configuration non-posted write transactions requirement, because it
+>>>>> provides a memory mapping that issues "bufferable" or, in PCI terms
+>>>>> "posted" write transactions. Likewise, the current pci_remap_iospace()
+>>>>> implementation maps the physical address range that the PCI translates
+>>>>> to I/O space cycles to virtual address space through pgprot_device()
+>>>>> attributes that on eg ARM64 provides a memory mapping issuing
+>>>>> posted writes transactions, which is not PCI specifications compliant.
+>>>>
+>>>>
+>>>> Side note that I've pinged all of the ARM server vendors and asked them
+>>>> to verify this patch series on their platforms.
+>>>>
+>>>> Jon.
+>>>>
+>>>> .
+>>>>
+>>
+>> .
+>>
+>
 
-> > 
-> > In terms of our current implementation this means that vgic_add_lpi()
-> > should ask the redistributor what the state of the LPI is (priority,
-> > enabled, pending).
-> this practically means I move update_lpi_config call from
-> vgic_its_restore_ite to vgic_add_lpi(). OK
-
-Pretty much, yes.
-
-Thanks,
--Christoffer
+-- 
+CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is 
+for the sole use of the intended recipient(s) and contains information that 
+is confidential and proprietary to Applied Micro Circuits Corporation or 
+its subsidiaries. It is to be used solely for the purpose of furthering the 
+parties' business relationship. All unauthorized review, use, disclosure or 
+distribution is prohibited. If you are not the intended recipient, please 
+contact the sender by reply e-mail and destroy all copies of the original 
+message.
