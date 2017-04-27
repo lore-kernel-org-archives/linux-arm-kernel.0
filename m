@@ -1,37 +1,147 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Thu, 27 Apr 2017 17:23:13 -0400
-Subject: [PATCH v2 2/3] thermal: broadcom: ns-thermal: default on iProc SoCs
-In-Reply-To: <1493328194-1766-1-git-send-email-jon.mason@broadcom.com>
-References: <1493328194-1766-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1493328194-1766-3-git-send-email-jon.mason@broadcom.com>
+From: krh@bitplanet.net (Kristian H. Kristensen)
+Date: Thu, 27 Apr 2017 14:31:53 -0700
+Subject: [PATCH] drm/rockchip: Set line flag config register in
+ vop_crtc_enable
+In-Reply-To: <1493276057-4516-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1493276057-4516-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <rdisefwdbkqe.fsf@hawkmoon.pdx.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tweak the Kconfig description to mention support for NSP and make the
-default on for iProc based platforms.
+Jeffy Chen <jeffy.chen@rock-chips.com> writes:
 
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- drivers/thermal/broadcom/Kconfig | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+> We need to set vop config done after update line flag config, it's a
+> new requirement for chips newer than rk3368.
+>
+> Since we would only use line flag irq for vact_end, let's move it to
+> vop_crtc_enable.
+>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>
+> ---
+>
+>  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c |  4 ++--
+>  drivers/gpu/drm/rockchip/rockchip_drm_drv.h     |  3 +--
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c     | 20 +++++++++-----------
+>  3 files changed, 12 insertions(+), 15 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> index d8fa7a9..9bfdbc6 100644
+> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> @@ -115,8 +115,8 @@ static void analogix_dp_psr_work(struct work_struct *work)
+>  
+>  	vact_end = crtc->mode.vtotal - crtc->mode.vsync_start + crtc->mode.vdisplay;
 
-diff --git a/drivers/thermal/broadcom/Kconfig b/drivers/thermal/broadcom/Kconfig
-index f0dea8a..26d706c 100644
---- a/drivers/thermal/broadcom/Kconfig
-+++ b/drivers/thermal/broadcom/Kconfig
-@@ -1,8 +1,9 @@
- config BCM_NS_THERMAL
- 	tristate "Northstar thermal driver"
- 	depends on ARCH_BCM_IPROC || COMPILE_TEST
-+	default ARCH_BCM_IPROC
- 	help
--	  Northstar is a family of SoCs that includes e.g. BCM4708, BCM47081,
--	  BCM4709 and BCM47094. It contains DMU (Device Management Unit) block
--	  with a thermal sensor that allows checking CPU temperature. This
--	  driver provides support for it.
-+	  Support for the Northstar and Northstar Plus family of SoCs (e.g.
-+	  BCM4708, BCM4709, BCM5301x, BCM95852X, etc). It contains DMU (Device
-+	  Management Unit) block with a thermal sensor that allows checking CPU
-+	  temperature.
--- 
-2.7.4
+We don't need vact_end anymore here.
+
+Kristian
+
+> -	ret = rockchip_drm_wait_line_flag(dp->encoder.crtc, vact_end,
+> -					  PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
+> +	ret = rockchip_drm_wait_vact_end(dp->encoder.crtc,
+> +					 PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
+>  	if (ret) {
+>  		dev_err(dp->dev, "line flag interrupt did not arrive\n");
+>  		return;
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+> index a48fcce..47905fa 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+> @@ -62,8 +62,7 @@ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
+>  				   struct device *dev);
+>  void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
+>  				    struct device *dev);
+> -int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
+> -				unsigned int mstimeout);
+> +int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout);
+>  
+>  extern struct platform_driver cdn_dp_driver;
+>  extern struct platform_driver dw_hdmi_rockchip_pltfm_driver;
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 3f7a82d..40a5e6e 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -468,7 +468,7 @@ static bool vop_line_flag_irq_is_enabled(struct vop *vop)
+>  	return !!line_flag_irq;
+>  }
+>  
+> -static void vop_line_flag_irq_enable(struct vop *vop, int line_num)
+> +static void vop_line_flag_irq_enable(struct vop *vop)
+>  {
+>  	unsigned long flags;
+>  
+> @@ -477,7 +477,6 @@ static void vop_line_flag_irq_enable(struct vop *vop, int line_num)
+>  
+>  	spin_lock_irqsave(&vop->irq_lock, flags);
+>  
+> -	VOP_CTRL_SET(vop, line_flag_num[0], line_num);
+>  	VOP_INTR_SET_TYPE(vop, clear, LINE_FLAG_INTR, 1);
+>  	VOP_INTR_SET_TYPE(vop, enable, LINE_FLAG_INTR, 1);
+>  
+> @@ -981,6 +980,8 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+>  	VOP_CTRL_SET(vop, vact_st_end, val);
+>  	VOP_CTRL_SET(vop, vpost_st_end, val);
+>  
+> +	VOP_CTRL_SET(vop, line_flag_num[0], vact_end);
+> +
+>  	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
+>  
+>  	VOP_CTRL_SET(vop, standby, 0);
+> @@ -1507,19 +1508,16 @@ static void vop_win_init(struct vop *vop)
+>  }
+>  
+>  /**
+> - * rockchip_drm_wait_line_flag - acqiure the give line flag event
+> + * rockchip_drm_wait_vact_end
+>   * @crtc: CRTC to enable line flag
+> - * @line_num: interested line number
+>   * @mstimeout: millisecond for timeout
+>   *
+> - * Driver would hold here until the interested line flag interrupt have
+> - * happened or timeout to wait.
+> + * Wait for vact_end line flag irq or timeout.
+>   *
+>   * Returns:
+>   * Zero on success, negative errno on failure.
+>   */
+> -int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
+> -				unsigned int mstimeout)
+> +int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout)
+>  {
+>  	struct vop *vop = to_vop(crtc);
+>  	unsigned long jiffies_left;
+> @@ -1527,14 +1525,14 @@ int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
+>  	if (!crtc || !vop->is_enabled)
+>  		return -ENODEV;
+>  
+> -	if (line_num > crtc->mode.vtotal || mstimeout <= 0)
+> +	if (mstimeout <= 0)
+>  		return -EINVAL;
+>  
+>  	if (vop_line_flag_irq_is_enabled(vop))
+>  		return -EBUSY;
+>  
+>  	reinit_completion(&vop->line_flag_completion);
+> -	vop_line_flag_irq_enable(vop, line_num);
+> +	vop_line_flag_irq_enable(vop);
+>  
+>  	jiffies_left = wait_for_completion_timeout(&vop->line_flag_completion,
+>  						   msecs_to_jiffies(mstimeout));
+> @@ -1547,7 +1545,7 @@ int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
+>  
+>  	return 0;
+>  }
+> -EXPORT_SYMBOL(rockchip_drm_wait_line_flag);
+> +EXPORT_SYMBOL(rockchip_drm_wait_vact_end);
+>  
+>  static int vop_bind(struct device *dev, struct device *master, void *data)
+>  {
+> -- 
+> 2.1.4
+>
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
