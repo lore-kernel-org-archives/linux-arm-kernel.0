@@ -1,48 +1,52 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Thu, 27 Apr 2017 13:07:32 -0700
-Subject: [PATCH] Mangled urls fixed (was... Re: linux-next: manual merge
- of the pm tree with the arm-soc tree)
-In-Reply-To: <CAK8P3a3O1zJt87prKyh691u854Pb1ef0TQS22fh0CS9KU69veg@mail.gmail.com>
-References: <20170421105405.6a690b35@canb.auug.org.au>
- <CAK8P3a3kHO1NZFJXvDwWO625aEmXoo2540FRKe+YYzoYE9NCSg@mail.gmail.com>
- <4b58d5ab-c924-97af-728f-b9f524e62a53@oracle.com>
- <CAK8P3a0cVMt3y_oYH70V-ekPvUMeeBApSvybpRftSupzYy1FWQ@mail.gmail.com>
- <e2f9efab-291f-1436-2176-0fff3f2aae3f@oracle.com>
- <CAK8P3a1mPgM4XmS398DPsSbyCyD=12xQfUrF_HRqyd52_21o7Q@mail.gmail.com>
- <664dcaaf-3eee-3292-9489-912baf5c393d@oracle.com>
- <CAK8P3a3O1zJt87prKyh691u854Pb1ef0TQS22fh0CS9KU69veg@mail.gmail.com>
-Message-ID: <10a13996-aeae-a828-7b63-998d8034fcb7@oracle.com>
+From: leedom@chelsio.com (Casey Leedom)
+Date: Thu, 27 Apr 2017 20:34:57 +0000
+Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
+ ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+In-Reply-To: <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170401.112603.1991545644693496714.davem@davemloft.net>
+ <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
+ <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
+ <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
+ <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
+ <CAKgT0Uc4L=GgYbpO-Fm9OfN+_fLypbDP1c+X4T_ta90ecQiyGQ@mail.gmail.com>,
+ <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <MWHPR12MB1600CB0756EA24211C93E053C8100@MWHPR12MB1600.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/27/2017 12:50 PM, Arnd Bergmann wrote:
-> On Mon, Apr 24, 2017 at 11:28 PM, santosh.shilimkar at oracle.com
-> <santosh.shilimkar@oracle.com> wrote:
->> On 4/21/17 2:44 PM, Arnd Bergmann wrote:
->>>
->>> On Fri, Apr 21, 2017 at 11:02 PM, santosh.shilimkar at oracle.com
->>
->>
->> [...]
->>
->>> Ok, good, thanks for checking! They are however the commits that
->>> contain the silly https://urldefense.proofpoint.com URLs. Can you
->>> send a follow-up patch to fix these and use the regular
->>> https://urldefense.proofpoint.com/v2/url?u=http-3A__www.ti.org&d=DwIBaQ&c=RoP1YumCXCgaWHvlZYR8PQcxBKCX5YTpkKY057SbK10&r=XBn1JQGPwR8CsE7xpP3wPlG6DQU7qw8ym65xieNZ4hY&m=vFHOEb7p2FxbH00YRQq4WnRiu2BKHADn0gl6e6DoNFQ&s=7mfiIp2Ywy9_ppWKjEGlrswiKRndv8_I7zGVF9uyT0w&e=
->>> URL that is in linux-next?
->>>
->> If not late can you please apply the top patch from below head
->> which fixes the mangled urls. Let me know if you want me to
->> create tag for the same.
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
->> for_4.12/soc-pmdomain-p2
->
-> I pulled the fix into next/drivers. The timing is not a problem, but I would
-> have preferred a signed tag. Not a big issue here since it's a very obvious
-> fix and there is reason to doubt its authenticity.
->
-Thanks Arnd !!
+| From: Bjorn Helgaas <helgaas@kernel.org>
+| Sent: Thursday, April 27, 2017 10:19 AM
+|
+| Are you hinting that the PCI core or arch code could actually *enable*
+| Relaxed Ordering without the driver doing anything?  Is it safe to do that?
+| Is there such a thing as a device that is capable of using RO, but where the
+| driver must be aware of it being enabled, so it programs the device
+| appropriately?
 
-Regards,
-Santosh
+  I forgot to reply to this portion of Bjorn's email.
+
+  The PCI Configuration Space PCI Capability Device Control[Enable Relaxed
+Ordering] bit governs enabling the _ability_ for the PCIe Device to send
+TLPs with the Relaxed Ordering Attribute set.  It does not _cause_ RO to be
+set on TLPs.  Doing that would almost certainly cause Data Corruption Bugs
+since you only want a subset of TLPs to have RO set.
+
+  For instance, we typically use RO for Ingress Packet Data delivery but
+non-RO for messages notifying the Host that an Ingress Packet has been
+delivered.  This ensures that the "Ingress Packet Delivered" non-RO TLP is
+processed _after_ any preceding RO TLPs delivering the actual Ingress Packet
+Data.
+
+  In the above scenario, if one were to turn off Enable Relaxed Ordering via
+the PCIe Capability, then the on-chip PCIe engine would simply never send a
+TLP with the Relaxed Ordering Attribute set, regardless of any other chip
+programming.
+
+  And finally, just to be absolutely clear, using Relaxed Ordering isn't and
+"Architecture Thing".  It's a PCIe Fabric End Point Thing.  Many End Points
+simply ignore the Relaxed Ordering Attribute (except to reflect it back in
+Response TLPs).  In this sense, Relaxed Ordering simply provides
+potentially useful optimization information to the PCIe End Point.
+
+Casey
