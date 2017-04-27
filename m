@@ -1,121 +1,49 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 27 Apr 2017 14:53:14 +0200
-Subject: [PATCH v5 08/22] KVM: arm64: vgic-its: Implement
- vgic_mmio_uaccess_write_its_creadr
-In-Reply-To: <20170427112725.GJ50776@lvm>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-9-git-send-email-eric.auger@redhat.com>
- <20170427112725.GJ50776@lvm>
-Message-ID: <0a8f1594-e566-b6bd-47bb-69ad39e4e53a@redhat.com>
+From: c.jayachandran@gmail.com (Jayachandran C.)
+Date: Thu, 27 Apr 2017 18:31:50 +0530
+Subject: [PATCH 1/3] arm64: Add MIDR values for Cavium cn99xx SoCs
+In-Reply-To: <1493293584-20287-2-git-send-email-gakula@caviumnetworks.com>
+References: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
+ <1493293584-20287-2-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <CA+7sy7BX3hVG=Coh0Dy6iiAHWqKuEVz1c2Z58TQACbMPrvdyqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Apr 27, 2017 at 5:16 PM, Geetha sowjanya
+<gakula@caviumnetworks.com> wrote:
+> From: Geetha <gakula@cavium.com>
+>
+> Add MIDR values for Cavium cn99xx SoCs
+>
+> Signed-off-by: Geetha <gakula@cavium.com>
+> ---
+>  arch/arm64/include/asm/cputype.h | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+> index fc50271..066fad0 100644
+> --- a/arch/arm64/include/asm/cputype.h
+> +++ b/arch/arm64/include/asm/cputype.h
+> @@ -85,6 +85,7 @@
+>
+>  #define CAVIUM_CPU_PART_THUNDERX       0x0A1
+>  #define CAVIUM_CPU_PART_THUNDERX_81XX  0x0A2
+> +#define CAVIUM_CPU_PART_THUNDERX_99XX  0x0AF
 
-On 27/04/2017 13:27, Christoffer Dall wrote:
-> On Fri, Apr 14, 2017 at 12:15:20PM +0200, Eric Auger wrote:
->> GITS_CREADR needs to be restored so let's implement the associated
->> uaccess_write_its callback. The write only is allowed if the its
->> is disabled.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->> v4 -> v5:
->> - keep Stalled bit
->> - vgic_mmio_uaccess_write_its_creadr can now return an error
->>
->> v3 -> v4:
->> - REGISTER_ITS_DESC_UACCESS now introduced in this patch
->> - we now check the its is disabled
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 42 ++++++++++++++++++++++++++++++++++++++++--
->>  1 file changed, 40 insertions(+), 2 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index a9a2c12..79ed1c2 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -1213,6 +1213,33 @@ static unsigned long vgic_mmio_read_its_creadr(struct kvm *kvm,
->>  	return extract_bytes(its->creadr, addr & 0x7, len);
->>  }
->>  
->> +static int vgic_mmio_uaccess_write_its_creadr(struct kvm *kvm,
->> +					      struct vgic_its *its,
->> +					      gpa_t addr, unsigned int len,
->> +					      unsigned long val)
->> +{
->> +	int ret = 0;
->> +	u32 reg;
->> +
->> +	mutex_lock(&its->cmd_lock);
->> +
->> +	if (its->enabled) {
->> +		ret = -EBUSY;
->> +		goto out;
->> +	}
->> +
->> +	reg = update_64bit_reg(its->creadr, addr & 7, len, val);
-> 
-> you theoretically don't need this, since you prevent 32-bit accesses to
-> this register, but I guess it doesn't hurt...
-OK
-> 
->> +	if (ITS_CMD_OFFSET(reg) >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
->> +		ret = -EINVAL;
->> +		goto out;
->> +	}
-> 
-> can the creadr value be unaligned to the command size?  I don't think
-> you check that anywhere here?
-makes sense. I will add this check.
+Can you please use the name CAVIUM_CPU_PART_THUNDERX2? We have used
+ThunderX2 consistently for this platform, having THUNDERX here would
+be confusing.
 
-Thanks!
+>  #define BRCM_CPU_PART_VULCAN           0x516
+>
+> @@ -94,6 +95,8 @@
+>  #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
+>  #define MIDR_THUNDERX  MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
+>  #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
+> +#define MIDR_THUNDERX_99XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_99XX)
+> +#define MIDR_BRCM_VULCAN MIDR_CPU_MODEL(ARM_CPU_IMP_BRCM, BRCM_CPU_PART_VULCAN)
+>  #define MIDR_QCOM_FALKOR_V1 MIDR_CPU_MODEL(ARM_CPU_IMP_QCOM, QCOM_CPU_PART_FALKOR_V1)
+>
+>  #ifndef __ASSEMBLY__
 
-Eric
-> 
-> Thanks,
-> -Christoffer
-> 
->> +
->> +	its->creadr = reg;
->> +out:
->> +	mutex_unlock(&its->cmd_lock);
->> +	return ret;
->> +}
->> +
->>  #define BASER_INDEX(addr) (((addr) / sizeof(u64)) & 0x7)
->>  static unsigned long vgic_mmio_read_its_baser(struct kvm *kvm,
->>  					      struct vgic_its *its,
->> @@ -1317,6 +1344,16 @@ static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
->>  	.its_write = wr,					\
->>  }
->>  
->> +#define REGISTER_ITS_DESC_UACCESS(off, rd, wr, uwr, length, acc)\
->> +{								\
->> +	.reg_offset = off,					\
->> +	.len = length,						\
->> +	.access_flags = acc,					\
->> +	.its_read = rd,						\
->> +	.its_write = wr,					\
->> +	.uaccess_its_write = uwr,				\
->> +}
->> +
->>  static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
->>  			      gpa_t addr, unsigned int len, unsigned long val)
->>  {
->> @@ -1339,8 +1376,9 @@ static struct vgic_register_region its_registers[] = {
->>  	REGISTER_ITS_DESC(GITS_CWRITER,
->>  		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
->>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->> -	REGISTER_ITS_DESC(GITS_CREADR,
->> -		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
->> +	REGISTER_ITS_DESC_UACCESS(GITS_CREADR,
->> +		vgic_mmio_read_its_creadr, its_mmio_write_wi,
->> +		vgic_mmio_uaccess_write_its_creadr, 8,
->>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->>  	REGISTER_ITS_DESC(GITS_BASER,
->>  		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
->> -- 
->> 2.5.5
->>
+Thanks,
+JC.
