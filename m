@@ -1,76 +1,62 @@
-From: olivier.moysan@st.com (Olivier MOYSAN)
-Date: Thu, 27 Apr 2017 15:57:51 +0000
-Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
-In-Reply-To: <20170426161553.oc5pozga53ttypyq@sirena.org.uk>
-References: <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
- <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
- <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
- <73caede5-ea6f-8b2b-2270-227f7ef31823@st.com>
- <20170411211040.htrcedus3c57fbed@sirena.org.uk>
- <86a179ad-7961-18f7-8050-25e0e584c77d@st.com>
- <20170412113251.nfyk5sw6c5pnpmwr@sirena.org.uk>
- <d886a9c7-ca46-f37a-0e82-6ed8d7a4e052@st.com>
- <20170412153831.r2urwvfseipfsrsi@sirena.org.uk>
- <a87748e4-21e7-f65a-5be1-fe4f60bdfbef@st.com>
- <20170426161553.oc5pozga53ttypyq@sirena.org.uk>
-Message-ID: <7005b06f-457c-90f4-bdf1-bed75c565063@st.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 27 Apr 2017 12:14:58 -0400
+Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
+In-Reply-To: <20170420131154.GL3452@pathway.suse.cz>
+References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+ <1461239325-22779-2-git-send-email-pmladek@suse.com>
+ <20170419131341.76bc7634@gandalf.local.home>
+ <20170420033112.GB542@jagdpanzerIV.localdomain>
+ <20170420131154.GL3452@pathway.suse.cz>
+Message-ID: <20170427121458.2be577cc@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+On Thu, 20 Apr 2017 15:11:54 +0200
+Petr Mladek <pmladek@suse.com> wrote:
 
-On 04/26/2017 06:15 PM, Mark Brown wrote:
-> On Thu, Apr 13, 2017 at 08:01:34AM +0000, Olivier MOYSAN wrote:
->
->> 1) 2 static dais NOT exclusive
->> 	- dai tx
->> 	- dai rx
->> The IP exhibits a mode register, where you select mode TX, RX or FD.
->> There are 2 two options to manage this register.
->> option 1:
->> 	start first channel with mode RX or TX
->> 	when second channel is started, mode has to be changed to FD.
->> 	Transfers have to be stopped before changing configuration
->> 	registers, so this leads to cuts in audio stream.
->> option 2:
->> 	start a first channel with mode FD.
->> 	In this case, we may have unpredictable behavior for the stream
->> 	which is not already started. probably underrun/overrun.
->> So, this solution rises problem for full-duplex management.
->
->> 2) 3 static dais exclusive
->> 	- dai tx
->> 	- dai rx
->> 	- dai rx-tx (fd)
->> This is the current implementation.
->> The choice of the dai is done at probe time. It is provided by DT
->> through sound-dai parameter.
->> When dai fd is selected, after starting first stream, we assume that
->> second stream will be started. In this case we wait for second stream
->> to be available before enabling IP and starting transfers.
->
->> 3) 1 dynamic dai
->> 	- dai rx or tx or fd (according to dma conf in IP node)
->> Here the driver exposes only a single dai constructed from dma
->> configuration provided by IP DT node.
->> This allows to get ride of sound-dai parameter.
->
-> None of these options reflect how normal I2S controllers present
-> themselves in DT.  To repeat, you should present a single bidirectional
-> DAI for the single physical bidirectional I2S controller that your
-> hardware has.
->
-> If it's not possible to figure out a way to make the controller support
-> simultaneous playback and record with the two started independently then
-> the driver should just return an error if userspace tries to start the
-> second direction up.  This will severely limit the utility of the driver
-> as Linux generally treats playback and record independently but that's
-> going to apply just as much with any of the options involving multiple
-> DAIs or configuration in DT.  You might be able to do something with
-> feeding it dummy data I guess?
->
 
-Ok. I will implement a single bidirectional DAI in v2.
 
-Best regards
-Olivier
+> 
+> >From c530d9dee91c74db5e6a198479e2e63b24cb84a2 Mon Sep 17 00:00:00 2001  
+> From: Petr Mladek <pmladek@suse.com>
+> Date: Thu, 20 Apr 2017 10:52:31 +0200
+> Subject: [PATCH] printk: Use the main logbuf in NMI when logbuf_lock is
+>  available
+
+I tried this patch. It's better because I get the end of the trace, but
+I do lose the beginning of it:
+
+** 196358 printk messages dropped ** [  102.321182]     perf-5981    0.... 12983650us : d_path <-seq_path
+
+The way I tested it was by adding this:
+
+Index: linux-trace.git/kernel/trace/trace_functions.c
+===================================================================
+--- linux-trace.git.orig/kernel/trace/trace_functions.c
++++ linux-trace.git/kernel/trace/trace_functions.c
+@@ -469,8 +469,11 @@ ftrace_cpudump_probe(unsigned long ip, u
+ 		     struct trace_array *tr, struct ftrace_probe_ops *ops,
+ 		     void *data)
+ {
+-	if (update_count(ops, ip, data))
+-		ftrace_dump(DUMP_ORIG);
++	char *killer = NULL;
++
++	panic_on_oops = 1;	/* force panic */
++	wmb();
++	*killer = 1;
+ }
+ 
+ static int
+
+
+Then doing the following:
+
+# echo 1 > /proc/sys/kernel/ftrace_dump_on_oops 
+# trace-cmd start -p function
+# echo nmi_handle:cpudump > /debug/tracing/set_ftrace_filter
+# perf record -c 100 -a sleep 1
+
+And that triggers the crash.
+
+-- Steve
