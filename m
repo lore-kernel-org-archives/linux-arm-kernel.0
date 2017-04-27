@@ -1,120 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Apr 2017 20:55:21 +0200
-Subject: [PATCH 1/2] PCI: mediatek: Add Mediatek PCIe host controller
- support
-In-Reply-To: <1493194200.27023.79.camel@mtkswgap22>
-References: <1492935543-18190-1-git-send-email-ryder.lee@mediatek.com>
- <1492935543-18190-2-git-send-email-ryder.lee@mediatek.com>
- <CAK8P3a39TFkJ5=jp8me+Dyg-Qi-N_1ZKxpJGvnhmPEo4csnFCw@mail.gmail.com>
- <1493194200.27023.79.camel@mtkswgap22>
-Message-ID: <CAK8P3a0DjPL8uWuXfCmEwt05SCPJ0yEQTAJmZAPtFDEfsn4a1Q@mail.gmail.com>
+From: leedom@chelsio.com (Casey Leedom)
+Date: Thu, 27 Apr 2017 19:00:27 +0000
+Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
+ ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+In-Reply-To: <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170401.112603.1991545644693496714.davem@davemloft.net>
+ <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
+ <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
+ <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
+ <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
+ <CAKgT0Uc4L=GgYbpO-Fm9OfN+_fLypbDP1c+X4T_ta90ecQiyGQ@mail.gmail.com>,
+ <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <MWHPR12MB1600F53E6E09C9B3F99D255EC8100@MWHPR12MB1600.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 10:10 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> On Tue, 2017-04-25 at 14:38 +0200, Arnd Bergmann wrote:
->> On Sun, Apr 23, 2017 at 10:19 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+  Thanks for adding me to the Cc list Bjorn.  Hopefully my message will make
+it out to the netdev and linux-pci lists -- I'm not currently subscribed to
+them.  I've explicitly marked this message to be sent in plain text but
+modern email agents suck with respect to this. (sigh) I have officially
+become a curmudgeon. 
 
->> > +static int mtk_pcie_enable_ports(struct mtk_pcie *pcie)
->> > +{
->> > +       struct device *dev = pcie->dev;
->> > +       struct mtk_pcie_port *port, *tmp;
->> > +       int err, linkup = 0;
->> > +
->> > +       list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
->> > +               err = clk_prepare_enable(port->sys_ck);
->> > +               if (err) {
->> > +                       dev_err(dev, "failed to enable port%d clock\n",
->> > +                               port->index);
->> > +                       continue;
->> > +               }
->> > +
->> > +               /* assert RC */
->> > +               reset_control_assert(port->reset);
->> > +               /* de-assert RC */
->> > +               reset_control_deassert(port->reset);
->> > +
->> > +               /* power on PHY */
->> > +               err = phy_power_on(port->phy);
->> > +               if (err) {
->> > +                       dev_err(dev, "failed to power on port%d phy\n",
->> > +                               port->index);
->> > +                       goto err_phy_on;
->> > +               }
->> > +
->> > +               mtk_pcie_assert_ports(port);
->> > +
->>
->> Similar to the comment I had for the binding, I wonder if it would be
->> better to keep all the information about the ports in one place and
->> then just deal with it at the root level.
->>
->> Alternatively, we could decide to standardize on the properties
->> you have added to the pcie port node, but then I would handle
->> them in the pcieport driver rather than in the host bridge driver.
->
-> Sorry, I'm not sure what you want me to do here.
->
-> I could move all clock operation in root level. But we need to keep the
-> reset and PHY operation sequence in the loop, In addition, we could
-> easily free resources if ports link fail.
->
-> How about moving this function to mtk_pcie_parse_and_add_res()?
+  So, officially, Relaxed Ordering should be a Semantic Noop as far as PCIe
+transfers are concerned, as long as you don't care what order the PCIe
+Transaction Layer Packets are processed in by the target PCIe Fabric End
+Point.
 
-That could work, please try it out and see if the code gets better or
-worse. This may depend on what we end up doing with the DT
-properties.
+  Basically, if you have some number of back-to-back PCIe TLPs between two
+Fabric End Points {A} -> {B} which have the Relaxed Ordering Attribute set,
+the End Point {B} receiving these RO TLPs may process them in any order it
+likes.  When a TLP without Relaxed Ordering is sent {A} -> {B}, all
+preceding TLPs with Relaxed Ordering set must be processed by {B} prior to
+processing the TLP without Relaxed Ordering set.  In this sense, a TLP
+without Relaxed Ordering set is something akin to a "memory barrier".
 
->> > +/*
->> > + * This IP lacks interrupt status register to check or map INTx from
->> > + * different devices at the same time.
->> > + */
->> > +static int __init mtk_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
->> > +{
->> > +       struct mtk_pcie *pcie = dev->bus->sysdata;
->> > +       struct mtk_pcie_port *port;
->> > +
->> > +       list_for_each_entry(port, &pcie->ports, list)
->> > +               if (port->index == slot)
->> > +                       return port->irq;
->> > +
->> > +       return -1;
->> > +}
->>
->> This looks odd, what is it needed for specifically? It looks like
->> it's broken for devices behind bridges, and the interrupt mapping
->> should normally come from the interrupt-map property, without
->> the need for a driver specific map_irq override.
->
-> Our hardware just has a GIC for each port and lacks interrupt status for
-> host driver to distinguish INTx. So I return port IRQ here.
+  All of this is covered in Section 2.4.1 of the PCIe 3.0 Specification (PCI
+Express(r) Base Specification Revision 3.0 November 10, 2010).
 
-You should still be able to express this with standard interrupt-map
-DT property, without having to resort to your own map_irq
-callback handler.
+  The advantage of using Relaxed Ordering (which is heavily used when
+sending data to Graphics Cards as I understand it), is that the PCIe
+Endpoint can potentially optimize the processing order of RO TLPs with
+things like a local multi-channel Memory Controller in order to achieve the
+highest transfer bandwidth possible.
 
-In the interrupt-map-mask, you can ignore the interrupt line
-only list the devfn of the root ports for each entry.
+  However, we have discovered at least two PCIe 3.0 Root Complex
+implementations which have problems with TLPs directed at them with the
+Relaxed Ordering Attribute set and I'm in the process of working up a Linux
+Kernel PCI "Quirk" to allow those PCIe End Points to be marked as "not being
+advisable to send RO TLPs to".  These problems range from "mere" Performance
+Problems to outright Data Corruption.  I'm working with the vendors of these
+...  "problematic" Root Complex implementations and hope to have this patch
+submitted to the linux-pci list by tomorrow.
 
->> > +static int mtk_pcie_register_ports(struct mtk_pcie *pcie)
->> > +{
->> > +       struct pci_bus *bus, *child;
->> > +
->> > +       bus = pci_scan_root_bus(pcie->dev, 0, &mtk_pcie_ops, pcie,
->> > +                               &pcie->resources);
->>
->> Can you use the new pci_register_host_bridge() method instead of
->> pci_scan_root_bus() here?
->
-> May I know what's difference between pci_scan_root_bus() and using
-> pci_register_host_bridge() directly? What situation should we use it?
-> It seems that just tegra use this new method currently.
+  By the way, it's important to note that just because, say, a Root Complex
+has problems with RO TLPs directed at it, that doesn't mean that you want to
+avoid all use of Relaxed Ordering within the PCIe Fabric.  For instance,
+with the vendor whose Root Complex has a Performance Problem with RO TLPs
+directed at it, it's perfectly reasonable -- and desired -- to use Relaxed
+Ordering in Peer-to-Peer traffic.  Say for instance, with an NVMe <->
+Ethernet application.
 
-We introduced the new function for tegra for now, in the long run
-I would hope we can convert all other drivers to it as well, to make it
-easier to add further parameters.
-
-The new function also has a cleaner way of dealing with the memory
-allocations, similar to how other subsystems work.
-
-     Arnd
+Casey
