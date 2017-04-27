@@ -1,29 +1,62 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Thu, 27 Apr 2017 17:23:11 -0400
-Subject: [PATCH v2 0/3] thermal: broadcom: Add NSP Thermal Support
-Message-ID: <1493328194-1766-1-git-send-email-jon.mason@broadcom.com>
+Date: Thu, 27 Apr 2017 17:23:14 -0400
+Subject: [PATCH v2 3/3] ARM: dts: NSP: Add Thermal Support
+In-Reply-To: <1493328194-1766-1-git-send-email-jon.mason@broadcom.com>
+References: <1493328194-1766-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <1493328194-1766-4-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v2:
-* Split SoC enablement into a separate patch (per Eduardo Valentin)
-* Added Eduardo Valentin's Acked-by to the DTS patch
+Add thermal support via the ns-thermal driver and create a single
+thermal zone for the entire SoC.
 
+Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+Acked-by: Eduardo Valentin <edubezval@gmail.com>
+---
+ arch/arm/boot/dts/bcm-nsp.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-This adds support for NSP to the existing Northstar thermal driver.
-This code is based on patches currently in the Linux SoC Thermal git
-tree.  Specfically,
-https://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git/commit/?h=linus&id=a94cb7eeecc4104a6874339f90c5d0647359c102
-
-Jon Mason (3):
-  ARM: BCM: Enable thermal support for iProc SoCs
-  thermal: broadcom: ns-thermal: default on iProc SoCs
-  ARM: dts: NSP: Add Thermal Support
-
- arch/arm/boot/dts/bcm-nsp.dtsi   | 26 ++++++++++++++++++++++++++
- arch/arm/mach-bcm/Kconfig        |  2 ++
- drivers/thermal/broadcom/Kconfig |  9 +++++----
- 3 files changed, 33 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+index 832795b..be6fcfb 100644
+--- a/arch/arm/boot/dts/bcm-nsp.dtsi
++++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+@@ -383,6 +383,12 @@
+ 			      <0x3f408 0x04>;
+ 		};
+ 
++		thermal: thermal at 3f2c0 {
++			compatible = "brcm,ns-thermal";
++			reg = <0x3f2c0 0x10>;
++			#thermal-sensor-cells = <0>;
++		};
++
+ 		sata_phy: sata_phy at 40100 {
+ 			compatible = "brcm,iproc-nsp-sata-phy";
+ 			reg = <0x40100 0x340>;
+@@ -533,4 +539,24 @@
+ 			brcm,pcie-msi-inten;
+ 		};
+ 	};
++
++	thermal-zones {
++		cpu-thermal {
++			polling-delay-passive = <0>;
++			polling-delay = <1000>;
++			coefficients = <(-556) 418000>;
++			thermal-sensors = <&thermal>;
++
++			trips {
++				cpu-crit {
++					temperature     = <125000>;
++					hysteresis      = <0>;
++					type            = "critical";
++				};
++			};
++
++			cooling-maps {
++			};
++		};
++	};
+ };
 -- 
 2.7.4
