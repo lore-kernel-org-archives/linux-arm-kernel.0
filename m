@@ -1,17 +1,72 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 27 Apr 2017 17:34:45 +0200
-Subject: [PULL 00/79] KVM/ARM Changes for v4.12
-In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
-References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <c8913fd1-e169-faef-205a-1b08d7bf1b2e@redhat.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 27 Apr 2017 11:42:48 -0400
+Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
+In-Reply-To: <20170427152807.GY3452@pathway.suse.cz>
+References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+ <1461239325-22779-2-git-send-email-pmladek@suse.com>
+ <20170419131341.76bc7634@gandalf.local.home>
+ <20170420033112.GB542@jagdpanzerIV.localdomain>
+ <20170420131154.GL3452@pathway.suse.cz>
+ <20170421015724.GA586@jagdpanzerIV.localdomain>
+ <20170421120627.GO3452@pathway.suse.cz>
+ <20170424021747.GA630@jagdpanzerIV.localdomain>
+ <20170427133819.GW3452@pathway.suse.cz>
+ <20170427103118.56351d30@gandalf.local.home>
+ <20170427152807.GY3452@pathway.suse.cz>
+Message-ID: <20170427114248.1d751efd@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 27 Apr 2017 17:28:07 +0200
+Petr Mladek <pmladek@suse.com> wrote:
 
 
-On 23/04/2017 19:08, Christoffer Dall wrote:
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-v4.12
+> > When I get a chance, I'll see if I can insert a trigger to crash the
+> > kernel from NMI on another box and see if this patch helps.  
+> 
+> I actually tested it here using this hack:
+> 
+> diff --cc lib/nmi_backtrace.c
+> index d531f85c0c9b,0bc0a3535a8a..000000000000
+> --- a/lib/nmi_backtrace.c
+> +++ b/lib/nmi_backtrace.c
+> @@@ -89,8 -90,7 +90,9 @@@ bool nmi_cpu_backtrace(struct pt_regs *
+>         int cpu = smp_processor_id();
+>   
+>         if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
+>  +              if (in_nmi())
+>  +                      panic("Simulating panic in NMI\n");
+> +               arch_spin_lock(&lock);
 
-Pulled, thanks.
+I was going to create a ftrace trigger, to crash on demand, but this
+may do as well.
 
-Paolo
+>                 if (regs && cpu_in_idle(instruction_pointer(regs))) {
+>                         pr_warn("NMI backtrace for cpu %d skipped: idling at pc %#lx\n",
+>                                 cpu, instruction_pointer(regs));
+> 
+> and triggered by:
+> 
+>    echo  l > /proc/sysrq-trigger
+> 
+> The patch really helped to see much more (all) messages from the ftrace
+> buffers in NMI mode.
+> 
+> But the test is a bit artifical. The patch might not help when there
+> is a big printk() activity on the system when the panic() is
+> triggered. We might wrongly use the small per-CPU buffer when
+> the logbuf_lock is tested and taken on another CPU at the same time.
+> It means that it will not always help.
+> 
+> I personally think that the patch might be good enough. I am not sure
+> if a perfect (more comlpex) solution is worth it.
+
+I wasn't asking for perfect, as the previous solutions never were
+either. I just want an optimistic dump if possible.
+
+I'll try to get some time today to test this, and let you know. But it
+wont be on the machine that I originally had the issue with.
+
+Thanks,
+
+-- Steve
