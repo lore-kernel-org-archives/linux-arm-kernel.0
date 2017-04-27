@@ -1,99 +1,116 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 27 Apr 2017 19:24:28 +0200
-Subject: [PATCH v5 13/22] KVM: arm64: vgic-its: Check the device id
- matches TYPER DEVBITS range
-In-Reply-To: <20170427164837.GQ50776@lvm>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-14-git-send-email-eric.auger@redhat.com>
- <20170427164837.GQ50776@lvm>
-Message-ID: <9c4ce1a0-f034-477d-6515-963bbfeacb9d@redhat.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Thu, 27 Apr 2017 22:54:42 +0530
+Subject: [PATCH] perf evsel: Fix to perf-stat malloc corruption on arm64
+ platforms
+In-Reply-To: <20170427155221.GB6646@leverpostej>
+References: <1493198780-25415-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170426145057.GK27156@leverpostej> <20170426171208.GC23669@leverpostej>
+ <CAFpQJXX7HaKQ8t85mB2Fqn-6wHhb_GR+2sOi23HQZnRgUw-Y4g@mail.gmail.com>
+ <20170427143438.GE31337@leverpostej>
+ <CAFpQJXWjx3uVG-6UNiJzmdc4FFw8kea2A5aJZquxVRXq8BR1VQ@mail.gmail.com>
+ <20170427155221.GB6646@leverpostej>
+Message-ID: <CAFpQJXXqbeJ8+g-HcKPMUJroosb7NS79zd2zr6O0GJozbVZY_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Apr 27, 2017 at 9:22 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Apr 27, 2017 at 09:16:41PM +0530, Ganapatrao Kulkarni wrote:
+>> > Could you please give my diff a go?
+>>
+>> i tried your diff, and testing looks ok.
+>
+> Can I take that as a Tested-by when I post this as a proper patch?
 
-On 27/04/2017 18:48, Christoffer Dall wrote:
-> On Fri, Apr 14, 2017 at 12:15:25PM +0200, Eric Auger wrote:
->> On MAPD we currently check the device id can be stored in the device table.
->> Let's first check it can be encoded within the range defined by TYPER
->> DEVBITS.
+sure.
+
+>
+>> below is the cleanly merged diff on top of latest commit
+>> f832460 Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/sparc
+>
+> Thanks for the rebase.
+>
+> Mark.
+>
+>> diff --git a/tools/perf/builtin-stat.c b/tools/perf/builtin-stat.c
+>> index 13b5499..4be2980 100644
+>> --- a/tools/perf/builtin-stat.c
+>> +++ b/tools/perf/builtin-stat.c
+>> @@ -346,6 +346,28 @@ static void read_counters(void)
+>>   }
+>>  }
 >>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->>
->> v4 -> v5:
->> - use GIC_ENCODE_SZ macro
->>
->> v3 -> v4:
->> - VITS_TYPER_DEVBITS set to 16 for homogeneity
->> - use BIT_ULL
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 10 +++++++---
->>  1 file changed, 7 insertions(+), 3 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 757598d..de1ed6d 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -194,6 +194,7 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
->>  #define GIC_LPI_OFFSET 8192
->>  
->>  #define VITS_TYPER_IDBITS 16
->> +#define VITS_TYPER_DEVBITS 16
->>  
->>  /*
->>   * Finds and returns a collection in the ITS collection table.
->> @@ -394,7 +395,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
->>  	 * To avoid memory waste in the guest, we keep the number of IDBits and
->>  	 * DevBits low - as least for the time being.
->>  	 */
->> -	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
->> +	reg |= GIC_ENCODE_SZ(VITS_TYPER_DEVBITS, 5) << GITS_TYPER_DEVBITS_SHIFT;
->>  	reg |= GIC_ENCODE_SZ(VITS_TYPER_IDBITS, 5) << GITS_TYPER_IDBITS_SHIFT;
->>  	reg |= GIC_ENCODE_SZ(abi->ite_esz, 4) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
->>  
->> @@ -639,10 +640,10 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
->>   * Check whether an ID can be stored into the corresponding guest table.
->>   * For a direct table this is pretty easy, but gets a bit nasty for
->>   * indirect tables. We check whether the resulting guest physical address
->> - * is actually valid (covered by a memslot and guest accessbible).
->> + * is actually valid (covered by a memslot and guest accessible).
->>   * For this we have to read the respective first level entry.
->>   */
->> -static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
->> +static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
->>  {
->>  	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
->>  	int index;
->> @@ -650,6 +651,9 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
->>  	gfn_t gfn;
->>  	int esz = GITS_BASER_ENTRY_SIZE(baser);
->>  
->> +	if (id >= BIT_ULL(VITS_TYPER_DEVBITS))
->> +		return false;
+>> +/*
+>> + * Close all evnt FDs we open in __run_perf_stat() and
+>> + * create_perf_stat_counter(), taking care to match the number of
+>> threads and CPUs.
+>> + *
+>> + * Note that perf_evlist__close(evsel_list) is not equivalent, as it doesn't
+>> + * take the target into account.
+>> + */
+>> +static void close_counters(void)
+>> +{
+>> +       bool per_cpu = target__has_cpu(&target);
+>> +       struct perf_evsel *evsel;
 >> +
-> 
-> Isn't vgic_its_check_id called with both a device id and a collection
-> id?  How can this then be a valid check?
-
-Hum yes that's correct. In practice the test is correct for collection
-ID too since our virtual implementation supports collections in memory
-(GITS_TYPER.CIL ==0, spec 8.19.8) and a 16-bit collection ID is
-supported. But this is by chance and this really deserves some proper
-differentiation. Thank you for spotting that one too!
-
-Thanks
-
-Eric
-> 
->>  	if (!(baser & GITS_BASER_INDIRECT)) {
->>  		phys_addr_t addr;
->>  
->> -- 
->> 2.5.5
+>> +       evlist__for_each_entry(evsel_list, evsel) {
+>> +               if (per_cpu)
+>> +                       perf_evsel__close_per_cpu(evsel,
+>> +                                                 perf_evsel__cpus(evsel));
+>> +               else
+>> +                       perf_evsel__close_per_thread(evsel,
+>> +                                                    evsel_list->threads);
+>> +       }
+>> +}
+>> +
+>>  static void process_interval(void)
+>>  {
+>>   struct timespec ts, rs;
+>> @@ -686,7 +708,7 @@ static int __run_perf_stat(int argc, const char **argv)
+>>   * group leaders.
+>>   */
+>>   read_counters();
+>> - perf_evlist__close(evsel_list);
+>> + close_counters();
 >>
-> 
-> Thanks,
-> -Christoffer
-> 
+>>   return WEXITSTATUS(status);
+>>  }
+>> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+>> index ac59710..ecd9778 100644
+>> --- a/tools/perf/util/evsel.c
+>> +++ b/tools/perf/util/evsel.c
+>> @@ -1691,6 +1691,20 @@ int perf_evsel__open_per_thread(struct perf_evsel *evsel,
+>>   return perf_evsel__open(evsel, NULL, threads);
+>>  }
+>>
+>> +void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
+>> +                              struct cpu_map *cpus)
+>> + {
+>> +       int ncpus = cpus ? cpus->nr : 1;
+>> +       perf_evsel__close(evsel, ncpus, 1);
+>> + }
+>> +
+>> +void perf_evsel__close_per_thread(struct perf_evsel *evsel,
+>> +                                 struct thread_map *threads)
+>> + {
+>> +       int nthreads = threads ? threads->nr : 1;
+>> +       perf_evsel__close(evsel, 1, nthreads);
+>> + }
+>> +
+>>  static int perf_evsel__parse_id_sample(const struct perf_evsel *evsel,
+>>         const union perf_event *event,
+>>         struct perf_sample *sample)
+>> diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
+>> index 06ef6f2..6779bd2 100644
+>> --- a/tools/perf/util/evsel.h
+>> +++ b/tools/perf/util/evsel.h
+>> @@ -250,6 +250,10 @@ int perf_evsel__open_per_cpu(struct perf_evsel *evsel,
+>>       struct cpu_map *cpus);
+>>  int perf_evsel__open_per_thread(struct perf_evsel *evsel,
+>>   struct thread_map *threads);
+>> +void perf_evsel__close_per_cpu(struct perf_evsel *evsel,
+>> +                              struct cpu_map *cpus);
+>> +void perf_evsel__close_per_thread(struct perf_evsel *evsel,
+>> +                                 struct thread_map *threads);
+>>  int perf_evsel__open(struct perf_evsel *evsel, struct cpu_map *cpus,
+>>       struct thread_map *threads);
+>>  void perf_evsel__close(struct perf_evsel *evsel, int ncpus, int nthreads);
