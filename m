@@ -1,33 +1,143 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 27 Apr 2017 08:55:11 +0200
-Subject: [PATCH v5 00/22] vITS save/restore
-In-Reply-To: <CACJhumdaHDX2oAuJ2PQCqhmJV0u7Eu9SF7a8xsga6sAwJHyrCQ@mail.gmail.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <CACJhumdaHDX2oAuJ2PQCqhmJV0u7Eu9SF7a8xsga6sAwJHyrCQ@mail.gmail.com>
-Message-ID: <a667e4ab-3bac-8a4b-691f-29019d547c08@redhat.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Thu, 27 Apr 2017 15:00:29 +0800
+Subject: [PATCH] drm/rockchip: Set line flag config register in
+ vop_crtc_enable
+In-Reply-To: <1493276057-4516-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1493276057-4516-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <5901970D.2070902@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brahmajyosyula,
+On 2017?04?27? 14:54, Jeffy Chen wrote:
+> We need to set vop config done after update line flag config, it's a
+> new requirement for chips newer than rk3368.
+>
+> Since we would only use line flag irq for vact_end, let's move it to
+> vop_crtc_enable.
+>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-On 26/04/2017 13:38, Prakash B wrote:
-> Verified on Cavium ThunderX platform
-> Continousily migrated Guest more than 500 times b/w different  hosts.
-> Please feel free to add  Tested-by: Prakash, Brahmajyosyula
-> <Brahmajyosyula.Prakash@cavium.com>
+looks good for me:
 
-I really appreciate. Many thanks!
+Acked-by: Mark Yao <mark.yao@rock-chips.com>
 
-Best Regards
+>
+> ---
+>
+>   drivers/gpu/drm/rockchip/analogix_dp-rockchip.c |  4 ++--
+>   drivers/gpu/drm/rockchip/rockchip_drm_drv.h     |  3 +--
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c     | 20 +++++++++-----------
+>   3 files changed, 12 insertions(+), 15 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> index d8fa7a9..9bfdbc6 100644
+> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> @@ -115,8 +115,8 @@ static void analogix_dp_psr_work(struct work_struct *work)
+>   
+>   	vact_end = crtc->mode.vtotal - crtc->mode.vsync_start + crtc->mode.vdisplay;
+>   
+> -	ret = rockchip_drm_wait_line_flag(dp->encoder.crtc, vact_end,
+> -					  PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
+> +	ret = rockchip_drm_wait_vact_end(dp->encoder.crtc,
+> +					 PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
+>   	if (ret) {
+>   		dev_err(dp->dev, "line flag interrupt did not arrive\n");
+>   		return;
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+> index a48fcce..47905fa 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+> @@ -62,8 +62,7 @@ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
+>   				   struct device *dev);
+>   void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
+>   				    struct device *dev);
+> -int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
+> -				unsigned int mstimeout);
+> +int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout);
+>   
+>   extern struct platform_driver cdn_dp_driver;
+>   extern struct platform_driver dw_hdmi_rockchip_pltfm_driver;
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 3f7a82d..40a5e6e 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -468,7 +468,7 @@ static bool vop_line_flag_irq_is_enabled(struct vop *vop)
+>   	return !!line_flag_irq;
+>   }
+>   
+> -static void vop_line_flag_irq_enable(struct vop *vop, int line_num)
+> +static void vop_line_flag_irq_enable(struct vop *vop)
+>   {
+>   	unsigned long flags;
+>   
+> @@ -477,7 +477,6 @@ static void vop_line_flag_irq_enable(struct vop *vop, int line_num)
+>   
+>   	spin_lock_irqsave(&vop->irq_lock, flags);
+>   
+> -	VOP_CTRL_SET(vop, line_flag_num[0], line_num);
+>   	VOP_INTR_SET_TYPE(vop, clear, LINE_FLAG_INTR, 1);
+>   	VOP_INTR_SET_TYPE(vop, enable, LINE_FLAG_INTR, 1);
+>   
+> @@ -981,6 +980,8 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+>   	VOP_CTRL_SET(vop, vact_st_end, val);
+>   	VOP_CTRL_SET(vop, vpost_st_end, val);
+>   
+> +	VOP_CTRL_SET(vop, line_flag_num[0], vact_end);
+> +
+>   	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
+>   
+>   	VOP_CTRL_SET(vop, standby, 0);
+> @@ -1507,19 +1508,16 @@ static void vop_win_init(struct vop *vop)
+>   }
+>   
+>   /**
+> - * rockchip_drm_wait_line_flag - acqiure the give line flag event
+> + * rockchip_drm_wait_vact_end
+>    * @crtc: CRTC to enable line flag
+> - * @line_num: interested line number
+>    * @mstimeout: millisecond for timeout
+>    *
+> - * Driver would hold here until the interested line flag interrupt have
+> - * happened or timeout to wait.
+> + * Wait for vact_end line flag irq or timeout.
+>    *
+>    * Returns:
+>    * Zero on success, negative errno on failure.
+>    */
+> -int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
+> -				unsigned int mstimeout)
+> +int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout)
+>   {
+>   	struct vop *vop = to_vop(crtc);
+>   	unsigned long jiffies_left;
+> @@ -1527,14 +1525,14 @@ int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
+>   	if (!crtc || !vop->is_enabled)
+>   		return -ENODEV;
+>   
+> -	if (line_num > crtc->mode.vtotal || mstimeout <= 0)
+> +	if (mstimeout <= 0)
+>   		return -EINVAL;
+>   
+>   	if (vop_line_flag_irq_is_enabled(vop))
+>   		return -EBUSY;
+>   
+>   	reinit_completion(&vop->line_flag_completion);
+> -	vop_line_flag_irq_enable(vop, line_num);
+> +	vop_line_flag_irq_enable(vop);
+>   
+>   	jiffies_left = wait_for_completion_timeout(&vop->line_flag_completion,
+>   						   msecs_to_jiffies(mstimeout));
+> @@ -1547,7 +1545,7 @@ int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
+>   
+>   	return 0;
+>   }
+> -EXPORT_SYMBOL(rockchip_drm_wait_line_flag);
+> +EXPORT_SYMBOL(rockchip_drm_wait_vact_end);
+>   
+>   static int vop_bind(struct device *dev, struct device *master, void *data)
+>   {
 
-Eric
 
-* note you are not obliged to bother to send individual T-b on each
-patch. You can just send T-b on the cover letter and if requested
-exclude patches or features you could not test.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+?ark Yao
