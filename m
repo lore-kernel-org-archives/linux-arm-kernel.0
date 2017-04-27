@@ -1,131 +1,113 @@
-From: markus.mayer@broadcom.com (Markus Mayer)
-Date: Thu, 27 Apr 2017 11:28:37 -0700
-Subject: [PATCH 1/2] dt/bindings: Add bindings for Broadcom STB DRAM
- Sensors
-In-Reply-To: <CAGt4E5susQWWNZPbNh8AoWtK-4yu50VL=GqOw+_2w_FA+2V68Q@mail.gmail.com>
-References: <20170418201702.57019-1-code@mmayer.net>
- <20170418201702.57019-2-code@mmayer.net>
- <CAGt4E5susQWWNZPbNh8AoWtK-4yu50VL=GqOw+_2w_FA+2V68Q@mail.gmail.com>
-Message-ID: <CAGt4E5uu1Ty0ReaiBZ0kcR_-jnqJQL8vgU4Y9mL64FP7f+=T7Q@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 27 Apr 2017 11:34:21 -0700
+Subject: [PATCH 0/3 v3] ARM/ARM64: silence large module first time
+ allocation
+In-Reply-To: <56EE35F5-97F9-4EA4-894B-581E7AE09A78@linaro.org>
+References: <20170427181902.28829-1-f.fainelli@gmail.com>
+ <56EE35F5-97F9-4EA4-894B-581E7AE09A78@linaro.org>
+Message-ID: <d12fa030-9d81-6740-dabf-d3305259f38e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 April 2017 at 12:29, Markus Mayer <markus.mayer@broadcom.com> wrote:
-> Hi Rob,
->
-> On 18 April 2017 at 13:17, Markus Mayer <code@mmayer.net> wrote:
->> From: Markus Mayer <mmayer@broadcom.com>
+On 04/27/2017 11:24 AM, Ard Biesheuvel wrote:
+> 
+>> On 27 Apr 2017, at 19:18, Florian Fainelli <f.fainelli@gmail.com> wrote:
 >>
->> Provide bindings for the Broadcom STB DDR PHY Front End (DPFE).
->
-> Would you be able to have a look at this binding? The driver won't be
-> upstreamed as hwmon driver (as per Guenter's comments). I am currently
-> converting the driver to a "soc" driver instead, but the proposed
-> binding remains unchanged.
->
-> If you have comments or suggestions, I would like to incorporate them
-> with the new series I will be sending out.
-
-To explain a bit more what we are looking for: we had a internal
-discussions how to structure this binding and are looking for some
-guidance.
-
-Should we create three different nodes for the three different memory
-areas (dpfe-cpu at ..., dpfe-dmem at ..., dpfe-imem at ...), each with a single
-"reg" property (which is the proposal below) or should this be one
-single property with 3 "reg" cells, i.e. something like this:
-
-dpfe-cpu at f1132000 {
-    ...
-    reg = <0xf1132000 0x180     /* register space */
-           0xf1134000 0x1000    /* data memory */
-           0xf1138000 0x4000>;  /* instruction memory */
-    ...
-};
-
-Regards,
--Markus
-
->> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
->> ---
->>  .../devicetree/bindings/hwmon/brcmstb-dpfe.txt     | 68 ++++++++++++++++++++++
->>  1 file changed, 68 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt
+>> With kernels built with CONFIG_ARM{,64}_MODULES_PLTS=y, the first allocation
+>> done from module space will fail, produce a general OOM allocation and also a
+>> vmap warning. The second allocation from vmalloc space may or may not be
+>> successful, but is actually the one we are interested about in these cases.
 >>
->> diff --git a/Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt b/Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt
->> new file mode 100644
->> index 0000000..3519197
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt
->> @@ -0,0 +1,68 @@
->> +DDR PHY Front End (DPFE) for Broadcom STB
->> +=========================================
->> +
->> +DPFE and the DPFE firmware provide an interface for the host CPU to
->> +communicate with the DCPU, which resides inside the DDR PHY.
->> +
->> +There are three memory regions for interacting with the DCPU.
->> +
->> +The DCPU Register Space
->> +-----------------------
->> +
->> +Required properties:
->> +  - compatible: must be one of brcm,bcm7271-dpfe-cpu, brcm,dpfe-cpu-v12.0.0.0
->> +    or brcm,dpfe-cpu
->> +  - reg: must reference the start address and length of the DCPU register
->> +    space
->> +
->> +Optional properties:
->> +  - cell-index: the index of the DPFE instance; will default to 0 if not set
->> +
->> +Example:
->> +       dpfe_cpu0: dpfe-cpu at f1132000 {
->> +               compatible = "brcm,bcm7271-dpfe-cpu",
->> +                       "brcm,dpfe-cpu-v12.0.0.0",
->> +                       "brcm,dpfe-cpu";
->> +               reg = <0xf1132000 0x180>;
->> +               cell-index = <0>;
->> +       };
->> +
->> +The DCPU Data Memory Space
->> +--------------------------
->> +
->> +Required properties:
->> +  - compatible: must be one of brcm,bcm7271-dpfe-dmem, brcm,dpfe-dmem-v12.0.0.0
->> +    or brcm,dpfe-dmem
->> +  - reg: must reference the start address and length of the DCPU DMEM space
->> +
->> +Optional properties:
->> +  - cell-index: the index of the DPFE instance; will default to 0 if not set
->> +
->> +Example:
->> +       dpfe_dmem0: dpfe-dmem at f1134000 {
->> +               compatible = "brcm,bcm7271-dpfe-dmem",
->> +                       "brcm,dpfe-dmem-v12.0.0.0",
->> +                       "brcm,dpfe-dmem";
->> +               reg = <0xf1134000 0x1000>;
->> +               cell-index = <0>;
->> +       };
->> +
->> +The DCPU Instruction Memory Space
->> +---------------------------------
->> +
->> +Required properties:
->> +  - compatible: must be one of brcm,bcm7271-dpfe-imem, brcm,dpfe-imem-v12.0.0.0
->> +    or brcm,dpfe-imem
->> +  - reg: must reference the start address and length of the DCPU IMEM space
->> +
->> +Optional properties:
->> +  - cell-index: the index of the DPFE instance; will default to 0 if not set
->> +
->> +Example:
->> +       dpfe_imem0: dpfe-imem at f1138000 {
->> +               compatible = "brcm,bcm7271-dpfe-imem",
->> +                       "brcm,dpfe-imem-v12.0.0.0",
->> +                       "brcm,dpfe-imem";
->> +               reg = <0xf1138000 0x4000>;
->> +               cell-index = <0>;
->> +       };
->> --
->> 2.7.4
+>> This patch series passed __GFP_NOWARN to silence such allocations from the
+>> ARM/ARM64 module loader's first time allocation when the MODULES_PLT option is
+>> enabled, and also makes alloc_vmap_area() react to the caller setting
+>> __GFP_NOWARN to silence "vmap allocation for size..." messages.
 >>
+>>
+>> Changes in v3:
+>> - check for __GFP_NOWARN not set where the check for printk_ratelimited()
+>>  is done, add Michal's Acked-by
+>>
+>> - use C conditionals and not CPP conditionals for IS_ENABLED(), add Ard's
+>>  Reviewed-by tag
+>>
+> 
+> Ok these look fine now. But are you sure that omitting the single pr_warn() gets rid of all of that?
+> Or do we need more patches on top?
+
+Since the caller now set __GFP_NOWARN, this propagates correctly to all
+functions called from alloc_vmap_area() like kmalloc_node(). With the
+patches applied, I only get the stuff that I would expect:
+
+# echo 8 7 4 1 > /proc/sys/kernel/printk
+# insmod huge.ko
+[   59.285547] huge: loading out-of-tree module taints kernel.
+[   59.328553] big_init: I am a big module using 3932160 bytes of data!
+#
+
+> 
+> 
+>> Changes in v2:
+>>
+>> - check __GFP_NOWARN out of the printk_ratelimited() check (Michal)
+>>
+>> Here is an example of what we would get without these two patches, pretty
+>> scary huh?
+>>
+>> # insmod /mnt/nfs/huge.ko 
+>> [   22.114143] random: nonblocking pool is initialized
+>> [   22.183575] vmap allocation for size 15736832 failed: use vmalloc=<size> to increase size.
+>> [   22.191873] vmalloc: allocation failure: 15729534 bytes
+>> [   22.197112] insmod: page allocation failure: order:0, mode:0xd0
+>> [   22.203048] CPU: 2 PID: 1506 Comm: insmod Tainted: G           O    4.1.20-1.9pre-01082-gbbbff07bc3ce #9
+>> [   22.212536] Hardware name: Broadcom STB (Flattened Device Tree)
+>> [   22.218480] [<c0017eec>] (unwind_backtrace) from [<c00135c8>] (show_stack+0x10/0x14)
+>> [   22.226238] [<c00135c8>] (show_stack) from [<c0638684>] (dump_stack+0x90/0xa4)
+>> [   22.233473] [<c0638684>] (dump_stack) from [<c00aae1c>] (warn_alloc_failed+0x104/0x144)
+>> [   22.241490] [<c00aae1c>] (warn_alloc_failed) from [<c00d72e0>] (__vmalloc_node_range+0x170/0x218)
+>> [   22.250375] [<c00d72e0>] (__vmalloc_node_range) from [<c00147d0>] (module_alloc+0x50/0xac)
+>> [   22.258651] [<c00147d0>] (module_alloc) from [<c008ae2c>] (module_alloc_update_bounds+0xc/0x6c)
+>> [   22.267360] [<c008ae2c>] (module_alloc_update_bounds) from [<c008b778>] (load_module+0x8ec/0x2058)
+>> [   22.276329] [<c008b778>] (load_module) from [<c008cfd4>] (SyS_init_module+0xf0/0x174)
+>> [   22.284170] [<c008cfd4>] (SyS_init_module) from [<c0010140>] (ret_fast_syscall+0x0/0x3c)
+>> [   22.292277] Mem-Info:
+>> [   22.294567] active_anon:5236 inactive_anon:1773 isolated_anon:0
+>> [   22.294567]  active_file:1 inactive_file:3822 isolated_file:0
+>> [   22.294567]  unevictable:0 dirty:0 writeback:0 unstable:0
+>> [   22.294567]  slab_reclaimable:238 slab_unreclaimable:1594
+>> [   22.294567]  mapped:855 shmem:2950 pagetables:36 bounce:0
+>> [   22.294567]  free:39031 free_pcp:198 free_cma:3928
+>> [   22.327196] DMA free:156124kB min:1880kB low:2348kB high:2820kB active_anon:20944kB inactive_anon:7092kB active_file:4kB inactive_file:15288kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:262144kB managed:227676kB mlocked:0kB dirty:0kB writeback:0kB mapped:3420kB shmem:11800kB slab_reclaimable:952kB slab_unreclaimable:6376kB kernel_stack:560kB pagetables:144kB unstable:0kB bounce:0kB free_pcp:792kB local_pcp:68kB free_cma:15712kB writeback_tmp:0kB pages_scanned:0 all_unreclaimable? no
+>> [   22.371631] lowmem_reserve[]: 0 0 0 0
+>> [   22.375372] HighMem free:0kB min:128kB low:128kB high:128kB active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:2883584kB managed:0kB mlocked:0kB dirty:0kB writeback:0kB mapped:0kB shmem:0kB slab_reclaimable:0kB slab_unreclaimable:0kB kernel_stack:0kB pagetables:0kB unstable:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB writeback_tmp:0kB pages_scanned:0 all_unreclaimable? yes
+>> [   22.416249] lowmem_reserve[]: 0 0 0 0
+>> [   22.419986] DMA: 3*4kB (UEM) 4*8kB (UE) 1*16kB (M) 4*32kB (UEMC) 3*64kB (EMC) 1*128kB (E) 4*256kB (UEMC) 2*512kB (UE) 2*1024kB (MC) 4*2048kB (UEMC) 35*4096kB (MRC) = 156156kB
+>> [   22.435922] HighMem: 0*4kB 0*8kB 0*16kB 0*32kB 0*64kB 0*128kB 0*256kB 0*512kB 0*1024kB 0*2048kB 0*4096kB = 0kB
+>> [   22.446130] 6789 total pagecache pages
+>> [   22.449889] 0 pages in swap cache
+>> [   22.453212] Swap cache stats: add 0, delete 0, find 0/0
+>> [   22.458447] Free swap  = 0kB
+>> [   22.461334] Total swap = 0kB
+>> [   22.464222] 786432 pages RAM
+>> [   22.467110] 720896 pages HighMem/MovableOnly
+>> [   22.471388] 725417 pages reserved
+>> [   22.474711] 4096 pages cma reserved
+>> [   22.511310] big_init: I am a big module using 3932160 bytes of data!
+>>
+>> Florian Fainelli (3):
+>>  mm: Silence vmap() allocation failures based on caller gfp_flags
+>>  ARM: Silence first allocation with CONFIG_ARM_MODULE_PLTS=y
+>>  arm64: Silence first allocation with CONFIG_ARM64_MODULE_PLTS=y
+>>
+>> arch/arm/kernel/module.c   | 11 +++++++++--
+>> arch/arm64/kernel/module.c |  7 ++++++-
+>> mm/vmalloc.c               |  2 +-
+>> 3 files changed, 16 insertions(+), 4 deletions(-)
+>>
+>> -- 
+>> 2.9.3
+>>
+
+
+-- 
+Florian
