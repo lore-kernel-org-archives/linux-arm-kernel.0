@@ -1,111 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Apr 2017 21:32:30 +0200
-Subject: [PATCH] [stable v3.18.y] ARM: 8383/1: nommu: avoid deprecated source
- register on mov
-Message-ID: <20170427193230.2673449-1-arnd@arndb.de>
+Date: Thu, 27 Apr 2017 21:42:39 +0200
+Subject: [GIT PULL] ARM: dts: vexpress: fix for v4.12
+In-Reply-To: <3457b9e7-f720-b142-fa82-2855b2c2e2b1@arm.com>
+References: <3457b9e7-f720-b142-fa82-2855b2c2e2b1@arm.com>
+Message-ID: <CAK8P3a0F3oP7FqynamnyvE4A+pe2O4=zSqMoLA0CPg=OxWbdGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Agner <stefan@agner.ch>
+On Thu, Apr 20, 2017 at 6:30 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Hi ARM SoC team,
+>
+> Sorry for the late pull request, but this just contain fix to remove DT
+> build warnings that are showing up in linux-next
+>
+> Please pull!
 
-Commit 970d96f9a81b0dd83ddd8bce0e5e1ba31881c5f5 upstream.
+Pulled into next/dt, thanks,
 
-In Thumb2 mode, the stack register r13 is deprecated if the
-destination register is the program counter (r15). Similar to
-head.S, head-nommu.S uses r13 to store the return address used
-after configuring the CPU's CP15 register. However, since we do
-not enable a MMU, there will be no address switch and it is
-possible to use branch with link instruction to call
-__after_proc_init.
-
-Avoid using r13 completely by using bl to call __after_proc_init
-and get rid of __secondary_switched.
-
-Beside removing unnecessary complexity, this also fixes a
-compiler warning when compiling a !MMU kernel:
-Warning: Use of r13 as a source register is deprecated when r15
-is the destination register.
-
-Tested-?by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-----
-I've backported this build fix to 3.18.y as the original
-patch did not apply cleanly. I rebased it one patch at a time,
-and each step was fairly straightforward, but I did not test
-it on hardware, so it would still be nice to have someone else
-look over the patch to see if I did something wrong.
----
- arch/arm/kernel/head-nommu.S | 20 +++++++-------------
- 1 file changed, 7 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index cc176b67c134..c6c66dd4be89 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -77,13 +77,12 @@ ENTRY(stext)
- 	orr	r6, r6, #(1 << MPU_RSR_EN)	@ Set region enabled bit
- 	bl	__setup_mpu
- #endif
--	ldr	r13, =__mmap_switched		@ address to jump to after
--						@ initialising sctlr
- 	adr	lr, BSYM(1f)			@ return (PIC) address
-  ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
-  THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
-  THUMB(	ret	r12				)
-- 1:	b	__after_proc_init
-+1:	bl	__after_proc_init
-+	b	__mmap_switched
- ENDPROC(stext)
- 
- #ifdef CONFIG_SMP
-@@ -106,8 +105,7 @@ ENTRY(secondary_startup)
- 	movs	r10, r5				@ invalid processor?
- 	beq	__error_p			@ yes, error 'p'
- 
--	adr	r4, __secondary_data
--	ldmia	r4, {r7, r12}
-+	ldr	r7, __secondary_data
- 
- #ifdef CONFIG_ARM_MPU
- 	/* Use MPU region info supplied by __cpu_up */
-@@ -115,23 +113,19 @@ ENTRY(secondary_startup)
- 	bl      __setup_mpu			@ Initialize the MPU
- #endif
- 
--	adr	lr, BSYM(__after_proc_init)	@ return address
--	mov	r13, r12			@ __secondary_switched address
-+	adr	lr, BSYM(1f)			@ return (PIC) address
-  ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
-  THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
-  THUMB(	ret	r12				)
--ENDPROC(secondary_startup)
--
--ENTRY(__secondary_switched)
-+1:	bl	__after_proc_init
- 	ldr	sp, [r7, #8]			@ set up the stack pointer
- 	mov	fp, #0
- 	b	secondary_start_kernel
--ENDPROC(__secondary_switched)
-+ENDPROC(secondary_startup)
- 
- 	.type	__secondary_data, %object
- __secondary_data:
- 	.long	secondary_data
--	.long	__secondary_switched
- #endif /* CONFIG_SMP */
- 
- /*
-@@ -164,7 +158,7 @@ __after_proc_init:
- #endif
- 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
- #endif /* CONFIG_CPU_CP15 */
--	ret	r13
-+	ret	lr
- ENDPROC(__after_proc_init)
- 	.ltorg
- 
--- 
-2.9.0
+        Arnd
