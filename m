@@ -1,89 +1,79 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Thu, 27 Apr 2017 08:52:21 +0300
-Subject: [patch] autogain support for bayer10 format (was Re: [patch]
- propagating controls in libv4l2)
-In-Reply-To: <20170426225150.GA4188@amd>
-References: <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
- <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
- <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
- <20170424224724.5bb52382@vento.lan> <20170426105300.GA857@amd>
- <20170426081330.6ca10e42@vento.lan> <20170426132337.GA6482@amd>
- <cedfd68d-d0fe-6fa8-2676-b61f3ddda652@gmail.com> <20170426225150.GA4188@amd>
-Message-ID: <8a129dca-69c2-366f-1a81-c64dbabc1983@gmail.com>
+From: houlong.wei@mediatek.com (houlong wei)
+Date: Thu, 27 Apr 2017 14:11:52 +0800
+Subject: [PATCH] [media] mtk-mdp: Fix g_/s_selection capture/compose logic
+In-Reply-To: <CAOMLVLiLkZsBfezx6b9Xq=kyPjUZOXwHC4LfHh1=wy6Ynt=zSQ@mail.gmail.com>
+References: <1492057130-1194-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <CAOMLVLiLkZsBfezx6b9Xq=kyPjUZOXwHC4LfHh1=wy6Ynt=zSQ@mail.gmail.com>
+Message-ID: <1493273512.8340.4.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 27.04.2017 01:51, Pavel Machek wrote:
-> Hi!
->
->>>> There are two separate things here:
->>>>
->>>> 1) Autofoucs for a device that doesn't use subdev API
->>>> 2) libv4l2 support for devices that require MC and subdev API
->>>
->>> Actually there are three: 0) autogain. Unfortunately, I need autogain
->>> first before autofocus has a chance...
->>>
->>> And that means... bayer10 support for autogain.
->>>
->>> Plus, I changed avg_lum to long long. Quick calculation tells me int
->>> could overflow with few megapixel sensor.
->>>
->>> Oh, btw http://ytse.tricolour.net/docs/LowLightOptimization.html no
->>> longer works.
->>>
->>> Regards,
->>> 								Pavel
->>>
->>> diff --git a/lib/libv4lconvert/processing/autogain.c b/lib/libv4lconvert/processing/autogain.c
->>> index c6866d6..0b52d0f 100644
->>> --- a/lib/libv4lconvert/processing/autogain.c
->>> +++ b/lib/libv4lconvert/processing/autogain.c
->>> @@ -68,6 +71,41 @@ static void autogain_adjust(struct v4l2_queryctrl *ctrl, int *value,
->>> 	}
->>> }
->>>
->>> +static int get_luminosity_bayer10(uint16_t *buf, const struct v4l2_format *fmt)
->>> +{
->>> +	long long avg_lum = 0;
->>> +	int x, y;
->>> +	
->>> +	buf += fmt->fmt.pix.height * fmt->fmt.pix.bytesperline / 4 +
->>> +		fmt->fmt.pix.width / 4;
->>> +
->>> +	for (y = 0; y < fmt->fmt.pix.height / 2; y++) {
->>> +		for (x = 0; x < fmt->fmt.pix.width / 2; x++)
->>
->> That would take some time :). AIUI, we have NEON support in ARM kernels
->> (CONFIG_KERNEL_MODE_NEON), I wonder if it makes sense (me) to convert the
->> above loop to NEON-optimized when it comes to it? Are there any drawbacks in
->> using NEON code in kernel?
->
-> Well, thanks for offer. This is actualy libv4l2.
->
-
-Oh, somehow I got confused that this is kernel code :)
-
-> But I'd say NEON conversion is not neccessary anytime soon. First,
-> this is just trying to get average luminosity. We can easily skip
-> quite a lot of pixels, and still get reasonable answer.
->
-> Second, omap3isp actually has a hardware block computing statistics
-> for us. We just don't use it for simplicity.
->
-
-Right, I forgot about that.
-
-> (But if you want to play with camera, I'll get you patches; there's
-> ton of work to be done, both kernel and userspace :-).
-
-Well, I saw a low hanging fruit I thought I can convert to NEON in a day 
-or two, while having some rest from the huge "project" I am devoting all 
-my spare time recently (rebasing hildon/maemo 5 on top of devuan 
-Jessie). Still, if there is something relatively small to be done, just 
-email me and I'll have a look.
-
-Regards,
-Ivo
+On Thu, 2017-04-13 at 14:50 +0800, Wu-Cheng Li (???) wrote:
+> Reviewed-by: Wu-Cheng Li <wuchengli@chromium.org>
+> 
+> On Thu, Apr 13, 2017 at 12:18 PM, Minghsiu Tsai
+> <minghsiu.tsai@mediatek.com> wrote:
+> > From: Daniel Kurtz <djkurtz@chromium.org>
+> >
+> > Experiments show that the:
+> >  (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
+> >  (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
+> >
+> > Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+Acked-by:Houlong Wei <houlong.wei@mediatek.com>
+> >
+> > ---
+> >  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 18 +++++++++---------
+> >  1 file changed, 9 insertions(+), 9 deletions(-)
+> >
+> > diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> > index 13afe48..8ab7ca0 100644
+> > --- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> > +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> > @@ -837,12 +837,12 @@ static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
+> >         struct mtk_mdp_ctx *ctx = fh_to_ctx(fh);
+> >         bool valid = false;
+> >
+> > -       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+> > -               if (mtk_mdp_is_target_compose(s->target))
+> > -                       valid = true;
+> > -       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+> > +       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+> >                 if (mtk_mdp_is_target_crop(s->target))
+> >                         valid = true;
+> > +       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+> > +               if (mtk_mdp_is_target_compose(s->target))
+> > +                       valid = true;
+> >         }
+> >         if (!valid) {
+> >                 mtk_mdp_dbg(1, "[%d] invalid type:%d,%u", ctx->id, s->type,
+> > @@ -907,12 +907,12 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
+> >         int ret;
+> >         bool valid = false;
+> >
+> > -       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+> > -               if (s->target == V4L2_SEL_TGT_COMPOSE)
+> > -                       valid = true;
+> > -       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+> > +       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+> >                 if (s->target == V4L2_SEL_TGT_CROP)
+> >                         valid = true;
+> > +       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+> > +               if (s->target == V4L2_SEL_TGT_COMPOSE)
+> > +                       valid = true;
+> >         }
+> >         if (!valid) {
+> >                 mtk_mdp_dbg(1, "[%d] invalid type:%d,%u", ctx->id, s->type,
+> > @@ -925,7 +925,7 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
+> >         if (ret)
+> >                 return ret;
+> >
+> > -       if (mtk_mdp_is_target_crop(s->target))
+> > +       if (mtk_mdp_is_target_compose(s->target))
+> >                 frame = &ctx->s_frame;
+> >         else
+> >                 frame = &ctx->d_frame;
+> > --
+> > 1.9.1
+> >
