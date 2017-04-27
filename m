@@ -1,28 +1,47 @@
 From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 27 Apr 2017 17:54:44 +0200
-Subject: [RFC kvm-unit-tests PATCH 4/8] Makefiles: use explicit path for
- including sub-Makefiles
-In-Reply-To: <20170407122010.umftrqr2qqd6g3q4@kamzik.brq.redhat.com>
+Date: Thu, 27 Apr 2017 17:57:36 +0200
+Subject: [RFC kvm-unit-tests PATCH 5/8] Makefile: add explicit mkdir for
+ .o targets
+In-Reply-To: <20170406190727.5624-6-alex.bennee@linaro.org>
 References: <20170406190727.5624-1-alex.bennee@linaro.org>
- <20170406190727.5624-5-alex.bennee@linaro.org>
- <20170407122010.umftrqr2qqd6g3q4@kamzik.brq.redhat.com>
-Message-ID: <328f9a03-d6ec-2d3a-af41-e107b4651fea@redhat.com>
+ <20170406190727.5624-6-alex.bennee@linaro.org>
+Message-ID: <a8eb190a-3487-1a89-0069-789b62860b3e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 07/04/2017 14:20, Andrew Jones wrote:
->> -LIBFDT_objdir = lib/libfdt
->> -LIBFDT_srcdir = lib/libfdt
->> +LIBFDT_objdir = $(SRCDIR)/lib/libfdt
->> +LIBFDT_srcdir = $(SRCDIR)/lib/libfdt
->>  LIBFDT_archive = $(LIBFDT_objdir)/libfdt.a
->>  LIBFDT_include = $(addprefix $(LIBFDT_srcdir)/,$(LIBFDT_INCLUDES))
->>  LIBFDT_version = $(addprefix $(LIBFDT_srcdir)/,$(LIBFDT_VERSION))
-> Can't we just do VPATH += $LIBFDT_srcdir instead?
+On 06/04/2017 21:07, Alex Benn?e wrote:
+> This is fairly direct way of ensuring the target build directories are
+> created before we build a binary blob. mkdir -p fails gracefully if
+> the directory is already there.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> ---
+>  Makefile | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/Makefile b/Makefile
+> index 781186e..56598df 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -79,8 +79,13 @@ $(LIBFDT_archive): $(addprefix $(LIBFDT_objdir)/,$(LIBFDT_OBJS))
+>  	$(AR) rcs $@ $^
+>  
+>  %.o: %.S
+> +	mkdir -p $(dir $@)
 
-That would search for every file in the lib/libfdt subdirectory of the
-source directory, while here the desired prefix is just $(SRCDIR).
+Should this use @ for cleanliness?
 
 Paolo
+
+>  	$(CC) $(CFLAGS) -c -nostdlib -o $@ $<
+>  
+> +%.o: %.c
+> +	mkdir -p $(dir $@)
+> +	$(CC) $(CFLAGS) -c -o $@ $<
+> +
+>  -include */.*.d */*/.*.d
+>  
+>  all: $(shell git -C $(SRCDIR) rev-parse --verify --short=8 HEAD >build-head 2>/dev/null)
+> 
