@@ -1,118 +1,44 @@
-From: gakula@caviumnetworks.com (Geetha sowjanya)
-Date: Thu, 27 Apr 2017 17:16:24 +0530
-Subject: [PATCH 3/3] iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2
-In-Reply-To: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
-References: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <1493293584-20287-4-git-send-email-gakula@caviumnetworks.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Thu, 27 Apr 2017 14:17:23 +0200
+Subject: [PATCH] mtd: spi-nor: stm32: remove broken MODULE_ALIAS
+In-Reply-To: <20170427111001.2587551-1-arnd@arndb.de>
+References: <20170427111001.2587551-1-arnd@arndb.de>
+Message-ID: <dc7d8b5e-0f0e-1593-4c6b-0c93a828818c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geetha <gakula@cavium.com>
+thanks a lot Arnd
 
-Cavium 99xx SMMU doesn't support MSI and also doesn't have unique irq
-lines for gerror, eventq and cmdq-sync.
+Oops, I've not tested in Module :-(.
+Just tested in built-in, and used bind/unbind and device tree overlays.
 
-This patch addresses the issue by checking if any interrupt sources are
-using same irq number, then they are registered as shared irqs.
-
-Signed-off-by: Geetha <gakula@cavium.com>
----
- Documentation/arm64/silicon-errata.txt |  1 +
- drivers/iommu/arm-smmu-v3.c            | 32 ++++++++++++++++++++++++++++----
- 2 files changed, 29 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 629e2ce..cc15f25 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -62,6 +62,7 @@ stable kernels.
- | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
- | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
- | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
-+| Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
- |                |                 |                 |                             |
- | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
- |                |                 |                 |                             |
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index ee23ccd..eb55d38 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2211,10 +2211,30 @@ static void arm_smmu_setup_msis(struct arm_smmu_device *smmu)
- 	devm_add_action(dev, arm_smmu_free_msis, dev);
- }
- 
-+static int get_irq_flags(struct arm_smmu_device *smmu, int irq)
-+{
-+	int match_count = 0;
-+
-+	if (irq == smmu->evtq.q.irq)
-+		match_count++;
-+	if (irq == smmu->cmdq.q.irq)
-+		match_count++;
-+	if (irq == smmu->gerr_irq)
-+		match_count++;
-+	if (irq == smmu->priq.q.irq)
-+		match_count++;
-+
-+	if (match_count > 1)
-+		return IRQF_SHARED | IRQF_ONESHOT;
-+
-+	return 0;
-+}
-+
- static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
- {
- 	int ret, irq;
- 	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
-+	u32 irqflags = 0;
- 
- 	/* Disable IRQs first */
- 	ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
-@@ -2229,9 +2249,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
- 	/* Request interrupt lines */
- 	irq = smmu->evtq.q.irq;
- 	if (irq) {
-+		irqflags = get_irq_flags(smmu, irq);
- 		ret = devm_request_threaded_irq(smmu->dev, irq, NULL,
- 						arm_smmu_evtq_thread,
--						IRQF_ONESHOT,
-+						IRQF_ONESHOT | irqflags,
- 						"arm-smmu-v3-evtq", smmu);
- 		if (ret < 0)
- 			dev_warn(smmu->dev, "failed to enable evtq irq\n");
-@@ -2239,8 +2260,9 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
- 
- 	irq = smmu->cmdq.q.irq;
- 	if (irq) {
-+		irqflags = get_irq_flags(smmu, irq);
- 		ret = devm_request_irq(smmu->dev, irq,
--				       arm_smmu_cmdq_sync_handler, 0,
-+				       arm_smmu_cmdq_sync_handler, irqflags,
- 				       "arm-smmu-v3-cmdq-sync", smmu);
- 		if (ret < 0)
- 			dev_warn(smmu->dev, "failed to enable cmdq-sync irq\n");
-@@ -2248,8 +2270,9 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
- 
- 	irq = smmu->gerr_irq;
- 	if (irq) {
-+		irqflags = get_irq_flags(smmu, irq);
- 		ret = devm_request_irq(smmu->dev, irq, arm_smmu_gerror_handler,
--				       0, "arm-smmu-v3-gerror", smmu);
-+				       irqflags, "arm-smmu-v3-gerror", smmu);
- 		if (ret < 0)
- 			dev_warn(smmu->dev, "failed to enable gerror irq\n");
- 	}
-@@ -2257,9 +2280,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
- 	if (smmu->features & ARM_SMMU_FEAT_PRI) {
- 		irq = smmu->priq.q.irq;
- 		if (irq) {
-+			irqflags = get_irq_flags(smmu, irq);
- 			ret = devm_request_threaded_irq(smmu->dev, irq, NULL,
- 							arm_smmu_priq_thread,
--							IRQF_ONESHOT,
-+							IRQF_ONESHOT | irqflags,
- 							"arm-smmu-v3-priq",
- 							smmu);
- 			if (ret < 0)
--- 
-1.9.1
+BR
+Ludo
+On 04/27/2017 01:09 PM, Arnd Bergmann wrote:
+> The MODULE_ALIAS statement refers to a macro that has never been defined
+> in this driver, causing a build error:
+>
+> drivers/mtd/spi-nor/stm32-quadspi.c:694:150: error: expected ',' or ';' before 'DRIVER_NAME'
+>
+> Unless there is a specific alias we need other then the driver name,
+> we don't need an alias here and can simply remove the line to fix the
+> build.
+>
+> Fixes: dc5e400611c5 ("mtd: spi-nor: add driver for STM32 quad spi flash controller")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>   drivers/mtd/spi-nor/stm32-quadspi.c | 1 -
+>   1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
+> index 90d9152ddf98..1056e7408d2a 100644
+> --- a/drivers/mtd/spi-nor/stm32-quadspi.c
+> +++ b/drivers/mtd/spi-nor/stm32-quadspi.c
+> @@ -691,7 +691,6 @@ static struct platform_driver stm32_qspi_driver = {
+>   };
+>   module_platform_driver(stm32_qspi_driver);
+>   
+> -MODULE_ALIAS("platform:" DRIVER_NAME);
+>   MODULE_AUTHOR("Ludovic Barre <ludovic.barre@st.com>");
+>   MODULE_DESCRIPTION("STMicroelectronics STM32 quad spi driver");
+>   MODULE_LICENSE("GPL v2");
