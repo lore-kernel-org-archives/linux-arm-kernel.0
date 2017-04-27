@@ -1,88 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 27 Apr 2017 18:37:59 +0100
-Subject: [PATCH v2] arm64: perf: Use only exclude_kernel attribute when
- kernel is running in HYP
-In-Reply-To: <20170426134141.GA6417@localhost>
-References: <1492623846-29335-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170420084928.GC31436@leverpostej>
- <CAFpQJXVSsg8CX28vEo2LzmOi3pknHiH233spMD6ip4LZO4vw=Q@mail.gmail.com>
- <20170424154530.GO12323@arm.com>
- <CAFpQJXWX=0GQ5hse4E_OSdnYhMOA7CvqeoHe9AdMsyoZJmrPQQ@mail.gmail.com>
- <20170425165259.GS24484@arm.com>
- <CA+7sy7D-ZB84xQ2pE-io1v7pmnAuWUszh1B=Zq+Ezup=sysQ2g@mail.gmail.com>
- <CY4PR07MB3415C0CEBB9D3DF0C249DC6793110@CY4PR07MB3415.namprd07.prod.outlook.com>
- <20170426101021.GF21744@arm.com> <20170426134141.GA6417@localhost>
-Message-ID: <20170427173758.GN1890@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 27 Apr 2017 10:38:57 -0700
+Subject: [PATCH 0/3 v2] ARM/ARM64: silence large module first time allocation
+Message-ID: <20170427173900.2538-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 01:41:42PM +0000, Jayachandran C wrote:
-> On Wed, Apr 26, 2017 at 11:10:21AM +0100, Will Deacon wrote:
-> > On Wed, Apr 26, 2017 at 07:22:46AM +0000, Pinski, Andrew wrote:
-> > > On 4/25/2017 11:53 PM, Jayachandran C. wrote:
-> > > > On Tue, Apr 25, 2017 at 10:23 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > >> On Tue, Apr 25, 2017 at 09:13:40AM +0530, Ganapatrao Kulkarni wrote:
-> > > >>> On Mon, Apr 24, 2017 at 9:15 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > >>>> On Thu, Apr 20, 2017 at 02:56:50PM +0530, Ganapatrao Kulkarni wrote:
-> > > >>>>> OK, if you are ok with sysfs part, i can send next version with that
-> > > >>>>> change only?.
-> > > >>>> I think the sysfs part is still a little dodgy, since you still expose the
-> > > >>>> "exclude_hv" file with a value of 0 when not running at EL2, which would
-> > > >>>> imply that exclude_hv is forced to zero. I don't think that's correct.
-> > > >>> okay, i can make exclude_hv visible only when kernel booted in EL2.
-> > > >>> is it ok to have empty directory "attr" when kernel booted to EL1?
-> > > >>> attr can be place holder for any other miscellaneous attributes, that
-> > > >>> can be added in future.
-> > > >> Sounds good to me, although I'll seek comment from the other perf folks
-> > > >> before merging anything with ABI implications.
-> > > > Do you really think this is the solution given:
-> > > > - this is an arm64 specific sysfs interface that is tied to the perf API
-> > 
-> > That's why I want feedback from others. The intention would be that this can
-> > be used by other PMUs as well, since it's not uncommon that parts of the
-> > sizeable perf_event_attr structure are not used by a given PMU.
-> > 
-> > > > - the perf API documentation has to be updated for this
-> > 
-> > So? If having to update documentation means we shouldn't change the kernel,
-> > then we may as well all find new jobs.
-> > 
-> > > > - All the applications that use the perf API have to be modified to
-> > > > check this sysfs interface
-> > > > - If the application fails to do so, a very narrow corner case
-> > > > (exclude_hv != exclude_kernel and VHE enabled) fails.
-> > 
-> > See below, but apparently people care about it.
-> > 
-> > > > Any application that really cares can already do see if exclude_hv !=
-> > > > exclude_kernel case works by calling perf_open_event() with those
-> > > > options and checking the return value.
-> > 
-> > That's a good point: there is *something* userspace can do, although that
-> > would be arm64-specific and doesn't really help with the state-space
-> > explosion you get with combinations of invalid/unused perf_event_attr
-> > fields.
-> > 
-> > > An example of an application which needs to changed is HHVM. Currently 
-> > > it sets exclude_hv to true but exclude_kernel to false as it does not 
-> > > care about the hypervisor associated perf events associated with the 
-> > > code, only the kernel and userspace associated evnts.
-> > > Yes we could submit a patch to use the sysfs interface to check but it 
-> > > would look funny and the facebook folks might reject the patch as it is 
-> > > ARM64 specific in generic code.  Note this is how all of this discussion 
-> > > started was HHVM's call to perf_open_event was failing.
-> > 
-> > Hmm, if you're saying that HHVM won't be changed to use the sysfs stuff,
-> > then why are we bothering?
-> > 
-> > Not sure where this leaves us.
-> 
-> If my understanding is correct, the sysfs suggestion above is going to
-> add API complexity without solving the issue. Ignoring the exclude_hv if
-> it cannot be honored would be a better solution.
+With kernels built with CONFIG_ARM{,64}_MODULES_PLTS=y, the first allocation
+done from module space will fail, produce a general OOM allocation and also a
+vmap warning. The second allocation from vmalloc space may or may not be
+successful, but is actually the one we are interested about in these cases.
 
-Better for HHVM, sure, but I don't think it's better in general. It means
-that we silently do the opposite of what the user has requested in some
-configurations.
+This patch series passed __GFP_NOWARN to silence such allocations from the
+ARM/ARM64 module loader's first time allocation when the MODULES_PLT option is
+enabled, and also makes alloc_vmap_area() react to the caller setting
+__GFP_NOWARN to silence "vmap allocation for size..." messages.
 
-Will
+Changes in v2:
+
+- check __GFP_NOWARN out of the printk_ratelimited() check (Michal)
+
+Here is an example of what we would get without these two patches, pretty
+scary huh?
+
+# insmod /mnt/nfs/huge.ko 
+[   22.114143] random: nonblocking pool is initialized
+[   22.183575] vmap allocation for size 15736832 failed: use vmalloc=<size> to increase size.
+[   22.191873] vmalloc: allocation failure: 15729534 bytes
+[   22.197112] insmod: page allocation failure: order:0, mode:0xd0
+[   22.203048] CPU: 2 PID: 1506 Comm: insmod Tainted: G           O    4.1.20-1.9pre-01082-gbbbff07bc3ce #9
+[   22.212536] Hardware name: Broadcom STB (Flattened Device Tree)
+[   22.218480] [<c0017eec>] (unwind_backtrace) from [<c00135c8>] (show_stack+0x10/0x14)
+[   22.226238] [<c00135c8>] (show_stack) from [<c0638684>] (dump_stack+0x90/0xa4)
+[   22.233473] [<c0638684>] (dump_stack) from [<c00aae1c>] (warn_alloc_failed+0x104/0x144)
+[   22.241490] [<c00aae1c>] (warn_alloc_failed) from [<c00d72e0>] (__vmalloc_node_range+0x170/0x218)
+[   22.250375] [<c00d72e0>] (__vmalloc_node_range) from [<c00147d0>] (module_alloc+0x50/0xac)
+[   22.258651] [<c00147d0>] (module_alloc) from [<c008ae2c>] (module_alloc_update_bounds+0xc/0x6c)
+[   22.267360] [<c008ae2c>] (module_alloc_update_bounds) from [<c008b778>] (load_module+0x8ec/0x2058)
+[   22.276329] [<c008b778>] (load_module) from [<c008cfd4>] (SyS_init_module+0xf0/0x174)
+[   22.284170] [<c008cfd4>] (SyS_init_module) from [<c0010140>] (ret_fast_syscall+0x0/0x3c)
+[   22.292277] Mem-Info:
+[   22.294567] active_anon:5236 inactive_anon:1773 isolated_anon:0
+[   22.294567]  active_file:1 inactive_file:3822 isolated_file:0
+[   22.294567]  unevictable:0 dirty:0 writeback:0 unstable:0
+[   22.294567]  slab_reclaimable:238 slab_unreclaimable:1594
+[   22.294567]  mapped:855 shmem:2950 pagetables:36 bounce:0
+[   22.294567]  free:39031 free_pcp:198 free_cma:3928
+[   22.327196] DMA free:156124kB min:1880kB low:2348kB high:2820kB active_anon:20944kB inactive_anon:7092kB active_file:4kB inactive_file:15288kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:262144kB managed:227676kB mlocked:0kB dirty:0kB writeback:0kB mapped:3420kB shmem:11800kB slab_reclaimable:952kB slab_unreclaimable:6376kB kernel_stack:560kB pagetables:144kB unstable:0kB bounce:0kB free_pcp:792kB local_pcp:68kB free_cma:15712kB writeback_tmp:0kB pages_scanned:0 all_unreclaimable? no
+[   22.371631] lowmem_reserve[]: 0 0 0 0
+[   22.375372] HighMem free:0kB min:128kB low:128kB high:128kB active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:2883584kB managed:0kB mlocked:0kB dirty:0kB writeback:0kB mapped:0kB shmem:0kB slab_reclaimable:0kB slab_unreclaimable:0kB kernel_stack:0kB pagetables:0kB unstable:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB writeback_tmp:0kB pages_scanned:0 all_unreclaimable? yes
+[   22.416249] lowmem_reserve[]: 0 0 0 0
+[   22.419986] DMA: 3*4kB (UEM) 4*8kB (UE) 1*16kB (M) 4*32kB (UEMC) 3*64kB (EMC) 1*128kB (E) 4*256kB (UEMC) 2*512kB (UE) 2*1024kB (MC) 4*2048kB (UEMC) 35*4096kB (MRC) = 156156kB
+[   22.435922] HighMem: 0*4kB 0*8kB 0*16kB 0*32kB 0*64kB 0*128kB 0*256kB 0*512kB 0*1024kB 0*2048kB 0*4096kB = 0kB
+[   22.446130] 6789 total pagecache pages
+[   22.449889] 0 pages in swap cache
+[   22.453212] Swap cache stats: add 0, delete 0, find 0/0
+[   22.458447] Free swap  = 0kB
+[   22.461334] Total swap = 0kB
+[   22.464222] 786432 pages RAM
+[   22.467110] 720896 pages HighMem/MovableOnly
+[   22.471388] 725417 pages reserved
+[   22.474711] 4096 pages cma reserved
+[   22.511310] big_init: I am a big module using 3932160 bytes of data!
+
+Florian Fainelli (3):
+  mm: Silence vmap() allocation failures based on caller gfp_flags
+  ARM: Silence first allocation with CONFIG_ARM_MODULE_PLTS=y
+  arm64: Silence first allocation with CONFIG_ARM64_MODULE_PLTS=y
+
+ arch/arm/kernel/module.c   | 11 +++++++++--
+ arch/arm64/kernel/module.c |  7 ++++++-
+ mm/vmalloc.c               |  2 +-
+ 3 files changed, 16 insertions(+), 4 deletions(-)
+
+-- 
+2.9.3
