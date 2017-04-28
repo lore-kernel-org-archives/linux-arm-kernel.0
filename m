@@ -1,88 +1,139 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 28 Apr 2017 09:11:36 +0200
-Subject: [PATCH/RFC 0/5] arm64: dts: renesas: Break out common board
- support
-In-Reply-To: <20170428070458.GB10196@verge.net.au>
-References: <1492779321-23939-1-git-send-email-geert+renesas@glider.be>
- <20170426080642.GK25517@verge.net.au>
- <CAMuHMdXbe=rkeS+-teg7nqbjULWY0_5pBO1XEzCGdYA4gB57oA@mail.gmail.com>
- <CAMuHMdV1SQoeEACaNLZbByRLbosMj5oxEysNDVevYgxqStDaug@mail.gmail.com>
- <20170428070458.GB10196@verge.net.au>
-Message-ID: <CAMuHMdVypXM59rk50Guc90ktD2PKHsVHgXyN34Cz3EC1hMTs8g@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 28 Apr 2017 08:18:52 +0100
+Subject: [PATCH v2] arm64: Add ASM modifier for xN register operands
+In-Reply-To: <20170427225221.GS128305@google.com>
+References: <20170426214616.142580-1-mka@chromium.org>
+ <20170427110256.GC31337@leverpostej>
+ <20170427225221.GS128305@google.com>
+Message-ID: <CAKv+Gu9s2t+Nt7JCcTxkr5BYSN05f_zxYkKzfrD-4owWQLvF_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi SImon,
-
-On Fri, Apr 28, 2017 at 9:04 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Apr 27, 2017 at 03:32:49PM +0200, Geert Uytterhoeven wrote:
->> On Wed, Apr 26, 2017 at 10:11 AM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->> > CC Vladimir (which I forgot to CC initially, sorry for that)
->> >
->> > On Wed, Apr 26, 2017 at 10:06 AM, Simon Horman <horms@verge.net.au> wrote:
->> >> On Fri, Apr 21, 2017 at 02:55:16PM +0200, Geert Uytterhoeven wrote:
->> >>> The Renesas Salvator-X and ULCB development board can be equipped with
->> >>> either an R-Car H3 or M3-W SiP, which are pin-compatible.  All boards
->> >>> use separate DTBs, but currently there's no sharing of board-specific
->> >>> devices in DTS.
->> >>>
->> >>> This series reduces duplication by extracting common board support into
->> >>> their own .dtsi files.  As the level of support varies across boards and
->> >>> SoCs, this requires the addition of a few external clocks and
->> >>> placeholder devices on R-Car M3-W, so the common board support DTS can
->> >>> refer to them.
->> >>>
->> >>>   - Patches 1 and 2 add the external audio and PCIe bus clocks on R-Car
->> >>>     M3-W, which are present in r8a7795.dtsi, and used in
->> >>>     r8a7795-salvator-x.dts,
->> >>>   - RFC patch 3 adds placeholders for devices that are not yet supported
->> >>>     and/or tested on R-Car M3-W, but used on R-Car H3,
->> >>>   - RFC patch 4 extracts common Salvator-X board support,
->> >>>   - RFC patch 5 extracts common ULCB board support.
->> >>>
->> >>> For R-Car H3 based boards, there are no functional changes.
->> >>> For R-Car M3-W based boards, some new devices are now described in DT.
->> >>>
->> >>> Dependencies:
->> >>>   - renesas-devel-20170420-v4.11-rc7,
->> >>>   - Patches 1 and 2 can be applied as-is,
->> >>>   - Patches 4 and 5 depend on "[PATCH 0/8] arm64: dts: renesas: Break
->> >>>     out R-Car H3 and M3-W SiP"
->> >>>     (http://www.spinics.net/lists/devicetree/msg173820.html).
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
->> >>> DTB changes have been inspected using scripts/dtc/dtx_diff.
->> >>> This has been tested on Salvator-X (both H3 and M3-W).
->> >>> This has not been tested on H3ULCB and M3ULCB due to lack of hardware.
->> >>>
->> >>> Thanks for your comments!
->> >>
->> >> Thanks for tackling this important problem. I have looked over the changes
->> >> and they seem nice to me. I would, however, be more comfortable applying
->> >> them if they were rested on the ULCB boards.
->> >
->> > tested?
->> >
->> > I've pushed a branch for testing to topic/rcar3-dtsi-sharing in
->> > git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
->>
->> I managed to test it on the new H3ULCB and M3ULCB baords in Magnus' farm.
->> No issues detected.
+On 27 April 2017 at 23:52, Matthias Kaehlcke <mka@chromium.org> wrote:
+> Hi Mark,
 >
-> Great! Any objections to me queuing this up?
+> Thanks for your comments.
+>
+> El Thu, Apr 27, 2017 at 12:02:56PM +0100 Mark Rutland ha dit:
+>
+>> Hi,
+>>
+>> On Wed, Apr 26, 2017 at 02:46:16PM -0700, Matthias Kaehlcke wrote:
+>> > Many inline assembly statements don't include the 'x' modifier when
+>> > using xN registers as operands. This is perfectly valid, however it
+>> > causes clang to raise warnings like this:
+>> >
+>> > warning: value size does not match register size specified by the
+>> >   constraint and modifier [-Wasm-operand-widths]
+>> > ...
+>> > arch/arm64/include/asm/barrier.h:62:23: note: expanded from macro
+>> >   '__smp_store_release'
+>> >     asm volatile ("stlr %1, %0"
+>> >
+>> > Add the modifiers to keep clang happy.
+>>
+>> If we're going to make this consistent, it would make sense to similarly
+>> annotate 'w' regs. That will make it easier going forward to enforce a
+>> policy that registers are suitably annotated.
+>
+> Ok
+>
+>> Also, there's a risk that we silently mask a bug here, for which clang's
+>> warning is legitimate, so we need to review this very carefully...
+>>
+>> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+>> > ---
+>> > Changes in v2:
+>> > - also add modifiers to multiline ASM statements in include/asm/
+>> >   {atomic_ll_sc.h,irqflags.h,pgtable.h,uaccess.h,word-at-a-time.h}
+>> >   that were missed on v1
+>> >
+>> >  arch/arm64/include/asm/arch_gicv3.h     |  2 +-
+>> >  arch/arm64/include/asm/atomic_ll_sc.h   | 36 ++++++++++++++++-----------------
+>> >  arch/arm64/include/asm/barrier.h        |  4 ++--
+>> >  arch/arm64/include/asm/io.h             | 24 +++++++++++-----------
+>> >  arch/arm64/include/asm/irqflags.h       | 10 ++++-----
+>> >  arch/arm64/include/asm/kvm_hyp.h        | 10 ++++-----
+>> >  arch/arm64/include/asm/kvm_mmu.h        | 12 +++++------
+>> >  arch/arm64/include/asm/percpu.h         |  4 ++--
+>> >  arch/arm64/include/asm/pgtable.h        | 20 +++++++++---------
+>> >  arch/arm64/include/asm/sysreg.h         |  4 ++--
+>> >  arch/arm64/include/asm/uaccess.h        | 14 ++++++-------
+>> >  arch/arm64/include/asm/word-at-a-time.h | 14 ++++++-------
+>> >  arch/arm64/kernel/armv8_deprecated.c    |  4 ++--
+>> >  arch/arm64/kernel/probes/kprobes.c      |  2 +-
+>> >  arch/arm64/kvm/hyp/switch.c             |  4 ++--
+>> >  15 files changed, 82 insertions(+), 82 deletions(-)
+>>
+>> ... to that end, could you split these into a few patches?
+>>
+>> That way, knowledgeable people can focus their review on the code they
+>> understand.
+>>
+>> That doesn't need to be a patch per file; all the KVM bits can be
+>> collated in one patch, for example. However, the atomics, kvm, and
+>> uaccess+word-at-a-time bits should certainly be separate patches given
+>> their (existing) complexity.
+>
+> I agree the patch is too large, I considered to split it up but wasn't
+> sure where to draw the line(s). Will try to find halfway reasonable
+> batches :)
+>
+>> Otherwise, I have a couple of comments below.
+>>
+>> > diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+>> > index f37e3a21f6e7..ba54e5bee885 100644
+>> > --- a/arch/arm64/include/asm/arch_gicv3.h
+>> > +++ b/arch/arm64/include/asm/arch_gicv3.h
+>> > @@ -166,7 +166,7 @@ static inline void gic_write_sre(u32 val)
+>> >
+>> >  static inline void gic_write_bpr1(u32 val)
+>> >  {
+>> > -   asm volatile("msr_s " __stringify(ICC_BPR1_EL1) ", %0" : : "r" (val));
+>> > +   asm volatile("msr_s " __stringify(ICC_BPR1_EL1) ", %x0" : : "r" (val));
+>> >  }
+>>
+>> Please make this use write_sysreg_s() instead, i.e.
+>>
+>> static inline void gic_write_bpr1(u32 val)
+>> {
+>>       write_sysreg_s(var, ICC_BPR1_EL1);
+>> }
+>>
+>> ... that uses the 'x' modifier internally, and it's what we do for the
+>> other GIC sysreg accesors.
+>>
+>> This accessor was missed by commit:
+>>
+>>   d44ffa5ae70a15a1 ("irqchip/gic-v3: Convert arm64 GIC accessors to {read,write}_sysreg_s")
+>>
+>> ... because it was added concurrently by commitL
+>>
+>>   91ef84428a86b75a ("irqchip/gic-v3: Reset BPR during initialization")
+>>
+>> ... i.e. it was not deliberately omitted.
+>
+> Will do
+>
+>> [...]
+>>
+>> > -   asm volatile("strb %w0, [%1]" : : "rZ" (val), "r" (addr));
+>> > +   asm volatile("strb %w0, [%x1]" : : "rZ" (val), "r" (addr));
+>>
+>> In general, the '[%xN]' pattern looks *very* suspicious to me. Any
+>> address must be 64-bit, so this would mask a legitimate warning.
+>>
+>> Given the prototype of this function the code if fine either way, but
+>> were we to refactor things (e.g. making this a macro), that might not be
+>> true.
+>>
+>> ... so I'm not sure it make sense to alter instances used for addresses.
+>
+> Good point, I'll leave instances dealing with addresses untouched for now.
+>
 
-The dependency above (no feedback about the SiP types yet).
-
-I can respin without that dependency, if that is preferred...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+OK, I am confused now. We started this thread under the assumption
+that all unqualified placeholders are warned about by Clang. Given
+that this appears not to be the case, could we please first find out
+what causes the warnings? Is it necessary at all to add the x
+modifiers for 64-bit types?
