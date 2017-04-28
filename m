@@ -1,107 +1,82 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Fri, 28 Apr 2017 15:02:46 +0800
-Subject: [PATCH v2 2/3] clk: rockchip: add clock-ids for rk3228 clocks
+Date: Fri, 28 Apr 2017 15:02:45 +0800
+Subject: [PATCH v2 1/3] clk: rockchip: fix up the RK3228 clk cpu setting table
 In-Reply-To: <1493362967-4040-1-git-send-email-zhangqing@rock-chips.com>
 References: <1493362967-4040-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1493362967-4040-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1493362967-4040-2-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch exports related BUS/VPU/RGA/HDCP/IEP/TSP/WIFI/
-VIO/USB/EFUSE/GPU/CRYPTO clocks for dts reference.
+support more cpu freq, and add armcore div setting.
 
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- include/dt-bindings/clock/rk3228-cru.h | 47 ++++++++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
+ drivers/clk/rockchip/clk-rk3228.c | 50 ++++++++++++++++++++++++++-------------
+ 1 file changed, 34 insertions(+), 16 deletions(-)
 
-diff --git a/include/dt-bindings/clock/rk3228-cru.h b/include/dt-bindings/clock/rk3228-cru.h
-index b27e2b1a65e3..56f841c22801 100644
---- a/include/dt-bindings/clock/rk3228-cru.h
-+++ b/include/dt-bindings/clock/rk3228-cru.h
-@@ -61,6 +61,17 @@
- #define SCLK_MAC_TX		130
- #define SCLK_MAC_PHY		131
- #define SCLK_MAC_OUT		132
-+#define SCLK_VDEC_CABAC		133
-+#define SCLK_VDEC_CORE		134
-+#define SCLK_RGA		135
-+#define SCLK_HDCP		136
-+#define SCLK_HDMI_CEC		137
-+#define SCLK_CRYPTO		138
-+#define SCLK_TSP		139
-+#define SCLK_HSADC		140
-+#define SCLK_WIFI		141
-+#define SCLK_OTGPHY0		142
-+#define SCLK_OTGPHY1		143
+diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
+index db6e5a9e6de6..a6cdf8fc1e75 100644
+--- a/drivers/clk/rockchip/clk-rk3228.c
++++ b/drivers/clk/rockchip/clk-rk3228.c
+@@ -86,25 +86,43 @@ enum rk3228_plls {
+ #define RK3228_DIV_PCLK_MASK		0x7
+ #define RK3228_DIV_PCLK_SHIFT		12
  
- /* dclk gates */
- #define DCLK_VOP		190
-@@ -68,15 +79,32 @@
+-#define RK3228_CLKSEL1(_core_peri_div)					\
+-	{									\
+-		.reg = RK2928_CLKSEL_CON(1),					\
+-		.val = HIWORD_UPDATE(_core_peri_div, RK3228_DIV_PERI_MASK,	\
+-				RK3228_DIV_PERI_SHIFT)				\
+-	}
++#define RK3228_CLKSEL1(_core_aclk_div, _core_peri_div)			\
++{									\
++	.reg = RK2928_CLKSEL_CON(1),					\
++	.val = HIWORD_UPDATE(_core_peri_div, RK3228_DIV_PERI_MASK,	\
++			     RK3228_DIV_PERI_SHIFT) |			\
++	       HIWORD_UPDATE(_core_aclk_div, RK3228_DIV_ACLK_MASK,	\
++			     RK3228_DIV_ACLK_SHIFT),			\
++}
  
- /* aclk gates */
- #define ACLK_DMAC		194
-+#define ACLK_CPU		195
-+#define ACLK_VPU_PRE		196
-+#define ACLK_RKVDEC_PRE		197
-+#define ACLK_RGA_PRE		198
-+#define ACLK_IEP_PRE		199
-+#define ACLK_HDCP_PRE		200
-+#define ACLK_VOP_PRE		201
-+#define ACLK_VPU		202
-+#define ACLK_RKVDEC		203
-+#define ACLK_IEP		204
-+#define ACLK_RGA		205
-+#define ACLK_HDCP		206
- #define ACLK_PERI		210
- #define ACLK_VOP		211
- #define ACLK_GMAC		212
-+#define ACLK_GPU		213
+-#define RK3228_CPUCLK_RATE(_prate, _core_peri_div)			\
+-	{								\
+-		.prate = _prate,					\
+-		.divs = {						\
+-			RK3228_CLKSEL1(_core_peri_div),		\
+-		},							\
+-	}
++#define RK3228_CPUCLK_RATE(_prate, _core_aclk_div, _core_peri_div)	\
++{									\
++	.prate = _prate,						\
++	.divs = {							\
++		RK3228_CLKSEL1(_core_aclk_div, _core_peri_div),		\
++	},								\
++}
  
- /* pclk gates */
- #define PCLK_GPIO0		320
- #define PCLK_GPIO1		321
- #define PCLK_GPIO2		322
- #define PCLK_GPIO3		323
-+#define PCLK_VIO_H2P		324
-+#define PCLK_HDCP		325
-+#define PCLK_EFUSE_1024		326
-+#define PCLK_EFUSE_256		327
- #define PCLK_GRF		329
- #define PCLK_I2C0		332
- #define PCLK_I2C1		333
-@@ -89,6 +117,7 @@
- #define PCLK_TSADC		344
- #define PCLK_PWM		350
- #define PCLK_TIMER		353
-+#define PCLK_CPU		354
- #define PCLK_PERI		363
- #define PCLK_HDMI_CTRL		364
- #define PCLK_HDMI_PHY		365
-@@ -104,6 +133,24 @@
- #define HCLK_SDMMC		456
- #define HCLK_SDIO		457
- #define HCLK_EMMC		459
-+#define HCLK_CPU		460
-+#define HCLK_VPU_PRE		461
-+#define HCLK_RKVDEC_PRE		462
-+#define HCLK_VIO_PRE		463
-+#define HCLK_VPU		464
-+#define HCLK_RKVDEC		465
-+#define HCLK_VIO		466
-+#define HCLK_RGA		467
-+#define HCLK_IEP		468
-+#define HCLK_VIO_H2P		469
-+#define HCLK_HDCP_MMU		470
-+#define HCLK_HOST0		471
-+#define HCLK_HOST1		472
-+#define HCLK_HOST2		473
-+#define HCLK_OTG		474
-+#define HCLK_TSP		475
-+#define HCLK_M_CRYPTO		476
-+#define HCLK_S_CRYPTO		477
- #define HCLK_PERI		478
+ static struct rockchip_cpuclk_rate_table rk3228_cpuclk_rates[] __initdata = {
+-	RK3228_CPUCLK_RATE(816000000, 4),
+-	RK3228_CPUCLK_RATE(600000000, 4),
+-	RK3228_CPUCLK_RATE(312000000, 4),
++	RK3228_CPUCLK_RATE(1800000000, 1, 7),
++	RK3228_CPUCLK_RATE(1704000000, 1, 7),
++	RK3228_CPUCLK_RATE(1608000000, 1, 7),
++	RK3228_CPUCLK_RATE(1512000000, 1, 7),
++	RK3228_CPUCLK_RATE(1488000000, 1, 5),
++	RK3228_CPUCLK_RATE(1416000000, 1, 5),
++	RK3228_CPUCLK_RATE(1392000000, 1, 5),
++	RK3228_CPUCLK_RATE(1296000000, 1, 5),
++	RK3228_CPUCLK_RATE(1200000000, 1, 5),
++	RK3228_CPUCLK_RATE(1104000000, 1, 5),
++	RK3228_CPUCLK_RATE(1008000000, 1, 5),
++	RK3228_CPUCLK_RATE(912000000, 1, 5),
++	RK3228_CPUCLK_RATE(816000000, 1, 3),
++	RK3228_CPUCLK_RATE(696000000, 1, 3),
++	RK3228_CPUCLK_RATE(600000000, 1, 3),
++	RK3228_CPUCLK_RATE(408000000, 1, 1),
++	RK3228_CPUCLK_RATE(312000000, 1, 1),
++	RK3228_CPUCLK_RATE(216000000,  1, 1),
++	RK3228_CPUCLK_RATE(96000000, 1, 1),
+ };
  
- #define CLK_NR_CLKS		(HCLK_PERI + 1)
+ static const struct rockchip_cpuclk_reg_data rk3228_cpuclk_data = {
 -- 
 1.9.1
