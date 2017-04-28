@@ -1,305 +1,55 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 28 Apr 2017 16:01:33 +0200
-Subject: [PATCH v5 1/1] pinctrl: armada-37xx: Add irqchip support
-In-Reply-To: <cover.5e6e6649efd7d0482a5df17fb7f94fde29a54210.1493387770.git-series.gregory.clement@free-electrons.com>
-References: <cover.5e6e6649efd7d0482a5df17fb7f94fde29a54210.1493387770.git-series.gregory.clement@free-electrons.com>
-Message-ID: <e7e0d7156844933efe5fdb997afa4cdca1ea6ec4.1493387770.git-series.gregory.clement@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 28 Apr 2017 15:15:01 +0100
+Subject: [PATCH 2/2] arm64: pmu: Wire-up L2 cache events for ARMv8 PMUv3
+In-Reply-To: <20170427173642.GM1890@arm.com>
+References: <20170420190546.7453-1-f.fainelli@gmail.com>
+ <20170420190546.7453-4-f.fainelli@gmail.com>
+ <20170425124427.GI24484@arm.com>
+ <28edde78-b965-8136-1c95-11b9182de405@gmail.com>
+ <20170427173642.GM1890@arm.com>
+Message-ID: <20170428141500.GE6368@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 37xx SoCs can handle interrupt through GPIO. However it can
-only manage the edge ones.
+On Thu, Apr 27, 2017 at 06:36:42PM +0100, Will Deacon wrote:
+> On Tue, Apr 25, 2017 at 10:13:51AM -0700, Florian Fainelli wrote:
+> > On 04/25/2017 05:44 AM, Will Deacon wrote:
+> > > On Thu, Apr 20, 2017 at 12:05:46PM -0700, Florian Fainelli wrote:
+> > >> The ARMv8 PMUv3 cache map did not include the L2 cache events, add
+> > >> them.
+> > >>
+> > >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> > >> ---
+> > >>  arch/arm64/kernel/perf_event.c | 5 +++++
+> > >>  1 file changed, 5 insertions(+)
+> > >>
+> > >> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> > >> index 4f011cdd756d..a664c575f3fd 100644
+> > >> --- a/arch/arm64/kernel/perf_event.c
+> > >> +++ b/arch/arm64/kernel/perf_event.c
+> > >> @@ -264,6 +264,11 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+> > >>  	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE,
+> > >>  	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL,
+> > >>  
+> > >> +	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
+> > >> +	[C(LL)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
+> > >> +	[C(LL)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
+> > >> +	[C(LL)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
+> > > 
+> > > I don't think this is correct in general. 'LL' stands for "last-level",
+> > > which may be L3 or even a system cache in the interconnect. Tying that to L2
+> > > is the wrong thing to do from perf's generic event perspective.
+> > > 
+> > > I'm ok with what you're proposing for A53 (where the PMU can only count
+> > > events out to the L2), but I'm reluctant to make this change for the generic
+> > > PMUv3 events.
+> > 
+> > That makes sense, shall I resubmit the first patch by itself or can you
+> > or Catalin take it as-is?
+> 
+> I'll talk to Catalin tomorrow and try to get the A53 bit queued.
 
-The way the interrupt are managed is classical so we can use the generic
-interrupt chip model.
+I queued patch 1/2. Shall I add your ack?
 
-The only unusual "feature" is that many interrupts are connected to the
-parent interrupt controller. But we do not take advantage of this and use
-the chained irq with all of them.
-
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 229 +++++++++++++++++++++-
- 1 file changed, 229 insertions(+)
-
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-index 5c96f5558310..001542f68627 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-@@ -13,7 +13,9 @@
- #include <linux/gpio/driver.h>
- #include <linux/mfd/syscon.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_device.h>
-+#include <linux/of_irq.h>
- #include <linux/pinctrl/pinconf-generic.h>
- #include <linux/pinctrl/pinconf.h>
- #include <linux/pinctrl/pinctrl.h>
-@@ -30,6 +32,11 @@
- #define OUTPUT_CTL	0x20
- #define SELECTION	0x30
- 
-+#define IRQ_EN		0x0
-+#define IRQ_POL		0x08
-+#define IRQ_STATUS	0x10
-+#define IRQ_WKUP	0x18
-+
- #define NB_FUNCS 2
- #define GPIO_PER_REG	32
- 
-@@ -75,9 +82,12 @@ struct armada_37xx_pmx_func {
- 
- struct armada_37xx_pinctrl {
- 	struct regmap			*regmap;
-+	void __iomem			*base;
- 	const struct armada_37xx_pin_data	*data;
- 	struct device			*dev;
- 	struct gpio_chip		gpio_chip;
-+	struct irq_chip			irq_chip;
-+	spinlock_t			irq_lock;
- 	struct pinctrl_desc		pctl;
- 	struct pinctrl_dev		*pctl_dev;
- 	struct armada_37xx_pin_group	*groups;
-@@ -346,6 +356,14 @@ static int armada_37xx_pmx_set(struct pinctrl_dev *pctldev,
- 	return armada_37xx_pmx_set_by_name(pctldev, name, grp);
- }
- 
-+static inline void armada_37xx_irq_update_reg(unsigned int *reg,
-+					  struct irq_data *d)
-+{
-+	int offset = irqd_to_hwirq(d);
-+
-+	armada_37xx_update_reg(reg, offset);
-+}
-+
- static int armada_37xx_gpio_direction_input(struct gpio_chip *chip,
- 					    unsigned int offset)
- {
-@@ -468,6 +486,214 @@ static const struct gpio_chip armada_37xx_gpiolib_chip = {
- 	.owner = THIS_MODULE,
- };
- 
-+static void armada_37xx_irq_ack(struct irq_data *d)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 reg = IRQ_STATUS;
-+	unsigned long flags;
-+
-+	armada_37xx_irq_update_reg(&reg, d);
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	writel(d->mask, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+}
-+
-+static void armada_37xx_irq_mask(struct irq_data *d)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 val, reg = IRQ_EN;
-+	unsigned long flags;
-+
-+	armada_37xx_irq_update_reg(&reg, d);
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	val = readl(info->base + reg);
-+	writel(val & ~d->mask, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+}
-+
-+static void armada_37xx_irq_unmask(struct irq_data *d)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 val, reg = IRQ_EN;
-+	unsigned long flags;
-+
-+	armada_37xx_irq_update_reg(&reg, d);
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	val = readl(info->base + reg);
-+	writel(val | d->mask, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+}
-+
-+static int armada_37xx_irq_set_wake(struct irq_data *d, unsigned int on)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 val, reg = IRQ_WKUP;
-+	unsigned long flags;
-+
-+	armada_37xx_irq_update_reg(&reg, d);
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	val = readl(info->base + reg);
-+	if (on)
-+		val |= d->mask;
-+	else
-+		val &= ~d->mask;
-+	writel(val, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+
-+	return 0;
-+}
-+
-+static int armada_37xx_irq_set_type(struct irq_data *d, unsigned int type)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 val, reg = IRQ_POL;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	armada_37xx_irq_update_reg(&reg, d);
-+	val = readl(info->base + reg);
-+	switch (type) {
-+	case IRQ_TYPE_EDGE_RISING:
-+		val &= ~d->mask;
-+		break;
-+	case IRQ_TYPE_EDGE_FALLING:
-+		val |= d->mask;
-+		break;
-+	default:
-+		spin_unlock_irqrestore(&info->irq_lock, flags);
-+		return -EINVAL;
-+	}
-+	writel(val, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+
-+	return 0;
-+}
-+
-+
-+static void armada_37xx_irq_handler(struct irq_desc *desc)
-+{
-+	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(gc);
-+	struct irq_domain *d = gc->irqdomain;
-+	int i;
-+
-+	chained_irq_enter(chip, desc);
-+	for (i = 0; i <= d->revmap_size / GPIO_PER_REG; i++) {
-+		u32 status;
-+		unsigned long flags;
-+
-+		spin_lock_irqsave(&info->irq_lock, flags);
-+		status = readl_relaxed(info->base + IRQ_STATUS + 4 * i);
-+		/* Manage only the interrupt that was enabled */
-+		status &= readl_relaxed(info->base + IRQ_EN + 4 * i);
-+		spin_unlock_irqrestore(&info->irq_lock, flags);
-+		while (status) {
-+			u32 hwirq = ffs(status) - 1;
-+			u32 virq = irq_find_mapping(d, hwirq +
-+						     i * GPIO_PER_REG);
-+
-+			generic_handle_irq(virq);
-+
-+			/* Update status in case a new IRQ appears */
-+			spin_lock_irqsave(&info->irq_lock, flags);
-+			status = readl_relaxed(info->base +
-+					       IRQ_STATUS + 4 * i);
-+			/* Manage only the interrupt that was enabled */
-+			status &= readl_relaxed(info->base + IRQ_EN + 4 * i);
-+			spin_unlock_irqrestore(&info->irq_lock, flags);
-+		}
-+	}
-+	chained_irq_exit(chip, desc);
-+}
-+
-+static int armada_37xx_irqchip_register(struct platform_device *pdev,
-+					struct armada_37xx_pinctrl *info)
-+{
-+	struct device_node *np = info->dev->of_node;
-+	int nrirqs = info->data->nr_pins;
-+	struct gpio_chip *gc = &info->gpio_chip;
-+	struct irq_chip *irqchip = &info->irq_chip;
-+	struct resource res;
-+	int ret = -ENODEV, i, nr_irq_parent;
-+
-+	/* Check if we have at least one gpio-controller child node */
-+	for_each_child_of_node(info->dev->of_node, np) {
-+		if (of_property_read_bool(np, "gpio-controller")) {
-+			ret = 0;
-+			break;
-+		}
-+	};
-+	if (ret)
-+		return ret;
-+
-+	nr_irq_parent = of_irq_count(np);
-+	spin_lock_init(&info->irq_lock);
-+
-+	if (!nr_irq_parent) {
-+		dev_err(&pdev->dev, "Invalid or no IRQ\n");
-+		return 0;
-+	}
-+
-+	if (of_address_to_resource(info->dev->of_node, 1, &res)) {
-+		dev_err(info->dev, "cannot find IO resource\n");
-+		return -ENOENT;
-+	}
-+
-+	info->base = devm_ioremap_resource(info->dev, &res);
-+	if (IS_ERR(info->base))
-+		return PTR_ERR(info->base);
-+
-+	irqchip->irq_ack = armada_37xx_irq_ack;
-+	irqchip->irq_mask = armada_37xx_irq_mask;
-+	irqchip->irq_unmask = armada_37xx_irq_unmask;
-+	irqchip->irq_set_wake = armada_37xx_irq_set_wake;
-+	irqchip->irq_set_type = armada_37xx_irq_set_type;
-+	irqchip->name = info->data->name;
-+
-+	ret = gpiochip_irqchip_add(gc, irqchip, 0,
-+				   handle_edge_irq, IRQ_TYPE_NONE);
-+	if (ret) {
-+		dev_info(&pdev->dev, "could not add irqchip\n");
-+		return ret;
-+	}
-+
-+	/*
-+	 * Many interrupts are connected to the parent interrupt
-+	 * controller. But we do not take advantage of this and use
-+	 * the chained irq with all of them.
-+	 */
-+	for (i = 0; i < nrirqs; i++) {
-+		struct irq_data *d = irq_get_irq_data(gc->irq_base + i);
-+
-+		/*
-+		 * The mask field is a "precomputed bitmask for
-+		 * accessing the chip registers" which was introduced
-+		 * for the generic irqchip framework. As we don't use
-+		 * this framework, we can reuse this field for our own
-+		 * usage.
-+		 */
-+		d->mask = BIT(i % GPIO_PER_REG);
-+	}
-+
-+	for (i = 0; i < nr_irq_parent; i++) {
-+		int irq = irq_of_parse_and_map(np, i);
-+
-+		if (irq < 0)
-+			continue;
-+
-+		gpiochip_set_chained_irqchip(gc, irqchip, irq,
-+					     armada_37xx_irq_handler);
-+	}
-+
-+	return 0;
-+}
-+
- static int armada_37xx_gpiochip_register(struct platform_device *pdev,
- 					struct armada_37xx_pinctrl *info)
- {
-@@ -496,6 +722,9 @@ static int armada_37xx_gpiochip_register(struct platform_device *pdev,
- 	ret = devm_gpiochip_add_data(&pdev->dev, gc, info);
- 	if (ret)
- 		return ret;
-+	ret = armada_37xx_irqchip_register(pdev, info);
-+	if (ret)
-+		return ret;
- 
- 	return 0;
- }
 -- 
-git-series 0.9.1
+Catalin
