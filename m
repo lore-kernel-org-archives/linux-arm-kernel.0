@@ -1,64 +1,31 @@
-From: Wenyou.Yang@Microchip.com (Yang, Wenyou)
-Date: Fri, 28 Apr 2017 09:34:12 +0800
-Subject: [PATCH 3/3] ARM: at91: pm: fallback to slowclock when backup mode
- fails
-In-Reply-To: <20170426160419.22401-3-alexandre.belloni@free-electrons.com>
-References: <20170426160419.22401-1-alexandre.belloni@free-electrons.com>
- <20170426160419.22401-3-alexandre.belloni@free-electrons.com>
-Message-ID: <cf16a132-8b3c-681c-d532-5f28b286a6ce@Microchip.com>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Fri, 28 Apr 2017 10:35:32 +0900
+Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
+In-Reply-To: <20170427121458.2be577cc@gandalf.local.home>
+References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+ <1461239325-22779-2-git-send-email-pmladek@suse.com>
+ <20170419131341.76bc7634@gandalf.local.home>
+ <20170420033112.GB542@jagdpanzerIV.localdomain>
+ <20170420131154.GL3452@pathway.suse.cz>
+ <20170427121458.2be577cc@gandalf.local.home>
+Message-ID: <20170428013532.GB383@jagdpanzerIV.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On (04/27/17 12:14), Steven Rostedt wrote:
+[..]
+> I tried this patch. It's better because I get the end of the trace, but
+> I do lose the beginning of it:
+> 
+> ** 196358 printk messages dropped ** [  102.321182]     perf-5981    0.... 12983650us : d_path <-seq_path
 
+many thanks!
 
-On 2017/4/27 0:04, Alexandre Belloni wrote:
-> If the backup sram allocation fails, ensure we can suspend by falling back
-> to the usual slow clock mode.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Wenyou Yang <wenyou.yang@atmel.com>
+so we now drop messages from logbuf, not from per-CPU buffers. that
+"queue printk_deferred irq_work on every online CPU when we bypass per-CPU
+buffers from NMI" idea *probably* might help here - we need someone to emit
+messages from the logbuf while we printk from NMI. there is still a
+possibility that we can drop messages, though, since log_store() from NMI
+CPU can be much-much faster than call_console_drivers() on other CPU.
 
-> ---
->   arch/arm/mach-at91/pm.c | 12 +++++++++---
->   1 file changed, 9 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> index d08f032f9d94..02823d8f3ada 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -519,24 +519,30 @@ static void __init at91_pm_bu_sram_init(void)
->   
->   	if (!pdev) {
->   		pr_warn("%s: failed to find securam device!\n", __func__);
-> -		return;
-> +		goto fallback;
->   	}
->   
->   	sram_pool = gen_pool_get(&pdev->dev, NULL);
->   	if (!sram_pool) {
->   		pr_warn("%s: securam pool unavailable!\n", __func__);
-> -		return;
-> +		goto fallback;
->   	}
->   
->   	pm_bu = (void *)gen_pool_alloc(sram_pool, sizeof(struct at91_pm_bu));
->   	if (!pm_bu) {
->   		pr_warn("%s: unable to alloc securam!\n", __func__);
-> -		return;
-> +		goto fallback;
->   	}
->   
->   	pm_bu->suspended = 0;
->   	pm_bu->canary = virt_to_phys(&canary);
->   	pm_bu->resume = virt_to_phys(cpu_resume);
-> +
-> +fallback:
-> +	if (pm_data.standby_mode == AT91_PM_BACKUP)
-> +		pm_data.standby_mode = AT91_PM_SLOW_CLOCK;
-> +	if (pm_data.suspend_mode != AT91_PM_BACKUP)
-> +		pm_data.suspend_mode = AT91_PM_SLOW_CLOCK;
->   }
->   
->   struct pmc_info {
-Best Regards,
-Wenyou Yang
+	-ss
