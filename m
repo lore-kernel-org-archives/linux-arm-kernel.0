@@ -1,84 +1,100 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 28 Apr 2017 12:05:32 -0400 (EDT)
-Subject: arm64: next-20170428 hangs on boot
-In-Reply-To: <20170428145233.GB5292@leverpostej>
-References: <20170428132429.c3dlxbmt7iqs2isl@yury-N73SV>
- <20170428145233.GB5292@leverpostej>
-Message-ID: <20170428.120532.2008072008826207366.davem@davemloft.net>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 28 Apr 2017 17:10:28 +0100
+Subject: [PATCH 3/4] arm64: entry: improve data abort handling of tagged
+ pointers
+In-Reply-To: <d886b2b3-f623-9e79-a99a-c51672a80390@arm.com>
+References: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
+ <1492712234-4950-4-git-send-email-kristina.martsenko@arm.com>
+ <20170421182450.GR3750@e103592.cambridge.arm.com>
+ <d886b2b3-f623-9e79-a99a-c51672a80390@arm.com>
+Message-ID: <20170428161026.GC9082@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
-Date: Fri, 28 Apr 2017 15:52:34 +0100
-
-> On Fri, Apr 28, 2017 at 04:24:29PM +0300, Yury Norov wrote:
->> Hi all,
+On Thu, Apr 27, 2017 at 05:34:24PM +0100, Kristina Martsenko wrote:
+> On 21/04/17 19:24, Dave Martin wrote:
+> > On Thu, Apr 20, 2017 at 07:17:13PM +0100, Kristina Martsenko wrote:
+> >> When handling a data abort from EL0, we currently zero the top byte of
+> >> the faulting address, as we assume the address is a TTBR0 address, which
+> >> may contain a non-zero address tag. However, the address may be a TTBR1
+> >> address, in which case we should not zero the top byte. This patch fixes
+> >> that. The effect is that the full TTBR1 address is passed to the task's
+> >> signal handler (or printed out in the kernel log).
+> >>
+> >> When handling a data abort from EL1, we leave the faulting address
+> >> intact, as we assume it's either a TTBR1 address or a TTBR0 address with
+> >> tag 0x00. This is true as far as I'm aware, we don't seem to access a
+> >> tagged TTBR0 address anywhere in the kernel. Regardless, it's easy to
+> >> forget about address tags, and code added in the future may not always
+> >> remember to remove tags from addresses before accessing them. So add tag
+> >> handling to the EL1 data abort handler as well. This also makes it
+> >> consistent with the EL0 data abort handler.
+> > 
+> > Possibly it doesn't matter whether the tag bits are cleared for an EL0
+> > fault on a TTBR1 address, since userspace can't have a valid pointer in
+> > this range to (mis)match the fault address against ... or did I miss
+> > something?
 > 
-> Hi,
+> I don't think you've missed anything. But I don't see why userspace
+> can't match against an invalid (TTBR1) address, I think that would be a
+> valid thing to do (even if unlikely).
 > 
-> [adding Dave Miller, netdev, lkml]
+> > Factoring out the tag handling makes the intent of the code clearer
+> > though, either way.
 > 
->> On QEMU the next-20170428 hangs on boot for me due to kernel panic in 
->> rtnetlink_init():
->> 
->> void __init rtnetlink_init(void)
->> {
->>         if (register_pernet_subsys(&rtnetlink_net_ops))
->>                 panic("rtnetlink_init: cannot initialize rtnetlink\n");
->> 
->>         ...
->> }
-> 
-> I see the same thing with a next-20170428 arm64 defconfig, on a Juno R1
-> system:
+> I assume this means you're fine with the patch as is.
 
-As stated, should be fixed by:
+Yes, the behaviour here seems fine.  I just wanted to check there wasn't
+some real use of TTBR1 addresses by userspace that I was missing.
 
->From 2d2ab658d2debcb4c0e29c9e6f18e5683f3077bf Mon Sep 17 00:00:00 2001
-From: Herbert Xu <herbert@gondor.apana.org.au>
-Date: Fri, 28 Apr 2017 14:10:48 +0800
-Subject: [PATCH] rhashtable: Do not lower max_elems when max_size is zero
 
-The commit 6d684e54690c ("rhashtable: Cap total number of entries
-to 2^31") breaks rhashtable users that do not set max_size.  This
-is because when max_size is zero max_elems is also incorrectly set
-to zero instead of 2^31.
+It looks like a minor improvement may be possible (below) but these
+aren't hot paths, so it's far from crucial.
 
-This patch fixes it by only lowering max_elems when max_size is not
-zero.
+> +/*
+> + * Remove the address tag from a virtual address, if present.
+> + */
+> +	.macro	clear_address_tag, addr, tmp
+> +	bic	\tmp, \addr, #(0xff << 56)
+> +	tst	\addr, #(1 << 55)
+> +	csel	\addr, \tmp, \addr, eq
+> +	.endm
 
-Fixes: 6d684e54690c ("rhashtable: Cap total number of entries to 2^31")
-Reported-by: Florian Fainelli <f.fainelli@gmail.com>
-Reported-by: kernel test robot <fengguang.wu@intel.com>
-Signed-off-by: Herbert Xu <herbert@gondor.apana.org.au>
-Signed-off-by: David S. Miller <davem@davemloft.net>
----
- lib/rhashtable.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+Minor nit: this may issue better on simpler microarchitectures if the
+tst and bic are swapped: this may reduce how far the Z flag needs to
+be forwarded.
 
-diff --git a/lib/rhashtable.c b/lib/rhashtable.c
-index 751630b..3895486 100644
---- a/lib/rhashtable.c
-+++ b/lib/rhashtable.c
-@@ -958,13 +958,14 @@ int rhashtable_init(struct rhashtable *ht,
- 	if (params->min_size)
- 		ht->p.min_size = roundup_pow_of_two(params->min_size);
- 
--	if (params->max_size)
--		ht->p.max_size = rounddown_pow_of_two(params->max_size);
--
- 	/* Cap total entries at 2^31 to avoid nelems overflow. */
- 	ht->max_elems = 1u << 31;
--	if (ht->p.max_size < ht->max_elems / 2)
--		ht->max_elems = ht->p.max_size * 2;
-+
-+	if (params->max_size) {
-+		ht->p.max_size = rounddown_pow_of_two(params->max_size);
-+		if (ht->p.max_size < ht->max_elems / 2)
-+			ht->max_elems = ht->p.max_size * 2;
-+	}
- 
- 	ht->p.min_size = max(ht->p.min_size, HASH_MIN_SIZE);
- 
--- 
-2.4.11
+For beefier microarchitectures it probably doesn't make a difference.
+
+Also, in:
+
+> @@ -594,7 +595,8 @@ el0_da:
+>  	// enable interrupts before calling the main handler
+>  	enable_dbg_and_irq
+>  	ct_user_exit
+> -	bic	x0, x26, #(0xff << 56)
+> +	mov	x0, x26
+> +	clear_address_tag x0, x3
+
+we can lose the mov if clear_address_tag is altered to take "addr out"
+and "addr in" arguments instead of "addr in+out" and "tmp": addr out can
+store result of the bic, then we can conditionally revert that back to
+addr in using the csel.
+
+This change will break el1_da:
+
+> @@ -434,6 +434,7 @@ el1_da:
+> 	mrs	x0, far_el1
+> 	enable_dbg
+> 	// re-enable interrupts if they were enabled in the aborted context
+>  	tbnz	x23, #7, 1f			// PSR_I_BIT
+>  	enable_irq
+>  1:
+> +	clear_address_tag x0, x3
+
+... because we want the same register as input and output.  But that can
+be fixed if we use a different destination register in the mrs in the
+first place (say, x3).
+
+Cheers
+---Dave
