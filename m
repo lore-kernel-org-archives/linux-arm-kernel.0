@@ -1,42 +1,40 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Fri, 28 Apr 2017 09:08:08 +0000
-Subject: [PATCH v2 1/4] perf utils: passing pmu as a parameter to
- function get_cpuid_str
-In-Reply-To: <1493355227-31492-2-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1493355227-31492-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1493355227-31492-2-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20170428090808.GA84977@localhost>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Fri, 28 Apr 2017 17:10:32 +0800
+Subject: [PATCH v1 0/2] Add PCIe host driver support for Mediatek SoCs
+Message-ID: <1493370634-7038-1-git-send-email-ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 10:23:44AM +0530, Ganapatrao Kulkarni wrote:
-> cpuid string will not be same on all CPUs on heterogeneous
-> platforms like ARM's big.LITTLE, adding provision(using pmu->cpus)
-> to find cpuid string from associated CPUs of PMU CORE device.
-> 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  tools/perf/arch/powerpc/util/header.c |  3 ++-
->  tools/perf/arch/x86/util/header.c     |  4 +++-
->  tools/perf/util/header.h              |  3 ++-
->  tools/perf/util/pmu.c                 | 10 ++++++----
->  4 files changed, 13 insertions(+), 7 deletions(-)
-> 
-> diff --git a/tools/perf/arch/powerpc/util/header.c b/tools/perf/arch/powerpc/util/header.c
-> index 9aaa6f5..9a70cc1 100644
-> --- a/tools/perf/arch/powerpc/util/header.c
-> +++ b/tools/perf/arch/powerpc/util/header.c
-> @@ -34,10 +34,11 @@
->  }
->  
->  char *
-> -get_cpuid_str(void)
-> +get_cpuid_str(struct perf_pmu *pmu)
->  {
->  	char *bufp;
->  
-> +	do { if (pmu) {} } while (0);
+Hi,
 
-If this is to avoid warnings, can you use __maybe_unused here?
+This patch series add Mediatek Gen2 PCIe host controller driver and
+dt-binding document. It can be found on MT7623 series SoCs.
 
-JC.
+This driver was validated using Broadcom Tigon3 and Intel(R) 82575/82576
+gigabit ethernet card.
+
+Changes since v1:
+- add .suppress_bind_attrs.
+- remove unnecessary *_valid_device() pattern.
+- remove PCI_PROBE_ONLY.
+- use the regular readl() instead of readl_relaxed().
+- add .map_bus() and change to use pci_generic_config_read/pci_generic_config_write.
+- revise dt-binding document and move nonstandard properties to root node.
+- change compatible string.
+- use interrupt-map property and replace mtk_pcie_map_irq() with of_irq_parse_and_map_pci().
+- use the new pci_register_host_bridge() method instead of pci_scan_root_bus().
+
+Ryder Lee (2):
+  PCI: mediatek: Add Mediatek PCIe host controller support
+  dt-bindings: pcie: Add documentation for Mediatek PCIe
+
+ .../bindings/pci/mediatek,gen2v1-pcie.txt          | 174 +++++++
+ drivers/pci/host/Kconfig                           |  11 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pcie-mediatek.c                   | 563 +++++++++++++++++++++
+ 4 files changed, 749 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/mediatek,gen2v1-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-mediatek.c
+
+-- 
+1.9.1
