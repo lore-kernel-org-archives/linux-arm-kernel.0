@@ -1,35 +1,33 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 28 Apr 2017 16:05:59 -0500
-Subject: [PATCH 5/9] arm64: defconfig: enable support for PCIe hotplug
+Date: Fri, 28 Apr 2017 16:06:01 -0500
+Subject: [PATCH 7/9] [v2] arm64: defconfig: enable EDAC options
 In-Reply-To: <1493413563-18375-1-git-send-email-timur@codeaurora.org>
 References: <1493413563-18375-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1493413563-18375-6-git-send-email-timur@codeaurora.org>
+Message-ID: <1493413563-18375-8-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ARM64 server systems support PCIe hotplug, so enable the options
-for that.
+Enable EDAC (Error Detection and Correction) support for ARM64 server
+systems that feature it, so that user space applications can be
+notified of memory errors.
 
 Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
- arch/arm64/configs/defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 8099aeb..f6b86a1 100644
+index 389f97f..b8b1374 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -61,7 +61,10 @@ CONFIG_ARCH_XGENE=y
- CONFIG_ARCH_ZX=y
- CONFIG_ARCH_ZYNQMP=y
- CONFIG_PCI=y
-+CONFIG_HOTPLUG_PCI_PCIE=y
- CONFIG_PCI_IOV=y
-+CONFIG_HOTPLUG_PCI=y
-+CONFIG_HOTPLUG_PCI_ACPI=y
- CONFIG_PCI_LAYERSCAPE=y
- CONFIG_PCI_HISI=y
- CONFIG_PCIE_QCOM=y
+@@ -418,6 +418,7 @@ CONFIG_LEDS_SYSCON=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_EDAC=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_MAX77686=y
+ CONFIG_RTC_DRV_RK808=m
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
