@@ -1,43 +1,42 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Fri, 28 Apr 2017 13:51:54 -0700
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <CAKv+Gu_n7xP-2RtF44GVzwyoMXDOeF-bR43yStwp2y+oBNs4jg@mail.gmail.com>
-References: <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
- <20170330100524.GA22801@red-moon>
- <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
- <CAKv+Gu8YjySTDMgsrtGqEPMOtVhHc8gvTHZ4C5Ga8OTYdC9R3A@mail.gmail.com>
- <ae87ae28-f50d-095f-576e-f3fd7f96dea2@codeaurora.org>
- <CAKv+Gu8x0rQUnTUorknW-mW9LFgrxFYsXyy4LU_w9JbA-m_sjA@mail.gmail.com>
- <CAKv+Gu9Su0F9CSRe=sxomuDDH7c2szO6Z8dpqOQ=t_1Vn3JD3g@mail.gmail.com>
- <20170410165328.GA5248@red-moon>
- <CAKv+Gu-AN-OwnAJG5dt0Qg4GU8HxZBowTSA0H3LhNA3nHfrsQg@mail.gmail.com>
- <CAKv+Gu9dS4OhLbBw59yKYQmoJ8SpFexzk9yH=XfXnzn8NJ4mcg@mail.gmail.com>
- <20170423014546.GA2704@dhcp-whq-twvpn-1-vpnpool-10-159-153-149.vpn.oracle.com>
- <CAKv+Gu_n7xP-2RtF44GVzwyoMXDOeF-bR43yStwp2y+oBNs4jg@mail.gmail.com>
-Message-ID: <CAE9FiQVNWC7pGjSADJVTLwEuYt90TDUhGJzrVh3VPxDz0eJqqg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 28 Apr 2017 15:37:27 -0500
+Subject: [PATCH v2 29/30] dt-bindings: add vendor prefix for bananapi
+In-Reply-To: <1493198774-4478-30-git-send-email-sean.wang@mediatek.com>
+References: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
+ <1493198774-4478-30-git-send-email-sean.wang@mediatek.com>
+Message-ID: <20170428203727.m6jm5w6nb2iirxih@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 6:55 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 23 April 2017 at 02:45, Yinghai Lu <yinghai@kernel.org> wrote:
+On Wed, Apr 26, 2017 at 05:26:13PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> Banana Pi team in Sinovoip Co., Limited which are dedicated to
+> design and manufacture open hardware product.
+> 
+> Website: http://www.banana-pi.org/
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index ec0bfb9..8ca0f3c 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -44,6 +44,7 @@ avia	avia semiconductor
+>  avic	Shanghai AVIC Optoelectronics Co., Ltd.
+>  axentia	Axentia Technologies AB
+>  axis	Axis Communications AB
+> +bananapi Banana Pi SINOVOP CO., LIMITED
 
->>
->> looks like those two lines are reversed. you should use:
->>                 pcibios_resource_survey_bus(bus);
->>                 pci_assign_unassigned_root_bus_resources(bus);
->>
->> please check x86 pcibios_resource_survey_bus() definition in
->>         arch/x86/pci/i386.c
->>
->> but pci_bus_claim_resources() should work too.
->>
->
-> pcibios_resource_survey_bus() is actually an empty function on arm64,
-> but I guess that is where logic should go that checks the state of the
-> BARs before trying to claim anything?
+s/SINOVOP/SINOVOIP/ 
 
-Yes. Please copy for x86 and simplify it for arm64.
 
-Yinghai
+>  boe	BOE Technology Group Co., Ltd.
+>  bosch	Bosch Sensortec GmbH
+>  boundary	Boundary Devices Inc.
+> -- 
+> 1.9.1
+> 
