@@ -1,96 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Apr 2017 15:05:44 +0200
-Subject: [RFC/RFT PATCH 18/18] ARM/ARM64: PCI: Drop pci_fixup_irqs() usage
- for DT based host controllers
-In-Reply-To: <20170426111809.19922-19-lorenzo.pieralisi@arm.com>
-References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
- <20170426111809.19922-19-lorenzo.pieralisi@arm.com>
-Message-ID: <CAK8P3a3dT-PR69LrAc8_9tNkdj+LTztQ0pcJKyAV6DwykyXi4A@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 28 Apr 2017 15:07:10 +0200
+Subject: [PATCH V15 07/11] acpi: apei: panic OS with fatal error status
+ block
+In-Reply-To: <1492556723-9189-8-git-send-email-tbaicar@codeaurora.org>
+References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
+ <1492556723-9189-8-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20170428130710.s7m7nk46xmobxgq5@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 1:18 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> DT based PCI host controllers are currently relying on
-> pci_fixup_irqs() to assign legacy PCI irqs to devices. This is
-> broken in that pci_fixup_irqs() assign IRQs for all PCI devices
-> present in a given system some of which may well be enabled by
-> the time pci_fixup_irqs() is called (ie a system with multiple
-> host controllers). With the introduction of
-> struct pci_host_bridge.map_irq pointer it is possible to assign IRQs
-> for all devices originating from a PCI host bridge at probe time;
-> this is implemented through pci_assign_irq() that relies on the
-> struct pci_host_bridge.map_irq pointer to map IRQ for a given device.
->
-> The benefits this brings are twofold:
->
-> - the IRQ for a device is assigned once at probe time
-> - the IRQ assignment works also for hotplugged devices
->
-> Remove pci_fixup_irqs() call from all DT based PCI host controller
-> drivers. The map_irq() and swizzle_irq() struct pci_host_bridge callbacks
-> are either set-up in the respective PCI host controller driver or
-> delegated to ARM/ARM64 pcibios_root_bridge_prepare() implementations,
-> where, upon DT probe detection, the functions are set to DT defaults (ie
-> of_irq_parse_and_map_pci() and pci_common_swizzle() respectively.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-Nice!
-
-> +int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
-> +{
-> +       /*
-> +        * Set-up IRQ mapping/swizzingly functions.
-> +        * If the either function pointer is already set,
-> +        * do not override any of them since it is a host
-> +        * controller specific mapping/swizzling function.
-> +        */
-> +       if (!bridge->map_irq && !bridge->swizzle_irq) {
-> +               struct device *parent = bridge->dev.parent;
-> +               /*
-> +                * If we have a parent pointer with a valid
-> +                * OF node this means we are probing a PCI host
-> +                * controller configured through DT firmware.
-> +                */
-> +               if (IS_ENABLED(CONFIG_OF) && parent && parent->of_node) {
-> +                       bridge->map_irq = of_irq_parse_and_map_pci;
-> +                       bridge->swizzle_irq = pci_common_swizzle;
-> +               }
-> +       }
+On Tue, Apr 18, 2017 at 05:05:19PM -0600, Tyler Baicar wrote:
+> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+> 
+> Even if an error status block's severity is fatal, the kernel does not
+> honor the severity level and panic.
+> 
+> With the firmware first model, the platform could inform the OS about a
+> fatal hardware error through the non-NMI GHES notification type. The OS
+> should panic when a hardware error record is received with this
+> severity.
+> 
+> Call panic() after CPER data in error status block is printed if
+> severity is fatal, before each error section is handled.
+> 
+> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Reviewed-by: James Morse <james.morse@arm.com>
+> ---
+>  drivers/acpi/apei/ghes.c | 19 ++++++++++++++-----
+>  1 file changed, 14 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 2d387f8..b91123f 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -134,6 +134,8 @@
+>  static struct ghes_estatus_cache *ghes_estatus_caches[GHES_ESTATUS_CACHES_SIZE];
+>  static atomic_t ghes_estatus_cache_alloced;
+>  
+> +static int ghes_panic_timeout __read_mostly = 30;
 > +
-> +       return 0;
+>  static int ghes_ioremap_init(void)
+>  {
+>  	ghes_ioremap_area = __get_vm_area(PAGE_SIZE * GHES_IOREMAP_PAGES,
+> @@ -692,6 +694,13 @@ static int ghes_ack_error(struct acpi_hest_generic_v2 *generic_v2)
+>  	return apei_write(val, &generic_v2->read_ack_register);
+>  }
+>  
+> +static void __ghes_call_panic(void)
+
+__ghes_panic()
+
+> +{
+> +	if (panic_timeout == 0)
+
+	if (!panic_timeout)
+
+> +		panic_timeout = ghes_panic_timeout;
+> +	panic("Fatal hardware error!");
 > +}
+> +
+>  static int ghes_proc(struct ghes *ghes)
+>  {
+>  	int rc;
+> @@ -699,6 +708,10 @@ static int ghes_proc(struct ghes *ghes)
+>  	rc = ghes_read_estatus(ghes, 0);
+>  	if (rc)
+>  		goto out;
 
-I think it would be better to reduce the number of global functions defined
-by common code to be called from PCI core code, and instead use
-additional callback pointers from the pci_host_bridge operations.
+<---- newline here.
 
-In particular, there are only very few existing users of
-pcibios_root_bridge_prepare() at the moment, so we should
-be able to get rid of those quite easily now.
+> +	if (ghes_severity(ghes->estatus->error_severity) >= GHES_SEV_PANIC) {
+> +		__ghes_print_estatus(KERN_EMERG, ghes->generic, ghes->estatus);
+> +		__ghes_call_panic();
+> +	}
 
-> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> index 0f39bd2..bc9e36a 100644
-> --- a/drivers/pci/host/pcie-iproc.c
-> +++ b/drivers/pci/host/pcie-iproc.c
-> @@ -1205,7 +1205,8 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
->         struct device *dev;
->         int ret;
->         void *sysdata;
-> -       struct pci_bus *bus, *child;
-> +       struct pci_bus *child;
-> +       struct pci_host_bridge *host;
->
->         dev = pcie->dev;
->
-> @@ -1252,15 +1253,30 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
->         sysdata = pcie;
->  #endif
->
-> -       bus = pci_create_root_bus(dev, 0, &iproc_pcie_ops, sysdata, res);
-> -       if (!bus) {
+ditto.
 
-Could this be a separate patch?
+>  	if (!ghes_estatus_cached(ghes->estatus)) {
+>  		if (ghes_print_estatus(NULL, ghes->generic, ghes->estatus))
+>  			ghes_estatus_cache_add(ghes->generic, ghes->estatus);
 
-      Arnd
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
