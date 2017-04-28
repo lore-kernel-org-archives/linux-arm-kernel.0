@@ -1,99 +1,58 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Fri, 28 Apr 2017 13:46:24 +0000
-Subject: [PATCH v2] arm64: perf: Use only exclude_kernel attribute when
- kernel is running in HYP
-In-Reply-To: <20170427173758.GN1890@arm.com>
-References: <20170420084928.GC31436@leverpostej>
- <CAFpQJXVSsg8CX28vEo2LzmOi3pknHiH233spMD6ip4LZO4vw=Q@mail.gmail.com>
- <20170424154530.GO12323@arm.com>
- <CAFpQJXWX=0GQ5hse4E_OSdnYhMOA7CvqeoHe9AdMsyoZJmrPQQ@mail.gmail.com>
- <20170425165259.GS24484@arm.com>
- <CA+7sy7D-ZB84xQ2pE-io1v7pmnAuWUszh1B=Zq+Ezup=sysQ2g@mail.gmail.com>
- <CY4PR07MB3415C0CEBB9D3DF0C249DC6793110@CY4PR07MB3415.namprd07.prod.outlook.com>
- <20170426101021.GF21744@arm.com> <20170426134141.GA6417@localhost>
- <20170427173758.GN1890@arm.com>
-Message-ID: <20170428134623.GA85316@localhost>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 28 Apr 2017 08:48:41 -0500
+Subject: [PATCH v2 1/9] dt-bindings: display: sun4i: Add component
+ endpoint ID numbering scheme
+In-Reply-To: <20170421083857.29636-2-wens@csie.org>
+References: <20170421083857.29636-1-wens@csie.org>
+ <20170421083857.29636-2-wens@csie.org>
+Message-ID: <20170428134841.cc5jrqhunh2rxhog@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 06:37:59PM +0100, Will Deacon wrote:
-> On Wed, Apr 26, 2017 at 01:41:42PM +0000, Jayachandran C wrote:
-> > On Wed, Apr 26, 2017 at 11:10:21AM +0100, Will Deacon wrote:
-> > > On Wed, Apr 26, 2017 at 07:22:46AM +0000, Pinski, Andrew wrote:
-> > > > On 4/25/2017 11:53 PM, Jayachandran C. wrote:
-> > > > > On Tue, Apr 25, 2017 at 10:23 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > > >> On Tue, Apr 25, 2017 at 09:13:40AM +0530, Ganapatrao Kulkarni wrote:
-> > > > >>> On Mon, Apr 24, 2017 at 9:15 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > > >>>> On Thu, Apr 20, 2017 at 02:56:50PM +0530, Ganapatrao Kulkarni wrote:
-> > > > >>>>> OK, if you are ok with sysfs part, i can send next version with that
-> > > > >>>>> change only?.
-> > > > >>>> I think the sysfs part is still a little dodgy, since you still expose the
-> > > > >>>> "exclude_hv" file with a value of 0 when not running at EL2, which would
-> > > > >>>> imply that exclude_hv is forced to zero. I don't think that's correct.
-> > > > >>> okay, i can make exclude_hv visible only when kernel booted in EL2.
-> > > > >>> is it ok to have empty directory "attr" when kernel booted to EL1?
-> > > > >>> attr can be place holder for any other miscellaneous attributes, that
-> > > > >>> can be added in future.
-> > > > >> Sounds good to me, although I'll seek comment from the other perf folks
-> > > > >> before merging anything with ABI implications.
-> > > > > Do you really think this is the solution given:
-> > > > > - this is an arm64 specific sysfs interface that is tied to the perf API
-> > > 
-> > > That's why I want feedback from others. The intention would be that this can
-> > > be used by other PMUs as well, since it's not uncommon that parts of the
-> > > sizeable perf_event_attr structure are not used by a given PMU.
-> > > 
-> > > > > - the perf API documentation has to be updated for this
-> > > 
-> > > So? If having to update documentation means we shouldn't change the kernel,
-> > > then we may as well all find new jobs.
-> > > 
-> > > > > - All the applications that use the perf API have to be modified to
-> > > > > check this sysfs interface
-> > > > > - If the application fails to do so, a very narrow corner case
-> > > > > (exclude_hv != exclude_kernel and VHE enabled) fails.
-> > > 
-> > > See below, but apparently people care about it.
-> > > 
-> > > > > Any application that really cares can already do see if exclude_hv !=
-> > > > > exclude_kernel case works by calling perf_open_event() with those
-> > > > > options and checking the return value.
-> > > 
-> > > That's a good point: there is *something* userspace can do, although that
-> > > would be arm64-specific and doesn't really help with the state-space
-> > > explosion you get with combinations of invalid/unused perf_event_attr
-> > > fields.
-> > > 
-> > > > An example of an application which needs to changed is HHVM. Currently 
-> > > > it sets exclude_hv to true but exclude_kernel to false as it does not 
-> > > > care about the hypervisor associated perf events associated with the 
-> > > > code, only the kernel and userspace associated evnts.
-> > > > Yes we could submit a patch to use the sysfs interface to check but it 
-> > > > would look funny and the facebook folks might reject the patch as it is 
-> > > > ARM64 specific in generic code.  Note this is how all of this discussion 
-> > > > started was HHVM's call to perf_open_event was failing.
-> > > 
-> > > Hmm, if you're saying that HHVM won't be changed to use the sysfs stuff,
-> > > then why are we bothering?
-> > > 
-> > > Not sure where this leaves us.
-> > 
-> > If my understanding is correct, the sysfs suggestion above is going to
-> > add API complexity without solving the issue. Ignoring the exclude_hv if
-> > it cannot be honored would be a better solution.
+On Fri, Apr 21, 2017 at 04:38:49PM +0800, Chen-Yu Tsai wrote:
+> The Allwinner display pipeline contains many hardware components, some
+> of which can consume data from one of multiple upstream components.
+> The numbering scheme of these components must be encoded into the device
+> tree so the driver can figure out which component out of two or more of
+> the same type it is supposed to use or program.
 > 
-> Better for HHVM, sure, but I don't think it's better in general. It means
-> that we silently do the opposite of what the user has requested in some
-> configurations.
+> This patch adds the constraint that local endpoint IDs must be the index
+> or number of the remote endpoint's hardware block, for all components
+> in the display pipeline up to the TCONs.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> index 57a8d0610062..7acdbf14ae1c 100644
+> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> @@ -4,6 +4,16 @@ Allwinner A10 Display Pipeline
+>  The Allwinner A10 Display pipeline is composed of several components
+>  that are going to be documented below:
+>  
+> +For the input port of all components up to the TCON in the display
+> +pipeline, if there are multiple components, the local endpoint IDs
+> +must correspond to the index of the upstream block. For example, if
+> +the remote endpoint is Frontend 1, then the local endpoint ID must
+> +be 1.
+> +
+> +Conversely, for the output ports of the same group, the remote endpoint
+> +ID must be the index of the local hardware block. If the local backend
+> +is backend 1, then the remote endpoint ID must be 1.
 
-If my understanding is correct, when is_kernel_in_hyp_mode() is true,
-the kernel is in EL2 and there is no real hypervisor with hvc calls
-from kernel. Ignoring the exclude_hv would be correct.
+It would be clearer if you just explicitly listed IDs and their 
+connections. From how this is worded, it would not work if you had 
+connections like this:
 
-When kernel is in EL1, it would be correct to consider exclude_hv to
-skip events in EL2 (reached with hvc).
+DevA 0
+DevA 1
+DevB 0
+DevB 1
 
-I don't see the issue, can you please give more detail on the config
-with unexpected behavior?
+These would need to be endpoints 0-3 in TCON, and that doesn't reflect 
+the remote devices' index.
 
-JC.
+Rob
