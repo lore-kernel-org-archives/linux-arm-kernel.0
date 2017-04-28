@@ -1,122 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 28 Apr 2017 10:53:51 +0100
-Subject: [PATCH v2] arm64: Add ASM modifier for xN register operands
-In-Reply-To: <CAKv+Gu9s2t+Nt7JCcTxkr5BYSN05f_zxYkKzfrD-4owWQLvF_Q@mail.gmail.com>
-References: <20170426214616.142580-1-mka@chromium.org>
- <20170427110256.GC31337@leverpostej>
- <20170427225221.GS128305@google.com>
- <CAKv+Gu9s2t+Nt7JCcTxkr5BYSN05f_zxYkKzfrD-4owWQLvF_Q@mail.gmail.com>
-Message-ID: <20170428095349.GA22161@leverpostej>
+From: varada@codeaurora.org (Varadarajan Narayanan)
+Date: Fri, 28 Apr 2017 15:26:38 +0530
+Subject: [PATCH 0/5] Add minimal boot support for IPQ8074
+Message-ID: <1493373403-23462-1-git-send-email-varada@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 08:18:52AM +0100, Ard Biesheuvel wrote:
-> On 27 April 2017 at 23:52, Matthias Kaehlcke <mka@chromium.org> wrote:
-> > El Thu, Apr 27, 2017 at 12:02:56PM +0100 Mark Rutland ha dit:
-> >> On Wed, Apr 26, 2017 at 02:46:16PM -0700, Matthias Kaehlcke wrote:
+The IPQ8074 is Qualcomm?s High-capacity 802.11ax SoC for Routers,
+Gateways and Access Points.
 
-> >> > -   asm volatile("strb %w0, [%1]" : : "rZ" (val), "r" (addr));
-> >> > +   asm volatile("strb %w0, [%x1]" : : "rZ" (val), "r" (addr));
-> >>
-> >> In general, the '[%xN]' pattern looks *very* suspicious to me. Any
-> >> address must be 64-bit, so this would mask a legitimate warning.
-> >>
-> >> Given the prototype of this function the code if fine either way, but
-> >> were we to refactor things (e.g. making this a macro), that might not be
-> >> true.
-> >>
-> >> ... so I'm not sure it make sense to alter instances used for addresses.
-> >
-> > Good point, I'll leave instances dealing with addresses untouched for now.
-> >
-> 
-> OK, I am confused now. We started this thread under the assumption
-> that all unqualified placeholders are warned about by Clang. Given
-> that this appears not to be the case, could we please first find out
-> what causes the warnings?
+This series adds minimal board boot support for ipq8074-hk01
+board.
 
-Yes please.
+Abhishek Sahu (2):
+  clk: qcom: ipq8074: Add Global Clock Controller support
+  arm64: defconfig: Enable QCOM IPQ8074 clock and pinctrl
 
-> Is it necessary at all to add the x modifiers for 64-bit types?
+Varadarajan Narayanan (3):
+  pinctrl: qcom: Add ipq8074 pinctrl driver
+  dt-bindings: qcom: Add IPQ8074 bindings
+  arm64: dts: Add ipq8074 SoC and MTP board support
 
-Having delved a little deeper, I think this is actively harmful, and
-clang's warning indicates potential problems even when compiling with
-GCC.
+ Documentation/devicetree/bindings/arm/qcom.txt     |    2 +
+ .../devicetree/bindings/clock/qcom,gcc.txt         |    1 +
+ .../bindings/pinctrl/qcom,ipq8074-pinctrl.txt      |  202 ++++
+ arch/arm64/boot/dts/qcom/Makefile                  |    1 +
+ arch/arm64/boot/dts/qcom/ipq8074-hk01.dts          |   48 +
+ arch/arm64/boot/dts/qcom/ipq8074.dtsi              |  153 +++
+ arch/arm64/configs/defconfig                       |    2 +
+ drivers/clk/qcom/Kconfig                           |    9 +
+ drivers/clk/qcom/Makefile                          |    1 +
+ drivers/clk/qcom/gcc-ipq8074.c                     | 1033 +++++++++++++++++
+ drivers/pinctrl/qcom/Kconfig                       |   10 +
+ drivers/pinctrl/qcom/Makefile                      |    1 +
+ drivers/pinctrl/qcom/pinctrl-ipq8074.c             | 1220 ++++++++++++++++++++
+ include/dt-bindings/clock/qcom,gcc-ipq8074.h       |  152 +++
+ 14 files changed, 2835 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/qcom,ipq8074-pinctrl.txt
+ create mode 100644 arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/ipq8074.dtsi
+ create mode 100644 drivers/clk/qcom/gcc-ipq8074.c
+ create mode 100644 drivers/pinctrl/qcom/pinctrl-ipq8074.c
+ create mode 100644 include/dt-bindings/clock/qcom,gcc-ipq8074.h
 
-The below test simulates how we might write to control regs and so on,
-with a mov in asm simulating something like an msr.
-
----->8----
-#include <stdio.h>
-
-static inline unsigned long generate_val(void)
-{
-        unsigned long val;
-
-        /* hide value generation from GCC */
-        asm (
-                "movn %0, #0"
-                : "=r" (val)
-        );
-
-        return val;
-}
-
-static inline unsigned long use_val_32(unsigned int in)
-{
-        unsigned long out;
-
-	/* simulate what we might write to a sysreg */
-        asm (
-                "mov %x0, %x1"
-                : "=r" (out)
-                : "r" (in)
-        );
-
-        return out;
-}
-
-int main(int argc, char *argv)
-{
-        printf("32-bit val is: 0x%016lx\n", use_val_32(generate_val()));
-
-        return 0;
-}
----->8----
-
-Depending on optimization level, bits that we do not expect can flow through:
-
-$ gcc test.c -o test
-$ ./test
-32-bit val is: 0x00000000ffffffff
-$ gcc test.c -O1 -o test
-$ ./test
-32-bit val is: 0xffffffffffffffff
-$ gcc test.c -O2 -o test
-$ ./test
-32-bit val is: 0xffffffffffffffff
-
-... that could be disastrous depending on how the result was used.
-
-With "in" cast to an unsigned long, the compiler realises it needs to perform
-any necessary truncation itself:
-
-$ gcc test.c -o test
-$ ./test
-32-bit val is: 0x00000000ffffffff
-$ gcc test.c -O1 -o test
-$ ./test
-32-bit val is: 0x00000000ffffffff
-$ gcc test.c -O2 -o test
-$ ./test
-32-bit val is: 0x00000000ffffffff
-$ gcc test.c -O3 -o test
-$ ./test
-32-bit val is: 0x00000000ffffffff
-
-I think that the correct fix is to use intermediate 64-bit variables, or
-casts, so that the compiler *must* use an x register, and consequently
-guarantees that all 64-bits of the register are as we expect.
-
-Thanks,
-Mark.
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
