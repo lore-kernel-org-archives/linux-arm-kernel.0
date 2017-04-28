@@ -1,97 +1,98 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Apr 2017 14:28:38 +0200
-Subject: [RFC/RFT PATCH 03/18] PCI: Introduce pci_scan_root_bus_bridge()
-In-Reply-To: <20170426111809.19922-4-lorenzo.pieralisi@arm.com>
-References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
- <20170426111809.19922-4-lorenzo.pieralisi@arm.com>
-Message-ID: <CAK8P3a0HmrrYBP5em1s4VOY4Tb6=bwOrDDN6K8rPp8OEXtpMtA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 28 Apr 2017 14:28:44 +0200
+Subject: [PATCH/RFC 0/5] arm64: dts: renesas: Break out common board
+ support
+In-Reply-To: <20170428073256.GG10196@verge.net.au>
+References: <1492779321-23939-1-git-send-email-geert+renesas@glider.be>
+ <20170426080642.GK25517@verge.net.au>
+ <CAMuHMdXbe=rkeS+-teg7nqbjULWY0_5pBO1XEzCGdYA4gB57oA@mail.gmail.com>
+ <CAMuHMdV1SQoeEACaNLZbByRLbosMj5oxEysNDVevYgxqStDaug@mail.gmail.com>
+ <20170428070458.GB10196@verge.net.au>
+ <CAMuHMdVypXM59rk50Guc90ktD2PKHsVHgXyN34Cz3EC1hMTs8g@mail.gmail.com>
+ <20170428073256.GG10196@verge.net.au>
+Message-ID: <CAMuHMdV=31DFBb2cE+Q_cBovdQys0iv7jAJsBWq4yT4yFO0gDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> Current pci_scan_root_bus() interface is made up of two main
-> code paths:
->
-> - pci_create_root_bus()
-> - pci_scan_child_bus()
->
-> pci_create_root_bus() is a wrapper function that allows to create
-> a struct pci_host_bridge structure, initialize it with the passed
-> parameters and register it with the kernel.
->
-> As the struct pci_host_bridge require additional struct members,
-> pci_create_root_bus() parameters list has grown in time, making
-> it unwieldy to add further parameters to it in case the struct
-> pci_host_bridge gains more members fields to augment its functionality.
->
-> Since PCI core code provides functions to allocate struct
-> pci_host_bridge, instead of forcing the pci_create_root_bus() interface
-> to add new parameters to cater for new struct pci_host_bridge
-> functionality, it is more suitable to add an interface in PCI
-> core code to scan a PCI bus straight from a struct pci_host_bridge
-> created and customized by each specific PCI host controller driver.
->
-> Add a pci_scan_root_bus_bridge() function to allow PCI host controller
-> drivers to create and initialize struct pci_host_bridge and scan
-> the resulting bus.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
+Hi Simon,
 
-Good idea, yes. To avoid growing the number of interfaces too
-much, should we change the existing users of pci_register_host_bridge
-in host drivers over to this entry point, and make the other one
-local to probe.c then?
-
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 7e4ffc4..c7a7f72 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -2412,6 +2412,44 @@ void pci_bus_release_busn_res(struct pci_bus *b)
->                         res, ret ? "can not be" : "is");
->  }
+On Fri, Apr 28, 2017 at 9:32 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Apr 28, 2017 at 09:11:36AM +0200, Geert Uytterhoeven wrote:
+>> On Fri, Apr 28, 2017 at 9:04 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Thu, Apr 27, 2017 at 03:32:49PM +0200, Geert Uytterhoeven wrote:
+>> >> On Wed, Apr 26, 2017 at 10:11 AM, Geert Uytterhoeven
+>> >> <geert@linux-m68k.org> wrote:
+>> >> > CC Vladimir (which I forgot to CC initially, sorry for that)
+>> >> >
+>> >> > On Wed, Apr 26, 2017 at 10:06 AM, Simon Horman <horms@verge.net.au> wrote:
+>> >> >> On Fri, Apr 21, 2017 at 02:55:16PM +0200, Geert Uytterhoeven wrote:
+>> >> >>> The Renesas Salvator-X and ULCB development board can be equipped with
+>> >> >>> either an R-Car H3 or M3-W SiP, which are pin-compatible.  All boards
+>> >> >>> use separate DTBs, but currently there's no sharing of board-specific
+>> >> >>> devices in DTS.
+>> >> >>>
+>> >> >>> This series reduces duplication by extracting common board support into
+>> >> >>> their own .dtsi files.  As the level of support varies across boards and
+>> >> >>> SoCs, this requires the addition of a few external clocks and
+>> >> >>> placeholder devices on R-Car M3-W, so the common board support DTS can
+>> >> >>> refer to them.
+>> >> >>>
+>> >> >>>   - Patches 1 and 2 add the external audio and PCIe bus clocks on R-Car
+>> >> >>>     M3-W, which are present in r8a7795.dtsi, and used in
+>> >> >>>     r8a7795-salvator-x.dts,
+>> >> >>>   - RFC patch 3 adds placeholders for devices that are not yet supported
+>> >> >>>     and/or tested on R-Car M3-W, but used on R-Car H3,
+>> >> >>>   - RFC patch 4 extracts common Salvator-X board support,
+>> >> >>>   - RFC patch 5 extracts common ULCB board support.
+>> >> >>>
+>> >> >>> For R-Car H3 based boards, there are no functional changes.
+>> >> >>> For R-Car M3-W based boards, some new devices are now described in DT.
+>> >> >>>
+>> >> >>> Dependencies:
+>> >> >>>   - renesas-devel-20170420-v4.11-rc7,
+>> >> >>>   - Patches 1 and 2 can be applied as-is,
+>> >> >>>   - Patches 4 and 5 depend on "[PATCH 0/8] arm64: dts: renesas: Break
+>> >> >>>     out R-Car H3 and M3-W SiP"
+>> >> >>>     (http://www.spinics.net/lists/devicetree/msg173820.html).
+>>            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>>
+>> >> >>> DTB changes have been inspected using scripts/dtc/dtx_diff.
+>> >> >>> This has been tested on Salvator-X (both H3 and M3-W).
+>> >> >>> This has not been tested on H3ULCB and M3ULCB due to lack of hardware.
+>> >> >>>
+>> >> >>> Thanks for your comments!
+>> >> >>
+>> >> >> Thanks for tackling this important problem. I have looked over the changes
+>> >> >> and they seem nice to me. I would, however, be more comfortable applying
+>> >> >> them if they were rested on the ULCB boards.
+>> >> >
+>> >> > tested?
+>> >> >
+>> >> > I've pushed a branch for testing to topic/rcar3-dtsi-sharing in
+>> >> > git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
+>> >>
+>> >> I managed to test it on the new H3ULCB and M3ULCB baords in Magnus' farm.
+>> >> No issues detected.
+>> >
+>> > Great! Any objections to me queuing this up?
+>>
+>> The dependency above (no feedback about the SiP types yet).
+>>
+>> I can respin without that dependency, if that is preferred...
 >
-> +int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge)
-> +{
-> +       struct resource_entry *window;
-> +       bool found = false;
-> +       struct pci_bus *b;
-> +       int max, bus, ret;
-> +
-> +       if (!bridge)
-> +               return -EINVAL;
-> +
-> +       resource_list_for_each_entry(window, &bridge->windows)
-> +               if (window->res->flags & IORESOURCE_BUS) {
-> +                       found = true;
-> +                       break;
-> +               }
-> +
-> +       ret = pci_register_host_bridge(bridge);
-> +       if (ret < 0)
-> +               return ret;
-> +
-> +       b = bridge->bus;
-> +       bus = bridge->busnr;
-> +
-> +       if (!found) {
-> +               dev_info(&b->dev,
-> +                "No busn resource found for root bus, will use [bus %02x-ff]\n",
-> +                       bus);
-> +               pci_bus_insert_busn_res(b, bus, 255);
-> +       }
-> +
-> +       max = pci_scan_child_bus(b);
-> +
-> +       if (!found)
-> +               pci_bus_update_busn_res_end(b, max);
-> +
-> +       return 0;
-> +}
-> +
+> It seems to me that it would be nice to get these in sooner than later - in
+> particular earlier rather than later in the (v4.13) development cycle. But
+> I defer to your judgement on what is best.
 
-We probably want an EXPORT_SYMBOL() here as well.
+Agreed.  Stay tuned for v2...
 
-     Arnd
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
