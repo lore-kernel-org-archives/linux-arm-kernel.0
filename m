@@ -1,123 +1,76 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 28 Apr 2017 14:58:42 +0200
-Subject: [PATCH v2 3/5] arm64: dts: r8a7796: Add placeholders for various
- devices
-In-Reply-To: <1493384324-29344-1-git-send-email-geert+renesas@glider.be>
-References: <1493384324-29344-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1493384324-29344-4-git-send-email-geert+renesas@glider.be>
+Date: Fri, 28 Apr 2017 14:58:39 +0200
+Subject: [PATCH v2 0/5] arm64: dts: renesas: Break out common board support
+Message-ID: <1493384324-29344-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add empty device nodes serving as placeholders for devices that are not
-yet supported and/or tested on R-Car M3-W, but are supported and used on
-Salvator-X or H3ULCB boards equipped with an R-Car H3 SoC.
+	Hi Simon, Magnus,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-  - Drop RFC state.
----
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 82 ++++++++++++++++++++++++++++++++
- 1 file changed, 82 insertions(+)
+The Renesas Salvator-X and ULCB development board can be equipped with
+either an R-Car H3 or M3-W SiP, which are pin-compatible.  All boards
+use separate DTBs, but currently there's no sharing of board-specific
+devices in DTS.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 8e2aab8b6b103cc9..60a4289d0b14fe50 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -961,6 +961,38 @@
- 			dma-channels = <16>;
- 		};
- 
-+		hsusb: usb at e6590000 {
-+			/* placeholder */
-+		};
-+
-+		xhci0: usb at ee000000 {
-+			/* placeholder */
-+		};
-+
-+		ohci0: usb at ee080000 {
-+			/* placeholder */
-+		};
-+
-+		ehci0: usb at ee080100 {
-+			/* placeholder */
-+		};
-+
-+		usb2_phy0: usb-phy at ee080200 {
-+			/* placeholder */
-+		};
-+
-+		ohci1: usb at ee0a0000 {
-+			/* placeholder */
-+		};
-+
-+		ehci1: usb at ee0a0100 {
-+			/* placeholder */
-+		};
-+
-+		usb2_phy1: usb-phy at ee0a0200 {
-+			/* placeholder */
-+		};
-+
- 		sdhi0: sd at ee100000 {
- 			compatible = "renesas,sdhi-r8a7796";
- 			reg = <0 0xee100000 0 0x2000>;
-@@ -1063,5 +1095,55 @@
- 				};
- 			};
- 		};
-+
-+		rcar_sound: sound at ec500000 {
-+			/* placeholder */
-+
-+			rcar_sound,dvc {
-+				dvc0: dvc-0 {
-+				};
-+
-+				dvc1: dvc-1 {
-+				};
-+			};
-+
-+			rcar_sound,src {
-+				src0: src-0 {
-+				};
-+				src1: src-1 {
-+				};
-+			};
-+
-+			rcar_sound,ssi {
-+				ssi0: ssi-0 {
-+				};
-+
-+				ssi1: ssi-1 {
-+				};
-+			};
-+		};
-+
-+		pciec0: pcie at fe000000 {
-+			/* placeholder */
-+		};
-+
-+		pciec1: pcie at ee800000 {
-+			/* placeholder */
-+		};
-+
-+		du: display at feb00000 {
-+			/* placeholder */
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					du_out_rgb: endpoint {
-+					};
-+				};
-+			};
-+		};
- 	};
- };
+This series reduces duplication by extracting common board support into
+their own .dtsi files.  As the level of support varies across boards and
+SoCs, this requires the addition of a few external clocks and
+placeholder devices on R-Car M3-W, so the common board support DTS can
+refer to them.
+
+  - Patches 1 and 2 add the external audio and PCIe bus clocks on R-Car
+    M3-W, which are present in r8a7795.dtsi, and used in
+    r8a7795-salvator-x.dts,
+  - Patch 3 adds placeholders for devices that are not yet supported
+    and/or tested on R-Car M3-W, but used on R-Car H3,
+  - Patch 4 extracts common Salvator-X board support,
+  - Patch 5 extracts common ULCB board support.
+
+For R-Car H3 based boards, there are no functional changes.
+For R-Car M3-W based boards, some new devices are now described in DT.
+
+Compared to v1, the most important change is a rebase to remove the
+dependency on "[PATCH 0/8] arm64: dts: renesas: Break out R-Car H3 and
+M3-W SiP" (http://www.spinics.net/lists/devicetree/msg173820.html).
+Please refer to the individual patches for more changelog information.
+
+Dependencies:
+  - renesas-devel-20170428-v4.11-rc8.
+
+DTB changes have been inspected using scripts/dtc/dtx_diff.
+This has been tested on Salvator-X (both H3 and M3-W), H3ULCB, and
+M3ULCB.
+
+Thanks for applying!
+
+Geert Uytterhoeven (5):
+  arm64: dts: r8a7796: Add external audio clocks
+  arm64: dts: r8a7796: Add external PCIe bus clock
+  arm64: dts: r8a7796: Add placeholders for various devices
+  arm64: dts: renesas: Extract common Salvator-X board support
+  arm64: dts: renesas: Extract common ULCB board support
+
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     | 341 +------------
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 543 +--------------------
+ arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts     | 201 +-------
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 259 +---------
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 112 +++++
+ .../{r8a7795-salvator-x.dts => salvator-x.dtsi}    | 393 +++++++--------
+ .../dts/renesas/{r8a7795-h3ulcb.dts => ulcb.dtsi}  | 264 +++++-----
+ 7 files changed, 420 insertions(+), 1693 deletions(-)
+ copy arch/arm64/boot/dts/renesas/{r8a7795-salvator-x.dts => salvator-x.dtsi} (91%)
+ copy arch/arm64/boot/dts/renesas/{r8a7795-h3ulcb.dts => ulcb.dtsi} (91%)
+
 -- 
 2.7.4
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
