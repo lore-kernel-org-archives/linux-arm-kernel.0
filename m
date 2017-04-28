@@ -1,49 +1,65 @@
-From: Frederik.Juul@3shape.com (Frederik Juul)
-Date: Fri, 28 Apr 2017 12:45:15 +0000
-Subject: [PATCH] IMX: Rearm watchdog after loading value for restart
-In-Reply-To: <20170428120329.2dab740f@ipc1.ka-ro>
-References: <20170427131434.17085-1-Frederik.juul@3shape.com>
- <20170428120329.2dab740f@ipc1.ka-ro>
-Message-ID: <db36b4c832db4b75b4cb3fa7b19635f6@3shape.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 28 Apr 2017 21:50:35 +0900
+Subject: [PATCH v2] pinctrl: rockchip: remove unneeded (void *) casts in
+ of_match_table
+Message-ID: <1493383835-1959-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disregard this patch then :) I had seen some strange behavior when toying with watchdog where it didn?t reset properly and wrote the "something went wrong" message. This patch fixed it for me, but I guess I may have misunderstood the issue.
+of_device_id::data is an opaque pointer.  No explicit cast is needed.
 
-Frederik Juul
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+---
 
------Original Message-----
-From: Lothar Wa?mann [mailto:LW at KARO-electronics.de] 
-Sent: 28. april 2017 12:03
-To: frederikj at gmail.com
-Cc: linux-arm-kernel at lists.infradead.org; shawnguo at kernel.org; fabio.estevam at nxp.com; kernel at pengutronix.de; Frederik Juul <Frederik.Juul@3shape.com>
-Subject: Re: [PATCH] IMX: Rearm watchdog after loading value for restart
+Changes in v2:
+  - Rebase on pinctrl subsystem tree
 
-Hi,
+ drivers/pinctrl/pinctrl-rockchip.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-On Thu, 27 Apr 2017 15:14:34 +0200 frederikj at gmail.com wrote:
-> When calling the restart function the watchdog is activated and the 
-> WDOG timeout field is set to 0. This gives a reset time of 500 ms, 
-> which is consistent with the following delay. However this new time is 
-> not loaded into the WDOG until the WDOG service routine is run (see 
-> IMX6SXRM section
-> 70.5.1.1 "Servicing WDOG to reload the counter").
-> 
-> Not reloading the counter could result in a random delay up to 128 
-> seconds before the system restarts, depending on the previous value of 
-> the WDOG timeout field and when it has last been serviced. That bug is 
-> fixed with this patch.
->
-The routine is actually initiating a softreset by clearing the SRS bit in WCR. Thus the watchdog timeout should only have any effect, if the softreset fails in some way. Under normal circumstances the reset should happen immediately no matter what watchdog timeout is programmed.
-
-
-Lothar Wa?mann
---
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de ___________________________________________________________
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index f141aa0..5b4e1c44 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -2998,27 +2998,27 @@ static struct rockchip_pin_ctrl rk3399_pin_ctrl = {
+ 
+ static const struct of_device_id rockchip_pinctrl_dt_match[] = {
+ 	{ .compatible = "rockchip,rv1108-pinctrl",
+-		.data = (void *)&rv1108_pin_ctrl },
++		.data = &rv1108_pin_ctrl },
+ 	{ .compatible = "rockchip,rk2928-pinctrl",
+-		.data = (void *)&rk2928_pin_ctrl },
++		.data = &rk2928_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3036-pinctrl",
+-		.data = (void *)&rk3036_pin_ctrl },
++		.data = &rk3036_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3066a-pinctrl",
+-		.data = (void *)&rk3066a_pin_ctrl },
++		.data = &rk3066a_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3066b-pinctrl",
+-		.data = (void *)&rk3066b_pin_ctrl },
++		.data = &rk3066b_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3188-pinctrl",
+-		.data = (void *)&rk3188_pin_ctrl },
++		.data = &rk3188_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3228-pinctrl",
+-		.data = (void *)&rk3228_pin_ctrl },
++		.data = &rk3228_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3288-pinctrl",
+-		.data = (void *)&rk3288_pin_ctrl },
++		.data = &rk3288_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3328-pinctrl",
+-		.data = (void *)&rk3328_pin_ctrl },
++		.data = &rk3328_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3368-pinctrl",
+-		.data = (void *)&rk3368_pin_ctrl },
++		.data = &rk3368_pin_ctrl },
+ 	{ .compatible = "rockchip,rk3399-pinctrl",
+-		.data = (void *)&rk3399_pin_ctrl },
++		.data = &rk3399_pin_ctrl },
+ 	{},
+ };
+ 
+-- 
+2.7.4
