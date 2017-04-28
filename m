@@ -1,48 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Apr 2017 10:45:34 +0200
-Subject: [PATCH v2] arm: dts: sun7i-a20-bananapi: name the GPIO lines
-In-Reply-To: <60d2e24d-91c8-7563-9ecc-f203b12e0983@rempel-privat.de>
-References: <CACRpkdYnK=7C=F5hZUo-nYv6Z+Pb+eT7vm1e4hL8N-QgJnuLfg@mail.gmail.com>
- <1470384404-6796-1-git-send-email-linux@rempel-privat.de>
- <CACRpkdZn7-SL5kmGn7Pysz=QiQFBEm8+c6bw=hE5F0CV4ct0RQ@mail.gmail.com>
- <60d2e24d-91c8-7563-9ecc-f203b12e0983@rempel-privat.de>
-Message-ID: <CACRpkdZcnJ1eCNW4ZF_A4zbeCt3JcAuw-1meB_Pn7ctMy99B_g@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 28 Apr 2017 10:51:11 +0200
+Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
+ ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+In-Reply-To: <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170401.112603.1991545644693496714.davem@davemloft.net>
+ <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
+ <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
+ <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
+ <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
+ <CAKgT0Uc4L=GgYbpO-Fm9OfN+_fLypbDP1c+X4T_ta90ecQiyGQ@mail.gmail.com>
+ <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1493369471.13947.11.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 7:11 AM, Oleksij Rempel <linux@rempel-privat.de> wrote:
-> Am 08.08.2016 um 19:51 schrieb Linus Walleij:
->> On Fri, Aug 5, 2016 at 10:06 AM, Oleksij Rempel <linux@rempel-privat.de> wrote:
->>
->>> This names the GPIO lines on the Banana Pi board in accordance with
->>> the A20_Banana_Pi v1.4 Specification.
->>>
->>> This will make these line names reflect through to userspace
->>> so that they can easily be identified and used with the new
->>> character device ABI.
->>>
->>> Some care has been taken to name all lines, not just those used
->>> by the external connectors, also lines that are muxed into some
->>> other function than GPIO: these are named "[FOO]" so that users
->>> can see with lsgpio what all lines are used for.
->>>
->>> Ps: most of the text was taken from Linus Wallej patch.
->>>
->>> Cc: devicetree at vger.kernel.org
->>> Cc: Linus Walleij <linus.walleij@linaro.org>
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: Chen-Yu Tsai <wens@csie.org>
->>> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> Yours,
->> Linus Walleij
->
-> Hm... i assume this patch was lost. Should i resend it?
+Am Donnerstag, den 27.04.2017, 12:19 -0500 schrieb Bjorn Helgaas:
+> [+cc Casey]
+> 
+> On Wed, Apr 26, 2017 at 09:18:33AM -0700, Alexander Duyck wrote:
+> > On Wed, Apr 26, 2017 at 2:26 AM, Ding Tianhong <dingtianhong@huawei.com> wrote:
+> > > Hi Amir:
+> > >
+> > > It is really glad to hear that the mlx5 will support RO mode this year, if so, do you agree that enable it dynamic by ethtool -s xxx,
+> > > we have try it several month ago but there was only one drivers would use it at that time so the maintainer against it, it mlx5 would support RO,
+> > > we could try to restart this solution, what do you think about it. :)
+> > >
+> > > Thanks
+> > > Ding
+> > 
+> > Hi Ding,
+> > 
+> > Enabing relaxed ordering really doesn't have any place in ethtool. It
+> > is a PCIe attribute that you are essentially wanting to enable.
+> > 
+> > It might be worth while to take a look at updating the PCIe code path
+> > to handle this. Really what we should probably do is guarantee that
+> > the architectures that need relaxed ordering are setting it in the
+> > PCIe Device Control register and that the ones that don't are clearing
+> > the bit. It's possible that this is already occurring, but I don't
+> > know the state of handling those bits is in the kernel. Once we can
+> > guarantee that we could use that to have the drivers determine their
+> > behavior in regards to relaxed ordering. For example in the case of
+> > igb/ixgbe we could probably change the behavior so that it will bey
+> > default try to use relaxed ordering but if it is not enabled in PCIe
+> > Device Control register the hardware should not request to use it. It
+> > would simplify things in the drivers and allow for each architecture
+> > to control things as needed in their PCIe code.
+> 
+> I thought Relaxed Ordering was an optimization.  Are there cases where
+> it is actually required for correct behavior?
 
-Yes, but I'm not applying DTS patches. Make sure that the
-sunxi maintainers get it and merge it.
+Yes, at least the Tegra 2 TRM claims that RO needs to be enabled on the
+device side for correct operation with the following language:
 
-Yours,
-Linus Walleij
+"Tegra 2 requires relaxed ordering for responses to downstream requests
+(responses can pass writes). It is possible in some circumstances for
+PCIe transfers from an external bus masters (i.e. upstream transfers) to
+become blocked by a downstream read or non-posted write. The responses
+to these downstream requests are blocked by upstream posted writes only
+when PCIe strict ordering is imposed. It is therefore necessary to never
+impose strict ordering that would block a response to a downstream
+NPW/read request and always set the relaxed ordering bit to 1. Only
+devices that are capable of relaxed ordering may be used with Tegra 2
+devices."
+
+Regards,
+Lucas
