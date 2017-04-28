@@ -1,76 +1,1002 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 28 Apr 2017 14:58:39 +0200
-Subject: [PATCH v2 0/5] arm64: dts: renesas: Break out common board support
-Message-ID: <1493384324-29344-1-git-send-email-geert+renesas@glider.be>
+Date: Fri, 28 Apr 2017 14:58:44 +0200
+Subject: [PATCH v2 5/5] arm64: dts: renesas: Extract common ULCB board support
+In-Reply-To: <1493384324-29344-1-git-send-email-geert+renesas@glider.be>
+References: <1493384324-29344-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1493384324-29344-6-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+The Renesas ULCB development board can be equipped with either an R-Car
+H3 or M3-W SiP, which are pin-compatible.  Both boards use different
+DTBs.
 
-The Renesas Salvator-X and ULCB development board can be equipped with
-either an R-Car H3 or M3-W SiP, which are pin-compatible.  All boards
-use separate DTBs, but currently there's no sharing of board-specific
-devices in DTS.
+Reduce duplication by extracting common ULCB board support into its own
+.dtsi file.  References to SoC-specific clocks are handled through cpp
+definitions.  Sort device nodes while at it.
 
-This series reduces duplication by extracting common board support into
-their own .dtsi files.  As the level of support varies across boards and
-SoCs, this requires the addition of a few external clocks and
-placeholder devices on R-Car M3-W, so the common board support DTS can
-refer to them.
+For H3ULCB, there are no functional changes.
 
-  - Patches 1 and 2 add the external audio and PCIe bus clocks on R-Car
-    M3-W, which are present in r8a7795.dtsi, and used in
-    r8a7795-salvator-x.dts,
-  - Patch 3 adds placeholders for devices that are not yet supported
-    and/or tested on R-Car M3-W, but used on R-Car H3,
-  - Patch 4 extracts common Salvator-X board support,
-  - Patch 5 extracts common ULCB board support.
+For M3ULCB, the following new devices are now described in DT:
+  - External audio, CAN, and PCIe clocks,
+  - CS2000 clock generator,
+  - AK4613 Audio Codec.
 
-For R-Car H3 based boards, there are no functional changes.
-For R-Car M3-W based boards, some new devices are now described in DT.
-
-Compared to v1, the most important change is a rebase to remove the
-dependency on "[PATCH 0/8] arm64: dts: renesas: Break out R-Car H3 and
-M3-W SiP" (http://www.spinics.net/lists/devicetree/msg173820.html).
-Please refer to the individual patches for more changelog information.
-
-Dependencies:
-  - renesas-devel-20170428-v4.11-rc8.
-
-DTB changes have been inspected using scripts/dtc/dtx_diff.
-This has been tested on Salvator-X (both H3 and M3-W), H3ULCB, and
-M3ULCB.
-
-Thanks for applying!
-
-Geert Uytterhoeven (5):
-  arm64: dts: r8a7796: Add external audio clocks
-  arm64: dts: r8a7796: Add external PCIe bus clock
-  arm64: dts: r8a7796: Add placeholders for various devices
-  arm64: dts: renesas: Extract common Salvator-X board support
-  arm64: dts: renesas: Extract common ULCB board support
-
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     | 341 +------------
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 543 +--------------------
- arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts     | 201 +-------
- arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 259 +---------
- arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 112 +++++
- .../{r8a7795-salvator-x.dts => salvator-x.dtsi}    | 393 +++++++--------
- .../dts/renesas/{r8a7795-h3ulcb.dts => ulcb.dtsi}  | 264 +++++-----
- 7 files changed, 420 insertions(+), 1693 deletions(-)
- copy arch/arm64/boot/dts/renesas/{r8a7795-salvator-x.dts => salvator-x.dtsi} (91%)
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2:
+  - Drop RFC state,
+  - Rebased.
+---
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     | 341 +--------------------
+ arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts     | 201 +-----------
+ .../dts/renesas/{r8a7795-h3ulcb.dts => ulcb.dtsi}  | 264 ++++++++--------
+ 3 files changed, 126 insertions(+), 680 deletions(-)
  copy arch/arm64/boot/dts/renesas/{r8a7795-h3ulcb.dts => ulcb.dtsi} (91%)
 
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+index 3574965e074718d8..a1fbf0ab8ad8e425 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+@@ -9,24 +9,16 @@
+  * kind, whether express or implied.
+  */
+ 
++#define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
++
+ /dts-v1/;
+ #include "r8a7795.dtsi"
+-#include <dt-bindings/gpio/gpio.h>
+-#include <dt-bindings/input/input.h>
++#include "ulcb.dtsi"
+ 
+ / {
+ 	model = "Renesas H3ULCB board based on r8a7795";
+ 	compatible = "renesas,h3ulcb", "renesas,r8a7795";
+ 
+-	aliases {
+-		serial0 = &scif2;
+-		ethernet0 = &avb;
+-	};
+-
+-	chosen {
+-		stdout-path = "serial0:115200n8";
+-	};
+-
+ 	memory at 48000000 {
+ 		device_type = "memory";
+ 		/* first 128MB is reserved for secure area. */
+@@ -47,331 +39,4 @@
+ 		device_type = "memory";
+ 		reg = <0x7 0x00000000 0x0 0x40000000>;
+ 	};
+-
+-	leds {
+-		compatible = "gpio-leds";
+-
+-		led5 {
+-			gpios = <&gpio6 12 GPIO_ACTIVE_HIGH>;
+-		};
+-		led6 {
+-			gpios = <&gpio6 13 GPIO_ACTIVE_HIGH>;
+-		};
+-	};
+-
+-	keyboard {
+-		compatible = "gpio-keys";
+-
+-		key-1 {
+-			linux,code = <KEY_1>;
+-			label = "SW3";
+-			wakeup-source;
+-			debounce-interval = <20>;
+-			gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
+-		};
+-	};
+-
+-	x12_clk: x12 {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <24576000>;
+-	};
+-
+-	reg_1p8v: regulator0 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "fixed-1.8V";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <1800000>;
+-		regulator-boot-on;
+-		regulator-always-on;
+-	};
+-
+-	reg_3p3v: regulator1 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "fixed-3.3V";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		regulator-boot-on;
+-		regulator-always-on;
+-	};
+-
+-	vcc_sdhi0: regulator-vcc-sdhi0 {
+-		compatible = "regulator-fixed";
+-
+-		regulator-name = "SDHI0 Vcc";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-
+-		gpio = <&gpio5 2 GPIO_ACTIVE_HIGH>;
+-		enable-active-high;
+-	};
+-
+-	vccq_sdhi0: regulator-vccq-sdhi0 {
+-		compatible = "regulator-gpio";
+-
+-		regulator-name = "SDHI0 VccQ";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <3300000>;
+-
+-		gpios = <&gpio5 1 GPIO_ACTIVE_HIGH>;
+-		gpios-states = <1>;
+-		states = <3300000 1
+-			  1800000 0>;
+-	};
+-
+-	audio_clkout: audio-clkout {
+-		/*
+-		 * This is same as <&rcar_sound 0>
+-		 * but needed to avoid cs2000/rcar_sound probe dead-lock
+-		 */
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <11289600>;
+-	};
+-
+-	rsnd_ak4613: sound {
+-		compatible = "simple-audio-card";
+-
+-		simple-audio-card,format = "left_j";
+-		simple-audio-card,bitclock-master = <&sndcpu>;
+-		simple-audio-card,frame-master = <&sndcpu>;
+-
+-		sndcpu: simple-audio-card,cpu {
+-			sound-dai = <&rcar_sound>;
+-		};
+-
+-		sndcodec: simple-audio-card,codec {
+-			sound-dai = <&ak4613>;
+-		};
+-	};
+-};
+-
+-&extal_clk {
+-	clock-frequency = <16666666>;
+-};
+-
+-&extalr_clk {
+-	clock-frequency = <32768>;
+-};
+-
+-&pfc {
+-	pinctrl-0 = <&scif_clk_pins>;
+-	pinctrl-names = "default";
+-
+-	scif2_pins: scif2 {
+-		groups = "scif2_data_a";
+-		function = "scif2";
+-	};
+-
+-	scif_clk_pins: scif_clk {
+-		groups = "scif_clk_a";
+-		function = "scif_clk";
+-	};
+-
+-	i2c2_pins: i2c2 {
+-		groups = "i2c2_a";
+-		function = "i2c2";
+-	};
+-
+-	avb_pins: avb {
+-		groups = "avb_mdc";
+-		function = "avb";
+-	};
+-
+-	sdhi0_pins: sd0 {
+-		groups = "sdhi0_data4", "sdhi0_ctrl";
+-		function = "sdhi0";
+-		power-source = <3300>;
+-	};
+-
+-	sdhi0_pins_uhs: sd0_uhs {
+-		groups = "sdhi0_data4", "sdhi0_ctrl";
+-		function = "sdhi0";
+-		power-source = <1800>;
+-	};
+-
+-	sdhi2_pins: sd2 {
+-		groups = "sdhi2_data8", "sdhi2_ctrl";
+-		function = "sdhi2";
+-		power-source = <3300>;
+-	};
+-
+-	sdhi2_pins_uhs: sd2_uhs {
+-		groups = "sdhi2_data8", "sdhi2_ctrl";
+-		function = "sdhi2";
+-		power-source = <1800>;
+-	};
+-
+-	sound_pins: sound {
+-		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a";
+-		function = "ssi";
+-	};
+-
+-	sound_clk_pins: sound-clk {
+-		groups = "audio_clk_a_a", "audio_clk_b_a", "audio_clk_c_a",
+-			 "audio_clkout_a", "audio_clkout3_a";
+-		function = "audio_clk";
+-	};
+-
+-	usb1_pins: usb1 {
+-		groups = "usb1";
+-		function = "usb1";
+-	};
+-};
+-
+-&scif2 {
+-	pinctrl-0 = <&scif2_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-};
+-
+-&scif_clk {
+-	clock-frequency = <14745600>;
+-};
+-
+-&i2c2 {
+-	pinctrl-0 = <&i2c2_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-
+-	clock-frequency = <100000>;
+-
+-	ak4613: codec at 10 {
+-		compatible = "asahi-kasei,ak4613";
+-		#sound-dai-cells = <0>;
+-		reg = <0x10>;
+-		clocks = <&rcar_sound 3>;
+-
+-		asahi-kasei,in1-single-end;
+-		asahi-kasei,in2-single-end;
+-		asahi-kasei,out1-single-end;
+-		asahi-kasei,out2-single-end;
+-		asahi-kasei,out3-single-end;
+-		asahi-kasei,out4-single-end;
+-		asahi-kasei,out5-single-end;
+-		asahi-kasei,out6-single-end;
+-	};
+-
+-	cs2000: clk-multiplier at 4f {
+-		#clock-cells = <0>;
+-		compatible = "cirrus,cs2000-cp";
+-		reg = <0x4f>;
+-		clocks = <&audio_clkout>, <&x12_clk>;
+-		clock-names = "clk_in", "ref_clk";
+-
+-		assigned-clocks = <&cs2000>;
+-		assigned-clock-rates = <24576000>; /* 1/1 divide */
+-	};
+-};
+-
+-&rcar_sound {
+-	pinctrl-0 = <&sound_pins &sound_clk_pins>;
+-	pinctrl-names = "default";
+-
+-	/* Single DAI */
+-	#sound-dai-cells = <0>;
+-
+-	/* audio_clkout0/1/2/3 */
+-	#clock-cells = <1>;
+-	clock-frequency = <11289600>;
+-
+-	status = "okay";
+-
+-	/* update <audio_clk_b> to <cs2000> */
+-	clocks = <&cpg CPG_MOD 1005>,
+-		 <&cpg CPG_MOD 1006>, <&cpg CPG_MOD 1007>,
+-		 <&cpg CPG_MOD 1008>, <&cpg CPG_MOD 1009>,
+-		 <&cpg CPG_MOD 1010>, <&cpg CPG_MOD 1011>,
+-		 <&cpg CPG_MOD 1012>, <&cpg CPG_MOD 1013>,
+-		 <&cpg CPG_MOD 1014>, <&cpg CPG_MOD 1015>,
+-		 <&cpg CPG_MOD 1022>, <&cpg CPG_MOD 1023>,
+-		 <&cpg CPG_MOD 1024>, <&cpg CPG_MOD 1025>,
+-		 <&cpg CPG_MOD 1026>, <&cpg CPG_MOD 1027>,
+-		 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
+-		 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
+-		 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
+-		 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
+-		 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
+-		 <&audio_clk_a>, <&cs2000>,
+-		 <&audio_clk_c>,
+-		 <&cpg CPG_CORE R8A7795_CLK_S0D4>;
+-
+-	rcar_sound,dai {
+-		dai0 {
+-			playback = <&ssi0 &src0 &dvc0>;
+-			capture  = <&ssi1 &src1 &dvc1>;
+-		};
+-	};
+-};
+-
+-&sdhi0 {
+-	pinctrl-0 = <&sdhi0_pins>;
+-	pinctrl-1 = <&sdhi0_pins_uhs>;
+-	pinctrl-names = "default", "state_uhs";
+-
+-	vmmc-supply = <&vcc_sdhi0>;
+-	vqmmc-supply = <&vccq_sdhi0>;
+-	cd-gpios = <&gpio3 12 GPIO_ACTIVE_LOW>;
+-	bus-width = <4>;
+-	sd-uhs-sdr50;
+-	status = "okay";
+-};
+-
+-&sdhi2 {
+-	/* used for on-board 8bit eMMC */
+-	pinctrl-0 = <&sdhi2_pins>;
+-	pinctrl-1 = <&sdhi2_pins_uhs>;
+-	pinctrl-names = "default", "state_uhs";
+-
+-	vmmc-supply = <&reg_3p3v>;
+-	vqmmc-supply = <&reg_1p8v>;
+-	bus-width = <8>;
+-	mmc-hs200-1_8v;
+-	non-removable;
+-	status = "okay";
+-};
+-
+-&ssi1 {
+-	shared-pin;
+-};
+-
+-&wdt0 {
+-	timeout-sec = <60>;
+-	status = "okay";
+-};
+-
+-&audio_clk_a {
+-	clock-frequency = <22579200>;
+-};
+-
+-&avb {
+-	pinctrl-0 = <&avb_pins>;
+-	pinctrl-names = "default";
+-	renesas,no-ether-link;
+-	phy-handle = <&phy0>;
+-	status = "okay";
+-
+-	phy0: ethernet-phy at 0 {
+-		rxc-skew-ps = <1500>;
+-		reg = <0>;
+-		interrupt-parent = <&gpio2>;
+-		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
+-	};
+-};
+-
+-&usb2_phy1 {
+-	pinctrl-0 = <&usb1_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-};
+-
+-&ehci1 {
+-	status = "okay";
+-};
+-
+-&ohci1 {
+-	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
+index 440d93e8388df3ed..38b58b7fca4bf0e9 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
+@@ -9,24 +9,16 @@
+  * kind, whether express or implied.
+  */
+ 
++#define CPG_AUDIO_CLK_I		R8A7796_CLK_S0D4
++
+ /dts-v1/;
+ #include "r8a7796.dtsi"
+-#include <dt-bindings/gpio/gpio.h>
+-#include <dt-bindings/input/input.h>
++#include "ulcb.dtsi"
+ 
+ / {
+ 	model = "Renesas M3ULCB board based on r8a7796";
+ 	compatible = "renesas,m3ulcb", "renesas,r8a7796";
+ 
+-	aliases {
+-		serial0 = &scif2;
+-		ethernet0 = &avb;
+-	};
+-
+-	chosen {
+-		stdout-path = "serial0:115200n8";
+-	};
+-
+ 	memory at 48000000 {
+ 		device_type = "memory";
+ 		/* first 128MB is reserved for secure area. */
+@@ -37,191 +29,4 @@
+ 		device_type = "memory";
+ 		reg = <0x6 0x00000000 0x0 0x40000000>;
+ 	};
+-
+-	leds {
+-		compatible = "gpio-leds";
+-
+-		led5 {
+-			gpios = <&gpio6 12 GPIO_ACTIVE_HIGH>;
+-		};
+-		led6 {
+-			gpios = <&gpio6 13 GPIO_ACTIVE_HIGH>;
+-		};
+-	};
+-
+-	keyboard {
+-		compatible = "gpio-keys";
+-
+-		key-1 {
+-			linux,code = <KEY_1>;
+-			label = "SW3";
+-			wakeup-source;
+-			debounce-interval = <20>;
+-			gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
+-		};
+-	};
+-
+-	reg_1p8v: regulator0 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "fixed-1.8V";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <1800000>;
+-		regulator-boot-on;
+-		regulator-always-on;
+-	};
+-
+-	reg_3p3v: regulator1 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "fixed-3.3V";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		regulator-boot-on;
+-		regulator-always-on;
+-	};
+-
+-	vcc_sdhi0: regulator-vcc-sdhi0 {
+-		compatible = "regulator-fixed";
+-
+-		regulator-name = "SDHI0 Vcc";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-
+-		gpio = <&gpio5 2 GPIO_ACTIVE_HIGH>;
+-		enable-active-high;
+-	};
+-
+-	vccq_sdhi0: regulator-vccq-sdhi0 {
+-		compatible = "regulator-gpio";
+-
+-		regulator-name = "SDHI0 VccQ";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <3300000>;
+-
+-		gpios = <&gpio5 1 GPIO_ACTIVE_HIGH>;
+-		gpios-states = <1>;
+-		states = <3300000 1
+-			  1800000 0>;
+-	};
+-};
+-
+-&extal_clk {
+-	clock-frequency = <16666666>;
+-};
+-
+-&extalr_clk {
+-	clock-frequency = <32768>;
+-};
+-
+-&pfc {
+-	pinctrl-0 = <&scif_clk_pins>;
+-	pinctrl-names = "default";
+-
+-	avb_pins: avb {
+-		groups = "avb_mdc";
+-		function = "avb";
+-	};
+-
+-	scif2_pins: scif2 {
+-		groups = "scif2_data_a";
+-		function = "scif2";
+-	};
+-
+-	scif_clk_pins: scif_clk {
+-		groups = "scif_clk_a";
+-		function = "scif_clk";
+-	};
+-
+-	i2c2_pins: i2c2 {
+-		groups = "i2c2_a";
+-		function = "i2c2";
+-	};
+-
+-	sdhi0_pins: sd0 {
+-		groups = "sdhi0_data4", "sdhi0_ctrl";
+-		function = "sdhi0";
+-		power-source = <3300>;
+-	};
+-
+-	sdhi0_pins_uhs: sd0_uhs {
+-		groups = "sdhi0_data4", "sdhi0_ctrl";
+-		function = "sdhi0";
+-		power-source = <1800>;
+-	};
+-
+-	sdhi2_pins: sd2 {
+-		groups = "sdhi2_data8", "sdhi2_ctrl";
+-		function = "sdhi2";
+-		power-source = <3300>;
+-	};
+-
+-	sdhi2_pins_uhs: sd2_uhs {
+-		groups = "sdhi2_data8", "sdhi2_ctrl";
+-		function = "sdhi2";
+-		power-source = <1800>;
+-	};
+-};
+-
+-&avb {
+-	pinctrl-0 = <&avb_pins>;
+-	pinctrl-names = "default";
+-	renesas,no-ether-link;
+-	phy-handle = <&phy0>;
+-	status = "okay";
+-
+-	phy0: ethernet-phy at 0 {
+-		rxc-skew-ps = <1500>;
+-		reg = <0>;
+-		interrupt-parent = <&gpio2>;
+-		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
+-	};
+-};
+-
+-&sdhi0 {
+-	pinctrl-0 = <&sdhi0_pins>;
+-	pinctrl-1 = <&sdhi0_pins_uhs>;
+-	pinctrl-names = "default", "state_uhs";
+-
+-	vmmc-supply = <&vcc_sdhi0>;
+-	vqmmc-supply = <&vccq_sdhi0>;
+-	cd-gpios = <&gpio3 12 GPIO_ACTIVE_LOW>;
+-	bus-width = <4>;
+-	sd-uhs-sdr50;
+-	status = "okay";
+-};
+-
+-&sdhi2 {
+-	/* used for on-board 8bit eMMC */
+-	pinctrl-0 = <&sdhi2_pins>;
+-	pinctrl-1 = <&sdhi2_pins_uhs>;
+-	pinctrl-names = "default", "state_uhs";
+-
+-	vmmc-supply = <&reg_3p3v>;
+-	vqmmc-supply = <&reg_1p8v>;
+-	bus-width = <8>;
+-	mmc-hs200-1_8v;
+-	non-removable;
+-	status = "okay";
+-};
+-
+-&scif2 {
+-	pinctrl-0 = <&scif2_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-};
+-
+-&scif_clk {
+-	clock-frequency = <14745600>;
+-};
+-
+-&i2c2 {
+-	pinctrl-0 = <&i2c2_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-};
+-
+-&wdt0 {
+-	timeout-sec = <60>;
+-	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+similarity index 91%
+copy from arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+copy to arch/arm64/boot/dts/renesas/ulcb.dtsi
+index 3574965e074718d8..2bc7ceb2efa45598 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+@@ -1,5 +1,5 @@
+ /*
+- * Device Tree Source for the H3ULCB (R-Car Starter Kit Premier) board
++ * Device Tree Source for the R-Car Gen3 ULCB board
+  *
+  * Copyright (C) 2016 Renesas Electronics Corp.
+  * Copyright (C) 2016 Cogent Embedded, Inc.
+@@ -9,14 +9,11 @@
+  * kind, whether express or implied.
+  */
+ 
+-/dts-v1/;
+-#include "r8a7795.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
+ 
+ / {
+-	model = "Renesas H3ULCB board based on r8a7795";
+-	compatible = "renesas,h3ulcb", "renesas,r8a7795";
++	model = "Renesas R-Car Gen3 ULCB board";
+ 
+ 	aliases {
+ 		serial0 = &scif2;
+@@ -27,36 +24,14 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+-	memory at 48000000 {
+-		device_type = "memory";
+-		/* first 128MB is reserved for secure area. */
+-		reg = <0x0 0x48000000 0x0 0x38000000>;
+-	};
+-
+-	memory at 500000000 {
+-		device_type = "memory";
+-		reg = <0x5 0x00000000 0x0 0x40000000>;
+-	};
+-
+-	memory at 600000000 {
+-		device_type = "memory";
+-		reg = <0x6 0x00000000 0x0 0x40000000>;
+-	};
+-
+-	memory at 700000000 {
+-		device_type = "memory";
+-		reg = <0x7 0x00000000 0x0 0x40000000>;
+-	};
+-
+-	leds {
+-		compatible = "gpio-leds";
+-
+-		led5 {
+-			gpios = <&gpio6 12 GPIO_ACTIVE_HIGH>;
+-		};
+-		led6 {
+-			gpios = <&gpio6 13 GPIO_ACTIVE_HIGH>;
+-		};
++	audio_clkout: audio-clkout {
++		/*
++		 * This is same as <&rcar_sound 0>
++		 * but needed to avoid cs2000/rcar_sound probe dead-lock
++		 */
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <11289600>;
+ 	};
+ 
+ 	keyboard {
+@@ -71,10 +46,15 @@
+ 		};
+ 	};
+ 
+-	x12_clk: x12 {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <24576000>;
++	leds {
++		compatible = "gpio-leds";
++
++		led5 {
++			gpios = <&gpio6 12 GPIO_ACTIVE_HIGH>;
++		};
++		led6 {
++			gpios = <&gpio6 13 GPIO_ACTIVE_HIGH>;
++		};
+ 	};
+ 
+ 	reg_1p8v: regulator0 {
+@@ -95,6 +75,22 @@
+ 		regulator-always-on;
+ 	};
+ 
++	rsnd_ak4613: sound {
++		compatible = "simple-audio-card";
++
++		simple-audio-card,format = "left_j";
++		simple-audio-card,bitclock-master = <&sndcpu>;
++		simple-audio-card,frame-master = <&sndcpu>;
++
++		sndcpu: simple-audio-card,cpu {
++			sound-dai = <&rcar_sound>;
++		};
++
++		sndcodec: simple-audio-card,codec {
++			sound-dai = <&ak4613>;
++		};
++	};
++
+ 	vcc_sdhi0: regulator-vcc-sdhi0 {
+ 		compatible = "regulator-fixed";
+ 
+@@ -119,33 +115,36 @@
+ 			  1800000 0>;
+ 	};
+ 
+-	audio_clkout: audio-clkout {
+-		/*
+-		 * This is same as <&rcar_sound 0>
+-		 * but needed to avoid cs2000/rcar_sound probe dead-lock
+-		 */
++	x12_clk: x12 {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-		clock-frequency = <11289600>;
++		clock-frequency = <24576000>;
+ 	};
++};
+ 
+-	rsnd_ak4613: sound {
+-		compatible = "simple-audio-card";
+-
+-		simple-audio-card,format = "left_j";
+-		simple-audio-card,bitclock-master = <&sndcpu>;
+-		simple-audio-card,frame-master = <&sndcpu>;
++&audio_clk_a {
++	clock-frequency = <22579200>;
++};
+ 
+-		sndcpu: simple-audio-card,cpu {
+-			sound-dai = <&rcar_sound>;
+-		};
++&avb {
++	pinctrl-0 = <&avb_pins>;
++	pinctrl-names = "default";
++	renesas,no-ether-link;
++	phy-handle = <&phy0>;
++	status = "okay";
+ 
+-		sndcodec: simple-audio-card,codec {
+-			sound-dai = <&ak4613>;
+-		};
++	phy0: ethernet-phy at 0 {
++		rxc-skew-ps = <1500>;
++		reg = <0>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
+ 	};
+ };
+ 
++&ehci1 {
++	status = "okay";
++};
++
+ &extal_clk {
+ 	clock-frequency = <16666666>;
+ };
+@@ -154,10 +153,60 @@
+ 	clock-frequency = <32768>;
+ };
+ 
++&i2c2 {
++	pinctrl-0 = <&i2c2_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++
++	clock-frequency = <100000>;
++
++	ak4613: codec at 10 {
++		compatible = "asahi-kasei,ak4613";
++		#sound-dai-cells = <0>;
++		reg = <0x10>;
++		clocks = <&rcar_sound 3>;
++
++		asahi-kasei,in1-single-end;
++		asahi-kasei,in2-single-end;
++		asahi-kasei,out1-single-end;
++		asahi-kasei,out2-single-end;
++		asahi-kasei,out3-single-end;
++		asahi-kasei,out4-single-end;
++		asahi-kasei,out5-single-end;
++		asahi-kasei,out6-single-end;
++	};
++
++	cs2000: clk-multiplier at 4f {
++		#clock-cells = <0>;
++		compatible = "cirrus,cs2000-cp";
++		reg = <0x4f>;
++		clocks = <&audio_clkout>, <&x12_clk>;
++		clock-names = "clk_in", "ref_clk";
++
++		assigned-clocks = <&cs2000>;
++		assigned-clock-rates = <24576000>; /* 1/1 divide */
++	};
++};
++
++&ohci1 {
++	status = "okay";
++};
++
+ &pfc {
+ 	pinctrl-0 = <&scif_clk_pins>;
+ 	pinctrl-names = "default";
+ 
++	avb_pins: avb {
++		groups = "avb_mdc";
++		function = "avb";
++	};
++
++	i2c2_pins: i2c2 {
++		groups = "i2c2_a";
++		function = "i2c2";
++	};
++
+ 	scif2_pins: scif2 {
+ 		groups = "scif2_data_a";
+ 		function = "scif2";
+@@ -168,16 +217,6 @@
+ 		function = "scif_clk";
+ 	};
+ 
+-	i2c2_pins: i2c2 {
+-		groups = "i2c2_a";
+-		function = "i2c2";
+-	};
+-
+-	avb_pins: avb {
+-		groups = "avb_mdc";
+-		function = "avb";
+-	};
+-
+ 	sdhi0_pins: sd0 {
+ 		groups = "sdhi0_data4", "sdhi0_ctrl";
+ 		function = "sdhi0";
+@@ -219,53 +258,6 @@
+ 	};
+ };
+ 
+-&scif2 {
+-	pinctrl-0 = <&scif2_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-};
+-
+-&scif_clk {
+-	clock-frequency = <14745600>;
+-};
+-
+-&i2c2 {
+-	pinctrl-0 = <&i2c2_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-
+-	clock-frequency = <100000>;
+-
+-	ak4613: codec at 10 {
+-		compatible = "asahi-kasei,ak4613";
+-		#sound-dai-cells = <0>;
+-		reg = <0x10>;
+-		clocks = <&rcar_sound 3>;
+-
+-		asahi-kasei,in1-single-end;
+-		asahi-kasei,in2-single-end;
+-		asahi-kasei,out1-single-end;
+-		asahi-kasei,out2-single-end;
+-		asahi-kasei,out3-single-end;
+-		asahi-kasei,out4-single-end;
+-		asahi-kasei,out5-single-end;
+-		asahi-kasei,out6-single-end;
+-	};
+-
+-	cs2000: clk-multiplier at 4f {
+-		#clock-cells = <0>;
+-		compatible = "cirrus,cs2000-cp";
+-		reg = <0x4f>;
+-		clocks = <&audio_clkout>, <&x12_clk>;
+-		clock-names = "clk_in", "ref_clk";
+-
+-		assigned-clocks = <&cs2000>;
+-		assigned-clock-rates = <24576000>; /* 1/1 divide */
+-	};
+-};
+-
+ &rcar_sound {
+ 	pinctrl-0 = <&sound_pins &sound_clk_pins>;
+ 	pinctrl-names = "default";
+@@ -296,7 +288,7 @@
+ 		 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
+ 		 <&audio_clk_a>, <&cs2000>,
+ 		 <&audio_clk_c>,
+-		 <&cpg CPG_CORE R8A7795_CLK_S0D4>;
++		 <&cpg CPG_CORE CPG_AUDIO_CLK_I>;
+ 
+ 	rcar_sound,dai {
+ 		dai0 {
+@@ -306,6 +298,17 @@
+ 	};
+ };
+ 
++&scif2 {
++	pinctrl-0 = <&scif2_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
++&scif_clk {
++	clock-frequency = <14745600>;
++};
++
+ &sdhi0 {
+ 	pinctrl-0 = <&sdhi0_pins>;
+ 	pinctrl-1 = <&sdhi0_pins_uhs>;
+@@ -337,30 +340,6 @@
+ 	shared-pin;
+ };
+ 
+-&wdt0 {
+-	timeout-sec = <60>;
+-	status = "okay";
+-};
+-
+-&audio_clk_a {
+-	clock-frequency = <22579200>;
+-};
+-
+-&avb {
+-	pinctrl-0 = <&avb_pins>;
+-	pinctrl-names = "default";
+-	renesas,no-ether-link;
+-	phy-handle = <&phy0>;
+-	status = "okay";
+-
+-	phy0: ethernet-phy at 0 {
+-		rxc-skew-ps = <1500>;
+-		reg = <0>;
+-		interrupt-parent = <&gpio2>;
+-		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
+-	};
+-};
+-
+ &usb2_phy1 {
+ 	pinctrl-0 = <&usb1_pins>;
+ 	pinctrl-names = "default";
+@@ -368,10 +347,7 @@
+ 	status = "okay";
+ };
+ 
+-&ehci1 {
+-	status = "okay";
+-};
+-
+-&ohci1 {
++&wdt0 {
++	timeout-sec = <60>;
+ 	status = "okay";
+ };
 -- 
 2.7.4
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
