@@ -1,38 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 28 Apr 2017 12:52:57 -0500
-Subject: [PATCH v5 01/11] dt-bindings: add binding for the Allwinner DE2
- CCU
-In-Reply-To: <20170423103754.50012-2-icenowy@aosc.io>
-References: <20170423103754.50012-1-icenowy@aosc.io>
- <20170423103754.50012-2-icenowy@aosc.io>
-Message-ID: <20170428175257.iob2i33fjfyrg7cv@rob-hp-laptop>
+Date: Fri, 28 Apr 2017 12:58:58 -0500
+Subject: [PATCH 1/2] dt-bindings: add bindings doc for ZTE pinctrl
+In-Reply-To: <1493038873-18354-2-git-send-email-shawnguo@kernel.org>
+References: <1493038873-18354-1-git-send-email-shawnguo@kernel.org>
+ <1493038873-18354-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <20170428175858.uht2an5wei2ghmfs@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 23, 2017 at 06:37:44PM +0800, Icenowy Zheng wrote:
-> Allwinner "Display Engine 2.0" contains some clock controls in it.
+On Mon, Apr 24, 2017 at 09:01:12PM +0800, Shawn Guo wrote:
+> From: Shawn Guo <shawn.guo@linaro.org>
 > 
-> In order to add them as clock drivers, we need a device tree binding.
-> Add the binding here.
+> It adds device tree bindings for ZTE pin controller found on ZX2967xx
+> family SoCs.
 > 
-> Also add the device tree binding headers.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
-> Changes in v5:
-> - Moved dt-binding headers here.
-> - Changed dt-binding headers' license header to SPDX license.
-> Changes in v4:
-> - Dropped the leading 0 in clock at 1000000 .
-> Changes in v3:
-> - Fill the address space length of DE2 CCU to 0x100000, just reach the start of mixer0.
-> 
->  .../devicetree/bindings/clock/sun8i-de2.txt        | 31 ++++++++++++++++++++++
->  include/dt-bindings/clock/sun8i-de2.h              | 18 +++++++++++++
->  include/dt-bindings/reset/sun8i-de2.h              | 14 ++++++++++
->  3 files changed, 63 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
->  create mode 100644 include/dt-bindings/clock/sun8i-de2.h
->  create mode 100644 include/dt-bindings/reset/sun8i-de2.h
+>  .../devicetree/bindings/pinctrl/pinctrl-zx.txt     | 85 ++++++++++++++++++++++
+>  1 file changed, 85 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-zx.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
