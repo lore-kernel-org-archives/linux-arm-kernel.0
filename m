@@ -1,84 +1,255 @@
-From: leedom@chelsio.com (Casey Leedom)
-Date: Fri, 28 Apr 2017 18:42:36 +0000
-Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
- ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
-In-Reply-To: <1493369471.13947.11.camel@pengutronix.de>
-References: <20170401.112603.1991545644693496714.davem@davemloft.net>
- <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
- <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
- <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
- <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
- <CAKgT0Uc4L=GgYbpO-Fm9OfN+_fLypbDP1c+X4T_ta90ecQiyGQ@mail.gmail.com>
- <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>,
- <1493369471.13947.11.camel@pengutronix.de>
-Message-ID: <MWHPR12MB1600E090394DD648BC27E0FFC8130@MWHPR12MB1600.namprd12.prod.outlook.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 28 Apr 2017 11:53:49 -0700
+Subject: [PATCH 4/5] arm64: dts: Add ipq8074 SoC and MTP board support
+In-Reply-To: <1493373403-23462-5-git-send-email-varada@codeaurora.org>
+References: <1493373403-23462-1-git-send-email-varada@codeaurora.org>
+ <1493373403-23462-5-git-send-email-varada@codeaurora.org>
+Message-ID: <20170428185349.GD7065@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-| From: Lucas Stach <l.stach@pengutronix.de>
-| Sent: Friday, April 28, 2017 1:51 AM
-|     
-| Am Donnerstag, den 27.04.2017, 12:19 -0500 schrieb Bjorn Helgaas:
-| > 
-| > 
-| > I thought Relaxed Ordering was an optimization.  Are there cases where
-| > it is actually required for correct behavior?
-| 
-| Yes, at least the Tegra 2 TRM claims that RO needs to be enabled on the
-| device side for correct operation with the following language:
-| 
-| "Tegra 2 requires relaxed ordering for responses to downstream requests
-| (responses can pass writes). It is possible in some circumstances for PCIe
-| transfers from an external bus masters (i.e. upstream transfers) to become
-| blocked by a downstream read or non-posted write. The responses to these
-| downstream requests are blocked by upstream posted writes only when PCIe
-| strict ordering is imposed. It is therefore necessary to never impose strict
-| ordering that would block a response to a downstream NPW/read request and
-| always set the relaxed ordering bit to 1. Only devices that are capable of
-| relaxed ordering may be used with Tegra 2 devices."
+On 04/28, Varadarajan Narayanan wrote:
+> diff --git a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+> new file mode 100644
+> index 0000000..c150bea
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+> @@ -0,0 +1,48 @@
+> +/dts-v1/;
+> +/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include "ipq8074.dtsi"
+> +
+> +/ {
+> +	#address-cells = <0x2>;
+> +	#size-cells = <0x2>;
+> +	model = "Qualcomm Technologies, Inc. IPQ8074-HK01";
+> +	compatible = "qcom,ipq8074-hk01", "qcom,ipq8074";
+> +	interrupt-parent = <&intc>;
+> +
+> +	chosen {
+> +		bootargs = "console=ttyMSM0,115200,n8 root=/dev/ram0 rw init=/init";
 
-  (woof) Reading through the above paragraph is difficult because the author
-seems to shift language and terminology mid sentence and isn't following
-standard PCI terminology conventions.  The Root Complex is "Upstream", a
-non-Root Complex Node in the PCIe Fabric is "Downstream", Requests that a
-Downstream Device (End Point) send to the Root Complex are called "Upstream
-Requests", responses that the Root Complex send to a Device are called
-"Downstream Responses" (or, even more pedantically, "Responses sent
-Downstream for an earlier Upstream Request").
+Add an aliases node for serial0 and use a chosen node with stdout-path = "serial0" instead please.
 
-  Because a Root Complex is Upstream, but the Requests it sent Downstream,
-and Downstream Devices send their Requests Upstream, it's very important
-that we use exceedingly precise language.
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x0 0x40000000 0x0 0x20000000>;
+> +	};
+> +
+> +	soc: soc {
 
-  So, it ~sounds like~ the nVidia Tegra 2 document is talking about the need
-for Downstream Devices to echo the Relaxed Ordering Attribute in their
-Responses directed Upstream to Requests sent Downstream from the Root
-Complex.  Moreover, there's code in drivers/pci/host/pci-tegra.c:
-tegra_pcie_relax_enable() which appears to set the PCIe Capability Device
-Control[Enable Relaxed Ordering] bit on all PCIe Fabric Nodes.
+Do you need the soc label here? Please remove.
 
-  If my reading of the intent of the nVidia document is correct -- and
-that's a Big If because of the extremely imprecise language used -- that
-means that the tegra_pcie_relax_enable() is completely bogus.  The PCIe 3.0
-Specification states that Responses MUST reflect the Relaxed Ordering and No
-Snoop Attributes of the Requests for which they are responding.  Section
-2.2.9 of PCI Express(r) Base Specification Revision 3.0 November 10, 2010:
-"Completion headers must supply the same values for the Attribute as were
-supplied in the header of the corresponding Request, except as explicitly
-allowed when IDO is used."
+> +		pinctrl at 1000000 {
+> +			serial_4_pins: serial4_pinmux {
+> +				mux {
+> +					pins = "gpio23", "gpio24";
+> +					function = "blsp4_uart1";
+> +					bias-disable;
+> +				};
+> +			};
+> +		};
+> +
+> +		serial at 78b3000 {
+> +			pinctrl-0 = <&serial_4_pins>;
+> +			pinctrl-names = "default";
+> +			status = "ok";
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+> new file mode 100644
+> index 0000000..f910cc0
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+> @@ -0,0 +1,153 @@
+> +/*
+> + * Copyright (c) 2017, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/clock/qcom,gcc-ipq8074.h>
+> +
+> +/ {
+> +	model = "Qualcomm Technologies, Inc. IPQ8074";
+> +	compatible = "qcom,ipq8074";
+> +
+> +	soc: soc {
+> +		#address-cells = <0x1>;
+> +		#size-cells = <0x1>;
+> +		ranges = <0 0 0 0xffffffff>;
+> +		compatible = "simple-bus";
+> +
+> +		pinctrl at 1000000 {
+> +			compatible = "qcom,ipq8074-pinctrl";
+> +			reg = <0x1000000 0x300000>;
+> +			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
+> +			gpio-controller;
+> +			#gpio-cells = <0x2>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <0x2>;
+> +		};
+> +
+> +		intc: interrupt-controller at b000000 {
+> +			compatible = "qcom,msm-qgic2";
+> +			interrupt-controller;
+> +			#interrupt-cells = <0x3>;
+> +			reg = <0xb000000 0x1000>,
+> +			<0xb002000 0x1000>;
 
-  And, specifically, the PCIe Capability Device Control[Enable Relaxed
-Ordering] bit _only_ affects the ability of that Device to originate
-Transaction Layer Packet Requests with the Relaxed Ordering Attribute set.
-Thus, tegra_pcie_relax_enable() setting those bits on all the Downstream
-Devices (and intervening Bridges) does not _cause_ those Devices to generate
-Requests with Relaxed Ordering set.  And, if the Devices are PCIe 3.0
-compliant, it also doesn't affect the Responses that they send back Upstream
-to the Root Complex.
+Please align this up with previous reg property.
 
-  I apologize for the incredibly detailed nature of these responses, but
-it's very easy for people new to PCIe to get these things wrong and/or
-misinterpret the PCIe Specifications.
+> +		};
+> +
+> +		timer {
+> +			compatible = "arm,armv8-timer";
+> +			interrupts = <GIC_PPI 2 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +				     <GIC_PPI 3 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +				     <GIC_PPI 4 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +				     <GIC_PPI 1 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+> +		};
 
-Casey
+Is there an mmio timer as well? We should add it too.
+
+> +
+> +		gcc: gcc at 1800000 {
+> +			compatible = "qcom,gcc-ipq8074";
+> +			reg = <0x1800000 0x80000>;
+
+Wow that is a huge area! Is it really that large?
+
+> +			#clock-cells = <0x1>;
+> +			#reset-cells = <0x1>;
+> +		};
+> +
+> +		serial at 78b3000 {
+> +			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+> +			reg = <0x78b3000 0x200>;
+> +			interrupts = <GIC_SPI 308 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&gcc GCC_BLSP1_UART5_APPS_CLK>,
+> +				 <&gcc GCC_BLSP1_AHB_CLK>;
+> +			clock-names = "core", "iface";
+> +			status = "disabled";
+> +		};
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <0x1>;
+> +		#size-cells = <0x0>;
+> +
+> +		cpu-map {
+> +
+> +			cluster0 {
+> +
+> +				core0 {
+> +					cpu = <&CPU0>;
+> +				};
+> +
+> +				core1 {
+> +					cpu = <&CPU1>;
+> +				};
+> +
+> +				core2 {
+> +					cpu = <&CPU2>;
+> +				};
+> +
+> +				core3 {
+> +					cpu = <&CPU3>;
+> +				};
+> +			};
+> +		};
+
+Is this needed? Looks ok, but just curious if we need to do it
+for other arm64 platforms we support.
+
+> +
+> +		CPU0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x0>;
+> +			next-level-cache = <&L2_0>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		CPU1: cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			enable-method = "psci";
+> +			reg = <0x1>;
+> +			next-level-cache = <&L2_0>;
+> +		};
+> +
+> +		CPU2: cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			enable-method = "psci";
+> +			reg = <0x2>;
+> +			next-level-cache = <&L2_0>;
+> +		};
+> +
+> +		CPU3: cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			enable-method = "psci";
+> +			reg = <0x3>;
+> +			next-level-cache = <&L2_0>;
+> +		};
+> +
+> +		L2_0: l2-cache {
+> +			compatible = "cache";
+> +			cache-level = <0x2>;
+> +		};
+
+This should be inside some CPU? CPU0?
+
+> +	};
+
+We should be able to add the performance monitor node too?
+
+> +
+> +	psci {
+> +		compatible = "arm,psci-1.0";
+> +		method = "smc";
+> +	};
+> +
+> +	clocks {
+> +		sleep_clk: sleep_clk {
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <32000>;
+
+Not 32765 or 32768?
+
+> +			#clock-cells = <0>;
+> +		};
+> +
+> +		xo: xo {
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <19200000>;
+> +			#clock-cells = <0>;
+> +		};
+> +	};
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
