@@ -1,49 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Apr 2017 14:53:37 +0200
-Subject: [RFC/RFT PATCH 10/18] PCI: rcar: Convert PCI scan API to
- pci_scan_root_bus_bridge()
-In-Reply-To: <20170426111809.19922-11-lorenzo.pieralisi@arm.com>
-References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
- <20170426111809.19922-11-lorenzo.pieralisi@arm.com>
-Message-ID: <CAK8P3a0_VN1YoSqQ08YHcezRaKCE+2XwVpKfGjiok1qKxT+s1g@mail.gmail.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Fri, 28 Apr 2017 14:57:25 +0200
+Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
+In-Reply-To: <20170428013532.GB383@jagdpanzerIV.localdomain>
+References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+ <1461239325-22779-2-git-send-email-pmladek@suse.com>
+ <20170419131341.76bc7634@gandalf.local.home>
+ <20170420033112.GB542@jagdpanzerIV.localdomain>
+ <20170420131154.GL3452@pathway.suse.cz>
+ <20170427121458.2be577cc@gandalf.local.home>
+ <20170428013532.GB383@jagdpanzerIV.localdomain>
+Message-ID: <20170428125725.GA3452@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 1:18 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> The introduction of pci_scan_root_bus_bridge() provides a PCI core
-> API to scan a PCI root bus backed by an already initialized
-> struct pci_host_bridge object, which simplifies the bus scan
-> interface and makes the PCI scan root bus interface easier to
-> generalize as members are added to the struct pci_host_bridge().
+On Fri 2017-04-28 10:35:32, Sergey Senozhatsky wrote:
+> On (04/27/17 12:14), Steven Rostedt wrote:
+> [..]
+> > I tried this patch. It's better because I get the end of the trace, but
+> > I do lose the beginning of it:
+> > 
+> > ** 196358 printk messages dropped ** [  102.321182]     perf-5981    0.... 12983650us : d_path <-seq_path
 >
-> Convert PCI rcar host code to pci_scan_root_bus_bridge() to
-> improve the PCI root bus scanning interface.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> ---
->  drivers/pci/host/pcie-rcar.c | 28 ++++++++++++++++++----------
->  1 file changed, 18 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
-> index cb07c45..051b4db 100644
-> --- a/drivers/pci/host/pcie-rcar.c
-> +++ b/drivers/pci/host/pcie-rcar.c
-> @@ -451,27 +451,35 @@ static int rcar_pcie_enable(struct rcar_pcie *pcie)
->  {
->         struct device *dev = pcie->dev;
->         struct pci_bus *bus, *child;
-> -       LIST_HEAD(res);
-> +       struct pci_host_bridge *bridge;
-> +       int ret;
-> +
-> +       bridge = pci_alloc_host_bridge(0);
-> +       if (!bridge)
-> +               return -ENOMEM;
+> many thanks!
+> 
+> so we now drop messages from logbuf, not from per-CPU buffers. that
+> "queue printk_deferred irq_work on every online CPU when we bypass per-CPU
+> buffers from NMI" idea *probably* might help here - we need someone to emit
+> messages from the logbuf while we printk from NMI. there is still a
+> possibility that we can drop messages, though, since log_store() from NMI
+> CPU can be much-much faster than call_console_drivers() on other CPU.
 
-The pci_alloc_host_bridge() here should also be moved into
-rcare_pcie_probe(), replacing the devm_kzalloc there.
+ftrace log is dumped via trace_panic_notifier. It is done after
+smp_send_stop(). It means that only a single CPU is available and
+it is NMI context at the moment.
 
-        Arnd
+One possibility might be to put printk into a special mode and
+drop the last messages instead of the first ones. But this would
+need to be configurable.
+
+Of course, if the problem is reproducible, the easiest solution
+is to use bigger main log buffer, for example boot with
+log_buf_len=32M.
+
+Best Regards,
+Petr
