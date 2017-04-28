@@ -1,97 +1,84 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 28 Apr 2017 13:27:50 -0500
-Subject: [PATCH 1/2] reset: Add DT bindings for the Gemini reset controller
-In-Reply-To: <20170424192746.27378-1-linus.walleij@linaro.org>
-References: <20170424192746.27378-1-linus.walleij@linaro.org>
-Message-ID: <20170428182750.cs7he6lkwklsmxvl@rob-hp-laptop>
+From: leedom@chelsio.com (Casey Leedom)
+Date: Fri, 28 Apr 2017 18:42:36 +0000
+Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
+ ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+In-Reply-To: <1493369471.13947.11.camel@pengutronix.de>
+References: <20170401.112603.1991545644693496714.davem@davemloft.net>
+ <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
+ <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
+ <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
+ <a2239141-a185-1bb8-0abd-7a05b9fde015@huawei.com>
+ <CAKgT0Uc4L=GgYbpO-Fm9OfN+_fLypbDP1c+X4T_ta90ecQiyGQ@mail.gmail.com>
+ <20170427171938.GA10705@bhelgaas-glaptop.roam.corp.google.com>,
+ <1493369471.13947.11.camel@pengutronix.de>
+Message-ID: <MWHPR12MB1600E090394DD648BC27E0FFC8130@MWHPR12MB1600.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 09:27:46PM +0200, Linus Walleij wrote:
-> This is a simple reset controller in a single 32bit
-> register.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  .../bindings/reset/cortina,gemini-reset.txt        | 59 ++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/cortina,gemini-reset.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/cortina,gemini-reset.txt b/Documentation/devicetree/bindings/reset/cortina,gemini-reset.txt
-> new file mode 100644
-> index 000000000000..21aa12901774
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/cortina,gemini-reset.txt
-> @@ -0,0 +1,59 @@
-> +Cortina Gemini Reset Controller
-> +
-> +This reset controller is found in Cortina Systems CS3516 and
-> +the predecessor StorLink SL3516.
-> +
-> +Required properties:
-> +- compatible: "cortina,gemini-reset"
-> +- #reset-cells: Must be 1
-> +
-> +The Gemini reset controller must be a child node of the
-> +system controller. Apart from this it follows the standard reset
-> +controller bindings.
+| From: Lucas Stach <l.stach@pengutronix.de>
+| Sent: Friday, April 28, 2017 1:51 AM
+|     
+| Am Donnerstag, den 27.04.2017, 12:19 -0500 schrieb Bjorn Helgaas:
+| > 
+| > 
+| > I thought Relaxed Ordering was an optimization.  Are there cases where
+| > it is actually required for correct behavior?
+| 
+| Yes, at least the Tegra 2 TRM claims that RO needs to be enabled on the
+| device side for correct operation with the following language:
+| 
+| "Tegra 2 requires relaxed ordering for responses to downstream requests
+| (responses can pass writes). It is possible in some circumstances for PCIe
+| transfers from an external bus masters (i.e. upstream transfers) to become
+| blocked by a downstream read or non-posted write. The responses to these
+| downstream requests are blocked by upstream posted writes only when PCIe
+| strict ordering is imposed. It is therefore necessary to never impose strict
+| ordering that would block a response to a downstream NPW/read request and
+| always set the relaxed ordering bit to 1. Only devices that are capable of
+| relaxed ordering may be used with Tegra 2 devices."
 
-Same comment as clocks. The parent can be the provider.
+  (woof) Reading through the above paragraph is difficult because the author
+seems to shift language and terminology mid sentence and isn't following
+standard PCI terminology conventions.  The Root Complex is "Upstream", a
+non-Root Complex Node in the PCIe Fabric is "Downstream", Requests that a
+Downstream Device (End Point) send to the Root Complex are called "Upstream
+Requests", responses that the Root Complex send to a Device are called
+"Downstream Responses" (or, even more pedantically, "Responses sent
+Downstream for an earlier Upstream Request").
 
-> +
-> +Valid reset line values:
-> +
-> +0:  DRAM controller
+  Because a Root Complex is Upstream, but the Requests it sent Downstream,
+and Downstream Devices send their Requests Upstream, it's very important
+that we use exceedingly precise language.
 
-Why no header like clocks?
+  So, it ~sounds like~ the nVidia Tegra 2 document is talking about the need
+for Downstream Devices to echo the Relaxed Ordering Attribute in their
+Responses directed Upstream to Requests sent Downstream from the Root
+Complex.  Moreover, there's code in drivers/pci/host/pci-tegra.c:
+tegra_pcie_relax_enable() which appears to set the PCIe Capability Device
+Control[Enable Relaxed Ordering] bit on all PCIe Fabric Nodes.
 
-> +1:  Flash controller
-> +2:  IDE controller
-> +3:  RAID controller
-> +4:  Security module
-> +5:  GMAC0 (ethernet)
-> +6:  GMAC1 (ethernet)
-> +7:  PCI host bridge
-> +8:  USB0 USB host controller
-> +9:  USB1 USB host controller
-> +10: General DMA controller
-> +11: APB bridge
-> +12: LPC (Low Pin Count) controller
-> +13: LCD module
-> +14: Interrupt controller 0
-> +15: Interrupt controller 1
-> +16: RTC module
-> +17: Timer module
-> +18: UART controller
-> +19: SSP controller
-> +20: GPIO0 GPIO controller
-> +21: GPIO1 GPIO controller
-> +22: GPIO2 GPIO controller
-> +23: Watchdog timer
-> +24: External device reset
-> +25: CIR module (infrared)
-> +26: SATA0 SATA bridge
-> +27: SATA1 SATA bridge
-> +28: TVE TV Encoder module
-> +29: Reserved
-> +30: CPU1 reset
-> +31: Global soft reset
-> +
-> +Example:
-> +
-> +syscon: syscon at 40000000 {
-> +	compatible = "cortina,gemini-syscon", "syscon", "simple-mfd";
-> +	reg = <0x40000000 0x1000>;
-> +
-> +	reset-controller {
-> +		compatible = "cortina,gemini-reset";
-> +		#reset-cells = <1>;
-> +	};
-> +};
-> -- 
-> 2.9.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+  If my reading of the intent of the nVidia document is correct -- and
+that's a Big If because of the extremely imprecise language used -- that
+means that the tegra_pcie_relax_enable() is completely bogus.  The PCIe 3.0
+Specification states that Responses MUST reflect the Relaxed Ordering and No
+Snoop Attributes of the Requests for which they are responding.  Section
+2.2.9 of PCI Express(r) Base Specification Revision 3.0 November 10, 2010:
+"Completion headers must supply the same values for the Attribute as were
+supplied in the header of the corresponding Request, except as explicitly
+allowed when IDO is used."
+
+  And, specifically, the PCIe Capability Device Control[Enable Relaxed
+Ordering] bit _only_ affects the ability of that Device to originate
+Transaction Layer Packet Requests with the Relaxed Ordering Attribute set.
+Thus, tegra_pcie_relax_enable() setting those bits on all the Downstream
+Devices (and intervening Bridges) does not _cause_ those Devices to generate
+Requests with Relaxed Ordering set.  And, if the Devices are PCIe 3.0
+compliant, it also doesn't affect the Responses that they send back Upstream
+to the Root Complex.
+
+  I apologize for the incredibly detailed nature of these responses, but
+it's very easy for people new to PCIe to get these things wrong and/or
+misinterpret the PCIe Specifications.
+
+Casey
