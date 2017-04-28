@@ -1,50 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Apr 2017 18:20:43 +0100
-Subject: [PATCH v2 4/4] perf vendor events arm64: Add implementation
- defined pmu core events of ThunderX2
-In-Reply-To: <1493355227-31492-5-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1493355227-31492-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1493355227-31492-5-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20170428172043.GD13675@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 28 Apr 2017 18:30:45 +0100
+Subject: [PATCH] arm64: Print DT machine model in setup_machine_fdt()
+In-Reply-To: <20170428165232.GZ13675@arm.com>
+References: <1493296385-14140-1-git-send-email-geert+renesas@glider.be>
+ <20170428145730.GS13675@arm.com>
+ <CAMuHMdVHMcY5iy3gsYUOJLhYnMECh4yu-5pZJHXNxJhBp6+TOQ@mail.gmail.com>
+ <20170428165232.GZ13675@arm.com>
+Message-ID: <7b593509-a0de-8493-051d-8b7e3118f551@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 10:23:47AM +0530, Ganapatrao Kulkarni wrote:
-> This is not a full event list, but a short list of useful events.
+
+
+On 28/04/17 17:52, Will Deacon wrote:
+> On Fri, Apr 28, 2017 at 06:16:46PM +0200, Geert Uytterhoeven wrote:
+>> On Fri, Apr 28, 2017 at 4:57 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>> On Thu, Apr 27, 2017 at 02:33:05PM +0200, Geert Uytterhoeven wrote:
+>>>> On arm32, the machine model specified in the device tree is printed
+>>>> during boot-up, courtesy of of_flat_dt_match_machine().
+>>>>
+>>>> On arm64, of_flat_dt_match_machine() is not called, and the machine
+>>>> model information is not available from the kernel log.
+>>>>
+>>>> Print the machine model to make it easier to derive the machine model
+>>>> from an arbitrary kernel boot log.
+>>>>
+>>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>>> ---
+>>>> I have scripts to save kernel boot logs, and compare logs[*] for
+>>>> subsequent boots on the same machine.  Having a way to extract the
+>>>> machine model from an arbitrary kernel boot log makes this easier.
+>>
+>>> I think your use-case is slightly questionable (e.g. for ACPI, we print
+>>> something different, and this isn't generally considered to be ABI), but
+>>> the patch is harmless and if you find it useful then:
+>>
+>> Not having access to an ARM ACPI system, what does it print for example?
 > 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 14 +++++
->  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
->  2 files changed, 76 insertions(+)
->  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
->  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+> It's supposed to print out some stuff from DMI, but my Juno just says:
 > 
-> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-> new file mode 100644
-> index 0000000..bc9f798
-> --- /dev/null
-> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-> @@ -0,0 +1,14 @@
-> +# Format:
-> +#	MIDR,Version,JSON/file/pathname,Type
-> +#
-> +# where
-> +#	MIDR	Processor version
-> +#	Version could be used to track version of of JSON file
-> +#		but currently unused.
-> +#	JSON/file/pathname is the path to JSON file, relative
-> +#		to tools/perf/pmu-events/arch/arm64/.
-> +#	Type is core, uncore etc
-> +#
-> +#
-> +#Family-model,Version,Filename,EventType
-> +0x00000000420f5161,v1,thunderx2,core
+>   DMI not present or invalid.
+> 
 
-In general, I don't think we want to require an exact match on the whole
-MIDR here. Specifically, we'd want to mask out the Variant and Revision
-fields for ARM CPUs, to avoid having to update the mapfile all the time.
+With latest firmware, I get something like:
 
-Is it possible to support wildcarding in the MIDR match?
+DMI: ARM LTD ARM Juno Development Platform/ARM Juno Development
+Platform, BIOS EDK II ...
 
-Will
+-- 
+Regards,
+Sudeep
