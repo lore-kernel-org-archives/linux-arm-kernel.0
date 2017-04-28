@@ -1,119 +1,83 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 28 Apr 2017 08:40:54 -0700
-Subject: arm64: next-20170428 hangs on boot
-In-Reply-To: <20170428150931.iyoewmc5qs55aw3t@yury-N73SV>
-References: <20170428132429.c3dlxbmt7iqs2isl@yury-N73SV>
- <20170428145233.GB5292@leverpostej>
- <20170428150931.iyoewmc5qs55aw3t@yury-N73SV>
-Message-ID: <e65b3ec3-790d-da96-9e1f-3d344f65517b@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Apr 2017 16:44:16 +0100
+Subject: [PATCH 3/3] arm64/locking: qspinlocks and qrwlocks support
+In-Reply-To: <20170426123947.ogap6xgg7xc5wsd4@yury-N73SV>
+References: <1491860104-4103-1-git-send-email-ynorov@caviumnetworks.com>
+ <1491860104-4103-4-git-send-email-ynorov@caviumnetworks.com>
+ <20170413181212.y3ezah76qoztxhnn@hirez.programming.kicks-ass.net>
+ <20170420182318.4ddtfiobxz6hgbo4@yury-N73SV>
+ <20170420190530.GA6873@worktop>
+ <20170426123947.ogap6xgg7xc5wsd4@yury-N73SV>
+Message-ID: <20170428154416.GW13675@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2017 08:09 AM, Yury Norov wrote:
-> On Fri, Apr 28, 2017 at 03:52:34PM +0100, Mark Rutland wrote:
->> On Fri, Apr 28, 2017 at 04:24:29PM +0300, Yury Norov wrote:
->>> Hi all,
->>
->> Hi,
->>
->> [adding Dave Miller, netdev, lkml]
+On Wed, Apr 26, 2017 at 03:39:47PM +0300, Yury Norov wrote:
+> On Thu, Apr 20, 2017 at 09:05:30PM +0200, Peter Zijlstra wrote:
+> > On Thu, Apr 20, 2017 at 09:23:18PM +0300, Yury Norov wrote:
+> > > Is there some test to reproduce the locking failure for the case.
+> > 
+> > Possibly sysvsem stress before commit:
+> > 
+> >   27d7be1801a4 ("ipc/sem.c: avoid using spin_unlock_wait()")
+> > 
+> > Although a similar scheme is also used in nf_conntrack, see commit:
+> > 
+> >   b316ff783d17 ("locking/spinlock, netfilter: Fix nf_conntrack_lock() barriers")
+> > 
+> > > I
+> > > ask because I run loctorture for many hours on my qemu (emulating
+> > > cortex-a57), and I see no failures in the test reports. And Jan did it
+> > > on ThunderX, and Adam on QDF2400 without any problems. So even if I
+> > > rework those functions, how could I check them for correctness?
+> > 
+> > Running them doesn't prove them correct. Memory ordering bugs have been
+> > in the kernel for many years without 'ever' triggering. This is stuff
+> > you have to think about.
+> > 
+> > > Anyway, regarding the queued_spin_unlock_wait(), is my understanding
+> > > correct that you assume adding smp_mb() before entering the for(;;)
+> > > cycle, and using ldaxr/strxr instead of atomic_read()?
+> > 
+> > You'll have to ask Will, I always forget the arm64 details.
 > 
-> thanks
+> So, below is what I have. For queued_spin_unlock_wait() the generated
+> code is looking like this:
+> ffff0000080983a0 <queued_spin_unlock_wait>:
+> ffff0000080983a0:       d5033bbf        dmb     ish
+> ffff0000080983a4:       b9400007        ldr     w7, [x0]
+> ffff0000080983a8:       350000c7        cbnz    w7, ffff0000080983c0 <queued_spin_unlock_wait+0x20>
+> ffff0000080983ac:       1400000e        b       ffff0000080983e4 <queued_spin_unlock_wait+0x44>
+> ffff0000080983b0:       d503203f        yield
+> ffff0000080983b4:       d5033bbf        dmb     ish
+> ffff0000080983b8:       b9400007        ldr     w7, [x0]
+> ffff0000080983bc:       34000147        cbz     w7, ffff0000080983e4 <queued_spin_unlock_wait+0x44>
+> ffff0000080983c0:       f2401cff        tst     x7, #0xff
+> ffff0000080983c4:       54ffff60        b.eq    ffff0000080983b0 <queued_spin_unlock_wait+0x10>
+> ffff0000080983c8:       14000003        b       ffff0000080983d4 <queued_spin_unlock_wait+0x34>
+> ffff0000080983cc:       d503201f        nop
+> ffff0000080983d0:       d503203f        yield
+> ffff0000080983d4:       d5033bbf        dmb     ish
+> ffff0000080983d8:       b9400007        ldr     w7, [x0]
+> ffff0000080983dc:       f2401cff        tst     x7, #0xff
+> ffff0000080983e0:       54ffff81        b.ne    ffff0000080983d0 <queued_spin_unlock_wait+0x30>
+> ffff0000080983e4:       d50339bf        dmb     ishld
+> ffff0000080983e8:       d65f03c0        ret
+> ffff0000080983ec:       d503201f        nop
 > 
->>> On QEMU the next-20170428 hangs on boot for me due to kernel panic in 
->>> rtnetlink_init():
->>>
->>> void __init rtnetlink_init(void)
->>> {
->>>         if (register_pernet_subsys(&rtnetlink_net_ops))
->>>                 panic("rtnetlink_init: cannot initialize rtnetlink\n");
->>>
->>>         ...
->>> }
->>
->> I see the same thing with a next-20170428 arm64 defconfig, on a Juno R1
->> system:
->>
->> [    0.531949] Kernel panic - not syncing: rtnetlink_init: cannot initialize rtnetlink
->> [    0.531949] 
->> [    0.541271] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.11.0-rc8-next-20170428-00002-g6ee3799 #10
->> [    0.550307] Hardware name: ARM Juno development board (r1) (DT)
->> [    0.556332] Call trace:
->> [    0.558833] [<ffff000008088538>] dump_backtrace+0x0/0x238
->> [    0.564332] [<ffff000008088834>] show_stack+0x14/0x20
->> [    0.569477] [<ffff00000839dd54>] dump_stack+0x9c/0xc0
->> [    0.574622] [<ffff000008175344>] panic+0x11c/0x28c
->> [    0.579505] [<ffff000008d80034>] rtnetlink_init+0x2c/0x1d0
->> [    0.585092] [<ffff000008d8047c>] netlink_proto_init+0x14c/0x17c
->> [    0.591119] [<ffff000008083150>] do_one_initcall+0x38/0x120
->> [    0.596796] [<ffff000008d30d00>] kernel_init_freeable+0x1a0/0x240
->> [    0.603003] [<ffff00000892a790>] kernel_init+0x10/0x100
->> [    0.608324] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
->> [    0.613736] SMP: stopping secondary CPUs
->> [    0.617738] ---[ end Kernel panic - not syncing: rtnetlink_init: cannot initialize rtnetlink
->>
->> If this isn't a known issue, it would be worth trying to bisect this.
+> If I understand the documentation correctly, it's enough to check the lock
+> properly. If not - please give me the clue. Will?
 
-It's fixed already by this commit in net-next:
+Sorry, but I haven't had time to page this back in recently, so I can't give
+you an answer straight off the bat. I'll need to go back and revisit the
+qspinlock parts and, in particular, use of WFE before I'm comfortable with
+this. I also don't want this on by default for the arm64 kernel, and I'd
+like to see numbers comparing with our ticket locks on silicon with and
+without the large system extensions, for low (<=8), medium (8-32) and high
+(>32) core counts.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git/commit/?id=2d2ab658d2debcb4c0e29c9e6f18e5683f3077bf
+I'm very nervous about switching our locking implementation over to
+something that's largely been developed and tested for x86, which has a
+stronger memory model.
 
-> 
-> The exact function that fails is: 
-> include/linux/rhashtable.h
-> static inline void *__rhashtable_insert_fast(
->         struct rhashtable *ht, const void *key, struct rhash_head *obj,
->         const struct rhashtable_params params, bool rhlist)
-> {
->         ...
-> 
->         data = ERR_PTR(-E2BIG);
->         if (unlikely(rht_grow_above_max(ht, tbl)))
->                goto out;
->         ...
-> 
-> out:
->         spin_unlock_bh(lock);
->         rcu_read_unlock();
-> 
->         return data;
-> }
-> 
-> And the backtrace:
-> #0  __rhashtable_insert_fast (rhlist=<optimized out>, params=..., obj=<optimized out>, 
->     key=<optimized out>, ht=<optimized out>) at ./include/linux/rhashtable.h:803
-> #1  rhashtable_lookup_insert_key (params=..., obj=<optimized out>, key=<optimized out>, 
->     ht=<optimized out>) at ./include/linux/rhashtable.h:980
-> #2  __netlink_insert (sk=<optimized out>, table=<optimized out>) at net/netlink/af_netlink.c:484
-> #3  netlink_insert (sk=0xffff80003da85000, portid=0) at net/netlink/af_netlink.c:548
-> #4  0xffff00000876c5a0 in __netlink_kernel_create (net=<optimized out>, unit=0, module=0x0, 
->     cfg=0xffff80003d84fc60) at net/netlink/af_netlink.c:1996
-> #5  0xffff000008756704 in netlink_kernel_create (cfg=<optimized out>, unit=<optimized out>, 
->     net=<optimized out>) at ./include/linux/netlink.h:62
-> #6  rtnetlink_net_init (net=0xffff000008c7c100 <init_net>) at net/core/rtnetlink.c:4175
-> #7  0xffff000008737a2c in ops_init (ops=0xffff000008c7e268 <rtnetlink_net_ops>, 
->     net=0xffff000008c7c100 <init_net>) at net/core/net_namespace.c:117
-> #8  0xffff000008738704 in __register_pernet_operations (ops=<optimized out>,
->     list=<optimized out>) at net/core/net_namespace.c:818
-> #9  register_pernet_operations (list=<optimized out>, ops=0xffff000008c7e268
->     <rtnetlink_net_ops>) at net/core/net_namespace.c:892
-> #10 0xffff0000087387fc in register_pernet_subsys (ops=0xffff000008c7e268
->     <rtnetlink_net_ops>) at net/core/net_namespace.c:934
-> #11 0xffff000008b5b9b8 in rtnetlink_init () at net/core/rtnetlink.c:4195
-> #12 0xffff000008b5be08 in netlink_proto_init () at net/netlink/af_netlink.c:2730
-> #13 0xffff000008083158 in do_one_initcall (fn=0xffff000008b5bcc4 <netlink_proto_init>) at init/main.c:795
-> #14 0xffff000008b20d04 in do_initcall_level (level=<optimized out>) at init/main.c:861
-> #15 do_initcalls () at init/main.c:869
-> #16 do_basic_setup () at init/main.c:887
-> 
-> Yury
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-
--- 
-Florian
+Will
