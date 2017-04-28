@@ -1,52 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Apr 2017 17:38:23 +0100
-Subject: [PATCH v2] arm64: perf: Use only exclude_kernel attribute when
- kernel is running in HYP
-In-Reply-To: <20170428134623.GA85316@localhost>
-References: <CAFpQJXVSsg8CX28vEo2LzmOi3pknHiH233spMD6ip4LZO4vw=Q@mail.gmail.com>
- <20170424154530.GO12323@arm.com>
- <CAFpQJXWX=0GQ5hse4E_OSdnYhMOA7CvqeoHe9AdMsyoZJmrPQQ@mail.gmail.com>
- <20170425165259.GS24484@arm.com>
- <CA+7sy7D-ZB84xQ2pE-io1v7pmnAuWUszh1B=Zq+Ezup=sysQ2g@mail.gmail.com>
- <CY4PR07MB3415C0CEBB9D3DF0C249DC6793110@CY4PR07MB3415.namprd07.prod.outlook.com>
- <20170426101021.GF21744@arm.com> <20170426134141.GA6417@localhost>
- <20170427173758.GN1890@arm.com> <20170428134623.GA85316@localhost>
-Message-ID: <20170428163823.GX13675@arm.com>
+Date: Fri, 28 Apr 2017 17:52:32 +0100
+Subject: [PATCH] arm64: Print DT machine model in setup_machine_fdt()
+In-Reply-To: <CAMuHMdVHMcY5iy3gsYUOJLhYnMECh4yu-5pZJHXNxJhBp6+TOQ@mail.gmail.com>
+References: <1493296385-14140-1-git-send-email-geert+renesas@glider.be>
+ <20170428145730.GS13675@arm.com>
+ <CAMuHMdVHMcY5iy3gsYUOJLhYnMECh4yu-5pZJHXNxJhBp6+TOQ@mail.gmail.com>
+Message-ID: <20170428165232.GZ13675@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
-
-On Fri, Apr 28, 2017 at 01:46:24PM +0000, Jayachandran C wrote:
-> On Thu, Apr 27, 2017 at 06:37:59PM +0100, Will Deacon wrote:
-> > > If my understanding is correct, the sysfs suggestion above is going to
-> > > add API complexity without solving the issue. Ignoring the exclude_hv if
-> > > it cannot be honored would be a better solution.
-> > 
-> > Better for HHVM, sure, but I don't think it's better in general. It means
-> > that we silently do the opposite of what the user has requested in some
-> > configurations.
+On Fri, Apr 28, 2017 at 06:16:46PM +0200, Geert Uytterhoeven wrote:
+> On Fri, Apr 28, 2017 at 4:57 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Apr 27, 2017 at 02:33:05PM +0200, Geert Uytterhoeven wrote:
+> >> On arm32, the machine model specified in the device tree is printed
+> >> during boot-up, courtesy of of_flat_dt_match_machine().
+> >>
+> >> On arm64, of_flat_dt_match_machine() is not called, and the machine
+> >> model information is not available from the kernel log.
+> >>
+> >> Print the machine model to make it easier to derive the machine model
+> >> from an arbitrary kernel boot log.
+> >>
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> ---
+> >> I have scripts to save kernel boot logs, and compare logs[*] for
+> >> subsequent boots on the same machine.  Having a way to extract the
+> >> machine model from an arbitrary kernel boot log makes this easier.
 > 
-> If my understanding is correct, when is_kernel_in_hyp_mode() is true,
-> the kernel is in EL2 and there is no real hypervisor with hvc calls
-> from kernel. Ignoring the exclude_hv would be correct.
+> > I think your use-case is slightly questionable (e.g. for ACPI, we print
+> > something different, and this isn't generally considered to be ABI), but
+> > the patch is harmless and if you find it useful then:
 > 
-> When kernel is in EL1, it would be correct to consider exclude_hv to
-> skip events in EL2 (reached with hvc).
-> 
-> I don't see the issue, can you please give more detail on the config
-> with unexpected behavior?
+> Not having access to an ARM ACPI system, what does it print for example?
 
-This got me thinking, so I tried to look at the history of exclude_hv. It
-turns out it was added in 0475f9ea8e2c ("perf_counters: allow users to
-count user, kernel and/or hypervisor events") for PowerPC, not x86 (where
-this doesn't seem to be supported).
+It's supposed to print out some stuff from DMI, but my Juno just says:
 
-Notably, it looks like it's always ignored for the x86 CPU PMU, and ignored
-on PowerPC when a hypervisor is not present. I think that backs up your
-suggestion that we should ignore it when is_kernel_in_hyp_mode() is true.
+  DMI not present or invalid.
 
-In which case, I withdraw my objection to ignoring exclude_hv when running
-in hyp mode, but please add a comment explaining the rationale!
+Luckily, it's not really an issue because I don't get to a prompt after USB
+fails to come up and it times out mounting the rootfs.
 
 Will
