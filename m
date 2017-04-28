@@ -1,332 +1,343 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Fri, 28 Apr 2017 04:50:30 -0500
-Subject: [PATCH v3 5/9] staging: fsl-dpaa2/eth: Add ethtool support
+Date: Fri, 28 Apr 2017 04:50:31 -0500
+Subject: [PATCH v3 6/9] staging: fsl-dpaa2/eth: Add driver specific stats
 In-Reply-To: <20170428095034.8842-1-ruxandra.radulescu@nxp.com>
 References: <20170428095034.8842-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170428095034.8842-6-ruxandra.radulescu@nxp.com>
+Message-ID: <20170428095034.8842-7-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for several ethtool operations: show hardware statistics,
-get/set link settings, get hash configuration.
+Add custom statistics to be reported via ethtool -S. These include
+driver specific per-cpu statistics as well as queue and channel
+counters.
 
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
-Signed-off-by: Bogdan Hamciuc <bogdan.hamciuc@nxp.com>
 ---
 v3: no changes
 v2: no changes
 
- drivers/staging/fsl-dpaa2/ethernet/Makefile        |   2 +-
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |   6 +
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h     |   6 +
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c | 234 +++++++++++++++++++++
- 4 files changed, 247 insertions(+), 1 deletion(-)
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     | 42 ++++++++++++++++++-
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h     | 36 ++++++++++++++++
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c | 49 +++++++++++++++++++++-
+ 3 files changed, 123 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/Makefile b/drivers/staging/fsl-dpaa2/ethernet/Makefile
-index 4897d39a1c21..4327ebe803cb 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/Makefile
-+++ b/drivers/staging/fsl-dpaa2/ethernet/Makefile
-@@ -4,4 +4,4 @@
- 
- obj-$(CONFIG_FSL_DPAA2_ETH) += fsl-dpaa2-eth.o
- 
--fsl-dpaa2-eth-objs    := dpaa2-eth.o dpni.o
-+fsl-dpaa2-eth-objs    := dpaa2-eth.o dpaa2-ethtool.o dpni.o
 diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index abd700e57aeb..f13f72f3dd9a 100644
+index f13f72f3dd9a..67f007bdbe79 100644
 --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
 +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -46,6 +46,8 @@ MODULE_LICENSE("Dual BSD/GPL");
- MODULE_AUTHOR("Freescale Semiconductor, Inc");
- MODULE_DESCRIPTION("Freescale DPAA2 Ethernet Driver");
+@@ -208,6 +208,7 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
+ 	void *vaddr;
+ 	struct sk_buff *skb;
+ 	struct rtnl_link_stats64 *percpu_stats;
++	struct dpaa2_eth_drv_stats *percpu_extras;
+ 	struct device *dev = priv->net_dev->dev.parent;
+ 	struct dpaa2_fas *fas;
+ 	u32 status = 0;
+@@ -219,6 +220,7 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
+ 	prefetch(vaddr + dpaa2_fd_get_offset(fd));
  
-+const char dpaa2_eth_drv_version[] = "0.1";
+ 	percpu_stats = this_cpu_ptr(priv->percpu_stats);
++	percpu_extras = this_cpu_ptr(priv->percpu_extras);
+ 
+ 	if (fd_format == dpaa2_fd_single) {
+ 		skb = build_linear_skb(priv, ch, fd, vaddr);
+@@ -227,6 +229,8 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
+ 				vaddr + dpaa2_fd_get_offset(fd);
+ 		skb = build_frag_skb(priv, ch, sgt);
+ 		skb_free_frag(vaddr);
++		percpu_extras->rx_sg_frames++;
++		percpu_extras->rx_sg_bytes += dpaa2_fd_get_len(fd);
+ 	} else {
+ 		/* We don't support any other format */
+ 		goto err_frame_format;
+@@ -291,6 +295,7 @@ static int consume_frames(struct dpaa2_eth_channel *ch)
+ 
+ 		fd = dpaa2_dq_fd(dq);
+ 		fq = (struct dpaa2_eth_fq *)dpaa2_dq_fqd_ctx(dq);
++		fq->stats.frames++;
+ 
+ 		fq->consume(priv, ch, fd, &ch->napi);
+ 		cleaned++;
+@@ -532,11 +537,13 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
+ 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
+ 	struct dpaa2_fd fd;
+ 	struct rtnl_link_stats64 *percpu_stats;
++	struct dpaa2_eth_drv_stats *percpu_extras;
+ 	struct dpaa2_eth_fq *fq;
+ 	u16 queue_mapping;
+ 	int err, i;
+ 
+ 	percpu_stats = this_cpu_ptr(priv->percpu_stats);
++	percpu_extras = this_cpu_ptr(priv->percpu_extras);
+ 
+ 	if (unlikely(skb_headroom(skb) < DPAA2_ETH_NEEDED_HEADROOM(priv))) {
+ 		struct sk_buff *ns;
+@@ -563,10 +570,14 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
+ 	/* Setup the FD fields */
+ 	memset(&fd, 0, sizeof(fd));
+ 
+-	if (skb_is_nonlinear(skb))
++	if (skb_is_nonlinear(skb)) {
+ 		err = build_sg_fd(priv, skb, &fd);
+-	else
++		percpu_extras->tx_sg_frames++;
++		percpu_extras->tx_sg_bytes += skb->len;
++	} else {
+ 		err = build_single_fd(priv, skb, &fd);
++	}
 +
- static void validate_rx_csum(struct dpaa2_eth_priv *priv,
- 			     u32 fd_status,
- 			     struct sk_buff *skb)
-@@ -1929,6 +1931,8 @@ int dpaa2_eth_set_hash(struct net_device *net_dev, u64 flags)
- 		key->extract.from_hdr.type = DPKG_FULL_FIELD;
- 		key->extract.from_hdr.field = hash_fields[i].cls_field;
- 		cls_cfg.num_extracts++;
+ 	if (unlikely(err)) {
+ 		percpu_stats->tx_dropped++;
+ 		goto err_build_fd;
+@@ -583,6 +594,7 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
+ 		if (err != -EBUSY)
+ 			break;
+ 	}
++	percpu_extras->tx_portal_busy += i;
+ 	if (unlikely(err < 0)) {
+ 		percpu_stats->tx_errors++;
+ 		/* Clean up everything, including freeing the skb */
+@@ -608,8 +620,13 @@ static void dpaa2_eth_tx_conf(struct dpaa2_eth_priv *priv,
+ 			      struct napi_struct *napi __always_unused)
+ {
+ 	struct rtnl_link_stats64 *percpu_stats;
++	struct dpaa2_eth_drv_stats *percpu_extras;
+ 	u32 status = 0;
+ 
++	percpu_extras = this_cpu_ptr(priv->percpu_extras);
++	percpu_extras->tx_conf_frames++;
++	percpu_extras->tx_conf_bytes += dpaa2_fd_get_len(fd);
 +
-+		priv->rx_hash_fields |= hash_fields[i].rxnfc_field;
+ 	free_tx_fd(priv, fd, &status);
+ 
+ 	if (unlikely(status & DPAA2_ETH_TXCONF_ERR_MASK)) {
+@@ -814,13 +831,19 @@ static int refill_pool(struct dpaa2_eth_priv *priv,
+ static int pull_channel(struct dpaa2_eth_channel *ch)
+ {
+ 	int err;
++	int dequeues = -1;
+ 
+ 	/* Retry while portal is busy */
+ 	do {
+ 		err = dpaa2_io_service_pull_channel(NULL, ch->ch_id, ch->store);
++		dequeues++;
+ 		cpu_relax();
+ 	} while (err == -EBUSY);
+ 
++	ch->stats.dequeue_portal_busy += dequeues;
++	if (unlikely(err))
++		ch->stats.pull_err++;
++
+ 	return err;
+ }
+ 
+@@ -868,6 +891,8 @@ static int dpaa2_eth_poll(struct napi_struct *napi, int budget)
+ 		} while (err == -EBUSY);
  	}
  
- 	dma_mem = kzalloc(DPAA2_CLASSIFIER_DMA_SIZE, GFP_DMA | GFP_KERNEL);
-@@ -2360,6 +2364,8 @@ static int dpaa2_eth_probe(struct fsl_mc_device *dpni_dev)
- 	if (err)
- 		goto err_alloc_rings;
- 
-+	net_dev->ethtool_ops = &dpaa2_ethtool_ops;
++	ch->stats.frames += cleaned;
 +
- 	err = setup_irqs(dpni_dev);
- 	if (err) {
- 		netdev_warn(net_dev, "Failed to set link interrupt, fall back to polling\n");
+ 	return cleaned;
+ }
+ 
+@@ -1320,6 +1345,10 @@ static void cdan_cb(struct dpaa2_io_notification_ctx *ctx)
+ 	struct dpaa2_eth_channel *ch;
+ 
+ 	ch = container_of(ctx, struct dpaa2_eth_channel, nctx);
++
++	/* Update NAPI statistics */
++	ch->stats.cdan++;
++
+ 	napi_schedule_irqoff(&ch->napi);
+ }
+ 
+@@ -2345,6 +2374,12 @@ static int dpaa2_eth_probe(struct fsl_mc_device *dpni_dev)
+ 		err = -ENOMEM;
+ 		goto err_alloc_percpu_stats;
+ 	}
++	priv->percpu_extras = alloc_percpu(*priv->percpu_extras);
++	if (!priv->percpu_extras) {
++		dev_err(dev, "alloc_percpu(percpu_extras) failed\n");
++		err = -ENOMEM;
++		goto err_alloc_percpu_extras;
++	}
+ 
+ 	err = netdev_init(net_dev);
+ 	if (err)
+@@ -2387,6 +2422,8 @@ static int dpaa2_eth_probe(struct fsl_mc_device *dpni_dev)
+ err_csum:
+ 	unregister_netdev(net_dev);
+ err_netdev_init:
++	free_percpu(priv->percpu_extras);
++err_alloc_percpu_extras:
+ 	free_percpu(priv->percpu_stats);
+ err_alloc_percpu_stats:
+ 	del_ch_napi(priv);
+@@ -2425,6 +2462,7 @@ static int dpaa2_eth_remove(struct fsl_mc_device *ls_dev)
+ 
+ 	free_rings(priv);
+ 	free_percpu(priv->percpu_stats);
++	free_percpu(priv->percpu_extras);
+ 
+ 	del_ch_napi(priv);
+ 	free_dpbp(priv);
 diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-index 7b194a47df2f..b30231891eef 100644
+index b30231891eef..f2b0a60795fe 100644
 --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
 +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-@@ -281,6 +281,9 @@ struct dpaa2_eth_priv {
- 	struct dpni_link_state link_state;
- 	bool do_link_poll;
- 	struct task_struct *poll_thread;
+@@ -197,6 +197,38 @@ struct dpaa2_fas {
+  */
+ #define DPAA2_ETH_ENQUEUE_RETRIES	10
+ 
++/* Driver statistics, other than those in struct rtnl_link_stats64.
++ * These are usually collected per-CPU and aggregated by ethtool.
++ */
++struct dpaa2_eth_drv_stats {
++	__u64	tx_conf_frames;
++	__u64	tx_conf_bytes;
++	__u64	tx_sg_frames;
++	__u64	tx_sg_bytes;
++	__u64	rx_sg_frames;
++	__u64	rx_sg_bytes;
++	/* Enqueues retried due to portal busy */
++	__u64	tx_portal_busy;
++};
 +
-+	/* enabled ethtool hashing bits */
-+	u64 rx_hash_fields;
++/* Per-FQ statistics */
++struct dpaa2_eth_fq_stats {
++	/* Number of frames received on this queue */
++	__u64 frames;
++};
++
++/* Per-channel statistics */
++struct dpaa2_eth_ch_stats {
++	/* Volatile dequeues retried due to portal busy */
++	__u64 dequeue_portal_busy;
++	/* Number of CDANs; useful to estimate avg NAPI len */
++	__u64 cdan;
++	/* Number of frames received on queues from this channel */
++	__u64 frames;
++	/* Pull errors */
++	__u64 pull_err;
++};
++
+ /* Maximum number of queues associated with a DPNI */
+ #define DPAA2_ETH_MAX_RX_QUEUES		16
+ #define DPAA2_ETH_MAX_TX_QUEUES		NR_CPUS
+@@ -224,6 +256,7 @@ struct dpaa2_eth_fq {
+ 			struct dpaa2_eth_channel *,
+ 			const struct dpaa2_fd *,
+ 			struct napi_struct *);
++	struct dpaa2_eth_fq_stats stats;
  };
  
- /* default Rx hash options, set during probing */
-@@ -294,6 +297,9 @@ struct dpaa2_eth_priv {
- /* Required by struct dpni_rx_tc_dist_cfg::key_cfg_iova */
- #define DPAA2_CLASSIFIER_DMA_SIZE 256
+ struct dpaa2_eth_channel {
+@@ -236,6 +269,7 @@ struct dpaa2_eth_channel {
+ 	struct dpaa2_io_store *store;
+ 	struct dpaa2_eth_priv *priv;
+ 	int buf_count;
++	struct dpaa2_eth_ch_stats stats;
+ };
  
-+extern const struct ethtool_ops dpaa2_ethtool_ops;
-+extern const char dpaa2_eth_drv_version[];
-+
- int dpaa2_eth_set_hash(struct net_device *net_dev, u64 flags);
+ struct dpaa2_eth_hash_fields {
+@@ -275,6 +309,8 @@ struct dpaa2_eth_priv {
  
- static int dpaa2_eth_queue_count(struct dpaa2_eth_priv *priv)
+ 	/* Standard statistics */
+ 	struct rtnl_link_stats64 __percpu *percpu_stats;
++	/* Extra stats, in addition to the ones known by the kernel */
++	struct dpaa2_eth_drv_stats __percpu *percpu_extras;
+ 
+ 	u16 mc_token;
+ 
 diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
-new file mode 100644
-index 000000000000..4378956a5527
---- /dev/null
+index 4378956a5527..dd0cffa908ef 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
 +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
-@@ -0,0 +1,234 @@
-+/* Copyright 2014-2016 Freescale Semiconductor Inc.
-+ * Copyright 2016 NXP
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions are met:
-+ *     * Redistributions of source code must retain the above copyright
-+ *	 notice, this list of conditions and the following disclaimer.
-+ *     * Redistributions in binary form must reproduce the above copyright
-+ *	 notice, this list of conditions and the following disclaimer in the
-+ *	 documentation and/or other materials provided with the distribution.
-+ *     * Neither the name of Freescale Semiconductor nor the
-+ *	 names of its contributors may be used to endorse or promote products
-+ *	 derived from this software without specific prior written permission.
-+ *
-+ *
-+ * ALTERNATIVELY, this software may be distributed under the terms of the
-+ * GNU General Public License ("GPL") as published by the Free Software
-+ * Foundation, either version 2 of that License or (at your option) any
-+ * later version.
-+ *
-+ * THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor ``AS IS'' AND ANY
-+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-+ * DISCLAIMED. IN NO EVENT SHALL Freescale Semiconductor BE LIABLE FOR ANY
-+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+#include "dpni.h"	/* DPNI_LINK_OPT_* */
-+#include "dpaa2-eth.h"
-+
-+/* To be kept in sync with DPNI statistics */
-+char dpaa2_ethtool_stats[][ETH_GSTRING_LEN] = {
-+	"rx frames",
-+	"rx bytes",
-+	"rx mcast frames",
-+	"rx mcast bytes",
-+	"rx bcast frames",
-+	"rx bcast bytes",
-+	"tx frames",
-+	"tx bytes",
-+	"tx mcast frames",
-+	"tx mcast bytes",
-+	"tx bcast frames",
-+	"tx bcast bytes",
-+	"rx filtered frames",
-+	"rx discarded frames",
-+	"rx nobuffer discards",
-+	"tx discarded frames",
-+	"tx confirmed frames",
+@@ -56,6 +56,23 @@ char dpaa2_ethtool_stats[][ETH_GSTRING_LEN] = {
+ 
+ #define DPAA2_ETH_NUM_STATS	ARRAY_SIZE(dpaa2_ethtool_stats)
+ 
++char dpaa2_ethtool_extras[][ETH_GSTRING_LEN] = {
++	/* per-cpu stats */
++	"tx conf frames",
++	"tx conf bytes",
++	"tx sg frames",
++	"tx sg bytes",
++	"rx sg frames",
++	"rx sg bytes",
++	"enqueue portal busy",
++	/* Channel stats */
++	"dequeue portal busy",
++	"channel pull errors",
++	"cdan",
 +};
 +
-+#define DPAA2_ETH_NUM_STATS	ARRAY_SIZE(dpaa2_ethtool_stats)
++#define DPAA2_ETH_NUM_EXTRA_STATS	ARRAY_SIZE(dpaa2_ethtool_extras)
 +
-+static void dpaa2_eth_get_drvinfo(struct net_device *net_dev,
-+				  struct ethtool_drvinfo *drvinfo)
-+{
-+	strlcpy(drvinfo->driver, KBUILD_MODNAME, sizeof(drvinfo->driver));
-+	strlcpy(drvinfo->version, dpaa2_eth_drv_version,
-+		sizeof(drvinfo->version));
-+	strlcpy(drvinfo->fw_version, "N/A", sizeof(drvinfo->fw_version));
-+	strlcpy(drvinfo->bus_info, dev_name(net_dev->dev.parent->parent),
-+		sizeof(drvinfo->bus_info));
-+}
-+
-+static int
-+dpaa2_eth_get_link_ksettings(struct net_device *net_dev,
-+			     struct ethtool_link_ksettings *link_settings)
-+{
-+	struct dpni_link_state state = {0};
-+	int err = 0;
-+	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
-+
-+	err = dpni_get_link_state(priv->mc_io, 0, priv->mc_token, &state);
-+	if (err) {
-+		netdev_err(net_dev, "ERROR %d getting link state", err);
-+		goto out;
-+	}
-+
-+	/* At the moment, we have no way of interrogating the DPMAC
-+	 * from the DPNI side - and for that matter there may exist
-+	 * no DPMAC at all. So for now we just don't report anything
-+	 * beyond the DPNI attributes.
-+	 */
-+	if (state.options & DPNI_LINK_OPT_AUTONEG)
-+		link_settings->base.autoneg = AUTONEG_ENABLE;
-+	if (!(state.options & DPNI_LINK_OPT_HALF_DUPLEX))
-+		link_settings->base.duplex = DUPLEX_FULL;
-+	link_settings->base.speed = state.rate;
-+
-+out:
-+	return err;
-+}
-+
-+static int
-+dpaa2_eth_set_link_ksettings(struct net_device *net_dev,
-+			     const struct ethtool_link_ksettings *link_settings)
-+{
-+	struct dpni_link_cfg cfg = {0};
-+	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
-+	int err = 0;
-+
-+	netdev_dbg(net_dev, "Setting link parameters...");
-+
-+	/* Due to a temporary MC limitation, the DPNI must be down
-+	 * in order to be able to change link settings. Taking steps to let
-+	 * the user know that.
-+	 */
-+	if (netif_running(net_dev)) {
-+		netdev_info(net_dev, "Sorry, interface must be brought down first.\n");
-+		return -EACCES;
-+	}
-+
-+	cfg.rate = link_settings->base.speed;
-+	if (link_settings->base.autoneg == AUTONEG_ENABLE)
-+		cfg.options |= DPNI_LINK_OPT_AUTONEG;
-+	else
-+		cfg.options &= ~DPNI_LINK_OPT_AUTONEG;
-+	if (link_settings->base.duplex  == DUPLEX_HALF)
-+		cfg.options |= DPNI_LINK_OPT_HALF_DUPLEX;
-+	else
-+		cfg.options &= ~DPNI_LINK_OPT_HALF_DUPLEX;
-+
-+	err = dpni_set_link_cfg(priv->mc_io, 0, priv->mc_token, &cfg);
-+	if (err)
-+		/* ethtool will be loud enough if we return an error; no point
-+		 * in putting our own error message on the console by default
-+		 */
-+		netdev_dbg(net_dev, "ERROR %d setting link cfg", err);
-+
-+	return err;
-+}
-+
-+static void dpaa2_eth_get_strings(struct net_device *netdev, u32 stringset,
-+				  u8 *data)
-+{
-+	u8 *p = data;
-+	int i;
-+
-+	switch (stringset) {
-+	case ETH_SS_STATS:
-+		for (i = 0; i < DPAA2_ETH_NUM_STATS; i++) {
-+			strlcpy(p, dpaa2_ethtool_stats[i], ETH_GSTRING_LEN);
+ static void dpaa2_eth_get_drvinfo(struct net_device *net_dev,
+ 				  struct ethtool_drvinfo *drvinfo)
+ {
+@@ -147,6 +164,10 @@ static void dpaa2_eth_get_strings(struct net_device *netdev, u32 stringset,
+ 			strlcpy(p, dpaa2_ethtool_stats[i], ETH_GSTRING_LEN);
+ 			p += ETH_GSTRING_LEN;
+ 		}
++		for (i = 0; i < DPAA2_ETH_NUM_EXTRA_STATS; i++) {
++			strlcpy(p, dpaa2_ethtool_extras[i], ETH_GSTRING_LEN);
 +			p += ETH_GSTRING_LEN;
 +		}
-+		break;
+ 		break;
+ 	}
+ }
+@@ -155,7 +176,7 @@ static int dpaa2_eth_get_sset_count(struct net_device *net_dev, int sset)
+ {
+ 	switch (sset) {
+ 	case ETH_SS_STATS: /* ethtool_get_stats(), ethtool_get_drvinfo() */
+-		return DPAA2_ETH_NUM_STATS;
++		return DPAA2_ETH_NUM_STATS + DPAA2_ETH_NUM_EXTRA_STATS;
+ 	default:
+ 		return -EOPNOTSUPP;
+ 	}
+@@ -171,9 +192,14 @@ static void dpaa2_eth_get_ethtool_stats(struct net_device *net_dev,
+ 	int j, k, err;
+ 	int num_cnt;
+ 	union dpni_statistics dpni_stats;
++	u64 cdan = 0;
++	u64 portal_busy = 0, pull_err = 0;
+ 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
++	struct dpaa2_eth_drv_stats *extras;
++	struct dpaa2_eth_ch_stats *ch_stats;
+ 
+-	memset(data, 0, sizeof(u64) * DPAA2_ETH_NUM_STATS);
++	memset(data, 0,
++	       sizeof(u64) * (DPAA2_ETH_NUM_STATS + DPAA2_ETH_NUM_EXTRA_STATS));
+ 
+ 	/* Print standard counters, from DPNI statistics */
+ 	for (j = 0; j <= 2; j++) {
+@@ -197,6 +223,25 @@ static void dpaa2_eth_get_ethtool_stats(struct net_device *net_dev,
+ 		for (k = 0; k < num_cnt; k++)
+ 			*(data + i++) = dpni_stats.raw.counter[k];
+ 	}
++
++	/* Print per-cpu extra stats */
++	for_each_online_cpu(k) {
++		extras = per_cpu_ptr(priv->percpu_extras, k);
++		for (j = 0; j < sizeof(*extras) / sizeof(__u64); j++)
++			*((__u64 *)data + i + j) += *((__u64 *)extras + j);
 +	}
-+}
++	i += j;
 +
-+static int dpaa2_eth_get_sset_count(struct net_device *net_dev, int sset)
-+{
-+	switch (sset) {
-+	case ETH_SS_STATS: /* ethtool_get_stats(), ethtool_get_drvinfo() */
-+		return DPAA2_ETH_NUM_STATS;
-+	default:
-+		return -EOPNOTSUPP;
-+	}
-+}
-+
-+/** Fill in hardware counters, as returned by MC.
-+ */
-+static void dpaa2_eth_get_ethtool_stats(struct net_device *net_dev,
-+					struct ethtool_stats *stats,
-+					u64 *data)
-+{
-+	int i = 0;
-+	int j, k, err;
-+	int num_cnt;
-+	union dpni_statistics dpni_stats;
-+	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
-+
-+	memset(data, 0, sizeof(u64) * DPAA2_ETH_NUM_STATS);
-+
-+	/* Print standard counters, from DPNI statistics */
-+	for (j = 0; j <= 2; j++) {
-+		err = dpni_get_statistics(priv->mc_io, 0, priv->mc_token,
-+					  j, &dpni_stats);
-+		if (err != 0)
-+			netdev_warn(net_dev, "dpni_get_stats(%d) failed", j);
-+		switch (j) {
-+		case 0:
-+			num_cnt = sizeof(dpni_stats.page_0) / sizeof(u64);
-+			break;
-+		case 1:
-+			num_cnt = sizeof(dpni_stats.page_1) / sizeof(u64);
-+			break;
-+		case 2:
-+			num_cnt = sizeof(dpni_stats.page_2) / sizeof(u64);
-+			break;
-+		default:
-+			break;
-+		}
-+		for (k = 0; k < num_cnt; k++)
-+			*(data + i++) = dpni_stats.raw.counter[k];
-+	}
-+}
-+
-+static int dpaa2_eth_get_rxnfc(struct net_device *net_dev,
-+			       struct ethtool_rxnfc *rxnfc, u32 *rule_locs)
-+{
-+	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
-+
-+	switch (rxnfc->cmd) {
-+	case ETHTOOL_GRXFH:
-+		/* we purposely ignore cmd->flow_type for now, because the
-+		 * classifier only supports a single set of fields for all
-+		 * protocols
-+		 */
-+		rxnfc->data = priv->rx_hash_fields;
-+		break;
-+	case ETHTOOL_GRXRINGS:
-+		rxnfc->data = dpaa2_eth_queue_count(priv);
-+		break;
-+	default:
-+		return -EOPNOTSUPP;
++	for (j = 0; j < priv->num_channels; j++) {
++		ch_stats = &priv->channel[j]->stats;
++		cdan += ch_stats->cdan;
++		portal_busy += ch_stats->dequeue_portal_busy;
++		pull_err += ch_stats->pull_err;
 +	}
 +
-+	return 0;
-+}
-+
-+const struct ethtool_ops dpaa2_ethtool_ops = {
-+	.get_drvinfo = dpaa2_eth_get_drvinfo,
-+	.get_link = ethtool_op_get_link,
-+	.get_link_ksettings = dpaa2_eth_get_link_ksettings,
-+	.set_link_ksettings = dpaa2_eth_set_link_ksettings,
-+	.get_sset_count = dpaa2_eth_get_sset_count,
-+	.get_ethtool_stats = dpaa2_eth_get_ethtool_stats,
-+	.get_strings = dpaa2_eth_get_strings,
-+	.get_rxnfc = dpaa2_eth_get_rxnfc,
-+};
++	*(data + i++) = portal_busy;
++	*(data + i++) = pull_err;
++	*(data + i++) = cdan;
+ }
+ 
+ static int dpaa2_eth_get_rxnfc(struct net_device *net_dev,
 -- 
 2.11.0
