@@ -1,29 +1,35 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 28 Apr 2017 08:39:23 -0500
-Subject: [PATCH 1/8] [RFC] dt-bindings: renesas: Document R-Car H3 and
- M3-W SiP DT bindings
-In-Reply-To: <1492593351-13835-2-git-send-email-geert+renesas@glider.be>
-References: <1492593351-13835-1-git-send-email-geert+renesas@glider.be>
- <1492593351-13835-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170428133923.ycbqixcxvcsonocn@rob-hp-laptop>
+From: pmladek@suse.com (Petr Mladek)
+Date: Fri, 28 Apr 2017 15:44:23 +0200
+Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
+In-Reply-To: <20170428090226.qqoe6qbewjeo57kd@hirez.programming.kicks-ass.net>
+References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+ <1461239325-22779-2-git-send-email-pmladek@suse.com>
+ <20170419131341.76bc7634@gandalf.local.home>
+ <20170420033112.GB542@jagdpanzerIV.localdomain>
+ <20170420131154.GL3452@pathway.suse.cz>
+ <20170421015724.GA586@jagdpanzerIV.localdomain>
+ <20170421120627.GO3452@pathway.suse.cz>
+ <20170424021747.GA630@jagdpanzerIV.localdomain>
+ <20170427133819.GW3452@pathway.suse.cz>
+ <20170428090226.qqoe6qbewjeo57kd@hirez.programming.kicks-ass.net>
+Message-ID: <20170428134423.GB3452@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 11:15:44AM +0200, Geert Uytterhoeven wrote:
-> Document the SiP ("System-in-Package") versions of the R-Car H3 and M3-W
-> SoCs, which contain an R-Car H3 or M3-W SoC, RAM, and HyperFlash.
+On Fri 2017-04-28 11:02:26, Peter Zijlstra wrote:
+> On Thu, Apr 27, 2017 at 03:38:19PM +0200, Petr Mladek wrote:
+> > Also we need to look for alternatives. There is a chance
+> > to create crashdump and get the ftrace messages from it.
+> > Also this might be scenario when we might need to suggest
+> > the early_printk() patchset from Peter Zijlstra.
 > 
-> Add their compatible values to all boards equipped with R-Car Gen3 SiPs.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Questions:
->   - Do we need more compatible values, for different configurations?
->     At least r8j7796 is available with either 2 GiB or 4 GiB of RAM,
->     possibly using RAM parts from different vendors.
+> I'd be happy to repost those. I still carry them in my tree.
 
-Same die, just a different package? If so, I don't think you need a 
-different compatible. It's going to be a different board from any 
-non-SiP which should be enough to distinguish.
+You do not need to if they are still the same as
+https://lkml.kernel.org/r/20161018170830.405990950 at infradead.org
 
-Rob
+I rather do not promise anything but I would like to look at them
+within next few weeks (after the merge window).
+
+Best Regards,
+Petr
