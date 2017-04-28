@@ -1,43 +1,81 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 28 Apr 2017 13:24:01 -0500
-Subject: [PATCH 1/2] clk: Add bindings for the Gemini Clock Controller
-In-Reply-To: <20170424185545.26608-1-linus.walleij@linaro.org>
-References: <20170424185545.26608-1-linus.walleij@linaro.org>
-Message-ID: <20170428182401.rpn7ytxvu6shy5sn@rob-hp-laptop>
+Date: Fri, 28 Apr 2017 13:27:50 -0500
+Subject: [PATCH 1/2] reset: Add DT bindings for the Gemini reset controller
+In-Reply-To: <20170424192746.27378-1-linus.walleij@linaro.org>
+References: <20170424192746.27378-1-linus.walleij@linaro.org>
+Message-ID: <20170428182750.cs7he6lkwklsmxvl@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 08:55:45PM +0200, Linus Walleij wrote:
-> This adds device tree bindings and a header for the Gemini SoC
-> Clock Controller.
+On Mon, Apr 24, 2017 at 09:27:46PM +0200, Linus Walleij wrote:
+> This is a simple reset controller in a single 32bit
+> register.
 > 
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  .../clock/cortina,gemini-clock-controller.txt      | 25 +++++++++++++++++++
->  include/dt-bindings/clock/cortina,gemini-clock.h   | 29 ++++++++++++++++++++++
->  2 files changed, 54 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/cortina,gemini-clock-controller.txt
->  create mode 100644 include/dt-bindings/clock/cortina,gemini-clock.h
+>  .../bindings/reset/cortina,gemini-reset.txt        | 59 ++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reset/cortina,gemini-reset.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/cortina,gemini-clock-controller.txt b/Documentation/devicetree/bindings/clock/cortina,gemini-clock-controller.txt
+> diff --git a/Documentation/devicetree/bindings/reset/cortina,gemini-reset.txt b/Documentation/devicetree/bindings/reset/cortina,gemini-reset.txt
 > new file mode 100644
-> index 000000000000..7af84acfcbce
+> index 000000000000..21aa12901774
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/cortina,gemini-clock-controller.txt
-> @@ -0,0 +1,25 @@
-> +Clock bindings for the Cortina Systems Gemini SoC Clock Controller
+> +++ b/Documentation/devicetree/bindings/reset/cortina,gemini-reset.txt
+> @@ -0,0 +1,59 @@
+> +Cortina Gemini Reset Controller
 > +
-> +Required properties :
-> +- compatible : shall contain the following:
-> +  "cortina,gemini-clock-controller"
-> +- #clock-cells should be <1>
+> +This reset controller is found in Cortina Systems CS3516 and
+> +the predecessor StorLink SL3516.
 > +
-> +The Gemini clock controller needs to be placed as a subnode of the
-> +system controller.
+> +Required properties:
+> +- compatible: "cortina,gemini-reset"
+> +- #reset-cells: Must be 1
 > +
-> +All available clocks are defined as preprocessor macros in
-> +dt-bindings/clock/cortina,gemini-clock.h header and can be used in device
-> +tree sources.
+> +The Gemini reset controller must be a child node of the
+> +system controller. Apart from this it follows the standard reset
+> +controller bindings.
+
+Same comment as clocks. The parent can be the provider.
+
+> +
+> +Valid reset line values:
+> +
+> +0:  DRAM controller
+
+Why no header like clocks?
+
+> +1:  Flash controller
+> +2:  IDE controller
+> +3:  RAID controller
+> +4:  Security module
+> +5:  GMAC0 (ethernet)
+> +6:  GMAC1 (ethernet)
+> +7:  PCI host bridge
+> +8:  USB0 USB host controller
+> +9:  USB1 USB host controller
+> +10: General DMA controller
+> +11: APB bridge
+> +12: LPC (Low Pin Count) controller
+> +13: LCD module
+> +14: Interrupt controller 0
+> +15: Interrupt controller 1
+> +16: RTC module
+> +17: Timer module
+> +18: UART controller
+> +19: SSP controller
+> +20: GPIO0 GPIO controller
+> +21: GPIO1 GPIO controller
+> +22: GPIO2 GPIO controller
+> +23: Watchdog timer
+> +24: External device reset
+> +25: CIR module (infrared)
+> +26: SATA0 SATA bridge
+> +27: SATA1 SATA bridge
+> +28: TVE TV Encoder module
+> +29: Reserved
+> +30: CPU1 reset
+> +31: Global soft reset
 > +
 > +Example:
 > +
@@ -45,11 +83,15 @@ On Mon, Apr 24, 2017 at 08:55:45PM +0200, Linus Walleij wrote:
 > +	compatible = "cortina,gemini-syscon", "syscon", "simple-mfd";
 > +	reg = <0x40000000 0x1000>;
 > +
-> +	clock-controller {
-> +		compatible = "cortina,gemini-clock-controller";
-> +		#clock-cells = <1>;
-
-There's not really much reason to have a child node here. The parent can 
-be the clock provider.
-
-Rob
+> +	reset-controller {
+> +		compatible = "cortina,gemini-reset";
+> +		#reset-cells = <1>;
+> +	};
+> +};
+> -- 
+> 2.9.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
