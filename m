@@ -1,40 +1,69 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 28 Apr 2017 12:03:29 +0200
-Subject: [PATCH] IMX: Rearm watchdog after loading value for restart
-In-Reply-To: <20170427131434.17085-1-Frederik.juul@3shape.com>
-References: <20170427131434.17085-1-Frederik.juul@3shape.com>
-Message-ID: <20170428120329.2dab740f@ipc1.ka-ro>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Apr 2017 11:07:29 +0100
+Subject: [PATCHv2 2/2] arm64: cpufeature: use
+ static_branch_enable_cpuslocked()
+In-Reply-To: <20170428100230.GA22621@leverpostej>
+References: <1493315077-19496-1-git-send-email-mark.rutland@arm.com>
+ <1493315077-19496-3-git-send-email-mark.rutland@arm.com>
+ <20170427180104.GO1890@arm.com>
+ <20170428100230.GA22621@leverpostej>
+Message-ID: <20170428100729.GC13675@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, 27 Apr 2017 15:14:34 +0200 frederikj at gmail.com wrote:
-> When calling the restart function the watchdog is activated and the WDOG
-> timeout field is set to 0. This gives a reset time of 500 ms, which is
-> consistent with the following delay. However this new time is not loaded
-> into the WDOG until the WDOG service routine is run (see IMX6SXRM section
-> 70.5.1.1 "Servicing WDOG to reload the counter").
+On Fri, Apr 28, 2017 at 11:02:30AM +0100, Mark Rutland wrote:
+> On Thu, Apr 27, 2017 at 07:01:04PM +0100, Will Deacon wrote:
+> > On Thu, Apr 27, 2017 at 06:44:37PM +0100, Mark Rutland wrote:
+> > > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> > > index f6cc67e..379ad8d 100644
+> > > --- a/arch/arm64/kernel/cpu_errata.c
+> > > +++ b/arch/arm64/kernel/cpu_errata.c
+> > > @@ -175,9 +175,20 @@ void verify_local_cpu_errata_workarounds(void)
+> > >  		}
+> > >  }
+> > >  
+> > > -void update_cpu_errata_workarounds(void)
+> > > +/*
+> > > + * Secondary CPUs are booted with the waker holding the
+> > > + * CPU hotplug lock, hence we don't need to lock it here again.
+> > > + */
+> > > +void update_secondary_cpu_errata_workarounds(void)
+> > > +{
+> > > +	update_cpu_capabilities(arm64_errata, "enabling workaround for");
+> > > +}
+> > > +
+> > > +void update_boot_cpu_errata_workarounds(void)
+> > >  {
+> > > +	get_online_cpus();
+> > >  	update_cpu_capabilities(arm64_errata, "enabling workaround for");
+> > > +	put_online_cpus();
+> > >  }
+> > 
+> > These functions seem to have unhelpful names, especially when compared to
+> > the naming scheme used by the core code. I'd prefer to have:
+> > 
+> > update_cpu_errata_workarounds: just calls update_cpu_capabilities
+> > 
+> > update_cpu_errata_workarounds_cpuslocked: does get_online_cpus(), then calls
+> > update_cpu_errata_workarounds, then does put_online_cpus();
 > 
-> Not reloading the counter could result in a random delay up to 128 seconds
-> before the system restarts, depending on the previous value of the WDOG
-> timeout field and when it has last been serviced. That bug is fixed with
-> this patch.
->
-The routine is actually initiating a softreset by clearing the SRS bit
-in WCR. Thus the watchdog timeout should only have any effect, if the
-softreset fails in some way. Under normal circumstances the reset
-should happen immediately no matter what watchdog timeout is programmed.
+> That's the opposite polarity to the other _cpuslocked functions, where
+> _cpuslocked means that the lock is already held (and should not be taken
+> by the _cpuslocked function itself.
+> 
+> So I'll make those changes, but I'll swap that so:
+> update_cpu_errata_workarounds() does:
+> 
+>   get_online_cpus()
+>   update_cpu_errata_workarounds_cpuslocked()
+>   put_online_cpus()
+> 
+> > With that change:
+> > 
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> I assume that will stand with the above change. Please shout if not!
 
+Haha, yes, I got it downside-up. Thanks for working out what I meant.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Will
