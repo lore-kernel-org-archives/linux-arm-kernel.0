@@ -1,42 +1,67 @@
-From: ruxandra.radulescu@nxp.com (Ruxandra Ioana Radulescu)
-Date: Fri, 28 Apr 2017 12:29:47 +0000
-Subject: [PATCH v3 1/9] bus: fsl-mc: add DPCON object APIs
-In-Reply-To: <20170428122332.GB18081@kroah.com>
-References: <20170428095034.8842-1-ruxandra.radulescu@nxp.com>
- <20170428095034.8842-2-ruxandra.radulescu@nxp.com>
- <20170428122332.GB18081@kroah.com>
-Message-ID: <VI1PR0402MB28478DBF5B717B72A762FF9B94130@VI1PR0402MB2847.eurprd04.prod.outlook.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Fri, 28 Apr 2017 14:38:38 +0200
+Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
+In-Reply-To: <20170428012530.GA383@jagdpanzerIV.localdomain>
+References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+ <1461239325-22779-2-git-send-email-pmladek@suse.com>
+ <20170419131341.76bc7634@gandalf.local.home>
+ <20170420033112.GB542@jagdpanzerIV.localdomain>
+ <20170420131154.GL3452@pathway.suse.cz>
+ <20170428012530.GA383@jagdpanzerIV.localdomain>
+Message-ID: <20170428123838.GZ3452@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Greg KH [mailto:gregkh at linuxfoundation.org]
-> Sent: Friday, April 28, 2017 3:24 PM
-> To: Ruxandra Ioana Radulescu <ruxandra.radulescu@nxp.com>
-> Cc: devel at driverdev.osuosl.org; stuyoder at gmail.com; arnd at arndb.de;
-> Haiying Wang <haiying.wang@nxp.com>; Roy Pledge
-> <roy.pledge@nxp.com>; Alexandru Marginean
-> <alexandru.marginean@nxp.com>; linux-kernel at vger.kernel.org;
-> agraf at suse.de; Bogdan Hamciuc <bogdan.hamciuc@nxp.com>; Bogdan
-> Purcareata <bogdan.purcareata@nxp.com>; linux-arm-
-> kernel at lists.infradead.org; Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> Subject: Re: [PATCH v3 1/9] bus: fsl-mc: add DPCON object APIs
+On Fri 2017-04-28 10:25:30, Sergey Senozhatsky wrote:
 > 
-> On Fri, Apr 28, 2017 at 04:50:26AM -0500, Ioana Radulescu wrote:
-> > From: Ioana Radulescu <ruxandra.radulescu@freescale.com>
-> >
-> > This patch adds the command building/parsing wrapper functions
-> > for the DPCON object. The binary interface version is v3.2.
+> On (04/20/17 15:11), Petr Mladek wrote:
+> [..]
+> >  void printk_nmi_enter(void)
+> >  {
+> > -	this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
+> > +	/*
+> > +	 * The size of the extra per-CPU buffer is limited. Use it
+> > +	 * only when really needed.
+> > +	 */
+> > +	if (this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK ||
+> > +	    raw_spin_is_locked(&logbuf_lock)) {
 > 
-> The subject should have "staging: fsl-mc: bus: ..." to match the other
-> ones (and to catch my filters properly...)
+> can we please have && here?
 
-My bad, I must have missed this one when I changed the subject
-lines for v2.
- 
-> I'll take this as-is for now.
- 
-Thanks a lot!
-Ioana
+OK, it sounds reasonable after all.
+
+> [..]
+> > diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
+> > index 4e8a30d1c22f..0bc0a3535a8a 100644
+> > --- a/lib/nmi_backtrace.c
+> > +++ b/lib/nmi_backtrace.c
+> > @@ -86,9 +86,11 @@ void nmi_trigger_cpumask_backtrace(const cpumask_t *mask,
+> >  
+> >  bool nmi_cpu_backtrace(struct pt_regs *regs)
+> >  {
+> > +	static arch_spinlock_t lock = __ARCH_SPIN_LOCK_UNLOCKED;
+> >  	int cpu = smp_processor_id();
+> >  
+> >  	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
+> > +		arch_spin_lock(&lock);
+> >  		if (regs && cpu_in_idle(instruction_pointer(regs))) {
+> >  			pr_warn("NMI backtrace for cpu %d skipped: idling at pc %#lx\n",
+> >  				cpu, instruction_pointer(regs));
+> > @@ -99,6 +101,7 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
+> >  			else
+> >  				dump_stack();
+> >  		}
+> > +		arch_spin_unlock(&lock);
+> >  		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
+> >  		return true;
+> >  	}
+> 
+> can the nmi_backtrace part be a patch on its own?
+
+I would prefer to keep it in the same patch. The backtrace from
+all CPUs is completely unusable when all CPUs push to the global
+log buffer in parallel. Single patch might safe hair of some
+poor bisectors.
+
+Best Regards,
+Petr
