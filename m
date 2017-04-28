@@ -1,139 +1,245 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 28 Apr 2017 12:01:06 +0100
-Subject: [PATCHv3 2/2] arm64: cpufeature: use static_branch_enable_cpuslocked()
-In-Reply-To: <1493377266-2205-1-git-send-email-mark.rutland@arm.com>
-References: <1493377266-2205-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1493377266-2205-3-git-send-email-mark.rutland@arm.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 28 Apr 2017 13:05:15 +0200
+Subject: [PATCH v5 17/22] KVM: arm64: vgic-its: Collection table
+ save/restore
+In-Reply-To: <20170428104448.GB1439@lvm>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-18-git-send-email-eric.auger@redhat.com>
+ <20170428104448.GB1439@lvm>
+Message-ID: <e866c4bd-8ec5-9cac-fa43-aa442b1d2dac@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recently, the hotplug locking was conveted to use a percpu rwsem. Unlike
-the existing {get,put}_online_cpus() logic, this can't nest.
-Unfortunately, in arm64's secondary boot path we can end up nesting via
-static_branch_enable() in cpus_set_cap() when we detect an erratum.
+Hi Christoffer,
 
-This leads to a stream of messages as below, where the secondary
-attempts to schedule before it has been fully onlined. As the CPU
-orchestrating the onlining holds the rswem, this hangs the system.
+On 28/04/2017 12:44, Christoffer Dall wrote:
+> On Fri, Apr 14, 2017 at 12:15:29PM +0200, Eric Auger wrote:
+>> The save path copies the collection entries into guest RAM
+>> at the GPA specified in the BASER register. This obviously
+>> requires the BASER to be set. The last written element is a
+>> dummy collection table entry.
+>>
+>> We do not index by collection ID as the collection entry
+>> can fit into 8 bytes while containing the collection ID.
+>>
+>> On restore path we re-allocate the collection objects.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>> v4 -> v5:
+>> - add macros for field encoding/decoding
+>> - use abi->cte_esz
+>> - rename flush into save
+>> - check the target_addr is valid
+>>
+>> v3 -> v4:
+>> - replaced u64 *ptr by gpa_t gpa
+>> - check the collection does not exist before allocating it
+>>
+>> v1 -> v2:
+>> - reword commit message and directly use 8 as entry size
+>> - no kvm parameter anymore
+>> - add helper for flush/restore cte
+>> - table size computed here
+>> - add le64/cpu conversions
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 109 ++++++++++++++++++++++++++++++++++++++++++-
+>>  virt/kvm/arm/vgic/vgic.h     |   9 ++++
+>>  2 files changed, 116 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index c22b35d..484e541 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -1785,13 +1785,97 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
+>>  	return -ENXIO;
+>>  }
+>>  
+>> +static int vgic_its_save_cte(struct vgic_its *its,
+>> +			     struct its_collection *collection,
+>> +			     gpa_t gpa, int esz)
+>> +{
+>> +	u64 val;
+>> +	int ret;
+>> +
+>> +	val = (1ULL << KVM_ITS_CTE_VALID_SHIFT |
+>> +	       ((u64)collection->target_addr << KVM_ITS_CTE_RDBASE_SHIFT) |
+>> +	       collection->collection_id);
+>> +	val = cpu_to_le64(val);
+>> +	ret = kvm_write_guest(its->dev->kvm, gpa, &val, esz);
+>> +	return ret;
+>> +}
+>> +
+>> +static int vgic_its_restore_cte(struct vgic_its *its, gpa_t gpa,
+>> +				int esz, bool *valid)
+>> +{
+>> +	struct its_collection *collection;
+>> +	struct kvm *kvm = its->dev->kvm;
+>> +	u32 target_addr;
+>> +	u32 coll_id;
+>> +	u64 val;
+>> +	int ret;
+>> +
+>> +	*valid = false;
+> 
+> I don't see why you need this.
+I initialized it here in case kvm_read_guest() fails
+> 
+>> +
+>> +	ret = kvm_read_guest(kvm, gpa, &val, esz);
+> 
+> hmm, we better not have an esz larger than sizeof(u64) here then.
+Yes this could be part if the ABI ops but is that worth the effort now?
+I can add a comment somewhere to mention that trap.
+> 
+>> +	if (ret)
+>> +		return ret;
+>> +	val = le64_to_cpu(val);
+>> +	*valid = val & KVM_ITS_CTE_VALID_MASK;
+>> +
+>> +	if (!*valid)
+>> +		return 0;
+> 
+> I think this would be nicer with just a bool on the stack and then set
+> *valid = in the end of the function.
+OK
+  Alternatively, you could just have
+> the return value return > 0 when there are more entries.
+> 
+>> +
+>> +	target_addr = (u32)(val >> KVM_ITS_CTE_RDBASE_SHIFT);
+>> +	coll_id = val & KVM_ITS_CTE_ICID_MASK;
+>> +
+>> +	if (target_addr >= atomic_read(&kvm->online_vcpus))
+>> +		return -EINVAL;
+>> +
+>> +	collection = find_collection(its, coll_id);
+>> +	if (collection)
+>> +		return -EEXIST;
+>> +	ret = vgic_its_alloc_collection(its, &collection, coll_id);
+>> +	if (ret)
+>> +		return ret;
+>> +	collection->target_addr = target_addr;
+>> +	return 0;
+>> +}
+>> +
+>>  /**
+>>   * vgic_its_save_collection_table - Save the collection table into
+>>   * guest RAM
+>>   */
+>>  static int vgic_its_save_collection_table(struct vgic_its *its)
+>>  {
+>> -	return -ENXIO;
+>> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+>> +	struct its_collection *collection;
+>> +	u64 val;
+>> +	gpa_t gpa;
+>> +	size_t max_size, filled = 0;
+>> +	int ret, cte_esz = abi->cte_esz;
+>> +
+>> +	gpa = BASER_ADDRESS(its->baser_coll_table);
+>> +	if (!gpa)
+>> +		return 0;
+>> +
+>> +	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
+>> +
+>> +	list_for_each_entry(collection, &its->collection_list, coll_list) {
+>> +		if (filled == max_size)
+>> +			return -ENOSPC;
+>> +		ret = vgic_its_save_cte(its, collection, gpa, cte_esz);
+>> +		if (ret)
+>> +			return ret;
+>> +		gpa += cte_esz;
+>> +		filled += cte_esz;
+>> +	}
+>> +
+>> +	if (filled == max_size)
+>> +		return 0;
+>> +
+>> +	/*
+>> +	 * table is not fully filled, add a last dummy element
+>> +	 * with valid bit unset
+>> +	 */
+>> +	val = 0;
+>> +	ret = kvm_write_guest(its->dev->kvm, gpa, &val, cte_esz);
+>> +	return ret;
+>>  }
+>>  
+>>  /**
+>> @@ -1801,7 +1885,28 @@ static int vgic_its_save_collection_table(struct vgic_its *its)
+>>   */
+>>  static int vgic_its_restore_collection_table(struct vgic_its *its)
+>>  {
+>> -	return -ENXIO;
+>> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+>> +	size_t max_size, read = 0;
+>> +	gpa_t gpa;
+>> +	int ret, cte_esz = abi->cte_esz;
+>> +
+>> +	gpa = BASER_ADDRESS(its->baser_coll_table);
+>> +
+>> +	if (!gpa)
+>> +		return 0;
+> 
+> I don't understand this check.
+> 
+> Don't you want to do do
+> 	if (!(its->baser_coll_table) & GITS_BASER_VALID)
+> 		return 0;
+> 
+> Or what am I missing?
+Yes that's correct I will fix that.
 
-[    0.250334] BUG: scheduling while atomic: swapper/1/0/0x00000002
-[    0.250337] Modules linked in:
-[    0.250346] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.11.0-rc7-next-20170424 #2
-[    0.250349] Hardware name: ARM Juno development board (r1) (DT)
-[    0.250353] Call trace:
-[    0.250365] [<ffff000008088510>] dump_backtrace+0x0/0x238
-[    0.250371] [<ffff00000808880c>] show_stack+0x14/0x20
-[    0.250377] [<ffff00000839d854>] dump_stack+0x9c/0xc0
-[    0.250384] [<ffff0000080e3540>] __schedule_bug+0x50/0x70
-[    0.250391] [<ffff000008932ecc>] __schedule+0x52c/0x5a8
-[    0.250395] [<ffff000008932f80>] schedule+0x38/0xa0
-[    0.250400] [<ffff000008935e8c>] rwsem_down_read_failed+0xc4/0x108
-[    0.250407] [<ffff0000080fe8e0>] __percpu_down_read+0x100/0x118
-[    0.250414] [<ffff0000080c0b60>] get_online_cpus+0x70/0x78
-[    0.250420] [<ffff0000081749e8>] static_key_enable+0x28/0x48
-[    0.250425] [<ffff00000808de90>] update_cpu_capabilities+0x78/0xf8
-[    0.250430] [<ffff00000808d14c>] update_cpu_errata_workarounds+0x1c/0x28
-[    0.250435] [<ffff00000808e004>] check_local_cpu_capabilities+0xf4/0x128
-[    0.250440] [<ffff00000808e894>] secondary_start_kernel+0x8c/0x118
-[    0.250444] [<000000008093d1b4>] 0x8093d1b4
+Thanks
 
-We call cpus_set_cap() from update_cpu_capabilities(), which is called
-from the secondary boot path (where the CPU orchestrating the onlining
-holds the hotplug rwsem), and in the primary boot path, where this is
-not held.
-
-This patch makes cpus_set_cap() use static_branch_enable_cpuslocked(),
-and updates all the callers of update_cpu_capabilities() consistent with
-the change.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Catalin Marinas <catalin.marinas@arm.com>
-Suggested-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Suggested-by: Thomas Gleixner <tglx@linutronix.de>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-[Mark: minor fixups]
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/include/asm/cpufeature.h | 3 ++-
- arch/arm64/kernel/cpu_errata.c      | 9 ++++++++-
- arch/arm64/kernel/cpufeature.c      | 5 ++++-
- 3 files changed, 14 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index f31c48d..a8d1b5b 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -145,7 +145,7 @@ static inline void cpus_set_cap(unsigned int num)
- 			num, ARM64_NCAPS);
- 	} else {
- 		__set_bit(num, cpu_hwcaps);
--		static_branch_enable(&cpu_hwcap_keys[num]);
-+		static_branch_enable_cpuslocked(&cpu_hwcap_keys[num]);
- 	}
- }
- 
-@@ -223,6 +223,7 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- void check_local_cpu_capabilities(void);
- 
- void update_cpu_errata_workarounds(void);
-+void update_cpu_errata_workarounds_cpuslocked(void);
- void __init enable_errata_workarounds(void);
- void verify_local_cpu_errata_workarounds(void);
- 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index f6cc67e..e650cf8 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -175,11 +175,18 @@ void verify_local_cpu_errata_workarounds(void)
- 		}
- }
- 
--void update_cpu_errata_workarounds(void)
-+void update_cpu_errata_workarounds_cpuslocked(void)
- {
- 	update_cpu_capabilities(arm64_errata, "enabling workaround for");
- }
- 
-+void update_cpu_errata_workarounds(void)
-+{
-+	get_online_cpus();
-+	update_cpu_errata_workarounds_cpuslocked();
-+	put_online_cpus();
-+}
-+
- void __init enable_errata_workarounds(void)
- {
- 	enable_cpu_capabilities(arm64_errata);
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index abda8e8..113c06d 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -956,6 +956,7 @@ static void __init setup_elf_hwcaps(const struct arm64_cpu_capabilities *hwcaps)
- 			cap_set_elf_hwcap(hwcaps);
- }
- 
-+/* Should be called with CPU hotplug lock held */
- void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info)
- {
-@@ -1075,14 +1076,16 @@ void check_local_cpu_capabilities(void)
- 	 * advertised capabilities.
- 	 */
- 	if (!sys_caps_initialised)
--		update_cpu_errata_workarounds();
-+		update_cpu_errata_workarounds_cpuslocked();
- 	else
- 		verify_local_cpu_capabilities();
- }
- 
- static void __init setup_feature_capabilities(void)
- {
-+	get_online_cpus();
- 	update_cpu_capabilities(arm64_features, "detected feature:");
-+	put_online_cpus();
- 	enable_cpu_capabilities(arm64_features);
- }
- 
--- 
-1.9.1
+Eric
+> 
+> Thanks,
+> -Christoffer
+> 
+>> +
+>> +	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
+>> +
+>> +	while (read < max_size) {
+>> +		bool valid;
+>> +
+>> +		ret = vgic_its_restore_cte(its, gpa, cte_esz, &valid);
+>> +		if (!valid || ret)
+>> +			break;
+>> +		gpa += cte_esz;
+>> +		read += cte_esz;
+>> +	}
+>> +	return ret;
+>>  }
+>>  
+>>  /**
+>> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+>> index b87f1c6..56e57c1 100644
+>> --- a/virt/kvm/arm/vgic/vgic.h
+>> +++ b/virt/kvm/arm/vgic/vgic.h
+>> @@ -73,6 +73,15 @@
+>>  				      KVM_REG_ARM_VGIC_SYSREG_CRM_MASK | \
+>>  				      KVM_REG_ARM_VGIC_SYSREG_OP2_MASK)
+>>  
+>> +/*
+>> + * As per Documentation/virtual/kvm/devices/arm-vgic-its.txt,
+>> + * below macros are defined for ITS table entry encoding.
+>> + */
+>> +#define KVM_ITS_CTE_VALID_SHIFT		63
+>> +#define KVM_ITS_CTE_VALID_MASK		BIT_ULL(63)
+>> +#define KVM_ITS_CTE_RDBASE_SHIFT	16
+>> +#define KVM_ITS_CTE_ICID_MASK		GENMASK_ULL(15, 0)
+>> +
+>>  static inline bool irq_is_pending(struct vgic_irq *irq)
+>>  {
+>>  	if (irq->config == VGIC_CONFIG_EDGE)
+>> -- 
+>> 2.5.5
+>>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
