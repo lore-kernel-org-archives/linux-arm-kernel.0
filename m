@@ -1,77 +1,46 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Fri, 28 Apr 2017 04:50:25 -0500
-Subject: [PATCH v3 0/9] staging: Introduce Freescale DPAA2 Ethernet driver
-Message-ID: <20170428095034.8842-1-ruxandra.radulescu@nxp.com>
+Date: Fri, 28 Apr 2017 04:50:33 -0500
+Subject: [PATCH v3 8/9] staging: fsl-dpaa2/eth: Add TODO file
+In-Reply-To: <20170428095034.8842-1-ruxandra.radulescu@nxp.com>
+References: <20170428095034.8842-1-ruxandra.radulescu@nxp.com>
+Message-ID: <20170428095034.8842-9-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset introduces the Ethernet driver for Freescale/NXP SoCs
-with DPAA2 (DataPath Acceleration Architecture v2). The driver manages
-network objects discovered on the fsl-mc bus. A description of the
-driver can be found in the associated README file.
+Add a list of TODO items for the Ethernet driver
 
-The patchset consists of:
-* A set of libraries containing APIs for configuring and controlling
-Management Complex (MC) networking objects
-* The DPAA2 Ethernet basic driver
-* A couple of patches adding ethtool and debug support
+Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
+---
+v3: Add contact info
+v2: Add note
 
-v3 changes:
- - add contact info in TODO file
-v2 changes:
- - update path of include header files since fsl-mc bus driver
-   is still in staging
- - minor updates in patch #4 due to networking API changes
-
-Ioana Radulescu (9):
-  bus: fsl-mc: add DPCON object APIs
-  staging: fsl-dpaa2/eth: Add Ethernet driver overview document
-  staging: fsl-dpaa2/eth: Add APIs for DPNI objects
-  staging: fsl-dpaa2/eth: Add Freescale DPAA2 Ethernet driver
-  staging: fsl-dpaa2/eth: Add ethtool support
-  staging: fsl-dpaa2/eth: Add driver specific stats
-  staging: fsl-dpaa2/eth: Add trace points
-  staging: fsl-dpaa2/eth: Add TODO file
-  staging: fsl-dpaa2/eth: Add maintainer for Ethernet driver
-
- MAINTAINERS                                        |    6 +
- drivers/staging/Kconfig                            |    2 +
- drivers/staging/Makefile                           |    1 +
- drivers/staging/fsl-dpaa2/Kconfig                  |   17 +
- drivers/staging/fsl-dpaa2/Makefile                 |    5 +
- drivers/staging/fsl-dpaa2/ethernet/Makefile        |   10 +
- drivers/staging/fsl-dpaa2/ethernet/README          |  186 ++
- drivers/staging/fsl-dpaa2/ethernet/TODO            |   14 +
- .../staging/fsl-dpaa2/ethernet/dpaa2-eth-trace.h   |  185 ++
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     | 2520 ++++++++++++++++++++
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h     |  348 +++
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c |  279 +++
- drivers/staging/fsl-dpaa2/ethernet/dpkg.h          |  176 ++
- drivers/staging/fsl-dpaa2/ethernet/dpni-cmd.h      |  541 +++++
- drivers/staging/fsl-dpaa2/ethernet/dpni.c          | 1595 +++++++++++++
- drivers/staging/fsl-dpaa2/ethernet/dpni.h          |  832 +++++++
- drivers/staging/fsl-dpaa2/ethernet/net.h           |  480 ++++
- drivers/staging/fsl-mc/bus/Makefile                |    3 +-
- drivers/staging/fsl-mc/bus/dpcon-cmd.h             |   69 +-
- drivers/staging/fsl-mc/bus/dpcon.c                 |  317 +++
- drivers/staging/fsl-mc/include/dpcon.h             |  115 +
- 21 files changed, 7677 insertions(+), 24 deletions(-)
- create mode 100644 drivers/staging/fsl-dpaa2/Kconfig
- create mode 100644 drivers/staging/fsl-dpaa2/Makefile
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/Makefile
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/README
+ drivers/staging/fsl-dpaa2/ethernet/TODO | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
  create mode 100644 drivers/staging/fsl-dpaa2/ethernet/TODO
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth-trace.h
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/dpkg.h
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/dpni-cmd.h
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/dpni.c
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/dpni.h
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/net.h
- create mode 100644 drivers/staging/fsl-mc/bus/dpcon.c
- create mode 100644 drivers/staging/fsl-mc/include/dpcon.h
 
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/TODO b/drivers/staging/fsl-dpaa2/ethernet/TODO
+new file mode 100644
+index 000000000000..110e66d44b42
+--- /dev/null
++++ b/drivers/staging/fsl-dpaa2/ethernet/TODO
+@@ -0,0 +1,18 @@
++* Add a DPAA2 MAC kernel driver in order to allow PHY management; currently
++  the DPMAC objects and their link to DPNIs are handled by MC internally
++  and all PHYs are seen as fixed-link
++* add more debug support: decide how to expose detailed debug statistics,
++  add ingress error queue support
++* MC firmware uprev; the DPAA2 objects used by the Ethernet driver need to
++  be kept in sync with binary interface changes in MC
++* refine README file
++* cleanup
++
++NOTE: None of the above is must-have before getting the DPAA2 Ethernet driver
++out of staging. The main requirement for that is to have the drivers it
++depends on, fsl-mc bus and DPIO driver, moved to drivers/bus and drivers/soc
++respectively.
++
++ Please send any patches to Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
++ ruxandra.radulescu at nxp.com, devel at driverdev.osuosl.org,
++ linux-kernel at vger.kernel.org
 -- 
 2.11.0
