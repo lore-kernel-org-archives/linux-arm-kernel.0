@@ -1,110 +1,45 @@
-From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Fri, 28 Apr 2017 10:23:47 +0530
-Subject: [PATCH v2 4/4] perf vendor events arm64: Add implementation defined
- pmu core events of ThunderX2
-In-Reply-To: <1493355227-31492-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1493355227-31492-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <1493355227-31492-5-git-send-email-ganapatrao.kulkarni@cavium.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 28 Apr 2017 07:10:06 +0200
+Subject: [PATCH 0/9] ARM: dts: renesas: update PFC node name to
+ pin-controller
+In-Reply-To: <CAMuHMdVtMAMEjbEUA+ypwK5V+Sh+mEPs14_rUe0e4--sH=sTjw@mail.gmail.com>
+References: <20170426100538.22060-1-horms+renesas@verge.net.au>
+ <CAMuHMdVtMAMEjbEUA+ypwK5V+Sh+mEPs14_rUe0e4--sH=sTjw@mail.gmail.com>
+Message-ID: <20170428051005.GA18349@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is not a full event list, but a short list of useful events.
+On Wed, Apr 26, 2017 at 01:20:52PM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Wed, Apr 26, 2017 at 12:05 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > The device trees for Renesas SoCs use either pfc or pin-controller as the
+> > node name for the PFC device. This patch is intended to take a step towards
+> > unifying the node name used as pin-controller which appears to be the more
+> > generic of the two and thus more in keeping with the DT specs.
+> >
+> > My analysis is that this is a user-visible change to the extent that kernel
+> > logs, and sysfs entries change from XXX.pfc and pfc at XXX to
+> > XXX.pin-controller and pin-controller at XXX.
+> >
+> > Boot tested on:
+> >  r8a73a4/ape6evm
+> >  r8a7740/armadillo800evb
+> >  r8a7778/bockw
+> >  r8a7790/lager
+> >  r8a7791/koelsch
+> >  r8a7791/porter
+> >  r8a7793/gose
+> >  sh73a9/kzm9g
+> >
+> > Not tested on (due to lack of hw access):
+> >  evm2/kzm9d
+> >  r8a7789/marzen
+> >
+> > Simon Horman (9):
+> 
+> For the whole series:
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
----
- tools/perf/pmu-events/arch/arm64/mapfile.csv       | 14 +++++
- .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
- 2 files changed, 76 insertions(+)
- create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
- create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-
-diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-new file mode 100644
-index 0000000..bc9f798
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-@@ -0,0 +1,14 @@
-+# Format:
-+#	MIDR,Version,JSON/file/pathname,Type
-+#
-+# where
-+#	MIDR	Processor version
-+#	Version could be used to track version of of JSON file
-+#		but currently unused.
-+#	JSON/file/pathname is the path to JSON file, relative
-+#		to tools/perf/pmu-events/arch/arm64/.
-+#	Type is core, uncore etc
-+#
-+#
-+#Family-model,Version,Filename,EventType
-+0x00000000420f5161,v1,thunderx2,core
-diff --git a/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-new file mode 100644
-index 0000000..cdb03db
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-@@ -0,0 +1,62 @@
-+[
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, read",
-+        "EventCode": "0x40",
-+        "EventName": "l1d_cache_access_read",
-+        "BriefDescription": "l1d cache access, read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, write ",
-+        "EventCode": "0x41",
-+        "EventName": "l1d_cache_access_write",
-+        "BriefDescription": "l1d cache access, write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, read",
-+        "EventCode": "0x42",
-+        "EventName": "l1d_cache_refill_read",
-+        "BriefDescription": "l1d cache refill, read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, write",
-+        "EventCode": "0x43",
-+        "EventName": "l1d_cache_refill_write",
-+        "BriefDescription": "l1d refill, write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, read",
-+        "EventCode": "0x4C",
-+        "EventName": "l1d_tlb_refill_read",
-+        "BriefDescription": "l1d tlb refill, read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, write",
-+        "EventCode": "0x4D",
-+        "EventName": "l1d_tlb_refill_write",
-+        "BriefDescription": "l1d tlb refill, write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
-+        "EventCode": "0x4E",
-+        "EventName": "l1d_tlb_read",
-+        "BriefDescription": "l1d tlb, read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
-+        "EventCode": "0x4F",
-+        "EventName": "l1d_tlb_write",
-+        "BriefDescription": "l1d tlb, write",
-+    },
-+    {
-+        "PublicDescription": "Bus access, read",
-+        "EventCode": "0x60",
-+        "EventName": "bus_access_read",
-+        "BriefDescription": "Bus access, read",
-+   },
-+   {
-+        "PublicDescription": "Bus access, write",
-+        "EventCode": "0x61",
-+        "EventName": "bus_access_write",
-+        "BriefDescription": "Bus access, write",
-+   }
-+]
--- 
-1.8.1.4
+Thanks, I have queued these up.
