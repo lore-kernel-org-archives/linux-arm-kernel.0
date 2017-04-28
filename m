@@ -1,301 +1,122 @@
-From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Fri, 28 Apr 2017 04:50:32 -0500
-Subject: [PATCH v3 7/9] staging: fsl-dpaa2/eth: Add trace points
-In-Reply-To: <20170428095034.8842-1-ruxandra.radulescu@nxp.com>
-References: <20170428095034.8842-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170428095034.8842-8-ruxandra.radulescu@nxp.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 28 Apr 2017 10:53:51 +0100
+Subject: [PATCH v2] arm64: Add ASM modifier for xN register operands
+In-Reply-To: <CAKv+Gu9s2t+Nt7JCcTxkr5BYSN05f_zxYkKzfrD-4owWQLvF_Q@mail.gmail.com>
+References: <20170426214616.142580-1-mka@chromium.org>
+ <20170427110256.GC31337@leverpostej>
+ <20170427225221.GS128305@google.com>
+ <CAKv+Gu9s2t+Nt7JCcTxkr5BYSN05f_zxYkKzfrD-4owWQLvF_Q@mail.gmail.com>
+Message-ID: <20170428095349.GA22161@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add trace events in significant places of the data path.
-Useful for debuggging.
+On Fri, Apr 28, 2017 at 08:18:52AM +0100, Ard Biesheuvel wrote:
+> On 27 April 2017 at 23:52, Matthias Kaehlcke <mka@chromium.org> wrote:
+> > El Thu, Apr 27, 2017 at 12:02:56PM +0100 Mark Rutland ha dit:
+> >> On Wed, Apr 26, 2017 at 02:46:16PM -0700, Matthias Kaehlcke wrote:
 
-Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
----
-v3: no changes
-v2: no changes
+> >> > -   asm volatile("strb %w0, [%1]" : : "rZ" (val), "r" (addr));
+> >> > +   asm volatile("strb %w0, [%x1]" : : "rZ" (val), "r" (addr));
+> >>
+> >> In general, the '[%xN]' pattern looks *very* suspicious to me. Any
+> >> address must be 64-bit, so this would mask a legitimate warning.
+> >>
+> >> Given the prototype of this function the code if fine either way, but
+> >> were we to refactor things (e.g. making this a macro), that might not be
+> >> true.
+> >>
+> >> ... so I'm not sure it make sense to alter instances used for addresses.
+> >
+> > Good point, I'll leave instances dealing with addresses untouched for now.
+> >
+> 
+> OK, I am confused now. We started this thread under the assumption
+> that all unqualified placeholders are warned about by Clang. Given
+> that this appears not to be the case, could we please first find out
+> what causes the warnings?
 
- drivers/staging/fsl-dpaa2/ethernet/Makefile        |   3 +
- .../staging/fsl-dpaa2/ethernet/dpaa2-eth-trace.h   | 185 +++++++++++++++++++++
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |  21 +++
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h     |   2 +
- 4 files changed, 211 insertions(+)
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth-trace.h
+Yes please.
 
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/Makefile b/drivers/staging/fsl-dpaa2/ethernet/Makefile
-index 4327ebe803cb..77b0b74f835a 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/Makefile
-+++ b/drivers/staging/fsl-dpaa2/ethernet/Makefile
-@@ -5,3 +5,6 @@
- obj-$(CONFIG_FSL_DPAA2_ETH) += fsl-dpaa2-eth.o
- 
- fsl-dpaa2-eth-objs    := dpaa2-eth.o dpaa2-ethtool.o dpni.o
-+
-+# Needed by the tracing framework
-+CFLAGS_dpaa2-eth.o := -I$(src)
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth-trace.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth-trace.h
-new file mode 100644
-index 000000000000..3b040e8d6a4e
---- /dev/null
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth-trace.h
-@@ -0,0 +1,185 @@
-+/* Copyright 2014-2015 Freescale Semiconductor Inc.
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions are met:
-+ *     * Redistributions of source code must retain the above copyright
-+ *	 notice, this list of conditions and the following disclaimer.
-+ *     * Redistributions in binary form must reproduce the above copyright
-+ *	 notice, this list of conditions and the following disclaimer in the
-+ *	 documentation and/or other materials provided with the distribution.
-+ *     * Neither the name of Freescale Semiconductor nor the
-+ *	 names of its contributors may be used to endorse or promote products
-+ *	 derived from this software without specific prior written permission.
-+ *
-+ *
-+ * ALTERNATIVELY, this software may be distributed under the terms of the
-+ * GNU General Public License ("GPL") as published by the Free Software
-+ * Foundation, either version 2 of that License or (at your option) any
-+ * later version.
-+ *
-+ * THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor ``AS IS'' AND ANY
-+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-+ * DISCLAIMED. IN NO EVENT SHALL Freescale Semiconductor BE LIABLE FOR ANY
-+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+#undef TRACE_SYSTEM
-+#define TRACE_SYSTEM	dpaa2_eth
-+
-+#if !defined(_DPAA2_ETH_TRACE_H) || defined(TRACE_HEADER_MULTI_READ)
-+#define _DPAA2_ETH_TRACE_H
-+
-+#include <linux/skbuff.h>
-+#include <linux/netdevice.h>
-+#include "dpaa2-eth.h"
-+#include <linux/tracepoint.h>
-+
-+#define TR_FMT "[%s] fd: addr=0x%llx, len=%u, off=%u"
-+/* trace_printk format for raw buffer event class */
-+#define TR_BUF_FMT "[%s] vaddr=%p size=%zu dma_addr=%pad map_size=%zu bpid=%d"
-+
-+/* This is used to declare a class of events.
-+ * individual events of this type will be defined below.
-+ */
-+
-+/* Store details about a frame descriptor */
-+DECLARE_EVENT_CLASS(dpaa2_eth_fd,
-+		    /* Trace function prototype */
-+		    TP_PROTO(struct net_device *netdev,
-+			     const struct dpaa2_fd *fd),
-+
-+		    /* Repeat argument list here */
-+		    TP_ARGS(netdev, fd),
-+
-+		    /* A structure containing the relevant information we want
-+		     * to record. Declare name and type for each normal element,
-+		     * name, type and size for arrays. Use __string for variable
-+		     * length strings.
-+		     */
-+		    TP_STRUCT__entry(
-+				     __field(u64, fd_addr)
-+				     __field(u32, fd_len)
-+				     __field(u16, fd_offset)
-+				     __string(name, netdev->name)
-+		    ),
-+
-+		    /* The function that assigns values to the above declared
-+		     * fields
-+		     */
-+		    TP_fast_assign(
-+				   __entry->fd_addr = dpaa2_fd_get_addr(fd);
-+				   __entry->fd_len = dpaa2_fd_get_len(fd);
-+				   __entry->fd_offset = dpaa2_fd_get_offset(fd);
-+				   __assign_str(name, netdev->name);
-+		    ),
-+
-+		    /* This is what gets printed when the trace event is
-+		     * triggered.
-+		     */
-+		    TP_printk(TR_FMT,
-+			      __get_str(name),
-+			      __entry->fd_addr,
-+			      __entry->fd_len,
-+			      __entry->fd_offset)
-+);
-+
-+/* Now declare events of the above type. Format is:
-+ * DEFINE_EVENT(class, name, proto, args), with proto and args same as for class
-+ */
-+
-+/* Tx (egress) fd */
-+DEFINE_EVENT(dpaa2_eth_fd, dpaa2_tx_fd,
-+	     TP_PROTO(struct net_device *netdev,
-+		      const struct dpaa2_fd *fd),
-+
-+	     TP_ARGS(netdev, fd)
-+);
-+
-+/* Rx fd */
-+DEFINE_EVENT(dpaa2_eth_fd, dpaa2_rx_fd,
-+	     TP_PROTO(struct net_device *netdev,
-+		      const struct dpaa2_fd *fd),
-+
-+	     TP_ARGS(netdev, fd)
-+);
-+
-+/* Tx confirmation fd */
-+DEFINE_EVENT(dpaa2_eth_fd, dpaa2_tx_conf_fd,
-+	     TP_PROTO(struct net_device *netdev,
-+		      const struct dpaa2_fd *fd),
-+
-+	     TP_ARGS(netdev, fd)
-+);
-+
-+/* Log data about raw buffers. Useful for tracing DPBP content. */
-+TRACE_EVENT(dpaa2_eth_buf_seed,
-+	    /* Trace function prototype */
-+	    TP_PROTO(struct net_device *netdev,
-+		     /* virtual address and size */
-+		     void *vaddr,
-+		     size_t size,
-+		     /* dma map address and size */
-+		     dma_addr_t dma_addr,
-+		     size_t map_size,
-+		     /* buffer pool id, if relevant */
-+		     u16 bpid),
-+
-+	    /* Repeat argument list here */
-+	    TP_ARGS(netdev, vaddr, size, dma_addr, map_size, bpid),
-+
-+	    /* A structure containing the relevant information we want
-+	     * to record. Declare name and type for each normal element,
-+	     * name, type and size for arrays. Use __string for variable
-+	     * length strings.
-+	     */
-+	    TP_STRUCT__entry(
-+			     __field(void *, vaddr)
-+			     __field(size_t, size)
-+			     __field(dma_addr_t, dma_addr)
-+			     __field(size_t, map_size)
-+			     __field(u16, bpid)
-+			     __string(name, netdev->name)
-+	    ),
-+
-+	    /* The function that assigns values to the above declared
-+	     * fields
-+	     */
-+	    TP_fast_assign(
-+			   __entry->vaddr = vaddr;
-+			   __entry->size = size;
-+			   __entry->dma_addr = dma_addr;
-+			   __entry->map_size = map_size;
-+			   __entry->bpid = bpid;
-+			   __assign_str(name, netdev->name);
-+	    ),
-+
-+	    /* This is what gets printed when the trace event is
-+	     * triggered.
-+	     */
-+	    TP_printk(TR_BUF_FMT,
-+		      __get_str(name),
-+		      __entry->vaddr,
-+		      __entry->size,
-+		      &__entry->dma_addr,
-+		      __entry->map_size,
-+		      __entry->bpid)
-+);
-+
-+/* If only one event of a certain type needs to be declared, use TRACE_EVENT().
-+ * The syntax is the same as for DECLARE_EVENT_CLASS().
-+ */
-+
-+#endif /* _DPAA2_ETH_TRACE_H */
-+
-+/* This must be outside ifdef _DPAA2_ETH_TRACE_H */
-+#undef TRACE_INCLUDE_PATH
-+#define TRACE_INCLUDE_PATH .
-+#undef TRACE_INCLUDE_FILE
-+#define TRACE_INCLUDE_FILE	dpaa2-eth-trace
-+#include <trace/define_trace.h>
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index 67f007bdbe79..6f9eed66c64d 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -42,6 +42,12 @@
- #include "../../fsl-mc/include/mc-sys.h"
- #include "dpaa2-eth.h"
- 
-+/* CREATE_TRACE_POINTS only needs to be defined once. Other dpa files
-+ * using trace events only need to #include <trace/events/sched.h>
-+ */
-+#define CREATE_TRACE_POINTS
-+#include "dpaa2-eth-trace.h"
-+
- MODULE_LICENSE("Dual BSD/GPL");
- MODULE_AUTHOR("Freescale Semiconductor, Inc");
- MODULE_DESCRIPTION("Freescale DPAA2 Ethernet Driver");
-@@ -213,6 +219,9 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
- 	struct dpaa2_fas *fas;
- 	u32 status = 0;
- 
-+	/* Tracing point */
-+	trace_dpaa2_rx_fd(priv->net_dev, fd);
-+
- 	dma_unmap_single(dev, addr, DPAA2_ETH_RX_BUF_SIZE, DMA_FROM_DEVICE);
- 	vaddr = phys_to_virt(addr);
- 
-@@ -583,6 +592,9 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
- 		goto err_build_fd;
- 	}
- 
-+	/* Tracing point */
-+	trace_dpaa2_tx_fd(net_dev, &fd);
-+
- 	/* TxConf FQ selection primarily based on cpu affinity; this is
- 	 * non-migratable context, so it's safe to call smp_processor_id().
- 	 */
-@@ -623,6 +635,9 @@ static void dpaa2_eth_tx_conf(struct dpaa2_eth_priv *priv,
- 	struct dpaa2_eth_drv_stats *percpu_extras;
- 	u32 status = 0;
- 
-+	/* Tracing point */
-+	trace_dpaa2_tx_conf_fd(priv->net_dev, fd);
-+
- 	percpu_extras = this_cpu_ptr(priv->percpu_extras);
- 	percpu_extras->tx_conf_frames++;
- 	percpu_extras->tx_conf_bytes += dpaa2_fd_get_len(fd);
-@@ -707,6 +722,12 @@ static int add_bufs(struct dpaa2_eth_priv *priv, u16 bpid)
- 			goto err_map;
- 
- 		buf_array[i] = addr;
-+
-+		/* tracing point */
-+		trace_dpaa2_eth_buf_seed(priv->net_dev,
-+					 buf, DPAA2_ETH_BUF_RAW_SIZE,
-+					 addr, DPAA2_ETH_RX_BUF_SIZE,
-+					 bpid);
- 	}
- 
- release_bufs:
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-index f2b0a60795fe..c67cced55b72 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-@@ -43,6 +43,8 @@
- #include "dpni.h"
- #include "dpni-cmd.h"
- 
-+#include "dpaa2-eth-trace.h"
-+
- #define DPAA2_ETH_STORE_SIZE		16
- 
- /* Maximum number of scatter-gather entries in an ingress frame,
--- 
-2.11.0
+> Is it necessary at all to add the x modifiers for 64-bit types?
+
+Having delved a little deeper, I think this is actively harmful, and
+clang's warning indicates potential problems even when compiling with
+GCC.
+
+The below test simulates how we might write to control regs and so on,
+with a mov in asm simulating something like an msr.
+
+---->8----
+#include <stdio.h>
+
+static inline unsigned long generate_val(void)
+{
+        unsigned long val;
+
+        /* hide value generation from GCC */
+        asm (
+                "movn %0, #0"
+                : "=r" (val)
+        );
+
+        return val;
+}
+
+static inline unsigned long use_val_32(unsigned int in)
+{
+        unsigned long out;
+
+	/* simulate what we might write to a sysreg */
+        asm (
+                "mov %x0, %x1"
+                : "=r" (out)
+                : "r" (in)
+        );
+
+        return out;
+}
+
+int main(int argc, char *argv)
+{
+        printf("32-bit val is: 0x%016lx\n", use_val_32(generate_val()));
+
+        return 0;
+}
+---->8----
+
+Depending on optimization level, bits that we do not expect can flow through:
+
+$ gcc test.c -o test
+$ ./test
+32-bit val is: 0x00000000ffffffff
+$ gcc test.c -O1 -o test
+$ ./test
+32-bit val is: 0xffffffffffffffff
+$ gcc test.c -O2 -o test
+$ ./test
+32-bit val is: 0xffffffffffffffff
+
+... that could be disastrous depending on how the result was used.
+
+With "in" cast to an unsigned long, the compiler realises it needs to perform
+any necessary truncation itself:
+
+$ gcc test.c -o test
+$ ./test
+32-bit val is: 0x00000000ffffffff
+$ gcc test.c -O1 -o test
+$ ./test
+32-bit val is: 0x00000000ffffffff
+$ gcc test.c -O2 -o test
+$ ./test
+32-bit val is: 0x00000000ffffffff
+$ gcc test.c -O3 -o test
+$ ./test
+32-bit val is: 0x00000000ffffffff
+
+I think that the correct fix is to use intermediate 64-bit variables, or
+casts, so that the compiler *must* use an x register, and consequently
+guarantees that all 64-bits of the register are as we expect.
+
+Thanks,
+Mark.
