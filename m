@@ -1,138 +1,84 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 28 Apr 2017 16:59:49 +0100
-Subject: [PATCH] ACPI/IORT: Fix CONFIG_IOMMU_API dependency
-Message-ID: <1493395189-10857-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 28 Apr 2017 12:05:32 -0400 (EDT)
+Subject: arm64: next-20170428 hangs on boot
+In-Reply-To: <20170428145233.GB5292@leverpostej>
+References: <20170428132429.c3dlxbmt7iqs2isl@yury-N73SV>
+ <20170428145233.GB5292@leverpostej>
+Message-ID: <20170428.120532.2008072008826207366.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IOMMU probe deferral IORT rework had to add code in
-iort_iommu_configure() and iort_iommu_xlate() that requires
-the IOMMU_API to be selected in order to compile and work.
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Fri, 28 Apr 2017 15:52:34 +0100
 
-Stub out the pieces of code that depend on CONFIG_IOMMU_API
-to be selected to prevent compilation failures such as:
+> On Fri, Apr 28, 2017 at 04:24:29PM +0300, Yury Norov wrote:
+>> Hi all,
+> 
+> Hi,
+> 
+> [adding Dave Miller, netdev, lkml]
+> 
+>> On QEMU the next-20170428 hangs on boot for me due to kernel panic in 
+>> rtnetlink_init():
+>> 
+>> void __init rtnetlink_init(void)
+>> {
+>>         if (register_pernet_subsys(&rtnetlink_net_ops))
+>>                 panic("rtnetlink_init: cannot initialize rtnetlink\n");
+>> 
+>>         ...
+>> }
+> 
+> I see the same thing with a next-20170428 arm64 defconfig, on a Juno R1
+> system:
 
-drivers/acpi/arm64/iort.c: In function 'iort_iommu_xlate':
-drivers/acpi/arm64/iort.c:647:22: error: 'struct iommu_fwspec' has no
-member named 'ops'
+As stated, should be fixed by:
 
-by wrapping the code in static inline functions that provide a NOP
-implementation when CONFIG_IOMMU_API is not selected.
+>From 2d2ab658d2debcb4c0e29c9e6f18e5683f3077bf Mon Sep 17 00:00:00 2001
+From: Herbert Xu <herbert@gondor.apana.org.au>
+Date: Fri, 28 Apr 2017 14:10:48 +0800
+Subject: [PATCH] rhashtable: Do not lower max_elems when max_size is zero
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Sricharan R <sricharan@codeaurora.org>
+The commit 6d684e54690c ("rhashtable: Cap total number of entries
+to 2^31") breaks rhashtable users that do not set max_size.  This
+is because when max_size is zero max_elems is also incorrectly set
+to zero instead of 2^31.
+
+This patch fixes it by only lowering max_elems when max_size is not
+zero.
+
+Fixes: 6d684e54690c ("rhashtable: Cap total number of entries to 2^31")
+Reported-by: Florian Fainelli <f.fainelli@gmail.com>
+Reported-by: kernel test robot <fengguang.wu@intel.com>
+Signed-off-by: Herbert Xu <herbert@gondor.apana.org.au>
+Signed-off-by: David S. Miller <davem@davemloft.net>
 ---
-Joerg, all,
+ lib/rhashtable.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-as reported by Arnd:
-
-https://lkml.org/lkml/2017/4/27/303
-
-we have this issue in -next and I managed to write this patch in a
-way that applies to Joerg's tree - branch:
-
-arm/core
-
-and does not conflict with ACPI IORT patches queued via arm64 tree.
-
-I know it is late and it is not a major breakage, so either Joerg
-applies this patch to his arm/core branch or I can send a fix for -rc1
-when both the IOMMU and arm64 trees are merged, please let me know how
-you prefer handling it, it is a bit rushed owing to where we are in
-the cycle.
-
-Thanks !
-Lorenzo
-
- drivers/acpi/arm64/iort.c | 44 ++++++++++++++++++++++++++++++++++----------
- 1 file changed, 34 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index e7b1940..a629e83 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -536,6 +536,33 @@ static inline bool iort_iommu_driver_enabled(u8 type)
- 	}
- }
+diff --git a/lib/rhashtable.c b/lib/rhashtable.c
+index 751630b..3895486 100644
+--- a/lib/rhashtable.c
++++ b/lib/rhashtable.c
+@@ -958,13 +958,14 @@ int rhashtable_init(struct rhashtable *ht,
+ 	if (params->min_size)
+ 		ht->p.min_size = roundup_pow_of_two(params->min_size);
  
-+#ifdef CONFIG_IOMMU_API
-+static inline
-+const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
-+{
-+	return (fwspec && fwspec->ops) ? fwspec->ops : NULL;
-+}
-+
-+static inline
-+int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
-+{
-+	int err = 0;
-+
-+	if (!IS_ERR_OR_NULL(ops) && ops->add_device && dev->bus &&
-+	    !dev->iommu_group)
-+		err = ops->add_device(dev);
-+
-+	return err;
-+}
-+#else
-+static inline
-+const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
-+{ return NULL; }
-+static inline
-+int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
-+{ return 0; }
-+#endif
-+
- static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
- 					struct acpi_iort_node *node,
- 					u32 streamid)
-@@ -543,14 +570,14 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
- 	const struct iommu_ops *ops = NULL;
- 	int ret = -ENODEV;
- 	struct fwnode_handle *iort_fwnode;
--	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
- 
- 	/*
- 	 * If we already translated the fwspec there
- 	 * is nothing left to do, return the iommu_ops.
- 	 */
--	if (fwspec && fwspec->ops)
--		return fwspec->ops;
-+	ops = iort_fwspec_iommu_ops(dev->iommu_fwspec);
-+	if (ops)
-+		return ops;
- 
- 	if (node) {
- 		iort_fwnode = iort_get_fwnode(node);
-@@ -611,6 +638,7 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
- 	struct acpi_iort_node *node, *parent;
- 	const struct iommu_ops *ops = NULL;
- 	u32 streamid = 0;
-+	int err;
- 
- 	if (dev_is_pci(dev)) {
- 		struct pci_bus *bus = to_pci_dev(dev)->bus;
-@@ -654,13 +682,9 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
- 	 * If we have reason to believe the IOMMU driver missed the initial
- 	 * add_device callback for dev, replay it to get things in order.
- 	 */
--	if (!IS_ERR_OR_NULL(ops) && ops->add_device &&
--	    dev->bus && !dev->iommu_group) {
--		int err = ops->add_device(dev);
+-	if (params->max_size)
+-		ht->p.max_size = rounddown_pow_of_two(params->max_size);
 -
--		if (err)
--			ops = ERR_PTR(err);
--	}
-+	err = iort_add_device_replay(ops, dev);
-+	if (err)
-+		ops = ERR_PTR(err);
+ 	/* Cap total entries at 2^31 to avoid nelems overflow. */
+ 	ht->max_elems = 1u << 31;
+-	if (ht->p.max_size < ht->max_elems / 2)
+-		ht->max_elems = ht->p.max_size * 2;
++
++	if (params->max_size) {
++		ht->p.max_size = rounddown_pow_of_two(params->max_size);
++		if (ht->p.max_size < ht->max_elems / 2)
++			ht->max_elems = ht->p.max_size * 2;
++	}
  
- 	return ops;
- }
+ 	ht->p.min_size = max(ht->p.min_size, HASH_MIN_SIZE);
+ 
 -- 
-2.10.0
+2.4.11
