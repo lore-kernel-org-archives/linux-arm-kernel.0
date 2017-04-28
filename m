@@ -1,42 +1,66 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Fri, 28 Apr 2017 15:26:43 +0530
-Subject: [PATCH 5/5] arm64: defconfig: Enable QCOM IPQ8074 clock and pinctrl
-In-Reply-To: <1493373403-23462-1-git-send-email-varada@codeaurora.org>
-References: <1493373403-23462-1-git-send-email-varada@codeaurora.org>
-Message-ID: <1493373403-23462-6-git-send-email-varada@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 28 Apr 2017 11:02:30 +0100
+Subject: [PATCHv2 2/2] arm64: cpufeature: use
+ static_branch_enable_cpuslocked()
+In-Reply-To: <20170427180104.GO1890@arm.com>
+References: <1493315077-19496-1-git-send-email-mark.rutland@arm.com>
+ <1493315077-19496-3-git-send-email-mark.rutland@arm.com>
+ <20170427180104.GO1890@arm.com>
+Message-ID: <20170428100230.GA22621@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhishek Sahu <absahu@codeaurora.org>
+On Thu, Apr 27, 2017 at 07:01:04PM +0100, Will Deacon wrote:
+> On Thu, Apr 27, 2017 at 06:44:37PM +0100, Mark Rutland wrote:
+> > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> > index f6cc67e..379ad8d 100644
+> > --- a/arch/arm64/kernel/cpu_errata.c
+> > +++ b/arch/arm64/kernel/cpu_errata.c
+> > @@ -175,9 +175,20 @@ void verify_local_cpu_errata_workarounds(void)
+> >  		}
+> >  }
+> >  
+> > -void update_cpu_errata_workarounds(void)
+> > +/*
+> > + * Secondary CPUs are booted with the waker holding the
+> > + * CPU hotplug lock, hence we don't need to lock it here again.
+> > + */
+> > +void update_secondary_cpu_errata_workarounds(void)
+> > +{
+> > +	update_cpu_capabilities(arm64_errata, "enabling workaround for");
+> > +}
+> > +
+> > +void update_boot_cpu_errata_workarounds(void)
+> >  {
+> > +	get_online_cpus();
+> >  	update_cpu_capabilities(arm64_errata, "enabling workaround for");
+> > +	put_online_cpus();
+> >  }
+> 
+> These functions seem to have unhelpful names, especially when compared to
+> the naming scheme used by the core code. I'd prefer to have:
+> 
+> update_cpu_errata_workarounds: just calls update_cpu_capabilities
+> 
+> update_cpu_errata_workarounds_cpuslocked: does get_online_cpus(), then calls
+> update_cpu_errata_workarounds, then does put_online_cpus();
 
-These configs are required for booting kernel in QCOM
-IPQ8074 boards.
+That's the opposite polarity to the other _cpuslocked functions, where
+_cpuslocked means that the lock is already held (and should not be taken
+by the _cpuslocked function itself.
 
-Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
-Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
----
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+So I'll make those changes, but I'll swap that so:
+update_cpu_errata_workarounds() does:
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 7c48028..e6aeb69 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -266,6 +266,7 @@ CONFIG_SPI_SPIDEV=m
- CONFIG_SPI_S3C64XX=y
- CONFIG_SPMI=y
- CONFIG_PINCTRL_SINGLE=y
-+CONFIG_PINCTRL_IPQ8074=y
- CONFIG_PINCTRL_MAX77620=y
- CONFIG_PINCTRL_MSM8916=y
- CONFIG_PINCTRL_MSM8994=y
-@@ -439,6 +440,7 @@ CONFIG_COMMON_CLK_PWM=y
- CONFIG_COMMON_CLK_RK808=y
- CONFIG_CLK_QORIQ=y
- CONFIG_COMMON_CLK_QCOM=y
-+CONFIG_IPQ_GCC_8074=y
- CONFIG_MSM_GCC_8916=y
- CONFIG_MSM_GCC_8994=y
- CONFIG_MSM_MMCC_8996=y
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+  get_online_cpus()
+  update_cpu_errata_workarounds_cpuslocked()
+  put_online_cpus()
+
+> With that change:
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+
+I assume that will stand with the above change. Please shout if not!
+
+Thanks,
+Mark.
