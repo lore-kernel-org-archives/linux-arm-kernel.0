@@ -1,45 +1,52 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 28 Apr 2017 07:10:06 +0200
-Subject: [PATCH 0/9] ARM: dts: renesas: update PFC node name to
- pin-controller
-In-Reply-To: <CAMuHMdVtMAMEjbEUA+ypwK5V+Sh+mEPs14_rUe0e4--sH=sTjw@mail.gmail.com>
-References: <20170426100538.22060-1-horms+renesas@verge.net.au>
- <CAMuHMdVtMAMEjbEUA+ypwK5V+Sh+mEPs14_rUe0e4--sH=sTjw@mail.gmail.com>
-Message-ID: <20170428051005.GA18349@verge.net.au>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Fri, 28 Apr 2017 07:11:00 +0200
+Subject: [PATCH v2] arm: dts: sun7i-a20-bananapi: name the GPIO lines
+In-Reply-To: <CACRpkdZn7-SL5kmGn7Pysz=QiQFBEm8+c6bw=hE5F0CV4ct0RQ@mail.gmail.com>
+References: <CACRpkdYnK=7C=F5hZUo-nYv6Z+Pb+eT7vm1e4hL8N-QgJnuLfg@mail.gmail.com>
+ <1470384404-6796-1-git-send-email-linux@rempel-privat.de>
+ <CACRpkdZn7-SL5kmGn7Pysz=QiQFBEm8+c6bw=hE5F0CV4ct0RQ@mail.gmail.com>
+Message-ID: <60d2e24d-91c8-7563-9ecc-f203b12e0983@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 01:20:52PM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
+Am 08.08.2016 um 19:51 schrieb Linus Walleij:
+> On Fri, Aug 5, 2016 at 10:06 AM, Oleksij Rempel <linux@rempel-privat.de> wrote:
 > 
-> On Wed, Apr 26, 2017 at 12:05 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > The device trees for Renesas SoCs use either pfc or pin-controller as the
-> > node name for the PFC device. This patch is intended to take a step towards
-> > unifying the node name used as pin-controller which appears to be the more
-> > generic of the two and thus more in keeping with the DT specs.
-> >
-> > My analysis is that this is a user-visible change to the extent that kernel
-> > logs, and sysfs entries change from XXX.pfc and pfc at XXX to
-> > XXX.pin-controller and pin-controller at XXX.
-> >
-> > Boot tested on:
-> >  r8a73a4/ape6evm
-> >  r8a7740/armadillo800evb
-> >  r8a7778/bockw
-> >  r8a7790/lager
-> >  r8a7791/koelsch
-> >  r8a7791/porter
-> >  r8a7793/gose
-> >  sh73a9/kzm9g
-> >
-> > Not tested on (due to lack of hw access):
-> >  evm2/kzm9d
-> >  r8a7789/marzen
-> >
-> > Simon Horman (9):
+>> This names the GPIO lines on the Banana Pi board in accordance with
+>> the A20_Banana_Pi v1.4 Specification.
+>>
+>> This will make these line names reflect through to userspace
+>> so that they can easily be identified and used with the new
+>> character device ABI.
+>>
+>> Some care has been taken to name all lines, not just those used
+>> by the external connectors, also lines that are muxed into some
+>> other function than GPIO: these are named "[FOO]" so that users
+>> can see with lsgpio what all lines are used for.
+>>
+>> Ps: most of the text was taken from Linus Wallej patch.
+>>
+>> Cc: devicetree at vger.kernel.org
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: Chen-Yu Tsai <wens@csie.org>
+>> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 > 
-> For the whole series:
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Yours,
+> Linus Walleij
 
-Thanks, I have queued these up.
+Hm... i assume this patch was lost. Should i resend it?
+
+-- 
+Regards,
+Oleksij
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170428/8543b817/attachment.sig>
