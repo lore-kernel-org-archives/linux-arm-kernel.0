@@ -1,58 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Apr 2017 15:17:45 +0100
-Subject: [PATCH 2/2] arm64: pmu: Wire-up L2 cache events for ARMv8 PMUv3
-In-Reply-To: <20170428141500.GE6368@e104818-lin.cambridge.arm.com>
-References: <20170420190546.7453-1-f.fainelli@gmail.com>
- <20170420190546.7453-4-f.fainelli@gmail.com>
- <20170425124427.GI24484@arm.com>
- <28edde78-b965-8136-1c95-11b9182de405@gmail.com>
- <20170427173642.GM1890@arm.com>
- <20170428141500.GE6368@e104818-lin.cambridge.arm.com>
-Message-ID: <20170428141745.GQ13675@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 28 Apr 2017 16:23:38 +0200
+Subject: [PATCH 1/8] [RFC] dt-bindings: renesas: Document R-Car H3 and
+ M3-W SiP DT bindings
+In-Reply-To: <20170428133923.ycbqixcxvcsonocn@rob-hp-laptop>
+References: <1492593351-13835-1-git-send-email-geert+renesas@glider.be>
+ <1492593351-13835-2-git-send-email-geert+renesas@glider.be>
+ <20170428133923.ycbqixcxvcsonocn@rob-hp-laptop>
+Message-ID: <CAMuHMdXv+Eb8RRCH3u18Lm=ZeBBxkErUxb4TN=Sf6RNFP0xO3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 03:15:01PM +0100, Catalin Marinas wrote:
-> On Thu, Apr 27, 2017 at 06:36:42PM +0100, Will Deacon wrote:
-> > On Tue, Apr 25, 2017 at 10:13:51AM -0700, Florian Fainelli wrote:
-> > > On 04/25/2017 05:44 AM, Will Deacon wrote:
-> > > > On Thu, Apr 20, 2017 at 12:05:46PM -0700, Florian Fainelli wrote:
-> > > >> The ARMv8 PMUv3 cache map did not include the L2 cache events, add
-> > > >> them.
-> > > >>
-> > > >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> > > >> ---
-> > > >>  arch/arm64/kernel/perf_event.c | 5 +++++
-> > > >>  1 file changed, 5 insertions(+)
-> > > >>
-> > > >> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> > > >> index 4f011cdd756d..a664c575f3fd 100644
-> > > >> --- a/arch/arm64/kernel/perf_event.c
-> > > >> +++ b/arch/arm64/kernel/perf_event.c
-> > > >> @@ -264,6 +264,11 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
-> > > >>  	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE,
-> > > >>  	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL,
-> > > >>  
-> > > >> +	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
-> > > >> +	[C(LL)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
-> > > >> +	[C(LL)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
-> > > >> +	[C(LL)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
-> > > > 
-> > > > I don't think this is correct in general. 'LL' stands for "last-level",
-> > > > which may be L3 or even a system cache in the interconnect. Tying that to L2
-> > > > is the wrong thing to do from perf's generic event perspective.
-> > > > 
-> > > > I'm ok with what you're proposing for A53 (where the PMU can only count
-> > > > events out to the L2), but I'm reluctant to make this change for the generic
-> > > > PMUv3 events.
-> > > 
-> > > That makes sense, shall I resubmit the first patch by itself or can you
-> > > or Catalin take it as-is?
-> > 
-> > I'll talk to Catalin tomorrow and try to get the A53 bit queued.
-> 
-> I queued patch 1/2. Shall I add your ack?
+Hi Rob,
 
-Yes, please.
+On Fri, Apr 28, 2017 at 3:39 PM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, Apr 19, 2017 at 11:15:44AM +0200, Geert Uytterhoeven wrote:
+>> Document the SiP ("System-in-Package") versions of the R-Car H3 and M3-W
+>> SoCs, which contain an R-Car H3 or M3-W SoC, RAM, and HyperFlash.
+>>
+>> Add their compatible values to all boards equipped with R-Car Gen3 SiPs.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>> Questions:
+>>   - Do we need more compatible values, for different configurations?
+>>     At least r8j7796 is available with either 2 GiB or 4 GiB of RAM,
+>>     possibly using RAM parts from different vendors.
+>
+> Same die, just a different package? If so, I don't think you need a
+> different compatible. It's going to be a different board from any
+> non-SiP which should be enough to distinguish.
 
-Will
+An SiP is more like a CPU daughterboard.
+
+The different SiP-versions based on r8a7795 contain the same r8a7795 SoC die,
+but different amounts of RAM, i.e. different RAM dies.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
