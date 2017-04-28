@@ -1,25 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 28 Apr 2017 17:14:03 +0100
-Subject: [PATCH] arm64: Print DT machine model in setup_machine_fdt()
-In-Reply-To: <1493296385-14140-1-git-send-email-geert+renesas@glider.be>
-References: <1493296385-14140-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170428161403.GF6368@e104818-lin.cambridge.arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 28 Apr 2017 18:14:11 +0200
+Subject: [PATCH] drivers: dma-mapping: Do not leave an invalid
+ area->pages pointer in dma_common_contiguous_remap()
+In-Reply-To: <20170425182549.GA18677@e104818-lin.cambridge.arm.com>
+References: <1493144543-2497-1-git-send-email-catalin.marinas@arm.com>
+ <20170425182549.GA18677@e104818-lin.cambridge.arm.com>
+Message-ID: <20170428161411.GA26277@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 02:33:05PM +0200, Geert Uytterhoeven wrote:
-> On arm32, the machine model specified in the device tree is printed
-> during boot-up, courtesy of of_flat_dt_match_machine().
+On Tue, Apr 25, 2017 at 07:25:49PM +0100, Catalin Marinas wrote:
+> On Tue, Apr 25, 2017 at 07:22:23PM +0100, Catalin Marinas wrote:
+> > The dma_common_pages_remap() function allocates a vm_struct object and
+> > initialises the pages pointer to value passed as argument. However, when
+> > this function is called dma_common_contiguous_remap(), the pages array
+> > is only temporarily allocated, being freed shortly after
+> > dma_common_contiguous_remap() returns. Architecture code checking the
+> > validity of an area->pages pointer would incorrectly dereference already
+> > freed pointers. This has been exposed by the arm64 commit 44176bb38fa4
+> > ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU").
+> > 
+> > Fixes: 513510ddba96 ("common: dma-mapping: introduce common remapping functions")
+> > Cc: Laura Abbott <labbott@redhat.com>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Reported-by: Andrzej Hajda <a.hajda@samsung.com>
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> On arm64, of_flat_dt_match_machine() is not called, and the machine
-> model information is not available from the kernel log.
+> Small correction on the subject, the prefix should be something like:
 > 
-> Print the machine model to make it easier to derive the machine model
-> from an arbitrary kernel boot log.
+> drivers: dma-mapping:
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> It's not an arm64 patch.
 
-Applied. Thanks.
+If you want to take it through your tree:
+	Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+otherwise feel free to resend it with a fixed subject line and I can
+take it :)
 
--- 
-Catalin
+thanks,
+
+greg k-h
