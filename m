@@ -1,46 +1,61 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Fri, 28 Apr 2017 14:57:25 +0200
-Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
-In-Reply-To: <20170428013532.GB383@jagdpanzerIV.localdomain>
-References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
- <1461239325-22779-2-git-send-email-pmladek@suse.com>
- <20170419131341.76bc7634@gandalf.local.home>
- <20170420033112.GB542@jagdpanzerIV.localdomain>
- <20170420131154.GL3452@pathway.suse.cz>
- <20170427121458.2be577cc@gandalf.local.home>
- <20170428013532.GB383@jagdpanzerIV.localdomain>
-Message-ID: <20170428125725.GA3452@pathway.suse.cz>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 28 Apr 2017 14:58:40 +0200
+Subject: [PATCH v2 1/5] arm64: dts: r8a7796: Add external audio clocks
+In-Reply-To: <1493384324-29344-1-git-send-email-geert+renesas@glider.be>
+References: <1493384324-29344-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1493384324-29344-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2017-04-28 10:35:32, Sergey Senozhatsky wrote:
-> On (04/27/17 12:14), Steven Rostedt wrote:
-> [..]
-> > I tried this patch. It's better because I get the end of the trace, but
-> > I do lose the beginning of it:
-> > 
-> > ** 196358 printk messages dropped ** [  102.321182]     perf-5981    0.... 12983650us : d_path <-seq_path
->
-> many thanks!
-> 
-> so we now drop messages from logbuf, not from per-CPU buffers. that
-> "queue printk_deferred irq_work on every online CPU when we bypass per-CPU
-> buffers from NMI" idea *probably* might help here - we need someone to emit
-> messages from the logbuf while we printk from NMI. there is still a
-> possibility that we can drop messages, though, since log_store() from NMI
-> CPU can be much-much faster than call_console_drivers() on other CPU.
+Add the external audio clocks as zero Hz fixed-frequency clocks.
+Boards that provide these clocks should override them.
 
-ftrace log is dumped via trace_panic_notifier. It is done after
-smp_send_stop(). It means that only a single CPU is available and
-it is NMI context at the moment.
+Based on commit 623197b90c7aa97c ("arm64: renesas: r8a7795: Sound SSI
+PIO support").
 
-One possibility might be to put printk into a special mode and
-drop the last messages instead of the first ones. But this would
-need to be configurable.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+---
+v2:
+  - Correct one-line summary prefix,
+  - Add Acked-by.
+---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-Of course, if the problem is reproducible, the easiest solution
-is to use bigger main log buffer, for example boot with
-log_buf_len=32M.
-
-Best Regards,
-Petr
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 2ec1ed5f499165ad..101cd41d693a7ab5 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -120,6 +120,29 @@
+ 		clock-frequency = <0>;
+ 	};
+ 
++	/*
++	 * The external audio clocks are configured as 0 Hz fixed frequency
++	 * clocks by default.
++	 * Boards that provide audio clocks should override them.
++	 */
++	audio_clk_a: audio_clk_a {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_b: audio_clk_b {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_c: audio_clk_c {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
+ 	/* External CAN clock - to be overridden by boards that provide it */
+ 	can_clk: can {
+ 		compatible = "fixed-clock";
+-- 
+2.7.4
