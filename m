@@ -1,102 +1,126 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 28 Apr 2017 18:09:31 +0300
-Subject: arm64: next-20170428 hangs on boot
-In-Reply-To: <20170428145233.GB5292@leverpostej>
-References: <20170428132429.c3dlxbmt7iqs2isl@yury-N73SV>
- <20170428145233.GB5292@leverpostej>
-Message-ID: <20170428150931.iyoewmc5qs55aw3t@yury-N73SV>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Fri, 28 Apr 2017 08:32:10 -0700
+Subject: [PATCH v9 1/4] syscalls: Verify address limit before returning to
+ user-mode
+Message-ID: <20170428153213.137279-1-thgarnie@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 03:52:34PM +0100, Mark Rutland wrote:
-> On Fri, Apr 28, 2017 at 04:24:29PM +0300, Yury Norov wrote:
-> > Hi all,
-> 
-> Hi,
-> 
-> [adding Dave Miller, netdev, lkml]
+Ensure that a syscall does not return to user-mode with a kernel address
+limit. If that happens, a process can corrupt kernel-mode memory and
+elevate privileges [1].
 
-thanks
+The CONFIG_ADDR_LIMIT_CHECK option disables the generic check so each
+architecture can create optimized versions. This option is enabled by
+default on s390 because a similar feature already exists.
 
-> > On QEMU the next-20170428 hangs on boot for me due to kernel panic in 
-> > rtnetlink_init():
-> > 
-> > void __init rtnetlink_init(void)
-> > {
-> >         if (register_pernet_subsys(&rtnetlink_net_ops))
-> >                 panic("rtnetlink_init: cannot initialize rtnetlink\n");
-> > 
-> >         ...
-> > }
-> 
-> I see the same thing with a next-20170428 arm64 defconfig, on a Juno R1
-> system:
-> 
-> [    0.531949] Kernel panic - not syncing: rtnetlink_init: cannot initialize rtnetlink
-> [    0.531949] 
-> [    0.541271] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.11.0-rc8-next-20170428-00002-g6ee3799 #10
-> [    0.550307] Hardware name: ARM Juno development board (r1) (DT)
-> [    0.556332] Call trace:
-> [    0.558833] [<ffff000008088538>] dump_backtrace+0x0/0x238
-> [    0.564332] [<ffff000008088834>] show_stack+0x14/0x20
-> [    0.569477] [<ffff00000839dd54>] dump_stack+0x9c/0xc0
-> [    0.574622] [<ffff000008175344>] panic+0x11c/0x28c
-> [    0.579505] [<ffff000008d80034>] rtnetlink_init+0x2c/0x1d0
-> [    0.585092] [<ffff000008d8047c>] netlink_proto_init+0x14c/0x17c
-> [    0.591119] [<ffff000008083150>] do_one_initcall+0x38/0x120
-> [    0.596796] [<ffff000008d30d00>] kernel_init_freeable+0x1a0/0x240
-> [    0.603003] [<ffff00000892a790>] kernel_init+0x10/0x100
-> [    0.608324] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
-> [    0.613736] SMP: stopping secondary CPUs
-> [    0.617738] ---[ end Kernel panic - not syncing: rtnetlink_init: cannot initialize rtnetlink
-> 
-> If this isn't a known issue, it would be worth trying to bisect this.
+[1] https://bugs.chromium.org/p/project-zero/issues/detail?id=990
 
-The exact function that fails is: 
-include/linux/rhashtable.h
-static inline void *__rhashtable_insert_fast(
-        struct rhashtable *ht, const void *key, struct rhash_head *obj,
-        const struct rhashtable_params params, bool rhlist)
-{
-        ...
+Signed-off-by: Thomas Garnier <thgarnie@google.com>
+Tested-by: Kees Cook <keescook@chromium.org>
+---
+Based on next-20170426
+---
+ arch/s390/Kconfig        |  1 +
+ include/linux/syscalls.h | 27 ++++++++++++++++++++++++++-
+ init/Kconfig             |  6 ++++++
+ kernel/sys.c             | 13 +++++++++++++
+ 4 files changed, 46 insertions(+), 1 deletion(-)
 
-        data = ERR_PTR(-E2BIG);
-        if (unlikely(rht_grow_above_max(ht, tbl)))
-               goto out;
-        ...
-
-out:
-        spin_unlock_bh(lock);
-        rcu_read_unlock();
-
-        return data;
-}
-
-And the backtrace:
-#0  __rhashtable_insert_fast (rhlist=<optimized out>, params=..., obj=<optimized out>, 
-    key=<optimized out>, ht=<optimized out>) at ./include/linux/rhashtable.h:803
-#1  rhashtable_lookup_insert_key (params=..., obj=<optimized out>, key=<optimized out>, 
-    ht=<optimized out>) at ./include/linux/rhashtable.h:980
-#2  __netlink_insert (sk=<optimized out>, table=<optimized out>) at net/netlink/af_netlink.c:484
-#3  netlink_insert (sk=0xffff80003da85000, portid=0) at net/netlink/af_netlink.c:548
-#4  0xffff00000876c5a0 in __netlink_kernel_create (net=<optimized out>, unit=0, module=0x0, 
-    cfg=0xffff80003d84fc60) at net/netlink/af_netlink.c:1996
-#5  0xffff000008756704 in netlink_kernel_create (cfg=<optimized out>, unit=<optimized out>, 
-    net=<optimized out>) at ./include/linux/netlink.h:62
-#6  rtnetlink_net_init (net=0xffff000008c7c100 <init_net>) at net/core/rtnetlink.c:4175
-#7  0xffff000008737a2c in ops_init (ops=0xffff000008c7e268 <rtnetlink_net_ops>, 
-    net=0xffff000008c7c100 <init_net>) at net/core/net_namespace.c:117
-#8  0xffff000008738704 in __register_pernet_operations (ops=<optimized out>,
-    list=<optimized out>) at net/core/net_namespace.c:818
-#9  register_pernet_operations (list=<optimized out>, ops=0xffff000008c7e268
-    <rtnetlink_net_ops>) at net/core/net_namespace.c:892
-#10 0xffff0000087387fc in register_pernet_subsys (ops=0xffff000008c7e268
-    <rtnetlink_net_ops>) at net/core/net_namespace.c:934
-#11 0xffff000008b5b9b8 in rtnetlink_init () at net/core/rtnetlink.c:4195
-#12 0xffff000008b5be08 in netlink_proto_init () at net/netlink/af_netlink.c:2730
-#13 0xffff000008083158 in do_one_initcall (fn=0xffff000008b5bcc4 <netlink_proto_init>) at init/main.c:795
-#14 0xffff000008b20d04 in do_initcall_level (level=<optimized out>) at init/main.c:861
-#15 do_initcalls () at init/main.c:869
-#16 do_basic_setup () at init/main.c:887
-
-Yury
+diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+index d25435d94b6e..3d2ec084d5fc 100644
+--- a/arch/s390/Kconfig
++++ b/arch/s390/Kconfig
+@@ -64,6 +64,7 @@ config ARCH_SUPPORTS_UPROBES
+ 
+ config S390
+ 	def_bool y
++	select ADDR_LIMIT_CHECK
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 980c3c9b06f8..e534b93ce43a 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -191,6 +191,28 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+ 	SYSCALL_METADATA(sname, x, __VA_ARGS__)			\
+ 	__SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
+ 
++
++/*
++ * Called before coming back to user-mode. Returning to user-mode with an
++ * address limit different than USER_DS can allow to overwrite kernel memory.
++ */
++static inline void addr_limit_check_syscall(void)
++{
++	BUG_ON(!segment_eq(get_fs(), USER_DS));
++}
++
++#ifndef CONFIG_ADDR_LIMIT_CHECK
++#define ADDR_LIMIT_CHECK_PRE() \
++	bool user_caller = segment_eq(get_fs(), USER_DS)
++#define ADDR_LIMIT_CHECK_POST() \
++	if (user_caller) addr_limit_check_syscall()
++#else
++#define ADDR_LIMIT_CHECK_PRE()
++#define ADDR_LIMIT_CHECK_POST()
++asmlinkage void addr_limit_check_failed(void) __noreturn;
++#endif
++
++
+ #define __PROTECT(...) asmlinkage_protect(__VA_ARGS__)
+ #define __SYSCALL_DEFINEx(x, name, ...)					\
+ 	asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))	\
+@@ -199,7 +221,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+ 	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));	\
+ 	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))	\
+ 	{								\
+-		long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
++		long ret;						\
++		ADDR_LIMIT_CHECK_PRE();					\
++		ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
++		ADDR_LIMIT_CHECK_POST();				\
+ 		__MAP(x,__SC_TEST,__VA_ARGS__);				\
+ 		__PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));	\
+ 		return ret;						\
+diff --git a/init/Kconfig b/init/Kconfig
+index 42a346b0df43..599d9fe30703 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -1961,6 +1961,12 @@ config PROFILING
+ config TRACEPOINTS
+ 	bool
+ 
++config ADDR_LIMIT_CHECK
++	bool
++	help
++	  Disable the generic address limit check. Allow each architecture to
++	  optimize how and when the verification is done.
++
+ source "arch/Kconfig"
+ 
+ endmenu		# General setup
+diff --git a/kernel/sys.c b/kernel/sys.c
+index 8a94b4eabcaa..a1cbcd715d62 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -2458,3 +2458,16 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
+ 	return 0;
+ }
+ #endif /* CONFIG_COMPAT */
++
++#ifdef CONFIG_ADDR_LIMIT_CHECK
++/*
++ * Used when an architecture specific implementation detects an invalid address
++ * limit. This function does not return.
++ */
++asmlinkage void addr_limit_check_failed(void)
++{
++	/* Try to fail on the generic address limit check */
++	addr_limit_check_syscall();
++	panic("Invalid address limit before returning to user-mode");
++}
++#endif
+-- 
+2.13.0.rc0.306.g87b477812d-goog
