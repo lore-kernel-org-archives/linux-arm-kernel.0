@@ -1,58 +1,50 @@
-From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Fri, 28 Apr 2017 10:25:30 +0900
-Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
-In-Reply-To: <20170420131154.GL3452@pathway.suse.cz>
-References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
- <1461239325-22779-2-git-send-email-pmladek@suse.com>
- <20170419131341.76bc7634@gandalf.local.home>
- <20170420033112.GB542@jagdpanzerIV.localdomain>
- <20170420131154.GL3452@pathway.suse.cz>
-Message-ID: <20170428012530.GA383@jagdpanzerIV.localdomain>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 27 Apr 2017 18:28:11 -0700
+Subject: [PATCH] watchdog: bcm281xx: Fix use of uninitialized spinlock.
+In-Reply-To: <20170428010232.19905-1-eric@anholt.net>
+References: <20170428010232.19905-1-eric@anholt.net>
+Message-ID: <8592b4ab-3277-d8ef-a227-91ad30f05328@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On (04/20/17 15:11), Petr Mladek wrote:
-[..]
->  void printk_nmi_enter(void)
->  {
-> -	this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
-> +	/*
-> +	 * The size of the extra per-CPU buffer is limited. Use it
-> +	 * only when really needed.
-> +	 */
-> +	if (this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK ||
-> +	    raw_spin_is_locked(&logbuf_lock)) {
 
-can we please have && here?
+On 04/27/2017 06:02 PM, Eric Anholt wrote:
+> The bcm_kona_wdt_set_resolution_reg() call takes the spinlock, so
+> initialize it earlier.  Fixes a warning at boot with lock debugging
+> enabled.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
+Fixes: 6adb730dc208 ("watchdog: bcm281xx: Watchdog Driver")
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-[..]
-> diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
-> index 4e8a30d1c22f..0bc0a3535a8a 100644
-> --- a/lib/nmi_backtrace.c
-> +++ b/lib/nmi_backtrace.c
-> @@ -86,9 +86,11 @@ void nmi_trigger_cpumask_backtrace(const cpumask_t *mask,
+> ---
+>  drivers/watchdog/bcm_kona_wdt.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/watchdog/bcm_kona_wdt.c b/drivers/watchdog/bcm_kona_wdt.c
+> index 6fce17d5b9f1..a5775dfd8d5f 100644
+> --- a/drivers/watchdog/bcm_kona_wdt.c
+> +++ b/drivers/watchdog/bcm_kona_wdt.c
+> @@ -304,6 +304,8 @@ static int bcm_kona_wdt_probe(struct platform_device *pdev)
+>  	if (!wdt)
+>  		return -ENOMEM;
 >  
->  bool nmi_cpu_backtrace(struct pt_regs *regs)
->  {
-> +	static arch_spinlock_t lock = __ARCH_SPIN_LOCK_UNLOCKED;
->  	int cpu = smp_processor_id();
->  
->  	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
-> +		arch_spin_lock(&lock);
->  		if (regs && cpu_in_idle(instruction_pointer(regs))) {
->  			pr_warn("NMI backtrace for cpu %d skipped: idling at pc %#lx\n",
->  				cpu, instruction_pointer(regs));
-> @@ -99,6 +101,7 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
->  			else
->  				dump_stack();
->  		}
-> +		arch_spin_unlock(&lock);
->  		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
->  		return true;
+> +	spin_lock_init(&wdt->lock);
+> +
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	wdt->base = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(wdt->base))
+> @@ -316,7 +318,6 @@ static int bcm_kona_wdt_probe(struct platform_device *pdev)
+>  		return ret;
 >  	}
+>  
+> -	spin_lock_init(&wdt->lock);
+>  	platform_set_drvdata(pdev, wdt);
+>  	watchdog_set_drvdata(&bcm_kona_wdt_wdd, wdt);
+>  	bcm_kona_wdt_wdd.parent = &pdev->dev;
+> 
 
-can the nmi_backtrace part be a patch on its own?
-
-	-ss
+-- 
+Florian
