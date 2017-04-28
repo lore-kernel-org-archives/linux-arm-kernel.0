@@ -1,44 +1,20 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 27 Apr 2017 19:27:12 -0700
-Subject: [PATCH] watchdog: bcm281xx: Fix use of uninitialized spinlock.
-In-Reply-To: <20170428010232.19905-1-eric@anholt.net>
-References: <20170428010232.19905-1-eric@anholt.net>
-Message-ID: <936cc171-cc1e-b00e-dee1-061fcd42c93f@roeck-us.net>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Fri, 28 Apr 2017 10:33:19 +0800
+Subject: [PATCH v1 0/2] clk: rockchip: Perfect clock description for RK3228
+Message-ID: <1493346801-23785-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2017 06:02 PM, Eric Anholt wrote:
-> The bcm_kona_wdt_set_resolution_reg() call takes the spinlock, so
-> initialize it earlier.  Fixes a warning at boot with lock debugging
-> enabled.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+support more cpu freq, and support armcore div setting.
+Add some necessary clks ID.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Elaine Zhang (2):
+  clk: rockchip: fix up the RK3228 clk cpu setting table
+  clk: rockchip: export rk3228 clocks ID
 
-> ---
->  drivers/watchdog/bcm_kona_wdt.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/watchdog/bcm_kona_wdt.c b/drivers/watchdog/bcm_kona_wdt.c
-> index 6fce17d5b9f1..a5775dfd8d5f 100644
-> --- a/drivers/watchdog/bcm_kona_wdt.c
-> +++ b/drivers/watchdog/bcm_kona_wdt.c
-> @@ -304,6 +304,8 @@ static int bcm_kona_wdt_probe(struct platform_device *pdev)
->  	if (!wdt)
->  		return -ENOMEM;
->
-> +	spin_lock_init(&wdt->lock);
-> +
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	wdt->base = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(wdt->base))
-> @@ -316,7 +318,6 @@ static int bcm_kona_wdt_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->
-> -	spin_lock_init(&wdt->lock);
->  	platform_set_drvdata(pdev, wdt);
->  	watchdog_set_drvdata(&bcm_kona_wdt_wdd, wdt);
->  	bcm_kona_wdt_wdd.parent = &pdev->dev;
->
+ drivers/clk/rockchip/clk-rk3228.c      | 142 +++++++++++++++++++--------------
+ include/dt-bindings/clock/rk3228-cru.h |  47 +++++++++++
+ 2 files changed, 127 insertions(+), 62 deletions(-)
+
+-- 
+1.9.1
