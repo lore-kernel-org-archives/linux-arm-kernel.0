@@ -1,225 +1,81 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 28 Apr 2017 03:44:48 -0700
-Subject: [PATCH v5 17/22] KVM: arm64: vgic-its: Collection table
- save/restore
-In-Reply-To: <1492164934-988-18-git-send-email-eric.auger@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-18-git-send-email-eric.auger@redhat.com>
-Message-ID: <20170428104448.GB1439@lvm>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 28 Apr 2017 12:01:05 +0100
+Subject: [PATCHv3 1/2] jump_label: Provide
+ static_key_[enable|/slow_inc]_cpuslocked()
+In-Reply-To: <1493377266-2205-1-git-send-email-mark.rutland@arm.com>
+References: <1493377266-2205-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1493377266-2205-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 14, 2017 at 12:15:29PM +0200, Eric Auger wrote:
-> The save path copies the collection entries into guest RAM
-> at the GPA specified in the BASER register. This obviously
-> requires the BASER to be set. The last written element is a
-> dummy collection table entry.
-> 
-> We do not index by collection ID as the collection entry
-> can fit into 8 bytes while containing the collection ID.
-> 
-> On restore path we re-allocate the collection objects.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> v4 -> v5:
-> - add macros for field encoding/decoding
-> - use abi->cte_esz
-> - rename flush into save
-> - check the target_addr is valid
-> 
-> v3 -> v4:
-> - replaced u64 *ptr by gpa_t gpa
-> - check the collection does not exist before allocating it
-> 
-> v1 -> v2:
-> - reword commit message and directly use 8 as entry size
-> - no kvm parameter anymore
-> - add helper for flush/restore cte
-> - table size computed here
-> - add le64/cpu conversions
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 109 ++++++++++++++++++++++++++++++++++++++++++-
->  virt/kvm/arm/vgic/vgic.h     |   9 ++++
->  2 files changed, 116 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index c22b35d..484e541 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1785,13 +1785,97 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
->  	return -ENXIO;
->  }
->  
-> +static int vgic_its_save_cte(struct vgic_its *its,
-> +			     struct its_collection *collection,
-> +			     gpa_t gpa, int esz)
-> +{
-> +	u64 val;
-> +	int ret;
-> +
-> +	val = (1ULL << KVM_ITS_CTE_VALID_SHIFT |
-> +	       ((u64)collection->target_addr << KVM_ITS_CTE_RDBASE_SHIFT) |
-> +	       collection->collection_id);
-> +	val = cpu_to_le64(val);
-> +	ret = kvm_write_guest(its->dev->kvm, gpa, &val, esz);
-> +	return ret;
-> +}
-> +
-> +static int vgic_its_restore_cte(struct vgic_its *its, gpa_t gpa,
-> +				int esz, bool *valid)
-> +{
-> +	struct its_collection *collection;
-> +	struct kvm *kvm = its->dev->kvm;
-> +	u32 target_addr;
-> +	u32 coll_id;
-> +	u64 val;
-> +	int ret;
-> +
-> +	*valid = false;
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-I don't see why you need this.
+Provide static_key_[enable|slow_inc]_cpuslocked() variant that
+don't take cpu_hotplug_lock().
 
-> +
-> +	ret = kvm_read_guest(kvm, gpa, &val, esz);
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Sebastian Siewior <bigeasy@linutronix.de>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: jbaron at akamai.com
+---
+ include/linux/jump_label.h |  7 +++++++
+ kernel/jump_label.c        | 10 ++++++++++
+ 2 files changed, 17 insertions(+)
 
-hmm, we better not have an esz larger than sizeof(u64) here then.
-
-> +	if (ret)
-> +		return ret;
-> +	val = le64_to_cpu(val);
-> +	*valid = val & KVM_ITS_CTE_VALID_MASK;
-> +
-> +	if (!*valid)
-> +		return 0;
-
-I think this would be nicer with just a bool on the stack and then set
-*valid = in the end of the function.  Alternatively, you could just have
-the return value return > 0 when there are more entries.
-
-> +
-> +	target_addr = (u32)(val >> KVM_ITS_CTE_RDBASE_SHIFT);
-> +	coll_id = val & KVM_ITS_CTE_ICID_MASK;
-> +
-> +	if (target_addr >= atomic_read(&kvm->online_vcpus))
-> +		return -EINVAL;
-> +
-> +	collection = find_collection(its, coll_id);
-> +	if (collection)
-> +		return -EEXIST;
-> +	ret = vgic_its_alloc_collection(its, &collection, coll_id);
-> +	if (ret)
-> +		return ret;
-> +	collection->target_addr = target_addr;
-> +	return 0;
-> +}
-> +
->  /**
->   * vgic_its_save_collection_table - Save the collection table into
->   * guest RAM
->   */
->  static int vgic_its_save_collection_table(struct vgic_its *its)
->  {
-> -	return -ENXIO;
-> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-> +	struct its_collection *collection;
-> +	u64 val;
-> +	gpa_t gpa;
-> +	size_t max_size, filled = 0;
-> +	int ret, cte_esz = abi->cte_esz;
-> +
-> +	gpa = BASER_ADDRESS(its->baser_coll_table);
-> +	if (!gpa)
-> +		return 0;
-> +
-> +	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
-> +
-> +	list_for_each_entry(collection, &its->collection_list, coll_list) {
-> +		if (filled == max_size)
-> +			return -ENOSPC;
-> +		ret = vgic_its_save_cte(its, collection, gpa, cte_esz);
-> +		if (ret)
-> +			return ret;
-> +		gpa += cte_esz;
-> +		filled += cte_esz;
-> +	}
-> +
-> +	if (filled == max_size)
-> +		return 0;
-> +
-> +	/*
-> +	 * table is not fully filled, add a last dummy element
-> +	 * with valid bit unset
-> +	 */
-> +	val = 0;
-> +	ret = kvm_write_guest(its->dev->kvm, gpa, &val, cte_esz);
-> +	return ret;
->  }
->  
->  /**
-> @@ -1801,7 +1885,28 @@ static int vgic_its_save_collection_table(struct vgic_its *its)
->   */
->  static int vgic_its_restore_collection_table(struct vgic_its *its)
->  {
-> -	return -ENXIO;
-> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-> +	size_t max_size, read = 0;
-> +	gpa_t gpa;
-> +	int ret, cte_esz = abi->cte_esz;
-> +
-> +	gpa = BASER_ADDRESS(its->baser_coll_table);
-> +
-> +	if (!gpa)
-> +		return 0;
-
-I don't understand this check.
-
-Don't you want to do do
-	if (!(its->baser_coll_table) & GITS_BASER_VALID)
-		return 0;
-
-Or what am I missing?
-
-Thanks,
--Christoffer
-
-> +
-> +	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
-> +
-> +	while (read < max_size) {
-> +		bool valid;
-> +
-> +		ret = vgic_its_restore_cte(its, gpa, cte_esz, &valid);
-> +		if (!valid || ret)
-> +			break;
-> +		gpa += cte_esz;
-> +		read += cte_esz;
-> +	}
-> +	return ret;
->  }
->  
->  /**
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index b87f1c6..56e57c1 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -73,6 +73,15 @@
->  				      KVM_REG_ARM_VGIC_SYSREG_CRM_MASK | \
->  				      KVM_REG_ARM_VGIC_SYSREG_OP2_MASK)
->  
-> +/*
-> + * As per Documentation/virtual/kvm/devices/arm-vgic-its.txt,
-> + * below macros are defined for ITS table entry encoding.
-> + */
-> +#define KVM_ITS_CTE_VALID_SHIFT		63
-> +#define KVM_ITS_CTE_VALID_MASK		BIT_ULL(63)
-> +#define KVM_ITS_CTE_RDBASE_SHIFT	16
-> +#define KVM_ITS_CTE_ICID_MASK		GENMASK_ULL(15, 0)
-> +
->  static inline bool irq_is_pending(struct vgic_irq *irq)
->  {
->  	if (irq->config == VGIC_CONFIG_EDGE)
-> -- 
-> 2.5.5
-> 
+diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
+index d7b17d1..c80d8b1 100644
+--- a/include/linux/jump_label.h
++++ b/include/linux/jump_label.h
+@@ -164,6 +164,7 @@ extern void arch_jump_label_transform_static(struct jump_entry *entry,
+ extern void jump_label_apply_nops(struct module *mod);
+ extern int static_key_count(struct static_key *key);
+ extern void static_key_enable(struct static_key *key);
++extern void static_key_enable_cpuslocked(struct static_key *key);
+ extern void static_key_disable(struct static_key *key);
+ extern void static_key_disable_cpuslocked(struct static_key *key);
+ 
+@@ -252,6 +253,11 @@ static inline void static_key_enable(struct static_key *key)
+ 		static_key_slow_inc(key);
+ }
+ 
++static inline void static_key_enable_cpuslocked(struct static_key *key)
++{
++	static_key_enable(key);
++}
++
+ static inline void static_key_disable(struct static_key *key)
+ {
+ 	int count = static_key_count(key);
+@@ -429,6 +435,7 @@ struct static_key_false {
+  */
+ 
+ #define static_branch_enable(x)			static_key_enable(&(x)->key)
++#define static_branch_enable_cpuslocked(x)	static_key_enable_cpuslocked(&(x)->key)
+ #define static_branch_disable(x)		static_key_disable(&(x)->key)
+ #define static_branch_disable_cpuslocked(x)	static_key_disable_cpuslocked(&(x)->key)
+ 
+diff --git a/kernel/jump_label.c b/kernel/jump_label.c
+index d71124e..6343f4c 100644
+--- a/kernel/jump_label.c
++++ b/kernel/jump_label.c
+@@ -90,6 +90,16 @@ void static_key_enable(struct static_key *key)
+ }
+ EXPORT_SYMBOL_GPL(static_key_enable);
+ 
++void static_key_enable_cpuslocked(struct static_key *key)
++{
++	int count = static_key_count(key);
++
++	WARN_ON_ONCE(count < 0 || count > 1);
++
++	if (!count)
++		static_key_slow_inc_cpuslocked(key);
++}
++
+ void static_key_disable(struct static_key *key)
+ {
+ 	int count = static_key_count(key);
+-- 
+1.9.1
