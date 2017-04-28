@@ -1,127 +1,67 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 28 Apr 2017 06:07:02 -0700
-Subject: [PATCH 1/2] thermal: broadcom: Allow for NSP to use ns-thermal
- driver
-In-Reply-To: <CAC3K-4pr4LY-9unHNxMDN9YmCYHKekUo66813OUdiKkQH4QzVw@mail.gmail.com>
-References: <1493153351-12698-1-git-send-email-jon.mason@broadcom.com>
- <1493153351-12698-2-git-send-email-jon.mason@broadcom.com>
- <20170427163658.GC18276@localhost.localdomain>
- <CAC3K-4pr4LY-9unHNxMDN9YmCYHKekUo66813OUdiKkQH4QzVw@mail.gmail.com>
-Message-ID: <20170428130659.GA28546@localhost.localdomain>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Apr 2017 14:11:33 +0100
+Subject: [PATCH] drivers/of_iommu: ignore SMMU DT nodes with status
+ 'disabled'
+In-Reply-To: <20170414124315.2401-1-ard.biesheuvel@linaro.org>
+References: <20170414124315.2401-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170428131133.GJ13675@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 01:42:25PM -0400, Jon Mason wrote:
-> On Thu, Apr 27, 2017 at 12:37 PM, Eduardo Valentin <edubezval@gmail.com> wrote:
-> > Hey Jason,
-> 
-> It's Jon :)
+Hi Ard,
 
-Apologies. I think I either read too fast, or my fingers were faster
-than my brain. Sorry.
+[+ devicetree@]
 
+On Fri, Apr 14, 2017 at 01:43:15PM +0100, Ard Biesheuvel wrote:
+> DT nodes may have a status property, and if they do, such nodes should
+> only be considered present if the status property is set to 'okay'.
 > 
-> >
-> > On Tue, Apr 25, 2017 at 04:49:10PM -0400, Jon Mason wrote:
-> >> Change the iProc Kconfig to select THERMAL and THERMAL_OF, which allows
-> >> the ns-thermal driver to be selected via menuconfig.  Also, change the
-> >> ns-thermal driver to work on any iProc based SoC.  Finally, tweak the
-> >> Kconfig description to mention support for NSP and make the default on
-> >> for iProc based platforms.
-> >
-> >
-> > Thanks for the patch, but..
-> >>
-> >> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-> >> ---
-> >>  arch/arm/mach-bcm/Kconfig        | 2 ++
-> >>  drivers/thermal/broadcom/Kconfig | 9 +++++----
-> >>  2 files changed, 7 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> >> index a0e66d8..da2bfeb 100644
-> >> --- a/arch/arm/mach-bcm/Kconfig
-> >> +++ b/arch/arm/mach-bcm/Kconfig
-> >> @@ -19,6 +19,8 @@ config ARCH_BCM_IPROC
-> >>       select GPIOLIB
-> >>       select ARM_AMBA
-> >>       select PINCTRL
-> >> +     select THERMAL
-> >> +     select THERMAL_OF
-> >>       help
-> >>         This enables support for systems based on Broadcom IPROC architected SoCs.
-> >>         The IPROC complex contains one or more ARM CPUs along with common
-> >
-> > It would be better if this is split and sent through your arch tree, to
-> > avoid conflicts. I could also pick it if you get an ack from one of your
-> > maintainers. Still, first option is preferable.
+> Currently, we call the init function of IOMMUs described by the device
+> tree without taking this into account, which may result in the output
+> below on systems where some SMMUs may be legally disabled.
 > 
-> Sure, I'll be happy to split this off.  I should've thought to split
-> it up before sending.  Thanks for the suggestion.
+>  Failed to initialise IOMMU /smb/smmu at e0200000
+>  Failed to initialise IOMMU /smb/smmu at e0c00000
+>  arm-smmu e0a00000.smmu: probing hardware configuration...
+>  arm-smmu e0a00000.smmu: SMMUv1 with:
+>  arm-smmu e0a00000.smmu:  stage 2 translation
+>  arm-smmu e0a00000.smmu:  coherent table walk
+>  arm-smmu e0a00000.smmu:  stream matching with 32 register groups, mask 0x7fff
+>  arm-smmu e0a00000.smmu:  8 context banks (8 stage-2 only)
+>  arm-smmu e0a00000.smmu:  Supported page sizes: 0x60211000
+>  arm-smmu e0a00000.smmu:  Stage-2: 40-bit IPA -> 40-bit PA
+>  Failed to initialise IOMMU /smb/smmu at e0600000
+>  Failed to initialise IOMMU /smb/smmu at e0800000
+> 
+> Since this is not an error condition, only call the init function if
+> the device is enabled, which also inhibits the spurious error messages.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/iommu/of_iommu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 2683e9fc0dcf..2dd1206e6c0d 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -183,7 +183,7 @@ static int __init of_iommu_init(void)
+>  	for_each_matching_node_and_match(np, matches, &match) {
+>  		const of_iommu_init_fn init_fn = match->data;
+>  
+> -		if (init_fn(np))
+> +		if (of_device_is_available(np) && init_fn(np))
+>  			pr_err("Failed to initialise IOMMU %s\n",
+>  				of_node_full_name(np));
+>  	}
 
-Cool!
+Is there a definition of what status = "disabled" is supposed to mean for an
+IOMMU? For example, that could mean that the firmware has pre-programmed the
+SMMU with particular translations or memory attributes (a bit like the
+CCA=1, CPM=1, DACS=0 case in ACPI IORT), or even disabled DMA traffic
+altogether.
 
-> 
-> >
-> >> diff --git a/drivers/thermal/broadcom/Kconfig b/drivers/thermal/broadcom/Kconfig
-> >> index f0dea8a..26d706c 100644
-> >> --- a/drivers/thermal/broadcom/Kconfig
-> >> +++ b/drivers/thermal/broadcom/Kconfig
-> >> @@ -1,8 +1,9 @@
-> >>  config BCM_NS_THERMAL
-> >>       tristate "Northstar thermal driver"
-> >>       depends on ARCH_BCM_IPROC || COMPILE_TEST
-> >> +     default ARCH_BCM_IPROC
-> >
-> > Not sure if this is really what you wanted. Based on your commit log
-> > message, you meant the following, perhaps?
-> >
-> >  +      default y if ARCH_BCM_IPROC
-> 
-> IIUC, my original default works, as we have used it frequently in
-> other places in the kernel.
-> grep -rI "default ARCH_BCM_IPROC" * | wc -l
-> 15
+So I think we'd need an update to the generic IOMMU binding text to say
+exactly what the semantics are supposed to be here.
 
-Yeah... Are you sure they are all correct?
-
-> 
-> However, if the above is preferred (or the other 15 massively broken),
-> I'll be happy to do it that way.
-
-Your construction is syntactically correct. Maybe might still work (did
-not check myself) for the purpose you describe, but the construction
-mentioned in Documentation/kbuild/kconfig-language.txt is:
- +      default y if BAR
-
-So, please fix it.
-
-
-> 
-> 
-> >>       help
-> >> -       Northstar is a family of SoCs that includes e.g. BCM4708, BCM47081,
-> >> -       BCM4709 and BCM47094. It contains DMU (Device Management Unit) block
-> >> -       with a thermal sensor that allows checking CPU temperature. This
-> >> -       driver provides support for it.
-> >> +       Support for the Northstar and Northstar Plus family of SoCs (e.g.
-> >> +       BCM4708, BCM4709, BCM5301x, BCM95852X, etc). It contains DMU (Device
-> >
-> > Did we look BCM47094 somehow on this patch?
-> 
-> Naa, just trying to be more concise, while adding the NSP products to
-> the list..  BCM47094 is a type of BCM4709.  So, it is still there :)
-> 
-> >
-> >> +       Management Unit) block with a thermal sensor that allows checking CPU
-> >> +       temperature.
-> >> --
-> >> 2.7.4
-> >>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170428/b46e5a16/attachment.sig>
+Will
