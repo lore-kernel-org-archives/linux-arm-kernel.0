@@ -1,83 +1,138 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Apr 2017 16:44:16 +0100
-Subject: [PATCH 3/3] arm64/locking: qspinlocks and qrwlocks support
-In-Reply-To: <20170426123947.ogap6xgg7xc5wsd4@yury-N73SV>
-References: <1491860104-4103-1-git-send-email-ynorov@caviumnetworks.com>
- <1491860104-4103-4-git-send-email-ynorov@caviumnetworks.com>
- <20170413181212.y3ezah76qoztxhnn@hirez.programming.kicks-ass.net>
- <20170420182318.4ddtfiobxz6hgbo4@yury-N73SV>
- <20170420190530.GA6873@worktop>
- <20170426123947.ogap6xgg7xc5wsd4@yury-N73SV>
-Message-ID: <20170428154416.GW13675@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 28 Apr 2017 16:59:49 +0100
+Subject: [PATCH] ACPI/IORT: Fix CONFIG_IOMMU_API dependency
+Message-ID: <1493395189-10857-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 03:39:47PM +0300, Yury Norov wrote:
-> On Thu, Apr 20, 2017 at 09:05:30PM +0200, Peter Zijlstra wrote:
-> > On Thu, Apr 20, 2017 at 09:23:18PM +0300, Yury Norov wrote:
-> > > Is there some test to reproduce the locking failure for the case.
-> > 
-> > Possibly sysvsem stress before commit:
-> > 
-> >   27d7be1801a4 ("ipc/sem.c: avoid using spin_unlock_wait()")
-> > 
-> > Although a similar scheme is also used in nf_conntrack, see commit:
-> > 
-> >   b316ff783d17 ("locking/spinlock, netfilter: Fix nf_conntrack_lock() barriers")
-> > 
-> > > I
-> > > ask because I run loctorture for many hours on my qemu (emulating
-> > > cortex-a57), and I see no failures in the test reports. And Jan did it
-> > > on ThunderX, and Adam on QDF2400 without any problems. So even if I
-> > > rework those functions, how could I check them for correctness?
-> > 
-> > Running them doesn't prove them correct. Memory ordering bugs have been
-> > in the kernel for many years without 'ever' triggering. This is stuff
-> > you have to think about.
-> > 
-> > > Anyway, regarding the queued_spin_unlock_wait(), is my understanding
-> > > correct that you assume adding smp_mb() before entering the for(;;)
-> > > cycle, and using ldaxr/strxr instead of atomic_read()?
-> > 
-> > You'll have to ask Will, I always forget the arm64 details.
-> 
-> So, below is what I have. For queued_spin_unlock_wait() the generated
-> code is looking like this:
-> ffff0000080983a0 <queued_spin_unlock_wait>:
-> ffff0000080983a0:       d5033bbf        dmb     ish
-> ffff0000080983a4:       b9400007        ldr     w7, [x0]
-> ffff0000080983a8:       350000c7        cbnz    w7, ffff0000080983c0 <queued_spin_unlock_wait+0x20>
-> ffff0000080983ac:       1400000e        b       ffff0000080983e4 <queued_spin_unlock_wait+0x44>
-> ffff0000080983b0:       d503203f        yield
-> ffff0000080983b4:       d5033bbf        dmb     ish
-> ffff0000080983b8:       b9400007        ldr     w7, [x0]
-> ffff0000080983bc:       34000147        cbz     w7, ffff0000080983e4 <queued_spin_unlock_wait+0x44>
-> ffff0000080983c0:       f2401cff        tst     x7, #0xff
-> ffff0000080983c4:       54ffff60        b.eq    ffff0000080983b0 <queued_spin_unlock_wait+0x10>
-> ffff0000080983c8:       14000003        b       ffff0000080983d4 <queued_spin_unlock_wait+0x34>
-> ffff0000080983cc:       d503201f        nop
-> ffff0000080983d0:       d503203f        yield
-> ffff0000080983d4:       d5033bbf        dmb     ish
-> ffff0000080983d8:       b9400007        ldr     w7, [x0]
-> ffff0000080983dc:       f2401cff        tst     x7, #0xff
-> ffff0000080983e0:       54ffff81        b.ne    ffff0000080983d0 <queued_spin_unlock_wait+0x30>
-> ffff0000080983e4:       d50339bf        dmb     ishld
-> ffff0000080983e8:       d65f03c0        ret
-> ffff0000080983ec:       d503201f        nop
-> 
-> If I understand the documentation correctly, it's enough to check the lock
-> properly. If not - please give me the clue. Will?
+The IOMMU probe deferral IORT rework had to add code in
+iort_iommu_configure() and iort_iommu_xlate() that requires
+the IOMMU_API to be selected in order to compile and work.
 
-Sorry, but I haven't had time to page this back in recently, so I can't give
-you an answer straight off the bat. I'll need to go back and revisit the
-qspinlock parts and, in particular, use of WFE before I'm comfortable with
-this. I also don't want this on by default for the arm64 kernel, and I'd
-like to see numbers comparing with our ticket locks on silicon with and
-without the large system extensions, for low (<=8), medium (8-32) and high
-(>32) core counts.
+Stub out the pieces of code that depend on CONFIG_IOMMU_API
+to be selected to prevent compilation failures such as:
 
-I'm very nervous about switching our locking implementation over to
-something that's largely been developed and tested for x86, which has a
-stronger memory model.
+drivers/acpi/arm64/iort.c: In function 'iort_iommu_xlate':
+drivers/acpi/arm64/iort.c:647:22: error: 'struct iommu_fwspec' has no
+member named 'ops'
 
-Will
+by wrapping the code in static inline functions that provide a NOP
+implementation when CONFIG_IOMMU_API is not selected.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Sricharan R <sricharan@codeaurora.org>
+---
+Joerg, all,
+
+as reported by Arnd:
+
+https://lkml.org/lkml/2017/4/27/303
+
+we have this issue in -next and I managed to write this patch in a
+way that applies to Joerg's tree - branch:
+
+arm/core
+
+and does not conflict with ACPI IORT patches queued via arm64 tree.
+
+I know it is late and it is not a major breakage, so either Joerg
+applies this patch to his arm/core branch or I can send a fix for -rc1
+when both the IOMMU and arm64 trees are merged, please let me know how
+you prefer handling it, it is a bit rushed owing to where we are in
+the cycle.
+
+Thanks !
+Lorenzo
+
+ drivers/acpi/arm64/iort.c | 44 ++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 34 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index e7b1940..a629e83 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -536,6 +536,33 @@ static inline bool iort_iommu_driver_enabled(u8 type)
+ 	}
+ }
+ 
++#ifdef CONFIG_IOMMU_API
++static inline
++const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
++{
++	return (fwspec && fwspec->ops) ? fwspec->ops : NULL;
++}
++
++static inline
++int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
++{
++	int err = 0;
++
++	if (!IS_ERR_OR_NULL(ops) && ops->add_device && dev->bus &&
++	    !dev->iommu_group)
++		err = ops->add_device(dev);
++
++	return err;
++}
++#else
++static inline
++const struct iommu_ops *iort_fwspec_iommu_ops(struct iommu_fwspec *fwspec)
++{ return NULL; }
++static inline
++int iort_add_device_replay(const struct iommu_ops *ops, struct device *dev)
++{ return 0; }
++#endif
++
+ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+ 					struct acpi_iort_node *node,
+ 					u32 streamid)
+@@ -543,14 +570,14 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+ 	const struct iommu_ops *ops = NULL;
+ 	int ret = -ENODEV;
+ 	struct fwnode_handle *iort_fwnode;
+-	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+ 
+ 	/*
+ 	 * If we already translated the fwspec there
+ 	 * is nothing left to do, return the iommu_ops.
+ 	 */
+-	if (fwspec && fwspec->ops)
+-		return fwspec->ops;
++	ops = iort_fwspec_iommu_ops(dev->iommu_fwspec);
++	if (ops)
++		return ops;
+ 
+ 	if (node) {
+ 		iort_fwnode = iort_get_fwnode(node);
+@@ -611,6 +638,7 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+ 	struct acpi_iort_node *node, *parent;
+ 	const struct iommu_ops *ops = NULL;
+ 	u32 streamid = 0;
++	int err;
+ 
+ 	if (dev_is_pci(dev)) {
+ 		struct pci_bus *bus = to_pci_dev(dev)->bus;
+@@ -654,13 +682,9 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+ 	 * If we have reason to believe the IOMMU driver missed the initial
+ 	 * add_device callback for dev, replay it to get things in order.
+ 	 */
+-	if (!IS_ERR_OR_NULL(ops) && ops->add_device &&
+-	    dev->bus && !dev->iommu_group) {
+-		int err = ops->add_device(dev);
+-
+-		if (err)
+-			ops = ERR_PTR(err);
+-	}
++	err = iort_add_device_replay(ops, dev);
++	if (err)
++		ops = ERR_PTR(err);
+ 
+ 	return ops;
+ }
+-- 
+2.10.0
