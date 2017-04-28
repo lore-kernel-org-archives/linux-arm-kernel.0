@@ -1,69 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Apr 2017 11:07:29 +0100
-Subject: [PATCHv2 2/2] arm64: cpufeature: use
- static_branch_enable_cpuslocked()
-In-Reply-To: <20170428100230.GA22621@leverpostej>
-References: <1493315077-19496-1-git-send-email-mark.rutland@arm.com>
- <1493315077-19496-3-git-send-email-mark.rutland@arm.com>
- <20170427180104.GO1890@arm.com>
- <20170428100230.GA22621@leverpostej>
-Message-ID: <20170428100729.GC13675@arm.com>
+From: sven.eckelmann@openmesh.com (Sven Eckelmann)
+Date: Fri, 28 Apr 2017 12:10:36 +0200
+Subject: [PATCH] arm: dts: qcom: add gsbi7 serial to ipq8064 SoC device tree
+Message-ID: <20170428101036.8605-1-sven.eckelmann@openmesh.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 11:02:30AM +0100, Mark Rutland wrote:
-> On Thu, Apr 27, 2017 at 07:01:04PM +0100, Will Deacon wrote:
-> > On Thu, Apr 27, 2017 at 06:44:37PM +0100, Mark Rutland wrote:
-> > > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> > > index f6cc67e..379ad8d 100644
-> > > --- a/arch/arm64/kernel/cpu_errata.c
-> > > +++ b/arch/arm64/kernel/cpu_errata.c
-> > > @@ -175,9 +175,20 @@ void verify_local_cpu_errata_workarounds(void)
-> > >  		}
-> > >  }
-> > >  
-> > > -void update_cpu_errata_workarounds(void)
-> > > +/*
-> > > + * Secondary CPUs are booted with the waker holding the
-> > > + * CPU hotplug lock, hence we don't need to lock it here again.
-> > > + */
-> > > +void update_secondary_cpu_errata_workarounds(void)
-> > > +{
-> > > +	update_cpu_capabilities(arm64_errata, "enabling workaround for");
-> > > +}
-> > > +
-> > > +void update_boot_cpu_errata_workarounds(void)
-> > >  {
-> > > +	get_online_cpus();
-> > >  	update_cpu_capabilities(arm64_errata, "enabling workaround for");
-> > > +	put_online_cpus();
-> > >  }
-> > 
-> > These functions seem to have unhelpful names, especially when compared to
-> > the naming scheme used by the core code. I'd prefer to have:
-> > 
-> > update_cpu_errata_workarounds: just calls update_cpu_capabilities
-> > 
-> > update_cpu_errata_workarounds_cpuslocked: does get_online_cpus(), then calls
-> > update_cpu_errata_workarounds, then does put_online_cpus();
-> 
-> That's the opposite polarity to the other _cpuslocked functions, where
-> _cpuslocked means that the lock is already held (and should not be taken
-> by the _cpuslocked function itself.
-> 
-> So I'll make those changes, but I'll swap that so:
-> update_cpu_errata_workarounds() does:
-> 
->   get_online_cpus()
->   update_cpu_errata_workarounds_cpuslocked()
->   put_online_cpus()
-> 
-> > With that change:
-> > 
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> I assume that will stand with the above change. Please shout if not!
+The gsbi_serial7 under gsbi7 is used by the IPQ8068 based board EWS870AP as
+main serial console.
 
-Haha, yes, I got it downside-up. Thanks for working out what I meant.
+Signed-off-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
+---
+ arch/arm/boot/dts/qcom-ipq8064.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-Will
+diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+index 76f4e8921d58..f1fbffe59b93 100644
+--- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+@@ -284,6 +284,29 @@
+ 			};
+ 		};
+ 
++		gsbi7: gsbi at 16600000 {
++			status = "disabled";
++			compatible = "qcom,gsbi-v1.0.0";
++			cell-index = <7>;
++			reg = <0x16600000 0x100>;
++			clocks = <&gcc GSBI7_H_CLK>;
++			clock-names = "iface";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			syscon-tcsr = <&tcsr>;
++
++			gsbi7_serial: serial at 16640000 {
++				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
++				reg = <0x16640000 0x1000>,
++				      <0x16600000 0x1000>;
++				interrupts = <0 158 0x0>;
++				clocks = <&gcc GSBI7_UART_CLK>, <&gcc GSBI7_H_CLK>;
++				clock-names = "core", "iface";
++				status = "disabled";
++			};
++		};
++
+ 		sata_phy: sata-phy at 1b400000 {
+ 			compatible = "qcom,ipq806x-sata-phy";
+ 			reg = <0x1b400000 0x200>;
+-- 
+2.11.0
