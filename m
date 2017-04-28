@@ -1,56 +1,117 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 28 Apr 2017 15:30:25 -0500
-Subject: [PATCH v2 25/30] arm: dts: mt7623: rename mt7623-evb.dts to
- arch/arm/boot/dts/mt7623n-rfb.dtsi
-In-Reply-To: <1493198774-4478-26-git-send-email-sean.wang@mediatek.com>
-References: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
- <1493198774-4478-26-git-send-email-sean.wang@mediatek.com>
-Message-ID: <20170428203025.gdrtbudfzwy5z4h5@rob-hp-laptop>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 28 Apr 2017 13:31:14 -0700
+Subject: [PATCH] [stable v3.18.y] ARM: 8383/1: nommu: avoid deprecated
+ source register on mov
+In-Reply-To: <20170427193230.2673449-1-arnd@arndb.de>
+References: <20170427193230.2673449-1-arnd@arndb.de>
+Message-ID: <20de5c06b41b1776c79da2a418eea8ac@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 05:26:09PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On 2017-04-27 12:32, Arnd Bergmann wrote:
+> From: Stefan Agner <stefan@agner.ch>
 > 
-> There are 2 versions of the SoC. MT7623N is almost identical to MT7623A
-> but has some additional multimedia features. The reference boards are
-> available as NAND or MMC and might have a different ethernet setup. In
-> order to reduce the duplication of devicetree code we add an intermediate
-> dtsi file for these reference boards. Additionally Mediatek pointed out,
-> that the EVB is yet another board and the board in question is infact the
-> RFB. Take this into account while renaming the files.
+> Commit 970d96f9a81b0dd83ddd8bce0e5e1ba31881c5f5 upstream.
+> 
+> In Thumb2 mode, the stack register r13 is deprecated if the
+> destination register is the program counter (r15). Similar to
+> head.S, head-nommu.S uses r13 to store the return address used
+> after configuring the CPU's CP15 register. However, since we do
+> not enable a MMU, there will be no address switch and it is
+> possible to use branch with link instruction to call
+> __after_proc_init.
+> 
+> Avoid using r13 completely by using bl to call __after_proc_init
+> and get rid of __secondary_switched.
+> 
+> Beside removing unnecessary complexity, this also fixes a
+> compiler warning when compiling a !MMU kernel:
+> Warning: Use of r13 as a source register is deprecated when r15
+> is the destination register.
+> 
+> Tested-?by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ----
+> I've backported this build fix to 3.18.y as the original
+> patch did not apply cleanly. I rebased it one patch at a time,
+> and each step was fairly straightforward, but I did not test
+> it on hardware, so it would still be nice to have someone else
+> look over the patch to see if I did something wrong.
 
-You are breaking compatibility with existing DTs. Just document which 
-flavor you want "mediatek,mt7623" to refer to and add the new one. Or 
-just add 2 new strings but keep the old one.
+Looks good to me.
 
-> 
-> Signed-off-by: John Crispin <john@phrozen.org>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> 
+--
+Stefan
+
 > ---
->  Documentation/devicetree/bindings/arm/mediatek.txt |  6 ++--
->  arch/arm/boot/dts/Makefile                         |  2 +-
->  arch/arm/boot/dts/mt7623-evb.dts                   | 33 ----------------------
->  arch/arm/boot/dts/mt7623n-rfb-nand.dts             | 21 ++++++++++++++
->  arch/arm/boot/dts/mt7623n-rfb.dtsi                 | 29 +++++++++++++++++++
->  arch/arm/mach-mediatek/mediatek.c                  |  4 +--
->  arch/arm/mach-mediatek/platsmp.c                   |  2 +-
->  7 files changed, 57 insertions(+), 40 deletions(-)
->  delete mode 100644 arch/arm/boot/dts/mt7623-evb.dts
->  create mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
->  create mode 100644 arch/arm/boot/dts/mt7623n-rfb.dtsi
+>  arch/arm/kernel/head-nommu.S | 20 +++++++-------------
+>  1 file changed, 7 insertions(+), 13 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-> index c860b24..7f7c804 100644
-> --- a/Documentation/devicetree/bindings/arm/mediatek.txt
-> +++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-> @@ -12,7 +12,7 @@ compatible: Must contain one of
->     "mediatek,mt6592"
->     "mediatek,mt6755"
->     "mediatek,mt6795"
-> -   "mediatek,mt7623"
-> +   "mediatek,mt7623n"
->     "mediatek,mt8127"
->     "mediatek,mt8135"
->     "mediatek,mt8173"
+> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+> index cc176b67c134..c6c66dd4be89 100644
+> --- a/arch/arm/kernel/head-nommu.S
+> +++ b/arch/arm/kernel/head-nommu.S
+> @@ -77,13 +77,12 @@ ENTRY(stext)
+>  	orr	r6, r6, #(1 << MPU_RSR_EN)	@ Set region enabled bit
+>  	bl	__setup_mpu
+>  #endif
+> -	ldr	r13, =__mmap_switched		@ address to jump to after
+> -						@ initialising sctlr
+>  	adr	lr, BSYM(1f)			@ return (PIC) address
+>   ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
+>   THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
+>   THUMB(	ret	r12				)
+> - 1:	b	__after_proc_init
+> +1:	bl	__after_proc_init
+> +	b	__mmap_switched
+>  ENDPROC(stext)
+>  
+>  #ifdef CONFIG_SMP
+> @@ -106,8 +105,7 @@ ENTRY(secondary_startup)
+>  	movs	r10, r5				@ invalid processor?
+>  	beq	__error_p			@ yes, error 'p'
+>  
+> -	adr	r4, __secondary_data
+> -	ldmia	r4, {r7, r12}
+> +	ldr	r7, __secondary_data
+>  
+>  #ifdef CONFIG_ARM_MPU
+>  	/* Use MPU region info supplied by __cpu_up */
+> @@ -115,23 +113,19 @@ ENTRY(secondary_startup)
+>  	bl      __setup_mpu			@ Initialize the MPU
+>  #endif
+>  
+> -	adr	lr, BSYM(__after_proc_init)	@ return address
+> -	mov	r13, r12			@ __secondary_switched address
+> +	adr	lr, BSYM(1f)			@ return (PIC) address
+>   ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
+>   THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
+>   THUMB(	ret	r12				)
+> -ENDPROC(secondary_startup)
+> -
+> -ENTRY(__secondary_switched)
+> +1:	bl	__after_proc_init
+>  	ldr	sp, [r7, #8]			@ set up the stack pointer
+>  	mov	fp, #0
+>  	b	secondary_start_kernel
+> -ENDPROC(__secondary_switched)
+> +ENDPROC(secondary_startup)
+>  
+>  	.type	__secondary_data, %object
+>  __secondary_data:
+>  	.long	secondary_data
+> -	.long	__secondary_switched
+>  #endif /* CONFIG_SMP */
+>  
+>  /*
+> @@ -164,7 +158,7 @@ __after_proc_init:
+>  #endif
+>  	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+>  #endif /* CONFIG_CPU_CP15 */
+> -	ret	r13
+> +	ret	lr
+>  ENDPROC(__after_proc_init)
+>  	.ltorg
