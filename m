@@ -1,37 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Apr 2017 11:06:38 +0200
-Subject: [PATCH] pwm: sun4i: switch to atomic PWM
-In-Reply-To: <20170427220002.20266-1-alexandre.belloni@free-electrons.com>
-References: <20170427220002.20266-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170428090638.tkarvtkjh2pukjvo@lukather>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Fri, 28 Apr 2017 09:08:08 +0000
+Subject: [PATCH v2 1/4] perf utils: passing pmu as a parameter to
+ function get_cpuid_str
+In-Reply-To: <1493355227-31492-2-git-send-email-ganapatrao.kulkarni@cavium.com>
+References: <1493355227-31492-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1493355227-31492-2-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170428090808.GA84977@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 12:00:02AM +0200, Alexandre Belloni wrote:
-> Switch the driver to atomic PWM. This makes it easier to wait a proper
-> amount of time when changing the duty cycle before disabling the channel
-> (main use case is switching the duty cycle to 0 before disabling).
+On Fri, Apr 28, 2017 at 10:23:44AM +0530, Ganapatrao Kulkarni wrote:
+> cpuid string will not be same on all CPUs on heterogeneous
+> platforms like ARM's big.LITTLE, adding provision(using pmu->cpus)
+> to find cpuid string from associated CPUs of PMU CORE device.
 > 
-> Also, the hardware read out is now greatly improved as it was formerly only
-> handling PWM polarity.
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+>  tools/perf/arch/powerpc/util/header.c |  3 ++-
+>  tools/perf/arch/x86/util/header.c     |  4 +++-
+>  tools/perf/util/header.h              |  3 ++-
+>  tools/perf/util/pmu.c                 | 10 ++++++----
+>  4 files changed, 13 insertions(+), 7 deletions(-)
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> diff --git a/tools/perf/arch/powerpc/util/header.c b/tools/perf/arch/powerpc/util/header.c
+> index 9aaa6f5..9a70cc1 100644
+> --- a/tools/perf/arch/powerpc/util/header.c
+> +++ b/tools/perf/arch/powerpc/util/header.c
+> @@ -34,10 +34,11 @@
+>  }
+>  
+>  char *
+> -get_cpuid_str(void)
+> +get_cpuid_str(struct perf_pmu *pmu)
+>  {
+>  	char *bufp;
+>  
+> +	do { if (pmu) {} } while (0);
 
-You have a bunch of checkpatch warnings, please fix them.
+If this is to avoid warnings, can you use __maybe_unused here?
 
-Once done, you have my reviewed-by.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170428/18862221/attachment.sig>
+JC.
