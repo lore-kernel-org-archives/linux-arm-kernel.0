@@ -1,154 +1,50 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 28 Apr 2017 18:20:04 +0100
-Subject: [PATCH 1/2] kvm: Fix mmu_notifier release race
-In-Reply-To: <c1232b1d-ad82-794b-1b86-4d0cc0d4cd7f@arm.com>
-References: <1493028624-29837-1-git-send-email-suzuki.poulose@arm.com>
- <1493028624-29837-2-git-send-email-suzuki.poulose@arm.com>
- <20170425184904.GI5713@potion> <c1232b1d-ad82-794b-1b86-4d0cc0d4cd7f@arm.com>
-Message-ID: <611d0ad2-f907-d41c-cdc1-5977c247b104@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Apr 2017 18:20:43 +0100
+Subject: [PATCH v2 4/4] perf vendor events arm64: Add implementation
+ defined pmu core events of ThunderX2
+In-Reply-To: <1493355227-31492-5-git-send-email-ganapatrao.kulkarni@cavium.com>
+References: <1493355227-31492-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1493355227-31492-5-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170428172043.GD13675@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/04/17 17:03, Suzuki K Poulose wrote:
-> On 25/04/17 19:49, Radim Kr?m?? wrote:
->> 2017-04-24 11:10+0100, Suzuki K Poulose:
->>> The KVM uses mmu_notifier (wherever available) to keep track
->>> of the changes to the mm of the guest. The guest shadow page
->>> tables are released when the VM exits via mmu_notifier->ops.release().
->>> There is a rare chance that the mmu_notifier->release could be
->>> called more than once via two different paths, which could end
->>> up in use-after-free of kvm instance (such as [0]).
->>>
->>> e.g:
->>>
->>> thread A                                        thread B
->>> -------                                         --------------
->>>
->>>  get_signal->                                   kvm_destroy_vm()->
->>>  do_exit->                                        mmu_notifier_unregister->
->>>  exit_mm->                                        kvm_arch_flush_shadow_all()->
->>>  exit_mmap->                                      spin_lock(&kvm->mmu_lock)
->>>  mmu_notifier_release->                           ....
->>>   kvm_arch_flush_shadow_all()->                   .....
->>>   ... spin_lock(&kvm->mmu_lock)                   .....
->>>                                                   spin_unlock(&kvm->mmu_lock)
->>>                                                 kvm_arch_free_kvm()
->>>    *** use after free of kvm ***
->>
->> I don't understand this race ...
->> a piece of code in mmu_notifier_unregister() says:
->>
->>       /*
->>        * Wait for any running method to finish, of course including
->>        * ->release if it was run by mmu_notifier_release instead of us.
->>        */
->>       synchronize_srcu(&srcu);
->>
->> and code before that removes the notifier from the list, so it cannot be
->> called after we pass this point.  mmu_notifier_release() does roughly
->> the same and explains it as:
->>
->>       /*
->>        * synchronize_srcu here prevents mmu_notifier_release from returning to
->>        * exit_mmap (which would proceed with freeing all pages in the mm)
->>        * until the ->release method returns, if it was invoked by
->>        * mmu_notifier_unregister.
->>        *
->>        * The mmu_notifier_mm can't go away from under us because one mm_count
->>        * is held by exit_mmap.
->>        */
->>       synchronize_srcu(&srcu);
->>
->> The call of mmu_notifier->release is protected by srcu in both cases and
->> while it seems possible that mmu_notifier->release would be called
->> twice, I don't see a combination that could result in use-after-free
->> from mmu_notifier_release after mmu_notifier_unregister() has returned.
->
-> Thanks for bringing it up. Even I am wondering why this is triggered ! (But it
-> does get triggered for sure !!)
->
-> The only difference I can spot with _unregister & _release paths are the way
-> we use src_read_lock across the deletion of the entry from the list.
->
-> In mmu_notifier_unregister() we do :
->
->                 id = srcu_read_lock(&srcu);
->                 /*
->                  * exit_mmap will block in mmu_notifier_release to guarantee
->                  * that ->release is called before freeing the pages.
->                  */
->                 if (mn->ops->release)
->                         mn->ops->release(mn, mm);
->                 srcu_read_unlock(&srcu, id);
->
-> ## Releases the srcu lock here and then goes on to grab the spin_lock.
->
->                 spin_lock(&mm->mmu_notifier_mm->lock);
->                 /*
->                  * Can not use list_del_rcu() since __mmu_notifier_release
->                  * can delete it before we hold the lock.
->                  */
->                 hlist_del_init_rcu(&mn->hlist);
->                 spin_unlock(&mm->mmu_notifier_mm->lock);
->
-> While in mmu_notifier_release() we hold it until the node(s) are deleted from the
-> list :
->         /*
->          * SRCU here will block mmu_notifier_unregister until
->          * ->release returns.
->          */
->         id = srcu_read_lock(&srcu);
->         hlist_for_each_entry_rcu(mn, &mm->mmu_notifier_mm->list, hlist)
->                 /*
->                  * If ->release runs before mmu_notifier_unregister it must be
->                  * handled, as it's the only way for the driver to flush all
->                  * existing sptes and stop the driver from establishing any more
->                  * sptes before all the pages in the mm are freed.
->                  */
->                 if (mn->ops->release)
->                         mn->ops->release(mn, mm);
->
->         spin_lock(&mm->mmu_notifier_mm->lock);
->         while (unlikely(!hlist_empty(&mm->mmu_notifier_mm->list))) {
->                 mn = hlist_entry(mm->mmu_notifier_mm->list.first,
->                                  struct mmu_notifier,
->                                  hlist);
->                 /*
->                  * We arrived before mmu_notifier_unregister so
->                  * mmu_notifier_unregister will do nothing other than to wait
->                  * for ->release to finish and for mmu_notifier_unregister to
->                  * return.
->                  */
->                 hlist_del_init_rcu(&mn->hlist);
->         }
->         spin_unlock(&mm->mmu_notifier_mm->lock);
->         srcu_read_unlock(&srcu, id);
->
-> ## The lock is release only after the deletion of the node.
->
-> Both are followed by a synchronize_srcu(). Now, I am wondering if the unregister path
-> could potentially miss SRCU read lock held in _release() path and go onto finish the
-> synchronize_srcu before the item is deleted ? May be we should do the read_unlock
-> after the deletion of the node in _unregister (like we do in the _release()) ?
+On Fri, Apr 28, 2017 at 10:23:47AM +0530, Ganapatrao Kulkarni wrote:
+> This is not a full event list, but a short list of useful events.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 14 +++++
+>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+>  2 files changed, 76 insertions(+)
+>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+> 
+> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> new file mode 100644
+> index 0000000..bc9f798
+> --- /dev/null
+> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+> @@ -0,0 +1,14 @@
+> +# Format:
+> +#	MIDR,Version,JSON/file/pathname,Type
+> +#
+> +# where
+> +#	MIDR	Processor version
+> +#	Version could be used to track version of of JSON file
+> +#		but currently unused.
+> +#	JSON/file/pathname is the path to JSON file, relative
+> +#		to tools/perf/pmu-events/arch/arm64/.
+> +#	Type is core, uncore etc
+> +#
+> +#
+> +#Family-model,Version,Filename,EventType
+> +0x00000000420f5161,v1,thunderx2,core
 
-I haven't been able to reproduce the mmu_notifier race condition, which leads to KVM
-free, reported at [1]. I will leave it running (with tracepoints/ftrace) over the
-weekend.
+In general, I don't think we want to require an exact match on the whole
+MIDR here. Specifically, we'd want to mask out the Variant and Revision
+fields for ARM CPUs, to avoid having to update the mapfile all the time.
 
->
->>
->> Doesn't [2/2] solve the exact same issue (that the release method cannot
->> be called twice in parallel)?
->
-> Not really. This could be a race between a release() and one of the other notifier
-> callbacks. e.g, In [0], we were hitting a use-after-free in kvm_unmap_hva() where,
-> the unregister could have succeeded and released the KVM.
+Is it possible to support wildcarding in the MIDR match?
 
-But I can reproduce this problem [0], and we need the [2/2] for arm/arm64.
-
-[0] http://lkml.kernel.org/r/febea966-3767-21ff-3c40-1a76d1399138 at suse.de
-[1] http://lkml.kernel.org/r/CAAeHK+x8udHKq9xa1zkTO6ax5E8Dk32HYWfaT05FMchL2cr48g at mail.gmail.com
-
-
-Thanks
-Suzuki
+Will
