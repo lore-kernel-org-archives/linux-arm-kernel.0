@@ -1,52 +1,106 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 28 Apr 2017 18:30:45 +0100
-Subject: [PATCH] arm64: Print DT machine model in setup_machine_fdt()
-In-Reply-To: <20170428165232.GZ13675@arm.com>
-References: <1493296385-14140-1-git-send-email-geert+renesas@glider.be>
- <20170428145730.GS13675@arm.com>
- <CAMuHMdVHMcY5iy3gsYUOJLhYnMECh4yu-5pZJHXNxJhBp6+TOQ@mail.gmail.com>
- <20170428165232.GZ13675@arm.com>
-Message-ID: <7b593509-a0de-8493-051d-8b7e3118f551@arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 28 Apr 2017 19:42:50 +0200
+Subject: [PATCH v5 17/22] KVM: arm64: vgic-its: Collection table
+ save/restore
+In-Reply-To: <e866c4bd-8ec5-9cac-fa43-aa442b1d2dac@redhat.com>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-18-git-send-email-eric.auger@redhat.com>
+ <20170428104448.GB1439@lvm>
+ <e866c4bd-8ec5-9cac-fa43-aa442b1d2dac@redhat.com>
+Message-ID: <20170428174250.GA31666@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 28/04/17 17:52, Will Deacon wrote:
-> On Fri, Apr 28, 2017 at 06:16:46PM +0200, Geert Uytterhoeven wrote:
->> On Fri, Apr 28, 2017 at 4:57 PM, Will Deacon <will.deacon@arm.com> wrote:
->>> On Thu, Apr 27, 2017 at 02:33:05PM +0200, Geert Uytterhoeven wrote:
->>>> On arm32, the machine model specified in the device tree is printed
->>>> during boot-up, courtesy of of_flat_dt_match_machine().
->>>>
->>>> On arm64, of_flat_dt_match_machine() is not called, and the machine
->>>> model information is not available from the kernel log.
->>>>
->>>> Print the machine model to make it easier to derive the machine model
->>>> from an arbitrary kernel boot log.
->>>>
->>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>>> ---
->>>> I have scripts to save kernel boot logs, and compare logs[*] for
->>>> subsequent boots on the same machine.  Having a way to extract the
->>>> machine model from an arbitrary kernel boot log makes this easier.
->>
->>> I think your use-case is slightly questionable (e.g. for ACPI, we print
->>> something different, and this isn't generally considered to be ABI), but
->>> the patch is harmless and if you find it useful then:
->>
->> Not having access to an ARM ACPI system, what does it print for example?
+On Fri, Apr 28, 2017 at 01:05:15PM +0200, Auger Eric wrote:
+> Hi Christoffer,
 > 
-> It's supposed to print out some stuff from DMI, but my Juno just says:
-> 
->   DMI not present or invalid.
-> 
+> On 28/04/2017 12:44, Christoffer Dall wrote:
+> > On Fri, Apr 14, 2017 at 12:15:29PM +0200, Eric Auger wrote:
+> >> The save path copies the collection entries into guest RAM
+> >> at the GPA specified in the BASER register. This obviously
+> >> requires the BASER to be set. The last written element is a
+> >> dummy collection table entry.
+> >>
+> >> We do not index by collection ID as the collection entry
+> >> can fit into 8 bytes while containing the collection ID.
+> >>
+> >> On restore path we re-allocate the collection objects.
+> >>
+> >> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> >>
+> >> ---
+> >> v4 -> v5:
+> >> - add macros for field encoding/decoding
+> >> - use abi->cte_esz
+> >> - rename flush into save
+> >> - check the target_addr is valid
+> >>
+> >> v3 -> v4:
+> >> - replaced u64 *ptr by gpa_t gpa
+> >> - check the collection does not exist before allocating it
+> >>
+> >> v1 -> v2:
+> >> - reword commit message and directly use 8 as entry size
+> >> - no kvm parameter anymore
+> >> - add helper for flush/restore cte
+> >> - table size computed here
+> >> - add le64/cpu conversions
+> >> ---
+> >>  virt/kvm/arm/vgic/vgic-its.c | 109 ++++++++++++++++++++++++++++++++++++++++++-
+> >>  virt/kvm/arm/vgic/vgic.h     |   9 ++++
+> >>  2 files changed, 116 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> >> index c22b35d..484e541 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-its.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> >> @@ -1785,13 +1785,97 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
+> >>  	return -ENXIO;
+> >>  }
+> >>  
+> >> +static int vgic_its_save_cte(struct vgic_its *its,
+> >> +			     struct its_collection *collection,
+> >> +			     gpa_t gpa, int esz)
+> >> +{
+> >> +	u64 val;
+> >> +	int ret;
+> >> +
+> >> +	val = (1ULL << KVM_ITS_CTE_VALID_SHIFT |
+> >> +	       ((u64)collection->target_addr << KVM_ITS_CTE_RDBASE_SHIFT) |
+> >> +	       collection->collection_id);
+> >> +	val = cpu_to_le64(val);
+> >> +	ret = kvm_write_guest(its->dev->kvm, gpa, &val, esz);
+> >> +	return ret;
+> >> +}
+> >> +
+> >> +static int vgic_its_restore_cte(struct vgic_its *its, gpa_t gpa,
+> >> +				int esz, bool *valid)
+> >> +{
+> >> +	struct its_collection *collection;
+> >> +	struct kvm *kvm = its->dev->kvm;
+> >> +	u32 target_addr;
+> >> +	u32 coll_id;
+> >> +	u64 val;
+> >> +	int ret;
+> >> +
+> >> +	*valid = false;
+> > 
+> > I don't see why you need this.
+> I initialized it here in case kvm_read_guest() fails
 
-With latest firmware, I get something like:
+If the caller looks at the valid setting when it receives an error code,
+that's really weird.
 
-DMI: ARM LTD ARM Juno Development Platform/ARM Juno Development
-Platform, BIOS EDK II ...
+> > 
+> >> +
+> >> +	ret = kvm_read_guest(kvm, gpa, &val, esz);
+> > 
+> > hmm, we better not have an esz larger than sizeof(u64) here then.
+> Yes this could be part if the ABI ops but is that worth the effort now?
+> I can add a comment somewhere to mention that trap.
 
--- 
-Regards,
-Sudeep
+I wasn't really sure what we should do here, but I think we should add
+BUG_ON(esz > sizeof(val)) when going over this again.
+
+Thanks,
+-Christoffer
