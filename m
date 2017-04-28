@@ -1,42 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Apr 2017 13:41:58 +0200
-Subject: [PATCH 2/2] dt-bindings: pcie: Add documentation for Mediatek PCIe
-In-Reply-To: <1493347596.29314.55.camel@mtkswgap22>
-References: <1492935543-18190-1-git-send-email-ryder.lee@mediatek.com>
- <1492935543-18190-3-git-send-email-ryder.lee@mediatek.com>
- <CAK8P3a1vgi9VBZfRNq0dDKzmfe8FkHQtgz6fEXW9fyUnBHtaQQ@mail.gmail.com>
- <1493194205.27023.80.camel@mtkswgap22>
- <CAK8P3a0vD8s_3R+jS=JdUXX3X05SkCk-mipMA6UxWYQZe6vLUQ@mail.gmail.com>
- <1493347596.29314.55.camel@mtkswgap22>
-Message-ID: <CAK8P3a0WGwukWj8V-S2c13S3futkxBhiMfRTa=0QWaDG7qREVw@mail.gmail.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 28 Apr 2017 14:05:29 +0200
+Subject: [PATCH v2] clk: sunxi-ng: Fix dependency on SUNXI_CCU_GATE
+In-Reply-To: <20170428011533.GZ7065@codeaurora.org>
+References: <20170426115319.30951-1-clabbe.montjoie@gmail.com>
+ <20170427070436.3qu4mzepq4gmmymi@lukather>
+ <20170427081249.GA25781@Red> <20170428011533.GZ7065@codeaurora.org>
+Message-ID: <20170428120529.GA25131@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 4:46 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> On Thu, 2017-04-27 at 21:06 +0200, Arnd Bergmann wrote:
->> On Wed, Apr 26, 2017 at 10:10 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
->> > On Tue, 2017-04-25 at 14:18 +0200, Arnd Bergmann wrote:
->> >> On Sun, Apr 23, 2017 at 10:19 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
->> Are any of the registers the same at all, e.g. for MSI handling?
->
-> No, It doesn't support MSI. All I can do is using the registers that designer provide
-> to me. The others are inviable for software. So I treat it as different hardware.
-> Furthermore, we hope that we can put all mediatek drivers together
-> regardless of in-house IP or lincense IP
->
-> We have no particular IP name but just use chip name to call it. So I
-> will temporarily use "mediatek,gen2v1-pcie" in patch v1.
+On Thu, Apr 27, 2017 at 06:15:33PM -0700, Stephen Boyd wrote:
+> On 04/27, Corentin Labbe wrote:
+> > On Thu, Apr 27, 2017 at 09:04:36AM +0200, Maxime Ripard wrote:
+> > > On Wed, Apr 26, 2017 at 01:53:19PM +0200, Corentin Labbe wrote:
+> > > > When CONFIG_SUNXI_CCU is set but no other SUNXI_CCU is selected i got
+> > > > the following build error:
+> > > > drivers/built-in.o: In function `ccu_pll_notifier_cb':
+> > > > drivers/clk/sunxi-ng/ccu_common.c:71: undefined reference to `ccu_gate_helper_disable'
+> > > > drivers/clk/sunxi-ng/ccu_common.c:73: undefined reference to `ccu_gate_helper_enable'
+> > > > 
+> > > > The problem is the function ccu_pll_notifier_cb in ccu_common.c need
+> > > > some function from ccu_gate.c which is not compiled since SUNXI_CCU_GATE
+> > > > is not selected.
+> > > > 
+> > > > This patch remove SUNXI_CCU_GATE and compile ccu_gate.c unconditionnaly
+> > > > since all other combination of options select SUNXI_CCU_GATE finally.
+> > > > 
+> > > > Fixes: 02ae2bc6febd ("clk: sunxi-ng: Add clk notifier to gate then ungate PLL clocks")
+> > > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > > 
+> > > I think Chen-Yu had some comments that you didn't address.
+> > > 
+> > 
+> > I have changed subject as requested
+> 
+> There were more comments than just fixing the subject. And now
+> Arnd has sent a patch. This is a problem in mainline, and the
+> release is days away. I'm inclined to go with Arnd's patch unless
+> someone sends something else and forward it directly to Linus.
 
-I think using the chip name as in the first version of your patch name is
-better then, in particular since the 'gen2v1' would not be an actual version
-number but just say which variant got merged into mainline first.
-
-A related question would be on how general we want the binding to be.
-Your binding text starts out by describing that there are three root ports
-and what their capabilities are.
-
-If you think there might be other (existing or future) chips that use the
-same binding and driver, then being a little more abstract could help
-in the long run.
-
-       Arnd
+Sorry, I havent see the rest of wens's comments.
+Go for Arnd's patch.
