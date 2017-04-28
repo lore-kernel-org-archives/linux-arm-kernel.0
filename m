@@ -1,34 +1,37 @@
-From: andreas@kemnade.info (Andreas Kemnade)
-Date: Fri, 28 Apr 2017 12:27:35 +0200
-Subject: [PATCH] dt: gta04: fix polarity of clocks for mcbsp4
-Message-ID: <1493375255-21094-1-git-send-email-andreas@kemnade.info>
+From: absahu@codeaurora.org (Abhishek Sahu)
+Date: Fri, 28 Apr 2017 15:57:53 +0530
+Subject: [PATCH] ARM: qcom_defconfig: Enable IPQ4019 clock and pinctrl
+Message-ID: <1493375273-1635-1-git-send-email-absahu@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock polarity setting of the mcbsp connected to
-the modem was wrong so almost only noise
-was received.
-With this patch it is also the same as it was on
-earlier non-dt kernels where it was working properly
+These configs are required for booting kernel in QCOM IPQ4019 boards.
 
-Signed-off-by: Andreas Kemnade <andreas@kemnade.info>
+Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
 ---
- arch/arm/boot/dts/omap3-gta04.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/configs/qcom_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-index 16b237d3..c0d9d4b 100644
---- a/arch/arm/boot/dts/omap3-gta04.dtsi
-+++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-@@ -68,7 +68,8 @@
- 		simple-audio-card,bitclock-master = <&telephony_link_master>;
- 		simple-audio-card,frame-master = <&telephony_link_master>;
- 		simple-audio-card,format = "i2s";
--
-+		simple-audio-card,bitclock-inversion;
-+		simple-audio-card,frame-inversion;
- 		simple-audio-card,cpu {
- 			sound-dai = <&mcbsp4>;
- 		};
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index 4ffdd60..28c98c6 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -113,6 +113,7 @@ CONFIG_SPI_QUP=y
+ CONFIG_SPMI=y
+ CONFIG_PINCTRL_APQ8064=y
+ CONFIG_PINCTRL_APQ8084=y
++CONFIG_PINCTRL_IPQ4019=y
+ CONFIG_PINCTRL_IPQ8064=y
+ CONFIG_PINCTRL_MSM8660=y
+ CONFIG_PINCTRL_MSM8960=y
+@@ -182,6 +183,7 @@ CONFIG_COMMON_CLK_QCOM=y
+ CONFIG_QCOM_CLK_RPM=y
+ CONFIG_QCOM_CLK_SMD_RPM=y
+ CONFIG_APQ_MMCC_8084=y
++CONFIG_IPQ_GCC_4019=y
+ CONFIG_IPQ_LCC_806X=y
+ CONFIG_MSM_GCC_8660=y
+ CONFIG_MSM_LCC_8960=y
 -- 
-2.1.4
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
