@@ -1,67 +1,30 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Fri, 28 Apr 2017 14:38:38 +0200
-Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
-In-Reply-To: <20170428012530.GA383@jagdpanzerIV.localdomain>
-References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
- <1461239325-22779-2-git-send-email-pmladek@suse.com>
- <20170419131341.76bc7634@gandalf.local.home>
- <20170420033112.GB542@jagdpanzerIV.localdomain>
- <20170420131154.GL3452@pathway.suse.cz>
- <20170428012530.GA383@jagdpanzerIV.localdomain>
-Message-ID: <20170428123838.GZ3452@pathway.suse.cz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Apr 2017 14:38:48 +0200
+Subject: [RFC/RFT PATCH 05/18] ARM: PCI: dove: Convert PCI scan API to
+ pci_scan_root_bus_bridge()
+In-Reply-To: <20170426111809.19922-6-lorenzo.pieralisi@arm.com>
+References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
+ <20170426111809.19922-6-lorenzo.pieralisi@arm.com>
+Message-ID: <CAK8P3a1bnnq-9iuse43bCNX_9TirZPOtmH_vFsvJ9VOAsoUBzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2017-04-28 10:25:30, Sergey Senozhatsky wrote:
-> 
-> On (04/20/17 15:11), Petr Mladek wrote:
-> [..]
-> >  void printk_nmi_enter(void)
-> >  {
-> > -	this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
-> > +	/*
-> > +	 * The size of the extra per-CPU buffer is limited. Use it
-> > +	 * only when really needed.
-> > +	 */
-> > +	if (this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK ||
-> > +	    raw_spin_is_locked(&logbuf_lock)) {
-> 
-> can we please have && here?
+On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> The introduction of pci_scan_root_bus_bridge() provides a PCI core
+> API to scan a PCI root bus backed by an already initialized
+> struct pci_host_bridge object, which simplifies the bus scan
+> interface and makes the PCI scan root bus interface easier to
+> generalize as members are added to the struct pci_host_bridge().
+>
+> Convert ARM dove platform code to pci_scan_root_bus_bridge() to improve
+> the PCI root bus scanning interface.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-OK, it sounds reasonable after all.
+Is this patch required for one of the later steps in the series?
 
-> [..]
-> > diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
-> > index 4e8a30d1c22f..0bc0a3535a8a 100644
-> > --- a/lib/nmi_backtrace.c
-> > +++ b/lib/nmi_backtrace.c
-> > @@ -86,9 +86,11 @@ void nmi_trigger_cpumask_backtrace(const cpumask_t *mask,
-> >  
-> >  bool nmi_cpu_backtrace(struct pt_regs *regs)
-> >  {
-> > +	static arch_spinlock_t lock = __ARCH_SPIN_LOCK_UNLOCKED;
-> >  	int cpu = smp_processor_id();
-> >  
-> >  	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
-> > +		arch_spin_lock(&lock);
-> >  		if (regs && cpu_in_idle(instruction_pointer(regs))) {
-> >  			pr_warn("NMI backtrace for cpu %d skipped: idling at pc %#lx\n",
-> >  				cpu, instruction_pointer(regs));
-> > @@ -99,6 +101,7 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
-> >  			else
-> >  				dump_stack();
-> >  		}
-> > +		arch_spin_unlock(&lock);
-> >  		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-> >  		return true;
-> >  	}
-> 
-> can the nmi_backtrace part be a patch on its own?
+As non-DT dove uses the traditional pci_common_init() helper rather
+than registering its own driver, I wonder if there is anything to gain here.
 
-I would prefer to keep it in the same patch. The backtrace from
-all CPUs is completely unusable when all CPUs push to the global
-log buffer in parallel. Single patch might safe hair of some
-poor bisectors.
-
-Best Regards,
-Petr
+        Arnd
