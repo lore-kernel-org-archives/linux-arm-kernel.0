@@ -1,97 +1,84 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Fri, 28 Apr 2017 12:08:15 -0700
-Subject: [PATCH v2] arm64: Add ASM modifier for xN register operands
-In-Reply-To: <20170428143333.GA5292@leverpostej>
-References: <20170426214616.142580-1-mka@chromium.org>
- <20170427110256.GC31337@leverpostej>
- <20170427225221.GS128305@google.com>
- <CAKv+Gu9s2t+Nt7JCcTxkr5BYSN05f_zxYkKzfrD-4owWQLvF_Q@mail.gmail.com>
- <20170428143333.GA5292@leverpostej>
-Message-ID: <20170428190815.GT128305@google.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 28 Apr 2017 14:27:42 -0500
+Subject: [PATCH v4 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <9349c8ae9091fbd93e9410f4cfae770ac850bf6b.1493125299.git.guillaume.tucker@collabora.com>
+References: <cover.1493125299.git.guillaume.tucker@collabora.com>
+ <9349c8ae9091fbd93e9410f4cfae770ac850bf6b.1493125299.git.guillaume.tucker@collabora.com>
+Message-ID: <20170428192742.pu4v4layszr6z2ot@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Fri, Apr 28, 2017 at 03:33:33PM +0100 Mark Rutland ha dit:
+On Tue, Apr 25, 2017 at 02:16:16PM +0100, Guillaume Tucker wrote:
+> The ARM Mali Midgard GPU family is present in a number of SoCs
+> from many different vendors such as Samsung Exynos and Rockchip.
+> 
+> Import the device tree bindings documentation from the r16p0
+> release of the Mali Midgard GPU kernel driver:
+> 
+>   https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/mali-midgard-gpu/TX011-SW-99002-r16p0-00rel0.tgz
+> 
+> Remove the copyright and GPL licence header as deemed not necessary.
+> 
+> Redesign the "compatible" property strings to list all the Mali
+> Midgard GPU types and include optional vendor ones.
+> 
+> Drop the "clock-names" property as only one clock is used by the Mali
+> Midgard driver (which now needs to call clk_get with NULL).
+> 
+> Convert the "interrupt-names" property values to lower-case: "job",
+> "mmu" and "gpu".
+> 
+> Replace the deprecated "operating-points" optional property with
+> "operating-points-v2".
+> 
+> Omit the following optional properties in this initial version as they
+> are only used in very specific cases:
+> 
+>   * snoop_enable_smc
+>   * snoop_disable_smc
+>   * jm_config
+>   * power_model
+>   * system-coherency
+>   * ipa-model
+> 
+> Update the example accordingly to reflect all these changes.
+> 
+> CC: John Reitan <john.reitan@arm.com>
+> Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
+> ---
+>  .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 82 ++++++++++++++++++++++
+>  1 file changed, 82 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> new file mode 100644
+> index 000000000000..547ddeceb498
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> @@ -0,0 +1,82 @@
+> +ARM Mali Midgard GPU
+> +====================
+> +
+> +Required properties:
+> +
+> +- compatible :
+> +  * Must be one of the following:
+> +    + "arm,mali-t60x"
+> +    + "arm,mali-t62x"
 
-> On Fri, Apr 28, 2017 at 08:18:52AM +0100, Ard Biesheuvel wrote:
-> > On 27 April 2017 at 23:52, Matthias Kaehlcke <mka@chromium.org> wrote:
-> > > El Thu, Apr 27, 2017 at 12:02:56PM +0100 Mark Rutland ha dit:
-> > >> On Wed, Apr 26, 2017 at 02:46:16PM -0700, Matthias Kaehlcke wrote:
-> > >> > Many inline assembly statements don't include the 'x' modifier when
-> > >> > using xN registers as operands. This is perfectly valid, however it
-> > >> > causes clang to raise warnings like this:
-> > >> >
-> > >> > warning: value size does not match register size specified by the
-> > >> >   constraint and modifier [-Wasm-operand-widths]
-> 
-> [...]
-> 
-> > >> > -   asm volatile("strb %w0, [%1]" : : "rZ" (val), "r" (addr));
-> > >> > +   asm volatile("strb %w0, [%x1]" : : "rZ" (val), "r" (addr));
-> > >>
-> > >> In general, the '[%xN]' pattern looks *very* suspicious to me. Any
-> > >> address must be 64-bit, so this would mask a legitimate warning.
-> > >>
-> > >> Given the prototype of this function the code if fine either way, but
-> > >> were we to refactor things (e.g. making this a macro), that might not be
-> > >> true.
-> > >>
-> > >> ... so I'm not sure it make sense to alter instances used for addresses.
-> > >
-> > > Good point, I'll leave instances dealing with addresses untouched for now.
-> > >
-> > 
-> > OK, I am confused now. We started this thread under the assumption
-> > that all unqualified placeholders are warned about by Clang. Given
-> > that this appears not to be the case, could we please first find out
-> > what causes the warnings? Is it necessary at all to add the x
-> > modifiers for 64-bit types?
-> 
-> FWIW, I grabbed a clang 4.0.0 binary and had a play.
-> 
-> It looks like clang only warns when an operand is less than 64 bits
-> wide, and there is no 'x' or 'w' modifier. Pointers a 64 bits wide, so
-> never produce a warning.
-> 
-> As far as I can tell, applying to both integers and pointers:
-> 
-> * GCC and clang always treat %N as meaning xN for an r constraint, and
->   you need to use %wN to get wN.
-> 
-> * If an operand type is 64 bits in size, clang will not produce a warning
->   regarding the operand size.
-> 
-> * If an x or w modifier is used, clang will not produce a warning
->   regarding the operand size, regardless of whether it matches the
->   register size. Clang is happy for %wN to be used on a pointer type.
-> 
-> * If an operand type is less than 64 bits in size, and neither an x or
->   w modifier is used, clang will produce a warning as above.
-> 
-> * If an operand type is greater than 64 bits in size, clang encounters
->   an internal error.
-> 
-> Given that, I think we *should not* use the x modifier to suppress this
-> warning, as I think for those cases we have a potential bug as outlined
-> in my prior reply.
-> 
-> Instead, we should use a temporary 64-bit variable (or cast input
-> operands to 64-bit), which avoids that and makes clang happy.
-> 
-> I've included my test below. Note that clang will produce other errors for
-> invalid asm (e.g. for mov w0, x0).
+Don't use wildcards.
 
-Thanks for your investigation!
+> +    + "arm,mali-t720"
+> +    + "arm,mali-t760"
+> +    + "arm,mali-t820"
+> +    + "arm,mali-t830"
+> +    + "arm,mali-t860"
+> +    + "arm,mali-t880"
+> +  * And, optionally, one of the vendor specific compatible:
 
-I apologize for the noise, my expertise with inline assembly is
-extremely limited, and admittedly I need a bit of handholding in this
-area. Not without reason changes like this or the prefetch code are at
-the very top of my clang stack (i.e. postponed until the other less
-scary issues were solved). Hopefully the discussion was still useful.
+IMO, these should not be optional.
 
-I'll prepare a short patch that only fixes the warnings encountered in
-my build in the way you suggested.
-
-Thanks
-
-Matthias
+> +    + "amlogic,meson-gxm-mali"
+> +    + "rockchip,rk3288-mali"
