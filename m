@@ -1,39 +1,43 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 27 Apr 2017 18:02:32 -0700
-Subject: [PATCH] watchdog: bcm281xx: Fix use of uninitialized spinlock.
-Message-ID: <20170428010232.19905-1-eric@anholt.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 27 Apr 2017 18:15:33 -0700
+Subject: [PATCH v2] clk: sunxi-ng: Fix dependency on SUNXI_CCU_GATE
+In-Reply-To: <20170427081249.GA25781@Red>
+References: <20170426115319.30951-1-clabbe.montjoie@gmail.com>
+ <20170427070436.3qu4mzepq4gmmymi@lukather>
+ <20170427081249.GA25781@Red>
+Message-ID: <20170428011533.GZ7065@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bcm_kona_wdt_set_resolution_reg() call takes the spinlock, so
-initialize it earlier.  Fixes a warning at boot with lock debugging
-enabled.
+On 04/27, Corentin Labbe wrote:
+> On Thu, Apr 27, 2017 at 09:04:36AM +0200, Maxime Ripard wrote:
+> > On Wed, Apr 26, 2017 at 01:53:19PM +0200, Corentin Labbe wrote:
+> > > When CONFIG_SUNXI_CCU is set but no other SUNXI_CCU is selected i got
+> > > the following build error:
+> > > drivers/built-in.o: In function `ccu_pll_notifier_cb':
+> > > drivers/clk/sunxi-ng/ccu_common.c:71: undefined reference to `ccu_gate_helper_disable'
+> > > drivers/clk/sunxi-ng/ccu_common.c:73: undefined reference to `ccu_gate_helper_enable'
+> > > 
+> > > The problem is the function ccu_pll_notifier_cb in ccu_common.c need
+> > > some function from ccu_gate.c which is not compiled since SUNXI_CCU_GATE
+> > > is not selected.
+> > > 
+> > > This patch remove SUNXI_CCU_GATE and compile ccu_gate.c unconditionnaly
+> > > since all other combination of options select SUNXI_CCU_GATE finally.
+> > > 
+> > > Fixes: 02ae2bc6febd ("clk: sunxi-ng: Add clk notifier to gate then ungate PLL clocks")
+> > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > 
+> > I think Chen-Yu had some comments that you didn't address.
+> > 
+> 
+> I have changed subject as requested
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- drivers/watchdog/bcm_kona_wdt.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+There were more comments than just fixing the subject. And now
+Arnd has sent a patch. This is a problem in mainline, and the
+release is days away. I'm inclined to go with Arnd's patch unless
+someone sends something else and forward it directly to Linus.
 
-diff --git a/drivers/watchdog/bcm_kona_wdt.c b/drivers/watchdog/bcm_kona_wdt.c
-index 6fce17d5b9f1..a5775dfd8d5f 100644
---- a/drivers/watchdog/bcm_kona_wdt.c
-+++ b/drivers/watchdog/bcm_kona_wdt.c
-@@ -304,6 +304,8 @@ static int bcm_kona_wdt_probe(struct platform_device *pdev)
- 	if (!wdt)
- 		return -ENOMEM;
- 
-+	spin_lock_init(&wdt->lock);
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	wdt->base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(wdt->base))
-@@ -316,7 +318,6 @@ static int bcm_kona_wdt_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	spin_lock_init(&wdt->lock);
- 	platform_set_drvdata(pdev, wdt);
- 	watchdog_set_drvdata(&bcm_kona_wdt_wdd, wdt);
- 	bcm_kona_wdt_wdd.parent = &pdev->dev;
 -- 
-2.11.0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
