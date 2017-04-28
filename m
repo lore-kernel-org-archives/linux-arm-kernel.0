@@ -1,24 +1,97 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 28 Apr 2017 14:23:32 +0200
-Subject: [PATCH v3 1/9] bus: fsl-mc: add DPCON object APIs
-In-Reply-To: <20170428095034.8842-2-ruxandra.radulescu@nxp.com>
-References: <20170428095034.8842-1-ruxandra.radulescu@nxp.com>
- <20170428095034.8842-2-ruxandra.radulescu@nxp.com>
-Message-ID: <20170428122332.GB18081@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Apr 2017 14:28:38 +0200
+Subject: [RFC/RFT PATCH 03/18] PCI: Introduce pci_scan_root_bus_bridge()
+In-Reply-To: <20170426111809.19922-4-lorenzo.pieralisi@arm.com>
+References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
+ <20170426111809.19922-4-lorenzo.pieralisi@arm.com>
+Message-ID: <CAK8P3a0HmrrYBP5em1s4VOY4Tb6=bwOrDDN6K8rPp8OEXtpMtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 04:50:26AM -0500, Ioana Radulescu wrote:
-> From: Ioana Radulescu <ruxandra.radulescu@freescale.com>
-> 
-> This patch adds the command building/parsing wrapper functions
-> for the DPCON object. The binary interface version is v3.2.
+On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> Current pci_scan_root_bus() interface is made up of two main
+> code paths:
+>
+> - pci_create_root_bus()
+> - pci_scan_child_bus()
+>
+> pci_create_root_bus() is a wrapper function that allows to create
+> a struct pci_host_bridge structure, initialize it with the passed
+> parameters and register it with the kernel.
+>
+> As the struct pci_host_bridge require additional struct members,
+> pci_create_root_bus() parameters list has grown in time, making
+> it unwieldy to add further parameters to it in case the struct
+> pci_host_bridge gains more members fields to augment its functionality.
+>
+> Since PCI core code provides functions to allocate struct
+> pci_host_bridge, instead of forcing the pci_create_root_bus() interface
+> to add new parameters to cater for new struct pci_host_bridge
+> functionality, it is more suitable to add an interface in PCI
+> core code to scan a PCI bus straight from a struct pci_host_bridge
+> created and customized by each specific PCI host controller driver.
+>
+> Add a pci_scan_root_bus_bridge() function to allow PCI host controller
+> drivers to create and initialize struct pci_host_bridge and scan
+> the resulting bus.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
 
-The subject should have "staging: fsl-mc: bus: ..." to match the other
-ones (and to catch my filters properly...)
+Good idea, yes. To avoid growing the number of interfaces too
+much, should we change the existing users of pci_register_host_bridge
+in host drivers over to this entry point, and make the other one
+local to probe.c then?
 
-I'll take this as-is for now.
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 7e4ffc4..c7a7f72 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -2412,6 +2412,44 @@ void pci_bus_release_busn_res(struct pci_bus *b)
+>                         res, ret ? "can not be" : "is");
+>  }
+>
+> +int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge)
+> +{
+> +       struct resource_entry *window;
+> +       bool found = false;
+> +       struct pci_bus *b;
+> +       int max, bus, ret;
+> +
+> +       if (!bridge)
+> +               return -EINVAL;
+> +
+> +       resource_list_for_each_entry(window, &bridge->windows)
+> +               if (window->res->flags & IORESOURCE_BUS) {
+> +                       found = true;
+> +                       break;
+> +               }
+> +
+> +       ret = pci_register_host_bridge(bridge);
+> +       if (ret < 0)
+> +               return ret;
+> +
+> +       b = bridge->bus;
+> +       bus = bridge->busnr;
+> +
+> +       if (!found) {
+> +               dev_info(&b->dev,
+> +                "No busn resource found for root bus, will use [bus %02x-ff]\n",
+> +                       bus);
+> +               pci_bus_insert_busn_res(b, bus, 255);
+> +       }
+> +
+> +       max = pci_scan_child_bus(b);
+> +
+> +       if (!found)
+> +               pci_bus_update_busn_res_end(b, max);
+> +
+> +       return 0;
+> +}
+> +
 
-thanks,
+We probably want an EXPORT_SYMBOL() here as well.
 
-greg k-h
+     Arnd
