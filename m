@@ -1,117 +1,44 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 28 Apr 2017 13:31:14 -0700
-Subject: [PATCH] [stable v3.18.y] ARM: 8383/1: nommu: avoid deprecated
- source register on mov
-In-Reply-To: <20170427193230.2673449-1-arnd@arndb.de>
-References: <20170427193230.2673449-1-arnd@arndb.de>
-Message-ID: <20de5c06b41b1776c79da2a418eea8ac@agner.ch>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Fri, 28 Apr 2017 13:36:39 -0700
+Subject: [PATCH v3 2/3] thermal: broadcom: ns-thermal: default on iProc
+ SoCs
+In-Reply-To: <1493410291-16679-3-git-send-email-jon.mason@broadcom.com>
+References: <1493410291-16679-1-git-send-email-jon.mason@broadcom.com>
+ <1493410291-16679-3-git-send-email-jon.mason@broadcom.com>
+Message-ID: <6628a958-087d-1221-7717-c07eeaec3cce@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-04-27 12:32, Arnd Bergmann wrote:
-> From: Stefan Agner <stefan@agner.ch>
-> 
-> Commit 970d96f9a81b0dd83ddd8bce0e5e1ba31881c5f5 upstream.
-> 
-> In Thumb2 mode, the stack register r13 is deprecated if the
-> destination register is the program counter (r15). Similar to
-> head.S, head-nommu.S uses r13 to store the return address used
-> after configuring the CPU's CP15 register. However, since we do
-> not enable a MMU, there will be no address switch and it is
-> possible to use branch with link instruction to call
-> __after_proc_init.
-> 
-> Avoid using r13 completely by using bl to call __after_proc_init
-> and get rid of __secondary_switched.
-> 
-> Beside removing unnecessary complexity, this also fixes a
-> compiler warning when compiling a !MMU kernel:
-> Warning: Use of r13 as a source register is deprecated when r15
-> is the destination register.
-> 
-> Tested-?by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ----
-> I've backported this build fix to 3.18.y as the original
-> patch did not apply cleanly. I rebased it one patch at a time,
-> and each step was fairly straightforward, but I did not test
-> it on hardware, so it would still be nice to have someone else
-> look over the patch to see if I did something wrong.
 
-Looks good to me.
 
---
-Stefan
-
+On 17-04-28 01:11 PM, Jon Mason wrote:
+> Tweak the Kconfig description to mention support for NSP and make the
+> default on for iProc based platforms.
+>
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 > ---
->  arch/arm/kernel/head-nommu.S | 20 +++++++-------------
->  1 file changed, 7 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-> index cc176b67c134..c6c66dd4be89 100644
-> --- a/arch/arm/kernel/head-nommu.S
-> +++ b/arch/arm/kernel/head-nommu.S
-> @@ -77,13 +77,12 @@ ENTRY(stext)
->  	orr	r6, r6, #(1 << MPU_RSR_EN)	@ Set region enabled bit
->  	bl	__setup_mpu
->  #endif
-> -	ldr	r13, =__mmap_switched		@ address to jump to after
-> -						@ initialising sctlr
->  	adr	lr, BSYM(1f)			@ return (PIC) address
->   ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
->   THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
->   THUMB(	ret	r12				)
-> - 1:	b	__after_proc_init
-> +1:	bl	__after_proc_init
-> +	b	__mmap_switched
->  ENDPROC(stext)
->  
->  #ifdef CONFIG_SMP
-> @@ -106,8 +105,7 @@ ENTRY(secondary_startup)
->  	movs	r10, r5				@ invalid processor?
->  	beq	__error_p			@ yes, error 'p'
->  
-> -	adr	r4, __secondary_data
-> -	ldmia	r4, {r7, r12}
-> +	ldr	r7, __secondary_data
->  
->  #ifdef CONFIG_ARM_MPU
->  	/* Use MPU region info supplied by __cpu_up */
-> @@ -115,23 +113,19 @@ ENTRY(secondary_startup)
->  	bl      __setup_mpu			@ Initialize the MPU
->  #endif
->  
-> -	adr	lr, BSYM(__after_proc_init)	@ return address
-> -	mov	r13, r12			@ __secondary_switched address
-> +	adr	lr, BSYM(1f)			@ return (PIC) address
->   ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
->   THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
->   THUMB(	ret	r12				)
-> -ENDPROC(secondary_startup)
-> -
-> -ENTRY(__secondary_switched)
-> +1:	bl	__after_proc_init
->  	ldr	sp, [r7, #8]			@ set up the stack pointer
->  	mov	fp, #0
->  	b	secondary_start_kernel
-> -ENDPROC(__secondary_switched)
-> +ENDPROC(secondary_startup)
->  
->  	.type	__secondary_data, %object
->  __secondary_data:
->  	.long	secondary_data
-> -	.long	__secondary_switched
->  #endif /* CONFIG_SMP */
->  
->  /*
-> @@ -164,7 +158,7 @@ __after_proc_init:
->  #endif
->  	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
->  #endif /* CONFIG_CPU_CP15 */
-> -	ret	r13
-> +	ret	lr
->  ENDPROC(__after_proc_init)
->  	.ltorg
+>  drivers/thermal/broadcom/Kconfig | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/thermal/broadcom/Kconfig b/drivers/thermal/broadcom/Kconfig
+> index f0dea8a..b6f4b85 100644
+> --- a/drivers/thermal/broadcom/Kconfig
+> +++ b/drivers/thermal/broadcom/Kconfig
+> @@ -1,8 +1,9 @@
+>  config BCM_NS_THERMAL
+>  	tristate "Northstar thermal driver"
+>  	depends on ARCH_BCM_IPROC || COMPILE_TEST
+If this driver is used on these SoCs then it:
+depends on ARCH_BCM_NSP || ARCH_BCM_5301X || COMPILE_TEST
+?
+> +	default y if ARCH_BCM_IPROC
+>  	help
+> -	  Northstar is a family of SoCs that includes e.g. BCM4708, BCM47081,
+> -	  BCM4709 and BCM47094. It contains DMU (Device Management Unit) block
+> -	  with a thermal sensor that allows checking CPU temperature. This
+> -	  driver provides support for it.
+> +	  Support for the Northstar and Northstar Plus family of SoCs (e.g.
+> +	  BCM4708, BCM4709, BCM5301x, BCM95852X, etc). It contains DMU (Device
+> +	  Management Unit) block with a thermal sensor that allows checking CPU
+> +	  temperature.
+>
