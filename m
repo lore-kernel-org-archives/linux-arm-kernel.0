@@ -1,71 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 28 Apr 2017 15:53:58 -0500
-Subject: [PATCH v3 1/2] ASoC: stm32: add bindings for SAI
-In-Reply-To: <1491837596-2924-2-git-send-email-olivier.moysan@st.com>
-References: <1491837596-2924-1-git-send-email-olivier.moysan@st.com>
- <1491837596-2924-2-git-send-email-olivier.moysan@st.com>
-Message-ID: <20170428205358.fxjqaki44xqim4ta@rob-hp-laptop>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 28 Apr 2017 16:05:58 -0500
+Subject: [PATCH 4/9] [v2] arm64: defconfig: enable EFI_CAPSULE_LOADER
+In-Reply-To: <1493413563-18375-1-git-send-email-timur@codeaurora.org>
+References: <1493413563-18375-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1493413563-18375-5-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 05:19:55PM +0200, olivier moysan wrote:
-> This patch adds documentation of device tree bindings for the
-> STM32 SAI ASoC driver.
-> 
-> Signed-off-by: olivier moysan <olivier.moysan@st.com>
-> ---
->  .../devicetree/bindings/sound/st,stm32-sai.txt     | 89 ++++++++++++++++++++++
->  1 file changed, 89 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-> new file mode 100644
-> index 0000000..c59a3d7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-> @@ -0,0 +1,89 @@
-> +STMicroelectronics STM32 Serial Audio Interface (SAI).
+CONFIG_EFI_CAPSULE_LOADER allows the user to update the EFI firmware,
+which is useful on ARM64 server platforms.
 
-[...]
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> +	sai1b: audio-controller at 40015824 {
-> +		#sound-dai-cells = <0>;
-> +		compatible = "st,stm32-sai-sub-b";
-> +		reg = <0x40015824 0x1C>;
-> +		clocks = <&rcc 1 CLK_SAI2>;
-> +		clock-names = "sai_ck";
-> +		dmas = <&dma2 5 0 0x400 0x0>;
-> +		dma-names = "tx";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_sai1b>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			sai1b_port: port at 0 {
-> +				reg = <0>;
-> +				cpu_endpoint: endpoint {
-> +					remote-endpoint = <&codec_endpoint>;
-> +					audio-graph-card,format = "i2s";
-> +					audio-graph-card,bitclock-master = <&codec_endpoint>;
-> +					audio-graph-card,frame-master = <&codec_endpoint>;
-
-These property names are wrong.
-
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +audio-codec {
-> +	codec_port: port {
-> +		codec_endpoint: endpoint {
-> +			remote-endpoint = <&cpu_endpoint>;
-> +		};
-> +	};
-> +};
-> -- 
-> 1.9.1
-> 
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index b2c579d..8099aeb 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -483,6 +483,7 @@ CONFIG_PHY_XGENE=y
+ CONFIG_PHY_TEGRA_XUSB=y
+ CONFIG_ARM_SCPI_PROTOCOL=y
+ CONFIG_RASPBERRYPI_FIRMWARE=y
++CONFIG_EFI_CAPSULE_LOADER=y
+ CONFIG_ACPI=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
