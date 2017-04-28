@@ -1,216 +1,579 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Fri, 28 Apr 2017 04:50:27 -0500
-Subject: [PATCH v3 2/9] staging: fsl-dpaa2/eth: Add Ethernet driver overview
- document
+Date: Fri, 28 Apr 2017 04:50:26 -0500
+Subject: [PATCH v3 1/9] bus: fsl-mc: add DPCON object APIs
 In-Reply-To: <20170428095034.8842-1-ruxandra.radulescu@nxp.com>
 References: <20170428095034.8842-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170428095034.8842-3-ruxandra.radulescu@nxp.com>
+Message-ID: <20170428095034.8842-2-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a README file describing the driver architecture, components
-and I/O interface.
+From: Ioana Radulescu <ruxandra.radulescu@freescale.com>
+
+This patch adds the command building/parsing wrapper functions
+for the DPCON object. The binary interface version is v3.2.
+
+A DPCON (DataPath Concentrator) is an aggregator object that
+allows ingress frames from multiple hardware queues to be seen
+as coming from a single source, from the CPU point of view.
 
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
+Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
+Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
 ---
 v3: no changes
-v2: no changes
+v2: update #include paths since fsl-mc bus driver is still in staging
 
- drivers/staging/fsl-dpaa2/ethernet/README | 186 ++++++++++++++++++++++++++++++
- 1 file changed, 186 insertions(+)
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/README
+Note: The DPAA2 Ethernet driver is the first user of the DPCON objects,
+but they can also be used as building blocks by other DPAA2 drivers,
+so the API files are located for now under staging/fsl-mc/bus, along
+the other "common" MC object files.
 
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/README b/drivers/staging/fsl-dpaa2/ethernet/README
+ drivers/staging/fsl-mc/bus/Makefile    |   3 +-
+ drivers/staging/fsl-mc/bus/dpcon-cmd.h |  69 ++++---
+ drivers/staging/fsl-mc/bus/dpcon.c     | 317 +++++++++++++++++++++++++++++++++
+ drivers/staging/fsl-mc/include/dpcon.h | 115 ++++++++++++
+ 4 files changed, 480 insertions(+), 24 deletions(-)
+ create mode 100644 drivers/staging/fsl-mc/bus/dpcon.c
+ create mode 100644 drivers/staging/fsl-mc/include/dpcon.h
+
+diff --git a/drivers/staging/fsl-mc/bus/Makefile b/drivers/staging/fsl-mc/bus/Makefile
+index 577e9fab34ec..659eccf52a4f 100644
+--- a/drivers/staging/fsl-mc/bus/Makefile
++++ b/drivers/staging/fsl-mc/bus/Makefile
+@@ -17,7 +17,8 @@ mc-bus-driver-objs := fsl-mc-bus.o \
+ 		      fsl-mc-msi.o \
+ 		      irq-gic-v3-its-fsl-mc-msi.o \
+ 		      dpmcp.o \
+-		      dpbp.o
++		      dpbp.o \
++		      dpcon.o
+ 
+ # MC DPIO driver
+ obj-$(CONFIG_FSL_MC_DPIO) += dpio/
+diff --git a/drivers/staging/fsl-mc/bus/dpcon-cmd.h b/drivers/staging/fsl-mc/bus/dpcon-cmd.h
+index d0a5e194c5e1..2bb66988ecf6 100644
+--- a/drivers/staging/fsl-mc/bus/dpcon-cmd.h
++++ b/drivers/staging/fsl-mc/bus/dpcon-cmd.h
+@@ -33,30 +33,53 @@
+ #define _FSL_DPCON_CMD_H
+ 
+ /* DPCON Version */
+-#define DPCON_VER_MAJOR				2
+-#define DPCON_VER_MINOR				1
++#define DPCON_VER_MAJOR				3
++#define DPCON_VER_MINOR				2
++
++/* Command versioning */
++#define DPCON_CMD_BASE_VERSION			1
++#define DPCON_CMD_ID_OFFSET			4
++
++#define DPCON_CMD(id)	(((id) << DPCON_CMD_ID_OFFSET) | DPCON_CMD_BASE_VERSION)
+ 
+ /* Command IDs */
+-#define DPCON_CMDID_CLOSE				0x800
+-#define DPCON_CMDID_OPEN				0x808
+-#define DPCON_CMDID_CREATE				0x908
+-#define DPCON_CMDID_DESTROY				0x900
+-
+-#define DPCON_CMDID_ENABLE				0x002
+-#define DPCON_CMDID_DISABLE				0x003
+-#define DPCON_CMDID_GET_ATTR				0x004
+-#define DPCON_CMDID_RESET				0x005
+-#define DPCON_CMDID_IS_ENABLED				0x006
+-
+-#define DPCON_CMDID_SET_IRQ				0x010
+-#define DPCON_CMDID_GET_IRQ				0x011
+-#define DPCON_CMDID_SET_IRQ_ENABLE			0x012
+-#define DPCON_CMDID_GET_IRQ_ENABLE			0x013
+-#define DPCON_CMDID_SET_IRQ_MASK			0x014
+-#define DPCON_CMDID_GET_IRQ_MASK			0x015
+-#define DPCON_CMDID_GET_IRQ_STATUS			0x016
+-#define DPCON_CMDID_CLEAR_IRQ_STATUS			0x017
+-
+-#define DPCON_CMDID_SET_NOTIFICATION			0x100
++#define DPCON_CMDID_CLOSE			DPCON_CMD(0x800)
++#define DPCON_CMDID_OPEN			DPCON_CMD(0x808)
++#define DPCON_CMDID_GET_API_VERSION		DPCON_CMD(0xa08)
++
++#define DPCON_CMDID_ENABLE			DPCON_CMD(0x002)
++#define DPCON_CMDID_DISABLE			DPCON_CMD(0x003)
++#define DPCON_CMDID_GET_ATTR			DPCON_CMD(0x004)
++#define DPCON_CMDID_RESET			DPCON_CMD(0x005)
++#define DPCON_CMDID_IS_ENABLED			DPCON_CMD(0x006)
++
++#define DPCON_CMDID_SET_NOTIFICATION		DPCON_CMD(0x100)
++
++struct dpcon_cmd_open {
++	__le32 dpcon_id;
++};
++
++#define DPCON_ENABLE			1
++
++struct dpcon_rsp_is_enabled {
++	u8 enabled;
++};
++
++struct dpcon_rsp_get_attr {
++	/* response word 0 */
++	__le32 id;
++	__le16 qbman_ch_id;
++	u8 num_priorities;
++	u8 pad;
++};
++
++struct dpcon_cmd_set_notification {
++	/* cmd word 0 */
++	__le32 dpio_id;
++	u8 priority;
++	u8 pad[3];
++	/* cmd word 1 */
++	__le64 user_ctx;
++};
+ 
+ #endif /* _FSL_DPCON_CMD_H */
+diff --git a/drivers/staging/fsl-mc/bus/dpcon.c b/drivers/staging/fsl-mc/bus/dpcon.c
 new file mode 100644
-index 000000000000..410952ecf657
+index 000000000000..eb713578b817
 --- /dev/null
-+++ b/drivers/staging/fsl-dpaa2/ethernet/README
-@@ -0,0 +1,186 @@
-+Freescale DPAA2 Ethernet driver
-+===============================
++++ b/drivers/staging/fsl-mc/bus/dpcon.c
+@@ -0,0 +1,317 @@
++/* Copyright 2013-2016 Freescale Semiconductor Inc.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ * * Redistributions of source code must retain the above copyright
++ * notice, this list of conditions and the following disclaimer.
++ * * Redistributions in binary form must reproduce the above copyright
++ * notice, this list of conditions and the following disclaimer in the
++ * documentation and/or other materials provided with the distribution.
++ * * Neither the name of the above-listed copyright holders nor the
++ * names of any contributors may be used to endorse or promote products
++ * derived from this software without specific prior written permission.
++ *
++ *
++ * ALTERNATIVELY, this software may be distributed under the terms of the
++ * GNU General Public License ("GPL") as published by the Free Software
++ * Foundation, either version 2 of that License or (at your option) any
++ * later version.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ */
++#include "../include/mc-sys.h"
++#include "../include/mc-cmd.h"
++#include "../include/dpcon.h"
 +
-+This file provides documentation for the Freescale DPAA2 Ethernet driver.
++#include "dpcon-cmd.h"
 +
++/**
++ * dpcon_open() - Open a control session for the specified object
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @dpcon_id:	DPCON unique ID
++ * @token:	Returned token; use in subsequent API calls
++ *
++ * This function can be used to open a control session for an
++ * already created object; an object may have been declared in
++ * the DPL or by calling the dpcon_create() function.
++ * This function returns a unique authentication token,
++ * associated with the specific object ID and the specific MC
++ * portal; this token must be used in all subsequent commands for
++ * this specific object.
++ *
++ * Return:	'0' on Success; Error code otherwise.
++ */
++int dpcon_open(struct fsl_mc_io *mc_io,
++	       u32 cmd_flags,
++	       int dpcon_id,
++	       u16 *token)
++{
++	struct mc_command cmd = { 0 };
++	struct dpcon_cmd_open *dpcon_cmd;
++	int err;
 +
-+Contents
-+========
-+	Supported Platforms
-+	Architecture Overview
-+	Creating a Network Interface
-+	Features & Offloads
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_OPEN,
++					  cmd_flags,
++					  0);
++	dpcon_cmd = (struct dpcon_cmd_open *)cmd.params;
++	dpcon_cmd->dpcon_id = cpu_to_le32(dpcon_id);
 +
++	/* send command to mc*/
++	err = mc_send_command(mc_io, &cmd);
++	if (err)
++		return err;
 +
-+Supported Platforms
-+===================
-+This driver provides networking support for Freescale DPAA2 SoCs, e.g.
-+LS2080A, LS2088A, LS1088A.
++	/* retrieve response parameters */
++	*token = mc_cmd_hdr_read_token(&cmd);
 +
++	return 0;
++}
++EXPORT_SYMBOL(dpcon_open);
 +
-+Architecture Overview
-+=====================
-+Unlike regular NICs, in the DPAA2 architecture there is no single hardware block
-+representing network interfaces; instead, several separate hardware resources
-+concur to provide the networking functionality:
-+        - network interfaces
-+        - queues, channels
-+        - buffer pools
-+        - MAC/PHY
++/**
++ * dpcon_close() - Close the control session of the object
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ *
++ * After this function is called, no further operations are
++ * allowed on the object without opening a new control session.
++ *
++ * Return:	'0' on Success; Error code otherwise.
++ */
++int dpcon_close(struct fsl_mc_io *mc_io,
++		u32 cmd_flags,
++		u16 token)
++{
++	struct mc_command cmd = { 0 };
 +
-+All hardware resources are allocated and configured through the Management
-+Complex (MC) portals. MC abstracts most of these resources as DPAA2 objects
-+and exposes ABIs through which they can be configured and controlled. A few
-+hardware resources, like queues, do not have a corresponding MC object and
-+are treated as internal resources of other objects.
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_CLOSE,
++					  cmd_flags,
++					  token);
 +
-+For a more detailed description of the DPAA2 architecture and its object
-+abstractions see:
-+	drivers/staging/fsl-mc/README.txt
++	/* send command to mc*/
++	return mc_send_command(mc_io, &cmd);
++}
++EXPORT_SYMBOL(dpcon_close);
 +
-+Each Linux net device is built on top of a Datapath Network Interface (DPNI)
-+object and uses Buffer Pools (DPBPs), I/O Portals (DPIOs) and Concentrators
-+(DPCONs).
++/**
++ * dpcon_enable() - Enable the DPCON
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ *
++ * Return:	'0' on Success; Error code otherwise
++ */
++int dpcon_enable(struct fsl_mc_io *mc_io,
++		 u32 cmd_flags,
++		 u16 token)
++{
++	struct mc_command cmd = { 0 };
 +
-+Configuration interface:
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_ENABLE,
++					  cmd_flags,
++					  token);
 +
-+                 -----------------------
-+                | DPAA2 Ethernet Driver |
-+                 -----------------------
-+                     .      .      .
-+                     .      .      .
-+             . . . . .      .      . . . . . .
-+             .              .                .
-+             .              .                .
-+         ----------     ----------      -----------
-+        | DPBP API |   | DPNI API |    | DPCON API |
-+         ----------     ----------      -----------
-+             .              .                .             software
-+===========  .  ==========  .  ============  .  ===================
-+             .              .                .             hardware
-+         ------------------------------------------
-+        |            MC hardware portals           |
-+         ------------------------------------------
-+             .              .                .
-+             .              .                .
-+          ------         ------            -------
-+         | DPBP |       | DPNI |          | DPCON |
-+          ------         ------            -------
++	/* send command to mc*/
++	return mc_send_command(mc_io, &cmd);
++}
++EXPORT_SYMBOL(dpcon_enable);
 +
-+The DPNIs are network interfaces without a direct one-on-one mapping to PHYs.
-+DPBPs represent hardware buffer pools. Packet I/O is performed in the context
-+of DPCON objects, using DPIO portals for managing and communicating with the
-+hardware resources.
++/**
++ * dpcon_disable() - Disable the DPCON
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ *
++ * Return:	'0' on Success; Error code otherwise
++ */
++int dpcon_disable(struct fsl_mc_io *mc_io,
++		  u32 cmd_flags,
++		  u16 token)
++{
++	struct mc_command cmd = { 0 };
 +
-+Datapath (I/O) interface:
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_DISABLE,
++					  cmd_flags,
++					  token);
 +
-+         -----------------------------------------------
-+        |           DPAA2 Ethernet Driver               |
-+          -----------------------------------------------
-+          |          ^        ^         |            |
-+          |          |        |         |            |
-+   enqueue|   dequeue|   data |  dequeue|       seed |
-+    (Tx)  | (Rx, TxC)|  avail.|  request|     buffers|
-+          |          |  notify|         |            |
-+          |          |        |         |            |
-+          V          |        |         V            V
-+         -----------------------------------------------
-+        |                 DPIO Driver                   |
-+         -----------------------------------------------
-+          |          |        |         |            |          software
-+          |          |        |         |            |  ================
-+          |          |        |         |            |          hardware
-+         -----------------------------------------------
-+        |               I/O hardware portals            |
-+         -----------------------------------------------
-+          |          ^        ^         |            |
-+          |          |        |         |            |
-+          |          |        |         V            |
-+          V          |    ================           V
-+        ----------------------           |      -------------
-+ queues  ----------------------          |     | Buffer pool |
-+          ----------------------         |      -------------
-+                   =======================
-+                                Channel
++	/* send command to mc*/
++	return mc_send_command(mc_io, &cmd);
++}
++EXPORT_SYMBOL(dpcon_disable);
 +
-+Datapath I/O (DPIO) portals provide enqueue and dequeue services, data
-+availability notifications and buffer pool management. DPIOs are shared between
-+all DPAA2 objects (and implicitly all DPAA2 kernel drivers) that work with data
-+frames, but must be affine to the CPUs for the purpose of traffic distribution.
++/**
++ * dpcon_is_enabled() -	Check if the DPCON is enabled.
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ * @en:		Returns '1' if object is enabled; '0' otherwise
++ *
++ * Return:	'0' on Success; Error code otherwise.
++ */
++int dpcon_is_enabled(struct fsl_mc_io *mc_io,
++		     u32 cmd_flags,
++		     u16 token,
++		     int *en)
++{
++	struct mc_command cmd = { 0 };
++	struct dpcon_rsp_is_enabled *dpcon_rsp;
++	int err;
 +
-+Frames are transmitted and received through hardware frame queues, which can be
-+grouped in channels for the purpose of hardware scheduling. The Ethernet driver
-+enqueues TX frames on egress queues and after transmission is complete a TX
-+confirmation frame is sent back to the CPU.
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_IS_ENABLED,
++					  cmd_flags,
++					  token);
 +
-+When frames are available on ingress queues, a data availability notification
-+is sent to the CPU; notifications are raised per channel, so even if multiple
-+queues in the same channel have available frames, only one notification is sent.
-+After a channel fires a notification, is must be explicitly rearmed.
++	/* send command to mc*/
++	err = mc_send_command(mc_io, &cmd);
++	if (err)
++		return err;
 +
-+Each network interface can have multiple Rx, Tx and confirmation queues affined
-+to CPUs, and one channel (DPCON) for each CPU that services at least one queue.
-+DPCONs are used to distribute ingress traffic to different CPUs via the cores'
-+affine DPIOs.
++	/* retrieve response parameters */
++	dpcon_rsp = (struct dpcon_rsp_is_enabled *)cmd.params;
++	*en = dpcon_rsp->enabled & DPCON_ENABLE;
 +
-+The role of hardware buffer pools is storage of ingress frame data. Each network
-+interface has a privately owned buffer pool which it seeds with kernel allocated
-+buffers.
++	return 0;
++}
++EXPORT_SYMBOL(dpcon_is_enabled);
 +
++/**
++ * dpcon_reset() - Reset the DPCON, returns the object to initial state.
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ *
++ * Return:	'0' on Success; Error code otherwise.
++ */
++int dpcon_reset(struct fsl_mc_io *mc_io,
++		u32 cmd_flags,
++		u16 token)
++{
++	struct mc_command cmd = { 0 };
 +
-+DPNIs are decoupled from PHYs; a DPNI can be connected to a PHY through a DPMAC
-+object or to another DPNI through an internal link, but the connection is
-+managed by MC and completely transparent to the Ethernet driver.
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_RESET,
++					  cmd_flags, token);
 +
-+     ---------     ---------     ---------
-+    | eth if1 |   | eth if2 |   | eth ifn |
-+     ---------     ---------     ---------
-+          .           .          .
-+          .           .          .
-+          .           .          .
-+         ---------------------------
-+        |   DPAA2 Ethernet Driver   |
-+         ---------------------------
-+          .           .          .
-+          .           .          .
-+          .           .          .
-+       ------      ------      ------            -------
-+      | DPNI |    | DPNI |    | DPNI |          | DPMAC |----+
-+       ------      ------      ------            -------     |
-+         |           |           |                  |        |
-+         |           |           |                  |      -----
-+          ===========             ==================      | PHY |
-+                                                           -----
++	/* send command to mc*/
++	return mc_send_command(mc_io, &cmd);
++}
++EXPORT_SYMBOL(dpcon_reset);
 +
-+Creating a Network Interface
-+============================
-+A net device is created for each DPNI object probed on the MC bus. Each DPNI has
-+a number of properties which determine the network interface configuration
-+options and associated hardware resources.
++/**
++ * dpcon_get_attributes() - Retrieve DPCON attributes.
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ * @attr:	Object's attributes
++ *
++ * Return:	'0' on Success; Error code otherwise.
++ */
++int dpcon_get_attributes(struct fsl_mc_io *mc_io,
++			 u32 cmd_flags,
++			 u16 token,
++			 struct dpcon_attr *attr)
++{
++	struct mc_command cmd = { 0 };
++	struct dpcon_rsp_get_attr *dpcon_rsp;
++	int err;
 +
-+DPNI objects (and the other DPAA2 objects needed for a network interface) can be
-+added to a container on the MC bus in one of two ways: statically, through a
-+Datapath Layout Binary file (DPL) that is parsed by MC at boot time; or created
-+dynamically at runtime, via the DPAA2 objects APIs.
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_GET_ATTR,
++					  cmd_flags,
++					  token);
 +
++	/* send command to mc*/
++	err = mc_send_command(mc_io, &cmd);
++	if (err)
++		return err;
 +
-+Features & Offloads
-+===================
-+Hardware checksum offloading is supported for TCP and UDP over IPv4/6 frames.
-+The checksum offloads can be independently configured on RX and TX through
-+ethtool.
++	/* retrieve response parameters */
++	dpcon_rsp = (struct dpcon_rsp_get_attr *)cmd.params;
++	attr->id = le32_to_cpu(dpcon_rsp->id);
++	attr->qbman_ch_id = le16_to_cpu(dpcon_rsp->qbman_ch_id);
++	attr->num_priorities = dpcon_rsp->num_priorities;
 +
-+Hardware offload of unicast and multicast MAC filtering is supported on the
-+ingress path and permanently enabled.
++	return 0;
++}
++EXPORT_SYMBOL(dpcon_get_attributes);
 +
-+Scatter-gather frames are supported on both RX and TX paths. On TX, SG support
-+is configurable via ethtool; on RX it is always enabled.
++/**
++ * dpcon_set_notification() - Set DPCON notification destination
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ * @cfg:	Notification parameters
++ *
++ * Return:	'0' on Success; Error code otherwise
++ */
++int dpcon_set_notification(struct fsl_mc_io *mc_io,
++			   u32 cmd_flags,
++			   u16 token,
++			   struct dpcon_notification_cfg *cfg)
++{
++	struct mc_command cmd = { 0 };
++	struct dpcon_cmd_set_notification *dpcon_cmd;
 +
-+The DPAA2 hardware can process jumbo Ethernet frames of up to 10K bytes.
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_SET_NOTIFICATION,
++					  cmd_flags,
++					  token);
++	dpcon_cmd = (struct dpcon_cmd_set_notification *)cmd.params;
++	dpcon_cmd->dpio_id = cpu_to_le32(cfg->dpio_id);
++	dpcon_cmd->priority = cfg->priority;
++	dpcon_cmd->user_ctx = cpu_to_le64(cfg->user_ctx);
 +
-+The Ethernet driver defines a static flow hashing scheme that distributes
-+traffic based on a 5-tuple key: src IP, dst IP, IP proto, L4 src port,
-+L4 dst port. No user configuration is supported for now.
++	/* send command to mc*/
++	return mc_send_command(mc_io, &cmd);
++}
++EXPORT_SYMBOL(dpcon_set_notification);
 +
-+Hardware specific statistics for the network interface as well as some
-+non-standard driver stats can be consulted through ethtool -S option.
++/**
++ * dpcon_get_api_version - Get Data Path Concentrator API version
++ * @mc_io:	Pointer to MC portal's DPCON object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @major_ver:	Major version of DPCON API
++ * @minor_ver:	Minor version of DPCON API
++ *
++ * Return:	'0' on Success; Error code otherwise
++ */
++int dpcon_get_api_version(struct fsl_mc_io *mc_io,
++			  u32 cmd_flags,
++			  u16 *major_ver,
++			  u16 *minor_ver)
++{
++	struct mc_command cmd = { 0 };
++	int err;
++
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_GET_API_VERSION,
++					  cmd_flags, 0);
++
++	/* send command to mc */
++	err = mc_send_command(mc_io, &cmd);
++	if (err)
++		return err;
++
++	/* retrieve response parameters */
++	mc_cmd_read_api_version(&cmd, major_ver, minor_ver);
++
++	return 0;
++}
++EXPORT_SYMBOL(dpcon_get_api_version);
+diff --git a/drivers/staging/fsl-mc/include/dpcon.h b/drivers/staging/fsl-mc/include/dpcon.h
+new file mode 100644
+index 000000000000..efa23906b364
+--- /dev/null
++++ b/drivers/staging/fsl-mc/include/dpcon.h
+@@ -0,0 +1,115 @@
++/* Copyright 2013-2016 Freescale Semiconductor Inc.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ * * Redistributions of source code must retain the above copyright
++ * notice, this list of conditions and the following disclaimer.
++ * * Redistributions in binary form must reproduce the above copyright
++ * notice, this list of conditions and the following disclaimer in the
++ * documentation and/or other materials provided with the distribution.
++ * * Neither the name of the above-listed copyright holders nor the
++ * names of any contributors may be used to endorse or promote products
++ * derived from this software without specific prior written permission.
++ *
++ *
++ * ALTERNATIVELY, this software may be distributed under the terms of the
++ * GNU General Public License ("GPL") as published by the Free Software
++ * Foundation, either version 2 of that License or (at your option) any
++ * later version.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ */
++#ifndef __FSL_DPCON_H
++#define __FSL_DPCON_H
++
++/* Data Path Concentrator API
++ * Contains initialization APIs and runtime control APIs for DPCON
++ */
++
++struct fsl_mc_io;
++
++/** General DPCON macros */
++
++/**
++ * Use it to disable notifications; see dpcon_set_notification()
++ */
++#define DPCON_INVALID_DPIO_ID		(int)(-1)
++
++int dpcon_open(struct fsl_mc_io *mc_io,
++	       u32 cmd_flags,
++	       int dpcon_id,
++	       u16 *token);
++
++int dpcon_close(struct fsl_mc_io *mc_io,
++		u32 cmd_flags,
++		u16 token);
++
++int dpcon_enable(struct fsl_mc_io *mc_io,
++		 u32 cmd_flags,
++		 u16 token);
++
++int dpcon_disable(struct fsl_mc_io *mc_io,
++		  u32 cmd_flags,
++		  u16 token);
++
++int dpcon_is_enabled(struct fsl_mc_io *mc_io,
++		     u32 cmd_flags,
++		     u16 token,
++		     int *en);
++
++int dpcon_reset(struct fsl_mc_io *mc_io,
++		u32 cmd_flags,
++		u16 token);
++
++/**
++ * struct dpcon_attr - Structure representing DPCON attributes
++ * @id: DPCON object ID
++ * @qbman_ch_id: Channel ID to be used by dequeue operation
++ * @num_priorities: Number of priorities for the DPCON channel (1-8)
++ */
++struct dpcon_attr {
++	int id;
++	u16 qbman_ch_id;
++	u8 num_priorities;
++};
++
++int dpcon_get_attributes(struct fsl_mc_io *mc_io,
++			 u32 cmd_flags,
++			 u16 token,
++			 struct dpcon_attr *attr);
++
++/**
++ * struct dpcon_notification_cfg - Structure representing notification params
++ * @dpio_id:	DPIO object ID; must be configured with a notification channel;
++ *	to disable notifications set it to 'DPCON_INVALID_DPIO_ID';
++ * @priority:	Priority selection within the DPIO channel; valid values
++ *		are 0-7, depending on the number of priorities in that channel
++ * @user_ctx:	User context value provided with each CDAN message
++ */
++struct dpcon_notification_cfg {
++	int dpio_id;
++	u8 priority;
++	u64 user_ctx;
++};
++
++int dpcon_set_notification(struct fsl_mc_io *mc_io,
++			   u32 cmd_flags,
++			   u16 token,
++			   struct dpcon_notification_cfg *cfg);
++
++int dpcon_get_api_version(struct fsl_mc_io *mc_io,
++			  u32 cmd_flags,
++			  u16 *major_ver,
++			  u16 *minor_ver);
++
++#endif /* __FSL_DPCON_H */
 -- 
 2.11.0
