@@ -1,30 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Apr 2017 14:38:48 +0200
-Subject: [RFC/RFT PATCH 05/18] ARM: PCI: dove: Convert PCI scan API to
+Date: Fri, 28 Apr 2017 14:41:59 +0200
+Subject: [RFC/RFT PATCH 04/18] ARM: PCI: bios32: Convert PCI scan API to
  pci_scan_root_bus_bridge()
-In-Reply-To: <20170426111809.19922-6-lorenzo.pieralisi@arm.com>
+In-Reply-To: <20170426111809.19922-5-lorenzo.pieralisi@arm.com>
 References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
- <20170426111809.19922-6-lorenzo.pieralisi@arm.com>
-Message-ID: <CAK8P3a1bnnq-9iuse43bCNX_9TirZPOtmH_vFsvJ9VOAsoUBzQ@mail.gmail.com>
+ <20170426111809.19922-5-lorenzo.pieralisi@arm.com>
+Message-ID: <CAK8P3a3+fjMkq9C6bbz69yWGr6Qh6w2dPN3PJBXDxur8Qc02Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
 <lorenzo.pieralisi@arm.com> wrote:
-> The introduction of pci_scan_root_bus_bridge() provides a PCI core
-> API to scan a PCI root bus backed by an already initialized
-> struct pci_host_bridge object, which simplifies the bus scan
-> interface and makes the PCI scan root bus interface easier to
-> generalize as members are added to the struct pci_host_bridge().
+
+> @@ -483,10 +483,31 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
 >
-> Convert ARM dove platform code to pci_scan_root_bus_bridge() to improve
-> the PCI root bus scanning interface.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>                         if (hw->scan)
+>                                 sys->bus = hw->scan(nr, sys);
+> -                       else
+> -                               sys->bus = pci_scan_root_bus_msi(parent,
+> -                                       sys->busnr, hw->ops, sys,
+> -                                       &sys->resources, hw->msi_ctrl);
+> +                       else {
+> +                               bridge = pci_alloc_host_bridge(0);
+> +                               if (!bridge) {
+> +                                       kfree(sys);
+> +                                       break;
+> +                               }
 
-Is this patch required for one of the later steps in the series?
+I think for consistency, the pci_alloc_host_bridge() here should replace
+the sys=kzalloc(sizeof(struct pci_sys_data), GFP_KERNEL), and
+the pci_sys_data made the bridge->private pointer.
 
-As non-DT dove uses the traditional pci_common_init() helper rather
-than registering its own driver, I wonder if there is anything to gain here.
-
-        Arnd
+      Arnd
