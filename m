@@ -1,28 +1,110 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Fri, 28 Apr 2017 16:29:38 -0400
-Subject: [PATCH 0/3] USB3 support for Broadcom NS2 SoC
-Message-ID: <1493411381-16833-1-git-send-email-jon.mason@broadcom.com>
+Date: Fri, 28 Apr 2017 16:29:39 -0400
+Subject: [PATCH 1/3] dt-bindings: phy: Add documentation for NS2 USB3 PHY
+In-Reply-To: <1493411381-16833-1-git-send-email-jon.mason@broadcom.com>
+References: <1493411381-16833-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <1493411381-16833-2-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set contains the USB3 support for Broadcom NS2 SoC.  The USB3
-PHY is connected through the MDIO interface.
+From: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
 
-Yendapally Reddy Dhananjaya Reddy (3):
-  dt-bindings: phy: Add documentation for NS2 USB3 PHY
-  phy: Add USB3 PHY support for Broadcom NS2 SoC
-  arm64: dts: ns2: Add USB3 Support
+Add documentation for USB3 PHY available in NS2 SoC
 
- .../devicetree/bindings/phy/brcm,ns2-usb3-phy.txt  |  82 +++
- arch/arm64/boot/dts/broadcom/ns2-svk.dts           |  16 +
- arch/arm64/boot/dts/broadcom/ns2-xmc.dts           |   8 +
- arch/arm64/boot/dts/broadcom/ns2.dtsi              |  62 +++
- drivers/phy/Kconfig                                |   9 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-bcm-ns2-usb3.c                     | 596 +++++++++++++++++++++
- 7 files changed, 774 insertions(+)
+Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+---
+ .../devicetree/bindings/phy/brcm,ns2-usb3-phy.txt  | 82 ++++++++++++++++++++++
+ 1 file changed, 82 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-usb3-phy.txt
- create mode 100644 drivers/phy/phy-bcm-ns2-usb3.c
 
+diff --git a/Documentation/devicetree/bindings/phy/brcm,ns2-usb3-phy.txt b/Documentation/devicetree/bindings/phy/brcm,ns2-usb3-phy.txt
+new file mode 100644
+index 0000000..5bb8d53
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/brcm,ns2-usb3-phy.txt
+@@ -0,0 +1,82 @@
++Broadcom USB3 dual port phy for Northstar2 SoC
++This is a child bus node of "brcm,mdio-mux-iproc" node.
++
++Required mdio bus properties:
++- reg: MDIO Bus number for the MDIO interface
++- #address-cells: must be 1
++- #size-cells: must be 0
++
++Required PHY properties:
++- compatible: should be "brcm,ns2-usb3-phy"
++- reg: Phy address in the MDIO interface
++- usb3-ctrl-syscon: handler of syscon node defining physical address
++  of usb3 control register.
++- usb3-phy-cfg-syscon: handler of syscon node defining physical base
++  address and length of usb3 phy config region.
++- usb3-rst-ctrl-syscon: handler of syscon node defining physical base
++  address and length of idm reset control of two ports.
++- #phy-cells: must be 0
++- #address-cells: must be 1
++- #size-cells: must be 0
++
++Sub-nodes:
++  Each port's PHY should be represented as a sub-node.
++
++Sub-nodes required properties:
++ - reg: the PHY number
++ - phy-cells: from the generic PHY bindings, must be 0
++
++Required usb3 control properties:
++- compatible: should be "brcm,ns2-usb3-ctrl"
++- reg: offset and length of the control registers
++
++Required usb3 phy config properties:
++- compatible: should be "brcm,ns2-usb3-phy-cfg"
++- reg: offset and length of the phy config registers
++
++Required usb3 reset control properties:
++- compatible: should be "brcm,ns2-usb3-rst-ctrl"
++- reg: offset and length of the reset control registers
++
++Example:
++
++mdio at 1 {
++	reg = <0x1>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	usb3phy: usb3phy at 0 {
++		compatible = "brcm,ns2-usb3-phy";
++		reg = <0x0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		usb3-ctrl-syscon = <&usb3_ctrl>;
++		usb3-phy-cfg-syscon = <&usb3_phy_cfg>;
++		usb3-rst-ctrl-syscon = <&usb3_rst_ctrl>;
++
++		usb3phy0: usbphy at 0 {
++			reg = <0>;
++			#phy-cells = <0>;
++		};
++
++		usb3phy1: usbphy at 1 {
++			reg = <1>;
++			#phy-cells = <0>;
++		};
++	};
++};
++
++usb3_ctrl: syscon at 6501d144 {
++	compatible = "brcm,ns2-usb3-ctrl", "syscon";
++	reg = <0x6501d144 0x4>;
++};
++
++usb3_phy_cfg: syscon at 66000910 {
++	compatible = "brcm,ns2-usb3-phy-cfg", "syscon";
++	reg = <0x66000910 0x14>;
++};
++
++usb3_rst_ctrl: syscon at 67000800 {
++	compatible = "brcm,ns2-usb3-rst-ctrl", "syscon";
++	reg = <0x67000800 0x1808>;
++};
 -- 
 2.7.4
