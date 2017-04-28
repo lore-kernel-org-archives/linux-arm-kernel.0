@@ -1,58 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 28 Apr 2017 08:48:41 -0500
-Subject: [PATCH v2 1/9] dt-bindings: display: sun4i: Add component
- endpoint ID numbering scheme
-In-Reply-To: <20170421083857.29636-2-wens@csie.org>
-References: <20170421083857.29636-1-wens@csie.org>
- <20170421083857.29636-2-wens@csie.org>
-Message-ID: <20170428134841.cc5jrqhunh2rxhog@rob-hp-laptop>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 28 Apr 2017 15:58:10 +0200
+Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
+In-Reply-To: <20170428134423.GB3452@pathway.suse.cz>
+References: <1461239325-22779-2-git-send-email-pmladek@suse.com>
+ <20170419131341.76bc7634@gandalf.local.home>
+ <20170420033112.GB542@jagdpanzerIV.localdomain>
+ <20170420131154.GL3452@pathway.suse.cz>
+ <20170421015724.GA586@jagdpanzerIV.localdomain>
+ <20170421120627.GO3452@pathway.suse.cz>
+ <20170424021747.GA630@jagdpanzerIV.localdomain>
+ <20170427133819.GW3452@pathway.suse.cz>
+ <20170428090226.qqoe6qbewjeo57kd@hirez.programming.kicks-ass.net>
+ <20170428134423.GB3452@pathway.suse.cz>
+Message-ID: <20170428135810.gljrbuwgrypu5jkn@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 04:38:49PM +0800, Chen-Yu Tsai wrote:
-> The Allwinner display pipeline contains many hardware components, some
-> of which can consume data from one of multiple upstream components.
-> The numbering scheme of these components must be encoded into the device
-> tree so the driver can figure out which component out of two or more of
-> the same type it is supposed to use or program.
+On Fri, Apr 28, 2017 at 03:44:23PM +0200, Petr Mladek wrote:
+> On Fri 2017-04-28 11:02:26, Peter Zijlstra wrote:
+> > On Thu, Apr 27, 2017 at 03:38:19PM +0200, Petr Mladek wrote:
+> > > Also we need to look for alternatives. There is a chance
+> > > to create crashdump and get the ftrace messages from it.
+> > > Also this might be scenario when we might need to suggest
+> > > the early_printk() patchset from Peter Zijlstra.
+> > 
+> > I'd be happy to repost those. I still carry them in my tree.
 > 
-> This patch adds the constraint that local endpoint IDs must be the index
-> or number of the remote endpoint's hardware block, for all components
-> in the display pipeline up to the TCONs.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> index 57a8d0610062..7acdbf14ae1c 100644
-> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> @@ -4,6 +4,16 @@ Allwinner A10 Display Pipeline
->  The Allwinner A10 Display pipeline is composed of several components
->  that are going to be documented below:
->  
-> +For the input port of all components up to the TCON in the display
-> +pipeline, if there are multiple components, the local endpoint IDs
-> +must correspond to the index of the upstream block. For example, if
-> +the remote endpoint is Frontend 1, then the local endpoint ID must
-> +be 1.
-> +
-> +Conversely, for the output ports of the same group, the remote endpoint
-> +ID must be the index of the local hardware block. If the local backend
-> +is backend 1, then the remote endpoint ID must be 1.
+> You do not need to if they are still the same as
+> https://lkml.kernel.org/r/20161018170830.405990950 at infradead.org
 
-It would be clearer if you just explicitly listed IDs and their 
-connections. From how this is worded, it would not work if you had 
-connections like this:
+More or less, I think I fixed an intermediate compile fail reported by
+you and the 0-day thing and I wrote a few comments in the last patch.
 
-DevA 0
-DevA 1
-DevB 0
-DevB 1
+They live here fwiw:
 
-These would need to be endpoints 0-3 in TCON, and that doesn't reflect 
-the remote devices' index.
+  git://git.kernel.org/pub/scm/linux/kernel/git/peterz/queue.git debug/tmp
 
-Rob
+> I rather do not promise anything but I would like to look at them
+> within next few weeks (after the merge window).
+
+Sure, I'll post them again during/after the merge window.
