@@ -1,88 +1,127 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 28 Apr 2017 15:07:10 +0200
-Subject: [PATCH V15 07/11] acpi: apei: panic OS with fatal error status
- block
-In-Reply-To: <1492556723-9189-8-git-send-email-tbaicar@codeaurora.org>
-References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
- <1492556723-9189-8-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170428130710.s7m7nk46xmobxgq5@pd.tnic>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Fri, 28 Apr 2017 06:07:02 -0700
+Subject: [PATCH 1/2] thermal: broadcom: Allow for NSP to use ns-thermal
+ driver
+In-Reply-To: <CAC3K-4pr4LY-9unHNxMDN9YmCYHKekUo66813OUdiKkQH4QzVw@mail.gmail.com>
+References: <1493153351-12698-1-git-send-email-jon.mason@broadcom.com>
+ <1493153351-12698-2-git-send-email-jon.mason@broadcom.com>
+ <20170427163658.GC18276@localhost.localdomain>
+ <CAC3K-4pr4LY-9unHNxMDN9YmCYHKekUo66813OUdiKkQH4QzVw@mail.gmail.com>
+Message-ID: <20170428130659.GA28546@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 05:05:19PM -0600, Tyler Baicar wrote:
-> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+On Thu, Apr 27, 2017 at 01:42:25PM -0400, Jon Mason wrote:
+> On Thu, Apr 27, 2017 at 12:37 PM, Eduardo Valentin <edubezval@gmail.com> wrote:
+> > Hey Jason,
 > 
-> Even if an error status block's severity is fatal, the kernel does not
-> honor the severity level and panic.
+> It's Jon :)
+
+Apologies. I think I either read too fast, or my fingers were faster
+than my brain. Sorry.
+
 > 
-> With the firmware first model, the platform could inform the OS about a
-> fatal hardware error through the non-NMI GHES notification type. The OS
-> should panic when a hardware error record is received with this
-> severity.
+> >
+> > On Tue, Apr 25, 2017 at 04:49:10PM -0400, Jon Mason wrote:
+> >> Change the iProc Kconfig to select THERMAL and THERMAL_OF, which allows
+> >> the ns-thermal driver to be selected via menuconfig.  Also, change the
+> >> ns-thermal driver to work on any iProc based SoC.  Finally, tweak the
+> >> Kconfig description to mention support for NSP and make the default on
+> >> for iProc based platforms.
+> >
+> >
+> > Thanks for the patch, but..
+> >>
+> >> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> >> ---
+> >>  arch/arm/mach-bcm/Kconfig        | 2 ++
+> >>  drivers/thermal/broadcom/Kconfig | 9 +++++----
+> >>  2 files changed, 7 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> >> index a0e66d8..da2bfeb 100644
+> >> --- a/arch/arm/mach-bcm/Kconfig
+> >> +++ b/arch/arm/mach-bcm/Kconfig
+> >> @@ -19,6 +19,8 @@ config ARCH_BCM_IPROC
+> >>       select GPIOLIB
+> >>       select ARM_AMBA
+> >>       select PINCTRL
+> >> +     select THERMAL
+> >> +     select THERMAL_OF
+> >>       help
+> >>         This enables support for systems based on Broadcom IPROC architected SoCs.
+> >>         The IPROC complex contains one or more ARM CPUs along with common
+> >
+> > It would be better if this is split and sent through your arch tree, to
+> > avoid conflicts. I could also pick it if you get an ack from one of your
+> > maintainers. Still, first option is preferable.
 > 
-> Call panic() after CPER data in error status block is printed if
-> severity is fatal, before each error section is handled.
+> Sure, I'll be happy to split this off.  I should've thought to split
+> it up before sending.  Thanks for the suggestion.
+
+Cool!
+
 > 
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Reviewed-by: James Morse <james.morse@arm.com>
-> ---
->  drivers/acpi/apei/ghes.c | 19 ++++++++++++++-----
->  1 file changed, 14 insertions(+), 5 deletions(-)
+> >
+> >> diff --git a/drivers/thermal/broadcom/Kconfig b/drivers/thermal/broadcom/Kconfig
+> >> index f0dea8a..26d706c 100644
+> >> --- a/drivers/thermal/broadcom/Kconfig
+> >> +++ b/drivers/thermal/broadcom/Kconfig
+> >> @@ -1,8 +1,9 @@
+> >>  config BCM_NS_THERMAL
+> >>       tristate "Northstar thermal driver"
+> >>       depends on ARCH_BCM_IPROC || COMPILE_TEST
+> >> +     default ARCH_BCM_IPROC
+> >
+> > Not sure if this is really what you wanted. Based on your commit log
+> > message, you meant the following, perhaps?
+> >
+> >  +      default y if ARCH_BCM_IPROC
 > 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 2d387f8..b91123f 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -134,6 +134,8 @@
->  static struct ghes_estatus_cache *ghes_estatus_caches[GHES_ESTATUS_CACHES_SIZE];
->  static atomic_t ghes_estatus_cache_alloced;
->  
-> +static int ghes_panic_timeout __read_mostly = 30;
-> +
->  static int ghes_ioremap_init(void)
->  {
->  	ghes_ioremap_area = __get_vm_area(PAGE_SIZE * GHES_IOREMAP_PAGES,
-> @@ -692,6 +694,13 @@ static int ghes_ack_error(struct acpi_hest_generic_v2 *generic_v2)
->  	return apei_write(val, &generic_v2->read_ack_register);
->  }
->  
-> +static void __ghes_call_panic(void)
+> IIUC, my original default works, as we have used it frequently in
+> other places in the kernel.
+> grep -rI "default ARCH_BCM_IPROC" * | wc -l
+> 15
 
-__ghes_panic()
+Yeah... Are you sure they are all correct?
 
-> +{
-> +	if (panic_timeout == 0)
+> 
+> However, if the above is preferred (or the other 15 massively broken),
+> I'll be happy to do it that way.
 
-	if (!panic_timeout)
+Your construction is syntactically correct. Maybe might still work (did
+not check myself) for the purpose you describe, but the construction
+mentioned in Documentation/kbuild/kconfig-language.txt is:
+ +      default y if BAR
 
-> +		panic_timeout = ghes_panic_timeout;
-> +	panic("Fatal hardware error!");
-> +}
-> +
->  static int ghes_proc(struct ghes *ghes)
->  {
->  	int rc;
-> @@ -699,6 +708,10 @@ static int ghes_proc(struct ghes *ghes)
->  	rc = ghes_read_estatus(ghes, 0);
->  	if (rc)
->  		goto out;
+So, please fix it.
 
-<---- newline here.
 
-> +	if (ghes_severity(ghes->estatus->error_severity) >= GHES_SEV_PANIC) {
-> +		__ghes_print_estatus(KERN_EMERG, ghes->generic, ghes->estatus);
-> +		__ghes_call_panic();
-> +	}
-
-ditto.
-
->  	if (!ghes_estatus_cached(ghes->estatus)) {
->  		if (ghes_print_estatus(NULL, ghes->generic, ghes->estatus))
->  			ghes_estatus_cache_add(ghes->generic, ghes->estatus);
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+> 
+> 
+> >>       help
+> >> -       Northstar is a family of SoCs that includes e.g. BCM4708, BCM47081,
+> >> -       BCM4709 and BCM47094. It contains DMU (Device Management Unit) block
+> >> -       with a thermal sensor that allows checking CPU temperature. This
+> >> -       driver provides support for it.
+> >> +       Support for the Northstar and Northstar Plus family of SoCs (e.g.
+> >> +       BCM4708, BCM4709, BCM5301x, BCM95852X, etc). It contains DMU (Device
+> >
+> > Did we look BCM47094 somehow on this patch?
+> 
+> Naa, just trying to be more concise, while adding the NSP products to
+> the list..  BCM47094 is a type of BCM4709.  So, it is still there :)
+> 
+> >
+> >> +       Management Unit) block with a thermal sensor that allows checking CPU
+> >> +       temperature.
+> >> --
+> >> 2.7.4
+> >>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170428/b46e5a16/attachment.sig>
