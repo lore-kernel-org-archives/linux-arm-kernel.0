@@ -1,55 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 28 Apr 2017 15:15:01 +0100
-Subject: [PATCH 2/2] arm64: pmu: Wire-up L2 cache events for ARMv8 PMUv3
-In-Reply-To: <20170427173642.GM1890@arm.com>
-References: <20170420190546.7453-1-f.fainelli@gmail.com>
- <20170420190546.7453-4-f.fainelli@gmail.com>
- <20170425124427.GI24484@arm.com>
- <28edde78-b965-8136-1c95-11b9182de405@gmail.com>
- <20170427173642.GM1890@arm.com>
-Message-ID: <20170428141500.GE6368@e104818-lin.cambridge.arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 28 Apr 2017 10:16:59 -0400
+Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
+In-Reply-To: <20170428125725.GA3452@pathway.suse.cz>
+References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+ <1461239325-22779-2-git-send-email-pmladek@suse.com>
+ <20170419131341.76bc7634@gandalf.local.home>
+ <20170420033112.GB542@jagdpanzerIV.localdomain>
+ <20170420131154.GL3452@pathway.suse.cz>
+ <20170427121458.2be577cc@gandalf.local.home>
+ <20170428013532.GB383@jagdpanzerIV.localdomain>
+ <20170428125725.GA3452@pathway.suse.cz>
+Message-ID: <20170428101659.7cd879e7@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 06:36:42PM +0100, Will Deacon wrote:
-> On Tue, Apr 25, 2017 at 10:13:51AM -0700, Florian Fainelli wrote:
-> > On 04/25/2017 05:44 AM, Will Deacon wrote:
-> > > On Thu, Apr 20, 2017 at 12:05:46PM -0700, Florian Fainelli wrote:
-> > >> The ARMv8 PMUv3 cache map did not include the L2 cache events, add
-> > >> them.
-> > >>
-> > >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> > >> ---
-> > >>  arch/arm64/kernel/perf_event.c | 5 +++++
-> > >>  1 file changed, 5 insertions(+)
-> > >>
-> > >> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> > >> index 4f011cdd756d..a664c575f3fd 100644
-> > >> --- a/arch/arm64/kernel/perf_event.c
-> > >> +++ b/arch/arm64/kernel/perf_event.c
-> > >> @@ -264,6 +264,11 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
-> > >>  	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE,
-> > >>  	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL,
-> > >>  
-> > >> +	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
-> > >> +	[C(LL)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
-> > >> +	[C(LL)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE,
-> > >> +	[C(LL)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL,
-> > > 
-> > > I don't think this is correct in general. 'LL' stands for "last-level",
-> > > which may be L3 or even a system cache in the interconnect. Tying that to L2
-> > > is the wrong thing to do from perf's generic event perspective.
-> > > 
-> > > I'm ok with what you're proposing for A53 (where the PMU can only count
-> > > events out to the L2), but I'm reluctant to make this change for the generic
-> > > PMUv3 events.
-> > 
-> > That makes sense, shall I resubmit the first patch by itself or can you
-> > or Catalin take it as-is?
-> 
-> I'll talk to Catalin tomorrow and try to get the A53 bit queued.
+On Fri, 28 Apr 2017 14:57:25 +0200
+Petr Mladek <pmladek@suse.com> wrote:
 
-I queued patch 1/2. Shall I add your ack?
 
--- 
-Catalin
+> Of course, if the problem is reproducible, the easiest solution
+> is to use bigger main log buffer, for example boot with
+> log_buf_len=32M.
+
+Of course that may not be enough. Especially when I have a machine with
+240 CPUs. But it also has a ton of RAM, I could easily do
+log_buf_len=32G
+
+-- Steve
