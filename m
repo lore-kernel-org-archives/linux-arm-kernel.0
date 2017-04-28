@@ -1,46 +1,39 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Fri, 28 Apr 2017 06:51:56 +0200
-Subject: [PATCH] [media] pxa_camera: fix module remove codepath for v4l2
- clock
-In-Reply-To: <87efwd1wus.fsf@belgarion.home>
-References: <4391b498-0a75-ff42-6a7e-65aef0fada07@tul.cz>
- <87efwd1wus.fsf@belgarion.home>
-Message-ID: <c95ef700-d34d-5aa2-ef92-ad1aa7dd5a0d@tul.cz>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Fri, 28 Apr 2017 10:23:43 +0530
+Subject: [PATCH v2 0/4] Add support for ThunderX2 pmu events using json files
+Message-ID: <1493355227-31492-1-git-send-email-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 27.4.2017 v 21:20 Robert Jarzmik napsal(a):
-> Petr Cvek <petr.cvek@tul.cz> writes:
-> 
->> The conversion from soc_camera omitted a correct handling of the clock
->> gating for a sensor. When the pxa_camera driver module was removed it
->> tried to unregister clk, but this caused a similar warning:
->>
->>   WARNING: CPU: 0 PID: 6740 at drivers/media/v4l2-core/v4l2-clk.c:278
->>   v4l2_clk_unregister(): Refusing to unregister ref-counted 0-0030 clock!
->>
->> The clock was at time still refcounted by the sensor driver. Before
->> the removing of the pxa_camera the clock must be dropped by the sensor
->> driver. This should be triggered by v4l2_async_notifier_unregister() call
->> which removes sensor driver module too, calls unbind() function and then
->> tries to probe sensor driver again. Inside unbind() we can safely
->> unregister the v4l2 clock as the sensor driver got removed. The original
->> v4l2_clk_unregister() should be put inside test as the clock can be
->> already unregistered from unbind(). If there was not any bound sensor
->> the clock is still present.
->>
->> The codepath is practically a copy from the old soc_camera. The bug was
->> tested with a pxa_camera+ov9640 combination during the conversion
->> of the ov9640 from the soc_camera.
->>
->> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
-> 
-> Yeah, it's way better with this patch, especially the insmod/rmmod/insmod/rmmod
-> test.
+Extending json/jevent framework for parsing arm64 event files.
+Adding jevents for ThunderX2 implementation defined PMU events.
 
-I will post some other bugfixes (and feature adding) for pxa_camera soon. Do you wish to be CC'd? 
+v2:
+   - Updated as per Mark Rutland's suggestions.
+   - added provision for get_cpuid_str to get cpu id string
+     from associated cpus of pmu core device.
 
-P.S. Who is the the maintainer of pxa_camera BTW? Still Guennadi Liakhovetski? Basically pxa_camera is no longer part of the soc_camera and MAINTAINERS file does not exactly specify pxa_camera.c (I'm asking because I will send the patch for ov9640 soc_camera removal too :-D).
+v1: Initial patchset.
 
-Best regards,
-Petr
+Ganapatrao Kulkarni (4):
+  perf utils: passing pmu as a parameter to function get_cpuid_str
+  perf tools arm64: Add support for get_cpuid_str function.
+  perf utils: Add helper function is_pmu_core to detect PMU CORE devices
+  perf vendor events arm64: Add implementation defined pmu core events
+    of ThunderX2
+
+ tools/perf/arch/arm64/util/Build                   |  1 +
+ tools/perf/arch/arm64/util/header.c                | 41 ++++++++++++++
+ tools/perf/arch/powerpc/util/header.c              |  3 +-
+ tools/perf/arch/x86/util/header.c                  |  4 +-
+ tools/perf/pmu-events/arch/arm64/mapfile.csv       | 14 +++++
+ .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+ tools/perf/util/header.h                           |  3 +-
+ tools/perf/util/pmu.c                              | 54 ++++++++++++++++---
+ 8 files changed, 171 insertions(+), 11 deletions(-)
+ create mode 100644 tools/perf/arch/arm64/util/header.c
+ create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+ create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+
+-- 
+1.8.1.4
