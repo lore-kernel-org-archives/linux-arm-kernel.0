@@ -1,183 +1,48 @@
-From: priyanka.jain@nxp.com (Priyanka Jain)
-Date: Fri, 28 Apr 2017 13:55:30 +0530
-Subject: [PATCH][v2] arm64: dts: ls2081ardb: Add DTS support for NXP LS2081ARDB
-Message-ID: <1493367930-10612-1-git-send-email-priyanka.jain@nxp.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 28 Apr 2017 10:45:34 +0200
+Subject: [PATCH v2] arm: dts: sun7i-a20-bananapi: name the GPIO lines
+In-Reply-To: <60d2e24d-91c8-7563-9ecc-f203b12e0983@rempel-privat.de>
+References: <CACRpkdYnK=7C=F5hZUo-nYv6Z+Pb+eT7vm1e4hL8N-QgJnuLfg@mail.gmail.com>
+ <1470384404-6796-1-git-send-email-linux@rempel-privat.de>
+ <CACRpkdZn7-SL5kmGn7Pysz=QiQFBEm8+c6bw=hE5F0CV4ct0RQ@mail.gmail.com>
+ <60d2e24d-91c8-7563-9ecc-f203b12e0983@rempel-privat.de>
+Message-ID: <CACRpkdZcnJ1eCNW4ZF_A4zbeCt3JcAuw-1meB_Pn7ctMy99B_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for NXP LS2081ARDB board which has
-LS2081A SoC.
+On Fri, Apr 28, 2017 at 7:11 AM, Oleksij Rempel <linux@rempel-privat.de> wrote:
+> Am 08.08.2016 um 19:51 schrieb Linus Walleij:
+>> On Fri, Aug 5, 2016 at 10:06 AM, Oleksij Rempel <linux@rempel-privat.de> wrote:
+>>
+>>> This names the GPIO lines on the Banana Pi board in accordance with
+>>> the A20_Banana_Pi v1.4 Specification.
+>>>
+>>> This will make these line names reflect through to userspace
+>>> so that they can easily be identified and used with the new
+>>> character device ABI.
+>>>
+>>> Some care has been taken to name all lines, not just those used
+>>> by the external connectors, also lines that are muxed into some
+>>> other function than GPIO: these are named "[FOO]" so that users
+>>> can see with lsgpio what all lines are used for.
+>>>
+>>> Ps: most of the text was taken from Linus Wallej patch.
+>>>
+>>> Cc: devicetree at vger.kernel.org
+>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: Chen-Yu Tsai <wens@csie.org>
+>>> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+>>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> Yours,
+>> Linus Walleij
+>
+> Hm... i assume this patch was lost. Should i resend it?
 
-LS2081A SoC is 40-pin derivative of LS2088A SoC
-So, from functional perspective both are same.
-Hence,ls2088a SoC dtsi files are included from ls2081ARDB dts
+Yes, but I'm not applying DTS patches. Make sure that the
+sunxi maintainers get it and merge it.
 
-Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
----
-Changes for v2: Updated subject and NXP copyright
-	based on Leo's comments
-
- arch/arm64/boot/dts/freescale/Makefile            |    1 +
- arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts |  139 +++++++++++++++++++++
- 2 files changed, 140 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts
-
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 72c4b52..58b80de 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -9,6 +9,7 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1088a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1088a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2081a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts
-new file mode 100644
-index 0000000..bc1c4f6
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts
-@@ -0,0 +1,139 @@
-+/*
-+ * Device Tree file for NXP LS2081A RDB Board.
-+ *
-+ * Copyright 2017, NXP
-+ *
-+ * Priyanka Jain <priyanka.jain@nxp.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "fsl-ls2088a.dtsi"
-+
-+/ {
-+	model = "NXP Layerscape 2081A RDB Board";
-+	compatible = "fsl,ls2081a-rdb", "fsl,ls2081a";
-+
-+	aliases {
-+		serial0 = &serial0;
-+		serial1 = &serial1;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial1:115200n8";
-+	};
-+};
-+
-+&esdhc {
-+	status = "okay";
-+};
-+
-+&ifc {
-+	status = "disabled";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	pca9547 at 75 {
-+		compatible = "nxp,pca9547";
-+		reg = <0x75>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x01>;
-+			rtc at 51 {
-+				compatible = "nxp,pcf2129";
-+				reg = <0x51>;
-+			};
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+
-+			adt7481 at 4c {
-+				compatible = "adi,adt7461";
-+				reg = <0x4c>;
-+			};
-+		};
-+	};
-+};
-+
-+&dspi {
-+	status = "okay";
-+	dflash0: n25q512a {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "st,m25p80";
-+		spi-max-frequency = <3000000>;
-+		reg = <0>;
-+	};
-+};
-+
-+
-+&qspi {
-+	status = "okay";
-+	flash0: n25q512a at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "st,m25p80";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
-+	flash1: n25q512a at 1 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "st,m25p80";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
--- 
-1.7.4.1
+Yours,
+Linus Walleij
