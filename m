@@ -1,100 +1,63 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 28 Apr 2017 17:10:28 +0100
-Subject: [PATCH 3/4] arm64: entry: improve data abort handling of tagged
- pointers
-In-Reply-To: <d886b2b3-f623-9e79-a99a-c51672a80390@arm.com>
-References: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
- <1492712234-4950-4-git-send-email-kristina.martsenko@arm.com>
- <20170421182450.GR3750@e103592.cambridge.arm.com>
- <d886b2b3-f623-9e79-a99a-c51672a80390@arm.com>
-Message-ID: <20170428161026.GC9082@e103592.cambridge.arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 28 Apr 2017 19:10:56 +0300
+Subject: arm64: next-20170428 hangs on boot
+In-Reply-To: <e65b3ec3-790d-da96-9e1f-3d344f65517b@gmail.com>
+References: <20170428132429.c3dlxbmt7iqs2isl@yury-N73SV>
+ <20170428145233.GB5292@leverpostej>
+ <20170428150931.iyoewmc5qs55aw3t@yury-N73SV>
+ <e65b3ec3-790d-da96-9e1f-3d344f65517b@gmail.com>
+Message-ID: <20170428161056.vvzkj6lxhvixy33v@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 05:34:24PM +0100, Kristina Martsenko wrote:
-> On 21/04/17 19:24, Dave Martin wrote:
-> > On Thu, Apr 20, 2017 at 07:17:13PM +0100, Kristina Martsenko wrote:
-> >> When handling a data abort from EL0, we currently zero the top byte of
-> >> the faulting address, as we assume the address is a TTBR0 address, which
-> >> may contain a non-zero address tag. However, the address may be a TTBR1
-> >> address, in which case we should not zero the top byte. This patch fixes
-> >> that. The effect is that the full TTBR1 address is passed to the task's
-> >> signal handler (or printed out in the kernel log).
+On Fri, Apr 28, 2017 at 08:40:54AM -0700, Florian Fainelli wrote:
+> On 04/28/2017 08:09 AM, Yury Norov wrote:
+> > On Fri, Apr 28, 2017 at 03:52:34PM +0100, Mark Rutland wrote:
+> >> On Fri, Apr 28, 2017 at 04:24:29PM +0300, Yury Norov wrote:
+> >>> Hi all,
 > >>
-> >> When handling a data abort from EL1, we leave the faulting address
-> >> intact, as we assume it's either a TTBR1 address or a TTBR0 address with
-> >> tag 0x00. This is true as far as I'm aware, we don't seem to access a
-> >> tagged TTBR0 address anywhere in the kernel. Regardless, it's easy to
-> >> forget about address tags, and code added in the future may not always
-> >> remember to remove tags from addresses before accessing them. So add tag
-> >> handling to the EL1 data abort handler as well. This also makes it
-> >> consistent with the EL0 data abort handler.
+> >> Hi,
+> >>
+> >> [adding Dave Miller, netdev, lkml]
 > > 
-> > Possibly it doesn't matter whether the tag bits are cleared for an EL0
-> > fault on a TTBR1 address, since userspace can't have a valid pointer in
-> > this range to (mis)match the fault address against ... or did I miss
-> > something?
+> > thanks
+> > 
+> >>> On QEMU the next-20170428 hangs on boot for me due to kernel panic in 
+> >>> rtnetlink_init():
+> >>>
+> >>> void __init rtnetlink_init(void)
+> >>> {
+> >>>         if (register_pernet_subsys(&rtnetlink_net_ops))
+> >>>                 panic("rtnetlink_init: cannot initialize rtnetlink\n");
+> >>>
+> >>>         ...
+> >>> }
+> >>
+> >> I see the same thing with a next-20170428 arm64 defconfig, on a Juno R1
+> >> system:
+> >>
+> >> [    0.531949] Kernel panic - not syncing: rtnetlink_init: cannot initialize rtnetlink
+> >> [    0.531949] 
+> >> [    0.541271] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.11.0-rc8-next-20170428-00002-g6ee3799 #10
+> >> [    0.550307] Hardware name: ARM Juno development board (r1) (DT)
+> >> [    0.556332] Call trace:
+> >> [    0.558833] [<ffff000008088538>] dump_backtrace+0x0/0x238
+> >> [    0.564332] [<ffff000008088834>] show_stack+0x14/0x20
+> >> [    0.569477] [<ffff00000839dd54>] dump_stack+0x9c/0xc0
+> >> [    0.574622] [<ffff000008175344>] panic+0x11c/0x28c
+> >> [    0.579505] [<ffff000008d80034>] rtnetlink_init+0x2c/0x1d0
+> >> [    0.585092] [<ffff000008d8047c>] netlink_proto_init+0x14c/0x17c
+> >> [    0.591119] [<ffff000008083150>] do_one_initcall+0x38/0x120
+> >> [    0.596796] [<ffff000008d30d00>] kernel_init_freeable+0x1a0/0x240
+> >> [    0.603003] [<ffff00000892a790>] kernel_init+0x10/0x100
+> >> [    0.608324] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
+> >> [    0.613736] SMP: stopping secondary CPUs
+> >> [    0.617738] ---[ end Kernel panic - not syncing: rtnetlink_init: cannot initialize rtnetlink
+> >>
+> >> If this isn't a known issue, it would be worth trying to bisect this.
 > 
-> I don't think you've missed anything. But I don't see why userspace
-> can't match against an invalid (TTBR1) address, I think that would be a
-> valid thing to do (even if unlikely).
+> It's fixed already by this commit in net-next:
 > 
-> > Factoring out the tag handling makes the intent of the code clearer
-> > though, either way.
-> 
-> I assume this means you're fine with the patch as is.
+> https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git/commit/?id=2d2ab658d2debcb4c0e29c9e6f18e5683f3077bf
 
-Yes, the behaviour here seems fine.  I just wanted to check there wasn't
-some real use of TTBR1 addresses by userspace that I was missing.
-
-
-It looks like a minor improvement may be possible (below) but these
-aren't hot paths, so it's far from crucial.
-
-> +/*
-> + * Remove the address tag from a virtual address, if present.
-> + */
-> +	.macro	clear_address_tag, addr, tmp
-> +	bic	\tmp, \addr, #(0xff << 56)
-> +	tst	\addr, #(1 << 55)
-> +	csel	\addr, \tmp, \addr, eq
-> +	.endm
-
-Minor nit: this may issue better on simpler microarchitectures if the
-tst and bic are swapped: this may reduce how far the Z flag needs to
-be forwarded.
-
-For beefier microarchitectures it probably doesn't make a difference.
-
-Also, in:
-
-> @@ -594,7 +595,8 @@ el0_da:
->  	// enable interrupts before calling the main handler
->  	enable_dbg_and_irq
->  	ct_user_exit
-> -	bic	x0, x26, #(0xff << 56)
-> +	mov	x0, x26
-> +	clear_address_tag x0, x3
-
-we can lose the mov if clear_address_tag is altered to take "addr out"
-and "addr in" arguments instead of "addr in+out" and "tmp": addr out can
-store result of the bic, then we can conditionally revert that back to
-addr in using the csel.
-
-This change will break el1_da:
-
-> @@ -434,6 +434,7 @@ el1_da:
-> 	mrs	x0, far_el1
-> 	enable_dbg
-> 	// re-enable interrupts if they were enabled in the aborted context
->  	tbnz	x23, #7, 1f			// PSR_I_BIT
->  	enable_irq
->  1:
-> +	clear_address_tag x0, x3
-
-... because we want the same register as input and output.  But that can
-be fixed if we use a different destination register in the mrs in the
-first place (say, x3).
-
-Cheers
----Dave
+Works for me, thank you.
