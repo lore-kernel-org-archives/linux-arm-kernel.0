@@ -1,140 +1,136 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 28 Apr 2017 10:27:34 +0100
-Subject: [PATCH v2 pci] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI
- boot for X-Gene v1
-In-Reply-To: <1493340847-25720-1-git-send-email-kdinh@apm.com>
-References: <1493340847-25720-1-git-send-email-kdinh@apm.com>
-Message-ID: <f5cb58a5-7c06-8d54-6293-1a72ee0a4707@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 28 Apr 2017 02:47:09 -0700
+Subject: [PATCH v5 16/22] KVM: arm64: vgic-its: Add infrastructure for
+ table lookup
+In-Reply-To: <58f99f7e-15ea-221d-e7ec-911f64148644@redhat.com>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-17-git-send-email-eric.auger@redhat.com>
+ <20170427180641.GT50776@lvm>
+ <58f99f7e-15ea-221d-e7ec-911f64148644@redhat.com>
+Message-ID: <20170428094709.GA1439@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/04/17 01:54, Khuong Dinh wrote:
-> From: Khuong Dinh <kdinh@apm.com>
+On Thu, Apr 27, 2017 at 09:24:57PM +0200, Auger Eric wrote:
+> Hi,
 > 
-> This patch makes pci-xgene-msi driver ACPI-aware and provides
-> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
-> 
-> Signed-off-by: Khuong Dinh <kdinh@apm.com>
-> Signed-off-by: Duc Dang <dhdang@apm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> v2:
->  - Verify with BIOS version 3.06.25 and 3.07.09
-> v1:
->  - Initial version
-> ---
->  drivers/pci/host/pci-xgene-msi.c |   35 ++++++++++++++++++++++++++++++++---
->  1 files changed, 32 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
-> index f1b633b..00aaa3d 100644
-> --- a/drivers/pci/host/pci-xgene-msi.c
-> +++ b/drivers/pci/host/pci-xgene-msi.c
-> @@ -24,6 +24,7 @@
->  #include <linux/pci.h>
->  #include <linux/platform_device.h>
->  #include <linux/of_pci.h>
-> +#include <linux/acpi.h>
->  
->  #define MSI_IR0			0x000000
->  #define MSI_INT0		0x800000
-> @@ -39,7 +40,7 @@ struct xgene_msi_group {
->  };
->  
->  struct xgene_msi {
-> -	struct device_node	*node;
-> +	struct fwnode_handle	*fwnode;
->  	struct irq_domain	*inner_domain;
->  	struct irq_domain	*msi_domain;
->  	u64			msi_addr;
-> @@ -249,6 +250,13 @@ static void xgene_irq_domain_free(struct irq_domain *domain,
->  	.free   = xgene_irq_domain_free,
->  };
->  
-> +#ifdef CONFIG_ACPI
-> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
-> +{
-> +	return xgene_msi_ctrl.fwnode;
-> +}
-> +#endif
-> +
->  static int xgene_allocate_domains(struct xgene_msi *msi)
->  {
->  	msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
-> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
->  	if (!msi->inner_domain)
->  		return -ENOMEM;
->  
-> -	msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
-> +	msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
->  						    &xgene_msi_domain_info,
->  						    msi->inner_domain);
->  
-> @@ -265,6 +273,9 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
->  		return -ENOMEM;
->  	}
->  
-> +#ifdef CONFIG_ACPI
-> +	pci_msi_register_fwnode_provider(&xgene_msi_get_fwnode);
-> +#endif
->  	return 0;
->  }
->  
-> @@ -449,6 +460,13 @@ static int xgene_msi_hwirq_free(unsigned int cpu)
->  	{},
->  };
->  
-> +#ifdef CONFIG_ACPI
-> +static const struct acpi_device_id xgene_msi_acpi_ids[] = {
-> +	{"APMC0D0E", 0},
-> +	{ },
-> +};
-> +#endif
-> +
->  static int xgene_msi_probe(struct platform_device *pdev)
->  {
->  	struct resource *res;
-> @@ -469,7 +487,17 @@ static int xgene_msi_probe(struct platform_device *pdev)
->  		goto error;
->  	}
->  	xgene_msi->msi_addr = res->start;
-> -	xgene_msi->node = pdev->dev.of_node;
-> +
-> +	xgene_msi->fwnode = of_node_to_fwnode(pdev->dev.of_node);
-> +	if (!xgene_msi->fwnode) {
-> +		xgene_msi->fwnode = irq_domain_alloc_fwnode(NULL);
+> On 27/04/2017 20:06, Christoffer Dall wrote:
+> > On Fri, Apr 14, 2017 at 12:15:28PM +0200, Eric Auger wrote:
+> >> Add a generic lookup_table() helper whose role consists in
+> >> scanning a contiguous table located in guest RAM and applying
+> >> a callback on each entry. Entries can be handled as linked lists
+> >> since the callback may return an offset to the next entry and
+> >> also tell that an entry is the last one.
+> >>
+> >> Helper functions also are added to compute the device/event ID
+> >> offset to the next DTE/ITE.
+> >>
+> >> compute_next_devid_offset, compute_next_eventid_offset and
+> >> lookup_table will become static in subsequent patches
+> >>
+> >> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> >>
+> >> ---
+> >> v4 -> v5:
+> >> - use kvm_read_guest
+> >>
+> >> v3 -> v4:
+> >> - remove static to avoid compilation warning
+> >> - correct size computation in looup_table()
+> >> - defines now encode the number of bits used for devid and eventid offsets
+> >> - use BIT() - 1 to encode the max offets
+> >> ---
+> >>  virt/kvm/arm/vgic/vgic-its.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 93 insertions(+)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> >> index 56c5123..c22b35d 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-its.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> >> @@ -195,6 +195,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+> >>  
+> >>  #define VITS_TYPER_IDBITS 16
+> >>  #define VITS_TYPER_DEVBITS 16
+> >> +#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
+> >> +#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
+> >>  
+> >>  /*
+> >>   * Finds and returns a collection in the ITS collection table.
+> >> @@ -1674,6 +1676,97 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+> >>  	return ret;
+> >>  }
+> >>  
+> >> +u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
+> >> +{
+> >> +	struct list_head *e = &dev->dev_list;
+> >> +	struct its_device *next;
+> >> +	u32 next_offset;
+> >> +
+> >> +	if (e->next == h)
+> >> +		return 0;
+> >> +	next = list_entry(e->next, struct its_device, dev_list);
+> >> +	next_offset = next->device_id - dev->device_id;
+> >> +
+> >> +	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
+> >> +}
+> >> +
+> >> +u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
+> >> +{
+> >> +	struct list_head *e = &ite->ite_list;
+> >> +	struct its_ite *next;
+> >> +	u32 next_offset;
+> >> +
+> >> +	if (e->next == h)
+> >> +		return 0;
+> >> +	next = list_entry(e->next, struct its_ite, ite_list);
+> >> +	next_offset = next->event_id - ite->event_id;
+> >> +
+> >> +	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
+> >> +}
+> >> +
+> >> +/**
+> >> + * entry_fn_t - Callback called on a table entry restore path
+> >> + * @its: its handle
+> >> + * @id: id of the entry
+> >> + * @entry: pointer to the entry
+> >> + * @opaque: pointer to an opaque data
+> >> + * @next_offset: minimal ID offset to the next entry. 0 if this
+> >> + * entry is the last one, 1 if the entry is invalid, >= 1 if an
+> >> + * entry's next_offset field was truly decoded
+> >> + *
+> >> + * Return: < 0 on error, 0 otherwise
+> >> + */
+> >> +typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+> >> +			  void *opaque, u32 *next_offset);
+> >> +
+> >> +/**
+> >> + * lookup_table - scan a contiguous table in guest RAM and applies a function
+> >> + * to each entry
+> >> + *
+> >> + * @its: its handle
+> >> + * @base: base gpa of the table
+> >> + * @size: size of the table in bytes
+> >> + * @esz: entry size in bytes
+> >> + * @start_id: first entry's ID
+> > 
+> > I'm a little confused.  Why is this not 0?
+> Because this is meant to be called on a second-level table as well
+> (device table). In that case the start ID != 0.
 
-Please provide something other than NULL, such as the base address if
-the device. That's quite useful for debugging.
+Ah, ok, makes sense.  You could use the comment to explain that:
+  @start_id: The ID of the first entry in the table
+             (non-zero for second-level tables)
 
-> +		if (!xgene_msi->fwnode) {
-> +			dev_err(&pdev->dev, "Failed to create fwnode\n");
-> +			rc = ENOMEM;
-> +			goto error;
-> +		}
-> +	}
-> +
->  	xgene_msi->num_cpus = num_possible_cpus();
->  
->  	rc = xgene_msi_init_allocator(xgene_msi);
-> @@ -540,6 +568,7 @@ static int xgene_msi_probe(struct platform_device *pdev)
->  	.driver = {
->  		.name = "xgene-msi",
->  		.of_match_table = xgene_msi_match_table,
-> +		.acpi_match_table = ACPI_PTR(xgene_msi_acpi_ids),
->  	},
->  	.probe = xgene_msi_probe,
->  	.remove = xgene_msi_remove,
-> 
+> > 
+> >> + * @fn: function to apply on each entry
+> >> + *
+> >> + * Return: < 0 on error, 1 if last element identified, 0 otherwise
+> > 
+> > How can you scan the entire table and not find the last element?
+> This happens on 2d level tables. The last element might be in another 2d
+> level table.
 
-The code is trivial, but relies on the MSI controller to probe before
-the PCI bus. What enforces this? How is it making sure that this is not
-going to break in the next kernel release? As far as I can tell, there
-is no explicit dependency between the two, making it the whole thing
-extremely fragile.
+Ah, I think you should explain this so that the intended use is clear.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-Christoffer
