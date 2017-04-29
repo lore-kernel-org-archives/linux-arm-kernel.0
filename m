@@ -1,65 +1,50 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 29 Apr 2017 11:19:19 +0200
-Subject: [patch] propagating controls in libv4l2 was Re: support
- autofocus / autogain in libv4l2
-In-Reply-To: <20170426082608.7dd52fbf@vento.lan>
-References: <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
- <20170414232332.63850d7b@vento.lan>
- <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
- <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
- <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
- <20170424224724.5bb52382@vento.lan> <20170426105300.GA857@amd>
- <20170426082608.7dd52fbf@vento.lan>
-Message-ID: <20170429091919.GA14148@amd>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Sat, 29 Apr 2017 20:39:07 +0800
+Subject: [PATCH] drm/rockchip: analogix_dp: Remove unused check and variables
+Message-ID: <1493469547-2121-1-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Remove unused check and variables after:
+drm/rockchip: Set line flag config register in vop_crtc_enable
 
-> > +	devices[index].subdev_fds[0] = SYS_OPEN("/dev/video_sensor", O_RDWR, 0);
-> > +	devices[index].subdev_fds[1] = SYS_OPEN("/dev/video_focus", O_RDWR, 0);
-> > +	devices[index].subdev_fds[2] = -1;
-> 
-> Hardcoding names here is not a good idea. Ideally, it should open
-> the MC, using the newgen API, and parse the media graph.
-> 
-> The problem is that, even with newgen API, without the properties API
-> you likely won't be able to write a generic parser. So, we need a
-> plugin specific for OMAP3 (or at least some database that would teach
-> a generic plugin about OMAP3 specifics).
-> 
-> I guess that the approach that Jacek was taken were very close to what
-> a generic plugin would need:
-> 	https://lwn.net/Articles/619449/
-> 
-> The last version of his patch set is here:
-> 	https://patchwork.linuxtv.org/patch/37496/
-> 
-> I didn't review his patchset, but from what I saw, Sakari is the one
-> that found some issues on v7.1 patchset.
-> 
-> Sakari,
-> 
-> Could you shed us a light about why this patchset was not merged?
-> 
-> Are there anything really bad at the code, or just minor issues that
-> could be fixed later?
-> 
-> If it is the last case, perhaps we could merge the code, if this
-> would make easier for Pavel to work on a N9 solution using the
-> same approach.
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-It would be nice to get some solution here. Camera without libv4l
-support is pretty much useless :-(.
+---
 
-									Pavel
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 9bfdbc6..1bccd82 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -104,17 +104,9 @@ static void analogix_dp_psr_work(struct work_struct *work)
+ {
+ 	struct rockchip_dp_device *dp =
+ 				container_of(work, typeof(*dp), psr_work);
+-	struct drm_crtc *crtc = dp->encoder.crtc;
+-	int psr_state = dp->psr_state;
+-	int vact_end;
+ 	int ret;
+ 	unsigned long flags;
+ 
+-	if (!crtc)
+-		return;
+-
+-	vact_end = crtc->mode.vtotal - crtc->mode.vsync_start + crtc->mode.vdisplay;
+-
+ 	ret = rockchip_drm_wait_vact_end(dp->encoder.crtc,
+ 					 PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
+ 	if (ret) {
+@@ -123,7 +115,7 @@ static void analogix_dp_psr_work(struct work_struct *work)
+ 	}
+ 
+ 	spin_lock_irqsave(&dp->psr_lock, flags);
+-	if (psr_state == EDP_VSC_PSR_STATE_ACTIVE)
++	if (dp->psr_state == EDP_VSC_PSR_STATE_ACTIVE)
+ 		analogix_dp_enable_psr(dp->dev);
+ 	else
+ 		analogix_dp_disable_psr(dp->dev);
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170429/5a448afb/attachment.sig>
+2.1.4
