@@ -1,40 +1,52 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 30 Apr 2017 07:28:54 +0800
-Subject: [PATCH v1 1/2] PCI: mediatek: Add Mediatek PCIe host controller
- support
-In-Reply-To: <1493370634-7038-2-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <201704300745.VhwAQyFt%fengguang.wu@intel.com>
+From: oss@buserror.net (Scott Wood)
+Date: Sat, 29 Apr 2017 18:32:55 -0500
+Subject: [PATCH] drivers:soc:fsl:qbman:qman.c: unsigned long jiffies value.
+In-Reply-To: <1493498620-9975-1-git-send-email-karim.eshapa@gmail.com>
+References: <1493495164-8658-1-git-send-email-karim.eshapa@gmail.com>
+ <1493498620-9975-1-git-send-email-karim.eshapa@gmail.com>
+Message-ID: <1493508775.25397.26.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryder,
+On Sat, 2017-04-29 at 22:43 +0200, Karim Eshapa wrote:
+> unsigned long jiffies value sorry for that.
 
-[auto build test ERROR on pci/next]
-[also build test ERROR on v4.11-rc8 next-20170428]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+You mean unsigned long msecs?
 
-url:    https://github.com/0day-ci/linux/commits/Ryder-Lee/Add-PCIe-host-driver-support-for-Mediatek-SoCs/20170429-181028
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
-config: s390-allmodconfig (attached as .config)
-compiler: s390x-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=s390 
+> 
+> Signed-off-by: Karim Eshapa <karim.eshapa@gmail.com>
+> ---
+> ?drivers/soc/fsl/qbman/qman.c | 2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
+> index e0df4d1..6e1a44a 100644
+> --- a/drivers/soc/fsl/qbman/qman.c
+> +++ b/drivers/soc/fsl/qbman/qman.c
+> @@ -1084,7 +1084,7 @@ static int drain_mr_fqrni(struct qm_portal *p)
+> ?		?* entries well before the ring has been fully consumed, so
+> ?		?* we're being *really* paranoid here.
+> ?		?*/
+> -		unsigned int udel_time = jiffies_to_usecs(10000);
+> +		unsigned long udel_time = jiffies_to_usecs(10000);
+> ?
+> ?		usleep_range(udel_time/2, udel_time);
+> ?		msg = qm_mr_current(p);
 
-All errors (new ones prefixed by >>):
+If unsigned int isn't big enough, then unsigned long won't be either on 32-
+bit.  With such a long delay why not use msleep()?
 
-   drivers/built-in.o: In function `mtk_pcie_probe':
->> drivers/pci/host/.tmp_gl_pcie-mediatek.o:(.text+0x5b68c): undefined reference to `pci_fixup_irqs'
+As for the previous patch[1], you're halving the minimum timeout which may not
+be correct.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 45164 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170430/27e2afde/attachment-0001.gz>
+For the NXP people: Is there *really* no better way to handle this than
+waiting for so long?  Nothing that can be checked to exit the loop early (at
+least, you could exit early if there is more work to do so only the final
+iteration takes the full timeout)?  And why is the desired timeout specified
+in jiffies, the duration of which can change based on kernel config and
+doesn't reflect anything about the hardware?
+
+-Scott
+
+[1] When fixing a patch you've already posted that hasn't yet been applied,
+send a replacement (v2) patch rather than a separate fix.
