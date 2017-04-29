@@ -1,159 +1,65 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 29 Apr 2017 10:52:35 +0200
-Subject: [PATCH v2 2/3] mtd: nand: fsmc: add support for SDR timings
-In-Reply-To: <1493455956-18362-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1493455956-18362-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1493455956-18362-3-git-send-email-thomas.petazzoni@free-electrons.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 29 Apr 2017 11:19:19 +0200
+Subject: [patch] propagating controls in libv4l2 was Re: support
+ autofocus / autogain in libv4l2
+In-Reply-To: <20170426082608.7dd52fbf@vento.lan>
+References: <1487074823-28274-2-git-send-email-sakari.ailus@linux.intel.com>
+ <20170414232332.63850d7b@vento.lan>
+ <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
+ <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
+ <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
+ <20170424224724.5bb52382@vento.lan> <20170426105300.GA857@amd>
+ <20170426082608.7dd52fbf@vento.lan>
+Message-ID: <20170429091919.GA14148@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, the fsmc_nand driver was either using controller timings
-specified in the Device Tree (through FSMC specific DT properties) or
-alternatively default/fallback timings.
+Hi!
 
-This commit implements support to use the timings advertised by the NAND
-chip itself, by implementing the ->setup_data_interface() hook. To
-preserve backward compatibility, if timings are specified in the Device
-Tree, we use the timings from the Device Tree (and don't implement
-->setup_data_interface).
+> > +	devices[index].subdev_fds[0] = SYS_OPEN("/dev/video_sensor", O_RDWR, 0);
+> > +	devices[index].subdev_fds[1] = SYS_OPEN("/dev/video_focus", O_RDWR, 0);
+> > +	devices[index].subdev_fds[2] = -1;
+> 
+> Hardcoding names here is not a good idea. Ideally, it should open
+> the MC, using the newgen API, and parse the media graph.
+> 
+> The problem is that, even with newgen API, without the properties API
+> you likely won't be able to write a generic parser. So, we need a
+> plugin specific for OMAP3 (or at least some database that would teach
+> a generic plugin about OMAP3 specifics).
+> 
+> I guess that the approach that Jacek was taken were very close to what
+> a generic plugin would need:
+> 	https://lwn.net/Articles/619449/
+> 
+> The last version of his patch set is here:
+> 	https://patchwork.linuxtv.org/patch/37496/
+> 
+> I didn't review his patchset, but from what I saw, Sakari is the one
+> that found some issues on v7.1 patchset.
+> 
+> Sakari,
+> 
+> Could you shed us a light about why this patchset was not merged?
+> 
+> Are there anything really bad at the code, or just minor issues that
+> could be fixed later?
+> 
+> If it is the last case, perhaps we could merge the code, if this
+> would make easier for Pavel to work on a N9 solution using the
+> same approach.
 
-Many thanks to Boris Brezillon for coming up with the logic to convert
-the NAND chip timings into the timings expected by the FSMC controller.
+It would be nice to get some solution here. Camera without libv4l
+support is pretty much useless :-(.
 
-Also, since the timings are now not only coming from the DT, the message
-warning that default timings will be used is removed.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/mtd/nand/fsmc_nand.c | 94 +++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 89 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
-index 43108dd..442e4df 100644
---- a/drivers/mtd/nand/fsmc_nand.c
-+++ b/drivers/mtd/nand/fsmc_nand.c
-@@ -346,6 +346,88 @@ static void fsmc_nand_setup(struct fsmc_nand_data *host,
- 			FSMC_NAND_REG(regs, bank, ATTRIB));
- }
- 
-+static int fsmc_calc_timings(struct fsmc_nand_data *host,
-+			     const struct nand_sdr_timings *sdrt,
-+			     struct fsmc_nand_timings *tims)
-+{
-+	unsigned long hclk = clk_get_rate(host->clk);
-+	unsigned long hclkn = NSEC_PER_SEC / hclk;
-+	uint32_t thiz, thold, twait, tset;
-+
-+	if (sdrt->tRC_min < 30000)
-+		return -EOPNOTSUPP;
-+
-+	tims->tar = DIV_ROUND_UP(sdrt->tAR_min / 1000, hclkn) - 1;
-+	if (tims->tar > FSMC_TAR_MASK)
-+		tims->tar = FSMC_TAR_MASK;
-+	tims->tclr = DIV_ROUND_UP(sdrt->tCLR_min / 1000, hclkn) - 1;
-+	if (tims->tclr > FSMC_TCLR_MASK)
-+		tims->tclr = FSMC_TCLR_MASK;
-+
-+	thiz = sdrt->tCS_min - sdrt->tWP_min;
-+	tims->thiz = DIV_ROUND_UP(thiz / 1000, hclkn);
-+
-+	thold = sdrt->tDH_min;
-+	if (thold < sdrt->tCH_min)
-+		thold = sdrt->tCH_min;
-+	if (thold < sdrt->tCLH_min)
-+		thold = sdrt->tCLH_min;
-+	if (thold < sdrt->tWH_min)
-+		thold = sdrt->tWH_min;
-+	if (thold < sdrt->tALH_min)
-+		thold = sdrt->tALH_min;
-+	if (thold < sdrt->tREH_min)
-+		thold = sdrt->tREH_min;
-+	tims->thold = DIV_ROUND_UP(thold / 1000, hclkn);
-+	if (tims->thold == 0)
-+		tims->thold = 1;
-+	else if (tims->thold > FSMC_THOLD_MASK)
-+		tims->thold = FSMC_THOLD_MASK;
-+
-+	twait = max(sdrt->tRP_min, sdrt->tWP_min);
-+	tims->twait = DIV_ROUND_UP(twait / 1000, hclkn) - 1;
-+	if (tims->twait == 0)
-+		tims->twait = 1;
-+	else if (tims->twait > FSMC_TWAIT_MASK)
-+		tims->twait = FSMC_TWAIT_MASK;
-+
-+	tset = max(sdrt->tCS_min - sdrt->tWP_min,
-+		   sdrt->tCEA_max - sdrt->tREA_max);
-+	tims->tset = DIV_ROUND_UP(tset / 1000, hclkn) - 1;
-+	if (tims->tset == 0)
-+		tims->tset = 1;
-+	else if (tims->tset > FSMC_TSET_MASK)
-+		tims->tset = FSMC_TSET_MASK;
-+
-+	return 0;
-+}
-+
-+static int fsmc_setup_data_interface(struct mtd_info *mtd,
-+				     const struct nand_data_interface *conf,
-+				     bool check_only)
-+{
-+	struct nand_chip *nand = mtd_to_nand(mtd);
-+	struct fsmc_nand_data *host = nand_get_controller_data(nand);
-+	struct fsmc_nand_timings tims;
-+	const struct nand_sdr_timings *sdrt;
-+	int ret;
-+
-+	sdrt = nand_get_sdr_timings(conf);
-+	if (IS_ERR(sdrt))
-+		return PTR_ERR(sdrt);
-+
-+	ret = fsmc_calc_timings(host, sdrt, &tims);
-+	if (ret)
-+		return ret;
-+
-+	if (check_only)
-+		return 0;
-+
-+	fsmc_nand_setup(host, &tims);
-+
-+	return 0;
-+}
-+
- /*
-  * fsmc_enable_hwecc - Enables Hardware ECC through FSMC registers
-  */
-@@ -798,10 +880,8 @@ static int fsmc_nand_probe_config_dt(struct platform_device *pdev,
- 		return -ENOMEM;
- 	ret = of_property_read_u8_array(np, "timings", (u8 *)host->dev_timings,
- 						sizeof(*host->dev_timings));
--	if (ret) {
--		dev_info(&pdev->dev, "No timings in dts specified, using default timings!\n");
-+	if (ret)
- 		host->dev_timings = NULL;
--	}
- 
- 	/* Set default NAND bank to 0 */
- 	host->bank = 0;
-@@ -935,7 +1015,10 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
- 		break;
- 	}
- 
--	fsmc_nand_setup(host, host->dev_timings);
-+	if (host->dev_timings)
-+		fsmc_nand_setup(host, host->dev_timings);
-+	else
-+		nand->setup_data_interface = fsmc_setup_data_interface;
- 
- 	if (AMBA_REV_BITS(host->pid) >= 8) {
- 		nand->ecc.read_page = fsmc_read_page_hwecc;
-@@ -1073,7 +1156,8 @@ static int fsmc_nand_resume(struct device *dev)
- 	struct fsmc_nand_data *host = dev_get_drvdata(dev);
- 	if (host) {
- 		clk_prepare_enable(host->clk);
--		fsmc_nand_setup(host, host->dev_timings);
-+		if (host->dev_timings)
-+			fsmc_nand_setup(host, host->dev_timings);
- 	}
- 	return 0;
- }
+									Pavel
 -- 
-2.7.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170429/5a448afb/attachment.sig>
