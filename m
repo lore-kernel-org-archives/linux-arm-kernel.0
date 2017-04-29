@@ -1,38 +1,53 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 29 Apr 2017 10:52:33 +0200
-Subject: [PATCH v2 0/3] mtd: nand: fsmc: support SDR timing configuration
-Message-ID: <1493455956-18362-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Sat, 29 Apr 2017 10:52:36 +0200
+Subject: [PATCH v2 3/3] mtd: nand: fsmc: remove default timings
+In-Reply-To: <1493455956-18362-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1493455956-18362-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1493455956-18362-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+When timings are no longer provided by the Device Tree, we now use the
+SDR timings specified by the NAND flash, and such SDR timings are always
+provided. Therefore, it is no longer necessary to keep "default" timings
+in the fmsc driver.
 
-This patch series add support for configuring the FSMC NAND controller
-timings according to the SDR timings exposed by the NAND chip.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/mtd/nand/fsmc_nand.c | 16 +---------------
+ 1 file changed, 1 insertion(+), 15 deletions(-)
 
-Changes since v1:
-
- - Dropped all patches from the series that have already been merged
-   in nand/next.
-
- - Rework the implementation as suggested by Boris Brezillon, i.e by
-   implementing ->setup_data_interface() only when we are going to use
-   the NAND SDR timings. If there is a "timings" DT property, we keep
-   using the old strategy without ->setup_data_interface().
-
-The patch series is based on the nand/next branch.
-
-Best regards,
-
-Thomas
-
-Thomas Petazzoni (3):
-  mtd: nand: fsmc: reduce number of arguments of fsmc_nand_setup()
-  mtd: nand: fsmc: add support for SDR timings
-  mtd: nand: fsmc: remove default timings
-
- drivers/mtd/nand/fsmc_nand.c | 120 +++++++++++++++++++++++++++++++++----------
- 1 file changed, 94 insertions(+), 26 deletions(-)
-
+diff --git a/drivers/mtd/nand/fsmc_nand.c b/drivers/mtd/nand/fsmc_nand.c
+index 442e4df..f58c912 100644
+--- a/drivers/mtd/nand/fsmc_nand.c
++++ b/drivers/mtd/nand/fsmc_nand.c
+@@ -303,26 +303,12 @@ static void fsmc_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+  * FSMC registers
+  */
+ static void fsmc_nand_setup(struct fsmc_nand_data *host,
+-			    struct fsmc_nand_timings *timings)
++			    struct fsmc_nand_timings *tims)
+ {
+ 	uint32_t value = FSMC_DEVTYPE_NAND | FSMC_ENABLE | FSMC_WAITON;
+ 	uint32_t tclr, tar, thiz, thold, twait, tset;
+ 	unsigned int bank = host->bank;
+ 	void __iomem *regs = host->regs_va;
+-	struct fsmc_nand_timings *tims;
+-	struct fsmc_nand_timings default_timings = {
+-		.tclr	= FSMC_TCLR_1,
+-		.tar	= FSMC_TAR_1,
+-		.thiz	= FSMC_THIZ_1,
+-		.thold	= FSMC_THOLD_4,
+-		.twait	= FSMC_TWAIT_6,
+-		.tset	= FSMC_TSET_0,
+-	};
+-
+-	if (timings)
+-		tims = host->dev_timings;
+-	else
+-		tims = &default_timings;
+ 
+ 	tclr = (tims->tclr & FSMC_TCLR_MASK) << FSMC_TCLR_SHIFT;
+ 	tar = (tims->tar & FSMC_TAR_MASK) << FSMC_TAR_SHIFT;
 -- 
 2.7.4
