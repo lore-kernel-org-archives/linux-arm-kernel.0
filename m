@@ -1,135 +1,57 @@
-From: abhishek.shah@broadcom.com (Abhishek Shah)
-Date: Sun, 30 Apr 2017 11:04:21 +0530
-Subject: [PATCH] net: phy: Allow BCM5481x PHYs to setup internal TX/RX clock
- delay
-Message-ID: <1493530461-11935-1-git-send-email-abhishek.shah@broadcom.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sun, 30 Apr 2017 09:36:15 -0500
+Subject: [PATCH v4] irqchip/gicv3-its: Avoid memory over allocation for ITEs
+Message-ID: <1493562975-14365-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows users to enable/disable internal TX and/or RX
-clock delay for BCM5481x series PHYs so as to satisfy RGMII timing
-specifications.
+We are always allocating extra 255Bytes of memory to handle ITE
+physical address alignment requirement. The kmalloc() satisfies
+the ITE alignment since the ITS driver is requesting a minimum
+size of ITS_ITT_ALIGN bytes.
 
-On a particular platform, whether TX and/or RX clock delay is required
-depends on how PHY connected to the MAC IP. This requirement can be
-specified through "phy-mode" property in the platform device tree.
+Let's try to allocate the exact amount of memory that is required
+for ITEs to avoid wastage.
 
-Signed-off-by: Abhishek Shah <abhishek.shah@broadcom.com>
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 ---
- drivers/net/phy/broadcom.c | 69 ++++++++++++++++++++++------------------------
- 1 file changed, 33 insertions(+), 36 deletions(-)
+Changes:
+v2: removed 'Change-Id: Ia8084189833f2081ff13c392deb5070c46a64038' from commit.
+v3: changed from IITE to ITE.
+v3: removed fallback since kmalloc() guarantees the right alignment.
 
-diff --git a/drivers/net/phy/broadcom.c b/drivers/net/phy/broadcom.c
-index 9cd8b27..a32dc5d 100644
---- a/drivers/net/phy/broadcom.c
-+++ b/drivers/net/phy/broadcom.c
-@@ -74,27 +74,40 @@ static int bcm54612e_config_init(struct phy_device *phydev)
- 	return 0;
- }
+ drivers/irqchip/irq-gic-v3-its.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 45ea1933..72e56f03 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -261,7 +261,6 @@ static struct its_collection *its_build_mapd_cmd(struct its_cmd_block *cmd,
+ 	u8 size = ilog2(desc->its_mapd_cmd.dev->nr_ites);
  
--static int bcm54810_config(struct phy_device *phydev)
-+static int bcm5481x_config(struct phy_device *phydev)
- {
- 	int rc, val;
+ 	itt_addr = virt_to_phys(desc->its_mapd_cmd.dev->itt);
+-	itt_addr = ALIGN(itt_addr, ITS_ITT_ALIGN);
  
--	val = bcm_phy_read_exp(phydev, BCM54810_EXP_BROADREACH_LRE_MISC_CTL);
--	val &= ~BCM54810_EXP_BROADREACH_LRE_MISC_CTL_EN;
--	rc = bcm_phy_write_exp(phydev, BCM54810_EXP_BROADREACH_LRE_MISC_CTL,
--			       val);
--	if (rc < 0)
--		return rc;
--
-+	/* handling PHY's internal RX clock delay */
- 	val = bcm54xx_auxctl_read(phydev, MII_BCM54XX_AUXCTL_SHDWSEL_MISC);
--	val &= ~MII_BCM54XX_AUXCTL_SHDWSEL_MISC_RGMII_SKEW_EN;
- 	val |= MII_BCM54XX_AUXCTL_MISC_WREN;
-+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII ||
-+	    phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
-+		/* Disable RGMII RXC-RXD skew */
-+		val &= ~MII_BCM54XX_AUXCTL_SHDWSEL_MISC_RGMII_SKEW_EN;
-+	}
-+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
-+	    phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
-+		/* Enable RGMII RXC-RXD skew */
-+		val |= MII_BCM54XX_AUXCTL_SHDWSEL_MISC_RGMII_SKEW_EN;
-+	}
- 	rc = bcm54xx_auxctl_write(phydev, MII_BCM54XX_AUXCTL_SHDWSEL_MISC,
- 				  val);
- 	if (rc < 0)
- 		return rc;
+ 	its_encode_cmd(cmd, GITS_CMD_MAPD);
+ 	its_encode_devid(cmd, desc->its_mapd_cmd.dev->device_id);
+@@ -1329,13 +1328,14 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	 */
+ 	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+ 	sz = nr_ites * its->ite_size;
+-	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
++	sz = max(sz, ITS_ITT_ALIGN);
+ 	itt = kzalloc(sz, GFP_KERNEL);
+ 	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
+ 	if (lpi_map)
+ 		col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
  
-+	/* handling PHY's internal TX clock delay */
- 	val = bcm_phy_read_shadow(phydev, BCM54810_SHD_CLK_CTL);
--	val &= ~BCM54810_SHD_CLK_CTL_GTXCLK_EN;
-+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII ||
-+	    phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
-+		/* Disable internal TX clock delay */
-+		val &= ~BCM54810_SHD_CLK_CTL_GTXCLK_EN;
-+	}
-+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
-+	    phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
-+		/* Enable internal TX clock delay */
-+		val |= BCM54810_SHD_CLK_CTL_GTXCLK_EN;
-+	}
- 	rc = bcm_phy_write_shadow(phydev, BCM54810_SHD_CLK_CTL, val);
- 	if (rc < 0)
- 		return rc;
-@@ -244,7 +257,7 @@ static void bcm54xx_adjust_rxrefclk(struct phy_device *phydev)
- 
- static int bcm54xx_config_init(struct phy_device *phydev)
- {
--	int reg, err;
-+	int reg, err, val;
- 
- 	reg = phy_read(phydev, MII_BCM54XX_ECR);
- 	if (reg < 0)
-@@ -283,8 +296,14 @@ static int bcm54xx_config_init(struct phy_device *phydev)
- 		if (err)
- 			return err;
- 	} else if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM54810) {
--		err = bcm54810_config(phydev);
--		if (err)
-+		/* For BCM54810, we need to disable BroadR-Reach function */
-+		val = bcm_phy_read_exp(phydev,
-+				       BCM54810_EXP_BROADREACH_LRE_MISC_CTL);
-+		val &= ~BCM54810_EXP_BROADREACH_LRE_MISC_CTL_EN;
-+		err = bcm_phy_write_exp(phydev,
-+					BCM54810_EXP_BROADREACH_LRE_MISC_CTL,
-+					val);
-+		if (err < 0)
- 			return err;
- 	}
- 
-@@ -392,29 +411,7 @@ static int bcm5481_config_aneg(struct phy_device *phydev)
- 	ret = genphy_config_aneg(phydev);
- 
- 	/* Then we can set up the delay. */
--	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
--		u16 reg;
--
--		/*
--		 * There is no BCM5481 specification available, so down
--		 * here is everything we know about "register 0x18". This
--		 * at least helps BCM5481 to successfully receive packets
--		 * on MPC8360E-RDK board. Peter Barada <peterb@logicpd.com>
--		 * says: "This sets delay between the RXD and RXC signals
--		 * instead of using trace lengths to achieve timing".
--		 */
--
--		/* Set RDX clk delay. */
--		reg = 0x7 | (0x7 << 12);
--		phy_write(phydev, 0x18, reg);
--
--		reg = phy_read(phydev, 0x18);
--		/* Set RDX-RXC skew. */
--		reg |= (1 << 8);
--		/* Write bits 14:0. */
--		reg |= (1 << 15);
--		phy_write(phydev, 0x18, reg);
--	}
-+	bcm5481x_config(phydev);
- 
- 	if (of_property_read_bool(np, "enet-phy-lane-swap")) {
- 		/* Lane Swap - Undocumented register...magic! */
+-	if (!dev || !itt || !lpi_map || !col_map) {
++	if (!dev || !itt || !lpi_map || !col_map ||
++	    !IS_ALIGNED(virt_to_phys(itt), ITS_ITT_ALIGN)) {
+ 		kfree(dev);
+ 		kfree(itt);
+ 		kfree(lpi_map);
 -- 
-2.7.4
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
