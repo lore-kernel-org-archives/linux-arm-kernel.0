@@ -1,136 +1,166 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 31 May 2017 15:51:34 -0700
-Subject: [PATCH 06/11] ARM: OMAP2+: Remove unused legacy code for io.c
-In-Reply-To: <20170531225139.30723-1-tony@atomide.com>
-References: <20170531225139.30723-1-tony@atomide.com>
-Message-ID: <20170531225139.30723-7-tony@atomide.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 1 May 2017 00:48:46 +0200
+Subject: [patch] autogain support for bayer10 format (was Re: [patch]
+ propagating controls in libv4l2)
+In-Reply-To: <20170426132337.GA6482@amd>
+References: <20170414232332.63850d7b@vento.lan>
+ <20170416091209.GB7456@valkosipuli.retiisi.org.uk>
+ <20170419105118.72b8e284@vento.lan> <20170424093059.GA20427@amd>
+ <20170424103802.00d3b554@vento.lan> <20170424212914.GA20780@amd>
+ <20170424224724.5bb52382@vento.lan> <20170426105300.GA857@amd>
+ <20170426081330.6ca10e42@vento.lan> <20170426132337.GA6482@amd>
+Message-ID: <20170430224846.GA17956@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are now booting all mach-omap2 in device tree only mode.
-Any code that is only called in legacy boot mode where
-of_have_populated_dt() is not set is safe to remove now.
+On Wed 2017-04-26 15:23:37, Pavel Machek wrote:
+> Hi!
+> 
+> > > > I don't see why it would be hard to open files or have threads inside
+> > > > a library. There are several libraries that do that already, specially
+> > > > the ones designed to be used on multimidia apps.  
+> > > 
+> > > Well, This is what the libv4l2 says:
+> > > 
+> > >    This file implements libv4l2, which offers v4l2_ prefixed versions
+> > >    of
+> > >       open/close/etc. The API is 100% the same as directly opening
+> > >    /dev/videoX
+> > >       using regular open/close/etc, the big difference is that format
+> > >    conversion
+> > >    
+> > > but if I open additional files in v4l2_open(), API is no longer the
+> > > same, as unix open() is defined to open just one file descriptor.
+> > > 
+> > > Now. There is autogain support in libv4lconvert, but it expects to use
+> > > same fd for camera and for the gain... which does not work with
+> > > subdevs.
+> > > 
+> > > Of course, opening subdevs by name like this is not really
+> > > acceptable. But can you suggest a method that is?
+> > 
+> > There are two separate things here:
+> > 
+> > 1) Autofoucs for a device that doesn't use subdev API
+> > 2) libv4l2 support for devices that require MC and subdev API
+> 
+> Actually there are three: 0) autogain. Unfortunately, I need autogain
+> first before autofocus has a chance...
+> 
+> And that means... bayer10 support for autogain.
+> 
+> Plus, I changed avg_lum to long long. Quick calculation tells me int
+> could overflow with few megapixel sensor.
+> 
+> Oh, btw http://ytse.tricolour.net/docs/LowLightOptimization.html no
+> longer works.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/io.c | 59 ++++++++++++------------------------------------
- 1 file changed, 14 insertions(+), 45 deletions(-)
+Can I get some comments here? Patch will need fixup (constants need
+adjusting), but is style/design acceptable?
 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -493,67 +493,39 @@ void __init omap3_init_early(void)
- 	omap2_set_globals_tap(OMAP343X_CLASS, OMAP2_L4_IO_ADDRESS(0x4830A000));
- 	omap2_set_globals_sdrc(OMAP2_L3_IO_ADDRESS(OMAP343X_SDRC_BASE),
- 			       OMAP2_L3_IO_ADDRESS(OMAP343X_SMS_BASE));
--	/* XXX: remove these once OMAP3 is DT only */
--	if (!of_have_populated_dt()) {
--		omap2_set_globals_control(
--			OMAP2_L4_IO_ADDRESS(OMAP343X_CTRL_BASE));
--		omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP3430_PRM_BASE));
--		omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE),
--				     NULL);
--	}
- 	omap2_control_base_init();
- 	omap3xxx_check_revision();
- 	omap3xxx_check_features();
- 	omap2_prcm_base_init();
--	/* XXX: remove these once OMAP3 is DT only */
--	if (!of_have_populated_dt()) {
--		omap3xxx_prm_init(NULL);
--		omap3xxx_cm_init(NULL);
--	}
- 	omap3xxx_voltagedomains_init();
- 	omap3xxx_powerdomains_init();
- 	omap3xxx_clockdomains_init();
- 	omap3xxx_hwmod_init();
- 	omap_hwmod_init_postsetup();
--	if (!of_have_populated_dt()) {
--		omap3_control_legacy_iomap_init();
--		if (soc_is_am35xx())
--			omap_clk_soc_init = am35xx_clk_legacy_init;
--		else if (cpu_is_omap3630())
--			omap_clk_soc_init = omap36xx_clk_legacy_init;
--		else if (omap_rev() == OMAP3430_REV_ES1_0)
--			omap_clk_soc_init = omap3430es1_clk_legacy_init;
--		else
--			omap_clk_soc_init = omap3430_clk_legacy_init;
--	}
- }
- 
- void __init omap3430_init_early(void)
- {
- 	omap3_init_early();
--	if (of_have_populated_dt())
--		omap_clk_soc_init = omap3430_dt_clk_init;
-+	omap_clk_soc_init = omap3430_dt_clk_init;
- }
- 
- void __init omap35xx_init_early(void)
- {
- 	omap3_init_early();
--	if (of_have_populated_dt())
--		omap_clk_soc_init = omap3430_dt_clk_init;
-+	omap_clk_soc_init = omap3430_dt_clk_init;
- }
- 
- void __init omap3630_init_early(void)
- {
- 	omap3_init_early();
--	if (of_have_populated_dt())
--		omap_clk_soc_init = omap3630_dt_clk_init;
-+	omap_clk_soc_init = omap3630_dt_clk_init;
- }
- 
- void __init am35xx_init_early(void)
- {
- 	omap3_init_early();
--	if (of_have_populated_dt())
--		omap_clk_soc_init = am35xx_dt_clk_init;
-+	omap_clk_soc_init = am35xx_dt_clk_init;
- }
- 
- void __init omap3_init_late(void)
-@@ -628,8 +600,7 @@ void __init ti816x_init_early(void)
- 	ti816x_clockdomains_init();
- 	dm816x_hwmod_init();
- 	omap_hwmod_init_postsetup();
--	if (of_have_populated_dt())
--		omap_clk_soc_init = dm816x_dt_clk_init;
-+	omap_clk_soc_init = dm816x_dt_clk_init;
- }
- #endif
- 
-@@ -785,21 +756,19 @@ int __init omap_clk_init(void)
- 
- 	omap2_clk_setup_ll_ops();
- 
--	if (of_have_populated_dt()) {
--		ret = omap_control_init();
--		if (ret)
--			return ret;
-+	ret = omap_control_init();
-+	if (ret)
-+		return ret;
- 
--		ret = omap_prcm_init();
--		if (ret)
--			return ret;
-+	ret = omap_prcm_init();
-+	if (ret)
-+		return ret;
- 
--		of_clk_init(NULL);
-+	of_clk_init(NULL);
- 
--		ti_dt_clk_init_retry_clks();
-+	ti_dt_clk_init_retry_clks();
- 
--		ti_dt_clockdomains_setup();
--	}
-+	ti_dt_clockdomains_setup();
- 
- 	ret = omap_clk_soc_init();
- 
+Thanks,
+								Pavel
+
+> diff --git a/lib/libv4lconvert/processing/autogain.c b/lib/libv4lconvert/processing/autogain.c
+> index c6866d6..0b52d0f 100644
+> --- a/lib/libv4lconvert/processing/autogain.c
+> +++ b/lib/libv4lconvert/processing/autogain.c
+> @@ -68,6 +71,41 @@ static void autogain_adjust(struct v4l2_queryctrl *ctrl, int *value,
+>  	}
+>  }
+>  
+> +static int get_luminosity_bayer10(uint16_t *buf, const struct v4l2_format *fmt)
+> +{
+> +	long long avg_lum = 0;
+> +	int x, y;
+> +	
+> +	buf += fmt->fmt.pix.height * fmt->fmt.pix.bytesperline / 4 +
+> +		fmt->fmt.pix.width / 4;
+> +
+> +	for (y = 0; y < fmt->fmt.pix.height / 2; y++) {
+> +		for (x = 0; x < fmt->fmt.pix.width / 2; x++)
+> +			avg_lum += *buf++;
+> +		buf += fmt->fmt.pix.bytesperline - fmt->fmt.pix.width / 2;
+> +	}
+> +	avg_lum /= fmt->fmt.pix.height * fmt->fmt.pix.width / 4;
+> +	avg_lum /= 4;
+> +	return avg_lum;
+> +}
+> +
+> +static int get_luminosity_bayer8(unsigned char *buf, const struct v4l2_format *fmt)
+> +{
+> +	long long avg_lum = 0;
+> +	int x, y;
+> +	
+> +	buf += fmt->fmt.pix.height * fmt->fmt.pix.bytesperline / 4 +
+> +		fmt->fmt.pix.width / 4;
+> +
+> +	for (y = 0; y < fmt->fmt.pix.height / 2; y++) {
+> +		for (x = 0; x < fmt->fmt.pix.width / 2; x++)
+> +			avg_lum += *buf++;
+> +		buf += fmt->fmt.pix.bytesperline - fmt->fmt.pix.width / 2;
+> +	}
+> +	avg_lum /= fmt->fmt.pix.height * fmt->fmt.pix.width / 4;
+> +	return avg_lum;
+> +}
+> +
+>  /* auto gain and exposure algorithm based on the knee algorithm described here:
+>  http://ytse.tricolour.net/docs/LowLightOptimization.html */
+>  static int autogain_calculate_lookup_tables(
+> @@ -100,17 +142,16 @@ static int autogain_calculate_lookup_tables(
+>  	switch (fmt->fmt.pix.pixelformat) {
+> +	case V4L2_PIX_FMT_SGBRG10:
+> +	case V4L2_PIX_FMT_SGRBG10:
+> +	case V4L2_PIX_FMT_SBGGR10:
+> +	case V4L2_PIX_FMT_SRGGB10:
+> +		avg_lum = get_luminosity_bayer10((void *) buf, fmt);
+> +		break;
+> +
+>  	case V4L2_PIX_FMT_SGBRG8:
+>  	case V4L2_PIX_FMT_SGRBG8:
+>  	case V4L2_PIX_FMT_SBGGR8:
+>  	case V4L2_PIX_FMT_SRGGB8:
+> -		buf += fmt->fmt.pix.height * fmt->fmt.pix.bytesperline / 4 +
+> -			fmt->fmt.pix.width / 4;
+> -
+> -		for (y = 0; y < fmt->fmt.pix.height / 2; y++) {
+> -			for (x = 0; x < fmt->fmt.pix.width / 2; x++)
+> -				avg_lum += *buf++;
+> -			buf += fmt->fmt.pix.bytesperline - fmt->fmt.pix.width / 2;
+> -		}
+> -		avg_lum /= fmt->fmt.pix.height * fmt->fmt.pix.width / 4;
+> +		avg_lum = get_luminosity_bayer8(buf, fmt);
+>  		break;
+>  
+>  	case V4L2_PIX_FMT_RGB24:
+> diff --git a/lib/libv4lconvert/processing/libv4lprocessing.c b/lib/libv4lconvert/processing/libv4lprocessing.c
+> index b061f50..b98d024 100644
+> --- a/lib/libv4lconvert/processing/libv4lprocessing.c
+> +++ b/lib/libv4lconvert/processing/libv4lprocessing.c
+> @@ -164,6 +165,10 @@ void v4lprocessing_processing(struct v4lprocessing_data *data,
+>  	case V4L2_PIX_FMT_SGRBG8:
+>  	case V4L2_PIX_FMT_SBGGR8:
+>  	case V4L2_PIX_FMT_SRGGB8:
+> +	case V4L2_PIX_FMT_SGBRG10:
+> +	case V4L2_PIX_FMT_SGRBG10:
+> +	case V4L2_PIX_FMT_SBGGR10:
+> +	case V4L2_PIX_FMT_SRGGB10:
+>  	case V4L2_PIX_FMT_RGB24:
+>  	case V4L2_PIX_FMT_BGR24:
+>  		break;
+> 
+> 
+> 
+
+
+
 -- 
-2.13.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170501/f729b3a9/attachment-0001.sig>
