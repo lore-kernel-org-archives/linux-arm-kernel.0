@@ -1,88 +1,61 @@
-From: karim.eshapa@gmail.com (Karim Eshapa)
-Date: Sun, 30 Apr 2017 03:09:26 +0200
-Subject: drivers:soc:fsl:qbman:qman.c: unsigned long jiffies value
-In-Reply-To: <1493508775.25397.26.camel@buserror.net>
-References: <1493508775.25397.26.camel@buserror.net>
-Message-ID: <1493514566-12920-1-git-send-email-karim.eshapa@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 29 Apr 2017 20:37:49 -0700
+Subject: Updating kernel.org cross compilers?
+In-Reply-To: <92b5ff36-ad2b-10bc-de4f-4774babd9625@arm.com>
+References: <92b5ff36-ad2b-10bc-de4f-4774babd9625@arm.com>
+Message-ID: <36993be3-c40e-3882-5f20-f8ea1a3916bf@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 29 Apr 2017 18:32:55 -0500, Scott Wood wrote:
->On Sat, 2017-04-29 at 22:43 +0200, Karim Eshapa wrote:
+On 04/26/2017 07:14 AM, Andre Przywara wrote:
+> Hi!
 >
->> unsigned long jiffies value sorry for that.
->>
-> You mean unsigned long msecs?
+> (Tony: I've seen you redirecting to "Chris" in an older email, but the
+> web archive doesn't have his email address)
 >
-
-Yes, I mean usecs. 
-
->>
->> Signed-off-by: Karim Eshapa <karim.eshapa@gmail.com>
->> ---
->>  drivers/soc/fsl/qbman/qman.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
->> index e0df4d1..6e1a44a 100644
->> --- a/drivers/soc/fsl/qbman/qman.c
->> +++ b/drivers/soc/fsl/qbman/qman.c
->> @@ -1084,7 +1084,7 @@ static int drain_mr_fqrni(struct qm_portal *p)
->>                * entries well before the ring has been fully consumed, so
->>                * we're being *really* paranoid here.
->>                */
->> -             unsigned int udel_time = jiffies_to_usecs(10000);
->> +             unsigned long udel_time = jiffies_to_usecs(10000);
->>  
->>               usleep_range(udel_time/2, udel_time);
->>               msg = qm_mr_current(p);
-
->If unsigned int isn't big enough, then unsigned long won't be either on 32-
->bit.  With such a long delay why not use msleep()?
+> It seems that many people (even outside the Linux kernel community) use
+> the cross compilers provided at kernel.org/pub/tools/crosstool.
+> The latest compiler I find there is 4.9.0, which celebrated its third
+> birthday at the weekend, also has been superseded by 4.9.4 meanwhile.
 >
-
-I agree with you in long int.
-After looking at Documentation/timers/timers-howto.txt I think
-the msleep() is better as we actually have long delay.
-may be we can use jiffies_to_msecs() with msleep() in case of we still have 
-this large jiffies difference.
-
->As for the previous patch[1], you're halving the minimum timeout which may not
->be correct.
+> So I took Segher's buildall scripts from [1] and threw binutils 2.28 and
+> GCC 6.3.0 at them. After removing --enable-sjlj-exceptions from
+> build-gcc and adding --disable-multilib (for building x86-64 on a x86-64
+> box without 32-bit libs) I was able to build (bare-metal) toolchains for
+> all architectures except arc, m68k, tilegx and tilepro.
+> Now my understanding is that a baremetal/stage 1 compiler should be
+> build with "all-gcc" instead of the implicit "all" make target, and
+> "install-gcc" instead of "install". And indeed adding this to build-gcc
+> makes all toolchains build now - except arc, which needs an explicit
+> "--with-cpu=arc700" on the GCC configure command line.
 >
+> So after those changes, the sequence:
+> $ ./buildall --toolchain
+> $ PATH=$PATH:/opt/cross/bin
+> $ ./buildall --kernel
+> worked reasonably well for me (binutils 2.28, GCC 6.3.0, Linux 4.11-rc8
+> on an Intel host with Ubuntu 14.04.5). Just tilegx/pro is still broken
+> due to toolchain issues.
 >
+Those need libgcc, and to build libgcc you'll have to install the kernel
+header files. Same is true for cris (and possibly others).
 
-For the minimum timeout, I've read the following comments.
+Also, crisv32 builds as well.
 
-		 /*
-                  * if MR was full and h/w had other FQRNI entries to produce, we
-                  * need to allow it time to produce those entries once the
-                  * existing entries are consumed. A worst-case situation
-                  * (fully-loaded system) means h/w sequencers may have to do 3-4
-                  * other things before servicing the portal's MR pump, each of
-                  * which (if slow) may take ~50 qman cycles (which is ~200
-                  * processor cycles). So rounding up and then multiplying this
-                  * worst-case estimate by a factor of 10, just to be
-                  * ultra-paranoid, goes as high as 10,000 cycles. NB, we consume
-                  * one entry at a time, so h/w has an opportunity to produce new
-                  * entries well before the ring has been fully consumed, so
-                  * we're being *really* paranoid here.
-		  */
-		  u64 now, then = jiffies;
-		
-		do {
-	                now = jiffies;
-                 } while ((then + 10000) > now);  
-
-He needs to guarantee certain action so, he made a very large factor of saftey
-therefore I've used sleep in range with approximate delay. But we still need 
-the driver owner to define appropriate value to put.
-
->[1] When fixing a patch you've already posted that hasn't yet been applied,
->send a replacement (v2) patch rather than a separate fix.
+> So I wonder what the process is to get those compilers updated?
 >
+If you find out let me know.
 
-Thanks so much, I'm just newbies :)
+Guenter
 
-
-Karim   
+> And what is a good build setup, so that the binaries run on as many
+> systems as possible?
+>
+> Also the web page (https://www.kernel.org/pub/tools/crosstool) seems to
+> only link outdated builds (4.6.3, mostly), is that on purpose?
+>
+> Cheers,
+> Andre.
+>
+> [1] http://git.infradead.org/users/segher/buildall.git/
+>
