@@ -1,86 +1,135 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Sun, 30 Apr 2017 13:35:04 +0800
-Subject: [PATCH v3 2/4] target-arm: kvm64: detect guest RAS EXTENSION feature
-In-Reply-To: <1493530506-26833-1-git-send-email-gengdongjiu@huawei.com>
-References: <1493530506-26833-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1493530506-26833-2-git-send-email-gengdongjiu@huawei.com>
+From: abhishek.shah@broadcom.com (Abhishek Shah)
+Date: Sun, 30 Apr 2017 11:04:21 +0530
+Subject: [PATCH] net: phy: Allow BCM5481x PHYs to setup internal TX/RX clock
+ delay
+Message-ID: <1493530461-11935-1-git-send-email-abhishek.shah@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-check if kvm supports guest RAS EXTENSION. if so, set
-corresponding feature bit for vcpu.
+This patch allows users to enable/disable internal TX and/or RX
+clock delay for BCM5481x series PHYs so as to satisfy RGMII timing
+specifications.
 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+On a particular platform, whether TX and/or RX clock delay is required
+depends on how PHY connected to the MAC IP. This requirement can be
+specified through "phy-mode" property in the platform device tree.
+
+Signed-off-by: Abhishek Shah <abhishek.shah@broadcom.com>
 ---
- linux-headers/asm-arm64/kvm.h | 1 +
- linux-headers/linux/kvm.h     | 1 +
- target/arm/cpu.h              | 3 +++
- target/arm/kvm64.c            | 8 ++++++++
- 4 files changed, 13 insertions(+)
+ drivers/net/phy/broadcom.c | 69 ++++++++++++++++++++++------------------------
+ 1 file changed, 33 insertions(+), 36 deletions(-)
 
-diff --git a/linux-headers/asm-arm64/kvm.h b/linux-headers/asm-arm64/kvm.h
-index 651ec30..acb5c4d 100644
---- a/linux-headers/asm-arm64/kvm.h
-+++ b/linux-headers/asm-arm64/kvm.h
-@@ -97,6 +97,7 @@ struct kvm_regs {
- #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
- #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
- #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
-+#define KVM_ARM_VCPU_RAS_EXTENSION	4
+diff --git a/drivers/net/phy/broadcom.c b/drivers/net/phy/broadcom.c
+index 9cd8b27..a32dc5d 100644
+--- a/drivers/net/phy/broadcom.c
++++ b/drivers/net/phy/broadcom.c
+@@ -74,27 +74,40 @@ static int bcm54612e_config_init(struct phy_device *phydev)
+ 	return 0;
+ }
  
- struct kvm_vcpu_init {
- 	__u32 target;
-diff --git a/linux-headers/linux/kvm.h b/linux-headers/linux/kvm.h
-index 4e082a8..e0fa5b8 100644
---- a/linux-headers/linux/kvm.h
-+++ b/linux-headers/linux/kvm.h
-@@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
- #define KVM_CAP_PPC_MMU_RADIX 134
- #define KVM_CAP_PPC_MMU_HASH_V3 135
- #define KVM_CAP_IMMEDIATE_EXIT 136
-+#define KVM_CAP_ARM_RAS_EXTENSION 137
+-static int bcm54810_config(struct phy_device *phydev)
++static int bcm5481x_config(struct phy_device *phydev)
+ {
+ 	int rc, val;
  
- #ifdef KVM_CAP_IRQ_ROUTING
+-	val = bcm_phy_read_exp(phydev, BCM54810_EXP_BROADREACH_LRE_MISC_CTL);
+-	val &= ~BCM54810_EXP_BROADREACH_LRE_MISC_CTL_EN;
+-	rc = bcm_phy_write_exp(phydev, BCM54810_EXP_BROADREACH_LRE_MISC_CTL,
+-			       val);
+-	if (rc < 0)
+-		return rc;
+-
++	/* handling PHY's internal RX clock delay */
+ 	val = bcm54xx_auxctl_read(phydev, MII_BCM54XX_AUXCTL_SHDWSEL_MISC);
+-	val &= ~MII_BCM54XX_AUXCTL_SHDWSEL_MISC_RGMII_SKEW_EN;
+ 	val |= MII_BCM54XX_AUXCTL_MISC_WREN;
++	if (phydev->interface == PHY_INTERFACE_MODE_RGMII ||
++	    phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
++		/* Disable RGMII RXC-RXD skew */
++		val &= ~MII_BCM54XX_AUXCTL_SHDWSEL_MISC_RGMII_SKEW_EN;
++	}
++	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
++	    phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
++		/* Enable RGMII RXC-RXD skew */
++		val |= MII_BCM54XX_AUXCTL_SHDWSEL_MISC_RGMII_SKEW_EN;
++	}
+ 	rc = bcm54xx_auxctl_write(phydev, MII_BCM54XX_AUXCTL_SHDWSEL_MISC,
+ 				  val);
+ 	if (rc < 0)
+ 		return rc;
  
-diff --git a/target/arm/cpu.h b/target/arm/cpu.h
-index a8aabce..1cf4a5b 100644
---- a/target/arm/cpu.h
-+++ b/target/arm/cpu.h
-@@ -610,6 +610,8 @@ struct ARMCPU {
++	/* handling PHY's internal TX clock delay */
+ 	val = bcm_phy_read_shadow(phydev, BCM54810_SHD_CLK_CTL);
+-	val &= ~BCM54810_SHD_CLK_CTL_GTXCLK_EN;
++	if (phydev->interface == PHY_INTERFACE_MODE_RGMII ||
++	    phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
++		/* Disable internal TX clock delay */
++		val &= ~BCM54810_SHD_CLK_CTL_GTXCLK_EN;
++	}
++	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
++	    phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
++		/* Enable internal TX clock delay */
++		val |= BCM54810_SHD_CLK_CTL_GTXCLK_EN;
++	}
+ 	rc = bcm_phy_write_shadow(phydev, BCM54810_SHD_CLK_CTL, val);
+ 	if (rc < 0)
+ 		return rc;
+@@ -244,7 +257,7 @@ static void bcm54xx_adjust_rxrefclk(struct phy_device *phydev)
  
-     /* CPU has memory protection unit */
-     bool has_mpu;
-+    /* CPU has ras extension unit */
-+    bool has_ras_extension;
-     /* PMSAv7 MPU number of supported regions */
-     uint32_t pmsav7_dregion;
+ static int bcm54xx_config_init(struct phy_device *phydev)
+ {
+-	int reg, err;
++	int reg, err, val;
  
-@@ -1216,6 +1218,7 @@ enum arm_features {
-     ARM_FEATURE_THUMB_DSP, /* DSP insns supported in the Thumb encodings */
-     ARM_FEATURE_PMU, /* has PMU support */
-     ARM_FEATURE_VBAR, /* has cp15 VBAR */
-+    ARM_FEATURE_RAS_EXTENSION, /*has RAS extension support */
- };
+ 	reg = phy_read(phydev, MII_BCM54XX_ECR);
+ 	if (reg < 0)
+@@ -283,8 +296,14 @@ static int bcm54xx_config_init(struct phy_device *phydev)
+ 		if (err)
+ 			return err;
+ 	} else if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM54810) {
+-		err = bcm54810_config(phydev);
+-		if (err)
++		/* For BCM54810, we need to disable BroadR-Reach function */
++		val = bcm_phy_read_exp(phydev,
++				       BCM54810_EXP_BROADREACH_LRE_MISC_CTL);
++		val &= ~BCM54810_EXP_BROADREACH_LRE_MISC_CTL_EN;
++		err = bcm_phy_write_exp(phydev,
++					BCM54810_EXP_BROADREACH_LRE_MISC_CTL,
++					val);
++		if (err < 0)
+ 			return err;
+ 	}
  
- static inline int arm_feature(CPUARMState *env, int feature)
-diff --git a/target/arm/kvm64.c b/target/arm/kvm64.c
-index 6111109..fd30a5a 100644
---- a/target/arm/kvm64.c
-+++ b/target/arm/kvm64.c
-@@ -518,6 +518,14 @@ int kvm_arch_init_vcpu(CPUState *cs)
-         unset_feature(&env->features, ARM_FEATURE_PMU);
-     }
+@@ -392,29 +411,7 @@ static int bcm5481_config_aneg(struct phy_device *phydev)
+ 	ret = genphy_config_aneg(phydev);
  
-+    if (kvm_check_extension(cs->kvm_state, KVM_CAP_ARM_RAS_EXTENSION)) {
-+        cpu->has_ras_extension = true;
-+        cpu->kvm_init_features[0] |= 1 << KVM_ARM_VCPU_RAS_EXTENSION;
-+    } else {
-+        cpu->has_ras_extension = false;
-+        unset_feature(&env->features, ARM_FEATURE_RAS_EXTENSION);
-+    }
-+
-     /* Do KVM_ARM_VCPU_INIT ioctl */
-     ret = kvm_arm_vcpu_init(cs);
-     if (ret) {
+ 	/* Then we can set up the delay. */
+-	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
+-		u16 reg;
+-
+-		/*
+-		 * There is no BCM5481 specification available, so down
+-		 * here is everything we know about "register 0x18". This
+-		 * at least helps BCM5481 to successfully receive packets
+-		 * on MPC8360E-RDK board. Peter Barada <peterb@logicpd.com>
+-		 * says: "This sets delay between the RXD and RXC signals
+-		 * instead of using trace lengths to achieve timing".
+-		 */
+-
+-		/* Set RDX clk delay. */
+-		reg = 0x7 | (0x7 << 12);
+-		phy_write(phydev, 0x18, reg);
+-
+-		reg = phy_read(phydev, 0x18);
+-		/* Set RDX-RXC skew. */
+-		reg |= (1 << 8);
+-		/* Write bits 14:0. */
+-		reg |= (1 << 15);
+-		phy_write(phydev, 0x18, reg);
+-	}
++	bcm5481x_config(phydev);
+ 
+ 	if (of_property_read_bool(np, "enet-phy-lane-swap")) {
+ 		/* Lane Swap - Undocumented register...magic! */
 -- 
-1.8.3.1
+2.7.4
