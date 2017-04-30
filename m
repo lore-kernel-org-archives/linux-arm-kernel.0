@@ -1,11 +1,11 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 30 Apr 2017 12:35:55 -0700
+Date: Sun, 30 Apr 2017 13:13:38 -0700
 Subject: [PATCH v5 16/22] KVM: arm64: vgic-its: Add infrastructure for
  table lookup
 In-Reply-To: <1492164934-988-17-git-send-email-eric.auger@redhat.com>
 References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
  <1492164934-988-17-git-send-email-eric.auger@redhat.com>
-Message-ID: <20170430193555.GB1670@lvm>
+Message-ID: <20170430201338.GC1670@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -80,18 +80,12 @@ On Fri, Apr 14, 2017 at 12:15:28PM +0200, Eric Auger wrote:
 > +	next_offset = next->event_id - ite->event_id;
 > +
 > +	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
-> +}
-> +
-> +/**
-> + * entry_fn_t - Callback called on a table entry restore path
-> + * @its: its handle
-> + * @id: id of the entry
-> + * @entry: pointer to the entry
-> + * @opaque: pointer to an opaque data
-> + * @next_offset: minimal ID offset to the next entry. 0 if this
-> + * entry is the last one, 1 if the entry is invalid, >= 1 if an
 
-eh, also, did you mean -1 if the entry is invalid?
+nit: in both of these functions you can avoid the extra e variable and
+maybe make this slightly more readable by using these two calls instead:
+
+list_is_last(&ite->ite_list, h);
+next = list_next_entry(ite, ite_list);
 
 Thanks,
 -Christoffer
