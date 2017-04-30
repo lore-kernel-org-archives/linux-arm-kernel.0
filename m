@@ -1,287 +1,138 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 30 Apr 2017 14:32:19 -0700
-Subject: [PATCH v5 22/22] KVM: arm64: vgic-v3:
- KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
-In-Reply-To: <1492164934-988-23-git-send-email-eric.auger@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-23-git-send-email-eric.auger@redhat.com>
-Message-ID: <20170430213219.GE1499@lvm>
+From: joe@perches.com (Joe Perches)
+Date: Sun, 30 Apr 2017 14:50:11 -0700
+Subject: [PATCH] scsi: fas216: Add __printf validation, fix fallout
+Message-ID: <ea0f8cf0ba961817f13225a5444c76a86e2ea610.1493588987.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 14, 2017 at 12:15:34PM +0200, Eric Auger wrote:
-> This patch adds a new attribute to GICV3 KVM device
-> KVM_DEV_ARM_VGIC_GRP_CTRL group. This Allows the userspace to
+__printf makes the compiler check format and arguments.
 
-nit: allows (lowercase)
-nit: s/the userspace/userspace/
+Fix fallout.
 
-> flush all GICR pending tables into guest RAM. At the moment
-> we do not offer any restore control as the sync is implicit.
+Miscellanea:
 
-I would probably remove the last sentence here.
+o Convert formats to const char *
+o Use vsprintf extension %pV instead of a static buffer.
+o Add newline to logging and remove now unnecessary printk("\n")
+o Use pr_cont where appropriate
 
-> 
-> As we need the PENDBASER_ADDRESS() in vgic-v3, let's move its
-> definition in the irqchip header. We restore the full length
-> of the field, ie [51:16]. Same for PROPBASER_ADDRESS with full
-> field length of [51:12].
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> v4 -> v5:
-> - move pending table save code/ctrl into VGICv3 instead of ITS
-> - remove useless gpa_t cast
-> - use the same optimization as in its_sync_lpi_pending_table
-> 
-> v3 -> v4:
-> - remove the wrong comment about locking
-> - pass kvm struct instead of its handle
-> - add comment about restore method
-> - remove GITR_PENDABASER.PTZ check
-> - continue if target_vcpu == NULL
-> - new locking strategy
-> 
-> v1 -> v2:
-> - do not care about the 1st KB which should be zeroed according to
->   the spec.
-> ---
->  arch/arm/include/uapi/asm/kvm.h     |  1 +
->  arch/arm64/include/uapi/asm/kvm.h   |  1 +
->  include/linux/irqchip/arm-gic-v3.h  |  2 ++
->  virt/kvm/arm/vgic/vgic-its.c        |  6 ++---
->  virt/kvm/arm/vgic/vgic-kvm-device.c | 20 ++++++++++++++
->  virt/kvm/arm/vgic/vgic-v3.c         | 54 +++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h            |  1 +
->  7 files changed, 81 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index 8e6563c..78fe803 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -202,6 +202,7 @@ struct kvm_arch_memory_slot {
->  #define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
->  #define   KVM_DEV_ARM_ITS_SAVE_TABLES		1
->  #define   KVM_DEV_ARM_ITS_RESTORE_TABLES	2
-> +#define   KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES	3
->  
->  /* KVM_IRQ_LINE irq field index values */
->  #define KVM_ARM_IRQ_TYPE_SHIFT		24
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 1e35115..8a3758a 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -222,6 +222,7 @@ struct kvm_arch_memory_slot {
->  #define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
->  #define   KVM_DEV_ARM_ITS_SAVE_TABLES           1
->  #define   KVM_DEV_ARM_ITS_RESTORE_TABLES        2
-> +#define   KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES	3
->  
->  /* Device Control API on vcpu fd */
->  #define KVM_ARM_VCPU_PMU_V3_CTRL	0
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 0c6798c..9d3932f 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -158,6 +158,7 @@
->  #define GICR_PROPBASER_RaWaWb	GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, RaWaWb)
->  
->  #define GICR_PROPBASER_IDBITS_MASK			(0x1f)
-> +#define GICR_PROPBASER_ADDRESS(x)    ((x) & GENMASK_ULL(51, 12))
->  
->  #define GICR_PENDBASER_SHAREABILITY_SHIFT		(10)
->  #define GICR_PENDBASER_INNER_CACHEABILITY_SHIFT		(7)
-> @@ -183,6 +184,7 @@
->  #define GICR_PENDBASER_RaWaWb	GIC_BASER_CACHEABILITY(GICR_PENDBASER, INNER, RaWaWb)
->  
->  #define GICR_PENDBASER_PTZ				BIT_ULL(62)
-> +#define GICR_PENDBASER_ADDRESS(x)    ((x) & GENMASK_ULL(51, 16))
->  
->  /*
->   * Re-Distributor registers, offsets from SGI_base
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index be848be..745c245 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -189,8 +189,6 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
->   */
->  #define BASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
->  #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
-> -#define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
-> -#define PROPBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
->  
->  #define GIC_LPI_OFFSET 8192
->  
-> @@ -227,7 +225,7 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
->  static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
->  			     struct kvm_vcpu *filter_vcpu)
->  {
-> -	u64 propbase = PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
-> +	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
->  	u8 prop;
->  	int ret;
->  
-> @@ -339,7 +337,7 @@ static u32 max_lpis_propbaser(u64 propbaser)
->   */
->  static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
->  {
-> -	gpa_t pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
-> +	gpa_t pendbase = GICR_PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
->  	struct vgic_irq *irq;
->  	int last_byte_offset = -1;
->  	int ret = 0;
-> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> index 859bfa8..d48743c 100644
-> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> @@ -580,6 +580,24 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
->  		reg = tmp32;
->  		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
->  	}
-> +	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
-> +		int ret;
-> +
-> +		switch (attr->attr) {
-> +		case KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES:
-> +			mutex_lock(&dev->kvm->lock);
-> +
-> +			if (!lock_all_vcpus(dev->kvm)) {
-> +				mutex_unlock(&dev->kvm->lock);
-> +				return -EBUSY;
-> +			}
-> +			ret = vgic_v3_save_pending_tables(dev->kvm);
-> +			unlock_all_vcpus(dev->kvm);
-> +			mutex_unlock(&dev->kvm->lock);
-> +			return ret;
-> +		}
-> +		break;
-> +	}
->  	}
->  	return -ENXIO;
->  }
-> @@ -658,6 +676,8 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
->  		switch (attr->attr) {
->  		case KVM_DEV_ARM_VGIC_CTRL_INIT:
->  			return 0;
-> +		case KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES:
-> +			return 0;
->  		}
->  	}
->  	return -ENXIO;
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index be0f4c3..1f0977f 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -15,6 +15,7 @@
->  #include <linux/irqchip/arm-gic-v3.h>
->  #include <linux/kvm.h>
->  #include <linux/kvm_host.h>
-> +//#include <linux/bitops.h>
->  #include <kvm/arm_vgic.h>
->  #include <asm/kvm_mmu.h>
->  #include <asm/kvm_asm.h>
-> @@ -252,6 +253,59 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
->  	vgic_v3->vgic_hcr = ICH_HCR_EN;
->  }
->  
-> +/**
-> + * vgic_its_save_pending_tables - Save the pending tables into guest RAM
-> + * kvm lock and all vcpu lock must be held
-> + */
-> +int vgic_v3_save_pending_tables(struct kvm *kvm)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	int last_byte_offset = -1;
-> +	struct vgic_irq *irq;
-> +	int ret;
-> +
-> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-> +		int byte_offset, bit_nr;
-> +		struct kvm_vcpu *vcpu;
-> +		gpa_t pendbase, ptr;
-> +		bool stored;
-> +		u8 val;
-> +
-> +		vcpu = irq->target_vcpu;
-> +		if (!vcpu)
-> +			continue;
-> +
-> +		pendbase = GICR_PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
-> +
-> +		byte_offset = irq->intid / BITS_PER_BYTE;
-> +		bit_nr = irq->intid % BITS_PER_BYTE;
-> +		ptr = pendbase + byte_offset;
-> +
-> +		if (byte_offset != last_byte_offset) {
-> +			ret = kvm_read_guest(kvm, ptr, &val, 1);
-> +			if (ret)
-> +				return ret;
-> +			last_byte_offset = byte_offset;
-> +		}
-> +
-> +		stored = val & bit_nr;
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ drivers/scsi/arm/fas216.c | 39 ++++++++++++++++++++-------------------
+ 1 file changed, 20 insertions(+), 19 deletions(-)
 
-didn't you mean 'stored = val & (1 << bit_nr)' ?
-
-> +		if (stored == irq->pending_latch)
-> +			continue;
-> +
-> +		if (irq->pending_latch)
-> +			val |= 1 << bit_nr;
-> +		else
-> +			val &= ~(1 << bit_nr);
-> +
-> +		ret = kvm_write_guest(kvm, ptr, &val, 1);
-> +		if (ret)
-> +			return ret;
-> +	}
-
-This loop could probably be written a bit more efficiently and
-simplicity by reading the memory one word at a time (and remembering to
-do le64_to_cpu) and then doing something like:
-
-		if (irq->pending_latch)
-			old = __test_and_set_bit(bit_nr, &val);
-		else
-			old = __test_and_clear_bit(bit_nr, &val);
-
-		if (old != val) {
-			tmp = cpu_to_le64(val);
-			ret = kvm_write_guest(kvm, ptr, &tmp,
-					      sizeof(unsigned long));
-			if (ret)
-				retur ret;
-		}
-
-Further, you could also detect when the word_offset changes and write
-back the entire word with all its changes then, but you'd also have to
-check at the end of the loop then.  Not sure that's worth the
-optimization or easier to read than what you heave.  It's up to you.
-
-Thanks,
--Christoffer
-
-> +
-> +	return 0;
-> +}
-> +
-> +
->  /* check for overlapping regions and for regions crossing the end of memory */
->  static bool vgic_v3_check_base(struct kvm *kvm)
->  {
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 9bc52ef..535c2fc 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -177,6 +177,7 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  void vgic_v3_enable(struct kvm_vcpu *vcpu);
->  int vgic_v3_probe(const struct gic_kvm_info *info);
->  int vgic_v3_map_resources(struct kvm *kvm);
-> +int vgic_v3_save_pending_tables(struct kvm *kvm);
->  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
->  
->  int vgic_register_its_iodevs(struct kvm *kvm);
-> -- 
-> 2.5.5
-> 
+diff --git a/drivers/scsi/arm/fas216.c b/drivers/scsi/arm/fas216.c
+index 24388795ee9a..112bec886192 100644
+--- a/drivers/scsi/arm/fas216.c
++++ b/drivers/scsi/arm/fas216.c
+@@ -289,17 +289,20 @@ static char fas216_target(FAS216_Info *info)
+ 		return 'H';
+ }
+ 
+-static void
+-fas216_do_log(FAS216_Info *info, char target, char *fmt, va_list ap)
++__printf(3, 0) static void
++fas216_do_log(FAS216_Info *info, char target, const char *fmt, va_list ap)
+ {
+-	static char buf[1024];
++	struct va_format vaf;
++
++	vaf.fmt = fmt;
++	vaf.va = &ap;
+ 
+-	vsnprintf(buf, sizeof(buf), fmt, ap);
+-	printk("scsi%d.%c: %s", info->host->host_no, target, buf);
++	printk("scsi%d.%c: %pV\n", info->host->host_no, target, &vaf);
+ }
+ 
++__printf(4, 5)
+ static void fas216_log_command(FAS216_Info *info, int level,
+-			       struct scsi_cmnd *SCpnt, char *fmt, ...)
++			       struct scsi_cmnd *SCpnt, const char *fmt, ...)
+ {
+ 	va_list args;
+ 
+@@ -313,8 +316,9 @@ static void fas216_log_command(FAS216_Info *info, int level,
+ 	scsi_print_command(SCpnt);
+ }
+ 
+-static void
+-fas216_log_target(FAS216_Info *info, int level, int target, char *fmt, ...)
++__printf(4, 5) static void
++fas216_log_target(FAS216_Info *info, int level, int target,
++		  const char *fmt, ...)
+ {
+ 	va_list args;
+ 
+@@ -329,11 +333,10 @@ fas216_log_target(FAS216_Info *info, int level, int target, char *fmt, ...)
+ 	va_start(args, fmt);
+ 	fas216_do_log(info, target, fmt, args);
+ 	va_end(args);
+-
+-	printk("\n");
+ }
+ 
+-static void fas216_log(FAS216_Info *info, int level, char *fmt, ...)
++__printf(3, 4)
++static void fas216_log(FAS216_Info *info, int level, const char *fmt, ...)
+ {
+ 	va_list args;
+ 
+@@ -343,8 +346,6 @@ static void fas216_log(FAS216_Info *info, int level, char *fmt, ...)
+ 	va_start(args, fmt);
+ 	fas216_do_log(info, fas216_target(info), fmt, args);
+ 	va_end(args);
+-
+-	printk("\n");
+ }
+ 
+ #define PH_SIZE	32
+@@ -431,7 +432,7 @@ fas216_get_last_msg(FAS216_Info *info, int pos)
+ 	}
+ 
+ 	fas216_log(info, LOG_MESSAGES,
+-		"Message: %04x found at position %02x\n", packed_msg, pos);
++		   "Message: %04x found at position %02x", packed_msg, pos);
+ 
+ 	return packed_msg;
+ }
+@@ -725,7 +726,7 @@ static void fas216_cleanuptransfer(FAS216_Info *info)
+ 	fifo = fas216_readb(info, REG_CFIS) & CFIS_CF;
+ 
+ 	fas216_log(info, LOG_BUFFER, "cleaning up from previous "
+-		   "transfer: length 0x%06x, residual 0x%x, fifo %d",
++		   "transfer: length 0x%06lx, residual 0x%lx, fifo %ld",
+ 		   total, residual, fifo);
+ 
+ 	/*
+@@ -1144,8 +1145,8 @@ static void fas216_parse_message(FAS216_Info *info, unsigned char *message, int
+ 	fas216_log(info, 0, "unrecognised message, rejecting");
+ 	printk("scsi%d.%c: message was", info->host->host_no, fas216_target(info));
+ 	for (i = 0; i < msglen; i++)
+-		printk("%s%02X", i & 31 ? " " : "\n  ", message[i]);
+-	printk("\n");
++		pr_cont("%s%02X", i & 31 ? " " : "\n  ", message[i]);
++	pr_cont("\n");
+ 
+ 	/*
+ 	 * Something strange seems to be happening here -
+@@ -1582,7 +1583,7 @@ static void fas216_funcdone_intr(FAS216_Info *info, unsigned int stat, unsigned
+ 	default:
+ 		fas216_log(info, 0, "internal phase %s for function done?"
+ 			"  What do I do with this?",
+-			fas216_target(info), fas216_drv_phase(info));
++			fas216_drv_phase(info));
+ 	}
+ }
+ 
+@@ -1642,7 +1643,7 @@ irqreturn_t fas216_intr(FAS216_Info *info)
+ 			fas216_bus_reset(info);
+ 			scsi_report_bus_reset(info->host, 0);
+ 		} else if (inst & INST_ILLEGALCMD) {
+-			fas216_log(info, LOG_ERROR, "illegal command given\n");
++			fas216_log(info, LOG_ERROR, "illegal command given");
+ 			fas216_dumpstate(info);
+ 			print_debug_list();
+ 		} else if (inst & INST_DISCONNECT)
+-- 
+2.10.0.rc2.1.g053435c
