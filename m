@@ -1,61 +1,86 @@
-From: segher@kernel.crashing.org (Segher Boessenkool)
-Date: Sun, 30 Apr 2017 00:29:57 -0500
-Subject: Updating kernel.org cross compilers?
-In-Reply-To: <92b5ff36-ad2b-10bc-de4f-4774babd9625@arm.com>
-References: <92b5ff36-ad2b-10bc-de4f-4774babd9625@arm.com>
-Message-ID: <20170430052957.GJ19687@gate.crashing.org>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Sun, 30 Apr 2017 13:35:04 +0800
+Subject: [PATCH v3 2/4] target-arm: kvm64: detect guest RAS EXTENSION feature
+In-Reply-To: <1493530506-26833-1-git-send-email-gengdongjiu@huawei.com>
+References: <1493530506-26833-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1493530506-26833-2-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+check if kvm supports guest RAS EXTENSION. if so, set
+corresponding feature bit for vcpu.
 
-On Wed, Apr 26, 2017 at 03:14:16PM +0100, Andre Przywara wrote:
-> It seems that many people (even outside the Linux kernel community) use
-> the cross compilers provided at kernel.org/pub/tools/crosstool.
-> The latest compiler I find there is 4.9.0, which celebrated its third
-> birthday at the weekend, also has been superseded by 4.9.4 meanwhile.
-> 
-> So I took Segher's buildall scripts from [1] and threw binutils 2.28 and
-> GCC 6.3.0 at them.
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+---
+ linux-headers/asm-arm64/kvm.h | 1 +
+ linux-headers/linux/kvm.h     | 1 +
+ target/arm/cpu.h              | 3 +++
+ target/arm/kvm64.c            | 8 ++++++++
+ 4 files changed, 13 insertions(+)
 
-Happy to see people are still using these!
-
-> After removing --enable-sjlj-exceptions from build-gcc
-
-This was needed to build some targets.  It does prevent aarch64 from
-building without patch.
-
-> and adding --disable-multilib (for building x86-64 on a x86-64
-> box without 32-bit libs)
-
-Why is this needed?  What error are you seeing.
-
-> I was able to build (bare-metal) toolchains for
-> all architectures except arc, m68k, tilegx and tilepro.
-
-arc needs a more recent GCC; the other probably as well.  GCC 7 should
-be out very soon, you probably want to wait for that :-)
-
-> $ ./buildall --toolchain
-> $ PATH=$PATH:/opt/cross/bin
-> $ ./buildall --kernel
-
-You should have the target dir in your PATH before doing anything else.
-Is this not documented?  Hrm I guess not, let me fix that.
-
-> And what is a good build setup, so that the binaries run on as many
-> systems as possible?
-
-Run contrib/download_prerequisites in the gcc source dir: this will
-make GMP, MPFR, MPC statically linked, and use a version of each that
-is known to work (and work correctly).
-
-> [1] http://git.infradead.org/users/segher/buildall.git/
-
-I'll push some changes that make aarch64 work out-of-the-box in a
-minute.  It does some other things as well (e.g., make ia64 work again
-after *that* change); more changes are still needed to make sh4 work
-without patches.
-
-
-Segher
+diff --git a/linux-headers/asm-arm64/kvm.h b/linux-headers/asm-arm64/kvm.h
+index 651ec30..acb5c4d 100644
+--- a/linux-headers/asm-arm64/kvm.h
++++ b/linux-headers/asm-arm64/kvm.h
+@@ -97,6 +97,7 @@ struct kvm_regs {
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+ #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
+ #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
++#define KVM_ARM_VCPU_RAS_EXTENSION	4
+ 
+ struct kvm_vcpu_init {
+ 	__u32 target;
+diff --git a/linux-headers/linux/kvm.h b/linux-headers/linux/kvm.h
+index 4e082a8..e0fa5b8 100644
+--- a/linux-headers/linux/kvm.h
++++ b/linux-headers/linux/kvm.h
+@@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_CAP_PPC_MMU_RADIX 134
+ #define KVM_CAP_PPC_MMU_HASH_V3 135
+ #define KVM_CAP_IMMEDIATE_EXIT 136
++#define KVM_CAP_ARM_RAS_EXTENSION 137
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
+diff --git a/target/arm/cpu.h b/target/arm/cpu.h
+index a8aabce..1cf4a5b 100644
+--- a/target/arm/cpu.h
++++ b/target/arm/cpu.h
+@@ -610,6 +610,8 @@ struct ARMCPU {
+ 
+     /* CPU has memory protection unit */
+     bool has_mpu;
++    /* CPU has ras extension unit */
++    bool has_ras_extension;
+     /* PMSAv7 MPU number of supported regions */
+     uint32_t pmsav7_dregion;
+ 
+@@ -1216,6 +1218,7 @@ enum arm_features {
+     ARM_FEATURE_THUMB_DSP, /* DSP insns supported in the Thumb encodings */
+     ARM_FEATURE_PMU, /* has PMU support */
+     ARM_FEATURE_VBAR, /* has cp15 VBAR */
++    ARM_FEATURE_RAS_EXTENSION, /*has RAS extension support */
+ };
+ 
+ static inline int arm_feature(CPUARMState *env, int feature)
+diff --git a/target/arm/kvm64.c b/target/arm/kvm64.c
+index 6111109..fd30a5a 100644
+--- a/target/arm/kvm64.c
++++ b/target/arm/kvm64.c
+@@ -518,6 +518,14 @@ int kvm_arch_init_vcpu(CPUState *cs)
+         unset_feature(&env->features, ARM_FEATURE_PMU);
+     }
+ 
++    if (kvm_check_extension(cs->kvm_state, KVM_CAP_ARM_RAS_EXTENSION)) {
++        cpu->has_ras_extension = true;
++        cpu->kvm_init_features[0] |= 1 << KVM_ARM_VCPU_RAS_EXTENSION;
++    } else {
++        cpu->has_ras_extension = false;
++        unset_feature(&env->features, ARM_FEATURE_RAS_EXTENSION);
++    }
++
+     /* Do KVM_ARM_VCPU_INIT ioctl */
+     ret = kvm_arm_vcpu_init(cs);
+     if (ret) {
+-- 
+1.8.3.1
