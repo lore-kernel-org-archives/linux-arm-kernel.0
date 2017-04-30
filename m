@@ -1,57 +1,49 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Sun, 30 Apr 2017 10:14:20 -0500
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 30 Apr 2017 18:04:30 +0200
 Subject: [PATCH 0/4] TI Bluetooth serdev support
-In-Reply-To: <20170405183005.20570-1-robh@kernel.org>
+In-Reply-To: <CAHCN7xJUxZm1qKAxT0kaK6qoDg+HWOJK7sTH-q9za4HJuUwe8Q@mail.gmail.com>
 References: <20170405183005.20570-1-robh@kernel.org>
-Message-ID: <CAHCN7xJUxZm1qKAxT0kaK6qoDg+HWOJK7sTH-q9za4HJuUwe8Q@mail.gmail.com>
+ <CAHCN7xJUxZm1qKAxT0kaK6qoDg+HWOJK7sTH-q9za4HJuUwe8Q@mail.gmail.com>
+Message-ID: <20170430160430.rmyuo6sdrkrjxjg6@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 5, 2017 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
-> This series adds serdev support to the HCI LL protocol used on TI BT
-> modules and enables support on HiKey board with with the WL1835 module.
-> With this the custom TI UIM daemon and btattach are no longer needed.
+Hi,
 
-Without UIM daemon, what instruction do you use to load the BT firmware?
+On Sun, Apr 30, 2017 at 10:14:20AM -0500, Adam Ford wrote:
+> On Wed, Apr 5, 2017 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
+> > This series adds serdev support to the HCI LL protocol used on TI BT
+> > modules and enables support on HiKey board with with the WL1835 module.
+> > With this the custom TI UIM daemon and btattach are no longer needed.
+> 
+> Without UIM daemon, what instruction do you use to load the BT firmware?
+> 
+> I was thinking 'hciattach' but I was having trouble.  I was hoping you
+> might have some insight.
+> 
+>  hciattach -t 30 -s 115200 /dev/ttymxc1 texas 3000000 flow  Just
+> returns a timeout.
+> 
+> I modified my i.MX6 device tree per the binding documentation and
+> setup the regulators and enable GPIO pins.
 
-I was thinking 'hciattach' but I was having trouble.  I was hoping you
-might have some insight.
+If you configured everything correctly no userspace interaction is
+required. The driver should request the firmware automatically once
+you power up the bluetooth device.
 
- hciattach -t 30 -s 115200 /dev/ttymxc1 texas 3000000 flow  Just
-returns a timeout.
+Apart from DT changes make sure, that the following options are
+enabled and check dmesg for any hints.
 
-I modified my i.MX6 device tree per the binding documentation and
-setup the regulators and enable GPIO pins.
+CONFIG_SERIAL_DEV_BUS
+CONFIG_SERIAL_DEV_CTRL_TTYPORT
+CONFIG_BT_HCIUART
+CONFIG_BT_HCIUART_LL
 
-adam
->
-> The series is available on this git branch[1]. Patch 2 is just clean-up
-> and can be applied independently. Patch 3 is dependent on the series
-> "Nokia H4+ support". I'd suggest both series are merged thru the BT tree.
->
-> Rob
->
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git ti-bluetooth
->
-> Rob Herring (4):
->   dt-bindings: net: Add TI WiLink shared transport binding
->   bluetooth: hci_uart: remove unused hci_uart_init_tty
->   bluetooth: hci_uart: add LL protocol serdev driver support
->   arm64: dts: hikey: add WL1835 Bluetooth device node
->
->  .../devicetree/bindings/net/ti,wilink-st.txt       |  35 +++
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   5 +
->  drivers/bluetooth/hci_ldisc.c                      |  19 --
->  drivers/bluetooth/hci_ll.c                         | 261 ++++++++++++++++++++-
->  drivers/bluetooth/hci_uart.h                       |   1 -
->  5 files changed, 300 insertions(+), 21 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/net/ti,wilink-st.txt
->
-> --
-> 2.10.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170430/f8f82e8d/attachment.sig>
