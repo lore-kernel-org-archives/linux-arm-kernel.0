@@ -1,155 +1,111 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun, 30 Apr 2017 22:56:52 +0200
-Subject: [PATCH 1/3] ARM: dts: rockchip: Move cros-ec-sbs to
- rk3288-veyron-chromebook-sbs
-In-Reply-To: <2369975.a4dWayqU5d@phil>
-References: <20170430183054.24563-1-contact@paulk.fr> <2369975.a4dWayqU5d@phil>
-Message-ID: <1493585812.6493.4.camel@paulk.fr>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 30 Apr 2017 14:10:33 -0700
+Subject: [PATCH v5 21/22] KVM: arm64: vgic-its: Fix pending table sync
+In-Reply-To: <1492164934-988-22-git-send-email-eric.auger@redhat.com>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-22-git-send-email-eric.auger@redhat.com>
+Message-ID: <20170430211033.GD1499@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le dimanche 30 avril 2017 ? 22:37 +0200, Heiko Stuebner a ?crit?:
-> Hi Paul,
+On Fri, Apr 14, 2017 at 12:15:33PM +0200, Eric Auger wrote:
+> In its_sync_lpi_pending_table() we currently ignore the
+> target_vcpu of the LPIs. We sync the pending bit found in
+> the vcpu pending table even if the LPI is not targeting it.
 > 
-> Am Sonntag, 30. April 2017, 20:30:52 CEST schrieb Paul Kocialkowski:
-> > This moves the cros-ec-sbs dtsi to a new rk3288-veyron-chromebook-sbs
-> > dtsi since it only concerns rk3288 veyron Chromebooks.
-> > 
-> > Other Chromebooks (such as the tegra124 nyans) also have sbs batteries
-> > and don't use this dtsi, that only makes sense when used with
-> > rk3288-veyron-chromebook anyway.
+> Also in vgic_its_cmd_handle_invall() we are supposed to
+> read the config table data for the LPIs associated to the
+> collection ID. At the moment we refresh all LPI config
+> information.
 > 
-> That isn't true. The gru series (rk3399-based) also uses the
-> sbs-battery [0]. And while it is currently limited to Rockchip-based
-> Chromebooks it is nevertheless used on more than one platform, so
-> the probability is high that it will be used in future series as well.
-
-That's good to know, but as pointed out, other cros devices are using a sbs
-battery without this header, so such a generic name isn't really a good fit.
-
-Note that &charger has to be defined (after my subsequent patches), which it is
-for devices that also include rk3288-veyron-chromebook, but not necessarily
-others.
-
-Overall, I think having one -sbs dtsi file makes sense here because there is
-already a rk3288-veyron-chromebook dtsi that veyron chromebooks use. That file
-cannot contain the battery bindings because minnie has a different one and it
-would be a bit silly to copy it over all devices. That definitely makes sense.
-
-As for other devices, I don't see why we should have a separate include file for
-the battery instead of having it in the device's dts.?I think this should be the
-case on gru/kevin.
-
-Also maybe not *all* gru-based devices will turn out to use a SBS battery, so it
-seems early to include this header in the gru dtsi. One last point, gru/kevin
-currently don't define a charger, which will break my subsequent patch (that is
-however needed for the veyrons that use this file).
-
-To me, it seems that there's little advantage and major drawbacks in keeping
-this file the way it is.
-
-> Also, it might be nice to also include some Chromeos people (there should
-> be some in the git logs, like Brian who submitted the Gru patches), as they
-> might be able to provide more detailed input.
-
-That's a good point, thanks for including them.
-
+> This patch passes a vpcu to vgic_copy_lpi_list() so that
+> this latter returns a snapshot of the LPIs targeting this
+> CPU and only those.
 > 
-> Heiko
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 24 ++++++++++++------------
+>  1 file changed, 12 insertions(+), 12 deletions(-)
 > 
-> [0] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/a
-> rch/arm64/boot/dts/rockchip/rk3399-gru.dtsi#n886
-> 
-> > 
-> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> > ---
-> > ?.../boot/dts/{cros-ec-sbs.dtsi => rk3288-veyron-chromebook-sbs.dtsi}????| 0
-> > ?arch/arm/boot/dts/rk3288-veyron-jaq.dts?????????????????????????????????| 2
-> > +-
-> > ?arch/arm/boot/dts/rk3288-veyron-jerry.dts???????????????????????????????| 2
-> > +-
-> > ?arch/arm/boot/dts/rk3288-veyron-pinky.dts???????????????????????????????| 2
-> > +-
-> > ?arch/arm/boot/dts/rk3288-veyron-speedy.dts??????????????????????????????| 2
-> > +-
-> > ?5 files changed, 4 insertions(+), 4 deletions(-)
-> > ?rename arch/arm/boot/dts/{cros-ec-sbs.dtsi => rk3288-veyron-chromebook-
-> > sbs.dtsi} (100%)
-> > 
-> > diff --git a/arch/arm/boot/dts/cros-ec-sbs.dtsi b/arch/arm/boot/dts/rk3288-
-> > veyron-chromebook-sbs.dtsi
-> > similarity index 100%
-> > rename from arch/arm/boot/dts/cros-ec-sbs.dtsi
-> > rename to arch/arm/boot/dts/rk3288-veyron-chromebook-sbs.dtsi
-> > diff --git a/arch/arm/boot/dts/rk3288-veyron-jaq.dts
-> > b/arch/arm/boot/dts/rk3288-veyron-jaq.dts
-> > index d33f5763c39c..f217a978e47a 100644
-> > --- a/arch/arm/boot/dts/rk3288-veyron-jaq.dts
-> > +++ b/arch/arm/boot/dts/rk3288-veyron-jaq.dts
-> > @@ -45,7 +45,7 @@
-> > ?/dts-v1/;
-> > ?
-> > ?#include "rk3288-veyron-chromebook.dtsi"
-> > -#include "cros-ec-sbs.dtsi"
-> > +#include "rk3288-veyron-chromebook-sbs.dtsi"
-> > ?
-> > ?/ {
-> > ?	model = "Google Jaq";
-> > diff --git a/arch/arm/boot/dts/rk3288-veyron-jerry.dts
-> > b/arch/arm/boot/dts/rk3288-veyron-jerry.dts
-> > index cdea751f2a8c..bec607574165 100644
-> > --- a/arch/arm/boot/dts/rk3288-veyron-jerry.dts
-> > +++ b/arch/arm/boot/dts/rk3288-veyron-jerry.dts
-> > @@ -44,7 +44,7 @@
-> > ?
-> > ?/dts-v1/;
-> > ?#include "rk3288-veyron-chromebook.dtsi"
-> > -#include "cros-ec-sbs.dtsi"
-> > +#include "rk3288-veyron-chromebook-sbs.dtsi"
-> > ?
-> > ?/ {
-> > ?	model = "Google Jerry";
-> > diff --git a/arch/arm/boot/dts/rk3288-veyron-pinky.dts
-> > b/arch/arm/boot/dts/rk3288-veyron-pinky.dts
-> > index 995cff42fa43..c81ad5bf1121 100644
-> > --- a/arch/arm/boot/dts/rk3288-veyron-pinky.dts
-> > +++ b/arch/arm/boot/dts/rk3288-veyron-pinky.dts
-> > @@ -44,7 +44,7 @@
-> > ?
-> > ?/dts-v1/;
-> > ?#include "rk3288-veyron-chromebook.dtsi"
-> > -#include "cros-ec-sbs.dtsi"
-> > +#include "rk3288-veyron-chromebook-sbs.dtsi"
-> > ?
-> > ?/ {
-> > ?	model = "Google Pinky";
-> > diff --git a/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-> > b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-> > index cc0b78cefe34..8aea9c3ff6e2 100644
-> > --- a/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-> > +++ b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-> > @@ -44,7 +44,7 @@
-> > ?
-> > ?/dts-v1/;
-> > ?#include "rk3288-veyron-chromebook.dtsi"
-> > -#include "cros-ec-sbs.dtsi"
-> > +#include "rk3288-veyron-chromebook-sbs.dtsi"
-> > ?
-> > ?/ {
-> > ?	model = "Google Speedy";
-> > 
-> 
-> 
--- 
-Paul Kocialkowski, developer of free digital technology and hardware support
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 86dfc6c..be848be 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -252,13 +252,13 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+>  }
+>  
+>  /*
+> - * Create a snapshot of the current LPI list, so that we can enumerate all
+> - * LPIs without holding any lock.
+> - * Returns the array length and puts the kmalloc'ed array into intid_ptr.
+> + * Create a snapshot of the current LPIs targeting @vcpu, so that we can
+> + * enumerate those LPIs without holding any lock.
+> + * Returns their number and puts the kmalloc'ed array into intid_ptr.
+>   */
+> -static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
+> +static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
+>  {
+> -	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>  	struct vgic_irq *irq;
+>  	u32 *intids;
+>  	int irq_count = dist->lpi_list_count, i = 0;
+> @@ -277,14 +277,14 @@ static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
+>  	spin_lock(&dist->lpi_list_lock);
+>  	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+>  		/* We don't need to "get" the IRQ, as we hold the list lock. */
+> -		intids[i] = irq->intid;
+> -		if (++i == irq_count)
+> -			break;
+> +		if (irq->target_vcpu != vcpu)
+> +			continue;
+> +		intids[i++] = irq->intid;
 
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170430/3d522370/attachment-0001.sig>
+were we checking the ++i == irq_count condition for no good reason
+before since we can just drop it now?
+
+>  	}
+>  	spin_unlock(&dist->lpi_list_lock);
+>  
+>  	*intid_ptr = intids;
+> -	return irq_count;
+> +	return i;
+>  }
+>  
+>  /*
+> @@ -333,7 +333,7 @@ static u32 max_lpis_propbaser(u64 propbaser)
+>  }
+>  
+>  /*
+> - * Scan the whole LPI pending table and sync the pending bit in there
+> + * Sync the pending table pending bit of LPIs targeting @vcpu
+>   * with our own data structures. This relies on the LPI being
+>   * mapped before.
+>   */
+> @@ -346,7 +346,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+>  	u32 *intids;
+>  	int nr_irqs, i;
+>  
+> -	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, &intids);
+> +	nr_irqs = vgic_copy_lpi_list(vcpu, &intids);
+>  	if (nr_irqs < 0)
+>  		return nr_irqs;
+>  
+> @@ -1027,7 +1027,7 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
+>  
+>  	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
+>  
+> -	irq_count = vgic_copy_lpi_list(kvm, &intids);
+> +	irq_count = vgic_copy_lpi_list(vcpu, &intids);
+>  	if (irq_count < 0)
+>  		return irq_count;
+>  
+> -- 
+> 2.5.5
+> 
+
+Assuming that it's ok to remove the irq_count check above, the rest of
+this patch looks good to me.
+
+Thanks,
+-Christoffer
