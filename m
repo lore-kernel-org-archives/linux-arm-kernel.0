@@ -1,52 +1,88 @@
-From: oss@buserror.net (Scott Wood)
-Date: Sat, 29 Apr 2017 18:32:55 -0500
-Subject: [PATCH] drivers:soc:fsl:qbman:qman.c: unsigned long jiffies value.
-In-Reply-To: <1493498620-9975-1-git-send-email-karim.eshapa@gmail.com>
-References: <1493495164-8658-1-git-send-email-karim.eshapa@gmail.com>
- <1493498620-9975-1-git-send-email-karim.eshapa@gmail.com>
-Message-ID: <1493508775.25397.26.camel@buserror.net>
+From: karim.eshapa@gmail.com (Karim Eshapa)
+Date: Sun, 30 Apr 2017 03:09:26 +0200
+Subject: drivers:soc:fsl:qbman:qman.c: unsigned long jiffies value
+In-Reply-To: <1493508775.25397.26.camel@buserror.net>
+References: <1493508775.25397.26.camel@buserror.net>
+Message-ID: <1493514566-12920-1-git-send-email-karim.eshapa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2017-04-29 at 22:43 +0200, Karim Eshapa wrote:
-> unsigned long jiffies value sorry for that.
+On Sat, 29 Apr 2017 18:32:55 -0500, Scott Wood wrote:
+>On Sat, 2017-04-29 at 22:43 +0200, Karim Eshapa wrote:
+>
+>> unsigned long jiffies value sorry for that.
+>>
+> You mean unsigned long msecs?
+>
 
-You mean unsigned long msecs?
+Yes, I mean usecs. 
 
-> 
-> Signed-off-by: Karim Eshapa <karim.eshapa@gmail.com>
-> ---
-> ?drivers/soc/fsl/qbman/qman.c | 2 +-
-> ?1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
-> index e0df4d1..6e1a44a 100644
-> --- a/drivers/soc/fsl/qbman/qman.c
-> +++ b/drivers/soc/fsl/qbman/qman.c
-> @@ -1084,7 +1084,7 @@ static int drain_mr_fqrni(struct qm_portal *p)
-> ?		?* entries well before the ring has been fully consumed, so
-> ?		?* we're being *really* paranoid here.
-> ?		?*/
-> -		unsigned int udel_time = jiffies_to_usecs(10000);
-> +		unsigned long udel_time = jiffies_to_usecs(10000);
-> ?
-> ?		usleep_range(udel_time/2, udel_time);
-> ?		msg = qm_mr_current(p);
+>>
+>> Signed-off-by: Karim Eshapa <karim.eshapa@gmail.com>
+>> ---
+>>  drivers/soc/fsl/qbman/qman.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
+>> index e0df4d1..6e1a44a 100644
+>> --- a/drivers/soc/fsl/qbman/qman.c
+>> +++ b/drivers/soc/fsl/qbman/qman.c
+>> @@ -1084,7 +1084,7 @@ static int drain_mr_fqrni(struct qm_portal *p)
+>>                * entries well before the ring has been fully consumed, so
+>>                * we're being *really* paranoid here.
+>>                */
+>> -             unsigned int udel_time = jiffies_to_usecs(10000);
+>> +             unsigned long udel_time = jiffies_to_usecs(10000);
+>>  
+>>               usleep_range(udel_time/2, udel_time);
+>>               msg = qm_mr_current(p);
 
-If unsigned int isn't big enough, then unsigned long won't be either on 32-
-bit.  With such a long delay why not use msleep()?
+>If unsigned int isn't big enough, then unsigned long won't be either on 32-
+>bit.  With such a long delay why not use msleep()?
+>
 
-As for the previous patch[1], you're halving the minimum timeout which may not
-be correct.
+I agree with you in long int.
+After looking at Documentation/timers/timers-howto.txt I think
+the msleep() is better as we actually have long delay.
+may be we can use jiffies_to_msecs() with msleep() in case of we still have 
+this large jiffies difference.
 
-For the NXP people: Is there *really* no better way to handle this than
-waiting for so long?  Nothing that can be checked to exit the loop early (at
-least, you could exit early if there is more work to do so only the final
-iteration takes the full timeout)?  And why is the desired timeout specified
-in jiffies, the duration of which can change based on kernel config and
-doesn't reflect anything about the hardware?
+>As for the previous patch[1], you're halving the minimum timeout which may not
+>be correct.
+>
+>
 
--Scott
+For the minimum timeout, I've read the following comments.
 
-[1] When fixing a patch you've already posted that hasn't yet been applied,
-send a replacement (v2) patch rather than a separate fix.
+		 /*
+                  * if MR was full and h/w had other FQRNI entries to produce, we
+                  * need to allow it time to produce those entries once the
+                  * existing entries are consumed. A worst-case situation
+                  * (fully-loaded system) means h/w sequencers may have to do 3-4
+                  * other things before servicing the portal's MR pump, each of
+                  * which (if slow) may take ~50 qman cycles (which is ~200
+                  * processor cycles). So rounding up and then multiplying this
+                  * worst-case estimate by a factor of 10, just to be
+                  * ultra-paranoid, goes as high as 10,000 cycles. NB, we consume
+                  * one entry at a time, so h/w has an opportunity to produce new
+                  * entries well before the ring has been fully consumed, so
+                  * we're being *really* paranoid here.
+		  */
+		  u64 now, then = jiffies;
+		
+		do {
+	                now = jiffies;
+                 } while ((then + 10000) > now);  
+
+He needs to guarantee certain action so, he made a very large factor of saftey
+therefore I've used sleep in range with approximate delay. But we still need 
+the driver owner to define appropriate value to put.
+
+>[1] When fixing a patch you've already posted that hasn't yet been applied,
+>send a replacement (v2) patch rather than a separate fix.
+>
+
+Thanks so much, I'm just newbies :)
+
+
+Karim   
