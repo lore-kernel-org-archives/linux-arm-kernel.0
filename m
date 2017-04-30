@@ -1,42 +1,197 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 30 Apr 2017 12:25:28 +0800
-Subject: [PATCH v1 1/2] PCI: mediatek: Add Mediatek PCIe host controller
- support
-In-Reply-To: <1493370634-7038-2-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <201704301228.Kg86siTz%fengguang.wu@intel.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Sun, 30 Apr 2017 13:37:56 +0800
+Subject: [PATCH v3 2/3] arm64: kvm: inject SError with virtual syndrome
+In-Reply-To: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
+References: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1493530677-4919-2-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryder,
+when SError happen, kvm notifies kvmtool to generate GHES table
+to record the error, then kvmtools inject the SError with specified
+virtual syndrome. when switch to guest, a virtual SError will happen with
+this specified syndrome.
 
-[auto build test ERROR on pci/next]
-[also build test ERROR on v4.11-rc8 next-20170428]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Ryder-Lee/Add-PCIe-host-driver-support-for-Mediatek-SoCs/20170429-181028
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
-config: xtensa-allmodconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 4.9.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
-
-All errors (new ones prefixed by >>):
-
-   drivers/built-in.o: In function `pci_host_bridge_of_msi_domain':
->> (.text+0x2f154): undefined reference to `pci_fixup_irqs'
-   drivers/built-in.o: In function `mtk_pcie_probe':
-   pcie-mediatek.c:(.text+0x2f956): undefined reference to `pci_fixup_irqs'
-
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 49161 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170430/e036f722/attachment-0001.gz>
+ arch/arm64/include/asm/esr.h         |  2 ++
+ arch/arm64/include/asm/kvm_emulate.h | 10 ++++++++++
+ arch/arm64/include/asm/kvm_host.h    |  1 +
+ arch/arm64/include/asm/sysreg.h      |  3 +++
+ arch/arm64/kvm/handle_exit.c         | 25 +++++++++++++++++++------
+ arch/arm64/kvm/hyp/switch.c          | 15 ++++++++++++++-
+ include/uapi/linux/kvm.h             |  5 +++++
+ 7 files changed, 54 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 22f9c90..d009c99 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -127,6 +127,8 @@
+ #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
+ #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
+ 
++#define VSESR_ELx_IDS_ISS_MASK    ((1UL << 25) - 1)
++
+ /* ESR value templates for specific events */
+ 
+ /* BRK instruction trap from AArch64 state */
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index f5ea0ba..a3259a9 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -148,6 +148,16 @@ static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
+ 	return vcpu->arch.fault.esr_el2;
+ }
+ 
++static inline u32 kvm_vcpu_get_vsesr(const struct kvm_vcpu *vcpu)
++{
++		return vcpu->arch.fault.vsesr_el2;
++}
++
++static inline void kvm_vcpu_set_vsesr(struct kvm_vcpu *vcpu, unsigned long val)
++{
++		vcpu->arch.fault.vsesr_el2 = val;
++}
++
+ static inline int kvm_vcpu_get_condition(const struct kvm_vcpu *vcpu)
+ {
+ 	u32 esr = kvm_vcpu_get_hsr(vcpu);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index e7705e7..84ed239 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -86,6 +86,7 @@ struct kvm_vcpu_fault_info {
+ 	u32 esr_el2;		/* Hyp Syndrom Register */
+ 	u64 far_el2;		/* Hyp Fault Address Register */
+ 	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
++	u32 vsesr_el2;		/* Virtual SError Exception Syndrome Register */
+ };
+ 
+ /*
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 32964c7..b6afb7a 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -125,6 +125,9 @@
+ #define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
+ #define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
+ 
++#define VSESR_EL2			sys_reg(3, 4, 5, 2, 3)
++
++
+ #define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
+ 				      (!!x)<<8 | 0x1f)
+ #define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index c89d83a..3d024a9 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -180,7 +180,11 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+ 
+ static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	unsigned long fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
++	unsigned long hva, fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
++	struct kvm_memory_slot *memslot;
++	int hsr, ret = 1;
++	bool writable;
++	gfn_t gfn;
+ 
+ 	if (handle_guest_sei((unsigned long)fault_ipa,
+ 				kvm_vcpu_get_hsr(vcpu))) {
+@@ -190,9 +194,20 @@ static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 				(unsigned long)kvm_vcpu_get_hsr(vcpu));
+ 
+ 		kvm_inject_vabt(vcpu);
++	} else {
++		hsr = kvm_vcpu_get_hsr(vcpu);
++
++		gfn = fault_ipa >> PAGE_SHIFT;
++		memslot = gfn_to_memslot(vcpu->kvm, gfn);
++		hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
++
++		run->exit_reason = KVM_EXIT_INTR;
++		run->intr.syndrome_info = hsr;
++		run->intr.address = hva;
++		ret = 0;
+ 	}
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ /*
+@@ -218,8 +233,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 			*vcpu_pc(vcpu) -= adj;
+ 		}
+ 
+-		kvm_handle_guest_sei(vcpu, run);
+-		return 1;
++		return kvm_handle_guest_sei(vcpu, run);
+ 	}
+ 
+ 	exception_index = ARM_EXCEPTION_CODE(exception_index);
+@@ -228,8 +242,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	case ARM_EXCEPTION_IRQ:
+ 		return 1;
+ 	case ARM_EXCEPTION_EL1_SERROR:
+-		kvm_handle_guest_sei(vcpu, run);
+-		return 1;
++		return kvm_handle_guest_sei(vcpu, run);
+ 	case ARM_EXCEPTION_TRAP:
+ 		/*
+ 		 * See ARM ARM B1.14.1: "Hyp traps on instructions
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index aede165..ded6211 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -86,6 +86,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 		isb();
+ 	}
+ 	write_sysreg(val, hcr_el2);
++    /* If virtual System Error or Asynchronous Abort is pending. set
++     * the virtual exception syndrome information
++     */
++	if (cpus_have_cap(ARM64_HAS_RAS_EXTN) &&
++			(vcpu->arch.hcr_el2 & HCR_VSE))
++		write_sysreg_s(vcpu->arch.fault.vsesr_el2, VSESR_EL2);
++
+ 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+ 	write_sysreg(1 << 15, hstr_el2);
+ 	/*
+@@ -139,9 +146,15 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ 	 * the crucial bit is "On taking a vSError interrupt,
+ 	 * HCR_EL2.VSE is cleared to 0."
+ 	 */
+-	if (vcpu->arch.hcr_el2 & HCR_VSE)
++	if (vcpu->arch.hcr_el2 & HCR_VSE) {
+ 		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
+ 
++		if (cpus_have_cap(ARM64_HAS_RAS_EXTN)) {
++			/* set vsesr_el2[24:0] with esr_el2[24:0] */
++			kvm_vcpu_set_vsesr(vcpu, read_sysreg_el2(esr)
++					& VSESR_ELx_IDS_ISS_MASK);
++		}
++	}
+ 	__deactivate_traps_arch()();
+ 	write_sysreg(0, hstr_el2);
+ 	write_sysreg(0, pmuserenr_el0);
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 27fe556..bb02909 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -360,6 +360,11 @@ struct kvm_run {
+ 		struct {
+ 			__u8 vector;
+ 		} eoi;
++		/* KVM_EXIT_INTR */
++		struct {
++			__u32 syndrome_info;
++			__u64 address;
++		} intr;
+ 		/* KVM_EXIT_HYPERV */
+ 		struct kvm_hyperv_exit hyperv;
+ 		/* Fix the size of the union. */
+-- 
+2.10.1
