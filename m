@@ -1,60 +1,213 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Sun, 30 Apr 2017 13:37:55 +0800
-Subject: [PATCH v3 1/3] arm64: kvm: support kvmtool to detect RAS extension
- feature
-Message-ID: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
+Date: Sun, 30 Apr 2017 13:35:05 +0800
+Subject: [PATCH v3 3/4] target-arm: kvm64: handle SIGBUS signal for
+ synchronous External Abort
+In-Reply-To: <1493530506-26833-1-git-send-email-gengdongjiu@huawei.com>
+References: <1493530506-26833-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1493530506-26833-3-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle kvmtool's detection for RAS extension, because sometimes
-the APP needs to know the CPU's capacity
+If RAS extension feature exists, when guest OS happen synchronous
+External Abort, a SIGBUS signal will be delivered from the kvm.
+so handle this signal, generate GHES record and inject this
+abort to notify guest. then guest can handle this abort
+
+The Synchronous External Abort mainly includes below two types:
+1. Error on memory access, such as hwpoison. the SIGBUS si_code is
+   BUS_MCEERR_AR or BUS_MCEERR_OR
+2. Error on translation table walk or hardware update of translation table.
+   The SIGBUS si_code is 0
 
 Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 ---
- arch/arm64/kvm/reset.c   | 11 +++++++++++
- include/uapi/linux/kvm.h |  1 +
- 2 files changed, 12 insertions(+)
+ include/sysemu/kvm.h      |  2 +-
+ linux-headers/linux/kvm.h |  3 +++
+ target/arm/kvm.c          | 34 +++++++++++++++++++++++++++
+ target/arm/kvm64.c        | 60 +++++++++++++++++++++++++++++++++++++++++++++++
+ target/arm/kvm_arm.h      |  1 +
+ 5 files changed, 99 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index d9e9697..1004039 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
- 	return !!(pfr0 & 0x20);
+diff --git a/include/sysemu/kvm.h b/include/sysemu/kvm.h
+index 24281fc..feef990 100644
+--- a/include/sysemu/kvm.h
++++ b/include/sysemu/kvm.h
+@@ -354,7 +354,7 @@ bool kvm_vcpu_id_is_valid(int vcpu_id);
+ /* Returns VCPU ID to be used on KVM_CREATE_VCPU ioctl() */
+ unsigned long kvm_arch_vcpu_id(CPUState *cpu);
+ 
+-#ifdef TARGET_I386
++#if defined(TARGET_I386) || defined(TARGET_AARCH64)
+ #define KVM_HAVE_MCE_INJECTION 1
+ void kvm_arch_on_sigbus_vcpu(CPUState *cpu, int code, void *addr);
+ #endif
+diff --git a/linux-headers/linux/kvm.h b/linux-headers/linux/kvm.h
+index e0fa5b8..c985e10 100644
+--- a/linux-headers/linux/kvm.h
++++ b/linux-headers/linux/kvm.h
+@@ -1301,6 +1301,9 @@ struct kvm_s390_ucas_mapping {
+ #define KVM_S390_GET_IRQ_STATE	  _IOW(KVMIO, 0xb6, struct kvm_s390_irq_state)
+ /* Available with KVM_CAP_X86_SMM */
+ #define KVM_SMI                   _IO(KVMIO,   0xb7)
++/* Available with KVM_CAP_ARM_RAS_EXTENSION */
++#define KVM_ARM_SEA                 _IO(KVMIO,   0xb8)
++
+ 
+ #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
+ #define KVM_DEV_ASSIGN_PCI_2_3		(1 << 1)
+diff --git a/target/arm/kvm.c b/target/arm/kvm.c
+index 4555468..bf6ee4c 100644
+--- a/target/arm/kvm.c
++++ b/target/arm/kvm.c
+@@ -129,6 +129,39 @@ void kvm_arm_destroy_scratch_host_vcpu(int *fdarray)
+     }
  }
  
-+static bool kvm_arm_support_ras_extension(void)
-+{
-+	u64 pfr0;
++typedef struct HWPoisonPage {
++    ram_addr_t ram_addr;
++    QLIST_ENTRY(HWPoisonPage) list;
++} HWPoisonPage;
 +
-+	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
-+	return !!(pfr0 & 0x10000000);
++static QLIST_HEAD(, HWPoisonPage) hwpoison_page_list =
++    QLIST_HEAD_INITIALIZER(hwpoison_page_list);
++
++static void kvm_unpoison_all(void *param)
++{
++    HWPoisonPage *page, *next_page;
++
++    QLIST_FOREACH_SAFE(page, &hwpoison_page_list, list, next_page) {
++        QLIST_REMOVE(page, list);
++        qemu_ram_remap(page->ram_addr, TARGET_PAGE_SIZE);
++        g_free(page);
++    }
 +}
 +
- /**
-  * kvm_arch_dev_ioctl_check_extension
-  *
-@@ -87,6 +95,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ARM_PMU_V3:
- 		r = kvm_arm_support_pmu_v3();
- 		break;
-+	case KVM_CAP_ARM_RAS_EXTENSION:
-+		r = kvm_arm_support_ras_extension();
-+		break;
- 	case KVM_CAP_SET_GUEST_DEBUG:
- 	case KVM_CAP_VCPU_ATTRIBUTES:
- 		r = 1;
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index f51d508..27fe556 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
- #define KVM_CAP_PPC_MMU_RADIX 134
- #define KVM_CAP_PPC_MMU_HASH_V3 135
- #define KVM_CAP_IMMEDIATE_EXIT 136
-+#define KVM_CAP_ARM_RAS_EXTENSION 137
++void kvm_hwpoison_page_add(ram_addr_t ram_addr)
++{
++    HWPoisonPage *page;
++
++    QLIST_FOREACH(page, &hwpoison_page_list, list) {
++        if (page->ram_addr == ram_addr) {
++            return;
++        }
++    }
++    page = g_new(HWPoisonPage, 1);
++    page->ram_addr = ram_addr;
++    QLIST_INSERT_HEAD(&hwpoison_page_list, page, list);
++}
++
+ static void kvm_arm_host_cpu_class_init(ObjectClass *oc, void *data)
+ {
+     ARMHostCPUClass *ahcc = ARM_HOST_CPU_CLASS(oc);
+@@ -176,6 +209,7 @@ int kvm_arch_init(MachineState *ms, KVMState *s)
  
- #ifdef KVM_CAP_IRQ_ROUTING
+     cap_has_mp_state = kvm_check_extension(s, KVM_CAP_MP_STATE);
  
++    qemu_register_reset(kvm_unpoison_all, NULL);
+     type_register_static(&host_arm_cpu_type_info);
+ 
+     return 0;
+diff --git a/target/arm/kvm64.c b/target/arm/kvm64.c
+index fd30a5a..5eee6f4 100644
+--- a/target/arm/kvm64.c
++++ b/target/arm/kvm64.c
+@@ -27,6 +27,8 @@
+ #include "kvm_arm.h"
+ #include "internals.h"
+ #include "hw/arm/arm.h"
++#include "hw/acpi/acpi-defs.h"
++#include "hw/acpi/hest_ghes.h"
+ 
+ static bool have_guest_debug;
+ 
+@@ -590,6 +592,21 @@ int kvm_arm_cpreg_level(uint64_t regidx)
+     return KVM_PUT_RUNTIME_STATE;
+ }
+ 
++static int kvm_inject_arm_sea(ARMCPU *cpu)
++{
++    CPUState *cs = CPU(cpu);
++    if (cs->exception_index == EXCP_DATA_ABORT) {
++        cs->exception_index = -1;
++        /* Here use a new ioctl KVM_ARM_SEA instead of KVM_SET_ONE_REG,
++         * Becuase kernel has direct injection interface, so simplify
++         * the logic to use kernel interface
++         */
++        return  kvm_vcpu_ioctl(CPU(cpu), KVM_ARM_SEA);
++    }
++
++    return 0;
++}
++
+ #define AARCH64_CORE_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U64 | \
+                  KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
+ 
+@@ -735,6 +752,13 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+         return EINVAL;
+     }
+ 
++    if (arm_feature(env, ARM_FEATURE_RAS_EXTENSION)) {
++        ret = kvm_inject_arm_sea(cpu);
++        if (ret < 0) {
++            return ret;
++        }
++    }
++
+     kvm_arm_sync_mpstate_to_kvm(cpu);
+ 
+     return ret;
+@@ -887,6 +911,42 @@ int kvm_arch_get_registers(CPUState *cs)
+     return ret;
+ }
+ 
++void kvm_arch_on_sigbus_vcpu(CPUState *c, int code, void *addr)
++{
++    ARMCPU *cpu = ARM_CPU(c);
++    CPUARMState *env = &cpu->env;
++
++    ram_addr_t ram_addr;
++    hwaddr paddr;
++
++    if (arm_feature(env, ARM_FEATURE_RAS_EXTENSION) && addr) {
++        ram_addr = qemu_ram_addr_from_host(addr);
++        if (ram_addr != RAM_ADDR_INVALID &&
++            kvm_physical_memory_addr_from_host(c->kvm_state, addr, &paddr)) {
++            /* For the hardware error, some are hwpoison errors, some
++             * are other errors, such as translation table walk or hardware
++             * update of translation table. For the hwpoison, the si_code
++             * is BUS_MCEERR_AR or BUS_MCEERR_AO, other errors are 0
++             */
++            if (code == BUS_MCEERR_AR || code == BUS_MCEERR_AO) {
++                kvm_hwpoison_page_add(ram_addr);
++            }
++            ghes_update_guest(ACPI_HEST_NOTIFY_SEA, paddr);
++            c->exception_index = EXCP_DATA_ABORT;
++            kvm_cpu_synchronize_state(c);
++            return;
++        }
++
++        fprintf(stderr, "Hardware memory error for memory used by "
++                "QEMU itself instead of guest system!\n");
++    }
++
++    if (code == BUS_MCEERR_AR) {
++        fprintf(stderr, "Hardware memory error!\n");
++        exit(1);
++    }
++}
++
+ /* C6.6.29 BRK instruction */
+ static const uint32_t brk_insn = 0xd4200000;
+ 
+diff --git a/target/arm/kvm_arm.h b/target/arm/kvm_arm.h
+index 633d088..7cdde97 100644
+--- a/target/arm/kvm_arm.h
++++ b/target/arm/kvm_arm.h
+@@ -288,4 +288,5 @@ static inline const char *its_class_name(void)
+     }
+ }
+ 
++void kvm_hwpoison_page_add(ram_addr_t ram_addr);
+ #endif
 -- 
-2.10.1
+1.8.3.1
