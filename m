@@ -1,61 +1,42 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 29 Apr 2017 20:37:49 -0700
-Subject: Updating kernel.org cross compilers?
-In-Reply-To: <92b5ff36-ad2b-10bc-de4f-4774babd9625@arm.com>
-References: <92b5ff36-ad2b-10bc-de4f-4774babd9625@arm.com>
-Message-ID: <36993be3-c40e-3882-5f20-f8ea1a3916bf@roeck-us.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 30 Apr 2017 12:25:28 +0800
+Subject: [PATCH v1 1/2] PCI: mediatek: Add Mediatek PCIe host controller
+ support
+In-Reply-To: <1493370634-7038-2-git-send-email-ryder.lee@mediatek.com>
+Message-ID: <201704301228.Kg86siTz%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2017 07:14 AM, Andre Przywara wrote:
-> Hi!
->
-> (Tony: I've seen you redirecting to "Chris" in an older email, but the
-> web archive doesn't have his email address)
->
-> It seems that many people (even outside the Linux kernel community) use
-> the cross compilers provided at kernel.org/pub/tools/crosstool.
-> The latest compiler I find there is 4.9.0, which celebrated its third
-> birthday at the weekend, also has been superseded by 4.9.4 meanwhile.
->
-> So I took Segher's buildall scripts from [1] and threw binutils 2.28 and
-> GCC 6.3.0 at them. After removing --enable-sjlj-exceptions from
-> build-gcc and adding --disable-multilib (for building x86-64 on a x86-64
-> box without 32-bit libs) I was able to build (bare-metal) toolchains for
-> all architectures except arc, m68k, tilegx and tilepro.
-> Now my understanding is that a baremetal/stage 1 compiler should be
-> build with "all-gcc" instead of the implicit "all" make target, and
-> "install-gcc" instead of "install". And indeed adding this to build-gcc
-> makes all toolchains build now - except arc, which needs an explicit
-> "--with-cpu=arc700" on the GCC configure command line.
->
-> So after those changes, the sequence:
-> $ ./buildall --toolchain
-> $ PATH=$PATH:/opt/cross/bin
-> $ ./buildall --kernel
-> worked reasonably well for me (binutils 2.28, GCC 6.3.0, Linux 4.11-rc8
-> on an Intel host with Ubuntu 14.04.5). Just tilegx/pro is still broken
-> due to toolchain issues.
->
-Those need libgcc, and to build libgcc you'll have to install the kernel
-header files. Same is true for cris (and possibly others).
+Hi Ryder,
 
-Also, crisv32 builds as well.
+[auto build test ERROR on pci/next]
+[also build test ERROR on v4.11-rc8 next-20170428]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> So I wonder what the process is to get those compilers updated?
->
-If you find out let me know.
+url:    https://github.com/0day-ci/linux/commits/Ryder-Lee/Add-PCIe-host-driver-support-for-Mediatek-SoCs/20170429-181028
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
+config: xtensa-allmodconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 4.9.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=xtensa 
 
-Guenter
+All errors (new ones prefixed by >>):
 
-> And what is a good build setup, so that the binaries run on as many
-> systems as possible?
->
-> Also the web page (https://www.kernel.org/pub/tools/crosstool) seems to
-> only link outdated builds (4.6.3, mostly), is that on purpose?
->
-> Cheers,
-> Andre.
->
-> [1] http://git.infradead.org/users/segher/buildall.git/
->
+   drivers/built-in.o: In function `pci_host_bridge_of_msi_domain':
+>> (.text+0x2f154): undefined reference to `pci_fixup_irqs'
+   drivers/built-in.o: In function `mtk_pcie_probe':
+   pcie-mediatek.c:(.text+0x2f956): undefined reference to `pci_fixup_irqs'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 49161 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170430/e036f722/attachment-0001.gz>
