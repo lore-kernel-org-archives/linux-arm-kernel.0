@@ -1,44 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 1 May 2017 18:05:53 +0200
-Subject: [PATCH v3 4/5] ARM: sun7i: Convert to CCU
-In-Reply-To: <560676328328d23f344468f5c43ff1b1533f36f0.1493235134.git-series.plaes@plaes.org>
-References: <cover.908ce010a25e503bb5ad0967759c723219c6ed0d.1493235134.git-series.plaes@plaes.org>
- <560676328328d23f344468f5c43ff1b1533f36f0.1493235134.git-series.plaes@plaes.org>
-Message-ID: <20170501160553.fa67agqy5ltpwo7p@lukather>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Mon, 1 May 2017 16:10:19 +0000
+Subject: [PATCH v2] arm64: perf: Use only exclude_kernel attribute when
+ kernel is running in HYP
+In-Reply-To: <20170428163823.GX13675@arm.com>
+References: <20170424154530.GO12323@arm.com>
+ <CAFpQJXWX=0GQ5hse4E_OSdnYhMOA7CvqeoHe9AdMsyoZJmrPQQ@mail.gmail.com>
+ <20170425165259.GS24484@arm.com>
+ <CA+7sy7D-ZB84xQ2pE-io1v7pmnAuWUszh1B=Zq+Ezup=sysQ2g@mail.gmail.com>
+ <CY4PR07MB3415C0CEBB9D3DF0C249DC6793110@CY4PR07MB3415.namprd07.prod.outlook.com>
+ <20170426101021.GF21744@arm.com> <20170426134141.GA6417@localhost>
+ <20170427173758.GN1890@arm.com> <20170428134623.GA85316@localhost>
+ <20170428163823.GX13675@arm.com>
+Message-ID: <20170501161018.GA7112@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Apr 28, 2017 at 05:38:23PM +0100, Will Deacon wrote:
+> Hi guys,
+> 
+> On Fri, Apr 28, 2017 at 01:46:24PM +0000, Jayachandran C wrote:
+> > On Thu, Apr 27, 2017 at 06:37:59PM +0100, Will Deacon wrote:
+> > > > If my understanding is correct, the sysfs suggestion above is going to
+> > > > add API complexity without solving the issue. Ignoring the exclude_hv if
+> > > > it cannot be honored would be a better solution.
+> > > 
+> > > Better for HHVM, sure, but I don't think it's better in general. It means
+> > > that we silently do the opposite of what the user has requested in some
+> > > configurations.
+> > 
+> > If my understanding is correct, when is_kernel_in_hyp_mode() is true,
+> > the kernel is in EL2 and there is no real hypervisor with hvc calls
+> > from kernel. Ignoring the exclude_hv would be correct.
+> > 
+> > When kernel is in EL1, it would be correct to consider exclude_hv to
+> > skip events in EL2 (reached with hvc).
+> > 
+> > I don't see the issue, can you please give more detail on the config
+> > with unexpected behavior?
+> 
+> This got me thinking, so I tried to look at the history of exclude_hv. It
+> turns out it was added in 0475f9ea8e2c ("perf_counters: allow users to
+> count user, kernel and/or hypervisor events") for PowerPC, not x86 (where
+> this doesn't seem to be supported).
+> 
+> Notably, it looks like it's always ignored for the x86 CPU PMU, and ignored
+> on PowerPC when a hypervisor is not present. I think that backs up your
+> suggestion that we should ignore it when is_kernel_in_hyp_mode() is true.
+> 
+> In which case, I withdraw my objection to ignoring exclude_hv when running
+> in hyp mode, but please add a comment explaining the rationale!
 
-On Wed, Apr 26, 2017 at 10:32:24PM +0300, Priit Laes wrote:
->  			compatible = "allwinner,simple-framebuffer",
->  				     "simple-framebuffer";
->  			allwinner,pipeline = "de_be0-lcd0-hdmi";
-> -			clocks = <&ahb_gates 36>, <&ahb_gates 43>,
-> -				 <&ahb_gates 44>, <&de_be0_clk>,
-> -				 <&tcon0_ch1_clk>, <&dram_gates 26>;
-> +			clocks = <&ccu CLK_AHB_LCD0>, <&ccu CLK_AHB_HDMI0>,
-> +				 <&ccu CLK_AHB_DE_BE0>, <&ccu CLK_DE_BE0>,
-> +				 <&ccu CLK_TCON0_CH1>, <&ccu CLK_DRAM_DE_BE0>,
-> +				 <&ccu CLK_HDMI>;
+Thanks, we will send out an updated patch with a commit message summarizing
+this disucssion.
 
-In order to make merging those patches *much* easier, could you just
-use the raw IDs (ie not the defines, but the numbers) for now?
-
-And ideally, send a patch after 4.13-rc1 that will switch to the
-defines.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170501/22a331f8/attachment.sig>
+JC
