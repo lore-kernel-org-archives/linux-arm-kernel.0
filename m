@@ -1,48 +1,46 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  1 May 2017 14:45:02 +0200
-Subject: [PATCH v5 02/20] net: stmmac: add optional setup function
+Date: Mon,  1 May 2017 14:45:04 +0200
+Subject: [PATCH v5 04/20] dt-bindings: syscon: Add DT bindings documentation
+ for Allwinner syscon
 In-Reply-To: <20170501124520.3769-1-clabbe.montjoie@gmail.com>
 References: <20170501124520.3769-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170501124520.3769-3-clabbe.montjoie@gmail.com>
+Message-ID: <20170501124520.3769-5-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of adding more ifthen logic for adding a new mac_device_info
-setup function, it is easier to add a function pointer to the function
-needed.
+This patch adds documentation for Device-Tree bindings for the
+syscon present in allwinner devices.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 4 +++-
- include/linux/stmmac.h                            | 1 +
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/misc/allwinner,syscon.txt     | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-index cd8c601..b82ab64 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-@@ -3947,7 +3947,9 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
- 	struct mac_device_info *mac;
- 
- 	/* Identify the MAC HW device */
--	if (priv->plat->has_gmac) {
-+	if (priv->plat->setup) {
-+		mac = priv->plat->setup(priv);
-+	} else if (priv->plat->has_gmac) {
- 		priv->dev->priv_flags |= IFF_UNICAST_FLT;
- 		mac = dwmac1000_setup(priv->ioaddr,
- 				      priv->plat->multicast_filter_bins,
-diff --git a/include/linux/stmmac.h b/include/linux/stmmac.h
-index 3921cb9..8bb550b 100644
---- a/include/linux/stmmac.h
-+++ b/include/linux/stmmac.h
-@@ -177,6 +177,7 @@ struct plat_stmmacenet_data {
- 	void (*fix_mac_speed)(void *priv, unsigned int speed);
- 	int (*init)(struct platform_device *pdev, void *priv);
- 	void (*exit)(struct platform_device *pdev, void *priv);
-+	struct mac_device_info *(*setup)(void *priv);
- 	void *bsp_priv;
- 	struct clk *stmmac_clk;
- 	struct clk *pclk;
+diff --git a/Documentation/devicetree/bindings/misc/allwinner,syscon.txt b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+new file mode 100644
+index 0000000..cb57691
+--- /dev/null
++++ b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+@@ -0,0 +1,19 @@
++* Allwinner sun8i system controller
++
++This file describes the bindings for the system controller present in
++Allwinner SoC H3, A83T and A64.
++The principal function of this syscon is to control EMAC PHY choice and
++config.
++
++Required properties for the system controller:
++- reg: address and length of the register for the device.
++- compatible: should be "syscon" and one of the following string:
++		"allwinner,sun8i-h3-system-controller"
++		"allwinner,sun50i-a64-system-controller"
++		"allwinner,sun8i-a83t-system-controller"
++
++Example:
++syscon: syscon at 1c00000 {
++	compatible = "allwinner,sun8i-h3-system-controller", "syscon";
++	reg = <0x01c00000 0x1000>;
++};
 -- 
 2.10.2
