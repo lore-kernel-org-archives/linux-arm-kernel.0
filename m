@@ -1,31 +1,32 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  1 May 2017 14:45:18 +0200
-Subject: [PATCH v5 18/20] arm: sunxi: Enable dwmac-sun8i driver on
- sunxi_defconfig
-In-Reply-To: <20170501124520.3769-1-clabbe.montjoie@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 1 May 2017 15:45:58 +0200
+Subject: [PATCH v5 03/20] dt-bindings: net: Add DT bindings documentation
+ for Allwinner dwmac-sun8i
+In-Reply-To: <20170501124520.3769-4-clabbe.montjoie@gmail.com>
 References: <20170501124520.3769-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170501124520.3769-19-clabbe.montjoie@gmail.com>
+ <20170501124520.3769-4-clabbe.montjoie@gmail.com>
+Message-ID: <20170501134558.GC31281@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the dwmac-sun8i driver in the sunxi default configuration
+On Mon, May 01, 2017 at 02:45:03PM +0200, Corentin Labbe wrote:
+> +emac: ethernet at 1c0b000 {
+> +	compatible = "allwinner,sun8i-h3-emac";
+> +	syscon = <&syscon>;
+> +	reg = <0x01c0b000 0x104>;
+> +	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+> +	interrupt-names = "macirq";
+> +	resets = <&ccu RST_BUS_EMAC>;
+> +	reset-names = "stmmaceth";
+> +	clocks = <&ccu CLK_BUS_EMAC>;
+> +	clock-names = "stmmaceth";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	phy = <&int_mii_phy>;
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- arch/arm/configs/sunxi_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Hi Corentin
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 5cd5dd70..504e022 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -40,6 +40,7 @@ CONFIG_ATA=y
- CONFIG_AHCI_SUNXI=y
- CONFIG_NETDEVICES=y
- CONFIG_SUN4I_EMAC=y
-+CONFIG_DWMAC_SUN8I=y
- # CONFIG_NET_VENDOR_ARC is not set
- # CONFIG_NET_CADENCE is not set
- # CONFIG_NET_VENDOR_BROADCOM is not set
--- 
-2.10.2
+Should this be phy-handle?
+
+       Andrew
