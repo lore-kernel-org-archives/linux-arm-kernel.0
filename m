@@ -1,48 +1,34 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 1 May 2017 17:30:10 -0400
-Subject: [PATCH v3 08/11] soc/fsl/qbman: add QMAN_REV32
+Date: Mon, 1 May 2017 17:30:13 -0400
+Subject: [PATCH v3 11/11] fsl/soc/qbman: Enable FSL_LAYERSCAPE config on ARM
 In-Reply-To: <1493674213-963-1-git-send-email-roy.pledge@nxp.com>
 References: <1493674213-963-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1493674213-963-9-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1493674213-963-12-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Madalin Bucur <madalin.bucur@nxp.com>
 
-Add revision 3.2 of the QBMan block.  This is the version
-for LS1043A and LS1046A SoCs.
-
 Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
+Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
+[Stuart: changed to use ARCH_LAYERSCAPE]
+Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
 Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/soc/fsl/qbman/qman_ccsr.c | 2 ++
- drivers/soc/fsl/qbman/qman_priv.h | 1 +
- 2 files changed, 3 insertions(+)
+ drivers/soc/fsl/qbman/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
-index 17a4aaa..af66e63 100644
---- a/drivers/soc/fsl/qbman/qman_ccsr.c
-+++ b/drivers/soc/fsl/qbman/qman_ccsr.c
-@@ -720,6 +720,8 @@ static int fsl_qman_probe(struct platform_device *pdev)
- 		qman_ip_rev = QMAN_REV30;
- 	else if (major == 3 && minor == 1)
- 		qman_ip_rev = QMAN_REV31;
-+	else if (major == 3 && minor == 2)
-+		qman_ip_rev = QMAN_REV32;
- 	else {
- 		dev_err(dev, "Unknown QMan version\n");
- 		return -ENODEV;
-diff --git a/drivers/soc/fsl/qbman/qman_priv.h b/drivers/soc/fsl/qbman/qman_priv.h
-index 1e998ea5..96f58c4 100644
---- a/drivers/soc/fsl/qbman/qman_priv.h
-+++ b/drivers/soc/fsl/qbman/qman_priv.h
-@@ -186,6 +186,7 @@ struct qm_portal_config {
- #define QMAN_REV20 0x0200
- #define QMAN_REV30 0x0300
- #define QMAN_REV31 0x0301
-+#define QMAN_REV32 0x0302
- extern u16 qman_ip_rev; /* 0 if uninitialised, otherwise QMAN_REVx */
- 
- #define QM_FQID_RANGE_START 1 /* FQID 0 reserved for internal use */
+diff --git a/drivers/soc/fsl/qbman/Kconfig b/drivers/soc/fsl/qbman/Kconfig
+index 757033c..fb4e6bf 100644
+--- a/drivers/soc/fsl/qbman/Kconfig
++++ b/drivers/soc/fsl/qbman/Kconfig
+@@ -1,6 +1,6 @@
+ menuconfig FSL_DPAA
+ 	bool "Freescale DPAA 1.x support"
+-	depends on FSL_SOC_BOOKE
++	depends on (FSL_SOC_BOOKE || ARCH_LAYERSCAPE)
+ 	select GENERIC_ALLOCATOR
+ 	help
+ 	  The Freescale Data Path Acceleration Architecture (DPAA) is a set of
 -- 
 2.7.4
