@@ -1,42 +1,31 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 01 May 2017 08:15:17 -0700
-Subject: [PATCH v3 1/2] net: dsa: b53: Add compatible strings for the
- Cygnus-family BCM11360.
-In-Reply-To: <20170430.224852.172293736555378453.davem@davemloft.net>
-References: <20170428222204.7103-1-eric@anholt.net>
- <20170430.224852.172293736555378453.davem@davemloft.net>
-Message-ID: <87k260k3qy.fsf@eliezer.anholt.net>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 1 May 2017 10:46:38 -0500
+Subject: [PATCH 0/9] [v3] arm64: defconfig: enable several options useful
+ for ARM64 server platforms
+In-Reply-To: <1493413563-18375-1-git-send-email-timur@codeaurora.org>
+References: <1493413563-18375-1-git-send-email-timur@codeaurora.org>
+Message-ID: <00b185fa-3fd5-664e-345e-35292d55feb0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Miller <davem@davemloft.net> writes:
+On 04/28/2017 04:05 PM, Timur Tabi wrote:
+> Timur Tabi (9):
+>   [v3] arm64: defconfig: resynchronize the defconfig
+>   arm64: defconfig: enable ACPI_CPPC_CPUFREQ
+>   arm64: defconfig: enable BLK_DEV_NVME
+>   [v2] arm64: defconfig: enable EFI_CAPSULE_LOADER
+>   arm64: defconfig: enable support for PCIe hotplug
+>   arm64: defconfig: enable APEI and GHES features
+>   [v2] arm64: defconfig: enable EDAC options
+>   arm64: defconfig: enable QCOM_L2_PMU and QCOM_L3_PMU
+>   arm64: defconfig: enable the Qualcomm Technologies EMAC Ethernet
+>     driver
 
-> From: Eric Anholt <eric@anholt.net>
-> Date: Fri, 28 Apr 2017 15:22:03 -0700
->
->> Cygnus is a small family of SoCs, of which we currently have
->> devicetree for BCM11360 and BCM58300.  The 11360's B53 is mostly the
->> same as 58xx, just requiring a tiny bit of setup that was previously
->> missing.
->> 
->> v2: Reorder the entry in the docs (suggestion by Scott Branden), add
->>     missing '"'
->> 
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->
-> The second patch with the DTS file update doesn't apply cleanly
-> at all to net-next.
->
-> So I'm dropping this series.
+Catalin,
 
-DTS updates go through arm-soc branches through Florian.  The first
-patch is the one I would like you to apply.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170501/bc8cb0ef/attachment.sig>
+Any chance of getting these into 4.12?
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
