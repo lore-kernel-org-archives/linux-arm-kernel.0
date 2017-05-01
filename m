@@ -1,34 +1,36 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 1 May 2017 17:30:13 -0400
-Subject: [PATCH v3 11/11] fsl/soc/qbman: Enable FSL_LAYERSCAPE config on ARM
-In-Reply-To: <1493674213-963-1-git-send-email-roy.pledge@nxp.com>
-References: <1493674213-963-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1493674213-963-12-git-send-email-roy.pledge@nxp.com>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Tue,  2 May 2017 00:39:13 +0200
+Subject: [PATCH 1/1] arm64: Always provide "model name" in /proc/cpuinfo
+Message-ID: <20170501223913.6894-1-xypron.glpk@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Madalin Bucur <madalin.bucur@nxp.com>
+There is no need to hide the model name in processes
+that are not PER_LINUX32.
 
-Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
-Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
-[Stuart: changed to use ARCH_LAYERSCAPE]
-Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+So let us always provide a model name that is easily readable.
+
+Fixes: e47b020a323d ("arm64: Provide "model name" in /proc/cpuinfo for PER_LINUX32 tasks")
+Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
 ---
- drivers/soc/fsl/qbman/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/cpuinfo.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/soc/fsl/qbman/Kconfig b/drivers/soc/fsl/qbman/Kconfig
-index 757033c..fb4e6bf 100644
---- a/drivers/soc/fsl/qbman/Kconfig
-+++ b/drivers/soc/fsl/qbman/Kconfig
-@@ -1,6 +1,6 @@
- menuconfig FSL_DPAA
- 	bool "Freescale DPAA 1.x support"
--	depends on FSL_SOC_BOOKE
-+	depends on (FSL_SOC_BOOKE || ARCH_LAYERSCAPE)
- 	select GENERIC_ALLOCATOR
- 	help
- 	  The Freescale Data Path Acceleration Architecture (DPAA) is a set of
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index b3d5b3e8fbcb..9ad9ddcd2f19 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -118,9 +118,8 @@ static int c_show(struct seq_file *m, void *v)
+ 		 * "processor".  Give glibc what it expects.
+ 		 */
+ 		seq_printf(m, "processor\t: %d\n", i);
+-		if (compat)
+-			seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
+-				   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
++		seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
++			   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
+ 
+ 		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
+ 			   loops_per_jiffy / (500000UL/HZ),
 -- 
-2.7.4
+2.11.0
