@@ -1,56 +1,71 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Mon, 1 May 2017 21:30:20 +0200
-Subject: [PATCH 3/3] soc-knav_dma: Delete error messages for a failed memory
- allocation in two functions
-In-Reply-To: <eddc35f7-a04b-42f5-ad8b-d345ca0b57b4@users.sourceforge.net>
-References: <eddc35f7-a04b-42f5-ad8b-d345ca0b57b4@users.sourceforge.net>
-Message-ID: <b37a7b6a-cee6-2536-1ffe-994a208d8d00@users.sourceforge.net>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 1 May 2017 20:46:43 +0100
+Subject: Tegra baseline test results for v4.11
+Message-ID: <bb6fc3c6-5f7c-6a2a-6d57-afe68bd00ae7@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Mon, 1 May 2017 21:14:48 +0200
+Here are some basic Tegra test results for Linux v4.11.
+Logs and other details at:
 
-The script "checkpatch.pl" pointed information out like the following.
+    https://nvtb.github.io//linux/test_v4.11/20170430200102/
 
-WARNING: Possible unnecessary 'out of memory' message
 
-Thus remove such statements here.
+Test summary
+------------
 
-Link: http://events.linuxfoundation.org/sites/events/files/slides/LCJ16-Refactor_Strings-WSang_0.pdf
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/soc/ti/knav_dma.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-diff --git a/drivers/soc/ti/knav_dma.c b/drivers/soc/ti/knav_dma.c
-index 410018d9054e..dd5adfbf9910 100644
---- a/drivers/soc/ti/knav_dma.c
-+++ b/drivers/soc/ti/knav_dma.c
-@@ -621,10 +621,9 @@ static int dma_init(struct device_node *cloud, struct device_node *dma_node)
- 	u32 i;
- 
- 	dma = devm_kzalloc(kdev->dev, sizeof(*dma), GFP_KERNEL);
--	if (!dma) {
--		dev_err(kdev->dev, "could not allocate driver mem\n");
-+	if (!dma)
- 		return -ENOMEM;
--	}
-+
- 	INIT_LIST_HEAD(&dma->list);
- 	INIT_LIST_HEAD(&dma->chan_list);
- 
-@@ -740,10 +739,8 @@ static int knav_dma_probe(struct platform_device *pdev)
- 	}
- 
- 	kdev = devm_kzalloc(dev, sizeof(*kdev), GFP_KERNEL);
--	if (!kdev) {
--		dev_err(dev, "could not allocate driver mem\n");
-+	if (!kdev)
- 		return -ENOMEM;
--	}
- 
- 	kdev->dev = dev;
- 	INIT_LIST_HEAD(&kdev->list);
--- 
-2.12.2
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.11-rc8 (5a7ad1146caa895ad718a534399e38bd2ba721b7)):
+   text     data      bss    total  kernel
+  -3352     -744        0    -4096  defconfig
+   +284        0        0     +284  multi_v7_defconfig
+   +332        0        0     +332  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.11-rc8 (5a7ad1146caa895ad718a534399e38bd2ba721b7))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
