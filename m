@@ -1,57 +1,91 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 1 May 2017 17:30:02 -0400
-Subject: [PATCH v3 00/11] soc/fsl/qbman: Enable QBMan on ARM Platforms
-Message-ID: <1493674213-963-1-git-send-email-roy.pledge@nxp.com>
+Date: Mon, 1 May 2017 17:30:03 -0400
+Subject: [PATCH v3 01/11] soc/fsl/qbman: Use shared-dma-pool for BMan private
+ memory allocations
+In-Reply-To: <1493674213-963-1-git-send-email-roy.pledge@nxp.com>
+References: <1493674213-963-1-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1493674213-963-2-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enables DPAA1 QBMan devices for ARM and
-ARM64 architectures. This allows the LS1043A and LS1046A to use
-QBMan functionality.
+Use the shared-memory-pool mechanism for free buffer proxy record
+area allocation.
 
-Changes since v2:
-Fixed some misspellings
-Added 'no-map' constraint to device tree bindings
-Described ordering contraint on regions in the device tree
-Removed confusing comment regarding non-shareable mappings
-Added warning if old reserved-memory technique is used on ARM
+Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+---
+ drivers/soc/fsl/qbman/bman_ccsr.c | 35 ++++++++++++++++++++++++++++++++++-
+ drivers/soc/fsl/qbman/bman_priv.h |  3 +++
+ 2 files changed, 37 insertions(+), 1 deletion(-)
 
-Changes since v1:
-Reworked private memory allocations to use shared-dma-pool on ARM platforms
-
-Claudiu Manoil (2):
-  soc/fsl/qbman: Drop L1_CACHE_BYTES compile time check
-  soc/fsl/qbman: Add missing headers on ARM
-
-Madalin Bucur (4):
-  soc/fsl/qbman: Drop set/clear_bits usage
-  soc/fsl/qbman: add QMAN_REV32
-  soc/fsl/qbman: different register offsets on ARM
-  fsl/soc/qbman: Enable FSL_LAYERSCAPE config on ARM
-
-Roy Pledge (4):
-  soc/fsl/qbman: Use shared-dma-pool for BMan private memory allocations
-  soc/fsl/qbman: Use shared-dma-pool for QMan private memory allocations
-  dt-bindings: soc/fsl: Update reserved memory binding for QBMan
-  soc/fsl/qbman: Rework ioremap() calls for ARM/PPC
-
-Valentin Rothberg (1):
-  soc/fsl/qbman: Fix ARM32 typo
-
- Documentation/devicetree/bindings/soc/fsl/bman.txt |  12 +-
- Documentation/devicetree/bindings/soc/fsl/qman.txt |  26 ++--
- drivers/soc/fsl/qbman/Kconfig                      |   2 +-
- drivers/soc/fsl/qbman/bman.c                       |  24 +++-
- drivers/soc/fsl/qbman/bman_ccsr.c                  |  35 +++++-
- drivers/soc/fsl/qbman/bman_portal.c                |  12 +-
- drivers/soc/fsl/qbman/bman_priv.h                  |   3 +
- drivers/soc/fsl/qbman/dpaa_sys.h                   |   8 +-
- drivers/soc/fsl/qbman/qman.c                       |  46 ++++++-
- drivers/soc/fsl/qbman/qman_ccsr.c                  | 140 ++++++++++++++++-----
- drivers/soc/fsl/qbman/qman_portal.c                |  12 +-
- drivers/soc/fsl/qbman/qman_priv.h                  |   5 +-
- drivers/soc/fsl/qbman/qman_test.h                  |   2 -
- 13 files changed, 262 insertions(+), 65 deletions(-)
-
---
+diff --git a/drivers/soc/fsl/qbman/bman_ccsr.c b/drivers/soc/fsl/qbman/bman_ccsr.c
+index a8e8389..f126dbd 100644
+--- a/drivers/soc/fsl/qbman/bman_ccsr.c
++++ b/drivers/soc/fsl/qbman/bman_ccsr.c
+@@ -170,10 +170,11 @@ static int fsl_bman_probe(struct platform_device *pdev)
+ {
+ 	int ret, err_irq;
+ 	struct device *dev = &pdev->dev;
+-	struct device_node *node = dev->of_node;
++	struct device_node *mem_node, *node = dev->of_node;
+ 	struct resource *res;
+ 	u16 id, bm_pool_cnt;
+ 	u8 major, minor;
++	u64 size;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!res) {
+@@ -201,6 +202,38 @@ static int fsl_bman_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
++	/*
++	 * If FBPR memory wasn't defined using the qbman compatiable string
++	 * try using the of_reserved_mem_device method
++	 */
++	if (!fbpr_a) {
++		ret = of_reserved_mem_device_init(dev);
++		if (ret) {
++			dev_err(dev, "of_reserved_mem_device_init() failed 0x%x\n",
++				ret);
++			return -ENODEV;
++		}
++		mem_node = of_parse_phandle(dev->of_node, "memory-region", 0);
++		if (mem_node) {
++			ret = of_property_read_u64(mem_node, "size", &size);
++			if (ret) {
++				dev_err(dev, "FBPR: of_address_to_resource fails 0x%x\n",
++					ret);
++				return -ENODEV;
++			}
++			fbpr_sz = size;
++		} else {
++			dev_err(dev, "No memory-region found for FBPR\n");
++			return -ENODEV;
++		}
++		if (!dma_zalloc_coherent(dev, fbpr_sz, &fbpr_a, 0)) {
++			dev_err(dev, "Alloc FBPR memory failed\n");
++			return -ENODEV;
++		}
++	}
++
++	dev_dbg(dev, "Allocated FBPR 0x%llx 0x%zx\n", fbpr_a, fbpr_sz);
++
+ 	bm_set_memory(fbpr_a, fbpr_sz);
+ 
+ 	err_irq = platform_get_irq(pdev, 0);
+diff --git a/drivers/soc/fsl/qbman/bman_priv.h b/drivers/soc/fsl/qbman/bman_priv.h
+index f6896a2..765a4bf 100644
+--- a/drivers/soc/fsl/qbman/bman_priv.h
++++ b/drivers/soc/fsl/qbman/bman_priv.h
+@@ -33,6 +33,9 @@
+ #include "dpaa_sys.h"
+ 
+ #include <soc/fsl/bman.h>
++#include <linux/dma-contiguous.h>
++#include <linux/of_address.h>
++#include <linux/dma-mapping.h>
+ 
+ /* Portal processing (interrupt) sources */
+ #define BM_PIRQ_RCRI	0x00000002	/* RCR Ring (below threshold) */
+-- 
 2.7.4
