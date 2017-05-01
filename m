@@ -1,41 +1,38 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Mon, 1 May 2017 13:30:19 +0200
-Subject: [PATCH v6 2/6] power: supply: add battery driver for AXP20X and
- AXP22X PMICs
-In-Reply-To: <20170418073421.31351-3-quentin.schulz@free-electrons.com>
-References: <20170418073421.31351-1-quentin.schulz@free-electrons.com>
- <20170418073421.31351-3-quentin.schulz@free-electrons.com>
-Message-ID: <20170501113019.gc4mblrwvyd7qgv3@earth>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Mon,  1 May 2017 14:45:01 +0200
+Subject: [PATCH v5 01/20] net: stmmac: export
+ stmmac_set_mac_addr/stmmac_get_mac_addr
+In-Reply-To: <20170501124520.3769-1-clabbe.montjoie@gmail.com>
+References: <20170501124520.3769-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170501124520.3769-2-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thoses symbol will be needed for the dwmac-sun8i ethernet driver.
+For letting it to be build as module, they need to be exported.
 
-On Tue, Apr 18, 2017 at 09:34:17AM +0200, Quentin Schulz wrote:
-> The X-Powers AXP20X and AXP22X PMICs can have a battery as power supply.
-> 
-> This patch adds the battery power supply driver to get various data from
-> the PMIC, such as the battery status (charging, discharging, full,
-> dead), current max limit, current current, battery capacity (in
-> percentage), voltage max and min limits, current voltage and battery
-> capacity (in Ah).
-> 
-> This battery driver uses the AXP20X/AXP22X ADC driver as PMIC data
-> provider.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> Acked-by: Sebastian Reichel <sre@kernel.org>
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Thanks, queued.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170501/9eedd794/attachment.sig>
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c b/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
+index 38f9430..67af0bd 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
+@@ -248,6 +248,7 @@ void stmmac_set_mac_addr(void __iomem *ioaddr, u8 addr[6],
+ 	data = (addr[3] << 24) | (addr[2] << 16) | (addr[1] << 8) | addr[0];
+ 	writel(data, ioaddr + low);
+ }
++EXPORT_SYMBOL_GPL(stmmac_set_mac_addr);
+ 
+ /* Enable disable MAC RX/TX */
+ void stmmac_set_mac(void __iomem *ioaddr, bool enable)
+@@ -279,4 +280,4 @@ void stmmac_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
+ 	addr[4] = hi_addr & 0xff;
+ 	addr[5] = (hi_addr >> 8) & 0xff;
+ }
+-
++EXPORT_SYMBOL_GPL(stmmac_get_mac_addr);
+-- 
+2.10.2
