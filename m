@@ -1,91 +1,132 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 1 May 2017 17:30:03 -0400
-Subject: [PATCH v3 01/11] soc/fsl/qbman: Use shared-dma-pool for BMan private
- memory allocations
+Date: Mon, 1 May 2017 17:30:05 -0400
+Subject: [PATCH v3 03/11] dt-bindings: soc/fsl: Update reserved memory binding
+ for QBMan
 In-Reply-To: <1493674213-963-1-git-send-email-roy.pledge@nxp.com>
 References: <1493674213-963-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1493674213-963-2-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1493674213-963-4-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the shared-memory-pool mechanism for free buffer proxy record
-area allocation.
+Updates the QMan and BMan device tree bindings for reserved memory
+nodes. This makes the reserved memory allocation compatiable with
+the shared-dma-pool usage.
 
 Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/soc/fsl/qbman/bman_ccsr.c | 35 ++++++++++++++++++++++++++++++++++-
- drivers/soc/fsl/qbman/bman_priv.h |  3 +++
- 2 files changed, 37 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/soc/fsl/bman.txt | 12 +++++-----
+ Documentation/devicetree/bindings/soc/fsl/qman.txt | 26 ++++++++++++++++------
+ 2 files changed, 26 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/soc/fsl/qbman/bman_ccsr.c b/drivers/soc/fsl/qbman/bman_ccsr.c
-index a8e8389..f126dbd 100644
---- a/drivers/soc/fsl/qbman/bman_ccsr.c
-+++ b/drivers/soc/fsl/qbman/bman_ccsr.c
-@@ -170,10 +170,11 @@ static int fsl_bman_probe(struct platform_device *pdev)
- {
- 	int ret, err_irq;
- 	struct device *dev = &pdev->dev;
--	struct device_node *node = dev->of_node;
-+	struct device_node *mem_node, *node = dev->of_node;
- 	struct resource *res;
- 	u16 id, bm_pool_cnt;
- 	u8 major, minor;
-+	u64 size;
+diff --git a/Documentation/devicetree/bindings/soc/fsl/bman.txt b/Documentation/devicetree/bindings/soc/fsl/bman.txt
+index 47ac834..48eed14 100644
+--- a/Documentation/devicetree/bindings/soc/fsl/bman.txt
++++ b/Documentation/devicetree/bindings/soc/fsl/bman.txt
+@@ -65,8 +65,8 @@ to the respective BMan instance
+ BMan Private Memory Node
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
-@@ -201,6 +202,38 @@ static int fsl_bman_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
+ BMan requires a contiguous range of physical memory used for the backing store
+-for BMan Free Buffer Proxy Records (FBPR). This memory is reserved/allocated as a
+-node under the /reserved-memory node
++for BMan Free Buffer Proxy Records (FBPR). This memory is reserved/allocated as
++a node under the /reserved-memory node.
  
-+	/*
-+	 * If FBPR memory wasn't defined using the qbman compatiable string
-+	 * try using the of_reserved_mem_device method
-+	 */
-+	if (!fbpr_a) {
-+		ret = of_reserved_mem_device_init(dev);
-+		if (ret) {
-+			dev_err(dev, "of_reserved_mem_device_init() failed 0x%x\n",
-+				ret);
-+			return -ENODEV;
-+		}
-+		mem_node = of_parse_phandle(dev->of_node, "memory-region", 0);
-+		if (mem_node) {
-+			ret = of_property_read_u64(mem_node, "size", &size);
-+			if (ret) {
-+				dev_err(dev, "FBPR: of_address_to_resource fails 0x%x\n",
-+					ret);
-+				return -ENODEV;
-+			}
-+			fbpr_sz = size;
-+		} else {
-+			dev_err(dev, "No memory-region found for FBPR\n");
-+			return -ENODEV;
-+		}
-+		if (!dma_zalloc_coherent(dev, fbpr_sz, &fbpr_a, 0)) {
-+			dev_err(dev, "Alloc FBPR memory failed\n");
-+			return -ENODEV;
-+		}
-+	}
+ The BMan FBPR memory node must be named "bman-fbpr"
+ 
+@@ -75,7 +75,9 @@ PROPERTIES
+ - compatible
+ 	Usage:		required
+ 	Value type:	<stringlist>
+-	Definition:	Must inclide "fsl,bman-fbpr"
++	Definition:	PPC platforms: Must include "fsl,bman-fbpr"
++			ARM platforms: Must include "shared-dma-pool"
++				       as well as the "no-map" property
+ 
+ The following constraints are relevant to the FBPR private memory:
+ 	- The size must be 2^(size + 1), with size = 11..33. That is 4 KiB to
+@@ -100,10 +102,10 @@ The example below shows a BMan FBPR dynamic allocation memory node
+ 		ranges;
+ 
+ 		bman_fbpr: bman-fbpr {
+-			compatible = "fsl,bman-fbpr";
+-			alloc-ranges = <0 0 0x10 0>;
++			compatible = "shared-mem-pool";
+ 			size = <0 0x1000000>;
+ 			alignment = <0 0x1000000>;
++			no-map;
+ 		};
+ 	};
+ 
+diff --git a/Documentation/devicetree/bindings/soc/fsl/qman.txt b/Documentation/devicetree/bindings/soc/fsl/qman.txt
+index 556ebb8..ee96afd 100644
+--- a/Documentation/devicetree/bindings/soc/fsl/qman.txt
++++ b/Documentation/devicetree/bindings/soc/fsl/qman.txt
+@@ -60,6 +60,12 @@ are located at offsets 0xbf8 and 0xbfc
+ 	Value type:	<prop-encoded-array>
+ 	Definition:	Reference input clock. Its frequency is half of the
+ 			platform clock
++- memory-regions
++	Usage:		Required for ARM
++	Value type:	<phandle array>
++	Definition:	List of phandles referencing the QMan private memory
++			nodes (described below). The qman-fqd node must be
++			first followed by qman-pfdr node. Only used on ARM
+ 
+ Devices connected to a QMan instance via Direct Connect Portals (DCP) must link
+ to the respective QMan instance
+@@ -74,7 +80,9 @@ QMan Private Memory Nodes
+ 
+ QMan requires two contiguous range of physical memory used for the backing store
+ for QMan Frame Queue Descriptor (FQD) and Packed Frame Descriptor Record (PFDR).
+-This memory is reserved/allocated as a nodes under the /reserved-memory node
++This memory is reserved/allocated as a node under the /reserved-memory node.
 +
-+	dev_dbg(dev, "Allocated FBPR 0x%llx 0x%zx\n", fbpr_a, fbpr_sz);
-+
- 	bm_set_memory(fbpr_a, fbpr_sz);
++For additional details about reserved memory regions see reserved-memory.txt
  
- 	err_irq = platform_get_irq(pdev, 0);
-diff --git a/drivers/soc/fsl/qbman/bman_priv.h b/drivers/soc/fsl/qbman/bman_priv.h
-index f6896a2..765a4bf 100644
---- a/drivers/soc/fsl/qbman/bman_priv.h
-+++ b/drivers/soc/fsl/qbman/bman_priv.h
-@@ -33,6 +33,9 @@
- #include "dpaa_sys.h"
+ The QMan FQD memory node must be named "qman-fqd"
  
- #include <soc/fsl/bman.h>
-+#include <linux/dma-contiguous.h>
-+#include <linux/of_address.h>
-+#include <linux/dma-mapping.h>
+@@ -83,7 +91,9 @@ PROPERTIES
+ - compatible
+ 	Usage:		required
+ 	Value type:	<stringlist>
+-	Definition:	Must inclide "fsl,qman-fqd"
++	Definition:	PPC platforms: Must include "fsl,qman-fqd"
++			ARM platforms: Must include "shared-dma-pool"
++				       as well as the "no-map" property
  
- /* Portal processing (interrupt) sources */
- #define BM_PIRQ_RCRI	0x00000002	/* RCR Ring (below threshold) */
+ The QMan PFDR memory node must be named "qman-pfdr"
+ 
+@@ -92,7 +102,9 @@ PROPERTIES
+ - compatible
+ 	Usage:		required
+ 	Value type:	<stringlist>
+-	Definition:	Must inclide "fsl,qman-pfdr"
++	Definition:	PPC platforms: Must include "fsl,qman-pfdr"
++			ARM platforms: Must include "shared-dma-pool"
++				       as well as the "no-map" property
+ 
+ The following constraints are relevant to the FQD and PFDR private memory:
+ 	- The size must be 2^(size + 1), with size = 11..29. That is 4 KiB to
+@@ -117,16 +129,16 @@ The example below shows a QMan FQD and a PFDR dynamic allocation memory nodes
+ 		ranges;
+ 
+ 		qman_fqd: qman-fqd {
+-			compatible = "fsl,qman-fqd";
+-			alloc-ranges = <0 0 0x10 0>;
++			compatible = "shared-dma-pool";
+ 			size = <0 0x400000>;
+ 			alignment = <0 0x400000>;
++			no-map;
+ 		};
+ 		qman_pfdr: qman-pfdr {
+-			compatible = "fsl,qman-pfdr";
+-			alloc-ranges = <0 0 0x10 0>;
++			compatible = "shared-dma-pool";
+ 			size = <0 0x2000000>;
+ 			alignment = <0 0x2000000>;
++			no-map;
+ 		};
+ 	};
+ 
 -- 
 2.7.4
