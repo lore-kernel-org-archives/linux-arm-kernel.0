@@ -1,40 +1,47 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  1 May 2017 14:45:06 +0200
-Subject: [PATCH v5 06/20] arm: sun8i: sunxi-h3-h5: Add dt node for the syscon
- control module
+Date: Mon,  1 May 2017 14:45:10 +0200
+Subject: [PATCH v5 10/20] arm: sun8i: orangepi-one: Enable dwmac-sun8i
 In-Reply-To: <20170501124520.3769-1-clabbe.montjoie@gmail.com>
 References: <20170501124520.3769-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170501124520.3769-7-clabbe.montjoie@gmail.com>
+Message-ID: <20170501124520.3769-11-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the dt node for the syscon register present on the
-Allwinner H3/H5
+The dwmac-sun8i hardware is present on the Orange PI One.
+It uses the internal PHY.
 
-Only two register are present in this syscon and the only one useful is
-the one dedicated to EMAC clock..
+This patch create the needed emac node.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index 1aeeacb..d9691fc 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -83,6 +83,12 @@
- 		#size-cells = <1>;
- 		ranges;
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+index 5fea430..6880268 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+@@ -52,6 +52,7 @@
+ 	compatible = "xunlong,orangepi-one", "allwinner,sun8i-h3";
  
-+		syscon: syscon at 1c00000 {
-+			compatible = "allwinner,sun8i-h3-system-controller",
-+				"syscon";
-+			reg = <0x01c00000 0x1000>;
-+		};
+ 	aliases {
++		ethernet0 = &emac;
+ 		serial0 = &uart0;
+ 	};
+ 
+@@ -97,6 +98,13 @@
+ 	status = "okay";
+ };
+ 
++&emac {
++	phy-handle = <&int_mii_phy>;
++	phy-mode = "mii";
++	allwinner,leds-active-low;
++	status = "okay";
++};
 +
- 		dma: dma-controller at 01c02000 {
- 			compatible = "allwinner,sun8i-h3-dma";
- 			reg = <0x01c02000 0x1000>;
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
 -- 
 2.10.2
