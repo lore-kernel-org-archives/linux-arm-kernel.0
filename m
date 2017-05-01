@@ -1,29 +1,24 @@
 From: davem@davemloft.net (David Miller)
-Date: Sun, 30 Apr 2017 22:48:52 -0400 (EDT)
-Subject: [PATCH v3 1/2] net: dsa: b53: Add compatible strings for the
- Cygnus-family BCM11360.
-In-Reply-To: <20170428222204.7103-1-eric@anholt.net>
-References: <20170428222204.7103-1-eric@anholt.net>
-Message-ID: <20170430.224852.172293736555378453.davem@davemloft.net>
+Date: Sun, 30 Apr 2017 22:56:47 -0400 (EDT)
+Subject: [PATCH] net: phy: Allow BCM5481x PHYs to setup internal TX/RX
+ clock delay
+In-Reply-To: <1493530461-11935-1-git-send-email-abhishek.shah@broadcom.com>
+References: <1493530461-11935-1-git-send-email-abhishek.shah@broadcom.com>
+Message-ID: <20170430.225647.1704817458991201009.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Anholt <eric@anholt.net>
-Date: Fri, 28 Apr 2017 15:22:03 -0700
+From: Abhishek Shah <abhishek.shah@broadcom.com>
+Date: Sun, 30 Apr 2017 11:04:21 +0530
 
-> Cygnus is a small family of SoCs, of which we currently have
-> devicetree for BCM11360 and BCM58300.  The 11360's B53 is mostly the
-> same as 58xx, just requiring a tiny bit of setup that was previously
-> missing.
+> This patch allows users to enable/disable internal TX and/or RX
+> clock delay for BCM5481x series PHYs so as to satisfy RGMII timing
+> specifications.
 > 
-> v2: Reorder the entry in the docs (suggestion by Scott Branden), add
->     missing '"'
+> On a particular platform, whether TX and/or RX clock delay is required
+> depends on how PHY connected to the MAC IP. This requirement can be
+> specified through "phy-mode" property in the platform device tree.
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Abhishek Shah <abhishek.shah@broadcom.com>
 
-The second patch with the DTS file update doesn't apply cleanly
-at all to net-next.
-
-So I'm dropping this series.
+Applied.
