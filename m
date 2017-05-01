@@ -1,138 +1,145 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 30 Apr 2017 14:50:11 -0700
-Subject: [PATCH] scsi: fas216: Add __printf validation, fix fallout
-Message-ID: <ea0f8cf0ba961817f13225a5444c76a86e2ea610.1493588987.git.joe@perches.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 30 Apr 2017 17:53:36 -0700
+Subject: [PATCH] net: phy: Allow BCM5481x PHYs to setup internal TX/RX
+ clock delay
+In-Reply-To: <1493530461-11935-1-git-send-email-abhishek.shah@broadcom.com>
+References: <1493530461-11935-1-git-send-email-abhishek.shah@broadcom.com>
+Message-ID: <5e7e1410-ede2-9a38-084d-bf866c91d790@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__printf makes the compiler check format and arguments.
 
-Fix fallout.
 
-Miscellanea:
+On 04/29/2017 10:34 PM, Abhishek Shah wrote:
+> This patch allows users to enable/disable internal TX and/or RX
+> clock delay for BCM5481x series PHYs so as to satisfy RGMII timing
+> specifications.
+> 
+> On a particular platform, whether TX and/or RX clock delay is required
+> depends on how PHY connected to the MAC IP. This requirement can be
+> specified through "phy-mode" property in the platform device tree.
+> 
+> Signed-off-by: Abhishek Shah <abhishek.shah@broadcom.com>
 
-o Convert formats to const char *
-o Use vsprintf extension %pV instead of a static buffer.
-o Add newline to logging and remove now unnecessary printk("\n")
-o Use pr_cont where appropriate
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- drivers/scsi/arm/fas216.c | 39 ++++++++++++++++++++-------------------
- 1 file changed, 20 insertions(+), 19 deletions(-)
+> ---
+>  drivers/net/phy/broadcom.c | 69 ++++++++++++++++++++++------------------------
+>  1 file changed, 33 insertions(+), 36 deletions(-)
+> 
+> diff --git a/drivers/net/phy/broadcom.c b/drivers/net/phy/broadcom.c
+> index 9cd8b27..a32dc5d 100644
+> --- a/drivers/net/phy/broadcom.c
+> +++ b/drivers/net/phy/broadcom.c
+> @@ -74,27 +74,40 @@ static int bcm54612e_config_init(struct phy_device *phydev)
+>  	return 0;
+>  }
+>  
+> -static int bcm54810_config(struct phy_device *phydev)
+> +static int bcm5481x_config(struct phy_device *phydev)
+>  {
+>  	int rc, val;
+>  
+> -	val = bcm_phy_read_exp(phydev, BCM54810_EXP_BROADREACH_LRE_MISC_CTL);
+> -	val &= ~BCM54810_EXP_BROADREACH_LRE_MISC_CTL_EN;
+> -	rc = bcm_phy_write_exp(phydev, BCM54810_EXP_BROADREACH_LRE_MISC_CTL,
+> -			       val);
+> -	if (rc < 0)
+> -		return rc;
+> -
+> +	/* handling PHY's internal RX clock delay */
+>  	val = bcm54xx_auxctl_read(phydev, MII_BCM54XX_AUXCTL_SHDWSEL_MISC);
+> -	val &= ~MII_BCM54XX_AUXCTL_SHDWSEL_MISC_RGMII_SKEW_EN;
+>  	val |= MII_BCM54XX_AUXCTL_MISC_WREN;
+> +	if (phydev->interface == PHY_INTERFACE_MODE_RGMII ||
+> +	    phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
+> +		/* Disable RGMII RXC-RXD skew */
+> +		val &= ~MII_BCM54XX_AUXCTL_SHDWSEL_MISC_RGMII_SKEW_EN;
+> +	}
+> +	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
+> +	    phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
+> +		/* Enable RGMII RXC-RXD skew */
+> +		val |= MII_BCM54XX_AUXCTL_SHDWSEL_MISC_RGMII_SKEW_EN;
+> +	}
+>  	rc = bcm54xx_auxctl_write(phydev, MII_BCM54XX_AUXCTL_SHDWSEL_MISC,
+>  				  val);
+>  	if (rc < 0)
+>  		return rc;
+>  
+> +	/* handling PHY's internal TX clock delay */
+>  	val = bcm_phy_read_shadow(phydev, BCM54810_SHD_CLK_CTL);
+> -	val &= ~BCM54810_SHD_CLK_CTL_GTXCLK_EN;
+> +	if (phydev->interface == PHY_INTERFACE_MODE_RGMII ||
+> +	    phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
+> +		/* Disable internal TX clock delay */
+> +		val &= ~BCM54810_SHD_CLK_CTL_GTXCLK_EN;
+> +	}
+> +	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
+> +	    phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
+> +		/* Enable internal TX clock delay */
+> +		val |= BCM54810_SHD_CLK_CTL_GTXCLK_EN;
+> +	}
+>  	rc = bcm_phy_write_shadow(phydev, BCM54810_SHD_CLK_CTL, val);
+>  	if (rc < 0)
+>  		return rc;
+> @@ -244,7 +257,7 @@ static void bcm54xx_adjust_rxrefclk(struct phy_device *phydev)
+>  
+>  static int bcm54xx_config_init(struct phy_device *phydev)
+>  {
+> -	int reg, err;
+> +	int reg, err, val;
+>  
+>  	reg = phy_read(phydev, MII_BCM54XX_ECR);
+>  	if (reg < 0)
+> @@ -283,8 +296,14 @@ static int bcm54xx_config_init(struct phy_device *phydev)
+>  		if (err)
+>  			return err;
+>  	} else if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM54810) {
+> -		err = bcm54810_config(phydev);
+> -		if (err)
+> +		/* For BCM54810, we need to disable BroadR-Reach function */
+> +		val = bcm_phy_read_exp(phydev,
+> +				       BCM54810_EXP_BROADREACH_LRE_MISC_CTL);
+> +		val &= ~BCM54810_EXP_BROADREACH_LRE_MISC_CTL_EN;
+> +		err = bcm_phy_write_exp(phydev,
+> +					BCM54810_EXP_BROADREACH_LRE_MISC_CTL,
+> +					val);
+> +		if (err < 0)
+>  			return err;
+>  	}
+>  
+> @@ -392,29 +411,7 @@ static int bcm5481_config_aneg(struct phy_device *phydev)
+>  	ret = genphy_config_aneg(phydev);
+>  
+>  	/* Then we can set up the delay. */
+> -	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
+> -		u16 reg;
+> -
+> -		/*
+> -		 * There is no BCM5481 specification available, so down
+> -		 * here is everything we know about "register 0x18". This
+> -		 * at least helps BCM5481 to successfully receive packets
+> -		 * on MPC8360E-RDK board. Peter Barada <peterb@logicpd.com>
+> -		 * says: "This sets delay between the RXD and RXC signals
+> -		 * instead of using trace lengths to achieve timing".
+> -		 */
+> -
+> -		/* Set RDX clk delay. */
+> -		reg = 0x7 | (0x7 << 12);
+> -		phy_write(phydev, 0x18, reg);
+> -
+> -		reg = phy_read(phydev, 0x18);
+> -		/* Set RDX-RXC skew. */
+> -		reg |= (1 << 8);
+> -		/* Write bits 14:0. */
+> -		reg |= (1 << 15);
+> -		phy_write(phydev, 0x18, reg);
+> -	}
+> +	bcm5481x_config(phydev);
+>  
+>  	if (of_property_read_bool(np, "enet-phy-lane-swap")) {
+>  		/* Lane Swap - Undocumented register...magic! */
+> 
 
-diff --git a/drivers/scsi/arm/fas216.c b/drivers/scsi/arm/fas216.c
-index 24388795ee9a..112bec886192 100644
---- a/drivers/scsi/arm/fas216.c
-+++ b/drivers/scsi/arm/fas216.c
-@@ -289,17 +289,20 @@ static char fas216_target(FAS216_Info *info)
- 		return 'H';
- }
- 
--static void
--fas216_do_log(FAS216_Info *info, char target, char *fmt, va_list ap)
-+__printf(3, 0) static void
-+fas216_do_log(FAS216_Info *info, char target, const char *fmt, va_list ap)
- {
--	static char buf[1024];
-+	struct va_format vaf;
-+
-+	vaf.fmt = fmt;
-+	vaf.va = &ap;
- 
--	vsnprintf(buf, sizeof(buf), fmt, ap);
--	printk("scsi%d.%c: %s", info->host->host_no, target, buf);
-+	printk("scsi%d.%c: %pV\n", info->host->host_no, target, &vaf);
- }
- 
-+__printf(4, 5)
- static void fas216_log_command(FAS216_Info *info, int level,
--			       struct scsi_cmnd *SCpnt, char *fmt, ...)
-+			       struct scsi_cmnd *SCpnt, const char *fmt, ...)
- {
- 	va_list args;
- 
-@@ -313,8 +316,9 @@ static void fas216_log_command(FAS216_Info *info, int level,
- 	scsi_print_command(SCpnt);
- }
- 
--static void
--fas216_log_target(FAS216_Info *info, int level, int target, char *fmt, ...)
-+__printf(4, 5) static void
-+fas216_log_target(FAS216_Info *info, int level, int target,
-+		  const char *fmt, ...)
- {
- 	va_list args;
- 
-@@ -329,11 +333,10 @@ fas216_log_target(FAS216_Info *info, int level, int target, char *fmt, ...)
- 	va_start(args, fmt);
- 	fas216_do_log(info, target, fmt, args);
- 	va_end(args);
--
--	printk("\n");
- }
- 
--static void fas216_log(FAS216_Info *info, int level, char *fmt, ...)
-+__printf(3, 4)
-+static void fas216_log(FAS216_Info *info, int level, const char *fmt, ...)
- {
- 	va_list args;
- 
-@@ -343,8 +346,6 @@ static void fas216_log(FAS216_Info *info, int level, char *fmt, ...)
- 	va_start(args, fmt);
- 	fas216_do_log(info, fas216_target(info), fmt, args);
- 	va_end(args);
--
--	printk("\n");
- }
- 
- #define PH_SIZE	32
-@@ -431,7 +432,7 @@ fas216_get_last_msg(FAS216_Info *info, int pos)
- 	}
- 
- 	fas216_log(info, LOG_MESSAGES,
--		"Message: %04x found at position %02x\n", packed_msg, pos);
-+		   "Message: %04x found at position %02x", packed_msg, pos);
- 
- 	return packed_msg;
- }
-@@ -725,7 +726,7 @@ static void fas216_cleanuptransfer(FAS216_Info *info)
- 	fifo = fas216_readb(info, REG_CFIS) & CFIS_CF;
- 
- 	fas216_log(info, LOG_BUFFER, "cleaning up from previous "
--		   "transfer: length 0x%06x, residual 0x%x, fifo %d",
-+		   "transfer: length 0x%06lx, residual 0x%lx, fifo %ld",
- 		   total, residual, fifo);
- 
- 	/*
-@@ -1144,8 +1145,8 @@ static void fas216_parse_message(FAS216_Info *info, unsigned char *message, int
- 	fas216_log(info, 0, "unrecognised message, rejecting");
- 	printk("scsi%d.%c: message was", info->host->host_no, fas216_target(info));
- 	for (i = 0; i < msglen; i++)
--		printk("%s%02X", i & 31 ? " " : "\n  ", message[i]);
--	printk("\n");
-+		pr_cont("%s%02X", i & 31 ? " " : "\n  ", message[i]);
-+	pr_cont("\n");
- 
- 	/*
- 	 * Something strange seems to be happening here -
-@@ -1582,7 +1583,7 @@ static void fas216_funcdone_intr(FAS216_Info *info, unsigned int stat, unsigned
- 	default:
- 		fas216_log(info, 0, "internal phase %s for function done?"
- 			"  What do I do with this?",
--			fas216_target(info), fas216_drv_phase(info));
-+			fas216_drv_phase(info));
- 	}
- }
- 
-@@ -1642,7 +1643,7 @@ irqreturn_t fas216_intr(FAS216_Info *info)
- 			fas216_bus_reset(info);
- 			scsi_report_bus_reset(info->host, 0);
- 		} else if (inst & INST_ILLEGALCMD) {
--			fas216_log(info, LOG_ERROR, "illegal command given\n");
-+			fas216_log(info, LOG_ERROR, "illegal command given");
- 			fas216_dumpstate(info);
- 			print_debug_list();
- 		} else if (inst & INST_DISCONNECT)
 -- 
-2.10.0.rc2.1.g053435c
+Florian
