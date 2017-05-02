@@ -1,37 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 2 May 2017 11:27:58 +0200
-Subject: [PATCH/RFT renesas-devel] arm64: dts: ulcb: Enable NFS root
-In-Reply-To: <1493717048-10740-1-git-send-email-horms+renesas@verge.net.au>
-References: <1493717048-10740-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXbvC90k1QYZsjWx=f7QVQyWOzi_v3u8ShDoDsSAmZsjw@mail.gmail.com>
+From: jgross@suse.com (Juergen Gross)
+Date: Tue, 2 May 2017 11:30:14 +0200
+Subject: [PATCH 0/3 v2] xen: Implement EFI reset_system callback
+In-Reply-To: <33472949-4748-f03e-cae9-65bd5f54c2f7@arm.com>
+References: <20170424175839.5262-1-julien.grall@arm.com>
+ <33472949-4748-f03e-cae9-65bd5f54c2f7@arm.com>
+Message-ID: <f7bfc07d-ae10-09fb-9fce-a2ef93460459@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On 02/05/17 11:08, Julien Grall wrote:
+> Hi all,
+> 
+> It looks like the series has fully been acked, can someone merge this
+> into xentip?
 
-On Tue, May 2, 2017 at 11:24 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Enable NFS root on the r8a7795/h3ulcb and r8a7796/m3ulcb
-> as per:
-> * commit b2407c566ba29215 ("arm64: dts: r8a7795: enable nfs root on Salvator-X board").
-> * commit 742a9dfb90f0 ("arm64: dts: r8a7796: salvator-x: Enable NFS root")
->
-> Also set ignore_loglevel rw as boot args as is the case for the boards
-> for the boards for other Renesas ARM/ARM64 based SoCs.
+As I already wrote: patch 1 doesn't apply any longer.
 
-s/for the boards//
+As there were other conflicts between xentip and Linus' tree I'm doing
+a rebase of for-linus-4.12 right now, so I can do the rebase of this
+patch for you.
 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Juergen
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> Cheers,
+> 
+> On 04/24/2017 06:58 PM, Julien Grall wrote:
+>> Hi all,
+>>
+>> This small patch series implements EFI reset_system callback when
+>> using EFI
+>> Xen. Without this, it will not be possible to reboot/power off ARM64 DOM0
+>> when using ACPI.
+>>
+>> Cheers,
+>>
+>> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+>> Cc: Juergen Gross <jgross@suse.com>
+>>
+>> Julien Grall (3):
+>>   xen: Export xen_reboot
+>>   arm/xen: Consolidate calls to shutdown hypercall in a single helper
+>>   xen: Implement EFI reset_system callback
+>>
+>>  arch/arm/xen/efi.c       |  2 +-
+>>  arch/arm/xen/enlighten.c | 16 ++++++++++------
+>>  arch/x86/xen/efi.c       |  2 +-
+>>  arch/x86/xen/enlighten.c |  2 +-
+>>  drivers/xen/efi.c        | 18 ++++++++++++++++++
+>>  include/xen/xen-ops.h    |  5 +++++
+>>  6 files changed, 36 insertions(+), 9 deletions(-)
+>>
+> 
