@@ -1,138 +1,75 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Tue, 2 May 2017 15:54:11 +0930
-Subject: [PATCH v6 07/23] drivers/fsi: Implement slave initialisation
-In-Reply-To: <20170410194706.64280-8-cbostic@linux.vnet.ibm.com>
-References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
- <20170410194706.64280-8-cbostic@linux.vnet.ibm.com>
-Message-ID: <CACPK8XeQnqD3TV_+38hTjb8Qf4R7Um6Eztuun-T6vTMvigw+cQ@mail.gmail.com>
+From: geethasowjanya.akula@gmail.com (Geetha Akula)
+Date: Tue, 2 May 2017 12:01:15 +0530
+Subject: [PATCH 2/3] iommu/arm-smmu-v3: Add workaround for Cavium
+ ThunderX2 erratum #74
+In-Reply-To: <20170427170030.GF1890@arm.com>
+References: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
+ <1493293584-20287-3-git-send-email-gakula@caviumnetworks.com>
+ <20170427164237.GA7114@leverpostej> <20170427170030.GF1890@arm.com>
+Message-ID: <CANHdaibvzp22XEa3NnKAKUtrHcWGc9oUcnM8KubcYCzEfOaKJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 5:16 AM, Christopher Bostic
-<cbostic@linux.vnet.ibm.com> wrote:
-> From: Jeremy Kerr <jk@ozlabs.org>
->
-> Implement fsi_slave_init: if we can read a chip ID, create fsi_slave
-> devices and register with the driver core.
->
-> Includes changes from Chris Bostic <cbostic@linux.vnet.ibm.com>.
->
-> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-> Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> ---
->  drivers/fsi/fsi-core.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 64 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-> index 6e1cfdf..c705ca2 100644
-> --- a/drivers/fsi/fsi-core.c
-> +++ b/drivers/fsi/fsi-core.c
-> @@ -17,9 +17,12 @@
->  #include <linux/fsi.h>
->  #include <linux/idr.h>
->  #include <linux/module.h>
-> +#include <linux/slab.h>
->
->  #include "fsi-master.h"
->
-> +#define FSI_SLAVE_SIZE_23b             0x800000
-> +
->  static DEFINE_IDA(master_ida);
->
->  struct fsi_slave {
-> @@ -114,11 +117,70 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
->                         addr, val, size);
->  }
->
-> +static void fsi_slave_release(struct device *dev)
-> +{
-> +       struct fsi_slave *slave = to_fsi_slave(dev);
-> +
-> +       kfree(slave);
-> +}
-> +
->  static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
->  {
-> -       /* todo: initialise slave device, perform engine scan */
-> +       struct fsi_slave *slave;
-> +       uint32_t chip_id;
-> +       uint8_t crc;
-> +       int rc;
-> +
-> +       /* Currently, we only support single slaves on a link, and use the
-> +        * full 23-bit address range
-> +        */
-> +       if (id != 0)
-> +               return -EINVAL;
-> +
-> +       rc = fsi_master_read(master, link, id, 0, &chip_id, sizeof(chip_id));
-> +       if (rc) {
-> +               dev_warn(&master->dev, "can't read slave %02x:%02x %d\n",
-> +                               link, id, rc);
+Hi Will,
 
-When I boot a system with this driver loaded, I get his warning:
+SMMU_IIDR register is broken on T99, that the reason we are using MIDR.
+If using MIDR is not accepted, can we enable errata based on SMMU resource size?
+some thing like below.
 
-[    9.740000] usbhid: USB HID core driver
-[    9.840000]  fsi0: can't read slave 00:00 -5
-[    9.840000] NET: Registered protocol family 10
+static bool page0_reg_only = false;
++static unsigned long arm_smmu_resource_size(void)
++{
++       if (page0_reg_only)
++               return SZ_64K;
++       else
++               return SZ_128K;
++}
++
+ static int arm_smmu_device_probe(struct platform_device *pdev)
+ {
+        int irq, ret;
+@@ -2674,7 +2692,13 @@ static int arm_smmu_device_probe(struct
+platform_device *pdev)
 
-Two things:
+        /* Base address */
+        res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
-There's a space in front of "fsi0".
++       /*
++     * Setting page0_reg_only flag, for Cavium CN99xx implementations
++     * which doesn't support the page 1 SMMU register space.
++     */
++       if (resource_size(res) == SZ_64K)
++                       page0_reg_only = true;
+-        if (resource_size(res) + 1 < SZ_128K) {
++       if (resource_size(res) + 1 < arm_smmu_resource_size()) {
+                dev_err(dev, "MMIO region too small (%pr)\n", res);
+                return -EINVAL;
+        }
 
-This warning isn't useful at that point. The slave is not readable as
-the FSI master is not present (the P9 hasn't been turned on). Can we
-avoid printing the warning at boot?
 
-Cheers,
+Thank you,
+Geetha.
 
-Joel
-
-> +               return -ENODEV;
-> +       }
-> +       chip_id = be32_to_cpu(chip_id);
-> +
-> +       crc = fsi_crc4(0, chip_id, 32);
-> +       if (crc) {
-> +               dev_warn(&master->dev, "slave %02x:%02x invalid chip id CRC!\n",
-> +                               link, id);
-> +               return -EIO;
-> +       }
-> +
-> +       dev_info(&master->dev, "fsi: found chip %08x at %02x:%02x:%02x\n",
-> +                       chip_id, master->idx, link, id);
-> +
-> +       /* We can communicate with a slave; create the slave device and
-> +        * register.
-> +        */
-> +       slave = kzalloc(sizeof(*slave), GFP_KERNEL);
-> +       if (!slave)
-> +               return -ENOMEM;
-> +
-> +       slave->master = master;
-> +       slave->dev.parent = &master->dev;
-> +       slave->dev.release = fsi_slave_release;
-> +       slave->link = link;
-> +       slave->id = id;
-> +       slave->size = FSI_SLAVE_SIZE_23b;
-> +
-> +       dev_set_name(&slave->dev, "slave@%02x:%02x", link, id);
-> +       rc = device_register(&slave->dev);
-> +       if (rc < 0) {
-> +               dev_warn(&master->dev, "failed to create slave device: %d\n",
-> +                               rc);
-> +               put_device(&slave->dev);
-> +               return rc;
-> +       }
-> +
-> +       /* todo: perform engine scan */
+On Thu, Apr 27, 2017 at 10:30 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Apr 27, 2017 at 05:42:37PM +0100, Mark Rutland wrote:
+>> On Thu, Apr 27, 2017 at 05:16:23PM +0530, Geetha sowjanya wrote:
+>> > +   /*
+>> > +    * Override the size, for Cavium CN99xx implementations
+>> > +    * which doesn't support the page 1 SMMU register space.
+>> > +    */
+>> > +   cpu_model = read_cpuid_id() & MIDR_CPU_MODEL_MASK;
+>> > +   if (cpu_model == MIDR_THUNDERX_99XX ||
+>> > +       cpu_model == MIDR_BRCM_VULCAN)
+>> > +           size = SZ_64K;
+>>
+>> If you're trying to identify an SMMU erratum, identify the SMMU, not the
+>> CPU it happens to be paired with this time.
+>>
+>> There are ID registers in the SMMU you can use to do so.
+>>
+>> NAK to using the CPU ID here.
 >
-> -       return -ENODEV;
-> +       return rc;
->  }
+> Agreed. I had some off-list discussion with Geetha where we agreed to use
+> the "silicon ID", which I assumed was the SMMU IIDR register.
 >
->  /* FSI master support */
-> --
-> 1.8.2.2
->
+> Will
