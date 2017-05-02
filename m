@@ -1,33 +1,111 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 2 May 2017 10:10:23 +0800
-Subject: [PATCH 1/2] [PATCH 1/2] iio: adc: sun4i-gpadc-iio: Fix module
- autoload when PLATFORM devices are registered
-In-Reply-To: <20170501224559.21028-1-edu.molinas@gmail.com>
-References: <20170501224559.21028-1-edu.molinas@gmail.com>
-Message-ID: <CAGb2v65Cgtxjhuj8v5A8RF8pGTK0FD3MDmDeirO4T_T7UCF4Vw@mail.gmail.com>
+From: bradleyb@fuzziesquirrel.com (Brad Bishop)
+Date: Tue, 2 May 2017 01:25:22 -0400
+Subject: [v6,10/23] drivers/fsi: Add device read/write/peek API
+In-Reply-To: <20170410194706.64280-11-cbostic@linux.vnet.ibm.com>
+References: <20170410194706.64280-11-cbostic@linux.vnet.ibm.com>
+Message-ID: <F7D77D88-214B-48FC-AAA7-05A76483D017@fuzziesquirrel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 2, 2017 at 6:45 AM, Eduardo Molinas <edu.molinas@gmail.com> wrote:
-> If the driver is built as a module, it won't be autloaded if the devices
-> are registered via PLATFORM code because the PLATFORM device table
-> entries are not exported as aliases
->
-> Before the patch:
-> $ modinfo drivers/iio/adc/sun4i-gpadc-iio.ko | grep alias
-> $
->
-> After th patch:
+> On Apr 10, 2017, at 3:46 PM, Christopher Bostic <cbostic@linux.vnet.ibm.com> wrote:
+> 
+> From: Jeremy Kerr <jk@ozlabs.org>
+> 
+> This change introduces the fsi device API: simple read, write and peek
+> accessors for the devices' address spaces.
+> 
+> Includes contributions from Chris Bostic <cbostic@linux.vnet.ibm.com>
+> and Edward A. James <eajames@us.ibm.com>.
+> 
+> Signed-off-by: Edward A. James <eajames@us.ibm.com>
+> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+> Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
+> ---
+> drivers/fsi/fsi-core.c | 33 +++++++++++++++++++++++++++++++++
+> include/linux/fsi.h    |  7 ++++++-
+> 2 files changed, 39 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+> index a8faa89..4da0b030 100644
+> --- a/drivers/fsi/fsi-core.c
+> +++ b/drivers/fsi/fsi-core.c
+> @@ -32,6 +32,8 @@
+> #define FSI_SLAVE_CONF_CRC_MASK		0x0000000f
+> #define FSI_SLAVE_CONF_DATA_BITS	28
+> 
+> +#define FSI_PEEK_BASE			0x410
+> +
+> static const int engine_page_size = 0x400;
+> 
+> #define FSI_SLAVE_BASE			0x800
+> @@ -73,9 +75,40 @@ static int fsi_master_read(struct fsi_master *master, int link,
+> 		uint8_t slave_id, uint32_t addr, void *val, size_t size);
+> static int fsi_master_write(struct fsi_master *master, int link,
+> 		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
+> +static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
+> +		void *val, size_t size);
+> +static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
+> +		const void *val, size_t size);
+> 
+> /* FSI endpoint-device support */
+> 
+> +int fsi_device_read(struct fsi_device *dev, uint32_t addr, void *val,
+> +		size_t size)
+> +{
+> +	if (addr > dev->size || size > dev->size || addr > dev->size - size)
+> +		return -EINVAL;
+> +
+> +	return fsi_slave_read(dev->slave, dev->addr + addr, val, size);
+> +}
+> +EXPORT_SYMBOL_GPL(fsi_device_read);
+> +
+> +int fsi_device_write(struct fsi_device *dev, uint32_t addr, const void *val,
+> +		size_t size)
+> +{
+> +	if (addr > dev->size || size > dev->size || addr > dev->size - size)
+> +		return -EINVAL;
+> +
+> +	return fsi_slave_write(dev->slave, dev->addr + addr, val, size);
+> +}
+> +EXPORT_SYMBOL_GPL(fsi_device_write);
+> +
+> +int fsi_device_peek(struct fsi_device *dev, void *val)
+> +{
+> +	uint32_t addr = FSI_PEEK_BASE + ((dev->unit - 2) * sizeof(uint32_t));
+> +
+> +	return fsi_slave_read(dev->slave, addr, val, sizeof(uint32_t));
+> +}
+> +
+> static void fsi_device_release(struct device *_device)
+> {
+> 	struct fsi_device *device = to_fsi_dev(_device);
+> diff --git a/include/linux/fsi.h b/include/linux/fsi.h
+> index efa55ba..66bce48 100644
+> --- a/include/linux/fsi.h
+> +++ b/include/linux/fsi.h
+> @@ -27,6 +27,12 @@ struct fsi_device {
+> 	uint32_t		size;
+> };
+> 
+> +extern int fsi_device_read(struct fsi_device *dev, uint32_t addr,
+> +		void *val, size_t size);
+> +extern int fsi_device_write(struct fsi_device *dev, uint32_t addr,
+> +		const void *val, size_t size);
+> +extern int fsi_device_peek(struct fsi_device *dev, void *val);
+> +
+> struct fsi_device_id {
+> 	u8	engine_type;
+> 	u8	version;
+> @@ -40,7 +46,6 @@ struct fsi_device_id {
+> #define FSI_DEVICE_VERSIONED(t, v) \
+> 	.engine_type = (t), .version = (v),
+> 
+> -
+> struct fsi_driver {
+> 	struct device_driver		drv;
+> 	const struct fsi_device_id	*id_table;
 
-        ^^ the
+I wrote a driver using this API.  It seems to be suitable enough.
 
-> $ modinfo drivers/iio/adc/sun4i-gpadc-iio.ko | grep alias
-> alias:          platform:sun6i-a31-gpadc-iio
-> alias:          platform:sun5i-a13-gpadc-iio
-> alias:          platform:sun4i-a10-gpadc-iio
->
-> Signed-off-by: Eduardo Molinas <edu.molinas@gmail.com>
-
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
-Can we merge this as a fix for 4.12?
+Acked-by: Brad Bishop <bradleyb@fuzziesquirrel.com>
