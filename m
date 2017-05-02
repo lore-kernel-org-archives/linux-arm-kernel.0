@@ -1,77 +1,64 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 May 2017 13:22:08 +0200
-Subject: [PATCH v5 01/10] arm64: allwinner: a64: enable RSB on A64
-In-Reply-To: <4f910cd7ab972c1b6d93b0327833b596@aosc.io>
-References: <20170426152023.41567-1-icenowy@aosc.io>
- <20170426152023.41567-2-icenowy@aosc.io>
- <20170427132805.izv6xfktlhfc4yty@lukather>
- <4f910cd7ab972c1b6d93b0327833b596@aosc.io>
-Message-ID: <20170502112208.km7q4inncospx673@lukather>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Tue, 2 May 2017 12:23:36 +0100
+Subject: [PATCH v4 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <20170428192742.pu4v4layszr6z2ot@rob-hp-laptop>
+References: <cover.1493125299.git.guillaume.tucker@collabora.com>
+ <9349c8ae9091fbd93e9410f4cfae770ac850bf6b.1493125299.git.guillaume.tucker@collabora.com>
+ <20170428192742.pu4v4layszr6z2ot@rob-hp-laptop>
+Message-ID: <60b3c062-d4bb-6502-61be-ada830cf58f7@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 02:14:58AM +0800, icenowy at aosc.io wrote:
-> ? 2017-04-27 21:28?Maxime Ripard ???
-> > On Wed, Apr 26, 2017 at 11:20:14PM +0800, Icenowy Zheng wrote:
-> > > Allwinner A64 have a RSB controller like the one on A23/A33 SoCs.
-> > > 
-> > > Add it and its pinmux.
-> > > 
-> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > > Acked-by: Chen-Yu Tsai <wens@csie.org>
-> > > ---
-> > > Changes in v2:
-> > > - Removed bonus properties in pio node.
-> > > - Added Chen-Yu's ACK.
-> > > 
-> > >  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 19
-> > > +++++++++++++++++++
-> > >  1 file changed, 19 insertions(+)
-> > > 
-> > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > > b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > > index c7f669f5884f..05ec9fc5e81f 100644
-> > > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > > @@ -422,6 +422,25 @@
-> > >  			#gpio-cells = <3>;
-> > >  			interrupt-controller;
-> > >  			#interrupt-cells = <3>;
-> > > +
-> > > +			r_rsb_pins: rsb at 0 {
-> > > +				pins = "PL0", "PL1";
-> > > +				function = "s_rsb";
-> > > +			};
-> > > +		};
-> > > +
-> > > +		r_rsb: rsb at 1f03400 {
-> > > +			compatible = "allwinner,sun8i-a23-rsb";
-> > > +			reg = <0x01f03400 0x400>;
-> > > +			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-> > > +			clocks = <&r_ccu 6>;
-> > 
-> > Please use the defines here..
-> 
-> Linux-4.12 doesn't yet enter rc1, and the defines are still not in
-> Linus's tree.
-> 
-> Please note that I have already mentioned that this patch is necessary
-> to be merged into 4.12, otherwise poweroff won't work properly at 4.12 .
+Hi Rob,
 
-This is too late for 4.12. We don't merge any patch two weeks before
-the merge window opens, which makes it around -rc6. This will be 4.13
-material, so we'll definitely have the defines by then.
+On 28/04/17 20:27, Rob Herring wrote:
+> On Tue, Apr 25, 2017 at 02:16:16PM +0100, Guillaume Tucker wrote:
 
-Maxime
+>> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>> new file mode 100644
+>> index 000000000000..547ddeceb498
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>> @@ -0,0 +1,82 @@
+>> +ARM Mali Midgard GPU
+>> +====================
+>> +
+>> +Required properties:
+>> +
+>> +- compatible :
+>> +  * Must be one of the following:
+>> +    + "arm,mali-t60x"
+>> +    + "arm,mali-t62x"
+>
+> Don't use wildcards.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170502/f8b1df85/attachment.sig>
+Sure, old habits die hard...  I'll fix it in patch v5.
+
+>> +    + "arm,mali-t720"
+>> +    + "arm,mali-t760"
+>> +    + "arm,mali-t820"
+>> +    + "arm,mali-t830"
+>> +    + "arm,mali-t860"
+>> +    + "arm,mali-t880"
+>> +  * And, optionally, one of the vendor specific compatible:
+>
+> IMO, these should not be optional.
+
+Well, vendor compatible strings are clearly optional for the
+Utgard GPU series for which the bindings docs were recently
+merged.  It seems that whether these should be optional or not,
+the documentation should be consistent between at least all
+similar types of devices like Midgard and Utgard GPUs.  They have
+different architectures but from a device tree point of view,
+they both have the same kind of SoC-specific integration (clocks,
+irqs, regulators...).
+
+So was this was overlooked in the Utgard case and should it
+ideally be fixed there as well as non-optional?  Or, is it OK to
+keep these optional on a second thought?
+
+>> +    + "amlogic,meson-gxm-mali"
+>> +    + "rockchip,rk3288-mali"
+
+Guillaume
