@@ -1,101 +1,42 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Tue, 2 May 2017 20:15:03 +0800
-Subject: [PATCH v3 1/3] arm64: kvm: support kvmtool to detect RAS
- extension feature
-In-Reply-To: <20170502075631.GE16940@cbox>
-References: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
- <20170502075631.GE16940@cbox>
-Message-ID: <c3b355e7-0358-25ea-9617-80be489a3f83@huawei.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 2 May 2017 13:27:54 +0100
+Subject: [PATCH] Remove ARM errata Workarounds 458693 and 460075
+In-Reply-To: <20170418155725.GG27592@e104818-lin.cambridge.arm.com>
+References: <1492301166-10292-1-git-send-email-nisalmenuka23@gmail.com>
+ <20170416080446.GI17774@n2100.armlinux.org.uk>
+ <20170418155725.GG27592@e104818-lin.cambridge.arm.com>
+Message-ID: <e7310f9f-96a3-186a-7e5d-7da902bc76f8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-   thanks for your review and comments.
-
-On 2017/5/2 15:56, Christoffer Dall wrote:
-> Hi Dongjiu,
-> 
-> Please send a cover letter for patch series with more than a single
-> patch.
- OK, got it.
-
-> 
-> The subject and description of these patches are also misleading.
-> Hopefully this is in no way tied to kvmtool, but to userspace
-> generically, for example also to be used by QEMU?
-> 
-> On Sun, Apr 30, 2017 at 01:37:55PM +0800, Dongjiu Geng wrote:
->> Handle kvmtool's detection for RAS extension, because sometimes
->> the APP needs to know the CPU's capacity
-> 
-> the APP ?
-> 
-> the CPU's capacity?
-I will fix it.
-
-> 
+On 18/04/17 16:57, Catalin Marinas wrote:
+> On Sun, Apr 16, 2017 at 09:04:46AM +0100, Russell King - ARM Linux wrote:
+>> On Sat, Apr 15, 2017 at 07:06:06PM -0500, Nisal Menuka wrote:
+>>> According to ARM, these errata exist only in a version of Cortex-A8
+>>> (r2p0) which was never built. Therefore, I believe there are no platforms
+>>> where this workaround should be enabled.
+>>> link :http://infocenter.arm.com/help/index.jsp?topic=
+>>> /com.arm.doc.faqs/ka15634.html
 >>
->> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->> ---
->>  arch/arm64/kvm/reset.c   | 11 +++++++++++
->>  include/uapi/linux/kvm.h |  1 +
->>  2 files changed, 12 insertions(+)
->>
->> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->> index d9e9697..1004039 100644
->> --- a/arch/arm64/kvm/reset.c
->> +++ b/arch/arm64/kvm/reset.c
->> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
->>  	return !!(pfr0 & 0x20);
->>  }
->>  
->> +static bool kvm_arm_support_ras_extension(void)
->> +{
->> +	u64 pfr0;
->> +
->> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
->> +	return !!(pfr0 & 0x10000000);
->> +}
->> +
->>  /**
->>   * kvm_arch_dev_ioctl_check_extension
->>   *
->> @@ -87,6 +95,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->>  	case KVM_CAP_ARM_PMU_V3:
->>  		r = kvm_arm_support_pmu_v3();
->>  		break;
->> +	case KVM_CAP_ARM_RAS_EXTENSION:
->> +		r = kvm_arm_support_ras_extension();
->> +		break;
+>> These were submitted by ARM Ltd back in 2009 - if the silicon was never
+>> built, there would've been no reason to submit them.  Maybe Catalin can
+>> shed some light on this, being the commit author who introduced these?
 > 
-> You need to document this capability and API in
-> Documentation/virtual/kvm/api.txt and explain how this works.
- Ok, thanks for your suggestion.
+> We normally try not to submit errata workarounds for revisions that are
+> not going to be built/deployed. It's possible that at the time there
+> were plans for r2p0 to be licensed and built (not just FPGA) but I don't
+> really remember the details. The A8 errata document indeed states that
+> r1p0 and r2p0 are obsolete but this can mean many things (like not
+> available to license).
+> 
+> I'll try to see if any of the A8 past product managers know anything
+> about this. In the meantime, I would leave them in (no run-time
+> overhead).
 
-> 
-> 
-> 
->>  	case KVM_CAP_SET_GUEST_DEBUG:
->>  	case KVM_CAP_VCPU_ATTRIBUTES:
->>  		r = 1;
->> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->> index f51d508..27fe556 100644
->> --- a/include/uapi/linux/kvm.h
->> +++ b/include/uapi/linux/kvm.h
->> @@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
->>  #define KVM_CAP_PPC_MMU_RADIX 134
->>  #define KVM_CAP_PPC_MMU_HASH_V3 135
->>  #define KVM_CAP_IMMEDIATE_EXIT 136
->> +#define KVM_CAP_ARM_RAS_EXTENSION 137
->>  
->>  #ifdef KVM_CAP_IRQ_ROUTING
->>  
->> -- 
->> 2.10.1
->>
-> 
-> Thanks,
-> -Christoffer
-> 
-> .
-> 
+FWIW, I just fired up a RealView PB-A8 board to check, and that reports
+r1p1. True, it's not strictly a real silicon implementation (I think
+it's one of the structured ASIC test chips), but since it was, as far as
+I'm aware, a commercially-available development system, it's not
+impossible that someone may still own and use one of these beasts.
+
+Robin.
