@@ -1,37 +1,39 @@
-From: chunkeey@googlemail.com (Christian Lamparter)
-Date: Tue,  2 May 2017 21:19:24 +0200
-Subject: [PATCH] qcom: ipq4019: fix i2c_0 node
-Message-ID: <20170502191924.32585-1-chunkeey@googlemail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 2 May 2017 21:36:41 +0200
+Subject: [RFC/RFT PATCH 03/18] PCI: Introduce pci_scan_root_bus_bridge()
+In-Reply-To: <20170502171501.GA5545@red-moon>
+References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
+ <20170426111809.19922-4-lorenzo.pieralisi@arm.com>
+ <CAK8P3a0HmrrYBP5em1s4VOY4Tb6=bwOrDDN6K8rPp8OEXtpMtA@mail.gmail.com>
+ <20170502171501.GA5545@red-moon>
+Message-ID: <CAK8P3a1dbopDOXot-brx+xfZeBbUZUfYf1Urs2T3UNwXyg8Mnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes two typos in the i2c_0 node for the ipq4019.
-The reg property length is just 0x600. The core clock is
-GCC_BLSP1_QUP1_I2C_APPS_CLK. GCC_BLSP1_QUP2_I2C_APPS_CLK is
-used by the second i2c.
+On Tue, May 2, 2017 at 7:15 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Fri, Apr 28, 2017 at 02:28:38PM +0200, Arnd Bergmann wrote:
+>> On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
+>> <lorenzo.pieralisi@arm.com> wrote:
+>>
+>> Good idea, yes. To avoid growing the number of interfaces too
+>> much, should we change the existing users of pci_register_host_bridge
+>> in host drivers over to this entry point, and make the other one
+>> local to probe.c then?
+>
+> Yes, the problem is that there are drivers (ie pcie-iproc.c) that
+> require the struct pci_bus (created by pci_register_host_bridge())
+> to fiddle with it to check link status and THEN scan the bus (so
+> the pci_register_host_bridge() call can't be embedded in the scan
+> interface - the driver requires struct pci_bus for pci_ops to work
+> before scanning the bus itself).
+>
+> I will see how I can accommodate this change because you definitely
+> have a point.
 
-Fixes: e76b4284b520ba3 ("qcom: ipq4019: add i2c node to ipq4019 SoC and DK01 device tree")
-Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
----
- arch/arm/boot/dts/qcom-ipq4019.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+The obvious answer for that particular problem would be a link_check()
+callback in the bridge operations. I think that would also fit in well with
+the dw_pcie driver that has some private infrastructure for it. I don't
+know if that callback is sufficient to solve all related problems though.
 
-diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-index b7a24af8f47b..4b7d97275c62 100644
---- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-@@ -154,10 +154,10 @@
- 
- 		i2c_0: i2c at 78b7000 {
- 			compatible = "qcom,i2c-qup-v2.2.1";
--			reg = <0x78b7000 0x6000>;
-+			reg = <0x78b7000 0x600>;
- 			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
--				 <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
-+				 <&gcc GCC_BLSP1_QUP1_I2C_APPS_CLK>;
- 			clock-names = "iface", "core";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--- 
-2.11.0
+       Arnd
