@@ -1,91 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 2 May 2017 17:48:47 +0100
-Subject: [PATCH 1/1] arm64: Always provide "model name" in /proc/cpuinfo
-In-Reply-To: <15006378-af42-b029-f967-3f7230b64706@gmx.de>
-References: <20170501223913.6894-1-xypron.glpk@gmx.de>
- <20170502110827.GA29224@e104818-lin.cambridge.arm.com>
- <15006378-af42-b029-f967-3f7230b64706@gmx.de>
-Message-ID: <20170502164846.GD28132@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 02 May 2017 17:50:17 +0100
+Subject: [PATCH] arm: pmu: Get PMU working when the A53 is run in 32 bit
+ mode
+In-Reply-To: <3f44e99a-6ff1-23e5-52d5-59c662fd10c3@gmail.com> (Florian
+ Fainelli's message of "Tue, 2 May 2017 08:51:55 -0700")
+References: <1493733691-43814-1-git-send-email-alcooperx@gmail.com>
+ <0f716b0c-b9ac-29d9-2909-50906ad90bd3@arm.com>
+ <3f44e99a-6ff1-23e5-52d5-59c662fd10c3@gmail.com>
+Message-ID: <87h913mcdy.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 02, 2017 at 06:28:40PM +0200, Heinrich Schuchardt wrote:
-> On 05/02/2017 01:08 PM, Catalin Marinas wrote:
-> > On Tue, May 02, 2017 at 12:39:13AM +0200, Heinrich Schuchardt wrote:
-> >> There is no need to hide the model name in processes
-> >> that are not PER_LINUX32.
-> >>
-> >> So let us always provide a model name that is easily readable.
-> >>
-> >> Fixes: e47b020a323d ("arm64: Provide "model name" in /proc/cpuinfo for PER_LINUX32 tasks")
-> >> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
-> >> ---
-> >>  arch/arm64/kernel/cpuinfo.c | 5 ++---
-> >>  1 file changed, 2 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> >> index b3d5b3e8fbcb..9ad9ddcd2f19 100644
-> >> --- a/arch/arm64/kernel/cpuinfo.c
-> >> +++ b/arch/arm64/kernel/cpuinfo.c
-> >> @@ -118,9 +118,8 @@ static int c_show(struct seq_file *m, void *v)
-> >>  		 * "processor".  Give glibc what it expects.
-> >>  		 */
-> >>  		seq_printf(m, "processor\t: %d\n", i);
-> >> -		if (compat)
-> >> -			seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
-> >> -				   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
-> >> +		seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
-> >> +			   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
-> >>  
-> >>  		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
-> >>  			   loops_per_jiffy / (500000UL/HZ),
-> > 
-> > Such patch seems to come up regularly:
-> > 
-> > https://patchwork.kernel.org/patch/9303311/
-> > 
-> > (and it usually gets rejected)
-> > 
-> Dear Catalin,
-> 
-> thank you for pointing me to the previous discussion. I understand that
-> adding model name in the current form would not provide sufficient
-> valuable information.
-> 
-> The real interesting thing in an ARM SOC is to see which CPU is A72,
-> A57, A53 or whatever.
+On Tue, May 02 2017 at  4:51:55 pm BST, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> Hi Mark,
+>
+> On 05/02/2017 07:17 AM, Marc Zyngier wrote:
+>> Hi Al,
+>> 
+>> On 02/05/17 15:01, Al Cooper wrote:
+>>> From: Al Cooper <al.cooper@broadcom.com>
+>>>
+>>> When the A53 is run in A15 (32 bit) mode, the registers used to
+>>> access the counters are A15 style registers, but the actual
+>>> counters are the A53 counters not A15 counters. This patch will
+>>> select a PMU counters map for the A53 if the device tree pmu
+>>> "compatible" property includes "arm,cortex-a53-pmu".
+>> 
+>> I wasn't aware of an "A15 mode"! Is there an ARM3 mode, while we're at
+>> it? ;-)
+>
+> This is referring to how our Device Tree and kernel end-up "viewing" the
+> PMU (based on provided compatible strings) but this probably should be
+> omitted for clarity.
 
-This information can be derived from the MIDR fields exposed in
-/proc/cpuninfo
+That's certainly wrong from both an architectural and implementation
+PoV. Although there is some level of compatibility between the ARMv7 and
+ARMv8 PMU architectures, they are distinct beasts.
 
-e.g.
+>> 
+>> More seriously, you seem to take the problem from the wrong end. If you
+>> have an ARMv8 core, you should use the PMUv3 driver (because that is
+>> what your A53 has), and not the ARMv7 PMU.
+>> 
+>> To that affect, I've posted this[1] a while ago. Can you please give it
+>> a go?
+>
+> That seems to be the right direction, however don't you also need to
+> possibly expose other PMU types as well? Cortex-A53 and Cortex-A57 PMUs
+> (and possibly more) for instance because there are additional counters
+> that can be defined specifically for those, e.g: LL = L2 cache on A53,
+> see [1].
 
-CPU implementer : 0x41
-CPU architecture: 8
-CPU variant     : 0x1
-CPU part        : 0xd07
-CPU revision    : 2
-
-... is a Cortex-A57.
-
-> This information is available from the device tree in the compatible
-> property of the individual CPUs
-> (/sys/firmware/devicetree/base/cpus/cpu@*/compatible), e.g.
-> compatible =3D "arm,cortex-a53", "arm,armv8";
-> 
-> I guess this information is the closest to the model name property on
-> other architectures that we can get.
-> 
-> Would exposing this information in /proc/cpuinfo as 'model name' make
-> sense to you?
-
-I would disagree with exposing this, as in practice it is wrong in some
-DTs, and it's not avaialble on ACPI systems.
-
-We already expose the information necessary to derive the name, given a
-lookup table in userspace. We don't have sufficient information to build
-this in the kernel in all cases, so I don't think that we should attempt
-to do so.
+That's pretty much orthogonal. Once we have a common driver for PMUv3 on
+both 32 and 64bit, adding implementation-specific events can be done for
+both architecture.
 
 Thanks,
-Mark.
+
+	M.
+-- 
+Jazz is not dead, it just smell funny.
