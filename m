@@ -1,56 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 2 May 2017 13:37:52 +0100
-Subject: [PATCH 1/1] arm64: Always provide "model name" in /proc/cpuinfo
-In-Reply-To: <20170502110827.GA29224@e104818-lin.cambridge.arm.com>
-References: <20170501223913.6894-1-xypron.glpk@gmx.de>
- <20170502110827.GA29224@e104818-lin.cambridge.arm.com>
-Message-ID: <20170502123752.GB28132@leverpostej>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Tue,  2 May 2017 18:36:49 +0530
+Subject: [PATCH 0/9] net: thunderx: Adds XDP support
+Message-ID: <1493730418-24606-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 02, 2017 at 12:08:27PM +0100, Catalin Marinas wrote:
-> On Tue, May 02, 2017 at 12:39:13AM +0200, Heinrich Schuchardt wrote:
-> > There is no need to hide the model name in processes
-> > that are not PER_LINUX32.
-> > 
-> > So let us always provide a model name that is easily readable.
-> > 
-> > Fixes: e47b020a323d ("arm64: Provide "model name" in /proc/cpuinfo for PER_LINUX32 tasks")
-> > Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
-> > ---
-> >  arch/arm64/kernel/cpuinfo.c | 5 ++---
-> >  1 file changed, 2 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> > index b3d5b3e8fbcb..9ad9ddcd2f19 100644
-> > --- a/arch/arm64/kernel/cpuinfo.c
-> > +++ b/arch/arm64/kernel/cpuinfo.c
-> > @@ -118,9 +118,8 @@ static int c_show(struct seq_file *m, void *v)
-> >  		 * "processor".  Give glibc what it expects.
-> >  		 */
-> >  		seq_printf(m, "processor\t: %d\n", i);
-> > -		if (compat)
-> > -			seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
-> > -				   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
-> > +		seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
-> > +			   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
-> >  
-> >  		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
-> >  			   loops_per_jiffy / (500000UL/HZ),
-> 
-> Such patch seems to come up regularly:
-> 
-> https://patchwork.kernel.org/patch/9303311/
-> 
-> (and it usually gets rejected)
+From: Sunil Goutham <sgoutham@cavium.com>
 
-Indeed; my comments from that previous discussion apply here.
+This patch series adds support for XDP to ThunderX NIC driver
+which is used on CN88xx, CN81xx and CN83xx platforms. 
 
-In addition, the commit message above refers to this as fixing another
-commit, but does not explain why the current behviour would be
-considered a bug.
+Patches 1-4 are performance improvement and cleanup patches
+which are done keeping XDP performance bottlenecks in view.
+Rest of the patches adds actual XDP support.
 
-I do not think it makes sense to take this patch.
+Sunil Goutham (9):
+  net: thunderx: Support for page recycling
+  net: thunderx: Optimize RBDR descriptor handling
+  net: thunderx: Optimize CQE_TX handling
+  net: thunderx: Cleanup receive buffer allocation
+  net: thunderx: Add basic XDP support
+  net: thunderx: Add support for XDP_DROP
+  net: thunderx: Add support for XDP_TX
+  net: thunderx: Support for XDP header adjustment
+  net: thunderx: Optimize page recycling for XDP
 
-Thanks,
-Mark.
+ drivers/net/ethernet/cavium/thunder/nic.h          |  10 +-
+ .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |  29 +-
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 313 +++++++++++++++--
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 387 +++++++++++++++++----
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |  32 +-
+ drivers/net/ethernet/cavium/thunder/q_struct.h     |  10 +-
+ 6 files changed, 657 insertions(+), 124 deletions(-)
+
+-- 
+2.7.4
