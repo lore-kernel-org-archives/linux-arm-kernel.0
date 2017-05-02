@@ -1,108 +1,113 @@
-From: ashok.raj@intel.com (Raj, Ashok)
-Date: Tue, 2 May 2017 09:53:29 -0700
-Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING
-In-Reply-To: <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
-References: <cover.1493678834.git.leedom@chelsio.com>
- <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
- <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
-Message-ID: <20170502165329.GB26406@linux.intel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 2 May 2017 18:15:01 +0100
+Subject: [RFC/RFT PATCH 03/18] PCI: Introduce pci_scan_root_bus_bridge()
+In-Reply-To: <CAK8P3a0HmrrYBP5em1s4VOY4Tb6=bwOrDDN6K8rPp8OEXtpMtA@mail.gmail.com>
+References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
+ <20170426111809.19922-4-lorenzo.pieralisi@arm.com>
+ <CAK8P3a0HmrrYBP5em1s4VOY4Tb6=bwOrDDN6K8rPp8OEXtpMtA@mail.gmail.com>
+Message-ID: <20170502171501.GA5545@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 02, 2017 at 09:39:34AM -0700, Alexander Duyck wrote:
-> On Mon, May 1, 2017 at 4:13 PM, Casey Leedom <leedom@chelsio.com> wrote:
-> > The new flag PCI_DEV_FLAGS_NO_RELAXED_ORDERING indicates that the Relaxed
-> > Ordering Attribute should not be used on Transaction Layer Packets destined
-> > for the PCIe End Node so flagged.  Initially flagged this way are Intel
-> > E5-26xx Root Complex Ports which suffer from a Flow Control Credit
-> > Performance Problem and AMD A1100 ARM ("SEATTLE") Root Complex Ports which
-> > don't obey PCIe 3.0 ordering rules which can lead to Data Corruption.
-> 
-> So this is a good first step though might I suggest one other change.
-> 
-> We may want to add logic to the core PCIe code that clears the "Enable
-> Relaxed Ordering" bit in the device control register for all devices
-> hanging off of this root complex. Assuming the devices conform to the
-> PCIe spec doing that should disable relaxed ordering in a device
-> agnostic way that then enables us at a driver level to just enable the
-> feature always without having to perform any checks for your flag. We
-> could probably do that as a part of probing the PCIe interfaces
-> hanging off of these devices.
-
-I suppose you don't want to turn off RO completely on the device. When
-traffic is targetted to mmio for peer to peer reasons RO has performance
-upside. The specific issue with these root ports indicate limitation using 
-RO for traffic targetting coherent memory.
-
-> 
-> > ---
-> >  drivers/pci/quirks.c | 38 ++++++++++++++++++++++++++++++++++++++
-> >  include/linux/pci.h  |  2 ++
-> >  2 files changed, 40 insertions(+)
+On Fri, Apr 28, 2017 at 02:28:38PM +0200, Arnd Bergmann wrote:
+> On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > Current pci_scan_root_bus() interface is made up of two main
+> > code paths:
 > >
-> > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> > index f754453..4ae78b3 100644
-> > --- a/drivers/pci/quirks.c
-> > +++ b/drivers/pci/quirks.c
-> > @@ -3979,6 +3979,44 @@ static void quirk_tw686x_class(struct pci_dev *pdev)
-> >                               quirk_tw686x_class);
+> > - pci_create_root_bus()
+> > - pci_scan_child_bus()
 > >
-> >  /*
-> > + * Some devices have problems with Transaction Layer Packets with the Relaxed
-> > + * Ordering Attribute set.  Such devices should mark themselves and other
-> > + * Device Drivers should check before sending TLPs with RO set.
-> > + */
-> > +static void quirk_relaxedordering_disable(struct pci_dev *dev)
+> > pci_create_root_bus() is a wrapper function that allows to create
+> > a struct pci_host_bridge structure, initialize it with the passed
+> > parameters and register it with the kernel.
+> >
+> > As the struct pci_host_bridge require additional struct members,
+> > pci_create_root_bus() parameters list has grown in time, making
+> > it unwieldy to add further parameters to it in case the struct
+> > pci_host_bridge gains more members fields to augment its functionality.
+> >
+> > Since PCI core code provides functions to allocate struct
+> > pci_host_bridge, instead of forcing the pci_create_root_bus() interface
+> > to add new parameters to cater for new struct pci_host_bridge
+> > functionality, it is more suitable to add an interface in PCI
+> > core code to scan a PCI bus straight from a struct pci_host_bridge
+> > created and customized by each specific PCI host controller driver.
+> >
+> > Add a pci_scan_root_bus_bridge() function to allow PCI host controller
+> > drivers to create and initialize struct pci_host_bridge and scan
+> > the resulting bus.
+> >
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> 
+> Good idea, yes. To avoid growing the number of interfaces too
+> much, should we change the existing users of pci_register_host_bridge
+> in host drivers over to this entry point, and make the other one
+> local to probe.c then?
+
+Yes, the problem is that there are drivers (ie pcie-iproc.c) that
+require the struct pci_bus (created by pci_register_host_bridge())
+to fiddle with it to check link status and THEN scan the bus (so
+the pci_register_host_bridge() call can't be embedded in the scan
+interface - the driver requires struct pci_bus for pci_ops to work
+before scanning the bus itself).
+
+I will see how I can accommodate this change because you definitely
+have a point.
+
+> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > index 7e4ffc4..c7a7f72 100644
+> > --- a/drivers/pci/probe.c
+> > +++ b/drivers/pci/probe.c
+> > @@ -2412,6 +2412,44 @@ void pci_bus_release_busn_res(struct pci_bus *b)
+> >                         res, ret ? "can not be" : "is");
+> >  }
+> >
+> > +int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge)
 > > +{
-> > +       dev->dev_flags |= PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
+> > +       struct resource_entry *window;
+> > +       bool found = false;
+> > +       struct pci_bus *b;
+> > +       int max, bus, ret;
+> > +
+> > +       if (!bridge)
+> > +               return -EINVAL;
+> > +
+> > +       resource_list_for_each_entry(window, &bridge->windows)
+> > +               if (window->res->flags & IORESOURCE_BUS) {
+> > +                       found = true;
+> > +                       break;
+> > +               }
+> > +
+> > +       ret = pci_register_host_bridge(bridge);
+> > +       if (ret < 0)
+> > +               return ret;
+> > +
+> > +       b = bridge->bus;
+> > +       bus = bridge->busnr;
+> > +
+> > +       if (!found) {
+> > +               dev_info(&b->dev,
+> > +                "No busn resource found for root bus, will use [bus %02x-ff]\n",
+> > +                       bus);
+> > +               pci_bus_insert_busn_res(b, bus, 255);
+> > +       }
+> > +
+> > +       max = pci_scan_child_bus(b);
+> > +
+> > +       if (!found)
+> > +               pci_bus_update_busn_res_end(b, max);
+> > +
+> > +       return 0;
 > > +}
 > > +
-> > +/*
-> > + * Intel E5-26xx Root Complex has a Flow Control Credit issue which can
-> > + * cause performance problems with Upstream Transaction Layer Packets with
-> > + * Relaxed Ordering set.
-> > + */
-> > +DECLARE_PCI_FIXUP_CLASS_EARLY(0x8086, 0x6f02, PCI_CLASS_NOT_DEFINED, 8,
-> > +                             quirk_relaxedordering_disable);
-> > +DECLARE_PCI_FIXUP_CLASS_EARLY(0x8086, 0x6f04, PCI_CLASS_NOT_DEFINED, 8,
-> > +                             quirk_relaxedordering_disable);
-> > +DECLARE_PCI_FIXUP_CLASS_EARLY(0x8086, 0x6f08, PCI_CLASS_NOT_DEFINED, 8,
-> > +                             quirk_relaxedordering_disable);
-> > +
-> > +/*
-> > + * The AMD ARM A1100 (AKA "SEATTLE") SoC has a bug in its PCIe Root Complex
-> > + * where Upstream Transaction Layer Packets with the Relaxed Ordering
-> > + * Attribute clear are allowed to bypass earlier TLPs with Relaxed Ordering
-> > + * set.  This is a violation of the PCIe 3.0 Transaction Ordering Rules
-> > + * outlined in Section 2.4.1 (PCI Express(r) Base Specification Revision 3.0
-> > + * November 10, 2010).  As a result, on this platform we can't use Relaxed
-> > + * Ordering for Upstream TLPs.
-> > + */
-> > +DECLARE_PCI_FIXUP_CLASS_EARLY(0x1022, 0x1a00, PCI_CLASS_NOT_DEFINED, 8,
-> > +                             quirk_relaxedordering_disable);
-> > +DECLARE_PCI_FIXUP_CLASS_EARLY(0x1022, 0x1a01, PCI_CLASS_NOT_DEFINED, 8,
-> > +                             quirk_relaxedordering_disable);
-> > +DECLARE_PCI_FIXUP_CLASS_EARLY(0x1022, 0x1a02, PCI_CLASS_NOT_DEFINED, 8,
-> > +                             quirk_relaxedordering_disable);
-> > +
-> > +/*
-> >   * Per PCIe r3.0, sec 2.2.9, "Completion headers must supply the same
-> >   * values for the Attribute as were supplied in the header of the
-> >   * corresponding Request, except as explicitly allowed when IDO is used."
-> > diff --git a/include/linux/pci.h b/include/linux/pci.h
-> > index eb3da1a..6764f66 100644
-> > --- a/include/linux/pci.h
-> > +++ b/include/linux/pci.h
-> > @@ -178,6 +178,8 @@ enum pci_dev_flags {
-> >         PCI_DEV_FLAGS_NO_PM_RESET = (__force pci_dev_flags_t) (1 << 7),
-> >         /* Get VPD from function 0 VPD */
-> >         PCI_DEV_FLAGS_VPD_REF_F0 = (__force pci_dev_flags_t) (1 << 8),
-> > +       /* Don't use Relaxed Ordering for TLPs directed at this device */
-> > +       PCI_DEV_FLAGS_NO_RELAXED_ORDERING = (__force pci_dev_flags_t) (1 << 9),
-> >  };
-> >
-> >  enum pci_irq_reroute_variant {
-> > --
-> > 1.9.1
-> >
+> 
+> We probably want an EXPORT_SYMBOL() here as well.
+
+Yep, sure.
+
+Thanks for having a look !
+
+Lorenzo
