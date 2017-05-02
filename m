@@ -1,78 +1,51 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 2 May 2017 10:25:18 +0200
-Subject: linux-next: build failure after merge of the drm-misc tree
-In-Reply-To: <20170424112512.582d04da@canb.auug.org.au>
-References: <20170421121014.3ee14a83@canb.auug.org.au>
- <20170424112512.582d04da@canb.auug.org.au>
-Message-ID: <20170502082518.jdk5tqjhvlsqntny@phenom.ffwll.local>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 2 May 2017 09:25:42 +0100
+Subject: [PATCH] arm64: Fix multiple 'asm-operand-widths' warnings
+In-Reply-To: <20170501212622.153720-1-mka@chromium.org>
+References: <20170501212622.153720-1-mka@chromium.org>
+Message-ID: <0f4ccaac-7cb0-6888-4127-e4ef15ebab25@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 11:25:12AM +1000, Stephen Rothwell wrote:
-> Hi all,
+On 01/05/17 22:26, Matthias Kaehlcke wrote:
+> clang raises 'asm-operand-widths' warnings in inline assembly code when
+> the size of an operand is < 64 bits and the operand width is unspecified.
+> Most warnings are raised in macros, i.e. the datatype of the operand may
+> vary. Forcing the use of an x register through the 'x' operand modifier
+> would silence the warning however it involves the risk that for operands
+> < 64 bits 'unused' bits may be assigned to 64-bit values (more details at
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/503816.html).
+> Instead we cast the operand to 64 bits, which also forces the use of a
+> x register, but without the unexpected behavior.
 > 
-> On Fri, 21 Apr 2017 12:10:14 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> >
-> > After merging the drm-misc tree, today's linux-next build (x86_64
-> > allmodconfig) failed like this:
-> > 
-> > drivers/tee/tee_shm.c:87:2: error: unknown field 'kmap_atomic' specified in initializer
-> >   .kmap_atomic = tee_shm_op_kmap_atomic,
-> >   ^
-> > drivers/tee/tee_shm.c:87:17: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-> >   .kmap_atomic = tee_shm_op_kmap_atomic,
-> >                  ^
-> > drivers/tee/tee_shm.c:87:17: note: (near initialization for 'tee_shm_dma_buf_ops.begin_cpu_access')
-> > drivers/tee/tee_shm.c:88:2: error: unknown field 'kmap' specified in initializer
-> >   .kmap = tee_shm_op_kmap,
-> >   ^
-> > drivers/tee/tee_shm.c:88:10: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-> >   .kmap = tee_shm_op_kmap,
-> >           ^
-> > drivers/tee/tee_shm.c:88:10: note: (near initialization for 'tee_shm_dma_buf_ops.end_cpu_access')
-> > 
-> > Caused by commit
-> > 
-> >   f9b67f0014cb ("dma-buf: Rename dma-ops to prevent conflict with kunmap_atomic macro")
-> > 
-> > interacting with commit
-> > 
-> >   967c9cca2cc5 ("tee: generic TEE subsystem")
-> > 
-> > from the arm-soc tree.
-> > 
-> > I applied the following merge fix patch for today:
-> > 
-> > From: Stephen Rothwell <sfr@canb.auug.org.au>
-> > Date: Fri, 21 Apr 2017 12:06:32 +1000
-> > Subject: [PATCH] tee: merge fix for dma-ops field name changes
-> > 
-> > Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
-> > ---
-> >  drivers/tee/tee_shm.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
-> > index 0be1e3e93bee..4e14c9c9cb1c 100644
-> > --- a/drivers/tee/tee_shm.c
-> > +++ b/drivers/tee/tee_shm.c
-> > @@ -84,8 +84,8 @@ static struct dma_buf_ops tee_shm_dma_buf_ops = {
-> >  	.map_dma_buf = tee_shm_op_map_dma_buf,
-> >  	.unmap_dma_buf = tee_shm_op_unmap_dma_buf,
-> >  	.release = tee_shm_op_release,
-> > -	.kmap_atomic = tee_shm_op_kmap_atomic,
-> > -	.kmap = tee_shm_op_kmap,
-> > +	.map_atomic = tee_shm_op_kmap_atomic,
-> > +	.map = tee_shm_op_kmap,
-> >  	.mmap = tee_shm_op_mmap,
-> >  };
+> In gic_write_bpr1() use write_sysreg_s() to write the register. This
+> aligns the functions with others in this header and fixes an
+> 'asm-operand-widths' warning.
+> 
+> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> ---
+>  arch/arm64/include/asm/arch_gicv3.h  | 2 +-
+>  arch/arm64/include/asm/barrier.h     | 2 +-
+>  arch/arm64/include/asm/uaccess.h     | 2 +-
+>  arch/arm64/kernel/armv8_deprecated.c | 2 +-
+>  4 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+> index f37e3a21f6e7..9092d612d8c2 100644
+> --- a/arch/arm64/include/asm/arch_gicv3.h
+> +++ b/arch/arm64/include/asm/arch_gicv3.h
+> @@ -166,7 +166,7 @@ static inline void gic_write_sre(u32 val)
+>  
+>  static inline void gic_write_bpr1(u32 val)
+>  {
+> -	asm volatile("msr_s " __stringify(ICC_BPR1_EL1) ", %0" : : "r" (val));
+> +	write_sysreg_s(val, ICC_BPR1_EL1);
+>  }
 
-Since this is an all-new driver it might be best to stagger the pull
-requests and merge the new tee subsystem (or whatever it is) after drm?
+For the GICv3 part:
 
-Not sure what to best do here ...
--Daniel
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Jazz is not dead. It just smells funny...
