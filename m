@@ -1,24 +1,118 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 02 May 2017 15:47:44 -0400 (EDT)
-Subject: [PATCH 0/9] net: thunderx: Adds XDP support
-In-Reply-To: <1493730418-24606-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1493730418-24606-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <20170502.154744.1762061314370744901.davem@davemloft.net>
+From: sgoel@codeaurora.org (Sameer Goel)
+Date: Tue,  2 May 2017 14:28:05 -0600
+Subject: [PATCH] arm64: Add translation functions for /dev/mem read/write
+Message-ID: <1493756885-29704-1-git-send-email-sgoel@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: sunil.kovvuri@gmail.com
-Date: Tue,  2 May 2017 18:36:49 +0530
+Port architecture specific xlate and unxlate functions for /dev/mem
+read/write. This sets up the mapping for a valid physical address if a
+kernel direct mapping is not already present.
 
-> From: Sunil Goutham <sgoutham@cavium.com>
-> 
-> This patch series adds support for XDP to ThunderX NIC driver
-> which is used on CN88xx, CN81xx and CN83xx platforms. 
-> 
-> Patches 1-4 are performance improvement and cleanup patches
-> which are done keeping XDP performance bottlenecks in view.
-> Rest of the patches adds actual XDP support.
+This is a generic issue as a user space app should not be allowed to crash
+the kernel. This issue was observed when systemd tried to access performance
+pointer record from the FPDT table.
 
-Series applied, thanks for doing this work.
+Ported from commit e045fb2a988a ("x86: PAT avoid aliasing in /dev/mem
+read/write")
 
-Do you have any performance numbers?
+Crash Signature:
+ Unable to handle kernel paging request at virtual address ffff800008ff0000
+ pgd = ffff8007de8b2200
+ [ffff800008ff0000] *pgd=0000000000000000, *pud=0000000000000000
+ Internal error: Oops: 96000007 [#1] SMP
+................
+ CPU: 0 PID: 1 Comm: systemd Not tainted 4.10.0 #1
+ task: ffff8007c0820000 task.stack: ffff8007c0900000
+ PC is at __arch_copy_to_user+0xb4/0x280
+ LR is at read_mem+0xc0/0x138
+ pc : [<ffff0000084b3bb4>] lr : [<ffff00000869d178>]
+pstate: 80000145
+ sp : ffff8007c0903d40
+....................
+ x3 : ffff800800000000 x2 : 0000000000000008
+ x1 : ffff800008ff0000 x0 : 0000fffff6fdac00
+....................
+ Call trace:
+ Exception stack(0xffff8007c0903b70 to 0xffff8007c0903ca0)
+ [<ffff0000084b3bb4>] __arch_copy_to_user+0xb4/0x280
+ [<ffff0000082454d0>] __vfs_read+0x48/0x130
+ [<ffff0000082467dc>] vfs_read+0x8c/0x148
+ [<ffff000008247a34>] SyS_pread64+0x94/0xa8
+ [<ffff0000080833b0>] el0_svc_naked+0x24/0x28
+ Code: a88120c7 d503201f d503201f 36180082 (f8408423)
+
+Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
+Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+ arch/arm64/include/asm/io.h |  5 +++++
+ arch/arm64/mm/ioremap.c     | 31 +++++++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
+
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 0c00c87..c869ea4 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -183,6 +183,11 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+ #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
+ #define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
+ 
++extern void *xlate_dev_mem_ptr(phys_addr_t phys);
++extern void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr);
++
++#define xlate_dev_mem_ptr xlate_dev_mem_ptr
++#define unxlate_dev_mem_ptr unxlate_dev_mem_ptr
+ #include <asm-generic/io.h>
+ 
+ /*
+diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
+index c4c8cd4..ba7e63b 100644
+--- a/arch/arm64/mm/ioremap.c
++++ b/arch/arm64/mm/ioremap.c
+@@ -24,6 +24,7 @@
+ #include <linux/mm.h>
+ #include <linux/vmalloc.h>
+ #include <linux/io.h>
++#include <linux/memblock.h>
+ 
+ #include <asm/fixmap.h>
+ #include <asm/tlbflush.h>
+@@ -105,6 +106,36 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
+ EXPORT_SYMBOL(ioremap_cache);
+ 
+ /*
++ * Convert a physical pointer to a virtual kernel pointer for /dev/mem
++ * access
++ */
++void *xlate_dev_mem_ptr(phys_addr_t phys)
++{
++	unsigned long start  = phys &  PAGE_MASK;
++	unsigned long offset = phys & ~PAGE_MASK;
++	void *vaddr;
++
++	/* If page is RAM, we can use __va. Otherwise ioremap and unmap. */
++	if (page_is_ram(start >> PAGE_SHIFT) && memblock_is_memory(phys))
++		return __va(phys);
++
++	vaddr = ioremap_cache(start, PAGE_SIZE);
++	 /* Add the offset on success and return NULL if ioremap() failed */
++	if (vaddr)
++		vaddr += offset;
++
++	return vaddr;
++}
++
++void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr)
++{
++	if (page_is_ram(phys >> PAGE_SHIFT))
++		return;
++
++	iounmap((void __iomem *)((unsigned long)addr & PAGE_MASK));
++}
++
++/*
+  * Must be called after early_fixmap_init
+  */
+ void __init early_ioremap_init(void)
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
