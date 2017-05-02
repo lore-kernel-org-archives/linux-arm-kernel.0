@@ -1,42 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 2 May 2017 15:40:29 +0100
-Subject: [PATCH 1/5] arm64: KVM: Do not use stack-protector to compile
- EL2 code
-In-Reply-To: <20170502133041.10980-2-marc.zyngier@arm.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 2 May 2017 16:44:34 +0200
+Subject: [PATCH 0/5] KVM/ARM: Fixes for 4.12-rc1
+In-Reply-To: <20170502133041.10980-1-marc.zyngier@arm.com>
 References: <20170502133041.10980-1-marc.zyngier@arm.com>
- <20170502133041.10980-2-marc.zyngier@arm.com>
-Message-ID: <20170502144029.GB29224@e104818-lin.cambridge.arm.com>
+Message-ID: <75f031d5-d16e-6311-af44-f2c5af5bded4@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 02, 2017 at 02:30:37PM +0100, Marc Zyngier wrote:
-> We like living dangerously. Nothing explicitely forbids stack-protector
-> to be used in the EL2 code, while distributions routinely compile their
-> kernel with it. We're just lucky that no code actually triggers the
-> instrumentation.
-> 
-> Let's not try our luck for much longer, and disable stack-protector
-> for code living at EL2.
-> 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/hyp/Makefile | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index aaf42ae8d8c3..14c4e3b14bcb 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -2,6 +2,8 @@
->  # Makefile for Kernel-based Virtual Machine module, HYP part
->  #
->  
-> +ccflags-y += -fno-stack-protector
-> +
 
-While you are at it, should we have a -fpic here as well? The hyp code
-runs at a different location than the rest of the kernel.
 
--- 
-Catalin
+On 02/05/2017 15:30, Marc Zyngier wrote:
+> Here's a handful of random fixes I've queued locally that didn't have
+> a chance to make it in 4.11.
+> 
+> The first two patches avoid stack-protector messing with the HYP code,
+> as this ends up being a complete disaster.
+> 
+> The following two patches fix a bug introduced in the new vgic, where
+> we may queue HW interrupts with the Pending+Active state, which is
+> illegal.
+> 
+> The final patch fixes a misinterpretation of the spec, where we
+> compute the number of APxRn register based on the number of priorities
+> instead of using the number of preemption levels.
+> 
+> I've tagged the first 4 patches for stable, given that we're doing
+> something potentially harmful. The last patch is more of a theoretical
+> issue at this stage, so probably need for a backport.
+
+Would you like me to apply them, or are you looking for reviews and
+going to send them in a pull request?
+
+I can wait a couple days before sending my own pull request to Linus.
+
+Paolo
