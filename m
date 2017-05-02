@@ -1,52 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 2 May 2017 15:50:17 +0100
-Subject: [PATCH 1/5] arm64: KVM: Do not use stack-protector to compile EL2
- code
-In-Reply-To: <20170502144029.GB29224@e104818-lin.cambridge.arm.com>
-References: <20170502133041.10980-1-marc.zyngier@arm.com>
- <20170502133041.10980-2-marc.zyngier@arm.com>
- <20170502144029.GB29224@e104818-lin.cambridge.arm.com>
-Message-ID: <334c4025-873d-d30c-534b-4194c78eb64b@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 May 2017 16:54:53 +0200
+Subject: [PATCH v2 1/9] dt-bindings: display: sun4i: Add component
+ endpoint ID numbering scheme
+In-Reply-To: <20170428134841.cc5jrqhunh2rxhog@rob-hp-laptop>
+References: <20170421083857.29636-1-wens@csie.org>
+ <20170421083857.29636-2-wens@csie.org>
+ <20170428134841.cc5jrqhunh2rxhog@rob-hp-laptop>
+Message-ID: <20170502145453.3moqzsr3venpn4mu@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/17 15:40, Catalin Marinas wrote:
-> On Tue, May 02, 2017 at 02:30:37PM +0100, Marc Zyngier wrote:
->> We like living dangerously. Nothing explicitely forbids stack-protector
->> to be used in the EL2 code, while distributions routinely compile their
->> kernel with it. We're just lucky that no code actually triggers the
->> instrumentation.
->>
->> Let's not try our luck for much longer, and disable stack-protector
->> for code living at EL2.
->>
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/hyp/Makefile | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
->> index aaf42ae8d8c3..14c4e3b14bcb 100644
->> --- a/arch/arm64/kvm/hyp/Makefile
->> +++ b/arch/arm64/kvm/hyp/Makefile
->> @@ -2,6 +2,8 @@
->>  # Makefile for Kernel-based Virtual Machine module, HYP part
->>  #
->>  
->> +ccflags-y += -fno-stack-protector
->> +
-> 
-> While you are at it, should we have a -fpic here as well? The hyp code
-> runs at a different location than the rest of the kernel.
+Hi,
 
-We definitely should. I've just tried this, and this doesn't seem to
-work very well. At least this seems to break our jump label
-implementation. I need to page in that part of the code base and see
-what happens.
+On Fri, Apr 28, 2017 at 08:48:41AM -0500, Rob Herring wrote:
+> On Fri, Apr 21, 2017 at 04:38:49PM +0800, Chen-Yu Tsai wrote:
+> > The Allwinner display pipeline contains many hardware components, some
+> > of which can consume data from one of multiple upstream components.
+> > The numbering scheme of these components must be encoded into the device
+> > tree so the driver can figure out which component out of two or more of
+> > the same type it is supposed to use or program.
+> > 
+> > This patch adds the constraint that local endpoint IDs must be the index
+> > or number of the remote endpoint's hardware block, for all components
+> > in the display pipeline up to the TCONs.
+> > 
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > ---
+> >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > index 57a8d0610062..7acdbf14ae1c 100644
+> > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > @@ -4,6 +4,16 @@ Allwinner A10 Display Pipeline
+> >  The Allwinner A10 Display pipeline is composed of several components
+> >  that are going to be documented below:
+> >  
+> > +For the input port of all components up to the TCON in the display
+> > +pipeline, if there are multiple components, the local endpoint IDs
+> > +must correspond to the index of the upstream block. For example, if
+> > +the remote endpoint is Frontend 1, then the local endpoint ID must
+> > +be 1.
+> > +
+> > +Conversely, for the output ports of the same group, the remote endpoint
+> > +ID must be the index of the local hardware block. If the local backend
+> > +is backend 1, then the remote endpoint ID must be 1.
+> 
+> It would be clearer if you just explicitly listed IDs and their 
+> connections. From how this is worded, it would not work if you had 
+> connections like this:
+> 
+> DevA 0
+> DevA 1
+> DevB 0
+> DevB 1
+> 
+> These would need to be endpoints 0-3 in TCON, and that doesn't reflect 
+> the remote devices' index.
+
+Chen-Yu, can you send a patch to rephrase the doc that way?
 
 Thanks,
+Maxime
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170502/841b73a4/attachment-0001.sig>
