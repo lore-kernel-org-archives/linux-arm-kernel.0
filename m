@@ -1,116 +1,79 @@
-From: eajames@linux.vnet.ibm.com (Eddie James)
-Date: Tue, 2 May 2017 09:11:57 -0500
-Subject: [v6,10/23] drivers/fsi: Add device read/write/peek API
-In-Reply-To: <d0d2932a-e69e-bda5-5731-f1bd46fca265@linux.vnet.ibm.com>
-References: <d0d2932a-e69e-bda5-5731-f1bd46fca265@linux.vnet.ibm.com>
-Message-ID: <d2b26e2b-b488-886a-93c8-17db37e77b92@linux.vnet.ibm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 2 May 2017 09:13:00 -0500
+Subject: [PATCH v4 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <60b3c062-d4bb-6502-61be-ada830cf58f7@collabora.com>
+References: <cover.1493125299.git.guillaume.tucker@collabora.com>
+ <9349c8ae9091fbd93e9410f4cfae770ac850bf6b.1493125299.git.guillaume.tucker@collabora.com>
+ <20170428192742.pu4v4layszr6z2ot@rob-hp-laptop>
+ <60b3c062-d4bb-6502-61be-ada830cf58f7@collabora.com>
+Message-ID: <CAL_JsqK8rjvFW=LFb7==Qho-MHVew-O_vAJ+M6wcFJGfVD6r1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 10, 2017, at 3:46 PM, Christopher Bostic 
-<cbostic@linux.vnet.ibm.com> wrote:
-> From: Jeremy Kerr <jk@ozlabs.org>
+On Tue, May 2, 2017 at 6:23 AM, Guillaume Tucker
+<guillaume.tucker@collabora.com> wrote:
+> Hi Rob,
 >
-> This change introduces the fsi device API: simple read, write and peek
-> accessors for the devices' address spaces.
+> On 28/04/17 20:27, Rob Herring wrote:
+>>
+>> On Tue, Apr 25, 2017 at 02:16:16PM +0100, Guillaume Tucker wrote:
 >
-> Includes contributions from Chris Bostic <cbostic@linux.vnet.ibm.com>
-> and Edward A. James <eajames@us.ibm.com>.
 >
-> Signed-off-by: Edward A. James <eajames@us.ibm.com>
-> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-> Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> ---
->  drivers/fsi/fsi-core.c | 33 +++++++++++++++++++++++++++++++++
->  include/linux/fsi.h    |  7 ++++++-
->  2 files changed, 39 insertions(+), 1 deletion(-)
+>>> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>>> b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>>> new file mode 100644
+>>> index 000000000000..547ddeceb498
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>>> @@ -0,0 +1,82 @@
+>>> +ARM Mali Midgard GPU
+>>> +====================
+>>> +
+>>> +Required properties:
+>>> +
+>>> +- compatible :
+>>> +  * Must be one of the following:
+>>> +    + "arm,mali-t60x"
+>>> +    + "arm,mali-t62x"
+>>
+>>
+>> Don't use wildcards.
 >
-> diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-> index a8faa89..4da0b030 100644
-> --- a/drivers/fsi/fsi-core.c
-> +++ b/drivers/fsi/fsi-core.c
-> @@ -32,6 +32,8 @@
->  #define FSI_SLAVE_CONF_CRC_MASK        0x0000000f
->  #define FSI_SLAVE_CONF_DATA_BITS    28
 >
-> +#define FSI_PEEK_BASE            0x410
-> +
->  static const int engine_page_size = 0x400;
+> Sure, old habits die hard...  I'll fix it in patch v5.
 >
->  #define FSI_SLAVE_BASE            0x800
-> @@ -73,9 +75,40 @@ static int fsi_master_read(struct fsi_master 
-> *master, int link,
->          uint8_t slave_id, uint32_t addr, void *val, size_t size);
->  static int fsi_master_write(struct fsi_master *master, int link,
->          uint8_t slave_id, uint32_t addr, const void *val, size_t size);
-> +static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-> +        void *val, size_t size);
-> +static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-> +        const void *val, size_t size);
+>>> +    + "arm,mali-t720"
+>>> +    + "arm,mali-t760"
+>>> +    + "arm,mali-t820"
+>>> +    + "arm,mali-t830"
+>>> +    + "arm,mali-t860"
+>>> +    + "arm,mali-t880"
+>>> +  * And, optionally, one of the vendor specific compatible:
+>>
+>>
+>> IMO, these should not be optional.
 >
->  /* FSI endpoint-device support */
 >
-> +int fsi_device_read(struct fsi_device *dev, uint32_t addr, void *val,
-> +        size_t size)
-> +{
-> +    if (addr > dev->size || size > dev->size || addr > dev->size - size)
-> +        return -EINVAL;
-> +
-> +    return fsi_slave_read(dev->slave, dev->addr + addr, val, size);
-> +}
-> +EXPORT_SYMBOL_GPL(fsi_device_read);
-> +
-> +int fsi_device_write(struct fsi_device *dev, uint32_t addr, const 
-> void *val,
-> +        size_t size)
-> +{
-> +    if (addr > dev->size || size > dev->size || addr > dev->size - size)
-> +        return -EINVAL;
-> +
-> +    return fsi_slave_write(dev->slave, dev->addr + addr, val, size);
-> +}
-> +EXPORT_SYMBOL_GPL(fsi_device_write);
-> +
-> +int fsi_device_peek(struct fsi_device *dev, void *val)
-> +{
-> +    uint32_t addr = FSI_PEEK_BASE + ((dev->unit - 2) * 
-> sizeof(uint32_t));
-> +
-> +    return fsi_slave_read(dev->slave, addr, val, sizeof(uint32_t));
-> +}
-> +
->  static void fsi_device_release(struct device *_device)
->  {
->      struct fsi_device *device = to_fsi_dev(_device);
-> diff --git a/include/linux/fsi.h b/include/linux/fsi.h
-> index efa55ba..66bce48 100644
-> --- a/include/linux/fsi.h
-> +++ b/include/linux/fsi.h
-> @@ -27,6 +27,12 @@ struct fsi_device {
->      uint32_t        size;
->  };
->
-> +extern int fsi_device_read(struct fsi_device *dev, uint32_t addr,
-> +        void *val, size_t size);
-> +extern int fsi_device_write(struct fsi_device *dev, uint32_t addr,
-> +        const void *val, size_t size);
-> +extern int fsi_device_peek(struct fsi_device *dev, void *val);
-> +
->  struct fsi_device_id {
->      u8    engine_type;
->      u8    version;
-> @@ -40,7 +46,6 @@ struct fsi_device_id {
->  #define FSI_DEVICE_VERSIONED(t, v) \
->      .engine_type = (t), .version = (v),
->
-> -
->  struct fsi_driver {
->      struct device_driver        drv;
->      const struct fsi_device_id    *id_table;
->
+> Well, vendor compatible strings are clearly optional for the
+> Utgard GPU series for which the bindings docs were recently
+> merged.  It seems that whether these should be optional or not,
+> the documentation should be consistent between at least all
+> similar types of devices like Midgard and Utgard GPUs.  They have
+> different architectures but from a device tree point of view,
+> they both have the same kind of SoC-specific integration (clocks,
+> irqs, regulators...).
 
-I also wrote a driver against this API (an i2c algorithm). Everything 
-looks good and working well.
+Clocks should not vary by SoC. There is often variation because clocks
+get driven by same source or are not s/w controlled, but really there
+should not be that variation. I noticed Utgard has 2 clocks. So is
+Midgard really just 1 clock? The DT should have all the clocks listed
+in the TRMs.
 
-Edward (Eddie) James <eajames@linux.vnet.ibm.com>
+> So was this was overlooked in the Utgard case and should it
+> ideally be fixed there as well as non-optional?  Or, is it OK to
+> keep these optional on a second thought?
+
+Probably should be required in the Utgard case as well.
+
+Rob
