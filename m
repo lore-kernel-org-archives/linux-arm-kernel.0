@@ -1,83 +1,158 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 2 May 2017 10:29:28 +0200
-Subject: [PATCH v5 18/22] KVM: arm64: vgic-its: vgic_its_check_id returns
- the entry's GPA
-In-Reply-To: <1492164934-988-19-git-send-email-eric.auger@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-19-git-send-email-eric.auger@redhat.com>
-Message-ID: <CAMJs5B9T0WFDTnBhkv9aFF-p=uG1wNLBHN6oagpEJ9G_MufOZg@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue,  2 May 2017 16:29:58 +0800
+Subject: [PATCH v7 0/7] coresight: enable debug module
+Message-ID: <1493713805-26920-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 14, 2017 at 12:15:30PM +0200, Eric Auger wrote:
-> As vgic_its_check_id() computes the device/collection entry's
-> GPA, let's return it so that new callers can retrieve it easily.
->
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->
+ARMv8 architecture reference manual (ARM DDI 0487A.k) Chapter H7 "The
+Sample-based Profiling Extension" has description for sampling
+registers, we can utilize these registers to check program counter
+value with combined CPU exception level, secure state, etc. So this is
+helpful for CPU lockup bugs, e.g. if one CPU has run into infinite loop
+with IRQ disabled; the 'hang' CPU cannot switch context and handle any
+interrupt, so it cannot handle SMP call for stack dump, etc.
 
-Acked-by: Christoffer Dall <cdall@linaro.org>
+This patch series is to enable coresight debug module with sample-based
+registers and register call back notifier for PCSR register dumping
+when panic happens, so we can see below dumping info for panic; and
+this patch series has considered the conditions for access permission
+for debug registers self, so this can avoid access debug registers when
+CPU power domain is off; the driver also try to figure out the CPU is
+in secure or non-secure state.
 
-> ---
-> v3 -> v4:
-> - check eaddr is not NULL to allow passing NULL eaddr parameter
->   to vgic_its_check_id
->
-> v2: new
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
->
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 484e541..35b2ca1 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -645,7 +645,8 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
->   * is actually valid (covered by a memslot and guest accessible).
->   * For this we have to read the respective first level entry.
->   */
-> -static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
-> +static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
-> +      gpa_t *eaddr)
->  {
->   int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
->   int index;
-> @@ -665,6 +666,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
->   addr = BASER_ADDRESS(baser) + id * esz;
->   gfn = addr >> PAGE_SHIFT;
->
-> + if (eaddr)
-> + *eaddr = addr;
->   return kvm_is_visible_gfn(its->dev->kvm, gfn);
->   }
->
-> @@ -697,6 +700,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
->   indirect_ptr += index * esz;
->   gfn = indirect_ptr >> PAGE_SHIFT;
->
-> + if (eaddr)
-> + *eaddr = indirect_ptr;
->   return kvm_is_visible_gfn(its->dev->kvm, gfn);
->  }
->
-> @@ -706,7 +711,7 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
->  {
->   struct its_collection *collection;
->
-> - if (!vgic_its_check_id(its, its->baser_coll_table, coll_id))
-> + if (!vgic_its_check_id(its, its->baser_coll_table, coll_id, NULL))
->   return E_ITS_MAPC_COLLECTION_OOR;
->
->   collection = kzalloc(sizeof(*collection), GFP_KERNEL);
-> @@ -889,7 +894,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->   gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
->   struct its_device *device;
->
-> - if (!vgic_its_check_id(its, its->baser_device_table, device_id))
-> + if (!vgic_its_check_id(its, its->baser_device_table, device_id, NULL))
->   return E_ITS_MAPD_DEVICE_OOR;
->
->   if (valid && nb_eventid_bits > VITS_TYPER_IDBITS)
-> --
-> 2.5.5
->
+Patch 0001 is to document the dt binding; patch 0002 is to document
+boot parameters used in kernel command line and add one detailed
+document to describe the Coresight debug module implementation, the
+clock and power domain impaction on the driver, some examples for
+usage.
+
+Patch 0003 is used to fix the func of_get_coresight_platform_data()
+doesn't properly drop the reference to the CPU node pointer; and
+patch 0004 is refactor to add new function of_coresight_get_cpu().
+
+Patch 0005 is the driver for CPU debug module.
+
+Patch 0006 in this series are to enable debug unit on 96boards Hikey,
+Patch 0007 is to enable debug on 96boards DB410c. Have verified on both
+two boards.
+
+We can enable debugging with two methods, adding parameters into kernel
+command line for build-in module:
+  coresight_cpu_debug.enable=1
+
+Or we can wait the system has booted up to use debugfs nodes to enable
+debugging:
+  # echo 1 > /sys/kernel/debug/coresight_cpu_debug/enable
+
+As result we can get below log after input command:
+echo c > /proc/sysrq-trigger:
+
+ARM external debug module:
+CPU[0]:
+ EDPRSR:  0000000b (Power:On DLK:Unlock)
+ EDPCSR:  [<ffff00000808eb54>] handle_IPI+0xe4/0x150
+ EDCIDSR: 00000000
+ EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+CPU[1]:
+ EDPRSR:  0000000b (Power:On DLK:Unlock)
+ EDPCSR:  [<ffff0000087a64c0>] debug_notifier_call+0x108/0x288
+ EDCIDSR: 00000000
+ EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+
+[...]
+
+Changes from v6:
+* According to Suzuki and Mathieu suggestions, refined debug module
+  driver to install panic notifier when insmod module; refined function
+  debug_force_cpu_powered_up() for CPU power state checking; some minor
+  fixing for output log, adding comments for memory barrier, code
+  alignment.
+
+Changes from v5:
+* According to Suzuki and Mathieu suggestions, refined debug module
+  driver to drop unused structure members, refactored initialization
+  code to distinguish hardware implementation features, refactored
+  flow for forcing CPU powered up, supported pm_runtime operations.
+* Added one new doc file: Documentation/trace/coresight-cpu-debug.txt,
+  which is used to describe detailed info for implementation, clock
+  and power domain impaction on debug module, and exmaples for common
+  usage.
+* Removed "idle constraints" from debug driver.
+
+Changes from v4:
+* This version is mainly credit to ARM colleagues many contribution
+  ideas for better quality (Thanks a lot Suzuki, Mike and Sudeep!).
+* According to Suzuki suggestion, refined debug module driver to avoid
+  memory leak for drvdata struct, handle PCSAMPLE_MODE=1, use flag
+  drvdata.pc_has_offset to indicate if PCSR has offset, minor fixes.
+* According to Mathieu suggestion, refined dt binding description.
+* Changed driver to support module mode;
+* According to Mike suggestion and very appreciate the pseudo code,
+  added support to force CPU powered up with register EDPRCR;
+* According to discussions, added command line and debugfs nodes to
+  support enabling debugging for boot time, or later can dynamically
+  enable/disable debugging by debugfs.
+* According to Rob Herring suggestion, one minor fixes in DT binding.
+* According to Stephen Boyd suggestion, add const quality to structure
+  device_node. And used use of_cpu_device_node_get() to replace
+  of_get_cpu_node() in patch 0003.
+
+Changes from v3:
+* Added Suzuki K Poulose's patch to fix issue for the func
+  of_get_coresight_platform_data() doesn't properly drop the reference
+  to the CPU node pointer.
+* According to Suzuki suggestion, added code to handl the corner case
+  for ARMv8 CPU with aarch32 mode.
+* According to Suzuki suggestion, changed compatible string to
+  "arm,coresight-cpu-debug".
+* According to Mathieu suggestion, added "power-domains" as optional
+  properties.
+
+Changes from v2:
+* According to Mathieu Poirier suggestion, applied some minor fixes.
+* Added two extra patches for enabling debug module on Hikey.
+
+Changes from v1:
+* According to Mike Leach suggestion, removed the binding for debug
+  module clocks which have been directly provided by CPU clocks.
+* According to Mathieu Poirier suggestion, added function
+  of_coresight_get_cpu() and some minor refactors for debug module
+  driver.
+
+Changes from RFC:
+* According to Mike Leach suggestion, added check for EDPRSR to avoid
+  lockup; added supporting EDVIDSR and EDCIDSR registers.
+* According to Mark Rutland and Mathieu Poirier suggestion, rewrote
+  the documentation for DT binding.
+* According to Mark and Mathieu suggestion, refined debug driver.
+
+
+Leo Yan (6):
+  coresight: bindings for CPU debug module
+  doc: Add documentation for Coresight CPU debug
+  coresight: refactor with function of_coresight_get_cpu
+  coresight: add support for CPU debug module
+  arm64: dts: hi6220: register debug module
+  arm64: dts: qcom: msm8916: Add debug unit
+
+Suzuki K Poulose (1):
+  coresight: of_get_coresight_platform_data: Add missing of_node_put
+
+ Documentation/admin-guide/kernel-parameters.txt    |   7 +
+ .../bindings/arm/coresight-cpu-debug.txt           |  49 ++
+ Documentation/trace/coresight-cpu-debug.txt        | 174 ++++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  64 ++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  32 +
+ drivers/hwtracing/coresight/Kconfig                |  14 +
+ drivers/hwtracing/coresight/Makefile               |   1 +
+ drivers/hwtracing/coresight/coresight-cpu-debug.c  | 671 +++++++++++++++++++++
+ drivers/hwtracing/coresight/of_coresight.c         |  40 +-
+ include/linux/coresight.h                          |   2 +
+ 10 files changed, 1042 insertions(+), 12 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
+ create mode 100644 Documentation/trace/coresight-cpu-debug.txt
+ create mode 100644 drivers/hwtracing/coresight/coresight-cpu-debug.c
+
+-- 
+2.7.4
