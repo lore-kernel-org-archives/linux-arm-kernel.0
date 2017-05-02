@@ -1,64 +1,38 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 2 May 2017 15:09:38 +0800
-Subject: FW: [PATCH 2/2] dt-bindings: pcie: Add documentation for
- Mediatek PCIe
-In-Reply-To: <4BAFE512E7223A4B91F29C40AC7A579616B5155E@MTKMBS05N1.mediatek.inc>
-References: <1492935543-18190-1-git-send-email-ryder.lee@mediatek.com>
- <1492935543-18190-3-git-send-email-ryder.lee@mediatek.com>
- <CAK8P3a1vgi9VBZfRNq0dDKzmfe8FkHQtgz6fEXW9fyUnBHtaQQ@mail.gmail.com>
- <1493194205.27023.80.camel@mtkswgap22>
- <CAK8P3a0vD8s_3R+jS=JdUXX3X05SkCk-mipMA6UxWYQZe6vLUQ@mail.gmail.com>
- <1493347596.29314.55.camel@mtkswgap22>
- <CAK8P3a0WGwukWj8V-S2c13S3futkxBhiMfRTa=0QWaDG7qREVw@mail.gmail.com>
- <CAFST5+Dn3bMwtGt9pQBMc+q+qkrpvmXh67ZXm2=hs-ZoX8E_ww@mail.gmail.com>
- <4BAFE512E7223A4B91F29C40AC7A579616B5155E@MTKMBS05N1.mediatek.inc>
-Message-ID: <1493708978.6464.37.camel@mtkswgap22>
+From: sr@denx.de (Stefan Roese)
+Date: Tue,  2 May 2017 09:26:00 +0200
+Subject: [PATCH] irqchip/armada-370-xp: Enable MSI-X support
+Message-ID: <20170502072600.13380-1-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Armada XP does not only support MSI, but also MSI-X. This patch sets
+the MSI_FLAG_PCI_MSIX flag in the interrupt controller driver which
+is the only change necessary to enable MSI-X support on this SoC. As
+the Linux PCI MSI-X infrastructure takes care of writing the data and
+address structures into the BAR specified by the MSI-X controller.
 
-Hi Arnd,
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+---
+ drivers/irqchip/irq-armada-370-xp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> 2017-04-28 19:41 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> 
->         On Fri, Apr 28, 2017 at 4:46 AM, Ryder Lee
->         <ryder.lee@mediatek.com> wrote:
->         > On Thu, 2017-04-27 at 21:06 +0200, Arnd Bergmann wrote:
->         >> On Wed, Apr 26, 2017 at 10:10 AM, Ryder Lee
->         <ryder.lee@mediatek.com> wrote:
->         >> > On Tue, 2017-04-25 at 14:18 +0200, Arnd Bergmann wrote:
->         >> >> On Sun, Apr 23, 2017 at 10:19 AM, Ryder Lee
->         <ryder.lee@mediatek.com> wrote:
->         >> Are any of the registers the same at all, e.g. for MSI
->         handling?
->         >
->         > No, It doesn't support MSI. All I can do is using the
->         registers that designer provide to me. The others are inviable
->         for software. So I treat it as different hardware.
->         Furthermore, we hope that we can put all mediatek drivers
->         together regardless of in-house IP or lincense IP
->         >
->         > We have no particular IP name but just use chip name to call
->         it. So I will temporarily use "mediatek,gen2v1-pcie" in patch
->         v1.
->         
->         I think using the chip name as in the first version of your
->         patch name is better then, in particular since the 'gen2v1'
->         would not be an actual version number but just say which
->         variant got merged into mainline first.
-
-Okay, i will correct it.
-
->         A related question would be on how general we want the binding
->         to be.
->         Your binding text starts out by describing that there are
->         three root ports and what their capabilities are.
->         
->         If you think there might be other (existing or future) chips
->         that use the same binding and driver, then being a little more
->         abstract could help in the long run.
-
-Thanks for reminding me. If we decide to use the same driver in the
-future, we will have a internal discussion about it.
-
-Ryder.
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index 33982cbd8a57..b17039ed8735 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -124,7 +124,7 @@ static struct irq_chip armada_370_xp_msi_irq_chip = {
+ 
+ static struct msi_domain_info armada_370_xp_msi_domain_info = {
+ 	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+-		   MSI_FLAG_MULTI_PCI_MSI),
++		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
+ 	.chip	= &armada_370_xp_msi_irq_chip,
+ };
+ 
+-- 
+2.12.2
