@@ -1,63 +1,81 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 2 May 2017 14:50:02 -0400
-Subject: [PATCH] drm/rockchip: analogix_dp: Remove unused check and
- variables
-In-Reply-To: <1493469547-2121-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1493469547-2121-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <20170502185002.ll3gcg4y2p5astvu@art_vandelay>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 2 May 2017 11:52:00 -0700
+Subject: [PATCH] arm: pmu: Get PMU working when the A53 is run in 32 bit
+ mode
+In-Reply-To: <87d1brm9h1.fsf@on-the-bus.cambridge.arm.com>
+References: <1493733691-43814-1-git-send-email-alcooperx@gmail.com>
+ <0f716b0c-b9ac-29d9-2909-50906ad90bd3@arm.com>
+ <3f44e99a-6ff1-23e5-52d5-59c662fd10c3@gmail.com>
+ <87h913mcdy.fsf@on-the-bus.cambridge.arm.com>
+ <e32b1d89-b349-5a45-565a-19463032adbc@gmail.com>
+ <87d1brm9h1.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <6369cfdd-f0f1-0d37-f93a-5f1445087e6d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 29, 2017 at 08:39:07PM +0800, Jeffy Chen wrote:
-> Remove unused check and variables after:
-> drm/rockchip: Set line flag config register in vop_crtc_enable
+On 05/02/2017 10:53 AM, Marc Zyngier wrote:
+> On Tue, May 02 2017 at  6:37:40 pm BST, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> On 05/02/2017 09:50 AM, Marc Zyngier wrote:
+>>> On Tue, May 02 2017 at  4:51:55 pm BST, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>>> Hi Mark,
+>>>>
+>>>> On 05/02/2017 07:17 AM, Marc Zyngier wrote:
+>>>>> Hi Al,
+>>>>>
+>>>>> On 02/05/17 15:01, Al Cooper wrote:
+>>>>>> From: Al Cooper <al.cooper@broadcom.com>
+>>>>>>
+>>>>>> When the A53 is run in A15 (32 bit) mode, the registers used to
+>>>>>> access the counters are A15 style registers, but the actual
+>>>>>> counters are the A53 counters not A15 counters. This patch will
+>>>>>> select a PMU counters map for the A53 if the device tree pmu
+>>>>>> "compatible" property includes "arm,cortex-a53-pmu".
+>>>>>
+>>>>> I wasn't aware of an "A15 mode"! Is there an ARM3 mode, while we're at
+>>>>> it? ;-)
+>>>>
+>>>> This is referring to how our Device Tree and kernel end-up "viewing" the
+>>>> PMU (based on provided compatible strings) but this probably should be
+>>>> omitted for clarity.
+>>>
+>>> That's certainly wrong from both an architectural and implementation
+>>> PoV. Although there is some level of compatibility between the ARMv7 and
+>>> ARMv8 PMU architectures, they are distinct beasts.
+>>
+>> Yes, we are well aware of that, which is why I don't think it's even
+>> relevant to this discussion here because it's a known implementation
+>> issue on our end.
+>>
+>>>
+>>>>>
+>>>>> More seriously, you seem to take the problem from the wrong end. If you
+>>>>> have an ARMv8 core, you should use the PMUv3 driver (because that is
+>>>>> what your A53 has), and not the ARMv7 PMU.
+>>>>>
+>>>>> To that affect, I've posted this[1] a while ago. Can you please give it
+>>>>> a go?
+>>>>
+>>>> That seems to be the right direction, however don't you also need to
+>>>> possibly expose other PMU types as well? Cortex-A53 and Cortex-A57 PMUs
+>>>> (and possibly more) for instance because there are additional counters
+>>>> that can be defined specifically for those, e.g: LL = L2 cache on A53,
+>>>> see [1].
+>>>
+>>> That's pretty much orthogonal. Once we have a common driver for PMUv3 on
+>>> both 32 and 64bit, adding implementation-specific events can be done for
+>>> both architecture.
+>>
+>> My comment was not so much about the PMU-specific events, but about the
+>> fact that if you make changes to the PMUv3 between 32-bit and 64-bit
+>> kernels, we might as well bring all other PMU models that have a
+>> potential for being shared between 32-bit and 64-bit in one go.
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> 
-> ---
+> I'm only concerned about the CPU PMU so far, as my main goal is
+> virtualization (and I have no desire to expose any other form of PMU to
+> a guest). Non-CPU PMUs should be mostly architecture agnostic already,
+> and thus pretty easy to enable.
 
-Applied to -misc-next, thanks.
-
-Sean
-
-> 
->  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 10 +---------
->  1 file changed, 1 insertion(+), 9 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> index 9bfdbc6..1bccd82 100644
-> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> @@ -104,17 +104,9 @@ static void analogix_dp_psr_work(struct work_struct *work)
->  {
->  	struct rockchip_dp_device *dp =
->  				container_of(work, typeof(*dp), psr_work);
-> -	struct drm_crtc *crtc = dp->encoder.crtc;
-> -	int psr_state = dp->psr_state;
-> -	int vact_end;
->  	int ret;
->  	unsigned long flags;
->  
-> -	if (!crtc)
-> -		return;
-> -
-> -	vact_end = crtc->mode.vtotal - crtc->mode.vsync_start + crtc->mode.vdisplay;
-> -
->  	ret = rockchip_drm_wait_vact_end(dp->encoder.crtc,
->  					 PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
->  	if (ret) {
-> @@ -123,7 +115,7 @@ static void analogix_dp_psr_work(struct work_struct *work)
->  	}
->  
->  	spin_lock_irqsave(&dp->psr_lock, flags);
-> -	if (psr_state == EDP_VSC_PSR_STATE_ACTIVE)
-> +	if (dp->psr_state == EDP_VSC_PSR_STATE_ACTIVE)
->  		analogix_dp_enable_psr(dp->dev);
->  	else
->  		analogix_dp_disable_psr(dp->dev);
-> -- 
-> 2.1.4
-> 
-
+By other PMU models here, I was actually referring to all other known
+types of CPU PMU models, such as A53, A57 and so on.
 -- 
-Sean Paul, Software Engineer, Google / Chromium OS
+Florian
