@@ -1,77 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 May 2017 16:54:53 +0200
-Subject: [PATCH v2 1/9] dt-bindings: display: sun4i: Add component
- endpoint ID numbering scheme
-In-Reply-To: <20170428134841.cc5jrqhunh2rxhog@rob-hp-laptop>
-References: <20170421083857.29636-1-wens@csie.org>
- <20170421083857.29636-2-wens@csie.org>
- <20170428134841.cc5jrqhunh2rxhog@rob-hp-laptop>
-Message-ID: <20170502145453.3moqzsr3venpn4mu@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 2 May 2017 16:00:49 +0100
+Subject: [PATCH 0/5] KVM/ARM: Fixes for 4.12-rc1
+In-Reply-To: <75f031d5-d16e-6311-af44-f2c5af5bded4@redhat.com>
+References: <20170502133041.10980-1-marc.zyngier@arm.com>
+ <75f031d5-d16e-6311-af44-f2c5af5bded4@redhat.com>
+Message-ID: <c9f36b35-6a46-8ed8-0bb0-9c099f28d834@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 02/05/17 15:44, Paolo Bonzini wrote:
+> 
+> 
+> On 02/05/2017 15:30, Marc Zyngier wrote:
+>> Here's a handful of random fixes I've queued locally that didn't have
+>> a chance to make it in 4.11.
+>>
+>> The first two patches avoid stack-protector messing with the HYP code,
+>> as this ends up being a complete disaster.
+>>
+>> The following two patches fix a bug introduced in the new vgic, where
+>> we may queue HW interrupts with the Pending+Active state, which is
+>> illegal.
+>>
+>> The final patch fixes a misinterpretation of the spec, where we
+>> compute the number of APxRn register based on the number of priorities
+>> instead of using the number of preemption levels.
+>>
+>> I've tagged the first 4 patches for stable, given that we're doing
+>> something potentially harmful. The last patch is more of a theoretical
+>> issue at this stage, so probably need for a backport.
+> 
+> Would you like me to apply them, or are you looking for reviews and
+> going to send them in a pull request?
+> 
+> I can wait a couple days before sending my own pull request to Linus.
 
-On Fri, Apr 28, 2017 at 08:48:41AM -0500, Rob Herring wrote:
-> On Fri, Apr 21, 2017 at 04:38:49PM +0800, Chen-Yu Tsai wrote:
-> > The Allwinner display pipeline contains many hardware components, some
-> > of which can consume data from one of multiple upstream components.
-> > The numbering scheme of these components must be encoded into the device
-> > tree so the driver can figure out which component out of two or more of
-> > the same type it is supposed to use or program.
-> > 
-> > This patch adds the constraint that local endpoint IDs must be the index
-> > or number of the remote endpoint's hardware block, for all components
-> > in the display pipeline up to the TCONs.
-> > 
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > ---
-> >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > index 57a8d0610062..7acdbf14ae1c 100644
-> > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > @@ -4,6 +4,16 @@ Allwinner A10 Display Pipeline
-> >  The Allwinner A10 Display pipeline is composed of several components
-> >  that are going to be documented below:
-> >  
-> > +For the input port of all components up to the TCON in the display
-> > +pipeline, if there are multiple components, the local endpoint IDs
-> > +must correspond to the index of the upstream block. For example, if
-> > +the remote endpoint is Frontend 1, then the local endpoint ID must
-> > +be 1.
-> > +
-> > +Conversely, for the output ports of the same group, the remote endpoint
-> > +ID must be the index of the local hardware block. If the local backend
-> > +is backend 1, then the remote endpoint ID must be 1.
-> 
-> It would be clearer if you just explicitly listed IDs and their 
-> connections. From how this is worded, it would not work if you had 
-> connections like this:
-> 
-> DevA 0
-> DevA 1
-> DevB 0
-> DevB 1
-> 
-> These would need to be endpoints 0-3 in TCON, and that doesn't reflect 
-> the remote devices' index.
-
-Chen-Yu, can you send a patch to rephrase the doc that way?
+Christoffer is in charge of the tree at the moment, so I'll leave it up
+to him to decide. But my guess is that he will send a PR some time
+later, with the rest of the fixes that have been posted lately.
 
 Thanks,
-Maxime
 
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170502/841b73a4/attachment-0001.sig>
+Jazz is not dead. It just smells funny...
