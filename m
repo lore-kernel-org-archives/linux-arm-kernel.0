@@ -1,49 +1,64 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 2 May 2017 19:15:55 +0200
-Subject: [PATCH 0/5] KVM/ARM: Fixes for 4.12-rc1
-In-Reply-To: <c9f36b35-6a46-8ed8-0bb0-9c099f28d834@arm.com>
-References: <20170502133041.10980-1-marc.zyngier@arm.com>
- <75f031d5-d16e-6311-af44-f2c5af5bded4@redhat.com>
- <c9f36b35-6a46-8ed8-0bb0-9c099f28d834@arm.com>
-Message-ID: <20170502171555.GA12916@cbox>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Tue, 2 May 2017 10:26:18 -0700
+Subject: [PATCH] arm64: Fix multiple 'asm-operand-widths' warnings
+In-Reply-To: <20170502102718.GA28132@leverpostej>
+References: <20170501212622.153720-1-mka@chromium.org>
+ <20170502102718.GA28132@leverpostej>
+Message-ID: <20170502172618.GX128305@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 02, 2017 at 04:00:49PM +0100, Marc Zyngier wrote:
-> On 02/05/17 15:44, Paolo Bonzini wrote:
-> > 
-> > 
-> > On 02/05/2017 15:30, Marc Zyngier wrote:
-> >> Here's a handful of random fixes I've queued locally that didn't have
-> >> a chance to make it in 4.11.
-> >>
-> >> The first two patches avoid stack-protector messing with the HYP code,
-> >> as this ends up being a complete disaster.
-> >>
-> >> The following two patches fix a bug introduced in the new vgic, where
-> >> we may queue HW interrupts with the Pending+Active state, which is
-> >> illegal.
-> >>
-> >> The final patch fixes a misinterpretation of the spec, where we
-> >> compute the number of APxRn register based on the number of priorities
-> >> instead of using the number of preemption levels.
-> >>
-> >> I've tagged the first 4 patches for stable, given that we're doing
-> >> something potentially harmful. The last patch is more of a theoretical
-> >> issue at this stage, so probably need for a backport.
-> > 
-> > Would you like me to apply them, or are you looking for reviews and
-> > going to send them in a pull request?
-> > 
-> > I can wait a couple days before sending my own pull request to Linus.
-> 
-> Christoffer is in charge of the tree at the moment, so I'll leave it up
-> to him to decide. But my guess is that he will send a PR some time
-> later, with the rest of the fixes that have been posted lately.
-> 
+Hi Mark,
 
-Yes, I have some other fixes that I'll send together with these as soon
-as -rc1 hits.  And I plan on reviewing these.
+El Tue, May 02, 2017 at 11:27:18AM +0100 Mark Rutland ha dit:
 
-Thanks,
--Christoffer
+> On Mon, May 01, 2017 at 02:26:22PM -0700, Matthias Kaehlcke wrote:
+> > clang raises 'asm-operand-widths' warnings in inline assembly code when
+> > the size of an operand is < 64 bits and the operand width is unspecified.
+> > Most warnings are raised in macros, i.e. the datatype of the operand may
+> > vary. Forcing the use of an x register through the 'x' operand modifier
+> > would silence the warning however it involves the risk that for operands
+> > < 64 bits 'unused' bits may be assigned to 64-bit values (more details at
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/503816.html).
+> > Instead we cast the operand to 64 bits, which also forces the use of a
+> > x register, but without the unexpected behavior.
+> > 
+> > In gic_write_bpr1() use write_sysreg_s() to write the register. This
+> > aligns the functions with others in this header and fixes an
+> > 'asm-operand-widths' warning.
+> > 
+> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> > ---
+> >  arch/arm64/include/asm/arch_gicv3.h  | 2 +-
+> >  arch/arm64/include/asm/barrier.h     | 2 +-
+> >  arch/arm64/include/asm/uaccess.h     | 2 +-
+> >  arch/arm64/kernel/armv8_deprecated.c | 2 +-
+> >  4 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> Thanks for putting this together.
+> 
+> Just to check, are these the only instances that you see clang warning
+> about?
+
+Yes, these are the only warnings clang raises in my builds (custom and
+defconfig).
+
+> There are a number of other cases where we can see similar problems
+> (e.g. passing a u8 value to an smp_store_release() on a u32 variable),
+> so we need to fix more than the clang warnings.
+> 
+> I'm currently attempting a systematic audit of our inline asm to correct
+> all instances, looking at:
+> 
+> 	git grep -e asm \
+> 	--and --not -e 'include' \
+> 	--and --not -e 'asmlinkage' \
+> 	-- arch/arm64
+> 
+> I hope to have patches shortly, and will keep you informed.
+
+Sounds good!
+
+Thanks
+
+Matthias
