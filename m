@@ -1,33 +1,37 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 02 May 2017 15:06:04 -0400 (EDT)
-Subject: [PATCH net] bpf, arm64: fix jit branch offset related to ldimm64
-In-Reply-To: <5f7d105a1830ed789f1b416dc17b02fce0bd070e.1493749880.git.daniel@iogearbox.net>
-References: <5f7d105a1830ed789f1b416dc17b02fce0bd070e.1493749880.git.daniel@iogearbox.net>
-Message-ID: <20170502.150604.1278120708759571672.davem@davemloft.net>
+From: chunkeey@googlemail.com (Christian Lamparter)
+Date: Tue,  2 May 2017 21:19:24 +0200
+Subject: [PATCH] qcom: ipq4019: fix i2c_0 node
+Message-ID: <20170502191924.32585-1-chunkeey@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Borkmann <daniel@iogearbox.net>
-Date: Tue,  2 May 2017 20:34:54 +0200
+This patch fixes two typos in the i2c_0 node for the ipq4019.
+The reg property length is just 0x600. The core clock is
+GCC_BLSP1_QUP1_I2C_APPS_CLK. GCC_BLSP1_QUP2_I2C_APPS_CLK is
+used by the second i2c.
 
-> When the instruction right before the branch destination is
-> a 64 bit load immediate, we currently calculate the wrong
-> jump offset in the ctx->offset[] array as we only account
-> one instruction slot for the 64 bit load immediate although
-> it uses two BPF instructions. Fix it up by setting the offset
-> into the right slot after we incremented the index.
- ...
-> Also, add a couple of test cases to make sure JITs pass
-> this test. Tested on Cavium ThunderX ARMv8. The added
-> test cases all pass after the fix.
-> 
-> Fixes: 8eee539ddea0 ("arm64: bpf: fix out-of-bounds read in bpf2a64_offset()")
-> Reported-by: David S. Miller <davem@davemloft.net>
-> Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
-> Acked-by: Alexei Starovoitov <ast@kernel.org>
+Fixes: e76b4284b520ba3 ("qcom: ipq4019: add i2c node to ipq4019 SoC and DK01 device tree")
+Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
+---
+ arch/arm/boot/dts/qcom-ipq4019.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Applied and queued up for -stable, thanks!
-
-I also applied your XADD patch as well.
-
-Thanks again.
+diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+index b7a24af8f47b..4b7d97275c62 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+@@ -154,10 +154,10 @@
+ 
+ 		i2c_0: i2c at 78b7000 {
+ 			compatible = "qcom,i2c-qup-v2.2.1";
+-			reg = <0x78b7000 0x6000>;
++			reg = <0x78b7000 0x600>;
+ 			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+-				 <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
++				 <&gcc GCC_BLSP1_QUP1_I2C_APPS_CLK>;
+ 			clock-names = "iface", "core";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-- 
+2.11.0
