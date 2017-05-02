@@ -1,38 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 2 May 2017 15:17:00 +0100
-Subject: [PATCH] arm: pmu: Get PMU working when the A53 is run in 32 bit
- mode
-In-Reply-To: <1493733691-43814-1-git-send-email-alcooperx@gmail.com>
-References: <1493733691-43814-1-git-send-email-alcooperx@gmail.com>
-Message-ID: <0f716b0c-b9ac-29d9-2909-50906ad90bd3@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 2 May 2017 15:40:29 +0100
+Subject: [PATCH 1/5] arm64: KVM: Do not use stack-protector to compile
+ EL2 code
+In-Reply-To: <20170502133041.10980-2-marc.zyngier@arm.com>
+References: <20170502133041.10980-1-marc.zyngier@arm.com>
+ <20170502133041.10980-2-marc.zyngier@arm.com>
+Message-ID: <20170502144029.GB29224@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Al,
-
-On 02/05/17 15:01, Al Cooper wrote:
-> From: Al Cooper <al.cooper@broadcom.com>
+On Tue, May 02, 2017 at 02:30:37PM +0100, Marc Zyngier wrote:
+> We like living dangerously. Nothing explicitely forbids stack-protector
+> to be used in the EL2 code, while distributions routinely compile their
+> kernel with it. We're just lucky that no code actually triggers the
+> instrumentation.
 > 
-> When the A53 is run in A15 (32 bit) mode, the registers used to
-> access the counters are A15 style registers, but the actual
-> counters are the A53 counters not A15 counters. This patch will
-> select a PMU counters map for the A53 if the device tree pmu
-> "compatible" property includes "arm,cortex-a53-pmu".
+> Let's not try our luck for much longer, and disable stack-protector
+> for code living at EL2.
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/Makefile | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> index aaf42ae8d8c3..14c4e3b14bcb 100644
+> --- a/arch/arm64/kvm/hyp/Makefile
+> +++ b/arch/arm64/kvm/hyp/Makefile
+> @@ -2,6 +2,8 @@
+>  # Makefile for Kernel-based Virtual Machine module, HYP part
+>  #
+>  
+> +ccflags-y += -fno-stack-protector
+> +
 
-I wasn't aware of an "A15 mode"! Is there an ARM3 mode, while we're at
-it? ;-)
+While you are at it, should we have a -fpic here as well? The hyp code
+runs at a different location than the rest of the kernel.
 
-More seriously, you seem to take the problem from the wrong end. If you
-have an ARMv8 core, you should use the PMUv3 driver (because that is
-what your A53 has), and not the ARMv7 PMU.
-
-To that affect, I've posted this[1] a while ago. Can you please give it
-a go?
-
-Thanks,
-
-	M.
-
-[1]: https://www.spinics.net/lists/arm-kernel/msg571476.html
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
