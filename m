@@ -1,81 +1,60 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 2 May 2017 11:52:00 -0700
-Subject: [PATCH] arm: pmu: Get PMU working when the A53 is run in 32 bit
- mode
-In-Reply-To: <87d1brm9h1.fsf@on-the-bus.cambridge.arm.com>
-References: <1493733691-43814-1-git-send-email-alcooperx@gmail.com>
- <0f716b0c-b9ac-29d9-2909-50906ad90bd3@arm.com>
- <3f44e99a-6ff1-23e5-52d5-59c662fd10c3@gmail.com>
- <87h913mcdy.fsf@on-the-bus.cambridge.arm.com>
- <e32b1d89-b349-5a45-565a-19463032adbc@gmail.com>
- <87d1brm9h1.fsf@on-the-bus.cambridge.arm.com>
-Message-ID: <6369cfdd-f0f1-0d37-f93a-5f1445087e6d@gmail.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Tue, 2 May 2017 11:52:12 -0700
+Subject: [PATCH] arm64: Fix multiple 'asm-operand-widths' warnings
+In-Reply-To: <20170502172948.GE28132@leverpostej>
+References: <20170501212622.153720-1-mka@chromium.org>
+ <20170502172948.GE28132@leverpostej>
+Message-ID: <20170502185212.GY128305@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2017 10:53 AM, Marc Zyngier wrote:
-> On Tue, May 02 2017 at  6:37:40 pm BST, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> On 05/02/2017 09:50 AM, Marc Zyngier wrote:
->>> On Tue, May 02 2017 at  4:51:55 pm BST, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>>> Hi Mark,
->>>>
->>>> On 05/02/2017 07:17 AM, Marc Zyngier wrote:
->>>>> Hi Al,
->>>>>
->>>>> On 02/05/17 15:01, Al Cooper wrote:
->>>>>> From: Al Cooper <al.cooper@broadcom.com>
->>>>>>
->>>>>> When the A53 is run in A15 (32 bit) mode, the registers used to
->>>>>> access the counters are A15 style registers, but the actual
->>>>>> counters are the A53 counters not A15 counters. This patch will
->>>>>> select a PMU counters map for the A53 if the device tree pmu
->>>>>> "compatible" property includes "arm,cortex-a53-pmu".
->>>>>
->>>>> I wasn't aware of an "A15 mode"! Is there an ARM3 mode, while we're at
->>>>> it? ;-)
->>>>
->>>> This is referring to how our Device Tree and kernel end-up "viewing" the
->>>> PMU (based on provided compatible strings) but this probably should be
->>>> omitted for clarity.
->>>
->>> That's certainly wrong from both an architectural and implementation
->>> PoV. Although there is some level of compatibility between the ARMv7 and
->>> ARMv8 PMU architectures, they are distinct beasts.
->>
->> Yes, we are well aware of that, which is why I don't think it's even
->> relevant to this discussion here because it's a known implementation
->> issue on our end.
->>
->>>
->>>>>
->>>>> More seriously, you seem to take the problem from the wrong end. If you
->>>>> have an ARMv8 core, you should use the PMUv3 driver (because that is
->>>>> what your A53 has), and not the ARMv7 PMU.
->>>>>
->>>>> To that affect, I've posted this[1] a while ago. Can you please give it
->>>>> a go?
->>>>
->>>> That seems to be the right direction, however don't you also need to
->>>> possibly expose other PMU types as well? Cortex-A53 and Cortex-A57 PMUs
->>>> (and possibly more) for instance because there are additional counters
->>>> that can be defined specifically for those, e.g: LL = L2 cache on A53,
->>>> see [1].
->>>
->>> That's pretty much orthogonal. Once we have a common driver for PMUv3 on
->>> both 32 and 64bit, adding implementation-specific events can be done for
->>> both architecture.
->>
->> My comment was not so much about the PMU-specific events, but about the
->> fact that if you make changes to the PMUv3 between 32-bit and 64-bit
->> kernels, we might as well bring all other PMU models that have a
->> potential for being shared between 32-bit and 64-bit in one go.
-> 
-> I'm only concerned about the CPU PMU so far, as my main goal is
-> virtualization (and I have no desire to expose any other form of PMU to
-> a guest). Non-CPU PMUs should be mostly architecture agnostic already,
-> and thus pretty easy to enable.
+Hi,
 
-By other PMU models here, I was actually referring to all other known
-types of CPU PMU models, such as A53, A57 and so on.
--- 
-Florian
+El Tue, May 02, 2017 at 06:29:48PM +0100 Mark Rutland ha dit:
+
+> On Mon, May 01, 2017 at 02:26:22PM -0700, Matthias Kaehlcke wrote:
+> > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> > index 5308d696311b..7db143689694 100644
+> > --- a/arch/arm64/include/asm/uaccess.h
+> > +++ b/arch/arm64/include/asm/uaccess.h
+> > @@ -302,7 +302,7 @@ do {									\
+> >  	"	.previous\n"						\
+> >  	_ASM_EXTABLE(1b, 3b)						\
+> >  	: "+r" (err)							\
+> > -	: "r" (x), "r" (addr), "i" (-EFAULT))
+> > +	: "r" ((__u64)x), "r" (addr), "i" (-EFAULT))
+> >  
+> 
+> For reference, do you have the warning for this case to hand?
+> 
+> In __put_user_err() we make __pu_val the same type as *ptr, then we
+> switch on sizeof(*ptr), and pass __pu_val to __put_user_asm(), as x.
+> For cases 1, 2, and 4, we use "%w" as the register template.
+> 
+> So I can't see why we'd  need this cast in __put_user_err().
+> 
+> I must be missing something.
+
+This is one of many instances:
+
+./include/linux/pagemap.h:554:10: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+                return __put_user(0, end);
+                       ^
+./arch/arm64/include/asm/uaccess.h:338:2: note: expanded from macro '__put_user'
+        __put_user_err((x), (ptr), __pu_err);                           \
+        ^
+./arch/arm64/include/asm/uaccess.h:326:38: note: expanded from macro '__put_user_err'
+                __put_user_asm("str", "sttr", "%", __pu_val, (ptr),     \
+                                                   ^
+./include/linux/pagemap.h:554:10: note: use constraint modifier "w"
+./arch/arm64/include/asm/uaccess.h:338:2: note: expanded from macro '__put_user'
+        __put_user_err((x), (ptr), __pu_err);                           \
+        ^
+./arch/arm64/include/asm/uaccess.h:326:34: note: expanded from macro '__put_user_err'
+                __put_user_asm("str", "sttr", "%", __pu_val, (ptr),     \
+                                               ^
+
+'end' is a char pointer, it is not clear to me why we would end up in
+the width == 8 branch.
+
+Matthias
