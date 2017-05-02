@@ -1,59 +1,71 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 2 May 2017 11:17:58 +0200
-Subject: [PATCH 2/5] mtd: nand: gpmi: add i.MX 7 SoC support
-In-Reply-To: <CA+EcR20FCPSec+ihTMA=SGwogd7p5tsnECCp3CR-Nv6fUciK4g@mail.gmail.com>
-References: <20170421010755.18025-1-stefan@agner.ch>
- <20170421010755.18025-3-stefan@agner.ch>
- <af3fe671-c5fb-d3cf-c891-e6b7c973baa1@gmail.com>
- <5cf26d2b020392c875464c7504a9fb5b@agner.ch>
- <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
- <494a7bc044457240a302d92b3a50b8e5@agner.ch>
- <57336d7e-7b48-8855-9e87-3eb370facd05@gmail.com>
- <a9cdc47795433e7b152dcdd123f9bd63@agner.ch>
- <CA+EcR20FCPSec+ihTMA=SGwogd7p5tsnECCp3CR-Nv6fUciK4g@mail.gmail.com>
-Message-ID: <20170502111758.53e9a959@bbrezillon>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 2 May 2017 17:20:18 +0800
+Subject: [PATCH v7 5/7] coresight: add support for CPU debug module
+In-Reply-To: <1493713805-26920-6-git-send-email-leo.yan@linaro.org>
+References: <1493713805-26920-1-git-send-email-leo.yan@linaro.org>
+ <1493713805-26920-6-git-send-email-leo.yan@linaro.org>
+Message-ID: <20170502092018.GB20225@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Han,
+On Tue, May 02, 2017 at 04:30:03PM +0800, Leo Yan wrote:
 
-On Fri, 21 Apr 2017 13:29:16 -0500
-Han Xu <xhnjupt@gmail.com> wrote:
+[...]
 
-> >>  
-> >>>>> But then, adding the type would only require 2-3 lines of change if I
-> >>>>> add it to the GPMI_IS_MX6 macro...  
-> >>>>
-> >>>> Then at least add a comment because using type = IMX6SX right under
-> >>>> gpmi_data_mx7d can trigger some head-scratching. And put my R-B on V2.  
-> >>>
-> >>> FWIW, I mentioned it in the commit message.
-> >>>
-> >>> I think rather then adding a comment it is cleaner to just add IS_IMX7D
-> >>> and add it to the GPMI_IS_MX6 macro. That does not need a comment since
-> >>> it implicitly says we have a i.MX 7 but treat it like i.MX 6 and it is a
-> >>> rather small change. Does that sound acceptable?  
-> >>
-> >> Sure, that's even better, thanks.
-> >>
-> >> btw isn't there some single-core mx7 (mx7s ?) , maybe we should just go
-> >> with mx7 (without the d suffix). I dunno if it has GPMI NAND though, so
-> >> maybe mx7d is the right thing to do here ...
-> >>  
-> >
-> > There is a Solo version yes, and it has GPMI NAND too. However, almost
-> > all i.MX 7 IPs have been named imx7d by NXP for some reason (including
-> > compatible strings, see grep -r -e imx7 Documentation/), so I thought I
-> > stay consistent here...  
-> 
-> Hi Guys,
-> 
-> Yes, there should be a i.MX7 Solo version with one core fused out. IMO, can
-> we use QUIRK to distinguish them rather than SoC name. I know I also sent
-> some patch set with SoC Name but I prefer to use QUIRK now.
+> +static void debug_force_cpu_powered_up(struct debug_drvdata *drvdata)
+> +{
+> +	u32 edprcr;
+> +
+> +try_again:
+> +
+> +	/*
+> +	 * Send request to power management controller and assert
+> +	 * DBGPWRUPREQ signal; if power management controller has
+> +	 * sane implementation, it should enable CPU power domain
+> +	 * in case CPU is in low power state.
+> +	 */
+> +	edprcr = readl_relaxed(drvdata->base + EDPRCR);
+> +	edprcr |= EDPRCR_COREPURQ;
+> +	writel_relaxed(edprcr, drvdata->base + EDPRCR);
+> +
+> +	/* Wait for CPU to be powered up (timeout~=32ms) */
+> +	if (readx_poll_timeout_atomic(readl_relaxed, drvdata->base + EDPRSR,
+> +			drvdata->edprsr, (drvdata->edprsr & EDPRSR_PU),
+> +			DEBUG_WAIT_SLEEP, DEBUG_WAIT_TIMEOUT)) {
+> +		/*
+> +		 * Unfortunately the CPU cannot be powered up, so return
+> +		 * back and later has no permission to access other
+> +		 * registers. For this case, should disable CPU low power
+> +		 * states to ensure CPU power domain is enabled!
+> +		 */
+> +		pr_err("%s: power up request for CPU%d failed\n",
+> +			__func__, drvdata->cpu);
+> +		return;
+> +	}
+> +
+> +	/*
+> +	 * At this point the CPU is powered up, so set the no powerdown
+> +	 * request bit so we don't lose power and emulate power down.
+> +	 */
+> +	edprcr = readl_relaxed(drvdata->base + EDPRCR);
+> +	edprcr |= EDPRCR_COREPURQ | EDPRCR_CORENPDRQ;
+> +	writel_relaxed(edprcr, drvdata->base + EDPRCR);
+> +
+> +	drvdata->edprsr = readl_relaxed(drvdata->base + EDPRSR);
+> +
+> +	/* The core power domain got switched off on use, try again */
+> +	if (unlikely(!drvdata->edprsr & EDPRSR_PU))
 
-Not sure what this means. Are you okay with Stefan's v2?
+Here have error introduced by operator priority. Should change to
 
-Regards,
+        if (unlikely(!(drvdata->edprsr & EDPRSR_PU)))
 
-Boris
+Will send new version soon for this fixing.
+
+> +		goto try_again;
+> +}
+
+[...]
+
+Thanks,
+Leo Yan
