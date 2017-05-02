@@ -1,148 +1,182 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Tue,  2 May 2017 20:34:54 +0200
-Subject: [PATCH net] bpf, arm64: fix jit branch offset related to ldimm64
-Message-ID: <5f7d105a1830ed789f1b416dc17b02fce0bd070e.1493749880.git.daniel@iogearbox.net>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 2 May 2017 20:35:37 +0200
+Subject: [PATCH V8 07/11] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <1486136933-20328-8-git-send-email-sricharan@codeaurora.org>
+References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
+ <1486136933-20328-8-git-send-email-sricharan@codeaurora.org>
+Message-ID: <CAMuHMdV05uCcVss+V1E+_OQYosJO6P95rU1WynV-G08-iHJnyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the instruction right before the branch destination is
-a 64 bit load immediate, we currently calculate the wrong
-jump offset in the ctx->offset[] array as we only account
-one instruction slot for the 64 bit load immediate although
-it uses two BPF instructions. Fix it up by setting the offset
-into the right slot after we incremented the index.
+Hi Sricharan,
 
-Before (ldimm64 test 1):
+On Fri, Feb 3, 2017 at 4:48 PM, Sricharan R <sricharan@codeaurora.org> wrote:
+> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+>
+> Failures to look up an IOMMU when parsing the DT iommus property need to
+> be handled separately from the .of_xlate() failures to support deferred
+> probing.
+>
+> The lack of a registered IOMMU can be caused by the lack of a driver for
+> the IOMMU, the IOMMU device probe not having been performed yet, having
+> been deferred, or having failed.
+>
+> The first case occurs when the device tree describes the bus master and
+> IOMMU topology correctly but no device driver exists for the IOMMU yet
+> or the device driver has not been compiled in. Return NULL, the caller
+> will configure the device without an IOMMU.
+>
+> The second and third cases are handled by deferring the probe of the bus
+> master device which will eventually get reprobed after the IOMMU.
+>
+> The last case is currently handled by deferring the probe of the bus
+> master device as well. A mechanism to either configure the bus master
+> device without an IOMMU or to fail the bus master device probe depending
+> on whether the IOMMU is optional or mandatory would be a good
+> enhancement.
+>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 
-  [...]
-  00000020:  52800007  mov w7, #0x0 // #0
-  00000024:  d2800060  mov x0, #0x3 // #3
-  00000028:  d2800041  mov x1, #0x2 // #2
-  0000002c:  eb01001f  cmp x0, x1
-  00000030:  54ffff82  b.cs 0x00000020
-  00000034:  d29fffe7  mov x7, #0xffff // #65535
-  00000038:  f2bfffe7  movk x7, #0xffff, lsl #16
-  0000003c:  f2dfffe7  movk x7, #0xffff, lsl #32
-  00000040:  f2ffffe7  movk x7, #0xffff, lsl #48
-  00000044:  d29dddc7  mov x7, #0xeeee // #61166
-  00000048:  f2bdddc7  movk x7, #0xeeee, lsl #16
-  0000004c:  f2ddddc7  movk x7, #0xeeee, lsl #32
-  00000050:  f2fdddc7  movk x7, #0xeeee, lsl #48
-  [...]
+This patch broke Renesas R-Car Gen3 platforms in renesas-drivers.
+As the IOMMU nodes in DT are not yet enabled, all devices having iommus
+properties in DT now fail to probe.
 
-After (ldimm64 test 1):
+This can be fixed by either:
+  - Disabling CONFIG_IPMMU_VMSA, or
+  - Reverting commit 7b07cbefb68d486f (but keeping "int ret = 0;").
 
-  [...]
-  00000020:  52800007  mov w7, #0x0 // #0
-  00000024:  d2800060  mov x0, #0x3 // #3
-  00000028:  d2800041  mov x1, #0x2 // #2
-  0000002c:  eb01001f  cmp x0, x1
-  00000030:  540000a2  b.cs 0x00000044
-  00000034:  d29fffe7  mov x7, #0xffff // #65535
-  00000038:  f2bfffe7  movk x7, #0xffff, lsl #16
-  0000003c:  f2dfffe7  movk x7, #0xffff, lsl #32
-  00000040:  f2ffffe7  movk x7, #0xffff, lsl #48
-  00000044:  d29dddc7  mov x7, #0xeeee // #61166
-  00000048:  f2bdddc7  movk x7, #0xeeee, lsl #16
-  0000004c:  f2ddddc7  movk x7, #0xeeee, lsl #32
-  00000050:  f2fdddc7  movk x7, #0xeeee, lsl #48
-  [...]
+Note that this was a bit hard to investigate, as R-Car Gen3 support wasn't
+upstreamed yet, so bisection pointed to a merge commit.
 
-Also, add a couple of test cases to make sure JITs pass
-this test. Tested on Cavium ThunderX ARMv8. The added
-test cases all pass after the fix.
+> ---
+>  [*] Fixed minor comment from Bjorn for removing the pci.h header inclusion
+>      in of_iommu.c
+>
+>  drivers/base/dma-mapping.c | 5 +++--
+>  drivers/iommu/of_iommu.c   | 4 ++--
+>  drivers/of/device.c        | 7 ++++++-
+>  include/linux/of_device.h  | 9 ++++++---
+>  4 files changed, 17 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+> index 449b948..82bd45c 100644
+> --- a/drivers/base/dma-mapping.c
+> +++ b/drivers/base/dma-mapping.c
+> @@ -353,6 +353,7 @@ int dma_configure(struct device *dev)
+>  {
+>         struct device *bridge = NULL, *dma_dev = dev;
+>         enum dev_dma_attr attr;
+> +       int ret = 0;
+>
+>         if (dev_is_pci(dev)) {
+>                 bridge = pci_get_host_bridge_device(to_pci_dev(dev));
+> @@ -363,7 +364,7 @@ int dma_configure(struct device *dev)
+>         }
+>
+>         if (dma_dev->of_node) {
+> -               of_dma_configure(dev, dma_dev->of_node);
+> +               ret = of_dma_configure(dev, dma_dev->of_node);
+>         } else if (has_acpi_companion(dma_dev)) {
+>                 attr = acpi_get_dma_attr(to_acpi_device_node(dma_dev->fwnode));
+>                 if (attr != DEV_DMA_NOT_SUPPORTED)
+> @@ -373,7 +374,7 @@ int dma_configure(struct device *dev)
+>         if (bridge)
+>                 pci_put_host_bridge_device(bridge);
+>
+> -       return 0;
+> +       return ret;
+>  }
+>
+>  void dma_deconfigure(struct device *dev)
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 1f92d98..2d04663 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -236,7 +236,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+>                         ops = ERR_PTR(err);
+>         }
+>
+> -       return IS_ERR(ops) ? NULL : ops;
+> +       return ops;
+>  }
+>
+>  static int __init of_iommu_init(void)
+> @@ -247,7 +247,7 @@ static int __init of_iommu_init(void)
+>         for_each_matching_node_and_match(np, matches, &match) {
+>                 const of_iommu_init_fn init_fn = match->data;
+>
+> -               if (init_fn(np))
+> +               if (init_fn && init_fn(np))
+>                         pr_err("Failed to initialise IOMMU %s\n",
+>                                 of_node_full_name(np));
+>         }
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index c17c19d..ba51ca6 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -82,7 +82,7 @@ int of_device_add(struct platform_device *ofdev)
+>   * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
+>   * to fix up DMA configuration.
+>   */
+> -void of_dma_configure(struct device *dev, struct device_node *np)
+> +int of_dma_configure(struct device *dev, struct device_node *np)
+>  {
+>         u64 dma_addr, paddr, size;
+>         int ret;
+> @@ -129,10 +129,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>                 coherent ? " " : " not ");
+>
+>         iommu = of_iommu_configure(dev, np);
+> +       if (IS_ERR(iommu))
+> +               return PTR_ERR(iommu);
+> +
+>         dev_dbg(dev, "device is%sbehind an iommu\n",
+>                 iommu ? " " : " not ");
+>
+>         arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+> +
+> +       return 0;
+>  }
+>  EXPORT_SYMBOL_GPL(of_dma_configure);
+>
+> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+> index 3cb2288..9499861 100644
+> --- a/include/linux/of_device.h
+> +++ b/include/linux/of_device.h
+> @@ -56,7 +56,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+>         return of_node_get(cpu_dev->of_node);
+>  }
+>
+> -void of_dma_configure(struct device *dev, struct device_node *np);
+> +int of_dma_configure(struct device *dev, struct device_node *np);
+>  void of_dma_deconfigure(struct device *dev);
+>  #else /* CONFIG_OF */
+>
+> @@ -105,8 +105,11 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+>  {
+>         return NULL;
+>  }
+> -static inline void of_dma_configure(struct device *dev, struct device_node *np)
+> -{}
+> +
+> +static inline int of_dma_configure(struct device *dev, struct device_node *np)
+> +{
+> +       return 0;
+> +}
+>  static inline void of_dma_deconfigure(struct device *dev)
+>  {}
+>  #endif /* CONFIG_OF */
 
-Fixes: 8eee539ddea0 ("arm64: bpf: fix out-of-bounds read in bpf2a64_offset()")
-Reported-by: David S. Miller <davem@davemloft.net>
-Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
-Acked-by: Alexei Starovoitov <ast@kernel.org>
-Cc: Xi Wang <xi.wang@gmail.com>
----
- ( Based against net-next where BPF related patches are usually
-   routed, if something else is preferred please let me know. )
+Gr{oetje,eeting}s,
 
- arch/arm64/net/bpf_jit_comp.c |  8 ++++----
- lib/test_bpf.c                | 45 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 49 insertions(+), 4 deletions(-)
+                        Geert
 
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index a785554..ce8ab04 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -779,14 +779,14 @@ static int build_body(struct jit_ctx *ctx)
- 		int ret;
- 
- 		ret = build_insn(insn, ctx);
--
--		if (ctx->image == NULL)
--			ctx->offset[i] = ctx->idx;
--
- 		if (ret > 0) {
- 			i++;
-+			if (ctx->image == NULL)
-+				ctx->offset[i] = ctx->idx;
- 			continue;
- 		}
-+		if (ctx->image == NULL)
-+			ctx->offset[i] = ctx->idx;
- 		if (ret)
- 			return ret;
- 	}
-diff --git a/lib/test_bpf.c b/lib/test_bpf.c
-index 0362da0..2e38502 100644
---- a/lib/test_bpf.c
-+++ b/lib/test_bpf.c
-@@ -4656,6 +4656,51 @@ static int bpf_fill_ld_abs_vlan_push_pop(struct bpf_test *self)
- 		{ },
- 		{ { 0, 1 } },
- 	},
-+	{
-+		/* Mainly testing JIT + imm64 here. */
-+		"JMP_JGE_X: ldimm64 test 1",
-+		.u.insns_int = {
-+			BPF_ALU32_IMM(BPF_MOV, R0, 0),
-+			BPF_LD_IMM64(R1, 3),
-+			BPF_LD_IMM64(R2, 2),
-+			BPF_JMP_REG(BPF_JGE, R1, R2, 2),
-+			BPF_LD_IMM64(R0, 0xffffffffffffffffUL),
-+			BPF_LD_IMM64(R0, 0xeeeeeeeeeeeeeeeeUL),
-+			BPF_EXIT_INSN(),
-+		},
-+		INTERNAL,
-+		{ },
-+		{ { 0, 0xeeeeeeeeU } },
-+	},
-+	{
-+		"JMP_JGE_X: ldimm64 test 2",
-+		.u.insns_int = {
-+			BPF_ALU32_IMM(BPF_MOV, R0, 0),
-+			BPF_LD_IMM64(R1, 3),
-+			BPF_LD_IMM64(R2, 2),
-+			BPF_JMP_REG(BPF_JGE, R1, R2, 0),
-+			BPF_LD_IMM64(R0, 0xffffffffffffffffUL),
-+			BPF_EXIT_INSN(),
-+		},
-+		INTERNAL,
-+		{ },
-+		{ { 0, 0xffffffffU } },
-+	},
-+	{
-+		"JMP_JGE_X: ldimm64 test 3",
-+		.u.insns_int = {
-+			BPF_ALU32_IMM(BPF_MOV, R0, 1),
-+			BPF_LD_IMM64(R1, 3),
-+			BPF_LD_IMM64(R2, 2),
-+			BPF_JMP_REG(BPF_JGE, R1, R2, 4),
-+			BPF_LD_IMM64(R0, 0xffffffffffffffffUL),
-+			BPF_LD_IMM64(R0, 0xeeeeeeeeeeeeeeeeUL),
-+			BPF_EXIT_INSN(),
-+		},
-+		INTERNAL,
-+		{ },
-+		{ { 0, 1 } },
-+	},
- 	/* BPF_JMP | BPF_JNE | BPF_X */
- 	{
- 		"JMP_JNE_X: if (3 != 2) return 1",
--- 
-1.9.3
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
