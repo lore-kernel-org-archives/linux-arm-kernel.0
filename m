@@ -1,43 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  2 May 2017 14:30:40 +0100
-Subject: [PATCH 4/5] KVM: arm/arm64: vgic-v3: Do not use Active+Pending state
- for a HW interrupt
+Date: Tue,  2 May 2017 14:30:37 +0100
+Subject: [PATCH 1/5] arm64: KVM: Do not use stack-protector to compile EL2 code
 In-Reply-To: <20170502133041.10980-1-marc.zyngier@arm.com>
 References: <20170502133041.10980-1-marc.zyngier@arm.com>
-Message-ID: <20170502133041.10980-5-marc.zyngier@arm.com>
+Message-ID: <20170502133041.10980-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an interrupt is injected with the HW bit set (indicating that
-deactivation should be propagated to the physical distributor),
-special care must be taken so that we never mark the corresponding
-LR with the Active+Pending state (as the pending state is kept in
-the physycal distributor).
+We like living dangerously. Nothing explicitely forbids stack-protector
+to be used in the EL2 code, while distributions routinely compile their
+kernel with it. We're just lucky that no code actually triggers the
+instrumentation.
+
+Let's not try our luck for much longer, and disable stack-protector
+for code living at EL2.
 
 Cc: stable at vger.kernel.org
-Fixes: 59529f69f504 ("KVM: arm/arm64: vgic-new: Add GICv3 world switch backend")
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-v3.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/kvm/hyp/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index df1503650300..393779ebe87c 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -127,6 +127,13 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
- 	if (irq->hw) {
- 		val |= ICH_LR_HW;
- 		val |= ((u64)irq->hwintid) << ICH_LR_PHYS_ID_SHIFT;
-+		/*
-+		 * Never set pending+active on a HW interrupt, as the
-+		 * pending state is kept@the physical distributor
-+		 * level.
-+		 */
-+		if (irq->active && irq_is_pending(irq))
-+			val &= ~ICH_LR_PENDING_BIT;
- 	} else {
- 		if (irq->config == VGIC_CONFIG_LEVEL)
- 			val |= ICH_LR_EOI;
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index aaf42ae8d8c3..14c4e3b14bcb 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -2,6 +2,8 @@
+ # Makefile for Kernel-based Virtual Machine module, HYP part
+ #
+ 
++ccflags-y += -fno-stack-protector
++
+ KVM=../../../../virt/kvm
+ 
+ obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
 -- 
 2.11.0
