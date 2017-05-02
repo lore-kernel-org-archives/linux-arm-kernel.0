@@ -1,91 +1,52 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Tue, 2 May 2017 15:49:29 +0100
-Subject: [PATCH v4 1/5] dt-bindings: gpu: add bindings for the ARM Mali
- Midgard GPU
-In-Reply-To: <CAL_JsqK8rjvFW=LFb7==Qho-MHVew-O_vAJ+M6wcFJGfVD6r1A@mail.gmail.com>
-References: <cover.1493125299.git.guillaume.tucker@collabora.com>
- <9349c8ae9091fbd93e9410f4cfae770ac850bf6b.1493125299.git.guillaume.tucker@collabora.com>
- <20170428192742.pu4v4layszr6z2ot@rob-hp-laptop>
- <60b3c062-d4bb-6502-61be-ada830cf58f7@collabora.com>
- <CAL_JsqK8rjvFW=LFb7==Qho-MHVew-O_vAJ+M6wcFJGfVD6r1A@mail.gmail.com>
-Message-ID: <5a058271-c840-90d1-4708-fd0c4d59950b@collabora.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 2 May 2017 15:50:17 +0100
+Subject: [PATCH 1/5] arm64: KVM: Do not use stack-protector to compile EL2
+ code
+In-Reply-To: <20170502144029.GB29224@e104818-lin.cambridge.arm.com>
+References: <20170502133041.10980-1-marc.zyngier@arm.com>
+ <20170502133041.10980-2-marc.zyngier@arm.com>
+ <20170502144029.GB29224@e104818-lin.cambridge.arm.com>
+Message-ID: <334c4025-873d-d30c-534b-4194c78eb64b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/17 15:13, Rob Herring wrote:
-> On Tue, May 2, 2017 at 6:23 AM, Guillaume Tucker
-> <guillaume.tucker@collabora.com> wrote:
->> Hi Rob,
+On 02/05/17 15:40, Catalin Marinas wrote:
+> On Tue, May 02, 2017 at 02:30:37PM +0100, Marc Zyngier wrote:
+>> We like living dangerously. Nothing explicitely forbids stack-protector
+>> to be used in the EL2 code, while distributions routinely compile their
+>> kernel with it. We're just lucky that no code actually triggers the
+>> instrumentation.
 >>
->> On 28/04/17 20:27, Rob Herring wrote:
->>>
->>> On Tue, Apr 25, 2017 at 02:16:16PM +0100, Guillaume Tucker wrote:
+>> Let's not try our luck for much longer, and disable stack-protector
+>> for code living at EL2.
 >>
+>> Cc: stable at vger.kernel.org
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp/Makefile | 2 ++
+>>  1 file changed, 2 insertions(+)
 >>
->>>> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
->>>> b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
->>>> new file mode 100644
->>>> index 000000000000..547ddeceb498
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
->>>> @@ -0,0 +1,82 @@
->>>> +ARM Mali Midgard GPU
->>>> +====================
->>>> +
->>>> +Required properties:
->>>> +
->>>> +- compatible :
->>>> +  * Must be one of the following:
->>>> +    + "arm,mali-t60x"
->>>> +    + "arm,mali-t62x"
->>>
->>>
->>> Don't use wildcards.
->>
->>
->> Sure, old habits die hard...  I'll fix it in patch v5.
->>
->>>> +    + "arm,mali-t720"
->>>> +    + "arm,mali-t760"
->>>> +    + "arm,mali-t820"
->>>> +    + "arm,mali-t830"
->>>> +    + "arm,mali-t860"
->>>> +    + "arm,mali-t880"
->>>> +  * And, optionally, one of the vendor specific compatible:
->>>
->>>
->>> IMO, these should not be optional.
->>
->>
->> Well, vendor compatible strings are clearly optional for the
->> Utgard GPU series for which the bindings docs were recently
->> merged.  It seems that whether these should be optional or not,
->> the documentation should be consistent between at least all
->> similar types of devices like Midgard and Utgard GPUs.  They have
->> different architectures but from a device tree point of view,
->> they both have the same kind of SoC-specific integration (clocks,
->> irqs, regulators...).
->
-> Clocks should not vary by SoC. There is often variation because clocks
-> get driven by same source or are not s/w controlled, but really there
-> should not be that variation. I noticed Utgard has 2 clocks. So is
-> Midgard really just 1 clock? The DT should have all the clocks listed
-> in the TRMs.
+>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+>> index aaf42ae8d8c3..14c4e3b14bcb 100644
+>> --- a/arch/arm64/kvm/hyp/Makefile
+>> +++ b/arch/arm64/kvm/hyp/Makefile
+>> @@ -2,6 +2,8 @@
+>>  # Makefile for Kernel-based Virtual Machine module, HYP part
+>>  #
+>>  
+>> +ccflags-y += -fno-stack-protector
+>> +
+> 
+> While you are at it, should we have a -fpic here as well? The hyp code
+> runs at a different location than the rest of the kernel.
 
-I meant to say that the clock sources are different in each SoC,
-but yes the same clock input is always needed by the GPU.
+We definitely should. I've just tried this, and this doesn't seem to
+work very well. At least this seems to break our jump label
+implementation. I need to page in that part of the code base and see
+what happens.
 
-The TRM is confidential but to the best of my knowledge and based
-on existing device trees and the out-of-tree kernel driver, the
-Midgard GPU has only one clock input.
+Thanks,
 
->> So was this was overlooked in the Utgard case and should it
->> ideally be fixed there as well as non-optional?  Or, is it OK to
->> keep these optional on a second thought?
->
-> Probably should be required in the Utgard case as well.
-
-OK, so I'll make the vendor compatible strings required (for
-Midgard) in patch v5.
-
-Guillaume
+	M.
+-- 
+Jazz is not dead. It just smells funny...
