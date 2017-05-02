@@ -1,70 +1,44 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue,  2 May 2017 16:30:01 +0800
-Subject: [PATCH v7 3/7] coresight: of_get_coresight_platform_data: Add missing
- of_node_put
-In-Reply-To: <1493713805-26920-1-git-send-email-leo.yan@linaro.org>
-References: <1493713805-26920-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1493713805-26920-4-git-send-email-leo.yan@linaro.org>
+From: julien.grall@arm.com (Julien Grall)
+Date: Tue, 2 May 2017 10:08:24 +0100
+Subject: [PATCH 0/3 v2] xen: Implement EFI reset_system callback
+In-Reply-To: <20170424175839.5262-1-julien.grall@arm.com>
+References: <20170424175839.5262-1-julien.grall@arm.com>
+Message-ID: <33472949-4748-f03e-cae9-65bd5f54c2f7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Hi all,
 
-The of_get_coresight_platform_data iterates over the possible CPU nodes
-to find a given cpu phandle. However it does not drop the reference
-to the node pointer returned by the of_get_coresight_platform_data.
+It looks like the series has fully been acked, can someone merge this 
+into xentip?
 
-This patch also introduces another minor fix is to use
-of_cpu_device_node_get() to replace of_get_cpu_node().
+Cheers,
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-[Leo: minor tweaks for of_get_coresight_platform_data]
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- drivers/hwtracing/coresight/of_coresight.c | 17 ++++++++++-------
- 1 file changed, 10 insertions(+), 7 deletions(-)
+On 04/24/2017 06:58 PM, Julien Grall wrote:
+> Hi all,
+>
+> This small patch series implements EFI reset_system callback when using EFI
+> Xen. Without this, it will not be possible to reboot/power off ARM64 DOM0
+> when using ACPI.
+>
+> Cheers,
+>
+> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: Juergen Gross <jgross@suse.com>
+>
+> Julien Grall (3):
+>   xen: Export xen_reboot
+>   arm/xen: Consolidate calls to shutdown hypercall in a single helper
+>   xen: Implement EFI reset_system callback
+>
+>  arch/arm/xen/efi.c       |  2 +-
+>  arch/arm/xen/enlighten.c | 16 ++++++++++------
+>  arch/x86/xen/efi.c       |  2 +-
+>  arch/x86/xen/enlighten.c |  2 +-
+>  drivers/xen/efi.c        | 18 ++++++++++++++++++
+>  include/xen/xen-ops.h    |  5 +++++
+>  6 files changed, 36 insertions(+), 9 deletions(-)
+>
 
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index 859ad49..de7e8ce 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -108,7 +108,8 @@ struct coresight_platform_data *of_get_coresight_platform_data(
- 	struct coresight_platform_data *pdata;
- 	struct of_endpoint endpoint, rendpoint;
- 	struct device *rdev;
--	struct device_node *dn;
-+	bool found;
-+	struct device_node *dn, *np;
- 	struct device_node *ep = NULL;
- 	struct device_node *rparent = NULL;
- 	struct device_node *rport = NULL;
-@@ -175,17 +176,19 @@ struct coresight_platform_data *of_get_coresight_platform_data(
- 		} while (ep);
- 	}
- 
--	/* Affinity defaults to CPU0 */
--	pdata->cpu = 0;
- 	dn = of_parse_phandle(node, "cpu", 0);
--	for (cpu = 0; dn && cpu < nr_cpu_ids; cpu++) {
--		if (dn == of_get_cpu_node(cpu, NULL)) {
--			pdata->cpu = cpu;
-+	for_each_possible_cpu(cpu) {
-+		np = of_cpu_device_node_get(cpu);
-+		found = (dn == np);
-+		of_node_put(np);
-+		if (found)
- 			break;
--		}
- 	}
- 	of_node_put(dn);
- 
-+	/* Affinity to CPU0 if no cpu nodes are found */
-+	pdata->cpu = found ? cpu : 0;
-+
- 	return pdata;
- }
- EXPORT_SYMBOL_GPL(of_get_coresight_platform_data);
 -- 
-2.7.4
+Julien Grall
