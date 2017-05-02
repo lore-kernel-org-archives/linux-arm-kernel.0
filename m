@@ -1,46 +1,52 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 2 May 2017 17:46:00 +0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable cpufreq governors
-Message-ID: <c401883fec8db20878c7593d879e9e128cacc495.1493736306.git.leonard.crestez@nxp.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 2 May 2017 15:48:15 +0100
+Subject: [PATCH 1/5] arm64: KVM: Do not use stack-protector to compile EL2
+ code
+In-Reply-To: <20170502144029.GB29224@e104818-lin.cambridge.arm.com>
+References: <20170502133041.10980-1-marc.zyngier@arm.com>
+ <20170502133041.10980-2-marc.zyngier@arm.com>
+ <20170502144029.GB29224@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu9O-vAfVV0GWoja1jVsDuU1fizeAAACJKpEcWFv8YZA1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable more common cpufreq governors in imx defconfig because this is
-very useful for testing. In particular you can't use cpufreq-set -f
-$FREQ without explicitly defining CONFIG_CPU_FREQ_GOV_USERSPACE=y.
+On 2 May 2017 at 15:40, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, May 02, 2017 at 02:30:37PM +0100, Marc Zyngier wrote:
+>> We like living dangerously. Nothing explicitely forbids stack-protector
+>> to be used in the EL2 code, while distributions routinely compile their
+>> kernel with it. We're just lucky that no code actually triggers the
+>> instrumentation.
+>>
+>> Let's not try our luck for much longer, and disable stack-protector
+>> for code living at EL2.
+>>
+>> Cc: stable at vger.kernel.org
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp/Makefile | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+>> index aaf42ae8d8c3..14c4e3b14bcb 100644
+>> --- a/arch/arm64/kvm/hyp/Makefile
+>> +++ b/arch/arm64/kvm/hyp/Makefile
+>> @@ -2,6 +2,8 @@
+>>  # Makefile for Kernel-based Virtual Machine module, HYP part
+>>  #
+>>
+>> +ccflags-y += -fno-stack-protector
+>> +
+>
+> While you are at it, should we have a -fpic here as well? The hyp code
+> runs at a different location than the rest of the kernel.
+>
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+-fpic almost guarantees you will get position dependent but runtime
+relocatable code (i.e., symbol references indirected via GOT entries
+which need to be fixed up at runtime etc), unless you play around with
+hidden visibility etc. For the same reason, the EFI stub does not
+support being built with -fpic either.
 
----
-
-It might make sense for all governors to be enabled by default from
-drivers/cpufreq/Kconfig and allow defconfigs to be shorter.
-Right now the descriptions for some of them includes a line that says
-"If in doubt, say Y" but the config options don't have actually have a
-default value defined and they effectively default to N.
-
-Cycling via savedefconfig on shawnguo/for-next also generates some
-reordering for some newly added options CONFIG_TOUCHSCREEN_MAX11801=y
-and CONFIG_HID_MULTITOUCH=y. Those were not included but it's strange
-that this happens. Maybe those options were inserted manually, or
-otherwise there is an annoying bug in kconfig?
-
- arch/arm/configs/imx_v6_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index bb6fa56..bf1e7e3 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -55,6 +55,9 @@ CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
- CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_CPU_FREQ_GOV_POWERSAVE=y
-+CONFIG_CPU_FREQ_GOV_USERSPACE=y
-+CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
- CONFIG_ARM_IMX6Q_CPUFREQ=y
- CONFIG_CPU_IDLE=y
- CONFIG_VFP=y
--- 
-2.7.4
+Adding -mcmodel=small explicitly is much more likely to do anything
+meaningful here, but only in case we need to set it to 'large'
+globally in the future.
