@@ -1,86 +1,182 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Tue,  2 May 2017 18:36:51 +0530
-Subject: [PATCH 2/9] net: thunderx: Optimize RBDR descriptor handling
+Date: Tue,  2 May 2017 18:36:52 +0530
+Subject: [PATCH 3/9] net: thunderx: Optimize CQE_TX handling
 In-Reply-To: <1493730418-24606-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1493730418-24606-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1493730418-24606-3-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1493730418-24606-4-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@cavium.com>
 
-Receive buffer's physical address or iova will anyway not
-go beyond 49bits, since it is the max supported HW address.
-As per perf, updating bitfields i.e buf_addr:42 in RBDR
-descriptor entry consumes lots of cpu cycles, hence changed
-it to a 64bit field with alignment requirements taken care of.
+Optimized CQE handling with below changes
+- Feeing descriptors back to SQ in bulk i.e once per NAPI
+  instance instead for every CQE_TX, this will reduce number
+  of atomic updates to 'sq->free_cnt'.
+- Checking errors in CQE_TX and CQE_RX before calling appropriate
+  fn()s to update error stats i.e reduce branching.
+
+Also removed debug messages in packet handling path which otherwise
+causes issues if DEBUG is enabled.
 
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  8 ++++----
- drivers/net/ethernet/cavium/thunder/q_struct.h     | 10 +---------
- 2 files changed, 5 insertions(+), 13 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 44 +++++++++++-----------
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  5 ---
+ 2 files changed, 21 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index 12f9709..dfc85a1 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -257,7 +257,7 @@ static int  nicvf_init_rbdr(struct nicvf *nic, struct rbdr *rbdr,
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index 81a2fcb..0d79894 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -498,7 +498,7 @@ static int nicvf_init_resources(struct nicvf *nic)
+ 
+ static void nicvf_snd_pkt_handler(struct net_device *netdev,
+ 				  struct cqe_send_t *cqe_tx,
+-				  int cqe_type, int budget,
++				  int budget, int *subdesc_cnt,
+ 				  unsigned int *tx_pkts, unsigned int *tx_bytes)
+ {
+ 	struct sk_buff *skb = NULL;
+@@ -513,12 +513,10 @@ static void nicvf_snd_pkt_handler(struct net_device *netdev,
+ 	if (hdr->subdesc_type != SQ_DESC_TYPE_HEADER)
+ 		return;
+ 
+-	netdev_dbg(nic->netdev,
+-		   "%s Qset #%d SQ #%d SQ ptr #%d subdesc count %d\n",
+-		   __func__, cqe_tx->sq_qs, cqe_tx->sq_idx,
+-		   cqe_tx->sqe_ptr, hdr->subdesc_cnt);
++	/* Check for errors */
++	if (cqe_tx->send_status)
++		nicvf_check_cqe_tx_errs(nic->pnicvf, cqe_tx);
+ 
+-	nicvf_check_cqe_tx_errs(nic, cqe_tx);
+ 	skb = (struct sk_buff *)sq->skbuff[cqe_tx->sqe_ptr];
+ 	if (skb) {
+ 		/* Check for dummy descriptor used for HW TSO offload on 88xx */
+@@ -528,12 +526,12 @@ static void nicvf_snd_pkt_handler(struct net_device *netdev,
+ 			 (struct sq_hdr_subdesc *)GET_SQ_DESC(sq, hdr->rsvd2);
+ 			nicvf_unmap_sndq_buffers(nic, sq, hdr->rsvd2,
+ 						 tso_sqe->subdesc_cnt);
+-			nicvf_put_sq_desc(sq, tso_sqe->subdesc_cnt + 1);
++			*subdesc_cnt += tso_sqe->subdesc_cnt + 1;
+ 		} else {
+ 			nicvf_unmap_sndq_buffers(nic, sq, cqe_tx->sqe_ptr,
+ 						 hdr->subdesc_cnt);
+ 		}
+-		nicvf_put_sq_desc(sq, hdr->subdesc_cnt + 1);
++		*subdesc_cnt += hdr->subdesc_cnt + 1;
+ 		prefetch(skb);
+ 		(*tx_pkts)++;
+ 		*tx_bytes += skb->len;
+@@ -544,7 +542,7 @@ static void nicvf_snd_pkt_handler(struct net_device *netdev,
+ 		 * a SKB attached, so just free SQEs here.
+ 		 */
+ 		if (!nic->hw_tso)
+-			nicvf_put_sq_desc(sq, hdr->subdesc_cnt + 1);
++			*subdesc_cnt += hdr->subdesc_cnt + 1;
+ 	}
+ }
+ 
+@@ -595,9 +593,11 @@ static void nicvf_rcv_pkt_handler(struct net_device *netdev,
+ 	}
+ 
+ 	/* Check for errors */
+-	err = nicvf_check_cqe_rx_errs(nic, cqe_rx);
+-	if (err && !cqe_rx->rb_cnt)
+-		return;
++	if (cqe_rx->err_level || cqe_rx->err_opcode) {
++		err = nicvf_check_cqe_rx_errs(nic, cqe_rx);
++		if (err && !cqe_rx->rb_cnt)
++			return;
++	}
+ 
+ 	skb = nicvf_get_rcv_skb(snic, cqe_rx);
+ 	if (!skb) {
+@@ -646,6 +646,7 @@ static int nicvf_cq_intr_handler(struct net_device *netdev, u8 cq_idx,
+ {
+ 	int processed_cqe, work_done = 0, tx_done = 0;
+ 	int cqe_count, cqe_head;
++	int subdesc_cnt = 0;
+ 	struct nicvf *nic = netdev_priv(netdev);
+ 	struct queue_set *qs = nic->qs;
+ 	struct cmp_queue *cq = &qs->cq[cq_idx];
+@@ -667,8 +668,6 @@ static int nicvf_cq_intr_handler(struct net_device *netdev, u8 cq_idx,
+ 	cqe_head = nicvf_queue_reg_read(nic, NIC_QSET_CQ_0_7_HEAD, cq_idx) >> 9;
+ 	cqe_head &= 0xFFFF;
+ 
+-	netdev_dbg(nic->netdev, "%s CQ%d cqe_count %d cqe_head %d\n",
+-		   __func__, cq_idx, cqe_count, cqe_head);
+ 	while (processed_cqe < cqe_count) {
+ 		/* Get the CQ descriptor */
+ 		cq_desc = (struct cqe_rx_t *)GET_CQ_DESC(cq, cqe_head);
+@@ -682,17 +681,15 @@ static int nicvf_cq_intr_handler(struct net_device *netdev, u8 cq_idx,
+ 			break;
  		}
  
- 		desc = GET_RBDR_DESC(rbdr, idx);
--		desc->buf_addr = (u64)rbuf >> NICVF_RCV_BUF_ALIGN;
-+		desc->buf_addr = (u64)rbuf & ~(NICVF_RCV_BUF_ALIGN_BYTES - 1);
+-		netdev_dbg(nic->netdev, "CQ%d cq_desc->cqe_type %d\n",
+-			   cq_idx, cq_desc->cqe_type);
+ 		switch (cq_desc->cqe_type) {
+ 		case CQE_TYPE_RX:
+ 			nicvf_rcv_pkt_handler(netdev, napi, cq_desc);
+ 			work_done++;
+ 		break;
+ 		case CQE_TYPE_SEND:
+-			nicvf_snd_pkt_handler(netdev,
+-					      (void *)cq_desc, CQE_TYPE_SEND,
+-					      budget, &tx_pkts, &tx_bytes);
++			nicvf_snd_pkt_handler(netdev, (void *)cq_desc,
++					      budget, &subdesc_cnt,
++					      &tx_pkts, &tx_bytes);
+ 			tx_done++;
+ 		break;
+ 		case CQE_TYPE_INVALID:
+@@ -704,9 +701,6 @@ static int nicvf_cq_intr_handler(struct net_device *netdev, u8 cq_idx,
+ 		}
+ 		processed_cqe++;
  	}
+-	netdev_dbg(nic->netdev,
+-		   "%s CQ%d processed_cqe %d work_done %d budget %d\n",
+-		   __func__, cq_idx, processed_cqe, work_done, budget);
  
- 	nicvf_get_page(nic);
-@@ -286,7 +286,7 @@ static void nicvf_free_rbdr(struct nicvf *nic, struct rbdr *rbdr)
- 	/* Release page references */
- 	while (head != tail) {
- 		desc = GET_RBDR_DESC(rbdr, head);
--		buf_addr = ((u64)desc->buf_addr) << NICVF_RCV_BUF_ALIGN;
-+		buf_addr = desc->buf_addr;
- 		phys_addr = nicvf_iova_to_phys(nic, buf_addr);
- 		dma_unmap_page_attrs(&nic->pdev->dev, buf_addr, RCV_FRAG_LEN,
- 				     DMA_FROM_DEVICE, DMA_ATTR_SKIP_CPU_SYNC);
-@@ -297,7 +297,7 @@ static void nicvf_free_rbdr(struct nicvf *nic, struct rbdr *rbdr)
- 	}
- 	/* Release buffer of tail desc */
- 	desc = GET_RBDR_DESC(rbdr, tail);
--	buf_addr = ((u64)desc->buf_addr) << NICVF_RCV_BUF_ALIGN;
-+	buf_addr = desc->buf_addr;
- 	phys_addr = nicvf_iova_to_phys(nic, buf_addr);
- 	dma_unmap_page_attrs(&nic->pdev->dev, buf_addr, RCV_FRAG_LEN,
- 			     DMA_FROM_DEVICE, DMA_ATTR_SKIP_CPU_SYNC);
-@@ -364,7 +364,7 @@ static void nicvf_refill_rbdr(struct nicvf *nic, gfp_t gfp)
- 			break;
+ 	/* Ring doorbell to inform H/W to reuse processed CQEs */
+ 	nicvf_queue_reg_write(nic, NIC_QSET_CQ_0_7_DOOR,
+@@ -716,8 +710,12 @@ static int nicvf_cq_intr_handler(struct net_device *netdev, u8 cq_idx,
+ 		goto loop;
  
- 		desc = GET_RBDR_DESC(rbdr, tail);
--		desc->buf_addr = (u64)rbuf >> NICVF_RCV_BUF_ALIGN;
-+		desc->buf_addr = (u64)rbuf & ~(NICVF_RCV_BUF_ALIGN_BYTES - 1);
- 		refill_rb_cnt--;
- 		new_rb++;
- 	}
-diff --git a/drivers/net/ethernet/cavium/thunder/q_struct.h b/drivers/net/ethernet/cavium/thunder/q_struct.h
-index f363472..e47205a 100644
---- a/drivers/net/ethernet/cavium/thunder/q_struct.h
-+++ b/drivers/net/ethernet/cavium/thunder/q_struct.h
-@@ -359,15 +359,7 @@ union cq_desc_t {
- };
- 
- struct rbdr_entry_t {
--#if defined(__BIG_ENDIAN_BITFIELD)
--	u64   rsvd0:15;
--	u64   buf_addr:42;
--	u64   cache_align:7;
--#elif defined(__LITTLE_ENDIAN_BITFIELD)
--	u64   cache_align:7;
--	u64   buf_addr:42;
--	u64   rsvd0:15;
--#endif
-+	u64   buf_addr;
- };
- 
- /* TCP reassembly context */
+ done:
+-	/* Wakeup TXQ if its stopped earlier due to SQ full */
+ 	sq = &nic->qs->sq[cq_idx];
++	/* Update SQ's descriptor free count */
++	if (subdesc_cnt)
++		nicvf_put_sq_desc(sq, subdesc_cnt);
++
++	/* Wakeup TXQ if its stopped earlier due to SQ full */
+ 	if (tx_done ||
+ 	    (atomic_read(&sq->free_cnt) >= MIN_SQ_DESC_PER_PKT_XMIT)) {
+ 		netdev = nic->pnicvf->netdev;
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index dfc85a1..90c5bc7d 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -1640,9 +1640,6 @@ void nicvf_update_sq_stats(struct nicvf *nic, int sq_idx)
+ /* Check for errors in the receive cmp.queue entry */
+ int nicvf_check_cqe_rx_errs(struct nicvf *nic, struct cqe_rx_t *cqe_rx)
+ {
+-	if (!cqe_rx->err_level && !cqe_rx->err_opcode)
+-		return 0;
+-
+ 	if (netif_msg_rx_err(nic))
+ 		netdev_err(nic->netdev,
+ 			   "%s: RX error CQE err_level 0x%x err_opcode 0x%x\n",
+@@ -1731,8 +1728,6 @@ int nicvf_check_cqe_rx_errs(struct nicvf *nic, struct cqe_rx_t *cqe_rx)
+ int nicvf_check_cqe_tx_errs(struct nicvf *nic, struct cqe_send_t *cqe_tx)
+ {
+ 	switch (cqe_tx->send_status) {
+-	case CQ_TX_ERROP_GOOD:
+-		return 0;
+ 	case CQ_TX_ERROP_DESC_FAULT:
+ 		this_cpu_inc(nic->drv_stats->tx_desc_fault);
+ 		break;
 -- 
 2.7.4
