@@ -1,62 +1,39 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue,  2 May 2017 16:30:05 +0800
-Subject: [PATCH v7 7/7] arm64: dts: qcom: msm8916: Add debug unit
-In-Reply-To: <1493713805-26920-1-git-send-email-leo.yan@linaro.org>
-References: <1493713805-26920-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1493713805-26920-8-git-send-email-leo.yan@linaro.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue,  2 May 2017 10:35:44 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.12
+Message-ID: <cover.1493713942.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add debug unit on Qualcomm msm8916 based platforms, including the
-DragonBoard 410c board.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+Please consider these Renesas ARM based SoC fixes for v4.12.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 68a8e67..3af814b 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -1104,6 +1104,38 @@
- 			};
- 		};
- 
-+		debug at 850000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0x850000 0x1000>;
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&CPU0>;
-+		};
-+
-+		debug at 852000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0x852000 0x1000>;
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&CPU1>;
-+		};
-+
-+		debug at 854000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0x854000 0x1000>;
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&CPU2>;
-+		};
-+
-+		debug at 856000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0x856000 0x1000>;
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&CPU3>;
-+		};
-+
- 		etm at 85c000 {
- 			compatible = "arm,coresight-etm4x", "arm,primecell";
- 			reg = <0x85c000 0x1000>;
--- 
-2.7.4
+* Fix from Geert Uytterhoeven to avoid an undefined reference
+  to `rcar_rst_read_mode_pins' in the case where the R-Car RST driver
+  is not included.
+
+
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.12
+
+for you to fetch changes up to 7b4ccb3c466f62bbf2f4dd5d6a143d945a6f3051:
+
+  soc: renesas: Provide dummy rcar_rst_read_mode_pins() for compile-testing (2017-04-28 10:07:36 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Fixes for v4.12
+
+* Provide dummy rcar_rst_read_mode_pins() for compile-testing
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      soc: renesas: Provide dummy rcar_rst_read_mode_pins() for compile-testing
+
+ include/linux/soc/renesas/rcar-rst.h | 5 +++++
+ 1 file changed, 5 insertions(+)
