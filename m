@@ -1,43 +1,70 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 2 May 2017 09:57:18 +0100
-Subject: [PATCH 2/2] cpufreq: scpi: use new scpi_ops functions to remove
- duplicate code
-In-Reply-To: <1644626.pZFp7GD5Yb@aspire.rjw.lan>
-References: <1493371296-12465-1-git-send-email-sudeep.holla@arm.com>
- <1493371296-12465-2-git-send-email-sudeep.holla@arm.com>
- <20170428092456.GF21517@vireshk-i7> <1644626.pZFp7GD5Yb@aspire.rjw.lan>
-Message-ID: <0587f9f7-0813-2348-3717-687ed1df3e0e@arm.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue,  2 May 2017 16:30:01 +0800
+Subject: [PATCH v7 3/7] coresight: of_get_coresight_platform_data: Add missing
+ of_node_put
+In-Reply-To: <1493713805-26920-1-git-send-email-leo.yan@linaro.org>
+References: <1493713805-26920-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1493713805-26920-4-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
+The of_get_coresight_platform_data iterates over the possible CPU nodes
+to find a given cpu phandle. However it does not drop the reference
+to the node pointer returned by the of_get_coresight_platform_data.
 
-On 28/04/17 22:34, Rafael J. Wysocki wrote:
-> On Friday, April 28, 2017 02:54:56 PM Viresh Kumar wrote:
->> On 28-04-17, 10:21, Sudeep Holla wrote:
->>> scpi_ops now provide APIs to get the transition_latency and to add
->>> OPPs to the devices making those logic redundant here.
->>>
->>> This patch makes use of those APIs and removes the redunant code in
->>> this driver.
->>>
->>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
->>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>> ---
->>>  drivers/cpufreq/scpi-cpufreq.c | 38 ++++++--------------------------------
->>>  1 file changed, 6 insertions(+), 32 deletions(-)
->>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->>
->>
-> 
-> OK
-> 
-> Sudeep, please route this through ARM.
+This patch also introduces another minor fix is to use
+of_cpu_device_node_get() to replace of_get_cpu_node().
 
-Sure, thanks.
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+[Leo: minor tweaks for of_get_coresight_platform_data]
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ drivers/hwtracing/coresight/of_coresight.c | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
 
+diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+index 859ad49..de7e8ce 100644
+--- a/drivers/hwtracing/coresight/of_coresight.c
++++ b/drivers/hwtracing/coresight/of_coresight.c
+@@ -108,7 +108,8 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 	struct coresight_platform_data *pdata;
+ 	struct of_endpoint endpoint, rendpoint;
+ 	struct device *rdev;
+-	struct device_node *dn;
++	bool found;
++	struct device_node *dn, *np;
+ 	struct device_node *ep = NULL;
+ 	struct device_node *rparent = NULL;
+ 	struct device_node *rport = NULL;
+@@ -175,17 +176,19 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 		} while (ep);
+ 	}
+ 
+-	/* Affinity defaults to CPU0 */
+-	pdata->cpu = 0;
+ 	dn = of_parse_phandle(node, "cpu", 0);
+-	for (cpu = 0; dn && cpu < nr_cpu_ids; cpu++) {
+-		if (dn == of_get_cpu_node(cpu, NULL)) {
+-			pdata->cpu = cpu;
++	for_each_possible_cpu(cpu) {
++		np = of_cpu_device_node_get(cpu);
++		found = (dn == np);
++		of_node_put(np);
++		if (found)
+ 			break;
+-		}
+ 	}
+ 	of_node_put(dn);
+ 
++	/* Affinity to CPU0 if no cpu nodes are found */
++	pdata->cpu = found ? cpu : 0;
++
+ 	return pdata;
+ }
+ EXPORT_SYMBOL_GPL(of_get_coresight_platform_data);
 -- 
-Regards,
-Sudeep
+2.7.4
