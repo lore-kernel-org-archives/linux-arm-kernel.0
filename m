@@ -1,62 +1,69 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 2 May 2017 08:51:55 -0700
-Subject: [PATCH] arm: pmu: Get PMU working when the A53 is run in 32 bit
- mode
-In-Reply-To: <0f716b0c-b9ac-29d9-2909-50906ad90bd3@arm.com>
-References: <1493733691-43814-1-git-send-email-alcooperx@gmail.com>
- <0f716b0c-b9ac-29d9-2909-50906ad90bd3@arm.com>
-Message-ID: <3f44e99a-6ff1-23e5-52d5-59c662fd10c3@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 02 May 2017 17:16:32 +0100
+Subject: [PATCH v4] irqchip/gicv3-its: Avoid memory over allocation for
+ ITEs
+In-Reply-To: <1493562975-14365-1-git-send-email-shankerd@codeaurora.org>
+ (Shanker Donthineni's message of "Sun, 30 Apr 2017 09:36:15 -0500")
+References: <1493562975-14365-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <87lgqfmdy7.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Sun, Apr 30 2017 at  3:36:15 pm BST, Shanker Donthineni <shankerd@codeaurora.org> wrote:
+> We are always allocating extra 255Bytes of memory to handle ITE
+> physical address alignment requirement. The kmalloc() satisfies
+> the ITE alignment since the ITS driver is requesting a minimum
+> size of ITS_ITT_ALIGN bytes.
+>
+> Let's try to allocate the exact amount of memory that is required
+> for ITEs to avoid wastage.
+>
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+> Changes:
+> v2: removed 'Change-Id: Ia8084189833f2081ff13c392deb5070c46a64038' from commit.
+> v3: changed from IITE to ITE.
+> v3: removed fallback since kmalloc() guarantees the right alignment.
+>
+>  drivers/irqchip/irq-gic-v3-its.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 45ea1933..72e56f03 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -261,7 +261,6 @@ static struct its_collection *its_build_mapd_cmd(struct its_cmd_block *cmd,
+>  	u8 size = ilog2(desc->its_mapd_cmd.dev->nr_ites);
+>  
+>  	itt_addr = virt_to_phys(desc->its_mapd_cmd.dev->itt);
+> -	itt_addr = ALIGN(itt_addr, ITS_ITT_ALIGN);
+>  
+>  	its_encode_cmd(cmd, GITS_CMD_MAPD);
+>  	its_encode_devid(cmd, desc->its_mapd_cmd.dev->device_id);
+> @@ -1329,13 +1328,14 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>  	 */
+>  	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+>  	sz = nr_ites * its->ite_size;
+> -	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+> +	sz = max(sz, ITS_ITT_ALIGN);
+>  	itt = kzalloc(sz, GFP_KERNEL);
+>  	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
+>  	if (lpi_map)
+>  		col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
+>  
+> -	if (!dev || !itt || !lpi_map || !col_map) {
+> +	if (!dev || !itt || !lpi_map || !col_map ||
+> +	    !IS_ALIGNED(virt_to_phys(itt), ITS_ITT_ALIGN)) {
+>  		kfree(dev);
+>  		kfree(itt);
+>  		kfree(lpi_map);
 
-On 05/02/2017 07:17 AM, Marc Zyngier wrote:
-> Hi Al,
-> 
-> On 02/05/17 15:01, Al Cooper wrote:
->> From: Al Cooper <al.cooper@broadcom.com>
->>
->> When the A53 is run in A15 (32 bit) mode, the registers used to
->> access the counters are A15 style registers, but the actual
->> counters are the A53 counters not A15 counters. This patch will
->> select a PMU counters map for the A53 if the device tree pmu
->> "compatible" property includes "arm,cortex-a53-pmu".
-> 
-> I wasn't aware of an "A15 mode"! Is there an ARM3 mode, while we're at
-> it? ;-)
+I'm confused. Either the alignment is guaranteed (and you should
+document why it is so), or it is not, and we need to handle the
+non-alignment (instead of failing).
 
-This is referring to how our Device Tree and kernel end-up "viewing" the
-PMU (based on provided compatible strings) but this probably should be
-omitted for clarity.
+Thanks,
 
-> 
-> More seriously, you seem to take the problem from the wrong end. If you
-> have an ARMv8 core, you should use the PMUv3 driver (because that is
-> what your A53 has), and not the ARMv7 PMU.
-> 
-> To that affect, I've posted this[1] a while ago. Can you please give it
-> a go?
-
-That seems to be the right direction, however don't you also need to
-possibly expose other PMU types as well? Cortex-A53 and Cortex-A57 PMUs
-(and possibly more) for instance because there are additional counters
-that can be defined specifically for those, e.g: LL = L2 cache on A53,
-see [1].
-
-[1]:
-https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/commit/?h=for-next/core&id=f5337346cd8fe1b105f319b4b7fb06fe25c54480
-
-Thanks!
-
-> 
-> Thanks,
-> 
-> 	M.
-> 
-> [1]: https://www.spinics.net/lists/arm-kernel/msg571476.html
-> 
-
-
+	M.
 -- 
-Florian
+Jazz is not dead, it just smell funny.
