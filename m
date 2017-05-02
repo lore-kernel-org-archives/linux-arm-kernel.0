@@ -1,46 +1,104 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 2 May 2017 12:08:27 +0100
-Subject: [PATCH 1/1] arm64: Always provide "model name" in /proc/cpuinfo
-In-Reply-To: <20170501223913.6894-1-xypron.glpk@gmx.de>
-References: <20170501223913.6894-1-xypron.glpk@gmx.de>
-Message-ID: <20170502110827.GA29224@e104818-lin.cambridge.arm.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Tue, 2 May 2017 19:05:42 +0800
+Subject: [PATCH v3 1/3] arm64: kvm: support kvmtool to detect RAS
+ extension feature
+In-Reply-To: <20170502075631.GE16940@cbox>
+References: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
+ <20170502075631.GE16940@cbox>
+Message-ID: <c56b7b8f-3fa6-ed03-acb2-a2af1fcd5237@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 02, 2017 at 12:39:13AM +0200, Heinrich Schuchardt wrote:
-> There is no need to hide the model name in processes
-> that are not PER_LINUX32.
+Hi Christoffer,
+   thanks for your review and comments
+
+On 2017/5/2 15:56, Christoffer Dall wrote:
+> Hi Dongjiu,
 > 
-> So let us always provide a model name that is easily readable.
+> Please send a cover letter for patch series with more than a single
+> patch.
+  OK, got it.
+
 > 
-> Fixes: e47b020a323d ("arm64: Provide "model name" in /proc/cpuinfo for PER_LINUX32 tasks")
-> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
-> ---
->  arch/arm64/kernel/cpuinfo.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
+> The subject and description of these patches are also misleading.
+> Hopefully this is in no way tied to kvmtool, but to userspace
+> generically, for example also to be used by QEMU?
+ yes, it is also used by QEMU, it should be userspace.
+
+
 > 
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index b3d5b3e8fbcb..9ad9ddcd2f19 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -118,9 +118,8 @@ static int c_show(struct seq_file *m, void *v)
->  		 * "processor".  Give glibc what it expects.
->  		 */
->  		seq_printf(m, "processor\t: %d\n", i);
-> -		if (compat)
-> -			seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
-> -				   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
-> +		seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
-> +			   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
->  
->  		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
->  			   loops_per_jiffy / (500000UL/HZ),
+> On Sun, Apr 30, 2017 at 01:37:55PM +0800, Dongjiu Geng wrote:
+>> Handle kvmtool's detection for RAS extension, because sometimes
+>> the APP needs to know the CPU's capacity
+> 
+> the APP ?
+> 
+> the CPU's capacity?
+  I will fix it.
 
-Such patch seems to come up regularly:
+> 
+>>
+>> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+>> ---
+>>  arch/arm64/kvm/reset.c   | 11 +++++++++++
+>>  include/uapi/linux/kvm.h |  1 +
+>>  2 files changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+>> index d9e9697..1004039 100644
+>> --- a/arch/arm64/kvm/reset.c
+>> +++ b/arch/arm64/kvm/reset.c
+>> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
+>>  	return !!(pfr0 & 0x20);
+>>  }
+>>  
+>> +static bool kvm_arm_support_ras_extension(void)
+>> +{
+>> +	u64 pfr0;
+>> +
+>> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+>> +	return !!(pfr0 & 0x10000000);
+>> +}
+>> +
+>>  /**
+>>   * kvm_arch_dev_ioctl_check_extension
+>>   *
+>> @@ -87,6 +95,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>>  	case KVM_CAP_ARM_PMU_V3:
+>>  		r = kvm_arm_support_pmu_v3();
+>>  		break;
+>> +	case KVM_CAP_ARM_RAS_EXTENSION:
+>> +		r = kvm_arm_support_ras_extension();
+>> +		break;
+> 
+> You need to document this capability and API in
+> Documentation/virtual/kvm/api.txt and explain how this works.
+  Ok, thanks for your suggestion.
 
-https://patchwork.kernel.org/patch/9303311/
-
-(and it usually gets rejected)
-
--- 
-Catalin
+> 
+> 
+> 
+>>  	case KVM_CAP_SET_GUEST_DEBUG:
+>>  	case KVM_CAP_VCPU_ATTRIBUTES:
+>>  		r = 1;
+>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>> index f51d508..27fe556 100644
+>> --- a/include/uapi/linux/kvm.h
+>> +++ b/include/uapi/linux/kvm.h
+>> @@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
+>>  #define KVM_CAP_PPC_MMU_RADIX 134
+>>  #define KVM_CAP_PPC_MMU_HASH_V3 135
+>>  #define KVM_CAP_IMMEDIATE_EXIT 136
+>> +#define KVM_CAP_ARM_RAS_EXTENSION 137
+>>  
+>>  #ifdef KVM_CAP_IRQ_ROUTING
+>>  
+>> -- 
+>> 2.10.1
+>>
+> 
+> Thanks,
+> -Christoffer
+> 
+> .
+> 
