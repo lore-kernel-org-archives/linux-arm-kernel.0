@@ -1,81 +1,76 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 02 May 2017 18:53:14 +0100
-Subject: [PATCH] arm: pmu: Get PMU working when the A53 is run in 32 bit
- mode
-In-Reply-To: <e32b1d89-b349-5a45-565a-19463032adbc@gmail.com> (Florian
- Fainelli's message of "Tue, 2 May 2017 10:37:40 -0700")
-References: <1493733691-43814-1-git-send-email-alcooperx@gmail.com>
- <0f716b0c-b9ac-29d9-2909-50906ad90bd3@arm.com>
- <3f44e99a-6ff1-23e5-52d5-59c662fd10c3@gmail.com>
- <87h913mcdy.fsf@on-the-bus.cambridge.arm.com>
- <e32b1d89-b349-5a45-565a-19463032adbc@gmail.com>
-Message-ID: <87d1brm9h1.fsf@on-the-bus.cambridge.arm.com>
+From: alexander.duyck@gmail.com (Alexander Duyck)
+Date: Tue, 2 May 2017 11:10:22 -0700
+Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <20170502165329.GB26406@linux.intel.com>
+References: <cover.1493678834.git.leedom@chelsio.com>
+ <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
+ <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
+ <20170502165329.GB26406@linux.intel.com>
+Message-ID: <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 02 2017 at  6:37:40 pm BST, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 05/02/2017 09:50 AM, Marc Zyngier wrote:
->> On Tue, May 02 2017 at  4:51:55 pm BST, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>> Hi Mark,
->>>
->>> On 05/02/2017 07:17 AM, Marc Zyngier wrote:
->>>> Hi Al,
->>>>
->>>> On 02/05/17 15:01, Al Cooper wrote:
->>>>> From: Al Cooper <al.cooper@broadcom.com>
->>>>>
->>>>> When the A53 is run in A15 (32 bit) mode, the registers used to
->>>>> access the counters are A15 style registers, but the actual
->>>>> counters are the A53 counters not A15 counters. This patch will
->>>>> select a PMU counters map for the A53 if the device tree pmu
->>>>> "compatible" property includes "arm,cortex-a53-pmu".
->>>>
->>>> I wasn't aware of an "A15 mode"! Is there an ARM3 mode, while we're at
->>>> it? ;-)
->>>
->>> This is referring to how our Device Tree and kernel end-up "viewing" the
->>> PMU (based on provided compatible strings) but this probably should be
->>> omitted for clarity.
->> 
->> That's certainly wrong from both an architectural and implementation
->> PoV. Although there is some level of compatibility between the ARMv7 and
->> ARMv8 PMU architectures, they are distinct beasts.
+On Tue, May 2, 2017 at 9:53 AM, Raj, Ashok <ashok.raj@intel.com> wrote:
+> On Tue, May 02, 2017 at 09:39:34AM -0700, Alexander Duyck wrote:
+>> On Mon, May 1, 2017 at 4:13 PM, Casey Leedom <leedom@chelsio.com> wrote:
+>> > The new flag PCI_DEV_FLAGS_NO_RELAXED_ORDERING indicates that the Relaxed
+>> > Ordering Attribute should not be used on Transaction Layer Packets destined
+>> > for the PCIe End Node so flagged.  Initially flagged this way are Intel
+>> > E5-26xx Root Complex Ports which suffer from a Flow Control Credit
+>> > Performance Problem and AMD A1100 ARM ("SEATTLE") Root Complex Ports which
+>> > don't obey PCIe 3.0 ordering rules which can lead to Data Corruption.
+>>
+>> So this is a good first step though might I suggest one other change.
+>>
+>> We may want to add logic to the core PCIe code that clears the "Enable
+>> Relaxed Ordering" bit in the device control register for all devices
+>> hanging off of this root complex. Assuming the devices conform to the
+>> PCIe spec doing that should disable relaxed ordering in a device
+>> agnostic way that then enables us at a driver level to just enable the
+>> feature always without having to perform any checks for your flag. We
+>> could probably do that as a part of probing the PCIe interfaces
+>> hanging off of these devices.
 >
-> Yes, we are well aware of that, which is why I don't think it's even
-> relevant to this discussion here because it's a known implementation
-> issue on our end.
->
->> 
->>>>
->>>> More seriously, you seem to take the problem from the wrong end. If you
->>>> have an ARMv8 core, you should use the PMUv3 driver (because that is
->>>> what your A53 has), and not the ARMv7 PMU.
->>>>
->>>> To that affect, I've posted this[1] a while ago. Can you please give it
->>>> a go?
->>>
->>> That seems to be the right direction, however don't you also need to
->>> possibly expose other PMU types as well? Cortex-A53 and Cortex-A57 PMUs
->>> (and possibly more) for instance because there are additional counters
->>> that can be defined specifically for those, e.g: LL = L2 cache on A53,
->>> see [1].
->> 
->> That's pretty much orthogonal. Once we have a common driver for PMUv3 on
->> both 32 and 64bit, adding implementation-specific events can be done for
->> both architecture.
->
-> My comment was not so much about the PMU-specific events, but about the
-> fact that if you make changes to the PMUv3 between 32-bit and 64-bit
-> kernels, we might as well bring all other PMU models that have a
-> potential for being shared between 32-bit and 64-bit in one go.
+> I suppose you don't want to turn off RO completely on the device. When
+> traffic is targetted to mmio for peer to peer reasons RO has performance
+> upside. The specific issue with these root ports indicate limitation using
+> RO for traffic targetting coherent memory.
 
-I'm only concerned about the CPU PMU so far, as my main goal is
-virtualization (and I have no desire to expose any other form of PMU to
-a guest). Non-CPU PMUs should be mostly architecture agnostic already,
-and thus pretty easy to enable.
+Actually my main concern here is virtualization. If I take the PCIe
+function and direct assign it I have no way of seeing the root complex
+flag as it is now virtualized away. In the meantime the guest now has
+the ability to enable the function and sees nothing that says you
+can't enable relaxed ordering which in turn ends up potentially
+causing data corruption on the system. I want relaxed ordering
+disabled before I even consider assigning it to the guest on the
+systems where this would be an issue.
 
-Thanks,
+I prefer to err on the side of caution with this. Enabling Relaxed
+Ordering is technically a performance enhancement, so we function but
+not as well as we would like, while having it enabled when there are
+issues can lead to data corruption. I would weigh the risk of data
+corruption the thing to be avoided and of much higher priority than
+enabling improved performance. As such I say we should default the
+relaxed ordering attribute to off in general and look at
+"white-listing" it in for various architectures and/or chipsets that
+support/need it rather than having it enabled by default and trying to
+switch it off after the fact when we find some new issue.
 
-	M.
--- 
-Jazz is not dead, it just smell funny.
+So for example, in the case of x86 it seems like there are multiple
+root complexes that have issues, and the gains for enabling it with
+standard DMA to host memory are small. As such we may want to default
+it to off via the architecture specific PCIe code and then look at
+having "white-list" cases where we enable it for things like
+peer-to-peer accesses. In the case of SPARC we could look at
+defaulting it to on, and only "black-list" any cases where there might
+be issues since SPARC relies on this in a significant way for
+performance. In the case of ARM and other architectures it is a bit of
+a toss-up. I would say we could just default it to on for now and
+"black-list" anything that doesn't work, or we could go the other way
+like I suggested for x86. It all depends on what the ARM community
+would want to agree on for this. I would say unless it makes a
+significant difference like it does in the case of SPARC we are
+probably better off just defaulting it to off.
+
+- Alex
