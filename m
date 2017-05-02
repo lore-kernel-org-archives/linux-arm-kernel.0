@@ -1,82 +1,87 @@
-From: olivier.moysan@st.com (Olivier MOYSAN)
-Date: Tue, 2 May 2017 07:45:35 +0000
-Subject: [PATCH v3 1/2] ASoC: stm32: add bindings for SAI
-In-Reply-To: <20170428205358.fxjqaki44xqim4ta@rob-hp-laptop>
-References: <1491837596-2924-1-git-send-email-olivier.moysan@st.com>
- <1491837596-2924-2-git-send-email-olivier.moysan@st.com>
- <20170428205358.fxjqaki44xqim4ta@rob-hp-laptop>
-Message-ID: <5bf88908-37ec-412f-9123-6f90938b5b66@st.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 2 May 2017 09:56:31 +0200
+Subject: [PATCH v3 1/3] arm64: kvm: support kvmtool to detect RAS
+ extension feature
+In-Reply-To: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
+References: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <20170502075631.GE16940@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
+Hi Dongjiu,
 
-On 04/28/2017 10:53 PM, Rob Herring wrote:
-> On Mon, Apr 10, 2017 at 05:19:55PM +0200, olivier moysan wrote:
->> This patch adds documentation of device tree bindings for the
->> STM32 SAI ASoC driver.
->>
->> Signed-off-by: olivier moysan <olivier.moysan@st.com>
->> ---
->>  .../devicetree/bindings/sound/st,stm32-sai.txt     | 89 ++++++++++++++++++++++
->>  1 file changed, 89 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-sai.txt
->>
->> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
->> new file mode 100644
->> index 0000000..c59a3d7
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
->> @@ -0,0 +1,89 @@
->> +STMicroelectronics STM32 Serial Audio Interface (SAI).
->
-> [...]
->
->> +	sai1b: audio-controller at 40015824 {
->> +		#sound-dai-cells = <0>;
->> +		compatible = "st,stm32-sai-sub-b";
->> +		reg = <0x40015824 0x1C>;
->> +		clocks = <&rcc 1 CLK_SAI2>;
->> +		clock-names = "sai_ck";
->> +		dmas = <&dma2 5 0 0x400 0x0>;
->> +		dma-names = "tx";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_sai1b>;
->> +
->> +		ports {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +
->> +			sai1b_port: port at 0 {
->> +				reg = <0>;
->> +				cpu_endpoint: endpoint {
->> +					remote-endpoint = <&codec_endpoint>;
->> +					audio-graph-card,format = "i2s";
->> +					audio-graph-card,bitclock-master = <&codec_endpoint>;
->> +					audio-graph-card,frame-master = <&codec_endpoint>;
->
-> These property names are wrong.
->
+Please send a cover letter for patch series with more than a single
+patch.
 
-I have taken into account this comment (and previous ones).
-They will be included in next update of this patch set.
+The subject and description of these patches are also misleading.
+Hopefully this is in no way tied to kvmtool, but to userspace
+generically, for example also to be used by QEMU?
 
->> +				};
->> +			};
->> +		};
->> +	};
->> +};
->> +
->> +audio-codec {
->> +	codec_port: port {
->> +		codec_endpoint: endpoint {
->> +			remote-endpoint = <&cpu_endpoint>;
->> +		};
->> +	};
->> +};
->> --
->> 1.9.1
->>
+On Sun, Apr 30, 2017 at 01:37:55PM +0800, Dongjiu Geng wrote:
+> Handle kvmtool's detection for RAS extension, because sometimes
+> the APP needs to know the CPU's capacity
 
-Best regards
-Olivier
+the APP ?
+
+the CPU's capacity?
+
+> 
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> ---
+>  arch/arm64/kvm/reset.c   | 11 +++++++++++
+>  include/uapi/linux/kvm.h |  1 +
+>  2 files changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index d9e9697..1004039 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
+>  	return !!(pfr0 & 0x20);
+>  }
+>  
+> +static bool kvm_arm_support_ras_extension(void)
+> +{
+> +	u64 pfr0;
+> +
+> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+> +	return !!(pfr0 & 0x10000000);
+> +}
+> +
+>  /**
+>   * kvm_arch_dev_ioctl_check_extension
+>   *
+> @@ -87,6 +95,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_ARM_PMU_V3:
+>  		r = kvm_arm_support_pmu_v3();
+>  		break;
+> +	case KVM_CAP_ARM_RAS_EXTENSION:
+> +		r = kvm_arm_support_ras_extension();
+> +		break;
+
+You need to document this capability and API in
+Documentation/virtual/kvm/api.txt and explain how this works.
+
+
+
+>  	case KVM_CAP_SET_GUEST_DEBUG:
+>  	case KVM_CAP_VCPU_ATTRIBUTES:
+>  		r = 1;
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index f51d508..27fe556 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
+>  #define KVM_CAP_PPC_MMU_RADIX 134
+>  #define KVM_CAP_PPC_MMU_HASH_V3 135
+>  #define KVM_CAP_IMMEDIATE_EXIT 136
+> +#define KVM_CAP_ARM_RAS_EXTENSION 137
+>  
+>  #ifdef KVM_CAP_IRQ_ROUTING
+>  
+> -- 
+> 2.10.1
+> 
+
+Thanks,
+-Christoffer
