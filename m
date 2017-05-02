@@ -1,107 +1,190 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  2 May 2017 14:30:41 +0100
-Subject: [PATCH 5/5] KVM: arm/arm64: vgic-v3: Use PREbits to infer the number
- of ICH_APxRn_EL2 registers
-In-Reply-To: <20170502133041.10980-1-marc.zyngier@arm.com>
-References: <20170502133041.10980-1-marc.zyngier@arm.com>
-Message-ID: <20170502133041.10980-6-marc.zyngier@arm.com>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Tue,  2 May 2017 18:36:57 +0530
+Subject: [PATCH 8/9] net: thunderx: Support for XDP header adjustment
+In-Reply-To: <1493730418-24606-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1493730418-24606-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1493730418-24606-9-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GICv3 documentation is extremely confusing, as it talks about
-the number of priorities represented by the ICH_APxRn_EL2 registers,
-while it should really talk about the number of preemption levels.
+From: Sunil Goutham <sgoutham@cavium.com>
 
-This leads to a bug where we may access undefined ICH_APxRn_EL2
-registers, since PREbits is allowed to be smaller than PRIbits.
-Thankfully, nobody seem to have taken this path so far...
+When in XDP mode reserve XDP_PACKET_HEADROOM bytes at the start
+of receive buffer for XDP program to modify headers and adjust
+packet start. Additional code changes done to handle such packets.
 
-The fix is to use ICH_VTR_EL2.PREbits instead.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 63 ++++++++++++++++------
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  9 +++-
+ 2 files changed, 55 insertions(+), 17 deletions(-)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index bce6037cf01d..32c3295929b0 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -22,7 +22,7 @@
- #include <asm/kvm_hyp.h>
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index bb13dee..d6477af 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -502,13 +502,15 @@ static int nicvf_init_resources(struct nicvf *nic)
+ }
  
- #define vtr_to_max_lr_idx(v)		((v) & 0xf)
--#define vtr_to_nr_pri_bits(v)		(((u32)(v) >> 29) + 1)
-+#define vtr_to_nr_pre_bits(v)		(((u32)(v) >> 26) + 1)
- 
- static u64 __hyp_text __gic_v3_get_lr(unsigned int lr)
+ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+-				struct cqe_rx_t *cqe_rx, struct snd_queue *sq)
++				struct cqe_rx_t *cqe_rx, struct snd_queue *sq,
++				struct sk_buff **skb)
  {
-@@ -135,13 +135,13 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 	struct xdp_buff xdp;
+ 	struct page *page;
+ 	u32 action;
+-	u16 len;
++	u16 len, offset = 0;
+ 	u64 dma_addr, cpu_addr;
++	void *orig_data;
  
- 	if (used_lrs) {
- 		int i;
--		u32 nr_pri_bits;
-+		u32 nr_pre_bits;
+ 	/* Retrieve packet buffer's DMA address and length */
+ 	len = *((u16 *)((void *)cqe_rx + (3 * sizeof(u64))));
+@@ -517,17 +519,47 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+ 	cpu_addr = nicvf_iova_to_phys(nic, dma_addr);
+ 	if (!cpu_addr)
+ 		return false;
++	cpu_addr = (u64)phys_to_virt(cpu_addr);
++	page = virt_to_page((void *)cpu_addr);
  
- 		cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
+-	xdp.data = phys_to_virt(cpu_addr);
++	xdp.data_hard_start = page_address(page);
++	xdp.data = (void *)cpu_addr;
+ 	xdp.data_end = xdp.data + len;
++	orig_data = xdp.data;
  
- 		write_gicreg(0, ICH_HCR_EL2);
- 		val = read_gicreg(ICH_VTR_EL2);
--		nr_pri_bits = vtr_to_nr_pri_bits(val);
-+		nr_pre_bits = vtr_to_nr_pre_bits(val);
+ 	rcu_read_lock();
+ 	action = bpf_prog_run_xdp(prog, &xdp);
+ 	rcu_read_unlock();
  
- 		for (i = 0; i < used_lrs; i++) {
- 			if (cpu_if->vgic_elrsr & (1 << i))
-@@ -152,7 +152,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 			__gic_v3_set_lr(0, i);
++	/* Check if XDP program has changed headers */
++	if (orig_data != xdp.data) {
++		len = xdp.data_end - xdp.data;
++		offset = orig_data - xdp.data;
++		dma_addr -= offset;
++	}
++
+ 	switch (action) {
+ 	case XDP_PASS:
+-		/* Pass on packet to network stack */
++		/* Check if it's a recycled page, if not
++		 * unmap the DMA mapping.
++		 *
++		 * Recycled page holds an extra reference.
++		 */
++		if (page_ref_count(page) == 1) {
++			dma_addr &= PAGE_MASK;
++			dma_unmap_page_attrs(&nic->pdev->dev, dma_addr,
++					     RCV_FRAG_LEN + XDP_PACKET_HEADROOM,
++					     DMA_FROM_DEVICE,
++					     DMA_ATTR_SKIP_CPU_SYNC);
++		}
++
++		/* Build SKB and pass on packet to network stack */
++		*skb = build_skb(xdp.data,
++				 RCV_FRAG_LEN - cqe_rx->align_pad + offset);
++		if (!*skb)
++			put_page(page);
++		else
++			skb_put(*skb, len);
+ 		return false;
+ 	case XDP_TX:
+ 		nicvf_xdp_sq_append_pkt(nic, sq, (u64)xdp.data, dma_addr, len);
+@@ -537,7 +569,6 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+ 	case XDP_ABORTED:
+ 		trace_xdp_exception(nic->netdev, prog, action);
+ 	case XDP_DROP:
+-		page = virt_to_page(xdp.data);
+ 		/* Check if it's a recycled page, if not
+ 		 * unmap the DMA mapping.
+ 		 *
+@@ -546,7 +577,8 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+ 		if (page_ref_count(page) == 1) {
+ 			dma_addr &= PAGE_MASK;
+ 			dma_unmap_page_attrs(&nic->pdev->dev, dma_addr,
+-					     RCV_FRAG_LEN, DMA_FROM_DEVICE,
++					     RCV_FRAG_LEN + XDP_PACKET_HEADROOM,
++					     DMA_FROM_DEVICE,
+ 					     DMA_ATTR_SKIP_CPU_SYNC);
  		}
- 
--		switch (nr_pri_bits) {
-+		switch (nr_pre_bits) {
- 		case 7:
- 			cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
- 			cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
-@@ -162,7 +162,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 			cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
- 		}
- 
--		switch (nr_pri_bits) {
-+		switch (nr_pre_bits) {
- 		case 7:
- 			cpu_if->vgic_ap1r[3] = read_gicreg(ICH_AP1R3_EL2);
- 			cpu_if->vgic_ap1r[2] = read_gicreg(ICH_AP1R2_EL2);
-@@ -198,7 +198,7 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
- 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
- 	u64 val;
--	u32 nr_pri_bits;
-+	u32 nr_pre_bits;
- 	int i;
- 
- 	/*
-@@ -217,12 +217,12 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 		put_page(page);
+@@ -654,7 +686,7 @@ static void nicvf_rcv_pkt_handler(struct net_device *netdev,
+ 				  struct napi_struct *napi,
+ 				  struct cqe_rx_t *cqe_rx, struct snd_queue *sq)
+ {
+-	struct sk_buff *skb;
++	struct sk_buff *skb = NULL;
+ 	struct nicvf *nic = netdev_priv(netdev);
+ 	struct nicvf *snic = nic;
+ 	int err = 0;
+@@ -676,15 +708,17 @@ static void nicvf_rcv_pkt_handler(struct net_device *netdev,
  	}
  
- 	val = read_gicreg(ICH_VTR_EL2);
--	nr_pri_bits = vtr_to_nr_pri_bits(val);
-+	nr_pre_bits = vtr_to_nr_pre_bits(val);
+ 	/* For XDP, ignore pkts spanning multiple pages */
+-	if (nic->xdp_prog && (cqe_rx->rb_cnt == 1))
+-		if (nicvf_xdp_rx(snic, nic->xdp_prog, cqe_rx, sq))
++	if (nic->xdp_prog && (cqe_rx->rb_cnt == 1)) {
++		/* Packet consumed by XDP */
++		if (nicvf_xdp_rx(snic, nic->xdp_prog, cqe_rx, sq, &skb))
+ 			return;
++	} else {
++		skb = nicvf_get_rcv_skb(snic, cqe_rx,
++					nic->xdp_prog ? true : false);
++	}
  
- 	if (used_lrs) {
- 		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+-	skb = nicvf_get_rcv_skb(snic, cqe_rx, nic->xdp_prog ? true : false);
+-	if (!skb) {
+-		netdev_dbg(nic->netdev, "Packet not received\n");
++	if (!skb)
+ 		return;
+-	}
  
--		switch (nr_pri_bits) {
-+		switch (nr_pre_bits) {
- 		case 7:
- 			write_gicreg(cpu_if->vgic_ap0r[3], ICH_AP0R3_EL2);
- 			write_gicreg(cpu_if->vgic_ap0r[2], ICH_AP0R2_EL2);
-@@ -232,7 +232,7 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 			write_gicreg(cpu_if->vgic_ap0r[0], ICH_AP0R0_EL2);
+ 	if (netif_msg_pktdata(nic)) {
+ 		netdev_info(nic->netdev, "%s: skb 0x%p, len=%d\n", netdev->name,
+@@ -1672,9 +1706,6 @@ static int nicvf_xdp_setup(struct nicvf *nic, struct bpf_prog *prog)
+ 		return -EOPNOTSUPP;
+ 	}
+ 
+-	if (prog && prog->xdp_adjust_head)
+-		return -EOPNOTSUPP;
+-
+ 	/* ALL SQs attached to CQs i.e same as RQs, are treated as
+ 	 * XDP Tx queues and more Tx queues are allocated for
+ 	 * network stack to send pkts out.
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index ec234b6..43428ce 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -164,6 +164,11 @@ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, struct rbdr *rbdr,
+ 	}
+ 
+ 	nic->rb_page_offset = 0;
++
++	/* Reserve space for header modifications by BPF program */
++	if (rbdr->is_xdp)
++		buf_len += XDP_PACKET_HEADROOM;
++
+ 	/* Check if it's recycled */
+ 	if (pgcache)
+ 		nic->rb_page = pgcache->page;
+@@ -183,7 +188,7 @@ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, struct rbdr *rbdr,
+ 			return -ENOMEM;
  		}
+ 		if (pgcache)
+-			pgcache->dma_addr = *rbuf;
++			pgcache->dma_addr = *rbuf + XDP_PACKET_HEADROOM;
+ 		nic->rb_page_offset += buf_len;
+ 	}
  
--		switch (nr_pri_bits) {
-+		switch (nr_pre_bits) {
- 		case 7:
- 			write_gicreg(cpu_if->vgic_ap1r[3], ICH_AP1R3_EL2);
- 			write_gicreg(cpu_if->vgic_ap1r[2], ICH_AP1R2_EL2);
+@@ -1575,6 +1580,8 @@ static void nicvf_unmap_rcv_buffer(struct nicvf *nic, u64 dma_addr,
+ 		 */
+ 		if (page_ref_count(page) != 1)
+ 			return;
++
++		len += XDP_PACKET_HEADROOM;
+ 		/* Receive buffers in XDP mode are mapped from page start */
+ 		dma_addr &= PAGE_MASK;
+ 	}
 -- 
-2.11.0
+2.7.4
