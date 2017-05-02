@@ -1,111 +1,59 @@
-From: bradleyb@fuzziesquirrel.com (Brad Bishop)
-Date: Tue, 2 May 2017 01:25:22 -0400
-Subject: [v6,10/23] drivers/fsi: Add device read/write/peek API
-In-Reply-To: <20170410194706.64280-11-cbostic@linux.vnet.ibm.com>
-References: <20170410194706.64280-11-cbostic@linux.vnet.ibm.com>
-Message-ID: <F7D77D88-214B-48FC-AAA7-05A76483D017@fuzziesquirrel.com>
+From: jerry.huang@nxp.com (Jerry Huang)
+Date: Tue, 2 May 2017 06:13:33 +0000
+Subject: [PATCH v4 3/3] USB3/DWC3: Enable undefined length INCR burst type
+In-Reply-To: <87tw71xthj.fsf@linux.intel.com>
+References: <1484727138-3264-1-git-send-email-jerry.huang@nxp.com>
+ <1484727138-3264-3-git-send-email-jerry.huang@nxp.com>
+ <DB5PR0401MB1813965DDC8CC6CD0BD85980FE440@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+ <87y3xeqvsl.fsf@linux.intel.com>
+ <DB5PR0401MB1813AAB5AA84B0B310ED1B10FE440@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+ <87tw71xthj.fsf@linux.intel.com>
+Message-ID: <DB5PR0401MB181366E27C238DF8B2228B00FE170@DB5PR0401MB1813.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Apr 10, 2017, at 3:46 PM, Christopher Bostic <cbostic@linux.vnet.ibm.com> wrote:
-> 
-> From: Jeremy Kerr <jk@ozlabs.org>
-> 
-> This change introduces the fsi device API: simple read, write and peek
-> accessors for the devices' address spaces.
-> 
-> Includes contributions from Chris Bostic <cbostic@linux.vnet.ibm.com>
-> and Edward A. James <eajames@us.ibm.com>.
-> 
-> Signed-off-by: Edward A. James <eajames@us.ibm.com>
-> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-> Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> ---
-> drivers/fsi/fsi-core.c | 33 +++++++++++++++++++++++++++++++++
-> include/linux/fsi.h    |  7 ++++++-
-> 2 files changed, 39 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-> index a8faa89..4da0b030 100644
-> --- a/drivers/fsi/fsi-core.c
-> +++ b/drivers/fsi/fsi-core.c
-> @@ -32,6 +32,8 @@
-> #define FSI_SLAVE_CONF_CRC_MASK		0x0000000f
-> #define FSI_SLAVE_CONF_DATA_BITS	28
-> 
-> +#define FSI_PEEK_BASE			0x410
-> +
-> static const int engine_page_size = 0x400;
-> 
-> #define FSI_SLAVE_BASE			0x800
-> @@ -73,9 +75,40 @@ static int fsi_master_read(struct fsi_master *master, int link,
-> 		uint8_t slave_id, uint32_t addr, void *val, size_t size);
-> static int fsi_master_write(struct fsi_master *master, int link,
-> 		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
-> +static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-> +		void *val, size_t size);
-> +static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-> +		const void *val, size_t size);
-> 
-> /* FSI endpoint-device support */
-> 
-> +int fsi_device_read(struct fsi_device *dev, uint32_t addr, void *val,
-> +		size_t size)
-> +{
-> +	if (addr > dev->size || size > dev->size || addr > dev->size - size)
-> +		return -EINVAL;
-> +
-> +	return fsi_slave_read(dev->slave, dev->addr + addr, val, size);
-> +}
-> +EXPORT_SYMBOL_GPL(fsi_device_read);
-> +
-> +int fsi_device_write(struct fsi_device *dev, uint32_t addr, const void *val,
-> +		size_t size)
-> +{
-> +	if (addr > dev->size || size > dev->size || addr > dev->size - size)
-> +		return -EINVAL;
-> +
-> +	return fsi_slave_write(dev->slave, dev->addr + addr, val, size);
-> +}
-> +EXPORT_SYMBOL_GPL(fsi_device_write);
-> +
-> +int fsi_device_peek(struct fsi_device *dev, void *val)
-> +{
-> +	uint32_t addr = FSI_PEEK_BASE + ((dev->unit - 2) * sizeof(uint32_t));
-> +
-> +	return fsi_slave_read(dev->slave, addr, val, sizeof(uint32_t));
-> +}
-> +
-> static void fsi_device_release(struct device *_device)
-> {
-> 	struct fsi_device *device = to_fsi_dev(_device);
-> diff --git a/include/linux/fsi.h b/include/linux/fsi.h
-> index efa55ba..66bce48 100644
-> --- a/include/linux/fsi.h
-> +++ b/include/linux/fsi.h
-> @@ -27,6 +27,12 @@ struct fsi_device {
-> 	uint32_t		size;
-> };
-> 
-> +extern int fsi_device_read(struct fsi_device *dev, uint32_t addr,
-> +		void *val, size_t size);
-> +extern int fsi_device_write(struct fsi_device *dev, uint32_t addr,
-> +		const void *val, size_t size);
-> +extern int fsi_device_peek(struct fsi_device *dev, void *val);
-> +
-> struct fsi_device_id {
-> 	u8	engine_type;
-> 	u8	version;
-> @@ -40,7 +46,6 @@ struct fsi_device_id {
-> #define FSI_DEVICE_VERSIONED(t, v) \
-> 	.engine_type = (t), .version = (v),
-> 
-> -
-> struct fsi_driver {
-> 	struct device_driver		drv;
-> 	const struct fsi_device_id	*id_table;
 
-I wrote a driver using this API.  It seems to be suitable enough.
+> -----Original Message-----
+> From: Felipe Balbi [mailto:balbi at kernel.org]
+> Sent: Friday, March 10, 2017 7:27 PM
+> To: Jerry Huang <jerry.huang@nxp.com>; robh+dt at kernel.org;
+> mark.rutland at arm.com; catalin.marinas at arm.com
+> Cc: linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Rajesh
+> Bhagat <rajesh.bhagat@nxp.com>
+> Subject: RE: [PATCH v4 3/3] USB3/DWC3: Enable undefined length INCR burst
+> type
+> 
+> 
+> Hi,
+> 
+> Jerry Huang <jerry.huang@nxp.com> writes:
+> >> >> --
+> >> >> 1.7.9.5
+> >> > Hi, Balbi and all guys,
+> >> > Any comment for these patches? Can they be accepted?
+> >>
+> >> Rob had comments which you didn't reply yet. I cannot take this
+> >> patchset yet ;-)
+> >>
+> > Balbi,
+> >
+> > I look into his mail again, which was based v3, and I replied it.
+> >
+> > He had different understanding for undefined length burst mode.
+> >
+> > It seems he think for this mode, just setting bit[0] (INCRBrstEna) and
+> > don't need to set other field.
+> >
+> > However, according to the DWC USB3.0 controller databook, when it is
+> > undefined length INCR burst mode, we still need to set one max burst
+> > type, such as INCR8, which means controller will use any length less
+> > than or equal to this INCR8.
+> 
+> Rob, do you agree with the patch now?
+> 
+> --
+> balbi
 
-Acked-by: Brad Bishop <bradleyb@fuzziesquirrel.com>
+Hi, Balbi,
+Any comment for these patches? Or any chance to merge them?
