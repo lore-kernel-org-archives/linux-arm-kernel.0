@@ -1,38 +1,26 @@
-From: sr@denx.de (Stefan Roese)
-Date: Tue,  2 May 2017 09:26:00 +0200
-Subject: [PATCH] irqchip/armada-370-xp: Enable MSI-X support
-Message-ID: <20170502072600.13380-1-sr@denx.de>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 2 May 2017 09:30:26 +0200
+Subject: [PATCH] arm64: KVM: Fix decoding of Rt/Rt2 when trapping AArch32
+ CP accesses
+In-Reply-To: <20170427180648.25159-1-marc.zyngier@arm.com>
+References: <20170427180648.25159-1-marc.zyngier@arm.com>
+Message-ID: <20170502073026.GD16940@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armada XP does not only support MSI, but also MSI-X. This patch sets
-the MSI_FLAG_PCI_MSIX flag in the interrupt controller driver which
-is the only change necessary to enable MSI-X support on this SoC. As
-the Linux PCI MSI-X infrastructure takes care of writing the data and
-address structures into the BAR specified by the MSI-X controller.
+On Thu, Apr 27, 2017 at 07:06:48PM +0100, Marc Zyngier wrote:
+> Our 32bit CP14/15 handling inherited some of the ARMv7 code for handling
+> the trapped system registers, completely missing the fact that the
+> fields for Rt and Rt2 are now 5 bit wide, and not 4...
+> 
+> Let's fix it, and provide an accessor for the most common Rt case.
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Thomas Gleixner <tglx@linutronix.de>
----
- drivers/irqchip/irq-armada-370-xp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 33982cbd8a57..b17039ed8735 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -124,7 +124,7 @@ static struct irq_chip armada_370_xp_msi_irq_chip = {
- 
- static struct msi_domain_info armada_370_xp_msi_domain_info = {
- 	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
--		   MSI_FLAG_MULTI_PCI_MSI),
-+		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
- 	.chip	= &armada_370_xp_msi_irq_chip,
- };
- 
--- 
-2.12.2
+Aplied to kvmarm/queue.
+
+Thanks,
+-Christoffer
