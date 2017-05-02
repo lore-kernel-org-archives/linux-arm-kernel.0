@@ -1,50 +1,82 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Tue,  2 May 2017 15:34:06 +0800
-Subject: [PATCH v3 4/4] clk: rockchip: rk3368: make some special clk as
- critical_clocks
-In-Reply-To: <1493710446-7203-1-git-send-email-zhangqing@rock-chips.com>
-References: <1493710446-7203-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1493710446-7203-5-git-send-email-zhangqing@rock-chips.com>
+From: olivier.moysan@st.com (Olivier MOYSAN)
+Date: Tue, 2 May 2017 07:45:35 +0000
+Subject: [PATCH v3 1/2] ASoC: stm32: add bindings for SAI
+In-Reply-To: <20170428205358.fxjqaki44xqim4ta@rob-hp-laptop>
+References: <1491837596-2924-1-git-send-email-olivier.moysan@st.com>
+ <1491837596-2924-2-git-send-email-olivier.moysan@st.com>
+ <20170428205358.fxjqaki44xqim4ta@rob-hp-laptop>
+Message-ID: <5bf88908-37ec-412f-9123-6f90938b5b66@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The jtag clk no driver to handle them.
-But this clk need enable,so make it as critical.
+Hello Rob,
 
-The ddrphy\ddrupctl clks no driver to handle them,
-Chip design requirements for these clock to always on,
-The new document will update the description of these clock.
+On 04/28/2017 10:53 PM, Rob Herring wrote:
+> On Mon, Apr 10, 2017 at 05:19:55PM +0200, olivier moysan wrote:
+>> This patch adds documentation of device tree bindings for the
+>> STM32 SAI ASoC driver.
+>>
+>> Signed-off-by: olivier moysan <olivier.moysan@st.com>
+>> ---
+>>  .../devicetree/bindings/sound/st,stm32-sai.txt     | 89 ++++++++++++++++++++++
+>>  1 file changed, 89 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+>> new file mode 100644
+>> index 0000000..c59a3d7
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+>> @@ -0,0 +1,89 @@
+>> +STMicroelectronics STM32 Serial Audio Interface (SAI).
+>
+> [...]
+>
+>> +	sai1b: audio-controller at 40015824 {
+>> +		#sound-dai-cells = <0>;
+>> +		compatible = "st,stm32-sai-sub-b";
+>> +		reg = <0x40015824 0x1C>;
+>> +		clocks = <&rcc 1 CLK_SAI2>;
+>> +		clock-names = "sai_ck";
+>> +		dmas = <&dma2 5 0 0x400 0x0>;
+>> +		dma-names = "tx";
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pinctrl_sai1b>;
+>> +
+>> +		ports {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +
+>> +			sai1b_port: port at 0 {
+>> +				reg = <0>;
+>> +				cpu_endpoint: endpoint {
+>> +					remote-endpoint = <&codec_endpoint>;
+>> +					audio-graph-card,format = "i2s";
+>> +					audio-graph-card,bitclock-master = <&codec_endpoint>;
+>> +					audio-graph-card,frame-master = <&codec_endpoint>;
+>
+> These property names are wrong.
+>
 
-The pmu_hclk_otg0 is Chip design defect, must be always on,
-The new document will update the description of this clock.
+I have taken into account this comment (and previous ones).
+They will be included in next update of this patch set.
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- drivers/clk/rockchip/clk-rk3368.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+>> +				};
+>> +			};
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +audio-codec {
+>> +	codec_port: port {
+>> +		codec_endpoint: endpoint {
+>> +			remote-endpoint = <&cpu_endpoint>;
+>> +		};
+>> +	};
+>> +};
+>> --
+>> 1.9.1
+>>
 
-diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
-index 6cb474c593e7..b38343f9177c 100644
---- a/drivers/clk/rockchip/clk-rk3368.c
-+++ b/drivers/clk/rockchip/clk-rk3368.c
-@@ -638,7 +638,7 @@ enum rk3368_plls {
- 	GATE(SCLK_MAC_TX, "sclk_mac_tx", "mac_clk", 0,
- 			RK3368_CLKGATE_CON(7), 5, GFLAGS),
- 
--	GATE(0, "jtag", "ext_jtag", 0,
-+	GATE(0, "jtag", "ext_jtag", CLK_IGNORE_UNUSED,
- 			RK3368_CLKGATE_CON(7), 0, GFLAGS),
- 
- 	COMPOSITE_NODIV(0, "hsic_usbphy_480m", mux_hsic_usbphy480m_p, 0,
-@@ -858,6 +858,9 @@ enum rk3368_plls {
- 	 */
- 	"pclk_pwm1",
- 	"pclk_pd_pmu",
-+	"pclk_ddrphy",
-+	"pclk_ddrupctl",
-+	"pmu_hclk_otg0",
- };
- 
- static void __init rk3368_clk_init(struct device_node *np)
--- 
-1.9.1
+Best regards
+Olivier
