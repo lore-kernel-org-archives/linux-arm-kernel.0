@@ -1,51 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 2 May 2017 09:25:42 +0100
-Subject: [PATCH] arm64: Fix multiple 'asm-operand-widths' warnings
-In-Reply-To: <20170501212622.153720-1-mka@chromium.org>
-References: <20170501212622.153720-1-mka@chromium.org>
-Message-ID: <0f4ccaac-7cb0-6888-4127-e4ef15ebab25@arm.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Tue, 2 May 2017 13:57:01 +0530
+Subject: [PATCH v2 4/4] perf vendor events arm64: Add implementation
+ defined pmu core events of ThunderX2
+In-Reply-To: <20170428172043.GD13675@arm.com>
+References: <1493355227-31492-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1493355227-31492-5-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170428172043.GD13675@arm.com>
+Message-ID: <CAFpQJXX8G0Ksqw2+4dETJD4A2y32eFMwXBXcz1UDQW_jVBX2QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/17 22:26, Matthias Kaehlcke wrote:
-> clang raises 'asm-operand-widths' warnings in inline assembly code when
-> the size of an operand is < 64 bits and the operand width is unspecified.
-> Most warnings are raised in macros, i.e. the datatype of the operand may
-> vary. Forcing the use of an x register through the 'x' operand modifier
-> would silence the warning however it involves the risk that for operands
-> < 64 bits 'unused' bits may be assigned to 64-bit values (more details at
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/503816.html).
-> Instead we cast the operand to 64 bits, which also forces the use of a
-> x register, but without the unexpected behavior.
-> 
-> In gic_write_bpr1() use write_sysreg_s() to write the register. This
-> aligns the functions with others in this header and fixes an
-> 'asm-operand-widths' warning.
-> 
-> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> ---
->  arch/arm64/include/asm/arch_gicv3.h  | 2 +-
->  arch/arm64/include/asm/barrier.h     | 2 +-
->  arch/arm64/include/asm/uaccess.h     | 2 +-
->  arch/arm64/kernel/armv8_deprecated.c | 2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-> index f37e3a21f6e7..9092d612d8c2 100644
-> --- a/arch/arm64/include/asm/arch_gicv3.h
-> +++ b/arch/arm64/include/asm/arch_gicv3.h
-> @@ -166,7 +166,7 @@ static inline void gic_write_sre(u32 val)
->  
->  static inline void gic_write_bpr1(u32 val)
->  {
-> -	asm volatile("msr_s " __stringify(ICC_BPR1_EL1) ", %0" : : "r" (val));
-> +	write_sysreg_s(val, ICC_BPR1_EL1);
->  }
+On Fri, Apr 28, 2017 at 10:50 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Apr 28, 2017 at 10:23:47AM +0530, Ganapatrao Kulkarni wrote:
+>> This is not a full event list, but a short list of useful events.
+>>
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>> ---
+>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 14 +++++
+>>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+>>  2 files changed, 76 insertions(+)
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+>>
+>> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+>> new file mode 100644
+>> index 0000000..bc9f798
+>> --- /dev/null
+>> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+>> @@ -0,0 +1,14 @@
+>> +# Format:
+>> +#    MIDR,Version,JSON/file/pathname,Type
+>> +#
+>> +# where
+>> +#    MIDR    Processor version
+>> +#    Version could be used to track version of of JSON file
+>> +#            but currently unused.
+>> +#    JSON/file/pathname is the path to JSON file, relative
+>> +#            to tools/perf/pmu-events/arch/arm64/.
+>> +#    Type is core, uncore etc
+>> +#
+>> +#
+>> +#Family-model,Version,Filename,EventType
+>> +0x00000000420f5161,v1,thunderx2,core
+>
+> In general, I don't think we want to require an exact match on the whole
+> MIDR here. Specifically, we'd want to mask out the Variant and Revision
+> fields for ARM CPUs, to avoid having to update the mapfile all the time.
+>
+> Is it possible to support wildcarding in the MIDR match?
 
-For the GICv3 part:
+thanks, Variant and Revision can be wildcard.
+>
+> Will
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+thanks
+Ganapat
