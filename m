@@ -1,44 +1,59 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 2 May 2017 10:08:24 +0100
-Subject: [PATCH 0/3 v2] xen: Implement EFI reset_system callback
-In-Reply-To: <20170424175839.5262-1-julien.grall@arm.com>
-References: <20170424175839.5262-1-julien.grall@arm.com>
-Message-ID: <33472949-4748-f03e-cae9-65bd5f54c2f7@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 2 May 2017 11:17:58 +0200
+Subject: [PATCH 2/5] mtd: nand: gpmi: add i.MX 7 SoC support
+In-Reply-To: <CA+EcR20FCPSec+ihTMA=SGwogd7p5tsnECCp3CR-Nv6fUciK4g@mail.gmail.com>
+References: <20170421010755.18025-1-stefan@agner.ch>
+ <20170421010755.18025-3-stefan@agner.ch>
+ <af3fe671-c5fb-d3cf-c891-e6b7c973baa1@gmail.com>
+ <5cf26d2b020392c875464c7504a9fb5b@agner.ch>
+ <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
+ <494a7bc044457240a302d92b3a50b8e5@agner.ch>
+ <57336d7e-7b48-8855-9e87-3eb370facd05@gmail.com>
+ <a9cdc47795433e7b152dcdd123f9bd63@agner.ch>
+ <CA+EcR20FCPSec+ihTMA=SGwogd7p5tsnECCp3CR-Nv6fUciK4g@mail.gmail.com>
+Message-ID: <20170502111758.53e9a959@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Han,
 
-It looks like the series has fully been acked, can someone merge this 
-into xentip?
+On Fri, 21 Apr 2017 13:29:16 -0500
+Han Xu <xhnjupt@gmail.com> wrote:
 
-Cheers,
+> >>  
+> >>>>> But then, adding the type would only require 2-3 lines of change if I
+> >>>>> add it to the GPMI_IS_MX6 macro...  
+> >>>>
+> >>>> Then at least add a comment because using type = IMX6SX right under
+> >>>> gpmi_data_mx7d can trigger some head-scratching. And put my R-B on V2.  
+> >>>
+> >>> FWIW, I mentioned it in the commit message.
+> >>>
+> >>> I think rather then adding a comment it is cleaner to just add IS_IMX7D
+> >>> and add it to the GPMI_IS_MX6 macro. That does not need a comment since
+> >>> it implicitly says we have a i.MX 7 but treat it like i.MX 6 and it is a
+> >>> rather small change. Does that sound acceptable?  
+> >>
+> >> Sure, that's even better, thanks.
+> >>
+> >> btw isn't there some single-core mx7 (mx7s ?) , maybe we should just go
+> >> with mx7 (without the d suffix). I dunno if it has GPMI NAND though, so
+> >> maybe mx7d is the right thing to do here ...
+> >>  
+> >
+> > There is a Solo version yes, and it has GPMI NAND too. However, almost
+> > all i.MX 7 IPs have been named imx7d by NXP for some reason (including
+> > compatible strings, see grep -r -e imx7 Documentation/), so I thought I
+> > stay consistent here...  
+> 
+> Hi Guys,
+> 
+> Yes, there should be a i.MX7 Solo version with one core fused out. IMO, can
+> we use QUIRK to distinguish them rather than SoC name. I know I also sent
+> some patch set with SoC Name but I prefer to use QUIRK now.
 
-On 04/24/2017 06:58 PM, Julien Grall wrote:
-> Hi all,
->
-> This small patch series implements EFI reset_system callback when using EFI
-> Xen. Without this, it will not be possible to reboot/power off ARM64 DOM0
-> when using ACPI.
->
-> Cheers,
->
-> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> Cc: Juergen Gross <jgross@suse.com>
->
-> Julien Grall (3):
->   xen: Export xen_reboot
->   arm/xen: Consolidate calls to shutdown hypercall in a single helper
->   xen: Implement EFI reset_system callback
->
->  arch/arm/xen/efi.c       |  2 +-
->  arch/arm/xen/enlighten.c | 16 ++++++++++------
->  arch/x86/xen/efi.c       |  2 +-
->  arch/x86/xen/enlighten.c |  2 +-
->  drivers/xen/efi.c        | 18 ++++++++++++++++++
->  include/xen/xen-ops.h    |  5 +++++
->  6 files changed, 36 insertions(+), 9 deletions(-)
->
+Not sure what this means. Are you okay with Stefan's v2?
 
--- 
-Julien Grall
+Regards,
+
+Boris
