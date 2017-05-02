@@ -1,51 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 2 May 2017 16:21:05 +0100
-Subject: [PATCH] Remove ARM errata Workarounds 458693 and 460075
-In-Reply-To: <e7310f9f-96a3-186a-7e5d-7da902bc76f8@arm.com>
-References: <1492301166-10292-1-git-send-email-nisalmenuka23@gmail.com>
- <20170416080446.GI17774@n2100.armlinux.org.uk>
- <20170418155725.GG27592@e104818-lin.cambridge.arm.com>
- <e7310f9f-96a3-186a-7e5d-7da902bc76f8@arm.com>
-Message-ID: <20170502152105.GC29224@e104818-lin.cambridge.arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 02 May 2017 16:29:00 +0100
+Subject: [PATCH v3 1/3] arm64: kvm: support kvmtool to detect RAS extension
+ feature
+In-Reply-To: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
+References: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <5908A5BC.1060202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 02, 2017 at 01:27:54PM +0100, Robin Murphy wrote:
-> On 18/04/17 16:57, Catalin Marinas wrote:
-> > On Sun, Apr 16, 2017 at 09:04:46AM +0100, Russell King - ARM Linux wrote:
-> >> On Sat, Apr 15, 2017 at 07:06:06PM -0500, Nisal Menuka wrote:
-> >>> According to ARM, these errata exist only in a version of Cortex-A8
-> >>> (r2p0) which was never built. Therefore, I believe there are no platforms
-> >>> where this workaround should be enabled.
-> >>> link :http://infocenter.arm.com/help/index.jsp?topic=
-> >>> /com.arm.doc.faqs/ka15634.html
-> >>
-> >> These were submitted by ARM Ltd back in 2009 - if the silicon was never
-> >> built, there would've been no reason to submit them.  Maybe Catalin can
-> >> shed some light on this, being the commit author who introduced these?
-> > 
-> > We normally try not to submit errata workarounds for revisions that are
-> > not going to be built/deployed. It's possible that at the time there
-> > were plans for r2p0 to be licensed and built (not just FPGA) but I don't
-> > really remember the details. The A8 errata document indeed states that
-> > r1p0 and r2p0 are obsolete but this can mean many things (like not
-> > available to license).
-> > 
-> > I'll try to see if any of the A8 past product managers know anything
-> > about this. In the meantime, I would leave them in (no run-time
-> > overhead).
-> 
-> FWIW, I just fired up a RealView PB-A8 board to check, and that reports
-> r1p1. True, it's not strictly a real silicon implementation (I think
-> it's one of the structured ASIC test chips), but since it was, as far as
-> I'm aware, a commercially-available development system, it's not
-> impossible that someone may still own and use one of these beasts.
+Hi Dongjiu Geng,
 
-The above errata were specific to r1p0 (not r1p1) and r2p0. Since ARM
-Ltd claims there are no products built around these revisions, I'm fine
-with removing the workarounds from the kernel (internal testchips/FPGA
-don't count as products but I doubt they are still relevant 8 years
-later).
+On 30/04/17 06:37, Dongjiu Geng wrote:
+> Handle kvmtool's detection for RAS extension, because sometimes
+> the APP needs to know the CPU's capacity
 
--- 
-Catalin
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index d9e9697..1004039 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
+>  	return !!(pfr0 & 0x20);
+>  }
+>  
+> +static bool kvm_arm_support_ras_extension(void)
+> +{
+> +	u64 pfr0;
+> +
+> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+> +	return !!(pfr0 & 0x10000000);
+> +}
+
+Why are we telling user-space that the CPU has RAS extensions? EL0 can't do
+anything with this and the guest EL1 can detect it from the id registers.
+
+
+Are you using this to decide whether or not to generate a HEST for the guest?
+
+If Qemu/kvmtool supports handling memory-failure notifications from signals you
+should always generate a HEST. The GHES notification method could be anything
+Qemu can deliver to the guest using the KVM APIs. Notifications from Qemu to the
+guest don't depend on the RAS extensions. KVM has APIs for IRQ and SEA (you can
+use KVM_SET_ONE_REG).
+
+
+I think we need a new API for injecting SError for SEI from Qemu/kvmtool, but it
+shouldn't be related to the RAS extensions. All v8.0 CPUs have HCR_EL2.VSE, so
+we need to know KVM supports this API.
+
+Your later patch adds code to set VSESR to make virtual RAS SErrors work, I
+think we need to expose that to user-space.
+
+
+Thanks,
+
+James
