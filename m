@@ -1,29 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 2 May 2017 10:36:22 +0200
-Subject: [PATCH/RFT v3 renesas-devel] ARM: dts: silk: Enable UHS-I SDR-50
-In-Reply-To: <20170502082247.GB2640@katana>
-References: <20170426080024.8391-1-horms+renesas@verge.net.au>
- <20170426081334.11846-1-horms+renesas@verge.net.au>
- <20170502082247.GB2640@katana>
-Message-ID: <20170502083622.GB32059@verge.net.au>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 2 May 2017 18:41:32 +1000
+Subject: linux-next: build failure after merge of the drm-misc tree
+In-Reply-To: <20170502082518.jdk5tqjhvlsqntny@phenom.ffwll.local>
+References: <20170421121014.3ee14a83@canb.auug.org.au>
+ <20170424112512.582d04da@canb.auug.org.au>
+ <20170502082518.jdk5tqjhvlsqntny@phenom.ffwll.local>
+Message-ID: <20170502184132.2c1b0299@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 02, 2017 at 10:22:47AM +0200, Wolfram Sang wrote:
-> > +	sdhi1_pins_uhs: sd1_uhs {
-> > +		groups = "sdhi1_data4", "sdhi1_ctrl";
-> > +		function = "sdhi1";
-> > +		power-source = <1800>;
-> >  	};
-> >  
-> >  	qspi_pins: qspi {
-> > @@ -338,11 +345,13 @@
-> >  
-> >  &sdhi1 {
-> >  	pinctrl-0 = <&sdhi1_pins>;
-> > -	pinctrl-names = "default";
-> > +	pinctrl-1 = <&sdhi0_pins_uhs>;
-> 
-> This must be sdhi1_pins_uhs.
+Hi Daniel,
 
-Thanks, will fix.
+On Tue, 2 May 2017 10:25:18 +0200 Daniel Vetter <daniel@ffwll.ch> wrote:
+>
+> Since this is an all-new driver it might be best to stagger the pull
+> requests and merge the new tee subsystem (or whatever it is) after drm?
+> 
+> Not sure what to best do here ...
+
+This will merge via Dave, so Dave just needs to let Linus know that a
+fix up is needed when this merges with the arm-soc stuff in Linus' tree.
+
+-- 
+Cheers,
+Stephen Rothwell
