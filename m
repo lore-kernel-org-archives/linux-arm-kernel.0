@@ -1,104 +1,71 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Tue, 2 May 2017 19:05:42 +0800
-Subject: [PATCH v3 1/3] arm64: kvm: support kvmtool to detect RAS
- extension feature
-In-Reply-To: <20170502075631.GE16940@cbox>
-References: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
- <20170502075631.GE16940@cbox>
-Message-ID: <c56b7b8f-3fa6-ed03-acb2-a2af1fcd5237@huawei.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 2 May 2017 13:18:21 +0200
+Subject: [PATCH 2/5] mtd: nand: gpmi: add i.MX 7 SoC support
+In-Reply-To: <20170502111758.53e9a959@bbrezillon>
+References: <20170421010755.18025-1-stefan@agner.ch>
+ <20170421010755.18025-3-stefan@agner.ch>
+ <af3fe671-c5fb-d3cf-c891-e6b7c973baa1@gmail.com>
+ <5cf26d2b020392c875464c7504a9fb5b@agner.ch>
+ <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
+ <494a7bc044457240a302d92b3a50b8e5@agner.ch>
+ <57336d7e-7b48-8855-9e87-3eb370facd05@gmail.com>
+ <a9cdc47795433e7b152dcdd123f9bd63@agner.ch>
+ <CA+EcR20FCPSec+ihTMA=SGwogd7p5tsnECCp3CR-Nv6fUciK4g@mail.gmail.com>
+ <20170502111758.53e9a959@bbrezillon>
+Message-ID: <d0162bbe-c2de-73d1-0d37-9bdd68ceb94b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-   thanks for your review and comments
+On 05/02/2017 11:17 AM, Boris Brezillon wrote:
+> Hi Han,
+> 
+> On Fri, 21 Apr 2017 13:29:16 -0500
+> Han Xu <xhnjupt@gmail.com> wrote:
+> 
+>>>>  
+>>>>>>> But then, adding the type would only require 2-3 lines of change if I
+>>>>>>> add it to the GPMI_IS_MX6 macro...  
+>>>>>>
+>>>>>> Then at least add a comment because using type = IMX6SX right under
+>>>>>> gpmi_data_mx7d can trigger some head-scratching. And put my R-B on V2.  
+>>>>>
+>>>>> FWIW, I mentioned it in the commit message.
+>>>>>
+>>>>> I think rather then adding a comment it is cleaner to just add IS_IMX7D
+>>>>> and add it to the GPMI_IS_MX6 macro. That does not need a comment since
+>>>>> it implicitly says we have a i.MX 7 but treat it like i.MX 6 and it is a
+>>>>> rather small change. Does that sound acceptable?  
+>>>>
+>>>> Sure, that's even better, thanks.
+>>>>
+>>>> btw isn't there some single-core mx7 (mx7s ?) , maybe we should just go
+>>>> with mx7 (without the d suffix). I dunno if it has GPMI NAND though, so
+>>>> maybe mx7d is the right thing to do here ...
+>>>>  
+>>>
+>>> There is a Solo version yes, and it has GPMI NAND too. However, almost
+>>> all i.MX 7 IPs have been named imx7d by NXP for some reason (including
+>>> compatible strings, see grep -r -e imx7 Documentation/), so I thought I
+>>> stay consistent here...  
 
-On 2017/5/2 15:56, Christoffer Dall wrote:
-> Hi Dongjiu,
-> 
-> Please send a cover letter for patch series with more than a single
-> patch.
-  OK, got it.
+I missed the DT bit, sorry. the DT bindings say:
+  - compatible : should be "fsl,<chip>-gpmi-nand"
+so if FSL invented their own buggy bindings, they need to get them
+through Rob :) IMO for MX7, this should be "imx7-gpmi-nand" , unless
+there's some incentive to discern the solo/dual chips and/or there
+is a future imx7 coming up with different GPMI NAND block version.
 
-> 
-> The subject and description of these patches are also misleading.
-> Hopefully this is in no way tied to kvmtool, but to userspace
-> generically, for example also to be used by QEMU?
- yes, it is also used by QEMU, it should be userspace.
-
-
-> 
-> On Sun, Apr 30, 2017 at 01:37:55PM +0800, Dongjiu Geng wrote:
->> Handle kvmtool's detection for RAS extension, because sometimes
->> the APP needs to know the CPU's capacity
-> 
-> the APP ?
-> 
-> the CPU's capacity?
-  I will fix it.
-
-> 
+>> Hi Guys,
 >>
->> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->> ---
->>  arch/arm64/kvm/reset.c   | 11 +++++++++++
->>  include/uapi/linux/kvm.h |  1 +
->>  2 files changed, 12 insertions(+)
->>
->> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->> index d9e9697..1004039 100644
->> --- a/arch/arm64/kvm/reset.c
->> +++ b/arch/arm64/kvm/reset.c
->> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
->>  	return !!(pfr0 & 0x20);
->>  }
->>  
->> +static bool kvm_arm_support_ras_extension(void)
->> +{
->> +	u64 pfr0;
->> +
->> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
->> +	return !!(pfr0 & 0x10000000);
->> +}
->> +
->>  /**
->>   * kvm_arch_dev_ioctl_check_extension
->>   *
->> @@ -87,6 +95,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->>  	case KVM_CAP_ARM_PMU_V3:
->>  		r = kvm_arm_support_pmu_v3();
->>  		break;
->> +	case KVM_CAP_ARM_RAS_EXTENSION:
->> +		r = kvm_arm_support_ras_extension();
->> +		break;
+>> Yes, there should be a i.MX7 Solo version with one core fused out. IMO, can
+>> we use QUIRK to distinguish them rather than SoC name. I know I also sent
+>> some patch set with SoC Name but I prefer to use QUIRK now.
 > 
-> You need to document this capability and API in
-> Documentation/virtual/kvm/api.txt and explain how this works.
-  Ok, thanks for your suggestion.
+> Not sure what this means. Are you okay with Stefan's v2?
 
-> 
-> 
-> 
->>  	case KVM_CAP_SET_GUEST_DEBUG:
->>  	case KVM_CAP_VCPU_ATTRIBUTES:
->>  		r = 1;
->> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->> index f51d508..27fe556 100644
->> --- a/include/uapi/linux/kvm.h
->> +++ b/include/uapi/linux/kvm.h
->> @@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
->>  #define KVM_CAP_PPC_MMU_RADIX 134
->>  #define KVM_CAP_PPC_MMU_HASH_V3 135
->>  #define KVM_CAP_IMMEDIATE_EXIT 136
->> +#define KVM_CAP_ARM_RAS_EXTENSION 137
->>  
->>  #ifdef KVM_CAP_IRQ_ROUTING
->>  
->> -- 
->> 2.10.1
->>
-> 
-> Thanks,
-> -Christoffer
-> 
-> .
-> 
+IMO the GPMI controller in solo and dual should be the same, so there's
+no need to have quirks for it.
+
+-- 
+Best regards,
+Marek Vasut
