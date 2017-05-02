@@ -1,36 +1,46 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 2 May 2017 16:44:34 +0200
-Subject: [PATCH 0/5] KVM/ARM: Fixes for 4.12-rc1
-In-Reply-To: <20170502133041.10980-1-marc.zyngier@arm.com>
-References: <20170502133041.10980-1-marc.zyngier@arm.com>
-Message-ID: <75f031d5-d16e-6311-af44-f2c5af5bded4@redhat.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 2 May 2017 17:46:00 +0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable cpufreq governors
+Message-ID: <c401883fec8db20878c7593d879e9e128cacc495.1493736306.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Enable more common cpufreq governors in imx defconfig because this is
+very useful for testing. In particular you can't use cpufreq-set -f
+$FREQ without explicitly defining CONFIG_CPU_FREQ_GOV_USERSPACE=y.
 
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-On 02/05/2017 15:30, Marc Zyngier wrote:
-> Here's a handful of random fixes I've queued locally that didn't have
-> a chance to make it in 4.11.
-> 
-> The first two patches avoid stack-protector messing with the HYP code,
-> as this ends up being a complete disaster.
-> 
-> The following two patches fix a bug introduced in the new vgic, where
-> we may queue HW interrupts with the Pending+Active state, which is
-> illegal.
-> 
-> The final patch fixes a misinterpretation of the spec, where we
-> compute the number of APxRn register based on the number of priorities
-> instead of using the number of preemption levels.
-> 
-> I've tagged the first 4 patches for stable, given that we're doing
-> something potentially harmful. The last patch is more of a theoretical
-> issue at this stage, so probably need for a backport.
+---
 
-Would you like me to apply them, or are you looking for reviews and
-going to send them in a pull request?
+It might make sense for all governors to be enabled by default from
+drivers/cpufreq/Kconfig and allow defconfigs to be shorter.
+Right now the descriptions for some of them includes a line that says
+"If in doubt, say Y" but the config options don't have actually have a
+default value defined and they effectively default to N.
 
-I can wait a couple days before sending my own pull request to Linus.
+Cycling via savedefconfig on shawnguo/for-next also generates some
+reordering for some newly added options CONFIG_TOUCHSCREEN_MAX11801=y
+and CONFIG_HID_MULTITOUCH=y. Those were not included but it's strange
+that this happens. Maybe those options were inserted manually, or
+otherwise there is an annoying bug in kconfig?
 
-Paolo
+ arch/arm/configs/imx_v6_v7_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index bb6fa56..bf1e7e3 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -55,6 +55,9 @@ CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
+ CONFIG_KEXEC=y
+ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_POWERSAVE=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
+ CONFIG_ARM_IMX6Q_CPUFREQ=y
+ CONFIG_CPU_IDLE=y
+ CONFIG_VFP=y
+-- 
+2.7.4
