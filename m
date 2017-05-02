@@ -1,99 +1,62 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 2 May 2017 17:48:34 +0200
-Subject: [PATCH v3 1/3] arm64: kvm: support kvmtool to detect RAS
- extension feature
-In-Reply-To: <20170502075631.GE16940@cbox>
-References: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
- <20170502075631.GE16940@cbox>
-Message-ID: <8d443da4-d17f-2487-10d5-b6c9639dc5a4@redhat.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 2 May 2017 08:51:55 -0700
+Subject: [PATCH] arm: pmu: Get PMU working when the A53 is run in 32 bit
+ mode
+In-Reply-To: <0f716b0c-b9ac-29d9-2909-50906ad90bd3@arm.com>
+References: <1493733691-43814-1-git-send-email-alcooperx@gmail.com>
+ <0f716b0c-b9ac-29d9-2909-50906ad90bd3@arm.com>
+Message-ID: <3f44e99a-6ff1-23e5-52d5-59c662fd10c3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mark,
 
-
-On 02/05/2017 09:56, Christoffer Dall wrote:
-> Hi Dongjiu,
+On 05/02/2017 07:17 AM, Marc Zyngier wrote:
+> Hi Al,
 > 
-> Please send a cover letter for patch series with more than a single
-> patch.
-> 
-> The subject and description of these patches are also misleading.
-> Hopefully this is in no way tied to kvmtool, but to userspace
-> generically, for example also to be used by QEMU?
-
-Yes, QEMU already has a similar capability on x86.
-
-Does ARM support background scrubbing of memory to detect errors?  If
-so, are there any plans to support action-optional SIGBUS on ARM?
-
-Paolo
-
-> On Sun, Apr 30, 2017 at 01:37:55PM +0800, Dongjiu Geng wrote:
->> Handle kvmtool's detection for RAS extension, because sometimes
->> the APP needs to know the CPU's capacity
-> 
-> the APP ?
-> 
-> the CPU's capacity?
-> 
+> On 02/05/17 15:01, Al Cooper wrote:
+>> From: Al Cooper <al.cooper@broadcom.com>
 >>
->> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->> ---
->>  arch/arm64/kvm/reset.c   | 11 +++++++++++
->>  include/uapi/linux/kvm.h |  1 +
->>  2 files changed, 12 insertions(+)
->>
->> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->> index d9e9697..1004039 100644
->> --- a/arch/arm64/kvm/reset.c
->> +++ b/arch/arm64/kvm/reset.c
->> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
->>  	return !!(pfr0 & 0x20);
->>  }
->>  
->> +static bool kvm_arm_support_ras_extension(void)
->> +{
->> +	u64 pfr0;
->> +
->> +	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
->> +	return !!(pfr0 & 0x10000000);
->> +}
->> +
->>  /**
->>   * kvm_arch_dev_ioctl_check_extension
->>   *
->> @@ -87,6 +95,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->>  	case KVM_CAP_ARM_PMU_V3:
->>  		r = kvm_arm_support_pmu_v3();
->>  		break;
->> +	case KVM_CAP_ARM_RAS_EXTENSION:
->> +		r = kvm_arm_support_ras_extension();
->> +		break;
+>> When the A53 is run in A15 (32 bit) mode, the registers used to
+>> access the counters are A15 style registers, but the actual
+>> counters are the A53 counters not A15 counters. This patch will
+>> select a PMU counters map for the A53 if the device tree pmu
+>> "compatible" property includes "arm,cortex-a53-pmu".
 > 
-> You need to document this capability and API in
-> Documentation/virtual/kvm/api.txt and explain how this works.
+> I wasn't aware of an "A15 mode"! Is there an ARM3 mode, while we're at
+> it? ;-)
+
+This is referring to how our Device Tree and kernel end-up "viewing" the
+PMU (based on provided compatible strings) but this probably should be
+omitted for clarity.
+
 > 
+> More seriously, you seem to take the problem from the wrong end. If you
+> have an ARMv8 core, you should use the PMUv3 driver (because that is
+> what your A53 has), and not the ARMv7 PMU.
 > 
-> 
->>  	case KVM_CAP_SET_GUEST_DEBUG:
->>  	case KVM_CAP_VCPU_ATTRIBUTES:
->>  		r = 1;
->> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->> index f51d508..27fe556 100644
->> --- a/include/uapi/linux/kvm.h
->> +++ b/include/uapi/linux/kvm.h
->> @@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
->>  #define KVM_CAP_PPC_MMU_RADIX 134
->>  #define KVM_CAP_PPC_MMU_HASH_V3 135
->>  #define KVM_CAP_IMMEDIATE_EXIT 136
->> +#define KVM_CAP_ARM_RAS_EXTENSION 137
->>  
->>  #ifdef KVM_CAP_IRQ_ROUTING
->>  
->> -- 
->> 2.10.1
->>
+> To that affect, I've posted this[1] a while ago. Can you please give it
+> a go?
+
+That seems to be the right direction, however don't you also need to
+possibly expose other PMU types as well? Cortex-A53 and Cortex-A57 PMUs
+(and possibly more) for instance because there are additional counters
+that can be defined specifically for those, e.g: LL = L2 cache on A53,
+see [1].
+
+[1]:
+https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/commit/?h=for-next/core&id=f5337346cd8fe1b105f319b4b7fb06fe25c54480
+
+Thanks!
+
 > 
 > Thanks,
-> -Christoffer
 > 
+> 	M.
+> 
+> [1]: https://www.spinics.net/lists/arm-kernel/msg571476.html
+> 
+
+
+-- 
+Florian
