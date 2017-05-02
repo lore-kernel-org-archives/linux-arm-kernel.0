@@ -1,71 +1,37 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 2 May 2017 17:20:18 +0800
-Subject: [PATCH v7 5/7] coresight: add support for CPU debug module
-In-Reply-To: <1493713805-26920-6-git-send-email-leo.yan@linaro.org>
-References: <1493713805-26920-1-git-send-email-leo.yan@linaro.org>
- <1493713805-26920-6-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170502092018.GB20225@leoy-ThinkPad-T440>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue,  2 May 2017 11:24:08 +0200
+Subject: [PATCH/RFT renesas-devel] arm64: dts: ulcb: Enable NFS root
+Message-ID: <1493717048-10740-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 02, 2017 at 04:30:03PM +0800, Leo Yan wrote:
+Enable NFS root on the r8a7795/h3ulcb and r8a7796/m3ulcb
+as per:
+* commit b2407c566ba29215 ("arm64: dts: r8a7795: enable nfs root on Salvator-X board").
+* commit 742a9dfb90f0 ("arm64: dts: r8a7796: salvator-x: Enable NFS root")
 
-[...]
+Also set ignore_loglevel rw as boot args as is the case for the boards
+for the boards for other Renesas ARM/ARM64 based SoCs.
 
-> +static void debug_force_cpu_powered_up(struct debug_drvdata *drvdata)
-> +{
-> +	u32 edprcr;
-> +
-> +try_again:
-> +
-> +	/*
-> +	 * Send request to power management controller and assert
-> +	 * DBGPWRUPREQ signal; if power management controller has
-> +	 * sane implementation, it should enable CPU power domain
-> +	 * in case CPU is in low power state.
-> +	 */
-> +	edprcr = readl_relaxed(drvdata->base + EDPRCR);
-> +	edprcr |= EDPRCR_COREPURQ;
-> +	writel_relaxed(edprcr, drvdata->base + EDPRCR);
-> +
-> +	/* Wait for CPU to be powered up (timeout~=32ms) */
-> +	if (readx_poll_timeout_atomic(readl_relaxed, drvdata->base + EDPRSR,
-> +			drvdata->edprsr, (drvdata->edprsr & EDPRSR_PU),
-> +			DEBUG_WAIT_SLEEP, DEBUG_WAIT_TIMEOUT)) {
-> +		/*
-> +		 * Unfortunately the CPU cannot be powered up, so return
-> +		 * back and later has no permission to access other
-> +		 * registers. For this case, should disable CPU low power
-> +		 * states to ensure CPU power domain is enabled!
-> +		 */
-> +		pr_err("%s: power up request for CPU%d failed\n",
-> +			__func__, drvdata->cpu);
-> +		return;
-> +	}
-> +
-> +	/*
-> +	 * At this point the CPU is powered up, so set the no powerdown
-> +	 * request bit so we don't lose power and emulate power down.
-> +	 */
-> +	edprcr = readl_relaxed(drvdata->base + EDPRCR);
-> +	edprcr |= EDPRCR_COREPURQ | EDPRCR_CORENPDRQ;
-> +	writel_relaxed(edprcr, drvdata->base + EDPRCR);
-> +
-> +	drvdata->edprsr = readl_relaxed(drvdata->base + EDPRSR);
-> +
-> +	/* The core power domain got switched off on use, try again */
-> +	if (unlikely(!drvdata->edprsr & EDPRSR_PU))
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+* Compile tested only due to lack of hardware access
+* Based on renesas-devel-20170502-v4.11
+---
+ arch/arm64/boot/dts/renesas/ulcb.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-Here have error introduced by operator priority. Should change to
-
-        if (unlikely(!(drvdata->edprsr & EDPRSR_PU)))
-
-Will send new version soon for this fixing.
-
-> +		goto try_again;
-> +}
-
-[...]
-
-Thanks,
-Leo Yan
+diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+index 2bc7ceb2efa4..7669b282bde2 100644
+--- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
++++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+@@ -21,6 +21,7 @@
+ 	};
+ 
+ 	chosen {
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+-- 
+2.1.4
