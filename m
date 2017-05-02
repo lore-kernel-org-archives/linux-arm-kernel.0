@@ -1,76 +1,148 @@
-From: alexander.duyck@gmail.com (Alexander Duyck)
-Date: Tue, 2 May 2017 11:10:22 -0700
-Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING
-In-Reply-To: <20170502165329.GB26406@linux.intel.com>
-References: <cover.1493678834.git.leedom@chelsio.com>
- <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
- <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
- <20170502165329.GB26406@linux.intel.com>
-Message-ID: <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Tue,  2 May 2017 20:34:54 +0200
+Subject: [PATCH net] bpf, arm64: fix jit branch offset related to ldimm64
+Message-ID: <5f7d105a1830ed789f1b416dc17b02fce0bd070e.1493749880.git.daniel@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 2, 2017 at 9:53 AM, Raj, Ashok <ashok.raj@intel.com> wrote:
-> On Tue, May 02, 2017 at 09:39:34AM -0700, Alexander Duyck wrote:
->> On Mon, May 1, 2017 at 4:13 PM, Casey Leedom <leedom@chelsio.com> wrote:
->> > The new flag PCI_DEV_FLAGS_NO_RELAXED_ORDERING indicates that the Relaxed
->> > Ordering Attribute should not be used on Transaction Layer Packets destined
->> > for the PCIe End Node so flagged.  Initially flagged this way are Intel
->> > E5-26xx Root Complex Ports which suffer from a Flow Control Credit
->> > Performance Problem and AMD A1100 ARM ("SEATTLE") Root Complex Ports which
->> > don't obey PCIe 3.0 ordering rules which can lead to Data Corruption.
->>
->> So this is a good first step though might I suggest one other change.
->>
->> We may want to add logic to the core PCIe code that clears the "Enable
->> Relaxed Ordering" bit in the device control register for all devices
->> hanging off of this root complex. Assuming the devices conform to the
->> PCIe spec doing that should disable relaxed ordering in a device
->> agnostic way that then enables us at a driver level to just enable the
->> feature always without having to perform any checks for your flag. We
->> could probably do that as a part of probing the PCIe interfaces
->> hanging off of these devices.
->
-> I suppose you don't want to turn off RO completely on the device. When
-> traffic is targetted to mmio for peer to peer reasons RO has performance
-> upside. The specific issue with these root ports indicate limitation using
-> RO for traffic targetting coherent memory.
+When the instruction right before the branch destination is
+a 64 bit load immediate, we currently calculate the wrong
+jump offset in the ctx->offset[] array as we only account
+one instruction slot for the 64 bit load immediate although
+it uses two BPF instructions. Fix it up by setting the offset
+into the right slot after we incremented the index.
 
-Actually my main concern here is virtualization. If I take the PCIe
-function and direct assign it I have no way of seeing the root complex
-flag as it is now virtualized away. In the meantime the guest now has
-the ability to enable the function and sees nothing that says you
-can't enable relaxed ordering which in turn ends up potentially
-causing data corruption on the system. I want relaxed ordering
-disabled before I even consider assigning it to the guest on the
-systems where this would be an issue.
+Before (ldimm64 test 1):
 
-I prefer to err on the side of caution with this. Enabling Relaxed
-Ordering is technically a performance enhancement, so we function but
-not as well as we would like, while having it enabled when there are
-issues can lead to data corruption. I would weigh the risk of data
-corruption the thing to be avoided and of much higher priority than
-enabling improved performance. As such I say we should default the
-relaxed ordering attribute to off in general and look at
-"white-listing" it in for various architectures and/or chipsets that
-support/need it rather than having it enabled by default and trying to
-switch it off after the fact when we find some new issue.
+  [...]
+  00000020:  52800007  mov w7, #0x0 // #0
+  00000024:  d2800060  mov x0, #0x3 // #3
+  00000028:  d2800041  mov x1, #0x2 // #2
+  0000002c:  eb01001f  cmp x0, x1
+  00000030:  54ffff82  b.cs 0x00000020
+  00000034:  d29fffe7  mov x7, #0xffff // #65535
+  00000038:  f2bfffe7  movk x7, #0xffff, lsl #16
+  0000003c:  f2dfffe7  movk x7, #0xffff, lsl #32
+  00000040:  f2ffffe7  movk x7, #0xffff, lsl #48
+  00000044:  d29dddc7  mov x7, #0xeeee // #61166
+  00000048:  f2bdddc7  movk x7, #0xeeee, lsl #16
+  0000004c:  f2ddddc7  movk x7, #0xeeee, lsl #32
+  00000050:  f2fdddc7  movk x7, #0xeeee, lsl #48
+  [...]
 
-So for example, in the case of x86 it seems like there are multiple
-root complexes that have issues, and the gains for enabling it with
-standard DMA to host memory are small. As such we may want to default
-it to off via the architecture specific PCIe code and then look at
-having "white-list" cases where we enable it for things like
-peer-to-peer accesses. In the case of SPARC we could look at
-defaulting it to on, and only "black-list" any cases where there might
-be issues since SPARC relies on this in a significant way for
-performance. In the case of ARM and other architectures it is a bit of
-a toss-up. I would say we could just default it to on for now and
-"black-list" anything that doesn't work, or we could go the other way
-like I suggested for x86. It all depends on what the ARM community
-would want to agree on for this. I would say unless it makes a
-significant difference like it does in the case of SPARC we are
-probably better off just defaulting it to off.
+After (ldimm64 test 1):
 
-- Alex
+  [...]
+  00000020:  52800007  mov w7, #0x0 // #0
+  00000024:  d2800060  mov x0, #0x3 // #3
+  00000028:  d2800041  mov x1, #0x2 // #2
+  0000002c:  eb01001f  cmp x0, x1
+  00000030:  540000a2  b.cs 0x00000044
+  00000034:  d29fffe7  mov x7, #0xffff // #65535
+  00000038:  f2bfffe7  movk x7, #0xffff, lsl #16
+  0000003c:  f2dfffe7  movk x7, #0xffff, lsl #32
+  00000040:  f2ffffe7  movk x7, #0xffff, lsl #48
+  00000044:  d29dddc7  mov x7, #0xeeee // #61166
+  00000048:  f2bdddc7  movk x7, #0xeeee, lsl #16
+  0000004c:  f2ddddc7  movk x7, #0xeeee, lsl #32
+  00000050:  f2fdddc7  movk x7, #0xeeee, lsl #48
+  [...]
+
+Also, add a couple of test cases to make sure JITs pass
+this test. Tested on Cavium ThunderX ARMv8. The added
+test cases all pass after the fix.
+
+Fixes: 8eee539ddea0 ("arm64: bpf: fix out-of-bounds read in bpf2a64_offset()")
+Reported-by: David S. Miller <davem@davemloft.net>
+Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
+Acked-by: Alexei Starovoitov <ast@kernel.org>
+Cc: Xi Wang <xi.wang@gmail.com>
+---
+ ( Based against net-next where BPF related patches are usually
+   routed, if something else is preferred please let me know. )
+
+ arch/arm64/net/bpf_jit_comp.c |  8 ++++----
+ lib/test_bpf.c                | 45 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index a785554..ce8ab04 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -779,14 +779,14 @@ static int build_body(struct jit_ctx *ctx)
+ 		int ret;
+ 
+ 		ret = build_insn(insn, ctx);
+-
+-		if (ctx->image == NULL)
+-			ctx->offset[i] = ctx->idx;
+-
+ 		if (ret > 0) {
+ 			i++;
++			if (ctx->image == NULL)
++				ctx->offset[i] = ctx->idx;
+ 			continue;
+ 		}
++		if (ctx->image == NULL)
++			ctx->offset[i] = ctx->idx;
+ 		if (ret)
+ 			return ret;
+ 	}
+diff --git a/lib/test_bpf.c b/lib/test_bpf.c
+index 0362da0..2e38502 100644
+--- a/lib/test_bpf.c
++++ b/lib/test_bpf.c
+@@ -4656,6 +4656,51 @@ static int bpf_fill_ld_abs_vlan_push_pop(struct bpf_test *self)
+ 		{ },
+ 		{ { 0, 1 } },
+ 	},
++	{
++		/* Mainly testing JIT + imm64 here. */
++		"JMP_JGE_X: ldimm64 test 1",
++		.u.insns_int = {
++			BPF_ALU32_IMM(BPF_MOV, R0, 0),
++			BPF_LD_IMM64(R1, 3),
++			BPF_LD_IMM64(R2, 2),
++			BPF_JMP_REG(BPF_JGE, R1, R2, 2),
++			BPF_LD_IMM64(R0, 0xffffffffffffffffUL),
++			BPF_LD_IMM64(R0, 0xeeeeeeeeeeeeeeeeUL),
++			BPF_EXIT_INSN(),
++		},
++		INTERNAL,
++		{ },
++		{ { 0, 0xeeeeeeeeU } },
++	},
++	{
++		"JMP_JGE_X: ldimm64 test 2",
++		.u.insns_int = {
++			BPF_ALU32_IMM(BPF_MOV, R0, 0),
++			BPF_LD_IMM64(R1, 3),
++			BPF_LD_IMM64(R2, 2),
++			BPF_JMP_REG(BPF_JGE, R1, R2, 0),
++			BPF_LD_IMM64(R0, 0xffffffffffffffffUL),
++			BPF_EXIT_INSN(),
++		},
++		INTERNAL,
++		{ },
++		{ { 0, 0xffffffffU } },
++	},
++	{
++		"JMP_JGE_X: ldimm64 test 3",
++		.u.insns_int = {
++			BPF_ALU32_IMM(BPF_MOV, R0, 1),
++			BPF_LD_IMM64(R1, 3),
++			BPF_LD_IMM64(R2, 2),
++			BPF_JMP_REG(BPF_JGE, R1, R2, 4),
++			BPF_LD_IMM64(R0, 0xffffffffffffffffUL),
++			BPF_LD_IMM64(R0, 0xeeeeeeeeeeeeeeeeUL),
++			BPF_EXIT_INSN(),
++		},
++		INTERNAL,
++		{ },
++		{ { 0, 1 } },
++	},
+ 	/* BPF_JMP | BPF_JNE | BPF_X */
+ 	{
+ 		"JMP_JNE_X: if (3 != 2) return 1",
+-- 
+1.9.3
