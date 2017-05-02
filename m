@@ -1,35 +1,106 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 2 May 2017 11:53:20 +0100
-Subject: [PATCH 0/3 v2] xen: Implement EFI reset_system callback
-In-Reply-To: <f7bfc07d-ae10-09fb-9fce-a2ef93460459@suse.com>
-References: <20170424175839.5262-1-julien.grall@arm.com>
- <33472949-4748-f03e-cae9-65bd5f54c2f7@arm.com>
- <f7bfc07d-ae10-09fb-9fce-a2ef93460459@suse.com>
-Message-ID: <06141a49-157c-f340-805e-00431ea2349c@arm.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue,  2 May 2017 18:08:34 +0800
+Subject: [PATCH v8 4/7] coresight: refactor with function of_coresight_get_cpu
+In-Reply-To: <1493719717-27698-1-git-send-email-leo.yan@linaro.org>
+References: <1493719717-27698-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1493719717-27698-5-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juergen,
+This is refactor to add function of_coresight_get_cpu(), so it's used to
+retrieve CPU id for coresight component. Finally can use it as a common
+function for multiple places.
 
-On 02/05/17 10:30, Juergen Gross wrote:
-> On 02/05/17 11:08, Julien Grall wrote:
->> Hi all,
->>
->> It looks like the series has fully been acked, can someone merge this
->> into xentip?
->
-> As I already wrote: patch 1 doesn't apply any longer.
->
-> As there were other conflicts between xentip and Linus' tree I'm doing
-> a rebase of for-linus-4.12 right now, so I can do the rebase of this
-> patch for you.
+Suggested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ drivers/hwtracing/coresight/of_coresight.c | 43 +++++++++++++++++++-----------
+ include/linux/coresight.h                  |  2 ++
+ 2 files changed, 30 insertions(+), 15 deletions(-)
 
-Sorry I missed your answer on patch #1.
-
-I saw you just rebased it, thank you for that!
-
-Cheers,
-
-
+diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+index de7e8ce..46eec0f 100644
+--- a/drivers/hwtracing/coresight/of_coresight.c
++++ b/drivers/hwtracing/coresight/of_coresight.c
+@@ -101,15 +101,39 @@ static int of_coresight_alloc_memory(struct device *dev,
+ 	return 0;
+ }
+ 
++int of_coresight_get_cpu(const struct device_node *node)
++{
++	int cpu;
++	bool found;
++	struct device_node *dn, *np;
++
++	dn = of_parse_phandle(node, "cpu", 0);
++
++	/* Affinity defaults to CPU0 */
++	if (!dn)
++		return 0;
++
++	for_each_possible_cpu(cpu) {
++		np = of_cpu_device_node_get(cpu);
++		found = (dn == np);
++		of_node_put(np);
++		if (found)
++			break;
++	}
++	of_node_put(dn);
++
++	/* Affinity to CPU0 if no cpu nodes are found */
++	return found ? cpu : 0;
++}
++EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
++
+ struct coresight_platform_data *of_get_coresight_platform_data(
+ 			struct device *dev, const struct device_node *node)
+ {
+-	int i = 0, ret = 0, cpu;
++	int i = 0, ret = 0;
+ 	struct coresight_platform_data *pdata;
+ 	struct of_endpoint endpoint, rendpoint;
+ 	struct device *rdev;
+-	bool found;
+-	struct device_node *dn, *np;
+ 	struct device_node *ep = NULL;
+ 	struct device_node *rparent = NULL;
+ 	struct device_node *rport = NULL;
+@@ -176,18 +200,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 		} while (ep);
+ 	}
+ 
+-	dn = of_parse_phandle(node, "cpu", 0);
+-	for_each_possible_cpu(cpu) {
+-		np = of_cpu_device_node_get(cpu);
+-		found = (dn == np);
+-		of_node_put(np);
+-		if (found)
+-			break;
+-	}
+-	of_node_put(dn);
+-
+-	/* Affinity to CPU0 if no cpu nodes are found */
+-	pdata->cpu = found ? cpu : 0;
++	pdata->cpu = of_coresight_get_cpu(node);
+ 
+ 	return pdata;
+ }
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index 769f2c8..4915254 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -263,9 +263,11 @@ static inline int coresight_timeout(void __iomem *addr, u32 offset,
+ #endif
+ 
+ #ifdef CONFIG_OF
++extern int of_coresight_get_cpu(const struct device_node *node);
+ extern struct coresight_platform_data *of_get_coresight_platform_data(
+ 	struct device *dev, const struct device_node *node);
+ #else
++static inline int of_coresight_get_cpu(const struct device_node *node) { return 0; }
+ static inline struct coresight_platform_data *of_get_coresight_platform_data(
+ 	struct device *dev, const struct device_node *node) { return NULL; }
+ #endif
 -- 
-Julien Grall
+2.7.4
