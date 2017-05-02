@@ -1,29 +1,27 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 2 May 2017 10:09:52 +0800
-Subject: [PATCH 2/2] [PATCH 2/2] iio: adc: sun4i-gpadc-iio: Fix module
- autoload when OF devices are registered
-In-Reply-To: <20170501224559.21028-2-edu.molinas@gmail.com>
+Date: Tue, 2 May 2017 10:10:23 +0800
+Subject: [PATCH 1/2] [PATCH 1/2] iio: adc: sun4i-gpadc-iio: Fix module
+ autoload when PLATFORM devices are registered
+In-Reply-To: <20170501224559.21028-1-edu.molinas@gmail.com>
 References: <20170501224559.21028-1-edu.molinas@gmail.com>
- <20170501224559.21028-2-edu.molinas@gmail.com>
-Message-ID: <CAGb2v66_F4yHzQaOtO+-yH7d36kx_ahDCTyXkpTKkzGxQ-bYeA@mail.gmail.com>
+Message-ID: <CAGb2v65Cgtxjhuj8v5A8RF8pGTK0FD3MDmDeirO4T_T7UCF4Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, May 2, 2017 at 6:45 AM, Eduardo Molinas <edu.molinas@gmail.com> wrote:
 > If the driver is built as a module, it won't be autloaded if the devices
-> are registered via OF code because the OF device table
+> are registered via PLATFORM code because the PLATFORM device table
 > entries are not exported as aliases
 >
 > Before the patch:
 > $ modinfo drivers/iio/adc/sun4i-gpadc-iio.ko | grep alias
-> alias:          platform:sun6i-a31-gpadc-iio
-> alias:          platform:sun5i-a13-gpadc-iio
-> alias:          platform:sun4i-a10-gpadc-iio
+> $
 >
-> After the patch:
+> After th patch:
+
+        ^^ the
+
 > $ modinfo drivers/iio/adc/sun4i-gpadc-iio.ko | grep alias
-> alias:          of:N*T*Callwinner,sun8i-a33-thsC*
-> alias:          of:N*T*Callwinner,sun8i-a33-ths
 > alias:          platform:sun6i-a31-gpadc-iio
 > alias:          platform:sun5i-a13-gpadc-iio
 > alias:          platform:sun4i-a10-gpadc-iio
