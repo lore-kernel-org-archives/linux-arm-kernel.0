@@ -1,65 +1,100 @@
-From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Tue,  2 May 2017 21:59:34 +0530
-Subject: [PATCH v3] arm64: perf: Ignore exclude_hv when kernel is running in
- HYP
-Message-ID: <1493742574-25955-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+From: alexander.duyck@gmail.com (Alexander Duyck)
+Date: Tue, 2 May 2017 09:39:34 -0700
+Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
+References: <cover.1493678834.git.leedom@chelsio.com>
+ <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
+Message-ID: <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit d98ecdaca296 ("arm64: perf: Count EL2 events if the kernel is
-running in HYP") returns -EINVAL when perf system call perf_event_open is
-called with exclude_hv != exclude_kernel. This change breaks applications
-on VHE enabled ARMv8.1 platforms. The issue was observed with HHVM
-application, which calls perf_event_open with exclude_hv = 1 and
-exclude_kernel = 0.
+On Mon, May 1, 2017 at 4:13 PM, Casey Leedom <leedom@chelsio.com> wrote:
+> The new flag PCI_DEV_FLAGS_NO_RELAXED_ORDERING indicates that the Relaxed
+> Ordering Attribute should not be used on Transaction Layer Packets destined
+> for the PCIe End Node so flagged.  Initially flagged this way are Intel
+> E5-26xx Root Complex Ports which suffer from a Flow Control Credit
+> Performance Problem and AMD A1100 ARM ("SEATTLE") Root Complex Ports which
+> don't obey PCIe 3.0 ordering rules which can lead to Data Corruption.
 
-There is no separate hypervisor privilege level when VHE is enabled, the
-host kernel runs at EL2. So when VHE is enabled, we should ignore
-exclude_hv from the application. This behaviour is consistent with PowerPC
-where the exclude_hv is ignored when the hypervisor is not present and with
-x86 where this flag is ignored.
+So this is a good first step though might I suggest one other change.
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
----
+We may want to add logic to the core PCIe code that clears the "Enable
+Relaxed Ordering" bit in the device control register for all devices
+hanging off of this root complex. Assuming the devices conform to the
+PCIe spec doing that should disable relaxed ordering in a device
+agnostic way that then enables us at a driver level to just enable the
+feature always without having to perform any checks for your flag. We
+could probably do that as a part of probing the PCIe interfaces
+hanging off of these devices.
 
-Changelog:
-
-V2/V3:
- - Changes as per Will Deacon's suggestions.
-
-V1: Initial patch
-
- arch/arm64/kernel/perf_event.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 57ae9d9..f6748c0 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -871,15 +871,17 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
- 
- 	if (attr->exclude_idle)
- 		return -EPERM;
--	if (is_kernel_in_hyp_mode() &&
--	    attr->exclude_kernel != attr->exclude_hv)
--		return -EINVAL;
-+	if (is_kernel_in_hyp_mode()) {
-+		if (!attr->exclude_kernel)
-+			config_base |= ARMV8_PMU_INCLUDE_EL2;
-+	} else {
-+		if (attr->exclude_kernel)
-+			config_base |= ARMV8_PMU_EXCLUDE_EL1;
-+		if (!attr->exclude_hv)
-+			config_base |= ARMV8_PMU_INCLUDE_EL2;
-+	}
- 	if (attr->exclude_user)
- 		config_base |= ARMV8_PMU_EXCLUDE_EL0;
--	if (!is_kernel_in_hyp_mode() && attr->exclude_kernel)
--		config_base |= ARMV8_PMU_EXCLUDE_EL1;
--	if (!attr->exclude_hv)
--		config_base |= ARMV8_PMU_INCLUDE_EL2;
- 
- 	/*
- 	 * Install the filter into config_base as this is used to
--- 
-1.8.1.4
+> ---
+>  drivers/pci/quirks.c | 38 ++++++++++++++++++++++++++++++++++++++
+>  include/linux/pci.h  |  2 ++
+>  2 files changed, 40 insertions(+)
+>
+> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> index f754453..4ae78b3 100644
+> --- a/drivers/pci/quirks.c
+> +++ b/drivers/pci/quirks.c
+> @@ -3979,6 +3979,44 @@ static void quirk_tw686x_class(struct pci_dev *pdev)
+>                               quirk_tw686x_class);
+>
+>  /*
+> + * Some devices have problems with Transaction Layer Packets with the Relaxed
+> + * Ordering Attribute set.  Such devices should mark themselves and other
+> + * Device Drivers should check before sending TLPs with RO set.
+> + */
+> +static void quirk_relaxedordering_disable(struct pci_dev *dev)
+> +{
+> +       dev->dev_flags |= PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
+> +}
+> +
+> +/*
+> + * Intel E5-26xx Root Complex has a Flow Control Credit issue which can
+> + * cause performance problems with Upstream Transaction Layer Packets with
+> + * Relaxed Ordering set.
+> + */
+> +DECLARE_PCI_FIXUP_CLASS_EARLY(0x8086, 0x6f02, PCI_CLASS_NOT_DEFINED, 8,
+> +                             quirk_relaxedordering_disable);
+> +DECLARE_PCI_FIXUP_CLASS_EARLY(0x8086, 0x6f04, PCI_CLASS_NOT_DEFINED, 8,
+> +                             quirk_relaxedordering_disable);
+> +DECLARE_PCI_FIXUP_CLASS_EARLY(0x8086, 0x6f08, PCI_CLASS_NOT_DEFINED, 8,
+> +                             quirk_relaxedordering_disable);
+> +
+> +/*
+> + * The AMD ARM A1100 (AKA "SEATTLE") SoC has a bug in its PCIe Root Complex
+> + * where Upstream Transaction Layer Packets with the Relaxed Ordering
+> + * Attribute clear are allowed to bypass earlier TLPs with Relaxed Ordering
+> + * set.  This is a violation of the PCIe 3.0 Transaction Ordering Rules
+> + * outlined in Section 2.4.1 (PCI Express(r) Base Specification Revision 3.0
+> + * November 10, 2010).  As a result, on this platform we can't use Relaxed
+> + * Ordering for Upstream TLPs.
+> + */
+> +DECLARE_PCI_FIXUP_CLASS_EARLY(0x1022, 0x1a00, PCI_CLASS_NOT_DEFINED, 8,
+> +                             quirk_relaxedordering_disable);
+> +DECLARE_PCI_FIXUP_CLASS_EARLY(0x1022, 0x1a01, PCI_CLASS_NOT_DEFINED, 8,
+> +                             quirk_relaxedordering_disable);
+> +DECLARE_PCI_FIXUP_CLASS_EARLY(0x1022, 0x1a02, PCI_CLASS_NOT_DEFINED, 8,
+> +                             quirk_relaxedordering_disable);
+> +
+> +/*
+>   * Per PCIe r3.0, sec 2.2.9, "Completion headers must supply the same
+>   * values for the Attribute as were supplied in the header of the
+>   * corresponding Request, except as explicitly allowed when IDO is used."
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index eb3da1a..6764f66 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -178,6 +178,8 @@ enum pci_dev_flags {
+>         PCI_DEV_FLAGS_NO_PM_RESET = (__force pci_dev_flags_t) (1 << 7),
+>         /* Get VPD from function 0 VPD */
+>         PCI_DEV_FLAGS_VPD_REF_F0 = (__force pci_dev_flags_t) (1 << 8),
+> +       /* Don't use Relaxed Ordering for TLPs directed at this device */
+> +       PCI_DEV_FLAGS_NO_RELAXED_ORDERING = (__force pci_dev_flags_t) (1 << 9),
+>  };
+>
+>  enum pci_irq_reroute_variant {
+> --
+> 1.9.1
+>
