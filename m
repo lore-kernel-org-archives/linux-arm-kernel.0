@@ -1,55 +1,29 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 2 May 2017 08:52:49 -0500
-Subject: [PATCH v2 29/30] dt-bindings: add vendor prefix for bananapi
-In-Reply-To: <1493621880.32195.13.camel@mtkswgap22>
-References: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
- <1493198774-4478-30-git-send-email-sean.wang@mediatek.com>
- <20170428203727.m6jm5w6nb2iirxih@rob-hp-laptop>
- <1493621880.32195.13.camel@mtkswgap22>
-Message-ID: <CAL_JsqKHpWGviZ2H-xhGMzNWsCCRMj_O5ux8aguFfeVKBfJa_w@mail.gmail.com>
+From: aford173@gmail.com (Adam Ford)
+Date: Tue, 2 May 2017 08:55:20 -0500
+Subject: fsl, imx-parallel-display Question
+Message-ID: <CAHCN7xLNgy77ocUM04--11vUBsL198+3_g_ur+Yj8jTtj3SNNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+arm-soc
+I am trying to use a parallel LCD with an i.MX6Q board using the
+device tree, but I was hoping to do it in the device tree itself
+instead of modifying the "panel-simple" driver that most imx6q devices
+appear to use.  I have an omap product with the LCD, and I was hoping
+to just re-use the panel timings, etc.
 
-On Mon, May 1, 2017 at 1:58 AM, Sean Wang <sean.wang@mediatek.com> wrote:
-> On Fri, 2017-04-28 at 15:37 -0500, Rob Herring wrote:
->> On Wed, Apr 26, 2017 at 05:26:13PM +0800, sean.wang at mediatek.com wrote:
->> > From: Sean Wang <sean.wang@mediatek.com>
->> >
->> > Banana Pi team in Sinovoip Co., Limited which are dedicated to
->> > design and manufacture open hardware product.
->> >
->> > Website: http://www.banana-pi.org/
->> >
->> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->> > ---
->> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->> >  1 file changed, 1 insertion(+)
->> >
->> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> > index ec0bfb9..8ca0f3c 100644
->> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> > @@ -44,6 +44,7 @@ avia      avia semiconductor
->> >  avic       Shanghai AVIC Optoelectronics Co., Ltd.
->> >  axentia    Axentia Technologies AB
->> >  axis       Axis Communications AB
->> > +bananapi Banana Pi SINOVOP CO., LIMITED
->>
->> s/SINOVOP/SINOVOIP/
->
-> Hi Rob,
->
-> thanks for your careful reviewing , i will correct it in the next
-> version.
->
-> BTW, Could those related dts changes go through your tree if everything
-> looks good? Because I find Matthias have been inactive for a while and
-> the latest branch in his tree seems still staying on 4.10.
+I found imx6q-tx6q-1010-comtft.dts didn't use "panel-simple", but
+using that as an example doesn't work, for me yet I can get it working
+with "panel-simple"
 
-Happy to take binding doc changes, but I don't take dts changes
-because those go thru arm-soc. If the platform maintainer is not
-responsive, then we should replace or add maintainers.
+Looking at the driver for parallel-display.c, I states that "port at 1"
+is the output port which is consistent with most of the boards that
+use "panel-simple" but imx6q-tx6q-1010-comtft.dts does not have this.
+The other thing I noticed is that "panel-simple" devices have an gpio
+enable which I need, but but imx6q-tx6q-1010-comtft.dts does not have
+this either.
 
-Rob
+Is "panel-simple" the only solution, or is there a way to integrate
+the display info into the device tree and keep the enable-gpios stuff?
+ Is imx6q-tx6q-1010-comtft.dts doing something wrong?
+
+adam
