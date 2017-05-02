@@ -1,26 +1,29 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 2 May 2017 09:30:26 +0200
-Subject: [PATCH] arm64: KVM: Fix decoding of Rt/Rt2 when trapping AArch32
- CP accesses
-In-Reply-To: <20170427180648.25159-1-marc.zyngier@arm.com>
-References: <20170427180648.25159-1-marc.zyngier@arm.com>
-Message-ID: <20170502073026.GD16940@cbox>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Tue,  2 May 2017 15:34:02 +0800
+Subject: [PATCH v3 0/4] make some special clk as critical_clocks
+Message-ID: <1493710446-7203-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 07:06:48PM +0100, Marc Zyngier wrote:
-> Our 32bit CP14/15 handling inherited some of the ARMv7 code for handling
-> the trapped system registers, completely missing the fact that the
-> fields for Rt and Rt2 are now 5 bit wide, and not 4...
-> 
-> Let's fix it, and provide an accessor for the most common Rt case.
-> 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+change in V3:
+reword the commit message,explain why the specific clocks are need to be critical.
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+change in v2:
+fix up some clks which have their own driver, not need to set as critical clocks
 
-Aplied to kvmarm/queue.
+Elaine Zhang (4):
+  clk: rockchip: rk3036: make pclk_ddrupctl as critical_clock
+  clk: rockchip: rk3228: make noc and some special clk as
+    critical_clocks
+  clk: rockchip: rk3288: make noc and some special clk as
+    critical_clocks
+  clk: rockchip: rk3368: make some special clk as critical_clocks
 
-Thanks,
--Christoffer
+ drivers/clk/rockchip/clk-rk3036.c |  1 +
+ drivers/clk/rockchip/clk-rk3228.c | 30 +++++++++++++++++++++++++++++-
+ drivers/clk/rockchip/clk-rk3288.c | 14 ++++++++++----
+ drivers/clk/rockchip/clk-rk3368.c |  5 ++++-
+ 4 files changed, 44 insertions(+), 6 deletions(-)
+
+-- 
+1.9.1
