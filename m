@@ -1,113 +1,49 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 2 May 2017 18:15:01 +0100
-Subject: [RFC/RFT PATCH 03/18] PCI: Introduce pci_scan_root_bus_bridge()
-In-Reply-To: <CAK8P3a0HmrrYBP5em1s4VOY4Tb6=bwOrDDN6K8rPp8OEXtpMtA@mail.gmail.com>
-References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
- <20170426111809.19922-4-lorenzo.pieralisi@arm.com>
- <CAK8P3a0HmrrYBP5em1s4VOY4Tb6=bwOrDDN6K8rPp8OEXtpMtA@mail.gmail.com>
-Message-ID: <20170502171501.GA5545@red-moon>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 2 May 2017 19:15:55 +0200
+Subject: [PATCH 0/5] KVM/ARM: Fixes for 4.12-rc1
+In-Reply-To: <c9f36b35-6a46-8ed8-0bb0-9c099f28d834@arm.com>
+References: <20170502133041.10980-1-marc.zyngier@arm.com>
+ <75f031d5-d16e-6311-af44-f2c5af5bded4@redhat.com>
+ <c9f36b35-6a46-8ed8-0bb0-9c099f28d834@arm.com>
+Message-ID: <20170502171555.GA12916@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 02:28:38PM +0200, Arnd Bergmann wrote:
-> On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > Current pci_scan_root_bus() interface is made up of two main
-> > code paths:
-> >
-> > - pci_create_root_bus()
-> > - pci_scan_child_bus()
-> >
-> > pci_create_root_bus() is a wrapper function that allows to create
-> > a struct pci_host_bridge structure, initialize it with the passed
-> > parameters and register it with the kernel.
-> >
-> > As the struct pci_host_bridge require additional struct members,
-> > pci_create_root_bus() parameters list has grown in time, making
-> > it unwieldy to add further parameters to it in case the struct
-> > pci_host_bridge gains more members fields to augment its functionality.
-> >
-> > Since PCI core code provides functions to allocate struct
-> > pci_host_bridge, instead of forcing the pci_create_root_bus() interface
-> > to add new parameters to cater for new struct pci_host_bridge
-> > functionality, it is more suitable to add an interface in PCI
-> > core code to scan a PCI bus straight from a struct pci_host_bridge
-> > created and customized by each specific PCI host controller driver.
-> >
-> > Add a pci_scan_root_bus_bridge() function to allow PCI host controller
-> > drivers to create and initialize struct pci_host_bridge and scan
-> > the resulting bus.
-> >
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+On Tue, May 02, 2017 at 04:00:49PM +0100, Marc Zyngier wrote:
+> On 02/05/17 15:44, Paolo Bonzini wrote:
+> > 
+> > 
+> > On 02/05/2017 15:30, Marc Zyngier wrote:
+> >> Here's a handful of random fixes I've queued locally that didn't have
+> >> a chance to make it in 4.11.
+> >>
+> >> The first two patches avoid stack-protector messing with the HYP code,
+> >> as this ends up being a complete disaster.
+> >>
+> >> The following two patches fix a bug introduced in the new vgic, where
+> >> we may queue HW interrupts with the Pending+Active state, which is
+> >> illegal.
+> >>
+> >> The final patch fixes a misinterpretation of the spec, where we
+> >> compute the number of APxRn register based on the number of priorities
+> >> instead of using the number of preemption levels.
+> >>
+> >> I've tagged the first 4 patches for stable, given that we're doing
+> >> something potentially harmful. The last patch is more of a theoretical
+> >> issue at this stage, so probably need for a backport.
+> > 
+> > Would you like me to apply them, or are you looking for reviews and
+> > going to send them in a pull request?
+> > 
+> > I can wait a couple days before sending my own pull request to Linus.
 > 
-> Good idea, yes. To avoid growing the number of interfaces too
-> much, should we change the existing users of pci_register_host_bridge
-> in host drivers over to this entry point, and make the other one
-> local to probe.c then?
-
-Yes, the problem is that there are drivers (ie pcie-iproc.c) that
-require the struct pci_bus (created by pci_register_host_bridge())
-to fiddle with it to check link status and THEN scan the bus (so
-the pci_register_host_bridge() call can't be embedded in the scan
-interface - the driver requires struct pci_bus for pci_ops to work
-before scanning the bus itself).
-
-I will see how I can accommodate this change because you definitely
-have a point.
-
-> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > index 7e4ffc4..c7a7f72 100644
-> > --- a/drivers/pci/probe.c
-> > +++ b/drivers/pci/probe.c
-> > @@ -2412,6 +2412,44 @@ void pci_bus_release_busn_res(struct pci_bus *b)
-> >                         res, ret ? "can not be" : "is");
-> >  }
-> >
-> > +int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge)
-> > +{
-> > +       struct resource_entry *window;
-> > +       bool found = false;
-> > +       struct pci_bus *b;
-> > +       int max, bus, ret;
-> > +
-> > +       if (!bridge)
-> > +               return -EINVAL;
-> > +
-> > +       resource_list_for_each_entry(window, &bridge->windows)
-> > +               if (window->res->flags & IORESOURCE_BUS) {
-> > +                       found = true;
-> > +                       break;
-> > +               }
-> > +
-> > +       ret = pci_register_host_bridge(bridge);
-> > +       if (ret < 0)
-> > +               return ret;
-> > +
-> > +       b = bridge->bus;
-> > +       bus = bridge->busnr;
-> > +
-> > +       if (!found) {
-> > +               dev_info(&b->dev,
-> > +                "No busn resource found for root bus, will use [bus %02x-ff]\n",
-> > +                       bus);
-> > +               pci_bus_insert_busn_res(b, bus, 255);
-> > +       }
-> > +
-> > +       max = pci_scan_child_bus(b);
-> > +
-> > +       if (!found)
-> > +               pci_bus_update_busn_res_end(b, max);
-> > +
-> > +       return 0;
-> > +}
-> > +
+> Christoffer is in charge of the tree at the moment, so I'll leave it up
+> to him to decide. But my guess is that he will send a PR some time
+> later, with the rest of the fixes that have been posted lately.
 > 
-> We probably want an EXPORT_SYMBOL() here as well.
 
-Yep, sure.
+Yes, I have some other fixes that I'll send together with these as soon
+as -rc1 hits.  And I plan on reviewing these.
 
-Thanks for having a look !
-
-Lorenzo
+Thanks,
+-Christoffer
