@@ -1,135 +1,250 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 3 May 2017 12:22:06 +0200
-Subject: [PATCH v5 16/22] KVM: arm64: vgic-its: Add infrastructure for
- table lookup
-In-Reply-To: <20170503080158.GA8452@cbox>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-17-git-send-email-eric.auger@redhat.com>
- <20170430193555.GB1670@lvm> <303f2981-489e-ec38-ebaf-40d65429d820@redhat.com>
- <20170503080158.GA8452@cbox>
-Message-ID: <970be3ad-4856-899e-1129-dd88318c00f0@redhat.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Wed, 3 May 2017 15:54:59 +0530
+Subject: [PATCH V8 07/11] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <2bfd11dc-9f94-2b69-7b03-c640e53155e1@arm.com>
+References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
+ <1486136933-20328-8-git-send-email-sricharan@codeaurora.org>
+ <CAMuHMdV05uCcVss+V1E+_OQYosJO6P95rU1WynV-G08-iHJnyg@mail.gmail.com>
+ <2bfd11dc-9f94-2b69-7b03-c640e53155e1@arm.com>
+Message-ID: <26defadf-6380-4af4-6323-b51198376bc1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi Robin,
 
-On 03/05/2017 10:01, Christoffer Dall wrote:
-> On Wed, May 03, 2017 at 08:53:36AM +0200, Auger Eric wrote:
->> Hi Christoffer,
+On 5/3/2017 3:24 PM, Robin Murphy wrote:
+> Hi Geert,
+> 
+> On 02/05/17 19:35, Geert Uytterhoeven wrote:
+>> Hi Sricharan,
 >>
->> On 30/04/2017 21:35, Christoffer Dall wrote:
->>> On Fri, Apr 14, 2017 at 12:15:28PM +0200, Eric Auger wrote:
->>>> Add a generic lookup_table() helper whose role consists in
->>>> scanning a contiguous table located in guest RAM and applying
->>>> a callback on each entry. Entries can be handled as linked lists
->>>> since the callback may return an offset to the next entry and
->>>> also tell that an entry is the last one.
->>>>
->>>> Helper functions also are added to compute the device/event ID
->>>> offset to the next DTE/ITE.
->>>>
->>>> compute_next_devid_offset, compute_next_eventid_offset and
->>>> lookup_table will become static in subsequent patches
->>>>
->>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>>
->>>> ---
->>>> v4 -> v5:
->>>> - use kvm_read_guest
->>>>
->>>> v3 -> v4:
->>>> - remove static to avoid compilation warning
->>>> - correct size computation in looup_table()
->>>> - defines now encode the number of bits used for devid and eventid offsets
->>>> - use BIT() - 1 to encode the max offets
->>>> ---
->>>>  virt/kvm/arm/vgic/vgic-its.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
->>>>  1 file changed, 93 insertions(+)
->>>>
->>>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->>>> index 56c5123..c22b35d 100644
->>>> --- a/virt/kvm/arm/vgic/vgic-its.c
->>>> +++ b/virt/kvm/arm/vgic/vgic-its.c
->>>> @@ -195,6 +195,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
->>>>  
->>>>  #define VITS_TYPER_IDBITS 16
->>>>  #define VITS_TYPER_DEVBITS 16
->>>> +#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
->>>> +#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
->>>>  
->>>>  /*
->>>>   * Finds and returns a collection in the ITS collection table.
->>>> @@ -1674,6 +1676,97 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
->>>>  	return ret;
->>>>  }
->>>>  
->>>> +u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
->>>> +{
->>>> +	struct list_head *e = &dev->dev_list;
->>>> +	struct its_device *next;
->>>> +	u32 next_offset;
->>>> +
->>>> +	if (e->next == h)
->>>> +		return 0;
->>>> +	next = list_entry(e->next, struct its_device, dev_list);
->>>> +	next_offset = next->device_id - dev->device_id;
->>>> +
->>>> +	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
->>>> +}
->>>> +
->>>> +u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
->>>> +{
->>>> +	struct list_head *e = &ite->ite_list;
->>>> +	struct its_ite *next;
->>>> +	u32 next_offset;
->>>> +
->>>> +	if (e->next == h)
->>>> +		return 0;
->>>> +	next = list_entry(e->next, struct its_ite, ite_list);
->>>> +	next_offset = next->event_id - ite->event_id;
->>>> +
->>>> +	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
->>>> +}
->>>> +
->>>> +/**
->>>> + * entry_fn_t - Callback called on a table entry restore path
->>>> + * @its: its handle
->>>> + * @id: id of the entry
->>>> + * @entry: pointer to the entry
->>>> + * @opaque: pointer to an opaque data
->>>> + * @next_offset: minimal ID offset to the next entry. 0 if this
->>>> + * entry is the last one, 1 if the entry is invalid, >= 1 if an
+>> On Fri, Feb 3, 2017 at 4:48 PM, Sricharan R <sricharan@codeaurora.org> wrote:
+>>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 >>>
->>> eh, also, did you mean -1 if the entry is invalid?
->> no in case the entry is invalid, we tell the caller that it must inspect
->> the next entry, hence the next_offset = +1.
-> jjjjj
-> hmm, but you say aftterwards that >= 1 if an entry's next_offset field
-> was truly decoded, so this is confusing.  Perhaps it would make more
-> sense to get rid of the parameter entirely and change the return value
-> to say:
+>>> Failures to look up an IOMMU when parsing the DT iommus property need to
+>>> be handled separately from the .of_xlate() failures to support deferred
+>>> probing.
+>>>
+>>> The lack of a registered IOMMU can be caused by the lack of a driver for
+>>> the IOMMU, the IOMMU device probe not having been performed yet, having
+>>> been deferred, or having failed.
+>>>
+>>> The first case occurs when the device tree describes the bus master and
+>>> IOMMU topology correctly but no device driver exists for the IOMMU yet
+>>> or the device driver has not been compiled in. Return NULL, the caller
+>>> will configure the device without an IOMMU.
+>>>
+>>> The second and third cases are handled by deferring the probe of the bus
+>>> master device which will eventually get reprobed after the IOMMU.
+>>>
+>>> The last case is currently handled by deferring the probe of the bus
+>>> master device as well. A mechanism to either configure the bus master
+>>> device without an IOMMU or to fail the bus master device probe depending
+>>> on whether the IOMMU is optional or mandatory would be a good
+>>> enhancement.
+>>>
+>>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
+>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>>
+>> This patch broke Renesas R-Car Gen3 platforms in renesas-drivers.
+>> As the IOMMU nodes in DT are not yet enabled, all devices having iommus
+>> properties in DT now fail to probe.
 > 
->   Return: < 0 on error, 0 if the entry was the last one, and > 0 to
->           indicate the offset to the next entry that must be processed
-> 	  when scanning a table.
+> How exactly do they fail to probe? Per d7b0558230e4, if there are no ops
+> registered then they should merely defer until we reach the point of
+> giving up and ignoring the IOMMU. Is it just that you have no other
+> late-probing drivers or post-init module loads to kick the deferred
+> queue after that point? I did try to find a way to explicitly kick it
+> from a suitably late initcall, but there didn't seem to be any obvious
+> public interface - anyone have any suggestions?
 > 
->   Note that we return 1 for an invalid entry, because scanning a table
->   in this case simply requires us looking at the next entry, but we may
->   return >= to 1 if we found a valid entry and decoded the next field in
->   the entry.
+> I think that's more of a general problem with the probe deferral
+> mechanism itself (I've seen the same thing happen with some of the
+> CoreSight stuff on Juno due to the number of inter-component
+> dependencies) rather than any specific fault of this series.
 > 
-> What do you think?
-Yes I'm going to experiment that change.
 
-Thanks
+I was thinking of an additional check like below to avoid the
+situation ?
 
-Eric
+>From 499b6e662f60f23740b8880882b0a16f16434501 Mon Sep 17 00:00:00 2001
+From: Sricharan R <sricharan@codeaurora.org>
+Date: Wed, 3 May 2017 13:16:59 +0530
+Subject: [PATCH] iommu: of: Fix check for returning EPROBE_DEFER
+
+While returning EPROBE_DEFER for iommu masters
+take in to account of iommu nodes that could be
+marked in DT as 'status=disabled', in which case
+simply return NULL and let the master's probe
+continue rather than deferring.
+
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+---
+ drivers/iommu/of_iommu.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 9f44ee8..e6e9bec 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -118,6 +118,7 @@ static bool of_iommu_driver_present(struct device_node *np)
+
+        ops = iommu_ops_from_fwnode(fwnode);
+        if ((ops && !ops->of_xlate) ||
++           !of_device_is_available(iommu_spec->np) ||
+            (!ops && !of_iommu_driver_present(iommu_spec->np)))
+                return NULL;
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+
+
+Regards,
+ Sricharan
+
+
+> Robin.
 > 
-> Thanks,
-> -Christoffer
+>> This can be fixed by either:
+>>   - Disabling CONFIG_IPMMU_VMSA, or
+>>   - Reverting commit 7b07cbefb68d486f (but keeping "int ret = 0;").
+>>
+>> Note that this was a bit hard to investigate, as R-Car Gen3 support wasn't
+>> upstreamed yet, so bisection pointed to a merge commit.
+>>
+>>> ---
+>>>  [*] Fixed minor comment from Bjorn for removing the pci.h header inclusion
+>>>      in of_iommu.c
+>>>
+>>>  drivers/base/dma-mapping.c | 5 +++--
+>>>  drivers/iommu/of_iommu.c   | 4 ++--
+>>>  drivers/of/device.c        | 7 ++++++-
+>>>  include/linux/of_device.h  | 9 ++++++---
+>>>  4 files changed, 17 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+>>> index 449b948..82bd45c 100644
+>>> --- a/drivers/base/dma-mapping.c
+>>> +++ b/drivers/base/dma-mapping.c
+>>> @@ -353,6 +353,7 @@ int dma_configure(struct device *dev)
+>>>  {
+>>>         struct device *bridge = NULL, *dma_dev = dev;
+>>>         enum dev_dma_attr attr;
+>>> +       int ret = 0;
+>>>
+>>>         if (dev_is_pci(dev)) {
+>>>                 bridge = pci_get_host_bridge_device(to_pci_dev(dev));
+>>> @@ -363,7 +364,7 @@ int dma_configure(struct device *dev)
+>>>         }
+>>>
+>>>         if (dma_dev->of_node) {
+>>> -               of_dma_configure(dev, dma_dev->of_node);
+>>> +               ret = of_dma_configure(dev, dma_dev->of_node);
+>>>         } else if (has_acpi_companion(dma_dev)) {
+>>>                 attr = acpi_get_dma_attr(to_acpi_device_node(dma_dev->fwnode));
+>>>                 if (attr != DEV_DMA_NOT_SUPPORTED)
+>>> @@ -373,7 +374,7 @@ int dma_configure(struct device *dev)
+>>>         if (bridge)
+>>>                 pci_put_host_bridge_device(bridge);
+>>>
+>>> -       return 0;
+>>> +       return ret;
+>>>  }
+>>>
+>>>  void dma_deconfigure(struct device *dev)
+>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>>> index 1f92d98..2d04663 100644
+>>> --- a/drivers/iommu/of_iommu.c
+>>> +++ b/drivers/iommu/of_iommu.c
+>>> @@ -236,7 +236,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>>                         ops = ERR_PTR(err);
+>>>         }
+>>>
+>>> -       return IS_ERR(ops) ? NULL : ops;
+>>> +       return ops;
+>>>  }
+>>>
+>>>  static int __init of_iommu_init(void)
+>>> @@ -247,7 +247,7 @@ static int __init of_iommu_init(void)
+>>>         for_each_matching_node_and_match(np, matches, &match) {
+>>>                 const of_iommu_init_fn init_fn = match->data;
+>>>
+>>> -               if (init_fn(np))
+>>> +               if (init_fn && init_fn(np))
+>>>                         pr_err("Failed to initialise IOMMU %s\n",
+>>>                                 of_node_full_name(np));
+>>>         }
+>>> diff --git a/drivers/of/device.c b/drivers/of/device.c
+>>> index c17c19d..ba51ca6 100644
+>>> --- a/drivers/of/device.c
+>>> +++ b/drivers/of/device.c
+>>> @@ -82,7 +82,7 @@ int of_device_add(struct platform_device *ofdev)
+>>>   * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
+>>>   * to fix up DMA configuration.
+>>>   */
+>>> -void of_dma_configure(struct device *dev, struct device_node *np)
+>>> +int of_dma_configure(struct device *dev, struct device_node *np)
+>>>  {
+>>>         u64 dma_addr, paddr, size;
+>>>         int ret;
+>>> @@ -129,10 +129,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>>>                 coherent ? " " : " not ");
+>>>
+>>>         iommu = of_iommu_configure(dev, np);
+>>> +       if (IS_ERR(iommu))
+>>> +               return PTR_ERR(iommu);
+>>> +
+>>>         dev_dbg(dev, "device is%sbehind an iommu\n",
+>>>                 iommu ? " " : " not ");
+>>>
+>>>         arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+>>> +
+>>> +       return 0;
+>>>  }
+>>>  EXPORT_SYMBOL_GPL(of_dma_configure);
+>>>
+>>> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+>>> index 3cb2288..9499861 100644
+>>> --- a/include/linux/of_device.h
+>>> +++ b/include/linux/of_device.h
+>>> @@ -56,7 +56,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+>>>         return of_node_get(cpu_dev->of_node);
+>>>  }
+>>>
+>>> -void of_dma_configure(struct device *dev, struct device_node *np);
+>>> +int of_dma_configure(struct device *dev, struct device_node *np);
+>>>  void of_dma_deconfigure(struct device *dev);
+>>>  #else /* CONFIG_OF */
+>>>
+>>> @@ -105,8 +105,11 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+>>>  {
+>>>         return NULL;
+>>>  }
+>>> -static inline void of_dma_configure(struct device *dev, struct device_node *np)
+>>> -{}
+>>> +
+>>> +static inline int of_dma_configure(struct device *dev, struct device_node *np)
+>>> +{
+>>> +       return 0;
+>>> +}
+>>>  static inline void of_dma_deconfigure(struct device *dev)
+>>>  {}
+>>>  #endif /* CONFIG_OF */
+>>
+>> Gr{oetje,eeting}s,
+>>
+>>                         Geert
+>>
+>> --
+>> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>>
+>> In personal conversations with technical people, I call myself a hacker. But
+>> when I'm talking to journalists I just say "programmer" or something like that.
+>>                                 -- Linus Torvalds
+>>
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
