@@ -1,68 +1,31 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Wed,  3 May 2017 08:04:54 -0700
-Subject: [PATCH] ARM: dts: imx: add DH2228FV DAC to Gateworks Ventana boards
- with SPI
-Message-ID: <1493823894-2107-1-git-send-email-tharvey@gateworks.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 3 May 2017 17:05:29 +0200
+Subject: [PATCH 1/3] kernel/locking: #include <asm/spinlock.h> in qrwlock.c
+In-Reply-To: <20170503145141.4966-2-ynorov@caviumnetworks.com>
+References: <20170503145141.4966-1-ynorov@caviumnetworks.com>
+ <20170503145141.4966-2-ynorov@caviumnetworks.com>
+Message-ID: <CAMuHMdXks7pXcg+MNvqYyRWHf-WUrNWLrG8GcPWy8ho49Wx7ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 6 ++++++
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 6 ++++++
- arch/arm/boot/dts/imx6qdl-gw560x.dtsi | 6 ++++++
- 3 files changed, 18 insertions(+)
+On Wed, May 3, 2017 at 4:51 PM, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> --- a/kernel/locking/qrwlock.c
+> +++ b/kernel/locking/qrwlock.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/cpumask.h>
+>  #include <linux/percpu.h>
+>  #include <linux/hardirq.h>
+> +#include <asm/spinlock.h>
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 91991d6..b5c1a8f 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -143,6 +143,12 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_ecspi3>;
- 	status = "okay";
-+
-+	spidev0: spidev at 0 {
-+		compatible = "rohm,dh2228fv";
-+		reg = <0>;
-+		spi-max-frequency = <60000000>;
-+	};
- };
- 
- &fec {
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index 968fda9..9d26511 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -154,6 +154,12 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_ecspi2>;
- 	status = "okay";
-+
-+	spidev0: spidev at 0 {
-+		compatible = "rohm,dh2228fv";
-+		reg = <0>;
-+		spi-max-frequency = <60000000>;
-+	};
- };
- 
- &fec {
-diff --git a/arch/arm/boot/dts/imx6qdl-gw560x.dtsi b/arch/arm/boot/dts/imx6qdl-gw560x.dtsi
-index d894dde..bfb63e9 100644
---- a/arch/arm/boot/dts/imx6qdl-gw560x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw560x.dtsi
-@@ -208,6 +208,12 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_ecspi3>;
- 	status = "okay";
-+
-+	spidev0: spidev at 0 {
-+		compatible = "rohm,dh2228fv";
-+		reg = <0>;
-+		spi-max-frequency = <60000000>;
-+	};
- };
- 
- &can1 {
--- 
-2.7.4
+linux/spinlock.h?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
