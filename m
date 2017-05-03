@@ -1,83 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 3 May 2017 16:40:46 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Poll for CMDQ drain completion more
- effectively
-In-Reply-To: <a9d1bb4d-6578-93bb-66cf-5ed55952b85a@arm.com>
-References: <1493291587-23488-1-git-send-email-sunil.kovvuri@gmail.com>
- <a9d1bb4d-6578-93bb-66cf-5ed55952b85a@arm.com>
-Message-ID: <20170503154046.GQ8233@arm.com>
+Date: Wed, 3 May 2017 16:48:52 +0100
+Subject: [PATCH 0/9] [v3] arm64: defconfig: enable several options useful
+ for ARM64 server platforms
+In-Reply-To: <1493413563-18375-1-git-send-email-timur@codeaurora.org>
+References: <1493413563-18375-1-git-send-email-timur@codeaurora.org>
+Message-ID: <20170503154852.GS8233@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 04:33:57PM +0100, Robin Murphy wrote:
-> On 27/04/17 12:13, sunil.kovvuri at gmail.com wrote:
-> > From: Sunil Goutham <sgoutham@cavium.com>
-> > 
-> > Modified polling on CMDQ consumer similar to how polling is done for TLB SYNC
-> > completion in SMMUv2 driver. Code changes are done with reference to
-> > 
-> > 8513c8930069 iommu/arm-smmu: Poll for TLB sync completion more effectively
-> > 
-> > Poll timeout has been increased which addresses issue of 100us timeout not
-> > sufficient, when command queue is full with TLB invalidation commands.
-> > 
-> > Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-> > Signed-off-by: Geetha <gakula@cavium.com>
-> > ---
-> >  drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++---
-> >  1 file changed, 12 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> > index d412bdd..34599d4 100644
-> > --- a/drivers/iommu/arm-smmu-v3.c
-> > +++ b/drivers/iommu/arm-smmu-v3.c
-> > @@ -379,6 +379,9 @@
-> >  #define CMDQ_SYNC_0_CS_NONE		(0UL << CMDQ_SYNC_0_CS_SHIFT)
-> >  #define CMDQ_SYNC_0_CS_SEV		(2UL << CMDQ_SYNC_0_CS_SHIFT)
-> >  
-> > +#define CMDQ_DRAIN_TIMEOUT_US		1000
-> > +#define CMDQ_SPIN_COUNT			10
-> > +
-> >  /* Event queue */
-> >  #define EVTQ_ENT_DWORDS			4
-> >  #define EVTQ_MAX_SZ_SHIFT		7
-> > @@ -737,7 +740,8 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
-> >   */
-> >  static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
-> >  {
-> > -	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
-> > +	ktime_t timeout = ktime_add_us(ktime_get(), CMDQ_DRAIN_TIMEOUT_US);
-> > +	unsigned int spin_cnt, delay = 1;
-> >  
-> >  	while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
-> >  		if (ktime_compare(ktime_get(), timeout) > 0)
-> > @@ -746,8 +750,13 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
-> >  		if (wfe) {
-> >  			wfe();
-> >  		} else {
-> > -			cpu_relax();
-> > -			udelay(1);
-> > +			for (spin_cnt = 0;
-> > +			     spin_cnt < CMDQ_SPIN_COUNT; spin_cnt++) {
-> > +				cpu_relax();
-> > +				continue;
-> > +			}
-> > +			udelay(delay);
-> > +			delay *= 2;
+Hi Timur,
+
+On Fri, Apr 28, 2017 at 04:05:54PM -0500, Timur Tabi wrote:
+> ACPI-based ARM64 server platforms based, like the Qualcomm Datacenter
+> Technologies QDF2400, need several features and drivers enabled for
+> full functionality.  This patchset enables many of those features.
 > 
-> Sorry, I can't make sense of this. The referenced commit uses the spin
-> loop to poll opportunistically a few times before delaying. This loop
-> just adds a short open-coded udelay to an exponential udelay, and it's
-> not really clear that that's any better than a fixed udelay (especially
-> as the two cases in which we poll are somewhat different).
+> The first patch, "resynchronize the defconfig" refreshes the ARM64
+> defconfig so that it's aligned with savedefconfig.  This needs to be
+> done periodically, so that new patches avoid merge conflicts.  
 > 
-> What's wrong with simply increasing the timeout value alone?
+> If the first patch does not apply cleanly, I ask the maintainer to 
+> refresh it himself manually, following the instructions in the commit
+> message.  The remaining 8 patches should apply cleanly on top of that.
 
-I asked that the timeout is only increased for the drain case, and that
-we fix the issue here where we udelat if cons didn't move immediately:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/503389.html
-
-but I don't think the patch above actually achieves any of that.
+The arm-soc folks usually deal with defconfig updates, so please resend this
+to arm at kernel.org, although I suspect it's too late for 4.12 given that the
+merge window is now open. The "resynchronize" patch is also likely to
+conflict with any other pending changes to the file.
 
 Will
+
+> Timur Tabi (9):
+>   [v3] arm64: defconfig: resynchronize the defconfig
+>   arm64: defconfig: enable ACPI_CPPC_CPUFREQ
+>   arm64: defconfig: enable BLK_DEV_NVME
+>   [v2] arm64: defconfig: enable EFI_CAPSULE_LOADER
+>   arm64: defconfig: enable support for PCIe hotplug
+>   arm64: defconfig: enable APEI and GHES features
+>   [v2] arm64: defconfig: enable EDAC options
+>   arm64: defconfig: enable QCOM_L2_PMU and QCOM_L3_PMU
+>   arm64: defconfig: enable the Qualcomm Technologies EMAC Ethernet
+>     driver
+> 
+>  arch/arm64/configs/defconfig | 116 ++++++++++++++++++++-----------------------
+>  1 file changed, 55 insertions(+), 61 deletions(-)
+> 
+> -- 
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+> Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+> Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 
