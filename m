@@ -1,39 +1,22 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed,  3 May 2017 11:31:25 -0500
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 May 2017 17:34:24 +0100
 Subject: [PATCH] MAINTAINERS: add arm@kernel.org as the list for arm64
  defconfig changes
-Message-ID: <1493829085-11864-1-git-send-email-timur@codeaurora.org>
+In-Reply-To: <1493829085-11864-1-git-send-email-timur@codeaurora.org>
+References: <1493829085-11864-1-git-send-email-timur@codeaurora.org>
+Message-ID: <20170503163424.GA22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any changes to arch/arm64/configs/defconfig must be sent to arm at kernel.org,
-otherwise they will not get picked up.  Add a MAINTAINERS entry to ensure
-the get_maintainers includes it.
+On Wed, May 03, 2017 at 11:31:25AM -0500, Timur Tabi wrote:
+> Any changes to arch/arm64/configs/defconfig must be sent to arm at kernel.org,
+> otherwise they will not get picked up.  Add a MAINTAINERS entry to ensure
+> the get_maintainers includes it.
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+arm at kernel.org is not a mailing list, it is an alias to those who deal
+with those requests.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 58590cf..da2b06b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2066,6 +2066,13 @@ S:	Maintained
- F:	arch/arm64/
- F:	Documentation/arm64/
- 
-+ARM64 DEFCONFIG
-+M:	Catalin Marinas <catalin.marinas@arm.com>
-+M:	Will Deacon <will.deacon@arm.com>
-+L:	arm at kernel.org
-+S:	Maintained
-+F:	arch/arm64/configs/defconfig
-+
- AS3645A LED FLASH CONTROLLER DRIVER
- M:	Laurent Pinchart <laurent.pinchart@ideasonboard.com>
- L:	linux-media at vger.kernel.org
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
