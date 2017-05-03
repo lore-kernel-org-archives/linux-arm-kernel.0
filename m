@@ -1,66 +1,182 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  3 May 2017 13:59:40 +0200
-Subject: [PATCH v2 3/20] clk: sunxi-ng: div: Switch to divider_round_rate
+Date: Wed,  3 May 2017 13:59:39 +0200
+Subject: [PATCH v2 2/20] clk: sunxi-ng: Pass the parent and a pointer to the
+ clocks round rate
 In-Reply-To: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
 References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <8ea7c8c0ac01fe06f7ded94e03532a1838f2bf8f.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <83d508e254c6656aee02bbe5c410922ea66cf3d7.1493812478.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-divider_round_rate already evaluates changing the parent rate if
-CLK_SET_RATE_PARENT is set. Now that we can do that on muxes too, let's
-just use it.
+The clocks might need to modify their parent clocks. In order to make that
+possible, give them access to the parent clock being evaluated, and to a
+pointer to the parent rate so that they can modify it if needed.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu_div.c | 27 ++++-----------------------
- 1 file changed, 4 insertions(+), 23 deletions(-)
+ drivers/clk/sunxi-ng/ccu_div.c  |  7 ++++---
+ drivers/clk/sunxi-ng/ccu_mp.c   |  7 ++++---
+ drivers/clk/sunxi-ng/ccu_mult.c | 11 ++++++-----
+ drivers/clk/sunxi-ng/ccu_mux.c  |  8 +++++---
+ drivers/clk/sunxi-ng/ccu_mux.h  |  3 ++-
+ drivers/clk/sunxi-ng/ccu_nkm.c  |  7 ++++---
+ 6 files changed, 25 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
-index a489f18a3c01..419463375bc1 100644
+index 4057e6021aa9..a489f18a3c01 100644
 --- a/drivers/clk/sunxi-ng/ccu_div.c
 +++ b/drivers/clk/sunxi-ng/ccu_div.c
-@@ -20,18 +20,11 @@ static unsigned long ccu_div_round_rate(struct ccu_mux_internal *mux,
+@@ -14,7 +14,8 @@
+ #include "ccu_div.h"
+ 
+ static unsigned long ccu_div_round_rate(struct ccu_mux_internal *mux,
+-					unsigned long parent_rate,
++					struct clk_hw *parent,
++					unsigned long *parent_rate,
+ 					unsigned long rate,
  					void *data)
  {
- 	struct ccu_div *cd = data;
--	unsigned long val;
--
--	/*
--	 * We can't use divider_round_rate that assumes that there's
--	 * several parents, while we might be called to evaluate
--	 * several different parents.
--	 */
--	val = divider_get_val(rate, *parent_rate, cd->div.table, cd->div.width,
--			      cd->div.flags);
+@@ -26,10 +27,10 @@ static unsigned long ccu_div_round_rate(struct ccu_mux_internal *mux,
+ 	 * several parents, while we might be called to evaluate
+ 	 * several different parents.
+ 	 */
+-	val = divider_get_val(rate, parent_rate, cd->div.table, cd->div.width,
++	val = divider_get_val(rate, *parent_rate, cd->div.table, cd->div.width,
+ 			      cd->div.flags);
  
--	return divider_recalc_rate(&cd->common.hw, *parent_rate, val,
--				   cd->div.table, cd->div.flags);
-+	return divider_round_rate_parent(&cd->common.hw, parent,
-+					 rate, parent_rate,
-+					 cd->div.table, cd->div.width,
-+					 cd->div.flags);
+-	return divider_recalc_rate(&cd->common.hw, parent_rate, val,
++	return divider_recalc_rate(&cd->common.hw, *parent_rate, val,
+ 				   cd->div.table, cd->div.flags);
  }
  
- static void ccu_div_disable(struct clk_hw *hw)
-@@ -78,18 +71,6 @@ static int ccu_div_determine_rate(struct clk_hw *hw,
+diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
+index b583f186a804..de02e6c386d8 100644
+--- a/drivers/clk/sunxi-ng/ccu_mp.c
++++ b/drivers/clk/sunxi-ng/ccu_mp.c
+@@ -41,7 +41,8 @@ static void ccu_mp_find_best(unsigned long parent, unsigned long rate,
+ }
+ 
+ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
+-				       unsigned long parent_rate,
++				       struct clk_hw *hw,
++				       unsigned long *parent_rate,
+ 				       unsigned long rate,
+ 				       void *data)
  {
- 	struct ccu_div *cd = hw_to_ccu_div(hw);
+@@ -52,9 +53,9 @@ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
+ 	max_m = cmp->m.max ?: 1 << cmp->m.width;
+ 	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
  
--	if (clk_hw_get_num_parents(hw) == 1) {
--		req->rate = divider_round_rate(hw, req->rate,
--					       &req->best_parent_rate,
--					       cd->div.table,
--					       cd->div.width,
--					       cd->div.flags);
--
--		req->best_parent_hw = clk_hw_get_parent(hw);
--
--		return 0;
--	}
--
- 	return ccu_mux_helper_determine_rate(&cd->common, &cd->mux,
- 					     req, ccu_div_round_rate, cd);
+-	ccu_mp_find_best(parent_rate, rate, max_m, max_p, &m, &p);
++	ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
+ 
+-	return parent_rate / p / m;
++	return *parent_rate / p / m;
  }
+ 
+ static void ccu_mp_disable(struct clk_hw *hw)
+diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
+index 671141359895..6ee7ba0738fb 100644
+--- a/drivers/clk/sunxi-ng/ccu_mult.c
++++ b/drivers/clk/sunxi-ng/ccu_mult.c
+@@ -33,9 +33,10 @@ static void ccu_mult_find_best(unsigned long parent, unsigned long rate,
+ }
+ 
+ static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
+-					unsigned long parent_rate,
+-					unsigned long rate,
+-					void *data)
++					 struct clk_hw *parent,
++					 unsigned long *parent_rate,
++					 unsigned long rate,
++					 void *data)
+ {
+ 	struct ccu_mult *cm = data;
+ 	struct _ccu_mult _cm;
+@@ -47,9 +48,9 @@ static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
+ 	else
+ 		_cm.max = (1 << cm->mult.width) + cm->mult.offset - 1;
+ 
+-	ccu_mult_find_best(parent_rate, rate, &_cm);
++	ccu_mult_find_best(*parent_rate, rate, &_cm);
+ 
+-	return parent_rate * _cm.mult;
++	return *parent_rate * _cm.mult;
+ }
+ 
+ static void ccu_mult_disable(struct clk_hw *hw)
+diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
+index c6bb1f523232..bae735e252b6 100644
+--- a/drivers/clk/sunxi-ng/ccu_mux.c
++++ b/drivers/clk/sunxi-ng/ccu_mux.c
+@@ -61,7 +61,8 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
+ 				  struct ccu_mux_internal *cm,
+ 				  struct clk_rate_request *req,
+ 				  unsigned long (*round)(struct ccu_mux_internal *,
+-							 unsigned long,
++							 struct clk_hw *,
++							 unsigned long *,
+ 							 unsigned long,
+ 							 void *),
+ 				  void *data)
+@@ -80,7 +81,8 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
+ 		ccu_mux_helper_adjust_parent_for_prediv(common, cm, -1,
+ 							&adj_parent_rate);
+ 
+-		best_rate = round(cm, adj_parent_rate, req->rate, data);
++		best_rate = round(cm, best_parent, &adj_parent_rate,
++				  req->rate, data);
+ 
+ 		goto out;
+ 	}
+@@ -109,7 +111,7 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
+ 		ccu_mux_helper_adjust_parent_for_prediv(common, cm, i,
+ 							&adj_parent_rate);
+ 
+-		tmp_rate = round(cm, adj_parent_rate, req->rate, data);
++		tmp_rate = round(cm, parent, &adj_parent_rate, req->rate, data);
+ 		if (tmp_rate == req->rate) {
+ 			best_parent = parent;
+ 			best_parent_rate = parent_rate;
+diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
+index 47aba3a48245..4be56eee2bfd 100644
+--- a/drivers/clk/sunxi-ng/ccu_mux.h
++++ b/drivers/clk/sunxi-ng/ccu_mux.h
+@@ -86,7 +86,8 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
+ 				  struct ccu_mux_internal *cm,
+ 				  struct clk_rate_request *req,
+ 				  unsigned long (*round)(struct ccu_mux_internal *,
+-							 unsigned long,
++							 struct clk_hw *,
++							 unsigned long *,
+ 							 unsigned long,
+ 							 void *),
+ 				  void *data);
+diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+index cba84afe1cf1..44b16dc8fea6 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkm.c
++++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+@@ -102,7 +102,8 @@ static unsigned long ccu_nkm_recalc_rate(struct clk_hw *hw,
+ }
+ 
+ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+-					unsigned long parent_rate,
++					struct clk_hw *hw,
++					unsigned long *parent_rate,
+ 					unsigned long rate,
+ 					void *data)
+ {
+@@ -116,9 +117,9 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+ 	_nkm.min_m = 1;
+ 	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
+ 
+-	ccu_nkm_find_best(parent_rate, rate, &_nkm);
++	ccu_nkm_find_best(*parent_rate, rate, &_nkm);
+ 
+-	return parent_rate * _nkm.n * _nkm.k / _nkm.m;
++	return *parent_rate * _nkm.n * _nkm.k / _nkm.m;
+ }
+ 
+ static int ccu_nkm_determine_rate(struct clk_hw *hw,
 -- 
 git-series 0.8.11
