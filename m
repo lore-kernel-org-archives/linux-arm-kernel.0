@@ -1,50 +1,80 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  3 May 2017 13:59:52 +0200
-Subject: [PATCH v2 15/20] drm/sun4i: Ignore the generic connectors for
- components
+Date: Wed,  3 May 2017 13:59:57 +0200
+Subject: [PATCH v2 20/20] ARM: sun5i: a10s-olinuxino: Enable HDMI
 In-Reply-To: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
 References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <88de0f79b508e51b5fbf38fac058921a3c748807.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <c7ac6faa0568e6418291255af537c4b070bdea63.1493812478.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic connectors such as hdmi-connector doesn't have any driver in,
-so if they are added to the component list, we will be waiting forever for
-a non-existing driver to probe.
+The A10s Olinuxino has an HDMI connector. Make sure we can use it.
 
-Add a list of the connectors we want to ignore when building our component
-list.
-
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 29 +++++++++++++++++-
+ 1 file changed, 29 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 8ddd72cd5873..8c9d2e36be55 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -164,6 +164,11 @@ static const struct component_master_ops sun4i_drv_master_ops = {
- 	.unbind	= sun4i_drv_unbind,
+diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+index 894f874a5beb..1d13b6407222 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+@@ -63,6 +63,17 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+@@ -76,6 +87,10 @@
+ 	};
  };
  
-+static bool sun4i_drv_node_is_connector(struct device_node *node)
-+{
-+	return of_device_is_compatible(node, "hdmi-connector");
-+}
++&be0 {
++	status = "okay";
++};
 +
- static bool sun4i_drv_node_is_frontend(struct device_node *node)
- {
- 	return of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
-@@ -204,7 +209,8 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 	    !of_device_is_available(node))
- 		return 0;
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -91,6 +106,16 @@
+ 	status = "okay";
+ };
  
--	if (!sun4i_drv_node_is_frontend(node)) {
-+	if (!sun4i_drv_node_is_connector(node) &&
-+	    !sun4i_drv_node_is_frontend(node)) {
- 		/* Add current component */
- 		DRM_DEBUG_DRIVER("Adding component %s\n",
- 				 of_node_full_name(node));
++&hdmi {
++	status = "okay";
++};
++
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
+ &i2c0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c0_pins_a>;
+@@ -248,6 +273,10 @@
+ 	status = "okay";
+ };
+ 
++&tcon0 {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 git-series 0.8.11
