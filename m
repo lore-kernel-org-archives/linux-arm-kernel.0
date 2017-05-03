@@ -1,143 +1,109 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 3 May 2017 11:51:56 +0100
-Subject: [PATCH] arm64: Fix multiple 'asm-operand-widths' warnings
-In-Reply-To: <20170502185212.GY128305@google.com>
-References: <20170501212622.153720-1-mka@chromium.org>
- <20170502172948.GE28132@leverpostej>
- <20170502185212.GY128305@google.com>
-Message-ID: <20170503105156.GB4951@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 3 May 2017 11:51:30 +0100
+Subject: [RFC/RFT PATCH 18/18] ARM/ARM64: PCI: Drop pci_fixup_irqs()
+ usage for DT based host controllers
+In-Reply-To: <CAK8P3a3dT-PR69LrAc8_9tNkdj+LTztQ0pcJKyAV6DwykyXi4A@mail.gmail.com>
+References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
+ <20170426111809.19922-19-lorenzo.pieralisi@arm.com>
+ <CAK8P3a3dT-PR69LrAc8_9tNkdj+LTztQ0pcJKyAV6DwykyXi4A@mail.gmail.com>
+Message-ID: <20170503105130.GD10800@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 02, 2017 at 11:52:12AM -0700, Matthias Kaehlcke wrote:
-> El Tue, May 02, 2017 at 06:29:48PM +0100 Mark Rutland ha dit:
-> > On Mon, May 01, 2017 at 02:26:22PM -0700, Matthias Kaehlcke wrote:
-> > > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> > > index 5308d696311b..7db143689694 100644
-> > > --- a/arch/arm64/include/asm/uaccess.h
-> > > +++ b/arch/arm64/include/asm/uaccess.h
-> > > @@ -302,7 +302,7 @@ do {									\
-> > >  	"	.previous\n"						\
-> > >  	_ASM_EXTABLE(1b, 3b)						\
-> > >  	: "+r" (err)							\
-> > > -	: "r" (x), "r" (addr), "i" (-EFAULT))
-> > > +	: "r" ((__u64)x), "r" (addr), "i" (-EFAULT))
-> > >  
-> > 
-> > For reference, do you have the warning for this case to hand?
-> > 
-> > In __put_user_err() we make __pu_val the same type as *ptr, then we
-> > switch on sizeof(*ptr), and pass __pu_val to __put_user_asm(), as x.
-> > For cases 1, 2, and 4, we use "%w" as the register template.
-> > 
-> > So I can't see why we'd  need this cast in __put_user_err().
-> > 
-> > I must be missing something.
+On Fri, Apr 28, 2017 at 03:05:44PM +0200, Arnd Bergmann wrote:
+> On Wed, Apr 26, 2017 at 1:18 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > DT based PCI host controllers are currently relying on
+> > pci_fixup_irqs() to assign legacy PCI irqs to devices. This is
+> > broken in that pci_fixup_irqs() assign IRQs for all PCI devices
+> > present in a given system some of which may well be enabled by
+> > the time pci_fixup_irqs() is called (ie a system with multiple
+> > host controllers). With the introduction of
+> > struct pci_host_bridge.map_irq pointer it is possible to assign IRQs
+> > for all devices originating from a PCI host bridge at probe time;
+> > this is implemented through pci_assign_irq() that relies on the
+> > struct pci_host_bridge.map_irq pointer to map IRQ for a given device.
+> >
+> > The benefits this brings are twofold:
+> >
+> > - the IRQ for a device is assigned once at probe time
+> > - the IRQ assignment works also for hotplugged devices
+> >
+> > Remove pci_fixup_irqs() call from all DT based PCI host controller
+> > drivers. The map_irq() and swizzle_irq() struct pci_host_bridge callbacks
+> > are either set-up in the respective PCI host controller driver or
+> > delegated to ARM/ARM64 pcibios_root_bridge_prepare() implementations,
+> > where, upon DT probe detection, the functions are set to DT defaults (ie
+> > of_irq_parse_and_map_pci() and pci_common_swizzle() respectively.
+> >
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > 
-> This is one of many instances:
+> Nice!
 > 
-> ./include/linux/pagemap.h:554:10: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
->                 return __put_user(0, end);
->                        ^
-> ./arch/arm64/include/asm/uaccess.h:338:2: note: expanded from macro '__put_user'
->         __put_user_err((x), (ptr), __pu_err);                           \
->         ^
-> ./arch/arm64/include/asm/uaccess.h:326:38: note: expanded from macro '__put_user_err'
->                 __put_user_asm("str", "sttr", "%", __pu_val, (ptr),     \
->                                                    ^
-> ./include/linux/pagemap.h:554:10: note: use constraint modifier "w"
-> ./arch/arm64/include/asm/uaccess.h:338:2: note: expanded from macro '__put_user'
->         __put_user_err((x), (ptr), __pu_err);                           \
->         ^
-> ./arch/arm64/include/asm/uaccess.h:326:34: note: expanded from macro '__put_user_err'
->                 __put_user_asm("str", "sttr", "%", __pu_val, (ptr),     \
->                                                ^
+> > +int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+> > +{
+> > +       /*
+> > +        * Set-up IRQ mapping/swizzingly functions.
+> > +        * If the either function pointer is already set,
+> > +        * do not override any of them since it is a host
+> > +        * controller specific mapping/swizzling function.
+> > +        */
+> > +       if (!bridge->map_irq && !bridge->swizzle_irq) {
+> > +               struct device *parent = bridge->dev.parent;
+> > +               /*
+> > +                * If we have a parent pointer with a valid
+> > +                * OF node this means we are probing a PCI host
+> > +                * controller configured through DT firmware.
+> > +                */
+> > +               if (IS_ENABLED(CONFIG_OF) && parent && parent->of_node) {
+> > +                       bridge->map_irq = of_irq_parse_and_map_pci;
+> > +                       bridge->swizzle_irq = pci_common_swizzle;
+> > +               }
+> > +       }
+> > +
+> > +       return 0;
+> > +}
+> 
+> I think it would be better to reduce the number of global functions defined
+> by common code to be called from PCI core code, and instead use
+> additional callback pointers from the pci_host_bridge operations.
 
-Thanks for the log above!
+Yes but this means duplicating the whole map_irq/swizzle_irq
+initialization thing in all DT PCI host controllers, it is getting
+quite cumbersome to be frank, we should try to consolidate DT PCI
+host controllers code, it is becoming a bit unwieldy to manage and
+there is too much code duplication.
 
-> 'end' is a char pointer, it is not clear to me why we would end up in
-> the width == 8 branch.
+> In particular, there are only very few existing users of
+> pcibios_root_bridge_prepare() at the moment, so we should
+> be able to get rid of those quite easily now.
 
-Indeed.
+I could do but please see my comment above.
 
-I took a look, and I think the issue is that clang instantiates the
-assembly in all cases, producing the warning, *then* optimizes away the
-unreachable cases.
+> > diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+> > index 0f39bd2..bc9e36a 100644
+> > --- a/drivers/pci/host/pcie-iproc.c
+> > +++ b/drivers/pci/host/pcie-iproc.c
+> > @@ -1205,7 +1205,8 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+> >         struct device *dev;
+> >         int ret;
+> >         void *sysdata;
+> > -       struct pci_bus *bus, *child;
+> > +       struct pci_bus *child;
+> > +       struct pci_host_bridge *host;
+> >
+> >         dev = pcie->dev;
+> >
+> > @@ -1252,15 +1253,30 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+> >         sysdata = pcie;
+> >  #endif
+> >
+> > -       bus = pci_create_root_bus(dev, 0, &iproc_pcie_ops, sysdata, res);
+> > -       if (!bus) {
+> 
+> Could this be a separate patch?
 
-If you ask clang to build the following:
-
-----
-#define __put_user(val, ptr)						\
-do {									\
-	__typeof__(*(ptr)) __pu_val = (val);				\
-	switch (sizeof(*(ptr))) { 					\
-	case 1:								\
-		asm volatile ("strb %w1, %0"				\
-				: "+Q" (*(ptr)) : "r" (__pu_val));	\
-		break;							\
-	case 2:								\
-		asm volatile ("strh %1, %0"				\
-				: "+Q" (*(ptr)) : "r" (__pu_val));	\
-		break;							\
-	case 4:								\
-		asm volatile ("str %1, %0"				\
-				: "+Q" (*(ptr)) : "r" (__pu_val));	\
-		break;							\
-	case 8:								\
-		asm volatile ("str %1, %0"				\
-				: "+Q" (*(ptr)) : "r" (__pu_val));	\
-		break;							\
-	}								\
-} while (0)
-
-void put_char(char in, char *ptr)
-{
-	__put_user(in, ptr);
-}
-----
-
-It complains for all of the unmatched cases:
-
-----
-size-switch.c:26:2: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
-        __put_user(in, ptr);
-        ^
-size-switch.c:11:28: note: expanded from macro '__put_user'
-                                : "+Q" (*(ptr)) : "r" (__pu_val));      \
-                                                       ^
-size-switch.c:26:2: note: use constraint modifier "w"
-size-switch.c:10:23: note: expanded from macro '__put_user'
-                asm volatile ("strh %1, %0"                             \
-                                    ^
-size-switch.c:26:2: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
-        __put_user(in, ptr);
-        ^
-size-switch.c:15:28: note: expanded from macro '__put_user'
-                                : "+Q" (*(ptr)) : "r" (__pu_val));      \
-                                                       ^
-size-switch.c:26:2: note: use constraint modifier "w"
-size-switch.c:14:22: note: expanded from macro '__put_user'
-                asm volatile ("str %1, %0"                              \
-                                   ^
-size-switch.c:26:2: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
-        __put_user(in, ptr);
-        ^
-size-switch.c:19:28: note: expanded from macro '__put_user'
-                                : "+Q" (*(ptr)) : "r" (__pu_val));      \
-                                                       ^
-size-switch.c:26:2: note: use constraint modifier "w"
-size-switch.c:18:22: note: expanded from macro '__put_user'
-                asm volatile ("str %1, %0"                              \
-                                   ^
-3 warnings generated.
-----
-
-AFAICT, in all other cases where we switch(sizeof(...)), we (will) use
-an explicit cast on the parameter, which placates clang.
-
-I think the best option is to get rid of __pu_val, and have an explicit
-cast of x in each case of the switch statement. I'll add that to my asm
-fixups series, with your Reported-by.
+Yes, I can split it from the pci_fixup_irqs() removal.
 
 Thanks,
-Mark.
+Lorenzo
