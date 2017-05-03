@@ -1,48 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 3 May 2017 14:02:16 +0200
-Subject: [RFC/RFT PATCH 05/18] ARM: PCI: dove: Convert PCI scan API to
- pci_scan_root_bus_bridge()
-In-Reply-To: <20170503103153.GB10800@red-moon>
-References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
- <20170426111809.19922-6-lorenzo.pieralisi@arm.com>
- <CAK8P3a1bnnq-9iuse43bCNX_9TirZPOtmH_vFsvJ9VOAsoUBzQ@mail.gmail.com>
- <20170503103153.GB10800@red-moon>
-Message-ID: <CAK8P3a2Ww0DtTq_ZeACJPC7oGkoY3YP4GQB7RWouY2=e9gck1A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed,  3 May 2017 13:59:49 +0200
+Subject: [PATCH v2 12/20] drm/sun4i: tcon: Fix tcon channel 1 backporch
+ calculation
+In-Reply-To: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
+References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <c742fe1641de0a5a8ce83c1dbcb8df79f953a19e.1493812478.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 3, 2017 at 12:31 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Fri, Apr 28, 2017 at 02:38:48PM +0200, Arnd Bergmann wrote:
->> On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
->> <lorenzo.pieralisi@arm.com> wrote:
->> > The introduction of pci_scan_root_bus_bridge() provides a PCI core
->> > API to scan a PCI root bus backed by an already initialized
->> > struct pci_host_bridge object, which simplifies the bus scan
->> > interface and makes the PCI scan root bus interface easier to
->> > generalize as members are added to the struct pci_host_bridge().
->> >
->> > Convert ARM dove platform code to pci_scan_root_bus_bridge() to improve
->> > the PCI root bus scanning interface.
->> >
->> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>
->> Is this patch required for one of the later steps in the series?
->>
->> As non-DT dove uses the traditional pci_common_init() helper rather
->> than registering its own driver, I wonder if there is anything to gain here.
->
-> Well, the point is, the non-DT platforms I patched implement a custom
-> .scan method in struct hw_pci. If we move the bridge allocation to
-> pcibios_init_hw() we would end up initializing some struct
-> pci_host_bridge fields in pcibios_init_hw() and some in the custom .scan
-> method (ie custom pci_ops) which I found not very elegant but it could be
-> done I reckon, I need to give it a go to see how the code looks like.
+It seems like what's called a backporch in the datasheet is actually the
+backporch plus the sync period. Fix that in our driver.
 
-I don't see anything wrong with initializing the members in different
-places. The first set would give you a default that works for basic
-drivers, and the second set is a way to override the defaults for drivers
-that do something special. Conceptually we do this all the time in
-other places.
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-     Arnd
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 1c609d808b86..86a806fae9fb 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -262,7 +262,7 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+ 		     SUN4I_TCON1_BASIC2_Y(mode->crtc_vdisplay));
+ 
+ 	/* Set horizontal display timings */
+-	bp = mode->crtc_htotal - mode->crtc_hsync_end;
++	bp = mode->crtc_htotal - mode->crtc_hsync_start;
+ 	DRM_DEBUG_DRIVER("Setting horizontal total %d, backporch %d\n",
+ 			 mode->htotal, bp);
+ 	regmap_write(tcon->regs, SUN4I_TCON1_BASIC3_REG,
+@@ -270,7 +270,7 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+ 		     SUN4I_TCON1_BASIC3_H_BACKPORCH(bp));
+ 
+ 	/* Set vertical display timings */
+-	bp = mode->crtc_vtotal - mode->crtc_vsync_end;
++	bp = mode->crtc_vtotal - mode->crtc_vsync_start;
+ 	DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
+ 			 mode->vtotal, bp);
+ 	regmap_write(tcon->regs, SUN4I_TCON1_BASIC4_REG,
+-- 
+git-series 0.8.11
