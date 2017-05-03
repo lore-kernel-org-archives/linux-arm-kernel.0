@@ -1,223 +1,131 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 3 May 2017 22:31:47 +0800
-Subject: [PATCH][v2] arm64: dts: ls2081ardb: Add DTS support for NXP
- LS2081ARDB
-In-Reply-To: <1493367930-10612-1-git-send-email-priyanka.jain@nxp.com>
-References: <1493367930-10612-1-git-send-email-priyanka.jain@nxp.com>
-Message-ID: <20170503143145.GK18578@dragon>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 3 May 2017 16:38:26 +0200
+Subject: [PATCH v5 16/22] KVM: arm64: vgic-its: Add infrastructure for
+ table lookup
+In-Reply-To: <8f162a7d-e629-5828-6230-f0b7b7a6f9db@redhat.com>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-17-git-send-email-eric.auger@redhat.com>
+ <20170430193325.GA1670@lvm>
+ <8f162a7d-e629-5828-6230-f0b7b7a6f9db@redhat.com>
+Message-ID: <20170503143826.GA28421@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 01:55:30PM +0530, Priyanka Jain wrote:
-> This patch add support for NXP LS2081ARDB board which has
-> LS2081A SoC.
+On Wed, May 03, 2017 at 03:40:34PM +0200, Auger Eric wrote:
+> Hi Christoffer,
 > 
-> LS2081A SoC is 40-pin derivative of LS2088A SoC
-> So, from functional perspective both are same.
-> Hence,ls2088a SoC dtsi files are included from ls2081ARDB dts
+> On 30/04/2017 21:33, Christoffer Dall wrote:
+> > On Fri, Apr 14, 2017 at 12:15:28PM +0200, Eric Auger wrote:
+> >> Add a generic lookup_table() helper whose role consists in
+> >> scanning a contiguous table located in guest RAM and applying
+> >> a callback on each entry. Entries can be handled as linked lists
+> >> since the callback may return an offset to the next entry and
+> >> also tell that an entry is the last one.
+> >>
+> >> Helper functions also are added to compute the device/event ID
+> >> offset to the next DTE/ITE.
+> >>
+> >> compute_next_devid_offset, compute_next_eventid_offset and
+> >> lookup_table will become static in subsequent patches
+> >>
+> >> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> >>
+> >> ---
+> >> v4 -> v5:
+> >> - use kvm_read_guest
+> >>
+> >> v3 -> v4:
+> >> - remove static to avoid compilation warning
+> >> - correct size computation in looup_table()
+> >> - defines now encode the number of bits used for devid and eventid offsets
+> >> - use BIT() - 1 to encode the max offets
+> >> ---
+> >>  virt/kvm/arm/vgic/vgic-its.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 93 insertions(+)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> >> index 56c5123..c22b35d 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-its.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> >> @@ -195,6 +195,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+> >>  
+> >>  #define VITS_TYPER_IDBITS 16
+> >>  #define VITS_TYPER_DEVBITS 16
+> >> +#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
+> >> +#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
+> >>  
+> >>  /*
+> >>   * Finds and returns a collection in the ITS collection table.
+> >> @@ -1674,6 +1676,97 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+> >>  	return ret;
+> >>  }
+> >>  
+> >> +u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
+> >> +{
+> >> +	struct list_head *e = &dev->dev_list;
+> >> +	struct its_device *next;
+> >> +	u32 next_offset;
+> >> +
+> >> +	if (e->next == h)
+> >> +		return 0;
+> >> +	next = list_entry(e->next, struct its_device, dev_list);
+> >> +	next_offset = next->device_id - dev->device_id;
+> >> +
+> >> +	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
+> >> +}
+> >> +
+> >> +u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
+> >> +{
+> >> +	struct list_head *e = &ite->ite_list;
+> >> +	struct its_ite *next;
+> >> +	u32 next_offset;
+> >> +
+> >> +	if (e->next == h)
+> >> +		return 0;
+> >> +	next = list_entry(e->next, struct its_ite, ite_list);
+> >> +	next_offset = next->event_id - ite->event_id;
+> >> +
+> >> +	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
+> >> +}
+> >> +
+> >> +/**
+> >> + * entry_fn_t - Callback called on a table entry restore path
+> >> + * @its: its handle
+> >> + * @id: id of the entry
+> >> + * @entry: pointer to the entry
+> >> + * @opaque: pointer to an opaque data
+> >> + * @next_offset: minimal ID offset to the next entry. 0 if this
+> >> + * entry is the last one, 1 if the entry is invalid, >= 1 if an
+> >> + * entry's next_offset field was truly decoded
+> >> + *
+> >> + * Return: < 0 on error, 0 otherwise
+> >> + */
+> >> +typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+> >> +			  void *opaque, u32 *next_offset);
+> > 
+> > Just noticed.  All the table entries are 64-bit long at this point,
+> > right?  So why not make entry a u64 * instead?  Could we end up with
+> > some endianness mess with using void pointers the way it is now?
+> the size of the entry is ABI dependent while this infrastructure is
+> generic. 
+
+Yes, for a single version of the ABI where all the entries are 64-bit.
+
+
+> In each of such function we use
 > 
-> Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
-> ---
-> Changes for v2: Updated subject and NXP copyright
-> 	based on Leo's comments
+> u64 entry = *(u64 *)addr;
+> and we do a le64_to_cpu(entry).
 > 
->  arch/arm64/boot/dts/freescale/Makefile            |    1 +
->  arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts |  139 +++++++++++++++++++++
->  2 files changed, 140 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts
+> Do you see something wrong? Otherwise I would be tempted to leave as is.
 > 
-> diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-> index 72c4b52..58b80de 100644
-> --- a/arch/arm64/boot/dts/freescale/Makefile
-> +++ b/arch/arm64/boot/dts/freescale/Makefile
-> @@ -9,6 +9,7 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1088a-qds.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1088a-rdb.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
-> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2081a-rdb.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts
-> new file mode 100644
-> index 0000000..bc1c4f6
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts
-> @@ -0,0 +1,139 @@
-> +/*
-> + * Device Tree file for NXP LS2081A RDB Board.
-> + *
-> + * Copyright 2017, NXP
 
-It still doesn't match what Leo's patch does.
+I don't think there's anything wrong with the current version, and
+you're right, this always points to an ITS data structure which is LE,
+so there shouldn't be a problem.  I always just quiver when I see void
+pointers cast to a type in the caller and callee.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt64&id=827270124c75c7eca8d2e0b41e21fc668e04932e
+Just leave it for now.
 
-Hint: there is no comma in the middle.
-
-> + *
-> + * Priyanka Jain <priyanka.jain@nxp.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPLv2 or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "fsl-ls2088a.dtsi"
-> +
-> +/ {
-> +	model = "NXP Layerscape 2081A RDB Board";
-> +	compatible = "fsl,ls2081a-rdb", "fsl,ls2081a";
-> +
-> +	aliases {
-> +		serial0 = &serial0;
-> +		serial1 = &serial1;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial1:115200n8";
-> +	};
-> +};
-> +
-> +&esdhc {
-> +	status = "okay";
-> +};
-> +
-> +&ifc {
-> +	status = "disabled";
-
-We should have those devices which will need board level connector/pinout
-disabled in <soc>.dtsi, and enable the device in <board>.dts which
-actually has the device pinout on board.
-
-> +};
-> +
-> +&i2c0 {
-> +	status = "okay";
-
-Have a newline between property list and child node.
-
-> +	pca9547 at 75 {
-
-Node name should be as generic as possible.  The name used in bindings
-doc example is obviously better.
-
-This comment applies to other nodes added by this patch.
-
-> +		compatible = "nxp,pca9547";
-> +		reg = <0x75>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		i2c at 1 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x01>;
-> +			rtc at 51 {
-> +				compatible = "nxp,pcf2129";
-> +				reg = <0x51>;
-> +			};
-> +		};
-> +
-> +		i2c at 3 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x3>;
-> +
-> +			adt7481 at 4c {
-> +				compatible = "adi,adt7461";
-> +				reg = <0x4c>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&dspi {
-
-Sort these labeled nodes alphabetically.
-
-> +	status = "okay";
-> +	dflash0: n25q512a {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "st,m25p80";
-> +		spi-max-frequency = <3000000>;
-> +		reg = <0>;
-> +	};
-> +};
-> +
-> +
-> +&qspi {
-> +	status = "okay";
-> +	flash0: n25q512a at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "st,m25p80";
-> +		spi-max-frequency = <20000000>;
-> +		reg = <0>;
-> +	};
-
-Have a newline between nodes.
-
-Shawn
-
-> +	flash1: n25q512a at 1 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "st,m25p80";
-> +		spi-max-frequency = <20000000>;
-> +		reg = <0>;
-> +	};
-> +};
-> +
-> +&usb0 {
-> +	status = "okay";
-> +};
-> +
-> +&usb1 {
-> +	status = "okay";
-> +};
-> -- 
-> 1.7.4.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+-Christoffer
