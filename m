@@ -1,36 +1,18 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 3 May 2017 21:57:18 +0800
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
-In-Reply-To: <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
-References: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
- <CAOMZO5BsgXRfgZ0hszk2Vgo2keVDHH1BLbJTbW+awMS2cBoNow@mail.gmail.com>
- <CAOMZO5CKUsEr1yf5RrsPLipNtLC_6sK0dPjT2M-eN-uo8hEbrQ@mail.gmail.com>
- <1493141004.3557.8.camel@nxp.com>
- <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
-Message-ID: <20170503135715.GG18578@dragon>
+Date: Wed, 3 May 2017 22:00:45 +0800
+Subject: [PATCH] arm64: dts: ls1088a: add esdhc node
+In-Reply-To: <1493271110-6361-1-git-send-email-yangbo.lu@nxp.com>
+References: <1493271110-6361-1-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <20170503140043.GH18578@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 07:28:06PM +0200, Marek Vasut wrote:
-> On 04/25/2017 07:23 PM, Leonard Crestez wrote:
-> > Anyway, that version also sets the supply for reg_arm and reg_soc. It
-> > is not necessary for fixing the crash I'm seeing but is good because it
-> > will result in the minimum voltage on VDD_ARM_SOC_IN rather than a fix
-> > 1375mv. I tested Marek's patch and it works fine on my rev B board
-> > (which otherwise fails to boot upstream).
+On Thu, Apr 27, 2017 at 01:31:50PM +0800, Yangbo Lu wrote:
+> Add esdhc node for ls1088a and enable it on both RDB and QDS boards.
 > 
-> Oh that's nice , thanks ! I don't have SDB and I hacked it up after a
-> brief discussion with Fabio without even compile-testing it, thus RFC.
-> Glad to hear it works and thanks for testing it ! Can you add a formal
-> Tested-by please ?
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 
-Hi Marek,
-
-Thanks for your patch.  But I prefer Leonard's version because: 1) it
-has a better commit log; 2) it sticks to one-patch-does-one-thing
-policy.
-
-But I'm going to wait for a while to get Peter's comment discussed,
-before I actually apply Leonard's patch.
+It seems that the comments I put on '[PATCH 3/3] arm64: dts: ls1012a:
+add eSDHC nodes' applies to this one as well.
 
 Shawn
