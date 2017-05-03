@@ -1,124 +1,143 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 3 May 2017 11:58:30 +0100
-Subject: [PATCH] drivers/of_iommu: ignore SMMU DT nodes with status
- 'disabled'
-In-Reply-To: <1c0463e6-f82f-1179-4f54-b2d3de63dc87@arm.com>
-References: <20170414124315.2401-1-ard.biesheuvel@linaro.org>
- <20170428131133.GJ13675@arm.com>
- <CAKv+Gu_G9fw0kwSetXmGjomc8Y_nu95O=rEVzgfafNRs0dtgvg@mail.gmail.com>
- <20170428131744.GL13675@arm.com>
- <CAKv+Gu8L1iyzBitt8zzvWDDEXk_ysGfPRxHJbQQK5o8NMWF5MA@mail.gmail.com>
- <1c0463e6-f82f-1179-4f54-b2d3de63dc87@arm.com>
-Message-ID: <4B3EA199-183C-40CE-8C7B-E55CD92FD402@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 3 May 2017 11:51:56 +0100
+Subject: [PATCH] arm64: Fix multiple 'asm-operand-widths' warnings
+In-Reply-To: <20170502185212.GY128305@google.com>
+References: <20170501212622.153720-1-mka@chromium.org>
+ <20170502172948.GE28132@leverpostej>
+ <20170502185212.GY128305@google.com>
+Message-ID: <20170503105156.GB4951@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On 3 May 2017, at 11:32, Robin Murphy <robin.murphy@arm.com> wrote:
+On Tue, May 02, 2017 at 11:52:12AM -0700, Matthias Kaehlcke wrote:
+> El Tue, May 02, 2017 at 06:29:48PM +0100 Mark Rutland ha dit:
+> > On Mon, May 01, 2017 at 02:26:22PM -0700, Matthias Kaehlcke wrote:
+> > > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> > > index 5308d696311b..7db143689694 100644
+> > > --- a/arch/arm64/include/asm/uaccess.h
+> > > +++ b/arch/arm64/include/asm/uaccess.h
+> > > @@ -302,7 +302,7 @@ do {									\
+> > >  	"	.previous\n"						\
+> > >  	_ASM_EXTABLE(1b, 3b)						\
+> > >  	: "+r" (err)							\
+> > > -	: "r" (x), "r" (addr), "i" (-EFAULT))
+> > > +	: "r" ((__u64)x), "r" (addr), "i" (-EFAULT))
+> > >  
+> > 
+> > For reference, do you have the warning for this case to hand?
+> > 
+> > In __put_user_err() we make __pu_val the same type as *ptr, then we
+> > switch on sizeof(*ptr), and pass __pu_val to __put_user_asm(), as x.
+> > For cases 1, 2, and 4, we use "%w" as the register template.
+> > 
+> > So I can't see why we'd  need this cast in __put_user_err().
+> > 
+> > I must be missing something.
 > 
->> On 28/04/17 14:22, Ard Biesheuvel wrote:
->>> On 28 April 2017 at 14:17, Will Deacon <will.deacon@arm.com> wrote:
->>>> On Fri, Apr 28, 2017 at 02:14:49PM +0100, Ard Biesheuvel wrote:
->>>>> On 28 April 2017 at 14:11, Will Deacon <will.deacon@arm.com> wrote:
->>>>> Hi Ard,
->>>>> 
->>>>> [+ devicetree@]
->>>>> 
->>>>>> On Fri, Apr 14, 2017 at 01:43:15PM +0100, Ard Biesheuvel wrote:
->>>>>> DT nodes may have a status property, and if they do, such nodes should
->>>>>> only be considered present if the status property is set to 'okay'.
->>>>>> 
->>>>>> Currently, we call the init function of IOMMUs described by the device
->>>>>> tree without taking this into account, which may result in the output
->>>>>> below on systems where some SMMUs may be legally disabled.
->>>>>> 
->>>>>> Failed to initialise IOMMU /smb/smmu at e0200000
->>>>>> Failed to initialise IOMMU /smb/smmu at e0c00000
->>>>>> arm-smmu e0a00000.smmu: probing hardware configuration...
->>>>>> arm-smmu e0a00000.smmu: SMMUv1 with:
->>>>>> arm-smmu e0a00000.smmu:  stage 2 translation
->>>>>> arm-smmu e0a00000.smmu:  coherent table walk
->>>>>> arm-smmu e0a00000.smmu:  stream matching with 32 register groups, mask 0x7fff
->>>>>> arm-smmu e0a00000.smmu:  8 context banks (8 stage-2 only)
->>>>>> arm-smmu e0a00000.smmu:  Supported page sizes: 0x60211000
->>>>>> arm-smmu e0a00000.smmu:  Stage-2: 40-bit IPA -> 40-bit PA
->>>>>> Failed to initialise IOMMU /smb/smmu at e0600000
->>>>>> Failed to initialise IOMMU /smb/smmu at e0800000
->>>>>> 
->>>>>> Since this is not an error condition, only call the init function if
->>>>>> the device is enabled, which also inhibits the spurious error messages.
->>>>>> 
->>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>>> ---
->>>>>> drivers/iommu/of_iommu.c | 2 +-
->>>>>> 1 file changed, 1 insertion(+), 1 deletion(-)
->>>>>> 
->>>>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
->>>>>> index 2683e9fc0dcf..2dd1206e6c0d 100644
->>>>>> --- a/drivers/iommu/of_iommu.c
->>>>>> +++ b/drivers/iommu/of_iommu.c
->>>>>> @@ -183,7 +183,7 @@ static int __init of_iommu_init(void)
->>>>>>      for_each_matching_node_and_match(np, matches, &match) {
->>>>>>              const of_iommu_init_fn init_fn = match->data;
->>>>>> 
->>>>>> -             if (init_fn(np))
->>>>>> +             if (of_device_is_available(np) && init_fn(np))
->>>>>>                      pr_err("Failed to initialise IOMMU %s\n",
->>>>>>                              of_node_full_name(np));
->>>>>>      }
->>>>> 
->>>>> Is there a definition of what status = "disabled" is supposed to mean for an
->>>>> IOMMU? For example, that could mean that the firmware has pre-programmed the
->>>>> SMMU with particular translations or memory attributes (a bit like the
->>>>> CCA=1, CPM=1, DACS=0 case in ACPI IORT), or even disabled DMA traffic
->>>>> altogether.
->>>>> 
->>>>> So I think we'd need an update to the generic IOMMU binding text to say
->>>>> exactly what the semantics are supposed to be here.
->>>>> 
->>>> 
->>>> I agree that it might make sense to describe the behavior of the IOMMU
->>>> when it is left in the state we found it in. But that is not the same
->>>> as status=disabled.
->>>> 
->>>> The DTS subtree contains loads and loads of boilerplate
->>>> configurations, where only some pieces are enabled in the final image
->>>> by setting status=okay. So a node that has status 'disabled' should be
->>>> treated as 'not present', not as 'present but can be ignored under
->>>> assumptions such and such'
->>>> 
->>>> In other words, I think we are talking about two different issues here.
->>> 
->>> I'm not so sure... if we have a master device that has an iommus= property
->>> pointing to an IOMMU with status="disabled", I really don't know whether we
->>> should:
->>> 
->>>  1. Assume the master can do DMA with a 1:1 mapping of memory and no
->>>     changes to memory attributes
->>> 
->>>  2. Assume the master can do DMA with a 1:1 mapping of memory, but
->>>     potentially with changes to the attributes
->>> 
->>>  3. Assume the master can do DMA, but with some pre-existing translation
->>>     (what?)
->>> 
->>>  4. Assume the master can't do DMA
->>> 
->>> and I also don't know whether the "dma-coherent" property remains valid.
->>> 
->> 
->> Ah yes. Good point.
->> 
->> So indeed, there should be some IOMMU specific status property that
->> can convey all of the above, or 1. and 4. at the minimum
+> This is one of many instances:
 > 
-> FWIW, the underlying issue being addressed here should be going away now
-> anyway, since the now-queued probe deferral series obviates the init_fn
-> early-device-creation bodge. I've been deliberately ignoring it for some
-> time for precisely that reason ;)
-> 
+> ./include/linux/pagemap.h:554:10: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+>                 return __put_user(0, end);
+>                        ^
+> ./arch/arm64/include/asm/uaccess.h:338:2: note: expanded from macro '__put_user'
+>         __put_user_err((x), (ptr), __pu_err);                           \
+>         ^
+> ./arch/arm64/include/asm/uaccess.h:326:38: note: expanded from macro '__put_user_err'
+>                 __put_user_asm("str", "sttr", "%", __pu_val, (ptr),     \
+>                                                    ^
+> ./include/linux/pagemap.h:554:10: note: use constraint modifier "w"
+> ./arch/arm64/include/asm/uaccess.h:338:2: note: expanded from macro '__put_user'
+>         __put_user_err((x), (ptr), __pu_err);                           \
+>         ^
+> ./arch/arm64/include/asm/uaccess.h:326:34: note: expanded from macro '__put_user_err'
+>                 __put_user_asm("str", "sttr", "%", __pu_val, (ptr),     \
+>                                                ^
 
+Thanks for the log above!
 
-Ok. I have also updated the Seattle firmware to remove the smmu nodes and the associated iommus/iommu-map properties entirely when disabling SMMU support in the firmware, which should address Will's concern regarding unspecified behavior of a disabled SMMU.
+> 'end' is a char pointer, it is not clear to me why we would end up in
+> the width == 8 branch.
 
-IOW, this patch can be disregarded. Thanks.
+Indeed.
+
+I took a look, and I think the issue is that clang instantiates the
+assembly in all cases, producing the warning, *then* optimizes away the
+unreachable cases.
+
+If you ask clang to build the following:
+
+----
+#define __put_user(val, ptr)						\
+do {									\
+	__typeof__(*(ptr)) __pu_val = (val);				\
+	switch (sizeof(*(ptr))) { 					\
+	case 1:								\
+		asm volatile ("strb %w1, %0"				\
+				: "+Q" (*(ptr)) : "r" (__pu_val));	\
+		break;							\
+	case 2:								\
+		asm volatile ("strh %1, %0"				\
+				: "+Q" (*(ptr)) : "r" (__pu_val));	\
+		break;							\
+	case 4:								\
+		asm volatile ("str %1, %0"				\
+				: "+Q" (*(ptr)) : "r" (__pu_val));	\
+		break;							\
+	case 8:								\
+		asm volatile ("str %1, %0"				\
+				: "+Q" (*(ptr)) : "r" (__pu_val));	\
+		break;							\
+	}								\
+} while (0)
+
+void put_char(char in, char *ptr)
+{
+	__put_user(in, ptr);
+}
+----
+
+It complains for all of the unmatched cases:
+
+----
+size-switch.c:26:2: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+        __put_user(in, ptr);
+        ^
+size-switch.c:11:28: note: expanded from macro '__put_user'
+                                : "+Q" (*(ptr)) : "r" (__pu_val));      \
+                                                       ^
+size-switch.c:26:2: note: use constraint modifier "w"
+size-switch.c:10:23: note: expanded from macro '__put_user'
+                asm volatile ("strh %1, %0"                             \
+                                    ^
+size-switch.c:26:2: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+        __put_user(in, ptr);
+        ^
+size-switch.c:15:28: note: expanded from macro '__put_user'
+                                : "+Q" (*(ptr)) : "r" (__pu_val));      \
+                                                       ^
+size-switch.c:26:2: note: use constraint modifier "w"
+size-switch.c:14:22: note: expanded from macro '__put_user'
+                asm volatile ("str %1, %0"                              \
+                                   ^
+size-switch.c:26:2: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+        __put_user(in, ptr);
+        ^
+size-switch.c:19:28: note: expanded from macro '__put_user'
+                                : "+Q" (*(ptr)) : "r" (__pu_val));      \
+                                                       ^
+size-switch.c:26:2: note: use constraint modifier "w"
+size-switch.c:18:22: note: expanded from macro '__put_user'
+                asm volatile ("str %1, %0"                              \
+                                   ^
+3 warnings generated.
+----
+
+AFAICT, in all other cases where we switch(sizeof(...)), we (will) use
+an explicit cast on the parameter, which placates clang.
+
+I think the best option is to get rid of __pu_val, and have an explicit
+cast of x in each case of the switch statement. I'll add that to my asm
+fixups series, with your Reported-by.
+
+Thanks,
+Mark.
