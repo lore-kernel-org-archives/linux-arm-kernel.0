@@ -1,92 +1,101 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  3 May 2017 13:59:42 +0200
-Subject: [PATCH v2 5/20] clk: sunxi-ng: mux: split out the pre-divider
- computation code
+Date: Wed,  3 May 2017 13:59:56 +0200
+Subject: [PATCH v2 19/20] ARM: sun5i: a10s: Add the HDMI controller node
 In-Reply-To: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
 References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <fcda95612e72a1a5bb6010993181e638a41511e9.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <1e3ddf81459adbab455b2211fe6b78bd6cf1bbec.1493812478.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pre-divider retrieval code was merged into the function to apply the
-current pre-divider onto the parent clock rate so that we can use that
-adjusted value to do our factors computation.
+The A10s has an HDMI controller connected to the second TCON channel. Add
+it to our DT.
 
-However, since we'll need to do the reverse operation, we need to split out
-that code into a function that will be shared.
+Since the TV Encoder was the only channel 1 user so far, also add the
+property now that we have several users.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu_mux.c | 32 ++++++++++++++++++++------------
- 1 file changed, 20 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 50 ++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/sun5i.dtsi      |  1 +-
+ 2 files changed, 51 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-index 58b6e349a0ed..3eb23d4e6534 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.c
-+++ b/drivers/clk/sunxi-ng/ccu_mux.c
-@@ -15,24 +15,20 @@
- #include "ccu_gate.h"
- #include "ccu_mux.h"
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index 1e38ff80366c..c9d4ee12599d 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -71,7 +71,49 @@
+ 		};
+ 	};
  
--void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
--					     struct ccu_mux_internal *cm,
--					     int parent_index,
--					     unsigned long *parent_rate)
-+static u16 ccu_mux_get_prediv(struct ccu_common *common,
-+			      struct ccu_mux_internal *cm,
-+			      int parent_index)
- {
- 	u16 prediv = 1;
- 	u32 reg;
--	int i;
- 
- 	if (!((common->features & CCU_FEATURE_FIXED_PREDIV) ||
- 	      (common->features & CCU_FEATURE_VARIABLE_PREDIV) ||
- 	      (common->features & CCU_FEATURE_ALL_PREDIV)))
--		return;
-+		return 1;
- 
--	if (common->features & CCU_FEATURE_ALL_PREDIV) {
--		*parent_rate = *parent_rate / common->prediv;
--		return;
--	}
-+	if (common->features & CCU_FEATURE_ALL_PREDIV)
-+		return common->prediv;
- 
- 	reg = readl(common->base + common->reg);
- 	if (parent_index < 0) {
-@@ -40,10 +36,13 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
- 		parent_index &= (1 << cm->width) - 1;
- 	}
- 
--	if (common->features & CCU_FEATURE_FIXED_PREDIV)
-+	if (common->features & CCU_FEATURE_FIXED_PREDIV) {
-+		int i;
++	display-engine {
++		compatible = "allwinner,sun5i-a10s-display-engine",
++			     "allwinner,sun5i-a13-display-engine";
++		allwinner,pipelines = <&fe0>;
++	};
 +
- 		for (i = 0; i < cm->n_predivs; i++)
- 			if (parent_index == cm->fixed_predivs[i].index)
- 				prediv = cm->fixed_predivs[i].div;
-+	}
- 
- 	if (common->features & CCU_FEATURE_VARIABLE_PREDIV)
- 		if (parent_index == cm->variable_prediv.index) {
-@@ -54,7 +53,16 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
- 			prediv = div + 1;
- 		}
- 
--	*parent_rate = *parent_rate / prediv;
-+	return prediv;
-+}
+ 	soc at 01c00000 {
++		hdmi: hdmi at 01c16000 {
++			compatible = "allwinner,sun5i-a10s-hdmi";
++			reg = <0x01c16000 0x1000>;
++			interrupts = <58>;
++			clocks = <&ccu CLK_AHB_HDMI>, <&ccu CLK_HDMI>,
++				 <&ccu CLK_PLL_VIDEO0_2X>,
++				 <&ccu CLK_PLL_VIDEO1_2X>;
++			clock-names = "ahb", "mod", "pll-0", "pll-1";
++			dmas = <&dma SUN4I_DMA_NORMAL 16>,
++			       <&dma SUN4I_DMA_NORMAL 16>,
++			       <&dma SUN4I_DMA_DEDICATED 24>;
++			dma-names = "ddc-tx", "ddc-rx", "audio-tx";
++			status = "disabled";
 +
-+void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
-+					     struct ccu_mux_internal *cm,
-+					     int parent_index,
-+					     unsigned long *parent_rate)
-+{
-+	*parent_rate = *parent_rate / ccu_mux_get_prediv(common, cm,
-+							 parent_index);
- }
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				hdmi_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					hdmi_in_tcon0: endpoint {
++						remote-endpoint = <&tcon0_out_hdmi>;
++					};
++				};
++
++				hdmi_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
+ 		pwm: pwm at 01c20e00 {
+ 			compatible = "allwinner,sun5i-a10s-pwm";
+ 			reg = <0x01c20e00 0xc>;
+@@ -128,3 +170,11 @@
  
- int ccu_mux_helper_determine_rate(struct ccu_common *common,
+ &sram_a {
+ };
++
++&tcon0_out {
++	tcon0_out_hdmi: endpoint at 2 {
++		reg = <2>;
++		remote-endpoint = <&hdmi_in_tcon0>;
++		allwinner,tcon-channel = <1>;
++	};
++};
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 5175f9cc9bed..0e29f1d98a9e 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -272,6 +272,7 @@
+ 					tcon0_out_tve0: endpoint at 1 {
+ 						reg = <1>;
+ 						remote-endpoint = <&tve0_in_tcon0>;
++						allwinner,tcon-channel = <1>;
+ 					};
+ 				};
+ 			};
 -- 
 git-series 0.8.11
