@@ -1,32 +1,79 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 3 May 2017 21:17:16 +0800
-Subject: [PATCH 0/3] Add eSDHC UHS-I/HS200 mode support for
- ls1012a/ls1046a/ls208xa
-In-Reply-To: <DB6PR0401MB253641C6AB25737F9F57EE8DF81E0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
-References: <1492746756-12024-1-git-send-email-yangbo.lu@nxp.com>
- <CAPDyKFp_TWSj7FH6KagU4gz+A9CR-thwU9b1WaSEgupZMBAyaQ@mail.gmail.com>
- <DB6PR0401MB253641C6AB25737F9F57EE8DF81E0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
-Message-ID: <20170503131714.GD24392@dragon>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Wed, 3 May 2017 18:49:09 +0530
+Subject: [PATCH] iommu/arm-smmu-v3: Poll for CMDQ drain completion more
+ effectively
+In-Reply-To: <1493291587-23488-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1493291587-23488-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <CA+sq2CdR0vC76F1m-LvYGfZW32nKbQg9dQsfJ_jtvYgZ7yyt3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 09:01:28AM +0000, Y.B. Lu wrote:
-> > By curiosity I tried applying these to my mmc tree, but they don't apply.
-> > So I can pick them, even with acks.
-> > Also it's too difficult for me to host an immutable branch with the
-> > relevant sdhci-esdc changes, because of additional sdhci dependencies.
-> > 
-> > Perhaps just easier to pick this for 4.13 or 4.12 rc2.
-> 
-> [Lu Yangbo-B47093] Hi Uffe, I agree.
-> These patches are based on Shawn's tree which has the latest layerscape board dts.
-> Actually I'm not sure which git tree I should send these patches to according to MAINTAINERS, but I saw Shawn had merged some layerscape board dts before.
-> 
-> Hi Shawn,
-> Am I right to send these patches to you for reviewing? Which git tree do you recommend I should send these patches to?
+On Thu, Apr 27, 2017 at 4:43 PM,  <sunil.kovvuri@gmail.com> wrote:
+> From: Sunil Goutham <sgoutham@cavium.com>
+>
+> Modified polling on CMDQ consumer similar to how polling is done for TLB SYNC
+> completion in SMMUv2 driver. Code changes are done with reference to
+>
+> 8513c8930069 iommu/arm-smmu: Poll for TLB sync completion more effectively
+>
+> Poll timeout has been increased which addresses issue of 100us timeout not
+> sufficient, when command queue is full with TLB invalidation commands.
+>
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> Signed-off-by: Geetha <gakula@cavium.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++---
+>  1 file changed, 12 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index d412bdd..34599d4 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -379,6 +379,9 @@
+>  #define CMDQ_SYNC_0_CS_NONE            (0UL << CMDQ_SYNC_0_CS_SHIFT)
+>  #define CMDQ_SYNC_0_CS_SEV             (2UL << CMDQ_SYNC_0_CS_SHIFT)
+>
+> +#define CMDQ_DRAIN_TIMEOUT_US          1000
+> +#define CMDQ_SPIN_COUNT                        10
+> +
+>  /* Event queue */
+>  #define EVTQ_ENT_DWORDS                        4
+>  #define EVTQ_MAX_SZ_SHIFT              7
+> @@ -737,7 +740,8 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
+>   */
+>  static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
+>  {
+> -       ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
+> +       ktime_t timeout = ktime_add_us(ktime_get(), CMDQ_DRAIN_TIMEOUT_US);
+> +       unsigned int spin_cnt, delay = 1;
+>
+>         while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
+>                 if (ktime_compare(ktime_get(), timeout) > 0)
+> @@ -746,8 +750,13 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
+>                 if (wfe) {
+>                         wfe();
+>                 } else {
+> -                       cpu_relax();
+> -                       udelay(1);
+> +                       for (spin_cnt = 0;
+> +                            spin_cnt < CMDQ_SPIN_COUNT; spin_cnt++) {
+> +                               cpu_relax();
+> +                               continue;
+> +                       }
+> +                       udelay(delay);
+> +                       delay *= 2;
+>                 }
+>         }
+>
+> --
+> 2.7.4
+>
 
-Yes, currently arm64 freescale dts patches flows to mainline as below.
+Sorry for the ignorance.
+Is there a patchwork where I can check current status of ARM IOMMU
+related patches ?
 
-  my imx/dt64 branch --> arm-soc tree --> mainline
+And is this patch accepted, if not any comments / feedback ?
 
-Shawn
+Thanks,
+Sunil.
