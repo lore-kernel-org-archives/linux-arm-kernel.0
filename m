@@ -1,40 +1,57 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 3 May 2017 12:47:16 -0500
-Subject: [PATCH] MAINTAINERS: add arm@kernel.org as the list for arm64
- defconfig changes
-In-Reply-To: <CAOesGMgnOQXtLT8aUvPhXDfShzhkP-3LWFhP60xiMn65x6aq=w@mail.gmail.com>
-References: <1493829085-11864-1-git-send-email-timur@codeaurora.org>
- <20170503170110.GB23620@e104818-lin.cambridge.arm.com>
- <95597ce9-a46f-1491-ae65-518ed8b8c44c@codeaurora.org>
- <CAOesGMiY9o8199bb13gsd3SAs8YR-4rafYHoyV3VmK0dY0MDtQ@mail.gmail.com>
- <4b048ba1-b7e4-6ab6-95be-3163120f63aa@codeaurora.org>
- <CAOesGMgnOQXtLT8aUvPhXDfShzhkP-3LWFhP60xiMn65x6aq=w@mail.gmail.com>
-Message-ID: <0ad7d305-d323-339f-9534-d559f1cf656a@codeaurora.org>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 3 May 2017 20:58:18 +0300
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
+In-Reply-To: <e46a57c2-4a28-a8b6-445e-299dd9d8659c@denx.de>
+References: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
+ <CAOMZO5BsgXRfgZ0hszk2Vgo2keVDHH1BLbJTbW+awMS2cBoNow@mail.gmail.com>
+ <CAOMZO5CKUsEr1yf5RrsPLipNtLC_6sK0dPjT2M-eN-uo8hEbrQ@mail.gmail.com>
+ <1493141004.3557.8.camel@nxp.com>
+ <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
+ <20170503135715.GG18578@dragon>
+ <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
+ <1493823533.11226.28.camel@nxp.com>
+ <e46a57c2-4a28-a8b6-445e-299dd9d8659c@denx.de>
+Message-ID: <1493834298.11226.40.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2017 12:39 PM, Olof Johansson wrote:
-> No, I'm not saying that, and there is a better way: Send it through
-> Andy if in doubt -- it should be his job as your platform maintainer
-> to help guide you through the system if needed.
+On Wed, 2017-05-03 at 17:59 +0200, Marek Vasut wrote:
+> On 05/03/2017 04:58 PM, Leonard Crestez wrote:
+> > On Wed, 2017-05-03 at 16:26 +0200, Marek Vasut wrote:
+> > > 2) It actually fixes a problem with the voltage rails such that the DVFS
+> > > ???works without leaving the system in unstable or dead state. You do
+> > > ???need the second part of my patch if you drop the OPP hackery, without
+> > > ???it the power framework cannot correctly configure the core voltages,
+> > > ???so the patch from Leonard makes things worse.
+> > No, I think there is a misunderstanding here. The second part of your
+> > patch will cause cpufreq poking at LDOs to indirectly adjust the input
+> > from the PMIC to the minimum required (this is LDO target +
+> > min_dropout_uv). Without it by default VDD_ARM_SOC_IN will remain fixed
+> > as 1375mV from boot.
 
-Will told me that defconfig patches should go to arm at kernel.org, but you're
-telling me they should go to Andy instead.
+> Who sets / guarantees that default value for ARM and SOC rails ?
 
-Andy's being the platform maintainer is news to me.  I'm not saying he
-isn't, but I can't remember the last time I involved him in any patches of ours.
+I think it's from the PMIC hardware itself (but maybe uboot plays with
+it). VDD_ARM_SOC_IN on this board is tied to SW1AB from MMPF0200:
 
-Either way, I think there should be a designated maintainer for
-arch/arm64/configs/defconfig, and I think that person/alias should be in
-MAINTAINERS.
+http://www.nxp.com/assets/documents/data/en/data-sheets/MMPF0200.pdf
 
-> Sometimes we tweak defconfigs late in the merge window and sometimes
-> even during early -rc, so let us get back to this after we've handled
-> the merges.
+It seems reasonable to rely on such voltages set externally.
 
-Ok, thank you.
+> With the OPP override in place, there's at least the guarantee that both
+> rails will have the same voltage requirement. If you remove the OPP
+> override without modeling the actual regulator wiring, the guarantee is
+> gone.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+The imx6sx chip has internal LDO_ARM and LDO_SOC regulators which can
+generate separate voltages for arm/soc. The fact that these regulators
+share the same supply is only an issue when they are set in bypass
+mode.
+
+However the boot issues happen on REV C but apparently not REV B of the
+board. I don't have a good explanation for this so maybe I am missing
+something.
+
+--?
+Regards,
+Leonard
