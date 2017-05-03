@@ -1,36 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  3 May 2017 11:46:06 +0100
-Subject: [PATCH 31/31] KVM: arm64: vgic-v3: Log which GICv3 system registers
- are trapped
+Date: Wed,  3 May 2017 11:45:58 +0100
+Subject: [PATCH 23/31] KVM: arm64: Enable GICv3 Group-0 sysreg trapping via
+ command-line
 In-Reply-To: <20170503104606.19342-1-marc.zyngier@arm.com>
 References: <20170503104606.19342-1-marc.zyngier@arm.com>
-Message-ID: <20170503104606.19342-32-marc.zyngier@arm.com>
+Message-ID: <20170503104606.19342-24-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to facilitate debug, let's log which class of GICv3 system
-registers are trapped.
+Now that we're able to safely handle Group-0 sysreg access, let's
+give the user the opportunity to enable it by passing a specific
+command-line option (vgic_v3.group0_trap).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-v3.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-v3.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 717219ab58a2..9110657b502c 100644
+index 812f179a6931..7c82c586d44a 100644
 --- a/virt/kvm/arm/vgic/vgic-v3.c
 +++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -407,7 +407,10 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
- #endif
+@@ -327,6 +327,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
  
- 	if (group0_trap || group1_trap || common_trap) {
--		kvm_info("GICv3 sysreg trapping enabled (reduced performance)\n");
-+		kvm_info("GICv3 sysreg trapping enabled ([%s%s%s], reduced performance)\n",
-+			 group0_trap ? "G0" : "",
-+			 group1_trap ? "G1" : "",
-+			 common_trap ? "C"  : "");
- 		static_branch_enable(&vgic_v3_cpuif_trap);
- 	}
+ DEFINE_STATIC_KEY_FALSE(vgic_v3_cpuif_trap);
  
++static int __init early_group0_trap_cfg(char *buf)
++{
++	return strtobool(buf, &group0_trap);
++}
++early_param("vgic_v3.group0_trap", early_group0_trap_cfg);
++
+ static int __init early_group1_trap_cfg(char *buf)
+ {
+ 	return strtobool(buf, &group1_trap);
 -- 
 2.11.0
