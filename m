@@ -1,61 +1,66 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 3 May 2017 12:57:25 +0100
-Subject: [PATCH v3 2/3] crypto: inside-secure: add SafeXcel EIP197 crypto
- engine driver
-In-Reply-To: <20170424075407.19730-3-antoine.tenart@free-electrons.com>
-References: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
- <20170424075407.19730-3-antoine.tenart@free-electrons.com>
-Message-ID: <6ed16e7e-7f7a-795f-ee82-d2d97c3a5540@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed,  3 May 2017 13:59:40 +0200
+Subject: [PATCH v2 3/20] clk: sunxi-ng: div: Switch to divider_round_rate
+In-Reply-To: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
+References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <8ea7c8c0ac01fe06f7ded94e03532a1838f2bf8f.1493812478.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
+divider_round_rate already evaluates changing the parent rate if
+CLK_SET_RATE_PARENT is set. Now that we can do that on muxes too, let's
+just use it.
 
-On 24/04/17 08:54, Antoine Tenart wrote:
-> Add support for Inside Secure SafeXcel EIP197 cryptographic engine,
-> which can be found on Marvell Armada 7k and 8k boards. This driver
-> currently implements: ecb(aes), cbc(aes), sha1, sha224, sha256 and
-> hmac(sah1) algorithms.
-> 
-> Two firmwares are needed for this engine to work. Their are mostly used
-> for more advanced operations than the ones supported (as of now), but we
-> still need them to pass the data to the internal cryptographic engine.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/sunxi-ng/ccu_div.c | 27 ++++-----------------------
+ 1 file changed, 4 insertions(+), 23 deletions(-)
 
-[...]
-
-> diff --git a/drivers/crypto/inside-secure/safexcel.c b/drivers/crypto/inside-secure/safexcel.c
-> new file mode 100644
-> index 000000000000..9cb3d0832835
-> --- /dev/null
-> +++ b/drivers/crypto/inside-secure/safexcel.c
-> @@ -0,0 +1,925 @@
-> +/*
-> + * Copyright (C) 2017 Marvell
-> + *
-> + * Antoine Tenart <antoine.tenart@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/device.h>
-> +#include <linux/dmapool.h>
-> +#include <linux/firmware.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/workqueue.h>
-> +
-> +#include <asm/dma-mapping.h>
-
-<linux/dma-mapping.h> everywhere, please.
-
-Other than that, the DMA aspects all look much nicer now, thanks.
-
-Robin.
+diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
+index a489f18a3c01..419463375bc1 100644
+--- a/drivers/clk/sunxi-ng/ccu_div.c
++++ b/drivers/clk/sunxi-ng/ccu_div.c
+@@ -20,18 +20,11 @@ static unsigned long ccu_div_round_rate(struct ccu_mux_internal *mux,
+ 					void *data)
+ {
+ 	struct ccu_div *cd = data;
+-	unsigned long val;
+-
+-	/*
+-	 * We can't use divider_round_rate that assumes that there's
+-	 * several parents, while we might be called to evaluate
+-	 * several different parents.
+-	 */
+-	val = divider_get_val(rate, *parent_rate, cd->div.table, cd->div.width,
+-			      cd->div.flags);
+ 
+-	return divider_recalc_rate(&cd->common.hw, *parent_rate, val,
+-				   cd->div.table, cd->div.flags);
++	return divider_round_rate_parent(&cd->common.hw, parent,
++					 rate, parent_rate,
++					 cd->div.table, cd->div.width,
++					 cd->div.flags);
+ }
+ 
+ static void ccu_div_disable(struct clk_hw *hw)
+@@ -78,18 +71,6 @@ static int ccu_div_determine_rate(struct clk_hw *hw,
+ {
+ 	struct ccu_div *cd = hw_to_ccu_div(hw);
+ 
+-	if (clk_hw_get_num_parents(hw) == 1) {
+-		req->rate = divider_round_rate(hw, req->rate,
+-					       &req->best_parent_rate,
+-					       cd->div.table,
+-					       cd->div.width,
+-					       cd->div.flags);
+-
+-		req->best_parent_hw = clk_hw_get_parent(hw);
+-
+-		return 0;
+-	}
+-
+ 	return ccu_mux_helper_determine_rate(&cd->common, &cd->mux,
+ 					     req, ccu_div_round_rate, cd);
+ }
+-- 
+git-series 0.8.11
