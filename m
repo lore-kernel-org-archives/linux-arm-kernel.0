@@ -1,74 +1,30 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 4 May 2017 09:50:12 +1000
-Subject: linux-next: build failure after merge of the drm-misc tree
-In-Reply-To: <20170421121014.3ee14a83@canb.auug.org.au>
-References: <20170421121014.3ee14a83@canb.auug.org.au>
-Message-ID: <20170504095012.2c109448@canb.auug.org.au>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu,  4 May 2017 00:49:36 +0100
+Subject: [PATCH] Documentation: earlycon: fix Marvell Armada 3700 UART name
+Message-ID: <1493855376-4341-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The Marvell Armada 3700 UART uses "ar3700_uart" for its earlycon name.
+Adjust documentation to match the code.
 
-On Fri, 21 Apr 2017 12:10:14 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->
-> After merging the drm-misc tree, today's linux-next build (x86_64
-> allmodconfig) failed like this:
-> 
-> drivers/tee/tee_shm.c:87:2: error: unknown field 'kmap_atomic' specified in initializer
->   .kmap_atomic = tee_shm_op_kmap_atomic,
->   ^
-> drivers/tee/tee_shm.c:87:17: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
->   .kmap_atomic = tee_shm_op_kmap_atomic,
->                  ^
-> drivers/tee/tee_shm.c:87:17: note: (near initialization for 'tee_shm_dma_buf_ops.begin_cpu_access')
-> drivers/tee/tee_shm.c:88:2: error: unknown field 'kmap' specified in initializer
->   .kmap = tee_shm_op_kmap,
->   ^
-> drivers/tee/tee_shm.c:88:10: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
->   .kmap = tee_shm_op_kmap,
->           ^
-> drivers/tee/tee_shm.c:88:10: note: (near initialization for 'tee_shm_dma_buf_ops.end_cpu_access')
-> 
-> Caused by commit
-> 
->   f9b67f0014cb ("dma-buf: Rename dma-ops to prevent conflict with kunmap_atomic macro")
-> 
-> interacting with commit
-> 
->   967c9cca2cc5 ("tee: generic TEE subsystem")
-> 
-> from the arm-soc tree.
-> 
-> I applied the following merge fix patch for today:
-> 
-> From: Stephen Rothwell <sfr@canb.auug.org.au>
-> Date: Fri, 21 Apr 2017 12:06:32 +1000
-> Subject: [PATCH] tee: merge fix for dma-ops field name changes
-> 
-> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
-> ---
->  drivers/tee/tee_shm.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
-> index 0be1e3e93bee..4e14c9c9cb1c 100644
-> --- a/drivers/tee/tee_shm.c
-> +++ b/drivers/tee/tee_shm.c
-> @@ -84,8 +84,8 @@ static struct dma_buf_ops tee_shm_dma_buf_ops = {
->  	.map_dma_buf = tee_shm_op_map_dma_buf,
->  	.unmap_dma_buf = tee_shm_op_unmap_dma_buf,
->  	.release = tee_shm_op_release,
-> -	.kmap_atomic = tee_shm_op_kmap_atomic,
-> -	.kmap = tee_shm_op_kmap,
-> +	.map_atomic = tee_shm_op_kmap_atomic,
-> +	.map = tee_shm_op_kmap,
->  	.mmap = tee_shm_op_mmap,
->  };
->  
-> -- 
-> 2.11.0
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ Documentation/admin-guide/kernel-parameters.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This fixup is now needed when merging the arm-soc tree with Linus' tree.
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index facc20a..7ee86c2 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -973,7 +973,7 @@
+ 			A valid base address must be provided, and the serial
+ 			port must already be setup and configured.
+ 
+-		armada3700_uart,<addr>
++		ar3700_uart,<addr>
+ 			Start an early, polled-mode console on the
+ 			Armada 3700 serial port at the specified
+ 			address. The serial port must already be setup
 -- 
-Cheers,
-Stephen Rothwell
+2.8.2
