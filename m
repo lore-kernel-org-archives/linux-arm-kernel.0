@@ -1,71 +1,63 @@
-From: henri.roosen@ginzinger.com (Henri Roosen)
-Date: Wed, 3 May 2017 16:27:39 +0200
-Subject: [PATCH] [RFC] ARM: dts: imx6sx-sdb: Drop OPP hackery
-In-Reply-To: <1493818353.11226.2.camel@nxp.com>
-References: <20170425164224.26537-1-marex@denx.de>
- <a75000d6-aa53-92e3-c43a-58b49f18ff7e@denx.de>
- <1493149194.20997.3.camel@nxp.com> <1493818353.11226.2.camel@nxp.com>
-Message-ID: <8467de40-ffde-9723-e09c-54785bbfeab6@ginzinger.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 3 May 2017 16:32:06 +0200
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
+In-Reply-To: <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
+References: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
+ <CAOMZO5BsgXRfgZ0hszk2Vgo2keVDHH1BLbJTbW+awMS2cBoNow@mail.gmail.com>
+ <CAOMZO5CKUsEr1yf5RrsPLipNtLC_6sK0dPjT2M-eN-uo8hEbrQ@mail.gmail.com>
+ <1493141004.3557.8.camel@nxp.com>
+ <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
+ <20170503135715.GG18578@dragon>
+ <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
+Message-ID: <0f84e2ee-1ea1-acf8-8368-3fc848d33e23@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2017 03:32 PM, Leonard Crestez wrote:
-> On Tue, 2017-04-25 at 22:39 +0300, Leonard Crestez wrote:
->> On Tue, 2017-04-25 at 21:30 +0200, Marek Vasut wrote:
+On 05/03/2017 04:26 PM, Marek Vasut wrote:
+> On 05/03/2017 03:57 PM, Shawn Guo wrote:
+>> On Tue, Apr 25, 2017 at 07:28:06PM +0200, Marek Vasut wrote:
+>>> On 04/25/2017 07:23 PM, Leonard Crestez wrote:
+>>>> Anyway, that version also sets the supply for reg_arm and reg_soc. It
+>>>> is not necessary for fixing the crash I'm seeing but is good because it
+>>>> will result in the minimum voltage on VDD_ARM_SOC_IN rather than a fix
+>>>> 1375mv. I tested Marek's patch and it works fine on my rev B board
+>>>> (which otherwise fails to boot upstream).
 >>>
->>> On 04/25/2017 06:42 PM, Marek Vasut wrote:
->>>>
->>>> The imx6sx-sdb has one power supply that drives both VDDARM_IN
->>>> and VDDSOC_IN, which is the sw1a regulator on the PFUZE PMIC.
->>>> Connect both inputs to the sw1a regulator on the PMIC and drop
->>>> the OPP hackery which is no longer needed as the power framework
->>>> will take care of the regulator configuration as needed.
->>>>
->>>> Signed-off-by: Marek Vasut <marex@denx.de>
->>>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
->>>> Cc: Shawn Guo <shawnguo@kernel.org>
->>> +CC Leonard
->> Tested-by: Leonard Crestez <leonard.crestez@nxp.com>
+>>> Oh that's nice , thanks ! I don't have SDB and I hacked it up after a
+>>> brief discussion with Fabio without even compile-testing it, thus RFC.
+>>> Glad to hear it works and thanks for testing it ! Can you add a formal
+>>> Tested-by please ?
 >>
->> The OPP hack only applies to LDO bypass mode and that is not in
->> upstream. When LDOs are enabled the effect is to use higher voltages
->> than necessary for no good reason.
->>
->> Setting these higher voltages can make some boards (for example Rev B)
->> fail to boot with ugly semi-random crashes reminiscent of memory
->> corruption. These failures happen the first time the lowest idle state
->> is used. This patch fixes those crashes.
->>
->> It's not clear exactly why the crashes happen. Perhaps waking up from
->> idle draws more power than is available? I don't think it matters.
->>
->> I sent a very similar patch a few minutes after this one:
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/503241
->> .html
->
-> Adding Henri Roosen because he reported something very similar.
->
-> Henri: Can you please check if this patch fixes your issue?
+>> Hi Marek,
+> 
+> Hi Shawn,
+> 
+>> Thanks for your patch.  But I prefer Leonard's version because: 1) it
+>> has a better commit log; 2) it sticks to one-patch-does-one-thing
+>> policy.
+> 
+> Well I'd prefer this patch because
+> 1) It has T-B
 
-I've been successfully running a similar patch (reverting operating 
-points, without reg_arm/reg_soc) as provided by Anson for about a month 
-on an iMX6SX-SDB RevC board. I'm sorry for not copying the mailing list 
-on this before.
+Correction, two TBs [1]
 
-This patch, with the regulators setup as provided by Marek, has been 
-tested successfully on the iMX6SX-SDB RevC board as well.
+[1] https://patchwork.kernel.org/patch/9698749/
 
-Feel free to add my
+> 2) It actually fixes a problem with the voltage rails such that the DVFS
+>    works without leaving the system in unstable or dead state. You do
+>    need the second part of my patch if you drop the OPP hackery, without
+>    it the power framework cannot correctly configure the core voltages,
+>    so the patch from Leonard makes things worse.
+> 
+>> But I'm going to wait for a while to get Peter's comment discussed,
+>> before I actually apply Leonard's patch.
+>>
+>> Shawn
+>>
+> 
+> 
 
-Tested-by: Henri Roosen <henri.roosen@ginzinger.com>
 
 -- 
 Best regards,
-Henri Roosen
-
->
-> --
-> Regards,
-> Leonard
->
+Marek Vasut
