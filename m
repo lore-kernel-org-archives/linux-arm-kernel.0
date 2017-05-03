@@ -1,67 +1,61 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 3 May 2017 16:51:35 +0200
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
-In-Reply-To: <20170503144059.GL18578@dragon>
-References: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
- <CAOMZO5BsgXRfgZ0hszk2Vgo2keVDHH1BLbJTbW+awMS2cBoNow@mail.gmail.com>
- <CAOMZO5CKUsEr1yf5RrsPLipNtLC_6sK0dPjT2M-eN-uo8hEbrQ@mail.gmail.com>
- <1493141004.3557.8.camel@nxp.com>
- <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
- <20170503135715.GG18578@dragon>
- <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
- <0f84e2ee-1ea1-acf8-8368-3fc848d33e23@denx.de>
- <20170503144059.GL18578@dragon>
-Message-ID: <1af9275a-45ad-67a7-9f59-0677a33cf3a7@denx.de>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed,  3 May 2017 17:51:38 +0300
+Subject: [PATCH 0/3] arm64: queued spinlocks and rw-locks
+Message-ID: <20170503145141.4966-1-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2017 04:41 PM, Shawn Guo wrote:
-> On Wed, May 03, 2017 at 04:32:06PM +0200, Marek Vasut wrote:
->> On 05/03/2017 04:26 PM, Marek Vasut wrote:
->>> On 05/03/2017 03:57 PM, Shawn Guo wrote:
->>>> On Tue, Apr 25, 2017 at 07:28:06PM +0200, Marek Vasut wrote:
->>>>> On 04/25/2017 07:23 PM, Leonard Crestez wrote:
->>>>>> Anyway, that version also sets the supply for reg_arm and reg_soc. It
->>>>>> is not necessary for fixing the crash I'm seeing but is good because it
->>>>>> will result in the minimum voltage on VDD_ARM_SOC_IN rather than a fix
->>>>>> 1375mv. I tested Marek's patch and it works fine on my rev B board
->>>>>> (which otherwise fails to boot upstream).
->>>>>
->>>>> Oh that's nice , thanks ! I don't have SDB and I hacked it up after a
->>>>> brief discussion with Fabio without even compile-testing it, thus RFC.
->>>>> Glad to hear it works and thanks for testing it ! Can you add a formal
->>>>> Tested-by please ?
->>>>
->>>> Hi Marek,
->>>
->>> Hi Shawn,
->>>
->>>> Thanks for your patch.  But I prefer Leonard's version because: 1) it
->>>> has a better commit log; 2) it sticks to one-patch-does-one-thing
->>>> policy.
->>>
->>> Well I'd prefer this patch because
->>> 1) It has T-B
->>
->> Correction, two TBs [1]
->>
->> [1] https://patchwork.kernel.org/patch/9698749/
-> 
-> That doesn't mean Leonard's patch hasn't been tested by anyone.
+The patch 3 adds implementation for queued-based locking on
+ARM64, and the option in kernel config to enable it. Patches
+1 and 2 fix some mess in header files to apply patch 3 smoothly.
 
-That's what the T-B tags are for ...
+Tested on QDF2400 with huge improvements with these patches on
+the torture tests, by Adam Wallis.
 
->>> 2) It actually fixes a problem with the voltage rails such that the DVFS
->>>    works without leaving the system in unstable or dead state. You do
->>>    need the second part of my patch if you drop the OPP hackery, without
->>>    it the power framework cannot correctly configure the core voltages,
->>>    so the patch from Leonard makes things worse.
-> 
-> If that's true, I will change my mind.
+Tested on ThunderX, by Andrew Pinski:
+120 thread (30 core - 4 thread/core) CN99xx (single socket):
 
-Well you can check the schematic ... the ARM and SOC rails share the
-same upstream regulator.
+benchmark               Units	qspinlocks vs ticket locks
+sched/messaging		s	73.91%
+sched/pipe		ops/s	104.18%
+futex/hash		ops/s	103.87%
+futex/wake		ms	71.04%
+futex/wake-parallel	ms	93.88%
+futex/requeue		ms	96.47%
+futex/lock-pi		ops/s	118.33%
+
+Notice, there's the queued locks implementation for the Power PC introduced
+by Pan Xinhui. He largely tested it and also found significant performance
+gain. In arch part it is very similar to this patch though.
+https://lwn.net/Articles/701137/
+
+RFC: https://www.spinics.net/lists/arm-kernel/msg575575.html
+v1:
+ - queued_spin_unlock_wait() and queued_spin_is_locked() are
+   re-implemented in arch part to add additional memory barriers;
+ - queued locks are made optional, ticket locks are enabled by default.
+
+Jan Glauber (1):
+  arm64/locking: qspinlocks and qrwlocks support
+
+Yury Norov (2):
+  kernel/locking: #include <asm/spinlock.h> in qrwlock.c
+  asm-generic: don't #include <linux/atomic.h> in qspinlock_types.h
+
+ arch/arm64/Kconfig                      | 24 +++++++++++++++++++
+ arch/arm64/include/asm/qrwlock.h        |  7 ++++++
+ arch/arm64/include/asm/qspinlock.h      | 42 +++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/spinlock.h       | 12 ++++++++++
+ arch/arm64/include/asm/spinlock_types.h | 14 ++++++++---
+ arch/arm64/kernel/Makefile              |  1 +
+ arch/arm64/kernel/qspinlock.c           | 34 ++++++++++++++++++++++++++
+ include/asm-generic/qspinlock.h         |  1 +
+ include/asm-generic/qspinlock_types.h   |  8 -------
+ kernel/locking/qrwlock.c                |  1 +
+ 10 files changed, 133 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/include/asm/qrwlock.h
+ create mode 100644 arch/arm64/include/asm/qspinlock.h
+ create mode 100644 arch/arm64/kernel/qspinlock.c
 
 -- 
-Best regards,
-Marek Vasut
+2.11.0
