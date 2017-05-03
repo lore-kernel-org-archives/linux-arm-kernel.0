@@ -1,34 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 4 May 2017 00:27:46 +0200
-Subject: [PATCH 1/3] ARM: dts: imx6qdl-nitrogen6_max: fix rv4162 compatible
-In-Reply-To: <CAOMZO5BhxHbSyHhj-6GhHNSbgQ6H6b1+HudB9MhmUOsFPdd5YA@mail.gmail.com>
-References: <20170419202204.7689-1-alexandre.belloni@free-electrons.com>
- <20170503085010.GF18578@dragon>
- <CAOMZO5BhxHbSyHhj-6GhHNSbgQ6H6b1+HudB9MhmUOsFPdd5YA@mail.gmail.com>
-Message-ID: <20170503222746.rsm5y5dwesqbdk2k@piout.net>
+From: markus.mayer@broadcom.com (Markus Mayer)
+Date: Wed, 3 May 2017 15:29:10 -0700
+Subject: [PATCH 1/2] dt/bindings: Add bindings for Broadcom STB DRAM
+ Sensors
+In-Reply-To: <90f011d6-9241-e860-7a0e-2fb52c2337ce@gmail.com>
+References: <20170418201702.57019-1-code@mmayer.net>
+ <20170418201702.57019-2-code@mmayer.net>
+ <CAGt4E5susQWWNZPbNh8AoWtK-4yu50VL=GqOw+_2w_FA+2V68Q@mail.gmail.com>
+ <CAGt4E5uu1Ty0ReaiBZ0kcR_-jnqJQL8vgU4Y9mL64FP7f+=T7Q@mail.gmail.com>
+ <20170427215737.dmnj4u2e4tfc6vfv@rob-hp-laptop>
+ <90f011d6-9241-e860-7a0e-2fb52c2337ce@gmail.com>
+Message-ID: <CAGt4E5s0uoLjeEhk_srxbr=f_sf-NSVXbW_HEJfjnSiAQU8o=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2017 at 19:14:42 -0300, Fabio Estevam wrote:
-> Hi Shawn,
-> 
-> On Wed, May 3, 2017 at 5:50 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> 
-> >>       rtc: rtc at 68 {
-> >> -             compatible = "st,rv4162";
-> >> +             compatible = "microcrystal,rv4162";
-> >
-> > The compatible is not documented?
-> 
-> This compatible has been added in a897bf138c9b443 ("rtc: m41t80: Add
-> proper compatible for rv4162") in linux-next, so it will be present in
-> 4.12-rc1.
+Hi Rob,
 
-Yes, and to be clear, both patches are independent and can be applied
-in any order because the i?C core will still continue to match the
-i2c_device_ids if the compatible doesn't match.
+On 27 April 2017 at 15:00, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 04/27/2017 02:57 PM, Rob Herring wrote:
+>>>>> +Optional properties:
+>>>>> +  - cell-index: the index of the DPFE instance; will default to 0 if not set
+>>
+>> Don't use cell-index. It's not a valid property for FDT (only real
+>> OpenFirmware).
+>
+> My bad, I was advising Markus to use this property since it was largely
+> used throughout Documentation/devicetree/bindings/. What would be a more
+> appropriate way to have the same information? Aliases?
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Hopefully this will be the last time we need to pester you about this.
+What should we be using instead of cell-index to identify multiple
+instances of a device?
+
+To give you an idea of what the code looks like right now:
+
+ret = of_property_read_u32(dev->of_node, "cell-index", &index);
+if (ret)
+    index = 0;
+[...]
+dev_set_name(dpfe_dev, "dpfe%u", index);
+ret = device_register(dpfe_dev);
+
+Enumerating the devices like this is what we are after.
+
+Thanks,
+-Markus
