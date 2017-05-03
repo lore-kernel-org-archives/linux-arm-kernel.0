@@ -1,93 +1,44 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  3 May 2017 16:09:34 +0100
-Subject: [PATCH 2/6] arm64: ensure extension of smp_store_release value
+Date: Wed,  3 May 2017 16:09:36 +0100
+Subject: [PATCH 4/6] arm64: armv8_deprecated: ensure extension of addr
 In-Reply-To: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
 References: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1493824178-7399-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1493824178-7399-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an inline assembly operand's type is narrower than the register it
-is allocated to, the least significant bits of the register (up to the
-operand type's width) are valid, and any other bits are permitted to
-contain any arbitrary value. This aligns with the AAPCS64 parameter
-passing rules.
+Our compat swp emulation holds the compat user address in an unsigned
+int, which it passes to __user_swpX_asm(). When a 32-bit value is passed
+in a register, the upper 32 bits of the register are unknown, and we
+must extend the value to 64 bits before we can use it as a base address.
 
-Our __smp_store_release() implementation does not account for this, and
-implicitly assumes that operands have been zero-extended to the width of
-the type being stored to. Thus, we may store unknown values to memory
-when the value type is narrower than the pointer type (e.g. when storing
-a char to a long).
+This patch casts the address to unsigned long to ensure it has been
+suitably extended, avoiding the potential issue, and silencing a related
+warning from clang.
 
-This patch fixes the issue by casting the value operand to the same
-width as the pointer operand in all cases, which ensures that the value
-is zero-extended as we expect. We use the same union trickery as
-__smp_load_acquire and {READ,WRITE}_ONCE() to avoid GCC complaining that
-pointers are potentially cast to narrower width integers in unreachable
-paths.
-
-A whitespace issue at the top of __smp_store_release() is also
-corrected.
-
-No changes are necessary for __smp_load_acquire(). Load instructions
-implicitly clear any upper bits of the register, and the compiler will
-only consider the least significant bits of the register as valid
-regardless.
-
-Fixes: 47933ad41a86a4a9 ("arch: Introduce smp_load_acquire(), smp_store_release()")
-Fixes: 878a84d5a8a18a4a ("arm64: add missing data types in smp_load_acquire/smp_store_release")
+Fixes: bd35a4adc4131c53 ("arm64: Port SWP/SWPB emulation support from arm")
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Matthias Kaehlcke <mka@chromium.org>
+Cc: Punit Agrawal <punit.agrawal@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/barrier.h | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/armv8_deprecated.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 4e0497f..0fe7e43 100644
---- a/arch/arm64/include/asm/barrier.h
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -42,25 +42,35 @@
- #define __smp_rmb()	dmb(ishld)
- #define __smp_wmb()	dmb(ishst)
- 
--#define __smp_store_release(p, v)						\
-+#define __smp_store_release(p, v)					\
- do {									\
-+	union { typeof(*p) __val; char __c[1]; } __u =			\
-+		{ .__val = (__force typeof(*p)) (v) }; 			\
- 	compiletime_assert_atomic_type(*p);				\
- 	switch (sizeof(*p)) {						\
- 	case 1:								\
- 		asm volatile ("stlrb %w1, %0"				\
--				: "=Q" (*p) : "r" (v) : "memory");	\
-+				: "=Q" (*p)				\
-+				: "r" (*(__u8 *)__u.__c)		\
-+				: "memory");				\
- 		break;							\
- 	case 2:								\
- 		asm volatile ("stlrh %w1, %0"				\
--				: "=Q" (*p) : "r" (v) : "memory");	\
-+				: "=Q" (*p)				\
-+				: "r" (*(__u16 *)__u.__c)		\
-+				: "memory");				\
- 		break;							\
- 	case 4:								\
- 		asm volatile ("stlr %w1, %0"				\
--				: "=Q" (*p) : "r" (v) : "memory");	\
-+				: "=Q" (*p)				\
-+				: "r" (*(__u32 *)__u.__c)		\
-+				: "memory");				\
- 		break;							\
- 	case 8:								\
- 		asm volatile ("stlr %1, %0"				\
--				: "=Q" (*p) : "r" (v) : "memory");	\
-+				: "=Q" (*p)				\
-+				: "r" (*(__u64 *)__u.__c)		\
-+				: "memory");				\
- 		break;							\
- 	}								\
- } while (0)
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index 657977e..f0e6d71 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -306,7 +306,8 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
+ 	_ASM_EXTABLE(0b, 4b)					\
+ 	_ASM_EXTABLE(1b, 4b)					\
+ 	: "=&r" (res), "+r" (data), "=&r" (temp), "=&r" (temp2)	\
+-	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT),		\
++	: "r" ((unsigned long)addr), "i" (-EAGAIN),		\
++	  "i" (-EFAULT),					\
+ 	  "i" (__SWP_LL_SC_LOOPS)				\
+ 	: "memory");						\
+ 	uaccess_disable();					\
 -- 
 1.9.1
