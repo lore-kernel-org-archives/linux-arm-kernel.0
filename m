@@ -1,68 +1,111 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Wed,  3 May 2017 16:37:44 +0100
-Subject: [PATCH v2 0/4] arm64: improve tagged pointer handling
-Message-ID: <1493825868-30872-1-git-send-email-kristina.martsenko@arm.com>
+Date: Wed,  3 May 2017 16:37:48 +0100
+Subject: [PATCH v2 4/4] arm64: documentation: document tagged pointer stack
+ constraints
+In-Reply-To: <1493825868-30872-1-git-send-email-kristina.martsenko@arm.com>
+References: <1493825868-30872-1-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1493825868-30872-5-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Some kernel features don't currently work if a task puts a non-zero
+address tag in its stack pointer, frame pointer, or frame record entries
+(FP, LR).
 
-Here are some patches to fix a few issues related to tagged pointer
-handling.
+For example, with a tagged stack pointer, the kernel can't deliver
+signals to the process, and the task is killed instead. As another
+example, with a tagged frame pointer or frame records, perf fails to
+generate call graphs or resolve symbols.
 
-Tagged pointers from userspace can end up in the kernel in a number of
-ways. I most likely have not found all of them, but they include at
-least the following:
+For now, just document these limitations, instead of finding and fixing
+everything that doesn't work, as it's not known if anyone needs to use
+tags in these places anyway.
 
- - Passing tagged pointers in system call arguments. This would be a
-   userspace bug, as documented in tagged-pointers.txt.
+In addition, as requested by Dave Martin, generalize the limitations
+into a general kernel address tag policy, and refactor
+tagged-pointers.txt to include it.
 
- - Through FAR_EL1 when we take a data abort or watchpoint exception.
-   Watchpoint handling is currently broken if we get a tagged pointer,
-   patch #2 in this series fixes it. We already do the right thing for
-   data aborts but patch #3 tries to improve on it a little.
-
- - Reading a tagged pointer from a GPR when trapping and emulating
-   instructions, e.g. cache maintenance or uprobes. Patch #1 fixes the
-   cache maintenance case.
-
- - The user stack pointer, frame pointer (x29), frame records, and link
-   register (x30) can contain tagged pointers. Patch #4 documents that
-   some kernel features do not currently work with tagged pointers in
-   the first three of these.
-
- - A tagged pointer can end up in the PC on an illegal exception return
-   (see D4.1.4 ARMARM A.k_iss10775), and from there in ELR on exception
-   entry. As I understand it, this can only be caused by a bad eret at
-   EL1 or a bad debug state exit by an external debugger, so only by a
-   bug in Linux/firmware or the external debugger. So I don't think we
-   need to handle this.
-
-Note that the above applies to Linux only. I have spoken to Marc Zyngier
-about KVM, and so far he hasn't found any problems there.
-
-Thanks,
-Kristina
-
-v2:
- - Patch #3: changed clear_address_tag macro arguments, swapped bic and
-   tst
-
-
-Kristina Martsenko (4):
-  arm64: traps: fix userspace cache maintenance emulation on a tagged
-    pointer
-  arm64: hw_breakpoint: fix watchpoint matching for tagged pointers
-  arm64: entry: improve data abort handling of tagged pointers
-  arm64: documentation: document tagged pointer stack constraints
-
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+---
  Documentation/arm64/tagged-pointers.txt | 62 +++++++++++++++++++++++++--------
- arch/arm64/include/asm/asm-uaccess.h    |  9 +++++
- arch/arm64/include/asm/uaccess.h        |  6 ++--
- arch/arm64/kernel/entry.S               |  5 +--
- arch/arm64/kernel/hw_breakpoint.c       |  3 ++
- arch/arm64/kernel/traps.c               |  4 +--
- 6 files changed, 67 insertions(+), 22 deletions(-)
+ 1 file changed, 47 insertions(+), 15 deletions(-)
 
+diff --git a/Documentation/arm64/tagged-pointers.txt b/Documentation/arm64/tagged-pointers.txt
+index d9995f1f51b3..a25a99e82bb1 100644
+--- a/Documentation/arm64/tagged-pointers.txt
++++ b/Documentation/arm64/tagged-pointers.txt
+@@ -11,24 +11,56 @@ in AArch64 Linux.
+ The kernel configures the translation tables so that translations made
+ via TTBR0 (i.e. userspace mappings) have the top byte (bits 63:56) of
+ the virtual address ignored by the translation hardware. This frees up
+-this byte for application use, with the following caveats:
++this byte for application use.
+ 
+-	(1) The kernel requires that all user addresses passed to EL1
+-	    are tagged with tag 0x00. This means that any syscall
+-	    parameters containing user virtual addresses *must* have
+-	    their top byte cleared before trapping to the kernel.
+ 
+-	(2) Non-zero tags are not preserved when delivering signals.
+-	    This means that signal handlers in applications making use
+-	    of tags cannot rely on the tag information for user virtual
+-	    addresses being maintained for fields inside siginfo_t.
+-	    One exception to this rule is for signals raised in response
+-	    to watchpoint debug exceptions, where the tag information
+-	    will be preserved.
++Passing tagged addresses to the kernel
++--------------------------------------
+ 
+-	(3) Special care should be taken when using tagged pointers,
+-	    since it is likely that C compilers will not hazard two
+-	    virtual addresses differing only in the upper byte.
++All interpretation of userspace memory addresses by the kernel assumes
++an address tag of 0x00.
++
++This includes, but is not limited to, addresses found in:
++
++ - pointer arguments to system calls, including pointers in structures
++   passed to system calls,
++
++ - the stack pointer (sp), e.g. when interpreting it to deliver a
++   signal,
++
++ - the frame pointer (x29) and frame records, e.g. when interpreting
++   them to generate a backtrace or call graph.
++
++Using non-zero address tags in any of these locations may result in an
++error code being returned, a (fatal) signal being raised, or other modes
++of failure.
++
++For these reasons, passing non-zero address tags to the kernel via
++system calls is forbidden, and using a non-zero address tag for sp is
++strongly discouraged.
++
++Programs maintaining a frame pointer and frame records that use non-zero
++address tags may suffer impaired or inaccurate debug and profiling
++visibility.
++
++
++Preserving tags
++---------------
++
++Non-zero tags are not preserved when delivering signals. This means that
++signal handlers in applications making use of tags cannot rely on the
++tag information for user virtual addresses being maintained for fields
++inside siginfo_t. One exception to this rule is for signals raised in
++response to watchpoint debug exceptions, where the tag information will
++be preserved.
+ 
+ The architecture prevents the use of a tagged PC, so the upper byte will
+ be set to a sign-extension of bit 55 on exception return.
++
++
++Other considerations
++--------------------
++
++Special care should be taken when using tagged pointers, since it is
++likely that C compilers will not hazard two virtual addresses differing
++only in the upper byte.
 -- 
 2.1.4
