@@ -1,86 +1,130 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 3 May 2017 17:59:29 +0200
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
-In-Reply-To: <1493823533.11226.28.camel@nxp.com>
-References: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
- <CAOMZO5BsgXRfgZ0hszk2Vgo2keVDHH1BLbJTbW+awMS2cBoNow@mail.gmail.com>
- <CAOMZO5CKUsEr1yf5RrsPLipNtLC_6sK0dPjT2M-eN-uo8hEbrQ@mail.gmail.com>
- <1493141004.3557.8.camel@nxp.com>
- <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
- <20170503135715.GG18578@dragon>
- <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
- <1493823533.11226.28.camel@nxp.com>
-Message-ID: <e46a57c2-4a28-a8b6-445e-299dd9d8659c@denx.de>
+From: alexander.duyck@gmail.com (Alexander Duyck)
+Date: Wed, 3 May 2017 09:02:12 -0700
+Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <MWHPR12MB160095DF53CE981C923FE65DC8160@MWHPR12MB1600.namprd12.prod.outlook.com>
+References: <cover.1493678834.git.leedom@chelsio.com>
+ <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
+ <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
+ <20170502165329.GB26406@linux.intel.com>
+ <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
+ <MWHPR12MB160095DF53CE981C923FE65DC8160@MWHPR12MB1600.namprd12.prod.outlook.com>
+Message-ID: <CAKgT0UdJ17DGAphuP5Y9co6ky-GBFdq2s-1nqctY_Tz_iz5__g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2017 04:58 PM, Leonard Crestez wrote:
-> On Wed, 2017-05-03 at 16:26 +0200, Marek Vasut wrote:
-> 
->> On 05/03/2017 03:57 PM, Shawn Guo wrote:
->>>
->>> On Tue, Apr 25, 2017 at 07:28:06PM +0200, Marek Vasut wrote:
->>>>
->>>> On 04/25/2017 07:23 PM, Leonard Crestez wrote:
->>>>>
->>>>> Anyway, that version also sets the supply for reg_arm and reg_soc. It
->>>>> is not necessary for fixing the crash I'm seeing but is good because it
->>>>> will result in the minimum voltage on VDD_ARM_SOC_IN rather than a fix
->>>>> 1375mv. I tested Marek's patch and it works fine on my rev B board
->>>>> (which otherwise fails to boot upstream).
->>>> Oh that's nice , thanks ! I don't have SDB and I hacked it up after a
->>>> brief discussion with Fabio without even compile-testing it, thus RFC.
->>>> Glad to hear it works and thanks for testing it ! Can you add a formal
->>>> Tested-by please ?
->>> Hi Marek,
->> Hi Shawn,
->>
->>> Thanks for your patch.  But I prefer Leonard's version because: 1) it
->>> has a better commit log; 2) it sticks to one-patch-does-one-thing
->>> policy.
-> 
->> 2) It actually fixes a problem with the voltage rails such that the DVFS
->>    works without leaving the system in unstable or dead state. You do
->>    need the second part of my patch if you drop the OPP hackery, without
->>    it the power framework cannot correctly configure the core voltages,
->>    so the patch from Leonard makes things worse.
-> 
-> No, I think there is a misunderstanding here. The second part of your
-> patch will cause cpufreq poking at LDOs to indirectly adjust the input
-> from the PMIC to the minimum required (this is LDO target +
-> min_dropout_uv). Without it by default VDD_ARM_SOC_IN will remain fixed
-> as 1375mV from boot.
+On Tue, May 2, 2017 at 9:30 PM, Casey Leedom <leedom@chelsio.com> wrote:
+> | From: Alexander Duyck <alexander.duyck@gmail.com>
+> | Date: Tuesday, May 2, 2017 11:10 AM
+> | ...
+> | So for example, in the case of x86 it seems like there are multiple
+> | root complexes that have issues, and the gains for enabling it with
+> | standard DMA to host memory are small. As such we may want to default
+> | it to off via the architecture specific PCIe code and then look at
+> | having "white-list" cases where we enable it for things like
+> | peer-to-peer accesses. In the case of SPARC we could look at
+> | defaulting it to on, and only "black-list" any cases where there might
+> | be issues since SPARC relies on this in a significant way for
+> | performance. In the case of ARM and other architectures it is a bit of
+> | a toss-up. I would say we could just default it to on for now and
+> | "black-list" anything that doesn't work, or we could go the other way
+> | like I suggested for x86. It all depends on what the ARM community
+> | would want to agree on for this. I would say unless it makes a
+> | significant difference like it does in the case of SPARC we are
+> | probably better off just defaulting it to off.
+>
+>   Sorry, I forgot to respond to this earlier when someone was rushing me out
+> to a customer dinner.
+>
+>   I'm unaware of any other x86 Root Complex Port that has a problem with
+> Relaxed Ordering other than the performance issue with the current Intel
+> implementation.  Ashok tells me that Intel is in the final stages of putting
+> together a technical notice on this issue but I don't know when that will
+> come out.  Hopefully that will shed much more light on the cause and actual
+> use of Relaxed Ordering when directed to Coherent Memory on current and past
+> Intel platforms.  (Note that the performance bug seems to limit us to
+> ~75-85Gb/s DMA Write speed to Coherent Host Memory.)
 
-Who sets / guarantees that default value for ARM and SOC rails ?
+So my concern isn't so much about existing issues as it is about where
+is the advantage in enabling it. We have had support in the Intel
+hardware for enabling relaxed ordering for about 10 years. In all that
+time I have yet to see an x86 platform that sees any real benefit from
+enabling it for standard DMA. That is why my preference would be to
+leave it disabled by default on x86 and we white list it in at some
+point when hardware shows that there is a benefit to be had for
+enabling it.
 
-With the OPP override in place, there's at least the guarantee that both
-rails will have the same voltage requirement. If you remove the OPP
-override without modeling the actual regulator wiring, the guarantee is
-gone.
+>   The only other Device that I currently know of which has issues with
+> Relaxed Ordering TLPs directed at it, is also a Root Complex Port on the new
+> AMD A1100 ARM SoC ("SEATTLE").  There we have an actual bug which could lead
+> to Data Corruption.
+>
+>   But I don't know anything about other x86 Root Complex Ports having issues
+> with this -- we've been using it ever since commit ef306b50b from December
+> 2010.
 
-> That default value should be high enough for all cpufreq settings.
-> Setting the LDO parent will cause this voltage to be dynamically
-> reduced when possible (at low frequencies). This is not required for
-> proper operation, it is just an optimization to do more of the
-> regulation in the PMIC instead. It should work just fine without the
-> second part.
-> 
-> That OPP override exists for "LDO bypass" mode, a feature not present
-> in upstream. In that mode the internal regulators are set to bypass
-> mode and voltage is controlled directly from the PMIC. Since VDD_ARM
-> and VDD_SOC have different minimum requirements but are joined on the
-> board the OPP voltages are adjusted to max(VDD_ARM, VDD_SOC). If LDOs
-> are enabled there is no good reason to do this.
-> 
-> I don't care which patch goes in but the effect of the patch should be
-> clarified.
-> 
-> -- 
-> Regards,
-> Leonard
-> 
+So the question I would have for you then, is what benefits have you
+seen from enabling it on x86? In our case we haven't seen any for
+transactions that go through the root complex. If you are seeing
+benefits would I be correct in assuming it is for your peer-to-peer
+case or were there some x86 platforms that showed gains?
 
+>   Also, I'm not aware of any performance data which has been gathered on the
+> use of Relaxed Ordering when directed at Host Memory.  From your note, it
+> sounds like it's important on SPARC architectures.  But it could conceivably
+> be important on any architecture or Root Complex/Memory Controller
+> implementation.  We use it to direct Ingress Packet Data to Free List
+> Buffers, followed by a TLP without Relaxed Ordering directed at a Host
+> Memory Message Queue.  The idea here is to give the Root Complex options on
+> which DMA Memory Write TLPs to process in order to optimize data placement
+> in memory.  And with the next Ethernet speed bump to 200Gb/s this may be
+> even more important.
 
--- 
-Best regards,
-Marek Vasut
+The operative term here is "may be". That is my concern. We are
+leaving this enabled by default and there are known hardware that have
+issues that can be pretty serious. I'm not saying we have to disable
+it and keep it disabled, but I would like to see us intelligently
+enable this feature so that it is enabled on the platforms that show
+benefit and disabled on the ones that don't.
+
+My biggest concern with all this is introducing regressions as drivers
+like igb and ixgbe are used on a wide range of platforms beyond even
+what is covered by x86 and I would prefer not to suddenly have a
+deluge of bugs to sort out triggered by us enabling relaxed ordering
+on platforms that historically have not had it enabled on them.
+
+>   Basically, I'd hate to come up with a solution where we write off the use
+> of Relaxed Ordering for DMA Writes to Host Memory.  I don't think you're
+> suggesting that, but there are a number of x86 Root Complex implementations
+> out there -- and some like the new AMD Ryzen have yet to be tested -- as
+> well as other architectures.
+
+I'm not saying that we have to write off the use of Relaxed Ordering,
+what I am saying is that we should probably be more judicious about
+how we go about enabling it. If a platform and/or architecture has no
+benefit to enabling it what is the point in adding the possible risk?
+
+Hopefully the AMD Ryzen platform has already been tested and doesn't
+need a quirk to disable relaxed ordering. Really it shouldn't fall on
+the likes of us to be testing for those kind of things.
+
+>   And, as Ashok and I have both nothed, any solution we come up with needs
+> to cope with a heterogeneous situation where, on the same PCIe Fabric, it
+> may be necessesary/desireable to support Relaxed Ordering TLPs directed at
+> some End Nodes but not others.
+>
+> Casey
+
+It sounds like we are more or less in agreement. My only concern is
+really what we default this to. On x86 I would say we could probably
+default this to disabled for existing platforms since my understanding
+is that relaxed ordering doesn't provide much benefit on what is out
+there right now when performing DMA through the root complex. As far
+as peer-to-peer I would say we should probably look at enabling the
+ability to have Relaxed Ordering enabled for some channels but not
+others. In those cases the hardware needs to be smart enough to allow
+for you to indicate you want it disabled by default for most of your
+DMA channels, and then enabled for the select channels that are
+handling the peer-to-peer traffic.
+
+- Alex
