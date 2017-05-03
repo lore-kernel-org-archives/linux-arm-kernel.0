@@ -1,147 +1,39 @@
 From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Wed,  3 May 2017 10:56:25 +0100
-Subject: [PATCH v5 1/5] dt-bindings: gpu: add bindings for the ARM Mali
- Midgard GPU
+Date: Wed,  3 May 2017 10:56:29 +0100
+Subject: [PATCH v5 5/5] ARM: dts: rockchip: enable ARM Mali GPU on
+ rk3288-veyron
 In-Reply-To: <cover.1493804968.git.guillaume.tucker@collabora.com>
 References: <cover.1493804968.git.guillaume.tucker@collabora.com>
-Message-ID: <bebe578ba130de5fa320ca7c6427b2fae83d61d7.1493804968.git.guillaume.tucker@collabora.com>
+Message-ID: <000831729017aaf278618b76205a4f1029c2575b.1493804968.git.guillaume.tucker@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM Mali Midgard GPU family is present in a number of SoCs
-from many different vendors such as Samsung Exynos and Rockchip.
+From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 
-Import the device tree bindings documentation from the r16p0
-release of the Mali Midgard GPU kernel driver:
+Add reference to the Mali GPU device tree node on rk3288-veyron.
+Tested on Minnie and Jerry boards.
 
-  https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/mali-midgard-gpu/TX011-SW-99002-r16p0-00rel0.tgz
-
-Remove the copyright and GPL licence header as deemed not necessary.
-
-Redesign the "compatible" property strings to list all the Mali
-Midgard GPU types and add vendor specific ones.
-
-Drop the "clock-names" property as the Mali Midgard GPU uses only one
-clock (the driver now needs to call clk_get with NULL).
-
-Convert the "interrupt-names" property values to lower-case: "job",
-"mmu" and "gpu".
-
-Replace the deprecated "operating-points" optional property with
-"operating-points-v2".
-
-Omit the following optional properties in this initial version as they
-are only used in very specific cases:
-
-  * snoop_enable_smc
-  * snoop_disable_smc
-  * jm_config
-  * power_model
-  * system-coherency
-  * ipa-model
-
-Update the example accordingly to reflect all these changes, based on
-rk3288 mali-t760.
-
-CC: John Reitan <john.reitan@arm.com>
-Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
 ---
- .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 86 ++++++++++++++++++++++
- 1 file changed, 86 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+ arch/arm/boot/dts/rk3288-veyron.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
-new file mode 100644
-index 000000000000..d3b6e1a4713a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
-@@ -0,0 +1,86 @@
-+ARM Mali Midgard GPU
-+====================
-+
-+Required properties:
-+
-+- compatible :
-+  * Must contain one of the following:
-+    + "arm,mali-t604"
-+    + "arm,mali-t624"
-+    + "arm,mali-t628"
-+    + "arm,mali-t720"
-+    + "arm,mali-t760"
-+    + "arm,mali-t820"
-+    + "arm,mali-t830"
-+    + "arm,mali-t860"
-+    + "arm,mali-t880"
-+  * which must be preceded by one of the following vendor specifics:
-+    + "amlogic,meson-gxm-mali"
-+    + "rockchip,rk3288-mali"
-+
-+- reg : Physical base address of the device and length of the register area.
-+
-+- interrupts : Contains the three IRQ lines required by Mali Midgard devices.
-+
-+- interrupt-names : Contains the names of IRQ resources in the order they were
-+  provided in the interrupts property. Must contain: "job", "mmu", "gpu".
-+
-+
-+Optional properties:
-+
-+- clocks : Phandle to clock for the Mali Midgard device.
-+
-+- mali-supply : Phandle to regulator for the Mali device. Refer to
-+  Documentation/devicetree/bindings/regulator/regulator.txt for details.
-+
-+- operating-points-v2 : Refer to Documentation/devicetree/bindings/power/opp.txt
-+  for details.
-+
-+
-+Example for a Mali-T760:
-+
-+gpu at ffa30000 {
-+	compatible = "rockchip,rk3288-mali", "arm,mali-t760", "arm,mali-midgard";
-+	reg = <0xffa30000 0x10000>;
-+	interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+	interrupt-names = "job", "mmu", "gpu";
-+	clocks = <&cru ACLK_GPU>;
+diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
+index 5d1eb0a25827..9847d5c6db3b 100644
+--- a/arch/arm/boot/dts/rk3288-veyron.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
+@@ -447,6 +447,11 @@
+ 	status = "okay";
+ };
+ 
++&gpu {
 +	mali-supply = <&vdd_gpu>;
-+	operating-points-v2 = <&gpu_opp_table>;
-+	power-domains = <&power RK3288_PD_GPU>;
++	status = "okay";
 +};
 +
-+gpu_opp_table: opp_table0 {
-+	compatible = "operating-points-v2";
-+
-+	opp at 533000000 {
-+		opp-hz = /bits/ 64 <533000000>;
-+		opp-microvolt = <1250000>;
-+	};
-+	opp at 450000000 {
-+		opp-hz = /bits/ 64 <450000000>;
-+		opp-microvolt = <1150000>;
-+	};
-+	opp at 400000000 {
-+		opp-hz = /bits/ 64 <400000000>;
-+		opp-microvolt = <1125000>;
-+	};
-+	opp at 350000000 {
-+		opp-hz = /bits/ 64 <350000000>;
-+		opp-microvolt = <1075000>;
-+	};
-+	opp at 266000000 {
-+		opp-hz = /bits/ 64 <266000000>;
-+		opp-microvolt = <1025000>;
-+	};
-+	opp at 160000000 {
-+		opp-hz = /bits/ 64 <160000000>;
-+		opp-microvolt = <925000>;
-+	};
-+	opp at 100000000 {
-+		opp-hz = /bits/ 64 <100000000>;
-+		opp-microvolt = <912500>;
-+	};
-+};
+ &wdt {
+ 	status = "okay";
+ };
 -- 
 2.11.0
