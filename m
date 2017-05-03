@@ -1,60 +1,135 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 3 May 2017 11:16:42 +0100
-Subject: [RFC/RFT PATCH 08/18] PCI: designware: Convert PCI scan API to
- pci_scan_root_bus_bridge()
-In-Reply-To: <CAK8P3a1ULYxkopxJ8-vZpFs_uPP2gu5TsRWjCKUOW+0QRombLw@mail.gmail.com>
-References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
- <20170426111809.19922-9-lorenzo.pieralisi@arm.com>
- <CAK8P3a1ULYxkopxJ8-vZpFs_uPP2gu5TsRWjCKUOW+0QRombLw@mail.gmail.com>
-Message-ID: <20170503101642.GA10800@red-moon>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 3 May 2017 12:22:06 +0200
+Subject: [PATCH v5 16/22] KVM: arm64: vgic-its: Add infrastructure for
+ table lookup
+In-Reply-To: <20170503080158.GA8452@cbox>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-17-git-send-email-eric.auger@redhat.com>
+ <20170430193555.GB1670@lvm> <303f2981-489e-ec38-ebaf-40d65429d820@redhat.com>
+ <20170503080158.GA8452@cbox>
+Message-ID: <970be3ad-4856-899e-1129-dd88318c00f0@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 03:13:04PM +0200, Arnd Bergmann wrote:
-> On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > The introduction of pci_scan_root_bus_bridge() provides a PCI core
-> > API to scan a PCI root bus backed by an already initialized
-> > struct pci_host_bridge object, which simplifies the bus scan
-> > interface and makes the PCI scan root bus interface easier to
-> > generalize as members are added to the struct pci_host_bridge().
-> >
-> > Convert PCI designware host code to pci_scan_root_bus_bridge() to
-> > improve the PCI root bus scanning interface.
-> >
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Jingoo Han <jingoohan1@gmail.com>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Joao Pinto <Joao.Pinto@synopsys.com>
-> > ---
-> >  drivers/pci/dwc/pcie-designware-host.c | 36 +++++++++++++++++++++-------------
-> >  1 file changed, 22 insertions(+), 14 deletions(-)
-> >
-> > diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
-> > index 5ba3349..e43c21a 100644
-> > --- a/drivers/pci/dwc/pcie-designware-host.c
-> > +++ b/drivers/pci/dwc/pcie-designware-host.c
-> > @@ -294,16 +294,21 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >                 dev_err(dev, "missing *config* reg space\n");
-> >         }
-> >
-> > -       ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base);
-> > +       bridge = pci_alloc_host_bridge(0);
-> > +       if (!bridge)
-> > +               return  -ENOMEM;
-> > +
+Hi Christoffer,
+
+On 03/05/2017 10:01, Christoffer Dall wrote:
+> On Wed, May 03, 2017 at 08:53:36AM +0200, Auger Eric wrote:
+>> Hi Christoffer,
+>>
+>> On 30/04/2017 21:35, Christoffer Dall wrote:
+>>> On Fri, Apr 14, 2017 at 12:15:28PM +0200, Eric Auger wrote:
+>>>> Add a generic lookup_table() helper whose role consists in
+>>>> scanning a contiguous table located in guest RAM and applying
+>>>> a callback on each entry. Entries can be handled as linked lists
+>>>> since the callback may return an offset to the next entry and
+>>>> also tell that an entry is the last one.
+>>>>
+>>>> Helper functions also are added to compute the device/event ID
+>>>> offset to the next DTE/ITE.
+>>>>
+>>>> compute_next_devid_offset, compute_next_eventid_offset and
+>>>> lookup_table will become static in subsequent patches
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>>>
+>>>> ---
+>>>> v4 -> v5:
+>>>> - use kvm_read_guest
+>>>>
+>>>> v3 -> v4:
+>>>> - remove static to avoid compilation warning
+>>>> - correct size computation in looup_table()
+>>>> - defines now encode the number of bits used for devid and eventid offsets
+>>>> - use BIT() - 1 to encode the max offets
+>>>> ---
+>>>>  virt/kvm/arm/vgic/vgic-its.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
+>>>>  1 file changed, 93 insertions(+)
+>>>>
+>>>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>>>> index 56c5123..c22b35d 100644
+>>>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>>>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>>>> @@ -195,6 +195,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+>>>>  
+>>>>  #define VITS_TYPER_IDBITS 16
+>>>>  #define VITS_TYPER_DEVBITS 16
+>>>> +#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
+>>>> +#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
+>>>>  
+>>>>  /*
+>>>>   * Finds and returns a collection in the ITS collection table.
+>>>> @@ -1674,6 +1676,97 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+>>>>  	return ret;
+>>>>  }
+>>>>  
+>>>> +u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
+>>>> +{
+>>>> +	struct list_head *e = &dev->dev_list;
+>>>> +	struct its_device *next;
+>>>> +	u32 next_offset;
+>>>> +
+>>>> +	if (e->next == h)
+>>>> +		return 0;
+>>>> +	next = list_entry(e->next, struct its_device, dev_list);
+>>>> +	next_offset = next->device_id - dev->device_id;
+>>>> +
+>>>> +	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
+>>>> +}
+>>>> +
+>>>> +u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
+>>>> +{
+>>>> +	struct list_head *e = &ite->ite_list;
+>>>> +	struct its_ite *next;
+>>>> +	u32 next_offset;
+>>>> +
+>>>> +	if (e->next == h)
+>>>> +		return 0;
+>>>> +	next = list_entry(e->next, struct its_ite, ite_list);
+>>>> +	next_offset = next->event_id - ite->event_id;
+>>>> +
+>>>> +	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
+>>>> +}
+>>>> +
+>>>> +/**
+>>>> + * entry_fn_t - Callback called on a table entry restore path
+>>>> + * @its: its handle
+>>>> + * @id: id of the entry
+>>>> + * @entry: pointer to the entry
+>>>> + * @opaque: pointer to an opaque data
+>>>> + * @next_offset: minimal ID offset to the next entry. 0 if this
+>>>> + * entry is the last one, 1 if the entry is invalid, >= 1 if an
+>>>
+>>> eh, also, did you mean -1 if the entry is invalid?
+>> no in case the entry is invalid, we tell the caller that it must inspect
+>> the next entry, hence the next_offset = +1.
+> jjjjj
+> hmm, but you say aftterwards that >= 1 if an entry's next_offset field
+> was truly decoded, so this is confusing.  Perhaps it would make more
+> sense to get rid of the parameter entirely and change the return value
+> to say:
 > 
-> I think here we warn to have the pci_alloc_host_bridge() called in the
+>   Return: < 0 on error, 0 if the entry was the last one, and > 0 to
+>           indicate the offset to the next entry that must be processed
+> 	  when scanning a table.
+> 
+>   Note that we return 1 for an invalid entry, because scanning a table
+>   in this case simply requires us looking at the next entry, but we may
+>   return >= to 1 if we found a valid entry and decoded the next field in
+>   the entry.
+> 
+> What do you think?
+Yes I'm going to experiment that change.
 
-s/warn/want, correct ?
+Thanks
 
-> individual drivers, to have them allocate the dw_pcie structure as
-> part of the host bridge allocation, before calling
-> hisi_add_pcie_port().
-
-I see what you mean I will see how I can do it with this series or
-another one, it won't certainly make this DW stuff any shinier, it
-is really really hard to read.
-
-Thanks,
-Lorenzo
+Eric
+> 
+> Thanks,
+> -Christoffer
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
