@@ -1,326 +1,153 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed,  3 May 2017 20:33:00 +0200
-Subject: [PATCH 5/5] KVM: arm/arm64: Allow setting the timer IRQ numbers from
- userspace
-In-Reply-To: <20170503183300.4618-1-cdall@linaro.org>
-References: <20170503183300.4618-1-cdall@linaro.org>
-Message-ID: <20170503183300.4618-6-cdall@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 May 2017 19:55:33 +0100
+Subject: [PATCH v2] misc: sram-exec: Use aligned fncpy instead of memcpy
+In-Reply-To: <20170410145247.6023-1-d-gerlach@ti.com>
+References: <20170410145247.6023-1-d-gerlach@ti.com>
+Message-ID: <20170503185533.GS23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First we define an ABI using the vcpu devices that lets userspace set
-the interrupt numbers for the various timers on both the 32-bit and
-64-bit KVM/ARM implementations.
+On Mon, Apr 10, 2017 at 09:52:47AM -0500, Dave Gerlach wrote:
+> Currently the sram-exec functionality, which allows allocation of
+> executable memory and provides an API to move code to it, is only
+> selected in configs for the ARM architecture. Based on commit
+> 5756e9dd0de6 ("ARM: 6640/1: Thumb-2: Symbol manipulation macros for
+> function body copying") simply copying a C function pointer address
+> using memcpy without consideration of alignment and Thumb is unsafe on
+> ARM platforms.
+> 
+> The aforementioned patch introduces the fncpy macro which is a safe way
+> to copy executable code on ARM platforms, so let's make use of that here
+> rather than the unsafe plain memcpy that was previously used by
+> sram_exec_copy. Now sram_exec_copy will move the code to "dst" and
+> return an address that is guaranteed to be safely callable.
+> 
+> In the future, architectures hoping to make use of the sram-exec
+> functionality must define an fncpy macro just as ARM has done to
+> guarantee or check for safe copying to executable memory before allowing
+> the arch to select CONFIG_SRAM_EXEC.
+> 
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 
-Second, we add the definitions for the groups and attributes introduced
-by the above ABI.  (We add the PMU define on the 32-bit side as well for
-symmetry and it may get used some day.)
+Looks a lot saner, thanks.  It's just a bit sad that we lose the type
+checking.
 
-Third, we set up the arch-specific vcpu device operation handlers to
-call into the timer code for anything related to the
-KVM_ARM_VCPU_TIMER_CTRL group.
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Fourth, we implement support for getting and setting the timer interrupt
-numbers using the above defined ABI in the arch timer code.
+> ---
+> 
+> v1: http://www.spinics.net/lists/linux-omap/msg136517.html
+> 
+> v2 changes: Return value of fncpy, as the returned address is the safely
+> 	    executable one, and add supporting docs in comments.
+> 
+>  drivers/misc/sram-exec.c | 27 ++++++++++++++++++++-------
+>  include/linux/sram.h     |  8 ++++----
+>  2 files changed, 24 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/misc/sram-exec.c b/drivers/misc/sram-exec.c
+> index ac522417c462..9d54e14e8360 100644
+> --- a/drivers/misc/sram-exec.c
+> +++ b/drivers/misc/sram-exec.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/sram.h>
+>  
+>  #include <asm/cacheflush.h>
+> +#include <asm/fncpy.h>
+>  
+>  #include "sram.h"
+>  
+> @@ -57,20 +58,32 @@ int sram_add_protect_exec(struct sram_partition *part)
+>   * @src: Source address for the data to copy
+>   * @size: Size of copy to perform, which starting from dst, must reside in pool
+>   *
+> + * Return: Address for copied data that can safely be called through function
+> + *	   pointer, or NULL if problem.
+> + *
+>   * This helper function allows sram driver to act as central control location
+>   * of 'protect-exec' pools which are normal sram pools but are always set
+>   * read-only and executable except when copying data to them, at which point
+>   * they are set to read-write non-executable, to make sure no memory is
+>   * writeable and executable at the same time. This region must be page-aligned
+>   * and is checked during probe, otherwise page attribute manipulation would
+> - * not be possible.
+> + * not be possible. Care must be taken to only call the returned address as
+> + * dst address is not guaranteed to be safely callable.
+> + *
+> + * NOTE: This function uses the fncpy macro to move code to the executable
+> + * region. Some architectures have strict requirements for relocating
+> + * executable code, so fncpy is a macro that must be defined by any arch
+> + * making use of this functionality that guarantees a safe copy of exec
+> + * data and returns a safe address that can be called as a C function
+> + * pointer.
+>   */
+> -int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+> -		   size_t size)
+> +void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+> +		     size_t size)
+>  {
+>  	struct sram_partition *part = NULL, *p;
+>  	unsigned long base;
+>  	int pages;
+> +	void *dst_cpy;
+>  
+>  	mutex_lock(&exec_pool_list_mutex);
+>  	list_for_each_entry(p, &exec_pool_list, list) {
+> @@ -80,10 +93,10 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+>  	mutex_unlock(&exec_pool_list_mutex);
+>  
+>  	if (!part)
+> -		return -EINVAL;
+> +		return NULL;
+>  
+>  	if (!addr_in_gen_pool(pool, (unsigned long)dst, size))
+> -		return -EINVAL;
+> +		return NULL;
+>  
+>  	base = (unsigned long)part->base;
+>  	pages = PAGE_ALIGN(size) / PAGE_SIZE;
+> @@ -93,13 +106,13 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+>  	set_memory_nx((unsigned long)base, pages);
+>  	set_memory_rw((unsigned long)base, pages);
+>  
+> -	memcpy(dst, src, size);
+> +	dst_cpy = fncpy(dst, src, size);
+>  
+>  	set_memory_ro((unsigned long)base, pages);
+>  	set_memory_x((unsigned long)base, pages);
+>  
+>  	mutex_unlock(&part->lock);
+>  
+> -	return 0;
+> +	return dst_cpy;
+>  }
+>  EXPORT_SYMBOL_GPL(sram_exec_copy);
+> diff --git a/include/linux/sram.h b/include/linux/sram.h
+> index c97dcbe8ce25..4fb405fb0480 100644
+> --- a/include/linux/sram.h
+> +++ b/include/linux/sram.h
+> @@ -16,12 +16,12 @@
+>  struct gen_pool;
+>  
+>  #ifdef CONFIG_SRAM_EXEC
+> -int sram_exec_copy(struct gen_pool *pool, void *dst, void *src, size_t size);
+> +void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src, size_t size);
+>  #else
+> -static inline int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+> -				 size_t size)
+> +static inline void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+> +				   size_t size)
+>  {
+> -	return -ENODEV;
+> +	return NULL;
+>  }
+>  #endif /* CONFIG_SRAM_EXEC */
+>  #endif /* __LINUX_SRAM_H__ */
+> -- 
+> 2.11.0
+> 
 
-Fifth, we introduce error checking upon enabling the arch timer (which
-is called when first running a VCPU) to check that all VCPUs are
-configured to use the same PPI for the timer (as mandated by the
-architecture) and that the virtual and physical timers are not
-configured to use the same IRQ number.
-
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
----
- Documentation/virtual/kvm/devices/vcpu.txt |  25 +++++++
- arch/arm/include/uapi/asm/kvm.h            |   8 +++
- arch/arm/kvm/guest.c                       |   9 +++
- arch/arm64/include/uapi/asm/kvm.h          |   3 +
- arch/arm64/kvm/guest.c                     |   9 +++
- include/kvm/arm_arch_timer.h               |   4 ++
- virt/kvm/arm/arch_timer.c                  | 104 +++++++++++++++++++++++++++++
- 7 files changed, 162 insertions(+)
-
-diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
-index 352af6e..013e3f1 100644
---- a/Documentation/virtual/kvm/devices/vcpu.txt
-+++ b/Documentation/virtual/kvm/devices/vcpu.txt
-@@ -35,3 +35,28 @@ Returns: -ENODEV: PMUv3 not supported or GIC not initialized
- Request the initialization of the PMUv3.  If using the PMUv3 with an in-kernel
- virtual GIC implementation, this must be done after initializing the in-kernel
- irqchip.
-+
-+
-+2. GROUP: KVM_ARM_VCPU_TIMER_CTRL
-+Architectures: ARM,ARM64
-+
-+2.1. ATTRIBUTE: KVM_ARM_VCPU_TIMER_IRQ_VTIMER
-+2.2. ATTRIBUTE: KVM_ARM_VCPU_TIMER_IRQ_PTIMER
-+Parameters: in kvm_device_attr.addr the address for the timer interrupt is a
-+            pointer to an int
-+Returns: -EINVAL: Invalid timer interrupt number
-+         -EBUSY:  One or more VCPUs has already run
-+
-+A value describing the architected timer interrupt number when connected to an
-+in-kernel virtual GIC.  These must be a PPI (16 <= intid < 32).  If an
-+attribute is not set, a default value is applied (see below).
-+
-+KVM_ARM_VCPU_TIMER_IRQ_VTIMER: The EL1 virtual timer intid (default: 27)
-+KVM_ARM_VCPU_TIMER_IRQ_PTIMER: The EL1 physical timer intid (default: 30)
-+
-+Setting the same PPI for different timers will prevent the VCPUs from running.
-+Setting the interrupt number on a VCPU configures all VCPUs created at that
-+time to use the number provided for a given timer, overwriting any previously
-+configured values on other VCPUs.  Userspace should configure the interrupt
-+numbers on@least one VCPU after creating all VCPUs and before running any
-+VCPUs.
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index a5838d6..6a75ec4 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -200,6 +200,14 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK 0x3ff
- #define VGIC_LEVEL_INFO_LINE_LEVEL	0
- 
-+/* Device Control API on vcpu fd */
-+#define KVM_ARM_VCPU_PMU_V3_CTRL	0
-+#define   KVM_ARM_VCPU_PMU_V3_IRQ	0
-+#define   KVM_ARM_VCPU_PMU_V3_INIT	1
-+#define KVM_ARM_VCPU_TIMER_CTRL		1
-+#define   KVM_ARM_VCPU_TIMER_IRQ_VTIMER		0
-+#define   KVM_ARM_VCPU_TIMER_IRQ_PTIMER		1
-+
- #define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
- 
- /* KVM_IRQ_LINE irq field index values */
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index acea05e..1e0784e 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -308,6 +308,9 @@ int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
- 	int ret;
- 
- 	switch (attr->group) {
-+	case KVM_ARM_VCPU_TIMER_CTRL:
-+		ret = kvm_arm_timer_set_attr(vcpu, attr);
-+		break;
- 	default:
- 		ret = -ENXIO;
- 		break;
-@@ -322,6 +325,9 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
- 	int ret;
- 
- 	switch (attr->group) {
-+	case KVM_ARM_VCPU_TIMER_CTRL:
-+		ret = kvm_arm_timer_get_attr(vcpu, attr);
-+		break;
- 	default:
- 		ret = -ENXIO;
- 		break;
-@@ -336,6 +342,9 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
- 	int ret;
- 
- 	switch (attr->group) {
-+	case KVM_ARM_VCPU_TIMER_CTRL:
-+		ret = kvm_arm_timer_has_attr(vcpu, attr);
-+		break;
- 	default:
- 		ret = -ENXIO;
- 		break;
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index cd6bea4..fc64518 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -226,6 +226,9 @@ struct kvm_arch_memory_slot {
- #define KVM_ARM_VCPU_PMU_V3_CTRL	0
- #define   KVM_ARM_VCPU_PMU_V3_IRQ	0
- #define   KVM_ARM_VCPU_PMU_V3_INIT	1
-+#define KVM_ARM_VCPU_TIMER_CTRL		1
-+#define   KVM_ARM_VCPU_TIMER_IRQ_VTIMER		0
-+#define   KVM_ARM_VCPU_TIMER_IRQ_PTIMER		1
- 
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index b37446a..5c7f657 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -390,6 +390,9 @@ int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
- 	case KVM_ARM_VCPU_PMU_V3_CTRL:
- 		ret = kvm_arm_pmu_v3_set_attr(vcpu, attr);
- 		break;
-+	case KVM_ARM_VCPU_TIMER_CTRL:
-+		ret = kvm_arm_timer_set_attr(vcpu, attr);
-+		break;
- 	default:
- 		ret = -ENXIO;
- 		break;
-@@ -407,6 +410,9 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
- 	case KVM_ARM_VCPU_PMU_V3_CTRL:
- 		ret = kvm_arm_pmu_v3_get_attr(vcpu, attr);
- 		break;
-+	case KVM_ARM_VCPU_TIMER_CTRL:
-+		ret = kvm_arm_timer_get_attr(vcpu, attr);
-+		break;
- 	default:
- 		ret = -ENXIO;
- 		break;
-@@ -424,6 +430,9 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
- 	case KVM_ARM_VCPU_PMU_V3_CTRL:
- 		ret = kvm_arm_pmu_v3_has_attr(vcpu, attr);
- 		break;
-+	case KVM_ARM_VCPU_TIMER_CTRL:
-+		ret = kvm_arm_timer_has_attr(vcpu, attr);
-+		break;
- 	default:
- 		ret = -ENXIO;
- 		break;
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index f1c967a..f0053f8 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -68,6 +68,10 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
- u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
- int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
- 
-+int kvm_arm_timer_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
-+int kvm_arm_timer_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
-+int kvm_arm_timer_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
-+
- bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
- void kvm_timer_schedule(struct kvm_vcpu *vcpu);
- void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 6c5a064..d3d1dce 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -21,6 +21,7 @@
- #include <linux/kvm_host.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/uaccess.h>
- 
- #include <clocksource/arm_arch_timer.h>
- #include <asm/arch_timer.h>
-@@ -617,6 +618,28 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
- 	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
- }
- 
-+static bool timer_irqs_are_valid(struct kvm *kvm)
-+{
-+	struct kvm_vcpu *vcpu;
-+	int vtimer_irq, ptimer_irq;
-+	int i;
-+
-+	vcpu = kvm_get_vcpu(kvm, 0);
-+	vtimer_irq = vcpu_vtimer(vcpu)->irq.irq;
-+	ptimer_irq = vcpu_ptimer(vcpu)->irq.irq;
-+
-+	if (vtimer_irq == ptimer_irq)
-+		return false;
-+
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		if (vcpu_vtimer(vcpu)->irq.irq != vtimer_irq ||
-+		    vcpu_ptimer(vcpu)->irq.irq != ptimer_irq)
-+			return false;
-+	}
-+
-+	return true;
-+}
-+
- int kvm_timer_enable(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-@@ -636,6 +659,11 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 	if (!vgic_initialized(vcpu->kvm))
- 		return -ENODEV;
- 
-+	if (!timer_irqs_are_valid(vcpu->kvm)) {
-+		kvm_debug("incorrectly configured timer irqs\n");
-+		return -EINVAL;
-+	}
-+
- 	/*
- 	 * Find the physical IRQ number corresponding to the host_vtimer_irq
- 	 */
-@@ -685,3 +713,79 @@ void kvm_timer_init_vhe(void)
- 	val |= (CNTHCTL_EL1PCTEN << cnthctl_shift);
- 	write_sysreg(val, cnthctl_el2);
- }
-+
-+static void set_timer_irqs(struct kvm *kvm, int vtimer_irq, int ptimer_irq)
-+{
-+	struct kvm_vcpu *vcpu;
-+	int i;
-+
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		vcpu_vtimer(vcpu)->irq.irq = vtimer_irq;
-+		vcpu_ptimer(vcpu)->irq.irq = ptimer_irq;
-+	}
-+}
-+
-+int kvm_arm_timer_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
-+{
-+	int __user *uaddr = (int __user *)(long)attr->addr;
-+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-+	int irq;
-+
-+	if (!irqchip_in_kernel(vcpu->kvm))
-+		return -EINVAL;
-+
-+	if (get_user(irq, uaddr))
-+		return -EFAULT;
-+
-+	if (!(irq_is_ppi(irq)))
-+		return -EINVAL;
-+
-+	if (vcpu->arch.timer_cpu.enabled)
-+		return -EBUSY;
-+
-+	switch (attr->attr) {
-+	case KVM_ARM_VCPU_TIMER_IRQ_VTIMER:
-+		set_timer_irqs(vcpu->kvm, irq, ptimer->irq.irq);
-+		break;
-+	case KVM_ARM_VCPU_TIMER_IRQ_PTIMER:
-+		set_timer_irqs(vcpu->kvm, vtimer->irq.irq, irq);
-+		break;
-+	default:
-+		return -ENXIO;
-+	}
-+
-+	return 0;
-+}
-+
-+int kvm_arm_timer_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
-+{
-+	int __user *uaddr = (int __user *)(long)attr->addr;
-+	struct arch_timer_context *timer;
-+	int irq;
-+
-+	switch (attr->attr) {
-+	case KVM_ARM_VCPU_TIMER_IRQ_VTIMER:
-+		timer = vcpu_vtimer(vcpu);
-+		break;
-+	case KVM_ARM_VCPU_TIMER_IRQ_PTIMER:
-+		timer = vcpu_ptimer(vcpu);
-+		break;
-+	default:
-+		return -ENXIO;
-+	}
-+
-+	irq = timer->irq.irq;
-+	return put_user(irq, uaddr);
-+}
-+
-+int kvm_arm_timer_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
-+{
-+	switch (attr->attr) {
-+	case KVM_ARM_VCPU_TIMER_IRQ_VTIMER:
-+	case KVM_ARM_VCPU_TIMER_IRQ_PTIMER:
-+		return 0;
-+	}
-+
-+	return -ENXIO;
-+}
 -- 
-2.9.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
