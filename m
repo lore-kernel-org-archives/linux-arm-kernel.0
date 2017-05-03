@@ -1,120 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  3 May 2017 13:59:53 +0200
-Subject: [PATCH v2 16/20] dt-bindings: display: sun4i: Add HDMI display
- bindings
-In-Reply-To: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
-References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <0941a11259b2dba88d235c6ad713e3451d385028.1493812478.git-series.maxime.ripard@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 3 May 2017 14:02:16 +0200
+Subject: [RFC/RFT PATCH 05/18] ARM: PCI: dove: Convert PCI scan API to
+ pci_scan_root_bus_bridge()
+In-Reply-To: <20170503103153.GB10800@red-moon>
+References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
+ <20170426111809.19922-6-lorenzo.pieralisi@arm.com>
+ <CAK8P3a1bnnq-9iuse43bCNX_9TirZPOtmH_vFsvJ9VOAsoUBzQ@mail.gmail.com>
+ <20170503103153.GB10800@red-moon>
+Message-ID: <CAK8P3a2Ww0DtTq_ZeACJPC7oGkoY3YP4GQB7RWouY2=e9gck1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the possible output of the display pipeline, on the SoCs that have
-it, is the HDMI controller.
+On Wed, May 3, 2017 at 12:31 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Fri, Apr 28, 2017 at 02:38:48PM +0200, Arnd Bergmann wrote:
+>> On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
+>> <lorenzo.pieralisi@arm.com> wrote:
+>> > The introduction of pci_scan_root_bus_bridge() provides a PCI core
+>> > API to scan a PCI root bus backed by an already initialized
+>> > struct pci_host_bridge object, which simplifies the bus scan
+>> > interface and makes the PCI scan root bus interface easier to
+>> > generalize as members are added to the struct pci_host_bridge().
+>> >
+>> > Convert ARM dove platform code to pci_scan_root_bus_bridge() to improve
+>> > the PCI root bus scanning interface.
+>> >
+>> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>
+>> Is this patch required for one of the later steps in the series?
+>>
+>> As non-DT dove uses the traditional pci_common_init() helper rather
+>> than registering its own driver, I wonder if there is anything to gain here.
+>
+> Well, the point is, the non-DT platforms I patched implement a custom
+> .scan method in struct hw_pci. If we move the bridge allocation to
+> pcibios_init_hw() we would end up initializing some struct
+> pci_host_bridge fields in pcibios_init_hw() and some in the custom .scan
+> method (ie custom pci_ops) which I found not very elegant but it could be
+> done I reckon, I need to give it a go to see how the code looks like.
 
-Add a binding for it.
+I don't see anything wrong with initializing the members in different
+places. The first set would give you a default that works for basic
+drivers, and the second set is a way to override the defaults for drivers
+that do something special. Conceptually we do this all the time in
+other places.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 79 +++++++-
- 1 file changed, 79 insertions(+), 0 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 57a8d0610062..91ce2c920750 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -4,6 +4,34 @@ Allwinner A10 Display Pipeline
- The Allwinner A10 Display pipeline is composed of several components
- that are going to be documented below:
- 
-+HDMI Encoder
-+------------
-+
-+The HDMI Encoder supports the HDMI video and audio outputs, and does
-+CEC. It is one end of the pipeline.
-+
-+Required properties:
-+  - compatible: value must be one of:
-+    * allwinner,sun5i-a10s-hdmi
-+  - reg: base address and size of memory-mapped region
-+  - interrupts: interrupt associated to this IP
-+  - clocks: phandles to the clocks feeding the HDMI encoder
-+    * ahb: the HDMI interface clock
-+    * mod: the HDMI module clock
-+    * pll-0: the first video PLL
-+    * pll-1: the second video PLL
-+  - clock-names: the clock names mentioned above
-+  - dmas: phandles to the DMA channels used by the HDMI encoder
-+    * ddc-tx: The channel for DDC transmission
-+    * ddc-rx: The channel for DDC reception
-+    * audio-tx: The channel used for audio transmission
-+  - dma-names: the channel names mentioned above
-+
-+  - ports: A ports node with endpoint definitions as defined in
-+    Documentation/devicetree/bindings/media/video-interfaces.txt. The
-+    first port should be the input endpoint. The second should be the
-+    output, usually to an HDMI connector.
-+
- TV Encoder
- ----------
- 
-@@ -173,6 +201,57 @@ panel: panel {
- 	};
- };
- 
-+connector {
-+	compatible = "hdmi-connector";
-+	type = "a";
-+
-+	port {
-+		hdmi_con_in: endpoint {
-+			remote-endpoint = <&hdmi_out_con>;
-+		};
-+	};
-+};
-+
-+hdmi: hdmi at 01c16000 {
-+	compatible = "allwinner,sun5i-a10s-hdmi";
-+	reg = <0x01c16000 0x1000>;
-+	interrupts = <58>;
-+	clocks = <&ccu CLK_AHB_HDMI>, <&ccu CLK_HDMI>,
-+		 <&ccu CLK_PLL_VIDEO0_2X>,
-+		 <&ccu CLK_PLL_VIDEO1_2X>;
-+	clock-names = "ahb", "mod", "pll-0", "pll-1";
-+	dmas = <&dma SUN4I_DMA_NORMAL 16>,
-+	       <&dma SUN4I_DMA_NORMAL 16>,
-+	       <&dma SUN4I_DMA_DEDICATED 24>;
-+	dma-names = "ddc-tx", "ddc-rx", "audio-tx";
-+	status = "disabled";
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+
-+			hdmi_in_tcon0: endpoint {
-+				remote-endpoint = <&tcon0_out_hdmi>;
-+			};
-+		};
-+
-+		port at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+
-+			hdmi_out_con: endpoint {
-+				remote-endpoint = <&hdmi_con_in>;
-+			};
-+		};
-+	};
-+};
-+
- tve0: tv-encoder at 01c0a000 {
- 	compatible = "allwinner,sun4i-a10-tv-encoder";
- 	reg = <0x01c0a000 0x1000>;
--- 
-git-series 0.8.11
+     Arnd
