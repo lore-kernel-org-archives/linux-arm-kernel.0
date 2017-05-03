@@ -1,78 +1,61 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  3 May 2017 11:45:55 +0100
-Subject: [PATCH 20/31] KVM: arm64: vgic-v3: Add ICV_IGNREN0_EL1 handler
+Date: Wed,  3 May 2017 11:46:01 +0100
+Subject: [PATCH 26/31] KVM: arm64: vgic-v3: Add ICV_DIR_EL1 handler
 In-Reply-To: <20170503104606.19342-1-marc.zyngier@arm.com>
 References: <20170503104606.19342-1-marc.zyngier@arm.com>
-Message-ID: <20170503104606.19342-21-marc.zyngier@arm.com>
+Message-ID: <20170503104606.19342-27-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a handler for reading/writing the guest's view of the ICC_IGRPEN0_EL1
-register, which is located in the ICH_VMCR_EL2.VENG0 field.
+Add a handler for writing the guest's view of the ICC_DIR_EL1
+register, performing the deactivation of an interrupt if EOImode
+is set ot 1.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h |  1 +
- virt/kvm/arm/hyp/vgic-v3-sr.c   | 23 +++++++++++++++++++++++
- 2 files changed, 24 insertions(+)
+ virt/kvm/arm/hyp/vgic-v3-sr.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index d20be0b28ca4..ba93bc7ac8e4 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -190,6 +190,7 @@
- #define SYS_ICC_BPR1_EL1		sys_reg(3, 0, 12, 12, 3)
- #define SYS_ICC_CTLR_EL1		sys_reg(3, 0, 12, 12, 4)
- #define SYS_ICC_SRE_EL1			sys_reg(3, 0, 12, 12, 5)
-+#define SYS_ICC_GRPEN0_EL1		sys_reg(3, 0, 12, 12, 6)
- #define SYS_ICC_GRPEN1_EL1		sys_reg(3, 0, 12, 12, 7)
- 
- #define SYS_CONTEXTIDR_EL1		sys_reg(3, 0, 13, 0, 1)
 diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index b21bb0c77ec2..77d5d12389ec 100644
+index 9c639f57268b..563dd2d16c59 100644
 --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
 +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -649,11 +649,28 @@ static void __hyp_text __vgic_v3_write_eoir(struct kvm_vcpu *vcpu, u32 vmcr, int
- 	__vgic_v3_clear_active_lr(lr, lr_val);
+@@ -612,6 +612,26 @@ static void __hyp_text __vgic_v3_bump_eoicount(void)
+ 	write_gicreg(hcr, ICH_HCR_EL2);
  }
  
-+static void __hyp_text __vgic_v3_read_igrpen0(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
++static void __hyp_text __vgic_v3_write_dir(struct kvm_vcpu *vcpu,
++					   u32 vmcr, int rt)
 +{
-+	vcpu_set_reg(vcpu, rt, !!(vmcr & ICH_VMCR_ENG0_MASK));
++	u32 vid = vcpu_get_reg(vcpu, rt);
++	u64 lr_val;
++	int lr;
++
++	/* No deactivate to be performed on an LPI */
++	if (vid >= VGIC_MIN_LPI)
++		return;
++
++	lr = __vgic_v3_find_active_lr(vcpu, vid, &lr_val);
++	if (lr == -1) {
++		__vgic_v3_bump_eoicount();
++		return;
++	}
++
++	__vgic_v3_clear_active_lr(lr, lr_val);
 +}
 +
- static void __hyp_text __vgic_v3_read_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+ static void __hyp_text __vgic_v3_write_eoir(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
  {
- 	vcpu_set_reg(vcpu, rt, !!(vmcr & ICH_VMCR_ENG1_MASK));
- }
- 
-+static void __hyp_text __vgic_v3_write_igrpen0(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
-+{
-+	u64 val = vcpu_get_reg(vcpu, rt);
-+
-+	if (val & 1)
-+		vmcr |= ICH_VMCR_ENG0_MASK;
-+	else
-+		vmcr &= ~ICH_VMCR_ENG0_MASK;
-+
-+	__vgic_v3_write_vmcr(vmcr);
-+}
-+
- static void __hyp_text __vgic_v3_write_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
- {
- 	u64 val = vcpu_get_reg(vcpu, rt);
-@@ -876,6 +893,12 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 	case SYS_ICC_HPPIR1_EL1:
- 		fn = __vgic_v3_read_hppir;
+ 	u32 vid = vcpu_get_reg(vcpu, rt);
+@@ -912,6 +932,9 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 		else
+ 			fn = __vgic_v3_write_bpr0;
  		break;
-+	case SYS_ICC_GRPEN0_EL1:
-+		if (is_read)
-+			fn = __vgic_v3_read_igrpen0;
-+		else
-+			fn = __vgic_v3_write_igrpen0;
++	case SYS_ICC_DIR_EL1:
++		fn = __vgic_v3_write_dir;
 +		break;
- 	case SYS_ICC_BPR0_EL1:
- 		if (is_read)
- 			fn = __vgic_v3_read_bpr0;
+ 	default:
+ 		return 0;
+ 	}
 -- 
 2.11.0
