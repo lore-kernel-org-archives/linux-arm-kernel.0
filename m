@@ -1,54 +1,89 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  3 May 2017 13:59:54 +0200
-Subject: [PATCH v2 17/20] dt-bindings: display: sun4i: Add allwinner,
- tcon-channel property
+Date: Wed,  3 May 2017 13:59:44 +0200
+Subject: [PATCH v2 7/20] clk: sunxi-ng: mux: Re-adjust parent rate
 In-Reply-To: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
 References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <2f00be9d75b68090ffed30654be65132a156a317.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <0d8fc6d976c64be906fa86ead20aa10bb490386b.1493812478.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner Timings Controller has two, mutually exclusive, channels.
-When the binding has been introduced, it was assumed that there would be
-only a single user per channel in the system.
+Currently, the parent rate given back to the clock framework in our
+request is the original parent rate we calculated before trying to round
+the rate of our clock.
 
-While this is likely for the channel 0 which only connects to LCD displays,
-it turns out that the channel 1 can be connected to multiple controllers in
-the SoC (HDMI and TV encoders for example). And while the simultaneous use
-of HDMI and TV outputs cannot be achieved, switching from one to the other
-at runtime definitely sounds plausible.
+This works fine unless our clock also changes its parent rate, in which
+case we will simply ignore that change and still use the previous parent
+rate.
 
-Add an extra property, allwinner,tcon-channel, to specify for a given
-endpoint which TCON channel it is connected to, while falling back to the
-previous mechanism if that property is missing.
+Create a new function to re-adjust the parent rate to take the pre-dividers
+into account, and give that back to the clock framework.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 11 ++++---
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ drivers/clk/sunxi-ng/ccu_mux.c | 33 ++++++++++++++++++++++++++++-----
+ 1 file changed, 28 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 91ce2c920750..acdc0c17c00e 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -75,10 +75,13 @@ Required properties:
-   Documentation/devicetree/bindings/media/video-interfaces.txt. The
-   first port should be the input endpoint, the second one the output
+diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
+index c33210972581..1ce62cc23f8a 100644
+--- a/drivers/clk/sunxi-ng/ccu_mux.c
++++ b/drivers/clk/sunxi-ng/ccu_mux.c
+@@ -64,6 +64,14 @@ unsigned long ccu_mux_helper_apply_prediv(struct ccu_common *common,
+ 	return parent_rate / ccu_mux_get_prediv(common, cm, parent_index);
+ }
  
--  The output should have two endpoints. The first is the block
--  connected to the TCON channel 0 (usually a panel or a bridge), the
--  second the block connected to the TCON channel 1 (usually the TV
--  encoder)
-+  The output may have multiple endpoints. The TCON has two channels,
-+  usually with the first channel being used for the panels interfaces
-+  (RGB, LVDS, etc.), and the second being used for the outputs that
-+  require another controller (TV Encoder, HDMI, etc.). The endpoints
-+  will take an extra property, allwinner,tcon-channel, to specify the
-+  channel the endpoint is associated to. If that property is not
-+  present, the endpoint number will be used as the channel number.
++unsigned long ccu_mux_helper_unapply_prediv(struct ccu_common *common,
++					    struct ccu_mux_internal *cm,
++					    int parent_index,
++					    unsigned long parent_rate)
++{
++	return parent_rate * ccu_mux_get_prediv(common, cm, parent_index);
++}
++
+ int ccu_mux_helper_determine_rate(struct ccu_common *common,
+ 				  struct ccu_mux_internal *cm,
+ 				  struct clk_rate_request *req,
+@@ -89,22 +97,37 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
+ 		best_rate = round(cm, best_parent, &adj_parent_rate,
+ 				  req->rate, data);
  
- On SoCs other than the A33, there is one more clock required:
-    - 'tcon-ch1': The clock driving the TCON channel 1
++		/*
++		 * parent_rate might have been modified by our clock.
++		 * Re-apply the pre-divider if there's one, and give
++		 * the actual frequency the parent needs to run at.
++		 */
++		best_parent_rate = ccu_mux_helper_unapply_prediv(common, cm, -1,
++								 adj_parent_rate);
++
+ 		goto out;
+ 	}
+ 
+ 	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
+-		unsigned long tmp_rate, parent_rate, adj_parent_rate;
++		unsigned long tmp_rate, parent_rate;
+ 		struct clk_hw *parent;
+ 
+ 		parent = clk_hw_get_parent_by_index(hw, i);
+ 		if (!parent)
+ 			continue;
+ 
+-		parent_rate = clk_hw_get_rate(parent);
+-		adj_parent_rate = ccu_mux_helper_apply_prediv(common, cm, i,
+-							      parent_rate);
++		parent_rate = ccu_mux_helper_apply_prediv(common, cm, i,
++							  clk_hw_get_rate(parent));
++
++		tmp_rate = round(cm, parent, &parent_rate, req->rate, data);
+ 
+-		tmp_rate = round(cm, parent, &adj_parent_rate, req->rate, data);
++		/*
++		 * parent_rate might have been modified by our clock.
++		 * Re-apply the pre-divider if there's one, and give
++		 * the actual frequency the parent needs to run at.
++		 */
++		parent_rate = ccu_mux_helper_unapply_prediv(common, cm, i,
++							    parent_rate);
+ 		if (tmp_rate == req->rate) {
+ 			best_parent = parent;
+ 			best_parent_rate = parent_rate;
 -- 
 git-series 0.8.11
