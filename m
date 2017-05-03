@@ -1,77 +1,170 @@
-From: leedom@chelsio.com (Casey Leedom)
-Date: Wed, 3 May 2017 04:30:24 +0000
-Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING
-In-Reply-To: <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
-References: <cover.1493678834.git.leedom@chelsio.com>
- <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
- <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
- <20170502165329.GB26406@linux.intel.com>,
- <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
-Message-ID: <MWHPR12MB160095DF53CE981C923FE65DC8160@MWHPR12MB1600.namprd12.prod.outlook.com>
+From: oza.oza@broadcom.com (Oza Pawandeep)
+Date: Wed,  3 May 2017 10:16:33 +0530
+Subject: [PATCH 1/3] of/pci/dma: fix DMA configuration for PCI masters
+Message-ID: <1493786795-28153-1-git-send-email-oza.oza@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-| From: Alexander Duyck <alexander.duyck@gmail.com>
-| Date: Tuesday, May 2, 2017 11:10 AM
-| ...
-| So for example, in the case of x86 it seems like there are multiple
-| root complexes that have issues, and the gains for enabling it with
-| standard DMA to host memory are small. As such we may want to default
-| it to off via the architecture specific PCIe code and then look at
-| having "white-list" cases where we enable it for things like
-| peer-to-peer accesses. In the case of SPARC we could look at
-| defaulting it to on, and only "black-list" any cases where there might
-| be issues since SPARC relies on this in a significant way for
-| performance. In the case of ARM and other architectures it is a bit of
-| a toss-up. I would say we could just default it to on for now and
-| "black-list" anything that doesn't work, or we could go the other way
-| like I suggested for x86. It all depends on what the ARM community
-| would want to agree on for this. I would say unless it makes a
-| significant difference like it does in the case of SPARC we are
-| probably better off just defaulting it to off.
+current device framework and of framework integration assumes
+dma-ranges in a way where memory-mapped devices define their
+dma-ranges. (child-bus-address, parent-bus-address, length).
 
-  Sorry, I forgot to respond to this earlier when someone was rushing me out
-to a customer dinner.
+of_dma_configure is specifically written to take care of memory
+mapped devices. but no implementation exists for pci to take
+care of pcie based memory ranges.
 
-  I'm unaware of any other x86 Root Complex Port that has a problem with
-Relaxed Ordering other than the performance issue with the current Intel
-implementation.  Ashok tells me that Intel is in the final stages of putting
-together a technical notice on this issue but I don't know when that will
-come out.  Hopefully that will shed much more light on the cause and actual
-use of Relaxed Ordering when directed to Coherent Memory on current and past
-Intel platforms.  (Note that the performance bug seems to limit us to
-~75-85Gb/s DMA Write speed to Coherent Host Memory.)
+for e.g. iproc based SOCs and other SOCs(suc as rcar) have PCI
+world dma-ranges.
+dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
 
-  The only other Device that I currently know of which has issues with
-Relaxed Ordering TLPs directed at it, is also a Root Complex Port on the new
-AMD A1100 ARM SoC ("SEATTLE").  There we have an actual bug which could lead
-to Data Corruption.
+this patch serves following:
 
-  But I don't know anything about other x86 Root Complex Ports having issues
-with this -- we've been using it ever since commit ef306b50b from December
-2010.
+1) exposes interface to the pci host driver for their
+inbound memory ranges
 
-  Also, I'm not aware of any performance data which has been gathered on the
-use of Relaxed Ordering when directed at Host Memory.  From your note, it
-sounds like it's important on SPARC architectures.  But it could conceivably
-be important on any architecture or Root Complex/Memory Controller
-implementation.  We use it to direct Ingress Packet Data to Free List
-Buffers, followed by a TLP without Relaxed Ordering directed at a Host
-Memory Message Queue.  The idea here is to give the Root Complex options on
-which DMA Memory Write TLPs to process in order to optimize data placement
-in memory.  And with the next Ethernet speed bump to 200Gb/s this may be
-even more important.
+2) provide an interface to callers such as of_dma_get_ranges.
+so then the returned size get best possible (largest) dma_mask.
+because PCI RC drivers do not call APIs such as
+dma_set_coherent_mask() and hence rather it shows its addressing
+capabilities based on dma-ranges.
+for e.g.
+dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+we should get dev->coherent_dma_mask=0x7fffffffff.
 
-  Basically, I'd hate to come up with a solution where we write off the use
-of Relaxed Ordering for DMA Writes to Host Memory.  I don't think you're
-suggesting that, but there are a number of x86 Root Complex implementations
-out there -- and some like the new AMD Ryzen have yet to be tested -- as
-well as other architectures.
+3) this patch handles multiple inbound windows and dma-ranges.
+it is left to the caller, how it wants to use them.
+the new function returns the resources in a standard and unform way
 
-  And, as Ashok and I have both nothed, any solution we come up with needs
-to cope with a heterogeneous situation where, on the same PCIe Fabric, it
-may be necessesary/desireable to support Relaxed Ordering TLPs directed at
-some End Nodes but not others.
+4) this way the callers of for e.g. of_dma_get_ranges
+does not need to change.
 
-Casey
+5) leaves scope of adding PCI flag handling for inbound memory
+by the new function.
+
+Bug: SOC-5216
+Change-Id: Ie045386df91e1e0587846bb147ae40d96f6d7d2e
+Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+Reviewed-on: http://gerrit-ccxsw.broadcom.net/40428
+Reviewed-by: vpx_checkpatch status <vpx_checkpatch@broadcom.com>
+Reviewed-by: CCXSW <ccxswbuild@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Tested-by: vpx_autobuild status <vpx_autobuild@broadcom.com>
+Tested-by: vpx_smoketest status <vpx_smoketest@broadcom.com>
+Tested-by: CCXSW <ccxswbuild@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 0ee42c3..ed6e69a 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -283,6 +283,83 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 	return err;
+ }
+ EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
++
++/**
++ * of_pci_get_dma_ranges - Parse PCI host bridge inbound resources from DT
++ * @np: device node of the host bridge having the dma-ranges property
++ * @resources: list where the range of resources will be added after DT parsing
++ *
++ * It is the caller's job to free the @resources list.
++ *
++ * This function will parse the "dma-ranges" property of a
++ * PCI host bridge device node and setup the resource mapping based
++ * on its content.
++ *
++ * It returns zero if the range parsing has been successful or a standard error
++ * value if it failed.
++ */
++
++int of_pci_get_dma_ranges(struct device_node *np, struct list_head *resources)
++{
++	struct device_node *node = of_node_get(np);
++	int rlen;
++	int ret = 0;
++	const int na = 3, ns = 2;
++	struct resource *res;
++	struct of_pci_range_parser parser;
++	struct of_pci_range range;
++
++	if (!node)
++		return -EINVAL;
++
++	parser.node = node;
++	parser.pna = of_n_addr_cells(node);
++	parser.np = parser.pna + na + ns;
++
++	parser.range = of_get_property(node, "dma-ranges", &rlen);
++
++	if (!parser.range) {
++		pr_debug("pcie device has no dma-ranges defined for node(%s)\n",
++			  np->full_name);
++		ret = -EINVAL;
++		goto out;
++	}
++
++	parser.end = parser.range + rlen / sizeof(__be32);
++
++	for_each_of_pci_range(&parser, &range) {
++		/*
++		 * If we failed translation or got a zero-sized region
++		 * then skip this range
++		 */
++		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
++			continue;
++
++		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
++		if (!res) {
++			ret = -ENOMEM;
++			goto parse_failed;
++		}
++
++		ret = of_pci_range_to_resource(&range, np, res);
++		if (ret) {
++			kfree(res);
++			continue;
++		}
++
++		pci_add_resource_offset(resources, res,
++					res->start - range.pci_addr);
++	}
++
++	return ret;
++
++parse_failed:
++	pci_free_resource_list(resources);
++out:
++	of_node_put(node);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(of_pci_get_dma_ranges);
+ #endif /* CONFIG_OF_ADDRESS */
+ 
+ #ifdef CONFIG_PCI_MSI
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index 0e0974e..617b90d 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -76,6 +76,7 @@ static inline void of_pci_check_probe_only(void) { }
+ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 			unsigned char busno, unsigned char bus_max,
+ 			struct list_head *resources, resource_size_t *io_base);
++int of_pci_get_dma_ranges(struct device_node *np, struct list_head *resources);
+ #else
+ static inline int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 			unsigned char busno, unsigned char bus_max,
+@@ -83,6 +84,12 @@ static inline int of_pci_get_host_bridge_resources(struct device_node *dev,
+ {
+ 	return -EINVAL;
+ }
++
++static inline int of_pci_get_dma_ranges(struct device_node *np,
++					struct list_head *resources)
++{
++	return -EINVAL;
++}
+ #endif
+ 
+ #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+-- 
+1.9.1
