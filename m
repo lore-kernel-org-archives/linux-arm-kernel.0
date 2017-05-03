@@ -1,119 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 3 May 2017 12:26:40 +0100
-Subject: [PATCH] arm64: Add translation functions for /dev/mem read/write
-In-Reply-To: <1493756885-29704-1-git-send-email-sgoel@codeaurora.org>
-References: <1493756885-29704-1-git-send-email-sgoel@codeaurora.org>
-Message-ID: <20170503112639.GG8233@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 3 May 2017 12:57:25 +0100
+Subject: [PATCH v3 2/3] crypto: inside-secure: add SafeXcel EIP197 crypto
+ engine driver
+In-Reply-To: <20170424075407.19730-3-antoine.tenart@free-electrons.com>
+References: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
+ <20170424075407.19730-3-antoine.tenart@free-electrons.com>
+Message-ID: <6ed16e7e-7f7a-795f-ee82-d2d97c3a5540@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding some /dev/mem fans to cc]
+Hi Antoine,
 
-On Tue, May 02, 2017 at 02:28:05PM -0600, Sameer Goel wrote:
-> Port architecture specific xlate and unxlate functions for /dev/mem
-> read/write. This sets up the mapping for a valid physical address if a
-> kernel direct mapping is not already present.
+On 24/04/17 08:54, Antoine Tenart wrote:
+> Add support for Inside Secure SafeXcel EIP197 cryptographic engine,
+> which can be found on Marvell Armada 7k and 8k boards. This driver
+> currently implements: ecb(aes), cbc(aes), sha1, sha224, sha256 and
+> hmac(sah1) algorithms.
 > 
-> This is a generic issue as a user space app should not be allowed to crash
-> the kernel.
-
-> This issue was observed when systemd tried to access performance
-> pointer record from the FPDT table.
-
-Why is it doing that? Is there not a way to get this via /sys?
-
-> Ported from commit e045fb2a988a ("x86: PAT avoid aliasing in /dev/mem
-> read/write")
+> Two firmwares are needed for this engine to work. Their are mostly used
+> for more advanced operations than the ones supported (as of now), but we
+> still need them to pass the data to the internal cryptographic engine.
 > 
-> Crash Signature:
->  Unable to handle kernel paging request at virtual address ffff800008ff0000
->  pgd = ffff8007de8b2200
->  [ffff800008ff0000] *pgd=0000000000000000, *pud=0000000000000000
->  Internal error: Oops: 96000007 [#1] SMP
-> ................
->  CPU: 0 PID: 1 Comm: systemd Not tainted 4.10.0 #1
->  task: ffff8007c0820000 task.stack: ffff8007c0900000
->  PC is at __arch_copy_to_user+0xb4/0x280
->  LR is at read_mem+0xc0/0x138
->  pc : [<ffff0000084b3bb4>] lr : [<ffff00000869d178>]
-> pstate: 80000145
->  sp : ffff8007c0903d40
-> ....................
->  x3 : ffff800800000000 x2 : 0000000000000008
->  x1 : ffff800008ff0000 x0 : 0000fffff6fdac00
-> ....................
->  Call trace:
->  Exception stack(0xffff8007c0903b70 to 0xffff8007c0903ca0)
->  [<ffff0000084b3bb4>] __arch_copy_to_user+0xb4/0x280
->  [<ffff0000082454d0>] __vfs_read+0x48/0x130
->  [<ffff0000082467dc>] vfs_read+0x8c/0x148
->  [<ffff000008247a34>] SyS_pread64+0x94/0xa8
->  [<ffff0000080833b0>] el0_svc_naked+0x24/0x28
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-So this certainly looks like a kernel bug, but I don't think your patch is
-the right way to fix it.
+[...]
 
->  Code: a88120c7 d503201f d503201f 36180082 (f8408423)
-> 
-> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
-> Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
->  arch/arm64/include/asm/io.h |  5 +++++
->  arch/arm64/mm/ioremap.c     | 31 +++++++++++++++++++++++++++++++
->  2 files changed, 36 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> index 0c00c87..c869ea4 100644
-> --- a/arch/arm64/include/asm/io.h
-> +++ b/arch/arm64/include/asm/io.h
-> @@ -183,6 +183,11 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
->  #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
->  #define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
->  
-> +extern void *xlate_dev_mem_ptr(phys_addr_t phys);
-> +extern void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr);
-> +
-> +#define xlate_dev_mem_ptr xlate_dev_mem_ptr
-> +#define unxlate_dev_mem_ptr unxlate_dev_mem_ptr
->  #include <asm-generic/io.h>
->  
->  /*
-> diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-> index c4c8cd4..ba7e63b 100644
-> --- a/arch/arm64/mm/ioremap.c
-> +++ b/arch/arm64/mm/ioremap.c
-> @@ -24,6 +24,7 @@
->  #include <linux/mm.h>
->  #include <linux/vmalloc.h>
->  #include <linux/io.h>
-> +#include <linux/memblock.h>
->  
->  #include <asm/fixmap.h>
->  #include <asm/tlbflush.h>
-> @@ -105,6 +106,36 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
->  EXPORT_SYMBOL(ioremap_cache);
->  
->  /*
-> + * Convert a physical pointer to a virtual kernel pointer for /dev/mem
-> + * access
+> diff --git a/drivers/crypto/inside-secure/safexcel.c b/drivers/crypto/inside-secure/safexcel.c
+> new file mode 100644
+> index 000000000000..9cb3d0832835
+> --- /dev/null
+> +++ b/drivers/crypto/inside-secure/safexcel.c
+> @@ -0,0 +1,925 @@
+> +/*
+> + * Copyright (C) 2017 Marvell
+> + *
+> + * Antoine Tenart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
 > + */
-> +void *xlate_dev_mem_ptr(phys_addr_t phys)
-> +{
-> +	unsigned long start  = phys &  PAGE_MASK;
-> +	unsigned long offset = phys & ~PAGE_MASK;
-> +	void *vaddr;
 > +
-> +	/* If page is RAM, we can use __va. Otherwise ioremap and unmap. */
-> +	if (page_is_ram(start >> PAGE_SHIFT) && memblock_is_memory(phys))
-> +		return __va(phys);
+> +#include <linux/clk.h>
+> +#include <linux/device.h>
+> +#include <linux/dmapool.h>
+> +#include <linux/firmware.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/module.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/workqueue.h>
 > +
-> +	vaddr = ioremap_cache(start, PAGE_SIZE);
+> +#include <asm/dma-mapping.h>
 
-Blindly using ioremap like this looks unsafe, since we could accidentally
-set conflict with the attributes of a mapping used by something else (e.g.
-firmware running on another CPU).
+<linux/dma-mapping.h> everywhere, please.
 
-I'd like to understand more about the crash, so we can see work out how to
-fix this properly.
+Other than that, the DMA aspects all look much nicer now, thanks.
 
-Will
+Robin.
