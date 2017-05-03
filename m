@@ -1,32 +1,58 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  3 May 2017 11:16:57 +0800
-Subject: [PATCH v2 7/8] ARM: sun8i: a83t: Set clock accuracy for 24MHz
- oscillator
+Date: Wed,  3 May 2017 11:16:56 +0800
+Subject: [PATCH v2 6/8] ARM: sun8i: a83t: Add CCU device nodes
 In-Reply-To: <20170503031658.29299-1-wens@csie.org>
 References: <20170503031658.29299-1-wens@csie.org>
-Message-ID: <20170503031658.29299-8-wens@csie.org>
+Message-ID: <20170503031658.29299-7-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The datasheets for Allwinner SoCs set strict requirements on the
-stability of the external crystal oscillators. Add the accuracy
-for the main 24MHz oscillator to the device tree.
+Now that we have support for the A83T CCU, add a device node for it,
+and replace any existing placeholder clock phandles with the correct
+ones.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index c9a5d07b2ada..e12dd7170b8f 100644
+index c0a1e4f74b89..c9a5d07b2ada 100644
 --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
 +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -126,6 +126,7 @@
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
- 			clock-frequency = <24000000>;
-+			clock-accuracy = <50000>;
- 			clock-output-names = "osc24M";
+@@ -162,13 +162,23 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		ccu: clock at 1c20000 {
++			compatible = "allwinner,sun8i-a83t-ccu";
++			reg = <0x01c20000 0x400>;
++			clocks = <&osc24M>, <&osc16Md512>;
++			clock-names = "hosc", "losc";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
+ 		pio: pinctrl at 1c20800 {
+ 			compatible = "allwinner,sun8i-a83t-pinctrl";
+ 			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0x01c20800 0x400>;
+-			clocks = <&osc24M>;
++			clocks = <&ccu 45>, <&osc24M>, <&osc16Md512>;
++			clock-names = "apb", "hosc", "losc";
+ 			gpio-controller;
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
+@@ -214,7 +224,8 @@
+ 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc24M>;
++			clocks = <&ccu 53>;
++			resets = <&ccu 40>;
+ 			status = "disabled";
  		};
  
 -- 
