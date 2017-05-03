@@ -1,14 +1,16 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 3 May 2017 16:28:19 +0800
-Subject: [PATCH v2 6/7] ARM: dts: imx7d: Add node for PCIe controller
-In-Reply-To: <20170418150133.31679-7-andrew.smirnov@gmail.com>
+Date: Wed, 3 May 2017 16:30:17 +0800
+Subject: [PATCH v2 7/7] ARM: dts: imx7d-sdb: Enable PCIe peripheral
+In-Reply-To: <20170418150133.31679-8-andrew.smirnov@gmail.com>
 References: <20170418150133.31679-1-andrew.smirnov@gmail.com>
- <20170418150133.31679-7-andrew.smirnov@gmail.com>
-Message-ID: <20170503082817.GD18578@dragon>
+ <20170418150133.31679-8-andrew.smirnov@gmail.com>
+Message-ID: <20170503083015.GE18578@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 08:01:32AM -0700, Andrey Smirnov wrote:
+On Tue, Apr 18, 2017 at 08:01:33AM -0700, Andrey Smirnov wrote:
+> Enable PCIe peripheral on this board.
+> 
 > Cc: yurovsky at gmail.com
 > Cc: Dong Aisheng <aisheng.dong@nxp.com>
 > Cc: Shawn Guo <shawnguo@kernel.org>
@@ -22,20 +24,32 @@ On Tue, Apr 18, 2017 at 08:01:32AM -0700, Andrey Smirnov wrote:
 > Cc: linux-arm-kernel at lists.infradead.org
 > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 > ---
->  arch/arm/boot/dts/imx7d.dtsi | 37 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
+>  arch/arm/boot/dts/imx7d-sdb.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index f6dee41..f46814a 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -42,6 +42,7 @@
->   */
+> diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+> index d6f2dda..65dda66 100644
+> --- a/arch/arm/boot/dts/imx7d-sdb.dts
+> +++ b/arch/arm/boot/dts/imx7d-sdb.dts
+> @@ -349,6 +349,12 @@
+>  	};
+>  };
 >  
->  #include "imx7s.dtsi"
-> +#include <dt-bindings/reset/imx7-reset.h>
+> +&pcie {
+> +	pinctrl-names = "default";
 
-It has dependency on imx7 reset driver, and I need to wait for
-v4.12-rc1 to apply the patch.
+No corresponding pinctrl-0 entry?  In that case, there is no point to
+have pinctrl-names.
 
 Shawn
+
+> +	reset-gpio = <&extended_io 1 GPIO_ACTIVE_LOW>;
+> +	status = "okay";
+> +};
+> +
+>  &pwm1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_pwm1>;
+> -- 
+> 2.9.3
+> 
