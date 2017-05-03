@@ -1,89 +1,44 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  3 May 2017 16:09:33 +0100
-Subject: [PATCH 1/6] arm64: xchg: hazard against entire exchange variable
-In-Reply-To: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
-References: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1493824178-7399-2-git-send-email-mark.rutland@arm.com>
+Date: Wed,  3 May 2017 16:09:32 +0100
+Subject: [PATCH 0/6] arm64: inline assembly fixes + cleanup
+Message-ID: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The inline assembly in __XCHG_CASE() uses a +Q constraint to hazard
-against other accesses to the memory location being exchanged. However,
-the pointer passed to the constraint is a u8 pointer, and thus the
-hazard only applies to the first byte of the location.
+Recent attempts to make our inline assembly more clang-friendly [1,2]
+made it clear that we have some latent problems. I've reviewed all the
+inline assembly under arch/arm64/, and this series fixes the issues that
+I noted.
 
-GCC can take advantage of this, assuming that other portions of the
-location are unchanged, as demonstrated with the following test case:
+The series is based on the arm64 for-next/core branch. I've built the
+series with a Linaro 15,08 GCC 5.1.1 toolchain. I see no new warnings,
+and the result boots happily on Juno R1.
 
-union u {
-	unsigned long l;
-	unsigned int i[2];
-};
+The first four patches address latent bugs, with the final two patches
+improving consistency and compatibility with clang. I believe that this
+supersedes [2], with the GIC accessor having been fixed up by the recent
+sysreg rework.
 
-unsigned long update_char_hazard(union u *u)
-{
-	unsigned int a, b;
+Thanks,
+Mark.
 
-	a = u->i[1];
-	asm ("str %1, %0" : "+Q" (*(char *)&u->l) : "r" (0UL));
-	b = u->i[1];
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/503535.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/504072.html
 
-	return a ^ b;
-}
+Mark Rutland (6):
+  arm64: xchg: hazard against entire exchange variable
+  arm64: ensure extension of smp_store_release value
+  arm64: uaccess: ensure extension of access_ok() addr
+  arm64: armv8_deprecated: ensure extension of addr
+  arm64: atomic_lse: match asm register sizes
+  arm64: uaccess: suppress spurious clang warning
 
-unsigned long update_long_hazard(union u *u)
-{
-	unsigned int a, b;
+ arch/arm64/include/asm/atomic_lse.h  |  4 ++--
+ arch/arm64/include/asm/barrier.h     | 20 +++++++++++++++-----
+ arch/arm64/include/asm/cmpxchg.h     |  2 +-
+ arch/arm64/include/asm/uaccess.h     |  7 ++++---
+ arch/arm64/kernel/armv8_deprecated.c |  3 ++-
+ 5 files changed, 24 insertions(+), 12 deletions(-)
 
-	a = u->i[1];
-	asm ("str %1, %0" : "+Q" (*(long *)&u->l) : "r" (0UL));
-	b = u->i[1];
-
-	return a ^ b;
-}
-
-The linaro 15.08 GCC 5.1.1 toolchain compiles the above as follows when
-using -O2 or above:
-
-0000000000000000 <update_char_hazard>:
-   0:	d2800001 	mov	x1, #0x0                   	// #0
-   4:	f9000001 	str	x1, [x0]
-   8:	d2800000 	mov	x0, #0x0                   	// #0
-   c:	d65f03c0 	ret
-
-0000000000000010 <update_long_hazard>:
-  10:	b9400401 	ldr	w1, [x0,#4]
-  14:	d2800002 	mov	x2, #0x0                   	// #0
-  18:	f9000002 	str	x2, [x0]
-  1c:	b9400400 	ldr	w0, [x0,#4]
-  20:	4a000020 	eor	w0, w1, w0
-  24:	d65f03c0 	ret
-
-This patch fixes the issue by passing an unsigned long pointer into the
-+Q constraint, as we do for our cmpxchg code. This may hazard against
-more than is necessary, but this is better than missing a necessary
-hazard.
-
-Fixes: 305d454aaa292be3 ("arm64: atomics: implement native {relaxed, acquire, release} atomics")
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/cmpxchg.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-index 91b26d2..ae852ad 100644
---- a/arch/arm64/include/asm/cmpxchg.h
-+++ b/arch/arm64/include/asm/cmpxchg.h
-@@ -46,7 +46,7 @@
- 	"	swp" #acq_lse #rel #sz "\t%" #w "3, %" #w "0, %2\n"	\
- 		__nops(3)						\
- 	"	" #nop_lse)						\
--	: "=&r" (ret), "=&r" (tmp), "+Q" (*(u8 *)ptr)			\
-+	: "=&r" (ret), "=&r" (tmp), "+Q" (*(unsigned long *)ptr)	\
- 	: "r" (x)							\
- 	: cl);								\
- 									\
 -- 
 1.9.1
