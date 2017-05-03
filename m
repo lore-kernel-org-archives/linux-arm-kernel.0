@@ -1,53 +1,121 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 4 May 2017 00:16:20 +0200
-Subject: [PATCH 1/3] ARM: dts: imx6qdl-nitrogen6_max: fix rv4162 compatible
-In-Reply-To: <20170503085010.GF18578@dragon>
-References: <20170419202204.7689-1-alexandre.belloni@free-electrons.com>
- <20170503085010.GF18578@dragon>
-Message-ID: <20170503221620.k3gf3s7lramlgfyf@piout.net>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 4 May 2017 00:20:13 +0200
+Subject: [PATCH v5 21/22] KVM: arm64: vgic-its: Fix pending table sync
+In-Reply-To: <20170430211033.GD1499@lvm>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-22-git-send-email-eric.auger@redhat.com>
+ <20170430211033.GD1499@lvm>
+Message-ID: <03432fc8-5e39-2f50-1e36-1c4b2f9be773@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2017 at 16:50:12 +0800, Shawn Guo wrote:
-> On Wed, Apr 19, 2017 at 10:22:02PM +0200, Alexandre Belloni wrote:
-> > The rv4162 vendor is microcrystal, not ST.
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-> > index bad3c9f9eeac..b63134e3b51a 100644
-> > --- a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-> > @@ -408,7 +408,7 @@
-> >  	};
-> >  
-> >  	rtc: rtc at 68 {
-> > -		compatible = "st,rv4162";
-> > +		compatible = "microcrystal,rv4162";
+Hi,
+
+On 30/04/2017 23:10, Christoffer Dall wrote:
+> On Fri, Apr 14, 2017 at 12:15:33PM +0200, Eric Auger wrote:
+>> In its_sync_lpi_pending_table() we currently ignore the
+>> target_vcpu of the LPIs. We sync the pending bit found in
+>> the vcpu pending table even if the LPI is not targeting it.
+>>
+>> Also in vgic_its_cmd_handle_invall() we are supposed to
+>> read the config table data for the LPIs associated to the
+>> collection ID. At the moment we refresh all LPI config
+>> information.
+>>
+>> This patch passes a vpcu to vgic_copy_lpi_list() so that
+>> this latter returns a snapshot of the LPIs targeting this
+>> CPU and only those.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 24 ++++++++++++------------
+>>  1 file changed, 12 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 86dfc6c..be848be 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -252,13 +252,13 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+>>  }
+>>  
+>>  /*
+>> - * Create a snapshot of the current LPI list, so that we can enumerate all
+>> - * LPIs without holding any lock.
+>> - * Returns the array length and puts the kmalloc'ed array into intid_ptr.
+>> + * Create a snapshot of the current LPIs targeting @vcpu, so that we can
+>> + * enumerate those LPIs without holding any lock.
+>> + * Returns their number and puts the kmalloc'ed array into intid_ptr.
+>>   */
+>> -static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
+>> +static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
+>>  {
+>> -	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>>  	struct vgic_irq *irq;
+>>  	u32 *intids;
+>>  	int irq_count = dist->lpi_list_count, i = 0;
+>> @@ -277,14 +277,14 @@ static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
+>>  	spin_lock(&dist->lpi_list_lock);
+>>  	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+>>  		/* We don't need to "get" the IRQ, as we hold the list lock. */
+>> -		intids[i] = irq->intid;
+>> -		if (++i == irq_count)
+>> -			break;
+>> +		if (irq->target_vcpu != vcpu)
+>> +			continue;
+>> +		intids[i++] = irq->intid;
 > 
-> The compatible is not documented?
+> were we checking the ++i == irq_count condition for no good reason
+> before since we can just drop it now?
+I didn't get why we had that check.
+
+Thanks
+
+Eric
 > 
-
-No, it wasn't. Like for many i2c devices, the driver predates DT and
-didn't need any specific code to be used from DT. Basically, the i2c
-core was using the i2c_device_ids to match the DT compatible string.
-This is changing since cabcf4f6be658b2d4bea26dee89d08fdf67d6811.
-
-I'm planning to document all the undocumented ones soon.
-
-> Shawn
+>>  	}
+>>  	spin_unlock(&dist->lpi_list_lock);
+>>  
+>>  	*intid_ptr = intids;
+>> -	return irq_count;
+>> +	return i;
+>>  }
+>>  
+>>  /*
+>> @@ -333,7 +333,7 @@ static u32 max_lpis_propbaser(u64 propbaser)
+>>  }
+>>  
+>>  /*
+>> - * Scan the whole LPI pending table and sync the pending bit in there
+>> + * Sync the pending table pending bit of LPIs targeting @vcpu
+>>   * with our own data structures. This relies on the LPI being
+>>   * mapped before.
+>>   */
+>> @@ -346,7 +346,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+>>  	u32 *intids;
+>>  	int nr_irqs, i;
+>>  
+>> -	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, &intids);
+>> +	nr_irqs = vgic_copy_lpi_list(vcpu, &intids);
+>>  	if (nr_irqs < 0)
+>>  		return nr_irqs;
+>>  
+>> @@ -1027,7 +1027,7 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
+>>  
+>>  	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
+>>  
+>> -	irq_count = vgic_copy_lpi_list(kvm, &intids);
+>> +	irq_count = vgic_copy_lpi_list(vcpu, &intids);
+>>  	if (irq_count < 0)
+>>  		return irq_count;
+>>  
+>> -- 
+>> 2.5.5
+>>
 > 
-> >  		pinctrl-names = "default";
-> >  		pinctrl-0 = <&pinctrl_rv4162>;
-> >  		reg = <0x68>;
-> > -- 
-> > 2.11.0
-> > 
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> Assuming that it's ok to remove the irq_count check above, the rest of
+> this patch looks good to me.
+> 
+> Thanks,
+> -Christoffer
+> 
