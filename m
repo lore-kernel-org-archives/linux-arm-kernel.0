@@ -1,101 +1,54 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  3 May 2017 13:59:56 +0200
-Subject: [PATCH v2 19/20] ARM: sun5i: a10s: Add the HDMI controller node
+Date: Wed,  3 May 2017 13:59:54 +0200
+Subject: [PATCH v2 17/20] dt-bindings: display: sun4i: Add allwinner,
+ tcon-channel property
 In-Reply-To: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
 References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <1e3ddf81459adbab455b2211fe6b78bd6cf1bbec.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <2f00be9d75b68090ffed30654be65132a156a317.1493812478.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A10s has an HDMI controller connected to the second TCON channel. Add
-it to our DT.
+The Allwinner Timings Controller has two, mutually exclusive, channels.
+When the binding has been introduced, it was assumed that there would be
+only a single user per channel in the system.
 
-Since the TV Encoder was the only channel 1 user so far, also add the
-property now that we have several users.
+While this is likely for the channel 0 which only connects to LCD displays,
+it turns out that the channel 1 can be connected to multiple controllers in
+the SoC (HDMI and TV encoders for example). And while the simultaneous use
+of HDMI and TV outputs cannot be achieved, switching from one to the other
+at runtime definitely sounds plausible.
 
+Add an extra property, allwinner,tcon-channel, to specify for a given
+endpoint which TCON channel it is connected to, while falling back to the
+previous mechanism if that property is missing.
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-a10s.dtsi | 50 ++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/sun5i.dtsi      |  1 +-
- 2 files changed, 51 insertions(+), 0 deletions(-)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 11 ++++---
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 1e38ff80366c..c9d4ee12599d 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -71,7 +71,49 @@
- 		};
- 	};
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 91ce2c920750..acdc0c17c00e 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -75,10 +75,13 @@ Required properties:
+   Documentation/devicetree/bindings/media/video-interfaces.txt. The
+   first port should be the input endpoint, the second one the output
  
-+	display-engine {
-+		compatible = "allwinner,sun5i-a10s-display-engine",
-+			     "allwinner,sun5i-a13-display-engine";
-+		allwinner,pipelines = <&fe0>;
-+	};
-+
- 	soc at 01c00000 {
-+		hdmi: hdmi at 01c16000 {
-+			compatible = "allwinner,sun5i-a10s-hdmi";
-+			reg = <0x01c16000 0x1000>;
-+			interrupts = <58>;
-+			clocks = <&ccu CLK_AHB_HDMI>, <&ccu CLK_HDMI>,
-+				 <&ccu CLK_PLL_VIDEO0_2X>,
-+				 <&ccu CLK_PLL_VIDEO1_2X>;
-+			clock-names = "ahb", "mod", "pll-0", "pll-1";
-+			dmas = <&dma SUN4I_DMA_NORMAL 16>,
-+			       <&dma SUN4I_DMA_NORMAL 16>,
-+			       <&dma SUN4I_DMA_DEDICATED 24>;
-+			dma-names = "ddc-tx", "ddc-rx", "audio-tx";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				hdmi_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					hdmi_in_tcon0: endpoint {
-+						remote-endpoint = <&tcon0_out_hdmi>;
-+					};
-+				};
-+
-+				hdmi_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
- 		pwm: pwm at 01c20e00 {
- 			compatible = "allwinner,sun5i-a10s-pwm";
- 			reg = <0x01c20e00 0xc>;
-@@ -128,3 +170,11 @@
+-  The output should have two endpoints. The first is the block
+-  connected to the TCON channel 0 (usually a panel or a bridge), the
+-  second the block connected to the TCON channel 1 (usually the TV
+-  encoder)
++  The output may have multiple endpoints. The TCON has two channels,
++  usually with the first channel being used for the panels interfaces
++  (RGB, LVDS, etc.), and the second being used for the outputs that
++  require another controller (TV Encoder, HDMI, etc.). The endpoints
++  will take an extra property, allwinner,tcon-channel, to specify the
++  channel the endpoint is associated to. If that property is not
++  present, the endpoint number will be used as the channel number.
  
- &sram_a {
- };
-+
-+&tcon0_out {
-+	tcon0_out_hdmi: endpoint at 2 {
-+		reg = <2>;
-+		remote-endpoint = <&hdmi_in_tcon0>;
-+		allwinner,tcon-channel = <1>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 5175f9cc9bed..0e29f1d98a9e 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -272,6 +272,7 @@
- 					tcon0_out_tve0: endpoint at 1 {
- 						reg = <1>;
- 						remote-endpoint = <&tve0_in_tcon0>;
-+						allwinner,tcon-channel = <1>;
- 					};
- 				};
- 			};
+ On SoCs other than the A33, there is one more clock required:
+    - 'tcon-ch1': The clock driving the TCON channel 1
 -- 
 git-series 0.8.11
