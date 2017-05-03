@@ -1,44 +1,50 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  3 May 2017 16:09:32 +0100
-Subject: [PATCH 0/6] arm64: inline assembly fixes + cleanup
-Message-ID: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
+Date: Wed,  3 May 2017 16:09:35 +0100
+Subject: [PATCH 3/6] arm64: uaccess: ensure extension of access_ok() addr
+In-Reply-To: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
+References: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1493824178-7399-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent attempts to make our inline assembly more clang-friendly [1,2]
-made it clear that we have some latent problems. I've reviewed all the
-inline assembly under arch/arm64/, and this series fixes the issues that
-I noted.
+Our access_ok() simply hands its arguments over to __range_ok(), which
+implicitly assummes that the addr parameter is 64 bits wide. This isn't
+necessarily true for compat code, which might pass down a 32-bit address
+parameter.
 
-The series is based on the arm64 for-next/core branch. I've built the
-series with a Linaro 15,08 GCC 5.1.1 toolchain. I see no new warnings,
-and the result boots happily on Juno R1.
+In these cases, we don't have a guarantee that the address has been zero
+extended to 64 bits, and the upper bits of the register may contain
+unknown values, potentially resulting in a suprious failure.
 
-The first four patches address latent bugs, with the final two patches
-improving consistency and compatibility with clang. I believe that this
-supersedes [2], with the GIC accessor having been fixed up by the recent
-sysreg rework.
+Avoid this by explicitly casting the addr parameter to an unsigned long
+(as is done on other architectures), ensuring that the parameter is
+widened appropriately.
 
-Thanks,
-Mark.
+Fixes: 0aea86a2176c2264 ("arm64: User access library functions")
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/uaccess.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/503535.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/504072.html
-
-Mark Rutland (6):
-  arm64: xchg: hazard against entire exchange variable
-  arm64: ensure extension of smp_store_release value
-  arm64: uaccess: ensure extension of access_ok() addr
-  arm64: armv8_deprecated: ensure extension of addr
-  arm64: atomic_lse: match asm register sizes
-  arm64: uaccess: suppress spurious clang warning
-
- arch/arm64/include/asm/atomic_lse.h  |  4 ++--
- arch/arm64/include/asm/barrier.h     | 20 +++++++++++++++-----
- arch/arm64/include/asm/cmpxchg.h     |  2 +-
- arch/arm64/include/asm/uaccess.h     |  7 ++++---
- arch/arm64/kernel/armv8_deprecated.c |  3 ++-
- 5 files changed, 24 insertions(+), 12 deletions(-)
-
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 5308d69..ed3ecf1 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -95,11 +95,12 @@ static inline void set_fs(mm_segment_t fs)
+  */
+ #define __range_ok(addr, size)						\
+ ({									\
++	unsigned long __addr = (unsigned long __force)(addr);		\
+ 	unsigned long flag, roksum;					\
+ 	__chk_user_ptr(addr);						\
+ 	asm("adds %1, %1, %3; ccmp %1, %4, #2, cc; cset %0, ls"		\
+ 		: "=&r" (flag), "=&r" (roksum)				\
+-		: "1" (addr), "Ir" (size),				\
++		: "1" (__addr), "Ir" (size),				\
+ 		  "r" (current_thread_info()->addr_limit)		\
+ 		: "cc");						\
+ 	flag;								\
 -- 
 1.9.1
