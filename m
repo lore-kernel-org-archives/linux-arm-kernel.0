@@ -1,108 +1,104 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 3 May 2017 08:53:36 +0200
-Subject: [PATCH v5 16/22] KVM: arm64: vgic-its: Add infrastructure for
- table lookup
-In-Reply-To: <20170430193555.GB1670@lvm>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-17-git-send-email-eric.auger@redhat.com>
- <20170430193555.GB1670@lvm>
-Message-ID: <303f2981-489e-ec38-ebaf-40d65429d820@redhat.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Wed,  3 May 2017 09:09:20 +0200
+Subject: [PATCH v2 resend] arm: dts: sun7i-a20-bananapi: name the GPIO lines
+In-Reply-To: <CACRpkdZcnJ1eCNW4ZF_A4zbeCt3JcAuw-1meB_Pn7ctMy99B_g@mail.gmail.com>
+References: <CACRpkdZcnJ1eCNW4ZF_A4zbeCt3JcAuw-1meB_Pn7ctMy99B_g@mail.gmail.com>
+Message-ID: <1493795360-18629-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+This names the GPIO lines on the Banana Pi board in accordance with
+the A20_Banana_Pi v1.4 Specification.
 
-On 30/04/2017 21:35, Christoffer Dall wrote:
-> On Fri, Apr 14, 2017 at 12:15:28PM +0200, Eric Auger wrote:
->> Add a generic lookup_table() helper whose role consists in
->> scanning a contiguous table located in guest RAM and applying
->> a callback on each entry. Entries can be handled as linked lists
->> since the callback may return an offset to the next entry and
->> also tell that an entry is the last one.
->>
->> Helper functions also are added to compute the device/event ID
->> offset to the next DTE/ITE.
->>
->> compute_next_devid_offset, compute_next_eventid_offset and
->> lookup_table will become static in subsequent patches
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->> v4 -> v5:
->> - use kvm_read_guest
->>
->> v3 -> v4:
->> - remove static to avoid compilation warning
->> - correct size computation in looup_table()
->> - defines now encode the number of bits used for devid and eventid offsets
->> - use BIT() - 1 to encode the max offets
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 93 insertions(+)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 56c5123..c22b35d 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -195,6 +195,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
->>  
->>  #define VITS_TYPER_IDBITS 16
->>  #define VITS_TYPER_DEVBITS 16
->> +#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
->> +#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
->>  
->>  /*
->>   * Finds and returns a collection in the ITS collection table.
->> @@ -1674,6 +1676,97 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
->>  	return ret;
->>  }
->>  
->> +u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
->> +{
->> +	struct list_head *e = &dev->dev_list;
->> +	struct its_device *next;
->> +	u32 next_offset;
->> +
->> +	if (e->next == h)
->> +		return 0;
->> +	next = list_entry(e->next, struct its_device, dev_list);
->> +	next_offset = next->device_id - dev->device_id;
->> +
->> +	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
->> +}
->> +
->> +u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
->> +{
->> +	struct list_head *e = &ite->ite_list;
->> +	struct its_ite *next;
->> +	u32 next_offset;
->> +
->> +	if (e->next == h)
->> +		return 0;
->> +	next = list_entry(e->next, struct its_ite, ite_list);
->> +	next_offset = next->event_id - ite->event_id;
->> +
->> +	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
->> +}
->> +
->> +/**
->> + * entry_fn_t - Callback called on a table entry restore path
->> + * @its: its handle
->> + * @id: id of the entry
->> + * @entry: pointer to the entry
->> + * @opaque: pointer to an opaque data
->> + * @next_offset: minimal ID offset to the next entry. 0 if this
->> + * entry is the last one, 1 if the entry is invalid, >= 1 if an
-> 
-> eh, also, did you mean -1 if the entry is invalid?
-no in case the entry is invalid, we tell the caller that it must inspect
-the next entry, hence the next_offset = +1.
+This will make these line names reflect through to userspace
+so that they can easily be identified and used with the new
+character device ABI.
 
-Thanks
+Some care has been taken to name all lines, not just those used
+by the external connectors, also lines that are muxed into some
+other function than GPIO: these are named "[FOO]" so that users
+can see with lsgpio what all lines are used for.
 
-Eric
-> 
-> Thanks,
-> -Christoffer
-> 
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts | 60 ++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+index 91f2e5f..5b3e0ee 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+@@ -178,6 +178,66 @@
+ };
+ 
+ &pio {
++	/*
++	 * Legend: proper name = the GPIO line is used as GPIO
++	 *         NC = not connected (not routed from the SoC)
++	 *         "[PER]" = pin is muxed for peripheral (not GPIO)
++	 *         "" = no idea, schematic doesn't say, could be
++	 *              unrouted (not connected to any external pin)
++	 *         LSEC = Low Speed External Connector
++	 *         HSEC = High Speed External Connector
++	 */
++	gpio-line-names =
++		/* PA */
++		"[ERXD3]", "[ERXD2]", "[ERXD1]", "[ERXD0]", "[ETXD3]",
++			"[ETXD2]", "[ETXD1]", "[ETXD0]",
++		"[ERXCK]", "[ERXERR]", "[ERXDV]", "[EMDC]", "[EMDIO]",
++			"[ETXEN]", "[ETXCK]", "[ECRS]",
++		"[ECOL]", "[ETXERR]", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PB */
++		"[PMU-SCK]", "[PMU-SDA]", "", "", "", "NC", "NC", "NC",
++		"NC", "[USB0-DRV]", "NC", "NC", "NC", "NC", "", "",
++		"", "", "", "", "SCL", "SDA", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PC */
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PD */
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PE */
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PF */
++		"[SD0-D1]", "[SD0-D0]", "[SD0-CLK]", "[SD0-CMD]", "[SD0-D3]",
++			"[SD0-D2]", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PG */
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PH */
++		"TXD0", "RXD0", "IO-1", "PH3", "[USB0-IDDET]", "PH5", "", "",
++		"", "", "[SD0-DET]", "", "", "", "", "",
++		"NC", "", "", "", "IO-4", "IO-5", "NC", "[EMAC-PWR-EN]",
++		"[LED1]", "NC", "NC", "NC", "", "", "", "",
++		/* PI */
++		"", "", "", "IO-GCLK", "NC", "NC", "NC", "NC",
++		"NC", "NC", "[SPI-CE0]", "[SPI-CLK]", "[SPI-MOSI]",
++			"[SPI-MISO]", "[SPI-CE1]", "NC",
++		"IO-6", "IO-3", "IO-2", "IO-0", "", "", "", "",
++		"", "", "", "", "", "", "", "";
++
+ 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+ 		pins = "PH4";
+ 		function = "gpio_in";
+-- 
+2.7.4
