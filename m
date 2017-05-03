@@ -1,16 +1,14 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 3 May 2017 16:26:36 +0800
-Subject: [PATCH v2 3/7] ARM: dts: imx7s: Add node for GPC
-In-Reply-To: <20170418150133.31679-4-andrew.smirnov@gmail.com>
+Date: Wed, 3 May 2017 16:28:19 +0800
+Subject: [PATCH v2 6/7] ARM: dts: imx7d: Add node for PCIe controller
+In-Reply-To: <20170418150133.31679-7-andrew.smirnov@gmail.com>
 References: <20170418150133.31679-1-andrew.smirnov@gmail.com>
- <20170418150133.31679-4-andrew.smirnov@gmail.com>
-Message-ID: <20170503082634.GC18578@dragon>
+ <20170418150133.31679-7-andrew.smirnov@gmail.com>
+Message-ID: <20170503082817.GD18578@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 08:01:29AM -0700, Andrey Smirnov wrote:
-> Add node for GPC and specify as a parent interrupt controller for SoC bus.
-> 
+On Tue, Apr 18, 2017 at 08:01:32AM -0700, Andrey Smirnov wrote:
 > Cc: yurovsky at gmail.com
 > Cc: Dong Aisheng <aisheng.dong@nxp.com>
 > Cc: Shawn Guo <shawnguo@kernel.org>
@@ -24,24 +22,20 @@ On Tue, Apr 18, 2017 at 08:01:29AM -0700, Andrey Smirnov wrote:
 > Cc: linux-arm-kernel at lists.infradead.org
 > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 > ---
->  arch/arm/boot/dts/imx7s.dtsi | 26 +++++++++++++++++++++++++-
->  1 file changed, 25 insertions(+), 1 deletion(-)
+>  arch/arm/boot/dts/imx7d.dtsi | 37 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index 7148eac..5ba1289 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> index f6dee41..f46814a 100644
+> --- a/arch/arm/boot/dts/imx7d.dtsi
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
 > @@ -42,6 +42,7 @@
 >   */
 >  
->  #include <dt-bindings/clock/imx7d-clock.h>
-> +#include <dt-bindings/power/imx7-power.h>
+>  #include "imx7s.dtsi"
+> +#include <dt-bindings/reset/imx7-reset.h>
 
-It has dependency on imx7 power domain driver, and I need to wait for
+It has dependency on imx7 reset driver, and I need to wait for
 v4.12-rc1 to apply the patch.
 
 Shawn
-
->  #include <dt-bindings/gpio/gpio.h>
->  #include <dt-bindings/input/input.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
