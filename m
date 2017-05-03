@@ -1,64 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 3 May 2017 16:32:01 +0100
-Subject: [PATCH 07/31] KVM: arm/arm64: vgic-v3: Add accessors for the
- ICH_APxRn_EL2 registers
-In-Reply-To: <20170503104606.19342-8-marc.zyngier@arm.com>
-References: <20170503104606.19342-1-marc.zyngier@arm.com>
- <20170503104606.19342-8-marc.zyngier@arm.com>
-Message-ID: <20170503153201.GC4951@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 3 May 2017 16:33:57 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Poll for CMDQ drain completion more
+ effectively
+In-Reply-To: <1493291587-23488-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1493291587-23488-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <a9d1bb4d-6578-93bb-66cf-5ed55952b85a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 11:45:42AM +0100, Marc Zyngier wrote:
-> As we're about to access the Active Priority registers a lot more,
-> let's define accessors that take the register number as a parameter.
+On 27/04/17 12:13, sunil.kovvuri at gmail.com wrote:
+> From: Sunil Goutham <sgoutham@cavium.com>
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Modified polling on CMDQ consumer similar to how polling is done for TLB SYNC
+> completion in SMMUv2 driver. Code changes are done with reference to
+> 
+> 8513c8930069 iommu/arm-smmu: Poll for TLB sync completion more effectively
+> 
+> Poll timeout has been increased which addresses issue of 100us timeout not
+> sufficient, when command queue is full with TLB invalidation commands.
+> 
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> Signed-off-by: Geetha <gakula@cavium.com>
 > ---
->  virt/kvm/arm/hyp/vgic-v3-sr.c | 116 ++++++++++++++++++++++++++++++++++++------
->  1 file changed, 100 insertions(+), 16 deletions(-)
+>  drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++---
+>  1 file changed, 12 insertions(+), 3 deletions(-)
 > 
-> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index 32c3295929b0..990d9d1e85d0 100644
-> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -118,6 +118,90 @@ static void __hyp_text __gic_v3_set_lr(u64 val, int lr)
->  	}
->  }
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index d412bdd..34599d4 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -379,6 +379,9 @@
+>  #define CMDQ_SYNC_0_CS_NONE		(0UL << CMDQ_SYNC_0_CS_SHIFT)
+>  #define CMDQ_SYNC_0_CS_SEV		(2UL << CMDQ_SYNC_0_CS_SHIFT)
 >  
-> +static void __hyp_text __vgic_v3_write_ap0rn(u32 val, int n)
-> +{
-> +	switch (n) {
-> +	case 0:
-> +		write_gicreg(val, ICH_AP0R0_EL2);
-> +		break;
-> +	case 1:
-> +		write_gicreg(val, ICH_AP0R1_EL2);
-> +		break;
-> +	case 2:
-> +		write_gicreg(val, ICH_AP0R2_EL2);
-> +		break;
-> +	case 3:
-> +		write_gicreg(val, ICH_AP0R3_EL2);
-> +		break;
-> +	}
+> +#define CMDQ_DRAIN_TIMEOUT_US		1000
+> +#define CMDQ_SPIN_COUNT			10
+> +
+>  /* Event queue */
+>  #define EVTQ_ENT_DWORDS			4
+>  #define EVTQ_MAX_SZ_SHIFT		7
+> @@ -737,7 +740,8 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
+>   */
+>  static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
+>  {
+> -	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
+> +	ktime_t timeout = ktime_add_us(ktime_get(), CMDQ_DRAIN_TIMEOUT_US);
+> +	unsigned int spin_cnt, delay = 1;
+>  
+>  	while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
+>  		if (ktime_compare(ktime_get(), timeout) > 0)
+> @@ -746,8 +750,13 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
+>  		if (wfe) {
+>  			wfe();
+>  		} else {
+> -			cpu_relax();
+> -			udelay(1);
+> +			for (spin_cnt = 0;
+> +			     spin_cnt < CMDQ_SPIN_COUNT; spin_cnt++) {
+> +				cpu_relax();
+> +				continue;
+> +			}
+> +			udelay(delay);
+> +			delay *= 2;
 
-Is there any way we can get a build or runtime failure for an
-out-of-bounds n value?
+Sorry, I can't make sense of this. The referenced commit uses the spin
+loop to poll opportunistically a few times before delaying. This loop
+just adds a short open-coded udelay to an exponential udelay, and it's
+not really clear that that's any better than a fixed udelay (especially
+as the two cases in which we poll are somewhat different).
 
-> +}
+What's wrong with simply increasing the timeout value alone?
 
-Given this is used with a constant n, you could make this:
+Robin.
 
-#define __vgic_v3_write_ap0rn(v, n) \
-	write_gicreg(v, ICH_AP0R##n##_EL2)
-
-... which should also give you a warning for an out-of-bounds n.
-
-Similar could apply for the other helpers here.
-
-That would require some function -> macro conversion in later patches
-though, so I can understand if you're not keen on that.
-
-Thanks,
-Mark.
+>  		}
+>  	}
+>  
+> 
