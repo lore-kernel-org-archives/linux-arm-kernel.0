@@ -1,87 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  3 May 2017 16:09:38 +0100
-Subject: [PATCH 6/6] arm64: uaccess: suppress spurious clang warning
-In-Reply-To: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
-References: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1493824178-7399-7-git-send-email-mark.rutland@arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 3 May 2017 08:19:07 -0700
+Subject: [PATCH v2] drivers: dma-mapping: Do not leave an invalid
+ area->pages pointer in dma_common_contiguous_remap()
+In-Reply-To: <1493823468-19470-1-git-send-email-catalin.marinas@arm.com>
+References: <1493823468-19470-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20170503151907.GA31469@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clang tries to warn when there's a mismatch between an operand's size,
-and the size of the register it is held in, as this may indicate a bug.
-Specifically, clang warns when the operand's type is less than 64 bits
-wide, and the register is used unqualified (i.e. %N rather than %xN or
-%wN).
+On Wed, May 03, 2017 at 03:57:48PM +0100, Catalin Marinas wrote:
+> The dma_common_pages_remap() function allocates a vm_struct object and
+> initialises the pages pointer to value passed as argument. However, when
+> this function is called dma_common_contiguous_remap(), the pages array
+> is only temporarily allocated, being freed shortly after
+> dma_common_contiguous_remap() returns. Architecture code checking the
+> validity of an area->pages pointer would incorrectly dereference already
+> freed pointers. This has been exposed by the arm64 commit 44176bb38fa4
+> ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU").
+> 
+> Fixes: 513510ddba96 ("common: dma-mapping: introduce common remapping functions")
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Reported-by: Andrzej Hajda <a.hajda@samsung.com>
+> Acked-by: Laura Abbott <labbott@redhat.com>
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+> 
+> Greg,
+> 
+> Please merge this patch via your tree (and therefore I haven't added
+> your ack). Thanks.
 
-Unfortunately clang can generate these warnings for unreachable code.
-For example, for code like:
+Ok, will queue it up after 4.12-rc1 is out.
 
-do {                                            \
-        typeof(*(ptr)) __v = (v);               \
-        switch(sizeof(*(ptr))) {                \
-        case 1:                                 \
-                // assume __v is 1 byte wide    \
-                asm ("{op}b %w0" : : "r" (v));  \
-                break;                          \
-        case 8:                                 \
-                // assume __v is 8 bytes wide   \
-                asm ("{op} %0" : : "r" (v));    \
-                break;                          \
-        }
-while (0)
+thanks,
 
-... if op() were passed a char value and pointer to char, clang may
-produce a warning for the unreachable case where sizeof(*(ptr)) is 8.
-
-For the same reasons, clang produces warnings when __put_user_err() is
-used for types that are less than 64 bits wide.
-
-We could avoid this with a cast to a fixed-width type in each of the
-cases. However, GCC will then warn that pointer types are being cast to
-mismatched integer sizes (in unreachable paths).
-
-Another option would be to use the same union trickery as we do for
-__smp_store_release() and __smp_load_acquire(), but this is fairly
-invasive.
-
-Instead, this patch suppresses the clang warning by using an x modifier
-in the assembly for the 8 byte case of __put_user_err(). No additional
-work is necessary as the value has been cast to typeof(*(ptr)), so the
-compiler will have performed any necessary extension for the reachable
-case.
-
-For consistency, __get_user_err() is also updated to use the x modifier
-for its 8 byte case.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Matthias Kaehlcke <mka@chromium.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/uaccess.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index ed3ecf1..2c7822c 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -257,7 +257,7 @@ static inline void uaccess_enable_not_uao(void)
- 			       (err), ARM64_HAS_UAO);			\
- 		break;							\
- 	case 8:								\
--		__get_user_asm("ldr", "ldtr", "%",  __gu_val, (ptr),	\
-+		__get_user_asm("ldr", "ldtr", "%x",  __gu_val, (ptr),	\
- 			       (err), ARM64_HAS_UAO);			\
- 		break;							\
- 	default:							\
-@@ -324,7 +324,7 @@ static inline void uaccess_enable_not_uao(void)
- 			       (err), ARM64_HAS_UAO);			\
- 		break;							\
- 	case 8:								\
--		__put_user_asm("str", "sttr", "%", __pu_val, (ptr),	\
-+		__put_user_asm("str", "sttr", "%x", __pu_val, (ptr),	\
- 			       (err), ARM64_HAS_UAO);			\
- 		break;							\
- 	default:							\
--- 
-1.9.1
+greg k-h
