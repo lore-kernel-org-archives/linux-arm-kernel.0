@@ -1,103 +1,190 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  3 May 2017 13:59:47 +0200
-Subject: [PATCH v2 10/20] drm/sun4i: tcon: Move the muxing out of the mode set
- function
+Date: Wed,  3 May 2017 13:59:43 +0200
+Subject: [PATCH v2 6/20] clk: sunxi-ng: mux: Change pre-divider application
+ function prototype
 In-Reply-To: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
 References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <ea29ffd2bc3c76203168d0fd1e969b045424b24c.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <b7fab9142ae318f9188b93dfba0b6bd2b530a514.1493812478.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The muxing can actually happen on both channels on some SoCs, so it makes
-more sense to just move it out of the sun4i_tcon1_mode_set function and
-create a separate function that needs to be called by the encoders.
+The current function name is a bit confusing, and doesn't really allow to
+create an explicit function to reverse the operation.
 
-Let's do that and convert the existing drivers.
+We also for now change the parent rate through a pointer, while we don't
+return anything.
+
+In order to be less confusing, and easier to use for downstream users,
+change the function name to something hopefully clearer, and return the
+adjusted rate instead of changing the pointer.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_rgb.c  |  1 +
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 22 ++++++++++++++++------
- drivers/gpu/drm/sun4i/sun4i_tcon.h |  2 ++
- drivers/gpu/drm/sun4i/sun4i_tv.c   |  1 +
- 4 files changed, 20 insertions(+), 6 deletions(-)
+ drivers/clk/sunxi-ng/ccu_div.c  |  8 ++++----
+ drivers/clk/sunxi-ng/ccu_mp.c   |  8 ++++----
+ drivers/clk/sunxi-ng/ccu_mult.c |  8 ++++----
+ drivers/clk/sunxi-ng/ccu_mux.c  | 29 ++++++++++++-----------------
+ drivers/clk/sunxi-ng/ccu_mux.h  |  8 ++++----
+ 5 files changed, 28 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index 67f0b91a99de..3003d290c635 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -175,6 +175,7 @@ static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
- 	struct sun4i_tcon *tcon = rgb->tcon;
+diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
+index 419463375bc1..c0e5c10d0091 100644
+--- a/drivers/clk/sunxi-ng/ccu_div.c
++++ b/drivers/clk/sunxi-ng/ccu_div.c
+@@ -59,8 +59,8 @@ static unsigned long ccu_div_recalc_rate(struct clk_hw *hw,
+ 	val = reg >> cd->div.shift;
+ 	val &= (1 << cd->div.width) - 1;
  
- 	sun4i_tcon0_mode_set(tcon, mode);
-+	sun4i_tcon_set_mux(tcon, 0, encoder);
+-	ccu_mux_helper_adjust_parent_for_prediv(&cd->common, &cd->mux, -1,
+-						&parent_rate);
++	parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
++						  parent_rate);
  
- 	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
+ 	return divider_recalc_rate(hw, parent_rate, val, cd->div.table,
+ 				   cd->div.flags);
+@@ -83,8 +83,8 @@ static int ccu_div_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	unsigned long val;
+ 	u32 reg;
  
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 66a5bb9b85e9..0204d9fadb66 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -108,6 +108,22 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
+-	ccu_mux_helper_adjust_parent_for_prediv(&cd->common, &cd->mux, -1,
+-						&parent_rate);
++	parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
++						  parent_rate);
+ 
+ 	val = divider_get_val(rate, parent_rate, cd->div.table, cd->div.width,
+ 			      cd->div.flags);
+diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
+index de02e6c386d8..b917ad7a386c 100644
+--- a/drivers/clk/sunxi-ng/ccu_mp.c
++++ b/drivers/clk/sunxi-ng/ccu_mp.c
+@@ -87,8 +87,8 @@ static unsigned long ccu_mp_recalc_rate(struct clk_hw *hw,
+ 	u32 reg;
+ 
+ 	/* Adjust parent_rate according to pre-dividers */
+-	ccu_mux_helper_adjust_parent_for_prediv(&cmp->common, &cmp->mux,
+-						-1, &parent_rate);
++	parent_rate = ccu_mux_helper_apply_prediv(&cmp->common, &cmp->mux, -1,
++						  parent_rate);
+ 
+ 	reg = readl(cmp->common.base + cmp->common.reg);
+ 
+@@ -123,8 +123,8 @@ static int ccu_mp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	u32 reg;
+ 
+ 	/* Adjust parent_rate according to pre-dividers */
+-	ccu_mux_helper_adjust_parent_for_prediv(&cmp->common, &cmp->mux,
+-						-1, &parent_rate);
++	parent_rate = ccu_mux_helper_apply_prediv(&cmp->common, &cmp->mux, -1,
++						  parent_rate);
+ 
+ 	max_m = cmp->m.max ?: 1 << cmp->m.width;
+ 	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
+diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
+index 6ee7ba0738fb..20d0300867f2 100644
+--- a/drivers/clk/sunxi-ng/ccu_mult.c
++++ b/drivers/clk/sunxi-ng/ccu_mult.c
+@@ -88,8 +88,8 @@ static unsigned long ccu_mult_recalc_rate(struct clk_hw *hw,
+ 	val = reg >> cm->mult.shift;
+ 	val &= (1 << cm->mult.width) - 1;
+ 
+-	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
+-						&parent_rate);
++	parent_rate = ccu_mux_helper_apply_prediv(&cm->common, &cm->mux, -1,
++						  parent_rate);
+ 
+ 	return parent_rate * (val + cm->mult.offset);
  }
- EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
+@@ -116,8 +116,8 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	else
+ 		ccu_frac_helper_disable(&cm->common, &cm->frac);
  
-+void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
-+			struct drm_encoder *encoder)
-+{
-+	if (!tcon->quirks->has_unknown_mux)
-+		return;
-+
-+	if (channel != 1)
-+		return;
-+
-+	/*
-+	 * FIXME: Undocumented bits
-+	 */
-+	regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
-+}
-+EXPORT_SYMBOL(sun4i_tcon_set_mux);
-+
- static int sun4i_tcon_get_clk_delay(struct drm_display_mode *mode,
- 				    int channel)
+-	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
+-						&parent_rate);
++	parent_rate = ccu_mux_helper_apply_prediv(&cm->common, &cm->mux, -1,
++						  parent_rate);
+ 
+ 	_cm.min = cm->mult.min;
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
+index 3eb23d4e6534..c33210972581 100644
+--- a/drivers/clk/sunxi-ng/ccu_mux.c
++++ b/drivers/clk/sunxi-ng/ccu_mux.c
+@@ -56,13 +56,12 @@ static u16 ccu_mux_get_prediv(struct ccu_common *common,
+ 	return prediv;
+ }
+ 
+-void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
+-					     struct ccu_mux_internal *cm,
+-					     int parent_index,
+-					     unsigned long *parent_rate)
++unsigned long ccu_mux_helper_apply_prediv(struct ccu_common *common,
++					  struct ccu_mux_internal *cm,
++					  int parent_index,
++					  unsigned long parent_rate)
  {
-@@ -266,12 +282,6 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
- 	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
- 			   SUN4I_TCON_GCTL_IOMAP_MASK,
- 			   SUN4I_TCON_GCTL_IOMAP_TCON1);
--
--	/*
--	 * FIXME: Undocumented bits
--	 */
--	if (tcon->quirks->has_unknown_mux)
--		regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
+-	*parent_rate = *parent_rate / ccu_mux_get_prediv(common, cm,
+-							 parent_index);
++	return parent_rate / ccu_mux_get_prediv(common, cm, parent_index);
  }
- EXPORT_SYMBOL(sun4i_tcon1_mode_set);
  
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index f636343a935d..0350936b413c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -190,6 +190,8 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable);
- /* Mode Related Controls */
- void sun4i_tcon_switch_interlace(struct sun4i_tcon *tcon,
- 				 bool enable);
-+void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
-+			struct drm_encoder *encoder);
- void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
- 			  struct drm_display_mode *mode);
- void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-index 49c49431a053..03c494b8159c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-@@ -393,6 +393,7 @@ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
- 	const struct tv_mode *tv_mode = sun4i_tv_find_tv_by_mode(mode);
+ int ccu_mux_helper_determine_rate(struct ccu_common *common,
+@@ -84,10 +83,8 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
  
- 	sun4i_tcon1_mode_set(tcon, mode);
-+	sun4i_tcon_set_mux(tcon, 1, encoder);
+ 		best_parent = clk_hw_get_parent(hw);
+ 		best_parent_rate = clk_hw_get_rate(best_parent);
+-
+-		adj_parent_rate = best_parent_rate;
+-		ccu_mux_helper_adjust_parent_for_prediv(common, cm, -1,
+-							&adj_parent_rate);
++		adj_parent_rate = ccu_mux_helper_apply_prediv(common, cm, -1,
++							      best_parent_rate);
  
- 	/* Enable and map the DAC to the output */
- 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
+ 		best_rate = round(cm, best_parent, &adj_parent_rate,
+ 				  req->rate, data);
+@@ -103,9 +100,9 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
+ 		if (!parent)
+ 			continue;
+ 
+-		adj_parent_rate = parent_rate = clk_hw_get_rate(parent);
+-		ccu_mux_helper_adjust_parent_for_prediv(common, cm, i,
+-							&adj_parent_rate);
++		parent_rate = clk_hw_get_rate(parent);
++		adj_parent_rate = ccu_mux_helper_apply_prediv(common, cm, i,
++							      parent_rate);
+ 
+ 		tmp_rate = round(cm, parent, &adj_parent_rate, req->rate, data);
+ 		if (tmp_rate == req->rate) {
+@@ -215,10 +212,8 @@ static unsigned long ccu_mux_recalc_rate(struct clk_hw *hw,
+ {
+ 	struct ccu_mux *cm = hw_to_ccu_mux(hw);
+ 
+-	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
+-						&parent_rate);
+-
+-	return parent_rate;
++	return ccu_mux_helper_apply_prediv(&cm->common, &cm->mux, -1,
++					   parent_rate);
+ }
+ 
+ const struct clk_ops ccu_mux_ops = {
+diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
+index 4be56eee2bfd..dba12c76cf54 100644
+--- a/drivers/clk/sunxi-ng/ccu_mux.h
++++ b/drivers/clk/sunxi-ng/ccu_mux.h
+@@ -78,10 +78,10 @@ static inline struct ccu_mux *hw_to_ccu_mux(struct clk_hw *hw)
+ 
+ extern const struct clk_ops ccu_mux_ops;
+ 
+-void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
+-					     struct ccu_mux_internal *cm,
+-					     int parent_index,
+-					     unsigned long *parent_rate);
++unsigned long ccu_mux_helper_apply_prediv(struct ccu_common *common,
++					  struct ccu_mux_internal *cm,
++					  int parent_index,
++					  unsigned long parent_rate);
+ int ccu_mux_helper_determine_rate(struct ccu_common *common,
+ 				  struct ccu_mux_internal *cm,
+ 				  struct clk_rate_request *req,
 -- 
 git-series 0.8.11
