@@ -1,79 +1,48 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Wed, 3 May 2017 18:49:09 +0530
-Subject: [PATCH] iommu/arm-smmu-v3: Poll for CMDQ drain completion more
- effectively
-In-Reply-To: <1493291587-23488-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1493291587-23488-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <CA+sq2CdR0vC76F1m-LvYGfZW32nKbQg9dQsfJ_jtvYgZ7yyt3g@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 3 May 2017 21:25:15 +0800
+Subject: [PATCH v2 0/5] mtd: nand: gpmi: add i.MX 7 support
+In-Reply-To: <20170422012338.4635-1-stefan@agner.ch>
+References: <20170422012338.4635-1-stefan@agner.ch>
+Message-ID: <20170503132513.GE24392@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 4:43 PM,  <sunil.kovvuri@gmail.com> wrote:
-> From: Sunil Goutham <sgoutham@cavium.com>
->
-> Modified polling on CMDQ consumer similar to how polling is done for TLB SYNC
-> completion in SMMUv2 driver. Code changes are done with reference to
->
-> 8513c8930069 iommu/arm-smmu: Poll for TLB sync completion more effectively
->
-> Poll timeout has been increased which addresses issue of 100us timeout not
-> sufficient, when command queue is full with TLB invalidation commands.
->
-> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-> Signed-off-by: Geetha <gakula@cavium.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++---
->  1 file changed, 12 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index d412bdd..34599d4 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -379,6 +379,9 @@
->  #define CMDQ_SYNC_0_CS_NONE            (0UL << CMDQ_SYNC_0_CS_SHIFT)
->  #define CMDQ_SYNC_0_CS_SEV             (2UL << CMDQ_SYNC_0_CS_SHIFT)
->
-> +#define CMDQ_DRAIN_TIMEOUT_US          1000
-> +#define CMDQ_SPIN_COUNT                        10
-> +
->  /* Event queue */
->  #define EVTQ_ENT_DWORDS                        4
->  #define EVTQ_MAX_SZ_SHIFT              7
-> @@ -737,7 +740,8 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
->   */
->  static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
->  {
-> -       ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
-> +       ktime_t timeout = ktime_add_us(ktime_get(), CMDQ_DRAIN_TIMEOUT_US);
-> +       unsigned int spin_cnt, delay = 1;
->
->         while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
->                 if (ktime_compare(ktime_get(), timeout) > 0)
-> @@ -746,8 +750,13 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
->                 if (wfe) {
->                         wfe();
->                 } else {
-> -                       cpu_relax();
-> -                       udelay(1);
-> +                       for (spin_cnt = 0;
-> +                            spin_cnt < CMDQ_SPIN_COUNT; spin_cnt++) {
-> +                               cpu_relax();
-> +                               continue;
-> +                       }
-> +                       udelay(delay);
-> +                       delay *= 2;
->                 }
->         }
->
+On Fri, Apr 21, 2017 at 06:23:33PM -0700, Stefan Agner wrote:
+> This patchset adds support for i.MX 7 SoC for the GPMI NAND controller.
+> There have been similar patchsets already:
+> https://lkml.org/lkml/2016/2/23/912
+> 
+> However, this patchset does not make use of any of the new features.
+> The current feature set seems to work fine, I successfully run the MTD
+> tests on a Colibri iMX7.
+> 
 > --
-> 2.7.4
->
+> Stefan
+> 
+> Changes since v1:
+> - Make clks_count const
+> - Introduce IS_IMX7D for i.MX 7 SoC's and make it part of GPMI_IS_MX6
+> 
+> Stefan Agner (5):
+>   mtd: nand: gpmi: unify clock handling
+>   mtd: nand: gpmi: add i.MX 7 SoC support
+>   mtd: gpmi: document current clock requirements
+>   ARM: dts: imx7: add GPMI NAND
+>   ARM: dts: imx7-colibri: add NAND support
 
-Sorry for the ignorance.
-Is there a patchwork where I can check current status of ARM IOMMU
-related patches ?
+The dts patches look good to me.  I will pick them up once the driver
+changes are accepted.
 
-And is this patch accepted, if not any comments / feedback ?
+Shawn
 
-Thanks,
-Sunil.
+> 
+>  .../devicetree/bindings/mtd/gpmi-nand.txt          | 14 +++++-
+>  arch/arm/boot/dts/imx7-colibri.dtsi                |  9 ++++
+>  arch/arm/boot/dts/imx7s.dtsi                       | 31 ++++++++++++
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c             | 56 +++++++++++++---------
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.h             |  9 +++-
+>  5 files changed, 93 insertions(+), 26 deletions(-)
+> 
+> -- 
+> 2.12.2
+> 
