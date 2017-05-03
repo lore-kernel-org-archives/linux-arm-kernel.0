@@ -1,104 +1,54 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed,  3 May 2017 15:17:51 +0100
-Subject: [PATCH 1/2] kvm: arm/arm64: Fix race in resetting stage2 PGD
-In-Reply-To: <1493821072-29713-1-git-send-email-suzuki.poulose@arm.com>
-References: <1493821072-29713-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1493821072-29713-2-git-send-email-suzuki.poulose@arm.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 3 May 2017 16:26:05 +0200
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
+In-Reply-To: <20170503135715.GG18578@dragon>
+References: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
+ <CAOMZO5BsgXRfgZ0hszk2Vgo2keVDHH1BLbJTbW+awMS2cBoNow@mail.gmail.com>
+ <CAOMZO5CKUsEr1yf5RrsPLipNtLC_6sK0dPjT2M-eN-uo8hEbrQ@mail.gmail.com>
+ <1493141004.3557.8.camel@nxp.com>
+ <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
+ <20170503135715.GG18578@dragon>
+Message-ID: <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In kvm_free_stage2_pgd() we check the stage2 PGD before holding
-the lock and proceed to take the lock if it is valid. And we unmap
-the page tables, followed by releasing the lock. We reset the PGD
-only after dropping this lock, which could cause a race condition
-where another thread waiting on or even holding the lock, could
-potentially see that the PGD is still valid and proceed to perform
-a stage2 operation and later encounter a NULL PGD.
+On 05/03/2017 03:57 PM, Shawn Guo wrote:
+> On Tue, Apr 25, 2017 at 07:28:06PM +0200, Marek Vasut wrote:
+>> On 04/25/2017 07:23 PM, Leonard Crestez wrote:
+>>> Anyway, that version also sets the supply for reg_arm and reg_soc. It
+>>> is not necessary for fixing the crash I'm seeing but is good because it
+>>> will result in the minimum voltage on VDD_ARM_SOC_IN rather than a fix
+>>> 1375mv. I tested Marek's patch and it works fine on my rev B board
+>>> (which otherwise fails to boot upstream).
+>>
+>> Oh that's nice , thanks ! I don't have SDB and I hacked it up after a
+>> brief discussion with Fabio without even compile-testing it, thus RFC.
+>> Glad to hear it works and thanks for testing it ! Can you add a formal
+>> Tested-by please ?
+> 
+> Hi Marek,
 
-[223090.242280] Unable to handle kernel NULL pointer dereference at
-virtual address 00000040
-[223090.262330] PC is at unmap_stage2_range+0x8c/0x428
-[223090.262332] LR is at kvm_unmap_hva_handler+0x2c/0x3c
-[223090.262531] Call trace:
-[223090.262533] [<ffff0000080adb78>] unmap_stage2_range+0x8c/0x428
-[223090.262535] [<ffff0000080adf40>] kvm_unmap_hva_handler+0x2c/0x3c
-[223090.262537] [<ffff0000080ace2c>] handle_hva_to_gpa+0xb0/0x104
-[223090.262539] [<ffff0000080af988>] kvm_unmap_hva+0x5c/0xbc
-[223090.262543] [<ffff0000080a2478>]
-kvm_mmu_notifier_invalidate_page+0x50/0x8c
-[223090.262547] [<ffff0000082274f8>]
-__mmu_notifier_invalidate_page+0x5c/0x84
-[223090.262551] [<ffff00000820b700>] try_to_unmap_one+0x1d0/0x4a0
-[223090.262553] [<ffff00000820c5c8>] rmap_walk+0x1cc/0x2e0
-[223090.262555] [<ffff00000820c90c>] try_to_unmap+0x74/0xa4
-[223090.262557] [<ffff000008230ce4>] migrate_pages+0x31c/0x5ac
-[223090.262561] [<ffff0000081f869c>] compact_zone+0x3fc/0x7ac
-[223090.262563] [<ffff0000081f8ae0>] compact_zone_order+0x94/0xb0
-[223090.262564] [<ffff0000081f91c0>] try_to_compact_pages+0x108/0x290
-[223090.262569] [<ffff0000081d5108>] __alloc_pages_direct_compact+0x70/0x1ac
-[223090.262571] [<ffff0000081d64a0>] __alloc_pages_nodemask+0x434/0x9f4
-[223090.262572] [<ffff0000082256f0>] alloc_pages_vma+0x230/0x254
-[223090.262574] [<ffff000008235e5c>] do_huge_pmd_anonymous_page+0x114/0x538
-[223090.262576] [<ffff000008201bec>] handle_mm_fault+0xd40/0x17a4
-[223090.262577] [<ffff0000081fb324>] __get_user_pages+0x12c/0x36c
-[223090.262578] [<ffff0000081fb804>] get_user_pages_unlocked+0xa4/0x1b8
-[223090.262579] [<ffff0000080a3ce8>] __gfn_to_pfn_memslot+0x280/0x31c
-[223090.262580] [<ffff0000080a3dd0>] gfn_to_pfn_prot+0x4c/0x5c
-[223090.262582] [<ffff0000080af3f8>] kvm_handle_guest_abort+0x240/0x774
-[223090.262584] [<ffff0000080b2bac>] handle_exit+0x11c/0x1ac
-[223090.262586] [<ffff0000080ab99c>] kvm_arch_vcpu_ioctl_run+0x31c/0x648
-[223090.262587] [<ffff0000080a1d78>] kvm_vcpu_ioctl+0x378/0x768
-[223090.262590] [<ffff00000825df5c>] do_vfs_ioctl+0x324/0x5a4
-[223090.262591] [<ffff00000825e26c>] SyS_ioctl+0x90/0xa4
-[223090.262595] [<ffff000008085d84>] el0_svc_naked+0x38/0x3c
+Hi Shawn,
 
-This patch moves the stage2 PGD manipulation under the lock.
+> Thanks for your patch.  But I prefer Leonard's version because: 1) it
+> has a better commit log; 2) it sticks to one-patch-does-one-thing
+> policy.
 
-Reported-by: Alexander Graf <agraf@suse.de>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Paolo Bonzini <pbonzini@redhat.com>
-Cc: Radim Kr?m?? <rkrcmar@redhat.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm/kvm/mmu.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+Well I'd prefer this patch because
+1) It has T-B
+2) It actually fixes a problem with the voltage rails such that the DVFS
+   works without leaving the system in unstable or dead state. You do
+   need the second part of my patch if you drop the OPP hackery, without
+   it the power framework cannot correctly configure the core voltages,
+   so the patch from Leonard makes things worse.
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 313ee64..909a1a7 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -829,22 +829,22 @@ void stage2_unmap_vm(struct kvm *kvm)
-  * Walks the level-1 page table pointed to by kvm->arch.pgd and frees all
-  * underlying level-2 and level-3 tables before freeing the actual level-1 table
-  * and setting the struct pointer to NULL.
-- *
-- * Note we don't need locking here as this is only called when the VM is
-- * destroyed, which can only be done once.
-  */
- void kvm_free_stage2_pgd(struct kvm *kvm)
- {
--	if (kvm->arch.pgd == NULL)
--		return;
-+	void *pgd = NULL;
- 
- 	spin_lock(&kvm->mmu_lock);
--	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
-+	if (kvm->arch.pgd) {
-+		unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
-+		pgd = kvm->arch.pgd;
-+		kvm->arch.pgd = NULL;
-+	}
- 	spin_unlock(&kvm->mmu_lock);
- 
- 	/* Free the HW pgd, one page at a time */
--	free_pages_exact(kvm->arch.pgd, S2_PGD_SIZE);
--	kvm->arch.pgd = NULL;
-+	if (pgd)
-+		free_pages_exact(pgd, S2_PGD_SIZE);
- }
- 
- static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> But I'm going to wait for a while to get Peter's comment discussed,
+> before I actually apply Leonard's patch.
+> 
+> Shawn
+> 
+
+
 -- 
-2.7.4
+Best regards,
+Marek Vasut
