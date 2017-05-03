@@ -1,36 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 3 May 2017 10:11:31 +0200
-Subject: [PATCH 0/9] ARM: dts: renesas: update PFC node name to
- pin-controller
-In-Reply-To: <20170426100538.22060-1-horms+renesas@verge.net.au>
-References: <20170426100538.22060-1-horms+renesas@verge.net.au>
-Message-ID: <20170503081131.GA28564@verge.net.au>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 3 May 2017 16:22:53 +0800
+Subject: [PATCH v2 1/7] ARM: dts: i.MX: Reintroduce 'anatop-enable-bit'
+ where appropriate
+In-Reply-To: <20170418150133.31679-2-andrew.smirnov@gmail.com>
+References: <20170418150133.31679-1-andrew.smirnov@gmail.com>
+ <20170418150133.31679-2-andrew.smirnov@gmail.com>
+Message-ID: <20170503082252.GA18578@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 26, 2017 at 12:05:29PM +0200, Simon Horman wrote:
+On Tue, Apr 18, 2017 at 08:01:27AM -0700, Andrey Smirnov wrote:
+> Now that support for 'anatop-enable-bit' has been added to ANADIG
+> driver, reintroduce 'anatop-enable-bit' for all applicable LDOs.
 > 
-> The device trees for Renesas SoCs use either pfc or pin-controller as the
-> node name for the PFC device. This patch is intended to take a step towards
-> unifying the node name used as pin-controller which appears to be the more
-> generic of the two and thus more in keeping with the DT specs.
-> 
-> My analysis is that this is a user-visible change to the extent that kernel
-> logs, and sysfs entries change from XXX.pfc and pfc at XXX to
-> XXX.pin-controller and pin-controller at XXX.
-> 
-> Boot tested on:
->  r8a73a4/ape6evm
->  r8a7740/armadillo800evb
->  r8a7778/bockw
->  r8a7790/lager
->  r8a7791/koelsch
->  r8a7791/porter
->  r8a7793/gose
->  sh73a9/kzm9g
-> 
-> Not tested on (due to lack of hw access):
->  evm2/kzm9d
->  r8a7789/marzen
+> Cc: yurovsky at gmail.com
+> Cc: Dong Aisheng <aisheng.dong@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-I have now tested this on r8a7789/marzen
+Please use 'imx' instead of 'i.MX' in subject prefix to make it more
+consistent with other patches in the series.
+
+Shawn
