@@ -1,82 +1,124 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  3 May 2017 11:45:52 +0100
-Subject: [PATCH 17/31] KVM: arm64: vgic-v3: Enable trapping of Group-1 system
- registers
-In-Reply-To: <20170503104606.19342-1-marc.zyngier@arm.com>
-References: <20170503104606.19342-1-marc.zyngier@arm.com>
-Message-ID: <20170503104606.19342-18-marc.zyngier@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 3 May 2017 11:58:30 +0100
+Subject: [PATCH] drivers/of_iommu: ignore SMMU DT nodes with status
+ 'disabled'
+In-Reply-To: <1c0463e6-f82f-1179-4f54-b2d3de63dc87@arm.com>
+References: <20170414124315.2401-1-ard.biesheuvel@linaro.org>
+ <20170428131133.GJ13675@arm.com>
+ <CAKv+Gu_G9fw0kwSetXmGjomc8Y_nu95O=rEVzgfafNRs0dtgvg@mail.gmail.com>
+ <20170428131744.GL13675@arm.com>
+ <CAKv+Gu8L1iyzBitt8zzvWDDEXk_ysGfPRxHJbQQK5o8NMWF5MA@mail.gmail.com>
+ <1c0463e6-f82f-1179-4f54-b2d3de63dc87@arm.com>
+Message-ID: <4B3EA199-183C-40CE-8C7B-E55CD92FD402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to trap Group-1 GICv3 system registers, we need to
-set ICH_HCR_EL2.TALL1 begore entering the guest. This is conditionnaly
-done after having restored the guest's state, and cleared on exit.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- include/linux/irqchip/arm-gic-v3.h | 1 +
- virt/kvm/arm/hyp/vgic-v3-sr.c      | 7 +++++++
- virt/kvm/arm/vgic/vgic-v3.c        | 4 ++++
- 3 files changed, 12 insertions(+)
+> On 3 May 2017, at 11:32, Robin Murphy <robin.murphy@arm.com> wrote:
+> 
+>> On 28/04/17 14:22, Ard Biesheuvel wrote:
+>>> On 28 April 2017 at 14:17, Will Deacon <will.deacon@arm.com> wrote:
+>>>> On Fri, Apr 28, 2017 at 02:14:49PM +0100, Ard Biesheuvel wrote:
+>>>>> On 28 April 2017 at 14:11, Will Deacon <will.deacon@arm.com> wrote:
+>>>>> Hi Ard,
+>>>>> 
+>>>>> [+ devicetree@]
+>>>>> 
+>>>>>> On Fri, Apr 14, 2017 at 01:43:15PM +0100, Ard Biesheuvel wrote:
+>>>>>> DT nodes may have a status property, and if they do, such nodes should
+>>>>>> only be considered present if the status property is set to 'okay'.
+>>>>>> 
+>>>>>> Currently, we call the init function of IOMMUs described by the device
+>>>>>> tree without taking this into account, which may result in the output
+>>>>>> below on systems where some SMMUs may be legally disabled.
+>>>>>> 
+>>>>>> Failed to initialise IOMMU /smb/smmu at e0200000
+>>>>>> Failed to initialise IOMMU /smb/smmu at e0c00000
+>>>>>> arm-smmu e0a00000.smmu: probing hardware configuration...
+>>>>>> arm-smmu e0a00000.smmu: SMMUv1 with:
+>>>>>> arm-smmu e0a00000.smmu:  stage 2 translation
+>>>>>> arm-smmu e0a00000.smmu:  coherent table walk
+>>>>>> arm-smmu e0a00000.smmu:  stream matching with 32 register groups, mask 0x7fff
+>>>>>> arm-smmu e0a00000.smmu:  8 context banks (8 stage-2 only)
+>>>>>> arm-smmu e0a00000.smmu:  Supported page sizes: 0x60211000
+>>>>>> arm-smmu e0a00000.smmu:  Stage-2: 40-bit IPA -> 40-bit PA
+>>>>>> Failed to initialise IOMMU /smb/smmu at e0600000
+>>>>>> Failed to initialise IOMMU /smb/smmu at e0800000
+>>>>>> 
+>>>>>> Since this is not an error condition, only call the init function if
+>>>>>> the device is enabled, which also inhibits the spurious error messages.
+>>>>>> 
+>>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>>> ---
+>>>>>> drivers/iommu/of_iommu.c | 2 +-
+>>>>>> 1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>>> 
+>>>>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>>>>>> index 2683e9fc0dcf..2dd1206e6c0d 100644
+>>>>>> --- a/drivers/iommu/of_iommu.c
+>>>>>> +++ b/drivers/iommu/of_iommu.c
+>>>>>> @@ -183,7 +183,7 @@ static int __init of_iommu_init(void)
+>>>>>>      for_each_matching_node_and_match(np, matches, &match) {
+>>>>>>              const of_iommu_init_fn init_fn = match->data;
+>>>>>> 
+>>>>>> -             if (init_fn(np))
+>>>>>> +             if (of_device_is_available(np) && init_fn(np))
+>>>>>>                      pr_err("Failed to initialise IOMMU %s\n",
+>>>>>>                              of_node_full_name(np));
+>>>>>>      }
+>>>>> 
+>>>>> Is there a definition of what status = "disabled" is supposed to mean for an
+>>>>> IOMMU? For example, that could mean that the firmware has pre-programmed the
+>>>>> SMMU with particular translations or memory attributes (a bit like the
+>>>>> CCA=1, CPM=1, DACS=0 case in ACPI IORT), or even disabled DMA traffic
+>>>>> altogether.
+>>>>> 
+>>>>> So I think we'd need an update to the generic IOMMU binding text to say
+>>>>> exactly what the semantics are supposed to be here.
+>>>>> 
+>>>> 
+>>>> I agree that it might make sense to describe the behavior of the IOMMU
+>>>> when it is left in the state we found it in. But that is not the same
+>>>> as status=disabled.
+>>>> 
+>>>> The DTS subtree contains loads and loads of boilerplate
+>>>> configurations, where only some pieces are enabled in the final image
+>>>> by setting status=okay. So a node that has status 'disabled' should be
+>>>> treated as 'not present', not as 'present but can be ignored under
+>>>> assumptions such and such'
+>>>> 
+>>>> In other words, I think we are talking about two different issues here.
+>>> 
+>>> I'm not so sure... if we have a master device that has an iommus= property
+>>> pointing to an IOMMU with status="disabled", I really don't know whether we
+>>> should:
+>>> 
+>>>  1. Assume the master can do DMA with a 1:1 mapping of memory and no
+>>>     changes to memory attributes
+>>> 
+>>>  2. Assume the master can do DMA with a 1:1 mapping of memory, but
+>>>     potentially with changes to the attributes
+>>> 
+>>>  3. Assume the master can do DMA, but with some pre-existing translation
+>>>     (what?)
+>>> 
+>>>  4. Assume the master can't do DMA
+>>> 
+>>> and I also don't know whether the "dma-coherent" property remains valid.
+>>> 
+>> 
+>> Ah yes. Good point.
+>> 
+>> So indeed, there should be some IOMMU specific status property that
+>> can convey all of the above, or 1. and 4. at the minimum
+> 
+> FWIW, the underlying issue being addressed here should be going away now
+> anyway, since the now-queued probe deferral series obviates the init_fn
+> early-device-creation bodge. I've been deliberately ignoring it for some
+> time for precisely that reason ;)
+> 
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index c56d9bc2c904..a1739843343e 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -403,6 +403,7 @@
- 
- #define ICH_HCR_EN			(1 << 0)
- #define ICH_HCR_UIE			(1 << 1)
-+#define ICH_HCR_TALL1			(1 << 12)
- #define ICH_HCR_EOIcount_SHIFT		27
- #define ICH_HCR_EOIcount_MASK		(0x1f << ICH_HCR_EOIcount_SHIFT)
- 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index a521e105ade1..a27671b1e9af 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -257,6 +257,9 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
- 		}
- 	} else {
-+		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-+			write_gicreg(0, ICH_HCR_EL2);
-+
- 		cpu_if->vgic_elrsr = 0xffff;
- 		cpu_if->vgic_ap0r[0] = 0;
- 		cpu_if->vgic_ap0r[1] = 0;
-@@ -329,6 +332,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 
- 		for (i = 0; i < used_lrs; i++)
- 			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
-+	} else {
-+		/* Always write ICH_HCR_EL2 to enable trapping */
-+		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-+			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
- 	}
- 
- 	/*
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 063526443781..547b8374fb64 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -21,6 +21,8 @@
- 
- #include "vgic.h"
- 
-+static bool group1_trap;
-+
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
-@@ -239,6 +241,8 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
- 
- 	/* Get the show on the road... */
- 	vgic_v3->vgic_hcr = ICH_HCR_EN;
-+	if (group1_trap)
-+		vgic_v3->vgic_hcr |= ICH_HCR_TALL1;
- }
- 
- /* check for overlapping regions and for regions crossing the end of memory */
--- 
-2.11.0
+
+Ok. I have also updated the Seattle firmware to remove the smmu nodes and the associated iommus/iommu-map properties entirely when disabling SMMU support in the firmware, which should address Will's concern regarding unspecified behavior of a disabled SMMU.
+
+IOW, this patch can be disregarded. Thanks.
