@@ -1,38 +1,36 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 3 May 2017 08:19:07 -0700
-Subject: [PATCH v2] drivers: dma-mapping: Do not leave an invalid
- area->pages pointer in dma_common_contiguous_remap()
-In-Reply-To: <1493823468-19470-1-git-send-email-catalin.marinas@arm.com>
-References: <1493823468-19470-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20170503151907.GA31469@kroah.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Wed,  3 May 2017 17:19:40 +0200
+Subject: [PATCH] iommu/rockchip: Enable Rockchip IOMMU on ARM64
+Message-ID: <20170503151940.3987-1-mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 03:57:48PM +0100, Catalin Marinas wrote:
-> The dma_common_pages_remap() function allocates a vm_struct object and
-> initialises the pages pointer to value passed as argument. However, when
-> this function is called dma_common_contiguous_remap(), the pages array
-> is only temporarily allocated, being freed shortly after
-> dma_common_contiguous_remap() returns. Architecture code checking the
-> validity of an area->pages pointer would incorrectly dereference already
-> freed pointers. This has been exposed by the arm64 commit 44176bb38fa4
-> ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU").
-> 
-> Fixes: 513510ddba96 ("common: dma-mapping: introduce common remapping functions")
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Reported-by: Andrzej Hajda <a.hajda@samsung.com>
-> Acked-by: Laura Abbott <labbott@redhat.com>
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
-> 
-> Greg,
-> 
-> Please merge this patch via your tree (and therefore I haven't added
-> your ack). Thanks.
+From: Simon Xue <xxm@rock-chips.com>
 
-Ok, will queue it up after 4.12-rc1 is out.
+This patch makes it possible to compile the rockchip-iommu driver on
+ARM64, so that it can be used with 64-bit SoCs equipped with this type
+of IOMMU.
 
-thanks,
+Signed-off-by: Simon Xue <xxm@rock-chips.com>
+Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Reviewed-by: Matthias Brugger <mbrugger@suse.com>
+---
+ drivers/iommu/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-greg k-h
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 6ee3a25ae731..99c6366a2551 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -219,7 +219,7 @@ config OMAP_IOMMU_DEBUG
+ 
+ config ROCKCHIP_IOMMU
+ 	bool "Rockchip IOMMU Support"
+-	depends on ARM
++	depends on ARM || ARM64
+ 	depends on ARCH_ROCKCHIP || COMPILE_TEST
+ 	select IOMMU_API
+ 	select ARM_DMA_USE_IOMMU
+-- 
+2.12.0
