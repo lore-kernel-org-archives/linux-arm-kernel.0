@@ -1,89 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  3 May 2017 13:59:44 +0200
-Subject: [PATCH v2 7/20] clk: sunxi-ng: mux: Re-adjust parent rate
+Date: Wed,  3 May 2017 13:59:52 +0200
+Subject: [PATCH v2 15/20] drm/sun4i: Ignore the generic connectors for
+ components
 In-Reply-To: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
 References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <0d8fc6d976c64be906fa86ead20aa10bb490386b.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <88de0f79b508e51b5fbf38fac058921a3c748807.1493812478.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the parent rate given back to the clock framework in our
-request is the original parent rate we calculated before trying to round
-the rate of our clock.
+The generic connectors such as hdmi-connector doesn't have any driver in,
+so if they are added to the component list, we will be waiting forever for
+a non-existing driver to probe.
 
-This works fine unless our clock also changes its parent rate, in which
-case we will simply ignore that change and still use the previous parent
-rate.
-
-Create a new function to re-adjust the parent rate to take the pre-dividers
-into account, and give that back to the clock framework.
+Add a list of the connectors we want to ignore when building our component
+list.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu_mux.c | 33 ++++++++++++++++++++++++++++-----
- 1 file changed, 28 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-index c33210972581..1ce62cc23f8a 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.c
-+++ b/drivers/clk/sunxi-ng/ccu_mux.c
-@@ -64,6 +64,14 @@ unsigned long ccu_mux_helper_apply_prediv(struct ccu_common *common,
- 	return parent_rate / ccu_mux_get_prediv(common, cm, parent_index);
- }
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 8ddd72cd5873..8c9d2e36be55 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -164,6 +164,11 @@ static const struct component_master_ops sun4i_drv_master_ops = {
+ 	.unbind	= sun4i_drv_unbind,
+ };
  
-+unsigned long ccu_mux_helper_unapply_prediv(struct ccu_common *common,
-+					    struct ccu_mux_internal *cm,
-+					    int parent_index,
-+					    unsigned long parent_rate)
++static bool sun4i_drv_node_is_connector(struct device_node *node)
 +{
-+	return parent_rate * ccu_mux_get_prediv(common, cm, parent_index);
++	return of_device_is_compatible(node, "hdmi-connector");
 +}
 +
- int ccu_mux_helper_determine_rate(struct ccu_common *common,
- 				  struct ccu_mux_internal *cm,
- 				  struct clk_rate_request *req,
-@@ -89,22 +97,37 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
- 		best_rate = round(cm, best_parent, &adj_parent_rate,
- 				  req->rate, data);
+ static bool sun4i_drv_node_is_frontend(struct device_node *node)
+ {
+ 	return of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
+@@ -204,7 +209,8 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+ 	    !of_device_is_available(node))
+ 		return 0;
  
-+		/*
-+		 * parent_rate might have been modified by our clock.
-+		 * Re-apply the pre-divider if there's one, and give
-+		 * the actual frequency the parent needs to run at.
-+		 */
-+		best_parent_rate = ccu_mux_helper_unapply_prediv(common, cm, -1,
-+								 adj_parent_rate);
-+
- 		goto out;
- 	}
- 
- 	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
--		unsigned long tmp_rate, parent_rate, adj_parent_rate;
-+		unsigned long tmp_rate, parent_rate;
- 		struct clk_hw *parent;
- 
- 		parent = clk_hw_get_parent_by_index(hw, i);
- 		if (!parent)
- 			continue;
- 
--		parent_rate = clk_hw_get_rate(parent);
--		adj_parent_rate = ccu_mux_helper_apply_prediv(common, cm, i,
--							      parent_rate);
-+		parent_rate = ccu_mux_helper_apply_prediv(common, cm, i,
-+							  clk_hw_get_rate(parent));
-+
-+		tmp_rate = round(cm, parent, &parent_rate, req->rate, data);
- 
--		tmp_rate = round(cm, parent, &adj_parent_rate, req->rate, data);
-+		/*
-+		 * parent_rate might have been modified by our clock.
-+		 * Re-apply the pre-divider if there's one, and give
-+		 * the actual frequency the parent needs to run at.
-+		 */
-+		parent_rate = ccu_mux_helper_unapply_prediv(common, cm, i,
-+							    parent_rate);
- 		if (tmp_rate == req->rate) {
- 			best_parent = parent;
- 			best_parent_rate = parent_rate;
+-	if (!sun4i_drv_node_is_frontend(node)) {
++	if (!sun4i_drv_node_is_connector(node) &&
++	    !sun4i_drv_node_is_frontend(node)) {
+ 		/* Add current component */
+ 		DRM_DEBUG_DRIVER("Adding component %s\n",
+ 				 of_node_full_name(node));
 -- 
 git-series 0.8.11
