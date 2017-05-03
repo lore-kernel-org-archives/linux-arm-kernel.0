@@ -1,112 +1,71 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed,  3 May 2017 15:57:48 +0100
-Subject: [PATCH v2] drivers: dma-mapping: Do not leave an invalid area->pages
- pointer in dma_common_contiguous_remap()
-Message-ID: <1493823468-19470-1-git-send-email-catalin.marinas@arm.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 3 May 2017 17:58:53 +0300
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
+In-Reply-To: <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
+References: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
+ <CAOMZO5BsgXRfgZ0hszk2Vgo2keVDHH1BLbJTbW+awMS2cBoNow@mail.gmail.com>
+ <CAOMZO5CKUsEr1yf5RrsPLipNtLC_6sK0dPjT2M-eN-uo8hEbrQ@mail.gmail.com>
+ <1493141004.3557.8.camel@nxp.com>
+ <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
+ <20170503135715.GG18578@dragon>
+ <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
+Message-ID: <1493823533.11226.28.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dma_common_pages_remap() function allocates a vm_struct object and
-initialises the pages pointer to value passed as argument. However, when
-this function is called dma_common_contiguous_remap(), the pages array
-is only temporarily allocated, being freed shortly after
-dma_common_contiguous_remap() returns. Architecture code checking the
-validity of an area->pages pointer would incorrectly dereference already
-freed pointers. This has been exposed by the arm64 commit 44176bb38fa4
-("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU").
+On Wed, 2017-05-03 at 16:26 +0200, Marek Vasut wrote:
 
-Fixes: 513510ddba96 ("common: dma-mapping: introduce common remapping functions")
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Reported-by: Andrzej Hajda <a.hajda@samsung.com>
-Acked-by: Laura Abbott <labbott@redhat.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
+> On 05/03/2017 03:57 PM, Shawn Guo wrote:
+> > 
+> > On Tue, Apr 25, 2017 at 07:28:06PM +0200, Marek Vasut wrote:
+> > > 
+> > > On 04/25/2017 07:23 PM, Leonard Crestez wrote:
+> > > > 
+> > > > Anyway, that version also sets the supply for reg_arm and reg_soc. It
+> > > > is not necessary for fixing the crash I'm seeing but is good because it
+> > > > will result in the minimum voltage on VDD_ARM_SOC_IN rather than a fix
+> > > > 1375mv. I tested Marek's patch and it works fine on my rev B board
+> > > > (which otherwise fails to boot upstream).
+> > > Oh that's nice , thanks ! I don't have SDB and I hacked it up after a
+> > > brief discussion with Fabio without even compile-testing it, thus RFC.
+> > > Glad to hear it works and thanks for testing it ! Can you add a formal
+> > > Tested-by please ?
+> > Hi Marek,
+> Hi Shawn,
+> 
+> > Thanks for your patch.??But I prefer Leonard's version because: 1) it
+> > has a better commit log; 2) it sticks to one-patch-does-one-thing
+> > policy.
 
-Greg,
+> 2) It actually fixes a problem with the voltage rails such that the DVFS
+> ???works without leaving the system in unstable or dead state. You do
+> ???need the second part of my patch if you drop the OPP hackery, without
+> ???it the power framework cannot correctly configure the core voltages,
+> ???so the patch from Leonard makes things worse.
 
-Please merge this patch via your tree (and therefore I haven't added
-your ack). Thanks.
+No, I think there is a misunderstanding here. The second part of your
+patch will cause cpufreq poking at LDOs to indirectly adjust the input
+from the PMIC to the minimum required (this is LDO target +
+min_dropout_uv). Without it by default VDD_ARM_SOC_IN will remain fixed
+as 1375mV from boot.
 
-Changes since v1:
+That default value should be high enough for all cpufreq settings.
+Setting the LDO parent will cause this voltage to be dynamically
+reduced when possible (at low frequencies). This is not required for
+proper operation, it is just an optimization to do more of the
+regulation in the PMIC instead. It should work just fine without the
+second part.
 
-- Kept the original comment near the dma_common_pages_remap() function
+That OPP override exists for "LDO bypass" mode, a feature not present
+in upstream. In that mode the internal regulators are set to bypass
+mode and voltage is controlled directly from the PMIC. Since VDD_ARM
+and VDD_SOC have different minimum requirements but are joined on the
+board the OPP voltages are adjusted to max(VDD_ARM, VDD_SOC). If LDOs
+are enabled there is no good reason to do this.
 
-- Added acks/reviews
+I don't care which patch goes in but the effect of the patch should be
+clarified.
 
- drivers/base/dma-mapping.c | 33 ++++++++++++++++++++++++---------
- 1 file changed, 24 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-index efd71cf4fdea..ac224de462f6 100644
---- a/drivers/base/dma-mapping.c
-+++ b/drivers/base/dma-mapping.c
-@@ -273,6 +273,24 @@ int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
- EXPORT_SYMBOL(dma_common_mmap);
- 
- #ifdef CONFIG_MMU
-+static struct vm_struct *__dma_common_pages_remap(struct page **pages,
-+			size_t size, unsigned long vm_flags, pgprot_t prot,
-+			const void *caller)
-+{
-+	struct vm_struct *area;
-+
-+	area = get_vm_area_caller(size, vm_flags, caller);
-+	if (!area)
-+		return NULL;
-+
-+	if (map_vm_area(area, prot, pages)) {
-+		vunmap(area->addr);
-+		return NULL;
-+	}
-+
-+	return area;
-+}
-+
- /*
-  * remaps an array of PAGE_SIZE pages into another vm_area
-  * Cannot be used in non-sleeping contexts
-@@ -283,17 +301,12 @@ void *dma_common_pages_remap(struct page **pages, size_t size,
- {
- 	struct vm_struct *area;
- 
--	area = get_vm_area_caller(size, vm_flags, caller);
-+	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
- 	if (!area)
- 		return NULL;
- 
- 	area->pages = pages;
- 
--	if (map_vm_area(area, prot, pages)) {
--		vunmap(area->addr);
--		return NULL;
--	}
--
- 	return area->addr;
- }
- 
-@@ -308,7 +321,7 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
- {
- 	int i;
- 	struct page **pages;
--	void *ptr;
-+	struct vm_struct *area;
- 	unsigned long pfn;
- 
- 	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
-@@ -318,11 +331,13 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
- 	for (i = 0, pfn = page_to_pfn(page); i < (size >> PAGE_SHIFT); i++)
- 		pages[i] = pfn_to_page(pfn + i);
- 
--	ptr = dma_common_pages_remap(pages, size, vm_flags, prot, caller);
-+	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
- 
- 	kfree(pages);
- 
--	return ptr;
-+	if (!area)
-+		return NULL;
-+	return area->addr;
- }
- 
- /*
+--?
+Regards,
+Leonard
