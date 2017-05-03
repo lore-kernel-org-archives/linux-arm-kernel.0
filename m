@@ -1,16 +1,15 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 3 May 2017 16:24:49 +0800
-Subject: [PATCH v2 2/7] ARM: imx: Select GPCv2 for i.MX7
-In-Reply-To: <20170418150133.31679-3-andrew.smirnov@gmail.com>
+Date: Wed, 3 May 2017 16:26:36 +0800
+Subject: [PATCH v2 3/7] ARM: dts: imx7s: Add node for GPC
+In-Reply-To: <20170418150133.31679-4-andrew.smirnov@gmail.com>
 References: <20170418150133.31679-1-andrew.smirnov@gmail.com>
- <20170418150133.31679-3-andrew.smirnov@gmail.com>
-Message-ID: <20170503082447.GB18578@dragon>
+ <20170418150133.31679-4-andrew.smirnov@gmail.com>
+Message-ID: <20170503082634.GC18578@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 08:01:28AM -0700, Andrey Smirnov wrote:
-> GPCv2 IP block is a part of i.MX7 SoC. Select it to make corresponding
-> driver availible to support DT changes following this patch.
+On Tue, Apr 18, 2017 at 08:01:29AM -0700, Andrey Smirnov wrote:
+> Add node for GPC and specify as a parent interrupt controller for SoC bus.
 > 
 > Cc: yurovsky at gmail.com
 > Cc: Dong Aisheng <aisheng.dong@nxp.com>
@@ -25,27 +24,24 @@ On Tue, Apr 18, 2017 at 08:01:28AM -0700, Andrey Smirnov wrote:
 > Cc: linux-arm-kernel at lists.infradead.org
 > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 > ---
->  arch/arm/mach-imx/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/imx7s.dtsi | 26 +++++++++++++++++++++++++-
+>  1 file changed, 25 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 936c59d..1a4ea3a 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -532,6 +532,7 @@ config SOC_IMX7D
->  	bool "i.MX7 Dual support"
->  	select PINCTRL_IMX7D
->  	select ARM_GIC
-> +	select IMX_GPCV2
+> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+> index 7148eac..5ba1289 100644
+> --- a/arch/arm/boot/dts/imx7s.dtsi
+> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> @@ -42,6 +42,7 @@
+>   */
+>  
+>  #include <dt-bindings/clock/imx7d-clock.h>
+> +#include <dt-bindings/power/imx7-power.h>
 
-Yes, PINCTRL_IMX7D is already out of order, but still please keep new
-added one sorted in alphabetic order.
+It has dependency on imx7 power domain driver, and I need to wait for
+v4.12-rc1 to apply the patch.
 
 Shawn
 
->  	select HAVE_ARM_ARCH_TIMER
->  	select HAVE_IMX_ANATOP
->  	select HAVE_IMX_MMDC
-> -- 
-> 2.9.3
-> 
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/input/input.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
