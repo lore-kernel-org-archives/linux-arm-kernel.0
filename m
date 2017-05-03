@@ -1,38 +1,32 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Wed,  3 May 2017 11:17:51 -0500
-Subject: [PATCH 0/9] [v3] [RESEND] arm64: defconfig: enable several options
- useful for ARM64 server platforms
-Message-ID: <1493828280-6620-1-git-send-email-timur@codeaurora.org>
+Date: Wed,  3 May 2017 11:17:55 -0500
+Subject: [PATCH 4/9] [v2] arm64: defconfig: enable EFI_CAPSULE_LOADER
+In-Reply-To: <1493828280-6620-1-git-send-email-timur@codeaurora.org>
+References: <1493828280-6620-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1493828280-6620-5-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI-based ARM64 server platforms based, like the Qualcomm Datacenter
-Technologies QDF2400, need several features and drivers enabled for
-full functionality.  This patchset enables many of those features.
+CONFIG_EFI_CAPSULE_LOADER allows the user to update the EFI firmware,
+which is useful on ARM64 server platforms.
 
-The first patch, "resynchronize the defconfig" refreshes the ARM64
-defconfig so that it's aligned with savedefconfig.  This needs to be
-done periodically, so that new patches avoid merge conflicts.  
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-If the first patch does not apply cleanly, I ask the maintainer to 
-refresh it himself manually, following the instructions in the commit
-message.  The remaining 8 patches should apply cleanly on top of that.
-
-Timur Tabi (9):
-  [v3] arm64: defconfig: resynchronize the defconfig
-  arm64: defconfig: enable ACPI_CPPC_CPUFREQ
-  arm64: defconfig: enable BLK_DEV_NVME
-  [v2] arm64: defconfig: enable EFI_CAPSULE_LOADER
-  arm64: defconfig: enable support for PCIe hotplug
-  arm64: defconfig: enable APEI and GHES features
-  [v2] arm64: defconfig: enable EDAC options
-  arm64: defconfig: enable QCOM_L2_PMU and QCOM_L3_PMU
-  arm64: defconfig: enable the Qualcomm Technologies EMAC Ethernet
-    driver
-
- arch/arm64/configs/defconfig | 116 ++++++++++++++++++++-----------------------
- 1 file changed, 55 insertions(+), 61 deletions(-)
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index b2c579d..8099aeb 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -483,6 +483,7 @@ CONFIG_PHY_XGENE=y
+ CONFIG_PHY_TEGRA_XUSB=y
+ CONFIG_ARM_SCPI_PROTOCOL=y
+ CONFIG_RASPBERRYPI_FIRMWARE=y
++CONFIG_EFI_CAPSULE_LOADER=y
+ CONFIG_ACPI=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
