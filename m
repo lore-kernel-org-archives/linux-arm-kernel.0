@@ -1,53 +1,87 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  3 May 2017 16:09:37 +0100
-Subject: [PATCH 5/6] arm64: atomic_lse: match asm register sizes
+Date: Wed,  3 May 2017 16:09:38 +0100
+Subject: [PATCH 6/6] arm64: uaccess: suppress spurious clang warning
 In-Reply-To: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
 References: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1493824178-7399-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1493824178-7399-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LSE atomic code uses asm register variables to ensure that
-parameters are allocated in specific registers. In the majority of cases
-we specifically ask for an x register when using 64-bit values, but in a
-couple of cases we use a w regsiter for a 64-bit value.
+Clang tries to warn when there's a mismatch between an operand's size,
+and the size of the register it is held in, as this may indicate a bug.
+Specifically, clang warns when the operand's type is less than 64 bits
+wide, and the register is used unqualified (i.e. %N rather than %xN or
+%wN).
 
-For asm register variables, the compiler only cares about the register
-index, with wN and xN having the same meaning. The compiler determines
-the register size to use based on the type of the variable. Thus, this
-inconsistency is merely confusing, and not harmful to code generation.
+Unfortunately clang can generate these warnings for unreachable code.
+For example, for code like:
 
-For consistency, this patch updates those cases to use the x register
-alias. There should be no functional change as a result of this patch.
+do {                                            \
+        typeof(*(ptr)) __v = (v);               \
+        switch(sizeof(*(ptr))) {                \
+        case 1:                                 \
+                // assume __v is 1 byte wide    \
+                asm ("{op}b %w0" : : "r" (v));  \
+                break;                          \
+        case 8:                                 \
+                // assume __v is 8 bytes wide   \
+                asm ("{op} %0" : : "r" (v));    \
+                break;                          \
+        }
+while (0)
+
+... if op() were passed a char value and pointer to char, clang may
+produce a warning for the unreachable case where sizeof(*(ptr)) is 8.
+
+For the same reasons, clang produces warnings when __put_user_err() is
+used for types that are less than 64 bits wide.
+
+We could avoid this with a cast to a fixed-width type in each of the
+cases. However, GCC will then warn that pointer types are being cast to
+mismatched integer sizes (in unreachable paths).
+
+Another option would be to use the same union trickery as we do for
+__smp_store_release() and __smp_load_acquire(), but this is fairly
+invasive.
+
+Instead, this patch suppresses the clang warning by using an x modifier
+in the assembly for the 8 byte case of __put_user_err(). No additional
+work is necessary as the value has been cast to typeof(*(ptr)), so the
+compiler will have performed any necessary extension for the reachable
+case.
+
+For consistency, __get_user_err() is also updated to use the x modifier
+for its 8 byte case.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Matthias Kaehlcke <mka@chromium.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/atomic_lse.h | 4 ++--
+ arch/arm64/include/asm/uaccess.h | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-index 7457ce0..99fa69c 100644
---- a/arch/arm64/include/asm/atomic_lse.h
-+++ b/arch/arm64/include/asm/atomic_lse.h
-@@ -322,7 +322,7 @@ static inline void atomic64_and(long i, atomic64_t *v)
- #define ATOMIC64_FETCH_OP_AND(name, mb, cl...)				\
- static inline long atomic64_fetch_and##name(long i, atomic64_t *v)	\
- {									\
--	register long x0 asm ("w0") = i;				\
-+	register long x0 asm ("x0") = i;				\
- 	register atomic64_t *x1 asm ("x1") = v;				\
- 									\
- 	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
-@@ -394,7 +394,7 @@ static inline void atomic64_sub(long i, atomic64_t *v)
- #define ATOMIC64_FETCH_OP_SUB(name, mb, cl...)				\
- static inline long atomic64_fetch_sub##name(long i, atomic64_t *v)	\
- {									\
--	register long x0 asm ("w0") = i;				\
-+	register long x0 asm ("x0") = i;				\
- 	register atomic64_t *x1 asm ("x1") = v;				\
- 									\
- 	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index ed3ecf1..2c7822c 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -257,7 +257,7 @@ static inline void uaccess_enable_not_uao(void)
+ 			       (err), ARM64_HAS_UAO);			\
+ 		break;							\
+ 	case 8:								\
+-		__get_user_asm("ldr", "ldtr", "%",  __gu_val, (ptr),	\
++		__get_user_asm("ldr", "ldtr", "%x",  __gu_val, (ptr),	\
+ 			       (err), ARM64_HAS_UAO);			\
+ 		break;							\
+ 	default:							\
+@@ -324,7 +324,7 @@ static inline void uaccess_enable_not_uao(void)
+ 			       (err), ARM64_HAS_UAO);			\
+ 		break;							\
+ 	case 8:								\
+-		__put_user_asm("str", "sttr", "%", __pu_val, (ptr),	\
++		__put_user_asm("str", "sttr", "%x", __pu_val, (ptr),	\
+ 			       (err), ARM64_HAS_UAO);			\
+ 		break;							\
+ 	default:							\
 -- 
 1.9.1
