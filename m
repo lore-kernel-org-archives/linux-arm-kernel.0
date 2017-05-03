@@ -1,81 +1,70 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Wed,  3 May 2017 16:37:47 +0100
-Subject: [PATCH v2 3/4] arm64: entry: improve data abort handling of tagged
- pointers
+Date: Wed,  3 May 2017 16:37:46 +0100
+Subject: [PATCH v2 2/4] arm64: hw_breakpoint: fix watchpoint matching for
+ tagged pointers
 In-Reply-To: <1493825868-30872-1-git-send-email-kristina.martsenko@arm.com>
 References: <1493825868-30872-1-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <1493825868-30872-4-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1493825868-30872-3-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When handling a data abort from EL0, we currently zero the top byte of
-the faulting address, as we assume the address is a TTBR0 address, which
-may contain a non-zero address tag. However, the address may be a TTBR1
-address, in which case we should not zero the top byte. This patch fixes
-that. The effect is that the full TTBR1 address is passed to the task's
-signal handler (or printed out in the kernel log).
+When we take a watchpoint exception, the address that triggered the
+watchpoint is found in FAR_EL1. We compare it to the address of each
+configured watchpoint to see which one was hit.
 
-When handling a data abort from EL1, we leave the faulting address
-intact, as we assume it's either a TTBR1 address or a TTBR0 address with
-tag 0x00. This is true as far as I'm aware, we don't seem to access a
-tagged TTBR0 address anywhere in the kernel. Regardless, it's easy to
-forget about address tags, and code added in the future may not always
-remember to remove tags from addresses before accessing them. So add tag
-handling to the EL1 data abort handler as well. This also makes it
-consistent with the EL0 data abort handler.
+The configured watchpoint addresses are untagged, while the address in
+FAR_EL1 will have an address tag if the data access was done using a
+tagged address. The tag needs to be removed to compare the address to
+the watchpoints.
+
+Currently we don't remove it, and as a result can report the wrong
+watchpoint as being hit (specifically, always either the highest TTBR0
+watchpoint or lowest TTBR1 watchpoint). This patch removes the tag.
 
 Fixes: d50240a5f6ce ("arm64: mm: permit use of tagged pointers at EL0")
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 ---
- arch/arm64/include/asm/asm-uaccess.h | 9 +++++++++
- arch/arm64/kernel/entry.S            | 5 +++--
- 2 files changed, 12 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/uaccess.h  | 6 +++---
+ arch/arm64/kernel/hw_breakpoint.c | 3 +++
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
-index df411f3e083c..ecd9788cd298 100644
---- a/arch/arm64/include/asm/asm-uaccess.h
-+++ b/arch/arm64/include/asm/asm-uaccess.h
-@@ -62,4 +62,13 @@ alternative_if ARM64_ALT_PAN_NOT_UAO
- alternative_else_nop_endif
- 	.endm
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 5308d696311b..0221029e27ff 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -106,9 +106,9 @@ static inline void set_fs(mm_segment_t fs)
+ })
  
-+/*
-+ * Remove the address tag from a virtual address, if present.
-+ */
-+	.macro	clear_address_tag, dst, addr
-+	tst	\addr, #(1 << 55)
-+	bic	\dst, \addr, #(0xff << 56)
-+	csel	\dst, \dst, \addr, eq
-+	.endm
+ /*
+- * When dealing with data aborts or instruction traps we may end up with
+- * a tagged userland pointer. Clear the tag to get a sane pointer to pass
+- * on to access_ok(), for instance.
++ * When dealing with data aborts, watchpoints, or instruction traps we may end
++ * up with a tagged userland pointer. Clear the tag to get a sane pointer to
++ * pass on to access_ok(), for instance.
+  */
+ #define untagged_addr(addr)		sign_extend64(addr, 55)
+ 
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index 0296e7924240..749f81779420 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -36,6 +36,7 @@
+ #include <asm/traps.h>
+ #include <asm/cputype.h>
+ #include <asm/system_misc.h>
++#include <asm/uaccess.h>
+ 
+ /* Breakpoint currently in use for each BRP. */
+ static DEFINE_PER_CPU(struct perf_event *, bp_on_reg[ARM_MAX_BRP]);
+@@ -721,6 +722,8 @@ static u64 get_distance_from_watchpoint(unsigned long addr, u64 val,
+ 	u64 wp_low, wp_high;
+ 	u32 lens, lene;
+ 
++	addr = untagged_addr(addr);
 +
- #endif
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 43512d4d7df2..b738880350f9 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -428,12 +428,13 @@ el1_da:
- 	/*
- 	 * Data abort handling
- 	 */
--	mrs	x0, far_el1
-+	mrs	x3, far_el1
- 	enable_dbg
- 	// re-enable interrupts if they were enabled in the aborted context
- 	tbnz	x23, #7, 1f			// PSR_I_BIT
- 	enable_irq
- 1:
-+	clear_address_tag x0, x3
- 	mov	x2, sp				// struct pt_regs
- 	bl	do_mem_abort
+ 	lens = __ffs(ctrl->len);
+ 	lene = __fls(ctrl->len);
  
-@@ -594,7 +595,7 @@ el0_da:
- 	// enable interrupts before calling the main handler
- 	enable_dbg_and_irq
- 	ct_user_exit
--	bic	x0, x26, #(0xff << 56)
-+	clear_address_tag x0, x26
- 	mov	x1, x25
- 	mov	x2, sp
- 	bl	do_mem_abort
 -- 
 2.1.4
