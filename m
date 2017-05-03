@@ -1,131 +1,58 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 3 May 2017 16:38:26 +0200
-Subject: [PATCH v5 16/22] KVM: arm64: vgic-its: Add infrastructure for
- table lookup
-In-Reply-To: <8f162a7d-e629-5828-6230-f0b7b7a6f9db@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-17-git-send-email-eric.auger@redhat.com>
- <20170430193325.GA1670@lvm>
- <8f162a7d-e629-5828-6230-f0b7b7a6f9db@redhat.com>
-Message-ID: <20170503143826.GA28421@cbox>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 3 May 2017 22:41:01 +0800
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
+In-Reply-To: <0f84e2ee-1ea1-acf8-8368-3fc848d33e23@denx.de>
+References: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
+ <CAOMZO5BsgXRfgZ0hszk2Vgo2keVDHH1BLbJTbW+awMS2cBoNow@mail.gmail.com>
+ <CAOMZO5CKUsEr1yf5RrsPLipNtLC_6sK0dPjT2M-eN-uo8hEbrQ@mail.gmail.com>
+ <1493141004.3557.8.camel@nxp.com>
+ <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
+ <20170503135715.GG18578@dragon>
+ <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
+ <0f84e2ee-1ea1-acf8-8368-3fc848d33e23@denx.de>
+Message-ID: <20170503144059.GL18578@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 03:40:34PM +0200, Auger Eric wrote:
-> Hi Christoffer,
-> 
-> On 30/04/2017 21:33, Christoffer Dall wrote:
-> > On Fri, Apr 14, 2017 at 12:15:28PM +0200, Eric Auger wrote:
-> >> Add a generic lookup_table() helper whose role consists in
-> >> scanning a contiguous table located in guest RAM and applying
-> >> a callback on each entry. Entries can be handled as linked lists
-> >> since the callback may return an offset to the next entry and
-> >> also tell that an entry is the last one.
+On Wed, May 03, 2017 at 04:32:06PM +0200, Marek Vasut wrote:
+> On 05/03/2017 04:26 PM, Marek Vasut wrote:
+> > On 05/03/2017 03:57 PM, Shawn Guo wrote:
+> >> On Tue, Apr 25, 2017 at 07:28:06PM +0200, Marek Vasut wrote:
+> >>> On 04/25/2017 07:23 PM, Leonard Crestez wrote:
+> >>>> Anyway, that version also sets the supply for reg_arm and reg_soc. It
+> >>>> is not necessary for fixing the crash I'm seeing but is good because it
+> >>>> will result in the minimum voltage on VDD_ARM_SOC_IN rather than a fix
+> >>>> 1375mv. I tested Marek's patch and it works fine on my rev B board
+> >>>> (which otherwise fails to boot upstream).
+> >>>
+> >>> Oh that's nice , thanks ! I don't have SDB and I hacked it up after a
+> >>> brief discussion with Fabio without even compile-testing it, thus RFC.
+> >>> Glad to hear it works and thanks for testing it ! Can you add a formal
+> >>> Tested-by please ?
 > >>
-> >> Helper functions also are added to compute the device/event ID
-> >> offset to the next DTE/ITE.
-> >>
-> >> compute_next_devid_offset, compute_next_eventid_offset and
-> >> lookup_table will become static in subsequent patches
-> >>
-> >> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> >>
-> >> ---
-> >> v4 -> v5:
-> >> - use kvm_read_guest
-> >>
-> >> v3 -> v4:
-> >> - remove static to avoid compilation warning
-> >> - correct size computation in looup_table()
-> >> - defines now encode the number of bits used for devid and eventid offsets
-> >> - use BIT() - 1 to encode the max offets
-> >> ---
-> >>  virt/kvm/arm/vgic/vgic-its.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 93 insertions(+)
-> >>
-> >> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> >> index 56c5123..c22b35d 100644
-> >> --- a/virt/kvm/arm/vgic/vgic-its.c
-> >> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> >> @@ -195,6 +195,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
-> >>  
-> >>  #define VITS_TYPER_IDBITS 16
-> >>  #define VITS_TYPER_DEVBITS 16
-> >> +#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
-> >> +#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
-> >>  
-> >>  /*
-> >>   * Finds and returns a collection in the ITS collection table.
-> >> @@ -1674,6 +1676,97 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
-> >>  	return ret;
-> >>  }
-> >>  
-> >> +u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
-> >> +{
-> >> +	struct list_head *e = &dev->dev_list;
-> >> +	struct its_device *next;
-> >> +	u32 next_offset;
-> >> +
-> >> +	if (e->next == h)
-> >> +		return 0;
-> >> +	next = list_entry(e->next, struct its_device, dev_list);
-> >> +	next_offset = next->device_id - dev->device_id;
-> >> +
-> >> +	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
-> >> +}
-> >> +
-> >> +u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
-> >> +{
-> >> +	struct list_head *e = &ite->ite_list;
-> >> +	struct its_ite *next;
-> >> +	u32 next_offset;
-> >> +
-> >> +	if (e->next == h)
-> >> +		return 0;
-> >> +	next = list_entry(e->next, struct its_ite, ite_list);
-> >> +	next_offset = next->event_id - ite->event_id;
-> >> +
-> >> +	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
-> >> +}
-> >> +
-> >> +/**
-> >> + * entry_fn_t - Callback called on a table entry restore path
-> >> + * @its: its handle
-> >> + * @id: id of the entry
-> >> + * @entry: pointer to the entry
-> >> + * @opaque: pointer to an opaque data
-> >> + * @next_offset: minimal ID offset to the next entry. 0 if this
-> >> + * entry is the last one, 1 if the entry is invalid, >= 1 if an
-> >> + * entry's next_offset field was truly decoded
-> >> + *
-> >> + * Return: < 0 on error, 0 otherwise
-> >> + */
-> >> +typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
-> >> +			  void *opaque, u32 *next_offset);
+> >> Hi Marek,
 > > 
-> > Just noticed.  All the table entries are 64-bit long at this point,
-> > right?  So why not make entry a u64 * instead?  Could we end up with
-> > some endianness mess with using void pointers the way it is now?
-> the size of the entry is ABI dependent while this infrastructure is
-> generic. 
-
-Yes, for a single version of the ABI where all the entries are 64-bit.
-
-
-> In each of such function we use
+> > Hi Shawn,
+> > 
+> >> Thanks for your patch.  But I prefer Leonard's version because: 1) it
+> >> has a better commit log; 2) it sticks to one-patch-does-one-thing
+> >> policy.
+> > 
+> > Well I'd prefer this patch because
+> > 1) It has T-B
 > 
-> u64 entry = *(u64 *)addr;
-> and we do a le64_to_cpu(entry).
+> Correction, two TBs [1]
 > 
-> Do you see something wrong? Otherwise I would be tempted to leave as is.
-> 
+> [1] https://patchwork.kernel.org/patch/9698749/
 
-I don't think there's anything wrong with the current version, and
-you're right, this always points to an ITS data structure which is LE,
-so there shouldn't be a problem.  I always just quiver when I see void
-pointers cast to a type in the caller and callee.
+That doesn't mean Leonard's patch hasn't been tested by anyone.
 
-Just leave it for now.
+> > 2) It actually fixes a problem with the voltage rails such that the DVFS
+> >    works without leaving the system in unstable or dead state. You do
+> >    need the second part of my patch if you drop the OPP hackery, without
+> >    it the power framework cannot correctly configure the core voltages,
+> >    so the patch from Leonard makes things worse.
 
-Thanks,
--Christoffer
+If that's true, I will change my mind.
+
+Shawn
