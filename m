@@ -1,93 +1,53 @@
-From: bharat.bhushan@nxp.com (Bharat Bhushan)
-Date: Wed, 3 May 2017 16:00:10 +0000
-Subject: [PATCH] ARM64/PCI: Allow userspace to mmap PCI resources
-In-Reply-To: <20170503155858.GA11986@red-moon>
-References: <1493826538-23785-1-git-send-email-Bharat.Bhushan@nxp.com>
- <20170503155858.GA11986@red-moon>
-Message-ID: <AM5PR0401MB25457915BAEEBF8F50BC7C1F9A160@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 3 May 2017 17:36:38 +0100
+Subject: [PATCH v3 1/3] Documentation/bindings: Document the SafeXel
+ cryptographic engine driver
+In-Reply-To: <20170424075407.19730-2-antoine.tenart@free-electrons.com>
+References: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
+ <20170424075407.19730-2-antoine.tenart@free-electrons.com>
+Message-ID: <7986721e-3a2b-23fb-61d7-7032f0d65533@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> Sent: Wednesday, May 03, 2017 9:29 PM
-> To: Bharat Bhushan <bharat.bhushan@nxp.com>
-> Cc: catalin.marinas at arm.com; will.deacon at arm.com;
-> bhelgaas at google.com; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: Re: [PATCH] ARM64/PCI: Allow userspace to mmap PCI resources
+On 24/04/17 08:54, Antoine Tenart wrote:
+> The Inside Secure Safexcel cryptographic engine is found on some Marvell
+> SoCs (7k/8k). Document the bindings used by its driver.
 > 
-> On Wed, May 03, 2017 at 09:18:58PM +0530, Bharat Bhushan wrote:
-> > This patch allows user-space to mmap PCI resources. This patch is
-> > inline to arm32 bit implementation.
-> >
-> > Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
-> > ---
-> >  arch/arm64/include/asm/pci.h |  4 ++++
-> >  arch/arm64/kernel/pci.c      | 19 +++++++++++++++++++
-> >  2 files changed, 23 insertions(+)
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  .../bindings/crypto/inside-secure-safexcel.txt     | 27 ++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
 > 
-> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-
-> next.git/commit/arch/arm64/include/asm/pci.h?id=f719582435afe9c7985206
-> e42d804ea6aa315d33
+> diff --git a/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt b/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
+> new file mode 100644
+> index 000000000000..ff56b9384fcc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
+> @@ -0,0 +1,27 @@
+> +Inside Secure SafeXcel cryptographic engine
+> +
+> +Required properties:
+> +- compatible: Should be "inside-secure,safexcel-eip197".
+> +- reg: Base physical address of the engine and length of memory mapped region.
+> +- interrupts: Interrupt numbers for the rings and engine.
+> +- interrupt-names: Should be "ring0", "ring1", "ring2", "ring3", "eip", "mem".
+> +
+> +Optional properties:
+> +- clocks: Reference to the crypto engine clock.
+> +
+> +Example:
+> +
+> +	crypto: crypto at 800000 {
+> +		compatible = "inside-secure,safexcel-eip197";
+> +		reg = <0x800000 0x200000>;
+> +		interrupts = <GIC_SPI 34 (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH)>,
 
-Oh, I missed this patch series,
+I'm puzzled. How can the interrupt can be both level *and* edge? That
+doesn't make any sense.
 
-Thanks
--Bharat
+Thanks,
 
-> 
-> >
-> > diff --git a/arch/arm64/include/asm/pci.h
-> > b/arch/arm64/include/asm/pci.h index b9a7ba9..8a18915 100644
-> > --- a/arch/arm64/include/asm/pci.h
-> > +++ b/arch/arm64/include/asm/pci.h
-> > @@ -31,6 +31,10 @@ static inline int pci_get_legacy_ide_irq(struct pci_dev
-> *dev, int channel)
-> >  	return -ENODEV;
-> >  }
-> >
-> > +#define HAVE_PCI_MMAP
-> > +extern int pci_mmap_page_range(struct pci_dev *dev, struct
-> vm_area_struct *vma,
-> > +			       enum pci_mmap_state mmap_state,
-> > +			       int write_combine);
-> >  static inline int pci_proc_domain(struct pci_bus *bus)  {
-> >  	return 1;
-> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c index
-> > ce20f4c..2e45a83 100644
-> > --- a/arch/arm64/kernel/pci.c
-> > +++ b/arch/arm64/kernel/pci.c
-> > @@ -97,6 +97,25 @@ int pcibios_check_service_irqs(struct pci_dev *dev,
-> int *irqs, int mask)
-> >  	return count;
-> >  }
-> >
-> > +int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct
-> *vma,
-> > +			enum pci_mmap_state mmap_state, int
-> write_combine) {
-> > +	if (mmap_state == pci_mmap_io)
-> > +		return -EINVAL;
-> > +
-> > +	/*
-> > +	 * Mark this as IO
-> > +	 */
-> > +	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-> > +
-> > +	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
-> > +			     vma->vm_end - vma->vm_start,
-> > +			     vma->vm_page_prot))
-> > +		return -EAGAIN;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> >  /*
-> >   * raw_pci_read/write - Platform-specific PCI config space access.
-> >   */
-> > --
-> > 1.9.3
-> >
+	M.
+-- 
+Jazz is not dead. It just smells funny...
