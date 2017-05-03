@@ -1,70 +1,86 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 3 May 2017 16:58:58 +0100
-Subject: [PATCH] ARM64/PCI: Allow userspace to mmap PCI resources
-In-Reply-To: <1493826538-23785-1-git-send-email-Bharat.Bhushan@nxp.com>
-References: <1493826538-23785-1-git-send-email-Bharat.Bhushan@nxp.com>
-Message-ID: <20170503155858.GA11986@red-moon>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 3 May 2017 17:59:29 +0200
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
+In-Reply-To: <1493823533.11226.28.camel@nxp.com>
+References: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
+ <CAOMZO5BsgXRfgZ0hszk2Vgo2keVDHH1BLbJTbW+awMS2cBoNow@mail.gmail.com>
+ <CAOMZO5CKUsEr1yf5RrsPLipNtLC_6sK0dPjT2M-eN-uo8hEbrQ@mail.gmail.com>
+ <1493141004.3557.8.camel@nxp.com>
+ <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
+ <20170503135715.GG18578@dragon>
+ <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
+ <1493823533.11226.28.camel@nxp.com>
+Message-ID: <e46a57c2-4a28-a8b6-445e-299dd9d8659c@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 09:18:58PM +0530, Bharat Bhushan wrote:
-> This patch allows user-space to mmap PCI resources. This
-> patch is inline to arm32 bit implementation.
+On 05/03/2017 04:58 PM, Leonard Crestez wrote:
+> On Wed, 2017-05-03 at 16:26 +0200, Marek Vasut wrote:
 > 
-> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
-> ---
->  arch/arm64/include/asm/pci.h |  4 ++++
->  arch/arm64/kernel/pci.c      | 19 +++++++++++++++++++
->  2 files changed, 23 insertions(+)
-
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/arch/arm64/include/asm/pci.h?id=f719582435afe9c7985206e42d804ea6aa315d33
-
+>> On 05/03/2017 03:57 PM, Shawn Guo wrote:
+>>>
+>>> On Tue, Apr 25, 2017 at 07:28:06PM +0200, Marek Vasut wrote:
+>>>>
+>>>> On 04/25/2017 07:23 PM, Leonard Crestez wrote:
+>>>>>
+>>>>> Anyway, that version also sets the supply for reg_arm and reg_soc. It
+>>>>> is not necessary for fixing the crash I'm seeing but is good because it
+>>>>> will result in the minimum voltage on VDD_ARM_SOC_IN rather than a fix
+>>>>> 1375mv. I tested Marek's patch and it works fine on my rev B board
+>>>>> (which otherwise fails to boot upstream).
+>>>> Oh that's nice , thanks ! I don't have SDB and I hacked it up after a
+>>>> brief discussion with Fabio without even compile-testing it, thus RFC.
+>>>> Glad to hear it works and thanks for testing it ! Can you add a formal
+>>>> Tested-by please ?
+>>> Hi Marek,
+>> Hi Shawn,
+>>
+>>> Thanks for your patch.  But I prefer Leonard's version because: 1) it
+>>> has a better commit log; 2) it sticks to one-patch-does-one-thing
+>>> policy.
 > 
-> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-> index b9a7ba9..8a18915 100644
-> --- a/arch/arm64/include/asm/pci.h
-> +++ b/arch/arm64/include/asm/pci.h
-> @@ -31,6 +31,10 @@ static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
->  	return -ENODEV;
->  }
->  
-> +#define HAVE_PCI_MMAP
-> +extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-> +			       enum pci_mmap_state mmap_state,
-> +			       int write_combine);
->  static inline int pci_proc_domain(struct pci_bus *bus)
->  {
->  	return 1;
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index ce20f4c..2e45a83 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -97,6 +97,25 @@ int pcibios_check_service_irqs(struct pci_dev *dev, int *irqs, int mask)
->  	return count;
->  }
->  
-> +int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-> +			enum pci_mmap_state mmap_state, int write_combine)
-> +{
-> +	if (mmap_state == pci_mmap_io)
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Mark this as IO
-> +	 */
-> +	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-> +
-> +	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
-> +			     vma->vm_end - vma->vm_start,
-> +			     vma->vm_page_prot))
-> +		return -EAGAIN;
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * raw_pci_read/write - Platform-specific PCI config space access.
->   */
+>> 2) It actually fixes a problem with the voltage rails such that the DVFS
+>>    works without leaving the system in unstable or dead state. You do
+>>    need the second part of my patch if you drop the OPP hackery, without
+>>    it the power framework cannot correctly configure the core voltages,
+>>    so the patch from Leonard makes things worse.
+> 
+> No, I think there is a misunderstanding here. The second part of your
+> patch will cause cpufreq poking at LDOs to indirectly adjust the input
+> from the PMIC to the minimum required (this is LDO target +
+> min_dropout_uv). Without it by default VDD_ARM_SOC_IN will remain fixed
+> as 1375mV from boot.
+
+Who sets / guarantees that default value for ARM and SOC rails ?
+
+With the OPP override in place, there's at least the guarantee that both
+rails will have the same voltage requirement. If you remove the OPP
+override without modeling the actual regulator wiring, the guarantee is
+gone.
+
+> That default value should be high enough for all cpufreq settings.
+> Setting the LDO parent will cause this voltage to be dynamically
+> reduced when possible (at low frequencies). This is not required for
+> proper operation, it is just an optimization to do more of the
+> regulation in the PMIC instead. It should work just fine without the
+> second part.
+> 
+> That OPP override exists for "LDO bypass" mode, a feature not present
+> in upstream. In that mode the internal regulators are set to bypass
+> mode and voltage is controlled directly from the PMIC. Since VDD_ARM
+> and VDD_SOC have different minimum requirements but are joined on the
+> board the OPP voltages are adjusted to max(VDD_ARM, VDD_SOC). If LDOs
+> are enabled there is no good reason to do this.
+> 
+> I don't care which patch goes in but the effect of the patch should be
+> clarified.
+> 
 > -- 
-> 1.9.3
+> Regards,
+> Leonard
 > 
+
+
+-- 
+Best regards,
+Marek Vasut
