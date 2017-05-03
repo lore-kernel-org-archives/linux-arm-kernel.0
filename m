@@ -1,74 +1,96 @@
-From: cyrille.pitchen@wedev4u.fr (Cyrille Pitchen)
-Date: Wed, 3 May 2017 23:23:32 +0200
-Subject: [RFC PATCH] mtd: spi-nor: handle signal case as failure
-In-Reply-To: <1493805189-25327-1-git-send-email-der.herr@hofr.at>
-References: <1493805189-25327-1-git-send-email-der.herr@hofr.at>
-Message-ID: <b3de06f6-9fcd-4b58-60f2-14c55d83898d@wedev4u.fr>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 03 May 2017 14:24:06 -0700
+Subject: [PATCH 2/5] mtd: nand: gpmi: add i.MX 7 SoC support
+In-Reply-To: <d0162bbe-c2de-73d1-0d37-9bdd68ceb94b@gmail.com>
+References: <20170421010755.18025-1-stefan@agner.ch>
+ <20170421010755.18025-3-stefan@agner.ch>
+ <af3fe671-c5fb-d3cf-c891-e6b7c973baa1@gmail.com>
+ <5cf26d2b020392c875464c7504a9fb5b@agner.ch>
+ <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
+ <494a7bc044457240a302d92b3a50b8e5@agner.ch>
+ <57336d7e-7b48-8855-9e87-3eb370facd05@gmail.com>
+ <a9cdc47795433e7b152dcdd123f9bd63@agner.ch>
+ <CA+EcR20FCPSec+ihTMA=SGwogd7p5tsnECCp3CR-Nv6fUciK4g@mail.gmail.com>
+ <20170502111758.53e9a959@bbrezillon>
+ <d0162bbe-c2de-73d1-0d37-9bdd68ceb94b@gmail.com>
+Message-ID: <db9527e36a4e23984df3c867ba494c9a@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 2017-05-02 04:18, Marek Vasut wrote:
+> On 05/02/2017 11:17 AM, Boris Brezillon wrote:
+>> Hi Han,
+>>
+>> On Fri, 21 Apr 2017 13:29:16 -0500
+>> Han Xu <xhnjupt@gmail.com> wrote:
+>>
+>>>>>
+>>>>>>>> But then, adding the type would only require 2-3 lines of change if I
+>>>>>>>> add it to the GPMI_IS_MX6 macro...
+>>>>>>>
+>>>>>>> Then at least add a comment because using type = IMX6SX right under
+>>>>>>> gpmi_data_mx7d can trigger some head-scratching. And put my R-B on V2.
+>>>>>>
+>>>>>> FWIW, I mentioned it in the commit message.
+>>>>>>
+>>>>>> I think rather then adding a comment it is cleaner to just add IS_IMX7D
+>>>>>> and add it to the GPMI_IS_MX6 macro. That does not need a comment since
+>>>>>> it implicitly says we have a i.MX 7 but treat it like i.MX 6 and it is a
+>>>>>> rather small change. Does that sound acceptable?
+>>>>>
+>>>>> Sure, that's even better, thanks.
+>>>>>
+>>>>> btw isn't there some single-core mx7 (mx7s ?) , maybe we should just go
+>>>>> with mx7 (without the d suffix). I dunno if it has GPMI NAND though, so
+>>>>> maybe mx7d is the right thing to do here ...
+>>>>>
+>>>>
+>>>> There is a Solo version yes, and it has GPMI NAND too. However, almost
+>>>> all i.MX 7 IPs have been named imx7d by NXP for some reason (including
+>>>> compatible strings, see grep -r -e imx7 Documentation/), so I thought I
+>>>> stay consistent here...
+> 
+> I missed the DT bit, sorry. the DT bindings say:
+>   - compatible : should be "fsl,<chip>-gpmi-nand"
+> so if FSL invented their own buggy bindings, they need to get them
+> through Rob :) IMO for MX7, this should be "imx7-gpmi-nand" , unless
+> there's some incentive to discern the solo/dual chips and/or there
+> is a future imx7 coming up with different GPMI NAND block version.
+> 
 
-Le 03/05/2017 ? 11:53, Nicholas Mc Guire a ?crit :
->  The problem is that stm32_qspi_wait_cmd() will indicate success in case of
->  being interrupted. The if condition is incomplete here as
->  wait_for_copletion_interruptible_timeout can return -ERESTARTSYS but this
->  is not handled by if(!wait_for_completion_interruptible_timeout()).
->  While somewhat unlikely it probably would be hard to figure out what went
->  wrong if the signal case does occur.
-> 
-> Fixes: commit 0d43d7ab277a ("mtd: spi-nor: add driver for STM32 quad spi flash controller")
-> Signed-off-by: Nicholas Mc Guire <der.herr@hofr.at>
-> ---
-> Problem found by experimental coccinelle script
-> 
-> Its not clear if its sufficient to simply treat this case as failure or
-> if it might need some debug output to allow differentiation of signal
-> and timeout case. 
-> 
-> Patch was compile tested with: stm32_defconfig +CONFIG_MTD=y, CONFIG_MTD_SPI_NOR=y,
-> CONFIG_SPI_STM32_QUADSPI=m
-> 
-> Patch is against v4.11-rc8 (localversion-next is next-20170503)
-> 
->  drivers/mtd/spi-nor/stm32-quadspi.c  | 10 ++++++++--
->  1 files changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
-> index 1056e74..27147ad 100644
-> --- a/drivers/mtd/spi-nor/stm32-quadspi.c
-> +++ b/drivers/mtd/spi-nor/stm32-quadspi.c
-> @@ -159,6 +159,7 @@ static int stm32_qspi_wait_cmd(struct stm32_qspi *qspi)
->  {
->  	u32 cr;
->  	int err = 0;
-> +	long timeout = 0;
->  
->  	if (readl_relaxed(qspi->io_base + QUADSPI_SR) & SR_TCF)
->  		return 0;
-> @@ -167,8 +168,13 @@ static int stm32_qspi_wait_cmd(struct stm32_qspi *qspi)
->  	cr = readl_relaxed(qspi->io_base + QUADSPI_CR);
->  	writel_relaxed(cr | CR_TCIE, qspi->io_base + QUADSPI_CR);
->  
-> -	if (!wait_for_completion_interruptible_timeout(&qspi->cmd_completion,
-> -						       msecs_to_jiffies(1000)))
+There is no incentive to discern solo/dual, afaict this are the same
+chips, only some IP's "fused away"... From GPMI NAND perspective, they
+are definitely the same.
 
-Ludovic, can we just use wait_for_completion_timeout() instead?
-I think so but you surely know better than me :)
-Do you plan to receive signal? maybe to abort the current SPI flash command?
+So that leaves us with "imx7-gpmi-nand" vs. "imx7d-gpmi-nand".
 
-Best regards,
+All device tree compatible strings as well as Kconfig symbol,
+preprocessor defines and function prefixes have been named "imx7d" or
+IMX7D so far... Although they work just fine for i.MX7 Solo too... Not
+sure why that exactly ended up to be that way, but I guess the reason
+was that NXP started to upstream with the dual...
 
-Cyrille
+For the sake of continuity, I would prefer if we stick to that (as my
+current patchsets do)... It is like imx6q, which also works for dual...
 
-> +	timeout = wait_for_completion_interruptible_timeout(
-> +				&qspi->cmd_completion, msecs_to_jiffies(1000));
-> +
-> +	/* since the calling side only cares about success of failure
-> +	 * returning -ETIMEDOUT even when interrupted should be ok here
-> +	 */
-> +	if (timeout == 0 || timeout == -ERESTARTSYS)
->  		err = -ETIMEDOUT;
->  
->  	writel_relaxed(cr, qspi->io_base + QUADSPI_CR);
+$ grep -r -w compatible.*imx7d  arch/arm/boot/dts/*.dts* | wc -l
+68
+$ grep -r -w compatible.*imx7^d  arch/arm/boot/dts/*.dts* | wc -l
+0
+
+
+>>> Hi Guys,
+>>>
+>>> Yes, there should be a i.MX7 Solo version with one core fused out. IMO, can
+>>> we use QUIRK to distinguish them rather than SoC name. I know I also sent
+>>> some patch set with SoC Name but I prefer to use QUIRK now.
+>>
+>> Not sure what this means. Are you okay with Stefan's v2?
 > 
+> IMO the GPMI controller in solo and dual should be the same, so there's
+> no need to have quirks for it.
+
+Agreed.
+
+--
+Stefan
