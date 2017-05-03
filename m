@@ -1,83 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 3 May 2017 16:37:39 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Poll for CMDQ drain completion more
- effectively
-In-Reply-To: <CA+sq2CdR0vC76F1m-LvYGfZW32nKbQg9dQsfJ_jtvYgZ7yyt3g@mail.gmail.com>
-References: <1493291587-23488-1-git-send-email-sunil.kovvuri@gmail.com>
- <CA+sq2CdR0vC76F1m-LvYGfZW32nKbQg9dQsfJ_jtvYgZ7yyt3g@mail.gmail.com>
-Message-ID: <20170503153738.GP8233@arm.com>
+From: kristina.martsenko@arm.com (Kristina Martsenko)
+Date: Wed,  3 May 2017 16:37:44 +0100
+Subject: [PATCH v2 0/4] arm64: improve tagged pointer handling
+Message-ID: <1493825868-30872-1-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 06:49:09PM +0530, Sunil Kovvuri wrote:
-> On Thu, Apr 27, 2017 at 4:43 PM,  <sunil.kovvuri@gmail.com> wrote:
-> > From: Sunil Goutham <sgoutham@cavium.com>
-> >
-> > Modified polling on CMDQ consumer similar to how polling is done for TLB SYNC
-> > completion in SMMUv2 driver. Code changes are done with reference to
-> >
-> > 8513c8930069 iommu/arm-smmu: Poll for TLB sync completion more effectively
-> >
-> > Poll timeout has been increased which addresses issue of 100us timeout not
-> > sufficient, when command queue is full with TLB invalidation commands.
-> >
-> > Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-> > Signed-off-by: Geetha <gakula@cavium.com>
-> > ---
-> >  drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++---
-> >  1 file changed, 12 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> > index d412bdd..34599d4 100644
-> > --- a/drivers/iommu/arm-smmu-v3.c
-> > +++ b/drivers/iommu/arm-smmu-v3.c
-> > @@ -379,6 +379,9 @@
-> >  #define CMDQ_SYNC_0_CS_NONE            (0UL << CMDQ_SYNC_0_CS_SHIFT)
-> >  #define CMDQ_SYNC_0_CS_SEV             (2UL << CMDQ_SYNC_0_CS_SHIFT)
-> >
-> > +#define CMDQ_DRAIN_TIMEOUT_US          1000
-> > +#define CMDQ_SPIN_COUNT                        10
-> > +
-> >  /* Event queue */
-> >  #define EVTQ_ENT_DWORDS                        4
-> >  #define EVTQ_MAX_SZ_SHIFT              7
-> > @@ -737,7 +740,8 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
-> >   */
-> >  static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
-> >  {
-> > -       ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
-> > +       ktime_t timeout = ktime_add_us(ktime_get(), CMDQ_DRAIN_TIMEOUT_US);
-> > +       unsigned int spin_cnt, delay = 1;
-> >
-> >         while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
-> >                 if (ktime_compare(ktime_get(), timeout) > 0)
-> > @@ -746,8 +750,13 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
-> >                 if (wfe) {
-> >                         wfe();
-> >                 } else {
-> > -                       cpu_relax();
-> > -                       udelay(1);
-> > +                       for (spin_cnt = 0;
-> > +                            spin_cnt < CMDQ_SPIN_COUNT; spin_cnt++) {
-> > +                               cpu_relax();
-> > +                               continue;
-> > +                       }
-> > +                       udelay(delay);
-> > +                       delay *= 2;
-> >                 }
-> >         }
-> >
-> > --
-> > 2.7.4
-> >
-> 
-> Sorry for the ignorance.
-> Is there a patchwork where I can check current status of ARM IOMMU
-> related patches ?
-> 
-> And is this patch accepted, if not any comments / feedback ?
+Hi,
 
-Please be patient: the merge window is open and it's not been long since you
-posted the patch, which looks pretty bonkers at first glance.
+Here are some patches to fix a few issues related to tagged pointer
+handling.
 
-Will
+Tagged pointers from userspace can end up in the kernel in a number of
+ways. I most likely have not found all of them, but they include at
+least the following:
+
+ - Passing tagged pointers in system call arguments. This would be a
+   userspace bug, as documented in tagged-pointers.txt.
+
+ - Through FAR_EL1 when we take a data abort or watchpoint exception.
+   Watchpoint handling is currently broken if we get a tagged pointer,
+   patch #2 in this series fixes it. We already do the right thing for
+   data aborts but patch #3 tries to improve on it a little.
+
+ - Reading a tagged pointer from a GPR when trapping and emulating
+   instructions, e.g. cache maintenance or uprobes. Patch #1 fixes the
+   cache maintenance case.
+
+ - The user stack pointer, frame pointer (x29), frame records, and link
+   register (x30) can contain tagged pointers. Patch #4 documents that
+   some kernel features do not currently work with tagged pointers in
+   the first three of these.
+
+ - A tagged pointer can end up in the PC on an illegal exception return
+   (see D4.1.4 ARMARM A.k_iss10775), and from there in ELR on exception
+   entry. As I understand it, this can only be caused by a bad eret at
+   EL1 or a bad debug state exit by an external debugger, so only by a
+   bug in Linux/firmware or the external debugger. So I don't think we
+   need to handle this.
+
+Note that the above applies to Linux only. I have spoken to Marc Zyngier
+about KVM, and so far he hasn't found any problems there.
+
+Thanks,
+Kristina
+
+v2:
+ - Patch #3: changed clear_address_tag macro arguments, swapped bic and
+   tst
+
+
+Kristina Martsenko (4):
+  arm64: traps: fix userspace cache maintenance emulation on a tagged
+    pointer
+  arm64: hw_breakpoint: fix watchpoint matching for tagged pointers
+  arm64: entry: improve data abort handling of tagged pointers
+  arm64: documentation: document tagged pointer stack constraints
+
+ Documentation/arm64/tagged-pointers.txt | 62 +++++++++++++++++++++++++--------
+ arch/arm64/include/asm/asm-uaccess.h    |  9 +++++
+ arch/arm64/include/asm/uaccess.h        |  6 ++--
+ arch/arm64/kernel/entry.S               |  5 +--
+ arch/arm64/kernel/hw_breakpoint.c       |  3 ++
+ arch/arm64/kernel/traps.c               |  4 +--
+ 6 files changed, 67 insertions(+), 22 deletions(-)
+
+-- 
+2.1.4
