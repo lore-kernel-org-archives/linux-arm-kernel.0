@@ -1,39 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 3 May 2017 11:31:53 +0100
-Subject: [RFC/RFT PATCH 05/18] ARM: PCI: dove: Convert PCI scan API to
- pci_scan_root_bus_bridge()
-In-Reply-To: <CAK8P3a1bnnq-9iuse43bCNX_9TirZPOtmH_vFsvJ9VOAsoUBzQ@mail.gmail.com>
-References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
- <20170426111809.19922-6-lorenzo.pieralisi@arm.com>
- <CAK8P3a1bnnq-9iuse43bCNX_9TirZPOtmH_vFsvJ9VOAsoUBzQ@mail.gmail.com>
-Message-ID: <20170503103153.GB10800@red-moon>
+From: geethasowjanya.akula@gmail.com (Geetha Akula)
+Date: Wed, 3 May 2017 16:02:34 +0530
+Subject: [PATCH 2/3] iommu/arm-smmu-v3: Add workaround for Cavium
+ ThunderX2 erratum #74
+In-Reply-To: <20170503094717.GC8233@arm.com>
+References: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
+ <1493293584-20287-3-git-send-email-gakula@caviumnetworks.com>
+ <20170427164237.GA7114@leverpostej> <20170427170030.GF1890@arm.com>
+ <CANHdaibvzp22XEa3NnKAKUtrHcWGc9oUcnM8KubcYCzEfOaKJg@mail.gmail.com>
+ <20170503094717.GC8233@arm.com>
+Message-ID: <CANHdaib0hSFqPmD_WDFTWF6B4OSgFY+popNhK-wiWboTumbBng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 02:38:48PM +0200, Arnd Bergmann wrote:
-> On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > The introduction of pci_scan_root_bus_bridge() provides a PCI core
-> > API to scan a PCI root bus backed by an already initialized
-> > struct pci_host_bridge object, which simplifies the bus scan
-> > interface and makes the PCI scan root bus interface easier to
-> > generalize as members are added to the struct pci_host_bridge().
-> >
-> > Convert ARM dove platform code to pci_scan_root_bus_bridge() to improve
-> > the PCI root bus scanning interface.
-> >
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
-> Is this patch required for one of the later steps in the series?
-> 
-> As non-DT dove uses the traditional pci_common_init() helper rather
-> than registering its own driver, I wonder if there is anything to gain here.
+Hi Will,
 
-Well, the point is, the non-DT platforms I patched implement a custom
-.scan method in struct hw_pci. If we move the bridge allocation to
-pcibios_init_hw() we would end up initializing some struct
-pci_host_bridge fields in pcibios_init_hw() and some in the custom .scan
-method (ie custom pci_ops) which I found not very elegant but it could be
-done I reckon, I need to give it a go to see how the code looks like.
+We will resubmit the patches based on IORT.
 
-Lorenzo
+
+Thank you,
+Geetha.
+
+On Wed, May 3, 2017 at 3:17 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Geetha,
+>
+> On Tue, May 02, 2017 at 12:01:15PM +0530, Geetha Akula wrote:
+>> SMMU_IIDR register is broken on T99, that the reason we are using MIDR.
+>
+> Urgh, that's unfortunate. In what way is it broken?
+>
+>> If using MIDR is not accepted, can we enable errata based on SMMU resource size?
+>> some thing like below.
+>
+> No, you need to get your model number added to IORT after all if the IIDR
+> can't uniqely identify the part.
+>
+> Sorry,
+>
+> Will
