@@ -1,48 +1,52 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 3 May 2017 21:25:15 +0800
-Subject: [PATCH v2 0/5] mtd: nand: gpmi: add i.MX 7 support
-In-Reply-To: <20170422012338.4635-1-stefan@agner.ch>
-References: <20170422012338.4635-1-stefan@agner.ch>
-Message-ID: <20170503132513.GE24392@dragon>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 3 May 2017 16:32:33 +0300
+Subject: [PATCH] [RFC] ARM: dts: imx6sx-sdb: Drop OPP hackery
+In-Reply-To: <1493149194.20997.3.camel@nxp.com>
+References: <20170425164224.26537-1-marex@denx.de>
+ <a75000d6-aa53-92e3-c43a-58b49f18ff7e@denx.de>
+ <1493149194.20997.3.camel@nxp.com>
+Message-ID: <1493818353.11226.2.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 06:23:33PM -0700, Stefan Agner wrote:
-> This patchset adds support for i.MX 7 SoC for the GPMI NAND controller.
-> There have been similar patchsets already:
-> https://lkml.org/lkml/2016/2/23/912
+On Tue, 2017-04-25 at 22:39 +0300, Leonard Crestez wrote:
+> On Tue, 2017-04-25 at 21:30 +0200, Marek Vasut wrote:
+> > 
+> > On 04/25/2017 06:42 PM, Marek Vasut wrote:
+> > > 
+> > > The imx6sx-sdb has one power supply that drives both VDDARM_IN
+> > > and VDDSOC_IN, which is the sw1a regulator on the PFUZE PMIC.
+> > > Connect both inputs to the sw1a regulator on the PMIC and drop
+> > > the OPP hackery which is no longer needed as the power framework
+> > > will take care of the regulator configuration as needed.
+> > > 
+> > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > +CC Leonard
+> Tested-by: Leonard Crestez <leonard.crestez@nxp.com>
 > 
-> However, this patchset does not make use of any of the new features.
-> The current feature set seems to work fine, I successfully run the MTD
-> tests on a Colibri iMX7.
+> The OPP hack only applies to LDO bypass mode and that is not in
+> upstream. When LDOs are enabled the effect is to use higher voltages
+> than necessary for no good reason.
 > 
-> --
-> Stefan
+> Setting these higher voltages can make some boards (for example Rev B)
+> fail to boot with ugly semi-random crashes reminiscent of memory
+> corruption. These failures happen the first time the lowest idle state
+> is used. This patch fixes those crashes.
 > 
-> Changes since v1:
-> - Make clks_count const
-> - Introduce IS_IMX7D for i.MX 7 SoC's and make it part of GPMI_IS_MX6
+> It's not clear exactly why the crashes happen. Perhaps waking up from
+> idle draws more power than is available? I don't think it matters.
 > 
-> Stefan Agner (5):
->   mtd: nand: gpmi: unify clock handling
->   mtd: nand: gpmi: add i.MX 7 SoC support
->   mtd: gpmi: document current clock requirements
->   ARM: dts: imx7: add GPMI NAND
->   ARM: dts: imx7-colibri: add NAND support
+> I sent a very similar patch a few minutes after this one:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/503241
+> .html
 
-The dts patches look good to me.  I will pick them up once the driver
-changes are accepted.
+Adding Henri Roosen because he reported something very similar.
 
-Shawn
+Henri: Can you please check if this patch fixes your issue?
 
-> 
->  .../devicetree/bindings/mtd/gpmi-nand.txt          | 14 +++++-
->  arch/arm/boot/dts/imx7-colibri.dtsi                |  9 ++++
->  arch/arm/boot/dts/imx7s.dtsi                       | 31 ++++++++++++
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c             | 56 +++++++++++++---------
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.h             |  9 +++-
->  5 files changed, 93 insertions(+), 26 deletions(-)
-> 
-> -- 
-> 2.12.2
-> 
+--?
+Regards,
+Leonard
