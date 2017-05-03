@@ -1,287 +1,381 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 3 May 2017 18:08:58 +0200
-Subject: [PATCH v5 19/22] KVM: arm64: vgic-its: ITT save and restore
-In-Reply-To: <20170430201438.GB1499@lvm>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-20-git-send-email-eric.auger@redhat.com>
- <20170430201438.GB1499@lvm>
-Message-ID: <8ccb9bec-0df6-732b-c0b3-3c2067c67bf0@redhat.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed,  3 May 2017 11:17:52 -0500
+Subject: [PATCH 1/9] [v3] arm64: defconfig: resynchronize the defconfig
+In-Reply-To: <1493828280-6620-1-git-send-email-timur@codeaurora.org>
+References: <1493828280-6620-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1493828280-6620-2-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Defconfig files become unsynchronized over time as Kconfig entries are
+added, removed, or changed.  Making specific changes to the defconfig
+becomes difficult as unrelated differences can interfere.  This problem
+is easily remedied:
 
-On 30/04/2017 22:14, Christoffer Dall wrote:
-> On Fri, Apr 14, 2017 at 12:15:31PM +0200, Eric Auger wrote:
->> Introduce routines to save and restore device ITT and their
->> interrupt table entries (ITE).
->>
->> The routines will be called on device table save and
->> restore. They will become static in subsequent patches.
-> 
-> Why this bottom-up approach?  Couldn't you start by having the patch
-> that restores the device table and define the static functions that
-> return an error there
-done
-, and then fill them in with subsequent patches
-> (liek this one)?
-> 
-> That would have the added benefit of being able to tell how things are
-> designed to be called.
-> 
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->> v4 -> v5:
->> - ITE are now sorted by eventid on the flush
->> - rename *flush* into *save*
->> - use macros for shits and masks
->> - pass ite_esz to vgic_its_save_ite
->>
->> v3 -> v4:
->> - lookup_table and compute_next_eventid_offset become static in this
->>   patch
->> - remove static along with vgic_its_flush/restore_itt to avoid
->>   compilation warnings
->> - next field only computed with a shift (mask removed)
->> - handle the case where the last element has not been found
->>
->> v2 -> v3:
->> - add return 0 in vgic_its_restore_ite (was in subsequent patch)
->>
->> v2: creation
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 128 ++++++++++++++++++++++++++++++++++++++++++-
->>  virt/kvm/arm/vgic/vgic.h     |   4 ++
->>  2 files changed, 129 insertions(+), 3 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 35b2ca1..b02fc3f 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -23,6 +23,7 @@
->>  #include <linux/interrupt.h>
->>  #include <linux/list.h>
->>  #include <linux/uaccess.h>
->> +#include <linux/list_sort.h>
->>  
->>  #include <linux/irqchip/arm-gic-v3.h>
->>  
->> @@ -1695,7 +1696,7 @@ u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
->>  	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
->>  }
->>  
->> -u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
->> +static u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
->>  {
->>  	struct list_head *e = &ite->ite_list;
->>  	struct its_ite *next;
->> @@ -1737,8 +1738,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
->>   *
->>   * Return: < 0 on error, 1 if last element identified, 0 otherwise
->>   */
->> -int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
->> -		 int start_id, entry_fn_t fn, void *opaque)
->> +static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
->> +			int start_id, entry_fn_t fn, void *opaque)
->>  {
->>  	void *entry = kzalloc(esz, GFP_KERNEL);
->>  	struct kvm *kvm = its->dev->kvm;
->> @@ -1773,6 +1774,127 @@ int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
->>  }
->>  
->>  /**
->> + * vgic_its_save_ite - Save an interrupt translation entry at @gpa
->> + */
->> +static int vgic_its_save_ite(struct vgic_its *its, struct its_device *dev,
->> +			      struct its_ite *ite, gpa_t gpa, int ite_esz)
->> +{
->> +	struct kvm *kvm = its->dev->kvm;
->> +	u32 next_offset;
->> +	u64 val;
->> +
->> +	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
->> +	val = ((u64)next_offset << KVM_ITS_ITE_NEXT_SHIFT) |
->> +	       ((u64)ite->lpi << KVM_ITS_ITE_PINTID_SHIFT) |
->> +		ite->collection->collection_id;
->> +	val = cpu_to_le64(val);
->> +	return kvm_write_guest(kvm, gpa, &val, ite_esz);
->> +}
->> +
->> +/**
->> + * vgic_its_restore_ite - restore an interrupt translation entry
->> + * @event_id: id used for indexing
->> + * @ptr: pointer to the ITE entry
->> + * @opaque: pointer to the its_device
->> + * @next: id offset to the next entry
->> + */
->> +static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
->> +				void *ptr, void *opaque, u32 *next)
->> +{
->> +	struct its_device *dev = (struct its_device *)opaque;
->> +	struct its_collection *collection;
->> +	struct kvm *kvm = its->dev->kvm;
->> +	u64 val, *p = (u64 *)ptr;
-> 
-> nit: initializations on separate line (and possible do that just above
-> assigning val).
-done
-> 
->> +	struct vgic_irq *irq;
->> +	u32 coll_id, lpi_id;
->> +	struct its_ite *ite;
->> +	int ret;
->> +
->> +	val = *p;
->> +	*next = 1;
->> +
->> +	val = le64_to_cpu(val);
->> +
->> +	coll_id = val & KVM_ITS_ITE_ICID_MASK;
->> +	lpi_id = (val & KVM_ITS_ITE_PINTID_MASK) >> KVM_ITS_ITE_PINTID_SHIFT;
->> +
->> +	if (!lpi_id)
->> +		return 0;
-> 
-> are all non-zero LPI IDs valid?  Don't we have a wrapper that tests if
-> the ID is valid?
-no, lpi_id must be >= GIC_MIN_LPI=8192; added that check.
-ABI Doc says lpi_id==0 is interpreted as invalid. Other values <
-GIC_MIN_LPI cause an -EINVAL error
-> 
-> (looks like it's possible to add LPIs with the INTID range of SPIs, SGIs
-> and PPIs here)
+	make defconfig
+	make savedefconfig
+	cp defconfig arch/arm64/configs/defconfig
+	git add arch/arm64/configs/defconfig
+	git commit -s <sha>
 
-> 
->> +
->> +	*next = val >> KVM_ITS_ITE_NEXT_SHIFT;
-> 
-> Don't we need to validate this somehow since it will presumably be used
-> to forward a pointer somehow by the caller?
-checked against max number of eventids supported by the device
-> 
->> +
->> +	collection = find_collection(its, coll_id);
->> +	if (!collection)
->> +		return -EINVAL;
->> +
->> +	ret = vgic_its_alloc_ite(dev, &ite, collection,
->> +				  lpi_id, event_id);
->> +	if (ret)
->> +		return ret;
->> +
->> +	irq = vgic_add_lpi(kvm, lpi_id);
->> +	if (IS_ERR(irq))
->> +		return PTR_ERR(irq);
->> +	ite->irq = irq;
->> +
->> +	/* restore the configuration of the LPI */
->> +	ret = update_lpi_config(kvm, irq, NULL);
->> +	if (ret)
->> +		return ret;
->> +
->> +	update_affinity_ite(kvm, ite);
->> +	return 0;
->> +}
->> +
->> +static int vgic_its_ite_cmp(void *priv, struct list_head *a,
->> +			    struct list_head *b)
->> +{
->> +	struct its_ite *itea = container_of(a, struct its_ite, ite_list);
->> +	struct its_ite *iteb = container_of(b, struct its_ite, ite_list);
->> +
->> +	if (itea->event_id < iteb->event_id)
->> +		return -1;
->> +	else
->> +		return 1;
->> +}
->> +
->> +int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
->> +{
->> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
->> +	gpa_t base = device->itt_addr;
->> +	struct its_ite *ite;
->> +	int ret, ite_esz = abi->ite_esz;
-> 
-> nit: initializations on separate line
-OK
-> 
->> +
->> +	list_sort(NULL, &device->itt_head, vgic_its_ite_cmp);
->> +
->> +	list_for_each_entry(ite, &device->itt_head, ite_list) {
->> +		gpa_t gpa = base + ite->event_id * ite_esz;
->> +
->> +		ret = vgic_its_save_ite(its, device, ite, gpa, ite_esz);
->> +		if (ret)
->> +			return ret;
->> +	}
->> +	return 0;
->> +}
->> +
->> +int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
->> +{
->> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
->> +	gpa_t base = dev->itt_addr;
->> +	int ret, ite_esz = abi->ite_esz;
->> +	size_t max_size = BIT_ULL(dev->nb_eventid_bits) * ite_esz;
-> 
-> nit: initializations on separate line
-OK
-> 
->> +
->> +	ret =  lookup_table(its, base, max_size, ite_esz, 0,
->> +			    vgic_its_restore_ite, dev);
-> 
-> nit: extra white space
-> 
->> +
->> +	if (ret < 0)
->> +		return ret;
->> +
->> +	/* if the last element has not been found we are in trouble */
->> +	return ret ? 0 : -EINVAL;
-> 
-> hmm, these are values potentially created by the guest in guest RAM,
-> right?  So do we really abort migration and return an error to userspace
-> in this case?
-So we discussed with Peter/dave we shouldn't abort() in qemu in case of
-such error. The restore table IOCTL will return an error. Up to qemu to
-print the error. Destination guest will not be functional though.
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ arch/arm64/configs/defconfig | 103 ++++++++++++++++++-------------------------
+ 1 file changed, 42 insertions(+), 61 deletions(-)
 
-Thanks
-
-Eric
-> 
-> Also, this comment doesn't really tell me what this situation is and how
-> we handle things...
-> 
->> +}
->> +
->> +/**
->>   * vgic_its_save_device_tables - Save the device table and all ITT
->>   * into guest RAM
->>   */
->> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
->> index 56e57c1..ce57fbd 100644
->> --- a/virt/kvm/arm/vgic/vgic.h
->> +++ b/virt/kvm/arm/vgic/vgic.h
->> @@ -81,6 +81,10 @@
->>  #define KVM_ITS_CTE_VALID_MASK		BIT_ULL(63)
->>  #define KVM_ITS_CTE_RDBASE_SHIFT	16
->>  #define KVM_ITS_CTE_ICID_MASK		GENMASK_ULL(15, 0)
->> +#define KVM_ITS_ITE_NEXT_SHIFT		48
->> +#define KVM_ITS_ITE_PINTID_SHIFT	16
->> +#define KVM_ITS_ITE_PINTID_MASK		GENMASK_ULL(47, 16)
->> +#define KVM_ITS_ITE_ICID_MASK		GENMASK_ULL(15, 0)
->>  
->>  static inline bool irq_is_pending(struct vgic_irq *irq)
->>  {
->> -- 
->> 2.5.5
->>
-> 
-> Thanks,
-> -Christoffer
-> 
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index ce07285..d916fc3 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -30,7 +30,6 @@ CONFIG_PROFILING=y
+ CONFIG_JUMP_LABEL=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+-# CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_ARCH_ALPINE=y
+@@ -62,16 +61,15 @@ CONFIG_ARCH_XGENE=y
+ CONFIG_ARCH_ZX=y
+ CONFIG_ARCH_ZYNQMP=y
+ CONFIG_PCI=y
+-CONFIG_PCI_MSI=y
+ CONFIG_PCI_IOV=y
+-CONFIG_PCI_AARDVARK=y
+-CONFIG_PCIE_RCAR=y
+-CONFIG_PCI_HOST_GENERIC=y
+-CONFIG_PCI_XGENE=y
+ CONFIG_PCI_LAYERSCAPE=y
+ CONFIG_PCI_HISI=y
+ CONFIG_PCIE_QCOM=y
+ CONFIG_PCIE_ARMADA_8K=y
++CONFIG_PCI_AARDVARK=y
++CONFIG_PCIE_RCAR=y
++CONFIG_PCI_HOST_GENERIC=y
++CONFIG_PCI_XGENE=y
+ CONFIG_ARM64_VA_BITS_48=y
+ CONFIG_SCHED_MC=y
+ CONFIG_NUMA=y
+@@ -80,12 +78,11 @@ CONFIG_KSM=y
+ CONFIG_TRANSPARENT_HUGEPAGE=y
+ CONFIG_CMA=y
+ CONFIG_SECCOMP=y
+-CONFIG_XEN=y
+ CONFIG_KEXEC=y
+ CONFIG_CRASH_DUMP=y
++CONFIG_XEN=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_COMPAT=y
+-CONFIG_CPU_IDLE=y
+ CONFIG_HIBERNATION=y
+ CONFIG_ARM_CPUIDLE=y
+ CONFIG_CPU_FREQ=y
+@@ -155,8 +152,8 @@ CONFIG_MTD_SPI_NOR=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_NBD=m
+ CONFIG_VIRTIO_BLK=y
+-CONFIG_EEPROM_AT25=m
+ CONFIG_SRAM=y
++CONFIG_EEPROM_AT25=m
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_SCSI_SAS_ATA=y
+@@ -168,8 +165,8 @@ CONFIG_AHCI_CEVA=y
+ CONFIG_AHCI_MVEBU=y
+ CONFIG_AHCI_XGENE=y
+ CONFIG_AHCI_QORIQ=y
+-CONFIG_SATA_RCAR=y
+ CONFIG_SATA_SIL24=y
++CONFIG_SATA_RCAR=y
+ CONFIG_PATA_PLATFORM=y
+ CONFIG_PATA_OF_PLATFORM=y
+ CONFIG_NETDEVICES=y
+@@ -186,18 +183,17 @@ CONFIG_HNS_ENET=y
+ CONFIG_E1000E=y
+ CONFIG_IGB=y
+ CONFIG_IGBVF=y
+-CONFIG_MVPP2=y
+ CONFIG_MVNETA=y
++CONFIG_MVPP2=y
+ CONFIG_SKY2=y
+ CONFIG_RAVB=y
+ CONFIG_SMC91X=y
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=m
+-CONFIG_REALTEK_PHY=m
++CONFIG_MDIO_BUS_MUX_MMIOREG=y
+ CONFIG_MESON_GXL_PHY=m
+ CONFIG_MICREL_PHY=y
+-CONFIG_MDIO_BUS_MUX=y
+-CONFIG_MDIO_BUS_MUX_MMIOREG=y
++CONFIG_REALTEK_PHY=m
+ CONFIG_USB_PEGASUS=m
+ CONFIG_USB_RTL8150=m
+ CONFIG_USB_RTL8152=m
+@@ -230,14 +226,14 @@ CONFIG_SERIAL_8250_UNIPHIER=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_MESON=y
++CONFIG_SERIAL_MESON_CONSOLE=y
+ CONFIG_SERIAL_SAMSUNG=y
+ CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+ CONFIG_SERIAL_TEGRA=y
+ CONFIG_SERIAL_SH_SCI=y
+ CONFIG_SERIAL_SH_SCI_NR_UARTS=11
+ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+-CONFIG_SERIAL_MESON=y
+-CONFIG_SERIAL_MESON_CONSOLE=y
+ CONFIG_SERIAL_MSM=y
+ CONFIG_SERIAL_MSM_CONSOLE=y
+ CONFIG_SERIAL_XILINX_PS_UART=y
+@@ -261,14 +257,14 @@ CONFIG_I2C_UNIPHIER_F=y
+ CONFIG_I2C_RCAR=y
+ CONFIG_I2C_CROS_EC_TUNNEL=y
+ CONFIG_SPI=y
+-CONFIG_SPI_MESON_SPIFC=m
+ CONFIG_SPI_BCM2835=m
+ CONFIG_SPI_BCM2835AUX=m
++CONFIG_SPI_MESON_SPIFC=m
+ CONFIG_SPI_ORION=y
+ CONFIG_SPI_PL022=y
+ CONFIG_SPI_QUP=y
+-CONFIG_SPI_SPIDEV=m
+ CONFIG_SPI_S3C64XX=y
++CONFIG_SPI_SPIDEV=m
+ CONFIG_SPMI=y
+ CONFIG_PINCTRL_SINGLE=y
+ CONFIG_PINCTRL_MAX77620=y
+@@ -286,39 +282,35 @@ CONFIG_GPIO_PCA953X=y
+ CONFIG_GPIO_PCA953X_IRQ=y
+ CONFIG_GPIO_MAX77620=y
+ CONFIG_POWER_RESET_MSM=y
+-CONFIG_BATTERY_BQ27XXX=y
+ CONFIG_POWER_RESET_XGENE=y
+ CONFIG_POWER_RESET_SYSCON=y
++CONFIG_BATTERY_BQ27XXX=y
++CONFIG_SENSORS_ARM_SCPI=y
+ CONFIG_SENSORS_LM90=m
+ CONFIG_SENSORS_INA2XX=m
+-CONFIG_SENSORS_ARM_SCPI=y
+-CONFIG_THERMAL=y
+-CONFIG_THERMAL_EMULATION=y
+ CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+ CONFIG_CPU_THERMAL=y
+-CONFIG_BCM2835_THERMAL=y
++CONFIG_THERMAL_EMULATION=y
+ CONFIG_EXYNOS_THERMAL=y
+ CONFIG_WATCHDOG=y
+-CONFIG_BCM2835_WDT=y
+-CONFIG_RENESAS_WDT=y
+ CONFIG_S3C2410_WATCHDOG=y
+ CONFIG_MESON_GXBB_WATCHDOG=m
+ CONFIG_MESON_WATCHDOG=m
++CONFIG_RENESAS_WDT=y
++CONFIG_BCM2835_WDT=y
++CONFIG_MFD_CROS_EC=y
++CONFIG_MFD_CROS_EC_I2C=y
+ CONFIG_MFD_EXYNOS_LPASS=m
++CONFIG_MFD_HI655X_PMIC=y
+ CONFIG_MFD_MAX77620=y
+-CONFIG_MFD_RK808=y
+ CONFIG_MFD_SPMI_PMIC=y
++CONFIG_MFD_RK808=y
+ CONFIG_MFD_SEC_CORE=y
+-CONFIG_MFD_HI655X_PMIC=y
+-CONFIG_REGULATOR=y
+-CONFIG_MFD_CROS_EC=y
+-CONFIG_MFD_CROS_EC_I2C=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_HI655X=y
+ CONFIG_REGULATOR_MAX77620=y
+ CONFIG_REGULATOR_PWM=y
+-CONFIG_REGULATOR_QCOM_SMD_RPM=y
+ CONFIG_REGULATOR_QCOM_SPMI=y
+ CONFIG_REGULATOR_RK808=y
+ CONFIG_REGULATOR_S2MPS11=y
+@@ -345,13 +337,12 @@ CONFIG_DRM_EXYNOS_DSI=y
+ CONFIG_DRM_EXYNOS_HDMI=y
+ CONFIG_DRM_EXYNOS_MIC=y
+ CONFIG_DRM_RCAR_DU=m
+-CONFIG_DRM_RCAR_HDMI=y
+ CONFIG_DRM_RCAR_LVDS=y
+ CONFIG_DRM_RCAR_VSP=y
+ CONFIG_DRM_TEGRA=m
+-CONFIG_DRM_VC4=m
+ CONFIG_DRM_PANEL_SIMPLE=m
+ CONFIG_DRM_I2C_ADV7511=m
++CONFIG_DRM_VC4=m
+ CONFIG_DRM_HISI_KIRIN=m
+ CONFIG_DRM_MESON=m
+ CONFIG_FB=y
+@@ -366,26 +357,24 @@ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
+ CONFIG_SND_BCM2835_SOC_I2S=m
+-CONFIG_SND_SOC_RCAR=y
+ CONFIG_SND_SOC_SAMSUNG=y
++CONFIG_SND_SOC_RCAR=y
+ CONFIG_SND_SOC_AK4613=y
+ CONFIG_USB=y
+ CONFIG_USB_OTG=y
+ CONFIG_USB_XHCI_HCD=y
+-CONFIG_USB_XHCI_PLATFORM=y
+-CONFIG_USB_XHCI_RCAR=y
+-CONFIG_USB_EHCI_EXYNOS=y
+ CONFIG_USB_XHCI_TEGRA=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_MSM=y
++CONFIG_USB_EHCI_EXYNOS=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
+-CONFIG_USB_OHCI_EXYNOS=y
+ CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_OHCI_EXYNOS=y
+ CONFIG_USB_OHCI_HCD_PLATFORM=y
+ CONFIG_USB_RENESAS_USBHS=m
+ CONFIG_USB_STORAGE=y
+-CONFIG_USB_DWC2=y
+ CONFIG_USB_DWC3=y
++CONFIG_USB_DWC2=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_UDC=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+@@ -398,7 +387,6 @@ CONFIG_USB_RENESAS_USBHS_UDC=m
+ CONFIG_MMC=y
+ CONFIG_MMC_BLOCK_MINORS=32
+ CONFIG_MMC_ARMMMCI=y
+-CONFIG_MMC_MESON_GX=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_ACPI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+@@ -406,6 +394,7 @@ CONFIG_MMC_SDHCI_OF_ARASAN=y
+ CONFIG_MMC_SDHCI_OF_ESDHC=y
+ CONFIG_MMC_SDHCI_CADENCE=y
+ CONFIG_MMC_SDHCI_TEGRA=y
++CONFIG_MMC_MESON_GX=y
+ CONFIG_MMC_SDHCI_MSM=y
+ CONFIG_MMC_SPI=y
+ CONFIG_MMC_SDHI=y
+@@ -414,32 +403,31 @@ CONFIG_MMC_DW_EXYNOS=y
+ CONFIG_MMC_DW_K3=y
+ CONFIG_MMC_DW_ROCKCHIP=y
+ CONFIG_MMC_SUNXI=y
+-CONFIG_MMC_SDHCI_XENON=y
+ CONFIG_MMC_BCM2835=y
++CONFIG_MMC_SDHCI_XENON=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_PWM=y
+ CONFIG_LEDS_SYSCON=y
+-CONFIG_LEDS_TRIGGERS=y
+-CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_MAX77686=y
++CONFIG_RTC_DRV_RK808=m
+ CONFIG_RTC_DRV_S5M=y
+ CONFIG_RTC_DRV_DS3232=y
+ CONFIG_RTC_DRV_EFI=y
++CONFIG_RTC_DRV_S3C=y
+ CONFIG_RTC_DRV_PL031=y
+ CONFIG_RTC_DRV_SUN6I=y
+-CONFIG_RTC_DRV_RK808=m
+ CONFIG_RTC_DRV_TEGRA=y
+ CONFIG_RTC_DRV_XGENE=y
+-CONFIG_RTC_DRV_S3C=y
+ CONFIG_DMADEVICES=y
++CONFIG_DMA_BCM2835=m
+ CONFIG_MV_XOR_V2=y
+ CONFIG_PL330_DMA=y
+-CONFIG_DMA_BCM2835=m
+ CONFIG_TEGRA20_APB_DMA=y
+ CONFIG_QCOM_BAM_DMA=y
+ CONFIG_QCOM_HIDMA_MGMT=y
+@@ -452,18 +440,17 @@ CONFIG_VIRTIO_BALLOON=y
+ CONFIG_VIRTIO_MMIO=y
+ CONFIG_XEN_GNTDEV=y
+ CONFIG_XEN_GRANT_DEV_ALLOC=y
++CONFIG_COMMON_CLK_RK808=y
+ CONFIG_COMMON_CLK_SCPI=y
+ CONFIG_COMMON_CLK_CS2000_CP=y
+ CONFIG_COMMON_CLK_S2MPS11=y
+-CONFIG_COMMON_CLK_PWM=y
+-CONFIG_COMMON_CLK_RK808=y
+ CONFIG_CLK_QORIQ=y
++CONFIG_COMMON_CLK_PWM=y
+ CONFIG_COMMON_CLK_QCOM=y
+ CONFIG_MSM_GCC_8916=y
+ CONFIG_MSM_GCC_8994=y
+ CONFIG_MSM_MMCC_8996=y
+ CONFIG_HWSPINLOCK_QCOM=y
+-CONFIG_MAILBOX=y
+ CONFIG_ARM_MHU=y
+ CONFIG_PLATFORM_MHU=y
+ CONFIG_BCM2835_MBOX=y
+@@ -472,32 +459,29 @@ CONFIG_ARM_SMMU=y
+ CONFIG_ARM_SMMU_V3=y
+ CONFIG_RASPBERRYPI_POWER=y
+ CONFIG_QCOM_SMEM=y
+-CONFIG_QCOM_SMD=y
+-CONFIG_QCOM_SMD_RPM=y
+ CONFIG_ROCKCHIP_PM_DOMAINS=y
+ CONFIG_ARCH_TEGRA_132_SOC=y
+ CONFIG_ARCH_TEGRA_210_SOC=y
+ CONFIG_ARCH_TEGRA_186_SOC=y
+ CONFIG_EXTCON_USB_GPIO=y
++CONFIG_IIO=y
++CONFIG_EXYNOS_ADC=y
+ CONFIG_PWM=y
+ CONFIG_PWM_BCM2835=m
++CONFIG_PWM_MESON=m
+ CONFIG_PWM_ROCKCHIP=y
++CONFIG_PWM_SAMSUNG=y
+ CONFIG_PWM_TEGRA=m
+-CONFIG_PWM_MESON=m
+-CONFIG_COMMON_RESET_HI6220=y
+ CONFIG_PHY_RCAR_GEN3_USB2=y
+ CONFIG_PHY_HI6220_USB=y
++CONFIG_PHY_SUN4I_USB=y
+ CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+ CONFIG_PHY_ROCKCHIP_EMMC=y
+-CONFIG_PHY_SUN4I_USB=y
+ CONFIG_PHY_XGENE=y
+ CONFIG_PHY_TEGRA_XUSB=y
+ CONFIG_ARM_SCPI_PROTOCOL=y
+-CONFIG_ACPI=y
+-CONFIG_IIO=y
+-CONFIG_EXYNOS_ADC=y
+-CONFIG_PWM_SAMSUNG=y
+ CONFIG_RASPBERRYPI_FIRMWARE=y
++CONFIG_ACPI=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT4_FS_POSIX_ACL=y
+@@ -511,7 +495,6 @@ CONFIG_FUSE_FS=m
+ CONFIG_CUSE=m
+ CONFIG_OVERLAY_FS=m
+ CONFIG_VFAT_FS=y
+-CONFIG_TMPFS=y
+ CONFIG_HUGETLBFS=y
+ CONFIG_CONFIGFS_FS=y
+ CONFIG_EFIVAR_FS=y
+@@ -539,11 +522,9 @@ CONFIG_MEMTEST=y
+ CONFIG_SECURITY=y
+ CONFIG_CRYPTO_ECHAINIV=y
+ CONFIG_CRYPTO_ANSI_CPRNG=y
+-CONFIG_CRYPTO_DEV_SAFEXCEL=m
+ CONFIG_ARM64_CRYPTO=y
+ CONFIG_CRYPTO_SHA1_ARM64_CE=y
+ CONFIG_CRYPTO_SHA2_ARM64_CE=y
+ CONFIG_CRYPTO_GHASH_ARM64_CE=y
+ CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
+ CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
+-# CONFIG_CRYPTO_AES_ARM64_NEON_BLK is not set
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
