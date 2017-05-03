@@ -1,78 +1,65 @@
-From: bart.vanassche@sandisk.com (Bart Van Assche)
-Date: Wed, 3 May 2017 12:46:00 -0700
-Subject: [PATCH] ARM: Fix rd_size declaration
-Message-ID: <20170503194600.16089-1-bart.vanassche@sandisk.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 3 May 2017 21:33:24 +0200
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
+In-Reply-To: <1493834298.11226.40.camel@nxp.com>
+References: <89cc7192100bdc9ce546bf6000446e629457ebc1.1493138693.git.leonard.crestez@nxp.com>
+ <CAOMZO5BsgXRfgZ0hszk2Vgo2keVDHH1BLbJTbW+awMS2cBoNow@mail.gmail.com>
+ <CAOMZO5CKUsEr1yf5RrsPLipNtLC_6sK0dPjT2M-eN-uo8hEbrQ@mail.gmail.com>
+ <1493141004.3557.8.camel@nxp.com>
+ <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
+ <20170503135715.GG18578@dragon>
+ <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
+ <1493823533.11226.28.camel@nxp.com>
+ <e46a57c2-4a28-a8b6-445e-299dd9d8659c@denx.de>
+ <1493834298.11226.40.camel@nxp.com>
+Message-ID: <51fb1bd0-028d-c431-acc8-3c4f1d25fdba@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The global variable 'rd_size' is declared as 'int' in source file
-arch/arm/kernel/atags_parse.c and as 'unsigned long' in
-drivers/block/brd.c. Fix this inconsistency. Additionally, remove
-the declarations of rd_image_start, rd_prompt and rd_doload from
-parse_tag_ramdisk() since these duplicate existing declarations
-in <linux/initrd.h>.
+On 05/03/2017 07:58 PM, Leonard Crestez wrote:
+> On Wed, 2017-05-03 at 17:59 +0200, Marek Vasut wrote:
+>> On 05/03/2017 04:58 PM, Leonard Crestez wrote:
+>>> On Wed, 2017-05-03 at 16:26 +0200, Marek Vasut wrote:
+>>>> 2) It actually fixes a problem with the voltage rails such that the DVFS
+>>>>    works without leaving the system in unstable or dead state. You do
+>>>>    need the second part of my patch if you drop the OPP hackery, without
+>>>>    it the power framework cannot correctly configure the core voltages,
+>>>>    so the patch from Leonard makes things worse.
+>>> No, I think there is a misunderstanding here. The second part of your
+>>> patch will cause cpufreq poking at LDOs to indirectly adjust the input
+>>> from the PMIC to the minimum required (this is LDO target +
+>>> min_dropout_uv). Without it by default VDD_ARM_SOC_IN will remain fixed
+>>> as 1375mV from boot.
+> 
+>> Who sets / guarantees that default value for ARM and SOC rails ?
+> 
+> I think it's from the PMIC hardware itself (but maybe uboot plays with
+> it). VDD_ARM_SOC_IN on this board is tied to SW1AB from MMPF0200:
+> 
+> http://www.nxp.com/assets/documents/data/en/data-sheets/MMPF0200.pdf
+> 
+> It seems reasonable to rely on such voltages set externally.
 
-Signed-off-by: Bart Van Assche <bart.vanassche@sandisk.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Jens Axboe <axboe@kernel.dk>
-Cc: Jan Kara <jack@suse.cz>
-Cc: <yanaijie@huawei.com>
-Cc: <zhaohongjiang@huawei.com>
-Cc: <miaoxie@huawei.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-block at vger.kernel.org
----
- arch/arm/kernel/atags_parse.c | 3 +--
- drivers/block/brd.c           | 1 +
- include/linux/initrd.h        | 3 +++
- 3 files changed, 5 insertions(+), 2 deletions(-)
+Isn't it an established rule that Linux should not depend on bootloader
+settings ? Or did that change ?
 
-diff --git a/arch/arm/kernel/atags_parse.c b/arch/arm/kernel/atags_parse.c
-index 68c6ae0b9e4c..98fbfd235ac8 100644
---- a/arch/arm/kernel/atags_parse.c
-+++ b/arch/arm/kernel/atags_parse.c
-@@ -18,6 +18,7 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/initrd.h>
- #include <linux/kernel.h>
- #include <linux/fs.h>
- #include <linux/root_dev.h>
-@@ -91,8 +92,6 @@ __tagtable(ATAG_VIDEOTEXT, parse_tag_videotext);
- #ifdef CONFIG_BLK_DEV_RAM
- static int __init parse_tag_ramdisk(const struct tag *tag)
- {
--	extern int rd_size, rd_image_start, rd_prompt, rd_doload;
--
- 	rd_image_start = tag->u.ramdisk.start;
- 	rd_doload = (tag->u.ramdisk.flags & 1) == 0;
- 	rd_prompt = (tag->u.ramdisk.flags & 2) == 0;
-diff --git a/drivers/block/brd.c b/drivers/block/brd.c
-index 3adc32a3153b..30a45080a9b4 100644
---- a/drivers/block/brd.c
-+++ b/drivers/block/brd.c
-@@ -9,6 +9,7 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/initrd.h>
- #include <linux/module.h>
- #include <linux/moduleparam.h>
- #include <linux/major.h>
-diff --git a/include/linux/initrd.h b/include/linux/initrd.h
-index 55289d261b4f..bc67b767f9ce 100644
---- a/include/linux/initrd.h
-+++ b/include/linux/initrd.h
-@@ -10,6 +10,9 @@ extern int rd_prompt;
- /* starting block # of image */
- extern int rd_image_start;
- 
-+/* size of a single RAM disk */
-+extern unsigned long rd_size;
-+
- /* 1 if it is not an error if initrd_start < memory_start */
- extern int initrd_below_start_ok;
- 
+>> With the OPP override in place, there's at least the guarantee that both
+>> rails will have the same voltage requirement. If you remove the OPP
+>> override without modeling the actual regulator wiring, the guarantee is
+>> gone.
+> 
+> The imx6sx chip has internal LDO_ARM and LDO_SOC regulators which can
+> generate separate voltages for arm/soc. The fact that these regulators
+> share the same supply is only an issue when they are set in bypass
+> mode.
+> 
+> However the boot issues happen on REV C but apparently not REV B of the
+> board. I don't have a good explanation for this so maybe I am missing
+> something.
+
+Well the regulator(s) cannot be correctly configured if the kernel
+doesn't have the correct power distribution described in the DT .
+
 -- 
-2.12.2
+Best regards,
+Marek Vasut
