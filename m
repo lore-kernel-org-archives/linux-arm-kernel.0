@@ -1,50 +1,93 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  3 May 2017 16:09:35 +0100
-Subject: [PATCH 3/6] arm64: uaccess: ensure extension of access_ok() addr
+Date: Wed,  3 May 2017 16:09:34 +0100
+Subject: [PATCH 2/6] arm64: ensure extension of smp_store_release value
 In-Reply-To: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
 References: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1493824178-7399-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1493824178-7399-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our access_ok() simply hands its arguments over to __range_ok(), which
-implicitly assummes that the addr parameter is 64 bits wide. This isn't
-necessarily true for compat code, which might pass down a 32-bit address
-parameter.
+When an inline assembly operand's type is narrower than the register it
+is allocated to, the least significant bits of the register (up to the
+operand type's width) are valid, and any other bits are permitted to
+contain any arbitrary value. This aligns with the AAPCS64 parameter
+passing rules.
 
-In these cases, we don't have a guarantee that the address has been zero
-extended to 64 bits, and the upper bits of the register may contain
-unknown values, potentially resulting in a suprious failure.
+Our __smp_store_release() implementation does not account for this, and
+implicitly assumes that operands have been zero-extended to the width of
+the type being stored to. Thus, we may store unknown values to memory
+when the value type is narrower than the pointer type (e.g. when storing
+a char to a long).
 
-Avoid this by explicitly casting the addr parameter to an unsigned long
-(as is done on other architectures), ensuring that the parameter is
-widened appropriately.
+This patch fixes the issue by casting the value operand to the same
+width as the pointer operand in all cases, which ensures that the value
+is zero-extended as we expect. We use the same union trickery as
+__smp_load_acquire and {READ,WRITE}_ONCE() to avoid GCC complaining that
+pointers are potentially cast to narrower width integers in unreachable
+paths.
 
-Fixes: 0aea86a2176c2264 ("arm64: User access library functions")
+A whitespace issue at the top of __smp_store_release() is also
+corrected.
+
+No changes are necessary for __smp_load_acquire(). Load instructions
+implicitly clear any upper bits of the register, and the compiler will
+only consider the least significant bits of the register as valid
+regardless.
+
+Fixes: 47933ad41a86a4a9 ("arch: Introduce smp_load_acquire(), smp_store_release()")
+Fixes: 878a84d5a8a18a4a ("arm64: add missing data types in smp_load_acquire/smp_store_release")
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Matthias Kaehlcke <mka@chromium.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/uaccess.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/barrier.h | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 5308d69..ed3ecf1 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -95,11 +95,12 @@ static inline void set_fs(mm_segment_t fs)
-  */
- #define __range_ok(addr, size)						\
- ({									\
-+	unsigned long __addr = (unsigned long __force)(addr);		\
- 	unsigned long flag, roksum;					\
- 	__chk_user_ptr(addr);						\
- 	asm("adds %1, %1, %3; ccmp %1, %4, #2, cc; cset %0, ls"		\
- 		: "=&r" (flag), "=&r" (roksum)				\
--		: "1" (addr), "Ir" (size),				\
-+		: "1" (__addr), "Ir" (size),				\
- 		  "r" (current_thread_info()->addr_limit)		\
- 		: "cc");						\
- 	flag;								\
+diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+index 4e0497f..0fe7e43 100644
+--- a/arch/arm64/include/asm/barrier.h
++++ b/arch/arm64/include/asm/barrier.h
+@@ -42,25 +42,35 @@
+ #define __smp_rmb()	dmb(ishld)
+ #define __smp_wmb()	dmb(ishst)
+ 
+-#define __smp_store_release(p, v)						\
++#define __smp_store_release(p, v)					\
+ do {									\
++	union { typeof(*p) __val; char __c[1]; } __u =			\
++		{ .__val = (__force typeof(*p)) (v) }; 			\
+ 	compiletime_assert_atomic_type(*p);				\
+ 	switch (sizeof(*p)) {						\
+ 	case 1:								\
+ 		asm volatile ("stlrb %w1, %0"				\
+-				: "=Q" (*p) : "r" (v) : "memory");	\
++				: "=Q" (*p)				\
++				: "r" (*(__u8 *)__u.__c)		\
++				: "memory");				\
+ 		break;							\
+ 	case 2:								\
+ 		asm volatile ("stlrh %w1, %0"				\
+-				: "=Q" (*p) : "r" (v) : "memory");	\
++				: "=Q" (*p)				\
++				: "r" (*(__u16 *)__u.__c)		\
++				: "memory");				\
+ 		break;							\
+ 	case 4:								\
+ 		asm volatile ("stlr %w1, %0"				\
+-				: "=Q" (*p) : "r" (v) : "memory");	\
++				: "=Q" (*p)				\
++				: "r" (*(__u32 *)__u.__c)		\
++				: "memory");				\
+ 		break;							\
+ 	case 8:								\
+ 		asm volatile ("stlr %1, %0"				\
+-				: "=Q" (*p) : "r" (v) : "memory");	\
++				: "=Q" (*p)				\
++				: "r" (*(__u64 *)__u.__c)		\
++				: "memory");				\
+ 		break;							\
+ 	}								\
+ } while (0)
 -- 
 1.9.1
