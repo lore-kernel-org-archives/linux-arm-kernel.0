@@ -1,59 +1,53 @@
-From: spjoshi@codeaurora.org (Sarangdhar Joshi)
-Date: Tue, 2 May 2017 19:06:42 -0700
-Subject: [PATCH 1/2] remoteproc: Introduce rproc_{start,stop}() functions
-In-Reply-To: <20170503000205.GZ15143@minitux>
-References: <1493758742-26148-1-git-send-email-spjoshi@codeaurora.org>
- <20170503000205.GZ15143@minitux>
-Message-ID: <c3cce8b1-7c46-7a6f-0cde-d38400b4ea0b@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed,  3 May 2017 11:09:23 +0800
+Subject: [PATCH v2 2/8] clk: Provide option to query hardware for clk phase
+In-Reply-To: <20170503030929.28763-1-wens@csie.org>
+References: <20170503030929.28763-1-wens@csie.org>
+Message-ID: <20170503030929.28763-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2017 05:02 PM, Bjorn Andersson wrote:
-> On Tue 02 May 13:59 PDT 2017, Sarangdhar Joshi wrote:
->
->> In the context of recovering from crash,
->> rproc_trigger_recovery() does rproc_shutdown() followed
->> by rproc_boot(). The remoteproc resources are cleaned up
->> in rproc_shutdown() and immediately reallocated in
->> rproc_boot() which is an unnecessary overhead.
->>
->> Furthermore, we want the memory regions to be accessible
->> after stopping the remote processor, to be able to extract
->> the memory content for a coredump.
->>
->> The current patch factors out the code in rproc_boot() and
->
-> "This patch factors..."
->
->> rproc_shutdown() path and introduces rproc_{start,stop}()
->> in order to avoid resource allocation overhead.
->>
->
-> I think the result of the two patches looks good.
->
-> But I would prefer if you splice them differently. If I read the patches
-> correctly you should be able to introduce rproc_start()/stop() and move
-> rproc_boot()/shutdown() over to use these in one patch and then in a
-> second patch modify the behavior of the recovery.
->
-> That way if one bisects any issues to either one we know if it was the
-> refactoring or the modification of the recovery behavior.
+On some hardware, the clk phase is tied to the parent clk's
+rate and some clk delay programmed into the hardware. As the
+parent clk rate changes, so does the clk phase.
 
-Yes, got your point. I will split it into two separate patches.
+Add a clk flag specifying not to use the cached clk phase,
+but always query the hardware for it.
 
-Regards,
-Sarang
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/clk/clk.c            | 6 +++++-
+ include/linux/clk-provider.h | 1 +
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
->
-> Regards,
-> Bjorn
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 67201f67a14a..05e2481c1340 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1929,7 +1929,11 @@ static int clk_core_get_phase(struct clk_core *core)
+ 	int ret;
+ 
+ 	clk_prepare_lock();
+-	ret = core->phase;
++	if (core && (core->flags & CLK_GET_PHASE_NOCACHE) &&
++	    core->ops->get_phase)
++		ret = core->ops->get_phase(core->hw);
++	else
++		ret = core->phase;
+ 	clk_prepare_unlock();
+ 
+ 	return ret;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index a428aec36ace..e2e856b1a81f 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -35,6 +35,7 @@
+ #define CLK_IS_CRITICAL		BIT(11) /* do not gate, ever */
+ /* parents need enable during gate/ungate, set rate and re-parent */
+ #define CLK_OPS_PARENT_ENABLE	BIT(12)
++#define CLK_GET_PHASE_NOCACHE	BIT(13) /* do not use the cached clk phase */
+ 
+ struct clk;
+ struct clk_hw;
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.11.0
