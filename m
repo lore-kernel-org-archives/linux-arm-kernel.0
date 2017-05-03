@@ -1,116 +1,150 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 3 May 2017 21:05:47 +0800
-Subject: [PATCH 3/3] arm64: dts: ls1012a: add eSDHC nodes
-In-Reply-To: <1492746756-12024-4-git-send-email-yangbo.lu@nxp.com>
-References: <1492746756-12024-1-git-send-email-yangbo.lu@nxp.com>
- <1492746756-12024-4-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <20170503130545.GB24392@dragon>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 3 May 2017 14:13:01 +0100
+Subject: [PATCH 1/2] kvm: Fix mmu_notifier release race
+In-Reply-To: <611d0ad2-f907-d41c-cdc1-5977c247b104@arm.com>
+References: <1493028624-29837-1-git-send-email-suzuki.poulose@arm.com>
+ <1493028624-29837-2-git-send-email-suzuki.poulose@arm.com>
+ <20170425184904.GI5713@potion> <c1232b1d-ad82-794b-1b86-4d0cc0d4cd7f@arm.com>
+ <611d0ad2-f907-d41c-cdc1-5977c247b104@arm.com>
+Message-ID: <f732440f-bfad-f2f8-2524-037f03f31c10@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 11:52:36AM +0800, Yangbo Lu wrote:
-> There are two eSDHC controllers in LS1012A. This patch is to add
-> eSDHC nodes for ls1012a dts. Also enable eSDHC for RDB/QDS boards.
-> 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> ---
->  arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts |  8 ++++++++
->  arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts | 13 ++++++++++++
->  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi    | 25 +++++++++++++++++++++++
->  3 files changed, 46 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-> index e2a93d5..a21a587 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-> @@ -130,3 +130,11 @@
->  &sata {
->  	status = "okay";
->  };
-> +
-> +&esdhc0 {
-> +	status = "okay";
-> +};
-> +
-> +&esdhc1 {
-> +	status = "okay";
-> +};
+On 28/04/17 18:20, Suzuki K Poulose wrote:
+> On 26/04/17 17:03, Suzuki K Poulose wrote:
+>> On 25/04/17 19:49, Radim Kr?m?? wrote:
+>>> 2017-04-24 11:10+0100, Suzuki K Poulose:
+>>>> The KVM uses mmu_notifier (wherever available) to keep track
+>>>> of the changes to the mm of the guest. The guest shadow page
+>>>> tables are released when the VM exits via mmu_notifier->ops.release().
+>>>> There is a rare chance that the mmu_notifier->release could be
+>>>> called more than once via two different paths, which could end
+>>>> up in use-after-free of kvm instance (such as [0]).
+>>>>
+>>>> e.g:
+>>>>
+>>>> thread A                                        thread B
+>>>> -------                                         --------------
+>>>>
+>>>>  get_signal->                                   kvm_destroy_vm()->
+>>>>  do_exit->                                        mmu_notifier_unregister->
+>>>>  exit_mm->                                        kvm_arch_flush_shadow_all()->
+>>>>  exit_mmap->                                      spin_lock(&kvm->mmu_lock)
+>>>>  mmu_notifier_release->                           ....
+>>>>   kvm_arch_flush_shadow_all()->                   .....
+>>>>   ... spin_lock(&kvm->mmu_lock)                   .....
+>>>>                                                   spin_unlock(&kvm->mmu_lock)
+>>>>                                                 kvm_arch_free_kvm()
+>>>>    *** use after free of kvm ***
+>>>
+>>> I don't understand this race ...
+>>> a piece of code in mmu_notifier_unregister() says:
+>>>
+>>>       /*
+>>>        * Wait for any running method to finish, of course including
+>>>        * ->release if it was run by mmu_notifier_release instead of us.
+>>>        */
+>>>       synchronize_srcu(&srcu);
+>>>
+>>> and code before that removes the notifier from the list, so it cannot be
+>>> called after we pass this point.  mmu_notifier_release() does roughly
+>>> the same and explains it as:
+>>>
+>>>       /*
+>>>        * synchronize_srcu here prevents mmu_notifier_release from returning to
+>>>        * exit_mmap (which would proceed with freeing all pages in the mm)
+>>>        * until the ->release method returns, if it was invoked by
+>>>        * mmu_notifier_unregister.
+>>>        *
+>>>        * The mmu_notifier_mm can't go away from under us because one mm_count
+>>>        * is held by exit_mmap.
+>>>        */
+>>>       synchronize_srcu(&srcu);
+>>>
+>>> The call of mmu_notifier->release is protected by srcu in both cases and
+>>> while it seems possible that mmu_notifier->release would be called
+>>> twice, I don't see a combination that could result in use-after-free
+>>> from mmu_notifier_release after mmu_notifier_unregister() has returned.
+>>
+>> Thanks for bringing it up. Even I am wondering why this is triggered ! (But it
+>> does get triggered for sure !!)
+>>
+>> The only difference I can spot with _unregister & _release paths are the way
+>> we use src_read_lock across the deletion of the entry from the list.
+>>
+>> In mmu_notifier_unregister() we do :
+>>
+>>                 id = srcu_read_lock(&srcu);
+>>                 /*
+>>                  * exit_mmap will block in mmu_notifier_release to guarantee
+>>                  * that ->release is called before freeing the pages.
+>>                  */
+>>                 if (mn->ops->release)
+>>                         mn->ops->release(mn, mm);
+>>                 srcu_read_unlock(&srcu, id);
+>>
+>> ## Releases the srcu lock here and then goes on to grab the spin_lock.
+>>
+>>                 spin_lock(&mm->mmu_notifier_mm->lock);
+>>                 /*
+>>                  * Can not use list_del_rcu() since __mmu_notifier_release
+>>                  * can delete it before we hold the lock.
+>>                  */
+>>                 hlist_del_init_rcu(&mn->hlist);
+>>                 spin_unlock(&mm->mmu_notifier_mm->lock);
+>>
+>> While in mmu_notifier_release() we hold it until the node(s) are deleted from the
+>> list :
+>>         /*
+>>          * SRCU here will block mmu_notifier_unregister until
+>>          * ->release returns.
+>>          */
+>>         id = srcu_read_lock(&srcu);
+>>         hlist_for_each_entry_rcu(mn, &mm->mmu_notifier_mm->list, hlist)
+>>                 /*
+>>                  * If ->release runs before mmu_notifier_unregister it must be
+>>                  * handled, as it's the only way for the driver to flush all
+>>                  * existing sptes and stop the driver from establishing any more
+>>                  * sptes before all the pages in the mm are freed.
+>>                  */
+>>                 if (mn->ops->release)
+>>                         mn->ops->release(mn, mm);
+>>
+>>         spin_lock(&mm->mmu_notifier_mm->lock);
+>>         while (unlikely(!hlist_empty(&mm->mmu_notifier_mm->list))) {
+>>                 mn = hlist_entry(mm->mmu_notifier_mm->list.first,
+>>                                  struct mmu_notifier,
+>>                                  hlist);
+>>                 /*
+>>                  * We arrived before mmu_notifier_unregister so
+>>                  * mmu_notifier_unregister will do nothing other than to wait
+>>                  * for ->release to finish and for mmu_notifier_unregister to
+>>                  * return.
+>>                  */
+>>                 hlist_del_init_rcu(&mn->hlist);
+>>         }
+>>         spin_unlock(&mm->mmu_notifier_mm->lock);
+>>         srcu_read_unlock(&srcu, id);
+>>
+>> ## The lock is release only after the deletion of the node.
+>>
+>> Both are followed by a synchronize_srcu(). Now, I am wondering if the unregister path
+>> could potentially miss SRCU read lock held in _release() path and go onto finish the
+>> synchronize_srcu before the item is deleted ? May be we should do the read_unlock
+>> after the deletion of the node in _unregister (like we do in the _release()) ?
+>
+> I haven't been able to reproduce the mmu_notifier race condition, which leads to KVM
+> free, reported at [1]. I will leave it running (with tracepoints/ftrace) over the
+> weekend.
+>
 
-Sort these labeled nodes alphabetically.
+I couldn't reproduce the proposed "mmu_notifier race" reported in [0].
+However I found some other use-after-free cases in the unmap_stage2_range()
+code due to the introduction of cond_resched_lock(). It may be just that the
+IP reported in [0] was for wrong line of code ? i.e, arch_spin_is_locked instead
+of unmap_stage2_range ?
+Anyways, I will send a new version of the patches in a separate series.
 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-> index ed77f6b..57669b0 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-> @@ -61,3 +61,16 @@
->  &sata {
->  	status = "okay";
->  };
-> +
-> +&esdhc0 {
-> +	sd-uhs-sdr104;
-> +	sd-uhs-sdr50;
-> +	sd-uhs-sdr25;
-> +	sd-uhs-sdr12;
-> +	status = "okay";
-> +};
-> +
-> +&esdhc1 {
-> +	mmc-hs200-1_8v;
-> +	status = "okay";
-> +};
+[0] https://marc.info/?l=linux-kernel&m=149201399018791&w=2
 
-Ditto
-
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> index b497ac1..e3a1943 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> @@ -302,6 +302,31 @@
->  			};
->  		};
->  
-> +		esdhc0: esdhc at 1560000 {
-
-Sort the nodes in order of unit-address.
-
-> +			compatible = "fsl,ls1012a-esdhc", "fsl,esdhc";
-
-Please document the compatible.
-
-Shawn
-
-> +			reg = <0x0 0x1560000 0x0 0x10000>;
-> +			interrupts = <0 62 0x4>;
-> +			clocks = <&clockgen 4 0>;
-> +			voltage-ranges = <1800 1800 3300 3300>;
-> +			sdhci,auto-cmd12;
-> +			big-endian;
-> +			bus-width = <4>;
-> +			status = "disabled";
-> +		};
-> +
-> +		esdhc1: esdhc at 1580000 {
-> +			compatible = "fsl,ls1012a-esdhc", "fsl,esdhc";
-> +			reg = <0x0 0x1580000 0x0 0x10000>;
-> +			interrupts = <0 65 0x4>;
-> +			clocks = <&clockgen 4 0>;
-> +			voltage-ranges = <1800 1800 3300 3300>;
-> +			sdhci,auto-cmd12;
-> +			big-endian;
-> +			broken-cd;
-> +			bus-width = <4>;
-> +			status = "disabled";
-> +		};
-> +
->  		i2c0: i2c at 2180000 {
->  			compatible = "fsl,vf610-i2c";
->  			#address-cells = <1>;
-> -- 
-> 2.1.0.27.g96db324
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Suzuki
