@@ -1,58 +1,103 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  3 May 2017 13:59:45 +0200
-Subject: [PATCH v2 8/20] clk: sunxi-ng: sun5i: Export video PLLs
+Date: Wed,  3 May 2017 13:59:47 +0200
+Subject: [PATCH v2 10/20] drm/sun4i: tcon: Move the muxing out of the mode set
+ function
 In-Reply-To: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
 References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <1fc17b7a14830306a83747b5086c0fd5d6dff290.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <ea29ffd2bc3c76203168d0fd1e969b045424b24c.1493812478.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The video PLLs are used directly by the HDMI controller. Export them so
-that we can use them in our DT node.
+The muxing can actually happen on both channels on some SoCs, so it makes
+more sense to just move it out of the sun4i_tcon1_mode_set function and
+create a separate function that needs to be called by the encoders.
+
+Let's do that and convert the existing drivers.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu-sun5i.h      | 6 ++++--
- include/dt-bindings/clock/sun5i-ccu.h | 3 +++
- 2 files changed, 7 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_rgb.c  |  1 +
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 22 ++++++++++++++++------
+ drivers/gpu/drm/sun4i/sun4i_tcon.h |  2 ++
+ drivers/gpu/drm/sun4i/sun4i_tv.c   |  1 +
+ 4 files changed, 20 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.h b/drivers/clk/sunxi-ng/ccu-sun5i.h
-index 8144487eb7ca..93a275fbd9a9 100644
---- a/drivers/clk/sunxi-ng/ccu-sun5i.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun5i.h
-@@ -28,15 +28,17 @@
- #define CLK_PLL_AUDIO_4X	6
- #define CLK_PLL_AUDIO_8X	7
- #define CLK_PLL_VIDEO0		8
--#define CLK_PLL_VIDEO0_2X	9
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index 67f0b91a99de..3003d290c635 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -175,6 +175,7 @@ static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
+ 	struct sun4i_tcon *tcon = rgb->tcon;
+ 
+ 	sun4i_tcon0_mode_set(tcon, mode);
++	sun4i_tcon_set_mux(tcon, 0, encoder);
+ 
+ 	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 66a5bb9b85e9..0204d9fadb66 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -108,6 +108,22 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
+ }
+ EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
+ 
++void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
++			struct drm_encoder *encoder)
++{
++	if (!tcon->quirks->has_unknown_mux)
++		return;
 +
-+/* The PLL_VIDEO0_2X is exported for HDMI */
++	if (channel != 1)
++		return;
 +
- #define CLK_PLL_VE		10
- #define CLK_PLL_DDR_BASE	11
- #define CLK_PLL_DDR		12
- #define CLK_PLL_DDR_OTHER	13
- #define CLK_PLL_PERIPH		14
- #define CLK_PLL_VIDEO1		15
--#define CLK_PLL_VIDEO1_2X	16
- 
-+/* The PLL_VIDEO1_2X is exported for HDMI */
- /* The CPU clock is exported */
- 
- #define CLK_AXI			18
-diff --git a/include/dt-bindings/clock/sun5i-ccu.h b/include/dt-bindings/clock/sun5i-ccu.h
-index aeb2e2f781fb..81f34d477aeb 100644
---- a/include/dt-bindings/clock/sun5i-ccu.h
-+++ b/include/dt-bindings/clock/sun5i-ccu.h
-@@ -19,6 +19,9 @@
- 
- #define CLK_HOSC		1
- 
-+#define CLK_PLL_VIDEO0_2X	9
++	/*
++	 * FIXME: Undocumented bits
++	 */
++	regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
++}
++EXPORT_SYMBOL(sun4i_tcon_set_mux);
 +
-+#define CLK_PLL_VIDEO1_2X	16
- #define CLK_CPU			17
+ static int sun4i_tcon_get_clk_delay(struct drm_display_mode *mode,
+ 				    int channel)
+ {
+@@ -266,12 +282,6 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
+ 			   SUN4I_TCON_GCTL_IOMAP_MASK,
+ 			   SUN4I_TCON_GCTL_IOMAP_TCON1);
+-
+-	/*
+-	 * FIXME: Undocumented bits
+-	 */
+-	if (tcon->quirks->has_unknown_mux)
+-		regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
+ }
+ EXPORT_SYMBOL(sun4i_tcon1_mode_set);
  
- #define CLK_AHB_OTG		23
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index f636343a935d..0350936b413c 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -190,6 +190,8 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable);
+ /* Mode Related Controls */
+ void sun4i_tcon_switch_interlace(struct sun4i_tcon *tcon,
+ 				 bool enable);
++void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
++			struct drm_encoder *encoder);
+ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+ 			  struct drm_display_mode *mode);
+ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
+index 49c49431a053..03c494b8159c 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
+@@ -393,6 +393,7 @@ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
+ 	const struct tv_mode *tv_mode = sun4i_tv_find_tv_by_mode(mode);
+ 
+ 	sun4i_tcon1_mode_set(tcon, mode);
++	sun4i_tcon_set_mux(tcon, 1, encoder);
+ 
+ 	/* Enable and map the DAC to the output */
+ 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
 -- 
 git-series 0.8.11
