@@ -1,32 +1,109 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed,  3 May 2017 11:17:53 -0500
-Subject: [PATCH 2/9] arm64: defconfig: enable ACPI_CPPC_CPUFREQ
-In-Reply-To: <1493828280-6620-1-git-send-email-timur@codeaurora.org>
-References: <1493828280-6620-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1493828280-6620-3-git-send-email-timur@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 3 May 2017 16:59:20 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Poll for CMDQ drain completion more
+ effectively
+In-Reply-To: <CA+sq2CeU7RN_UEiN1fuRtFpkHwgORHv_qU8yvziHqteLdz+_rw@mail.gmail.com>
+References: <1493291587-23488-1-git-send-email-sunil.kovvuri@gmail.com>
+ <CA+sq2CdR0vC76F1m-LvYGfZW32nKbQg9dQsfJ_jtvYgZ7yyt3g@mail.gmail.com>
+ <20170503153738.GP8233@arm.com>
+ <CA+sq2CeU7RN_UEiN1fuRtFpkHwgORHv_qU8yvziHqteLdz+_rw@mail.gmail.com>
+Message-ID: <20170503155920.GT8233@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPPC CPUFreq driver is used on many ACPI-based ARM64 server systems.
+On Wed, May 03, 2017 at 09:24:13PM +0530, Sunil Kovvuri wrote:
+> On Wed, May 3, 2017 at 9:07 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, May 03, 2017 at 06:49:09PM +0530, Sunil Kovvuri wrote:
+> >> On Thu, Apr 27, 2017 at 4:43 PM,  <sunil.kovvuri@gmail.com> wrote:
+> >> > From: Sunil Goutham <sgoutham@cavium.com>
+> >> >
+> >> > Modified polling on CMDQ consumer similar to how polling is done for TLB SYNC
+> >> > completion in SMMUv2 driver. Code changes are done with reference to
+> >> >
+> >> > 8513c8930069 iommu/arm-smmu: Poll for TLB sync completion more effectively
+> >> >
+> >> > Poll timeout has been increased which addresses issue of 100us timeout not
+> >> > sufficient, when command queue is full with TLB invalidation commands.
+> >> >
+> >> > Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> >> > Signed-off-by: Geetha <gakula@cavium.com>
+> >> > ---
+> >> >  drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++---
+> >> >  1 file changed, 12 insertions(+), 3 deletions(-)
+> >> >
+> >> > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> >> > index d412bdd..34599d4 100644
+> >> > --- a/drivers/iommu/arm-smmu-v3.c
+> >> > +++ b/drivers/iommu/arm-smmu-v3.c
+> >> > @@ -379,6 +379,9 @@
+> >> >  #define CMDQ_SYNC_0_CS_NONE            (0UL << CMDQ_SYNC_0_CS_SHIFT)
+> >> >  #define CMDQ_SYNC_0_CS_SEV             (2UL << CMDQ_SYNC_0_CS_SHIFT)
+> >> >
+> >> > +#define CMDQ_DRAIN_TIMEOUT_US          1000
+> >> > +#define CMDQ_SPIN_COUNT                        10
+> >> > +
+> >> >  /* Event queue */
+> >> >  #define EVTQ_ENT_DWORDS                        4
+> >> >  #define EVTQ_MAX_SZ_SHIFT              7
+> >> > @@ -737,7 +740,8 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
+> >> >   */
+> >> >  static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
+> >> >  {
+> >> > -       ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
+> >> > +       ktime_t timeout = ktime_add_us(ktime_get(), CMDQ_DRAIN_TIMEOUT_US);
+> >> > +       unsigned int spin_cnt, delay = 1;
+> >> >
+> >> >         while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
+> >> >                 if (ktime_compare(ktime_get(), timeout) > 0)
+> >> > @@ -746,8 +750,13 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
+> >> >                 if (wfe) {
+> >> >                         wfe();
+> >> >                 } else {
+> >> > -                       cpu_relax();
+> >> > -                       udelay(1);
+> >> > +                       for (spin_cnt = 0;
+> >> > +                            spin_cnt < CMDQ_SPIN_COUNT; spin_cnt++) {
+> >> > +                               cpu_relax();
+> >> > +                               continue;
+> >> > +                       }
+> >> > +                       udelay(delay);
+> >> > +                       delay *= 2;
+> >> >                 }
+> >> >         }
+> >> >
+> >> > --
+> >> > 2.7.4
+> >> >
+> >>
+> >> Sorry for the ignorance.
+> >> Is there a patchwork where I can check current status of ARM IOMMU
+> >> related patches ?
+> >>
+> >> And is this patch accepted, if not any comments / feedback ?
+> >
+> > Please be patient: the merge window is open and it's not been long since you
+> > posted the patch, which looks pretty bonkers at first glance.
+> >
+> > Will
+> 
+> Look at this
+> https://lkml.org/lkml/2017/4/3/605
+> The same thing, i pinged after a week and you said you already picked it up.
+> All I am asking is how do i know the current status, how many days
+> would normally
+> be considered being patient ?
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+At least wait until the merge window is over if it's not a fix, or keep an
+eye on the relevant branches (see below).
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index d916fc3..11f19df 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -89,6 +89,7 @@ CONFIG_CPU_FREQ=y
- CONFIG_CPUFREQ_DT=y
- CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
- CONFIG_ARM_SCPI_CPUFREQ=y
-+CONFIG_ACPI_CPPC_CPUFREQ=m
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+> Instead of troubling you, is there a patchwork where i can check the status ?
+
+No, but I pick patches up on my iommu/devel branch here:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/
+
+and at some point they appear on for-joerg/arm-smmu/updates, which I send
+to Joerg (who is the iommu maintainer). He then puts them into linux-next
+before they get sent for inclusion in mainline during the next merge window.
+
+Will
