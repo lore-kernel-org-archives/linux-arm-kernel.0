@@ -1,66 +1,77 @@
-From: aisheng.dong@nxp.com (A.S. Dong)
-Date: Wed, 3 May 2017 03:48:03 +0000
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable cpufreq governors
-In-Reply-To: <c401883fec8db20878c7593d879e9e128cacc495.1493736306.git.leonard.crestez@nxp.com>
-References: <c401883fec8db20878c7593d879e9e128cacc495.1493736306.git.leonard.crestez@nxp.com>
-Message-ID: <AM3PR04MB306B60CED1751FA382AFBB980160@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: leedom@chelsio.com (Casey Leedom)
+Date: Wed, 3 May 2017 04:30:24 +0000
+Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
+References: <cover.1493678834.git.leedom@chelsio.com>
+ <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
+ <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
+ <20170502165329.GB26406@linux.intel.com>,
+ <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
+Message-ID: <MWHPR12MB160095DF53CE981C923FE65DC8160@MWHPR12MB1600.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Leonard Crestez [mailto:leonard.crestez at nxp.com]
-> Sent: Tuesday, May 02, 2017 10:46 PM
-> To: Shawn Guo
-> Cc: Leonard Crestez; Sascha Hauer; Jagan Teki; Fabio Estevam; Dong Aisheng;
-> linux-arm-kernel at lists.infradead.org; linux-pm at vger.kernel.org; linux-
-> kernel at vger.kernel.org
-> Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable cpufreq governors
-> 
-> Enable more common cpufreq governors in imx defconfig because this is very
-> useful for testing. In particular you can't use cpufreq-set -f $FREQ
-> without explicitly defining CONFIG_CPU_FREQ_GOV_USERSPACE=y.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+| From: Alexander Duyck <alexander.duyck@gmail.com>
+| Date: Tuesday, May 2, 2017 11:10 AM
+| ...
+| So for example, in the case of x86 it seems like there are multiple
+| root complexes that have issues, and the gains for enabling it with
+| standard DMA to host memory are small. As such we may want to default
+| it to off via the architecture specific PCIe code and then look at
+| having "white-list" cases where we enable it for things like
+| peer-to-peer accesses. In the case of SPARC we could look at
+| defaulting it to on, and only "black-list" any cases where there might
+| be issues since SPARC relies on this in a significant way for
+| performance. In the case of ARM and other architectures it is a bit of
+| a toss-up. I would say we could just default it to on for now and
+| "black-list" anything that doesn't work, or we could go the other way
+| like I suggested for x86. It all depends on what the ARM community
+| would want to agree on for this. I would say unless it makes a
+| significant difference like it does in the case of SPARC we are
+| probably better off just defaulting it to off.
 
-Well, I think we do need this.
-So:
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+  Sorry, I forgot to respond to this earlier when someone was rushing me out
+to a customer dinner.
 
-Regards
-Dong Aisheng
+  I'm unaware of any other x86 Root Complex Port that has a problem with
+Relaxed Ordering other than the performance issue with the current Intel
+implementation.  Ashok tells me that Intel is in the final stages of putting
+together a technical notice on this issue but I don't know when that will
+come out.  Hopefully that will shed much more light on the cause and actual
+use of Relaxed Ordering when directed to Coherent Memory on current and past
+Intel platforms.  (Note that the performance bug seems to limit us to
+~75-85Gb/s DMA Write speed to Coherent Host Memory.)
 
-> 
-> ---
-> 
-> It might make sense for all governors to be enabled by default from
-> drivers/cpufreq/Kconfig and allow defconfigs to be shorter.
-> Right now the descriptions for some of them includes a line that says "If
-> in doubt, say Y" but the config options don't have actually have a default
-> value defined and they effectively default to N.
-> 
-> Cycling via savedefconfig on shawnguo/for-next also generates some
-> reordering for some newly added options CONFIG_TOUCHSCREEN_MAX11801=y and
-> CONFIG_HID_MULTITOUCH=y. Those were not included but it's strange that
-> this happens. Maybe those options were inserted manually, or otherwise
-> there is an annoying bug in kconfig?
-> 
->  arch/arm/configs/imx_v6_v7_defconfig | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig
-> b/arch/arm/configs/imx_v6_v7_defconfig
-> index bb6fa56..bf1e7e3 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -55,6 +55,9 @@ CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
->  CONFIG_KEXEC=y
->  CONFIG_CPU_FREQ=y
->  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-> +CONFIG_CPU_FREQ_GOV_POWERSAVE=y
-> +CONFIG_CPU_FREQ_GOV_USERSPACE=y
-> +CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
->  CONFIG_ARM_IMX6Q_CPUFREQ=y
->  CONFIG_CPU_IDLE=y
->  CONFIG_VFP=y
-> --
-> 2.7.4
+  The only other Device that I currently know of which has issues with
+Relaxed Ordering TLPs directed at it, is also a Root Complex Port on the new
+AMD A1100 ARM SoC ("SEATTLE").  There we have an actual bug which could lead
+to Data Corruption.
+
+  But I don't know anything about other x86 Root Complex Ports having issues
+with this -- we've been using it ever since commit ef306b50b from December
+2010.
+
+  Also, I'm not aware of any performance data which has been gathered on the
+use of Relaxed Ordering when directed at Host Memory.  From your note, it
+sounds like it's important on SPARC architectures.  But it could conceivably
+be important on any architecture or Root Complex/Memory Controller
+implementation.  We use it to direct Ingress Packet Data to Free List
+Buffers, followed by a TLP without Relaxed Ordering directed at a Host
+Memory Message Queue.  The idea here is to give the Root Complex options on
+which DMA Memory Write TLPs to process in order to optimize data placement
+in memory.  And with the next Ethernet speed bump to 200Gb/s this may be
+even more important.
+
+  Basically, I'd hate to come up with a solution where we write off the use
+of Relaxed Ordering for DMA Writes to Host Memory.  I don't think you're
+suggesting that, but there are a number of x86 Root Complex implementations
+out there -- and some like the new AMD Ryzen have yet to be tested -- as
+well as other architectures.
+
+  And, as Ashok and I have both nothed, any solution we come up with needs
+to cope with a heterogeneous situation where, on the same PCIe Fabric, it
+may be necessesary/desireable to support Relaxed Ordering TLPs directed at
+some End Nodes but not others.
+
+Casey
