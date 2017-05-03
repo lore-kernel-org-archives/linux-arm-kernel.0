@@ -1,29 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 3 May 2017 10:47:18 +0100
-Subject: [PATCH 2/3] iommu/arm-smmu-v3: Add workaround for Cavium
- ThunderX2 erratum #74
-In-Reply-To: <CANHdaibvzp22XEa3NnKAKUtrHcWGc9oUcnM8KubcYCzEfOaKJg@mail.gmail.com>
-References: <1493293584-20287-1-git-send-email-gakula@caviumnetworks.com>
- <1493293584-20287-3-git-send-email-gakula@caviumnetworks.com>
- <20170427164237.GA7114@leverpostej> <20170427170030.GF1890@arm.com>
- <CANHdaibvzp22XEa3NnKAKUtrHcWGc9oUcnM8KubcYCzEfOaKJg@mail.gmail.com>
-Message-ID: <20170503094717.GC8233@arm.com>
+From: der.herr@hofr.at (Nicholas Mc Guire)
+Date: Wed,  3 May 2017 11:53:09 +0200
+Subject: [RFC PATCH] mtd: spi-nor: handle signal case as failure
+Message-ID: <1493805189-25327-1-git-send-email-der.herr@hofr.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geetha,
+ The problem is that stm32_qspi_wait_cmd() will indicate success in case of
+ being interrupted. The if condition is incomplete here as
+ wait_for_copletion_interruptible_timeout can return -ERESTARTSYS but this
+ is not handled by if(!wait_for_completion_interruptible_timeout()).
+ While somewhat unlikely it probably would be hard to figure out what went
+ wrong if the signal case does occur.
 
-On Tue, May 02, 2017 at 12:01:15PM +0530, Geetha Akula wrote:
-> SMMU_IIDR register is broken on T99, that the reason we are using MIDR.
+Fixes: commit 0d43d7ab277a ("mtd: spi-nor: add driver for STM32 quad spi flash controller")
+Signed-off-by: Nicholas Mc Guire <der.herr@hofr.at>
+---
+Problem found by experimental coccinelle script
 
-Urgh, that's unfortunate. In what way is it broken?
+Its not clear if its sufficient to simply treat this case as failure or
+if it might need some debug output to allow differentiation of signal
+and timeout case. 
 
-> If using MIDR is not accepted, can we enable errata based on SMMU resource size?
-> some thing like below.
+Patch was compile tested with: stm32_defconfig +CONFIG_MTD=y, CONFIG_MTD_SPI_NOR=y,
+CONFIG_SPI_STM32_QUADSPI=m
 
-No, you need to get your model number added to IORT after all if the IIDR
-can't uniqely identify the part.
+Patch is against v4.11-rc8 (localversion-next is next-20170503)
 
-Sorry,
+ drivers/mtd/spi-nor/stm32-quadspi.c  | 10 ++++++++--
+ 1 files changed, 10 insertions(+), 2 deletions(-)
 
-Will
+diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
+index 1056e74..27147ad 100644
+--- a/drivers/mtd/spi-nor/stm32-quadspi.c
++++ b/drivers/mtd/spi-nor/stm32-quadspi.c
+@@ -159,6 +159,7 @@ static int stm32_qspi_wait_cmd(struct stm32_qspi *qspi)
+ {
+ 	u32 cr;
+ 	int err = 0;
++	long timeout = 0;
+ 
+ 	if (readl_relaxed(qspi->io_base + QUADSPI_SR) & SR_TCF)
+ 		return 0;
+@@ -167,8 +168,13 @@ static int stm32_qspi_wait_cmd(struct stm32_qspi *qspi)
+ 	cr = readl_relaxed(qspi->io_base + QUADSPI_CR);
+ 	writel_relaxed(cr | CR_TCIE, qspi->io_base + QUADSPI_CR);
+ 
+-	if (!wait_for_completion_interruptible_timeout(&qspi->cmd_completion,
+-						       msecs_to_jiffies(1000)))
++	timeout = wait_for_completion_interruptible_timeout(
++				&qspi->cmd_completion, msecs_to_jiffies(1000));
++
++	/* since the calling side only cares about success of failure
++	 * returning -ETIMEDOUT even when interrupted should be ok here
++	 */
++	if (timeout == 0 || timeout == -ERESTARTSYS)
+ 		err = -ETIMEDOUT;
+ 
+ 	writel_relaxed(cr, qspi->io_base + QUADSPI_CR);
+-- 
+2.1.4
