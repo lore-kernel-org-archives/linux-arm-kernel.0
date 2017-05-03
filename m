@@ -1,21 +1,64 @@
-From: Bart.VanAssche@sandisk.com (Bart Van Assche)
-Date: Wed, 3 May 2017 19:48:44 +0000
-Subject: [PATCH] ARM: Fix rd_size declaration
-In-Reply-To: <20170503194600.16089-1-bart.vanassche@sandisk.com>
-References: <20170503194600.16089-1-bart.vanassche@sandisk.com>
-Message-ID: <1493840922.3901.33.camel@sandisk.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 3 May 2017 14:55:25 -0500
+Subject: [PATCH 1/3] of/pci/dma: fix DMA configuration for PCI masters
+In-Reply-To: <1493786795-28153-1-git-send-email-oza.oza@broadcom.com>
+References: <1493786795-28153-1-git-send-email-oza.oza@broadcom.com>
+Message-ID: <CAL_JsqLE+CmukEYFnjkYTApGiXZVQn_Xz2GvOshPWLZoaoXvCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-05-03 at 12:46 -0700, Bart Van Assche wrote:
-> The global variable 'rd_size' is declared as 'int' in source file
-> arch/arm/kernel/atags_parse.c and as 'unsigned long' in
-> drivers/block/brd.c. Fix this inconsistency. Additionally, remove
-> the declarations of rd_image_start, rd_prompt and rd_doload from
-> parse_tag_ramdisk() since these duplicate existing declarations
-> in <linux/initrd.h>.
+On Tue, May 2, 2017 at 11:46 PM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
+> current device framework and of framework integration assumes
+> dma-ranges in a way where memory-mapped devices define their
+> dma-ranges. (child-bus-address, parent-bus-address, length).
+>
+> of_dma_configure is specifically written to take care of memory
+> mapped devices. but no implementation exists for pci to take
+> care of pcie based memory ranges.
+>
+> for e.g. iproc based SOCs and other SOCs(suc as rcar) have PCI
+> world dma-ranges.
+> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+>
+> this patch serves following:
+>
+> 1) exposes interface to the pci host driver for their
+> inbound memory ranges
+>
+> 2) provide an interface to callers such as of_dma_get_ranges.
+> so then the returned size get best possible (largest) dma_mask.
+> because PCI RC drivers do not call APIs such as
+> dma_set_coherent_mask() and hence rather it shows its addressing
+> capabilities based on dma-ranges.
+> for e.g.
+> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+> we should get dev->coherent_dma_mask=0x7fffffffff.
+>
+> 3) this patch handles multiple inbound windows and dma-ranges.
+> it is left to the caller, how it wants to use them.
+> the new function returns the resources in a standard and unform way
+>
+> 4) this way the callers of for e.g. of_dma_get_ranges
+> does not need to change.
+>
+> 5) leaves scope of adding PCI flag handling for inbound memory
+> by the new function.
+>
+> Bug: SOC-5216
+> Change-Id: Ie045386df91e1e0587846bb147ae40d96f6d7d2e
+> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+> Reviewed-on: http://gerrit-ccxsw.broadcom.net/40428
+> Reviewed-by: vpx_checkpatch status <vpx_checkpatch@broadcom.com>
+> Reviewed-by: CCXSW <ccxswbuild@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Tested-by: vpx_autobuild status <vpx_autobuild@broadcom.com>
+> Tested-by: vpx_smoketest status <vpx_smoketest@broadcom.com>
+> Tested-by: CCXSW <ccxswbuild@broadcom.com>
 
-This is version 2 of the patch for removing the rd_size declaration.
-Compared to v1, the new header file <linux/brd.h> has been dropped.
+All these non-person, probably internal Broadcom Tested-by and
+Reviewed-by's should be removed too.
 
-Bart.
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>
+
+Rob
