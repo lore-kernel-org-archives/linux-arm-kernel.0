@@ -1,53 +1,45 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  3 May 2017 11:09:23 +0800
-Subject: [PATCH v2 2/8] clk: Provide option to query hardware for clk phase
+Date: Wed,  3 May 2017 11:09:22 +0800
+Subject: [PATCH v2 1/8] dt-bindings: clock: sunxi-ccu: Add compatible string
+ for A83T CCU
 In-Reply-To: <20170503030929.28763-1-wens@csie.org>
 References: <20170503030929.28763-1-wens@csie.org>
-Message-ID: <20170503030929.28763-3-wens@csie.org>
+Message-ID: <20170503030929.28763-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some hardware, the clk phase is tied to the parent clk's
-rate and some clk delay programmed into the hardware. As the
-parent clk rate changes, so does the clk phase.
+The A83T clock control unit is a hybrid of some new style clock designs
+from the A80, and old style layout from the other Allwinner SoCs.
 
-Add a clk flag specifying not to use the cached clk phase,
-but always query the hardware for it.
+Like the A80, the SoC does not have a low speed 32.768 kHz oscillator.
+Unlike the A80, there is no clock input either. The only low speed clock
+available is the internal oscillator which runs at around 16 MHz,
+divided by 512, yielding a low speed clock around 31.250 kHz.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/clk.c            | 6 +++++-
- include/linux/clk-provider.h | 1 +
- 2 files changed, 6 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 67201f67a14a..05e2481c1340 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1929,7 +1929,11 @@ static int clk_core_get_phase(struct clk_core *core)
- 	int ret;
- 
- 	clk_prepare_lock();
--	ret = core->phase;
-+	if (core && (core->flags & CLK_GET_PHASE_NOCACHE) &&
-+	    core->ops->get_phase)
-+		ret = core->ops->get_phase(core->hw);
-+	else
-+		ret = core->phase;
- 	clk_prepare_unlock();
- 
- 	return ret;
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index a428aec36ace..e2e856b1a81f 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -35,6 +35,7 @@
- #define CLK_IS_CRITICAL		BIT(11) /* do not gate, ever */
- /* parents need enable during gate/ungate, set rate and re-parent */
- #define CLK_OPS_PARENT_ENABLE	BIT(12)
-+#define CLK_GET_PHASE_NOCACHE	BIT(13) /* do not use the cached clk phase */
- 
- struct clk;
- struct clk_hw;
+diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+index e9c5a1d9834a..34b2a9249a94 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+@@ -6,6 +6,7 @@ Required properties :
+ 		- "allwinner,sun6i-a31-ccu"
+ 		- "allwinner,sun8i-a23-ccu"
+ 		- "allwinner,sun8i-a33-ccu"
++		- "allwinner,sun8i-a83t-ccu"
+ 		- "allwinner,sun8i-h3-ccu"
+ 		- "allwinner,sun8i-h3-r-ccu"
+ 		- "allwinner,sun8i-v3s-ccu"
+@@ -18,6 +19,7 @@ Required properties :
+ - clocks: phandle to the oscillators feeding the CCU. Two are needed:
+   - "hosc": the high frequency oscillator (usually at 24MHz)
+   - "losc": the low frequency oscillator (usually at 32kHz)
++	    On the A83T, this is the internal 16MHz oscillator divided by 512
+ - clock-names: Must contain the clock names described just above
+ - #clock-cells : must contain 1
+ - #reset-cells : must contain 1
 -- 
 2.11.0
