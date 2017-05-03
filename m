@@ -1,43 +1,60 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  3 May 2017 11:45:40 +0100
-Subject: [PATCH 05/31] KVM: arm/arm64: vgic-v3: Do not use Active+Pending
- state for a HW interrupt
+Date: Wed,  3 May 2017 11:45:47 +0100
+Subject: [PATCH 12/31] KVM: arm64: vgic-v3: Add ICV_IGRPEN1_EL1 handler
 In-Reply-To: <20170503104606.19342-1-marc.zyngier@arm.com>
 References: <20170503104606.19342-1-marc.zyngier@arm.com>
-Message-ID: <20170503104606.19342-6-marc.zyngier@arm.com>
+Message-ID: <20170503104606.19342-13-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an interrupt is injected with the HW bit set (indicating that
-deactivation should be propagated to the physical distributor),
-special care must be taken so that we never mark the corresponding
-LR with the Active+Pending state (as the pending state is kept in
-the physycal distributor).
+Add a handler for reading/writing the guest's view of the ICC_IGRPEN1_EL1
+register, which is located in the ICH_VMCR_EL2.VENG1 field.
 
-Cc: stable at vger.kernel.org
-Fixes: 59529f69f504 ("KVM: arm/arm64: vgic-new: Add GICv3 world switch backend")
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-v3.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ virt/kvm/arm/hyp/vgic-v3-sr.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index df1503650300..393779ebe87c 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -127,6 +127,13 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
- 	if (irq->hw) {
- 		val |= ICH_LR_HW;
- 		val |= ((u64)irq->hwintid) << ICH_LR_PHYS_ID_SHIFT;
-+		/*
-+		 * Never set pending+active on a HW interrupt, as the
-+		 * pending state is kept@the physical distributor
-+		 * level.
-+		 */
-+		if (irq->active && irq_is_pending(irq))
-+			val &= ~ICH_LR_PENDING_BIT;
- 	} else {
- 		if (irq->config == VGIC_CONFIG_LEVEL)
- 			val |= ICH_LR_EOI;
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index f0f038c490a5..473ef22508e6 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -395,6 +395,23 @@ static unsigned int __hyp_text __vgic_v3_get_bpr1(u32 vmcr)
+ 	return bpr;
+ }
+ 
++static void __hyp_text __vgic_v3_read_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
++{
++	vcpu_set_reg(vcpu, rt, !!(vmcr & ICH_VMCR_ENG1_MASK));
++}
++
++static void __hyp_text __vgic_v3_write_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
++{
++	u64 val = vcpu_get_reg(vcpu, rt);
++
++	if (val & 1)
++		vmcr |= ICH_VMCR_ENG1_MASK;
++	else
++		vmcr &= ~ICH_VMCR_ENG1_MASK;
++
++	__vgic_v3_write_vmcr(vmcr);
++}
++
+ static void __hyp_text __vgic_v3_read_bpr1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+ {
+ 	vcpu_set_reg(vcpu, rt, __vgic_v3_get_bpr1(vmcr));
+@@ -440,6 +457,12 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 	is_read = (esr & ESR_ELx_SYS64_ISS_DIR_MASK) == ESR_ELx_SYS64_ISS_DIR_READ;
+ 
+ 	switch (sysreg) {
++	case SYS_ICC_GRPEN1_EL1:
++		if (is_read)
++			fn = __vgic_v3_read_igrpen1;
++		else
++			fn = __vgic_v3_write_igrpen1;
++		break;
+ 	case SYS_ICC_BPR1_EL1:
+ 		if (is_read)
+ 			fn = __vgic_v3_read_bpr1;
 -- 
 2.11.0
