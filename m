@@ -1,38 +1,61 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 3 May 2017 16:50:12 +0800
-Subject: [PATCH 1/3] ARM: dts: imx6qdl-nitrogen6_max: fix rv4162 compatible
-In-Reply-To: <20170419202204.7689-1-alexandre.belloni@free-electrons.com>
-References: <20170419202204.7689-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170503085010.GF18578@dragon>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 3 May 2017 11:43:04 +0200
+Subject: [PATCH 3/4] net: macb: Add hardware PTP support
+In-Reply-To: <BN3PR07MB2516757CB4EA7367F6623C06C9170@BN3PR07MB2516.namprd07.prod.outlook.com>
+References: <1492090439-11793-1-git-send-email-rafalo@cadence.com>
+ <1492090763-15686-1-git-send-email-rafalo@cadence.com>
+ <20170414182850.GB7751@localhost.localdomain>
+ <BN3PR07MB2516757CB4EA7367F6623C06C9170@BN3PR07MB2516.namprd07.prod.outlook.com>
+Message-ID: <20170503094304.GD2340@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 10:22:02PM +0200, Alexandre Belloni wrote:
-> The rv4162 vendor is microcrystal, not ST.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-> index bad3c9f9eeac..b63134e3b51a 100644
-> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-> @@ -408,7 +408,7 @@
->  	};
->  
->  	rtc: rtc at 68 {
-> -		compatible = "st,rv4162";
-> +		compatible = "microcrystal,rv4162";
+On Tue, May 02, 2017 at 01:57:15PM +0000, Rafal Ozieblo wrote:
+> > What is the point of this wrapper function anyhow?  Please remove it.
+> gem_ptp_gettime() is assigned in ptp_clock_info and it has to have 
+> ptp_clock_info pointer as first parameter. gem_tsu_get_time() is used in
+> the source code but with macb pointer.
+> Do you want me to do something like:
+> gem_ptp_gettime(macb->ptp, ts);
+> and first would be getting macb pointer from ptp ?
+> struct macb *bp = container_of(ptp, struct macb, ptp_clock_info);
 
-The compatible is not documented?
+Yes.  Unless your sub-function is used in more than one place, then it
+is wasteful and confusing to wrap the functionality for no apparent
+reason.
 
-Shawn
+> > > +	switch (rq->type) {
+> > > +	case PTP_CLK_REQ_EXTTS:	/* Toggle TSU match interrupt */
+> > > +		if (on)
+> > > +			macb_writel(bp, IER, MACB_BIT(TCI));
+> > 
+> > No locking to protect IER and IDE?
+> There is no need.
 
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&pinctrl_rv4162>;
->  		reg = <0x68>;
-> -- 
-> 2.11.0
-> 
+But what happens when the PTP_CLK_REQ_EXTTS and PTP_CLK_REQ_PPS ioctls
+are called at the same time?
+
+You need to ensure that IDR is consistent.  If the bits are write
+only, then you should comment this fact.
+
+> > > +		else
+> > > +			macb_writel(bp, IDR, MACB_BIT(TCI));
+> > > +		break;
+> > > +	case PTP_CLK_REQ_PEROUT: /* Toggle Periodic output */
+> > > +		return -EOPNOTSUPP;
+> > > +		/* break; */
+> > > +	case PTP_CLK_REQ_PPS:	/* Toggle TSU periodic (second)
+> > interrupt */
+> > > +		if (on)
+> > > +			macb_writel(bp, IER, MACB_BIT(SRI));
+> > > +		else
+> > > +			macb_writel(bp, IDR, MACB_BIT(SRI));
+> > > +		break;
+> > > +	default:
+> > > +		break;
+> > > +	}
+> > > +	return 0;
+> > > +}
+
+Thanks,
+Richard
