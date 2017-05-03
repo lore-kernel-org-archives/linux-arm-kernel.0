@@ -1,96 +1,66 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Wed, 3 May 2017 21:24:13 +0530
-Subject: [PATCH] iommu/arm-smmu-v3: Poll for CMDQ drain completion more
- effectively
-In-Reply-To: <20170503153738.GP8233@arm.com>
-References: <1493291587-23488-1-git-send-email-sunil.kovvuri@gmail.com>
- <CA+sq2CdR0vC76F1m-LvYGfZW32nKbQg9dQsfJ_jtvYgZ7yyt3g@mail.gmail.com>
- <20170503153738.GP8233@arm.com>
-Message-ID: <CA+sq2CeU7RN_UEiN1fuRtFpkHwgORHv_qU8yvziHqteLdz+_rw@mail.gmail.com>
+From: kristina.martsenko@arm.com (Kristina Martsenko)
+Date: Wed,  3 May 2017 16:37:45 +0100
+Subject: [PATCH v2 1/4] arm64: traps: fix userspace cache maintenance
+ emulation on a tagged pointer
+In-Reply-To: <1493825868-30872-1-git-send-email-kristina.martsenko@arm.com>
+References: <1493825868-30872-1-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1493825868-30872-2-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 3, 2017 at 9:07 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, May 03, 2017 at 06:49:09PM +0530, Sunil Kovvuri wrote:
->> On Thu, Apr 27, 2017 at 4:43 PM,  <sunil.kovvuri@gmail.com> wrote:
->> > From: Sunil Goutham <sgoutham@cavium.com>
->> >
->> > Modified polling on CMDQ consumer similar to how polling is done for TLB SYNC
->> > completion in SMMUv2 driver. Code changes are done with reference to
->> >
->> > 8513c8930069 iommu/arm-smmu: Poll for TLB sync completion more effectively
->> >
->> > Poll timeout has been increased which addresses issue of 100us timeout not
->> > sufficient, when command queue is full with TLB invalidation commands.
->> >
->> > Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
->> > Signed-off-by: Geetha <gakula@cavium.com>
->> > ---
->> >  drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++---
->> >  1 file changed, 12 insertions(+), 3 deletions(-)
->> >
->> > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> > index d412bdd..34599d4 100644
->> > --- a/drivers/iommu/arm-smmu-v3.c
->> > +++ b/drivers/iommu/arm-smmu-v3.c
->> > @@ -379,6 +379,9 @@
->> >  #define CMDQ_SYNC_0_CS_NONE            (0UL << CMDQ_SYNC_0_CS_SHIFT)
->> >  #define CMDQ_SYNC_0_CS_SEV             (2UL << CMDQ_SYNC_0_CS_SHIFT)
->> >
->> > +#define CMDQ_DRAIN_TIMEOUT_US          1000
->> > +#define CMDQ_SPIN_COUNT                        10
->> > +
->> >  /* Event queue */
->> >  #define EVTQ_ENT_DWORDS                        4
->> >  #define EVTQ_MAX_SZ_SHIFT              7
->> > @@ -737,7 +740,8 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
->> >   */
->> >  static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
->> >  {
->> > -       ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
->> > +       ktime_t timeout = ktime_add_us(ktime_get(), CMDQ_DRAIN_TIMEOUT_US);
->> > +       unsigned int spin_cnt, delay = 1;
->> >
->> >         while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
->> >                 if (ktime_compare(ktime_get(), timeout) > 0)
->> > @@ -746,8 +750,13 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
->> >                 if (wfe) {
->> >                         wfe();
->> >                 } else {
->> > -                       cpu_relax();
->> > -                       udelay(1);
->> > +                       for (spin_cnt = 0;
->> > +                            spin_cnt < CMDQ_SPIN_COUNT; spin_cnt++) {
->> > +                               cpu_relax();
->> > +                               continue;
->> > +                       }
->> > +                       udelay(delay);
->> > +                       delay *= 2;
->> >                 }
->> >         }
->> >
->> > --
->> > 2.7.4
->> >
->>
->> Sorry for the ignorance.
->> Is there a patchwork where I can check current status of ARM IOMMU
->> related patches ?
->>
->> And is this patch accepted, if not any comments / feedback ?
->
-> Please be patient: the merge window is open and it's not been long since you
-> posted the patch, which looks pretty bonkers at first glance.
->
-> Will
+When we emulate userspace cache maintenance in the kernel, we can
+currently send the task a SIGSEGV even though the maintenance was done
+on a valid address. This happens if the address has a non-zero address
+tag, and happens to not be mapped in.
 
-Look at this
-https://lkml.org/lkml/2017/4/3/605
-The same thing, i pinged after a week and you said you already picked it up.
-All I am asking is how do i know the current status, how many days
-would normally
-be considered being patient ?
-Instead of troubling you, is there a patchwork where i can check the status ?
+When we get the address from a user register, we don't currently remove
+the address tag before performing cache maintenance on it. If the
+maintenance faults, we end up in either __do_page_fault, where find_vma
+can't find the VMA if the address has a tag, or in do_translation_fault,
+where the tagged address will appear to be above TASK_SIZE. In both
+cases, the address is not mapped in, and the task is sent a SIGSEGV.
 
-Thanks,
-Sunil.
+This patch removes the tag from the address before using it. With this
+patch, the fault is handled correctly, the address gets mapped in, and
+the cache maintenance succeeds.
+
+As a second bug, if cache maintenance (correctly) fails on an invalid
+tagged address, the address gets passed into arm64_notify_segfault,
+where find_vma fails to find the VMA due to the tag, and the wrong
+si_code may be sent as part of the siginfo_t of the segfault. With this
+patch, the correct si_code is sent.
+
+Fixes: 7dd01aef0557 ("arm64: trap userspace "dc cvau" cache operation on errata-affected core")
+Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+---
+
+Note that patch #3 would also fix the first bug (incorrect segfault),
+but not the second (wrong si_code), hence this patch.
+
+ arch/arm64/kernel/traps.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index e52be6aa44ee..45c8eca951bc 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -443,7 +443,7 @@ int cpu_enable_cache_maint_trap(void *__unused)
+ }
+ 
+ #define __user_cache_maint(insn, address, res)			\
+-	if (untagged_addr(address) >= user_addr_max()) {	\
++	if (address >= user_addr_max()) {			\
+ 		res = -EFAULT;					\
+ 	} else {						\
+ 		uaccess_ttbr0_enable();				\
+@@ -469,7 +469,7 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
+ 	int crm = (esr & ESR_ELx_SYS64_ISS_CRM_MASK) >> ESR_ELx_SYS64_ISS_CRM_SHIFT;
+ 	int ret = 0;
+ 
+-	address = pt_regs_read_reg(regs, rt);
++	address = untagged_addr(pt_regs_read_reg(regs, rt));
+ 
+ 	switch (crm) {
+ 	case ESR_ELx_SYS64_ISS_CRM_DC_CVAU:	/* DC CVAU, gets promoted */
+-- 
+2.1.4
