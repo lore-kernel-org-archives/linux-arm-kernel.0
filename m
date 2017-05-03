@@ -1,52 +1,176 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 3 May 2017 16:32:33 +0300
-Subject: [PATCH] [RFC] ARM: dts: imx6sx-sdb: Drop OPP hackery
-In-Reply-To: <1493149194.20997.3.camel@nxp.com>
-References: <20170425164224.26537-1-marex@denx.de>
- <a75000d6-aa53-92e3-c43a-58b49f18ff7e@denx.de>
- <1493149194.20997.3.camel@nxp.com>
-Message-ID: <1493818353.11226.2.camel@nxp.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 3 May 2017 15:40:34 +0200
+Subject: [PATCH v5 16/22] KVM: arm64: vgic-its: Add infrastructure for
+ table lookup
+In-Reply-To: <20170430193325.GA1670@lvm>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-17-git-send-email-eric.auger@redhat.com>
+ <20170430193325.GA1670@lvm>
+Message-ID: <8f162a7d-e629-5828-6230-f0b7b7a6f9db@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-04-25 at 22:39 +0300, Leonard Crestez wrote:
-> On Tue, 2017-04-25 at 21:30 +0200, Marek Vasut wrote:
-> > 
-> > On 04/25/2017 06:42 PM, Marek Vasut wrote:
-> > > 
-> > > The imx6sx-sdb has one power supply that drives both VDDARM_IN
-> > > and VDDSOC_IN, which is the sw1a regulator on the PFUZE PMIC.
-> > > Connect both inputs to the sw1a regulator on the PMIC and drop
-> > > the OPP hackery which is no longer needed as the power framework
-> > > will take care of the regulator configuration as needed.
-> > > 
-> > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > > Cc: Shawn Guo <shawnguo@kernel.org>
-> > +CC Leonard
-> Tested-by: Leonard Crestez <leonard.crestez@nxp.com>
-> 
-> The OPP hack only applies to LDO bypass mode and that is not in
-> upstream. When LDOs are enabled the effect is to use higher voltages
-> than necessary for no good reason.
-> 
-> Setting these higher voltages can make some boards (for example Rev B)
-> fail to boot with ugly semi-random crashes reminiscent of memory
-> corruption. These failures happen the first time the lowest idle state
-> is used. This patch fixes those crashes.
-> 
-> It's not clear exactly why the crashes happen. Perhaps waking up from
-> idle draws more power than is available? I don't think it matters.
-> 
-> I sent a very similar patch a few minutes after this one:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/503241
-> .html
+Hi Christoffer,
 
-Adding Henri Roosen because he reported something very similar.
+On 30/04/2017 21:33, Christoffer Dall wrote:
+> On Fri, Apr 14, 2017 at 12:15:28PM +0200, Eric Auger wrote:
+>> Add a generic lookup_table() helper whose role consists in
+>> scanning a contiguous table located in guest RAM and applying
+>> a callback on each entry. Entries can be handled as linked lists
+>> since the callback may return an offset to the next entry and
+>> also tell that an entry is the last one.
+>>
+>> Helper functions also are added to compute the device/event ID
+>> offset to the next DTE/ITE.
+>>
+>> compute_next_devid_offset, compute_next_eventid_offset and
+>> lookup_table will become static in subsequent patches
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>> v4 -> v5:
+>> - use kvm_read_guest
+>>
+>> v3 -> v4:
+>> - remove static to avoid compilation warning
+>> - correct size computation in looup_table()
+>> - defines now encode the number of bits used for devid and eventid offsets
+>> - use BIT() - 1 to encode the max offets
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 93 insertions(+)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 56c5123..c22b35d 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -195,6 +195,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+>>  
+>>  #define VITS_TYPER_IDBITS 16
+>>  #define VITS_TYPER_DEVBITS 16
+>> +#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
+>> +#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
+>>  
+>>  /*
+>>   * Finds and returns a collection in the ITS collection table.
+>> @@ -1674,6 +1676,97 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+>>  	return ret;
+>>  }
+>>  
+>> +u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
+>> +{
+>> +	struct list_head *e = &dev->dev_list;
+>> +	struct its_device *next;
+>> +	u32 next_offset;
+>> +
+>> +	if (e->next == h)
+>> +		return 0;
+>> +	next = list_entry(e->next, struct its_device, dev_list);
+>> +	next_offset = next->device_id - dev->device_id;
+>> +
+>> +	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
+>> +}
+>> +
+>> +u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
+>> +{
+>> +	struct list_head *e = &ite->ite_list;
+>> +	struct its_ite *next;
+>> +	u32 next_offset;
+>> +
+>> +	if (e->next == h)
+>> +		return 0;
+>> +	next = list_entry(e->next, struct its_ite, ite_list);
+>> +	next_offset = next->event_id - ite->event_id;
+>> +
+>> +	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
+>> +}
+>> +
+>> +/**
+>> + * entry_fn_t - Callback called on a table entry restore path
+>> + * @its: its handle
+>> + * @id: id of the entry
+>> + * @entry: pointer to the entry
+>> + * @opaque: pointer to an opaque data
+>> + * @next_offset: minimal ID offset to the next entry. 0 if this
+>> + * entry is the last one, 1 if the entry is invalid, >= 1 if an
+>> + * entry's next_offset field was truly decoded
+>> + *
+>> + * Return: < 0 on error, 0 otherwise
+>> + */
+>> +typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+>> +			  void *opaque, u32 *next_offset);
+> 
+> Just noticed.  All the table entries are 64-bit long at this point,
+> right?  So why not make entry a u64 * instead?  Could we end up with
+> some endianness mess with using void pointers the way it is now?
+the size of the entry is ABI dependent while this infrastructure is
+generic. In each of such function we use
 
-Henri: Can you please check if this patch fixes your issue?
+u64 entry = *(u64 *)addr;
+and we do a le64_to_cpu(entry).
 
---?
-Regards,
-Leonard
+Do you see something wrong? Otherwise I would be tempted to leave as is.
+
+Thanks
+
+Eric
+> 
+> Thanks,
+> -Christoffer
+> 
+>> +
+>> +/**
+>> + * lookup_table - scan a contiguous table in guest RAM and applies a function
+>> + * to each entry
+>> + *
+>> + * @its: its handle
+>> + * @base: base gpa of the table
+>> + * @size: size of the table in bytes
+>> + * @esz: entry size in bytes
+>> + * @start_id: first entry's ID
+>> + * @fn: function to apply on each entry
+>> + *
+>> + * Return: < 0 on error, 1 if last element identified, 0 otherwise
+>> + */
+>> +int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>> +		 int start_id, entry_fn_t fn, void *opaque)
+>> +{
+>> +	void *entry = kzalloc(esz, GFP_KERNEL);
+>> +	struct kvm *kvm = its->dev->kvm;
+>> +	unsigned long len = size;
+>> +	u32 id = start_id;
+>> +	gpa_t gpa = base;
+>> +	int ret;
+>> +
+>> +	while (len > 0) {
+>> +		u32 next_offset;
+>> +		size_t byte_offset;
+>> +
+>> +		ret = kvm_read_guest(kvm, gpa, entry, esz);
+>> +		if (ret)
+>> +			goto out;
+>> +
+>> +		ret = fn(its, id, entry, opaque, &next_offset);
+>> +		if (ret < 0 || (!ret && !next_offset))
+>> +			goto out;
+>> +
+>> +		byte_offset = next_offset * esz;
+>> +		id += next_offset;
+>> +		gpa += byte_offset;
+>> +		len -= byte_offset;
+>> +	}
+>> +	kfree(entry);
+>> +	return 0;
+>> +
+>> +out:
+>> +	kfree(entry);
+>> +	return (ret < 0 ? ret : 1);
+>> +}
+>> +
+>>  /**
+>>   * vgic_its_save_device_tables - Save the device table and all ITT
+>>   * into guest RAM
+>> -- 
+>> 2.5.5
+>>
