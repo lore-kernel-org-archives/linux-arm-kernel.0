@@ -1,177 +1,280 @@
-From: sgoel@codeaurora.org (Goel, Sameer)
-Date: Wed, 3 May 2017 15:47:53 -0600
-Subject: [PATCH] arm64: Add translation functions for /dev/mem read/write
-In-Reply-To: <20170503201814.GP1657@bivouac.eciton.net>
-References: <1493756885-29704-1-git-send-email-sgoel@codeaurora.org>
- <20170503112639.GG8233@arm.com>
- <bda22142-6b46-0e11-9d13-4bed0dcfd713@codeaurora.org>
- <20170503201814.GP1657@bivouac.eciton.net>
-Message-ID: <345a59fb-085f-a776-2d7e-4889a0f86d7f@codeaurora.org>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 3 May 2017 23:55:34 +0200
+Subject: [PATCH v5 19/22] KVM: arm64: vgic-its: ITT save and restore
+In-Reply-To: <20170503163742.GA29506@cbox>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+ <1492164934-988-20-git-send-email-eric.auger@redhat.com>
+ <20170430201438.GB1499@lvm> <8ccb9bec-0df6-732b-c0b3-3c2067c67bf0@redhat.com>
+ <20170503163742.GA29506@cbox>
+Message-ID: <3af9ae62-1e20-e0f4-a2a9-db0a7a1b10ef@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Christoffer,
 
-
-On 5/3/2017 2:18 PM, Leif Lindholm wrote:
-> On Wed, May 03, 2017 at 11:07:45AM -0600, Goel, Sameer wrote:
->> On 5/3/2017 5:26 AM, Will Deacon wrote:
->>> [adding some /dev/mem fans to cc]
->>>
->>> On Tue, May 02, 2017 at 02:28:05PM -0600, Sameer Goel wrote:
->>>> Port architecture specific xlate and unxlate functions for /dev/mem
->>>> read/write. This sets up the mapping for a valid physical address if a
->>>> kernel direct mapping is not already present.
+On 03/05/2017 18:37, Christoffer Dall wrote:
+> On Wed, May 03, 2017 at 06:08:58PM +0200, Auger Eric wrote:
+>> Hi Christoffer,
+>>
+>> On 30/04/2017 22:14, Christoffer Dall wrote:
+>>> On Fri, Apr 14, 2017 at 12:15:31PM +0200, Eric Auger wrote:
+>>>> Introduce routines to save and restore device ITT and their
+>>>> interrupt table entries (ITE).
 >>>>
->>>> This is a generic issue as a user space app should not be allowed to crash
->>>> the kernel.
+>>>> The routines will be called on device table save and
+>>>> restore. They will become static in subsequent patches.
 >>>
->>>> This issue was observed when systemd tried to access performance
->>>> pointer record from the FPDT table.
+>>> Why this bottom-up approach?  Couldn't you start by having the patch
+>>> that restores the device table and define the static functions that
+>>> return an error there
+>> done
+>> , and then fill them in with subsequent patches
+>>> (liek this one)?
 >>>
->>> Why is it doing that? Is there not a way to get this via /sys?
->>
->> There is no ACPI FPDT implementation in the kernel, so the userspace
->> systemd code is getting the FPDT table contents from /sys
->> and parsing the entries. The performance pointer record is a
->> reserved address populated by UEFI and the userspace code tries to
->> access it using /dev/mem. The physical address is valid, so cannot
->> push back on the user space code.
-> 
-> OK, so then we need to add support for parsing this table in the
-> kernel and exposing the referred-to regions in a controllable fashion.
-> Maybe something that belongs under /sys/firmware/efi (adding Matt), or
-> maybe something that deserves its own driver.
-> 
-> The only two use-cases for /dev/mem on arm64 are:
-> - Implementing interfaces in the kernel takes up-front effort.
-> - Being able to accidentally panic the kernel from userland.
-> 
-We will see this issue with any access using /dev/mem to a MEMBLOCK_NOMAP marked
-memblock. The kernel crash issue has to be fixed irrespective of ACPI FPDT support.
-
-- Sameer
-> /
->     Leif
-> 
->> https://github.com/systemd/systemd/blob/master/src/shared/acpi-fpdt.c
->> http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf  5.2.23 
+>>> That would have the added benefit of being able to tell how things are
+>>> designed to be called.
 >>>
->>>> Ported from commit e045fb2a988a ("x86: PAT avoid aliasing in /dev/mem
->>>> read/write")
 >>>>
->>>> Crash Signature:
->>>>  Unable to handle kernel paging request at virtual address ffff800008ff0000
->>>>  pgd = ffff8007de8b2200
->>>>  [ffff800008ff0000] *pgd=0000000000000000, *pud=0000000000000000
->>>>  Internal error: Oops: 96000007 [#1] SMP
->>>> ................
->>>>  CPU: 0 PID: 1 Comm: systemd Not tainted 4.10.0 #1
->>>>  task: ffff8007c0820000 task.stack: ffff8007c0900000
->>>>  PC is at __arch_copy_to_user+0xb4/0x280
->>>>  LR is at read_mem+0xc0/0x138
->>>>  pc : [<ffff0000084b3bb4>] lr : [<ffff00000869d178>]
->>>> pstate: 80000145
->>>>  sp : ffff8007c0903d40
->>>> ....................
->>>>  x3 : ffff800800000000 x2 : 0000000000000008
->>>>  x1 : ffff800008ff0000 x0 : 0000fffff6fdac00
->>>> ....................
->>>>  Call trace:
->>>>  Exception stack(0xffff8007c0903b70 to 0xffff8007c0903ca0)
->>>>  [<ffff0000084b3bb4>] __arch_copy_to_user+0xb4/0x280
->>>>  [<ffff0000082454d0>] __vfs_read+0x48/0x130
->>>>  [<ffff0000082467dc>] vfs_read+0x8c/0x148
->>>>  [<ffff000008247a34>] SyS_pread64+0x94/0xa8
->>>>  [<ffff0000080833b0>] el0_svc_naked+0x24/0x28
->>>
->>> So this certainly looks like a kernel bug, but I don't think your patch is
->>> the right way to fix it.
->>
->> I agree that the reserved regions are not meant to be accessed by the kernel as system 
->> ram. So, another option was to to return a NULL for this translation.
->>
->> Since, the same usage was working on other architectures I ported over the same code to
->> highlight the issue.
->>
->>>
->>>>  Code: a88120c7 d503201f d503201f 36180082 (f8408423)
+>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 >>>>
->>>> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
->>>> Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
 >>>> ---
->>>>  arch/arm64/include/asm/io.h |  5 +++++
->>>>  arch/arm64/mm/ioremap.c     | 31 +++++++++++++++++++++++++++++++
->>>>  2 files changed, 36 insertions(+)
+>>>> v4 -> v5:
+>>>> - ITE are now sorted by eventid on the flush
+>>>> - rename *flush* into *save*
+>>>> - use macros for shits and masks
+>>>> - pass ite_esz to vgic_its_save_ite
 >>>>
->>>> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
->>>> index 0c00c87..c869ea4 100644
->>>> --- a/arch/arm64/include/asm/io.h
->>>> +++ b/arch/arm64/include/asm/io.h
->>>> @@ -183,6 +183,11 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
->>>>  #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
->>>>  #define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
+>>>> v3 -> v4:
+>>>> - lookup_table and compute_next_eventid_offset become static in this
+>>>>   patch
+>>>> - remove static along with vgic_its_flush/restore_itt to avoid
+>>>>   compilation warnings
+>>>> - next field only computed with a shift (mask removed)
+>>>> - handle the case where the last element has not been found
+>>>>
+>>>> v2 -> v3:
+>>>> - add return 0 in vgic_its_restore_ite (was in subsequent patch)
+>>>>
+>>>> v2: creation
+>>>> ---
+>>>>  virt/kvm/arm/vgic/vgic-its.c | 128 ++++++++++++++++++++++++++++++++++++++++++-
+>>>>  virt/kvm/arm/vgic/vgic.h     |   4 ++
+>>>>  2 files changed, 129 insertions(+), 3 deletions(-)
+>>>>
+>>>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>>>> index 35b2ca1..b02fc3f 100644
+>>>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>>>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>>>> @@ -23,6 +23,7 @@
+>>>>  #include <linux/interrupt.h>
+>>>>  #include <linux/list.h>
+>>>>  #include <linux/uaccess.h>
+>>>> +#include <linux/list_sort.h>
 >>>>  
->>>> +extern void *xlate_dev_mem_ptr(phys_addr_t phys);
->>>> +extern void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr);
->>>> +
->>>> +#define xlate_dev_mem_ptr xlate_dev_mem_ptr
->>>> +#define unxlate_dev_mem_ptr unxlate_dev_mem_ptr
->>>>  #include <asm-generic/io.h>
+>>>>  #include <linux/irqchip/arm-gic-v3.h>
 >>>>  
->>>>  /*
->>>> diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
->>>> index c4c8cd4..ba7e63b 100644
->>>> --- a/arch/arm64/mm/ioremap.c
->>>> +++ b/arch/arm64/mm/ioremap.c
->>>> @@ -24,6 +24,7 @@
->>>>  #include <linux/mm.h>
->>>>  #include <linux/vmalloc.h>
->>>>  #include <linux/io.h>
->>>> +#include <linux/memblock.h>
+>>>> @@ -1695,7 +1696,7 @@ u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
+>>>>  	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
+>>>>  }
 >>>>  
->>>>  #include <asm/fixmap.h>
->>>>  #include <asm/tlbflush.h>
->>>> @@ -105,6 +106,36 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
->>>>  EXPORT_SYMBOL(ioremap_cache);
+>>>> -u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
+>>>> +static u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
+>>>>  {
+>>>>  	struct list_head *e = &ite->ite_list;
+>>>>  	struct its_ite *next;
+>>>> @@ -1737,8 +1738,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+>>>>   *
+>>>>   * Return: < 0 on error, 1 if last element identified, 0 otherwise
+>>>>   */
+>>>> -int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>>>> -		 int start_id, entry_fn_t fn, void *opaque)
+>>>> +static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>>>> +			int start_id, entry_fn_t fn, void *opaque)
+>>>>  {
+>>>>  	void *entry = kzalloc(esz, GFP_KERNEL);
+>>>>  	struct kvm *kvm = its->dev->kvm;
+>>>> @@ -1773,6 +1774,127 @@ int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>>>>  }
 >>>>  
->>>>  /*
->>>> + * Convert a physical pointer to a virtual kernel pointer for /dev/mem
->>>> + * access
+>>>>  /**
+>>>> + * vgic_its_save_ite - Save an interrupt translation entry at @gpa
 >>>> + */
->>>> +void *xlate_dev_mem_ptr(phys_addr_t phys)
+>>>> +static int vgic_its_save_ite(struct vgic_its *its, struct its_device *dev,
+>>>> +			      struct its_ite *ite, gpa_t gpa, int ite_esz)
 >>>> +{
->>>> +	unsigned long start  = phys &  PAGE_MASK;
->>>> +	unsigned long offset = phys & ~PAGE_MASK;
->>>> +	void *vaddr;
+>>>> +	struct kvm *kvm = its->dev->kvm;
+>>>> +	u32 next_offset;
+>>>> +	u64 val;
 >>>> +
->>>> +	/* If page is RAM, we can use __va. Otherwise ioremap and unmap. */
->>>> +	if (page_is_ram(start >> PAGE_SHIFT) && memblock_is_memory(phys))
->>>> +		return __va(phys);
+>>>> +	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
+>>>> +	val = ((u64)next_offset << KVM_ITS_ITE_NEXT_SHIFT) |
+>>>> +	       ((u64)ite->lpi << KVM_ITS_ITE_PINTID_SHIFT) |
+>>>> +		ite->collection->collection_id;
+>>>> +	val = cpu_to_le64(val);
+>>>> +	return kvm_write_guest(kvm, gpa, &val, ite_esz);
+>>>> +}
 >>>> +
->>>> +	vaddr = ioremap_cache(start, PAGE_SIZE);
+>>>> +/**
+>>>> + * vgic_its_restore_ite - restore an interrupt translation entry
+>>>> + * @event_id: id used for indexing
+>>>> + * @ptr: pointer to the ITE entry
+>>>> + * @opaque: pointer to the its_device
+>>>> + * @next: id offset to the next entry
+>>>> + */
+>>>> +static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
+>>>> +				void *ptr, void *opaque, u32 *next)
+>>>> +{
+>>>> +	struct its_device *dev = (struct its_device *)opaque;
+>>>> +	struct its_collection *collection;
+>>>> +	struct kvm *kvm = its->dev->kvm;
+>>>> +	u64 val, *p = (u64 *)ptr;
 >>>
->>> Blindly using ioremap like this looks unsafe, since we could accidentally
->>> set conflict with the attributes of a mapping used by something else (e.g.
->>> firmware running on another CPU).
+>>> nit: initializations on separate line (and possible do that just above
+>>> assigning val).
+>> done
 >>>
->>> I'd like to understand more about the crash, so we can see work out how to
->>> fix this properly.
+>>>> +	struct vgic_irq *irq;
+>>>> +	u32 coll_id, lpi_id;
+>>>> +	struct its_ite *ite;
+>>>> +	int ret;
+>>>> +
+>>>> +	val = *p;
+>>>> +	*next = 1;
+>>>> +
+>>>> +	val = le64_to_cpu(val);
+>>>> +
+>>>> +	coll_id = val & KVM_ITS_ITE_ICID_MASK;
+>>>> +	lpi_id = (val & KVM_ITS_ITE_PINTID_MASK) >> KVM_ITS_ITE_PINTID_SHIFT;
+>>>> +
+>>>> +	if (!lpi_id)
+>>>> +		return 0;
 >>>
->> This does opens up access to any valid physical address. In the short term we 
->> can block this crash by return NULL from this function if the memblock is MEMBLOCK_NOMAP.
+>>> are all non-zero LPI IDs valid?  Don't we have a wrapper that tests if
+>>> the ID is valid?
+>> no, lpi_id must be >= GIC_MIN_LPI=8192; added that check.
+>> ABI Doc says lpi_id==0 is interpreted as invalid. Other values <
+>> GIC_MIN_LPI cause an -EINVAL error
+>>>
+>>> (looks like it's possible to add LPIs with the INTID range of SPIs, SGIs
+>>> and PPIs here)
 >>
->> Eventually we might need to add another memory type to make sure that it can be mapped.
->> I have not though about the exact design here.
->>
->> Thanks,
->> Sameer
->>  
->>> Will
 >>>
+>>>> +
+>>>> +	*next = val >> KVM_ITS_ITE_NEXT_SHIFT;
+>>>
+>>> Don't we need to validate this somehow since it will presumably be used
+>>> to forward a pointer somehow by the caller?
+>> checked against max number of eventids supported by the device
+>>>
+>>>> +
+>>>> +	collection = find_collection(its, coll_id);
+>>>> +	if (!collection)
+>>>> +		return -EINVAL;
+>>>> +
+>>>> +	ret = vgic_its_alloc_ite(dev, &ite, collection,
+>>>> +				  lpi_id, event_id);
+>>>> +	if (ret)
+>>>> +		return ret;
+>>>> +
+>>>> +	irq = vgic_add_lpi(kvm, lpi_id);
+>>>> +	if (IS_ERR(irq))
+>>>> +		return PTR_ERR(irq);
+>>>> +	ite->irq = irq;
+>>>> +
+>>>> +	/* restore the configuration of the LPI */
+>>>> +	ret = update_lpi_config(kvm, irq, NULL);
+>>>> +	if (ret)
+>>>> +		return ret;
+>>>> +
+>>>> +	update_affinity_ite(kvm, ite);
+>>>> +	return 0;
+>>>> +}
+>>>> +
+>>>> +static int vgic_its_ite_cmp(void *priv, struct list_head *a,
+>>>> +			    struct list_head *b)
+>>>> +{
+>>>> +	struct its_ite *itea = container_of(a, struct its_ite, ite_list);
+>>>> +	struct its_ite *iteb = container_of(b, struct its_ite, ite_list);
+>>>> +
+>>>> +	if (itea->event_id < iteb->event_id)
+>>>> +		return -1;
+>>>> +	else
+>>>> +		return 1;
+>>>> +}
+>>>> +
+>>>> +int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
+>>>> +{
+>>>> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+>>>> +	gpa_t base = device->itt_addr;
+>>>> +	struct its_ite *ite;
+>>>> +	int ret, ite_esz = abi->ite_esz;
+>>>
+>>> nit: initializations on separate line
+>> OK
+>>>
+>>>> +
+>>>> +	list_sort(NULL, &device->itt_head, vgic_its_ite_cmp);
+>>>> +
+>>>> +	list_for_each_entry(ite, &device->itt_head, ite_list) {
+>>>> +		gpa_t gpa = base + ite->event_id * ite_esz;
+>>>> +
+>>>> +		ret = vgic_its_save_ite(its, device, ite, gpa, ite_esz);
+>>>> +		if (ret)
+>>>> +			return ret;
+>>>> +	}
+>>>> +	return 0;
+>>>> +}
+>>>> +
+>>>> +int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
+>>>> +{
+>>>> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+>>>> +	gpa_t base = dev->itt_addr;
+>>>> +	int ret, ite_esz = abi->ite_esz;
+>>>> +	size_t max_size = BIT_ULL(dev->nb_eventid_bits) * ite_esz;
+>>>
+>>> nit: initializations on separate line
+>> OK
+>>>
+>>>> +
+>>>> +	ret =  lookup_table(its, base, max_size, ite_esz, 0,
+>>>> +			    vgic_its_restore_ite, dev);
+>>>
+>>> nit: extra white space
+>>>
+>>>> +
+>>>> +	if (ret < 0)
+>>>> +		return ret;
+>>>> +
+>>>> +	/* if the last element has not been found we are in trouble */
+>>>> +	return ret ? 0 : -EINVAL;
+>>>
+>>> hmm, these are values potentially created by the guest in guest RAM,
+>>> right?  So do we really abort migration and return an error to userspace
+>>> in this case?
+>> So we discussed with Peter/dave we shouldn't abort() in qemu in case of
+>> such error. The restore table IOCTL will return an error. Up to qemu to
+>> print the error. Destination guest will not be functional though.
 >>
->> -- 
->>  Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
 > 
+> ok, I'm just wondering if userspace can make a qualified decision based
+> on this error code.  EINVAL typically means that userspace provided
+> something incorrect, which I suppose in a sense is true, but this should
+> be the only case where we return EINVAL here.
+  Userspace must be able to
+> tell the cases apart where the guest programmed bogus into memory before
+> migration started, in which case we should ignore-and-resume, and where
+> QEMU errornously provide some bogus value where the machine state
+> becomes unreliable and must be powered down.
+guest does not feed much besides few registers the ITS table restore
+depends on. In case we want a more subtle error management at userspace
+level all the error codes need to be revisited I am afraid. My plan was
+to be more rough at the beginning and ignore & resume if ITS table
+restore fails.
 
--- 
- Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks
+
+Eric
+> 
+> Thanks,
+> -Christoffer
+> 
