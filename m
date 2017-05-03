@@ -1,79 +1,80 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 3 May 2017 16:33:57 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Poll for CMDQ drain completion more
- effectively
-In-Reply-To: <1493291587-23488-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1493291587-23488-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <a9d1bb4d-6578-93bb-66cf-5ed55952b85a@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 3 May 2017 16:35:01 +0100
+Subject: [PATCH 08/31] arm64: Add a facility to turn an ESR syndrome into
+ a sysreg encoding
+In-Reply-To: <20170503104606.19342-9-marc.zyngier@arm.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <20170503104606.19342-9-marc.zyngier@arm.com>
+Message-ID: <20170503153500.GD4951@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/04/17 12:13, sunil.kovvuri at gmail.com wrote:
-> From: Sunil Goutham <sgoutham@cavium.com>
+On Wed, May 03, 2017 at 11:45:43AM +0100, Marc Zyngier wrote:
+> It is often useful to compare an ESR syndrome reporting the trapping
+> of a system register with a value matching that system register.
 > 
-> Modified polling on CMDQ consumer similar to how polling is done for TLB SYNC
-> completion in SMMUv2 driver. Code changes are done with reference to
+> Since encoding both the sysreg and the ESR version seem to be a bit
+> overkill, let's add a set of macros that convert an ESR value into
+> the corresponding sysreg encoding.
 > 
-> 8513c8930069 iommu/arm-smmu: Poll for TLB sync completion more effectively
+> We handle both AArch32 and AArch64, taking advantage of identical
+> encodings between system registers and CP15 accessors.
 > 
-> Poll timeout has been increased which addresses issue of 100us timeout not
-> sufficient, when command queue is full with TLB invalidation commands.
-> 
-> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-> Signed-off-by: Geetha <gakula@cavium.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Nice!
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
 > ---
->  drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++---
->  1 file changed, 12 insertions(+), 3 deletions(-)
+>  arch/arm64/include/asm/esr.h | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
 > 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index d412bdd..34599d4 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -379,6 +379,9 @@
->  #define CMDQ_SYNC_0_CS_NONE		(0UL << CMDQ_SYNC_0_CS_SHIFT)
->  #define CMDQ_SYNC_0_CS_SEV		(2UL << CMDQ_SYNC_0_CS_SHIFT)
+> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+> index ad42e79a5d4d..db8f13137443 100644
+> --- a/arch/arm64/include/asm/esr.h
+> +++ b/arch/arm64/include/asm/esr.h
+> @@ -19,6 +19,7 @@
+>  #define __ASM_ESR_H
 >  
-> +#define CMDQ_DRAIN_TIMEOUT_US		1000
-> +#define CMDQ_SPIN_COUNT			10
+>  #include <asm/memory.h>
+> +#include <asm/sysreg.h>
+>  
+>  #define ESR_ELx_EC_UNKNOWN	(0x00)
+>  #define ESR_ELx_EC_WFx		(0x01)
+> @@ -177,6 +178,30 @@
+>  
+>  #define ESR_ELx_SYS64_ISS_SYS_CNTVCT	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 2, 14, 0) | \
+>  					 ESR_ELx_SYS64_ISS_DIR_READ)
 > +
->  /* Event queue */
->  #define EVTQ_ENT_DWORDS			4
->  #define EVTQ_MAX_SZ_SHIFT		7
-> @@ -737,7 +740,8 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
->   */
->  static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
->  {
-> -	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
-> +	ktime_t timeout = ktime_add_us(ktime_get(), CMDQ_DRAIN_TIMEOUT_US);
-> +	unsigned int spin_cnt, delay = 1;
+> +#define esr_sys64_to_sysreg(e)					\
+> +	sys_reg((((e) & ESR_ELx_SYS64_ISS_OP0_MASK) >>		\
+> +		 ESR_ELx_SYS64_ISS_OP0_SHIFT),			\
+> +		(((e) & ESR_ELx_SYS64_ISS_OP1_MASK) >>		\
+> +		 ESR_ELx_SYS64_ISS_OP1_SHIFT),			\
+> +		(((e) & ESR_ELx_SYS64_ISS_CRN_MASK) >>		\
+> +		 ESR_ELx_SYS64_ISS_CRN_SHIFT),			\
+> +		(((e) & ESR_ELx_SYS64_ISS_CRM_MASK) >>		\
+> +		 ESR_ELx_SYS64_ISS_CRM_SHIFT),			\
+> +		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
+> +		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
+> +
+> +#define esr_cp15_to_sysreg(e)					\
+> +	sys_reg(3,						\
+> +		(((e) & ESR_ELx_SYS64_ISS_OP1_MASK) >>		\
+> +		 ESR_ELx_SYS64_ISS_OP1_SHIFT),			\
+> +		(((e) & ESR_ELx_SYS64_ISS_CRN_MASK) >>		\
+> +		 ESR_ELx_SYS64_ISS_CRN_SHIFT),			\
+> +		(((e) & ESR_ELx_SYS64_ISS_CRM_MASK) >>		\
+> +		 ESR_ELx_SYS64_ISS_CRM_SHIFT),			\
+> +		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
+> +		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
+> +
+>  #ifndef __ASSEMBLY__
+>  #include <asm/types.h>
 >  
->  	while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
->  		if (ktime_compare(ktime_get(), timeout) > 0)
-> @@ -746,8 +750,13 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
->  		if (wfe) {
->  			wfe();
->  		} else {
-> -			cpu_relax();
-> -			udelay(1);
-> +			for (spin_cnt = 0;
-> +			     spin_cnt < CMDQ_SPIN_COUNT; spin_cnt++) {
-> +				cpu_relax();
-> +				continue;
-> +			}
-> +			udelay(delay);
-> +			delay *= 2;
-
-Sorry, I can't make sense of this. The referenced commit uses the spin
-loop to poll opportunistically a few times before delaying. This loop
-just adds a short open-coded udelay to an exponential udelay, and it's
-not really clear that that's any better than a fixed udelay (especially
-as the two cases in which we poll are somewhat different).
-
-What's wrong with simply increasing the timeout value alone?
-
-Robin.
-
->  		}
->  	}
->  
+> -- 
+> 2.11.0
 > 
