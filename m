@@ -1,64 +1,58 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu,  4 May 2017 21:49:57 +0800
-Subject: [PATCH v2 01/10] arm: sunxi: add support for R40 SoC
-In-Reply-To: <20170504135006.16483-1-icenowy@aosc.io>
-References: <20170504135006.16483-1-icenowy@aosc.io>
-Message-ID: <20170504135006.16483-2-icenowy@aosc.io>
+Date: Thu,  4 May 2017 21:49:56 +0800
+Subject: [PATCH v2 00/10] Initial Allwinner R40 support
+Message-ID: <20170504135006.16483-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.xyz>
+This is the first non-RFC version of this patchset, which added basical
+support including I2C, UART and MMC to the mainline Linux.
 
-Allwinner R40 is a new SoC, with Quad Core Cortex-A7 and peripherals
-like A20.
+The pinctrl driver of A20 is also merged into the one of A10 before
+R40 support is added into the A10 driver.
 
-Add support for it.
+Chen-Yu Tsai (2):
+  ARM: dts: sun8i: Add basic dtsi file for Allwinner R40
+  ARM: dts: sun8i: Add board dts file for Banana Pi M2 Ultra
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- Documentation/arm/sunxi/README                  | 4 ++++
- Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
- arch/arm/mach-sunxi/sunxi.c                     | 1 +
- 3 files changed, 6 insertions(+)
+Icenowy Zheng (8):
+  arm: sunxi: add support for R40 SoC
+  pinctrl: sunxi: add definitions for add A20 and R40 support to A10
+    driver
+  pinctrl: sunxi: add A20 support to A10 driver
+  pinctrl: sunxi: switch A20's pinctrl driver to use the A10 version
+  dt-bindings: add compatible string for Allwinner R40 pinctrl
+  pinctrl: sunxi: add support of R40 to A10 pinctrl driver
+  dt-bindings: add compatible string for Allwinner R40 CCU
+  clk: sunxi-ng: support R40 SoC
 
-diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-index d7b1f016bd62..25c814adcd47 100644
---- a/Documentation/arm/sunxi/README
-+++ b/Documentation/arm/sunxi/README
-@@ -75,6 +75,10 @@ SunXi family
-         + Datasheet
-           http://linux-sunxi.org/File:Allwinner_V3s_Datasheet_V1.0.pdf
- 
-+      - Allwinner R40 (sun8i)
-+        + Datasheet Draft
-+          http://linux-sunxi.org/File:Allwinner_R40_Datasheet_V0.1.pdf
-+
-     * Quad ARM Cortex-A15, Quad ARM Cortex-A7 based SoCs
-       - Allwinner A80
-         + Datasheet
-diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-index d2c46449b4eb..b3ffe6cf821a 100644
---- a/Documentation/devicetree/bindings/arm/sunxi.txt
-+++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-@@ -14,6 +14,7 @@ using one of the following compatible strings:
-   allwinner,sun8i-a83t
-   allwinner,sun8i-h2-plus
-   allwinner,sun8i-h3
-+  allwinner-sun8i-r40
-   allwinner,sun9i-a80
-   allwinner,sun50i-a64
-   nextthing,gr8
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index f44e3acb5c90..aea616759451 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -66,6 +66,7 @@ static const char * const sun8i_board_dt_compat[] = {
- 	"allwinner,sun8i-h2-plus",
- 	"allwinner,sun8i-h3",
- 	"allwinner,sun8i-v3s",
-+	"allwinner,sun8i-r40",
- 	NULL,
- };
- 
+ Documentation/arm/sunxi/README                     |    4 +
+ Documentation/devicetree/bindings/arm/sunxi.txt    |    1 +
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |    1 +
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |    1 +
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  |  161 +++
+ arch/arm/boot/dts/sun8i-r40.dtsi                   |  404 +++++++
+ arch/arm/mach-sunxi/sunxi.c                        |    1 +
+ drivers/clk/sunxi-ng/Kconfig                       |   10 +
+ drivers/clk/sunxi-ng/Makefile                      |    1 +
+ drivers/clk/sunxi-ng/ccu-sun8i-r40.c               | 1153 ++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-r40.h               |   68 ++
+ drivers/pinctrl/sunxi/Kconfig                      |    6 +-
+ drivers/pinctrl/sunxi/Makefile                     |    1 -
+ drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c          |  449 ++++++--
+ drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c          | 1056 ------------------
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h              |    3 +
+ include/dt-bindings/clock/sun8i-r40-ccu.h          |  191 ++++
+ include/dt-bindings/reset/sun8i-r40-ccu.h          |  129 +++
+ 19 files changed, 2495 insertions(+), 1146 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+ create mode 100644 arch/arm/boot/dts/sun8i-r40.dtsi
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-r40.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-r40.h
+ delete mode 100644 drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
+ create mode 100644 include/dt-bindings/clock/sun8i-r40-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun8i-r40-ccu.h
+
 -- 
 2.12.2
