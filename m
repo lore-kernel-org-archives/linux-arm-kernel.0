@@ -1,35 +1,49 @@
 From: gakula@caviumnetworks.com (Geetha sowjanya)
-Date: Thu,  4 May 2017 18:05:39 +0530
-Subject: [PATCH v2 7/7] arm64: Documentation: Add Cavium ThunderX2 SMMUv3
- erratas
+Date: Thu,  4 May 2017 18:05:37 +0530
+Subject: [PATCH v2 5/7] ACPI/IORT: Fixup SMMUv3 resource size for Cavium
+ ThunderX2 SMMUv3 model
 In-Reply-To: <1493901339-14929-1-git-send-email-gakula@caviumnetworks.com>
 References: <1493901339-14929-1-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <1493901339-14929-8-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <1493901339-14929-6-git-send-email-gakula@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linu Cherian <linu.cherian@cavium.com>
 
-Add Cavium ThunderX2 SMMUv3 erratas to the errata list.
+Cavium ThunderX2 implementation doesn't support second page in SMMU
+register space. Hence, resource size is set as 64k for this model.
 
 Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
 Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
 ---
- Documentation/arm64/silicon-errata.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/acpi/arm64/iort.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 10f2ddd..42422f6 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -62,6 +62,8 @@ stable kernels.
- | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154        |
- | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
- | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
-+| Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
-+| Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
- |                |                 |                 |                             |
- | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
- |                |                 |                 |                             |
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index c5fecf9..23c5350 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -833,12 +833,20 @@ static void __init arm_smmu_v3_init_resources(struct resource *res,
+ {
+ 	struct acpi_iort_smmu_v3 *smmu;
+ 	int num_res = 0;
++	unsigned long size = SZ_128K;
+ 
+ 	/* Retrieve SMMUv3 specific data */
+ 	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
+ 
++	/*
++	 * Override the size, for Cavium ThunderX2 implementation
++	 * which doesn't support the page 1 SMMU register space.
++	 */
++	if (smmu->model == ACPI_IORT_SMMU_V3_CAVIUM_CN99XX)
++		size = SZ_64K;
++
+ 	res[num_res].start = smmu->base_address;
+-	res[num_res].end = smmu->base_address + SZ_128K - 1;
++	res[num_res].end = smmu->base_address + size - 1;
+ 	res[num_res].flags = IORESOURCE_MEM;
+ 
+ 	num_res++;
 -- 
 1.8.3.1
