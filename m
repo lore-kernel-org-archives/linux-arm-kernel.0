@@ -1,60 +1,67 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Thu, 4 May 2017 18:48:57 +0800
-Subject: [v2, 2/5] arm64: dts: ls1046a: support SD UHS-I and eMMC HS200 on RDB
+Date: Thu, 4 May 2017 18:48:58 +0800
+Subject: [v2,
+ 3/5] arm64: dts: ls208xa: support SD UHS-I on RDB and eMMC HS200 on
+ QDS
 In-Reply-To: <1493894940-47452-1-git-send-email-yangbo.lu@nxp.com>
 References: <1493894940-47452-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1493894940-47452-3-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1493894940-47452-4-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to enable SD UHS-I mode and eMMC HS200 mode on
-LS1046ARDB in dts. Also, the eSDHC peripheral clock must be used
-instead of platform clock to support these modes.
+This patch is to enable SD UHS-I mode on LS208xRDB and eMMC HS200
+mode on LS208xQDS in dts. Also, the eSDHC peripheral clock must be
+used instead of platform clock to support these modes.
 
 Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 ---
 Changes for v2:
-	- Sorted the node.
+	- None.
 ---
- arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts | 8 ++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi    | 4 ++--
- 2 files changed, 10 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi | 1 +
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi | 4 ++++
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     | 2 +-
+ 3 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-index c5361e9..2d28726 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-@@ -72,6 +72,14 @@
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
+index c4282d9..b237446 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
+@@ -46,6 +46,7 @@
+  */
+ 
+ &esdhc {
++	mmc-hs200-1_8v;
  	status = "okay";
  };
  
-+&esdhc {
-+	mmc-hs200-1_8v;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
+index 9a1d0d2..29af54b 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
+@@ -46,6 +46,10 @@
+  */
+ 
+ &esdhc {
 +	sd-uhs-sdr104;
 +	sd-uhs-sdr50;
 +	sd-uhs-sdr25;
 +	sd-uhs-sdr12;
-+};
-+
- &i2c0 {
  	status = "okay";
+ };
  
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index d67557f..46b7839 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -209,10 +209,10 @@
- 		};
- 
- 		esdhc: esdhc at 1560000 {
--			compatible = "fsl,esdhc";
-+			compatible = "fsl,ls1046a-esdhc", "fsl,esdhc";
- 			reg = <0x0 0x1560000 0x0 0x10000>;
- 			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
--			clock-frequency = <0>;
-+			clocks = <&clockgen 2 1>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+index 6e531b9..94cdd30 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+@@ -472,7 +472,7 @@
+ 			compatible = "fsl,ls2080a-esdhc", "fsl,esdhc";
+ 			reg = <0x0 0x2140000 0x0 0x10000>;
+ 			interrupts = <0 28 0x4>; /* Level high type */
+-			clock-frequency = <0>;	/* Updated by bootloader */
++			clocks = <&clockgen 4 1>;
  			voltage-ranges = <1800 1800 3300 3300>;
  			sdhci,auto-cmd12;
- 			big-endian;
+ 			little-endian;
 -- 
 2.1.0.27.g96db324
