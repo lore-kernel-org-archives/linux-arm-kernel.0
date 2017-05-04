@@ -1,238 +1,94 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 4 May 2017 12:38:52 +0200
-Subject: [PATCH 1/5] KVM: arm64: Allow creating the PMU without the
- in-kernel GIC
-In-Reply-To: <b680335b-6407-f778-84c1-6565a46ae7d0@arm.com>
-References: <20170503183300.4618-1-cdall@linaro.org>
- <20170503183300.4618-2-cdall@linaro.org>
- <dcaefb19-6dab-a990-2e10-497d02b14242@arm.com>
- <20170504081337.GF5923@cbox>
- <db5a1fb7-e77e-b9f8-9be4-161e94279d10@arm.com>
- <20170504083845.GH5923@cbox>
- <17cb39a1-f0a9-a1f1-fef5-78379d99de2f@arm.com>
- <20170504094404.GI5923@cbox>
- <b680335b-6407-f778-84c1-6565a46ae7d0@arm.com>
-Message-ID: <20170504103852.GK5923@cbox>
+From: yangbo.lu@nxp.com (Y.B. Lu)
+Date: Thu, 4 May 2017 10:44:14 +0000
+Subject: [PATCH 1/3] arm64: dts: ls1046a: support SD UHS-I and eMMC HS200
+ on RDB
+In-Reply-To: <20170503125659.GA24392@dragon>
+References: <1492746756-12024-1-git-send-email-yangbo.lu@nxp.com>
+ <1492746756-12024-2-git-send-email-yangbo.lu@nxp.com>
+ <20170503125659.GA24392@dragon>
+Message-ID: <DB6PR0401MB2536CFB017A4F50CBA2A573AF8EA0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 04, 2017 at 11:16:57AM +0100, Marc Zyngier wrote:
-> On 04/05/17 10:44, Christoffer Dall wrote:
-> > On Thu, May 04, 2017 at 10:05:43AM +0100, Marc Zyngier wrote:
-> >> On 04/05/17 09:38, Christoffer Dall wrote:
-> >>> On Thu, May 04, 2017 at 09:28:50AM +0100, Marc Zyngier wrote:
-> >>>> On 04/05/17 09:13, Christoffer Dall wrote:
-> >>>>> On Thu, May 04, 2017 at 09:09:47AM +0100, Marc Zyngier wrote:
-> >>>>>> On 03/05/17 19:32, Christoffer Dall wrote:
-> >>>>>>> Since we got support for devices in userspace which allows reporting the
-> >>>>>>> PMU overflow output status to userspace, we should actually allow
-> >>>>>>> creating the PMU on systems without an in-kernel irqchip, which in turn
-> >>>>>>> requires us to slightly clarify error codes for the ABI and move things
-> >>>>>>> around for the initialization phase.
-> >>>>>>>
-> >>>>>>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> >>>>>>> ---
-> >>>>>>>  Documentation/virtual/kvm/devices/vcpu.txt | 16 +++++++++-------
-> >>>>>>>  virt/kvm/arm/pmu.c                         | 27 +++++++++++++++++----------
-> >>>>>>>  2 files changed, 26 insertions(+), 17 deletions(-)
-> >>>>>>>
-> >>>>>>> diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
-> >>>>>>> index 02f5068..352af6e 100644
-> >>>>>>> --- a/Documentation/virtual/kvm/devices/vcpu.txt
-> >>>>>>> +++ b/Documentation/virtual/kvm/devices/vcpu.txt
-> >>>>>>> @@ -16,7 +16,9 @@ Parameters: in kvm_device_attr.addr the address for PMU overflow interrupt is a
-> >>>>>>>  Returns: -EBUSY: The PMU overflow interrupt is already set
-> >>>>>>>           -ENXIO: The overflow interrupt not set when attempting to get it
-> >>>>>>>           -ENODEV: PMUv3 not supported
-> >>>>>>> -         -EINVAL: Invalid PMU overflow interrupt number supplied
-> >>>>>>> +         -EINVAL: Invalid PMU overflow interrupt number supplied or
-> >>>>>>> +                  trying to set the IRQ number without using an in-kernel
-> >>>>>>> +                  irqchip.
-> >>>>>>>  
-> >>>>>>>  A value describing the PMUv3 (Performance Monitor Unit v3) overflow interrupt
-> >>>>>>>  number for this vcpu. This interrupt could be a PPI or SPI, but the interrupt
-> >>>>>>> @@ -25,11 +27,11 @@ all vcpus, while as an SPI it must be a separate number per vcpu.
-> >>>>>>>  
-> >>>>>>>  1.2 ATTRIBUTE: KVM_ARM_VCPU_PMU_V3_INIT
-> >>>>>>>  Parameters: no additional parameter in kvm_device_attr.addr
-> >>>>>>> -Returns: -ENODEV: PMUv3 not supported
-> >>>>>>> -         -ENXIO: PMUv3 not properly configured as required prior to calling this
-> >>>>>>> -                 attribute
-> >>>>>>> +Returns: -ENODEV: PMUv3 not supported or GIC not initialized
-> >>>>>>> +         -ENXIO: PMUv3 not properly configured or in-kernel irqchip not
-> >>>>>>> +                 conigured as required prior to calling this attribute
-> >>>>>>>           -EBUSY: PMUv3 already initialized
-> >>>>>>>  
-> >>>>>>> -Request the initialization of the PMUv3.  This must be done after creating the
-> >>>>>>> -in-kernel irqchip.  Creating a PMU with a userspace irqchip is currently not
-> >>>>>>> -supported.
-> >>>>>>> +Request the initialization of the PMUv3.  If using the PMUv3 with an in-kernel
-> >>>>>>> +virtual GIC implementation, this must be done after initializing the in-kernel
-> >>>>>>> +irqchip.
-> >>>>>>> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> >>>>>>> index 4b43e7f..f046b08 100644
-> >>>>>>> --- a/virt/kvm/arm/pmu.c
-> >>>>>>> +++ b/virt/kvm/arm/pmu.c
-> >>>>>>> @@ -456,21 +456,25 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
-> >>>>>>>  	if (!kvm_arm_support_pmu_v3())
-> >>>>>>>  		return -ENODEV;
-> >>>>>>>  
-> >>>>>>> -	/*
-> >>>>>>> -	 * We currently require an in-kernel VGIC to use the PMU emulation,
-> >>>>>>> -	 * because we do not support forwarding PMU overflow interrupts to
-> >>>>>>> -	 * userspace yet.
-> >>>>>>> -	 */
-> >>>>>>> -	if (!irqchip_in_kernel(vcpu->kvm) || !vgic_initialized(vcpu->kvm))
-> >>>>>>> -		return -ENODEV;
-> >>>>>>> -
-> >>>>>>> -	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features) ||
-> >>>>>>> -	    !kvm_arm_pmu_irq_initialized(vcpu))
-> >>>>>>> +	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
-> >>>>>>>  		return -ENXIO;
-> >>>>>>>  
-> >>>>>>>  	if (kvm_arm_pmu_v3_ready(vcpu))
-> >>>>>>>  		return -EBUSY;
-> >>>>>>>  
-> >>>>>>> +	if (irqchip_in_kernel(vcpu->kvm)) {
-> >>>>>>> +		/*
-> >>>>>>> +		 * If using the PMU with an in-kernel virtual GIC
-> >>>>>>> +		 * implementation, we require the GIC to be already
-> >>>>>>> +		 * initialized when initializing the PMU.
-> >>>>>>> +		 */
-> >>>>>>> +		if (!vgic_initialized(vcpu->kvm))
-> >>>>>>> +			return -ENODEV;
-> >>>>>>> +
-> >>>>>>> +		if (!kvm_arm_pmu_irq_initialized(vcpu))
-> >>>>>>> +			return -ENXIO;
-> >>>>>>> +	}
-> >>>>>>> +
-> >>>>>>>  	kvm_pmu_vcpu_reset(vcpu);
-> >>>>>>>  	vcpu->arch.pmu.ready = true;
-> >>>>>>>  
-> >>>>>>> @@ -512,6 +516,9 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
-> >>>>>>>  		int __user *uaddr = (int __user *)(long)attr->addr;
-> >>>>>>>  		int irq;
-> >>>>>>>  
-> >>>>>>> +		if (!irqchip_in_kernel(vcpu->kvm))
-> >>>>>>> +			return -EINVAL;
-> >>>>>>> +
-> >>>>>>
-> >>>>>> Shouldn't we fail the same way for {get,has}_attr? get_attr is going to
-> >>>>>> generate a -ENXIO, and has_attr is going to lie about the availability
-> >>>>>> of KVM_ARM_VCPU_PMU_V3_IRQ...
-> >>>>>>
-> >>>>>
-> >>>>> Here's the text from api.txt:
-> >>>>>
-> >>>>>   Tests whether a device supports a particular attribute.  A successful
-> >>>>>   return indicates the attribute is implemented.  It does not necessarily
-> >>>>>   indicate that the attribute can be read or written in the device's
-> >>>>>   current state.  "addr" is ignored.
-> >>>>>
-> >>>>> My interpretation therefore is that QEMU can use this ioctl to figure
-> >>>>> out if the feature is supported (sort of like a capability), but that
-> >>>>> doesn't mean that the configuration of the VM is such that the attribute
-> >>>>> can be get or set at that moment.
-> >>>>>
-> >>>>> For example, there will also alway be situations where you can get an
-> >>>>> attr, but not set an attr, what should the has_attr return then?
-> >>>>
-> >>>> My issue here is that whether we can get/set the interrupt or not is not
-> >>>> a function of the device itself, but of the way it is "wired". No matter
-> >>>> what "the device's current state" is, we'll never be able to get/set the
-> >>>> interrupt.
-> >>>>
-> >>>> I'd tend to err on the side of caution and return something that is
-> >>>> unambiguous, be maybe I have too strict an interpretation of the API.
-> >>>>
-> >>>
-> >>> Hmm, I see the has_attr as a method for userspace to discover "does this
-> >>> kernel have this feature".  If we make has_attr return a value depending
-> >>> on the VM having an in-kernel gic or not, we implicitly require
-> >>> userspace to create a VM with an in-kernel GIC to discover if this
-> >>> kernel has that feature, and therefore also impose an ordering
-> >>> requirement of figuring out the capabilities of the kernel (i.e. create
-> >>> the GIC before checking this API).
-> >>>
-> >>> I think QEMU should be able to do:
-> >>>
-> >>>   if (has_attr()) {
-> >>>      kvm_supports_set_timer_irq = true;
-> >>>      vtimer_irq = foo;
-> >>>   } else {
-> >>>      kvm_supports_set_timer_irq = false;
-> >>>      vtimer_irq = 27; /* default, we're stuck with it */
-> >>>   }
-> >>>
-> >>>   create_board_definition();
-> >>>   create_dt();
-> >>>   create_acpi();
-> >>>
-> >>>   /* do whatever */
-> >>>
-> >>>   if (kvm_supports_set_timer_irq && kvm_irqchip_in_kernel()) {
-> >>>   	kvm_arm_timer_set_irq(...);
-> >>>   }
-> >>>
-> >>> And all this should not be coupled to when we create the irqchip device.
-> >>>
-> >>> But I may be failing to see the case where the current implementation
-> >>> creates a problem for userspace, in which case we should document the
-> >>> ordering requirement.
-> >>
-> >> I'm not sure it would create any problem, at least not for the PMU
-> >> (there is no working code that would have created a PMU without an irqchip).
-> >>
-> >> It is just that we have a slightly diverging interpretation of what
-> >> has_attr means. You see it as "attribute that the device supports", and
-> >> I see it as "attribute that the device supports in this configuration".
-> >> I'm happy to use your semantics from now on.
-> > 
-> > In either case, we should make sure this is clear in the ABI.  I thought
-> > that the "It does not necessarily indicate that the attribute can be
-> > read or written in the device's current state." implied my
-> > interpretation, but maybe I'm missing some subtlety there?
-> 
-> Well, that's what I said above. The interrupt number is not a function
-> of the device state, but one of the integration of that device in the
-> system. The PMU itself is not concerned with an interrupt number, only
-> the GIC is.
-> 
-> > Do you think we should clarify the API?
-> 
-> Not sure. I admit my interpretation is a bit borderline. If I was brave,
-> I'd say that all the interrupt numbers should be a property of the GIC,
-> and not of the device. But that ship has sailed a while ago, and I'm
-> weak ;-).
-> 
-> More seriously, I don't think this is likely to cause any issue.
-> 
+Hi Shawn,
 
-ok, I'll leave it as is then.
-
-> > 
-> > By the way, I now realize that we are not maintining the same
-> > understanding between get/set_attr, which I really think we should, so
-> > I'll add the following:
-> > 
-> > 
-> > diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> > index 9b3e3ea..0cf62b7 100644
-> > --- a/virt/kvm/arm/pmu.c
-> > +++ b/virt/kvm/arm/pmu.c
-> > @@ -551,6 +551,9 @@ int kvm_arm_pmu_v3_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
-> >  		int __user *uaddr = (int __user *)(long)attr->addr;
-> >  		int irq;
-> >  
-> > +		if (!irqchip_in_kernel(vcpu->kvm))
-> > +			return -EINVAL;
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Wednesday, May 03, 2017 8:57 PM
+> To: Y.B. Lu
+> Cc: linux-arm-kernel at lists.infradead.org; ulf.hansson at linaro.org; Catalin
+> Marinas; Xiaobo Xie
+> Subject: Re: [PATCH 1/3] arm64: dts: ls1046a: support SD UHS-I and eMMC
+> HS200 on RDB
+> 
+> On Fri, Apr 21, 2017 at 11:52:34AM +0800, Yangbo Lu wrote:
+> > This patch is to enable SD UHS-I mode and eMMC HS200 mode on
+> > LS1046ARDB in dts. Also, the eSDHC peripheral clock must be used
+> > instead of platform clock to support these modes.
+> >
+> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> > ---
+> >  arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts | 8 ++++++++
+> >  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi    | 4 ++--
+> >  2 files changed, 10 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+> > b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+> > index d1ccc00..08528c2 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+> > @@ -64,6 +64,14 @@
+> >  	};
+> >  };
+> >
+> > +&esdhc {
+> > +	mmc-hs200-1_8v;
+> > +	sd-uhs-sdr104;
+> > +	sd-uhs-sdr50;
+> > +	sd-uhs-sdr25;
+> > +	sd-uhs-sdr12;
+> > +};
 > > +
-> >  		if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
-> >  			return -ENODEV;
-> >  
 > 
-> Looks good to me.
+> Please sort the node alphabetically.
+
+[Lu Yangbo-B47093] Ok, I will do that.
+
+> 
+> >  &duart0 {
+> >  	status = "okay";
+> >  };
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> > b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> > index f4b8b7e..f06f329 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> > @@ -209,10 +209,10 @@
+> >  		};
+> >
+> >  		esdhc: esdhc at 1560000 {
+> > -			compatible = "fsl,esdhc";
+> > +			compatible = "fsl,ls1046a-esdhc", "fsl,esdhc";
+> 
+> I do not see "fsl,ls1046a-esdhc" is a documented compatible.
 > 
 
-Thanks,
--Christoffer
+[Lu Yangbo-B47093] Ok, I will add a doc patch.
+
+> Shawn
+> 
+> >  			reg = <0x0 0x1560000 0x0 0x10000>;
+> >  			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+> > -			clock-frequency = <0>;
+> > +			clocks = <&clockgen 2 1>;
+> >  			voltage-ranges = <1800 1800 3300 3300>;
+> >  			sdhci,auto-cmd12;
+> >  			big-endian;
+> > --
+> > 2.1.0.27.g96db324
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
