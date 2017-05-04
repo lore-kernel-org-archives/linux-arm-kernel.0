@@ -1,112 +1,81 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 4 May 2017 19:09:39 +0200
-Subject: [PATCH v6 08/24] KVM: arm64: vgic-its: Implement
- vgic_mmio_uaccess_write_its_creadr
-In-Reply-To: <1493898284-29504-9-git-send-email-eric.auger@redhat.com>
-References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
- <1493898284-29504-9-git-send-email-eric.auger@redhat.com>
-Message-ID: <20170504170939.GS5923@cbox>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 4 May 2017 18:10:01 +0100
+Subject: ARMv7 doesn't define CR_U?
+In-Reply-To: <20170504165450.GG22219@n2100.armlinux.org.uk>
+References: <CANEJEGv2snHD8vcAu2Hyu1839VdkCwUsRKOa28AsuHnvyZWwBw@mail.gmail.com>
+ <20170504165450.GG22219@n2100.armlinux.org.uk>
+Message-ID: <fcc98942-0b8c-d21b-deb7-2f0126c78d42@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 04, 2017 at 01:44:28PM +0200, Eric Auger wrote:
-> GITS_CREADR needs to be restored so let's implement the associated
-> uaccess_write_its callback. The write only is allowed if the its
-> is disabled.
+On 04/05/17 17:54, Russell King - ARM Linux wrote:
+> On Thu, May 04, 2017 at 09:35:15AM -0700, Grant Grundler wrote:
+>> I'm seeing unaligned accesses from sadc[1] (compiled with llvm) are
+>> getting SIGBUS on an QCA IPQ4019 chipset despite ARMv7 CPU claiming to
+>> support unaligned accesses[1].   My question is about use of CR_U on
+>> ARMv7 in cpu_is_v6_unaligned().
 > 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> Not every ARM instruction can cope with unaligned accesses.  Single
+> integer instructions can (LDR/STR, LDRH/STRH) but not LDM/STM or
+> the VFP instructions.
 > 
-> ---
-> v5 -> v6:
-> - remove usage of update_64bit_reg and check alignment of cmd offset
+>> And kernel output from a different invocation:
+>> [  226.596867] Alignment trap: not handling instruction f9602aef at [<2a0062b6>]
+>> [  226.596925] Unhandled fault: alignment exception (0x001) at 0x2a014088
 > 
-> v4 -> v5:
-> - keep Stalled bit
-> - vgic_mmio_uaccess_write_its_creadr can now return an error
+> This seems to be this instruction:
+>    0:   f960 2aef       vld1.64 {d18-d19}, [r0 :128]
 > 
-> v3 -> v4:
-> - REGISTER_ITS_DESC_UACCESS now introduced in this patch
-> - we now check the its is disabled
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 43 +++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 41 insertions(+), 2 deletions(-)
+> which is a SIMD load, which specifies an alignment of 128 bits.
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 222fad5..18588ef 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1213,6 +1213,34 @@ static unsigned long vgic_mmio_read_its_creadr(struct kvm *kvm,
->  	return extract_bytes(its->creadr, addr & 0x7, len);
->  }
->  
-> +static int vgic_mmio_uaccess_write_its_creadr(struct kvm *kvm,
-> +					      struct vgic_its *its,
-> +					      gpa_t addr, unsigned int len,
-> +					      unsigned long val)
-> +{
-> +	u32 cmd_offset;
-> +	int ret = 0;
-> +
-> +	mutex_lock(&its->cmd_lock);
-> +
-> +	if (its->enabled) {
-> +		ret = -EBUSY;
-> +		goto out;
-> +	}
-> +
-> +	cmd_offset = ITS_CMD_OFFSET(val);
-> +	if ((cmd_offset >= ITS_CMD_BUFFER_SIZE(its->cbaser)) ||
-> +	    (cmd_offset & 0x1F)) {
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-> +
-> +	its->creadr = val;
+>> But it looks like our kernel[2] should be handling this unaligned access:
+>> # cat /proc/cpu/alignment
+>> User:           16
+>> System:         0
+>> Skipped:        16
+>> Half:           0
+>> Word:           0
+>> DWord:          0
+>> Multi:          0
+>> User faults:    2 (fixup)
+>>
+>> Since Documentation/arm/mem_alignment doesn't seem to match the
+>> code[2], I'm not sure what to expect here.
+> 
+> Only known instructions (LDR/STR/LDM/STM) are fixed up.  VFP and SIMD
+> are never fixed up (to do so would be very complex.)
+> 
+>> arch/arm/include/asm/cp15.h:
+>> #define CR_U    (1 << 22)       /* Unaligned access operation           */
+>>
+>> But bit 22 isn't defined in the Cortex A7 (an ARMv7-A cpu).
+>>
+>> "Cortex-A7 MPCore Technical Reference Manual"
+>> "4.3.27. System Control Register"
+>> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0464f/BABJAHDA.html
+>>
+>> says bit 22 is "Reserved, RAO/SBOP."
+> 
+> RAO = read as one.  The bit _is_ the unaligned access operation, and what
+> the ARM ARM is telling you is that the bit has been retired, and it is now
+> defined to always be '1', meaning the CPU fixes up the single integer
+> load/store instructions.
 
-do we let userspace decide the stalled bit or should we use
-ITS_CMD_OFFSET() when assigning the field as well?
+Seconded - as I was halfway through writing myself, it may not be
+explicitly named any more, but the reserved value is intentionally
+backwards-compatible.
 
-> +out:
-> +	mutex_unlock(&its->cmd_lock);
-> +	return ret;
-> +}
-> +
->  #define BASER_INDEX(addr) (((addr) / sizeof(u64)) & 0x7)
->  static unsigned long vgic_mmio_read_its_baser(struct kvm *kvm,
->  					      struct vgic_its *its,
-> @@ -1317,6 +1345,16 @@ static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
->  	.its_write = wr,					\
->  }
->  
-> +#define REGISTER_ITS_DESC_UACCESS(off, rd, wr, uwr, length, acc)\
-> +{								\
-> +	.reg_offset = off,					\
-> +	.len = length,						\
-> +	.access_flags = acc,					\
-> +	.its_read = rd,						\
-> +	.its_write = wr,					\
-> +	.uaccess_its_write = uwr,				\
-> +}
-> +
->  static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
->  			      gpa_t addr, unsigned int len, unsigned long val)
->  {
-> @@ -1339,8 +1377,9 @@ static struct vgic_register_region its_registers[] = {
->  	REGISTER_ITS_DESC(GITS_CWRITER,
->  		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-> -	REGISTER_ITS_DESC(GITS_CREADR,
-> -		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
-> +	REGISTER_ITS_DESC_UACCESS(GITS_CREADR,
-> +		vgic_mmio_read_its_creadr, its_mmio_write_wi,
-> +		vgic_mmio_uaccess_write_its_creadr, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_BASER,
->  		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
-> -- 
-> 2.5.5
-> 
+> You're basically out of luck if you want to do a SIMD unaligned load.
+> These are simply not supported.
 
-Otherwise:
+More than that, they're outright wrong. Regular SIMD loads are free from
+alignment restrictions anyway - you only get the fault if the explicit
+alignment hint is set, which means there is some bad code at play here
+(passing an insufficiently-aligned pointer to someone who dereferences
+it thinking it's OK) and SIGBUS is a perfectly acceptable form of the
+resulting undefined behaviour. I don't believe GCC ever uses the
+alignment hints on VLDn/VSTn, so it could be some latent bug that only
+manifests when building with Clang (which does tend to set the hints as
+aggressively as it can).
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Robin.
