@@ -1,32 +1,93 @@
-From: yangbo.lu@nxp.com (Y.B. Lu)
-Date: Thu, 4 May 2017 10:59:49 +0000
-Subject: [PATCH] arm64: dts: ls1088a: add esdhc node
-In-Reply-To: <20170503140043.GH18578@dragon>
-References: <1493271110-6361-1-git-send-email-yangbo.lu@nxp.com>
- <20170503140043.GH18578@dragon>
-Message-ID: <DB6PR0401MB2536B671BDA6EF79ECB39B16F8EA0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 4 May 2017 12:00:40 +0100
+Subject: [PATCH 3/4] ARM: perf: Allow the use of the PMUv3 driver on 32bit
+ ARM
+In-Reply-To: <20170324121529.22603-4-marc.zyngier@arm.com>
+References: <20170324121529.22603-1-marc.zyngier@arm.com>
+ <20170324121529.22603-4-marc.zyngier@arm.com>
+Message-ID: <74692e75-1cb7-21da-be83-7a315e9a84b6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Wednesday, May 03, 2017 10:01 PM
-> To: Y.B. Lu
-> Cc: linux-arm-kernel at lists.infradead.org; Catalin Marinas; Harninder Rai;
-> Xiaobo Xie
-> Subject: Re: [PATCH] arm64: dts: ls1088a: add esdhc node
-> 
-> On Thu, Apr 27, 2017 at 01:31:50PM +0800, Yangbo Lu wrote:
-> > Add esdhc node for ls1088a and enable it on both RDB and QDS boards.
-> >
-> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> 
-> It seems that the comments I put on '[PATCH 3/3] arm64: dts: ls1012a:
-> add eSDHC nodes' applies to this one as well.
-> 
+Hi Marc,
 
-[Lu Yangbo-B47093] Ok, I will modify it. And I will add this patch in eSDHC dts patchset also with another doc patch.
-Thanks.
+On 24/03/17 12:15, Marc Zyngier wrote:
+> The only thing stopping the PMUv3 driver from compiling on 32bit
+> is the lack of defined system registers names. This is easily
+> solved by providing the sysreg accessors and updating the Kconfig entry.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/arm_pmuv3.h | 115 +++++++++++++++++++++++++++++++++++++++
+>  drivers/perf/Kconfig             |   4 +-
+>  2 files changed, 117 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/include/asm/arm_pmuv3.h
+> 
+> diff --git a/arch/arm/include/asm/arm_pmuv3.h b/arch/arm/include/asm/arm_pmuv3.h
+> new file mode 100644
+> index 000000000000..df14de3d7bdf
+> --- /dev/null
+> +++ b/arch/arm/include/asm/arm_pmuv3.h
+> @@ -0,0 +1,115 @@
+> +/*
+> + * Copyright (C) 2012 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __ASM_PMUV3_H
+> +#define __ASM_PMUV3_H
+> +
+> +#include <asm/cp15.h>
+> +
+> +#define pmcr		__ACCESS_CP15(c9, 0, c12, 0)
+> +#define pmselr		__ACCESS_CP15(c9, 0, c12, 5)
+> +#define pmccntr		__ACCESS_CP15_64(0, c9)
+> +#define pmxevcntr	__ACCESS_CP15(c9, 0, c13, 2)
+> +#define pmxevtyper	__ACCESS_CP15(c9, 0, c13, 1)
+> +#define pmcntenset	__ACCESS_CP15(c9, 0, c12, 1)
+> +#define pmcntenclr	__ACCESS_CP15(c9, 0, c12, 2)
+> +#define pmintenset	__ACCESS_CP15(c9, 0, c12, 1)
+
+Encoding is not right here
+
+To access the PMINTENSET:
+
+MRC p15,0,<Rt>,c9,c14,1 ; Read PMINTENSET into Rt
+
+MCR p15,0,<Rt>,c9,c14,1 ; Write Rt to PMINTENSET
 
 
-> Shawn
+> +#define pmintenclr	__ACCESS_CP15(c9, 0, c12, 2)
+
+Ditto
+
+To access the PMINTENCLR:
+
+MRC p15,0,<Rt>,c9,c14,2 ; Read PMINTENCLR into Rt
+
+MCR p15,0,<Rt>,c9,c14,2 ; Write Rt to PMINTENCLR
+
+
+> +#define pmovsclr	__ACCESS_CP15(c9, 0, c12, 3)
+
+Nit: in 32-bit world it is named as PMOVSR.
+
+> +#define pmceid0		__ACCESS_CP15(c9, 0, c12, 6)
+> +#define pmceid1		__ACCESS_CP15(c9, 0, c12, 7)
+
+Can all these defines be done in uppercase to be in align with existent users
+of __ACCESS_CP15() macro?
+
+Thanks
+Vladimir
