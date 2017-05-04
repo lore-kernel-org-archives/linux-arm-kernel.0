@@ -1,115 +1,54 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 4 May 2017 16:04:00 +0800
-Subject: [PATCH v2 19/20] ARM: sun5i: a10s: Add the HDMI controller node
-In-Reply-To: <1e3ddf81459adbab455b2211fe6b78bd6cf1bbec.1493812478.git-series.maxime.ripard@free-electrons.com>
-References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
- <1e3ddf81459adbab455b2211fe6b78bd6cf1bbec.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v640zxNzZ+CAitEUrwtcQUdsPJixjtuAFNp=xKhG6CCmcg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 04 May 2017 10:04:28 +0200
+Subject: [PATCH] Documentation: earlycon: fix Marvell Armada 3700 UART name
+In-Reply-To: <1493855376-4341-1-git-send-email-andre.przywara@arm.com> (Andre
+ Przywara's message of "Thu, 4 May 2017 00:49:36 +0100")
+References: <1493855376-4341-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <87pofp6oab.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 3, 2017 at 7:59 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The A10s has an HDMI controller connected to the second TCON channel. Add
-> it to our DT.
+Hi Andre,
+ 
+ On jeu., mai 04 2017, Andre Przywara <andre.przywara@arm.com> wrote:
+
+> The Marvell Armada 3700 UART uses "ar3700_uart" for its earlycon name.
+> Adjust documentation to match the code.
+
+Actually I think it was the code which was wrong. But as it is already
+part of the kernel it's too late to modify it.
+
 >
-> Since the TV Encoder was the only channel 1 user so far, also add the
-> property now that we have several users.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Thanks,
+
+Gregory
 > ---
->  arch/arm/boot/dts/sun5i-a10s.dtsi | 50 ++++++++++++++++++++++++++++++++-
->  arch/arm/boot/dts/sun5i.dtsi      |  1 +-
->  2 files changed, 51 insertions(+), 0 deletions(-)
+>  Documentation/admin-guide/kernel-parameters.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-> index 1e38ff80366c..c9d4ee12599d 100644
-> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-> @@ -71,7 +71,49 @@
->                 };
->         };
+> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> index facc20a..7ee86c2 100644
+> --- a/Documentation/admin-guide/kernel-parameters.txt
+> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> @@ -973,7 +973,7 @@
+>  			A valid base address must be provided, and the serial
+>  			port must already be setup and configured.
+>  
+> -		armada3700_uart,<addr>
+> +		ar3700_uart,<addr>
+>  			Start an early, polled-mode console on the
+>  			Armada 3700 serial port at the specified
+>  			address. The serial port must already be setup
+> -- 
+> 2.8.2
 >
-> +       display-engine {
-> +               compatible = "allwinner,sun5i-a10s-display-engine",
-> +                            "allwinner,sun5i-a13-display-engine";
 
-I assume this indicates a difference between A10s and A13, namely the former
-has an HDMI controller. The compatible string should be documented.
-
-> +               allwinner,pipelines = <&fe0>;
-> +       };
-> +
->         soc at 01c00000 {
-> +               hdmi: hdmi at 01c16000 {
-> +                       compatible = "allwinner,sun5i-a10s-hdmi";
-> +                       reg = <0x01c16000 0x1000>;
-> +                       interrupts = <58>;
-> +                       clocks = <&ccu CLK_AHB_HDMI>, <&ccu CLK_HDMI>,
-> +                                <&ccu CLK_PLL_VIDEO0_2X>,
-> +                                <&ccu CLK_PLL_VIDEO1_2X>;
-> +                       clock-names = "ahb", "mod", "pll-0", "pll-1";
-> +                       dmas = <&dma SUN4I_DMA_NORMAL 16>,
-> +                              <&dma SUN4I_DMA_NORMAL 16>,
-> +                              <&dma SUN4I_DMA_DEDICATED 24>;
-> +                       dma-names = "ddc-tx", "ddc-rx", "audio-tx";
-> +                       status = "disabled";
-> +
-> +                       ports {
-> +                               #address-cells = <1>;
-> +                               #size-cells = <0>;
-> +
-> +                               hdmi_in: port at 0 {
-> +                                       #address-cells = <1>;
-> +                                       #size-cells = <0>;
-> +                                       reg = <0>;
-> +
-> +                                       hdmi_in_tcon0: endpoint {
-
-Missing reg property here, since you have #address-cells = 1.
-
-Otherwise,
-
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
-> +                                               remote-endpoint = <&tcon0_out_hdmi>;
-> +                                       };
-> +                               };
-> +
-> +                               hdmi_out: port at 1 {
-> +                                       #address-cells = <1>;
-> +                                       #size-cells = <0>;
-> +                                       reg = <1>;
-> +                               };
-> +                       };
-> +               };
-> +
->                 pwm: pwm at 01c20e00 {
->                         compatible = "allwinner,sun5i-a10s-pwm";
->                         reg = <0x01c20e00 0xc>;
-> @@ -128,3 +170,11 @@
->
->  &sram_a {
->  };
-> +
-> +&tcon0_out {
-> +       tcon0_out_hdmi: endpoint at 2 {
-> +               reg = <2>;
-> +               remote-endpoint = <&hdmi_in_tcon0>;
-> +               allwinner,tcon-channel = <1>;
-> +       };
-> +};
-> diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-> index 5175f9cc9bed..0e29f1d98a9e 100644
-> --- a/arch/arm/boot/dts/sun5i.dtsi
-> +++ b/arch/arm/boot/dts/sun5i.dtsi
-> @@ -272,6 +272,7 @@
->                                         tcon0_out_tve0: endpoint at 1 {
->                                                 reg = <1>;
->                                                 remote-endpoint = <&tve0_in_tcon0>;
-> +                                               allwinner,tcon-channel = <1>;
->                                         };
->                                 };
->                         };
-> --
-> git-series 0.8.11
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
