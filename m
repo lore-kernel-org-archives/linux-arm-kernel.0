@@ -1,156 +1,202 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Thu,  4 May 2017 13:44:38 +0200
-Subject: [PATCH v6 18/24] KVM: arm64: vgic-its: Add infrastructure for table
- lookup
+Date: Thu,  4 May 2017 13:44:42 +0200
+Subject: [PATCH v6 22/24] KVM: arm64: vgic-its: ITT save and restore
 In-Reply-To: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
 References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1493898284-29504-19-git-send-email-eric.auger@redhat.com>
+Message-ID: <1493898284-29504-23-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a generic scan_its_table() helper whose role consists in
-scanning a contiguous table located in guest RAM and applying
-a callback on each entry. Entries can be handled as linked lists
-since the callback may return an id offset to the next entry and
-also indicate whether the entry is the last one.
-
-Helper functions also are added to compute the device/event ID
-offset to the next DTE/ITE.
-
-compute_next_devid_offset, compute_next_eventid_offset and
-scan_table will become static in subsequent patches
+Implement routines to save and restore device ITT and their
+interrupt table entries (ITE).
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 v5 -> v6:
-- add comments about 2d level table scan as suggested by Christoffer
-- s/lookup_table/scan_its_table
-- scan_table now return 0 if last elt found and +1 if not found
-- use int for id
-- simplify compute_next_devid/eventid_offset
+- accomodate vgic_its_alloc_ite change of proto
+- check LPI ID on restore, check eventid offset
+- initializations on separate line
+- coming after device save/restore
+- add_lpi does config and pending bit sync
 
 v4 -> v5:
-- use kvm_read_guest
+- ITE are now sorted by eventid on the flush
+- rename *flush* into *save*
+- use macros for shits and masks
+- pass ite_esz to vgic_its_save_ite
 
 v3 -> v4:
-- remove static to avoid compilation warning
-- correct size computation in looup_table()
-- defines now encode the number of bits used for devid and eventid offsets
-- use BIT() - 1 to encode the max offets
+- lookup_table and compute_next_eventid_offset become static in this
+  patch
+- remove static along with vgic_its_flush/restore_itt to avoid
+  compilation warnings
+- next field only computed with a shift (mask removed)
+- handle the case where the last element has not been found
+
+v2 -> v3:
+- add return 0 in vgic_its_restore_ite (was in subsequent patch)
+
+v2: creation
 ---
- virt/kvm/arm/vgic/vgic-its.c | 92 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 116 +++++++++++++++++++++++++++++++++++++++++--
+ virt/kvm/arm/vgic/vgic.h     |   4 ++
+ 2 files changed, 117 insertions(+), 3 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index ea8eb6a..1db7e38 100644
+index c5b388d..376d963 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -221,6 +221,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+@@ -1716,7 +1716,7 @@ static u32 compute_next_devid_offset(struct list_head *h,
+ 	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
+ }
  
- #define VITS_TYPER_IDBITS 16
- #define VITS_TYPER_DEVBITS 16
-+#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
-+#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
- 
- /*
-  * Finds and returns a collection in the ITS collection table.
-@@ -1694,6 +1696,96 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+-u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
++static u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
+ {
+ 	struct its_ite *next;
+ 	u32 next_offset;
+@@ -1793,14 +1793,124 @@ static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
  	return ret;
  }
  
-+u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
-+{
-+	struct its_device *next;
-+	u32 next_offset;
-+
-+	if (list_is_last(&dev->dev_list, h))
-+		return 0;
-+	next = list_next_entry(dev, dev_list);
-+	next_offset = next->device_id - dev->device_id;
-+
-+	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
-+}
-+
-+u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
-+{
-+	struct its_ite *next;
-+	u32 next_offset;
-+
-+	if (list_is_last(&ite->ite_list, h))
-+		return 0;
-+	next = list_next_entry(ite, ite_list);
-+	next_offset = next->event_id - ite->event_id;
-+
-+	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
-+}
-+
 +/**
-+ * entry_fn_t - Callback called on a table entry restore path
-+ * @its: its handle
-+ * @id: id of the entry
-+ * @entry: pointer to the entry
-+ * @opaque: pointer to an opaque data
-+ *
-+ * Return: < 0 on error, 0 if last element was identified, id offset to next
-+ * element otherwise
++ * vgic_its_save_ite - Save an interrupt translation entry at @gpa
 + */
-+typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
-+			  void *opaque);
-+
-+/**
-+ * scan_its_table - Scan a contiguous table in guest RAM and applies a function
-+ * to each entry
-+ *
-+ * @its: its handle
-+ * @base: base gpa of the table
-+ * @size: size of the table in bytes
-+ * @esz: entry size in bytes
-+ * @start_id: the ID of the first entry in the table
-+ * (non zero for 2d level tables)
-+ * @fn: function to apply on each entry
-+ *
-+ * Return: < 0 on error, 0 if last element was identified, 1 otherwise
-+ * (the last element may not be found on second level tables)
-+ */
-+int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
-+		   int start_id, entry_fn_t fn, void *opaque)
++static int vgic_its_save_ite(struct vgic_its *its, struct its_device *dev,
++			      struct its_ite *ite, gpa_t gpa, int ite_esz)
 +{
-+	void *entry = kzalloc(esz, GFP_KERNEL);
 +	struct kvm *kvm = its->dev->kvm;
-+	unsigned long len = size;
-+	int id = start_id;
-+	gpa_t gpa = base;
-+	int ret;
++	u32 next_offset;
++	u64 val;
 +
-+	while (len > 0) {
-+		int next_offset;
-+		size_t byte_offset;
-+
-+		ret = kvm_read_guest(kvm, gpa, entry, esz);
-+		if (ret)
-+			goto out;
-+
-+		next_offset = fn(its, id, entry, opaque);
-+		if (next_offset <= 0) {
-+			ret = next_offset;
-+			goto out;
-+		}
-+
-+		byte_offset = next_offset * esz;
-+		id += next_offset;
-+		gpa += byte_offset;
-+		len -= byte_offset;
-+	}
-+	ret =  1;
-+
-+out:
-+	kfree(entry);
-+	return ret;
++	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
++	val = ((u64)next_offset << KVM_ITS_ITE_NEXT_SHIFT) |
++	       ((u64)ite->lpi << KVM_ITS_ITE_PINTID_SHIFT) |
++		ite->collection->collection_id;
++	val = cpu_to_le64(val);
++	return kvm_write_guest(kvm, gpa, &val, ite_esz);
 +}
 +
++/**
++ * vgic_its_restore_ite - restore an interrupt translation entry
++ * @event_id: id used for indexing
++ * @ptr: pointer to the ITE entry
++ * @opaque: pointer to the its_device
++ */
++static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
++				void *ptr, void *opaque)
++{
++	struct its_device *dev = (struct its_device *)opaque;
++	struct its_collection *collection;
++	struct kvm *kvm = its->dev->kvm;
++	struct kvm_vcpu *vcpu = NULL;
++	u64 val;
++	u64 *p = (u64 *)ptr;
++	struct vgic_irq *irq;
++	u32 coll_id, lpi_id;
++	struct its_ite *ite;
++	u32 offset;
++
++	val = *p;
++
++	val = le64_to_cpu(val);
++
++	coll_id = val & KVM_ITS_ITE_ICID_MASK;
++	lpi_id = (val & KVM_ITS_ITE_PINTID_MASK) >> KVM_ITS_ITE_PINTID_SHIFT;
++
++	if (!lpi_id)
++		return 1; /* invalid entry, no choice but to scan next entry */
++
++	if (lpi_id < VGIC_MIN_LPI)
++		return -EINVAL;
++
++	offset = val >> KVM_ITS_ITE_NEXT_SHIFT;
++	if (event_id + offset >= BIT_ULL(dev->num_eventid_bits))
++		return -EINVAL;
++
++	collection = find_collection(its, coll_id);
++	if (!collection)
++		return -EINVAL;
++
++	ite = vgic_its_alloc_ite(dev, collection, lpi_id, event_id);
++	if (IS_ERR(ite))
++		return PTR_ERR(ite);
++
++	if (its_is_collection_mapped(collection))
++		vcpu = kvm_get_vcpu(kvm, collection->target_addr);
++
++	irq = vgic_add_lpi(kvm, lpi_id, vcpu);
++	if (IS_ERR(irq))
++		return PTR_ERR(irq);
++	ite->irq = irq;
++
++	return offset;
++}
++
++static int vgic_its_ite_cmp(void *priv, struct list_head *a,
++			    struct list_head *b)
++{
++	struct its_ite *itea = container_of(a, struct its_ite, ite_list);
++	struct its_ite *iteb = container_of(b, struct its_ite, ite_list);
++
++	if (itea->event_id < iteb->event_id)
++		return -1;
++	else
++		return 1;
++}
++
+ static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
+ {
+-	return -ENXIO;
++	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
++	gpa_t base = device->itt_addr;
++	struct its_ite *ite;
++	int ret;
++	int ite_esz = abi->ite_esz;
++
++	list_sort(NULL, &device->itt_head, vgic_its_ite_cmp);
++
++	list_for_each_entry(ite, &device->itt_head, ite_list) {
++		gpa_t gpa = base + ite->event_id * ite_esz;
++
++		ret = vgic_its_save_ite(its, device, ite, gpa, ite_esz);
++		if (ret)
++			return ret;
++	}
++	return 0;
+ }
+ 
+ static int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
+ {
+-	return -ENXIO;
++	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
++	gpa_t base = dev->itt_addr;
++	int ret;
++	int ite_esz = abi->ite_esz;
++	size_t max_size = BIT_ULL(dev->num_eventid_bits) * ite_esz;
++
++	ret = scan_its_table(its, base, max_size, ite_esz, 0,
++			     vgic_its_restore_ite, dev);
++
++	return ret;
+ }
+ 
  /**
-  * vgic_its_save_device_tables - Save the device table and all ITT
-  * into guest RAM
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index e896114..92a8ca0 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -81,6 +81,10 @@
+ #define KVM_ITS_CTE_VALID_MASK		BIT_ULL(63)
+ #define KVM_ITS_CTE_RDBASE_SHIFT	16
+ #define KVM_ITS_CTE_ICID_MASK		GENMASK_ULL(15, 0)
++#define KVM_ITS_ITE_NEXT_SHIFT		48
++#define KVM_ITS_ITE_PINTID_SHIFT	16
++#define KVM_ITS_ITE_PINTID_MASK		GENMASK_ULL(47, 16)
++#define KVM_ITS_ITE_ICID_MASK		GENMASK_ULL(15, 0)
+ #define KVM_ITS_DTE_VALID_SHIFT		63
+ #define KVM_ITS_DTE_VALID_MASK		BIT_ULL(63)
+ #define KVM_ITS_DTE_NEXT_SHIFT		49
 -- 
 2.5.5
