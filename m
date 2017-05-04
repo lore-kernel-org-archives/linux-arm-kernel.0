@@ -1,81 +1,267 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 4 May 2017 18:10:01 +0100
-Subject: ARMv7 doesn't define CR_U?
-In-Reply-To: <20170504165450.GG22219@n2100.armlinux.org.uk>
-References: <CANEJEGv2snHD8vcAu2Hyu1839VdkCwUsRKOa28AsuHnvyZWwBw@mail.gmail.com>
- <20170504165450.GG22219@n2100.armlinux.org.uk>
-Message-ID: <fcc98942-0b8c-d21b-deb7-2f0126c78d42@arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 4 May 2017 19:13:01 +0200
+Subject: [PATCH v6 09/24] KVM: arm64: vgic-its: Introduce migration ABI
+ infrastructure
+In-Reply-To: <1493898284-29504-10-git-send-email-eric.auger@redhat.com>
+References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
+ <1493898284-29504-10-git-send-email-eric.auger@redhat.com>
+Message-ID: <20170504171301.GT5923@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/17 17:54, Russell King - ARM Linux wrote:
-> On Thu, May 04, 2017 at 09:35:15AM -0700, Grant Grundler wrote:
->> I'm seeing unaligned accesses from sadc[1] (compiled with llvm) are
->> getting SIGBUS on an QCA IPQ4019 chipset despite ARMv7 CPU claiming to
->> support unaligned accesses[1].   My question is about use of CR_U on
->> ARMv7 in cpu_is_v6_unaligned().
+On Thu, May 04, 2017 at 01:44:29PM +0200, Eric Auger wrote:
+> We plan to support different migration ABIs, ie. characterizing
+> the ITS table layout format in guest RAM. For example, a new ABI
+> will be needed if vLPIs get supported for nested use case.
 > 
-> Not every ARM instruction can cope with unaligned accesses.  Single
-> integer instructions can (LDR/STR, LDRH/STRH) but not LDM/STM or
-> the VFP instructions.
+> So let's introduce an array of supported ABIs (at the moment a single
+> ABI is supported though). The following characteristics are foreseen
+> to vary with the ABI: size of table entries, save/restore operation,
+> the way abi settings are applied.
 > 
->> And kernel output from a different invocation:
->> [  226.596867] Alignment trap: not handling instruction f9602aef at [<2a0062b6>]
->> [  226.596925] Unhandled fault: alignment exception (0x001) at 0x2a014088
+> By default the MAX_ABI_REV is applied on its creation. In subsequent
+> patches we will introduce a way for the userspace to change the ABI
+> in use.
 > 
-> This seems to be this instruction:
->    0:   f960 2aef       vld1.64 {d18-d19}, [r0 :128]
+> The entry sizes now are set according to the ABI version and not
+> hardcoded anymore.
 > 
-> which is a SIMD load, which specifies an alignment of 128 bits.
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 > 
->> But it looks like our kernel[2] should be handling this unaligned access:
->> # cat /proc/cpu/alignment
->> User:           16
->> System:         0
->> Skipped:        16
->> Half:           0
->> Word:           0
->> DWord:          0
->> Multi:          0
->> User faults:    2 (fixup)
->>
->> Since Documentation/arm/mem_alignment doesn't seem to match the
->> code[2], I'm not sure what to expect here.
+> ---
+> v6 -> v7:
+> - rename abi into its_table_abi_versions
+> - kernel doc comments for struct vgic_its_abi
+> - comment GIC_ENCODE_SZ
+> - slighly rephrase the commit message
 > 
-> Only known instructions (LDR/STR/LDM/STM) are fixed up.  VFP and SIMD
-> are never fixed up (to do so would be very complex.)
+> v5: creation and squash KVM: arm64: ITS: Report the ITE size in
+>     GITS_TYPER
+> ---
+>  include/kvm/arm_vgic.h             |  3 ++
+>  include/linux/irqchip/arm-gic-v3.h |  5 +++
+>  virt/kvm/arm/vgic/vgic-its.c       | 92 ++++++++++++++++++++++++++++++++++++--
+>  3 files changed, 96 insertions(+), 4 deletions(-)
 > 
->> arch/arm/include/asm/cp15.h:
->> #define CR_U    (1 << 22)       /* Unaligned access operation           */
->>
->> But bit 22 isn't defined in the Cortex A7 (an ARMv7-A cpu).
->>
->> "Cortex-A7 MPCore Technical Reference Manual"
->> "4.3.27. System Control Register"
->> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0464f/BABJAHDA.html
->>
->> says bit 22 is "Reserved, RAO/SBOP."
-> 
-> RAO = read as one.  The bit _is_ the unaligned access operation, and what
-> the ARM ARM is telling you is that the bit has been retired, and it is now
-> defined to always be '1', meaning the CPU fixes up the single integer
-> load/store instructions.
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index c0b3d99..285474a 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -162,6 +162,9 @@ struct vgic_its {
+>  	u32			creadr;
+>  	u32			cwriter;
+>  
+> +	/* migration ABI revision in use */
+> +	u32			abi_rev;
+> +
+>  	/* Protects the device and collection lists */
+>  	struct mutex		its_lock;
+>  	struct list_head	device_list;
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 97cbca1..81ebe43 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -132,6 +132,9 @@
+>  #define GIC_BASER_SHAREABILITY(reg, type)				\
+>  	(GIC_BASER_##type << reg##_SHAREABILITY_SHIFT)
+>  
+> +/* encode a size field of width @w containing @n - 1 units */
+> +#define GIC_ENCODE_SZ(n, w) (((unsigned long)(n) - 1) & GENMASK_ULL(((w) - 1), 0))
+> +
+>  #define GICR_PROPBASER_SHAREABILITY_SHIFT		(10)
+>  #define GICR_PROPBASER_INNER_CACHEABILITY_SHIFT		(7)
+>  #define GICR_PROPBASER_OUTER_CACHEABILITY_SHIFT		(56)
+> @@ -232,6 +235,7 @@
+>  #define GITS_CTLR_QUIESCENT		(1U << 31)
+>  
+>  #define GITS_TYPER_PLPIS		(1UL << 0)
+> +#define GITS_TYPER_ITT_ENTRY_SIZE_SHIFT	4
+>  #define GITS_TYPER_IDBITS_SHIFT		8
+>  #define GITS_TYPER_DEVBITS_SHIFT	13
+>  #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
+> @@ -290,6 +294,7 @@
+>  #define GITS_BASER_TYPE(r)		(((r) >> GITS_BASER_TYPE_SHIFT) & 7)
+>  #define GITS_BASER_ENTRY_SIZE_SHIFT		(48)
+>  #define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0x1f) + 1)
+> +#define GITS_BASER_ENTRY_SIZE_MASK	GENMASK_ULL(52, 48)
+>  #define GITS_BASER_SHAREABILITY_SHIFT	(10)
+>  #define GITS_BASER_InnerShareable					\
+>  	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 18588ef..c336cce 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -33,6 +33,12 @@
+>  #include "vgic.h"
+>  #include "vgic-mmio.h"
+>  
+> +/* Highest migration ABI revision supported by this code */
+> +#define MAX_ABI_REV 0
+> +
+> +static int vgic_its_set_abi(struct vgic_its *its, int rev);
+> +static const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its);
+> +
+>  /*
+>   * Creates a new (reference to a) struct vgic_irq for a given LPI.
+>   * If this LPI is already mapped on another ITS, we increase its refcount
+> @@ -123,6 +129,25 @@ struct its_ite {
+>  	u32 event_id;
+>  };
+>  
+> +/**
+> + * struct vgic_its_abi - ITS abi ops and settings
+> + * @cte_esz: collection table entry size
+> + * @dte_esz: device table entry size
+> + * @ite_esz: interrupt translation table entry size
+> + * @save tables: save the ITS tables into guest RAM
+> + * @restore_tables: restore the ITS internal structs from
+> + * tables stored in guest RAM
 
-Seconded - as I was halfway through writing myself, it may not be
-explicitly named any more, but the reserved value is intentionally
-backwards-compatible.
+nit: indent to align with the beginning of 'restore...'
 
-> You're basically out of luck if you want to do a SIMD unaligned load.
-> These are simply not supported.
 
-More than that, they're outright wrong. Regular SIMD loads are free from
-alignment restrictions anyway - you only get the fault if the explicit
-alignment hint is set, which means there is some bad code at play here
-(passing an insufficiently-aligned pointer to someone who dereferences
-it thinking it's OK) and SIGBUS is a perfectly acceptable form of the
-resulting undefined behaviour. I don't believe GCC ever uses the
-alignment hints on VLDn/VSTn, so it could be some latent bug that only
-manifests when building with Clang (which does tend to set the hints as
-aggressively as it can).
+> + * @commit: apply the ABI settings to the ITS
 
-Robin.
+hmm, I already forgot what the commit function does, and reading this
+text doesn't seem to help me, unfortunately.  When is this called, what
+does it do?
+
+Thanks,
+-Christoffer
+
+> + */
+> +struct vgic_its_abi {
+> +	int cte_esz;
+> +	int dte_esz;
+> +	int ite_esz;
+> +	int (*save_tables)(struct vgic_its *its);
+> +	int (*restore_tables)(struct vgic_its *its);
+> +	int (*commit)(struct vgic_its *its);
+> +};
+> +
+>  /*
+>   * Find and returns a device in the device table for an ITS.
+>   * Must be called with the its_lock mutex held.
+> @@ -364,6 +389,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
+>  					      struct vgic_its *its,
+>  					      gpa_t addr, unsigned int len)
+>  {
+> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+>  	u64 reg = GITS_TYPER_PLPIS;
+>  
+>  	/*
+> @@ -376,6 +402,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
+>  	 */
+>  	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
+>  	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
+> +	reg |= GIC_ENCODE_SZ(abi->ite_esz, 4) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
+>  
+>  	return extract_bytes(reg, addr & 7, len);
+>  }
+> @@ -1269,6 +1296,7 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
+>  				      gpa_t addr, unsigned int len,
+>  				      unsigned long val)
+>  {
+> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+>  	u64 entry_size, device_type;
+>  	u64 reg, *regptr, clearbits = 0;
+>  
+> @@ -1279,12 +1307,12 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
+>  	switch (BASER_INDEX(addr)) {
+>  	case 0:
+>  		regptr = &its->baser_device_table;
+> -		entry_size = 8;
+> +		entry_size = abi->dte_esz;
+>  		device_type = GITS_BASER_TYPE_DEVICE;
+>  		break;
+>  	case 1:
+>  		regptr = &its->baser_coll_table;
+> -		entry_size = 8;
+> +		entry_size = abi->cte_esz;
+>  		device_type = GITS_BASER_TYPE_COLLECTION;
+>  		clearbits = GITS_BASER_INDIRECT;
+>  		break;
+> @@ -1426,7 +1454,6 @@ static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
+>  	(GIC_BASER_CACHEABILITY(GITS_BASER, INNER, RaWb)		| \
+>  	 GIC_BASER_CACHEABILITY(GITS_BASER, OUTER, SameAsInner)		| \
+>  	 GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)		| \
+> -	 ((8ULL - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)			| \
+>  	 GITS_BASER_PAGE_SIZE_64K)
+>  
+>  #define INITIAL_PROPBASER_VALUE						  \
+> @@ -1466,7 +1493,7 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+>  
+>  	dev->private = its;
+>  
+> -	return 0;
+> +	return vgic_its_set_abi(its, MAX_ABI_REV);
+>  }
+>  
+>  static void vgic_its_destroy(struct kvm_device *kvm_dev)
+> @@ -1584,6 +1611,63 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+>  	return ret;
+>  }
+>  
+> +/**
+> + * vgic_its_save_tables_v0 - Save the ITS tables into guest ARM
+> + * according to v0 ABI
+> + */
+> +static int vgic_its_save_tables_v0(struct vgic_its *its)
+> +{
+> +	return -ENXIO;
+> +}
+> +
+> +/**
+> + * vgic_its_restore_tables_v0 - Restore the ITS tables from guest RAM
+> + * to internal data structs according to V0 ABI
+> + *
+> + */
+> +static int vgic_its_restore_tables_v0(struct vgic_its *its)
+> +{
+> +	return -ENXIO;
+> +}
+> +
+> +static int vgic_its_commit_v0(struct vgic_its *its)
+> +{
+> +	const struct vgic_its_abi *abi;
+> +
+> +	abi = vgic_its_get_abi(its);
+> +	its->baser_coll_table &= ~GITS_BASER_ENTRY_SIZE_MASK;
+> +	its->baser_device_table &= ~GITS_BASER_ENTRY_SIZE_MASK;
+> +
+> +	its->baser_coll_table |= (GIC_ENCODE_SZ(abi->cte_esz, 5)
+> +					<< GITS_BASER_ENTRY_SIZE_SHIFT);
+> +
+> +	its->baser_device_table |= (GIC_ENCODE_SZ(abi->dte_esz, 5)
+> +					<< GITS_BASER_ENTRY_SIZE_SHIFT);
+> +	return 0;
+> +}
+> +
+> +static const struct vgic_its_abi its_table_abi_versions[MAX_ABI_REV + 1] = {
+> +	{.cte_esz = 8, .dte_esz = 8, .ite_esz = 8,
+> +	 .save_tables = vgic_its_save_tables_v0,
+> +	 .restore_tables = vgic_its_restore_tables_v0,
+> +	 .commit = vgic_its_commit_v0,
+> +	},
+> +};
+> +
+> +inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
+> +{
+> +	return &its_table_abi_versions[its->abi_rev];
+> +}
+> +
+> +int vgic_its_set_abi(struct vgic_its *its, int rev)
+> +{
+> +	const struct vgic_its_abi *abi;
+> +
+> +	its->abi_rev = rev;
+> +	abi = vgic_its_get_abi(its);
+> +	return abi->commit(its);
+> +}
+> +
+>  static int vgic_its_has_attr(struct kvm_device *dev,
+>  			     struct kvm_device_attr *attr)
+>  {
+> -- 
+> 2.5.5
+> 
