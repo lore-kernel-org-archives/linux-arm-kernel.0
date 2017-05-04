@@ -1,41 +1,40 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 4 May 2017 12:00:32 -0400
-Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
-In-Reply-To: <20170504120314.lfmcv4cpsuz2igte@lukather>
-References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
- <20170504120314.lfmcv4cpsuz2igte@lukather>
-Message-ID: <20170504160032.GA5147@htj.duckdns.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 4 May 2017 17:32:33 +0100
+Subject: [PATCH v2 1/7] iommu/arm-smmu-v3: Introduce SMMU option
+ PAGE0_REGS_ONLY
+In-Reply-To: <1493901339-14929-2-git-send-email-gakula@caviumnetworks.com>
+References: <1493901339-14929-1-git-send-email-gakula@caviumnetworks.com>
+ <1493901339-14929-2-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <20170504163233.GH20461@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, May 04, 2017 at 02:03:14PM +0200, Maxime Ripard wrote:
-> > @@ -704,6 +704,7 @@ static void pinctrl_generic_free_groups(struct pinctrl_dev *pctldev)
-> >  		radix_tree_delete(&pctldev->pin_group_tree, indices[i]);
-> >  		devm_kfree(pctldev->dev, group);
-> >  	}
-> > +	kfree(indices);
+On Thu, May 04, 2017 at 06:05:33PM +0530, Geetha sowjanya wrote:
+> From: Linu Cherian <linu.cherian@cavium.com>
 > 
-> We use devm_kfree for other allocations done here, maybe we can just
-> have the same thing here? We would be consistant, and we would still
-> keep the resource tracking.
+> Cavium ThunderX2 SMMU implementation doesn't support page 1 register space
+> and PAGE0_REGS_ONLY option will be enabled as an errata workaround.
+> 
+> This option when turned on, replaces all page 1 offsets used for
+> EVTQ_PROD/CONS, PRIQ_PROD/CONS register access with page 0 offsets.
+> 
+> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 44 ++++++++++++++++++++++++++++++++------------
+>  1 file changed, 32 insertions(+), 12 deletions(-)
 
-It doesn't make any sense to use the managed functions from the
-release functions and if you're always matching devm_kmalloc() with
-devm_kfree(), the only thing it'd do is confusing its readers.
+>  static struct arm_smmu_option_prop arm_smmu_options[] = {
 
-And the function in question just looks weird to me - give up on
-freeing resources if memory allocation fails?  And why call
-devm_kfree() on objects which are being released anyway?  Or if the
-group can be released w/o the device being detached, why use devm
-allocations on the members at all?
+> +	{ ARM_SMMU_OPT_PAGE0_REGS_ONLY, "cavium-cn99xx,broken-page1-regspace"},
 
-As for removal, can't it just call radix_tree_iter_delete() while
-iterating?  Why allocate memory to iterate and store all indices and
-to look them up again and delete them?
+No patch in this series documented the new property.
 
-Thanks.
+Please update Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt,
+with a description of the property. i.e. what it describes, and when it
+should be set.
 
--- 
-tejun
+Please either make that a prepatory path, or merge it in with this one.
+
+Thanksm
+Mark.
