@@ -1,169 +1,103 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 4 May 2017 12:29:37 +0100
-Subject: [PATCH] arm64: Fix the DMA mmap and get_sgtable API with
- DMA_ATTR_FORCE_CONTIGUOUS
-In-Reply-To: <1493143232-2245-1-git-send-email-catalin.marinas@arm.com>
-References: <1493143232-2245-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <7d0445e5-ddb3-7d0f-4749-c63b54beff43@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 4 May 2017 12:31:34 +0100
+Subject: [PATCH 3/4] ARM: perf: Allow the use of the PMUv3 driver on 32bit
+ ARM
+In-Reply-To: <74692e75-1cb7-21da-be83-7a315e9a84b6@arm.com>
+References: <20170324121529.22603-1-marc.zyngier@arm.com>
+ <20170324121529.22603-4-marc.zyngier@arm.com>
+ <74692e75-1cb7-21da-be83-7a315e9a84b6@arm.com>
+Message-ID: <80bb9c65-d456-a49b-5ab1-5683c991c1b5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/17 19:00, Catalin Marinas wrote:
-> While honouring the DMA_ATTR_FORCE_CONTIGUOUS on arm64 (commit
-> 44176bb38fa4: "arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to
-> IOMMU"), the existing uses of dma_mmap_attrs() and dma_get_sgtable()
-> have been broken by passing a physically contiguous vm_struct with an
-> invalid pages pointer through the common iommu API.
+On 04/05/17 12:00, Vladimir Murzin wrote:
+> Hi Marc,
 > 
-> Since the coherent allocation with DMA_ATTR_FORCE_CONTIGUOUS uses CMA,
-> this patch simply reuses the existing swiotlb logic for mmap and
-> get_sgtable.
+> On 24/03/17 12:15, Marc Zyngier wrote:
+>> The only thing stopping the PMUv3 driver from compiling on 32bit
+>> is the lack of defined system registers names. This is easily
+>> solved by providing the sysreg accessors and updating the Kconfig entry.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/include/asm/arm_pmuv3.h | 115 +++++++++++++++++++++++++++++++++++++++
+>>  drivers/perf/Kconfig             |   4 +-
+>>  2 files changed, 117 insertions(+), 2 deletions(-)
+>>  create mode 100644 arch/arm/include/asm/arm_pmuv3.h
+>>
+>> diff --git a/arch/arm/include/asm/arm_pmuv3.h b/arch/arm/include/asm/arm_pmuv3.h
+>> new file mode 100644
+>> index 000000000000..df14de3d7bdf
+>> --- /dev/null
+>> +++ b/arch/arm/include/asm/arm_pmuv3.h
+>> @@ -0,0 +1,115 @@
+>> +/*
+>> + * Copyright (C) 2012 ARM Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#ifndef __ASM_PMUV3_H
+>> +#define __ASM_PMUV3_H
+>> +
+>> +#include <asm/cp15.h>
+>> +
+>> +#define pmcr		__ACCESS_CP15(c9, 0, c12, 0)
+>> +#define pmselr		__ACCESS_CP15(c9, 0, c12, 5)
+>> +#define pmccntr		__ACCESS_CP15_64(0, c9)
+>> +#define pmxevcntr	__ACCESS_CP15(c9, 0, c13, 2)
+>> +#define pmxevtyper	__ACCESS_CP15(c9, 0, c13, 1)
+>> +#define pmcntenset	__ACCESS_CP15(c9, 0, c12, 1)
+>> +#define pmcntenclr	__ACCESS_CP15(c9, 0, c12, 2)
+>> +#define pmintenset	__ACCESS_CP15(c9, 0, c12, 1)
 > 
-> Note that the current implementation of get_sgtable (both swiotlb and
-> iommu) is broken if dma_declare_coherent_memory() is used since such
-> memory does not have a corresponding struct page. To be addressed in a
-> separate patch.
+> Encoding is not right here
 > 
-> Fixes: 44176bb38fa4 ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
-> Reported-by: Andrzej Hajda <a.hajda@samsung.com>
-> Cc: Andrzej Hajda <a.hajda@samsung.com>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
+> To access the PMINTENSET:
 > 
-> Here's my attempt of fixing this, though I'd like to wait for Robin's review
-> (who's currently on holiday until next week).
+> MRC p15,0,<Rt>,c9,c14,1 ; Read PMINTENSET into Rt
 > 
-> Not tested.
+> MCR p15,0,<Rt>,c9,c14,1 ; Write Rt to PMINTENSET
+> 
+> 
+>> +#define pmintenclr	__ACCESS_CP15(c9, 0, c12, 2)
+> 
+> Ditto
+> 
+> To access the PMINTENCLR:
+> 
+> MRC p15,0,<Rt>,c9,c14,2 ; Read PMINTENCLR into Rt
+> 
+> MCR p15,0,<Rt>,c9,c14,2 ; Write Rt to PMINTENCLR
 
-The general approach is sound, and I can't see anything that looks
-obviously wrong with the implementation, although I have no easy way of
-testing it either:
+Arghh, -ECOPYPASTE. Thanks for the heads up!
 
-Acked-by: Robin Murphy <robin.murphy@arm.com>
-
-As for all the other failings of get_sgtable, it seems those have been
-wrong from its inception, so can't be particularly critical as they're
-presumably not being hit in practice - if this fixes all the actual
-regressions I'd be inclined to leave it at that until the dma_buf folks
-can cook up a suitable replacement for the whole mess.
-
-Robin.
-
->  arch/arm64/mm/dma-mapping.c | 65 ++++++++++++++++++++++++++++++++++-----------
->  1 file changed, 49 insertions(+), 16 deletions(-)
 > 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index f7b54019ef55..c9e53dec3695 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -308,24 +308,15 @@ static void __swiotlb_sync_sg_for_device(struct device *dev,
->  				       sg->length, dir);
->  }
->  
-> -static int __swiotlb_mmap(struct device *dev,
-> -			  struct vm_area_struct *vma,
-> -			  void *cpu_addr, dma_addr_t dma_addr, size_t size,
-> -			  unsigned long attrs)
-> +static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
-> +			      unsigned long pfn, size_t size)
->  {
->  	int ret = -ENXIO;
->  	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >>
->  					PAGE_SHIFT;
->  	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> -	unsigned long pfn = dma_to_phys(dev, dma_addr) >> PAGE_SHIFT;
->  	unsigned long off = vma->vm_pgoff;
->  
-> -	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
-> -					     is_device_dma_coherent(dev));
-> -
-> -	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
-> -		return ret;
-> -
->  	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
->  		ret = remap_pfn_range(vma, vma->vm_start,
->  				      pfn + off,
-> @@ -336,19 +327,43 @@ static int __swiotlb_mmap(struct device *dev,
->  	return ret;
->  }
->  
-> -static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
-> -				 void *cpu_addr, dma_addr_t handle, size_t size,
-> -				 unsigned long attrs)
-> +static int __swiotlb_mmap(struct device *dev,
-> +			  struct vm_area_struct *vma,
-> +			  void *cpu_addr, dma_addr_t dma_addr, size_t size,
-> +			  unsigned long attrs)
-> +{
-> +	int ret;
-> +	unsigned long pfn = dma_to_phys(dev, dma_addr) >> PAGE_SHIFT;
-> +
-> +	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
-> +					     is_device_dma_coherent(dev));
-> +
-> +	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
-> +		return ret;
-> +
-> +	return __swiotlb_mmap_pfn(vma, pfn, size);
-> +}
-> +
-> +static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
-> +				      struct page *page, size_t size)
->  {
->  	int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
->  
->  	if (!ret)
-> -		sg_set_page(sgt->sgl, phys_to_page(dma_to_phys(dev, handle)),
-> -			    PAGE_ALIGN(size), 0);
-> +		sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
->  
->  	return ret;
->  }
->  
-> +static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
-> +				 void *cpu_addr, dma_addr_t handle, size_t size,
-> +				 unsigned long attrs)
-> +{
-> +	struct page *page = phys_to_page(dma_to_phys(dev, handle));
-> +
-> +	return __swiotlb_get_sgtable_page(sgt, page, size);
-> +}
-> +
->  static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
->  {
->  	if (swiotlb)
-> @@ -703,6 +718,15 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
->  	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
->  		return ret;
->  
-> +	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-> +		/*
-> +		 * DMA_ATTR_FORCE_CONTIGUOUS allocations are always remapped,
-> +		 * hence in the vmalloc space.
-> +		 */
-> +		unsigned long pfn = vmalloc_to_pfn(cpu_addr);
-> +		return __swiotlb_mmap_pfn(vma, pfn, size);
-> +	}
-> +
->  	area = find_vm_area(cpu_addr);
->  	if (WARN_ON(!area || !area->pages))
->  		return -ENXIO;
-> @@ -717,6 +741,15 @@ static int __iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
->  	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
->  	struct vm_struct *area = find_vm_area(cpu_addr);
->  
-> +	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-> +		/*
-> +		 * DMA_ATTR_FORCE_CONTIGUOUS allocations are always remapped,
-> +		 * hence in the vmalloc space.
-> +		 */
-> +		struct page *page = vmalloc_to_page(cpu_addr);
-> +		return __swiotlb_get_sgtable_page(sgt, page, size);
-> +	}
-> +
->  	if (WARN_ON(!area || !area->pages))
->  		return -ENXIO;
->  
 > 
+>> +#define pmovsclr	__ACCESS_CP15(c9, 0, c12, 3)
+> 
+> Nit: in 32-bit world it is named as PMOVSR.
+> 
+>> +#define pmceid0		__ACCESS_CP15(c9, 0, c12, 6)
+>> +#define pmceid1		__ACCESS_CP15(c9, 0, c12, 7)
+> 
+> Can all these defines be done in uppercase to be in align with existent users
+> of __ACCESS_CP15() macro?
+
+Sure, that shouldn't be an issue.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
