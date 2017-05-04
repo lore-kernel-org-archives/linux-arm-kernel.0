@@ -1,147 +1,93 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Thu,  4 May 2017 13:44:37 +0200
-Subject: [PATCH v6 17/24] KVM: arm64: vgic-its: vgic_its_alloc_ite/device
+Date: Thu,  4 May 2017 13:44:30 +0200
+Subject: [PATCH v6 10/24] KVM: arm64: vgic-its: Implement
+ vgic_mmio_uaccess_write_its_iidr
 In-Reply-To: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
 References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1493898284-29504-18-git-send-email-eric.auger@redhat.com>
+Message-ID: <1493898284-29504-11-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two new helpers to allocate an its ite and an its device.
-This will avoid duplication on restore path.
+The GITS_IIDR revision field is used to encode the migration ABI
+revision. So we need to restore it to check the table layout is
+readable by the destination.
+
+By writing the IIDR, userspace thus forces the ABI revision to be
+used and this must be less than or equal to the max revision KVM
+supports.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 v5 -> v6:
-- remove Marc's A-b
-- both functions now return the newly allocated struct
+- fix typos in the commit message
+- dont't use update_64bit_reg anymore
 
-v4 -> v5:
-- add Marc's A-b
+v4 -> v5
+- rename user_revision into abi_rev and REV into MAX_ABI_REV
+- IIDR reports abi_rev set by userspace if any.
+- If value set by userspace exceeds the max supported revision, an
+  error is reported.
+- add some defines
 
-v3 -> v4:
-- fix allocation
-- add comment about its_lock mutex hold
-
-v1 -> v2:
-- report itt_size fix and remove ITE_SIZE
-- s/itte/ite/g
+v4: creation
 ---
- virt/kvm/arm/vgic/vgic-its.c | 68 ++++++++++++++++++++++++++++++--------------
- 1 file changed, 47 insertions(+), 21 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h |  4 ++++
+ virt/kvm/arm/vgic/vgic-its.c       | 20 +++++++++++++++++---
+ 2 files changed, 21 insertions(+), 3 deletions(-)
 
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 81ebe43..59f1abd 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -242,6 +242,10 @@
+ #define GITS_TYPER_PTA			(1UL << 19)
+ #define GITS_TYPER_HWCOLLCNT_SHIFT	24
+ 
++#define GITS_IIDR_REV_SHIFT		12
++#define GITS_IIDR_REV(r)		(((r) >> GITS_IIDR_REV_SHIFT) & 0xf)
++#define GITS_IIDR_PRODUCTID_SHIFT	24
++
+ #define GITS_CBASER_VALID			(1ULL << 63)
+ #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
+ #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 5b251dc..ea8eb6a 100644
+index c336cce..072efbd 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -776,6 +776,25 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
- 	kfree(collection);
- }
- 
-+/* Must be called with its_lock mutex held */
-+static struct its_ite *vgic_its_alloc_ite(struct its_device *device,
-+					  struct its_collection *collection,
-+					  u32 lpi_id, u32 event_id)
-+{
-+	struct its_ite *ite;
-+
-+	ite = kzalloc(sizeof(*ite), GFP_KERNEL);
-+	if (!ite)
-+		return ERR_PTR(-ENOMEM);
-+
-+	ite->event_id	= event_id;
-+	ite->collection = collection;
-+	ite->lpi = lpi_id;
-+
-+	list_add_tail(&ite->ite_list, &device->itt_head);
-+	return ite;
+@@ -411,7 +411,20 @@ static unsigned long vgic_mmio_read_its_iidr(struct kvm *kvm,
+ 					     struct vgic_its *its,
+ 					     gpa_t addr, unsigned int len)
+ {
+-	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++	return (PRODUCT_ID_KVM << GITS_IIDR_PRODUCTID_SHIFT) |
++	       (its->abi_rev << GITS_IIDR_REV_SHIFT) | IMPLEMENTER_ARM;
 +}
 +
- /*
-  * The MAPTI and MAPI commands map LPIs to ITTEs.
-  * Must be called with its_lock mutex held.
-@@ -790,8 +809,8 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	struct kvm_vcpu *vcpu = NULL;
- 	struct its_device *device;
- 	struct its_collection *collection, *new_coll = NULL;
--	int lpi_nr;
- 	struct vgic_irq *irq;
-+	int lpi_nr;
- 
- 	device = find_its_device(its, device_id);
- 	if (!device)
-@@ -820,19 +839,13 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 		new_coll = collection;
- 	}
- 
--	ite = kzalloc(sizeof(struct its_ite), GFP_KERNEL);
--	if (!ite) {
-+	ite = vgic_its_alloc_ite(device, collection, lpi_nr, event_id);
-+	if (IS_ERR(ite)) {
- 		if (new_coll)
- 			vgic_its_free_collection(its, coll_id);
--		return -ENOMEM;
-+		return PTR_ERR(ite);
- 	}
- 
--	ite->event_id	= event_id;
--	list_add_tail(&ite->ite_list, &device->itt_head);
--
--	ite->collection = collection;
--	ite->lpi = lpi_nr;
--
- 	if (its_is_collection_mapped(collection))
- 		vcpu = kvm_get_vcpu(kvm, collection->target_addr);
- 
-@@ -865,6 +878,26 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
- 	kfree(device);
- }
- 
-+/* Must be called with its_lock mutex held */
-+static struct its_device *vgic_its_alloc_device(struct vgic_its *its,
-+						u32 device_id, gpa_t itt_addr,
-+						u8 num_eventid_bits)
++static int vgic_mmio_uaccess_write_its_iidr(struct kvm *kvm,
++					    struct vgic_its *its,
++					    gpa_t addr, unsigned int len,
++					    unsigned long val)
 +{
-+	struct its_device *device;
++	u32 rev = GITS_IIDR_REV(val);
 +
-+	device = kzalloc(sizeof(*device), GFP_KERNEL);
-+	if (!device)
-+		return ERR_PTR(-ENOMEM);
-+
-+	device->device_id = device_id;
-+	device->itt_addr = itt_addr;
-+	device->num_eventid_bits = num_eventid_bits;
-+	INIT_LIST_HEAD(&device->itt_head);
-+
-+	list_add_tail(&device->dev_list, &its->device_list);
-+	return device;
-+}
-+
- /*
-  * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
-  * Must be called with the its_lock mutex held.
-@@ -901,17 +934,10 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 	if (!valid)
- 		return 0;
- 
--	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
--	if (!device)
--		return -ENOMEM;
--
--	device->device_id = device_id;
--	device->num_eventid_bits = num_eventid_bits;
--	device->itt_addr = itt_addr;
--
--	INIT_LIST_HEAD(&device->itt_head);
--
--	list_add_tail(&device->dev_list, &its->device_list);
-+	device = vgic_its_alloc_device(its, device_id, itt_addr,
-+				       num_eventid_bits);
-+	if (IS_ERR(device))
-+		return PTR_ERR(device);
- 
- 	return 0;
++	if (rev > MAX_ABI_REV)
++		return -EINVAL;
++	return vgic_its_set_abi(its, rev);
  }
+ 
+ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
+@@ -1393,8 +1406,9 @@ static struct vgic_register_region its_registers[] = {
+ 	REGISTER_ITS_DESC(GITS_CTLR,
+ 		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
+ 		VGIC_ACCESS_32bit),
+-	REGISTER_ITS_DESC(GITS_IIDR,
+-		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
++	REGISTER_ITS_DESC_UACCESS(GITS_IIDR,
++		vgic_mmio_read_its_iidr, its_mmio_write_wi,
++		vgic_mmio_uaccess_write_its_iidr, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_TYPER,
+ 		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
 -- 
 2.5.5
