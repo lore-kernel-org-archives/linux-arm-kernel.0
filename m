@@ -1,115 +1,156 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Thu,  4 May 2017 13:44:35 +0200
-Subject: [PATCH v6 15/24] KVM: arm64: vgic-its: Read config and pending bit in
- add_lpi()
+Date: Thu,  4 May 2017 13:44:38 +0200
+Subject: [PATCH v6 18/24] KVM: arm64: vgic-its: Add infrastructure for table
+ lookup
 In-Reply-To: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
 References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1493898284-29504-16-git-send-email-eric.auger@redhat.com>
+Message-ID: <1493898284-29504-19-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When creating the lpi we now ask the redistributor what is the state
-of the LPI (priority, enabled, pending).
+Add a generic scan_its_table() helper whose role consists in
+scanning a contiguous table located in guest RAM and applying
+a callback on each entry. Entries can be handled as linked lists
+since the callback may return an id offset to the next entry and
+also indicate whether the entry is the last one.
+
+Helper functions also are added to compute the device/event ID
+offset to the next DTE/ITE.
+
+compute_next_devid_offset, compute_next_eventid_offset and
+scan_table will become static in subsequent patches
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
+v5 -> v6:
+- add comments about 2d level table scan as suggested by Christoffer
+- s/lookup_table/scan_its_table
+- scan_table now return 0 if last elt found and +1 if not found
+- use int for id
+- simplify compute_next_devid/eventid_offset
 
-v6: creation
+v4 -> v5:
+- use kvm_read_guest
+
+v3 -> v4:
+- remove static to avoid compilation warning
+- correct size computation in looup_table()
+- defines now encode the number of bits used for devid and eventid offsets
+- use BIT() - 1 to encode the max offets
 ---
- virt/kvm/arm/vgic/vgic-its.c | 35 ++++++++++++++++++++++++-----------
- 1 file changed, 24 insertions(+), 11 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 92 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 92 insertions(+)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index f43ea30c..3ad615a 100644
+index ea8eb6a..1db7e38 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -38,6 +38,8 @@
+@@ -221,6 +221,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
  
- static int vgic_its_set_abi(struct vgic_its *its, int rev);
- static const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its);
-+static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
-+			     struct kvm_vcpu *filter_vcpu);
+ #define VITS_TYPER_IDBITS 16
+ #define VITS_TYPER_DEVBITS 16
++#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
++#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
  
  /*
-  * Creates a new (reference to a) struct vgic_irq for a given LPI.
-@@ -46,10 +48,12 @@ static const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its);
-  * If this is a "new" LPI, we allocate and initialize a new struct vgic_irq.
-  * This function returns a pointer to the _unlocked_ structure.
-  */
--static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
-+static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
-+				     struct kvm_vcpu *vcpu)
- {
- 	struct vgic_dist *dist = &kvm->arch.vgic;
- 	struct vgic_irq *irq = vgic_get_irq(kvm, NULL, intid), *oldirq;
+  * Finds and returns a collection in the ITS collection table.
+@@ -1694,6 +1696,96 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+ 	return ret;
+ }
+ 
++u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
++{
++	struct its_device *next;
++	u32 next_offset;
++
++	if (list_is_last(&dev->dev_list, h))
++		return 0;
++	next = list_next_entry(dev, dev_list);
++	next_offset = next->device_id - dev->device_id;
++
++	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
++}
++
++u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
++{
++	struct its_ite *next;
++	u32 next_offset;
++
++	if (list_is_last(&ite->ite_list, h))
++		return 0;
++	next = list_next_entry(ite, ite_list);
++	next_offset = next->event_id - ite->event_id;
++
++	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
++}
++
++/**
++ * entry_fn_t - Callback called on a table entry restore path
++ * @its: its handle
++ * @id: id of the entry
++ * @entry: pointer to the entry
++ * @opaque: pointer to an opaque data
++ *
++ * Return: < 0 on error, 0 if last element was identified, id offset to next
++ * element otherwise
++ */
++typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
++			  void *opaque);
++
++/**
++ * scan_its_table - Scan a contiguous table in guest RAM and applies a function
++ * to each entry
++ *
++ * @its: its handle
++ * @base: base gpa of the table
++ * @size: size of the table in bytes
++ * @esz: entry size in bytes
++ * @start_id: the ID of the first entry in the table
++ * (non zero for 2d level tables)
++ * @fn: function to apply on each entry
++ *
++ * Return: < 0 on error, 0 if last element was identified, 1 otherwise
++ * (the last element may not be found on second level tables)
++ */
++int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
++		   int start_id, entry_fn_t fn, void *opaque)
++{
++	void *entry = kzalloc(esz, GFP_KERNEL);
++	struct kvm *kvm = its->dev->kvm;
++	unsigned long len = size;
++	int id = start_id;
++	gpa_t gpa = base;
 +	int ret;
- 
- 	/* In this case there is no put, since we keep the reference. */
- 	if (irq)
-@@ -66,6 +70,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
- 	irq->config = VGIC_CONFIG_EDGE;
- 	kref_init(&irq->refcount);
- 	irq->intid = intid;
-+	irq->target_vcpu = vcpu;
- 
- 	spin_lock(&dist->lpi_list_lock);
- 
-@@ -97,6 +102,19 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
- out_unlock:
- 	spin_unlock(&dist->lpi_list_lock);
- 
-+	/*
-+	 * We "cache" the configuration table entries in out struct vgic_irq's.
-+	 * However we only have those structs for mapped IRQs, so we read in
-+	 * the respective config data from memory here upon mapping the LPI.
-+	 */
-+	ret = update_lpi_config(kvm, irq, NULL);
-+	if (ret)
-+		return ERR_PTR(ret);
 +
-+	ret = vgic_v3_lpi_sync_pending_status(kvm, irq);
-+	if (ret)
-+		return ERR_PTR(ret);
++	while (len > 0) {
++		int next_offset;
++		size_t byte_offset;
 +
- 	return irq;
- }
- 
-@@ -769,6 +787,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	u32 event_id = its_cmd_get_id(its_cmd);
- 	u32 coll_id = its_cmd_get_collection(its_cmd);
- 	struct its_ite *ite;
-+	struct kvm_vcpu *vcpu = NULL;
- 	struct its_device *device;
- 	struct its_collection *collection, *new_coll = NULL;
- 	int lpi_nr;
-@@ -814,7 +833,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	ite->collection = collection;
- 	ite->lpi = lpi_nr;
- 
--	irq = vgic_add_lpi(kvm, lpi_nr);
-+	if (its_is_collection_mapped(collection))
-+		vcpu = kvm_get_vcpu(kvm, collection->target_addr);
++		ret = kvm_read_guest(kvm, gpa, entry, esz);
++		if (ret)
++			goto out;
 +
-+	irq = vgic_add_lpi(kvm, lpi_nr, vcpu);
- 	if (IS_ERR(irq)) {
- 		if (new_coll)
- 			vgic_its_free_collection(its, coll_id);
-@@ -823,15 +845,6 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	}
- 	ite->irq = irq;
- 
--	update_affinity_ite(kvm, ite);
--
--	/*
--	 * We "cache" the configuration table entries in out struct vgic_irq's.
--	 * However we only have those structs for mapped IRQs, so we read in
--	 * the respective config data from memory here upon mapping the LPI.
--	 */
--	update_lpi_config(kvm, ite->irq, NULL);
--
- 	return 0;
- }
- 
++		next_offset = fn(its, id, entry, opaque);
++		if (next_offset <= 0) {
++			ret = next_offset;
++			goto out;
++		}
++
++		byte_offset = next_offset * esz;
++		id += next_offset;
++		gpa += byte_offset;
++		len -= byte_offset;
++	}
++	ret =  1;
++
++out:
++	kfree(entry);
++	return ret;
++}
++
+ /**
+  * vgic_its_save_device_tables - Save the device table and all ITT
+  * into guest RAM
 -- 
 2.5.5
