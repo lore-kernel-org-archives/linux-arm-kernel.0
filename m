@@ -1,29 +1,119 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 04 May 2017 22:07:47 +0800
-Subject: [PATCH v2 02/10] pinctrl: sunxi: add definitions for add A20 and
- R40 support to A10 driver
-In-Reply-To: <20170504140431.zhpcxvphxnxj7ipq@lukather>
-References: <20170504135006.16483-1-icenowy@aosc.io>
- <20170504135006.16483-3-icenowy@aosc.io>
- <20170504140431.zhpcxvphxnxj7ipq@lukather>
-Message-ID: <318E9984-9F5A-41C3-A3E0-52D5ECA05212@aosc.io>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 4 May 2017 15:16:41 +0100
+Subject: [PATCH v6 08/24] KVM: arm64: vgic-its: Implement
+ vgic_mmio_uaccess_write_its_creadr
+In-Reply-To: <1493898284-29504-9-git-send-email-eric.auger@redhat.com>
+References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
+ <1493898284-29504-9-git-send-email-eric.auger@redhat.com>
+Message-ID: <a58918e7-4e21-7783-28d2-c116e2b7a1e1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/05/17 12:44, Eric Auger wrote:
+> GITS_CREADR needs to be restored so let's implement the associated
+> uaccess_write_its callback. The write only is allowed if the its
+> is disabled.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
+> ---
+> v5 -> v6:
+> - remove usage of update_64bit_reg and check alignment of cmd offset
+> 
+> v4 -> v5:
+> - keep Stalled bit
+> - vgic_mmio_uaccess_write_its_creadr can now return an error
+> 
+> v3 -> v4:
+> - REGISTER_ITS_DESC_UACCESS now introduced in this patch
+> - we now check the its is disabled
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 43 +++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 41 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 222fad5..18588ef 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1213,6 +1213,34 @@ static unsigned long vgic_mmio_read_its_creadr(struct kvm *kvm,
+>  	return extract_bytes(its->creadr, addr & 0x7, len);
+>  }
+>  
+> +static int vgic_mmio_uaccess_write_its_creadr(struct kvm *kvm,
+> +					      struct vgic_its *its,
+> +					      gpa_t addr, unsigned int len,
+> +					      unsigned long val)
+> +{
+> +	u32 cmd_offset;
+> +	int ret = 0;
+> +
+> +	mutex_lock(&its->cmd_lock);
+> +
+> +	if (its->enabled) {
+> +		ret = -EBUSY;
+> +		goto out;
+> +	}
+> +
+> +	cmd_offset = ITS_CMD_OFFSET(val);
+> +	if ((cmd_offset >= ITS_CMD_BUFFER_SIZE(its->cbaser)) ||
+> +	    (cmd_offset & 0x1F)) {
 
+nit: In general, and for alignments that aren't completely obvious, you
+can write something like IS_ALIGNED(cmd_offset, sizeof(struct its_cmd)).
 
-? 2017?5?4? GMT+08:00 ??10:04:31, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
->On Thu, May 04, 2017 at 09:49:58PM +0800, Icenowy Zheng wrote:
->> Allwinner A10, A20 and R40 SoCs have similar GPIO layout.
->> 
->> Add SoC definitions in pinctrl-sunxi.h, in order to merge A20 support
->> into A10 driver, and add R40 support into it.
->
->While your commit log is good, the commit title is misleading since
->you're not adding it to the A10 driver. You just adding SoC IDs
->definitions
+Unfortunately, we don't have a struct its_cmd, and maybe we should fix
+that at a later time.
 
-Is "pinctrl: sunxi: Add SoC ID definitions for A10, A20 and R40 SoCs" OK?
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +
+> +	its->creadr = val;
+> +out:
+> +	mutex_unlock(&its->cmd_lock);
+> +	return ret;
+> +}
+> +
+>  #define BASER_INDEX(addr) (((addr) / sizeof(u64)) & 0x7)
+>  static unsigned long vgic_mmio_read_its_baser(struct kvm *kvm,
+>  					      struct vgic_its *its,
+> @@ -1317,6 +1345,16 @@ static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
+>  	.its_write = wr,					\
+>  }
+>  
+> +#define REGISTER_ITS_DESC_UACCESS(off, rd, wr, uwr, length, acc)\
+> +{								\
+> +	.reg_offset = off,					\
+> +	.len = length,						\
+> +	.access_flags = acc,					\
+> +	.its_read = rd,						\
+> +	.its_write = wr,					\
+> +	.uaccess_its_write = uwr,				\
+> +}
+> +
+>  static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+>  			      gpa_t addr, unsigned int len, unsigned long val)
+>  {
+> @@ -1339,8 +1377,9 @@ static struct vgic_register_region its_registers[] = {
+>  	REGISTER_ITS_DESC(GITS_CWRITER,
+>  		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+> -	REGISTER_ITS_DESC(GITS_CREADR,
+> -		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
+> +	REGISTER_ITS_DESC_UACCESS(GITS_CREADR,
+> +		vgic_mmio_read_its_creadr, its_mmio_write_wi,
+> +		vgic_mmio_uaccess_write_its_creadr, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_ITS_DESC(GITS_BASER,
+>  		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
+> 
 
->
->Maxime
+Otherwise:
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
