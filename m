@@ -1,76 +1,204 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Thu, 4 May 2017 18:49:00 +0800
-Subject: [v2, 5/5] arm64: dts: ls1088a: add esdhc node
-In-Reply-To: <1493894940-47452-1-git-send-email-yangbo.lu@nxp.com>
-References: <1493894940-47452-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1493894940-47452-6-git-send-email-yangbo.lu@nxp.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 4 May 2017 13:22:25 +0200
+Subject: [PATCH 5/5] KVM: arm/arm64: Allow setting the timer IRQ numbers
+ from userspace
+In-Reply-To: <79ec69f2-d727-46ec-b1d5-4c535a904e63@arm.com>
+References: <20170503183300.4618-1-cdall@linaro.org>
+ <20170503183300.4618-6-cdall@linaro.org>
+ <b08c50b4-6aba-1a59-80f4-343cd906f1fa@arm.com>
+ <20170504095918.GJ5923@cbox>
+ <79ec69f2-d727-46ec-b1d5-4c535a904e63@arm.com>
+Message-ID: <20170504112225.GM5923@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add esdhc node for ls1088a and enable it on both RDB and QDS boards.
+On Thu, May 04, 2017 at 11:54:06AM +0100, Marc Zyngier wrote:
+> On 04/05/17 10:59, Christoffer Dall wrote:
+> > On Thu, May 04, 2017 at 10:34:32AM +0100, Marc Zyngier wrote:
+> >> On 03/05/17 19:33, Christoffer Dall wrote:
+> >>> First we define an ABI using the vcpu devices that lets userspace set
+> >>> the interrupt numbers for the various timers on both the 32-bit and
+> >>> 64-bit KVM/ARM implementations.
+> >>>
+> >>> Second, we add the definitions for the groups and attributes introduced
+> >>> by the above ABI.  (We add the PMU define on the 32-bit side as well for
+> >>> symmetry and it may get used some day.)
+> >>>
+> >>> Third, we set up the arch-specific vcpu device operation handlers to
+> >>> call into the timer code for anything related to the
+> >>> KVM_ARM_VCPU_TIMER_CTRL group.
+> >>>
+> >>> Fourth, we implement support for getting and setting the timer interrupt
+> >>> numbers using the above defined ABI in the arch timer code.
+> >>>
+> >>> Fifth, we introduce error checking upon enabling the arch timer (which
+> >>> is called when first running a VCPU) to check that all VCPUs are
+> >>> configured to use the same PPI for the timer (as mandated by the
+> >>> architecture) and that the virtual and physical timers are not
+> >>> configured to use the same IRQ number.
+> >>>
+> >>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> >>> ---
+> >>>  Documentation/virtual/kvm/devices/vcpu.txt |  25 +++++++
+> >>>  arch/arm/include/uapi/asm/kvm.h            |   8 +++
+> >>>  arch/arm/kvm/guest.c                       |   9 +++
+> >>>  arch/arm64/include/uapi/asm/kvm.h          |   3 +
+> >>>  arch/arm64/kvm/guest.c                     |   9 +++
+> >>>  include/kvm/arm_arch_timer.h               |   4 ++
+> >>>  virt/kvm/arm/arch_timer.c                  | 104 +++++++++++++++++++++++++++++
+> >>>  7 files changed, 162 insertions(+)
+> >>>
+> >>> diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
+> >>> index 352af6e..013e3f1 100644
+> >>> --- a/Documentation/virtual/kvm/devices/vcpu.txt
+> >>> +++ b/Documentation/virtual/kvm/devices/vcpu.txt
+> >>> @@ -35,3 +35,28 @@ Returns: -ENODEV: PMUv3 not supported or GIC not initialized
+> >>>  Request the initialization of the PMUv3.  If using the PMUv3 with an in-kernel
+> >>>  virtual GIC implementation, this must be done after initializing the in-kernel
+> >>>  irqchip.
+> >>> +
+> >>> +
+> >>> +2. GROUP: KVM_ARM_VCPU_TIMER_CTRL
+> >>> +Architectures: ARM,ARM64
+> >>> +
+> >>> +2.1. ATTRIBUTE: KVM_ARM_VCPU_TIMER_IRQ_VTIMER
+> >>> +2.2. ATTRIBUTE: KVM_ARM_VCPU_TIMER_IRQ_PTIMER
+> >>> +Parameters: in kvm_device_attr.addr the address for the timer interrupt is a
+> >>> +            pointer to an int
+> >>> +Returns: -EINVAL: Invalid timer interrupt number
+> >>> +         -EBUSY:  One or more VCPUs has already run
+> >>> +
+> >>> +A value describing the architected timer interrupt number when connected to an
+> >>> +in-kernel virtual GIC.  These must be a PPI (16 <= intid < 32).  If an
+> >>> +attribute is not set, a default value is applied (see below).
+> >>> +
+> >>> +KVM_ARM_VCPU_TIMER_IRQ_VTIMER: The EL1 virtual timer intid (default: 27)
+> >>> +KVM_ARM_VCPU_TIMER_IRQ_PTIMER: The EL1 physical timer intid (default: 30)
+> >>
+> >> uber nit: my reading of the code is that the default is set at VCPU
+> >> creation time. So setting the attribute overrides the default, not that
+> >> the default is applied if no attribute is set (i.e. there is always a
+> >> valid value).
+> >>
+> > 
+> > uh, right, I don't see the distinction though, so not sure how to
+> > correct the text.
+> > 
+> > Would "Setting the attribute overrides the default values (see below)."
+> > work instead?
+> 
+> Looks good to me.
+> 
+> [...]
+> 
+> >>
+> >> Another issue that just popped in my head: how do we ensure that we
+> >> don't clash between the PMU and the timers? Yes, that's a foolish thing
+> >> to do, but that's no different from avoiding the same interrupt on the
+> >> timers...
+> >>
+> > Argh, good point.
+> > 
+> > So actually, nothing *really bad* happens from using the same IRQ number
+> > except that the VM gets confused.  However, it's living life dangerously
+> > because we use the HW bit for the vtimer, so we if ever start using it
+> > for other timers or the PMU, then you could end up in a situation where
+> > you unmap the phys mapping on behalf of another device, and the physical
+> > interrupt could be left in an active state.
+> > 
+> > On the other hand, the vtimer currently belongs only to VMs and we set
+> > the required physical active state before entering the VM, so maybe it
+> > doesn't matter.
+> 
+> So far, we always assume that there is never more than a single source
+> per interrupt. We'll end-up with weird behaviours because our line_level
+> field is not an OR of the various inputs, but a direct assignment
+> (device A and B raise the line, then A drops it -> B's interrupt is gone).
+> 
+> I think that only the guest will be confused by it, but accepting it may
+> be interpreted as "this should work correctly". Would documenting that
+> it is a bad idea be enough?
+> 
+> > Should we just forego these checks and let the user shoot itself in the
+> > foot if he/she wants to?
+> 
+> If the documentation is enough, why not. Otherwise, we need some form of
+> allocator. Boring. ;-)
+> 
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
----
-Changes for v2:
-	- Sorted the node.
----
- arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts |  4 ++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  4 ++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 12 ++++++++++++
- 3 files changed, 20 insertions(+)
+Well, it's not that bad really (untested):
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
-index 8c3cae5..ff21055 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
-@@ -118,6 +118,10 @@
- 	status = "okay";
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 1541f5d..122f9d3 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -121,6 +121,9 @@ struct vgic_irq {
+ 	u8 source;			/* GICv2 SGIs only */
+ 	u8 priority;
+ 	enum vgic_irq_config config;	/* Level or edge */
++
++	void *owner;			/* Opaque pointer to reserve an interrupt
++					   for in-kernel devices. */
  };
  
-+&esdhc {
-+	status = "okay";
-+};
-+
- &sata {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-index 8a04fbb..ab62ef6 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-@@ -102,6 +102,10 @@
- 	status = "okay";
- };
+ struct vgic_register_region;
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 3d0979c..7561d2d 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -429,6 +429,42 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+ }
  
-+&esdhc {
-+	status = "okay";
-+};
+ /**
++ * kvm_vgic_set_owner - Set the owner of an interrupt for a VM
++ *
++ * @kvm:    Pointer to the VM structure
++ * @intid:  The virtual INTID identifying the interrupt (PPI or SPI)
++ * @owner:  Opaque pointer to the owner
++ *
++ * Returns 0 if intid is not already used by another in-kernel device and the
++ * owner is set, otherwise returns an error code.
++ *
++ * We only set the owner for VCPU 0 for PPIs.
++ */
++int kvm_vgic_set_owner(struct kvm *kvm, unsigned int intid, void *owner)
++{
++	struct vgic_irq *irq;
++	struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, 0);
++	int ret = 0;
 +
- &sata {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index 2946fd7..10b5775 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -263,6 +263,18 @@
- 			status = "disabled";
- 		};
- 
-+		esdhc: esdhc at 2140000 {
-+			compatible = "fsl,ls1088a-esdhc", "fsl,esdhc";
-+			reg = <0x0 0x2140000 0x0 0x10000>;
-+			interrupts = <0 28 0x4>; /* Level high type */
-+			clock-frequency = <0>;
-+			voltage-ranges = <1800 1800 3300 3300>;
-+			sdhci,auto-cmd12;
-+			little-endian;
-+			bus-width = <4>;
-+			status = "disabled";
-+		};
++	if (!vgic_initialized(kvm))
++		return -EAGAIN;
 +
- 		sata: sata at 3200000 {
- 			compatible = "fsl,ls1088a-ahci", "fsl,ls1043a-ahci";
- 			reg = <0x0 0x3200000 0x0 0x10000>;
--- 
-2.1.0.27.g96db324
++	/* SGIs and LPIs cannot be wired up to any device */
++	if (!irq_is_ppi(intid) && !vgic_valid_spi(kvm, intid))
++		return -EINVAL;
++
++	irq = vgic_get_irq(kvm, vcpu, intid);
++	spin_lock(&irq->irq_lock);
++	if (irq->owner && irq->owner != owner)
++		ret = -EEXIST;
++	else
++		irq->owner = owner;
++	spin_unlock(&irq->irq_lock);
++
++	return ret;
++}
++
++/**
+  * vgic_prune_ap_list - Remove non-relevant interrupts from the list
+  *
+  * @vcpu: The VCPU pointer
+
+The problem is that it doesn't help that much, because userspace can
+still change the level of an IRQ which is connected to an in-kernel
+device, unless we also introduce checking the owner field in the
+injection path.
+
+I don't see it blowing up the host with/without an allocator, so I'm
+fine with documentation, but I can also include the above.
+
+Thoughts?
+
+Thanks,
+-Christoffer
