@@ -1,29 +1,41 @@
 From: marex@denx.de (Marek Vasut)
-Date: Thu,  4 May 2017 12:26:30 +0200
-Subject: [PATCH] ARM: socfpga: Increase max number of GPIOs
-Message-ID: <20170504102630.10487-1-marex@denx.de>
+Date: Thu,  4 May 2017 12:27:20 +0200
+Subject: [PATCH] ARM: dts: socfpga: Fix the ethernet clock phandle
+Message-ID: <20170504102720.10545-1-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increase the maximum number of GPIOs on SoCFPGA as this platform
-can have many GPIO controllers in the FPGA part.
+The ethernet block clock phandle must point to the clock node which
+represents the clock which directly supply the ethernet block. This
+is emac_x_clk , not emacx_clk , so fix this.
 
+From: Pavel Machek <pavel@denx.de>
 Signed-off-by: Marek Vasut <marex@denx.de>
 ---
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/socfpga.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4c1a35f15838..108c203a8b29 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1460,6 +1460,7 @@ config ARM_PSCI
- # selected platforms.
- config ARCH_NR_GPIO
- 	int
-+	default 2048 if ARCH_SOCFPGA
- 	default 1024 if ARCH_BRCMSTB || ARCH_SHMOBILE || ARCH_TEGRA || \
- 		ARCH_ZYNQ
- 	default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 || \
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index b2674bdb8e6a..7e24dc8e82d4 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -557,7 +557,7 @@
+ 			interrupts = <0 115 4>;
+ 			interrupt-names = "macirq";
+ 			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+-			clocks = <&emac0_clk>;
++			clocks = <&emac_0_clk>;
+ 			clock-names = "stmmaceth";
+ 			resets = <&rst EMAC0_RESET>;
+ 			reset-names = "stmmaceth";
+@@ -575,7 +575,7 @@
+ 			interrupts = <0 120 4>;
+ 			interrupt-names = "macirq";
+ 			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+-			clocks = <&emac1_clk>;
++			clocks = <&emac_1_clk>;
+ 			clock-names = "stmmaceth";
+ 			resets = <&rst EMAC1_RESET>;
+ 			reset-names = "stmmaceth";
 -- 
 2.11.0
