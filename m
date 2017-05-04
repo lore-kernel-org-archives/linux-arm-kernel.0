@@ -1,149 +1,88 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 4 May 2017 14:36:01 +0200
-Subject: [PATCH v2] misc: sram-exec: Use aligned fncpy instead of memcpy
-In-Reply-To: <20170410145247.6023-1-d-gerlach@ti.com>
-References: <20170410145247.6023-1-d-gerlach@ti.com>
-Message-ID: <20170504123601.hcwja6bxlfniccnm@piout.net>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 4 May 2017 20:44:48 +0800
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
+In-Reply-To: <6dbf67a0-42ea-ee84-d144-41422a21c1c5@denx.de>
+References: <1493141004.3557.8.camel@nxp.com>
+ <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
+ <20170503135715.GG18578@dragon>
+ <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
+ <1493823533.11226.28.camel@nxp.com>
+ <e46a57c2-4a28-a8b6-445e-299dd9d8659c@denx.de>
+ <1493834298.11226.40.camel@nxp.com>
+ <51fb1bd0-028d-c431-acc8-3c4f1d25fdba@denx.de>
+ <1493890943.11226.42.camel@nxp.com>
+ <6dbf67a0-42ea-ee84-d144-41422a21c1c5@denx.de>
+Message-ID: <20170504124446.GO18578@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2017 at 09:52:47 -0500, Dave Gerlach wrote:
-> Currently the sram-exec functionality, which allows allocation of
-> executable memory and provides an API to move code to it, is only
-> selected in configs for the ARM architecture. Based on commit
-> 5756e9dd0de6 ("ARM: 6640/1: Thumb-2: Symbol manipulation macros for
-> function body copying") simply copying a C function pointer address
-> using memcpy without consideration of alignment and Thumb is unsafe on
-> ARM platforms.
+On Thu, May 04, 2017 at 12:06:11PM +0200, Marek Vasut wrote:
+> On 05/04/2017 11:42 AM, Leonard Crestez wrote:
+> > I think there is a further misunderstanding here. I have a problem
+> > where imx6sx-sdb rev C boards crash on boot with upstream (but are
+> > reported to work fine with rev B). Removing the OPP overrides fixes
+> > this specific issue.
+> > 
+> > I don't object to the second part of your patch, setting correct supply links is a good thing for various reasons. It is just not necessary for fixing the concrete crash mentioned above (and I tested this). It should probably go in a separate patch.
 > 
-> The aforementioned patch introduces the fncpy macro which is a safe way
-> to copy executable code on ARM platforms, so let's make use of that here
-> rather than the unsafe plain memcpy that was previously used by
-> sram_exec_copy. Now sram_exec_copy will move the code to "dst" and
-> return an address that is guaranteed to be safely callable.
-> 
-> In the future, architectures hoping to make use of the sram-exec
-> functionality must define an fncpy macro just as ARM has done to
-> guarantee or check for safe copying to executable memory before allowing
-> the arch to select CONFIG_SRAM_EXEC.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Mind you, my patch is not fixing any crash, it's correcting the
+> regulator binding and removing the OPP override which is at that
+> point useless.
 
-> ---
-> 
-> v1: http://www.spinics.net/lists/linux-omap/msg136517.html
-> 
-> v2 changes: Return value of fncpy, as the returned address is the safely
-> 	    executable one, and add supporting docs in comments.
-> 
->  drivers/misc/sram-exec.c | 27 ++++++++++++++++++++-------
->  include/linux/sram.h     |  8 ++++----
->  2 files changed, 24 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/misc/sram-exec.c b/drivers/misc/sram-exec.c
-> index ac522417c462..9d54e14e8360 100644
-> --- a/drivers/misc/sram-exec.c
-> +++ b/drivers/misc/sram-exec.c
-> @@ -19,6 +19,7 @@
->  #include <linux/sram.h>
->  
->  #include <asm/cacheflush.h>
-> +#include <asm/fncpy.h>
->  
->  #include "sram.h"
->  
-> @@ -57,20 +58,32 @@ int sram_add_protect_exec(struct sram_partition *part)
->   * @src: Source address for the data to copy
->   * @size: Size of copy to perform, which starting from dst, must reside in pool
->   *
-> + * Return: Address for copied data that can safely be called through function
-> + *	   pointer, or NULL if problem.
-> + *
->   * This helper function allows sram driver to act as central control location
->   * of 'protect-exec' pools which are normal sram pools but are always set
->   * read-only and executable except when copying data to them, at which point
->   * they are set to read-write non-executable, to make sure no memory is
->   * writeable and executable at the same time. This region must be page-aligned
->   * and is checked during probe, otherwise page attribute manipulation would
-> - * not be possible.
-> + * not be possible. Care must be taken to only call the returned address as
-> + * dst address is not guaranteed to be safely callable.
-> + *
-> + * NOTE: This function uses the fncpy macro to move code to the executable
-> + * region. Some architectures have strict requirements for relocating
-> + * executable code, so fncpy is a macro that must be defined by any arch
-> + * making use of this functionality that guarantees a safe copy of exec
-> + * data and returns a safe address that can be called as a C function
-> + * pointer.
->   */
-> -int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
-> -		   size_t size)
-> +void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
-> +		     size_t size)
->  {
->  	struct sram_partition *part = NULL, *p;
->  	unsigned long base;
->  	int pages;
-> +	void *dst_cpy;
->  
->  	mutex_lock(&exec_pool_list_mutex);
->  	list_for_each_entry(p, &exec_pool_list, list) {
-> @@ -80,10 +93,10 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
->  	mutex_unlock(&exec_pool_list_mutex);
->  
->  	if (!part)
-> -		return -EINVAL;
-> +		return NULL;
->  
->  	if (!addr_in_gen_pool(pool, (unsigned long)dst, size))
-> -		return -EINVAL;
-> +		return NULL;
->  
->  	base = (unsigned long)part->base;
->  	pages = PAGE_ALIGN(size) / PAGE_SIZE;
-> @@ -93,13 +106,13 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
->  	set_memory_nx((unsigned long)base, pages);
->  	set_memory_rw((unsigned long)base, pages);
->  
-> -	memcpy(dst, src, size);
-> +	dst_cpy = fncpy(dst, src, size);
->  
->  	set_memory_ro((unsigned long)base, pages);
->  	set_memory_x((unsigned long)base, pages);
->  
->  	mutex_unlock(&part->lock);
->  
-> -	return 0;
-> +	return dst_cpy;
->  }
->  EXPORT_SYMBOL_GPL(sram_exec_copy);
-> diff --git a/include/linux/sram.h b/include/linux/sram.h
-> index c97dcbe8ce25..4fb405fb0480 100644
-> --- a/include/linux/sram.h
-> +++ b/include/linux/sram.h
-> @@ -16,12 +16,12 @@
->  struct gen_pool;
->  
->  #ifdef CONFIG_SRAM_EXEC
-> -int sram_exec_copy(struct gen_pool *pool, void *dst, void *src, size_t size);
-> +void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src, size_t size);
->  #else
-> -static inline int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
-> -				 size_t size)
-> +static inline void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
-> +				   size_t size)
->  {
-> -	return -ENODEV;
-> +	return NULL;
->  }
->  #endif /* CONFIG_SRAM_EXEC */
->  #endif /* __LINUX_SRAM_H__ */
-> -- 
-> 2.11.0
-> 
+Heh, that's the primary reason why I prefer Leonard's patch, as his
+patch is fixing a critical crash issue, while yours is just removing
+some useless stuff and correcting something that doesn't show any real
+problem.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+So Leonard's patch will need to be applied for v4.12-rc and copy stable
+kernel, while yours will only be applied for next merge window as a
+cleanup/improving thing.
+
+Patches are similar, but they can be handled very differently, because
+commit log tells completely different stories.  Do you see how commit
+log matters now?
+
+> > It might seem a pedantic difference but it's good to accurately describe the effect of patches in commit messages. For example it might help somebody looking to backport various fixes.
+
+@Leonard, no, it's not pedantic at all.  I really appreciate your commit
+message and all the comments you added in the discussion, which is
+extremely helpful for us to understand the changes.
+
+> Which part of the following commit message is unclear?
+> 
+> "
+> The imx6sx-sdb has one power supply that drives both VDDARM_IN
+> and VDDSOC_IN, which is the sw1a regulator on the PFUZE PMIC.
+> Connect both inputs to the sw1a regulator on the PMIC and drop
+> the OPP hackery which is no longer needed as the power framework
+> will take care of the regulator configuration as needed.
+> "
+
+Something unclear in my opinion:
+
+ - The OPP hackery was never needed, as it's only needed for LDO bypass
+   mode which hasn't been supported by mainline kernel.  It's not 'no
+   longer needed as the power framework ...'.
+
+ - What are the related changes in power framework?  It will be more
+   clear if we can have the particular commit mentioned here.
+
+> btw if sending obvious bugfix upstream is met with this sort of
+
+Leonard's patch is an obvious bugfix, but yours is not.
+
+> resistance and pointless discussion, it is extremely demotivating.
+
+As I said to Leonard above, the discussion is extremely helpful, IMO.
+
+> Waiting for a maintainer reply for 2-4 weeks, only to get a kurt
+
+This is not a paid job for maintainer.  It's expected that he doesn't
+always reply in a timely manner, especially when the tree is kinda
+'frozen' for merge window.
+
+> reply like "I don't like the commit message" doesn't help either.
+
+What really annoys me is your attitude to commit message.
+
+Shawn
