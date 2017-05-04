@@ -1,107 +1,168 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu,  4 May 2017 19:41:56 +0800
-Subject: [PATCH 01/13] dt-bindings: add binding for the Allwinner DE2 CCU
-Message-ID: <20170504114208.8524-1-icenowy@aosc.io>
+Date: Thu,  4 May 2017 19:41:59 +0800
+Subject: [PATCH 04/13] drm/sun4i: return only planes for layers created
+In-Reply-To: <20170504114208.8524-1-icenowy@aosc.io>
+References: <20170504114208.8524-1-icenowy@aosc.io>
+Message-ID: <20170504114208.8524-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner "Display Engine 2.0" contains some clock controls in it.
+As we are going to add support for the Allwinner DE2 Mixer in sun4i-drm
+driver, we will finally have two types of layers.
 
-In order to add them as clock drivers, we need a device tree binding.
-Add the binding here.
+Each layer is bound to a drm_plane that is CRTC-specific, so we create
+them when initializing CRTC (calling sun4i_layers_init, which will be
+generalized in next patch). The drm_plane's will be used when creating
+CRTC, but the CRTC initialization code do not care other properties of
+the layer, so we let the sun4i_layers_init function return drm_plane's
+only.
 
-Also add the device tree binding headers.
+As we have no need to trace the layers after the CRTC is properly
+created, we drop the layers pointer in sun4i_crtc struct.
+
+Doing these things makes the CRTC code independent to the type of layer
+(the sun4i_layers_init function name is still hardcoded and will be
+changed in the next patch), so that we can finally gain support for the
+mixer in DE2, which will has different layers.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/clock/sun8i-de2.txt        | 30 ++++++++++++++++++++++
- include/dt-bindings/clock/sun8i-de2.h              | 18 +++++++++++++
- include/dt-bindings/reset/sun8i-de2.h              | 14 ++++++++++
- 3 files changed, 62 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
- create mode 100644 include/dt-bindings/clock/sun8i-de2.h
- create mode 100644 include/dt-bindings/reset/sun8i-de2.h
+ drivers/gpu/drm/sun4i/sun4i_crtc.c  | 23 ++++++++++++-----------
+ drivers/gpu/drm/sun4i/sun4i_crtc.h  |  1 -
+ drivers/gpu/drm/sun4i/sun4i_layer.c | 18 ++++++++++--------
+ drivers/gpu/drm/sun4i/sun4i_layer.h |  4 ++--
+ 4 files changed, 24 insertions(+), 22 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-new file mode 100644
-index 000000000000..d710c0111cd3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-@@ -0,0 +1,30 @@
-+Allwinner Display Engine 2.0 Clock Control Binding
-+--------------------------------------------------
-+
-+Required properties :
-+- compatible: must contain one of the following compatibles:
-+		- "allwinner,sun8i-a83t-de2-clk"
-+		- "allwinner,sun50i-h5-de2-clk"
-+
-+- reg: Must contain the registers base address and length
-+- clocks: phandle to the clocks feeding the display engine subsystem.
-+	  Three are needed:
-+  - "mod": the display engine module clock
-+  - "bus": the bus clock for the whole display engine subsystem
-+- clock-names: Must contain the clock names described just above
-+- resets: phandle to the reset control for the display engine subsystem.
-+- #clock-cells : must contain 1
-+- #reset-cells : must contain 1
-+
-+Example:
-+de2_clocks: clock at 1000000 {
-+	compatible = "allwinner,sun8i-a83t-de2-clk";
-+	reg = <0x01000000 0x100000>;
-+	clocks = <&ccu CLK_DE>,
-+		 <&ccu CLK_BUS_DE>;
-+	clock-names = "mod",
-+		      "bus";
-+	resets = <&ccu RST_BUS_DE>;
-+	#clock-cells = <1>;
-+	#reset-cells = <1>;
-+};
-diff --git a/include/dt-bindings/clock/sun8i-de2.h b/include/dt-bindings/clock/sun8i-de2.h
-new file mode 100644
-index 000000000000..3bed63b524aa
---- /dev/null
-+++ b/include/dt-bindings/clock/sun8i-de2.h
-@@ -0,0 +1,18 @@
-+/*
-+ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.io>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+#ifndef _DT_BINDINGS_CLOCK_SUN8I_DE2_H_
-+#define _DT_BINDINGS_CLOCK_SUN8I_DE2_H_
-+
-+#define CLK_BUS_MIXER0		0
-+#define CLK_BUS_MIXER1		1
-+#define CLK_BUS_WB		2
-+
-+#define CLK_MIXER0		6
-+#define CLK_MIXER1		7
-+#define CLK_WB			8
-+
-+#endif /* _DT_BINDINGS_CLOCK_SUN8I_DE2_H_ */
-diff --git a/include/dt-bindings/reset/sun8i-de2.h b/include/dt-bindings/reset/sun8i-de2.h
-new file mode 100644
-index 000000000000..9526017432f0
---- /dev/null
-+++ b/include/dt-bindings/reset/sun8i-de2.h
-@@ -0,0 +1,14 @@
-+/*
-+ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.io>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+#ifndef _DT_BINDINGS_RESET_SUN8I_DE2_H_
-+#define _DT_BINDINGS_RESET_SUN8I_DE2_H_
-+
-+#define RST_MIXER0	0
-+#define RST_MIXER1	1
-+#define RST_WB		2
-+
-+#endif /* _DT_BINDINGS_RESET_SUN8I_DE2_H_ */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index 3c876c3a356a..708b3543d4e9 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -139,6 +139,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
+ 				   struct sun4i_tcon *tcon)
+ {
+ 	struct sun4i_crtc *scrtc;
++	struct drm_plane **planes;
+ 	struct drm_plane *primary = NULL, *cursor = NULL;
+ 	int ret, i;
+ 
+@@ -149,22 +150,22 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
+ 	scrtc->tcon = tcon;
+ 
+ 	/* Create our layers */
+-	scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
+-	if (IS_ERR(scrtc->layers)) {
++	planes = sun4i_layers_init(drm, scrtc);
++	if (IS_ERR(planes)) {
+ 		dev_err(drm->dev, "Couldn't create the planes\n");
+ 		return NULL;
+ 	}
+ 
+ 	/* find primary and cursor planes for drm_crtc_init_with_planes */
+-	for (i = 0; scrtc->layers[i]; i++) {
+-		struct sun4i_layer *layer = scrtc->layers[i];
++	for (i = 0; planes[i]; i++) {
++		struct drm_plane *plane = planes[i];
+ 
+-		switch (layer->plane.type) {
++		switch (plane->type) {
+ 		case DRM_PLANE_TYPE_PRIMARY:
+-			primary = &layer->plane;
++			primary = plane;
+ 			break;
+ 		case DRM_PLANE_TYPE_CURSOR:
+-			cursor = &layer->plane;
++			cursor = plane;
+ 			break;
+ 		default:
+ 			break;
+@@ -188,12 +189,12 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
+ 						   1);
+ 
+ 	/* Set possible_crtcs to this crtc for overlay planes */
+-	for (i = 0; scrtc->layers[i]; i++) {
++	for (i = 0; planes[i]; i++) {
+ 		uint32_t possible_crtcs = BIT(drm_crtc_index(&scrtc->crtc));
+-		struct sun4i_layer *layer = scrtc->layers[i];
++		struct drm_plane *plane = planes[i];
+ 
+-		if (layer->plane.type == DRM_PLANE_TYPE_OVERLAY)
+-			layer->plane.possible_crtcs = possible_crtcs;
++		if (plane->type == DRM_PLANE_TYPE_OVERLAY)
++			plane->possible_crtcs = possible_crtcs;
+ 	}
+ 
+ 	return scrtc;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.h b/drivers/gpu/drm/sun4i/sun4i_crtc.h
+index 230cb8f0d601..4dae3508424a 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.h
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.h
+@@ -19,7 +19,6 @@ struct sun4i_crtc {
+ 
+ 	struct sun4i_backend		*backend;
+ 	struct sun4i_tcon		*tcon;
+-	struct sun4i_layer		**layers;
+ };
+ 
+ static inline struct sun4i_crtc *drm_crtc_to_sun4i_crtc(struct drm_crtc *crtc)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index f26bde5b9117..e1f03e1cc0ac 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -16,6 +16,7 @@
+ #include <drm/drmP.h>
+ 
+ #include "sun4i_backend.h"
++#include "sun4i_crtc.h"
+ #include "sun4i_layer.h"
+ 
+ struct sun4i_plane_desc {
+@@ -128,15 +129,16 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 	return layer;
+ }
+ 
+-struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
+-				       struct sun4i_backend *backend)
++struct drm_plane **sun4i_layers_init(struct drm_device *drm,
++				     struct sun4i_crtc *crtc)
+ {
+-	struct sun4i_layer **layers;
++	struct drm_plane **planes;
++	struct sun4i_backend *backend = crtc->backend;
+ 	int i;
+ 
+-	layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
+-			      sizeof(*layers), GFP_KERNEL);
+-	if (!layers)
++	planes = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
++			      sizeof(*planes), GFP_KERNEL);
++	if (!planes)
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	/*
+@@ -178,8 +180,8 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
+ 				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
+ 
+ 		layer->id = i;
+-		layers[i] = layer;
++		planes[i] = &layer->plane;
+ 	};
+ 
+-	return layers;
++	return planes;
+ }
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
+index 4be1f0919df2..5ea5c994d6ea 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.h
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
+@@ -26,7 +26,7 @@ plane_to_sun4i_layer(struct drm_plane *plane)
+ 	return container_of(plane, struct sun4i_layer, plane);
+ }
+ 
+-struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
+-				       struct sun4i_backend *backend);
++struct drm_plane **sun4i_layers_init(struct drm_device *drm,
++				     struct sun4i_crtc *crtc);
+ 
+ #endif /* _SUN4I_LAYER_H_ */
 -- 
 2.12.2
