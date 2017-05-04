@@ -1,220 +1,83 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 4 May 2017 08:40:40 +0100
-Subject: [PATCH v5 01/22] KVM: arm/arm64: Add ITS save/restore API
- documentation
-In-Reply-To: <3c16c95a-6bbc-a25c-7dc2-b4fd13685327@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-2-git-send-email-eric.auger@redhat.com>
- <20170426123120.GL4104@cbox>
- <88a194fa-9143-960e-e0a6-6b5c388cef82@redhat.com>
- <20170427085709.GB50776@lvm>
- <db5d0eb9-67eb-8b9a-50ca-816d217b3f53@redhat.com>
- <20170427110223.GH50776@lvm>
- <d0aa6771-a8c3-276e-0f70-d709cdf678d6@redhat.com>
- <20170427144516.GL50776@lvm>
- <3c16c95a-6bbc-a25c-7dc2-b4fd13685327@redhat.com>
-Message-ID: <73c4e7c5-14f0-8d47-cd30-7fd072a8f365@arm.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Thu, 4 May 2017 09:40:11 +0200
+Subject: [RFC PATCH] mtd: spi-nor: handle signal case as failure
+In-Reply-To: <b3de06f6-9fcd-4b58-60f2-14c55d83898d@wedev4u.fr>
+References: <1493805189-25327-1-git-send-email-der.herr@hofr.at>
+ <b3de06f6-9fcd-4b58-60f2-14c55d83898d@wedev4u.fr>
+Message-ID: <845ce78f-f3b0-35c0-8e3d-580ce4e1f63a@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/17 08:00, Auger Eric wrote:
-> Hi Christoffer,
-> 
-> On 27/04/2017 16:45, Christoffer Dall wrote:
->> Hi Eric,
+On 05/03/2017 11:23 PM, Cyrille Pitchen wrote:
+> Hi all,
+>
+> Le 03/05/2017 ? 11:53, Nicholas Mc Guire a ?crit :
+>>   The problem is that stm32_qspi_wait_cmd() will indicate success in case of
+>>   being interrupted. The if condition is incomplete here as
+>>   wait_for_copletion_interruptible_timeout can return -ERESTARTSYS but this
+>>   is not handled by if(!wait_for_completion_interruptible_timeout()).
+>>   While somewhat unlikely it probably would be hard to figure out what went
+>>   wrong if the signal case does occur.
 >>
->> On Thu, Apr 27, 2017 at 02:51:00PM +0200, Auger Eric wrote:
->>> On 27/04/2017 13:02, Christoffer Dall wrote:
->>>> On Thu, Apr 27, 2017 at 11:33:39AM +0200, Auger Eric wrote:
->>>>> On 27/04/2017 10:57, Christoffer Dall wrote:
->>>>>> On Wed, Apr 26, 2017 at 05:48:32PM +0200, Auger Eric wrote:
->>>>>>> On 26/04/2017 14:31, Christoffer Dall wrote:
->>>>>>>> On Fri, Apr 14, 2017 at 12:15:13PM +0200, Eric Auger wrote:
->>>>>>>>> Add description for how to access ITS registers and how to save/restore
->>>>>>>>> ITS tables into/from memory.
->>>>>>>>>
->>>>>>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>>>>>>>
->>>>>>>>> ---
->>>>>>>>> v4 -> v5:
->>>>>>>>> - take into account Christoffer's comments
->>>>>>>>> - pending table save on GICV3 side now
->>>>>>>>>
->>>>>>>>> v3 -> v4:
->>>>>>>>> - take into account Peter's comments:
->>>>>>>>>   - typos
->>>>>>>>>   - KVM_DEV_ARM_VGIC_GRP_ITS_TABLES kvm_device_attr = 0
->>>>>>>>>   - add a validity bit in DTE
->>>>>>>>>   - document all fields in CTE and ITE
->>>>>>>>>   - document ABI revision
->>>>>>>>> - take into account Andre's comments:
->>>>>>>>>   - document restrictions about GITS_CREADR writing and GITS_IIDR
->>>>>>>>>   - document -EBUSY error if one or more VCPUS are runnning
->>>>>>>>>   - document 64b registers only can be accessed with 64b access
->>>>>>>>> - itt_addr field matches bits [51:8] of the itt_addr
->>>>>>>>>
->>>>>>>>> v1 -> v2:
->>>>>>>>> - DTE and ITE now are 8 bytes
->>>>>>>>> - DTE and ITE now indexed by deviceid/eventid
->>>>>>>>> - use ITE name instead of ITTE
->>>>>>>>> - mentions ITT_addr matches bits [51:8] of the actual address
->>>>>>>>> - mentions LE layout
->>>>>>>>> ---
->>>>>>>>>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 99 ++++++++++++++++++++++
->>>>>>>>>  1 file changed, 99 insertions(+)
->>>>>>>>>
->>>>>>>>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
->>>>>>>>> index 6081a5b..b5f010d 100644
->>>>>>>>> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
->>>>>>>>> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
->>>>>>>>> @@ -32,7 +32,106 @@ Groups:
->>>>>>>>>      KVM_DEV_ARM_VGIC_CTRL_INIT
->>>>>>>>>        request the initialization of the ITS, no additional parameter in
->>>>>>>>>        kvm_device_attr.addr.
->>>>>>>>> +
->>>>>>>>> +    KVM_DEV_ARM_ITS_SAVE_TABLES
->>>>>>>>> +      save the ITS table data into guest RAM, at the location provisioned
->>>>>>>>> +      by the guest in corresponding registers/table entries.
->>>>>>>>> +
->>>>>>>>> +      The layout of the tables in guest memory defines an ABI. The entries
->>>>>>>>> +      are laid out in little endian format as described in the last paragraph.
->>>>>>>>> +
->>>>>>>>> +    KVM_DEV_ARM_ITS_RESTORE_TABLES
->>>>>>>>> +      restore the ITS tables from guest RAM to ITS internal structures.
->>>>>>>>> +
->>>>>>>>> +      The GICV3 must be restored before the ITS and all ITS registers but
->>>>>>>>> +      the GITS_CTLR must be restored before restoring the ITS tables.
->>>>>>>>> +
->>>>>>>>> +      The GITS_IIDR read-only register must also be restored before
->>>>>>>>> +      the table restore as the IIDR revision field encodes the ABI revision.
->>>>>>>>> +
->>>>>>>>
->>>>>>>> what is the expected sequence of operations.  For example, to restore
->>>>>>>> the ITS, do I call KVM_DEV_ARM_VGIC_CTRL_INIT first, then restore all
->>>>>>>> the memory and registers, and finally call KVM_DEV_ARM_ITS_RESTORE_TABLES?
->>>>>>> Yes KVM_DEV_ARM_VGIC_CTRL_INIT comes first, then restore all registers
->>>>>>> except GITS_CTLR, then table restore, then GITS_CTLR
->>>>>>>>
->>>>>>>> Is there any interaction between when you call KVM_DEV_ARM_ITS_RESTORE_TABLES
->>>>>>>> and restore GITS_CTLR (which enables the ITS)?
->>>>>>>
->>>>>>> Yep, when GITS_CTLR is set, LPIs may be enabled and this on that event
->>>>>>> that the pending table is read. But the whole pending table is not read
->>>>>>> as we only iterate on registered LPIs. So the ITT must have been
->>>>>>> restored previously.
->>>>>>>
->>>>>>> I became aware that the pending table sync is done twice, once in the
->>>>>>> pending table restore,  and once in the GITS_CTLR restore. So if we
->>>>>>> leave this order specification, I should be able to remove the sync on
->>>>>>> table restore. This was the original reason why GITS_CTLR restore has
->>>>>>> been done at the very end.
->>>>>>
->>>>>> I'm sorry, I'm a bit confused.  Do we not need
->>>>>> KVM_DEV_ARM_ITS_RESTORE_TABLES at all then?
->>>>>
->>>>> Yes you do. I was talking about the RDIST pending table sync. The save
->>>>> is explicit using GICV3 device KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES.
->>>>> However the sync is implicit on GITS_CTLR restore if LPIs are enabled.
->>>>> and today I do it also on ITS device KVM_DEV_ARM_ITS_RESTORE_TABLES
->>>>> which is not requested I think since GITS_CTLR restore does it already.
->>>>
->>>> Shouldn't restoring the pending tables happen when restoring some
->>>> redeistributor state and not anything related to the ITS?
->>>
->>> Marc wrote:
->>> "
->>> I don't think you necessarily need a coarse map. When restoring the ITS
->>> tables, you can always read the pending bit when creating the LPI
->>> structure (it has been written to RAM at save time). Note that we
->>> already do something like this in vgic_enable_lpis().
->>> "
->>>
->>> This is currently what is implemented I think. the pending tables are
->>> currently sync'ed on GITS_CTLR set (if LPI are enabled) + erroneously
->>> also on on ITS table restore
->>>
->>> The problematic is: Either you know in advance which LPI INTIDare used
->>> or you need to parse the whole pending table (possibly using the 1st kB
->>> as coarse mapping).
->>>
->>> If you don't know the LPI INTIDs in advance it is only possible to
->>> restore the pending bit of pending LPIs. At that time you would
->>> re-allocate those pending LPI (vgic_add_lpi) and when you restore the
->>> ITS ITT you would do the same for those which were not pending. Looks
->>> really heavy to me: coarse mapping + dual vgic_add_lpi path.
->>>
->>> Otherwise we would need to add another dependency between RDIST pending
->>> table restore and ITS table restore but this looks even more weird, no?
->>>
->>>
->> So I just sat down with Andre and Marc and we tried to work through this
->> and came up with the best scheme.  I apologize in advance for the
->> one-way nature of this e-mail, and I am of course open to discussing the
->> following proposal again if you do not agree.
+>> Fixes: commit 0d43d7ab277a ("mtd: spi-nor: add driver for STM32 quad spi flash controller")
+>> Signed-off-by: Nicholas Mc Guire <der.herr@hofr.at>
+>> ---
+>> Problem found by experimental coccinelle script
 >>
->> What I think this document should say, is that the following ordering
->> must be followed when restoring the GIC and the ITS:
+>> Its not clear if its sufficient to simply treat this case as failure or
+>> if it might need some debug output to allow differentiation of signal
+>> and timeout case.
 >>
->>   First, restore all guest memory
+>> Patch was compile tested with: stm32_defconfig +CONFIG_MTD=y, CONFIG_MTD_SPI_NOR=y,
+>> CONFIG_SPI_STM32_QUADSPI=m
 >>
->>   Second, restore ALL redistributors
+>> Patch is against v4.11-rc8 (localversion-next is next-20170503)
 >>
->>   Third, restore the ITS, in the following order:
->>     1. Initialize the ITS (KVM_DEV_ARM_VGIC_CTRL_INIT)
->>     2. Restore GITS_CBASER
->>     3. Restore all other GITS_ registers, except GITS_CTLR!
->>     4. Load the ITS table data (KVM_DEV_ARM_ITS_RESTORE_TABLES)
->>     5. Restore GITS_CTLR
+>>   drivers/mtd/spi-nor/stm32-quadspi.c  | 10 ++++++++--
+>>   1 files changed, 10 insertions(+), 2 deletions(-)
 >>
->> The rationale is that we really want the redistributor and the ITS
->> restore to be independent and follow the architecture.  This means that
->> our ABI for the redistributor should still work without restoring an ITS
->> (if we ever decide to support LPIs for KVM without the ITS).
->>
->> In terms of our current implementation this means that vgic_add_lpi()
->> should ask the redistributor what the state of the LPI is (priority,
->> enabled, pending).  I suggest you do the pending check by adding a
->> function called something like vgic_v3_lpi_is_pending() which scans the
->> bit in memory, clears the memory bit, and returns the value.  Clearing
->> the pending bit in memory when moving it to the struct irq is nice,
->> because you then don't have to clear out the entire pending table later
->> and we don't keep 'consumed' data lying around.  This change should be
->> implemented in its_sync_lpi_pending_table() as well, but note that you
->> need never call that function in the normal restore path using this
->> design.
->>
->> I hope this makes sense.
-> 
-> I am dubious about the above changes at the moment.
-> its_sync_lpi_pending_table() gets called on GITS_CTLR setting which is
-> documented to be the last step of the restoration. I wonder why the
-> above changes cannot be part of another series later on.
+>> diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
+>> index 1056e74..27147ad 100644
+>> --- a/drivers/mtd/spi-nor/stm32-quadspi.c
+>> +++ b/drivers/mtd/spi-nor/stm32-quadspi.c
+>> @@ -159,6 +159,7 @@ static int stm32_qspi_wait_cmd(struct stm32_qspi *qspi)
+>>   {
+>>   	u32 cr;
+>>   	int err = 0;
+>> +	long timeout = 0;
+>>   
+>>   	if (readl_relaxed(qspi->io_base + QUADSPI_SR) & SR_TCF)
+>>   		return 0;
+>> @@ -167,8 +168,13 @@ static int stm32_qspi_wait_cmd(struct stm32_qspi *qspi)
+>>   	cr = readl_relaxed(qspi->io_base + QUADSPI_CR);
+>>   	writel_relaxed(cr | CR_TCIE, qspi->io_base + QUADSPI_CR);
+>>   
+>> -	if (!wait_for_completion_interruptible_timeout(&qspi->cmd_completion,
+>> -						       msecs_to_jiffies(1000)))
+> Ludovic, can we just use wait_for_completion_timeout() instead?
+exactly, I would use _interruptible extension to allow "user" to
+abort a long transfer (without wait the end of command transfert).
+But it's not crucial for stm32_qspi, this could be replace by
+wait_for_completion_timeout.
+sorry to disturb the "mtd pull" :-(
 
-I think that's one of the issues. See below.
-
-> Consuming the RAM bit status means we record it in irq->pending_latch so
-> I guess we should have the irq->pending_latch setting in the same
-> function as the one that retrieves the bit status in guest RAM. So I
-> would rename vgic_v3_lpi_is_pending into something like
-> int vgic_v3_sync_lpi_pending_status(struct kvm *kvm, u32 intid)
-> Since this covers a single LPI, the removes the byte access optimization
-> found in its_sync_lpi_pending_table
-
-Well, never mind the optimization. How many LPIs are we restoring in a
-typical VM? 10? 1000? That's just one byte access per LPI. Of course,
-I'd rather have fewer guest memory accesses, but a restore is an
-incredibly rare event, so I'm not too bothered about the extra usec! ;-)
-
-> 
-> Also if I understand it correctly this means the sync will be done on
-> both add_lpi and GITS_CTLR setting
-
-Why GITS_CTLR? The Enable bit only controls the effect of
-GITS_TRANSLATER... I believe that vgic_add_lpi() is the only point where
-we should snapshot the pending state.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best regards,
+Ludo
+> I think so but you surely know better than me :)
+> Do you plan to receive signal? maybe to abort the current SPI flash command?
+>
+> Best regards,
+>
+> Cyrille
+>
+>> +	timeout = wait_for_completion_interruptible_timeout(
+>> +				&qspi->cmd_completion, msecs_to_jiffies(1000));
+>> +
+>> +	/* since the calling side only cares about success of failure
+>> +	 * returning -ETIMEDOUT even when interrupted should be ok here
+>> +	 */
+>> +	if (timeout == 0 || timeout == -ERESTARTSYS)
+>>   		err = -ETIMEDOUT;
+>>   
+>>   	writel_relaxed(cr, qspi->io_base + QUADSPI_CR);
+>>
