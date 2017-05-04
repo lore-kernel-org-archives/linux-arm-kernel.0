@@ -1,129 +1,89 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Thu,  4 May 2017 13:44:31 +0200
-Subject: [PATCH v6 11/24] KVM: arm64: vgic-its: Interpret MAPD Size field and
- check related errors
+Date: Thu,  4 May 2017 13:44:33 +0200
+Subject: [PATCH v6 13/24] KVM: arm64: vgic-its: Check the device id matches
+ TYPER DEVBITS range
 In-Reply-To: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
 References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1493898284-29504-12-git-send-email-eric.auger@redhat.com>
+Message-ID: <1493898284-29504-14-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Up to now the MAPD's ITT size field has been ignored. It encodes
-the number of eventid bit minus 1. It should be used to check
-the eventid when a MAPTI command is issued on a device. Let's
-store the number of eventid bits in the its_device and do the
-check on MAPTI. Also make sure the ITT size field does
-not exceed the GITS_TYPER IDBITS field.
+On MAPD we currently check the device id can be stored in the device table.
+Let's first check it can be encoded within the range defined by TYPER
+DEVBITS.
+
+Also check the collection ID belongs to the 16 bit range as GITS_TYPER
+CIL field equals to 0.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
 
 ---
-v5 -> v6:
-- add Christoffer's R-b
-- rename nb_eventid_bits into num_eventid_bits
 
 v4 -> v5:
-- its_cmd_get_size macro now returns the actual number of eventid bits
-- use GIC_ENCODE_SZ macro to encode ID_bits
+- use GIC_ENCODE_SZ macro
 
 v3 -> v4:
-- VITS_TYPER_IDBITS set to 16 to be homogeneous with VITS_ESZ definition
-  and correct users
-- nb_eventid_bits correspond to the actual number of eventid bits
+- VITS_TYPER_DEVBITS set to 16 for homogeneity
+- use BIT_ULL
 ---
- include/linux/irqchip/arm-gic-v3.h |  2 ++
- virt/kvm/arm/vgic/vgic-its.c       | 15 ++++++++++++++-
- 2 files changed, 16 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-its.c | 25 ++++++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 59f1abd..9519c7b 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -346,9 +346,11 @@
- #define E_ITS_INT_UNMAPPED_INTERRUPT		0x010307
- #define E_ITS_CLEAR_UNMAPPED_INTERRUPT		0x010507
- #define E_ITS_MAPD_DEVICE_OOR			0x010801
-+#define E_ITS_MAPD_ITTSIZE_OOR			0x010802
- #define E_ITS_MAPC_PROCNUM_OOR			0x010902
- #define E_ITS_MAPC_COLLECTION_OOR		0x010903
- #define E_ITS_MAPTI_UNMAPPED_DEVICE		0x010a04
-+#define E_ITS_MAPTI_ID_OOR			0x010a05
- #define E_ITS_MAPTI_PHYSICALID_OOR		0x010a06
- #define E_ITS_INV_UNMAPPED_INTERRUPT		0x010c07
- #define E_ITS_INVALL_UNMAPPED_COLLECTION	0x010d09
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 072efbd..06e01d1 100644
+index 6da548d..e7bb86a 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -105,6 +105,7 @@ struct its_device {
- 
- 	/* the head for the list of ITTEs */
- 	struct list_head itt_head;
-+	u32 num_eventid_bits;
- 	u32 device_id;
- };
- 
-@@ -201,6 +202,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
- 
+@@ -204,6 +204,7 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
  #define GIC_LPI_OFFSET 8192
  
-+#define VITS_TYPER_IDBITS 16
-+
+ #define VITS_TYPER_IDBITS 16
++#define VITS_TYPER_DEVBITS 16
+ 
  /*
   * Finds and returns a collection in the ITS collection table.
-  * Must be called with the its_lock mutex held.
-@@ -401,7 +404,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
+@@ -404,7 +405,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
+ 	 * To avoid memory waste in the guest, we keep the number of IDBits and
  	 * DevBits low - as least for the time being.
  	 */
- 	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
--	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
-+	reg |= GIC_ENCODE_SZ(VITS_TYPER_IDBITS, 5) << GITS_TYPER_IDBITS_SHIFT;
+-	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
++	reg |= GIC_ENCODE_SZ(VITS_TYPER_DEVBITS, 5) << GITS_TYPER_DEVBITS_SHIFT;
+ 	reg |= GIC_ENCODE_SZ(VITS_TYPER_IDBITS, 5) << GITS_TYPER_IDBITS_SHIFT;
  	reg |= GIC_ENCODE_SZ(abi->ite_esz, 4) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
  
- 	return extract_bytes(reg, addr & 7, len);
-@@ -569,6 +572,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
- 
- #define its_cmd_get_command(cmd)	its_cmd_mask_field(cmd, 0,  0,  8)
- #define its_cmd_get_deviceid(cmd)	its_cmd_mask_field(cmd, 0, 32, 32)
-+#define its_cmd_get_size(cmd)		(its_cmd_mask_field(cmd, 1,  0,  5) + 1)
- #define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
- #define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
- #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
-@@ -759,6 +763,9 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	if (!device)
- 		return E_ITS_MAPTI_UNMAPPED_DEVICE;
- 
-+	if (event_id >= BIT_ULL(device->num_eventid_bits))
-+		return E_ITS_MAPTI_ID_OOR;
-+
- 	if (its_cmd_get_command(its_cmd) == GITS_CMD_MAPTI)
- 		lpi_nr = its_cmd_get_physical_id(its_cmd);
- 	else
-@@ -839,11 +846,15 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+@@ -646,16 +647,30 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+  * Check whether an ID can be stored into the corresponding guest table.
+  * For a direct table this is pretty easy, but gets a bit nasty for
+  * indirect tables. We check whether the resulting guest physical address
+- * is actually valid (covered by a memslot and guest accessbible).
++ * is actually valid (covered by a memslot and guest accessible).
+  * For this we have to read the respective first level entry.
+  */
+-static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
++static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
  {
- 	u32 device_id = its_cmd_get_deviceid(its_cmd);
- 	bool valid = its_cmd_get_validbit(its_cmd);
-+	u8 num_eventid_bits = its_cmd_get_size(its_cmd);
- 	struct its_device *device;
- 
- 	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
- 		return E_ITS_MAPD_DEVICE_OOR;
- 
-+	if (valid && num_eventid_bits > VITS_TYPER_IDBITS)
-+		return E_ITS_MAPD_ITTSIZE_OOR;
+ 	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
++	u64 indirect_ptr, type = GITS_BASER_TYPE(baser);
++	int esz = GITS_BASER_ENTRY_SIZE(baser);
+ 	int index;
+-	u64 indirect_ptr;
+ 	gfn_t gfn;
+-	int esz = GITS_BASER_ENTRY_SIZE(baser);
 +
- 	device = find_its_device(its, device_id);
++	switch (type) {
++	case GITS_BASER_TYPE_DEVICE:
++		if (id >= BIT_ULL(VITS_TYPER_DEVBITS))
++			return false;
++		break;
++	case GITS_BASER_TYPE_COLLECTION:
++		/* as GITS_TYPER.CID == 0, ITS supports 16-bit collection ID */
++		if (id >= BIT_ULL(16))
++			return false;
++		break;
++	default:
++		return false;
++	}
  
- 	/*
-@@ -866,6 +877,8 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 		return -ENOMEM;
- 
- 	device->device_id = device_id;
-+	device->num_eventid_bits = num_eventid_bits;
-+
- 	INIT_LIST_HEAD(&device->itt_head);
- 
- 	list_add_tail(&device->dev_list, &its->device_list);
+ 	if (!(baser & GITS_BASER_INDIRECT)) {
+ 		phys_addr_t addr;
 -- 
 2.5.5
