@@ -1,36 +1,105 @@
-From: oss@buserror.net (Scott Wood)
-Date: Thu, 04 May 2017 16:07:14 -0500
-Subject: [PATCH v2] drivers:soc:fsl:qbman:qman.c: Sleep instead of stuck
- hacking jiffies.
-In-Reply-To: <1493873917-7484-1-git-send-email-karim.eshapa@gmail.com>
-References: <1493508775.25397.26.camel@buserror.net>
- <1493873917-7484-1-git-send-email-karim.eshapa@gmail.com>
-Message-ID: <1493932034.25397.37.camel@buserror.net>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 04 May 2017 14:50:56 -0700
+Subject: [PATCH v2 4/5] ARM: dts: imx7: add GPMI NAND
+In-Reply-To: <c66ca9c8-2a9f-8938-7a70-7f9dfe763457@nxp.com>
+References: <20170422012338.4635-1-stefan@agner.ch>
+ <20170422012338.4635-5-stefan@agner.ch>
+ <c66ca9c8-2a9f-8938-7a70-7f9dfe763457@nxp.com>
+Message-ID: <48b5c543e713f9597b67a39a51ffd521@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-05-04 at 06:58 +0200, Karim Eshapa wrote:
-> +	stop = jiffies + 10000;
-> +	/*
-> +	?* if MR was full and h/w had other FQRNI entries to produce, we
-> +	?* need to allow it time to produce those entries once the
-> +	?* existing entries are consumed. A worst-case situation
-> +	?* (fully-loaded system) means h/w sequencers may have to do 3-4
-> +	?* other things before servicing the portal's MR pump, each of
-> +	?* which (if slow) may take ~50 qman cycles (which is ~200
-> +	?* processor cycles). So rounding up and then multiplying this
-> +	?* worst-case estimate by a factor of 10, just to be
-> +	?* ultra-paranoid, goes as high as 10,000 cycles. NB, we consume
-> +	?* one entry at a time, so h/w has an opportunity to produce new
-> +	?* entries well before the ring has been fully consumed, so
-> +	?* we're being *really* paranoid here.
-> +	?*/
+On 2017-05-04 12:13, Han Xu wrote:
+> On 04/21/2017 08:23 PM, Stefan Agner wrote:
+>> Add i.MX 7 GPMI NAND module.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>   arch/arm/boot/dts/imx7s.dtsi | 31 +++++++++++++++++++++++++++++++
+>>   1 file changed, 31 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+>> index 843eb379e1ea..9645257638d4 100644
+>> --- a/arch/arm/boot/dts/imx7s.dtsi
+>> +++ b/arch/arm/boot/dts/imx7s.dtsi
+>> @@ -995,5 +995,36 @@
+>>   				status = "disabled";
+>>   			};
+>>   		};
+>> +
+>> +		dma_apbh: dma-apbh at 33000000 {
+>> +			compatible = "fsl,imx7d-dma-apbh", "fsl,imx28-dma-apbh";
+>> +			reg = <0x33000000 0x2000>;
+>> +			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+>> +			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
+>> +			#dma-cells = <1>;
+>> +			dma-channels = <4>;
+>> +			clocks = <&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
+>> +				<&clks IMX7D_NAND_ROOT_CLK>;
+>> +			clock-names = "dma_apbh_bch", "dma_apbh_io";
+>> +		};
+> Do you need some patches to enable all clks for APBH DMA? Refer to 
+> https://patchwork.ozlabs.org/patch/551967/
+> 
 
-OK, upon reading this more closely it seems the intent was to delay for 10,000
-*processor cycles* and somehow that got turned into 10,000 jiffies (which is
-40 seconds at the default Hz!).  We could just replace this whole thing with
-msleep(1) and still be far more paranoid than was originally intended.
+Oh I see, with the current code and this device tree we actually only
+enable the first clock... But it seems to work in practice...
 
-Claudiu and Roy, any comments?
+What is interesting, the chapter 5.2.5 System Clocks only describes
+APBHDMA, and no GPMI module.
 
--Scott
+Chapter 9.4 about APBH-Bridge-DMA bridge only specifies "hclk" as clock
+sources.
+
+When looking at the table in chapter 5.2.5, hclk is
+NAND_USDHC_BUS_CLK_ROOT
+
+Module    Syste Module Clock   Clock Root
+APBHDMA   apbhdma.hclk         NAND_USDHC_BUS_CLK_ROOT
+ 
+So my guess is that the actual DMA controller should work fine with
+IMX7D_NAND_USDHC_BUS_ROOT_CLK only. It is only the GPMI module which
+needs the NAND_ROOT_CLK. My guess is since the APBHDMA controller is
+only used for GPMI these days, it has been combined in one module in the
+table in chapter 5.2.5.
+
+So we could actually only specify:
+
+clocks = <&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>;
+
+Tested with this and NAND seems to work fine.
+
+Also tested accessing APBHDMA register in U-Boot with
+IMX7D_NAND_ROOT_CLK disabled, it worked fine.
+
+What do you think? Should we go with this?
+
+This probably even saves power since GPMI's runtime clock management
+disables IMX7D_NAND_ROOT_CLK when NAND is idle (according to the
+nand_root_clk counter in clk_summary and the root clock register at
+0x3038AA00).
+
+--
+Stefan
+
+>> +
+>> +		gpmi: gpmi-nand at 33002000{
+>> +			compatible = "fsl,imx7d-gpmi-nand";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			reg = <0x33002000 0x2000>, <0x33004000 0x4000>;
+>> +			reg-names = "gpmi-nand", "bch";
+>> +			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+>> +			interrupt-names = "bch";
+>> +			clocks = <&clks IMX7D_NAND_ROOT_CLK>,
+>> +				<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>;
+>> +			clock-names = "gpmi_io", "gpmi_bch_apb";
+>> +			dmas = <&dma_apbh 0>;
+>> +			dma-names = "rx-tx";
+>> +			status = "disabled";
+>> +		};
+>>   	};
+>>   };
