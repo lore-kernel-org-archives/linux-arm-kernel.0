@@ -1,34 +1,43 @@
-From: jcm@jonmasters.org (Jon Masters)
-Date: Thu, 4 May 2017 19:24:03 -0400
-Subject: [PATCH v2 pci] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI
- boot for X-Gene v1
-In-Reply-To: <3167d9b9-e8e5-d6bf-1b82-3d19f218bad6@jonmasters.org>
-References: <1493340847-25720-1-git-send-email-kdinh@apm.com>
- <55d52fce-be87-f055-e19b-4122015d5c94@redhat.com>
- <3167d9b9-e8e5-d6bf-1b82-3d19f218bad6@jonmasters.org>
-Message-ID: <5dd7918f-c780-9a5d-1eb9-30c70f516db0@jonmasters.org>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Thu, 4 May 2017 23:30:05 +0000
+Subject: [PATCH v2] drivers:soc:fsl:qbman:qman.c: Sleep instead of stuck
+ hacking jiffies.
+References: <1493508775.25397.26.camel@buserror.net>
+ <1493873917-7484-1-git-send-email-karim.eshapa@gmail.com>
+ <1493932034.25397.37.camel@buserror.net>
+Message-ID: <VI1PR04MB3216EC873ED7EB10F3D2CF9D86EA0@VI1PR04MB3216.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2017 12:36 PM, Jon Masters wrote:
-> On 04/28/2017 01:11 AM, Jon Masters wrote:
->> On 04/27/2017 08:54 PM, Khuong Dinh wrote:
->>> From: Khuong Dinh <kdinh@apm.com>
->>>
->>> This patch makes pci-xgene-msi driver ACPI-aware and provides
->>> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
->>>
->>> Signed-off-by: Khuong Dinh <kdinh@apm.com>
->>> Signed-off-by: Duc Dang <dhdang@apm.com>
->>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>
->> Thanks. Currently testing. Will review and followup shortly.
-> 
-> Attaching boot logs before and after. I tested with an Intel e1000.
-> Before the patch I get fallback interrupts. Afterward, I get X-Gene MSI
-> interrupts working. Please followup with answers to Marc's question
-> about how you propose to guarantee boottime ordering of binding.
+On 5/4/2017 5:07 PM, Scott Wood wrote:
+> On Thu, 2017-05-04 at 06:58 +0200, Karim Eshapa wrote:
+>> +	stop = jiffies + 10000;
+>> +	/*
+>> +	 * if MR was full and h/w had other FQRNI entries to produce, we
+>> +	 * need to allow it time to produce those entries once the
+>> +	 * existing entries are consumed. A worst-case situation
+>> +	 * (fully-loaded system) means h/w sequencers may have to do 3-4
+>> +	 * other things before servicing the portal's MR pump, each of
+>> +	 * which (if slow) may take ~50 qman cycles (which is ~200
+>> +	 * processor cycles). So rounding up and then multiplying this
+>> +	 * worst-case estimate by a factor of 10, just to be
+>> +	 * ultra-paranoid, goes as high as 10,000 cycles. NB, we consume
+>> +	 * one entry at a time, so h/w has an opportunity to produce new
+>> +	 * entries well before the ring has been fully consumed, so
+>> +	 * we're being *really* paranoid here.
+>> +	 */
+> OK, upon reading this more closely it seems the intent was to delay for 10,000
+> *processor cycles* and somehow that got turned into 10,000 jiffies (which is
+> 40 seconds at the default Hz!).  We could just replace this whole thing with
+> msleep(1) and still be far more paranoid than was originally intended.
+>
+> Claudiu and Roy, any comments?
+Yes the timing here is certainly off, the code changed a few times since
+the comment was originally written.
+An msleep(1) seems reasonable here to me.
 
-Any word?
-
-Jon.
+Roy
+>
+> -Scott
+>
+>
