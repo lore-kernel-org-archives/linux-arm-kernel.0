@@ -1,60 +1,143 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu,  4 May 2017 20:49:32 +0200
-Subject: [PATCH 4/4] pinctrl: meson: meson8: add the AO HDMI CEC pin
-In-Reply-To: <20170504184932.5372-1-martin.blumenstingl@googlemail.com>
-References: <20170504184932.5372-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170504184932.5372-5-martin.blumenstingl@googlemail.com>
+From: oza.oza@broadcom.com (Oza Oza)
+Date: Fri, 5 May 2017 00:22:10 +0530
+Subject: [PATCH 2/3] iommu/pci: reserve iova for PCI masters
+In-Reply-To: <0c9a6b09-139c-df49-cf73-6a3935a6aacd@arm.com>
+References: <1493786795-28153-1-git-send-email-oza.oza@broadcom.com>
+ <1493786795-28153-2-git-send-email-oza.oza@broadcom.com>
+ <0c9a6b09-139c-df49-cf73-6a3935a6aacd@arm.com>
+Message-ID: <CAMSpPPdtfMMkTpi9cWn0QV2qnfBoHayQQg5cGANAswSwFoHX3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds another missing pin found in the Meson8 SoCs. Currently
-there's no driver which would use this pin yet.
+On Thu, May 4, 2017 at 11:50 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 03/05/17 05:46, Oza Pawandeep wrote:
+>> this patch reserves the iova for PCI masters.
+>> ARM64 based SOCs may have scattered memory banks.
+>> such as iproc based SOC has
+>>
+>> <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
+>> <0x00000008 0x80000000 0x3 0x80000000>, /* 14G @ 34G */
+>> <0x00000090 0x00000000 0x4 0x00000000>, /* 16G @ 576G */
+>> <0x000000a0 0x00000000 0x4 0x00000000>; /* 16G @ 640G */
+>>
+>> but incoming PCI transcation addressing capability is limited
+>> by host bridge, for example if max incoming window capability
+>> is 512 GB, then 0x00000090 and 0x000000a0 will fall beyond it.
+>>
+>> to address this problem, iommu has to avoid allocating iovas which
+>> are reserved. which inturn does not allocate iova if it falls into hole.
+>
+> I don't necessarily disagree with doing this, as we could do with facing
+> up to the issue of discontiguous DMA ranges in particular (I too have a
+> platform with this problem), but I'm still not overly keen on pulling DT
+> specifics into this layer. More than that, though, if we are going to do
+> it, then we should do it for all devices with a restrictive
+> "dma-ranges", not just PCI ones.
+>
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- drivers/pinctrl/meson/pinctrl-meson8.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+How do you propose to do it ?
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson8.c b/drivers/pinctrl/meson/pinctrl-meson8.c
-index 55fbd1a17dbe..f022965866b0 100644
---- a/drivers/pinctrl/meson/pinctrl-meson8.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson8.c
-@@ -416,6 +416,8 @@ static const unsigned int i2s_ao_clk_out_ao_pins[] = { PIN(GPIOAO_9, AO_OFF) };
- static const unsigned int i2s_lr_clk_out_ao_pins[] = { PIN(GPIOAO_10, AO_OFF) };
- static const unsigned int i2s_out_ch01_ao_pins[] = { PIN(GPIOAO_11, AO_OFF) };
- 
-+static const unsigned int hdmi_cec_ao_pins[] = { PIN(GPIOAO_12, AO_OFF) };
-+
- static struct meson_pmx_group meson8_cbus_groups[] = {
- 	GPIO_GROUP(GPIOX_0, 0),
- 	GPIO_GROUP(GPIOX_1, 0),
-@@ -769,6 +771,8 @@ static struct meson_pmx_group meson8_aobus_groups[] = {
- 	GROUP(i2s_ao_clk_out_ao,	0,	29),
- 	GROUP(i2s_lr_clk_out_ao,	0,	28),
- 	GROUP(i2s_out_ch01_ao,		0,	27),
-+
-+	GROUP(hdmi_cec_ao,		0,	17),
- };
- 
- static const char * const gpio_groups[] = {
-@@ -985,6 +989,10 @@ static const char * const i2s_ao_groups[] = {
- 	"i2s_out_ch01_ao"
- };
- 
-+static const char * const hdmi_cec_ao_groups[] = {
-+	"hdmi_cec_ao"
-+};
-+
- static struct meson_pmx_func meson8_cbus_functions[] = {
- 	FUNCTION(gpio),
- 	FUNCTION(sd_a),
-@@ -1029,6 +1037,7 @@ static struct meson_pmx_func meson8_aobus_functions[] = {
- 	FUNCTION(i2c_mst_ao),
- 	FUNCTION(pwm_f_ao),
- 	FUNCTION(i2s_ao),
-+	FUNCTION(hdmi_cec_ao),
- };
- 
- static struct meson_bank meson8_cbus_banks[] = {
--- 
-2.12.2
+my thinking is this:
+iova_reserve_pci_windows is written specific for PCI, and I am adding there.
+
+ideally
+struct pci_host_bridge should have new member:
+
+struct list_head inbound_windows; /* resource_entry */
+
+but somehow this resource have to be filled much before
+iommu_dma_init_domain happens.
+and use brdge resource directly in iova_reserve_pci_windows as it is
+already doing it for outbound memory.
+
+this will detach the DT specifics from dma-immu layer.
+let me know how this sounds.
+
+
+>> Bug: SOC-5216
+>> Change-Id: Icbfc99a045d730be143fef427098c937b9d46353
+>> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+>> Reviewed-on: http://gerrit-ccxsw.broadcom.net/40760
+>> Reviewed-by: vpx_checkpatch status <vpx_checkpatch@broadcom.com>
+>> Reviewed-by: CCXSW <ccxswbuild@broadcom.com>
+>> Tested-by: vpx_autobuild status <vpx_autobuild@broadcom.com>
+>> Tested-by: vpx_smoketest status <vpx_smoketest@broadcom.com>
+>> Tested-by: CCXSW <ccxswbuild@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>
+>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>> index 48d36ce..08764b0 100644
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
+>> @@ -27,6 +27,7 @@
+>>  #include <linux/iova.h>
+>>  #include <linux/irq.h>
+>>  #include <linux/mm.h>
+>> +#include <linux/of_pci.h>
+>>  #include <linux/pci.h>
+>>  #include <linux/scatterlist.h>
+>>  #include <linux/vmalloc.h>
+>> @@ -171,8 +172,12 @@ static void iova_reserve_pci_windows(struct pci_dev *dev,
+>>               struct iova_domain *iovad)
+>>  {
+>>       struct pci_host_bridge *bridge = pci_find_host_bridge(dev->bus);
+>> +     struct device_node *np = bridge->dev.parent->of_node;
+>>       struct resource_entry *window;
+>>       unsigned long lo, hi;
+>> +     int ret;
+>> +     dma_addr_t tmp_dma_addr = 0, dma_addr;
+>> +     LIST_HEAD(res);
+>>
+>>       resource_list_for_each_entry(window, &bridge->windows) {
+>>               if (resource_type(window->res) != IORESOURCE_MEM &&
+>> @@ -183,6 +188,36 @@ static void iova_reserve_pci_windows(struct pci_dev *dev,
+>>               hi = iova_pfn(iovad, window->res->end - window->offset);
+>>               reserve_iova(iovad, lo, hi);
+>>       }
+>> +
+>> +     /* PCI inbound memory reservation. */
+>> +     ret = of_pci_get_dma_ranges(np, &res);
+>> +     if (!ret) {
+>> +             resource_list_for_each_entry(window, &res) {
+>> +                     struct resource *res_dma = window->res;
+>> +
+>> +                     dma_addr = res_dma->start - window->offset;
+>> +                     if (tmp_dma_addr > dma_addr) {
+>> +                             pr_warn("PCI: failed to reserve iovas; ranges should be sorted\n");
+>
+> I don't see anything in the DT spec about the entries having to be
+> sorted, and it's not exactly impossible to sort a list if you need it so
+> (and if I'm being really pedantic, one could still trigger this with a
+> list that *is* sorted, only by different criteria).
+>
+
+we have to sort it the way we want then. I can make it sort then.
+thanks for the suggestion.
+
+> Robin.
+>
+>> +                             return;
+>> +                     }
+>> +                     if (tmp_dma_addr != dma_addr) {
+>> +                             lo = iova_pfn(iovad, tmp_dma_addr);
+>> +                             hi = iova_pfn(iovad, dma_addr - 1);
+>> +                             reserve_iova(iovad, lo, hi);
+>> +                     }
+>> +                     tmp_dma_addr = window->res->end - window->offset;
+>> +             }
+>> +             /*
+>> +              * the last dma-range should honour based on the
+>> +              * 32/64-bit dma addresses.
+>> +              */
+>> +             if (tmp_dma_addr < DMA_BIT_MASK(sizeof(dma_addr_t) * 8)) {
+>> +                     lo = iova_pfn(iovad, tmp_dma_addr);
+>> +                     hi = iova_pfn(iovad,
+>> +                                   DMA_BIT_MASK(sizeof(dma_addr_t) * 8) - 1);
+>> +                     reserve_iova(iovad, lo, hi);
+>> +             }
+>> +     }
+>>  }
+>>
+>>  /**
+>>
+>
