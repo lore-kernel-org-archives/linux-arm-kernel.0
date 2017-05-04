@@ -1,26 +1,26 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 4 May 2017 11:25:34 +0800
-Subject: [PATCH v2 5/20] clk: sunxi-ng: mux: split out the pre-divider
- computation code
-In-Reply-To: <fcda95612e72a1a5bb6010993181e638a41511e9.1493812478.git-series.maxime.ripard@free-electrons.com>
+Date: Thu, 4 May 2017 11:27:13 +0800
+Subject: [PATCH v2 6/20] clk: sunxi-ng: mux: Change pre-divider
+ application function prototype
+In-Reply-To: <b7fab9142ae318f9188b93dfba0b6bd2b530a514.1493812478.git-series.maxime.ripard@free-electrons.com>
 References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
- <fcda95612e72a1a5bb6010993181e638a41511e9.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v65TyYoV97LmoEPseO5oxcNNyPiLncwxC9y_Hzi0XhyzMg@mail.gmail.com>
+ <b7fab9142ae318f9188b93dfba0b6bd2b530a514.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v672x244T9OWg10Y0+kithOOxn9p1WFipmovDqjZOc4WaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, May 3, 2017 at 7:59 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> The pre-divider retrieval code was merged into the function to apply the
-> current pre-divider onto the parent clock rate so that we can use that
-> adjusted value to do our factors computation.
+> The current function name is a bit confusing, and doesn't really allow to
+> create an explicit function to reverse the operation.
 >
-> However, since we'll need to do the reverse operation, we need to split out
-> that code into a function that will be shared.
+> We also for now change the parent rate through a pointer, while we don't
+> return anything.
+>
+> In order to be less confusing, and easier to use for downstream users,
+> change the function name to something hopefully clearer, and return the
+> adjusted rate instead of changing the pointer.
 >
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 Acked-by: Chen-Yu Tsai <wens@csie.org>
-
-Seems this would conflict with my "clk: sunxi-ng: Support multiple variable
-pre-dividers" patch though. We'll see how this works out.
