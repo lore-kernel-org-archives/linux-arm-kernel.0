@@ -1,27 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 4 May 2017 18:58:54 +0100
-Subject: [PATCH] arm64: Fix the DMA mmap and get_sgtable API with
- DMA_ATTR_FORCE_CONTIGUOUS
-In-Reply-To: <CAMuHMdXGutH1w8_yV3oToCXoOt3phWE5-b_Sovd8aAP7jC8MPQ@mail.gmail.com>
-References: <1493143232-2245-1-git-send-email-catalin.marinas@arm.com>
- <7d0445e5-ddb3-7d0f-4749-c63b54beff43@arm.com>
- <20170504140306.GB25108@e104818-lin.cambridge.arm.com>
- <CAMuHMdXGutH1w8_yV3oToCXoOt3phWE5-b_Sovd8aAP7jC8MPQ@mail.gmail.com>
-Message-ID: <20170504175853.GA22681@e104818-lin.cambridge.arm.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu,  4 May 2017 20:01:33 +0200
+Subject: [PATCH v3 0/3] Meson8 / Meson8b support for the meson_saradc driver
+Message-ID: <20170504180136.27025-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 04, 2017 at 04:08:29PM +0200, Geert Uytterhoeven wrote:
-> On Thu, May 4, 2017 at 4:03 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > Going through the past threads on this, I wonder whether the attribute
-> > is actually used anywhere (in which case we may be better off reverting
-> > the original patch). If improved IOMMU performance is required, there
-> 
-> AFAIK, the users are somewhere in the pipeline.
+The SAR ADC register layout seems to be mostly the same on older SoCs.
+Thus basically all functionality is already supported by the existing
+driver.
 
-Let's hope we are going to see some users soon. I'll push the fix as
-well to avoid a regression (though I cannot fully test your patch, nor
-my fix).
+There are two small differences though:
+- the adc_clk and adc_div clock are not provided by the clock-controller
+  on Meson8b. instead the SAR ADC provides an internal "adc_clk" (this
+  behavior is already supported by the driver and requires no changes)
+- the newer SoCs are using some register bits only the kernel or the
+  BL30 (bootloader) are using the SAR ADC. This is the main change of
+  this series: guarding all BL30 specific code with a corresponding
+  "if"-block.
+
+This also adds a new DT binding for the SAR ADC in Meson8 and Meson8b
+because the driver has to specify (for this older version) that there's
+no BL30 integration available (and these register bits should not be
+touched).
+
+
+Changes since v2 at [1]:
+- re-ordered patches so patch #1 now adds the "static" modifier to the
+  existing meson_sar_adc_data instances (was patch #3, now patch #1)
+- dropped the "Documentation: " prefix from the devicetree
+  documentation patch (patch #2)
+- added Rob's ACK to the devicetree Documentation patch (patch #2)
+- fixed a copy-and-paste error in the actual driver change (both,
+  in the commit message where I claimed that a of_device_id was only
+  added for Meson8b as well as in the driver code itself where the Meson8
+  meson_sar_adc_data.name was "meson-meson8b-saradc")
+
+Changes since v1 at [0]:
+- switched to bool data-type for has_bl30_integration
+- also added a "compatible" for Meson8 SoCs (the ADC driver from
+  Amlogic's GPL kernel sources handles Meson8 and Meson8b identical)
+- added patch #3 to constify some structs (there were supposed to be
+  const from the very beginning)
+
+
+[0] http://lists.infradead.org/pipermail/linux-amlogic/2017-March/003081.html
+[1] http://lists.infradead.org/pipermail/linux-amlogic/2017-April/003394.html
+
+Martin Blumenstingl (3):
+  iio: adc: meson-saradc: mark all meson_sar_adc_data static and const
+  dt-bindings: iio: adc: add Meson8 and Meson8b support
+  iio: adc: meson-saradc: add Meson8b SoC compatibility
+
+ .../bindings/iio/adc/amlogic,meson-saradc.txt      |  2 +
+ drivers/iio/adc/meson_saradc.c                     | 86 +++++++++++++++-------
+ 2 files changed, 61 insertions(+), 27 deletions(-)
 
 -- 
-Catalin
+2.12.2
