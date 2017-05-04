@@ -1,33 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 May 2017 16:40:10 +0200
-Subject: [PATCH v2 02/10] pinctrl: sunxi: add definitions for add A20 and
- R40 support to A10 driver
-In-Reply-To: <318E9984-9F5A-41C3-A3E0-52D5ECA05212@aosc.io>
+Date: Thu, 4 May 2017 16:41:52 +0200
+Subject: [PATCH v2 03/10] pinctrl: sunxi: add A20 support to A10 driver
+In-Reply-To: <83062089-19CD-4805-A6DC-2C25D75621FF@aosc.io>
 References: <20170504135006.16483-1-icenowy@aosc.io>
- <20170504135006.16483-3-icenowy@aosc.io>
- <20170504140431.zhpcxvphxnxj7ipq@lukather>
- <318E9984-9F5A-41C3-A3E0-52D5ECA05212@aosc.io>
-Message-ID: <20170504144010.lco2r6jviff63bcd@lukather>
+ <20170504135006.16483-4-icenowy@aosc.io>
+ <20170504140220.26kguf3trz7ocylv@lukather>
+ <83062089-19CD-4805-A6DC-2C25D75621FF@aosc.io>
+Message-ID: <20170504144152.34yzk424aqrizmbu@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 04, 2017 at 10:07:47PM +0800, Icenowy Zheng wrote:
+On Thu, May 04, 2017 at 10:03:26PM +0800, Icenowy Zheng wrote:
 > 
 > 
-> ? 2017?5?4? GMT+08:00 ??10:04:31, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
-> >On Thu, May 04, 2017 at 09:49:58PM +0800, Icenowy Zheng wrote:
-> >> Allwinner A10, A20 and R40 SoCs have similar GPIO layout.
-> >> 
-> >> Add SoC definitions in pinctrl-sunxi.h, in order to merge A20 support
-> >> into A10 driver, and add R40 support into it.
+> ? 2017?5?4? GMT+08:00 ??10:02:20, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+> >On Thu, May 04, 2017 at 09:49:59PM +0800, Icenowy Zheng wrote:
+> >>  static const struct of_device_id sun4i_a10_pinctrl_match[] = {
+> >> -	{ .compatible = "allwinner,sun4i-a10-pinctrl", },
+> >> +	{
+> >> +		.compatible = "allwinner,sun4i-a10-pinctrl",
+> >> +		.data = (void *)PINCTRL_SUN4I_A10
+> >> +	},
+> >> +	{
+> >> +		.compatible = "allwinner,sun7i-a20-pinctrl",
+> >> +		.data = (void *)PINCTRL_SUN7I_A20
+> >> +	},
+> >>  	{}
+> >>  };
 > >
-> >While your commit log is good, the commit title is misleading since
-> >you're not adding it to the A10 driver. You just adding SoC IDs
-> >definitions
+> >This means you're going to have two drivers probing for the same
+> >device: this driver, and the old one. This is not ok, and probably
+> >introduces some corner cases.
 > 
-> Is "pinctrl: sunxi: Add SoC ID definitions for A10, A20 and R40 SoCs" OK?
+> The A20 driver is dropped in the next commit.
 
-Yep, it is, thanks!
+Yes, and that is an issue for bisectability. Anyone that will checkout
+between those two commits will have a broken kernel, and that is not
+ok. Any commit should be in a working state.
+
 Maxime
 
 -- 
@@ -40,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170504/d0338558/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170504/c11aab5e/attachment.sig>
