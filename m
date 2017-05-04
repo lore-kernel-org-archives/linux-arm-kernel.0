@@ -1,92 +1,120 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu,  4 May 2017 19:48:45 +0800
-Subject: [PATCH v6 00/13] Initial Allwinner Display Engine 2.0 Support
-Message-ID: <20170504114858.9008-1-icenowy@aosc.io>
+Date: Thu,  4 May 2017 19:48:46 +0800
+Subject: [PATCH v6 01/13] dt-bindings: add binding for the Allwinner DE2 CCU
+In-Reply-To: <20170504114858.9008-1-icenowy@aosc.io>
+References: <20170504114858.9008-1-icenowy@aosc.io>
+Message-ID: <20170504114858.9008-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm sorry that some patch from this version is wrongly sent
-without decorations.
+Allwinner "Display Engine 2.0" contains some clock controls in it.
 
-This patchset is the initial patchset for Allwinner DE2 support.
+In order to add them as clock drivers, we need a device tree binding.
+Add the binding here.
 
-It contains the support of clocks in DE2 and the mixers in DE2.
+Also add the device tree binding headers.
 
-The SoC used to develop this patchset is V3s, as V3s is the simplest
-one of the SoCs that have DE2.
-(Allwinner V3s features only one mixer, although its clock control
-unit contains support for second mixer's clock; and its only video
-output is RGB LCD, which is already supported in our TCON driver)
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Changes in v6:
+- Added Rob's ACK.
+- Drpoped A64's compatible as it's not appropriate now.
+Changes in v5:
+- Moved dt-binding headers here.
+- Changed dt-binding headers' license header to SPDX license.
+Changes in v4:
+- Dropped the leading 0 in clock at 1000000 .
+Changes in v3:
+- Fill the address space length of DE2 CCU to 0x100000, just reach the start of mixer0.
 
-The last patch is only a testing patch, it shouldn't be merged; and
-for the patch to be really usable, the RFC fix of the TCON driver [1]
-is needed.
-
-No HDMI, TV encoder or other internal bridges' support is included
-in this patchset, which makes it currently not usable on H3. (Some
-WIP code have already been written based on v4 of this patchset by
-Jernej Skrabec and be, including TVE support (basical but usable)
-and HDMI support (can display something, but still not so usable
-because of some problem). )
-
-Thanks to Jean-Francois Moine and Jernej Skrabec for their efforts
-to discover the internal of DE2!
-
-[1] https://lists.freedesktop.org/archives/dri-devel/2016-December/126264.html
-
-Icenowy Zheng (13):
-  dt-bindings: add binding for the Allwinner DE2 CCU
-  clk: sunxi-ng: add support for DE2 CCU
-  dt-bindings: add bindings for DE2 on V3s SoC
-  drm/sun4i: return only planes for layers created
-  drm/sun4i: abstract a engine type
-  drm/sun4i: add a dedicated module for sun4i-backend and sun4i-layer
-  drm/sun4i: add a Kconfig option for sun4i-backend
-  drm/sun4i: add support for Allwinner DE2 mixers
-  drm/sun4i: Add compatible string for V3s display engine
-  drm/sun4i: tcon: add support for V3s TCON
-  ARM: dts: sun8i: add DE2 nodes for V3s SoC
-  ARM: dts: sun8i: add pinmux for LCD pins of V3s SoC
-  [DO NOT MERGE] ARM: dts: sun8i: enable LCD panel of Lichee Pi Zero
-
- .../devicetree/bindings/clock/sun8i-de2.txt        |  30 ++
- .../bindings/display/sunxi/sun4i-drm.txt           |  29 +-
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts      |  36 ++
- arch/arm/boot/dts/sun8i-v3s.dtsi                   |  96 +++++
- drivers/clk/sunxi-ng/Kconfig                       |   5 +
- drivers/clk/sunxi-ng/Makefile                      |   1 +
- drivers/clk/sunxi-ng/ccu-sun8i-de2.c               | 218 ++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-de2.h               |  28 ++
- drivers/gpu/drm/sun4i/Kconfig                      |  20 ++
- drivers/gpu/drm/sun4i/Makefile                     |   8 +-
- drivers/gpu/drm/sun4i/sun4i_backend.c              |  72 ++--
- drivers/gpu/drm/sun4i/sun4i_backend.h              |  17 +-
- drivers/gpu/drm/sun4i/sun4i_crtc.c                 |  32 +-
- drivers/gpu/drm/sun4i/sun4i_crtc.h                 |   5 +-
- drivers/gpu/drm/sun4i/sun4i_drv.c                  |   6 +-
- drivers/gpu/drm/sun4i/sun4i_drv.h                  |   2 +-
- drivers/gpu/drm/sun4i/sun4i_layer.c                |  20 +-
- drivers/gpu/drm/sun4i/sun4i_layer.h                |   7 +-
- drivers/gpu/drm/sun4i/sun4i_tcon.c                 |  41 ++-
- drivers/gpu/drm/sun4i/sun4i_tv.c                   |   9 +-
- drivers/gpu/drm/sun4i/sun8i_layer.c                | 140 ++++++++
- drivers/gpu/drm/sun4i/sun8i_layer.h                |  36 ++
- drivers/gpu/drm/sun4i/sun8i_mixer.c                | 394 +++++++++++++++++++++
- drivers/gpu/drm/sun4i/sun8i_mixer.h                | 137 +++++++
- drivers/gpu/drm/sun4i/sunxi_engine.h               | 112 ++++++
- include/dt-bindings/clock/sun8i-de2.h              |  18 +
- include/dt-bindings/reset/sun8i-de2.h              |  14 +
- 27 files changed, 1431 insertions(+), 102 deletions(-)
+ .../devicetree/bindings/clock/sun8i-de2.txt        | 30 ++++++++++++++++++++++
+ include/dt-bindings/clock/sun8i-de2.h              | 18 +++++++++++++
+ include/dt-bindings/reset/sun8i-de2.h              | 14 ++++++++++
+ 3 files changed, 62 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.h
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_layer.c
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_layer.h
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.c
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.h
- create mode 100644 drivers/gpu/drm/sun4i/sunxi_engine.h
  create mode 100644 include/dt-bindings/clock/sun8i-de2.h
  create mode 100644 include/dt-bindings/reset/sun8i-de2.h
 
+diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+new file mode 100644
+index 000000000000..d710c0111cd3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+@@ -0,0 +1,30 @@
++Allwinner Display Engine 2.0 Clock Control Binding
++--------------------------------------------------
++
++Required properties :
++- compatible: must contain one of the following compatibles:
++		- "allwinner,sun8i-a83t-de2-clk"
++		- "allwinner,sun50i-h5-de2-clk"
++
++- reg: Must contain the registers base address and length
++- clocks: phandle to the clocks feeding the display engine subsystem.
++	  Three are needed:
++  - "mod": the display engine module clock
++  - "bus": the bus clock for the whole display engine subsystem
++- clock-names: Must contain the clock names described just above
++- resets: phandle to the reset control for the display engine subsystem.
++- #clock-cells : must contain 1
++- #reset-cells : must contain 1
++
++Example:
++de2_clocks: clock at 1000000 {
++	compatible = "allwinner,sun8i-a83t-de2-clk";
++	reg = <0x01000000 0x100000>;
++	clocks = <&ccu CLK_DE>,
++		 <&ccu CLK_BUS_DE>;
++	clock-names = "mod",
++		      "bus";
++	resets = <&ccu RST_BUS_DE>;
++	#clock-cells = <1>;
++	#reset-cells = <1>;
++};
+diff --git a/include/dt-bindings/clock/sun8i-de2.h b/include/dt-bindings/clock/sun8i-de2.h
+new file mode 100644
+index 000000000000..3bed63b524aa
+--- /dev/null
++++ b/include/dt-bindings/clock/sun8i-de2.h
+@@ -0,0 +1,18 @@
++/*
++ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.io>
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ */
++
++#ifndef _DT_BINDINGS_CLOCK_SUN8I_DE2_H_
++#define _DT_BINDINGS_CLOCK_SUN8I_DE2_H_
++
++#define CLK_BUS_MIXER0		0
++#define CLK_BUS_MIXER1		1
++#define CLK_BUS_WB		2
++
++#define CLK_MIXER0		6
++#define CLK_MIXER1		7
++#define CLK_WB			8
++
++#endif /* _DT_BINDINGS_CLOCK_SUN8I_DE2_H_ */
+diff --git a/include/dt-bindings/reset/sun8i-de2.h b/include/dt-bindings/reset/sun8i-de2.h
+new file mode 100644
+index 000000000000..9526017432f0
+--- /dev/null
++++ b/include/dt-bindings/reset/sun8i-de2.h
+@@ -0,0 +1,14 @@
++/*
++ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.io>
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ */
++
++#ifndef _DT_BINDINGS_RESET_SUN8I_DE2_H_
++#define _DT_BINDINGS_RESET_SUN8I_DE2_H_
++
++#define RST_MIXER0	0
++#define RST_MIXER1	1
++#define RST_WB		2
++
++#endif /* _DT_BINDINGS_RESET_SUN8I_DE2_H_ */
 -- 
 2.12.2
