@@ -1,168 +1,312 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu,  4 May 2017 19:41:59 +0800
-Subject: [PATCH 04/13] drm/sun4i: return only planes for layers created
+Date: Thu,  4 May 2017 19:41:57 +0800
+Subject: [PATCH 02/13] clk: sunxi-ng: add support for DE2 CCU
 In-Reply-To: <20170504114208.8524-1-icenowy@aosc.io>
 References: <20170504114208.8524-1-icenowy@aosc.io>
-Message-ID: <20170504114208.8524-4-icenowy@aosc.io>
+Message-ID: <20170504114208.8524-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are going to add support for the Allwinner DE2 Mixer in sun4i-drm
-driver, we will finally have two types of layers.
+The "Display Engine 2.0" in Allwinner newer SoCs contains a clock
+management unit for its subunits, like the DE CCU in A80.
 
-Each layer is bound to a drm_plane that is CRTC-specific, so we create
-them when initializing CRTC (calling sun4i_layers_init, which will be
-generalized in next patch). The drm_plane's will be used when creating
-CRTC, but the CRTC initialization code do not care other properties of
-the layer, so we let the sun4i_layers_init function return drm_plane's
-only.
-
-As we have no need to trace the layers after the CRTC is properly
-created, we drop the layers pointer in sun4i_crtc struct.
-
-Doing these things makes the CRTC code independent to the type of layer
-(the sun4i_layers_init function name is still hardcoded and will be
-changed in the next patch), so that we can finally gain support for the
-mixer in DE2, which will has different layers.
+Add a sunxi-ng style driver for it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/gpu/drm/sun4i/sun4i_crtc.c  | 23 ++++++++++++-----------
- drivers/gpu/drm/sun4i/sun4i_crtc.h  |  1 -
- drivers/gpu/drm/sun4i/sun4i_layer.c | 18 ++++++++++--------
- drivers/gpu/drm/sun4i/sun4i_layer.h |  4 ++--
- 4 files changed, 24 insertions(+), 22 deletions(-)
+ drivers/clk/sunxi-ng/Kconfig         |   5 +
+ drivers/clk/sunxi-ng/Makefile        |   1 +
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c | 218 +++++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.h |  28 +++++
+ 4 files changed, 252 insertions(+)
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.h
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-index 3c876c3a356a..708b3543d4e9 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-@@ -139,6 +139,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
- 				   struct sun4i_tcon *tcon)
- {
- 	struct sun4i_crtc *scrtc;
-+	struct drm_plane **planes;
- 	struct drm_plane *primary = NULL, *cursor = NULL;
- 	int ret, i;
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index 64088e599404..2e4d804fbf61 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -140,6 +140,11 @@ config SUN8I_V3S_CCU
+ 	default MACH_SUN8I
+ 	depends on MACH_SUN8I || COMPILE_TEST
  
-@@ -149,22 +150,22 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
- 	scrtc->tcon = tcon;
- 
- 	/* Create our layers */
--	scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
--	if (IS_ERR(scrtc->layers)) {
-+	planes = sun4i_layers_init(drm, scrtc);
-+	if (IS_ERR(planes)) {
- 		dev_err(drm->dev, "Couldn't create the planes\n");
- 		return NULL;
- 	}
- 
- 	/* find primary and cursor planes for drm_crtc_init_with_planes */
--	for (i = 0; scrtc->layers[i]; i++) {
--		struct sun4i_layer *layer = scrtc->layers[i];
-+	for (i = 0; planes[i]; i++) {
-+		struct drm_plane *plane = planes[i];
- 
--		switch (layer->plane.type) {
-+		switch (plane->type) {
- 		case DRM_PLANE_TYPE_PRIMARY:
--			primary = &layer->plane;
-+			primary = plane;
- 			break;
- 		case DRM_PLANE_TYPE_CURSOR:
--			cursor = &layer->plane;
-+			cursor = plane;
- 			break;
- 		default:
- 			break;
-@@ -188,12 +189,12 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
- 						   1);
- 
- 	/* Set possible_crtcs to this crtc for overlay planes */
--	for (i = 0; scrtc->layers[i]; i++) {
-+	for (i = 0; planes[i]; i++) {
- 		uint32_t possible_crtcs = BIT(drm_crtc_index(&scrtc->crtc));
--		struct sun4i_layer *layer = scrtc->layers[i];
-+		struct drm_plane *plane = planes[i];
- 
--		if (layer->plane.type == DRM_PLANE_TYPE_OVERLAY)
--			layer->plane.possible_crtcs = possible_crtcs;
-+		if (plane->type == DRM_PLANE_TYPE_OVERLAY)
-+			plane->possible_crtcs = possible_crtcs;
- 	}
- 
- 	return scrtc;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.h b/drivers/gpu/drm/sun4i/sun4i_crtc.h
-index 230cb8f0d601..4dae3508424a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.h
-@@ -19,7 +19,6 @@ struct sun4i_crtc {
- 
- 	struct sun4i_backend		*backend;
- 	struct sun4i_tcon		*tcon;
--	struct sun4i_layer		**layers;
- };
- 
- static inline struct sun4i_crtc *drm_crtc_to_sun4i_crtc(struct drm_crtc *crtc)
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index f26bde5b9117..e1f03e1cc0ac 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -16,6 +16,7 @@
- #include <drm/drmP.h>
- 
- #include "sun4i_backend.h"
-+#include "sun4i_crtc.h"
- #include "sun4i_layer.h"
- 
- struct sun4i_plane_desc {
-@@ -128,15 +129,16 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
- 	return layer;
- }
- 
--struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
--				       struct sun4i_backend *backend)
-+struct drm_plane **sun4i_layers_init(struct drm_device *drm,
-+				     struct sun4i_crtc *crtc)
- {
--	struct sun4i_layer **layers;
-+	struct drm_plane **planes;
-+	struct sun4i_backend *backend = crtc->backend;
- 	int i;
- 
--	layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
--			      sizeof(*layers), GFP_KERNEL);
--	if (!layers)
-+	planes = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
-+			      sizeof(*planes), GFP_KERNEL);
-+	if (!planes)
- 		return ERR_PTR(-ENOMEM);
- 
- 	/*
-@@ -178,8 +180,8 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
- 				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
- 
- 		layer->id = i;
--		layers[i] = layer;
-+		planes[i] = &layer->plane;
- 	};
- 
--	return layers;
-+	return planes;
- }
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
-index 4be1f0919df2..5ea5c994d6ea 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
-@@ -26,7 +26,7 @@ plane_to_sun4i_layer(struct drm_plane *plane)
- 	return container_of(plane, struct sun4i_layer, plane);
- }
- 
--struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
--				       struct sun4i_backend *backend);
-+struct drm_plane **sun4i_layers_init(struct drm_device *drm,
-+				     struct sun4i_crtc *crtc);
- 
- #endif /* _SUN4I_LAYER_H_ */
++config SUN8I_DE2_CCU
++	bool "Support for the Allwinner SoCs DE2 CCU"
++	select SUNXI_CCU_DIV
++	select SUNXI_CCU_GATE
++
+ config SUN9I_A80_CCU
+ 	bool "Support for the Allwinner A80 CCU"
+ 	select SUNXI_CCU_DIV
+diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+index 0ec02fe14c50..be616279450e 100644
+--- a/drivers/clk/sunxi-ng/Makefile
++++ b/drivers/clk/sunxi-ng/Makefile
+@@ -25,6 +25,7 @@ obj-$(CONFIG_SUN8I_A23_CCU)	+= ccu-sun8i-a23.o
+ obj-$(CONFIG_SUN8I_A33_CCU)	+= ccu-sun8i-a33.o
+ obj-$(CONFIG_SUN8I_H3_CCU)	+= ccu-sun8i-h3.o
+ obj-$(CONFIG_SUN8I_V3S_CCU)	+= ccu-sun8i-v3s.o
++obj-$(CONFIG_SUN8I_DE2_CCU)	+= ccu-sun8i-de2.o
+ obj-$(CONFIG_SUN8I_R_CCU)	+= ccu-sun8i-r.o
+ obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80.o
+ obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80-de.o
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+new file mode 100644
+index 000000000000..adb2c344692a
+--- /dev/null
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+@@ -0,0 +1,218 @@
++/*
++ * Copyright (c) 2017 Icenowy Zheng <icenowy@aosc.io>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/reset.h>
++
++#include "ccu_common.h"
++#include "ccu_div.h"
++#include "ccu_gate.h"
++#include "ccu_reset.h"
++
++#include "ccu-sun8i-de2.h"
++
++static SUNXI_CCU_GATE(bus_mixer0_clk,	"bus-mixer0",	"bus-de",
++		      0x04, BIT(0), 0);
++static SUNXI_CCU_GATE(bus_mixer1_clk,	"bus-mixer1",	"bus-de",
++		      0x04, BIT(1), 0);
++static SUNXI_CCU_GATE(bus_wb_clk,	"bus-wb",	"bus-de",
++		      0x04, BIT(2), 0);
++
++static SUNXI_CCU_GATE(mixer0_clk,	"mixer0",	"mixer0-div",
++		      0x00, BIT(0), CLK_SET_RATE_PARENT);
++static SUNXI_CCU_GATE(mixer1_clk,	"mixer1",	"mixer1-div",
++		      0x00, BIT(1), CLK_SET_RATE_PARENT);
++static SUNXI_CCU_GATE(wb_clk,		"wb",		"wb-div",
++		      0x00, BIT(2), CLK_SET_RATE_PARENT);
++
++static SUNXI_CCU_M(mixer0_div_clk, "mixer0-div", "de", 0x0c, 0, 4,
++		   CLK_SET_RATE_PARENT);
++static SUNXI_CCU_M(mixer1_div_clk, "mixer1-div", "de", 0x0c, 4, 4,
++		   CLK_SET_RATE_PARENT);
++static SUNXI_CCU_M(wb_div_clk, "wb-div", "de", 0x0c, 8, 4,
++		   CLK_SET_RATE_PARENT);
++
++static struct ccu_common *sunxi_de2_clks[] = {
++	&mixer0_clk.common,
++	&mixer1_clk.common,
++	&wb_clk.common,
++
++	&bus_mixer0_clk.common,
++	&bus_mixer1_clk.common,
++	&bus_wb_clk.common,
++
++	&mixer0_div_clk.common,
++	&mixer1_div_clk.common,
++	&wb_div_clk.common,
++};
++
++static struct clk_hw_onecell_data sunxi_de2_hw_clks = {
++	.hws	= {
++		[CLK_MIXER0]		= &mixer0_clk.common.hw,
++		[CLK_MIXER1]		= &mixer1_clk.common.hw,
++		[CLK_WB]		= &wb_clk.common.hw,
++
++		[CLK_BUS_MIXER0]	= &bus_mixer0_clk.common.hw,
++		[CLK_BUS_MIXER1]	= &bus_mixer1_clk.common.hw,
++		[CLK_BUS_WB]		= &bus_wb_clk.common.hw,
++
++		[CLK_MIXER0_DIV]	= &mixer0_div_clk.common.hw,
++		[CLK_MIXER1_DIV]	= &mixer1_div_clk.common.hw,
++		[CLK_WB_DIV]		= &wb_div_clk.common.hw,
++	},
++	.num	= CLK_NUMBER,
++};
++
++static struct ccu_reset_map sun8i_a83t_de2_resets[] = {
++	[RST_MIXER0]	= { 0x08, BIT(0) },
++	/*
++	 * For A83T, H3 and R40, mixer1 reset line is shared with wb, so
++	 * only RST_WB is exported here.
++	 */
++	[RST_WB]	= { 0x08, BIT(2) },
++};
++
++static struct ccu_reset_map sun50i_a64_de2_resets[] = {
++	[RST_MIXER0]	= { 0x08, BIT(0) },
++	[RST_MIXER1]	= { 0x08, BIT(1) },
++	[RST_WB]	= { 0x08, BIT(2) },
++};
++
++static const struct sunxi_ccu_desc sun8i_a83t_de2_clk_desc = {
++	.ccu_clks	= sunxi_de2_clks,
++	.num_ccu_clks	= ARRAY_SIZE(sunxi_de2_clks),
++
++	.hw_clks	= &sunxi_de2_hw_clks,
++
++	.resets		= sun8i_a83t_de2_resets,
++	.num_resets	= ARRAY_SIZE(sun8i_a83t_de2_resets),
++};
++
++static const struct sunxi_ccu_desc sun50i_a64_de2_clk_desc = {
++	.ccu_clks	= sunxi_de2_clks,
++	.num_ccu_clks	= ARRAY_SIZE(sunxi_de2_clks),
++
++	.hw_clks	= &sunxi_de2_hw_clks,
++
++	.resets		= sun50i_a64_de2_resets,
++	.num_resets	= ARRAY_SIZE(sun50i_a64_de2_resets),
++};
++
++static int sunxi_de2_clk_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	struct clk *bus_clk, *mod_clk;
++	struct reset_control *rstc;
++	void __iomem *reg;
++	const struct sunxi_ccu_desc *ccu_desc;
++	int ret;
++
++	ccu_desc = of_device_get_match_data(&pdev->dev);
++	if (!ccu_desc)
++		return -EINVAL;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	reg = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(reg))
++		return PTR_ERR(reg);
++
++	bus_clk = devm_clk_get(&pdev->dev, "bus");
++	if (IS_ERR(bus_clk)) {
++		ret = PTR_ERR(bus_clk);
++		if (ret != -EPROBE_DEFER)
++			dev_err(&pdev->dev, "Couldn't get bus clk: %d\n", ret);
++		return ret;
++	}
++
++	mod_clk = devm_clk_get(&pdev->dev, "mod");
++	if (IS_ERR(mod_clk)) {
++		ret = PTR_ERR(mod_clk);
++		if (ret != -EPROBE_DEFER)
++			dev_err(&pdev->dev, "Couldn't get mod clk: %d\n", ret);
++		return ret;
++	}
++
++	rstc = devm_reset_control_get_exclusive(&pdev->dev, NULL);
++	if (IS_ERR(rstc)) {
++		ret = PTR_ERR(bus_clk);
++		if (ret != -EPROBE_DEFER)
++			dev_err(&pdev->dev,
++				"Couldn't get reset control: %d\n", ret);
++		return ret;
++	}
++
++	/* The clocks need to be enabled for us to access the registers */
++	ret = clk_prepare_enable(bus_clk);
++	if (ret) {
++		dev_err(&pdev->dev, "Couldn't enable bus clk: %d\n", ret);
++		return ret;
++	}
++
++	ret = clk_prepare_enable(mod_clk);
++	if (ret) {
++		dev_err(&pdev->dev, "Couldn't enable mod clk: %d\n", ret);
++		return ret;
++	}
++
++	/* The reset control needs to be asserted for the controls to work */
++	ret = reset_control_deassert(rstc);
++	if (ret) {
++		dev_err(&pdev->dev,
++			"Couldn't deassert reset control: %d\n", ret);
++		goto err_disable_clk;
++	}
++
++	ret = sunxi_ccu_probe(pdev->dev.of_node, reg, ccu_desc);
++	if (ret)
++		goto err_assert_reset;
++
++	return 0;
++
++err_assert_reset:
++	reset_control_assert(rstc);
++err_disable_clk:
++	clk_disable_unprepare(bus_clk);
++	return ret;
++}
++
++static const struct of_device_id sunxi_de2_clk_ids[] = {
++	{
++		.compatible = "allwinner,sun8i-a83t-de2-clk",
++		.data = &sun8i_a83t_de2_clk_desc,
++	},
++	{
++		.compatible = "allwinner,sun50i-h5-de2-clk",
++		.data = &sun50i_a64_de2_clk_desc,
++	},
++	/*
++	 * The Allwinner A64 SoC needs some bit to be poke in syscon to make
++	 * DE2 really working.
++	 * So there's currently no A64 compatible here.
++	 * H5 shares the same reset line with A64, so here H5 is using the
++	 * clock description of A64.
++	 */
++	{ }
++};
++
++static struct platform_driver sunxi_de2_clk_driver = {
++	.probe	= sunxi_de2_clk_probe,
++	.driver	= {
++		.name	= "sunxi-de2-clks",
++		.of_match_table	= sunxi_de2_clk_ids,
++	},
++};
++builtin_platform_driver(sunxi_de2_clk_driver);
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.h b/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+new file mode 100644
+index 000000000000..530c006e0ae9
+--- /dev/null
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+@@ -0,0 +1,28 @@
++/*
++ * Copyright 2016 Icenowy Zheng <icenowy@aosc.io>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _CCU_SUN8I_DE2_H_
++#define _CCU_SUN8I_DE2_H_
++
++#include <dt-bindings/clock/sun8i-de2.h>
++#include <dt-bindings/reset/sun8i-de2.h>
++
++/* Intermediary clock dividers are not exported */
++#define CLK_MIXER0_DIV	3
++#define CLK_MIXER1_DIV	4
++#define CLK_WB_DIV	5
++
++#define CLK_NUMBER	(CLK_WB + 1)
++
++#endif /* _CCU_SUN8I_DE2_H_ */
 -- 
 2.12.2
