@@ -1,89 +1,217 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 4 May 2017 16:34:14 +0200
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
-In-Reply-To: <20170504134100.GR18578@dragon>
-References: <20170503135715.GG18578@dragon>
- <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
- <1493823533.11226.28.camel@nxp.com>
- <e46a57c2-4a28-a8b6-445e-299dd9d8659c@denx.de>
- <1493834298.11226.40.camel@nxp.com>
- <51fb1bd0-028d-c431-acc8-3c4f1d25fdba@denx.de>
- <1493890943.11226.42.camel@nxp.com>
- <6dbf67a0-42ea-ee84-d144-41422a21c1c5@denx.de>
- <20170504124446.GO18578@dragon>
- <4ba6bdf2-56b2-972d-3326-0eda3985c80b@denx.de>
- <20170504134100.GR18578@dragon>
-Message-ID: <8c3827c4-1272-f004-52d9-7c79e93813c6@denx.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 4 May 2017 16:39:50 +0200
+Subject: [PATCH v2 10/10] ARM: dts: sun8i: Add board dts file for Banana
+ Pi M2 Ultra
+In-Reply-To: <20170504135006.16483-11-icenowy@aosc.io>
+References: <20170504135006.16483-1-icenowy@aosc.io>
+ <20170504135006.16483-11-icenowy@aosc.io>
+Message-ID: <20170504143950.xqx2st42xtgl5nsq@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2017 03:41 PM, Shawn Guo wrote:
-> On Thu, May 04, 2017 at 03:08:41PM +0200, Marek Vasut wrote:
->> On 05/04/2017 02:44 PM, Shawn Guo wrote:
->>> On Thu, May 04, 2017 at 12:06:11PM +0200, Marek Vasut wrote:
+On Thu, May 04, 2017 at 09:50:06PM +0800, Icenowy Zheng wrote:
+> From: Chen-Yu Tsai <wens@csie.org>
 > 
-> <snip>
+> The Banana Pi M2 Ultra is an SBC based on the Allwinner R40 SoC. The
+> form factor and position of various connectors, leds and buttons is
+> similar to the Banana Pi M1+, Banana Pi M3, and is exactly the same
+> as the latest Banana Pi M64.
 > 
->>>> Mind you, my patch is not fixing any crash, it's correcting the
->>>> regulator binding and removing the OPP override which is at that
->>>> point useless.
->>>
->>> Heh, that's the primary reason why I prefer Leonard's patch, as his
->>> patch is fixing a critical crash issue, while yours is just removing
->>> some useless stuff and correcting something that doesn't show any real
->>> problem.
->>
->> Maybe you want to compare those two patches again, his patch fixing the
->> critical crash is removing the same "some useless stuff" as mine.
+> It features:
 > 
-> The difference is in commit message.  From your commit message, people
-> do not see what real world user noticeable issue your patch is fixing.
+>   - X-Powers AXP221s PMIC connected to i2c0
+>   - 2 GB DDR3 DRAM
+>   - 8 GB eMMC
+>   - micro SD card slot
+>   - DC power jack
+>   - HDMI output
+>   - MIPI DSI connector
+>   - 2x USB 2.0 hosts
+>   - 1x USB 2.0 OTG
+>   - gigabit ethernet with Realtek RTL8211E transceiver
+>   - WiFi/Bluetooth with AP6212 chip, with external antenna connector
+>   - SATA and power connectors for native SATA support
+>   - camera sensor connector
+>   - consumer IR receiver
+>   - audio out headphone jack
+>   - onboard microphone
+>   - red, green, and blue LEDs
+>   - debug UART pins
+>   - Li-Po battery connector
+>   - Raspberry Pi B+ compatible GPIO header
+>   - power, reset, and boot control buttons
 > 
->> Plus
->> mine is actually making sure the regulators are configured correctly,
->> not just removing "some useless stuff" and hoping for the best that
->> bootloader will do the right thing.
+> This patch adds a dts file that enables debug UART and MMC support.
 > 
-> Without this part, we do not get anything worse.  That said, it can be
-> an improvement in another patch.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  arch/arm/boot/dts/Makefile                        |   1 +
+>  arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 161 ++++++++++++++++++++++
+>  2 files changed, 162 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
 > 
->>>> Which part of the following commit message is unclear?
->>>>
->>>> "
->>>> The imx6sx-sdb has one power supply that drives both VDDARM_IN
->>>> and VDDSOC_IN, which is the sw1a regulator on the PFUZE PMIC.
->>>> Connect both inputs to the sw1a regulator on the PMIC and drop
->>>> the OPP hackery which is no longer needed as the power framework
->>>> will take care of the regulator configuration as needed.
->>>> "
->>>
->>> Something unclear in my opinion:
->>>
->>>  - The OPP hackery was never needed, as it's only needed for LDO bypass
->>>    mode which hasn't been supported by mainline kernel.  It's not 'no
->>>    longer needed as the power framework ...'.
->>
->> I don't know what this is about, it's not from my patch either ...
-> 
-> So I guess you do not understand how the OPP hackery was born and why it
-> shouldn't be there for mainline kernel at all.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 9c5e1d944d1c..07a662494eed 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -905,6 +905,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+>  	sun8i-h3-orangepi-plus.dtb \
+>  	sun8i-h3-orangepi-plus2e.dtb \
+>  	sun8i-r16-parrot.dtb \
+> +	sun8i-r40-bananapi-m2-ultra.dtb \
+>  	sun8i-v3s-licheepi-zero.dtb
+>  dtb-$(CONFIG_MACH_SUN9I) += \
+>  	sun9i-a80-optimus.dtb \
+> diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+> new file mode 100644
+> index 000000000000..1d824830a1ad
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+> @@ -0,0 +1,161 @@
+> +/*
+> + * Copyright (C) 2017 Chen-Yu Tsai <wens@csie.org>
+> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun8i-r40.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +/ {
+> +	model = "Banana Pi BPI-M2-Ultra";
+> +	compatible = "sinovoip,bpi-m2-ultra", "allwinner,sun8i-r40";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	wifi_pwrseq: wifi_pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 WIFI_EN */
+> +	};
+> +};
+> +
+> +&i2c0 {
+> +	status = "okay";
+> +
+> +	axp22x: pmic at 68 {
+> +		compatible = "x-powers,axp221";
+> +		reg = <0x34>;
+> +		interrupt-parent = <&nmi_intc>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> +	};
+> +};
+> +
+> +#include "axp22x.dtsi"
+> +
+> +&reg_aldo3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <2700000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "avcc";
+> +};
+> +
+> +&reg_dcdc1 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "vcc-3v0";
+> +};
+> +
+> +&reg_dcdc2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1000000>;
+> +	regulator-max-microvolt = <1300000>;
+> +	regulator-name = "vdd-cpu";
+> +};
+> +
+> +&reg_dcdc3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1000000>;
+> +	regulator-max-microvolt = <1300000>;
+> +	regulator-name = "vdd-sys";
+> +};
+> +
+> +&reg_dcdc5 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1500000>;
+> +	regulator-max-microvolt = <1500000>;
+> +	regulator-name = "vcc-dram";
+> +};
+> +
+> +&reg_dldo1 {
+> +	regulator-min-microvolt = <1800000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-wifi-io";
+> +};
+> +
+> +&reg_dldo2 {
+> +	regulator-min-microvolt = <3300000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-wifi";
+> +};
+> +
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins>;
 
-The OPP hackery is there to keep both regulators configured the same
-way, since they share the same input voltage rail IMO. If you model the
-power distribution correctly, the OPP hackery can be removed.
+If there is multiple options, then it should be suffixed. If there's
+only a single option, then it should be set in the DTSI. Either way,
+this is wrong.
 
->>>  - What are the related changes in power framework?  It will be more
->>>    clear if we can have the particular commit mentioned here.
->>
->> Uh, I don't understand your question, there are no new changes in the
->> power framework. The DT for the SDB was always wrong, my patch fixes it.
-> 
-> Then 'no longer needed' in your commit message is really confusing.
-> 
-> Shawn
-> 
-
+Maxime
 
 -- 
-Best regards,
-Marek Vasut
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170504/cb78a7ff/attachment-0001.sig>
