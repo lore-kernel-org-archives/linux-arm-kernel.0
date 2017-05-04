@@ -1,175 +1,305 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 4 May 2017 17:32:56 +0800
-Subject: [PATCH v2 2/2] dt-bindings: pcie: Add documentation for Mediatek PCIe
-In-Reply-To: <1493890376-6713-1-git-send-email-ryder.lee@mediatek.com>
-References: <1493890376-6713-1-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <1493890376-6713-3-git-send-email-ryder.lee@mediatek.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 4 May 2017 10:34:32 +0100
+Subject: [PATCH 5/5] KVM: arm/arm64: Allow setting the timer IRQ numbers
+ from userspace
+In-Reply-To: <20170503183300.4618-6-cdall@linaro.org>
+References: <20170503183300.4618-1-cdall@linaro.org>
+ <20170503183300.4618-6-cdall@linaro.org>
+Message-ID: <b08c50b4-6aba-1a59-80f4-343cd906f1fa@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for PCIe host driver available in MT7623
-series SoCs.
+On 03/05/17 19:33, Christoffer Dall wrote:
+> First we define an ABI using the vcpu devices that lets userspace set
+> the interrupt numbers for the various timers on both the 32-bit and
+> 64-bit KVM/ARM implementations.
+> 
+> Second, we add the definitions for the groups and attributes introduced
+> by the above ABI.  (We add the PMU define on the 32-bit side as well for
+> symmetry and it may get used some day.)
+> 
+> Third, we set up the arch-specific vcpu device operation handlers to
+> call into the timer code for anything related to the
+> KVM_ARM_VCPU_TIMER_CTRL group.
+> 
+> Fourth, we implement support for getting and setting the timer interrupt
+> numbers using the above defined ABI in the arch timer code.
+> 
+> Fifth, we introduce error checking upon enabling the arch timer (which
+> is called when first running a VCPU) to check that all VCPUs are
+> configured to use the same PPI for the timer (as mandated by the
+> architecture) and that the virtual and physical timers are not
+> configured to use the same IRQ number.
+> 
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> ---
+>  Documentation/virtual/kvm/devices/vcpu.txt |  25 +++++++
+>  arch/arm/include/uapi/asm/kvm.h            |   8 +++
+>  arch/arm/kvm/guest.c                       |   9 +++
+>  arch/arm64/include/uapi/asm/kvm.h          |   3 +
+>  arch/arm64/kvm/guest.c                     |   9 +++
+>  include/kvm/arm_arch_timer.h               |   4 ++
+>  virt/kvm/arm/arch_timer.c                  | 104 +++++++++++++++++++++++++++++
+>  7 files changed, 162 insertions(+)
+> 
+> diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
+> index 352af6e..013e3f1 100644
+> --- a/Documentation/virtual/kvm/devices/vcpu.txt
+> +++ b/Documentation/virtual/kvm/devices/vcpu.txt
+> @@ -35,3 +35,28 @@ Returns: -ENODEV: PMUv3 not supported or GIC not initialized
+>  Request the initialization of the PMUv3.  If using the PMUv3 with an in-kernel
+>  virtual GIC implementation, this must be done after initializing the in-kernel
+>  irqchip.
+> +
+> +
+> +2. GROUP: KVM_ARM_VCPU_TIMER_CTRL
+> +Architectures: ARM,ARM64
+> +
+> +2.1. ATTRIBUTE: KVM_ARM_VCPU_TIMER_IRQ_VTIMER
+> +2.2. ATTRIBUTE: KVM_ARM_VCPU_TIMER_IRQ_PTIMER
+> +Parameters: in kvm_device_attr.addr the address for the timer interrupt is a
+> +            pointer to an int
+> +Returns: -EINVAL: Invalid timer interrupt number
+> +         -EBUSY:  One or more VCPUs has already run
+> +
+> +A value describing the architected timer interrupt number when connected to an
+> +in-kernel virtual GIC.  These must be a PPI (16 <= intid < 32).  If an
+> +attribute is not set, a default value is applied (see below).
+> +
+> +KVM_ARM_VCPU_TIMER_IRQ_VTIMER: The EL1 virtual timer intid (default: 27)
+> +KVM_ARM_VCPU_TIMER_IRQ_PTIMER: The EL1 physical timer intid (default: 30)
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- .../bindings/pci/mediatek,mt7623-pcie.txt          | 149 +++++++++++++++++++++
- 1 file changed, 149 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+uber nit: my reading of the code is that the default is set at VCPU
+creation time. So setting the attribute overrides the default, not that
+the default is applied if no attribute is set (i.e. there is always a
+valid value).
 
-diff --git a/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
-new file mode 100644
-index 0000000..9c5d5a7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
-@@ -0,0 +1,149 @@
-+Mediatek Gen2 PCIe controller which is available on MT7623 series SoCs
-+
-+PCIe subsys supports single root complex (RC) with 3 Root Ports. Each root
-+ports supports a Gen2 1-lane Link and has PIPE interface to PHY.
-+
-+Required properties:
-+- compatible: Should contain "mediatek,mt7623-pcie".
-+- device_type: Must be "pci"
-+- reg: Base addresses and lengths of the PCIe controller.
-+- #address-cells: Address representation for root ports (must be 3)
-+- #size-cells: Size representation for root ports (must be 2)
-+- #interrupt-cells: Size representation for interrupts (must be 1)
-+- interrupts: Three interrupt outputs of the controller. Must contain an
-+  entry for each entry in the interrupt-names property.
-+- interrupt-names: Must include the following names
-+  - "pcie-int0"
-+  - "pcie-int1"
-+  - "pcie-int2"
-+- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
-+  Please refer to the standard PCI bus binding document for a more detailed
-+  explanation.
-+- clocks: Must contain an entry for each entry in clock-names.
-+  See ../clocks/clock-bindings.txt for details.
-+- clock-names: Must include the following entries:
-+  - free_ck :for reference clock of PCIe subsys
-+  - sys_ck0 :for clock of Port0
-+  - sys_ck1 :for clock of Port1
-+  - sys_ck2 :for clock of Port2
-+- resets: Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names: Must include the following entries:
-+  - pcie-rst0 :port0 reset
-+  - pcie-rst1 :port1 reset
-+  - pcie-rst2 :port2 reset
-+- phys: list of PHY specifiers (used by generic PHY framework).
-+- phy-names : must be "pcie-phy0", "pcie-phy1", "pcie-phyN".. based on the
-+  number of PHYs as specified in *phys* property.
-+- power-domains: A phandle and power domain specifier pair to the power domain
-+  which is responsible for collapsing and restoring power to the peripheral.
-+- bus-range: Range of bus numbers associated with this controller.
-+- ranges:
-+  - The first three entries are expected to translate the addresses for the root
-+    port registers, which are referenced by the assigned-addresses property of
-+    the root port nodes (see below).
-+  - The remaining entries setup the mapping for the standard I/O and memory
-+	regions.
-+  Please refer to the standard PCI bus binding document for a more detailed
-+  explanation.
-+
-+In addition, the device tree node must have sub-nodes describing each
-+PCIe port interface, having the following mandatory properties:
-+
-+Required properties:
-+- device_type: Must be "pci"
-+- assigned-addresses: Address and size of the port configuration registers
-+- reg: Only the first four bytes are used to refer to the correct bus number
-+  and device number.
-+- #address-cells: Must be 3
-+- #size-cells: Must be 2
-+- #interrupt-cells: Must be 1
-+- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
-+  Please refer to the standard PCI bus binding document for a more detailed
-+  explanation.
-+- ranges: Sub-ranges distributed from the PCIe controller node. An empty
-+  property is sufficient.
-+- num-lanes: Number of lanes to use for this port.
-+
-+Examples:
-+
-+	hifsys: syscon at 1a000000 {
-+		compatible = "mediatek,mt7623-hifsys", "syscon";
-+		reg = <0 0x1a000000 0 0x1000>;
-+		#clock-cells = <1>;
-+		#reset-cells = <1>;
-+	};
-+
-+	pcie: pcie-controller at 1a140000 {
-+		compatible = "mediatek,mt7623-pcie";
-+		device_type = "pci";
-+		reg = <0 0x1a140000 0 0x1000>; /* PCIe shared registers */
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		#interrupt-cells = <1>;
-+		interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 195 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-names = "pcie-int0", "pcie-int1", "pcie-int2";
-+		interrupt-map-mask = <0xf800 0 0 0>;
-+		interrupt-map = <0x0000 0 0 0 &gic GIC_SPI 193 IRQ_TYPE_NONE>,
-+				 <0x0800 0 0 0 &gic GIC_SPI 194 IRQ_TYPE_NONE>,
-+			     <0x1000 0 0 0 &gic GIC_SPI 195 IRQ_TYPE_NONE>;
-+		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
-+			     <&hifsys CLK_HIFSYS_PCIE0>,
-+				 <&hifsys CLK_HIFSYS_PCIE1>,
-+				 <&hifsys CLK_HIFSYS_PCIE2>;
-+		clock-names = "free_ck", "sys_ck0", "sys_ck1", "sys_ck2";
-+		resets = <&hifsys MT2701_HIFSYS_PCIE0_RST>,
-+			     <&hifsys MT2701_HIFSYS_PCIE1_RST>,
-+			     <&hifsys MT2701_HIFSYS_PCIE2_RST>;
-+		reset-names = "pcie-rst0", "pcie-rst1", "pcie-rst2";
-+		phys = <&pcie0_phy>, <&pcie1_phy>, <&pcie2_phy>;
-+		phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
-+		bus-range = <0x00 0xff>;
-+		ranges = <0x82000000 0 0x1a142000 0 0x1a142000 0 0x1000 /* Port0 registers */
-+			  0x82000000 0 0x1a143000 0 0x1a143000 0 0x1000 /* Port1 registers */
-+			  0x82000000 0 0x1a144000 0 0x1a144000 0 0x1000 /* Port2 registers */
-+			  0x81000000 0 0x1a160000 0 0x1a160000 0 0x00010000 /* I/O space */
-+			  0x83000000 0 0x60000000 0 0x60000000 0 0x10000000>;	/* memory space */
-+
-+		pcie at 1,0 {
-+			device_type = "pci";
-+			assigned-addresses = <0x82000000 0 0x1a142000 0 0x1000>;
-+			reg = <0x0000 0 0 0 0>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0>;
-+			interrupt-map = <0 0 0 0 &gic GIC_SPI 193 IRQ_TYPE_NONE>;
-+			ranges;
-+			num-lanes = <1>;
-+		};
-+
-+		pcie at 2,0 {
-+			device_type = "pci";
-+			assigned-addresses = <0x82000800 0 0x1a143000 0 0x1000>;
-+			reg = <0x0800 0 0 0 0>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0>;
-+			interrupt-map = <0 0 0 0 &gic GIC_SPI 194 IRQ_TYPE_NONE>;
-+			ranges;
-+			num-lanes = <1>;
-+		};
-+
-+		pcie at 3,0 {
-+			device_type = "pci";
-+			assigned-addresses = <0x82001000 0 0x1a144000 0 0x1000>;
-+			reg = <0x1000 0 0 0 0>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0>;
-+			interrupt-map = <0 0 0 0 &gic GIC_SPI 195 IRQ_TYPE_NONE>;
-+			ranges;
-+			num-lanes = <1>;
-+		};
-+	};
+> +
+> +Setting the same PPI for different timers will prevent the VCPUs from running.
+> +Setting the interrupt number on a VCPU configures all VCPUs created at that
+> +time to use the number provided for a given timer, overwriting any previously
+> +configured values on other VCPUs.  Userspace should configure the interrupt
+> +numbers on at least one VCPU after creating all VCPUs and before running any
+> +VCPUs.
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index a5838d6..6a75ec4 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -200,6 +200,14 @@ struct kvm_arch_memory_slot {
+>  #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK 0x3ff
+>  #define VGIC_LEVEL_INFO_LINE_LEVEL	0
+>  
+> +/* Device Control API on vcpu fd */
+> +#define KVM_ARM_VCPU_PMU_V3_CTRL	0
+> +#define   KVM_ARM_VCPU_PMU_V3_IRQ	0
+> +#define   KVM_ARM_VCPU_PMU_V3_INIT	1
+> +#define KVM_ARM_VCPU_TIMER_CTRL		1
+> +#define   KVM_ARM_VCPU_TIMER_IRQ_VTIMER		0
+> +#define   KVM_ARM_VCPU_TIMER_IRQ_PTIMER		1
+> +
+>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
+>  
+>  /* KVM_IRQ_LINE irq field index values */
+> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+> index acea05e..1e0784e 100644
+> --- a/arch/arm/kvm/guest.c
+> +++ b/arch/arm/kvm/guest.c
+> @@ -308,6 +308,9 @@ int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+>  	int ret;
+>  
+>  	switch (attr->group) {
+> +	case KVM_ARM_VCPU_TIMER_CTRL:
+> +		ret = kvm_arm_timer_set_attr(vcpu, attr);
+> +		break;
+>  	default:
+>  		ret = -ENXIO;
+>  		break;
+> @@ -322,6 +325,9 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+>  	int ret;
+>  
+>  	switch (attr->group) {
+> +	case KVM_ARM_VCPU_TIMER_CTRL:
+> +		ret = kvm_arm_timer_get_attr(vcpu, attr);
+> +		break;
+>  	default:
+>  		ret = -ENXIO;
+>  		break;
+> @@ -336,6 +342,9 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+>  	int ret;
+>  
+>  	switch (attr->group) {
+> +	case KVM_ARM_VCPU_TIMER_CTRL:
+> +		ret = kvm_arm_timer_has_attr(vcpu, attr);
+> +		break;
+>  	default:
+>  		ret = -ENXIO;
+>  		break;
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index cd6bea4..fc64518 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -226,6 +226,9 @@ struct kvm_arch_memory_slot {
+>  #define KVM_ARM_VCPU_PMU_V3_CTRL	0
+>  #define   KVM_ARM_VCPU_PMU_V3_IRQ	0
+>  #define   KVM_ARM_VCPU_PMU_V3_INIT	1
+> +#define KVM_ARM_VCPU_TIMER_CTRL		1
+> +#define   KVM_ARM_VCPU_TIMER_IRQ_VTIMER		0
+> +#define   KVM_ARM_VCPU_TIMER_IRQ_PTIMER		1
+>  
+>  /* KVM_IRQ_LINE irq field index values */
+>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
+> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> index b37446a..5c7f657 100644
+> --- a/arch/arm64/kvm/guest.c
+> +++ b/arch/arm64/kvm/guest.c
+> @@ -390,6 +390,9 @@ int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+>  	case KVM_ARM_VCPU_PMU_V3_CTRL:
+>  		ret = kvm_arm_pmu_v3_set_attr(vcpu, attr);
+>  		break;
+> +	case KVM_ARM_VCPU_TIMER_CTRL:
+> +		ret = kvm_arm_timer_set_attr(vcpu, attr);
+> +		break;
+>  	default:
+>  		ret = -ENXIO;
+>  		break;
+> @@ -407,6 +410,9 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+>  	case KVM_ARM_VCPU_PMU_V3_CTRL:
+>  		ret = kvm_arm_pmu_v3_get_attr(vcpu, attr);
+>  		break;
+> +	case KVM_ARM_VCPU_TIMER_CTRL:
+> +		ret = kvm_arm_timer_get_attr(vcpu, attr);
+> +		break;
+>  	default:
+>  		ret = -ENXIO;
+>  		break;
+> @@ -424,6 +430,9 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+>  	case KVM_ARM_VCPU_PMU_V3_CTRL:
+>  		ret = kvm_arm_pmu_v3_has_attr(vcpu, attr);
+>  		break;
+> +	case KVM_ARM_VCPU_TIMER_CTRL:
+> +		ret = kvm_arm_timer_has_attr(vcpu, attr);
+> +		break;
+>  	default:
+>  		ret = -ENXIO;
+>  		break;
+> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> index f1c967a..f0053f8 100644
+> --- a/include/kvm/arm_arch_timer.h
+> +++ b/include/kvm/arm_arch_timer.h
+> @@ -68,6 +68,10 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
+>  u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+>  int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+>  
+> +int kvm_arm_timer_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
+> +int kvm_arm_timer_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
+> +int kvm_arm_timer_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
+> +
+>  bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
+>  void kvm_timer_schedule(struct kvm_vcpu *vcpu);
+>  void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 6c5a064..d3d1dce 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/kvm_host.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+> +#include <linux/uaccess.h>
+>  
+>  #include <clocksource/arm_arch_timer.h>
+>  #include <asm/arch_timer.h>
+> @@ -617,6 +618,28 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+>  	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
+>  }
+>  
+> +static bool timer_irqs_are_valid(struct kvm *kvm)
+> +{
+> +	struct kvm_vcpu *vcpu;
+> +	int vtimer_irq, ptimer_irq;
+> +	int i;
+> +
+> +	vcpu = kvm_get_vcpu(kvm, 0);
+> +	vtimer_irq = vcpu_vtimer(vcpu)->irq.irq;
+> +	ptimer_irq = vcpu_ptimer(vcpu)->irq.irq;
+> +
+> +	if (vtimer_irq == ptimer_irq)
+> +		return false;
+> +
+> +	kvm_for_each_vcpu(i, vcpu, kvm) {
+> +		if (vcpu_vtimer(vcpu)->irq.irq != vtimer_irq ||
+> +		    vcpu_ptimer(vcpu)->irq.irq != ptimer_irq)
+> +			return false;
+> +	}
+> +
+> +	return true;
+> +}
+> +
+>  int kvm_timer_enable(struct kvm_vcpu *vcpu)
+>  {
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> @@ -636,6 +659,11 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+>  	if (!vgic_initialized(vcpu->kvm))
+>  		return -ENODEV;
+>  
+> +	if (!timer_irqs_are_valid(vcpu->kvm)) {
+> +		kvm_debug("incorrectly configured timer irqs\n");
+> +		return -EINVAL;
+> +	}
+> +
+>  	/*
+>  	 * Find the physical IRQ number corresponding to the host_vtimer_irq
+>  	 */
+> @@ -685,3 +713,79 @@ void kvm_timer_init_vhe(void)
+>  	val |= (CNTHCTL_EL1PCTEN << cnthctl_shift);
+>  	write_sysreg(val, cnthctl_el2);
+>  }
+> +
+> +static void set_timer_irqs(struct kvm *kvm, int vtimer_irq, int ptimer_irq)
+> +{
+> +	struct kvm_vcpu *vcpu;
+> +	int i;
+> +
+> +	kvm_for_each_vcpu(i, vcpu, kvm) {
+> +		vcpu_vtimer(vcpu)->irq.irq = vtimer_irq;
+> +		vcpu_ptimer(vcpu)->irq.irq = ptimer_irq;
+> +	}
+> +}
+> +
+> +int kvm_arm_timer_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+> +{
+> +	int __user *uaddr = (int __user *)(long)attr->addr;
+> +	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+> +	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+> +	int irq;
+> +
+> +	if (!irqchip_in_kernel(vcpu->kvm))
+> +		return -EINVAL;
+> +
+> +	if (get_user(irq, uaddr))
+> +		return -EFAULT;
+> +
+> +	if (!(irq_is_ppi(irq)))
+> +		return -EINVAL;
+> +
+> +	if (vcpu->arch.timer_cpu.enabled)
+> +		return -EBUSY;
+> +
+> +	switch (attr->attr) {
+> +	case KVM_ARM_VCPU_TIMER_IRQ_VTIMER:
+> +		set_timer_irqs(vcpu->kvm, irq, ptimer->irq.irq);
+
+Could we move the (vtimer_irq == ptimer_irq) check here? It is probably
+better to fail early than to wait until the first run to discover that
+something was wrong... Or does that clash horribly with the default values?
+
+Another issue that just popped in my head: how do we ensure that we
+don't clash between the PMU and the timers? Yes, that's a foolish thing
+to do, but that's no different from avoiding the same interrupt on the
+timers...
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
