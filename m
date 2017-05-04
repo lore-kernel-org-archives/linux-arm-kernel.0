@@ -1,60 +1,106 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Thu, 4 May 2017 15:28:14 +0000
-Subject: [PATCH 2/5] dmaengine: Add STM32 DMAMUX driver
-In-Reply-To: <20170501060353.GO6263@localhost>
-References: <1489414561-28912-1-git-send-email-cedric.madianga@gmail.com>
- <1489414561-28912-3-git-send-email-cedric.madianga@gmail.com>
- <20170406064046.GF4094@localhost>
- <d18cb12d-1fd1-39d2-501a-18c000b9982e@st.com>
- <20170501060353.GO6263@localhost>
-Message-ID: <15dd7c9c-2de3-a575-5936-cd1d1124f59b@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 4 May 2017 16:39:26 +0100
+Subject: [PATCH v6 10/24] KVM: arm64: vgic-its: Implement
+ vgic_mmio_uaccess_write_its_iidr
+In-Reply-To: <1493898284-29504-11-git-send-email-eric.auger@redhat.com>
+References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
+ <1493898284-29504-11-git-send-email-eric.auger@redhat.com>
+Message-ID: <d877c0e7-6147-f8d5-c3d6-d8dee36f97bb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/2017 08:03 AM, Vinod Koul wrote:
-> On Wed, Apr 26, 2017 at 09:17:37AM +0000, Pierre Yves MORDRET wrote:
->>>> +
->>>> +	ret = of_property_read_u32(node, "dma-channels",
->>>> +				   &dmamux->dmamux_channels);
->>>
->>> can we have property_xxx calls alone, that way driver is not strictly
->>> dependent on of
->>
->> Can you please explain what you are asking for ? Not sure to understand
->> correctly.
->
-> Use device_property_read_u32() which is a generic property API.
+On 04/05/17 12:44, Eric Auger wrote:
+> The GITS_IIDR revision field is used to encode the migration ABI
+> revision. So we need to restore it to check the table layout is
+> readable by the destination.
+> 
+> By writing the IIDR, userspace thus forces the ABI revision to be
+> used and this must be less than or equal to the max revision KVM
+> supports.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
+> ---
+> v5 -> v6:
+> - fix typos in the commit message
+> - dont't use update_64bit_reg anymore
+> 
+> v4 -> v5
+> - rename user_revision into abi_rev and REV into MAX_ABI_REV
+> - IIDR reports abi_rev set by userspace if any.
+> - If value set by userspace exceeds the max supported revision, an
+>   error is reported.
+> - add some defines
+> 
+> v4: creation
+> ---
+>  include/linux/irqchip/arm-gic-v3.h |  4 ++++
+>  virt/kvm/arm/vgic/vgic-its.c       | 20 +++++++++++++++++---
+>  2 files changed, 21 insertions(+), 3 deletions(-)
+> 
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 81ebe43..59f1abd 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -242,6 +242,10 @@
+>  #define GITS_TYPER_PTA			(1UL << 19)
+>  #define GITS_TYPER_HWCOLLCNT_SHIFT	24
+>  
+> +#define GITS_IIDR_REV_SHIFT		12
+> +#define GITS_IIDR_REV(r)		(((r) >> GITS_IIDR_REV_SHIFT) & 0xf)
+> +#define GITS_IIDR_PRODUCTID_SHIFT	24
+> +
+>  #define GITS_CBASER_VALID			(1ULL << 63)
+>  #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
+>  #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index c336cce..072efbd 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -411,7 +411,20 @@ static unsigned long vgic_mmio_read_its_iidr(struct kvm *kvm,
+>  					     struct vgic_its *its,
+>  					     gpa_t addr, unsigned int len)
+>  {
+> -	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
+> +	return (PRODUCT_ID_KVM << GITS_IIDR_PRODUCTID_SHIFT) |
+> +	       (its->abi_rev << GITS_IIDR_REV_SHIFT) | IMPLEMENTER_ARM;
 
-OK Will be done in V2
+Given that abi_rev is a 32bit quantity, and the REV field only only 4
+bit wide, I'd feel safer with a mask somewhere...
 
->
->
->>>> +static int __init stm32_dmamux_init(void)
->>>> +{
->>>> +	return platform_driver_register(&stm32_dmamux_driver);
->>>> +}
->>>> +arch_initcall(stm32_dmamux_init);
->>>
->>> why not module init, wouldnt defer probe solve the dependencies
->>>
->>
->> The reason behind many devices (device_initcall level) rely on DMAs. If
->> init is deferred DMAMUX driver will be probed twice if dependents rely
->> on it. This sounds not a good call. This explains arch_initcall level.
->
-> Why not deferred probe was introduced to help with dependencies...
->
+And hopefully, we'll never have more than 16 ABIs! ;-)
 
-Most DMAs devices are already in subsys_initcall to avoid multiple 
-useless probe when clients are deferred. This DMAMUx is itself on top of 
-DMAs.
-DMAMUX ---> DMA#1 ---> Device Client #1
-        |          |--> Device Client #2
-        |               [...]
-        |          |--> Device Client #N
-        |    [...]
-        |--> DMA#N ---> Device Client #1
-                   |--> Device Client #2
-                        [...]
-                   |--> Device Client #N
-arch_initcall might a good call in this case for DMAMUX.
+> +}
+> +
+> +static int vgic_mmio_uaccess_write_its_iidr(struct kvm *kvm,
+> +					    struct vgic_its *its,
+> +					    gpa_t addr, unsigned int len,
+> +					    unsigned long val)
+> +{
+> +	u32 rev = GITS_IIDR_REV(val);
+> +
+> +	if (rev > MAX_ABI_REV)
+> +		return -EINVAL;
+> +	return vgic_its_set_abi(its, rev);
+>  }
+>  
+>  static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
+> @@ -1393,8 +1406,9 @@ static struct vgic_register_region its_registers[] = {
+>  	REGISTER_ITS_DESC(GITS_CTLR,
+>  		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
+>  		VGIC_ACCESS_32bit),
+> -	REGISTER_ITS_DESC(GITS_IIDR,
+> -		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
+> +	REGISTER_ITS_DESC_UACCESS(GITS_IIDR,
+> +		vgic_mmio_read_its_iidr, its_mmio_write_wi,
+> +		vgic_mmio_uaccess_write_its_iidr, 4,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_ITS_DESC(GITS_TYPER,
+>  		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
+> 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
