@@ -1,133 +1,81 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu,  4 May 2017 19:48:56 +0800
-Subject: [PATCH v6 11/13] ARM: dts: sun8i: add DE2 nodes for V3s SoC
-In-Reply-To: <20170504114858.9008-1-icenowy@aosc.io>
-References: <20170504114858.9008-1-icenowy@aosc.io>
-Message-ID: <20170504114858.9008-12-icenowy@aosc.io>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Thu,  4 May 2017 13:44:40 +0200
+Subject: [PATCH v6 20/24] KVM: arm64: vgic-its: vgic_its_check_id returns the
+ entry's GPA
+In-Reply-To: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
+References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1493898284-29504-21-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner V3s SoC features a "Display Engine 2.0" with only one TCON
-which have RGB LCD output.
+As vgic_its_check_id() computes the device/collection entry's
+GPA, let's return it so that new callers can retrieve it easily.
 
-Add device nodes for it as well as the TCON.
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Acked-by: Christoffer Dall <cdall@linaro.org>
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm/boot/dts/sun8i-v3s.dtsi | 87 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 87 insertions(+)
+v5 -> v6:
+- add Christoffer's A-b
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-index 71075969e5e6..0a895179d8ae 100644
---- a/arch/arm/boot/dts/sun8i-v3s.dtsi
-+++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-@@ -41,6 +41,10 @@
+v3 -> v4:
+- check eaddr is not NULL to allow passing NULL eaddr parameter
+  to vgic_its_check_id
+
+v2: new
+---
+ virt/kvm/arm/vgic/vgic-its.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 6bef9147..a3ed52a 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -668,7 +668,8 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+  * is actually valid (covered by a memslot and guest accessible).
+  * For this we have to read the respective first level entry.
   */
+-static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
++static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
++			      gpa_t *eaddr)
+ {
+ 	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
+ 	u64 indirect_ptr, type = GITS_BASER_TYPE(baser);
+@@ -699,6 +700,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
+ 		addr = BASER_ADDRESS(baser) + id * esz;
+ 		gfn = addr >> PAGE_SHIFT;
  
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/sun8i-v3s-ccu.h>
-+#include <dt-bindings/clock/sun8i-de2.h>
-+#include <dt-bindings/reset/sun8i-v3s-ccu.h>
-+#include <dt-bindings/reset/sun8i-de2.h>
++		if (eaddr)
++			*eaddr = addr;
+ 		return kvm_is_visible_gfn(its->dev->kvm, gfn);
+ 	}
  
- / {
- 	#address-cells = <1>;
-@@ -59,6 +63,12 @@
- 		};
- 	};
+@@ -731,6 +734,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
+ 	indirect_ptr += index * esz;
+ 	gfn = indirect_ptr >> PAGE_SHIFT;
  
-+	de: display-engine {
-+		compatible = "allwinner,sun8i-v3s-display-engine";
-+		allwinner,pipelines = <&de2_mixer0>;
-+		status = "disabled";
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -93,6 +103,83 @@
- 		#size-cells = <1>;
- 		ranges;
++	if (eaddr)
++		*eaddr = indirect_ptr;
+ 	return kvm_is_visible_gfn(its->dev->kvm, gfn);
+ }
  
-+		de2_clocks: clock at 1000000 {
-+			compatible = "allwinner,sun50i-h5-de2-clk";
-+			reg = <0x01000000 0x100000>;
-+			clocks = <&ccu CLK_DE>,
-+				 <&ccu CLK_BUS_DE>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&ccu RST_BUS_DE>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+
-+		de2_mixer0: mixer at 1100000 {
-+			compatible = "allwinner,sun8i-v3s-de2-mixer";
-+			reg = <0x01100000 0x100000>;
-+			clocks = <&de2_clocks CLK_MIXER0>,
-+				 <&de2_clocks CLK_BUS_MIXER0>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&de2_clocks RST_MIXER0>;
-+			assigned-clocks = <&de2_clocks CLK_MIXER0>;
-+			assigned-clock-rates = <150000000>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				mixer0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					mixer0_out_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_in_mixer0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		tcon0: lcd-controller at 1c0c000 {
-+			compatible = "allwinner,sun8i-v3s-tcon";
-+			reg = <0x01c0c000 0x1000>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_TCON0>,
-+				 <&ccu CLK_TCON0>;
-+			clock-names = "ahb",
-+				      "tcon-ch0";
-+			clock-output-names = "tcon-pixel-clock";
-+			resets = <&ccu RST_BUS_TCON0>;
-+			reset-names = "lcd";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon0_in_mixer0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&mixer0_out_tcon0>;
-+					};
-+				};
-+
-+				tcon0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
-+
- 		mmc0: mmc at 01c0f000 {
- 			compatible = "allwinner,sun7i-a20-mmc";
- 			reg = <0x01c0f000 0x1000>;
+@@ -740,7 +745,7 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
+ {
+ 	struct its_collection *collection;
+ 
+-	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id))
++	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id, NULL))
+ 		return E_ITS_MAPC_COLLECTION_OOR;
+ 
+ 	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
+@@ -913,7 +918,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+ 	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
+ 	struct its_device *device;
+ 
+-	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
++	if (!vgic_its_check_id(its, its->baser_device_table, device_id, NULL))
+ 		return E_ITS_MAPD_DEVICE_OOR;
+ 
+ 	if (valid && num_eventid_bits > VITS_TYPER_IDBITS)
 -- 
-2.12.2
+2.5.5
