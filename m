@@ -1,116 +1,139 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 4 May 2017 19:20:19 +0100
-Subject: [PATCH 2/3] iommu/pci: reserve iova for PCI masters
-In-Reply-To: <1493786795-28153-2-git-send-email-oza.oza@broadcom.com>
-References: <1493786795-28153-1-git-send-email-oza.oza@broadcom.com>
- <1493786795-28153-2-git-send-email-oza.oza@broadcom.com>
-Message-ID: <0c9a6b09-139c-df49-cf73-6a3935a6aacd@arm.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu,  4 May 2017 20:49:30 +0200
+Subject: [PATCH 2/4] pinctrl: meson: meson8: add support for the I2S and SPDIF
+ pins
+In-Reply-To: <20170504184932.5372-1-martin.blumenstingl@googlemail.com>
+References: <20170504184932.5372-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20170504184932.5372-3-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/17 05:46, Oza Pawandeep wrote:
-> this patch reserves the iova for PCI masters.
-> ARM64 based SOCs may have scattered memory banks.
-> such as iproc based SOC has
-> 
-> <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
-> <0x00000008 0x80000000 0x3 0x80000000>, /* 14G @ 34G */
-> <0x00000090 0x00000000 0x4 0x00000000>, /* 16G @ 576G */
-> <0x000000a0 0x00000000 0x4 0x00000000>; /* 16G @ 640G */
-> 
-> but incoming PCI transcation addressing capability is limited
-> by host bridge, for example if max incoming window capability
-> is 512 GB, then 0x00000090 and 0x000000a0 will fall beyond it.
-> 
-> to address this problem, iommu has to avoid allocating iovas which
-> are reserved. which inturn does not allocate iova if it falls into hole.
+This adds support for the I2S and SPDIF input and output pins, similar
+to what we have on GXBB and GXL.
 
-I don't necessarily disagree with doing this, as we could do with facing
-up to the issue of discontiguous DMA ranges in particular (I too have a
-platform with this problem), but I'm still not overly keen on pulling DT
-specifics into this layer. More than that, though, if we are going to do
-it, then we should do it for all devices with a restrictive
-"dma-ranges", not just PCI ones.
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ drivers/pinctrl/meson/pinctrl-meson8.c | 52 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-> Bug: SOC-5216
-> Change-Id: Icbfc99a045d730be143fef427098c937b9d46353
-> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
-> Reviewed-on: http://gerrit-ccxsw.broadcom.net/40760
-> Reviewed-by: vpx_checkpatch status <vpx_checkpatch@broadcom.com>
-> Reviewed-by: CCXSW <ccxswbuild@broadcom.com>
-> Tested-by: vpx_autobuild status <vpx_autobuild@broadcom.com>
-> Tested-by: vpx_smoketest status <vpx_smoketest@broadcom.com>
-> Tested-by: CCXSW <ccxswbuild@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> 
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index 48d36ce..08764b0 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -27,6 +27,7 @@
->  #include <linux/iova.h>
->  #include <linux/irq.h>
->  #include <linux/mm.h>
-> +#include <linux/of_pci.h>
->  #include <linux/pci.h>
->  #include <linux/scatterlist.h>
->  #include <linux/vmalloc.h>
-> @@ -171,8 +172,12 @@ static void iova_reserve_pci_windows(struct pci_dev *dev,
->  		struct iova_domain *iovad)
->  {
->  	struct pci_host_bridge *bridge = pci_find_host_bridge(dev->bus);
-> +	struct device_node *np = bridge->dev.parent->of_node;
->  	struct resource_entry *window;
->  	unsigned long lo, hi;
-> +	int ret;
-> +	dma_addr_t tmp_dma_addr = 0, dma_addr;
-> +	LIST_HEAD(res);
->  
->  	resource_list_for_each_entry(window, &bridge->windows) {
->  		if (resource_type(window->res) != IORESOURCE_MEM &&
-> @@ -183,6 +188,36 @@ static void iova_reserve_pci_windows(struct pci_dev *dev,
->  		hi = iova_pfn(iovad, window->res->end - window->offset);
->  		reserve_iova(iovad, lo, hi);
->  	}
-> +
-> +	/* PCI inbound memory reservation. */
-> +	ret = of_pci_get_dma_ranges(np, &res);
-> +	if (!ret) {
-> +		resource_list_for_each_entry(window, &res) {
-> +			struct resource *res_dma = window->res;
-> +
-> +			dma_addr = res_dma->start - window->offset;
-> +			if (tmp_dma_addr > dma_addr) {
-> +				pr_warn("PCI: failed to reserve iovas; ranges should be sorted\n");
-
-I don't see anything in the DT spec about the entries having to be
-sorted, and it's not exactly impossible to sort a list if you need it so
-(and if I'm being really pedantic, one could still trigger this with a
-list that *is* sorted, only by different criteria).
-
-Robin.
-
-> +				return;
-> +			}
-> +			if (tmp_dma_addr != dma_addr) {
-> +				lo = iova_pfn(iovad, tmp_dma_addr);
-> +				hi = iova_pfn(iovad, dma_addr - 1);
-> +				reserve_iova(iovad, lo, hi);
-> +			}
-> +			tmp_dma_addr = window->res->end - window->offset;
-> +		}
-> +		/*
-> +		 * the last dma-range should honour based on the
-> +		 * 32/64-bit dma addresses.
-> +		 */
-> +		if (tmp_dma_addr < DMA_BIT_MASK(sizeof(dma_addr_t) * 8)) {
-> +			lo = iova_pfn(iovad, tmp_dma_addr);
-> +			hi = iova_pfn(iovad,
-> +				      DMA_BIT_MASK(sizeof(dma_addr_t) * 8) - 1);
-> +			reserve_iova(iovad, lo, hi);
-> +		}
-> +	}
->  }
->  
->  /**
-> 
+diff --git a/drivers/pinctrl/meson/pinctrl-meson8.c b/drivers/pinctrl/meson/pinctrl-meson8.c
+index 9d9ddd9c0f83..d6fc7994cad5 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson8.c
++++ b/drivers/pinctrl/meson/pinctrl-meson8.c
+@@ -224,6 +224,18 @@ static const unsigned int i2c_sck_c0_pins[] = { PIN(GPIOY_1, 0) };
+ 
+ static const unsigned int pwm_a_y_pins[] = { PIN(GPIOY_16, 0) };
+ 
++static const unsigned int i2s_out_ch45_pins[] = { PIN(GPIOY_0, 0) };
++static const unsigned int i2s_out_ch23_pins[] = { PIN(GPIOY_1, 0) };
++static const unsigned int i2s_out_ch01_pins[] = { PIN(GPIOY_4, 0) };
++static const unsigned int i2s_in_ch01_pins[] = { PIN(GPIOY_5, 0) };
++static const unsigned int i2s_lr_clk_in_pins[] = { PIN(GPIOY_6, 0) };
++static const unsigned int i2s_ao_clk_in_pins[] = { PIN(GPIOY_7, 0) };
++static const unsigned int i2s_am_clk_pins[] = { PIN(GPIOY_8, 0) };
++static const unsigned int i2s_out_ch78_pins[] = { PIN(GPIOY_9, 0) };
++
++static const unsigned int spdif_in_pins[] = { PIN(GPIOY_2, 0) };
++static const unsigned int spdif_out_pins[] = { PIN(GPIOY_3, 0) };
++
+ /* bank DV */
+ static const unsigned int dvin_rgb_pins[] = { PIN(GPIODV_0, 0), PIN(GPIODV_1, 0),
+ 					      PIN(GPIODV_2, 0), PIN(GPIODV_3, 0),
+@@ -398,6 +410,11 @@ static const unsigned int i2c_mst_sda_ao_pins[] = { PIN(GPIOAO_5, AO_OFF) };
+ 
+ static const unsigned int pwm_f_ao_pins[] = { PIN(GPIO_TEST_N, AO_OFF) };
+ 
++static const unsigned int i2s_am_clk_out_ao_pins[] = { PIN(GPIOAO_8, AO_OFF) };
++static const unsigned int i2s_ao_clk_out_ao_pins[] = { PIN(GPIOAO_9, AO_OFF) };
++static const unsigned int i2s_lr_clk_out_ao_pins[] = { PIN(GPIOAO_10, AO_OFF) };
++static const unsigned int i2s_out_ch01_ao_pins[] = { PIN(GPIOAO_11, AO_OFF) };
++
+ static struct meson_pmx_group meson8_cbus_groups[] = {
+ 	GPIO_GROUP(GPIOX_0, 0),
+ 	GPIO_GROUP(GPIOX_1, 0),
+@@ -558,6 +575,18 @@ static struct meson_pmx_group meson8_cbus_groups[] = {
+ 
+ 	GROUP(pwm_a_y,		9,	14),
+ 
++	GROUP(i2s_out_ch45,	1,	10),
++	GROUP(i2s_out_ch23,	1,	19),
++	GROUP(i2s_out_ch01,	1,	6),
++	GROUP(i2s_in_ch01,	1,	5),
++	GROUP(i2s_lr_clk_in,	1,	4),
++	GROUP(i2s_ao_clk_in,	1,	2),
++	GROUP(i2s_am_clk,	1,	0),
++	GROUP(i2s_out_ch78,	1,	11),
++
++	GROUP(spdif_in,		1,	8),
++	GROUP(spdif_out,	1,	7),
++
+ 	/* bank DV */
+ 	GROUP(dvin_rgb,		0,	6),
+ 	GROUP(dvin_vs,		0,	9),
+@@ -733,6 +762,11 @@ static struct meson_pmx_group meson8_aobus_groups[] = {
+ 	GROUP(i2c_mst_sda_ao,		0,	5),
+ 
+ 	GROUP(pwm_f_ao,			0,	19),
++
++	GROUP(i2s_am_clk_out_ao,	0,	30),
++	GROUP(i2s_ao_clk_out_ao,	0,	29),
++	GROUP(i2s_lr_clk_out_ao,	0,	28),
++	GROUP(i2s_out_ch01_ao,		0,	27),
+ };
+ 
+ static const char * const gpio_groups[] = {
+@@ -860,6 +894,12 @@ static const char * const i2c_b_groups[] = {
+ 	"i2c_sda_b", "i2c_sck_b"
+ };
+ 
++static const char * const i2s_groups[] = {
++	"i2s_out_ch45", "i2s_out_ch23_pins", "i2s_out_ch01_pins",
++	"i2s_in_ch01_pins", "i2s_lr_clk_in_pins", "i2s_ao_clk_in_pins",
++	"i2s_am_clk_pins", "i2s_out_ch78_pins"
++};
++
+ static const char * const sd_c_groups[] = {
+ 	"sd_d0_c", "sd_d1_c", "sd_d2_c", "sd_d3_c",
+ 	"sd_cmd_c", "sd_clk_c"
+@@ -910,6 +950,10 @@ static const char * const sdxc_b_groups[] = {
+ 	"sdxc_d13_b", "sdxc_d0_b", "sdxc_clk_b", "sdxc_cmd_b"
+ };
+ 
++static const char * const spdif_groups[] = {
++	"spdif_in", "spdif_out"
++};
++
+ static const char * const uart_ao_groups[] = {
+ 	"uart_tx_ao_a", "uart_rx_ao_a", "uart_cts_ao_a", "uart_rts_ao_a"
+ };
+@@ -934,6 +978,11 @@ static const char * const pwm_f_ao_groups[] = {
+ 	"pwm_f"
+ };
+ 
++static const char * const i2s_ao_groups[] = {
++	"i2s_am_clk_out_ao", "i2s_ao_clk_out_ao", "i2s_lr_clk_out_ao",
++	"i2s_out_ch01_ao"
++};
++
+ static struct meson_pmx_func meson8_cbus_functions[] = {
+ 	FUNCTION(gpio),
+ 	FUNCTION(sd_a),
+@@ -966,6 +1015,8 @@ static struct meson_pmx_func meson8_cbus_functions[] = {
+ 	FUNCTION(pwm_c),
+ 	FUNCTION(pwm_d),
+ 	FUNCTION(pwm_e),
++	FUNCTION(i2s),
++	FUNCTION(spdif),
+ };
+ 
+ static struct meson_pmx_func meson8_aobus_functions[] = {
+@@ -975,6 +1026,7 @@ static struct meson_pmx_func meson8_aobus_functions[] = {
+ 	FUNCTION(uart_ao_b),
+ 	FUNCTION(i2c_mst_ao),
+ 	FUNCTION(pwm_f_ao),
++	FUNCTION(i2s_ao),
+ };
+ 
+ static struct meson_bank meson8_cbus_banks[] = {
+-- 
+2.12.2
