@@ -1,143 +1,129 @@
-From: yangbo.lu@nxp.com (Y.B. Lu)
-Date: Thu, 4 May 2017 10:45:21 +0000
-Subject: [PATCH 3/3] arm64: dts: ls1012a: add eSDHC nodes
-In-Reply-To: <20170503130545.GB24392@dragon>
-References: <1492746756-12024-1-git-send-email-yangbo.lu@nxp.com>
- <1492746756-12024-4-git-send-email-yangbo.lu@nxp.com>
- <20170503130545.GB24392@dragon>
-Message-ID: <DB6PR0401MB2536C5123107DACEBACF37B4F8EA0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 4 May 2017 11:54:06 +0100
+Subject: [PATCH 5/5] KVM: arm/arm64: Allow setting the timer IRQ numbers
+ from userspace
+In-Reply-To: <20170504095918.GJ5923@cbox>
+References: <20170503183300.4618-1-cdall@linaro.org>
+ <20170503183300.4618-6-cdall@linaro.org>
+ <b08c50b4-6aba-1a59-80f4-343cd906f1fa@arm.com> <20170504095918.GJ5923@cbox>
+Message-ID: <79ec69f2-d727-46ec-b1d5-4c535a904e63@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On 04/05/17 10:59, Christoffer Dall wrote:
+> On Thu, May 04, 2017 at 10:34:32AM +0100, Marc Zyngier wrote:
+>> On 03/05/17 19:33, Christoffer Dall wrote:
+>>> First we define an ABI using the vcpu devices that lets userspace set
+>>> the interrupt numbers for the various timers on both the 32-bit and
+>>> 64-bit KVM/ARM implementations.
+>>>
+>>> Second, we add the definitions for the groups and attributes introduced
+>>> by the above ABI.  (We add the PMU define on the 32-bit side as well for
+>>> symmetry and it may get used some day.)
+>>>
+>>> Third, we set up the arch-specific vcpu device operation handlers to
+>>> call into the timer code for anything related to the
+>>> KVM_ARM_VCPU_TIMER_CTRL group.
+>>>
+>>> Fourth, we implement support for getting and setting the timer interrupt
+>>> numbers using the above defined ABI in the arch timer code.
+>>>
+>>> Fifth, we introduce error checking upon enabling the arch timer (which
+>>> is called when first running a VCPU) to check that all VCPUs are
+>>> configured to use the same PPI for the timer (as mandated by the
+>>> architecture) and that the virtual and physical timers are not
+>>> configured to use the same IRQ number.
+>>>
+>>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+>>> ---
+>>>  Documentation/virtual/kvm/devices/vcpu.txt |  25 +++++++
+>>>  arch/arm/include/uapi/asm/kvm.h            |   8 +++
+>>>  arch/arm/kvm/guest.c                       |   9 +++
+>>>  arch/arm64/include/uapi/asm/kvm.h          |   3 +
+>>>  arch/arm64/kvm/guest.c                     |   9 +++
+>>>  include/kvm/arm_arch_timer.h               |   4 ++
+>>>  virt/kvm/arm/arch_timer.c                  | 104 +++++++++++++++++++++++++++++
+>>>  7 files changed, 162 insertions(+)
+>>>
+>>> diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
+>>> index 352af6e..013e3f1 100644
+>>> --- a/Documentation/virtual/kvm/devices/vcpu.txt
+>>> +++ b/Documentation/virtual/kvm/devices/vcpu.txt
+>>> @@ -35,3 +35,28 @@ Returns: -ENODEV: PMUv3 not supported or GIC not initialized
+>>>  Request the initialization of the PMUv3.  If using the PMUv3 with an in-kernel
+>>>  virtual GIC implementation, this must be done after initializing the in-kernel
+>>>  irqchip.
+>>> +
+>>> +
+>>> +2. GROUP: KVM_ARM_VCPU_TIMER_CTRL
+>>> +Architectures: ARM,ARM64
+>>> +
+>>> +2.1. ATTRIBUTE: KVM_ARM_VCPU_TIMER_IRQ_VTIMER
+>>> +2.2. ATTRIBUTE: KVM_ARM_VCPU_TIMER_IRQ_PTIMER
+>>> +Parameters: in kvm_device_attr.addr the address for the timer interrupt is a
+>>> +            pointer to an int
+>>> +Returns: -EINVAL: Invalid timer interrupt number
+>>> +         -EBUSY:  One or more VCPUs has already run
+>>> +
+>>> +A value describing the architected timer interrupt number when connected to an
+>>> +in-kernel virtual GIC.  These must be a PPI (16 <= intid < 32).  If an
+>>> +attribute is not set, a default value is applied (see below).
+>>> +
+>>> +KVM_ARM_VCPU_TIMER_IRQ_VTIMER: The EL1 virtual timer intid (default: 27)
+>>> +KVM_ARM_VCPU_TIMER_IRQ_PTIMER: The EL1 physical timer intid (default: 30)
+>>
+>> uber nit: my reading of the code is that the default is set at VCPU
+>> creation time. So setting the attribute overrides the default, not that
+>> the default is applied if no attribute is set (i.e. there is always a
+>> valid value).
+>>
+> 
+> uh, right, I don't see the distinction though, so not sure how to
+> correct the text.
+> 
+> Would "Setting the attribute overrides the default values (see below)."
+> work instead?
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Wednesday, May 03, 2017 9:06 PM
-> To: Y.B. Lu
-> Cc: linux-arm-kernel at lists.infradead.org; ulf.hansson at linaro.org; Catalin
-> Marinas; Xiaobo Xie
-> Subject: Re: [PATCH 3/3] arm64: dts: ls1012a: add eSDHC nodes
-> 
-> On Fri, Apr 21, 2017 at 11:52:36AM +0800, Yangbo Lu wrote:
-> > There are two eSDHC controllers in LS1012A. This patch is to add eSDHC
-> > nodes for ls1012a dts. Also enable eSDHC for RDB/QDS boards.
-> >
-> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> > ---
-> >  arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts |  8 ++++++++
-> > arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts | 13 ++++++++++++
-> >  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi    | 25
-> +++++++++++++++++++++++
-> >  3 files changed, 46 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-> > b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-> > index e2a93d5..a21a587 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-> > @@ -130,3 +130,11 @@
-> >  &sata {
-> >  	status = "okay";
-> >  };
-> > +
-> > +&esdhc0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&esdhc1 {
-> > +	status = "okay";
-> > +};
-> 
-> Sort these labeled nodes alphabetically.
+Looks good to me.
 
-[Lu Yangbo-B47093] Ok, I will do that.
+[...]
 
+>>
+>> Another issue that just popped in my head: how do we ensure that we
+>> don't clash between the PMU and the timers? Yes, that's a foolish thing
+>> to do, but that's no different from avoiding the same interrupt on the
+>> timers...
+>>
+> Argh, good point.
 > 
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-> > b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-> > index ed77f6b..57669b0 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-> > @@ -61,3 +61,16 @@
-> >  &sata {
-> >  	status = "okay";
-> >  };
-> > +
-> > +&esdhc0 {
-> > +	sd-uhs-sdr104;
-> > +	sd-uhs-sdr50;
-> > +	sd-uhs-sdr25;
-> > +	sd-uhs-sdr12;
-> > +	status = "okay";
-> > +};
-> > +
-> > +&esdhc1 {
-> > +	mmc-hs200-1_8v;
-> > +	status = "okay";
-> > +};
+> So actually, nothing *really bad* happens from using the same IRQ number
+> except that the VM gets confused.  However, it's living life dangerously
+> because we use the HW bit for the vtimer, so we if ever start using it
+> for other timers or the PMU, then you could end up in a situation where
+> you unmap the phys mapping on behalf of another device, and the physical
+> interrupt could be left in an active state.
 > 
-> Ditto
-> 
+> On the other hand, the vtimer currently belongs only to VMs and we set
+> the required physical active state before entering the VM, so maybe it
+> doesn't matter.
 
-[Lu Yangbo-B47093] No problem.
+So far, we always assume that there is never more than a single source
+per interrupt. We'll end-up with weird behaviours because our line_level
+field is not an OR of the various inputs, but a direct assignment
+(device A and B raise the line, then A drops it -> B's interrupt is gone).
 
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> > b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> > index b497ac1..e3a1943 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> > @@ -302,6 +302,31 @@
-> >  			};
-> >  		};
-> >
-> > +		esdhc0: esdhc at 1560000 {
-> 
-> Sort the nodes in order of unit-address.
+I think that only the guest will be confused by it, but accepting it may
+be interpreted as "this should work correctly". Would documenting that
+it is a bad idea be enough?
 
-[Lu Yangbo-B47093] Ok, I will do that.
+> Should we just forego these checks and let the user shoot itself in the
+> foot if he/she wants to?
 
-> 
-> > +			compatible = "fsl,ls1012a-esdhc", "fsl,esdhc";
-> 
-> Please document the compatible.
-> 
+If the documentation is enough, why not. Otherwise, we need some form of
+allocator. Boring. ;-)
 
-[Lu Yangbo-B47093] Ok, will add a patch for that
+Thanks,
 
-> Shawn
-> 
-> > +			reg = <0x0 0x1560000 0x0 0x10000>;
-> > +			interrupts = <0 62 0x4>;
-> > +			clocks = <&clockgen 4 0>;
-> > +			voltage-ranges = <1800 1800 3300 3300>;
-> > +			sdhci,auto-cmd12;
-> > +			big-endian;
-> > +			bus-width = <4>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		esdhc1: esdhc at 1580000 {
-> > +			compatible = "fsl,ls1012a-esdhc", "fsl,esdhc";
-> > +			reg = <0x0 0x1580000 0x0 0x10000>;
-> > +			interrupts = <0 65 0x4>;
-> > +			clocks = <&clockgen 4 0>;
-> > +			voltage-ranges = <1800 1800 3300 3300>;
-> > +			sdhci,auto-cmd12;
-> > +			big-endian;
-> > +			broken-cd;
-> > +			bus-width = <4>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> >  		i2c0: i2c at 2180000 {
-> >  			compatible = "fsl,vf610-i2c";
-> >  			#address-cells = <1>;
-> > --
-> > 2.1.0.27.g96db324
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	M.
+-- 
+Jazz is not dead. It just smells funny...
