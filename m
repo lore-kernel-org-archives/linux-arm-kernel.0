@@ -1,80 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 4 May 2017 14:11:38 +0100
-Subject: [PATCH v2 2/4] arm64: hw_breakpoint: fix watchpoint matching for
- tagged pointers
-In-Reply-To: <1493825868-30872-3-git-send-email-kristina.martsenko@arm.com>
-References: <1493825868-30872-1-git-send-email-kristina.martsenko@arm.com>
- <1493825868-30872-3-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <20170504131137.GD20461@leverpostej>
+From: kvalo@qca.qualcomm.com (Kalle Valo)
+Date: Thu, 4 May 2017 13:13:43 +0000
+Subject: [PATCH 1/2] wcn36xx: Pass used skb to ieee80211_tx_status()
+In-Reply-To: <20170428234247.GQ15143@minitux> (Bjorn Andersson's message of
+ "Fri, 28 Apr 2017 16:42:47 -0700")
+References: <20170426220444.10539-1-bjorn.andersson@linaro.org>
+ <1493281332.2529.1.camel@sipsolutions.net>	<20170428234247.GQ15143@minitux>
+Message-ID: <87fugkrchl.fsf@kamboji.qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 04:37:46PM +0100, Kristina Martsenko wrote:
-> When we take a watchpoint exception, the address that triggered the
-> watchpoint is found in FAR_EL1. We compare it to the address of each
-> configured watchpoint to see which one was hit.
-> 
-> The configured watchpoint addresses are untagged, while the address in
-> FAR_EL1 will have an address tag if the data access was done using a
-> tagged address. The tag needs to be removed to compare the address to
-> the watchpoints.
-> 
-> Currently we don't remove it, and as a result can report the wrong
-> watchpoint as being hit (specifically, always either the highest TTBR0
-> watchpoint or lowest TTBR1 watchpoint). This patch removes the tag.
-> 
-> Fixes: d50240a5f6ce ("arm64: mm: permit use of tagged pointers at EL0")
-> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+Bjorn Andersson <bjorn.andersson@linaro.org> writes:
 
-Looks sane to me. FWIW:
+> On Thu 27 Apr 01:22 PDT 2017, Johannes Berg wrote:
+>
+>> 
+>> > @@ -371,7 +371,7 @@ static void reap_tx_dxes(struct wcn36xx *wcn,
+>> > struct wcn36xx_dxe_ch *ch)
+>> > ?			info = IEEE80211_SKB_CB(ctl->skb);
+>> > ?			if (!(info->flags &
+>> > IEEE80211_TX_CTL_REQ_TX_STATUS)) {
+>> > ?				/* Keep frame until TX status comes
+>> > */
+>> > -				ieee80211_free_txskb(wcn->hw, ctl-
+>> > >skb);
+>> > +				ieee80211_tx_status(wcn->hw, ctl-
+>> > >skb);
+>> > 
+>> 
+>> I don't think this is a good idea.
+>
+> Thanks for letting me know :)
+>
+>> This code intentionally checked if TX status was requested, and if not
+>> then it doesn't go to the effort of building it.
+>> 
+>
+> What I'm finding puzzling is the fact that the only caller of
+> ieee80211_led_tx() is ieee80211_tx_status() and it seems like drivers,
+> such as ath10k, call this for each packet handled - but I'm likely
+> missing something.
+>
+>> As it is with your patch, it'll go and report the TX status without any
+>> TX status information - which is handled in wcn36xx_dxe_tx_ack_ind()
+>> for those frames needing it.
+>> 
+>
+> Right, it doesn't sound desired. However, during normal operation I'm
+> not seeing IEEE80211_TX_CTL_REQ_TX_STATUS being set and as such
+> ieee80211_led_tx() is never called.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+So what's the conclusion? How do we get leds working?
 
-Mark.
-
-> ---
->  arch/arm64/include/asm/uaccess.h  | 6 +++---
->  arch/arm64/kernel/hw_breakpoint.c | 3 +++
->  2 files changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 5308d696311b..0221029e27ff 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -106,9 +106,9 @@ static inline void set_fs(mm_segment_t fs)
->  })
->  
->  /*
-> - * When dealing with data aborts or instruction traps we may end up with
-> - * a tagged userland pointer. Clear the tag to get a sane pointer to pass
-> - * on to access_ok(), for instance.
-> + * When dealing with data aborts, watchpoints, or instruction traps we may end
-> + * up with a tagged userland pointer. Clear the tag to get a sane pointer to
-> + * pass on to access_ok(), for instance.
->   */
->  #define untagged_addr(addr)		sign_extend64(addr, 55)
->  
-> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-> index 0296e7924240..749f81779420 100644
-> --- a/arch/arm64/kernel/hw_breakpoint.c
-> +++ b/arch/arm64/kernel/hw_breakpoint.c
-> @@ -36,6 +36,7 @@
->  #include <asm/traps.h>
->  #include <asm/cputype.h>
->  #include <asm/system_misc.h>
-> +#include <asm/uaccess.h>
->  
->  /* Breakpoint currently in use for each BRP. */
->  static DEFINE_PER_CPU(struct perf_event *, bp_on_reg[ARM_MAX_BRP]);
-> @@ -721,6 +722,8 @@ static u64 get_distance_from_watchpoint(unsigned long addr, u64 val,
->  	u64 wp_low, wp_high;
->  	u32 lens, lene;
->  
-> +	addr = untagged_addr(addr);
-> +
->  	lens = __ffs(ctrl->len);
->  	lene = __fls(ctrl->len);
->  
-> -- 
-> 2.1.4
-> 
+-- 
+Kalle Valo
