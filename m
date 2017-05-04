@@ -1,78 +1,203 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 4 May 2017 09:32:15 +0200
-Subject: [PATCH v5 21/22] KVM: arm64: vgic-its: Fix pending table sync
-In-Reply-To: <03432fc8-5e39-2f50-1e36-1c4b2f9be773@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
- <1492164934-988-22-git-send-email-eric.auger@redhat.com>
- <20170430211033.GD1499@lvm>
- <03432fc8-5e39-2f50-1e36-1c4b2f9be773@redhat.com>
-Message-ID: <20170504073215.GB5923@cbox>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Thu, 4 May 2017 09:35:53 +0200
+Subject: [PATCH v4 0/8] Add support for DCMI camera interface of
+ STMicroelectronics STM32 SoC series
+In-Reply-To: <1492704445-22186-1-git-send-email-hugues.fruchet@st.com>
+References: <1492704445-22186-1-git-send-email-hugues.fruchet@st.com>
+Message-ID: <b6cee1d6-a07a-87ac-4f9e-aad6747f60bc@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 04, 2017 at 12:20:13AM +0200, Auger Eric wrote:
-> Hi,
-> 
-> On 30/04/2017 23:10, Christoffer Dall wrote:
-> > On Fri, Apr 14, 2017 at 12:15:33PM +0200, Eric Auger wrote:
-> >> In its_sync_lpi_pending_table() we currently ignore the
-> >> target_vcpu of the LPIs. We sync the pending bit found in
-> >> the vcpu pending table even if the LPI is not targeting it.
-> >>
-> >> Also in vgic_its_cmd_handle_invall() we are supposed to
-> >> read the config table data for the LPIs associated to the
-> >> collection ID. At the moment we refresh all LPI config
-> >> information.
-> >>
-> >> This patch passes a vpcu to vgic_copy_lpi_list() so that
-> >> this latter returns a snapshot of the LPIs targeting this
-> >> CPU and only those.
-> >>
-> >> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> >> ---
-> >>  virt/kvm/arm/vgic/vgic-its.c | 24 ++++++++++++------------
-> >>  1 file changed, 12 insertions(+), 12 deletions(-)
-> >>
-> >> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> >> index 86dfc6c..be848be 100644
-> >> --- a/virt/kvm/arm/vgic/vgic-its.c
-> >> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> >> @@ -252,13 +252,13 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
-> >>  }
-> >>  
-> >>  /*
-> >> - * Create a snapshot of the current LPI list, so that we can enumerate all
-> >> - * LPIs without holding any lock.
-> >> - * Returns the array length and puts the kmalloc'ed array into intid_ptr.
-> >> + * Create a snapshot of the current LPIs targeting @vcpu, so that we can
-> >> + * enumerate those LPIs without holding any lock.
-> >> + * Returns their number and puts the kmalloc'ed array into intid_ptr.
-> >>   */
-> >> -static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
-> >> +static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
-> >>  {
-> >> -	struct vgic_dist *dist = &kvm->arch.vgic;
-> >> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> >>  	struct vgic_irq *irq;
-> >>  	u32 *intids;
-> >>  	int irq_count = dist->lpi_list_count, i = 0;
-> >> @@ -277,14 +277,14 @@ static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
-> >>  	spin_lock(&dist->lpi_list_lock);
-> >>  	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-> >>  		/* We don't need to "get" the IRQ, as we hold the list lock. */
-> >> -		intids[i] = irq->intid;
-> >> -		if (++i == irq_count)
-> >> -			break;
-> >> +		if (irq->target_vcpu != vcpu)
-> >> +			continue;
-> >> +		intids[i++] = irq->intid;
-> > 
-> > were we checking the ++i == irq_count condition for no good reason
-> > before since we can just drop it now?
-> I didn't get why we had that check.
-> 
+Hi Hugues,
 
-ok, Andre is cc'ed so unless he complains let's just get rid of it.
+On 04/20/2017 06:07 PM, Hugues Fruchet wrote:
+> This patchset introduces a basic support for Digital Camera Memory Interface
+> (DCMI) of STMicroelectronics STM32 SoC series.
+>
+> This first basic support implements RGB565 & YUV frame grabbing.
+> Cropping and JPEG support will be added later on.
+>
+> This has been tested on STM324x9I-EVAL evaluation board embedding
+> an OV2640 camera sensor.
+>
+> This driver depends on:
+>   - [PATCHv6 00/14] atmel-isi/ov7670/ov2640: convert to standalone drivers http://www.spinics.net/lists/linux-media/msg113480.html
 
-Thanks,
--Christoffer
+For stm32 machine part (DT+config):
+Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+
+I will add it in future pull request.
+
+Regards
+Alex
+
+>
+> ===========
+> = history =
+> ===========
+> version 4:
+>   - "v4l2-compliance -s -f" report
+>   - fix behaviour in case of start_streaming failure (DMA memory shortage for ex.)
+>   - dt-bindings: Fix remarks from Rob Herring:
+>     http://www.mail-archive.com/linux-media at vger.kernel.org/msg111340.html
+>     Add "Acked-by: Rob Herring <robh@kernel.org>"
+>
+> version 3:
+>   - stm32-dcmi: Add "Reviewed-by: Hans Verkuil <hans.verkuil@cisco.com>"
+>   - dt-bindings: Fix remarks from Rob Herring:
+>     http://www.mail-archive.com/linux-media at vger.kernel.org/msg110956.html
+>
+> version 2:
+>   - Fix a Kbuild warning in probe:
+>     http://www.mail-archive.com/linux-media at vger.kernel.org/msg110678.html
+>   - Fix a warning in dcmi_queue_setup()
+>   - dt-bindings: warn on sensor signals level inversion in board example
+>   - Typos fixing
+>
+> version 1:
+>   - Initial submission
+>
+> ===================
+> = v4l2-compliance =
+> ===================
+> Below is the v4l2-compliance report for this current version of the DCMI camera interface.
+> v4l2-compliance has been built from v4l-utils-1.12.3.
+>
+> ~ # v4l2-compliance -s -f -d /dev/video0
+> v4l2-compliance SHA   : f5f45e17ee98a0ebad7836ade2b34ceec909d751
+>
+> Driver Info:
+>         Driver name   : stm32-dcmi
+>         Card type     : STM32 Digital Camera Memory Int
+>         Bus info      : platform:dcmi
+>         Driver version: 4.11.0
+>         Capabilities  : 0x85200001
+>                 Video Capture
+>                 Read/Write
+>                 Streaming
+>                 Extended Pix Format
+>                 Device Capabilities
+>         Device Caps   : 0x05200001
+>                 Video Capture
+>                 Read/Write
+>                 Streaming
+>                 Extended Pix Format
+>
+> Compliance test for device /dev/video0 (not using libv4l2):
+>
+> Required ioctls:
+>         test VIDIOC_QUERYCAP: OK
+>
+> Allow for multiple opens:
+>         test second video open: OK
+>         test VIDIOC_QUERYCAP: OK
+>         test VIDIOC_G/S_PRIORITY: OK
+>         test for unlimited opens: OK
+>
+> Debug ioctls:
+>         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+>         test VIDIOC_LOG_STATUS: OK
+>
+> Input ioctls:
+>         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+>         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+>         test VIDIOC_ENUMAUDIO: OK (Not Supported)
+>         test VIDIOC_G/S/ENUMINPUT: OK
+>         test VIDIOC_G/S_AUDIO: OK (Not Supported)
+>         Inputs: 1 Audio Inputs: 0 Tuners: 0
+>
+> Output ioctls:
+>         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+>         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+>         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+>         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+>         Outputs: 0 Audio Outputs: 0 Modulators: 0
+>
+> Input/Output configuration ioctls:
+>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+>         test VIDIOC_G/S_EDID: OK (Not Supported)
+>
+> Test input 0:
+>
+>         Control ioctls:
+>                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK
+>                 test VIDIOC_QUERYCTRL: OK
+>                 test VIDIOC_G/S_CTRL: OK
+>                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK
+>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
+>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+>                 Standard Controls: 3 Private Controls: 0
+>
+>         Format ioctls:
+>                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+>                 test VIDIOC_G/S_PARM: OK (Not Supported)
+>                 test VIDIOC_G_FBUF: OK (Not Supported)
+>                 test VIDIOC_G_FMT: OK
+>                 test VIDIOC_TRY_FMT: OK
+>                 test VIDIOC_S_FMT: OK
+>                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+>                 test Cropping: OK (Not Supported)
+>                 test Composing: OK (Not Supported)
+>                 test Scaling: OK
+>
+>         Codec ioctls:
+>                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+>                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+>                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+>
+>         Buffer ioctls:
+>                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+>                 test VIDIOC_EXPBUF: OK
+>
+> Test input 0:
+>
+> Streaming ioctls:
+>         test read/write: OK
+>         test MMAP: OK
+>         test USERPTR: OK (Not Supported)
+>         test DMABUF: Cannot test, specify --expbuf-device
+>
+> Stream using all formats:
+>         test MMAP for Format YUYV, Frame Size 176x144:
+>                 Stride 352, Field None: OK
+>         test MMAP for Format YUYV, Frame Size 320x240:
+>                 Stride 640, Field None: OK
+>         test MMAP for Format UYVY, Frame Size 176x144:
+>                 Stride 352, Field None: OK
+>         test MMAP for Format UYVY, Frame Size 320x240:
+>                 Stride 640, Field None: OK
+>         test MMAP for Format RGBP, Frame Size 176x144:
+>                 Stride 352, Field None: OK
+>         test MMAP for Format RGBP, Frame Size 320x240:
+>                 Stride 640, Field None: OK
+>
+> Total: 52, Succeeded: 52, Failed: 0, Warnings: 0
+>
+> Hugues Fruchet (8):
+>   dt-bindings: Document STM32 DCMI bindings
+>   [media] stm32-dcmi: STM32 DCMI camera interface driver
+>   ARM: dts: stm32: Enable DCMI support on STM32F429 MCU
+>   ARM: dts: stm32: Enable DCMI camera interface on STM32F429-EVAL board
+>   ARM: dts: stm32: Enable STMPE1600 gpio expander of STM32F429-EVAL
+>     board
+>   ARM: dts: stm32: Enable OV2640 camera support of STM32F429-EVAL board
+>   ARM: configs: stm32: STMPE1600 GPIO expander
+>   ARM: configs: stm32: DCMI + OV2640 camera support
+>
+>  .../devicetree/bindings/media/st,stm32-dcmi.txt    |   46 +
+>  arch/arm/boot/dts/stm32429i-eval.dts               |   56 +
+>  arch/arm/boot/dts/stm32f429.dtsi                   |   37 +
+>  arch/arm/configs/stm32_defconfig                   |    9 +
+>  drivers/media/platform/Kconfig                     |   12 +
+>  drivers/media/platform/Makefile                    |    2 +
+>  drivers/media/platform/stm32/Makefile              |    1 +
+>  drivers/media/platform/stm32/stm32-dcmi.c          | 1419 ++++++++++++++++++++
+>  8 files changed, 1582 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
+>  create mode 100644 drivers/media/platform/stm32/Makefile
+>  create mode 100644 drivers/media/platform/stm32/stm32-dcmi.c
+>
