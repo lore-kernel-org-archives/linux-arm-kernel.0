@@ -1,113 +1,80 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 4 May 2017 15:08:41 +0200
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
-In-Reply-To: <20170504124446.GO18578@dragon>
-References: <1493141004.3557.8.camel@nxp.com>
- <f3bbd20c-2132-1121-1044-ba00dba302d6@denx.de>
- <20170503135715.GG18578@dragon>
- <76e22a7e-590f-00ee-04f8-87604303eaad@denx.de>
- <1493823533.11226.28.camel@nxp.com>
- <e46a57c2-4a28-a8b6-445e-299dd9d8659c@denx.de>
- <1493834298.11226.40.camel@nxp.com>
- <51fb1bd0-028d-c431-acc8-3c4f1d25fdba@denx.de>
- <1493890943.11226.42.camel@nxp.com>
- <6dbf67a0-42ea-ee84-d144-41422a21c1c5@denx.de>
- <20170504124446.GO18578@dragon>
-Message-ID: <4ba6bdf2-56b2-972d-3326-0eda3985c80b@denx.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 4 May 2017 14:11:38 +0100
+Subject: [PATCH v2 2/4] arm64: hw_breakpoint: fix watchpoint matching for
+ tagged pointers
+In-Reply-To: <1493825868-30872-3-git-send-email-kristina.martsenko@arm.com>
+References: <1493825868-30872-1-git-send-email-kristina.martsenko@arm.com>
+ <1493825868-30872-3-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <20170504131137.GD20461@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2017 02:44 PM, Shawn Guo wrote:
-> On Thu, May 04, 2017 at 12:06:11PM +0200, Marek Vasut wrote:
->> On 05/04/2017 11:42 AM, Leonard Crestez wrote:
->>> I think there is a further misunderstanding here. I have a problem
->>> where imx6sx-sdb rev C boards crash on boot with upstream (but are
->>> reported to work fine with rev B). Removing the OPP overrides fixes
->>> this specific issue.
->>>
->>> I don't object to the second part of your patch, setting correct supply links is a good thing for various reasons. It is just not necessary for fixing the concrete crash mentioned above (and I tested this). It should probably go in a separate patch.
->>
->> Mind you, my patch is not fixing any crash, it's correcting the
->> regulator binding and removing the OPP override which is at that
->> point useless.
+On Wed, May 03, 2017 at 04:37:46PM +0100, Kristina Martsenko wrote:
+> When we take a watchpoint exception, the address that triggered the
+> watchpoint is found in FAR_EL1. We compare it to the address of each
+> configured watchpoint to see which one was hit.
 > 
-> Heh, that's the primary reason why I prefer Leonard's patch, as his
-> patch is fixing a critical crash issue, while yours is just removing
-> some useless stuff and correcting something that doesn't show any real
-> problem.
-
-Maybe you want to compare those two patches again, his patch fixing the
-critical crash is removing the same "some useless stuff" as mine. Plus
-mine is actually making sure the regulators are configured correctly,
-not just removing "some useless stuff" and hoping for the best that
-bootloader will do the right thing.
-
-> So Leonard's patch will need to be applied for v4.12-rc and copy stable
-> kernel, while yours will only be applied for next merge window as a
-> cleanup/improving thing.
-
-Well mine is bugfix, but I'm clearly unable to get that information across.
-
-> Patches are similar, but they can be handled very differently, because
-> commit log tells completely different stories.  Do you see how commit
-> log matters now?
-
-I understand how commit log matters and I still believe I described the
-change there just fine.
-
->>> It might seem a pedantic difference but it's good to accurately describe the effect of patches in commit messages. For example it might help somebody looking to backport various fixes.
+> The configured watchpoint addresses are untagged, while the address in
+> FAR_EL1 will have an address tag if the data access was done using a
+> tagged address. The tag needs to be removed to compare the address to
+> the watchpoints.
 > 
-> @Leonard, no, it's not pedantic at all.  I really appreciate your commit
-> message and all the comments you added in the discussion, which is
-> extremely helpful for us to understand the changes.
+> Currently we don't remove it, and as a result can report the wrong
+> watchpoint as being hit (specifically, always either the highest TTBR0
+> watchpoint or lowest TTBR1 watchpoint). This patch removes the tag.
 > 
->> Which part of the following commit message is unclear?
->>
->> "
->> The imx6sx-sdb has one power supply that drives both VDDARM_IN
->> and VDDSOC_IN, which is the sw1a regulator on the PFUZE PMIC.
->> Connect both inputs to the sw1a regulator on the PMIC and drop
->> the OPP hackery which is no longer needed as the power framework
->> will take care of the regulator configuration as needed.
->> "
-> 
-> Something unclear in my opinion:
-> 
->  - The OPP hackery was never needed, as it's only needed for LDO bypass
->    mode which hasn't been supported by mainline kernel.  It's not 'no
->    longer needed as the power framework ...'.
+> Fixes: d50240a5f6ce ("arm64: mm: permit use of tagged pointers at EL0")
+> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 
-I don't know what this is about, it's not from my patch either ...
+Looks sane to me. FWIW:
 
->  - What are the related changes in power framework?  It will be more
->    clear if we can have the particular commit mentioned here.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Uh, I don't understand your question, there are no new changes in the
-power framework. The DT for the SDB was always wrong, my patch fixes it.
+Mark.
 
->> btw if sending obvious bugfix upstream is met with this sort of
+> ---
+>  arch/arm64/include/asm/uaccess.h  | 6 +++---
+>  arch/arm64/kernel/hw_breakpoint.c | 3 +++
+>  2 files changed, 6 insertions(+), 3 deletions(-)
 > 
-> Leonard's patch is an obvious bugfix, but yours is not.
-
-Please consider mine one. I marked it RFC because I don't even have the
-board and I needed someone to test it.
-
->> resistance and pointless discussion, it is extremely demotivating.
+> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> index 5308d696311b..0221029e27ff 100644
+> --- a/arch/arm64/include/asm/uaccess.h
+> +++ b/arch/arm64/include/asm/uaccess.h
+> @@ -106,9 +106,9 @@ static inline void set_fs(mm_segment_t fs)
+>  })
+>  
+>  /*
+> - * When dealing with data aborts or instruction traps we may end up with
+> - * a tagged userland pointer. Clear the tag to get a sane pointer to pass
+> - * on to access_ok(), for instance.
+> + * When dealing with data aborts, watchpoints, or instruction traps we may end
+> + * up with a tagged userland pointer. Clear the tag to get a sane pointer to
+> + * pass on to access_ok(), for instance.
+>   */
+>  #define untagged_addr(addr)		sign_extend64(addr, 55)
+>  
+> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+> index 0296e7924240..749f81779420 100644
+> --- a/arch/arm64/kernel/hw_breakpoint.c
+> +++ b/arch/arm64/kernel/hw_breakpoint.c
+> @@ -36,6 +36,7 @@
+>  #include <asm/traps.h>
+>  #include <asm/cputype.h>
+>  #include <asm/system_misc.h>
+> +#include <asm/uaccess.h>
+>  
+>  /* Breakpoint currently in use for each BRP. */
+>  static DEFINE_PER_CPU(struct perf_event *, bp_on_reg[ARM_MAX_BRP]);
+> @@ -721,6 +722,8 @@ static u64 get_distance_from_watchpoint(unsigned long addr, u64 val,
+>  	u64 wp_low, wp_high;
+>  	u32 lens, lene;
+>  
+> +	addr = untagged_addr(addr);
+> +
+>  	lens = __ffs(ctrl->len);
+>  	lene = __fls(ctrl->len);
+>  
+> -- 
+> 2.1.4
 > 
-> As I said to Leonard above, the discussion is extremely helpful, IMO.
-> 
->> Waiting for a maintainer reply for 2-4 weeks, only to get a kurt
-> 
-> This is not a paid job for maintainer.  It's expected that he doesn't
-> always reply in a timely manner, especially when the tree is kinda
-> 'frozen' for merge window.
-> 
->> reply like "I don't like the commit message" doesn't help either.
-> 
-> What really annoys me is your attitude to commit message.
-
-We had this discussion before ...
-
--- 
-Best regards,
-Marek Vasut
