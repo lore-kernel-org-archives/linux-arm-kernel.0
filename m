@@ -1,49 +1,47 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu,  4 May 2017 20:19:18 +0200
-Subject: [PATCH v2 0/2] remove the "cpu_clk" from the GXBB/GXL/GXM driver
-In-Reply-To: <20170401125519.7339-1-martin.blumenstingl@googlemail.com>
+Date: Thu,  4 May 2017 20:19:19 +0200
+Subject: [PATCH v2 1/2] clk: meson-gxbb: un-export the CPU clock
+In-Reply-To: <20170504181920.21880-1-martin.blumenstingl@googlemail.com>
 References: <20170401125519.7339-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170504181920.21880-1-martin.blumenstingl@googlemail.com>
+ <20170504181920.21880-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20170504181920.21880-2-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The quick summary for this patch is that the "cpu_clk" seems to have
-been copied from the Meson8b clock driver when the GXBB clock driver
-was initially added. However, on GXBB (and the other GX SoCs) the
-actual CPU clock is provided by a SCPI DVFS clock.
-More details can be found in the description of the actual patch (#2).
+The CPU clock defined in the Meson GX clock driver is actually a
+left-over from the Meson8b clock controller. Un-export the clock so we
+can remove it from the driver.
 
-This was tested on a Khadas VIM board (GXL S905X).
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ drivers/clk/meson/gxbb.h              | 2 +-
+ include/dt-bindings/clock/gxbb-clkc.h | 1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
-
-Changes since v1:
-- split the patch into two patches: one which un-exports the clock ID
-  first and a second which does the actual cleanup. This was done based
-  on the recent discussion that new clocks should be added first and then
-  exported in a second patch (this patch does the same, just the other
-  way round: un-exporting first, then removing the actual clock)
-
-Changes since the RFC version from [0]:
-- rebased to the "clk-meson" branch (e65ae3fb97b4 "dt-bindings: clock:
-  gxbb-clkc: Add GXL compatible variant") and Jerome's audio clock
-  patches (in version 2: [1])
-- remove the now unused cpu_div_table (which was left over in the RFC
-  version)
-- slightly updated the comment for the now unused clock ID 1 in
-  drivers/clk/meson/gxbb.h
-
-
-[0] https://patchwork.kernel.org/patch/9644993/
-[1] http://lists.infradead.org/pipermail/linux-amlogic/2017-March/003200.html
-
-Martin Blumenstingl (2):
-  clk: meson-gxbb: un-export the CPU clock
-  clk: meson: gxbb: remove the "cpu_clk" from the GXBB and GXL driver
-
- drivers/clk/meson/gxbb.c              | 64 ++---------------------------------
- drivers/clk/meson/gxbb.h              |  2 +-
- include/dt-bindings/clock/gxbb-clkc.h |  1 -
- 3 files changed, 4 insertions(+), 63 deletions(-)
-
+diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+index 3e5f375af7b6..c15bbce8c585 100644
+--- a/drivers/clk/meson/gxbb.h
++++ b/drivers/clk/meson/gxbb.h
+@@ -171,7 +171,7 @@
+  * to be exposed to client nodes in DT: include/dt-bindings/clock/gxbb-clkc.h
+  */
+ #define CLKID_SYS_PLL		  0
+-/* CLKID_CPUCLK */
++#define CLKID_CPUCLK		  1
+ /* CLKID_HDMI_PLL */
+ #define CLKID_FIXED_PLL		  3
+ /* CLKID_FCLK_DIV2 */
+diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+index 3190e30b9398..46ff81fbc02e 100644
+--- a/include/dt-bindings/clock/gxbb-clkc.h
++++ b/include/dt-bindings/clock/gxbb-clkc.h
+@@ -5,7 +5,6 @@
+ #ifndef __GXBB_CLKC_H
+ #define __GXBB_CLKC_H
+ 
+-#define CLKID_CPUCLK		1
+ #define CLKID_HDMI_PLL		2
+ #define CLKID_FCLK_DIV2		4
+ #define CLKID_FCLK_DIV3		5
 -- 
 2.12.2
