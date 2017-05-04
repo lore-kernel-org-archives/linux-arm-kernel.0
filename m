@@ -1,51 +1,41 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 4 May 2017 09:13:39 +0100
-Subject: [PATCH] ARM: V7M: Set cacheid iff DminLine or IminLine is nonzero
-In-Reply-To: <20170503191437.GB22219@n2100.armlinux.org.uk>
-References: <1493201074-35472-1-git-send-email-vladimir.murzin@arm.com>
- <6c933cd2-bfaf-e7d3-b868-9d9955a1a105@arm.com>
- <20170503191437.GB22219@n2100.armlinux.org.uk>
-Message-ID: <8e0ee9d1-ba0e-9083-0299-80f9f32444ce@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 04 May 2017 09:19:23 +0100
+Subject: [PATCH v3 1/3] arm64: kvm: support kvmtool to detect RAS extension
+ feature
+In-Reply-To: <8d443da4-d17f-2487-10d5-b6c9639dc5a4@redhat.com>
+References: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
+ <20170502075631.GE16940@cbox>
+ <8d443da4-d17f-2487-10d5-b6c9639dc5a4@redhat.com>
+Message-ID: <590AE40B.7060002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/17 20:14, Russell King - ARM Linux wrote:
-> On Tue, May 02, 2017 at 09:31:24AM +0100, Vladimir Murzin wrote:
->> On 26/04/17 11:04, Vladimir Murzin wrote:
->>> Cache support is optional feature in M-class cores, thus DminLine or
->>> IminLine of Cache Type Register is zero if caches are not implemented,
->>> but we check the whole CTR which has other features encoded there.
->>> Let's be more precise and check for DminLine and IminLine of CTR
->>> before we set cacheid.
->>>
->>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->>> ---
->>>  arch/arm/kernel/setup.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->>> index f4e5450..231a1d83 100644
->>> --- a/arch/arm/kernel/setup.c
->>> +++ b/arch/arm/kernel/setup.c
->>> @@ -315,7 +315,7 @@ static void __init cacheid_init(void)
->>>  	if (arch >= CPU_ARCH_ARMv6) {
->>>  		unsigned int cachetype = read_cpuid_cachetype();
->>>  
->>> -		if ((arch == CPU_ARCH_ARMv7M) && !cachetype) {
->>> +		if ((arch == CPU_ARCH_ARMv7M) && !(cachetype & 0xf000f)) {
->>>  			cacheid = 0;
->>>  		} else if ((cachetype & (7 << 29)) == 4 << 29) {
->>>  			/* ARMv7 register format */
->>>
->>
->> Ok for patch tracker?
-> 
-> Not yet, I've been away and I've no time right now to evaluate this
-> change.  I'm hopefully going to catch up with some email in the coming
-> days.
-> 
+Hi Paolo,
 
-Noted.
+On 02/05/17 16:48, Paolo Bonzini wrote:
+> On 02/05/2017 09:56, Christoffer Dall wrote:
+>> The subject and description of these patches are also misleading.
+>> Hopefully this is in no way tied to kvmtool, but to userspace
+>> generically, for example also to be used by QEMU?
+> 
+> Yes, QEMU already has a similar capability on x86.
+> 
+> Does ARM support background scrubbing of memory to detect errors? 
 
-Cheers
-Vladimir
+As part of RAS support, yes. A way for firmware to notify the OS about these
+events was recently added to the ACPI specification.
+We are aiming to turn on ARCH_SUPPORTS_MEMORY_FAILURE which does the Linux end
+of things. Punit has a series here:
+https://www.spinics.net/lists/arm-kernel/msg575944.html
+
+
+> If
+> so, are there any plans to support action-optional SIGBUS on ARM?
+
+It looks like ARCH_SUPPORTS_MEMORY_FAILURE will bring that in, so yes.
+
+
+
+Thanks,
+
+James
