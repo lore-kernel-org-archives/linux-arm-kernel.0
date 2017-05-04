@@ -1,106 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 4 May 2017 16:39:26 +0100
-Subject: [PATCH v6 10/24] KVM: arm64: vgic-its: Implement
- vgic_mmio_uaccess_write_its_iidr
-In-Reply-To: <1493898284-29504-11-git-send-email-eric.auger@redhat.com>
-References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
- <1493898284-29504-11-git-send-email-eric.auger@redhat.com>
-Message-ID: <d877c0e7-6147-f8d5-c3d6-d8dee36f97bb@arm.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 4 May 2017 10:41:54 -0500
+Subject: [PATCH] MAINTAINERS: add arm@kernel.org as the list for arm64
+ defconfig changes
+In-Reply-To: <0ad7d305-d323-339f-9534-d559f1cf656a@codeaurora.org>
+References: <1493829085-11864-1-git-send-email-timur@codeaurora.org>
+ <20170503170110.GB23620@e104818-lin.cambridge.arm.com>
+ <95597ce9-a46f-1491-ae65-518ed8b8c44c@codeaurora.org>
+ <CAOesGMiY9o8199bb13gsd3SAs8YR-4rafYHoyV3VmK0dY0MDtQ@mail.gmail.com>
+ <4b048ba1-b7e4-6ab6-95be-3163120f63aa@codeaurora.org>
+ <CAOesGMgnOQXtLT8aUvPhXDfShzhkP-3LWFhP60xiMn65x6aq=w@mail.gmail.com>
+ <0ad7d305-d323-339f-9534-d559f1cf656a@codeaurora.org>
+Message-ID: <20170504154154.GA13706@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/17 12:44, Eric Auger wrote:
-> The GITS_IIDR revision field is used to encode the migration ABI
-> revision. So we need to restore it to check the table layout is
-> readable by the destination.
+On Wed, May 03, 2017 at 12:47:16PM -0500, Timur Tabi wrote:
+> On 05/03/2017 12:39 PM, Olof Johansson wrote:
+> > No, I'm not saying that, and there is a better way: Send it through
+> > Andy if in doubt -- it should be his job as your platform maintainer
+> > to help guide you through the system if needed.
 > 
-> By writing the IIDR, userspace thus forces the ABI revision to be
-> used and this must be less than or equal to the max revision KVM
-> supports.
+> Will told me that defconfig patches should go to arm at kernel.org, but you're
+> telling me they should go to Andy instead.
 > 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> v5 -> v6:
-> - fix typos in the commit message
-> - dont't use update_64bit_reg anymore
-> 
-> v4 -> v5
-> - rename user_revision into abi_rev and REV into MAX_ABI_REV
-> - IIDR reports abi_rev set by userspace if any.
-> - If value set by userspace exceeds the max supported revision, an
->   error is reported.
-> - add some defines
-> 
-> v4: creation
-> ---
->  include/linux/irqchip/arm-gic-v3.h |  4 ++++
->  virt/kvm/arm/vgic/vgic-its.c       | 20 +++++++++++++++++---
->  2 files changed, 21 insertions(+), 3 deletions(-)
-> 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 81ebe43..59f1abd 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -242,6 +242,10 @@
->  #define GITS_TYPER_PTA			(1UL << 19)
->  #define GITS_TYPER_HWCOLLCNT_SHIFT	24
->  
-> +#define GITS_IIDR_REV_SHIFT		12
-> +#define GITS_IIDR_REV(r)		(((r) >> GITS_IIDR_REV_SHIFT) & 0xf)
-> +#define GITS_IIDR_PRODUCTID_SHIFT	24
-> +
->  #define GITS_CBASER_VALID			(1ULL << 63)
->  #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
->  #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index c336cce..072efbd 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -411,7 +411,20 @@ static unsigned long vgic_mmio_read_its_iidr(struct kvm *kvm,
->  					     struct vgic_its *its,
->  					     gpa_t addr, unsigned int len)
->  {
-> -	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-> +	return (PRODUCT_ID_KVM << GITS_IIDR_PRODUCTID_SHIFT) |
-> +	       (its->abi_rev << GITS_IIDR_REV_SHIFT) | IMPLEMENTER_ARM;
+> Andy's being the platform maintainer is news to me.  I'm not saying he
+> isn't, but I can't remember the last time I involved him in any patches of ours.
 
-Given that abi_rev is a 32bit quantity, and the REV field only only 4
-bit wide, I'd feel safer with a mask somewhere...
+If it is Qualcomm related, it generally goes through me.  And I send it up
+through the arm soc guys (kevin, olof, and arnd).
 
-And hopefully, we'll never have more than 16 ABIs! ;-)
-
-> +}
-> +
-> +static int vgic_mmio_uaccess_write_its_iidr(struct kvm *kvm,
-> +					    struct vgic_its *its,
-> +					    gpa_t addr, unsigned int len,
-> +					    unsigned long val)
-> +{
-> +	u32 rev = GITS_IIDR_REV(val);
-> +
-> +	if (rev > MAX_ABI_REV)
-> +		return -EINVAL;
-> +	return vgic_its_set_abi(its, rev);
->  }
->  
->  static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
-> @@ -1393,8 +1406,9 @@ static struct vgic_register_region its_registers[] = {
->  	REGISTER_ITS_DESC(GITS_CTLR,
->  		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
->  		VGIC_ACCESS_32bit),
-> -	REGISTER_ITS_DESC(GITS_IIDR,
-> -		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
-> +	REGISTER_ITS_DESC_UACCESS(GITS_IIDR,
-> +		vgic_mmio_read_its_iidr, its_mmio_write_wi,
-> +		vgic_mmio_uaccess_write_its_iidr, 4,
->  		VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_TYPER,
->  		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
 > 
+> Either way, I think there should be a designated maintainer for
+> arch/arm64/configs/defconfig, and I think that person/alias should be in
+> MAINTAINERS.
 
-Thanks,
+I disagree here.  We've generally had defconfigs go up through the disparate ARM
+board maintainers and they get collated by arm-soc.  It's easy when it's
+something like qcom_defconfig, but get_maintainer doesn't give you the correct
+name if you are going for multiv7 or some of the default configs.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+Andy
