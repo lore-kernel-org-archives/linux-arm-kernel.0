@@ -1,37 +1,29 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 4 May 2017 16:08:29 +0200
-Subject: [PATCH] arm64: Fix the DMA mmap and get_sgtable API with
- DMA_ATTR_FORCE_CONTIGUOUS
-In-Reply-To: <20170504140306.GB25108@e104818-lin.cambridge.arm.com>
-References: <1493143232-2245-1-git-send-email-catalin.marinas@arm.com>
- <7d0445e5-ddb3-7d0f-4749-c63b54beff43@arm.com>
- <20170504140306.GB25108@e104818-lin.cambridge.arm.com>
-Message-ID: <CAMuHMdXGutH1w8_yV3oToCXoOt3phWE5-b_Sovd8aAP7jC8MPQ@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 04 May 2017 22:07:47 +0800
+Subject: [PATCH v2 02/10] pinctrl: sunxi: add definitions for add A20 and
+ R40 support to A10 driver
+In-Reply-To: <20170504140431.zhpcxvphxnxj7ipq@lukather>
+References: <20170504135006.16483-1-icenowy@aosc.io>
+ <20170504135006.16483-3-icenowy@aosc.io>
+ <20170504140431.zhpcxvphxnxj7ipq@lukather>
+Message-ID: <318E9984-9F5A-41C3-A3E0-52D5ECA05212@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
 
-On Thu, May 4, 2017 at 4:03 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> Going through the past threads on this, I wonder whether the attribute
-> is actually used anywhere (in which case we may be better off reverting
-> the original patch). If improved IOMMU performance is required, there
 
-AFAIK, the users are somewhere in the pipeline.
+? 2017?5?4? GMT+08:00 ??10:04:31, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+>On Thu, May 04, 2017 at 09:49:58PM +0800, Icenowy Zheng wrote:
+>> Allwinner A10, A20 and R40 SoCs have similar GPIO layout.
+>> 
+>> Add SoC definitions in pinctrl-sunxi.h, in order to merge A20 support
+>> into A10 driver, and add R40 support into it.
+>
+>While your commit log is good, the commit title is misleading since
+>you're not adding it to the A10 driver. You just adding SoC IDs
+>definitions
 
-> are likely better ways to achieve this like using a different page size
-> at the IOMMU level.
+Is "pinctrl: sunxi: Add SoC ID definitions for A10, A20 and R40 SoCs" OK?
 
-If I'm not mistaken, it's intended to be used when one device cannot use
-the IOMMU for whatever reason.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+>Maxime
