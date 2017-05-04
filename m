@@ -1,41 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 May 2017 16:02:20 +0200
-Subject: [PATCH v2 03/10] pinctrl: sunxi: add A20 support to A10 driver
-In-Reply-To: <20170504135006.16483-4-icenowy@aosc.io>
-References: <20170504135006.16483-1-icenowy@aosc.io>
- <20170504135006.16483-4-icenowy@aosc.io>
-Message-ID: <20170504140220.26kguf3trz7ocylv@lukather>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 4 May 2017 15:03:07 +0100
+Subject: [PATCH] arm64: Fix the DMA mmap and get_sgtable API with
+ DMA_ATTR_FORCE_CONTIGUOUS
+In-Reply-To: <7d0445e5-ddb3-7d0f-4749-c63b54beff43@arm.com>
+References: <1493143232-2245-1-git-send-email-catalin.marinas@arm.com>
+ <7d0445e5-ddb3-7d0f-4749-c63b54beff43@arm.com>
+Message-ID: <20170504140306.GB25108@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 04, 2017 at 09:49:59PM +0800, Icenowy Zheng wrote:
->  static const struct of_device_id sun4i_a10_pinctrl_match[] = {
-> -	{ .compatible = "allwinner,sun4i-a10-pinctrl", },
-> +	{
-> +		.compatible = "allwinner,sun4i-a10-pinctrl",
-> +		.data = (void *)PINCTRL_SUN4I_A10
-> +	},
-> +	{
-> +		.compatible = "allwinner,sun7i-a20-pinctrl",
-> +		.data = (void *)PINCTRL_SUN7I_A20
-> +	},
->  	{}
->  };
+On Thu, May 04, 2017 at 12:29:37PM +0100, Robin Murphy wrote:
+> On 25/04/17 19:00, Catalin Marinas wrote:
+> > While honouring the DMA_ATTR_FORCE_CONTIGUOUS on arm64 (commit
+> > 44176bb38fa4: "arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to
+> > IOMMU"), the existing uses of dma_mmap_attrs() and dma_get_sgtable()
+> > have been broken by passing a physically contiguous vm_struct with an
+> > invalid pages pointer through the common iommu API.
+> > 
+> > Since the coherent allocation with DMA_ATTR_FORCE_CONTIGUOUS uses CMA,
+> > this patch simply reuses the existing swiotlb logic for mmap and
+> > get_sgtable.
+> > 
+> > Note that the current implementation of get_sgtable (both swiotlb and
+> > iommu) is broken if dma_declare_coherent_memory() is used since such
+> > memory does not have a corresponding struct page. To be addressed in a
+> > separate patch.
+> > 
+> > Fixes: 44176bb38fa4 ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
+> > Reported-by: Andrzej Hajda <a.hajda@samsung.com>
+> > Cc: Andrzej Hajda <a.hajda@samsung.com>
+> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Cc: Robin Murphy <robin.murphy@arm.com>
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > ---
+> > 
+> > Here's my attempt of fixing this, though I'd like to wait for Robin's review
+> > (who's currently on holiday until next week).
+> > 
+> > Not tested.
+> 
+> The general approach is sound, and I can't see anything that looks
+> obviously wrong with the implementation, although I have no easy way of
+> testing it either:
+> 
+> Acked-by: Robin Murphy <robin.murphy@arm.com>
 
-This means you're going to have two drivers probing for the same
-device: this driver, and the old one. This is not ok, and probably
-introduces some corner cases.
+Thanks for looking at this patch.
 
-Maxime
+Going through the past threads on this, I wonder whether the attribute
+is actually used anywhere (in which case we may be better off reverting
+the original patch). If improved IOMMU performance is required, there
+are likely better ways to achieve this like using a different page size
+at the IOMMU level.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170504/f2a3c055/attachment.sig>
+Catalin
