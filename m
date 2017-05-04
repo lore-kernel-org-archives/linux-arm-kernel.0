@@ -1,38 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 4 May 2017 13:45:44 +0100
-Subject: [PATCH] KVM: arm/arm64: Move shared files to virt/kvm/arm
-In-Reply-To: <20170504123311.25252-1-cdall@linaro.org>
-References: <20170504123311.25252-1-cdall@linaro.org>
-Message-ID: <39ab7af1-618f-59db-f84d-bc9aa9102dd4@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 4 May 2017 13:50:09 +0100
+Subject: [PATCH v2 3/4] arm64: entry: improve data abort handling of
+ tagged pointers
+In-Reply-To: <1493825868-30872-4-git-send-email-kristina.martsenko@arm.com>
+References: <1493825868-30872-1-git-send-email-kristina.martsenko@arm.com>
+ <1493825868-30872-4-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <20170504125007.GD9082@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/17 13:33, Christoffer Dall wrote:
-> For some time now we have been having a lot of shared functionality
-> between the arm and arm64 KVM support in arch/arm, which not only
-> required a horrible inter-arch reference from the Makefile in
-> arch/arm64/kvm, but also created confusion for newcomers to the code
-> base, as was recently seen on the mailing list.
+On Wed, May 03, 2017 at 04:37:47PM +0100, Kristina Martsenko wrote:
+> When handling a data abort from EL0, we currently zero the top byte of
+> the faulting address, as we assume the address is a TTBR0 address, which
+> may contain a non-zero address tag. However, the address may be a TTBR1
+> address, in which case we should not zero the top byte. This patch fixes
+> that. The effect is that the full TTBR1 address is passed to the task's
+> signal handler (or printed out in the kernel log).
 > 
-> Further, it causes confusion for things like cscope, which needs special
-> attention to index specific shared files for arm64 from the arm tree.
+> When handling a data abort from EL1, we leave the faulting address
+> intact, as we assume it's either a TTBR1 address or a TTBR0 address with
+> tag 0x00. This is true as far as I'm aware, we don't seem to access a
+> tagged TTBR0 address anywhere in the kernel. Regardless, it's easy to
+> forget about address tags, and code added in the future may not always
+> remember to remove tags from addresses before accessing them. So add tag
+> handling to the EL1 data abort handler as well. This also makes it
+> consistent with the EL0 data abort handler.
+
+FWIW,
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+(Looks like Will beat me to it, though.)
+
+Cheers
+---Dave
+
 > 
-> Move the shared files into virt/kvm/arm and move the trace points along
-> with it.  When moving the tracepoints we have to modify the way the vgic
-> creates definitions of the trace points, so we take the chance to
-> include the VGIC tracepoints in its very own special vgic trace.h file.
-> 
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> Fixes: d50240a5f6ce ("arm64: mm: permit use of tagged pointers at EL0")
+> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 > ---
-> Hi Marc,
+>  arch/arm64/include/asm/asm-uaccess.h | 9 +++++++++
+>  arch/arm64/kernel/entry.S            | 5 +++--
+>  2 files changed, 12 insertions(+), 2 deletions(-)
 > 
-> What do you think of this?  If you like it, I think we should include it
-> for this merge window.
-
-I think we should have done that a while ago!
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
+> index df411f3e083c..ecd9788cd298 100644
+> --- a/arch/arm64/include/asm/asm-uaccess.h
+> +++ b/arch/arm64/include/asm/asm-uaccess.h
+> @@ -62,4 +62,13 @@ alternative_if ARM64_ALT_PAN_NOT_UAO
+>  alternative_else_nop_endif
+>  	.endm
+>  
+> +/*
+> + * Remove the address tag from a virtual address, if present.
+> + */
+> +	.macro	clear_address_tag, dst, addr
+> +	tst	\addr, #(1 << 55)
+> +	bic	\dst, \addr, #(0xff << 56)
+> +	csel	\dst, \dst, \addr, eq
+> +	.endm
+> +
+>  #endif
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 43512d4d7df2..b738880350f9 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -428,12 +428,13 @@ el1_da:
+>  	/*
+>  	 * Data abort handling
+>  	 */
+> -	mrs	x0, far_el1
+> +	mrs	x3, far_el1
+>  	enable_dbg
+>  	// re-enable interrupts if they were enabled in the aborted context
+>  	tbnz	x23, #7, 1f			// PSR_I_BIT
+>  	enable_irq
+>  1:
+> +	clear_address_tag x0, x3
+>  	mov	x2, sp				// struct pt_regs
+>  	bl	do_mem_abort
+>  
+> @@ -594,7 +595,7 @@ el0_da:
+>  	// enable interrupts before calling the main handler
+>  	enable_dbg_and_irq
+>  	ct_user_exit
+> -	bic	x0, x26, #(0xff << 56)
+> +	clear_address_tag x0, x26
+>  	mov	x1, x25
+>  	mov	x2, sp
+>  	bl	do_mem_abort
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
