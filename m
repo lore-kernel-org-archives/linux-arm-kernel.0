@@ -1,180 +1,101 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Thu,  4 May 2017 13:44:21 +0200
-Subject: [PATCH v6 01/24] KVM: arm/arm64: Add ITS save/restore API
- documentation
-In-Reply-To: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
-References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1493898284-29504-2-git-send-email-eric.auger@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 4 May 2017 14:03:14 +0200
+Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
+In-Reply-To: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
+References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20170504120314.lfmcv4cpsuz2igte@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add description for how to access ITS registers and how to save/restore
-ITS tables into/from memory.
+Hi Andre,
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+On Thu, May 04, 2017 at 12:57:37AM +0100, Andre Przywara wrote:
+> When a pinctrl driver gets interrupted during its probe process
+> (returning -EPROBE_DEFER), the devres system cleans up all allocated
+> resources. During this process it calls pinmux_generic_free_functions()
+> and pinctrl_generic_free_groups(), which in turn use managed kmalloc
+> calls for temporarily allocating some memory. Now those calls seem to
+> get added to the devres list, but are apparently not covered by the
+> cleanup process, because this is actually just running and iterating the
+> existing list. This leads to those mallocs being left with the device,
+> which the devres manager complains about when the driver eventually gets
+> probed again:
+> [    0.825239] ------------[ cut here ]------------
+> [    0.825256] WARNING: CPU: 1 PID: 89 at drivers/base/dd.c:349 driver_probe_device+0x2ac/0x2e8
+> [    0.825258] Modules linked in:
+> [    0.825262]
+> [    0.825270] CPU: 1 PID: 89 Comm: kworker/1:1 Not tainted 4.11.0 #307
+> [    0.825272] Hardware name: Pine64+ (DT)
+> [    0.825283] Workqueue: events deferred_probe_work_func
+> [    0.825288] task: ffff80007c19c100 task.stack: ffff80007c16c000
+> [    0.825292] PC is at driver_probe_device+0x2ac/0x2e8
+> [    0.825296] LR is at driver_probe_device+0x108/0x2e8
+> [    0.825300] pc : [<ffff000008559234>] lr : [<ffff000008559090>] pstate: 20000045
+> ....
+> This warning is triggered because the devres list is not empty. In this
+> case the allocations were using 0 bytes, so no real leaks, but still this
+> ugly warning.
+> Looking more closely at these *cleanup* functions, devm_kzalloc() is actually
+> not needed, because the memory is just allocated temporarily and can be
+> freed just before returning from this function.
+> So fix this issue by using the bog standard kcalloc() call instead of
+> devm_kzalloc() and kfree()ing the memory at the end.
+> 
+> This fixes above warnings on boot, which can be observed on *some* builds
+> for the Pine64, where the pinctrl driver gets loaded early, but it missing
+> resources, so gets deferred and is loaded again (successfully) later.
+> kernelci caught this as well [1].
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> 
+> [1] https://storage.kernelci.org/net-next/master/v4.11-rc8-2122-gc08bac03d289/arm64/defconfig/lab-baylibre-seattle/boot-sun50i-a64-pine64-plus.html
+> ---
+> Hi,
+> 
+> not sure this is the right fix, I am open to suggestions.
+> 
+> Cheers,
+> Andre.
+> 
+>  drivers/pinctrl/core.c   | 5 +++--
+>  drivers/pinctrl/pinmux.c | 5 +++--
+>  2 files changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+> index 32822b0d..5198415 100644
+> --- a/drivers/pinctrl/core.c
+> +++ b/drivers/pinctrl/core.c
+> @@ -690,8 +690,8 @@ static void pinctrl_generic_free_groups(struct pinctrl_dev *pctldev)
+>  	void **slot;
+>  	int i = 0;
+>  
+> -	indices = devm_kzalloc(pctldev->dev, sizeof(*indices) *
+> -			       pctldev->num_groups, GFP_KERNEL);
+> +	indices = kcalloc(pctldev->num_groups, sizeof(*indices),
+> +			  GFP_KERNEL);
+>  	if (!indices)
+>  		return;
+>  
+> @@ -704,6 +704,7 @@ static void pinctrl_generic_free_groups(struct pinctrl_dev *pctldev)
+>  		radix_tree_delete(&pctldev->pin_group_tree, indices[i]);
+>  		devm_kfree(pctldev->dev, group);
+>  	}
+> +	kfree(indices);
 
----
-v5 -> v6:
-- add restoration ordering
-- 256B -> 256 Byte aligned
-- DTE Size is number of bits for the EVENTID
-- s/GITS_READR/GITS_CREADR
+We use devm_kfree for other allocations done here, maybe we can just
+have the same thing here? We would be consistant, and we would still
+keep the resource tracking.
 
-v4 -> v5:
-- take into account Christoffer's comments
-- pending table save on GICV3 side now
+Maxime
 
-v3 -> v4:
-- take into account Peter's comments:
-  - typos
-  - KVM_DEV_ARM_VGIC_GRP_ITS_TABLES kvm_device_attr = 0
-  - add a validity bit in DTE
-  - document all fields in CTE and ITE
-  - document ABI revision
-- take into account Andre's comments:
-  - document restrictions about GITS_CREADR writing and GITS_IIDR
-  - document -EBUSY error if one or more VCPUS are runnning
-  - document 64b registers only can be accessed with 64b access
-- itt_addr field matches bits [51:8] of the itt_addr
-
-v1 -> v2:
-- DTE and ITE now are 8 bytes
-- DTE and ITE now indexed by deviceid/eventid
-- use ITE name instead of ITTE
-- mentions ITT_addr matches bits [51:8] of the actual address
-- mentions LE layout
----
- Documentation/virtual/kvm/devices/arm-vgic-its.txt | 117 +++++++++++++++++++++
- 1 file changed, 117 insertions(+)
-
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-index 6081a5b..863c359 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-@@ -32,7 +32,124 @@ Groups:
-     KVM_DEV_ARM_VGIC_CTRL_INIT
-       request the initialization of the ITS, no additional parameter in
-       kvm_device_attr.addr.
-+
-+    KVM_DEV_ARM_ITS_SAVE_TABLES
-+      save the ITS table data into guest RAM, at the location provisioned
-+      by the guest in corresponding registers/table entries.
-+
-+      The layout of the tables in guest memory defines an ABI. The entries
-+      are laid out in little endian format as described in the last paragraph.
-+
-+    KVM_DEV_ARM_ITS_RESTORE_TABLES
-+      restore the ITS tables from guest RAM to ITS internal structures.
-+
-+      The GICV3 must be restored before the ITS and all ITS registers but
-+      the GITS_CTLR must be restored before restoring the ITS tables.
-+
-+      The GITS_IIDR read-only register must also be restored before
-+      the table restore as the IIDR revision field encodes the ABI revision.
-+
-+      The expected ordering when restoring the GICv3/ITS is described in section
-+      "ITS Restoration Sequence".
-+
-   Errors:
-     -ENXIO:  ITS not properly configured as required prior to setting
-              this attribute
-     -ENOMEM: Memory shortage when allocating ITS internal data
-+    -EINVAL: Inconsistent restored data
-+    -EFAULT: Invalid guest ram access
-+    -EBUSY:  One or more VCPUS are running
-+
-+  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-+  Attributes:
-+      The attr field of kvm_device_attr encodes the offset of the
-+      ITS register, relative to the ITS control frame base address
-+      (ITS_base).
-+
-+      kvm_device_attr.addr points to a __u64 value whatever the width
-+      of the addressed register (32/64 bits). 64 bit registers can only
-+      be accessed with full length.
-+
-+      Writes to read-only registers are ignored by the kernel except for:
-+      - GITS_CREADR. It needs to be restored otherwise commands in the queue
-+        will be re-executed after restoring CWRITER. GITS_CREADR must be
-+        restored before restoring the GITS_CTLR which is likely to enable the
-+        ITS. Also it needs to be restored after GITS_CBASER since a write to
-+        GITS_CBASER resets GITS_CREADR.
-+      - GITS_IIDR. Its Revision field encodes the table layout ABI revision.
-+        In the future we might implement direct injection of virtual LPIS.
-+        This will require an upgrade of the table layout and an evolution of
-+        the ABI. GITS_IIDR must be restored before the table restoration.
-+
-+      For other registers, getting or setting a register has the same
-+      effect as reading/writing the register on real hardware.
-+  Errors:
-+    -ENXIO: Offset does not correspond to any supported register
-+    -EFAULT: Invalid user pointer for attr->addr
-+    -EINVAL: Offset is not 64-bit aligned
-+    -EBUSY: one or more VCPUS are running
-+
-+ ITS Restoration Sequence:
-+ -------------------------
-+
-+The following ordering must be followed when restoring the GIC and the ITS:
-+a) restore all guest memory and create vcpus
-+b) initialize the GIC and ITS (KVM_DEV_ARM_VGIC_CTRL_INIT)
-+c) provide GIC and ITS base addresses (KVM_DEV_ARM_VGIC_GRP_ADDR)
-+d) restore all redistributors
-+e) restore the ITS in the following order:
-+   1. Restore GITS_CBASER
-+   2. Restore all other GITS_ registers, except GITS_CTLR!
-+   3. Load the ITS table data (KVM_DEV_ARM_ITS_RESTORE_TABLES)
-+   4. Restore GITS_CTLR
-+f) start vcpus
-+
-+ ITS Table ABI REV0:
-+ -------------------
-+
-+ Revision 0 of the ABI only supports physical LPIs.
-+
-+ The device table and ITT are indexed by the deviceid and eventid,
-+ respectively. The collection table is not indexed by collectionid:
-+ CTE are written in the table in the order of collection creation. All
-+ entries are 8 bytes.
-+
-+ Device Table Entry (DTE):
-+
-+ bits:     | 63| 62 ... 49 | 48 ... 5 | 4 ... 0 |
-+ values:   | V |   next    | ITT_addr |  Size   |
-+
-+ where;
-+ - V indicates whether the entry is valid. If not, other fields
-+   are not meaningful.
-+ - next: equals to 0 if this entry is the last one; otherwise it
-+   corresponds to the deviceid offset to the next DTE, capped by
-+   2^14 -1.
-+ - ITT_addr matches bits [51:8] of the ITT address (256 Byte aligned).
-+ - Size specifies the supported number of bits for the eventid,
-+   minus one
-+
-+ Collection Table Entry (CTE):
-+
-+ bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
-+ values:   | V |    RES0    |  RDBase   |    ICID     |
-+
-+ where:
-+ - V indicates whether the entry is valid. If not, other fields are
-+   not meaningful.
-+ - RES0: reserved field with Should-Be-Zero-or-Preserved behavior.
-+ - RDBase is the PE number (GICR_TYPER.Processor_Number semantic),
-+ - ICID is the collection ID
-+
-+ Interrupt Translation Entry (ITE):
-+
-+ bits:     | 63 ... 48 | 47 ... 16 | 15 ... 0 |
-+ values:   |    next   |   pINTID  |  ICID    |
-+
-+ where:
-+ - next: equals to 0 if this entry is the last one; otherwise it corresponds
-+   to the eventid offset to the next ITE capped by 2^16 -1.
-+ - pINTID is the physical LPI ID; if zero, it means the entry is not valid
-+   and other fields are not meaningful.
-+ - ICID is the collection ID
-+
 -- 
-2.5.5
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170504/1e19f6b1/attachment.sig>
