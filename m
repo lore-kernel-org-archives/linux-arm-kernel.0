@@ -1,27 +1,23 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 4 May 2017 09:20:03 +0800
-Subject: [PATCH][v2] arm64: dts: ls2081ardb: Add DTS support for NXP
- LS2081ARDB
-In-Reply-To: <1493367930-10612-1-git-send-email-priyanka.jain@nxp.com>
-References: <1493367930-10612-1-git-send-email-priyanka.jain@nxp.com>
-Message-ID: <20170504012001.GM18578@dragon>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 4 May 2017 11:42:30 +1000
+Subject: linux-next: build warning after merge of the drm tree
+In-Reply-To: <tencent_62AF37B85899E2EA593CCE3B@qq.com>
+References: <20170504083336.35ed36ee@canb.auug.org.au>
+ <tencent_62AF37B85899E2EA593CCE3B@qq.com>
+Message-ID: <20170504114230.02793761@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 01:55:30PM +0530, Priyanka Jain wrote:
-> This patch add support for NXP LS2081ARDB board which has
-> LS2081A SoC.
+Hi Jeffy,
+
+On Thu, 4 May 2017 09:18:12 +0800 "Jeffy" <jeffy.chen@rock-chips.com> wrote:
+>
+> it should be fixed by "Arnd Bergmann"<arnd@arndb.de>(thanks a lot by the way) in:
 > 
-> LS2081A SoC is 40-pin derivative of LS2088A SoC
-> So, from functional perspective both are same.
-> Hence,ls2088a SoC dtsi files are included from ls2081ARDB dts
-> 
-> Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
+> 4a85aae multi_v7_defconfig: make Rockchip DRM drivers built-in
 
-The following recipients couldn't be delivered.  Please drop them in the
-next posting.
+Thanks for the heads up, I will await the arm-soc merges.
 
-  scott.wood at nxp.com
-  stuart.yoder at nxp.com
-
-Shawn
+-- 
+Cheers,
+Stephen Rothwell
