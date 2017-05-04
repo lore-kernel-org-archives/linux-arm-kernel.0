@@ -1,106 +1,59 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu,  4 May 2017 00:57:37 +0100
-Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
-Message-ID: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 03 May 2017 17:24:48 -0700
+Subject: [PATCH] ARM: Fix __show_regs output timestamps
+In-Reply-To: <20170503213034.GF22219@n2100.armlinux.org.uk>
+References: <61817479ac8c4c6c8be702d2e2136fddac1b1821.1493228290.git.joe@perches.com>
+ <20170503192310.GD22219@n2100.armlinux.org.uk>
+ <1493840651.22125.24.camel@perches.com>
+ <20170503213034.GF22219@n2100.armlinux.org.uk>
+Message-ID: <1493857488.22125.31.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a pinctrl driver gets interrupted during its probe process
-(returning -EPROBE_DEFER), the devres system cleans up all allocated
-resources. During this process it calls pinmux_generic_free_functions()
-and pinctrl_generic_free_groups(), which in turn use managed kmalloc
-calls for temporarily allocating some memory. Now those calls seem to
-get added to the devres list, but are apparently not covered by the
-cleanup process, because this is actually just running and iterating the
-existing list. This leads to those mallocs being left with the device,
-which the devres manager complains about when the driver eventually gets
-probed again:
-[    0.825239] ------------[ cut here ]------------
-[    0.825256] WARNING: CPU: 1 PID: 89 at drivers/base/dd.c:349 driver_probe_device+0x2ac/0x2e8
-[    0.825258] Modules linked in:
-[    0.825262]
-[    0.825270] CPU: 1 PID: 89 Comm: kworker/1:1 Not tainted 4.11.0 #307
-[    0.825272] Hardware name: Pine64+ (DT)
-[    0.825283] Workqueue: events deferred_probe_work_func
-[    0.825288] task: ffff80007c19c100 task.stack: ffff80007c16c000
-[    0.825292] PC is at driver_probe_device+0x2ac/0x2e8
-[    0.825296] LR is at driver_probe_device+0x108/0x2e8
-[    0.825300] pc : [<ffff000008559234>] lr : [<ffff000008559090>] pstate: 20000045
-....
-This warning is triggered because the devres list is not empty. In this
-case the allocations were using 0 bytes, so no real leaks, but still this
-ugly warning.
-Looking more closely at these *cleanup* functions, devm_kzalloc() is actually
-not needed, because the memory is just allocated temporarily and can be
-freed just before returning from this function.
-So fix this issue by using the bog standard kcalloc() call instead of
-devm_kzalloc() and kfree()ing the memory at the end.
+On Wed, 2017-05-03 at 22:30 +0100, Russell King - ARM Linux wrote:
+> On Wed, May 03, 2017 at 12:44:11PM -0700, Joe Perches wrote:
+> > On Wed, 2017-05-03 at 20:23 +0100, Russell King - ARM Linux wrote:
+> > > On Wed, Apr 26, 2017 at 10:39:49AM -0700, Joe Perches wrote:
+> > > > Multiple line formats are not preferred as the second and
+> > > > subsequent lines may not have timestamps.
+> > > > 
+> > > > Lacking timestamps makes reading the output a bit difficult.
+> > > > This also makes arm/arm64 output more similar.
+> > > > 
+> > > > Previous:
+> > > > 
+> > > > [ 1514.093231] pc : [<bf79c304>]    lr : [<bf79ced8>]    psr: a00f0013
+> > > > sp : ecdd7e20  ip : 00000000  fp : ffffffff
+> > > > 
+> > > > New:
+> > > > 
+> > > > [ 1514.093231] pc : [<bf79c304>]    lr : [<bf79ced8>]    psr: a00f0013
+> > > > [ 1514.105316] sp : ecdd7e20  ip : 00000000  fp : ffffffff
+> > > > 
+> > > > Signed-off-by: Joe Perches <joe@perches.com>
+> > > 
+> > > Hi Joe,
+> > > 
+> > > Could you put this in my patch system please, I'm unlikely to remember to
+> > > apply it otherwise if not already there (massive email backlog.)
+> > > 
+> > > Thanks.
+> > 
+> > Your patch system bounced my perfectly formatted patch
+> > because your system wants totally unnecessary additional
+> > information specific to your workflow.
+> > 
+> > No thanks, I don't need the additional work just to
+> > please your system and neither should anyone else.
+> 
+> Don't expect me to remember to apply your patch then.  I've got days of
+> catch up, and I'm just not going to remember.  Sorry.
 
-This fixes above warnings on boot, which can be observed on *some* builds
-for the Pine64, where the pinctrl driver gets loaded early, but it missing
-resources, so gets deferred and is loaded again (successfully) later.
-kernelci caught this as well [1].
+<shrug>
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+If your systems require special handling on the
+part of patch submitters, you should document it
+in the kernel tree.
 
-[1] https://storage.kernelci.org/net-next/master/v4.11-rc8-2122-gc08bac03d289/arm64/defconfig/lab-baylibre-seattle/boot-sun50i-a64-pine64-plus.html
----
-Hi,
-
-not sure this is the right fix, I am open to suggestions.
-
-Cheers,
-Andre.
-
- drivers/pinctrl/core.c   | 5 +++--
- drivers/pinctrl/pinmux.c | 5 +++--
- 2 files changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-index 32822b0d..5198415 100644
---- a/drivers/pinctrl/core.c
-+++ b/drivers/pinctrl/core.c
-@@ -690,8 +690,8 @@ static void pinctrl_generic_free_groups(struct pinctrl_dev *pctldev)
- 	void **slot;
- 	int i = 0;
- 
--	indices = devm_kzalloc(pctldev->dev, sizeof(*indices) *
--			       pctldev->num_groups, GFP_KERNEL);
-+	indices = kcalloc(pctldev->num_groups, sizeof(*indices),
-+			  GFP_KERNEL);
- 	if (!indices)
- 		return;
- 
-@@ -704,6 +704,7 @@ static void pinctrl_generic_free_groups(struct pinctrl_dev *pctldev)
- 		radix_tree_delete(&pctldev->pin_group_tree, indices[i]);
- 		devm_kfree(pctldev->dev, group);
- 	}
-+	kfree(indices);
- 
- 	pctldev->num_groups = 0;
- }
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index 29ad315..6a70339 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -836,8 +836,8 @@ void pinmux_generic_free_functions(struct pinctrl_dev *pctldev)
- 	void **slot;
- 	int i = 0;
- 
--	indices = devm_kzalloc(pctldev->dev, sizeof(*indices) *
--			       pctldev->num_functions, GFP_KERNEL);
-+	indices = kcalloc(pctldev->num_functions, sizeof(*indices),
-+			  GFP_KERNEL);
- 	if (!indices)
- 		return;
- 
-@@ -850,6 +850,7 @@ void pinmux_generic_free_functions(struct pinctrl_dev *pctldev)
- 		radix_tree_delete(&pctldev->pin_function_tree, indices[i]);
- 		devm_kfree(pctldev->dev, function);
- 	}
-+	kfree(indices);
- 
- 	pctldev->num_functions = 0;
- }
--- 
-2.8.2
+Better, someone else should find the time to apply
+properly formatted patches.
