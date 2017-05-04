@@ -1,126 +1,60 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 4 May 2017 17:09:52 +0200
-Subject: [PATCH v6 08/24] KVM: arm64: vgic-its: Implement
- vgic_mmio_uaccess_write_its_creadr
-In-Reply-To: <a58918e7-4e21-7783-28d2-c116e2b7a1e1@arm.com>
-References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
- <1493898284-29504-9-git-send-email-eric.auger@redhat.com>
- <a58918e7-4e21-7783-28d2-c116e2b7a1e1@arm.com>
-Message-ID: <ae1f4231-7b5d-cc69-bbf6-49e637e8d37c@redhat.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Thu, 4 May 2017 15:28:14 +0000
+Subject: [PATCH 2/5] dmaengine: Add STM32 DMAMUX driver
+In-Reply-To: <20170501060353.GO6263@localhost>
+References: <1489414561-28912-1-git-send-email-cedric.madianga@gmail.com>
+ <1489414561-28912-3-git-send-email-cedric.madianga@gmail.com>
+ <20170406064046.GF4094@localhost>
+ <d18cb12d-1fd1-39d2-501a-18c000b9982e@st.com>
+ <20170501060353.GO6263@localhost>
+Message-ID: <15dd7c9c-2de3-a575-5936-cd1d1124f59b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 05/01/2017 08:03 AM, Vinod Koul wrote:
+> On Wed, Apr 26, 2017 at 09:17:37AM +0000, Pierre Yves MORDRET wrote:
+>>>> +
+>>>> +	ret = of_property_read_u32(node, "dma-channels",
+>>>> +				   &dmamux->dmamux_channels);
+>>>
+>>> can we have property_xxx calls alone, that way driver is not strictly
+>>> dependent on of
+>>
+>> Can you please explain what you are asking for ? Not sure to understand
+>> correctly.
+>
+> Use device_property_read_u32() which is a generic property API.
 
-On 04/05/2017 16:16, Marc Zyngier wrote:
-> On 04/05/17 12:44, Eric Auger wrote:
->> GITS_CREADR needs to be restored so let's implement the associated
->> uaccess_write_its callback. The write only is allowed if the its
->> is disabled.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->> v5 -> v6:
->> - remove usage of update_64bit_reg and check alignment of cmd offset
->>
->> v4 -> v5:
->> - keep Stalled bit
->> - vgic_mmio_uaccess_write_its_creadr can now return an error
->>
->> v3 -> v4:
->> - REGISTER_ITS_DESC_UACCESS now introduced in this patch
->> - we now check the its is disabled
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 43 +++++++++++++++++++++++++++++++++++++++++--
->>  1 file changed, 41 insertions(+), 2 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 222fad5..18588ef 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -1213,6 +1213,34 @@ static unsigned long vgic_mmio_read_its_creadr(struct kvm *kvm,
->>  	return extract_bytes(its->creadr, addr & 0x7, len);
->>  }
->>  
->> +static int vgic_mmio_uaccess_write_its_creadr(struct kvm *kvm,
->> +					      struct vgic_its *its,
->> +					      gpa_t addr, unsigned int len,
->> +					      unsigned long val)
->> +{
->> +	u32 cmd_offset;
->> +	int ret = 0;
->> +
->> +	mutex_lock(&its->cmd_lock);
->> +
->> +	if (its->enabled) {
->> +		ret = -EBUSY;
->> +		goto out;
->> +	}
->> +
->> +	cmd_offset = ITS_CMD_OFFSET(val);
->> +	if ((cmd_offset >= ITS_CMD_BUFFER_SIZE(its->cbaser)) ||
->> +	    (cmd_offset & 0x1F)) {
-> 
-> nit: In general, and for alignments that aren't completely obvious, you
-> can write something like IS_ALIGNED(cmd_offset, sizeof(struct its_cmd)).
-> 
-> Unfortunately, we don't have a struct its_cmd, and maybe we should fix
-> that at a later time.
-OK
-> 
->> +		ret = -EINVAL;
->> +		goto out;
->> +	}
->> +
->> +	its->creadr = val;
->> +out:
->> +	mutex_unlock(&its->cmd_lock);
->> +	return ret;
->> +}
->> +
->>  #define BASER_INDEX(addr) (((addr) / sizeof(u64)) & 0x7)
->>  static unsigned long vgic_mmio_read_its_baser(struct kvm *kvm,
->>  					      struct vgic_its *its,
->> @@ -1317,6 +1345,16 @@ static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
->>  	.its_write = wr,					\
->>  }
->>  
->> +#define REGISTER_ITS_DESC_UACCESS(off, rd, wr, uwr, length, acc)\
->> +{								\
->> +	.reg_offset = off,					\
->> +	.len = length,						\
->> +	.access_flags = acc,					\
->> +	.its_read = rd,						\
->> +	.its_write = wr,					\
->> +	.uaccess_its_write = uwr,				\
->> +}
->> +
->>  static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
->>  			      gpa_t addr, unsigned int len, unsigned long val)
->>  {
->> @@ -1339,8 +1377,9 @@ static struct vgic_register_region its_registers[] = {
->>  	REGISTER_ITS_DESC(GITS_CWRITER,
->>  		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
->>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->> -	REGISTER_ITS_DESC(GITS_CREADR,
->> -		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
->> +	REGISTER_ITS_DESC_UACCESS(GITS_CREADR,
->> +		vgic_mmio_read_its_creadr, its_mmio_write_wi,
->> +		vgic_mmio_uaccess_write_its_creadr, 8,
->>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->>  	REGISTER_ITS_DESC(GITS_BASER,
->>  		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
->>
-> 
-> Otherwise:
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Thanks!
+OK Will be done in V2
 
-Eric
-> 
-> Thanks,
-> 
-> 	M.
-> 
+>
+>
+>>>> +static int __init stm32_dmamux_init(void)
+>>>> +{
+>>>> +	return platform_driver_register(&stm32_dmamux_driver);
+>>>> +}
+>>>> +arch_initcall(stm32_dmamux_init);
+>>>
+>>> why not module init, wouldnt defer probe solve the dependencies
+>>>
+>>
+>> The reason behind many devices (device_initcall level) rely on DMAs. If
+>> init is deferred DMAMUX driver will be probed twice if dependents rely
+>> on it. This sounds not a good call. This explains arch_initcall level.
+>
+> Why not deferred probe was introduced to help with dependencies...
+>
+
+Most DMAs devices are already in subsys_initcall to avoid multiple 
+useless probe when clients are deferred. This DMAMUx is itself on top of 
+DMAs.
+DMAMUX ---> DMA#1 ---> Device Client #1
+        |          |--> Device Client #2
+        |               [...]
+        |          |--> Device Client #N
+        |    [...]
+        |--> DMA#N ---> Device Client #1
+                   |--> Device Client #2
+                        [...]
+                   |--> Device Client #N
+arch_initcall might a good call in this case for DMAMUX.
