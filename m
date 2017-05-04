@@ -1,46 +1,62 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 4 May 2017 12:07:46 +0800
-Subject: [PATCH v2 14/20] drm/sun4i: tcon: multiply the vtotal when not in
- interlace
-In-Reply-To: <59bdbadc4d3adc6d75c2cef38df0af332bd313db.1493812478.git-series.maxime.ripard@free-electrons.com>
+Date: Thu, 4 May 2017 12:11:34 +0800
+Subject: [PATCH v2 15/20] drm/sun4i: Ignore the generic connectors for
+ components
+In-Reply-To: <88de0f79b508e51b5fbf38fac058921a3c748807.1493812478.git-series.maxime.ripard@free-electrons.com>
 References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
- <59bdbadc4d3adc6d75c2cef38df0af332bd313db.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64mHfj8MLTtvdJCs7h76uMmq-uJuaSEPoQ5CAv-nyrTNA@mail.gmail.com>
+ <88de0f79b508e51b5fbf38fac058921a3c748807.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64+2_qMbWf=Vd=FFhCfhoAun0eEMu66Vx2Bg6Gjrfrt9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, May 3, 2017 at 7:59 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> It appears that the total vertical resolution needs to be doubled when
-> we're not in interlaced. Make sure that is the case.
+> The generic connectors such as hdmi-connector doesn't have any driver in,
+> so if they are added to the component list, we will be waiting forever for
+> a non-existing driver to probe.
+>
+> Add a list of the connectors we want to ignore when building our component
+> list.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_drv.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> index 8ddd72cd5873..8c9d2e36be55 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> @@ -164,6 +164,11 @@ static const struct component_master_ops sun4i_drv_master_ops = {
+>         .unbind = sun4i_drv_unbind,
+>  };
+>
+> +static bool sun4i_drv_node_is_connector(struct device_node *node)
+> +{
+> +       return of_device_is_compatible(node, "hdmi-connector");
+> +}
+> +
+>  static bool sun4i_drv_node_is_frontend(struct device_node *node)
+>  {
+>         return of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
+> @@ -204,7 +209,8 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+>             !of_device_is_available(node))
+>                 return 0;
+>
+> -       if (!sun4i_drv_node_is_frontend(node)) {
+> +       if (!sun4i_drv_node_is_connector(node) &&
 
-I think the total vertical resolution needs to be doubled in all cases.
-It just happens that you should've been using mode->crtc_vtotal, which
-is halved when the mode is interlaced. Instead you used mode->vtotal,
-which is double the actual scan resolution in interlaced mode.
+I think it's better to just bail out (return 0) if the current node
+is a connector. The connector is the end of the pipeline anyway.
+Nothing after it should be considered for the component graph.
+The way you currently have it, traversal will continue beyond
+the connector node.
 
 ChenYu
 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index 0f91ec8a4b26..efa079c1a3f5 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -272,9 +272,9 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
->         /* Set vertical display timings */
->         bp = mode->crtc_vtotal - mode->crtc_vsync_start;
->         DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
-> -                        mode->vtotal, bp);
-> +                        mode->crtc_vtotal, bp);
->         regmap_write(tcon->regs, SUN4I_TCON1_BASIC4_REG,
-> -                    SUN4I_TCON1_BASIC4_V_TOTAL(mode->vtotal) |
-> +                    SUN4I_TCON1_BASIC4_V_TOTAL(mode->crtc_vtotal * 2) |
->                      SUN4I_TCON1_BASIC4_V_BACKPORCH(bp));
->
->         /* Set Hsync and Vsync length */
+> +           !sun4i_drv_node_is_frontend(node)) {
+>                 /* Add current component */
+>                 DRM_DEBUG_DRIVER("Adding component %s\n",
+>                                  of_node_full_name(node));
 > --
 > git-series 0.8.11
