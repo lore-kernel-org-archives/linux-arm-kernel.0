@@ -1,80 +1,172 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 4 May 2017 16:56:57 +0200
-Subject: [PATCH v2 resend] arm: dts: sun7i-a20-bananapi: name the GPIO
- lines
-In-Reply-To: <1493795360-18629-1-git-send-email-linux@rempel-privat.de>
-References: <CACRpkdZcnJ1eCNW4ZF_A4zbeCt3JcAuw-1meB_Pn7ctMy99B_g@mail.gmail.com>
- <1493795360-18629-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <20170504145657.yzbehfov2rgeqn5g@lukather>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 4 May 2017 17:03:21 +0200
+Subject: [PATCH v6 07/24] KVM: arm64: vgic-its: Implement
+ vgic_its_has_attr_regs and attr_regs_access
+In-Reply-To: <74f1b53a-9d52-8e6a-1af7-39820ce1c709@arm.com>
+References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
+ <1493898284-29504-8-git-send-email-eric.auger@redhat.com>
+ <74f1b53a-9d52-8e6a-1af7-39820ce1c709@arm.com>
+Message-ID: <8c1761c8-0774-784a-2f1f-5e82d66e874e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 09:09:20AM +0200, Oleksij Rempel wrote:
-> This names the GPIO lines on the Banana Pi board in accordance with
-> the A20_Banana_Pi v1.4 Specification.
+Hi Marc,
+
+On 04/05/2017 16:04, Marc Zyngier wrote:
+> On 04/05/17 12:44, Eric Auger wrote:
+>> This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
+>> upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+>> group becomes functional.
+>>
+>> At least GITS_CREADR and GITS_IIDR require to differentiate a guest write
+>> action from a user access. As such let's introduce a new uaccess_its_write
+>> vgic_register_region callback.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>> v6 -> v6:
+>> - fix GITS_PIDR/CIDR accesses
+>> - remove vgic_data_mmio_bus_to_host/vgic_data_host_to_mmio_bus
+>> - 64b full reg access comment rewording
+>> - vgic_its_attr_regs_access declaration block rework including
+>>   removal of iodev
+>>
+>> v4 -> v5:
+>> - use GITS_TYPER instead of offset 0x8
+>> - uaccess_its_write now can return an error
+>>
+>> v3 -> v4:
+>> - remove changes to the REGISTER_ITS_DESC macro. This will be handled in
+>>   subsequent patch with the introduction of a new REGISTER_ITS_DESC_UACCESS
+>>   macro
+>> - fix IIDR access and add a comment wrt full length access
+>> - handle endianness
+>> - add kvm lock and vcpus lock
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c  | 70 +++++++++++++++++++++++++++++++++++++++++--
+>>  virt/kvm/arm/vgic/vgic-mmio.h |  9 ++++--
+>>  2 files changed, 75 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index f687e91..222fad5 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -1469,14 +1469,80 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
+>>  int vgic_its_has_attr_regs(struct kvm_device *dev,
+>>  			   struct kvm_device_attr *attr)
+>>  {
+>> -	return -ENXIO;
+>> +	const struct vgic_register_region *region;
+>> +	gpa_t offset = attr->attr;
+>> +
 > 
-> This will make these line names reflect through to userspace
-> so that they can easily be identified and used with the new
-> character device ABI.
+> Shouldn't you check the alignment in the same way you do it below? It
+> seems a bit odd that one succeeds while the other fails with the same input.
+yes makes sense
+
+Thanks
+
+Eric
 > 
-> Some care has been taken to name all lines, not just those used
-> by the external connectors, also lines that are muxed into some
-> other function than GPIO: these are named "[FOO]" so that users
-> can see with lsgpio what all lines are used for.
+>> +	region = vgic_find_mmio_region(its_registers,
+>> +				       ARRAY_SIZE(its_registers),
+>> +				       offset);
+>> +	if (!region)
+>> +		return -ENXIO;
+>> +
+>> +	return 0;
+>>  }
+>>  
+>>  int vgic_its_attr_regs_access(struct kvm_device *dev,
+>>  			      struct kvm_device_attr *attr,
+>>  			      u64 *reg, bool is_write)
+>>  {
+>> -	return -ENXIO;
+>> +	const struct vgic_register_region *region;
+>> +	struct vgic_its *its;
+>> +	gpa_t addr, offset;
+>> +	unsigned int len;
+>> +	int align, ret = 0;
+>> +
+>> +	its = dev->private;
+>> +	offset = attr->attr;
+>> +
+>> +	/*
+>> +	 * Although the spec supports upper/lower 32-bit accesses to
+>> +	 * 64-bit ITS registers, the userspace ABI requires 64-bit
+>> +	 * accesses to all 64-bit wide registers. We therefore only
+>> +	 * support 32-bit accesses to GITS_CTLR, GITS_IIDR and GITS ID
+>> +	 * registers
+>> +	 */
+>> +	align = (offset < GITS_TYPER) || (offset >= GITS_PIDR4) ? 0x3 : 0x7;
+>> +
+>> +	if (offset & align)
+>> +		return -EINVAL;
+>> +
+>> +	mutex_lock(&dev->kvm->lock);
+>> +
+>> +	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base)) {
+>> +		ret = -ENXIO;
+>> +		goto out;
+>> +	}
+>> +
+>> +	region = vgic_find_mmio_region(its_registers,
+>> +				       ARRAY_SIZE(its_registers),
+>> +				       offset);
+>> +	if (!region) {
+>> +		ret = -ENXIO;
+>> +		goto out;
+>> +	}
+>> +
+>> +	if (!lock_all_vcpus(dev->kvm)) {
+>> +		ret = -EBUSY;
+>> +		goto out;
+>> +	}
+>> +
+>> +	addr = its->vgic_its_base + offset;
+>> +
+>> +	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
+>> +
+>> +	if (is_write) {
+>> +		if (region->uaccess_its_write)
+>> +			ret = region->uaccess_its_write(dev->kvm, its, addr,
+>> +							len, *reg);
+>> +		else
+>> +			region->its_write(dev->kvm, its, addr, len, *reg);
+>> +	} else {
+>> +		*reg = region->its_read(dev->kvm, its, addr, len);
+>> +	}
+>> +	unlock_all_vcpus(dev->kvm);
+>> +out:
+>> +	mutex_unlock(&dev->kvm->lock);
+>> +	return ret;
+>>  }
+>>  
+>>  static int vgic_its_has_attr(struct kvm_device *dev,
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+>> index 6eec91b..ea4171a 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+>> @@ -36,8 +36,13 @@ struct vgic_register_region {
+>>  	};
+>>  	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
+>>  				      unsigned int len);
+>> -	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+>> -			      unsigned int len, unsigned long val);
+>> +	union {
+>> +		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+>> +				      unsigned int len, unsigned long val);
+>> +		int (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
+>> +					 gpa_t addr, unsigned int len,
+>> +					 unsigned long val);
+>> +	};
+>>  };
+>>  
+>>  extern struct kvm_io_device_ops kvm_io_gic_ops;
+>>
 > 
-> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/boot/dts/sun7i-a20-bananapi.dts | 60 ++++++++++++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
+> Thanks,
 > 
-> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> index 91f2e5f..5b3e0ee 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> @@ -178,6 +178,66 @@
->  };
->  
->  &pio {
-> +	/*
-> +	 * Legend: proper name = the GPIO line is used as GPIO
-
-I'm not convinced that a legend here is helpful in any way. No end
-user is going to even search for it here.
-
-> +	 *         NC = not connected (not routed from the SoC)
-
-Judging from the binding documentation, this should be the same than
-"".
-
-> +	 *         "[PER]" = pin is muxed for peripheral (not GPIO)
-
-We don't need the brackets. You have no guarantee that it is actually
-muxed, and will need to get that info from somewhere else either
-way. This is also not a syntax that is in the generic binding
-definition.
-
-> +	 *         "" = no idea, schematic doesn't say, could be
-> +	 *              unrouted (not connected to any external pin)
-> +	 *         LSEC = Low Speed External Connector
-> +	 *         HSEC = High Speed External Connector
-
-And both of those are not used.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170504/86a6ce79/attachment.sig>
+> 	M.
+> 
