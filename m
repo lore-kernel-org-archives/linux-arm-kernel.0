@@ -1,204 +1,169 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 4 May 2017 13:22:25 +0200
-Subject: [PATCH 5/5] KVM: arm/arm64: Allow setting the timer IRQ numbers
- from userspace
-In-Reply-To: <79ec69f2-d727-46ec-b1d5-4c535a904e63@arm.com>
-References: <20170503183300.4618-1-cdall@linaro.org>
- <20170503183300.4618-6-cdall@linaro.org>
- <b08c50b4-6aba-1a59-80f4-343cd906f1fa@arm.com>
- <20170504095918.GJ5923@cbox>
- <79ec69f2-d727-46ec-b1d5-4c535a904e63@arm.com>
-Message-ID: <20170504112225.GM5923@cbox>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 4 May 2017 12:29:37 +0100
+Subject: [PATCH] arm64: Fix the DMA mmap and get_sgtable API with
+ DMA_ATTR_FORCE_CONTIGUOUS
+In-Reply-To: <1493143232-2245-1-git-send-email-catalin.marinas@arm.com>
+References: <1493143232-2245-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <7d0445e5-ddb3-7d0f-4749-c63b54beff43@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 04, 2017 at 11:54:06AM +0100, Marc Zyngier wrote:
-> On 04/05/17 10:59, Christoffer Dall wrote:
-> > On Thu, May 04, 2017 at 10:34:32AM +0100, Marc Zyngier wrote:
-> >> On 03/05/17 19:33, Christoffer Dall wrote:
-> >>> First we define an ABI using the vcpu devices that lets userspace set
-> >>> the interrupt numbers for the various timers on both the 32-bit and
-> >>> 64-bit KVM/ARM implementations.
-> >>>
-> >>> Second, we add the definitions for the groups and attributes introduced
-> >>> by the above ABI.  (We add the PMU define on the 32-bit side as well for
-> >>> symmetry and it may get used some day.)
-> >>>
-> >>> Third, we set up the arch-specific vcpu device operation handlers to
-> >>> call into the timer code for anything related to the
-> >>> KVM_ARM_VCPU_TIMER_CTRL group.
-> >>>
-> >>> Fourth, we implement support for getting and setting the timer interrupt
-> >>> numbers using the above defined ABI in the arch timer code.
-> >>>
-> >>> Fifth, we introduce error checking upon enabling the arch timer (which
-> >>> is called when first running a VCPU) to check that all VCPUs are
-> >>> configured to use the same PPI for the timer (as mandated by the
-> >>> architecture) and that the virtual and physical timers are not
-> >>> configured to use the same IRQ number.
-> >>>
-> >>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> >>> ---
-> >>>  Documentation/virtual/kvm/devices/vcpu.txt |  25 +++++++
-> >>>  arch/arm/include/uapi/asm/kvm.h            |   8 +++
-> >>>  arch/arm/kvm/guest.c                       |   9 +++
-> >>>  arch/arm64/include/uapi/asm/kvm.h          |   3 +
-> >>>  arch/arm64/kvm/guest.c                     |   9 +++
-> >>>  include/kvm/arm_arch_timer.h               |   4 ++
-> >>>  virt/kvm/arm/arch_timer.c                  | 104 +++++++++++++++++++++++++++++
-> >>>  7 files changed, 162 insertions(+)
-> >>>
-> >>> diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
-> >>> index 352af6e..013e3f1 100644
-> >>> --- a/Documentation/virtual/kvm/devices/vcpu.txt
-> >>> +++ b/Documentation/virtual/kvm/devices/vcpu.txt
-> >>> @@ -35,3 +35,28 @@ Returns: -ENODEV: PMUv3 not supported or GIC not initialized
-> >>>  Request the initialization of the PMUv3.  If using the PMUv3 with an in-kernel
-> >>>  virtual GIC implementation, this must be done after initializing the in-kernel
-> >>>  irqchip.
-> >>> +
-> >>> +
-> >>> +2. GROUP: KVM_ARM_VCPU_TIMER_CTRL
-> >>> +Architectures: ARM,ARM64
-> >>> +
-> >>> +2.1. ATTRIBUTE: KVM_ARM_VCPU_TIMER_IRQ_VTIMER
-> >>> +2.2. ATTRIBUTE: KVM_ARM_VCPU_TIMER_IRQ_PTIMER
-> >>> +Parameters: in kvm_device_attr.addr the address for the timer interrupt is a
-> >>> +            pointer to an int
-> >>> +Returns: -EINVAL: Invalid timer interrupt number
-> >>> +         -EBUSY:  One or more VCPUs has already run
-> >>> +
-> >>> +A value describing the architected timer interrupt number when connected to an
-> >>> +in-kernel virtual GIC.  These must be a PPI (16 <= intid < 32).  If an
-> >>> +attribute is not set, a default value is applied (see below).
-> >>> +
-> >>> +KVM_ARM_VCPU_TIMER_IRQ_VTIMER: The EL1 virtual timer intid (default: 27)
-> >>> +KVM_ARM_VCPU_TIMER_IRQ_PTIMER: The EL1 physical timer intid (default: 30)
-> >>
-> >> uber nit: my reading of the code is that the default is set at VCPU
-> >> creation time. So setting the attribute overrides the default, not that
-> >> the default is applied if no attribute is set (i.e. there is always a
-> >> valid value).
-> >>
-> > 
-> > uh, right, I don't see the distinction though, so not sure how to
-> > correct the text.
-> > 
-> > Would "Setting the attribute overrides the default values (see below)."
-> > work instead?
+On 25/04/17 19:00, Catalin Marinas wrote:
+> While honouring the DMA_ATTR_FORCE_CONTIGUOUS on arm64 (commit
+> 44176bb38fa4: "arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to
+> IOMMU"), the existing uses of dma_mmap_attrs() and dma_get_sgtable()
+> have been broken by passing a physically contiguous vm_struct with an
+> invalid pages pointer through the common iommu API.
 > 
-> Looks good to me.
+> Since the coherent allocation with DMA_ATTR_FORCE_CONTIGUOUS uses CMA,
+> this patch simply reuses the existing swiotlb logic for mmap and
+> get_sgtable.
 > 
-> [...]
+> Note that the current implementation of get_sgtable (both swiotlb and
+> iommu) is broken if dma_declare_coherent_memory() is used since such
+> memory does not have a corresponding struct page. To be addressed in a
+> separate patch.
 > 
-> >>
-> >> Another issue that just popped in my head: how do we ensure that we
-> >> don't clash between the PMU and the timers? Yes, that's a foolish thing
-> >> to do, but that's no different from avoiding the same interrupt on the
-> >> timers...
-> >>
-> > Argh, good point.
-> > 
-> > So actually, nothing *really bad* happens from using the same IRQ number
-> > except that the VM gets confused.  However, it's living life dangerously
-> > because we use the HW bit for the vtimer, so we if ever start using it
-> > for other timers or the PMU, then you could end up in a situation where
-> > you unmap the phys mapping on behalf of another device, and the physical
-> > interrupt could be left in an active state.
-> > 
-> > On the other hand, the vtimer currently belongs only to VMs and we set
-> > the required physical active state before entering the VM, so maybe it
-> > doesn't matter.
+> Fixes: 44176bb38fa4 ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
+> Reported-by: Andrzej Hajda <a.hajda@samsung.com>
+> Cc: Andrzej Hajda <a.hajda@samsung.com>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
 > 
-> So far, we always assume that there is never more than a single source
-> per interrupt. We'll end-up with weird behaviours because our line_level
-> field is not an OR of the various inputs, but a direct assignment
-> (device A and B raise the line, then A drops it -> B's interrupt is gone).
+> Here's my attempt of fixing this, though I'd like to wait for Robin's review
+> (who's currently on holiday until next week).
 > 
-> I think that only the guest will be confused by it, but accepting it may
-> be interpreted as "this should work correctly". Would documenting that
-> it is a bad idea be enough?
-> 
-> > Should we just forego these checks and let the user shoot itself in the
-> > foot if he/she wants to?
-> 
-> If the documentation is enough, why not. Otherwise, we need some form of
-> allocator. Boring. ;-)
-> 
+> Not tested.
 
-Well, it's not that bad really (untested):
+The general approach is sound, and I can't see anything that looks
+obviously wrong with the implementation, although I have no easy way of
+testing it either:
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 1541f5d..122f9d3 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -121,6 +121,9 @@ struct vgic_irq {
- 	u8 source;			/* GICv2 SGIs only */
- 	u8 priority;
- 	enum vgic_irq_config config;	/* Level or edge */
-+
-+	void *owner;			/* Opaque pointer to reserve an interrupt
-+					   for in-kernel devices. */
- };
- 
- struct vgic_register_region;
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 3d0979c..7561d2d 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -429,6 +429,42 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
- }
- 
- /**
-+ * kvm_vgic_set_owner - Set the owner of an interrupt for a VM
-+ *
-+ * @kvm:    Pointer to the VM structure
-+ * @intid:  The virtual INTID identifying the interrupt (PPI or SPI)
-+ * @owner:  Opaque pointer to the owner
-+ *
-+ * Returns 0 if intid is not already used by another in-kernel device and the
-+ * owner is set, otherwise returns an error code.
-+ *
-+ * We only set the owner for VCPU 0 for PPIs.
-+ */
-+int kvm_vgic_set_owner(struct kvm *kvm, unsigned int intid, void *owner)
-+{
-+	struct vgic_irq *irq;
-+	struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, 0);
-+	int ret = 0;
-+
-+	if (!vgic_initialized(kvm))
-+		return -EAGAIN;
-+
-+	/* SGIs and LPIs cannot be wired up to any device */
-+	if (!irq_is_ppi(intid) && !vgic_valid_spi(kvm, intid))
-+		return -EINVAL;
-+
-+	irq = vgic_get_irq(kvm, vcpu, intid);
-+	spin_lock(&irq->irq_lock);
-+	if (irq->owner && irq->owner != owner)
-+		ret = -EEXIST;
-+	else
-+		irq->owner = owner;
-+	spin_unlock(&irq->irq_lock);
-+
-+	return ret;
-+}
-+
-+/**
-  * vgic_prune_ap_list - Remove non-relevant interrupts from the list
-  *
-  * @vcpu: The VCPU pointer
+Acked-by: Robin Murphy <robin.murphy@arm.com>
 
-The problem is that it doesn't help that much, because userspace can
-still change the level of an IRQ which is connected to an in-kernel
-device, unless we also introduce checking the owner field in the
-injection path.
+As for all the other failings of get_sgtable, it seems those have been
+wrong from its inception, so can't be particularly critical as they're
+presumably not being hit in practice - if this fixes all the actual
+regressions I'd be inclined to leave it at that until the dma_buf folks
+can cook up a suitable replacement for the whole mess.
 
-I don't see it blowing up the host with/without an allocator, so I'm
-fine with documentation, but I can also include the above.
+Robin.
 
-Thoughts?
-
-Thanks,
--Christoffer
+>  arch/arm64/mm/dma-mapping.c | 65 ++++++++++++++++++++++++++++++++++-----------
+>  1 file changed, 49 insertions(+), 16 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index f7b54019ef55..c9e53dec3695 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -308,24 +308,15 @@ static void __swiotlb_sync_sg_for_device(struct device *dev,
+>  				       sg->length, dir);
+>  }
+>  
+> -static int __swiotlb_mmap(struct device *dev,
+> -			  struct vm_area_struct *vma,
+> -			  void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> -			  unsigned long attrs)
+> +static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
+> +			      unsigned long pfn, size_t size)
+>  {
+>  	int ret = -ENXIO;
+>  	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >>
+>  					PAGE_SHIFT;
+>  	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> -	unsigned long pfn = dma_to_phys(dev, dma_addr) >> PAGE_SHIFT;
+>  	unsigned long off = vma->vm_pgoff;
+>  
+> -	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
+> -					     is_device_dma_coherent(dev));
+> -
+> -	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+> -		return ret;
+> -
+>  	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
+>  		ret = remap_pfn_range(vma, vma->vm_start,
+>  				      pfn + off,
+> @@ -336,19 +327,43 @@ static int __swiotlb_mmap(struct device *dev,
+>  	return ret;
+>  }
+>  
+> -static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
+> -				 void *cpu_addr, dma_addr_t handle, size_t size,
+> -				 unsigned long attrs)
+> +static int __swiotlb_mmap(struct device *dev,
+> +			  struct vm_area_struct *vma,
+> +			  void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> +			  unsigned long attrs)
+> +{
+> +	int ret;
+> +	unsigned long pfn = dma_to_phys(dev, dma_addr) >> PAGE_SHIFT;
+> +
+> +	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
+> +					     is_device_dma_coherent(dev));
+> +
+> +	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+> +		return ret;
+> +
+> +	return __swiotlb_mmap_pfn(vma, pfn, size);
+> +}
+> +
+> +static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
+> +				      struct page *page, size_t size)
+>  {
+>  	int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
+>  
+>  	if (!ret)
+> -		sg_set_page(sgt->sgl, phys_to_page(dma_to_phys(dev, handle)),
+> -			    PAGE_ALIGN(size), 0);
+> +		sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
+>  
+>  	return ret;
+>  }
+>  
+> +static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
+> +				 void *cpu_addr, dma_addr_t handle, size_t size,
+> +				 unsigned long attrs)
+> +{
+> +	struct page *page = phys_to_page(dma_to_phys(dev, handle));
+> +
+> +	return __swiotlb_get_sgtable_page(sgt, page, size);
+> +}
+> +
+>  static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+>  {
+>  	if (swiotlb)
+> @@ -703,6 +718,15 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+>  	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+>  		return ret;
+>  
+> +	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+> +		/*
+> +		 * DMA_ATTR_FORCE_CONTIGUOUS allocations are always remapped,
+> +		 * hence in the vmalloc space.
+> +		 */
+> +		unsigned long pfn = vmalloc_to_pfn(cpu_addr);
+> +		return __swiotlb_mmap_pfn(vma, pfn, size);
+> +	}
+> +
+>  	area = find_vm_area(cpu_addr);
+>  	if (WARN_ON(!area || !area->pages))
+>  		return -ENXIO;
+> @@ -717,6 +741,15 @@ static int __iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
+>  	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+>  	struct vm_struct *area = find_vm_area(cpu_addr);
+>  
+> +	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+> +		/*
+> +		 * DMA_ATTR_FORCE_CONTIGUOUS allocations are always remapped,
+> +		 * hence in the vmalloc space.
+> +		 */
+> +		struct page *page = vmalloc_to_page(cpu_addr);
+> +		return __swiotlb_get_sgtable_page(sgt, page, size);
+> +	}
+> +
+>  	if (WARN_ON(!area || !area->pages))
+>  		return -ENXIO;
+>  
+> 
