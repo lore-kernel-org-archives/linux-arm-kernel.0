@@ -1,107 +1,223 @@
-From: grundler@google.com (Grant Grundler)
-Date: Thu, 4 May 2017 09:35:15 -0700
-Subject: ARMv7 doesn't define CR_U?
-Message-ID: <CANEJEGv2snHD8vcAu2Hyu1839VdkCwUsRKOa28AsuHnvyZWwBw@mail.gmail.com>
+From: gengdj.1984@gmail.com (gengdongjiu)
+Date: Fri, 5 May 2017 00:44:33 +0800
+Subject: No subject
+In-Reply-To: <CAMj-D2DO_CfvD77izsGfggoKP45HSC9aD6auUPAYC9Yeq_aX7w@mail.gmail.com>
+References: <CAMj-D2DO_CfvD77izsGfggoKP45HSC9aD6auUPAYC9Yeq_aX7w@mail.gmail.com>
+Message-ID: <CAMj-D2BVerutQXg0AArBvWrB04x9jYF+ACMQCZu3FT92kReZBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-I'm seeing unaligned accesses from sadc[1] (compiled with llvm) are
-getting SIGBUS on an QCA IPQ4019 chipset despite ARMv7 CPU claiming to
-support unaligned accesses[1].   My question is about use of CR_U on
-ARMv7 in cpu_is_v6_unaligned().
+Dear James,
+   Thanks a lot for your review and comments. I am very sorry for the
+late response.
 
 
-localhost crash # strace sadc -F -L 600 -
-execve("/usr/local/bin/sadc", ["sadc", "-F", "-L", "600", "-"], [/* 20
-vars */]) = 0
-brk(NULL)                               = 0x3953c000
-...
-access("/sys/block/mmcblk0/device", F_OK) = 0
---- SIGBUS {si_signo=SIGBUS, si_code=BUS_ADRALN, si_addr=0x3953d8f8} ---
-+++ killed by SIGBUS (core dumped) +++
-Bus error (core dumped)
+2017-05-04 23:42 GMT+08:00 gengdongjiu <gengdj.1984@gmail.com>:
+>  Hi Dongjiu Geng,
+>
+> On 30/04/17 06:37, Dongjiu Geng wrote:
+>> when happen SEA, deliver signal bus and handle the ioctl that
+>> inject SEA abort to guest, so that guest can handle the SEA error.
+>
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 105b6ab..a96594f 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -20,8 +20,10 @@
+>> @@ -1238,6 +1240,36 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+>>   __coherent_cache_guest_page(vcpu, pfn, size);
+>>  }
+>>
+>> +static void kvm_send_signal(unsigned long address, bool hugetlb, bool hwpoison)
+>> +{
+>> + siginfo_t info;
+>> +
+>> + info.si_signo   = SIGBUS;
+>> + info.si_errno   = 0;
+>> + if (hwpoison)
+>> + info.si_code    = BUS_MCEERR_AR;
+>> + else
+>> + info.si_code    = 0;
+>> +
+>> + info.si_addr    = (void __user *)address;
+>> + if (hugetlb)
+>> + info.si_addr_lsb = PMD_SHIFT;
+>> + else
+>> + info.si_addr_lsb = PAGE_SHIFT;
+>> +
+>> + send_sig_info(SIGBUS, &info, current);
+>> +}
+>> +
+> ?  [hide part of quote]
+>
+> Punit reviewed the other version of this patch, this PMD_SHIFT is not the right
+> thing to do, it needs a more accurate set of calls and shifts as there may be
+> hugetlbfs pages other than PMD_SIZE.
+>
+> https://www.spinics.net/lists/arm-kernel/msg568919.html
+>
+> I haven't posted a new version of that patch because I was still hunting a bug
+> in the hugepage/hwpoison code, even with Punit's fixes series I see -EFAULT
+> returned to userspace instead of this hwpoison code being invoked.
 
-And kernel output from a different invocation:
-[  226.596867] Alignment trap: not handling instruction f9602aef at [<2a0062b6>]
-[  226.596925] Unhandled fault: alignment exception (0x001) at 0x2a014088
+  Ok, got it, thanks for your information.
+>
+> Please avoid duplicating functionality between patches, it wastes reviewers
+> time, especially when we know there are problems with this approach.
+>
+>
+>> +static void kvm_handle_bad_page(unsigned long address,
+>> + bool hugetlb, bool hwpoison)
+>> +{
+>> + /* handle both hwpoison and other synchronous external Abort */
+>> + if (hwpoison)
+>> + kvm_send_signal(address, hugetlb, true);
+>> + else
+>> + kvm_send_signal(address, hugetlb, false);
+>> +}
+>
+> Why the extra level of indirection? We only want to signal userspace like this
+> from KVM for hwpoison. Signals for RAS related reasons should come from the bits
+> of the kernel that decoded the error.
 
-Backtrace from gdb:
-0x2a0062ba in read_diskstats_io (st_io=0x2a014088) at rd_stats.c:568
-568     rd_stats.c: No such file or directory.
-(gdb) bt
-#0  0x2a0062ba in read_diskstats_io (st_io=0x2a014088) at rd_stats.c:568
-#1  0x2a00299c in read_stats () at sadc.c:883
-#2  rw_sa_stat_loop (count=-1, rectime=0xbefff424, stdfd=<optimized out>,
-    ofd=<optimized out>, ofile=<optimized out>) at sadc.c:947
-#3  0x2a002d66 in main (argc=5, argv=<optimized out>) at sadc.c:1206
+For the SEA, the are maily two types:
+0b010000 Synchronous External Abort on memory access.
+0b0101xx Synchronous External Abort on page table walk. DFSC[1:0]
+encode the level.
 
-But it looks like our kernel[2] should be handling this unaligned access:
-# cat /proc/cpu/alignment
-User:           16
-System:         0
-Skipped:        16
-Half:           0
-Word:           0
-DWord:          0
-Multi:          0
-User faults:    2 (fixup)
+hwpoison should belong to the  "Synchronous External Abort on memory access"
+if the SEA type is not hwpoison, such as page table walk, do you mean
+KVM do not deliver the SIGBUS?
+If so, how the KVM handle the SEA type other than hwpoison?
 
-Since Documentation/arm/mem_alignment doesn't seem to match the
-code[2], I'm not sure what to expect here.
-"echo 0 > /proc/cpu/alignment" results in kernel printing:
-    alignment: ignoring faults is unsafe on this CPU.  Defaulting to fixup mode.
+>
+> (hwpoison for KVM is a corner case as Qemu's memory effectively has two users,
+> Qemu and KVM. This isn't the example of how user-space gets signalled.)
+>
+>
+>> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+>> index b37446a..780e3c4 100644
+>> --- a/arch/arm64/kvm/guest.c
+>> +++ b/arch/arm64/kvm/guest.c
+>> @@ -277,6 +277,13 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+>>   return -EINVAL;
+>>  }
+>>
+>> +int kvm_vcpu_ioctl_sea(struct kvm_vcpu *vcpu)
+>> +{
+>> + kvm_inject_dabt(vcpu, kvm_vcpu_get_hfar(vcpu));
+>> +
+>> + return 0;
+>> +}
+>
+>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>> index bb02909..1d2e2e7 100644
+>> --- a/include/uapi/linux/kvm.h
+>> +++ b/include/uapi/linux/kvm.h
+>> @@ -1306,6 +1306,7 @@ struct kvm_s390_ucas_mapping {
+>>  #define KVM_S390_GET_IRQ_STATE  _IOW(KVMIO, 0xb6, struct kvm_s390_irq_state)
+>>  /* Available with KVM_CAP_X86_SMM */
+>>  #define KVM_SMI                   _IO(KVMIO,   0xb7)
+>> +#define KVM_ARM_SEA               _IO(KVMIO,   0xb8)
+>>
+>>  #define KVM_DEV_ASSIGN_ENABLE_IOMMU (1 << 0)
+>>  #define KVM_DEV_ASSIGN_PCI_2_3 (1 << 1)
+>>
+>
+> Why do we need a userspace API for SEA? It can also be done by using
+> KVM_{G,S}ET_ONE_REG to change the vcpu registers. The advantage of doing it this
+> way is you can choose which ESR value to use.
+>
+> Adding a new API call to do something you could do with an old one doesn't look
+> right.
 
+James, I considered your suggestion before that use the
+KVM_{G,S}ET_ONE_REG to change the vcpu registers. but I found it does
+not have difference to use the alread existed KVM API.  so may be
+changing the vcpu registers in qemu will duplicate with the KVM APIs.
 
-arch/arm/mm/alignment.c:
-/* Return true if and only if the ARMv6 unaligned access model is in use. */
-static bool cpu_is_v6_unaligned(void)
+injection a SEA is no more than setting some registers: elr_el1, PC,
+PSTATE, SPSR_el1, far_el1, esr_el1
+I seen this KVM API do the same thing as Qemu.  do you found call this
+API will have issue and necessary to choose another ESR value?
+
+I pasted the alread existed KVM API code:
+
+static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned
+long addr)
 {
-        return cpu_architecture() >= CPU_ARCH_ARMv6 && get_cr() & CR_U;
+ unsigned long cpsr = *vcpu_cpsr(vcpu);
+ bool is_aarch32 = vcpu_mode_is_32bit(vcpu);
+ u32 esr = 0;
+ *vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
+ *vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
+ *vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
+ *vcpu_spsr(vcpu) = cpsr;
+ vcpu_sys_reg(vcpu, FAR_EL1) = addr;
+ /*
+  * Build an {i,d}abort, depending on the level and the
+  * instruction set. Report an external synchronous abort.
+  */
+ if (kvm_vcpu_trap_il_is32bit(vcpu))
+  esr |= ESR_ELx_IL;
+ /*
+  * Here, the guest runs in AArch64 mode when in EL1. If we get
+  * an AArch32 fault, it means we managed to trap an EL0 fault.
+  */
+ if (is_aarch32 || (cpsr & PSR_MODE_MASK) == PSR_MODE_EL0t)
+  esr |= (ESR_ELx_EC_IABT_LOW << ESR_ELx_EC_SHIFT);
+ else
+  esr |= (ESR_ELx_EC_IABT_CUR << ESR_ELx_EC_SHIFT);
+ if (!is_iabt)
+  esr |= ESR_ELx_EC_DABT_LOW << ESR_ELx_EC_SHIFT;
+ vcpu_sys_reg(vcpu, ESR_EL1) = esr | ESR_ELx_FSC_EXTABT;
 }
 
-arch/arm/include/asm/cp15.h:
-#define CR_U    (1 << 22)       /* Unaligned access operation           */
-
-But bit 22 isn't defined in the Cortex A7 (an ARMv7-A cpu).
-
-"Cortex-A7 MPCore Technical Reference Manual"
-"4.3.27. System Control Register"
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0464f/BABJAHDA.html
-
-says bit 22 is "Reserved, RAO/SBOP."
-
-
-So shouldn't cpu_is_v6_unaligned() be something like:
-
-static bool cpu_supports_unaligned(void)
+static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
+    unsigned long addr)
 {
-        return (cpu_architecture() == CPU_ARCH_ARMv6 && get_cr() & CR_U)
-             || (cpu_architecture() >= CPU_ARCH_ARMv7);
+ u32 vect_offset;
+ u32 *far, *fsr;
+ bool is_lpae;
+ if (is_pabt) {
+  vect_offset = 12;
+  far = &vcpu_cp15(vcpu, c6_IFAR);
+  fsr = &vcpu_cp15(vcpu, c5_IFSR);
+ } else { /* !iabt */
+  vect_offset = 16;
+  far = &vcpu_cp15(vcpu, c6_DFAR);
+  fsr = &vcpu_cp15(vcpu, c5_DFSR);
+ }
+ prepare_fault32(vcpu, COMPAT_PSR_MODE_ABT | COMPAT_PSR_A_BIT, vect_offset);
+ *far = addr;
+ /* Give the guest an IMPLEMENTATION DEFINED exception */
+ is_lpae = (vcpu_cp15(vcpu, c2_TTBCR) >> 31);
+ if (is_lpae)
+  *fsr = 1 << 9 | 0x34;
+ else
+  *fsr = 0x14;
 }
 
-thanks in advance for any guidance on this!
 
-cheers,
-grant
+/**
+ * kvm_inject_dabt - inject a data abort into the guest
+ * @vcpu: The VCPU to receive the undefined exception
+ * @addr: The address to report in the DFAR
+ *
+ * It is assumed that this code is called from the VCPU thread and that the
+ * VCPU therefore is not currently executing guest code.
+ */
+void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
+{
+ if (!(vcpu->arch.hcr_el2 & HCR_RW))
+  inject_abt32(vcpu, false, addr);
+ else
+  inject_abt64(vcpu, false, addr);
+}
 
-[1] "Migrating from IA-32 to ARM Application Note 274" says there is
-an exception to "unaligned data access" and it possible this is
-related to current sadc behavior:
 
-"3.4.5       Access types, endianness and alignment
-...
-2.     Data alignment
-All ARM processors access data in memory more efficiently if it is
-aligned according to size (words on word boundaries, halfwords on
-halfword boundaries etc.). All ARMv7-A processors, however, are
-capable of accessing unaligned data, albeit with a slight performance
-penalty (this is due to the need for the memory interface to make
-multiple accesses and is hidden, functionally, from the programmer).
-Notable exceptions are stack accesses which are all word-sized and
-must be word-aligned. Some memory access instructions (e.g. LDM/STM
-and LDREX/STREX) do not support unaligned addresses."
-
-[2] chromium.org chromeos-3.18 branch:
-    https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.18/arch/arm/mm/alignment.c
+>
+>
+> Thanks,
+>
+> James
