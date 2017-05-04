@@ -1,34 +1,244 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu,  4 May 2017 20:32:01 +0200
-Subject: [PATCH 1/1] clk: meson: meson8b: mark clk81 as critical
-In-Reply-To: <20170504183201.13175-1-martin.blumenstingl@googlemail.com>
-References: <20170504183201.13175-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170504183201.13175-2-martin.blumenstingl@googlemail.com>
+From: oza.oza@broadcom.com (Oza Oza)
+Date: Fri, 5 May 2017 00:11:19 +0530
+Subject: [PATCH 1/3] of/pci/dma: fix DMA configuration for PCI masters
+In-Reply-To: <d7203258-e39a-a59b-d14f-c0c92a1d3f41@arm.com>
+References: <1493786795-28153-1-git-send-email-oza.oza@broadcom.com>
+ <d7203258-e39a-a59b-d14f-c0c92a1d3f41@arm.com>
+Message-ID: <CAMSpPPcC6wN+2HeZPak+gWxoy2WaO14epHNQfHT1W0FnTRHnOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disabling clk81 results in an immediate freeze of the whole system. This
-can happen "accidentally" when the last child-clock of clk81 is disabled
-(in this case the common clock framework also disables clk81, even if it
-was only enabled indirectly before).
+On Thu, May 4, 2017 at 11:32 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> [apologies for the silence - I've been on holiday]
+>
+> On 03/05/17 05:46, Oza Pawandeep wrote:
+>> current device framework and of framework integration assumes
+>> dma-ranges in a way where memory-mapped devices define their
+>> dma-ranges. (child-bus-address, parent-bus-address, length).
+>
+> Well, yes, that is simply the definition of dma-ranges, and remains true
+> regardless of the particular format of either bus address.
+>
+>> of_dma_configure is specifically written to take care of memory
+>> mapped devices. but no implementation exists for pci to take
+>> care of pcie based memory ranges.
+>
+> That still doesn't make sense. To repeat myself again, PCI devices *ARE*
+> memory-mapped devices. Yes, there do exist some platforms where I/O
+> space is not treated as MMIO, but config space and memory space are very
+> much memory-mapped however you look at them, and in the context of DMA,
+> only memory space is relevant anyway.
+>
+> What *is* true about the current code is that of_dma_get_range() expects
+> to be passed an OF node representing the device itself, and doesn't work
+> properly when passed the node of the device's parent bus directly, which
+> happens to be what pci_dma_configure() currently does. That's the only
+> reason why it doesn't work for (single-entry) host controller dma-ranges
+> today. This does not mean it's a PCI problem, it is simply the case that
+> pci_dma_configure() is the only caller currently hitting it. Other
+> discoverable, DMA-capable buses like fsl-mc are still going to face the
+> exact same problem with or without this patch.
+>
+>> for e.g. iproc based SOCs and other SOCs(suc as rcar) have PCI
+>> world dma-ranges.
+>> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+>>
+>> this patch serves following:
+>>
+>> 1) exposes interface to the pci host driver for their
+>> inbound memory ranges
+>>
+>> 2) provide an interface to callers such as of_dma_get_ranges.
+>> so then the returned size get best possible (largest) dma_mask.
+>> because PCI RC drivers do not call APIs such as
+>> dma_set_coherent_mask() and hence rather it shows its addressing
+>> capabilities based on dma-ranges.
+>> for e.g.
+>> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+>> we should get dev->coherent_dma_mask=0x7fffffffff.
+>>
+>> 3) this patch handles multiple inbound windows and dma-ranges.
+>> it is left to the caller, how it wants to use them.
+>> the new function returns the resources in a standard and unform way
+>>
+>> 4) this way the callers of for e.g. of_dma_get_ranges
+>> does not need to change.
+>>
+>> 5) leaves scope of adding PCI flag handling for inbound memory
+>> by the new function.
+>
+> Which flags would ever actually matter? DMA windows aren't going to be
+> to config or I/O space, so the memory type can be assumed, and the
+> 32/64-bit distinction is irrelevant as it's not a relocatable BAR;
+> DMA-able system memory isn't going to be read-sensitive, so the
+> prefetchable flag shouldn't matter; and not being a BAR none of the
+> others would be relevant either.
+>
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- drivers/clk/meson/meson8b.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks Robin; for your reply and attention:
 
-diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-index e9985503165c..bfd1690724de 100644
---- a/drivers/clk/meson/meson8b.c
-+++ b/drivers/clk/meson/meson8b.c
-@@ -399,7 +399,7 @@ struct clk_gate meson8b_clk81 = {
- 		.ops = &clk_gate_ops,
- 		.parent_names = (const char *[]){ "mpeg_clk_div" },
- 		.num_parents = 1,
--		.flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED),
-+		.flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED | CLK_IS_CRITICAL),
- 	},
- };
- 
--- 
-2.12.2
+agree with you, at present it would not matter,
+but it does not mean that we do not scope it to make it matter in future.
+
+now where it could matter:
+there is Relaxed Ordering for inbound memory for PCI.
+According to standard, Relaxed Ordering (RO) bit can be set only for
+Memory requests and completions (if present in the original request).
+Also, according to transaction ordering rules, I/O and configuration
+requests can still be re-ordered ahead of each other.
+and we would like to make use of it.
+for e.g. lets say we mark memory as Relaxed Ordered with flag.
+the special about this memory is incoming PCI transactions can be
+reordered and rest memory has to be strongly ordered.
+
+how it our SOC would make use of this is out of scope for the
+discussion at this point of time, but I am just bringing in the
+idea/point how flags could be useful
+for inbound memory, since we would not like throw-away flags completely.
+
+>>
+>> Bug: SOC-5216
+>> Change-Id: Ie045386df91e1e0587846bb147ae40d96f6d7d2e
+>> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+>> Reviewed-on: http://gerrit-ccxsw.broadcom.net/40428
+>> Reviewed-by: vpx_checkpatch status <vpx_checkpatch@broadcom.com>
+>> Reviewed-by: CCXSW <ccxswbuild@broadcom.com>
+>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>> Tested-by: vpx_autobuild status <vpx_autobuild@broadcom.com>
+>> Tested-by: vpx_smoketest status <vpx_smoketest@broadcom.com>
+>> Tested-by: CCXSW <ccxswbuild@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>
+>> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+>> index 0ee42c3..ed6e69a 100644
+>> --- a/drivers/of/of_pci.c
+>> +++ b/drivers/of/of_pci.c
+>> @@ -283,6 +283,83 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+>>       return err;
+>>  }
+>>  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+>> +
+>> +/**
+>> + * of_pci_get_dma_ranges - Parse PCI host bridge inbound resources from DT
+>> + * @np: device node of the host bridge having the dma-ranges property
+>> + * @resources: list where the range of resources will be added after DT parsing
+>> + *
+>> + * It is the caller's job to free the @resources list.
+>> + *
+>> + * This function will parse the "dma-ranges" property of a
+>> + * PCI host bridge device node and setup the resource mapping based
+>> + * on its content.
+>> + *
+>> + * It returns zero if the range parsing has been successful or a standard error
+>> + * value if it failed.
+>> + */
+>> +
+>> +int of_pci_get_dma_ranges(struct device_node *np, struct list_head *resources)
+>> +{
+>> +     struct device_node *node = of_node_get(np);
+>> +     int rlen;
+>> +     int ret = 0;
+>> +     const int na = 3, ns = 2;
+>> +     struct resource *res;
+>> +     struct of_pci_range_parser parser;
+>> +     struct of_pci_range range;
+>> +
+>> +     if (!node)
+>> +             return -EINVAL;
+>> +
+>> +     parser.node = node;
+>> +     parser.pna = of_n_addr_cells(node);
+>> +     parser.np = parser.pna + na + ns;
+>> +
+>> +     parser.range = of_get_property(node, "dma-ranges", &rlen);
+>> +
+>> +     if (!parser.range) {
+>> +             pr_debug("pcie device has no dma-ranges defined for node(%s)\n",
+>> +                       np->full_name);
+>> +             ret = -EINVAL;
+>> +             goto out;
+>> +     }
+>> +
+>> +     parser.end = parser.range + rlen / sizeof(__be32);
+>> +
+>> +     for_each_of_pci_range(&parser, &range) {
+>
+> This is plain wrong - of_pci_range_parser_one() will translate upwards
+> through parent "ranges" properties, which is completely backwards for
+> DMA addresses.
+>
+> Robin.
+>
+
+No it does not, this patch is thoroughly tested on our SOC and it works.
+of_pci_range_parser_one does not translate upwards through parent. it
+just sticks to given PCI parser.
+
+>> +             /*
+>> +              * If we failed translation or got a zero-sized region
+>> +              * then skip this range
+>> +              */
+>> +             if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+>> +                     continue;
+>> +
+>> +             res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+>> +             if (!res) {
+>> +                     ret = -ENOMEM;
+>> +                     goto parse_failed;
+>> +             }
+>> +
+>> +             ret = of_pci_range_to_resource(&range, np, res);
+>> +             if (ret) {
+>> +                     kfree(res);
+>> +                     continue;
+>> +             }
+>> +
+>> +             pci_add_resource_offset(resources, res,
+>> +                                     res->start - range.pci_addr);
+>> +     }
+>> +
+>> +     return ret;
+>> +
+>> +parse_failed:
+>> +     pci_free_resource_list(resources);
+>> +out:
+>> +     of_node_put(node);
+>> +     return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(of_pci_get_dma_ranges);
+>>  #endif /* CONFIG_OF_ADDRESS */
+>>
+>>  #ifdef CONFIG_PCI_MSI
+>> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+>> index 0e0974e..617b90d 100644
+>> --- a/include/linux/of_pci.h
+>> +++ b/include/linux/of_pci.h
+>> @@ -76,6 +76,7 @@ static inline void of_pci_check_probe_only(void) { }
+>>  int of_pci_get_host_bridge_resources(struct device_node *dev,
+>>                       unsigned char busno, unsigned char bus_max,
+>>                       struct list_head *resources, resource_size_t *io_base);
+>> +int of_pci_get_dma_ranges(struct device_node *np, struct list_head *resources);
+>>  #else
+>>  static inline int of_pci_get_host_bridge_resources(struct device_node *dev,
+>>                       unsigned char busno, unsigned char bus_max,
+>> @@ -83,6 +84,12 @@ static inline int of_pci_get_host_bridge_resources(struct device_node *dev,
+>>  {
+>>       return -EINVAL;
+>>  }
+>> +
+>> +static inline int of_pci_get_dma_ranges(struct device_node *np,
+>> +                                     struct list_head *resources)
+>> +{
+>> +     return -EINVAL;
+>> +}
+>>  #endif
+>>
+>>  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+>>
+>
+
+I am posting v2, please have a look at it, it is very much improved
+design, which address Rob's comments.
+
+Regards,
+Oza.
