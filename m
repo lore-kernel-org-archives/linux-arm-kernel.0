@@ -1,60 +1,36 @@
-From: leedom@chelsio.com (Casey Leedom)
-Date: Thu, 4 May 2017 21:01:24 +0000
-Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING
-In-Reply-To: <CAKgT0UdJ17DGAphuP5Y9co6ky-GBFdq2s-1nqctY_Tz_iz5__g@mail.gmail.com>
-References: <cover.1493678834.git.leedom@chelsio.com>
- <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
- <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
- <20170502165329.GB26406@linux.intel.com>
- <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
- <MWHPR12MB160095DF53CE981C923FE65DC8160@MWHPR12MB1600.namprd12.prod.outlook.com>,
- <CAKgT0UdJ17DGAphuP5Y9co6ky-GBFdq2s-1nqctY_Tz_iz5__g@mail.gmail.com>
-Message-ID: <MWHPR12MB1600E78DD7F530AA9DC2433DC8EA0@MWHPR12MB1600.namprd12.prod.outlook.com>
+From: oss@buserror.net (Scott Wood)
+Date: Thu, 04 May 2017 16:07:14 -0500
+Subject: [PATCH v2] drivers:soc:fsl:qbman:qman.c: Sleep instead of stuck
+ hacking jiffies.
+In-Reply-To: <1493873917-7484-1-git-send-email-karim.eshapa@gmail.com>
+References: <1493508775.25397.26.camel@buserror.net>
+ <1493873917-7484-1-git-send-email-karim.eshapa@gmail.com>
+Message-ID: <1493932034.25397.37.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-| From: Alexander Duyck <alexander.duyck@gmail.com>
-| Sent: Wednesday, May 3, 2017 9:02 AM
-| ...
-| It sounds like we are more or less in agreement. My only concern is
-| really what we default this to. On x86 I would say we could probably
-| default this to disabled for existing platforms since my understanding
-| is that relaxed ordering doesn't provide much benefit on what is out
-| there right now when performing DMA through the root complex. As far
-| as peer-to-peer I would say we should probably look at enabling the
-| ability to have Relaxed Ordering enabled for some channels but not
-| others. In those cases the hardware needs to be smart enough to allow
-| for you to indicate you want it disabled by default for most of your
-| DMA channels, and then enabled for the select channels that are
-| handling the peer-to-peer traffic.
+On Thu, 2017-05-04 at 06:58 +0200, Karim Eshapa wrote:
+> +	stop = jiffies + 10000;
+> +	/*
+> +	?* if MR was full and h/w had other FQRNI entries to produce, we
+> +	?* need to allow it time to produce those entries once the
+> +	?* existing entries are consumed. A worst-case situation
+> +	?* (fully-loaded system) means h/w sequencers may have to do 3-4
+> +	?* other things before servicing the portal's MR pump, each of
+> +	?* which (if slow) may take ~50 qman cycles (which is ~200
+> +	?* processor cycles). So rounding up and then multiplying this
+> +	?* worst-case estimate by a factor of 10, just to be
+> +	?* ultra-paranoid, goes as high as 10,000 cycles. NB, we consume
+> +	?* one entry at a time, so h/w has an opportunity to produce new
+> +	?* entries well before the ring has been fully consumed, so
+> +	?* we're being *really* paranoid here.
+> +	?*/
 
-  Yes, I think that we are mostly in agreement.  I had just wanted to make
-sure that whatever scheme was developed would allow for simultaneously
-supporting non-Relaxed Ordering for some PCIe End Points and Relaxed
-Ordering for others within the same system.  I.e. not simply
-enabling/disabling/etc.  based solely on System Platform Architecture.
+OK, upon reading this more closely it seems the intent was to delay for 10,000
+*processor cycles* and somehow that got turned into 10,000 jiffies (which is
+40 seconds at the default Hz!).  We could just replace this whole thing with
+msleep(1) and still be far more paranoid than was originally intended.
 
-  By the way, I've started our QA folks off looking at what things look like
-in Linux Virtual Machines under different Hypervisors to see what
-information they may provide to the VM in the way of what Root Complex Port
-is being used, etc.  So far they've got Windows HyperV done and there
-there's no PCIe Fabric exposed in any way: just the attached device.  I'll
-have to see what pci_find_pcie_root_port() returns in that environment.
-Maybe NULL?
+Claudiu and Roy, any comments?
 
-  With your reservations (which I also share), I think that it probably
-makes sense to have a per-architecture definition of the "Can I Use Relaxed
-Ordering With TLPs Directed At This End Point" predicate, with the default
-being "No" for any architecture which doesn't implement the predicate.  And
-if the specified (struct pci_dev *) End Node is NULL, it ought to return
-False for that as well.  I can't see any reason to pass in the Source End
-Node but I may be missing something.
-
-  At this point, this is pretty far outside my level of expertise.  I'm
-happy to give it a go, but I'd be even happier if someone with a lot more
-experience in the PCIe Infrastructure were to want to carry the ball
-forward.  I'm not super familiar with the Linux Kernel "Rules Of
-Engagement", so let me know what my next step should be.  Thanks.
-
-Casey
+-Scott
