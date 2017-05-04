@@ -1,95 +1,119 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 4 May 2017 16:05:18 +0800
-Subject: [linux-sunxi] [PATCH v2 20/20] ARM: sun5i: a10s-olinuxino: Enable
- HDMI
-In-Reply-To: <c7ac6faa0568e6418291255af537c4b070bdea63.1493812478.git-series.maxime.ripard@free-electrons.com>
-References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
- <c7ac6faa0568e6418291255af537c4b070bdea63.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v65S2pw3z8NZ+tkPkF=A=5z2toRkC+26pAs6La6CNyeXoQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 4 May 2017 09:09:47 +0100
+Subject: [PATCH 1/5] KVM: arm64: Allow creating the PMU without the
+ in-kernel GIC
+In-Reply-To: <20170503183300.4618-2-cdall@linaro.org>
+References: <20170503183300.4618-1-cdall@linaro.org>
+ <20170503183300.4618-2-cdall@linaro.org>
+Message-ID: <dcaefb19-6dab-a990-2e10-497d02b14242@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 3, 2017 at 7:59 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The A10s Olinuxino has an HDMI connector. Make sure we can use it.
->
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On 03/05/17 19:32, Christoffer Dall wrote:
+> Since we got support for devices in userspace which allows reporting the
+> PMU overflow output status to userspace, we should actually allow
+> creating the PMU on systems without an in-kernel irqchip, which in turn
+> requires us to slightly clarify error codes for the ABI and move things
+> around for the initialization phase.
+> 
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
 > ---
->  arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 29 +++++++++++++++++-
->  1 file changed, 29 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-> index 894f874a5beb..1d13b6407222 100644
-> --- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-> +++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-> @@ -63,6 +63,17 @@
->                 stdout-path = "serial0:115200n8";
->         };
->
-> +       connector {
-> +               compatible = "hdmi-connector";
-> +               type = "a";
+>  Documentation/virtual/kvm/devices/vcpu.txt | 16 +++++++++-------
+>  virt/kvm/arm/pmu.c                         | 27 +++++++++++++++++----------
+>  2 files changed, 26 insertions(+), 17 deletions(-)
+> 
+> diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
+> index 02f5068..352af6e 100644
+> --- a/Documentation/virtual/kvm/devices/vcpu.txt
+> +++ b/Documentation/virtual/kvm/devices/vcpu.txt
+> @@ -16,7 +16,9 @@ Parameters: in kvm_device_attr.addr the address for PMU overflow interrupt is a
+>  Returns: -EBUSY: The PMU overflow interrupt is already set
+>           -ENXIO: The overflow interrupt not set when attempting to get it
+>           -ENODEV: PMUv3 not supported
+> -         -EINVAL: Invalid PMU overflow interrupt number supplied
+> +         -EINVAL: Invalid PMU overflow interrupt number supplied or
+> +                  trying to set the IRQ number without using an in-kernel
+> +                  irqchip.
+>  
+>  A value describing the PMUv3 (Performance Monitor Unit v3) overflow interrupt
+>  number for this vcpu. This interrupt could be a PPI or SPI, but the interrupt
+> @@ -25,11 +27,11 @@ all vcpus, while as an SPI it must be a separate number per vcpu.
+>  
+>  1.2 ATTRIBUTE: KVM_ARM_VCPU_PMU_V3_INIT
+>  Parameters: no additional parameter in kvm_device_attr.addr
+> -Returns: -ENODEV: PMUv3 not supported
+> -         -ENXIO: PMUv3 not properly configured as required prior to calling this
+> -                 attribute
+> +Returns: -ENODEV: PMUv3 not supported or GIC not initialized
+> +         -ENXIO: PMUv3 not properly configured or in-kernel irqchip not
+> +                 conigured as required prior to calling this attribute
+>           -EBUSY: PMUv3 already initialized
+>  
+> -Request the initialization of the PMUv3.  This must be done after creating the
+> -in-kernel irqchip.  Creating a PMU with a userspace irqchip is currently not
+> -supported.
+> +Request the initialization of the PMUv3.  If using the PMUv3 with an in-kernel
+> +virtual GIC implementation, this must be done after initializing the in-kernel
+> +irqchip.
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 4b43e7f..f046b08 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -456,21 +456,25 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+>  	if (!kvm_arm_support_pmu_v3())
+>  		return -ENODEV;
+>  
+> -	/*
+> -	 * We currently require an in-kernel VGIC to use the PMU emulation,
+> -	 * because we do not support forwarding PMU overflow interrupts to
+> -	 * userspace yet.
+> -	 */
+> -	if (!irqchip_in_kernel(vcpu->kvm) || !vgic_initialized(vcpu->kvm))
+> -		return -ENODEV;
+> -
+> -	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features) ||
+> -	    !kvm_arm_pmu_irq_initialized(vcpu))
+> +	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
+>  		return -ENXIO;
+>  
+>  	if (kvm_arm_pmu_v3_ready(vcpu))
+>  		return -EBUSY;
+>  
+> +	if (irqchip_in_kernel(vcpu->kvm)) {
+> +		/*
+> +		 * If using the PMU with an in-kernel virtual GIC
+> +		 * implementation, we require the GIC to be already
+> +		 * initialized when initializing the PMU.
+> +		 */
+> +		if (!vgic_initialized(vcpu->kvm))
+> +			return -ENODEV;
+> +
+> +		if (!kvm_arm_pmu_irq_initialized(vcpu))
+> +			return -ENXIO;
+> +	}
+> +
+>  	kvm_pmu_vcpu_reset(vcpu);
+>  	vcpu->arch.pmu.ready = true;
+>  
+> @@ -512,6 +516,9 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+>  		int __user *uaddr = (int __user *)(long)attr->addr;
+>  		int irq;
+>  
+> +		if (!irqchip_in_kernel(vcpu->kvm))
+> +			return -EINVAL;
+> +
 
-Just curious, should we take this into consideration when creating
-drm_connector?
+Shouldn't we fail the same way for {get,has}_attr? get_attr is going to
+generate a -ENXIO, and has_attr is going to lie about the availability
+of KVM_ARM_VCPU_PMU_V3_IRQ...
 
-ChenYu
+>  		if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
+>  			return -ENODEV;
+>  
+> 
 
-> +
-> +               port {
-> +                       hdmi_con_in: endpoint {
-> +                               remote-endpoint = <&hdmi_out_con>;
-> +                       };
-> +               };
-> +       };
-> +
->         leds {
->                 compatible = "gpio-leds";
->                 pinctrl-names = "default";
-> @@ -76,6 +87,10 @@
->         };
->  };
->
-> +&be0 {
-> +       status = "okay";
-> +};
-> +
->  &ehci0 {
->         status = "okay";
->  };
-> @@ -91,6 +106,16 @@
->         status = "okay";
->  };
->
-> +&hdmi {
-> +       status = "okay";
-> +};
-> +
-> +&hdmi_out {
-> +       hdmi_out_con: endpoint {
-> +               remote-endpoint = <&hdmi_con_in>;
-> +       };
-> +};
-> +
->  &i2c0 {
->         pinctrl-names = "default";
->         pinctrl-0 = <&i2c0_pins_a>;
-> @@ -248,6 +273,10 @@
->         status = "okay";
->  };
->
-> +&tcon0 {
-> +       status = "okay";
-> +};
-> +
->  &uart0 {
->         pinctrl-names = "default";
->         pinctrl-0 = <&uart0_pins_a>;
-> --
-> git-series 0.8.11
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
