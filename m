@@ -1,59 +1,63 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Fri, 05 May 2017 16:16:29 +0800
-Subject: [PATCH v2 14/20] drm/sun4i: tcon: multiply the vtotal when not in
- interlace
-In-Reply-To: <59bdbadc4d3adc6d75c2cef38df0af332bd313db.1493812478.git-series.maxime.ripard@free-electrons.com>
-References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
- <59bdbadc4d3adc6d75c2cef38df0af332bd313db.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <3683ca88e5dd7ab9f26f1c12beb15cb8@aosc.io>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 5 May 2017 10:32:28 +0200
+Subject: [PATCH V4] ARM64: dts: hi6220-hikey: Add clock binding for the
+ pmic mfd
+In-Reply-To: <20170505074821.fgnkq6lggde6gdv2@dell>
+References: <1493066439-6889-1-git-send-email-daniel.lezcano@linaro.org>
+ <20170504220721.GB5252@mai> <20170505074821.fgnkq6lggde6gdv2@dell>
+Message-ID: <20170505083228.GC5252@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-05-03 19:59?Maxime Ripard ???
-> It appears that the total vertical resolution needs to be doubled when
-> we're not in interlaced. Make sure that is the case.
+On Fri, May 05, 2017 at 08:48:21AM +0100, Lee Jones wrote:
+> On Fri, 05 May 2017, Daniel Lezcano wrote:
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> > On Mon, Apr 24, 2017 at 10:40:22PM +0200, Daniel Lezcano wrote:
+> > > The hi655x PMIC provides the regulators but also a clock. The latter is missing
+> > > in the definition and in the DT, thus it is no possible to enable the WiFi which
+> > > depends on this clock.
+> > > 
+> > > The hi655x's clock has been added and the hi655x multifunction driver has
+> > > updated with a clock-cell.
+> > > 
+> > > This patch adds the clock-cells for the PMIC in the DT and updates the
+> > > documentation.
+> > > 
+> > > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > > Acked-by: Rob Herring <robh@kernel.org>
+> > > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > > Cc: Michael Turquette <mturquette@baylibre.com>
+> > > ---
+> > >  Changelog:
+> > > 	v4:
+> > > 	   - Added Acked-by's
+> > > 	   - Updated the commit message with a better description
+> > > ---
+> > 
+> > Hi Xu Wei,
+> > 
+> > a gentle reminder for this patch. Is it ok for you?
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index 0f91ec8a4b26..efa079c1a3f5 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -272,9 +272,9 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
->  	/* Set vertical display timings */
->  	bp = mode->crtc_vtotal - mode->crtc_vsync_start;
->  	DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
-> -			 mode->vtotal, bp);
-> +			 mode->crtc_vtotal, bp);
->  	regmap_write(tcon->regs, SUN4I_TCON1_BASIC4_REG,
-> -		     SUN4I_TCON1_BASIC4_V_TOTAL(mode->vtotal) |
-> +		     SUN4I_TCON1_BASIC4_V_TOTAL(mode->crtc_vtotal * 2) |
+> a) Pings aren't usually received well.  If you wish to remind
+> maintainers of a patch's existence a [RESEND] is usually the most
+> accepted method.
+> b) There is usually little point (at least it's significantly reduced)
+> in sending pings/resends whilst the merge-window is open.  Maintainers
+> usually take this time to take a little breather (rest) from their
+> duties.
 
-For TVE the value should directly be mode->vtotal, but not
-mode->crtc_vtotal * 2.
+This patch is the last one of a series which was already merged. As the
+series has been resend and split with a different submission path, I just
+wanted to make sure there were no confusion.
 
-vtotal is 625 when PAL. crtc_vtotal is thus 312, but if we restore the
-vtotal value by doubling crtv_vtotal, we got 624, which will lead to
-instability of the image displayed. (the image will loop to go higher
-and then go lower, because wrong vtotal value)
+The sentence "a gentle reminder" is clumsy.
 
-Tested on patched H3 TV encoder.
+-- 
 
-I used a logic slightly changed from your v1 code:
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-```
-	val = mode->vtotal;
-	if (!(mode->flags & DRM_MODE_FLAG_INTERLACE))
-		val = val * 2;
-	regmap_write(tcon->regs, SUN4I_TCON1_BASIC4_REG,
-		     SUN4I_TCON1_BASIC4_V_TOTAL(val) |
-		     SUN4I_TCON1_BASIC4_V_BACKPORCH(bp));
-```
-
->  		     SUN4I_TCON1_BASIC4_V_BACKPORCH(bp));
-> 
->  	/* Set Hsync and Vsync length */
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
