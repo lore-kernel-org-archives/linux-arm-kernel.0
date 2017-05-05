@@ -1,103 +1,67 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 5 May 2017 07:54:04 -0700
-Subject: [PATCH v6 23/24] KVM: arm64: vgic-its: Fix pending table sync
-In-Reply-To: <1493898284-29504-24-git-send-email-eric.auger@redhat.com>
-References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
- <1493898284-29504-24-git-send-email-eric.auger@redhat.com>
-Message-ID: <20170505145404.GK1419@lvm>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 5 May 2017 15:55:06 +0100
+Subject: [PATCH] arm64: Add translation functions for /dev/mem read/write
+In-Reply-To: <CAKv+Gu-z8_OeTEp-4DSLtfvirKHct8sD+uThz4wseuZgHBxyoA@mail.gmail.com>
+References: <1493756885-29704-1-git-send-email-sgoel@codeaurora.org>
+ <20170503112639.GG8233@arm.com>
+ <bda22142-6b46-0e11-9d13-4bed0dcfd713@codeaurora.org>
+ <20170503201814.GP1657@bivouac.eciton.net>
+ <345a59fb-085f-a776-2d7e-4889a0f86d7f@codeaurora.org>
+ <CAKv+Gu-z8_OeTEp-4DSLtfvirKHct8sD+uThz4wseuZgHBxyoA@mail.gmail.com>
+Message-ID: <20170505145505.GF14111@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 04, 2017 at 01:44:43PM +0200, Eric Auger wrote:
-> In its_sync_lpi_pending_table() we currently ignore the
-> target_vcpu of the LPIs. We sync the pending bit found in
-> the vcpu pending table even if the LPI is not targeting it.
+On Thu, May 04, 2017 at 07:40:50AM +0100, Ard Biesheuvel wrote:
+> On 3 May 2017 at 22:47, Goel, Sameer <sgoel@codeaurora.org> wrote:
+> >
+> >
+> > On 5/3/2017 2:18 PM, Leif Lindholm wrote:
+> >> On Wed, May 03, 2017 at 11:07:45AM -0600, Goel, Sameer wrote:
+> >>> On 5/3/2017 5:26 AM, Will Deacon wrote:
+> >>>> [adding some /dev/mem fans to cc]
+> >>>>
+> >>>> On Tue, May 02, 2017 at 02:28:05PM -0600, Sameer Goel wrote:
+> >>>>> Port architecture specific xlate and unxlate functions for /dev/mem
+> >>>>> read/write. This sets up the mapping for a valid physical address if a
+> >>>>> kernel direct mapping is not already present.
+> >>>>>
+> >>>>> This is a generic issue as a user space app should not be allowed to crash
+> >>>>> the kernel.
+> >>>>
+> >>>>> This issue was observed when systemd tried to access performance
+> >>>>> pointer record from the FPDT table.
+> >>>>
+> >>>> Why is it doing that? Is there not a way to get this via /sys?
+> >>>
+> >>> There is no ACPI FPDT implementation in the kernel, so the userspace
+> >>> systemd code is getting the FPDT table contents from /sys
+> >>> and parsing the entries. The performance pointer record is a
+> >>> reserved address populated by UEFI and the userspace code tries to
+> >>> access it using /dev/mem. The physical address is valid, so cannot
+> >>> push back on the user space code.
+> >>
+> >> OK, so then we need to add support for parsing this table in the
+> >> kernel and exposing the referred-to regions in a controllable fashion.
+> >> Maybe something that belongs under /sys/firmware/efi (adding Matt), or
+> >> maybe something that deserves its own driver.
+> >>
+> >> The only two use-cases for /dev/mem on arm64 are:
+> >> - Implementing interfaces in the kernel takes up-front effort.
+> >> - Being able to accidentally panic the kernel from userland.
+> >>
+> > We will see this issue with any access using /dev/mem to a MEMBLOCK_NOMAP marked
+> > memblock. The kernel crash issue has to be fixed irrespective of ACPI FPDT support.
+> >
 > 
-> Also in vgic_its_cmd_handle_invall() we are supposed to
-> read the config table data for the LPIs associated to the
-> collection ID. At the moment we refresh all LPI config
-> information.
-> 
-> This patch passes a vpcu to vgic_copy_lpi_list() so that
-> this latter returns a snapshot of the LPIs targeting this
-> CPU and only those.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 24 ++++++++++++------------
->  1 file changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 376d963..3c114b1 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -278,13 +278,13 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
->  }
->  
->  /*
-> - * Create a snapshot of the current LPI list, so that we can enumerate all
-> - * LPIs without holding any lock.
-> - * Returns the array length and puts the kmalloc'ed array into intid_ptr.
-> + * Create a snapshot of the current LPIs targeting @vcpu, so that we can
-> + * enumerate those LPIs without holding any lock.
-> + * Returns their number and puts the kmalloc'ed array into intid_ptr.
->   */
-> -static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
-> +static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
->  {
-> -	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->  	struct vgic_irq *irq;
->  	u32 *intids;
->  	int irq_count = dist->lpi_list_count, i = 0;
-> @@ -303,14 +303,14 @@ static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
->  	spin_lock(&dist->lpi_list_lock);
->  	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
->  		/* We don't need to "get" the IRQ, as we hold the list lock. */
-> -		intids[i] = irq->intid;
-> -		if (++i == irq_count)
-> -			break;
-> +		if (irq->target_vcpu != vcpu)
-> +			continue;
-> +		intids[i++] = irq->intid;
->  	}
->  	spin_unlock(&dist->lpi_list_lock);
->  
->  	*intid_ptr = intids;
-> -	return irq_count;
-> +	return i;
->  }
->  
->  /*
-> @@ -359,7 +359,7 @@ static u32 max_lpis_propbaser(u64 propbaser)
->  }
->  
->  /*
-> - * Scan the whole LPI pending table and sync the pending bit in there
-> + * Sync the pending table pending bit of LPIs targeting @vcpu
->   * with our own data structures. This relies on the LPI being
->   * mapped before.
->   */
-> @@ -372,7 +372,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
->  	u32 *intids;
->  	int nr_irqs, i;
->  
-> -	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, &intids);
-> +	nr_irqs = vgic_copy_lpi_list(vcpu, &intids);
->  	if (nr_irqs < 0)
->  		return nr_irqs;
->  
-> @@ -1055,7 +1055,7 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
->  
->  	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
->  
-> -	irq_count = vgic_copy_lpi_list(kvm, &intids);
-> +	irq_count = vgic_copy_lpi_list(vcpu, &intids);
->  	if (irq_count < 0)
->  		return irq_count;
->  
-> -- 
-> 2.5.5
-> 
+> I reported the same issue a couple of weeks ago [0]. So while we all
+> agree that such accesses shouldn't oops the kernel, I think we may
+> disagree on whether such accesses should be allowed in the first
+> place, especially when using read/write on /dev/mem (as opposed to
+> mmap())
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Did you plan to respin those patches to address Alex's comments? I agree
+that it would be good to close the oops, regardless of the rest of the
+discussion here.
+
+Will
