@@ -1,148 +1,165 @@
-From: oza.oza@broadcom.com (Oza Oza)
-Date: Fri, 5 May 2017 13:40:40 +0530
-Subject: [PATCH 2/3] iommu/pci: reserve iova for PCI masters
-In-Reply-To: <0c9a6b09-139c-df49-cf73-6a3935a6aacd@arm.com>
-References: <1493786795-28153-1-git-send-email-oza.oza@broadcom.com>
- <1493786795-28153-2-git-send-email-oza.oza@broadcom.com>
- <0c9a6b09-139c-df49-cf73-6a3935a6aacd@arm.com>
-Message-ID: <CAMSpPPe9UExb2Wd2BeaWB0mY1fE788h57bsSZkhk5eZjcTdPpg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 5 May 2017 01:11:13 -0700
+Subject: [PATCH v6 14/24] KVM: arm64: vgic-v3:
+ vgic_v3_lpi_sync_pending_status
+In-Reply-To: <1493898284-29504-15-git-send-email-eric.auger@redhat.com>
+References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
+ <1493898284-29504-15-git-send-email-eric.auger@redhat.com>
+Message-ID: <20170505081113.GA1419@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 4, 2017 at 11:50 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 03/05/17 05:46, Oza Pawandeep wrote:
->> this patch reserves the iova for PCI masters.
->> ARM64 based SOCs may have scattered memory banks.
->> such as iproc based SOC has
->>
->> <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
->> <0x00000008 0x80000000 0x3 0x80000000>, /* 14G @ 34G */
->> <0x00000090 0x00000000 0x4 0x00000000>, /* 16G @ 576G */
->> <0x000000a0 0x00000000 0x4 0x00000000>; /* 16G @ 640G */
->>
->> but incoming PCI transcation addressing capability is limited
->> by host bridge, for example if max incoming window capability
->> is 512 GB, then 0x00000090 and 0x000000a0 will fall beyond it.
->>
->> to address this problem, iommu has to avoid allocating iovas which
->> are reserved. which inturn does not allocate iova if it falls into hole.
->
-> I don't necessarily disagree with doing this, as we could do with facing
-> up to the issue of discontiguous DMA ranges in particular (I too have a
-> platform with this problem), but I'm still not overly keen on pulling DT
-> specifics into this layer. More than that, though, if we are going to do
-> it, then we should do it for all devices with a restrictive
-> "dma-ranges", not just PCI ones.
->
+On Thu, May 04, 2017 at 01:44:34PM +0200, Eric Auger wrote:
+> this new helper synchronizes the irq pending_latch
+> with the LPI pending bit status found in rdist pending table.
+> As the status is consumed, we reset the bit in pending table.
+> 
+> As we need the PENDBASER_ADDRESS() in vgic-v3, let's move its
+> definition in the irqchip header. We restore the full length
+> of the field, ie [51:16]. Same for PROPBASER_ADDRESS with full
+> field length of [51:12].
 
-pci_create_root_bus allocates host bridge, and currently it takes only
-oubound resources.
+why into irqchip and not just the vgic header file?
 
-if inbound memory is also added as a part of  pci_create_root_bus params,
-then IOVA allocation can directly make use of inbound_windows member
-of structure pci_host_bridge.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
+> ---
+> 
+> v6: new
+> ---
+>  include/linux/irqchip/arm-gic-v3.h |  2 ++
+>  virt/kvm/arm/vgic/vgic-its.c       |  6 ++----
+>  virt/kvm/arm/vgic/vgic-v3.c        | 44 ++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h           |  1 +
+>  4 files changed, 49 insertions(+), 4 deletions(-)
+> 
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 9519c7b..e09e5d7 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -159,6 +159,8 @@
+>  #define GICR_PROPBASER_RaWaWb	GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, RaWaWb)
+>  
+>  #define GICR_PROPBASER_IDBITS_MASK			(0x1f)
+> +#define GICR_PROPBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
+> +#define GICR_PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 16))
+>  
+>  #define GICR_PENDBASER_SHAREABILITY_SHIFT		(10)
+>  #define GICR_PENDBASER_INNER_CACHEABILITY_SHIFT		(7)
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index e7bb86a..f43ea30c 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -198,8 +198,6 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+>   */
+>  #define BASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
+>  #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
+> -#define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
+> -#define PROPBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
+>  
+>  #define GIC_LPI_OFFSET 8192
+>  
+> @@ -234,7 +232,7 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
+>  static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+>  			     struct kvm_vcpu *filter_vcpu)
+>  {
+> -	u64 propbase = PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
+> +	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
+>  	u8 prop;
+>  	int ret;
+>  
+> @@ -346,7 +344,7 @@ static u32 max_lpis_propbaser(u64 propbaser)
+>   */
+>  static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+>  {
+> -	gpa_t pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
+> +	gpa_t pendbase = GICR_PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
+>  	struct vgic_irq *irq;
+>  	int last_byte_offset = -1;
+>  	int ret = 0;
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index be0f4c3..0d753ae 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -252,6 +252,50 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
+>  	vgic_v3->vgic_hcr = ICH_HCR_EN;
+>  }
+>  
+> +int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq)
+> +{
+> +	struct kvm_vcpu *vcpu;
+> +	int byte_offset, bit_nr;
+> +	gpa_t pendbase, ptr;
+> +	bool status;
+> +	u8 val;
+> +	int ret;
+> +
+> +retry:
+> +	vcpu = irq->target_vcpu;
+> +	if (!vcpu)
+> +		return 0;
+> +
+> +	pendbase = GICR_PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
+> +
+> +	byte_offset = irq->intid / BITS_PER_BYTE;
+> +	bit_nr = irq->intid % BITS_PER_BYTE;
+> +	ptr = pendbase + byte_offset;
+> +
+> +	ret = kvm_read_guest(kvm, ptr, &val, 1);
+> +	if (ret)
+> +		return ret;
+> +
+> +	status = val & (1 << bit_nr);
+> +
+> +	spin_lock(&irq->irq_lock);
+> +	if (irq->target_vcpu != vcpu) {
+> +		spin_unlock(&irq->irq_lock);
+> +		goto retry;
 
-struct pci_host_bridge {
-        struct device dev;
-        struct pci_bus *bus; /* root bus */
-        struct list_head windows; /* resource_entry */
-        struct list_head inbound_windows; /* resource_entry */
-        .
-        .
-}
+Can the guest be continuously changing the configuration of the LPI and
+cause this function to be called, which will efficiently hog this CPU
+from the system, or am I being overly cautious here?
 
-so iova_reserve_pci_windows can iterate throough
-resource_list_for_each_entry(window, &bridge->inbound_windows)
-this way we can remove the dependency of dma-iommu.c on OF layer.
+> +	}
+> +	irq->pending_latch = status;
+> +	vgic_queue_irq_unlock(vcpu->kvm, irq);
+> +
+> +	if (status) {
+> +		/* clear consumed data */
+> +		val &= ~(1 << bit_nr);
+> +		ret = kvm_write_guest(kvm, ptr, &val, 1);
+> +		if (ret)
+> +			return ret;
 
-but only thing is:
-pci_create_root_bus is called by handful of RC drivers, which needs to change.
-ideally if you see both inbound and outbound resource should belong to
-pci_host_bridge anyway.
-and inbound is completely missing.
+Do we have a problem that if this is done twice within the same byte (on
+different LPIs) then the data could be strangely out of sync?
 
-let me know your thoughts on this, Robin.
+Do we care?
 
->> Bug: SOC-5216
->> Change-Id: Icbfc99a045d730be143fef427098c937b9d46353
->> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
->> Reviewed-on: http://gerrit-ccxsw.broadcom.net/40760
->> Reviewed-by: vpx_checkpatch status <vpx_checkpatch@broadcom.com>
->> Reviewed-by: CCXSW <ccxswbuild@broadcom.com>
->> Tested-by: vpx_autobuild status <vpx_autobuild@broadcom.com>
->> Tested-by: vpx_smoketest status <vpx_smoketest@broadcom.com>
->> Tested-by: CCXSW <ccxswbuild@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>
->> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->> index 48d36ce..08764b0 100644
->> --- a/drivers/iommu/dma-iommu.c
->> +++ b/drivers/iommu/dma-iommu.c
->> @@ -27,6 +27,7 @@
->>  #include <linux/iova.h>
->>  #include <linux/irq.h>
->>  #include <linux/mm.h>
->> +#include <linux/of_pci.h>
->>  #include <linux/pci.h>
->>  #include <linux/scatterlist.h>
->>  #include <linux/vmalloc.h>
->> @@ -171,8 +172,12 @@ static void iova_reserve_pci_windows(struct pci_dev *dev,
->>               struct iova_domain *iovad)
->>  {
->>       struct pci_host_bridge *bridge = pci_find_host_bridge(dev->bus);
->> +     struct device_node *np = bridge->dev.parent->of_node;
->>       struct resource_entry *window;
->>       unsigned long lo, hi;
->> +     int ret;
->> +     dma_addr_t tmp_dma_addr = 0, dma_addr;
->> +     LIST_HEAD(res);
->>
->>       resource_list_for_each_entry(window, &bridge->windows) {
->>               if (resource_type(window->res) != IORESOURCE_MEM &&
->> @@ -183,6 +188,36 @@ static void iova_reserve_pci_windows(struct pci_dev *dev,
->>               hi = iova_pfn(iovad, window->res->end - window->offset);
->>               reserve_iova(iovad, lo, hi);
->>       }
->> +
->> +     /* PCI inbound memory reservation. */
->> +     ret = of_pci_get_dma_ranges(np, &res);
->> +     if (!ret) {
->> +             resource_list_for_each_entry(window, &res) {
->> +                     struct resource *res_dma = window->res;
->> +
->> +                     dma_addr = res_dma->start - window->offset;
->> +                     if (tmp_dma_addr > dma_addr) {
->> +                             pr_warn("PCI: failed to reserve iovas; ranges should be sorted\n");
->
-> I don't see anything in the DT spec about the entries having to be
-> sorted, and it's not exactly impossible to sort a list if you need it so
-> (and if I'm being really pedantic, one could still trigger this with a
-> list that *is* sorted, only by different criteria).
->
-> Robin.
->
->> +                             return;
->> +                     }
->> +                     if (tmp_dma_addr != dma_addr) {
->> +                             lo = iova_pfn(iovad, tmp_dma_addr);
->> +                             hi = iova_pfn(iovad, dma_addr - 1);
->> +                             reserve_iova(iovad, lo, hi);
->> +                     }
->> +                     tmp_dma_addr = window->res->end - window->offset;
->> +             }
->> +             /*
->> +              * the last dma-range should honour based on the
->> +              * 32/64-bit dma addresses.
->> +              */
->> +             if (tmp_dma_addr < DMA_BIT_MASK(sizeof(dma_addr_t) * 8)) {
->> +                     lo = iova_pfn(iovad, tmp_dma_addr);
->> +                     hi = iova_pfn(iovad,
->> +                                   DMA_BIT_MASK(sizeof(dma_addr_t) * 8) - 1);
->> +                     reserve_iova(iovad, lo, hi);
->> +             }
->> +     }
->>  }
->>
->>  /**
->>
->
+
+Thanks,
+-Christoffer
+
+> +	}
+> +	return 0;
+> +}
+> +
+>  /* check for overlapping regions and for regions crossing the end of memory */
+>  static bool vgic_v3_check_base(struct kvm *kvm)
+>  {
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index b87f1c6..309ab64 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -157,6 +157,7 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>  void vgic_v3_enable(struct kvm_vcpu *vcpu);
+>  int vgic_v3_probe(const struct gic_kvm_info *info);
+>  int vgic_v3_map_resources(struct kvm *kvm);
+> +int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq);
+>  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+>  
+>  int vgic_register_its_iodevs(struct kvm *kvm);
+> -- 
+> 2.5.5
+> 
