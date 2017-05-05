@@ -1,75 +1,100 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  5 May 2017 11:57:49 +0200
-Subject: [PATCH 06/10] dma: mv_xor_v2: remove interrupt coalescing
+Date: Fri,  5 May 2017 11:57:51 +0200
+Subject: [PATCH 08/10] dma: mv_xor_v2: implement proper interrupt coalescing
 In-Reply-To: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1493978274-12805-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1493978274-12805-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation of interrupt coalescing doesn't work, because
-it doesn't configure the coalescing timer, which is needed to make sure
-we get an interrupt at some point.
+From: Hanna Hawa <hannah@marvell.com>
 
-As a fix for stable, we simply remove the interrupt coalescing
-functionality. It will be re-introduced properly in a future commit.
+Until now, the driver was not using interrupt coalescing: one interrupt
+was generated for each descriptor processed by the XOR engine. This
+commit changes that by using the interrupt coalescing features of the
+hardware, by setting both a number of descriptors processed before an
+interrupt is generated and a timeout before an interrupt is generated.
 
-Fixes: 19a340b1a820 ("dmaengine: mv_xor_v2: new driver")
-Cc: <stable@vger.kernel.org>
+Signed-off-by: Hanna Hawa <hannah@marvell.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor_v2.c | 25 -------------------------
- 1 file changed, 25 deletions(-)
+ drivers/dma/mv_xor_v2.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
 diff --git a/drivers/dma/mv_xor_v2.c b/drivers/dma/mv_xor_v2.c
-index 4684ece..b133fe2 100644
+index f3e211f..5292ff2 100644
 --- a/drivers/dma/mv_xor_v2.c
 +++ b/drivers/dma/mv_xor_v2.c
-@@ -246,22 +246,6 @@ static int mv_xor_v2_set_desc_size(struct mv_xor_v2_device *xor_dev)
+@@ -42,6 +42,7 @@
+ #define MV_XOR_V2_DMA_IMSG_THRD_OFF			0x018
+ #define   MV_XOR_V2_DMA_IMSG_THRD_MASK			0x7FFF
+ #define   MV_XOR_V2_DMA_IMSG_THRD_SHIFT			0x0
++#define   MV_XOR_V2_DMA_IMSG_TIMER_EN			BIT(18)
+ #define MV_XOR_V2_DMA_DESQ_AWATTR_OFF			0x01C
+   /* Same flags as MV_XOR_V2_DMA_DESQ_ARATTR_OFF */
+ #define MV_XOR_V2_DMA_DESQ_ALLOC_OFF			0x04C
+@@ -55,6 +56,9 @@
+ #define MV_XOR_V2_DMA_DESQ_STOP_OFF			0x800
+ #define MV_XOR_V2_DMA_DESQ_DEALLOC_OFF			0x804
+ #define MV_XOR_V2_DMA_DESQ_ADD_OFF			0x808
++#define MV_XOR_V2_DMA_IMSG_TMOT				0x810
++#define   MV_XOR_V2_DMA_IMSG_TIMER_THRD_MASK		0x1FFF
++#define   MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT		0
+ 
+ /* XOR Global registers */
+ #define MV_XOR_V2_GLOB_BW_CTRL				0x4
+@@ -90,6 +94,13 @@
+  */
+ #define MV_XOR_V2_DESC_NUM				1024
+ 
++/*
++ * Threshold values for descriptors and timeout, determined by
++ * experimentation as giving a good level of performance.
++ */
++#define MV_XOR_V2_DONE_IMSG_THRD  0x14
++#define MV_XOR_V2_TIMER_THRD      0xB0
++
+ /**
+  * struct mv_xor_v2_descriptor - DMA HW descriptor
+  * @desc_id: used by S/W and is not affected by H/W.
+@@ -246,6 +257,29 @@ static int mv_xor_v2_set_desc_size(struct mv_xor_v2_device *xor_dev)
  	return MV_XOR_V2_EXT_DESC_SIZE;
  }
  
--/*
-- * Set the IMSG threshold
-- */
--static inline
--void mv_xor_v2_set_imsg_thrd(struct mv_xor_v2_device *xor_dev, int thrd_val)
--{
--	u32 reg;
--
--	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_THRD_OFF);
--
--	reg &= (~MV_XOR_V2_DMA_IMSG_THRD_MASK << MV_XOR_V2_DMA_IMSG_THRD_SHIFT);
--	reg |= (thrd_val << MV_XOR_V2_DMA_IMSG_THRD_SHIFT);
--
--	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_THRD_OFF);
--}
--
++/*
++ * Set the IMSG threshold
++ */
++static inline
++void mv_xor_v2_enable_imsg_thrd(struct mv_xor_v2_device *xor_dev)
++{
++	u32 reg;
++
++	/* Configure threshold of number of descriptors, and enable timer */
++	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_THRD_OFF);
++	reg &= (~MV_XOR_V2_DMA_IMSG_THRD_MASK << MV_XOR_V2_DMA_IMSG_THRD_SHIFT);
++	reg |= (MV_XOR_V2_DONE_IMSG_THRD << MV_XOR_V2_DMA_IMSG_THRD_SHIFT);
++	reg |= MV_XOR_V2_DMA_IMSG_TIMER_EN;
++	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_THRD_OFF);
++
++	/* Configure Timer Threshold */
++	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_TMOT);
++	reg &= (~MV_XOR_V2_DMA_IMSG_TIMER_THRD_MASK <<
++		MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT);
++	reg |= (MV_XOR_V2_TIMER_THRD << MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT);
++	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_TMOT);
++}
++
  static irqreturn_t mv_xor_v2_interrupt_handler(int irq, void *data)
  {
  	struct mv_xor_v2_device *xor_dev = data;
-@@ -277,12 +261,6 @@ static irqreturn_t mv_xor_v2_interrupt_handler(int irq, void *data)
- 	if (!ndescs)
- 		return IRQ_NONE;
+@@ -795,6 +829,8 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
+ 	list_add_tail(&xor_dev->dmachan.device_node,
+ 		      &dma_dev->channels);
  
--	/*
--	 * Update IMSG threshold, to disable new IMSG interrupts until
--	 * end of the tasklet
--	 */
--	mv_xor_v2_set_imsg_thrd(xor_dev, MV_XOR_V2_DESC_NUM);
--
- 	/* schedule a tasklet to handle descriptors callbacks */
- 	tasklet_schedule(&xor_dev->irq_tasklet);
++	mv_xor_v2_enable_imsg_thrd(xor_dev);
++
+ 	mv_xor_v2_descq_init(xor_dev);
  
-@@ -607,9 +585,6 @@ static void mv_xor_v2_tasklet(unsigned long data)
- 		/* free the descriptores */
- 		mv_xor_v2_free_desc_from_desq(xor_dev, num_of_pending);
- 	}
--
--	/* Update IMSG threshold, to enable new IMSG interrupts */
--	mv_xor_v2_set_imsg_thrd(xor_dev, 0);
- }
- 
- /*
+ 	ret = dma_async_device_register(dma_dev);
 -- 
 2.7.4
