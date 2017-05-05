@@ -1,142 +1,106 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 5 May 2017 15:23:40 +0200
-Subject: [PATCH V8 07/11] iommu: of: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <26defadf-6380-4af4-6323-b51198376bc1@codeaurora.org>
-References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
- <1486136933-20328-8-git-send-email-sricharan@codeaurora.org>
- <CAMuHMdV05uCcVss+V1E+_OQYosJO6P95rU1WynV-G08-iHJnyg@mail.gmail.com>
- <2bfd11dc-9f94-2b69-7b03-c640e53155e1@arm.com>
- <26defadf-6380-4af4-6323-b51198376bc1@codeaurora.org>
-Message-ID: <CAMuHMdUoLp1oVT_=NG8HS-jgG6AhOeVUsGgu7fLbGY+7A+0cOg@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 5 May 2017 15:27:17 +0200
+Subject: [PATCH V15 08/11] efi: print unrecognized CPER section
+In-Reply-To: <1492556723-9189-9-git-send-email-tbaicar@codeaurora.org>
+References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
+ <1492556723-9189-9-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20170505132717.zodffuha46f3q5sj@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan, Robin,
+On Tue, Apr 18, 2017 at 05:05:20PM -0600, Tyler Baicar wrote:
+> UEFI spec allows for non-standard section in Common Platform Error
+> Record. This is defined in section N.2.3 of UEFI version 2.5.
+> 
+> Currently if the CPER section's type (UUID) does not match with
+> one of the section types that the kernel knows how to parse, the
+> section is skipped. Therefore, user is not able to see
+> such CPER data, for instance, error record of non-standard section.
+> 
+> For above mentioned case, this change prints out the raw data in
+> hex in dmesg buffer.
 
-On Wed, May 3, 2017 at 12:24 PM, Sricharan R <sricharan@codeaurora.org> wrote:
-> On 5/3/2017 3:24 PM, Robin Murphy wrote:
->> On 02/05/17 19:35, Geert Uytterhoeven wrote:
->>> On Fri, Feb 3, 2017 at 4:48 PM, Sricharan R <sricharan@codeaurora.org> wrote:
->>>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
->>>>
->>>> Failures to look up an IOMMU when parsing the DT iommus property need to
->>>> be handled separately from the .of_xlate() failures to support deferred
->>>> probing.
->>>>
->>>> The lack of a registered IOMMU can be caused by the lack of a driver for
->>>> the IOMMU, the IOMMU device probe not having been performed yet, having
->>>> been deferred, or having failed.
->>>>
->>>> The first case occurs when the device tree describes the bus master and
->>>> IOMMU topology correctly but no device driver exists for the IOMMU yet
->>>> or the device driver has not been compiled in. Return NULL, the caller
->>>> will configure the device without an IOMMU.
->>>>
->>>> The second and third cases are handled by deferring the probe of the bus
->>>> master device which will eventually get reprobed after the IOMMU.
->>>>
->>>> The last case is currently handled by deferring the probe of the bus
->>>> master device as well. A mechanism to either configure the bus master
->>>> device without an IOMMU or to fail the bus master device probe depending
->>>> on whether the IOMMU is optional or mandatory would be a good
->>>> enhancement.
->>>>
->>>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>>> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
->>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->>>
->>> This patch broke Renesas R-Car Gen3 platforms in renesas-drivers.
->>> As the IOMMU nodes in DT are not yet enabled, all devices having iommus
->>> properties in DT now fail to probe.
->>
->> How exactly do they fail to probe? Per d7b0558230e4, if there are no ops
->> registered then they should merely defer until we reach the point of
->> giving up and ignoring the IOMMU. Is it just that you have no other
->> late-probing drivers or post-init module loads to kick the deferred
->> queue after that point? I did try to find a way to explicitly kick it
->> from a suitably late initcall, but there didn't seem to be any obvious
->> public interface - anyone have any suggestions?
->>
->> I think that's more of a general problem with the probe deferral
->> mechanism itself (I've seen the same thing happen with some of the
->> CoreSight stuff on Juno due to the number of inter-component
->> dependencies) rather than any specific fault of this series.
+... because? We'd need the reason why we're not ignoring those errors
+anymore.
 
-I had a deeper look into the issue.
+>  Data length is taken from Error Data length
+> field of Generic Error Data Entry.
+> 
+> The following is a sample output from dmesg:
+> [  140.739180] {1}[Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
+> [  140.739182] {1}[Hardware Error]: It has been corrected by h/w and requires no further action
+> [  140.739191] {1}[Hardware Error]: event severity: corrected
+> [  140.739196] {1}[Hardware Error]:  time: precise 2017-03-15 20:37:35
+> [  140.739197] {1}[Hardware Error]:  Error 0, type: corrected
+> [  140.739203] {1}[Hardware Error]:   section type: unknown, d2e2621c-f936-468d-0d84-15a4ed015c8b
+> [  140.739205] {1}[Hardware Error]:   section length: 568 (0x238)
+> [  140.739210] {1}[Hardware Error]:   00000000: 4d415201 4d492031 453a4d45 435f4343  .RAM1 IMEM:ECC_C
+> [  140.739214] {1}[Hardware Error]:   00000010: 53515f45 44525f42 00000000 00000000  E_QSB_RD........
+> [  140.739217] {1}[Hardware Error]:   00000020: 00000000 00000000 00000000 00000000  ................
+> [  140.739220] {1}[Hardware Error]:   00000030: 00000000 00000000 01010000 01010000  ................
+> [  140.739223] {1}[Hardware Error]:   00000040: 00000000 00000000 00000005 00000000  ................
+> [  140.739226] {1}[Hardware Error]:   00000050: 01010000 00000000 00000001 00dddd00  ................
 
-What changed, is that of_dma_configure() now returns an error code,
-and dma_configure() looks at it.
+Kill all those prefixes:
 
-Actually there are two failure modes:
-  1. Devices with an iommus property pointing to a disabled IOMMU node.
-     These return -EPROBE_DEFER, and are now retried forever.
-  2. Devices that are blacklisted in the IPMMU driver, as we don't want to
-     use them with an IOMMU yet.
-     These return -ENODEV, due to ipmmu_of_xlate_dma().
+" Hardware error from APEI Generic Hardware Error Source: 2
+  It has been corrected by h/w and requires no further action
+  event severity: corrected
+   time: precise 2017-03-15 20:37:35
+   Error 0, type: corrected
+    section type: unknown, d2e2621c-f936-468d-0d84-15a4ed015c8b
+    section length: 568 (0x238)
+    00000000: 4d415201 4d492031 453a4d45 435f4343  .RAM1 IMEM:ECC_C
+    00000010: 53515f45 44525f42 00000000 00000000  E_QSB_RD........
+    00000020: 00000000 00000000 00000000 00000000  ................
+    00000030: 00000000 00000000 01010000 01010000  ................
+    00000040: 00000000 00000000 00000005 00000000  ................
+    00000050: 01010000 00000000 00000001 00dddd00  ................
+"
 
-> I was thinking of an additional check like below to avoid the
-> situation ?
->
-> From 499b6e662f60f23740b8880882b0a16f16434501 Mon Sep 17 00:00:00 2001
-> From: Sricharan R <sricharan@codeaurora.org>
-> Date: Wed, 3 May 2017 13:16:59 +0530
-> Subject: [PATCH] iommu: of: Fix check for returning EPROBE_DEFER
->
-> While returning EPROBE_DEFER for iommu masters
-> take in to account of iommu nodes that could be
-> marked in DT as 'status=disabled', in which case
-> simply return NULL and let the master's probe
-> continue rather than deferring.
->
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+to the important info only.
+
+
+> ...
+> 
+> The raw data from the error can then be decoded using vendor
+> specific tools.
+> 
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Reviewed-by: James Morse <james.morse@arm.com>
 > ---
->  drivers/iommu/of_iommu.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index 9f44ee8..e6e9bec 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -118,6 +118,7 @@ static bool of_iommu_driver_present(struct device_node *np)
->
->         ops = iommu_ops_from_fwnode(fwnode);
->         if ((ops && !ops->of_xlate) ||
-> +           !of_device_is_available(iommu_spec->np) ||
->             (!ops && !of_iommu_driver_present(iommu_spec->np)))
->                 return NULL;
+>  drivers/firmware/efi/cper.c | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+> index f959185..610d31a 100644
+> --- a/drivers/firmware/efi/cper.c
+> +++ b/drivers/firmware/efi/cper.c
+> @@ -596,8 +596,16 @@ static void cper_estatus_timestamp(const char *pfx,
+>  			cper_print_proc_arm(newpfx, arm_err);
+>  		else
+>  			goto err_section_too_small;
+> -	} else
+> -		printk("%s""section type: unknown, %pUl\n", newpfx, sec_type);
+> +	} else {
+> +		const void *unknown_err;
+> +
+> +		unknown_err = acpi_hest_get_payload(gdata);
 
-Thanks, this fixes the first class of failures.
+Simply:
 
-The second class can be worked around using:
+	const void *err = acpi_hest_get_payload(gdata);
 
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -196,6 +196,11 @@ static const struct iommu_ops
-                ops = of_iommu_xlate(dev, &iommu_spec);
-                of_node_put(iommu_spec.np);
-                idx++;
-+               if (PTR_ERR(ops) == -ENODEV) {
-+                       dev_info(dev, "%s: Ignoring -ENODEV => NULL\n",
-+                                __func__);
-+                       return NULL;
-+               }
-                if (IS_ERR_OR_NULL(ops))
-                        break;
-        }
+Short and sweet.
 
-but obviously that's too hackish to apply...
-Magnus, do you have a suggestion?
+> +		printk("%ssection type: unknown, %pUl\n", newpfx, sec_type);
+> +		printk("%ssection length: %d (%#x)\n", newpfx,
 
-Thanks!
+One number format is fine.
 
-Gr{oetje,eeting}s,
+-- 
+Regards/Gruss,
+    Boris.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Good mailing practices for 400: avoid top-posting and trim the reply.
