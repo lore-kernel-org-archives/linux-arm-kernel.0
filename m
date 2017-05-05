@@ -1,197 +1,70 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 5 May 2017 04:55:07 -0700
-Subject: [PATCH v6 16/24] KVM: arm64: vgic-its:
- KVM_DEV_ARM_ITS_SAVE/RESTORE_TABLES
-In-Reply-To: <1493898284-29504-17-git-send-email-eric.auger@redhat.com>
-References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
- <1493898284-29504-17-git-send-email-eric.auger@redhat.com>
-Message-ID: <20170505115507.GD1419@lvm>
+From: oza.oza@broadcom.com (Oza Pawandeep)
+Date: Fri,  5 May 2017 17:27:15 +0530
+Subject: [PATCH v2 0/3] OF/PCI address PCI inbound memory limitations
+Message-ID: <1493985437-2748-1-git-send-email-oza.oza@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 04, 2017 at 01:44:36PM +0200, Eric Auger wrote:
-> Introduce new attributes in KVM_DEV_ARM_VGIC_GRP_CTRL group:
-> - KVM_DEV_ARM_ITS_SAVE_TABLES: saves the ITS tables into guest RAM
-> - KVM_DEV_ARM_ITS_RESTORE_TABLES: restores them into VGIC internal
->   structures.
-> 
-> We hold the vcpus lock during the save and restore to make
-> sure no vcpu is running.
-> 
-> At this stage the functionality is not yet implemented. Only
-> the skeleton is put in place.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> v5 -> v6:
-> - remove the pending table sync from the ITS table restore
-> 
-> v4 -> v5:
-> - use KVM_DEV_ARM_ITS_SAVE_TABLES and KVM_DEV_ARM_ITS_RESTORE_TABLES
-> - rename *flush* into *save*
-> - call its_sync_lpi_pending_table at the end of restore
-> - use abi framework
-> 
-> v3 -> v4:
-> - pass kvm struct handle to vgic_its_flush/restore_pending_tables
-> - take the kvm lock and vcpu locks
-> - ABI revision check
-> - check attr->attr is null
-> 
-> v1 -> v2:
-> - remove useless kvm parameter
-> ---
->  arch/arm/include/uapi/asm/kvm.h   |   4 +-
->  arch/arm64/include/uapi/asm/kvm.h |   4 +-
->  virt/kvm/arm/vgic/vgic-its.c      | 101 ++++++++++++++++++++++++++++++++++++--
->  3 files changed, 103 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index 4beb83b..8e6563c 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -199,7 +199,9 @@ struct kvm_arch_memory_slot {
->  #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK 0x3ff
->  #define VGIC_LEVEL_INFO_LINE_LEVEL	0
->  
-> -#define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
-> +#define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
-> +#define   KVM_DEV_ARM_ITS_SAVE_TABLES		1
-> +#define   KVM_DEV_ARM_ITS_RESTORE_TABLES	2
->  
->  /* KVM_IRQ_LINE irq field index values */
->  #define KVM_ARM_IRQ_TYPE_SHIFT		24
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 7e8dd69..1e35115 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -219,7 +219,9 @@ struct kvm_arch_memory_slot {
->  #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x3ff
->  #define VGIC_LEVEL_INFO_LINE_LEVEL	0
->  
-> -#define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
-> +#define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
-> +#define   KVM_DEV_ARM_ITS_SAVE_TABLES           1
-> +#define   KVM_DEV_ARM_ITS_RESTORE_TABLES        2
->  
->  /* Device Control API on vcpu fd */
->  #define KVM_ARM_VCPU_PMU_V3_CTRL	0
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 3ad615a..5b251dc 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1669,12 +1669,68 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
->  }
->  
->  /**
-> + * vgic_its_save_device_tables - Save the device table and all ITT
-> + * into guest RAM
-> + */
-> +static int vgic_its_save_device_tables(struct vgic_its *its)
-> +{
-> +	return -ENXIO;
-> +}
-> +
-> +/**
-> + * vgic_its_restore_device_tables - Restore the device table and all ITT
-> + * from guest RAM to internal data structs
-> + */
-> +static int vgic_its_restore_device_tables(struct vgic_its *its)
-> +{
-> +	return -ENXIO;
-> +}
-> +
-> +/**
-> + * vgic_its_save_collection_table - Save the collection table into
-> + * guest RAM
-> + */
-> +static int vgic_its_save_collection_table(struct vgic_its *its)
-> +{
-> +	return -ENXIO;
-> +}
-> +
-> +/**
-> + * vgic_its_restore_collection_table - reads the collection table
-> + * in guest memory and restores the ITS internal state. Requires the
-> + * BASER registers to be restored before.
-> + */
-> +static int vgic_its_restore_collection_table(struct vgic_its *its)
-> +{
-> +	return -ENXIO;
-> +}
-> +
-> +/**
->   * vgic_its_save_tables_v0 - Save the ITS tables into guest ARM
->   * according to v0 ABI
->   */
->  static int vgic_its_save_tables_v0(struct vgic_its *its)
->  {
-> -	return -ENXIO;
-> +	struct kvm *kvm = its->dev->kvm;
-> +	int ret;
-> +
-> +	mutex_lock(&kvm->lock);
-> +
-> +	if (!lock_all_vcpus(kvm)) {
-> +		mutex_unlock(&kvm->lock);
-> +		return -EBUSY;
-> +	}
-> +
-> +	ret = vgic_its_save_device_tables(its);
-> +	if (ret)
-> +		goto out;
-> +
-> +	ret = vgic_its_save_collection_table(its);
-> +
-> +out:
-> +	unlock_all_vcpus(kvm);
-> +	mutex_unlock(&kvm->lock);
-> +	return ret;
->  }
->  
->  /**
-> @@ -1684,7 +1740,34 @@ static int vgic_its_save_tables_v0(struct vgic_its *its)
->   */
->  static int vgic_its_restore_tables_v0(struct vgic_its *its)
->  {
-> -	return -ENXIO;
-> +	struct kvm *kvm = its->dev->kvm;
-> +	int ret;
-> +
-> +	mutex_lock(&kvm->lock);
-> +
-> +	if (!lock_all_vcpus(kvm)) {
-> +		mutex_unlock(&kvm->lock);
-> +		return -EBUSY;
-> +	}
-> +
-> +	ret = vgic_its_restore_collection_table(its);
-> +	if (ret)
-> +		goto out;
-> +
-> +	ret = vgic_its_restore_device_tables(its);
-> +
-> +out:
-> +	unlock_all_vcpus(kvm);
-> +	mutex_unlock(&kvm->lock);
-> +
-> +	if (ret)
-> +		return ret;
-> +
-> +	/*
-> +	 * On restore path, MSI injections can happen before the
-> +	 * first VCPU run so let's complete the GIC init here.
-> +	 */
-> +	return kvm_vgic_map_resources(its->dev->kvm);
+It is possible that PCI device supports 64-bit DMA addressing,
+and thus it's driver sets device's dma_mask to DMA_BIT_MASK(64),
+however PCI host bridge may have limitations on the inbound 
+transaction addressing.
 
-So not sure where we left this one in our other discussion.  I feel like
-this is a bit out of place currently, and registering the iodevs should
-rather be done when setting the base addresses used by that, but I think
-we can fix that later, or are we implying ordering towards userspace
-here?
+This is particularly problematic on ARM/ARM64 SOCs where the 
+IOMMU (i.e. SMMU) translates IOVA to PA for in-bound transactions
+only after PCI Host has forwarded these transactions on SOC IO bus. 
 
-Marc, any thoughts?
+This means, on such ARM/ARM64 SOCs the IOVA of in-bound transactions
+has to honor the addressing restrictions of the PCI Host.
 
-Thanks,
--Christoffer
+Current device framework and OF framework integration assumes
+dma-ranges in a way where memory-mapped devices define their
+dma-ranges. (child-bus-address, parent-bus-address, length).
+
+of_dma_configure is specifically written to take care of memory
+mapped devices but no implementation exists for pci devices.
+
+For e.g. iproc based SOCs and other SOCs (such as rcar) have
+PCI world dma-ranges.
+dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+
+This patchset
+reserves the IOVA ranges for PCI masters based
+on the PCI world dma-ranges.
+fix of_dma_get_range to cater to PCI dma-ranges.
+fix of_dma_get_range which currently returns size 0 for PCI devices.
+
+IOVA allocation patch:
+[PATCH 2/3] iommu/pci: reserve iova for PCI masters
+
+Fix of_dma_get_range bug and address PCI master.
+[PATCH 3/3] PCI/of fix of_dma_get_range; get PCI specific
+
+Base patch for both of the above patches:
+[PATCH 1/3] of/pci/dma: fix DMA configuration for PCI masters
+
+Changes since v2:
+- Remove internal detailes such as reviewed by	
+
+Changes since v1:
+- Remove internal GERRIT details from patch descriptions
+- address Rob's comments.
+- Add a get_dma_ranges() function to of_bus struct..
+- Convert existing contents of this function to of_bus_default_dma_get_ranges
+  and adding that to the default of_bus struct.
+- Make of_dma_get_range call of_bus_match() and then bus->get_dma_ranges.
+- no revison for [PATCH 2/3] iommu/pci: reserve iova for PCI masters; since under discussion with Robin
+  
+Oza Pawandeep (3):
+  of/pci/dma: fix DMA configuration for PCI masters
+  iommu/pci: reserve iova for PCI masters
+  PCI/of fix of_dma_get_range; get PCI specific dma-ranges
+
+ drivers/iommu/dma-iommu.c | 35 +++++++++++++++++++++
+ drivers/of/address.c      | 52 ++++++++++++++++++++++++++++++++
+ drivers/of/of_pci.c       | 77 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_pci.h    |  7 +++++
+ 4 files changed, 171 insertions(+)
+
+-- 
+1.9.1
