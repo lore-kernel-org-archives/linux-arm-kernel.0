@@ -1,138 +1,113 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Fri, 5 May 2017 15:18:30 -0700
-Subject: [PATCH v9 1/4] syscalls: Verify address limit before returning to
- user-mode
-In-Reply-To: <20170428153213.137279-1-thgarnie@google.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
-Message-ID: <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Sat, 6 May 2017 00:18:44 +0200
+Subject: [PATCH v3 2/7] iommu/arm-smmu-v3: Do resource size checks based
+ on SMMU
+In-Reply-To: <1493986091-30521-3-git-send-email-gakula@caviumnetworks.com>
+References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
+ <1493986091-30521-3-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <20170505221844.GW16981@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 8:32 AM, Thomas Garnier <thgarnie@google.com> wrote:
-> Ensure that a syscall does not return to user-mode with a kernel address
-> limit. If that happens, a process can corrupt kernel-mode memory and
-> elevate privileges [1].
->
-> The CONFIG_ADDR_LIMIT_CHECK option disables the generic check so each
-> architecture can create optimized versions. This option is enabled by
-> default on s390 because a similar feature already exists.
->
-> [1] https://bugs.chromium.org/p/project-zero/issues/detail?id=990
->
-> Signed-off-by: Thomas Garnier <thgarnie@google.com>
-> Tested-by: Kees Cook <keescook@chromium.org>
-
-Ingo: Do you want to take the set?
-
+On 05.05.17 17:38:06, Geetha sowjanya wrote:
+> From: Linu Cherian <linu.cherian@cavium.com>
+> 
+> With implementations supporting only page 0 register space,
+> resource size can be 64k as well and hence perform size checks
+> based on SMMU option PAGE0_REGS_ONLY.
+> 
+> For this, arm_smmu_device_dt_probe/acpi_probe has been moved before
+> platform_get_resource call, so that SMMU options are set beforehand.
+> 
+> Signed-off-by:  Linu Cherian <linu.cherian@cavium.com>
+> Signed-off-by:  Geetha Sowjanya <geethasowjanya.akula@cavium.com>
 > ---
-> Based on next-20170426
-> ---
->  arch/s390/Kconfig        |  1 +
->  include/linux/syscalls.h | 27 ++++++++++++++++++++++++++-
->  init/Kconfig             |  6 ++++++
->  kernel/sys.c             | 13 +++++++++++++
->  4 files changed, 46 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-> index d25435d94b6e..3d2ec084d5fc 100644
-> --- a/arch/s390/Kconfig
-> +++ b/arch/s390/Kconfig
-> @@ -64,6 +64,7 @@ config ARCH_SUPPORTS_UPROBES
->
->  config S390
->         def_bool y
-> +       select ADDR_LIMIT_CHECK
->         select ARCH_HAS_DEVMEM_IS_ALLOWED
->         select ARCH_HAS_ELF_RANDOMIZE
->         select ARCH_HAS_GCOV_PROFILE_ALL
-> diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-> index 980c3c9b06f8..e534b93ce43a 100644
-> --- a/include/linux/syscalls.h
-> +++ b/include/linux/syscalls.h
-> @@ -191,6 +191,28 @@ extern struct trace_event_functions exit_syscall_print_funcs;
->         SYSCALL_METADATA(sname, x, __VA_ARGS__)                 \
->         __SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
->
-> +
-> +/*
-> + * Called before coming back to user-mode. Returning to user-mode with an
-> + * address limit different than USER_DS can allow to overwrite kernel memory.
-> + */
-> +static inline void addr_limit_check_syscall(void)
-> +{
-> +       BUG_ON(!segment_eq(get_fs(), USER_DS));
-> +}
-> +
-> +#ifndef CONFIG_ADDR_LIMIT_CHECK
-> +#define ADDR_LIMIT_CHECK_PRE() \
-> +       bool user_caller = segment_eq(get_fs(), USER_DS)
-> +#define ADDR_LIMIT_CHECK_POST() \
-> +       if (user_caller) addr_limit_check_syscall()
-> +#else
-> +#define ADDR_LIMIT_CHECK_PRE()
-> +#define ADDR_LIMIT_CHECK_POST()
-> +asmlinkage void addr_limit_check_failed(void) __noreturn;
-> +#endif
-> +
-> +
->  #define __PROTECT(...) asmlinkage_protect(__VA_ARGS__)
->  #define __SYSCALL_DEFINEx(x, name, ...)                                        \
->         asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))       \
-> @@ -199,7 +221,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
->         asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));      \
->         asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))       \
->         {                                                               \
-> -               long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));  \
-> +               long ret;                                               \
-> +               ADDR_LIMIT_CHECK_PRE();                                 \
-> +               ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));       \
-> +               ADDR_LIMIT_CHECK_POST();                                \
->                 __MAP(x,__SC_TEST,__VA_ARGS__);                         \
->                 __PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));       \
->                 return ret;                                             \
-> diff --git a/init/Kconfig b/init/Kconfig
-> index 42a346b0df43..599d9fe30703 100644
-> --- a/init/Kconfig
-> +++ b/init/Kconfig
-> @@ -1961,6 +1961,12 @@ config PROFILING
->  config TRACEPOINTS
->         bool
->
-> +config ADDR_LIMIT_CHECK
-> +       bool
-> +       help
-> +         Disable the generic address limit check. Allow each architecture to
-> +         optimize how and when the verification is done.
-> +
->  source "arch/Kconfig"
->
->  endmenu                # General setup
-> diff --git a/kernel/sys.c b/kernel/sys.c
-> index 8a94b4eabcaa..a1cbcd715d62 100644
-> --- a/kernel/sys.c
-> +++ b/kernel/sys.c
-> @@ -2458,3 +2458,16 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
->         return 0;
+>  drivers/iommu/arm-smmu-v3.c | 26 +++++++++++++++++---------
+>  1 file changed, 17 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 107b4a6..f027676 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -2672,6 +2672,14 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+>  	return ret;
 >  }
->  #endif /* CONFIG_COMPAT */
-> +
-> +#ifdef CONFIG_ADDR_LIMIT_CHECK
-> +/*
-> + * Used when an architecture specific implementation detects an invalid address
-> + * limit. This function does not return.
-> + */
-> +asmlinkage void addr_limit_check_failed(void)
+>  
+> +static unsigned long arm_smmu_resource_size(struct arm_smmu_device *smmu)
 > +{
-> +       /* Try to fail on the generic address limit check */
-> +       addr_limit_check_syscall();
-> +       panic("Invalid address limit before returning to user-mode");
+> +	if (ARM_SMMU_PAGE0_REGS_ONLY(smmu))
+> +		return SZ_64K;
+> +	else
+> +		return SZ_128K;
 > +}
-> +#endif
-> --
-> 2.13.0.rc0.306.g87b477812d-goog
->
+> +
 
+I think this can be dropped. See below.
 
+>  static int arm_smmu_device_probe(struct platform_device *pdev)
+>  {
+>  	int irq, ret;
+> @@ -2688,9 +2696,17 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+>  	}
+>  	smmu->dev = dev;
+>  
+> +	if (dev->of_node) {
+> +		ret = arm_smmu_device_dt_probe(pdev, smmu);
+> +	} else {
+> +		ret = arm_smmu_device_acpi_probe(pdev, smmu);
+> +		if (ret == -ENODEV)
+> +			return ret;
+> +	}
+> +
+>  	/* Base address */
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (resource_size(res) + 1 < SZ_128K) {
+> +	if (resource_size(res) + 1 < arm_smmu_resource_size(smmu)) {
+>  		dev_err(dev, "MMIO region too small (%pr)\n", res);
+>  		return -EINVAL;
+>  	}
 
--- 
-Thomas
+Why not just do the follwoing here:
+
+ 	/* Base address */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (resource_size(res) + 1 < arm_smmu_resource_size(smmu)) {
+ 		dev_err(dev, "MMIO region too small (%pr)\n", res);
+ 		return -EINVAL;
+ 	}
+ 	ioaddr = res->start;
+
++	/*
++	 * Override the size, for Cavium ThunderX2 implementation
++	 * which doesn't support the page 1 SMMU register space.
++	 */
++	if (smmu->options & ARM_SMMU_OPT_PAGE0_REGS_ONLY)
++		res->end = res->size + SZ_64K -1;
++
+ 	smmu->base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(smmu->base))
+ 		return PTR_ERR(smmu->base);
+
+Since we can drop patch #5 then, the fix would be isolated to this
+file only. And we can use smmu->options as the onle check for this.
+
+-Robert
+
+> @@ -2717,14 +2733,6 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+>  	if (irq > 0)
+>  		smmu->gerr_irq = irq;
+>  
+> -	if (dev->of_node) {
+> -		ret = arm_smmu_device_dt_probe(pdev, smmu);
+> -	} else {
+> -		ret = arm_smmu_device_acpi_probe(pdev, smmu);
+> -		if (ret == -ENODEV)
+> -			return ret;
+> -	}
+> -
+>  	/* Set bypass mode according to firmware probing result */
+>  	bypass = !!ret;
+>  
+> -- 
+> 1.8.3.1
+> 
