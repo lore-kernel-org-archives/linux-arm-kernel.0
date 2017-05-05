@@ -1,146 +1,142 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Fri, 5 May 2017 21:19:12 +0800
-Subject: [PATCH v3 2/3] arm64: kvm: inject SError with virtual syndrome
-In-Reply-To: <5908A7CE.7030008@arm.com>
-References: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
- <1493530677-4919-2-git-send-email-gengdongjiu@huawei.com>
- <5908A7CE.7030008@arm.com>
-Message-ID: <bbceff7a-1ebf-e6de-abc6-e35b71c939f1@huawei.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 5 May 2017 15:23:40 +0200
+Subject: [PATCH V8 07/11] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <26defadf-6380-4af4-6323-b51198376bc1@codeaurora.org>
+References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
+ <1486136933-20328-8-git-send-email-sricharan@codeaurora.org>
+ <CAMuHMdV05uCcVss+V1E+_OQYosJO6P95rU1WynV-G08-iHJnyg@mail.gmail.com>
+ <2bfd11dc-9f94-2b69-7b03-c640e53155e1@arm.com>
+ <26defadf-6380-4af4-6323-b51198376bc1@codeaurora.org>
+Message-ID: <CAMuHMdUoLp1oVT_=NG8HS-jgG6AhOeVUsGgu7fLbGY+7A+0cOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi james,
+Hi Sricharan, Robin,
 
-   Thanks for your detailed suggestion.
+On Wed, May 3, 2017 at 12:24 PM, Sricharan R <sricharan@codeaurora.org> wrote:
+> On 5/3/2017 3:24 PM, Robin Murphy wrote:
+>> On 02/05/17 19:35, Geert Uytterhoeven wrote:
+>>> On Fri, Feb 3, 2017 at 4:48 PM, Sricharan R <sricharan@codeaurora.org> wrote:
+>>>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+>>>>
+>>>> Failures to look up an IOMMU when parsing the DT iommus property need to
+>>>> be handled separately from the .of_xlate() failures to support deferred
+>>>> probing.
+>>>>
+>>>> The lack of a registered IOMMU can be caused by the lack of a driver for
+>>>> the IOMMU, the IOMMU device probe not having been performed yet, having
+>>>> been deferred, or having failed.
+>>>>
+>>>> The first case occurs when the device tree describes the bus master and
+>>>> IOMMU topology correctly but no device driver exists for the IOMMU yet
+>>>> or the device driver has not been compiled in. Return NULL, the caller
+>>>> will configure the device without an IOMMU.
+>>>>
+>>>> The second and third cases are handled by deferring the probe of the bus
+>>>> master device which will eventually get reprobed after the IOMMU.
+>>>>
+>>>> The last case is currently handled by deferring the probe of the bus
+>>>> master device as well. A mechanism to either configure the bus master
+>>>> device without an IOMMU or to fail the bus master device probe depending
+>>>> on whether the IOMMU is optional or mandatory would be a good
+>>>> enhancement.
+>>>>
+>>>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
+>>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>>>
+>>> This patch broke Renesas R-Car Gen3 platforms in renesas-drivers.
+>>> As the IOMMU nodes in DT are not yet enabled, all devices having iommus
+>>> properties in DT now fail to probe.
+>>
+>> How exactly do they fail to probe? Per d7b0558230e4, if there are no ops
+>> registered then they should merely defer until we reach the point of
+>> giving up and ignoring the IOMMU. Is it just that you have no other
+>> late-probing drivers or post-init module loads to kick the deferred
+>> queue after that point? I did try to find a way to explicitly kick it
+>> from a suitably late initcall, but there didn't seem to be any obvious
+>> public interface - anyone have any suggestions?
+>>
+>> I think that's more of a general problem with the probe deferral
+>> mechanism itself (I've seen the same thing happen with some of the
+>> CoreSight stuff on Juno due to the number of inter-component
+>> dependencies) rather than any specific fault of this series.
 
-On 2017/5/2 23:37, James Morse wrote:
-> Hi Dongjiu Geng,
-> 
-> On 30/04/17 06:37, Dongjiu Geng wrote:
->> when SError happen, kvm notifies kvmtool to generate GHES table
->> to record the error, then kvmtools inject the SError with specified
->> virtual syndrome. when switch to guest, a virtual SError will happen with
->> this specified syndrome.
-> 
-> GHES records in the HEST (T)able have to be generated before the OS starts as
-> these are read at boot. Did you mean generate CPER records?
- you are quite right that should generate CPER records.
+I had a deeper look into the issue.
 
+What changed, is that of_dma_configure() now returns an error code,
+and dma_configure() looks at it.
 
-> 
-> 
-> It looks like this is based on the earlier SEI series, please work together and
-> post a combined series when there are changes. (It also good to summarise the
-> changes in the cover letter.)
-Ok.
+Actually there are two failure modes:
+  1. Devices with an iommus property pointing to a disabled IOMMU node.
+     These return -EPROBE_DEFER, and are now retried forever.
+  2. Devices that are blacklisted in the IPMMU driver, as we don't want to
+     use them with an IOMMU yet.
+     These return -ENODEV, due to ipmmu_of_xlate_dma().
 
-> 
-> This patch is modifying the world-switch to save/restore VSESR. You should
-> explain that VSESR is the Virtual SError Syndrome, it becomes the ESR value when
-> HCR_EL2.VSE injects an SError. This register was added by the RAS Extensions and
-> needs patching in or guarding.
-yes, you are right.
-
-> 
-> 
->> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->> index aede165..ded6211 100644
->> --- a/arch/arm64/kvm/hyp/switch.c
->> +++ b/arch/arm64/kvm/hyp/switch.c
->> @@ -86,6 +86,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
->>  		isb();
->>  	}
->>  	write_sysreg(val, hcr_el2);
->> +    /* If virtual System Error or Asynchronous Abort is pending. set
->> +     * the virtual exception syndrome information
->> +     */
->> +	if (cpus_have_cap(ARM64_HAS_RAS_EXTN) &&
-> 
-> Is cpus_have_cap() safe to use at EL2?
-> This would be the first user, and it accesses cpu_hwcaps. You probably want
-> something like the static_branch_unlikely()s in the vgic code elsewhere in this
-> file.
-> 
-> 
->> +			(vcpu->arch.hcr_el2 & HCR_VSE))
->> +		write_sysreg_s(vcpu->arch.fault.vsesr_el2, VSESR_EL2);
->> +
-> 
-> I think this would be clearer if you took this out to a helper method called
-> something like restore_vsesr() and did the if(cap|VSE) stuff there.
-  good suggestion.
-
-> 
-> (Nit: comment style)
- OK.
-
-> 
-> 
->>  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
->>  	write_sysreg(1 << 15, hstr_el2);
->>  	/*
->> @@ -139,9 +146,15 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
->>  	 * the crucial bit is "On taking a vSError interrupt,
->>  	 * HCR_EL2.VSE is cleared to 0."
->>  	 */
->> -	if (vcpu->arch.hcr_el2 & HCR_VSE)
->> +	if (vcpu->arch.hcr_el2 & HCR_VSE) {
->>  		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
->>  
->> +		if (cpus_have_cap(ARM64_HAS_RAS_EXTN)) {
->> +			/* set vsesr_el2[24:0] with esr_el2[24:0] */
->> +			kvm_vcpu_set_vsesr(vcpu, read_sysreg_el2(esr)
->> +					& VSESR_ELx_IDS_ISS_MASK);
-> 
-> There is no need for KVM to save the VSESR. It is copied to ESR_EL1 when
-> HCR_EL2.VSE delivers the SError, after this we don't care what the register
-> value is. When we switch to a guest we should set the value from KVM whenever
-> the VSE bit is set. We should never read back the value in hardware.
-  I think you are right. Thanks for your points out.
-
-> 
-> Why read ESR_EL2? This will give you a completely unrelated value. If EL2 takes
-> an IRQ or a page fault between pending the SError and delivering it, we
-> overwrite the value set by KVM or user-space with a stray EL2 value.
-> 
-> 
-> ... I think you expect an SError to arrive at EL2 and have its ESR recorded in
-> vcpu->arch.fault.vsesr_el2. Some time later KVM decides to inject an SError into
-> the guest, and this ESR is reused...
-> 
-> We shouldn't do this. Qemu/kvmtool may want to inject a virtual-SError that
-> never started as a physical-SError. Qemu/kvmtool may choose to notify the guest
-> of RAS events via another mechanism, or not at all.
-> 
-> KVM should not give the guest an ESR value of its choice. For SError the ESR
-> describes whether the error is corrected, correctable or fatal. Qemu/kvmtool
-> must choose this.
-
-Below is my previous solution:
-For the SError, CPU will firstly trap to EL3 firmware and records the syndrome to ESR_EL3.
-Before jumping to El2 hypervisors, it will copy the esr_el3 to esr_el2.
-so in order to pass this syndrome to vsesr_el2, using the esr_el2 value to assign it.
-
-
-If Qemu/kvmtool chooses the ESR value and ESR only describes whether the error is corrected/correctable/fatal,
-whether the information is not enough for the guest?
-
-
+> I was thinking of an additional check like below to avoid the
+> situation ?
 >
-> I think we need an API that allows Qemu/kvmtool to inject SError into a guest,
-> but that isn't quite what you have here.
+> From 499b6e662f60f23740b8880882b0a16f16434501 Mon Sep 17 00:00:00 2001
+> From: Sricharan R <sricharan@codeaurora.org>
+> Date: Wed, 3 May 2017 13:16:59 +0530
+> Subject: [PATCH] iommu: of: Fix check for returning EPROBE_DEFER
+>
+> While returning EPROBE_DEFER for iommu masters
+> take in to account of iommu nodes that could be
+> marked in DT as 'status=disabled', in which case
+> simply return NULL and let the master's probe
+> continue rather than deferring.
+>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  drivers/iommu/of_iommu.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 9f44ee8..e6e9bec 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -118,6 +118,7 @@ static bool of_iommu_driver_present(struct device_node *np)
+>
+>         ops = iommu_ops_from_fwnode(fwnode);
+>         if ((ops && !ops->of_xlate) ||
+> +           !of_device_is_available(iommu_spec->np) ||
+>             (!ops && !of_iommu_driver_present(iommu_spec->np)))
+>                 return NULL;
 
-KVM provides APIs to inject the SError, Qemu/kvmtool call the API though IOCTL, may be OK?
+Thanks, this fixes the first class of failures.
 
+The second class can be worked around using:
 
-> 
-> The VSESR value should always come from user space. The only exception are
-> SErrors that we know weren't due to RAS: for these we should set the VSESR to
-> zero to keep the existing behaviour.
-> 
-> 
-> Thanks,
-> 
-> James
-> .
-> 
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -196,6 +196,11 @@ static const struct iommu_ops
+                ops = of_iommu_xlate(dev, &iommu_spec);
+                of_node_put(iommu_spec.np);
+                idx++;
++               if (PTR_ERR(ops) == -ENODEV) {
++                       dev_info(dev, "%s: Ignoring -ENODEV => NULL\n",
++                                __func__);
++                       return NULL;
++               }
+                if (IS_ERR_OR_NULL(ops))
+                        break;
+        }
+
+but obviously that's too hackish to apply...
+Magnus, do you have a suggestion?
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
