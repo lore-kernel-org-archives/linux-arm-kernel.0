@@ -1,33 +1,50 @@
-From: iemdey@gmail.com (Yong Deng)
-Date: Fri,  5 May 2017 18:38:27 +0800
-Subject: [PATCH v2] clk: sunxi-ng: v3s: Fix usb otg device reset bit
-Message-ID: <1493980707-40095-1-git-send-email-iemdey@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri,  5 May 2017 11:57:47 +0200
+Subject: [PATCH 04/10] dma: mv_xor_v2: enable XOR engine after its
+ configuration
+In-Reply-To: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1493978274-12805-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V3S's usb otg device reset bit should be 24, not 23.
+From: Hanna Hawa <hannah@marvell.com>
 
-Signed-off-by: Yong Deng <iemdey@gmail.com>
-Reviewed-By: Icenowy Zheng <icenowy@aosc.io>
+The engine was enabled prior to its configuration, which isn't
+correct. This patch relocates the activation of the XOR engine, to be
+after the configuration of the XOR engine.
+
+Fixes: 19a340b1a820 ("dmaengine: mv_xor_v2: new driver")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Hanna Hawa <hannah@marvell.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
-Changes in v2:
-- Fix commit format
+ drivers/dma/mv_xor_v2.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
- drivers/clk/sunxi-ng/ccu-sun8i-v3s.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-v3s.c b/drivers/clk/sunxi-ng/ccu-sun8i-v3s.c
-index e58706b..6297add 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-v3s.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-v3s.c
-@@ -537,7 +537,7 @@ static CLK_FIXED_FACTOR(pll_periph0_2x_clk, "pll-periph0-2x",
- 	[RST_BUS_EMAC]		=  { 0x2c0, BIT(17) },
- 	[RST_BUS_HSTIMER]	=  { 0x2c0, BIT(19) },
- 	[RST_BUS_SPI0]		=  { 0x2c0, BIT(20) },
--	[RST_BUS_OTG]		=  { 0x2c0, BIT(23) },
-+	[RST_BUS_OTG]		=  { 0x2c0, BIT(24) },
- 	[RST_BUS_EHCI0]		=  { 0x2c0, BIT(26) },
- 	[RST_BUS_OHCI0]		=  { 0x2c0, BIT(29) },
+diff --git a/drivers/dma/mv_xor_v2.c b/drivers/dma/mv_xor_v2.c
+index cb60e7c..211b8c0 100644
+--- a/drivers/dma/mv_xor_v2.c
++++ b/drivers/dma/mv_xor_v2.c
+@@ -653,9 +653,6 @@ static int mv_xor_v2_descq_init(struct mv_xor_v2_device *xor_dev)
+ 	writel((xor_dev->hw_desq & 0xFFFF00000000) >> 32,
+ 	       xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_BAHR_OFF);
+ 
+-	/* enable the DMA engine */
+-	writel(0, xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_STOP_OFF);
+-
+ 	/*
+ 	 * This is a temporary solution, until we activate the
+ 	 * SMMU. Set the attributes for reading & writing data buffers
+@@ -699,6 +696,9 @@ static int mv_xor_v2_descq_init(struct mv_xor_v2_device *xor_dev)
+ 	reg |= MV_XOR_V2_GLOB_PAUSE_AXI_TIME_DIS_VAL;
+ 	writel(reg, xor_dev->glob_base + MV_XOR_V2_GLOB_PAUSE);
+ 
++	/* enable the DMA engine */
++	writel(0, xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_STOP_OFF);
++
+ 	return 0;
+ }
  
 -- 
-1.8.3.1
+2.7.4
