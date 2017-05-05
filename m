@@ -1,86 +1,36 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  5 May 2017 11:57:46 +0200
-Subject: [PATCH 03/10] dma: mv_xor_v2: do not use descriptors not acked by
- async_tx
+Date: Fri,  5 May 2017 11:57:50 +0200
+Subject: [PATCH 07/10] dma: mv_xor_v2: set DMA mask to 40 bits
 In-Reply-To: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1493978274-12805-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1493978274-12805-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Descriptors that have not been acknowledged by the async_tx layer
-should not be re-used, so this commit adjusts the implementation of
-mv_xor_v2_prep_sw_desc() to skip descriptors for which
-async_tx_test_ack() is false.
+The XORv2 engine on Armada 7K/8K can only access the first 40 bits of
+the physical address space, so the DMA mask must be set accordingly.
 
 Fixes: 19a340b1a820 ("dmaengine: mv_xor_v2: new driver")
 Cc: <stable@vger.kernel.org>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor_v2.c | 32 ++++++++++++++++++++++----------
- 1 file changed, 22 insertions(+), 10 deletions(-)
+ drivers/dma/mv_xor_v2.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/drivers/dma/mv_xor_v2.c b/drivers/dma/mv_xor_v2.c
-index bdfb36e..cb60e7c 100644
+index b133fe2..f3e211f 100644
 --- a/drivers/dma/mv_xor_v2.c
 +++ b/drivers/dma/mv_xor_v2.c
-@@ -344,6 +344,7 @@ static struct mv_xor_v2_sw_desc	*
- mv_xor_v2_prep_sw_desc(struct mv_xor_v2_device *xor_dev)
- {
- 	struct mv_xor_v2_sw_desc *sw_desc;
-+	bool found = false;
+@@ -693,6 +693,10 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
  
- 	/* Lock the channel */
- 	spin_lock_bh(&xor_dev->lock);
-@@ -355,19 +356,23 @@ mv_xor_v2_prep_sw_desc(struct mv_xor_v2_device *xor_dev)
- 		return NULL;
- 	}
+ 	platform_set_drvdata(pdev, xor_dev);
  
--	/* get a free SW descriptor from the SW DESQ */
--	sw_desc = list_first_entry(&xor_dev->free_sw_desc,
--				   struct mv_xor_v2_sw_desc, free_list);
-+	list_for_each_entry(sw_desc, &xor_dev->free_sw_desc, free_list) {
-+		if (async_tx_test_ack(&sw_desc->async_tx)) {
-+			found = true;
-+			break;
-+		}
-+	}
++	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(40));
++	if (ret)
++		return ret;
 +
-+	if (!found) {
-+		spin_unlock_bh(&xor_dev->lock);
-+		return NULL;
-+	}
-+
- 	list_del(&sw_desc->free_list);
- 
- 	/* Release the channel */
- 	spin_unlock_bh(&xor_dev->lock);
- 
--	/* set the async tx descriptor */
--	dma_async_tx_descriptor_init(&sw_desc->async_tx, &xor_dev->dmachan);
--	sw_desc->async_tx.tx_submit = mv_xor_v2_tx_submit;
--	async_tx_ack(&sw_desc->async_tx);
--
- 	return sw_desc;
- }
- 
-@@ -785,8 +790,15 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
- 
- 	/* add all SW descriptors to the free list */
- 	for (i = 0; i < MV_XOR_V2_DESC_NUM; i++) {
--		xor_dev->sw_desq[i].idx = i;
--		list_add(&xor_dev->sw_desq[i].free_list,
-+		struct mv_xor_v2_sw_desc *sw_desc =
-+			xor_dev->sw_desq + i;
-+		sw_desc->idx = i;
-+		dma_async_tx_descriptor_init(&sw_desc->async_tx,
-+					     &xor_dev->dmachan);
-+		sw_desc->async_tx.tx_submit = mv_xor_v2_tx_submit;
-+		async_tx_ack(&sw_desc->async_tx);
-+
-+		list_add(&sw_desc->free_list,
- 			 &xor_dev->free_sw_desc);
- 	}
- 
+ 	xor_dev->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(xor_dev->clk) && PTR_ERR(xor_dev->clk) == -EPROBE_DEFER)
+ 		return -EPROBE_DEFER;
 -- 
 2.7.4
