@@ -1,162 +1,173 @@
-From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Fri,  5 May 2017 14:07:53 +0530
-Subject: [PATCH v2 1/3] of/pci/dma: fix DMA configuration for PCI masters
-In-Reply-To: <1493973474-13939-1-git-send-email-oza.oza@broadcom.com>
-References: <1493973474-13939-1-git-send-email-oza.oza@broadcom.com>
-Message-ID: <1493973474-13939-2-git-send-email-oza.oza@broadcom.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Fri, 05 May 2017 16:53:43 +0800
+Subject: [linux-sunxi] [PATCH v6 11/13] ARM: dts: sun8i: add DE2 nodes for
+ V3s SoC
+In-Reply-To: <CAGb2v67uE2iuP+wrL2t0fSMY8C1qnX=pYru7pZGX+0WhC_z2EA@mail.gmail.com>
+References: <20170504114858.9008-1-icenowy@aosc.io>
+ <20170504114858.9008-12-icenowy@aosc.io>
+ <CAGb2v67uE2iuP+wrL2t0fSMY8C1qnX=pYru7pZGX+0WhC_z2EA@mail.gmail.com>
+Message-ID: <8ad5de02ffc13348dfc71e9ec203205c@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-current device framework and OF framework integration assumes
-dma-ranges in a way where memory-mapped devices define their
-dma-ranges. (child-bus-address, parent-bus-address, length).
+? 2017-05-05 11:31?Chen-Yu Tsai ???
+> On Thu, May 4, 2017 at 7:48 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>> Allwinner V3s SoC features a "Display Engine 2.0" with only one TCON
+>> which have RGB LCD output.
+> 
+> Please also mention that it only has one mixer.
+> 
+> For the subject, you could just say "Add device nodes for the display 
+> pipeline".
+> 
+>> 
+>> Add device nodes for it as well as the TCON.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> ---
+>>  arch/arm/boot/dts/sun8i-v3s.dtsi | 87 
+>> ++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 87 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi 
+>> b/arch/arm/boot/dts/sun8i-v3s.dtsi
+>> index 71075969e5e6..0a895179d8ae 100644
+>> --- a/arch/arm/boot/dts/sun8i-v3s.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
+>> @@ -41,6 +41,10 @@
+>>   */
+>> 
+>>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +#include <dt-bindings/clock/sun8i-v3s-ccu.h>
+>> +#include <dt-bindings/clock/sun8i-de2.h>
+>> +#include <dt-bindings/reset/sun8i-v3s-ccu.h>
+>> +#include <dt-bindings/reset/sun8i-de2.h>
+>> 
+>>  / {
+>>         #address-cells = <1>;
+>> @@ -59,6 +63,12 @@
+>>                 };
+>>         };
+>> 
+>> +       de: display-engine {
+>> +               compatible = "allwinner,sun8i-v3s-display-engine";
+>> +               allwinner,pipelines = <&de2_mixer0>;
+>> +               status = "disabled";
+>> +       };
+>> +
+>>         timer {
+>>                 compatible = "arm,armv7-timer";
+>>                 interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | 
+>> IRQ_TYPE_LEVEL_LOW)>,
+>> @@ -93,6 +103,83 @@
+>>                 #size-cells = <1>;
+>>                 ranges;
+>> 
+>> +               de2_clocks: clock at 1000000 {
+>> +                       compatible = "allwinner,sun50i-h5-de2-clk";
+> 
+> I am a bit skeptical about this. Since the V3S only has one mixer, do 
+> the clocks
+> for the second one even exist?
 
-of_dma_configure is specifically written to take care of memory
-mapped devices. but no implementation exists for pci to take
-care of pcie based memory ranges.
+It's described in the de_clock.c in the BSP source code, and in hardware
+these bits can be really set (although without clock output).
 
-for e.g. iproc based SOCs and other SOCs(suc as rcar) have PCI
-world dma-ranges.
-dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+So I use this compatible which has still the extra clocks.
 
-this patch serves following:
-
-1) exposes interface to the pci host driver for their
-inbound memory ranges
-
-2) provide an interface to callers such as of_dma_get_ranges.
-so then the returned size get best possible (largest) dma_mask.
-because PCI RC drivers do not call APIs such as
-dma_set_coherent_mask() and hence rather it shows its addressing
-capabilities based on dma-ranges.
-for e.g.
-dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
-we should get dev->coherent_dma_mask=0x7fffffffff.
-
-3) this patch handles multiple inbound windows and dma-ranges.
-it is left to the caller, how it wants to use them.
-the new function returns the resources in a standard and unform way
-
-4) this way the callers of for e.g. of_dma_get_ranges
-does not need to change.
-
-5) leaves scope of adding PCI flag handling for inbound memory
-by the new function.
-
-Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
-
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 0ee42c3..ed6e69a 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -283,6 +283,83 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
- 	return err;
- }
- EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
-+
-+/**
-+ * of_pci_get_dma_ranges - Parse PCI host bridge inbound resources from DT
-+ * @np: device node of the host bridge having the dma-ranges property
-+ * @resources: list where the range of resources will be added after DT parsing
-+ *
-+ * It is the caller's job to free the @resources list.
-+ *
-+ * This function will parse the "dma-ranges" property of a
-+ * PCI host bridge device node and setup the resource mapping based
-+ * on its content.
-+ *
-+ * It returns zero if the range parsing has been successful or a standard error
-+ * value if it failed.
-+ */
-+
-+int of_pci_get_dma_ranges(struct device_node *np, struct list_head *resources)
-+{
-+	struct device_node *node = of_node_get(np);
-+	int rlen;
-+	int ret = 0;
-+	const int na = 3, ns = 2;
-+	struct resource *res;
-+	struct of_pci_range_parser parser;
-+	struct of_pci_range range;
-+
-+	if (!node)
-+		return -EINVAL;
-+
-+	parser.node = node;
-+	parser.pna = of_n_addr_cells(node);
-+	parser.np = parser.pna + na + ns;
-+
-+	parser.range = of_get_property(node, "dma-ranges", &rlen);
-+
-+	if (!parser.range) {
-+		pr_debug("pcie device has no dma-ranges defined for node(%s)\n",
-+			  np->full_name);
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
-+	parser.end = parser.range + rlen / sizeof(__be32);
-+
-+	for_each_of_pci_range(&parser, &range) {
-+		/*
-+		 * If we failed translation or got a zero-sized region
-+		 * then skip this range
-+		 */
-+		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-+			continue;
-+
-+		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-+		if (!res) {
-+			ret = -ENOMEM;
-+			goto parse_failed;
-+		}
-+
-+		ret = of_pci_range_to_resource(&range, np, res);
-+		if (ret) {
-+			kfree(res);
-+			continue;
-+		}
-+
-+		pci_add_resource_offset(resources, res,
-+					res->start - range.pci_addr);
-+	}
-+
-+	return ret;
-+
-+parse_failed:
-+	pci_free_resource_list(resources);
-+out:
-+	of_node_put(node);
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_get_dma_ranges);
- #endif /* CONFIG_OF_ADDRESS */
- 
- #ifdef CONFIG_PCI_MSI
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 0e0974e..617b90d 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -76,6 +76,7 @@ static inline void of_pci_check_probe_only(void) { }
- int of_pci_get_host_bridge_resources(struct device_node *dev,
- 			unsigned char busno, unsigned char bus_max,
- 			struct list_head *resources, resource_size_t *io_base);
-+int of_pci_get_dma_ranges(struct device_node *np, struct list_head *resources);
- #else
- static inline int of_pci_get_host_bridge_resources(struct device_node *dev,
- 			unsigned char busno, unsigned char bus_max,
-@@ -83,6 +84,12 @@ static inline int of_pci_get_host_bridge_resources(struct device_node *dev,
- {
- 	return -EINVAL;
- }
-+
-+static inline int of_pci_get_dma_ranges(struct device_node *np,
-+					struct list_head *resources)
-+{
-+	return -EINVAL;
-+}
- #endif
- 
- #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
--- 
-1.9.1
+> 
+>> +                       reg = <0x01000000 0x100000>;
+>> +                       clocks = <&ccu CLK_DE>,
+>> +                                <&ccu CLK_BUS_DE>;
+>> +                       clock-names = "mod",
+>> +                                     "bus";
+>> +                       resets = <&ccu RST_BUS_DE>;
+>> +                       #clock-cells = <1>;
+>> +                       #reset-cells = <1>;
+>> +               };
+>> +
+>> +               de2_mixer0: mixer at 1100000 {
+>> +                       compatible = "allwinner,sun8i-v3s-de2-mixer";
+>> +                       reg = <0x01100000 0x100000>;
+>> +                       clocks = <&de2_clocks CLK_MIXER0>,
+>> +                                <&de2_clocks CLK_BUS_MIXER0>;
+>> +                       clock-names = "mod",
+>> +                                     "bus";
+> 
+> Nit: could you list the bus clock first?
+> 
+> Regards
+> ChenYu
+> 
+>> +                       resets = <&de2_clocks RST_MIXER0>;
+>> +                       assigned-clocks = <&de2_clocks CLK_MIXER0>;
+>> +                       assigned-clock-rates = <150000000>;
+>> +
+>> +                       ports {
+>> +                               #address-cells = <1>;
+>> +                               #size-cells = <0>;
+>> +
+>> +                               mixer0_out: port at 1 {
+>> +                                       #address-cells = <1>;
+>> +                                       #size-cells = <0>;
+>> +                                       reg = <1>;
+>> +
+>> +                                       mixer0_out_tcon0: endpoint at 0 {
+>> +                                               reg = <0>;
+>> +                                               remote-endpoint = 
+>> <&tcon0_in_mixer0>;
+>> +                                       };
+>> +                               };
+>> +                       };
+>> +               };
+>> +
+>> +               tcon0: lcd-controller at 1c0c000 {
+>> +                       compatible = "allwinner,sun8i-v3s-tcon";
+>> +                       reg = <0x01c0c000 0x1000>;
+>> +                       interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+>> +                       clocks = <&ccu CLK_BUS_TCON0>,
+>> +                                <&ccu CLK_TCON0>;
+>> +                       clock-names = "ahb",
+>> +                                     "tcon-ch0";
+>> +                       clock-output-names = "tcon-pixel-clock";
+>> +                       resets = <&ccu RST_BUS_TCON0>;
+>> +                       reset-names = "lcd";
+>> +                       status = "disabled";
+>> +
+>> +                       ports {
+>> +                               #address-cells = <1>;
+>> +                               #size-cells = <0>;
+>> +
+>> +                               tcon0_in: port at 0 {
+>> +                                       #address-cells = <1>;
+>> +                                       #size-cells = <0>;
+>> +                                       reg = <0>;
+>> +
+>> +                                       tcon0_in_mixer0: endpoint at 0 {
+>> +                                               reg = <0>;
+>> +                                               remote-endpoint = 
+>> <&mixer0_out_tcon0>;
+>> +                                       };
+>> +                               };
+>> +
+>> +                               tcon0_out: port at 1 {
+>> +                                       #address-cells = <1>;
+>> +                                       #size-cells = <0>;
+>> +                                       reg = <1>;
+>> +                               };
+>> +                       };
+>> +               };
+>> +
+>> +
+>>                 mmc0: mmc at 01c0f000 {
+>>                         compatible = "allwinner,sun7i-a20-mmc";
+>>                         reg = <0x01c0f000 0x1000>;
+>> --
+>> 2.12.2
+>> 
+>> --
+>> You received this message because you are subscribed to the Google 
+>> Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send 
+>> an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
