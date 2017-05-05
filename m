@@ -1,300 +1,361 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 5 May 2017 17:13:48 +0100
-Subject: [GIT PULL] arm64 updates for 4.12
-Message-ID: <20170505161345.GA23336@e104818-lin.cambridge.arm.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 5 May 2017 18:23:22 +0200
+Subject: [PATCH v6 21/24] KVM: arm64: vgic-its: Device table save/restore
+In-Reply-To: <20170505124424.GH1419@lvm>
+References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
+ <1493898284-29504-22-git-send-email-eric.auger@redhat.com>
+ <20170505124424.GH1419@lvm>
+Message-ID: <49f2669b-f3cb-d555-f376-dd4dad2f90fd@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Christoffer,
 
-Please pull the arm64 updates for 4.12 below. There is a minor conflict
-in arch/arm64/include/asm/bug.h, resolved as in current mainline but
-with __BUG_FLAGS taking two underscores rather than one:
+On 05/05/2017 14:44, Christoffer Dall wrote:
+> On Thu, May 04, 2017 at 01:44:41PM +0200, Eric Auger wrote:
+>> This patch saves the device table entries into guest RAM.
+>> Both flat table and 2 stage tables are supported. DeviceId
+>> indexing is used.
+>>
+>> For each device listed in the device table, we also save
+>> the translation table using the vgic_its_save/restore_itt
+>> routines. Those functions will be implemented in a subsequent
+>> patch.
+>>
+>> On restore, devices are re-allocated and their itt are
+>> re-built.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>> v5 -> v6:
+>> - accomodate vgic_its_alloc_device change of proto
+>> - define bit fields for L1 entries
+>> - s/handle_l1_entry/handle_l1_dte
+>> - s/ite_esz/dte_esz in handle_l1_dte
+>> - check BASER valid bit
+>> - s/nb_eventid_bits/num_eventid_bits
+>> - new convention for returned values
+>> - itt functions implemented in subsequent patch
+>>
+>> v4 -> v5:
+>> - sort the device list by deviceid on device table save
+>> - use defines for shifts and masks
+>> - use abi->dte_esz
+>> - clatify entry sizes for L1 and L2 tables
+>>
+>> v3 -> v4:
+>> - use the new proto for its_alloc_device
+>> - compute_next_devid_offset, vgic_its_flush/restore_itt
+>>   become static in this patch
+>> - change in the DTE entry format with the introduction of the
+>>   valid bit and next field width decrease; ittaddr encoded
+>>   on its full range
+>> - fix handle_l1_entry entry handling
+>> - correct vgic_its_table_restore error handling
+>>
+>> v2 -> v3:
+>> - fix itt_addr bitmask in vgic_its_restore_dte
+>> - addition of return 0 in vgic_its_restore_ite moved to
+>>   the ITE related patch
+>>
+>> v1 -> v2:
+>> - use 8 byte format for DTE and ITE
+>> - support 2 stage format
+>> - remove kvm parameter
+>> - ITT flush/restore moved in a separate patch
+>> - use deviceid indexing
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 194 +++++++++++++++++++++++++++++++++++++++++--
+>>  virt/kvm/arm/vgic/vgic.h     |  10 +++
+>>  2 files changed, 199 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index a3ed52a..c5b388d 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -23,6 +23,7 @@
+>>  #include <linux/interrupt.h>
+>>  #include <linux/list.h>
+>>  #include <linux/uaccess.h>
+>> +#include <linux/list_sort.h>
+>>  
+>>  #include <linux/irqchip/arm-gic-v3.h>
+>>  
+>> @@ -1701,7 +1702,8 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+>>  	return ret;
+>>  }
+>>  
+>> -u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
+>> +static u32 compute_next_devid_offset(struct list_head *h,
+>> +				     struct its_device *dev)
+>>  {
+>>  	struct its_device *next;
+>>  	u32 next_offset;
+>> @@ -1755,8 +1757,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+>>   * Return: < 0 on error, 0 if last element was identified, 1 otherwise
+>>   * (the last element may not be found on second level tables)
+>>   */
+>> -int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>> -		   int start_id, entry_fn_t fn, void *opaque)
+>> +static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>> +			  int start_id, entry_fn_t fn, void *opaque)
+>>  {
+>>  	void *entry = kzalloc(esz, GFP_KERNEL);
+>>  	struct kvm *kvm = its->dev->kvm;
+>> @@ -1791,13 +1793,171 @@ int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>>  	return ret;
+>>  }
+>>  
+>> +static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
+>> +{
+>> +	return -ENXIO;
+>> +}
+>> +
+>> +static int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
+>> +{
+>> +	return -ENXIO;
+>> +}
+>> +
+>> +/**
+>> + * vgic_its_save_dte - Save a device table entry at a given GPA
+>> + *
+>> + * @its: ITS handle
+>> + * @dev: ITS device
+>> + * @ptr: GPA
+>> + */
+>> +static int vgic_its_save_dte(struct vgic_its *its, struct its_device *dev,
+>> +			     gpa_t ptr, int dte_esz)
+>> +{
+>> +	struct kvm *kvm = its->dev->kvm;
+>> +	u64 val, itt_addr_field;
+>> +	u32 next_offset;
+>> +
+>> +	itt_addr_field = dev->itt_addr >> 8;
+>> +	next_offset = compute_next_devid_offset(&its->device_list, dev);
+>> +	val = (1ULL << KVM_ITS_DTE_VALID_SHIFT |
+>> +	       ((u64)next_offset << KVM_ITS_DTE_NEXT_SHIFT) |
+>> +	       (itt_addr_field << KVM_ITS_DTE_ITTADDR_SHIFT) |
+>> +		(dev->num_eventid_bits - 1));
+>> +	val = cpu_to_le64(val);
+>> +	return kvm_write_guest(kvm, ptr, &val, dte_esz);
+>> +}
+>> +
+>> +/**
+>> + * vgic_its_restore_dte - restore a device table entry
+>> + *
+>> + * @its: its handle
+>> + * @id: device id the DTE corresponds to
+>> + * @ptr: kernel VA where the 8 byte DTE is located
+>> + * @opaque: unused
+>> + *
+>> + * Return: < 0 on error, 0 if the dte is the last one, id offset to the
+>> + * next dte otherwise
+>> + */
+>> +static int vgic_its_restore_dte(struct vgic_its *its, u32 id,
+>> +				void *ptr, void *opaque)
+>> +{
+>> +	struct its_device *dev;
+>> +	gpa_t itt_addr;
+>> +	u8 num_eventid_bits;
+>> +	u64 entry = *(u64 *)ptr;
+>> +	bool valid;
+>> +	u32 offset;
+>> +	int ret;
+>> +
+>> +	entry = le64_to_cpu(entry);
+>> +
+>> +	valid = entry >> KVM_ITS_DTE_VALID_SHIFT;
+>> +	num_eventid_bits = (entry & KVM_ITS_DTE_SIZE_MASK) + 1;
+>> +	itt_addr = ((entry & KVM_ITS_DTE_ITTADDR_MASK)
+>> +			>> KVM_ITS_DTE_ITTADDR_SHIFT) << 8;
+>> +
+>> +	if (!valid)
+>> +		return 1;
+>> +
+>> +	/* dte entry is valid */
+>> +	offset = (entry & KVM_ITS_DTE_NEXT_MASK) >> KVM_ITS_DTE_NEXT_SHIFT;
+>> +
+>> +	dev = vgic_its_alloc_device(its, id, itt_addr, num_eventid_bits);
+>> +	if (IS_ERR(dev))
+>> +		return PTR_ERR(dev);
+>> +
+>> +	ret = vgic_its_restore_itt(its, dev);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	return offset;
+>> +}
+>> +
+>> +static int vgic_its_device_cmp(void *priv, struct list_head *a,
+>> +			       struct list_head *b)
+>> +{
+>> +	struct its_device *deva = container_of(a, struct its_device, dev_list);
+>> +	struct its_device *devb = container_of(b, struct its_device, dev_list);
+>> +
+>> +	if (deva->device_id < devb->device_id)
+>> +		return -1;
+>> +	else
+>> +		return 1;
+>> +}
+>> +
+>>  /**
+>>   * vgic_its_save_device_tables - Save the device table and all ITT
+>>   * into guest RAM
+>> + *
+>> + * L1/L2 handling is hidden by vgic_its_check_id() helper which directly
+>> + * returns the GPA of the device entry
+>>   */
+>>  static int vgic_its_save_device_tables(struct vgic_its *its)
+>>  {
+>> -	return -ENXIO;
+>> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+>> +	struct its_device *dev;
+>> +	int dte_esz = abi->dte_esz;
+>> +	u64 baser;
+>> +
+>> +	baser = its->baser_device_table;
+>> +
+>> +	list_sort(NULL, &its->device_list, vgic_its_device_cmp);
+> 
+> this list is protected by the ITS mutex but you seem to be only holding
+> the KVM mutex here, so don't we have a potential exploit here?
 
-------------8<---------------------------
-diff --cc arch/arm64/include/asm/bug.h
-index a9be1072933c,0bfe1df12b19..000000000000
---- a/arch/arm64/include/asm/bug.h
-+++ b/arch/arm64/include/asm/bug.h
-@@@ -56,7 -60,8 +60,7 @@@ _BUGVERBOSE_LOCATION(__FILE__, __LINE__
-  } while (0)
-  
-- #define __WARN_FLAGS(flags) _BUG_FLAGS(BUGFLAG_WARNING|(flags))
- -#define __WARN_TAINT(taint) 				\
- -	__BUG_FLAGS(BUGFLAG_TAINT(taint))
-++#define __WARN_FLAGS(flags) __BUG_FLAGS(BUGFLAG_WARNING|(flags))
-  
-- #endif /* ! CONFIG_GENERIC_BUG */
-+ #define HAVE_ARCH_BUG
-  
-  #include <asm-generic/bug.h>
-------------8<---------------------------
+Updates to the device, ite list are done when running commands. As we
+hold the KVM mutex, commands cannot run. Then there is
+vgic_its_destroy() which happens on kvm_put_kvm when all users have
+released their reference. So to me holding the kvm lock looks sufficient.
 
-Thanks.
+Thanks
 
-The following changes since commit eeb1efbcb83c0cfe6d567abbacd675bbddf3d658:
+Eric
 
-  arm64: cpu_errata: Add capability to advertise Cortex-A73 erratum 858921 (2017-04-07 11:22:08 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-upstream
-
-for you to fetch changes up to 92f66f84d9695d07adf9bc987bbcce4bf9b8e87c:
-
-  arm64: Fix the DMA mmap and get_sgtable API with DMA_ATTR_FORCE_CONTIGUOUS (2017-05-05 11:41:35 +0100)
-
-----------------------------------------------------------------
-arm64 updates for 4.12:
-
-- kdump support, including two necessary memblock additions:
-  memblock_clear_nomap() and memblock_cap_memory_range()
-
-- ARMv8.3 HWCAP bits for JavaScript conversion instructions, complex
-  numbers and weaker release consistency
-
-- arm64 ACPI platform MSI support
-
-- arm perf updates: ACPI PMU support, L3 cache PMU in some Qualcomm
-  SoCs, Cortex-A53 L2 cache events and DTLB refills, MAINTAINERS update
-  for DT perf bindings
-
-- architected timer errata framework (the arch/arm64 changes only)
-
-- support for DMA_ATTR_FORCE_CONTIGUOUS in the arm64 iommu DMA API
-
-- arm64 KVM refactoring to use common system register definitions
-
-- remove support for ASID-tagged VIVT I-cache (no ARMv8 implementation
-  using it and deprecated in the architecture) together with some
-  I-cache handling clean-up
-
-- PE/COFF EFI header clean-up/hardening
-
-- define BUG() instruction without CONFIG_BUG
-
-----------------------------------------------------------------
-AKASHI Takahiro (11):
-      memblock: add memblock_clear_nomap()
-      memblock: add memblock_cap_memory_range()
-      arm64: limit memory regions based on DT property, usable-memory-range
-      arm64: kdump: reserve memory for crash dump kernel
-      arm64: mm: add set_memory_valid()
-      arm64: hibernate: preserve kdump image around hibernation
-      arm64: kdump: implement machine_crash_shutdown()
-      arm64: kdump: add VMCOREINFO's for user-space tools
-      arm64: kdump: provide /proc/vmcore file
-      arm64: kdump: enable kdump in defconfig
-      Documentation: kdump: describe arm64 port
-
-Agustin Vega-Frias (1):
-      perf: qcom: Add L3 cache PMU driver
-
-Ard Biesheuvel (20):
-      arm64: Revert "arm64: kaslr: fix breakage with CONFIG_MODVERSIONS=y"
-      arm: kvm: move kvm_vgic_global_state out of .text section
-      arm64: mmu: move TLB maintenance from callers to create_mapping_late()
-      arm64: alternatives: apply boot time fixups via the linear mapping
-      arm64: mmu: map .text as read-only from the outset
-      arm64: mmu: apply strict permissions to .init.text and .init.data
-      arm64/mmu: align alloc_init_pte prototype with pmd/pud versions
-      arm64/mmu: ignore debug_pagealloc for kernel segments
-      arm64/mmu: add contiguous bit to sanity bug check
-      arm64/mmu: replace 'page_mappings_only' parameter with flags argument
-      arm64/mm: remove pointless map/unmap sequences when creating page tables
-      arm64: mm: set the contiguous bit for kernel mappings where appropriate
-      arm64: relocation testing module
-      arm64: efi: move EFI header and related data to a separate .S file
-      arm64: efi: clean up Image header after PE header has been split off
-      arm64: efi: remove forbidden values from the PE/COFF header
-      arm64: efi: remove pointless dummy .reloc section
-      arm64: efi: replace open coded constants with symbolic ones
-      arm64: efi: split Image code and data into separate PE/COFF sections
-      arm64: module: split core and init PLT sections
-
-Arnd Bergmann (1):
-      arm64: define BUG() instruction without CONFIG_BUG
-
-Catalin Marinas (5):
-      Merge tag 'acpi-arm64-for-v4.12' of git://git.kernel.org/.../lpieralisi/linux into for-next/core
-      Merge branch 'arm64/common-sysreg' of git://git.kernel.org/.../mark/linux into for-next/core
-      Merge tag 'arch-timer-errata-prereq' of git://git.kernel.org/.../maz/arm-platforms into for-next/core
-      Merge branch 'will/for-next/perf' into for-next/core
-      arm64: Fix the DMA mmap and get_sgtable API with DMA_ATTR_FORCE_CONTIGUOUS
-
-Chris Redmon (1):
-      arm64: struct debug_info: Check CONFIG_HAVE_HW_BREAKPOINT
-
-Dave Martin (1):
-      arm64: cpufeature: Make ID reg accessor naming less counterintuitive
-
-Florian Fainelli (1):
-      arm64: pmu: Wire-up Cortex A53 L2 cache events and DTLB refills
-
-Geert Uytterhoeven (3):
-      arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU
-      MAINTAINERS: Add file patterns for perf device tree bindings
-      arm64: Print DT machine model in setup_machine_fdt()
-
-Hanjun Guo (7):
-      ACPI/IORT: Fix the indentation in iort_scan_node()
-      ACPI/IORT: Add missing comment for iort_dev_find_its_id()
-      ACPI/IORT: Rework iort_match_node_callback() return value handling
-      ACPI/IORT: Rename iort_node_map_rid() to make it generic
-      ACPI/IORT: Introduce iort_node_map_platform_id() to retrieve dev id
-      ACPI: platform-msi: retrieve devid from IORT
-      ACPI: platform: setup MSI domain for ACPI based platform device
-
-James Morse (1):
-      Documentation: dt: chosen properties for arm64 kdump
-
-Kefeng Wang (1):
-      arm64: drop unnecessary newlines in show_regs()
-
-Marc Zyngier (2):
-      arm64: Silence spurious kbuild warning on menuconfig
-      arm64: Add CNTFRQ_EL0 trap handler
-
-Mark Rutland (29):
-      arm64: sysreg: sort by encoding
-      arm64: sysreg: add debug system registers
-      arm64: sysreg: add performance monitor registers
-      arm64: sysreg: subsume GICv3 sysreg definitions
-      arm64: sysreg: add physical timer registers
-      arm64: sysreg: add register encodings used by KVM
-      arm64: sysreg: add Set/Way sys encodings
-      arm64: reduce el2_setup branching
-      arm64: move !VHE work to end of el2_setup
-      drivers/perf: arm_pmu: rework per-cpu allocation
-      drivers/perf: arm_pmu: manage interrupts per-cpu
-      drivers/perf: arm_pmu: split irq request from enable
-      include: pe.h: allow for use in assembly
-      include: pe.h: add some missing definitions
-      drivers/perf: arm_pmu: remove pointless PMU disabling
-      drivers/perf: arm_pmu: define armpmu_init_fn
-      drivers/perf: arm_pmu: fold init into alloc
-      drivers/perf: arm_pmu: factor out pmu registration
-      drivers/perf: arm_pmu: simplify cpu_pmu_request_irqs()
-      drivers/perf: arm_pmu: handle no platform_device
-      drivers/perf: arm_pmu: rename irq request/free functions
-      drivers/perf: arm_pmu: split cpu-local irq request/free
-      drivers/perf: arm_pmu: move irq request/free into probe
-      drivers/perf: arm_pmu: split out platform device probe logic
-      arm64: add function to get a cpu's MADT GICC table
-      drivers/perf: arm_pmu: add ACPI framework
-      arm64: pmuv3: handle !PMUv3 when probing
-      arm64: pmuv3: use arm_pmu ACPI framework
-      arm64: pmuv3: handle pmuv3+
-
-Sameer Goel (1):
-      efi/libstub/arm*: Set default address and size cells values for an empty dtb
-
-Stephen Boyd (1):
-      arm64: print a fault message when attempting to write RO memory
-
-Suzuki K Poulose (3):
-      arm64: v8.3: Support for Javascript conversion instruction
-      arm64: v8.3: Support for complex number instructions
-      arm64: v8.3: Support for weaker release consistency
-
-Takahiro Akashi (1):
-      arm64: kdump: protect crash dump kernel memory
-
-Will Deacon (6):
-      arm64: cpuinfo: remove I-cache VIPT aliasing detection
-      arm64: cacheinfo: Remove CCSIDR-based cache information probing
-      arm64: cache: Remove support for ASID-tagged VIVT I-caches
-      arm64: cache: Merge cachetype.h into cache.h
-      arm64: cache: Identify VPIPT I-caches
-      arm64: KVM: Add support for VPIPT I-caches
-
- Documentation/arm64/cpu-feature-registers.txt |  12 +
- Documentation/devicetree/bindings/chosen.txt  |  45 ++
- Documentation/kdump/kdump.txt                 |  16 +-
- Documentation/perf/qcom_l3_pmu.txt            |  25 +
- MAINTAINERS                                   |   1 +
- arch/arm64/Kconfig                            |  11 +
- arch/arm64/Kconfig.debug                      |   4 +
- arch/arm64/Makefile                           |   4 +-
- arch/arm64/configs/defconfig                  |   1 +
- arch/arm64/include/asm/acpi.h                 |   2 +
- arch/arm64/include/asm/arch_gicv3.h           |  81 +--
- arch/arm64/include/asm/bug.h                  |  33 +-
- arch/arm64/include/asm/cache.h                |  38 +-
- arch/arm64/include/asm/cacheflush.h           |   1 +
- arch/arm64/include/asm/cachetype.h            | 100 ---
- arch/arm64/include/asm/cpufeature.h           |   4 +-
- arch/arm64/include/asm/esr.h                  |   4 +
- arch/arm64/include/asm/hardirq.h              |   2 +-
- arch/arm64/include/asm/hw_breakpoint.h        |   4 +-
- arch/arm64/include/asm/kexec.h                |  52 +-
- arch/arm64/include/asm/kvm_mmu.h              |  13 +-
- arch/arm64/include/asm/mmu.h                  |   1 +
- arch/arm64/include/asm/module.h               |  14 +-
- arch/arm64/include/asm/pgtable.h              |  10 +
- arch/arm64/include/asm/processor.h            |   2 +
- arch/arm64/include/asm/sections.h             |   2 +
- arch/arm64/include/asm/smp.h                  |   3 +
- arch/arm64/include/asm/sysreg.h               | 167 ++++-
- arch/arm64/include/uapi/asm/hwcap.h           |   3 +
- arch/arm64/kernel/Makefile                    |   3 +
- arch/arm64/kernel/alternative.c               |  11 +-
- arch/arm64/kernel/cacheinfo.c                 |  38 --
- arch/arm64/kernel/cpufeature.c                |  30 +-
- arch/arm64/kernel/cpuinfo.c                   |  37 +-
- arch/arm64/kernel/crash_dump.c                |  71 +++
- arch/arm64/kernel/debug-monitors.c            |   2 +-
- arch/arm64/kernel/efi-header.S                | 155 +++++
- arch/arm64/kernel/head.S                      | 222 ++-----
- arch/arm64/kernel/hibernate.c                 |  10 +-
- arch/arm64/kernel/machine_kexec.c             | 170 +++++-
- arch/arm64/kernel/module-plts.c               | 108 ++--
- arch/arm64/kernel/module.c                    |   2 +-
- arch/arm64/kernel/module.lds                  |   1 +
- arch/arm64/kernel/perf_event.c                | 120 +++-
- arch/arm64/kernel/process.c                   |   2 -
- arch/arm64/kernel/reloc_test_core.c           |  81 +++
- arch/arm64/kernel/reloc_test_syms.S           |  83 +++
- arch/arm64/kernel/setup.c                     |  12 +-
- arch/arm64/kernel/smp.c                       |  79 +++
- arch/arm64/kernel/traps.c                     |  14 +
- arch/arm64/kernel/vmlinux.lds.S               |  27 +-
- arch/arm64/kvm/hyp/tlb.c                      |  22 +
- arch/arm64/kvm/reset.c                        |   2 +-
- arch/arm64/kvm/sys_regs.c                     |   4 +-
- arch/arm64/mm/context.c                       |   3 -
- arch/arm64/mm/dma-mapping.c                   | 128 +++-
- arch/arm64/mm/fault.c                         |  55 +-
- arch/arm64/mm/flush.c                         |   4 +-
- arch/arm64/mm/init.c                          | 181 ++++++
- arch/arm64/mm/mmu.c                           | 311 ++++++----
- arch/arm64/mm/pageattr.c                      |  15 +-
- drivers/acpi/arm64/iort.c                     | 158 ++++-
- drivers/acpi/glue.c                           |   6 +
- drivers/firmware/efi/libstub/fdt.c            |  28 +-
- drivers/perf/Kconfig                          |  14 +
- drivers/perf/Makefile                         |   4 +-
- drivers/perf/arm_pmu.c                        | 530 +++++-----------
- drivers/perf/arm_pmu_acpi.c                   | 256 ++++++++
- drivers/perf/arm_pmu_platform.c               | 235 +++++++
- drivers/perf/qcom_l3_pmu.c                    | 849 ++++++++++++++++++++++++++
- include/linux/acpi_iort.h                     |   3 +
- include/linux/cpuhotplug.h                    |   2 +
- include/linux/memblock.h                      |   2 +
- include/linux/pe.h                            | 177 +++---
- include/linux/perf/arm_pmu.h                  |  29 +-
- mm/memblock.c                                 |  56 +-
- virt/kvm/arm/vgic/vgic.c                      |   4 +-
- 77 files changed, 3755 insertions(+), 1256 deletions(-)
- create mode 100644 Documentation/perf/qcom_l3_pmu.txt
- delete mode 100644 arch/arm64/include/asm/cachetype.h
- create mode 100644 arch/arm64/kernel/crash_dump.c
- create mode 100644 arch/arm64/kernel/efi-header.S
- create mode 100644 arch/arm64/kernel/reloc_test_core.c
- create mode 100644 arch/arm64/kernel/reloc_test_syms.S
- create mode 100644 drivers/perf/arm_pmu_acpi.c
- create mode 100644 drivers/perf/arm_pmu_platform.c
- create mode 100644 drivers/perf/qcom_l3_pmu.c
-
--- 
-Catalin
+> 
+> 
+> Otherwise this patch looks good to me.
+> 
+> Thanks,
+> -Christoffer
+> 
+>> +
+>> +	list_for_each_entry(dev, &its->device_list, dev_list) {
+>> +		int ret;
+>> +		gpa_t eaddr;
+>> +
+>> +		if (!vgic_its_check_id(its, baser,
+>> +				       dev->device_id, &eaddr))
+>> +			return -EINVAL;
+>> +
+>> +		ret = vgic_its_save_itt(its, dev);
+>> +		if (ret)
+>> +			return ret;
+>> +
+>> +		ret = vgic_its_save_dte(its, dev, eaddr, dte_esz);
+>> +		if (ret)
+>> +			return ret;
+>> +	}
+>> +	return 0;
+>> +}
+>> +
+>> +/**
+>> + * handle_l1_dte - callback used for L1 device table entries (2 stage case)
+>> + *
+>> + * @its: its handle
+>> + * @id: index of the entry in the L1 table
+>> + * @addr: kernel VA
+>> + * @opaque: unused
+>> + *
+>> + * L1 table entries are scanned by steps of 1 entry
+>> + * Return < 0 if error, 0 if last dte was found when scanning the L2
+>> + * table, +1 otherwise (meaning next L1 entry must be scanned)
+>> + */
+>> +static int handle_l1_dte(struct vgic_its *its, u32 id, void *addr,
+>> +			 void *opaque)
+>> +{
+>> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+>> +	int l2_start_id = id * (SZ_64K / abi->dte_esz);
+>> +	u64 entry = *(u64 *)addr;
+>> +	int dte_esz = abi->dte_esz;
+>> +	gpa_t gpa;
+>> +	int ret;
+>> +
+>> +	entry = le64_to_cpu(entry);
+>> +
+>> +	if (!(entry & KVM_ITS_L1E_VALID_MASK))
+>> +		return 1;
+>> +
+>> +	gpa = entry & KVM_ITS_L1E_ADDR_MASK;
+>> +
+>> +	ret = scan_its_table(its, gpa, SZ_64K, dte_esz,
+>> +			     l2_start_id, vgic_its_restore_dte, NULL);
+>> +
+>> +	if (ret <= 0)
+>> +		return ret;
+>> +
+>> +	return 1;
+>>  }
+>>  
+>>  /**
+>> @@ -1806,7 +1966,31 @@ static int vgic_its_save_device_tables(struct vgic_its *its)
+>>   */
+>>  static int vgic_its_restore_device_tables(struct vgic_its *its)
+>>  {
+>> -	return -ENXIO;
+>> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+>> +	u64 baser = its->baser_device_table;
+>> +	int l1_esz, ret;
+>> +	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
+>> +	gpa_t l1_gpa;
+>> +
+>> +	if (!(baser & GITS_BASER_VALID))
+>> +		return 0;
+>> +
+>> +	l1_gpa = BASER_ADDRESS(baser);
+>> +
+>> +	if (baser & GITS_BASER_INDIRECT) {
+>> +		l1_esz = GITS_LVL1_ENTRY_SIZE;
+>> +		ret = scan_its_table(its, l1_gpa, l1_tbl_size, l1_esz, 0,
+>> +				     handle_l1_dte, NULL);
+>> +	} else {
+>> +		l1_esz = abi->dte_esz;
+>> +		ret = scan_its_table(its, l1_gpa, l1_tbl_size, l1_esz, 0,
+>> +				     vgic_its_restore_dte, NULL);
+>> +	}
+>> +
+>> +	if (ret > 0)
+>> +		ret = -EINVAL;
+>> +
+>> +	return ret;
+>>  }
+>>  
+>>  static int vgic_its_save_cte(struct vgic_its *its,
+>> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+>> index 58adcae..e896114 100644
+>> --- a/virt/kvm/arm/vgic/vgic.h
+>> +++ b/virt/kvm/arm/vgic/vgic.h
+>> @@ -81,6 +81,16 @@
+>>  #define KVM_ITS_CTE_VALID_MASK		BIT_ULL(63)
+>>  #define KVM_ITS_CTE_RDBASE_SHIFT	16
+>>  #define KVM_ITS_CTE_ICID_MASK		GENMASK_ULL(15, 0)
+>> +#define KVM_ITS_DTE_VALID_SHIFT		63
+>> +#define KVM_ITS_DTE_VALID_MASK		BIT_ULL(63)
+>> +#define KVM_ITS_DTE_NEXT_SHIFT		49
+>> +#define KVM_ITS_DTE_NEXT_MASK		GENMASK_ULL(62, 49)
+>> +#define KVM_ITS_DTE_ITTADDR_SHIFT	5
+>> +#define KVM_ITS_DTE_ITTADDR_MASK	GENMASK_ULL(48, 5)
+>> +#define KVM_ITS_DTE_SIZE_MASK		GENMASK_ULL(4, 0)
+>> +#define KVM_ITS_L1E_VALID_MASK		BIT_ULL(63)
+>> +/* we only support 64 kB translation table page size */
+>> +#define KVM_ITS_L1E_ADDR_MASK		GENMASK_ULL(51, 16)
+>>  
+>>  static inline bool irq_is_pending(struct vgic_irq *irq)
+>>  {
+>> -- 
+>> 2.5.5
+>>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
