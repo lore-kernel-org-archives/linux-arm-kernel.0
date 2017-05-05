@@ -1,57 +1,44 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Fri, 5 May 2017 01:41:06 +0100
-Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
-In-Reply-To: <20170504160032.GA5147@htj.duckdns.org>
-References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
- <20170504120314.lfmcv4cpsuz2igte@lukather>
- <20170504160032.GA5147@htj.duckdns.org>
-Message-ID: <95a58640-f9e3-edb5-12e5-a6f92e75bdb0@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 5 May 2017 09:18:37 +0800
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
+In-Reply-To: <8c3827c4-1272-f004-52d9-7c79e93813c6@denx.de>
+References: <1493823533.11226.28.camel@nxp.com>
+ <e46a57c2-4a28-a8b6-445e-299dd9d8659c@denx.de>
+ <1493834298.11226.40.camel@nxp.com>
+ <51fb1bd0-028d-c431-acc8-3c4f1d25fdba@denx.de>
+ <1493890943.11226.42.camel@nxp.com>
+ <6dbf67a0-42ea-ee84-d144-41422a21c1c5@denx.de>
+ <20170504124446.GO18578@dragon>
+ <4ba6bdf2-56b2-972d-3326-0eda3985c80b@denx.de>
+ <20170504134100.GR18578@dragon>
+ <8c3827c4-1272-f004-52d9-7c79e93813c6@denx.de>
+Message-ID: <20170505011834.GS18578@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/17 17:00, Tejun Heo wrote:
-
-Hi,
-
-> Hello,
+On Thu, May 04, 2017 at 04:34:14PM +0200, Marek Vasut wrote:
+> On 05/04/2017 03:41 PM, Shawn Guo wrote:
+> > So I guess you do not understand how the OPP hackery was born and why it
+> > shouldn't be there for mainline kernel at all.
 > 
-> On Thu, May 04, 2017 at 02:03:14PM +0200, Maxime Ripard wrote:
->>> @@ -704,6 +704,7 @@ static void pinctrl_generic_free_groups(struct pinctrl_dev *pctldev)
->>>  		radix_tree_delete(&pctldev->pin_group_tree, indices[i]);
->>>  		devm_kfree(pctldev->dev, group);
->>>  	}
->>> +	kfree(indices);
->>
->> We use devm_kfree for other allocations done here, maybe we can just
->> have the same thing here? We would be consistant, and we would still
->> keep the resource tracking.
-> 
-> It doesn't make any sense to use the managed functions from the
-> release functions and if you're always matching devm_kmalloc() with
-> devm_kfree(), the only thing it'd do is confusing its readers.
+> The OPP hackery is there to keep both regulators configured the same
+> way, since they share the same input voltage rail IMO.
 
-I agree, the idea of this patch is to get rid of managed functions. Also
-my understanding is that devm_kfree needs to match some devm_kmalloc().
+Yes.  But configuring both regulators the same way is only required in
+vendor kernel where 'LDO bypass' mode is used.  With 'LDO enable' mode
+which is the case for upstream kernel, both regulators can be configured
+differently even they share the same input rail.
 
-> And the function in question just looks weird to me - give up on
-> freeing resources if memory allocation fails?  And why call
-> devm_kfree() on objects which are being released anyway?  Or if the
-> group can be released w/o the device being detached, why use devm
-> allocations on the members at all?
-> 
-> As for removal, can't it just call radix_tree_iter_delete() while
-> iterating?  Why allocate memory to iterate and store all indices and
-> to look them up again and delete them?
+> If you model the
+> power distribution correctly, the OPP hackery can be removed.
 
-Yeah, I was wondering about this as well. It looks like it just wants to
-clean up everything; the implementation of ida_destroy() seems to have
-the same intention and uses radix_tree_iter_delete().
+The OPP hackery can be removed even without reg_arm/reg_soc modeling.
+That's why we can do hackery dropping and reg_arm/reg_soc modeling in
+separate patches.
 
-Using this algorithm would avoid the memory allocation in the first
-place, so fix the issue as well and simplify the code.
+@Leonard, if someday we support 'LDO bypass' mode in upstream kernel,
+the OPP hackery needs to be back in some way even with reg_arm/reg_soc
+modeling in place, right?  Or will we have a better way to ensure SW1A
+rail can always feed a correct voltage directly to reg_arm&reg_soc?
 
-So is there anything we miss here why we store all indices and iterate
-twice over the tree?
-
-Cheers,
-Andre.
+Shawn
