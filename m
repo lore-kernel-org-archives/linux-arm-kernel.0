@@ -1,120 +1,23 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 5 May 2017 13:50:18 +0100
-Subject: [PATCH v6 15/24] KVM: arm64: vgic-its: Read config and pending
- bit in add_lpi()
-In-Reply-To: <20170505095708.GB1419@lvm>
-References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
- <1493898284-29504-16-git-send-email-eric.auger@redhat.com>
- <20170505095708.GB1419@lvm>
-Message-ID: <54aa52bb-dd92-e5a8-5c5c-353fc206d203@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 5 May 2017 10:18:42 -0300
+Subject: [PATCH 1/5] ARM: dts: imx7-colibri: use OF graph to describe the
+ display
+In-Reply-To: <CAOMZO5Bp=K8_nP0_+MjQ9teS_U9SpRspOhVPwOwg1J0m0QZjCg@mail.gmail.com>
+References: <20170329232113.19078-1-stefan@agner.ch>
+ <CAOMZO5Bp=K8_nP0_+MjQ9teS_U9SpRspOhVPwOwg1J0m0QZjCg@mail.gmail.com>
+Message-ID: <CAOMZO5AuvgqtNTHUW-LyXy9Xsq=rnaPODBzWA3FRmRpxqrRqAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/17 10:57, Christoffer Dall wrote:
-> On Thu, May 04, 2017 at 01:44:35PM +0200, Eric Auger wrote:
->> When creating the lpi we now ask the redistributor what is the state
->> of the LPI (priority, enabled, pending).
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->>
->> v6: creation
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 35 ++++++++++++++++++++++++-----------
->>  1 file changed, 24 insertions(+), 11 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index f43ea30c..3ad615a 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -38,6 +38,8 @@
->>  
->>  static int vgic_its_set_abi(struct vgic_its *its, int rev);
->>  static const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its);
->> +static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
->> +			     struct kvm_vcpu *filter_vcpu);
->>  
->>  /*
->>   * Creates a new (reference to a) struct vgic_irq for a given LPI.
->> @@ -46,10 +48,12 @@ static const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its);
->>   * If this is a "new" LPI, we allocate and initialize a new struct vgic_irq.
->>   * This function returns a pointer to the _unlocked_ structure.
->>   */
->> -static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
->> +static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
->> +				     struct kvm_vcpu *vcpu)
->>  {
->>  	struct vgic_dist *dist = &kvm->arch.vgic;
->>  	struct vgic_irq *irq = vgic_get_irq(kvm, NULL, intid), *oldirq;
->> +	int ret;
->>  
->>  	/* In this case there is no put, since we keep the reference. */
->>  	if (irq)
->> @@ -66,6 +70,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
->>  	irq->config = VGIC_CONFIG_EDGE;
->>  	kref_init(&irq->refcount);
->>  	irq->intid = intid;
->> +	irq->target_vcpu = vcpu;
->>  
->>  	spin_lock(&dist->lpi_list_lock);
->>  
->> @@ -97,6 +102,19 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
->>  out_unlock:
->>  	spin_unlock(&dist->lpi_list_lock);
->>  
->> +	/*
->> +	 * We "cache" the configuration table entries in out struct vgic_irq's.
-> 
-> s/out/our/ ?
-> 
->> +	 * However we only have those structs for mapped IRQs, so we read in
->> +	 * the respective config data from memory here upon mapping the LPI.
->> +	 */
->> +	ret = update_lpi_config(kvm, irq, NULL);
->> +	if (ret)
->> +		return ERR_PTR(ret);
->> +
->> +	ret = vgic_v3_lpi_sync_pending_status(kvm, irq);
->> +	if (ret)
->> +		return ERR_PTR(ret);
->> +
->>  	return irq;
->>  }
->>  
->> @@ -769,6 +787,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->>  	u32 event_id = its_cmd_get_id(its_cmd);
->>  	u32 coll_id = its_cmd_get_collection(its_cmd);
->>  	struct its_ite *ite;
->> +	struct kvm_vcpu *vcpu = NULL;
->>  	struct its_device *device;
->>  	struct its_collection *collection, *new_coll = NULL;
->>  	int lpi_nr;
->> @@ -814,7 +833,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->>  	ite->collection = collection;
->>  	ite->lpi = lpi_nr;
->>  
->> -	irq = vgic_add_lpi(kvm, lpi_nr);
->> +	if (its_is_collection_mapped(collection))
->> +		vcpu = kvm_get_vcpu(kvm, collection->target_addr);
->> +
->> +	irq = vgic_add_lpi(kvm, lpi_nr, vcpu);
-> 
-> So, if we don't have the collection and therefore end up with irq->vcpu
-> == NULL, how do we ever read the pending bit from memory as the affinity
-> may later change?
-> 
-> Is this a problem with our idea of only looking at the pending bit on
-> vgic_add_lpi, or does it just mean that we should sample the pending bit
-> whenever we move LPIs around to VCPUs and if the bit is set, then also
-> set the pennding_latch (if not already set), or what should happen here?
+On Fri, May 5, 2017 at 8:48 AM, Fabio Estevam <festevam@gmail.com> wrote:
 
-It means that we would need to sample that bit on MOVI and maybe MOVALL
-as well, but this feels a bit odd. How did that bit land there the first
-place?
+> Could you please confirm that drm/mxsfb is working fine on 4.11 on your board?
+>
+> I am converting mx6sx sdb to use drm/mxsfb and I noticed that when
+> board boots I get garbage on the display.
+>
+> If I do a blank/unblank then things are displayed correctly.
 
-Thanks,
+Ok, I managed to fix the drm/mxsfb driver.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will submit a patch shortly.
