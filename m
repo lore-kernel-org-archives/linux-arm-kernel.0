@@ -1,54 +1,137 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  5 May 2017 11:55:08 +0200
-Subject: [PATCH] arm64: marvell: add clocks for Armada AP806 XOR engines
-Message-ID: <1493978108-12477-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 5 May 2017 02:57:08 -0700
+Subject: [PATCH v6 15/24] KVM: arm64: vgic-its: Read config and pending
+ bit in add_lpi()
+In-Reply-To: <1493898284-29504-16-git-send-email-eric.auger@redhat.com>
+References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
+ <1493898284-29504-16-git-send-email-eric.auger@redhat.com>
+Message-ID: <20170505095708.GB1419@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The XORv2 engines in the AP side of the Armada 7K/8K SoCs are using the
-AP MS core clock as input, so this commit adds the appropriate clocks
-properties.
+On Thu, May 04, 2017 at 01:44:35PM +0200, Eric Auger wrote:
+> When creating the lpi we now ask the redistributor what is the state
+> of the LPI (priority, enabled, pending).
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
+> ---
+> 
+> v6: creation
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 35 ++++++++++++++++++++++++-----------
+>  1 file changed, 24 insertions(+), 11 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index f43ea30c..3ad615a 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -38,6 +38,8 @@
+>  
+>  static int vgic_its_set_abi(struct vgic_its *its, int rev);
+>  static const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its);
+> +static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+> +			     struct kvm_vcpu *filter_vcpu);
+>  
+>  /*
+>   * Creates a new (reference to a) struct vgic_irq for a given LPI.
+> @@ -46,10 +48,12 @@ static const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its);
+>   * If this is a "new" LPI, we allocate and initialize a new struct vgic_irq.
+>   * This function returns a pointer to the _unlocked_ structure.
+>   */
+> -static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
+> +static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
+> +				     struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_dist *dist = &kvm->arch.vgic;
+>  	struct vgic_irq *irq = vgic_get_irq(kvm, NULL, intid), *oldirq;
+> +	int ret;
+>  
+>  	/* In this case there is no put, since we keep the reference. */
+>  	if (irq)
+> @@ -66,6 +70,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
+>  	irq->config = VGIC_CONFIG_EDGE;
+>  	kref_init(&irq->refcount);
+>  	irq->intid = intid;
+> +	irq->target_vcpu = vcpu;
+>  
+>  	spin_lock(&dist->lpi_list_lock);
+>  
+> @@ -97,6 +102,19 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
+>  out_unlock:
+>  	spin_unlock(&dist->lpi_list_lock);
+>  
+> +	/*
+> +	 * We "cache" the configuration table entries in out struct vgic_irq's.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+s/out/our/ ?
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index a749ba2..2804231 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -159,6 +159,7 @@
- 				reg = <0x400000 0x1000>,
- 				      <0x410000 0x1000>;
- 				msi-parent = <&gic_v2m0>;
-+				clocks = <&ap_syscon 3>;
- 				dma-coherent;
- 			};
- 
-@@ -167,6 +168,7 @@
- 				reg = <0x420000 0x1000>,
- 				      <0x430000 0x1000>;
- 				msi-parent = <&gic_v2m0>;
-+				clocks = <&ap_syscon 3>;
- 				dma-coherent;
- 			};
- 
-@@ -175,6 +177,7 @@
- 				reg = <0x440000 0x1000>,
- 				      <0x450000 0x1000>;
- 				msi-parent = <&gic_v2m0>;
-+				clocks = <&ap_syscon 3>;
- 				dma-coherent;
- 			};
- 
-@@ -183,6 +186,7 @@
- 				reg = <0x460000 0x1000>,
- 				      <0x470000 0x1000>;
- 				msi-parent = <&gic_v2m0>;
-+				clocks = <&ap_syscon 3>;
- 				dma-coherent;
- 			};
- 
--- 
-2.7.4
+> +	 * However we only have those structs for mapped IRQs, so we read in
+> +	 * the respective config data from memory here upon mapping the LPI.
+> +	 */
+> +	ret = update_lpi_config(kvm, irq, NULL);
+> +	if (ret)
+> +		return ERR_PTR(ret);
+> +
+> +	ret = vgic_v3_lpi_sync_pending_status(kvm, irq);
+> +	if (ret)
+> +		return ERR_PTR(ret);
+> +
+>  	return irq;
+>  }
+>  
+> @@ -769,6 +787,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  	u32 event_id = its_cmd_get_id(its_cmd);
+>  	u32 coll_id = its_cmd_get_collection(its_cmd);
+>  	struct its_ite *ite;
+> +	struct kvm_vcpu *vcpu = NULL;
+>  	struct its_device *device;
+>  	struct its_collection *collection, *new_coll = NULL;
+>  	int lpi_nr;
+> @@ -814,7 +833,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  	ite->collection = collection;
+>  	ite->lpi = lpi_nr;
+>  
+> -	irq = vgic_add_lpi(kvm, lpi_nr);
+> +	if (its_is_collection_mapped(collection))
+> +		vcpu = kvm_get_vcpu(kvm, collection->target_addr);
+> +
+> +	irq = vgic_add_lpi(kvm, lpi_nr, vcpu);
+
+So, if we don't have the collection and therefore end up with irq->vcpu
+== NULL, how do we ever read the pending bit from memory as the affinity
+may later change?
+
+Is this a problem with our idea of only looking at the pending bit on
+vgic_add_lpi, or does it just mean that we should sample the pending bit
+whenever we move LPIs around to VCPUs and if the bit is set, then also
+set the pennding_latch (if not already set), or what should happen here?
+
+I think in any case, we should have a comment here explaining that vcpu
+configuration data gets picked up later?
+
+Thanks,
+-Christoffer
+
+>  	if (IS_ERR(irq)) {
+>  		if (new_coll)
+>  			vgic_its_free_collection(its, coll_id);
+> @@ -823,15 +845,6 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  	}
+>  	ite->irq = irq;
+>  
+> -	update_affinity_ite(kvm, ite);
+> -
+> -	/*
+> -	 * We "cache" the configuration table entries in out struct vgic_irq's.
+> -	 * However we only have those structs for mapped IRQs, so we read in
+> -	 * the respective config data from memory here upon mapping the LPI.
+> -	 */
+> -	update_lpi_config(kvm, ite->irq, NULL);
+> -
+>  	return 0;
+>  }
+>  
+> -- 
+> 2.5.5
+> 
