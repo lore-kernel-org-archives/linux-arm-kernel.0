@@ -1,48 +1,33 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Fri, 5 May 2017 13:11:05 +0300
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Remove cpufreq OPP override
-In-Reply-To: <20170505011834.GS18578@dragon>
-References: <1493823533.11226.28.camel@nxp.com>
- <e46a57c2-4a28-a8b6-445e-299dd9d8659c@denx.de>
- <1493834298.11226.40.camel@nxp.com>
- <51fb1bd0-028d-c431-acc8-3c4f1d25fdba@denx.de>
- <1493890943.11226.42.camel@nxp.com>
- <6dbf67a0-42ea-ee84-d144-41422a21c1c5@denx.de>
- <20170504124446.GO18578@dragon>
- <4ba6bdf2-56b2-972d-3326-0eda3985c80b@denx.de>
- <20170504134100.GR18578@dragon>
- <8c3827c4-1272-f004-52d9-7c79e93813c6@denx.de>
- <20170505011834.GS18578@dragon>
-Message-ID: <1493979065.3591.26.camel@nxp.com>
+From: iemdey@gmail.com (Yong Deng)
+Date: Fri,  5 May 2017 18:31:57 +0800
+Subject: [PATCH v2] clk: sunxi-ng: v3s: Fix usb otg device reset bit
+Message-ID: <1493980317-39775-1-git-send-email-iemdey@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-05-05 at 09:18 +0800, Shawn Guo wrote:
-> On Thu, May 04, 2017 at 04:34:14PM +0200, Marek Vasut wrote:
-> > If you model the
-> > power distribution correctly, the OPP hackery can be removed.
+V3S's usb otg device reset bit should be 24, not 23.
 
-> The OPP hackery can be removed even without reg_arm/reg_soc modeling.
-> That's why we can do hackery dropping and reg_arm/reg_soc modeling in
-> separate patches.
-> 
-> @Leonard, if someday we support 'LDO bypass' mode in upstream kernel,
-> the OPP hackery needs to be back in some way even with reg_arm/reg_soc
-> modeling in place, right???Or will we have a better way to ensure SW1A
-> rail can always feed a correct voltage directly to reg_arm?_soc?
+Signed-off-by: Yong Deng <iemdey@gmail.com>
+Reviewed-By: Icenowy Zheng <icenowy@aosc.io>
+---
+Changes in v2:
+- Fix commit format
 
-Maybe? Or maybe the cpufreq driver could detect this situation and
-handle it internally. In the vendor tree this the cpufreq driver has a
-special fsl,arm-soc-shared property for this anyway.
+ drivers/clk/sunxi-ng/ccu-sun8i-v3s.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I posted another RFC at upstreaming ldo-bypass recently but it did not
-handle this particular case of a shared input rail. It can be handled
-separately.
-
-See:?https://lkml.org/lkml/2017/3/22/640
-
-But getting that series to an acceptable state might take a long time.
-
---?
-Regards,
-Leonard
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-v3s.c b/drivers/clk/sunxi-ng/ccu-sun8i-v3s.c
+index e58706b..6297add 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-v3s.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-v3s.c
+@@ -537,7 +537,7 @@ static CLK_FIXED_FACTOR(pll_periph0_2x_clk, "pll-periph0-2x",
+ 	[RST_BUS_EMAC]		=  { 0x2c0, BIT(17) },
+ 	[RST_BUS_HSTIMER]	=  { 0x2c0, BIT(19) },
+ 	[RST_BUS_SPI0]		=  { 0x2c0, BIT(20) },
+-	[RST_BUS_OTG]		=  { 0x2c0, BIT(23) },
++	[RST_BUS_OTG]		=  { 0x2c0, BIT(24) },
+ 	[RST_BUS_EHCI0]		=  { 0x2c0, BIT(26) },
+ 	[RST_BUS_OHCI0]		=  { 0x2c0, BIT(29) },
+ 
+-- 
+1.8.3.1
