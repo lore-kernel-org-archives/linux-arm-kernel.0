@@ -1,316 +1,86 @@
-From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Fri,  5 May 2017 19:30:27 +0530
-Subject: [PATCH v5 3/3] PCI/of fix of_dma_get_range;
- get PCI specific dma-ranges
-In-Reply-To: <1493992827-1553-1-git-send-email-oza.oza@broadcom.com>
-References: <1493992827-1553-1-git-send-email-oza.oza@broadcom.com>
-Message-ID: <1493992827-1553-4-git-send-email-oza.oza@broadcom.com>
+From: alexander.duyck@gmail.com (Alexander Duyck)
+Date: Fri, 5 May 2017 07:04:53 -0700
+Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <MWHPR12MB1600E78DD7F530AA9DC2433DC8EA0@MWHPR12MB1600.namprd12.prod.outlook.com>
+References: <cover.1493678834.git.leedom@chelsio.com>
+ <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
+ <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
+ <20170502165329.GB26406@linux.intel.com>
+ <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
+ <MWHPR12MB160095DF53CE981C923FE65DC8160@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <CAKgT0UdJ17DGAphuP5Y9co6ky-GBFdq2s-1nqctY_Tz_iz5__g@mail.gmail.com>
+ <MWHPR12MB1600E78DD7F530AA9DC2433DC8EA0@MWHPR12MB1600.namprd12.prod.outlook.com>
+Message-ID: <CAKgT0Ucwkp+fi-9HhMbze6t_i15dj4e2WQBp13Coi6MegrDh=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-current device framework and OF framework integration assumes
-dma-ranges in a way where memory-mapped devices define their
-dma-ranges. (child-bus-address, parent-bus-address, length).
+On Thu, May 4, 2017 at 2:01 PM, Casey Leedom <leedom@chelsio.com> wrote:
+> | From: Alexander Duyck <alexander.duyck@gmail.com>
+> | Sent: Wednesday, May 3, 2017 9:02 AM
+> | ...
+> | It sounds like we are more or less in agreement. My only concern is
+> | really what we default this to. On x86 I would say we could probably
+> | default this to disabled for existing platforms since my understanding
+> | is that relaxed ordering doesn't provide much benefit on what is out
+> | there right now when performing DMA through the root complex. As far
+> | as peer-to-peer I would say we should probably look at enabling the
+> | ability to have Relaxed Ordering enabled for some channels but not
+> | others. In those cases the hardware needs to be smart enough to allow
+> | for you to indicate you want it disabled by default for most of your
+> | DMA channels, and then enabled for the select channels that are
+> | handling the peer-to-peer traffic.
+>
+>   Yes, I think that we are mostly in agreement.  I had just wanted to make
+> sure that whatever scheme was developed would allow for simultaneously
+> supporting non-Relaxed Ordering for some PCIe End Points and Relaxed
+> Ordering for others within the same system.  I.e. not simply
+> enabling/disabling/etc.  based solely on System Platform Architecture.
+>
+>   By the way, I've started our QA folks off looking at what things look like
+> in Linux Virtual Machines under different Hypervisors to see what
+> information they may provide to the VM in the way of what Root Complex Port
+> is being used, etc.  So far they've got Windows HyperV done and there
+> there's no PCIe Fabric exposed in any way: just the attached device.  I'll
+> have to see what pci_find_pcie_root_port() returns in that environment.
+> Maybe NULL?
 
-of_dma_configure is specifically written to take care of memory
-mapped devices. but no implementation exists for pci to take
-care of pcie based memory ranges.
+I believe NULL is one of the options. It all depends on what qemu is
+emulating. Most likely you won't find a pcie root port on KVM because
+the default is to emulate an older system that only supports PCI.
 
-for e.g. iproc based SOCs and other SOCs(suc as rcar) have PCI
-world dma-ranges.
-dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+>   With your reservations (which I also share), I think that it probably
+> makes sense to have a per-architecture definition of the "Can I Use Relaxed
+> Ordering With TLPs Directed At This End Point" predicate, with the default
+> being "No" for any architecture which doesn't implement the predicate.  And
+> if the specified (struct pci_dev *) End Node is NULL, it ought to return
+> False for that as well.  I can't see any reason to pass in the Source End
+> Node but I may be missing something.
+>
+>   At this point, this is pretty far outside my level of expertise.  I'm
+> happy to give it a go, but I'd be even happier if someone with a lot more
+> experience in the PCIe Infrastructure were to want to carry the ball
+> forward.  I'm not super familiar with the Linux Kernel "Rules Of
+> Engagement", so let me know what my next step should be.  Thanks.
+>
+> Casey
 
-this patch fixes the bug in of_dma_get_range, which with as is,
-parses the PCI memory ranges and return wrong size as 0.
+For now we can probably keep this on the linux-pci mailing list. Going
+that route is the most straight forward for now since step one is
+probably just making sure we are setting the relaxed ordering bit in
+the setups that make sense. I would say we could probably keep it
+simple. We just need to enable relaxed ordering by default for SPARC
+architectures, on most others we can probably default it to off.
 
-in order to get largest possible dma_mask. this patch also
-retuns the largest possible size based on dma-ranges,
+I believe this all had started as Ding Tianhong was hoping to enable
+this for the ARM architecture. That is the only one I can think of
+where it might be difficult to figure out which way to default as we
+were attempting to follow the same code that was enabled for SPARC and
+that is what started this tug-of-war about how this should be done.
+What we might do is take care of this in two phases. The first one
+enables the infrastructure generically but leaves it defaulted to off
+for everyone but SPARC. Then we can go through and start enabling it
+for other platforms such as some of those on ARM in the platforms that
+Ding Tianhong was working with.
 
-for e.g.
-dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
-we should get dev->coherent_dma_mask=0x7fffffffff.
-
-based on which IOVA allocation space will honour PCI host
-bridge limitations.
-
-the implementation hooks bus specific callbacks for getting
-dma-ranges.
-
-Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
-
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index 02b2903..b43e347 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -6,6 +6,7 @@
- #include <linux/ioport.h>
- #include <linux/module.h>
- #include <linux/of_address.h>
-+#include <linux/of_pci.h>
- #include <linux/pci.h>
- #include <linux/pci_regs.h>
- #include <linux/sizes.h>
-@@ -46,6 +47,8 @@ struct of_bus {
- 				int na, int ns, int pna);
- 	int		(*translate)(__be32 *addr, u64 offset, int na);
- 	unsigned int	(*get_flags)(const __be32 *addr);
-+	int		(*get_dma_ranges)(struct device_node *np,
-+					  u64 *dma_addr, u64 *paddr, u64 *size);
- };
- 
- /*
-@@ -171,6 +174,144 @@ static int of_bus_pci_translate(__be32 *addr, u64 offset, int na)
- {
- 	return of_bus_default_translate(addr + 1, offset, na - 1);
- }
-+
-+static int of_bus_pci_get_dma_ranges(struct device_node *np, u64 *dma_addr,
-+				     u64 *paddr, u64 *size)
-+{
-+	struct device_node *node = of_node_get(np);
-+	int ret = 0;
-+	struct resource_entry *window;
-+	LIST_HEAD(res);
-+
-+	if (!node)
-+		return -EINVAL;
-+
-+	*size = 0;
-+	/*
-+	 * PCI dma-ranges is not mandatory property.
-+	 * many devices do no need to have it, since
-+	 * host bridge does not require inbound memory
-+	 * configuration or rather have design limitations.
-+	 * so we look for dma-ranges, if missing we
-+	 * just return the caller full size, and also
-+	 * no dma-ranges suggests that, host bridge allows
-+	 * whatever comes in, so we set dma_addr to 0.
-+	 */
-+	ret = of_pci_get_dma_ranges(np, &res);
-+	if (!ret) {
-+		resource_list_for_each_entry(window, &res) {
-+		struct resource *res_dma = window->res;
-+
-+		if (*size < resource_size(res_dma)) {
-+			*dma_addr = res_dma->start - window->offset;
-+			*paddr = res_dma->start;
-+			*size = resource_size(res_dma);
-+			}
-+		}
-+	}
-+	pci_free_resource_list(&res);
-+
-+	/*
-+	 * return the largest possible size,
-+	 * since PCI master allows everything.
-+	 */
-+	if (*size == 0) {
-+		pr_debug("empty/zero size dma-ranges found for node(%s)\n",
-+			np->full_name);
-+		*size = DMA_BIT_MASK(sizeof(dma_addr_t) * 8) - 1;
-+		*dma_addr = *paddr = 0;
-+		ret = 0;
-+	}
-+
-+	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
-+		 *dma_addr, *paddr, *size);
-+
-+	of_node_put(node);
-+
-+	return ret;
-+}
-+
-+static int get_dma_ranges(struct device_node *np, u64 *dma_addr,
-+		          u64 *paddr, u64 *size)
-+{
-+	struct device_node *node = of_node_get(np);
-+	const __be32 *ranges = NULL;
-+	int len, naddr, nsize, pna;
-+	int ret = 0;
-+	u64 dmaaddr;
-+
-+	if (!node)
-+		return -EINVAL;
-+
-+	while (1) {
-+		naddr = of_n_addr_cells(node);
-+		nsize = of_n_size_cells(node);
-+		node = of_get_next_parent(node);
-+		if (!node)
-+			break;
-+
-+		ranges = of_get_property(node, "dma-ranges", &len);
-+
-+		/* Ignore empty ranges, they imply no translation required */
-+		if (ranges && len > 0)
-+			break;
-+
-+		/*
-+		 * At least empty ranges has to be defined for parent node if
-+		 * DMA is supported
-+		 */
-+		if (!ranges)
-+			break;
-+	}
-+
-+	if (!ranges) {
-+		pr_debug("no dma-ranges found for node(%s)\n", np->full_name);
-+		ret = -ENODEV;
-+		goto out;
-+	}
-+
-+	len /= sizeof(u32);
-+
-+	pna = of_n_addr_cells(node);
-+
-+	/* dma-ranges format:
-+	 * DMA addr	: naddr cells
-+	 * CPU addr	: pna cells
-+	 * size		: nsize cells
-+	 */
-+	dmaaddr = of_read_number(ranges, naddr);
-+	*paddr = of_translate_dma_address(np, ranges);
-+	if (*paddr == OF_BAD_ADDR) {
-+		pr_err("translation of DMA address(%pad) to CPU address failed node(%s)\n",
-+		       dma_addr, np->full_name);
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+	*dma_addr = dmaaddr;
-+
-+	*size = of_read_number(ranges + naddr + pna, nsize);
-+
-+	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
-+		 *dma_addr, *paddr, *size);
-+
-+out:
-+	of_node_put(node);
-+
-+	return ret;
-+}
-+
-+static int of_bus_isa_get_dma_ranges(struct device_node *np, u64 *dma_addr,
-+				     u64 *paddr, u64 *size)
-+{
-+	return get_dma_ranges(np, dma_addr, paddr, size);
-+}
-+
-+static int of_bus_default_get_dma_ranges(struct device_node *np, u64 *dma_addr,
-+					 u64 *paddr, u64 *size)
-+{
-+	return get_dma_ranges(np, dma_addr, paddr, size);
-+}
-+
- #endif /* CONFIG_OF_ADDRESS_PCI */
- 
- #ifdef CONFIG_PCI
-@@ -424,6 +565,7 @@ static unsigned int of_bus_isa_get_flags(const __be32 *addr)
- 		.map = of_bus_pci_map,
- 		.translate = of_bus_pci_translate,
- 		.get_flags = of_bus_pci_get_flags,
-+		.get_dma_ranges = of_bus_pci_get_dma_ranges,
- 	},
- #endif /* CONFIG_OF_ADDRESS_PCI */
- 	/* ISA */
-@@ -435,6 +577,7 @@ static unsigned int of_bus_isa_get_flags(const __be32 *addr)
- 		.map = of_bus_isa_map,
- 		.translate = of_bus_isa_translate,
- 		.get_flags = of_bus_isa_get_flags,
-+		.get_dma_ranges = of_bus_isa_get_dma_ranges,
- 	},
- 	/* Default */
- 	{
-@@ -445,6 +588,7 @@ static unsigned int of_bus_isa_get_flags(const __be32 *addr)
- 		.map = of_bus_default_map,
- 		.translate = of_bus_default_translate,
- 		.get_flags = of_bus_default_get_flags,
-+		.get_dma_ranges = of_bus_default_get_dma_ranges,
- 	},
- };
- 
-@@ -820,74 +964,20 @@ void __iomem *of_io_request_and_map(struct device_node *np, int index,
-  *	size			: nsize cells
-  *
-  * It returns -ENODEV if "dma-ranges" property was not found
-- * for this device in DT.
-+ * for this device in DT, except if PCI device then, dma-ranges
-+ * can be optional property, and in that case returns size with
-+ * entire host memory.
-  */
- int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size)
- {
--	struct device_node *node = of_node_get(np);
--	const __be32 *ranges = NULL;
--	int len, naddr, nsize, pna;
--	int ret = 0;
--	u64 dmaaddr;
--
--	if (!node)
--		return -EINVAL;
--
--	while (1) {
--		naddr = of_n_addr_cells(node);
--		nsize = of_n_size_cells(node);
--		node = of_get_next_parent(node);
--		if (!node)
--			break;
--
--		ranges = of_get_property(node, "dma-ranges", &len);
--
--		/* Ignore empty ranges, they imply no translation required */
--		if (ranges && len > 0)
--			break;
--
--		/*
--		 * At least empty ranges has to be defined for parent node if
--		 * DMA is supported
--		 */
--		if (!ranges)
--			break;
--	}
--
--	if (!ranges) {
--		pr_debug("no dma-ranges found for node(%s)\n", np->full_name);
--		ret = -ENODEV;
--		goto out;
--	}
--
--	len /= sizeof(u32);
--
--	pna = of_n_addr_cells(node);
--
--	/* dma-ranges format:
--	 * DMA addr	: naddr cells
--	 * CPU addr	: pna cells
--	 * size		: nsize cells
--	 */
--	dmaaddr = of_read_number(ranges, naddr);
--	*paddr = of_translate_dma_address(np, ranges);
--	if (*paddr == OF_BAD_ADDR) {
--		pr_err("translation of DMA address(%pad) to CPU address failed node(%s)\n",
--		       dma_addr, np->full_name);
--		ret = -EINVAL;
--		goto out;
--	}
--	*dma_addr = dmaaddr;
--
--	*size = of_read_number(ranges + naddr + pna, nsize);
--
--	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
--		 *dma_addr, *paddr, *size);
-+	struct of_bus *bus;
- 
--out:
--	of_node_put(node);
-+	/* get bus specific dma-ranges. */
-+	bus = of_match_bus(np);
-+	if (bus->get_dma_ranges)
-+		return bus->get_dma_ranges(np, dma_addr, paddr, size);
- 
--	return ret;
-+	return 0;
- }
- EXPORT_SYMBOL_GPL(of_dma_get_range);
- 
--- 
-1.9.1
+- Alex
