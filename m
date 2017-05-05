@@ -1,29 +1,55 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Fri,  5 May 2017 13:30:14 +0530
-Subject: [PATCH v1] pwm : pwm-vt8500 - Undo preparation of a clock source.
-Message-ID: <1493971214-3763-1-git-send-email-arvind.yadav.cs@gmail.com>
+From: karim.eshapa@gmail.com (Karim Eshapa)
+Date: Fri,  5 May 2017 10:04:39 +0200
+Subject: [PATCH] drivers:soc:fsl:qbman:qman.c: Change a comment for an entry
+ check inside drain_mr_fqrni function
+Message-ID: <1493971480-14864-1-git-send-email-karim.eshapa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Undo preparation of a clock source, if vt8500_pwm_probe is not
-successful.
+Change the comment for an entry check inside function
+drain_mr_fqrni() with sleep for sufficient period
+of time instead of long time proccessor cycles.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Signed-off-by: Karim Eshapa <karim.eshapa@gmail.com>
 ---
- drivers/pwm/pwm-vt8500.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/soc/fsl/qbman/qman.c | 25 +++++++++++++------------
+ 1 file changed, 13 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
-index 8141a49..3a78dd0 100644
---- a/drivers/pwm/pwm-vt8500.c
-+++ b/drivers/pwm/pwm-vt8500.c
-@@ -241,6 +241,7 @@ static int vt8500_pwm_probe(struct platform_device *pdev)
- 	ret = pwmchip_add(&chip->chip);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed to add PWM chip\n");
-+		clk_unprepare(chip->clk);
- 		return ret;
- 	}
- 
+diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
+index 18d391e..636a7d7 100644
+--- a/drivers/soc/fsl/qbman/qman.c
++++ b/drivers/soc/fsl/qbman/qman.c
+@@ -1071,18 +1071,19 @@ static int drain_mr_fqrni(struct qm_portal *p)
+ 	msg = qm_mr_current(p);
+ 	if (!msg) {
+ 		/*
+-		 * if MR was full and h/w had other FQRNI entries to produce, we
+-		 * need to allow it time to produce those entries once the
+-		 * existing entries are consumed. A worst-case situation
+-		 * (fully-loaded system) means h/w sequencers may have to do 3-4
+-		 * other things before servicing the portal's MR pump, each of
+-		 * which (if slow) may take ~50 qman cycles (which is ~200
+-		 * processor cycles). So rounding up and then multiplying this
+-		 * worst-case estimate by a factor of 10, just to be
+-		 * ultra-paranoid, goes as high as 10,000 cycles. NB, we consume
+-		 * one entry at a time, so h/w has an opportunity to produce new
+-		 * entries well before the ring has been fully consumed, so
+-		 * we're being *really* paranoid here.
++		 * if MR was full and h/w had other FQRNI entries to
++		 * produce, we need to allow it time to produce those
++		 * entries once the existing entries are consumed.
++		 * A worst-case situation (fully-loaded system) means
++		 * h/w sequencers may have to do 3-4 other things
++		 * before servicing the portal's MR pump, each of
++		 * which (if slow) may take ~50 qman cycles
++		 * (which is ~200 processor cycles). So sleep with
++		 * 1 ms would be very efficient, after this period
++		 * we can check if there is something produced.
++		 * NB, we consume one entry at a time, so h/w has
++		 * an opportunity to produce new entries well before
++		 * the ring has been fully consumed.
+ 		 */
+ 		msleep(1);
+ 		msg = qm_mr_current(p);
 -- 
-1.9.1
+2.7.4
