@@ -1,44 +1,77 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 5 May 2017 17:49:32 -0400
-Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
-In-Reply-To: <20170505195518.xbn5n7uzo2xherah@lukather>
-References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
- <20170504120314.lfmcv4cpsuz2igte@lukather>
- <20170504160032.GA5147@htj.duckdns.org>
- <20170505195518.xbn5n7uzo2xherah@lukather>
-Message-ID: <20170505214932.GA29891@wtj.duckdns.org>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Fri, 5 May 2017 17:04:22 -0500
+Subject: [PATCH v4] irqchip/gicv3-its: Avoid memory over allocation for
+ ITEs
+In-Reply-To: <87lgqfmdy7.fsf@on-the-bus.cambridge.arm.com>
+References: <1493562975-14365-1-git-send-email-shankerd@codeaurora.org>
+ <87lgqfmdy7.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <f3ca8eb8-88e9-6672-134a-d5eaac73f11f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Maxime.
+Hi Marc,
 
-On Fri, May 05, 2017 at 09:55:18PM +0200, Maxime Ripard wrote:
-> > It doesn't make any sense to use the managed functions from the
-> > release functions and if you're always matching devm_kmalloc() with
-> > devm_kfree(), the only thing it'd do is confusing its readers.
-> 
-> I wouldn't say that being able to recover and free whatever memory
-> leak we might have not making sense, but ok. That was one of the
-> options, let's discard it.
+
+On 05/02/2017 11:16 AM, Marc Zyngier wrote:
+> On Sun, Apr 30 2017 at  3:36:15 pm BST, Shanker Donthineni <shankerd@codeaurora.org> wrote:
+>> We are always allocating extra 255Bytes of memory to handle ITE
+>> physical address alignment requirement. The kmalloc() satisfies
+>> the ITE alignment since the ITS driver is requesting a minimum
+>> size of ITS_ITT_ALIGN bytes.
+>>
+>> Let's try to allocate the exact amount of memory that is required
+>> for ITEs to avoid wastage.
+>>
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>> ---
+>> Changes:
+>> v2: removed 'Change-Id: Ia8084189833f2081ff13c392deb5070c46a64038' from commit.
+>> v3: changed from IITE to ITE.
+>> v3: removed fallback since kmalloc() guarantees the right alignment.
+>>
+>>  drivers/irqchip/irq-gic-v3-its.c | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 45ea1933..72e56f03 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -261,7 +261,6 @@ static struct its_collection *its_build_mapd_cmd(struct its_cmd_block *cmd,
+>>  	u8 size = ilog2(desc->its_mapd_cmd.dev->nr_ites);
+>>  
+>>  	itt_addr = virt_to_phys(desc->its_mapd_cmd.dev->itt);
+>> -	itt_addr = ALIGN(itt_addr, ITS_ITT_ALIGN);
+>>  
+>>  	its_encode_cmd(cmd, GITS_CMD_MAPD);
+>>  	its_encode_devid(cmd, desc->its_mapd_cmd.dev->device_id);
+>> @@ -1329,13 +1328,14 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>>  	 */
+>>  	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+>>  	sz = nr_ites * its->ite_size;
+>> -	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+>> +	sz = max(sz, ITS_ITT_ALIGN);
+>>  	itt = kzalloc(sz, GFP_KERNEL);
+>>  	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
+>>  	if (lpi_map)
+>>  		col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
+>>  
+>> -	if (!dev || !itt || !lpi_map || !col_map) {
+>> +	if (!dev || !itt || !lpi_map || !col_map ||
+>> +	    !IS_ALIGNED(virt_to_phys(itt), ITS_ITT_ALIGN)) {
+>>  		kfree(dev);
+>>  		kfree(itt);
+>>  		kfree(lpi_map);
+> I'm confused. Either the alignment is guaranteed (and you should
+> document why it is so), or it is not, and we need to handle the
+> non-alignment (instead of failing).
+
+Sorry for confusion, alignment is guaranteed by kmalloc(), added a check for readability purpose only can be removed.
+ 
+> Thanks,
 >
-> The other one is: refactor the rest of the allocations so that you
-> don't have a mix of devm_kmalloc / devm_kfree and kmalloc / kfree for
-> the same purpose in the same function.
-
-So, I think the issues here are
-
-1. Use of devm functions in a devres release function.  This just
-   doesn't make sense.
-
-2. If a resource is always allocated and freed in the same function,
-   there's no reason to use devres for it.  I understand that there
-   can be exceptions for this, e.g. consistency, but it doesn't seem
-   to apply here.
-
-3. Last but not least, allocating memory to destroy a radix tree.  It
-   should be able to do that without allocating any memory.
-
-Thanks.
+> 	M.
 
 -- 
-tejun
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
