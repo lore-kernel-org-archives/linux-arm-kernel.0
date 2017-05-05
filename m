@@ -1,106 +1,73 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 5 May 2017 15:27:17 +0200
-Subject: [PATCH V15 08/11] efi: print unrecognized CPER section
-In-Reply-To: <1492556723-9189-9-git-send-email-tbaicar@codeaurora.org>
-References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
- <1492556723-9189-9-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170505132717.zodffuha46f3q5sj@pd.tnic>
+From: oza.oza@broadcom.com (Oza Pawandeep)
+Date: Fri,  5 May 2017 19:17:17 +0530
+Subject: [PATCH v4 0/3] OF/PCI address PCI inbound memory limitations
+Message-ID: <1493992040-31222-1-git-send-email-oza.oza@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 05:05:20PM -0600, Tyler Baicar wrote:
-> UEFI spec allows for non-standard section in Common Platform Error
-> Record. This is defined in section N.2.3 of UEFI version 2.5.
-> 
-> Currently if the CPER section's type (UUID) does not match with
-> one of the section types that the kernel knows how to parse, the
-> section is skipped. Therefore, user is not able to see
-> such CPER data, for instance, error record of non-standard section.
-> 
-> For above mentioned case, this change prints out the raw data in
-> hex in dmesg buffer.
+It is possible that PCI device supports 64-bit DMA addressing,
+and thus it's driver sets device's dma_mask to DMA_BIT_MASK(64),
+however PCI host bridge may have limitations on the inbound 
+transaction addressing.
 
-... because? We'd need the reason why we're not ignoring those errors
-anymore.
+This is particularly problematic on ARM/ARM64 SOCs where the 
+IOMMU (i.e. SMMU) translates IOVA to PA for in-bound transactions
+only after PCI Host has forwarded these transactions on SOC IO bus. 
 
->  Data length is taken from Error Data length
-> field of Generic Error Data Entry.
-> 
-> The following is a sample output from dmesg:
-> [  140.739180] {1}[Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
-> [  140.739182] {1}[Hardware Error]: It has been corrected by h/w and requires no further action
-> [  140.739191] {1}[Hardware Error]: event severity: corrected
-> [  140.739196] {1}[Hardware Error]:  time: precise 2017-03-15 20:37:35
-> [  140.739197] {1}[Hardware Error]:  Error 0, type: corrected
-> [  140.739203] {1}[Hardware Error]:   section type: unknown, d2e2621c-f936-468d-0d84-15a4ed015c8b
-> [  140.739205] {1}[Hardware Error]:   section length: 568 (0x238)
-> [  140.739210] {1}[Hardware Error]:   00000000: 4d415201 4d492031 453a4d45 435f4343  .RAM1 IMEM:ECC_C
-> [  140.739214] {1}[Hardware Error]:   00000010: 53515f45 44525f42 00000000 00000000  E_QSB_RD........
-> [  140.739217] {1}[Hardware Error]:   00000020: 00000000 00000000 00000000 00000000  ................
-> [  140.739220] {1}[Hardware Error]:   00000030: 00000000 00000000 01010000 01010000  ................
-> [  140.739223] {1}[Hardware Error]:   00000040: 00000000 00000000 00000005 00000000  ................
-> [  140.739226] {1}[Hardware Error]:   00000050: 01010000 00000000 00000001 00dddd00  ................
+This means, on such ARM/ARM64 SOCs the IOVA of in-bound transactions
+has to honor the addressing restrictions of the PCI Host.
 
-Kill all those prefixes:
+Current device framework and OF framework integration assumes
+dma-ranges in a way where memory-mapped devices define their
+dma-ranges. (child-bus-address, parent-bus-address, length).
 
-" Hardware error from APEI Generic Hardware Error Source: 2
-  It has been corrected by h/w and requires no further action
-  event severity: corrected
-   time: precise 2017-03-15 20:37:35
-   Error 0, type: corrected
-    section type: unknown, d2e2621c-f936-468d-0d84-15a4ed015c8b
-    section length: 568 (0x238)
-    00000000: 4d415201 4d492031 453a4d45 435f4343  .RAM1 IMEM:ECC_C
-    00000010: 53515f45 44525f42 00000000 00000000  E_QSB_RD........
-    00000020: 00000000 00000000 00000000 00000000  ................
-    00000030: 00000000 00000000 01010000 01010000  ................
-    00000040: 00000000 00000000 00000005 00000000  ................
-    00000050: 01010000 00000000 00000001 00dddd00  ................
-"
+of_dma_configure is specifically written to take care of memory
+mapped devices but no implementation exists for pci devices.
 
-to the important info only.
+For e.g. iproc based SOCs and other SOCs (such as rcar) have
+PCI world dma-ranges.
+dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
 
+This patchset
+reserves the IOVA ranges for PCI masters based
+on the PCI world dma-ranges.
+fix of_dma_get_range to cater to PCI dma-ranges.
+fix of_dma_get_range which currently returns size 0 for PCI devices.
 
-> ...
-> 
-> The raw data from the error can then be decoded using vendor
-> specific tools.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Reviewed-by: James Morse <james.morse@arm.com>
-> ---
->  drivers/firmware/efi/cper.c | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-> index f959185..610d31a 100644
-> --- a/drivers/firmware/efi/cper.c
-> +++ b/drivers/firmware/efi/cper.c
-> @@ -596,8 +596,16 @@ static void cper_estatus_timestamp(const char *pfx,
->  			cper_print_proc_arm(newpfx, arm_err);
->  		else
->  			goto err_section_too_small;
-> -	} else
-> -		printk("%s""section type: unknown, %pUl\n", newpfx, sec_type);
-> +	} else {
-> +		const void *unknown_err;
-> +
-> +		unknown_err = acpi_hest_get_payload(gdata);
+IOVA allocation patch:
+[PATCH 2/3] iommu/pci: reserve iova for PCI masters
 
-Simply:
+Fix of_dma_get_range bug and address PCI master.
+[PATCH 3/3] PCI/of fix of_dma_get_range; get PCI specific
 
-	const void *err = acpi_hest_get_payload(gdata);
+Base patch for both of the above patches:
+[PATCH 1/3] of/pci/dma: fix DMA configuration for PCI masters
 
-Short and sweet.
+Changes since v3:
+- redudant check removed
+- no revison for [PATCH 2/3] iommu/pci: reserve iova for PCI masters; since under discussion with Robin
+Changes since v2:
+- internal review names removed.
+- no revison for [PATCH 2/3] iommu/pci: reserve iova for PCI masters; since under discussion with Robin
+Changes since v1:
+- Remove internal GERRIT details from patch descriptions
+- address Rob's comments.
+- Add a get_dma_ranges() function to of_bus struct..
+- Convert existing contents of this function to of_bus_default_dma_get_ranges
+  and adding that to the default of_bus struct.
+- Make of_dma_get_range call of_bus_match() and then bus->get_dma_ranges.
+- no revison for [PATCH 2/3] iommu/pci: reserve iova for PCI masters; since under discussion with Robin
+  
+Oza Pawandeep (3):
+  of/pci/dma: fix DMA configuration for PCI masters
+  iommu/pci: reserve iova for PCI masters
+  PCI/of fix of_dma_get_range; get PCI specific dma-ranges
 
-> +		printk("%ssection type: unknown, %pUl\n", newpfx, sec_type);
-> +		printk("%ssection length: %d (%#x)\n", newpfx,
-
-One number format is fine.
+ drivers/iommu/dma-iommu.c | 35 +++++++++++++++++++++
+ drivers/of/address.c      | 52 ++++++++++++++++++++++++++++++++
+ drivers/of/of_pci.c       | 77 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_pci.h    |  7 +++++
+ 4 files changed, 171 insertions(+)
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+1.9.1
