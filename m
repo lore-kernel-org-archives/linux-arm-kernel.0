@@ -1,36 +1,75 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  5 May 2017 11:57:50 +0200
-Subject: [PATCH 07/10] dma: mv_xor_v2: set DMA mask to 40 bits
+Date: Fri,  5 May 2017 11:57:49 +0200
+Subject: [PATCH 06/10] dma: mv_xor_v2: remove interrupt coalescing
 In-Reply-To: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1493978274-12805-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1493978274-12805-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The XORv2 engine on Armada 7K/8K can only access the first 40 bits of
-the physical address space, so the DMA mask must be set accordingly.
+The current implementation of interrupt coalescing doesn't work, because
+it doesn't configure the coalescing timer, which is needed to make sure
+we get an interrupt at some point.
+
+As a fix for stable, we simply remove the interrupt coalescing
+functionality. It will be re-introduced properly in a future commit.
 
 Fixes: 19a340b1a820 ("dmaengine: mv_xor_v2: new driver")
 Cc: <stable@vger.kernel.org>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor_v2.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/dma/mv_xor_v2.c | 25 -------------------------
+ 1 file changed, 25 deletions(-)
 
 diff --git a/drivers/dma/mv_xor_v2.c b/drivers/dma/mv_xor_v2.c
-index b133fe2..f3e211f 100644
+index 4684ece..b133fe2 100644
 --- a/drivers/dma/mv_xor_v2.c
 +++ b/drivers/dma/mv_xor_v2.c
-@@ -693,6 +693,10 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
+@@ -246,22 +246,6 @@ static int mv_xor_v2_set_desc_size(struct mv_xor_v2_device *xor_dev)
+ 	return MV_XOR_V2_EXT_DESC_SIZE;
+ }
  
- 	platform_set_drvdata(pdev, xor_dev);
+-/*
+- * Set the IMSG threshold
+- */
+-static inline
+-void mv_xor_v2_set_imsg_thrd(struct mv_xor_v2_device *xor_dev, int thrd_val)
+-{
+-	u32 reg;
+-
+-	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_THRD_OFF);
+-
+-	reg &= (~MV_XOR_V2_DMA_IMSG_THRD_MASK << MV_XOR_V2_DMA_IMSG_THRD_SHIFT);
+-	reg |= (thrd_val << MV_XOR_V2_DMA_IMSG_THRD_SHIFT);
+-
+-	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_THRD_OFF);
+-}
+-
+ static irqreturn_t mv_xor_v2_interrupt_handler(int irq, void *data)
+ {
+ 	struct mv_xor_v2_device *xor_dev = data;
+@@ -277,12 +261,6 @@ static irqreturn_t mv_xor_v2_interrupt_handler(int irq, void *data)
+ 	if (!ndescs)
+ 		return IRQ_NONE;
  
-+	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(40));
-+	if (ret)
-+		return ret;
-+
- 	xor_dev->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(xor_dev->clk) && PTR_ERR(xor_dev->clk) == -EPROBE_DEFER)
- 		return -EPROBE_DEFER;
+-	/*
+-	 * Update IMSG threshold, to disable new IMSG interrupts until
+-	 * end of the tasklet
+-	 */
+-	mv_xor_v2_set_imsg_thrd(xor_dev, MV_XOR_V2_DESC_NUM);
+-
+ 	/* schedule a tasklet to handle descriptors callbacks */
+ 	tasklet_schedule(&xor_dev->irq_tasklet);
+ 
+@@ -607,9 +585,6 @@ static void mv_xor_v2_tasklet(unsigned long data)
+ 		/* free the descriptores */
+ 		mv_xor_v2_free_desc_from_desq(xor_dev, num_of_pending);
+ 	}
+-
+-	/* Update IMSG threshold, to enable new IMSG interrupts */
+-	mv_xor_v2_set_imsg_thrd(xor_dev, 0);
+ }
+ 
+ /*
 -- 
 2.7.4
