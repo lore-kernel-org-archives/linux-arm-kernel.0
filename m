@@ -1,88 +1,32 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 5 May 2017 23:26:11 +0800
-Subject: [PATCH 3/6] clk: mediatek: export cpu multiplexer clock for MT8173
- SoCs
-In-Reply-To: <1493997974-17699-1-git-send-email-sean.wang@mediatek.com>
-References: <1493997974-17699-1-git-send-email-sean.wang@mediatek.com>
-Message-ID: <1493997974-17699-4-git-send-email-sean.wang@mediatek.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 5 May 2017 18:28:45 +0300
+Subject: =?utf-8?B?562U5aSN?= =?utf-8?Q?=3A?= [PATCH 0/3] arm64: queued
+ spinlocks and rw-locks
+In-Reply-To: <20170505122639.GB14111@arm.com>
+References: <20170503145141.4966-1-ynorov@caviumnetworks.com>
+ <SIXPR0199MB0604CF9C101455F7D7417FF7C5160@SIXPR0199MB0604.apcprd01.prod.exchangelabs.com>
+ <20170504202809.lv222a3oes54ijkj@yury-N73SV>
+ <20170505115303.s3bsu4adfgkxrhh2@hirez.programming.kicks-ass.net>
+ <20170505122639.GB14111@arm.com>
+Message-ID: <20170505152845.e32h3jxhjdjw6yht@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Fri, May 05, 2017 at 01:26:40PM +0100, Will Deacon wrote:
+> On Fri, May 05, 2017 at 01:53:03PM +0200, Peter Zijlstra wrote:
+> > On Thu, May 04, 2017 at 11:28:09PM +0300, Yury Norov wrote:
+> > > I don't think
+> > > it's a real use case to have ticket spinlocks and queued rwlocks
+> > 
+> > There's nothing wrong with that combination. In fact, we merged qrwlock
+> > much earlier than qspinlock.
+> 
+> ... and that's almost certainly the direction we'll go on arm64 too, not
+> least because the former are a lot easier to grok.
+> 
+> Will
 
-The patch enables CPU multiplexer clock on MT8173 SoC which fixes up
-cpufreq driver fails at acquiring intermediate clock source when driver
-probe is called.
+Hmm. Then I think I have to split patch 3 to rwlock and spinlock
+parts, and allow user to enable them independently in config. 
 
-Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/clk/mediatek/clk-mt8173.c      | 23 +++++++++++++++++++++++
- include/dt-bindings/clock/mt8173-clk.h |  4 +++-
- 2 files changed, 26 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-index 0ac3aee..96c292c 100644
---- a/drivers/clk/mediatek/clk-mt8173.c
-+++ b/drivers/clk/mediatek/clk-mt8173.c
-@@ -18,6 +18,7 @@
- 
- #include "clk-mtk.h"
- #include "clk-gate.h"
-+#include "clk-cpumux.h"
- 
- #include <dt-bindings/clock/mt8173-clk.h>
- 
-@@ -525,6 +526,25 @@ static const char * const i2s3_b_ck_parents[] __initconst = {
- 	"apll2_div5"
- };
- 
-+static const char * const ca53_parents[] __initconst = {
-+	"clk26m",
-+	"armca7pll",
-+	"mainpll",
-+	"univpll"
-+};
-+
-+static const char * const ca57_parents[] __initconst = {
-+	"clk26m",
-+	"armca15pll",
-+	"mainpll",
-+	"univpll"
-+};
-+
-+static const struct mtk_composite cpu_muxes[] __initconst = {
-+	MUX(CLK_INFRA_CA53SEL, "infra_ca53_sel", ca53_parents, 0x0000, 0, 2),
-+	MUX(CLK_INFRA_CA57SEL, "infra_ca57_sel", ca57_parents, 0x0000, 2, 2),
-+};
-+
- static const struct mtk_composite top_muxes[] __initconst = {
- 	/* CLK_CFG_0 */
- 	MUX(CLK_TOP_AXI_SEL, "axi_sel", axi_parents, 0x0040, 0, 3),
-@@ -948,6 +968,9 @@ static void __init mtk_infrasys_init(struct device_node *node)
- 						clk_data);
- 	mtk_clk_register_factors(infra_divs, ARRAY_SIZE(infra_divs), clk_data);
- 
-+	mtk_clk_register_cpumuxes(node, cpu_muxes, ARRAY_SIZE(cpu_muxes),
-+				  clk_data);
-+
- 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
- 	if (r)
- 		pr_err("%s(): could not register clock provider: %d\n",
-diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
-index 6094bf7..8aea623 100644
---- a/include/dt-bindings/clock/mt8173-clk.h
-+++ b/include/dt-bindings/clock/mt8173-clk.h
-@@ -193,7 +193,9 @@
- #define CLK_INFRA_PMICSPI		10
- #define CLK_INFRA_PMICWRAP		11
- #define CLK_INFRA_CLK_13M		12
--#define CLK_INFRA_NR_CLK		13
-+#define CLK_INFRA_CA53SEL               13
-+#define CLK_INFRA_CA57SEL               14
-+#define CLK_INFRA_NR_CLK                15
- 
- /* PERI_SYS */
- 
--- 
-2.7.4
+Yury
