@@ -1,38 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 May 2017 16:32:46 +0100
-Subject: =?utf-8?B?562U5aSN?= =?utf-8?Q?=3A?= [PATCH 0/3] arm64: queued
- spinlocks and rw-locks
-In-Reply-To: <20170505152845.e32h3jxhjdjw6yht@yury-N73SV>
-References: <20170503145141.4966-1-ynorov@caviumnetworks.com>
- <SIXPR0199MB0604CF9C101455F7D7417FF7C5160@SIXPR0199MB0604.apcprd01.prod.exchangelabs.com>
- <20170504202809.lv222a3oes54ijkj@yury-N73SV>
- <20170505115303.s3bsu4adfgkxrhh2@hirez.programming.kicks-ass.net>
- <20170505122639.GB14111@arm.com>
- <20170505152845.e32h3jxhjdjw6yht@yury-N73SV>
-Message-ID: <20170505153245.GH14111@arm.com>
+From: hotran@apm.com (Hoan Tran)
+Date: Fri, 5 May 2017 08:48:28 -0700
+Subject: [PATCH v2 0/3] perf: xgene: Add support for SoC PMU version 3
+In-Reply-To: <CAFHUOYzJ1PoUV=BmcVxSHZ_8qENm6DW5_Hd3uuFHE9kdqhXCzA@mail.gmail.com>
+References: <1491238077-20666-1-git-send-email-hotran@apm.com>
+ <CAFHUOYzJ1PoUV=BmcVxSHZ_8qENm6DW5_Hd3uuFHE9kdqhXCzA@mail.gmail.com>
+Message-ID: <CAFHUOYw3WtTB+q+zKdRDBaXyCaDp+r-YfydTxHSRm5CT6sNnXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 05, 2017 at 06:28:45PM +0300, Yury Norov wrote:
-> On Fri, May 05, 2017 at 01:26:40PM +0100, Will Deacon wrote:
-> > On Fri, May 05, 2017 at 01:53:03PM +0200, Peter Zijlstra wrote:
-> > > On Thu, May 04, 2017 at 11:28:09PM +0300, Yury Norov wrote:
-> > > > I don't think
-> > > > it's a real use case to have ticket spinlocks and queued rwlocks
-> > > 
-> > > There's nothing wrong with that combination. In fact, we merged qrwlock
-> > > much earlier than qspinlock.
-> > 
-> > ... and that's almost certainly the direction we'll go on arm64 too, not
-> > least because the former are a lot easier to grok.
-> > 
-> > Will
-> 
-> Hmm. Then I think I have to split patch 3 to rwlock and spinlock
-> parts, and allow user to enable them independently in config. 
+Ping!
 
-To be honest, I'm going to spend some time looking at the qrwlock code again
-before I enable it for arm64, so I don't think you need to rush to resend
-patches since I suspect I'll have a few in the meantime.
+Thanks
+Hoan
 
-Will
+On Thu, Apr 13, 2017 at 10:50 AM, Hoan Tran <hotran@apm.com> wrote:
+> Hi All,
+>
+> Do you have any comments on this patch set?
+>
+> Thanks
+> Hoan
+>
+> On Mon, Apr 3, 2017 at 9:47 AM, Hoan Tran <hotran@apm.com> wrote:
+>>
+>> This patch set adds support for SoC-wide (AKA uncore) Performance
+>> Monitoring
+>> Unit version 3.
+>>
+>> It can support up to
+>>  - 2 IOB PMU instances
+>>  - 8 L3C PMU instances
+>>  - 2 MCB PMU instances
+>>  - 8 MCU PMU instances
+>>
+>> v2:
+>>  * Split into separate patches
+>>  * Use the function pointers for the PMU leaf functions
+>>  * Parse PMU subnode by the match table
+>>  * Dont allow user change agent id by config1 for SoC PMU v3
+>>
+>> Hoan Tran (3):
+>>   perf: xgene: Parse PMU subnode from the match table
+>>   perf: xgene: Move PMU leaf functions into function pointer structure
+>>   perf: xgene: Add support for SoC PMU version 3
+>>
+>>  drivers/perf/xgene_pmu.c | 695
+>> +++++++++++++++++++++++++++++++++++++++++------
+>>  1 file changed, 619 insertions(+), 76 deletions(-)
+>>
+>> --
+>> 1.9.1
+>>
+>
