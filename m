@@ -1,36 +1,43 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Fri, 5 May 2017 14:07:29 -0500
-Subject: [PATCH v2 0/4] ARM: dts: keystone: Add support for new K2G evm
-In-Reply-To: <20170424202204.24170-1-fcooper@ti.com>
-References: <20170424202204.24170-1-fcooper@ti.com>
-Message-ID: <b4909ea1-6b14-13f8-faf4-14e1c028dfc1@ti.com>
+From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
+Date: Fri,  5 May 2017 15:32:54 -0400
+Subject: [PATCH v3 1/6] of: documentation: add bindings documentation for
+ TS-4600
+In-Reply-To: <20170505193259.16517-1-sebastien.bourdelin@savoirfairelinux.com>
+References: <20170505193259.16517-1-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20170505193259.16517-2-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This adds the documentation for the TS-4600 by Technologic Systems.
 
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+---
+Changes v2 -> v3:
+  - rebase on master
 
-On 04/24/2017 03:22 PM, Franklin S Cooper Jr wrote:
-> This patchset adds support for new K2G Industrial Communication Engine
-> evm. For now only a bare minimal dts which will allow ram boot. Additional
-> peripherals will be added when base K2G SoC patches are upstreamed allowing
-> peripherals to be enabled.
-> 
-> Version 2 changes:
-> Make various tweaks to allow unit address to be added to memory node.
-> 
-> Franklin S Cooper Jr (4):
->   ARM: dts: keystone-k2g: Remove skeleton.dtsi
->   ARM: dts: k2g-evm: Add unit address to memory node
->   ARM: keystone: Create new binding for K2G ICE evm
->   ARM: dts: keystone: Add minimum support for K2G ICE evm
-> 
+Changes v1 -> v2:
+  - rebase on master
+  - add ack by Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/technologic.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-ping
->  .../devicetree/bindings/arm/keystone/keystone.txt  |  3 ++
->  arch/arm/boot/dts/Makefile                         |  3 +-
->  arch/arm/boot/dts/keystone-k2g-evm.dts             |  2 +-
->  arch/arm/boot/dts/keystone-k2g-ice.dts             | 35 ++++++++++++++++++++++
->  arch/arm/boot/dts/keystone-k2g.dtsi                |  3 +-
->  5 files changed, 43 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/boot/dts/keystone-k2g-ice.dts
-> 
+diff --git a/Documentation/devicetree/bindings/arm/technologic.txt b/Documentation/devicetree/bindings/arm/technologic.txt
+index 33797acad846..e9d6d6575566 100644
+--- a/Documentation/devicetree/bindings/arm/technologic.txt
++++ b/Documentation/devicetree/bindings/arm/technologic.txt
+@@ -1,6 +1,11 @@
+ Technologic Systems Platforms Device Tree Bindings
+ --------------------------------------------------
+ 
++TS-4600 is a System-on-Module based on the Freescale i.MX28 System-on-Chip.
++It can be mounted on a carrier board providing additional peripheral connectors.
++Required root node properties:
++	- compatible = "technologic,imx28-ts4600", "fsl,imx28"
++
+ TS-4800 board
+ Required root node properties:
+ 	- compatible = "technologic,imx51-ts4800", "fsl,imx51";
+-- 
+2.12.0
