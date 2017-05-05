@@ -1,25 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 May 2017 13:26:40 +0100
-Subject: =?utf-8?B?562U5aSN?= =?utf-8?Q?=3A?= [PATCH 0/3] arm64: queued
- spinlocks and rw-locks
-In-Reply-To: <20170505115303.s3bsu4adfgkxrhh2@hirez.programming.kicks-ass.net>
-References: <20170503145141.4966-1-ynorov@caviumnetworks.com>
- <SIXPR0199MB0604CF9C101455F7D7417FF7C5160@SIXPR0199MB0604.apcprd01.prod.exchangelabs.com>
- <20170504202809.lv222a3oes54ijkj@yury-N73SV>
- <20170505115303.s3bsu4adfgkxrhh2@hirez.programming.kicks-ass.net>
-Message-ID: <20170505122639.GB14111@arm.com>
+From: gakula@caviumnetworks.com (Geetha sowjanya)
+Date: Fri,  5 May 2017 17:38:04 +0530
+Subject: [PATCH v3 0/7] Cavium ThunderX2 SMMUv3 errata workarounds
+Message-ID: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 05, 2017 at 01:53:03PM +0200, Peter Zijlstra wrote:
-> On Thu, May 04, 2017 at 11:28:09PM +0300, Yury Norov wrote:
-> > I don't think
-> > it's a real use case to have ticket spinlocks and queued rwlocks
-> 
-> There's nothing wrong with that combination. In fact, we merged qrwlock
-> much earlier than qspinlock.
+From: Linu Cherian <linu.cherian@cavium.com>
 
-... and that's almost certainly the direction we'll go on arm64 too, not
-least because the former are a lot easier to grok.
+Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
+1. Errata ID #74
+   SMMU register alias Page 1 is not implemented
+2. Errata ID #126
+   SMMU doesnt support unique IRQ lines and also MSI for gerror, 
+   eventq and cmdq-sync
 
-Will
+The following patchset does software workaround for these two erratas.
+
+This series is based on patchset. 
+https://www.spinics.net/lists/arm-kernel/msg578443.html
+
+Changes from v1:
+ Since the use of MIDR register is rejected and SMMU_IIDR is broken on this 
+ silicon, as suggested by Will Deacon modified the patches to use ThunderX2 
+ SMMUv3 IORT model number to enable errata workaround.
+
+Changes from v2:
+ Updated "Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt" document with 
+ new SMMU option used to enable errata workaround.
+ 
+Geetha Sowjanya (1):
+  iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
+
+Linu Cherian (6):
+  iommu/arm-smmu-v3: Introduce smmu option PAGE0_REGS_ONLY for ThunderX2
+    errata#74.
+  iommu/arm-smmu-v3: Do resource size checks based on SMMU option
+    PAGE0_REGS_ONLY
+  ACPICA: IORT: Add Cavium ThunderX2 SMMUv3 model definition.
+  iommu/arm-smmu-v3: For ACPI based device probing, set PAGE0_REGS_ONLY
+    option     for ThunderX2 SMMUv3 implementations.
+  ACPI/IORT: Fixup SMMUv3 resource size for Cavium ThunderX2 SMMUv3
+    model
+  arm64: Documentation: Add Cavium ThunderX2 SMMUv3 erratas
+
+ Documentation/arm64/silicon-errata.txt |   2 +
+ drivers/acpi/arm64/iort.c              |  10 ++-
+ drivers/iommu/arm-smmu-v3.c            | 122 ++++++++++++++++++++++++++-------
+ include/acpi/actbl2.h                  |   2 +
+ 4 files changed, 110 insertions(+), 26 deletions(-)
+
+-- 
+1.8.3.1
