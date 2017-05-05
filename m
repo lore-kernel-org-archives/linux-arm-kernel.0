@@ -1,38 +1,81 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 05 May 2017 20:34:16 +0800
-Subject: [linux-sunxi] [PATCH v6 11/13] ARM: dts: sun8i: add DE2 nodes for
- V3s SoC
-In-Reply-To: <20170505123035.pwh3idz73ujrd3hx@lukather>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 5 May 2017 14:36:18 +0200
+Subject: [PATCH v6 08/13] drm/sun4i: add support for Allwinner DE2 mixers
+In-Reply-To: <522ab8cb2939f0017917c5e9b4065089@aosc.io>
 References: <20170504114858.9008-1-icenowy@aosc.io>
- <20170504114858.9008-12-icenowy@aosc.io>
- <CAGb2v67uE2iuP+wrL2t0fSMY8C1qnX=pYru7pZGX+0WhC_z2EA@mail.gmail.com>
- <8ad5de02ffc13348dfc71e9ec203205c@aosc.io>
- <20170505123035.pwh3idz73ujrd3hx@lukather>
-Message-ID: <47D16B11-E976-464C-92AD-213D837C8F68@aosc.io>
+ <20170504114858.9008-9-icenowy@aosc.io>
+ <20170504130535.6nokhni5a3uxwy66@lukather>
+ <522ab8cb2939f0017917c5e9b4065089@aosc.io>
+Message-ID: <20170505123618.5vztqx2vdwsgnrxt@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, May 05, 2017 at 12:50:51AM +0800, icenowy at aosc.io wrote:
+> > > +void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
+> > > +				int layer, bool enable)
+> > > +{
+> > > +	u32 val;
+> > > +	/* Currently the first UI channel is used */
+> > > +	int chan = mixer->cfg->vi_num;
+> > > +
+> > > +	DRM_DEBUG_DRIVER("Enabling layer %d in channel %d\n", layer, chan);
+> > > +
+> > > +	if (enable)
+> > > +		val = SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN;
+> > > +	else
+> > > +		val = 0;
+> > > +
+> > > +	regmap_update_bits(mixer->engine.regs,
+> > > +			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
+> > > +			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN, val);
+> > > +
+> > > +	/* Set the alpha configuration */
+> > > +	regmap_update_bits(mixer->engine.regs,
+> > > +			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
+> > > +			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_MASK,
+> > > +			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_DEF);
+> > > +	regmap_update_bits(mixer->engine.regs,
+> > > +			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
+> > > +			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MASK,
+> > > +			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF);
+> > > +}
+> > 
+> > This one too.
+> 
+> It's called from sun8i_layer.c, so it cannot be static.
 
+Fair enough.
 
-? 2017?5?5? GMT+08:00 ??8:30:35, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
->On Fri, May 05, 2017 at 04:53:43PM +0800, icenowy at aosc.io wrote:
->> > > +               de2_clocks: clock at 1000000 {
->> > > +                       compatible =
->"allwinner,sun50i-h5-de2-clk";
->> > 
->> > I am a bit skeptical about this. Since the V3S only has one mixer,
->do
->> > the clocks
->> > for the second one even exist?
->> 
->> It's described in the de_clock.c in the BSP source code, and in
->hardware
->> these bits can be really set (although without clock output).
->> 
->> So I use this compatible which has still the extra clocks.
->
->If it's not usable, then it shouldn't be in the code, it's basically
->dead code.
+> > > +	/* Set base coordinates */
+> > > +	DRM_DEBUG_DRIVER("Layer coordinates X: %d Y: %d\n",
+> > > +			 state->crtc_x, state->crtc_y);
+> > > +	regmap_write(mixer->engine.regs,
+> > > +		     SUN8I_MIXER_CHAN_UI_LAYER_COORD(chan, layer),
+> > > +		     SUN8I_MIXER_COORD(state->crtc_x, state->crtc_y));
+> > 
+> > X and Y are fixed point numbers. You want to keep only the higher 16
+> > bits there.
+> 
+> Do you mean "lower 16 bits"? Thus should I (x & 0xffff) or ((u16)x) ?
 
-Thus should we have one more DE2 CCU compatible without mixer1
-clocks for V3s?
+Nevermind, I got confused with src_x and src_y.
+
+> P.S. The negative coordinates are broken, how should I deal with it? or
+> is the coordinates promised to be not negative?
+
+Adjust the buffer base address, and use a shorter line. You have such
+an example in the sun4i code.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170505/d92a20a3/attachment.sig>
