@@ -1,70 +1,152 @@
-From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Fri,  5 May 2017 17:29:13 +0530
-Subject: [PATCH v3 0/3] OF/PCI address PCI inbound memory limitations
-Message-ID: <1493985553-2868-1-git-send-email-oza.oza@broadcom.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 5 May 2017 05:04:56 -0700
+Subject: [PATCH v6 17/24] KVM: arm64: vgic-its: vgic_its_alloc_ite/device
+In-Reply-To: <1493898284-29504-18-git-send-email-eric.auger@redhat.com>
+References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
+ <1493898284-29504-18-git-send-email-eric.auger@redhat.com>
+Message-ID: <20170505120456.GE1419@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is possible that PCI device supports 64-bit DMA addressing,
-and thus it's driver sets device's dma_mask to DMA_BIT_MASK(64),
-however PCI host bridge may have limitations on the inbound 
-transaction addressing.
+On Thu, May 04, 2017 at 01:44:37PM +0200, Eric Auger wrote:
+> Add two new helpers to allocate an its ite and an its device.
+> This will avoid duplication on restore path.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
+> ---
+> v5 -> v6:
+> - remove Marc's A-b
+> - both functions now return the newly allocated struct
+> 
+> v4 -> v5:
+> - add Marc's A-b
+> 
+> v3 -> v4:
+> - fix allocation
+> - add comment about its_lock mutex hold
+> 
+> v1 -> v2:
+> - report itt_size fix and remove ITE_SIZE
+> - s/itte/ite/g
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 68 ++++++++++++++++++++++++++++++--------------
+>  1 file changed, 47 insertions(+), 21 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 5b251dc..ea8eb6a 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -776,6 +776,25 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
+>  	kfree(collection);
+>  }
+>  
+> +/* Must be called with its_lock mutex held */
+> +static struct its_ite *vgic_its_alloc_ite(struct its_device *device,
+> +					  struct its_collection *collection,
+> +					  u32 lpi_id, u32 event_id)
+> +{
+> +	struct its_ite *ite;
+> +
+> +	ite = kzalloc(sizeof(*ite), GFP_KERNEL);
+> +	if (!ite)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	ite->event_id	= event_id;
+> +	ite->collection = collection;
+> +	ite->lpi = lpi_id;
+> +
+> +	list_add_tail(&ite->ite_list, &device->itt_head);
+> +	return ite;
+> +}
+> +
+>  /*
+>   * The MAPTI and MAPI commands map LPIs to ITTEs.
+>   * Must be called with its_lock mutex held.
+> @@ -790,8 +809,8 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  	struct kvm_vcpu *vcpu = NULL;
+>  	struct its_device *device;
+>  	struct its_collection *collection, *new_coll = NULL;
+> -	int lpi_nr;
+>  	struct vgic_irq *irq;
+> +	int lpi_nr;
+>  
+>  	device = find_its_device(its, device_id);
+>  	if (!device)
+> @@ -820,19 +839,13 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  		new_coll = collection;
+>  	}
+>  
+> -	ite = kzalloc(sizeof(struct its_ite), GFP_KERNEL);
+> -	if (!ite) {
+> +	ite = vgic_its_alloc_ite(device, collection, lpi_nr, event_id);
+> +	if (IS_ERR(ite)) {
+>  		if (new_coll)
+>  			vgic_its_free_collection(its, coll_id);
+> -		return -ENOMEM;
+> +		return PTR_ERR(ite);
+>  	}
+>  
+> -	ite->event_id	= event_id;
+> -	list_add_tail(&ite->ite_list, &device->itt_head);
+> -
+> -	ite->collection = collection;
+> -	ite->lpi = lpi_nr;
+> -
+>  	if (its_is_collection_mapped(collection))
+>  		vcpu = kvm_get_vcpu(kvm, collection->target_addr);
+>  
+> @@ -865,6 +878,26 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
+>  	kfree(device);
+>  }
+>  
+> +/* Must be called with its_lock mutex held */
+> +static struct its_device *vgic_its_alloc_device(struct vgic_its *its,
+> +						u32 device_id, gpa_t itt_addr,
+> +						u8 num_eventid_bits)
+> +{
+> +	struct its_device *device;
+> +
+> +	device = kzalloc(sizeof(*device), GFP_KERNEL);
+> +	if (!device)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	device->device_id = device_id;
+> +	device->itt_addr = itt_addr;
+> +	device->num_eventid_bits = num_eventid_bits;
+> +	INIT_LIST_HEAD(&device->itt_head);
+> +
+> +	list_add_tail(&device->dev_list, &its->device_list);
+> +	return device;
+> +}
+> +
+>  /*
+>   * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
+>   * Must be called with the its_lock mutex held.
+> @@ -901,17 +934,10 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>  	if (!valid)
+>  		return 0;
+>  
+> -	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
+> -	if (!device)
+> -		return -ENOMEM;
+> -
+> -	device->device_id = device_id;
+> -	device->num_eventid_bits = num_eventid_bits;
+> -	device->itt_addr = itt_addr;
+> -
+> -	INIT_LIST_HEAD(&device->itt_head);
+> -
+> -	list_add_tail(&device->dev_list, &its->device_list);
+> +	device = vgic_its_alloc_device(its, device_id, itt_addr,
+> +				       num_eventid_bits);
+> +	if (IS_ERR(device))
+> +		return PTR_ERR(device);
+>  
+>  	return 0;
+>  }
+> -- 
+> 2.5.5
+> 
 
-This is particularly problematic on ARM/ARM64 SOCs where the 
-IOMMU (i.e. SMMU) translates IOVA to PA for in-bound transactions
-only after PCI Host has forwarded these transactions on SOC IO bus. 
-
-This means, on such ARM/ARM64 SOCs the IOVA of in-bound transactions
-has to honor the addressing restrictions of the PCI Host.
-
-Current device framework and OF framework integration assumes
-dma-ranges in a way where memory-mapped devices define their
-dma-ranges. (child-bus-address, parent-bus-address, length).
-
-of_dma_configure is specifically written to take care of memory
-mapped devices but no implementation exists for pci devices.
-
-For e.g. iproc based SOCs and other SOCs (such as rcar) have
-PCI world dma-ranges.
-dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
-
-This patchset
-reserves the IOVA ranges for PCI masters based
-on the PCI world dma-ranges.
-fix of_dma_get_range to cater to PCI dma-ranges.
-fix of_dma_get_range which currently returns size 0 for PCI devices.
-
-IOVA allocation patch:
-[PATCH 2/3] iommu/pci: reserve iova for PCI masters
-
-Fix of_dma_get_range bug and address PCI master.
-[PATCH 3/3] PCI/of fix of_dma_get_range; get PCI specific
-
-Base patch for both of the above patches:
-[PATCH 1/3] of/pci/dma: fix DMA configuration for PCI masters
-
-Changes since v2:
-- Remove internal detailes such as reviewed by	
-
-Changes since v1:
-- Remove internal GERRIT details from patch descriptions
-- address Rob's comments.
-- Add a get_dma_ranges() function to of_bus struct..
-- Convert existing contents of this function to of_bus_default_dma_get_ranges
-  and adding that to the default of_bus struct.
-- Make of_dma_get_range call of_bus_match() and then bus->get_dma_ranges.
-- no revison for [PATCH 2/3] iommu/pci: reserve iova for PCI masters; since under discussion with Robin
-  
-Oza Pawandeep (3):
-  of/pci/dma: fix DMA configuration for PCI masters
-  iommu/pci: reserve iova for PCI masters
-  PCI/of fix of_dma_get_range; get PCI specific dma-ranges
-
- drivers/iommu/dma-iommu.c | 35 +++++++++++++++++++++
- drivers/of/address.c      | 52 ++++++++++++++++++++++++++++++++
- drivers/of/of_pci.c       | 77 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_pci.h    |  7 +++++
- 4 files changed, 171 insertions(+)
-
--- 
-1.9.1
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
