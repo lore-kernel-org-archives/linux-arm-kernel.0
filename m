@@ -1,48 +1,55 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Fri, 5 May 2017 09:41:39 +0200
-Subject: [PATCH v6 2/4] ARM: dts: mvebu: Add PWM properties to .dtsi files
-In-Reply-To: <CACRpkdZE0wnotF+OdAmutJcU9JSE_LxNd7Lz7yXqcn_bq5VqgQ@mail.gmail.com>
-References: <20170414154056.32055-1-ralph.sennhauser@gmail.com>
- <20170414154056.32055-3-ralph.sennhauser@gmail.com>
- <CACRpkdZE0wnotF+OdAmutJcU9JSE_LxNd7Lz7yXqcn_bq5VqgQ@mail.gmail.com>
-Message-ID: <20170505094139.484db2e7@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 5 May 2017 08:48:21 +0100
+Subject: [PATCH V4] ARM64: dts: hi6220-hikey: Add clock binding for the
+ pmic mfd
+In-Reply-To: <20170504220721.GB5252@mai>
+References: <1493066439-6889-1-git-send-email-daniel.lezcano@linaro.org>
+ <20170504220721.GB5252@mai>
+Message-ID: <20170505074821.fgnkq6lggde6gdv2@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Apr 2017 11:19:32 +0200
-Linus Walleij <linus.walleij@linaro.org> wrote:
+On Fri, 05 May 2017, Daniel Lezcano wrote:
 
-> On Fri, Apr 14, 2017 at 5:40 PM, Ralph Sennhauser
-> <ralph.sennhauser@gmail.com> wrote:
+> On Mon, Apr 24, 2017 at 10:40:22PM +0200, Daniel Lezcano wrote:
+> > The hi655x PMIC provides the regulators but also a clock. The latter is missing
+> > in the definition and in the DT, thus it is no possible to enable the WiFi which
+> > depends on this clock.
+> > 
+> > The hi655x's clock has been added and the hi655x multifunction driver has
+> > updated with a clock-cell.
+> > 
+> > This patch adds the clock-cells for the PMIC in the DT and updates the
+> > documentation.
+> > 
+> > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Cc: Michael Turquette <mturquette@baylibre.com>
+> > ---
+> >  Changelog:
+> > 	v4:
+> > 	   - Added Acked-by's
+> > 	   - Updated the commit message with a better description
+> > ---
 > 
-> > From: Andrew Lunn <andrew@lunn.ch>
-> >
-> > Add properties to the GPIO nodes to allow them to be also used as
-> > PWM lines.
-> >
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > URL: https://patchwork.ozlabs.org/patch/427294/
-> > [Ralph Sennhauser: Add new compatible string
-> > marvell,armada-370-xp-gpio] Signed-off-by: Ralph Sennhauser
-> > <ralph.sennhauser@gmail.com> Tested-by: Andrew Lunn
-> > <andrew@lunn.ch>  
+> Hi Xu Wei,
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Please funnel this through ARM SoC.
+> a gentle reminder for this patch. Is it ok for you?
 
-Hi Gregory,
+a) Pings aren't usually received well.  If you wish to remind
+maintainers of a patch's existence a [RESEND] is usually the most
+accepted method.
 
-A reminder on the off chance you have missed this and it's not to late
-already, Linus Walleij took the driver and submitted it for inclusion in
-4.12 [1]. So for completeness it be nice to have the dts(i) and
-defconfig changes in as well.
+b) There is usually little point (at least it's significantly reduced)
+in sending pings/resends whilst the merge-window is open.  Maintainers
+usually take this time to take a little breather (rest) from their
+duties.
 
-Thanks
-Ralph
-
-[1] https://lkml.org/lkml/2017/5/4/82
-
-> 
-> Yours,
-> Linus Walleij
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
