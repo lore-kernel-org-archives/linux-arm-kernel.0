@@ -1,78 +1,41 @@
-From: yangbo.lu@nxp.com (Y.B. Lu)
-Date: Fri, 5 May 2017 03:01:04 +0000
-Subject: [v2, 1/5] mmc: dt: add compatible into eSDHC required properties
-In-Reply-To: <20170505023651.GW18578@dragon>
-References: <1493894940-47452-1-git-send-email-yangbo.lu@nxp.com>
- <1493894940-47452-2-git-send-email-yangbo.lu@nxp.com>
- <20170505023651.GW18578@dragon>
-Message-ID: <DB6PR0401MB2536CB3661070921AEA0C5B6F8EB0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 5 May 2017 11:05:30 +0800
+Subject: [linux-sunxi] [PATCH 04/13] drm/sun4i: return only planes for
+ layers created
+In-Reply-To: <20170504114208.8524-4-icenowy@aosc.io>
+References: <20170504114208.8524-1-icenowy@aosc.io>
+ <20170504114208.8524-4-icenowy@aosc.io>
+Message-ID: <CAGb2v64xwoNC1puWZXb010Sxh27tp9xNSCupuftzBoKCMi-Edw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Thu, May 4, 2017 at 7:41 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> As we are going to add support for the Allwinner DE2 Mixer in sun4i-drm
+> driver, we will finally have two types of layers.
+>
+> Each layer is bound to a drm_plane that is CRTC-specific, so we create
+> them when initializing CRTC (calling sun4i_layers_init, which will be
+> generalized in next patch). The drm_plane's will be used when creating
+> CRTC, but the CRTC initialization code do not care other properties of
+> the layer, so we let the sun4i_layers_init function return drm_plane's
+> only.
+>
+> As we have no need to trace the layers after the CRTC is properly
+> created, we drop the layers pointer in sun4i_crtc struct.
+>
+> Doing these things makes the CRTC code independent to the type of layer
 
+Doing this uncouples the CRTC code from the type of layer.
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Friday, May 05, 2017 10:37 AM
-> To: Y.B. Lu
-> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> ulf.hansson at linaro.org; Rob Herring; Catalin Marinas; Harninder Rai;
-> Xiaobo Xie
-> Subject: Re: [v2, 1/5] mmc: dt: add compatible into eSDHC required
-> properties
-> 
-> On Thu, May 04, 2017 at 06:48:56PM +0800, Yangbo Lu wrote:
-> > This patch is to add compatible into eSDHC required properties.
-> >
-> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> > ---
-> > Changes for v2:
-> > 	- Added this patch.
-> > ---
-> >  Documentation/devicetree/bindings/mmc/fsl-esdhc.txt | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
-> > b/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
-> > index dedfb02..b04b248 100644
-> > --- a/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
-> > +++ b/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
-> > @@ -7,6 +7,7 @@ This file documents differences between the core
-> > properties described  by mmc.txt and the properties used by the sdhci-
-> esdhc driver.
-> >
-> >  Required properties:
-> > +  - compatible : should be "fsl,esdhc", or "fsl,<chip>-esdhc".
-> 
-> I think either supported <chip> or the compatible should be listed
-> explicitly.
-> 
+> (the sun4i_layers_init function name is still hardcoded and will be
+> changed in the next patch), so that we can finally gain support for the
+> mixer in DE2, which will has different layers.
 
-[Lu Yangbo-B47093] I think the reason we use <chip> is to avoid listing too much chips, and to avoid doc updating if new chips are added.
-The checkpatch script also had considered that.
+... which has ...
 
-Currently there're about 20 platforms with "fsl,<chip>-esdhc" compatible in kernel dts.
-And the doc also provide an example.
-Example:
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-sdhci at 2e000 {
-        compatible = "fsl,mpc8378-esdhc", "fsl,esdhc";
+Otherwise,
 
-Should we still need to list all ?
-
-Thanks.
-
-> Shawn
-> 
-> >    - interrupt-parent : interrupt source phandle.
-> >    - clock-frequency : specifies eSDHC base clock frequency.
-> >
-> > --
-> > 2.1.0.27.g96db324
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
