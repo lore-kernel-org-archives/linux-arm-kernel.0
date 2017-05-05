@@ -1,8 +1,8 @@
 From: karim.eshapa@gmail.com (Karim Eshapa)
-Date: Fri,  5 May 2017 10:04:39 +0200
+Date: Fri,  5 May 2017 10:05:56 +0200
 Subject: [PATCH] drivers:soc:fsl:qbman:qman.c: Change a comment for an entry
  check inside drain_mr_fqrni function
-Message-ID: <1493971480-14864-1-git-send-email-karim.eshapa@gmail.com>
+Message-ID: <1493971556-14918-1-git-send-email-karim.eshapa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
