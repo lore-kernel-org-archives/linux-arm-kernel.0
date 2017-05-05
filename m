@@ -1,49 +1,44 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 5 May 2017 23:43:06 +0200
-Subject: [PATCH v3 2/4] dt-binding: meson_uart: add documentation for the
- UARTs of amlogic
-In-Reply-To: <20170331165437.26227-3-hgkr.klein@gmail.com>
-References: <20170331165437.26227-1-hgkr.klein@gmail.com>
- <20170331165437.26227-3-hgkr.klein@gmail.com>
-Message-ID: <CAFBinCB=t6p_gmZMH3sUrVFCmnJTh2OVMT81ejdjUhs-0qyxpw@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 5 May 2017 17:49:32 -0400
+Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
+In-Reply-To: <20170505195518.xbn5n7uzo2xherah@lukather>
+References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
+ <20170504120314.lfmcv4cpsuz2igte@lukather>
+ <20170504160032.GA5147@htj.duckdns.org>
+ <20170505195518.xbn5n7uzo2xherah@lukather>
+Message-ID: <20170505214932.GA29891@wtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Helmut,
+Hello, Maxime.
 
-On Fri, Mar 31, 2017 at 6:54 PM, Helmut Klein <hgkr.klein@gmail.com> wrote:
-> Add the documentation for the device tree binding of meson_uart
+On Fri, May 05, 2017 at 09:55:18PM +0200, Maxime Ripard wrote:
+> > It doesn't make any sense to use the managed functions from the
+> > release functions and if you're always matching devm_kmalloc() with
+> > devm_kfree(), the only thing it'd do is confusing its readers.
+> 
+> I wouldn't say that being able to recover and free whatever memory
+> leak we might have not making sense, but ok. That was one of the
+> options, let's discard it.
 >
-> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
-> ---
->  .../bindings/serial/amlogic,meson_uart.txt         | 30 ++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
->
-> diff --git a/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt b/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
-> new file mode 100644
-> index 000000000000..8250a191c2fc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
-> @@ -0,0 +1,30 @@
-> +* Amlogic Meson UART, used in multiple SoCs (e.g. S905, s905X, ...)
-> +
-> +Required properties:
-> +- compatible   : "amlogic,meson-uart"
-> +- reg          : offset and length of the register set for the device.
-> +- interrupts   : device interrupt
-> +- clocks       : a list of phandle + clock-specifier pairs, one for each
-> +                   entry in clock names.
-> +- clocks-names : contains:
-> +   * "xtal" for the baud rate clock
-> +   * "core" for the core clock of none AO UARTs (optional)
-I'm not sure if we should name the first clock "xtal" as on Meson8b
-clk81 is used as input, see [0].
-maybe "refclk" or "clkin" (the latter is already used in other meson
-drivers, see sd_emmc_*, saradc, ethmac, and so on)
+> The other one is: refactor the rest of the allocations so that you
+> don't have a mix of devm_kmalloc / devm_kfree and kmalloc / kfree for
+> the same purpose in the same function.
 
-apart from that the whole series is a good thing (if the other small
-nits - for example from Rob - are fixed)!
+So, I think the issues here are
 
+1. Use of devm functions in a devres release function.  This just
+   doesn't make sense.
 
-[0] http://elixir.free-electrons.com/linux/latest/source/arch/arm/boot/dts/meson8b.dtsi#L135
+2. If a resource is always allocated and freed in the same function,
+   there's no reason to use devres for it.  I understand that there
+   can be exceptions for this, e.g. consistency, but it doesn't seem
+   to apply here.
+
+3. Last but not least, allocating memory to destroy a radix tree.  It
+   should be able to do that without allocating any memory.
+
+Thanks.
+
+-- 
+tejun
