@@ -1,81 +1,73 @@
 From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Fri, 5 May 2017 17:31:25 +0200
-Subject: [PATCH v5 6/8] ARM: dts: stm32: Enable OV2640 camera support of
- STM32F429-EVAL board
+Date: Fri, 5 May 2017 17:31:22 +0200
+Subject: [PATCH v5 3/8] ARM: dts: stm32: Enable DCMI support on STM32F429 MCU
 In-Reply-To: <1493998287-5828-1-git-send-email-hugues.fruchet@st.com>
 References: <1493998287-5828-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1493998287-5828-7-git-send-email-hugues.fruchet@st.com>
+Message-ID: <1493998287-5828-4-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable OV2640 camera support of STM32F429-EVAL board.
+Enable DCMI camera interface on STM32F429 MCU.
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
 ---
- arch/arm/boot/dts/stm32429i-eval.dts | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/stm32f429.dtsi | 37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index 2bb8a0f..95c33b1 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -48,6 +48,7 @@
- /dts-v1/;
- #include "stm32f429.dtsi"
- #include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "STMicroelectronics STM32429i-EVAL board";
-@@ -66,6 +67,14 @@
- 		serial0 = &usart1;
- 	};
- 
-+	clocks {
-+		clk_ext_camera: clk-ext-camera {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <24000000>;
-+		};
-+	};
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index ee0da97..e1ff978 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -736,6 +736,29 @@
+ 					slew-rate = <3>;
+ 				};
+ 			};
 +
- 	soc {
- 		dma-ranges = <0xc0000000 0x0 0x10000000>;
- 	};
-@@ -146,6 +155,11 @@
- 
- 	port {
- 		dcmi_0: endpoint {
-+			remote-endpoint = <&ov2640_0>;
-+			bus-width = <8>;
-+			hsync-active = <0>;
-+			vsync-active = <0>;
-+			pclk-sample = <1>;
- 		};
- 	};
- };
-@@ -155,6 +169,22 @@
- 	pinctrl-names = "default";
- 	status = "okay";
- 
-+	ov2640: camera at 30 {
-+		compatible = "ovti,ov2640";
-+		reg = <0x30>;
-+		resetb-gpios = <&stmpegpio 2 GPIO_ACTIVE_HIGH>;
-+		pwdn-gpios = <&stmpegpio 0 GPIO_ACTIVE_LOW>;
-+		clocks = <&clk_ext_camera>;
-+		clock-names = "xvclk";
-+		status = "okay";
-+
-+		port {
-+			ov2640_0: endpoint {
-+				remote-endpoint = <&dcmi_0>;
++			dcmi_pins: dcmi_pins at 0 {
++				pins {
++					pinmux = <STM32F429_PA4_FUNC_DCMI_HSYNC>,
++						 <STM32F429_PB7_FUNC_DCMI_VSYNC>,
++						 <STM32F429_PA6_FUNC_DCMI_PIXCLK>,
++						 <STM32F429_PC6_FUNC_DCMI_D0>,
++						 <STM32F429_PC7_FUNC_DCMI_D1>,
++						 <STM32F429_PC8_FUNC_DCMI_D2>,
++						 <STM32F429_PC9_FUNC_DCMI_D3>,
++						 <STM32F429_PC11_FUNC_DCMI_D4>,
++						 <STM32F429_PD3_FUNC_DCMI_D5>,
++						 <STM32F429_PB8_FUNC_DCMI_D6>,
++						 <STM32F429_PE6_FUNC_DCMI_D7>,
++						 <STM32F429_PC10_FUNC_DCMI_D8>,
++						 <STM32F429_PC12_FUNC_DCMI_D9>,
++						 <STM32F429_PD6_FUNC_DCMI_D10>,
++						 <STM32F429_PD2_FUNC_DCMI_D11>;
++					bias-disable;
++					drive-push-pull;
++					slew-rate = <3>;
++				};
 +			};
+ 		};
+ 
+ 		rcc: rcc at 40023810 {
+@@ -805,6 +828,20 @@
+ 			status = "disabled";
+ 		};
+ 
++		dcmi: dcmi at 50050000 {
++			compatible = "st,stm32-dcmi";
++			reg = <0x50050000 0x400>;
++			interrupts = <78>;
++			resets = <&rcc STM32F4_AHB2_RESET(DCMI)>;
++			clocks = <&rcc 0 STM32F4_AHB2_CLOCK(DCMI)>;
++			clock-names = "mclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&dcmi_pins>;
++			dmas = <&dma2 1 1 0x414 0x3>;
++			dma-names = "tx";
++			status = "disabled";
 +		};
-+	};
 +
- 	stmpe1600: stmpe1600 at 42 {
- 		compatible = "st,stmpe1600";
- 		reg = <0x42>;
+ 		rng: rng at 50060800 {
+ 			compatible = "st,stm32-rng";
+ 			reg = <0x50060800 0x400>;
 -- 
 1.9.1
