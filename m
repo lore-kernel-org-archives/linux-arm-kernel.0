@@ -1,100 +1,90 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  5 May 2017 11:57:51 +0200
-Subject: [PATCH 08/10] dma: mv_xor_v2: implement proper interrupt coalescing
+Date: Fri,  5 May 2017 11:57:48 +0200
+Subject: [PATCH 05/10] dma: mv_xor_v2: fix tx_submit() implementation
 In-Reply-To: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1493978274-12805-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1493978274-12805-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanna Hawa <hannah@marvell.com>
+The mv_xor_v2_tx_submit() gets the next available HW descriptor by
+calling mv_xor_v2_get_desq_write_ptr(), which reads a HW register
+telling the next available HW descriptor. This was working fine when HW
+descriptors were issued for processing directly in tx_submit().
 
-Until now, the driver was not using interrupt coalescing: one interrupt
-was generated for each descriptor processed by the XOR engine. This
-commit changes that by using the interrupt coalescing features of the
-hardware, by setting both a number of descriptors processed before an
-interrupt is generated and a timeout before an interrupt is generated.
+However, as part of the review process of the driver, a change was
+requested to move the actual kick-off of HW descriptors processing to
+->issue_pending(). Due to this, reading the HW register to know the next
+available HW descriptor no longer works.
 
-Signed-off-by: Hanna Hawa <hannah@marvell.com>
+So instead of using this HW register, we implemented a software index
+pointing to the next available HW descriptor.
+
+Fixes: 19a340b1a820 ("dmaengine: mv_xor_v2: new driver")
+Cc: <stable@vger.kernel.org>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor_v2.c | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ drivers/dma/mv_xor_v2.c | 22 +++++-----------------
+ 1 file changed, 5 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/dma/mv_xor_v2.c b/drivers/dma/mv_xor_v2.c
-index f3e211f..5292ff2 100644
+index 211b8c0..4684ece 100644
 --- a/drivers/dma/mv_xor_v2.c
 +++ b/drivers/dma/mv_xor_v2.c
-@@ -42,6 +42,7 @@
- #define MV_XOR_V2_DMA_IMSG_THRD_OFF			0x018
- #define   MV_XOR_V2_DMA_IMSG_THRD_MASK			0x7FFF
- #define   MV_XOR_V2_DMA_IMSG_THRD_SHIFT			0x0
-+#define   MV_XOR_V2_DMA_IMSG_TIMER_EN			BIT(18)
- #define MV_XOR_V2_DMA_DESQ_AWATTR_OFF			0x01C
-   /* Same flags as MV_XOR_V2_DMA_DESQ_ARATTR_OFF */
- #define MV_XOR_V2_DMA_DESQ_ALLOC_OFF			0x04C
-@@ -55,6 +56,9 @@
- #define MV_XOR_V2_DMA_DESQ_STOP_OFF			0x800
- #define MV_XOR_V2_DMA_DESQ_DEALLOC_OFF			0x804
- #define MV_XOR_V2_DMA_DESQ_ADD_OFF			0x808
-+#define MV_XOR_V2_DMA_IMSG_TMOT				0x810
-+#define   MV_XOR_V2_DMA_IMSG_TIMER_THRD_MASK		0x1FFF
-+#define   MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT		0
+@@ -161,6 +161,7 @@ struct mv_xor_v2_device {
+ 	struct mv_xor_v2_sw_desc *sw_desq;
+ 	int desc_size;
+ 	unsigned int npendings;
++	unsigned int hw_queue_idx;
+ };
  
- /* XOR Global registers */
- #define MV_XOR_V2_GLOB_BW_CTRL				0x4
-@@ -90,6 +94,13 @@
-  */
- #define MV_XOR_V2_DESC_NUM				1024
- 
-+/*
-+ * Threshold values for descriptors and timeout, determined by
-+ * experimentation as giving a good level of performance.
-+ */
-+#define MV_XOR_V2_DONE_IMSG_THRD  0x14
-+#define MV_XOR_V2_TIMER_THRD      0xB0
-+
  /**
-  * struct mv_xor_v2_descriptor - DMA HW descriptor
-  * @desc_id: used by S/W and is not affected by H/W.
-@@ -246,6 +257,29 @@ static int mv_xor_v2_set_desc_size(struct mv_xor_v2_device *xor_dev)
- 	return MV_XOR_V2_EXT_DESC_SIZE;
+@@ -214,18 +215,6 @@ static void mv_xor_v2_set_data_buffers(struct mv_xor_v2_device *xor_dev,
  }
  
-+/*
-+ * Set the IMSG threshold
-+ */
-+static inline
-+void mv_xor_v2_enable_imsg_thrd(struct mv_xor_v2_device *xor_dev)
-+{
-+	u32 reg;
-+
-+	/* Configure threshold of number of descriptors, and enable timer */
-+	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_THRD_OFF);
-+	reg &= (~MV_XOR_V2_DMA_IMSG_THRD_MASK << MV_XOR_V2_DMA_IMSG_THRD_SHIFT);
-+	reg |= (MV_XOR_V2_DONE_IMSG_THRD << MV_XOR_V2_DMA_IMSG_THRD_SHIFT);
-+	reg |= MV_XOR_V2_DMA_IMSG_TIMER_EN;
-+	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_THRD_OFF);
-+
-+	/* Configure Timer Threshold */
-+	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_TMOT);
-+	reg &= (~MV_XOR_V2_DMA_IMSG_TIMER_THRD_MASK <<
-+		MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT);
-+	reg |= (MV_XOR_V2_TIMER_THRD << MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT);
-+	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_TMOT);
-+}
-+
- static irqreturn_t mv_xor_v2_interrupt_handler(int irq, void *data)
+ /*
+- * Return the next available index in the DESQ.
+- */
+-static int mv_xor_v2_get_desq_write_ptr(struct mv_xor_v2_device *xor_dev)
+-{
+-	/* read the index for the next available descriptor in the DESQ */
+-	u32 reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_ALLOC_OFF);
+-
+-	return ((reg >> MV_XOR_V2_DMA_DESQ_ALLOC_WRPTR_SHIFT)
+-		& MV_XOR_V2_DMA_DESQ_ALLOC_WRPTR_MASK);
+-}
+-
+-/*
+  * notify the engine of new descriptors, and update the available index.
+  */
+ static void mv_xor_v2_add_desc_to_desq(struct mv_xor_v2_device *xor_dev,
+@@ -306,7 +295,6 @@ static irqreturn_t mv_xor_v2_interrupt_handler(int irq, void *data)
+ static dma_cookie_t
+ mv_xor_v2_tx_submit(struct dma_async_tx_descriptor *tx)
  {
- 	struct mv_xor_v2_device *xor_dev = data;
-@@ -795,6 +829,8 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
- 	list_add_tail(&xor_dev->dmachan.device_node,
- 		      &dma_dev->channels);
+-	int desq_ptr;
+ 	void *dest_hw_desc;
+ 	dma_cookie_t cookie;
+ 	struct mv_xor_v2_sw_desc *sw_desc =
+@@ -322,15 +310,15 @@ mv_xor_v2_tx_submit(struct dma_async_tx_descriptor *tx)
+ 	spin_lock_bh(&xor_dev->lock);
+ 	cookie = dma_cookie_assign(tx);
  
-+	mv_xor_v2_enable_imsg_thrd(xor_dev);
-+
- 	mv_xor_v2_descq_init(xor_dev);
+-	/* get the next available slot in the DESQ */
+-	desq_ptr = mv_xor_v2_get_desq_write_ptr(xor_dev);
+-
+ 	/* copy the HW descriptor from the SW descriptor to the DESQ */
+-	dest_hw_desc = xor_dev->hw_desq_virt + desq_ptr;
++	dest_hw_desc = xor_dev->hw_desq_virt + xor_dev->hw_queue_idx;
  
- 	ret = dma_async_device_register(dma_dev);
+ 	memcpy(dest_hw_desc, &sw_desc->hw_desc, xor_dev->desc_size);
+ 
+ 	xor_dev->npendings++;
++	xor_dev->hw_queue_idx++;
++	if (xor_dev->hw_queue_idx >= MV_XOR_V2_DESC_NUM)
++		xor_dev->hw_queue_idx = 0;
+ 
+ 	spin_unlock_bh(&xor_dev->lock);
+ 
 -- 
 2.7.4
