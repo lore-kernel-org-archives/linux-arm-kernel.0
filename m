@@ -1,145 +1,49 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 5 May 2017 16:25:30 +0100
-Subject: [PATCH 1/3] of/pci/dma: fix DMA configuration for PCI masters
-In-Reply-To: <CAMSpPPcC6wN+2HeZPak+gWxoy2WaO14epHNQfHT1W0FnTRHnOQ@mail.gmail.com>
-References: <1493786795-28153-1-git-send-email-oza.oza@broadcom.com>
- <d7203258-e39a-a59b-d14f-c0c92a1d3f41@arm.com>
- <CAMSpPPcC6wN+2HeZPak+gWxoy2WaO14epHNQfHT1W0FnTRHnOQ@mail.gmail.com>
-Message-ID: <48cd8da2-5928-3d5d-0f07-dfdb83f50ccb@arm.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Fri, 5 May 2017 23:26:08 +0800
+Subject: [PATCH 0/6] some fixups for Mediatek cpufreq driver
+Message-ID: <1493997974-17699-1-git-send-email-sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/17 19:41, Oza Oza wrote:
-[...]
->>> 5) leaves scope of adding PCI flag handling for inbound memory
->>> by the new function.
->>
->> Which flags would ever actually matter? DMA windows aren't going to be
->> to config or I/O space, so the memory type can be assumed, and the
->> 32/64-bit distinction is irrelevant as it's not a relocatable BAR;
->> DMA-able system memory isn't going to be read-sensitive, so the
->> prefetchable flag shouldn't matter; and not being a BAR none of the
->> others would be relevant either.
->>
-> 
-> Thanks Robin; for your reply and attention:
-> 
-> agree with you, at present it would not matter,
-> but it does not mean that we do not scope it to make it matter in future.
-> 
-> now where it could matter:
-> there is Relaxed Ordering for inbound memory for PCI.
-> According to standard, Relaxed Ordering (RO) bit can be set only for
-> Memory requests and completions (if present in the original request).
-> Also, according to transaction ordering rules, I/O and configuration
-> requests can still be re-ordered ahead of each other.
-> and we would like to make use of it.
-> for e.g. lets say we mark memory as Relaxed Ordered with flag.
-> the special about this memory is incoming PCI transactions can be
-> reordered and rest memory has to be strongly ordered.
+From: Sean Wang <sean.wang@mediatek.com>
 
-Please look at "PCI Bus Binding to: IEEE Std 1275-1994 Standard for Boot
-(Initialization Configuration) Firmware" (as referenced in DTSpec) and
-explain how PCIe Relaxed Order has anything to do with the DT binding.
+Hi,
 
-> how it our SOC would make use of this is out of scope for the
-> discussion at this point of time, but I am just bringing in the
-> idea/point how flags could be useful
-> for inbound memory, since we would not like throw-away flags completely.
+The purpose of the series is
+- (patch 1 to 3) to fix up current Mediatek cpufreq driver
+can't work with the latest tree since one required CPU clock muxer missing
+would cause the driver getting the resource fails when driver probe gets
+called.
+- (patch 4) to enable cpufreq feature on MT2701/MT7623 platform.
+- (patch 5 to 6) to update the binding document to reflect
+latest driver logic and add more examples guiding people how to apply for
+Mediatek cpufreq driver.
 
-The premise for implementing a PCI-specific parser is that you claim we
-need to do something with the phys.hi cell of a DT PCI address, rather
-than just taking the numerical part out of the phys.mid and phys.lo
-cells. Please make that argument in reference to the flags which that
-upper cell actually encodes, not unrelated things.
+Sean Wang (6):
+  clk: mediatek: add missing cpu mux causing Mediatek cpufreq can't work
+  clk: mediatek: export cpu multiplexer clock for MT2701/MT7623 SoCs
+  clk: mediatek: export cpu multiplexer clock for MT8173 SoCs
+  cpufreq: mediatek: Add support of cpufreq to MT2701/MT7623 SoC
+  dt-bindings: cpufreq: move Mediatek cpufreq dt-bindings document to
+    proper place
+  dt-bindings: cpufreq: enhance Mediatek cpufreq dt-binding document
 
-[...]
->>> +int of_pci_get_dma_ranges(struct device_node *np, struct list_head *resources)
->>> +{
->>> +     struct device_node *node = of_node_get(np);
->>> +     int rlen;
->>> +     int ret = 0;
->>> +     const int na = 3, ns = 2;
->>> +     struct resource *res;
->>> +     struct of_pci_range_parser parser;
->>> +     struct of_pci_range range;
->>> +
->>> +     if (!node)
->>> +             return -EINVAL;
->>> +
->>> +     parser.node = node;
->>> +     parser.pna = of_n_addr_cells(node);
->>> +     parser.np = parser.pna + na + ns;
->>> +
->>> +     parser.range = of_get_property(node, "dma-ranges", &rlen);
->>> +
->>> +     if (!parser.range) {
->>> +             pr_debug("pcie device has no dma-ranges defined for node(%s)\n",
->>> +                       np->full_name);
->>> +             ret = -EINVAL;
->>> +             goto out;
->>> +     }
->>> +
->>> +     parser.end = parser.range + rlen / sizeof(__be32);
->>> +
->>> +     for_each_of_pci_range(&parser, &range) {
->>
->> This is plain wrong - of_pci_range_parser_one() will translate upwards
->> through parent "ranges" properties, which is completely backwards for
->> DMA addresses.
->>
->> Robin.
->>
-> 
-> No it does not, this patch is thoroughly tested on our SOC and it works.
-> of_pci_range_parser_one does not translate upwards through parent. it
-> just sticks to given PCI parser.
+ .../devicetree/bindings/clock/mt8173-cpu-dvfs.txt  |  83 -------
+ .../bindings/cpufreq/cpufreq-mediatek.txt          | 247 +++++++++++++++++++++
+ drivers/clk/mediatek/Makefile                      |   2 +-
+ drivers/clk/mediatek/clk-cpumux.c                  | 120 ++++++++++
+ drivers/clk/mediatek/clk-cpumux.h                  |  30 +++
+ drivers/clk/mediatek/clk-mt2701.c                  |   8 +
+ drivers/clk/mediatek/clk-mt8173.c                  |  23 ++
+ drivers/cpufreq/Kconfig.arm                        |   4 +-
+ drivers/cpufreq/mt8173-cpufreq.c                   |   2 +
+ include/dt-bindings/clock/mt2701-clk.h             |   3 +-
+ include/dt-bindings/clock/mt8173-clk.h             |   4 +-
+ 11 files changed, 438 insertions(+), 88 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
+ create mode 100644 drivers/clk/mediatek/clk-cpumux.c
+ create mode 100644 drivers/clk/mediatek/clk-cpumux.h
 
-Frankly, I'm losing patience with this attitude. Please look at the code
-you call:
-
-#define for_each_of_pci_range(parser, range) \
-	for (; of_pci_range_parser_one(parser, range);)
-
-
-struct of_pci_range *of_pci_range_parser_one(struct of_pci_range_parser
-*parser,
-						struct of_pci_range *range)
-{
-	const int na = 3, ns = 2;
-
-	if (!range)
-		return NULL;
-
-	if (!parser->range || parser->range + parser->np > parser->end)
-		return NULL;
-
-	range->pci_space = parser->range[0];
-	range->flags = of_bus_pci_get_flags(parser->range);
-	range->pci_addr = of_read_number(parser->range + 1, ns);
-	range->cpu_addr = of_translate_address(parser->node,
-				parser->range + na);
-...
-
-
-u64 of_translate_address(struct device_node *dev, const __be32 *in_addr)
-{
-	return __of_translate_address(dev, in_addr, "ranges");
-}
-
-
-I don't doubt that you still manage to get the right result on *your*
-SoC, because you probably have neither further "ranges" nor "dma-ranges"
-translations above your host controller node anyway. That does not
-change the fact that the proposed code is still obviously wrong for more
-complex DT topologies that do.
-
-We're doing upstream work in core code here: I don't particularly care
-about making your SoC work; I don't really care about making Juno work
-properly either; what I do care about is that code to parse dma-ranges
-actually parses dma-ranges *correctly* for all possible valid uses of
-dma-ranges, which means fixing the existing bugs and not introducing
-more. The principal side-effect of that is that *all* systems with valid
-DTs will then work correctly.
-
-Robin.
+-- 
+2.7.4
