@@ -1,88 +1,103 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Fri, 5 May 2017 09:51:33 -0500
-Subject: [PATCH 0/4] TI Bluetooth serdev support
-In-Reply-To: <20170430160430.rmyuo6sdrkrjxjg6@earth>
-References: <20170405183005.20570-1-robh@kernel.org>
- <CAHCN7xJUxZm1qKAxT0kaK6qoDg+HWOJK7sTH-q9za4HJuUwe8Q@mail.gmail.com>
- <20170430160430.rmyuo6sdrkrjxjg6@earth>
-Message-ID: <CAHCN7x+Mq=b6RN-ezU0400W=H=D7DR+Es1FHtT4GyozpVd8ALA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 5 May 2017 07:54:04 -0700
+Subject: [PATCH v6 23/24] KVM: arm64: vgic-its: Fix pending table sync
+In-Reply-To: <1493898284-29504-24-git-send-email-eric.auger@redhat.com>
+References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
+ <1493898284-29504-24-git-send-email-eric.auger@redhat.com>
+Message-ID: <20170505145404.GK1419@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 30, 2017 at 11:04 AM, Sebastian Reichel <sre@kernel.org> wrote:
-> Hi,
->
-> On Sun, Apr 30, 2017 at 10:14:20AM -0500, Adam Ford wrote:
->> On Wed, Apr 5, 2017 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
->> > This series adds serdev support to the HCI LL protocol used on TI BT
->> > modules and enables support on HiKey board with with the WL1835 module.
->> > With this the custom TI UIM daemon and btattach are no longer needed.
->>
->> Without UIM daemon, what instruction do you use to load the BT firmware?
->>
->> I was thinking 'hciattach' but I was having trouble.  I was hoping you
->> might have some insight.
->>
->>  hciattach -t 30 -s 115200 /dev/ttymxc1 texas 3000000 flow  Just
->> returns a timeout.
->>
->> I modified my i.MX6 device tree per the binding documentation and
->> setup the regulators and enable GPIO pins.
->
-> If you configured everything correctly no userspace interaction is
-> required. The driver should request the firmware automatically once
-> you power up the bluetooth device.
->
-> Apart from DT changes make sure, that the following options are
-> enabled and check dmesg for any hints.
->
-> CONFIG_SERIAL_DEV_BUS
-> CONFIG_SERIAL_DEV_CTRL_TTYPORT
-> CONFIG_BT_HCIUART
-> CONFIG_BT_HCIUART_LL
->
+On Thu, May 04, 2017 at 01:44:43PM +0200, Eric Auger wrote:
+> In its_sync_lpi_pending_table() we currently ignore the
+> target_vcpu of the LPIs. We sync the pending bit found in
+> the vcpu pending table even if the LPI is not targeting it.
+> 
+> Also in vgic_its_cmd_handle_invall() we are supposed to
+> read the config table data for the LPIs associated to the
+> collection ID. At the moment we refresh all LPI config
+> information.
+> 
+> This patch passes a vpcu to vgic_copy_lpi_list() so that
+> this latter returns a snapshot of the LPIs targeting this
+> CPU and only those.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 24 ++++++++++++------------
+>  1 file changed, 12 insertions(+), 12 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 376d963..3c114b1 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -278,13 +278,13 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+>  }
+>  
+>  /*
+> - * Create a snapshot of the current LPI list, so that we can enumerate all
+> - * LPIs without holding any lock.
+> - * Returns the array length and puts the kmalloc'ed array into intid_ptr.
+> + * Create a snapshot of the current LPIs targeting @vcpu, so that we can
+> + * enumerate those LPIs without holding any lock.
+> + * Returns their number and puts the kmalloc'ed array into intid_ptr.
+>   */
+> -static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
+> +static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
+>  {
+> -	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>  	struct vgic_irq *irq;
+>  	u32 *intids;
+>  	int irq_count = dist->lpi_list_count, i = 0;
+> @@ -303,14 +303,14 @@ static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
+>  	spin_lock(&dist->lpi_list_lock);
+>  	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+>  		/* We don't need to "get" the IRQ, as we hold the list lock. */
+> -		intids[i] = irq->intid;
+> -		if (++i == irq_count)
+> -			break;
+> +		if (irq->target_vcpu != vcpu)
+> +			continue;
+> +		intids[i++] = irq->intid;
+>  	}
+>  	spin_unlock(&dist->lpi_list_lock);
+>  
+>  	*intid_ptr = intids;
+> -	return irq_count;
+> +	return i;
+>  }
+>  
+>  /*
+> @@ -359,7 +359,7 @@ static u32 max_lpis_propbaser(u64 propbaser)
+>  }
+>  
+>  /*
+> - * Scan the whole LPI pending table and sync the pending bit in there
+> + * Sync the pending table pending bit of LPIs targeting @vcpu
+>   * with our own data structures. This relies on the LPI being
+>   * mapped before.
+>   */
+> @@ -372,7 +372,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+>  	u32 *intids;
+>  	int nr_irqs, i;
+>  
+> -	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, &intids);
+> +	nr_irqs = vgic_copy_lpi_list(vcpu, &intids);
+>  	if (nr_irqs < 0)
+>  		return nr_irqs;
+>  
+> @@ -1055,7 +1055,7 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
+>  
+>  	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
+>  
+> -	irq_count = vgic_copy_lpi_list(kvm, &intids);
+> +	irq_count = vgic_copy_lpi_list(vcpu, &intids);
+>  	if (irq_count < 0)
+>  		return irq_count;
+>  
+> -- 
+> 2.5.5
+> 
 
-
-I have enabled those flags, and I have updated my device tree.
-I am testing this on an OMAP3630 (DM3730) board with a WL1283.  I am
-getting a lot of timeout errors.  I tested this against the original
-implemention I had in pdata-quirks.c using the ti-st driver, uim & and
-the btwilink driver.
-
-I pulled in some of the newer patches to enable the wl1283-st, but I
-am obviously missing something.
-
-I   58.717651] Bluetooth: hci0: Reading TI version information failed
-(-110)
-[   58.724853] Bluetooth: hci0: download firmware failed, retrying...
-[   60.957641] Bluetooth: hci0 command 0x1001 tx timeout
-[   68.957641] Bluetooth: hci0: Reading TI version information failed
-(-110)
-[   68.964843] Bluetooth: hci0: download firmware failed, retrying...
-[   69.132171] Bluetooth: Unknown HCI packet type 06
-[   69.138244] Bluetooth: Unknown HCI packet type 0c
-[   69.143249] Bluetooth: Unknown HCI packet type 40
-[   69.148498] Bluetooth: Unknown HCI packet type 20
-[   69.153533] Bluetooth: Data length is too large
-[   69.158569] Bluetooth: Unknown HCI packet type a0
-[   69.163574] Bluetooth: Unknown HCI packet type 00
-[   69.168731] Bluetooth: Unknown HCI packet type 00
-[   69.173736] Bluetooth: Unknown HCI packet type 34
-[   69.178924] Bluetooth: Unknown HCI packet type 91
-[   71.197631] Bluetooth: hci0 command 0x1001 tx timeout
-[   79.197662] Bluetooth: hci0: Reading TI version information failed (-110)
-
-Since the pdata-quirks and original ti-st drivers work together, I
-know the hardware is fine.  The only change to the device tree is the
-addition of the Bluetooth container:
-
-bluetooth {
-  compatible = "ti,wl1283-st";
-  enable-gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;
-};
-
-Any thoughts or suggestions to try?  I get similar behavior on an
-i.MX6 board with a wl1837-st module as well.
-
-adam
-> -- Sebastian
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
