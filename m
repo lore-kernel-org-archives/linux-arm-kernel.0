@@ -1,77 +1,20 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 5 May 2017 09:56:55 +0800
-Subject: [PATCH] ARM: dts: imx: add DH2228FV DAC to Gateworks Ventana
- boards with SPI
-In-Reply-To: <1493823894-2107-1-git-send-email-tharvey@gateworks.com>
-References: <1493823894-2107-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20170505015653.GT18578@dragon>
+Date: Fri, 5 May 2017 10:20:20 +0800
+Subject: [PATCH] arch: arm64: Define big endian of IFC for LS1043a/LS1046a
+In-Reply-To: <1493889032-20857-1-git-send-email-prabhakar.kushwaha@nxp.com>
+References: <1493889032-20857-1-git-send-email-prabhakar.kushwaha@nxp.com>
+Message-ID: <20170505022017.GU18578@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 08:04:54AM -0700, Tim Harvey wrote:
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 6 ++++++
->  arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 6 ++++++
->  arch/arm/boot/dts/imx6qdl-gw560x.dtsi | 6 ++++++
->  3 files changed, 18 insertions(+)
+On Thu, May 04, 2017 at 02:40:31PM +0530, Prabhakar Kushwaha wrote:
+> Integrated flash controller present in LS1043A and LS1046A is big endian.
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> index 91991d6..b5c1a8f 100644
-> --- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> @@ -143,6 +143,12 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_ecspi3>;
->  	status = "okay";
-> +
-> +	spidev0: spidev at 0 {
-> +		compatible = "rohm,dh2228fv";
+> So add big endian property in the devive tree.
+> 
+> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
 
-I do not see this is a documented compatible.
+The subject prefix should be 'arm64: dts: ...'.  I fixed it up and
+applied the patch.
 
 Shawn
-
-> +		reg = <0>;
-> +		spi-max-frequency = <60000000>;
-> +	};
->  };
->  
->  &fec {
-> diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-> index 968fda9..9d26511 100644
-> --- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-> @@ -154,6 +154,12 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_ecspi2>;
->  	status = "okay";
-> +
-> +	spidev0: spidev at 0 {
-> +		compatible = "rohm,dh2228fv";
-> +		reg = <0>;
-> +		spi-max-frequency = <60000000>;
-> +	};
->  };
->  
->  &fec {
-> diff --git a/arch/arm/boot/dts/imx6qdl-gw560x.dtsi b/arch/arm/boot/dts/imx6qdl-gw560x.dtsi
-> index d894dde..bfb63e9 100644
-> --- a/arch/arm/boot/dts/imx6qdl-gw560x.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-gw560x.dtsi
-> @@ -208,6 +208,12 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_ecspi3>;
->  	status = "okay";
-> +
-> +	spidev0: spidev at 0 {
-> +		compatible = "rohm,dh2228fv";
-> +		reg = <0>;
-> +		spi-max-frequency = <60000000>;
-> +	};
->  };
->  
->  &can1 {
-> -- 
-> 2.7.4
-> 
