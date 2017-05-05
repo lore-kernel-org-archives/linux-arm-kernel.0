@@ -1,71 +1,22 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 5 May 2017 21:16:14 +0100
-Subject: [GIT PULL] arm64 updates for 4.12
-In-Reply-To: <CA+55aFxFoV_BUbQ=fUAWd2WxGRPe3K_eb7yfZYrh7oa6UOgOCA@mail.gmail.com>
-References: <20170505161345.GA23336@e104818-lin.cambridge.arm.com>
- <CA+55aFxFoV_BUbQ=fUAWd2WxGRPe3K_eb7yfZYrh7oa6UOgOCA@mail.gmail.com>
-Message-ID: <20170505201613.GA26309@e104818-lin.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 5 May 2017 15:20:09 -0500
+Subject: [PATCH v5 04/20] dt-bindings: syscon: Add DT bindings
+ documentation for Allwinner syscon
+In-Reply-To: <20170501124520.3769-5-clabbe.montjoie@gmail.com>
+References: <20170501124520.3769-1-clabbe.montjoie@gmail.com>
+ <20170501124520.3769-5-clabbe.montjoie@gmail.com>
+Message-ID: <20170505202009.6i67fvcxf77bs6kp@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 05, 2017 at 12:38:32PM -0700, Linus Torvalds wrote:
-> On Fri, May 5, 2017 at 9:13 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > diff --cc arch/arm64/include/asm/bug.h
+On Mon, May 01, 2017 at 02:45:04PM +0200, Corentin Labbe wrote:
+> This patch adds documentation for Device-Tree bindings for the
+> syscon present in allwinner devices.
 > 
-> Hmm. The trivial resolution I did gets a different diff as the end
-> result, but your diff looks different.
-> 
-> I think you used "-U2" to make for a smaller and more targeted context..
-> 
-> So I think the trivial resolution is what you meant. But I couldn't
-> test it, so I thought I'd mention this oddity.
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  .../devicetree/bindings/misc/allwinner,syscon.txt     | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
 
-I indeed used -U2 as I thought that the rest of non-conflicting changes
-were just complicating the diff. Sorry about the confusion. Here's the
-default diff:
-
-diff --cc arch/arm64/include/asm/bug.h
-index a9be1072933c,0bfe1df12b19..000000000000
---- a/arch/arm64/include/asm/bug.h
-+++ b/arch/arm64/include/asm/bug.h
-@@@ -45,19 -42,27 +42,26 @@@
-  _BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
-  		".short " #flags "\n\t"			\
-  		".popsection\n"				\
-- 							\
-- 	"1:	brk %[imm]"				\
-- 		:: [imm] "i" (BUG_BRK_IMM)		\
-- )
-+ 	"1:	"
-+ #else
-+ #define __BUG_ENTRY(flags) ""
-+ #endif
-+ 
-+ #define __BUG_FLAGS(flags)				\
-+ 	asm volatile (					\
-+ 		__BUG_ENTRY(flags)			\
-+ 		"brk %[imm]" :: [imm] "i" (BUG_BRK_IMM)	\
-+ 	);
-  
-- #define BUG() do {				\
-- 	_BUG_FLAGS(0);				\
-- 	unreachable();				\
-+ 
-+ #define BUG() do {					\
-+ 	__BUG_FLAGS(0);					\
-+ 	unreachable();					\
-  } while (0)
-  
-- #define __WARN_FLAGS(flags) _BUG_FLAGS(BUGFLAG_WARNING|(flags))
- -#define __WARN_TAINT(taint) 				\
- -	__BUG_FLAGS(BUGFLAG_TAINT(taint))
-++#define __WARN_FLAGS(flags) __BUG_FLAGS(BUGFLAG_WARNING|(flags))
-  
-- #endif /* ! CONFIG_GENERIC_BUG */
-+ #define HAVE_ARCH_BUG
-  
-  #include <asm-generic/bug.h>
-  
-
--- 
-Catalin
+Acked-by: Rob Herring <robh@kernel.org>
