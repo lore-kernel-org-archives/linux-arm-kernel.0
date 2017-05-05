@@ -1,318 +1,122 @@
-From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Fri,  5 May 2017 14:07:54 +0530
-Subject: [PATCH v2 3/3] PCI/of fix of_dma_get_range;
- get PCI specific dma-ranges
-In-Reply-To: <1493973474-13939-1-git-send-email-oza.oza@broadcom.com>
-References: <1493973474-13939-1-git-send-email-oza.oza@broadcom.com>
-Message-ID: <1493973474-13939-3-git-send-email-oza.oza@broadcom.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 5 May 2017 16:38:16 +0800
+Subject: [linux-sunxi] [PATCH v6 05/13] drm/sun4i: abstract a engine type
+In-Reply-To: <a6dc783f7bd6e625fe456dffd93c4d57@aosc.io>
+References: <20170504114858.9008-1-icenowy@aosc.io>
+ <20170504114858.9008-6-icenowy@aosc.io>
+ <CAGb2v65a8+CdO5K_8G2m6uFf22yvXvOdX=3sDcHkYebbOiff-Q@mail.gmail.com>
+ <a6dc783f7bd6e625fe456dffd93c4d57@aosc.io>
+Message-ID: <CAGb2v65JxaifRt=QXH80Li3RrVzGULpfeYfSW-QeUn7SuNyGew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-current device framework and OF framework integration assumes
-dma-ranges in a way where memory-mapped devices define their
-dma-ranges. (child-bus-address, parent-bus-address, length).
+On Fri, May 5, 2017 at 4:36 PM,  <icenowy@aosc.io> wrote:
+> ? 2017-05-05 10:56?Chen-Yu Tsai ???
+>>
+>> On Thu, May 4, 2017 at 7:48 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>>>
+>>> As we are going to add support for the Allwinner DE2 engine in sun4i-drm
+>>> driver, we will finally have two types of display engines -- the DE1
+>>> backend and the DE2 mixer. They both do some display blending and feed
+>>> graphics data to TCON, so I choose to call them both "engine" here.
+>>
+>>
+>> These engines composite different layers into a final image which is
+>> then sent out to the TCONs. As such, "compositor" would be an accurate
+>> name.
+>>
+>> However, "engine" is OK, since Allwinner calls this stuff Display Engine
+>> 1.0 and 2.0. Hope there won't be a 3.0 ...
+>>
+>> Maybe you should note that in your commit message. That is justifies the
+>> name.
+>>
+>>>
+>>> Abstract the engine type to a new struct with an ops struct, which
+>>> contains
+>>> functions that should be called outside the engine-specified code (in
+>>> TCON, CRTC or TV Encoder code).
+>>>
+>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>> ---
+>>> Changes in v6:
+>>> - Rebased on wens's multi-pipeline patchset.
+>>> - Split out Makefile changes.
+>>> Changes in v5:
+>>> - Really made a sunxi_engine struct type, and moved ops pointer
+>>>   into it.
+>>> - Added checked ops wrappers.
+>>> - Changed the second parameter of layers_init from crtc to engine.
+>>> Changes in v4:
+>>> - Comments to tag the color correction functions as optional.
+>>> - Check before calling the optional functions.
+>>> - Change layers_init to satisfy new PATCH v4 04/11.
+>>>
+>>>  drivers/gpu/drm/sun4i/sun4i_backend.c |  68 ++++++++++++---------
+>>>  drivers/gpu/drm/sun4i/sun4i_backend.h |  17 +++---
+>>>  drivers/gpu/drm/sun4i/sun4i_crtc.c    |  11 ++--
+>>>  drivers/gpu/drm/sun4i/sun4i_crtc.h    |   4 +-
+>>>  drivers/gpu/drm/sun4i/sun4i_drv.c     |   2 +-
+>>>  drivers/gpu/drm/sun4i/sun4i_drv.h     |   2 +-
+>>>  drivers/gpu/drm/sun4i/sun4i_layer.c   |   8 +--
+>>>  drivers/gpu/drm/sun4i/sun4i_layer.h   |   5 +-
+>>>  drivers/gpu/drm/sun4i/sun4i_tcon.c    |  36 ++++++-----
+>>>  drivers/gpu/drm/sun4i/sun4i_tv.c      |   9 ++-
+>>>  drivers/gpu/drm/sun4i/sunxi_engine.h  | 112
+>>> ++++++++++++++++++++++++++++++++++
+>>>  11 files changed, 198 insertions(+), 76 deletions(-)
+>>>  create mode 100644 drivers/gpu/drm/sun4i/sunxi_engine.h
+>>>
 
-of_dma_configure is specifically written to take care of memory
-mapped devices. but no implementation exists for pci to take
-care of pcie based memory ranges.
+[...]
 
-for e.g. iproc based SOCs and other SOCs(suc as rcar) have PCI
-world dma-ranges.
-dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h
+>>> b/drivers/gpu/drm/sun4i/sun4i_layer.h
+>>> index 5ea5c994d6ea..004b7cfe8ffb 100644
+>>> --- a/drivers/gpu/drm/sun4i/sun4i_layer.h
+>>> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
+>>> @@ -13,6 +13,8 @@
+>>>  #ifndef _SUN4I_LAYER_H_
+>>>  #define _SUN4I_LAYER_H_
+>>>
+>>> +struct sunxi_engine;
+>>> +
+>>>  struct sun4i_layer {
+>>>         struct drm_plane        plane;
+>>>         struct sun4i_drv        *drv;
+>>> @@ -27,6 +29,5 @@ plane_to_sun4i_layer(struct drm_plane *plane)
+>>>  }
+>>>
+>>>  struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+>>> -                                    struct sun4i_crtc *crtc);
+>>> -
+>>> +                                    struct sunxi_engine *engine);
+>>
+>>
+>> Please keep the newline.
+>>
+>>>  #endif /* _SUN4I_LAYER_H_ */
+>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>> b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>> index 29fd829aa54c..c48135a10fda 100644
+>>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>> @@ -26,12 +26,12 @@
+>>>  #include <linux/regmap.h>
+>>>  #include <linux/reset.h>
+>>>
+>>> -#include "sun4i_backend.h"
+>>>  #include "sun4i_crtc.h"
+>>>  #include "sun4i_dotclock.h"
+>>>  #include "sun4i_drv.h"
+>>>  #include "sun4i_rgb.h"
+>>>  #include "sun4i_tcon.h"
+>>> +#include "sunxi_engine.h"
+>>
+>>
+>> Please keep the headers in alphabetical order.
+>
+>
+> sunxi is of course after sun4i.
 
-this patch fixes the bug in of_dma_get_range, which with as is,
-parses the PCI memory ranges and return wrong size as 0.
-
-in order to get largest possible dma_mask. this patch also
-retuns the largest possible size based on dma-ranges,
-
-for e.g.
-dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
-we should get dev->coherent_dma_mask=0x7fffffffff.
-
-based on which IOVA allocation space will honour PCI host
-bridge limitations.
-
-the implementation hooks bus specific callbacks for getting
-dma-ranges.
-
-Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
-
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index 02b2903..cc0fc28 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -6,6 +6,7 @@
- #include <linux/ioport.h>
- #include <linux/module.h>
- #include <linux/of_address.h>
-+#include <linux/of_pci.h>
- #include <linux/pci.h>
- #include <linux/pci_regs.h>
- #include <linux/sizes.h>
-@@ -46,6 +47,8 @@ struct of_bus {
- 				int na, int ns, int pna);
- 	int		(*translate)(__be32 *addr, u64 offset, int na);
- 	unsigned int	(*get_flags)(const __be32 *addr);
-+	int		(*get_dma_ranges)(struct device_node *np,
-+					  u64 *dma_addr, u64 *paddr, u64 *size);
- };
- 
- /*
-@@ -171,6 +174,146 @@ static int of_bus_pci_translate(__be32 *addr, u64 offset, int na)
- {
- 	return of_bus_default_translate(addr + 1, offset, na - 1);
- }
-+
-+static int of_bus_pci_get_dma_ranges(struct device_node *np, u64 *dma_addr,
-+				     u64 *paddr, u64 *size)
-+{
-+	struct device_node *node = of_node_get(np);
-+	int ret = 0;
-+	struct resource_entry *window;
-+	LIST_HEAD(res);
-+
-+	if (!node)
-+		return -EINVAL;
-+
-+	if (of_bus_pci_match(np)) {
-+		*size = 0;
-+		/*
-+		 * PCI dma-ranges is not mandatory property.
-+		 * many devices do no need to have it, since
-+		 * host bridge does not require inbound memory
-+		 * configuration or rather have design limitations.
-+		 * so we look for dma-ranges, if missing we
-+		 * just return the caller full size, and also
-+		 * no dma-ranges suggests that, host bridge allows
-+		 * whatever comes in, so we set dma_addr to 0.
-+		 */
-+		ret = of_pci_get_dma_ranges(np, &res);
-+		if (!ret) {
-+			resource_list_for_each_entry(window, &res) {
-+			struct resource *res_dma = window->res;
-+
-+			if (*size < resource_size(res_dma)) {
-+				*dma_addr = res_dma->start - window->offset;
-+				*paddr = res_dma->start;
-+				*size = resource_size(res_dma);
-+				}
-+			}
-+		}
-+		pci_free_resource_list(&res);
-+
-+		/*
-+		 * return the largest possible size,
-+		 * since PCI master allows everything.
-+		 */
-+		if (*size == 0) {
-+			pr_debug("empty/zero size dma-ranges found for node(%s)\n",
-+				np->full_name);
-+			*size = DMA_BIT_MASK(sizeof(dma_addr_t) * 8) - 1;
-+			*dma_addr = *paddr = 0;
-+			ret = 0;
-+		}
-+
-+		pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
-+			 *dma_addr, *paddr, *size);
-+	}
-+
-+	of_node_put(node);
-+
-+	return ret;
-+}
-+
-+static int get_dma_ranges(struct device_node *np, u64 *dma_addr,
-+		          u64 *paddr, u64 *size)
-+{
-+	struct device_node *node = of_node_get(np);
-+	const __be32 *ranges = NULL;
-+	int len, naddr, nsize, pna;
-+	int ret = 0;
-+	u64 dmaaddr;
-+
-+	if (!node)
-+		return -EINVAL;
-+
-+	while (1) {
-+		naddr = of_n_addr_cells(node);
-+		nsize = of_n_size_cells(node);
-+		node = of_get_next_parent(node);
-+		if (!node)
-+			break;
-+
-+		ranges = of_get_property(node, "dma-ranges", &len);
-+
-+		/* Ignore empty ranges, they imply no translation required */
-+		if (ranges && len > 0)
-+			break;
-+
-+		/*
-+		 * At least empty ranges has to be defined for parent node if
-+		 * DMA is supported
-+		 */
-+		if (!ranges)
-+			break;
-+	}
-+
-+	if (!ranges) {
-+		pr_debug("no dma-ranges found for node(%s)\n", np->full_name);
-+		ret = -ENODEV;
-+		goto out;
-+	}
-+
-+	len /= sizeof(u32);
-+
-+	pna = of_n_addr_cells(node);
-+
-+	/* dma-ranges format:
-+	 * DMA addr	: naddr cells
-+	 * CPU addr	: pna cells
-+	 * size		: nsize cells
-+	 */
-+	dmaaddr = of_read_number(ranges, naddr);
-+	*paddr = of_translate_dma_address(np, ranges);
-+	if (*paddr == OF_BAD_ADDR) {
-+		pr_err("translation of DMA address(%pad) to CPU address failed node(%s)\n",
-+		       dma_addr, np->full_name);
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+	*dma_addr = dmaaddr;
-+
-+	*size = of_read_number(ranges + naddr + pna, nsize);
-+
-+	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
-+		 *dma_addr, *paddr, *size);
-+
-+out:
-+	of_node_put(node);
-+
-+	return ret;
-+}
-+
-+static int of_bus_isa_get_dma_ranges(struct device_node *np, u64 *dma_addr,
-+				     u64 *paddr, u64 *size)
-+{
-+	return get_dma_ranges(np, dma_addr, paddr, size);
-+}
-+
-+static int of_bus_default_get_dma_ranges(struct device_node *np, u64 *dma_addr,
-+					 u64 *paddr, u64 *size)
-+{
-+	return get_dma_ranges(np, dma_addr, paddr, size);
-+}
-+
- #endif /* CONFIG_OF_ADDRESS_PCI */
- 
- #ifdef CONFIG_PCI
-@@ -424,6 +567,7 @@ static unsigned int of_bus_isa_get_flags(const __be32 *addr)
- 		.map = of_bus_pci_map,
- 		.translate = of_bus_pci_translate,
- 		.get_flags = of_bus_pci_get_flags,
-+		.get_dma_ranges = of_bus_pci_get_dma_ranges,
- 	},
- #endif /* CONFIG_OF_ADDRESS_PCI */
- 	/* ISA */
-@@ -435,6 +579,7 @@ static unsigned int of_bus_isa_get_flags(const __be32 *addr)
- 		.map = of_bus_isa_map,
- 		.translate = of_bus_isa_translate,
- 		.get_flags = of_bus_isa_get_flags,
-+		.get_dma_ranges = of_bus_isa_get_dma_ranges,
- 	},
- 	/* Default */
- 	{
-@@ -445,6 +590,7 @@ static unsigned int of_bus_isa_get_flags(const __be32 *addr)
- 		.map = of_bus_default_map,
- 		.translate = of_bus_default_translate,
- 		.get_flags = of_bus_default_get_flags,
-+		.get_dma_ranges = of_bus_default_get_dma_ranges,
- 	},
- };
- 
-@@ -820,74 +966,20 @@ void __iomem *of_io_request_and_map(struct device_node *np, int index,
-  *	size			: nsize cells
-  *
-  * It returns -ENODEV if "dma-ranges" property was not found
-- * for this device in DT.
-+ * for this device in DT, except if PCI device then, dma-ranges
-+ * can be optional property, and in that case returns size with
-+ * entire host memory.
-  */
- int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size)
- {
--	struct device_node *node = of_node_get(np);
--	const __be32 *ranges = NULL;
--	int len, naddr, nsize, pna;
--	int ret = 0;
--	u64 dmaaddr;
--
--	if (!node)
--		return -EINVAL;
--
--	while (1) {
--		naddr = of_n_addr_cells(node);
--		nsize = of_n_size_cells(node);
--		node = of_get_next_parent(node);
--		if (!node)
--			break;
--
--		ranges = of_get_property(node, "dma-ranges", &len);
--
--		/* Ignore empty ranges, they imply no translation required */
--		if (ranges && len > 0)
--			break;
--
--		/*
--		 * At least empty ranges has to be defined for parent node if
--		 * DMA is supported
--		 */
--		if (!ranges)
--			break;
--	}
--
--	if (!ranges) {
--		pr_debug("no dma-ranges found for node(%s)\n", np->full_name);
--		ret = -ENODEV;
--		goto out;
--	}
--
--	len /= sizeof(u32);
--
--	pna = of_n_addr_cells(node);
--
--	/* dma-ranges format:
--	 * DMA addr	: naddr cells
--	 * CPU addr	: pna cells
--	 * size		: nsize cells
--	 */
--	dmaaddr = of_read_number(ranges, naddr);
--	*paddr = of_translate_dma_address(np, ranges);
--	if (*paddr == OF_BAD_ADDR) {
--		pr_err("translation of DMA address(%pad) to CPU address failed node(%s)\n",
--		       dma_addr, np->full_name);
--		ret = -EINVAL;
--		goto out;
--	}
--	*dma_addr = dmaaddr;
--
--	*size = of_read_number(ranges + naddr + pna, nsize);
--
--	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
--		 *dma_addr, *paddr, *size);
-+	struct of_bus *bus;
- 
--out:
--	of_node_put(node);
-+	/* get bus specific dma-ranges. */
-+	bus = of_match_bus(np);
-+	if (bus->get_dma_ranges)
-+		return bus->get_dma_ranges(np, dma_addr, paddr, size);
- 
--	return ret;
-+	return 0;
- }
- EXPORT_SYMBOL_GPL(of_dma_get_range);
- 
--- 
-1.9.1
+Sorry. My bad. :(
