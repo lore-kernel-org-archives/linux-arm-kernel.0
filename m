@@ -1,77 +1,138 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Fri, 5 May 2017 17:04:22 -0500
-Subject: [PATCH v4] irqchip/gicv3-its: Avoid memory over allocation for
- ITEs
-In-Reply-To: <87lgqfmdy7.fsf@on-the-bus.cambridge.arm.com>
-References: <1493562975-14365-1-git-send-email-shankerd@codeaurora.org>
- <87lgqfmdy7.fsf@on-the-bus.cambridge.arm.com>
-Message-ID: <f3ca8eb8-88e9-6672-134a-d5eaac73f11f@codeaurora.org>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Fri, 5 May 2017 15:18:30 -0700
+Subject: [PATCH v9 1/4] syscalls: Verify address limit before returning to
+ user-mode
+In-Reply-To: <20170428153213.137279-1-thgarnie@google.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+Message-ID: <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-
-On 05/02/2017 11:16 AM, Marc Zyngier wrote:
-> On Sun, Apr 30 2017 at  3:36:15 pm BST, Shanker Donthineni <shankerd@codeaurora.org> wrote:
->> We are always allocating extra 255Bytes of memory to handle ITE
->> physical address alignment requirement. The kmalloc() satisfies
->> the ITE alignment since the ITS driver is requesting a minimum
->> size of ITS_ITT_ALIGN bytes.
->>
->> Let's try to allocate the exact amount of memory that is required
->> for ITEs to avoid wastage.
->>
->> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
->> ---
->> Changes:
->> v2: removed 'Change-Id: Ia8084189833f2081ff13c392deb5070c46a64038' from commit.
->> v3: changed from IITE to ITE.
->> v3: removed fallback since kmalloc() guarantees the right alignment.
->>
->>  drivers/irqchip/irq-gic-v3-its.c | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 45ea1933..72e56f03 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -261,7 +261,6 @@ static struct its_collection *its_build_mapd_cmd(struct its_cmd_block *cmd,
->>  	u8 size = ilog2(desc->its_mapd_cmd.dev->nr_ites);
->>  
->>  	itt_addr = virt_to_phys(desc->its_mapd_cmd.dev->itt);
->> -	itt_addr = ALIGN(itt_addr, ITS_ITT_ALIGN);
->>  
->>  	its_encode_cmd(cmd, GITS_CMD_MAPD);
->>  	its_encode_devid(cmd, desc->its_mapd_cmd.dev->device_id);
->> @@ -1329,13 +1328,14 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
->>  	 */
->>  	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
->>  	sz = nr_ites * its->ite_size;
->> -	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
->> +	sz = max(sz, ITS_ITT_ALIGN);
->>  	itt = kzalloc(sz, GFP_KERNEL);
->>  	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
->>  	if (lpi_map)
->>  		col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
->>  
->> -	if (!dev || !itt || !lpi_map || !col_map) {
->> +	if (!dev || !itt || !lpi_map || !col_map ||
->> +	    !IS_ALIGNED(virt_to_phys(itt), ITS_ITT_ALIGN)) {
->>  		kfree(dev);
->>  		kfree(itt);
->>  		kfree(lpi_map);
-> I'm confused. Either the alignment is guaranteed (and you should
-> document why it is so), or it is not, and we need to handle the
-> non-alignment (instead of failing).
-
-Sorry for confusion, alignment is guaranteed by kmalloc(), added a check for readability purpose only can be removed.
- 
-> Thanks,
+On Fri, Apr 28, 2017 at 8:32 AM, Thomas Garnier <thgarnie@google.com> wrote:
+> Ensure that a syscall does not return to user-mode with a kernel address
+> limit. If that happens, a process can corrupt kernel-mode memory and
+> elevate privileges [1].
 >
-> 	M.
+> The CONFIG_ADDR_LIMIT_CHECK option disables the generic check so each
+> architecture can create optimized versions. This option is enabled by
+> default on s390 because a similar feature already exists.
+>
+> [1] https://bugs.chromium.org/p/project-zero/issues/detail?id=990
+>
+> Signed-off-by: Thomas Garnier <thgarnie@google.com>
+> Tested-by: Kees Cook <keescook@chromium.org>
+
+Ingo: Do you want to take the set?
+
+> ---
+> Based on next-20170426
+> ---
+>  arch/s390/Kconfig        |  1 +
+>  include/linux/syscalls.h | 27 ++++++++++++++++++++++++++-
+>  init/Kconfig             |  6 ++++++
+>  kernel/sys.c             | 13 +++++++++++++
+>  4 files changed, 46 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+> index d25435d94b6e..3d2ec084d5fc 100644
+> --- a/arch/s390/Kconfig
+> +++ b/arch/s390/Kconfig
+> @@ -64,6 +64,7 @@ config ARCH_SUPPORTS_UPROBES
+>
+>  config S390
+>         def_bool y
+> +       select ADDR_LIMIT_CHECK
+>         select ARCH_HAS_DEVMEM_IS_ALLOWED
+>         select ARCH_HAS_ELF_RANDOMIZE
+>         select ARCH_HAS_GCOV_PROFILE_ALL
+> diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+> index 980c3c9b06f8..e534b93ce43a 100644
+> --- a/include/linux/syscalls.h
+> +++ b/include/linux/syscalls.h
+> @@ -191,6 +191,28 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+>         SYSCALL_METADATA(sname, x, __VA_ARGS__)                 \
+>         __SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
+>
+> +
+> +/*
+> + * Called before coming back to user-mode. Returning to user-mode with an
+> + * address limit different than USER_DS can allow to overwrite kernel memory.
+> + */
+> +static inline void addr_limit_check_syscall(void)
+> +{
+> +       BUG_ON(!segment_eq(get_fs(), USER_DS));
+> +}
+> +
+> +#ifndef CONFIG_ADDR_LIMIT_CHECK
+> +#define ADDR_LIMIT_CHECK_PRE() \
+> +       bool user_caller = segment_eq(get_fs(), USER_DS)
+> +#define ADDR_LIMIT_CHECK_POST() \
+> +       if (user_caller) addr_limit_check_syscall()
+> +#else
+> +#define ADDR_LIMIT_CHECK_PRE()
+> +#define ADDR_LIMIT_CHECK_POST()
+> +asmlinkage void addr_limit_check_failed(void) __noreturn;
+> +#endif
+> +
+> +
+>  #define __PROTECT(...) asmlinkage_protect(__VA_ARGS__)
+>  #define __SYSCALL_DEFINEx(x, name, ...)                                        \
+>         asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))       \
+> @@ -199,7 +221,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+>         asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));      \
+>         asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))       \
+>         {                                                               \
+> -               long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));  \
+> +               long ret;                                               \
+> +               ADDR_LIMIT_CHECK_PRE();                                 \
+> +               ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));       \
+> +               ADDR_LIMIT_CHECK_POST();                                \
+>                 __MAP(x,__SC_TEST,__VA_ARGS__);                         \
+>                 __PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));       \
+>                 return ret;                                             \
+> diff --git a/init/Kconfig b/init/Kconfig
+> index 42a346b0df43..599d9fe30703 100644
+> --- a/init/Kconfig
+> +++ b/init/Kconfig
+> @@ -1961,6 +1961,12 @@ config PROFILING
+>  config TRACEPOINTS
+>         bool
+>
+> +config ADDR_LIMIT_CHECK
+> +       bool
+> +       help
+> +         Disable the generic address limit check. Allow each architecture to
+> +         optimize how and when the verification is done.
+> +
+>  source "arch/Kconfig"
+>
+>  endmenu                # General setup
+> diff --git a/kernel/sys.c b/kernel/sys.c
+> index 8a94b4eabcaa..a1cbcd715d62 100644
+> --- a/kernel/sys.c
+> +++ b/kernel/sys.c
+> @@ -2458,3 +2458,16 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
+>         return 0;
+>  }
+>  #endif /* CONFIG_COMPAT */
+> +
+> +#ifdef CONFIG_ADDR_LIMIT_CHECK
+> +/*
+> + * Used when an architecture specific implementation detects an invalid address
+> + * limit. This function does not return.
+> + */
+> +asmlinkage void addr_limit_check_failed(void)
+> +{
+> +       /* Try to fail on the generic address limit check */
+> +       addr_limit_check_syscall();
+> +       panic("Invalid address limit before returning to user-mode");
+> +}
+> +#endif
+> --
+> 2.13.0.rc0.306.g87b477812d-goog
+>
+
+
 
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thomas
