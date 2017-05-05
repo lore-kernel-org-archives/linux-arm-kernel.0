@@ -1,40 +1,88 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 05 May 2017 15:51:05 +0100
-Subject: [PATCH 4/6] arm64: armv8_deprecated: ensure extension of addr
-In-Reply-To: <1493824178-7399-5-git-send-email-mark.rutland@arm.com> (Mark
- Rutland's message of "Wed, 3 May 2017 16:09:36 +0100")
-References: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
- <1493824178-7399-5-git-send-email-mark.rutland@arm.com>
-Message-ID: <87bmr7xspy.fsf@e105922-lin.cambridge.arm.com>
+From: aford173@gmail.com (Adam Ford)
+Date: Fri, 5 May 2017 09:51:33 -0500
+Subject: [PATCH 0/4] TI Bluetooth serdev support
+In-Reply-To: <20170430160430.rmyuo6sdrkrjxjg6@earth>
+References: <20170405183005.20570-1-robh@kernel.org>
+ <CAHCN7xJUxZm1qKAxT0kaK6qoDg+HWOJK7sTH-q9za4HJuUwe8Q@mail.gmail.com>
+ <20170430160430.rmyuo6sdrkrjxjg6@earth>
+Message-ID: <CAHCN7x+Mq=b6RN-ezU0400W=H=D7DR+Es1FHtT4GyozpVd8ALA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Rutland <mark.rutland@arm.com> writes:
-
-> Our compat swp emulation holds the compat user address in an unsigned
-> int, which it passes to __user_swpX_asm(). When a 32-bit value is passed
-> in a register, the upper 32 bits of the register are unknown, and we
-> must extend the value to 64 bits before we can use it as a base address.
+On Sun, Apr 30, 2017 at 11:04 AM, Sebastian Reichel <sre@kernel.org> wrote:
+> Hi,
 >
-> This patch casts the address to unsigned long to ensure it has been
-> suitably extended, avoiding the potential issue, and silencing a related
-> warning from clang.
+> On Sun, Apr 30, 2017 at 10:14:20AM -0500, Adam Ford wrote:
+>> On Wed, Apr 5, 2017 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
+>> > This series adds serdev support to the HCI LL protocol used on TI BT
+>> > modules and enables support on HiKey board with with the WL1835 module.
+>> > With this the custom TI UIM daemon and btattach are no longer needed.
+>>
+>> Without UIM daemon, what instruction do you use to load the BT firmware?
+>>
+>> I was thinking 'hciattach' but I was having trouble.  I was hoping you
+>> might have some insight.
+>>
+>>  hciattach -t 30 -s 115200 /dev/ttymxc1 texas 3000000 flow  Just
+>> returns a timeout.
+>>
+>> I modified my i.MX6 device tree per the binding documentation and
+>> setup the regulators and enable GPIO pins.
 >
-> Fixes: bd35a4adc4131c53 ("arm64: Port SWP/SWPB emulation support from arm")
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Matthias Kaehlcke <mka@chromium.org>
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-
->From the description, the problem looks quite serious. I'm surprised
-this hasn't exploded before.
-
-FWIW,
-
-        Acked-by: Punit Agrawal <punit.agrawal@arm.com>
-
-Thanks!
+> If you configured everything correctly no userspace interaction is
+> required. The driver should request the firmware automatically once
+> you power up the bluetooth device.
+>
+> Apart from DT changes make sure, that the following options are
+> enabled and check dmesg for any hints.
+>
+> CONFIG_SERIAL_DEV_BUS
+> CONFIG_SERIAL_DEV_CTRL_TTYPORT
+> CONFIG_BT_HCIUART
+> CONFIG_BT_HCIUART_LL
+>
 
 
-[...]
+I have enabled those flags, and I have updated my device tree.
+I am testing this on an OMAP3630 (DM3730) board with a WL1283.  I am
+getting a lot of timeout errors.  I tested this against the original
+implemention I had in pdata-quirks.c using the ti-st driver, uim & and
+the btwilink driver.
+
+I pulled in some of the newer patches to enable the wl1283-st, but I
+am obviously missing something.
+
+I   58.717651] Bluetooth: hci0: Reading TI version information failed
+(-110)
+[   58.724853] Bluetooth: hci0: download firmware failed, retrying...
+[   60.957641] Bluetooth: hci0 command 0x1001 tx timeout
+[   68.957641] Bluetooth: hci0: Reading TI version information failed
+(-110)
+[   68.964843] Bluetooth: hci0: download firmware failed, retrying...
+[   69.132171] Bluetooth: Unknown HCI packet type 06
+[   69.138244] Bluetooth: Unknown HCI packet type 0c
+[   69.143249] Bluetooth: Unknown HCI packet type 40
+[   69.148498] Bluetooth: Unknown HCI packet type 20
+[   69.153533] Bluetooth: Data length is too large
+[   69.158569] Bluetooth: Unknown HCI packet type a0
+[   69.163574] Bluetooth: Unknown HCI packet type 00
+[   69.168731] Bluetooth: Unknown HCI packet type 00
+[   69.173736] Bluetooth: Unknown HCI packet type 34
+[   69.178924] Bluetooth: Unknown HCI packet type 91
+[   71.197631] Bluetooth: hci0 command 0x1001 tx timeout
+[   79.197662] Bluetooth: hci0: Reading TI version information failed (-110)
+
+Since the pdata-quirks and original ti-st drivers work together, I
+know the hardware is fine.  The only change to the device tree is the
+addition of the Bluetooth container:
+
+bluetooth {
+  compatible = "ti,wl1283-st";
+  enable-gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;
+};
+
+Any thoughts or suggestions to try?  I get similar behavior on an
+i.MX6 board with a wl1837-st module as well.
+
+adam
+> -- Sebastian
