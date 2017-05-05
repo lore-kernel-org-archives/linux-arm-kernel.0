@@ -1,23 +1,146 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 5 May 2017 10:18:42 -0300
-Subject: [PATCH 1/5] ARM: dts: imx7-colibri: use OF graph to describe the
- display
-In-Reply-To: <CAOMZO5Bp=K8_nP0_+MjQ9teS_U9SpRspOhVPwOwg1J0m0QZjCg@mail.gmail.com>
-References: <20170329232113.19078-1-stefan@agner.ch>
- <CAOMZO5Bp=K8_nP0_+MjQ9teS_U9SpRspOhVPwOwg1J0m0QZjCg@mail.gmail.com>
-Message-ID: <CAOMZO5AuvgqtNTHUW-LyXy9Xsq=rnaPODBzWA3FRmRpxqrRqAw@mail.gmail.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Fri, 5 May 2017 21:19:12 +0800
+Subject: [PATCH v3 2/3] arm64: kvm: inject SError with virtual syndrome
+In-Reply-To: <5908A7CE.7030008@arm.com>
+References: <1493530677-4919-1-git-send-email-gengdongjiu@huawei.com>
+ <1493530677-4919-2-git-send-email-gengdongjiu@huawei.com>
+ <5908A7CE.7030008@arm.com>
+Message-ID: <bbceff7a-1ebf-e6de-abc6-e35b71c939f1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 5, 2017 at 8:48 AM, Fabio Estevam <festevam@gmail.com> wrote:
+Hi james,
 
-> Could you please confirm that drm/mxsfb is working fine on 4.11 on your board?
+   Thanks for your detailed suggestion.
+
+On 2017/5/2 23:37, James Morse wrote:
+> Hi Dongjiu Geng,
+> 
+> On 30/04/17 06:37, Dongjiu Geng wrote:
+>> when SError happen, kvm notifies kvmtool to generate GHES table
+>> to record the error, then kvmtools inject the SError with specified
+>> virtual syndrome. when switch to guest, a virtual SError will happen with
+>> this specified syndrome.
+> 
+> GHES records in the HEST (T)able have to be generated before the OS starts as
+> these are read at boot. Did you mean generate CPER records?
+ you are quite right that should generate CPER records.
+
+
+> 
+> 
+> It looks like this is based on the earlier SEI series, please work together and
+> post a combined series when there are changes. (It also good to summarise the
+> changes in the cover letter.)
+Ok.
+
+> 
+> This patch is modifying the world-switch to save/restore VSESR. You should
+> explain that VSESR is the Virtual SError Syndrome, it becomes the ESR value when
+> HCR_EL2.VSE injects an SError. This register was added by the RAS Extensions and
+> needs patching in or guarding.
+yes, you are right.
+
+> 
+> 
+>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>> index aede165..ded6211 100644
+>> --- a/arch/arm64/kvm/hyp/switch.c
+>> +++ b/arch/arm64/kvm/hyp/switch.c
+>> @@ -86,6 +86,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+>>  		isb();
+>>  	}
+>>  	write_sysreg(val, hcr_el2);
+>> +    /* If virtual System Error or Asynchronous Abort is pending. set
+>> +     * the virtual exception syndrome information
+>> +     */
+>> +	if (cpus_have_cap(ARM64_HAS_RAS_EXTN) &&
+> 
+> Is cpus_have_cap() safe to use at EL2?
+> This would be the first user, and it accesses cpu_hwcaps. You probably want
+> something like the static_branch_unlikely()s in the vgic code elsewhere in this
+> file.
+> 
+> 
+>> +			(vcpu->arch.hcr_el2 & HCR_VSE))
+>> +		write_sysreg_s(vcpu->arch.fault.vsesr_el2, VSESR_EL2);
+>> +
+> 
+> I think this would be clearer if you took this out to a helper method called
+> something like restore_vsesr() and did the if(cap|VSE) stuff there.
+  good suggestion.
+
+> 
+> (Nit: comment style)
+ OK.
+
+> 
+> 
+>>  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+>>  	write_sysreg(1 << 15, hstr_el2);
+>>  	/*
+>> @@ -139,9 +146,15 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+>>  	 * the crucial bit is "On taking a vSError interrupt,
+>>  	 * HCR_EL2.VSE is cleared to 0."
+>>  	 */
+>> -	if (vcpu->arch.hcr_el2 & HCR_VSE)
+>> +	if (vcpu->arch.hcr_el2 & HCR_VSE) {
+>>  		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
+>>  
+>> +		if (cpus_have_cap(ARM64_HAS_RAS_EXTN)) {
+>> +			/* set vsesr_el2[24:0] with esr_el2[24:0] */
+>> +			kvm_vcpu_set_vsesr(vcpu, read_sysreg_el2(esr)
+>> +					& VSESR_ELx_IDS_ISS_MASK);
+> 
+> There is no need for KVM to save the VSESR. It is copied to ESR_EL1 when
+> HCR_EL2.VSE delivers the SError, after this we don't care what the register
+> value is. When we switch to a guest we should set the value from KVM whenever
+> the VSE bit is set. We should never read back the value in hardware.
+  I think you are right. Thanks for your points out.
+
+> 
+> Why read ESR_EL2? This will give you a completely unrelated value. If EL2 takes
+> an IRQ or a page fault between pending the SError and delivering it, we
+> overwrite the value set by KVM or user-space with a stray EL2 value.
+> 
+> 
+> ... I think you expect an SError to arrive at EL2 and have its ESR recorded in
+> vcpu->arch.fault.vsesr_el2. Some time later KVM decides to inject an SError into
+> the guest, and this ESR is reused...
+> 
+> We shouldn't do this. Qemu/kvmtool may want to inject a virtual-SError that
+> never started as a physical-SError. Qemu/kvmtool may choose to notify the guest
+> of RAS events via another mechanism, or not at all.
+> 
+> KVM should not give the guest an ESR value of its choice. For SError the ESR
+> describes whether the error is corrected, correctable or fatal. Qemu/kvmtool
+> must choose this.
+
+Below is my previous solution:
+For the SError, CPU will firstly trap to EL3 firmware and records the syndrome to ESR_EL3.
+Before jumping to El2 hypervisors, it will copy the esr_el3 to esr_el2.
+so in order to pass this syndrome to vsesr_el2, using the esr_el2 value to assign it.
+
+
+If Qemu/kvmtool chooses the ESR value and ESR only describes whether the error is corrected/correctable/fatal,
+whether the information is not enough for the guest?
+
+
 >
-> I am converting mx6sx sdb to use drm/mxsfb and I noticed that when
-> board boots I get garbage on the display.
->
-> If I do a blank/unblank then things are displayed correctly.
+> I think we need an API that allows Qemu/kvmtool to inject SError into a guest,
+> but that isn't quite what you have here.
 
-Ok, I managed to fix the drm/mxsfb driver.
+KVM provides APIs to inject the SError, Qemu/kvmtool call the API though IOCTL, may be OK?
 
-Will submit a patch shortly.
+
+> 
+> The VSESR value should always come from user space. The only exception are
+> SErrors that we know weren't due to RAS: for these we should set the VSESR to
+> zero to keep the existing behaviour.
+> 
+> 
+> Thanks,
+> 
+> James
+> .
+> 
