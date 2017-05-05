@@ -1,62 +1,49 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 5 May 2017 23:17:14 +0200
-Subject: [PATCH v3 1/3] iio: adc: meson-saradc: mark all
- meson_sar_adc_data static and const
-In-Reply-To: <0DAF21CFE1B20740AE23D6AF6E54843F1E8BCDB2@IRSMSX101.ger.corp.intel.com>
-References: <20170504180136.27025-1-martin.blumenstingl@googlemail.com>
- <20170504180136.27025-2-martin.blumenstingl@googlemail.com>
- <0DAF21CFE1B20740AE23D6AF6E54843F1E8BCDB2@IRSMSX101.ger.corp.intel.com>
-Message-ID: <CAFBinCCQ=rhB9xrv7uPQhNFGHOCgSwEBFuCj1Xu-hVivdxu-Ng@mail.gmail.com>
+Date: Fri, 5 May 2017 23:43:06 +0200
+Subject: [PATCH v3 2/4] dt-binding: meson_uart: add documentation for the
+ UARTs of amlogic
+In-Reply-To: <20170331165437.26227-3-hgkr.klein@gmail.com>
+References: <20170331165437.26227-1-hgkr.klein@gmail.com>
+ <20170331165437.26227-3-hgkr.klein@gmail.com>
+Message-ID: <CAFBinCB=t6p_gmZMH3sUrVFCmnJTh2OVMT81ejdjUhs-0qyxpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Helmut,
 
-On Thu, May 4, 2017 at 9:07 PM, Langer, Thomas <thomas.langer@intel.com> wrote:
-> Hello Martin,
+On Fri, Mar 31, 2017 at 6:54 PM, Helmut Klein <hgkr.klein@gmail.com> wrote:
+> Add the documentation for the device tree binding of meson_uart
 >
->>
->> These are only passed as of_device_id.data and never modified. Thus we
->> can mark them as static const, just like the of_device_id instances
->> where they are used.
+> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+> ---
+>  .../bindings/serial/amlogic,meson_uart.txt         | 30 ++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
 >
-> Here you talk about static const, but in the code below the const is missing.
-indeed - excellent catch, thank you! I'll fix this in v4
+> diff --git a/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt b/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
+> new file mode 100644
+> index 000000000000..8250a191c2fc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
+> @@ -0,0 +1,30 @@
+> +* Amlogic Meson UART, used in multiple SoCs (e.g. S905, s905X, ...)
+> +
+> +Required properties:
+> +- compatible   : "amlogic,meson-uart"
+> +- reg          : offset and length of the register set for the device.
+> +- interrupts   : device interrupt
+> +- clocks       : a list of phandle + clock-specifier pairs, one for each
+> +                   entry in clock names.
+> +- clocks-names : contains:
+> +   * "xtal" for the baud rate clock
+> +   * "core" for the core clock of none AO UARTs (optional)
+I'm not sure if we should name the first clock "xtal" as on Meson8b
+clk81 is used as input, see [0].
+maybe "refclk" or "clkin" (the latter is already used in other meson
+drivers, see sd_emmc_*, saradc, ethmac, and so on)
 
->>
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> ---
->>  drivers/iio/adc/meson_saradc.c | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/iio/adc/meson_saradc.c
->> b/drivers/iio/adc/meson_saradc.c
->> index dd4190b50df6..1cb5df306001 100644
->> --- a/drivers/iio/adc/meson_saradc.c
->> +++ b/drivers/iio/adc/meson_saradc.c
->> @@ -834,17 +834,17 @@ static const struct iio_info meson_sar_adc_iio_info
->> = {
->>       .driver_module = THIS_MODULE,
->>  };
->>
->> -struct meson_sar_adc_data meson_sar_adc_gxbb_data = {
->> +static struct meson_sar_adc_data meson_sar_adc_gxbb_data = {
->>       .resolution = 10,
->>       .name = "meson-gxbb-saradc",
->>  };
->>
->> -struct meson_sar_adc_data meson_sar_adc_gxl_data = {
->> +static struct meson_sar_adc_data meson_sar_adc_gxl_data = {
->>       .resolution = 12,
->>       .name = "meson-gxl-saradc",
->>  };
->>
->> -struct meson_sar_adc_data meson_sar_adc_gxm_data = {
->> +static struct meson_sar_adc_data meson_sar_adc_gxm_data = {
->>       .resolution = 12,
->>       .name = "meson-gxm-saradc",
->>  };
->> --
->> 2.12.2
->>
->
+apart from that the whole series is a good thing (if the other small
+nits - for example from Rob - are fixed)!
+
+
+[0] http://elixir.free-electrons.com/linux/latest/source/arch/arm/boot/dts/meson8b.dtsi#L135
