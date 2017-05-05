@@ -1,69 +1,148 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 05 May 2017 10:09:09 +0200
-Subject: [PATCH v6 2/4] ARM: dts: mvebu: Add PWM properties to .dtsi files
-In-Reply-To: <20170505094139.484db2e7@gmail.com> (Ralph Sennhauser's message
- of "Fri, 5 May 2017 09:41:39 +0200")
-References: <20170414154056.32055-1-ralph.sennhauser@gmail.com>
- <20170414154056.32055-3-ralph.sennhauser@gmail.com>
- <CACRpkdZE0wnotF+OdAmutJcU9JSE_LxNd7Lz7yXqcn_bq5VqgQ@mail.gmail.com>
- <20170505094139.484db2e7@gmail.com>
-Message-ID: <87lgqb7mje.fsf@free-electrons.com>
+From: oza.oza@broadcom.com (Oza Oza)
+Date: Fri, 5 May 2017 13:40:40 +0530
+Subject: [PATCH 2/3] iommu/pci: reserve iova for PCI masters
+In-Reply-To: <0c9a6b09-139c-df49-cf73-6a3935a6aacd@arm.com>
+References: <1493786795-28153-1-git-send-email-oza.oza@broadcom.com>
+ <1493786795-28153-2-git-send-email-oza.oza@broadcom.com>
+ <0c9a6b09-139c-df49-cf73-6a3935a6aacd@arm.com>
+Message-ID: <CAMSpPPe9UExb2Wd2BeaWB0mY1fE788h57bsSZkhk5eZjcTdPpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ralph,
- 
- On ven., mai 05 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
-
-> On Mon, 24 Apr 2017 11:19:32 +0200
-> Linus Walleij <linus.walleij@linaro.org> wrote:
+On Thu, May 4, 2017 at 11:50 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 03/05/17 05:46, Oza Pawandeep wrote:
+>> this patch reserves the iova for PCI masters.
+>> ARM64 based SOCs may have scattered memory banks.
+>> such as iproc based SOC has
+>>
+>> <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
+>> <0x00000008 0x80000000 0x3 0x80000000>, /* 14G @ 34G */
+>> <0x00000090 0x00000000 0x4 0x00000000>, /* 16G @ 576G */
+>> <0x000000a0 0x00000000 0x4 0x00000000>; /* 16G @ 640G */
+>>
+>> but incoming PCI transcation addressing capability is limited
+>> by host bridge, for example if max incoming window capability
+>> is 512 GB, then 0x00000090 and 0x000000a0 will fall beyond it.
+>>
+>> to address this problem, iommu has to avoid allocating iovas which
+>> are reserved. which inturn does not allocate iova if it falls into hole.
 >
->> On Fri, Apr 14, 2017 at 5:40 PM, Ralph Sennhauser
->> <ralph.sennhauser@gmail.com> wrote:
->> 
->> > From: Andrew Lunn <andrew@lunn.ch>
->> >
->> > Add properties to the GPIO nodes to allow them to be also used as
->> > PWM lines.
->> >
->> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
->> > URL: https://patchwork.ozlabs.org/patch/427294/
->> > [Ralph Sennhauser: Add new compatible string
->> > marvell,armada-370-xp-gpio] Signed-off-by: Ralph Sennhauser
->> > <ralph.sennhauser@gmail.com> Tested-by: Andrew Lunn
->> > <andrew@lunn.ch>  
->> 
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->> 
->> Please funnel this through ARM SoC.
->
-> Hi Gregory,
->
-> A reminder on the off chance you have missed this and it's not to late
-> already, Linus Walleij took the driver and submitted it for inclusion in
-> 4.12 [1]. So for completeness it be nice to have the dts(i) and
-> defconfig changes in as well.
-
-Unfortunately it was too late to applied and to push it to arm-soc when
-the gpio part was applied.
-
-So I will apply when 4.12-rc1 will be released and it will be
-included in the 4.13 release.
-
-Gregory
->
-> Thanks
-> Ralph
->
-> [1] https://lkml.org/lkml/2017/5/4/82
->
->> 
->> Yours,
->> Linus Walleij
+> I don't necessarily disagree with doing this, as we could do with facing
+> up to the issue of discontiguous DMA ranges in particular (I too have a
+> platform with this problem), but I'm still not overly keen on pulling DT
+> specifics into this layer. More than that, though, if we are going to do
+> it, then we should do it for all devices with a restrictive
+> "dma-ranges", not just PCI ones.
 >
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+pci_create_root_bus allocates host bridge, and currently it takes only
+oubound resources.
+
+if inbound memory is also added as a part of  pci_create_root_bus params,
+then IOVA allocation can directly make use of inbound_windows member
+of structure pci_host_bridge.
+
+struct pci_host_bridge {
+        struct device dev;
+        struct pci_bus *bus; /* root bus */
+        struct list_head windows; /* resource_entry */
+        struct list_head inbound_windows; /* resource_entry */
+        .
+        .
+}
+
+so iova_reserve_pci_windows can iterate throough
+resource_list_for_each_entry(window, &bridge->inbound_windows)
+this way we can remove the dependency of dma-iommu.c on OF layer.
+
+but only thing is:
+pci_create_root_bus is called by handful of RC drivers, which needs to change.
+ideally if you see both inbound and outbound resource should belong to
+pci_host_bridge anyway.
+and inbound is completely missing.
+
+let me know your thoughts on this, Robin.
+
+>> Bug: SOC-5216
+>> Change-Id: Icbfc99a045d730be143fef427098c937b9d46353
+>> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+>> Reviewed-on: http://gerrit-ccxsw.broadcom.net/40760
+>> Reviewed-by: vpx_checkpatch status <vpx_checkpatch@broadcom.com>
+>> Reviewed-by: CCXSW <ccxswbuild@broadcom.com>
+>> Tested-by: vpx_autobuild status <vpx_autobuild@broadcom.com>
+>> Tested-by: vpx_smoketest status <vpx_smoketest@broadcom.com>
+>> Tested-by: CCXSW <ccxswbuild@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>
+>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>> index 48d36ce..08764b0 100644
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
+>> @@ -27,6 +27,7 @@
+>>  #include <linux/iova.h>
+>>  #include <linux/irq.h>
+>>  #include <linux/mm.h>
+>> +#include <linux/of_pci.h>
+>>  #include <linux/pci.h>
+>>  #include <linux/scatterlist.h>
+>>  #include <linux/vmalloc.h>
+>> @@ -171,8 +172,12 @@ static void iova_reserve_pci_windows(struct pci_dev *dev,
+>>               struct iova_domain *iovad)
+>>  {
+>>       struct pci_host_bridge *bridge = pci_find_host_bridge(dev->bus);
+>> +     struct device_node *np = bridge->dev.parent->of_node;
+>>       struct resource_entry *window;
+>>       unsigned long lo, hi;
+>> +     int ret;
+>> +     dma_addr_t tmp_dma_addr = 0, dma_addr;
+>> +     LIST_HEAD(res);
+>>
+>>       resource_list_for_each_entry(window, &bridge->windows) {
+>>               if (resource_type(window->res) != IORESOURCE_MEM &&
+>> @@ -183,6 +188,36 @@ static void iova_reserve_pci_windows(struct pci_dev *dev,
+>>               hi = iova_pfn(iovad, window->res->end - window->offset);
+>>               reserve_iova(iovad, lo, hi);
+>>       }
+>> +
+>> +     /* PCI inbound memory reservation. */
+>> +     ret = of_pci_get_dma_ranges(np, &res);
+>> +     if (!ret) {
+>> +             resource_list_for_each_entry(window, &res) {
+>> +                     struct resource *res_dma = window->res;
+>> +
+>> +                     dma_addr = res_dma->start - window->offset;
+>> +                     if (tmp_dma_addr > dma_addr) {
+>> +                             pr_warn("PCI: failed to reserve iovas; ranges should be sorted\n");
+>
+> I don't see anything in the DT spec about the entries having to be
+> sorted, and it's not exactly impossible to sort a list if you need it so
+> (and if I'm being really pedantic, one could still trigger this with a
+> list that *is* sorted, only by different criteria).
+>
+> Robin.
+>
+>> +                             return;
+>> +                     }
+>> +                     if (tmp_dma_addr != dma_addr) {
+>> +                             lo = iova_pfn(iovad, tmp_dma_addr);
+>> +                             hi = iova_pfn(iovad, dma_addr - 1);
+>> +                             reserve_iova(iovad, lo, hi);
+>> +                     }
+>> +                     tmp_dma_addr = window->res->end - window->offset;
+>> +             }
+>> +             /*
+>> +              * the last dma-range should honour based on the
+>> +              * 32/64-bit dma addresses.
+>> +              */
+>> +             if (tmp_dma_addr < DMA_BIT_MASK(sizeof(dma_addr_t) * 8)) {
+>> +                     lo = iova_pfn(iovad, tmp_dma_addr);
+>> +                     hi = iova_pfn(iovad,
+>> +                                   DMA_BIT_MASK(sizeof(dma_addr_t) * 8) - 1);
+>> +                     reserve_iova(iovad, lo, hi);
+>> +             }
+>> +     }
+>>  }
+>>
+>>  /**
+>>
+>
