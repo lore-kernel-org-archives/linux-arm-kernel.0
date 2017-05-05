@@ -1,54 +1,52 @@
-From: hotran@apm.com (Hoan Tran)
-Date: Fri, 5 May 2017 08:48:28 -0700
-Subject: [PATCH v2 0/3] perf: xgene: Add support for SoC PMU version 3
-In-Reply-To: <CAFHUOYzJ1PoUV=BmcVxSHZ_8qENm6DW5_Hd3uuFHE9kdqhXCzA@mail.gmail.com>
-References: <1491238077-20666-1-git-send-email-hotran@apm.com>
- <CAFHUOYzJ1PoUV=BmcVxSHZ_8qENm6DW5_Hd3uuFHE9kdqhXCzA@mail.gmail.com>
-Message-ID: <CAFHUOYw3WtTB+q+zKdRDBaXyCaDp+r-YfydTxHSRm5CT6sNnXQ@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 5 May 2017 11:33:47 -0400
+Subject: [PATCH v3 3/7] ACPICA: IORT: Add Cavium ThunderX2 SMMUv3 model
+ definition.
+In-Reply-To: <20170505145800.GG14111@arm.com>
+References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
+ <1493986091-30521-4-git-send-email-gakula@caviumnetworks.com>
+ <330d0438-f9ed-ef65-8ffd-d556d149b4e1@linaro.org>
+ <6b04ab17-449f-74e0-72f4-b5a9bc0639d8@gmail.com>
+ <20170505145800.GG14111@arm.com>
+Message-ID: <c4b72ee7-17ff-45f1-02a2-ec9f27232933@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping!
+On 05/05/2017 10:58 AM, Will Deacon wrote:
+> On Fri, May 05, 2017 at 07:56:17AM -0700, David Daney wrote:
+>> On 05/05/2017 06:53 AM, Hanjun Guo wrote:
+>>> On 2017/5/5 20:08, Geetha sowjanya wrote:
+>>>> From: Linu Cherian <linu.cherian@cavium.com>
 
-Thanks
-Hoan
+>>>> +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX 0x00000002 /* Cavium ThunderX2
+>>>> SMMUv3 */
+>>>
+>>> There are some other model numbers in the unreleased spec,
+>>> I think we need to wait for the updated IORT spec to
+>>> be released.
 
-On Thu, Apr 13, 2017 at 10:50 AM, Hoan Tran <hotran@apm.com> wrote:
-> Hi All,
->
-> Do you have any comments on this patch set?
->
-> Thanks
-> Hoan
->
-> On Mon, Apr 3, 2017 at 9:47 AM, Hoan Tran <hotran@apm.com> wrote:
->>
->> This patch set adds support for SoC-wide (AKA uncore) Performance
->> Monitoring
->> Unit version 3.
->>
->> It can support up to
->>  - 2 IOB PMU instances
->>  - 8 L3C PMU instances
->>  - 2 MCB PMU instances
->>  - 8 MCU PMU instances
->>
->> v2:
->>  * Split into separate patches
->>  * Use the function pointers for the PMU leaf functions
->>  * Parse PMU subnode by the match table
->>  * Dont allow user change agent id by config1 for SoC PMU v3
->>
->> Hoan Tran (3):
->>   perf: xgene: Parse PMU subnode from the match table
->>   perf: xgene: Move PMU leaf functions into function pointer structure
->>   perf: xgene: Add support for SoC PMU version 3
->>
->>  drivers/perf/xgene_pmu.c | 695
->> +++++++++++++++++++++++++++++++++++++++++------
->>  1 file changed, 619 insertions(+), 76 deletions(-)
->>
->> --
->> 1.9.1
->>
->
+Indeed. I've synced with the author on this and he's got it in hand.
+
+>> ... or if we are fairly confident that the identifier will not need to
+>> change, we can merge this as is and establish a de facto specification that
+>> the Real IORT specification will then be forced to follow.
+
+Can't do that - this always causes trouble ;) But if there's any delay
+I'll ask that the IDs at least be listed somewhere public or something.
+
+>> Is there anything other than bureaucratic inertia holding up the real
+>> specification?
+> 
+> My understanding is that IORT is going to be published imminently (i.e.
+> before the next kernel release), so it makes sense to wait rather than fork
+> the spec.
+
+Let's track this and get the updated patches posted next week once the
+new ID drops. Meanwhile, I suggest reviewing them as-is for other
+issues. I'm tracking this for internal purposes and require this to be
+upstream asap so I'll be sitting on this thread for updates ;)
+
+Jon.
+
+-- 
+Computer Architect | Sent from my Fedora powered laptop
