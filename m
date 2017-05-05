@@ -1,52 +1,87 @@
 From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Fri,  5 May 2017 15:32:53 -0400
-Subject: [PATCH v3 0/6] Add board support for TS-4600
-Message-ID: <20170505193259.16517-1-sebastien.bourdelin@savoirfairelinux.com>
+Date: Fri,  5 May 2017 15:32:56 -0400
+Subject: [PATCH v3 3/6] dt-bindings: bus: Add documentation for the
+ Technologic Systems NBUS
+In-Reply-To: <20170505193259.16517-1-sebastien.bourdelin@savoirfairelinux.com>
+References: <20170505193259.16517-1-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20170505193259.16517-4-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch serie adds support for the TS-4600 boards rev A and B. These
-boards, manufactured by Technologic Systems, are based on an i.MX28.
+Add binding documentation for the Technologic Systems NBUS that is used
+to interface with peripherals in the FPGA of the TS-4600 SoM.
 
-This serie include the support for the watchdog which could be enable
-at Linux boot time depending on the bootloader.
+Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+---
+Changes v2 -> v3:
+  - rebase on master
+  - fix typo (suggested by Rob Herring)
 
-The watchdog and few peripherals are implemented in a FPGA, and can
-only be access using a custom GPIOs bit-banged bus which is called the
-NBUS by Technologic Systems.
-A driver for this bus is also included and used by the watchdog.
-
-Sebastien Bourdelin (6):
-  of: documentation: add bindings documentation for TS-4600
-  ARM: dts: TS-4600: add basic device tree
-  dt-bindings: bus: Add documentation for the Technologic Systems NBUS
-  bus: add driver for the Technologic Systems NBUS
-  ARM: dts: TS-4600: add NBUS support
-  watchdog: ts4600: add driver for TS-4600 watchdog
-
- .../devicetree/bindings/arm/technologic.txt        |   5 +
- Documentation/devicetree/bindings/bus/ts-nbus.txt  |  50 +++
- .../devicetree/bindings/watchdog/ts4600-wdt.txt    |  16 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/imx28-ts4600-common.dtsi         | 126 +++++++
- arch/arm/boot/dts/imx28-ts4600-rev-a.dts           |  22 ++
- arch/arm/boot/dts/imx28-ts4600-rev-b.dts           |  22 ++
- drivers/bus/Kconfig                                |   8 +
- drivers/bus/Makefile                               |   1 +
- drivers/bus/ts-nbus.c                              | 375 +++++++++++++++++++++
- drivers/watchdog/Kconfig                           |  11 +
- drivers/watchdog/Makefile                          |   1 +
- drivers/watchdog/ts4600_wdt.c                      | 185 ++++++++++
- include/linux/ts-nbus.h                            |  18 +
- 14 files changed, 842 insertions(+)
+Changes v1 -> v2:
+  - rebase on master
+  - remove the simple-bus compatibility as the root node will now
+  populate child nodes (suggested by Rob Herring)
+  - use the ts vendor prefix for gpios (suggested by Rob Herring)
+---
+ Documentation/devicetree/bindings/bus/ts-nbus.txt | 50 +++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/bus/ts-nbus.txt
- create mode 100644 Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
- create mode 100644 arch/arm/boot/dts/imx28-ts4600-common.dtsi
- create mode 100644 arch/arm/boot/dts/imx28-ts4600-rev-a.dts
- create mode 100644 arch/arm/boot/dts/imx28-ts4600-rev-b.dts
- create mode 100644 drivers/bus/ts-nbus.c
- create mode 100644 drivers/watchdog/ts4600_wdt.c
- create mode 100644 include/linux/ts-nbus.h
 
+diff --git a/Documentation/devicetree/bindings/bus/ts-nbus.txt b/Documentation/devicetree/bindings/bus/ts-nbus.txt
+new file mode 100644
+index 000000000000..905600adfb64
+--- /dev/null
++++ b/Documentation/devicetree/bindings/bus/ts-nbus.txt
+@@ -0,0 +1,50 @@
++Technologic Systems NBUS
++
++The NBUS is a bus used to interface with peripherals in the Technologic
++Systems FPGA on the TS-4600 SoM.
++
++Required properties :
++ - compatible		: "technologic,ts-nbus"
++ - #address-cells	: must be 1
++ - #size-cells		: must be 0
++ - pwms			: The PWM bound to the FPGA
++ - ts-data-gpios	: The 8 GPIO pins connected to the data lines on the FPGA
++ - ts-csn-gpios		: The GPIO pin connected to the csn line on the FPGA
++ - ts-txrx-gpios	: The GPIO pin connected to the txrx line on the FPGA
++ - ts-strobe-gpios	: The GPIO pin connected to the stobe line on the FPGA
++ - ts-ale-gpios		: The GPIO pin connected to the ale line on the FPGA
++ - ts-rdy-gpios		: The GPIO pin connected to the rdy line on the FPGA
++
++Child nodes:
++
++The NBUS node can contain zero or more child nodes representing peripherals
++on the bus.
++
++Example:
++
++	nbus {
++		compatible = "technologic,ts-nbus";
++		pinctrl-0 = <&nbus_pins>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pwms = <&pwm 2 83>;
++		ts-data-gpios   = <&gpio0 0 GPIO_ACTIVE_HIGH
++				   &gpio0 1 GPIO_ACTIVE_HIGH
++				   &gpio0 2 GPIO_ACTIVE_HIGH
++				   &gpio0 3 GPIO_ACTIVE_HIGH
++				   &gpio0 4 GPIO_ACTIVE_HIGH
++				   &gpio0 5 GPIO_ACTIVE_HIGH
++				   &gpio0 6 GPIO_ACTIVE_HIGH
++				   &gpio0 7 GPIO_ACTIVE_HIGH>;
++		ts-csn-gpios    = <&gpio0 16 GPIO_ACTIVE_HIGH>;
++		ts-txrx-gpios   = <&gpio0 24 GPIO_ACTIVE_HIGH>;
++		ts-strobe-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
++		ts-ale-gpios    = <&gpio0 26 GPIO_ACTIVE_HIGH>;
++		ts-rdy-gpios    = <&gpio0 21 GPIO_ACTIVE_HIGH>;
++
++		watchdog at 2a {
++			compatible = "...";
++
++			/* ... */
++		};
++	};
 -- 
 2.12.0
