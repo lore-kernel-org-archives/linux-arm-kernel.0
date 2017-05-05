@@ -1,55 +1,86 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  5 May 2017 11:57:44 +0200
-Subject: [PATCH 01/10] dma: mv_xor_v2: handle mv_xor_v2_prep_sw_desc() error
- properly
+Date: Fri,  5 May 2017 11:57:46 +0200
+Subject: [PATCH 03/10] dma: mv_xor_v2: do not use descriptors not acked by
+ async_tx
 In-Reply-To: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1493978274-12805-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1493978274-12805-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mv_xor_v2_prep_sw_desc() is called from a few different places in
-the driver, but we never take into account the fact that it might
-return NULL. This commit fixes that, ensuring that we don't panic if
-there are no more descriptors available.
+Descriptors that have not been acknowledged by the async_tx layer
+should not be re-used, so this commit adjusts the implementation of
+mv_xor_v2_prep_sw_desc() to skip descriptors for which
+async_tx_test_ack() is false.
 
 Fixes: 19a340b1a820 ("dmaengine: mv_xor_v2: new driver")
 Cc: <stable@vger.kernel.org>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor_v2.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/dma/mv_xor_v2.c | 32 ++++++++++++++++++++++----------
+ 1 file changed, 22 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/dma/mv_xor_v2.c b/drivers/dma/mv_xor_v2.c
-index a28a01f..e928020 100644
+index bdfb36e..cb60e7c 100644
 --- a/drivers/dma/mv_xor_v2.c
 +++ b/drivers/dma/mv_xor_v2.c
-@@ -389,6 +389,8 @@ mv_xor_v2_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest,
- 		__func__, len, &src, &dest, flags);
+@@ -344,6 +344,7 @@ static struct mv_xor_v2_sw_desc	*
+ mv_xor_v2_prep_sw_desc(struct mv_xor_v2_device *xor_dev)
+ {
+ 	struct mv_xor_v2_sw_desc *sw_desc;
++	bool found = false;
  
- 	sw_desc = mv_xor_v2_prep_sw_desc(xor_dev);
-+	if (!sw_desc)
+ 	/* Lock the channel */
+ 	spin_lock_bh(&xor_dev->lock);
+@@ -355,19 +356,23 @@ mv_xor_v2_prep_sw_desc(struct mv_xor_v2_device *xor_dev)
+ 		return NULL;
+ 	}
+ 
+-	/* get a free SW descriptor from the SW DESQ */
+-	sw_desc = list_first_entry(&xor_dev->free_sw_desc,
+-				   struct mv_xor_v2_sw_desc, free_list);
++	list_for_each_entry(sw_desc, &xor_dev->free_sw_desc, free_list) {
++		if (async_tx_test_ack(&sw_desc->async_tx)) {
++			found = true;
++			break;
++		}
++	}
++
++	if (!found) {
++		spin_unlock_bh(&xor_dev->lock);
 +		return NULL;
++	}
++
+ 	list_del(&sw_desc->free_list);
  
- 	sw_desc->async_tx.flags = flags;
+ 	/* Release the channel */
+ 	spin_unlock_bh(&xor_dev->lock);
  
-@@ -443,6 +445,8 @@ mv_xor_v2_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 		__func__, src_cnt, len, &dest, flags);
+-	/* set the async tx descriptor */
+-	dma_async_tx_descriptor_init(&sw_desc->async_tx, &xor_dev->dmachan);
+-	sw_desc->async_tx.tx_submit = mv_xor_v2_tx_submit;
+-	async_tx_ack(&sw_desc->async_tx);
+-
+ 	return sw_desc;
+ }
  
- 	sw_desc = mv_xor_v2_prep_sw_desc(xor_dev);
-+	if (!sw_desc)
-+		return NULL;
+@@ -785,8 +790,15 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
  
- 	sw_desc->async_tx.flags = flags;
+ 	/* add all SW descriptors to the free list */
+ 	for (i = 0; i < MV_XOR_V2_DESC_NUM; i++) {
+-		xor_dev->sw_desq[i].idx = i;
+-		list_add(&xor_dev->sw_desq[i].free_list,
++		struct mv_xor_v2_sw_desc *sw_desc =
++			xor_dev->sw_desq + i;
++		sw_desc->idx = i;
++		dma_async_tx_descriptor_init(&sw_desc->async_tx,
++					     &xor_dev->dmachan);
++		sw_desc->async_tx.tx_submit = mv_xor_v2_tx_submit;
++		async_tx_ack(&sw_desc->async_tx);
++
++		list_add(&sw_desc->free_list,
+ 			 &xor_dev->free_sw_desc);
+ 	}
  
-@@ -491,6 +495,8 @@ mv_xor_v2_prep_dma_interrupt(struct dma_chan *chan, unsigned long flags)
- 		container_of(chan, struct mv_xor_v2_device, dmachan);
- 
- 	sw_desc = mv_xor_v2_prep_sw_desc(xor_dev);
-+	if (!sw_desc)
-+		return NULL;
- 
- 	/* set the HW descriptor */
- 	hw_descriptor = &sw_desc->hw_desc;
 -- 
 2.7.4
