@@ -1,200 +1,101 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Sat,  6 May 2017 17:24:38 +0200
-Subject: [PATCH v7 19/24] KVM: arm64: vgic-its: Collection table save/restore
+Date: Sat,  6 May 2017 17:24:29 +0200
+Subject: [PATCH v7 10/24] KVM: arm64: vgic-its: Implement
+ vgic_mmio_uaccess_write_its_iidr
 In-Reply-To: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
 References: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1494084283-12723-20-git-send-email-eric.auger@redhat.com>
+Message-ID: <1494084283-12723-11-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The save path copies the collection entries into guest RAM
-at the GPA specified in the BASER register. This obviously
-requires the BASER to be set. The last written element is a
-dummy collection table entry.
+The GITS_IIDR revision field is used to encode the migration ABI
+revision. So we need to restore it to check the table layout is
+readable by the destination.
 
-We do not index by collection ID as the collection entry
-can fit into 8 bytes while containing the collection ID.
-
-On restore path we re-allocate the collection objects.
+By writing the IIDR, userspace thus forces the ABI revision to be
+used and this must be less than or equal to the max revision KVM
+supports.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
 
 ---
 v6 -> v7:
-- added Christoffer's R-b
-- remove filled == max_size check
+- use NR_ITS_ABIS
+- introduce & use GITS_IIDR_REV_MASK
 
 v5 -> v6:
-- remove the valid pointer from vgic_its_restore_cte and
-  return +1 if no error and last elt not found
-- check the BASER valid bit
-- add BUG_ON to check esz versus val size
+- fix typos in the commit message
+- dont't use update_64bit_reg anymore
 
-v4 -> v5:
-- add macros for field encoding/decoding
-- use abi->cte_esz
-- rename flush into save
-- check the target_addr is valid
+v4 -> v5
+- rename user_revision into abi_rev and REV into MAX_ABI_REV
+- IIDR reports abi_rev set by userspace if any.
+- If value set by userspace exceeds the max supported revision, an
+  error is reported.
+- add some defines
 
-v3 -> v4:
-- replaced u64 *ptr by gpa_t gpa
-- check the collection does not exist before allocating it
-
-v1 -> v2:
-- reword commit message and directly use 8 as entry size
-- no kvm parameter anymore
-- add helper for flush/restore cte
-- table size computed here
-- add le64/cpu conversions
+v4: creation
 ---
- virt/kvm/arm/vgic/vgic-its.c | 100 ++++++++++++++++++++++++++++++++++++++++++-
- virt/kvm/arm/vgic/vgic.h     |   9 ++++
- 2 files changed, 107 insertions(+), 2 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h |  5 +++++
+ virt/kvm/arm/vgic/vgic-its.c       | 23 ++++++++++++++++++++---
+ 2 files changed, 25 insertions(+), 3 deletions(-)
 
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 81ebe43..2eaea30 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -242,6 +242,11 @@
+ #define GITS_TYPER_PTA			(1UL << 19)
+ #define GITS_TYPER_HWCOLLCNT_SHIFT	24
+ 
++#define GITS_IIDR_REV_SHIFT		12
++#define GITS_IIDR_REV_MASK		(0xf << GITS_IIDR_REV_SHIFT)
++#define GITS_IIDR_REV(r)		(((r) >> GITS_IIDR_REV_SHIFT) & 0xf)
++#define GITS_IIDR_PRODUCTID_SHIFT	24
++
+ #define GITS_CBASER_VALID			(1ULL << 63)
+ #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
+ #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index d5c0057..5523f0a 100644
+index 4f6ea46..9338efb 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1838,13 +1838,89 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
- 	return -ENXIO;
- }
- 
-+static int vgic_its_save_cte(struct vgic_its *its,
-+			     struct its_collection *collection,
-+			     gpa_t gpa, int esz)
-+{
-+	u64 val;
+@@ -434,7 +434,23 @@ static unsigned long vgic_mmio_read_its_iidr(struct kvm *kvm,
+ 					     struct vgic_its *its,
+ 					     gpa_t addr, unsigned int len)
+ {
+-	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++	u32 val;
 +
-+	val = (1ULL << KVM_ITS_CTE_VALID_SHIFT |
-+	       ((u64)collection->target_addr << KVM_ITS_CTE_RDBASE_SHIFT) |
-+	       collection->collection_id);
-+	val = cpu_to_le64(val);
-+	return kvm_write_guest(its->dev->kvm, gpa, &val, esz);
++	val = (its->abi_rev << GITS_IIDR_REV_SHIFT) & GITS_IIDR_REV_MASK;
++	val |= (PRODUCT_ID_KVM << GITS_IIDR_PRODUCTID_SHIFT) | IMPLEMENTER_ARM;
++	return val;
 +}
 +
-+static int vgic_its_restore_cte(struct vgic_its *its, gpa_t gpa, int esz)
++static int vgic_mmio_uaccess_write_its_iidr(struct kvm *kvm,
++					    struct vgic_its *its,
++					    gpa_t addr, unsigned int len,
++					    unsigned long val)
 +{
-+	struct its_collection *collection;
-+	struct kvm *kvm = its->dev->kvm;
-+	u32 target_addr, coll_id;
-+	u64 val;
-+	int ret;
++	u32 rev = GITS_IIDR_REV(val);
 +
-+	BUG_ON(esz > sizeof(val));
-+	ret = kvm_read_guest(kvm, gpa, &val, esz);
-+	if (ret)
-+		return ret;
-+	val = le64_to_cpu(val);
-+	if (!(val & KVM_ITS_CTE_VALID_MASK))
-+		return 0;
-+
-+	target_addr = (u32)(val >> KVM_ITS_CTE_RDBASE_SHIFT);
-+	coll_id = val & KVM_ITS_CTE_ICID_MASK;
-+
-+	if (target_addr >= atomic_read(&kvm->online_vcpus))
++	if (rev >= NR_ITS_ABIS)
 +		return -EINVAL;
-+
-+	collection = find_collection(its, coll_id);
-+	if (collection)
-+		return -EEXIST;
-+	ret = vgic_its_alloc_collection(its, &collection, coll_id);
-+	if (ret)
-+		return ret;
-+	collection->target_addr = target_addr;
-+	return 1;
-+}
-+
- /**
-  * vgic_its_save_collection_table - Save the collection table into
-  * guest RAM
-  */
- static int vgic_its_save_collection_table(struct vgic_its *its)
- {
--	return -ENXIO;
-+	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-+	struct its_collection *collection;
-+	u64 val;
-+	gpa_t gpa;
-+	size_t max_size, filled = 0;
-+	int ret, cte_esz = abi->cte_esz;
-+
-+	gpa = BASER_ADDRESS(its->baser_coll_table);
-+	if (!gpa)
-+		return 0;
-+
-+	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
-+
-+	list_for_each_entry(collection, &its->collection_list, coll_list) {
-+		ret = vgic_its_save_cte(its, collection, gpa, cte_esz);
-+		if (ret)
-+			return ret;
-+		gpa += cte_esz;
-+		filled += cte_esz;
-+	}
-+
-+	if (filled == max_size)
-+		return 0;
-+
-+	/*
-+	 * table is not fully filled, add a last dummy element
-+	 * with valid bit unset
-+	 */
-+	val = 0;
-+	BUG_ON(cte_esz > sizeof(val));
-+	ret = kvm_write_guest(its->dev->kvm, gpa, &val, cte_esz);
-+	return ret;
++	return vgic_its_set_abi(its, rev);
  }
  
- /**
-@@ -1854,7 +1930,27 @@ static int vgic_its_save_collection_table(struct vgic_its *its)
-  */
- static int vgic_its_restore_collection_table(struct vgic_its *its)
- {
--	return -ENXIO;
-+	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-+	int cte_esz = abi->cte_esz;
-+	size_t max_size, read = 0;
-+	gpa_t gpa;
-+	int ret;
-+
-+	if (!(its->baser_coll_table & GITS_BASER_VALID))
-+		return 0;
-+
-+	gpa = BASER_ADDRESS(its->baser_coll_table);
-+
-+	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
-+
-+	while (read < max_size) {
-+		ret = vgic_its_restore_cte(its, gpa, cte_esz);
-+		if (ret <= 0)
-+			break;
-+		gpa += cte_esz;
-+		read += cte_esz;
-+	}
-+	return ret;
- }
- 
- /**
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 309ab64..58adcae 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -73,6 +73,15 @@
- 				      KVM_REG_ARM_VGIC_SYSREG_CRM_MASK | \
- 				      KVM_REG_ARM_VGIC_SYSREG_OP2_MASK)
- 
-+/*
-+ * As per Documentation/virtual/kvm/devices/arm-vgic-its.txt,
-+ * below macros are defined for ITS table entry encoding.
-+ */
-+#define KVM_ITS_CTE_VALID_SHIFT		63
-+#define KVM_ITS_CTE_VALID_MASK		BIT_ULL(63)
-+#define KVM_ITS_CTE_RDBASE_SHIFT	16
-+#define KVM_ITS_CTE_ICID_MASK		GENMASK_ULL(15, 0)
-+
- static inline bool irq_is_pending(struct vgic_irq *irq)
- {
- 	if (irq->config == VGIC_CONFIG_EDGE)
+ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
+@@ -1415,8 +1431,9 @@ static struct vgic_register_region its_registers[] = {
+ 	REGISTER_ITS_DESC(GITS_CTLR,
+ 		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
+ 		VGIC_ACCESS_32bit),
+-	REGISTER_ITS_DESC(GITS_IIDR,
+-		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
++	REGISTER_ITS_DESC_UACCESS(GITS_IIDR,
++		vgic_mmio_read_its_iidr, its_mmio_write_wi,
++		vgic_mmio_uaccess_write_its_iidr, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_TYPER,
+ 		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
 -- 
 2.5.5
