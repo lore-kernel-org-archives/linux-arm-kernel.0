@@ -1,92 +1,203 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Sat,  6 May 2017 17:24:44 +0530
-Subject: [PATCH 09/11] arm64: dts: Add I2C DT nodes for Stingray SoC
+Date: Sat,  6 May 2017 17:24:40 +0530
+Subject: [PATCH 05/11] arm64: dts: Add clock DT nodes for Stingray SOC
 In-Reply-To: <1494071686-19098-1-git-send-email-anup.patel@broadcom.com>
 References: <1494071686-19098-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1494071686-19098-10-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1494071686-19098-6-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oza Pawandeep <oza@broadcom.com>
+From: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
 
-This patch adds I2C DT nodes on Stingray SoC.
+This patch describes Stingray SOC clock tree using
+DT nodes in Stingray DTS.
 
-Signed-off-by: Oza Pawandeep <oza@broadcom.com>
-Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
+Signed-off-by: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
 Reviewed-by: Ray Jui <ray.jui@broadcom.com>
 Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 ---
- .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 22 ++++++++++++++++++++++
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 20 ++++++++++++++++++++
- 2 files changed, 42 insertions(+)
+ .../boot/dts/broadcom/stingray/stingray-clock.dtsi | 162 +++++++++++++++++++++
+ .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |   2 +
+ 2 files changed, 164 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-index 6014525..3250d09 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-@@ -63,6 +63,28 @@
- 	status = "okay";
- };
- 
-+&i2c0 {
-+	status = "okay";
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
+new file mode 100644
+index 0000000..32af238f
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
+@@ -0,0 +1,162 @@
++/*
++ *  BSD LICENSE
++ *
++ *  Copyright(c) 2016-2017 Broadcom.  All rights reserved.
++ *
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
++ *
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom nor the names of its
++ *      contributors may be used to endorse or promote products derived
++ *      from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
 +
-+	pca9505: pca9505 at 20 {
-+		compatible = "nxp,pca9505";
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		reg = <0x20>;
++#include <dt-bindings/clock/bcm-sr.h>
++
++	osc: oscillator {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <50000000>;
 +	};
-+};
 +
-+&i2c1 {
-+	status = "okay";
-+
-+	pcf8574: pcf8574 at 20 {
-+		compatible = "nxp,pcf8574a";
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		reg = <0x27>;
++	crmu_ref25m: crmu_ref25m {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&osc>;
++		clock-div = <2>;
++		clock-mult = <1>;
 +	};
-+};
 +
- &nand {
- 	status = "ok";
- 	nandcs at 0 {
++	genpll0: genpll0 at 6641d104 {
++		#clock-cells = <1>;
++		compatible = "brcm,sr-genpll0";
++		reg = <0x6641d104 0x32>,
++		      <0x6641c854 0x4>;
++		clocks = <&osc>;
++		clock-output-names = "genpll0", "clk_125", "clk_scr", "clk_250",
++				     "clk_pcie_axi", "clk_paxc_axi_x2",
++				     "clk_paxc_axi";
++	};
++
++	genpll3: genpll3 at 6641d1e0 {
++		#clock-cells = <1>;
++		compatible = "brcm,sr-genpll3";
++		reg = <0x6641d1e0 0x32>,
++		      <0x6641c854 0x4>;
++		clocks = <&osc>;
++		clock-output-names = "genpll3", "clk_hsls", "clk_sdio";
++	};
++
++	genpll4: genpll4 at 6641d214 {
++		#clock-cells = <1>;
++		compatible = "brcm,sr-genpll4";
++		reg = <0x6641d214 0x32>,
++		      <0x6641c854 0x4>;
++		clocks = <&osc>;
++		clock-output-names = "genpll4", "clk_ccn", "clk_tpiu_pll",
++				"noc_clk", "pll_chclk_fs4", "clk_bridge_fscpu";
++	};
++
++	genpll5: genpll5 at 6641d248 {
++		#clock-cells = <1>;
++		compatible = "brcm,sr-genpll5";
++		reg = <0x6641d248 0x32>,
++		      <0x6641c870 0x4>;
++		clocks = <&osc>;
++		clock-output-names = "genpll5", "fs4_hf_clk",
++			"crypto_ae_clk", "raid_ae_clk";
++	};
++
++	lcpll0: lcpll0 {
++		#clock-cells = <1>;
++		compatible = "brcm,sr-lcpll0";
++		reg = <0x6641d0c4 0x3c>, <0x6641c870 0x4>;
++		clocks = <&osc>;
++		clock-output-names = "lcpll0", "clk_sata_refp",
++			"clk_sata_refn", "clk_sata_350", "clk_sata_500";
++	};
++
++	lcpll1: lcpll1 {
++		#clock-cells = <1>;
++		compatible = "brcm,sr-lcpll1";
++		reg = <0x6641d138 0x3c>, <0x6641c870 0x4>;
++		clocks = <&osc>;
++		clock-output-names = "lcpll1", "clk_wanpn",
++				"clk_usb_ref", "timesync_evt_clk";
++	};
++
++	hsls_clk: hsls_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&genpll3 1>;
++		clock-div = <1>;
++		clock-mult = <1>;
++	};
++
++	hsls_div2_clk: hsls_div2_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&genpll3 BCM_SR_GENPLL3_HSLS_CLK>;
++		clock-div = <2>;
++		clock-mult = <1>;
++
++	};
++
++	hsls_div4_clk: hsls_div4_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&genpll3 BCM_SR_GENPLL3_HSLS_CLK>;
++		clock-div = <4>;
++		clock-mult = <1>;
++	};
++
++	hsls_25m_clk: hsls_25m_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&crmu_ref25m>;
++		clock-div = <1>;
++		clock-mult = <1>;
++	};
++
++	hsls_25m_div2_clk: hsls_25m_div2_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&hsls_25m_clk>;
++		clock-div = <2>;
++		clock-mult = <1>;
++	};
++
++	sdio0_clk: sdio0_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&genpll3 BCM_SR_GENPLL3_SDIO_CLK>;
++		clock-div = <1>;
++		clock-mult = <1>;
++	};
++
++	sdio1_clk: sdio1_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&genpll3 BCM_SR_GENPLL3_SDIO_CLK>;
++		clock-div = <1>;
++		clock-mult = <1>;
++	};
 diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-index fb51473..d046b04 100644
+index f08b37e..c60de96 100644
 --- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
 +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-@@ -266,6 +266,16 @@
- 			gpio-controller;
- 		};
+@@ -255,6 +255,8 @@
+ 		#size-cells = <1>;
+ 		ranges = <0 0 0 0xffffffff>;
  
-+		i2c0: i2c at 689b0000 {
-+			compatible = "brcm,iproc-i2c";
-+			reg = <0x689b0000 0x100>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 177 IRQ_TYPE_NONE>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
-+
- 		gpio_hsls: gpio at 689d0000 {
- 			compatible = "brcm,iproc-gpio";
- 			reg = <0x689d0000 0x864>;
-@@ -292,6 +302,16 @@
- 					<&pinmux 151 91 4>;
- 		};
- 
-+		i2c1: i2c at 689e0000 {
-+			compatible = "brcm,iproc-i2c";
-+			reg = <0x689e0000 0x100>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 178 IRQ_TYPE_NONE>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
++		#include "stingray-clock.dtsi"
 +
  		uart0: uart at 68a00000 {
  			device_type = "serial";
