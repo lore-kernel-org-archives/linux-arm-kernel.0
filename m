@@ -1,133 +1,115 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Sat,  6 May 2017 17:24:46 +0530
-Subject: [PATCH 11/11] arm64: dts: Add PWM and SDHCI DT nodes for Stingray SOC
-In-Reply-To: <1494071686-19098-1-git-send-email-anup.patel@broadcom.com>
-References: <1494071686-19098-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1494071686-19098-12-git-send-email-anup.patel@broadcom.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat,  6 May 2017 14:10:50 +0200
+Subject: [PATCH 1/4] ata: Add DT bindings for Faraday Technology FTIDE010
+Message-ID: <20170506121053.11554-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinath Mannam <srinath.mannam@broadcom.com>
+This adds device tree bindings for the Faraday Technology
+FTIDE010 found in the Storlink/Storm/Cortina Systems Gemini SoC.
 
-The Stingray SoC has two instances of SDHCI controller
-and one instance of iProc PWM.
+I am not 100% sure that this part if from Faraday Technology but
+a lot points in that direction:
 
-Let's enable above mentioned devices in Stingray DT.
+- A later IDE interface called FTIDE020 exist and share some
+  properties.
 
-Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+- The SATA bridge has the same Built In Self Test (BIST) that the
+  Faraday FTSATA100 seems to have, and it has version number 0100
+  in the device ID register, so this is very likely a FTSATA100
+  bundled with the FTIDE010.
+
+Cc: devicetree at vger.kernel.org
+Cc: John Feng-Hsin Chiang <john453@faraday-tech.com>
+Cc: Greentime Hu <green.hu@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 39 ++++++++++++++++++++++
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 28 ++++++++++++++++
- 2 files changed, 67 insertions(+)
+Greentime: I think this may be interesting to you since the
+FTIDE020 will need the same bindings so we can probably
+just reuse them and maybe make the parser a library if you
+want to upstream the FTIDE020.
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-index 3250d09..a491ce9 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-@@ -52,6 +52,28 @@
- 		serial2 = &uart2;
- 		serial3 = &uart3;
- 	};
+Faraday people: I do not have it from a source that this
+hardware is really FTIDE010 but I would be VERY surprised
+if it is not. U-Boot has an FTIDE020 IDE controller
+synthesized in the Andestech platform, and it has a similar
+yet different register layout, featuring similar timing
+set-ups:
+http://git.denx.de/?p=u-boot.git;a=blob;f=drivers/block/ftide020.h
+http://git.denx.de/?p=u-boot.git;a=blob;f=drivers/block/ftide020.c
+---
+ .../devicetree/bindings/ata/faraday,ftide010.txt   | 63 ++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ata/faraday,ftide010.txt
+
+diff --git a/Documentation/devicetree/bindings/ata/faraday,ftide010.txt b/Documentation/devicetree/bindings/ata/faraday,ftide010.txt
+new file mode 100644
+index 000000000000..5048408c07c5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/faraday,ftide010.txt
+@@ -0,0 +1,63 @@
++* Faraday Technology FTIDE010 PATA controller
 +
-+	sdio0_vddo_ctrl_reg: sdio0_vddo_ctrl {
-+		compatible = "regulator-gpio";
-+		regulator-name = "sdio0_vddo_ctrl_reg";
-+		regulator-type = "voltage";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpios = <&pca9505 18 0>;
-+		states = <3300000 0x0
-+			  1800000 0x1>;
-+	};
++This controller is the first Faraday IDE interface block, used in the
++StorLink SL2312 and SL3516, later known as the Cortina Systems Gemini
++platform. The controller can do PIO modes 0 through 4, Multi-word DMA
++(MWDM)modes 0 through 2 and Ultra DMA modes 0 through 6.
 +
-+	sdio1_vddo_ctrl_reg: sdio1_vddo_ctrl {
-+		compatible = "regulator-gpio";
-+		regulator-name = "sdio1_vddo_ctrl_reg";
-+		regulator-type = "voltage";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpios = <&pca9505 19 0>;
-+		states = <3300000 0x0
-+			  1800000 0x1>;
-+	};
- };
- 
- &memory { /* Default DRAM banks */
-@@ -63,6 +85,10 @@
- 	status = "okay";
- };
- 
-+&pwm {
-+	status = "okay";
++On the Gemini platform, this PATA block is accompanied by a PATA to
++SATA bridge in order to support SATA. This is why a phandle to that
++controller is compulsory on that platform.
++
++The timing properties are unique per-SoC, not per-board.
++
++Required properties:
++- compatible: should be one of
++  "cortina,gemini-pata", "faraday,ftide010"
++  "faraday,ftide010"
++- interrupts: interrupt for the block
++- reg: registers and size for the block
++
++  The unit of the below required timings is two clock periods of the ATA
++  reference clock which is 30 nanoseconds per unit at 66MHz and 20 nanoseconds
++  per unit at 50 MHz.
++
++- faraday,pio-active-time: array of 5 elements for T2 timing for Mode 0,
++  1, 2, 3 and 4. Range 0..15.
++- faraday,pio-recovery-time: array of 5 elements for T2l timing for Mode 0,
++  1, 2, 3 and 4. Range 0..15.
++- faraday,mdma-50-active-time: array of 4 elements for Td timing for multi
++  word DMA, Mode 0, 1, and 2 at 50 MHz. Range 0..15.
++- faraday,mdma-50-recovery-time: array of 4 elements for Tk timing for
++  multi word DMA, Mode 0, 1 and 2 at 50 MHz. Range 0..15.
++- faraday,mdma-66-active-time: array of 4 elements for Td timing for multi
++  word DMA, Mode 0, 1 and 2 at 50 MHz. Range 0..15.
++- faraday,mdma-66-recovery-time: array of 4 elements for Tk timing for
++  multi word DMA, Mode 0, 1 and 2 at 50 MHz. Range 0..15.
++- faraday,udma-50-setup-time: array of 4 elements for Tvds timing for ultra
++  DMA, Mode 0, 1, 2, 3, 4 and 5 at 50 MHz. Range 0..7.
++- faraday,udma-50-hold-time: array of 4 elements for Tdvh timing for
++  multi word DMA, Mode 0, 1, 2, 3, 4 and 5 at 50 MHz, Range 0..7.
++- faraday,udma-66-setup-time: array of 4 elements for Tvds timing for multi
++  word DMA, Mode 0, 1, 2, 3, 4, 5 and 6 at 50 MHz. Range 0..7.
++- faraday,udma-66-hold-time: array of 4 elements for Tdvh timing for
++  multi word DMA, Mode 0, 1, 2, 3, 4, 5 and 6 at 50 MHz. Range 0..7.
++
++Optional properties:
++- clocks: a SoC clock running the peripheral.
++- clock-names: should be set to "PCLK" for the peripheral clock.
++
++Required properties for "cortina,gemini-pata" compatible:
++- sata: a phande to the Gemini PATA to SATA bridge, see
++  cortina,gemini-sata-bridge.txt for details.
++
++Example:
++
++ata at 63000000 {
++	compatible = "cortina,gemini-pata", "faraday,ftide010";
++	reg = <0x63000000 0x100>;
++	interrupts = <4 IRQ_TYPE_EDGE_RISING>;
++	clocks = <&gcc GEMINI_CLK_GATE_IDE>;
++	clock-names = "PCLK";
++	sata = <&sata>;
 +};
-+
- &i2c0 {
- 	status = "okay";
- 
-@@ -99,3 +125,16 @@
- 		#size-cells = <1>;
- 	};
- };
-+
-+&sdio0 {
-+	vqmmc-supply = <&sdio0_vddo_ctrl_reg>;
-+	non-removable;
-+	full-pwr-cycle;
-+	status = "okay";
-+};
-+
-+&sdio1 {
-+	vqmmc-supply = <&sdio1_vddo_ctrl_reg>;
-+	full-pwr-cycle;
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-index 36b8ced..d5e1944 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-@@ -266,6 +266,14 @@
- 			gpio-controller;
- 		};
- 
-+		pwm: pwm at 68910000{
-+			compatible = "brcm,iproc-pwm";
-+			reg = <0x68910000 0x1000>;
-+			clocks = <&crmu_ref25m>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
-+		};
-+
- 		i2c0: i2c at 689b0000 {
- 			compatible = "brcm,iproc-i2c";
- 			reg = <0x689b0000 0x100>;
-@@ -425,5 +433,25 @@
- 			brcm,nand-has-wp;
- 			status = "disabled";
- 		};
-+
-+		sdio0: sdhci at 68cf1000 {
-+			compatible = "brcm,sdhci-iproc";
-+			reg = <0x68cf1000 0x100>;
-+			interrupts = <GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH>;
-+			bus-width = <8>;
-+			clocks = <&sdio0_clk>;
-+			iommus = <&smmu 0x6002 0x0000>;
-+			status = "disabled";
-+		};
-+
-+		sdio1: sdhci at 68cf2000 {
-+			compatible = "brcm,sdhci-iproc";
-+			reg = <0x68cf2000 0x100>;
-+			interrupts = <GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH>;
-+			bus-width = <8>;
-+			clocks = <&sdio1_clk>;
-+			iommus = <&smmu 0x6003 0x0000>;
-+			status = "disabled";
-+		};
- 	};
- };
 -- 
-2.7.4
+2.9.3
