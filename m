@@ -1,109 +1,143 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Sat,  6 May 2017 17:24:27 +0200
-Subject: [PATCH v7 08/24] KVM: arm64: vgic-its: Implement
- vgic_mmio_uaccess_write_its_creadr
+Date: Sat,  6 May 2017 17:24:33 +0200
+Subject: [PATCH v7 14/24] KVM: arm64: vgic-v3: vgic_v3_lpi_sync_pending_status
 In-Reply-To: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
 References: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1494084283-12723-9-git-send-email-eric.auger@redhat.com>
+Message-ID: <1494084283-12723-15-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GITS_CREADR needs to be restored so let's implement the associated
-uaccess_write_its callback. The write only is allowed if the its
-is disabled.
+this new helper synchronizes the irq pending_latch
+with the LPI pending bit status found in rdist pending table.
+As the status is consumed, we reset the bit in pending table.
+
+As we need the PENDBASER_ADDRESS() in vgic-v3, let's move its
+definition in the irqchip header. We restore the full length
+of the field, ie [51:16]. Same for PROPBASER_ADDRESS with full
+field length of [51:12].
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
 
 ---
-v6 -> v7:
-- added Marc's A-b
-- discard the stalled bit if set
-- remove the alignment check as cmd_offset is [19:5] of the offset
-  and bits [4:0] are 0
-- added Christoffer R-b
 
-v5 -> v6:
-- remove usage of update_64bit_reg and check alignment of cmd offset
-
-v4 -> v5:
-- keep Stalled bit
-- vgic_mmio_uaccess_write_its_creadr can now return an error
-
-v3 -> v4:
-- REGISTER_ITS_DESC_UACCESS now introduced in this patch
-- we now check the its is disabled
+v6: new
 ---
- virt/kvm/arm/vgic/vgic-its.c | 42 ++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 40 insertions(+), 2 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h |  2 ++
+ virt/kvm/arm/vgic/vgic-its.c       |  6 ++----
+ virt/kvm/arm/vgic/vgic-v3.c        | 44 ++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h           |  1 +
+ 4 files changed, 49 insertions(+), 4 deletions(-)
 
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index be8bad0..fffb912 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -159,6 +159,8 @@
+ #define GICR_PROPBASER_RaWaWb	GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, RaWaWb)
+ 
+ #define GICR_PROPBASER_IDBITS_MASK			(0x1f)
++#define GICR_PROPBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
++#define GICR_PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 16))
+ 
+ #define GICR_PENDBASER_SHAREABILITY_SHIFT		(10)
+ #define GICR_PENDBASER_INNER_CACHEABILITY_SHIFT		(7)
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index fd2660d..bf3ff09 100644
+index bd1362e..3601790 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1213,6 +1213,33 @@ static unsigned long vgic_mmio_read_its_creadr(struct kvm *kvm,
- 	return extract_bytes(its->creadr, addr & 0x7, len);
- }
+@@ -221,8 +221,6 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+  */
+ #define BASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
+ #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
+-#define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
+-#define PROPBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
  
-+static int vgic_mmio_uaccess_write_its_creadr(struct kvm *kvm,
-+					      struct vgic_its *its,
-+					      gpa_t addr, unsigned int len,
-+					      unsigned long val)
-+{
-+	u32 cmd_offset;
-+	int ret = 0;
-+
-+	mutex_lock(&its->cmd_lock);
-+
-+	if (its->enabled) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
-+
-+	cmd_offset = ITS_CMD_OFFSET(val);
-+	if (cmd_offset >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
-+	its->creadr = cmd_offset;
-+out:
-+	mutex_unlock(&its->cmd_lock);
-+	return ret;
-+}
-+
- #define BASER_INDEX(addr) (((addr) / sizeof(u64)) & 0x7)
- static unsigned long vgic_mmio_read_its_baser(struct kvm *kvm,
- 					      struct vgic_its *its,
-@@ -1317,6 +1344,16 @@ static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
- 	.its_write = wr,					\
- }
+ #define GIC_LPI_OFFSET 8192
  
-+#define REGISTER_ITS_DESC_UACCESS(off, rd, wr, uwr, length, acc)\
-+{								\
-+	.reg_offset = off,					\
-+	.len = length,						\
-+	.access_flags = acc,					\
-+	.its_read = rd,						\
-+	.its_write = wr,					\
-+	.uaccess_its_write = uwr,				\
-+}
-+
- static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
- 			      gpa_t addr, unsigned int len, unsigned long val)
+@@ -257,7 +255,7 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
+ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+ 			     struct kvm_vcpu *filter_vcpu)
  {
-@@ -1339,8 +1376,9 @@ static struct vgic_register_region its_registers[] = {
- 	REGISTER_ITS_DESC(GITS_CWRITER,
- 		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
--	REGISTER_ITS_DESC(GITS_CREADR,
--		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
-+	REGISTER_ITS_DESC_UACCESS(GITS_CREADR,
-+		vgic_mmio_read_its_creadr, its_mmio_write_wi,
-+		vgic_mmio_uaccess_write_its_creadr, 8,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_ITS_DESC(GITS_BASER,
- 		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
+-	u64 propbase = PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
++	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
+ 	u8 prop;
+ 	int ret;
+ 
+@@ -369,7 +367,7 @@ static u32 max_lpis_propbaser(u64 propbaser)
+  */
+ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+ {
+-	gpa_t pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
++	gpa_t pendbase = GICR_PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
+ 	struct vgic_irq *irq;
+ 	int last_byte_offset = -1;
+ 	int ret = 0;
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index be0f4c3..0d753ae 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -252,6 +252,50 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ 	vgic_v3->vgic_hcr = ICH_HCR_EN;
+ }
+ 
++int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq)
++{
++	struct kvm_vcpu *vcpu;
++	int byte_offset, bit_nr;
++	gpa_t pendbase, ptr;
++	bool status;
++	u8 val;
++	int ret;
++
++retry:
++	vcpu = irq->target_vcpu;
++	if (!vcpu)
++		return 0;
++
++	pendbase = GICR_PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
++
++	byte_offset = irq->intid / BITS_PER_BYTE;
++	bit_nr = irq->intid % BITS_PER_BYTE;
++	ptr = pendbase + byte_offset;
++
++	ret = kvm_read_guest(kvm, ptr, &val, 1);
++	if (ret)
++		return ret;
++
++	status = val & (1 << bit_nr);
++
++	spin_lock(&irq->irq_lock);
++	if (irq->target_vcpu != vcpu) {
++		spin_unlock(&irq->irq_lock);
++		goto retry;
++	}
++	irq->pending_latch = status;
++	vgic_queue_irq_unlock(vcpu->kvm, irq);
++
++	if (status) {
++		/* clear consumed data */
++		val &= ~(1 << bit_nr);
++		ret = kvm_write_guest(kvm, ptr, &val, 1);
++		if (ret)
++			return ret;
++	}
++	return 0;
++}
++
+ /* check for overlapping regions and for regions crossing the end of memory */
+ static bool vgic_v3_check_base(struct kvm *kvm)
+ {
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index b87f1c6..309ab64 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -157,6 +157,7 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ void vgic_v3_enable(struct kvm_vcpu *vcpu);
+ int vgic_v3_probe(const struct gic_kvm_info *info);
+ int vgic_v3_map_resources(struct kvm *kvm);
++int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq);
+ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+ 
+ int vgic_register_its_iodevs(struct kvm *kvm);
 -- 
 2.5.5
