@@ -1,66 +1,258 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Sat, 6 May 2017 10:54:20 +0200
-Subject: [PATCH v5 2/8] [media] stm32-dcmi: STM32 DCMI camera interface
- driver
-In-Reply-To: <1493998287-5828-3-git-send-email-hugues.fruchet@st.com>
-References: <1493998287-5828-1-git-send-email-hugues.fruchet@st.com>
- <1493998287-5828-3-git-send-email-hugues.fruchet@st.com>
-Message-ID: <dd4a1ec1-b84a-81cb-51b6-c2e53b5efcc5@xs4all.nl>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Sat, 6 May 2017 12:21:08 +0200
+Subject: [PATCH v6 21/24] KVM: arm64: vgic-its: Device table save/restore
+In-Reply-To: <20170505181216.GZ5923@cbox>
+References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
+ <1493898284-29504-22-git-send-email-eric.auger@redhat.com>
+ <20170505124424.GH1419@lvm> <49f2669b-f3cb-d555-f376-dd4dad2f90fd@redhat.com>
+ <20170505181216.GZ5923@cbox>
+Message-ID: <a4315228-da49-3e9b-c24c-5d680813085a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hugues,
+Hi Christoffer,
 
-On 05/05/2017 05:31 PM, Hugues Fruchet wrote:
-> This V4L2 subdev driver enables Digital Camera Memory Interface (DCMI)
-> of STMicroelectronics STM32 SoC series.
+On 05/05/2017 20:12, Christoffer Dall wrote:
+> On Fri, May 05, 2017 at 06:23:22PM +0200, Auger Eric wrote:
+>> Hi Christoffer,
+>>
+>> On 05/05/2017 14:44, Christoffer Dall wrote:
+>>> On Thu, May 04, 2017 at 01:44:41PM +0200, Eric Auger wrote:
+>>>> This patch saves the device table entries into guest RAM.
+>>>> Both flat table and 2 stage tables are supported. DeviceId
+>>>> indexing is used.
+>>>>
+>>>> For each device listed in the device table, we also save
+>>>> the translation table using the vgic_its_save/restore_itt
+>>>> routines. Those functions will be implemented in a subsequent
+>>>> patch.
+>>>>
+>>>> On restore, devices are re-allocated and their itt are
+>>>> re-built.
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>>>
+>>>> ---
+>>>> v5 -> v6:
+>>>> - accomodate vgic_its_alloc_device change of proto
+>>>> - define bit fields for L1 entries
+>>>> - s/handle_l1_entry/handle_l1_dte
+>>>> - s/ite_esz/dte_esz in handle_l1_dte
+>>>> - check BASER valid bit
+>>>> - s/nb_eventid_bits/num_eventid_bits
+>>>> - new convention for returned values
+>>>> - itt functions implemented in subsequent patch
+>>>>
+>>>> v4 -> v5:
+>>>> - sort the device list by deviceid on device table save
+>>>> - use defines for shifts and masks
+>>>> - use abi->dte_esz
+>>>> - clatify entry sizes for L1 and L2 tables
+>>>>
+>>>> v3 -> v4:
+>>>> - use the new proto for its_alloc_device
+>>>> - compute_next_devid_offset, vgic_its_flush/restore_itt
+>>>>   become static in this patch
+>>>> - change in the DTE entry format with the introduction of the
+>>>>   valid bit and next field width decrease; ittaddr encoded
+>>>>   on its full range
+>>>> - fix handle_l1_entry entry handling
+>>>> - correct vgic_its_table_restore error handling
+>>>>
+>>>> v2 -> v3:
+>>>> - fix itt_addr bitmask in vgic_its_restore_dte
+>>>> - addition of return 0 in vgic_its_restore_ite moved to
+>>>>   the ITE related patch
+>>>>
+>>>> v1 -> v2:
+>>>> - use 8 byte format for DTE and ITE
+>>>> - support 2 stage format
+>>>> - remove kvm parameter
+>>>> - ITT flush/restore moved in a separate patch
+>>>> - use deviceid indexing
+>>>> ---
+>>>>  virt/kvm/arm/vgic/vgic-its.c | 194 +++++++++++++++++++++++++++++++++++++++++--
+>>>>  virt/kvm/arm/vgic/vgic.h     |  10 +++
+>>>>  2 files changed, 199 insertions(+), 5 deletions(-)
+>>>>
+>>>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>>>> index a3ed52a..c5b388d 100644
+>>>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>>>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>>>> @@ -23,6 +23,7 @@
+>>>>  #include <linux/interrupt.h>
+>>>>  #include <linux/list.h>
+>>>>  #include <linux/uaccess.h>
+>>>> +#include <linux/list_sort.h>
+>>>>  
+>>>>  #include <linux/irqchip/arm-gic-v3.h>
+>>>>  
+>>>> @@ -1701,7 +1702,8 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+>>>>  	return ret;
+>>>>  }
+>>>>  
+>>>> -u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
+>>>> +static u32 compute_next_devid_offset(struct list_head *h,
+>>>> +				     struct its_device *dev)
+>>>>  {
+>>>>  	struct its_device *next;
+>>>>  	u32 next_offset;
+>>>> @@ -1755,8 +1757,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+>>>>   * Return: < 0 on error, 0 if last element was identified, 1 otherwise
+>>>>   * (the last element may not be found on second level tables)
+>>>>   */
+>>>> -int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>>>> -		   int start_id, entry_fn_t fn, void *opaque)
+>>>> +static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>>>> +			  int start_id, entry_fn_t fn, void *opaque)
+>>>>  {
+>>>>  	void *entry = kzalloc(esz, GFP_KERNEL);
+>>>>  	struct kvm *kvm = its->dev->kvm;
+>>>> @@ -1791,13 +1793,171 @@ int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>>>>  	return ret;
+>>>>  }
+>>>>  
+>>>> +static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
+>>>> +{
+>>>> +	return -ENXIO;
+>>>> +}
+>>>> +
+>>>> +static int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
+>>>> +{
+>>>> +	return -ENXIO;
+>>>> +}
+>>>> +
+>>>> +/**
+>>>> + * vgic_its_save_dte - Save a device table entry at a given GPA
+>>>> + *
+>>>> + * @its: ITS handle
+>>>> + * @dev: ITS device
+>>>> + * @ptr: GPA
+>>>> + */
+>>>> +static int vgic_its_save_dte(struct vgic_its *its, struct its_device *dev,
+>>>> +			     gpa_t ptr, int dte_esz)
+>>>> +{
+>>>> +	struct kvm *kvm = its->dev->kvm;
+>>>> +	u64 val, itt_addr_field;
+>>>> +	u32 next_offset;
+>>>> +
+>>>> +	itt_addr_field = dev->itt_addr >> 8;
+>>>> +	next_offset = compute_next_devid_offset(&its->device_list, dev);
+>>>> +	val = (1ULL << KVM_ITS_DTE_VALID_SHIFT |
+>>>> +	       ((u64)next_offset << KVM_ITS_DTE_NEXT_SHIFT) |
+>>>> +	       (itt_addr_field << KVM_ITS_DTE_ITTADDR_SHIFT) |
+>>>> +		(dev->num_eventid_bits - 1));
+>>>> +	val = cpu_to_le64(val);
+>>>> +	return kvm_write_guest(kvm, ptr, &val, dte_esz);
+>>>> +}protection
+>>>> +
+>>>> +/**
+>>>> + * vgic_its_restore_dte - restore a device table entry
+>>>> + *
+>>>> + * @its: its handle
+>>>> + * @id: device id the DTE corresponds to
+>>>> + * @ptr: kernel VA where the 8 byte DTE is located
+>>>> + * @opaque: unused
+>>>> + *
+>>>> + * Return: < 0 on error, 0 if the dte is the last one, id offset to the
+>>>> + * next dte otherwise
+>>>> + */
+>>>> +static int vgic_its_restore_dte(struct vgic_its *its, u32 id,
+>>>> +				void *ptr, void *opaque)
+>>>> +{
+>>>> +	struct its_device *dev;
+>>>> +	gpa_t itt_addr;
+>>>> +	u8 num_eventid_bits;
+>>>> +	u64 entry = *(u64 *)ptr;
+>>>> +	bool valid;
+>>>> +	u32 offset;
+>>>> +	int ret;
+>>>> +
+>>>> +	entry = le64_to_cpu(entry);
+>>>> +
+>>>> +	valid = entry >> KVM_ITS_DTE_VALID_SHIFT;
+>>>> +	num_eventid_bits = (entry & KVM_ITS_DTE_SIZE_MASK) + 1;
+>>>> +	itt_addr = ((entry & KVM_ITS_DTE_ITTADDR_MASK)
+>>>> +			>> KVM_ITS_DTE_ITTADDR_SHIFT) << 8;
+>>>> +
+>>>> +	if (!valid)
+>>>> +		return 1;
+>>>> +
+>>>> +	/* dte entry is valid */
+>>>> +	offset = (entry & KVM_ITS_DTE_NEXT_MASK) >> KVM_ITS_DTE_NEXT_SHIFT;
+>>>> +
+>>>> +	dev = vgic_its_alloc_device(its, id, itt_addr, num_eventid_bits);
+>>>> +	if (IS_ERR(dev))
+>>>> +		return PTR_ERR(dev);
+>>>> +
+>>>> +	ret = vgic_its_restore_itt(its, dev);
+>>>> +	if (ret)
+>>>> +		return ret;
+>>>> +
+>>>> +	return offset;
+>>>> +}
+>>>> +
+>>>> +static int vgic_its_device_cmp(void *priv, struct list_head *a,
+>>>> +			       struct list_head *b)
+>>>> +{
+>>>> +	struct its_device *deva = container_of(a, struct its_device, dev_list);
+>>>> +	struct its_device *devb = container_of(b, struct its_device, dev_list);
+>>>> +
+>>>> +	if (deva->device_id < devb->device_id)
+>>>> +		return -1;
+>>>> +	else
+>>>> +		return 1;
+>>>> +}
+>>>> +
+>>>>  /**
+>>>>   * vgic_its_save_device_tables - Save the device table and all ITT
+>>>>   * into guest RAM
+>>>> + *
+>>>> + * L1/L2 handling is hidden by vgic_its_check_id() helper which directly
+>>>> + * returns the GPA of the device entry
+>>>>   */
+>>>>  static int vgic_its_save_device_tables(struct vgic_its *its)
+>>>>  {
+>>>> -	return -ENXIO;
+>>>> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+>>>> +	struct its_device *dev;
+>>>> +	int dte_esz = abi->dte_esz;
+>>>> +	u64 baser;
+>>>> +
+>>>> +	baser = its->baser_device_table;
+>>>> +
+>>>> +	list_sort(NULL, &its->device_list, vgic_its_device_cmp);
+>>>
+>>> this list is protected by the ITS mutex but you seem to be only holding
+>>> the KVM mutex here, so don't we have a potential exploit here?
+>>
+>> Updates to the device, ite list are done when running commands. As we
+>> hold the KVM mutex, commands cannot run. Then there is
+>> vgic_its_destroy() which happens on kvm_put_kvm when all users have
+>> released their reference. So to me holding the kvm lock looks sufficient.
+>>
 > 
-> Reviewed-by: Hans Verkuil <hans.verkuil@cisco.com>
-> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
-> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
-> ---
->  drivers/media/platform/Kconfig            |   12 +
->  drivers/media/platform/Makefile           |    2 +
->  drivers/media/platform/stm32/Makefile     |    1 +
->  drivers/media/platform/stm32/stm32-dcmi.c | 1403 +++++++++++++++++++++++++++++
->  4 files changed, 1418 insertions(+)
->  create mode 100644 drivers/media/platform/stm32/Makefile
->  create mode 100644 drivers/media/platform/stm32/stm32-dcmi.c
+> But we don't hold the KVM mutex when running commands, we run the its
+> mutex?  What am I missing?
+Yes we do. The kvm lock is taken in vgic_its_attr_regs_access. Commands
+are processed on vgic_mmio_write_its_cwriter and vgic_mmio_write_its_ctlr
 > 
-> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-> index ac026ee..de6e18b 100644
-> --- a/drivers/media/platform/Kconfig
-> +++ b/drivers/media/platform/Kconfig
-> @@ -114,6 +114,18 @@ config VIDEO_S3C_CAMIF
->  	  To compile this driver as a module, choose M here: the module
->  	  will be called s3c-camif.
->  
-> +config VIDEO_STM32_DCMI
-> +	tristate "Digital Camera Memory Interface (DCMI) support"
+> Even worse, the vgic_its_trigger_msi also only takes the its->its_lock
+> mutex (or rather its caller does) and that surely can run while we are
+> saving the tables can it not?
+Hum yes this can theoretically happen in a non qemu use case. Otherwise
+the VM being stopped at that time, injecting a new MSI at that point
+looks as invalid. Looks safer I take the its lock too then.
 
-Is it OK with you if I change this to:
+Thanks for spotting this!
 
-	tristate "STM32 Digital Camera Memory Interface (DCMI) support"
-
-Right now the text gives no indication that this driver is for an STM32 platform.
-
-No need to spin a new patch, just let me know you're OK with it and I'll make
-the change.
-
-Regards,
-
-	Hans
-
-> +	depends on VIDEO_V4L2 && OF && HAS_DMA
-> +	depends on ARCH_STM32 || COMPILE_TEST
-> +	select VIDEOBUF2_DMA_CONTIG
-> +	---help---
-> +	  This module makes the STM32 Digital Camera Memory Interface (DCMI)
-> +	  available as a v4l2 device.
-> +
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called stm32-dcmi.
-> +
->  source "drivers/media/platform/soc_camera/Kconfig"
->  source "drivers/media/platform/exynos4-is/Kconfig"
->  source "drivers/media/platform/am437x/Kconfig"
+Eric
+> 
+> Thanks,
+> -Christoffer
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
