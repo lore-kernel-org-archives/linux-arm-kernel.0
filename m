@@ -1,57 +1,115 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Sun, 7 May 2017 01:57:48 +0530
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <20170506.143816.2259768618578706384.davem@davemloft.net>
-References: <CAHgaXdJ1M4W3p9=B2hJmtxByPsA5-XHae8U6YtDH_2r_XMaR5A@mail.gmail.com>
- <58E639E0.1010700@iogearbox.net>
- <CAHgaXdK1XjDnhTqtk=nCq2crrigHiuCaLhF+1GupJt9bPThwZw@mail.gmail.com>
- <20170506.143816.2259768618578706384.davem@davemloft.net>
-Message-ID: <CAHgaXd+2vF=d5zpWTg+a=vSnv2ZA+8LCR_MXT_MDKn4r2s8sig@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 6 May 2017 22:32:30 +0200
+Subject: [PATCH v2 3/3] gpiolib: Add GPIO initialization
+In-Reply-To: <20170207110950.zy5pzo2hq6hrvmr5@pengutronix.de>
+References: <1440920686-6892-1-git-send-email-mpa@pengutronix.de>
+ <1440920686-6892-4-git-send-email-mpa@pengutronix.de>
+ <20170207110950.zy5pzo2hq6hrvmr5@pengutronix.de>
+Message-ID: <20170506203230.7ogwvdrzogvvlu67@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks David.
+Hello,
 
-Hi all,
+On Tue, Feb 07, 2017 at 12:09:50PM +0100, Uwe Kleine-K?nig wrote:
+> as far as I see, this topic isn't closed yet. I want something similar,
+> maybe even a bit more than this patch achieves:
+> 
+> Some gpios should get a fixed direction. If such a gpio is configured as
+> output, a value should be specified. This is already working today with
+> gpio-hogs.
+> 
+> Now additionally I want to initialize some gpios but allow them to be
+> grabbed later. IMHO there are the following new cases:
+> 
+> It should be possible to:
+> 
+>  a) change the value of a gpio initially configured as output
+>  b) change the direction of a gpio initially configured as output
+>  c) change the direction of a gpio initially configured as input
+> 
+> IMHO the dts should describe which case should be applied to a given
+> gpio.
+> 
+> Is it a valid assumption that a gpio that can change direction is also
+> allowed to change value when configured as output? I assume this in the
+> following discussion, some details need to change if this shouldn't be
+> implied. (I think we need a d) then, not sure how this should look
+> though.)
+> 
+> I'd suggest the following description for these cases:
+> 
+>  a)
+>  	/*
+> 	 * initially configured as low output. Consumer can do
+> 	 * gpio_set_value(..., 1); but not gpio_direction_input(...);
+> 	 */
+>  	nodename {
+> 		gpio-hog;
+> 		gpios = <...>;
+> 		output-low-init;
+> 	};
+> 
+>  b)
+>  	/*
+> 	 * initially configured as low output. Consumer can do
+> 	 * gpio_set_value(..., 1); and gpio_direction_input(...);
+> 	 */
+>  	nodename {
+> 		gpio-hog;
+> 		gpios = <...>;
+> 		output-init-low;
+> 	};
+> 
+>  c)
+>  	/*
+> 	 * initially configured as input. Consumer can do
+> 	 * gpio_direction_output(..., ...) and then set the value
+> 	 * freely.
+> 	 */
+> 	 nodename {
+> 	 	gpio-hog;
+> 		gpios = <...>;
+> 		input-init;
+> 	};
 
-I have two questions about the code at arch/arm64/net/bpf_jit_comp.c.
+I thought a bit more about this and the changes that would be necessary
+to achieve this:
 
-1. At line 708, " const u8 r1 = bpf2a64[BPF_REG_1]; /* r1: struct
-sk_buff *skb */ ".
-    Why is this code using BPF_REG_1 before saving it? As far as I
-know, BPF_REG_1 has pointer to bpf program context and this code
-clearly is overwriting that pointer which makes that pointer useless
-for future usage. It clearly looks like a bug.
+ - introduce new flags IS_FIXED_DIR and IS_FIXED_VALUE for struct
+   gpio_desc::flags and error out accordingly in gpiod_set_direction_*
+   and gpiod_set_value respectively. Then we have:
 
-2. At line 256, " emit(A64_LDR64(prg, tmp, r3), ctx); ".
-    This line of code is used to load an array( of pointers ) element,
-where r3 is used as an index of that array. Shouldn't it be be
-arithmetic left shifted by 3 or multiplied by 8 to get the right
-address in that array of pointers ?
+   	- already existing hogs: IS_FIXED_DIR | IS_FIXED_VALUE
+	- a) IS_FIXED_DIR
+	- b)+c) 0
+	- d) (if desired) IS_FIXED_VALUE
+ 
+   d) might need additional bookkeeping to remember the configured value
+   when the direction is changed to input.
+   These flags must be passed to gpiod_hog, via lflags should work.
 
-Apologies if any of the above question is stupid to ask.
+ - don't auto-request hogged pins
+   Currently hogged pins are not available for consumers to be
+   requested. This needs to be changed at least for the three (or four)
+   new cases.
+   IMHO it is sensible to allow requesting a gpio that is completely
+   hogged and just prevent changing direction and (if it's an output)
+   value.
+   TODO: review places that use IS_REQUESTED for need of adaption
+   TODO: race between hog and consumer?
 
-Best,
-Shubham
-Best,
-Shubham Bansal
+ - teach of_parse_own_gpio about IS_FIXED_DIR and IS_FIXED_VALUE
 
+ - expand gpiolib_dbg_show to show IS_FIXED_DIR and IS_FIXED_VALUE
 
-On Sun, May 7, 2017 at 12:08 AM, David Miller <davem@davemloft.net> wrote:
-> From: Shubham Bansal <illusionist.neo@gmail.com>
-> Date: Sat, 6 May 2017 22:18:16 +0530
->
->> Hi Daniel,
->>
->> Thanks for the last reply about the testing of eBPF JIT.
->>
->> I have one issue though, I am not able to find what BPF_ABS and
->> BPF_IND instruction does exactly.
->
-> They are not instructions, they are modifiers for the BPF_LD
-> instruction which indicate an SKB load is to be performed.
->
-> You never need to ask what a BPF instruction does, it is clear
-> defined in the BPF interperter found in kernel/bpf/core.c
->
-> Look for the case statement LD_ABS_W and friends in __bpf_prog_run().
+@Linus: I'd like to have an ok from your side that you like the approach
+before working on implementing this. So it would be great if you shared
+your thoughts about my ideas.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
