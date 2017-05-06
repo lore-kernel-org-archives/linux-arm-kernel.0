@@ -1,188 +1,107 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Sat,  6 May 2017 17:24:43 +0200
-Subject: [PATCH v7 24/24] KVM: arm64: vgic-v3:
- KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
-In-Reply-To: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
-References: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1494084283-12723-25-git-send-email-eric.auger@redhat.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 6 May 2017 23:40:07 +0800
+Subject: [arm:sa1100 73/112] arch/arm/mach-pxa/colibri-pxa320.c:98:15: error:
+ variable 'colibri_pxa320_pcmcia_lookup_table' has initializer but
+ incomplete type
+Message-ID: <201705062304.0gKtkGzd%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new attribute to GICV3 KVM device
-KVM_DEV_ARM_VGIC_GRP_CTRL group. This allows userspace to
-flush all GICR pending tables into guest RAM.
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
+head:   5d8c4e81af8e3188608bbf89ee90e6131c588c28
+commit: 95cb5c2a96dfbf8ecdc028aaa43461de6d2bcf30 [73/112] ARM: pxa/colibri: switch pcmcia to gpiod APIs
+config: arm-pxa_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 95cb5c2a96dfbf8ecdc028aaa43461de6d2bcf30
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+All error/warnings (new ones prefixed by >>):
+
+>> arch/arm/mach-pxa/colibri-pxa320.c:98:15: error: variable 'colibri_pxa320_pcmcia_lookup_table' has initializer but incomplete type
+    static struct gpiod_lookup_table colibri_pxa320_pcmcia_lookup_table = {
+                  ^~~~~~~~~~~~~~~~~~
+>> arch/arm/mach-pxa/colibri-pxa320.c:99:2: error: unknown field 'dev_id' specified in initializer
+     .dev_id = "pxa2xx-pcmcia",
+     ^
+>> arch/arm/mach-pxa/colibri-pxa320.c:99:12: warning: excess elements in struct initializer
+     .dev_id = "pxa2xx-pcmcia",
+               ^~~~~~~~~~~~~~~
+   arch/arm/mach-pxa/colibri-pxa320.c:99:12: note: (near initialization for 'colibri_pxa320_pcmcia_lookup_table')
+>> arch/arm/mach-pxa/colibri-pxa320.c:100:2: error: unknown field 'table' specified in initializer
+     .table = {
+     ^
+>> arch/arm/mach-pxa/colibri-pxa320.c:100:11: error: extra brace group at end of initializer
+     .table = {
+              ^
+   arch/arm/mach-pxa/colibri-pxa320.c:100:11: note: (near initialization for 'colibri_pxa320_pcmcia_lookup_table')
+>> arch/arm/mach-pxa/colibri-pxa320.c:101:3: error: implicit declaration of function 'GPIO_LOOKUP' [-Werror=implicit-function-declaration]
+      GPIO_LOOKUP("GPIO", 29, "ready",  GPIO_ACTIVE_HIGH),
+      ^~~~~~~~~~~
+>> arch/arm/mach-pxa/colibri-pxa320.c:101:37: error: 'GPIO_ACTIVE_HIGH' undeclared here (not in a function)
+      GPIO_LOOKUP("GPIO", 29, "ready",  GPIO_ACTIVE_HIGH),
+                                        ^~~~~~~~~~~~~~~~
+   arch/arm/mach-pxa/colibri-pxa320.c:107:3: error: extra brace group at end of initializer
+      { },
+      ^
+   arch/arm/mach-pxa/colibri-pxa320.c:107:3: note: (near initialization for 'colibri_pxa320_pcmcia_lookup_table')
+   arch/arm/mach-pxa/colibri-pxa320.c:100:11: warning: excess elements in struct initializer
+     .table = {
+              ^
+   arch/arm/mach-pxa/colibri-pxa320.c:100:11: note: (near initialization for 'colibri_pxa320_pcmcia_lookup_table')
+   arch/arm/mach-pxa/colibri-pxa320.c: In function 'colibri_pxa320_init_pcmcia':
+>> arch/arm/mach-pxa/colibri-pxa320.c:113:2: error: implicit declaration of function 'gpiod_add_lookup_table' [-Werror=implicit-function-declaration]
+     gpiod_add_lookup_table(&colibri_pxa320_pcmcia_gpio_table);
+     ^~~~~~~~~~~~~~~~~~~~~~
+>> arch/arm/mach-pxa/colibri-pxa320.c:113:26: error: 'colibri_pxa320_pcmcia_gpio_table' undeclared (first use in this function)
+     gpiod_add_lookup_table(&colibri_pxa320_pcmcia_gpio_table);
+                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   arch/arm/mach-pxa/colibri-pxa320.c:113:26: note: each undeclared identifier is reported only once for each function it appears in
+   arch/arm/mach-pxa/colibri-pxa320.c: At top level:
+>> arch/arm/mach-pxa/colibri-pxa320.c:98:34: error: storage size of 'colibri_pxa320_pcmcia_lookup_table' isn't known
+    static struct gpiod_lookup_table colibri_pxa320_pcmcia_lookup_table = {
+                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   arch/arm/mach-pxa/colibri-pxa320.c:98:34: warning: 'colibri_pxa320_pcmcia_lookup_table' defined but not used [-Wunused-variable]
+   cc1: some warnings being treated as errors
+
+vim +/colibri_pxa320_pcmcia_lookup_table +98 arch/arm/mach-pxa/colibri-pxa320.c
+
+    92		GPIO77_GPIO,		/* PRST (RESET GPIO) */
+    93		GPIO53_GPIO,		/* PBVD1 */
+    94		GPIO79_GPIO,		/* PBVD2 */
+    95		GPIO54_GPIO,		/* POE */
+    96	};
+    97	
+  > 98	static struct gpiod_lookup_table colibri_pxa320_pcmcia_lookup_table = {
+  > 99		.dev_id = "pxa2xx-pcmcia",
+ > 100		.table = {
+ > 101			GPIO_LOOKUP("GPIO", 29, "ready",  GPIO_ACTIVE_HIGH),
+   102			GPIO_LOOKUP("GPIO", 53, "bvd1",   GPIO_ACTIVE_HIGH),
+   103			GPIO_LOOKUP("GPIO", 57, "ppen",   GPIO_ACTIVE_HIGH),
+   104			GPIO_LOOKUP("GPIO", 77, "reset",  GPIO_ACTIVE_HIGH),
+   105			GPIO_LOOKUP("GPIO", 79, "bvd2",   GPIO_ACTIVE_HIGH),
+   106			GPIO_LOOKUP("GPIO", 81, "detect", GPIO_ACTIVE_HIGH),
+ > 107			{ },
+   108		},
+   109	};
+   110	
+   111	static void colibri_pxa320_init_pcmcia(void)
+   112	{
+ > 113		gpiod_add_lookup_table(&colibri_pxa320_pcmcia_gpio_table);
+   114	}
+   115	#else
+   116	static mfp_cfg_t colibri_pxa320_evalboard_pin_config[] __initdata = {};
 
 ---
-v6 -> v7:
-- remove GICR_PENDBASER_ADDRESS
-- added Christoffer's R-b
-
-v5 -> v6:
-- fix stored
-- GICR_PEND/PROPBASER_ADDRESS were already introduced
-
-v4 -> v5:
-- move pending table save code/ctrl into VGICv3 instead of ITS
-- remove useless gpa_t cast
-- use the same optimization as in its_sync_lpi_pending_table
-
-v3 -> v4:
-- remove the wrong comment about locking
-- pass kvm struct instead of its handle
-- add comment about restore method
-- remove GITR_PENDABASER.PTZ check
-- continue if target_vcpu == NULL
-- new locking strategy
-
-v1 -> v2:
-- do not care about the 1st KB which should be zeroed according to
-  the spec.
----
- arch/arm/include/uapi/asm/kvm.h     |  1 +
- arch/arm64/include/uapi/asm/kvm.h   |  1 +
- virt/kvm/arm/vgic/vgic-kvm-device.c | 20 +++++++++++++++
- virt/kvm/arm/vgic/vgic-v3.c         | 51 +++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h            |  1 +
- 5 files changed, 74 insertions(+)
-
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index 8e6563c..78fe803 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -202,6 +202,7 @@ struct kvm_arch_memory_slot {
- #define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
- #define   KVM_DEV_ARM_ITS_SAVE_TABLES		1
- #define   KVM_DEV_ARM_ITS_RESTORE_TABLES	2
-+#define   KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES	3
- 
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 1e35115..8a3758a 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -222,6 +222,7 @@ struct kvm_arch_memory_slot {
- #define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
- #define   KVM_DEV_ARM_ITS_SAVE_TABLES           1
- #define   KVM_DEV_ARM_ITS_RESTORE_TABLES        2
-+#define   KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES	3
- 
- /* Device Control API on vcpu fd */
- #define KVM_ARM_VCPU_PMU_V3_CTRL	0
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index 859bfa8..d48743c 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -580,6 +580,24 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
- 		reg = tmp32;
- 		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
-+		int ret;
-+
-+		switch (attr->attr) {
-+		case KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES:
-+			mutex_lock(&dev->kvm->lock);
-+
-+			if (!lock_all_vcpus(dev->kvm)) {
-+				mutex_unlock(&dev->kvm->lock);
-+				return -EBUSY;
-+			}
-+			ret = vgic_v3_save_pending_tables(dev->kvm);
-+			unlock_all_vcpus(dev->kvm);
-+			mutex_unlock(&dev->kvm->lock);
-+			return ret;
-+		}
-+		break;
-+	}
- 	}
- 	return -ENXIO;
- }
-@@ -658,6 +676,8 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
- 		switch (attr->attr) {
- 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
- 			return 0;
-+		case KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES:
-+			return 0;
- 		}
- 	}
- 	return -ENXIO;
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 0d753ae..6ff6510 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -296,6 +296,57 @@ int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq)
- 	return 0;
- }
- 
-+/**
-+ * vgic_its_save_pending_tables - Save the pending tables into guest RAM
-+ * kvm lock and all vcpu lock must be held
-+ */
-+int vgic_v3_save_pending_tables(struct kvm *kvm)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	int last_byte_offset = -1;
-+	struct vgic_irq *irq;
-+	int ret;
-+
-+	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-+		int byte_offset, bit_nr;
-+		struct kvm_vcpu *vcpu;
-+		gpa_t pendbase, ptr;
-+		bool stored;
-+		u8 val;
-+
-+		vcpu = irq->target_vcpu;
-+		if (!vcpu)
-+			continue;
-+
-+		pendbase = GICR_PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
-+
-+		byte_offset = irq->intid / BITS_PER_BYTE;
-+		bit_nr = irq->intid % BITS_PER_BYTE;
-+		ptr = pendbase + byte_offset;
-+
-+		if (byte_offset != last_byte_offset) {
-+			ret = kvm_read_guest(kvm, ptr, &val, 1);
-+			if (ret)
-+				return ret;
-+			last_byte_offset = byte_offset;
-+		}
-+
-+		stored = val & (1U << bit_nr);
-+		if (stored == irq->pending_latch)
-+			continue;
-+
-+		if (irq->pending_latch)
-+			val |= 1 << bit_nr;
-+		else
-+			val &= ~(1 << bit_nr);
-+
-+		ret = kvm_write_guest(kvm, ptr, &val, 1);
-+		if (ret)
-+			return ret;
-+	}
-+	return 0;
-+}
-+
- /* check for overlapping regions and for regions crossing the end of memory */
- static bool vgic_v3_check_base(struct kvm *kvm)
- {
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 92a8ca0..8de59a4 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -181,6 +181,7 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
- int vgic_v3_probe(const struct gic_kvm_info *info);
- int vgic_v3_map_resources(struct kvm *kvm);
- int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq);
-+int vgic_v3_save_pending_tables(struct kvm *kvm);
- int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
- 
- int vgic_register_its_iodevs(struct kvm *kvm);
--- 
-2.5.5
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 30525 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170506/4bc67d9f/attachment-0001.gz>
