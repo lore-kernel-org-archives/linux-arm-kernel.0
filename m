@@ -1,258 +1,91 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Sat, 6 May 2017 12:21:08 +0200
-Subject: [PATCH v6 21/24] KVM: arm64: vgic-its: Device table save/restore
-In-Reply-To: <20170505181216.GZ5923@cbox>
-References: <1493898284-29504-1-git-send-email-eric.auger@redhat.com>
- <1493898284-29504-22-git-send-email-eric.auger@redhat.com>
- <20170505124424.GH1419@lvm> <49f2669b-f3cb-d555-f376-dd4dad2f90fd@redhat.com>
- <20170505181216.GZ5923@cbox>
-Message-ID: <a4315228-da49-3e9b-c24c-5d680813085a@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 06 May 2017 12:25:02 +0100
+Subject: [PATCH v4] irqchip/gicv3-its: Avoid memory over allocation for
+ ITEs
+In-Reply-To: <f3ca8eb8-88e9-6672-134a-d5eaac73f11f@codeaurora.org> (Shanker
+ Donthineni's message of "Fri, 5 May 2017 17:04:22 -0500")
+References: <1493562975-14365-1-git-send-email-shankerd@codeaurora.org>
+ <87lgqfmdy7.fsf@on-the-bus.cambridge.arm.com>
+ <f3ca8eb8-88e9-6672-134a-d5eaac73f11f@codeaurora.org>
+Message-ID: <87vapekz1t.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 05/05/2017 20:12, Christoffer Dall wrote:
-> On Fri, May 05, 2017 at 06:23:22PM +0200, Auger Eric wrote:
->> Hi Christoffer,
->>
->> On 05/05/2017 14:44, Christoffer Dall wrote:
->>> On Thu, May 04, 2017 at 01:44:41PM +0200, Eric Auger wrote:
->>>> This patch saves the device table entries into guest RAM.
->>>> Both flat table and 2 stage tables are supported. DeviceId
->>>> indexing is used.
->>>>
->>>> For each device listed in the device table, we also save
->>>> the translation table using the vgic_its_save/restore_itt
->>>> routines. Those functions will be implemented in a subsequent
->>>> patch.
->>>>
->>>> On restore, devices are re-allocated and their itt are
->>>> re-built.
->>>>
->>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>>
->>>> ---
->>>> v5 -> v6:
->>>> - accomodate vgic_its_alloc_device change of proto
->>>> - define bit fields for L1 entries
->>>> - s/handle_l1_entry/handle_l1_dte
->>>> - s/ite_esz/dte_esz in handle_l1_dte
->>>> - check BASER valid bit
->>>> - s/nb_eventid_bits/num_eventid_bits
->>>> - new convention for returned values
->>>> - itt functions implemented in subsequent patch
->>>>
->>>> v4 -> v5:
->>>> - sort the device list by deviceid on device table save
->>>> - use defines for shifts and masks
->>>> - use abi->dte_esz
->>>> - clatify entry sizes for L1 and L2 tables
->>>>
->>>> v3 -> v4:
->>>> - use the new proto for its_alloc_device
->>>> - compute_next_devid_offset, vgic_its_flush/restore_itt
->>>>   become static in this patch
->>>> - change in the DTE entry format with the introduction of the
->>>>   valid bit and next field width decrease; ittaddr encoded
->>>>   on its full range
->>>> - fix handle_l1_entry entry handling
->>>> - correct vgic_its_table_restore error handling
->>>>
->>>> v2 -> v3:
->>>> - fix itt_addr bitmask in vgic_its_restore_dte
->>>> - addition of return 0 in vgic_its_restore_ite moved to
->>>>   the ITE related patch
->>>>
->>>> v1 -> v2:
->>>> - use 8 byte format for DTE and ITE
->>>> - support 2 stage format
->>>> - remove kvm parameter
->>>> - ITT flush/restore moved in a separate patch
->>>> - use deviceid indexing
->>>> ---
->>>>  virt/kvm/arm/vgic/vgic-its.c | 194 +++++++++++++++++++++++++++++++++++++++++--
->>>>  virt/kvm/arm/vgic/vgic.h     |  10 +++
->>>>  2 files changed, 199 insertions(+), 5 deletions(-)
->>>>
->>>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->>>> index a3ed52a..c5b388d 100644
->>>> --- a/virt/kvm/arm/vgic/vgic-its.c
->>>> +++ b/virt/kvm/arm/vgic/vgic-its.c
->>>> @@ -23,6 +23,7 @@
->>>>  #include <linux/interrupt.h>
->>>>  #include <linux/list.h>
->>>>  #include <linux/uaccess.h>
->>>> +#include <linux/list_sort.h>
->>>>  
->>>>  #include <linux/irqchip/arm-gic-v3.h>
->>>>  
->>>> @@ -1701,7 +1702,8 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
->>>>  	return ret;
->>>>  }
->>>>  
->>>> -u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
->>>> +static u32 compute_next_devid_offset(struct list_head *h,
->>>> +				     struct its_device *dev)
->>>>  {
->>>>  	struct its_device *next;
->>>>  	u32 next_offset;
->>>> @@ -1755,8 +1757,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
->>>>   * Return: < 0 on error, 0 if last element was identified, 1 otherwise
->>>>   * (the last element may not be found on second level tables)
->>>>   */
->>>> -int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
->>>> -		   int start_id, entry_fn_t fn, void *opaque)
->>>> +static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
->>>> +			  int start_id, entry_fn_t fn, void *opaque)
->>>>  {
->>>>  	void *entry = kzalloc(esz, GFP_KERNEL);
->>>>  	struct kvm *kvm = its->dev->kvm;
->>>> @@ -1791,13 +1793,171 @@ int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
->>>>  	return ret;
->>>>  }
->>>>  
->>>> +static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
->>>> +{
->>>> +	return -ENXIO;
->>>> +}
->>>> +
->>>> +static int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
->>>> +{
->>>> +	return -ENXIO;
->>>> +}
->>>> +
->>>> +/**
->>>> + * vgic_its_save_dte - Save a device table entry at a given GPA
->>>> + *
->>>> + * @its: ITS handle
->>>> + * @dev: ITS device
->>>> + * @ptr: GPA
->>>> + */
->>>> +static int vgic_its_save_dte(struct vgic_its *its, struct its_device *dev,
->>>> +			     gpa_t ptr, int dte_esz)
->>>> +{
->>>> +	struct kvm *kvm = its->dev->kvm;
->>>> +	u64 val, itt_addr_field;
->>>> +	u32 next_offset;
->>>> +
->>>> +	itt_addr_field = dev->itt_addr >> 8;
->>>> +	next_offset = compute_next_devid_offset(&its->device_list, dev);
->>>> +	val = (1ULL << KVM_ITS_DTE_VALID_SHIFT |
->>>> +	       ((u64)next_offset << KVM_ITS_DTE_NEXT_SHIFT) |
->>>> +	       (itt_addr_field << KVM_ITS_DTE_ITTADDR_SHIFT) |
->>>> +		(dev->num_eventid_bits - 1));
->>>> +	val = cpu_to_le64(val);
->>>> +	return kvm_write_guest(kvm, ptr, &val, dte_esz);
->>>> +}protection
->>>> +
->>>> +/**
->>>> + * vgic_its_restore_dte - restore a device table entry
->>>> + *
->>>> + * @its: its handle
->>>> + * @id: device id the DTE corresponds to
->>>> + * @ptr: kernel VA where the 8 byte DTE is located
->>>> + * @opaque: unused
->>>> + *
->>>> + * Return: < 0 on error, 0 if the dte is the last one, id offset to the
->>>> + * next dte otherwise
->>>> + */
->>>> +static int vgic_its_restore_dte(struct vgic_its *its, u32 id,
->>>> +				void *ptr, void *opaque)
->>>> +{
->>>> +	struct its_device *dev;
->>>> +	gpa_t itt_addr;
->>>> +	u8 num_eventid_bits;
->>>> +	u64 entry = *(u64 *)ptr;
->>>> +	bool valid;
->>>> +	u32 offset;
->>>> +	int ret;
->>>> +
->>>> +	entry = le64_to_cpu(entry);
->>>> +
->>>> +	valid = entry >> KVM_ITS_DTE_VALID_SHIFT;
->>>> +	num_eventid_bits = (entry & KVM_ITS_DTE_SIZE_MASK) + 1;
->>>> +	itt_addr = ((entry & KVM_ITS_DTE_ITTADDR_MASK)
->>>> +			>> KVM_ITS_DTE_ITTADDR_SHIFT) << 8;
->>>> +
->>>> +	if (!valid)
->>>> +		return 1;
->>>> +
->>>> +	/* dte entry is valid */
->>>> +	offset = (entry & KVM_ITS_DTE_NEXT_MASK) >> KVM_ITS_DTE_NEXT_SHIFT;
->>>> +
->>>> +	dev = vgic_its_alloc_device(its, id, itt_addr, num_eventid_bits);
->>>> +	if (IS_ERR(dev))
->>>> +		return PTR_ERR(dev);
->>>> +
->>>> +	ret = vgic_its_restore_itt(its, dev);
->>>> +	if (ret)
->>>> +		return ret;
->>>> +
->>>> +	return offset;
->>>> +}
->>>> +
->>>> +static int vgic_its_device_cmp(void *priv, struct list_head *a,
->>>> +			       struct list_head *b)
->>>> +{
->>>> +	struct its_device *deva = container_of(a, struct its_device, dev_list);
->>>> +	struct its_device *devb = container_of(b, struct its_device, dev_list);
->>>> +
->>>> +	if (deva->device_id < devb->device_id)
->>>> +		return -1;
->>>> +	else
->>>> +		return 1;
->>>> +}
->>>> +
->>>>  /**
->>>>   * vgic_its_save_device_tables - Save the device table and all ITT
->>>>   * into guest RAM
->>>> + *
->>>> + * L1/L2 handling is hidden by vgic_its_check_id() helper which directly
->>>> + * returns the GPA of the device entry
->>>>   */
->>>>  static int vgic_its_save_device_tables(struct vgic_its *its)
->>>>  {
->>>> -	return -ENXIO;
->>>> +	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
->>>> +	struct its_device *dev;
->>>> +	int dte_esz = abi->dte_esz;
->>>> +	u64 baser;
->>>> +
->>>> +	baser = its->baser_device_table;
->>>> +
->>>> +	list_sort(NULL, &its->device_list, vgic_its_device_cmp);
+On Fri, May 05 2017 at 11:04:22 pm BST, Shanker Donthineni <shankerd@codeaurora.org> wrote:
+> Hi Marc,
+>
+>
+> On 05/02/2017 11:16 AM, Marc Zyngier wrote:
+>> On Sun, Apr 30 2017 at  3:36:15 pm BST, Shanker Donthineni <shankerd@codeaurora.org> wrote:
+>>> We are always allocating extra 255Bytes of memory to handle ITE
+>>> physical address alignment requirement. The kmalloc() satisfies
+>>> the ITE alignment since the ITS driver is requesting a minimum
+>>> size of ITS_ITT_ALIGN bytes.
 >>>
->>> this list is protected by the ITS mutex but you seem to be only holding
->>> the KVM mutex here, so don't we have a potential exploit here?
->>
->> Updates to the device, ite list are done when running commands. As we
->> hold the KVM mutex, commands cannot run. Then there is
->> vgic_its_destroy() which happens on kvm_put_kvm when all users have
->> released their reference. So to me holding the kvm lock looks sufficient.
->>
-> 
-> But we don't hold the KVM mutex when running commands, we run the its
-> mutex?  What am I missing?
-Yes we do. The kvm lock is taken in vgic_its_attr_regs_access. Commands
-are processed on vgic_mmio_write_its_cwriter and vgic_mmio_write_its_ctlr
-> 
-> Even worse, the vgic_its_trigger_msi also only takes the its->its_lock
-> mutex (or rather its caller does) and that surely can run while we are
-> saving the tables can it not?
-Hum yes this can theoretically happen in a non qemu use case. Otherwise
-the VM being stopped at that time, injecting a new MSI at that point
-looks as invalid. Looks safer I take the its lock too then.
+>>> Let's try to allocate the exact amount of memory that is required
+>>> for ITEs to avoid wastage.
+>>>
+>>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>>> ---
+>>> Changes:
+>>> v2: removed 'Change-Id: Ia8084189833f2081ff13c392deb5070c46a64038' from commit.
+>>> v3: changed from IITE to ITE.
+>>> v3: removed fallback since kmalloc() guarantees the right alignment.
+>>>
+>>>  drivers/irqchip/irq-gic-v3-its.c | 6 +++---
+>>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>>> index 45ea1933..72e56f03 100644
+>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>> @@ -261,7 +261,6 @@ static struct its_collection *its_build_mapd_cmd(struct its_cmd_block *cmd,
+>>>  	u8 size = ilog2(desc->its_mapd_cmd.dev->nr_ites);
+>>>  
+>>>  	itt_addr = virt_to_phys(desc->its_mapd_cmd.dev->itt);
+>>> -	itt_addr = ALIGN(itt_addr, ITS_ITT_ALIGN);
+>>>  
+>>>  	its_encode_cmd(cmd, GITS_CMD_MAPD);
+>>>  	its_encode_devid(cmd, desc->its_mapd_cmd.dev->device_id);
+>>> @@ -1329,13 +1328,14 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>>>  	 */
+>>>  	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+>>>  	sz = nr_ites * its->ite_size;
+>>> -	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+>>> +	sz = max(sz, ITS_ITT_ALIGN);
+>>>  	itt = kzalloc(sz, GFP_KERNEL);
+>>>  	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
+>>>  	if (lpi_map)
+>>>  		col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
+>>>  
+>>> -	if (!dev || !itt || !lpi_map || !col_map) {
+>>> +	if (!dev || !itt || !lpi_map || !col_map ||
+>>> +	    !IS_ALIGNED(virt_to_phys(itt), ITS_ITT_ALIGN)) {
+>>>  		kfree(dev);
+>>>  		kfree(itt);
+>>>  		kfree(lpi_map);
+>> I'm confused. Either the alignment is guaranteed (and you should
+>> document why it is so), or it is not, and we need to handle the
+>> non-alignment (instead of failing).
+>
+> Sorry for confusion, alignment is guaranteed by kmalloc(), added a
+> check for readability purpose only can be removed.
 
-Thanks for spotting this!
+My question still remains. Where exactly is that alignment guarantee
+documented and enforced? I can't see anything giving that certainty.
 
-Eric
-> 
-> Thanks,
-> -Christoffer
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+I would expect kmalloc to give you something that is cache-line aligned,
+but probably nothing more than that. Now, I'd happily be proven wrong,
+but so far, all I can see is that:
+
+- ARCH_KMALLOC_MINALIGN is defined as ARCH_DMA_MINALIGN
+- ARCH_DMA_MINALIGN is defined as L1_CACHE_BYTES
+- L1_CACHE_BYTES is 128 on arm64, and either 32, 64, or 128 on arm.
+
+What am I missing?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead, it just smell funny.
