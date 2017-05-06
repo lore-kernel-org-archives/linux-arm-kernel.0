@@ -1,91 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 06 May 2017 12:25:02 +0100
-Subject: [PATCH v4] irqchip/gicv3-its: Avoid memory over allocation for
- ITEs
-In-Reply-To: <f3ca8eb8-88e9-6672-134a-d5eaac73f11f@codeaurora.org> (Shanker
- Donthineni's message of "Fri, 5 May 2017 17:04:22 -0500")
-References: <1493562975-14365-1-git-send-email-shankerd@codeaurora.org>
- <87lgqfmdy7.fsf@on-the-bus.cambridge.arm.com>
- <f3ca8eb8-88e9-6672-134a-d5eaac73f11f@codeaurora.org>
-Message-ID: <87vapekz1t.fsf@on-the-bus.cambridge.arm.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Sat,  6 May 2017 17:24:35 +0530
+Subject: [PATCH 00/11] Broadcom Stingray SOC Initial Support
+Message-ID: <1494071686-19098-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 05 2017 at 11:04:22 pm BST, Shanker Donthineni <shankerd@codeaurora.org> wrote:
-> Hi Marc,
->
->
-> On 05/02/2017 11:16 AM, Marc Zyngier wrote:
->> On Sun, Apr 30 2017 at  3:36:15 pm BST, Shanker Donthineni <shankerd@codeaurora.org> wrote:
->>> We are always allocating extra 255Bytes of memory to handle ITE
->>> physical address alignment requirement. The kmalloc() satisfies
->>> the ITE alignment since the ITS driver is requesting a minimum
->>> size of ITS_ITT_ALIGN bytes.
->>>
->>> Let's try to allocate the exact amount of memory that is required
->>> for ITEs to avoid wastage.
->>>
->>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
->>> ---
->>> Changes:
->>> v2: removed 'Change-Id: Ia8084189833f2081ff13c392deb5070c46a64038' from commit.
->>> v3: changed from IITE to ITE.
->>> v3: removed fallback since kmalloc() guarantees the right alignment.
->>>
->>>  drivers/irqchip/irq-gic-v3-its.c | 6 +++---
->>>  1 file changed, 3 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->>> index 45ea1933..72e56f03 100644
->>> --- a/drivers/irqchip/irq-gic-v3-its.c
->>> +++ b/drivers/irqchip/irq-gic-v3-its.c
->>> @@ -261,7 +261,6 @@ static struct its_collection *its_build_mapd_cmd(struct its_cmd_block *cmd,
->>>  	u8 size = ilog2(desc->its_mapd_cmd.dev->nr_ites);
->>>  
->>>  	itt_addr = virt_to_phys(desc->its_mapd_cmd.dev->itt);
->>> -	itt_addr = ALIGN(itt_addr, ITS_ITT_ALIGN);
->>>  
->>>  	its_encode_cmd(cmd, GITS_CMD_MAPD);
->>>  	its_encode_devid(cmd, desc->its_mapd_cmd.dev->device_id);
->>> @@ -1329,13 +1328,14 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
->>>  	 */
->>>  	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
->>>  	sz = nr_ites * its->ite_size;
->>> -	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
->>> +	sz = max(sz, ITS_ITT_ALIGN);
->>>  	itt = kzalloc(sz, GFP_KERNEL);
->>>  	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
->>>  	if (lpi_map)
->>>  		col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
->>>  
->>> -	if (!dev || !itt || !lpi_map || !col_map) {
->>> +	if (!dev || !itt || !lpi_map || !col_map ||
->>> +	    !IS_ALIGNED(virt_to_phys(itt), ITS_ITT_ALIGN)) {
->>>  		kfree(dev);
->>>  		kfree(itt);
->>>  		kfree(lpi_map);
->> I'm confused. Either the alignment is guaranteed (and you should
->> document why it is so), or it is not, and we need to handle the
->> non-alignment (instead of failing).
->
-> Sorry for confusion, alignment is guaranteed by kmalloc(), added a
-> check for readability purpose only can be removed.
+This patchset adds initial support of Broadcom Stingray SOC
+by reusing existing Broadcom iProc device drivers.
 
-My question still remains. Where exactly is that alignment guarantee
-documented and enforced? I can't see anything giving that certainty.
+Most of the patches in this patchset are DT patches except
+the Stingray clock tree support which just one patch.
 
-I would expect kmalloc to give you something that is cache-line aligned,
-but probably nothing more than that. Now, I'd happily be proven wrong,
-but so far, all I can see is that:
+This patchset is based on Linux-4.11 and it is also available
+at stingray-v1 branch of https://github.com/Broadcom/arm64-linux.git
 
-- ARCH_KMALLOC_MINALIGN is defined as ARCH_DMA_MINALIGN
-- ARCH_DMA_MINALIGN is defined as L1_CACHE_BYTES
-- L1_CACHE_BYTES is 128 on arm64, and either 32, 64, or 128 on arm.
+Anup Patel (3):
+  dt-bindings: bcm: Add Broadcom Stingray bindings document
+  arm64: dts: Initial DTS files for Broadcom Stingray SOC
+  arm64: dts: Add PL022, PL330 and SP805 DT nodes for Stingray
 
-What am I missing?
+Oza Pawandeep (1):
+  arm64: dts: Add I2C DT nodes for Stingray SoC
 
-Thanks,
+Pramod Kumar (3):
+  arm64: dts: Add NAND DT nodes for Stingray SOC
+  arm64: dts: Add pinctrl DT nodes for Stingray SOC
+  arm64: dts: Add GPIO DT nodes for Stingray SOC
 
-	M.
+Sandeep Tripathy (3):
+  dt-bindings: clk: Extend binding doc for Stingray SOC
+  clk: bcm: Add clocks for Stingray SOC
+  arm64: dts: Add clock DT nodes for Stingray SOC
+
+Srinath Mannam (1):
+  arm64: dts: Add PWM and SDHCI DT nodes for Stingray SOC
+
+ .../devicetree/bindings/arm/bcm/brcm,stingray.txt  |  12 +
+ .../bindings/clock/brcm,iproc-clocks.txt           |  76 ++++
+ arch/arm64/boot/dts/broadcom/Makefile              |   1 +
+ arch/arm64/boot/dts/broadcom/stingray/Makefile     |   6 +
+ .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 140 +++++++
+ .../boot/dts/broadcom/stingray/bcm958742k.dts      |  78 ++++
+ .../boot/dts/broadcom/stingray/bcm958742t.dts      |  40 ++
+ .../boot/dts/broadcom/stingray/stingray-clock.dtsi | 162 ++++++++
+ .../dts/broadcom/stingray/stingray-pinctrl.dtsi    | 345 ++++++++++++++++
+ .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 457 +++++++++++++++++++++
+ drivers/clk/bcm/Kconfig                            |   8 +
+ drivers/clk/bcm/Makefile                           |   1 +
+ drivers/clk/bcm/clk-sr.c                           | 300 ++++++++++++++
+ include/dt-bindings/clock/bcm-sr.h                 | 101 +++++
+ .../dt-bindings/pinctrl/brcm,pinctrl-stingray.h    |  68 +++
+ 15 files changed, 1795 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,stingray.txt
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/Makefile
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-pinctrl.dtsi
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+ create mode 100644 drivers/clk/bcm/clk-sr.c
+ create mode 100644 include/dt-bindings/clock/bcm-sr.h
+ create mode 100644 include/dt-bindings/pinctrl/brcm,pinctrl-stingray.h
+
 -- 
-Jazz is not dead, it just smell funny.
+2.7.4
