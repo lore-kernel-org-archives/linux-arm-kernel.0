@@ -1,84 +1,148 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat,  6 May 2017 14:10:51 +0200
-Subject: [PATCH 2/4] ata: Add DT bindings for the Gemini SATA bridge
+Date: Sat,  6 May 2017 14:10:53 +0200
+Subject: [PATCH 4/4] ARM: dts: add Gemini PATA/SATA support
 In-Reply-To: <20170506121053.11554-1-linus.walleij@linaro.org>
 References: <20170506121053.11554-1-linus.walleij@linaro.org>
-Message-ID: <20170506121053.11554-2-linus.walleij@linaro.org>
+Message-ID: <20170506121053.11554-4-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds device tree bindings for the Cortina Systems Gemini
-PATA to SATA bridge.
+The NAS4229B and SQ201 Gemini systems have a PATA controller
+which is linked to a SATA bridge in the SoC. Enable both
+platforms to use the PATA/SATA devices.
 
-Cc: devicetree at vger.kernel.org
 Cc: John Feng-Hsin Chiang <john453@faraday-tech.com>
 Cc: Greentime Hu <green.hu@gmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../bindings/ata/cortina,gemini-sata-bridge.txt    | 55 ++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ata/cortina,gemini-sata-bridge.txt
+PATA maintainers: this file will be applied by me through the ARM
+SoC git tree. It is provided for reference only so you see how
+it will be used.
+---
+ arch/arm/boot/dts/gemini-nas4220b.dts | 10 +++++++
+ arch/arm/boot/dts/gemini-sq201.dts    | 10 +++++++
+ arch/arm/boot/dts/gemini.dtsi         | 56 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 76 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/ata/cortina,gemini-sata-bridge.txt b/Documentation/devicetree/bindings/ata/cortina,gemini-sata-bridge.txt
-new file mode 100644
-index 000000000000..9fe92818b2fb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ata/cortina,gemini-sata-bridge.txt
-@@ -0,0 +1,55 @@
-+* Cortina Systems Gemini SATA Bridge
+diff --git a/arch/arm/boot/dts/gemini-nas4220b.dts b/arch/arm/boot/dts/gemini-nas4220b.dts
+index 7668ba52158e..55f6a4f1f801 100644
+--- a/arch/arm/boot/dts/gemini-nas4220b.dts
++++ b/arch/arm/boot/dts/gemini-nas4220b.dts
+@@ -98,5 +98,15 @@
+ 				read-only;
+ 			};
+ 		};
 +
-+The Gemini SATA bridge in a SoC-internal PATA to SATA bridge that
-+takes two Faraday Technology FTIDE010 PATA controllers and bridges
-+them in different configurations to two SATA ports.
++		sata: sata at 46000000 {
++			cortina,gemini-ata-muxmode = <0>;
++			cortina,gemini-enable-sata-bridge;
++			status = "okay";
++		};
 +
-+Required properties:
-+- compatible: should be
-+  "cortina,gemini-sata-bridge"
-+- reg: registers and size for the block
-+- resets: phandles to the reset lines for both SATA bridges
-+- reset-names: must be "sata0", "sata1"
-+- clocks: phandles to the compulsory peripheral clocks
-+- clock-names: must be "SATA0_PCLK", "SATA1_PCLK"
-+- syscon: a phandle to the global Gemini system controller
-+- cortina,gemini-ata-muxmode: tell the desired multiplexing mode for
-+  the ATA controller and SATA bridges. Values 0..3:
-+  Mode 0: ata0 master <-> sata0
-+          ata1 master <-> sata1
-+          ata0 slave interface brought out on IDE pads
-+  Mode 1: ata0 master <-> sata0
-+          ata1 master <-> sata1
-+          ata1 slave interface brought out on IDE pads
-+  Mode 2: ata1 master <-> sata1
-+          ata1 slave  <-> sata0
-+          ata0 master and slave interfaces brought out
-+               on IDE pads
-+  Mode 3: ata0 master <-> sata0
-+          ata1 slave  <-> sata1
-+          ata1 master and slave interfaces brought out
-+               on IDE pads
++		ata at 63000000 {
++			status = "okay";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/gemini-sq201.dts b/arch/arm/boot/dts/gemini-sq201.dts
+index 46309e79cc7b..4d200f0bcd45 100644
+--- a/arch/arm/boot/dts/gemini-sq201.dts
++++ b/arch/arm/boot/dts/gemini-sq201.dts
+@@ -93,6 +93,12 @@
+ 			};
+ 		};
+ 
++		sata: sata at 46000000 {
++			cortina,gemini-ata-muxmode = <0>;
++			cortina,gemini-enable-sata-bridge;
++			status = "okay";
++		};
 +
-+Optional boolean properties:
-+- cortina,gemini-enable-ide-pins: enables the PATA to IDE connection.
-+  The muxmode setting decides whether ATA0 or ATA1 is brought out,
-+  and whether master, slave or both interfaces get brought out.
-+- cortina,gemini-enable-sata-bridge: enables the PATA to SATA bridge
-+  inside the Gemnini SoC. The Muxmode decides what PATA blocks will
-+  be muxed out and how.
+ 		pci at 50000000 {
+ 			status = "okay";
+ 			interrupt-map-mask = <0xf800 0 0 7>;
+@@ -114,5 +120,9 @@
+ 				<0x6000 0 0 3 &pci_intc 1>,
+ 				<0x6000 0 0 4 &pci_intc 2>;
+ 		};
 +
-+Example:
++		ata at 63000000 {
++			status = "okay";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/gemini.dtsi b/arch/arm/boot/dts/gemini.dtsi
+index 6fe678a68e31..a50ad49d38f5 100644
+--- a/arch/arm/boot/dts/gemini.dtsi
++++ b/arch/arm/boot/dts/gemini.dtsi
+@@ -89,6 +89,18 @@
+ 			clock-names = "PCLK", "EXTCLK";
+ 		};
+ 
++		sata: sata at 46000000 {
++			compatible = "cortina,gemini-sata-bridge";
++			reg = <0x46000000 0x100>;
++			resets = <&rcon 26>, <&rcon 27>;
++			reset-names = "sata0", "sata1";
++			clocks = <&gcc GEMINI_CLK_GATE_SATA0>,
++				 <&gcc GEMINI_CLK_GATE_SATA1>;
++			clock-names = "SATA0_PCLK", "SATA1_PCLK";
++			syscon = <&syscon>;
++			status = "disabled";
++		};
 +
-+sata: sata at 46000000 {
-+	compatible = "cortina,gemini-sata-bridge";
-+	reg = <0x46000000 0x100>;
-+	resets = <&rcon 26>, <&rcon 27>;
-+	reset-names = "sata0", "sata1";
-+	clocks = <&gcc GEMINI_CLK_GATE_SATA0>,
-+		 <&gcc GEMINI_CLK_GATE_SATA1>;
-+	clock-names = "SATA0_PCLK", "SATA1_PCLK";
-+	syscon = <&syscon>;
-+	cortina,gemini-ata-muxmode = <3>;
-+	cortina,gemini-enable-ide-pins;
-+	cortina,gemini-enable-sata-bridge;
-+};
+ 		intcon: interrupt-controller at 48000000 {
+ 			compatible = "faraday,ftintc010";
+ 			reg = <0x48000000 0x1000>;
+@@ -183,5 +195,49 @@
+ 				#interrupt-cells = <1>;
+ 			};
+ 		};
++
++		ata at 63000000 {
++			compatible = "cortina,gemini-pata", "faraday,ftide010";
++			reg = <0x63000000 0x1000>;
++			interrupts = <4 IRQ_TYPE_EDGE_RISING>;
++			resets = <&rcon 2>;
++			clocks = <&gcc GEMINI_CLK_GATE_IDE>;
++			clock-names = "PCLK";
++			sata = <&sata>;
++			status = "disabled";
++			/* PIO timings assume 33 MHz bus speed */
++			faraday,pio-active-time = <10>, <10>, <10>, <3>, <3>;
++			faraday,pio-recovery-time = <10>, <3>, <1>, <3>, <1>;
++			faraday,mdma-50-active-time = <6>, <2>, <2>;
++			faraday,mdma-50-recovery-time = <6>, <2>, <1>;
++			faraday,mdma-66-active-time = <8>, <3>, <3>;
++			faraday,mdma-66-recovery-time = <8>, <2>, <1>;
++			faraday,udma-50-setup-time = <3>, <3>, <2>, <2>, <1>, <1>;
++			faraday,udma-50-hold-time = <3>, <1>, <1>, <1>, <1>, <1>;
++			faraday,udma-66-setup-time = <4>, <4>, <3>, <2>, <1>, <1>, <1>;
++			faraday,udma-66-hold-time = <4>, <2>, <1>, <1>, <1>, <1>, <1>;
++		};
++
++		ata at 63400000 {
++			compatible = "cortina,gemini-pata", "faraday,ftide010";
++			reg = <0x63400000 0x1000>;
++			interrupts = <5 IRQ_TYPE_EDGE_RISING>;
++			resets = <&rcon 2>;
++			clocks = <&gcc GEMINI_CLK_GATE_IDE>;
++			clock-names = "PCLK";
++			sata = <&sata>;
++			status = "disabled";
++			/* PIO timings assume 33 MHz bus speed */
++			faraday,pio-active-time = <10>, <10>, <10>, <3>, <3>;
++			faraday,pio-recovery-time = <10>, <3>, <1>, <3>, <1>;
++			faraday,mdma-50-active-time = <6>, <2>, <2>;
++			faraday,mdma-50-recovery-time = <6>, <2>, <1>;
++			faraday,mdma-66-active-time = <8>, <3>, <3>;
++			faraday,mdma-66-recovery-time = <8>, <2>, <1>;
++			faraday,udma-50-setup-time = <3>, <3>, <2>, <2>, <1>, <1>;
++			faraday,udma-50-hold-time = <3>, <1>, <1>, <1>, <1>, <1>;
++			faraday,udma-66-setup-time = <4>, <4>, <3>, <2>, <1>, <1>, <1>;
++			faraday,udma-66-hold-time = <4>, <2>, <1>, <1>, <1>, <1>, <1>;
++		};
+ 	};
+ };
 -- 
 2.9.3
