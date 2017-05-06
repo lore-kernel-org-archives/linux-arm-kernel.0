@@ -1,56 +1,91 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 6 May 2017 02:15:29 +0200
-Subject: [PATCH 1/5] ARM: dts: imx7-colibri: use OF graph to describe the
- display
-In-Reply-To: <144548a963c8393049f90afd683b331b@agner.ch>
-References: <20170329232113.19078-1-stefan@agner.ch>
- <CAOMZO5Bp=K8_nP0_+MjQ9teS_U9SpRspOhVPwOwg1J0m0QZjCg@mail.gmail.com>
- <CAOMZO5AuvgqtNTHUW-LyXy9Xsq=rnaPODBzWA3FRmRpxqrRqAw@mail.gmail.com>
- <144548a963c8393049f90afd683b331b@agner.ch>
-Message-ID: <86b6c888-a17b-e19c-8263-ce2b9dd71dea@denx.de>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Fri, 5 May 2017 18:37:55 -0700
+Subject: FIO performance regression in 4.11 kernel vs. 4.10 kernel observed on
+ ARM64
+Message-ID: <50f528e8-8d8d-b168-784d-607a602ba808@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2017 01:52 AM, Stefan Agner wrote:
-> On 2017-05-05 06:18, Fabio Estevam wrote:
->> On Fri, May 5, 2017 at 8:48 AM, Fabio Estevam <festevam@gmail.com> wrote:
->>
->>> Could you please confirm that drm/mxsfb is working fine on 4.11 on your board?
->>>
->>> I am converting mx6sx sdb to use drm/mxsfb and I noticed that when
->>> board boots I get garbage on the display.
->>>
->>> If I do a blank/unblank then things are displayed correctly.
->>
->> Ok, I managed to fix the drm/mxsfb driver.
->>
->> Will submit a patch shortly.
-> 
-> FWIW, it works, on i.MX 7 here, but I also have a U-Boot which
-> initialized eLCDIF first.
-> 
-> Will check your patch and without U-Boot eLCDIF support.
+I have updated the kernel to 4.11 and see significant performance
+drops using fio-2.9.
 
-Same thing here, I had U-Boot which inited the eLCDIF too and disabling
-that triggered this issue on MX6SX as well. Then again, the original
-patch I sent Fabio fixed it for me too:
+Using FIO the performanced drops from 281 KIOPS to 207 KIOPS using
+single core and task.
+Percent performance drop becomes even worse if multi-cores and multi-
+threads are used.
 
-diff --git a/drivers/gpu/drm/mxsfb/mxsfb_crtc.c
-b/drivers/gpu/drm/mxsfb/mxsfb_crtc.c
-index 6d701d2c362d..f02d23d55995 100644
---- a/drivers/gpu/drm/mxsfb/mxsfb_crtc.c
-+++ b/drivers/gpu/drm/mxsfb/mxsfb_crtc.c
-@@ -84,6 +84,8 @@ static int mxsfb_set_pixel_fmt(struct
-mxsfb_drm_private *mxsfb)
+Platform is ARM64 based A72.  Can somebody reproduce the results or
+know what may have changed to make such a dramatic change?
 
-        writel(ctrl1, mxsfb->base + LCDC_CTRL1);
-        writel(ctrl, mxsfb->base + LCDC_CTRL);
-+       writel(ctrl1, mxsfb->base + LCDC_CTRL1);
-+       writel(ctrl, mxsfb->base + LCDC_CTRL);
+FIO command and resulting log output below using null_blk to remove
+as many hardware specific driver dependencies as possible.
 
-        return 0;
- }
+modprobe null_blk queue_mode=2 irqmode=0 completion_nsec=0
+submit_queues=1 bs=4096
 
--- 
-Best regards,
-Marek Vasut
+taskset 0x1 fio --randrepeat=1 --ioengine=libaio --direct=1 --numjobs=1
+--gtod_reduce=1 --name=readtest --filename=/dev/nullb0 --bs=4k
+--iodepth=128 --time_based --runtime=15 --readwrite=read
+
+**** 281 KIOPS RESULT on 4.11 Kernel ****
+readtest: (g=0): rw=read, bs=4K-4K/4K-4K/4K-4K, ioengine=libaio, iodepth=128
+fio-2.9
+Starting 1 process
+Jobs: 1 (f=1): [R(1)] [100.0% done] [1098MB/0KB/0KB /s] [281K/0/0 iops] 
+[eta 00m:00s]
+readtest: (groupid=0, jobs=1): err= 0: pid=2868: Mon Apr  3 20:24:25 2017
+   read : io=16456MB, bw=1096.1MB/s, iops=280825, runt= 15001msec
+   cpu          : usr=28.35%, sys=71.55%, ctx=1560, majf=0, minf=146
+   IO depths    : 1=0.1%, 2=0.1%, 4=0.1%, 8=0.1%, 16=0.1%, 32=0.1%, 
+ >=64=100.0%
+      submit    : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.0%, 32=0.0%, 64=0.0%, 
+ >=64=0.0%
+      complete  : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.0%, 32=0.0%, 64=0.0%, 
+ >=64=0.1%
+      issued    : total=r=4212670/w=0/d=0, short=r=0/w=0/d=0, 
+drop=r=0/w=0/d=0
+      latency   : target=0, window=0, percentile=100.00%, depth=128
+
+Run status group 0 (all jobs):
+    READ: io=16456MB, aggrb=1096.1MB/s, minb=1096.1MB/s, 
+maxb=1096.1MB/s, mint=15001msec, maxt=15001msec
+
+Disk stats (read/write):
+   nullb0: ios=4185627/0, merge=0/0, ticks=3664/0, in_queue=3308, 
+util=22.05%
+
+
+**** 207 KIOPS RESULT on 4.10 Kernel ****
+taskset 0x1 fio --randrepeat=1 --ioengine=libaio --direct=1 --numjobs=1 
+--gtod_reduce=1 --name=readtest --filename=/dev/nullb0 --bs=4k 
+--iodepth=128 --time_based --runtime=15 --readwrite=read
+readtest: (g=0): rw=read, bs=4K-4K/4K-4K/4K-4K, ioengine=libaio, iodepth=128
+fio-2.9
+Starting 1 process
+Jobs: 1 (f=1): [R(1)] [100.0% done] [807.6MB/0KB/0KB /s] [207K/0/0 iops] 
+[eta 00m:00s]
+readtest: (groupid=0, jobs=1): err= 0: pid=2832: Mon Apr  3 20:09:31 2017
+   read : io=12109MB, bw=826620KB/s, iops=206654, runt= 15001msec
+   cpu          : usr=24.62%, sys=75.28%, ctx=1571, majf=0, minf=146
+   IO depths    : 1=0.1%, 2=0.1%, 4=0.1%, 8=0.1%, 16=0.1%, 32=0.1%, 
+ >=64=100.0%
+      submit    : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.0%, 32=0.0%, 64=0.0%, 
+ >=64=0.0%
+      complete  : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.0%, 32=0.0%, 64=0.0%, 
+ >=64=0.1%
+      issued    : total=r=3100030/w=0/d=0, short=r=0/w=0/d=0, 
+drop=r=0/w=0/d=0
+      latency   : target=0, window=0, percentile=100.00%, depth=128
+
+Run status group 0 (all jobs):
+    READ: io=12109MB, aggrb=826619KB/s, minb=826619KB/s, 
+maxb=826619KB/s, mint=15001msec, maxt=15001msec
+
+Disk stats (read/write):
+   nullb0: ios=3080149/0, merge=0/0, ticks=3952/0, in_queue=3560, 
+util=23.73%
+
+
+
+Regards,
+  Scott
