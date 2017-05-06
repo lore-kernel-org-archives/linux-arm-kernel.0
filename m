@@ -1,140 +1,95 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Sat,  6 May 2017 17:24:45 +0530
-Subject: [PATCH 10/11] arm64: dts: Add PL022,
- PL330 and SP805 DT nodes for Stingray
+Date: Sat,  6 May 2017 17:24:44 +0530
+Subject: [PATCH 09/11] arm64: dts: Add I2C DT nodes for Stingray SoC
 In-Reply-To: <1494071686-19098-1-git-send-email-anup.patel@broadcom.com>
 References: <1494071686-19098-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1494071686-19098-11-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1494071686-19098-10-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have two instance of PL022 SPI controllers, one instance of
-DMA PL330, and one non-secure SP805 Watchdog on Stingray SOC.
+From: Oza Pawandeep <oza@broadcom.com>
 
-This patch adds DT nodes for the above mentioned devices in
-Stingray DT.
+This patch adds I2C DT nodes on Stingray SoC.
 
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Pramod KUMAR <pramod.kumar@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
+Signed-off-by: Oza Pawandeep <oza@broadcom.com>
+Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 ---
- .../boot/dts/broadcom/stingray/bcm958742k.dts      | 30 +++++++++++++
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 52 ++++++++++++++++++++++
- 2 files changed, 82 insertions(+)
+ .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 22 ++++++++++++++++++++++
+ .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 20 ++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
-index c309cda..5671669 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
-+++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
-@@ -46,3 +46,33 @@
- &uart3 {
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+index 6014525..3250d09 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+@@ -63,6 +63,28 @@
  	status = "okay";
  };
-+
-+&ssp0 {
-+	pinctrl-0 = <&spi0_pins>;
-+	pinctrl-names = "default";
-+	cs-gpios = <&gpio_hsls 34 0>;
+ 
++&i2c0 {
 +	status = "okay";
 +
-+	spi-flash at 0 {
-+		compatible = "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <20000000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
++	pca9505: pca9505 at 20 {
++		compatible = "nxp,pca9505";
++		gpio-controller;
++		#gpio-cells = <2>;
++		reg = <0x20>;
 +	};
 +};
 +
-+&ssp1 {
-+	pinctrl-0 = <&spi1_pins>;
-+	pinctrl-names = "default";
-+	cs-gpios = <&gpio_hsls 96 0>;
++&i2c1 {
 +	status = "okay";
 +
-+	spi-flash at 0 {
-+		compatible = "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <20000000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
++	pcf8574: pcf8574 at 20 {
++		compatible = "nxp,pcf8574a";
++		gpio-controller;
++		#gpio-cells = <2>;
++		reg = <0x27>;
 +	};
 +};
++
+ &nand {
+ 	status = "ok";
+ 	nandcs at 0 {
 diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-index d046b04..36b8ced 100644
+index fb51473..d046b04 100644
 --- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
 +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-@@ -276,6 +276,14 @@
- 			status = "disabled";
+@@ -266,6 +266,16 @@
+ 			gpio-controller;
  		};
  
-+		wdt0: watchdog at 689c0000 {
-+			compatible = "arm,sp805", "arm,primecell";
-+			reg = <0x689c0000 0x1000>;
-+			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&hsls_25m_div2_clk>, <&hsls_div4_clk>;
-+			clock-names = "wdogclk", "apb_pclk";
++		i2c0: i2c at 689b0000 {
++			compatible = "brcm,iproc-i2c";
++			reg = <0x689b0000 0x100>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			interrupts = <GIC_SPI 177 IRQ_TYPE_NONE>;
++			clock-frequency = <100000>;
++			status = "disabled";
 +		};
 +
  		gpio_hsls: gpio at 689d0000 {
  			compatible = "brcm,iproc-gpio";
  			reg = <0x689d0000 0x864>;
-@@ -356,11 +364,55 @@
- 			status = "disabled";
+@@ -292,6 +302,16 @@
+ 					<&pinmux 151 91 4>;
  		};
  
-+		ssp0: ssp at 68a80000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			reg = <0x68a80000 0x1000>;
-+			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&hsls_div2_clk>, <&hsls_div2_clk>;
-+			clock-names = "spiclk", "apb_pclk";
-+			num-cs = <1>;
++		i2c1: i2c at 689e0000 {
++			compatible = "brcm,iproc-i2c";
++			reg = <0x689e0000 0x100>;
 +			#address-cells = <1>;
 +			#size-cells = <0>;
++			interrupts = <GIC_SPI 178 IRQ_TYPE_NONE>;
++			clock-frequency = <100000>;
 +			status = "disabled";
 +		};
 +
-+		ssp1: ssp at 68a90000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			reg = <0x68a90000 0x1000>;
-+			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&hsls_div2_clk>, <&hsls_div2_clk>;
-+			clock-names = "spiclk", "apb_pclk";
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		hwrng: hwrng at 68b20000 {
- 			compatible = "brcm,iproc-rng200";
- 			reg = <0x68b20000 0x28>;
- 		};
- 
-+		dma0: dma at 68c10000 {
-+			compatible = "arm,pl330", "arm,primecell";
-+			reg = <0x68c10000 0x1000>;
-+			interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 195 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 196 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 197 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 198 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 199 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 201 IRQ_TYPE_LEVEL_HIGH>;
-+			#dma-cells = <1>;
-+			#dma-channels = <8>;
-+			#dma-requests = <32>;
-+			clocks = <&hsls_div2_clk>;
-+			clock-names = "apb_pclk";
-+			iommus = <&smmu 0x6000 0x0000>;
-+		};
-+
- 		nand: nand at 68c60000 {
- 			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
- 			reg = <0x68c60000 0x600>,
+ 		uart0: uart at 68a00000 {
+ 			device_type = "serial";
+ 			compatible = "snps,dw-apb-uart";
 -- 
 2.7.4
