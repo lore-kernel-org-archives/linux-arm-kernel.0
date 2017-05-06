@@ -1,81 +1,117 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Sat,  6 May 2017 17:24:39 +0200
-Subject: [PATCH v7 20/24] KVM: arm64: vgic-its: vgic_its_check_id returns the
- entry's GPA
+Date: Sat,  6 May 2017 17:24:34 +0200
+Subject: [PATCH v7 15/24] KVM: arm64: vgic-its: Read config and pending bit in
+ add_lpi()
 In-Reply-To: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
 References: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1494084283-12723-21-git-send-email-eric.auger@redhat.com>
+Message-ID: <1494084283-12723-16-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As vgic_its_check_id() computes the device/collection entry's
-GPA, let's return it so that new callers can retrieve it easily.
+When creating the lpi we now ask the redistributor what is the state
+of the LPI (priority, enabled, pending).
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Acked-by: Christoffer Dall <cdall@linaro.org>
 
 ---
-v5 -> v6:
-- add Christoffer's A-b
+v6 -> v7:
+- fix a typo
 
-v3 -> v4:
-- check eaddr is not NULL to allow passing NULL eaddr parameter
-  to vgic_its_check_id
-
-v2: new
+v6: creation
 ---
- virt/kvm/arm/vgic/vgic-its.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 35 ++++++++++++++++++++++++-----------
+ 1 file changed, 24 insertions(+), 11 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 5523f0a..90afc83 100644
+index 3601790..ffd0a80 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -694,7 +694,8 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
-  * is actually valid (covered by a memslot and guest accessible).
-  * For this we have to read the respective first level entry.
+@@ -36,6 +36,8 @@
+ static int vgic_its_save_tables_v0(struct vgic_its *its);
+ static int vgic_its_restore_tables_v0(struct vgic_its *its);
+ static int vgic_its_commit_v0(struct vgic_its *its);
++static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
++			     struct kvm_vcpu *filter_vcpu);
+ 
+ /*
+  * Creates a new (reference to a) struct vgic_irq for a given LPI.
+@@ -44,10 +46,12 @@ static int vgic_its_commit_v0(struct vgic_its *its);
+  * If this is a "new" LPI, we allocate and initialize a new struct vgic_irq.
+  * This function returns a pointer to the _unlocked_ structure.
   */
--static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
-+static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
-+			      gpa_t *eaddr)
+-static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
++static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
++				     struct kvm_vcpu *vcpu)
  {
- 	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
- 	u64 indirect_ptr, type = GITS_BASER_TYPE(baser);
-@@ -725,6 +726,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
- 		addr = BASER_ADDRESS(baser) + id * esz;
- 		gfn = addr >> PAGE_SHIFT;
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	struct vgic_irq *irq = vgic_get_irq(kvm, NULL, intid), *oldirq;
++	int ret;
  
-+		if (eaddr)
-+			*eaddr = addr;
- 		return kvm_is_visible_gfn(its->dev->kvm, gfn);
- 	}
+ 	/* In this case there is no put, since we keep the reference. */
+ 	if (irq)
+@@ -64,6 +68,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
+ 	irq->config = VGIC_CONFIG_EDGE;
+ 	kref_init(&irq->refcount);
+ 	irq->intid = intid;
++	irq->target_vcpu = vcpu;
  
-@@ -757,6 +760,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
- 	indirect_ptr += index * esz;
- 	gfn = indirect_ptr >> PAGE_SHIFT;
+ 	spin_lock(&dist->lpi_list_lock);
  
-+	if (eaddr)
-+		*eaddr = indirect_ptr;
- 	return kvm_is_visible_gfn(its->dev->kvm, gfn);
+@@ -95,6 +100,19 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
+ out_unlock:
+ 	spin_unlock(&dist->lpi_list_lock);
+ 
++	/*
++	 * We "cache" the configuration table entries in our struct vgic_irq's.
++	 * However we only have those structs for mapped IRQs, so we read in
++	 * the respective config data from memory here upon mapping the LPI.
++	 */
++	ret = update_lpi_config(kvm, irq, NULL);
++	if (ret)
++		return ERR_PTR(ret);
++
++	ret = vgic_v3_lpi_sync_pending_status(kvm, irq);
++	if (ret)
++		return ERR_PTR(ret);
++
+ 	return irq;
  }
  
-@@ -766,7 +771,7 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
- {
- 	struct its_collection *collection;
- 
--	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id))
-+	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id, NULL))
- 		return E_ITS_MAPC_COLLECTION_OOR;
- 
- 	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
-@@ -939,7 +944,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
+@@ -795,6 +813,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	u32 event_id = its_cmd_get_id(its_cmd);
+ 	u32 coll_id = its_cmd_get_collection(its_cmd);
+ 	struct its_ite *ite;
++	struct kvm_vcpu *vcpu = NULL;
  	struct its_device *device;
+ 	struct its_collection *collection, *new_coll = NULL;
+ 	int lpi_nr;
+@@ -840,7 +859,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	ite->collection = collection;
+ 	ite->lpi = lpi_nr;
  
--	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
-+	if (!vgic_its_check_id(its, its->baser_device_table, device_id, NULL))
- 		return E_ITS_MAPD_DEVICE_OOR;
+-	irq = vgic_add_lpi(kvm, lpi_nr);
++	if (its_is_collection_mapped(collection))
++		vcpu = kvm_get_vcpu(kvm, collection->target_addr);
++
++	irq = vgic_add_lpi(kvm, lpi_nr, vcpu);
+ 	if (IS_ERR(irq)) {
+ 		if (new_coll)
+ 			vgic_its_free_collection(its, coll_id);
+@@ -849,15 +871,6 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	}
+ 	ite->irq = irq;
  
- 	if (valid && num_eventid_bits > VITS_TYPER_IDBITS)
+-	update_affinity_ite(kvm, ite);
+-
+-	/*
+-	 * We "cache" the configuration table entries in out struct vgic_irq's.
+-	 * However we only have those structs for mapped IRQs, so we read in
+-	 * the respective config data from memory here upon mapping the LPI.
+-	 */
+-	update_lpi_config(kvm, ite->irq, NULL);
+-
+ 	return 0;
+ }
+ 
 -- 
 2.5.5
