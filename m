@@ -1,71 +1,151 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Sat,  6 May 2017 17:24:31 +0200
-Subject: [PATCH v7 12/24] KVM: arm64: vgic-its: Interpret MAPD ITT_addr field
+Date: Sat,  6 May 2017 17:24:36 +0200
+Subject: [PATCH v7 17/24] KVM: arm64: vgic-its: vgic_its_alloc_ite/device
 In-Reply-To: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
 References: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1494084283-12723-13-git-send-email-eric.auger@redhat.com>
+Message-ID: <1494084283-12723-18-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Up to now the MAPD ITT_addr had been ignored. We will need it
-for save/restore. Let's record it in the its_device struct.
+Add two new helpers to allocate an its ite and an its device.
+This will avoid duplication on restore path.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
 ---
 v6 -> v7:
-- added Christoffer's and Marc's R-b
+added Christoffer's R-b
 
 v5 -> v6:
-- fix its_cmd_get_ittaddr and pass 44 to its_cmd_mask_field
+- remove Marc's A-b
+- both functions now return the newly allocated struct
 
 v4 -> v5:
-- its_cmd_get_ittaddr macro now returns the actual ITT GPA
+- add Marc's A-b
 
 v3 -> v4:
-- in vgic_its_cmd_handle_mapd, itt_addr directly is shifted
-- correct ittaddr bitmask to support 48bit GPA
+- fix allocation
+- add comment about its_lock mutex hold
+
+v1 -> v2:
+- report itt_size fix and remove ITE_SIZE
+- s/itte/ite/g
 ---
- virt/kvm/arm/vgic/vgic-its.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 68 ++++++++++++++++++++++++++++++--------------
+ 1 file changed, 47 insertions(+), 21 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 031f6ab..7b95b73 100644
+index cb7ae4c..737ba3c 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -104,6 +104,7 @@ struct its_device {
- 	/* the head for the list of ITTEs */
- 	struct list_head itt_head;
- 	u32 num_eventid_bits;
-+	gpa_t itt_addr;
- 	u32 device_id;
- };
+@@ -802,6 +802,25 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
+ 	kfree(collection);
+ }
  
-@@ -602,6 +603,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
- #define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
- #define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
- #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
-+#define its_cmd_get_ittaddr(cmd)	(its_cmd_mask_field(cmd, 2,  8, 44) << 8)
- #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
- #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
- 
-@@ -873,6 +875,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 	u32 device_id = its_cmd_get_deviceid(its_cmd);
- 	bool valid = its_cmd_get_validbit(its_cmd);
- 	u8 num_eventid_bits = its_cmd_get_size(its_cmd);
-+	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
++/* Must be called with its_lock mutex held */
++static struct its_ite *vgic_its_alloc_ite(struct its_device *device,
++					  struct its_collection *collection,
++					  u32 lpi_id, u32 event_id)
++{
++	struct its_ite *ite;
++
++	ite = kzalloc(sizeof(*ite), GFP_KERNEL);
++	if (!ite)
++		return ERR_PTR(-ENOMEM);
++
++	ite->event_id	= event_id;
++	ite->collection = collection;
++	ite->lpi = lpi_id;
++
++	list_add_tail(&ite->ite_list, &device->itt_head);
++	return ite;
++}
++
+ /*
+  * The MAPTI and MAPI commands map LPIs to ITTEs.
+  * Must be called with its_lock mutex held.
+@@ -816,8 +835,8 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	struct kvm_vcpu *vcpu = NULL;
  	struct its_device *device;
+ 	struct its_collection *collection, *new_coll = NULL;
+-	int lpi_nr;
+ 	struct vgic_irq *irq;
++	int lpi_nr;
  
- 	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
-@@ -904,6 +907,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+ 	device = find_its_device(its, device_id);
+ 	if (!device)
+@@ -846,19 +865,13 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 		new_coll = collection;
+ 	}
  
- 	device->device_id = device_id;
- 	device->num_eventid_bits = num_eventid_bits;
+-	ite = kzalloc(sizeof(struct its_ite), GFP_KERNEL);
+-	if (!ite) {
++	ite = vgic_its_alloc_ite(device, collection, lpi_nr, event_id);
++	if (IS_ERR(ite)) {
+ 		if (new_coll)
+ 			vgic_its_free_collection(its, coll_id);
+-		return -ENOMEM;
++		return PTR_ERR(ite);
+ 	}
+ 
+-	ite->event_id	= event_id;
+-	list_add_tail(&ite->ite_list, &device->itt_head);
+-
+-	ite->collection = collection;
+-	ite->lpi = lpi_nr;
+-
+ 	if (its_is_collection_mapped(collection))
+ 		vcpu = kvm_get_vcpu(kvm, collection->target_addr);
+ 
+@@ -891,6 +904,26 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
+ 	kfree(device);
+ }
+ 
++/* Must be called with its_lock mutex held */
++static struct its_device *vgic_its_alloc_device(struct vgic_its *its,
++						u32 device_id, gpa_t itt_addr,
++						u8 num_eventid_bits)
++{
++	struct its_device *device;
++
++	device = kzalloc(sizeof(*device), GFP_KERNEL);
++	if (!device)
++		return ERR_PTR(-ENOMEM);
++
++	device->device_id = device_id;
 +	device->itt_addr = itt_addr;
++	device->num_eventid_bits = num_eventid_bits;
++	INIT_LIST_HEAD(&device->itt_head);
++
++	list_add_tail(&device->dev_list, &its->device_list);
++	return device;
++}
++
+ /*
+  * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
+  * Must be called with the its_lock mutex held.
+@@ -927,17 +960,10 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+ 	if (!valid)
+ 		return 0;
  
- 	INIT_LIST_HEAD(&device->itt_head);
+-	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
+-	if (!device)
+-		return -ENOMEM;
+-
+-	device->device_id = device_id;
+-	device->num_eventid_bits = num_eventid_bits;
+-	device->itt_addr = itt_addr;
+-
+-	INIT_LIST_HEAD(&device->itt_head);
+-
+-	list_add_tail(&device->dev_list, &its->device_list);
++	device = vgic_its_alloc_device(its, device_id, itt_addr,
++				       num_eventid_bits);
++	if (IS_ERR(device))
++		return PTR_ERR(device);
  
+ 	return 0;
+ }
 -- 
 2.5.5
