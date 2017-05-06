@@ -1,75 +1,75 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat,  6 May 2017 19:36:25 +0200
-Subject: [PATCH] phy: meson8b-usb2: add support for the USB PHY on Meson8 SoCs
-Message-ID: <20170506173625.19501-1-martin.blumenstingl@googlemail.com>
+From: Andrew.Pinski@cavium.com (Pinski, Andrew)
+Date: Sat, 6 May 2017 17:38:52 +0000
+Subject: [PATCH 2/2] arm64:vdso: Remove ISB from gettimeofday.
+In-Reply-To: <CY4PR07MB3415D0B108BE622CF94B205893E80@CY4PR07MB3415.namprd07.prod.outlook.com>
+References: <1492991221-5156-1-git-send-email-apinski@cavium.com>
+ <1492991221-5156-2-git-send-email-apinski@cavium.com>
+ <7ac07a75-ec3b-d05e-061c-5efab751ae2b@jonmasters.org>
+ <CY4PR07MB3415D0B108BE622CF94B205893E80@CY4PR07MB3415.namprd07.prod.outlook.com>
+Message-ID: <CY4PR07MB34154B8FDA4C88F153FF8D5A93E80@CY4PR07MB3415.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Meson8 uses the same USB PHY as found on the Meson8b and GXBB SoCs. Add
-a new of_device_id to indicate this. Also update the documentation
-(devicetree binding, Kconfig and MODULE_DESCRIPTION) accordingly.
+Sorry sending again as plain text (I did not notice that before).
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt | 3 ++-
- drivers/phy/Kconfig                                        | 4 ++--
- drivers/phy/phy-meson8b-usb2.c                             | 5 +++--
- 3 files changed, 7 insertions(+), 5 deletions(-)
+On 5/6/2017 9:29 AM, Jon Masters wrote:
+On 04/23/2017 07:47 PM, Andrew Pinski wrote:
+> ISB is normally required before mrs CNTVCT if we want the
+> mrs to completed after the loads. In this case it is not.
+> As we are taking the difference and if that difference
+> was going to be negative, we just use the last counter value
+> instead.
+> 
+> Signed-off-by: Andrew Pinski <apinski@cavium.com>
 
-diff --git a/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt b/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
-index 5fa73b9d20f5..d81d73aea608 100644
---- a/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
-@@ -1,7 +1,8 @@
--* Amlogic Meson8b and GXBB USB2 PHY
-+* Amlogic Meson8, Meson8b and GXBB USB2 PHY
- 
- Required properties:
- - compatible:	Depending on the platform this should be one of:
-+	"amlogic,meson8-usb2-phy"
- 	"amlogic,meson8b-usb2-phy"
- 	"amlogic,meson-gxbb-usb2-phy"
- - reg:		The base address and length of the registers
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 005cadb7a3f8..0d3e5099ff6a 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -507,8 +507,8 @@ config PHY_MESON8B_USB2
- 	select USB_COMMON
- 	select GENERIC_PHY
- 	help
--	  Enable this to support the Meson USB2 PHYs found in Meson8b
--	  and GXBB SoCs.
-+	  Enable this to support the Meson USB2 PHYs found in Meson8,
-+	  Meson8b and GXBB SoCs.
- 	  If unsure, say N.
- 
- endmenu
-diff --git a/drivers/phy/phy-meson8b-usb2.c b/drivers/phy/phy-meson8b-usb2.c
-index d75004e69b65..a8012bb1d1c5 100644
---- a/drivers/phy/phy-meson8b-usb2.c
-+++ b/drivers/phy/phy-meson8b-usb2.c
-@@ -1,5 +1,5 @@
- /*
-- * Meson8b and GXBB USB2 PHY driver
-+ * Meson8, Meson8b and GXBB USB2 PHY driver
-  *
-  * Copyright (C) 2016 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-  *
-@@ -285,6 +285,7 @@ static int phy_meson8b_usb2_probe(struct platform_device *pdev)
- }
- 
- static const struct of_device_id phy_meson8b_usb2_of_match[] = {
-+	{ .compatible = "amlogic,meson8-usb2-phy", },
- 	{ .compatible = "amlogic,meson8b-usb2-phy", },
- 	{ .compatible = "amlogic,meson-gxbb-usb2-phy", },
- 	{ },
-@@ -301,5 +302,5 @@ static struct platform_driver phy_meson8b_usb2_driver = {
- module_platform_driver(phy_meson8b_usb2_driver);
- 
- MODULE_AUTHOR("Martin Blumenstingl <martin.blumenstingl@googlemail.com>");
--MODULE_DESCRIPTION("Meson8b and GXBB USB2 PHY driver");
-+MODULE_DESCRIPTION("Meson8, Meson8b and GXBB USB2 PHY driver");
- MODULE_LICENSE("GPL");
+Humor me. Walk me through this?
+
+Here is what the ARM ARM says (D6.1.3):
+Reads of CNTVCT_EL0 can occur speculatively and out of order relative to other instructions executed on the same PE.
+For example, if a read from memory is used to obtain a signal from another agent that indicates that CNTVCT_EL0 must be read, an ISB must be used to ensure that the read of CNTVCT_EL0 occurs after the signal has been read from memory
+--- CUT ---
+
+So we could have the read of the virtual timer happen before the reading of the cycles last field of the vdso data.? In the current code, there is an ISB which forces that case not to happen.? Without the ISB it could happen but since we know the time (virtual timer) cannot go backwards, we just take the last cycle field as the current time; this could happen when the last cycle field was updated from another core.? I hope this walk through a little better than my original description.
+
+Basically the current virtual timer is either newly read value or the read from last cycle counter.
+
+Thanks,
+Andrew Pinski
+
+
+> ---
+>? arch/arm64/kernel/vdso/gettimeofday.c | 14 ++++++++++++--
+>? 1 file changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/vdso/gettimeofday.c b/arch/arm64/kernel/vdso/gettimeofday.c
+> index a0ab8b1..cf3235a 100644
+> --- a/arch/arm64/kernel/vdso/gettimeofday.c
+> +++ b/arch/arm64/kernel/vdso/gettimeofday.c
+> @@ -117,10 +117,20 @@ static notrace u64 get_clock_shifted_nsec(u64 cycle_last, u64 mult)
+>??????? u64 res;
+>? 
+>??????? /* Read the virtual counter. */
+> -???? isb();
+> +???? /*
+> +????? * This normally requires an ISB but since we know the
+> +????? * read of the last cycle will always be after the
+> +????? * read of the values are valid word.
+> +????? */
+>??????? asm volatile("mrs %0, cntvct_el0" : "=r" (res) :: "memory");
+>? 
+> -???? res = res - cycle_last;
+> +???? /*
+> +????? * If the current cycle is greater than the last,
+> +????? *? then get the difference.
+> +????? */
+> +???? if (res > cycle_last)
+> +???????????? res = res - cycle_last;
+> +
+>??????? /* We can only guarantee 56 bits of precision. */
+>??????? res &= ~(0xff00ul<<48);
+>??????? return res * mult;
+> 
+
+
 -- 
-2.12.2
+Computer Architect
