@@ -1,107 +1,160 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sat, 6 May 2017 23:40:07 +0800
-Subject: [arm:sa1100 73/112] arch/arm/mach-pxa/colibri-pxa320.c:98:15: error:
- variable 'colibri_pxa320_pcmcia_lookup_table' has initializer but
- incomplete type
-Message-ID: <201705062304.0gKtkGzd%fengguang.wu@intel.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Sat,  6 May 2017 17:24:37 +0200
+Subject: [PATCH v7 18/24] KVM: arm64: vgic-its: Add infrastructure for table
+ lookup
+In-Reply-To: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
+References: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1494084283-12723-19-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
-head:   5d8c4e81af8e3188608bbf89ee90e6131c588c28
-commit: 95cb5c2a96dfbf8ecdc028aaa43461de6d2bcf30 [73/112] ARM: pxa/colibri: switch pcmcia to gpiod APIs
-config: arm-pxa_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 95cb5c2a96dfbf8ecdc028aaa43461de6d2bcf30
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Add a generic scan_its_table() helper whose role consists in
+scanning a contiguous table located in guest RAM and applying
+a callback on each entry. Entries can be handled as linked lists
+since the callback may return an id offset to the next entry and
+also indicate whether the entry is the last one.
 
-All error/warnings (new ones prefixed by >>):
+Helper functions also are added to compute the device/event ID
+offset to the next DTE/ITE.
 
->> arch/arm/mach-pxa/colibri-pxa320.c:98:15: error: variable 'colibri_pxa320_pcmcia_lookup_table' has initializer but incomplete type
-    static struct gpiod_lookup_table colibri_pxa320_pcmcia_lookup_table = {
-                  ^~~~~~~~~~~~~~~~~~
->> arch/arm/mach-pxa/colibri-pxa320.c:99:2: error: unknown field 'dev_id' specified in initializer
-     .dev_id = "pxa2xx-pcmcia",
-     ^
->> arch/arm/mach-pxa/colibri-pxa320.c:99:12: warning: excess elements in struct initializer
-     .dev_id = "pxa2xx-pcmcia",
-               ^~~~~~~~~~~~~~~
-   arch/arm/mach-pxa/colibri-pxa320.c:99:12: note: (near initialization for 'colibri_pxa320_pcmcia_lookup_table')
->> arch/arm/mach-pxa/colibri-pxa320.c:100:2: error: unknown field 'table' specified in initializer
-     .table = {
-     ^
->> arch/arm/mach-pxa/colibri-pxa320.c:100:11: error: extra brace group at end of initializer
-     .table = {
-              ^
-   arch/arm/mach-pxa/colibri-pxa320.c:100:11: note: (near initialization for 'colibri_pxa320_pcmcia_lookup_table')
->> arch/arm/mach-pxa/colibri-pxa320.c:101:3: error: implicit declaration of function 'GPIO_LOOKUP' [-Werror=implicit-function-declaration]
-      GPIO_LOOKUP("GPIO", 29, "ready",  GPIO_ACTIVE_HIGH),
-      ^~~~~~~~~~~
->> arch/arm/mach-pxa/colibri-pxa320.c:101:37: error: 'GPIO_ACTIVE_HIGH' undeclared here (not in a function)
-      GPIO_LOOKUP("GPIO", 29, "ready",  GPIO_ACTIVE_HIGH),
-                                        ^~~~~~~~~~~~~~~~
-   arch/arm/mach-pxa/colibri-pxa320.c:107:3: error: extra brace group at end of initializer
-      { },
-      ^
-   arch/arm/mach-pxa/colibri-pxa320.c:107:3: note: (near initialization for 'colibri_pxa320_pcmcia_lookup_table')
-   arch/arm/mach-pxa/colibri-pxa320.c:100:11: warning: excess elements in struct initializer
-     .table = {
-              ^
-   arch/arm/mach-pxa/colibri-pxa320.c:100:11: note: (near initialization for 'colibri_pxa320_pcmcia_lookup_table')
-   arch/arm/mach-pxa/colibri-pxa320.c: In function 'colibri_pxa320_init_pcmcia':
->> arch/arm/mach-pxa/colibri-pxa320.c:113:2: error: implicit declaration of function 'gpiod_add_lookup_table' [-Werror=implicit-function-declaration]
-     gpiod_add_lookup_table(&colibri_pxa320_pcmcia_gpio_table);
-     ^~~~~~~~~~~~~~~~~~~~~~
->> arch/arm/mach-pxa/colibri-pxa320.c:113:26: error: 'colibri_pxa320_pcmcia_gpio_table' undeclared (first use in this function)
-     gpiod_add_lookup_table(&colibri_pxa320_pcmcia_gpio_table);
-                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   arch/arm/mach-pxa/colibri-pxa320.c:113:26: note: each undeclared identifier is reported only once for each function it appears in
-   arch/arm/mach-pxa/colibri-pxa320.c: At top level:
->> arch/arm/mach-pxa/colibri-pxa320.c:98:34: error: storage size of 'colibri_pxa320_pcmcia_lookup_table' isn't known
-    static struct gpiod_lookup_table colibri_pxa320_pcmcia_lookup_table = {
-                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   arch/arm/mach-pxa/colibri-pxa320.c:98:34: warning: 'colibri_pxa320_pcmcia_lookup_table' defined but not used [-Wunused-variable]
-   cc1: some warnings being treated as errors
+compute_next_devid_offset, compute_next_eventid_offset and
+scan_table will become static in subsequent patches
 
-vim +/colibri_pxa320_pcmcia_lookup_table +98 arch/arm/mach-pxa/colibri-pxa320.c
-
-    92		GPIO77_GPIO,		/* PRST (RESET GPIO) */
-    93		GPIO53_GPIO,		/* PBVD1 */
-    94		GPIO79_GPIO,		/* PBVD2 */
-    95		GPIO54_GPIO,		/* POE */
-    96	};
-    97	
-  > 98	static struct gpiod_lookup_table colibri_pxa320_pcmcia_lookup_table = {
-  > 99		.dev_id = "pxa2xx-pcmcia",
- > 100		.table = {
- > 101			GPIO_LOOKUP("GPIO", 29, "ready",  GPIO_ACTIVE_HIGH),
-   102			GPIO_LOOKUP("GPIO", 53, "bvd1",   GPIO_ACTIVE_HIGH),
-   103			GPIO_LOOKUP("GPIO", 57, "ppen",   GPIO_ACTIVE_HIGH),
-   104			GPIO_LOOKUP("GPIO", 77, "reset",  GPIO_ACTIVE_HIGH),
-   105			GPIO_LOOKUP("GPIO", 79, "bvd2",   GPIO_ACTIVE_HIGH),
-   106			GPIO_LOOKUP("GPIO", 81, "detect", GPIO_ACTIVE_HIGH),
- > 107			{ },
-   108		},
-   109	};
-   110	
-   111	static void colibri_pxa320_init_pcmcia(void)
-   112	{
- > 113		gpiod_add_lookup_table(&colibri_pxa320_pcmcia_gpio_table);
-   114	}
-   115	#else
-   116	static mfp_cfg_t colibri_pxa320_evalboard_pin_config[] __initdata = {};
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 30525 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170506/4bc67d9f/attachment-0001.gz>
+v6 -> v7:
+- added Christoffer's R-b
+
+v5 -> v6:
+- add comments about 2d level table scan as suggested by Christoffer
+- s/lookup_table/scan_its_table
+- scan_table now return 0 if last elt found and +1 if not found
+- use int for id
+- simplify compute_next_devid/eventid_offset
+
+v4 -> v5:
+- use kvm_read_guest
+
+v3 -> v4:
+- remove static to avoid compilation warning
+- correct size computation in looup_table()
+- defines now encode the number of bits used for devid and eventid offsets
+- use BIT() - 1 to encode the max offets
+---
+ virt/kvm/arm/vgic/vgic-its.c | 92 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 92 insertions(+)
+
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 737ba3c..d5c0057 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -244,6 +244,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+ 
+ #define VITS_TYPER_IDBITS 16
+ #define VITS_TYPER_DEVBITS 16
++#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
++#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
+ 
+ /*
+  * Finds and returns a collection in the ITS collection table.
+@@ -1728,6 +1730,96 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+ 	return ret;
+ }
+ 
++u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
++{
++	struct its_device *next;
++	u32 next_offset;
++
++	if (list_is_last(&dev->dev_list, h))
++		return 0;
++	next = list_next_entry(dev, dev_list);
++	next_offset = next->device_id - dev->device_id;
++
++	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
++}
++
++u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
++{
++	struct its_ite *next;
++	u32 next_offset;
++
++	if (list_is_last(&ite->ite_list, h))
++		return 0;
++	next = list_next_entry(ite, ite_list);
++	next_offset = next->event_id - ite->event_id;
++
++	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
++}
++
++/**
++ * entry_fn_t - Callback called on a table entry restore path
++ * @its: its handle
++ * @id: id of the entry
++ * @entry: pointer to the entry
++ * @opaque: pointer to an opaque data
++ *
++ * Return: < 0 on error, 0 if last element was identified, id offset to next
++ * element otherwise
++ */
++typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
++			  void *opaque);
++
++/**
++ * scan_its_table - Scan a contiguous table in guest RAM and applies a function
++ * to each entry
++ *
++ * @its: its handle
++ * @base: base gpa of the table
++ * @size: size of the table in bytes
++ * @esz: entry size in bytes
++ * @start_id: the ID of the first entry in the table
++ * (non zero for 2d level tables)
++ * @fn: function to apply on each entry
++ *
++ * Return: < 0 on error, 0 if last element was identified, 1 otherwise
++ * (the last element may not be found on second level tables)
++ */
++int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
++		   int start_id, entry_fn_t fn, void *opaque)
++{
++	void *entry = kzalloc(esz, GFP_KERNEL);
++	struct kvm *kvm = its->dev->kvm;
++	unsigned long len = size;
++	int id = start_id;
++	gpa_t gpa = base;
++	int ret;
++
++	while (len > 0) {
++		int next_offset;
++		size_t byte_offset;
++
++		ret = kvm_read_guest(kvm, gpa, entry, esz);
++		if (ret)
++			goto out;
++
++		next_offset = fn(its, id, entry, opaque);
++		if (next_offset <= 0) {
++			ret = next_offset;
++			goto out;
++		}
++
++		byte_offset = next_offset * esz;
++		id += next_offset;
++		gpa += byte_offset;
++		len -= byte_offset;
++	}
++	ret =  1;
++
++out:
++	kfree(entry);
++	return ret;
++}
++
+ /**
+  * vgic_its_save_device_tables - Save the device table and all ITT
+  * into guest RAM
+-- 
+2.5.5
