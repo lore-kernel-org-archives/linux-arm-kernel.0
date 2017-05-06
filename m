@@ -1,50 +1,54 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Sat, 6 May 2017 22:18:16 +0530
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <58E639E0.1010700@iogearbox.net>
-References: <CAHgaXd+EKJ0FWaaPojsNJtgY_YpdQXu6eMEp97uOpTFAWs4qTQ@mail.gmail.com>
- <CAGXu5jLo8UvpNSQZBHjWZoO959ha6KFQxFzmg7SK44wz=R_QSg@mail.gmail.com>
- <CAHgaXdJL92XRjHae2Nb9j9SerSe65=N=ErDHTQf23sdBxwthzw@mail.gmail.com>
- <20170315.145512.1542025976162251828.davem@davemloft.net>
- <CAHgaXd+4QkFxnt-_iCqH8AyCN_Y8gXwr+y=iugz38NKSWspsbA@mail.gmail.com>
- <58DAF908.8010404@iogearbox.net>
- <CAHgaXdKfbob3WHMho32JSh_dmfp2A=cjcePqk+NfajVpShPE6Q@mail.gmail.com>
- <CAHgaXdJ1M4W3p9=B2hJmtxByPsA5-XHae8U6YtDH_2r_XMaR5A@mail.gmail.com>
- <58E639E0.1010700@iogearbox.net>
-Message-ID: <CAHgaXdK1XjDnhTqtk=nCq2crrigHiuCaLhF+1GupJt9bPThwZw@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat,  6 May 2017 18:57:47 +0200
+Subject: [PATCH v2 0/4] Meson8 pinctrl updates (PWM, I2S, SPDIF, AO pins)
+In-Reply-To: <20170504184932.5372-1-martin.blumenstingl@googlemail.com>
+References: <20170504184932.5372-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20170506165751.12442-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+This adds a bunch of missing pins to the Meson8 pinctrl driver.
+The full pinctrl register documentation can be found in a file called
+"m8_gpio.csv" which is part of older Amlogic GPL kernel releases (one
+example is the GPL kernel source of the Odroid-C1, see [0]).
 
-Thanks for the last reply about the testing of eBPF JIT.
+To sum it up, this series adds:
+- all pins with PWM function (PWM_A, PWM_B, PWM_C, PWM_D, PWM_E and PWM_F)
+- I2S input and output
+- SPDIF input and output
+- IR remote output ("IR blaster")
+- HDMI CEC in the AO domain
 
-I have one issue though, I am not able to find what BPF_ABS and
-BPF_IND instruction does exactly. It not described on this link -
-https://www.kernel.org/doc/Documentation/networking/filter.txt either.
-Can you please tell me where I could find the description of these
-instructions please?
-Best,
-Shubham Bansal
+This series does NOT add:
+- PWM_VS (exposed on a lot of pins, as these cannot be driven by the PWM
+  controllers/pwm-meson driver - these seem to be used for the backlight?)
+- UART_TX_AO_A and UART_RX_AO_A on CARD_4 and CARD_5 (I'm not sure why
+  there is AO functionality on non-AO pins)
+- I2C_SDA_A and I2C_SCK_A on GPIOZ_9/GPIOZ_10 and GPIOZ_11/GPIOZ_12
+- CLK_24M_OUT on GPIOZ_6 and CLK_32K_INCLK_32K_OUT on GPIOAO_6 as we don't
+  have a driver (or documentation) how to configure the clock rate for
+  these pins
+- all pins for which I don't know the actual purpose (isp_led_en1 and
+  isp_led_en2, all TSout pins, all TSin pins, all DVP pins, all TCON pins)
 
 
-On Thu, Apr 6, 2017 at 6:21 PM, Daniel Borkmann <daniel@iogearbox.net> wrote:
-> On 04/06/2017 01:05 PM, Shubham Bansal wrote:
->>
->> Gentle Reminder.
->
->
-> Sorry for late reply.
->
->> Anybody can tell me how to test the JIT compiler ?
->
->
-> There's lib/test_bpf.c, see Documentation/networking/filter.txt +1349
-> for some more information. It basically contains various test cases that
-> have the purpose to test the JIT with corner cases. If you see a useful
-> test missing, please send a patch for it, so all other JITs can benefit
-> from this as well. For extracting disassembly from a generated test case,
-> check out bpf_jit_disasm (Documentation/networking/filter.txt +486).
->
-> Thanks,
-> Daniel
+Changes since v1:
+- fixed a typo in the subject of patch #1 (which said meson8b instead of
+  meson8)
+- fixed a typo in the pwm_f_ao_groups definition, it referenced a pin
+  with the name "pwm_f", however that pin is actually called "pwm_f_ao"
+
+
+[0] https://github.com/hardkernel/linux/blob/d1342c45452ebafb4903557f0c909f4517c90934/arch/arm/mach-meson8/tool/m8_gpio.csv
+
+Martin Blumenstingl (4):
+  pinctrl: meson: meson8: add the PWM pins
+  pinctrl: meson: meson8: add support for the I2S and SPDIF pins
+  pinctrl: meson: meson8: add support for the AO remote output pin
+  pinctrl: meson: meson8: add the AO HDMI CEC pin
+
+ drivers/pinctrl/meson/pinctrl-meson8.c | 127 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 126 insertions(+), 1 deletion(-)
+
+-- 
+2.12.2
