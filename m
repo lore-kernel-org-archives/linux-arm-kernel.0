@@ -1,206 +1,66 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Sat,  6 May 2017 17:24:40 +0530
-Subject: [PATCH 05/11] arm64: dts: Add clock DT nodes for Stingray SOC
-In-Reply-To: <1494071686-19098-1-git-send-email-anup.patel@broadcom.com>
-References: <1494071686-19098-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1494071686-19098-6-git-send-email-anup.patel@broadcom.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat,  6 May 2017 15:49:26 +0200
+Subject: [PATCH v4 0/3] Meson8 / Meson8b support for the meson_saradc driver
+Message-ID: <20170506134929.31190-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
+The SAR ADC register layout seems to be mostly the same on older SoCs.
+Thus basically all functionality is already supported by the existing
+driver.
 
-This patch describes Stingray SOC clock tree using
-DT nodes in Stingray DTS.
+There are two small differences though:
+- the adc_clk and adc_div clock are not provided by the clock-controller
+  on Meson8b. instead the SAR ADC provides an internal "adc_clk" (this
+  behavior is already supported by the driver and requires no changes)
+- the newer SoCs are using some register bits only the kernel or the
+  BL30 (bootloader) are using the SAR ADC. This is the main change of
+  this series: guarding all BL30 specific code with a corresponding
+  "if"-block.
 
-Signed-off-by: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
----
- .../boot/dts/broadcom/stingray/stingray-clock.dtsi | 162 +++++++++++++++++++++
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |   2 +
- 2 files changed, 164 insertions(+)
- create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
+This also adds a new DT binding for the SAR ADC in Meson8 and Meson8b
+because the driver has to specify (for this older version) that there's
+no BL30 integration available (and these register bits should not be
+touched).
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
-new file mode 100644
-index 0000000..32af238f
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
-@@ -0,0 +1,162 @@
-+/*
-+ *  BSD LICENSE
-+ *
-+ *  Copyright(c) 2016-2017 Broadcom.  All rights reserved.
-+ *
-+ *  Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
-+ *
-+ *    * Redistributions of source code must retain the above copyright
-+ *      notice, this list of conditions and the following disclaimer.
-+ *    * Redistributions in binary form must reproduce the above copyright
-+ *      notice, this list of conditions and the following disclaimer in
-+ *      the documentation and/or other materials provided with the
-+ *      distribution.
-+ *    * Neither the name of Broadcom nor the names of its
-+ *      contributors may be used to endorse or promote products derived
-+ *      from this software without specific prior written permission.
-+ *
-+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+#include <dt-bindings/clock/bcm-sr.h>
-+
-+	osc: oscillator {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <50000000>;
-+	};
-+
-+	crmu_ref25m: crmu_ref25m {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&osc>;
-+		clock-div = <2>;
-+		clock-mult = <1>;
-+	};
-+
-+	genpll0: genpll0 at 6641d104 {
-+		#clock-cells = <1>;
-+		compatible = "brcm,sr-genpll0";
-+		reg = <0x6641d104 0x32>,
-+		      <0x6641c854 0x4>;
-+		clocks = <&osc>;
-+		clock-output-names = "genpll0", "clk_125", "clk_scr", "clk_250",
-+				     "clk_pcie_axi", "clk_paxc_axi_x2",
-+				     "clk_paxc_axi";
-+	};
-+
-+	genpll3: genpll3 at 6641d1e0 {
-+		#clock-cells = <1>;
-+		compatible = "brcm,sr-genpll3";
-+		reg = <0x6641d1e0 0x32>,
-+		      <0x6641c854 0x4>;
-+		clocks = <&osc>;
-+		clock-output-names = "genpll3", "clk_hsls", "clk_sdio";
-+	};
-+
-+	genpll4: genpll4 at 6641d214 {
-+		#clock-cells = <1>;
-+		compatible = "brcm,sr-genpll4";
-+		reg = <0x6641d214 0x32>,
-+		      <0x6641c854 0x4>;
-+		clocks = <&osc>;
-+		clock-output-names = "genpll4", "clk_ccn", "clk_tpiu_pll",
-+				"noc_clk", "pll_chclk_fs4", "clk_bridge_fscpu";
-+	};
-+
-+	genpll5: genpll5 at 6641d248 {
-+		#clock-cells = <1>;
-+		compatible = "brcm,sr-genpll5";
-+		reg = <0x6641d248 0x32>,
-+		      <0x6641c870 0x4>;
-+		clocks = <&osc>;
-+		clock-output-names = "genpll5", "fs4_hf_clk",
-+			"crypto_ae_clk", "raid_ae_clk";
-+	};
-+
-+	lcpll0: lcpll0 {
-+		#clock-cells = <1>;
-+		compatible = "brcm,sr-lcpll0";
-+		reg = <0x6641d0c4 0x3c>, <0x6641c870 0x4>;
-+		clocks = <&osc>;
-+		clock-output-names = "lcpll0", "clk_sata_refp",
-+			"clk_sata_refn", "clk_sata_350", "clk_sata_500";
-+	};
-+
-+	lcpll1: lcpll1 {
-+		#clock-cells = <1>;
-+		compatible = "brcm,sr-lcpll1";
-+		reg = <0x6641d138 0x3c>, <0x6641c870 0x4>;
-+		clocks = <&osc>;
-+		clock-output-names = "lcpll1", "clk_wanpn",
-+				"clk_usb_ref", "timesync_evt_clk";
-+	};
-+
-+	hsls_clk: hsls_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&genpll3 1>;
-+		clock-div = <1>;
-+		clock-mult = <1>;
-+	};
-+
-+	hsls_div2_clk: hsls_div2_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&genpll3 BCM_SR_GENPLL3_HSLS_CLK>;
-+		clock-div = <2>;
-+		clock-mult = <1>;
-+
-+	};
-+
-+	hsls_div4_clk: hsls_div4_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&genpll3 BCM_SR_GENPLL3_HSLS_CLK>;
-+		clock-div = <4>;
-+		clock-mult = <1>;
-+	};
-+
-+	hsls_25m_clk: hsls_25m_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&crmu_ref25m>;
-+		clock-div = <1>;
-+		clock-mult = <1>;
-+	};
-+
-+	hsls_25m_div2_clk: hsls_25m_div2_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&hsls_25m_clk>;
-+		clock-div = <2>;
-+		clock-mult = <1>;
-+	};
-+
-+	sdio0_clk: sdio0_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&genpll3 BCM_SR_GENPLL3_SDIO_CLK>;
-+		clock-div = <1>;
-+		clock-mult = <1>;
-+	};
-+
-+	sdio1_clk: sdio1_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&genpll3 BCM_SR_GENPLL3_SDIO_CLK>;
-+		clock-div = <1>;
-+		clock-mult = <1>;
-+	};
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-index f08b37e..c60de96 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-@@ -255,6 +255,8 @@
- 		#size-cells = <1>;
- 		ranges = <0 0 0 0xffffffff>;
- 
-+		#include "stingray-clock.dtsi"
-+
- 		uart0: uart at 68a00000 {
- 			device_type = "serial";
- 			compatible = "snps,dw-apb-uart";
+Changes since v3 at [2]:
+- the patch that should make the meson_sar_adc_data instances static and
+  const only made them static (but not const). thanks to Thomas Langer
+  for spotting this. note: this affects patch #1 and #3 (as in #3 there
+  are more meson_sar_adc_data instances introduced which were copied from
+  the ones in patch #1).
+
+Changes since v2 at [1]:
+- re-ordered patches so patch #1 now adds the "static" modifier to the
+  existing meson_sar_adc_data instances (was patch #3, now patch #1)
+- dropped the "Documentation: " prefix from the devicetree
+  documentation patch (patch #2)
+- added Rob's ACK to the devicetree Documentation patch (patch #2)
+- fixed a copy-and-paste error in the actual driver change (both,
+  in the commit message where I claimed that a of_device_id was only
+  added for Meson8b as well as in the driver code itself where the Meson8
+  meson_sar_adc_data.name was "meson-meson8b-saradc")
+
+Changes since v1 at [0]:
+- switched to bool data-type for has_bl30_integration
+- also added a "compatible" for Meson8 SoCs (the ADC driver from
+  Amlogic's GPL kernel sources handles Meson8 and Meson8b identical)
+- added patch #3 to constify some structs (there were supposed to be
+  const from the very beginning)
+
+
+[0] http://lists.infradead.org/pipermail/linux-amlogic/2017-March/003081.html
+[1] http://lists.infradead.org/pipermail/linux-amlogic/2017-April/003394.html
+[2] http://lists.infradead.org/pipermail/linux-amlogic/2017-May/003439.html
+
+Martin Blumenstingl (3):
+  iio: adc: meson-saradc: mark all meson_sar_adc_data static and const
+  dt-bindings: iio: adc: add Meson8 and Meson8b support
+  iio: adc: meson-saradc: add Meson8b SoC compatibility
+
+ .../bindings/iio/adc/amlogic,meson-saradc.txt      |  2 +
+ drivers/iio/adc/meson_saradc.c                     | 86 +++++++++++++++-------
+ 2 files changed, 61 insertions(+), 27 deletions(-)
+
 -- 
-2.7.4
+2.12.2
