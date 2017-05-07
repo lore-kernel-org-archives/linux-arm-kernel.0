@@ -1,39 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 7 May 2017 12:33:52 +0200
-Subject: [PATCH 1/2] clk: Add bindings for the Gemini Clock Controller
-In-Reply-To: <20170428182401.rpn7ytxvu6shy5sn@rob-hp-laptop>
-References: <20170424185545.26608-1-linus.walleij@linaro.org>
- <20170428182401.rpn7ytxvu6shy5sn@rob-hp-laptop>
-Message-ID: <CACRpkdbMTete8j0PFUnZUQBSMtu+FR+7TSwMJ-gh-Tt=hY0v+w@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 7 May 2017 12:35:07 +0100
+Subject: [PATCH v4 1/3] iio: adc: meson-saradc: mark all
+ meson_sar_adc_data static and const
+In-Reply-To: <20170506134929.31190-2-martin.blumenstingl@googlemail.com>
+References: <20170506134929.31190-1-martin.blumenstingl@googlemail.com>
+ <20170506134929.31190-2-martin.blumenstingl@googlemail.com>
+Message-ID: <a1cd9503-9231-40e1-2189-a7692531f604@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 8:24 PM, Rob Herring <robh@kernel.org> wrote:
-> On Mon, Apr 24, 2017 at 08:55:45PM +0200, Linus Walleij wrote:
+On 06/05/17 14:49, Martin Blumenstingl wrote:
+> These are only passed as of_device_id.data and never modified. Thus we
+> can mark them as static const, just like the of_device_id instances
+> where they are used.
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Good catch indeed on those consts!
 
->> This adds device tree bindings and a header for the Gemini SoC
->> Clock Controller.
-(...)
->> +- compatible : shall contain the following:
->> +  "cortina,gemini-clock-controller"
->> +- #clock-cells should be <1>
-(...)
->> +Example:
->> +
->> +syscon: syscon at 40000000 {
->> +     compatible = "cortina,gemini-syscon", "syscon", "simple-mfd";
->> +     reg = <0x40000000 0x1000>;
->> +
->> +     clock-controller {
->> +             compatible = "cortina,gemini-clock-controller";
->> +             #clock-cells = <1>;
->
-> There's not really much reason to have a child node here. The parent can
-> be the clock provider.
+Applied to the togreg branch of iio.git and pushed out as testing.
 
-But I should still keep the special clock controller compatible-string?
-I guess it is also possible to just bind all the drivers to
-"cortina,gemini-syscon".
+Thanks,
 
-Yours,
-Linus Walleij
+Jonathan
+> ---
+>  drivers/iio/adc/meson_saradc.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
+> index dd4190b50df6..2f6fec995264 100644
+> --- a/drivers/iio/adc/meson_saradc.c
+> +++ b/drivers/iio/adc/meson_saradc.c
+> @@ -834,17 +834,17 @@ static const struct iio_info meson_sar_adc_iio_info = {
+>  	.driver_module = THIS_MODULE,
+>  };
+>  
+> -struct meson_sar_adc_data meson_sar_adc_gxbb_data = {
+> +static const struct meson_sar_adc_data meson_sar_adc_gxbb_data = {
+>  	.resolution = 10,
+>  	.name = "meson-gxbb-saradc",
+>  };
+>  
+> -struct meson_sar_adc_data meson_sar_adc_gxl_data = {
+> +static const struct meson_sar_adc_data meson_sar_adc_gxl_data = {
+>  	.resolution = 12,
+>  	.name = "meson-gxl-saradc",
+>  };
+>  
+> -struct meson_sar_adc_data meson_sar_adc_gxm_data = {
+> +static const struct meson_sar_adc_data meson_sar_adc_gxm_data = {
+>  	.resolution = 12,
+>  	.name = "meson-gxm-saradc",
+>  };
+> 
