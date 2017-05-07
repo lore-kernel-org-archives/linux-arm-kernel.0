@@ -1,36 +1,37 @@
-From: jcm@jonmasters.org (Jon Masters)
-Date: Sat, 6 May 2017 20:06:46 -0400
-Subject: [PATCH 0/2] Fix incorrect warning from dma-debug
-In-Reply-To: <57305FD8.7070006@arm.com>
-References: <1462705196-10857-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <57305A4B.70401@arm.com> <57305FD8.7070006@arm.com>
-Message-ID: <477ded30-eef2-3598-3a8d-95d206e11efb@jonmasters.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sun, 7 May 2017 13:24:51 +0800
+Subject: [stericsson:mmc-no-null-mq-v4.11 91/93] block.c:(.init.text+0x0):
+ multiple definition of `init_module'
+Message-ID: <201705071349.18mdIn1d%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2016 06:00 AM, Robin Murphy wrote:
-> On 09/05/16 10:37, Robin Murphy wrote:
->> Hi Niklas,
->>
->> On 08/05/16 11:59, Niklas S?derlund wrote:
->>> Hi,
->>>
->>> While using CONFIG_DMA_API_DEBUG i came across this warning which I
->>> think is a false positive. As shown dma_sync_single_for_device() are
->>> called from the dma_map_single() call path. This triggers the warning
->>> since the dma-debug code have not yet been made aware of the mapping.
->>
->> Almost right ;) The thing being mapped (the SPI device's buffer) and the
->> thing being synced (the IOMMU's PTE) are entirely unrelated. Due to the
->> current of_iommu_init() setup, the IOMMU is probed long before
->> dma_debug_init() gets called, therefore DMA debug is missing entries for
->> some of the initial page table mappings and gets confused when we update
->> them later.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git mmc-no-null-mq-v4.11
+head:   6747bffda469bc8236af62c1267613bac0a4bb10
+commit: e311f2b40345fb17b74813bd05e734d4e8ef1c89 [91/93] mmc: core: make block layer non-optional
+config: x86_64-rhel (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout e311f2b40345fb17b74813bd05e734d4e8ef1c89
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-What was the eventual followup/fix for this? We're seeing similar traces
-to this during internal testing of 4.11 kernels.
+All errors (new ones prefixed by >>):
 
-Jon.
+   drivers/mmc/core/block.o: In function `mmc_blk_init':
+>> block.c:(.init.text+0x0): multiple definition of `init_module'
+   drivers/mmc/core/core.o:core.c:(.init.text+0x86c): first defined here
+   drivers/mmc/core/block.o: In function `mmc_blk_exit':
+>> block.c:(.exit.text+0x0): multiple definition of `cleanup_module'
+   drivers/mmc/core/core.o:core.c:(.exit.text+0x0): first defined here
 
--- 
-Computer Architect
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38847 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170507/ea018920/attachment-0001.gz>
