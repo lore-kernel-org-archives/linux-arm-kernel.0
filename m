@@ -1,50 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 7 May 2017 11:22:01 +0100
-Subject: [PATCH v2 3/3] gpiolib: Add GPIO initialization
-In-Reply-To: <20170207110950.zy5pzo2hq6hrvmr5@pengutronix.de>
-References: <1440920686-6892-1-git-send-email-mpa@pengutronix.de>
- <1440920686-6892-4-git-send-email-mpa@pengutronix.de>
- <20170207110950.zy5pzo2hq6hrvmr5@pengutronix.de>
-Message-ID: <20170507102201.GL22219@n2100.armlinux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 7 May 2017 12:33:52 +0200
+Subject: [PATCH 1/2] clk: Add bindings for the Gemini Clock Controller
+In-Reply-To: <20170428182401.rpn7ytxvu6shy5sn@rob-hp-laptop>
+References: <20170424185545.26608-1-linus.walleij@linaro.org>
+ <20170428182401.rpn7ytxvu6shy5sn@rob-hp-laptop>
+Message-ID: <CACRpkdbMTete8j0PFUnZUQBSMtu+FR+7TSwMJ-gh-Tt=hY0v+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 12:09:50PM +0100, Uwe Kleine-K?nig wrote:
-> Now additionally I want to initialize some gpios but allow them to be
-> grabbed later. IMHO there are the following new cases:
-> 
-> It should be possible to:
-> 
->  a) change the value of a gpio initially configured as output
->  b) change the direction of a gpio initially configured as output
->  c) change the direction of a gpio initially configured as input
-> 
-> IMHO the dts should describe which case should be applied to a given
-> gpio.
+On Fri, Apr 28, 2017 at 8:24 PM, Rob Herring <robh@kernel.org> wrote:
+> On Mon, Apr 24, 2017 at 08:55:45PM +0200, Linus Walleij wrote:
 
-Isn't it the job of the board firmware to ensure that the hardware is
-setup to a reasonably sane state for the board?
+>> This adds device tree bindings and a header for the Gemini SoC
+>> Clock Controller.
+(...)
+>> +- compatible : shall contain the following:
+>> +  "cortina,gemini-clock-controller"
+>> +- #clock-cells should be <1>
+(...)
+>> +Example:
+>> +
+>> +syscon: syscon at 40000000 {
+>> +     compatible = "cortina,gemini-syscon", "syscon", "simple-mfd";
+>> +     reg = <0x40000000 0x1000>;
+>> +
+>> +     clock-controller {
+>> +             compatible = "cortina,gemini-clock-controller";
+>> +             #clock-cells = <1>;
+>
+> There's not really much reason to have a child node here. The parent can
+> be the clock provider.
 
-You give an example of holding GPIOs low in Linux for "ESD reasons"
-later in this thread, but if you're only doing that in Linux, what if
-Linux isn't running yet, and the GPIO has been left floating by the
-board firmware?  Fixing this in Linux is really too late.
+But I should still keep the special clock controller compatible-string?
+I guess it is also possible to just bind all the drivers to
+"cortina,gemini-syscon".
 
-Floating GPIOs are also a source of higher current drain - a GPIO
-sitting mid-rail turns both transistors on for a MOS input, which gives
-a direct path across the power supply.  The quicker that the GPIOs can
-be initialised, the less wasted power there is.  So, that's another
-argument for board firmware doing the basic GPIO initialisation and not
-stuffing this into DT and having the kernel do it.
-
-We could then talk about floating GPIOs that activate higher power
-devices, and the arguments for doing GPIO initialisation as early as
-possible in board firmware continue to stack up.
-
-IMHO, initial configuration of GPIOs is the job of board firmware, not
-the kernel.  I see no sane reason to push that into the kernel.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Yours,
+Linus Walleij
