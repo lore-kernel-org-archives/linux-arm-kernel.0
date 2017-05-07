@@ -1,171 +1,61 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun, 07 May 2017 20:00:42 +0200
-Subject: [PATCH 1/3] ARM: dts: rockchip: Move cros-ec-sbs to
- rk3288-veyron-chromebook-sbs
-In-Reply-To: <CAD=FV=V_s0TE_2vUvDBYfmbt2VS0nk5gmSPLi+mh2sqGauj6dg@mail.gmail.com>
-References: <20170430183054.24563-1-contact@paulk.fr>
- <2369975.a4dWayqU5d@phil> <1493585812.6493.4.camel@paulk.fr>
- <2337202.q9Cdx8Nyxy@phil>
- <CAD=FV=V_s0TE_2vUvDBYfmbt2VS0nk5gmSPLi+mh2sqGauj6dg@mail.gmail.com>
-Message-ID: <1494180042.13734.4.camel@paulk.fr>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun, 7 May 2017 20:21:31 +0200
+Subject: ARM Power Firmware / "APPF"
+Message-ID: <CAFBinCCDC=ZDBrqMo37jV32c2vE0mMvSEsEXC7SJDotHFdV0nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-Le lundi 01 mai 2017 ? 08:49 -0700, Doug Anderson a ?crit?:
-> On Mon, May 1, 2017 at 7:07 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> > Am Sonntag, 30. April 2017, 22:56:52 CEST schrieb Paul Kocialkowski:
-> > > Le dimanche 30 avril 2017 ? 22:37 +0200, Heiko Stuebner a ?crit :
-> > > > Hi Paul,
-> > > > 
-> > > > Am Sonntag, 30. April 2017, 20:30:52 CEST schrieb Paul Kocialkowski:
-> > > > > This moves the cros-ec-sbs dtsi to a new rk3288-veyron-chromebook-sbs
-> > > > > dtsi since it only concerns rk3288 veyron Chromebooks.
-> > > > > 
-> > > > > Other Chromebooks (such as the tegra124 nyans) also have sbs batteries
-> > > > > and don't use this dtsi, that only makes sense when used with
-> > > > > rk3288-veyron-chromebook anyway.
-> > > > 
-> > > > That isn't true. The gru series (rk3399-based) also uses the
-> > > > sbs-battery [0]. And while it is currently limited to Rockchip-based
-> > > > Chromebooks it is nevertheless used on more than one platform, so
-> > > > the probability is high that it will be used in future series as well.
-> > > 
-> > > That's good to know, but as pointed out, other cros devices are using a
-> > > sbs
-> > > battery without this header, so such a generic name isn't really a good
-> > > fit.
-> 
-> It would be interesting to know if the "retry-count" ought to be the
-> same across all Chromebooks.??I guess you could argue that maybe
-> someone found it needed to be 10 in all "nyan" variants and needed to
-> be 1 in all "veyron" variants, but it seems more likely that the
-> difference is arbitrary, or that one of the two values would work for
-> everyone.??It sure looks like we've just been copying values from
-> device to device.??Given that all the "veyron" devices have vastly
-> different batteries (and probably all the nyan ones too), it seems
-> likely there ought to be one value.
+recently I've been looking into the older-gen Amlogic Meson SoCs.
+while looking at the suspend code from the vendor GPL kernel sources I
+found something interesting:
+these SoCs (Meson6, Meson8, Meson8b and Meson8m2) seem to use the ARM
+Power Firmware, also called "APPF"
 
-Well, the retry-count is a maximum number of retries to detect a status change
-on external power connection/disconnection. From my experience, it seems that
-nyans do indeed more retries to detect the change than veyrons, on average.
+there's not much information about this on the internet.
+however, the Amlogic u-boot GPL sources come with documentation for this: [0]
 
-I don't think setting this value to 1 is very reasonable (in the end, that's a
-number of seconds), because power supply status changes tend to take a few
-seconds to reflect on the battery status.
+Amlogic seems to use APPF in case "Trustzone" is disabled (see [1]).
+the actual invocation to APPF during suspend can be found here [2] for
+non-Trustzone kernels, and here [3] for kernels with Trustzone enabled
+(in the latter case a SMC is used)
 
-I think setting a high value (like 10) would always work and either way, the
-status detection mechanism stops itself as soon as a change is detected (it
-turns out this is not a good idea for bq27xxx batteries, because they go from
-charging to full in the first seconds after AC connection instead of directly
-reporting full, when full), but let's assume this is okay for sbs (and maybe
-change it later).
+from what I understood so far it works like this:
+1. APPF - which is compiled as position independent ELF - is loaded
+into main memory by u-boot, see [4]
+2. u-boot initializes APPF (also part of [4])
+3. kernel boots and should not modify this memory-region (reading and
+executing is fine)
+4. kernel initializes APPF by calling appf_runtime_call with function
+APPF_INITIALIZE (this is done by simply jumping to the memory from the
+APPF ELF -> this lands us here: [5])
+5. appf_runtime_call is invoked with function APPF_POWER_DOWN_CPU ->
+this blocks until the system is woken up
 
-> In terms of setting the "charger", that also could potentially be
-> something that could be for all Chromebooks, or at least older ones
-> that don't have their charger implemented by the type C driver.??...or
-> nyan devices could simply have a line in their dts like:
-> 
-> &battery {
-> ? power-supplies = <&charger>;
-> };
+so far this sounds pretty generic and does not contain (much) Amlogic
+specific code.
+there is a second (Amlogic specific) part which is involved in system
+suspend: arc_power firmware - this seems to be executed on an ARC core
+embedded in the Amlogic SoCs using the SRAM instead of DRAM (as the
+latter is powered down / in self-refresh mode). sources for the
+arc_power firmware can be found here: [6]
 
-That's true, but I think it makes as much sense to keep the whole binding.
+onto the actual question(s):
+- are there any other SoC vendors which use APPF other than Amlogic?
+- is there anything else I should know about this "feature"?
+- is there a good reason why I should not try to implement mainline
+support for this?
 
-In my opinion, the only reason to have a separate dtsi for this binding is that
-veyrons have another dtsi for chromebooks where this binding should be. However,
-it cannot be there because of minnie using another battery IC.
 
-So my approach here would be to make it common for devices where other major
-parts are also common, so we can avoid duplication when most of the device-tree
-is already common. In cases where most of the device-tree is specific to a
-device, I think the binding should be duplicated. This is done already for lots
-of other components that could be made (somewhat) common anyway.
+Regards,
+Martin
 
-> 
-> > > Note that &charger has to be defined (after my subsequent patches), which
-> > > it is
-> > > for devices that also include rk3288-veyron-chromebook, but not
-> > > necessarily
-> > > others.
-> > > 
-> > > Overall, I think having one -sbs dtsi file makes sense here because there
-> > > is
-> > > already a rk3288-veyron-chromebook dtsi that veyron chromebooks use. That
-> > > file
-> > > cannot contain the battery bindings because minnie has a different one and
-> > > it
-> > > would be a bit silly to copy it over all devices. That definitely makes
-> > > sense.
-> > > 
-> > > As for other devices, I don't see why we should have a separate include
-> > > file for
-> > > the battery instead of having it in the device's dts. I think this should
-> > > be the
-> > > case on gru/kevin.
-> > > 
-> > > Also maybe not *all* gru-based devices will turn out to use a SBS battery,
-> > > so it
-> > > seems early to include this header in the gru dtsi.
-> 
-> For gru devices, we've moved to a "virtual sbs battery" provided by
-> the EC.??I'm not 100% positive that everything will just magically
-> work and be converted in the EC if we put a non-sbs battery on a board
-> with this EC feature, but I would hope we'd convert everything
-> properly.
 
-Interesting and good to know!
-
-> > > One last point, gru/kevin
-> > > currently don't define a charger, which will break my subsequent patch
-> > > (that is
-> > > however needed for the veyrons that use this file).
-> 
-> Arguably this should be fixed.??On veyron-chromebook we just use
-> "gpio-charger".??We didn't add a special charger driver w/ a property
-> like "ti,external-control" since the only piece of information that
-> Linux really needed from the charger was whether or not AC was
-> connected.
-
-Thanks for taking that choice, it indeed makes things easier on the kernel side
-whith no drawbacks.
-
-> 
-> > > To me, it seems that there's little advantage and major drawbacks in
-> > > keeping
-> > > this file the way it is.
-> > 
-> > I don't have any set opinion right now but after looking through the
-> > other uses of the sbs-battery the cros-ec-sbs.dtsi snippet really seems
-> > somewhat veyron/gru-specific - especially wrt. the retry-count values.
-> > 
-> > What I'm not sure about is whether it is actually better to keep the include
-> > around under a new name or just move the (rather tiny) sbs-battery node
-> > into the relevant devicetrees directly, when there aren't that many users
-> > anyway.
-> 
-> I'm fine with whatever you guys choose to do here.??It's nice not to
-> have copied "code", but with device tree sometimes copies are cleaner
-> than trying to share something.
-
-I definitely agree. I think copies are a good fit here because overall, we have
-enough disparity in the possible configurations among different SoC platforms to
-justify having one per device. So I believe it would make sense to make that
-binding common *among the same SoC family*.
-
-Cheers,
-
--- 
-Paul Kocialkowski, developer of free digital technology and hardware support
-
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170507/7fb80bed/attachment.sig>
+[0] https://github.com/endlessm/u-boot-meson/blob/3286dd744d2b33a228f7f7f82109fd5fd9c8471e/arch/arm/cpu/aml_meson/m8/firmware/appf/ARM%20Firmware%20Specification.doc?raw=true
+[1] https://github.com/endlessm/linux-meson/blob/9bddb0a81b9f7de9ee099bd578aaef3408b66d94/arch/arm/mach-meson8/pm.c#L269
+[2] https://github.com/endlessm/linux-meson/blob/c173f4653186870f08dc9131b5d82ef4ab4151e1/arch/arm/mach-meson8/power_suspend.c#L99
+[3] https://github.com/endlessm/linux-meson/blob/c173f4653186870f08dc9131b5d82ef4ab4151e1/arch/arm/mach-meson8/meson-smc.S#L125
+[4] https://github.com/endlessm/u-boot-meson/blob/3286dd744d2b33a228f7f7f82109fd5fd9c8471e/arch/arm/cpu/aml_meson/m8/firmwareld.c
+[5] https://github.com/endlessm/u-boot-meson/blob/3286dd744d2b33a228f7f7f82109fd5fd9c8471e/arch/arm/cpu/aml_meson/m8/firmware/appf/os_api.c#L40
+[6] https://github.com/endlessm/u-boot-meson/tree/3286dd744d2b33a228f7f7f82109fd5fd9c8471e/arch/arm/cpu/aml_meson/m8/firmware/arc_power
