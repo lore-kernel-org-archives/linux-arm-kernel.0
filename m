@@ -1,136 +1,171 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Sun, 7 May 2017 19:33:30 +0200
-Subject: [PATCH v7 16/24] KVM: arm64: vgic-its:
- KVM_DEV_ARM_ITS_SAVE/RESTORE_TABLES
-In-Reply-To: <87efw0ixli.fsf@on-the-bus.cambridge.arm.com>
-References: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
- <1494084283-12723-17-git-send-email-eric.auger@redhat.com>
- <87lgq8kej5.fsf@on-the-bus.cambridge.arm.com>
- <87efw0ixli.fsf@on-the-bus.cambridge.arm.com>
-Message-ID: <4344234c-1c0a-b5dd-6a4b-32cbf2d0d7f8@redhat.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Sun, 07 May 2017 20:00:42 +0200
+Subject: [PATCH 1/3] ARM: dts: rockchip: Move cros-ec-sbs to
+ rk3288-veyron-chromebook-sbs
+In-Reply-To: <CAD=FV=V_s0TE_2vUvDBYfmbt2VS0nk5gmSPLi+mh2sqGauj6dg@mail.gmail.com>
+References: <20170430183054.24563-1-contact@paulk.fr>
+ <2369975.a4dWayqU5d@phil> <1493585812.6493.4.camel@paulk.fr>
+ <2337202.q9Cdx8Nyxy@phil>
+ <CAD=FV=V_s0TE_2vUvDBYfmbt2VS0nk5gmSPLi+mh2sqGauj6dg@mail.gmail.com>
+Message-ID: <1494180042.13734.4.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 07/05/2017 15:51, Marc Zyngier wrote:
-> On Sun, May 07 2017 at  2:00:30 pm BST, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On Sat, May 06 2017 at  4:24:35 pm BST, Eric Auger <eric.auger@redhat.com> wrote:
->>> Introduce new attributes in KVM_DEV_ARM_VGIC_GRP_CTRL group:
->>> - KVM_DEV_ARM_ITS_SAVE_TABLES: saves the ITS tables into guest RAM
->>> - KVM_DEV_ARM_ITS_RESTORE_TABLES: restores them into VGIC internal
->>>   structures.
->>>
->>> We hold the vcpus lock during the save and restore to make
->>> sure no vcpu is running.
->>>
->>> At this stage the functionality is not yet implemented. Only
->>> the skeleton is put in place.
->>>
->>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>
->>> ---
->>> v6 -> v7:
->>> - also hold the its_lock on save and restore
->>>
->>> v5 -> v6:
->>> - remove the pending table sync from the ITS table restore
->>>
->>> v4 -> v5:
->>> - use KVM_DEV_ARM_ITS_SAVE_TABLES and KVM_DEV_ARM_ITS_RESTORE_TABLES
->>> - rename *flush* into *save*
->>> - call its_sync_lpi_pending_table at the end of restore
->>> - use abi framework
->>>
->>> v3 -> v4:
->>> - pass kvm struct handle to vgic_its_flush/restore_pending_tables
->>> - take the kvm lock and vcpu locks
->>> - ABI revision check
->>> - check attr->attr is null
->>>
->>> v1 -> v2:
->>> - remove useless kvm parameter
->>> ---
->>>  arch/arm/include/uapi/asm/kvm.h   |   4 +-
->>>  arch/arm64/include/uapi/asm/kvm.h |   4 +-
->>>  virt/kvm/arm/vgic/vgic-its.c      | 107 ++++++++++++++++++++++++++++++++++++--
->>>  3 files changed, 109 insertions(+), 6 deletions(-)
->>>
->>
->> [...]
->>
->>> @@ -1718,7 +1777,37 @@ static int vgic_its_save_tables_v0(struct vgic_its *its)
->>>   */
->>>  static int vgic_its_restore_tables_v0(struct vgic_its *its)
->>>  {
->>> -	return -ENXIO;
->>> +	struct kvm *kvm = its->dev->kvm;
->>> +	int ret;
->>> +
->>> +	mutex_lock(&kvm->lock);
->>> +	mutex_lock(&its->its_lock);
->>> +
->>> +	if (!lock_all_vcpus(kvm)) {
->>> +		mutex_unlock(&its->its_lock);
->>> +		mutex_unlock(&kvm->lock);
->>> +		return -EBUSY;
->>> +	}
->>> +
->>> +	ret = vgic_its_restore_collection_table(its);
->>> +	if (ret)
->>> +		goto out;
->>> +
->>> +	ret = vgic_its_restore_device_tables(its);
->>> +
->>> +out:
->>> +	unlock_all_vcpus(kvm);
->>> +	mutex_unlock(&its->its_lock);
->>> +	mutex_unlock(&kvm->lock);
->>> +
->>> +	if (ret)
->>> +		return ret;
->>> +
->>> +	/*
->>> +	 * On restore path, MSI injections can happen before the
->>> +	 * first VCPU run so let's complete the GIC init here.
->>> +	 */
->>> +	return kvm_vgic_map_resources(its->dev->kvm);
->>
->> This one is still a rather sore spot, but I've lost track of what we can
->> do about it. Until now, this would only happen on first run. But it
->> looks like QEMU and KVM have different views of what "runable" is.
->>
->> I'm not sure there is a good way to solve this, unfortunately. From a
->> device PoV, everything is ready and the fact that nothing is clocking
->> the CPUs is very much irrelevant. I'm almost tempted to say that the
->> map_resource() call in kvm_vcpu_first_run_init shouldn't be there, and
->> that we're missing a synchronization point with userspace that would say
->> "system is entierely configured", triggering the iodev registration.
->>
->> Oh well. At that point, and short of having something better to offer:
->>
->> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>
->> 	M.
+Le lundi 01 mai 2017 ? 08:49 -0700, Doug Anderson a ?crit?:
+> On Mon, May 1, 2017 at 7:07 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > Am Sonntag, 30. April 2017, 22:56:52 CEST schrieb Paul Kocialkowski:
+> > > Le dimanche 30 avril 2017 ? 22:37 +0200, Heiko Stuebner a ?crit :
+> > > > Hi Paul,
+> > > > 
+> > > > Am Sonntag, 30. April 2017, 20:30:52 CEST schrieb Paul Kocialkowski:
+> > > > > This moves the cros-ec-sbs dtsi to a new rk3288-veyron-chromebook-sbs
+> > > > > dtsi since it only concerns rk3288 veyron Chromebooks.
+> > > > > 
+> > > > > Other Chromebooks (such as the tegra124 nyans) also have sbs batteries
+> > > > > and don't use this dtsi, that only makes sense when used with
+> > > > > rk3288-veyron-chromebook anyway.
+> > > > 
+> > > > That isn't true. The gru series (rk3399-based) also uses the
+> > > > sbs-battery [0]. And while it is currently limited to Rockchip-based
+> > > > Chromebooks it is nevertheless used on more than one platform, so
+> > > > the probability is high that it will be used in future series as well.
+> > > 
+> > > That's good to know, but as pointed out, other cros devices are using a
+> > > sbs
+> > > battery without this header, so such a generic name isn't really a good
+> > > fit.
 > 
-> Actually, there is a rather big problem here. This function is called on
-> a per-ITS basis. But once we have run map_resources *once*, any other
-> call becomes ineffective (vgic_ready() returns true). What happens to
-> the other ITSs? Can they still be successfully restored? Don't they
-> end-up with the same "blind spot" you've tried to close?
+> It would be interesting to know if the "retry-count" ought to be the
+> same across all Chromebooks.??I guess you could argue that maybe
+> someone found it needed to be 10 in all "nyan" variants and needed to
+> be 1 in all "veyron" variants, but it seems more likely that the
+> difference is arbitrary, or that one of the two values would work for
+> everyone.??It sure looks like we've just been copying values from
+> device to device.??Given that all the "veyron" devices have vastly
+> different batteries (and probably all the nyan ones too), it seems
+> likely there ought to be one value.
 
-The 1st call to map_resources() maps GICV3 regs and also maps all ITSes.
-So I don't think the problem comes from the fact subsequent calls are
-inefficient (and return 0) but that for this 1st call to succeeds all
-ITS base addresses must have been provided by the userspace. Otherwise
-this restoration of this ITS will fail. So this is not explicitly
-documented that way in the ABI doc.
+Well, the retry-count is a maximum number of retries to detect a status change
+on external power connection/disconnection. From my experience, it seems that
+nyans do indeed more retries to detect the change than veyrons, on average.
 
-Thanks
+I don't think setting this value to 1 is very reasonable (in the end, that's a
+number of seconds), because power supply status changes tend to take a few
+seconds to reflect on the battery status.
 
-Eric
+I think setting a high value (like 10) would always work and either way, the
+status detection mechanism stops itself as soon as a change is detected (it
+turns out this is not a good idea for bq27xxx batteries, because they go from
+charging to full in the first seconds after AC connection instead of directly
+reporting full, when full), but let's assume this is okay for sbs (and maybe
+change it later).
+
+> In terms of setting the "charger", that also could potentially be
+> something that could be for all Chromebooks, or at least older ones
+> that don't have their charger implemented by the type C driver.??...or
+> nyan devices could simply have a line in their dts like:
 > 
-> Thanks,
+> &battery {
+> ? power-supplies = <&charger>;
+> };
+
+That's true, but I think it makes as much sense to keep the whole binding.
+
+In my opinion, the only reason to have a separate dtsi for this binding is that
+veyrons have another dtsi for chromebooks where this binding should be. However,
+it cannot be there because of minnie using another battery IC.
+
+So my approach here would be to make it common for devices where other major
+parts are also common, so we can avoid duplication when most of the device-tree
+is already common. In cases where most of the device-tree is specific to a
+device, I think the binding should be duplicated. This is done already for lots
+of other components that could be made (somewhat) common anyway.
+
 > 
-> 	M.
+> > > Note that &charger has to be defined (after my subsequent patches), which
+> > > it is
+> > > for devices that also include rk3288-veyron-chromebook, but not
+> > > necessarily
+> > > others.
+> > > 
+> > > Overall, I think having one -sbs dtsi file makes sense here because there
+> > > is
+> > > already a rk3288-veyron-chromebook dtsi that veyron chromebooks use. That
+> > > file
+> > > cannot contain the battery bindings because minnie has a different one and
+> > > it
+> > > would be a bit silly to copy it over all devices. That definitely makes
+> > > sense.
+> > > 
+> > > As for other devices, I don't see why we should have a separate include
+> > > file for
+> > > the battery instead of having it in the device's dts. I think this should
+> > > be the
+> > > case on gru/kevin.
+> > > 
+> > > Also maybe not *all* gru-based devices will turn out to use a SBS battery,
+> > > so it
+> > > seems early to include this header in the gru dtsi.
 > 
+> For gru devices, we've moved to a "virtual sbs battery" provided by
+> the EC.??I'm not 100% positive that everything will just magically
+> work and be converted in the EC if we put a non-sbs battery on a board
+> with this EC feature, but I would hope we'd convert everything
+> properly.
+
+Interesting and good to know!
+
+> > > One last point, gru/kevin
+> > > currently don't define a charger, which will break my subsequent patch
+> > > (that is
+> > > however needed for the veyrons that use this file).
+> 
+> Arguably this should be fixed.??On veyron-chromebook we just use
+> "gpio-charger".??We didn't add a special charger driver w/ a property
+> like "ti,external-control" since the only piece of information that
+> Linux really needed from the charger was whether or not AC was
+> connected.
+
+Thanks for taking that choice, it indeed makes things easier on the kernel side
+whith no drawbacks.
+
+> 
+> > > To me, it seems that there's little advantage and major drawbacks in
+> > > keeping
+> > > this file the way it is.
+> > 
+> > I don't have any set opinion right now but after looking through the
+> > other uses of the sbs-battery the cros-ec-sbs.dtsi snippet really seems
+> > somewhat veyron/gru-specific - especially wrt. the retry-count values.
+> > 
+> > What I'm not sure about is whether it is actually better to keep the include
+> > around under a new name or just move the (rather tiny) sbs-battery node
+> > into the relevant devicetrees directly, when there aren't that many users
+> > anyway.
+> 
+> I'm fine with whatever you guys choose to do here.??It's nice not to
+> have copied "code", but with device tree sometimes copies are cleaner
+> than trying to share something.
+
+I definitely agree. I think copies are a good fit here because overall, we have
+enough disparity in the possible configurations among different SoC platforms to
+justify having one per device. So I believe it would make sense to make that
+binding common *among the same SoC family*.
+
+Cheers,
+
+-- 
+Paul Kocialkowski, developer of free digital technology and hardware support
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170507/7fb80bed/attachment.sig>
