@@ -1,86 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 7 May 2017 21:23:58 +0200
-Subject: [PATCH 2/2] reset: Add a Gemini reset controller
-In-Reply-To: <1493109822.2394.15.camel@pengutronix.de>
-References: <20170424192802.27430-1-linus.walleij@linaro.org>
- <1493109822.2394.15.camel@pengutronix.de>
-Message-ID: <CACRpkdaRkWY7qF43-XxOPu5h0cR3_w3ydHs3Ln-Oay+bzw4JWA@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun, 7 May 2017 22:25:07 +0200
+Subject: [RFC 2/2] mmc: meson-mx-sdio: Add a driver for the Amlogic Meson8
+ and Meson8b SoCs
+In-Reply-To: <20170506171857.16492-3-martin.blumenstingl@googlemail.com>
+References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
+ <20170506171857.16492-3-martin.blumenstingl@googlemail.com>
+Message-ID: <CAFBinCDw2xhfgE69jhxAqExaOsKv+Q1VGXAJaiSgvQMFQQJwFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 25, 2017 at 10:43 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> [Me]
->> +/*
->> + * Cortina Gemini Reset controller driver
->> + * Copyright (c) 2017 Linus Walleij <linus.walleij@linaro.org>
+On Sat, May 6, 2017 at 7:18 PM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> From: Carlo Caione <carlo@endlessm.com>
 >
-> No license statement, choice or oversight?
-
-Choice. I'm one of those guys who think that the top-level COPYING file
-in the kernel is by far enough of legalese. If you want, I can put in a license
-of course.
-
->> +struct gemini_reset {
->> +     struct regmap *map;
->> +     struct device *dev;
+> Add a driver for the SDIO/MMC host found on the Amlogic Meson SoCs. This
+> is an MMC controller which provides an interface between the application
+> processor and various memory cards. It supports the SD specification
+> v2.0 and the eMMC specification v4.41.
 >
-> dev is unused, can be dropped.
-
-OK
-
-> BIT(30) is called CPU1 reset in the DT binding, maybe add a #define?
-
-OK I have the new .h file that Rob asked for.
-
->> +static int gemini_reset_probe(struct platform_device *pdev)
->> +{
->> +     struct gemini_reset *gr;
->> +     struct device *dev = &pdev->dev;
->> +     struct device_node *np = dev->of_node;
->> +     struct device_node *parent_np = np->parent;
->> +     int ret;
->> +
->> +     if (!parent_np) {
+> The controller provides an internal "mux" which allows connecting up to
+> three MMC devices to it. Only one device can be used at a time though
+> since the registers are shared across all devices. The driver takes care
+> of synchronizing access (similar to the dw_mmc driver).
+> The maximum supported bus-width is 4-bits.
 >
-> Is this even possible?
-
-Goes away anyways when i fuse the syscon and reset controller
-as Rob suggested.
-
->> +     if (IS_ERR(gr->map)) {
->> +             dev_err(dev, "unable to get regmap");
+> Amlogic's GPL kernel sources call the corresponding driver "aml_sdio" to
+> differentiate it from the other MMC controller in (at least the Meson8
+> and Meson8b) the SoCs (they call the other drivers aml_sdhc and
+> aml_sdhc_m8, which seem to support a bus-width of up to 8-bits).
 >
-> It might be helpful to print the error code here.
-
-OK.
-
->> +     ret = devm_reset_controller_register(&pdev->dev, &gr->rcdev);
->> +     if (ret)
->> +             return ret;
->> +
->> +     dev_info(dev, "registered Gemini reset controller\n");
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  drivers/mmc/host/Kconfig         |  12 +
+>  drivers/mmc/host/Makefile        |   1 +
+>  drivers/mmc/host/meson-mx-sdio.c | 978 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 991 insertions(+)
+>  create mode 100644 drivers/mmc/host/meson-mx-sdio.c
 >
-> This is a bit verbose. I'd remove it and shorten the last part to:
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index a638cd0d80be..c557482ae327 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -343,6 +343,18 @@ config MMC_MESON_GX
 >
->         return devm_reset_controller_register(&pdev->dev, &gr->rcdev);
+>           If you have a controller with this interface, say Y here.
+>
+> +config MMC_MESON_MX_SDIO
+> +       tristate "Amlogic Meson6/Meson8/Meson8b SD/MMC Host Controller support"
+> +       depends on ARCH_MESON || COMPILE_TEST
+> +       depends on HAS_DMA
+> +       depends on OF
+just got an email from the kbuild test robot reminding me that I
+missed a COMMON_CLK dependency here. not a big deal - I'll fix this in
+the next version
 
-It's always this thing whether to be in the camp that like drivers to announce
-themselves or not, but I can do as you suggest if it's a strong preference.
-
-The reason I want it is: deselect the driver from Kconfig, something stops
-working. Compare the dmesg: they both look the same. You don't immediately
-see that something is missing.
-
-So some people think that it is time to go around in /sys, and then what
-if it is a boot regression, like the system can't mount root without the
-reset controller. (Yeah I know, the thing mounting root should select the
-reset controller then, OK another bug we would have seen with this...)
-
-And then all of a sudden there is a lot of debug time spent looking for this
-fact that would be spotted in no time if the was a dev_info() about the
-driver being probed.
-
-But if you insist, I will remove it.
-
-Yours,
-Linus Walleij
+> +       help
+> +         This selects support for the SD/MMC Host Controller on
+> +         Amlogic Meson6, Meson8 and Meson8b SoCs.
+> +
+> +         If you have a controller with this interface, say Y or M here.
+> +         If unsure, say N.
+> +
+>  config MMC_MOXART
+>         tristate "MOXART SD/MMC Host Controller support"
+>         depends on ARCH_MOXART && MMC
+[snip]
