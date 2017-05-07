@@ -1,55 +1,86 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 8 May 2017 03:08:24 +0800
-Subject: [PATCH v5 3/3] PCI/of fix of_dma_get_range; get PCI specific
- dma-ranges
-In-Reply-To: <1493992827-1553-4-git-send-email-oza.oza@broadcom.com>
-Message-ID: <201705080258.8tzPFTzu%fengguang.wu@intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 7 May 2017 21:23:58 +0200
+Subject: [PATCH 2/2] reset: Add a Gemini reset controller
+In-Reply-To: <1493109822.2394.15.camel@pengutronix.de>
+References: <20170424192802.27430-1-linus.walleij@linaro.org>
+ <1493109822.2394.15.camel@pengutronix.de>
+Message-ID: <CACRpkdaRkWY7qF43-XxOPu5h0cR3_w3ydHs3Ln-Oay+bzw4JWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oza,
+On Tue, Apr 25, 2017 at 10:43 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> [Me]
+>> +/*
+>> + * Cortina Gemini Reset controller driver
+>> + * Copyright (c) 2017 Linus Walleij <linus.walleij@linaro.org>
+>
+> No license statement, choice or oversight?
 
-[auto build test ERROR on v4.9-rc8]
-[cannot apply to glikely/devicetree/next iommu/next next-20170505]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Choice. I'm one of those guys who think that the top-level COPYING file
+in the kernel is by far enough of legalese. If you want, I can put in a license
+of course.
 
-url:    https://github.com/0day-ci/linux/commits/Oza-Pawandeep/OF-PCI-address-PCI-inbound-memory-limitations/20170508-004625
-config: arm-arm67 (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+>> +struct gemini_reset {
+>> +     struct regmap *map;
+>> +     struct device *dev;
+>
+> dev is unused, can be dropped.
 
-All errors (new ones prefixed by >>):
+OK
 
-   drivers//of/address.c: In function 'of_bus_pci_get_dma_ranges':
->> drivers//of/address.c:212:2: error: implicit declaration of function 'pci_free_resource_list' [-Werror=implicit-function-declaration]
-     pci_free_resource_list(&res);
-     ^~~~~~~~~~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
+> BIT(30) is called CPU1 reset in the DT binding, maybe add a #define?
 
-vim +/pci_free_resource_list +212 drivers//of/address.c
+OK I have the new .h file that Rob asked for.
 
-   206				*dma_addr = res_dma->start - window->offset;
-   207				*paddr = res_dma->start;
-   208				*size = resource_size(res_dma);
-   209				}
-   210			}
-   211		}
- > 212		pci_free_resource_list(&res);
-   213	
-   214		/*
-   215		 * return the largest possible size,
+>> +static int gemini_reset_probe(struct platform_device *pdev)
+>> +{
+>> +     struct gemini_reset *gr;
+>> +     struct device *dev = &pdev->dev;
+>> +     struct device_node *np = dev->of_node;
+>> +     struct device_node *parent_np = np->parent;
+>> +     int ret;
+>> +
+>> +     if (!parent_np) {
+>
+> Is this even possible?
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 30170 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170508/6c494a66/attachment-0001.gz>
+Goes away anyways when i fuse the syscon and reset controller
+as Rob suggested.
+
+>> +     if (IS_ERR(gr->map)) {
+>> +             dev_err(dev, "unable to get regmap");
+>
+> It might be helpful to print the error code here.
+
+OK.
+
+>> +     ret = devm_reset_controller_register(&pdev->dev, &gr->rcdev);
+>> +     if (ret)
+>> +             return ret;
+>> +
+>> +     dev_info(dev, "registered Gemini reset controller\n");
+>
+> This is a bit verbose. I'd remove it and shorten the last part to:
+>
+>         return devm_reset_controller_register(&pdev->dev, &gr->rcdev);
+
+It's always this thing whether to be in the camp that like drivers to announce
+themselves or not, but I can do as you suggest if it's a strong preference.
+
+The reason I want it is: deselect the driver from Kconfig, something stops
+working. Compare the dmesg: they both look the same. You don't immediately
+see that something is missing.
+
+So some people think that it is time to go around in /sys, and then what
+if it is a boot regression, like the system can't mount root without the
+reset controller. (Yeah I know, the thing mounting root should select the
+reset controller then, OK another bug we would have seen with this...)
+
+And then all of a sudden there is a lot of debug time spent looking for this
+fact that would be spotted in no time if the was a dev_info() about the
+driver being probed.
+
+But if you insist, I will remove it.
+
+Yours,
+Linus Walleij
