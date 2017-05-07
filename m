@@ -1,47 +1,123 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 7 May 2017 14:46:28 +0100
-Subject: [PATCH 2/2] [PATCH 2/2] iio: adc: sun4i-gpadc-iio: Fix module
- autoload when OF devices are registered
-In-Reply-To: <CAGb2v66_F4yHzQaOtO+-yH7d36kx_ahDCTyXkpTKkzGxQ-bYeA@mail.gmail.com>
-References: <20170501224559.21028-1-edu.molinas@gmail.com>
- <20170501224559.21028-2-edu.molinas@gmail.com>
- <CAGb2v66_F4yHzQaOtO+-yH7d36kx_ahDCTyXkpTKkzGxQ-bYeA@mail.gmail.com>
-Message-ID: <ce97e18f-aeb6-79c3-1fa3-048674769361@kernel.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 07 May 2017 14:51:37 +0100
+Subject: [PATCH v7 16/24] KVM: arm64: vgic-its:
+ KVM_DEV_ARM_ITS_SAVE/RESTORE_TABLES
+In-Reply-To: <87lgq8kej5.fsf@on-the-bus.cambridge.arm.com> (Marc Zyngier's
+ message of "Sun, 07 May 2017 14:00:30 +0100")
+References: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
+ <1494084283-12723-17-git-send-email-eric.auger@redhat.com>
+ <87lgq8kej5.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <87efw0ixli.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/17 03:09, Chen-Yu Tsai wrote:
-> On Tue, May 2, 2017 at 6:45 AM, Eduardo Molinas <edu.molinas@gmail.com> wrote:
->> If the driver is built as a module, it won't be autloaded if the devices
->> are registered via OF code because the OF device table
->> entries are not exported as aliases
+On Sun, May 07 2017 at  2:00:30 pm BST, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Sat, May 06 2017 at  4:24:35 pm BST, Eric Auger <eric.auger@redhat.com> wrote:
+>> Introduce new attributes in KVM_DEV_ARM_VGIC_GRP_CTRL group:
+>> - KVM_DEV_ARM_ITS_SAVE_TABLES: saves the ITS tables into guest RAM
+>> - KVM_DEV_ARM_ITS_RESTORE_TABLES: restores them into VGIC internal
+>>   structures.
 >>
->> Before the patch:
->> $ modinfo drivers/iio/adc/sun4i-gpadc-iio.ko | grep alias
->> alias:          platform:sun6i-a31-gpadc-iio
->> alias:          platform:sun5i-a13-gpadc-iio
->> alias:          platform:sun4i-a10-gpadc-iio
+>> We hold the vcpus lock during the save and restore to make
+>> sure no vcpu is running.
 >>
->> After the patch:
->> $ modinfo drivers/iio/adc/sun4i-gpadc-iio.ko | grep alias
->> alias:          of:N*T*Callwinner,sun8i-a33-thsC*
->> alias:          of:N*T*Callwinner,sun8i-a33-ths
->> alias:          platform:sun6i-a31-gpadc-iio
->> alias:          platform:sun5i-a13-gpadc-iio
->> alias:          platform:sun4i-a10-gpadc-iio
+>> At this stage the functionality is not yet implemented. Only
+>> the skeleton is put in place.
 >>
->> Signed-off-by: Eduardo Molinas <edu.molinas@gmail.com>
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> 
-> Can we merge this as a fix for 4.12?
-Applied to the fixes-togreg branch of iio.git.
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>> v6 -> v7:
+>> - also hold the its_lock on save and restore
+>>
+>> v5 -> v6:
+>> - remove the pending table sync from the ITS table restore
+>>
+>> v4 -> v5:
+>> - use KVM_DEV_ARM_ITS_SAVE_TABLES and KVM_DEV_ARM_ITS_RESTORE_TABLES
+>> - rename *flush* into *save*
+>> - call its_sync_lpi_pending_table at the end of restore
+>> - use abi framework
+>>
+>> v3 -> v4:
+>> - pass kvm struct handle to vgic_its_flush/restore_pending_tables
+>> - take the kvm lock and vcpu locks
+>> - ABI revision check
+>> - check attr->attr is null
+>>
+>> v1 -> v2:
+>> - remove useless kvm parameter
+>> ---
+>>  arch/arm/include/uapi/asm/kvm.h   |   4 +-
+>>  arch/arm64/include/uapi/asm/kvm.h |   4 +-
+>>  virt/kvm/arm/vgic/vgic-its.c      | 107 ++++++++++++++++++++++++++++++++++++--
+>>  3 files changed, 109 insertions(+), 6 deletions(-)
+>>
+>
+> [...]
+>
+>> @@ -1718,7 +1777,37 @@ static int vgic_its_save_tables_v0(struct vgic_its *its)
+>>   */
+>>  static int vgic_its_restore_tables_v0(struct vgic_its *its)
+>>  {
+>> -	return -ENXIO;
+>> +	struct kvm *kvm = its->dev->kvm;
+>> +	int ret;
+>> +
+>> +	mutex_lock(&kvm->lock);
+>> +	mutex_lock(&its->its_lock);
+>> +
+>> +	if (!lock_all_vcpus(kvm)) {
+>> +		mutex_unlock(&its->its_lock);
+>> +		mutex_unlock(&kvm->lock);
+>> +		return -EBUSY;
+>> +	}
+>> +
+>> +	ret = vgic_its_restore_collection_table(its);
+>> +	if (ret)
+>> +		goto out;
+>> +
+>> +	ret = vgic_its_restore_device_tables(its);
+>> +
+>> +out:
+>> +	unlock_all_vcpus(kvm);
+>> +	mutex_unlock(&its->its_lock);
+>> +	mutex_unlock(&kvm->lock);
+>> +
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	/*
+>> +	 * On restore path, MSI injections can happen before the
+>> +	 * first VCPU run so let's complete the GIC init here.
+>> +	 */
+>> +	return kvm_vgic_map_resources(its->dev->kvm);
+>
+> This one is still a rather sore spot, but I've lost track of what we can
+> do about it. Until now, this would only happen on first run. But it
+> looks like QEMU and KVM have different views of what "runable" is.
+>
+> I'm not sure there is a good way to solve this, unfortunately. From a
+> device PoV, everything is ready and the fact that nothing is clocking
+> the CPUs is very much irrelevant. I'm almost tempted to say that the
+> map_resource() call in kvm_vcpu_first_run_init shouldn't be there, and
+> that we're missing a synchronization point with userspace that would say
+> "system is entierely configured", triggering the iodev registration.
+>
+> Oh well. At that point, and short of having something better to offer:
+>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>
+> 	M.
+
+Actually, there is a rather big problem here. This function is called on
+a per-ITS basis. But once we have run map_resources *once*, any other
+call becomes ineffective (vgic_ready() returns true). What happens to
+the other ITSs? Can they still be successfully restored? Don't they
+end-up with the same "blind spot" you've tried to close?
 
 Thanks,
 
-Jonathan
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+	M.
+-- 
+Jazz is not dead, it just smell funny.
