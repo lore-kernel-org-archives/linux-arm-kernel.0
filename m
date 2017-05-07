@@ -1,25 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 07 May 2017 14:44:11 +0100
-Subject: [PATCH v7 24/24] KVM: arm64: vgic-v3:
- KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
-In-Reply-To: <1494084283-12723-25-git-send-email-eric.auger@redhat.com> (Eric
- Auger's message of "Sat, 6 May 2017 17:24:43 +0200")
-References: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
- <1494084283-12723-25-git-send-email-eric.auger@redhat.com>
-Message-ID: <87k25sixxw.fsf@on-the-bus.cambridge.arm.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 7 May 2017 14:45:22 +0100
+Subject: [PATCH 1/2] [PATCH 1/2] iio: adc: sun4i-gpadc-iio: Fix module
+ autoload when PLATFORM devices are registered
+In-Reply-To: <CAGb2v65Cgtxjhuj8v5A8RF8pGTK0FD3MDmDeirO4T_T7UCF4Vw@mail.gmail.com>
+References: <20170501224559.21028-1-edu.molinas@gmail.com>
+ <CAGb2v65Cgtxjhuj8v5A8RF8pGTK0FD3MDmDeirO4T_T7UCF4Vw@mail.gmail.com>
+Message-ID: <a7956be3-3598-0290-8810-8434f62834e7@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 06 2017 at  4:24:43 pm BST, Eric Auger <eric.auger@redhat.com> wrote:
-> This patch adds a new attribute to GICV3 KVM device
-> KVM_DEV_ARM_VGIC_GRP_CTRL group. This allows userspace to
-> flush all GICR pending tables into guest RAM.
->
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> Reviewed-by: Christoffer Dall <cdall@linaro.org>
+On 02/05/17 03:10, Chen-Yu Tsai wrote:
+> On Tue, May 2, 2017 at 6:45 AM, Eduardo Molinas <edu.molinas@gmail.com> wrote:
+>> If the driver is built as a module, it won't be autloaded if the devices
+>> are registered via PLATFORM code because the PLATFORM device table
+>> entries are not exported as aliases
+>>
+>> Before the patch:
+>> $ modinfo drivers/iio/adc/sun4i-gpadc-iio.ko | grep alias
+>> $
+>>
+>> After th patch:
+> 
+>         ^^ the
+> 
+>> $ modinfo drivers/iio/adc/sun4i-gpadc-iio.ko | grep alias
+>> alias:          platform:sun6i-a31-gpadc-iio
+>> alias:          platform:sun5i-a13-gpadc-iio
+>> alias:          platform:sun4i-a10-gpadc-iio
+>>
+>> Signed-off-by: Eduardo Molinas <edu.molinas@gmail.com>
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> Can we merge this as a fix for 4.12?
+Applied to fixes-togreg branch of iio.git.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Thanks,
 
-	M.
--- 
-Jazz is not dead, it just smell funny.
+Jonathan
+> 
