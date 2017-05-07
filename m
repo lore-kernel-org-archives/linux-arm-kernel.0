@@ -1,76 +1,61 @@
 From: ayaka@soulik.info (Randy Li)
-Date: Sun,  7 May 2017 22:26:27 +0800
-Subject: [PATCH] ARM: dts: rockchip: add adc button for Firefly
-Message-ID: <20170507142627.5307-1-ayaka@soulik.info>
+Date: Sun,  7 May 2017 22:34:46 +0800
+Subject: [PATCH] ARM: dts: rockchip: add missing grf phandle for rk3288
+Message-ID: <20170507143446.11502-1-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only adc button connected to adc input is recovery button.
+The PWM devices need to access the grf to switch the PWM IP.
+And tsadc uses it to shutdown the system.
 
 Signed-off-by: Randy Li <ayaka@soulik.info>
 ---
- arch/arm/boot/dts/rk3288-firefly-reload.dts | 17 +++++++++++++++++
- arch/arm/boot/dts/rk3288-firefly.dtsi       | 13 +++++++++++++
- 2 files changed, 30 insertions(+)
+ arch/arm/boot/dts/rk3288.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288-firefly-reload.dts b/arch/arm/boot/dts/rk3288-firefly-reload.dts
-index d0b3204a..ed1baa8 100644
---- a/arch/arm/boot/dts/rk3288-firefly-reload.dts
-+++ b/arch/arm/boot/dts/rk3288-firefly-reload.dts
-@@ -48,6 +48,19 @@
- 	model = "Firefly-RK3288-reload";
- 	compatible = "firefly,firefly-rk3288-reload", "rockchip,rk3288";
- 
-+	adc-keys {
-+		compatible = "adc-keys";
-+		io-channels = <&saradc 1>;
-+		io-channel-names = "buttons";
-+		keyup-threshold-microvolt = <1800000>;
-+
-+		button-recovery {
-+			label = "Recovery";
-+			linux,code = <KEY_BACK>;
-+			press-threshold-microvolt = <0>;
-+		};
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 
-@@ -246,6 +259,10 @@
- 	status = "okay";
- };
- 
-+&saradc {
-+	status = "okay";
-+};
-+
- &sdmmc {
- 	bus-width = <4>;
- 	cap-mmc-highspeed;
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index 10793ac..63b8b2d 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -49,6 +49,19 @@
- 		reg = <0 0x80000000>;
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 26b8886..c1d3b1f 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -546,6 +546,7 @@
+ 		pinctrl-2 = <&otp_gpio>;
+ 		#thermal-sensor-cells = <1>;
+ 		rockchip,hw-tshut-temp = <95000>;
++		rockchip,grf = <&grf>;
+ 		status = "disabled";
  	};
  
-+	adc-keys {
-+		compatible = "adc-keys";
-+		io-channels = <&saradc 1>;
-+		io-channel-names = "buttons";
-+		keyup-threshold-microvolt = <1800000>;
-+
-+		button-recovery {
-+			label = "Recovery";
-+			linux,code = <KEY_BACK>;
-+			press-threshold-microvolt = <0>;
-+		};
-+	};
-+
- 	dovdd_1v8: dovdd-1v8-regulator {
- 		compatible = "regulator-fixed";
- 		regulator-name = "dovdd_1v8";
+@@ -654,6 +655,7 @@
+ 		pinctrl-0 = <&pwm0_pin>;
+ 		clocks = <&cru PCLK_PWM>;
+ 		clock-names = "pwm";
++		rockchip,grf = <&grf>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -665,6 +667,7 @@
+ 		pinctrl-0 = <&pwm1_pin>;
+ 		clocks = <&cru PCLK_PWM>;
+ 		clock-names = "pwm";
++		rockchip,grf = <&grf>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -676,6 +679,7 @@
+ 		pinctrl-0 = <&pwm2_pin>;
+ 		clocks = <&cru PCLK_PWM>;
+ 		clock-names = "pwm";
++		rockchip,grf = <&grf>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -687,6 +691,7 @@
+ 		pinctrl-0 = <&pwm3_pin>;
+ 		clocks = <&cru PCLK_PWM>;
+ 		clock-names = "pwm";
++		rockchip,grf = <&grf>;
+ 		status = "disabled";
+ 	};
+ 
 -- 
 2.9.3
