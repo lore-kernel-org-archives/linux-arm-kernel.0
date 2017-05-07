@@ -1,29 +1,59 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sun, 7 May 2017 13:24:51 +0800
-Subject: [stericsson:mmc-no-null-mq-v4.11 91/93] block.c:(.init.text+0x0):
- multiple definition of `init_module'
-Message-ID: <201705071349.18mdIn1d%fengguang.wu@intel.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 7 May 2017 14:43:22 +0800
+Subject: [PATCH v4 3/3] PCI/of fix of_dma_get_range; get PCI specific
+ dma-ranges
+In-Reply-To: <1493992040-31222-4-git-send-email-oza.oza@broadcom.com>
+Message-ID: <201705071445.4WikSZFy%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git mmc-no-null-mq-v4.11
-head:   6747bffda469bc8236af62c1267613bac0a4bb10
-commit: e311f2b40345fb17b74813bd05e734d4e8ef1c89 [91/93] mmc: core: make block layer non-optional
-config: x86_64-rhel (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+Hi Oza,
+
+[auto build test ERROR on v4.9-rc8]
+[cannot apply to iommu/next next-20170505]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Oza-Pawandeep/OF-PCI-address-PCI-inbound-memory-limitations/20170507-141549
+config: c6x-evmc6678_defconfig (attached as .config)
+compiler: c6x-elf-gcc (GCC) 6.2.0
 reproduce:
-        git checkout e311f2b40345fb17b74813bd05e734d4e8ef1c89
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make ARCH=x86_64 
+        make.cross ARCH=c6x 
 
 All errors (new ones prefixed by >>):
 
-   drivers/mmc/core/block.o: In function `mmc_blk_init':
->> block.c:(.init.text+0x0): multiple definition of `init_module'
-   drivers/mmc/core/core.o:core.c:(.init.text+0x86c): first defined here
-   drivers/mmc/core/block.o: In function `mmc_blk_exit':
->> block.c:(.exit.text+0x0): multiple definition of `cleanup_module'
-   drivers/mmc/core/core.o:core.c:(.exit.text+0x0): first defined here
+>> drivers/of/address.c:580:21: error: 'of_bus_isa_get_dma_ranges' undeclared here (not in a function)
+      .get_dma_ranges = of_bus_isa_get_dma_ranges,
+                        ^~~~~~~~~~~~~~~~~~~~~~~~~
+>> drivers/of/address.c:591:21: error: 'of_bus_default_get_dma_ranges' undeclared here (not in a function)
+      .get_dma_ranges = of_bus_default_get_dma_ranges,
+                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+vim +/of_bus_isa_get_dma_ranges +580 drivers/of/address.c
+
+   574			.addresses = "reg",
+   575			.match = of_bus_isa_match,
+   576			.count_cells = of_bus_isa_count_cells,
+   577			.map = of_bus_isa_map,
+   578			.translate = of_bus_isa_translate,
+   579			.get_flags = of_bus_isa_get_flags,
+ > 580			.get_dma_ranges = of_bus_isa_get_dma_ranges,
+   581		},
+   582		/* Default */
+   583		{
+   584			.name = "default",
+   585			.addresses = "reg",
+   586			.match = NULL,
+   587			.count_cells = of_bus_default_count_cells,
+   588			.map = of_bus_default_map,
+   589			.translate = of_bus_default_translate,
+   590			.get_flags = of_bus_default_get_flags,
+ > 591			.get_dma_ranges = of_bus_default_get_dma_ranges,
+   592		},
+   593	};
+   594	
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -32,6 +62,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 38847 bytes
+Size: 5161 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170507/ea018920/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170507/47ac2f0d/attachment.gz>
