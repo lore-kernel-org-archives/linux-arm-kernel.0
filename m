@@ -1,67 +1,124 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 7 May 2017 14:43:22 +0800
-Subject: [PATCH v4 3/3] PCI/of fix of_dma_get_range; get PCI specific
- dma-ranges
-In-Reply-To: <1493992040-31222-4-git-send-email-oza.oza@broadcom.com>
-Message-ID: <201705071445.4WikSZFy%fengguang.wu@intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 7 May 2017 09:30:26 +0200
+Subject: [PATCH v2 3/3] gpiolib: Add GPIO initialization
+In-Reply-To: <20170506203230.7ogwvdrzogvvlu67@pengutronix.de>
+References: <1440920686-6892-1-git-send-email-mpa@pengutronix.de>
+ <1440920686-6892-4-git-send-email-mpa@pengutronix.de>
+ <20170207110950.zy5pzo2hq6hrvmr5@pengutronix.de>
+ <20170506203230.7ogwvdrzogvvlu67@pengutronix.de>
+Message-ID: <CACRpkdZeYXcXo5g-4wH8M7vK6gTFRHH4VMXqC7XJ_iwXUpL8HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oza,
+On Sat, May 6, 2017 at 10:32 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-[auto build test ERROR on v4.9-rc8]
-[cannot apply to iommu/next next-20170505]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+>> I'd suggest the following description for these cases:
+>>
+>>  a)
+>>       /*
+>>        * initially configured as low output. Consumer can do
+>>        * gpio_set_value(..., 1); but not gpio_direction_input(...);
+>>        */
+>>       nodename {
+>>               gpio-hog;
+>>               gpios = <...>;
+>>               output-low-init;
+>>       };
+>>
+>>  b)
+>>       /*
+>>        * initially configured as low output. Consumer can do
+>>        * gpio_set_value(..., 1); and gpio_direction_input(...);
+>>        */
+>>       nodename {
+>>               gpio-hog;
+>>               gpios = <...>;
+>>               output-init-low;
+>>       };
+>>
+>>  c)
+>>       /*
+>>        * initially configured as input. Consumer can do
+>>        * gpio_direction_output(..., ...) and then set the value
+>>        * freely.
+>>        */
+>>        nodename {
+>>               gpio-hog;
+>>               gpios = <...>;
+>>               input-init;
+>>       };
+>
+> I thought a bit more about this and the changes that would be necessary
+> to achieve this:
+>
+>  - introduce new flags IS_FIXED_DIR and IS_FIXED_VALUE for struct
+>    gpio_desc::flags and error out accordingly in gpiod_set_direction_*
+>    and gpiod_set_value respectively. Then we have:
+>
+>         - already existing hogs: IS_FIXED_DIR | IS_FIXED_VALUE
+>         - a) IS_FIXED_DIR
+>         - b)+c) 0
+>         - d) (if desired) IS_FIXED_VALUE
 
-url:    https://github.com/0day-ci/linux/commits/Oza-Pawandeep/OF-PCI-address-PCI-inbound-memory-limitations/20170507-141549
-config: c6x-evmc6678_defconfig (attached as .config)
-compiler: c6x-elf-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=c6x 
+I don't really understand IS_FIXED_DIR, if that is a property of the
+hardware then that is something the driver should be handling,
+i.e. the driver must know if a line is fixed direction (only input or only
+output). Same for IS_FIXED_VALUE.
 
-All errors (new ones prefixed by >>):
+Or do you mean it is something else, like these are only software
+flags for hogs? Then they should be HOG_IS_FIXED_DIR etc.
 
->> drivers/of/address.c:580:21: error: 'of_bus_isa_get_dma_ranges' undeclared here (not in a function)
-      .get_dma_ranges = of_bus_isa_get_dma_ranges,
-                        ^~~~~~~~~~~~~~~~~~~~~~~~~
->> drivers/of/address.c:591:21: error: 'of_bus_default_get_dma_ranges' undeclared here (not in a function)
-      .get_dma_ranges = of_bus_default_get_dma_ranges,
-                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>  - don't auto-request hogged pins
+>    Currently hogged pins are not available for consumers to be
+>    requested. This needs to be changed at least for the three (or four)
+>    new cases.
 
-vim +/of_bus_isa_get_dma_ranges +580 drivers/of/address.c
+But look at the dictionary definition of "hog":
+https://en.wiktionary.org/wiki/hog
 
-   574			.addresses = "reg",
-   575			.match = of_bus_isa_match,
-   576			.count_cells = of_bus_isa_count_cells,
-   577			.map = of_bus_isa_map,
-   578			.translate = of_bus_isa_translate,
-   579			.get_flags = of_bus_isa_get_flags,
- > 580			.get_dma_ranges = of_bus_isa_get_dma_ranges,
-   581		},
-   582		/* Default */
-   583		{
-   584			.name = "default",
-   585			.addresses = "reg",
-   586			.match = NULL,
-   587			.count_cells = of_bus_default_count_cells,
-   588			.map = of_bus_default_map,
-   589			.translate = of_bus_default_translate,
-   590			.get_flags = of_bus_default_get_flags,
- > 591			.get_dma_ranges = of_bus_default_get_dma_ranges,
-   592		},
-   593	};
-   594	
+The usage here is as in "to hog resources" so:
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 5161 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170507/47ac2f0d/attachment.gz>
+3. A greedy person; one who refuses to share.
+
+And check the verb form:
+
+1. hog (third-person singular simple present hogs, present participle
+  hogging, simple past and past participle hogged)
+(transitive) To greedily take more than one's share, to take precedence
+ at the expense of another or others.
+[quotations]Hey! Quit hogging all the blankets.
+
+So of course hogs request and hold the lines. That is what hogging
+is all about.
+
+>    IMHO it is sensible to allow requesting a gpio that is completely
+>    hogged and just prevent changing direction and (if it's an output)
+>    value.
+
+No it doesn't make sense at all to take something that is hogged
+because it is completely unintuitive to the very word "hog".
+
+As I have said before: a new property, something like
+"initial-directions" and "initial-values" need to be created and
+handled separately for this, without even involving the hogging
+mechanism.
+
+You need to introduce something in parallel from the hogs that
+does not request the lines, but just sets up initial values and
+directions on them and then leave them to be acquired later.
+
+We already keep track of the direction inside the gpio_desc
+and we have callbacks to read that up from the hardware if
+supported, and I guess the  same goes for initial values.
+
+I just don't see what you need here and why you want to expand
+the hog concept beyond its intuitive use?
+
+I say define something new in device tree with an intuitive name,
+that does what you want it to do: just sets up initial direction and
+optional value (on outputs) using the existing callbacks and then just
+gets out of the way. No hogging.
+
+Yours,
+Linus Walleij
