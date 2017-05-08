@@ -1,56 +1,57 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 8 May 2017 19:34:08 +0200
-Subject: [PATCH V15 10/11] trace, ras: add ARM processor error trace event
-In-Reply-To: <1492556723-9189-11-git-send-email-tbaicar@codeaurora.org>
-References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
- <1492556723-9189-11-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170508173408.njiuvnqf3zi5pinm@pd.tnic>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 May 2017 10:36:10 -0700
+Subject: [PATCH] memory: omap-gpmc: Fix debug output for access width
+In-Reply-To: <a59b8a21-056a-0e1f-44a6-585256945747@ti.com>
+References: <20170505223706.4913-1-tony@atomide.com>
+ <a59b8a21-056a-0e1f-44a6-585256945747@ti.com>
+Message-ID: <20170508173610.GJ3489@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 05:05:22PM -0600, Tyler Baicar wrote:
-> Currently there are trace events for the various RAS
-> errors with the exception of ARM processor type errors.
-> Add a new trace event for such errors so that the user
-> will know when they occur. These trace events are
-> consistent with the ARM processor error section type
-> defined in UEFI 2.6 spec section N.2.4.4.
+* Roger Quadros <rogerq@ti.com> [170508 03:44]:
+> Hi Tony,
 > 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Acked-by: Steven Rostedt <rostedt@goodmis.org>
-> Reviewed-by: Xie XiuQi <xiexiuqi@huawei.com>
-> ---
->  drivers/acpi/apei/ghes.c    |  8 +++++++-
->  drivers/firmware/efi/cper.c |  1 +
->  drivers/ras/ras.c           |  1 +
->  include/ras/ras_event.h     | 45 +++++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 54 insertions(+), 1 deletion(-)
+> On 06/05/17 01:37, Tony Lindgren wrote:
+> > The width needs to be configured in bytes with 1 meaning 8-bit
+> > access and 2 meaning 16-bit access.
 > 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 3d9f63b..612deb3 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -518,7 +518,13 @@ static void ghes_do_proc(struct ghes *ghes,
->  		}
->  #endif
->  #ifdef CONFIG_RAS
-> -		else if (trace_unknown_sec_event_enabled()) {
-> +		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM) &&
-> +			 trace_arm_event_enabled()) {
-> +			struct cper_sec_proc_arm *arm_err;
-> +
-> +			arm_err = acpi_hest_get_payload(gdata);
-> +			trace_arm_event(arm_err);
-> +		} else if (trace_unknown_sec_event_enabled()) {
->  			void *unknown_err = acpi_hest_get_payload(gdata);
->  
->  			trace_unknown_sec_event(&sec_type,
+> As per the TRM, for GPMC_CONFIG1.DEVICESIZE
+> 0 means 8-bit
+> 1 means 16-bit
+> 
+> > 
+> > Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> > Cc: Roger Quadros <rogerq@ti.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  drivers/memory/omap-gpmc.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
+> > --- a/drivers/memory/omap-gpmc.c
+> > +++ b/drivers/memory/omap-gpmc.c
+> > @@ -513,7 +513,7 @@ static void gpmc_cs_show_timings(int cs, const char *desc)
+> >  	pr_info("gpmc cs%i access configuration:\n", cs);
+> >  	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1,  4,  4, "time-para-granularity");
+> >  	GPMC_GET_RAW(GPMC_CS_CONFIG1,  8,  9, "mux-add-data");
+> > -	GPMC_GET_RAW_MAX(GPMC_CS_CONFIG1, 12, 13,
+> > +	GPMC_GET_RAW_SHIFT_MAX(GPMC_CS_CONFIG1, 12, 13, 1,
+> >  			 GPMC_CONFIG1_DEVICESIZE_MAX, "device-width");
+> 
+> setting shift 1 means the value will be multiplied by 2
+> so this will read 0 for 8-bit and 2 for 16-bit.
+> 
+> Is this what we want?
 
-As with the previous patch, move that code to ras.c so that you can get rid of
-the ifdeffery here.
+Yeah we already have debug output that is supposed to be usable
+for configuring a new device based on debug output of the bootloader
+timings. And the configured parameters use bytes for device-width.
 
--- 
-Regards/Gruss,
-    Boris.
+> I'd still prefer the old way of showing RAW values than interpreted ones.
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+We have that too in the debug output as the raw values of
+all the GPMC_CS_CONFIG registers.
+
+Regards,
+
+Tony
