@@ -1,42 +1,116 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 8 May 2017 17:40:40 +0530
-Subject: [PATCH] phy: meson8b-usb2: add support for the USB PHY on Meson8
- SoCs
-In-Reply-To: <20170506173625.19501-1-martin.blumenstingl@googlemail.com>
-References: <20170506173625.19501-1-martin.blumenstingl@googlemail.com>
-Message-ID: <950abc53-df2d-93dd-68d1-e9868445bb93@ti.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Mon, 8 May 2017 14:21:00 +0200
+Subject: [PATCH v3 2/7] iommu/arm-smmu-v3: Do resource size checks based
+ on SMMU
+In-Reply-To: <20170508105049.GA26654@virtx40>
+References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
+ <1493986091-30521-3-git-send-email-gakula@caviumnetworks.com>
+ <20170505221844.GW16981@rric.localdomain>
+ <20170508094437.GA26538@virtx40>
+ <20170508100932.GH16981@rric.localdomain>
+ <20170508105049.GA26654@virtx40>
+Message-ID: <20170508122100.GI16981@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Saturday 06 May 2017 11:06 PM, Martin Blumenstingl wrote:
-> Meson8 uses the same USB PHY as found on the Meson8b and GXBB SoCs. Add
-> a new of_device_id to indicate this. Also update the documentation
-> (devicetree binding, Kconfig and MODULE_DESCRIPTION) accordingly.
+On 08.05.17 16:20:49, Linu Cherian wrote:
 > 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> ---
->  Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt | 3 ++-
->  drivers/phy/Kconfig                                        | 4 ++--
->  drivers/phy/phy-meson8b-usb2.c                             | 5 +++--
->  3 files changed, 7 insertions(+), 5 deletions(-)
+> On Mon May 08, 2017 at 12:09:32PM +0200, Robert Richter wrote:
+> > On 08.05.17 15:14:37, Linu Cherian wrote:
+> > > On Sat May 06, 2017 at 12:18:44AM +0200, Robert Richter wrote:
+> > > > On 05.05.17 17:38:06, Geetha sowjanya wrote:
+> > > > > From: Linu Cherian <linu.cherian@cavium.com>
+> > > > > 
+> > > > > With implementations supporting only page 0 register space,
+> > > > > resource size can be 64k as well and hence perform size checks
+> > > > > based on SMMU option PAGE0_REGS_ONLY.
+> > > > > 
+> > > > > For this, arm_smmu_device_dt_probe/acpi_probe has been moved before
+> > > > > platform_get_resource call, so that SMMU options are set beforehand.
+> > > > > 
+> > > > > Signed-off-by:  Linu Cherian <linu.cherian@cavium.com>
+> > > > > Signed-off-by:  Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> > > > > ---
+> > > > >  drivers/iommu/arm-smmu-v3.c | 26 +++++++++++++++++---------
+> > > > >  1 file changed, 17 insertions(+), 9 deletions(-)
+> > > > > 
+> > > > > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> > > > > index 107b4a6..f027676 100644
+> > > > > --- a/drivers/iommu/arm-smmu-v3.c
+> > > > > +++ b/drivers/iommu/arm-smmu-v3.c
+> > > > > @@ -2672,6 +2672,14 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+> > > > >  	return ret;
+> > > > >  }
+> > > > >  
+> > > > > +static unsigned long arm_smmu_resource_size(struct arm_smmu_device *smmu)
+> > > > > +{
+> > > > > +	if (ARM_SMMU_PAGE0_REGS_ONLY(smmu))
+> > > > > +		return SZ_64K;
+> > > > > +	else
+> > > > > +		return SZ_128K;
+> > > > > +}
+> > > > > +
+> > > > 
+> > > > I think this can be dropped. See below.
+> > > > 
+> > > > >  static int arm_smmu_device_probe(struct platform_device *pdev)
+> > > > >  {
+> > > > >  	int irq, ret;
+> > > > > @@ -2688,9 +2696,17 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+> > > > >  	}
+> > > > >  	smmu->dev = dev;
+> > > > >  
+> > > > > +	if (dev->of_node) {
+> > > > > +		ret = arm_smmu_device_dt_probe(pdev, smmu);
+> > > > > +	} else {
+> > > > > +		ret = arm_smmu_device_acpi_probe(pdev, smmu);
+> > > > > +		if (ret == -ENODEV)
+> > > > > +			return ret;
+> > > > > +	}
+> > > > > +
+> > > > >  	/* Base address */
+> > > > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > > > -	if (resource_size(res) + 1 < SZ_128K) {
+> > > > > +	if (resource_size(res) + 1 < arm_smmu_resource_size(smmu)) {
+> > > > >  		dev_err(dev, "MMIO region too small (%pr)\n", res);
+> > > > >  		return -EINVAL;
+> > > > >  	}
+> > > > 
+> > > > Why not just do the follwoing here:
+> > > > 
+> > > >  	/* Base address */
+> > > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > >  	if (resource_size(res) + 1 < arm_smmu_resource_size(smmu)) {
+> > > >  		dev_err(dev, "MMIO region too small (%pr)\n", res);
+> > > >  		return -EINVAL;
+> > > >  	}
+> > > >  	ioaddr = res->start;
+> > > > 
+> > > > +	/*
+> > > > +	 * Override the size, for Cavium ThunderX2 implementation
+> > > > +	 * which doesn't support the page 1 SMMU register space.
+> > > > +	 */
+> > > > +	if (smmu->options & ARM_SMMU_OPT_PAGE0_REGS_ONLY)
+> > > > +		res->end = res->size + SZ_64K -1;
+> > > > +
+> > > >  	smmu->base = devm_ioremap_resource(dev, res);
+> > > >  	if (IS_ERR(smmu->base))
+> > > >  		return PTR_ERR(smmu->base);
+> > > 
+> > > 
+> > > This might not work, since platform_device_add is being called from
+> > > iort.c before the res->end gets fixed up here. 
+> > 
+> > It should. You added it with 128k and you get it back with
+> > platform_get_resource(), but before ioremap you shrink the size to
+> > 64k.
+> > 
 > 
-> diff --git a/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt b/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
-> index 5fa73b9d20f5..d81d73aea608 100644
-> --- a/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
-> @@ -1,7 +1,8 @@
-> -* Amlogic Meson8b and GXBB USB2 PHY
-> +* Amlogic Meson8, Meson8b and GXBB USB2 PHY
->  
->  Required properties:
->  - compatible:	Depending on the platform this should be one of:
-> +	"amlogic,meson8-usb2-phy"
->  	"amlogic,meson8b-usb2-phy"
->  	"amlogic,meson-gxbb-usb2-phy"
+> The smmu devices are located at 64k offsets and not at 128k
+> offsets and hence this would be result in resource conflict during
+> platform_add_device ?
 
-Please split the dt binding documentation into a separate patch.
+Right, we have overlapping io spaces then. So we need to change also
+iort.c for the fix.
 
-Thanks
-Kishon
+-Robert
