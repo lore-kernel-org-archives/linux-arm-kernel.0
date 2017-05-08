@@ -1,60 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 8 May 2017 14:27:04 +0100
-Subject: [PATCH] clocksource: arm_arch_timer: fix
- arch_timer_mem_find_best_frame
-In-Reply-To: <1494246747-17267-1-git-send-email-sudeep.holla@arm.com>
-References: <1494246747-17267-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20170508132703.GD5480@leverpostej>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Mon, 8 May 2017 21:56:55 +0800
+Subject: [PATCH 2/2] arm64: Add dump_backtrace() in show_regs
+In-Reply-To: <1494251815-55961-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1494251815-55961-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1494251815-55961-2-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 08, 2017 at 01:32:27PM +0100, Sudeep Holla wrote:
-> arch_timer_mem_find_best_frame looks through ARCH_TIMER_MEM_MAX_FRAMES
-> frames even after finding matches to ensure the best frame is chosen,
-> which means the variable frame will point to the last valid frame but
-> not necessarily the best frame.
-> 
-> On Juno, we get the following error as wrong frame is returned as the
-> best frame from arch_timer_mem_find_best_frame:
-> "
-> 	arch_timer: Unable to map frame @ 0x0000000000000000
-> 	arch_timer: Frame missing phys irq.
-> 	Failed to initialize '/timer at 2a810000': -22
-> "
-> 
-> This patch fixes the issue by correctly returning the best frame from
-> arch_timer_mem_find_best_frame.
-> 
-> Fixes: c389d701dfb7 ("clocksource: arm_arch_timer: split MMIO timer probing.")
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+When the system trigger a softlockup(eg, infinite loop when
+PREEMPT_NONE), it only shows regs without stack trace, which
+makes it difficult to adress the issue.
 
-Sorry about this; thanks for correcting it.
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm64/include/asm/stacktrace.h | 1 +
+ arch/arm64/kernel/process.c         | 1 +
+ arch/arm64/kernel/traps.c           | 2 +-
+ 3 files changed, 3 insertions(+), 1 deletion(-)
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Daniel, Thomas, could you please pick this up?
-
-Thanks,
-Mark.
-
-> ---
->  drivers/clocksource/arm_arch_timer.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index a1fb918b8021..4bed671e490e 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -1268,7 +1268,7 @@ arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
->  		pr_err("Unable to find a suitable frame in timer @ %pa\n",
->  			&timer_mem->cntctlbase);
->  
-> -	return frame;
-> +	return best_frame;
->  }
->  
->  static int __init
-> -- 
-> 2.7.4
+diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+index 801a16db..5b6eafc 100644
+--- a/arch/arm64/include/asm/stacktrace.h
++++ b/arch/arm64/include/asm/stacktrace.h
+@@ -30,5 +30,6 @@ struct stackframe {
+ extern int unwind_frame(struct task_struct *tsk, struct stackframe *frame);
+ extern void walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
+ 			    int (*fn)(struct stackframe *, void *), void *data);
++extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk);
+ 
+ #endif	/* __ASM_STACKTRACE_H */
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index ae2a835..af1ea25 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -210,6 +210,7 @@ void __show_regs(struct pt_regs *regs)
+ void show_regs(struct pt_regs * regs)
+ {
+ 	__show_regs(regs);
++	dump_backtrace(regs, NULL);
+ }
+ 
+ static void tls_thread_flush(void)
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index d4d6ae0..368c3c8 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -140,7 +140,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
+ 	}
+ }
+ 
+-static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
++void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ {
+ 	struct stackframe frame;
+ 	unsigned long irq_stack_ptr;
+-- 
+1.7.12.4
