@@ -1,28 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 8 May 2017 22:33:15 +0200
-Subject: [PATCH 2/4] ata: Add DT bindings for the Gemini SATA bridge
-In-Reply-To: <3791456.ZibJefW5cI@amdc3058>
-References: <20170506121053.11554-1-linus.walleij@linaro.org>
- <CGME20170506121119epcas5p437ea69e802ba94bd7df83d0bbac1b0bc@epcas5p4.samsung.com>
- <20170506121053.11554-2-linus.walleij@linaro.org>
- <3791456.ZibJefW5cI@amdc3058>
-Message-ID: <CACRpkdYz9Oka0SGJDTr=y4EN-VfggbuKY2s5X43oXg1dgjh1nw@mail.gmail.com>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Mon, 8 May 2017 21:48:58 +0100
+Subject: [PATCH v9 1/4] syscalls: Verify address limit before returning
+ to user-mode
+In-Reply-To: <CAG48ez0Hz=CimkPwuq903tgJkGj8gXUtiQJJb-P2zUes6bd6Hw@mail.gmail.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <CAGXu5jKZRESgGhZ6GEoO784Q1G8V0DPcwM1T2PpyTqvEAsrUdg@mail.gmail.com>
+ <20170508140230.23kxf2kfeazeo4zr@gmail.com>
+ <CAG48ez0Hz=CimkPwuq903tgJkGj8gXUtiQJJb-P2zUes6bd6Hw@mail.gmail.com>
+Message-ID: <20170508204858.GT29622@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 8, 2017 at 12:49 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> On Saturday, May 06, 2017 02:10:51 PM Linus Walleij wrote:
+On Mon, May 08, 2017 at 04:06:35PM +0200, Jann Horn wrote:
 
->> +  Mode 3: ata0 master <-> sata0
->> +          ata1 slave  <-> sata1
->
-> ata0 slave?
->
->> +          ata1 master and slave interfaces brought out
->> +               on IDE pads
+> I think Kees might be talking about
+> https://bugs.chromium.org/p/project-zero/issues/detail?id=822, fixed in
+> commit e6978e4bf181fb3b5f8cb6f71b4fe30fbf1b655c. The issue was that
+> perf code that can run in pretty much any context called access_ok().
 
-Of course. Thanks for reading close, much appreciated!
+And that commit has *NOT* solved the problem.  perf_callchain_user()
+can be called synchronously, without passing through that code.
+Tracepoint shite...
 
-Yours,
-Linus Walleij
+That set_fs() should be done in get_perf_callchain(), just around the call of
+perf_callchain_user().  Along with pagefault_disable(), actually.
+
+BTW, that's a nice example demonstrating why doing that on the kernel
+boundary is wrong.  Wider (in theory) area being "protected" => easier
+to miss the ways not crossing its border.
