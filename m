@@ -1,93 +1,61 @@
-From: ayaka@soulik.info (Randy Li)
-Date: Tue,  9 May 2017 00:34:17 +0800
-Subject: [PATCH] soc: rockchip: power-domain: export idle request
-Message-ID: <20170508163417.15017-1-ayaka@soulik.info>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 May 2017 11:36:26 -0500
+Subject: [v2, 1/5] mmc: dt: add compatible into eSDHC required properties
+In-Reply-To: <DB6PR0401MB2536CB3661070921AEA0C5B6F8EB0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+References: <1493894940-47452-1-git-send-email-yangbo.lu@nxp.com>
+ <1493894940-47452-2-git-send-email-yangbo.lu@nxp.com>
+ <20170505023651.GW18578@dragon>
+ <DB6PR0401MB2536CB3661070921AEA0C5B6F8EB0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+Message-ID: <20170508163626.q2tyiat2zmo7taju@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to put the power status of HEVC/RKVDEC IP into IDLE
-unless we can't reset that IP or the SoC would crash down.
-rockchip_pmu_idle_request(dev, true)---> enter idle
-rockchip_pmu_idle_request(dev, false)---> exit idle
+On Fri, May 05, 2017 at 03:01:04AM +0000, Y.B. Lu wrote:
+> Hi Shawn,
+> 
+> 
+> > -----Original Message-----
+> > From: Shawn Guo [mailto:shawnguo at kernel.org]
+> > Sent: Friday, May 05, 2017 10:37 AM
+> > To: Y.B. Lu
+> > Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > ulf.hansson at linaro.org; Rob Herring; Catalin Marinas; Harninder Rai;
+> > Xiaobo Xie
+> > Subject: Re: [v2, 1/5] mmc: dt: add compatible into eSDHC required
+> > properties
+> > 
+> > On Thu, May 04, 2017 at 06:48:56PM +0800, Yangbo Lu wrote:
+> > > This patch is to add compatible into eSDHC required properties.
+> > >
+> > > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> > > ---
+> > > Changes for v2:
+> > > 	- Added this patch.
+> > > ---
+> > >  Documentation/devicetree/bindings/mmc/fsl-esdhc.txt | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
+> > > b/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
+> > > index dedfb02..b04b248 100644
+> > > --- a/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
+> > > +++ b/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
+> > > @@ -7,6 +7,7 @@ This file documents differences between the core
+> > > properties described  by mmc.txt and the properties used by the sdhci-
+> > esdhc driver.
+> > >
+> > >  Required properties:
+> > > +  - compatible : should be "fsl,esdhc", or "fsl,<chip>-esdhc".
+> > 
+> > I think either supported <chip> or the compatible should be listed
+> > explicitly.
+> > 
+> 
+> [Lu Yangbo-B47093] I think the reason we use <chip> is to avoid listing too much chips, and to avoid doc updating if new chips are added.
+> The checkpatch script also had considered that.
+> 
+> Currently there're about 20 platforms with "fsl,<chip>-esdhc" compatible in kernel dts.
 
-Only the video codec drivers of rockchip platform would
-request this patch currently.
+Yes, but it's generally preferred to list possible values of <chip>.
 
-I am not sure whether it is necessary to add a new function
-at generic power domain. I want someone give me some advises
-here.
-
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Signed-off-by: Randy Li <ayaka@soulik.info>
----
- drivers/soc/rockchip/pm_domains.c | 24 ++++++++++++++++++++++++
- include/linux/rockchip_pmu.h      | 15 +++++++++++++++
- 2 files changed, 39 insertions(+)
- create mode 100644 include/linux/rockchip_pmu.h
-
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 796c46a..c1bff1c 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -18,6 +18,7 @@
- #include <linux/clk.h>
- #include <linux/regmap.h>
- #include <linux/mfd/syscon.h>
-+#include <linux/rockchip_pmu.h>
- #include <dt-bindings/power/rk3288-power.h>
- #include <dt-bindings/power/rk3328-power.h>
- #include <dt-bindings/power/rk3368-power.h>
-@@ -179,6 +180,29 @@ static int rockchip_pmu_set_idle_request(struct rockchip_pm_domain *pd,
- 	return 0;
- }
- 
-+int rockchip_pmu_idle_request(struct device *dev, bool idle)
-+{
-+	struct generic_pm_domain *genpd;
-+	struct rockchip_pm_domain *pd;
-+	int ret;
-+
-+	if (IS_ERR_OR_NULL(dev))
-+		return -EINVAL;
-+
-+	if (IS_ERR_OR_NULL(dev->pm_domain))
-+		return -EINVAL;
-+
-+	genpd = pd_to_genpd(dev->pm_domain);
-+	pd = to_rockchip_pd(genpd);
-+
-+	mutex_lock(&pd->pmu->mutex);
-+	ret = rockchip_pmu_set_idle_request(pd, idle);
-+	mutex_unlock(&pd->pmu->mutex);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(rockchip_pmu_idle_request);
-+
- static int rockchip_pmu_save_qos(struct rockchip_pm_domain *pd)
- {
- 	int i;
-diff --git a/include/linux/rockchip_pmu.h b/include/linux/rockchip_pmu.h
-new file mode 100644
-index 0000000..720b331
---- /dev/null
-+++ b/include/linux/rockchip_pmu.h
-@@ -0,0 +1,15 @@
-+/*
-+ * pm_domain.h - Definitions and headers related to device power domains.
-+ *
-+ * Copyright (C) 2017 Randy Li <ayaka@soulik.info>.
-+ *
-+ * This file is released under the GPLv2.
-+ */
-+
-+#ifndef _LINUX_ROCKCHIP_PM_H
-+#define _LINUX_ROCKCHIP_PM_H
-+#include <linux/device.h>
-+
-+int rockchip_pmu_idle_request(struct device *dev, bool idle);
-+
-+#endif /* _LINUX_ROCKCHIP_PM_H */
--- 
-2.9.3
+Rob
