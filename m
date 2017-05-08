@@ -1,52 +1,28 @@
-From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Mon, 8 May 2017 22:33:25 +0200
-Subject: Regression: 442ec4c04d1: PCI: dwc: all: Split struct pcie_port
- into host-only and core structures
-In-Reply-To: <20170508175536.GA3305@red-moon>
-References: <20170508150224.GA7458@collabora.com>
- <1494261248.2322.21.camel@pengutronix.de>
- <20170508175536.GA3305@red-moon>
-Message-ID: <20170508203325.GB9791@collabora.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 8 May 2017 22:33:15 +0200
+Subject: [PATCH 2/4] ata: Add DT bindings for the Gemini SATA bridge
+In-Reply-To: <3791456.ZibJefW5cI@amdc3058>
+References: <20170506121053.11554-1-linus.walleij@linaro.org>
+ <CGME20170506121119epcas5p437ea69e802ba94bd7df83d0bbac1b0bc@epcas5p4.samsung.com>
+ <20170506121053.11554-2-linus.walleij@linaro.org>
+ <3791456.ZibJefW5cI@amdc3058>
+Message-ID: <CACRpkdYz9Oka0SGJDTr=y4EN-VfggbuKY2s5X43oXg1dgjh1nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 08, 2017 at 06:55:36PM +0100, Lorenzo Pieralisi wrote:
-> On Mon, May 08, 2017 at 06:34:08PM +0200, Lucas Stach wrote:
-> > Am Montag, den 08.05.2017, 17:02 +0200 schrieb Peter Senna Tschudin:
-> > > Hello Kishon,
-> > > 
-> > > Our iMX6 hardware (imx6q-b850v3.dts) is not booting with latest
-> > > linux-next and I could bisect until:
-> > > 
-> > > commit 442ec4c04d1235f8c664a74004dae54a7a574d18
-> > > Author: Kishon Vijay Abraham I <kishon@ti.com>
-> > > Date:   Wed Feb 15 18:48:14 2017 +0530
-> > > 
-> > >     PCI: dwc: all: Split struct pcie_port into host-only and core structures
-> > > 
-> > > Which seem to be causing our issues. Our device (imx6q-b850v3.dts) boots
-> > > fine with 4.10, and also boots if we disable pcie with:
-> > 
-> > Are you sure about this bisect? It seems more likely that the secondary
-> > bus scanning goes wrong. It seems Lorenzo Pieralisi's cfg space
-> > non-posting patches landed in next, so the root cause of this might just
-> > be the driver hooking the wrong fault code now.
-> > 
-> > Async and synchronous aborts are different fault codes on ARM. Can you
-> > see of removing the "16 +" in hook_fault_code() in
-> > drivers/pci/dwc/pci-imx6.c fixes this issue?
-> 
-> You can also s/pci_remap_cfgspace/ioremap in pcie-designware-host.c
-> to see if my patches are the issue, it is quite a mechanical change.
+On Mon, May 8, 2017 at 12:49 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+> On Saturday, May 06, 2017 02:10:51 PM Linus Walleij wrote:
 
-No change. Exactly same issue, but I noticed that
-devm_pci_remap_cfgspace() is called twice for the same device, can this
-be a problem?
+>> +  Mode 3: ata0 master <-> sata0
+>> +          ata1 slave  <-> sata1
+>
+> ata0 slave?
+>
+>> +          ata1 master and slave interfaces brought out
+>> +               on IDE pads
 
-...
-[    0.505069] OF: PCI: host bridge /soc/pcie at 1ffc000 ranges:
-[    0.510586] OF: PCI:    IO 0x01f80000..0x01f8ffff -> 0x00000000
-[    0.516474] OF: PCI:   MEM 0x01000000..0x01efffff -> 0x01000000
-[    0.522420] imx6q-pcie 1ffc000.pcie: devm_pci_remap_cfgspace()
-[    0.528656] imx6q-pcie 1ffc000.pcie: devm_pci_remap_cfgspace()
-...
+Of course. Thanks for reading close, much appreciated!
+
+Yours,
+Linus Walleij
