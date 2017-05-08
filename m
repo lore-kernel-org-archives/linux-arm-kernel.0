@@ -1,76 +1,81 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Mon, 8 May 2017 12:51:34 -0700
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com>
- <20170508075209.7aluvpwildw325rf@gmail.com>
- <1494256932.1167.1.camel@gmail.com>
- <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
-Message-ID: <CAJcbSZGhE0ecpqS4jmezqwGXf_o4cakTVkE+m67kJJvhao1ENA@mail.gmail.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Mon, 8 May 2017 13:54:44 -0600
+Subject: [PATCH V15 11/11] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <20170508174058.5hbujeblxq5z6iwa@pd.tnic>
+References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
+ <1492556723-9189-12-git-send-email-tbaicar@codeaurora.org>
+ <20170508174058.5hbujeblxq5z6iwa@pd.tnic>
+Message-ID: <dade63eb-b231-d7a5-f307-9737d7b088f2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 8, 2017 at 8:26 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Mon, May 8, 2017 at 8:22 AM, Daniel Micay <danielmicay@gmail.com> wrote:
->> On Mon, 2017-05-08 at 09:52 +0200, Ingo Molnar wrote:
->>>
->>> ... it's just not usable in that form for a regular maintenance flow.
->>>
->>> So what would be more useful is to add a specific Sparse check that
->>> only checks
->>> KERNEL_DS, to add it as a regular (.config driven) build option and
->>> make sure the
->>> kernel build has zero warnings.
->>>
->>> From that point on we can declare that this kind of bug won't occur
->>> anymore, if
->>> the Sparse implementation of the check is correct.
->>>
->>> But there's a (big) problem with that development model: Sparse is not
->>> part of the
->>> kernel tree and adding a feature to it while making the kernel depend
->>> on that
->>> brand new feature is a logistical nightmare. The overhead is quite
->>> similar to
->>> adding new features to a compiler - it happens at a glacial pace and
->>> is only done
->>> for major features really, at considerable expense. I don't think this
->>> is an
->>> adequate model for 'extended syntax checking' of the kernel,
->>> especially when it
->>> comes to correctness that has such obvious security impact.
->>>
->>> Thanks,
->>>
->>>       Ingo
+On 5/8/2017 11:40 AM, Borislav Petkov wrote:
+> On Tue, Apr 18, 2017 at 05:05:23PM -0600, Tyler Baicar wrote:
+>> Currently external aborts are unsupported by the guest abort
+>> handling. Add handling for SEAs so that the host kernel reports
+>> SEAs which occur in the guest kernel.
 >>
->> There's the option of using GCC plugins now that the infrastructure was
->> upstreamed from grsecurity. It can be used as part of the regular build
->> process and as long as the analysis is pretty simple it shouldn't hurt
->> compile time much.
->
-> Well, and that the situation may arise due to memory corruption, not
-> from poorly-matched set_fs() calls, which static analysis won't help
-> solve. We need to catch this bad kernel state because it is a very bad
-> state to run in.
+>> When an SEA occurs in the guest kernel, the guest exits and is
+>> routed to kvm_handle_guest_abort(). Prior to this patch, a print
+>> message of an unsupported FSC would be printed and nothing else
+>> would happen. With this patch, the code gets routed to the APEI
+>> handling of SEAs in the host kernel to report the SEA information.
+>>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Acked-by: Christoffer Dall <cdall@linaro.org>
+...
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +/*
+>>    * Dispatch a data abort to the relevant handler.
+>>    */
+>>   asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>> index 612deb3..d286248 100644
+>> --- a/drivers/acpi/apei/ghes.c
+>> +++ b/drivers/acpi/apei/ghes.c
+>> @@ -812,17 +812,18 @@ static int ghes_notify_sci(struct notifier_block *this,
+>>   #ifdef CONFIG_ACPI_APEI_SEA
+>>   static LIST_HEAD(ghes_sea);
+>>   
+>> -void ghes_notify_sea(void)
+>> +int ghes_notify_sea(void)
+>>   {
+>>   	struct ghes *ghes;
+>> +	int ret = -ENOENT;
+>>   
+>> -	/*
+>> -	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+>> -	 * rcu_read_lock().
+>> -	 */
+>> +	rcu_read_lock();
+>>   	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
+>> -		ghes_proc(ghes);
+>> +		if(!ghes_proc(ghes))
+>> +			ret = 0;
+> What is the idea here: the first time ghes_proc() returns 0, ret is set
+> to 0 and all errors after it will be practically ignored. Looks like it
+> needs more love.
+This was discussed in the v12 and v13 patch series. There is existing 
+code in kvm_handle_guest_abort
+for injecting an abort back into the guest. We only want to do that if 
+it was an abort that was not
+handled by the firmware first handling. So here we verify that at least 
+one of the SEA error sources
+successfully reported an error record sent from the firmware. If there 
+were no errors reported by
+firmware, then we want to continue with the current implementation that 
+will inject the virtual
+abort. (kvm_inject_vabt)
 
-Of course, I agree with Kees points on this and previous emails.
-
-A static analysis solution is hard to scale across functions and build
-time can suffer. I don't think the coverage will be good enough to
-consider this change and static analysis as similar.
-
->
-> -Kees
->
-> --
-> Kees Cook
-> Pixel Security
-
-
+Thanks,
+Tyler
 
 -- 
-Thomas
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
