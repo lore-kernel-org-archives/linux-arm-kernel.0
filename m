@@ -1,49 +1,131 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 8 May 2017 22:02:11 +0200
-Subject: [PATCH] phy: meson8b-usb2: add support for the USB PHY on Meson8
- SoCs
-In-Reply-To: <950abc53-df2d-93dd-68d1-e9868445bb93@ti.com>
-References: <20170506173625.19501-1-martin.blumenstingl@googlemail.com>
- <950abc53-df2d-93dd-68d1-e9868445bb93@ti.com>
-Message-ID: <CAFBinCDed096pnD-mm+Y1iRXfZgBkZPgVjH537cUsZ+qd6g-2g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  8 May 2017 22:07:20 +0200
+Subject: [PATCH 1/2 v2] reset: Add DT bindings for the Gemini reset controller
+Message-ID: <20170508200720.26145-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 8, 2017 at 2:10 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Saturday 06 May 2017 11:06 PM, Martin Blumenstingl wrote:
->> Meson8 uses the same USB PHY as found on the Meson8b and GXBB SoCs. Add
->> a new of_device_id to indicate this. Also update the documentation
->> (devicetree binding, Kconfig and MODULE_DESCRIPTION) accordingly.
->>
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> ---
->>  Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt | 3 ++-
->>  drivers/phy/Kconfig                                        | 4 ++--
->>  drivers/phy/phy-meson8b-usb2.c                             | 5 +++--
->>  3 files changed, 7 insertions(+), 5 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt b/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
->> index 5fa73b9d20f5..d81d73aea608 100644
->> --- a/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
->> +++ b/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
->> @@ -1,7 +1,8 @@
->> -* Amlogic Meson8b and GXBB USB2 PHY
->> +* Amlogic Meson8, Meson8b and GXBB USB2 PHY
->>
->>  Required properties:
->>  - compatible:        Depending on the platform this should be one of:
->> +     "amlogic,meson8-usb2-phy"
->>       "amlogic,meson8b-usb2-phy"
->>       "amlogic,meson-gxbb-usb2-phy"
->
-> Please split the dt binding documentation into a separate patch.
-OK, however I guess I'll wait for a few days until that restructuring
-patch is merged
+This is a simple reset controller in a single 32bit
+register.
 
-thanks for reviewing this so quick!
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Move the reset controller node to be the same as the syscon
+  node, no need for a specific child node.
+- Add an include file with nice #defines.
+---
+ .../bindings/reset/cortina,gemini-reset.txt        | 58 ++++++++++++++++++++++
+ include/dt-bindings/reset/cortina,gemini-reset.h   | 36 ++++++++++++++
+ 2 files changed, 94 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/cortina,gemini-reset.txt
+ create mode 100644 include/dt-bindings/reset/cortina,gemini-reset.h
 
-
-Regards,
-Martin
+diff --git a/Documentation/devicetree/bindings/reset/cortina,gemini-reset.txt b/Documentation/devicetree/bindings/reset/cortina,gemini-reset.txt
+new file mode 100644
+index 000000000000..aa3d1b2a9677
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/cortina,gemini-reset.txt
+@@ -0,0 +1,58 @@
++Cortina Gemini Reset Controller
++
++This reset controller is found in Cortina Systems CS3516 and
++the predecessor StorLink SL3516.
++
++Required properties:
++- compatible: "cortina,gemini-reset"
++- #reset-cells: Must be 1
++
++The Gemini reset controller must be identical to the system controller node.
++Apart from this it follows the standard reset controller bindings.
++
++Valid reset line values:
++
++0:  DRAM controller
++1:  Flash controller
++2:  IDE controller
++3:  RAID controller
++4:  Security module
++5:  GMAC0 (ethernet)
++6:  GMAC1 (ethernet)
++7:  PCI host bridge
++8:  USB0 USB host controller
++9:  USB1 USB host controller
++10: General DMA controller
++11: APB bridge
++12: LPC (Low Pin Count) controller
++13: LCD module
++14: Interrupt controller 0
++15: Interrupt controller 1
++16: RTC module
++17: Timer module
++18: UART controller
++19: SSP controller
++20: GPIO0 GPIO controller
++21: GPIO1 GPIO controller
++22: GPIO2 GPIO controller
++23: Watchdog timer
++24: External device reset
++25: CIR module (infrared)
++26: SATA0 SATA bridge
++27: SATA1 SATA bridge
++28: TVE TV Encoder module
++29: Reserved
++30: CPU1 reset
++31: Global soft reset
++
++These also have shorthand defines in the include file:
++<dt-bindings/reset/cortina,gemini-reset.h>
++
++Example:
++
++syscon: syscon at 40000000 {
++	compatible = "cortina,gemini-syscon", "cortina,gemini-reset",
++		     "syscon", "simple-mfd";
++	reg = <0x40000000 0x1000>;
++	#reset-cells = <1>;
++};
+diff --git a/include/dt-bindings/reset/cortina,gemini-reset.h b/include/dt-bindings/reset/cortina,gemini-reset.h
+new file mode 100644
+index 000000000000..aebecae43721
+--- /dev/null
++++ b/include/dt-bindings/reset/cortina,gemini-reset.h
+@@ -0,0 +1,36 @@
++#ifndef _DT_BINDINGS_RESET_CORTINA_GEMINI_H
++#define _DT_BINDINGS_RESET_CORTINA_GEMINI_H
++
++#define GEMINI_RESET_DRAM	0
++#define GEMINI_RESET_FLASH	1
++#define GEMINI_RESET_IDE	2
++#define GEMINI_RESET_RAID	3
++#define GEMINI_RESET_SECURITY	4
++#define GEMINI_RESET_GMAC0	5
++#define GEMINI_RESET_GMAC1	6
++#define GEMINI_RESET_PCI	7
++#define GEMINI_RESET_USB0	8
++#define GEMINI_RESET_USB1	9
++#define GEMINI_RESET_DMAC	10
++#define GEMINI_RESET_APB	11
++#define GEMINI_RESET_LPC	12
++#define GEMINI_RESET_LCD	13
++#define GEMINI_RESET_INTCON0	14
++#define GEMINI_RESET_INTCON1	15
++#define GEMINI_RESET_RTC	16
++#define GEMINI_RESET_TIMER	17
++#define GEMINI_RESET_UART	18
++#define GEMINI_RESET_SSP	19
++#define GEMINI_RESET_GPIO0	20
++#define GEMINI_RESET_GPIO1	21
++#define GEMINI_RESET_GPIO2	22
++#define GEMINI_RESET_WDOG	23
++#define GEMINI_RESET_EXTERN	24
++#define GEMINI_RESET_CIR	25
++#define GEMINI_RESET_SATA0	26
++#define GEMINI_RESET_SATA1	27
++#define GEMINI_RESET_TVE	28
++#define GEMINI_RESET_CPU1	30
++#define GEMINI_RESET_GLOBAL	31
++
++#endif
+-- 
+2.9.3
