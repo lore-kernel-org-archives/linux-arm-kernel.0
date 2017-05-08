@@ -1,274 +1,115 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Mon, 8 May 2017 09:52:09 +0200
-Subject: [PATCH v9 1/4] syscalls: Verify address limit before returning
- to user-mode
-In-Reply-To: <20170508073352.caqe3fqf7nuxypgi@gmail.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com>
-Message-ID: <20170508075209.7aluvpwildw325rf@gmail.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 8 May 2017 10:27:07 +0200
+Subject: [PATCH] [media] imx: csi: retain current field order and
+ colorimetry setting as default
+In-Reply-To: <1491486929.2392.29.camel@pengutronix.de>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-22-git-send-email-steve_longerbeam@mentor.com>
+ <1491486929.2392.29.camel@pengutronix.de>
+Message-ID: <0632df59-10e7-1e03-c0f6-eb7c90b83c0d@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Philipp,
 
-* Ingo Molnar <mingo@kernel.org> wrote:
+Sorry for the very long delay, but I finally had some time to think about this.
 
-> ... and even a relatively simple static analysis tool ought to be able to see 
-> through that.
+On 04/06/2017 03:55 PM, Philipp Zabel wrote:
+> If the the field order is set to ANY in set_fmt, choose the currently
+> set field order. If the colorspace is set to DEFAULT, choose the current
+> colorspace.  If any of xfer_func, ycbcr_enc or quantization are set to
+> DEFAULT, either choose the current setting, or the default setting for the
+> new colorspace, if non-DEFAULT colorspace was given.
 > 
-> I'd even suggest we do it not like Sparse builds are done today, but in a more 
-> integrated fashion: do static analysis as part of a typical kernel defconfig 
-> build and not tolerate warnings but go for a 'zero warnings' policy like Linus 
-> uses for modconfig builds.
+> This allows to let field order and colorimetry settings be propagated
+> from upstream by calling media-ctl on the upstream entity source pad,
+> and then call media-ctl on the sink pad to manually set the input frame
+> interval, without changing the already set field order and colorimetry
+> information.
 > 
-> _That_ solution I'd feel very, very good about - it would be so much better than 
-> any runtime checks...
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+> This is based on imx-media-staging-md-v14, and it is supposed to allow
+> configuring the pipeline with media-ctl like this:
+> 
+> 1) media-ctl --set-v4l2 "'tc358743 1-000f':0[fmt:UYVY8_1X16/1920x1080]"
+> 2) media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY8_1X16/1920x108]"
+> 3) media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY8_1X16/1920x1080]"
+> 4) media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY8_1X16/1920x1080 at 1/60]"
+> 5) media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/1920x1080 at 1/30]"
+> 
+> Without having step 4) overwrite the colorspace and field order set on
+> 'ipu1_csi0':0 by the propagation in step 3).
+> ---
+>  drivers/staging/media/imx/imx-media-csi.c | 34 +++++++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+> 
+> diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+> index 64dc454f6b371..d94ce1de2bf05 100644
+> --- a/drivers/staging/media/imx/imx-media-csi.c
+> +++ b/drivers/staging/media/imx/imx-media-csi.c
+> @@ -1325,6 +1325,40 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
+>  	csi_try_fmt(priv, sensor, cfg, sdformat, crop, compose, &cc);
+>  
+>  	fmt = __csi_get_fmt(priv, cfg, sdformat->pad, sdformat->which);
+> +
+> +	/* Retain current field setting as default */
+> +	if (sdformat->format.field == V4L2_FIELD_ANY)
+> +		sdformat->format.field = fmt->field;
 
-So the problem I have with Sparse is that it is very spammy. For example:
+This is OK.
 
-	make C=1 kernel/sched/
+> +
+> +	/* Retain current colorspace setting as default */
+> +	if (sdformat->format.colorspace == V4L2_COLORSPACE_DEFAULT) {
+> +		sdformat->format.colorspace = fmt->colorspace;
+> +		if (sdformat->format.xfer_func == V4L2_XFER_FUNC_DEFAULT)
+> +			sdformat->format.xfer_func = fmt->xfer_func;
+> +		if (sdformat->format.ycbcr_enc == V4L2_YCBCR_ENC_DEFAULT)
+> +			sdformat->format.ycbcr_enc = fmt->ycbcr_enc;
+> +		if (sdformat->format.quantization == V4L2_QUANTIZATION_DEFAULT)
+> +			sdformat->format.quantization = fmt->quantization;
 
-... produces:
+If sdformat->format.colorspace == V4L2_COLORSPACE_DEFAULT, then you can just copy
+all four fields from fmt to sdformat->format. The other three fields are meaningless
+when colorspace == V4L2_COLORSPACE_DEFAULT.
 
-    kernel/sched/core.c:792:6: warning: symbol 'sched_set_stop_task' was not declared. Should it be static?
-    kernel/sched/core.c:1298:5: warning: symbol 'migrate_swap' was not declared. Should it be static?
-    kernel/sched/core.c:3648:35: warning: symbol 'preempt_schedule_irq' was not declared. Should it be static?
-    ./include/linux/uaccess.h:166:18: warning: incorrect type in argument 1 (different modifiers)
-    ./include/linux/uaccess.h:166:18:    expected void *<noident>
-    ./include/linux/uaccess.h:166:18:    got void const *from
-    ./include/linux/uaccess.h:166:18: warning: incorrect type in argument 1 (different modifiers)
-    ./include/linux/uaccess.h:166:18:    expected void *<noident>
-    ./include/linux/uaccess.h:166:18:    got void const *from
-    ./include/linux/uaccess.h:166:18: warning: incorrect type in argument 1 (different modifiers)
-    ./include/linux/uaccess.h:166:18:    expected void *<noident>
-    ./include/linux/uaccess.h:166:18:    got void const *from
-    ./include/linux/uaccess.h:166:18: warning: incorrect type in argument 1 (different modifiers)
-    ./include/linux/uaccess.h:166:18:    expected void *<noident>
-    ./include/linux/uaccess.h:166:18:    got void const *from
-    kernel/sched/clock.c:80:19: warning: symbol 'sched_clock_running' was not declared. Should it be static?
-    ./include/linux/sched/cputime.h:83:14: warning: expression using sizeof bool
-    ./include/linux/sched/cputime.h:83:14: warning: expression using sizeof bool
-    ./include/linux/sched/cputime.h:83:14: warning: expression using sizeof bool
-    ./include/linux/sched/cputime.h:83:14: warning: expression using sizeof bool
-    ./include/linux/sched/cputime.h:83:14: warning: expression using sizeof bool
-    ./include/linux/sched/cputime.h:83:14: warning: expression using sizeof bool
-    kernel/sched/cputime.c:335:33: warning: context imbalance in 'thread_group_cputime' - different lock contexts for basic block
-    kernel/sched/fair.c:54:14: warning: symbol 'normalized_sysctl_sched_latency' was not declared. Should it be static?
-    kernel/sched/fair.c:75:14: warning: symbol 'normalized_sysctl_sched_min_granularity' was not declared. Should it be static?
-    kernel/sched/fair.c:98:14: warning: symbol 'normalized_sysctl_sched_wakeup_granularity' was not declared. Should it be static?
-    kernel/sched/fair.c:132:14: warning: symbol 'capacity_margin' was not declared. Should it be static?
-    kernel/sched/sched.h:1988:16: error: cannot dereference this type
-    kernel/sched/sched.h:1988:16: error: cannot dereference this type
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: cannot dereference this type
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: cannot dereference this type
-    kernel/sched/fair.c:4688:35: error: marked inline, but without a definition
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/fair.c:5817:19: error: cannot dereference this type
-    kernel/sched/fair.c:5817:19: error: cannot dereference this type
-    kernel/sched/fair.c:5817:19: error: internal error: bad type in derived(11)
-    kernel/sched/fair.c:5817:19: error: cannot dereference this type
-    kernel/sched/fair.c:5817:19: error: incompatible types in comparison expression (different base types)
-    kernel/sched/fair.c:5817:19: error: cannot dereference this type
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/rt.c:635:6: warning: symbol 'sched_rt_bandwidth_account' was not declared. Should it be static?
-    kernel/sched/sched.h:1988:16: error: cannot dereference this type
-    kernel/sched/sched.h:1988:16: error: cannot dereference this type
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: cannot dereference this type
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: cannot dereference this type
-    kernel/sched/sched.h:1988:16: error: cannot dereference this type
-    kernel/sched/sched.h:1988:16: error: cannot dereference this type
-    kernel/sched/sched.h:1988:16: error: internal error: bad type in derived(11)
-    kernel/sched/sched.h:1988:16: error: cannot dereference this type
-    kernel/sched/sched.h:1988:16: error: incompatible types in comparison expression (different base types)
-    kernel/sched/sched.h:1988:16: error: cannot dereference this type
-    ./include/linux/sched/cputime.h:83:14: warning: expression using sizeof bool
-    ./include/linux/sched/cputime.h:83:14: warning: expression using sizeof bool
-    kernel/sched/topology.c:499:28: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:499:28:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:499:28:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:534:28: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:534:28:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:534:28:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:554:28: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:554:28:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:554:28:    got struct sched_group_capacity **<noident>
-    kernel/sched/topology.c:594:36: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:594:36:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:594:36:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:601:24: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:601:24:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:601:24:    got struct sched_group **<noident>
-    kernel/sched/topology.c:602:31: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:602:31:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:602:31:    got struct sched_group_capacity **<noident>
-    kernel/sched/topology.c:1330:39: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1330:39:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1330:39:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:1333:40: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1333:40:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1333:40:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:1337:40: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1337:40:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1337:40:    got struct sched_domain_shared **<noident>
-    kernel/sched/topology.c:1339:40: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1339:40:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1339:40:    got struct sched_group **<noident>
-    kernel/sched/topology.c:1341:40: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1341:40:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1341:40:    got struct sched_group_capacity **<noident>
-    kernel/sched/topology.c:1343:32: warning: incorrect type in argument 1 (different address spaces)
-    kernel/sched/topology.c:1343:32:    expected void [noderef] <asn:3>*__pdata
-    kernel/sched/topology.c:1343:32:    got struct sched_domain **[noderef] sd
-    kernel/sched/topology.c:1345:32: warning: incorrect type in argument 1 (different address spaces)
-    kernel/sched/topology.c:1345:32:    expected void [noderef] <asn:3>*__pdata
-    kernel/sched/topology.c:1345:32:    got struct sched_domain_shared **[noderef] sds
-    kernel/sched/topology.c:1347:32: warning: incorrect type in argument 1 (different address spaces)
-    kernel/sched/topology.c:1347:32:    expected void [noderef] <asn:3>*__pdata
-    kernel/sched/topology.c:1347:32:    got struct sched_group **[noderef] sg
-    kernel/sched/topology.c:1349:32: warning: incorrect type in argument 1 (different address spaces)
-    kernel/sched/topology.c:1349:32:    expected void [noderef] <asn:3>*__pdata
-    kernel/sched/topology.c:1349:32:    got struct sched_group_capacity **[noderef] sgc
-    kernel/sched/topology.c:1261:25: warning: incorrect type in assignment (different address spaces)
-    kernel/sched/topology.c:1261:25:    expected struct sched_domain **[noderef] sd
-    kernel/sched/topology.c:1261:25:    got struct sched_domain *[noderef] <asn:3>*<noident>
-    kernel/sched/topology.c:1265:26: warning: incorrect type in assignment (different address spaces)
-    kernel/sched/topology.c:1265:26:    expected struct sched_domain_shared **[noderef] sds
-    kernel/sched/topology.c:1265:26:    got struct sched_domain_shared *[noderef] <asn:3>*<noident>
-    kernel/sched/topology.c:1269:25: warning: incorrect type in assignment (different address spaces)
-    kernel/sched/topology.c:1269:25:    expected struct sched_group **[noderef] sg
-    kernel/sched/topology.c:1269:25:    got struct sched_group *[noderef] <asn:3>*<noident>
-    kernel/sched/topology.c:1273:26: warning: incorrect type in assignment (different address spaces)
-    kernel/sched/topology.c:1273:26:    expected struct sched_group_capacity **[noderef] sgc
-    kernel/sched/topology.c:1273:26:    got struct sched_group_capacity *[noderef] <asn:3>*<noident>
-    kernel/sched/topology.c:1288:26: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1288:26:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1288:26:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:1295:26: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1295:26:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1295:26:    got struct sched_domain_shared **<noident>
-    kernel/sched/topology.c:1304:26: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1304:26:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1304:26:    got struct sched_group **<noident>
-    kernel/sched/topology.c:1311:26: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1311:26:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1311:26:    got struct sched_group_capacity **<noident>
-    kernel/sched/topology.c:759:30: warning: incorrect type in argument 1 (different address spaces)
-    kernel/sched/topology.c:759:30:    expected void [noderef] <asn:3>*__pdata
-    kernel/sched/topology.c:759:30:    got struct sched_domain **[noderef] sd
-    kernel/sched/topology.c:776:15: warning: incorrect type in assignment (different address spaces)
-    kernel/sched/topology.c:776:15:    expected struct sched_domain **[noderef] sd
-    kernel/sched/topology.c:776:15:    got struct sched_domain *[noderef] <asn:3>*<noident>
-    kernel/sched/topology.c:794:9: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:794:9:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:794:9:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:795:10: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:795:10:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:795:10:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:797:28: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:797:28:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:797:28:    got struct sched_domain_shared **<noident>
-    kernel/sched/topology.c:798:18: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:798:18:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:798:18:    got struct sched_domain_shared **<noident>
-    kernel/sched/topology.c:800:28: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:800:28:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:800:28:    got struct sched_group **<noident>
-    kernel/sched/topology.c:801:18: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:801:18:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:801:18:    got struct sched_group **<noident>
-    kernel/sched/topology.c:803:28: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:803:28:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:803:28:    got struct sched_group_capacity **<noident>
-    kernel/sched/topology.c:804:18: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:804:18:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:804:18:    got struct sched_group_capacity **<noident>
-    kernel/sched/topology.c:848:36: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:848:36:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:848:36:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:954:31: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:954:31:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:954:31:    got struct sched_domain_shared **<noident>
-    kernel/sched/topology.c:1354:21: warning: symbol 'build_sched_domain' was not declared. Should it be static?
-    kernel/sched/topology.c:1409:34: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1409:34:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1409:34:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:1419:28: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1419:28:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1419:28:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:1436:28: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1436:28:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1436:28:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:1446:23: warning: incorrect type in initializer (different address spaces)
-    kernel/sched/topology.c:1446:23:    expected void const [noderef] <asn:3>*__vpp_verify
-    kernel/sched/topology.c:1446:23:    got struct sched_domain **<noident>
-    kernel/sched/topology.c:759:29: warning: dereference of noderef expression
-    kernel/sched/topology.c:777:14: warning: dereference of noderef expression
-    kernel/sched/topology.c:1262:22: warning: dereference of noderef expression
-    kernel/sched/topology.c:1266:22: warning: dereference of noderef expression
-    kernel/sched/topology.c:1270:22: warning: dereference of noderef expression
-    kernel/sched/topology.c:1274:22: warning: dereference of noderef expression
-    kernel/sched/topology.c:1329:29: warning: dereference of noderef expression
-    kernel/sched/topology.c:1336:29: warning: dereference of noderef expression
-    kernel/sched/topology.c:1338:29: warning: dereference of noderef expression
-    kernel/sched/topology.c:1340:29: warning: dereference of noderef expression
-    kernel/sched/topology.c:1343:29: warning: dereference of noderef expression
-    kernel/sched/topology.c:1344:17: warning: dereference of noderef expression
-    kernel/sched/topology.c:1345:29: warning: dereference of noderef expression
-    kernel/sched/topology.c:1346:17: warning: dereference of noderef expression
-    kernel/sched/topology.c:1347:29: warning: dereference of noderef expression
-    kernel/sched/topology.c:1348:17: warning: dereference of noderef expression
-    kernel/sched/topology.c:1349:29: warning: dereference of noderef expression
-    kernel/sched/topology.c:1350:17: warning: dereference of noderef expression
+> +	} else {
+> +		if (sdformat->format.xfer_func == V4L2_XFER_FUNC_DEFAULT) {
+> +			sdformat->format.xfer_func =
+> +				V4L2_MAP_XFER_FUNC_DEFAULT(
+> +						sdformat->format.colorspace);
+> +		}
+> +		if (sdformat->format.ycbcr_enc == V4L2_YCBCR_ENC_DEFAULT) {
+> +			sdformat->format.ycbcr_enc =
+> +				V4L2_MAP_YCBCR_ENC_DEFAULT(
+> +						sdformat->format.colorspace);
+> +		}
+> +		if (sdformat->format.quantization == V4L2_QUANTIZATION_DEFAULT) {
+> +			sdformat->format.quantization =
+> +				V4L2_MAP_QUANTIZATION_DEFAULT(
+> +						cc->cs != IPUV3_COLORSPACE_YUV,
+> +						sdformat->format.colorspace,
+> +						sdformat->format.ycbcr_enc);
+> +		}
 
-... it's just not usable in that form for a regular maintenance flow.
+Is this needed for validation? Currently these fields play no role in the
+default link validation. Which I think is actually the right thing to do,
+unless the subdev can do actual colorspace conversion.
 
-So what would be more useful is to add a specific Sparse check that only checks 
-KERNEL_DS, to add it as a regular (.config driven) build option and make sure the 
-kernel build has zero warnings.
+I would just drop the whole 'else' here.
 
->From that point on we can declare that this kind of bug won't occur anymore, if 
-the Sparse implementation of the check is correct.
+Actually, wouldn't it be better to always just copy this information from
+fmt? This subdev doesn't do any colorspace conversion, it just passes on
+this information. I.e., you can't set it in any meaningful way.
 
-But there's a (big) problem with that development model: Sparse is not part of the 
-kernel tree and adding a feature to it while making the kernel depend on that 
-brand new feature is a logistical nightmare. The overhead is quite similar to 
-adding new features to a compiler - it happens at a glacial pace and is only done 
-for major features really, at considerable expense. I don't think this is an 
-adequate model for 'extended syntax checking' of the kernel, especially when it 
-comes to correctness that has such obvious security impact.
+Regards,
 
-Thanks,
+	Hans
 
-	Ingo
+> +	}
+> +
+>  	*fmt = sdformat->format;
+>  
+>  	if (sdformat->pad == CSI_SINK_PAD) {
+> 
