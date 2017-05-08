@@ -1,48 +1,48 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Mon, 8 May 2017 16:02:30 +0200
-Subject: [PATCH v9 1/4] syscalls: Verify address limit before returning
- to user-mode
-In-Reply-To: <CAGXu5jKZRESgGhZ6GEoO784Q1G8V0DPcwM1T2PpyTqvEAsrUdg@mail.gmail.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com>
- <CAGXu5jKZRESgGhZ6GEoO784Q1G8V0DPcwM1T2PpyTqvEAsrUdg@mail.gmail.com>
-Message-ID: <20170508140230.23kxf2kfeazeo4zr@gmail.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Mon, 8 May 2017 21:56:54 +0800
+Subject: [PATCH 1/2] arm64: Call __show_regs directly
+Message-ID: <1494251815-55961-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Call __show_regs directly in longjmp_break_handler() and
+__do_user_fault(), it is to prepare for dump stack when
+softlockup detected.
 
-* Kees Cook <keescook@chromium.org> wrote:
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm64/kernel/probes/kprobes.c | 4 ++--
+ arch/arm64/mm/fault.c              | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-> > And yes, I realize that there were other such bugs and that such bugs might 
-> > occur in the future - but why not push the overhead of the security check to 
-> > the kernel build phase? I.e. I'm wondering how well we could do static 
-> > analysis during kernel build - would a limited mode of Sparse be good enough 
-> > for that? Or we could add a new static checker to tools/, built from first 
-> > principles and used primarily for extended syntactical checking.
-> 
-> Static analysis is just not going to cover all cases. We've had vulnerabilities 
-> where interrupt handlers left KERNEL_DS set, for example. [...]
-
-Got any commit ID of that bug - was it because a function executed by the 
-interrupt handler leaked KERNEL_DS?
-
-> [...] If there are performance concerns, let's put this behind a CONFIG. 2-5 
-> instructions is not an issue for most people that want this coverage.
-
-That doesn't really _solve_ the performance concerns, it just forces most people 
-to enable it by creating a 'security or performance' false dichotomy ...
-
-> [...] and it still won't catch everything. Bug-finding is different from making 
-> a bug class just unexploitable at all. As we've done before, it's the difference 
-> between trying to find format string attacks vs just removing %n from the format 
-> parser.
-
-No, it does not make it unexploitable, it could still be exploitable if the 
-runtime check is buggy or if there's kernel execution outside of the regular 
-system call paths - there's plenty of such hardware functionality on x86 for 
-example.
-
-Thanks,
-
-	Ingo
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index c5c4594..d849d98 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -522,9 +522,9 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+ 		pr_err("current sp %lx does not match saved sp %lx\n",
+ 		       orig_sp, stack_addr);
+ 		pr_err("Saved registers for jprobe %p\n", jp);
+-		show_regs(saved_regs);
++		__show_regs(saved_regs);
+ 		pr_err("Current registers\n");
+-		show_regs(regs);
++		__show_regs(regs);
+ 		BUG();
+ 	}
+ 	unpause_graph_tracing();
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 37b95df..c3f2b10 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -250,7 +250,7 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 			tsk->comm, task_pid_nr(tsk), inf->name, sig,
+ 			addr, esr);
+ 		show_pte(tsk->mm, addr);
+-		show_regs(regs);
++		__show_regs(regs);
+ 	}
+ 
+ 	tsk->thread.fault_address = addr;
+-- 
+1.7.12.4
