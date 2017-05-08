@@ -1,72 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 May 2017 16:24:00 +0100
-Subject: FIO performance regression in 4.11 kernel vs. 4.10 kernel
- observed on ARM64
-In-Reply-To: <b0a33959-f3be-9b98-51a0-26e8ea145617@fb.com>
-References: <50f528e8-8d8d-b168-784d-607a602ba808@broadcom.com>
- <20170508110754.GI8526@arm.com>
- <CAK8P3a0aqH5X0yoi1EF1=vM_gaJhRkjC66NQJk8enZEES5aYRw@mail.gmail.com>
- <b0a33959-f3be-9b98-51a0-26e8ea145617@fb.com>
-Message-ID: <20170508152400.GB7131@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 8 May 2017 08:24:43 -0700
+Subject: [PATCH v9 1/4] syscalls: Verify address limit before returning to
+ user-mode
+In-Reply-To: <20170508140230.23kxf2kfeazeo4zr@gmail.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <CAGXu5jKZRESgGhZ6GEoO784Q1G8V0DPcwM1T2PpyTqvEAsrUdg@mail.gmail.com>
+ <20170508140230.23kxf2kfeazeo4zr@gmail.com>
+Message-ID: <CAGXu5jJ4iY7QZ9wRu5dmm7RHtLh_V6TQh4huWwLCYPKOr63aiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 08, 2017 at 08:08:55AM -0600, Jens Axboe wrote:
-> On 05/08/2017 05:19 AM, Arnd Bergmann wrote:
-> > On Mon, May 8, 2017 at 1:07 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >> On Fri, May 05, 2017 at 06:37:55PM -0700, Scott Branden wrote:
-> >>> I have updated the kernel to 4.11 and see significant performance
-> >>> drops using fio-2.9.
-> >>>
-> >>> Using FIO the performanced drops from 281 KIOPS to 207 KIOPS using
-> >>> single core and task.
-> >>> Percent performance drop becomes even worse if multi-cores and multi-
-> >>> threads are used.
-> >>>
-> >>> Platform is ARM64 based A72.  Can somebody reproduce the results or
-> >>> know what may have changed to make such a dramatic change?
-> >>>
-> >>> FIO command and resulting log output below using null_blk to remove
-> >>> as many hardware specific driver dependencies as possible.
-> >>>
-> >>> modprobe null_blk queue_mode=2 irqmode=0 completion_nsec=0
-> >>> submit_queues=1 bs=4096
-> >>>
-> >>> taskset 0x1 fio --randrepeat=1 --ioengine=libaio --direct=1 --numjobs=1
-> >>> --gtod_reduce=1 --name=readtest --filename=/dev/nullb0 --bs=4k
-> >>> --iodepth=128 --time_based --runtime=15 --readwrite=read
-> >>
-> >> I can confirm that I also see a ~20% drop in results from 4.10 to 4.11 on
-> >> my AMD Seattle board w/ defconfig, but I can't see anything obvious in the
-> >> log.
-> >>
-> >> Things you could try:
-> >>
-> >>   1. Try disabling CONFIG_NUMA in the 4.11 kernel (this was enabled in
-> >>      defconfig between the releases).
-> >>
-> >>   2. Try to reproduce on an x86 box
-> >>
-> >>   3. Have a go at bisecting the issue, so we can revert the offender if
-> >>      necessary.
-> > 
-> > One more thing to try early: As 4.11 gained support for blk-mq I/O
-> > schedulers compared to 4.10, null_blk will now also need some extra
-> > cycles for each I/O request. Try loading the driver with "queue_mode=0"
-> > or "queue_mode=1" instead of "queue_mode=2".
-> 
-> Since you have 1 submit queues set, you are being loaded with deadline
-> attached. To compare 4.10 and 4.11, with queue_mode=2 and submit_queues=1,
-> after loading null_blk in 4.11, do:
-> 
-> # echo none > /sys/block/nullb0/queue/scheduler
-> 
-> and re-test.
+On Mon, May 8, 2017 at 7:02 AM, Ingo Molnar <mingo@kernel.org> wrote:
+>
+> * Kees Cook <keescook@chromium.org> wrote:
+>
+>> > And yes, I realize that there were other such bugs and that such bugs might
+>> > occur in the future - but why not push the overhead of the security check to
+>> > the kernel build phase? I.e. I'm wondering how well we could do static
+>> > analysis during kernel build - would a limited mode of Sparse be good enough
+>> > for that? Or we could add a new static checker to tools/, built from first
+>> > principles and used primarily for extended syntactical checking.
+>>
+>> Static analysis is just not going to cover all cases. We've had vulnerabilities
+>> where interrupt handlers left KERNEL_DS set, for example. [...]
+>
+> Got any commit ID of that bug - was it because a function executed by the
+> interrupt handler leaked KERNEL_DS?
 
-On my setup, doing this restored a bunch of the performance, but the numbers
-are still ~5% worse than 4.10 (as opposed to ~20% worse with mq-deadline).
-Disabling NUMA as well cuts this down to ~2%.
+Ah, it was an exception handler, but the one I was thinking of was this:
+https://lwn.net/Articles/419141/
 
-Scott -- do you see the same sort of thing?
+>> [...] If there are performance concerns, let's put this behind a CONFIG. 2-5
+>> instructions is not an issue for most people that want this coverage.
+>
+> That doesn't really _solve_ the performance concerns, it just forces most people
+> to enable it by creating a 'security or performance' false dichotomy ...
 
-Will
+That's fair, but what I'm trying to say is that many people will want
+this, so rejecting it because it's 2 more instructions seems
+unreasonable. We have had much more invasive changes added to the
+kernel.
+
+>> [...] and it still won't catch everything. Bug-finding is different from making
+>> a bug class just unexploitable at all. As we've done before, it's the difference
+>> between trying to find format string attacks vs just removing %n from the format
+>> parser.
+>
+> No, it does not make it unexploitable, it could still be exploitable if the
+> runtime check is buggy or if there's kernel execution outside of the regular
+> system call paths - there's plenty of such hardware functionality on x86 for
+> example.
+
+Fine, but this is splitting hairs. This does protect a specific
+situation, and it does so very cheaply. The real fix would be to
+remove set_fs() entirely. :P
+
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
