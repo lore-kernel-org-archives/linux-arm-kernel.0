@@ -1,33 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 May 2017 11:24:43 -0500
-Subject: [PATCH v2 17/20] dt-bindings: display: sun4i: Add
- allwinner,tcon-channel property
-In-Reply-To: <2f00be9d75b68090ffed30654be65132a156a317.1493812478.git-series.maxime.ripard@free-electrons.com>
-References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
- <2f00be9d75b68090ffed30654be65132a156a317.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20170508162443.faox4hm6jmfqccwt@rob-hp-laptop>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 08 May 2017 18:27:02 +0200
+Subject: [PATCH v5 0/5] Add ARM Mali Midgard device tree bindings and gpu
+ node for rk3288
+In-Reply-To: <cover.1493804968.git.guillaume.tucker@collabora.com>
+References: <cover.1493804968.git.guillaume.tucker@collabora.com>
+Message-ID: <12996903.t3AZceNVOh@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 01:59:54PM +0200, Maxime Ripard wrote:
-> The Allwinner Timings Controller has two, mutually exclusive, channels.
-> When the binding has been introduced, it was assumed that there would be
-> only a single user per channel in the system.
+Am Mittwoch, 3. Mai 2017, 10:56:24 CEST schrieb Guillaume Tucker:
+> The ARM Mali Midgard GPU kernel driver is only available
+> out-of-tree and is not going to be merged in its current form.
+> However, it would be useful to have its device tree bindings
+> merged.  In particular, this would enable distributions to create
+> working driver packages (dkms...) without having to patch the
+> kernel.
 > 
-> While this is likely for the channel 0 which only connects to LCD displays,
-> it turns out that the channel 1 can be connected to multiple controllers in
-> the SoC (HDMI and TV encoders for example). And while the simultaneous use
-> of HDMI and TV outputs cannot be achieved, switching from one to the other
-> at runtime definitely sounds plausible.
+> The bindings for the earlier Mali Utgard GPU family have already
+> been merged, so this is essentially the same scenario but for
+> newer GPUs (Mali-T604 ~ Mali-T880).
 > 
-> Add an extra property, allwinner,tcon-channel, to specify for a given
-> endpoint which TCON channel it is connected to, while falling back to the
-> previous mechanism if that property is missing.
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 11 ++++---
->  1 file changed, 7 insertions(+), 4 deletions(-)
+> This series of patches first imports the bindings from the latest
+> driver release with some clean-up then adds a gpu node for the
+> rk3288 SoC.  This was successfully tested on Radxa Rock2 Square,
+> Firefly, Veyron Minnie and Jerry boards using Mali kernel driver
+> r16p0 and r12p0 user-space binary.
 
-Acked-by: Rob Herring <robh@kernel.org>
+The actual devicetree parts are all Rockchip-specific, so I guess I'll just
+pick up the whole series, including the binding doc, after the merge
+window if nobody complains before that :-)
+
+
+Heiko
