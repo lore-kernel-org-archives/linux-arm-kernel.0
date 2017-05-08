@@ -1,33 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 May 2017 11:40:11 -0500
-Subject: [PATCH v2 3/5] clk: qcom: ipq8074: Add Global Clock Controller
- support
-In-Reply-To: <1493898841-20583-4-git-send-email-varada@codeaurora.org>
-References: <1493898841-20583-1-git-send-email-varada@codeaurora.org>
- <1493898841-20583-4-git-send-email-varada@codeaurora.org>
-Message-ID: <20170508164010.aoajie2udehhzduz@rob-hp-laptop>
+Date: Mon, 8 May 2017 11:44:14 -0500
+Subject: [PATCH v2 05/10] dt-bindings: add compatible string for
+ Allwinner R40 pinctrl
+In-Reply-To: <20170504135006.16483-6-icenowy@aosc.io>
+References: <20170504135006.16483-1-icenowy@aosc.io>
+ <20170504135006.16483-6-icenowy@aosc.io>
+Message-ID: <20170508164414.qu3v2s7ti6czwwvw@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 04, 2017 at 05:23:59PM +0530, Varadarajan Narayanan wrote:
-> From: Abhishek Sahu <absahu@codeaurora.org>
+On Thu, May 04, 2017 at 09:50:01PM +0800, Icenowy Zheng wrote:
+> Allwinner R40 has a pin controller like the ones in older Allwinner SoCs
+> (especially A20), and can use modified version of the A10/A20 pinctrl
+> driver.
 > 
-> This patch adds support for the global clock controller found on
-> the IPQ8074 based devices. This includes UART, I2C, SPI etc.
+> Add a compatible string for it.
 > 
-> Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
-> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
->  .../devicetree/bindings/clock/qcom,gcc.txt         |    1 +
->  drivers/clk/qcom/Kconfig                           |    9 +
->  drivers/clk/qcom/Makefile                          |    1 +
->  drivers/clk/qcom/gcc-ipq8074.c                     | 1032 ++++++++++++++++++++
->  include/dt-bindings/clock/qcom,gcc-ipq8074.h       |  152 +++
-
-For the binding,
+>  Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
-
->  5 files changed, 1195 insertions(+)
->  create mode 100644 drivers/clk/qcom/gcc-ipq8074.c
->  create mode 100644 include/dt-bindings/clock/qcom,gcc-ipq8074.h
