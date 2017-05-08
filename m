@@ -1,142 +1,121 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 08 May 2017 12:47:36 +0200
-Subject: [PATCH 1/4] ata: Add DT bindings for Faraday Technology FTIDE010
-In-Reply-To: <20170506121053.11554-1-linus.walleij@linaro.org>
-References: <CGME20170506121118epcas2p1b2a2d1a8005a37582a73c0e7be4b1a1b@epcas2p1.samsung.com>
- <20170506121053.11554-1-linus.walleij@linaro.org>
-Message-ID: <1678111.DmiVNKW3dQ@amdc3058>
+From: geethasowjanya.akula@gmail.com (Geetha Akula)
+Date: Mon, 8 May 2017 16:33:21 +0530
+Subject: [PATCH v3 2/7] iommu/arm-smmu-v3: Do resource size checks based
+ on SMMU
+In-Reply-To: <20170508100932.GH16981@rric.localdomain>
+References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
+ <1493986091-30521-3-git-send-email-gakula@caviumnetworks.com>
+ <20170505221844.GW16981@rric.localdomain> <20170508094437.GA26538@virtx40>
+ <20170508100932.GH16981@rric.localdomain>
+Message-ID: <CANHdaibz+RkLPwbme0NQ_Bq38=dLJS6OFDnFZpO1ubXKQzH_Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, May 8, 2017 at 3:39 PM, Robert Richter
+<robert.richter@cavium.com> wrote:
+> On 08.05.17 15:14:37, Linu Cherian wrote:
+>> On Sat May 06, 2017 at 12:18:44AM +0200, Robert Richter wrote:
+>> > On 05.05.17 17:38:06, Geetha sowjanya wrote:
+>> > > From: Linu Cherian <linu.cherian@cavium.com>
+>> > >
+>> > > With implementations supporting only page 0 register space,
+>> > > resource size can be 64k as well and hence perform size checks
+>> > > based on SMMU option PAGE0_REGS_ONLY.
+>> > >
+>> > > For this, arm_smmu_device_dt_probe/acpi_probe has been moved before
+>> > > platform_get_resource call, so that SMMU options are set beforehand.
+>> > >
+>> > > Signed-off-by:  Linu Cherian <linu.cherian@cavium.com>
+>> > > Signed-off-by:  Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+>> > > ---
+>> > >  drivers/iommu/arm-smmu-v3.c | 26 +++++++++++++++++---------
+>> > >  1 file changed, 17 insertions(+), 9 deletions(-)
+>> > >
+>> > > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> > > index 107b4a6..f027676 100644
+>> > > --- a/drivers/iommu/arm-smmu-v3.c
+>> > > +++ b/drivers/iommu/arm-smmu-v3.c
+>> > > @@ -2672,6 +2672,14 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+>> > >   return ret;
+>> > >  }
+>> > >
+>> > > +static unsigned long arm_smmu_resource_size(struct arm_smmu_device *smmu)
+>> > > +{
+>> > > + if (ARM_SMMU_PAGE0_REGS_ONLY(smmu))
+>> > > +         return SZ_64K;
+>> > > + else
+>> > > +         return SZ_128K;
+>> > > +}
+>> > > +
+>> >
+>> > I think this can be dropped. See below.
+>> >
+>> > >  static int arm_smmu_device_probe(struct platform_device *pdev)
+>> > >  {
+>> > >   int irq, ret;
+>> > > @@ -2688,9 +2696,17 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+>> > >   }
+>> > >   smmu->dev = dev;
+>> > >
+>> > > + if (dev->of_node) {
+>> > > +         ret = arm_smmu_device_dt_probe(pdev, smmu);
+>> > > + } else {
+>> > > +         ret = arm_smmu_device_acpi_probe(pdev, smmu);
+>> > > +         if (ret == -ENODEV)
+>> > > +                 return ret;
+>> > > + }
+>> > > +
+>> > >   /* Base address */
+>> > >   res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> > > - if (resource_size(res) + 1 < SZ_128K) {
+>> > > + if (resource_size(res) + 1 < arm_smmu_resource_size(smmu)) {
+>> > >           dev_err(dev, "MMIO region too small (%pr)\n", res);
+>> > >           return -EINVAL;
+>> > >   }
+>> >
+>> > Why not just do the follwoing here:
+>> >
+>> >     /* Base address */
+>> >     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> >     if (resource_size(res) + 1 < arm_smmu_resource_size(smmu)) {
+>> >             dev_err(dev, "MMIO region too small (%pr)\n", res);
+>> >             return -EINVAL;
+>> >     }
+>> >     ioaddr = res->start;
+>> >
+>> > +   /*
+>> > +    * Override the size, for Cavium ThunderX2 implementation
+>> > +    * which doesn't support the page 1 SMMU register space.
+>> > +    */
+>> > +   if (smmu->options & ARM_SMMU_OPT_PAGE0_REGS_ONLY)
+>> > +           res->end = res->size + SZ_64K -1;
+>> > +
+>> >     smmu->base = devm_ioremap_resource(dev, res);
+>> >     if (IS_ERR(smmu->base))
+>> >             return PTR_ERR(smmu->base);
+>>
+>>
+>> This might not work, since platform_device_add is being called from
+>> iort.c before the res->end gets fixed up here.
+>
+> It should. You added it with 128k and you get it back with
+> platform_get_resource(), but before ioremap you shrink the size to
+> 64k.
+>
+> -Robert
 
-Hi,
+Hi Robert,
 
-On Saturday, May 06, 2017 02:10:50 PM Linus Walleij wrote:
-> This adds device tree bindings for the Faraday Technology
-> FTIDE010 found in the Storlink/Storm/Cortina Systems Gemini SoC.
-> 
-> I am not 100% sure that this part if from Faraday Technology but
-> a lot points in that direction:
-> 
-> - A later IDE interface called FTIDE020 exist and share some
->   properties.
-> 
-> - The SATA bridge has the same Built In Self Test (BIST) that the
->   Faraday FTSATA100 seems to have, and it has version number 0100
->   in the device ID register, so this is very likely a FTSATA100
->   bundled with the FTIDE010.
-> 
-> Cc: devicetree at vger.kernel.org
-> Cc: John Feng-Hsin Chiang <john453@faraday-tech.com>
-> Cc: Greentime Hu <green.hu@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Greentime: I think this may be interesting to you since the
-> FTIDE020 will need the same bindings so we can probably
-> just reuse them and maybe make the parser a library if you
-> want to upstream the FTIDE020.
-> 
-> Faraday people: I do not have it from a source that this
-> hardware is really FTIDE010 but I would be VERY surprised
-> if it is not. U-Boot has an FTIDE020 IDE controller
-> synthesized in the Andestech platform, and it has a similar
-> yet different register layout, featuring similar timing
-> set-ups:
-> http://git.denx.de/?p=u-boot.git;a=blob;f=drivers/block/ftide020.h
-> http://git.denx.de/?p=u-boot.git;a=blob;f=drivers/block/ftide020.c
-> ---
->  .../devicetree/bindings/ata/faraday,ftide010.txt   | 63 ++++++++++++++++++++++
->  1 file changed, 63 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ata/faraday,ftide010.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/ata/faraday,ftide010.txt b/Documentation/devicetree/bindings/ata/faraday,ftide010.txt
-> new file mode 100644
-> index 000000000000..5048408c07c5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ata/faraday,ftide010.txt
-> @@ -0,0 +1,63 @@
-> +* Faraday Technology FTIDE010 PATA controller
-> +
-> +This controller is the first Faraday IDE interface block, used in the
-> +StorLink SL2312 and SL3516, later known as the Cortina Systems Gemini
-> +platform. The controller can do PIO modes 0 through 4, Multi-word DMA
-> +(MWDM)modes 0 through 2 and Ultra DMA modes 0 through 6.
-> +
-> +On the Gemini platform, this PATA block is accompanied by a PATA to
-> +SATA bridge in order to support SATA. This is why a phandle to that
-> +controller is compulsory on that platform.
-> +
-> +The timing properties are unique per-SoC, not per-board.
-> +
-> +Required properties:
-> +- compatible: should be one of
-> +  "cortina,gemini-pata", "faraday,ftide010"
-> +  "faraday,ftide010"
-> +- interrupts: interrupt for the block
-> +- reg: registers and size for the block
-> +
-> +  The unit of the below required timings is two clock periods of the ATA
-> +  reference clock which is 30 nanoseconds per unit at 66MHz and 20 nanoseconds
-> +  per unit at 50 MHz.
-> +
-> +- faraday,pio-active-time: array of 5 elements for T2 timing for Mode 0,
-> +  1, 2, 3 and 4. Range 0..15.
-> +- faraday,pio-recovery-time: array of 5 elements for T2l timing for Mode 0,
-> +  1, 2, 3 and 4. Range 0..15.
-> +- faraday,mdma-50-active-time: array of 4 elements for Td timing for multi
-> +  word DMA, Mode 0, 1, and 2 at 50 MHz. Range 0..15.
-> +- faraday,mdma-50-recovery-time: array of 4 elements for Tk timing for
-> +  multi word DMA, Mode 0, 1 and 2 at 50 MHz. Range 0..15.
-> +- faraday,mdma-66-active-time: array of 4 elements for Td timing for multi
-> +  word DMA, Mode 0, 1 and 2 at 50 MHz. Range 0..15.
+Linu is right. You are missing the sequence of event. If we skip the
+changes in iort file, smmu initialization in acpi fails.
 
-at 66 MHZ?
 
-> +- faraday,mdma-66-recovery-time: array of 4 elements for Tk timing for
+[    3.721647] ACPI: IORT: iort_add_smmu_platform_device
+[    3.726826] platform arm-smmu-v3.1.auto: failed to claim resource
+0: [mem 0x402310000-0x40232ffff]
+[    3.736052] arm-smmu-v3 arm-smmu-v3.0.auto: option mask 0x1
+[    3.741753] arm_smmu_device_probe
 
-at 66 MHZ?
 
-> +  multi word DMA, Mode 0, 1 and 2 at 50 MHz. Range 0..15.
-> +- faraday,udma-50-setup-time: array of 4 elements for Tvds timing for ultra
-> +  DMA, Mode 0, 1, 2, 3, 4 and 5 at 50 MHz. Range 0..7.
-> +- faraday,udma-50-hold-time: array of 4 elements for Tdvh timing for
-> +  multi word DMA, Mode 0, 1, 2, 3, 4 and 5 at 50 MHz, Range 0..7.
-> +- faraday,udma-66-setup-time: array of 4 elements for Tvds timing for multi
-> +  word DMA, Mode 0, 1, 2, 3, 4, 5 and 6 at 50 MHz. Range 0..7.
-
-at 66 MHZ?
-
-> +- faraday,udma-66-hold-time: array of 4 elements for Tdvh timing for
-> +  multi word DMA, Mode 0, 1, 2, 3, 4, 5 and 6 at 50 MHz. Range 0..7.
-
-at 66 MHZ?
-
-Also for all current drivers we just put timing values (or a logic
-to calculate them from the standard ATA timings) into the driver
-itself and not device tree (as they are based on values are dictated
-by ATA standard and should not change for a given controller type).
-
-> +Optional properties:
-> +- clocks: a SoC clock running the peripheral.
-> +- clock-names: should be set to "PCLK" for the peripheral clock.
-> +
-> +Required properties for "cortina,gemini-pata" compatible:
-> +- sata: a phande to the Gemini PATA to SATA bridge, see
-> +  cortina,gemini-sata-bridge.txt for details.
-> +
-> +Example:
-> +
-> +ata at 63000000 {
-> +	compatible = "cortina,gemini-pata", "faraday,ftide010";
-> +	reg = <0x63000000 0x100>;
-> +	interrupts = <4 IRQ_TYPE_EDGE_RISING>;
-> +	clocks = <&gcc GEMINI_CLK_GATE_IDE>;
-> +	clock-names = "PCLK";
-> +	sata = <&sata>;
-> +};
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Thank you,
+Geetha.
