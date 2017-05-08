@@ -1,81 +1,49 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Mon, 8 May 2017 13:59:37 -0600
-Subject: [PATCH V15 06/11] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <5910AAB8.8070703@arm.com>
-References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
- <1492556723-9189-7-git-send-email-tbaicar@codeaurora.org>
- <5910AAB8.8070703@arm.com>
-Message-ID: <9e26f779-5eae-2558-6045-10c1afde9bf2@codeaurora.org>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 8 May 2017 22:02:11 +0200
+Subject: [PATCH] phy: meson8b-usb2: add support for the USB PHY on Meson8
+ SoCs
+In-Reply-To: <950abc53-df2d-93dd-68d1-e9868445bb93@ti.com>
+References: <20170506173625.19501-1-martin.blumenstingl@googlemail.com>
+ <950abc53-df2d-93dd-68d1-e9868445bb93@ti.com>
+Message-ID: <CAFBinCDed096pnD-mm+Y1iRXfZgBkZPgVjH537cUsZ+qd6g-2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/8/2017 11:28 AM, James Morse wrote:
-> Hi Tyler,
+On Mon, May 8, 2017 at 2:10 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
 >
-> On 19/04/17 00:05, Tyler Baicar wrote:
->> ARM APEI extension proposal added SEA (Synchronous External Abort)
->> notification type for ARMv8.
->> Add a new GHES error source handling function for SEA. If an error
->> source's notification type is SEA, then this function can be registered
->> into the SEA exception handler. That way GHES will parse and report
->> SEA exceptions when they occur.
->> An SEA can interrupt code that had interrupts masked and is treated as
->> an NMI. To aid this the page of address space for mapping APEI buffers
->> while in_nmi() is always reserved, and ghes_ioremap_pfn_nmi() is
->> changed to use the helper methods to find the prot_t to map with in
->> the same way as ghes_ioremap_pfn_irq().
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index b74d8b7..10013ff 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -518,6 +520,17 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>   	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->>   		inf->name, esr, addr);
->>   
->> +	/*
->> +	 * Synchronous aborts may interrupt code which had interrupts masked.
->> +	 * Before calling out into the wider kernel tell the interested
->> +	 * subsystems.
->> +	 */
->> +	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
->> +		nmi_enter();
->> +		ghes_notify_sea();
->> +		nmi_exit();
->> +	}
->> +
->>   	info.si_signo = SIGBUS;
->>   	info.si_errno = 0;
->>   	info.si_code  = 0;
+> On Saturday 06 May 2017 11:06 PM, Martin Blumenstingl wrote:
+>> Meson8 uses the same USB PHY as found on the Meson8b and GXBB SoCs. Add
+>> a new of_device_id to indicate this. Also update the documentation
+>> (devicetree binding, Kconfig and MODULE_DESCRIPTION) accordingly.
+>>
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> ---
+>>  Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt | 3 ++-
+>>  drivers/phy/Kconfig                                        | 4 ++--
+>>  drivers/phy/phy-meson8b-usb2.c                             | 5 +++--
+>>  3 files changed, 7 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt b/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
+>> index 5fa73b9d20f5..d81d73aea608 100644
+>> --- a/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
+>> +++ b/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
+>> @@ -1,7 +1,8 @@
+>> -* Amlogic Meson8b and GXBB USB2 PHY
+>> +* Amlogic Meson8, Meson8b and GXBB USB2 PHY
+>>
+>>  Required properties:
+>>  - compatible:        Depending on the platform this should be one of:
+>> +     "amlogic,meson8-usb2-phy"
+>>       "amlogic,meson8b-usb2-phy"
+>>       "amlogic,meson-gxbb-usb2-phy"
 >
-> I was tidying up the masking/unmasking in entry.S, something I wasn't aware of
-> that leads to a bug:
-> entry.S will unmask interrupts for instruction/data aborts that came from a
-> context with interrupts enabled. This makes sense for get_user() and friends...
-> For do_sea() we pull nmi_enter() as this can interrupt interrupts-masked code,
-> such as APEI, but if we end up in here with interrupts unmasked we can take an
-> IRQ from this 'NMI' context, which will inherit the in_nmi() and could lead to
-> the deadlock we were originally trying to avoid.
->
-> Teaching entry.S to spot external aborts is messy. I think the two choices are
-> to either mask interrupts when calling nmi_enter() (as these things should be
-> mutually exclusive), or to conditionally call nmi_enter() based on
-> interrupts_enabled(regs). I prefer the second one as it matches the notify_sea()
-> while interruptible that happens when KVM takes one of these.
-Hello James,
+> Please split the dt binding documentation into a separate patch.
+OK, however I guess I'll wait for a few days until that restructuring
+patch is merged
 
-So it would need to be like this?
+thanks for reviewing this so quick!
 
-         if(interrupts_enabled(regs))
-             nmi_enter();
-         ghes_notify_sea();
-         if(interrupts_enabled(regs))
-             nmi_exit();
 
-Thanks,
-Tyler
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Regards,
+Martin
