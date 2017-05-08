@@ -1,105 +1,439 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 8 May 2017 22:03:50 +0800
-Subject: [PATCH V2 0/3] clk: introduce clk_bulk_get accessories
-Message-ID: <1494252233-21074-1-git-send-email-aisheng.dong@nxp.com>
+Date: Mon, 8 May 2017 22:03:51 +0800
+Subject: [PATCH V2 1/3] clk: add clk_bulk_get accessories
+In-Reply-To: <1494252233-21074-1-git-send-email-aisheng.dong@nxp.com>
+References: <1494252233-21074-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1494252233-21074-2-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 These helper function allows drivers to get several clk consumers in
-one operation.  If any of the clk cannot be acquired then any clks
+one operation. If any of the clk cannot be acquired then any clks
 that were got will be put before returning to the caller.
 
-The idea firstly came out when i wanted to clean up and optimize
-imx6q-cpufreq driver which needs to handle a lot of clocks as it
-becomes a bit mess.
+This can relieve the driver owners' life who needs to handle many clocks,
+as well as each clock error reporting.
 
-e.g. drivers/cpufreq/imx6q-cpufreq.c
-
-You will see we need get 7 clocks during driver probe.
-(Add there will be more, e.g. pll1, pll1_bypass, pll1_bypass_src,
-in the future when adding busfreq support).
-
-static int imx6q_cpufreq_probe(struct platform_device *pdev)
-{
-....
-	arm_clk = clk_get(cpu_dev, "arm");
-	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
-	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
-	step_clk = clk_get(cpu_dev, "step");
-	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
-	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
-	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
-		dev_err(cpu_dev, "failed to get clocks\n");
-		ret = -ENOENT;
-		goto put_clk;
-	}
-
-	if (of_machine_is_compatible("fsl,imx6ul")) {
-		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
-		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
-		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
-			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
-			ret = -ENOENT;
-			goto put_clk;
-		}
-	}
-....
-put_clk: 
-        if (!IS_ERR(arm_clk))
-                clk_put(arm_clk);
-        if (!IS_ERR(pll1_sys_clk))
-                clk_put(pll1_sys_clk);
-	...........
-}
-
-Together with the err path handling for each clocks, it does make
-things a bit ugly.
-
-Since we already have regulator_bulk_get accessories, i thought we
-probably could introduce clk_bulk_get as well to handle such case to
-ease the driver owners' life. 
-
-Besides IMX cpufreq driver, there is also some similar cases
-in kernel which could befinit from this api as well.
-e.g.
-drivers/cpufreq/tegra124-cpufreq.c
-drivers/cpufreq/s3c2412-cpufreq.c
-sound/soc/samsung/smdk_spdif.c
-arch/arm/mach-omap1/serial.c
-...
-
-And actually, if we handle clocks more than 3, then it might be
-worthy to try, which there is quite many manay in kernel and
-that probably could save a lot codes.
-
-Comments are welcome and appreciated!
-
-Tested on MX6Q SabreSD board with CPUfreq stress.
-Also ran IA64 and m68k compiling test:
-make.cross ARCH=m68k 
-make.cross ARCH=ia64
-
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Anson Huang <anson.huang@nxp.com>
+Cc: Robin Gong <yibin.gong@nxp.com>
+Cc: Bai Ping <ping.bai@nxp.com>
+Cc: Leonard Crestez <leonard.crestez@nxp.com>
+Cc: Octavian Purdila <octavian.purdila@nxp.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
 ChangeLog:
 v1->v2:
-Most significant change is introducing clk-bulk.c to centrally
-handle bulk_clks and fix !CONFIG_CLKDEV_LOOKUP platforms build break.
-Other are comments fix, adding const annotation and etc.
-Refer to individual patches for details.
-
-[v1] https://lkml.org/lkml/2017/4/11/335
-
-Dong Aisheng (3):
-  clk: add clk_bulk_get accessories
-  clk: add managed version of clk_bulk_get
-  cpufreq: imx6q: refine clk operations
-
- drivers/clk/Makefile            |   2 +-
- drivers/clk/clk-bulk.c          | 165 ++++++++++++++++++++++++++++++++++++++++
- drivers/clk/clk-devres.c        |  36 +++++++++
- drivers/cpufreq/imx6q-cpufreq.c | 119 +++++++++++++----------------
- include/linux/clk.h             | 132 ++++++++++++++++++++++++++++++++
- 5 files changed, 387 insertions(+), 67 deletions(-)
+ * fix comments of clk_bulk_get that only one dev is possible with the API.
+ * Comments 'bulk of clock source' replaced by 'set of clks'
+ * Mark clk_bulk_data structure as const for the following API:
+   clk_bulk_{enable|disable}
+   clk_bulk_{prepare|unprepare}
+   Except clk_bulk_{get|put} which needs update clk_bulk_date
+ * Introduce clk-bulk.c to centrally handle bulk_clks, especially moving
+   platform independant clk_bulk_{get|put} out of clkdev.c which depends on
+   CONFIG_CLKDEV_LOOKUP and is used in devm_clk_bulk_get(clk-devres.c) later
+   which is independant of CONFIG_CLKDEV_LOOKUP.
+ * Should call clk_disable in error path of clk_bulk_enable
+ * Fix a build warning of clk_bulk_get in !CONFIG_COMMON_CLK case
+ * Add __must_check anatation in function definition as well to make it
+   more explicitly
+---
+ drivers/clk/Makefile   |   2 +-
+ drivers/clk/clk-bulk.c | 165 +++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk.h    | 111 +++++++++++++++++++++++++++++++++
+ 3 files changed, 277 insertions(+), 1 deletion(-)
  create mode 100644 drivers/clk/clk-bulk.c
 
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index c19983a..ed1e99f 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -1,5 +1,5 @@
+ # common clock types
+-obj-$(CONFIG_HAVE_CLK)		+= clk-devres.o
++obj-$(CONFIG_HAVE_CLK)		+= clk-devres.o clk-bulk.o
+ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-divider.o
+diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
+new file mode 100644
+index 0000000..3527d56
+--- /dev/null
++++ b/drivers/clk/clk-bulk.c
+@@ -0,0 +1,165 @@
++/*
++ * Copyright 2017 NXP
++ *
++ * Dong Aisheng <aisheng.dong@nxp.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/clk.h>
++#include <linux/device.h>
++#include <linux/export.h>
++
++int __must_check clk_bulk_get(struct device *dev, int num_clks,
++			      struct clk_bulk_data *clks)
++{
++	int ret;
++	int i;
++
++	for (i = 0; i < num_clks; i++)
++		clks[i].clk = NULL;
++
++	for (i = 0; i < num_clks; i++) {
++		clks[i].clk = clk_get(dev, clks[i].id);
++		if (IS_ERR(clks[i].clk)) {
++			ret = PTR_ERR(clks[i].clk);
++			dev_err(dev, "Failed to get clk '%s': %d\n",
++				clks[i].id, ret);
++			clks[i].clk = NULL;
++			goto err;
++		}
++	}
++
++	return 0;
++
++err:
++	while (--i >= 0)
++		clk_put(clks[i].clk);
++
++	return ret;
++}
++EXPORT_SYMBOL(clk_bulk_get);
++
++void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
++{
++	int i;
++
++	for (i = 0; i < num_clks; i++) {
++		clk_put(clks[i].clk);
++		clks[i].clk = NULL;
++	}
++}
++EXPORT_SYMBOL_GPL(clk_bulk_put);
++
++#ifdef CONFIG_HAVE_CLK_PREPARE
++
++/**
++ * clk_bulk_unprepare - undo preparation of a set of clock sources
++ * @num_clks: the number of clk_bulk_data
++ * @clks: the clk_bulk_data table being unprepared
++ *
++ * clk_bulk_unprepare may sleep, which differentiates it from clk_bulk_disable.
++ * Returns 0 on success, -EERROR otherwise.
++ */
++void clk_bulk_unprepare(int num_clks, const struct clk_bulk_data *clks)
++{
++	int i;
++
++	for (i = 0; i < num_clks; i++)
++		clk_unprepare(clks[i].clk);
++}
++EXPORT_SYMBOL_GPL(clk_bulk_unprepare);
++
++/**
++ * clk_bulk_prepare - prepare a set of clocks
++ * @num_clks: the number of clk_bulk_data
++ * @clks: the clk_bulk_data table being prepared
++ *
++ * clk_bulk_prepare may sleep, which differentiates it from clk_bulk_enable.
++ * Returns 0 on success, -EERROR otherwise.
++ */
++int __must_check clk_bulk_prepare(int num_clks,
++				  const struct clk_bulk_data *clks)
++{
++	int ret;
++	int i;
++
++	for (i = 0; i < num_clks; i++) {
++		ret = clk_prepare(clks[i].clk);
++		if (ret) {
++			pr_err("Failed to prepare clk '%s': %d\n",
++				clks[i].id, ret);
++			goto err;
++		}
++	}
++
++	return 0;
++
++err:
++	while (--i >= 0)
++		clk_unprepare(clks[i].clk);
++
++	return  ret;
++}
++
++#endif /* CONFIG_HAVE_CLK_PREPARE */
++
++/**
++ * clk_bulk_disable - gate a set of clocks
++ * @num_clks: the number of clk_bulk_data
++ * @clks: the clk_bulk_data table being gated
++ *
++ * clk_bulk_disable must not sleep, which differentiates it from
++ * clk_bulk_unprepare. clk_bulk_disable must be called before
++ * clk_bulk_unprepare.
++ */
++void clk_bulk_disable(int num_clks, const struct clk_bulk_data *clks)
++{
++	int i;
++
++	for (i = 0; i < num_clks; i++)
++		clk_disable(clks[i].clk);
++}
++EXPORT_SYMBOL_GPL(clk_bulk_disable);
++
++/**
++ * clk_bulk_enable - ungate a set of clocks
++ * @num_clks: the number of clk_bulk_data
++ * @clks: the clk_bulk_data table being ungated
++ *
++ * clk_bulk_enable must not sleep
++ * Returns 0 on success, -EERROR otherwise.
++ */
++int __must_check clk_bulk_enable(int num_clks, const struct clk_bulk_data *clks)
++{
++	int ret;
++	int i;
++
++	for (i = 0; i < num_clks; i++) {
++		ret = clk_enable(clks[i].clk);
++		if (ret) {
++			pr_err("Failed to enable clk '%s': %d\n",
++				clks[i].id, ret);
++			goto err;
++		}
++	}
++
++	return 0;
++
++err:
++	while (--i >= 0)
++		clk_disable(clks[i].clk);
++
++	return  ret;
++}
++EXPORT_SYMBOL_GPL(clk_bulk_enable);
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index e9d36b3..1201944 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -77,6 +77,21 @@ struct clk_notifier_data {
+ 	unsigned long		new_rate;
+ };
+ 
++/**
++ * struct clk_bulk_data - Data used for bulk clk operations.
++ *
++ * @id: clock consumer ID
++ * @clk: struct clk * to store the associated clock
++ *
++ * The CLK APIs provide a series of clk_bulk_() API calls as
++ * a convenience to consumers which require multiple clks.  This
++ * structure is used to manage data for these calls.
++ */
++struct clk_bulk_data {
++	const char		*id;
++	struct clk		*clk;
++};
++
+ #ifdef CONFIG_COMMON_CLK
+ 
+ /**
+@@ -185,12 +200,20 @@ static inline bool clk_is_match(const struct clk *p, const struct clk *q)
+  */
+ #ifdef CONFIG_HAVE_CLK_PREPARE
+ int clk_prepare(struct clk *clk);
++int __must_check clk_bulk_prepare(int num_clks,
++				  const struct clk_bulk_data *clks);
+ #else
+ static inline int clk_prepare(struct clk *clk)
+ {
+ 	might_sleep();
+ 	return 0;
+ }
++
++static inline int clk_bulk_prepare(int num_clks, struct clk_bulk_data *clks)
++{
++	might_sleep();
++	return 0;
++}
+ #endif
+ 
+ /**
+@@ -204,11 +227,16 @@ static inline int clk_prepare(struct clk *clk)
+  */
+ #ifdef CONFIG_HAVE_CLK_PREPARE
+ void clk_unprepare(struct clk *clk);
++void clk_bulk_unprepare(int num_clks, const struct clk_bulk_data *clks);
+ #else
+ static inline void clk_unprepare(struct clk *clk)
+ {
+ 	might_sleep();
+ }
++static inline void clk_bulk_unprepare(int num_clks, struct clk_bulk_data *clks)
++{
++	might_sleep();
++}
+ #endif
+ 
+ #ifdef CONFIG_HAVE_CLK
+@@ -230,6 +258,29 @@ static inline void clk_unprepare(struct clk *clk)
+ struct clk *clk_get(struct device *dev, const char *id);
+ 
+ /**
++ * clk_bulk_get - lookup and obtain a number of references to clock producer.
++ * @dev: device for clock "consumer"
++ * @num_clks: the number of clk_bulk_data
++ * @clks: the clk_bulk_data table of consumer
++ *
++ * This helper function allows drivers to get several clk consumers in one
++ * operation. If any of the clk cannot be acquired then any clks
++ * that were obtained will be freed before returning to the caller.
++ *
++ * Returns 0 if all clocks specified in clk_bulk_data table are obtained
++ * successfully, or valid IS_ERR() condition containing errno.
++ * The implementation uses @dev and @clk_bulk_data.id to determine the
++ * clock consumer, and thereby the clock producer.
++ * The clock returned is stored in each @clk_bulk_data.clk field.
++ *
++ * Drivers must assume that the clock source is not enabled.
++ *
++ * clk_bulk_get should not be called from within interrupt context.
++ */
++int __must_check clk_bulk_get(struct device *dev, int num_clks,
++			      struct clk_bulk_data *clks);
++
++/**
+  * devm_clk_get - lookup and obtain a managed reference to a clock producer.
+  * @dev: device for clock "consumer"
+  * @id: clock consumer ID
+@@ -279,6 +330,18 @@ struct clk *devm_get_clk_from_child(struct device *dev,
+ int clk_enable(struct clk *clk);
+ 
+ /**
++ * clk_bulk_enable - inform the system when the set of clks should be running.
++ * @num_clks: the number of clk_bulk_data
++ * @clks: the clk_bulk_data table of consumer
++ *
++ * May be called from atomic contexts.
++ *
++ * Returns success (0) or negative errno.
++ */
++int __must_check clk_bulk_enable(int num_clks,
++				 const struct clk_bulk_data *clks);
++
++/**
+  * clk_disable - inform the system when the clock source is no longer required.
+  * @clk: clock source
+  *
+@@ -295,6 +358,24 @@ int clk_enable(struct clk *clk);
+ void clk_disable(struct clk *clk);
+ 
+ /**
++ * clk_bulk_disable - inform the system when the set of clks is no
++ *		      longer required.
++ * @num_clks: the number of clk_bulk_data
++ * @clks: the clk_bulk_data table of consumer
++ *
++ * Inform the system that a set of clks is no longer required by
++ * a driver and may be shut down.
++ *
++ * May be called from atomic contexts.
++ *
++ * Implementation detail: if the set of clks is shared between
++ * multiple drivers, clk_bulk_enable() calls must be balanced by the
++ * same number of clk_bulk_disable() calls for the clock source to be
++ * disabled.
++ */
++void clk_bulk_disable(int num_clks, const struct clk_bulk_data *clks);
++
++/**
+  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
+  *		  This is only valid once the clock source has been enabled.
+  * @clk: clock source
+@@ -314,6 +395,19 @@ unsigned long clk_get_rate(struct clk *clk);
+ void clk_put(struct clk *clk);
+ 
+ /**
++ * clk_bulk_put	- "free" the clock source
++ * @num_clks: the number of clk_bulk_data
++ * @clks: the clk_bulk_data table of consumer
++ *
++ * Note: drivers must ensure that all clk_bulk_enable calls made on this
++ * clock source are balanced by clk_bulk_disable calls prior to calling
++ * this function.
++ *
++ * clk_bulk_put should not be called from within interrupt context.
++ */
++void clk_bulk_put(int num_clks, struct clk_bulk_data *clks);
++
++/**
+  * devm_clk_put	- "free" a managed clock source
+  * @dev: device used to acquire the clock
+  * @clk: clock source acquired with devm_clk_get()
+@@ -445,6 +539,12 @@ static inline struct clk *clk_get(struct device *dev, const char *id)
+ 	return NULL;
+ }
+ 
++static inline int clk_bulk_get(struct device *dev, int num_clks,
++			       struct clk_bulk_data *clks)
++{
++	return 0;
++}
++
+ static inline struct clk *devm_clk_get(struct device *dev, const char *id)
+ {
+ 	return NULL;
+@@ -458,6 +558,8 @@ static inline struct clk *devm_get_clk_from_child(struct device *dev,
+ 
+ static inline void clk_put(struct clk *clk) {}
+ 
++static inline void clk_bulk_put(int num_clks, struct clk_bulk_data *clks) {}
++
+ static inline void devm_clk_put(struct device *dev, struct clk *clk) {}
+ 
+ static inline int clk_enable(struct clk *clk)
+@@ -465,8 +567,17 @@ static inline int clk_enable(struct clk *clk)
+ 	return 0;
+ }
+ 
++static inline int clk_bulk_enable(int num_clks, struct clk_bulk_data *clks)
++{
++	return 0;
++}
++
+ static inline void clk_disable(struct clk *clk) {}
+ 
++
++static inline void clk_bulk_disable(int num_clks,
++				    struct clk_bulk_data *clks) {}
++
+ static inline unsigned long clk_get_rate(struct clk *clk)
+ {
+ 	return 0;
 -- 
 2.7.4
