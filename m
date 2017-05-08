@@ -1,70 +1,41 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 8 May 2017 19:54:16 +0200
-Subject: [PATCH v3 3/3] arm/arm64: signal SIBGUS and inject SEA Error
-In-Reply-To: <5910AAA2.4030304@arm.com>
-References: <CAMj-D2BGTDKpOcMu2ip41_MTTj8VDwvs59Ds7yvLHcD8PeQzhg@mail.gmail.com>
- <5910AAA2.4030304@arm.com>
-Message-ID: <20170508175416.GA32234@cbox>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 8 May 2017 18:55:36 +0100
+Subject: Regression: 442ec4c04d1: PCI: dwc: all: Split struct pcie_port
+ into host-only and core structures
+In-Reply-To: <1494261248.2322.21.camel@pengutronix.de>
+References: <20170508150224.GA7458@collabora.com>
+ <1494261248.2322.21.camel@pengutronix.de>
+Message-ID: <20170508175536.GA3305@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 08, 2017 at 06:28:02PM +0100, James Morse wrote:
-
-[...]
-
-> 
-> 
-> >>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> >>> index bb02909..1d2e2e7 100644
-> >>> --- a/include/uapi/linux/kvm.h
-> >>> +++ b/include/uapi/linux/kvm.h
-> >>> @@ -1306,6 +1306,7 @@ struct kvm_s390_ucas_mapping {
-> >>>  #define KVM_S390_GET_IRQ_STATE  _IOW(KVMIO, 0xb6, struct kvm_s390_irq_state)
-> >>>  /* Available with KVM_CAP_X86_SMM */
-> >>>  #define KVM_SMI                   _IO(KVMIO,   0xb7)
-> >>> +#define KVM_ARM_SEA               _IO(KVMIO,   0xb8)
-> >>>
-> >>>  #define KVM_DEV_ASSIGN_ENABLE_IOMMU (1 << 0)
-> >>>  #define KVM_DEV_ASSIGN_PCI_2_3 (1 << 1)
-> >>>
-> >>
-> >> Why do we need a userspace API for SEA? It can also be done by using
-> >> KVM_{G,S}ET_ONE_REG to change the vcpu registers. The advantage of doing it this
-> >> way is you can choose which ESR value to use.
-> >>
-> >> Adding a new API call to do something you could do with an old one doesn't look
-> >> right.
+On Mon, May 08, 2017 at 06:34:08PM +0200, Lucas Stach wrote:
+> Am Montag, den 08.05.2017, 17:02 +0200 schrieb Peter Senna Tschudin:
+> > Hello Kishon,
 > > 
-> > James, I considered your suggestion before that use the
-> > KVM_{G,S}ET_ONE_REG to change the vcpu registers. but I found it does
-> > not have difference to use the alread existed KVM API. 
+> > Our iMX6 hardware (imx6q-b850v3.dts) is not booting with latest
+> > linux-next and I could bisect until:
+> > 
+> > commit 442ec4c04d1235f8c664a74004dae54a7a574d18
+> > Author: Kishon Vijay Abraham I <kishon@ti.com>
+> > Date:   Wed Feb 15 18:48:14 2017 +0530
+> > 
+> >     PCI: dwc: all: Split struct pcie_port into host-only and core structures
+> > 
+> > Which seem to be causing our issues. Our device (imx6q-b850v3.dts) boots
+> > fine with 4.10, and also boots if we disable pcie with:
 > 
-> (Only that is an in-kernel helper, not a published API)
+> Are you sure about this bisect? It seems more likely that the secondary
+> bus scanning goes wrong. It seems Lorenzo Pieralisi's cfg space
+> non-posting patches landed in next, so the root cause of this might just
+> be the driver hooking the wrong fault code now.
 > 
-> 
-> > so may be
-> > changing the vcpu registers in qemu will duplicate with the KVM APIs.
-> 
-> That is true, but the alternative is a new API that doesn't do anything new, its
-> just more convenient.
-> 
-> Marc and Christoffer are the people to convince.
-> I argue the existing API is sufficient.
-> 
+> Async and synchronous aborts are different fault codes on ARM. Can you
+> see of removing the "16 +" in hook_fault_code() in
+> drivers/pci/dwc/pci-imx6.c fixes this issue?
 
-I must admit I am losing track of exactly what this proposed API was
-supposed to do.
-
-However, if it's a question about setting up VCPU registers to a certain
-state and potentially modifying memory, then I think experience has
-shown us (psci) that emulating something in the kernel that userspace
-can have fine-grained control over is a bad idea, and should be left to
-userspace using as generic APIs as possible.
-
-Furthermore, if I understand what injecting a SEA requires, it is very
-similar to resetting the CPU and loading data into guest memory, which
-QEMU already does today, and there is no reason to introduce additional
-APIs if it can be done using KVM_GET/SET_ONE_REG ioctls.
+You can also s/pci_remap_cfgspace/ioremap in pcie-designware-host.c
+to see if my patches are the issue, it is quite a mechanical change.
 
 Thanks,
--Christoffer
+Lorenzo
