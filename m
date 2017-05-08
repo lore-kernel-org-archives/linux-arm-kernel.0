@@ -1,108 +1,171 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 8 May 2017 10:14:21 +0100
-Subject: [PATCH v7 01/24] KVM: arm/arm64: Add ITS save/restore API
- documentation
-In-Reply-To: <c2e1492b-bfb3-d8de-ca7a-0f925093f713@redhat.com>
-References: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
- <1494084283-12723-2-git-send-email-eric.auger@redhat.com>
- <87inlclw4t.fsf@on-the-bus.cambridge.arm.com>
- <c2e1492b-bfb3-d8de-ca7a-0f925093f713@redhat.com>
-Message-ID: <6ca05e9e-2a40-fc30-36d0-359d9a4ff172@arm.com>
+From: linu.cherian@cavium.com (Linu Cherian)
+Date: Mon, 8 May 2017 14:47:39 +0530
+Subject: [PATCH v3 1/7] iommu/arm-smmu-v3: Introduce SMMU option
+ PAGE0_REGS_ONLY for ThunderX2 errata #74
+In-Reply-To: <20170505230328.GN4906@rric.localdomain>
+References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
+ <1493986091-30521-2-git-send-email-gakula@caviumnetworks.com>
+ <20170505230328.GN4906@rric.localdomain>
+Message-ID: <20170508091739.GA26003@virtx40>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/17 18:05, Auger Eric wrote:
-> Hi Marc,
+On Sat May 06, 2017 at 01:03:28AM +0200, Robert Richter wrote:
+> On 05.05.17 17:38:05, Geetha sowjanya wrote:
+> > From: Linu Cherian <linu.cherian@cavium.com>
+> > 
+> > Cavium ThunderX2 SMMU implementation doesn't support page 1 register space
+> > and PAGE0_REGS_ONLY option will be enabled as an errata workaround.
+> > 
+> > This option when turned on, replaces all page 1 offsets used for
+> > EVTQ_PROD/CONS, PRIQ_PROD/CONS register access with page 0 offsets.
+> > 
+> > Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+> > Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> > ---
+> >  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |  6 +++
+> >  drivers/iommu/arm-smmu-v3.c                        | 44 ++++++++++++++++------
+> >  2 files changed, 38 insertions(+), 12 deletions(-)
 > 
-> On 07/05/2017 13:54, Marc Zyngier wrote:
->> On Sat, May 06 2017 at  4:24:20 pm BST, Eric Auger <eric.auger@redhat.com> wrote:
->>> Add description for how to access ITS registers and how to save/restore
->>> ITS tables into/from memory.
->>>
->>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>
->>> ---
->>> v6 -> v7:
->>> - rephrase ordering sequence + few cosmetic changes
->>>
->>> v5 -> v6:
->>> - add restoration ordering
->>> - 256B -> 256 Byte aligned
->>> - DTE Size is number of bits for the EVENTID
->>> - s/GITS_READR/GITS_CREADR
->>>
->>> v4 -> v5:
->>> - take into account Christoffer's comments
->>> - pending table save on GICV3 side now
->>>
->>> v3 -> v4:
->>> - take into account Peter's comments:
->>>   - typos
->>>   - KVM_DEV_ARM_VGIC_GRP_ITS_TABLES kvm_device_attr = 0
->>>   - add a validity bit in DTE
->>>   - document all fields in CTE and ITE
->>>   - document ABI revision
->>> - take into account Andre's comments:
->>>   - document restrictions about GITS_CREADR writing and GITS_IIDR
->>>   - document -EBUSY error if one or more VCPUS are runnning
->>>   - document 64b registers only can be accessed with 64b access
->>> - itt_addr field matches bits [51:8] of the itt_addr
->>>
->>> v1 -> v2:
->>> - DTE and ITE now are 8 bytes
->>> - DTE and ITE now indexed by deviceid/eventid
->>> - use ITE name instead of ITTE
->>> - mentions ITT_addr matches bits [51:8] of the actual address
->>> - mentions LE layout
->>> ---
->>>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 120 +++++++++++++++++++++
->>>  1 file changed, 120 insertions(+)
->>>
->>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
->>> index 6081a5b..ba132e9 100644
->>> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
->>> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
->> [...]
->>
->>> + ITS Table ABI REV0:
->>> + -------------------
->>> +
->>> + Revision 0 of the ABI only supports physical LPIs.
->>
->> Nit: these are no more physical than any other interrupt that KVM deals
->> with. If you're hinting at the lack of GICv4 support, it wouldn't
->> necessarily invalidate this ABI. It is actually even likely that the ABI
->> could stay the same (until we start supporting GICv4 in a nested
->> configuration).
-> I understood vLPI are associated to vPE and not to collections. As such
-> ITE would need to be updated, wouldn't it?
+> > @@ -1995,8 +2011,10 @@ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
+> >  	if (!(smmu->features & ARM_SMMU_FEAT_PRI))
+> >  		return 0;
+> >  
+> > -	return arm_smmu_init_one_queue(smmu, &smmu->priq.q, ARM_SMMU_PRIQ_PROD,
+> > -				       ARM_SMMU_PRIQ_CONS, PRIQ_ENT_DWORDS);
+> > +	return arm_smmu_init_one_queue(smmu, &smmu->priq.q,
+> > +				       ARM_SMMU_PRIQ_PROD(smmu),
+> > +				       ARM_SMMU_PRIQ_CONS(smmu),
+> > +				       PRIQ_ENT_DWORDS);
+> 
+> I would also suggest Robin's idea from the v1 review here. This works
+> if we rework arm_smmu_init_one_queue() to pass addresses instead of
+> offsets.
+> 
+> This would make these widespread offset calculations obsolete.
+>
 
-Even in a GICv4 setup (and ignoring nesting), a guest would only see a
-normal GICv3, as all the GICv4 state is the hypervisor's business, and
-not something meaningful to the guest. Also, it is very desirable to be
-able to migrate a GICv4 setup to a GICv3 setup without breaking everything.
+Have pasted here the relevant changes for doing fixups on smmu base instead
+of offset to get feedback. 
 
-To precisely answer your question, the VPE setup is done by finding out
-which collection is mapped to which vcpu, and using that to map VLPIs to
-VPEs. None of that is observable by the guest.
+This actually results in more lines of changes. If you think the below
+approach is still better, will post a V4 of this series with this change.
 
->>
->>> +
->>> + The device table and ITT are indexed by the deviceid and eventid,
->>> + respectively. The collection table is not indexed by collectionid:
->>> + CTEs are written in the table in the order of collection creation. All
->>
->> Is this order really relevant? Can we relax it? Would something break if
->> collections were in a random order?
-> Christoffer asked me to mention the exact storage order or at least I
-> understood his comment that way. Nothing would break if we change the order.
 
-OK. If that's not a requirement, then we should probably drop it.
++static inline unsigned long arm_smmu_page1_base(
++	struct arm_smmu_device *smmu)
++{
++	if (ARM_SMMU_PAGE0_REGS_ONLY(smmu))
++		return smmu->base;
++	else
++		return smmu->base + SZ_64K;
++}
++
 
-Christoffer, what do you think?
+@@ -1948,8 +1962,8 @@ static void arm_smmu_put_resv_regions(struct device *dev,
+ /* Probing and initialisation functions */
+ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
+ 				   struct arm_smmu_queue *q,
+-				   unsigned long prod_off,
+-				   unsigned long cons_off,
++				   unsigned long prod_addr,
++				   unsigned long cons_addr,
+ 				   size_t dwords)
+ {
+ 	size_t qsz = ((1 << q->max_n_shift) * dwords) << 3;
+@@ -1961,8 +1975,8 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
+ 		return -ENOMEM;
+ 	}
+ 
+-	q->prod_reg	= smmu->base + prod_off;
+-	q->cons_reg	= smmu->base + cons_off;
++	q->prod_reg	= prod_addr;
++	q->cons_reg	= cons_addr;
+ 	q->ent_dwords	= dwords;
+ 
+ 	q->q_base  = Q_BASE_RWA;
+@@ -1977,17 +1991,25 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
+ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
+ {
+ 	int ret;
++	unsigned long page1_base, page0_base;
++
++	page0_base = smmu->base;
++	page1_base = arm_smmu_page1_base(smmu);
+ 
+ 	/* cmdq */
+ 	spin_lock_init(&smmu->cmdq.lock);
+-	ret = arm_smmu_init_one_queue(smmu, &smmu->cmdq.q, ARM_SMMU_CMDQ_PROD,
+-				      ARM_SMMU_CMDQ_CONS, CMDQ_ENT_DWORDS);
++	ret = arm_smmu_init_one_queue(smmu, &smmu->cmdq.q, 
++				      page0_base + ARM_SMMU_CMDQ_PROD,
++				      page0_base + ARM_SMMU_CMDQ_CONS, 
++				      CMDQ_ENT_DWORDS);
+ 	if (ret)
+ 		return ret;
+ 
+ 	/* evtq */
+-	ret = arm_smmu_init_one_queue(smmu, &smmu->evtq.q, ARM_SMMU_EVTQ_PROD,
+-				      ARM_SMMU_EVTQ_CONS, EVTQ_ENT_DWORDS);
++	ret = arm_smmu_init_one_queue(smmu, &smmu->evtq.q,
++				      page1_base + ARM_SMMU_EVTQ_PROD,
++				      page1_base + ARM_SMMU_EVTQ_CONS,
++				      EVTQ_ENT_DWORDS);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1995,8 +2017,10 @@ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
+ 	if (!(smmu->features & ARM_SMMU_FEAT_PRI))
+ 		return 0;
+ 
+-	return arm_smmu_init_one_queue(smmu, &smmu->priq.q, ARM_SMMU_PRIQ_PROD,
+-				       ARM_SMMU_PRIQ_CONS, PRIQ_ENT_DWORDS);
++	return arm_smmu_init_one_queue(smmu, &smmu->priq.q,
++				       page1_base + ARM_SMMU_PRIQ_PROD,
++				       page1_base + ARM_SMMU_PRIQ_CONS,
++				       PRIQ_ENT_DWORDS);
+ }
 
-Thanks,
 
-	M.
+
+@@ -2301,8 +2349,11 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+ {
+ 	int ret;
+ 	u32 reg, enables;
++	unsigned long page1_base;
+ 	struct arm_smmu_cmdq_ent cmd;
+ 
++	page1_base = arm_smmu_page1_base(smmu);
++
+ 	/* Clear CR0 and sync (disables SMMU and queue processing) */
+ 	reg = readl_relaxed(smmu->base + ARM_SMMU_CR0);
+ 	if (reg & CR0_SMMUEN)
+@@ -2363,8 +2414,8 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+ 
+ 	/* Event queue */
+ 	writeq_relaxed(smmu->evtq.q.q_base, smmu->base + ARM_SMMU_EVTQ_BASE);
+-	writel_relaxed(smmu->evtq.q.prod, smmu->base + ARM_SMMU_EVTQ_PROD);
+-	writel_relaxed(smmu->evtq.q.cons, smmu->base + ARM_SMMU_EVTQ_CONS);
++	writel_relaxed(smmu->evtq.q.prod, page1_base + ARM_SMMU_EVTQ_PROD);
++	writel_relaxed(smmu->evtq.q.cons, page1_base + ARM_SMMU_EVTQ_CONS);
+ 
+ 	enables |= CR0_EVTQEN;
+ 	ret = arm_smmu_write_reg_sync(smmu, enables, ARM_SMMU_CR0,
+@@ -2379,9 +2430,9 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+ 		writeq_relaxed(smmu->priq.q.q_base,
+ 			       smmu->base + ARM_SMMU_PRIQ_BASE);
+ 		writel_relaxed(smmu->priq.q.prod,
+-			       smmu->base + ARM_SMMU_PRIQ_PROD);
++			       page1_base + ARM_SMMU_PRIQ_PROD);
+ 		writel_relaxed(smmu->priq.q.cons,
+-			       smmu->base + ARM_SMMU_PRIQ_CONS);
++			       page1_base + ARM_SMMU_PRIQ_CONS);
+ 
+ 		enables |= CR0_PRIQEN;
+ 		ret = arm_smmu_write_reg_sync(smmu, enables, ARM_SMMU_CR0,
+
+
+
+Thanks.
 -- 
-Jazz is not dead. It just smells funny...
+Linu cherian
