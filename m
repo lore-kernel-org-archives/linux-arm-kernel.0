@@ -1,45 +1,73 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Mon,  8 May 2017 13:54:46 +0200
-Subject: [PATCH 0/8] Fixes to v7 of the vITS save/restore series
-Message-ID: <20170508115454.5075-1-cdall@linaro.org>
+Date: Mon,  8 May 2017 13:54:47 +0200
+Subject: [PATCH 1/8] KVM: arm/arm64: Clarification and relaxation to ITS
+ save/restore ABI
+In-Reply-To: <20170508115454.5075-1-cdall@linaro.org>
+References: <20170508115454.5075-1-cdall@linaro.org>
+Message-ID: <20170508115454.5075-2-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We spotted a number of isses on the v7 ITS save/restore patch series,
-but because most of that patch series is in really good shape, and
-because the work discussed is somewhat orthogonal (the register iodevs
-in particular), I decided to send out a set of fixes to apply after the
-main ITS save/restore series, and we can apply the v7 series plus these
-fixes.
+Clarify what is meant by the save/restore ABI only supporting virtual
+physical interrupts.
 
-The whole series with the fixes applied on top of queue can be found here:
-git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git its-save-restore-queue-fixes
+Relax the requirement of the order that the collection entries are
+written in and be clear that there is no particular ordering enforced.
 
-Thanks,
--Christoffer
+Some cosmetic changes in the capitalization of ID names to align with
+the GICv3 manual and remove the empty line in the bottom of the patch.
 
-Christoffer Dall (8):
-  KVM: arm/arm64: Clarification and relaxation to ITS save/restore ABI
-  KVM: arm/arm64: vgic: Rename kvm_vgic_vcpu_init to
-    kvm_vgic_vcpu_enable
-  KVM: arm/arm64: Refactor vgic_register_redist_iodevs
-  KVM: arm/arm64: Make vgic_v3_check_base more broadly usable
-  KVM: arm/arm64: Slightly rework kvm_vgic_addr
-  KVM: arm/arm64: Register iodevs when setting redist base and creating
-    VCPUs
-  KVM: arm/arm64: Register ITS iodev when setting base address
-  KVM: arm/arm64: vgic-its: Cleanup after failed ITT restore
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+---
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
- Documentation/virtual/kvm/devices/arm-vgic-its.txt |  19 +--
- include/kvm/arm_vgic.h                             |   1 +
- virt/kvm/arm/arm.c                                 |   6 +-
- virt/kvm/arm/vgic/vgic-init.c                      |  25 +++-
- virt/kvm/arm/vgic/vgic-its.c                       |  64 ++++-----
- virt/kvm/arm/vgic/vgic-kvm-device.c                |  29 ++--
- virt/kvm/arm/vgic/vgic-mmio-v3.c                   | 147 +++++++++++++++------
- virt/kvm/arm/vgic/vgic-v3.c                        |  32 ++---
- virt/kvm/arm/vgic/vgic.h                           |   5 +-
- 9 files changed, 201 insertions(+), 127 deletions(-)
-
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+index ba132e9..d405242 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+@@ -110,12 +110,14 @@ Then vcpus can be started.
+  ITS Table ABI REV0:
+  -------------------
+ 
+- Revision 0 of the ABI only supports physical LPIs.
++ Revision 0 of the ABI only supports the features of a virtual GICv3, and does
++ not support a virtual GICv4 with support for direct injection of virtual
++ interrupts for nested hypervisors.
+ 
+- The device table and ITT are indexed by the deviceid and eventid,
+- respectively. The collection table is not indexed by collectionid:
+- CTEs are written in the table in the order of collection creation. All
+- entries are 8 bytes.
++ The device table and ITT are indexed by the DeviceID and EventID,
++ respectively. The collection table is not indexed by CollectionID, and the
++ entries in the collection are listed in no particular order.
++ All entries are 8 bytes.
+ 
+  Device Table Entry (DTE):
+ 
+@@ -126,10 +128,10 @@ Then vcpus can be started.
+  - V indicates whether the entry is valid. If not, other fields
+    are not meaningful.
+  - next: equals to 0 if this entry is the last one; otherwise it
+-   corresponds to the deviceid offset to the next DTE, capped by
++   corresponds to the DeviceID offset to the next DTE, capped by
+    2^14 -1.
+  - ITT_addr matches bits [51:8] of the ITT address (256 Byte aligned).
+- - Size specifies the supported number of bits for the eventid,
++ - Size specifies the supported number of bits for the EventID,
+    minus one
+ 
+  Collection Table Entry (CTE):
+@@ -151,8 +153,7 @@ Then vcpus can be started.
+ 
+  where:
+  - next: equals to 0 if this entry is the last one; otherwise it corresponds
+-   to the eventid offset to the next ITE capped by 2^16 -1.
++   to the EventID offset to the next ITE capped by 2^16 -1.
+  - pINTID is the physical LPI ID; if zero, it means the entry is not valid
+    and other fields are not meaningful.
+  - ICID is the collection ID
+-
 -- 
 2.9.0
