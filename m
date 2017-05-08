@@ -1,55 +1,60 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 May 2017 08:27:25 -0500
-Subject: [PATCH v3 6/6] watchdog: ts4600: add driver for TS-4600 watchdog
-In-Reply-To: <20170505193259.16517-7-sebastien.bourdelin@savoirfairelinux.com>
-References: <20170505193259.16517-1-sebastien.bourdelin@savoirfairelinux.com>
- <20170505193259.16517-7-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20170508132725.c3fnbz2lwz3khs7u@rob-hp-laptop>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 May 2017 14:27:04 +0100
+Subject: [PATCH] clocksource: arm_arch_timer: fix
+ arch_timer_mem_find_best_frame
+In-Reply-To: <1494246747-17267-1-git-send-email-sudeep.holla@arm.com>
+References: <1494246747-17267-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20170508132703.GD5480@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 05, 2017 at 03:32:59PM -0400, Sebastien Bourdelin wrote:
-> This watchdog is instantiated in a FPGA and can only be access using a
-> GPIOs bit-banged bus, called the NBUS by Technologic Systems.
-> The watchdog is made of only one register, called the feed register.
-> Writing to this register will re-arm the watchdog for a given time (and
-> enable it if it was disable). It can be disabled by writing a special
-> value into it.
+On Mon, May 08, 2017 at 01:32:27PM +0100, Sudeep Holla wrote:
+> arch_timer_mem_find_best_frame looks through ARCH_TIMER_MEM_MAX_FRAMES
+> frames even after finding matches to ensure the best frame is chosen,
+> which means the variable frame will point to the last valid frame but
+> not necessarily the best frame.
 > 
-> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
-> ---
-> Changes v2 -> v3:
->   - rebase on master
->   - remove the timeout table to simplify the logic (suggested by
->   Guenter Roeck)
->   - fix the set_timeout function (suggested by Guenter Roeck)
->   - hardcode the max_hw_heartbeat_ms value based on the ts4600 max
->   timeout value supported (suggested by Guenter Roeck)
->   - remove the max_timeout usage and set a default timeout value
-> (suggested by Guenter Roeck)
->   - use the devm_watchdog_register_device function instead of
->   watchdog_register_device (suggested by Guenter Roeck)
+> On Juno, we get the following error as wrong frame is returned as the
+> best frame from arch_timer_mem_find_best_frame:
+> "
+> 	arch_timer: Unable to map frame @ 0x0000000000000000
+> 	arch_timer: Frame missing phys irq.
+> 	Failed to initialize '/timer at 2a810000': -22
+> "
 > 
-> Changes v1 -> v2:
->   - rebase on master
->   - retrieve the ts_nbus instantiated by the parent node (suggested by
->   Linus Walleij)
->   - rename the wdt by watchdog in the device tree and in the
->   documentation (suggested by Rob Herring)
->   - add a dependency to the TS_NBUS driver in the Kconfig (suggested by
->   Guenter Roeck)
->   - simplify the set_timeout function (suggested by Guenter Roeck)
->   - use the max_hw_heartbeat_ms callback instead of the max_timeout
->   callback (suggested by Guenter Roeck)
+> This patch fixes the issue by correctly returning the best frame from
+> arch_timer_mem_find_best_frame.
+> 
+> Fixes: c389d701dfb7 ("clocksource: arm_arch_timer: split MMIO timer probing.")
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+
+Sorry about this; thanks for correcting it.
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Daniel, Thomas, could you please pick this up?
+
+Thanks,
+Mark.
+
 > ---
->  .../devicetree/bindings/watchdog/ts4600-wdt.txt    |  16 ++
->  arch/arm/boot/dts/imx28-ts4600-common.dtsi         |   5 +
-
-Please add acks when posting new versions. I acked v2.
-
->  drivers/watchdog/Kconfig                           |  11 ++
->  drivers/watchdog/Makefile                          |   1 +
->  drivers/watchdog/ts4600_wdt.c                      | 185 +++++++++++++++++++++
->  5 files changed, 218 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
->  create mode 100644 drivers/watchdog/ts4600_wdt.c
+>  drivers/clocksource/arm_arch_timer.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index a1fb918b8021..4bed671e490e 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -1268,7 +1268,7 @@ arch_timer_mem_find_best_frame(struct arch_timer_mem *timer_mem)
+>  		pr_err("Unable to find a suitable frame in timer @ %pa\n",
+>  			&timer_mem->cntctlbase);
+>  
+> -	return frame;
+> +	return best_frame;
+>  }
+>  
+>  static int __init
+> -- 
+> 2.7.4
