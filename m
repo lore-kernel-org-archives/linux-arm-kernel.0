@@ -1,37 +1,35 @@
-From: andy.tang@nxp.com (Yuantian Tang)
-Date: Mon, 8 May 2017 11:13:29 +0800
-Subject: [PATCH] arm64: dts: ls1088a: update the sata node
-Message-ID: <1494213209-39673-1-git-send-email-andy.tang@nxp.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 8 May 2017 09:48:27 +0530
+Subject: [PATCH 5/6] dt-bindings: cpufreq: move Mediatek cpufreq
+ dt-bindings document to proper place
+In-Reply-To: <1493997974-17699-6-git-send-email-sean.wang@mediatek.com>
+References: <1493997974-17699-1-git-send-email-sean.wang@mediatek.com>
+ <1493997974-17699-6-git-send-email-sean.wang@mediatek.com>
+Message-ID: <20170508041827.GC17010@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. Sata ecc should be disabled due to a erratum.
-Provide the ecc register address for driver to use.
-2. Enable dma coherence operation
+On 05-05-17, 23:26, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> The old place is Documentation/devicetree/bindings/clock/ that would
+> let people hard to find how to use Mediatek cpufreq driver, so moving
+> it to the new place as other cpufreq dirvers are done would be better.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  .../devicetree/bindings/clock/mt8173-cpu-dvfs.txt  | 83 ----------------------
+>  .../bindings/cpufreq/cpufreq-mediatek.txt          | 83 ++++++++++++++++++++++
+>  2 files changed, 83 insertions(+), 83 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
+>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
 
-Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Please generate patches with:
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index 2946fd7..90edd76 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -265,10 +265,13 @@
- 
- 		sata: sata at 3200000 {
- 			compatible = "fsl,ls1088a-ahci", "fsl,ls1043a-ahci";
--			reg = <0x0 0x3200000 0x0 0x10000>;
-+			reg = <0x0 0x3200000 0x0 0x10000>,
-+				<0x0 0x20140520 0x0 0x4>;
-+			reg-names = "ahci", "sata-ecc";
- 			interrupts = <0 133 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clockgen 4 3>;
- 			status = "disabled";
-+			dma-coherent;
- 		};
- 	};
- 
+git format-patch -C -M --thread=shallow
+
+You would be required to resend this patch at least to let us see what has
+changed.
+
 -- 
-2.1.0.27.g96db324
+viresh
