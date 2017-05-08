@@ -1,94 +1,98 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 9 May 2017 03:09:39 +0800
-Subject: [PATCH 2/2] drivers: pwm: pwm-atmel: implement pwm dead-times
-In-Reply-To: <1494253463-26993-3-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <201705090302.c80lEjnN%fengguang.wu@intel.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 8 May 2017 21:10:29 +0200
+Subject: [PATCH 4/8] KVM: arm/arm64: Make vgic_v3_check_base more broadly
+ usable
+In-Reply-To: <7e67fe6c-0956-ec03-d18c-d6e3c59b334a@redhat.com>
+References: <20170508115454.5075-1-cdall@linaro.org>
+ <20170508115454.5075-5-cdall@linaro.org>
+ <6c92055f-a5b1-c3a8-2343-61205324880c@redhat.com>
+ <20170508171849.GI28342@cbox>
+ <7e67fe6c-0956-ec03-d18c-d6e3c59b334a@redhat.com>
+Message-ID: <20170508191029.GL28342@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Claudiu,
+On Mon, May 08, 2017 at 07:39:24PM +0200, Auger Eric wrote:
+> Hi,
+> 
+> On 08/05/2017 19:18, Christoffer Dall wrote:
+> > On Mon, May 08, 2017 at 06:13:01PM +0200, Auger Eric wrote:
+> >> Hi Christoffer,
+> >>
+> >> On 08/05/2017 13:54, Christoffer Dall wrote:
+> >>> As we are about to fiddle with the io device registration mechanism
+> >>> let's be a little more careful in verifying the addresses we can ealier
+> >>> on to provide error messages to the user at time related to him/her
+> >>> setting overlapping addresses. 
+> >> Above sentence would need some rewording.
+> >>  We still want to check a consistent
+> > 
+> > indeed :)
+> > 
+> >>> system before actually running the VM for the first time, so we make
+> >>> vgic_v3_check_base available in the core vgic-v3 code as well as in the
+> >>> other parts of the GICv3 code, namely the MMIO config code.
+> >>>
+> >>> We also return true for undefined base addresses so that the function
+> >>> can be used before all base addresses are set; all callers already check
+> >>> for uninitialized addresses before calling this function.
+> >>>
+> >>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> >>> ---
+> >>>  virt/kvm/arm/vgic/vgic-v3.c | 18 ++++++++++++++----
+> >>>  virt/kvm/arm/vgic/vgic.h    |  1 +
+> >>>  2 files changed, 15 insertions(+), 4 deletions(-)
+> >>>
+> >>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> >>> index 12e52a0..b934e78 100644
+> >>> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> >>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> >>> @@ -329,19 +329,29 @@ int vgic_v3_save_pending_tables(struct kvm *kvm)
+> >>>  	return 0;
+> >>>  }
+> >>>  
+> >>> -/* check for overlapping regions and for regions crossing the end of memory */
+> >>> -static bool vgic_v3_check_base(struct kvm *kvm)
+> >>> +/*
+> >>> + * Check for overlapping regions and for regions crossing the end of memory
+> >>> + * for base addresses which have already been set.
+> >>> + */
+> >>> +bool vgic_v3_check_base(struct kvm *kvm)
+> >>>  {
+> >>>  	struct vgic_dist *d = &kvm->arch.vgic;
+> >>>  	gpa_t redist_size = KVM_VGIC_V3_REDIST_SIZE;
+> >>>  
+> >>>  	redist_size *= atomic_read(&kvm->online_vcpus);
+> >>>  
+> >>> -	if (d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE < d->vgic_dist_base)
+> >>> +	if (!IS_VGIC_ADDR_UNDEF(d->vgic_dist_base) &&
+> >>> +	    d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE < d->vgic_dist_base)
+> >>>  		return false;
+> >>> -	if (d->vgic_redist_base + redist_size < d->vgic_redist_base)
+> >>> +
+> >>> +	if (!IS_VGIC_ADDR_UNDEF(d->vgic_redist_base) &&
+> >>> +	    d->vgic_redist_base + redist_size < d->vgic_redist_base)
+> >>>  		return false;
+> >>>  
+> >>> +	if (IS_VGIC_ADDR_UNDEF(d->vgic_dist_base) &&
+> >>> +	    IS_VGIC_ADDR_UNDEF(d->vgic_redist_base))
+> >>> +		return true;
+> >>> +
+> >>>  	if (d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE <= d->vgic_redist_base)
+> >>>  		return true;
+> >> It is unclear to me if the dunction can be called if either of the
+> >> address is unset?
+> > 
+> > Yes, it can be called if both addreses are unset, in which case you'll
+> > get a positive result.  If a single address is set, we cannot check
+> > interaction between the two addresses, but we can check the requirements
+> > for the single address, and the interaction must be checked later.
+> Although unlikely can't you have the redist_base set at 0x0 and
+> dist_base unset. Wouldn't this return false?
 
-[auto build test WARNING on pwm/for-next]
-[also build test WARNING on next-20170508]
-[cannot apply to v4.11]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+In the case od fist_base == VGIC_ADDR_UNDEF and rd_base == 0, we'll get:
 
-url:    https://github.com/0day-ci/linux/commits/Claudiu-Beznea/extends-PWM-framework-to-support-PWM-dead-times/20170509-000624
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm.git for-next
-config: arm-multi_v5_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Ah, duh, my && should be a ||.  I'll fix this.
 
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
-
-All warnings (new ones prefixed by >>):
-
-   In file included from include/linux/io.h:25:0,
-                    from drivers/pwm/pwm-atmel.c:13:
-   drivers/pwm/pwm-atmel.c: In function 'atmel_pwm_apply':
->> arch/arm/include/asm/io.h:100:2: warning: 'dt' may be used uninitialized in this function [-Wmaybe-uninitialized]
-     asm volatile("str %1, %0"
-     ^~~
-   drivers/pwm/pwm-atmel.c:246:28: note: 'dt' was declared here
-     unsigned long cprd, cdty, dt;
-                               ^~
---
-   In file included from include/linux/io.h:25:0,
-                    from drivers//pwm/pwm-atmel.c:13:
-   drivers//pwm/pwm-atmel.c: In function 'atmel_pwm_apply':
->> arch/arm/include/asm/io.h:100:2: warning: 'dt' may be used uninitialized in this function [-Wmaybe-uninitialized]
-     asm volatile("str %1, %0"
-     ^~~
-   drivers//pwm/pwm-atmel.c:246:28: note: 'dt' was declared here
-     unsigned long cprd, cdty, dt;
-                               ^~
-
-vim +/dt +100 arch/arm/include/asm/io.h
-
-5bb5d66d8 Peter Hurley   2015-04-13   84  		     : "=r" (val)
-5bb5d66d8 Peter Hurley   2015-04-13   85  		     : "Q" (*(volatile u16 __force *)addr));
-195bbcac2 Will Deacon    2012-08-24   86  	return val;
-195bbcac2 Will Deacon    2012-08-24   87  }
-195bbcac2 Will Deacon    2012-08-24   88  #endif
-195bbcac2 Will Deacon    2012-08-24   89  
-84c4d3a6d Thierry Reding 2014-07-28   90  #define __raw_writeb __raw_writeb
-195bbcac2 Will Deacon    2012-08-24   91  static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
-195bbcac2 Will Deacon    2012-08-24   92  {
-195bbcac2 Will Deacon    2012-08-24   93  	asm volatile("strb %1, %0"
-5bb5d66d8 Peter Hurley   2015-04-13   94  		     : : "Qo" (*(volatile u8 __force *)addr), "r" (val));
-195bbcac2 Will Deacon    2012-08-24   95  }
-195bbcac2 Will Deacon    2012-08-24   96  
-84c4d3a6d Thierry Reding 2014-07-28   97  #define __raw_writel __raw_writel
-195bbcac2 Will Deacon    2012-08-24   98  static inline void __raw_writel(u32 val, volatile void __iomem *addr)
-195bbcac2 Will Deacon    2012-08-24   99  {
-195bbcac2 Will Deacon    2012-08-24 @100  	asm volatile("str %1, %0"
-5bb5d66d8 Peter Hurley   2015-04-13  101  		     : : "Qo" (*(volatile u32 __force *)addr), "r" (val));
-195bbcac2 Will Deacon    2012-08-24  102  }
-195bbcac2 Will Deacon    2012-08-24  103  
-84c4d3a6d Thierry Reding 2014-07-28  104  #define __raw_readb __raw_readb
-195bbcac2 Will Deacon    2012-08-24  105  static inline u8 __raw_readb(const volatile void __iomem *addr)
-195bbcac2 Will Deacon    2012-08-24  106  {
-195bbcac2 Will Deacon    2012-08-24  107  	u8 val;
-5bb5d66d8 Peter Hurley   2015-04-13  108  	asm volatile("ldrb %0, %1"
-
-:::::: The code at line 100 was first introduced by commit
-:::::: 195bbcac2e5c12f7fb99cdcc492c3000c5537f4a ARM: 7500/1: io: avoid writeback addressing modes for __raw_ accessors
-
-:::::: TO: Will Deacon <will.deacon@arm.com>
-:::::: CC: Russell King <rmk+kernel@arm.linux.org.uk>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 28670 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170509/887ab9c4/attachment-0001.gz>
+Thanks,
+-Christoffer
