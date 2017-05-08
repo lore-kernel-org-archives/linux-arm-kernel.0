@@ -1,109 +1,55 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 8 May 2017 06:09:28 -0700
-Subject: [PATCH v9 1/4] syscalls: Verify address limit before returning to
- user-mode
-In-Reply-To: <20170508073352.caqe3fqf7nuxypgi@gmail.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com>
-Message-ID: <CAGXu5jKZRESgGhZ6GEoO784Q1G8V0DPcwM1T2PpyTqvEAsrUdg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 May 2017 08:27:25 -0500
+Subject: [PATCH v3 6/6] watchdog: ts4600: add driver for TS-4600 watchdog
+In-Reply-To: <20170505193259.16517-7-sebastien.bourdelin@savoirfairelinux.com>
+References: <20170505193259.16517-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20170505193259.16517-7-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20170508132725.c3fnbz2lwz3khs7u@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 8, 2017 at 12:33 AM, Ingo Molnar <mingo@kernel.org> wrote:
->
-> (added more Cc:s)
->
-> * Thomas Garnier <thgarnie@google.com> wrote:
->
->> On Fri, Apr 28, 2017 at 8:32 AM, Thomas Garnier <thgarnie@google.com> wrote:
->> > Ensure that a syscall does not return to user-mode with a kernel address
->> > limit. If that happens, a process can corrupt kernel-mode memory and
->> > elevate privileges [1].
->> >
->> > The CONFIG_ADDR_LIMIT_CHECK option disables the generic check so each
->> > architecture can create optimized versions. This option is enabled by
->> > default on s390 because a similar feature already exists.
->> >
->> > [1] https://bugs.chromium.org/p/project-zero/issues/detail?id=990
->> >
->> > Signed-off-by: Thomas Garnier <thgarnie@google.com>
->> > Tested-by: Kees Cook <keescook@chromium.org>
->>
->> Ingo: Do you want to take the set?
->
-> Yeah, so now I'm questioning the whole premise of the feature, sorry :-/
->
-> A big disavantage is that the "security check" will add 2-5 instructions to the
-> system call fast path. Every one of them, and essentially forever. Just to handle
-> a CVE that was caused by a buggy touch-screen driver helper function leaking
-> KERNEL_DS and which was fixed long ago ...
->
-> And yes, I realize that there were other such bugs and that such bugs might occur
-> in the future - but why not push the overhead of the security check to the kernel
-> build phase? I.e. I'm wondering how well we could do static analysis during kernel
-> build - would a limited mode of Sparse be good enough for that? Or we could add a
-> new static checker to tools/, built from first principles and used primarily for
-> extended syntactical checking.
+On Fri, May 05, 2017 at 03:32:59PM -0400, Sebastien Bourdelin wrote:
+> This watchdog is instantiated in a FPGA and can only be access using a
+> GPIOs bit-banged bus, called the NBUS by Technologic Systems.
+> The watchdog is made of only one register, called the feed register.
+> Writing to this register will re-arm the watchdog for a given time (and
+> enable it if it was disable). It can be disabled by writing a special
+> value into it.
+> 
+> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+> ---
+> Changes v2 -> v3:
+>   - rebase on master
+>   - remove the timeout table to simplify the logic (suggested by
+>   Guenter Roeck)
+>   - fix the set_timeout function (suggested by Guenter Roeck)
+>   - hardcode the max_hw_heartbeat_ms value based on the ts4600 max
+>   timeout value supported (suggested by Guenter Roeck)
+>   - remove the max_timeout usage and set a default timeout value
+> (suggested by Guenter Roeck)
+>   - use the devm_watchdog_register_device function instead of
+>   watchdog_register_device (suggested by Guenter Roeck)
+> 
+> Changes v1 -> v2:
+>   - rebase on master
+>   - retrieve the ts_nbus instantiated by the parent node (suggested by
+>   Linus Walleij)
+>   - rename the wdt by watchdog in the device tree and in the
+>   documentation (suggested by Rob Herring)
+>   - add a dependency to the TS_NBUS driver in the Kconfig (suggested by
+>   Guenter Roeck)
+>   - simplify the set_timeout function (suggested by Guenter Roeck)
+>   - use the max_hw_heartbeat_ms callback instead of the max_timeout
+>   callback (suggested by Guenter Roeck)
+> ---
+>  .../devicetree/bindings/watchdog/ts4600-wdt.txt    |  16 ++
+>  arch/arm/boot/dts/imx28-ts4600-common.dtsi         |   5 +
 
-Static analysis is just not going to cover all cases. We've had
-vulnerabilities where interrupt handlers left KERNEL_DS set, for
-example. If there are performance concerns, let's put this behind a
-CONFIG. 2-5 instructions is not an issue for most people that want
-this coverage.
+Please add acks when posting new versions. I acked v2.
 
-> For example I'd consider it a good practice to mandate that if a kernel function
-> sets KERNEL_DS then it must restore it as well. Any function that does not do
-> that, or is too complex for the static analysis to prove correctness for sure
-> should be considered buggy!
->
-> Are there any common kernel APIs outside set_fs() that set KERNEL_DS
-> intentionally? The overwhelming pattern ought to be:
->
->         orig_fs = get_fs();
->         set_fs(KERNEL_DS);
->         ...
->         set_fs(orig_fs);
->
-> ... and even a relatively simple static analysis tool ought to be able to see
-> through that.
-
-This pattern was, in fact, what the interrupt handler bug escaped
-from. We have to build proactive defenses, and this check has a clear
-defensive advantage. It's a noble goal to improve the static analyzers
-and simplify the source, but we have too much history to prove that
-this just isn't enough. This instruction cost of this is extremely
-small, too. Until we can eliminate set_fs(), we need to add this
-check.
-
-
-> I'd even suggest we do it not like Sparse builds are done today, but in a more
-> integrated fashion: do static analysis as part of a typical kernel defconfig build
-> and not tolerate warnings but go for a 'zero warnings' policy like Linus uses for
-> modconfig builds.
->
-> _That_ solution I'd feel very, very good about - it would be so much better than
-> any runtime checks...
-
-I'm not opposed to this, but there will be push-back on "making the
-build slower", and it still won't catch everything. Bug-finding is
-different from making a bug class just unexploitable at all. As we've
-done before, it's the difference between trying to find format string
-attacks vs just removing %n from the format parser.
-
-> Not to mention that such an integrated static analysis facility would allow many
-> other things to be checked during build time, which we couldn't possibly check
-> runtime.
-
-Absolutely! But it's orthogonal to proactive runtime exploit blocking.
-We've got one that works and defends against an entire class of
-vulnerability for very low cost. It it's truly too costly for default,
-let's put it behind a CONFIG and see who wants it. (Most distros, I
-suspect, will enable it, just like hardened usercopy which is much
-more expensive than this.)
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+>  drivers/watchdog/Kconfig                           |  11 ++
+>  drivers/watchdog/Makefile                          |   1 +
+>  drivers/watchdog/ts4600_wdt.c                      | 185 +++++++++++++++++++++
+>  5 files changed, 218 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
+>  create mode 100644 drivers/watchdog/ts4600_wdt.c
