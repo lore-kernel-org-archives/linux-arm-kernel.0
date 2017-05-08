@@ -1,82 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 8 May 2017 16:04:09 +0100
-Subject: [PATCH 2/2] arm64: Add dump_backtrace() in show_regs
-In-Reply-To: <1494251815-55961-2-git-send-email-wangkefeng.wang@huawei.com>
-References: <1494251815-55961-1-git-send-email-wangkefeng.wang@huawei.com>
- <1494251815-55961-2-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20170508150409.GG5480@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 8 May 2017 17:08:46 +0200
+Subject: [PATCH V2 1/3] clk: add clk_bulk_get accessories
+In-Reply-To: <1494252233-21074-2-git-send-email-aisheng.dong@nxp.com>
+References: <1494252233-21074-1-git-send-email-aisheng.dong@nxp.com>
+ <1494252233-21074-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CAMuHMdVDOor0E2cjEKO+=Pm+1MGO4BibGTdULPvPKd390fTxuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 08, 2017 at 09:56:55PM +0800, Kefeng Wang wrote:
-> When the system trigger a softlockup(eg, infinite loop when
-> PREEMPT_NONE), it only shows regs without stack trace, which
-> makes it difficult to adress the issue.
+Hi Dong,
 
-How about:
+On Mon, May 8, 2017 at 4:03 PM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
+> --- /dev/null
+> +++ b/drivers/clk/clk-bulk.c
+> @@ -0,0 +1,165 @@
 
-  Generic code expects show_regs() to dump the stack, but arm64's
-  show_regs() does not. This makes it hard to debug softlockups and
-  other issues that reesult in show_regs() being called.
+> +int __must_check clk_bulk_get(struct device *dev, int num_clks,
+> +                             struct clk_bulk_data *clks)
+> +{
+> +       int ret;
+> +       int i;
+> +
+> +       for (i = 0; i < num_clks; i++)
+> +               clks[i].clk = NULL;
+> +
+> +       for (i = 0; i < num_clks; i++) {
+> +               clks[i].clk = clk_get(dev, clks[i].id);
+> +               if (IS_ERR(clks[i].clk)) {
+> +                       ret = PTR_ERR(clks[i].clk);
+> +                       dev_err(dev, "Failed to get clk '%s': %d\n",
+> +                               clks[i].id, ret);
+> +                       clks[i].clk = NULL;
+> +                       goto err;
+> +               }
+> +       }
+> +
+> +       return 0;
+> +
+> +err:
+> +       while (--i >= 0)
+> +               clk_put(clks[i].clk);
 
-  This patch updates arm64's show_regs() to dump the stack, as common
-  code expects.
+These are released in inverse order, which is good.
 
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
->  arch/arm64/include/asm/stacktrace.h | 1 +
->  arch/arm64/kernel/process.c         | 1 +
->  arch/arm64/kernel/traps.c           | 2 +-
->  3 files changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-> index 801a16db..5b6eafc 100644
-> --- a/arch/arm64/include/asm/stacktrace.h
-> +++ b/arch/arm64/include/asm/stacktrace.h
-> @@ -30,5 +30,6 @@ struct stackframe {
->  extern int unwind_frame(struct task_struct *tsk, struct stackframe *frame);
->  extern void walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
->  			    int (*fn)(struct stackframe *, void *), void *data);
-> +extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk);
->  
->  #endif	/* __ASM_STACKTRACE_H */
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index ae2a835..af1ea25 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -210,6 +210,7 @@ void __show_regs(struct pt_regs *regs)
->  void show_regs(struct pt_regs * regs)
->  {
->  	__show_regs(regs);
-> +	dump_backtrace(regs, NULL);
->  }
+> +
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL(clk_bulk_get);
+> +
+> +void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < num_clks; i++) {
+> +               clk_put(clks[i].clk);
+> +               clks[i].clk = NULL;
 
-I believe that as we pass the regs down, this should trigger the frame
-skipping that we want, as I mentioned in reply to v1 [1].
+These aren't.
 
-So FWIW, with the commit message fixup:
+Typically resources are released in the inverse order. Not doing so may
+cause subtle issues.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+I can't come up with an example. but I'm quite sure the real world will find
+one soon ;-)
 
-Thanks,
-Mark.
+The same is true for enable vs. disable, and prepare vs. unprepare.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/496377.html
+Gr{oetje,eeting}s,
 
->  static void tls_thread_flush(void)
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index d4d6ae0..368c3c8 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -140,7 +140,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
->  	}
->  }
->  
-> -static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
-> +void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
->  {
->  	struct stackframe frame;
->  	unsigned long irq_stack_ptr;
-> -- 
-> 1.7.12.4
-> 
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
