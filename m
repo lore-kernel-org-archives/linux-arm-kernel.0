@@ -1,76 +1,187 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Mon, 8 May 2017 17:53:33 +0800
-Subject: [PATCH v2 29/30] dt-bindings: add vendor prefix for bananapi
-In-Reply-To: <CAL_JsqKHpWGviZ2H-xhGMzNWsCCRMj_O5ux8aguFfeVKBfJa_w@mail.gmail.com>
-References: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
- <1493198774-4478-30-git-send-email-sean.wang@mediatek.com>
- <20170428203727.m6jm5w6nb2iirxih@rob-hp-laptop>
- <1493621880.32195.13.camel@mtkswgap22>
- <CAL_JsqKHpWGviZ2H-xhGMzNWsCCRMj_O5ux8aguFfeVKBfJa_w@mail.gmail.com>
-Message-ID: <1494237213.9662.50.camel@mtkswgap22>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 8 May 2017 10:59:46 +0100
+Subject: [PATCH v3 1/7] iommu/arm-smmu-v3: Introduce SMMU option
+ PAGE0_REGS_ONLY for ThunderX2 errata #74
+In-Reply-To: <20170508091739.GA26003@virtx40>
+References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
+ <1493986091-30521-2-git-send-email-gakula@caviumnetworks.com>
+ <20170505230328.GN4906@rric.localdomain> <20170508091739.GA26003@virtx40>
+Message-ID: <b4881237-aca6-63ca-467e-30e36b1f02df@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-thanks for helping me looping in the right group
-
-
-Hi Arnd and Olof
-
-I found Matthias is inactive for a while (his branch in his tree seemed
-to stop at 4.10 since the end of February) maybe he was busy at other
-things. Is there a good way to break the stuck situation and keeping
-linux-mediatek moving on?
-
-I have the willing to fork his tree, prepare dt-for-4.12 and send
-pull-requests to you. But I am worried in that way violating the
-reviewing process if Matthias no reads it.
-
-	Sean
-
-
-On Tue, 2017-05-02 at 08:52 -0500, Rob Herring wrote:
-> +arm-soc
+On 08/05/17 10:17, Linu Cherian wrote:
+> On Sat May 06, 2017 at 01:03:28AM +0200, Robert Richter wrote:
+>> On 05.05.17 17:38:05, Geetha sowjanya wrote:
+>>> From: Linu Cherian <linu.cherian@cavium.com>
+>>>
+>>> Cavium ThunderX2 SMMU implementation doesn't support page 1 register space
+>>> and PAGE0_REGS_ONLY option will be enabled as an errata workaround.
+>>>
+>>> This option when turned on, replaces all page 1 offsets used for
+>>> EVTQ_PROD/CONS, PRIQ_PROD/CONS register access with page 0 offsets.
+>>>
+>>> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+>>> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+>>> ---
+>>>  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |  6 +++
+>>>  drivers/iommu/arm-smmu-v3.c                        | 44 ++++++++++++++++------
+>>>  2 files changed, 38 insertions(+), 12 deletions(-)
+>>
+>>> @@ -1995,8 +2011,10 @@ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
+>>>  	if (!(smmu->features & ARM_SMMU_FEAT_PRI))
+>>>  		return 0;
+>>>  
+>>> -	return arm_smmu_init_one_queue(smmu, &smmu->priq.q, ARM_SMMU_PRIQ_PROD,
+>>> -				       ARM_SMMU_PRIQ_CONS, PRIQ_ENT_DWORDS);
+>>> +	return arm_smmu_init_one_queue(smmu, &smmu->priq.q,
+>>> +				       ARM_SMMU_PRIQ_PROD(smmu),
+>>> +				       ARM_SMMU_PRIQ_CONS(smmu),
+>>> +				       PRIQ_ENT_DWORDS);
+>>
+>> I would also suggest Robin's idea from the v1 review here. This works
+>> if we rework arm_smmu_init_one_queue() to pass addresses instead of
+>> offsets.
+>>
+>> This would make these widespread offset calculations obsolete.
+>>
 > 
-> On Mon, May 1, 2017 at 1:58 AM, Sean Wang <sean.wang@mediatek.com> wrote:
-> > On Fri, 2017-04-28 at 15:37 -0500, Rob Herring wrote:
-> >> On Wed, Apr 26, 2017 at 05:26:13PM +0800, sean.wang at mediatek.com wrote:
-> >> > From: Sean Wang <sean.wang@mediatek.com>
-> >> >
-> >> > Banana Pi team in Sinovoip Co., Limited which are dedicated to
-> >> > design and manufacture open hardware product.
-> >> >
-> >> > Website: http://www.banana-pi.org/
-> >> >
-> >> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> >> > ---
-> >> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
-> >> >  1 file changed, 1 insertion(+)
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> >> > index ec0bfb9..8ca0f3c 100644
-> >> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> >> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> >> > @@ -44,6 +44,7 @@ avia      avia semiconductor
-> >> >  avic       Shanghai AVIC Optoelectronics Co., Ltd.
-> >> >  axentia    Axentia Technologies AB
-> >> >  axis       Axis Communications AB
-> >> > +bananapi Banana Pi SINOVOP CO., LIMITED
-> >>
-> >> s/SINOVOP/SINOVOIP/
-> >
-> > Hi Rob,
-> >
-> > thanks for your careful reviewing , i will correct it in the next
-> > version.
-> >
-> > BTW, Could those related dts changes go through your tree if everything
-> > looks good? Because I find Matthias have been inactive for a while and
-> > the latest branch in his tree seems still staying on 4.10.
+> Have pasted here the relevant changes for doing fixups on smmu base instead
+> of offset to get feedback. 
 > 
-> Happy to take binding doc changes, but I don't take dts changes
-> because those go thru arm-soc. If the platform maintainer is not
-> responsive, then we should replace or add maintainers.
+> This actually results in more lines of changes. If you think the below
+> approach is still better, will post a V4 of this series with this change.
+
+Why not just do this?:
+
+static inline unsigned long page1_offset_adjust(
+	unsigned long off, struct arm_smmu_device *smmu)
+{
+	if (off > SZ_64K && ARM_SMMU_PAGE0_REGS_ONLY(smmu))
+		return (off - SZ_64K);
+
+	return off;
+}
+
+AFAICS that should be the least disruptive way to go about it.
+
+Robin.
+
 > 
-> Rob
+> 
+> +static inline unsigned long arm_smmu_page1_base(
+> +	struct arm_smmu_device *smmu)
+> +{
+> +	if (ARM_SMMU_PAGE0_REGS_ONLY(smmu))
+> +		return smmu->base;
+> +	else
+> +		return smmu->base + SZ_64K;
+> +}
+> +
+> 
+> @@ -1948,8 +1962,8 @@ static void arm_smmu_put_resv_regions(struct device *dev,
+>  /* Probing and initialisation functions */
+>  static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
+>  				   struct arm_smmu_queue *q,
+> -				   unsigned long prod_off,
+> -				   unsigned long cons_off,
+> +				   unsigned long prod_addr,
+> +				   unsigned long cons_addr,
+>  				   size_t dwords)
+>  {
+>  	size_t qsz = ((1 << q->max_n_shift) * dwords) << 3;
+> @@ -1961,8 +1975,8 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
+>  		return -ENOMEM;
+>  	}
+>  
+> -	q->prod_reg	= smmu->base + prod_off;
+> -	q->cons_reg	= smmu->base + cons_off;
+> +	q->prod_reg	= prod_addr;
+> +	q->cons_reg	= cons_addr;
+>  	q->ent_dwords	= dwords;
+>  
+>  	q->q_base  = Q_BASE_RWA;
+> @@ -1977,17 +1991,25 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
+>  static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
+>  {
+>  	int ret;
+> +	unsigned long page1_base, page0_base;
+> +
+> +	page0_base = smmu->base;
+> +	page1_base = arm_smmu_page1_base(smmu);
+>  
+>  	/* cmdq */
+>  	spin_lock_init(&smmu->cmdq.lock);
+> -	ret = arm_smmu_init_one_queue(smmu, &smmu->cmdq.q, ARM_SMMU_CMDQ_PROD,
+> -				      ARM_SMMU_CMDQ_CONS, CMDQ_ENT_DWORDS);
+> +	ret = arm_smmu_init_one_queue(smmu, &smmu->cmdq.q, 
+> +				      page0_base + ARM_SMMU_CMDQ_PROD,
+> +				      page0_base + ARM_SMMU_CMDQ_CONS, 
+> +				      CMDQ_ENT_DWORDS);
+>  	if (ret)
+>  		return ret;
+>  
+>  	/* evtq */
+> -	ret = arm_smmu_init_one_queue(smmu, &smmu->evtq.q, ARM_SMMU_EVTQ_PROD,
+> -				      ARM_SMMU_EVTQ_CONS, EVTQ_ENT_DWORDS);
+> +	ret = arm_smmu_init_one_queue(smmu, &smmu->evtq.q,
+> +				      page1_base + ARM_SMMU_EVTQ_PROD,
+> +				      page1_base + ARM_SMMU_EVTQ_CONS,
+> +				      EVTQ_ENT_DWORDS);
+>  	if (ret)
+>  		return ret;
+>  
+> @@ -1995,8 +2017,10 @@ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
+>  	if (!(smmu->features & ARM_SMMU_FEAT_PRI))
+>  		return 0;
+>  
+> -	return arm_smmu_init_one_queue(smmu, &smmu->priq.q, ARM_SMMU_PRIQ_PROD,
+> -				       ARM_SMMU_PRIQ_CONS, PRIQ_ENT_DWORDS);
+> +	return arm_smmu_init_one_queue(smmu, &smmu->priq.q,
+> +				       page1_base + ARM_SMMU_PRIQ_PROD,
+> +				       page1_base + ARM_SMMU_PRIQ_CONS,
+> +				       PRIQ_ENT_DWORDS);
+>  }
+> 
+> 
+> 
+> @@ -2301,8 +2349,11 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+>  {
+>  	int ret;
+>  	u32 reg, enables;
+> +	unsigned long page1_base;
+>  	struct arm_smmu_cmdq_ent cmd;
+>  
+> +	page1_base = arm_smmu_page1_base(smmu);
+> +
+>  	/* Clear CR0 and sync (disables SMMU and queue processing) */
+>  	reg = readl_relaxed(smmu->base + ARM_SMMU_CR0);
+>  	if (reg & CR0_SMMUEN)
+> @@ -2363,8 +2414,8 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+>  
+>  	/* Event queue */
+>  	writeq_relaxed(smmu->evtq.q.q_base, smmu->base + ARM_SMMU_EVTQ_BASE);
+> -	writel_relaxed(smmu->evtq.q.prod, smmu->base + ARM_SMMU_EVTQ_PROD);
+> -	writel_relaxed(smmu->evtq.q.cons, smmu->base + ARM_SMMU_EVTQ_CONS);
+> +	writel_relaxed(smmu->evtq.q.prod, page1_base + ARM_SMMU_EVTQ_PROD);
+> +	writel_relaxed(smmu->evtq.q.cons, page1_base + ARM_SMMU_EVTQ_CONS);
+>  
+>  	enables |= CR0_EVTQEN;
+>  	ret = arm_smmu_write_reg_sync(smmu, enables, ARM_SMMU_CR0,
+> @@ -2379,9 +2430,9 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+>  		writeq_relaxed(smmu->priq.q.q_base,
+>  			       smmu->base + ARM_SMMU_PRIQ_BASE);
+>  		writel_relaxed(smmu->priq.q.prod,
+> -			       smmu->base + ARM_SMMU_PRIQ_PROD);
+> +			       page1_base + ARM_SMMU_PRIQ_PROD);
+>  		writel_relaxed(smmu->priq.q.cons,
+> -			       smmu->base + ARM_SMMU_PRIQ_CONS);
+> +			       page1_base + ARM_SMMU_PRIQ_CONS);
+>  
+>  		enables |= CR0_PRIQEN;
+>  		ret = arm_smmu_write_reg_sync(smmu, enables, ARM_SMMU_CR0,
+> 
+> 
+> 
+> Thanks.
+> 
