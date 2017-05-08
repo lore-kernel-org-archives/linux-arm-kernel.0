@@ -1,69 +1,108 @@
-From: axboe@fb.com (Jens Axboe)
-Date: Mon, 8 May 2017 08:08:55 -0600
-Subject: FIO performance regression in 4.11 kernel vs. 4.10 kernel
- observed on ARM64
-In-Reply-To: <CAK8P3a0aqH5X0yoi1EF1=vM_gaJhRkjC66NQJk8enZEES5aYRw@mail.gmail.com>
-References: <50f528e8-8d8d-b168-784d-607a602ba808@broadcom.com>
- <20170508110754.GI8526@arm.com>
- <CAK8P3a0aqH5X0yoi1EF1=vM_gaJhRkjC66NQJk8enZEES5aYRw@mail.gmail.com>
-Message-ID: <b0a33959-f3be-9b98-51a0-26e8ea145617@fb.com>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Mon, 8 May 2017 17:24:21 +0300
+Subject: [PATCH 0/2] extends PWM framework to support PWM dead-times
+Message-ID: <1494253463-26993-1-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2017 05:19 AM, Arnd Bergmann wrote:
-> On Mon, May 8, 2017 at 1:07 PM, Will Deacon <will.deacon@arm.com> wrote:
->> Hi Scott,
->>
->> Thanks for the report.
->>
->> On Fri, May 05, 2017 at 06:37:55PM -0700, Scott Branden wrote:
->>> I have updated the kernel to 4.11 and see significant performance
->>> drops using fio-2.9.
->>>
->>> Using FIO the performanced drops from 281 KIOPS to 207 KIOPS using
->>> single core and task.
->>> Percent performance drop becomes even worse if multi-cores and multi-
->>> threads are used.
->>>
->>> Platform is ARM64 based A72.  Can somebody reproduce the results or
->>> know what may have changed to make such a dramatic change?
->>>
->>> FIO command and resulting log output below using null_blk to remove
->>> as many hardware specific driver dependencies as possible.
->>>
->>> modprobe null_blk queue_mode=2 irqmode=0 completion_nsec=0
->>> submit_queues=1 bs=4096
->>>
->>> taskset 0x1 fio --randrepeat=1 --ioengine=libaio --direct=1 --numjobs=1
->>> --gtod_reduce=1 --name=readtest --filename=/dev/nullb0 --bs=4k
->>> --iodepth=128 --time_based --runtime=15 --readwrite=read
->>
->> I can confirm that I also see a ~20% drop in results from 4.10 to 4.11 on
->> my AMD Seattle board w/ defconfig, but I can't see anything obvious in the
->> log.
->>
->> Things you could try:
->>
->>   1. Try disabling CONFIG_NUMA in the 4.11 kernel (this was enabled in
->>      defconfig between the releases).
->>
->>   2. Try to reproduce on an x86 box
->>
->>   3. Have a go at bisecting the issue, so we can revert the offender if
->>      necessary.
-> 
-> One more thing to try early: As 4.11 gained support for blk-mq I/O
-> schedulers compared to 4.10, null_blk will now also need some extra
-> cycles for each I/O request. Try loading the driver with "queue_mode=0"
-> or "queue_mode=1" instead of "queue_mode=2".
+Hi all,
 
-Since you have 1 submit queues set, you are being loaded with deadline
-attached. To compare 4.10 and 4.11, with queue_mode=2 and submit_queues=1,
-after loading null_blk in 4.11, do:
+Please give feedback on these patches which extends PWM framework
+in order to support PWM dead-times.
+Since I didn't receive any inputs on RFC series I'm resending it as
+normal patch series.
 
-# echo none > /sys/block/nullb0/queue/scheduler
+For a PWM controller with more than one output signals per PWM channel
+dead-times are the delays introduced between the edges of the output
+signals and the original signal introduced in dead-time generator
+engine.
+E.g. consider a PWM controller with a dead-time engine as in the following
+diagram:
 
-and re-test.
+                        -----------------
+                       |                 |---> PWMH
+        PWM signal --->| Dead-time engine|
+                       |                 |---> PWML
+                        -----------------
+
+With no dead-time configured, the PWMH and PWML signals will be
+complementary signals (rising and falling edges of PWMH and PWML
+have opposite leves, same duration and same starting time) as
+follows:
+
+                      ____0    D____P     ____      ____      ____
+        PWM signal __|    |____|    |____|    |____|    |____|    |___
+                      ____      ____      ____      ____      ____
+              PWMH __|    |____|    |____|    |____|    |____|    |___
+                   __      ____      ____      ____      ____      ___
+              PWML   |____|    |____|    |____|    |____|    |____|
+
+Where - 0 is the starting point of the signal
+      - D is the starting point of the duty-cycle
+      - P is the signal period
+
+Based on the above diagram:
+- rising edge dead-time - is the delay introduced in one of the
+dead-time engine output signals; the delay is introduced after
+rising edge of the original PWM signal
+- falling edge dead-time - is the delay introduced in one of the
+dead-time engine output signals; the delay is introduced after
+the end of falling edge of the original PWM signal
+
+The following diagram explain how PWM dead-times falls on some signals:
+
+                      ____0    D____P     ____      ____      ____
+        PWM signal __|    |____|    |____|    |____|    |____|    |___
+                        __        __        __        __        __
+              PWMH ____|  |____re|  |______|  |______|  |______|  |___
+                   __        __        __        __        __        __
+              PWML   |______|  |____fe|  |______|  |______|  |______|
+
+In the upper diagram:
+- re = rising edge = the delay between D point of the original PWM signal
+(rising edge) and the starting point of the next edge of one of the PWM
+dead-time engine output
+- fe = falling edge = the delay between P point of the original PWM signal
+(falling edge) and the starting point of the next edge of one of the PWM
+dead-time engine output
+
+To configure the PWM dead-times new inputs were added to sysfs,
+in PWM subsystem, one for rising edge dead-time, one for falling
+edge deadtime.
+
+root at sama5d2-xplained:/sys/devices/platform/ahb/ahb:apb/f802c000.pwm/pwm/pwmchip0/pwm2# ls -l
+-r--r--r--    1 root     root          4096 Feb 10 10:00 capture
+-rw-r--r--    1 root     root          4096 Feb 10 10:01 deadtime_fe
+-rw-r--r--    1 root     root          4096 Feb 10 10:02 deadtime_re
+-rw-r--r--    1 root     root          4096 Feb 10 10:00 duty_cycle
+-rw-r--r--    1 root     root          4096 Feb 10 10:00 enable
+-rw-r--r--    1 root     root          4096 Feb 10 10:00 period
+-rw-r--r--    1 root     root          4096 Feb 10 10:00 polarity
+drwxr-xr-x    2 root     root             0 Feb 10 10:00 power
+-rw-r--r--    1 root     root          4096 Feb 10 10:00 uevent
+
+The PWM dead-times are used in half bridge converters applications.
+
+Thanks you,
+Claudiu Beznea
+
+Changes since RFC patches:
+- corrected the Documentation/pwm.txt
+- in atmel-pwm.c check atmel_pwm->regs->dt before computing
+dead-times or setting specific registers since the driver is
+used by controllers witch supports dead-time configuration and
+controller which does not.
+
+Claudiu Beznea (2):
+  drivers: pwm: core: implement pwm dead-times
+  drivers: pwm: pwm-atmel: implement pwm dead-times
+
+ Documentation/pwm.txt   | 55 ++++++++++++++++++++++++++++++++++++
+ drivers/pwm/core.c      | 10 ++++++-
+ drivers/pwm/pwm-atmel.c | 62 ++++++++++++++++++++++++++++++++++++++---
+ drivers/pwm/sysfs.c     | 74 +++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pwm.h     | 36 ++++++++++++++++++++++++
+ 5 files changed, 232 insertions(+), 5 deletions(-)
 
 -- 
-Jens Axboe
+2.7.4
