@@ -1,99 +1,76 @@
-From: linu.cherian@cavium.com (Linu Cherian)
-Date: Mon, 8 May 2017 15:14:37 +0530
-Subject: [PATCH v3 2/7] iommu/arm-smmu-v3: Do resource size checks based
- on SMMU
-In-Reply-To: <20170505221844.GW16981@rric.localdomain>
-References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
- <1493986091-30521-3-git-send-email-gakula@caviumnetworks.com>
- <20170505221844.GW16981@rric.localdomain>
-Message-ID: <20170508094437.GA26538@virtx40>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Mon, 8 May 2017 17:53:33 +0800
+Subject: [PATCH v2 29/30] dt-bindings: add vendor prefix for bananapi
+In-Reply-To: <CAL_JsqKHpWGviZ2H-xhGMzNWsCCRMj_O5ux8aguFfeVKBfJa_w@mail.gmail.com>
+References: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
+ <1493198774-4478-30-git-send-email-sean.wang@mediatek.com>
+ <20170428203727.m6jm5w6nb2iirxih@rob-hp-laptop>
+ <1493621880.32195.13.camel@mtkswgap22>
+ <CAL_JsqKHpWGviZ2H-xhGMzNWsCCRMj_O5ux8aguFfeVKBfJa_w@mail.gmail.com>
+Message-ID: <1494237213.9662.50.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat May 06, 2017 at 12:18:44AM +0200, Robert Richter wrote:
-> On 05.05.17 17:38:06, Geetha sowjanya wrote:
-> > From: Linu Cherian <linu.cherian@cavium.com>
-> > 
-> > With implementations supporting only page 0 register space,
-> > resource size can be 64k as well and hence perform size checks
-> > based on SMMU option PAGE0_REGS_ONLY.
-> > 
-> > For this, arm_smmu_device_dt_probe/acpi_probe has been moved before
-> > platform_get_resource call, so that SMMU options are set beforehand.
-> > 
-> > Signed-off-by:  Linu Cherian <linu.cherian@cavium.com>
-> > Signed-off-by:  Geetha Sowjanya <geethasowjanya.akula@cavium.com>
-> > ---
-> >  drivers/iommu/arm-smmu-v3.c | 26 +++++++++++++++++---------
-> >  1 file changed, 17 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> > index 107b4a6..f027676 100644
-> > --- a/drivers/iommu/arm-smmu-v3.c
-> > +++ b/drivers/iommu/arm-smmu-v3.c
-> > @@ -2672,6 +2672,14 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
-> >  	return ret;
-> >  }
-> >  
-> > +static unsigned long arm_smmu_resource_size(struct arm_smmu_device *smmu)
-> > +{
-> > +	if (ARM_SMMU_PAGE0_REGS_ONLY(smmu))
-> > +		return SZ_64K;
-> > +	else
-> > +		return SZ_128K;
-> > +}
-> > +
-> 
-> I think this can be dropped. See below.
-> 
-> >  static int arm_smmu_device_probe(struct platform_device *pdev)
-> >  {
-> >  	int irq, ret;
-> > @@ -2688,9 +2696,17 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
-> >  	}
-> >  	smmu->dev = dev;
-> >  
-> > +	if (dev->of_node) {
-> > +		ret = arm_smmu_device_dt_probe(pdev, smmu);
-> > +	} else {
-> > +		ret = arm_smmu_device_acpi_probe(pdev, smmu);
-> > +		if (ret == -ENODEV)
-> > +			return ret;
-> > +	}
-> > +
-> >  	/* Base address */
-> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > -	if (resource_size(res) + 1 < SZ_128K) {
-> > +	if (resource_size(res) + 1 < arm_smmu_resource_size(smmu)) {
-> >  		dev_err(dev, "MMIO region too small (%pr)\n", res);
-> >  		return -EINVAL;
-> >  	}
-> 
-> Why not just do the follwoing here:
-> 
->  	/* Base address */
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (resource_size(res) + 1 < arm_smmu_resource_size(smmu)) {
->  		dev_err(dev, "MMIO region too small (%pr)\n", res);
->  		return -EINVAL;
->  	}
->  	ioaddr = res->start;
-> 
-> +	/*
-> +	 * Override the size, for Cavium ThunderX2 implementation
-> +	 * which doesn't support the page 1 SMMU register space.
-> +	 */
-> +	if (smmu->options & ARM_SMMU_OPT_PAGE0_REGS_ONLY)
-> +		res->end = res->size + SZ_64K -1;
-> +
->  	smmu->base = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(smmu->base))
->  		return PTR_ERR(smmu->base);
+Hi Rob,
+
+thanks for helping me looping in the right group
 
 
-This might not work, since platform_device_add is being called from
-iort.c before the res->end gets fixed up here. 
+Hi Arnd and Olof
+
+I found Matthias is inactive for a while (his branch in his tree seemed
+to stop at 4.10 since the end of February) maybe he was busy at other
+things. Is there a good way to break the stuck situation and keeping
+linux-mediatek moving on?
+
+I have the willing to fork his tree, prepare dt-for-4.12 and send
+pull-requests to you. But I am worried in that way violating the
+reviewing process if Matthias no reads it.
+
+	Sean
 
 
--- 
-Linu cherian
+On Tue, 2017-05-02 at 08:52 -0500, Rob Herring wrote:
+> +arm-soc
+> 
+> On Mon, May 1, 2017 at 1:58 AM, Sean Wang <sean.wang@mediatek.com> wrote:
+> > On Fri, 2017-04-28 at 15:37 -0500, Rob Herring wrote:
+> >> On Wed, Apr 26, 2017 at 05:26:13PM +0800, sean.wang at mediatek.com wrote:
+> >> > From: Sean Wang <sean.wang@mediatek.com>
+> >> >
+> >> > Banana Pi team in Sinovoip Co., Limited which are dedicated to
+> >> > design and manufacture open hardware product.
+> >> >
+> >> > Website: http://www.banana-pi.org/
+> >> >
+> >> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> >> > ---
+> >> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+> >> >  1 file changed, 1 insertion(+)
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> >> > index ec0bfb9..8ca0f3c 100644
+> >> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> >> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> >> > @@ -44,6 +44,7 @@ avia      avia semiconductor
+> >> >  avic       Shanghai AVIC Optoelectronics Co., Ltd.
+> >> >  axentia    Axentia Technologies AB
+> >> >  axis       Axis Communications AB
+> >> > +bananapi Banana Pi SINOVOP CO., LIMITED
+> >>
+> >> s/SINOVOP/SINOVOIP/
+> >
+> > Hi Rob,
+> >
+> > thanks for your careful reviewing , i will correct it in the next
+> > version.
+> >
+> > BTW, Could those related dts changes go through your tree if everything
+> > looks good? Because I find Matthias have been inactive for a while and
+> > the latest branch in his tree seems still staying on 4.10.
+> 
+> Happy to take binding doc changes, but I don't take dts changes
+> because those go thru arm-soc. If the platform maintainer is not
+> responsive, then we should replace or add maintainers.
+> 
+> Rob
