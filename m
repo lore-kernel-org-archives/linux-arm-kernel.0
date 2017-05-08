@@ -1,42 +1,37 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun, 7 May 2017 16:30:29 -0700
-Subject: [PATCH 04/11] arm64: dts: Initial DTS files for Broadcom Stingray
- SOC
-In-Reply-To: <1494071686-19098-5-git-send-email-anup.patel@broadcom.com>
-References: <1494071686-19098-1-git-send-email-anup.patel@broadcom.com>
- <1494071686-19098-5-git-send-email-anup.patel@broadcom.com>
-Message-ID: <38356358-cfd1-9a29-2b53-80ed495573c6@gmail.com>
+From: andy.tang@nxp.com (Yuantian Tang)
+Date: Mon, 8 May 2017 11:13:29 +0800
+Subject: [PATCH] arm64: dts: ls1088a: update the sata node
+Message-ID: <1494213209-39673-1-git-send-email-andy.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/06/17 ? 04:54, Anup Patel a ?crit :
-> The Broadcom Stingray SoC is a new member in Broadcom iProc
-> SoC family.
-> 
-> This patch adds initial DTS files for Broadcom Stingray SoC
-> and two of its reference boards (bcm958742k and bcm958742t).
-> 
-> We have lot of reference boards and large number of devices
-> in Broadcom Stingray SoC so eventually we will have quite
-> a few DTS files for Stingray. To tackle, we have added a
-> separate directory for Stingray DTS files.
-> 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> ---
+1. Sata ecc should be disabled due to a erratum.
+Provide the ecc register address for driver to use.
+2. Enable dma coherence operation
 
-> +
-> +	scr {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0 0 0xffffffff>;
+Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Sorry for missing that during the internal review, the ranges property
-here should include the 6300_0000 offset such that everything else under
-the "scr" node is relative to that base address. This makes it a lot
-easier to understand the different physical addresses involved and the
-bus topology.
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index 2946fd7..90edd76 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -265,10 +265,13 @@
+ 
+ 		sata: sata at 3200000 {
+ 			compatible = "fsl,ls1088a-ahci", "fsl,ls1043a-ahci";
+-			reg = <0x0 0x3200000 0x0 0x10000>;
++			reg = <0x0 0x3200000 0x0 0x10000>,
++				<0x0 0x20140520 0x0 0x4>;
++			reg-names = "ahci", "sata-ecc";
+ 			interrupts = <0 133 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clockgen 4 3>;
+ 			status = "disabled";
++			dma-coherent;
+ 		};
+ 	};
+ 
 -- 
-Florian
+2.1.0.27.g96db324
