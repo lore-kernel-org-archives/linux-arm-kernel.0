@@ -1,24 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 May 2017 11:20:23 -0500
-Subject: [PATCH v2 16/20] dt-bindings: display: sun4i: Add HDMI display
- bindings
-In-Reply-To: <0941a11259b2dba88d235c6ad713e3451d385028.1493812478.git-series.maxime.ripard@free-electrons.com>
-References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
- <0941a11259b2dba88d235c6ad713e3451d385028.1493812478.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20170508162023.nseoybdkmwdz7sls@rob-hp-laptop>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon,  8 May 2017 18:21:10 +0200
+Subject: [PATCH 1/8] mmc: dt: pwrseq-simple: Invent power-off-delay-us
+In-Reply-To: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
+References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1494260477-25163-2-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 01:59:53PM +0200, Maxime Ripard wrote:
-> One of the possible output of the display pipeline, on the SoCs that have
-> it, is the HDMI controller.
-> 
-> Add a binding for it.
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 79 +++++++-
->  1 file changed, 79 insertions(+), 0 deletions(-)
+During power off, after the GPIO pin has been asserted, some devices like
+the Wifi chip from TI, Wl18xx, needs a delay before the host continues with
+clock gating and turning off regulators as to follow a graceful shutdown
+sequence.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Therefore invent an optional power-off-delay-us DT binding for
+mmc-pwrseq-simple, to allow us to support this constraint.
+
+Cc: devicetree at vger.kernel.org
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: linux-mmc at vger.kernel.org
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+index e254368..9029b45 100644
+--- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
++++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+@@ -18,6 +18,8 @@ Optional properties:
+   "ext_clock" (External clock provided to the card).
+ - post-power-on-delay-ms : Delay in ms after powering the card and
+ 	de-asserting the reset-gpios (if any)
++- power-off-delay-us : Delay in us after asserting the reset-gpios (if any)
++	during power off of the card.
+ 
+ Example:
+ 
+-- 
+2.7.4
