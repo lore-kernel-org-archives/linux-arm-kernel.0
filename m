@@ -1,45 +1,53 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Mon, 8 May 2017 19:07:26 +0800
-Subject: [RFC PATCH 0/3] clk: introduce clk_bulk_get accessories
-In-Reply-To: <20170422030419.GV7065@codeaurora.org>
-References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
- <20170422030419.GV7065@codeaurora.org>
-Message-ID: <20170508110726.GA18153@b29396-OptiPlex-7040>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 May 2017 12:07:55 +0100
+Subject: FIO performance regression in 4.11 kernel vs. 4.10 kernel
+ observed on ARM64
+In-Reply-To: <50f528e8-8d8d-b168-784d-607a602ba808@broadcom.com>
+References: <50f528e8-8d8d-b168-784d-607a602ba808@broadcom.com>
+Message-ID: <20170508110754.GI8526@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 08:04:19PM -0700, Stephen Boyd wrote:
-> On 04/12, Dong Aisheng wrote:
-> > 
-> > Together with the err path handling for each clocks, it does make
-> > things a bit ugly.
-> > 
-> > Since we already have regulator_bulk_get accessories, i thought we
-> > probably could introduce clk_bulk_get as well to handle such case to
-> > ease the driver owners' life. 
-> > 
-> > Besides IMX cpufreq driver, there is also some similar cases
-> > in kernel which could befinit from this api as well.
-> > e.g.
-> > drivers/cpufreq/tegra124-cpufreq.c
-> > drivers/cpufreq/s3c2412-cpufreq.c
-> > sound/soc/samsung/smdk_spdif.c
-> > arch/arm/mach-omap1/serial.c
-> > ...
-> > 
-> > And actually, if we handle clocks more than 3, then it might be
-> > worthy to try, which there is quite many manay in kernel and
-> > that probably could save a lot codes.
-> > 
-> > This is a RFC patch intending to bring up the idea to discuss.
-> > 
-> 
-> Idea seems fine to me. Please also add Russell King, as we need
-> an ack from him on the clk.h API changes.
-> 
+Hi Scott,
 
-Great! Thanks! And sorry to miss Russell King.
-Quite willing to add him to help review in the next series.
+Thanks for the report.
 
-Regards
-Dong Aisheng
+On Fri, May 05, 2017 at 06:37:55PM -0700, Scott Branden wrote:
+> I have updated the kernel to 4.11 and see significant performance
+> drops using fio-2.9.
+> 
+> Using FIO the performanced drops from 281 KIOPS to 207 KIOPS using
+> single core and task.
+> Percent performance drop becomes even worse if multi-cores and multi-
+> threads are used.
+> 
+> Platform is ARM64 based A72.  Can somebody reproduce the results or
+> know what may have changed to make such a dramatic change?
+> 
+> FIO command and resulting log output below using null_blk to remove
+> as many hardware specific driver dependencies as possible.
+> 
+> modprobe null_blk queue_mode=2 irqmode=0 completion_nsec=0
+> submit_queues=1 bs=4096
+> 
+> taskset 0x1 fio --randrepeat=1 --ioengine=libaio --direct=1 --numjobs=1
+> --gtod_reduce=1 --name=readtest --filename=/dev/nullb0 --bs=4k
+> --iodepth=128 --time_based --runtime=15 --readwrite=read
+
+I can confirm that I also see a ~20% drop in results from 4.10 to 4.11 on
+my AMD Seattle board w/ defconfig, but I can't see anything obvious in the
+log.
+
+Things you could try:
+
+  1. Try disabling CONFIG_NUMA in the 4.11 kernel (this was enabled in
+     defconfig between the releases).
+
+  2. Try to reproduce on an x86 box
+
+  3. Have a go at bisecting the issue, so we can revert the offender if
+     necessary.
+
+Cheers,
+
+Will
