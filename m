@@ -1,58 +1,126 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 May 2017 13:19:01 +0200
-Subject: FIO performance regression in 4.11 kernel vs. 4.10 kernel
- observed on ARM64
-In-Reply-To: <20170508110754.GI8526@arm.com>
-References: <50f528e8-8d8d-b168-784d-607a602ba808@broadcom.com>
- <20170508110754.GI8526@arm.com>
-Message-ID: <CAK8P3a0aqH5X0yoi1EF1=vM_gaJhRkjC66NQJk8enZEES5aYRw@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 8 May 2017 12:21:28 +0100
+Subject: [PATCH v3 6/7] iommu/arm-smmu-v3: Add workaround for Cavium
+ ThunderX2 erratum #126
+In-Reply-To: <1493986091-30521-7-git-send-email-gakula@caviumnetworks.com>
+References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
+ <1493986091-30521-7-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <a2618ab6-6609-7885-3b62-c1c1f170c318@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 8, 2017 at 1:07 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Scott,
->
-> Thanks for the report.
->
-> On Fri, May 05, 2017 at 06:37:55PM -0700, Scott Branden wrote:
->> I have updated the kernel to 4.11 and see significant performance
->> drops using fio-2.9.
->>
->> Using FIO the performanced drops from 281 KIOPS to 207 KIOPS using
->> single core and task.
->> Percent performance drop becomes even worse if multi-cores and multi-
->> threads are used.
->>
->> Platform is ARM64 based A72.  Can somebody reproduce the results or
->> know what may have changed to make such a dramatic change?
->>
->> FIO command and resulting log output below using null_blk to remove
->> as many hardware specific driver dependencies as possible.
->>
->> modprobe null_blk queue_mode=2 irqmode=0 completion_nsec=0
->> submit_queues=1 bs=4096
->>
->> taskset 0x1 fio --randrepeat=1 --ioengine=libaio --direct=1 --numjobs=1
->> --gtod_reduce=1 --name=readtest --filename=/dev/nullb0 --bs=4k
->> --iodepth=128 --time_based --runtime=15 --readwrite=read
->
-> I can confirm that I also see a ~20% drop in results from 4.10 to 4.11 on
-> my AMD Seattle board w/ defconfig, but I can't see anything obvious in the
-> log.
->
-> Things you could try:
->
->   1. Try disabling CONFIG_NUMA in the 4.11 kernel (this was enabled in
->      defconfig between the releases).
->
->   2. Try to reproduce on an x86 box
->
->   3. Have a go at bisecting the issue, so we can revert the offender if
->      necessary.
+On 05/05/17 13:08, Geetha sowjanya wrote:
+> From: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> 
+> Cavium ThunderX2 SMMU doesn't support MSI and also doesn't have unique irq
+> lines for gerror, eventq and cmdq-sync.
+> 
+> This patch addresses the issue by checking if any interrupt sources are
+> using same irq number, then they are registered as shared irqs.
+> 
+> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 32 ++++++++++++++++++++++++++++----
+>  1 file changed, 28 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 016b702..46428e7 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -2236,10 +2236,30 @@ static void arm_smmu_setup_msis(struct arm_smmu_device *smmu)
+>  	devm_add_action(dev, arm_smmu_free_msis, dev);
+>  }
+>  
+> +static int get_irq_flags(struct arm_smmu_device *smmu, int irq)
+> +{
+> +	int match_count = 0;
+> +
+> +	if (irq == smmu->evtq.q.irq)
+> +		match_count++;
+> +	if (irq == smmu->cmdq.q.irq)
+> +		match_count++;
+> +	if (irq == smmu->gerr_irq)
+> +		match_count++;
+> +	if (irq == smmu->priq.q.irq)
+> +		match_count++;
+> +
+> +	if (match_count > 1)
+> +		return IRQF_SHARED | IRQF_ONESHOT;
+> +
+> +	return 0;
 
-One more thing to try early: As 4.11 gained support for blk-mq I/O
-schedulers compared to 4.10, null_blk will now also need some extra
-cycles for each I/O request. Try loading the driver with "queue_mode=0"
-or "queue_mode=1" instead of "queue_mode=2".
+I'd say just have this return IRQF_ONESHOT in the non-shared case...
 
-        Arnd
+> +}
+> +
+>  static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+>  {
+>  	int ret, irq;
+>  	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
+> +	u32 irqflags = 0;
+>  
+>  	/* Disable IRQs first */
+>  	ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
+> @@ -2254,9 +2274,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+>  	/* Request interrupt lines */
+>  	irq = smmu->evtq.q.irq;
+>  	if (irq) {
+> +		irqflags = get_irq_flags(smmu, irq);
+>  		ret = devm_request_threaded_irq(smmu->dev, irq, NULL,
+>  						arm_smmu_evtq_thread,
+> -						IRQF_ONESHOT,
+> +						IRQF_ONESHOT | irqflags,
+
+...and pass get_irq_flags(smmu, irq) directly as the argument here.
+
+The local variable and intermediate logic only seem to add unnecessary
+complexity, given that the two cases we actually end up with are:
+
+IRQF_ONESHOT | 0
+
+vs.
+
+IRQF_ONESHOT | IRQF_SHARED | IRQF_ONESHOT
+
+neither of which looks particularly sensible.
+
+Robin.
+
+>  						"arm-smmu-v3-evtq", smmu);
+>  		if (ret < 0)
+>  			dev_warn(smmu->dev, "failed to enable evtq irq\n");
+> @@ -2264,8 +2285,9 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+>  
+>  	irq = smmu->cmdq.q.irq;
+>  	if (irq) {
+> +		irqflags = get_irq_flags(smmu, irq);
+>  		ret = devm_request_irq(smmu->dev, irq,
+> -				       arm_smmu_cmdq_sync_handler, 0,
+> +				       arm_smmu_cmdq_sync_handler, irqflags,
+>  				       "arm-smmu-v3-cmdq-sync", smmu);
+>  		if (ret < 0)
+>  			dev_warn(smmu->dev, "failed to enable cmdq-sync irq\n");
+> @@ -2273,8 +2295,9 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+>  
+>  	irq = smmu->gerr_irq;
+>  	if (irq) {
+> +		irqflags = get_irq_flags(smmu, irq);
+>  		ret = devm_request_irq(smmu->dev, irq, arm_smmu_gerror_handler,
+> -				       0, "arm-smmu-v3-gerror", smmu);
+> +				       irqflags, "arm-smmu-v3-gerror", smmu);
+>  		if (ret < 0)
+>  			dev_warn(smmu->dev, "failed to enable gerror irq\n");
+>  	}
+> @@ -2282,9 +2305,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+>  	if (smmu->features & ARM_SMMU_FEAT_PRI) {
+>  		irq = smmu->priq.q.irq;
+>  		if (irq) {
+> +			irqflags = get_irq_flags(smmu, irq);
+>  			ret = devm_request_threaded_irq(smmu->dev, irq, NULL,
+>  							arm_smmu_priq_thread,
+> -							IRQF_ONESHOT,
+> +							IRQF_ONESHOT | irqflags,
+>  							"arm-smmu-v3-priq",
+>  							smmu);
+>  			if (ret < 0)
+> 
