@@ -1,136 +1,42 @@
-From: geethasowjanya.akula@gmail.com (Geetha Akula)
-Date: Mon, 8 May 2017 17:32:34 +0530
-Subject: [PATCH v3 6/7] iommu/arm-smmu-v3: Add workaround for Cavium
- ThunderX2 erratum #126
-In-Reply-To: <a2618ab6-6609-7885-3b62-c1c1f170c318@arm.com>
-References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
- <1493986091-30521-7-git-send-email-gakula@caviumnetworks.com>
- <a2618ab6-6609-7885-3b62-c1c1f170c318@arm.com>
-Message-ID: <CANHdaiaw4sB+bMY8LcyQGXbnAfKNk5zX6_893M0gqKrVNmeFuQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 8 May 2017 17:40:40 +0530
+Subject: [PATCH] phy: meson8b-usb2: add support for the USB PHY on Meson8
+ SoCs
+In-Reply-To: <20170506173625.19501-1-martin.blumenstingl@googlemail.com>
+References: <20170506173625.19501-1-martin.blumenstingl@googlemail.com>
+Message-ID: <950abc53-df2d-93dd-68d1-e9868445bb93@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 8, 2017 at 4:51 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 05/05/17 13:08, Geetha sowjanya wrote:
->> From: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
->>
->> Cavium ThunderX2 SMMU doesn't support MSI and also doesn't have unique irq
->> lines for gerror, eventq and cmdq-sync.
->>
->> This patch addresses the issue by checking if any interrupt sources are
->> using same irq number, then they are registered as shared irqs.
->>
->> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 32 ++++++++++++++++++++++++++++----
->>  1 file changed, 28 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 016b702..46428e7 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -2236,10 +2236,30 @@ static void arm_smmu_setup_msis(struct arm_smmu_device *smmu)
->>       devm_add_action(dev, arm_smmu_free_msis, dev);
->>  }
->>
->> +static int get_irq_flags(struct arm_smmu_device *smmu, int irq)
->> +{
->> +     int match_count = 0;
->> +
->> +     if (irq == smmu->evtq.q.irq)
->> +             match_count++;
->> +     if (irq == smmu->cmdq.q.irq)
->> +             match_count++;
->> +     if (irq == smmu->gerr_irq)
->> +             match_count++;
->> +     if (irq == smmu->priq.q.irq)
->> +             match_count++;
->> +
->> +     if (match_count > 1)
->> +             return IRQF_SHARED | IRQF_ONESHOT;
->> +
->> +     return 0;
->
-> I'd say just have this return IRQF_ONESHOT in the non-shared case...
->
->> +}
->> +
->>  static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
->>  {
->>       int ret, irq;
->>       u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
->> +     u32 irqflags = 0;
->>
->>       /* Disable IRQs first */
->>       ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
->> @@ -2254,9 +2274,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
->>       /* Request interrupt lines */
->>       irq = smmu->evtq.q.irq;
->>       if (irq) {
->> +             irqflags = get_irq_flags(smmu, irq);
->>               ret = devm_request_threaded_irq(smmu->dev, irq, NULL,
->>                                               arm_smmu_evtq_thread,
->> -                                             IRQF_ONESHOT,
->> +                                             IRQF_ONESHOT | irqflags,
->
-> ...and pass get_irq_flags(smmu, irq) directly as the argument here.
->
-> The local variable and intermediate logic only seem to add unnecessary
-> complexity, given that the two cases we actually end up with are:
->
-> IRQF_ONESHOT | 0
->
-> vs.
->
-> IRQF_ONESHOT | IRQF_SHARED | IRQF_ONESHOT
->
-> neither of which looks particularly sensible.
->
-> Robin.
->
-I will resubmit the patch with suggested changes.
+Hi,
 
-Thank you,
-Geetha.
+On Saturday 06 May 2017 11:06 PM, Martin Blumenstingl wrote:
+> Meson8 uses the same USB PHY as found on the Meson8b and GXBB SoCs. Add
+> a new of_device_id to indicate this. Also update the documentation
+> (devicetree binding, Kconfig and MODULE_DESCRIPTION) accordingly.
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt | 3 ++-
+>  drivers/phy/Kconfig                                        | 4 ++--
+>  drivers/phy/phy-meson8b-usb2.c                             | 5 +++--
+>  3 files changed, 7 insertions(+), 5 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt b/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
+> index 5fa73b9d20f5..d81d73aea608 100644
+> --- a/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
+> @@ -1,7 +1,8 @@
+> -* Amlogic Meson8b and GXBB USB2 PHY
+> +* Amlogic Meson8, Meson8b and GXBB USB2 PHY
+>  
+>  Required properties:
+>  - compatible:	Depending on the platform this should be one of:
+> +	"amlogic,meson8-usb2-phy"
+>  	"amlogic,meson8b-usb2-phy"
+>  	"amlogic,meson-gxbb-usb2-phy"
 
+Please split the dt binding documentation into a separate patch.
 
-
->>                                               "arm-smmu-v3-evtq", smmu);
->>               if (ret < 0)
->>                       dev_warn(smmu->dev, "failed to enable evtq irq\n");
->> @@ -2264,8 +2285,9 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
->>
->>       irq = smmu->cmdq.q.irq;
->>       if (irq) {
->> +             irqflags = get_irq_flags(smmu, irq);
->>               ret = devm_request_irq(smmu->dev, irq,
->> -                                    arm_smmu_cmdq_sync_handler, 0,
->> +                                    arm_smmu_cmdq_sync_handler, irqflags,
->>                                      "arm-smmu-v3-cmdq-sync", smmu);
->>               if (ret < 0)
->>                       dev_warn(smmu->dev, "failed to enable cmdq-sync irq\n");
->> @@ -2273,8 +2295,9 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
->>
->>       irq = smmu->gerr_irq;
->>       if (irq) {
->> +             irqflags = get_irq_flags(smmu, irq);
->>               ret = devm_request_irq(smmu->dev, irq, arm_smmu_gerror_handler,
->> -                                    0, "arm-smmu-v3-gerror", smmu);
->> +                                    irqflags, "arm-smmu-v3-gerror", smmu);
->>               if (ret < 0)
->>                       dev_warn(smmu->dev, "failed to enable gerror irq\n");
->>       }
->> @@ -2282,9 +2305,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
->>       if (smmu->features & ARM_SMMU_FEAT_PRI) {
->>               irq = smmu->priq.q.irq;
->>               if (irq) {
->> +                     irqflags = get_irq_flags(smmu, irq);
->>                       ret = devm_request_threaded_irq(smmu->dev, irq, NULL,
->>                                                       arm_smmu_priq_thread,
->> -                                                     IRQF_ONESHOT,
->> +                                                     IRQF_ONESHOT | irqflags,
->>                                                       "arm-smmu-v3-priq",
->>                                                       smmu);
->>                       if (ret < 0)
->>
->
+Thanks
+Kishon
