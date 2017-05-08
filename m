@@ -1,58 +1,48 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 8 May 2017 21:56:55 +0800
-Subject: [PATCH 2/2] arm64: Add dump_backtrace() in show_regs
-In-Reply-To: <1494251815-55961-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1494251815-55961-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1494251815-55961-2-git-send-email-wangkefeng.wang@huawei.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Mon, 8 May 2017 16:02:30 +0200
+Subject: [PATCH v9 1/4] syscalls: Verify address limit before returning
+ to user-mode
+In-Reply-To: <CAGXu5jKZRESgGhZ6GEoO784Q1G8V0DPcwM1T2PpyTqvEAsrUdg@mail.gmail.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <CAGXu5jKZRESgGhZ6GEoO784Q1G8V0DPcwM1T2PpyTqvEAsrUdg@mail.gmail.com>
+Message-ID: <20170508140230.23kxf2kfeazeo4zr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the system trigger a softlockup(eg, infinite loop when
-PREEMPT_NONE), it only shows regs without stack trace, which
-makes it difficult to adress the issue.
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm64/include/asm/stacktrace.h | 1 +
- arch/arm64/kernel/process.c         | 1 +
- arch/arm64/kernel/traps.c           | 2 +-
- 3 files changed, 3 insertions(+), 1 deletion(-)
+* Kees Cook <keescook@chromium.org> wrote:
 
-diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-index 801a16db..5b6eafc 100644
---- a/arch/arm64/include/asm/stacktrace.h
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -30,5 +30,6 @@ struct stackframe {
- extern int unwind_frame(struct task_struct *tsk, struct stackframe *frame);
- extern void walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
- 			    int (*fn)(struct stackframe *, void *), void *data);
-+extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk);
- 
- #endif	/* __ASM_STACKTRACE_H */
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index ae2a835..af1ea25 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -210,6 +210,7 @@ void __show_regs(struct pt_regs *regs)
- void show_regs(struct pt_regs * regs)
- {
- 	__show_regs(regs);
-+	dump_backtrace(regs, NULL);
- }
- 
- static void tls_thread_flush(void)
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index d4d6ae0..368c3c8 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -140,7 +140,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
- 	}
- }
- 
--static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
-+void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- {
- 	struct stackframe frame;
- 	unsigned long irq_stack_ptr;
--- 
-1.7.12.4
+> > And yes, I realize that there were other such bugs and that such bugs might 
+> > occur in the future - but why not push the overhead of the security check to 
+> > the kernel build phase? I.e. I'm wondering how well we could do static 
+> > analysis during kernel build - would a limited mode of Sparse be good enough 
+> > for that? Or we could add a new static checker to tools/, built from first 
+> > principles and used primarily for extended syntactical checking.
+> 
+> Static analysis is just not going to cover all cases. We've had vulnerabilities 
+> where interrupt handlers left KERNEL_DS set, for example. [...]
+
+Got any commit ID of that bug - was it because a function executed by the 
+interrupt handler leaked KERNEL_DS?
+
+> [...] If there are performance concerns, let's put this behind a CONFIG. 2-5 
+> instructions is not an issue for most people that want this coverage.
+
+That doesn't really _solve_ the performance concerns, it just forces most people 
+to enable it by creating a 'security or performance' false dichotomy ...
+
+> [...] and it still won't catch everything. Bug-finding is different from making 
+> a bug class just unexploitable at all. As we've done before, it's the difference 
+> between trying to find format string attacks vs just removing %n from the format 
+> parser.
+
+No, it does not make it unexploitable, it could still be exploitable if the 
+runtime check is buggy or if there's kernel execution outside of the regular 
+system call paths - there's plenty of such hardware functionality on x86 for 
+example.
+
+Thanks,
+
+	Ingo
