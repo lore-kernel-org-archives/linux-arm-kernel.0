@@ -1,73 +1,76 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 8 May 2017 21:21:53 +0200
-Subject: [PATCH 7/8] KVM: arm/arm64: Register ITS iodev when setting base
- address
-In-Reply-To: <a33cabd3-cf92-1a49-7b47-8d35d3daab4d@arm.com>
-References: <20170508115454.5075-1-cdall@linaro.org>
- <20170508115454.5075-8-cdall@linaro.org>
- <a33cabd3-cf92-1a49-7b47-8d35d3daab4d@arm.com>
-Message-ID: <20170508192153.GM28342@cbox>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Mon, 8 May 2017 12:51:34 -0700
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508075209.7aluvpwildw325rf@gmail.com>
+ <1494256932.1167.1.camel@gmail.com>
+ <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
+Message-ID: <CAJcbSZGhE0ecpqS4jmezqwGXf_o4cakTVkE+m67kJJvhao1ENA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 08, 2017 at 06:41:36PM +0100, Marc Zyngier wrote:
-> Hi Christoffer,
-> 
-> On 08/05/17 12:54, Christoffer Dall wrote:
-> > We have to register the ITS iodevice before running the VM, because in
-> > migration scenarios, we may be restoring a live device that wishes to
-> > inject MSIs before we get a chance to run the VM.
-> > 
-> > All we need to register the ITS io device is the base address of the
-> > ITS, so we can simply register that when the base address of the ITS is
-> > set.
-> > 
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > ---
-> >  virt/kvm/arm/vgic/vgic-its.c | 29 +----------------------------
-> >  virt/kvm/arm/vgic/vgic-v3.c  |  8 --------
-> >  virt/kvm/arm/vgic/vgic.h     |  1 -
-> >  3 files changed, 1 insertion(+), 37 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> > index 9f7105c..375c503 100644
-> > --- a/virt/kvm/arm/vgic/vgic-its.c
-> > +++ b/virt/kvm/arm/vgic/vgic-its.c
-> > @@ -2390,7 +2390,7 @@ static int vgic_its_set_attr(struct kvm_device *dev,
-> >  
-> >  		its->vgic_its_base = addr;
-> >  
-> > -		return 0;
-> > +		return vgic_register_its_iodev(dev->kvm, its);
-> >  	}
-> >  	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
-> >  		const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-> > @@ -2467,30 +2467,3 @@ int kvm_vgic_register_its_device(void)
-> >  	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
-> >  				       KVM_DEV_TYPE_ARM_VGIC_ITS);
-> >  }
-> 
-> This patch has the unfortunate side effect of breaking kvmtool 
-> (although the ITS support patches are not merged yet). The code 
-> sequence now requires that KVM_DEV_ARM_VGIC_CTRL_INIT has been issued 
-> on the ITS *before* we can set the ITS base address.
-> 
-> I find it a bit odd (I see KVM_DEV_ARM_VGIC_CTRL_INIT as a way to say 
-> "I'm done, do what you must and make it work"), but that's obviously 
-> what QEMU must be doing (the save/restore sequence hints at that, but I 
-> only just realized the issue). Of course, kvmtool does the opposite.
-> 
-> But now that we've coupled setting the address and mapping the iodev, 
-> there is not much that's left for KVM_DEV_ARM_VGIC_CTRL_INIT, and I 
-> wonder why we're keeping it (other than for backward compatibility)?
-> 
-> We're now unable to set the address more than once (fair enough). What 
-> is also interesting is that this makes it plain obvious that we have a 
-> race between setting the address and registering the device (no lock is 
-> taken here, and two threads could try and play a dirty game on us).
-> 
-> I've come up with the two following patches, that seem to make it work.
+On Mon, May 8, 2017 at 8:26 AM, Kees Cook <keescook@chromium.org> wrote:
+> On Mon, May 8, 2017 at 8:22 AM, Daniel Micay <danielmicay@gmail.com> wrote:
+>> On Mon, 2017-05-08 at 09:52 +0200, Ingo Molnar wrote:
+>>>
+>>> ... it's just not usable in that form for a regular maintenance flow.
+>>>
+>>> So what would be more useful is to add a specific Sparse check that
+>>> only checks
+>>> KERNEL_DS, to add it as a regular (.config driven) build option and
+>>> make sure the
+>>> kernel build has zero warnings.
+>>>
+>>> From that point on we can declare that this kind of bug won't occur
+>>> anymore, if
+>>> the Sparse implementation of the check is correct.
+>>>
+>>> But there's a (big) problem with that development model: Sparse is not
+>>> part of the
+>>> kernel tree and adding a feature to it while making the kernel depend
+>>> on that
+>>> brand new feature is a logistical nightmare. The overhead is quite
+>>> similar to
+>>> adding new features to a compiler - it happens at a glacial pace and
+>>> is only done
+>>> for major features really, at considerable expense. I don't think this
+>>> is an
+>>> adequate model for 'extended syntax checking' of the kernel,
+>>> especially when it
+>>> comes to correctness that has such obvious security impact.
+>>>
+>>> Thanks,
+>>>
+>>>       Ingo
+>>
+>> There's the option of using GCC plugins now that the infrastructure was
+>> upstreamed from grsecurity. It can be used as part of the regular build
+>> process and as long as the analysis is pretty simple it shouldn't hurt
+>> compile time much.
+>
+> Well, and that the situation may arise due to memory corruption, not
+> from poorly-matched set_fs() calls, which static analysis won't help
+> solve. We need to catch this bad kernel state because it is a very bad
+> state to run in.
 
-Both patches look good, thanks.
+Of course, I agree with Kees points on this and previous emails.
 
--Christoffer
+A static analysis solution is hard to scale across functions and build
+time can suffer. I don't think the coverage will be good enough to
+consider this change and static analysis as similar.
+
+>
+> -Kees
+>
+> --
+> Kees Cook
+> Pixel Security
+
+
+
+-- 
+Thomas
