@@ -1,85 +1,144 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Mon, 8 May 2017 09:32:16 -0700
-Subject: FIO performance regression in 4.11 kernel vs. 4.10 kernel
- observed on ARM64
-In-Reply-To: <20170508152400.GB7131@arm.com>
-References: <50f528e8-8d8d-b168-784d-607a602ba808@broadcom.com>
- <20170508110754.GI8526@arm.com>
- <CAK8P3a0aqH5X0yoi1EF1=vM_gaJhRkjC66NQJk8enZEES5aYRw@mail.gmail.com>
- <b0a33959-f3be-9b98-51a0-26e8ea145617@fb.com> <20170508152400.GB7131@arm.com>
-Message-ID: <1ab84e58-3e97-c792-ab8c-969e86c62d31@broadcom.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 May 2017 11:33:42 -0500
+Subject: [PATCH v2 2/2] dt-bindings: pcie: Add documentation for Mediatek
+ PCIe
+In-Reply-To: <1493890376-6713-3-git-send-email-ryder.lee@mediatek.com>
+References: <1493890376-6713-1-git-send-email-ryder.lee@mediatek.com>
+ <1493890376-6713-3-git-send-email-ryder.lee@mediatek.com>
+Message-ID: <20170508163342.deosevmxu7g2sv6d@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will/Jens,
+On Thu, May 04, 2017 at 05:32:56PM +0800, Ryder Lee wrote:
+> Add documentation for PCIe host driver available in MT7623
+> series SoCs.
+> 
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+>  .../bindings/pci/mediatek,mt7623-pcie.txt          | 149 +++++++++++++++++++++
+>  1 file changed, 149 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+> new file mode 100644
+> index 0000000..9c5d5a7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+> @@ -0,0 +1,149 @@
+> +Mediatek Gen2 PCIe controller which is available on MT7623 series SoCs
+> +
+> +PCIe subsys supports single root complex (RC) with 3 Root Ports. Each root
+> +ports supports a Gen2 1-lane Link and has PIPE interface to PHY.
+> +
+> +Required properties:
+> +- compatible: Should contain "mediatek,mt7623-pcie".
+> +- device_type: Must be "pci"
+> +- reg: Base addresses and lengths of the PCIe controller.
+> +- #address-cells: Address representation for root ports (must be 3)
+> +- #size-cells: Size representation for root ports (must be 2)
+> +- #interrupt-cells: Size representation for interrupts (must be 1)
+> +- interrupts: Three interrupt outputs of the controller. Must contain an
+> +  entry for each entry in the interrupt-names property.
+> +- interrupt-names: Must include the following names
+> +  - "pcie-int0"
+> +  - "pcie-int1"
+> +  - "pcie-int2"
+> +- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
+> +  Please refer to the standard PCI bus binding document for a more detailed
+> +  explanation.
+> +- clocks: Must contain an entry for each entry in clock-names.
+> +  See ../clocks/clock-bindings.txt for details.
+> +- clock-names: Must include the following entries:
+> +  - free_ck :for reference clock of PCIe subsys
+> +  - sys_ck0 :for clock of Port0
+> +  - sys_ck1 :for clock of Port1
+> +  - sys_ck2 :for clock of Port2
+> +- resets: Must contain an entry for each entry in reset-names.
+> +  See ../reset/reset.txt for details.
+> +- reset-names: Must include the following entries:
+> +  - pcie-rst0 :port0 reset
+> +  - pcie-rst1 :port1 reset
+> +  - pcie-rst2 :port2 reset
+> +- phys: list of PHY specifiers (used by generic PHY framework).
+> +- phy-names : must be "pcie-phy0", "pcie-phy1", "pcie-phyN".. based on the
+> +  number of PHYs as specified in *phys* property.
+> +- power-domains: A phandle and power domain specifier pair to the power domain
+> +  which is responsible for collapsing and restoring power to the peripheral.
+> +- bus-range: Range of bus numbers associated with this controller.
+> +- ranges:
+> +  - The first three entries are expected to translate the addresses for the root
+> +    port registers, which are referenced by the assigned-addresses property of
+> +    the root port nodes (see below).
+> +  - The remaining entries setup the mapping for the standard I/O and memory
+> +	regions.
+> +  Please refer to the standard PCI bus binding document for a more detailed
+> +  explanation.
+> +
+> +In addition, the device tree node must have sub-nodes describing each
+> +PCIe port interface, having the following mandatory properties:
+> +
+> +Required properties:
+> +- device_type: Must be "pci"
+> +- assigned-addresses: Address and size of the port configuration registers
+> +- reg: Only the first four bytes are used to refer to the correct bus number
+> +  and device number.
+> +- #address-cells: Must be 3
+> +- #size-cells: Must be 2
+> +- #interrupt-cells: Must be 1
+> +- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
+> +  Please refer to the standard PCI bus binding document for a more detailed
+> +  explanation.
+> +- ranges: Sub-ranges distributed from the PCIe controller node. An empty
+> +  property is sufficient.
+> +- num-lanes: Number of lanes to use for this port.
+> +
+> +Examples:
+> +
+> +	hifsys: syscon at 1a000000 {
+> +		compatible = "mediatek,mt7623-hifsys", "syscon";
+> +		reg = <0 0x1a000000 0 0x1000>;
+> +		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+> +	};
+> +
+> +	pcie: pcie-controller at 1a140000 {
+> +		compatible = "mediatek,mt7623-pcie";
+> +		device_type = "pci";
+> +		reg = <0 0x1a140000 0 0x1000>; /* PCIe shared registers */
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		#interrupt-cells = <1>;
+> +		interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_SPI 195 IRQ_TYPE_LEVEL_LOW>;
+> +		interrupt-names = "pcie-int0", "pcie-int1", "pcie-int2";
+> +		interrupt-map-mask = <0xf800 0 0 0>;
+> +		interrupt-map = <0x0000 0 0 0 &gic GIC_SPI 193 IRQ_TYPE_NONE>,
+> +				 <0x0800 0 0 0 &gic GIC_SPI 194 IRQ_TYPE_NONE>,
+> +			     <0x1000 0 0 0 &gic GIC_SPI 195 IRQ_TYPE_NONE>;
+> +		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
+> +			     <&hifsys CLK_HIFSYS_PCIE0>,
+> +				 <&hifsys CLK_HIFSYS_PCIE1>,
+> +				 <&hifsys CLK_HIFSYS_PCIE2>;
+> +		clock-names = "free_ck", "sys_ck0", "sys_ck1", "sys_ck2";
+> +		resets = <&hifsys MT2701_HIFSYS_PCIE0_RST>,
+> +			     <&hifsys MT2701_HIFSYS_PCIE1_RST>,
+> +			     <&hifsys MT2701_HIFSYS_PCIE2_RST>;
+> +		reset-names = "pcie-rst0", "pcie-rst1", "pcie-rst2";
+> +		phys = <&pcie0_phy>, <&pcie1_phy>, <&pcie2_phy>;
+> +		phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2";
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
+> +		bus-range = <0x00 0xff>;
+> +		ranges = <0x82000000 0 0x1a142000 0 0x1a142000 0 0x1000 /* Port0 registers */
+> +			  0x82000000 0 0x1a143000 0 0x1a143000 0 0x1000 /* Port1 registers */
+> +			  0x82000000 0 0x1a144000 0 0x1a144000 0 0x1000 /* Port2 registers */
+> +			  0x81000000 0 0x1a160000 0 0x1a160000 0 0x00010000 /* I/O space */
+> +			  0x83000000 0 0x60000000 0 0x60000000 0 0x10000000>;	/* memory space */
+> +
+> +		pcie at 1,0 {
 
-Thanks for reproducing.  Comment inline
+Your unit addresses appear to be off by 1. This one should be 0,0.
 
-On 17-05-08 08:24 AM, Will Deacon wrote:
-> On Mon, May 08, 2017 at 08:08:55AM -0600, Jens Axboe wrote:
->> On 05/08/2017 05:19 AM, Arnd Bergmann wrote:
->>> On Mon, May 8, 2017 at 1:07 PM, Will Deacon <will.deacon@arm.com> wrote:
->>>> On Fri, May 05, 2017 at 06:37:55PM -0700, Scott Branden wrote:
->>>>> I have updated the kernel to 4.11 and see significant performance
->>>>> drops using fio-2.9.
->>>>>
->>>>> Using FIO the performanced drops from 281 KIOPS to 207 KIOPS using
->>>>> single core and task.
->>>>> Percent performance drop becomes even worse if multi-cores and multi-
->>>>> threads are used.
->>>>>
->>>>> Platform is ARM64 based A72.  Can somebody reproduce the results or
->>>>> know what may have changed to make such a dramatic change?
->>>>>
->>>>> FIO command and resulting log output below using null_blk to remove
->>>>> as many hardware specific driver dependencies as possible.
->>>>>
->>>>> modprobe null_blk queue_mode=2 irqmode=0 completion_nsec=0
->>>>> submit_queues=1 bs=4096
->>>>>
->>>>> taskset 0x1 fio --randrepeat=1 --ioengine=libaio --direct=1 --numjobs=1
->>>>> --gtod_reduce=1 --name=readtest --filename=/dev/nullb0 --bs=4k
->>>>> --iodepth=128 --time_based --runtime=15 --readwrite=read
->>>>
->>>> I can confirm that I also see a ~20% drop in results from 4.10 to 4.11 on
->>>> my AMD Seattle board w/ defconfig, but I can't see anything obvious in the
->>>> log.
->>>>
->>>> Things you could try:
->>>>
->>>>   1. Try disabling CONFIG_NUMA in the 4.11 kernel (this was enabled in
->>>>      defconfig between the releases).
->>>>
->>>>   2. Try to reproduce on an x86 box
->>>>
->>>>   3. Have a go at bisecting the issue, so we can revert the offender if
->>>>      necessary.
->>>
->>> One more thing to try early: As 4.11 gained support for blk-mq I/O
->>> schedulers compared to 4.10, null_blk will now also need some extra
->>> cycles for each I/O request. Try loading the driver with "queue_mode=0"
->>> or "queue_mode=1" instead of "queue_mode=2".
->>
->> Since you have 1 submit queues set, you are being loaded with deadline
->> attached. To compare 4.10 and 4.11, with queue_mode=2 and submit_queues=1,
->> after loading null_blk in 4.11, do:
->>
->> # echo none > /sys/block/nullb0/queue/scheduler
->>
->> and re-test.
->
-> On my setup, doing this restored a bunch of the performance, but the numbers
-> are still ~5% worse than 4.10 (as opposed to ~20% worse with mq-deadline).
-> Disabling NUMA as well cuts this down to ~2%.
->
-> Scott -- do you see the same sort of thing?
-NUMA was already disabled in my defconfig.
+With those fixed,
 
-Using the echo to the scheduler restored half of my performance loss vs 
-4.10.
-echo none > /sys/block/nullb0/queue/scheduler
-
-I will spend some time comparing and building defconfigs.
->
-> Will
->
+Acked-by: Rob Herring <robh@kernel.org>
