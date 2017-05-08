@@ -1,160 +1,159 @@
-From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Mon, 8 May 2017 17:24:23 +0300
-Subject: [PATCH 2/2] drivers: pwm: pwm-atmel: implement pwm dead-times
-In-Reply-To: <1494253463-26993-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1494253463-26993-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1494253463-26993-3-git-send-email-claudiu.beznea@microchip.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Mon, 8 May 2017 22:33:10 +0800
+Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <CAKgT0Ufg6uebqj79e1FOHoPpF-GxPYMkp353r3Ok_=nM8wF6qA@mail.gmail.com>
+References: <cover.1493678834.git.leedom@chelsio.com>
+ <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
+ <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
+ <20170502165329.GB26406@linux.intel.com>
+ <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
+ <MWHPR12MB160095DF53CE981C923FE65DC8160@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <CAKgT0UdJ17DGAphuP5Y9co6ky-GBFdq2s-1nqctY_Tz_iz5__g@mail.gmail.com>
+ <MWHPR12MB1600E78DD7F530AA9DC2433DC8EA0@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <CAKgT0Ucwkp+fi-9HhMbze6t_i15dj4e2WQBp13Coi6MegrDh=w@mail.gmail.com>
+ <22c46382-5778-022f-d0bd-74abec9e9c7c@huawei.com>
+ <CAKgT0Ufg6uebqj79e1FOHoPpF-GxPYMkp353r3Ok_=nM8wF6qA@mail.gmail.com>
+Message-ID: <2a3f064b-e885-a528-4945-adb32904bd0e@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement PWM dead-times for atmel PWM controllers.
-Since this driver is used by PWM controllers which
-supports dead-times and PWM controllers which doesn't,
-add specific input for dead-time register in atmel
-register private data structure.
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- drivers/pwm/pwm-atmel.c | 62 +++++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 58 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-index 530d7dc..4fba167 100644
---- a/drivers/pwm/pwm-atmel.c
-+++ b/drivers/pwm/pwm-atmel.c
-@@ -33,8 +33,9 @@
- 
- #define PWM_CMR			0x0
- /* Bit field in CMR */
--#define PWM_CMR_CPOL		(1 << 9)
--#define PWM_CMR_UPD_CDTY	(1 << 10)
-+#define PWM_CMR_CPOL		BIT(9)
-+#define PWM_CMR_UPD_CDTY	BIT(10)
-+#define PWM_CMR_DTE		BIT(16)
- #define PWM_CMR_CPRE_MSK	0xF
- 
- /* The following registers for PWM v1 */
-@@ -47,6 +48,7 @@
- #define PWMV2_CDTYUPD		0x08
- #define PWMV2_CPRD		0x0C
- #define PWMV2_CPRDUPD		0x10
-+#define PWMV2_DT		0x18
- 
- /*
-  * Max value for duty and period
-@@ -63,6 +65,7 @@ struct atmel_pwm_registers {
- 	u8 period_upd;
- 	u8 duty;
- 	u8 duty_upd;
-+	u8 dt;
- };
- 
- struct atmel_pwm_chip {
-@@ -161,6 +164,32 @@ static void atmel_pwm_update_cdty(struct pwm_chip *chip, struct pwm_device *pwm,
- 			    atmel_pwm->regs->duty_upd, cdty);
- }
- 
-+static int atmel_pwm_calculate_deadtime(struct pwm_chip *chip,
-+					struct pwm_state *state,
-+					unsigned long cprd, unsigned long *dt)
-+{
-+	unsigned long long cycles;
-+
-+	if (state->deadtime_fe > state->duty_cycle ||
-+	    state->deadtime_re > state->period - state->duty_cycle)
-+		return -EINVAL;
-+
-+	*dt = 0;
-+	if (state->deadtime_fe) {
-+		cycles = (unsigned long long)state->deadtime_fe * cprd;
-+		do_div(cycles, state->period);
-+		*dt = (cycles << 16);
-+	}
-+
-+	if (state->deadtime_re) {
-+		cycles = (unsigned long long)state->deadtime_re * cprd;
-+		do_div(cycles, state->period);
-+		*dt |= cycles;
-+	}
-+
-+	return 0;
-+}
-+
- static void atmel_pwm_set_cprd_cdty(struct pwm_chip *chip,
- 				    struct pwm_device *pwm,
- 				    unsigned long cprd, unsigned long cdty)
-@@ -214,7 +243,7 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- {
- 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
- 	struct pwm_state cstate;
--	unsigned long cprd, cdty;
-+	unsigned long cprd, cdty, dt;
- 	u32 pres, val;
- 	int ret;
- 
-@@ -223,7 +252,9 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 	if (state->enabled) {
- 		if (cstate.enabled &&
- 		    cstate.polarity == state->polarity &&
--		    cstate.period == state->period) {
-+		    cstate.period == state->period &&
-+		    cstate.deadtime_re == state->deadtime_re &&
-+		    cstate.deadtime_fe == state->deadtime_fe) {
- 			cprd = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm,
- 						  atmel_pwm->regs->period);
- 			atmel_pwm_calculate_cdty(state, cprd, &cdty);
-@@ -239,6 +270,16 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 			return ret;
- 		}
- 
-+		if (atmel_pwm->regs->dt) {
-+			ret = atmel_pwm_calculate_deadtime(chip, state, cprd,
-+							   &dt);
-+			if (ret) {
-+				dev_err(chip->dev,
-+					"failed to calculate dead-time\n");
-+				return ret;
-+			}
-+		}
-+
- 		atmel_pwm_calculate_cdty(state, cprd, &cdty);
- 
- 		if (cstate.enabled) {
-@@ -258,8 +299,19 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 			val &= ~PWM_CMR_CPOL;
- 		else
- 			val |= PWM_CMR_CPOL;
-+
-+		if (atmel_pwm->regs->dt) {
-+			if (dt)
-+				val |= PWM_CMR_DTE;
-+			else
-+				val &= ~PWM_CMR_DTE;
-+		}
-+
- 		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
- 		atmel_pwm_set_cprd_cdty(chip, pwm, cprd, cdty);
-+		if (atmel_pwm->regs->dt)
-+			atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
-+					    atmel_pwm->regs->dt, dt);
- 		mutex_lock(&atmel_pwm->isr_lock);
- 		atmel_pwm->updated_pwms |= atmel_pwm_readl(atmel_pwm, PWM_ISR);
- 		atmel_pwm->updated_pwms &= ~(1 << pwm->hwpwm);
-@@ -282,6 +334,7 @@ static const struct atmel_pwm_registers atmel_pwm_regs_v1 = {
- 	.period_upd	= PWMV1_CUPD,
- 	.duty		= PWMV1_CDTY,
- 	.duty_upd	= PWMV1_CUPD,
-+	.dt		= 0,
- };
- 
- static const struct atmel_pwm_registers atmel_pwm_regs_v2 = {
-@@ -289,6 +342,7 @@ static const struct atmel_pwm_registers atmel_pwm_regs_v2 = {
- 	.period_upd	= PWMV2_CPRDUPD,
- 	.duty		= PWMV2_CDTY,
- 	.duty_upd	= PWMV2_CDTYUPD,
-+	.dt		= PWMV2_DT,
- };
- 
- static const struct platform_device_id atmel_pwm_devtypes[] = {
--- 
-2.7.4
+On 2017/5/7 2:07, Alexander Duyck wrote:
+> On Fri, May 5, 2017 at 8:08 PM, Ding Tianhong <dingtianhong@huawei.com> wrote:
+>>
+>>
+>> On 2017/5/5 22:04, Alexander Duyck wrote:
+>>> On Thu, May 4, 2017 at 2:01 PM, Casey Leedom <leedom@chelsio.com> wrote:
+>>>> | From: Alexander Duyck <alexander.duyck@gmail.com>
+>>>> | Sent: Wednesday, May 3, 2017 9:02 AM
+>>>> | ...
+>>>> | It sounds like we are more or less in agreement. My only concern is
+>>>> | really what we default this to. On x86 I would say we could probably
+>>>> | default this to disabled for existing platforms since my understanding
+>>>> | is that relaxed ordering doesn't provide much benefit on what is out
+>>>> | there right now when performing DMA through the root complex. As far
+>>>> | as peer-to-peer I would say we should probably look at enabling the
+>>>> | ability to have Relaxed Ordering enabled for some channels but not
+>>>> | others. In those cases the hardware needs to be smart enough to allow
+>>>> | for you to indicate you want it disabled by default for most of your
+>>>> | DMA channels, and then enabled for the select channels that are
+>>>> | handling the peer-to-peer traffic.
+>>>>
+>>>>   Yes, I think that we are mostly in agreement.  I had just wanted to make
+>>>> sure that whatever scheme was developed would allow for simultaneously
+>>>> supporting non-Relaxed Ordering for some PCIe End Points and Relaxed
+>>>> Ordering for others within the same system.  I.e. not simply
+>>>> enabling/disabling/etc.  based solely on System Platform Architecture.
+>>>>
+>>>>   By the way, I've started our QA folks off looking at what things look like
+>>>> in Linux Virtual Machines under different Hypervisors to see what
+>>>> information they may provide to the VM in the way of what Root Complex Port
+>>>> is being used, etc.  So far they've got Windows HyperV done and there
+>>>> there's no PCIe Fabric exposed in any way: just the attached device.  I'll
+>>>> have to see what pci_find_pcie_root_port() returns in that environment.
+>>>> Maybe NULL?
+>>>
+>>> I believe NULL is one of the options. It all depends on what qemu is
+>>> emulating. Most likely you won't find a pcie root port on KVM because
+>>> the default is to emulate an older system that only supports PCI.
+>>>
+>>>>   With your reservations (which I also share), I think that it probably
+>>>> makes sense to have a per-architecture definition of the "Can I Use Relaxed
+>>>> Ordering With TLPs Directed At This End Point" predicate, with the default
+>>>> being "No" for any architecture which doesn't implement the predicate.  And
+>>>> if the specified (struct pci_dev *) End Node is NULL, it ought to return
+>>>> False for that as well.  I can't see any reason to pass in the Source End
+>>>> Node but I may be missing something.
+>>>>
+>>>>   At this point, this is pretty far outside my level of expertise.  I'm
+>>>> happy to give it a go, but I'd be even happier if someone with a lot more
+>>>> experience in the PCIe Infrastructure were to want to carry the ball
+>>>> forward.  I'm not super familiar with the Linux Kernel "Rules Of
+>>>> Engagement", so let me know what my next step should be.  Thanks.
+>>>>
+>>>> Casey
+>>>
+>>> For now we can probably keep this on the linux-pci mailing list. Going
+>>> that route is the most straight forward for now since step one is
+>>> probably just making sure we are setting the relaxed ordering bit in
+>>> the setups that make sense. I would say we could probably keep it
+>>> simple. We just need to enable relaxed ordering by default for SPARC
+>>> architectures, on most others we can probably default it to off.
+>>>
+>>
+>> Casey, Alexander:
+>>
+>> Thanks for the wonderful discussion, it is more clearly that what to do next,
+>> I agree that enable relaxed ordering by default only for SPARC and ARM64
+>> is more safe for all the other platform, as no one want to break anything.
+>>
+>>> I believe this all had started as Ding Tianhong was hoping to enable
+>>> this for the ARM architecture. That is the only one I can think of
+>>> where it might be difficult to figure out which way to default as we
+>>> were attempting to follow the same code that was enabled for SPARC and
+>>> that is what started this tug-of-war about how this should be done.
+>>> What we might do is take care of this in two phases. The first one
+>>> enables the infrastructure generically but leaves it defaulted to off
+>>> for everyone but SPARC. Then we can go through and start enabling it
+>>> for other platforms such as some of those on ARM in the platforms that
+>>> Ding Tianhong was working with.
+>>>
+>>
+>> According the suggestion, I could only think of this code:
+>>
+>> @@ -3979,6 +3979,15 @@ static void quirk_tw686x_class(struct pci_dev *pdev)
+>>  DECLARE_PCI_FIXUP_CLASS_EARLY(0x1797, 0x6869, PCI_CLASS_NOT_DEFINED, 8,
+>>                               quirk_tw686x_class);
+>>
+>> +static void quirk_relaxedordering_disable(struct pci_dev *dev)
+>> +{
+>> + if (dev->vendor != PCI_VENDOR_ID_HUAWEI &&
+>> +     dev->vendor != PCI_VENDOR_ID_SUN)
+>> +         dev->dev_flags |= PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
+>> +}
+>> +DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_INTEL_ID, PCI_ANY_ID, PCI_CLASS_NOT_DEFINED, 8,
+>> +                       quirk_relaxedordering_disable);
+>> +
+>>  /*
+>>   * Per PCIe r3.0, sec 2.2.9, "Completion headers must supply the same
+>>   * values for the Attribute as were supplied in the header of the
+>>
+>>
+>> What do you think of it?
+>>
+>> Thanks
+>> Ding
+>>
+> 
+> This is a bit simplistic but it is a start.
+> 
+> The other bit I was getting at is that we need to update the core PCIe
+> code so that when we configure devices and the root complex reports no
+> support for relaxed ordering it should be clearing the relaxed
+> ordering bits in the PCIe configuration registers on the upstream
+> facing devices.
+
+How about this:
+rename the PCI_DEV_FLAGS_NO_RELAXED_ORDERIN to PCI_DEV_FLAGS_RELAXED_ORDERIN, only enable it
+when pcie root configure if it support the RO mode, otherwise we will not set it to indicate
+that the pcie dev did not support RO mode.
+
+> 
+> The last bit we need in all this is a way to allow for setups where
+> peer-to-peer wants to perform relaxed ordering but for writes to the
+> host we have to not use relaxed ordering. For that we need to enable a
+> special case and that isn't handled right now in any of the solutions
+> we have coded up so far.
+> 
+
+Sorry I am not clear of this way, can you explain more about this or give me
+a special case, thanks a lot.
+
+Ding
+
+> - Alex
+> 
+> .
+> 
