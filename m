@@ -1,114 +1,98 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 8 May 2017 20:38:19 +0200
-Subject: [PATCH 3/8] KVM: arm/arm64: Refactor vgic_register_redist_iodevs
-In-Reply-To: <b969f6d6-3a4f-b021-3bf7-5035eb7568b0@redhat.com>
-References: <20170508115454.5075-1-cdall@linaro.org>
- <20170508115454.5075-4-cdall@linaro.org>
- <b969f6d6-3a4f-b021-3bf7-5035eb7568b0@redhat.com>
-Message-ID: <20170508183819.GK28342@cbox>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Mon, 8 May 2017 21:07:50 +0200
+Subject: [PATCH 0/4] TI Bluetooth serdev support
+In-Reply-To: <CAHCN7x+Mq=b6RN-ezU0400W=H=D7DR+Es1FHtT4GyozpVd8ALA@mail.gmail.com>
+References: <20170405183005.20570-1-robh@kernel.org>
+ <CAHCN7xJUxZm1qKAxT0kaK6qoDg+HWOJK7sTH-q9za4HJuUwe8Q@mail.gmail.com>
+ <20170430160430.rmyuo6sdrkrjxjg6@earth>
+ <CAHCN7x+Mq=b6RN-ezU0400W=H=D7DR+Es1FHtT4GyozpVd8ALA@mail.gmail.com>
+Message-ID: <20170508190749.sev2wtecjnaneyng@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 08, 2017 at 06:03:14PM +0200, Auger Eric wrote:
-> Hi Christoffer,
+Hi,
+
+On Fri, May 05, 2017 at 09:51:33AM -0500, Adam Ford wrote:
+> On Sun, Apr 30, 2017 at 11:04 AM, Sebastian Reichel <sre@kernel.org> wrote:
+> > On Sun, Apr 30, 2017 at 10:14:20AM -0500, Adam Ford wrote:
+> >> On Wed, Apr 5, 2017 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
+> >> > This series adds serdev support to the HCI LL protocol used on TI BT
+> >> > modules and enables support on HiKey board with with the WL1835 module.
+> >> > With this the custom TI UIM daemon and btattach are no longer needed.
+> >>
+> >> Without UIM daemon, what instruction do you use to load the BT firmware?
+> >>
+> >> I was thinking 'hciattach' but I was having trouble.  I was hoping you
+> >> might have some insight.
+> >>
+> >>  hciattach -t 30 -s 115200 /dev/ttymxc1 texas 3000000 flow  Just
+> >> returns a timeout.
+> >>
+> >> I modified my i.MX6 device tree per the binding documentation and
+> >> setup the regulators and enable GPIO pins.
+> >
+> > If you configured everything correctly no userspace interaction is
+> > required. The driver should request the firmware automatically once
+> > you power up the bluetooth device.
+> >
+> > Apart from DT changes make sure, that the following options are
+> > enabled and check dmesg for any hints.
+> >
+> > CONFIG_SERIAL_DEV_BUS
+> > CONFIG_SERIAL_DEV_CTRL_TTYPORT
+> > CONFIG_BT_HCIUART
+> > CONFIG_BT_HCIUART_LL
 > 
-> On 08/05/2017 13:54, Christoffer Dall wrote:
-> > Split out the function to register all the redistributor iodevs into a
-> > function that handles a single redistributor at a time in preparation
-> > for being able to call this per VCPU as these get created.
-> > 
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > ---
-> >  virt/kvm/arm/vgic/vgic-mmio-v3.c | 108 ++++++++++++++++++++++++---------------
-> >  virt/kvm/arm/vgic/vgic-v3.c      |   2 +-
-> >  virt/kvm/arm/vgic/vgic.h         |   2 +-
-> >  3 files changed, 68 insertions(+), 44 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> > index 6afb3b4..1828ac7 100644
-> > --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> > +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> > @@ -556,61 +556,85 @@ unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
-> >  	return SZ_64K;
-> >  }
-> >  
-> > -int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
-> > +/**
-> > + * vgic_register_redist_iodev - register a single redist iodev
-> > + * @vcpu:    The VCPU to which the redistributor belongs
-> > + *
-> > + * Register a KVM iodev for this VCPU's redistributor using the address
-> > + * provided.
-> > + *
-> > + * Return 0 on success, -ERRNO otherwise.
-> > + */
-> > +static int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
-> > +{
-> > +	struct kvm *kvm = vcpu->kvm;
-> > +	struct vgic_dist *vgic = &kvm->arch.vgic;
-> > +	struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
-> > +	struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
-> > +	gpa_t rd_base, sgi_base;
-> > +	int ret;
-> > +
-> > +	rd_base = vgic->vgic_redist_base + vcpu->vcpu_id * SZ_64K * 2;
-> Previously we had
-> gpa_t rd_base = redist_base_address + c * SZ_64K * 2; where c is the
-> index in the vcpu array. Now we use the vpcu_id instead of c. Aren't
-> they potentially different?
+> I have enabled those flags, and I have updated my device tree.
+> I am testing this on an OMAP3630 (DM3730) board with a WL1283.  I am
+> getting a lot of timeout errors.  I tested this against the original
+> implemention I had in pdata-quirks.c using the ti-st driver, uim & and
+> the btwilink driver.
 > 
+> I pulled in some of the newer patches to enable the wl1283-st, but I
+> am obviously missing something.
+> 
+> I   58.717651] Bluetooth: hci0: Reading TI version information failed
+> (-110)
+> [   58.724853] Bluetooth: hci0: download firmware failed, retrying...
+> [   60.957641] Bluetooth: hci0 command 0x1001 tx timeout
+> [   68.957641] Bluetooth: hci0: Reading TI version information failed
+> (-110)
+> [   68.964843] Bluetooth: hci0: download firmware failed, retrying...
+> [   69.132171] Bluetooth: Unknown HCI packet type 06
+> [   69.138244] Bluetooth: Unknown HCI packet type 0c
+> [   69.143249] Bluetooth: Unknown HCI packet type 40
+> [   69.148498] Bluetooth: Unknown HCI packet type 20
+> [   69.153533] Bluetooth: Data length is too large
+> [   69.158569] Bluetooth: Unknown HCI packet type a0
+> [   69.163574] Bluetooth: Unknown HCI packet type 00
+> [   69.168731] Bluetooth: Unknown HCI packet type 00
+> [   69.173736] Bluetooth: Unknown HCI packet type 34
+> [   69.178924] Bluetooth: Unknown HCI packet type 91
+> [   71.197631] Bluetooth: hci0 command 0x1001 tx timeout
+> [   79.197662] Bluetooth: hci0: Reading TI version information failed (-110)
+>
+> Since the pdata-quirks and original ti-st drivers work together, I
+> know the hardware is fine.  The only change to the device tree is the
+> addition of the Bluetooth container:
+> 
+> bluetooth {
+>   compatible = "ti,wl1283-st";
+>   enable-gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;
+> };
+> 
+> Any thoughts or suggestions to try? I get similar behavior on an
+> i.MX6 board with a wl1837-st module as well.
 
-Nicely spotted!
+Looks like its loosing bytes. I suggest to have a look at
+pinmuxing (esp. for cts & rts) and maybe add some debug
+prints to see where it starts failing.
 
-They might be, theoretically.  I never realized this, but we have occurences
-of this assumption already, see kvm_pmu_update_state(), for example.
-Even worse, the ITS PE numbering is based on the vcpu_id, and not the
-index of the vcpu id (see vgic_mmio_read_v3r_typer).
-
-So there are two issues, one is that we should change most occurences of
-kvm_get_vcpu() to kvm_get_vcpu_by_id() in our code (I'll write a patch
-for this).
-
-The second issue is that vcpu_id is not enforced to be contiguous so we
-may end up with a sparse redist frame, which obviously doesn't work, so
-I think I'll need to add the following:
-
-
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 2c14ad9..12eb26d 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -490,6 +490,17 @@ static inline struct kvm_vcpu *kvm_get_vcpu_by_id(struct kvm *kvm, int id)
- 	return NULL;
- }
- 
-+static inline int kvm_vcpu_get_idx(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_vcpu *tmp;
-+	int idx;
-+
-+	kvm_for_each_vcpu(idx, tmp, vcpu->kvm)
-+		if (tmp == vcpu)
-+			return idx;
-+	BUG();
-+}
-+
- #define kvm_for_each_memslot(memslot, slots)	\
- 	for (memslot = &slots->memslots[0];	\
- 	      memslot < slots->memslots + KVM_MEM_SLOTS_NUM && memslot->npages;\
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 297557b..99da1a2 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -586,7 +586,7 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
- 	if (!vgic_v3_check_base(kvm))
- 		return -EINVAL;
- 
--	rd_base = vgic->vgic_redist_base + vcpu->vcpu_id * SZ_64K * 2;
-+	rd_base = vgic->vgic_redist_base + kvm_vcpu_get_idx(vcpu) * SZ_64K * 2;
- 	sgi_base = rd_base + SZ_64K;
- 
- 	kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
-
-Thanks,
--Christoffer
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170508/cadc0608/attachment.sig>
