@@ -1,23 +1,47 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 May 2017 11:44:36 -0500
-Subject: [PATCH v2 07/10] dt-bindings: add compatible string for
- Allwinner R40 CCU
-In-Reply-To: <20170504135006.16483-8-icenowy@aosc.io>
-References: <20170504135006.16483-1-icenowy@aosc.io>
- <20170504135006.16483-8-icenowy@aosc.io>
-Message-ID: <20170508164436.vlnrvv6qcu2f74sa@rob-hp-laptop>
+From: peter.senna@collabora.com (Peter Senna Tschudin)
+Date: Mon, 8 May 2017 18:44:40 +0200
+Subject: Regression: 442ec4c04d1: PCI: dwc: all: Split struct pcie_port
+ into host-only and core structures
+In-Reply-To: <1494261248.2322.21.camel@pengutronix.de>
+References: <20170508150224.GA7458@collabora.com>
+ <1494261248.2322.21.camel@pengutronix.de>
+Message-ID: <20170508164440.GB12665@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 04, 2017 at 09:50:03PM +0800, Icenowy Zheng wrote:
-> Allwinner R40 has a clock controlling unit like the ones on other
-> Allwinner SoCs after sun6i, and can also use a CCU-based driver.
+On Mon, May 08, 2017 at 06:34:08PM +0200, Lucas Stach wrote:
+> Am Montag, den 08.05.2017, 17:02 +0200 schrieb Peter Senna Tschudin:
+> > Hello Kishon,
+> > 
+> > Our iMX6 hardware (imx6q-b850v3.dts) is not booting with latest
+> > linux-next and I could bisect until:
+> > 
+> > commit 442ec4c04d1235f8c664a74004dae54a7a574d18
+> > Author: Kishon Vijay Abraham I <kishon@ti.com>
+> > Date:   Wed Feb 15 18:48:14 2017 +0530
+> > 
+> >     PCI: dwc: all: Split struct pcie_port into host-only and core structures
+> > 
+> > Which seem to be causing our issues. Our device (imx6q-b850v3.dts) boots
+> > fine with 4.10, and also boots if we disable pcie with:
 > 
-> Add a compatible string for it.
+> Are you sure about this bisect? It seems more likely that the secondary
+> bus scanning goes wrong. It seems Lorenzo Pieralisi's cfg space
+> non-posting patches landed in next, so the root cause of this might just
+> be the driver hooking the wrong fault code now.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 1 +
->  1 file changed, 1 insertion(+)
+> Async and synchronous aborts are different fault codes on ARM. Can you
+> see of removing the "16 +" in hook_fault_code() in
+> drivers/pci/dwc/pci-imx6.c fixes this issue?
 
-Acked-by: Rob Herring <robh@kernel.org>
+changing it to:
+
+hook_fault_code(6, imx6q_pcie_abort_handler, SIGBUS, 0,
+		"imprecise external abort");
+
+made no difference, problem persists...
+
+> 
+> Regards,
+> Lucas
+> 
