@@ -1,94 +1,141 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 08 May 2017 12:49:03 +0200
-Subject: [PATCH 2/4] ata: Add DT bindings for the Gemini SATA bridge
-In-Reply-To: <20170506121053.11554-2-linus.walleij@linaro.org>
-References: <20170506121053.11554-1-linus.walleij@linaro.org>
- <CGME20170506121119epcas5p437ea69e802ba94bd7df83d0bbac1b0bc@epcas5p4.samsung.com>
- <20170506121053.11554-2-linus.walleij@linaro.org>
-Message-ID: <3791456.ZibJefW5cI@amdc3058>
+From: linu.cherian@cavium.com (Linu Cherian)
+Date: Mon, 8 May 2017 16:20:49 +0530
+Subject: [PATCH v3 2/7] iommu/arm-smmu-v3: Do resource size checks based
+ on SMMU
+In-Reply-To: <20170508100932.GH16981@rric.localdomain>
+References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
+ <1493986091-30521-3-git-send-email-gakula@caviumnetworks.com>
+ <20170505221844.GW16981@rric.localdomain>
+ <20170508094437.GA26538@virtx40>
+ <20170508100932.GH16981@rric.localdomain>
+Message-ID: <20170508105049.GA26654@virtx40>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, May 06, 2017 02:10:51 PM Linus Walleij wrote:
-> This adds device tree bindings for the Cortina Systems Gemini
-> PATA to SATA bridge.
+
+On Mon May 08, 2017 at 12:09:32PM +0200, Robert Richter wrote:
+> On 08.05.17 15:14:37, Linu Cherian wrote:
+> > On Sat May 06, 2017 at 12:18:44AM +0200, Robert Richter wrote:
+> > > On 05.05.17 17:38:06, Geetha sowjanya wrote:
+> > > > From: Linu Cherian <linu.cherian@cavium.com>
+> > > > 
+> > > > With implementations supporting only page 0 register space,
+> > > > resource size can be 64k as well and hence perform size checks
+> > > > based on SMMU option PAGE0_REGS_ONLY.
+> > > > 
+> > > > For this, arm_smmu_device_dt_probe/acpi_probe has been moved before
+> > > > platform_get_resource call, so that SMMU options are set beforehand.
+> > > > 
+> > > > Signed-off-by:  Linu Cherian <linu.cherian@cavium.com>
+> > > > Signed-off-by:  Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> > > > ---
+> > > >  drivers/iommu/arm-smmu-v3.c | 26 +++++++++++++++++---------
+> > > >  1 file changed, 17 insertions(+), 9 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> > > > index 107b4a6..f027676 100644
+> > > > --- a/drivers/iommu/arm-smmu-v3.c
+> > > > +++ b/drivers/iommu/arm-smmu-v3.c
+> > > > @@ -2672,6 +2672,14 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+> > > >  	return ret;
+> > > >  }
+> > > >  
+> > > > +static unsigned long arm_smmu_resource_size(struct arm_smmu_device *smmu)
+> > > > +{
+> > > > +	if (ARM_SMMU_PAGE0_REGS_ONLY(smmu))
+> > > > +		return SZ_64K;
+> > > > +	else
+> > > > +		return SZ_128K;
+> > > > +}
+> > > > +
+> > > 
+> > > I think this can be dropped. See below.
+> > > 
+> > > >  static int arm_smmu_device_probe(struct platform_device *pdev)
+> > > >  {
+> > > >  	int irq, ret;
+> > > > @@ -2688,9 +2696,17 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+> > > >  	}
+> > > >  	smmu->dev = dev;
+> > > >  
+> > > > +	if (dev->of_node) {
+> > > > +		ret = arm_smmu_device_dt_probe(pdev, smmu);
+> > > > +	} else {
+> > > > +		ret = arm_smmu_device_acpi_probe(pdev, smmu);
+> > > > +		if (ret == -ENODEV)
+> > > > +			return ret;
+> > > > +	}
+> > > > +
+> > > >  	/* Base address */
+> > > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > > -	if (resource_size(res) + 1 < SZ_128K) {
+> > > > +	if (resource_size(res) + 1 < arm_smmu_resource_size(smmu)) {
+> > > >  		dev_err(dev, "MMIO region too small (%pr)\n", res);
+> > > >  		return -EINVAL;
+> > > >  	}
+> > > 
+> > > Why not just do the follwoing here:
+> > > 
+> > >  	/* Base address */
+> > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > >  	if (resource_size(res) + 1 < arm_smmu_resource_size(smmu)) {
+> > >  		dev_err(dev, "MMIO region too small (%pr)\n", res);
+> > >  		return -EINVAL;
+> > >  	}
+> > >  	ioaddr = res->start;
+> > > 
+> > > +	/*
+> > > +	 * Override the size, for Cavium ThunderX2 implementation
+> > > +	 * which doesn't support the page 1 SMMU register space.
+> > > +	 */
+> > > +	if (smmu->options & ARM_SMMU_OPT_PAGE0_REGS_ONLY)
+> > > +		res->end = res->size + SZ_64K -1;
+> > > +
+> > >  	smmu->base = devm_ioremap_resource(dev, res);
+> > >  	if (IS_ERR(smmu->base))
+> > >  		return PTR_ERR(smmu->base);
+> > 
+> > 
+> > This might not work, since platform_device_add is being called from
+> > iort.c before the res->end gets fixed up here. 
 > 
-> Cc: devicetree at vger.kernel.org
-> Cc: John Feng-Hsin Chiang <john453@faraday-tech.com>
-> Cc: Greentime Hu <green.hu@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  .../bindings/ata/cortina,gemini-sata-bridge.txt    | 55 ++++++++++++++++++++++
->  1 file changed, 55 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ata/cortina,gemini-sata-bridge.txt
+> It should. You added it with 128k and you get it back with
+> platform_get_resource(), but before ioremap you shrink the size to
+> 64k.
 > 
-> diff --git a/Documentation/devicetree/bindings/ata/cortina,gemini-sata-bridge.txt b/Documentation/devicetree/bindings/ata/cortina,gemini-sata-bridge.txt
-> new file mode 100644
-> index 000000000000..9fe92818b2fb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ata/cortina,gemini-sata-bridge.txt
-> @@ -0,0 +1,55 @@
-> +* Cortina Systems Gemini SATA Bridge
-> +
-> +The Gemini SATA bridge in a SoC-internal PATA to SATA bridge that
-> +takes two Faraday Technology FTIDE010 PATA controllers and bridges
-> +them in different configurations to two SATA ports.
-> +
-> +Required properties:
-> +- compatible: should be
-> +  "cortina,gemini-sata-bridge"
-> +- reg: registers and size for the block
-> +- resets: phandles to the reset lines for both SATA bridges
-> +- reset-names: must be "sata0", "sata1"
-> +- clocks: phandles to the compulsory peripheral clocks
-> +- clock-names: must be "SATA0_PCLK", "SATA1_PCLK"
-> +- syscon: a phandle to the global Gemini system controller
-> +- cortina,gemini-ata-muxmode: tell the desired multiplexing mode for
-> +  the ATA controller and SATA bridges. Values 0..3:
-> +  Mode 0: ata0 master <-> sata0
-> +          ata1 master <-> sata1
-> +          ata0 slave interface brought out on IDE pads
-> +  Mode 1: ata0 master <-> sata0
-> +          ata1 master <-> sata1
-> +          ata1 slave interface brought out on IDE pads
-> +  Mode 2: ata1 master <-> sata1
-> +          ata1 slave  <-> sata0
-> +          ata0 master and slave interfaces brought out
-> +               on IDE pads
-> +  Mode 3: ata0 master <-> sata0
-> +          ata1 slave  <-> sata1
 
-ata0 slave?
+The smmu devices are located at 64k offsets and not at 128k
+offsets and hence this would be result in resource conflict during
+platform_add_device ?
 
-> +          ata1 master and slave interfaces brought out
-> +               on IDE pads
-> +
-> +Optional boolean properties:
-> +- cortina,gemini-enable-ide-pins: enables the PATA to IDE connection.
-> +  The muxmode setting decides whether ATA0 or ATA1 is brought out,
-> +  and whether master, slave or both interfaces get brought out.
-> +- cortina,gemini-enable-sata-bridge: enables the PATA to SATA bridge
-> +  inside the Gemnini SoC. The Muxmode decides what PATA blocks will
-> +  be muxed out and how.
-> +
-> +Example:
-> +
-> +sata: sata at 46000000 {
-> +	compatible = "cortina,gemini-sata-bridge";
-> +	reg = <0x46000000 0x100>;
-> +	resets = <&rcon 26>, <&rcon 27>;
-> +	reset-names = "sata0", "sata1";
-> +	clocks = <&gcc GEMINI_CLK_GATE_SATA0>,
-> +		 <&gcc GEMINI_CLK_GATE_SATA1>;
-> +	clock-names = "SATA0_PCLK", "SATA1_PCLK";
-> +	syscon = <&syscon>;
-> +	cortina,gemini-ata-muxmode = <3>;
-> +	cortina,gemini-enable-ide-pins;
-> +	cortina,gemini-enable-sata-bridge;
-> +};
+Code snippet from platform_add_device:
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+        for (i = 0; i < pdev->num_resources; i++) {
+ 	        struct resource *p, *r = &pdev->resource[i];
+
+		if (r->name == NULL)
+	                r->name = dev_name(&pdev->dev);
+
+		p = r->parent;
+                if (!p) {
+                        if (resource_type(r) == IORESOURCE_MEM)
+                                p = &iomem_resource;
+                        else if (resource_type(r) == IORESOURCE_IO)
+                                p = &ioport_resource;
+                }
+
+                if (p && insert_resource(p, r)) {
+                        dev_err(&pdev->dev, "failed to claim resource %d: %pR\n", i, r);
+                        ret = -EBUSY;
+                        goto failed;
+                }
+        }
+
+
+
+
+
+
+
+-- 
+Linu cherian
