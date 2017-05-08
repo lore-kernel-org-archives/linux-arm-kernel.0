@@ -1,68 +1,57 @@
-From: linu.cherian@cavium.com (Linu Cherian)
-Date: Mon, 8 May 2017 20:45:36 +0530
-Subject: [PATCH v3 0/7] Cavium ThunderX2 SMMUv3 errata workarounds
-In-Reply-To: <20170505222250.GY16981@rric.localdomain>
-References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
- <20170505222250.GY16981@rric.localdomain>
-Message-ID: <20170508151536.GA27789@virtx40>
+From: danielmicay@gmail.com (Daniel Micay)
+Date: Mon, 08 May 2017 11:22:12 -0400
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <20170508075209.7aluvpwildw325rf@gmail.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508075209.7aluvpwildw325rf@gmail.com>
+Message-ID: <1494256932.1167.1.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat May 06, 2017 at 12:22:50AM +0200, Robert Richter wrote:
-> On 05.05.17 17:38:04, Geetha sowjanya wrote:
-> > From: Linu Cherian <linu.cherian@cavium.com>
-> > 
-> > Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
-> > 1. Errata ID #74
-> >    SMMU register alias Page 1 is not implemented
-> > 2. Errata ID #126
-> >    SMMU doesnt support unique IRQ lines and also MSI for gerror, 
-> >    eventq and cmdq-sync
-> > 
-> > The following patchset does software workaround for these two erratas.
-> > 
-> > This series is based on patchset. 
-> > https://www.spinics.net/lists/arm-kernel/msg578443.html
-> > 
-> > Changes from v1:
-> >  Since the use of MIDR register is rejected and SMMU_IIDR is broken on this 
-> >  silicon, as suggested by Will Deacon modified the patches to use ThunderX2 
-> >  SMMUv3 IORT model number to enable errata workaround.
-> > 
-> > Changes from v2:
-> >  Updated "Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt" document with 
-> >  new SMMU option used to enable errata workaround.
-> >  
-> > Geetha Sowjanya (1):
-> >   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
-> > 
-> > Linu Cherian (6):
-> >   iommu/arm-smmu-v3: Introduce smmu option PAGE0_REGS_ONLY for ThunderX2
-> >     errata#74.
-> >   iommu/arm-smmu-v3: Do resource size checks based on SMMU option
-> >     PAGE0_REGS_ONLY
-> >   ACPICA: IORT: Add Cavium ThunderX2 SMMUv3 model definition.
-> >   iommu/arm-smmu-v3: For ACPI based device probing, set PAGE0_REGS_ONLY
-> >     option     for ThunderX2 SMMUv3 implementations.
-> >   ACPI/IORT: Fixup SMMUv3 resource size for Cavium ThunderX2 SMMUv3
-> >     model
-> >   arm64: Documentation: Add Cavium ThunderX2 SMMUv3 erratas
+On Mon, 2017-05-08 at 09:52 +0200, Ingo Molnar wrote:
 > 
-> This split into patches does not look reasonable to me. 1 patch only
-> for each workaround should be sufficient.
+> ... it's just not usable in that form for a regular maintenance flow.
 > 
+> So what would be more useful is to add a specific Sparse check that
+> only checks?
+> KERNEL_DS, to add it as a regular (.config driven) build option and
+> make sure the?
+> kernel build has zero warnings.
+> 
+> From that point on we can declare that this kind of bug won't occur
+> anymore, if?
+> the Sparse implementation of the check is correct.
+> 
+> But there's a (big) problem with that development model: Sparse is not
+> part of the?
+> kernel tree and adding a feature to it while making the kernel depend
+> on that?
+> brand new feature is a logistical nightmare. The overhead is quite
+> similar to?
+> adding new features to a compiler - it happens at a glacial pace and
+> is only done?
+> for major features really, at considerable expense. I don't think this
+> is an?
+> adequate model for 'extended syntax checking' of the kernel,
+> especially when it?
+> comes to correctness that has such obvious security impact.
+> 
+> Thanks,
+> 
+> 	Ingo
 
-* Should we not atleast keep the changes in drivers/acpi/iort.c and
- include/acpi/actbl2.h seperate, since they are outside smmuv3 driver ? 
+There's the option of using GCC plugins now that the infrastructure was
+upstreamed from grsecurity. It can be used as part of the regular build
+process and as long as the analysis is pretty simple it shouldn't hurt
+compile time much.
 
-* Probably i can merge the below patches, 
-  1. iommu/arm-smmu-v3: Introduce smmu option PAGE0_REGS_ONLY for ThunderX2 
-    errata#74.
-  2. iommu/arm-smmu-v3: Do resource size checks based on SMMU option
-     PAGE0_REGS_O
-
-Is that fine ?
-
-Thanks.
--- 
-Linu cherian
+The problem with doing that is I don't think there are people with much
+experience with GCC contributing upstream and it's going to be more work
+to develop/maintain than some kind of specialized DSL for analysis. I
+think a few static analysis plugins are used as part of maintaining
+grsecurity for solving issues like finding false positives for the
+REFCOUNT overflow checking feature, so it's something that's already
+being done in practice elsewhere.
