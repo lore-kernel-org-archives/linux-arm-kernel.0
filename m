@@ -1,51 +1,94 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 8 May 2017 13:40:55 +0300
-Subject: [PATCH] memory: omap-gpmc: Fix debug output for access width
-In-Reply-To: <20170505223706.4913-1-tony@atomide.com>
-References: <20170505223706.4913-1-tony@atomide.com>
-Message-ID: <a59b8a21-056a-0e1f-44a6-585256945747@ti.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 08 May 2017 12:49:03 +0200
+Subject: [PATCH 2/4] ata: Add DT bindings for the Gemini SATA bridge
+In-Reply-To: <20170506121053.11554-2-linus.walleij@linaro.org>
+References: <20170506121053.11554-1-linus.walleij@linaro.org>
+ <CGME20170506121119epcas5p437ea69e802ba94bd7df83d0bbac1b0bc@epcas5p4.samsung.com>
+ <20170506121053.11554-2-linus.walleij@linaro.org>
+Message-ID: <3791456.ZibJefW5cI@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 06/05/17 01:37, Tony Lindgren wrote:
-> The width needs to be configured in bytes with 1 meaning 8-bit
-> access and 2 meaning 16-bit access.
-
-As per the TRM, for GPMC_CONFIG1.DEVICESIZE
-0 means 8-bit
-1 means 16-bit
-
+On Saturday, May 06, 2017 02:10:51 PM Linus Walleij wrote:
+> This adds device tree bindings for the Cortina Systems Gemini
+> PATA to SATA bridge.
 > 
-> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: John Feng-Hsin Chiang <john453@faraday-tech.com>
+> Cc: Greentime Hu <green.hu@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/memory/omap-gpmc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  .../bindings/ata/cortina,gemini-sata-bridge.txt    | 55 ++++++++++++++++++++++
+>  1 file changed, 55 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ata/cortina,gemini-sata-bridge.txt
 > 
-> diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
-> --- a/drivers/memory/omap-gpmc.c
-> +++ b/drivers/memory/omap-gpmc.c
-> @@ -513,7 +513,7 @@ static void gpmc_cs_show_timings(int cs, const char *desc)
->  	pr_info("gpmc cs%i access configuration:\n", cs);
->  	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1,  4,  4, "time-para-granularity");
->  	GPMC_GET_RAW(GPMC_CS_CONFIG1,  8,  9, "mux-add-data");
-> -	GPMC_GET_RAW_MAX(GPMC_CS_CONFIG1, 12, 13,
-> +	GPMC_GET_RAW_SHIFT_MAX(GPMC_CS_CONFIG1, 12, 13, 1,
->  			 GPMC_CONFIG1_DEVICESIZE_MAX, "device-width");
+> diff --git a/Documentation/devicetree/bindings/ata/cortina,gemini-sata-bridge.txt b/Documentation/devicetree/bindings/ata/cortina,gemini-sata-bridge.txt
+> new file mode 100644
+> index 000000000000..9fe92818b2fb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ata/cortina,gemini-sata-bridge.txt
+> @@ -0,0 +1,55 @@
+> +* Cortina Systems Gemini SATA Bridge
+> +
+> +The Gemini SATA bridge in a SoC-internal PATA to SATA bridge that
+> +takes two Faraday Technology FTIDE010 PATA controllers and bridges
+> +them in different configurations to two SATA ports.
+> +
+> +Required properties:
+> +- compatible: should be
+> +  "cortina,gemini-sata-bridge"
+> +- reg: registers and size for the block
+> +- resets: phandles to the reset lines for both SATA bridges
+> +- reset-names: must be "sata0", "sata1"
+> +- clocks: phandles to the compulsory peripheral clocks
+> +- clock-names: must be "SATA0_PCLK", "SATA1_PCLK"
+> +- syscon: a phandle to the global Gemini system controller
+> +- cortina,gemini-ata-muxmode: tell the desired multiplexing mode for
+> +  the ATA controller and SATA bridges. Values 0..3:
+> +  Mode 0: ata0 master <-> sata0
+> +          ata1 master <-> sata1
+> +          ata0 slave interface brought out on IDE pads
+> +  Mode 1: ata0 master <-> sata0
+> +          ata1 master <-> sata1
+> +          ata1 slave interface brought out on IDE pads
+> +  Mode 2: ata1 master <-> sata1
+> +          ata1 slave  <-> sata0
+> +          ata0 master and slave interfaces brought out
+> +               on IDE pads
+> +  Mode 3: ata0 master <-> sata0
+> +          ata1 slave  <-> sata1
 
-setting shift 1 means the value will be multiplied by 2
-so this will read 0 for 8-bit and 2 for 16-bit.
+ata0 slave?
 
-Is this what we want?
-I'd still prefer the old way of showing RAW values than interpreted ones.
+> +          ata1 master and slave interfaces brought out
+> +               on IDE pads
+> +
+> +Optional boolean properties:
+> +- cortina,gemini-enable-ide-pins: enables the PATA to IDE connection.
+> +  The muxmode setting decides whether ATA0 or ATA1 is brought out,
+> +  and whether master, slave or both interfaces get brought out.
+> +- cortina,gemini-enable-sata-bridge: enables the PATA to SATA bridge
+> +  inside the Gemnini SoC. The Muxmode decides what PATA blocks will
+> +  be muxed out and how.
+> +
+> +Example:
+> +
+> +sata: sata at 46000000 {
+> +	compatible = "cortina,gemini-sata-bridge";
+> +	reg = <0x46000000 0x100>;
+> +	resets = <&rcon 26>, <&rcon 27>;
+> +	reset-names = "sata0", "sata1";
+> +	clocks = <&gcc GEMINI_CLK_GATE_SATA0>,
+> +		 <&gcc GEMINI_CLK_GATE_SATA1>;
+> +	clock-names = "SATA0_PCLK", "SATA1_PCLK";
+> +	syscon = <&syscon>;
+> +	cortina,gemini-ata-muxmode = <3>;
+> +	cortina,gemini-enable-ide-pins;
+> +	cortina,gemini-enable-sata-bridge;
+> +};
 
->  	GPMC_GET_RAW(GPMC_CS_CONFIG1, 16, 17, "wait-pin");
->  	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 21, 21, "wait-on-write");
-> 
-
--- 
-cheers,
--roger
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
