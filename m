@@ -1,57 +1,181 @@
-From: danielmicay@gmail.com (Daniel Micay)
-Date: Mon, 08 May 2017 11:22:12 -0400
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <20170508075209.7aluvpwildw325rf@gmail.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com>
- <20170508075209.7aluvpwildw325rf@gmail.com>
-Message-ID: <1494256932.1167.1.camel@gmail.com>
+From: alexander.duyck@gmail.com (Alexander Duyck)
+Date: Mon, 8 May 2017 08:22:14 -0700
+Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <2a3f064b-e885-a528-4945-adb32904bd0e@huawei.com>
+References: <cover.1493678834.git.leedom@chelsio.com>
+ <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
+ <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
+ <20170502165329.GB26406@linux.intel.com>
+ <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
+ <MWHPR12MB160095DF53CE981C923FE65DC8160@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <CAKgT0UdJ17DGAphuP5Y9co6ky-GBFdq2s-1nqctY_Tz_iz5__g@mail.gmail.com>
+ <MWHPR12MB1600E78DD7F530AA9DC2433DC8EA0@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <CAKgT0Ucwkp+fi-9HhMbze6t_i15dj4e2WQBp13Coi6MegrDh=w@mail.gmail.com>
+ <22c46382-5778-022f-d0bd-74abec9e9c7c@huawei.com>
+ <CAKgT0Ufg6uebqj79e1FOHoPpF-GxPYMkp353r3Ok_=nM8wF6qA@mail.gmail.com>
+ <2a3f064b-e885-a528-4945-adb32904bd0e@huawei.com>
+Message-ID: <CAKgT0Uej61MGJjxaZCXsVTVApO2bYTmChi0suXbLZ7vSf4Y9wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-05-08 at 09:52 +0200, Ingo Molnar wrote:
-> 
-> ... it's just not usable in that form for a regular maintenance flow.
-> 
-> So what would be more useful is to add a specific Sparse check that
-> only checks?
-> KERNEL_DS, to add it as a regular (.config driven) build option and
-> make sure the?
-> kernel build has zero warnings.
-> 
-> From that point on we can declare that this kind of bug won't occur
-> anymore, if?
-> the Sparse implementation of the check is correct.
-> 
-> But there's a (big) problem with that development model: Sparse is not
-> part of the?
-> kernel tree and adding a feature to it while making the kernel depend
-> on that?
-> brand new feature is a logistical nightmare. The overhead is quite
-> similar to?
-> adding new features to a compiler - it happens at a glacial pace and
-> is only done?
-> for major features really, at considerable expense. I don't think this
-> is an?
-> adequate model for 'extended syntax checking' of the kernel,
-> especially when it?
-> comes to correctness that has such obvious security impact.
-> 
-> Thanks,
-> 
-> 	Ingo
+On Mon, May 8, 2017 at 7:33 AM, Ding Tianhong <dingtianhong@huawei.com> wrote:
+>
+>
+> On 2017/5/7 2:07, Alexander Duyck wrote:
+>> On Fri, May 5, 2017 at 8:08 PM, Ding Tianhong <dingtianhong@huawei.com> wrote:
+>>>
+>>>
+>>> On 2017/5/5 22:04, Alexander Duyck wrote:
+>>>> On Thu, May 4, 2017 at 2:01 PM, Casey Leedom <leedom@chelsio.com> wrote:
+>>>>> | From: Alexander Duyck <alexander.duyck@gmail.com>
+>>>>> | Sent: Wednesday, May 3, 2017 9:02 AM
+>>>>> | ...
+>>>>> | It sounds like we are more or less in agreement. My only concern is
+>>>>> | really what we default this to. On x86 I would say we could probably
+>>>>> | default this to disabled for existing platforms since my understanding
+>>>>> | is that relaxed ordering doesn't provide much benefit on what is out
+>>>>> | there right now when performing DMA through the root complex. As far
+>>>>> | as peer-to-peer I would say we should probably look at enabling the
+>>>>> | ability to have Relaxed Ordering enabled for some channels but not
+>>>>> | others. In those cases the hardware needs to be smart enough to allow
+>>>>> | for you to indicate you want it disabled by default for most of your
+>>>>> | DMA channels, and then enabled for the select channels that are
+>>>>> | handling the peer-to-peer traffic.
+>>>>>
+>>>>>   Yes, I think that we are mostly in agreement.  I had just wanted to make
+>>>>> sure that whatever scheme was developed would allow for simultaneously
+>>>>> supporting non-Relaxed Ordering for some PCIe End Points and Relaxed
+>>>>> Ordering for others within the same system.  I.e. not simply
+>>>>> enabling/disabling/etc.  based solely on System Platform Architecture.
+>>>>>
+>>>>>   By the way, I've started our QA folks off looking at what things look like
+>>>>> in Linux Virtual Machines under different Hypervisors to see what
+>>>>> information they may provide to the VM in the way of what Root Complex Port
+>>>>> is being used, etc.  So far they've got Windows HyperV done and there
+>>>>> there's no PCIe Fabric exposed in any way: just the attached device.  I'll
+>>>>> have to see what pci_find_pcie_root_port() returns in that environment.
+>>>>> Maybe NULL?
+>>>>
+>>>> I believe NULL is one of the options. It all depends on what qemu is
+>>>> emulating. Most likely you won't find a pcie root port on KVM because
+>>>> the default is to emulate an older system that only supports PCI.
+>>>>
+>>>>>   With your reservations (which I also share), I think that it probably
+>>>>> makes sense to have a per-architecture definition of the "Can I Use Relaxed
+>>>>> Ordering With TLPs Directed At This End Point" predicate, with the default
+>>>>> being "No" for any architecture which doesn't implement the predicate.  And
+>>>>> if the specified (struct pci_dev *) End Node is NULL, it ought to return
+>>>>> False for that as well.  I can't see any reason to pass in the Source End
+>>>>> Node but I may be missing something.
+>>>>>
+>>>>>   At this point, this is pretty far outside my level of expertise.  I'm
+>>>>> happy to give it a go, but I'd be even happier if someone with a lot more
+>>>>> experience in the PCIe Infrastructure were to want to carry the ball
+>>>>> forward.  I'm not super familiar with the Linux Kernel "Rules Of
+>>>>> Engagement", so let me know what my next step should be.  Thanks.
+>>>>>
+>>>>> Casey
+>>>>
+>>>> For now we can probably keep this on the linux-pci mailing list. Going
+>>>> that route is the most straight forward for now since step one is
+>>>> probably just making sure we are setting the relaxed ordering bit in
+>>>> the setups that make sense. I would say we could probably keep it
+>>>> simple. We just need to enable relaxed ordering by default for SPARC
+>>>> architectures, on most others we can probably default it to off.
+>>>>
+>>>
+>>> Casey, Alexander:
+>>>
+>>> Thanks for the wonderful discussion, it is more clearly that what to do next,
+>>> I agree that enable relaxed ordering by default only for SPARC and ARM64
+>>> is more safe for all the other platform, as no one want to break anything.
+>>>
+>>>> I believe this all had started as Ding Tianhong was hoping to enable
+>>>> this for the ARM architecture. That is the only one I can think of
+>>>> where it might be difficult to figure out which way to default as we
+>>>> were attempting to follow the same code that was enabled for SPARC and
+>>>> that is what started this tug-of-war about how this should be done.
+>>>> What we might do is take care of this in two phases. The first one
+>>>> enables the infrastructure generically but leaves it defaulted to off
+>>>> for everyone but SPARC. Then we can go through and start enabling it
+>>>> for other platforms such as some of those on ARM in the platforms that
+>>>> Ding Tianhong was working with.
+>>>>
+>>>
+>>> According the suggestion, I could only think of this code:
+>>>
+>>> @@ -3979,6 +3979,15 @@ static void quirk_tw686x_class(struct pci_dev *pdev)
+>>>  DECLARE_PCI_FIXUP_CLASS_EARLY(0x1797, 0x6869, PCI_CLASS_NOT_DEFINED, 8,
+>>>                               quirk_tw686x_class);
+>>>
+>>> +static void quirk_relaxedordering_disable(struct pci_dev *dev)
+>>> +{
+>>> + if (dev->vendor != PCI_VENDOR_ID_HUAWEI &&
+>>> +     dev->vendor != PCI_VENDOR_ID_SUN)
+>>> +         dev->dev_flags |= PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
+>>> +}
+>>> +DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_INTEL_ID, PCI_ANY_ID, PCI_CLASS_NOT_DEFINED, 8,
+>>> +                       quirk_relaxedordering_disable);
+>>> +
+>>>  /*
+>>>   * Per PCIe r3.0, sec 2.2.9, "Completion headers must supply the same
+>>>   * values for the Attribute as were supplied in the header of the
+>>>
+>>>
+>>> What do you think of it?
+>>>
+>>> Thanks
+>>> Ding
+>>>
+>>
+>> This is a bit simplistic but it is a start.
+>>
+>> The other bit I was getting at is that we need to update the core PCIe
+>> code so that when we configure devices and the root complex reports no
+>> support for relaxed ordering it should be clearing the relaxed
+>> ordering bits in the PCIe configuration registers on the upstream
+>> facing devices.
+>
+> How about this:
+> rename the PCI_DEV_FLAGS_NO_RELAXED_ORDERIN to PCI_DEV_FLAGS_RELAXED_ORDERIN, only enable it
+> when pcie root configure if it support the RO mode, otherwise we will not set it to indicate
+> that the pcie dev did not support RO mode.
 
-There's the option of using GCC plugins now that the infrastructure was
-upstreamed from grsecurity. It can be used as part of the regular build
-process and as long as the analysis is pretty simple it shouldn't hurt
-compile time much.
+The problem is we need to have something that can be communicated
+through a VM. Your change doesn't work in that regard. That was why I
+suggested just updating the code so that we when we initialized PCIe
+devices what we do is either set or clear the relaxed ordering bit in
+the PCIe device control register. That way when we direct assign an
+interface it could know just based on the bits int the PCIe
+configuration if it could use relaxed ordering or not.
 
-The problem with doing that is I don't think there are people with much
-experience with GCC contributing upstream and it's going to be more work
-to develop/maintain than some kind of specialized DSL for analysis. I
-think a few static analysis plugins are used as part of maintaining
-grsecurity for solving issues like finding false positives for the
-REFCOUNT overflow checking feature, so it's something that's already
-being done in practice elsewhere.
+At that point the driver code itself becomes very simple since you
+could just enable the relaxed ordering by default in the igb/ixgbe
+driver and if the bit is set or cleared in the PCIe configuration then
+we are either sending with relaxed ordering requests or not and don't
+have to try and locate the root complex.
+
+>>
+>> The last bit we need in all this is a way to allow for setups where
+>> peer-to-peer wants to perform relaxed ordering but for writes to the
+>> host we have to not use relaxed ordering. For that we need to enable a
+>> special case and that isn't handled right now in any of the solutions
+>> we have coded up so far.
+>>
+>
+> Sorry I am not clear of this way, can you explain more about this or give me
+> a special case, thanks a lot.
+
+So from the sound of it Casey has a special use case where he doesn't
+want to send relaxed ordering frames to the root complex, but instead
+would like to send them to another PCIe device. To do that he needs to
+have a way to enable the relaxed ordering bit in the PCIe
+configuration but then not send any to the root complex. Odds are that
+is something he might be able to just implement in the driver, but is
+something that may become a more general case in the future. I don't
+see our change here impacting it as long as we keep the solution
+generic and mostly confined to when we instantiate the devices as the
+driver could likely make the decision to change the behavior later.
+
+- Alex
