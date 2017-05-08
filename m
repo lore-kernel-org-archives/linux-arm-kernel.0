@@ -1,131 +1,89 @@
-From: andy.tang@nxp.com (Andy Tang)
-Date: Mon, 8 May 2017 05:59:27 +0000
-Subject: [PATCH 1/2 v2] dt-bindings: qoriq-clock: Add coreclk
-In-Reply-To: <DB6PR0402MB2837F82134ADCBAC53ECC51FF31F0@DB6PR0402MB2837.eurprd04.prod.outlook.com>
-References: <1489977443-33582-1-git-send-email-andy.tang@nxp.com>
- <DB6PR0402MB283701D478A1678D28894C77F30A0@DB6PR0402MB2837.eurprd04.prod.outlook.com>
- <DB6PR0402MB2837F82134ADCBAC53ECC51FF31F0@DB6PR0402MB2837.eurprd04.prod.outlook.com>
-Message-ID: <HE1PR0402MB2828CD7848C4C71F1526587DF3EE0@HE1PR0402MB2828.eurprd04.prod.outlook.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Mon, 8 May 2017 14:09:28 +0800
+Subject: [PATCH 4/6] cpufreq: mediatek: Add support of cpufreq to
+ MT2701/MT7623 SoC
+In-Reply-To: <20170506100059.6003d9ef@endymion>
+References: <1493997974-17699-1-git-send-email-sean.wang@mediatek.com>
+ <1493997974-17699-5-git-send-email-sean.wang@mediatek.com>
+ <20170506100059.6003d9ef@endymion>
+Message-ID: <1494223768.9662.4.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robh,
+Hi Jean,
 
-Could you please take a look at this patch set? They are pending for a really long time.
-Don't know why they have not been merged.
+Appreciate your reviewing and suggestion. I added my comment inline.
 
-Patch links:
-https://patchwork.kernel.org/patch/9633007/
-https://patchwork.kernel.org/patch/9633009/
-
-Regards,
-Andy
-
-> -----Original Message-----
-> From: Andy Tang
-> Sent: Monday, April 24, 2017 11:15 AM
-> To: mturquette at baylibre.com; sboyd at codeaurora.org
-> Cc: robh+dt at kernel.org; mark.rutland at arm.com; linux-clk at vger.kernel.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Scott Wood <oss@buserror.net>
-> Subject: RE: [PATCH 1/2 v2] dt-bindings: qoriq-clock: Add coreclk
+On Sat, 2017-05-06 at 10:00 +0200, Jean Delvare wrote:
+> Hi Sean,
 > 
-> Does anyone give me a clue why this patch set can't be responded after so
-> long time?
-> 
-> Thanks,
-> Andy
-> 
-> -----Original Message-----
-> From: Andy Tang
-> Sent: Monday, April 17, 2017 9:37 AM
-> To: 'mturquette at baylibre.com' <mturquette@baylibre.com>;
-> 'sboyd at codeaurora.org' <sboyd@codeaurora.org>
-> Cc: 'robh+dt at kernel.org' <robh+dt@kernel.org>; 'mark.rutland at arm.com'
-> <mark.rutland@arm.com>; 'linux-clk at vger.kernel.org' <linux-
-> clk at vger.kernel.org>; 'devicetree at vger.kernel.org'
-> <devicetree@vger.kernel.org>; 'linux-kernel at vger.kernel.org' <linux-
-> kernel at vger.kernel.org>; 'linux-arm-kernel at lists.infradead.org' <linux-arm-
-> kernel at lists.infradead.org>; 'Scott Wood' <oss@buserror.net>
-> Subject: RE: [PATCH 1/2 v2] dt-bindings: qoriq-clock: Add coreclk
-> 
-> Hi Stephen and Michael,
-> 
-> This patch set has been pending for more than two months since it was first
-> sent.
-> I have not received any response from you until now.
-> 
-> Could you give some comments on it?
-> 
-> Regards,
-> Andy
-> 
-> -----Original Message-----
-> From: Andy Tang
-> Sent: Wednesday, April 05, 2017 2:16 PM
-> To: mturquette at baylibre.com; sboyd at codeaurora.org
-> Cc: robh+dt at kernel.org; mark.rutland at arm.com; linux-clk at vger.kernel.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Scott Wood <oss@buserror.net>
-> Subject: RE: [PATCH 1/2 v2] dt-bindings: qoriq-clock: Add coreclk
-> 
-> Hello
-> 
-> Do you have any comments on this patch set which was acked by Rob?
-> 
-> Regards,
-> Andy
-> 
-> > -----Original Message-----
-> > From: Yuantian Tang [mailto:andy.tang at nxp.com]
-> > Sent: Monday, March 20, 2017 10:37 AM
-> > To: mturquette at baylibre.com
-> > Cc: sboyd at codeaurora.org; robh+dt at kernel.org; mark.rutland at arm.com;
-> > linux-clk at vger.kernel.org; devicetree at vger.kernel.org; linux-
-> > kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Scott
-> > Wood <oss@buserror.net>; Andy Tang <andy.tang@nxp.com>
-> > Subject: [PATCH 1/2 v2] dt-bindings: qoriq-clock: Add coreclk
-> >
-> > From: Scott Wood <oss@buserror.net>
-> >
-> > ls1012a has separate input root clocks for core PLLs versus the
-> > platform PLL, with the latter described as sysclk in the hw docs.
-> > Update the qoriq-clock binding to allow a second input clock, named
-> > "coreclk".  If present, this clock will be used for the core PLLs.
-> >
-> > Signed-off-by: Scott Wood <oss@buserror.net>
-> > Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-> > Acked-by: Rob Herring <robh@kernel.org>
+> On Fri, 5 May 2017 23:26:12 +0800, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > MT2701/MT7623 is an 32-bit ARMv7 based quad-core (4 * Cortex-A7) with
+> > single cluster and this hardware is also compatible with the existing
+> > driver through enabling CPU frequency feature with operating-points-v2
+> > bindings.
+> > 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 > > ---
-> > v2:
-> > 	-- change the author to Scott
-> >  Documentation/devicetree/bindings/clock/qoriq-clock.txt | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> > b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> > index aa3526f..119cafd 100644
-> > --- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> > +++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> > @@ -56,6 +56,11 @@ Optional properties:
-> >  - clocks: If clock-frequency is not specified, sysclk may be provided
-> >  	as an input clock.  Either clock-frequency or clocks must be
-> >  	provided.
-> > +	A second input clock, called "coreclk", may be provided if
-> > +	core PLLs are based on a different input clock from the
-> > +	platform PLL.
-> > +- clock-names: Required if a coreclk is present.  Valid names are
-> > +	"sysclk" and "coreclk".
-> >
-> >  2. Clock Provider
-> >
-> > @@ -72,6 +77,7 @@ second cell is the clock index for the specified type.
-> >  	2	hwaccel		index (n in CLKCGnHWACSR)
-> >  	3	fman		0 for fm1, 1 for fm2
-> >  	4	platform pll	0=pll, 1=pll/2, 2=pll/3, 3=pll/4
-> > +	5	coreclk		must be 0
-> >
-> >  3. Example
-> >
-> > --
-> > 2.1.0.27.g96db324
+> >  drivers/cpufreq/Kconfig.arm      | 4 ++--
+> >  drivers/cpufreq/mt8173-cpufreq.c | 2 ++
+> >  2 files changed, 4 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> > index 74ed7e9..68b387a 100644
+> > --- a/drivers/cpufreq/Kconfig.arm
+> > +++ b/drivers/cpufreq/Kconfig.arm
+> > @@ -90,11 +90,11 @@ config ARM_KIRKWOOD_CPUFREQ
+> >  config ARM_MT8173_CPUFREQ
+> >  	tristate "Mediatek MT8173 CPUFreq support"
+> >  	depends on ARCH_MEDIATEK && REGULATOR
+> > -	depends on ARM64 || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
+> > +	depends on (ARM || ARM64) || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
+> 
+> Parentheses not needed. I am also curious if ARM_CPU_TOPOLOGY can
+> actually be set when neither ARM nor ARM64 is. I suspect not, and then
+> the above can be simplified to just:
+> 
+
+I agree with you and I will look into more whether ARM_CPU_TOPOLOGY can
+be removed safely since I can't make fully sure here and then update
+those into the next version.
+
+> 	depends on ARM || ARM64
+> 
+> >  	depends on !CPU_THERMAL || THERMAL
+> >  	select PM_OPP
+> >  	help
+> > -	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
+> > +	  This adds the CPUFreq driver support for Mediatek SoCs.
+> 
+> If this driver actually support all Mediatek SoCs, the menu entry
+> itself should be updated to drop "MT8173".
+> 
+
+I will drop MT8173 wording because the driver also works for those
+Mediatek SoCs not belonged to MT817x series.
+
+In fact, the driver should also be extended and being more generic to
+support more Mediatek SoCs in the future.
+
+> >  
+> >  config ARM_OMAP2PLUS_CPUFREQ
+> >  	bool "TI OMAP2+"
+> > diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+> > index fd1886f..481ec77 100644
+> > --- a/drivers/cpufreq/mt8173-cpufreq.c
+> > +++ b/drivers/cpufreq/mt8173-cpufreq.c
+> > @@ -575,6 +575,8 @@ static struct platform_driver mt8173_cpufreq_platdrv = {
+> >  
+> >  /* List of machines supported by this driver */
+> >  static const struct of_device_id mt8173_cpufreq_machines[] __initconst = {
+> > +	{ .compatible = "mediatek,mt2701", },
+> > +	{ .compatible = "mediatek,mt7623", },
+> >  	{ .compatible = "mediatek,mt817x", },
+> >  	{ .compatible = "mediatek,mt8173", },
+> >  	{ .compatible = "mediatek,mt8176", },
+> 
+> 
