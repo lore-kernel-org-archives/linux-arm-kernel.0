@@ -1,78 +1,56 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 08 May 2017 18:31:09 +0100
-Subject: [PATCH v3 1/3] arm64: kvm: support kvmtool to detect RAS extension
- feature
-In-Reply-To: <CAMj-D2BS7UHLC3DGM5i7fSRsqDKHmLYg79UV7sT6yHGFy5aYfw@mail.gmail.com>
-References: <CAMj-D2BS7UHLC3DGM5i7fSRsqDKHmLYg79UV7sT6yHGFy5aYfw@mail.gmail.com>
-Message-ID: <5910AB5D.8060105@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 8 May 2017 19:34:08 +0200
+Subject: [PATCH V15 10/11] trace, ras: add ARM processor error trace event
+In-Reply-To: <1492556723-9189-11-git-send-email-tbaicar@codeaurora.org>
+References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
+ <1492556723-9189-11-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20170508173408.njiuvnqf3zi5pinm@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
-
-On 04/05/17 18:20, gengdongjiu wrote:
->> On 30/04/17 06:37, Dongjiu Geng wrote:
->>> Handle kvmtool's detection for RAS extension, because sometimes
->>> the APP needs to know the CPU's capacity
->>
->>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->>> index d9e9697..1004039 100644
->>> --- a/arch/arm64/kvm/reset.c
->>> +++ b/arch/arm64/kvm/reset.c
->>> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
->>>   return !!(pfr0 & 0x20);
->>>  }
->>>
->>> +static bool kvm_arm_support_ras_extension(void)
->>> +{
->>> + u64 pfr0;
->>> +
->>> + pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
->>> + return !!(pfr0 & 0x10000000);
->>> +}
->>
->> Why are we telling user-space that the CPU has RAS extensions? EL0 can't do
->> anything with this and the guest EL1 can detect it from the id registers.
->>
->>
->> Are you using this to decide whether or not to generate a HEST for the guest?
+On Tue, Apr 18, 2017 at 05:05:22PM -0600, Tyler Baicar wrote:
+> Currently there are trace events for the various RAS
+> errors with the exception of ARM processor type errors.
+> Add a new trace event for such errors so that the user
+> will know when they occur. These trace events are
+> consistent with the ARM processor error section type
+> defined in UEFI 2.6 spec section N.2.4.4.
 > 
-> James, yes, it is.  my current user-space qemu EL0 patches indeed will
-> check the RAS  extensions.
-> if has the RAS extensions. for SEA, userspace qemu will generate the
-> CPER and inject the SEA to guest;
-> for SEI,  userspace qemu sets the virtual SEI with the specified
-> Syndrome(set the HCR_EL2.VSE and vsesr_el2 );
-> if not have RAS extensions, Qemu does nothing
-
-But you can use APEI in a guest on CPUs without the RAS extensions: the host may
-signal memory errors to Qemu for any number of reasons, user-space shouldn't
-care how it knows. Examples are PCI-AER, any APEI event notified by polling or
-one of the flavours of irq.
-
-I would expect Qemu to generate a HEST based on its abilities, i.e. if it
-supports any mechanism of notifying the guest about errors. Choosing the
-mechanism then depends on the type of error.
-
-Ideally the Qemu code for HEST/GHES/CPER generation code using some of the irqs
-and polling could be shared with x86, as these should be possible using common
-KVM APIs.
-
-
->> If Qemu/kvmtool supports handling memory-failure notifications from signals you
->> should always generate a HEST. The GHES notification method could be anything
->> Qemu can deliver to the guest using the KVM APIs. Notifications from Qemu to the
->> guest don't depend on the RAS extensions. KVM has APIs for IRQ and SEA (you can
->> use KVM_SET_ONE_REG).
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Acked-by: Steven Rostedt <rostedt@goodmis.org>
+> Reviewed-by: Xie XiuQi <xiexiuqi@huawei.com>
+> ---
+>  drivers/acpi/apei/ghes.c    |  8 +++++++-
+>  drivers/firmware/efi/cper.c |  1 +
+>  drivers/ras/ras.c           |  1 +
+>  include/ras/ras_event.h     | 45 +++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 54 insertions(+), 1 deletion(-)
 > 
-> I will consider your suggestion to  always generate a CPER instead of
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 3d9f63b..612deb3 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -518,7 +518,13 @@ static void ghes_do_proc(struct ghes *ghes,
+>  		}
+>  #endif
+>  #ifdef CONFIG_RAS
+> -		else if (trace_unknown_sec_event_enabled()) {
+> +		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM) &&
+> +			 trace_arm_event_enabled()) {
+> +			struct cper_sec_proc_arm *arm_err;
+> +
+> +			arm_err = acpi_hest_get_payload(gdata);
+> +			trace_arm_event(arm_err);
+> +		} else if (trace_unknown_sec_event_enabled()) {
+>  			void *unknown_err = acpi_hest_get_payload(gdata);
+>  
+>  			trace_unknown_sec_event(&sec_type,
 
-(generate a HEST, CPER are the runtime records. There are too many acronyms in
-this space!)
+As with the previous patch, move that code to ras.c so that you can get rid of
+the ifdeffery here.
 
-> relying on the RAS extensions, thanks
+-- 
+Regards/Gruss,
+    Boris.
 
-
-Thanks,
-
-James
+Good mailing practices for 400: avoid top-posting and trim the reply.
