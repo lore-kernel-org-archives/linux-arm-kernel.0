@@ -1,54 +1,48 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon,  8 May 2017 18:21:11 +0200
-Subject: [PATCH 2/8] mmc: pwrseq_simple: Parse DTS for the power-off-delay-us
- property
+Date: Mon,  8 May 2017 18:21:12 +0200
+Subject: [PATCH 3/8] mfd: dts: hi655x: Add clock binding for the pmic
 In-Reply-To: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
 References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1494260477-25163-3-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1494260477-25163-4-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the optional power-off-delay-us property is found, insert the
-corresponding delay after asserting the GPIO during power off. This enables
-a graceful shutdown sequence for some devices.
+From: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Cc: linux-mmc at vger.kernel.org
+The hi655x PMIC provides the regulators but also a clock. The latter is
+missing in the definition, so extend the documentation to include this as
+well.
+
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+[Ulf: Split patch and updated changelog]
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/mmc/core/pwrseq_simple.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-index 1304160..13ef162 100644
---- a/drivers/mmc/core/pwrseq_simple.c
-+++ b/drivers/mmc/core/pwrseq_simple.c
-@@ -27,6 +27,7 @@ struct mmc_pwrseq_simple {
- 	struct mmc_pwrseq pwrseq;
- 	bool clk_enabled;
- 	u32 post_power_on_delay_ms;
-+	u32 power_off_delay_us;
- 	struct clk *ext_clk;
- 	struct gpio_descs *reset_gpios;
- };
-@@ -78,6 +79,10 @@ static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
- 
- 	mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
- 
-+	if (pwrseq->power_off_delay_us)
-+		usleep_range(pwrseq->power_off_delay_us,
-+			2 * pwrseq->power_off_delay_us);
+diff --git a/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt b/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
+index 0548569..9630ac0 100644
+--- a/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
++++ b/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
+@@ -16,6 +16,11 @@ Required properties:
+ - reg:                  Base address of PMIC on Hi6220 SoC.
+ - interrupt-controller: Hi655x has internal IRQs (has own IRQ domain).
+ - pmic-gpios:           The GPIO used by PMIC IRQ.
++- #clock-cells:		From common clock binding; shall be set to 0
 +
- 	if (!IS_ERR(pwrseq->ext_clk) && pwrseq->clk_enabled) {
- 		clk_disable_unprepare(pwrseq->ext_clk);
- 		pwrseq->clk_enabled = false;
-@@ -119,6 +124,8 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
++Optional properties:
++- clock-output-names: From common clock binding to override the
++  default output clock name
  
- 	device_property_read_u32(dev, "post-power-on-delay-ms",
- 				 &pwrseq->post_power_on_delay_ms);
-+	device_property_read_u32(dev, "power-off-delay-us",
-+				 &pwrseq->power_off_delay_us);
- 
- 	pwrseq->pwrseq.dev = dev;
- 	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
+ Example:
+ 	pmic: pmic at f8000000 {
+@@ -24,4 +29,5 @@ Example:
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
+ 		pmic-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
++		#clock-cells = <0>;
+ 	}
 -- 
 2.7.4
