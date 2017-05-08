@@ -1,217 +1,201 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 08 May 2017 13:23:04 +0200
-Subject: [PATCH V11 00/11] IOMMU probe deferral support
-In-Reply-To: <1491823266-1209-1-git-send-email-sricharan@codeaurora.org>
-References: <CGME20170410112136epcas2p2cdd7dc21a8dc0ffcfab7f8290c4b7467@epcas2p2.samsung.com>
- <1491823266-1209-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <5617791f-407a-1ab3-53aa-0f09fcd716aa@samsung.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 8 May 2017 13:30:42 +0200
+Subject: [PATCH v7 21/24] KVM: arm64: vgic-its: Device table save/restore
+In-Reply-To: <87zieoiyjy.fsf@on-the-bus.cambridge.arm.com>
+References: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
+ <1494084283-12723-22-git-send-email-eric.auger@redhat.com>
+ <87zieoiyjy.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <20170508113042.GB28342@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
+On Sun, May 07, 2017 at 02:30:57PM +0100, Marc Zyngier wrote:
+> On Sat, May 06 2017 at  4:24:40 pm BST, Eric Auger <eric.auger@redhat.com> wrote:
+> > This patch saves the device table entries into guest RAM.
+> > Both flat table and 2 stage tables are supported. DeviceId
+> > indexing is used.
+> >
+> > For each device listed in the device table, we also save
+> > the translation table using the vgic_its_save/restore_itt
+> > routines. Those functions will be implemented in a subsequent
+> > patch.
+> >
+> > On restore, devices are re-allocated and their itt are
+> > re-built.
+> >
+> > Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> >
+> > ---
+> > v5 -> v6:
+> > - accomodate vgic_its_alloc_device change of proto
+> > - define bit fields for L1 entries
+> > - s/handle_l1_entry/handle_l1_dte
+> > - s/ite_esz/dte_esz in handle_l1_dte
+> > - check BASER valid bit
+> > - s/nb_eventid_bits/num_eventid_bits
+> > - new convention for returned values
+> > - itt functions implemented in subsequent patch
+> >
+> > v4 -> v5:
+> > - sort the device list by deviceid on device table save
+> > - use defines for shifts and masks
+> > - use abi->dte_esz
+> > - clatify entry sizes for L1 and L2 tables
+> >
+> > v3 -> v4:
+> > - use the new proto for its_alloc_device
+> > - compute_next_devid_offset, vgic_its_flush/restore_itt
+> >   become static in this patch
+> > - change in the DTE entry format with the introduction of the
+> >   valid bit and next field width decrease; ittaddr encoded
+> >   on its full range
+> > - fix handle_l1_entry entry handling
+> > - correct vgic_its_table_restore error handling
+> >
+> > v2 -> v3:
+> > - fix itt_addr bitmask in vgic_its_restore_dte
+> > - addition of return 0 in vgic_its_restore_ite moved to
+> >   the ITE related patch
+> >
+> > v1 -> v2:
+> > - use 8 byte format for DTE and ITE
+> > - support 2 stage format
+> > - remove kvm parameter
+> > - ITT flush/restore moved in a separate patch
+> > - use deviceid indexing
+> > ---
+> >  virt/kvm/arm/vgic/vgic-its.c | 194 +++++++++++++++++++++++++++++++++++++++++--
+> >  virt/kvm/arm/vgic/vgic.h     |  10 +++
+> >  2 files changed, 199 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> > index 90afc83..3dea626 100644
+> > --- a/virt/kvm/arm/vgic/vgic-its.c
+> > +++ b/virt/kvm/arm/vgic/vgic-its.c
+> > @@ -23,6 +23,7 @@
+> >  #include <linux/interrupt.h>
+> >  #include <linux/list.h>
+> >  #include <linux/uaccess.h>
+> > +#include <linux/list_sort.h>
+> >  
+> >  #include <linux/irqchip/arm-gic-v3.h>
+> >  
+> > @@ -1735,7 +1736,8 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+> >  	return ret;
+> >  }
+> >  
+> > -u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
+> > +static u32 compute_next_devid_offset(struct list_head *h,
+> > +				     struct its_device *dev)
+> >  {
+> >  	struct its_device *next;
+> >  	u32 next_offset;
+> > @@ -1789,8 +1791,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+> >   * Return: < 0 on error, 0 if last element was identified, 1 otherwise
+> >   * (the last element may not be found on second level tables)
+> >   */
+> > -int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+> > -		   int start_id, entry_fn_t fn, void *opaque)
+> > +static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+> > +			  int start_id, entry_fn_t fn, void *opaque)
+> >  {
+> >  	void *entry = kzalloc(esz, GFP_KERNEL);
+> >  	struct kvm *kvm = its->dev->kvm;
+> > @@ -1825,13 +1827,171 @@ int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+> >  	return ret;
+> >  }
+> >  
+> > +static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
+> > +{
+> > +	return -ENXIO;
+> > +}
+> > +
+> > +static int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
+> > +{
+> > +	return -ENXIO;
+> > +}
+> > +
+> > +/**
+> > + * vgic_its_save_dte - Save a device table entry at a given GPA
+> > + *
+> > + * @its: ITS handle
+> > + * @dev: ITS device
+> > + * @ptr: GPA
+> > + */
+> > +static int vgic_its_save_dte(struct vgic_its *its, struct its_device *dev,
+> > +			     gpa_t ptr, int dte_esz)
+> > +{
+> > +	struct kvm *kvm = its->dev->kvm;
+> > +	u64 val, itt_addr_field;
+> > +	u32 next_offset;
+> > +
+> > +	itt_addr_field = dev->itt_addr >> 8;
+> > +	next_offset = compute_next_devid_offset(&its->device_list, dev);
+> > +	val = (1ULL << KVM_ITS_DTE_VALID_SHIFT |
+> > +	       ((u64)next_offset << KVM_ITS_DTE_NEXT_SHIFT) |
+> > +	       (itt_addr_field << KVM_ITS_DTE_ITTADDR_SHIFT) |
+> > +		(dev->num_eventid_bits - 1));
+> > +	val = cpu_to_le64(val);
+> > +	return kvm_write_guest(kvm, ptr, &val, dte_esz);
+> > +}
+> > +
+> > +/**
+> > + * vgic_its_restore_dte - restore a device table entry
+> > + *
+> > + * @its: its handle
+> > + * @id: device id the DTE corresponds to
+> > + * @ptr: kernel VA where the 8 byte DTE is located
+> > + * @opaque: unused
+> > + *
+> > + * Return: < 0 on error, 0 if the dte is the last one, id offset to the
+> > + * next dte otherwise
+> > + */
+> > +static int vgic_its_restore_dte(struct vgic_its *its, u32 id,
+> > +				void *ptr, void *opaque)
+> > +{
+> > +	struct its_device *dev;
+> > +	gpa_t itt_addr;
+> > +	u8 num_eventid_bits;
+> > +	u64 entry = *(u64 *)ptr;
+> > +	bool valid;
+> > +	u32 offset;
+> > +	int ret;
+> > +
+> > +	entry = le64_to_cpu(entry);
+> > +
+> > +	valid = entry >> KVM_ITS_DTE_VALID_SHIFT;
+> > +	num_eventid_bits = (entry & KVM_ITS_DTE_SIZE_MASK) + 1;
+> > +	itt_addr = ((entry & KVM_ITS_DTE_ITTADDR_MASK)
+> > +			>> KVM_ITS_DTE_ITTADDR_SHIFT) << 8;
+> > +
+> > +	if (!valid)
+> > +		return 1;
+> > +
+> > +	/* dte entry is valid */
+> > +	offset = (entry & KVM_ITS_DTE_NEXT_MASK) >> KVM_ITS_DTE_NEXT_SHIFT;
+> > +
+> > +	dev = vgic_its_alloc_device(its, id, itt_addr, num_eventid_bits);
+> > +	if (IS_ERR(dev))
+> > +		return PTR_ERR(dev);
+> > +
+> > +	ret = vgic_its_restore_itt(its, dev);
+> > +	if (ret)
+> > +		return ret;
+> 
+> Shouldn't we free the device entry if the restore as failed?
+> 
 
-On 2017-04-10 13:20, Sricharan R wrote:
-> This series calls the dma ops configuration for the devices
-> at a generic place so that it works for all busses.
-> The dma_configure_ops for a device is now called during
-> the device_attach callback just before the probe of the
-> bus/driver is called. Similarly dma_deconfigure is called during
-> device/driver_detach path.
->
-> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
->         |                         |
-> pci_bus_add_device     (device_add/driver_register)
->         |                         |
-> device_attach           device_initial_probe
->         |                         |
-> __device_attach_driver    __device_attach_driver
->         |
-> driver_probe_device
->         |
-> really_probe
->         |
-> dma_configure
->
-> Similarly on the device/driver_unregister path __device_release_driver is
-> called which inturn calls dma_deconfigure.
->
-> Rebased the series against mainline 4.11-rc5. Applies and builds cleanly
-> against iommu-next and with 3-way merge applies on top of linux-next
-> as well (patch #8), because of "ACPI platform MSI support" from
-> Hanjun being merged.
->    
-> * Tested with platform and pci devices for probe deferral
->    and reprobe on arm64 based platform.
+I don't think we need to in terms of a memleak.  If the device alloc
+succeeded, the device will be on the its->device_list, which will get
+traversed and each device will get freed when the device is closed.
 
-I just noticed that in the meantime the following patch: "arm: dma-mapping:
-Reset the device's dma_ops" (https://patchwork.kernel.org/patch/9434105/ )
-has been dropped from this series.
+In terms of correctness, we'll report an error and it's up to
+userspace to figure out what to do, but I can think of two scenarios.
+First, if it closes the VM and gives up, we're fine.  Second, if it
+fixes up some data and attempts a restore again, then we'll end up with
+double entries in the device list or partially restore data, which is
+sort of bad.  So I guess it would be nicer to clean up after ourselves,
+but not strictly required.
 
-Lack of it causes serious issues with deferred probe of devices, which are
-under IOMMU on ARM architecture. Please check where it got lost and push it
-to Russell's patch tracking system ASAP to get it during v4.12-rcX cycle.
-
->
-> Previous post of this series [8].
->
-> Please note that, i have kept the tested/acked tags intact from V8
-> because V9/10/11 were for more fixes that was added, so the original
-> tags that was given for the functional testing remains the same.
->
->   [V11]
->       * No functional changes.
->
->       * Rebased on top of 4.11-rc6.
->
->       * Dropped patch#3 from V10, as a result have to make
->         a change in patch#7 to return a 'non-void' to fix a
->         build warning.
->
->       * Added Robin's and Rob's tags.
->
->   [V10]
->       * Rebased on top of 4.11-rc5.
->   
->       * Fixed coherent_dma_mask 64bit overflow issue [8]
->         for OF. The fix for OF was added as a separate
->         patch#6, since the issue is true even without probe deferral,
->         but gets reproduced with the probe deferral series.
->         Added Lorenzo's ACPI fix for coherent_dma_mask overflow
->         and the fix for dma_configure getting called more than
->         once for the same device.
->
->       * Also fixed an build issue caught by kbuild robot for
->         m68k arch. The issue was dma_(de)configure was not
->         getting defined for !CONFIG_HAS_DMA, so fixed that as well.
->
->   [V9]
->       * Rebased on top of 4.11-rc1.
->
->       * Merged Robin's fixes for legacy binding issue,
->         pci devices with no iommu-map property and deferencing
->         of_iommu_table after init.
->       
->   [V8]
->       * Picked up all the acks and tested tags from Marek and
->         Hanjun for DT and ACPI patches respectively, since
->         no functional changes was done.
->
->       * Addressed Minor comments Sinan and Bjorn.
->
->       * Added Robin's fix for fixing the deferencing NULL for
->         of_iommu_table after init in patch #2.
->
->       * Rebased it on top of linux-next
->
->   [V7]
->       * Updated the subject and commit log for patch #6 as per
->         comments from Lorenzo. No functional changes.
->
->   [V6]
->       * Fixed a bug in dma_configure function pointed out by
->         Robin.
->       * Reordered the patches as per comments from Robin and
->         Lorenzo.
->       * Added Tags.
->
->   [V5]
->       * Reworked the pci configuration code hanging outside and
->         pushed it to dma_configure as in PATCH#5,6,7.
->         Also added a couple of patches that Lorenzo provided for
->         correcting the Probe deferring mechanism in case of
->         ACPI devices from here [5].
->
->   [V4]
->       * Took the reworked patches [2] from Robin's branch and
->         rebased on top of Lorenzo's ACPI IORT ARM support series [3].
->
->       * Added the patches for moving the dma ops configuration of
->         acpi based devices to probe time as well.
->   [V3]
->       * Removed the patch to split dma_masks/dma_ops configuration
->         separately based on review comments that both masks and ops are
->         required only during the device probe time.
->
->       * Reworked the series based on Generic DT bindings series.
->
->       * Added call to iommu's remove_device in the cleanup path for arm and
->         arm64.
->
->       * Removed the notifier trick in arm64 to handle early device
->         registration.
->
->       * Added reset of dma_ops in cleanup path for arm based on comments.
->
->       * Fixed the pci_iommu_configure path and tested with PCI device as
->         well.
->   
->       * Fixed a bug to return the correct iommu_ops from patch 7 [4] in
->         last post.
->
->       * Fixed few other cosmetic comments.
->    
->   [V2]
->       * Updated the Initial post to call dma_configure/deconfigure from
->         generic code
->   
->       * Added iommu add_device callback from of_iommu_configure path
->
->   [V1]
->       * Initial post from Laurent Pinchart [1]
->
-> [1] http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013016.html
-> [2] http://www.linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/defer
-> [3] https://lkml.org/lkml/2016/11/21/141
-> [4] https://www.mail-archive.com/iommu at xxxxxxxxxxxxxxxxxxxxxxxxxx/msg13940.html
-> [5] git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git iommu/probe-deferral
-> [6] http://www.spinics.net/lists/linux-pci/msg57992.html
-> [7] https://www.spinics.net/lists/arm-kernel/msg556209.html
-> [8] http://lkml.iu.edu/hypermail/linux/kernel/1704.0/01557.html
->
-> Laurent Pinchart (2):
->    of: dma: Make of_dma_deconfigure() public
->    iommu: of: Handle IOMMU lookup failure with deferred probing or error
->
-> Lorenzo Pieralisi (2):
->    ACPI/IORT: Add function to check SMMUs drivers presence
->    ACPI/IORT: Remove linker section for IORT entries probing
->
-> Robin Murphy (3):
->    iommu/of: Refactor of_iommu_configure() for error handling
->    iommu/of: Prepare for deferred IOMMU configuration
->    iommu/arm-smmu: Clean up early-probing workarounds
->
-> Sricharan R (4):
->    of: device: Fix overflow of coherent_dma_mask
->    of/acpi: Configure dma operations at probe time for platform/amba/pci
->      bus devices
->    drivers: acpi: Handle IOMMU lookup failure with deferred probing or
->      error
->    arm64: dma-mapping: Remove the notifier trick to handle early setting
->      of dma_ops
->
->   arch/arm64/mm/dma-mapping.c       | 142 +++++---------------------------------
->   drivers/acpi/arm64/iort.c         |  48 ++++++++++++-
->   drivers/acpi/glue.c               |   5 --
->   drivers/acpi/scan.c               |  11 ++-
->   drivers/base/dd.c                 |   9 +++
->   drivers/base/dma-mapping.c        |  41 +++++++++++
->   drivers/iommu/arm-smmu-v3.c       |  46 +-----------
->   drivers/iommu/arm-smmu.c          | 110 +++++++++++++----------------
->   drivers/iommu/of_iommu.c          | 126 ++++++++++++++++++++++++---------
->   drivers/of/device.c               |  23 +++++-
->   drivers/of/platform.c             |  10 +--
->   drivers/pci/probe.c               |  28 --------
->   include/acpi/acpi_bus.h           |   2 +-
->   include/asm-generic/vmlinux.lds.h |   1 -
->   include/linux/acpi.h              |   7 +-
->   include/linux/acpi_iort.h         |   3 -
->   include/linux/dma-mapping.h       |  12 ++++
->   include/linux/of_device.h         |  10 ++-
->   18 files changed, 312 insertions(+), 322 deletions(-)
->
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Thanks,
+-Christoffer
