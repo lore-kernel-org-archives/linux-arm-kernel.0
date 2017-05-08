@@ -1,186 +1,191 @@
-From: ayaka@soulik.info (Randy Li)
-Date: Mon,  8 May 2017 23:58:33 +0800
-Subject: [PATCH v2] ARM: dts: rockchip: add eDP panel support for Firefly
-Message-ID: <20170508155833.19652-1-ayaka@soulik.info>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 8 May 2017 18:03:14 +0200
+Subject: [PATCH 3/8] KVM: arm/arm64: Refactor vgic_register_redist_iodevs
+In-Reply-To: <20170508115454.5075-4-cdall@linaro.org>
+References: <20170508115454.5075-1-cdall@linaro.org>
+ <20170508115454.5075-4-cdall@linaro.org>
+Message-ID: <b969f6d6-3a4f-b021-3bf7-5035eb7568b0@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the supporting to the eDP panel sold by
-the T-CHIP for the Firefly RK3288. I assign the VOP lite
-for the eDP panel and VOP big to HDMI, as the HDMI supports
-4K resolution. With a different VOP device, eDP panel
-and HDMI could display a different contents.
+Hi Christoffer,
 
-The InvenSense MPU6050 sensor at the botton of the panel
-is also enabled.
+On 08/05/2017 13:54, Christoffer Dall wrote:
+> Split out the function to register all the redistributor iodevs into a
+> function that handles a single redistributor at a time in preparation
+> for being able to call this per VCPU as these get created.
+> 
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> ---
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 108 ++++++++++++++++++++++++---------------
+>  virt/kvm/arm/vgic/vgic-v3.c      |   2 +-
+>  virt/kvm/arm/vgic/vgic.h         |   2 +-
+>  3 files changed, 68 insertions(+), 44 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 6afb3b4..1828ac7 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -556,61 +556,85 @@ unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
+>  	return SZ_64K;
+>  }
+>  
+> -int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+> +/**
+> + * vgic_register_redist_iodev - register a single redist iodev
+> + * @vcpu:    The VCPU to which the redistributor belongs
+> + *
+> + * Register a KVM iodev for this VCPU's redistributor using the address
+> + * provided.
+> + *
+> + * Return 0 on success, -ERRNO otherwise.
+> + */
+> +static int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm *kvm = vcpu->kvm;
+> +	struct vgic_dist *vgic = &kvm->arch.vgic;
+> +	struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
+> +	struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
+> +	gpa_t rd_base, sgi_base;
+> +	int ret;
+> +
+> +	rd_base = vgic->vgic_redist_base + vcpu->vcpu_id * SZ_64K * 2;
+Previously we had
+gpa_t rd_base = redist_base_address + c * SZ_64K * 2; where c is the
+index in the vcpu array. Now we use the vpcu_id instead of c. Aren't
+they potentially different?
 
-The Firefly RK3288 Reload use a different GPIO pin to enable
-the power of the eDP panel.
+Thanks
 
-Signed-off-by: Randy Li <ayaka@soulik.info>
----
- arch/arm/boot/dts/rk3288-firefly.dtsi | 112 ++++++++++++++++++++++++++++++++++
- 1 file changed, 112 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index 436878b..db22316 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -62,6 +62,62 @@
- 		};
- 	};
- 
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		brightness-levels = <
-+			  3   4   5   6   7
-+			  8   9  10  11  12  13  14  15
-+			 16  17  18  19  20  21  22  23
-+			 24  25  26  27  28  29  30  31
-+			 32  33  34  35  36  37  38  39
-+			 40  41  42  43  44  45  46  47
-+			 48  49  50  51  52  53  54  55
-+			 56  57  58  59  60  61  62  63
-+			 64  65  66  67  68  69  70  71
-+			 72  73  74  75  76  77  78  79
-+			 80  81  82  83  84  85  86  87
-+			 88  89  90  91  92  93  94  95
-+			 96  97  98  99 100 101 102 103
-+			104 105 106 107 108 109 110 111
-+			112 113 114 115 116 117 118 119
-+			120 121 122 123 124 125 126 127
-+			128 129 130 131 132 133 134 135
-+			136 137 138 139 140 141 142 143
-+			144 145 146 147 148 149 150 151
-+			152 153 154 155 156 157 158 159
-+			160 161 162 163 164 165 166 167
-+			168 169 170 171 172 173 174 175
-+			176 177 178 179 180 181 182 183
-+			184 185 186 187 188 189 190 191
-+			192 193 194 195 196 197 198 199
-+			200 201 202 203 204 205 206 207
-+			208 209 210 211 212 213 214 215
-+			216 217 218 219 220 221 222 223
-+			224 225 226 227 228 229 230 231
-+			232 233 234 235 236 237 238 239
-+			240 241 242 243 244 245 246 247
-+			248 249 250 251 252 253 254 255>;
-+		default-brightness-level = <180>;
-+		pwms = <&pwm1 0 25000 0>;
-+		pwm-names = "backlight";
-+		power-supply = <&vcc_sys>;
-+	};
-+
-+	panel: panel {
-+		compatible ="lg,lp079qx1-sp0v";
-+		power-supply = <&vcc_sys>;
-+		backlight = <&backlight>;
-+		enable-gpios = <&gpio0 RK_PB5 GPIO_ACTIVE_HIGH>;
-+
-+		ports {
-+			panel_in: port {
-+				panel_in_edp: endpoint {
-+					remote-endpoint = <&edp_out_panel>;
-+				};
-+			};
-+		};
-+	};
-+
- 	dovdd_1v8: dovdd-1v8-regulator {
- 		compatible = "regulator-fixed";
- 		regulator-name = "dovdd_1v8";
-@@ -203,6 +259,32 @@
- 	cpu0-supply = <&vdd_cpu>;
- };
- 
-+&edp {
-+	vcc-supply = <&vdd_10>;
-+	vccio-supply = <&vcc_18>;
-+	status = "okay";
-+
-+	ports {
-+		edp_out: port at 1 {
-+			reg = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			edp_out_panel: endpoint {
-+				reg = <0>;
-+				remote-endpoint = <&panel_in_edp>;
-+			};
-+		};
-+	};
-+};
-+
-+&edp_in {
-+	/delete-node/ endpoint at 0;
-+};
-+
-+&edp_phy {
-+	status = "okay";
-+};
-+
- &emmc {
- 	bus-width = <8>;
- 	cap-mmc-highspeed;
-@@ -240,8 +322,14 @@
- &hdmi {
- 	ddc-i2c-bus = <&i2c5>;
- 	status = "okay";
-+
-+};
-+
-+&hdmi_in {
-+	/delete-node/ endpoint at 1;
- };
- 
-+
- &i2c0 {
- 	clock-frequency = <400000>;
- 	status = "okay";
-@@ -385,6 +473,22 @@
- 
- &i2c1 {
- 	status = "okay";
-+
-+	mpu6050 at 68 {
-+		compatible = "invensense,mpu6050";
-+		reg = <0x68>;
-+		interrupt-parent = <&gpio5>;
-+		interrupts = <RK_PB4 IRQ_TYPE_LEVEL_LOW>;
-+		mount-matrix = "0",
-+			       "1",
-+			       "0",
-+			       "-1",
-+			       "0",
-+			       "0",
-+			       "0",
-+			       "0",
-+			       "-1";
-+	};
- };
- 
- &i2c2 {
-@@ -601,6 +705,10 @@
- 	status = "okay";
- };
- 
-+&vopb_out {
-+	/delete-node/ endpoint at 1;
-+};
-+
- &vopl {
- 	status = "okay";
- };
-@@ -609,6 +717,10 @@
- 	status = "okay";
- };
- 
-+&vopl_out {
-+	/delete-node/ endpoint at 0;
-+};
-+
- &wdt {
- 	status = "okay";
- };
--- 
-2.9.3
+Eric
+> +	sgi_base = rd_base + SZ_64K;
+> +
+> +	kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
+> +	rd_dev->base_addr = rd_base;
+> +	rd_dev->iodev_type = IODEV_REDIST;
+> +	rd_dev->regions = vgic_v3_rdbase_registers;
+> +	rd_dev->nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
+> +	rd_dev->redist_vcpu = vcpu;
+> +
+> +	mutex_lock(&kvm->slots_lock);
+> +	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, rd_base,
+> +				      SZ_64K, &rd_dev->dev);
+> +	mutex_unlock(&kvm->slots_lock);
+> +
+> +	if (ret)
+> +		return ret;
+> +
+> +	kvm_iodevice_init(&sgi_dev->dev, &kvm_io_gic_ops);
+> +	sgi_dev->base_addr = sgi_base;
+> +	sgi_dev->iodev_type = IODEV_REDIST;
+> +	sgi_dev->regions = vgic_v3_sgibase_registers;
+> +	sgi_dev->nr_regions = ARRAY_SIZE(vgic_v3_sgibase_registers);
+> +	sgi_dev->redist_vcpu = vcpu;
+> +
+> +	mutex_lock(&kvm->slots_lock);
+> +	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, sgi_base,
+> +				      SZ_64K, &sgi_dev->dev);
+> +	mutex_unlock(&kvm->slots_lock);
+> +	if (ret)
+> +		kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> +					  &rd_dev->dev);
+> +
+> +	return ret;
+> +}
+> +
+> +static void vgic_unregister_redist_iodev(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
+> +	struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
+> +
+> +	kvm_io_bus_unregister_dev(vcpu->kvm, KVM_MMIO_BUS, &rd_dev->dev);
+> +	kvm_io_bus_unregister_dev(vcpu->kvm, KVM_MMIO_BUS, &sgi_dev->dev);
+> +}
+> +
+> +int vgic_register_redist_iodevs(struct kvm *kvm)
+>  {
+>  	struct kvm_vcpu *vcpu;
+>  	int c, ret = 0;
+>  
+>  	kvm_for_each_vcpu(c, vcpu, kvm) {
+> -		gpa_t rd_base = redist_base_address + c * SZ_64K * 2;
+> -		gpa_t sgi_base = rd_base + SZ_64K;
+> -		struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
+> -		struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
+> -
+> -		kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
+> -		rd_dev->base_addr = rd_base;
+> -		rd_dev->iodev_type = IODEV_REDIST;
+> -		rd_dev->regions = vgic_v3_rdbase_registers;
+> -		rd_dev->nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
+> -		rd_dev->redist_vcpu = vcpu;
+> -
+> -		mutex_lock(&kvm->slots_lock);
+> -		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, rd_base,
+> -					      SZ_64K, &rd_dev->dev);
+> -		mutex_unlock(&kvm->slots_lock);
+> -
+> +		ret = vgic_register_redist_iodev(vcpu);
+>  		if (ret)
+>  			break;
+> -
+> -		kvm_iodevice_init(&sgi_dev->dev, &kvm_io_gic_ops);
+> -		sgi_dev->base_addr = sgi_base;
+> -		sgi_dev->iodev_type = IODEV_REDIST;
+> -		sgi_dev->regions = vgic_v3_sgibase_registers;
+> -		sgi_dev->nr_regions = ARRAY_SIZE(vgic_v3_sgibase_registers);
+> -		sgi_dev->redist_vcpu = vcpu;
+> -
+> -		mutex_lock(&kvm->slots_lock);
+> -		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, sgi_base,
+> -					      SZ_64K, &sgi_dev->dev);
+> -		mutex_unlock(&kvm->slots_lock);
+> -		if (ret) {
+> -			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> -						  &rd_dev->dev);
+> -			break;
+> -		}
+>  	}
+>  
+>  	if (ret) {
+>  		/* The current c failed, so we start with the previous one. */
+>  		for (c--; c >= 0; c--) {
+> -			struct vgic_cpu *vgic_cpu;
+> -
+>  			vcpu = kvm_get_vcpu(kvm, c);
+> -			vgic_cpu = &vcpu->arch.vgic_cpu;
+> -			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> -						  &vgic_cpu->rd_iodev.dev);
+> -			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> -						  &vgic_cpu->sgi_iodev.dev);
+> +			vgic_unregister_redist_iodev(vcpu);
+>  		}
+>  	}
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index 54dee72..12e52a0 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -386,7 +386,7 @@ int vgic_v3_map_resources(struct kvm *kvm)
+>  		goto out;
+>  	}
+>  
+> -	ret = vgic_register_redist_iodevs(kvm, dist->vgic_redist_base);
+> +	ret = vgic_register_redist_iodevs(kvm);
+>  	if (ret) {
+>  		kvm_err("Unable to register VGICv3 redist MMIO regions\n");
+>  		goto out;
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 8259f0a..a2aeaa8 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -174,7 +174,7 @@ int vgic_v3_probe(const struct gic_kvm_info *info);
+>  int vgic_v3_map_resources(struct kvm *kvm);
+>  int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq);
+>  int vgic_v3_save_pending_tables(struct kvm *kvm);
+> -int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+> +int vgic_register_redist_iodevs(struct kvm *kvm);
+>  
+>  void vgic_v3_load(struct kvm_vcpu *vcpu);
+>  void vgic_v3_put(struct kvm_vcpu *vcpu);
+> 
