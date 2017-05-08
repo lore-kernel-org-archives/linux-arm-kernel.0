@@ -1,56 +1,95 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 May 2017 11:18:34 -0500
-Subject: [PATCH v5 1/5] dt-bindings: gpu: add bindings for the ARM Mali
- Midgard GPU
-In-Reply-To: <bebe578ba130de5fa320ca7c6427b2fae83d61d7.1493804968.git.guillaume.tucker@collabora.com>
-References: <cover.1493804968.git.guillaume.tucker@collabora.com>
- <bebe578ba130de5fa320ca7c6427b2fae83d61d7.1493804968.git.guillaume.tucker@collabora.com>
-Message-ID: <20170508161834.hwsjvtjf7voplkum@rob-hp-laptop>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 8 May 2017 18:19:05 +0200
+Subject: [PATCH 5/8] KVM: arm/arm64: Slightly rework kvm_vgic_addr
+In-Reply-To: <20170508115454.5075-6-cdall@linaro.org>
+References: <20170508115454.5075-1-cdall@linaro.org>
+ <20170508115454.5075-6-cdall@linaro.org>
+Message-ID: <1b0d1242-a4af-dc2e-5e87-dca0ddc2300e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 10:56:25AM +0100, Guillaume Tucker wrote:
-> The ARM Mali Midgard GPU family is present in a number of SoCs
-> from many different vendors such as Samsung Exynos and Rockchip.
-> 
-> Import the device tree bindings documentation from the r16p0
-> release of the Mali Midgard GPU kernel driver:
-> 
->   https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/mali-midgard-gpu/TX011-SW-99002-r16p0-00rel0.tgz
-> 
-> Remove the copyright and GPL licence header as deemed not necessary.
-> 
-> Redesign the "compatible" property strings to list all the Mali
-> Midgard GPU types and add vendor specific ones.
-> 
-> Drop the "clock-names" property as the Mali Midgard GPU uses only one
-> clock (the driver now needs to call clk_get with NULL).
-> 
-> Convert the "interrupt-names" property values to lower-case: "job",
-> "mmu" and "gpu".
-> 
-> Replace the deprecated "operating-points" optional property with
-> "operating-points-v2".
-> 
-> Omit the following optional properties in this initial version as they
-> are only used in very specific cases:
-> 
->   * snoop_enable_smc
->   * snoop_disable_smc
->   * jm_config
->   * power_model
->   * system-coherency
->   * ipa-model
-> 
-> Update the example accordingly to reflect all these changes, based on
-> rk3288 mali-t760.
-> 
-> CC: John Reitan <john.reitan@arm.com>
-> Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
-> ---
->  .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 86 ++++++++++++++++++++++
->  1 file changed, 86 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+Hi Christoffer,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+On 08/05/2017 13:54, Christoffer Dall wrote:
+> As we are about to handle setting the address for the redistributor base
+> region separately from some of the other base addresses, let's rework
+> this function to leave a little more room for being flexible in what
+> each type of base address does.
+> 
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+
+Thanks
+
+Eric
+
+> ---
+>  virt/kvm/arm/vgic/vgic-kvm-device.c | 22 +++++++++++++---------
+>  1 file changed, 13 insertions(+), 9 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> index d48743c..69ccfd5 100644
+> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> @@ -37,6 +37,14 @@ int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
+>  	return 0;
+>  }
+>  
+> +static int vgic_check_type(struct kvm *kvm, int type_needed)
+> +{
+> +	if (kvm->arch.vgic.vgic_model != type_needed)
+> +		return -ENODEV;
+> +	else
+> +		return 0;
+> +}
+> +
+>  /**
+>   * kvm_vgic_addr - set or get vgic VM base addresses
+>   * @kvm:   pointer to the vm struct
+> @@ -57,40 +65,36 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+>  {
+>  	int r = 0;
+>  	struct vgic_dist *vgic = &kvm->arch.vgic;
+> -	int type_needed;
+>  	phys_addr_t *addr_ptr, alignment;
+>  
+>  	mutex_lock(&kvm->lock);
+>  	switch (type) {
+>  	case KVM_VGIC_V2_ADDR_TYPE_DIST:
+> -		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
+> +		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
+>  		addr_ptr = &vgic->vgic_dist_base;
+>  		alignment = SZ_4K;
+>  		break;
+>  	case KVM_VGIC_V2_ADDR_TYPE_CPU:
+> -		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
+> +		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
+>  		addr_ptr = &vgic->vgic_cpu_base;
+>  		alignment = SZ_4K;
+>  		break;
+>  	case KVM_VGIC_V3_ADDR_TYPE_DIST:
+> -		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+> +		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V3);
+>  		addr_ptr = &vgic->vgic_dist_base;
+>  		alignment = SZ_64K;
+>  		break;
+>  	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
+> -		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+> +		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V3);
+>  		addr_ptr = &vgic->vgic_redist_base;
+>  		alignment = SZ_64K;
+>  		break;
+>  	default:
+>  		r = -ENODEV;
+> -		goto out;
+>  	}
+>  
+> -	if (vgic->vgic_model != type_needed) {
+> -		r = -ENODEV;
+> +	if (r)
+>  		goto out;
+> -	}
+>  
+>  	if (write) {
+>  		r = vgic_check_ioaddr(kvm, addr_ptr, *addr, alignment);
+> 
