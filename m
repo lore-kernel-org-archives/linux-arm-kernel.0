@@ -1,201 +1,121 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 8 May 2017 13:30:42 +0200
-Subject: [PATCH v7 21/24] KVM: arm64: vgic-its: Device table save/restore
-In-Reply-To: <87zieoiyjy.fsf@on-the-bus.cambridge.arm.com>
-References: <1494084283-12723-1-git-send-email-eric.auger@redhat.com>
- <1494084283-12723-22-git-send-email-eric.auger@redhat.com>
- <87zieoiyjy.fsf@on-the-bus.cambridge.arm.com>
-Message-ID: <20170508113042.GB28342@cbox>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Mon, 8 May 2017 19:34:59 +0800
+Subject: [RFC PATCH 1/3] clk: add clk_bulk_get accessories
+In-Reply-To: <20170422031647.GW7065@codeaurora.org>
+References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
+ <1491969809-20154-2-git-send-email-aisheng.dong@nxp.com>
+ <20170422031647.GW7065@codeaurora.org>
+Message-ID: <20170508113459.GB18153@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 07, 2017 at 02:30:57PM +0100, Marc Zyngier wrote:
-> On Sat, May 06 2017 at  4:24:40 pm BST, Eric Auger <eric.auger@redhat.com> wrote:
-> > This patch saves the device table entries into guest RAM.
-> > Both flat table and 2 stage tables are supported. DeviceId
-> > indexing is used.
-> >
-> > For each device listed in the device table, we also save
-> > the translation table using the vgic_its_save/restore_itt
-> > routines. Those functions will be implemented in a subsequent
-> > patch.
-> >
-> > On restore, devices are re-allocated and their itt are
-> > re-built.
-> >
-> > Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> >
-> > ---
-> > v5 -> v6:
-> > - accomodate vgic_its_alloc_device change of proto
-> > - define bit fields for L1 entries
-> > - s/handle_l1_entry/handle_l1_dte
-> > - s/ite_esz/dte_esz in handle_l1_dte
-> > - check BASER valid bit
-> > - s/nb_eventid_bits/num_eventid_bits
-> > - new convention for returned values
-> > - itt functions implemented in subsequent patch
-> >
-> > v4 -> v5:
-> > - sort the device list by deviceid on device table save
-> > - use defines for shifts and masks
-> > - use abi->dte_esz
-> > - clatify entry sizes for L1 and L2 tables
-> >
-> > v3 -> v4:
-> > - use the new proto for its_alloc_device
-> > - compute_next_devid_offset, vgic_its_flush/restore_itt
-> >   become static in this patch
-> > - change in the DTE entry format with the introduction of the
-> >   valid bit and next field width decrease; ittaddr encoded
-> >   on its full range
-> > - fix handle_l1_entry entry handling
-> > - correct vgic_its_table_restore error handling
-> >
-> > v2 -> v3:
-> > - fix itt_addr bitmask in vgic_its_restore_dte
-> > - addition of return 0 in vgic_its_restore_ite moved to
-> >   the ITE related patch
-> >
-> > v1 -> v2:
-> > - use 8 byte format for DTE and ITE
-> > - support 2 stage format
-> > - remove kvm parameter
-> > - ITT flush/restore moved in a separate patch
-> > - use deviceid indexing
-> > ---
-> >  virt/kvm/arm/vgic/vgic-its.c | 194 +++++++++++++++++++++++++++++++++++++++++--
-> >  virt/kvm/arm/vgic/vgic.h     |  10 +++
-> >  2 files changed, 199 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> > index 90afc83..3dea626 100644
-> > --- a/virt/kvm/arm/vgic/vgic-its.c
-> > +++ b/virt/kvm/arm/vgic/vgic-its.c
-> > @@ -23,6 +23,7 @@
-> >  #include <linux/interrupt.h>
-> >  #include <linux/list.h>
-> >  #include <linux/uaccess.h>
-> > +#include <linux/list_sort.h>
+On Fri, Apr 21, 2017 at 08:16:47PM -0700, Stephen Boyd wrote:
+> On 04/12, Dong Aisheng wrote:
 > >  
-> >  #include <linux/irqchip/arm-gic-v3.h>
+> >  #ifdef CONFIG_HAVE_CLK
+> > @@ -230,6 +257,32 @@ static inline void clk_unprepare(struct clk *clk)
+> >  struct clk *clk_get(struct device *dev, const char *id);
 > >  
-> > @@ -1735,7 +1736,8 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
-> >  	return ret;
-> >  }
-> >  
-> > -u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
-> > +static u32 compute_next_devid_offset(struct list_head *h,
-> > +				     struct its_device *dev)
-> >  {
-> >  	struct its_device *next;
-> >  	u32 next_offset;
-> > @@ -1789,8 +1791,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
-> >   * Return: < 0 on error, 0 if last element was identified, 1 otherwise
-> >   * (the last element may not be found on second level tables)
-> >   */
-> > -int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
-> > -		   int start_id, entry_fn_t fn, void *opaque)
-> > +static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
-> > +			  int start_id, entry_fn_t fn, void *opaque)
-> >  {
-> >  	void *entry = kzalloc(esz, GFP_KERNEL);
-> >  	struct kvm *kvm = its->dev->kvm;
-> > @@ -1825,13 +1827,171 @@ int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
-> >  	return ret;
-> >  }
-> >  
-> > +static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
-> > +{
-> > +	return -ENXIO;
-> > +}
-> > +
-> > +static int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
-> > +{
-> > +	return -ENXIO;
-> > +}
-> > +
-> > +/**
-> > + * vgic_its_save_dte - Save a device table entry at a given GPA
+> >  /**
+> > + * clk_bulk_get - lookup and obtain a number of references to clock producer.
+> > + * @dev: device for clock "consumer"
+> > + * @num_clks: the number of clk_bulk_data
+> > + * @clks: the clk_bulk_data table of consumer
 > > + *
-> > + * @its: ITS handle
-> > + * @dev: ITS device
-> > + * @ptr: GPA
-> > + */
-> > +static int vgic_its_save_dte(struct vgic_its *its, struct its_device *dev,
-> > +			     gpa_t ptr, int dte_esz)
-> > +{
-> > +	struct kvm *kvm = its->dev->kvm;
-> > +	u64 val, itt_addr_field;
-> > +	u32 next_offset;
-> > +
-> > +	itt_addr_field = dev->itt_addr >> 8;
-> > +	next_offset = compute_next_devid_offset(&its->device_list, dev);
-> > +	val = (1ULL << KVM_ITS_DTE_VALID_SHIFT |
-> > +	       ((u64)next_offset << KVM_ITS_DTE_NEXT_SHIFT) |
-> > +	       (itt_addr_field << KVM_ITS_DTE_ITTADDR_SHIFT) |
-> > +		(dev->num_eventid_bits - 1));
-> > +	val = cpu_to_le64(val);
-> > +	return kvm_write_guest(kvm, ptr, &val, dte_esz);
-> > +}
-> > +
-> > +/**
-> > + * vgic_its_restore_dte - restore a device table entry
+> > + * This helper function allows drivers to get several clk consumers in one
+> > + * operation. If any of the clk cannot be acquired then any clks
+> > + * that were obtained will be freed before returning to the caller.
 > > + *
-> > + * @its: its handle
-> > + * @id: device id the DTE corresponds to
-> > + * @ptr: kernel VA where the 8 byte DTE is located
-> > + * @opaque: unused
-> > + *
-> > + * Return: < 0 on error, 0 if the dte is the last one, id offset to the
-> > + * next dte otherwise
-> > + */
-> > +static int vgic_its_restore_dte(struct vgic_its *its, u32 id,
-> > +				void *ptr, void *opaque)
-> > +{
-> > +	struct its_device *dev;
-> > +	gpa_t itt_addr;
-> > +	u8 num_eventid_bits;
-> > +	u64 entry = *(u64 *)ptr;
-> > +	bool valid;
-> > +	u32 offset;
-> > +	int ret;
-> > +
-> > +	entry = le64_to_cpu(entry);
-> > +
-> > +	valid = entry >> KVM_ITS_DTE_VALID_SHIFT;
-> > +	num_eventid_bits = (entry & KVM_ITS_DTE_SIZE_MASK) + 1;
-> > +	itt_addr = ((entry & KVM_ITS_DTE_ITTADDR_MASK)
-> > +			>> KVM_ITS_DTE_ITTADDR_SHIFT) << 8;
-> > +
-> > +	if (!valid)
-> > +		return 1;
-> > +
-> > +	/* dte entry is valid */
-> > +	offset = (entry & KVM_ITS_DTE_NEXT_MASK) >> KVM_ITS_DTE_NEXT_SHIFT;
-> > +
-> > +	dev = vgic_its_alloc_device(its, id, itt_addr, num_eventid_bits);
-> > +	if (IS_ERR(dev))
-> > +		return PTR_ERR(dev);
-> > +
-> > +	ret = vgic_its_restore_itt(its, dev);
-> > +	if (ret)
-> > +		return ret;
+> > + * Returns 0 if all clocks specified in clk_bulk_data table are obtained
+> > + * successfully, or valid IS_ERR() condition containing errno.
+> > + * The implementation uses @dev and @clk_bulk_data.id to determine the
+> > + * clock consumer, and thereby the clock producer.
+> > + * (IOW, @id may be identical strings, but clk_get may return different
+> > + * clock producers depending on @dev.) The clock returned is stored in
 > 
-> Shouldn't we free the device entry if the restore as failed?
+> This comment is inaccurate. Only one dev is possible with this
+> API.
 > 
 
-I don't think we need to in terms of a memleak.  If the device alloc
-succeeded, the device will be on the its->device_list, which will get
-traversed and each device will get freed when the device is closed.
+Good catch! Will fix it.
 
-In terms of correctness, we'll report an error and it's up to
-userspace to figure out what to do, but I can think of two scenarios.
-First, if it closes the VM and gives up, we're fine.  Second, if it
-fixes up some data and attempts a restore again, then we'll end up with
-double entries in the device list or partially restore data, which is
-sort of bad.  So I guess it would be nicer to clean up after ourselves,
-but not strictly required.
+> > + * each @clk_bulk_data.clk field.
+> > + *
+> > + * Drivers must assume that the clock source is not enabled.
+> > + *
+> > + * clk_bulk_get should not be called from within interrupt context.
+> > + */
+> > +
+> 
+> Drop space.
+> 
 
-Thanks,
--Christoffer
+Got it
+
+> > +int __must_check clk_bulk_get(struct device *dev, int num_clks,
+> > +			      struct clk_bulk_data *clks);
+> > +
+> > +/**
+> >   * devm_clk_get - lookup and obtain a managed reference to a clock producer.
+> >   * @dev: device for clock "consumer"
+> >   * @id: clock consumer ID
+> > @@ -279,6 +332,20 @@ struct clk *devm_get_clk_from_child(struct device *dev,
+> >  int clk_enable(struct clk *clk);
+> >  
+> >  /**
+> > + * clk_bulk_enable - inform the system when the bulk of clock source should
+> > + *		     be running.
+> > + * @num_clks: the number of clk_bulk_data
+> > + * @clks: the clk_bulk_data table of consumer
+> > + *
+> > + * If the clock can not be enabled/disabled all, this should return success.
+> > + *
+> > + * May be called from atomic contexts.
+> > + *
+> > + * Returns success (0) or negative errno.
+> > + */
+> > +int __must_check clk_bulk_enable(int num_clks, struct clk_bulk_data *clks);
+> > +
+> > +/**
+> >   * clk_disable - inform the system when the clock source is no longer required.
+> >   * @clk: clock source
+> >   *
+> > @@ -295,6 +362,24 @@ int clk_enable(struct clk *clk);
+> >  void clk_disable(struct clk *clk);
+> >  
+> >  /**
+> > + * clk_bulk_disable - inform the system when the bulk of clock source is no
+> > + *		      longer required.
+> > + * @num_clks: the number of clk_bulk_data
+> > + * @clks: the clk_bulk_data table of consumer
+> > + *
+> > + * Inform the system that a bulk of clock source is no longer required by
+> > + * a driver and may be shut down.
+> > + *
+> > + * May be called from atomic contexts.
+> > + *
+> > + * Implementation detail: if the bulk of clock source is shared between
+> 
+> I'm not sure "bulk of clock source" is the correct terminology.
+> Perhaps "set of clks"?
+> 
+
+Good to me, will change.
+
+> > + * multiple drivers, clk_bulk_enable() calls must be balanced by the
+> > + * same number of clk_bulk_disable() calls for the clock source to be
+> > + * disabled.
+> > + */
+> > +void clk_bulk_disable(int num_clks, struct clk_bulk_data *clks);
+> 
+> We can mark clk_bulk_data structure as const here? Probably
+> applies in other places as well in this patch.
+> 
+
+Sounds good, will change the following API,
+clk_bulk_{enable|disable}
+clk_bulk_{prepare|unprepare}
+except clk_bulk_{get|put} which needs update clk_bulk_date.
+
+Regards
+Dong Aisheng
