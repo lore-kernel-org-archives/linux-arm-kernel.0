@@ -1,144 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 8 May 2017 11:33:42 -0500
-Subject: [PATCH v2 2/2] dt-bindings: pcie: Add documentation for Mediatek
- PCIe
-In-Reply-To: <1493890376-6713-3-git-send-email-ryder.lee@mediatek.com>
-References: <1493890376-6713-1-git-send-email-ryder.lee@mediatek.com>
- <1493890376-6713-3-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <20170508163342.deosevmxu7g2sv6d@rob-hp-laptop>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 08 May 2017 18:34:08 +0200
+Subject: Regression: 442ec4c04d1: PCI: dwc: all: Split struct pcie_port
+ into host-only and core structures
+In-Reply-To: <20170508150224.GA7458@collabora.com>
+References: <20170508150224.GA7458@collabora.com>
+Message-ID: <1494261248.2322.21.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 04, 2017 at 05:32:56PM +0800, Ryder Lee wrote:
-> Add documentation for PCIe host driver available in MT7623
-> series SoCs.
+Am Montag, den 08.05.2017, 17:02 +0200 schrieb Peter Senna Tschudin:
+> Hello Kishon,
 > 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  .../bindings/pci/mediatek,mt7623-pcie.txt          | 149 +++++++++++++++++++++
->  1 file changed, 149 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+> Our iMX6 hardware (imx6q-b850v3.dts) is not booting with latest
+> linux-next and I could bisect until:
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
-> new file mode 100644
-> index 0000000..9c5d5a7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
-> @@ -0,0 +1,149 @@
-> +Mediatek Gen2 PCIe controller which is available on MT7623 series SoCs
-> +
-> +PCIe subsys supports single root complex (RC) with 3 Root Ports. Each root
-> +ports supports a Gen2 1-lane Link and has PIPE interface to PHY.
-> +
-> +Required properties:
-> +- compatible: Should contain "mediatek,mt7623-pcie".
-> +- device_type: Must be "pci"
-> +- reg: Base addresses and lengths of the PCIe controller.
-> +- #address-cells: Address representation for root ports (must be 3)
-> +- #size-cells: Size representation for root ports (must be 2)
-> +- #interrupt-cells: Size representation for interrupts (must be 1)
-> +- interrupts: Three interrupt outputs of the controller. Must contain an
-> +  entry for each entry in the interrupt-names property.
-> +- interrupt-names: Must include the following names
-> +  - "pcie-int0"
-> +  - "pcie-int1"
-> +  - "pcie-int2"
-> +- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
-> +  Please refer to the standard PCI bus binding document for a more detailed
-> +  explanation.
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +  See ../clocks/clock-bindings.txt for details.
-> +- clock-names: Must include the following entries:
-> +  - free_ck :for reference clock of PCIe subsys
-> +  - sys_ck0 :for clock of Port0
-> +  - sys_ck1 :for clock of Port1
-> +  - sys_ck2 :for clock of Port2
-> +- resets: Must contain an entry for each entry in reset-names.
-> +  See ../reset/reset.txt for details.
-> +- reset-names: Must include the following entries:
-> +  - pcie-rst0 :port0 reset
-> +  - pcie-rst1 :port1 reset
-> +  - pcie-rst2 :port2 reset
-> +- phys: list of PHY specifiers (used by generic PHY framework).
-> +- phy-names : must be "pcie-phy0", "pcie-phy1", "pcie-phyN".. based on the
-> +  number of PHYs as specified in *phys* property.
-> +- power-domains: A phandle and power domain specifier pair to the power domain
-> +  which is responsible for collapsing and restoring power to the peripheral.
-> +- bus-range: Range of bus numbers associated with this controller.
-> +- ranges:
-> +  - The first three entries are expected to translate the addresses for the root
-> +    port registers, which are referenced by the assigned-addresses property of
-> +    the root port nodes (see below).
-> +  - The remaining entries setup the mapping for the standard I/O and memory
-> +	regions.
-> +  Please refer to the standard PCI bus binding document for a more detailed
-> +  explanation.
-> +
-> +In addition, the device tree node must have sub-nodes describing each
-> +PCIe port interface, having the following mandatory properties:
-> +
-> +Required properties:
-> +- device_type: Must be "pci"
-> +- assigned-addresses: Address and size of the port configuration registers
-> +- reg: Only the first four bytes are used to refer to the correct bus number
-> +  and device number.
-> +- #address-cells: Must be 3
-> +- #size-cells: Must be 2
-> +- #interrupt-cells: Must be 1
-> +- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
-> +  Please refer to the standard PCI bus binding document for a more detailed
-> +  explanation.
-> +- ranges: Sub-ranges distributed from the PCIe controller node. An empty
-> +  property is sufficient.
-> +- num-lanes: Number of lanes to use for this port.
-> +
-> +Examples:
-> +
-> +	hifsys: syscon at 1a000000 {
-> +		compatible = "mediatek,mt7623-hifsys", "syscon";
-> +		reg = <0 0x1a000000 0 0x1000>;
-> +		#clock-cells = <1>;
-> +		#reset-cells = <1>;
-> +	};
-> +
-> +	pcie: pcie-controller at 1a140000 {
-> +		compatible = "mediatek,mt7623-pcie";
-> +		device_type = "pci";
-> +		reg = <0 0x1a140000 0 0x1000>; /* PCIe shared registers */
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		#interrupt-cells = <1>;
-> +		interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 195 IRQ_TYPE_LEVEL_LOW>;
-> +		interrupt-names = "pcie-int0", "pcie-int1", "pcie-int2";
-> +		interrupt-map-mask = <0xf800 0 0 0>;
-> +		interrupt-map = <0x0000 0 0 0 &gic GIC_SPI 193 IRQ_TYPE_NONE>,
-> +				 <0x0800 0 0 0 &gic GIC_SPI 194 IRQ_TYPE_NONE>,
-> +			     <0x1000 0 0 0 &gic GIC_SPI 195 IRQ_TYPE_NONE>;
-> +		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
-> +			     <&hifsys CLK_HIFSYS_PCIE0>,
-> +				 <&hifsys CLK_HIFSYS_PCIE1>,
-> +				 <&hifsys CLK_HIFSYS_PCIE2>;
-> +		clock-names = "free_ck", "sys_ck0", "sys_ck1", "sys_ck2";
-> +		resets = <&hifsys MT2701_HIFSYS_PCIE0_RST>,
-> +			     <&hifsys MT2701_HIFSYS_PCIE1_RST>,
-> +			     <&hifsys MT2701_HIFSYS_PCIE2_RST>;
-> +		reset-names = "pcie-rst0", "pcie-rst1", "pcie-rst2";
-> +		phys = <&pcie0_phy>, <&pcie1_phy>, <&pcie2_phy>;
-> +		phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2";
-> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
-> +		bus-range = <0x00 0xff>;
-> +		ranges = <0x82000000 0 0x1a142000 0 0x1a142000 0 0x1000 /* Port0 registers */
-> +			  0x82000000 0 0x1a143000 0 0x1a143000 0 0x1000 /* Port1 registers */
-> +			  0x82000000 0 0x1a144000 0 0x1a144000 0 0x1000 /* Port2 registers */
-> +			  0x81000000 0 0x1a160000 0 0x1a160000 0 0x00010000 /* I/O space */
-> +			  0x83000000 0 0x60000000 0 0x60000000 0 0x10000000>;	/* memory space */
-> +
-> +		pcie at 1,0 {
+> commit 442ec4c04d1235f8c664a74004dae54a7a574d18
+> Author: Kishon Vijay Abraham I <kishon@ti.com>
+> Date:   Wed Feb 15 18:48:14 2017 +0530
+> 
+>     PCI: dwc: all: Split struct pcie_port into host-only and core structures
+> 
+> Which seem to be causing our issues. Our device (imx6q-b850v3.dts) boots
+> fine with 4.10, and also boots if we disable pcie with:
 
-Your unit addresses appear to be off by 1. This one should be 0,0.
+Are you sure about this bisect? It seems more likely that the secondary
+bus scanning goes wrong. It seems Lorenzo Pieralisi's cfg space
+non-posting patches landed in next, so the root cause of this might just
+be the driver hooking the wrong fault code now.
 
-With those fixed,
+Async and synchronous aborts are different fault codes on ARM. Can you
+see of removing the "16 +" in hook_fault_code() in
+drivers/pci/dwc/pci-imx6.c fixes this issue?
 
-Acked-by: Rob Herring <robh@kernel.org>
+Regards,
+Lucas
