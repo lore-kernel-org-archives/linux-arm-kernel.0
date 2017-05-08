@@ -1,149 +1,176 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Mon, 8 May 2017 11:29:52 +0200
-Subject: [PATCH v3 1/7] iommu/arm-smmu-v3: Introduce SMMU option
- PAGE0_REGS_ONLY for ThunderX2 errata #74
-In-Reply-To: <20170508091739.GA26003@virtx40>
-References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
- <1493986091-30521-2-git-send-email-gakula@caviumnetworks.com>
- <20170505230328.GN4906@rric.localdomain>
- <20170508091739.GA26003@virtx40>
-Message-ID: <20170508092952.GF16981@rric.localdomain>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 08 May 2017 11:36:47 +0200
+Subject: [PATCH] [media] imx: csi: retain current field order and
+ colorimetry setting as default
+In-Reply-To: <0632df59-10e7-1e03-c0f6-eb7c90b83c0d@xs4all.nl>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-22-git-send-email-steve_longerbeam@mentor.com>
+ <1491486929.2392.29.camel@pengutronix.de>
+ <0632df59-10e7-1e03-c0f6-eb7c90b83c0d@xs4all.nl>
+Message-ID: <1494236207.3029.66.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.05.17 14:47:39, Linu Cherian wrote:
-> Have pasted here the relevant changes for doing fixups on smmu base instead
-> of offset to get feedback. 
+Hi Hans,
 
-To me this looks better than the ARM_SMMU_EVTQ_*() macros. It still
-needs some more shaping (e.g. maybe remove page1_base var and call
-arm_smmu_page1_base() directly).
+On Mon, 2017-05-08 at 10:27 +0200, Hans Verkuil wrote:
+> Hi Philipp,
+> 
+> Sorry for the very long delay, but I finally had some time to think about this.
 
-But let's see what others say first.
+Thank you for your thoughts.
 
-Thanks,
+> On 04/06/2017 03:55 PM, Philipp Zabel wrote:
+> > If the the field order is set to ANY in set_fmt, choose the currently
+> > set field order. If the colorspace is set to DEFAULT, choose the current
+> > colorspace.  If any of xfer_func, ycbcr_enc or quantization are set to
+> > DEFAULT, either choose the current setting, or the default setting for the
+> > new colorspace, if non-DEFAULT colorspace was given.
+> > 
+> > This allows to let field order and colorimetry settings be propagated
+> > from upstream by calling media-ctl on the upstream entity source pad,
+> > and then call media-ctl on the sink pad to manually set the input frame
+> > interval, without changing the already set field order and colorimetry
+> > information.
+> > 
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > ---
+> > This is based on imx-media-staging-md-v14, and it is supposed to allow
+> > configuring the pipeline with media-ctl like this:
+> > 
+> > 1) media-ctl --set-v4l2 "'tc358743 1-000f':0[fmt:UYVY8_1X16/1920x1080]"
+> > 2) media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY8_1X16/1920x108]"
+> > 3) media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY8_1X16/1920x1080]"
+> > 4) media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY8_1X16/1920x1080 at 1/60]"
+> > 5) media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/1920x1080 at 1/30]"
+> > 
+> > Without having step 4) overwrite the colorspace and field order set on
+> > 'ipu1_csi0':0 by the propagation in step 3).
+> > ---
+> >  drivers/staging/media/imx/imx-media-csi.c | 34 +++++++++++++++++++++++++++++++
+> >  1 file changed, 34 insertions(+)
+> > 
+> > diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+> > index 64dc454f6b371..d94ce1de2bf05 100644
+> > --- a/drivers/staging/media/imx/imx-media-csi.c
+> > +++ b/drivers/staging/media/imx/imx-media-csi.c
+> > @@ -1325,6 +1325,40 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
+> >  	csi_try_fmt(priv, sensor, cfg, sdformat, crop, compose, &cc);
+> >  
+> >  	fmt = __csi_get_fmt(priv, cfg, sdformat->pad, sdformat->which);
+> > +
+> > +	/* Retain current field setting as default */
+> > +	if (sdformat->format.field == V4L2_FIELD_ANY)
+> > +		sdformat->format.field = fmt->field;
+> 
+> This is OK.
 
--Robert
+Would this be a "may" or a "should"? As in,
+"If SUBDEV_S_FMT is called with field == ANY, the driver may/should set
+field to the previously configured interlacing field order".
 
+What would be the correct place to document this behaviour?
+Documentation/media/uapi/v4l/vidioc-subdev-g-fmt.rst?
+
+> > +	/* Retain current colorspace setting as default */
+> > +	if (sdformat->format.colorspace == V4L2_COLORSPACE_DEFAULT) {
+> > +		sdformat->format.colorspace = fmt->colorspace;
+> > +		if (sdformat->format.xfer_func == V4L2_XFER_FUNC_DEFAULT)
+> > +			sdformat->format.xfer_func = fmt->xfer_func;
+> > +		if (sdformat->format.ycbcr_enc == V4L2_YCBCR_ENC_DEFAULT)
+> > +			sdformat->format.ycbcr_enc = fmt->ycbcr_enc;
+> > +		if (sdformat->format.quantization == V4L2_QUANTIZATION_DEFAULT)
+> > +			sdformat->format.quantization = fmt->quantization;
 > 
-> This actually results in more lines of changes. If you think the below
-> approach is still better, will post a V4 of this series with this change.
+> If sdformat->format.colorspace == V4L2_COLORSPACE_DEFAULT, then you can just copy
+> all four fields from fmt to sdformat->format. The other three fields are meaningless
+> when colorspace == V4L2_COLORSPACE_DEFAULT.
+
+Ok, good. Ignoring the transfer function / YCbCr encoding / quantization
+range fields when colorspace is DEFAULT would simplify this part to:
+
+	if (sdformat->format.colorspace == V4L2_COLORSPACE_DEFAULT) {
+		sdformat->format.colorspace = fmt->colorspace;
+		sdformat->format.xfer_func = fmt->xfer_func;
+		sdformat->format.ycbcr_enc = fmt->ycbcr_enc;
+		sdformat->format.quantization = fmt->quantization;
+	}
+
+Is that expectation already written down somewhere? If not, should we
+add it to Documentation/media/uapi/v4l/pixfmt-006.rst?
+
+> > +	} else {
+> > +		if (sdformat->format.xfer_func == V4L2_XFER_FUNC_DEFAULT) {
+> > +			sdformat->format.xfer_func =
+> > +				V4L2_MAP_XFER_FUNC_DEFAULT(
+> > +						sdformat->format.colorspace);
+> > +		}
+> > +		if (sdformat->format.ycbcr_enc == V4L2_YCBCR_ENC_DEFAULT) {
+> > +			sdformat->format.ycbcr_enc =
+> > +				V4L2_MAP_YCBCR_ENC_DEFAULT(
+> > +						sdformat->format.colorspace);
+> > +		}
+> > +		if (sdformat->format.quantization == V4L2_QUANTIZATION_DEFAULT) {
+> > +			sdformat->format.quantization =
+> > +				V4L2_MAP_QUANTIZATION_DEFAULT(
+> > +						cc->cs != IPUV3_COLORSPACE_YUV,
+> > +						sdformat->format.colorspace,
+> > +						sdformat->format.ycbcr_enc);
+> > +		}
 > 
-> 
-> +static inline unsigned long arm_smmu_page1_base(
-> +	struct arm_smmu_device *smmu)
-> +{
-> +	if (ARM_SMMU_PAGE0_REGS_ONLY(smmu))
-> +		return smmu->base;
-> +	else
-> +		return smmu->base + SZ_64K;
-> +}
-> +
-> 
-> @@ -1948,8 +1962,8 @@ static void arm_smmu_put_resv_regions(struct device *dev,
->  /* Probing and initialisation functions */
->  static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
->  				   struct arm_smmu_queue *q,
-> -				   unsigned long prod_off,
-> -				   unsigned long cons_off,
-> +				   unsigned long prod_addr,
-> +				   unsigned long cons_addr,
->  				   size_t dwords)
->  {
->  	size_t qsz = ((1 << q->max_n_shift) * dwords) << 3;
-> @@ -1961,8 +1975,8 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
->  		return -ENOMEM;
->  	}
->  
-> -	q->prod_reg	= smmu->base + prod_off;
-> -	q->cons_reg	= smmu->base + cons_off;
-> +	q->prod_reg	= prod_addr;
-> +	q->cons_reg	= cons_addr;
->  	q->ent_dwords	= dwords;
->  
->  	q->q_base  = Q_BASE_RWA;
-> @@ -1977,17 +1991,25 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
->  static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
->  {
->  	int ret;
-> +	unsigned long page1_base, page0_base;
-> +
-> +	page0_base = smmu->base;
-> +	page1_base = arm_smmu_page1_base(smmu);
->  
->  	/* cmdq */
->  	spin_lock_init(&smmu->cmdq.lock);
-> -	ret = arm_smmu_init_one_queue(smmu, &smmu->cmdq.q, ARM_SMMU_CMDQ_PROD,
-> -				      ARM_SMMU_CMDQ_CONS, CMDQ_ENT_DWORDS);
-> +	ret = arm_smmu_init_one_queue(smmu, &smmu->cmdq.q, 
-> +				      page0_base + ARM_SMMU_CMDQ_PROD,
-> +				      page0_base + ARM_SMMU_CMDQ_CONS, 
-> +				      CMDQ_ENT_DWORDS);
->  	if (ret)
->  		return ret;
->  
->  	/* evtq */
-> -	ret = arm_smmu_init_one_queue(smmu, &smmu->evtq.q, ARM_SMMU_EVTQ_PROD,
-> -				      ARM_SMMU_EVTQ_CONS, EVTQ_ENT_DWORDS);
-> +	ret = arm_smmu_init_one_queue(smmu, &smmu->evtq.q,
-> +				      page1_base + ARM_SMMU_EVTQ_PROD,
-> +				      page1_base + ARM_SMMU_EVTQ_CONS,
-> +				      EVTQ_ENT_DWORDS);
->  	if (ret)
->  		return ret;
->  
-> @@ -1995,8 +2017,10 @@ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
->  	if (!(smmu->features & ARM_SMMU_FEAT_PRI))
->  		return 0;
->  
-> -	return arm_smmu_init_one_queue(smmu, &smmu->priq.q, ARM_SMMU_PRIQ_PROD,
-> -				       ARM_SMMU_PRIQ_CONS, PRIQ_ENT_DWORDS);
-> +	return arm_smmu_init_one_queue(smmu, &smmu->priq.q,
-> +				       page1_base + ARM_SMMU_PRIQ_PROD,
-> +				       page1_base + ARM_SMMU_PRIQ_CONS,
-> +				       PRIQ_ENT_DWORDS);
->  }
-> 
-> 
-> 
-> @@ -2301,8 +2349,11 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
->  {
->  	int ret;
->  	u32 reg, enables;
-> +	unsigned long page1_base;
->  	struct arm_smmu_cmdq_ent cmd;
->  
-> +	page1_base = arm_smmu_page1_base(smmu);
-> +
->  	/* Clear CR0 and sync (disables SMMU and queue processing) */
->  	reg = readl_relaxed(smmu->base + ARM_SMMU_CR0);
->  	if (reg & CR0_SMMUEN)
-> @@ -2363,8 +2414,8 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
->  
->  	/* Event queue */
->  	writeq_relaxed(smmu->evtq.q.q_base, smmu->base + ARM_SMMU_EVTQ_BASE);
-> -	writel_relaxed(smmu->evtq.q.prod, smmu->base + ARM_SMMU_EVTQ_PROD);
-> -	writel_relaxed(smmu->evtq.q.cons, smmu->base + ARM_SMMU_EVTQ_CONS);
-> +	writel_relaxed(smmu->evtq.q.prod, page1_base + ARM_SMMU_EVTQ_PROD);
-> +	writel_relaxed(smmu->evtq.q.cons, page1_base + ARM_SMMU_EVTQ_CONS);
->  
->  	enables |= CR0_EVTQEN;
->  	ret = arm_smmu_write_reg_sync(smmu, enables, ARM_SMMU_CR0,
-> @@ -2379,9 +2430,9 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
->  		writeq_relaxed(smmu->priq.q.q_base,
->  			       smmu->base + ARM_SMMU_PRIQ_qBASE);
->  		writel_relaxed(smmu->priq.q.prod,
-> -			       smmu->base + ARM_SMMU_PRIQ_PROD);
-> +			       page1_base + ARM_SMMU_PRIQ_PROD);
->  		writel_relaxed(smmu->priq.q.cons,
-> -			       smmu->base + ARM_SMMU_PRIQ_CONS);
-> +			       page1_base + ARM_SMMU_PRIQ_CONS);
->  
->  		enables |= CR0_PRIQEN;
->  		ret = arm_smmu_write_reg_sync(smmu, enables, ARM_SMMU_CR0,
-> 
-> 
-> 
-> Thanks.
-> -- 
-> Linu cherian
+> Is this needed for validation? Currently these fields play no role in the
+> default link validation. Which I think is actually the right thing to do,
+> unless the subdev can do actual colorspace conversion.
+
+The CSI subdevice can't do colorspace conversion, but exactly the same
+applies to the IC subdevices, which can. Also I'd like this information
+to be correct, as the /dev/videoX capture device takes its colorspace
+information from the CSI source pad.
+
+The problem I wanted to solve here initially was that if the colorspace
+information was previously set correctly:
+
+  media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY8_1X16/1920x1080 at 1/60 colorspace:rec709 xfer:709 ycbcr:709 quantization:lim-range]"
+    ->
+	V4L2_COLORSPACE_REC709
+	V4L2_XFER_FUNC_709
+	V4L2_YCBCR_ENC_709
+	V4L2_QUANTIZATION_LIMITED_RANGE
+
+A later media-ctl call to just change the frame interval would overwrite the colorspace information:
+
+  media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY8_1X16/1920x1080 at 1/30]"
+    ->
+	V4L2_COLORSPACE_DEFAULT
+	V4L2_XFER_FUNC_DEFAULT
+	V4L2_YCBCR_ENC_DEFAULT
+	V4L2_QUANTIZATION_DEFAULT
+
+> I would just drop the whole 'else' here.
+
+That would allow to set the actual colorspace information reported by
+SUBDEV_G_FMT on both sink and source pads (and by extension, the
+colorspace information reported by G_FMT on /dev/videoX) to
+V4L2_{XFER_FUNC,YCBCR_ENC,QUANTIZATION}_DEFAULT.
+
+  media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY8_1X16/1920x1080 colorspace:rec709]"
+    ->
+	V4L2_COLORSPACE_REC709
+	V4L2_XFER_FUNC_DEFAULT
+	V4L2_YCBCR_ENC_DEFAULT
+	V4L2_QUANTIZATION_DEFAULT
+
+I suppose that is acceptable as given the colorspace, the other DEFAULT
+values have a unique meaning, but wouldn't it be nicer to show userspace
+what these default inputs actually map to?
+
+> Actually, wouldn't it be better to always just copy this information from
+> fmt? This subdev doesn't do any colorspace conversion, it just passes on
+> this information. I.e., you can't set it in any meaningful way.
+
+csi_set_fmt on the sink pad is the function that actually sets fmt in
+the first place. If we always copy colorspace information from fmt, it
+can't be set to the correct value at all.
+
+regards
+Philipp
