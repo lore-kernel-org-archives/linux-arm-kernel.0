@@ -1,96 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 8 May 2017 23:41:38 +0200
-Subject: [PATCH 1/2 v2] clk: Add bindings for the Gemini Clock Controller
-In-Reply-To: <CAL_JsqLAMObobPrBDdA8bjaKTX4rEo2=_qd86ibbA2kQP6AvBg@mail.gmail.com>
-References: <20170508201159.31634-1-linus.walleij@linaro.org>
- <CAL_JsqLAMObobPrBDdA8bjaKTX4rEo2=_qd86ibbA2kQP6AvBg@mail.gmail.com>
-Message-ID: <CACRpkdY+EzbbTy6PzN5-YhCnSxPoKej2z=t-7eC3CPqDa6Q4_w@mail.gmail.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Mon,  8 May 2017 17:48:35 -0400
+Subject: [PATCH] net: mdio-mux: bcm-iproc: call mdiobus_free() in error path
+Message-ID: <1494280115-9252-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 8, 2017 at 11:24 PM, Rob Herring <robh+dt@kernel.org> wrote:
+If an error is encountered in mdio_mux_init(), the error path will call
+mdiobus_free().  Since mdiobus_register() has been called prior to
+mdio_mux_init(), the bus->state will not be MDIOBUS_UNREGISTERED.  This
+causes a BUG_ON() in mdiobus_free().  To correct this issue, add an
+error path for mdio_mux_init() which calls mdiobus_unregister() prior to
+mdiobus_free().
 
->> +Example:
->> +
->> +syscon: syscon at 40000000 {
->> +       compatible = "cortina,gemini-syscon", "cortina,gemini-clock-controller",
->> +                    "syscon", "simple-mfd";
->
-> There are no child nodes, so you don't need simple-mfd.
+Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+Fixes: 98bc865a1ec8 ("net: mdio-mux: Add MDIO mux driver for iProc SoCs")
+---
+ drivers/net/phy/mdio-mux-bcm-iproc.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-The example is taken from an actual device tree (look below),
-where there are child nodes, I can trim it down.
-
->> +       reg = <0x40000000 0x1000>;
->
-> Looks like you have 2 nodes pointing to the same address with your
-> reset binding? You shouldn't have overlapping resources. It's allowed
-> for historical reasons but breaks resource creation in Linux.
-
-No... they are all in the same node, just sharing the same
-resource by way of regmap (syscon).
-
-In the end, as I think you requested, when you said:
-
->> +     clock-controller {
->> +             compatible = "cortina,gemini-clock-controller";
->> +             #clock-cells = <1>;
-(...)
-> There's not really much reason to have a child node here. The parent can
-> be the clock provider.
-(...)
-> Same comment as clocks. The parent can be the provider.
-
-So as you say, no specific child is needed and syscon provides
-clocks and resets:
-
-                syscon: syscon at 40000000 {
-                        compatible = "cortina,gemini-syscon",
-                                     "cortina,gemini-clock-controller",
-                                     "cortina,gemini-reset",
-                                     "syscon", "simple-mfd";
-                        reg = <0x40000000 0x1000>;
-                        #clock-cells = <1>;
-                        #reset-cells = <1>;
-
-                        syscon-reboot {
-                                compatible = "syscon-reboot";
-                                regmap = <&syscon>;
-                                /* GLOBAL_RESET register */
-                                offset = <0x0c>;
-                                /* RESET_GLOBAL | RESET_CPU1 */
-                                mask = <0xC0000000>;
-                        };
-                };
-
-Before your (as I percieved it) requested changes to avoid
-surplus children in the syscon it looked like this:
-
-                syscon: syscon at 40000000 {
-                        compatible = "cortina,gemini-syscon",
-"syscon", "simple-mfd";
-                        reg = <0x40000000 0x1000>;
-
-                        syscon-reboot {
-                                compatible = "syscon-reboot";
-                                regmap = <&syscon>;
-                                /* GLOBAL_RESET register */
-                                offset = <0x0c>;
-                                /* RESET_GLOBAL | RESET_CPU1 */
-                                mask = <0xC0000000>;
-                        };
-
-                        rcon: reset-controller {
-                                compatible = "cortina,gemini-reset";
-                                #reset-cells = <1>;
-                        };
-
-                        gcc: clock-controller {
-                                compatible = "cortina,gemini-clock-controller";
-                                #clock-cells = <1>;
-                        };
-                };
-
-
-Yours,
-Linus Walleij
+diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
+index 0a0412524cec..0a5f62e0efcc 100644
+--- a/drivers/net/phy/mdio-mux-bcm-iproc.c
++++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
+@@ -203,11 +203,14 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+ 			   &md->mux_handle, md, md->mii_bus);
+ 	if (rc) {
+ 		dev_info(md->dev, "mdiomux initialization failed\n");
+-		goto out;
++		goto out_register;
+ 	}
+ 
+ 	dev_info(md->dev, "iProc mdiomux registered\n");
+ 	return 0;
++
++out_register:
++	mdiobus_unregister(bus);
+ out:
+ 	mdiobus_free(bus);
+ 	return rc;
+-- 
+2.7.4
