@@ -1,32 +1,82 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Mon, 8 May 2017 21:48:58 +0100
-Subject: [PATCH v9 1/4] syscalls: Verify address limit before returning
- to user-mode
-In-Reply-To: <CAG48ez0Hz=CimkPwuq903tgJkGj8gXUtiQJJb-P2zUes6bd6Hw@mail.gmail.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com>
- <CAGXu5jKZRESgGhZ6GEoO784Q1G8V0DPcwM1T2PpyTqvEAsrUdg@mail.gmail.com>
- <20170508140230.23kxf2kfeazeo4zr@gmail.com>
- <CAG48ez0Hz=CimkPwuq903tgJkGj8gXUtiQJJb-P2zUes6bd6Hw@mail.gmail.com>
-Message-ID: <20170508204858.GT29622@ZenIV.linux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 May 2017 16:12:16 -0500
+Subject: [PATCH 0/4] TI Bluetooth serdev support
+In-Reply-To: <CAHCN7x+Mq=b6RN-ezU0400W=H=D7DR+Es1FHtT4GyozpVd8ALA@mail.gmail.com>
+References: <20170405183005.20570-1-robh@kernel.org>
+ <CAHCN7xJUxZm1qKAxT0kaK6qoDg+HWOJK7sTH-q9za4HJuUwe8Q@mail.gmail.com>
+ <20170430160430.rmyuo6sdrkrjxjg6@earth>
+ <CAHCN7x+Mq=b6RN-ezU0400W=H=D7DR+Es1FHtT4GyozpVd8ALA@mail.gmail.com>
+Message-ID: <CAL_JsqKBAPUPRtn+pEtz8B8pCrA=45RkEq6X_0i_HYoWsVmtyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 08, 2017 at 04:06:35PM +0200, Jann Horn wrote:
+On Fri, May 5, 2017 at 9:51 AM, Adam Ford <aford173@gmail.com> wrote:
+> On Sun, Apr 30, 2017 at 11:04 AM, Sebastian Reichel <sre@kernel.org> wrote:
+>> Hi,
+>>
+>> On Sun, Apr 30, 2017 at 10:14:20AM -0500, Adam Ford wrote:
+>>> On Wed, Apr 5, 2017 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
+>>> > This series adds serdev support to the HCI LL protocol used on TI BT
+>>> > modules and enables support on HiKey board with with the WL1835 module.
+>>> > With this the custom TI UIM daemon and btattach are no longer needed.
+>>>
+>>> Without UIM daemon, what instruction do you use to load the BT firmware?
+>>>
+>>> I was thinking 'hciattach' but I was having trouble.  I was hoping you
+>>> might have some insight.
+>>>
+>>>  hciattach -t 30 -s 115200 /dev/ttymxc1 texas 3000000 flow  Just
+>>> returns a timeout.
+>>>
+>>> I modified my i.MX6 device tree per the binding documentation and
+>>> setup the regulators and enable GPIO pins.
+>>
+>> If you configured everything correctly no userspace interaction is
+>> required. The driver should request the firmware automatically once
+>> you power up the bluetooth device.
+>>
+>> Apart from DT changes make sure, that the following options are
+>> enabled and check dmesg for any hints.
+>>
+>> CONFIG_SERIAL_DEV_BUS
+>> CONFIG_SERIAL_DEV_CTRL_TTYPORT
+>> CONFIG_BT_HCIUART
+>> CONFIG_BT_HCIUART_LL
+>>
+>
+>
+> I have enabled those flags, and I have updated my device tree.
+> I am testing this on an OMAP3630 (DM3730) board with a WL1283.  I am
+> getting a lot of timeout errors.  I tested this against the original
+> implemention I had in pdata-quirks.c using the ti-st driver, uim & and
+> the btwilink driver.
+>
+> I pulled in some of the newer patches to enable the wl1283-st, but I
+> am obviously missing something.
+>
+> I   58.717651] Bluetooth: hci0: Reading TI version information failed
+> (-110)
+> [   58.724853] Bluetooth: hci0: download firmware failed, retrying...
+> [   60.957641] Bluetooth: hci0 command 0x1001 tx timeout
+> [   68.957641] Bluetooth: hci0: Reading TI version information failed
+> (-110)
+> [   68.964843] Bluetooth: hci0: download firmware failed, retrying...
+> [   69.132171] Bluetooth: Unknown HCI packet type 06
+> [   69.138244] Bluetooth: Unknown HCI packet type 0c
+> [   69.143249] Bluetooth: Unknown HCI packet type 40
+> [   69.148498] Bluetooth: Unknown HCI packet type 20
+> [   69.153533] Bluetooth: Data length is too large
+> [   69.158569] Bluetooth: Unknown HCI packet type a0
+> [   69.163574] Bluetooth: Unknown HCI packet type 00
+> [   69.168731] Bluetooth: Unknown HCI packet type 00
+> [   69.173736] Bluetooth: Unknown HCI packet type 34
+> [   69.178924] Bluetooth: Unknown HCI packet type 91
+> [   71.197631] Bluetooth: hci0 command 0x1001 tx timeout
+> [   79.197662] Bluetooth: hci0: Reading TI version information failed (-110)
 
-> I think Kees might be talking about
-> https://bugs.chromium.org/p/project-zero/issues/detail?id=822, fixed in
-> commit e6978e4bf181fb3b5f8cb6f71b4fe30fbf1b655c. The issue was that
-> perf code that can run in pretty much any context called access_ok().
+There's a bug in serdev_device_write(), so if you have that function
+you need either the fix I sent or the patch to make
+serdev_device_writebuf atomic again. Both are on the linux-serial
+list, but not in any tree yet.
 
-And that commit has *NOT* solved the problem.  perf_callchain_user()
-can be called synchronously, without passing through that code.
-Tracepoint shite...
-
-That set_fs() should be done in get_perf_callchain(), just around the call of
-perf_callchain_user().  Along with pagefault_disable(), actually.
-
-BTW, that's a nice example demonstrating why doing that on the kernel
-boundary is wrong.  Wider (in theory) area being "protected" => easier
-to miss the ways not crossing its border.
+Rob
