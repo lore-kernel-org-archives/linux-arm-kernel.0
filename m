@@ -1,95 +1,24 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 8 May 2017 18:19:05 +0200
-Subject: [PATCH 5/8] KVM: arm/arm64: Slightly rework kvm_vgic_addr
-In-Reply-To: <20170508115454.5075-6-cdall@linaro.org>
-References: <20170508115454.5075-1-cdall@linaro.org>
- <20170508115454.5075-6-cdall@linaro.org>
-Message-ID: <1b0d1242-a4af-dc2e-5e87-dca0ddc2300e@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 May 2017 11:20:23 -0500
+Subject: [PATCH v2 16/20] dt-bindings: display: sun4i: Add HDMI display
+ bindings
+In-Reply-To: <0941a11259b2dba88d235c6ad713e3451d385028.1493812478.git-series.maxime.ripard@free-electrons.com>
+References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
+ <0941a11259b2dba88d235c6ad713e3451d385028.1493812478.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20170508162023.nseoybdkmwdz7sls@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 08/05/2017 13:54, Christoffer Dall wrote:
-> As we are about to handle setting the address for the redistributor base
-> region separately from some of the other base addresses, let's rework
-> this function to leave a little more room for being flexible in what
-> each type of base address does.
+On Wed, May 03, 2017 at 01:59:53PM +0200, Maxime Ripard wrote:
+> One of the possible output of the display pipeline, on the SoCs that have
+> it, is the HDMI controller.
 > 
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-Thanks
-
-Eric
-
+> Add a binding for it.
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  virt/kvm/arm/vgic/vgic-kvm-device.c | 22 +++++++++++++---------
->  1 file changed, 13 insertions(+), 9 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> index d48743c..69ccfd5 100644
-> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> @@ -37,6 +37,14 @@ int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
->  	return 0;
->  }
->  
-> +static int vgic_check_type(struct kvm *kvm, int type_needed)
-> +{
-> +	if (kvm->arch.vgic.vgic_model != type_needed)
-> +		return -ENODEV;
-> +	else
-> +		return 0;
-> +}
-> +
->  /**
->   * kvm_vgic_addr - set or get vgic VM base addresses
->   * @kvm:   pointer to the vm struct
-> @@ -57,40 +65,36 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
->  {
->  	int r = 0;
->  	struct vgic_dist *vgic = &kvm->arch.vgic;
-> -	int type_needed;
->  	phys_addr_t *addr_ptr, alignment;
->  
->  	mutex_lock(&kvm->lock);
->  	switch (type) {
->  	case KVM_VGIC_V2_ADDR_TYPE_DIST:
-> -		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-> +		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
->  		addr_ptr = &vgic->vgic_dist_base;
->  		alignment = SZ_4K;
->  		break;
->  	case KVM_VGIC_V2_ADDR_TYPE_CPU:
-> -		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-> +		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
->  		addr_ptr = &vgic->vgic_cpu_base;
->  		alignment = SZ_4K;
->  		break;
->  	case KVM_VGIC_V3_ADDR_TYPE_DIST:
-> -		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-> +		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V3);
->  		addr_ptr = &vgic->vgic_dist_base;
->  		alignment = SZ_64K;
->  		break;
->  	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-> -		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-> +		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V3);
->  		addr_ptr = &vgic->vgic_redist_base;
->  		alignment = SZ_64K;
->  		break;
->  	default:
->  		r = -ENODEV;
-> -		goto out;
->  	}
->  
-> -	if (vgic->vgic_model != type_needed) {
-> -		r = -ENODEV;
-> +	if (r)
->  		goto out;
-> -	}
->  
->  	if (write) {
->  		r = vgic_check_ioaddr(kvm, addr_ptr, *addr, alignment);
-> 
+>  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 79 +++++++-
+>  1 file changed, 79 insertions(+), 0 deletions(-)
+
+Acked-by: Rob Herring <robh@kernel.org>
