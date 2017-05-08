@@ -1,17 +1,17 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon,  8 May 2017 18:21:12 +0200
-Subject: [PATCH 3/8] mfd: dts: hi655x: Add clock binding for the pmic
+Date: Mon,  8 May 2017 18:21:13 +0200
+Subject: [PATCH 4/8] arm64: dts: hikey: Add clock for the pmic mfd
 In-Reply-To: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
 References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1494260477-25163-4-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1494260477-25163-5-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Daniel Lezcano <daniel.lezcano@linaro.org>
 
 The hi655x PMIC provides the regulators but also a clock. The latter is
-missing in the definition, so extend the documentation to include this as
-well.
+missing so let's add it. This clock is used by WiFi/Bluetooth chip, but
+that connection is done in a separate change on top of this one.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Acked-by: Rob Herring <robh@kernel.org>
@@ -19,30 +19,20 @@ Acked-by: Lee Jones <lee.jones@linaro.org>
 [Ulf: Split patch and updated changelog]
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt b/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
-index 0548569..9630ac0 100644
---- a/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
-+++ b/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
-@@ -16,6 +16,11 @@ Required properties:
- - reg:                  Base address of PMIC on Hi6220 SoC.
- - interrupt-controller: Hi655x has internal IRQs (has own IRQ domain).
- - pmic-gpios:           The GPIO used by PMIC IRQ.
-+- #clock-cells:		From common clock binding; shall be set to 0
-+
-+Optional properties:
-+- clock-output-names: From common clock binding to override the
-+  default output clock name
- 
- Example:
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index dba3c13..e0496f7 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -325,6 +325,7 @@
  	pmic: pmic at f8000000 {
-@@ -24,4 +29,5 @@ Example:
+ 		compatible = "hisilicon,hi655x-pmic";
+ 		reg = <0x0 0xf8000000 0x0 0x1000>;
++		#clock-cells = <0>;
  		interrupt-controller;
  		#interrupt-cells = <2>;
  		pmic-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-+		#clock-cells = <0>;
- 	}
 -- 
 2.7.4
