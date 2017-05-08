@@ -1,82 +1,222 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 8 May 2017 15:55:35 +0100
-Subject: [PATCH 1/2] arm64: Call __show_regs directly
-In-Reply-To: <1494251815-55961-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1494251815-55961-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20170508145535.GF5480@leverpostej>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 8 May 2017 20:27:13 +0530
+Subject: [PATCH V11 00/11] IOMMU probe deferral support
+In-Reply-To: <5617791f-407a-1ab3-53aa-0f09fcd716aa@samsung.com>
+References: <CGME20170410112136epcas2p2cdd7dc21a8dc0ffcfab7f8290c4b7467@epcas2p2.samsung.com>
+ <1491823266-1209-1-git-send-email-sricharan@codeaurora.org>
+ <5617791f-407a-1ab3-53aa-0f09fcd716aa@samsung.com>
+Message-ID: <b597429a-5615-ac71-1fd5-e947ae8cb576@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-I see these patches are effectively a v2 of [1].
-
-Please cite prior patch series when posting updates. The context really
-helps review.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/494840.html
-
-On Mon, May 08, 2017 at 09:56:54PM +0800, Kefeng Wang wrote:
-> Call __show_regs directly in longjmp_break_handler() and
-> __do_user_fault(), it is to prepare for dump stack when
-> softlockup detected.
+On 5/8/2017 4:53 PM, Marek Szyprowski wrote:
+> Hi Sricharan,
 > 
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-
-The above doesn't explain the problem clearly. How about:
-
-  Generic code expects show_regs() to also dump the stack, but arm64's
-  show_reg() does not do this. Some arm64 callers of show_regs() *only*
-  want the registers dumped, without the stack.
-
-  To enable generic code to work as expected, we need to make
-  show_regs() dump the stack. Where we only want the registers dumped,
-  we must use __show_regs().
-
-  This patch updates code to use __show_regs() where only registers are
-  desired. A subsequent patch will modify show_regs().
-
-... with that:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-> ---
->  arch/arm64/kernel/probes/kprobes.c | 4 ++--
->  arch/arm64/mm/fault.c              | 2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
+> On 2017-04-10 13:20, Sricharan R wrote:
+>> This series calls the dma ops configuration for the devices
+>> at a generic place so that it works for all busses.
+>> The dma_configure_ops for a device is now called during
+>> the device_attach callback just before the probe of the
+>> bus/driver is called. Similarly dma_deconfigure is called during
+>> device/driver_detach path.
+>>
+>> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
+>>         |                         |
+>> pci_bus_add_device     (device_add/driver_register)
+>>         |                         |
+>> device_attach           device_initial_probe
+>>         |                         |
+>> __device_attach_driver    __device_attach_driver
+>>         |
+>> driver_probe_device
+>>         |
+>> really_probe
+>>         |
+>> dma_configure
+>>
+>> Similarly on the device/driver_unregister path __device_release_driver is
+>> called which inturn calls dma_deconfigure.
+>>
+>> Rebased the series against mainline 4.11-rc5. Applies and builds cleanly
+>> against iommu-next and with 3-way merge applies on top of linux-next
+>> as well (patch #8), because of "ACPI platform MSI support" from
+>> Hanjun being merged.
+>>    * Tested with platform and pci devices for probe deferral
+>>    and reprobe on arm64 based platform.
 > 
-> diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-> index c5c4594..d849d98 100644
-> --- a/arch/arm64/kernel/probes/kprobes.c
-> +++ b/arch/arm64/kernel/probes/kprobes.c
-> @@ -522,9 +522,9 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
->  		pr_err("current sp %lx does not match saved sp %lx\n",
->  		       orig_sp, stack_addr);
->  		pr_err("Saved registers for jprobe %p\n", jp);
-> -		show_regs(saved_regs);
-> +		__show_regs(saved_regs);
->  		pr_err("Current registers\n");
-> -		show_regs(regs);
-> +		__show_regs(regs);
->  		BUG();
->  	}
->  	unpause_graph_tracing();
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 37b95df..c3f2b10 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -250,7 +250,7 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
->  			tsk->comm, task_pid_nr(tsk), inf->name, sig,
->  			addr, esr);
->  		show_pte(tsk->mm, addr);
-> -		show_regs(regs);
-> +		__show_regs(regs);
->  	}
->  
->  	tsk->thread.fault_address = addr;
-> -- 
-> 1.7.12.4
+> I just noticed that in the meantime the following patch: "arm: dma-mapping:
+> Reset the device's dma_ops" (https://patchwork.kernel.org/patch/9434105/ )
+> has been dropped from this series.
 > 
+> Lack of it causes serious issues with deferred probe of devices, which are
+> under IOMMU on ARM architecture. Please check where it got lost and push it
+> to Russell's patch tracking system ASAP to get it during v4.12-rcX cycle.
+
+ha, bad on me. I posted this patch independently from the series, but was not
+added to patch system. Will add it now.
+
+Regards,
+ Sricharan
+
+> 
+>>
+>> Previous post of this series [8].
+>>
+>> Please note that, i have kept the tested/acked tags intact from V8
+>> because V9/10/11 were for more fixes that was added, so the original
+>> tags that was given for the functional testing remains the same.
+>>
+>>   [V11]
+>>       * No functional changes.
+>>
+>>       * Rebased on top of 4.11-rc6.
+>>
+>>       * Dropped patch#3 from V10, as a result have to make
+>>         a change in patch#7 to return a 'non-void' to fix a
+>>         build warning.
+>>
+>>       * Added Robin's and Rob's tags.
+>>
+>>   [V10]
+>>       * Rebased on top of 4.11-rc5.
+>>         * Fixed coherent_dma_mask 64bit overflow issue [8]
+>>         for OF. The fix for OF was added as a separate
+>>         patch#6, since the issue is true even without probe deferral,
+>>         but gets reproduced with the probe deferral series.
+>>         Added Lorenzo's ACPI fix for coherent_dma_mask overflow
+>>         and the fix for dma_configure getting called more than
+>>         once for the same device.
+>>
+>>       * Also fixed an build issue caught by kbuild robot for
+>>         m68k arch. The issue was dma_(de)configure was not
+>>         getting defined for !CONFIG_HAS_DMA, so fixed that as well.
+>>
+>>   [V9]
+>>       * Rebased on top of 4.11-rc1.
+>>
+>>       * Merged Robin's fixes for legacy binding issue,
+>>         pci devices with no iommu-map property and deferencing
+>>         of_iommu_table after init.
+>>         [V8]
+>>       * Picked up all the acks and tested tags from Marek and
+>>         Hanjun for DT and ACPI patches respectively, since
+>>         no functional changes was done.
+>>
+>>       * Addressed Minor comments Sinan and Bjorn.
+>>
+>>       * Added Robin's fix for fixing the deferencing NULL for
+>>         of_iommu_table after init in patch #2.
+>>
+>>       * Rebased it on top of linux-next
+>>
+>>   [V7]
+>>       * Updated the subject and commit log for patch #6 as per
+>>         comments from Lorenzo. No functional changes.
+>>
+>>   [V6]
+>>       * Fixed a bug in dma_configure function pointed out by
+>>         Robin.
+>>       * Reordered the patches as per comments from Robin and
+>>         Lorenzo.
+>>       * Added Tags.
+>>
+>>   [V5]
+>>       * Reworked the pci configuration code hanging outside and
+>>         pushed it to dma_configure as in PATCH#5,6,7.
+>>         Also added a couple of patches that Lorenzo provided for
+>>         correcting the Probe deferring mechanism in case of
+>>         ACPI devices from here [5].
+>>
+>>   [V4]
+>>       * Took the reworked patches [2] from Robin's branch and
+>>         rebased on top of Lorenzo's ACPI IORT ARM support series [3].
+>>
+>>       * Added the patches for moving the dma ops configuration of
+>>         acpi based devices to probe time as well.
+>>   [V3]
+>>       * Removed the patch to split dma_masks/dma_ops configuration
+>>         separately based on review comments that both masks and ops are
+>>         required only during the device probe time.
+>>
+>>       * Reworked the series based on Generic DT bindings series.
+>>
+>>       * Added call to iommu's remove_device in the cleanup path for arm and
+>>         arm64.
+>>
+>>       * Removed the notifier trick in arm64 to handle early device
+>>         registration.
+>>
+>>       * Added reset of dma_ops in cleanup path for arm based on comments.
+>>
+>>       * Fixed the pci_iommu_configure path and tested with PCI device as
+>>         well.
+>>         * Fixed a bug to return the correct iommu_ops from patch 7 [4] in
+>>         last post.
+>>
+>>       * Fixed few other cosmetic comments.
+>>      [V2]
+>>       * Updated the Initial post to call dma_configure/deconfigure from
+>>         generic code
+>>         * Added iommu add_device callback from of_iommu_configure path
+>>
+>>   [V1]
+>>       * Initial post from Laurent Pinchart [1]
+>>
+>> [1] http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013016.html
+>> [2] http://www.linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/defer
+>> [3] https://lkml.org/lkml/2016/11/21/141
+>> [4] https://www.mail-archive.com/iommu at xxxxxxxxxxxxxxxxxxxxxxxxxx/msg13940.html
+>> [5] git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git iommu/probe-deferral
+>> [6] http://www.spinics.net/lists/linux-pci/msg57992.html
+>> [7] https://www.spinics.net/lists/arm-kernel/msg556209.html
+>> [8] http://lkml.iu.edu/hypermail/linux/kernel/1704.0/01557.html
+>>
+>> Laurent Pinchart (2):
+>>    of: dma: Make of_dma_deconfigure() public
+>>    iommu: of: Handle IOMMU lookup failure with deferred probing or error
+>>
+>> Lorenzo Pieralisi (2):
+>>    ACPI/IORT: Add function to check SMMUs drivers presence
+>>    ACPI/IORT: Remove linker section for IORT entries probing
+>>
+>> Robin Murphy (3):
+>>    iommu/of: Refactor of_iommu_configure() for error handling
+>>    iommu/of: Prepare for deferred IOMMU configuration
+>>    iommu/arm-smmu: Clean up early-probing workarounds
+>>
+>> Sricharan R (4):
+>>    of: device: Fix overflow of coherent_dma_mask
+>>    of/acpi: Configure dma operations at probe time for platform/amba/pci
+>>      bus devices
+>>    drivers: acpi: Handle IOMMU lookup failure with deferred probing or
+>>      error
+>>    arm64: dma-mapping: Remove the notifier trick to handle early setting
+>>      of dma_ops
+>>
+>>   arch/arm64/mm/dma-mapping.c       | 142 +++++---------------------------------
+>>   drivers/acpi/arm64/iort.c         |  48 ++++++++++++-
+>>   drivers/acpi/glue.c               |   5 --
+>>   drivers/acpi/scan.c               |  11 ++-
+>>   drivers/base/dd.c                 |   9 +++
+>>   drivers/base/dma-mapping.c        |  41 +++++++++++
+>>   drivers/iommu/arm-smmu-v3.c       |  46 +-----------
+>>   drivers/iommu/arm-smmu.c          | 110 +++++++++++++----------------
+>>   drivers/iommu/of_iommu.c          | 126 ++++++++++++++++++++++++---------
+>>   drivers/of/device.c               |  23 +++++-
+>>   drivers/of/platform.c             |  10 +--
+>>   drivers/pci/probe.c               |  28 --------
+>>   include/acpi/acpi_bus.h           |   2 +-
+>>   include/asm-generic/vmlinux.lds.h |   1 -
+>>   include/linux/acpi.h              |   7 +-
+>>   include/linux/acpi_iort.h         |   3 -
+>>   include/linux/dma-mapping.h       |  12 ++++
+>>   include/linux/of_device.h         |  10 ++-
+>>   18 files changed, 312 insertions(+), 322 deletions(-)
+>>
+> 
+> Best regards
+
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
