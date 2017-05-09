@@ -1,53 +1,191 @@
-From: phil@raspberrypi.org (Phil Elwell)
-Date: Tue, 9 May 2017 09:20:25 +0100
-Subject: [PATCH] ARM: dts: bcm283x: Reserve first page for firmware
-Message-ID: <c0c0ac24-b55d-046a-c765-0a2933424ac4@raspberrypi.org>
+From: Wenyou.Yang@Microchip.com (Yang, Wenyou)
+Date: Tue, 9 May 2017 16:27:36 +0800
+Subject: [PATCH v3] ARM: dts: at91: sama5d2: add m_can nodes
+In-Reply-To: <20170424011217.2530-1-wenyou.yang@atmel.com>
+References: <20170424011217.2530-1-wenyou.yang@atmel.com>
+Message-ID: <b893b543-bfb6-823d-e111-877a31f44170@Microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Raspberry Pi startup stub files for multi-core BCM283X processors
-make the secondary CPUs spin until the corresponding mailbox is
-written. These stubs are loaded at physical address 0x00000xxx (as seen
-by the ARMs), but this page will be reused by the kernel unless it is
-explicitly reserved, causing the waiting cores to execute random code.
 
-Use the /memreserve/ Device Tree directive to mark the first page as
-off-limits to the kernel.
 
-See: https://github.com/raspberrypi/linux/issues/1989
+On 2017/4/24 9:12, Wenyou Yang wrote:
+> Add nodes to support the Controller Area Network(M_CAN) on SAMA5D2.
+> The version of M_CAN IP core is 3.1.0 (CREL = 0x31040730).
+>
+> As said in SAMA5D2 datasheet, the CAN clock is recommended to use
+> frequencies of 20, 40 or 80 MHz. To achieve these frequencies,
+> PMC GCLK3 must select the UPLLCK(480 MHz) as source clock and
+> divide by 24, 12, or 6. So, the "assigned-clock-rates" property
+> has three options: 20000000, 40000000, and 80000000.
+> The "assigned-clock-parents" property should be referred to utmi
+> fixedly.
+>
+> The MSBs [bits 31:16] of the CAN Message RAM for CAN0 and CAN1 are
+> default configured in 0x00200000. To avoid conflict with SRAM map
+> for PM, change them to 0x00210000 in the AT91Bootstrap via setting
+> the CAN Memories Address-based Register(SFR_CAN) of SFR.
+>
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Tested-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-Signed-off-by: Phil Elwell <phil@raspberrypi.org>
----
- arch/arm/boot/dts/bcm2710-rpi-3-b.dts | 4 ----
- arch/arm/boot/dts/bcm283x.dtsi        | 2 ++
- 2 files changed, 2 insertions(+), 4 deletions(-)
+Do you have any comments?
+> ---
+> The patch is tested on SAMA5D2 Xplained and based on the patch set,
+>   1. [PATCH v4 1/7] can: m_can: Disabled Interrupt Line 1
+>      http://marc.info/?l=linux-can&m=149165343604033&w=2
+>
+> Changes in v3:
+>   - Add Tested-by tag.
+>   - Change the number of Rx Rx Buffers, Tx Buffers and Tx Event FIFO
+>     to maximum.
+>
+> Changes in v2:
+>   - Configures 10 TX Event FIFO elements and 10 TX Buffers/FIFO slots,
+>     because the TXE FIFO is needed to be configured.
+>   - Configure the offset of Message RAM for CAN1 followed from CAN0's.
+>
+>   arch/arm/boot/dts/at91-sama5d2_xplained.dts | 24 +++++++++++++
+>   arch/arm/boot/dts/sama5d2.dtsi              | 56 +++++++++++++++++++++++++++++
+>   2 files changed, 80 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> index 9f7f8a7d8ff9..2f19b08dc226 100644
+> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+> @@ -257,6 +257,12 @@
+>   				status = "okay";
+>   			};
+>   
+> +			can0: can at f8054000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_can0_default>;
+> +				status = "okay";
+> +			};
+> +
+>   			uart3: serial at fc008000 {
+>   				atmel,use-dma-rx;
+>   				atmel,use-dma-tx;
+> @@ -321,6 +327,18 @@
+>   					bias-disable;
+>   				};
+>   
+> +				pinctrl_can0_default: can0_default {
+> +					pinmux = <PIN_PC10__CANTX0>,
+> +						 <PIN_PC11__CANRX0>;
+> +					bias-disable;
+> +				};
+> +
+> +				pinctrl_can1_default: can1_default {
+> +					pinmux = <PIN_PC26__CANTX1>,
+> +						 <PIN_PC27__CANRX1>;
+> +					bias-disable;
+> +				};
+> +
+>   				pinctrl_charger_chglev: charger_chglev {
+>   					pinmux = <PIN_PA12__GPIO>;
+>   					bias-disable;
+> @@ -468,6 +486,12 @@
+>   				};
+>   
+>   			};
+> +
+> +			can1: can at fc050000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_can1_default>;
+> +				status = "okay";
+> +			};
+>   		};
+>   	};
+>   
+> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+> index 22332be72140..7e00fa21373e 100644
+> --- a/arch/arm/boot/dts/sama5d2.dtsi
+> +++ b/arch/arm/boot/dts/sama5d2.dtsi
+> @@ -762,6 +762,18 @@
+>   						atmel,clk-output-range = <0 83000000>;
+>   					};
+>   
+> +					can0_clk: can0_clk {
+> +						#clock-cells = <0>;
+> +						reg = <56>;
+> +						atmel,clk-output-range = <0 83000000>;
+> +					};
+> +
+> +					can1_clk: can1_clk {
+> +						#clock-cells = <0>;
+> +						reg = <57>;
+> +						atmel,clk-output-range = <0 83000000>;
+> +					};
+> +
+>   					classd_clk: classd_clk {
+>   						#clock-cells = <0>;
+>   						reg = <59>;
+> @@ -890,6 +902,18 @@
+>   						#clock-cells = <0>;
+>   						reg = <55>;
+>   					};
+> +
+> +					can0_gclk: can0_gclk {
+> +						#clock-cells = <0>;
+> +						reg = <56>;
+> +						atmel,clk-output-range = <0 80000000>;
+> +					};
+> +
+> +					can1_gclk: can1_gclk {
+> +						#clock-cells = <0>;
+> +						reg = <57>;
+> +						atmel,clk-output-range = <0 80000000>;
+> +					};
+>   				};
+>   			};
+>   
+> @@ -1144,6 +1168,22 @@
+>   				clocks = <&clk32k>;
+>   			};
+>   
+> +			can0: can at f8054000 {
+> +				compatible = "bosch,m_can";
+> +				reg = <0xf8054000 0x4000>, <0x210000 0x4000>;
+> +				reg-names = "m_can", "message_ram";
+> +				interrupts = <56 IRQ_TYPE_LEVEL_HIGH 7>,
+> +					     <64 IRQ_TYPE_LEVEL_HIGH 7>;
+> +				interrupt-names = "int0", "int1";
+> +				clocks = <&can0_clk>, <&can0_gclk>;
+> +				clock-names = "hclk", "cclk";
+> +				assigned-clocks = <&can0_gclk>;
+> +				assigned-clock-parents = <&utmi>;
+> +				assigned-clock-rates = <40000000>;
+> +				bosch,mram-cfg = <0x0 0 0 64 0 0 32 32>;
+> +				status = "disabled";
+> +			};
+> +
+>   			spi1: spi at fc000000 {
+>   				compatible = "atmel,at91rm9200-spi";
+>   				reg = <0xfc000000 0x100>;
+> @@ -1305,6 +1345,22 @@
+>   				status = "okay";
+>   			};
+>   
+> +			can1: can at fc050000 {
+> +				compatible = "bosch,m_can";
+> +				reg = <0xfc050000 0x4000>, <0x210000 0x4000>;
+> +				reg-names = "m_can", "message_ram";
+> +				interrupts = <57 IRQ_TYPE_LEVEL_HIGH 7>,
+> +					     <65 IRQ_TYPE_LEVEL_HIGH 7>;
+> +				interrupt-names = "int0", "int1";
+> +				clocks = <&can1_clk>, <&can1_gclk>;
+> +				clock-names = "hclk", "cclk";
+> +				assigned-clocks = <&can1_gclk>;
+> +				assigned-clock-parents = <&utmi>;
+> +				assigned-clock-rates = <40000000>;
+> +				bosch,mram-cfg = <0x1100 0 0 64 0 0 32 32>;
+> +				status = "disabled";
+> +			};
+> +
+>   			chipid at fc069000 {
+>   				compatible = "atmel,sama5d2-chipid";
+>   				reg = <0xfc069000 0x8>;
 
-diff --git a/arch/arm/boot/dts/bcm2710-rpi-3-b.dts b/arch/arm/boot/dts/bcm2710-rpi-3-b.dts
-index b21d286..cbec919 100644
---- a/arch/arm/boot/dts/bcm2710-rpi-3-b.dts
-+++ b/arch/arm/boot/dts/bcm2710-rpi-3-b.dts
-@@ -1,9 +1,5 @@
- /dts-v1/;
- 
--#ifdef RPI364
--/memreserve/ 0x00000000 0x00001000;
--#endif
--
- #include "bcm2710.dtsi"
- #include "bcm283x-rpi-smsc9514.dtsi"
- 
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 7d58cd7..0bc1932 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -3,6 +3,8 @@
- #include <dt-bindings/clock/bcm2835-aux.h>
- #include <dt-bindings/gpio/gpio.h>
- 
-+/memreserve/ 0x00000000 0x00001000;
-+
- /* This include file covers the common peripherals and configuration between
-  * bcm2835 and bcm2836 implementations, leaving the CPU configuration to
-  * bcm2835.dtsi and bcm2836.dtsi.
--- 
-1.9.1
+Best Regards,
+Wenyou Yang
