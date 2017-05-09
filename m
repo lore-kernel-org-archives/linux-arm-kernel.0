@@ -1,74 +1,55 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:51 +0200
-Subject: [PULL 22/37] KVM: arm64: vgic-its: vgic_its_check_id returns the
- entry's GPA
+Date: Tue,  9 May 2017 12:45:05 +0200
+Subject: [PULL 36/37] KVM: arm/arm64: Don't call map_resources when restoring
+ ITS tables
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-23-cdall@linaro.org>
+Message-ID: <20170509104506.30929-37-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+The only reason we called kvm_vgic_map_resources() when restoring the
+ITS tables was because we wanted to have the KVM iodevs registered in
+the KVM IO bus framework at the time when the ITS was restored such that
+a restored and active device can inject MSIs prior to otherwise calling
+kvm_vgic_map_resources() from the first run of a VCPU.
 
-As vgic_its_check_id() computes the device/collection entry's
-GPA, let's return it so that new callers can retrieve it easily.
+Since we now register the KVM iodevs for the redestributors and ITS as
+soon as possible (when setting the base addresses), we no longer need
+this call and kvm_vgic_map_resources() is again called only when first
+running a VCPU.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Acked-by: Christoffer Dall <cdall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 5523f0a..90afc83 100644
+index 89acaef..9aeaff0 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -694,7 +694,8 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
-  * is actually valid (covered by a memslot and guest accessible).
-  * For this we have to read the respective first level entry.
-  */
--static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
-+static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
-+			      gpa_t *eaddr)
- {
- 	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
- 	u64 indirect_ptr, type = GITS_BASER_TYPE(baser);
-@@ -725,6 +726,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
- 		addr = BASER_ADDRESS(baser) + id * esz;
- 		gfn = addr >> PAGE_SHIFT;
+@@ -2308,20 +2308,12 @@ static int vgic_its_restore_tables_v0(struct vgic_its *its)
+ 		goto out;
  
-+		if (eaddr)
-+			*eaddr = addr;
- 		return kvm_is_visible_gfn(its->dev->kvm, gfn);
- 	}
+ 	ret = vgic_its_restore_device_tables(its);
+-
+ out:
+ 	unlock_all_vcpus(kvm);
+ 	mutex_unlock(&its->its_lock);
+ 	mutex_unlock(&kvm->lock);
  
-@@ -757,6 +760,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
- 	indirect_ptr += index * esz;
- 	gfn = indirect_ptr >> PAGE_SHIFT;
- 
-+	if (eaddr)
-+		*eaddr = indirect_ptr;
- 	return kvm_is_visible_gfn(its->dev->kvm, gfn);
+-	if (ret)
+-		return ret;
+-
+-	/*
+-	 * On restore path, MSI injections can happen before the
+-	 * first VCPU run so let's complete the GIC init here.
+-	 */
+-	return kvm_vgic_map_resources(its->dev->kvm);
++	return ret;
  }
  
-@@ -766,7 +771,7 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
- {
- 	struct its_collection *collection;
- 
--	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id))
-+	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id, NULL))
- 		return E_ITS_MAPC_COLLECTION_OOR;
- 
- 	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
-@@ -939,7 +944,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
- 	struct its_device *device;
- 
--	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
-+	if (!vgic_its_check_id(its, its->baser_device_table, device_id, NULL))
- 		return E_ITS_MAPD_DEVICE_OOR;
- 
- 	if (valid && num_eventid_bits > VITS_TYPER_IDBITS)
+ static int vgic_its_commit_v0(struct vgic_its *its)
 -- 
 2.9.0
