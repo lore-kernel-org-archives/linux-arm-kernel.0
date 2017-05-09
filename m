@@ -1,123 +1,86 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:36 +0200
-Subject: [PULL 07/37] KVM: arm64: vgic-its: KVM_DEV_ARM_VGIC_GRP_ITS_REGS group
+Date: Tue,  9 May 2017 12:44:41 +0200
+Subject: [PULL 12/37] KVM: arm64: vgic-its: Implement
+ vgic_mmio_uaccess_write_its_iidr
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-8-cdall@linaro.org>
+Message-ID: <20170509104506.30929-13-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@redhat.com>
 
-The ITS KVM device exposes a new KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-group which allows the userspace to save/restore ITS registers.
+The GITS_IIDR revision field is used to encode the migration ABI
+revision. So we need to restore it to check the table layout is
+readable by the destination.
 
-At this stage the get/set/has operations are not yet implemented.
+By writing the IIDR, userspace thus forces the ABI revision to be
+used and this must be less than or equal to the max revision KVM
+supports.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/uapi/asm/kvm.h   |  1 +
- arch/arm64/include/uapi/asm/kvm.h |  1 +
- virt/kvm/arm/vgic/vgic-its.c      | 36 +++++++++++++++++++++++++++++++++++-
- 3 files changed, 37 insertions(+), 1 deletion(-)
+ include/linux/irqchip/arm-gic-v3.h |  5 +++++
+ virt/kvm/arm/vgic/vgic-its.c       | 23 ++++++++++++++++++++---
+ 2 files changed, 25 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index a5838d6..ee183fc 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -194,6 +194,7 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
- #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
- #define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
-+#define KVM_DEV_ARM_VGIC_GRP_ITS_REGS	8
- #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
- #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
- 			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index cd6bea4..ee4a0ad 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -214,6 +214,7 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
- #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
- #define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
-+#define KVM_DEV_ARM_VGIC_GRP_ITS_REGS 8
- #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
- #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
- 			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 81ebe43..2eaea30 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -242,6 +242,11 @@
+ #define GITS_TYPER_PTA			(1UL << 19)
+ #define GITS_TYPER_HWCOLLCNT_SHIFT	24
+ 
++#define GITS_IIDR_REV_SHIFT		12
++#define GITS_IIDR_REV_MASK		(0xf << GITS_IIDR_REV_SHIFT)
++#define GITS_IIDR_REV(r)		(((r) >> GITS_IIDR_REV_SHIFT) & 0xf)
++#define GITS_IIDR_PRODUCTID_SHIFT	24
++
+ #define GITS_CBASER_VALID			(1ULL << 63)
+ #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
+ #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 3ffcbbe..f687e91 100644
+index 4f6ea46..9338efb 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1466,6 +1466,19 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
- 	kfree(its);
- }
- 
-+int vgic_its_has_attr_regs(struct kvm_device *dev,
-+			   struct kvm_device_attr *attr)
-+{
-+	return -ENXIO;
-+}
-+
-+int vgic_its_attr_regs_access(struct kvm_device *dev,
-+			      struct kvm_device_attr *attr,
-+			      u64 *reg, bool is_write)
-+{
-+	return -ENXIO;
-+}
-+
- static int vgic_its_has_attr(struct kvm_device *dev,
- 			     struct kvm_device_attr *attr)
+@@ -434,7 +434,23 @@ static unsigned long vgic_mmio_read_its_iidr(struct kvm *kvm,
+ 					     struct vgic_its *its,
+ 					     gpa_t addr, unsigned int len)
  {
-@@ -1482,6 +1495,8 @@ static int vgic_its_has_attr(struct kvm_device *dev,
- 			return 0;
- 		}
- 		break;
-+	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS:
-+		return vgic_its_has_attr_regs(dev, attr);
- 	}
- 	return -ENXIO;
+-	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++	u32 val;
++
++	val = (its->abi_rev << GITS_IIDR_REV_SHIFT) & GITS_IIDR_REV_MASK;
++	val |= (PRODUCT_ID_KVM << GITS_IIDR_PRODUCTID_SHIFT) | IMPLEMENTER_ARM;
++	return val;
++}
++
++static int vgic_mmio_uaccess_write_its_iidr(struct kvm *kvm,
++					    struct vgic_its *its,
++					    gpa_t addr, unsigned int len,
++					    unsigned long val)
++{
++	u32 rev = GITS_IIDR_REV(val);
++
++	if (rev >= NR_ITS_ABIS)
++		return -EINVAL;
++	return vgic_its_set_abi(its, rev);
  }
-@@ -1521,6 +1536,15 @@ static int vgic_its_set_attr(struct kvm_device *dev,
- 			return 0;
- 		}
- 		break;
-+	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
-+		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-+		u64 reg;
-+
-+		if (get_user(reg, uaddr))
-+			return -EFAULT;
-+
-+		return vgic_its_attr_regs_access(dev, attr, &reg, true);
-+	}
- 	}
- 	return -ENXIO;
- }
-@@ -1541,10 +1565,20 @@ static int vgic_its_get_attr(struct kvm_device *dev,
- 		if (copy_to_user(uaddr, &addr, sizeof(addr)))
- 			return -EFAULT;
- 		break;
-+	}
-+	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
-+		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-+		u64 reg;
-+		int ret;
-+
-+		ret = vgic_its_attr_regs_access(dev, attr, &reg, false);
-+		if (ret)
-+			return ret;
-+		return put_user(reg, uaddr);
-+	}
- 	default:
- 		return -ENXIO;
- 	}
--	}
  
- 	return 0;
- }
+ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
+@@ -1415,8 +1431,9 @@ static struct vgic_register_region its_registers[] = {
+ 	REGISTER_ITS_DESC(GITS_CTLR,
+ 		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
+ 		VGIC_ACCESS_32bit),
+-	REGISTER_ITS_DESC(GITS_IIDR,
+-		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
++	REGISTER_ITS_DESC_UACCESS(GITS_IIDR,
++		vgic_mmio_read_its_iidr, its_mmio_write_wi,
++		vgic_mmio_uaccess_write_its_iidr, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_TYPER,
+ 		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
 -- 
 2.9.0
