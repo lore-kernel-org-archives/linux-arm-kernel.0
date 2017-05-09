@@ -1,127 +1,154 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:29 +0200
-Subject: [PULL 00/37] KVM/ARM Changes for v4.12 - Round 2
-Message-ID: <20170509104506.30929-1-cdall@linaro.org>
+Date: Tue,  9 May 2017 12:44:32 +0200
+Subject: [PULL 03/37] KVM: arm/arm64: Add ITS save/restore API documentation
+In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
+References: <20170509104506.30929-1-cdall@linaro.org>
+Message-ID: <20170509104506.30929-4-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo and Radim,
+From: Eric Auger <eric.auger@redhat.com>
 
-Here is a second round of KVM/ARM Changes for v4.12.  I only just put
-these changes in kvmarm/next, but we've tested them pretty thoroughly.
+Add description for how to access ITS registers and how to save/restore
+ITS tables into/from memory.
 
-I know it's late in the merge window, but if we can still get them into
-v4.12 that would be good as the ITS save/restore impedes migration on
-GICv3 ARMv8 server systems.
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+---
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt | 120 +++++++++++++++++++++
+ 1 file changed, 120 insertions(+)
 
-The changes include:
- - A fix related to the 32-bit idmap stub
- - A fix to the bitmask used to deode the operands of an AArch32 CP
-   instruction
- - We have moved the files shared between arch/arm/kvm and
-   arch/arm64/kvm to virt/kvm/arm
- - We add support for saving/restoring the virtual ITS state to
-   userspace
-
-The following changes since commit 1edb632133efb6226b6bef3e7d9fa8c7134ac4e2:
-
-  ARM: KVM: Fix idmap stub entry when running Thumb-2 code (2017-04-20 20:17:57 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.12-round2
-
-for you to fetch changes up to a2b19e6e2d4bb662a64799541c144fd94f8fb024:
-
-  KVM: arm/arm64: vgic-its: Cleanup after failed ITT restore (2017-05-09 12:19:46 +0200)
-
-
-Thanks,
--Christoffer
-
-
-Christoffer Dall (11):
-  KVM: arm/arm64: Move shared files to virt/kvm/arm
-  KVM: arm/arm64: Clarification and relaxation to ITS save/restore ABI
-  KVM: arm/arm64: vgic: Rename kvm_vgic_vcpu_init to
-    kvm_vgic_vcpu_enable
-  KVM: Add kvm_vcpu_get_idx to get vcpu index in kvm->vcpus
-  KVM: arm/arm64: Refactor vgic_register_redist_iodevs
-  KVM: arm/arm64: Make vgic_v3_check_base more broadly usable
-  KVM: arm/arm64: Slightly rework kvm_vgic_addr
-  KVM: arm/arm64: Register iodevs when setting redist base and creating
-    VCPUs
-  KVM: arm/arm64: Register ITS iodev when setting base address
-  KVM: arm/arm64: Don't call map_resources when restoring ITS tables
-  KVM: arm/arm64: vgic-its: Cleanup after failed ITT restore
-
-Eric Auger (24):
-  KVM: arm/arm64: Add ITS save/restore API documentation
-  KVM: arm/arm64: Add GICV3 pending table save API documentation
-  KVM: arm/arm64: vgic-its: rename itte into ite
-  arm/arm64: vgic: turn vgic_find_mmio_region into public
-  KVM: arm64: vgic-its: KVM_DEV_ARM_VGIC_GRP_ITS_REGS group
-  KVM: arm/arm64: vgic: expose (un)lock_all_vcpus
-  KVM: arm64: vgic-its: Implement vgic_its_has_attr_regs and
-    attr_regs_access
-  KVM: arm64: vgic-its: Implement vgic_mmio_uaccess_write_its_creadr
-  KVM: arm64: vgic-its: Introduce migration ABI infrastructure
-  KVM: arm64: vgic-its: Implement vgic_mmio_uaccess_write_its_iidr
-  KVM: arm64: vgic-its: Interpret MAPD Size field and check related
-    errors
-  KVM: arm64: vgic-its: Interpret MAPD ITT_addr field
-  KVM: arm64: vgic-its: Check the device id matches TYPER DEVBITS range
-  KVM: arm64: vgic-v3: vgic_v3_lpi_sync_pending_status
-  KVM: arm64: vgic-its: Read config and pending bit in add_lpi()
-  KVM: arm64: vgic-its: KVM_DEV_ARM_ITS_SAVE/RESTORE_TABLES
-  KVM: arm64: vgic-its: vgic_its_alloc_ite/device
-  KVM: arm64: vgic-its: Add infrastructure for table lookup
-  KVM: arm64: vgic-its: Collection table save/restore
-  KVM: arm64: vgic-its: vgic_its_check_id returns the entry's GPA
-  KVM: arm64: vgic-its: Device table save/restore
-  KVM: arm64: vgic-its: ITT save and restore
-  KVM: arm64: vgic-its: Fix pending table sync
-  KVM: arm64: vgic-v3: KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
-
-Marc Zyngier (2):
-  arm64: KVM: Fix decoding of Rt/Rt2 when trapping AArch32 CP accesses
-  KVM: arm/arm64: Get rid of its->initialized field
-
- Documentation/virtual/kvm/devices/arm-vgic-its.txt |  121 ++
- Documentation/virtual/kvm/devices/arm-vgic-v3.txt  |    6 +
- arch/arm/include/uapi/asm/kvm.h                    |    6 +-
- arch/arm/kvm/Makefile                              |    7 +-
- arch/arm/kvm/trace.h                               |  247 ----
- arch/arm64/include/asm/kvm_emulate.h               |    6 +
- arch/arm64/include/uapi/asm/kvm.h                  |    6 +-
- arch/arm64/kvm/Makefile                            |    5 +-
- arch/arm64/kvm/sys_regs.c                          |    8 +-
- include/kvm/arm_vgic.h                             |    5 +-
- include/linux/irqchip/arm-gic-v3.h                 |   14 +
- include/linux/kvm_host.h                           |   11 +
- {arch/arm/kvm => virt/kvm/arm}/arm.c               |    2 +-
- {arch/arm/kvm => virt/kvm/arm}/mmio.c              |    0
- {arch/arm/kvm => virt/kvm/arm}/mmu.c               |    0
- {arch/arm/kvm => virt/kvm/arm}/perf.c              |    0
- {arch/arm/kvm => virt/kvm/arm}/psci.c              |    0
- virt/kvm/arm/trace.h                               |  246 +++-
- virt/kvm/arm/vgic/trace.h                          |   37 +
- virt/kvm/arm/vgic/vgic-init.c                      |   25 +-
- virt/kvm/arm/vgic/vgic-its.c                       | 1234 +++++++++++++++++---
- virt/kvm/arm/vgic/vgic-kvm-device.c                |   53 +-
- virt/kvm/arm/vgic/vgic-mmio-v3.c                   |  147 ++-
- virt/kvm/arm/vgic/vgic-mmio.c                      |   11 +-
- virt/kvm/arm/vgic/vgic-mmio.h                      |   14 +-
- virt/kvm/arm/vgic/vgic-v3.c                        |  128 +-
- virt/kvm/arm/vgic/vgic.c                           |    2 +-
- virt/kvm/arm/vgic/vgic.h                           |   33 +-
- 28 files changed, 1837 insertions(+), 537 deletions(-)
- rename {arch/arm/kvm => virt/kvm/arm}/arm.c (99%)
- rename {arch/arm/kvm => virt/kvm/arm}/mmio.c (100%)
- rename {arch/arm/kvm => virt/kvm/arm}/mmu.c (100%)
- rename {arch/arm/kvm => virt/kvm/arm}/perf.c (100%)
- rename {arch/arm/kvm => virt/kvm/arm}/psci.c (100%)
- create mode 100644 virt/kvm/arm/vgic/trace.h
-
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+index 6081a5b..ba132e9 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+@@ -32,7 +32,127 @@ Groups:
+     KVM_DEV_ARM_VGIC_CTRL_INIT
+       request the initialization of the ITS, no additional parameter in
+       kvm_device_attr.addr.
++
++    KVM_DEV_ARM_ITS_SAVE_TABLES
++      save the ITS table data into guest RAM, at the location provisioned
++      by the guest in corresponding registers/table entries.
++
++      The layout of the tables in guest memory defines an ABI. The entries
++      are laid out in little endian format as described in the last paragraph.
++
++    KVM_DEV_ARM_ITS_RESTORE_TABLES
++      restore the ITS tables from guest RAM to ITS internal structures.
++
++      The GICV3 must be restored before the ITS and all ITS registers but
++      the GITS_CTLR must be restored before restoring the ITS tables.
++
++      The GITS_IIDR read-only register must also be restored before
++      calling KVM_DEV_ARM_ITS_RESTORE_TABLES as the IIDR revision field
++      encodes the ABI revision.
++
++      The expected ordering when restoring the GICv3/ITS is described in section
++      "ITS Restore Sequence".
++
+   Errors:
+     -ENXIO:  ITS not properly configured as required prior to setting
+              this attribute
+     -ENOMEM: Memory shortage when allocating ITS internal data
++    -EINVAL: Inconsistent restored data
++    -EFAULT: Invalid guest ram access
++    -EBUSY:  One or more VCPUS are running
++
++  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
++  Attributes:
++      The attr field of kvm_device_attr encodes the offset of the
++      ITS register, relative to the ITS control frame base address
++      (ITS_base).
++
++      kvm_device_attr.addr points to a __u64 value whatever the width
++      of the addressed register (32/64 bits). 64 bit registers can only
++      be accessed with full length.
++
++      Writes to read-only registers are ignored by the kernel except for:
++      - GITS_CREADR. It must be restored otherwise commands in the queue
++        will be re-executed after restoring CWRITER. GITS_CREADR must be
++        restored before restoring the GITS_CTLR which is likely to enable the
++        ITS. Also it must be restored after GITS_CBASER since a write to
++        GITS_CBASER resets GITS_CREADR.
++      - GITS_IIDR. The Revision field encodes the table layout ABI revision.
++        In the future we might implement direct injection of virtual LPIs.
++        This will require an upgrade of the table layout and an evolution of
++        the ABI. GITS_IIDR must be restored before calling
++        KVM_DEV_ARM_ITS_RESTORE_TABLES.
++
++      For other registers, getting or setting a register has the same
++      effect as reading/writing the register on real hardware.
++  Errors:
++    -ENXIO: Offset does not correspond to any supported register
++    -EFAULT: Invalid user pointer for attr->addr
++    -EINVAL: Offset is not 64-bit aligned
++    -EBUSY: one or more VCPUS are running
++
++ ITS Restore Sequence:
++ -------------------------
++
++The following ordering must be followed when restoring the GIC and the ITS:
++a) restore all guest memory and create vcpus
++b) restore all redistributors
++c) initialize the ITS and then provide its base address
++   (KVM_DEV_ARM_VGIC_CTRL_INIT, KVM_DEV_ARM_VGIC_GRP_ADDR)
++d) restore the ITS in the following order:
++   1. Restore GITS_CBASER
++   2. Restore all other GITS_ registers, except GITS_CTLR!
++   3. Load the ITS table data (KVM_DEV_ARM_ITS_RESTORE_TABLES)
++   4. Restore GITS_CTLR
++
++Then vcpus can be started.
++
++ ITS Table ABI REV0:
++ -------------------
++
++ Revision 0 of the ABI only supports physical LPIs.
++
++ The device table and ITT are indexed by the deviceid and eventid,
++ respectively. The collection table is not indexed by collectionid:
++ CTEs are written in the table in the order of collection creation. All
++ entries are 8 bytes.
++
++ Device Table Entry (DTE):
++
++ bits:     | 63| 62 ... 49 | 48 ... 5 | 4 ... 0 |
++ values:   | V |   next    | ITT_addr |  Size   |
++
++ where;
++ - V indicates whether the entry is valid. If not, other fields
++   are not meaningful.
++ - next: equals to 0 if this entry is the last one; otherwise it
++   corresponds to the deviceid offset to the next DTE, capped by
++   2^14 -1.
++ - ITT_addr matches bits [51:8] of the ITT address (256 Byte aligned).
++ - Size specifies the supported number of bits for the eventid,
++   minus one
++
++ Collection Table Entry (CTE):
++
++ bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
++ values:   | V |    RES0    |  RDBase   |    ICID     |
++
++ where:
++ - V indicates whether the entry is valid. If not, other fields are
++   not meaningful.
++ - RES0: reserved field with Should-Be-Zero-or-Preserved behavior.
++ - RDBase is the PE number (GICR_TYPER.Processor_Number semantic),
++ - ICID is the collection ID
++
++ Interrupt Translation Entry (ITE):
++
++ bits:     | 63 ... 48 | 47 ... 16 | 15 ... 0 |
++ values:   |    next   |   pINTID  |  ICID    |
++
++ where:
++ - next: equals to 0 if this entry is the last one; otherwise it corresponds
++   to the eventid offset to the next ITE capped by 2^16 -1.
++ - pINTID is the physical LPI ID; if zero, it means the entry is not valid
++   and other fields are not meaningful.
++ - ICID is the collection ID
++
 -- 
 2.9.0
