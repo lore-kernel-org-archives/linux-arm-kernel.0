@@ -1,21 +1,90 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 9 May 2017 10:25:59 -0700
-Subject: [GIT PULL 0/7] ARM: SoC contents for 4.12 merge window
-In-Reply-To: <1494312773-9790-1-git-send-email-olof@lixom.net>
-References: <1494312773-9790-1-git-send-email-olof@lixom.net>
-Message-ID: <CA+55aFxRb2Bp+7Egw2f_QPQtdpmXU+aMt4dD_AsP7=JXs62qTw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 9 May 2017 18:39:42 +0100
+Subject: [PATCH 00/31] arm64: KVM: Mediate access to GICv3 sysregs at EL2
+In-Reply-To: <3f177b5e-e5c1-c681-1607-0a80c5aafba4@caviumnetworks.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <3f177b5e-e5c1-c681-1607-0a80c5aafba4@caviumnetworks.com>
+Message-ID: <be454720-190b-8730-4c04-b4098b33df45@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 8, 2017 at 11:52 PM, Olof Johansson <olof@lixom.net> wrote:
->
-> It's been a relatively quiet release cycle here. Patch count is about
-> the usual (818 commits, which includes merges). Accumulated diffstat:
+On 09/05/17 01:05, David Daney wrote:
+> On 05/03/2017 03:45 AM, Marc Zyngier wrote:
+>> [Apologies for posting this at the beginning of a merge window, but as
+>>   this is a rather hot topic, I'd rather put it out as soon as possible]
+>>
+>> Some systems have less than perfect GICv3 implementations, leading to
+>> all kind of ugly issues (guest hanging, host dying). In order to allow
+>> some level of diagnostic, and in some cases implement workarounds,
+>> this series enables the trapping of both Group-0, Group-1 and Common
+>> sysregs. Mediating the access at EL2 allows some form of sanity
+>> checking that the HW is sometimes sorely lacking.
+>>
+>> Instead of fully emulating a GICv3 CPU interface, we still use the
+>> existing HW (list registers, AP registers, VMCR...), which allows the
+>> code to be independent from the rest of the KVM code, and to cope with
+>> partial trapping.
+>>
+>> Of course, trapping has a cost, which is why this must be either
+>> enabled on the command line, or selected by another cpu capability
+>> (see Cavium erratum 30115). A quick test on an A57-based platform
+>> shows a 25% hit when repeatedly banging on the trapped registers,
+>> while normal workloads do not seem to suffer noticeably from such
+>> trapping (hackbench variance is in the usual noise, despite being very
+>> IPI happy).
+>>
+>> This has been tested on a dual socket Thundex-X and a Freescale LS-2085a.
+>>
+>> The first 6 patches are fixes, and only here for reference as they
+>> have already been posted separately. The rest of the patches implement
+>> Group-1, Group-0 and Common sysreg handlers, with the corresponding
+>> command line options. I've also taken the liberty to rebase David
+>> Daney's initial Cavium erratum 30115 workaround on top of this series,
+>> and included it here as a typical use case.
+>>
+> 
+> 
+> Thanks Marc for working on this.
+> 
+> I tested this series based on your git branch:
+> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm64/gicv3-cpuif-mediated-access
+> 
+> This does indeed fix the problems we were seeing, so feel free to add:
+> 
+> Tested-by: David Daney <david.daney@cavium.com>
+> 
+> to the entire series.
 
-Thanks, all merged, and all trivial to merge. I was getting a bit
-nervous when I didn't get this the first week, but it all looks fine.
+Thanks for having given it a go.
 
-Pushed out, probably still worth double-checking even though
-everything looked trivial.
+> 
+> I would note that with these patches we see an occasional:
+> 
+> [ 3868.311491] Unexpected interrupt 4 on vcpu ffff801f57a6a020
+> [ 4262.063419] Unexpected interrupt 4 on vcpu ffff801f5b3dc040
+> [ 4262.063422] Unexpected interrupt 4 on vcpu ffff801f50972020
+> 
+> This is better than locking up the system, but I wonder if it indicates 
+> that improvement to the code is still possible.
 
-                  Linus
+This warning occasionally shows up on the same platform even without
+these patches (it is just harder to trigger). This is an artefact of the
+way KVM treats the virtual timer, disabling it on exit and expecting it
+to immediately retired from the CPU interface. This works just fine on
+all systems, except for this platform where it seems to take a bit more
+time.
+
+Trapping things at EL2 introduces just enough additional latency that we
+end-up exiting with a pending interrupt more often than without the
+trapping, trigger this warning.
+
+The good news is twofold: this is completely harmless (we just get an
+extra interrupt on the host), and Christoffer is working on patches that
+will change the way we handle this so that we actually make use of that
+interrupt.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
