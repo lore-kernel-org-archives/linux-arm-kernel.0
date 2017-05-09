@@ -1,87 +1,44 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:45:01 +0200
-Subject: [PULL 32/37] KVM: arm/arm64: Slightly rework kvm_vgic_addr
+Date: Tue,  9 May 2017 12:44:58 +0200
+Subject: [PULL 29/37] KVM: Add kvm_vcpu_get_idx to get vcpu index in kvm->vcpus
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-33-cdall@linaro.org>
+Message-ID: <20170509104506.30929-30-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are about to handle setting the address for the redistributor base
-region separately from some of the other base addresses, let's rework
-this function to leave a little more room for being flexible in what
-each type of base address does.
+There are occasional needs to use the index of vcpu in the kvm->vcpus
+array to map something related to a VCPU.  For example, unlike the
+vcpu->vcpu_id, the vcpu index is guaranteed to not be sparse across all
+vcpus which is useful when allocating a memory area for each vcpu.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 ---
- virt/kvm/arm/vgic/vgic-kvm-device.c | 22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+ include/linux/kvm_host.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index d48743c..69ccfd5 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -37,6 +37,14 @@ int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
- 	return 0;
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index 2c14ad9..12eb26d 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -490,6 +490,17 @@ static inline struct kvm_vcpu *kvm_get_vcpu_by_id(struct kvm *kvm, int id)
+ 	return NULL;
  }
  
-+static int vgic_check_type(struct kvm *kvm, int type_needed)
++static inline int kvm_vcpu_get_idx(struct kvm_vcpu *vcpu)
 +{
-+	if (kvm->arch.vgic.vgic_model != type_needed)
-+		return -ENODEV;
-+	else
-+		return 0;
++	struct kvm_vcpu *tmp;
++	int idx;
++
++	kvm_for_each_vcpu(idx, tmp, vcpu->kvm)
++		if (tmp == vcpu)
++			return idx;
++	BUG();
 +}
 +
- /**
-  * kvm_vgic_addr - set or get vgic VM base addresses
-  * @kvm:   pointer to the vm struct
-@@ -57,40 +65,36 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- {
- 	int r = 0;
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
--	int type_needed;
- 	phys_addr_t *addr_ptr, alignment;
- 
- 	mutex_lock(&kvm->lock);
- 	switch (type) {
- 	case KVM_VGIC_V2_ADDR_TYPE_DIST:
--		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
- 		addr_ptr = &vgic->vgic_dist_base;
- 		alignment = SZ_4K;
- 		break;
- 	case KVM_VGIC_V2_ADDR_TYPE_CPU:
--		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
- 		addr_ptr = &vgic->vgic_cpu_base;
- 		alignment = SZ_4K;
- 		break;
- 	case KVM_VGIC_V3_ADDR_TYPE_DIST:
--		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V3);
- 		addr_ptr = &vgic->vgic_dist_base;
- 		alignment = SZ_64K;
- 		break;
- 	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
--		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V3);
- 		addr_ptr = &vgic->vgic_redist_base;
- 		alignment = SZ_64K;
- 		break;
- 	default:
- 		r = -ENODEV;
--		goto out;
- 	}
- 
--	if (vgic->vgic_model != type_needed) {
--		r = -ENODEV;
-+	if (r)
- 		goto out;
--	}
- 
- 	if (write) {
- 		r = vgic_check_ioaddr(kvm, addr_ptr, *addr, alignment);
+ #define kvm_for_each_memslot(memslot, slots)	\
+ 	for (memslot = &slots->memslots[0];	\
+ 	      memslot < slots->memslots + KVM_MEM_SLOTS_NUM && memslot->npages;\
 -- 
 2.9.0
