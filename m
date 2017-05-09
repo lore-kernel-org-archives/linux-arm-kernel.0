@@ -1,24 +1,31 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue, 9 May 2017 08:24:12 -0500
-Subject: [PATCH] ARM: socfpga: Increase max number of GPIOs
-In-Reply-To: <20170504102630.10487-1-marex@denx.de>
-References: <20170504102630.10487-1-marex@denx.de>
-Message-ID: <aa0eed09-33d6-1315-4d80-dd3d3a7c831d@kernel.org>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 09 May 2017 09:25:18 -0400 (EDT)
+Subject: [PATCH 1/4] net: macb: Add support for PTP timestamps in DMA
+ descriptors
+In-Reply-To: <20170509120434.GA9368@localhost.localdomain>
+References: <1494321885-14384-1-git-send-email-rafalo@cadence.com>
+ <20170509120434.GA9368@localhost.localdomain>
+Message-ID: <20170509.092518.1737282249706066693.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Richard Cochran <richardcochran@gmail.com>
+Date: Tue, 9 May 2017 14:04:34 +0200
 
-
-On 05/04/2017 05:26 AM, Marek Vasut wrote:
-> Increase the maximum number of GPIOs on SoCFPGA as this platform
-> can have many GPIO controllers in the FPGA part.
+> On Tue, May 09, 2017 at 10:24:45AM +0100, Rafal Ozieblo wrote:
+>> This patch adds support for PTP timestamps in
+>> DMA buffer descriptors. It checks capability at runtime
+>> and uses appropriate buffer descriptor.
+>> 
+>> Signed-off-by: Rafal Ozieblo <rafalo@cadence.com>
 > 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> ---
->  arch/arm/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+> You posted this series once before, on April 13, 2017.  That makes
+> this v2.  Please add v2 in the subject line, eg. [PATCH v2 1/4].
 > 
+> Also, add a cover letter [0/4] that summarizes the changes between v1
+> and v2 of the series.
 
-Applied! Thanks..
+Please don't ask someone to repost a series targetting net-next
+right now when that tree is currently closed for submissions.
 
-Dinh
+Thank you.
