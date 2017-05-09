@@ -1,74 +1,60 @@
-From: hugues.fruchet@st.com (Hugues FRUCHET)
-Date: Tue, 9 May 2017 07:36:34 +0000
-Subject: [PATCH v5 2/8] [media] stm32-dcmi: STM32 DCMI camera interface
- driver
-In-Reply-To: <dd4a1ec1-b84a-81cb-51b6-c2e53b5efcc5@xs4all.nl>
-References: <1493998287-5828-1-git-send-email-hugues.fruchet@st.com>
- <1493998287-5828-3-git-send-email-hugues.fruchet@st.com>
- <dd4a1ec1-b84a-81cb-51b6-c2e53b5efcc5@xs4all.nl>
-Message-ID: <5d588e10-4185-60c5-de38-54b2a4428ae6@st.com>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Tue, 9 May 2017 08:40:27 +0100
+Subject: [PATCH v5 0/5] Add ARM Mali Midgard device tree bindings and gpu
+ node for rk3288
+In-Reply-To: <b63475e9-21f6-5995-90b6-e0eeae8144ab@rock-chips.com>
+References: <cover.1493804968.git.guillaume.tucker@collabora.com>
+ <12996903.t3AZceNVOh@diego>
+ <b63475e9-21f6-5995-90b6-e0eeae8144ab@rock-chips.com>
+Message-ID: <b43fc703-3c39-58e9-6006-1aa7f9d0cea6@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-It's OK, feel free to change.
-BR
-Hugues.
+On 09/05/17 02:16, Randy Li wrote:
+>
+>
+> On 05/09/2017 12:27 AM, Heiko St?bner wrote:
+>> Am Mittwoch, 3. Mai 2017, 10:56:24 CEST schrieb Guillaume Tucker:
+>>> The ARM Mali Midgard GPU kernel driver is only available
+>>> out-of-tree and is not going to be merged in its current form.
+>>> However, it would be useful to have its device tree bindings
+>>> merged.  In particular, this would enable distributions to create
+>>> working driver packages (dkms...) without having to patch the
+>>> kernel.
+>>>
+>>> The bindings for the earlier Mali Utgard GPU family have already
+>>> been merged, so this is essentially the same scenario but for
+>>> newer GPUs (Mali-T604 ~ Mali-T880).
+>>>
+>>> This series of patches first imports the bindings from the latest
+>>> driver release with some clean-up then adds a gpu node for the
+>>> rk3288 SoC.  This was successfully tested on Radxa Rock2 Square,
+>>> Firefly, Veyron Minnie and Jerry boards using Mali kernel driver
+>>> r16p0 and r12p0 user-space binary.
+> I won't suggest such combine. We meet some problems at mali 400 serial.
+> I would suggest the kernel version would match the user library.
+
+Well, I can test it again with r12p0 kernel driver (out-of-tree)
+if you want.  The user-space driver checks the version of the
+kernel driver and gives up if it's not compatible.  With Midgard,
+there's a range of versions that maintain kernel/userspace
+compatibility unlike Utgard and older Midgard releases where they
+had to exactly match.  Again, if there was a mismatch then the
+user-space would fail to initialise and report an error.
+
+> Also please notice there is rk3288w, the hardware version becomes r1p0.
+
+Sounds like a new SoC?  Does rk3288w affect rk3288 in any way?
+
+Unless it's a special case, it seems to me that any new SoC with
+a Midgard GPU would need an extra vendor compatible string in the
+binding documentation and maybe a separate gpu dt node.
+
+>> The actual devicetree parts are all Rockchip-specific, so I guess I'll just
+>> pick up the whole series, including the binding doc, after the merge
+>> window if nobody complains before that :-)
+
+Thanks!
 
 
-On 05/06/2017 10:54 AM, Hans Verkuil wrote:
-> Hi Hugues,
->
-> On 05/05/2017 05:31 PM, Hugues Fruchet wrote:
->> This V4L2 subdev driver enables Digital Camera Memory Interface (DCMI)
->> of STMicroelectronics STM32 SoC series.
->>
->> Reviewed-by: Hans Verkuil <hans.verkuil@cisco.com>
->> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
->> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
->> ---
->>  drivers/media/platform/Kconfig            |   12 +
->>  drivers/media/platform/Makefile           |    2 +
->>  drivers/media/platform/stm32/Makefile     |    1 +
->>  drivers/media/platform/stm32/stm32-dcmi.c | 1403 +++++++++++++++++++++++++++++
->>  4 files changed, 1418 insertions(+)
->>  create mode 100644 drivers/media/platform/stm32/Makefile
->>  create mode 100644 drivers/media/platform/stm32/stm32-dcmi.c
->>
->> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
->> index ac026ee..de6e18b 100644
->> --- a/drivers/media/platform/Kconfig
->> +++ b/drivers/media/platform/Kconfig
->> @@ -114,6 +114,18 @@ config VIDEO_S3C_CAMIF
->>  	  To compile this driver as a module, choose M here: the module
->>  	  will be called s3c-camif.
->>
->> +config VIDEO_STM32_DCMI
->> +	tristate "Digital Camera Memory Interface (DCMI) support"
->
-> Is it OK with you if I change this to:
->
-> 	tristate "STM32 Digital Camera Memory Interface (DCMI) support"
->
-> Right now the text gives no indication that this driver is for an STM32 platform.
->
-> No need to spin a new patch, just let me know you're OK with it and I'll make
-> the change.
->
-> Regards,
->
-> 	Hans
->
->> +	depends on VIDEO_V4L2 && OF && HAS_DMA
->> +	depends on ARCH_STM32 || COMPILE_TEST
->> +	select VIDEOBUF2_DMA_CONTIG
->> +	---help---
->> +	  This module makes the STM32 Digital Camera Memory Interface (DCMI)
->> +	  available as a v4l2 device.
->> +
->> +	  To compile this driver as a module, choose M here: the module
->> +	  will be called stm32-dcmi.
->> +
->>  source "drivers/media/platform/soc_camera/Kconfig"
->>  source "drivers/media/platform/exynos4-is/Kconfig"
->>  source "drivers/media/platform/am437x/Kconfig"
+Guillaume
