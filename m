@@ -1,246 +1,115 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:40 +0200
-Subject: [PULL 11/37] KVM: arm64: vgic-its: Introduce migration ABI
- infrastructure
+Date: Tue,  9 May 2017 12:44:46 +0200
+Subject: [PULL 17/37] KVM: arm64: vgic-its: Read config and pending bit in
+ add_lpi()
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-12-cdall@linaro.org>
+Message-ID: <20170509104506.30929-18-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@redhat.com>
 
-We plan to support different migration ABIs, ie. characterizing
-the ITS table layout format in guest RAM. For example, a new ABI
-will be needed if vLPIs get supported for nested use case.
-
-So let's introduce an array of supported ABIs (at the moment a single
-ABI is supported though). The following characteristics are foreseen
-to vary with the ABI: size of table entries, save/restore operation,
-the way abi settings are applied.
-
-By default the MAX_ABI_REV is applied on its creation. In subsequent
-patches we will introduce a way for the userspace to change the ABI
-in use.
-
-The entry sizes now are set according to the ABI version and not
-hardcoded anymore.
+When creating the lpi we now ask the redistributor what is the state
+of the LPI (priority, enabled, pending).
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
 ---
- include/kvm/arm_vgic.h             |  3 ++
- include/linux/irqchip/arm-gic-v3.h |  5 ++
- virt/kvm/arm/vgic/vgic-its.c       | 93 ++++++++++++++++++++++++++++++++++++--
- 3 files changed, 97 insertions(+), 4 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 35 ++++++++++++++++++++++++-----------
+ 1 file changed, 24 insertions(+), 11 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 26ed4fb..fabcc64 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -162,6 +162,9 @@ struct vgic_its {
- 	u32			creadr;
- 	u32			cwriter;
- 
-+	/* migration ABI revision in use */
-+	u32			abi_rev;
-+
- 	/* Protects the device and collection lists */
- 	struct mutex		its_lock;
- 	struct list_head	device_list;
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 97cbca1..81ebe43 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -132,6 +132,9 @@
- #define GIC_BASER_SHAREABILITY(reg, type)				\
- 	(GIC_BASER_##type << reg##_SHAREABILITY_SHIFT)
- 
-+/* encode a size field of width @w containing @n - 1 units */
-+#define GIC_ENCODE_SZ(n, w) (((unsigned long)(n) - 1) & GENMASK_ULL(((w) - 1), 0))
-+
- #define GICR_PROPBASER_SHAREABILITY_SHIFT		(10)
- #define GICR_PROPBASER_INNER_CACHEABILITY_SHIFT		(7)
- #define GICR_PROPBASER_OUTER_CACHEABILITY_SHIFT		(56)
-@@ -232,6 +235,7 @@
- #define GITS_CTLR_QUIESCENT		(1U << 31)
- 
- #define GITS_TYPER_PLPIS		(1UL << 0)
-+#define GITS_TYPER_ITT_ENTRY_SIZE_SHIFT	4
- #define GITS_TYPER_IDBITS_SHIFT		8
- #define GITS_TYPER_DEVBITS_SHIFT	13
- #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
-@@ -290,6 +294,7 @@
- #define GITS_BASER_TYPE(r)		(((r) >> GITS_BASER_TYPE_SHIFT) & 7)
- #define GITS_BASER_ENTRY_SIZE_SHIFT		(48)
- #define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0x1f) + 1)
-+#define GITS_BASER_ENTRY_SIZE_MASK	GENMASK_ULL(52, 48)
- #define GITS_BASER_SHAREABILITY_SHIFT	(10)
- #define GITS_BASER_InnerShareable					\
- 	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index bf3ff09..4f6ea46 100644
+index 3601790..ffd0a80 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -33,6 +33,10 @@
- #include "vgic.h"
- #include "vgic-mmio.h"
+@@ -36,6 +36,8 @@
+ static int vgic_its_save_tables_v0(struct vgic_its *its);
+ static int vgic_its_restore_tables_v0(struct vgic_its *its);
+ static int vgic_its_commit_v0(struct vgic_its *its);
++static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
++			     struct kvm_vcpu *filter_vcpu);
  
-+static int vgic_its_save_tables_v0(struct vgic_its *its);
-+static int vgic_its_restore_tables_v0(struct vgic_its *its);
-+static int vgic_its_commit_v0(struct vgic_its *its);
-+
  /*
   * Creates a new (reference to a) struct vgic_irq for a given LPI.
-  * If this LPI is already mapped on another ITS, we increase its refcount
-@@ -123,6 +127,50 @@ struct its_ite {
- 	u32 event_id;
- };
- 
-+/**
-+ * struct vgic_its_abi - ITS abi ops and settings
-+ * @cte_esz: collection table entry size
-+ * @dte_esz: device table entry size
-+ * @ite_esz: interrupt translation table entry size
-+ * @save tables: save the ITS tables into guest RAM
-+ * @restore_tables: restore the ITS internal structs from tables
-+ *  stored in guest RAM
-+ * @commit: initialize the registers which expose the ABI settings,
-+ *  especially the entry sizes
-+ */
-+struct vgic_its_abi {
-+	int cte_esz;
-+	int dte_esz;
-+	int ite_esz;
-+	int (*save_tables)(struct vgic_its *its);
-+	int (*restore_tables)(struct vgic_its *its);
-+	int (*commit)(struct vgic_its *its);
-+};
-+
-+static const struct vgic_its_abi its_table_abi_versions[] = {
-+	[0] = {.cte_esz = 8, .dte_esz = 8, .ite_esz = 8,
-+	 .save_tables = vgic_its_save_tables_v0,
-+	 .restore_tables = vgic_its_restore_tables_v0,
-+	 .commit = vgic_its_commit_v0,
-+	},
-+};
-+
-+#define NR_ITS_ABIS	ARRAY_SIZE(its_table_abi_versions)
-+
-+inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
-+{
-+	return &its_table_abi_versions[its->abi_rev];
-+}
-+
-+int vgic_its_set_abi(struct vgic_its *its, int rev)
-+{
-+	const struct vgic_its_abi *abi;
-+
-+	its->abi_rev = rev;
-+	abi = vgic_its_get_abi(its);
-+	return abi->commit(its);
-+}
-+
- /*
-  * Find and returns a device in the device table for an ITS.
-  * Must be called with the its_lock mutex held.
-@@ -364,6 +412,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
- 					      struct vgic_its *its,
- 					      gpa_t addr, unsigned int len)
+@@ -44,10 +46,12 @@ static int vgic_its_commit_v0(struct vgic_its *its);
+  * If this is a "new" LPI, we allocate and initialize a new struct vgic_irq.
+  * This function returns a pointer to the _unlocked_ structure.
+  */
+-static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
++static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
++				     struct kvm_vcpu *vcpu)
  {
-+	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
- 	u64 reg = GITS_TYPER_PLPIS;
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	struct vgic_irq *irq = vgic_get_irq(kvm, NULL, intid), *oldirq;
++	int ret;
  
- 	/*
-@@ -376,6 +425,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
- 	 */
- 	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
- 	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
-+	reg |= GIC_ENCODE_SZ(abi->ite_esz, 4) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
+ 	/* In this case there is no put, since we keep the reference. */
+ 	if (irq)
+@@ -64,6 +68,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
+ 	irq->config = VGIC_CONFIG_EDGE;
+ 	kref_init(&irq->refcount);
+ 	irq->intid = intid;
++	irq->target_vcpu = vcpu;
  
- 	return extract_bytes(reg, addr & 7, len);
- }
-@@ -1268,6 +1318,7 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
- 				      gpa_t addr, unsigned int len,
- 				      unsigned long val)
- {
-+	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
- 	u64 entry_size, device_type;
- 	u64 reg, *regptr, clearbits = 0;
+ 	spin_lock(&dist->lpi_list_lock);
  
-@@ -1278,12 +1329,12 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
- 	switch (BASER_INDEX(addr)) {
- 	case 0:
- 		regptr = &its->baser_device_table;
--		entry_size = 8;
-+		entry_size = abi->dte_esz;
- 		device_type = GITS_BASER_TYPE_DEVICE;
- 		break;
- 	case 1:
- 		regptr = &its->baser_coll_table;
--		entry_size = 8;
-+		entry_size = abi->cte_esz;
- 		device_type = GITS_BASER_TYPE_COLLECTION;
- 		clearbits = GITS_BASER_INDIRECT;
- 		break;
-@@ -1425,7 +1476,6 @@ static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
- 	(GIC_BASER_CACHEABILITY(GITS_BASER, INNER, RaWb)		| \
- 	 GIC_BASER_CACHEABILITY(GITS_BASER, OUTER, SameAsInner)		| \
- 	 GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)		| \
--	 ((8ULL - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)			| \
- 	 GITS_BASER_PAGE_SIZE_64K)
+@@ -95,6 +100,19 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
+ out_unlock:
+ 	spin_unlock(&dist->lpi_list_lock);
  
- #define INITIAL_PROPBASER_VALUE						  \
-@@ -1465,7 +1515,7 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
- 
- 	dev->private = its;
- 
--	return 0;
-+	return vgic_its_set_abi(its, NR_ITS_ABIS - 1);
++	/*
++	 * We "cache" the configuration table entries in our struct vgic_irq's.
++	 * However we only have those structs for mapped IRQs, so we read in
++	 * the respective config data from memory here upon mapping the LPI.
++	 */
++	ret = update_lpi_config(kvm, irq, NULL);
++	if (ret)
++		return ERR_PTR(ret);
++
++	ret = vgic_v3_lpi_sync_pending_status(kvm, irq);
++	if (ret)
++		return ERR_PTR(ret);
++
+ 	return irq;
  }
  
- static void vgic_its_destroy(struct kvm_device *kvm_dev)
-@@ -1592,6 +1642,41 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
- 	return ret;
+@@ -795,6 +813,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	u32 event_id = its_cmd_get_id(its_cmd);
+ 	u32 coll_id = its_cmd_get_collection(its_cmd);
+ 	struct its_ite *ite;
++	struct kvm_vcpu *vcpu = NULL;
+ 	struct its_device *device;
+ 	struct its_collection *collection, *new_coll = NULL;
+ 	int lpi_nr;
+@@ -840,7 +859,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	ite->collection = collection;
+ 	ite->lpi = lpi_nr;
+ 
+-	irq = vgic_add_lpi(kvm, lpi_nr);
++	if (its_is_collection_mapped(collection))
++		vcpu = kvm_get_vcpu(kvm, collection->target_addr);
++
++	irq = vgic_add_lpi(kvm, lpi_nr, vcpu);
+ 	if (IS_ERR(irq)) {
+ 		if (new_coll)
+ 			vgic_its_free_collection(its, coll_id);
+@@ -849,15 +871,6 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	}
+ 	ite->irq = irq;
+ 
+-	update_affinity_ite(kvm, ite);
+-
+-	/*
+-	 * We "cache" the configuration table entries in out struct vgic_irq's.
+-	 * However we only have those structs for mapped IRQs, so we read in
+-	 * the respective config data from memory here upon mapping the LPI.
+-	 */
+-	update_lpi_config(kvm, ite->irq, NULL);
+-
+ 	return 0;
  }
  
-+/**
-+ * vgic_its_save_tables_v0 - Save the ITS tables into guest ARM
-+ * according to v0 ABI
-+ */
-+static int vgic_its_save_tables_v0(struct vgic_its *its)
-+{
-+	return -ENXIO;
-+}
-+
-+/**
-+ * vgic_its_restore_tables_v0 - Restore the ITS tables from guest RAM
-+ * to internal data structs according to V0 ABI
-+ *
-+ */
-+static int vgic_its_restore_tables_v0(struct vgic_its *its)
-+{
-+	return -ENXIO;
-+}
-+
-+static int vgic_its_commit_v0(struct vgic_its *its)
-+{
-+	const struct vgic_its_abi *abi;
-+
-+	abi = vgic_its_get_abi(its);
-+	its->baser_coll_table &= ~GITS_BASER_ENTRY_SIZE_MASK;
-+	its->baser_device_table &= ~GITS_BASER_ENTRY_SIZE_MASK;
-+
-+	its->baser_coll_table |= (GIC_ENCODE_SZ(abi->cte_esz, 5)
-+					<< GITS_BASER_ENTRY_SIZE_SHIFT);
-+
-+	its->baser_device_table |= (GIC_ENCODE_SZ(abi->dte_esz, 5)
-+					<< GITS_BASER_ENTRY_SIZE_SHIFT);
-+	return 0;
-+}
-+
- static int vgic_its_has_attr(struct kvm_device *dev,
- 			     struct kvm_device_attr *attr)
- {
 -- 
 2.9.0
