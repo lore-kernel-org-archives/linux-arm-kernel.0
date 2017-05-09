@@ -1,81 +1,33 @@
-From: segher@kernel.crashing.org (Segher Boessenkool)
-Date: Tue, 9 May 2017 17:18:43 -0500
-Subject: Updating kernel.org cross compilers?
-In-Reply-To: <ee8a7f2c-976d-fe2a-55f9-ab8eebbf22eb@arm.com>
-References: <92b5ff36-ad2b-10bc-de4f-4774babd9625@arm.com>
- <20170430052957.GJ19687@gate.crashing.org>
- <ee8a7f2c-976d-fe2a-55f9-ab8eebbf22eb@arm.com>
-Message-ID: <20170509221843.GZ19687@gate.crashing.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 10 May 2017 00:35:23 +0200
+Subject: [PATCH 2/4] arm64: dts: rk3399: add power domain for some
+ peripheral
+In-Reply-To: <1580550.DrIeisNgS3@phil>
+References: <1491981044-24635-1-git-send-email-kever.yang@rock-chips.com>
+ <1491981044-24635-2-git-send-email-kever.yang@rock-chips.com>
+ <1580550.DrIeisNgS3@phil>
+Message-ID: <106742786.ILvbsPBJ6D@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
-
-On Tue, May 09, 2017 at 03:59:27PM +0100, Andre Przywara wrote:
-> >> and adding --disable-multilib (for building x86-64 on a x86-64
-> >> box without 32-bit libs)
+Am Dienstag, 9. Mai 2017, 23:40:29 CEST schrieb Heiko Stuebner:
+> Am Mittwoch, 12. April 2017, 15:10:42 CEST schrieb Kever Yang:
+> > Add power domain for sd, usb, edp.
 > > 
-> > Why is this needed?  What error are you seeing.
+> > Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 > 
-> It was something along the lines of not finding 32-bit compat libraries
-> (which I don't have on that build machine):
-> ------------------------
-> configure: error: I suspect your system does not have 32-bit development
-> libraries (libc and headers). If you have them, rerun configure with
-> --enable-multilib. If you do not have them, and want to build a
-> 64-bit-only compiler, rerun configure with --disable-multilib.
-> ------------------------
-> 
-> I don't think we need multilib for a kernel build, also we have an i386
-> compiler for 32-bit kernels. So adding this flags allows x86_64 to be
-> build on pure 64-bit systems.
+> applied for 4.13
 
-Oh hrm, so it is building a native compiler?  I thought I got rid of
-that everywhere, always build crosses instead.  I'll investigate.
+and dropped again.
 
-> >> I was able to build (bare-metal) toolchains for
-> >> all architectures except arc, m68k, tilegx and tilepro.
-> > 
-> > arc needs a more recent GCC; the other probably as well.  GCC 7 should
-> > be out very soon, you probably want to wait for that :-)
-> 
-> Well, GCC 7 indeed builds better, but then again is a very new compiler.
-> For instance in the moment it spits a lot of warnings when compiling the
-> kernel (mostly due to some *printf analysis). It's not hard to fix, but
-> this will take a while to trickle in and it's questionable whether this
-> will be backported everywhere.
-> So in addition to GCC 7.1 I'd like to have at least GCC 6.3 around,
-> which builds kernels without warnings today.
+Actual testing revealed that I now get "synchronous external aborts" with
+this patch applied.
 
-If you don't want warnings, turn off the warnings or just don't look at
-them...  or fix the problems?  Many of the new warnings point out actual
-problems.
+The power-domain driver now probably disables some domain that should've 
+stayed on and I guess the only thing missing is probably some power-domains
+reference in some device node in rk3399.dtsi.
 
-Many of those sprintf problems in the kernel have already been fixed.
-
-> For GCC 6.3 (and probably before) arc was breaking because missing a
-> (default) CPU type. Adding "--with-cpu=arc700" to EXTRA_GCC_CONF fixed
-> that, but GCC 7 indeed builds fine, even without it.
-
-There were other problems, also in binutils.
-
-> Also I removed documentation (share/ directory, which won't be in
-> MANPATH mostly anyway) from the tarball and stripped the (host) binaries
-> to get the tarball size down (to about 16 MB per arch)
-
-I used to make tarballs for everything together, which is about 200MB
-using lzma (which compresses this *much* better than e.g. bzip2).  But
-that is a while ago, the compiler grows in size really fast.
-
-> I built both toolchains and kernels for almost all 31 supported
-> architectures. Some kernel builds fails (sparc, sparc64, arc), but not
-> due to toolchain issues, as it seems. Only sh4 complains:
-> sh4-linux-gcc: error: command line option '-m4-nofpu' is not supported
-> by this configuration.
-
-Everything builds for me.  I do have a few local patches, also one for
-that SuperH problem, yeah.  And my kernel trees are a few weeks old,
-who knows what snuck in :-)
+It would be cool, if you could investigate which one it is :-) .
 
 
-Segher
+Heiko
