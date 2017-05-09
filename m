@@ -1,65 +1,92 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:35 +0200
-Subject: [PULL 06/37] arm/arm64: vgic: turn vgic_find_mmio_region into public
+Date: Tue,  9 May 2017 12:44:39 +0200
+Subject: [PULL 10/37] KVM: arm64: vgic-its: Implement
+ vgic_mmio_uaccess_write_its_creadr
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-7-cdall@linaro.org>
+Message-ID: <20170509104506.30929-11-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@redhat.com>
 
-We plan to use vgic_find_mmio_region in vgic-its.c so let's
-turn it into a public function.
-
-Also let's take the opportunity to rename the region parameter
-into regions to emphasize this latter is an array of regions.
+GITS_CREADR needs to be restored so let's implement the associated
+uaccess_write_its callback. The write only is allowed if the its
+is disabled.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-mmio.c | 11 +++++------
- virt/kvm/arm/vgic/vgic-mmio.h |  5 +++++
- 2 files changed, 10 insertions(+), 6 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 42 ++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 40 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 2a5db13..1c17b2a 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -446,13 +446,12 @@ static int match_region(const void *key, const void *elt)
- 	return 0;
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index fd2660d..bf3ff09 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1213,6 +1213,33 @@ static unsigned long vgic_mmio_read_its_creadr(struct kvm *kvm,
+ 	return extract_bytes(its->creadr, addr & 0x7, len);
  }
  
--/* Find the proper register handler entry given a certain address offset. */
--static const struct vgic_register_region *
--vgic_find_mmio_region(const struct vgic_register_region *region, int nr_regions,
--		      unsigned int offset)
-+const struct vgic_register_region *
-+vgic_find_mmio_region(const struct vgic_register_region *regions,
-+		      int nr_regions, unsigned int offset)
- {
--	return bsearch((void *)(uintptr_t)offset, region, nr_regions,
--		       sizeof(region[0]), match_region);
-+	return bsearch((void *)(uintptr_t)offset, regions, nr_regions,
-+		       sizeof(regions[0]), match_region);
- }
- 
- void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 98bb566..6eec91b 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -192,4 +192,9 @@ u64 vgic_sanitise_shareability(u64 reg);
- u64 vgic_sanitise_field(u64 reg, u64 field_mask, int field_shift,
- 			u64 (*sanitise_fn)(u64));
- 
-+/* Find the proper register handler entry given a certain address offset */
-+const struct vgic_register_region *
-+vgic_find_mmio_region(const struct vgic_register_region *regions,
-+		      int nr_regions, unsigned int offset);
++static int vgic_mmio_uaccess_write_its_creadr(struct kvm *kvm,
++					      struct vgic_its *its,
++					      gpa_t addr, unsigned int len,
++					      unsigned long val)
++{
++	u32 cmd_offset;
++	int ret = 0;
 +
- #endif
++	mutex_lock(&its->cmd_lock);
++
++	if (its->enabled) {
++		ret = -EBUSY;
++		goto out;
++	}
++
++	cmd_offset = ITS_CMD_OFFSET(val);
++	if (cmd_offset >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	its->creadr = cmd_offset;
++out:
++	mutex_unlock(&its->cmd_lock);
++	return ret;
++}
++
+ #define BASER_INDEX(addr) (((addr) / sizeof(u64)) & 0x7)
+ static unsigned long vgic_mmio_read_its_baser(struct kvm *kvm,
+ 					      struct vgic_its *its,
+@@ -1317,6 +1344,16 @@ static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
+ 	.its_write = wr,					\
+ }
+ 
++#define REGISTER_ITS_DESC_UACCESS(off, rd, wr, uwr, length, acc)\
++{								\
++	.reg_offset = off,					\
++	.len = length,						\
++	.access_flags = acc,					\
++	.its_read = rd,						\
++	.its_write = wr,					\
++	.uaccess_its_write = uwr,				\
++}
++
+ static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+ 			      gpa_t addr, unsigned int len, unsigned long val)
+ {
+@@ -1339,8 +1376,9 @@ static struct vgic_register_region its_registers[] = {
+ 	REGISTER_ITS_DESC(GITS_CWRITER,
+ 		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+-	REGISTER_ITS_DESC(GITS_CREADR,
+-		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
++	REGISTER_ITS_DESC_UACCESS(GITS_CREADR,
++		vgic_mmio_read_its_creadr, its_mmio_write_wi,
++		vgic_mmio_uaccess_write_its_creadr, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_BASER,
+ 		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
 -- 
 2.9.0
