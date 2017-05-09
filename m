@@ -1,365 +1,283 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Tue, 9 May 2017 10:17:22 +0530
-Subject: [PATCH v3 2/2] phy: meson: add USB2 PHY support for Meson GXL and
- GXM
-In-Reply-To: <4c311c7f-9ffd-00ab-0cc0-8e1c27caa340@ti.com>
-References: <20170318130013.20771-1-martin.blumenstingl@googlemail.com>
- <20170417191142.26099-1-martin.blumenstingl@googlemail.com>
- <20170417191142.26099-3-martin.blumenstingl@googlemail.com>
- <CAFBinCCWKeGZ_Eh7=6xAY3gFiaj-OZCG7R9wzoNb46+_NOn89w@mail.gmail.com>
- <4c311c7f-9ffd-00ab-0cc0-8e1c27caa340@ti.com>
-Message-ID: <cb2a1b5a-0508-066c-4482-519081eb73cf@codeaurora.org>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Tue, 9 May 2017 12:47:08 +0800
+Subject: [PATCH 3/3] arm64/locking: qspinlocks and qrwlocks support
+In-Reply-To: <20170503145141.4966-4-ynorov@caviumnetworks.com>
+References: <20170503145141.4966-1-ynorov@caviumnetworks.com>
+ <20170503145141.4966-4-ynorov@caviumnetworks.com>
+Message-ID: <20170509044708.vvwgzhvdrqyljy6s@tardis>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 03, 2017 at 05:51:41PM +0300, Yury Norov wrote:
+> From: Jan Glauber <jglauber@cavium.com>
+> 
+> Ported from x86_64 with paravirtualization support removed.
+> 
+> Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> 
+> Note. This patch removes protection from direct inclusion of
+> arch/arm64/include/asm/spinlock_types.h. It's done because
+> kernel/locking/qrwlock.c file does it thru the header
+> include/asm-generic/qrwlock_types.h. Until now the only user
+> of qrwlock.c was x86, and there's no such protection too.
+> 
+> I'm not happy to remove the protection, but if it's OK for x86,
+> it should be also OK for arm64. If not, I think we'd fix it
+> for x86, and add the protection there too.
+> 
+> Yury
+> 
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> ---
+>  arch/arm64/Kconfig                      | 24 +++++++++++++++++++
+>  arch/arm64/include/asm/qrwlock.h        |  7 ++++++
+>  arch/arm64/include/asm/qspinlock.h      | 42 +++++++++++++++++++++++++++++++++
+>  arch/arm64/include/asm/spinlock.h       | 12 ++++++++++
+>  arch/arm64/include/asm/spinlock_types.h | 14 ++++++++---
+>  arch/arm64/kernel/Makefile              |  1 +
+>  arch/arm64/kernel/qspinlock.c           | 34 ++++++++++++++++++++++++++
+>  7 files changed, 131 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/qrwlock.h
+>  create mode 100644 arch/arm64/include/asm/qspinlock.h
+>  create mode 100644 arch/arm64/kernel/qspinlock.c
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 22dbde97eefa..db24b3b3f3c6 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -25,6 +25,8 @@ config ARM64
+>  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+>  	select ARCH_WANT_FRAME_POINTERS
+>  	select ARCH_HAS_UBSAN_SANITIZE_ALL
+> +	select ARCH_USE_QUEUED_RWLOCKS if QUEUED_LOCKS
+> +	select ARCH_USE_QUEUED_SPINLOCKS if QUEUED_LOCKS
+>  	select ARM_AMBA
+>  	select ARM_ARCH_TIMER
+>  	select ARM_GIC
+> @@ -692,6 +694,28 @@ config ARCH_WANT_HUGE_PMD_SHARE
+>  config ARCH_HAS_CACHE_LINE_SIZE
+>  	def_bool y
+>  
+> +choice
+> +	prompt "Locking type"
+> +	default TICKET_LOCKS
+> +	help
+> +	  Choose between traditional ticked-based locking mechanism and
+> +	  queued-based mechanism.
+> +
+> +config TICKET_LOCKS
+> +	bool "Ticket locks"
+> +	help
+> +	  Ticked-based locking implementation for ARM64
+> +
+> +config QUEUED_LOCKS
+> +	bool "Queued locks"
+> +	help
+> +	  Queue-based locking mechanism. This option improves
+> +	  locking performance in case of high-contended locking
+> +	  on many-cpu machines. On low-cpu machines there is no
+> +	  difference comparing to ticked-based locking.
+> +
+> +endchoice
+> +
+>  source "mm/Kconfig"
+>  
+>  config SECCOMP
+> diff --git a/arch/arm64/include/asm/qrwlock.h b/arch/arm64/include/asm/qrwlock.h
+> new file mode 100644
+> index 000000000000..626f6ebfb52d
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/qrwlock.h
+> @@ -0,0 +1,7 @@
+> +#ifndef _ASM_ARM64_QRWLOCK_H
+> +#define _ASM_ARM64_QRWLOCK_H
+> +
+> +#include <asm-generic/qrwlock_types.h>
+> +#include <asm-generic/qrwlock.h>
+> +
+> +#endif /* _ASM_ARM64_QRWLOCK_H */
+> diff --git a/arch/arm64/include/asm/qspinlock.h b/arch/arm64/include/asm/qspinlock.h
+> new file mode 100644
+> index 000000000000..09ef4f13f549
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/qspinlock.h
+> @@ -0,0 +1,42 @@
+> +#ifndef _ASM_ARM64_QSPINLOCK_H
+> +#define _ASM_ARM64_QSPINLOCK_H
+> +
+> +#include <asm-generic/qspinlock_types.h>
+> +#include <asm/atomic.h>
+> +
+> +extern void queued_spin_unlock_wait(struct qspinlock *lock);
+> +#define queued_spin_unlock_wait queued_spin_unlock_wait
+> +
+> +#define	queued_spin_unlock queued_spin_unlock
+> +/**
+> + * queued_spin_unlock - release a queued spinlock
+> + * @lock : Pointer to queued spinlock structure
+> + *
+> + * A smp_store_release() on the least-significant byte.
+> + */
+> +static inline void queued_spin_unlock(struct qspinlock *lock)
+> +{
+> +	smp_store_release((u8 *)lock, 0);
 
+I think this part will cause endian issues, maybe you want something
+like what we do in queued_write_lock().
 
-On 05/08/2017 05:51 PM, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Thursday 04 May 2017 11:38 PM, Martin Blumenstingl wrote:
->> Hi Kishon,
->>
->> On Mon, Apr 17, 2017 at 9:11 PM, Martin Blumenstingl
->> <martin.blumenstingl@googlemail.com> wrote:
->>> This adds a new driver for the USB2 PHYs found on Meson GXL and GXM SoCs
->>> (both SoCs are using the same USB PHY register layout).
->>>
->>> The USB2 PHY is a simple PHY which only has a few registers to configure
->>> the mode (host/device) and a reset register (to enable/disable the PHY).
->>>
->>> Unfortunately there are no datasheets available for this PHY. The driver
->>> was written by reading the code from Amlogic's GPL kernel sources and
->>> by analyzing the registers on an actual GXL and GXM device running the
->>> kernel that was shipped on the boards I have.
->>>
->>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->>> ---
->>>   drivers/phy/Kconfig              |  12 ++
->>>   drivers/phy/Makefile             |   1 +
->>>   drivers/phy/phy-meson-gxl-usb2.c | 261 +++++++++++++++++++++++++++++++++++++++
->>>   3 files changed, 274 insertions(+)
->>>   create mode 100644 drivers/phy/phy-meson-gxl-usb2.c
->>>
->>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->>> index 005cadb7a3f8..fada8354c0fe 100644
->>> --- a/drivers/phy/Kconfig
->>> +++ b/drivers/phy/Kconfig
->>> @@ -511,4 +511,16 @@ config PHY_MESON8B_USB2
->>>            and GXBB SoCs.
->>>            If unsure, say N.
->>>
->>> +config PHY_MESON_GXL_USB
->>> +       tristate "Meson GXL and GXM USB2 PHY drivers"
->>> +       default ARCH_MESON
->>> +       depends on OF && (ARCH_MESON || COMPILE_TEST)
->>> +       depends on USB_SUPPORT
->>> +       select GENERIC_PHY
->>> +       select REGMAP_MMIO
->>> +       help
->>> +         Enable this to support the Meson USB2 PHYs found in Meson
->>> +         GXL and GXM SoCs.
->>> +         If unsure, say N.
->>> +
->>>   endmenu
->>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
->>> index dd8f3b5d2918..4f5ede46b0b9 100644
->>> --- a/drivers/phy/Makefile
->>> +++ b/drivers/phy/Makefile
->>> @@ -62,3 +62,4 @@ obj-$(CONFIG_PHY_CYGNUS_PCIE)         += phy-bcm-cygnus-pcie.o
->>>   obj-$(CONFIG_ARCH_TEGRA) += tegra/
->>>   obj-$(CONFIG_PHY_NS2_PCIE)             += phy-bcm-ns2-pcie.o
->>>   obj-$(CONFIG_PHY_MESON8B_USB2)         += phy-meson8b-usb2.o
->>> +obj-$(CONFIG_PHY_MESON_GXL_USB)                += phy-meson-gxl-usb2.o
->>> diff --git a/drivers/phy/phy-meson-gxl-usb2.c b/drivers/phy/phy-meson-gxl-usb2.c
->>> new file mode 100644
->>> index 000000000000..f5fbd3c09542
->>> --- /dev/null
->>> +++ b/drivers/phy/phy-meson-gxl-usb2.c
->>> @@ -0,0 +1,261 @@
->>> +/*
->>> + * Meson GXL and GXM USB2 PHY driver
->>> + *
->>> + * Copyright (C) 2017 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * You should have received a copy of the GNU General Public License
->>> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
->>> + */
->>> +
->>> +#include <linux/delay.h>
->>> +#include <linux/io.h>
->>> +#include <linux/module.h>
->>> +#include <linux/of_device.h>
->>> +#include <linux/regmap.h>
->>> +#include <linux/phy/phy.h>
->>> +#include <linux/platform_device.h>
->>> +
->>> +/* bits [31:27] are read-only */
->>> +#define U2P_R0                                                 0x0
->>> +       #define U2P_R0_BYPASS_SEL                               BIT(0)
->>> +       #define U2P_R0_BYPASS_DM_EN                             BIT(1)
->>> +       #define U2P_R0_BYPASS_DP_EN                             BIT(2)
->>> +       #define U2P_R0_TXBITSTUFF_ENH                           BIT(3)
->>> +       #define U2P_R0_TXBITSTUFF_EN                            BIT(4)
->>> +       #define U2P_R0_DM_PULLDOWN                              BIT(5)
->>> +       #define U2P_R0_DP_PULLDOWN                              BIT(6)
->>> +       #define U2P_R0_DP_VBUS_VLD_EXT_SEL                      BIT(7)
->>> +       #define U2P_R0_DP_VBUS_VLD_EXT                          BIT(8)
->>> +       #define U2P_R0_ADP_PRB_EN                               BIT(9)
->>> +       #define U2P_R0_ADP_DISCHARGE                            BIT(10)
->>> +       #define U2P_R0_ADP_CHARGE                               BIT(11)
->>> +       #define U2P_R0_DRV_VBUS                                 BIT(12)
->>> +       #define U2P_R0_ID_PULLUP                                BIT(13)
->>> +       #define U2P_R0_LOOPBACK_EN_B                            BIT(14)
->>> +       #define U2P_R0_OTG_DISABLE                              BIT(15)
->>> +       #define U2P_R0_COMMON_ONN                               BIT(16)
->>> +       #define U2P_R0_FSEL_MASK                                GENMASK(19, 17)
->>> +       #define U2P_R0_REF_CLK_SEL_MASK                         GENMASK(21, 20)
->>> +       #define U2P_R0_POWER_ON_RESET                           BIT(22)
->>> +       #define U2P_R0_V_ATE_TEST_EN_B_MASK                     GENMASK(24, 23)
->>> +       #define U2P_R0_ID_SET_ID_DQ                             BIT(25)
->>> +       #define U2P_R0_ATE_RESET                                BIT(26)
->>> +       #define U2P_R0_FSV_MINUS                                BIT(27)
->>> +       #define U2P_R0_FSV_PLUS                                 BIT(28)
->>> +       #define U2P_R0_BYPASS_DM_DATA                           BIT(29)
->>> +       #define U2P_R0_BYPASS_DP_DATA                           BIT(30)
->>> +
->>> +#define U2P_R1                                                 0x4
->>> +       #define U2P_R1_BURN_IN_TEST                             BIT(0)
->>> +       #define U2P_R1_ACA_ENABLE                               BIT(1)
->>> +       #define U2P_R1_DCD_ENABLE                               BIT(2)
->>> +       #define U2P_R1_VDAT_SRC_EN_B                            BIT(3)
->>> +       #define U2P_R1_VDAT_DET_EN_B                            BIT(4)
->>> +       #define U2P_R1_CHARGES_SEL                              BIT(5)
->>> +       #define U2P_R1_TX_PREEMP_PULSE_TUNE                     BIT(6)
->>> +       #define U2P_R1_TX_PREEMP_AMP_TUNE_MASK                  GENMASK(8, 7)
->>> +       #define U2P_R1_TX_RES_TUNE_MASK                         GENMASK(10, 9)
->>> +       #define U2P_R1_TX_RISE_TUNE_MASK                        GENMASK(12, 11)
->>> +       #define U2P_R1_TX_VREF_TUNE_MASK                        GENMASK(16, 13)
->>> +       #define U2P_R1_TX_FSLS_TUNE_MASK                        GENMASK(20, 17)
->>> +       #define U2P_R1_TX_HSXV_TUNE_MASK                        GENMASK(22, 21)
->>> +       #define U2P_R1_OTG_TUNE_MASK                            GENMASK(25, 23)
->>> +       #define U2P_R1_SQRX_TUNE_MASK                           GENMASK(28, 26)
->>> +       #define U2P_R1_COMP_DIS_TUNE_MASK                       GENMASK(31, 29)
->>> +
->>> +/* bits [31:14] are read-only */
->>> +#define U2P_R2                                                 0x8
->>> +       #define U2P_R2_DATA_IN_MASK                             GENMASK(3, 0)
->>> +       #define U2P_R2_DATA_IN_EN_MASK                          GENMASK(7, 4)
->>> +       #define U2P_R2_ADDR_MASK                                GENMASK(11, 8)
->>> +       #define U2P_R2_DATA_OUT_SEL                             BIT(12)
->>> +       #define U2P_R2_CLK                                      BIT(13)
->>> +       #define U2P_R2_DATA_OUT_MASK                            GENMASK(17, 14)
->>> +       #define U2P_R2_ACA_PIN_RANGE_C                          BIT(18)
->>> +       #define U2P_R2_ACA_PIN_RANGE_B                          BIT(19)
->>> +       #define U2P_R2_ACA_PIN_RANGE_A                          BIT(20)
->>> +       #define U2P_R2_ACA_PIN_GND                              BIT(21)
->>> +       #define U2P_R2_ACA_PIN_FLOAT                            BIT(22)
->>> +       #define U2P_R2_CHARGE_DETECT                            BIT(23)
->>> +       #define U2P_R2_DEVICE_SESSION_VALID                     BIT(24)
->>> +       #define U2P_R2_ADP_PROBE                                BIT(25)
->>> +       #define U2P_R2_ADP_SENSE                                BIT(26)
->>> +       #define U2P_R2_SESSION_END                              BIT(27)
->>> +       #define U2P_R2_VBUS_VALID                               BIT(28)
->>> +       #define U2P_R2_B_VALID                                  BIT(29)
->>> +       #define U2P_R2_A_VALID                                  BIT(30)
->>> +       #define U2P_R2_ID_DIG                                   BIT(31)
->>> +
->>> +#define U2P_R3                                                 0xc
->>> +
->>> +#define RESET_COMPLETE_TIME                            500
->>> +
->>> +struct phy_meson_gxl_usb2_priv {
->>> +       struct regmap           *regmap;
->>> +       enum phy_mode           mode;
->>> +       int                     is_enabled;
->>> +};
->>> +
->>> +static const struct regmap_config phy_meson_gxl_usb2_regmap_conf = {
->>> +       .reg_bits = 8,
->>> +       .val_bits = 32,
->>> +       .reg_stride = 4,
->>> +       .max_register = U2P_R3,
->>> +};
->>> +
->>> +static int phy_meson_gxl_usb2_reset(struct phy *phy)
->>> +{
->>> +       struct phy_meson_gxl_usb2_priv *priv = phy_get_drvdata(phy);
->>> +
->>> +       if (!priv->is_enabled)
->>> +               return 0;
->>> +
->>> +       /* reset the PHY and wait until settings are stabilized */
->>> +       regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_POWER_ON_RESET,
->>> +                          U2P_R0_POWER_ON_RESET);
->>> +       udelay(RESET_COMPLETE_TIME);
->>> +       regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_POWER_ON_RESET, 0);
->>> +       udelay(RESET_COMPLETE_TIME);
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static int phy_meson_gxl_usb2_set_mode(struct phy *phy, enum phy_mode mode)
->>> +{
->>> +       struct phy_meson_gxl_usb2_priv *priv = phy_get_drvdata(phy);
->>> +
->>> +       switch (mode) {
->>> +       case PHY_MODE_USB_HOST:
->>> +       case PHY_MODE_USB_OTG:
->>> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DM_PULLDOWN,
->>> +                                  U2P_R0_DM_PULLDOWN);
->>> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DP_PULLDOWN,
->>> +                                  U2P_R0_DP_PULLDOWN);
->>> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_ID_PULLUP, 0);
->>> +               break;
->>> +
->>> +       case PHY_MODE_USB_DEVICE:
->>> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DM_PULLDOWN,
->>> +                                  0);
->>> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DP_PULLDOWN,
->>> +                                  0);
->>> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_ID_PULLUP,
->>> +                                  U2P_R0_ID_PULLUP);
->>> +               break;
->>> +
->>> +       default:
->>> +               return -EINVAL;
->>> +       }
->>> +
->>> +       phy_meson_gxl_usb2_reset(phy);
->>> +
->>> +       priv->mode = mode;
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static int phy_meson_gxl_usb2_power_off(struct phy *phy)
->>> +{
->>> +       struct phy_meson_gxl_usb2_priv *priv = phy_get_drvdata(phy);
->>> +
->>> +       priv->is_enabled = 0;
->>> +
->>> +       /* power off the PHY by putting it into reset mode */
->>> +       regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_POWER_ON_RESET,
->>> +                          U2P_R0_POWER_ON_RESET);
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static int phy_meson_gxl_usb2_power_on(struct phy *phy)
->>> +{
->>> +       struct phy_meson_gxl_usb2_priv *priv = phy_get_drvdata(phy);
->>> +       int ret;
->>> +
->>> +       priv->is_enabled = 1;
->>> +
->>> +       /* power on the PHY by taking it out of reset mode */
->>> +       regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_POWER_ON_RESET, 0);
->>> +
->>> +       ret = phy_meson_gxl_usb2_set_mode(phy, priv->mode);
->>> +       if (ret) {
->>> +               phy_meson_gxl_usb2_power_off(phy);
->>> +
->>> +               dev_err(&phy->dev, "Failed to initialize PHY with mode %d\n",
->>> +                       priv->mode);
->>> +               return ret;
->>> +       }
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static const struct phy_ops phy_meson_gxl_usb2_ops = {
->>> +       .power_on       = phy_meson_gxl_usb2_power_on,
->>> +       .power_off      = phy_meson_gxl_usb2_power_off,
->>> +       .set_mode       = phy_meson_gxl_usb2_set_mode,
->>> +       .reset          = phy_meson_gxl_usb2_reset,
->>> +       .owner          = THIS_MODULE,
->>> +};
->>> +
->>> +static int phy_meson_gxl_usb2_probe(struct platform_device *pdev)
->>> +{
->>> +       struct device *dev = &pdev->dev;
->>> +       struct phy_provider *phy_provider;
->>> +       struct resource *res;
->>> +       struct phy_meson_gxl_usb2_priv *priv;
->>> +       struct phy *phy;
->>> +       void __iomem *base;
->>> +
->>> +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
->>> +       if (!priv)
->>> +               return -ENOMEM;
->>> +
->>> +       platform_set_drvdata(pdev, priv);
->>> +
->>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>> +       base = devm_ioremap_resource(dev, res);
->>> +       if (IS_ERR(base))
->>> +               return PTR_ERR(base);
->>> +
->>> +       priv->mode = PHY_MODE_USB_HOST;
->>> +
->>> +       priv->regmap = devm_regmap_init_mmio(dev, base,
->>> +                                            &phy_meson_gxl_usb2_regmap_conf);
->>> +       if (IS_ERR(priv->regmap))
->>> +               return PTR_ERR(priv->regmap);
->>> +
->>> +       phy = devm_phy_create(dev, NULL, &phy_meson_gxl_usb2_ops);
->>> +       if (IS_ERR(phy)) {
->>> +               dev_err(dev, "failed to create PHY\n");
->>> +               return PTR_ERR(phy);
->>> +       }
->>> +
->>> +       phy_set_drvdata(phy, priv);
->>> +
->>> +       phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
->>> +
->>> +       return PTR_ERR_OR_ZERO(phy_provider);
->>> +}
->>> +
->>> +static const struct of_device_id phy_meson_gxl_usb2_of_match[] = {
->>> +       { .compatible = "amlogic,meson-gxl-usb2-phy", },
->>> +       { },
->>> +};
->>> +MODULE_DEVICE_TABLE(of, phy_meson_gxl_usb2_of_match);
->>> +
->>> +static struct platform_driver phy_meson_gxl_usb2_driver = {
->>> +       .probe  = phy_meson_gxl_usb2_probe,
->>> +       .driver = {
->>> +               .name           = "phy-meson-gxl-usb2",
->>> +               .of_match_table = phy_meson_gxl_usb2_of_match,
->>> +       },
->>> +};
->>> +module_platform_driver(phy_meson_gxl_usb2_driver);
->>> +
->>> +MODULE_AUTHOR("Martin Blumenstingl <martin.blumenstingl@googlemail.com>");
->>> +MODULE_DESCRIPTION("Meson GXL and GXM USB2 PHY driver");
->>> +MODULE_LICENSE("GPL v2");
->>> --
->>> 2.12.2
->>>
->> the devicetree documentation already got Rob's ACK. is there anything
->> that I still need to fix? I would really like to see this getting into
->> 4.13
-> I don't have any further comments. I'll queue this once -rc1 is tagged. Btw
-> Vivek Gautam has plans to change the directory structure of phy, so you might
-> have to resend this patch once his patch is merged.
->
-> Vivek, since phy tree is already merged to Linus, can you send your
-> restructuring patch asap based on linus latest?
+Have you tested this on an BE environment?
 
-Sure, I will send the patch soon this week.
+Regards,
+Boqun
 
-Regards
-Vivek
->
-> Thanks
-> Kishon
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> +}
+> +
+> +#define queued_spin_is_locked queued_spin_is_locked
+> +/**
+> + * queued_spin_is_locked - is the spinlock locked?
+> + * @lock: Pointer to queued spinlock structure
+> + * Return: 1 if it is locked, 0 otherwise
+> + */
+> +static __always_inline int queued_spin_is_locked(struct qspinlock *lock)
+> +{
+> +	/*
+> +	 * See queued_spin_unlock_wait().
+> +	 *
+> +	 * Any !0 state indicates it is locked, even if _Q_LOCKED_VAL
+> +	 * isn't immediately observable.
+> +	 */
+> +	smp_mb();
+> +	return atomic_read(&lock->val);
+> +}
+> +
+> +#include <asm-generic/qspinlock.h>
+> +
+> +#endif /* _ASM_ARM64_QSPINLOCK_H */
+> diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
+> index cae331d553f8..37713397e0c5 100644
+> --- a/arch/arm64/include/asm/spinlock.h
+> +++ b/arch/arm64/include/asm/spinlock.h
+> @@ -20,6 +20,10 @@
+>  #include <asm/spinlock_types.h>
+>  #include <asm/processor.h>
+>  
+> +#ifdef CONFIG_QUEUED_SPINLOCKS
+> +#include <asm/qspinlock.h>
+> +#else
+> +
+>  /*
+>   * Spinlock implementation.
+>   *
+> @@ -187,6 +191,12 @@ static inline int arch_spin_is_contended(arch_spinlock_t *lock)
+>  }
+>  #define arch_spin_is_contended	arch_spin_is_contended
+>  
+> +#endif /* CONFIG_QUEUED_SPINLOCKS */
+> +
+> +#ifdef CONFIG_QUEUED_RWLOCKS
+> +#include <asm/qrwlock.h>
+> +#else
+> +
+>  /*
+>   * Write lock implementation.
+>   *
+> @@ -351,6 +361,8 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
+>  /* read_can_lock - would read_trylock() succeed? */
+>  #define arch_read_can_lock(x)		((x)->lock < 0x80000000)
+>  
+> +#endif /* CONFIG_QUEUED_RWLOCKS */
+> +
+>  #define arch_read_lock_flags(lock, flags) arch_read_lock(lock)
+>  #define arch_write_lock_flags(lock, flags) arch_write_lock(lock)
+>  
+> diff --git a/arch/arm64/include/asm/spinlock_types.h b/arch/arm64/include/asm/spinlock_types.h
+> index 55be59a35e3f..0f0f1561ab6a 100644
+> --- a/arch/arm64/include/asm/spinlock_types.h
+> +++ b/arch/arm64/include/asm/spinlock_types.h
+> @@ -16,9 +16,9 @@
+>  #ifndef __ASM_SPINLOCK_TYPES_H
+>  #define __ASM_SPINLOCK_TYPES_H
+>  
+> -#if !defined(__LINUX_SPINLOCK_TYPES_H) && !defined(__ASM_SPINLOCK_H)
+> -# error "please don't include this file directly"
+> -#endif
+> +#ifdef CONFIG_QUEUED_SPINLOCKS
+> +#include <asm-generic/qspinlock_types.h>
+> +#else
+>  
+>  #include <linux/types.h>
+>  
+> @@ -36,10 +36,18 @@ typedef struct {
+>  
+>  #define __ARCH_SPIN_LOCK_UNLOCKED	{ 0 , 0 }
+>  
+> +#endif /* CONFIG_QUEUED_SPINLOCKS */
+> +
+> +#ifdef CONFIG_QUEUED_RWLOCKS
+> +#include <asm-generic/qrwlock_types.h>
+> +#else
+> +
+>  typedef struct {
+>  	volatile unsigned int lock;
+>  } arch_rwlock_t;
+>  
+>  #define __ARCH_RW_LOCK_UNLOCKED		{ 0 }
+>  
+> +#endif /* CONFIG_QUEUED_RWLOCKS */
+> +
+>  #endif
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 9d56467dc223..f48f6256e893 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -56,6 +56,7 @@ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
+>  arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
+>  arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+>  arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+> +arm64-obj-$(CONFIG_QUEUED_SPINLOCKS)	+= qspinlock.o
+>  
+>  obj-y					+= $(arm64-obj-y) vdso/ probes/
+>  obj-$(CONFIG_ARM64_ILP32)		+= vdso-ilp32/
+> diff --git a/arch/arm64/kernel/qspinlock.c b/arch/arm64/kernel/qspinlock.c
+> new file mode 100644
+> index 000000000000..924f19953adb
+> --- /dev/null
+> +++ b/arch/arm64/kernel/qspinlock.c
+> @@ -0,0 +1,34 @@
+> +#include <asm/qspinlock.h>
+> +#include <asm/processor.h>
+> +
+> +void queued_spin_unlock_wait(struct qspinlock *lock)
+> +{
+> +	u32 val;
+> +
+> +	for (;;) {
+> +		smp_mb();
+> +		val = atomic_read(&lock->val);
+> +
+> +		if (!val) /* not locked, we're done */
+> +			goto done;
+> +
+> +		if (val & _Q_LOCKED_MASK) /* locked, go wait for unlock */
+> +			break;
+> +
+> +		/* not locked, but pending, wait until we observe the lock */
+> +		cpu_relax();
+> +	}
+> +
+> +	for (;;) {
+> +		smp_mb();
+> +		val = atomic_read(&lock->val);
+> +		if (!(val & _Q_LOCKED_MASK)) /* any unlock is good */
+> +			break;
+> +
+> +		cpu_relax();
+> +	}
+> +
+> +done:
+> +	smp_acquire__after_ctrl_dep();
+> +}
+> +EXPORT_SYMBOL(queued_spin_unlock_wait);
+> -- 
+> 2.11.0
+> 
