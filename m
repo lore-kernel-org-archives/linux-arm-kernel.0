@@ -1,66 +1,44 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Tue, 9 May 2017 09:53:36 +0800
-Subject: [PATCH v2 1/2] arm64: Call __show_regs directly
-In-Reply-To: <20170508145535.GF5480@leverpostej>
-References: <20170508145535.GF5480@leverpostej>
-Message-ID: <1494294817-29187-1-git-send-email-wangkefeng.wang@huawei.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Tue, 9 May 2017 10:16:32 +0800
+Subject: [PATCH v3 7/8] arm64: exception: handle asynchronous SError
+ interrupt
+In-Reply-To: <5910AA92.2010106@arm.com>
+References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
+ <1490869877-118713-8-git-send-email-xiexiuqi@huawei.com>
+ <20170413105131.GD24027@leverpostej>
+ <d7a8884d-f6b7-69d0-2438-83c202926000@huawei.com> <58F5EFC6.5070601@arm.com>
+ <e6502f82-108e-3f53-4791-515671e4d515@huawei.com> <58F876EB.2020805@arm.com>
+ <2bb41d98-553f-1361-e497-4095ddd501d0@huawei.com> <58FE328E.7030106@arm.com>
+ <d20bb634-d70b-5ab9-20e2-46275675ce1f@huawei.com> <5910AA92.2010106@arm.com>
+Message-ID: <4cfa4f66-e9a2-fd52-fb64-b2510bcdf1d8@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generic code expects show_regs() to also dump the stack, but arm64's
-show_reg() does not do this. Some arm64 callers of show_regs() *only*
-want the registers dumped, without the stack.
+Hi James,
 
-To enable generic code to work as expected, we need to make
-show_regs() dump the stack. Where we only want the registers dumped,
-we must use __show_regs().
+On 2017/5/9 1:27, James Morse wrote:
+> Hi Xiongfeng Wang,
+> 
+> On 28/04/17 03:55, Xiongfeng Wang wrote:
+>>>>>> It is ok to just ignore the process following the ESB instruction in el0_sync, because the process will be sent SIGBUS signal.
+>>>>
+>>>> I don't understand. How will Linux know the process caused an error if we
+>>>> neither take an SError nor read DISR_EL1 after an ESB?
+> 
+>> I think there may be some misunderstanding here. The ESB instruction is placed in kernel_entry
+>> of el0_sync and el0_irq. For the el0_sync, such as an syscall from userspace, after ESB is executed,
+>> we check whether DISR.A is set. If it is not set, we go on to process the syscall. If it is set, we
+>> jump to sError vector and then just eret.
+> 
+> Ah, this looks like an early optimisation!
+> 
+> We can't assume that the SError will result in the processing being killed, the
+> AET bits of the SError ISS Encoding (page D7-2284 of ARM-ARM DDI0487B.a), has a
+> 'corrected' error encoding.
+> For these I would expect the SError-vector C code to do nothing and return to
+> where it came from. In this case the syscall should still be run.
+> 
+Yes, it makes sense, so we should add a return value for the do_sei handler.
 
-This patch updates code to use __show_regs() where only registers are
-desired. A subsequent patch will modify show_regs().
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
-
-v1->v2:
-- Update the changelog according to Mark's kindly review, thanks Mark again.
-
-Please see the background from link [1].
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/494840.html
-
- arch/arm64/kernel/probes/kprobes.c | 4 ++--
- arch/arm64/mm/fault.c              | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-index c5c4594..d849d98 100644
---- a/arch/arm64/kernel/probes/kprobes.c
-+++ b/arch/arm64/kernel/probes/kprobes.c
-@@ -522,9 +522,9 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
- 		pr_err("current sp %lx does not match saved sp %lx\n",
- 		       orig_sp, stack_addr);
- 		pr_err("Saved registers for jprobe %p\n", jp);
--		show_regs(saved_regs);
-+		__show_regs(saved_regs);
- 		pr_err("Current registers\n");
--		show_regs(regs);
-+		__show_regs(regs);
- 		BUG();
- 	}
- 	unpause_graph_tracing();
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 37b95df..c3f2b10 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -250,7 +250,7 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
- 			tsk->comm, task_pid_nr(tsk), inf->name, sig,
- 			addr, esr);
- 		show_pte(tsk->mm, addr);
--		show_regs(regs);
-+		__show_regs(regs);
- 	}
- 
- 	tsk->thread.fault_address = addr;
--- 
-1.7.12.4
+Thanks,
+Wang Xiongfeng
