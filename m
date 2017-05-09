@@ -1,128 +1,119 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 8 May 2017 17:05:56 -0700
-Subject: [PATCH 00/31] arm64: KVM: Mediate access to GICv3 sysregs at EL2
-In-Reply-To: <20170503104606.19342-1-marc.zyngier@arm.com>
-References: <20170503104606.19342-1-marc.zyngier@arm.com>
-Message-ID: <3f177b5e-e5c1-c681-1607-0a80c5aafba4@caviumnetworks.com>
+From: leedom@chelsio.com (Casey Leedom)
+Date: Tue, 9 May 2017 00:48:05 +0000
+Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <CAKgT0Ufg6uebqj79e1FOHoPpF-GxPYMkp353r3Ok_=nM8wF6qA@mail.gmail.com>
+References: <cover.1493678834.git.leedom@chelsio.com>
+ <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
+ <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
+ <20170502165329.GB26406@linux.intel.com>
+ <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
+ <MWHPR12MB160095DF53CE981C923FE65DC8160@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <CAKgT0UdJ17DGAphuP5Y9co6ky-GBFdq2s-1nqctY_Tz_iz5__g@mail.gmail.com>
+ <MWHPR12MB1600E78DD7F530AA9DC2433DC8EA0@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <CAKgT0Ucwkp+fi-9HhMbze6t_i15dj4e2WQBp13Coi6MegrDh=w@mail.gmail.com>
+ <22c46382-5778-022f-d0bd-74abec9e9c7c@huawei.com>,
+ <CAKgT0Ufg6uebqj79e1FOHoPpF-GxPYMkp353r3Ok_=nM8wF6qA@mail.gmail.com>
+Message-ID: <MWHPR12MB1600AC957C7E3B0DB4F06D6CC8EE0@MWHPR12MB1600.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2017 03:45 AM, Marc Zyngier wrote:
-> [Apologies for posting this at the beginning of a merge window, but as
->   this is a rather hot topic, I'd rather put it out as soon as possible]
-> 
-> Some systems have less than perfect GICv3 implementations, leading to
-> all kind of ugly issues (guest hanging, host dying). In order to allow
-> some level of diagnostic, and in some cases implement workarounds,
-> this series enables the trapping of both Group-0, Group-1 and Common
-> sysregs. Mediating the access at EL2 allows some form of sanity
-> checking that the HW is sometimes sorely lacking.
-> 
-> Instead of fully emulating a GICv3 CPU interface, we still use the
-> existing HW (list registers, AP registers, VMCR...), which allows the
-> code to be independent from the rest of the KVM code, and to cope with
-> partial trapping.
-> 
-> Of course, trapping has a cost, which is why this must be either
-> enabled on the command line, or selected by another cpu capability
-> (see Cavium erratum 30115). A quick test on an A57-based platform
-> shows a 25% hit when repeatedly banging on the trapped registers,
-> while normal workloads do not seem to suffer noticeably from such
-> trapping (hackbench variance is in the usual noise, despite being very
-> IPI happy).
-> 
-> This has been tested on a dual socket Thundex-X and a Freescale LS-2085a.
-> 
-> The first 6 patches are fixes, and only here for reference as they
-> have already been posted separately. The rest of the patches implement
-> Group-1, Group-0 and Common sysreg handlers, with the corresponding
-> command line options. I've also taken the liberty to rebase David
-> Daney's initial Cavium erratum 30115 workaround on top of this series,
-> and included it here as a typical use case.
-> 
+
+| From: Alexander Duyck <alexander.duyck@gmail.com>
+| Date: Saturday, May 6, 2017 11:07 AM
+| 
+| | From: Ding Tianhong <dingtianhong@huawei.com>
+| | Date: Fri, May 5, 2017 at 8:08 PM
+| | 
+| | According the suggestion, I could only think of this code:
+| | ..
+| 
+| This is a bit simplistic but it is a start.
+
+  Yes, something tells me that this is going to be more complicated than any
+of us like ...
+
+| The other bit I was getting at is that we need to update the core PCIe
+| code so that when we configure devices and the root complex reports no
+| support for relaxed ordering it should be clearing the relaxed
+| ordering bits in the PCIe configuration registers on the upstream
+| facing devices.
+
+  Of course, this can be written to by the Driver at any time ... and is in
+the case of the cxgb4 Driver ...
+
+  After a lot of rummaging around, it does look like KVM prohibits writes to
+the PCIe Capability Device Control register in drivers/xen/xen-pciback/
+conf_space_capability.c and conf_space.c simply because writes aren't
+allowed unless "permissive" is set.  So it ~looks~ like a driver running in
+a Virtual Machine can't turn Enable Relaxed Ordering back on ...
+
+| The last bit we need in all this is a way to allow for setups where
+| peer-to-peer wants to perform relaxed ordering but for writes to the
+| host we have to not use relaxed ordering. For that we need to enable a
+| special case and that isn't handled right now in any of the solutions
+| we have coded up so far.
+
+  Yes, we do need this.
 
 
-Thanks Marc for working on this.
+| From: Alexander Duyck <alexander.duyck@gmail.com>
+| Date: Saturday, May 8, 2017 08:22 AM
+|
+| The problem is we need to have something that can be communicated
+| through a VM. Your change doesn't work in that regard. That was why I
+| suggested just updating the code so that we when we initialized PCIe
+| devices what we do is either set or clear the relaxed ordering bit in
+| the PCIe device control register. That way when we direct assign an
+| interface it could know just based on the bits int the PCIe
+| configuration if it could use relaxed ordering or not.
+| 
+| At that point the driver code itself becomes very simple since you
+| could just enable the relaxed ordering by default in the igb/ixgbe
+| driver and if the bit is set or cleared in the PCIe configuration then
+| we are either sending with relaxed ordering requests or not and don't
+| have to try and locate the root complex.
+| 
+| So from the sound of it Casey has a special use case where he doesn't
+| want to send relaxed ordering frames to the root complex, but instead
+| would like to send them to another PCIe device. To do that he needs to
+| have a way to enable the relaxed ordering bit in the PCIe
+| configuration but then not send any to the root complex. Odds are that
+| is something he might be able to just implement in the driver, but is
+| something that may become a more general case in the future. I don't
+| see our change here impacting it as long as we keep the solution
+| generic and mostly confined to when we instantiate the devices as the
+| driver could likely make the decision to change the behavior later.
 
-I tested this series based on your git branch:
-https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm64/gicv3-cpuif-mediated-access
+  It's not just me.  Intel has said that while RO directed at the Root
+Complex Host Coherent Memory has a performance bug (not Data Corruption),
+it's a performance win for Peer-to-Peer writes to MMIO Space.  (I'll be very
+interested in hearing what the bug is if we get that much detail.  The very
+same TLPs directed to the Root Complex Port without Relaxed Ordering set get
+good performance.  So this is essentially a bug in the hardware that was
+~trying~ to implement a performance win.)
 
-This does indeed fix the problems we were seeing, so feel free to add:
+  Meanwhile, I currently only know of a single PCIe End Point which causes
+catastrophic results: the AMD A1100 ARM SoC ("SEATTLE").  And it's not even
+clear that product is even alive anymore since I haven't been able to get
+any responses from them for several months.
 
-Tested-by: David Daney <david.daney@cavium.com>
+  What I'm saying is: let's try to architect a solution which doesn't throw
+the baby out with the bath water ...
 
-to the entire series.
+  I think that if a Device's Root Complex Port has problems with Relaxed
+Ordering, it ~probably~ makes sense to turn off the PCIe Capability Device
+Control[Enable Relaxed Ordering] when we assign a device to a Virtual
+Machine since the Device Driver can no longer query the Relaxed Ordering
+Support of the Root Complex Port.  The only down side of this would be if we
+assigned two Peers to a VM in an application which wanted to do Peer-to-Peer
+transfers.  But that seems like a hard application to support in any case
+since the PCI Bus:Slot.Function IDs for assigned Devices within a VM don't
+match the actual values.
 
-I would note that with these patches we see an occasional:
+  For Devices running in the base OS/Hypervisor, their Drivers can query the
+Relaxed Ordering Support for the Root Complex Port or a Peer Device.  So a
+simple flag within the (struct pci_dev *)->dev_flags would serve for that
+along with a per-Architecture/Platform mechanism for setting it ...
 
-[ 3868.311491] Unexpected interrupt 4 on vcpu ffff801f57a6a020
-[ 4262.063419] Unexpected interrupt 4 on vcpu ffff801f5b3dc040
-[ 4262.063422] Unexpected interrupt 4 on vcpu ffff801f50972020
-
-This is better than locking up the system, but I wonder if it indicates 
-that improvement to the code is still possible.
-
-David Daney
-
-
-
-> David Daney (2):
->    arm64: Add MIDR values for Cavium cn83XX SoCs
->    arm64: Add workaround for Cavium Thunder erratum 30115
-> 
-> Marc Zyngier (29):
->    arm64: KVM: Fix decoding of Rt/Rt2 when trapping AArch32 CP accesses
->    arm64: KVM: Do not use stack-protector to compile EL2 code
->    arm: KVM: Do not use stack-protector to compile HYP code
->    KVM: arm/arm64: vgic-v2: Do not use Active+Pending state for a HW
->      interrupt
->    KVM: arm/arm64: vgic-v3: Do not use Active+Pending state for a HW
->      interrupt
->    KVM: arm/arm64: vgic-v3: Use PREbits to infer the number of
->      ICH_APxRn_EL2 registers
->    KVM: arm/arm64: vgic-v3: Add accessors for the ICH_APxRn_EL2 registers
->    arm64: Add a facility to turn an ESR syndrome into a sysreg encoding
->    KVM: arm64: Make kvm_condition_valid32() accessible from EL2
->    KVM: arm64: vgic-v3: Add hook to handle guest GICv3 sysreg accesses at
->      EL2
->    KVM: arm64: vgic-v3: Add ICV_BPR1_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_IGRPEN1_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_IAR1_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_EOIR1_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_AP1Rn_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_HPPIR1_EL1 handler
->    KVM: arm64: vgic-v3: Enable trapping of Group-1 system registers
->    KVM: arm64: Enable GICv3 Group-1 sysreg trapping via command-line
->    KVM: arm64: vgic-v3: Add ICV_BPR0_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_IGNREN0_EL1 handler
->    KVM: arm64: vgic-v3: Add misc Group-0 handlers
->    KVM: arm64: vgic-v3: Enable trapping of Group-0 system registers
->    KVM: arm64: Enable GICv3 Group-0 sysreg trapping via command-line
->    KVM: arm64: vgic-v3: Add ICV_DIR_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_RPR_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_CTLR_EL1 handler
->    KVM: arm64: vgic-v3: Add ICV_PMR_EL1 handler
->    KVM: arm64: Enable GICv3 common sysreg trapping via command-line
->    KVM: arm64: vgic-v3: Log which GICv3 system registers are trapped
-> 
->   Documentation/arm64/silicon-errata.txt |   1 +
->   arch/arm/kvm/hyp/Makefile              |   2 +
->   arch/arm64/Kconfig                     |  11 +
->   arch/arm64/include/asm/cpucaps.h       |   3 +-
->   arch/arm64/include/asm/cputype.h       |   2 +
->   arch/arm64/include/asm/esr.h           |  25 ++
->   arch/arm64/include/asm/kvm_emulate.h   |   6 +
->   arch/arm64/include/asm/kvm_hyp.h       |   1 +
->   arch/arm64/include/asm/sysreg.h        |   9 +
->   arch/arm64/kernel/cpu_errata.c         |  21 +
->   arch/arm64/kvm/hyp/Makefile            |   2 +
->   arch/arm64/kvm/hyp/switch.c            |  14 +
->   arch/arm64/kvm/sys_regs.c              |   8 +-
->   include/kvm/arm_vgic.h                 |   1 +
->   include/linux/irqchip/arm-gic-v3.h     |   6 +
->   virt/kvm/arm/aarch32.c                 |   2 +-
->   virt/kvm/arm/hyp/vgic-v3-sr.c          | 792 +++++++++++++++++++++++++++++++--
->   virt/kvm/arm/vgic/vgic-v2.c            |   7 +
->   virt/kvm/arm/vgic/vgic-v3.c            |  52 +++
->   19 files changed, 934 insertions(+), 31 deletions(-)
-> 
+Casey
