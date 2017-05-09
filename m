@@ -1,45 +1,69 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 9 May 2017 08:45:22 +0200
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <20170508124621.GA20705@kroah.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com>
- <20170508124621.GA20705@kroah.com>
-Message-ID: <20170509064522.anusoikaalvlux3w@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon,  8 May 2017 23:52:46 -0700
+Subject: [GIT PULL 0/7] ARM: SoC contents for 4.12 merge window
+Message-ID: <1494312773-9790-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
 
-* Greg KH <greg@kroah.com> wrote:
+It's been a relatively quiet release cycle here. Patch count is about
+the usual (818 commits, which includes merges). Accumulated diffstat:
 
-> What about a simple coccinelle script to test for this type of thing?
-> We write it once, add it to the in-kernel body of tests, and then 0-day
-> runs it on all trees all the time.  That should catch this type of
-> issue, like all of the other "bad programming bus" that the tool
-> currently catches.
+ 683 files changed, 28234 insertions(+), 7251 deletions(-)
 
-Yeah, that would work - but today most of our coccinelle scripts are still pretty 
-verbose, and I think it's important to make this a different category of 
-coccinelle script, which is .config driven where a loud warning yells at us.
+Dirstat is also more or less as we're used to it these days. Since arm's dts
+structure is flat, it's all in one directory but arm64 sums up to 33.6%.
 
-I.e. force the 'zero warnings tolerated' model.
+  42.5% arch/arm/boot/dts/
+   5.6% arch/arm/mach-gemini/
+   5.5% arch/arm/
+   3.2% arch/arm64/boot/dts/amlogic/
+   9.4% arch/arm64/boot/dts/freescale/
+   4.2% arch/arm64/boot/dts/hisilicon/
+   8.4% arch/arm64/boot/dts/rockchip/
+   8.1% arch/arm64/boot/dts/
+   1.1% drivers/ata/
+   1.5% drivers/reset/
+   2.3% drivers/soc/imx/
+   2.8% drivers/soc/
 
-I also noticed that Coccinelle builds are pretty slow, so it would still make 
-sense to have a performance oriented static checking facility that does not have 
-the performance baggage of high level functional languages.
+So, not a tiny set of branches, but also not huge.
 
-I.e. either integrate it into Sparse - or start a kernel integrated static 
-analysis tooling project that would only follow control flow initially - which is 
-what we need here I believe.
+Besides dts, the mach-gemini cleanup by Linus Walleij is the only
+platform that pops up on its own. Driver changes are some moves out
+from mach-hosted drivers, some new drivers (ata are acked by Tejun), the
+usual drivers/reset branch we merge, and general tweaks for SoC support.
 
-We only have ~115 code blocks in the kernel that set/restore KERNEL_DS, it would 
-be a pity to add a runtime check to every system call ...
+Only a few conflicts; all are from developers sending DT changes to driver
+maintainers. We're trying to avoid that since it's needless conflicts --
+DT contents should flow in through us. But these ones are all easy to
+resolve so it's not a big deal. See dt and dt64 emails for details.
 
-We could also add a runtime check to oops handling to make sure we don't leak 
-KERNEL_DS through kernel crashes, to ease worries about CVE-2010-4258.
+A handful of new platforms this merge window:
+ - Renesas RZ/G1H and G1N
+ - Rockchip RK3399 support, including Samsung Chromebook Plus ("Kevin").
+ - Rockchip RK3288 support for ASUS Tinkerboard and a couple of Phytec boards
+ - A handful of wireless basestations and other appliances, several based
+   on Marvell and Qualcomm SoCs.
+ - i.MX28 "Duckbill" platforms
+ - A couple of i.MX6Q platforms from Zodiac Inflight Innovations, which seems
+   to a couple of those tablet-like inflight entertainment systems that are
+   becoming popular.
+ - Motorola Droid4, an old OMAP-based phone that some people might have at
+   the bottom of their old hardware piles, sees a bunch of mainline support
+   additions.
+ - Nvidia Tegra186 ("Parker", used for Jetson TX2)
+ - ST Micro STM32H743 support has been added
+
+In addition to these 7 branches, there'll be one more with the TEE
+subsystem, which we broke out in a separate branch this merge window as
+it's introduced; it's likely to go into our driver aggregation branch
+for the future. Arnd has a tag writeup and will send that separately.
+
+
+Please merge!
 
 Thanks,
 
-	Ingo
+-Olof
