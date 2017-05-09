@@ -1,55 +1,72 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:45:05 +0200
-Subject: [PULL 36/37] KVM: arm/arm64: Don't call map_resources when restoring
- ITS tables
+Date: Tue,  9 May 2017 12:45:03 +0200
+Subject: [PULL 34/37] KVM: arm/arm64: Get rid of its->initialized field
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-37-cdall@linaro.org>
+Message-ID: <20170509104506.30929-35-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only reason we called kvm_vgic_map_resources() when restoring the
-ITS tables was because we wanted to have the KVM iodevs registered in
-the KVM IO bus framework at the time when the ITS was restored such that
-a restored and active device can inject MSIs prior to otherwise calling
-kvm_vgic_map_resources() from the first run of a VCPU.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Since we now register the KVM iodevs for the redestributors and ITS as
-soon as possible (when setting the base addresses), we no longer need
-this call and kvm_vgic_map_resources() is again called only when first
-running a VCPU.
+The its->initialized doesn't bring much to the table, and creates
+unnecessary ordering between setting the address and initializing it
+(which amounts to exactly nothing).
 
+Let's kill it altogether, making KVM_DEV_ARM_VGIC_CTRL_INIT the no-op
+it deserves to be.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 10 +---------
- 1 file changed, 1 insertion(+), 9 deletions(-)
+ include/kvm/arm_vgic.h       | 1 -
+ virt/kvm/arm/vgic/vgic-its.c | 7 +------
+ 2 files changed, 1 insertion(+), 7 deletions(-)
 
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 4ff65ef..bfde6fb 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -148,7 +148,6 @@ struct vgic_its {
+ 	gpa_t			vgic_its_base;
+ 
+ 	bool			enabled;
+-	bool			initialized;
+ 	struct vgic_io_device	iodev;
+ 	struct kvm_device	*dev;
+ 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 89acaef..9aeaff0 100644
+index 9f7105c..18318c6 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -2308,20 +2308,12 @@ static int vgic_its_restore_tables_v0(struct vgic_its *its)
- 		goto out;
+@@ -1545,9 +1545,6 @@ static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
+ 	struct vgic_io_device *iodev = &its->iodev;
+ 	int ret;
  
- 	ret = vgic_its_restore_device_tables(its);
+-	if (!its->initialized)
+-		return -EBUSY;
 -
- out:
- 	unlock_all_vcpus(kvm);
- 	mutex_unlock(&its->its_lock);
- 	mutex_unlock(&kvm->lock);
+ 	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
+ 		return -ENXIO;
  
--	if (ret)
--		return ret;
+@@ -1597,7 +1594,6 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+ 	INIT_LIST_HEAD(&its->collection_list);
+ 
+ 	dev->kvm->arch.vgic.has_its = true;
+-	its->initialized = false;
+ 	its->enabled = false;
+ 	its->dev = dev;
+ 
+@@ -2397,8 +2393,7 @@ static int vgic_its_set_attr(struct kvm_device *dev,
+ 
+ 		switch (attr->attr) {
+ 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+-			its->initialized = true;
 -
--	/*
--	 * On restore path, MSI injections can happen before the
--	 * first VCPU run so let's complete the GIC init here.
--	 */
--	return kvm_vgic_map_resources(its->dev->kvm);
-+	return ret;
- }
- 
- static int vgic_its_commit_v0(struct vgic_its *its)
++			/* Nothing to do */
+ 			return 0;
+ 		case KVM_DEV_ARM_ITS_SAVE_TABLES:
+ 			return abi->save_tables(its);
 -- 
 2.9.0
