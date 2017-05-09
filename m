@@ -1,175 +1,164 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:50 +0200
-Subject: [PULL 21/37] KVM: arm64: vgic-its: Collection table save/restore
+Date: Tue,  9 May 2017 12:44:55 +0200
+Subject: [PULL 26/37] KVM: arm64: vgic-v3: KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-22-cdall@linaro.org>
+Message-ID: <20170509104506.30929-27-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@redhat.com>
 
-The save path copies the collection entries into guest RAM
-at the GPA specified in the BASER register. This obviously
-requires the BASER to be set. The last written element is a
-dummy collection table entry.
-
-We do not index by collection ID as the collection entry
-can fit into 8 bytes while containing the collection ID.
-
-On restore path we re-allocate the collection objects.
+This patch adds a new attribute to GICV3 KVM device
+KVM_DEV_ARM_VGIC_GRP_CTRL group. This allows userspace to
+flush all GICR pending tables into guest RAM.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 100 ++++++++++++++++++++++++++++++++++++++++++-
- virt/kvm/arm/vgic/vgic.h     |   9 ++++
- 2 files changed, 107 insertions(+), 2 deletions(-)
+ arch/arm/include/uapi/asm/kvm.h     |  1 +
+ arch/arm64/include/uapi/asm/kvm.h   |  1 +
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 20 +++++++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c         | 51 +++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h            |  1 +
+ 5 files changed, 74 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index d5c0057..5523f0a 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1838,13 +1838,89 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index 0f7ee15..a3fbab5 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -204,6 +204,7 @@ struct kvm_arch_memory_slot {
+ #define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
+ #define   KVM_DEV_ARM_ITS_SAVE_TABLES		1
+ #define   KVM_DEV_ARM_ITS_RESTORE_TABLES	2
++#define   KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES	3
+ 
+ /* KVM_IRQ_LINE irq field index values */
+ #define KVM_ARM_IRQ_TYPE_SHIFT		24
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 5dd7be0..d46a99d 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -224,6 +224,7 @@ struct kvm_arch_memory_slot {
+ #define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
+ #define   KVM_DEV_ARM_ITS_SAVE_TABLES           1
+ #define   KVM_DEV_ARM_ITS_RESTORE_TABLES        2
++#define   KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES	3
+ 
+ /* Device Control API on vcpu fd */
+ #define KVM_ARM_VCPU_PMU_V3_CTRL	0
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 859bfa8..d48743c 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -580,6 +580,24 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
+ 		reg = tmp32;
+ 		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
+ 	}
++	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
++		int ret;
++
++		switch (attr->attr) {
++		case KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES:
++			mutex_lock(&dev->kvm->lock);
++
++			if (!lock_all_vcpus(dev->kvm)) {
++				mutex_unlock(&dev->kvm->lock);
++				return -EBUSY;
++			}
++			ret = vgic_v3_save_pending_tables(dev->kvm);
++			unlock_all_vcpus(dev->kvm);
++			mutex_unlock(&dev->kvm->lock);
++			return ret;
++		}
++		break;
++	}
+ 	}
  	return -ENXIO;
  }
+@@ -658,6 +676,8 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 		switch (attr->attr) {
+ 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+ 			return 0;
++		case KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES:
++			return 0;
+ 		}
+ 	}
+ 	return -ENXIO;
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 9ae8add..54dee72 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -278,6 +278,57 @@ int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq)
+ 	return 0;
+ }
  
-+static int vgic_its_save_cte(struct vgic_its *its,
-+			     struct its_collection *collection,
-+			     gpa_t gpa, int esz)
++/**
++ * vgic_its_save_pending_tables - Save the pending tables into guest RAM
++ * kvm lock and all vcpu lock must be held
++ */
++int vgic_v3_save_pending_tables(struct kvm *kvm)
 +{
-+	u64 val;
-+
-+	val = (1ULL << KVM_ITS_CTE_VALID_SHIFT |
-+	       ((u64)collection->target_addr << KVM_ITS_CTE_RDBASE_SHIFT) |
-+	       collection->collection_id);
-+	val = cpu_to_le64(val);
-+	return kvm_write_guest(its->dev->kvm, gpa, &val, esz);
-+}
-+
-+static int vgic_its_restore_cte(struct vgic_its *its, gpa_t gpa, int esz)
-+{
-+	struct its_collection *collection;
-+	struct kvm *kvm = its->dev->kvm;
-+	u32 target_addr, coll_id;
-+	u64 val;
++	struct vgic_dist *dist = &kvm->arch.vgic;
++	int last_byte_offset = -1;
++	struct vgic_irq *irq;
 +	int ret;
 +
-+	BUG_ON(esz > sizeof(val));
-+	ret = kvm_read_guest(kvm, gpa, &val, esz);
-+	if (ret)
-+		return ret;
-+	val = le64_to_cpu(val);
-+	if (!(val & KVM_ITS_CTE_VALID_MASK))
-+		return 0;
++	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
++		int byte_offset, bit_nr;
++		struct kvm_vcpu *vcpu;
++		gpa_t pendbase, ptr;
++		bool stored;
++		u8 val;
 +
-+	target_addr = (u32)(val >> KVM_ITS_CTE_RDBASE_SHIFT);
-+	coll_id = val & KVM_ITS_CTE_ICID_MASK;
++		vcpu = irq->target_vcpu;
++		if (!vcpu)
++			continue;
 +
-+	if (target_addr >= atomic_read(&kvm->online_vcpus))
-+		return -EINVAL;
++		pendbase = GICR_PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
 +
-+	collection = find_collection(its, coll_id);
-+	if (collection)
-+		return -EEXIST;
-+	ret = vgic_its_alloc_collection(its, &collection, coll_id);
-+	if (ret)
-+		return ret;
-+	collection->target_addr = target_addr;
-+	return 1;
-+}
++		byte_offset = irq->intid / BITS_PER_BYTE;
++		bit_nr = irq->intid % BITS_PER_BYTE;
++		ptr = pendbase + byte_offset;
 +
- /**
-  * vgic_its_save_collection_table - Save the collection table into
-  * guest RAM
-  */
- static int vgic_its_save_collection_table(struct vgic_its *its)
- {
--	return -ENXIO;
-+	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-+	struct its_collection *collection;
-+	u64 val;
-+	gpa_t gpa;
-+	size_t max_size, filled = 0;
-+	int ret, cte_esz = abi->cte_esz;
++		if (byte_offset != last_byte_offset) {
++			ret = kvm_read_guest(kvm, ptr, &val, 1);
++			if (ret)
++				return ret;
++			last_byte_offset = byte_offset;
++		}
 +
-+	gpa = BASER_ADDRESS(its->baser_coll_table);
-+	if (!gpa)
-+		return 0;
++		stored = val & (1U << bit_nr);
++		if (stored == irq->pending_latch)
++			continue;
 +
-+	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
++		if (irq->pending_latch)
++			val |= 1 << bit_nr;
++		else
++			val &= ~(1 << bit_nr);
 +
-+	list_for_each_entry(collection, &its->collection_list, coll_list) {
-+		ret = vgic_its_save_cte(its, collection, gpa, cte_esz);
++		ret = kvm_write_guest(kvm, ptr, &val, 1);
 +		if (ret)
 +			return ret;
-+		gpa += cte_esz;
-+		filled += cte_esz;
 +	}
++	return 0;
++}
 +
-+	if (filled == max_size)
-+		return 0;
-+
-+	/*
-+	 * table is not fully filled, add a last dummy element
-+	 * with valid bit unset
-+	 */
-+	val = 0;
-+	BUG_ON(cte_esz > sizeof(val));
-+	ret = kvm_write_guest(its->dev->kvm, gpa, &val, cte_esz);
-+	return ret;
- }
- 
- /**
-@@ -1854,7 +1930,27 @@ static int vgic_its_save_collection_table(struct vgic_its *its)
-  */
- static int vgic_its_restore_collection_table(struct vgic_its *its)
+ /* check for overlapping regions and for regions crossing the end of memory */
+ static bool vgic_v3_check_base(struct kvm *kvm)
  {
--	return -ENXIO;
-+	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-+	int cte_esz = abi->cte_esz;
-+	size_t max_size, read = 0;
-+	gpa_t gpa;
-+	int ret;
-+
-+	if (!(its->baser_coll_table & GITS_BASER_VALID))
-+		return 0;
-+
-+	gpa = BASER_ADDRESS(its->baser_coll_table);
-+
-+	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
-+
-+	while (read < max_size) {
-+		ret = vgic_its_restore_cte(its, gpa, cte_esz);
-+		if (ret <= 0)
-+			break;
-+		gpa += cte_esz;
-+		read += cte_esz;
-+	}
-+	return ret;
- }
- 
- /**
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 79768c8..757de7a 100644
+index 433449b..8259f0a 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -73,6 +73,15 @@
- 				      KVM_REG_ARM_VGIC_SYSREG_CRM_MASK | \
- 				      KVM_REG_ARM_VGIC_SYSREG_OP2_MASK)
+@@ -173,6 +173,7 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
+ int vgic_v3_probe(const struct gic_kvm_info *info);
+ int vgic_v3_map_resources(struct kvm *kvm);
+ int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq);
++int vgic_v3_save_pending_tables(struct kvm *kvm);
+ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
  
-+/*
-+ * As per Documentation/virtual/kvm/devices/arm-vgic-its.txt,
-+ * below macros are defined for ITS table entry encoding.
-+ */
-+#define KVM_ITS_CTE_VALID_SHIFT		63
-+#define KVM_ITS_CTE_VALID_MASK		BIT_ULL(63)
-+#define KVM_ITS_CTE_RDBASE_SHIFT	16
-+#define KVM_ITS_CTE_ICID_MASK		GENMASK_ULL(15, 0)
-+
- static inline bool irq_is_pending(struct vgic_irq *irq)
- {
- 	if (irq->config == VGIC_CONFIG_EDGE)
+ void vgic_v3_load(struct kvm_vcpu *vcpu);
 -- 
 2.9.0
