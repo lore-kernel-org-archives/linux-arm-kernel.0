@@ -1,62 +1,70 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Tue, 9 May 2017 10:37:06 +0800
-Subject: [v3, 2/5] arm64: dts: ls1046a: support SD UHS-I and eMMC HS200 on RDB
-In-Reply-To: <1494297429-12083-1-git-send-email-yangbo.lu@nxp.com>
-References: <1494297429-12083-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1494297429-12083-3-git-send-email-yangbo.lu@nxp.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue,  9 May 2017 10:49:58 +0800
+Subject: [PATCH v9 5/9] coresight: of_get_coresight_platform_data: Add missing
+ of_node_put
+In-Reply-To: <1494298202-6739-1-git-send-email-leo.yan@linaro.org>
+References: <1494298202-6739-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1494298202-6739-6-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to enable SD UHS-I mode and eMMC HS200 mode on
-LS1046ARDB in dts. Also, the eSDHC peripheral clock must be used
-instead of platform clock to support these modes.
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
----
-Changes for v2:
-	- Sorted the node.
-Changes for v3:
-	- None.
----
- arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts | 8 ++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi    | 4 ++--
- 2 files changed, 10 insertions(+), 2 deletions(-)
+The of_get_coresight_platform_data iterates over the possible CPU nodes
+to find a given cpu phandle. However it does not drop the reference
+to the node pointer returned by the of_get_coresight_platform_data.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-index c5361e9..2d28726 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-@@ -72,6 +72,14 @@
- 	status = "okay";
- };
+This patch also introduces another minor fix is to use
+of_cpu_device_node_get() to replace of_get_cpu_node().
+
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+[Leo: minor tweaks for of_get_coresight_platform_data]
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ drivers/hwtracing/coresight/of_coresight.c | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+index 2749853..225b2dd 100644
+--- a/drivers/hwtracing/coresight/of_coresight.c
++++ b/drivers/hwtracing/coresight/of_coresight.c
+@@ -109,7 +109,8 @@ of_get_coresight_platform_data(struct device *dev,
+ 	struct coresight_platform_data *pdata;
+ 	struct of_endpoint endpoint, rendpoint;
+ 	struct device *rdev;
+-	struct device_node *dn;
++	bool found;
++	struct device_node *dn, *np;
+ 	struct device_node *ep = NULL;
+ 	struct device_node *rparent = NULL;
+ 	struct device_node *rport = NULL;
+@@ -176,17 +177,19 @@ of_get_coresight_platform_data(struct device *dev,
+ 		} while (ep);
+ 	}
  
-+&esdhc {
-+	mmc-hs200-1_8v;
-+	sd-uhs-sdr104;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr12;
-+};
+-	/* Affinity defaults to CPU0 */
+-	pdata->cpu = 0;
+ 	dn = of_parse_phandle(node, "cpu", 0);
+-	for (cpu = 0; dn && cpu < nr_cpu_ids; cpu++) {
+-		if (dn == of_get_cpu_node(cpu, NULL)) {
+-			pdata->cpu = cpu;
++	for_each_possible_cpu(cpu) {
++		np = of_cpu_device_node_get(cpu);
++		found = (dn == np);
++		of_node_put(np);
++		if (found)
+ 			break;
+-		}
+ 	}
+ 	of_node_put(dn);
+ 
++	/* Affinity to CPU0 if no cpu nodes are found */
++	pdata->cpu = found ? cpu : 0;
 +
- &i2c0 {
- 	status = "okay";
- 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 7ef2b9f..5975d30 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -210,10 +210,10 @@
- 		};
- 
- 		esdhc: esdhc at 1560000 {
--			compatible = "fsl,esdhc";
-+			compatible = "fsl,ls1046a-esdhc", "fsl,esdhc";
- 			reg = <0x0 0x1560000 0x0 0x10000>;
- 			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
--			clock-frequency = <0>;
-+			clocks = <&clockgen 2 1>;
- 			voltage-ranges = <1800 1800 3300 3300>;
- 			sdhci,auto-cmd12;
- 			big-endian;
+ 	return pdata;
+ }
+ EXPORT_SYMBOL_GPL(of_get_coresight_platform_data);
 -- 
-2.1.0.27.g96db324
+2.7.4
