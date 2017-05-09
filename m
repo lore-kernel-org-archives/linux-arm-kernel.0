@@ -1,85 +1,84 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:56 +0200
-Subject: [PULL 27/37] KVM: arm/arm64: Clarification and relaxation to ITS
- save/restore ABI
+Date: Tue,  9 May 2017 12:44:44 +0200
+Subject: [PULL 15/37] KVM: arm64: vgic-its: Check the device id matches TYPER
+ DEVBITS range
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-28-cdall@linaro.org>
+Message-ID: <20170509104506.30929-16-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clarify what is meant by the save/restore ABI only supporting virtual
-physical interrupts.
+From: Eric Auger <eric.auger@redhat.com>
 
-Relax the requirement of the order that the collection entries are
-written in and be clear that there is no particular ordering enforced.
+On MAPD we currently check the device id can be stored in the device table.
+Let's first check it can be encoded within the range defined by TYPER
+DEVBITS.
 
-Some cosmetic changes in the capitalization of ID names to align with
-the GICv3 manual and remove the empty line in the bottom of the patch.
+Also check the collection ID belongs to the 16 bit range as GITS_TYPER
+CIL field equals to 0.
 
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/virtual/kvm/devices/arm-vgic-its.txt | 23 +++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 25 ++++++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-index ba132e9..eb06beb 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-@@ -97,8 +97,8 @@ Groups:
- The following ordering must be followed when restoring the GIC and the ITS:
- a) restore all guest memory and create vcpus
- b) restore all redistributors
--c) initialize the ITS and then provide its base address
--   (KVM_DEV_ARM_VGIC_CTRL_INIT, KVM_DEV_ARM_VGIC_GRP_ADDR)
-+c) provide the its base address
-+   (KVM_DEV_ARM_VGIC_GRP_ADDR)
- d) restore the ITS in the following order:
-    1. Restore GITS_CBASER
-    2. Restore all other GITS_ registers, except GITS_CTLR!
-@@ -110,12 +110,14 @@ Then vcpus can be started.
-  ITS Table ABI REV0:
-  -------------------
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 7b95b73..bd1362e 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -227,6 +227,7 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+ #define GIC_LPI_OFFSET 8192
  
-- Revision 0 of the ABI only supports physical LPIs.
-+ Revision 0 of the ABI only supports the features of a virtual GICv3, and does
-+ not support a virtual GICv4 with support for direct injection of virtual
-+ interrupts for nested hypervisors.
+ #define VITS_TYPER_IDBITS 16
++#define VITS_TYPER_DEVBITS 16
  
-- The device table and ITT are indexed by the deviceid and eventid,
-- respectively. The collection table is not indexed by collectionid:
-- CTEs are written in the table in the order of collection creation. All
-- entries are 8 bytes.
-+ The device table and ITT are indexed by the DeviceID and EventID,
-+ respectively. The collection table is not indexed by CollectionID, and the
-+ entries in the collection are listed in no particular order.
-+ All entries are 8 bytes.
+ /*
+  * Finds and returns a collection in the ITS collection table.
+@@ -427,7 +428,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
+ 	 * To avoid memory waste in the guest, we keep the number of IDBits and
+ 	 * DevBits low - as least for the time being.
+ 	 */
+-	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
++	reg |= GIC_ENCODE_SZ(VITS_TYPER_DEVBITS, 5) << GITS_TYPER_DEVBITS_SHIFT;
+ 	reg |= GIC_ENCODE_SZ(VITS_TYPER_IDBITS, 5) << GITS_TYPER_IDBITS_SHIFT;
+ 	reg |= GIC_ENCODE_SZ(abi->ite_esz, 4) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
  
-  Device Table Entry (DTE):
+@@ -672,16 +673,30 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+  * Check whether an ID can be stored into the corresponding guest table.
+  * For a direct table this is pretty easy, but gets a bit nasty for
+  * indirect tables. We check whether the resulting guest physical address
+- * is actually valid (covered by a memslot and guest accessbible).
++ * is actually valid (covered by a memslot and guest accessible).
+  * For this we have to read the respective first level entry.
+  */
+-static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
++static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
+ {
+ 	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
++	u64 indirect_ptr, type = GITS_BASER_TYPE(baser);
++	int esz = GITS_BASER_ENTRY_SIZE(baser);
+ 	int index;
+-	u64 indirect_ptr;
+ 	gfn_t gfn;
+-	int esz = GITS_BASER_ENTRY_SIZE(baser);
++
++	switch (type) {
++	case GITS_BASER_TYPE_DEVICE:
++		if (id >= BIT_ULL(VITS_TYPER_DEVBITS))
++			return false;
++		break;
++	case GITS_BASER_TYPE_COLLECTION:
++		/* as GITS_TYPER.CIL == 0, ITS supports 16-bit collection ID */
++		if (id >= BIT_ULL(16))
++			return false;
++		break;
++	default:
++		return false;
++	}
  
-@@ -126,10 +128,10 @@ Then vcpus can be started.
-  - V indicates whether the entry is valid. If not, other fields
-    are not meaningful.
-  - next: equals to 0 if this entry is the last one; otherwise it
--   corresponds to the deviceid offset to the next DTE, capped by
-+   corresponds to the DeviceID offset to the next DTE, capped by
-    2^14 -1.
-  - ITT_addr matches bits [51:8] of the ITT address (256 Byte aligned).
-- - Size specifies the supported number of bits for the eventid,
-+ - Size specifies the supported number of bits for the EventID,
-    minus one
- 
-  Collection Table Entry (CTE):
-@@ -151,8 +153,7 @@ Then vcpus can be started.
- 
-  where:
-  - next: equals to 0 if this entry is the last one; otherwise it corresponds
--   to the eventid offset to the next ITE capped by 2^16 -1.
-+   to the EventID offset to the next ITE capped by 2^16 -1.
-  - pINTID is the physical LPI ID; if zero, it means the entry is not valid
-    and other fields are not meaningful.
-  - ICID is the collection ID
--
+ 	if (!(baser & GITS_BASER_INDIRECT)) {
+ 		phys_addr_t addr;
 -- 
 2.9.0
