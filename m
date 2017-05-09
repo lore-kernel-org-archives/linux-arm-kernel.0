@@ -1,66 +1,49 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue,  9 May 2017 09:27:16 -0500
-Subject: [PATCH] ARM: dts: socfpga: set the i2c frequency
-Message-ID: <1494340036-26099-1-git-send-email-dinguyen@kernel.org>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 09 May 2017 15:28:20 +0100
+Subject: [PATCH v3 3/3] arm/arm64: signal SIBGUS and inject SEA Error
+In-Reply-To: <20170508175416.GA32234@cbox>
+References: <CAMj-D2BGTDKpOcMu2ip41_MTTj8VDwvs59Ds7yvLHcD8PeQzhg@mail.gmail.com>
+ <5910AAA2.4030304@arm.com> <20170508175416.GA32234@cbox>
+Message-ID: <5911D204.7020304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use 'clock-frequency' binding for the i2c node that will put the I2C driver
-into the standard operating mode. 'speed-mode' was not a valid binding for
-the I2C driver, remove it.
+Hi Christoffer,
 
-Signed-off-by: Alan Tull <atull@kernel.org>
-Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
----
- arch/arm/boot/dts/socfpga_arria10_socdk.dtsi      | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts     | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+On 08/05/17 18:54, Christoffer Dall wrote:
+> On Mon, May 08, 2017 at 06:28:02PM +0100, James Morse wrote:
+> I must admit I am losing track of exactly what this proposed API was
+> supposed to do.
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-index c57e6ce..0a500e77 100644
---- a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-@@ -125,13 +125,13 @@
- };
- 
- &i2c1 {
--	speed-mode = <0>;
- 	status = "okay";
- 
- 	/*
- 	 * adjust the falling times to decrease the i2c frequency to 50Khz
- 	 * because the LCD module does not work at the standard 100Khz
- 	 */
-+	clock-frequency = <100000>;
- 	i2c-sda-falling-time-ns = <6000>;
- 	i2c-scl-falling-time-ns = <6000>;
- 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-index 5ecd2ef..b13642c 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-@@ -86,7 +86,7 @@
- 
- &i2c0 {
- 	status = "okay";
--	speed-mode = <0>;
-+	clock-frequency = <100000>;
- 
- 	adxl345: adxl345 at 0 {
- 		compatible = "adi,adxl345";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-index e5a98e5..7221908 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-@@ -58,7 +58,7 @@
- 
- &i2c0 {
- 	status = "okay";
--	speed-mode = <0>;
-+	clock-frequency = <100000>;
- 
- 	stmpe1: stmpe811 at 41 {
- 		compatible = "st,stmpe811";
--- 
-2.7.4
+There are two, and we keep jumping between them!
+This is about two notification methods APEI has for arm64, 'SEA' and 'SEI'.
+
+SEA is synchronous and looks like a data abort. Qemu/kvmtool can inject these
+today using the KVM_GET/SET_ONE_REG API whenever it wants to.
+
+SEI uses SError, is asynchronous and can be masked. In addition these need to be
+consumed/synchronised by the ESB instruction, even when executed by a guest.
+Hardware has the necessary bits to drive all this, we need to expose an API to
+drive it.
+
+(I try to spell them out each time so I don't confuse SEI with something
+synchronous!)
+
+
+This patch was about SEA. I think you've answered our question:
+
+> However, if it's a question about setting up VCPU registers to a certain
+> state and potentially modifying memory, then I think experience has
+> shown us (psci) that emulating something in the kernel that userspace
+> can have fine-grained control over is a bad idea, and should be left to
+> userspace using as generic APIs as possible.
+> 
+> Furthermore, if I understand what injecting a SEA requires, it is very
+> similar to resetting the CPU and loading data into guest memory, which
+> QEMU already does today, and there is no reason to introduce additional
+> APIs if it can be done using KVM_GET/SET_ONE_REG ioctls.
+
+
+Thanks,
+
+James
