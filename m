@@ -1,142 +1,29 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 10:56:16 +0200
-Subject: [PATCH v2 09/11] KVM: arm/arm64: Register ITS iodev when setting base
- address
-In-Reply-To: <20170509085618.28311-1-cdall@linaro.org>
-References: <20170509085618.28311-1-cdall@linaro.org>
-Message-ID: <20170509085618.28311-10-cdall@linaro.org>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Tue, 9 May 2017 01:56:59 -0700
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <20170509064522.anusoikaalvlux3w@gmail.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508124621.GA20705@kroah.com>
+ <20170509064522.anusoikaalvlux3w@gmail.com>
+Message-ID: <20170509085659.GA32555@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have to register the ITS iodevice before running the VM, because in
-migration scenarios, we may be restoring a live device that wishes to
-inject MSIs before the VCPUs have started.
+On Tue, May 09, 2017 at 08:45:22AM +0200, Ingo Molnar wrote:
+> We only have ~115 code blocks in the kernel that set/restore KERNEL_DS, it would 
+> be a pity to add a runtime check to every system call ...
 
-All we need to register the ITS io device is the base address of the
-ITS, so we can simply register that when the base address of the ITS is
-set.
+I think we should simply strive to remove all of them that aren't
+in core scheduler / arch code.  Basically evetyytime we do the
 
-  [ Code to fix concurrency issues when setting the ITS base address and
-    to fix the undef base address check written by Marc Zyngier ]
+	oldfs = get_fs();
+	set_fs(KERNEL_DS); 
+	..
+	set_fs(oldfs);
 
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-its.c | 44 ++++++++++----------------------------------
- virt/kvm/arm/vgic/vgic-v3.c  |  8 --------
- virt/kvm/arm/vgic/vgic.h     |  1 -
- 3 files changed, 10 insertions(+), 43 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 18318c6..89acaef 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1540,14 +1540,19 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
- 		its_sync_lpi_pending_table(vcpu);
- }
- 
--static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
-+static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its,
-+				   u64 addr)
- {
- 	struct vgic_io_device *iodev = &its->iodev;
- 	int ret;
- 
--	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
--		return -ENXIO;
-+	mutex_lock(&kvm->slots_lock);
-+	if (!IS_VGIC_ADDR_UNDEF(its->vgic_its_base)) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
- 
-+	its->vgic_its_base = addr;
- 	iodev->regions = its_registers;
- 	iodev->nr_regions = ARRAY_SIZE(its_registers);
- 	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
-@@ -1555,9 +1560,9 @@ static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
- 	iodev->base_addr = its->vgic_its_base;
- 	iodev->iodev_type = IODEV_ITS;
- 	iodev->its = its;
--	mutex_lock(&kvm->slots_lock);
- 	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
- 				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
-+out:
- 	mutex_unlock(&kvm->slots_lock);
- 
- 	return ret;
-@@ -2384,9 +2389,7 @@ static int vgic_its_set_attr(struct kvm_device *dev,
- 		if (ret)
- 			return ret;
- 
--		its->vgic_its_base = addr;
--
--		return 0;
-+		return vgic_register_its_iodev(dev->kvm, its, addr);
- 	}
- 	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
- 		const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-@@ -2462,30 +2465,3 @@ int kvm_vgic_register_its_device(void)
- 	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
- 				       KVM_DEV_TYPE_ARM_VGIC_ITS);
- }
--
--/*
-- * Registers all ITSes with the kvm_io_bus framework.
-- * To follow the existing VGIC initialization sequence, this has to be
-- * done as late as possible, just before the first VCPU runs.
-- */
--int vgic_register_its_iodevs(struct kvm *kvm)
--{
--	struct kvm_device *dev;
--	int ret = 0;
--
--	list_for_each_entry(dev, &kvm->devices, vm_node) {
--		if (dev->ops != &kvm_arm_vgic_its_ops)
--			continue;
--
--		ret = vgic_register_its_iodev(kvm, dev->private);
--		if (ret)
--			return ret;
--		/*
--		 * We don't need to care about tearing down previously
--		 * registered ITSes, as the kvm_io_bus framework removes
--		 * them for us if the VM gets destroyed.
--		 */
--	}
--
--	return ret;
--}
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index bb35078..8fa737e 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -397,14 +397,6 @@ int vgic_v3_map_resources(struct kvm *kvm)
- 		goto out;
- 	}
- 
--	if (vgic_has_its(kvm)) {
--		ret = vgic_register_its_iodevs(kvm);
--		if (ret) {
--			kvm_err("Unable to register VGIC ITS MMIO regions\n");
--			goto out;
--		}
--	}
--
- 	dist->ready = true;
- 
- out:
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 5f17eac..8ac7397 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -181,7 +181,6 @@ bool vgic_v3_check_base(struct kvm *kvm);
- void vgic_v3_load(struct kvm_vcpu *vcpu);
- void vgic_v3_put(struct kvm_vcpu *vcpu);
- 
--int vgic_register_its_iodevs(struct kvm *kvm);
- bool vgic_has_its(struct kvm *kvm);
- int kvm_vgic_register_its_device(void);
- void vgic_enable_lpis(struct kvm_vcpu *vcpu);
--- 
-2.9.0
+trick we're doing something wrong, and there should always be better
+ways to archive it.  E.g. using iov_iter with a ITER_KVEC type
+consistently would already remove most of them.
