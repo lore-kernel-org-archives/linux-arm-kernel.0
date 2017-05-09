@@ -1,143 +1,74 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:45 +0200
-Subject: [PULL 16/37] KVM: arm64: vgic-v3: vgic_v3_lpi_sync_pending_status
+Date: Tue,  9 May 2017 12:44:51 +0200
+Subject: [PULL 22/37] KVM: arm64: vgic-its: vgic_its_check_id returns the
+ entry's GPA
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-17-cdall@linaro.org>
+Message-ID: <20170509104506.30929-23-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@redhat.com>
 
-this new helper synchronizes the irq pending_latch
-with the LPI pending bit status found in rdist pending table.
-As the status is consumed, we reset the bit in pending table.
-
-As we need the PENDBASER_ADDRESS() in vgic-v3, let's move its
-definition in the irqchip header. We restore the full length
-of the field, ie [51:16]. Same for PROPBASER_ADDRESS with full
-field length of [51:12].
+As vgic_its_check_id() computes the device/collection entry's
+GPA, let's return it so that new callers can retrieve it easily.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irqchip/arm-gic-v3.h |  2 ++
- virt/kvm/arm/vgic/vgic-its.c       |  6 ++----
- virt/kvm/arm/vgic/vgic-v3.c        | 44 ++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h           |  1 +
- 4 files changed, 49 insertions(+), 4 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index be8bad0..fffb912 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -159,6 +159,8 @@
- #define GICR_PROPBASER_RaWaWb	GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, RaWaWb)
- 
- #define GICR_PROPBASER_IDBITS_MASK			(0x1f)
-+#define GICR_PROPBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
-+#define GICR_PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 16))
- 
- #define GICR_PENDBASER_SHAREABILITY_SHIFT		(10)
- #define GICR_PENDBASER_INNER_CACHEABILITY_SHIFT		(7)
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index bd1362e..3601790 100644
+index 5523f0a..90afc83 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -221,8 +221,6 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+@@ -694,7 +694,8 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+  * is actually valid (covered by a memslot and guest accessible).
+  * For this we have to read the respective first level entry.
   */
- #define BASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
- #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
--#define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
--#define PROPBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
- 
- #define GIC_LPI_OFFSET 8192
- 
-@@ -257,7 +255,7 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
- static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
- 			     struct kvm_vcpu *filter_vcpu)
+-static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
++static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
++			      gpa_t *eaddr)
  {
--	u64 propbase = PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
-+	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
- 	u8 prop;
- 	int ret;
+ 	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
+ 	u64 indirect_ptr, type = GITS_BASER_TYPE(baser);
+@@ -725,6 +726,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
+ 		addr = BASER_ADDRESS(baser) + id * esz;
+ 		gfn = addr >> PAGE_SHIFT;
  
-@@ -369,7 +367,7 @@ static u32 max_lpis_propbaser(u64 propbaser)
-  */
- static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
- {
--	gpa_t pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
-+	gpa_t pendbase = GICR_PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
- 	struct vgic_irq *irq;
- 	int last_byte_offset = -1;
- 	int ret = 0;
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index df15036..9ae8add 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -234,6 +234,50 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
- 	vgic_v3->vgic_hcr = ICH_HCR_EN;
++		if (eaddr)
++			*eaddr = addr;
+ 		return kvm_is_visible_gfn(its->dev->kvm, gfn);
+ 	}
+ 
+@@ -757,6 +760,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
+ 	indirect_ptr += index * esz;
+ 	gfn = indirect_ptr >> PAGE_SHIFT;
+ 
++	if (eaddr)
++		*eaddr = indirect_ptr;
+ 	return kvm_is_visible_gfn(its->dev->kvm, gfn);
  }
  
-+int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq)
-+{
-+	struct kvm_vcpu *vcpu;
-+	int byte_offset, bit_nr;
-+	gpa_t pendbase, ptr;
-+	bool status;
-+	u8 val;
-+	int ret;
-+
-+retry:
-+	vcpu = irq->target_vcpu;
-+	if (!vcpu)
-+		return 0;
-+
-+	pendbase = GICR_PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
-+
-+	byte_offset = irq->intid / BITS_PER_BYTE;
-+	bit_nr = irq->intid % BITS_PER_BYTE;
-+	ptr = pendbase + byte_offset;
-+
-+	ret = kvm_read_guest(kvm, ptr, &val, 1);
-+	if (ret)
-+		return ret;
-+
-+	status = val & (1 << bit_nr);
-+
-+	spin_lock(&irq->irq_lock);
-+	if (irq->target_vcpu != vcpu) {
-+		spin_unlock(&irq->irq_lock);
-+		goto retry;
-+	}
-+	irq->pending_latch = status;
-+	vgic_queue_irq_unlock(vcpu->kvm, irq);
-+
-+	if (status) {
-+		/* clear consumed data */
-+		val &= ~(1 << bit_nr);
-+		ret = kvm_write_guest(kvm, ptr, &val, 1);
-+		if (ret)
-+			return ret;
-+	}
-+	return 0;
-+}
-+
- /* check for overlapping regions and for regions crossing the end of memory */
- static bool vgic_v3_check_base(struct kvm *kvm)
+@@ -766,7 +771,7 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
  {
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index a48f33b..79768c8 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -149,6 +149,7 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v3_enable(struct kvm_vcpu *vcpu);
- int vgic_v3_probe(const struct gic_kvm_info *info);
- int vgic_v3_map_resources(struct kvm *kvm);
-+int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq);
- int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+ 	struct its_collection *collection;
  
- void vgic_v3_load(struct kvm_vcpu *vcpu);
+-	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id))
++	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id, NULL))
+ 		return E_ITS_MAPC_COLLECTION_OOR;
+ 
+ 	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
+@@ -939,7 +944,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+ 	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
+ 	struct its_device *device;
+ 
+-	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
++	if (!vgic_its_check_id(its, its->baser_device_table, device_id, NULL))
+ 		return E_ITS_MAPD_DEVICE_OOR;
+ 
+ 	if (valid && num_eventid_bits > VITS_TYPER_IDBITS)
 -- 
 2.9.0
