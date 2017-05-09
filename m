@@ -1,75 +1,66 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 9 May 2017 09:23:28 -0500
-Subject: [PATCH 1/2 v2] clk: Add bindings for the Gemini Clock Controller
-In-Reply-To: <CACRpkdY+EzbbTy6PzN5-YhCnSxPoKej2z=t-7eC3CPqDa6Q4_w@mail.gmail.com>
-References: <20170508201159.31634-1-linus.walleij@linaro.org>
- <CAL_JsqLAMObobPrBDdA8bjaKTX4rEo2=_qd86ibbA2kQP6AvBg@mail.gmail.com>
- <CACRpkdY+EzbbTy6PzN5-YhCnSxPoKej2z=t-7eC3CPqDa6Q4_w@mail.gmail.com>
-Message-ID: <CAL_Jsq+WQijqm43U_SzSVzCn6_eeFLjggcWnbwbCpW99ct4XOQ@mail.gmail.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Tue,  9 May 2017 09:27:16 -0500
+Subject: [PATCH] ARM: dts: socfpga: set the i2c frequency
+Message-ID: <1494340036-26099-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 8, 2017 at 4:41 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, May 8, 2017 at 11:24 PM, Rob Herring <robh+dt@kernel.org> wrote:
->
->>> +Example:
->>> +
->>> +syscon: syscon at 40000000 {
->>> +       compatible = "cortina,gemini-syscon", "cortina,gemini-clock-controller",
->>> +                    "syscon", "simple-mfd";
->>
->> There are no child nodes, so you don't need simple-mfd.
->
-> The example is taken from an actual device tree (look below),
-> where there are child nodes, I can trim it down.
->
->>> +       reg = <0x40000000 0x1000>;
->>
->> Looks like you have 2 nodes pointing to the same address with your
->> reset binding? You shouldn't have overlapping resources. It's allowed
->> for historical reasons but breaks resource creation in Linux.
->
-> No... they are all in the same node, just sharing the same
-> resource by way of regmap (syscon).
+Use 'clock-frequency' binding for the i2c node that will put the I2C driver
+into the standard operating mode. 'speed-mode' was not a valid binding for
+the I2C driver, remove it.
 
-Okay, then please document at least the parent syscon node in a single
-doc. Splitting it is very confusing.
+Signed-off-by: Alan Tull <atull@kernel.org>
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+---
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi      | 2 +-
+ arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts | 2 +-
+ arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts     | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
->
-> In the end, as I think you requested, when you said:
->
->>> +     clock-controller {
->>> +             compatible = "cortina,gemini-clock-controller";
->>> +             #clock-cells = <1>;
-> (...)
->> There's not really much reason to have a child node here. The parent can
->> be the clock provider.
-> (...)
->> Same comment as clocks. The parent can be the provider.
->
-> So as you say, no specific child is needed and syscon provides
-> clocks and resets:
->
->                 syscon: syscon at 40000000 {
->                         compatible = "cortina,gemini-syscon",
->                                      "cortina,gemini-clock-controller",
->                                      "cortina,gemini-reset",
-
-This mostly looks fine, but you shouldn't need 3 compatible strings
-for the block.
-
->                                      "syscon", "simple-mfd";
->                         reg = <0x40000000 0x1000>;
->                         #clock-cells = <1>;
->                         #reset-cells = <1>;
->
->                         syscon-reboot {
->                                 compatible = "syscon-reboot";
->                                 regmap = <&syscon>;
->                                 /* GLOBAL_RESET register */
->                                 offset = <0x0c>;
->                                 /* RESET_GLOBAL | RESET_CPU1 */
->                                 mask = <0xC0000000>;
->                         };
->                 };
->
+diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
+index c57e6ce..0a500e77 100644
+--- a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
+@@ -125,13 +125,13 @@
+ };
+ 
+ &i2c1 {
+-	speed-mode = <0>;
+ 	status = "okay";
+ 
+ 	/*
+ 	 * adjust the falling times to decrease the i2c frequency to 50Khz
+ 	 * because the LCD module does not work at the standard 100Khz
+ 	 */
++	clock-frequency = <100000>;
+ 	i2c-sda-falling-time-ns = <6000>;
+ 	i2c-scl-falling-time-ns = <6000>;
+ 
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+index 5ecd2ef..b13642c 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+@@ -86,7 +86,7 @@
+ 
+ &i2c0 {
+ 	status = "okay";
+-	speed-mode = <0>;
++	clock-frequency = <100000>;
+ 
+ 	adxl345: adxl345 at 0 {
+ 		compatible = "adi,adxl345";
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
+index e5a98e5..7221908 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
+@@ -58,7 +58,7 @@
+ 
+ &i2c0 {
+ 	status = "okay";
+-	speed-mode = <0>;
++	clock-frequency = <100000>;
+ 
+ 	stmpe1: stmpe811 at 41 {
+ 		compatible = "st,stmpe811";
+-- 
+2.7.4
