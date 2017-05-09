@@ -1,143 +1,181 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:45:04 +0200
-Subject: [PULL 35/37] KVM: arm/arm64: Register ITS iodev when setting base
- address
+Date: Tue,  9 May 2017 12:44:59 +0200
+Subject: [PULL 30/37] KVM: arm/arm64: Refactor vgic_register_redist_iodevs
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-36-cdall@linaro.org>
+Message-ID: <20170509104506.30929-31-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have to register the ITS iodevice before running the VM, because in
-migration scenarios, we may be restoring a live device that wishes to
-inject MSIs before the VCPUs have started.
-
-All we need to register the ITS io device is the base address of the
-ITS, so we can simply register that when the base address of the ITS is
-set.
-
-  [ Code to fix concurrency issues when setting the ITS base address and
-    to fix the undef base address check written by Marc Zyngier ]
+Split out the function to register all the redistributor iodevs into a
+function that handles a single redistributor at a time in preparation
+for being able to call this per VCPU as these get created.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 44 ++++++++++----------------------------------
- virt/kvm/arm/vgic/vgic-v3.c  |  8 --------
- virt/kvm/arm/vgic/vgic.h     |  1 -
- 3 files changed, 10 insertions(+), 43 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 108 ++++++++++++++++++++++++---------------
+ virt/kvm/arm/vgic/vgic-v3.c      |   2 +-
+ virt/kvm/arm/vgic/vgic.h         |   2 +-
+ 3 files changed, 68 insertions(+), 44 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 18318c6..89acaef 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1540,14 +1540,19 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
- 		its_sync_lpi_pending_table(vcpu);
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 6afb3b4..168269b 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -556,61 +556,85 @@ unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
+ 	return SZ_64K;
  }
  
--static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
-+static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its,
-+				   u64 addr)
- {
- 	struct vgic_io_device *iodev = &its->iodev;
- 	int ret;
- 
--	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
--		return -ENXIO;
+-int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
++/**
++ * vgic_register_redist_iodev - register a single redist iodev
++ * @vcpu:    The VCPU to which the redistributor belongs
++ *
++ * Register a KVM iodev for this VCPU's redistributor using the address
++ * provided.
++ *
++ * Return 0 on success, -ERRNO otherwise.
++ */
++static int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
++{
++	struct kvm *kvm = vcpu->kvm;
++	struct vgic_dist *vgic = &kvm->arch.vgic;
++	struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
++	struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
++	gpa_t rd_base, sgi_base;
++	int ret;
++
++	rd_base = vgic->vgic_redist_base + kvm_vcpu_get_idx(vcpu) * SZ_64K * 2;
++	sgi_base = rd_base + SZ_64K;
++
++	kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
++	rd_dev->base_addr = rd_base;
++	rd_dev->iodev_type = IODEV_REDIST;
++	rd_dev->regions = vgic_v3_rdbase_registers;
++	rd_dev->nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
++	rd_dev->redist_vcpu = vcpu;
++
 +	mutex_lock(&kvm->slots_lock);
-+	if (!IS_VGIC_ADDR_UNDEF(its->vgic_its_base)) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
++	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, rd_base,
++				      SZ_64K, &rd_dev->dev);
++	mutex_unlock(&kvm->slots_lock);
++
++	if (ret)
++		return ret;
++
++	kvm_iodevice_init(&sgi_dev->dev, &kvm_io_gic_ops);
++	sgi_dev->base_addr = sgi_base;
++	sgi_dev->iodev_type = IODEV_REDIST;
++	sgi_dev->regions = vgic_v3_sgibase_registers;
++	sgi_dev->nr_regions = ARRAY_SIZE(vgic_v3_sgibase_registers);
++	sgi_dev->redist_vcpu = vcpu;
++
++	mutex_lock(&kvm->slots_lock);
++	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, sgi_base,
++				      SZ_64K, &sgi_dev->dev);
++	mutex_unlock(&kvm->slots_lock);
++	if (ret)
++		kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
++					  &rd_dev->dev);
++
++	return ret;
++}
++
++static void vgic_unregister_redist_iodev(struct kvm_vcpu *vcpu)
++{
++	struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
++	struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
++
++	kvm_io_bus_unregister_dev(vcpu->kvm, KVM_MMIO_BUS, &rd_dev->dev);
++	kvm_io_bus_unregister_dev(vcpu->kvm, KVM_MMIO_BUS, &sgi_dev->dev);
++}
++
++int vgic_register_redist_iodevs(struct kvm *kvm)
+ {
+ 	struct kvm_vcpu *vcpu;
+ 	int c, ret = 0;
  
-+	its->vgic_its_base = addr;
- 	iodev->regions = its_registers;
- 	iodev->nr_regions = ARRAY_SIZE(its_registers);
- 	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
-@@ -1555,9 +1560,9 @@ static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
- 	iodev->base_addr = its->vgic_its_base;
- 	iodev->iodev_type = IODEV_ITS;
- 	iodev->its = its;
--	mutex_lock(&kvm->slots_lock);
- 	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
- 				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
-+out:
- 	mutex_unlock(&kvm->slots_lock);
- 
- 	return ret;
-@@ -2384,9 +2389,7 @@ static int vgic_its_set_attr(struct kvm_device *dev,
+ 	kvm_for_each_vcpu(c, vcpu, kvm) {
+-		gpa_t rd_base = redist_base_address + c * SZ_64K * 2;
+-		gpa_t sgi_base = rd_base + SZ_64K;
+-		struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
+-		struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
+-
+-		kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
+-		rd_dev->base_addr = rd_base;
+-		rd_dev->iodev_type = IODEV_REDIST;
+-		rd_dev->regions = vgic_v3_rdbase_registers;
+-		rd_dev->nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
+-		rd_dev->redist_vcpu = vcpu;
+-
+-		mutex_lock(&kvm->slots_lock);
+-		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, rd_base,
+-					      SZ_64K, &rd_dev->dev);
+-		mutex_unlock(&kvm->slots_lock);
+-
++		ret = vgic_register_redist_iodev(vcpu);
  		if (ret)
- 			return ret;
- 
--		its->vgic_its_base = addr;
+ 			break;
 -
--		return 0;
-+		return vgic_register_its_iodev(dev->kvm, its, addr);
+-		kvm_iodevice_init(&sgi_dev->dev, &kvm_io_gic_ops);
+-		sgi_dev->base_addr = sgi_base;
+-		sgi_dev->iodev_type = IODEV_REDIST;
+-		sgi_dev->regions = vgic_v3_sgibase_registers;
+-		sgi_dev->nr_regions = ARRAY_SIZE(vgic_v3_sgibase_registers);
+-		sgi_dev->redist_vcpu = vcpu;
+-
+-		mutex_lock(&kvm->slots_lock);
+-		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, sgi_base,
+-					      SZ_64K, &sgi_dev->dev);
+-		mutex_unlock(&kvm->slots_lock);
+-		if (ret) {
+-			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+-						  &rd_dev->dev);
+-			break;
+-		}
  	}
- 	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
- 		const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-@@ -2462,30 +2465,3 @@ int kvm_vgic_register_its_device(void)
- 	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
- 				       KVM_DEV_TYPE_ARM_VGIC_ITS);
- }
+ 
+ 	if (ret) {
+ 		/* The current c failed, so we start with the previous one. */
+ 		for (c--; c >= 0; c--) {
+-			struct vgic_cpu *vgic_cpu;
 -
--/*
-- * Registers all ITSes with the kvm_io_bus framework.
-- * To follow the existing VGIC initialization sequence, this has to be
-- * done as late as possible, just before the first VCPU runs.
-- */
--int vgic_register_its_iodevs(struct kvm *kvm)
--{
--	struct kvm_device *dev;
--	int ret = 0;
--
--	list_for_each_entry(dev, &kvm->devices, vm_node) {
--		if (dev->ops != &kvm_arm_vgic_its_ops)
--			continue;
--
--		ret = vgic_register_its_iodev(kvm, dev->private);
--		if (ret)
--			return ret;
--		/*
--		 * We don't need to care about tearing down previously
--		 * registered ITSes, as the kvm_io_bus framework removes
--		 * them for us if the VM gets destroyed.
--		 */
--	}
--
--	return ret;
--}
+ 			vcpu = kvm_get_vcpu(kvm, c);
+-			vgic_cpu = &vcpu->arch.vgic_cpu;
+-			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+-						  &vgic_cpu->rd_iodev.dev);
+-			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+-						  &vgic_cpu->sgi_iodev.dev);
++			vgic_unregister_redist_iodev(vcpu);
+ 		}
+ 	}
+ 
 diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index bb35078..8fa737e 100644
+index 54dee72..12e52a0 100644
 --- a/virt/kvm/arm/vgic/vgic-v3.c
 +++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -397,14 +397,6 @@ int vgic_v3_map_resources(struct kvm *kvm)
+@@ -386,7 +386,7 @@ int vgic_v3_map_resources(struct kvm *kvm)
  		goto out;
  	}
  
--	if (vgic_has_its(kvm)) {
--		ret = vgic_register_its_iodevs(kvm);
--		if (ret) {
--			kvm_err("Unable to register VGIC ITS MMIO regions\n");
--			goto out;
--		}
--	}
--
- 	dist->ready = true;
- 
- out:
+-	ret = vgic_register_redist_iodevs(kvm, dist->vgic_redist_base);
++	ret = vgic_register_redist_iodevs(kvm);
+ 	if (ret) {
+ 		kvm_err("Unable to register VGICv3 redist MMIO regions\n");
+ 		goto out;
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 5f17eac..8ac7397 100644
+index 8259f0a..a2aeaa8 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -181,7 +181,6 @@ bool vgic_v3_check_base(struct kvm *kvm);
+@@ -174,7 +174,7 @@ int vgic_v3_probe(const struct gic_kvm_info *info);
+ int vgic_v3_map_resources(struct kvm *kvm);
+ int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq);
+ int vgic_v3_save_pending_tables(struct kvm *kvm);
+-int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
++int vgic_register_redist_iodevs(struct kvm *kvm);
+ 
  void vgic_v3_load(struct kvm_vcpu *vcpu);
  void vgic_v3_put(struct kvm_vcpu *vcpu);
- 
--int vgic_register_its_iodevs(struct kvm *kvm);
- bool vgic_has_its(struct kvm *kvm);
- int kvm_vgic_register_its_device(void);
- void vgic_enable_lpis(struct kvm_vcpu *vcpu);
 -- 
 2.9.0
