@@ -1,62 +1,85 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 10:56:07 +0200
-Subject: [PATCH v2 00/11] Fixes to v7 of the vITS save/restore series
-Message-ID: <20170509085618.28311-1-cdall@linaro.org>
+Date: Tue,  9 May 2017 10:56:08 +0200
+Subject: [PATCH v2 01/11] KVM: arm/arm64: Clarification and relaxation to ITS
+ save/restore ABI
+In-Reply-To: <20170509085618.28311-1-cdall@linaro.org>
+References: <20170509085618.28311-1-cdall@linaro.org>
+Message-ID: <20170509085618.28311-2-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We spotted a number of isses on the v7 ITS save/restore patch series,
-but because most of that patch series is in really good shape, and
-because the work discussed is somewhat orthogonal (the register iodevs
-in particular), I decided to send out a set of fixes to apply after the
-main ITS save/restore series, and we can apply the v7 series plus these
-fixes.
+Clarify what is meant by the save/restore ABI only supporting virtual
+physical interrupts.
 
-The whole series with the fixes applied on top of queue can be found here:
-git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git its-save-restore-queue-fixes-v2
+Relax the requirement of the order that the collection entries are
+written in and be clear that there is no particular ordering enforced.
 
-Thanks,
--Christoffer
+Some cosmetic changes in the capitalization of ID names to align with
+the GICv3 manual and remove the empty line in the bottom of the patch.
 
-Changes since v1:
- - We got rid of the requirement to initialize the ITS (it doesn't do
-   anything).
- - We fixed a race condition with setting the ITS base address which was
-   introduced in v1 of this series.
- - We reworded some commit messages based on Eric's comments
- - We fixed the address check to work with partically unset base addrs
- - We use the vcpu index instead of the vcpu id for allocating redist
-   regions.
- - Some renames and code cleanups.
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+---
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt | 23 +++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
 
-Christoffer Dall (10):
-  KVM: arm/arm64: Clarification and relaxation to ITS save/restore ABI
-  KVM: arm/arm64: vgic: Rename kvm_vgic_vcpu_init to
-    kvm_vgic_vcpu_enable
-  KVM: Add kvm_vcpu_get_idx to get vcpu index in kvm->vcpus
-  KVM: arm/arm64: Refactor vgic_register_redist_iodevs
-  KVM: arm/arm64: Make vgic_v3_check_base more broadly usable
-  KVM: arm/arm64: Slightly rework kvm_vgic_addr
-  KVM: arm/arm64: Register iodevs when setting redist base and creating
-    VCPUs
-  KVM: arm/arm64: Register ITS iodev when setting base address
-  KVM: arm/arm64: Don't call map_resources when restoring ITS tables
-  KVM: arm/arm64: vgic-its: Cleanup after failed ITT restore
-
-Marc Zyngier (1):
-  KVM: arm/arm64: Get rid of its->initialized field
-
- Documentation/virtual/kvm/devices/arm-vgic-its.txt |  23 ++--
- include/kvm/arm_vgic.h                             |   2 +-
- include/linux/kvm_host.h                           |  11 ++
- virt/kvm/arm/arm.c                                 |   2 +-
- virt/kvm/arm/vgic/vgic-init.c                      |  25 +++-
- virt/kvm/arm/vgic/vgic-its.c                       |  96 +++++---------
- virt/kvm/arm/vgic/vgic-kvm-device.c                |  29 ++--
- virt/kvm/arm/vgic/vgic-mmio-v3.c                   | 147 +++++++++++++++------
- virt/kvm/arm/vgic/vgic-v3.c                        |  33 +++--
- virt/kvm/arm/vgic/vgic.h                           |   5 +-
- 10 files changed, 222 insertions(+), 151 deletions(-)
-
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+index ba132e9..eb06beb 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+@@ -97,8 +97,8 @@ Groups:
+ The following ordering must be followed when restoring the GIC and the ITS:
+ a) restore all guest memory and create vcpus
+ b) restore all redistributors
+-c) initialize the ITS and then provide its base address
+-   (KVM_DEV_ARM_VGIC_CTRL_INIT, KVM_DEV_ARM_VGIC_GRP_ADDR)
++c) provide the its base address
++   (KVM_DEV_ARM_VGIC_GRP_ADDR)
+ d) restore the ITS in the following order:
+    1. Restore GITS_CBASER
+    2. Restore all other GITS_ registers, except GITS_CTLR!
+@@ -110,12 +110,14 @@ Then vcpus can be started.
+  ITS Table ABI REV0:
+  -------------------
+ 
+- Revision 0 of the ABI only supports physical LPIs.
++ Revision 0 of the ABI only supports the features of a virtual GICv3, and does
++ not support a virtual GICv4 with support for direct injection of virtual
++ interrupts for nested hypervisors.
+ 
+- The device table and ITT are indexed by the deviceid and eventid,
+- respectively. The collection table is not indexed by collectionid:
+- CTEs are written in the table in the order of collection creation. All
+- entries are 8 bytes.
++ The device table and ITT are indexed by the DeviceID and EventID,
++ respectively. The collection table is not indexed by CollectionID, and the
++ entries in the collection are listed in no particular order.
++ All entries are 8 bytes.
+ 
+  Device Table Entry (DTE):
+ 
+@@ -126,10 +128,10 @@ Then vcpus can be started.
+  - V indicates whether the entry is valid. If not, other fields
+    are not meaningful.
+  - next: equals to 0 if this entry is the last one; otherwise it
+-   corresponds to the deviceid offset to the next DTE, capped by
++   corresponds to the DeviceID offset to the next DTE, capped by
+    2^14 -1.
+  - ITT_addr matches bits [51:8] of the ITT address (256 Byte aligned).
+- - Size specifies the supported number of bits for the eventid,
++ - Size specifies the supported number of bits for the EventID,
+    minus one
+ 
+  Collection Table Entry (CTE):
+@@ -151,8 +153,7 @@ Then vcpus can be started.
+ 
+  where:
+  - next: equals to 0 if this entry is the last one; otherwise it corresponds
+-   to the eventid offset to the next ITE capped by 2^16 -1.
++   to the EventID offset to the next ITE capped by 2^16 -1.
+  - pINTID is the physical LPI ID; if zero, it means the entry is not valid
+    and other fields are not meaningful.
+  - ICID is the collection ID
+-
 -- 
 2.9.0
