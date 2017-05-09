@@ -1,123 +1,84 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 9 May 2017 09:26:55 -0700
-Subject: Updating kernel.org cross compilers?
-In-Reply-To: <ee8a7f2c-976d-fe2a-55f9-ab8eebbf22eb@arm.com>
-References: <92b5ff36-ad2b-10bc-de4f-4774babd9625@arm.com>
- <20170430052957.GJ19687@gate.crashing.org>
- <ee8a7f2c-976d-fe2a-55f9-ab8eebbf22eb@arm.com>
-Message-ID: <20170509162655.GB14061@roeck-us.net>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 9 May 2017 09:30:02 -0700
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <20170509065619.wmqa6z6w3n6xpvrw@gmail.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508075209.7aluvpwildw325rf@gmail.com>
+ <1494256932.1167.1.camel@gmail.com>
+ <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
+ <20170509065619.wmqa6z6w3n6xpvrw@gmail.com>
+Message-ID: <CAGXu5jL-qvFxLkJZSosAovK4qL5eLPOD7orpei42x6mK_tBXhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 09, 2017 at 03:59:27PM +0100, Andre Przywara wrote:
-> On 30/04/17 06:29, Segher Boessenkool wrote:
-> 
-> Hi,
-> 
-> > On Wed, Apr 26, 2017 at 03:14:16PM +0100, Andre Przywara wrote:
-> >> It seems that many people (even outside the Linux kernel community) use
-> >> the cross compilers provided at kernel.org/pub/tools/crosstool.
-> >> The latest compiler I find there is 4.9.0, which celebrated its third
-> >> birthday at the weekend, also has been superseded by 4.9.4 meanwhile.
-> >>
-> >> So I took Segher's buildall scripts from [1] and threw binutils 2.28 and
-> >> GCC 6.3.0 at them.
-> > 
-> > Happy to see people are still using these!
-> > 
-> >> After removing --enable-sjlj-exceptions from build-gcc
-> > 
-> > This was needed to build some targets.  It does prevent aarch64 from
-> > building without patch.
-> 
-> I saw you fixing that in your repo, thanks for that!
-> 
-> >> and adding --disable-multilib (for building x86-64 on a x86-64
-> >> box without 32-bit libs)
-> > 
-> > Why is this needed?  What error are you seeing.
-> 
-> It was something along the lines of not finding 32-bit compat libraries
-> (which I don't have on that build machine):
-> ------------------------
-> configure: error: I suspect your system does not have 32-bit development
-> libraries (libc and headers). If you have them, rerun configure with
-> --enable-multilib. If you do not have them, and want to build a
-> 64-bit-only compiler, rerun configure with --disable-multilib.
-> ------------------------
-> 
-> I don't think we need multilib for a kernel build, also we have an i386
-> compiler for 32-bit kernels. So adding this flags allows x86_64 to be
-> build on pure 64-bit systems.
-> 
-> >> I was able to build (bare-metal) toolchains for
-> >> all architectures except arc, m68k, tilegx and tilepro.
-> > 
-> > arc needs a more recent GCC; the other probably as well.  GCC 7 should
-> > be out very soon, you probably want to wait for that :-)
-> 
-> Well, GCC 7 indeed builds better, but then again is a very new compiler.
-> For instance in the moment it spits a lot of warnings when compiling the
-> kernel (mostly due to some *printf analysis). It's not hard to fix, but
-> this will take a while to trickle in and it's questionable whether this
-> will be backported everywhere.
-> So in addition to GCC 7.1 I'd like to have at least GCC 6.3 around,
-> which builds kernels without warnings today.
-> 
-> For GCC 6.3 (and probably before) arc was breaking because missing a
-> (default) CPU type. Adding "--with-cpu=arc700" to EXTRA_GCC_CONF fixed
-> that, but GCC 7 indeed builds fine, even without it.
-> I was wondering if we could have that flags added to the new
-> TARGET_GCC_CONF variable for arc-elf, to cover pre GCC 7 compilers.
-> 
+On Mon, May 8, 2017 at 11:56 PM, Ingo Molnar <mingo@kernel.org> wrote:
+>
+> * Kees Cook <keescook@chromium.org> wrote:
+>
+>> > There's the option of using GCC plugins now that the infrastructure was
+>> > upstreamed from grsecurity. It can be used as part of the regular build
+>> > process and as long as the analysis is pretty simple it shouldn't hurt compile
+>> > time much.
+>>
+>> Well, and that the situation may arise due to memory corruption, not from
+>> poorly-matched set_fs() calls, which static analysis won't help solve. We need
+>> to catch this bad kernel state because it is a very bad state to run in.
 
-I think arcv2 requires gcc 7.
+[attempting some thread-merging]
 
-> >> $ ./buildall --toolchain
-> >> $ PATH=$PATH:/opt/cross/bin
-> >> $ ./buildall --kernel
-> > 
-> > You should have the target dir in your PATH before doing anything else.
-> > Is this not documented?  Hrm I guess not, let me fix that.
-> > 
-> >> And what is a good build setup, so that the binaries run on as many
-> >> systems as possible?
-> > 
-> > Run contrib/download_prerequisites in the gcc source dir: this will
-> > make GMP, MPFR, MPC statically linked, and use a version of each that
-> > is known to work (and work correctly).
-> 
-> Ah, that's a good hint! Thanks, that solves a lot of problems.
-> 
-> Also I removed documentation (share/ directory, which won't be in
-> MANPATH mostly anyway) from the tarball and stripped the (host) binaries
-> to get the tarball size down (to about 16 MB per arch)
-> 
-> I built both toolchains and kernels for almost all 31 supported
-> architectures. Some kernel builds fails (sparc, sparc64, arc), but not
+> Ok, so that's CVE-2010-4258, where an oops with KERNEL_DS set was used to escalate
+> privileges, due to the kernel's oops handler not cleaning up the KERNEL_DS. The
+> exploit used another bug, a crash in a network protocol handler, to execute the
+> oops handler with KERNEL_DS set.
 
-Are those missing libgcc ? If so, I think it is a toolchain issue.
-I solved it by adding all-target-libgcc / install-target-libgcc
-to the build (and installing the kernel headers where needed, ie for
-m68k and tilegx/tilepro).
+Right, I didn't mean to suggest that vulnerability would be fixed by
+this solution. I was trying to show how there can be some pretty
+complex interaction with exceptions/interrupts/etc that would make
+pure static analysis still miss things.
 
-> So while I have now 31 GCC 7.1.0 tarballs, pushing those binaries to
-> due to toolchain issues, as it seems. Only sh4 complains:
-> sh4-linux-gcc: error: command line option '-m4-nofpu' is not supported
+> If memory corruption corrupted the task state into having addr_limit set to
+> KERNEL_DS then there's already a fair chance that it's game over: it could also
+> have set *uid to 0, or changed a sensitive PF_ flag, or a number of other
+> things...
+>
+> Furthermore, think about it: there's literally an infinite amount of corrupted
+> task states that could be a security problem and that could be checked after every
+> system call. Do we want to check every one of them?
 
-What configuration are you trying to build, and how does your make command
-line look like (wondering, because I don't see the problem) ?
+Right, but this "slippery slope" argument isn't the best way to reject
+security changes. Let me take a step back and describe the threat, and
+where we should likely spend time:
 
-> by this configuration.
+The primary threat with addr_limit getting changed is that a
+narrowly-scoped attack (traditionally stack exhaustion or
+adjacent-stack large-index writes) could be leveraged into opening the
+entire kernel to writes (by allowing all syscalls with a
+copy_to_user() call to suddenly be able to write to kernel memory).
+So, really, the flaw is having addr_limit at all. Removing set_fs()
+should, I think, allow this to become a const (or at least should get
+us a lot closer).
 
-> some public webspace raises some legal eyebrows here, so I was wondering
-> if someone (probably with less affiliation to a hardware (arch) vendor)
-> could build, package and upload them? I am happy to assist with that
-> process.
-> 
+The main path to corrupting addr_limit has been via stack corruption.
+On architectures with CONFIG_THREAD_INFO_IN_TASK, this risk is greatly
+reduced already, but it's not universally available yet. (And as long
+as we're talking about stack attacks, CONFIG_VMAP_STACK makes
+cross-stack overflows go away, and cross-stack indexing harder, but
+that's not really about addr_limit since currently nothing with
+VMAP_STACK doesn't already have THREAD_INFO_IN_TASK.)
 
-How do you create the per-target tarballs ? The script in the
-repository pushes eherything into a single target directory. 
+So, left with a still exploitable target in memory that allows such an
+expansion of attack method, I still think it's worth keeping this
+patch series, but if we can drop set_fs() I could probably be
+convinced the benefit of the series doesn't exceed the cost on
+THREAD_INFO_IN_TASK-architectures (x86, arm64, s390). But that means
+at least currently keeping it on arm, for example. If we can make
+addr_limit const, well, we don't need the series at all.
 
-Thanks,
-Guenter
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
