@@ -1,49 +1,92 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 09 May 2017 15:28:20 +0100
-Subject: [PATCH v3 3/3] arm/arm64: signal SIBGUS and inject SEA Error
-In-Reply-To: <20170508175416.GA32234@cbox>
-References: <CAMj-D2BGTDKpOcMu2ip41_MTTj8VDwvs59Ds7yvLHcD8PeQzhg@mail.gmail.com>
- <5910AAA2.4030304@arm.com> <20170508175416.GA32234@cbox>
-Message-ID: <5911D204.7020304@arm.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Tue, 9 May 2017 07:29:57 -0700
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <20170509111007.GA14702@kroah.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508075209.7aluvpwildw325rf@gmail.com>
+ <1494256932.1167.1.camel@gmail.com>
+ <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
+ <20170509065619.wmqa6z6w3n6xpvrw@gmail.com> <20170509111007.GA14702@kroah.com>
+Message-ID: <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Tue, May 9, 2017 at 4:10 AM, Greg KH <greg@kroah.com> wrote:
+> On Tue, May 09, 2017 at 08:56:19AM +0200, Ingo Molnar wrote:
+>>
+>> * Kees Cook <keescook@chromium.org> wrote:
+>>
+>> > > There's the option of using GCC plugins now that the infrastructure was
+>> > > upstreamed from grsecurity. It can be used as part of the regular build
+>> > > process and as long as the analysis is pretty simple it shouldn't hurt compile
+>> > > time much.
+>> >
+>> > Well, and that the situation may arise due to memory corruption, not from
+>> > poorly-matched set_fs() calls, which static analysis won't help solve. We need
+>> > to catch this bad kernel state because it is a very bad state to run in.
+>>
+>> If memory corruption corrupted the task state into having addr_limit set to
+>> KERNEL_DS then there's already a fair chance that it's game over: it could also
+>> have set *uid to 0, or changed a sensitive PF_ flag, or a number of other
+>> things...
+>>
+>> Furthermore, think about it: there's literally an infinite amount of corrupted
+>> task states that could be a security problem and that could be checked after every
+>> system call. Do we want to check every one of them?
+>
+> Ok, I'm all for not checking lots of stuff all the time, just to protect
+> from crappy drivers that.  Especially as we _can_ audit and run checks
+> on the source code for them in the kernel tree.
+>
+> But, and here's the problem, outside of the desktop/enterprise world,
+> there are a ton of out-of-tree code that is crap.  The number of
+> security/bug fixes and kernel crashes for out-of-tree code in systems
+> like Android phones is just so high it's laughable.
+>
+> When you have a device that is running 3.2 million lines of kernel code,
+> yet the diffstat of the tree compared to mainline adds 3 million lines
+> of code, there is bound to be a ton of issues/problems there.
+>
+> So this is an entirely different thing we need to try to protect
+> ourselves from.  A long time ago I laughed when I saw that Microsoft had
+> to do lots of "hardening" of their kernel to protect themselves from
+> crappy drivers, as I knew we didn't have to do that because we had the
+> source for them and could fix the root issues.  But that has changed and
+> now we don't all have that option.  That code is out-of-tree because the
+> vendor doesn't care, and doesn't want to take any time at all to do
+> anything resembling a real code review[1].
 
-On 08/05/17 18:54, Christoffer Dall wrote:
-> On Mon, May 08, 2017 at 06:28:02PM +0100, James Morse wrote:
-> I must admit I am losing track of exactly what this proposed API was
-> supposed to do.
+That's a big part of why I thought would be useful. I am less worried
+about edge cases upstream right now than forks with custom codes not
+using set_fs correctly.
 
-There are two, and we keep jumping between them!
-This is about two notification methods APEI has for arm64, 'SEA' and 'SEI'.
+>
+> So, how about options like the ones being proposed here, go behind a new
+> config option:
+>         CONFIG_PROTECT_FROM_CRAPPY_DRIVERS
+> that device owners can enable if they do not trust their vendor-provided
+> code (hint, I sure don't.)  That way the "normal" path that all of us
+> are used to running will be fine, but if you want to take the speed hit
+> to try to protect yourself, then you can do that as well.
 
-SEA is synchronous and looks like a data abort. Qemu/kvmtool can inject these
-today using the KVM_GET/SET_ONE_REG API whenever it wants to.
+Maybe another name but why not.
 
-SEI uses SError, is asynchronous and can be masked. In addition these need to be
-consumed/synchronised by the ESB instruction, even when executed by a guest.
-Hardware has the necessary bits to drive all this, we need to expose an API to
-drive it.
-
-(I try to spell them out each time so I don't confuse SEI with something
-synchronous!)
-
-
-This patch was about SEA. I think you've answered our question:
-
-> However, if it's a question about setting up VCPU registers to a certain
-> state and potentially modifying memory, then I think experience has
-> shown us (psci) that emulating something in the kernel that userspace
-> can have fine-grained control over is a bad idea, and should be left to
-> userspace using as generic APIs as possible.
-> 
-> Furthermore, if I understand what injecting a SEA requires, it is very
-> similar to resetting the CPU and loading data into guest memory, which
-> QEMU already does today, and there is no reason to introduce additional
-> APIs if it can be done using KVM_GET/SET_ONE_REG ioctls.
+>
+> Anyway, just an idea...
+>
+> thanks,
+>
+> greg k-h
+>
+> [1] I am working really hard with lots of vendors to try to fix their
+>     broken development model, but that is going to take years to resolve
+>     as their device pipelines are years long, and changing their
+>     mindsets takes a long time...
 
 
-Thanks,
 
-James
+-- 
+Thomas
