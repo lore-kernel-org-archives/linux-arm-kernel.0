@@ -1,33 +1,32 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 10 May 2017 00:12:31 +0800
-Subject: [PATCH v3] dt-bindings: add vendor prefix for bananapi
-Message-ID: <271c3a1548a712c529e5fd783f785e9847ab5103.1494345301.git.sean.wang@mediatek.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Tue, 9 May 2017 09:24:20 -0700
+Subject: [PATCH] PCI: imx6: remove LTSSM disable workaround
+In-Reply-To: <20170120155837.2874-1-l.stach@pengutronix.de>
+References: <20170120155837.2874-1-l.stach@pengutronix.de>
+Message-ID: <CAJ+vNU1LqNRNEEX4NH3uyiw-xS-07zU94drhGOewwYM5UOs87Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Fri, Jan 20, 2017 at 7:58 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> This causes CPU hangs when the system is reset by the watchdog, as
+> the GPRs aren't cleared, but the clocks are back to disabled state.
+>
+> If the bootloader uses PCIe, it must take care to bring it down
+> into a safe state, before passing control to the Linux kernel.
+> This is the only way to get a properly operating system at all
+> times and circumstances.
+>
 
-Add BIPAI KEJI LIMITED which is a company dedicating to design and
-manufacture bananapi open hardware.
+Lucas,
 
-Website: http://www.banana-pi.org/
+I missed this patch when it came through.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+Can you give some details about what you consider a 'safe state' for
+the bootloader to bring PCI to before passing control to the kernel
+(with respect to PERST#, PCI CLK, and the various host controller
+registers)? I would like to investigate making PCI available in the
+bootloader as well as the kernel reliable on IMX6.
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index c7d1b72..8f7283d 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -44,6 +44,7 @@ avia	avia semiconductor
- avic	Shanghai AVIC Optoelectronics Co., Ltd.
- axentia	Axentia Technologies AB
- axis	Axis Communications AB
-+bananapi BIPAI KEJI LIMITED
- boe	BOE Technology Group Co., Ltd.
- bosch	Bosch Sensortec GmbH
- boundary	Boundary Devices Inc.
--- 
-2.7.4
+Regards,
+
+Tim
