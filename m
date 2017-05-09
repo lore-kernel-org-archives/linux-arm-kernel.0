@@ -1,141 +1,17 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 11 May 2017 10:44:10 +0800
-Subject: [PATCH v3 2/2] dt-bindings: pcie: Add documentation for
- Mediatek PCIe
-In-Reply-To: <CAK8P3a1AUsUTNDnN+_9251sxC7R4vvkQRr37dvAke6ooCJ_oxg@mail.gmail.com>
-References: <1494382020-26790-1-git-send-email-ryder.lee@mediatek.com>
- <1494382020-26790-3-git-send-email-ryder.lee@mediatek.com>
- <CAK8P3a193RxchvFAMWeZiP0sc0bd+VGg=_aVvipSgcbDpHXojg@mail.gmail.com>
- <1494408707.31307.32.camel@mtkswgap22>
- <CAK8P3a1AUsUTNDnN+_9251sxC7R4vvkQRr37dvAke6ooCJ_oxg@mail.gmail.com>
-Message-ID: <1494470650.20742.36.camel@mtkswgap22>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 9 May 2017 12:52:59 +0200
+Subject: [PULL 00/37] KVM/ARM Changes for v4.12 - Round 2
+In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
+References: <20170509104506.30929-1-cdall@linaro.org>
+Message-ID: <4d57c285-e0e4-7410-f113-0331d6c723a2@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-05-10 at 12:01 +0200, Arnd Bergmann wrote:
-> On Wed, May 10, 2017 at 11:31 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> > On Wed, 2017-05-10 at 10:08 +0200, Arnd Bergmann wrote:
-> >> On Wed, May 10, 2017 at 4:07 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> >>
-> >> > +- ranges:
-> >> > +  - The first three entries are expected to translate the addresses for the root
-> >> > +    port registers, which are referenced by the assigned-addresses property of
-> >> > +    the root port nodes (see below).
-> >>
-> >> I don't understand this part. Why do you need a static translation for these?
-> >> Shouldn't they just be listed in the 'reg' property of the parent node now that
-> >> you have the clk/reset/phy properties in the parent as well?
-> >
-> > At first, I did like that. But I noticed that someone suggest it's
-> > better to use 'assigned-addresses' to handle per-port registers, the
-> > same path as tegra and marvell did, in other platform discussion thread.
-> > So I just put shared register in root node. It could be rolled back if
-> > you feel this is inappropriate.
-> 
-> The marvell case is not a good example for your case: their top-level
-> device is made up by the OS to help with the shared resource allocation,
-> while in your case the bus bridge actually exists in hardware.
-> 
-> I'm not too familiar with the Tegra case, and haven't looked at that here,
-> but it could be an artifact of how for a while we used to list the config
-> space access in the top-level "ranges" instead of the "reg" property.
-> 
-> I'd vote for moving it back, for consistency with the other port specific
-> properties that are now in the root node. Once you do that, the port
-> nodes can be removed completely, which is what I was aiming for with
-> the comments on the previous version.
- 
-I'll move it back.
 
-> >> > +Required properties:
-> >> > +- device_type: Must be "pci"
-> >> > +- assigned-addresses: Address and size of the port configuration registers
-> >> > +- reg: Only the first four bytes are used to refer to the correct bus number
-> >> > +  and device number.
-> >> > +- #address-cells: Must be 3
-> >> > +- #size-cells: Must be 2
-> >> > +- #interrupt-cells: Must be 1
-> >> > +- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
-> >> > +  Please refer to the standard PCI bus binding document for a more detailed
-> >> > +  explanation.
-> >>
-> >> Child nodes do not normally have interrupt-map properties. Isn't this
-> >> already covered by the interrupt-map in the parent?
-> >>
-> >
-> > I have one Intel 4 port ethernet card(0000:00:01) and MTK WLAN card
-> > (0000:00:02), probe message looks good to me.
-> >
-> > pci 0000:00:01.0: fixup irq: got 224
-> > pci 0000:00:01.0: assigning IRQ 224
-> > pci 0000:00:02.0: fixup irq: got 225
-> > pci 0000:00:02.0: assigning IRQ 225
-> >
-> > pci 0000:01:00.0: fixup irq: got 224
-> > pci 0000:01:00.0: assigning IRQ 224
-> > pci 0000:01:00.1: fixup irq: got 224
-> > pci 0000:01:00.1: assigning IRQ 224
-> > pci 0000:01:00.2: fixup irq: got 224
-> > pci 0000:01:00.2: assigning IRQ 224
-> > pci 0000:01:00.3: fixup irq: got 224
-> > pci 0000:01:00.3: assigning IRQ 224
-> >
-> > pci 0000:02:00.0: fixup irq: got 225
-> > pci 0000:02:00.0: assigning IRQ 225
-> >
-> >
-> > But child nodes without interrupt-map properties:
-> > It seems incorrect.
-> >
-> > pci 0000:00:01.0: fixup irq: got 224
-> > pci 0000:00:01.0: assigning IRQ 224
-> > pci 0000:00:02.0: fixup irq: got 225
-> > pci 0000:00:02.0: assigning IRQ 225
-> >
-> > pci 0000:01:00.0: fixup irq: got 223
-> > pci 0000:01:00.0: assigning IRQ 223
-> 
-> Not entirely sure what happens here, but I guess the problem
-> is that the 'reg' portion of the parent interrupt-map refers to
-> the port devices, not the devices attached the devices behind
-> them.
 
-I agree with you. That's why I need additional interrupt-map properties
-to resolve IRQ correctly for the devices behind root ports.
+On 09/05/2017 12:44, Christoffer Dall wrote:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.12-round2
 
-Not sure whether other platforms have similar case like me here.
+Pulled, thanks (locally only for now, should be on kernel.org later today).
 
-> On a related note, I see that you still list
-> 
-> > +- interrupts: Three interrupt outputs of the controller. Must contain an
-> > +  entry for each entry in the interrupt-names property.
-> > +- interrupt-names: Must include the following names
-> > +  - "pcie-int0"
-> > +  - "pcie-int1"
-> > +  - "pcie-int2"
-> 
-> This seems to be an artifact from the older version and should be
-> removed as the driver correctly ignores the properties now.
-
-Actually, everything works fine without these properties however when it
-loads we see a few weird error message:
-
-pcieport 0000:00:01.0: Signaling PME with IRQ 232
-pcieport 0000:00:02.0: enabling device (0140 -> 0142)
-pcieport 0000:00:02.0: enabling bus mastering
-irq 232: nobody cared (try booting with the "irqpoll" option)
-...
-[<c03f6be4>] (pcie_pme_probe) from [<c03f47b8>] (pcie_port_probe_service
-+0x44/0x6c)
-(pcie_port_probe_service) from [<c0454cf8>] (driver_probe_device
-+0x280/0x470)
-...
-(pcie_port_device_register) from [<c03f51a0>] (pcie_portdrv_probe
-+0x3c/0xb4)
-(pcie_portdrv_probe) from [<c03e7acc>] (pci_device_probe+0x98/0xfc)
-(pci_device_probe) from [<c0454cf8>] (driver_probe_device+0x280/0x470)
-handlers:
-[<c03f68b0>] pcie_pme_irq
-Disabling IRQ #233
-
-I haven't dig it out yet, but just keep them here to solve that.
+Paolo
