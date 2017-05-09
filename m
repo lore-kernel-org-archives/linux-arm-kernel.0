@@ -1,32 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 May 2017 16:24:46 +0100
-Subject: [PATCH 0/6] arm64: inline assembly fixes + cleanup
-In-Reply-To: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
-References: <1493824178-7399-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170509152446.GB25451@arm.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Tue, 9 May 2017 09:03:22 -0700
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <20170509130250.GA11381@infradead.org>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508124621.GA20705@kroah.com>
+ <20170509064522.anusoikaalvlux3w@gmail.com>
+ <20170509085659.GA32555@infradead.org>
+ <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
+ <20170509130250.GA11381@infradead.org>
+Message-ID: <20170509160322.GA15902@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 04:09:32PM +0100, Mark Rutland wrote:
-> Recent attempts to make our inline assembly more clang-friendly [1,2]
-> made it clear that we have some latent problems. I've reviewed all the
-> inline assembly under arch/arm64/, and this series fixes the issues that
-> I noted.
+On Tue, May 09, 2017 at 06:02:50AM -0700, Christoph Hellwig wrote:
+> On Tue, May 09, 2017 at 06:00:01AM -0700, Andy Lutomirski wrote:
+> > fs/splice.c has some, ahem, interesting uses that have been the source
+> > of nasty exploits in the past.  Converting them to use iov_iter
+> > properly would be really, really nice.  Christoph, I don't suppose
+> > you'd like to do that?
 > 
-> The series is based on the arm64 for-next/core branch. I've built the
-> series with a Linaro 15,08 GCC 5.1.1 toolchain. I see no new warnings,
-> and the result boots happily on Juno R1.
-> 
-> The first four patches address latent bugs, with the final two patches
-> improving consistency and compatibility with clang. I believe that this
-> supersedes [2], with the GIC accessor having been fixed up by the recent
-> sysreg rework.
+> I can take care of all the fs code including this one.
 
-For the series:
+I spent the afternoon hacking up where I'd like this to head.  It's
+completely untested as of now:
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-It's a pity that we always cast to (unsigned long) for xchg, but I doubt
-it actually makes a performance difference in practice.
-
-Will
+	http://git.infradead.org/users/hch/vfs.git/shortlog/refs/heads/setfs-elimination
