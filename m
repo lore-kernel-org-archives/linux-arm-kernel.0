@@ -1,57 +1,200 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 9 May 2017 15:52:35 -0700
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <CAGXu5jKHVMRMKDfn+=kkbm+JkWPhoEtDwKx=QXAYxg1p9bn7PQ@mail.gmail.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com> <20170508124621.GA20705@kroah.com>
- <20170509064522.anusoikaalvlux3w@gmail.com>
- <20170509085659.GA32555@infradead.org>
- <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
- <20170509130250.GA11381@infradead.org> <20170509160322.GA15902@infradead.org>
- <CAGXu5jKHVMRMKDfn+=kkbm+JkWPhoEtDwKx=QXAYxg1p9bn7PQ@mail.gmail.com>
-Message-ID: <CALCETrV73=cDvaSLOMvb299yaGNJYME8LC-=P+N6p7R1NN97Yg@mail.gmail.com>
+From: kdinh@apm.com (Khuong Dinh)
+Date: Tue, 9 May 2017 15:55:37 -0700
+Subject: [PATCH v2 pci] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI
+ boot for X-Gene v1
+In-Reply-To: <20170505165119.GA8614@red-moon>
+References: <1493340847-25720-1-git-send-email-kdinh@apm.com>
+ <f5cb58a5-7c06-8d54-6293-1a72ee0a4707@arm.com>
+ <CAAsHzquFJE7X0MQyZCP4+UW_E+WK2ORe1EK6yxiq-ev81i1-xg@mail.gmail.com>
+ <20170505165119.GA8614@red-moon>
+Message-ID: <CAAsHzqttOoWOCAEmYaWjWmH4a--o0FXCRKfFC9S-+3KGiZVuHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 9, 2017 at 9:50 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Tue, May 9, 2017 at 9:03 AM, Christoph Hellwig <hch@infradead.org> wrote:
->> On Tue, May 09, 2017 at 06:02:50AM -0700, Christoph Hellwig wrote:
->>> On Tue, May 09, 2017 at 06:00:01AM -0700, Andy Lutomirski wrote:
->>> > fs/splice.c has some, ahem, interesting uses that have been the source
->>> > of nasty exploits in the past.  Converting them to use iov_iter
->>> > properly would be really, really nice.  Christoph, I don't suppose
->>> > you'd like to do that?
->>>
->>> I can take care of all the fs code including this one.
->>
->> I spent the afternoon hacking up where I'd like this to head.  It's
->> completely untested as of now:
->>
->>         http://git.infradead.org/users/hch/vfs.git/shortlog/refs/heads/setfs-elimination
->
-> Ooooh yes! Nice work.
->
-> I love this:
-> http://git.infradead.org/users/hch/vfs.git/commitdiff/51e83f50f824ca23f5584c172138e6b7c2ff786d
-> but I wonder what it'll cause out-of-tree code to do. I mean, I'd
-> rather nothing out-of-tree be calling these, but I'd hate 3rd party
-> hacks even more.
->
-> http://git.infradead.org/users/hch/vfs.git/commitdiff/018e0e9030777121fe87e89d43066691e7366587
-> This accidentally(?) removes the kernel-doc comments.
->
-> http://git.infradead.org/users/hch/vfs.git/commitdiff/78b62c730254fc39fa888cdbdca08fde6e09a798
-> Could this be made defensive? (Return 0 if ret wraps, for example?) I
-> see what the comment says, but not everyone will read that. :(
->
-> http://git.infradead.org/users/hch/vfs.git/commitdiff/a106276ca0294be054bc89ce97219933fe543df1
-> Perhaps unconditionally set USER_DS on exit instead of retaining
-> whatever was there?
+Hi Lorenzo,
 
-I don't like silent fixups.  If we want to do this, we should BUG or
-at least WARN, not just change the addr limit.  But I'm also not
-convinced it's indicative of an actual bug here.
+On Fri, May 5, 2017 at 9:51 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Thu, May 04, 2017 at 05:36:06PM -0700, Khuong Dinh wrote:
+>> Hi Marc,
+>> There's no explicit dependency between pcie driver and msi
+>> controller.  The current solution that we did is relying on the
+>> node ordering in BIOS.  ACPI 5.0 introduced _DEP method to assign a
+>> higher priority in start ordering.  This method could be applied in
+>> case of msi and pcie are the same level of subsys_init (in ACPI
+>> boot).  However, PCIe driver has not supported for this dependency
+>> check yet.  How do you think about this solution.
+>
+> First off, you can't post emails with confidentiality notices on
+> mailing lists so remove it from now onwards.
 
---Andy
+Fixed
+
+> Secondly, I commented on this before, so you know what my opinion is.
+
+I got your opinion. I'll implement as your suggestion.
+
+> Finally, please execute this command on the vmlinux that "works"
+> for you:
+>
+> nm vmlinux | grep -E '__initcall_(xgene_pcie_msi_init|acpi_init)'
+
+$ nm vmlinux | grep -E '__initcall_(xgene_pcie_msi_init|acpi_init)'
+ffff000008dab2d8 t __initcall_acpi_init4
+ffff000008dab2c8 t __initcall_xgene_pcie_msi_init4
+
+Best regards,
+Khuong Dinh
+
+> Even by ordering devices in the ACPI tables (that I abhor) I still do
+> not understand how this works (I mean without relying on kernel link
+> order to ensure that the MSI driver is probed before PCI devices are
+> enumerated in acpi_init()).
+>
+> Thanks,
+> Lorenzo
+>
+>> Best regards,
+>> Khuong
+>>
+>> On Fri, Apr 28, 2017 at 2:27 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> > On 28/04/17 01:54, Khuong Dinh wrote:
+>> >> From: Khuong Dinh <kdinh@apm.com>
+>> >>
+>> >> This patch makes pci-xgene-msi driver ACPI-aware and provides
+>> >> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
+>> >>
+>> >> Signed-off-by: Khuong Dinh <kdinh@apm.com>
+>> >> Signed-off-by: Duc Dang <dhdang@apm.com>
+>> >> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>> >> ---
+>> >> v2:
+>> >>  - Verify with BIOS version 3.06.25 and 3.07.09
+>> >> v1:
+>> >>  - Initial version
+>> >> ---
+>> >>  drivers/pci/host/pci-xgene-msi.c |   35 ++++++++++++++++++++++++++++++++---
+>> >>  1 files changed, 32 insertions(+), 3 deletions(-)
+>> >>
+>> >> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+>> >> index f1b633b..00aaa3d 100644
+>> >> --- a/drivers/pci/host/pci-xgene-msi.c
+>> >> +++ b/drivers/pci/host/pci-xgene-msi.c
+>> >> @@ -24,6 +24,7 @@
+>> >>  #include <linux/pci.h>
+>> >>  #include <linux/platform_device.h>
+>> >>  #include <linux/of_pci.h>
+>> >> +#include <linux/acpi.h>
+>> >>
+>> >>  #define MSI_IR0                      0x000000
+>> >>  #define MSI_INT0             0x800000
+>> >> @@ -39,7 +40,7 @@ struct xgene_msi_group {
+>> >>  };
+>> >>
+>> >>  struct xgene_msi {
+>> >> -     struct device_node      *node;
+>> >> +     struct fwnode_handle    *fwnode;
+>> >>       struct irq_domain       *inner_domain;
+>> >>       struct irq_domain       *msi_domain;
+>> >>       u64                     msi_addr;
+>> >> @@ -249,6 +250,13 @@ static void xgene_irq_domain_free(struct irq_domain *domain,
+>> >>       .free   = xgene_irq_domain_free,
+>> >>  };
+>> >>
+>> >> +#ifdef CONFIG_ACPI
+>> >> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
+>> >> +{
+>> >> +     return xgene_msi_ctrl.fwnode;
+>> >> +}
+>> >> +#endif
+>> >> +
+>> >>  static int xgene_allocate_domains(struct xgene_msi *msi)
+>> >>  {
+>> >>       msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
+>> >> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+>> >>       if (!msi->inner_domain)
+>> >>               return -ENOMEM;
+>> >>
+>> >> -     msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
+>> >> +     msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
+>> >>                                                   &xgene_msi_domain_info,
+>> >>                                                   msi->inner_domain);
+>> >>
+>> >> @@ -265,6 +273,9 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+>> >>               return -ENOMEM;
+>> >>       }
+>> >>
+>> >> +#ifdef CONFIG_ACPI
+>> >> +     pci_msi_register_fwnode_provider(&xgene_msi_get_fwnode);
+>> >> +#endif
+>> >>       return 0;
+>> >>  }
+>> >>
+>> >> @@ -449,6 +460,13 @@ static int xgene_msi_hwirq_free(unsigned int cpu)
+>> >>       {},
+>> >>  };
+>> >>
+>> >> +#ifdef CONFIG_ACPI
+>> >> +static const struct acpi_device_id xgene_msi_acpi_ids[] = {
+>> >> +     {"APMC0D0E", 0},
+>> >> +     { },
+>> >> +};
+>> >> +#endif
+>> >> +
+>> >>  static int xgene_msi_probe(struct platform_device *pdev)
+>> >>  {
+>> >>       struct resource *res;
+>> >> @@ -469,7 +487,17 @@ static int xgene_msi_probe(struct platform_device *pdev)
+>> >>               goto error;
+>> >>       }
+>> >>       xgene_msi->msi_addr = res->start;
+>> >> -     xgene_msi->node = pdev->dev.of_node;
+>> >> +
+>> >> +     xgene_msi->fwnode = of_node_to_fwnode(pdev->dev.of_node);
+>> >> +     if (!xgene_msi->fwnode) {
+>> >> +             xgene_msi->fwnode = irq_domain_alloc_fwnode(NULL);
+>> >
+>> > Please provide something other than NULL, such as the base address if
+>> > the device. That's quite useful for debugging.
+>> >
+>> >> +             if (!xgene_msi->fwnode) {
+>> >> +                     dev_err(&pdev->dev, "Failed to create fwnode\n");
+>> >> +                     rc = ENOMEM;
+>> >> +                     goto error;
+>> >> +             }
+>> >> +     }
+>> >> +
+>> >>       xgene_msi->num_cpus = num_possible_cpus();
+>> >>
+>> >>       rc = xgene_msi_init_allocator(xgene_msi);
+>> >> @@ -540,6 +568,7 @@ static int xgene_msi_probe(struct platform_device *pdev)
+>> >>       .driver = {
+>> >>               .name = "xgene-msi",
+>> >>               .of_match_table = xgene_msi_match_table,
+>> >> +             .acpi_match_table = ACPI_PTR(xgene_msi_acpi_ids),
+>> >>       },
+>> >>       .probe = xgene_msi_probe,
+>> >>       .remove = xgene_msi_remove,
+>> >>
+>> >
+>> > The code is trivial, but relies on the MSI controller to probe before
+>> > the PCI bus. What enforces this? How is it making sure that this is not
+>> > going to break in the next kernel release? As far as I can tell, there
+>> > is no explicit dependency between the two, making it the whole thing
+>> > extremely fragile.
+>> >
+>> > Thanks,
+>> >
+>> >         M.
+>> > --
+>> > Jazz is not dead. It just smells funny...
+>>
+>> --
+>> CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is
+>> for the sole use of the intended recipient(s) and contains information that
+>> is confidential and proprietary to Applied Micro Circuits Corporation or
+>> its subsidiaries. It is to be used solely for the purpose of furthering the
+>> parties' business relationship. All unauthorized review, use, disclosure or
+>> distribution is prohibited. If you are not the intended recipient, please
+>> contact the sender by reply e-mail and destroy all copies of the original
+>> message.
