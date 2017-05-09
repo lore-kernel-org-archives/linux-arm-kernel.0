@@ -1,93 +1,102 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:45:06 +0200
-Subject: [PULL 37/37] KVM: arm/arm64: vgic-its: Cleanup after failed ITT
- restore
+Date: Tue,  9 May 2017 12:44:54 +0200
+Subject: [PULL 25/37] KVM: arm64: vgic-its: Fix pending table sync
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-38-cdall@linaro.org>
+Message-ID: <20170509104506.30929-26-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When failing to restore the ITT for a DTE, we should remove the failed
-device entry from the list and free the object.
+From: Eric Auger <eric.auger@redhat.com>
 
-We slightly refactor vgic_its_destroy to be able to reuse the now
-separate vgic_its_free_dte() function.
+In its_sync_lpi_pending_table() we currently ignore the
+target_vcpu of the LPIs. We sync the pending bit found in
+the vcpu pending table even if the LPI is not targeting it.
 
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Also in vgic_its_cmd_handle_invall() we are supposed to
+read the config table data for the LPIs associated to the
+collection ID. At the moment we refresh all LPI config
+information.
+
+This patch passes a vpcu to vgic_copy_lpi_list() so that
+this latter returns a snapshot of the LPIs targeting this
+CPU and only those.
+
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 35 ++++++++++++++++++++++-------------
- 1 file changed, 22 insertions(+), 13 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 9aeaff0..2dff288 100644
+index adb3d9e..9f7105c 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1613,13 +1613,20 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
- 	return vgic_its_set_abi(its, NR_ITS_ABIS - 1);
+@@ -301,13 +301,13 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
  }
  
-+static void vgic_its_free_device(struct kvm *kvm, struct its_device *dev)
-+{
-+	struct its_ite *ite, *tmp;
-+
-+	list_for_each_entry_safe(ite, tmp, &dev->itt_head, ite_list)
-+		its_free_ite(kvm, ite);
-+	list_del(&dev->dev_list);
-+	kfree(dev);
-+}
-+
- static void vgic_its_destroy(struct kvm_device *kvm_dev)
+ /*
+- * Create a snapshot of the current LPI list, so that we can enumerate all
+- * LPIs without holding any lock.
+- * Returns the array length and puts the kmalloc'ed array into intid_ptr.
++ * Create a snapshot of the current LPIs targeting @vcpu, so that we can
++ * enumerate those LPIs without holding any lock.
++ * Returns their number and puts the kmalloc'ed array into intid_ptr.
+  */
+-static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
++static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
  {
- 	struct kvm *kvm = kvm_dev->kvm;
- 	struct vgic_its *its = kvm_dev->private;
--	struct its_device *dev;
--	struct its_ite *ite;
--	struct list_head *dev_cur, *dev_temp;
- 	struct list_head *cur, *temp;
- 
- 	/*
-@@ -1630,19 +1637,19 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
- 		return;
- 
- 	mutex_lock(&its->its_lock);
--	list_for_each_safe(dev_cur, dev_temp, &its->device_list) {
--		dev = container_of(dev_cur, struct its_device, dev_list);
--		list_for_each_safe(cur, temp, &dev->itt_head) {
--			ite = (container_of(cur, struct its_ite, ite_list));
--			its_free_ite(kvm, ite);
--		}
--		list_del(dev_cur);
--		kfree(dev);
-+	list_for_each_safe(cur, temp, &its->device_list) {
-+		struct its_device *dev;
-+
-+		dev = list_entry(cur, struct its_device, dev_list);
-+		vgic_its_free_device(kvm, dev);
+-	struct vgic_dist *dist = &kvm->arch.vgic;
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_irq *irq;
+ 	u32 *intids;
+ 	int irq_count = dist->lpi_list_count, i = 0;
+@@ -326,14 +326,14 @@ static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
+ 	spin_lock(&dist->lpi_list_lock);
+ 	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+ 		/* We don't need to "get" the IRQ, as we hold the list lock. */
+-		intids[i] = irq->intid;
+-		if (++i == irq_count)
+-			break;
++		if (irq->target_vcpu != vcpu)
++			continue;
++		intids[i++] = irq->intid;
  	}
+ 	spin_unlock(&dist->lpi_list_lock);
  
- 	list_for_each_safe(cur, temp, &its->collection_list) {
-+		struct its_collection *coll;
-+
-+		coll = list_entry(cur, struct its_collection, coll_list);
- 		list_del(cur);
--		kfree(container_of(cur, struct its_collection, coll_list));
-+		kfree(coll);
- 	}
- 	mutex_unlock(&its->its_lock);
- 
-@@ -2012,8 +2019,10 @@ static int vgic_its_restore_dte(struct vgic_its *its, u32 id,
- 		return PTR_ERR(dev);
- 
- 	ret = vgic_its_restore_itt(its, dev);
--	if (ret)
-+	if (ret) {
-+		vgic_its_free_device(its->dev->kvm, dev);
- 		return ret;
-+	}
- 
- 	return offset;
+ 	*intid_ptr = intids;
+-	return irq_count;
++	return i;
  }
+ 
+ /*
+@@ -382,7 +382,7 @@ static u32 max_lpis_propbaser(u64 propbaser)
+ }
+ 
+ /*
+- * Scan the whole LPI pending table and sync the pending bit in there
++ * Sync the pending table pending bit of LPIs targeting @vcpu
+  * with our own data structures. This relies on the LPI being
+  * mapped before.
+  */
+@@ -395,7 +395,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+ 	u32 *intids;
+ 	int nr_irqs, i;
+ 
+-	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, &intids);
++	nr_irqs = vgic_copy_lpi_list(vcpu, &intids);
+ 	if (nr_irqs < 0)
+ 		return nr_irqs;
+ 
+@@ -1081,7 +1081,7 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
+ 
+ 	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
+ 
+-	irq_count = vgic_copy_lpi_list(kvm, &intids);
++	irq_count = vgic_copy_lpi_list(vcpu, &intids);
+ 	if (irq_count < 0)
+ 		return irq_count;
+ 
 -- 
 2.9.0
