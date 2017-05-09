@@ -1,79 +1,111 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 9 May 2017 16:03:00 +0800
-Subject: [PATCH v2 29/30] dt-bindings: add vendor prefix for bananapi
-In-Reply-To: <1493621880.32195.13.camel@mtkswgap22>
-References: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
- <1493198774-4478-30-git-send-email-sean.wang@mediatek.com>
- <20170428203727.m6jm5w6nb2iirxih@rob-hp-laptop>
- <1493621880.32195.13.camel@mtkswgap22>
-Message-ID: <CAGb2v66PuKQVoq1oSLepdUGLwvA-O0jh+ckLNwsNMCwcnfAJBg@mail.gmail.com>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Tue, 9 May 2017 11:19:48 +0300
+Subject: [PATCH v2 0/2] extends PWM framework to support PWM dead-times
+Message-ID: <1494317990-9131-1-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-On Mon, May 1, 2017 at 2:58 PM, Sean Wang <sean.wang@mediatek.com> wrote:
-> On Fri, 2017-04-28 at 15:37 -0500, Rob Herring wrote:
->> On Wed, Apr 26, 2017 at 05:26:13PM +0800, sean.wang at mediatek.com wrote:
->> > From: Sean Wang <sean.wang@mediatek.com>
->> >
->> > Banana Pi team in Sinovoip Co., Limited which are dedicated to
->> > design and manufacture open hardware product.
->> >
->> > Website: http://www.banana-pi.org/
->> >
->> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->> > ---
->> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->> >  1 file changed, 1 insertion(+)
->> >
->> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> > index ec0bfb9..8ca0f3c 100644
->> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> > @@ -44,6 +44,7 @@ avia      avia semiconductor
->> >  avic       Shanghai AVIC Optoelectronics Co., Ltd.
->> >  axentia    Axentia Technologies AB
->> >  axis       Axis Communications AB
->> > +bananapi Banana Pi SINOVOP CO., LIMITED
->>
->> s/SINOVOP/SINOVOIP/
->
-> Hi Rob,
->
-> thanks for your careful reviewing , i will correct it in the next
-> version.
->
-> BTW, Could those related dts changes go through your tree if everything
-> looks good? Because I find Matthias have been inactive for a while and
-> the latest branch in his tree seems still staying on 4.10.
+Please give feedback on these patches which extends PWM framework
+in order to support PWM dead-times.
+Since I didn't receive any inputs on RFC series I'm resending it as
+normal patch series.
 
-Chiming in from the linux-sunxi side.
+For a PWM controller with more than one output signals per PWM channel
+dead-times are the delays introduced between the edges of the output
+signals and the original signal introduced in dead-time generator
+engine.
+E.g. consider a PWM controller with a dead-time engine as in the following
+diagram:
 
-We've been using the "lemaker" prefix for the original Banana Pi, and
-the "sinovoip" prefix for all the later ones by SINOVOIP. Both prefixes
-are still undocumented.
+                        -----------------
+                       |                 |---> PWMH
+        PWM signal --->| Dead-time engine|
+                       |                 |---> PWML
+                        -----------------
 
-Given the complicated history behind the Banana Pi brand, do we know
-what prefix they prefer, and what company should be tied to it?
+With no dead-time configured, the PWMH and PWML signals will be
+complementary signals (rising and falling edges of PWMH and PWML
+have opposite leves, same duration and same starting time) as
+follows:
 
-Thanks
-ChenYu
+                      ____0    D____P     ____      ____      ____
+        PWM signal __|    |____|    |____|    |____|    |____|    |___
+                      ____      ____      ____      ____      ____
+              PWMH __|    |____|    |____|    |____|    |____|    |___
+                   __      ____      ____      ____      ____      ___
+              PWML   |____|    |____|    |____|    |____|    |____|
 
->
->         Sean
->
->>
->> >  boe        BOE Technology Group Co., Ltd.
->> >  bosch      Bosch Sensortec GmbH
->> >  boundary   Boundary Devices Inc.
->> > --
->> > 1.9.1
->> >
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Where - 0 is the starting point of the signal
+      - D is the starting point of the duty-cycle
+      - P is the signal period
+
+Based on the above diagram:
+- rising edge dead-time - is the delay introduced in one of the
+dead-time engine output signals; the delay is introduced after
+rising edge of the original PWM signal
+- falling edge dead-time - is the delay introduced in one of the
+dead-time engine output signals; the delay is introduced after
+the end of falling edge of the original PWM signal
+
+The following diagram explain how PWM dead-times falls on some signals:
+
+                      ____0    D____P     ____      ____      ____
+        PWM signal __|    |____|    |____|    |____|    |____|    |___
+                        __        __        __        __        __
+              PWMH ____|  |____re|  |______|  |______|  |______|  |___
+                   __        __        __        __        __        __
+              PWML   |______|  |____fe|  |______|  |______|  |______|
+
+In the upper diagram:
+- re = rising edge = the delay between D point of the original PWM signal
+(rising edge) and the starting point of the next edge of one of the PWM
+dead-time engine output
+- fe = falling edge = the delay between P point of the original PWM signal
+(falling edge) and the starting point of the next edge of one of the PWM
+dead-time engine output
+
+To configure the PWM dead-times new inputs were added to sysfs,
+in PWM subsystem, one for rising edge dead-time, one for falling
+edge deadtime.
+
+root at sama5d2-xplained:/sys/devices/platform/ahb/ahb:apb/f802c000.pwm/pwm/pwmchip0/pwm2# ls -l
+-r--r--r--    1 root     root          4096 Feb 10 10:00 capture
+-rw-r--r--    1 root     root          4096 Feb 10 10:01 deadtime_fe
+-rw-r--r--    1 root     root          4096 Feb 10 10:02 deadtime_re
+-rw-r--r--    1 root     root          4096 Feb 10 10:00 duty_cycle
+-rw-r--r--    1 root     root          4096 Feb 10 10:00 enable
+-rw-r--r--    1 root     root          4096 Feb 10 10:00 period
+-rw-r--r--    1 root     root          4096 Feb 10 10:00 polarity
+drwxr-xr-x    2 root     root             0 Feb 10 10:00 power
+-rw-r--r--    1 root     root          4096 Feb 10 10:00 uevent
+
+The PWM dead-times are used in half bridge converters applications.
+
+Thank you,
+Claudiu Beznea
+
+Changes since v1:
+- fixed compilation warning
+
+Changes since RFC patches:
+- corrected the Documentation/pwm.txt
+- in atmel-pwm.c check atmel_pwm->regs->dt before computing
+dead-times or setting specific registers since the driver is
+used by controllers witch supports dead-time configuration and
+controller which does not.
+
+Claudiu Beznea (2):
+  drivers: pwm: core: implement pwm dead-times
+  drivers: pwm: pwm-atmel: implement pwm dead-times
+
+ Documentation/pwm.txt   | 55 ++++++++++++++++++++++++++++++++++++
+ drivers/pwm/core.c      | 10 ++++++-
+ drivers/pwm/pwm-atmel.c | 62 ++++++++++++++++++++++++++++++++++++++---
+ drivers/pwm/sysfs.c     | 74 +++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pwm.h     | 36 ++++++++++++++++++++++++
+ 5 files changed, 232 insertions(+), 5 deletions(-)
+
+-- 
+2.7.4
