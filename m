@@ -1,57 +1,78 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 9 May 2017 21:26:11 +0200
-Subject: [linux-sunxi] [PATCH v6 11/13] ARM: dts: sun8i: add DE2 nodes
- for V3s SoC
-In-Reply-To: <47D16B11-E976-464C-92AD-213D837C8F68@aosc.io>
-References: <20170504114858.9008-1-icenowy@aosc.io>
- <20170504114858.9008-12-icenowy@aosc.io>
- <CAGb2v67uE2iuP+wrL2t0fSMY8C1qnX=pYru7pZGX+0WhC_z2EA@mail.gmail.com>
- <8ad5de02ffc13348dfc71e9ec203205c@aosc.io>
- <20170505123035.pwh3idz73ujrd3hx@lukather>
- <47D16B11-E976-464C-92AD-213D837C8F68@aosc.io>
-Message-ID: <20170509192611.vouyitju6x3yibzz@lukather>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 9 May 2017 22:37:19 +0300
+Subject: [PATCH 3/3] arm64/locking: qspinlocks and qrwlocks support
+In-Reply-To: <20170509184829.scwjixgc2kxxxku7@yury-N73SV>
+References: <20170503145141.4966-1-ynorov@caviumnetworks.com>
+ <20170503145141.4966-4-ynorov@caviumnetworks.com>
+ <20170509044708.vvwgzhvdrqyljy6s@tardis>
+ <20170509184829.scwjixgc2kxxxku7@yury-N73SV>
+Message-ID: <20170509193719.is3naupydwuytzdt@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1;4601;0c
-On Fri, May 05, 2017 at 08:34:16PM +0800, Icenowy Zheng wrote:
+On Tue, May 09, 2017 at 09:48:29PM +0300, Yury Norov wrote:
+> On Tue, May 09, 2017 at 12:47:08PM +0800, Boqun Feng wrote:
+> > On Wed, May 03, 2017 at 05:51:41PM +0300, Yury Norov wrote:
+> > > From: Jan Glauber <jglauber@cavium.com>
+> > > 
+> > > Ported from x86_64 with paravirtualization support removed.
+> > > 
+> > > Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> > > 
+> > > Note. This patch removes protection from direct inclusion of
+> > > arch/arm64/include/asm/spinlock_types.h. It's done because
+> > > kernel/locking/qrwlock.c file does it thru the header
+> > > include/asm-generic/qrwlock_types.h. Until now the only user
+> > > of qrwlock.c was x86, and there's no such protection too.
+> > > 
+> > > I'm not happy to remove the protection, but if it's OK for x86,
+> > > it should be also OK for arm64. If not, I think we'd fix it
+> > > for x86, and add the protection there too.
+> > > 
+> > > Yury
+> > > 
+> > > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 > 
+> [...]
 > 
-> ? 2017?5?5? GMT+08:00 ??8:30:35, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
-> >On Fri, May 05, 2017 at 04:53:43PM +0800, icenowy at aosc.io wrote:
-> >> > > +               de2_clocks: clock at 1000000 {
-> >> > > +                       compatible =
-> >"allwinner,sun50i-h5-de2-clk";
-> >> > 
-> >> > I am a bit skeptical about this. Since the V3S only has one mixer,
-> >do
-> >> > the clocks
-> >> > for the second one even exist?
-> >> 
-> >> It's described in the de_clock.c in the BSP source code, and in
-> >hardware
-> >> these bits can be really set (although without clock output).
-> >> 
-> >> So I use this compatible which has still the extra clocks.
-> >
-> >If it's not usable, then it shouldn't be in the code, it's basically
-> >dead code.
+> > > +#define	queued_spin_unlock queued_spin_unlock
+> > > +/**
+> > > + * queued_spin_unlock - release a queued spinlock
+> > > + * @lock : Pointer to queued spinlock structure
+> > > + *
+> > > + * A smp_store_release() on the least-significant byte.
+> > > + */
+> > > +static inline void queued_spin_unlock(struct qspinlock *lock)
+> > > +{
+> > > +	smp_store_release((u8 *)lock, 0);
+> > 
+> > I think this part will cause endian issues, maybe you want something
+> > like what we do in queued_write_lock().
+> > 
+> > Have you tested this on an BE environment?
 > 
-> Thus should we have one more DE2 CCU compatible without mixer1
-> clocks for V3s?
+> No. I think I have to. Thanks for the pointing it.
+> 
+> > 
+> > Regards,
+> > Boqun
+> 
+> I think it's just the issue of copying from x86, and there's no any
+> specific need to cast to u8* type on arm64. So the correct version of
+> it would be like this, I believe: smp_store_release(&lock->val).
+> 
+> Yury
 
-If those clocks don't exist on v3s, then yes.
+Oops, it would rather be like this:
 
-Maxime
+static inline void queued_spin_unlock(struct qspinlock *lock)
+{
+#if IS_BUILTIN(CONFIG_CPU_BIG_ENDIAN)
+       smp_store_release((u8 *) &lock->val + 3, 0);
+#else
+       smp_store_release((u8 *) &lock->val, 0);
+#endif
+}
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170509/dd115812/attachment.sig>
+Or with the helper, like here in ppc port:
+https://www.spinics.net/lists/linux-virtualization/msg29390.html
