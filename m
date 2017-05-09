@@ -1,44 +1,48 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:58 +0200
-Subject: [PULL 29/37] KVM: Add kvm_vcpu_get_idx to get vcpu index in kvm->vcpus
+Date: Tue,  9 May 2017 12:44:57 +0200
+Subject: [PULL 28/37] KVM: arm/arm64: vgic: Rename kvm_vgic_vcpu_init to
+ kvm_vgic_vcpu_enable
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-30-cdall@linaro.org>
+Message-ID: <20170509104506.30929-29-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are occasional needs to use the index of vcpu in the kvm->vcpus
-array to map something related to a VCPU.  For example, unlike the
-vcpu->vcpu_id, the vcpu index is guaranteed to not be sparse across all
-vcpus which is useful when allocating a memory area for each vcpu.
+This function really doesn't init anything, it enables the CPU
+interface, so name it as such, which gives us the name to use for actual
+init work later on.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 ---
- include/linux/kvm_host.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ virt/kvm/arm/vgic/vgic-init.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 2c14ad9..12eb26d 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -490,6 +490,17 @@ static inline struct kvm_vcpu *kvm_get_vcpu_by_id(struct kvm *kvm, int id)
- 	return NULL;
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 87de048..0ea64a1 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -226,11 +226,7 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
+ 	return 0;
  }
  
-+static inline int kvm_vcpu_get_idx(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_vcpu *tmp;
-+	int idx;
-+
-+	kvm_for_each_vcpu(idx, tmp, vcpu->kvm)
-+		if (tmp == vcpu)
-+			return idx;
-+	BUG();
-+}
-+
- #define kvm_for_each_memslot(memslot, slots)	\
- 	for (memslot = &slots->memslots[0];	\
- 	      memslot < slots->memslots + KVM_MEM_SLOTS_NUM && memslot->npages;\
+-/**
+- * kvm_vgic_vcpu_init() - Enable the VCPU interface
+- * @vcpu: the VCPU which's VGIC should be enabled
+- */
+-static void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
++static void kvm_vgic_vcpu_enable(struct kvm_vcpu *vcpu)
+ {
+ 	if (kvm_vgic_global_state.type == VGIC_V2)
+ 		vgic_v2_enable(vcpu);
+@@ -269,7 +265,7 @@ int vgic_init(struct kvm *kvm)
+ 		dist->msis_require_devid = true;
+ 
+ 	kvm_for_each_vcpu(i, vcpu, kvm)
+-		kvm_vgic_vcpu_init(vcpu);
++		kvm_vgic_vcpu_enable(vcpu);
+ 
+ 	ret = kvm_vgic_setup_default_irq_routing(kvm);
+ 	if (ret)
 -- 
 2.9.0
