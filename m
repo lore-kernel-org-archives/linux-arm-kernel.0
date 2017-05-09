@@ -1,102 +1,81 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 9 May 2017 20:14:35 +0800
-Subject: [PATCH V2 1/3] clk: add clk_bulk_get accessories
-In-Reply-To: <CAMuHMdVDOor0E2cjEKO+=Pm+1MGO4BibGTdULPvPKd390fTxuw@mail.gmail.com>
-References: <1494252233-21074-1-git-send-email-aisheng.dong@nxp.com>
- <1494252233-21074-2-git-send-email-aisheng.dong@nxp.com>
- <CAMuHMdVDOor0E2cjEKO+=Pm+1MGO4BibGTdULPvPKd390fTxuw@mail.gmail.com>
-Message-ID: <CAA+hA=TaC2Mdekz1KSPpOGiFY1vKRd+CqLXGd1yb7iRP_j_tnQ@mail.gmail.com>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Tue, 9 May 2017 15:15:51 +0300
+Subject: [PATCH 0/2] extend PWM framework to support PWM dead-times
+Message-ID: <1494332153-14534-1-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi all,
 
-On Mon, May 8, 2017 at 11:08 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Dong,
->
-> On Mon, May 8, 2017 at 4:03 PM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
->> --- /dev/null
->> +++ b/drivers/clk/clk-bulk.c
->> @@ -0,0 +1,165 @@
->
->> +int __must_check clk_bulk_get(struct device *dev, int num_clks,
->> +                             struct clk_bulk_data *clks)
->> +{
->> +       int ret;
->> +       int i;
->> +
->> +       for (i = 0; i < num_clks; i++)
->> +               clks[i].clk = NULL;
->> +
->> +       for (i = 0; i < num_clks; i++) {
->> +               clks[i].clk = clk_get(dev, clks[i].id);
->> +               if (IS_ERR(clks[i].clk)) {
->> +                       ret = PTR_ERR(clks[i].clk);
->> +                       dev_err(dev, "Failed to get clk '%s': %d\n",
->> +                               clks[i].id, ret);
->> +                       clks[i].clk = NULL;
->> +                       goto err;
->> +               }
->> +       }
->> +
->> +       return 0;
->> +
->> +err:
->> +       while (--i >= 0)
->> +               clk_put(clks[i].clk);
->
-> These are released in inverse order, which is good.
->
->> +
->> +       return ret;
->> +}
->> +EXPORT_SYMBOL(clk_bulk_get);
->> +
->> +void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
->> +{
->> +       int i;
->> +
->> +       for (i = 0; i < num_clks; i++) {
->> +               clk_put(clks[i].clk);
->> +               clks[i].clk = NULL;
->
-> These aren't.
->
-> Typically resources are released in the inverse order. Not doing so may
-> cause subtle issues.
->
-> I can't come up with an example. but I'm quite sure the real world will find
-> one soon ;-)
->
-> The same is true for enable vs. disable, and prepare vs. unprepare.
->
+Please give feedback on these patches which extends the PWM
+framework in order to support multiple PWM signal types.
+Since I didn't receive any inputs on RFC series I'm resending it as
+normal patch series.
 
-I thought of it before and was wondering whether it's necessary to do it
-as i believe it may be wrong for drivers to reply on the clk_bulk API to
-do some some magic ordering to make things run because the API does not
-guarantee it.
+The current patch series add the following PWM signal types:
+- PWM complementary signals
+- PWM push-pull signal
 
-But i do agree with you that it might be a common sense to release resource
-in inverse order, just harmless to do it!
-So i will make it in V3 if no objection from Maintainer later.
+Definition of PWM complementary mode:
+For a PWM controllers with more than one outputs per PWM channel,
+e.g. with 2 outputs per PWM channels, the PWM complementary signals
+have opposite levels, same duration and same starting times,
+as in the following diagram:
 
-Thanks for your suggestion!
+        __    __    __    __
+PWMH __|  |__|  |__|  |__|  |__
+     __    __    __    __    __
+PWML   |__|  |__|  |__|  |__|
+       <--T-->
+Where T is the signal period.
 
-Regards
-Dong Aisheng
+Definition of PWM push-pull mode:
+For PWM controllers with more than one outputs per PWM channel,
+e.g. with 2 outputs per PWM channel, the PWM push-pull signals
+have same levels, same duration and are delayed until the begining
+of the next period, as in the following diagram:
 
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+        __          __
+PWMH __|  |________|  |________
+              __          __
+PWML ________|  |________|  |__
+       <--T-->
+
+Where T is the signal period.
+
+These output signals could be configured by setting PWM mode
+(a new input in sysfs has been added in order to support this
+operation).
+
+root at sama5d2-xplained:/sys/devices/platform/ahb/ahb:apb/f802c000.pwm/pwm/pwmchip0/pwm2# ls -l
+-r--r--r--    1 root     root          4096 Feb  9 10:54 capture
+-rw-r--r--    1 root     root          4096 Feb  9 10:54 duty_cycle
+-rw-r--r--    1 root     root          4096 Feb  9 10:54 enable
+-rw-r--r--    1 root     root          4096 Feb  9 10:54 mode
+-rw-r--r--    1 root     root          4096 Feb  9 10:54 period
+-rw-r--r--    1 root     root          4096 Feb  9 10:55 polarity
+drwxr-xr-x    2 root     root             0 Feb  9 10:54 power
+-rw-r--r--    1 root     root          4096 Feb  9 10:54 uevent
+
+The PWM push-pull mode could be usefull in applications like
+half bridge converters.
+
+This series add support for PWM modes on atmel SAMA5D2 SoC.
+
+Thank you,
+Claudiu Beznea
+
+Claudiu Beznea (2):
+  drivers: pwm: core: implement pwm mode
+  drivers: pwm: pwm-atmel: add support for pwm modes
+
+ Documentation/pwm.txt         |  24 ++++++++--
+ drivers/pwm/core.c            |  13 +++++-
+ drivers/pwm/pwm-atmel.c       | 103 +++++++++++++++++++++++++++++-------------
+ drivers/pwm/sysfs.c           |  52 +++++++++++++++++++++
+ include/dt-bindings/pwm/pwm.h |   1 +
+ include/linux/pwm.h           |  37 ++++++++++++++-
+ 6 files changed, 192 insertions(+), 38 deletions(-)
+
+-- 
+2.7.4
