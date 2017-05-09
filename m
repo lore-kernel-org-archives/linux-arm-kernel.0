@@ -1,105 +1,79 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Tue, 9 May 2017 15:50:46 +0800
-Subject: [PATCH 4/6] tty: serial: lpuart: add imx7ulp support
-In-Reply-To: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
-References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1494316248-24052-5-git-send-email-aisheng.dong@nxp.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 9 May 2017 16:03:00 +0800
+Subject: [PATCH v2 29/30] dt-bindings: add vendor prefix for bananapi
+In-Reply-To: <1493621880.32195.13.camel@mtkswgap22>
+References: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
+ <1493198774-4478-30-git-send-email-sean.wang@mediatek.com>
+ <20170428203727.m6jm5w6nb2iirxih@rob-hp-laptop>
+ <1493621880.32195.13.camel@mtkswgap22>
+Message-ID: <CAGb2v66PuKQVoq1oSLepdUGLwvA-O0jh+ckLNwsNMCwcnfAJBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The lpuart of imx7ulp is basically the same as ls1021a. It's also
-32 bit width register, but unlike ls1021a, it's little endian.
-Besides that, imx7ulp lpuart has a minor different register layout
-from ls1021a that it has four extra registers (verid, param, global,
-pincfg) located at the beginning of register map, which are currently
-not used by the driver and less to be used later.
+Hi,
 
-To ease the register difference handling, we add a reg_off member
-in lpuart_soc_data structure to represent if the normal
-lpuart32_{read|write} requires plus a offset to hide the issue.
+On Mon, May 1, 2017 at 2:58 PM, Sean Wang <sean.wang@mediatek.com> wrote:
+> On Fri, 2017-04-28 at 15:37 -0500, Rob Herring wrote:
+>> On Wed, Apr 26, 2017 at 05:26:13PM +0800, sean.wang at mediatek.com wrote:
+>> > From: Sean Wang <sean.wang@mediatek.com>
+>> >
+>> > Banana Pi team in Sinovoip Co., Limited which are dedicated to
+>> > design and manufacture open hardware product.
+>> >
+>> > Website: http://www.banana-pi.org/
+>> >
+>> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+>> > ---
+>> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>> >  1 file changed, 1 insertion(+)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> > index ec0bfb9..8ca0f3c 100644
+>> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> > @@ -44,6 +44,7 @@ avia      avia semiconductor
+>> >  avic       Shanghai AVIC Optoelectronics Co., Ltd.
+>> >  axentia    Axentia Technologies AB
+>> >  axis       Axis Communications AB
+>> > +bananapi Banana Pi SINOVOP CO., LIMITED
+>>
+>> s/SINOVOP/SINOVOIP/
+>
+> Hi Rob,
+>
+> thanks for your careful reviewing , i will correct it in the next
+> version.
+>
+> BTW, Could those related dts changes go through your tree if everything
+> looks good? Because I find Matthias have been inactive for a while and
+> the latest branch in his tree seems still staying on 4.10.
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.com>
-Cc: Fugang Duan <fugang.duan@nxp.com>
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
-Cc: Yangbo Lu <yangbo.lu@nxp.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/tty/serial/fsl_lpuart.c | 21 ++++++++++++++++++---
- 1 file changed, 18 insertions(+), 3 deletions(-)
+Chiming in from the linux-sunxi side.
 
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index bddd041..1cdb3f9 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -231,7 +231,11 @@
- #define DEV_NAME	"ttyLP"
- #define UART_NR		6
- 
-+/* IMX lpuart has four extra unused regs located at the beginning */
-+#define IMX_REG_OFF	0x10
-+
- static bool lpuart_is_be;
-+static u8 lpuart_reg_off;
- 
- struct lpuart_port {
- 	struct uart_port	port;
-@@ -263,6 +267,7 @@ struct lpuart_port {
- struct lpuart_soc_data {
- 	bool	is_32;
- 	bool	is_be;
-+	u8	reg_off;
- };
- 
- static struct lpuart_soc_data vf_data = {
-@@ -272,11 +277,19 @@ static struct lpuart_soc_data vf_data = {
- static struct lpuart_soc_data ls_data = {
- 	.is_32 = true,
- 	.is_be = true,
-+	.reg_off = 0x0,
-+};
-+
-+static struct lpuart_soc_data imx_data = {
-+	.is_32 = true,
-+	.is_be = false,
-+	.reg_off = IMX_REG_OFF,
- };
- 
- static const struct of_device_id lpuart_dt_ids[] = {
- 	{ .compatible = "fsl,vf610-lpuart", .data = &vf_data, },
- 	{ .compatible = "fsl,ls1021a-lpuart", .data = &ls_data, },
-+	{ .compatible = "fsl,imx7ulp-lpuart", .data = &imx_data, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
-@@ -286,15 +299,16 @@ static void lpuart_dma_tx_complete(void *arg);
- 
- static u32 lpuart32_read(void __iomem *addr)
- {
--	return lpuart_is_be ? ioread32be(addr) : readl(addr);
-+	return lpuart_is_be ? ioread32be(addr + lpuart_reg_off) :
-+			      readl(addr + lpuart_reg_off);
- }
- 
- static void lpuart32_write(u32 val, void __iomem *addr)
- {
- 	if (lpuart_is_be)
--		iowrite32be(val, addr);
-+		iowrite32be(val, addr + lpuart_reg_off);
- 	else
--		writel(val, addr);
-+		writel(val, addr + lpuart_reg_off);
- }
- 
- static void lpuart_stop_tx(struct uart_port *port)
-@@ -2008,6 +2022,7 @@ static int lpuart_probe(struct platform_device *pdev)
- 	sport->port.line = ret;
- 	sport->lpuart32 = sdata->is_32;
- 	lpuart_is_be = sdata->is_be;
-+	lpuart_reg_off = sdata->reg_off;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	sport->port.membase = devm_ioremap_resource(&pdev->dev, res);
--- 
-2.7.4
+We've been using the "lemaker" prefix for the original Banana Pi, and
+the "sinovoip" prefix for all the later ones by SINOVOIP. Both prefixes
+are still undocumented.
+
+Given the complicated history behind the Banana Pi brand, do we know
+what prefix they prefer, and what company should be tied to it?
+
+Thanks
+ChenYu
+
+>
+>         Sean
+>
+>>
+>> >  boe        BOE Technology Group Co., Ltd.
+>> >  bosch      Bosch Sensortec GmbH
+>> >  boundary   Boundary Devices Inc.
+>> > --
+>> > 1.9.1
+>> >
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
