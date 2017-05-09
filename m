@@ -1,50 +1,65 @@
-From: brgerst@gmail.com (Brian Gerst)
-Date: Tue, 9 May 2017 12:05:12 -0400
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com> <20170508124621.GA20705@kroah.com>
- <20170509064522.anusoikaalvlux3w@gmail.com>
- <20170509085659.GA32555@infradead.org>
- <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
-Message-ID: <CAMzpN2jmW3FmKXZmHNaK537oTdcrDvqatEYZk=aT2B7Qx=fEuA@mail.gmail.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Tue, 9 May 2017 18:07:29 +0200
+Subject: [PATCH v3 0/7] Cavium ThunderX2 SMMUv3 errata workarounds
+In-Reply-To: <20170508151536.GA27789@virtx40>
+References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
+ <20170505222250.GY16981@rric.localdomain>
+ <20170508151536.GA27789@virtx40>
+Message-ID: <20170509160729.GN16981@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 9, 2017 at 9:00 AM, Andy Lutomirski <luto@kernel.org> wrote:
-> On Tue, May 9, 2017 at 1:56 AM, Christoph Hellwig <hch@infradead.org> wrote:
->> On Tue, May 09, 2017 at 08:45:22AM +0200, Ingo Molnar wrote:
->>> We only have ~115 code blocks in the kernel that set/restore KERNEL_DS, it would
->>> be a pity to add a runtime check to every system call ...
->>
->> I think we should simply strive to remove all of them that aren't
->> in core scheduler / arch code.  Basically evetyytime we do the
->>
->>         oldfs = get_fs();
->>         set_fs(KERNEL_DS);
->>         ..
->>         set_fs(oldfs);
->>
->> trick we're doing something wrong, and there should always be better
->> ways to archive it.  E.g. using iov_iter with a ITER_KVEC type
->> consistently would already remove most of them.
->
-> How about trying to remove all of them?  If we could actually get rid
-> of all of them, we could drop the arch support, and we'd get faster,
-> simpler, shorter uaccess code throughout the kernel.
->
-> The ones in kernel/compat.c are generally garbage.  They should be
-> using compat_alloc_user_space().  Ditto for kernel/power/user.c.
+On 08.05.17 20:45:36, Linu Cherian wrote:
+> On Sat May 06, 2017 at 12:22:50AM +0200, Robert Richter wrote:
+> > On 05.05.17 17:38:04, Geetha sowjanya wrote:
+> > > From: Linu Cherian <linu.cherian@cavium.com>
+> > > 
+> > > Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
+> > > 1. Errata ID #74
+> > >    SMMU register alias Page 1 is not implemented
+> > > 2. Errata ID #126
+> > >    SMMU doesnt support unique IRQ lines and also MSI for gerror, 
+> > >    eventq and cmdq-sync
+> > > 
+> > > The following patchset does software workaround for these two erratas.
+> > > 
+> > > This series is based on patchset. 
+> > > https://www.spinics.net/lists/arm-kernel/msg578443.html
+> > > 
+> > > Changes from v1:
+> > >  Since the use of MIDR register is rejected and SMMU_IIDR is broken on this 
+> > >  silicon, as suggested by Will Deacon modified the patches to use ThunderX2 
+> > >  SMMUv3 IORT model number to enable errata workaround.
+> > > 
+> > > Changes from v2:
+> > >  Updated "Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt" document with 
+> > >  new SMMU option used to enable errata workaround.
+> > >  
+> > > Geetha Sowjanya (1):
+> > >   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
+> > > 
+> > > Linu Cherian (6):
+> > >   iommu/arm-smmu-v3: Introduce smmu option PAGE0_REGS_ONLY for ThunderX2
+> > >     errata#74.
+> > >   iommu/arm-smmu-v3: Do resource size checks based on SMMU option
+> > >     PAGE0_REGS_ONLY
+> > >   ACPICA: IORT: Add Cavium ThunderX2 SMMUv3 model definition.
+> > >   iommu/arm-smmu-v3: For ACPI based device probing, set PAGE0_REGS_ONLY
+> > >     option     for ThunderX2 SMMUv3 implementations.
+> > >   ACPI/IORT: Fixup SMMUv3 resource size for Cavium ThunderX2 SMMUv3
+> > >     model
+> > >   arm64: Documentation: Add Cavium ThunderX2 SMMUv3 erratas
+> > 
+> > This split into patches does not look reasonable to me. 1 patch only
+> > for each workaround should be sufficient.
+> > 
+> 
+> * Should we not atleast keep the changes in drivers/acpi/iort.c and
+>  include/acpi/actbl2.h seperate, since they are outside smmuv3 driver ? 
 
-compat_alloc_user_space() is a hack that should go away too.  It ends
-up copying the data three times.
+IMO both patches depend each other. You can't shrink the io space
+first without adjusting the offset when accessing it. At least the
+order should be changed. But since it is one workaround I would prefer
+also one patch.
 
-The more efficient solution to this is to have a core syscall function
-that only accesses kernel memory, and then have two front-end
-functions (native and compat) that do the actual reads and writes to
-userspace, with conversion in the compat case.
-
---
-Brian Gerst
+-Robert
