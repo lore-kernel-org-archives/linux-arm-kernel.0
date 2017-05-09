@@ -1,45 +1,69 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Tue, 9 May 2017 10:37:04 +0800
+Date: Tue, 9 May 2017 10:37:07 +0800
 Subject: [v3,
- 0/5] Add eSDHC UHS-I/HS200 mode support for ls1012a/ls1046a/ls208xa
-Message-ID: <1494297429-12083-1-git-send-email-yangbo.lu@nxp.com>
+ 3/5] arm64: dts: ls208xa: support SD UHS-I on RDB and eMMC HS200 on
+ QDS
+In-Reply-To: <1494297429-12083-1-git-send-email-yangbo.lu@nxp.com>
+References: <1494297429-12083-1-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1494297429-12083-4-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is to add eSDHC UHS-I/HS200 mode support for ls1012a/ls1046a/ls208xa.
-Also add eSDHC node for ls1088a. Because eSDHC is not a standard SD controller,
-the specific speed mode support depends on board's peripheral circuit for eSDHC.
-So, we have to add these speed modes support on board dts file.
+This patch is to enable SD UHS-I mode on LS208xRDB and eMMC HS200
+mode on LS208xQDS in dts. Also, the eSDHC peripheral clock must be
+used instead of platform clock to support these modes.
 
-In additon, these dts patches depends on esdhc driver patches which just had been merged
-on mmc.git. Otherwise, the UHS-I SD card and eMMC HS200 card would fail to be initialized,
-but other cards still could work fine.
-https://patchwork.kernel.org/patch/9689875/
-https://patchwork.kernel.org/patch/9689877/
-https://patchwork.kernel.org/patch/9689879/
-https://patchwork.kernel.org/patch/9689887/
-https://patchwork.kernel.org/patch/9689885/
+Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+---
+Changes for v2:
+	- None.
+Changes for v3:
+	- None.
+---
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi | 1 +
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi | 4 ++++
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     | 2 +-
+ 3 files changed, 6 insertions(+), 1 deletion(-)
 
-Yangbo Lu (5):
-  mmc: dt: add compatible into eSDHC required properties
-  arm64: dts: ls1046a: support SD UHS-I and eMMC HS200 on RDB
-  arm64: dts: ls208xa: support SD UHS-I on RDB and eMMC HS200 on QDS
-  arm64: dts: ls1012a: add eSDHC nodes
-  arm64: dts: ls1088a: add esdhc node
-
- .../devicetree/bindings/mmc/fsl-esdhc.txt          | 14 ++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  |  8 +++++++
- arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts  | 13 +++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 25 ++++++++++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts  |  8 +++++++
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     |  4 ++--
- arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts  |  4 ++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts  |  4 ++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi     | 12 +++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi |  1 +
- arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi |  4 ++++
- arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |  2 +-
- 12 files changed, 96 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
+index c4282d9..b237446 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
+@@ -46,6 +46,7 @@
+  */
+ 
+ &esdhc {
++	mmc-hs200-1_8v;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
+index 9a1d0d2..29af54b 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
+@@ -46,6 +46,10 @@
+  */
+ 
+ &esdhc {
++	sd-uhs-sdr104;
++	sd-uhs-sdr50;
++	sd-uhs-sdr25;
++	sd-uhs-sdr12;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+index 6e531b9..94cdd30 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+@@ -472,7 +472,7 @@
+ 			compatible = "fsl,ls2080a-esdhc", "fsl,esdhc";
+ 			reg = <0x0 0x2140000 0x0 0x10000>;
+ 			interrupts = <0 28 0x4>; /* Level high type */
+-			clock-frequency = <0>;	/* Updated by bootloader */
++			clocks = <&clockgen 4 1>;
+ 			voltage-ranges = <1800 1800 3300 3300>;
+ 			sdhci,auto-cmd12;
+ 			little-endian;
 -- 
 2.1.0.27.g96db324
