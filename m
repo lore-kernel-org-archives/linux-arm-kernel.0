@@ -1,63 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 May 2017 08:39:44 +0200
-Subject: [OpenWrt-Devel] [PATCH 2/4] ata: Add DT bindings for the Gemini
- SATA bridge
-In-Reply-To: <6e0751d2-8f78-c584-2990-c05bc3090214@gmail.com>
-References: <20170506121053.11554-1-linus.walleij@linaro.org>
- <CGME20170506121119epcas5p437ea69e802ba94bd7df83d0bbac1b0bc@epcas5p4.samsung.com>
- <20170506121053.11554-2-linus.walleij@linaro.org>
- <3791456.ZibJefW5cI@amdc3058>
- <CACRpkdYz9Oka0SGJDTr=y4EN-VfggbuKY2s5X43oXg1dgjh1nw@mail.gmail.com>
- <CAKR_QVJTbLMzqsUTEZJOquZ9T5aQ1_=73WAoRWrm+QK9wFhngA@mail.gmail.com>
- <6e0751d2-8f78-c584-2990-c05bc3090214@gmail.com>
-Message-ID: <CACRpkdbPJDPs0bMHbKUGXt2E4O=e_rJveKy=hR-_J-GKG7oLkQ@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 9 May 2017 08:45:22 +0200
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <20170508124621.GA20705@kroah.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508124621.GA20705@kroah.com>
+Message-ID: <20170509064522.anusoikaalvlux3w@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 9, 2017 at 12:52 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 05/08/2017 02:16 PM, Tom Psyborg wrote:
->> Is it ever going to be added so this endless spam can end?
->
-> It's the first iteration of the (S)ATA patchset, and if you are not
-> interested, just ignore the thread.
 
-I mailed with Tom and it turns out he thinks openwrt-devel is getting
-spammed with these submissions.
+* Greg KH <greg@kroah.com> wrote:
 
-It's true in a sense: the patches are targeted for upstream and not
-for the openwrt repo.
+> What about a simple coccinelle script to test for this type of thing?
+> We write it once, add it to the in-kernel body of tests, and then 0-day
+> runs it on all trees all the time.  That should catch this type of
+> issue, like all of the other "bad programming bus" that the tool
+> currently catches.
 
-It's no big deal, I don't want to unnecessarily increase traffic on
-openwrt-devel if it is annoying to some.
+Yeah, that would work - but today most of our coccinelle scripts are still pretty 
+verbose, and I think it's important to make this a different category of 
+coccinelle script, which is .config driven where a loud warning yells at us.
 
-> Linus is doing everyone a great favor here by making sure that this
-> platform gets properly supported upstream such that the cost of
-> maintaining in OpenWrt/LEDE/anywhere else comes down to almost zero.
+I.e. force the 'zero warnings tolerated' model.
 
-I am porting to D-Link DIR-685 and DNS-313 as part of the
-process, so we have two new high-volume routers/NAS boxes
-as part of the process. I don't know how to fix the OpenWRT
-install and builds for these in the end though.
+I also noticed that Coccinelle builds are pretty slow, so it would still make 
+sense to have a performance oriented static checking facility that does not have 
+the performance baggage of high level functional languages.
 
-It is actually probably an even bigger win though.
+I.e. either integrate it into Sparse - or start a kernel integrated static 
+analysis tooling project that would only follow control flow initially - which is 
+what we need here I believe.
 
-We have learnt that Faraday Technology is sprinkling silicon blocks
-all over any silicon foundries close to Taiwan. Their stuff appear
-to be in a lot of cheap routers, NAS etc. They use the number of
-successful deployments of the IP block as a selling point. I guess
-these guys are commonly called in to consult when kickstarting
-silicon design, simply.
+We only have ~115 code blocks in the kernel that set/restore KERNEL_DS, it would 
+be a pity to add a runtime check to every system call ...
 
-It turns out that this and other silicon vendors such as Grain Media,
-Andestech, Moschip etc are using the same silicon blocks, so
-a bunch of out-of-tree code is actually just duplicate implementations
-of Faraday drivers... we already merged Gemini and MoxaArt in
-the upstream kernel so we have a common interrupt chip, timer,
-PCI driver, and now this IDE/ATA driver (not the FTIDE200 yet though).
+We could also add a runtime check to oops handling to make sure we don't leak 
+KERNEL_DS through kernel crashes, to ease worries about CVE-2010-4258.
 
-So there is maybe not as much unique silicon
-in the world as we have come to think, we need to pay attention
-to how register maps look on different things.
+Thanks,
 
-Yours,
-Linus Walleij
+	Ingo
