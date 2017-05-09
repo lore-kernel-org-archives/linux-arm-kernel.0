@@ -1,283 +1,95 @@
-From: boqun.feng@gmail.com (Boqun Feng)
-Date: Tue, 9 May 2017 12:47:08 +0800
-Subject: [PATCH 3/3] arm64/locking: qspinlocks and qrwlocks support
-In-Reply-To: <20170503145141.4966-4-ynorov@caviumnetworks.com>
-References: <20170503145141.4966-1-ynorov@caviumnetworks.com>
- <20170503145141.4966-4-ynorov@caviumnetworks.com>
-Message-ID: <20170509044708.vvwgzhvdrqyljy6s@tardis>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 9 May 2017 07:48:37 +0300
+Subject: [PATCH 0/4] TI Bluetooth serdev support
+In-Reply-To: <CAL_JsqKBAPUPRtn+pEtz8B8pCrA=45RkEq6X_0i_HYoWsVmtyw@mail.gmail.com>
+References: <20170405183005.20570-1-robh@kernel.org>
+ <CAHCN7xJUxZm1qKAxT0kaK6qoDg+HWOJK7sTH-q9za4HJuUwe8Q@mail.gmail.com>
+ <20170430160430.rmyuo6sdrkrjxjg6@earth>
+ <CAHCN7x+Mq=b6RN-ezU0400W=H=D7DR+Es1FHtT4GyozpVd8ALA@mail.gmail.com>
+ <CAL_JsqKBAPUPRtn+pEtz8B8pCrA=45RkEq6X_0i_HYoWsVmtyw@mail.gmail.com>
+Message-ID: <20170509044837.oje2tfodytyuuuur@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 03, 2017 at 05:51:41PM +0300, Yury Norov wrote:
-> From: Jan Glauber <jglauber@cavium.com>
-> 
-> Ported from x86_64 with paravirtualization support removed.
-> 
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> 
-> Note. This patch removes protection from direct inclusion of
-> arch/arm64/include/asm/spinlock_types.h. It's done because
-> kernel/locking/qrwlock.c file does it thru the header
-> include/asm-generic/qrwlock_types.h. Until now the only user
-> of qrwlock.c was x86, and there's no such protection too.
-> 
-> I'm not happy to remove the protection, but if it's OK for x86,
-> it should be also OK for arm64. If not, I think we'd fix it
-> for x86, and add the protection there too.
-> 
-> Yury
-> 
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> ---
->  arch/arm64/Kconfig                      | 24 +++++++++++++++++++
->  arch/arm64/include/asm/qrwlock.h        |  7 ++++++
->  arch/arm64/include/asm/qspinlock.h      | 42 +++++++++++++++++++++++++++++++++
->  arch/arm64/include/asm/spinlock.h       | 12 ++++++++++
->  arch/arm64/include/asm/spinlock_types.h | 14 ++++++++---
->  arch/arm64/kernel/Makefile              |  1 +
->  arch/arm64/kernel/qspinlock.c           | 34 ++++++++++++++++++++++++++
->  7 files changed, 131 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm64/include/asm/qrwlock.h
->  create mode 100644 arch/arm64/include/asm/qspinlock.h
->  create mode 100644 arch/arm64/kernel/qspinlock.c
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 22dbde97eefa..db24b3b3f3c6 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -25,6 +25,8 @@ config ARM64
->  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
->  	select ARCH_WANT_FRAME_POINTERS
->  	select ARCH_HAS_UBSAN_SANITIZE_ALL
-> +	select ARCH_USE_QUEUED_RWLOCKS if QUEUED_LOCKS
-> +	select ARCH_USE_QUEUED_SPINLOCKS if QUEUED_LOCKS
->  	select ARM_AMBA
->  	select ARM_ARCH_TIMER
->  	select ARM_GIC
-> @@ -692,6 +694,28 @@ config ARCH_WANT_HUGE_PMD_SHARE
->  config ARCH_HAS_CACHE_LINE_SIZE
->  	def_bool y
->  
-> +choice
-> +	prompt "Locking type"
-> +	default TICKET_LOCKS
-> +	help
-> +	  Choose between traditional ticked-based locking mechanism and
-> +	  queued-based mechanism.
-> +
-> +config TICKET_LOCKS
-> +	bool "Ticket locks"
-> +	help
-> +	  Ticked-based locking implementation for ARM64
-> +
-> +config QUEUED_LOCKS
-> +	bool "Queued locks"
-> +	help
-> +	  Queue-based locking mechanism. This option improves
-> +	  locking performance in case of high-contended locking
-> +	  on many-cpu machines. On low-cpu machines there is no
-> +	  difference comparing to ticked-based locking.
-> +
-> +endchoice
-> +
->  source "mm/Kconfig"
->  
->  config SECCOMP
-> diff --git a/arch/arm64/include/asm/qrwlock.h b/arch/arm64/include/asm/qrwlock.h
-> new file mode 100644
-> index 000000000000..626f6ebfb52d
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/qrwlock.h
-> @@ -0,0 +1,7 @@
-> +#ifndef _ASM_ARM64_QRWLOCK_H
-> +#define _ASM_ARM64_QRWLOCK_H
-> +
-> +#include <asm-generic/qrwlock_types.h>
-> +#include <asm-generic/qrwlock.h>
-> +
-> +#endif /* _ASM_ARM64_QRWLOCK_H */
-> diff --git a/arch/arm64/include/asm/qspinlock.h b/arch/arm64/include/asm/qspinlock.h
-> new file mode 100644
-> index 000000000000..09ef4f13f549
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/qspinlock.h
-> @@ -0,0 +1,42 @@
-> +#ifndef _ASM_ARM64_QSPINLOCK_H
-> +#define _ASM_ARM64_QSPINLOCK_H
-> +
-> +#include <asm-generic/qspinlock_types.h>
-> +#include <asm/atomic.h>
-> +
-> +extern void queued_spin_unlock_wait(struct qspinlock *lock);
-> +#define queued_spin_unlock_wait queued_spin_unlock_wait
-> +
-> +#define	queued_spin_unlock queued_spin_unlock
-> +/**
-> + * queued_spin_unlock - release a queued spinlock
-> + * @lock : Pointer to queued spinlock structure
-> + *
-> + * A smp_store_release() on the least-significant byte.
-> + */
-> +static inline void queued_spin_unlock(struct qspinlock *lock)
-> +{
-> +	smp_store_release((u8 *)lock, 0);
+Hi Rob,
 
-I think this part will cause endian issues, maybe you want something
-like what we do in queued_write_lock().
-
-Have you tested this on an BE environment?
-
-Regards,
-Boqun
-
-> +}
-> +
-> +#define queued_spin_is_locked queued_spin_is_locked
-> +/**
-> + * queued_spin_is_locked - is the spinlock locked?
-> + * @lock: Pointer to queued spinlock structure
-> + * Return: 1 if it is locked, 0 otherwise
-> + */
-> +static __always_inline int queued_spin_is_locked(struct qspinlock *lock)
-> +{
-> +	/*
-> +	 * See queued_spin_unlock_wait().
-> +	 *
-> +	 * Any !0 state indicates it is locked, even if _Q_LOCKED_VAL
-> +	 * isn't immediately observable.
-> +	 */
-> +	smp_mb();
-> +	return atomic_read(&lock->val);
-> +}
-> +
-> +#include <asm-generic/qspinlock.h>
-> +
-> +#endif /* _ASM_ARM64_QSPINLOCK_H */
-> diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
-> index cae331d553f8..37713397e0c5 100644
-> --- a/arch/arm64/include/asm/spinlock.h
-> +++ b/arch/arm64/include/asm/spinlock.h
-> @@ -20,6 +20,10 @@
->  #include <asm/spinlock_types.h>
->  #include <asm/processor.h>
->  
-> +#ifdef CONFIG_QUEUED_SPINLOCKS
-> +#include <asm/qspinlock.h>
-> +#else
-> +
->  /*
->   * Spinlock implementation.
->   *
-> @@ -187,6 +191,12 @@ static inline int arch_spin_is_contended(arch_spinlock_t *lock)
->  }
->  #define arch_spin_is_contended	arch_spin_is_contended
->  
-> +#endif /* CONFIG_QUEUED_SPINLOCKS */
-> +
-> +#ifdef CONFIG_QUEUED_RWLOCKS
-> +#include <asm/qrwlock.h>
-> +#else
-> +
->  /*
->   * Write lock implementation.
->   *
-> @@ -351,6 +361,8 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
->  /* read_can_lock - would read_trylock() succeed? */
->  #define arch_read_can_lock(x)		((x)->lock < 0x80000000)
->  
-> +#endif /* CONFIG_QUEUED_RWLOCKS */
-> +
->  #define arch_read_lock_flags(lock, flags) arch_read_lock(lock)
->  #define arch_write_lock_flags(lock, flags) arch_write_lock(lock)
->  
-> diff --git a/arch/arm64/include/asm/spinlock_types.h b/arch/arm64/include/asm/spinlock_types.h
-> index 55be59a35e3f..0f0f1561ab6a 100644
-> --- a/arch/arm64/include/asm/spinlock_types.h
-> +++ b/arch/arm64/include/asm/spinlock_types.h
-> @@ -16,9 +16,9 @@
->  #ifndef __ASM_SPINLOCK_TYPES_H
->  #define __ASM_SPINLOCK_TYPES_H
->  
-> -#if !defined(__LINUX_SPINLOCK_TYPES_H) && !defined(__ASM_SPINLOCK_H)
-> -# error "please don't include this file directly"
-> -#endif
-> +#ifdef CONFIG_QUEUED_SPINLOCKS
-> +#include <asm-generic/qspinlock_types.h>
-> +#else
->  
->  #include <linux/types.h>
->  
-> @@ -36,10 +36,18 @@ typedef struct {
->  
->  #define __ARCH_SPIN_LOCK_UNLOCKED	{ 0 , 0 }
->  
-> +#endif /* CONFIG_QUEUED_SPINLOCKS */
-> +
-> +#ifdef CONFIG_QUEUED_RWLOCKS
-> +#include <asm-generic/qrwlock_types.h>
-> +#else
-> +
->  typedef struct {
->  	volatile unsigned int lock;
->  } arch_rwlock_t;
->  
->  #define __ARCH_RW_LOCK_UNLOCKED		{ 0 }
->  
-> +#endif /* CONFIG_QUEUED_RWLOCKS */
-> +
->  #endif
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 9d56467dc223..f48f6256e893 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -56,6 +56,7 @@ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
->  arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
->  arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
->  arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
-> +arm64-obj-$(CONFIG_QUEUED_SPINLOCKS)	+= qspinlock.o
->  
->  obj-y					+= $(arm64-obj-y) vdso/ probes/
->  obj-$(CONFIG_ARM64_ILP32)		+= vdso-ilp32/
-> diff --git a/arch/arm64/kernel/qspinlock.c b/arch/arm64/kernel/qspinlock.c
-> new file mode 100644
-> index 000000000000..924f19953adb
-> --- /dev/null
-> +++ b/arch/arm64/kernel/qspinlock.c
-> @@ -0,0 +1,34 @@
-> +#include <asm/qspinlock.h>
-> +#include <asm/processor.h>
-> +
-> +void queued_spin_unlock_wait(struct qspinlock *lock)
-> +{
-> +	u32 val;
-> +
-> +	for (;;) {
-> +		smp_mb();
-> +		val = atomic_read(&lock->val);
-> +
-> +		if (!val) /* not locked, we're done */
-> +			goto done;
-> +
-> +		if (val & _Q_LOCKED_MASK) /* locked, go wait for unlock */
-> +			break;
-> +
-> +		/* not locked, but pending, wait until we observe the lock */
-> +		cpu_relax();
-> +	}
-> +
-> +	for (;;) {
-> +		smp_mb();
-> +		val = atomic_read(&lock->val);
-> +		if (!(val & _Q_LOCKED_MASK)) /* any unlock is good */
-> +			break;
-> +
-> +		cpu_relax();
-> +	}
-> +
-> +done:
-> +	smp_acquire__after_ctrl_dep();
-> +}
-> +EXPORT_SYMBOL(queued_spin_unlock_wait);
-> -- 
-> 2.11.0
+On Mon, May 08, 2017 at 04:12:16PM -0500, Rob Herring wrote:
+> On Fri, May 5, 2017 at 9:51 AM, Adam Ford <aford173@gmail.com> wrote:
+> > On Sun, Apr 30, 2017 at 11:04 AM, Sebastian Reichel <sre@kernel.org> wrote:
+> >> On Sun, Apr 30, 2017 at 10:14:20AM -0500, Adam Ford wrote:
+> >>> On Wed, Apr 5, 2017 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
+> >>> > This series adds serdev support to the HCI LL protocol used on TI BT
+> >>> > modules and enables support on HiKey board with with the WL1835 module.
+> >>> > With this the custom TI UIM daemon and btattach are no longer needed.
+> >>>
+> >>> Without UIM daemon, what instruction do you use to load the BT firmware?
+> >>>
+> >>> I was thinking 'hciattach' but I was having trouble.  I was hoping you
+> >>> might have some insight.
+> >>>
+> >>>  hciattach -t 30 -s 115200 /dev/ttymxc1 texas 3000000 flow  Just
+> >>> returns a timeout.
+> >>>
+> >>> I modified my i.MX6 device tree per the binding documentation and
+> >>> setup the regulators and enable GPIO pins.
+> >>
+> >> If you configured everything correctly no userspace interaction is
+> >> required. The driver should request the firmware automatically once
+> >> you power up the bluetooth device.
+> >>
+> >> Apart from DT changes make sure, that the following options are
+> >> enabled and check dmesg for any hints.
+> >>
+> >> CONFIG_SERIAL_DEV_BUS
+> >> CONFIG_SERIAL_DEV_CTRL_TTYPORT
+> >> CONFIG_BT_HCIUART
+> >> CONFIG_BT_HCIUART_LL
+> >
+> > I have enabled those flags, and I have updated my device tree.
+> > I am testing this on an OMAP3630 (DM3730) board with a WL1283.  I am
+> > getting a lot of timeout errors.  I tested this against the original
+> > implemention I had in pdata-quirks.c using the ti-st driver, uim & and
+> > the btwilink driver.
+> >
+> > I pulled in some of the newer patches to enable the wl1283-st, but I
+> > am obviously missing something.
+> >
+> > I   58.717651] Bluetooth: hci0: Reading TI version information failed
+> > (-110)
+> > [   58.724853] Bluetooth: hci0: download firmware failed, retrying...
+> > [   60.957641] Bluetooth: hci0 command 0x1001 tx timeout
+> > [   68.957641] Bluetooth: hci0: Reading TI version information failed
+> > (-110)
+> > [   68.964843] Bluetooth: hci0: download firmware failed, retrying...
+> > [   69.132171] Bluetooth: Unknown HCI packet type 06
+> > [   69.138244] Bluetooth: Unknown HCI packet type 0c
+> > [   69.143249] Bluetooth: Unknown HCI packet type 40
+> > [   69.148498] Bluetooth: Unknown HCI packet type 20
+> > [   69.153533] Bluetooth: Data length is too large
+> > [   69.158569] Bluetooth: Unknown HCI packet type a0
+> > [   69.163574] Bluetooth: Unknown HCI packet type 00
+> > [   69.168731] Bluetooth: Unknown HCI packet type 00
+> > [   69.173736] Bluetooth: Unknown HCI packet type 34
+> > [   69.178924] Bluetooth: Unknown HCI packet type 91
+> > [   71.197631] Bluetooth: hci0 command 0x1001 tx timeout
+> > [   79.197662] Bluetooth: hci0: Reading TI version information failed (-110)
 > 
+> There's a bug in serdev_device_write(), so if you have that function
+> you need either the fix I sent or the patch to make
+> serdev_device_writebuf atomic again. Both are on the linux-serial
+> list, but not in any tree yet.
+
+You refer to the patches below, right?
+
+  [PATCH] tty: serdev: fix serdev_device_write return value, 
+  http://www.spinics.net/lists/linux-serial/msg26117.html
+
+  [PATCH] serdev: Restore serdev_device_write_buf for atomic context,
+  http://www.spinics.net/lists/linux-serial/msg26113.html
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
