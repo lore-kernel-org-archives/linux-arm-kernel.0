@@ -1,32 +1,60 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue, 9 May 2017 09:24:20 -0700
-Subject: [PATCH] PCI: imx6: remove LTSSM disable workaround
-In-Reply-To: <20170120155837.2874-1-l.stach@pengutronix.de>
-References: <20170120155837.2874-1-l.stach@pengutronix.de>
-Message-ID: <CAJ+vNU1LqNRNEEX4NH3uyiw-xS-07zU94drhGOewwYM5UOs87Q@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 9 May 2017 09:25:54 -0700
+Subject: [PATCH V2] ARM: dts: bcm283x: Reserve first page for firmware
+In-Reply-To: <b6aef857-1454-7931-2c60-6d7b55b7a0a8@raspberrypi.org>
+References: <b6aef857-1454-7931-2c60-6d7b55b7a0a8@raspberrypi.org>
+Message-ID: <e2718c25-fdf1-ead1-cbfa-d23bf729a079@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 7:58 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> This causes CPU hangs when the system is reset by the watchdog, as
-> the GPRs aren't cleared, but the clocks are back to disabled state.
->
-> If the bootloader uses PCIe, it must take care to bring it down
-> into a safe state, before passing control to the Linux kernel.
-> This is the only way to get a properly operating system at all
-> times and circumstances.
->
+On 05/09/2017 02:04 AM, Phil Elwell wrote:
+> The Raspberry Pi startup stub files for multi-core BCM27XX processors
+> make the secondary CPUs spin until the corresponding mailbox is
+> written. These stubs are loaded at physical address 0x00000xxx (as seen
+> by the ARMs), but this page will be reused by the kernel unless it is
+> explicitly reserved, causing the waiting cores to execute random code.
+> 
+> Use the /memreserve/ Device Tree directive to mark the first page as
+> off-limits to the kernel.
 
-Lucas,
+This reserves a 4KB page here, is this good enough, or should we just go
+directly to the maximum page granule size possible on an ARM64/Linux
+system to be on the safe side?
 
-I missed this patch when it came through.
+> 
+> See: https://github.com/raspberrypi/linux/issues/1989
+> 
+> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+> ---
+> 
+> Changes in V2:
+> - Rebase against linux-next
+> - Drop downstream-only patch
+> 
+>  arch/arm/boot/dts/bcm283x.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+> index a3106aa..6d12c3e8 100644
+> --- a/arch/arm/boot/dts/bcm283x.dtsi
+> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+> @@ -3,6 +3,8 @@
+>  #include <dt-bindings/clock/bcm2835-aux.h>
+>  #include <dt-bindings/gpio/gpio.h>
+>  
+> +/memreserve/ 0x00000000 0x00001000;
 
-Can you give some details about what you consider a 'safe state' for
-the bootloader to bring PCI to before passing control to the kernel
-(with respect to PERST#, PCI CLK, and the various host controller
-registers)? I would like to investigate making PCI available in the
-bootloader as well as the kernel reliable on IMX6.
+Can you put a comment above this /memreserve entry here to remind about
+what this is useful for?
 
-Regards,
+Thanks!
 
-Tim
+> +
+>  /* This include file covers the common peripherals and configuration between
+>   * bcm2835 and bcm2836 implementations, leaving the CPU configuration to
+>   * bcm2835.dtsi and bcm2836.dtsi.
+> 
+
+
+-- 
+Florian
