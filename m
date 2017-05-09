@@ -1,292 +1,213 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:52 +0200
-Subject: [PULL 23/37] KVM: arm64: vgic-its: Device table save/restore
+Date: Tue,  9 May 2017 12:44:47 +0200
+Subject: [PULL 18/37] KVM: arm64: vgic-its: KVM_DEV_ARM_ITS_SAVE/RESTORE_TABLES
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-24-cdall@linaro.org>
+Message-ID: <20170509104506.30929-19-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@redhat.com>
 
-This patch saves the device table entries into guest RAM.
-Both flat table and 2 stage tables are supported. DeviceId
-indexing is used.
+Introduce new attributes in KVM_DEV_ARM_VGIC_GRP_CTRL group:
+- KVM_DEV_ARM_ITS_SAVE_TABLES: saves the ITS tables into guest RAM
+- KVM_DEV_ARM_ITS_RESTORE_TABLES: restores them into VGIC internal
+  structures.
 
-For each device listed in the device table, we also save
-the translation table using the vgic_its_save/restore_itt
-routines. Those functions will be implemented in a subsequent
-patch.
+We hold the vcpus lock during the save and restore to make
+sure no vcpu is running.
 
-On restore, devices are re-allocated and their itt are
-re-built.
+At this stage the functionality is not yet implemented. Only
+the skeleton is put in place.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
+[Given we will move the iodev register until setting the base addr]
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 194 +++++++++++++++++++++++++++++++++++++++++--
- virt/kvm/arm/vgic/vgic.h     |  10 +++
- 2 files changed, 199 insertions(+), 5 deletions(-)
+ arch/arm/include/uapi/asm/kvm.h   |   4 +-
+ arch/arm64/include/uapi/asm/kvm.h |   4 +-
+ virt/kvm/arm/vgic/vgic-its.c      | 107 ++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 109 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index ee183fc..0f7ee15 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -201,7 +201,9 @@ struct kvm_arch_memory_slot {
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK 0x3ff
+ #define VGIC_LEVEL_INFO_LINE_LEVEL	0
+ 
+-#define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
++#define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
++#define   KVM_DEV_ARM_ITS_SAVE_TABLES		1
++#define   KVM_DEV_ARM_ITS_RESTORE_TABLES	2
+ 
+ /* KVM_IRQ_LINE irq field index values */
+ #define KVM_ARM_IRQ_TYPE_SHIFT		24
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index ee4a0ad..5dd7be0 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -221,7 +221,9 @@ struct kvm_arch_memory_slot {
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x3ff
+ #define VGIC_LEVEL_INFO_LINE_LEVEL	0
+ 
+-#define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
++#define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
++#define   KVM_DEV_ARM_ITS_SAVE_TABLES           1
++#define   KVM_DEV_ARM_ITS_RESTORE_TABLES        2
+ 
+ /* Device Control API on vcpu fd */
+ #define KVM_ARM_VCPU_PMU_V3_CTRL	0
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 90afc83..3dea626 100644
+index ffd0a80..cb7ae4c 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -23,6 +23,7 @@
- #include <linux/interrupt.h>
- #include <linux/list.h>
- #include <linux/uaccess.h>
-+#include <linux/list_sort.h>
- 
- #include <linux/irqchip/arm-gic-v3.h>
- 
-@@ -1735,7 +1736,8 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
- 	return ret;
+@@ -1703,12 +1703,71 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
  }
  
--u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
-+static u32 compute_next_devid_offset(struct list_head *h,
-+				     struct its_device *dev)
- {
- 	struct its_device *next;
- 	u32 next_offset;
-@@ -1789,8 +1791,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
-  * Return: < 0 on error, 0 if last element was identified, 1 otherwise
-  * (the last element may not be found on second level tables)
-  */
--int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
--		   int start_id, entry_fn_t fn, void *opaque)
-+static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
-+			  int start_id, entry_fn_t fn, void *opaque)
- {
- 	void *entry = kzalloc(esz, GFP_KERNEL);
- 	struct kvm *kvm = its->dev->kvm;
-@@ -1825,13 +1827,171 @@ int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
- 	return ret;
- }
- 
-+static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
-+{
-+	return -ENXIO;
-+}
-+
-+static int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
+ /**
++ * vgic_its_save_device_tables - Save the device table and all ITT
++ * into guest RAM
++ */
++static int vgic_its_save_device_tables(struct vgic_its *its)
 +{
 +	return -ENXIO;
 +}
 +
 +/**
-+ * vgic_its_save_dte - Save a device table entry at a given GPA
-+ *
-+ * @its: ITS handle
-+ * @dev: ITS device
-+ * @ptr: GPA
++ * vgic_its_restore_device_tables - Restore the device table and all ITT
++ * from guest RAM to internal data structs
 + */
-+static int vgic_its_save_dte(struct vgic_its *its, struct its_device *dev,
-+			     gpa_t ptr, int dte_esz)
++static int vgic_its_restore_device_tables(struct vgic_its *its)
 +{
++	return -ENXIO;
++}
++
++/**
++ * vgic_its_save_collection_table - Save the collection table into
++ * guest RAM
++ */
++static int vgic_its_save_collection_table(struct vgic_its *its)
++{
++	return -ENXIO;
++}
++
++/**
++ * vgic_its_restore_collection_table - reads the collection table
++ * in guest memory and restores the ITS internal state. Requires the
++ * BASER registers to be restored before.
++ */
++static int vgic_its_restore_collection_table(struct vgic_its *its)
++{
++	return -ENXIO;
++}
++
++/**
+  * vgic_its_save_tables_v0 - Save the ITS tables into guest ARM
+  * according to v0 ABI
+  */
+ static int vgic_its_save_tables_v0(struct vgic_its *its)
+ {
+-	return -ENXIO;
 +	struct kvm *kvm = its->dev->kvm;
-+	u64 val, itt_addr_field;
-+	u32 next_offset;
-+
-+	itt_addr_field = dev->itt_addr >> 8;
-+	next_offset = compute_next_devid_offset(&its->device_list, dev);
-+	val = (1ULL << KVM_ITS_DTE_VALID_SHIFT |
-+	       ((u64)next_offset << KVM_ITS_DTE_NEXT_SHIFT) |
-+	       (itt_addr_field << KVM_ITS_DTE_ITTADDR_SHIFT) |
-+		(dev->num_eventid_bits - 1));
-+	val = cpu_to_le64(val);
-+	return kvm_write_guest(kvm, ptr, &val, dte_esz);
-+}
-+
-+/**
-+ * vgic_its_restore_dte - restore a device table entry
-+ *
-+ * @its: its handle
-+ * @id: device id the DTE corresponds to
-+ * @ptr: kernel VA where the 8 byte DTE is located
-+ * @opaque: unused
-+ *
-+ * Return: < 0 on error, 0 if the dte is the last one, id offset to the
-+ * next dte otherwise
-+ */
-+static int vgic_its_restore_dte(struct vgic_its *its, u32 id,
-+				void *ptr, void *opaque)
-+{
-+	struct its_device *dev;
-+	gpa_t itt_addr;
-+	u8 num_eventid_bits;
-+	u64 entry = *(u64 *)ptr;
-+	bool valid;
-+	u32 offset;
 +	int ret;
 +
-+	entry = le64_to_cpu(entry);
++	mutex_lock(&kvm->lock);
++	mutex_lock(&its->its_lock);
 +
-+	valid = entry >> KVM_ITS_DTE_VALID_SHIFT;
-+	num_eventid_bits = (entry & KVM_ITS_DTE_SIZE_MASK) + 1;
-+	itt_addr = ((entry & KVM_ITS_DTE_ITTADDR_MASK)
-+			>> KVM_ITS_DTE_ITTADDR_SHIFT) << 8;
++	if (!lock_all_vcpus(kvm)) {
++		mutex_unlock(&its->its_lock);
++		mutex_unlock(&kvm->lock);
++		return -EBUSY;
++	}
 +
-+	if (!valid)
-+		return 1;
-+
-+	/* dte entry is valid */
-+	offset = (entry & KVM_ITS_DTE_NEXT_MASK) >> KVM_ITS_DTE_NEXT_SHIFT;
-+
-+	dev = vgic_its_alloc_device(its, id, itt_addr, num_eventid_bits);
-+	if (IS_ERR(dev))
-+		return PTR_ERR(dev);
-+
-+	ret = vgic_its_restore_itt(its, dev);
++	ret = vgic_its_save_device_tables(its);
 +	if (ret)
-+		return ret;
++		goto out;
 +
-+	return offset;
-+}
++	ret = vgic_its_save_collection_table(its);
 +
-+static int vgic_its_device_cmp(void *priv, struct list_head *a,
-+			       struct list_head *b)
-+{
-+	struct its_device *deva = container_of(a, struct its_device, dev_list);
-+	struct its_device *devb = container_of(b, struct its_device, dev_list);
-+
-+	if (deva->device_id < devb->device_id)
-+		return -1;
-+	else
-+		return 1;
-+}
-+
- /**
-  * vgic_its_save_device_tables - Save the device table and all ITT
-  * into guest RAM
-+ *
-+ * L1/L2 handling is hidden by vgic_its_check_id() helper which directly
-+ * returns the GPA of the device entry
-  */
- static int vgic_its_save_device_tables(struct vgic_its *its)
- {
--	return -ENXIO;
-+	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-+	struct its_device *dev;
-+	int dte_esz = abi->dte_esz;
-+	u64 baser;
-+
-+	baser = its->baser_device_table;
-+
-+	list_sort(NULL, &its->device_list, vgic_its_device_cmp);
-+
-+	list_for_each_entry(dev, &its->device_list, dev_list) {
-+		int ret;
-+		gpa_t eaddr;
-+
-+		if (!vgic_its_check_id(its, baser,
-+				       dev->device_id, &eaddr))
-+			return -EINVAL;
-+
-+		ret = vgic_its_save_itt(its, dev);
-+		if (ret)
-+			return ret;
-+
-+		ret = vgic_its_save_dte(its, dev, eaddr, dte_esz);
-+		if (ret)
-+			return ret;
-+	}
-+	return 0;
-+}
-+
-+/**
-+ * handle_l1_dte - callback used for L1 device table entries (2 stage case)
-+ *
-+ * @its: its handle
-+ * @id: index of the entry in the L1 table
-+ * @addr: kernel VA
-+ * @opaque: unused
-+ *
-+ * L1 table entries are scanned by steps of 1 entry
-+ * Return < 0 if error, 0 if last dte was found when scanning the L2
-+ * table, +1 otherwise (meaning next L1 entry must be scanned)
-+ */
-+static int handle_l1_dte(struct vgic_its *its, u32 id, void *addr,
-+			 void *opaque)
-+{
-+	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-+	int l2_start_id = id * (SZ_64K / abi->dte_esz);
-+	u64 entry = *(u64 *)addr;
-+	int dte_esz = abi->dte_esz;
-+	gpa_t gpa;
-+	int ret;
-+
-+	entry = le64_to_cpu(entry);
-+
-+	if (!(entry & KVM_ITS_L1E_VALID_MASK))
-+		return 1;
-+
-+	gpa = entry & KVM_ITS_L1E_ADDR_MASK;
-+
-+	ret = scan_its_table(its, gpa, SZ_64K, dte_esz,
-+			     l2_start_id, vgic_its_restore_dte, NULL);
-+
-+	if (ret <= 0)
-+		return ret;
-+
-+	return 1;
- }
- 
- /**
-@@ -1840,7 +2000,31 @@ static int vgic_its_save_device_tables(struct vgic_its *its)
-  */
- static int vgic_its_restore_device_tables(struct vgic_its *its)
- {
--	return -ENXIO;
-+	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-+	u64 baser = its->baser_device_table;
-+	int l1_esz, ret;
-+	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
-+	gpa_t l1_gpa;
-+
-+	if (!(baser & GITS_BASER_VALID))
-+		return 0;
-+
-+	l1_gpa = BASER_ADDRESS(baser);
-+
-+	if (baser & GITS_BASER_INDIRECT) {
-+		l1_esz = GITS_LVL1_ENTRY_SIZE;
-+		ret = scan_its_table(its, l1_gpa, l1_tbl_size, l1_esz, 0,
-+				     handle_l1_dte, NULL);
-+	} else {
-+		l1_esz = abi->dte_esz;
-+		ret = scan_its_table(its, l1_gpa, l1_tbl_size, l1_esz, 0,
-+				     vgic_its_restore_dte, NULL);
-+	}
-+
-+	if (ret > 0)
-+		ret = -EINVAL;
-+
++out:
++	unlock_all_vcpus(kvm);
++	mutex_unlock(&its->its_lock);
++	mutex_unlock(&kvm->lock);
 +	return ret;
  }
  
- static int vgic_its_save_cte(struct vgic_its *its,
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 757de7a..f35e993 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -81,6 +81,16 @@
- #define KVM_ITS_CTE_VALID_MASK		BIT_ULL(63)
- #define KVM_ITS_CTE_RDBASE_SHIFT	16
- #define KVM_ITS_CTE_ICID_MASK		GENMASK_ULL(15, 0)
-+#define KVM_ITS_DTE_VALID_SHIFT		63
-+#define KVM_ITS_DTE_VALID_MASK		BIT_ULL(63)
-+#define KVM_ITS_DTE_NEXT_SHIFT		49
-+#define KVM_ITS_DTE_NEXT_MASK		GENMASK_ULL(62, 49)
-+#define KVM_ITS_DTE_ITTADDR_SHIFT	5
-+#define KVM_ITS_DTE_ITTADDR_MASK	GENMASK_ULL(48, 5)
-+#define KVM_ITS_DTE_SIZE_MASK		GENMASK_ULL(4, 0)
-+#define KVM_ITS_L1E_VALID_MASK		BIT_ULL(63)
-+/* we only support 64 kB translation table page size */
-+#define KVM_ITS_L1E_ADDR_MASK		GENMASK_ULL(51, 16)
- 
- static inline bool irq_is_pending(struct vgic_irq *irq)
+ /**
+@@ -1718,7 +1777,37 @@ static int vgic_its_save_tables_v0(struct vgic_its *its)
+  */
+ static int vgic_its_restore_tables_v0(struct vgic_its *its)
  {
+-	return -ENXIO;
++	struct kvm *kvm = its->dev->kvm;
++	int ret;
++
++	mutex_lock(&kvm->lock);
++	mutex_lock(&its->its_lock);
++
++	if (!lock_all_vcpus(kvm)) {
++		mutex_unlock(&its->its_lock);
++		mutex_unlock(&kvm->lock);
++		return -EBUSY;
++	}
++
++	ret = vgic_its_restore_collection_table(its);
++	if (ret)
++		goto out;
++
++	ret = vgic_its_restore_device_tables(its);
++
++out:
++	unlock_all_vcpus(kvm);
++	mutex_unlock(&its->its_lock);
++	mutex_unlock(&kvm->lock);
++
++	if (ret)
++		return ret;
++
++	/*
++	 * On restore path, MSI injections can happen before the
++	 * first VCPU run so let's complete the GIC init here.
++	 */
++	return kvm_vgic_map_resources(its->dev->kvm);
+ }
+ 
+ static int vgic_its_commit_v0(struct vgic_its *its)
+@@ -1751,6 +1840,10 @@ static int vgic_its_has_attr(struct kvm_device *dev,
+ 		switch (attr->attr) {
+ 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+ 			return 0;
++		case KVM_DEV_ARM_ITS_SAVE_TABLES:
++			return 0;
++		case KVM_DEV_ARM_ITS_RESTORE_TABLES:
++			return 0;
+ 		}
+ 		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS:
+@@ -1786,14 +1879,20 @@ static int vgic_its_set_attr(struct kvm_device *dev,
+ 
+ 		return 0;
+ 	}
+-	case KVM_DEV_ARM_VGIC_GRP_CTRL:
++	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
++		const struct vgic_its_abi *abi = vgic_its_get_abi(its);
++
+ 		switch (attr->attr) {
+ 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+ 			its->initialized = true;
+ 
+ 			return 0;
++		case KVM_DEV_ARM_ITS_SAVE_TABLES:
++			return abi->save_tables(its);
++		case KVM_DEV_ARM_ITS_RESTORE_TABLES:
++			return abi->restore_tables(its);
+ 		}
+-		break;
++	}
+ 	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
+ 		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
+ 		u64 reg;
 -- 
 2.9.0
