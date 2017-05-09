@@ -1,65 +1,33 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Tue, 9 May 2017 18:07:29 +0200
-Subject: [PATCH v3 0/7] Cavium ThunderX2 SMMUv3 errata workarounds
-In-Reply-To: <20170508151536.GA27789@virtx40>
-References: <1493986091-30521-1-git-send-email-gakula@caviumnetworks.com>
- <20170505222250.GY16981@rric.localdomain>
- <20170508151536.GA27789@virtx40>
-Message-ID: <20170509160729.GN16981@rric.localdomain>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Wed, 10 May 2017 00:12:31 +0800
+Subject: [PATCH v3] dt-bindings: add vendor prefix for bananapi
+Message-ID: <271c3a1548a712c529e5fd783f785e9847ab5103.1494345301.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.05.17 20:45:36, Linu Cherian wrote:
-> On Sat May 06, 2017 at 12:22:50AM +0200, Robert Richter wrote:
-> > On 05.05.17 17:38:04, Geetha sowjanya wrote:
-> > > From: Linu Cherian <linu.cherian@cavium.com>
-> > > 
-> > > Cavium ThunderX2 SMMUv3 implementation has two Silicon Erratas.
-> > > 1. Errata ID #74
-> > >    SMMU register alias Page 1 is not implemented
-> > > 2. Errata ID #126
-> > >    SMMU doesnt support unique IRQ lines and also MSI for gerror, 
-> > >    eventq and cmdq-sync
-> > > 
-> > > The following patchset does software workaround for these two erratas.
-> > > 
-> > > This series is based on patchset. 
-> > > https://www.spinics.net/lists/arm-kernel/msg578443.html
-> > > 
-> > > Changes from v1:
-> > >  Since the use of MIDR register is rejected and SMMU_IIDR is broken on this 
-> > >  silicon, as suggested by Will Deacon modified the patches to use ThunderX2 
-> > >  SMMUv3 IORT model number to enable errata workaround.
-> > > 
-> > > Changes from v2:
-> > >  Updated "Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt" document with 
-> > >  new SMMU option used to enable errata workaround.
-> > >  
-> > > Geetha Sowjanya (1):
-> > >   iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2 erratum #126
-> > > 
-> > > Linu Cherian (6):
-> > >   iommu/arm-smmu-v3: Introduce smmu option PAGE0_REGS_ONLY for ThunderX2
-> > >     errata#74.
-> > >   iommu/arm-smmu-v3: Do resource size checks based on SMMU option
-> > >     PAGE0_REGS_ONLY
-> > >   ACPICA: IORT: Add Cavium ThunderX2 SMMUv3 model definition.
-> > >   iommu/arm-smmu-v3: For ACPI based device probing, set PAGE0_REGS_ONLY
-> > >     option     for ThunderX2 SMMUv3 implementations.
-> > >   ACPI/IORT: Fixup SMMUv3 resource size for Cavium ThunderX2 SMMUv3
-> > >     model
-> > >   arm64: Documentation: Add Cavium ThunderX2 SMMUv3 erratas
-> > 
-> > This split into patches does not look reasonable to me. 1 patch only
-> > for each workaround should be sufficient.
-> > 
-> 
-> * Should we not atleast keep the changes in drivers/acpi/iort.c and
->  include/acpi/actbl2.h seperate, since they are outside smmuv3 driver ? 
+From: Sean Wang <sean.wang@mediatek.com>
 
-IMO both patches depend each other. You can't shrink the io space
-first without adjusting the offset when accessing it. At least the
-order should be changed. But since it is one workaround I would prefer
-also one patch.
+Add BIPAI KEJI LIMITED which is a company dedicating to design and
+manufacture bananapi open hardware.
 
--Robert
+Website: http://www.banana-pi.org/
+
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index c7d1b72..8f7283d 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -44,6 +44,7 @@ avia	avia semiconductor
+ avic	Shanghai AVIC Optoelectronics Co., Ltd.
+ axentia	Axentia Technologies AB
+ axis	Axis Communications AB
++bananapi BIPAI KEJI LIMITED
+ boe	BOE Technology Group Co., Ltd.
+ bosch	Bosch Sensortec GmbH
+ boundary	Boundary Devices Inc.
+-- 
+2.7.4
