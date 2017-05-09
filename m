@@ -1,73 +1,34 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 9 May 2017 11:54:49 +0200
-Subject: [PATCH v2 00/11] Fixes to v7 of the vITS save/restore series
-In-Reply-To: <20170509085618.28311-1-cdall@linaro.org>
-References: <20170509085618.28311-1-cdall@linaro.org>
-Message-ID: <9deb4131-df13-bdc1-36e6-1308d9b2d70d@redhat.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 9 May 2017 07:21:24 -0300
+Subject: Regression: 442ec4c04d1: PCI: dwc: all: Split struct pcie_port
+ into host-only and core structures
+In-Reply-To: <20170509063439.GC9791@collabora.com>
+References: <20170508150224.GA7458@collabora.com>
+ <CAOMZO5DjFxAus3B03Om0xoqxKuY2TkbcjCY1YEUK9s_R8C_DNA@mail.gmail.com>
+ <20170509063439.GC9791@collabora.com>
+Message-ID: <CAOMZO5CXjb7LVT5ByP1RqgBPkkfRn7PcRPmW3hos=UNXGnok=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi Peter,
 
-On 09/05/2017 10:56, Christoffer Dall wrote:
-> We spotted a number of isses on the v7 ITS save/restore patch series,
-> but because most of that patch series is in really good shape, and
-> because the work discussed is somewhat orthogonal (the register iodevs
-> in particular), I decided to send out a set of fixes to apply after the
-> main ITS save/restore series, and we can apply the v7 series plus these
-> fixes.
-> 
-> The whole series with the fixes applied on top of queue can be found here:
-> git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git its-save-restore-queue-fixes-v2
-I tested ITS migration series v7 + this version on Cavium Thunderx and
-it works fine for me.
+On Tue, May 9, 2017 at 3:34 AM, Peter Senna Tschudin
+<peter.senna@collabora.com> wrote:
 
-Tested-by: Eric Auger <eric.auger@redhat.com>
+> Something that ocurred to me is that u-boot is initializing the PCI, and
+> the PCI networkd cards.  Ideally this should not affect anything, but
+> can this be related to the issue?
 
-Thanks
+Yes, in order to narrow things down: please boot 4.11 without PCI
+support in U-Boot.
 
-Eric
-> 
-> Thanks,
-> -Christoffer
-> 
-> Changes since v1:
->  - We got rid of the requirement to initialize the ITS (it doesn't do
->    anything).
->  - We fixed a race condition with setting the ITS base address which was
->    introduced in v1 of this series.
->  - We reworded some commit messages based on Eric's comments
->  - We fixed the address check to work with partically unset base addrs
->  - We use the vcpu index instead of the vcpu id for allocating redist
->    regions.
->  - Some renames and code cleanups.
-> 
-> Christoffer Dall (10):
->   KVM: arm/arm64: Clarification and relaxation to ITS save/restore ABI
->   KVM: arm/arm64: vgic: Rename kvm_vgic_vcpu_init to
->     kvm_vgic_vcpu_enable
->   KVM: Add kvm_vcpu_get_idx to get vcpu index in kvm->vcpus
->   KVM: arm/arm64: Refactor vgic_register_redist_iodevs
->   KVM: arm/arm64: Make vgic_v3_check_base more broadly usable
->   KVM: arm/arm64: Slightly rework kvm_vgic_addr
->   KVM: arm/arm64: Register iodevs when setting redist base and creating
->     VCPUs
->   KVM: arm/arm64: Register ITS iodev when setting base address
->   KVM: arm/arm64: Don't call map_resources when restoring ITS tables
->   KVM: arm/arm64: vgic-its: Cleanup after failed ITT restore
-> 
-> Marc Zyngier (1):
->   KVM: arm/arm64: Get rid of its->initialized field
-> 
->  Documentation/virtual/kvm/devices/arm-vgic-its.txt |  23 ++--
->  include/kvm/arm_vgic.h                             |   2 +-
->  include/linux/kvm_host.h                           |  11 ++
->  virt/kvm/arm/arm.c                                 |   2 +-
->  virt/kvm/arm/vgic/vgic-init.c                      |  25 +++-
->  virt/kvm/arm/vgic/vgic-its.c                       |  96 +++++---------
->  virt/kvm/arm/vgic/vgic-kvm-device.c                |  29 ++--
->  virt/kvm/arm/vgic/vgic-mmio-v3.c                   | 147 +++++++++++++++------
->  virt/kvm/arm/vgic/vgic-v3.c                        |  33 +++--
->  virt/kvm/arm/vgic/vgic.h                           |   5 +-
->  10 files changed, 222 insertions(+), 151 deletions(-)
-> 
+The problem is that mx6q does not have a way to properly reset the PCI block.
+
+On the board I tested there is no PCI support in U-Boot.
+
+Maybe we need the following approach in U-Boot as Lucas did for Barebox:
+https://git.pengutronix.de/cgit/barebox/commit/?id=f1da98da2760c21487bbba8f7fb957c843a22896
+
+According to this patch that went into 4.11 the bootloader must put
+PCI back in a safe state:
+https://patchwork.kernel.org/patch/9528911
