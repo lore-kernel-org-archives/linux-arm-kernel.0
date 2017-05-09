@@ -1,85 +1,44 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 10:56:08 +0200
-Subject: [PATCH v2 01/11] KVM: arm/arm64: Clarification and relaxation to ITS
- save/restore ABI
+Date: Tue,  9 May 2017 10:56:10 +0200
+Subject: [PATCH v2 03/11] KVM: Add kvm_vcpu_get_idx to get vcpu index in
+ kvm->vcpus
 In-Reply-To: <20170509085618.28311-1-cdall@linaro.org>
 References: <20170509085618.28311-1-cdall@linaro.org>
-Message-ID: <20170509085618.28311-2-cdall@linaro.org>
+Message-ID: <20170509085618.28311-4-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clarify what is meant by the save/restore ABI only supporting virtual
-physical interrupts.
-
-Relax the requirement of the order that the collection entries are
-written in and be clear that there is no particular ordering enforced.
-
-Some cosmetic changes in the capitalization of ID names to align with
-the GICv3 manual and remove the empty line in the bottom of the patch.
+There are occasional needs to use the index of vcpu in the kvm->vcpus
+array to map something related to a VCPU.  For example, unlike the
+vcpu->vcpu_id, the vcpu index is guaranteed to not be sparse across all
+vcpus which is useful when allocating a memory area for each vcpu.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
 ---
- Documentation/virtual/kvm/devices/arm-vgic-its.txt | 23 +++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
+ include/linux/kvm_host.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-index ba132e9..eb06beb 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-@@ -97,8 +97,8 @@ Groups:
- The following ordering must be followed when restoring the GIC and the ITS:
- a) restore all guest memory and create vcpus
- b) restore all redistributors
--c) initialize the ITS and then provide its base address
--   (KVM_DEV_ARM_VGIC_CTRL_INIT, KVM_DEV_ARM_VGIC_GRP_ADDR)
-+c) provide the its base address
-+   (KVM_DEV_ARM_VGIC_GRP_ADDR)
- d) restore the ITS in the following order:
-    1. Restore GITS_CBASER
-    2. Restore all other GITS_ registers, except GITS_CTLR!
-@@ -110,12 +110,14 @@ Then vcpus can be started.
-  ITS Table ABI REV0:
-  -------------------
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index 2c14ad9..12eb26d 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -490,6 +490,17 @@ static inline struct kvm_vcpu *kvm_get_vcpu_by_id(struct kvm *kvm, int id)
+ 	return NULL;
+ }
  
-- Revision 0 of the ABI only supports physical LPIs.
-+ Revision 0 of the ABI only supports the features of a virtual GICv3, and does
-+ not support a virtual GICv4 with support for direct injection of virtual
-+ interrupts for nested hypervisors.
- 
-- The device table and ITT are indexed by the deviceid and eventid,
-- respectively. The collection table is not indexed by collectionid:
-- CTEs are written in the table in the order of collection creation. All
-- entries are 8 bytes.
-+ The device table and ITT are indexed by the DeviceID and EventID,
-+ respectively. The collection table is not indexed by CollectionID, and the
-+ entries in the collection are listed in no particular order.
-+ All entries are 8 bytes.
- 
-  Device Table Entry (DTE):
- 
-@@ -126,10 +128,10 @@ Then vcpus can be started.
-  - V indicates whether the entry is valid. If not, other fields
-    are not meaningful.
-  - next: equals to 0 if this entry is the last one; otherwise it
--   corresponds to the deviceid offset to the next DTE, capped by
-+   corresponds to the DeviceID offset to the next DTE, capped by
-    2^14 -1.
-  - ITT_addr matches bits [51:8] of the ITT address (256 Byte aligned).
-- - Size specifies the supported number of bits for the eventid,
-+ - Size specifies the supported number of bits for the EventID,
-    minus one
- 
-  Collection Table Entry (CTE):
-@@ -151,8 +153,7 @@ Then vcpus can be started.
- 
-  where:
-  - next: equals to 0 if this entry is the last one; otherwise it corresponds
--   to the eventid offset to the next ITE capped by 2^16 -1.
-+   to the EventID offset to the next ITE capped by 2^16 -1.
-  - pINTID is the physical LPI ID; if zero, it means the entry is not valid
-    and other fields are not meaningful.
-  - ICID is the collection ID
--
++static inline int kvm_vcpu_get_idx(struct kvm_vcpu *vcpu)
++{
++	struct kvm_vcpu *tmp;
++	int idx;
++
++	kvm_for_each_vcpu(idx, tmp, vcpu->kvm)
++		if (tmp == vcpu)
++			return idx;
++	BUG();
++}
++
+ #define kvm_for_each_memslot(memslot, slots)	\
+ 	for (memslot = &slots->memslots[0];	\
+ 	      memslot < slots->memslots + KVM_MEM_SLOTS_NUM && memslot->npages;\
 -- 
 2.9.0
