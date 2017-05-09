@@ -1,52 +1,93 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 9 May 2017 11:28:16 +0200
-Subject: [PATCH] clk: meson: gxbb: fix build error without RESET_CONTROLLER
-In-Reply-To: <8556c66c-585f-d171-e2a8-1f59d109e9de@baylibre.com>
-References: <20170424100542.20226-1-tobias.regnery@gmail.com>
- <8556c66c-585f-d171-e2a8-1f59d109e9de@baylibre.com>
-Message-ID: <d0aae880-655a-7306-263d-9b15f2ba2f3f@baylibre.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Tue, 9 May 2017 17:40:56 +0800
+Subject: [PATCH v2 29/30] dt-bindings: add vendor prefix for bananapi
+In-Reply-To: <CAGb2v66PuKQVoq1oSLepdUGLwvA-O0jh+ckLNwsNMCwcnfAJBg@mail.gmail.com>
+References: <1493198774-4478-1-git-send-email-sean.wang@mediatek.com>
+ <1493198774-4478-30-git-send-email-sean.wang@mediatek.com>
+ <20170428203727.m6jm5w6nb2iirxih@rob-hp-laptop>
+ <1493621880.32195.13.camel@mtkswgap22>
+ <CAGb2v66PuKQVoq1oSLepdUGLwvA-O0jh+ckLNwsNMCwcnfAJBg@mail.gmail.com>
+Message-ID: <1494322856.9662.54.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2017 12:10 PM, Neil Armstrong wrote:
-> On 04/24/2017 12:05 PM, Tobias Regnery wrote:
->> With CONFIG_RESET_CONTROLLER=n we see the following link error in the
->> meson gxbb clk driver:
->>
->> drivers/built-in.o: In function 'gxbb_aoclkc_probe':
->> drivers/clk/meson/gxbb-aoclk.c:161: undefined reference to 'devm_reset_controller_register'
->>
->> Fix this by selecting the reset controller subsystem.
->>
->> Signed-off-by: Tobias Regnery <tobias.regnery@gmail.com>
->> ---
->>  drivers/clk/meson/Kconfig | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/clk/meson/Kconfig b/drivers/clk/meson/Kconfig
->> index 19480bcc7046..2f29ee1a4d00 100644
->> --- a/drivers/clk/meson/Kconfig
->> +++ b/drivers/clk/meson/Kconfig
->> @@ -14,6 +14,7 @@ config COMMON_CLK_MESON8B
->>  config COMMON_CLK_GXBB
->>  	bool
->>  	depends on COMMON_CLK_AMLOGIC
->> +	select RESET_CONTROLLER
->>  	help
->>  	  Support for the clock controller on AmLogic S905 devices, aka gxbb.
->>  	  Say Y if you want peripherals and CPU frequency scaling to work.
->>
+On Tue, 2017-05-09 at 16:03 +0800, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> Hi Tobias,
+> On Mon, May 1, 2017 at 2:58 PM, Sean Wang <sean.wang@mediatek.com> wrote:
+> > On Fri, 2017-04-28 at 15:37 -0500, Rob Herring wrote:
+> >> On Wed, Apr 26, 2017 at 05:26:13PM +0800, sean.wang at mediatek.com wrote:
+> >> > From: Sean Wang <sean.wang@mediatek.com>
+> >> >
+> >> > Banana Pi team in Sinovoip Co., Limited which are dedicated to
+> >> > design and manufacture open hardware product.
+> >> >
+> >> > Website: http://www.banana-pi.org/
+> >> >
+> >> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> >> > ---
+> >> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+> >> >  1 file changed, 1 insertion(+)
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> >> > index ec0bfb9..8ca0f3c 100644
+> >> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> >> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> >> > @@ -44,6 +44,7 @@ avia      avia semiconductor
+> >> >  avic       Shanghai AVIC Optoelectronics Co., Ltd.
+> >> >  axentia    Axentia Technologies AB
+> >> >  axis       Axis Communications AB
+> >> > +bananapi Banana Pi SINOVOP CO., LIMITED
+> >>
+> >> s/SINOVOP/SINOVOIP/
+> >
+> > Hi Rob,
+> >
+> > thanks for your careful reviewing , i will correct it in the next
+> > version.
+> >
+> > BTW, Could those related dts changes go through your tree if everything
+> > looks good? Because I find Matthias have been inactive for a while and
+> > the latest branch in his tree seems still staying on 4.10.
 > 
-> I was going to push this, thanks for the patch !
+> Chiming in from the linux-sunxi side.
 > 
-> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+> We've been using the "lemaker" prefix for the original Banana Pi, and
+> the "sinovoip" prefix for all the later ones by SINOVOIP. Both prefixes
+> are still undocumented.
 > 
-> Neil
+> Given the complicated history behind the Banana Pi brand, do we know
+> what prefix they prefer, and what company should be tied to it?
 > 
+> Thanks
+> ChenYu
 
-Applied on fixes/meson-clk-drivers
 
-Thanks,
-Neil
+I knew there are some litigation issues between them
+
+Finally, Bananapi brand is owned by BIPAI KEJI and registered has been
+registered in more than 20 countries. So Lemaker can no longer use
+bananapi brand.
+
+I will update prefix naming with bananpi, BIPAI KEJI LIMITED for real
+bananapi boards that is confirmed by BIPAI KEJI
+
+
+
+> >
+> >         Sean
+> >
+> >>
+> >> >  boe        BOE Technology Group Co., Ltd.
+> >> >  bosch      Bosch Sensortec GmbH
+> >> >  boundary   Boundary Devices Inc.
+> >> > --
+> >> > 1.9.1
+> >> >
+> >
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
