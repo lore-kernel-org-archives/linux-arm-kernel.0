@@ -1,102 +1,175 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:54 +0200
-Subject: [PULL 25/37] KVM: arm64: vgic-its: Fix pending table sync
+Date: Tue,  9 May 2017 12:44:50 +0200
+Subject: [PULL 21/37] KVM: arm64: vgic-its: Collection table save/restore
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-26-cdall@linaro.org>
+Message-ID: <20170509104506.30929-22-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@redhat.com>
 
-In its_sync_lpi_pending_table() we currently ignore the
-target_vcpu of the LPIs. We sync the pending bit found in
-the vcpu pending table even if the LPI is not targeting it.
+The save path copies the collection entries into guest RAM
+at the GPA specified in the BASER register. This obviously
+requires the BASER to be set. The last written element is a
+dummy collection table entry.
 
-Also in vgic_its_cmd_handle_invall() we are supposed to
-read the config table data for the LPIs associated to the
-collection ID. At the moment we refresh all LPI config
-information.
+We do not index by collection ID as the collection entry
+can fit into 8 bytes while containing the collection ID.
 
-This patch passes a vpcu to vgic_copy_lpi_list() so that
-this latter returns a snapshot of the LPIs targeting this
-CPU and only those.
+On restore path we re-allocate the collection objects.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 100 ++++++++++++++++++++++++++++++++++++++++++-
+ virt/kvm/arm/vgic/vgic.h     |   9 ++++
+ 2 files changed, 107 insertions(+), 2 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index adb3d9e..9f7105c 100644
+index d5c0057..5523f0a 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -301,13 +301,13 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+@@ -1838,13 +1838,89 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
+ 	return -ENXIO;
  }
  
- /*
-- * Create a snapshot of the current LPI list, so that we can enumerate all
-- * LPIs without holding any lock.
-- * Returns the array length and puts the kmalloc'ed array into intid_ptr.
-+ * Create a snapshot of the current LPIs targeting @vcpu, so that we can
-+ * enumerate those LPIs without holding any lock.
-+ * Returns their number and puts the kmalloc'ed array into intid_ptr.
++static int vgic_its_save_cte(struct vgic_its *its,
++			     struct its_collection *collection,
++			     gpa_t gpa, int esz)
++{
++	u64 val;
++
++	val = (1ULL << KVM_ITS_CTE_VALID_SHIFT |
++	       ((u64)collection->target_addr << KVM_ITS_CTE_RDBASE_SHIFT) |
++	       collection->collection_id);
++	val = cpu_to_le64(val);
++	return kvm_write_guest(its->dev->kvm, gpa, &val, esz);
++}
++
++static int vgic_its_restore_cte(struct vgic_its *its, gpa_t gpa, int esz)
++{
++	struct its_collection *collection;
++	struct kvm *kvm = its->dev->kvm;
++	u32 target_addr, coll_id;
++	u64 val;
++	int ret;
++
++	BUG_ON(esz > sizeof(val));
++	ret = kvm_read_guest(kvm, gpa, &val, esz);
++	if (ret)
++		return ret;
++	val = le64_to_cpu(val);
++	if (!(val & KVM_ITS_CTE_VALID_MASK))
++		return 0;
++
++	target_addr = (u32)(val >> KVM_ITS_CTE_RDBASE_SHIFT);
++	coll_id = val & KVM_ITS_CTE_ICID_MASK;
++
++	if (target_addr >= atomic_read(&kvm->online_vcpus))
++		return -EINVAL;
++
++	collection = find_collection(its, coll_id);
++	if (collection)
++		return -EEXIST;
++	ret = vgic_its_alloc_collection(its, &collection, coll_id);
++	if (ret)
++		return ret;
++	collection->target_addr = target_addr;
++	return 1;
++}
++
+ /**
+  * vgic_its_save_collection_table - Save the collection table into
+  * guest RAM
   */
--static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
-+static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
+ static int vgic_its_save_collection_table(struct vgic_its *its)
  {
--	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct vgic_irq *irq;
- 	u32 *intids;
- 	int irq_count = dist->lpi_list_count, i = 0;
-@@ -326,14 +326,14 @@ static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
- 	spin_lock(&dist->lpi_list_lock);
- 	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
- 		/* We don't need to "get" the IRQ, as we hold the list lock. */
--		intids[i] = irq->intid;
--		if (++i == irq_count)
--			break;
-+		if (irq->target_vcpu != vcpu)
-+			continue;
-+		intids[i++] = irq->intid;
- 	}
- 	spin_unlock(&dist->lpi_list_lock);
- 
- 	*intid_ptr = intids;
--	return irq_count;
-+	return i;
+-	return -ENXIO;
++	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
++	struct its_collection *collection;
++	u64 val;
++	gpa_t gpa;
++	size_t max_size, filled = 0;
++	int ret, cte_esz = abi->cte_esz;
++
++	gpa = BASER_ADDRESS(its->baser_coll_table);
++	if (!gpa)
++		return 0;
++
++	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
++
++	list_for_each_entry(collection, &its->collection_list, coll_list) {
++		ret = vgic_its_save_cte(its, collection, gpa, cte_esz);
++		if (ret)
++			return ret;
++		gpa += cte_esz;
++		filled += cte_esz;
++	}
++
++	if (filled == max_size)
++		return 0;
++
++	/*
++	 * table is not fully filled, add a last dummy element
++	 * with valid bit unset
++	 */
++	val = 0;
++	BUG_ON(cte_esz > sizeof(val));
++	ret = kvm_write_guest(its->dev->kvm, gpa, &val, cte_esz);
++	return ret;
  }
  
- /*
-@@ -382,7 +382,7 @@ static u32 max_lpis_propbaser(u64 propbaser)
- }
- 
- /*
-- * Scan the whole LPI pending table and sync the pending bit in there
-+ * Sync the pending table pending bit of LPIs targeting @vcpu
-  * with our own data structures. This relies on the LPI being
-  * mapped before.
+ /**
+@@ -1854,7 +1930,27 @@ static int vgic_its_save_collection_table(struct vgic_its *its)
   */
-@@ -395,7 +395,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
- 	u32 *intids;
- 	int nr_irqs, i;
+ static int vgic_its_restore_collection_table(struct vgic_its *its)
+ {
+-	return -ENXIO;
++	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
++	int cte_esz = abi->cte_esz;
++	size_t max_size, read = 0;
++	gpa_t gpa;
++	int ret;
++
++	if (!(its->baser_coll_table & GITS_BASER_VALID))
++		return 0;
++
++	gpa = BASER_ADDRESS(its->baser_coll_table);
++
++	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
++
++	while (read < max_size) {
++		ret = vgic_its_restore_cte(its, gpa, cte_esz);
++		if (ret <= 0)
++			break;
++		gpa += cte_esz;
++		read += cte_esz;
++	}
++	return ret;
+ }
  
--	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, &intids);
-+	nr_irqs = vgic_copy_lpi_list(vcpu, &intids);
- 	if (nr_irqs < 0)
- 		return nr_irqs;
+ /**
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 79768c8..757de7a 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -73,6 +73,15 @@
+ 				      KVM_REG_ARM_VGIC_SYSREG_CRM_MASK | \
+ 				      KVM_REG_ARM_VGIC_SYSREG_OP2_MASK)
  
-@@ -1081,7 +1081,7 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
- 
- 	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
- 
--	irq_count = vgic_copy_lpi_list(kvm, &intids);
-+	irq_count = vgic_copy_lpi_list(vcpu, &intids);
- 	if (irq_count < 0)
- 		return irq_count;
- 
++/*
++ * As per Documentation/virtual/kvm/devices/arm-vgic-its.txt,
++ * below macros are defined for ITS table entry encoding.
++ */
++#define KVM_ITS_CTE_VALID_SHIFT		63
++#define KVM_ITS_CTE_VALID_MASK		BIT_ULL(63)
++#define KVM_ITS_CTE_RDBASE_SHIFT	16
++#define KVM_ITS_CTE_ICID_MASK		GENMASK_ULL(15, 0)
++
+ static inline bool irq_is_pending(struct vgic_irq *irq)
+ {
+ 	if (irq->config == VGIC_CONFIG_EDGE)
 -- 
 2.9.0
