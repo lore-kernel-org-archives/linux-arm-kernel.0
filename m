@@ -1,700 +1,146 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:31 +0200
-Subject: [PULL 02/37] KVM: arm/arm64: Move shared files to virt/kvm/arm
+Date: Tue,  9 May 2017 12:44:38 +0200
+Subject: [PULL 09/37] KVM: arm64: vgic-its: Implement vgic_its_has_attr_regs
+ and attr_regs_access
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-3-cdall@linaro.org>
+Message-ID: <20170509104506.30929-10-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some time now we have been having a lot of shared functionality
-between the arm and arm64 KVM support in arch/arm, which not only
-required a horrible inter-arch reference from the Makefile in
-arch/arm64/kvm, but also created confusion for newcomers to the code
-base, as was recently seen on the mailing list.
+From: Eric Auger <eric.auger@redhat.com>
 
-Further, it causes confusion for things like cscope, which needs special
-attention to index specific shared files for arm64 from the arm tree.
+This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
+upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+group becomes functional.
 
-Move the shared files into virt/kvm/arm and move the trace points along
-with it.  When moving the tracepoints we have to modify the way the vgic
-creates definitions of the trace points, so we take the chance to
-include the VGIC tracepoints in its very own special vgic trace.h file.
+At least GITS_CREADR and GITS_IIDR require to differentiate a guest write
+action from a user access. As such let's introduce a new uaccess_its_write
+vgic_register_region callback.
 
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/Makefile                 |   7 +-
- arch/arm/kvm/trace.h                  | 247 ----------------------------------
- arch/arm64/kvm/Makefile               |   5 +-
- {arch/arm/kvm => virt/kvm/arm}/arm.c  |   0
- {arch/arm/kvm => virt/kvm/arm}/mmio.c |   0
- {arch/arm/kvm => virt/kvm/arm}/mmu.c  |   0
- {arch/arm/kvm => virt/kvm/arm}/perf.c |   0
- {arch/arm/kvm => virt/kvm/arm}/psci.c |   0
- virt/kvm/arm/trace.h                  | 246 +++++++++++++++++++++++++++++++--
- virt/kvm/arm/vgic/trace.h             |  37 +++++
- virt/kvm/arm/vgic/vgic.c              |   2 +-
- 11 files changed, 280 insertions(+), 264 deletions(-)
- rename {arch/arm/kvm => virt/kvm/arm}/arm.c (100%)
- rename {arch/arm/kvm => virt/kvm/arm}/mmio.c (100%)
- rename {arch/arm/kvm => virt/kvm/arm}/mmu.c (100%)
- rename {arch/arm/kvm => virt/kvm/arm}/perf.c (100%)
- rename {arch/arm/kvm => virt/kvm/arm}/psci.c (100%)
- create mode 100644 virt/kvm/arm/vgic/trace.h
+ virt/kvm/arm/vgic/vgic-its.c  | 79 +++++++++++++++++++++++++++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-mmio.h |  9 +++--
+ 2 files changed, 84 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index 7b3670c..d9beee65 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -18,9 +18,12 @@ KVM := ../../../virt/kvm
- kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index f687e91..fd2660d 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1469,14 +1469,89 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
+ int vgic_its_has_attr_regs(struct kvm_device *dev,
+ 			   struct kvm_device_attr *attr)
+ {
+-	return -ENXIO;
++	const struct vgic_register_region *region;
++	gpa_t offset = attr->attr;
++	int align;
++
++	align = (offset < GITS_TYPER) || (offset >= GITS_PIDR4) ? 0x3 : 0x7;
++
++	if (offset & align)
++		return -EINVAL;
++
++	region = vgic_find_mmio_region(its_registers,
++				       ARRAY_SIZE(its_registers),
++				       offset);
++	if (!region)
++		return -ENXIO;
++
++	return 0;
+ }
  
- obj-$(CONFIG_KVM_ARM_HOST) += hyp/
+ int vgic_its_attr_regs_access(struct kvm_device *dev,
+ 			      struct kvm_device_attr *attr,
+ 			      u64 *reg, bool is_write)
+ {
+-	return -ENXIO;
++	const struct vgic_register_region *region;
++	struct vgic_its *its;
++	gpa_t addr, offset;
++	unsigned int len;
++	int align, ret = 0;
 +
- obj-y += kvm-arm.o init.o interrupts.o
--obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
--obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o vgic-v3-coproc.o
-+obj-y += handle_exit.o guest.o emulate.o reset.o
-+obj-y += coproc.o coproc_a15.o coproc_a7.o   vgic-v3-coproc.o
-+obj-y += $(KVM)/arm/arm.o $(KVM)/arm/mmu.o $(KVM)/arm/mmio.o
-+obj-y += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
- obj-y += $(KVM)/arm/aarch32.o
++	its = dev->private;
++	offset = attr->attr;
++
++	/*
++	 * Although the spec supports upper/lower 32-bit accesses to
++	 * 64-bit ITS registers, the userspace ABI requires 64-bit
++	 * accesses to all 64-bit wide registers. We therefore only
++	 * support 32-bit accesses to GITS_CTLR, GITS_IIDR and GITS ID
++	 * registers
++	 */
++	if ((offset < GITS_TYPER) || (offset >= GITS_PIDR4))
++		align = 0x3;
++	else
++		align = 0x7;
++
++	if (offset & align)
++		return -EINVAL;
++
++	mutex_lock(&dev->kvm->lock);
++
++	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base)) {
++		ret = -ENXIO;
++		goto out;
++	}
++
++	region = vgic_find_mmio_region(its_registers,
++				       ARRAY_SIZE(its_registers),
++				       offset);
++	if (!region) {
++		ret = -ENXIO;
++		goto out;
++	}
++
++	if (!lock_all_vcpus(dev->kvm)) {
++		ret = -EBUSY;
++		goto out;
++	}
++
++	addr = its->vgic_its_base + offset;
++
++	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
++
++	if (is_write) {
++		if (region->uaccess_its_write)
++			ret = region->uaccess_its_write(dev->kvm, its, addr,
++							len, *reg);
++		else
++			region->its_write(dev->kvm, its, addr, len, *reg);
++	} else {
++		*reg = region->its_read(dev->kvm, its, addr, len);
++	}
++	unlock_all_vcpus(dev->kvm);
++out:
++	mutex_unlock(&dev->kvm->lock);
++	return ret;
+ }
  
- obj-y += $(KVM)/arm/vgic/vgic.o
-diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
-index c25a885..fc09437 100644
---- a/arch/arm/kvm/trace.h
-+++ b/arch/arm/kvm/trace.h
-@@ -6,133 +6,6 @@
- #undef TRACE_SYSTEM
- #define TRACE_SYSTEM kvm
+ static int vgic_its_has_attr(struct kvm_device *dev,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 6eec91b..ea4171a 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -36,8 +36,13 @@ struct vgic_register_region {
+ 	};
+ 	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
+ 				      unsigned int len);
+-	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+-			      unsigned int len, unsigned long val);
++	union {
++		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
++				      unsigned int len, unsigned long val);
++		int (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
++					 gpa_t addr, unsigned int len,
++					 unsigned long val);
++	};
+ };
  
--/*
-- * Tracepoints for entry/exit to guest
-- */
--TRACE_EVENT(kvm_entry,
--	TP_PROTO(unsigned long vcpu_pc),
--	TP_ARGS(vcpu_pc),
--
--	TP_STRUCT__entry(
--		__field(	unsigned long,	vcpu_pc		)
--	),
--
--	TP_fast_assign(
--		__entry->vcpu_pc		= vcpu_pc;
--	),
--
--	TP_printk("PC: 0x%08lx", __entry->vcpu_pc)
--);
--
--TRACE_EVENT(kvm_exit,
--	TP_PROTO(int idx, unsigned int exit_reason, unsigned long vcpu_pc),
--	TP_ARGS(idx, exit_reason, vcpu_pc),
--
--	TP_STRUCT__entry(
--		__field(	int,		idx		)
--		__field(	unsigned int,	exit_reason	)
--		__field(	unsigned long,	vcpu_pc		)
--	),
--
--	TP_fast_assign(
--		__entry->idx			= idx;
--		__entry->exit_reason		= exit_reason;
--		__entry->vcpu_pc		= vcpu_pc;
--	),
--
--	TP_printk("%s: HSR_EC: 0x%04x (%s), PC: 0x%08lx",
--		  __print_symbolic(__entry->idx, kvm_arm_exception_type),
--		  __entry->exit_reason,
--		  __print_symbolic(__entry->exit_reason, kvm_arm_exception_class),
--		  __entry->vcpu_pc)
--);
--
--TRACE_EVENT(kvm_guest_fault,
--	TP_PROTO(unsigned long vcpu_pc, unsigned long hsr,
--		 unsigned long hxfar,
--		 unsigned long long ipa),
--	TP_ARGS(vcpu_pc, hsr, hxfar, ipa),
--
--	TP_STRUCT__entry(
--		__field(	unsigned long,	vcpu_pc		)
--		__field(	unsigned long,	hsr		)
--		__field(	unsigned long,	hxfar		)
--		__field(   unsigned long long,	ipa		)
--	),
--
--	TP_fast_assign(
--		__entry->vcpu_pc		= vcpu_pc;
--		__entry->hsr			= hsr;
--		__entry->hxfar			= hxfar;
--		__entry->ipa			= ipa;
--	),
--
--	TP_printk("ipa %#llx, hsr %#08lx, hxfar %#08lx, pc %#08lx",
--		  __entry->ipa, __entry->hsr,
--		  __entry->hxfar, __entry->vcpu_pc)
--);
--
--TRACE_EVENT(kvm_access_fault,
--	TP_PROTO(unsigned long ipa),
--	TP_ARGS(ipa),
--
--	TP_STRUCT__entry(
--		__field(	unsigned long,	ipa		)
--	),
--
--	TP_fast_assign(
--		__entry->ipa		= ipa;
--	),
--
--	TP_printk("IPA: %lx", __entry->ipa)
--);
--
--TRACE_EVENT(kvm_irq_line,
--	TP_PROTO(unsigned int type, int vcpu_idx, int irq_num, int level),
--	TP_ARGS(type, vcpu_idx, irq_num, level),
--
--	TP_STRUCT__entry(
--		__field(	unsigned int,	type		)
--		__field(	int,		vcpu_idx	)
--		__field(	int,		irq_num		)
--		__field(	int,		level		)
--	),
--
--	TP_fast_assign(
--		__entry->type		= type;
--		__entry->vcpu_idx	= vcpu_idx;
--		__entry->irq_num	= irq_num;
--		__entry->level		= level;
--	),
--
--	TP_printk("Inject %s interrupt (%d), vcpu->idx: %d, num: %d, level: %d",
--		  (__entry->type == KVM_ARM_IRQ_TYPE_CPU) ? "CPU" :
--		  (__entry->type == KVM_ARM_IRQ_TYPE_PPI) ? "VGIC PPI" :
--		  (__entry->type == KVM_ARM_IRQ_TYPE_SPI) ? "VGIC SPI" : "UNKNOWN",
--		  __entry->type, __entry->vcpu_idx, __entry->irq_num, __entry->level)
--);
--
--TRACE_EVENT(kvm_mmio_emulate,
--	TP_PROTO(unsigned long vcpu_pc, unsigned long instr,
--		 unsigned long cpsr),
--	TP_ARGS(vcpu_pc, instr, cpsr),
--
--	TP_STRUCT__entry(
--		__field(	unsigned long,	vcpu_pc		)
--		__field(	unsigned long,	instr		)
--		__field(	unsigned long,	cpsr		)
--	),
--
--	TP_fast_assign(
--		__entry->vcpu_pc		= vcpu_pc;
--		__entry->instr			= instr;
--		__entry->cpsr			= cpsr;
--	),
--
--	TP_printk("Emulate MMIO at: 0x%08lx (instr: %08lx, cpsr: %08lx)",
--		  __entry->vcpu_pc, __entry->instr, __entry->cpsr)
--);
--
- /* Architecturally implementation defined CP15 register access */
- TRACE_EVENT(kvm_emulate_cp15_imp,
- 	TP_PROTO(unsigned long Op1, unsigned long Rt1, unsigned long CRn,
-@@ -181,87 +54,6 @@ TRACE_EVENT(kvm_wfx,
- 		__entry->is_wfe ? 'e' : 'i', __entry->vcpu_pc)
- );
- 
--TRACE_EVENT(kvm_unmap_hva,
--	TP_PROTO(unsigned long hva),
--	TP_ARGS(hva),
--
--	TP_STRUCT__entry(
--		__field(	unsigned long,	hva		)
--	),
--
--	TP_fast_assign(
--		__entry->hva		= hva;
--	),
--
--	TP_printk("mmu notifier unmap hva: %#08lx", __entry->hva)
--);
--
--TRACE_EVENT(kvm_unmap_hva_range,
--	TP_PROTO(unsigned long start, unsigned long end),
--	TP_ARGS(start, end),
--
--	TP_STRUCT__entry(
--		__field(	unsigned long,	start		)
--		__field(	unsigned long,	end		)
--	),
--
--	TP_fast_assign(
--		__entry->start		= start;
--		__entry->end		= end;
--	),
--
--	TP_printk("mmu notifier unmap range: %#08lx -- %#08lx",
--		  __entry->start, __entry->end)
--);
--
--TRACE_EVENT(kvm_set_spte_hva,
--	TP_PROTO(unsigned long hva),
--	TP_ARGS(hva),
--
--	TP_STRUCT__entry(
--		__field(	unsigned long,	hva		)
--	),
--
--	TP_fast_assign(
--		__entry->hva		= hva;
--	),
--
--	TP_printk("mmu notifier set pte hva: %#08lx", __entry->hva)
--);
--
--TRACE_EVENT(kvm_age_hva,
--	TP_PROTO(unsigned long start, unsigned long end),
--	TP_ARGS(start, end),
--
--	TP_STRUCT__entry(
--		__field(	unsigned long,	start		)
--		__field(	unsigned long,	end		)
--	),
--
--	TP_fast_assign(
--		__entry->start		= start;
--		__entry->end		= end;
--	),
--
--	TP_printk("mmu notifier age hva: %#08lx -- %#08lx",
--		  __entry->start, __entry->end)
--);
--
--TRACE_EVENT(kvm_test_age_hva,
--	TP_PROTO(unsigned long hva),
--	TP_ARGS(hva),
--
--	TP_STRUCT__entry(
--		__field(	unsigned long,	hva		)
--	),
--
--	TP_fast_assign(
--		__entry->hva		= hva;
--	),
--
--	TP_printk("mmu notifier test age hva: %#08lx", __entry->hva)
--);
--
- TRACE_EVENT(kvm_hvc,
- 	TP_PROTO(unsigned long vcpu_pc, unsigned long r0, unsigned long imm),
- 	TP_ARGS(vcpu_pc, r0, imm),
-@@ -282,45 +74,6 @@ TRACE_EVENT(kvm_hvc,
- 		  __entry->vcpu_pc, __entry->r0, __entry->imm)
- );
- 
--TRACE_EVENT(kvm_set_way_flush,
--	    TP_PROTO(unsigned long vcpu_pc, bool cache),
--	    TP_ARGS(vcpu_pc, cache),
--
--	    TP_STRUCT__entry(
--		    __field(	unsigned long,	vcpu_pc		)
--		    __field(	bool,		cache		)
--	    ),
--
--	    TP_fast_assign(
--		    __entry->vcpu_pc		= vcpu_pc;
--		    __entry->cache		= cache;
--	    ),
--
--	    TP_printk("S/W flush at 0x%016lx (cache %s)",
--		      __entry->vcpu_pc, __entry->cache ? "on" : "off")
--);
--
--TRACE_EVENT(kvm_toggle_cache,
--	    TP_PROTO(unsigned long vcpu_pc, bool was, bool now),
--	    TP_ARGS(vcpu_pc, was, now),
--
--	    TP_STRUCT__entry(
--		    __field(	unsigned long,	vcpu_pc		)
--		    __field(	bool,		was		)
--		    __field(	bool,		now		)
--	    ),
--
--	    TP_fast_assign(
--		    __entry->vcpu_pc		= vcpu_pc;
--		    __entry->was		= was;
--		    __entry->now		= now;
--	    ),
--
--	    TP_printk("VM op at 0x%016lx (cache was %s, now %s)",
--		      __entry->vcpu_pc, __entry->was ? "on" : "off",
--		      __entry->now ? "on" : "off")
--);
--
- #endif /* _TRACE_KVM_H */
- 
- #undef TRACE_INCLUDE_PATH
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index afd51be..5d98100 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -7,14 +7,13 @@ CFLAGS_arm.o := -I.
- CFLAGS_mmu.o := -I.
- 
- KVM=../../../virt/kvm
--ARM=../../../arch/arm/kvm
- 
- obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
- obj-$(CONFIG_KVM_ARM_HOST) += hyp/
- 
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
--kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
--kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arm.o $(KVM)/arm/mmu.o $(KVM)/arm/mmio.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
- 
- kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
-diff --git a/arch/arm/kvm/arm.c b/virt/kvm/arm/arm.c
-similarity index 100%
-rename from arch/arm/kvm/arm.c
-rename to virt/kvm/arm/arm.c
-diff --git a/arch/arm/kvm/mmio.c b/virt/kvm/arm/mmio.c
-similarity index 100%
-rename from arch/arm/kvm/mmio.c
-rename to virt/kvm/arm/mmio.c
-diff --git a/arch/arm/kvm/mmu.c b/virt/kvm/arm/mmu.c
-similarity index 100%
-rename from arch/arm/kvm/mmu.c
-rename to virt/kvm/arm/mmu.c
-diff --git a/arch/arm/kvm/perf.c b/virt/kvm/arm/perf.c
-similarity index 100%
-rename from arch/arm/kvm/perf.c
-rename to virt/kvm/arm/perf.c
-diff --git a/arch/arm/kvm/psci.c b/virt/kvm/arm/psci.c
-similarity index 100%
-rename from arch/arm/kvm/psci.c
-rename to virt/kvm/arm/psci.c
-diff --git a/virt/kvm/arm/trace.h b/virt/kvm/arm/trace.h
-index 37d8b98..f7dc5dd 100644
---- a/virt/kvm/arm/trace.h
-+++ b/virt/kvm/arm/trace.h
-@@ -7,26 +7,250 @@
- #define TRACE_SYSTEM kvm
- 
- /*
-- * Tracepoints for vgic
-+ * Tracepoints for entry/exit to guest
-  */
--TRACE_EVENT(vgic_update_irq_pending,
--	TP_PROTO(unsigned long vcpu_id, __u32 irq, bool level),
--	TP_ARGS(vcpu_id, irq, level),
-+TRACE_EVENT(kvm_entry,
-+	TP_PROTO(unsigned long vcpu_pc),
-+	TP_ARGS(vcpu_pc),
- 
- 	TP_STRUCT__entry(
--		__field(	unsigned long,	vcpu_id	)
--		__field(	__u32,		irq	)
--		__field(	bool,		level	)
-+		__field(	unsigned long,	vcpu_pc		)
- 	),
- 
- 	TP_fast_assign(
--		__entry->vcpu_id	= vcpu_id;
--		__entry->irq		= irq;
-+		__entry->vcpu_pc		= vcpu_pc;
-+	),
-+
-+	TP_printk("PC: 0x%08lx", __entry->vcpu_pc)
-+);
-+
-+TRACE_EVENT(kvm_exit,
-+	TP_PROTO(int idx, unsigned int exit_reason, unsigned long vcpu_pc),
-+	TP_ARGS(idx, exit_reason, vcpu_pc),
-+
-+	TP_STRUCT__entry(
-+		__field(	int,		idx		)
-+		__field(	unsigned int,	exit_reason	)
-+		__field(	unsigned long,	vcpu_pc		)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->idx			= idx;
-+		__entry->exit_reason		= exit_reason;
-+		__entry->vcpu_pc		= vcpu_pc;
-+	),
-+
-+	TP_printk("%s: HSR_EC: 0x%04x (%s), PC: 0x%08lx",
-+		  __print_symbolic(__entry->idx, kvm_arm_exception_type),
-+		  __entry->exit_reason,
-+		  __print_symbolic(__entry->exit_reason, kvm_arm_exception_class),
-+		  __entry->vcpu_pc)
-+);
-+
-+TRACE_EVENT(kvm_guest_fault,
-+	TP_PROTO(unsigned long vcpu_pc, unsigned long hsr,
-+		 unsigned long hxfar,
-+		 unsigned long long ipa),
-+	TP_ARGS(vcpu_pc, hsr, hxfar, ipa),
-+
-+	TP_STRUCT__entry(
-+		__field(	unsigned long,	vcpu_pc		)
-+		__field(	unsigned long,	hsr		)
-+		__field(	unsigned long,	hxfar		)
-+		__field(   unsigned long long,	ipa		)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->vcpu_pc		= vcpu_pc;
-+		__entry->hsr			= hsr;
-+		__entry->hxfar			= hxfar;
-+		__entry->ipa			= ipa;
-+	),
-+
-+	TP_printk("ipa %#llx, hsr %#08lx, hxfar %#08lx, pc %#08lx",
-+		  __entry->ipa, __entry->hsr,
-+		  __entry->hxfar, __entry->vcpu_pc)
-+);
-+
-+TRACE_EVENT(kvm_access_fault,
-+	TP_PROTO(unsigned long ipa),
-+	TP_ARGS(ipa),
-+
-+	TP_STRUCT__entry(
-+		__field(	unsigned long,	ipa		)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->ipa		= ipa;
-+	),
-+
-+	TP_printk("IPA: %lx", __entry->ipa)
-+);
-+
-+TRACE_EVENT(kvm_irq_line,
-+	TP_PROTO(unsigned int type, int vcpu_idx, int irq_num, int level),
-+	TP_ARGS(type, vcpu_idx, irq_num, level),
-+
-+	TP_STRUCT__entry(
-+		__field(	unsigned int,	type		)
-+		__field(	int,		vcpu_idx	)
-+		__field(	int,		irq_num		)
-+		__field(	int,		level		)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->type		= type;
-+		__entry->vcpu_idx	= vcpu_idx;
-+		__entry->irq_num	= irq_num;
- 		__entry->level		= level;
- 	),
- 
--	TP_printk("VCPU: %ld, IRQ %d, level: %d",
--		  __entry->vcpu_id, __entry->irq, __entry->level)
-+	TP_printk("Inject %s interrupt (%d), vcpu->idx: %d, num: %d, level: %d",
-+		  (__entry->type == KVM_ARM_IRQ_TYPE_CPU) ? "CPU" :
-+		  (__entry->type == KVM_ARM_IRQ_TYPE_PPI) ? "VGIC PPI" :
-+		  (__entry->type == KVM_ARM_IRQ_TYPE_SPI) ? "VGIC SPI" : "UNKNOWN",
-+		  __entry->type, __entry->vcpu_idx, __entry->irq_num, __entry->level)
-+);
-+
-+TRACE_EVENT(kvm_mmio_emulate,
-+	TP_PROTO(unsigned long vcpu_pc, unsigned long instr,
-+		 unsigned long cpsr),
-+	TP_ARGS(vcpu_pc, instr, cpsr),
-+
-+	TP_STRUCT__entry(
-+		__field(	unsigned long,	vcpu_pc		)
-+		__field(	unsigned long,	instr		)
-+		__field(	unsigned long,	cpsr		)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->vcpu_pc		= vcpu_pc;
-+		__entry->instr			= instr;
-+		__entry->cpsr			= cpsr;
-+	),
-+
-+	TP_printk("Emulate MMIO at: 0x%08lx (instr: %08lx, cpsr: %08lx)",
-+		  __entry->vcpu_pc, __entry->instr, __entry->cpsr)
-+);
-+
-+TRACE_EVENT(kvm_unmap_hva,
-+	TP_PROTO(unsigned long hva),
-+	TP_ARGS(hva),
-+
-+	TP_STRUCT__entry(
-+		__field(	unsigned long,	hva		)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->hva		= hva;
-+	),
-+
-+	TP_printk("mmu notifier unmap hva: %#08lx", __entry->hva)
-+);
-+
-+TRACE_EVENT(kvm_unmap_hva_range,
-+	TP_PROTO(unsigned long start, unsigned long end),
-+	TP_ARGS(start, end),
-+
-+	TP_STRUCT__entry(
-+		__field(	unsigned long,	start		)
-+		__field(	unsigned long,	end		)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->start		= start;
-+		__entry->end		= end;
-+	),
-+
-+	TP_printk("mmu notifier unmap range: %#08lx -- %#08lx",
-+		  __entry->start, __entry->end)
-+);
-+
-+TRACE_EVENT(kvm_set_spte_hva,
-+	TP_PROTO(unsigned long hva),
-+	TP_ARGS(hva),
-+
-+	TP_STRUCT__entry(
-+		__field(	unsigned long,	hva		)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->hva		= hva;
-+	),
-+
-+	TP_printk("mmu notifier set pte hva: %#08lx", __entry->hva)
-+);
-+
-+TRACE_EVENT(kvm_age_hva,
-+	TP_PROTO(unsigned long start, unsigned long end),
-+	TP_ARGS(start, end),
-+
-+	TP_STRUCT__entry(
-+		__field(	unsigned long,	start		)
-+		__field(	unsigned long,	end		)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->start		= start;
-+		__entry->end		= end;
-+	),
-+
-+	TP_printk("mmu notifier age hva: %#08lx -- %#08lx",
-+		  __entry->start, __entry->end)
-+);
-+
-+TRACE_EVENT(kvm_test_age_hva,
-+	TP_PROTO(unsigned long hva),
-+	TP_ARGS(hva),
-+
-+	TP_STRUCT__entry(
-+		__field(	unsigned long,	hva		)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->hva		= hva;
-+	),
-+
-+	TP_printk("mmu notifier test age hva: %#08lx", __entry->hva)
-+);
-+
-+TRACE_EVENT(kvm_set_way_flush,
-+	    TP_PROTO(unsigned long vcpu_pc, bool cache),
-+	    TP_ARGS(vcpu_pc, cache),
-+
-+	    TP_STRUCT__entry(
-+		    __field(	unsigned long,	vcpu_pc		)
-+		    __field(	bool,		cache		)
-+	    ),
-+
-+	    TP_fast_assign(
-+		    __entry->vcpu_pc		= vcpu_pc;
-+		    __entry->cache		= cache;
-+	    ),
-+
-+	    TP_printk("S/W flush at 0x%016lx (cache %s)",
-+		      __entry->vcpu_pc, __entry->cache ? "on" : "off")
-+);
-+
-+TRACE_EVENT(kvm_toggle_cache,
-+	    TP_PROTO(unsigned long vcpu_pc, bool was, bool now),
-+	    TP_ARGS(vcpu_pc, was, now),
-+
-+	    TP_STRUCT__entry(
-+		    __field(	unsigned long,	vcpu_pc		)
-+		    __field(	bool,		was		)
-+		    __field(	bool,		now		)
-+	    ),
-+
-+	    TP_fast_assign(
-+		    __entry->vcpu_pc		= vcpu_pc;
-+		    __entry->was		= was;
-+		    __entry->now		= now;
-+	    ),
-+
-+	    TP_printk("VM op at 0x%016lx (cache was %s, now %s)",
-+		      __entry->vcpu_pc, __entry->was ? "on" : "off",
-+		      __entry->now ? "on" : "off")
- );
- 
- /*
-diff --git a/virt/kvm/arm/vgic/trace.h b/virt/kvm/arm/vgic/trace.h
-new file mode 100644
-index 0000000..ed32292
---- /dev/null
-+++ b/virt/kvm/arm/vgic/trace.h
-@@ -0,0 +1,37 @@
-+#if !defined(_TRACE_VGIC_H) || defined(TRACE_HEADER_MULTI_READ)
-+#define _TRACE_VGIC_H
-+
-+#include <linux/tracepoint.h>
-+
-+#undef TRACE_SYSTEM
-+#define TRACE_SYSTEM kvm
-+
-+TRACE_EVENT(vgic_update_irq_pending,
-+	TP_PROTO(unsigned long vcpu_id, __u32 irq, bool level),
-+	TP_ARGS(vcpu_id, irq, level),
-+
-+	TP_STRUCT__entry(
-+		__field(	unsigned long,	vcpu_id	)
-+		__field(	__u32,		irq	)
-+		__field(	bool,		level	)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->vcpu_id	= vcpu_id;
-+		__entry->irq		= irq;
-+		__entry->level		= level;
-+	),
-+
-+	TP_printk("VCPU: %ld, IRQ %d, level: %d",
-+		  __entry->vcpu_id, __entry->irq, __entry->level)
-+);
-+
-+#endif /* _TRACE_VGIC_H */
-+
-+#undef TRACE_INCLUDE_PATH
-+#define TRACE_INCLUDE_PATH ../../../virt/kvm/arm/vgic
-+#undef TRACE_INCLUDE_FILE
-+#define TRACE_INCLUDE_FILE trace
-+
-+/* This part must be outside protection */
-+#include <trace/define_trace.h>
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 3d0979c..d40210a 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -21,7 +21,7 @@
- #include "vgic.h"
- 
- #define CREATE_TRACE_POINTS
--#include "../trace.h"
-+#include "trace.h"
- 
- #ifdef CONFIG_DEBUG_SPINLOCK
- #define DEBUG_SPINLOCK_BUG_ON(p) BUG_ON(p)
+ extern struct kvm_io_device_ops kvm_io_gic_ops;
 -- 
 2.9.0
