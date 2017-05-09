@@ -1,146 +1,65 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:38 +0200
-Subject: [PULL 09/37] KVM: arm64: vgic-its: Implement vgic_its_has_attr_regs
- and attr_regs_access
+Date: Tue,  9 May 2017 12:44:35 +0200
+Subject: [PULL 06/37] arm/arm64: vgic: turn vgic_find_mmio_region into public
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-10-cdall@linaro.org>
+Message-ID: <20170509104506.30929-7-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@redhat.com>
 
-This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
-upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-group becomes functional.
+We plan to use vgic_find_mmio_region in vgic-its.c so let's
+turn it into a public function.
 
-At least GITS_CREADR and GITS_IIDR require to differentiate a guest write
-action from a user access. As such let's introduce a new uaccess_its_write
-vgic_register_region callback.
+Also let's take the opportunity to rename the region parameter
+into regions to emphasize this latter is an array of regions.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-its.c  | 79 +++++++++++++++++++++++++++++++++++++++++--
- virt/kvm/arm/vgic/vgic-mmio.h |  9 +++--
- 2 files changed, 84 insertions(+), 4 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio.c | 11 +++++------
+ virt/kvm/arm/vgic/vgic-mmio.h |  5 +++++
+ 2 files changed, 10 insertions(+), 6 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index f687e91..fd2660d 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1469,14 +1469,89 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
- int vgic_its_has_attr_regs(struct kvm_device *dev,
- 			   struct kvm_device_attr *attr)
- {
--	return -ENXIO;
-+	const struct vgic_register_region *region;
-+	gpa_t offset = attr->attr;
-+	int align;
-+
-+	align = (offset < GITS_TYPER) || (offset >= GITS_PIDR4) ? 0x3 : 0x7;
-+
-+	if (offset & align)
-+		return -EINVAL;
-+
-+	region = vgic_find_mmio_region(its_registers,
-+				       ARRAY_SIZE(its_registers),
-+				       offset);
-+	if (!region)
-+		return -ENXIO;
-+
-+	return 0;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index 2a5db13..1c17b2a 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -446,13 +446,12 @@ static int match_region(const void *key, const void *elt)
+ 	return 0;
  }
  
- int vgic_its_attr_regs_access(struct kvm_device *dev,
- 			      struct kvm_device_attr *attr,
- 			      u64 *reg, bool is_write)
+-/* Find the proper register handler entry given a certain address offset. */
+-static const struct vgic_register_region *
+-vgic_find_mmio_region(const struct vgic_register_region *region, int nr_regions,
+-		      unsigned int offset)
++const struct vgic_register_region *
++vgic_find_mmio_region(const struct vgic_register_region *regions,
++		      int nr_regions, unsigned int offset)
  {
--	return -ENXIO;
-+	const struct vgic_register_region *region;
-+	struct vgic_its *its;
-+	gpa_t addr, offset;
-+	unsigned int len;
-+	int align, ret = 0;
-+
-+	its = dev->private;
-+	offset = attr->attr;
-+
-+	/*
-+	 * Although the spec supports upper/lower 32-bit accesses to
-+	 * 64-bit ITS registers, the userspace ABI requires 64-bit
-+	 * accesses to all 64-bit wide registers. We therefore only
-+	 * support 32-bit accesses to GITS_CTLR, GITS_IIDR and GITS ID
-+	 * registers
-+	 */
-+	if ((offset < GITS_TYPER) || (offset >= GITS_PIDR4))
-+		align = 0x3;
-+	else
-+		align = 0x7;
-+
-+	if (offset & align)
-+		return -EINVAL;
-+
-+	mutex_lock(&dev->kvm->lock);
-+
-+	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base)) {
-+		ret = -ENXIO;
-+		goto out;
-+	}
-+
-+	region = vgic_find_mmio_region(its_registers,
-+				       ARRAY_SIZE(its_registers),
-+				       offset);
-+	if (!region) {
-+		ret = -ENXIO;
-+		goto out;
-+	}
-+
-+	if (!lock_all_vcpus(dev->kvm)) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
-+
-+	addr = its->vgic_its_base + offset;
-+
-+	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
-+
-+	if (is_write) {
-+		if (region->uaccess_its_write)
-+			ret = region->uaccess_its_write(dev->kvm, its, addr,
-+							len, *reg);
-+		else
-+			region->its_write(dev->kvm, its, addr, len, *reg);
-+	} else {
-+		*reg = region->its_read(dev->kvm, its, addr, len);
-+	}
-+	unlock_all_vcpus(dev->kvm);
-+out:
-+	mutex_unlock(&dev->kvm->lock);
-+	return ret;
+-	return bsearch((void *)(uintptr_t)offset, region, nr_regions,
+-		       sizeof(region[0]), match_region);
++	return bsearch((void *)(uintptr_t)offset, regions, nr_regions,
++		       sizeof(regions[0]), match_region);
  }
  
- static int vgic_its_has_attr(struct kvm_device *dev,
+ void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
 diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 6eec91b..ea4171a 100644
+index 98bb566..6eec91b 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio.h
 +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -36,8 +36,13 @@ struct vgic_register_region {
- 	};
- 	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
- 				      unsigned int len);
--	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
--			      unsigned int len, unsigned long val);
-+	union {
-+		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
-+				      unsigned int len, unsigned long val);
-+		int (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
-+					 gpa_t addr, unsigned int len,
-+					 unsigned long val);
-+	};
- };
+@@ -192,4 +192,9 @@ u64 vgic_sanitise_shareability(u64 reg);
+ u64 vgic_sanitise_field(u64 reg, u64 field_mask, int field_shift,
+ 			u64 (*sanitise_fn)(u64));
  
- extern struct kvm_io_device_ops kvm_io_gic_ops;
++/* Find the proper register handler entry given a certain address offset */
++const struct vgic_register_region *
++vgic_find_mmio_region(const struct vgic_register_region *regions,
++		      int nr_regions, unsigned int offset);
++
+ #endif
 -- 
 2.9.0
