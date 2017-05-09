@@ -1,88 +1,93 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:45:00 +0200
-Subject: [PULL 31/37] KVM: arm/arm64: Make vgic_v3_check_base more broadly
- usable
+Date: Tue,  9 May 2017 12:45:06 +0200
+Subject: [PULL 37/37] KVM: arm/arm64: vgic-its: Cleanup after failed ITT
+ restore
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-32-cdall@linaro.org>
+Message-ID: <20170509104506.30929-38-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are about to fiddle with the IO device registration mechanism,
-let's be a little more careful when setting base addresses as early as
-possible.  When setting a base address, we can check that there's
-address space enough for its scope and when the last of the two
-base addresses (dist and redist) get set, we can also check if the
-regions overlap at that time.
+When failing to restore the ITT for a DTE, we should remove the failed
+device entry from the list and free the object.
 
-This allows us to provide error messages to the user at time when trying
-to set the base address, as opposed to later when trying to run the VM.
-
-To do this,  we make vgic_v3_check_base available in the core vgic-v3
-code as well as in the other parts of the GICv3 code, namely the MMIO
-config code.
-
-We also return true for undefined base addresses so that the function
-can be used before all base addresses are set; all callers already check
-for uninitialized addresses before calling this function.
+We slightly refactor vgic_its_destroy to be able to reuse the now
+separate vgic_its_free_dte() function.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 ---
- virt/kvm/arm/vgic/vgic-v3.c | 19 +++++++++++++++----
- virt/kvm/arm/vgic/vgic.h    |  1 +
- 2 files changed, 16 insertions(+), 4 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 35 ++++++++++++++++++++++-------------
+ 1 file changed, 22 insertions(+), 13 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 12e52a0..2d53d7a 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -329,19 +329,30 @@ int vgic_v3_save_pending_tables(struct kvm *kvm)
- 	return 0;
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 9aeaff0..2dff288 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1613,13 +1613,20 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+ 	return vgic_its_set_abi(its, NR_ITS_ABIS - 1);
  }
  
--/* check for overlapping regions and for regions crossing the end of memory */
--static bool vgic_v3_check_base(struct kvm *kvm)
-+/*
-+ * Check for overlapping regions and for regions crossing the end of memory
-+ * for base addresses which have already been set.
-+ */
-+bool vgic_v3_check_base(struct kvm *kvm)
++static void vgic_its_free_device(struct kvm *kvm, struct its_device *dev)
++{
++	struct its_ite *ite, *tmp;
++
++	list_for_each_entry_safe(ite, tmp, &dev->itt_head, ite_list)
++		its_free_ite(kvm, ite);
++	list_del(&dev->dev_list);
++	kfree(dev);
++}
++
+ static void vgic_its_destroy(struct kvm_device *kvm_dev)
  {
- 	struct vgic_dist *d = &kvm->arch.vgic;
- 	gpa_t redist_size = KVM_VGIC_V3_REDIST_SIZE;
+ 	struct kvm *kvm = kvm_dev->kvm;
+ 	struct vgic_its *its = kvm_dev->private;
+-	struct its_device *dev;
+-	struct its_ite *ite;
+-	struct list_head *dev_cur, *dev_temp;
+ 	struct list_head *cur, *temp;
  
- 	redist_size *= atomic_read(&kvm->online_vcpus);
+ 	/*
+@@ -1630,19 +1637,19 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
+ 		return;
  
--	if (d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE < d->vgic_dist_base)
-+	if (!IS_VGIC_ADDR_UNDEF(d->vgic_dist_base) &&
-+	    d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE < d->vgic_dist_base)
- 		return false;
--	if (d->vgic_redist_base + redist_size < d->vgic_redist_base)
+ 	mutex_lock(&its->its_lock);
+-	list_for_each_safe(dev_cur, dev_temp, &its->device_list) {
+-		dev = container_of(dev_cur, struct its_device, dev_list);
+-		list_for_each_safe(cur, temp, &dev->itt_head) {
+-			ite = (container_of(cur, struct its_ite, ite_list));
+-			its_free_ite(kvm, ite);
+-		}
+-		list_del(dev_cur);
+-		kfree(dev);
++	list_for_each_safe(cur, temp, &its->device_list) {
++		struct its_device *dev;
 +
-+	if (!IS_VGIC_ADDR_UNDEF(d->vgic_redist_base) &&
-+	    d->vgic_redist_base + redist_size < d->vgic_redist_base)
- 		return false;
++		dev = list_entry(cur, struct its_device, dev_list);
++		vgic_its_free_device(kvm, dev);
+ 	}
  
-+	/* Both base addresses must be set to check if they overlap */
-+	if (IS_VGIC_ADDR_UNDEF(d->vgic_dist_base) ||
-+	    IS_VGIC_ADDR_UNDEF(d->vgic_redist_base))
-+		return true;
+ 	list_for_each_safe(cur, temp, &its->collection_list) {
++		struct its_collection *coll;
 +
- 	if (d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE <= d->vgic_redist_base)
- 		return true;
- 	if (d->vgic_redist_base + redist_size <= d->vgic_dist_base)
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index a2aeaa8..89eb935 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -175,6 +175,7 @@ int vgic_v3_map_resources(struct kvm *kvm);
- int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq);
- int vgic_v3_save_pending_tables(struct kvm *kvm);
- int vgic_register_redist_iodevs(struct kvm *kvm);
-+bool vgic_v3_check_base(struct kvm *kvm);
++		coll = list_entry(cur, struct its_collection, coll_list);
+ 		list_del(cur);
+-		kfree(container_of(cur, struct its_collection, coll_list));
++		kfree(coll);
+ 	}
+ 	mutex_unlock(&its->its_lock);
  
- void vgic_v3_load(struct kvm_vcpu *vcpu);
- void vgic_v3_put(struct kvm_vcpu *vcpu);
+@@ -2012,8 +2019,10 @@ static int vgic_its_restore_dte(struct vgic_its *its, u32 id,
+ 		return PTR_ERR(dev);
+ 
+ 	ret = vgic_its_restore_itt(its, dev);
+-	if (ret)
++	if (ret) {
++		vgic_its_free_device(its->dev->kvm, dev);
+ 		return ret;
++	}
+ 
+ 	return offset;
+ }
 -- 
 2.9.0
