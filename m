@@ -1,63 +1,66 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Tue, 9 May 2017 09:53:37 +0800
-Subject: [PATCH v2 2/2] arm64: Add dump_backtrace() in show_regs
-In-Reply-To: <1494294817-29187-1-git-send-email-wangkefeng.wang@huawei.com>
+Date: Tue, 9 May 2017 09:53:36 +0800
+Subject: [PATCH v2 1/2] arm64: Call __show_regs directly
+In-Reply-To: <20170508145535.GF5480@leverpostej>
 References: <20170508145535.GF5480@leverpostej>
- <1494294817-29187-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1494294817-29187-2-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1494294817-29187-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generic code expects show_regs() to dump the stack, but arm64's
-show_regs() does not. This makes it hard to debug softlockups and
-other issues that result in show_regs() being called.
+Generic code expects show_regs() to also dump the stack, but arm64's
+show_reg() does not do this. Some arm64 callers of show_regs() *only*
+want the registers dumped, without the stack.
 
-This patch updates arm64's show_regs() to dump the stack, as common
-code expects.
+To enable generic code to work as expected, we need to make
+show_regs() dump the stack. Where we only want the registers dumped,
+we must use __show_regs().
+
+This patch updates code to use __show_regs() where only registers are
+desired. A subsequent patch will modify show_regs().
 
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/arm64/include/asm/stacktrace.h | 1 +
- arch/arm64/kernel/process.c         | 1 +
- arch/arm64/kernel/traps.c           | 2 +-
- 3 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-index 801a16db..5b6eafc 100644
---- a/arch/arm64/include/asm/stacktrace.h
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -30,5 +30,6 @@ struct stackframe {
- extern int unwind_frame(struct task_struct *tsk, struct stackframe *frame);
- extern void walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
- 			    int (*fn)(struct stackframe *, void *), void *data);
-+extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk);
- 
- #endif	/* __ASM_STACKTRACE_H */
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index ae2a835..af1ea25 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -210,6 +210,7 @@ void __show_regs(struct pt_regs *regs)
- void show_regs(struct pt_regs * regs)
- {
- 	__show_regs(regs);
-+	dump_backtrace(regs, NULL);
- }
- 
- static void tls_thread_flush(void)
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index d4d6ae0..368c3c8 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -140,7 +140,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
+v1->v2:
+- Update the changelog according to Mark's kindly review, thanks Mark again.
+
+Please see the background from link [1].
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/494840.html
+
+ arch/arm64/kernel/probes/kprobes.c | 4 ++--
+ arch/arm64/mm/fault.c              | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index c5c4594..d849d98 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -522,9 +522,9 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+ 		pr_err("current sp %lx does not match saved sp %lx\n",
+ 		       orig_sp, stack_addr);
+ 		pr_err("Saved registers for jprobe %p\n", jp);
+-		show_regs(saved_regs);
++		__show_regs(saved_regs);
+ 		pr_err("Current registers\n");
+-		show_regs(regs);
++		__show_regs(regs);
+ 		BUG();
  	}
- }
+ 	unpause_graph_tracing();
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 37b95df..c3f2b10 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -250,7 +250,7 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 			tsk->comm, task_pid_nr(tsk), inf->name, sig,
+ 			addr, esr);
+ 		show_pte(tsk->mm, addr);
+-		show_regs(regs);
++		__show_regs(regs);
+ 	}
  
--static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
-+void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- {
- 	struct stackframe frame;
- 	unsigned long irq_stack_ptr;
+ 	tsk->thread.fault_address = addr;
 -- 
 1.7.12.4
