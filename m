@@ -1,92 +1,48 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue,  9 May 2017 10:50:01 +0800
-Subject: [PATCH v9 8/9] arm64: dts: hi6220: register debug module
-In-Reply-To: <1494298202-6739-1-git-send-email-leo.yan@linaro.org>
-References: <1494298202-6739-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1494298202-6739-9-git-send-email-leo.yan@linaro.org>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Tue, 9 May 2017 10:37:05 +0800
+Subject: [v3, 1/5] mmc: dt: add compatible into eSDHC required properties
+In-Reply-To: <1494297429-12083-1-git-send-email-yangbo.lu@nxp.com>
+References: <1494297429-12083-1-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1494297429-12083-2-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bind debug module driver for Hi6220.
+This patch is to add compatible into eSDHC required properties.
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 64 +++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+Changes for v2:
+	- Added this patch.
+Changes for v3:
+	- Added possible comaptible list
+---
+ Documentation/devicetree/bindings/mmc/fsl-esdhc.txt | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 470461d..467aa15 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -913,5 +913,69 @@
- 				};
- 			};
- 		};
-+
-+		debug at f6590000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf6590000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu0>;
-+		};
-+
-+		debug at f6592000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf6592000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu1>;
-+		};
-+
-+		debug at f6594000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf6594000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu2>;
-+		};
-+
-+		debug at f6596000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf6596000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu3>;
-+		};
-+
-+		debug at f65d0000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf65d0000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu4>;
-+		};
-+
-+		debug at f65d2000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf65d2000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu5>;
-+		};
-+
-+		debug at f65d4000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf65d4000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu6>;
-+		};
-+
-+		debug at f65d6000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf65d6000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu7>;
-+		};
- 	};
- };
+diff --git a/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
+index dedfb02..a2cf5e1 100644
+--- a/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
++++ b/Documentation/devicetree/bindings/mmc/fsl-esdhc.txt
+@@ -7,6 +7,20 @@ This file documents differences between the core properties described
+ by mmc.txt and the properties used by the sdhci-esdhc driver.
+ 
+ Required properties:
++  - compatible : should be "fsl,esdhc", or "fsl,<chip>-esdhc".
++    Possible compatibles for PowerPC:
++	"fsl,mpc8536-esdhc"
++	"fsl,mpc8378-esdhc"
++	"fsl,p2020-esdhc"
++	"fsl,p4080-esdhc"
++	"fsl,t1040-esdhc"
++	"fsl,t4240-esdhc"
++    Possible compatibles for ARM:
++	"fsl,ls1012a-esdhc"
++	"fsl,ls1088a-esdhc"
++	"fsl,ls1043a-esdhc"
++	"fsl,ls1046a-esdhc"
++	"fsl,ls2080a-esdhc"
+   - interrupt-parent : interrupt source phandle.
+   - clock-frequency : specifies eSDHC base clock frequency.
+ 
 -- 
-2.7.4
+2.1.0.27.g96db324
