@@ -1,19 +1,16 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Tue, 9 May 2017 15:50:45 +0800
-Subject: [PATCH 3/6] dt-bindings: serial: fsl-lpuart: add i.MX7ULP support
+Date: Tue, 9 May 2017 15:50:47 +0800
+Subject: [PATCH 5/6] tty: serial: lpuart: add earlycon support for imx7ulp
 In-Reply-To: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
 References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1494316248-24052-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1494316248-24052-6-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The lpuart of imx7ulp is basically the same as ls1021a. It's also
-32 bit width register, but unlike ls1021a, it's little endian.
-Besides that, imx7ulp lpuart has a minor different register layout
-from ls1021a.
+earlycon is executed quite early before the device tree probe,
+so we need configure the correct reg_off for imx7ulp during
+early console setup.
 
-Cc: devicetree at vger.kernel.org
-Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Jiri Slaby <jslaby@suse.com>
 Cc: Fugang Duan <fugang.duan@nxp.com>
@@ -22,21 +19,33 @@ Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
 Cc: Yangbo Lu <yangbo.lu@nxp.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- Documentation/devicetree/bindings/serial/fsl-lpuart.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/tty/serial/fsl_lpuart.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-index c95005e..a1252a0 100644
---- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-+++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-@@ -6,6 +6,8 @@ Required properties:
-     on Vybrid vf610 SoC with 8-bit register organization
-   - "fsl,ls1021a-lpuart" for lpuart compatible with the one integrated
-     on LS1021A SoC with 32-bit big-endian register organization
-+  - "fsl,imx7ulp-lpuart" for lpuart compatible with the one integrated
-+    on i.MX7ULP SoC with 32-bit little-endian register organization
- - reg : Address and length of the register set for the device
- - interrupts : Should contain uart interrupt
- - clocks : phandle + clock specifier pairs, one for each entry in clock-names
+diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+index 1cdb3f9..5b485e8 100644
+--- a/drivers/tty/serial/fsl_lpuart.c
++++ b/drivers/tty/serial/fsl_lpuart.c
+@@ -1978,8 +1978,20 @@ static int __init lpuart32_early_console_setup(struct earlycon_device *device,
+ 	return 0;
+ }
+ 
++static int __init lpuart32_imx_early_console_setup(struct earlycon_device *device,
++						   const char *opt)
++{
++	if (!device->port.membase)
++		return -ENODEV;
++
++	lpuart_reg_off = IMX_REG_OFF;
++	device->con->write = lpuart32_early_write;
++
++	return 0;
++}
+ OF_EARLYCON_DECLARE(lpuart, "fsl,vf610-lpuart", lpuart_early_console_setup);
+ OF_EARLYCON_DECLARE(lpuart32, "fsl,ls1021a-lpuart", lpuart32_early_console_setup);
++OF_EARLYCON_DECLARE(lpuart32, "fsl,imx7ulp-lpuart", lpuart32_imx_early_console_setup);
+ EARLYCON_DECLARE(lpuart, lpuart_early_console_setup);
+ EARLYCON_DECLARE(lpuart32, lpuart32_early_console_setup);
+ 
 -- 
 2.7.4
