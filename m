@@ -1,66 +1,128 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 8 May 2017 15:52:40 -0700
-Subject: [OpenWrt-Devel] [PATCH 2/4] ata: Add DT bindings for the Gemini
- SATA bridge
-In-Reply-To: <CAKR_QVJTbLMzqsUTEZJOquZ9T5aQ1_=73WAoRWrm+QK9wFhngA@mail.gmail.com>
-References: <20170506121053.11554-1-linus.walleij@linaro.org>
- <CGME20170506121119epcas5p437ea69e802ba94bd7df83d0bbac1b0bc@epcas5p4.samsung.com>
- <20170506121053.11554-2-linus.walleij@linaro.org>
- <3791456.ZibJefW5cI@amdc3058>
- <CACRpkdYz9Oka0SGJDTr=y4EN-VfggbuKY2s5X43oXg1dgjh1nw@mail.gmail.com>
- <CAKR_QVJTbLMzqsUTEZJOquZ9T5aQ1_=73WAoRWrm+QK9wFhngA@mail.gmail.com>
-Message-ID: <6e0751d2-8f78-c584-2990-c05bc3090214@gmail.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Mon, 8 May 2017 17:05:56 -0700
+Subject: [PATCH 00/31] arm64: KVM: Mediate access to GICv3 sysregs at EL2
+In-Reply-To: <20170503104606.19342-1-marc.zyngier@arm.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+Message-ID: <3f177b5e-e5c1-c681-1607-0a80c5aafba4@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2017 02:16 PM, Tom Psyborg wrote:
-> Is it ever going to be added so this endless spam can end?
-
-It's the first iteration of the (S)ATA patchset, and if you are not
-interested, just ignore the thread.
-
-Linus is doing everyone a great favor here by making sure that this
-platform gets properly supported upstream such that the cost of
-maintaining in OpenWrt/LEDE/anywhere else comes down to almost zero.
-
-Almost forgot: please don't top post.
-
+On 05/03/2017 03:45 AM, Marc Zyngier wrote:
+> [Apologies for posting this at the beginning of a merge window, but as
+>   this is a rather hot topic, I'd rather put it out as soon as possible]
 > 
+> Some systems have less than perfect GICv3 implementations, leading to
+> all kind of ugly issues (guest hanging, host dying). In order to allow
+> some level of diagnostic, and in some cases implement workarounds,
+> this series enables the trapping of both Group-0, Group-1 and Common
+> sysregs. Mediating the access at EL2 allows some form of sanity
+> checking that the HW is sometimes sorely lacking.
 > 
-> On 8 May 2017 at 22:33, Linus Walleij <linus.walleij@linaro.org
-> <mailto:linus.walleij@linaro.org>> wrote:
+> Instead of fully emulating a GICv3 CPU interface, we still use the
+> existing HW (list registers, AP registers, VMCR...), which allows the
+> code to be independent from the rest of the KVM code, and to cope with
+> partial trapping.
 > 
->     On Mon, May 8, 2017 at 12:49 PM, Bartlomiej Zolnierkiewicz
->     <b.zolnierkie at samsung.com <mailto:b.zolnierkie@samsung.com>> wrote:
->     > On Saturday, May 06, 2017 02:10:51 PM Linus Walleij wrote:
+> Of course, trapping has a cost, which is why this must be either
+> enabled on the command line, or selected by another cpu capability
+> (see Cavium erratum 30115). A quick test on an A57-based platform
+> shows a 25% hit when repeatedly banging on the trapped registers,
+> while normal workloads do not seem to suffer noticeably from such
+> trapping (hackbench variance is in the usual noise, despite being very
+> IPI happy).
 > 
->     >> +  Mode 3: ata0 master <-> sata0
->     >> +          ata1 slave  <-> sata1
->     >
->     > ata0 slave?
->     >
->     >> +          ata1 master and slave interfaces brought out
->     >> +               on IDE pads
+> This has been tested on a dual socket Thundex-X and a Freescale LS-2085a.
 > 
->     Of course. Thanks for reading close, much appreciated!
-> 
->     Yours,
->     Linus Walleij
->     _______________________________________________
->     openwrt-devel mailing list
->     openwrt-devel at lists.openwrt.org <mailto:openwrt-devel@lists.openwrt.org>
->     https://lists.openwrt.org/cgi-bin/mailman/listinfo/openwrt-devel
->     <https://lists.openwrt.org/cgi-bin/mailman/listinfo/openwrt-devel>
-> 
-> 
-> 
-> 
-> _______________________________________________
-> openwrt-devel mailing list
-> openwrt-devel at lists.openwrt.org
-> https://lists.openwrt.org/cgi-bin/mailman/listinfo/openwrt-devel
+> The first 6 patches are fixes, and only here for reference as they
+> have already been posted separately. The rest of the patches implement
+> Group-1, Group-0 and Common sysreg handlers, with the corresponding
+> command line options. I've also taken the liberty to rebase David
+> Daney's initial Cavium erratum 30115 workaround on top of this series,
+> and included it here as a typical use case.
 > 
 
 
--- 
-Florian
+Thanks Marc for working on this.
+
+I tested this series based on your git branch:
+https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm64/gicv3-cpuif-mediated-access
+
+This does indeed fix the problems we were seeing, so feel free to add:
+
+Tested-by: David Daney <david.daney@cavium.com>
+
+to the entire series.
+
+I would note that with these patches we see an occasional:
+
+[ 3868.311491] Unexpected interrupt 4 on vcpu ffff801f57a6a020
+[ 4262.063419] Unexpected interrupt 4 on vcpu ffff801f5b3dc040
+[ 4262.063422] Unexpected interrupt 4 on vcpu ffff801f50972020
+
+This is better than locking up the system, but I wonder if it indicates 
+that improvement to the code is still possible.
+
+David Daney
+
+
+
+> David Daney (2):
+>    arm64: Add MIDR values for Cavium cn83XX SoCs
+>    arm64: Add workaround for Cavium Thunder erratum 30115
+> 
+> Marc Zyngier (29):
+>    arm64: KVM: Fix decoding of Rt/Rt2 when trapping AArch32 CP accesses
+>    arm64: KVM: Do not use stack-protector to compile EL2 code
+>    arm: KVM: Do not use stack-protector to compile HYP code
+>    KVM: arm/arm64: vgic-v2: Do not use Active+Pending state for a HW
+>      interrupt
+>    KVM: arm/arm64: vgic-v3: Do not use Active+Pending state for a HW
+>      interrupt
+>    KVM: arm/arm64: vgic-v3: Use PREbits to infer the number of
+>      ICH_APxRn_EL2 registers
+>    KVM: arm/arm64: vgic-v3: Add accessors for the ICH_APxRn_EL2 registers
+>    arm64: Add a facility to turn an ESR syndrome into a sysreg encoding
+>    KVM: arm64: Make kvm_condition_valid32() accessible from EL2
+>    KVM: arm64: vgic-v3: Add hook to handle guest GICv3 sysreg accesses at
+>      EL2
+>    KVM: arm64: vgic-v3: Add ICV_BPR1_EL1 handler
+>    KVM: arm64: vgic-v3: Add ICV_IGRPEN1_EL1 handler
+>    KVM: arm64: vgic-v3: Add ICV_IAR1_EL1 handler
+>    KVM: arm64: vgic-v3: Add ICV_EOIR1_EL1 handler
+>    KVM: arm64: vgic-v3: Add ICV_AP1Rn_EL1 handler
+>    KVM: arm64: vgic-v3: Add ICV_HPPIR1_EL1 handler
+>    KVM: arm64: vgic-v3: Enable trapping of Group-1 system registers
+>    KVM: arm64: Enable GICv3 Group-1 sysreg trapping via command-line
+>    KVM: arm64: vgic-v3: Add ICV_BPR0_EL1 handler
+>    KVM: arm64: vgic-v3: Add ICV_IGNREN0_EL1 handler
+>    KVM: arm64: vgic-v3: Add misc Group-0 handlers
+>    KVM: arm64: vgic-v3: Enable trapping of Group-0 system registers
+>    KVM: arm64: Enable GICv3 Group-0 sysreg trapping via command-line
+>    KVM: arm64: vgic-v3: Add ICV_DIR_EL1 handler
+>    KVM: arm64: vgic-v3: Add ICV_RPR_EL1 handler
+>    KVM: arm64: vgic-v3: Add ICV_CTLR_EL1 handler
+>    KVM: arm64: vgic-v3: Add ICV_PMR_EL1 handler
+>    KVM: arm64: Enable GICv3 common sysreg trapping via command-line
+>    KVM: arm64: vgic-v3: Log which GICv3 system registers are trapped
+> 
+>   Documentation/arm64/silicon-errata.txt |   1 +
+>   arch/arm/kvm/hyp/Makefile              |   2 +
+>   arch/arm64/Kconfig                     |  11 +
+>   arch/arm64/include/asm/cpucaps.h       |   3 +-
+>   arch/arm64/include/asm/cputype.h       |   2 +
+>   arch/arm64/include/asm/esr.h           |  25 ++
+>   arch/arm64/include/asm/kvm_emulate.h   |   6 +
+>   arch/arm64/include/asm/kvm_hyp.h       |   1 +
+>   arch/arm64/include/asm/sysreg.h        |   9 +
+>   arch/arm64/kernel/cpu_errata.c         |  21 +
+>   arch/arm64/kvm/hyp/Makefile            |   2 +
+>   arch/arm64/kvm/hyp/switch.c            |  14 +
+>   arch/arm64/kvm/sys_regs.c              |   8 +-
+>   include/kvm/arm_vgic.h                 |   1 +
+>   include/linux/irqchip/arm-gic-v3.h     |   6 +
+>   virt/kvm/arm/aarch32.c                 |   2 +-
+>   virt/kvm/arm/hyp/vgic-v3-sr.c          | 792 +++++++++++++++++++++++++++++++--
+>   virt/kvm/arm/vgic/vgic-v2.c            |   7 +
+>   virt/kvm/arm/vgic/vgic-v3.c            |  52 +++
+>   19 files changed, 934 insertions(+), 31 deletions(-)
+> 
