@@ -1,135 +1,78 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:48 +0200
-Subject: [PULL 19/37] KVM: arm64: vgic-its: vgic_its_alloc_ite/device
-In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
-References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-20-cdall@linaro.org>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 9 May 2017 13:10:07 +0200
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <20170509065619.wmqa6z6w3n6xpvrw@gmail.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508075209.7aluvpwildw325rf@gmail.com>
+ <1494256932.1167.1.camel@gmail.com>
+ <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
+ <20170509065619.wmqa6z6w3n6xpvrw@gmail.com>
+Message-ID: <20170509111007.GA14702@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+On Tue, May 09, 2017 at 08:56:19AM +0200, Ingo Molnar wrote:
+> 
+> * Kees Cook <keescook@chromium.org> wrote:
+> 
+> > > There's the option of using GCC plugins now that the infrastructure was 
+> > > upstreamed from grsecurity. It can be used as part of the regular build 
+> > > process and as long as the analysis is pretty simple it shouldn't hurt compile 
+> > > time much.
+> > 
+> > Well, and that the situation may arise due to memory corruption, not from 
+> > poorly-matched set_fs() calls, which static analysis won't help solve. We need 
+> > to catch this bad kernel state because it is a very bad state to run in.
+> 
+> If memory corruption corrupted the task state into having addr_limit set to 
+> KERNEL_DS then there's already a fair chance that it's game over: it could also 
+> have set *uid to 0, or changed a sensitive PF_ flag, or a number of other 
+> things...
+> 
+> Furthermore, think about it: there's literally an infinite amount of corrupted 
+> task states that could be a security problem and that could be checked after every 
+> system call. Do we want to check every one of them?
 
-Add two new helpers to allocate an its ite and an its device.
-This will avoid duplication on restore path.
+Ok, I'm all for not checking lots of stuff all the time, just to protect
+from crappy drivers that.  Especially as we _can_ audit and run checks
+on the source code for them in the kernel tree.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-its.c | 68 ++++++++++++++++++++++++++++++--------------
- 1 file changed, 47 insertions(+), 21 deletions(-)
+But, and here's the problem, outside of the desktop/enterprise world,
+there are a ton of out-of-tree code that is crap.  The number of
+security/bug fixes and kernel crashes for out-of-tree code in systems
+like Android phones is just so high it's laughable.
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index cb7ae4c..737ba3c 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -802,6 +802,25 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
- 	kfree(collection);
- }
- 
-+/* Must be called with its_lock mutex held */
-+static struct its_ite *vgic_its_alloc_ite(struct its_device *device,
-+					  struct its_collection *collection,
-+					  u32 lpi_id, u32 event_id)
-+{
-+	struct its_ite *ite;
-+
-+	ite = kzalloc(sizeof(*ite), GFP_KERNEL);
-+	if (!ite)
-+		return ERR_PTR(-ENOMEM);
-+
-+	ite->event_id	= event_id;
-+	ite->collection = collection;
-+	ite->lpi = lpi_id;
-+
-+	list_add_tail(&ite->ite_list, &device->itt_head);
-+	return ite;
-+}
-+
- /*
-  * The MAPTI and MAPI commands map LPIs to ITTEs.
-  * Must be called with its_lock mutex held.
-@@ -816,8 +835,8 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	struct kvm_vcpu *vcpu = NULL;
- 	struct its_device *device;
- 	struct its_collection *collection, *new_coll = NULL;
--	int lpi_nr;
- 	struct vgic_irq *irq;
-+	int lpi_nr;
- 
- 	device = find_its_device(its, device_id);
- 	if (!device)
-@@ -846,19 +865,13 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 		new_coll = collection;
- 	}
- 
--	ite = kzalloc(sizeof(struct its_ite), GFP_KERNEL);
--	if (!ite) {
-+	ite = vgic_its_alloc_ite(device, collection, lpi_nr, event_id);
-+	if (IS_ERR(ite)) {
- 		if (new_coll)
- 			vgic_its_free_collection(its, coll_id);
--		return -ENOMEM;
-+		return PTR_ERR(ite);
- 	}
- 
--	ite->event_id	= event_id;
--	list_add_tail(&ite->ite_list, &device->itt_head);
--
--	ite->collection = collection;
--	ite->lpi = lpi_nr;
--
- 	if (its_is_collection_mapped(collection))
- 		vcpu = kvm_get_vcpu(kvm, collection->target_addr);
- 
-@@ -891,6 +904,26 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
- 	kfree(device);
- }
- 
-+/* Must be called with its_lock mutex held */
-+static struct its_device *vgic_its_alloc_device(struct vgic_its *its,
-+						u32 device_id, gpa_t itt_addr,
-+						u8 num_eventid_bits)
-+{
-+	struct its_device *device;
-+
-+	device = kzalloc(sizeof(*device), GFP_KERNEL);
-+	if (!device)
-+		return ERR_PTR(-ENOMEM);
-+
-+	device->device_id = device_id;
-+	device->itt_addr = itt_addr;
-+	device->num_eventid_bits = num_eventid_bits;
-+	INIT_LIST_HEAD(&device->itt_head);
-+
-+	list_add_tail(&device->dev_list, &its->device_list);
-+	return device;
-+}
-+
- /*
-  * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
-  * Must be called with the its_lock mutex held.
-@@ -927,17 +960,10 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 	if (!valid)
- 		return 0;
- 
--	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
--	if (!device)
--		return -ENOMEM;
--
--	device->device_id = device_id;
--	device->num_eventid_bits = num_eventid_bits;
--	device->itt_addr = itt_addr;
--
--	INIT_LIST_HEAD(&device->itt_head);
--
--	list_add_tail(&device->dev_list, &its->device_list);
-+	device = vgic_its_alloc_device(its, device_id, itt_addr,
-+				       num_eventid_bits);
-+	if (IS_ERR(device))
-+		return PTR_ERR(device);
- 
- 	return 0;
- }
--- 
-2.9.0
+When you have a device that is running 3.2 million lines of kernel code,
+yet the diffstat of the tree compared to mainline adds 3 million lines
+of code, there is bound to be a ton of issues/problems there.
+
+So this is an entirely different thing we need to try to protect
+ourselves from.  A long time ago I laughed when I saw that Microsoft had
+to do lots of "hardening" of their kernel to protect themselves from
+crappy drivers, as I knew we didn't have to do that because we had the
+source for them and could fix the root issues.  But that has changed and
+now we don't all have that option.  That code is out-of-tree because the
+vendor doesn't care, and doesn't want to take any time at all to do
+anything resembling a real code review[1].
+
+So, how about options like the ones being proposed here, go behind a new
+config option:
+	CONFIG_PROTECT_FROM_CRAPPY_DRIVERS
+that device owners can enable if they do not trust their vendor-provided
+code (hint, I sure don't.)  That way the "normal" path that all of us
+are used to running will be fine, but if you want to take the speed hit
+to try to protect yourself, then you can do that as well.
+
+Anyway, just an idea...
+
+thanks,
+
+greg k-h
+
+[1] I am working really hard with lots of vendors to try to fix their
+    broken development model, but that is going to take years to resolve
+    as their device pipelines are years long, and changing their
+    mindsets takes a long time...
