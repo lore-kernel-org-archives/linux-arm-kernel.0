@@ -1,69 +1,81 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon,  8 May 2017 23:52:46 -0700
-Subject: [GIT PULL 0/7] ARM: SoC contents for 4.12 merge window
-Message-ID: <1494312773-9790-1-git-send-email-olof@lixom.net>
+Date: Mon,  8 May 2017 23:52:47 -0700
+Subject: [GIT PULL 1/7] ARM: SoC non-urgent fixes for merge window
+In-Reply-To: <1494312773-9790-1-git-send-email-olof@lixom.net>
+References: <1494312773-9790-1-git-send-email-olof@lixom.net>
+Message-ID: <1494312773-9790-2-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Smaller patches that didn't seem to find a home in other branches, and
+low-priority fixes from late in the merge window. A number of these are
+MAINTAINER updates, it seems.
 
-It's been a relatively quiet release cycle here. Patch count is about
-the usual (818 commits, which includes merges). Accumulated diffstat:
+Highlights:
 
- 683 files changed, 28234 insertions(+), 7251 deletions(-)
+* Maintainers:
+- Remove Alexandre Courbot and Stephen Warren from Tegra maintainership,
+add Jon Hunter
+- Remove Stephen Warren and add Stefan Wahren to bcm2835
+- Tweaks for file flagging for Marvell Dove
 
-Dirstat is also more or less as we're used to it these days. Since arm's dts
-structure is flat, it's all in one directory but arm64 sums up to 33.6%.
+* Fixes:
+- For two non-common-clk platform, handle clk_disable with NULL arg
+- Remove redundant Kconfig select for Oxnas
 
-  42.5% arch/arm/boot/dts/
-   5.6% arch/arm/mach-gemini/
-   5.5% arch/arm/
-   3.2% arch/arm64/boot/dts/amlogic/
-   9.4% arch/arm64/boot/dts/freescale/
-   4.2% arch/arm64/boot/dts/hisilicon/
-   8.4% arch/arm64/boot/dts/rockchip/
-   8.1% arch/arm64/boot/dts/
-   1.1% drivers/ata/
-   1.5% drivers/reset/
-   2.3% drivers/soc/imx/
-   2.8% drivers/soc/
+----------------------------------------------------------------
 
-So, not a tiny set of branches, but also not huge.
+The following changes since commit 2868b2513aa732a99ea4a0a6bf10dc93c1f3dac2:
 
-Besides dts, the mach-gemini cleanup by Linus Walleij is the only
-platform that pops up on its own. Driver changes are some moves out
-from mach-hosted drivers, some new drivers (ata are acked by Tejun), the
-usual drivers/reset branch we merge, and general tweaks for SoC support.
+  Merge tag 'linux-kselftest-4.12-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/shuah/linux-kselftest
 
-Only a few conflicts; all are from developers sending DT changes to driver
-maintainers. We're trying to avoid that since it's needless conflicts --
-DT contents should flow in through us. But these ones are all easy to
-resolve so it's not a big deal. See dt and dt64 emails for details.
+are available in the git repository at:
 
-A handful of new platforms this merge window:
- - Renesas RZ/G1H and G1N
- - Rockchip RK3399 support, including Samsung Chromebook Plus ("Kevin").
- - Rockchip RK3288 support for ASUS Tinkerboard and a couple of Phytec boards
- - A handful of wireless basestations and other appliances, several based
-   on Marvell and Qualcomm SoCs.
- - i.MX28 "Duckbill" platforms
- - A couple of i.MX6Q platforms from Zodiac Inflight Innovations, which seems
-   to a couple of those tablet-like inflight entertainment systems that are
-   becoming popular.
- - Motorola Droid4, an old OMAP-based phone that some people might have at
-   the bottom of their old hardware piles, sees a bunch of mainline support
-   additions.
- - Nvidia Tegra186 ("Parker", used for Jetson TX2)
- - ST Micro STM32H743 support has been added
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes-nc
 
-In addition to these 7 branches, there'll be one more with the TEE
-subsystem, which we broke out in a separate branch this merge window as
-it's introduced; it's likely to go into our driver aggregation branch
-for the future. Arnd has a tag writeup and will send that separately.
+for you to fetch changes up to c58ab5376a0f46fd3356786f4b146894df40f22b:
+
+  Merge tag 'tegra-for-4.12-misc' of git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux into next/fixes-non-critical
+
+----------------------------------------------------------------
+
+Alexandre Courbot (1):
+      MAINTAINERS: tegra: Remove self as maintainer
+
+Arnd Bergmann (3):
+      Merge tag 'oxnas-arm-soc-for-4.12' of https://github.com/OXNAS/linux into next/fixes-non-critical
+      Merge tag 'mvebu-soc-4.12-1' of git://git.infradead.org/linux-mvebu into next/fixes-non-critical
+      Merge tag 'arm-soc/for-4.12/maintainers' of http://github.com/Broadcom/stblinux into next/fixes-non-critical
+
+Eric Anholt (1):
+      MAINTAINERS: Add Stefan Wahren to bcm2835.
+
+Florian Fainelli (1):
+      Merge tag 'bcm2835-maintainers-next-2017-03-21' into maintainers/next
+
+Geert Uytterhoeven (1):
+      MAINTAINERS: Add file patterns for dove device tree bindings
+
+Jon Mason (1):
+      MAINTAINERS: Add Jon Mason to BCM5301X maintainers
+
+Masahiro Yamada (3):
+      ARM: oxnas: remove redundant select CPU_V6K
+      ARM: w90x900: let clk_disable() return immediately if clk is NULL
+      ARM: mmp: let clk_disable() return immediately if clk is NULL
+
+Olof Johansson (1):
+      Merge tag 'tegra-for-4.12-misc' of git://git.kernel.org/.../tegra/linux into next/fixes-non-critical
+
+Stephen Warren (1):
+      MAINTAINERS: remove swarren from bcm2835
+
+Thierry Reding (1):
+      MAINTAINERS: tegra: Replace Stephen with Jon
 
 
-Please merge!
-
-Thanks,
-
--Olof
+ MAINTAINERS                   | 8 +++++---
+ arch/arm/mach-mmp/clock.c     | 3 +++
+ arch/arm/mach-oxnas/Kconfig   | 1 -
+ arch/arm/mach-w90x900/clock.c | 3 +++
+ 4 files changed, 11 insertions(+), 4 deletions(-)
