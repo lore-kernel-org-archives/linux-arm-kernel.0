@@ -1,115 +1,85 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue,  9 May 2017 12:44:46 +0200
-Subject: [PULL 17/37] KVM: arm64: vgic-its: Read config and pending bit in
- add_lpi()
+Date: Tue,  9 May 2017 12:44:56 +0200
+Subject: [PULL 27/37] KVM: arm/arm64: Clarification and relaxation to ITS
+ save/restore ABI
 In-Reply-To: <20170509104506.30929-1-cdall@linaro.org>
 References: <20170509104506.30929-1-cdall@linaro.org>
-Message-ID: <20170509104506.30929-18-cdall@linaro.org>
+Message-ID: <20170509104506.30929-28-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+Clarify what is meant by the save/restore ABI only supporting virtual
+physical interrupts.
 
-When creating the lpi we now ask the redistributor what is the state
-of the LPI (priority, enabled, pending).
+Relax the requirement of the order that the collection entries are
+written in and be clear that there is no particular ordering enforced.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Some cosmetic changes in the capitalization of ID names to align with
+the GICv3 manual and remove the empty line in the bottom of the patch.
+
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 35 ++++++++++++++++++++++++-----------
- 1 file changed, 24 insertions(+), 11 deletions(-)
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt | 23 +++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 3601790..ffd0a80 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -36,6 +36,8 @@
- static int vgic_its_save_tables_v0(struct vgic_its *its);
- static int vgic_its_restore_tables_v0(struct vgic_its *its);
- static int vgic_its_commit_v0(struct vgic_its *its);
-+static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
-+			     struct kvm_vcpu *filter_vcpu);
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+index ba132e9..eb06beb 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+@@ -97,8 +97,8 @@ Groups:
+ The following ordering must be followed when restoring the GIC and the ITS:
+ a) restore all guest memory and create vcpus
+ b) restore all redistributors
+-c) initialize the ITS and then provide its base address
+-   (KVM_DEV_ARM_VGIC_CTRL_INIT, KVM_DEV_ARM_VGIC_GRP_ADDR)
++c) provide the its base address
++   (KVM_DEV_ARM_VGIC_GRP_ADDR)
+ d) restore the ITS in the following order:
+    1. Restore GITS_CBASER
+    2. Restore all other GITS_ registers, except GITS_CTLR!
+@@ -110,12 +110,14 @@ Then vcpus can be started.
+  ITS Table ABI REV0:
+  -------------------
  
- /*
-  * Creates a new (reference to a) struct vgic_irq for a given LPI.
-@@ -44,10 +46,12 @@ static int vgic_its_commit_v0(struct vgic_its *its);
-  * If this is a "new" LPI, we allocate and initialize a new struct vgic_irq.
-  * This function returns a pointer to the _unlocked_ structure.
-  */
--static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
-+static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
-+				     struct kvm_vcpu *vcpu)
- {
- 	struct vgic_dist *dist = &kvm->arch.vgic;
- 	struct vgic_irq *irq = vgic_get_irq(kvm, NULL, intid), *oldirq;
-+	int ret;
+- Revision 0 of the ABI only supports physical LPIs.
++ Revision 0 of the ABI only supports the features of a virtual GICv3, and does
++ not support a virtual GICv4 with support for direct injection of virtual
++ interrupts for nested hypervisors.
  
- 	/* In this case there is no put, since we keep the reference. */
- 	if (irq)
-@@ -64,6 +68,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
- 	irq->config = VGIC_CONFIG_EDGE;
- 	kref_init(&irq->refcount);
- 	irq->intid = intid;
-+	irq->target_vcpu = vcpu;
+- The device table and ITT are indexed by the deviceid and eventid,
+- respectively. The collection table is not indexed by collectionid:
+- CTEs are written in the table in the order of collection creation. All
+- entries are 8 bytes.
++ The device table and ITT are indexed by the DeviceID and EventID,
++ respectively. The collection table is not indexed by CollectionID, and the
++ entries in the collection are listed in no particular order.
++ All entries are 8 bytes.
  
- 	spin_lock(&dist->lpi_list_lock);
+  Device Table Entry (DTE):
  
-@@ -95,6 +100,19 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
- out_unlock:
- 	spin_unlock(&dist->lpi_list_lock);
+@@ -126,10 +128,10 @@ Then vcpus can be started.
+  - V indicates whether the entry is valid. If not, other fields
+    are not meaningful.
+  - next: equals to 0 if this entry is the last one; otherwise it
+-   corresponds to the deviceid offset to the next DTE, capped by
++   corresponds to the DeviceID offset to the next DTE, capped by
+    2^14 -1.
+  - ITT_addr matches bits [51:8] of the ITT address (256 Byte aligned).
+- - Size specifies the supported number of bits for the eventid,
++ - Size specifies the supported number of bits for the EventID,
+    minus one
  
-+	/*
-+	 * We "cache" the configuration table entries in our struct vgic_irq's.
-+	 * However we only have those structs for mapped IRQs, so we read in
-+	 * the respective config data from memory here upon mapping the LPI.
-+	 */
-+	ret = update_lpi_config(kvm, irq, NULL);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	ret = vgic_v3_lpi_sync_pending_status(kvm, irq);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
- 	return irq;
- }
+  Collection Table Entry (CTE):
+@@ -151,8 +153,7 @@ Then vcpus can be started.
  
-@@ -795,6 +813,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	u32 event_id = its_cmd_get_id(its_cmd);
- 	u32 coll_id = its_cmd_get_collection(its_cmd);
- 	struct its_ite *ite;
-+	struct kvm_vcpu *vcpu = NULL;
- 	struct its_device *device;
- 	struct its_collection *collection, *new_coll = NULL;
- 	int lpi_nr;
-@@ -840,7 +859,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	ite->collection = collection;
- 	ite->lpi = lpi_nr;
- 
--	irq = vgic_add_lpi(kvm, lpi_nr);
-+	if (its_is_collection_mapped(collection))
-+		vcpu = kvm_get_vcpu(kvm, collection->target_addr);
-+
-+	irq = vgic_add_lpi(kvm, lpi_nr, vcpu);
- 	if (IS_ERR(irq)) {
- 		if (new_coll)
- 			vgic_its_free_collection(its, coll_id);
-@@ -849,15 +871,6 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	}
- 	ite->irq = irq;
- 
--	update_affinity_ite(kvm, ite);
+  where:
+  - next: equals to 0 if this entry is the last one; otherwise it corresponds
+-   to the eventid offset to the next ITE capped by 2^16 -1.
++   to the EventID offset to the next ITE capped by 2^16 -1.
+  - pINTID is the physical LPI ID; if zero, it means the entry is not valid
+    and other fields are not meaningful.
+  - ICID is the collection ID
 -
--	/*
--	 * We "cache" the configuration table entries in out struct vgic_irq's.
--	 * However we only have those structs for mapped IRQs, so we read in
--	 * the respective config data from memory here upon mapping the LPI.
--	 */
--	update_lpi_config(kvm, ite->irq, NULL);
--
- 	return 0;
- }
- 
 -- 
 2.9.0
