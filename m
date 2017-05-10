@@ -1,38 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 May 2017 10:08:46 +0200
-Subject: [PATCH v3 2/2] dt-bindings: pcie: Add documentation for Mediatek
- PCIe
-In-Reply-To: <1494382020-26790-3-git-send-email-ryder.lee@mediatek.com>
-References: <1494382020-26790-1-git-send-email-ryder.lee@mediatek.com>
- <1494382020-26790-3-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <CAK8P3a193RxchvFAMWeZiP0sc0bd+VGg=_aVvipSgcbDpHXojg@mail.gmail.com>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Wed, 10 May 2017 09:08:41 +0100
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <CAK8P3a2j6h2MAx3h2NCtadcFsNuFcf158F5OV1e2SK37acZRRg@mail.gmail.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508124621.GA20705@kroah.com>
+ <20170509064522.anusoikaalvlux3w@gmail.com>
+ <20170509085659.GA32555@infradead.org>
+ <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
+ <CAK8P3a2j6h2MAx3h2NCtadcFsNuFcf158F5OV1e2SK37acZRRg@mail.gmail.com>
+Message-ID: <20170510080841.GG390@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 10, 2017 at 4:07 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+On Wed, May 10, 2017 at 09:37:04AM +0200, Arnd Bergmann wrote:
 
-> +- ranges:
-> +  - The first three entries are expected to translate the addresses for the root
-> +    port registers, which are referenced by the assigned-addresses property of
-> +    the root port nodes (see below).
+> > How about trying to remove all of them?  If we could actually get rid
+> > of all of them, we could drop the arch support, and we'd get faster,
+> > simpler, shorter uaccess code throughout the kernel.
 
-I don't understand this part. Why do you need a static translation for these?
-Shouldn't they just be listed in the 'reg' property of the parent node now that
-you have the clk/reset/phy properties in the parent as well?
+BTW, not all get_user() under KERNEL_DS are plain loads.  There is an
+exception - probe_kernel_read().
 
-> +Required properties:
-> +- device_type: Must be "pci"
-> +- assigned-addresses: Address and size of the port configuration registers
-> +- reg: Only the first four bytes are used to refer to the correct bus number
-> +  and device number.
-> +- #address-cells: Must be 3
-> +- #size-cells: Must be 2
-> +- #interrupt-cells: Must be 1
-> +- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
-> +  Please refer to the standard PCI bus binding document for a more detailed
-> +  explanation.
+> > The ones in kernel/compat.c are generally garbage.  They should be
+> > using compat_alloc_user_space().  Ditto for kernel/power/user.c.
+> 
+> compat_alloc_user_space() has some problems too, it adds
+> complexity to a rarely-tested code path and can add some noticeable
+> overhead in cases where user space access is slow because of
+> extra checks.
+> 
+> It's clearly better than set_fs(), but the way I prefer to convert the
+> code is to avoid both and instead move compat handlers next to
+> the native code, and splitting out the common code between native
+> and compat mode into a helper that takes a regular kernel pointer.
+> 
+> I think that's what both Al has done in the past on compat_ioctl()
+> and select() and what Christoph does in his latest series, but
+> it seems worth pointing out for others that decide to help out here.
 
-Child nodes do not normally have interrupt-map properties. Isn't this
-already covered by the interrupt-map in the parent?
+Folks, reducing the amount of places where we play with set_fs() is certainly
+a good thing.  Getting rid of them completely is something entirely different;
+I have tried to plot out patch series in this direction many times during the
+last 5 years or so, but it's not going to be easy.  Tomorrow I can start
+posting my notes in that direction (and there are tons of those, unfortunately
+mixed with git grep results, highly unprintable personal comments, etc.);
+just let me grab some sleep first...
 
-      Arnd
+BTW, slow userland access is not just due to extra checks; access_ok(),
+in particular, is pretty much noise.  The real PITA comes from the things
+like STAC/CLAC on recent x86.  Or hardware overhead of cross-address-space
+block copy insn (e.g. on s390, where it's optimized for multi-cacheline
+blocks).  Or things like uml, where it's a matter of walking the page
+tables for each sodding __get_user().  It's not always just a matter of
+address space limit...
