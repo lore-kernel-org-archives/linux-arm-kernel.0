@@ -1,35 +1,68 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 10 May 2017 16:04:47 -0300
-Subject: [PATCH] PCI: imx6: fix downstream bus scanning
-In-Reply-To: <CAOMZO5BYXx9VmhGrTv44O-njGQsz=GSRp9fA_VbkWapkqY+p=g@mail.gmail.com>
-References: <20170510175752.6519-1-l.stach@pengutronix.de>
- <CAOMZO5BYXx9VmhGrTv44O-njGQsz=GSRp9fA_VbkWapkqY+p=g@mail.gmail.com>
-Message-ID: <CAOMZO5AnDRbuvp3G-ruM+1fo+9_JPCApRDQ9=kuDL0NZXgHmqA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 May 2017 21:11:05 +0200
+Subject: [GIT PULL] TEE driver infrastructure and OP-TEE drivers
+In-Reply-To: <CA+55aFxfBG5tc3ysXF_A_5mvsYk4Y2zdq+OD_oxoaDz0UrXMKA@mail.gmail.com>
+References: <CAK8P3a06+bG93H0XzAF1UUN_BbV-Cg3ERpVdR6qLuLpZUmp2Ug@mail.gmail.com>
+ <CA+55aFxfBG5tc3ysXF_A_5mvsYk4Y2zdq+OD_oxoaDz0UrXMKA@mail.gmail.com>
+Message-ID: <CAK8P3a14wZ5QRPZ-+V-K6Y9KB-50dCmfR14P2Cad+WZciTWd-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 10, 2017 at 3:35 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Lucas,
+On Wed, May 10, 2017 at 8:55 PM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Tue, May 9, 2017 at 12:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > https://lkml.org/lkml/2017/3/10/1277
 >
-> On Wed, May 10, 2017 at 2:57 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
->> The change in Linux 4.12 to make PCI configuartion requests non-posted
->> means that we are now getting a synchronous abort when the CFG space
->> read to probe for downstream devices times out.
->>
->> Synchronous aborts need to be handled differently from the async aborts
->> we were getting before, in particular the PC needs to be advanced when
->> resolving the abort. This is mostly a copy of what other PCI drivers do
->> on ARM to handle those aborts.
->>
->> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
->> ---
->> This is a fix that needs to go in for 4.12, but I would hope to get
->> some thorough testing before.
->
-> This fixes the kernel crash on my mx6q board with a PCI switch, thanks!
->
-> PCI Wifi card is also correctly detected.
+> Oh well, that wasn't very useful right now..
 
-Forgot to add:
+Hopefully it comes back eventually. For now, the same contents are also at
 
-Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
+https://lwn.net/Articles/716737/
+
+>> TEE driver infrastructure and OP-TEE drivers
+>
+> Another note: right now this adds a config question for TEE support,
+> but the only actual TEE driver has a
+>
+>         depends on HAVE_ARM_SMCCC
+>
+> on it.
+>
+> Until we get more TEE drivers, might I suggest that we perhaps make
+> the TEE config option have
+>
+>         depends on HAVE_ARM_SMCCC || COMPILE_TEST
+>
+> so that the generic tee code still gets the compile test coverage, but
+> we don't confuse people by asking about infrastructure that they can't
+> possibly use..
+>
+> Hmm?
+
+Yes, good idea. I've added this patch to the arm-soc fixes branch that
+already contains a couple of other things you will get in a few days:
+
+>From efd467ff4f611d67e9009de2391ce484f9436054 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 10 May 2017 21:05:16 +0200
+Subject: [PATCH] tee: add ARM_SMCCC dependency
+
+For the moment, the tee subsystem only makes sense in combination with
+the op-tee driver that depends on ARM_SMCCC, so let's hide the subsystem
+from users that can't select that.
+
+Suggested-by: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/tee/Kconfig b/drivers/tee/Kconfig
+index 2330a4eb4e8b..2824398fc5d6 100644
+--- a/drivers/tee/Kconfig
++++ b/drivers/tee/Kconfig
+@@ -1,6 +1,7 @@
+ # Generic Trusted Execution Environment Configuration
+ config TEE
+  tristate "Trusted Execution Environment support"
++ depends on HAVE_ARM_SMCCC || COMPILE_TEST # until we have more than one driver
+  select DMA_SHARED_BUFFER
+  select GENERIC_ALLOCATOR
+  help
