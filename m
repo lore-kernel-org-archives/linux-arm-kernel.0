@@ -1,103 +1,70 @@
-From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Wed, 10 May 2017 15:13:23 +0530
-Subject: [PATCH][v3] arm64: Add flash node for ls1088a qds and rdb
-Message-ID: <1494409403-22369-1-git-send-email-prabhakar.kushwaha@nxp.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 10 May 2017 11:48:31 +0200
+Subject: [PATCH v5 1/9] phy: phy-mt65xx-usb3: improve RX detection stable
+ time
+In-Reply-To: <de1b9870-d325-e97a-a2f0-bd355c70356c@ti.com>
+References: <1490945735-9531-1-git-send-email-chunfeng.yun@mediatek.com>
+ <de1b9870-d325-e97a-a2f0-bd355c70356c@ti.com>
+Message-ID: <75079f91-01f3-88ef-1733-5139857cc609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LS1088AQDS consist of NOR, NAND and FPGA connected over IFC
-LS1088ARDB consist of NAND and FPGA connected over IFC.
+I took DTS parts for v4.12-next.
+Sorry for the late response.
+Matthias
 
-So add flash information in ifc node of device tree.
-
-Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
----
-changes for v2: Incorporated Shawn's comments
-changes for v3: Incorporated Shawn's further comments
-
- arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts | 24 +++++++++++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts | 16 +++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    |  5 +----
- 3 files changed, 41 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
-index 8c3cae5..82e1615 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
-@@ -110,6 +110,30 @@
- 	};
- };
- 
-+&ifc {
-+	ranges = <0 0 0x5 0x80000000 0x08000000
-+		  2 0 0x5 0x30000000 0x00010000
-+		  3 0 0x5 0x20000000 0x00010000>;
-+	status = "okay";
-+
-+	nor at 0,0 {
-+		compatible = "cfi-flash";
-+		reg = <0x0 0x0 0x8000000>;
-+		bank-width = <2>;
-+		device-width = <1>;
-+	};
-+
-+	nand at 2,0 {
-+		compatible = "fsl,ifc-nand";
-+		reg = <0x2 0x0 0x10000>;
-+	};
-+
-+	fpga: board-control at 3,0 {
-+		compatible = "fsl,ls1088aqds-fpga", "fsl,fpga-qixis";
-+		reg = <0x3 0x0 0x0000100>;
-+	};
-+};
-+
- &duart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-index 8a04fbb..a93a588 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-@@ -94,6 +94,22 @@
- 	};
- };
- 
-+&ifc {
-+	ranges = <0 0 0x5 0x30000000 0x00010000
-+		  2 0 0x5 0x20000000 0x00010000>;
-+	status = "okay";
-+
-+	nand at 0,0 {
-+		compatible = "fsl,ifc-nand";
-+		reg = <0x0 0x0 0x10000>;
-+	};
-+
-+	fpga: board-control at 2,0 {
-+		compatible = "fsl,ls1088ardb-fpga", "fsl,fpga-qixis";
-+		reg = <0x2 0x0 0x0000100>;
-+	};
-+};
-+
- &duart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index 2946fd7..e852b22 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -216,11 +216,8 @@
- 			little-endian;
- 			#address-cells = <2>;
- 			#size-cells = <1>;
--
--			ranges = <0 0 0x5 0x80000000 0x08000000
--				  2 0 0x5 0x30000000 0x00010000
--				  3 0 0x5 0x20000000 0x00010000>;
- 			status = "disabled";
-+
- 		};
- 
- 		i2c0: i2c at 2000000 {
--- 
-2.7.4
+On 06/04/17 12:28, Kishon Vijay Abraham I wrote:
+> 
+> 
+> On Friday 31 March 2017 01:05 PM, Chunfeng Yun wrote:
+>> The default value of RX detection stable time is 10us, and this
+>> margin is too big for some critical cases which cause U3 link fail
+>> and link to U2(probability is about 1%). So change it to 5us.
+>>
+> merged all the phy patches in this series to linux-phy -next.
+> 
+> Thanks
+> Kishon
+> 
+>> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+>> ---
+>>   drivers/phy/phy-mt65xx-usb3.c |   18 ++++++++++++++++++
+>>   1 file changed, 18 insertions(+)
+>>
+>> diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
+>> index d972067..fe2392a 100644
+>> --- a/drivers/phy/phy-mt65xx-usb3.c
+>> +++ b/drivers/phy/phy-mt65xx-usb3.c
+>> @@ -112,6 +112,14 @@
+>>   #define P3D_RG_CDR_BIR_LTD0		GENMASK(12, 8)
+>>   #define P3D_RG_CDR_BIR_LTD0_VAL(x)	((0x1f & (x)) << 8)
+>>   
+>> +#define U3P_U3_PHYD_RXDET1		(SSUSB_SIFSLV_U3PHYD_BASE + 0x128)
+>> +#define P3D_RG_RXDET_STB2_SET		GENMASK(17, 9)
+>> +#define P3D_RG_RXDET_STB2_SET_VAL(x)	((0x1ff & (x)) << 9)
+>> +
+>> +#define U3P_U3_PHYD_RXDET2		(SSUSB_SIFSLV_U3PHYD_BASE + 0x12c)
+>> +#define P3D_RG_RXDET_STB2_SET_P3	GENMASK(8, 0)
+>> +#define P3D_RG_RXDET_STB2_SET_P3_VAL(x)	(0x1ff & (x))
+>> +
+>>   #define U3P_XTALCTL3		(SSUSB_SIFSLV_SPLLC + 0x0018)
+>>   #define XC3_RG_U3_XTAL_RX_PWD		BIT(9)
+>>   #define XC3_RG_U3_FRC_XTAL_RX_PWD	BIT(8)
+>> @@ -295,6 +303,16 @@ static void phy_instance_init(struct mt65xx_u3phy *u3phy,
+>>   	tmp |= P3D_RG_CDR_BIR_LTD0_VAL(0xc) | P3D_RG_CDR_BIR_LTD1_VAL(0x3);
+>>   	writel(tmp, port_base + U3P_PHYD_CDR1);
+>>   
+>> +	tmp = readl(port_base + U3P_U3_PHYD_RXDET1);
+>> +	tmp &= ~P3D_RG_RXDET_STB2_SET;
+>> +	tmp |= P3D_RG_RXDET_STB2_SET_VAL(0x10);
+>> +	writel(tmp, port_base + U3P_U3_PHYD_RXDET1);
+>> +
+>> +	tmp = readl(port_base + U3P_U3_PHYD_RXDET2);
+>> +	tmp &= ~P3D_RG_RXDET_STB2_SET_P3;
+>> +	tmp |= P3D_RG_RXDET_STB2_SET_P3_VAL(0x10);
+>> +	writel(tmp, port_base + U3P_U3_PHYD_RXDET2);
+>> +
+>>   	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
+>>   }
+>>   
+>>
