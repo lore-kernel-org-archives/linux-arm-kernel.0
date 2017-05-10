@@ -1,381 +1,160 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 10 May 2017 21:16:10 +0200
-Subject: [PATCH v2 1/3] ARM: at91: pm: Add sama5d2 backup mode
-Message-ID: <20170510191612.24364-1-alexandre.belloni@free-electrons.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Wed, 10 May 2017 21:22:10 +0200
+Subject: [RFC 0/2] Add support for Meson MX "SDIO" MMC driver
+In-Reply-To: <CAPDyKFoYPjB1bjRfFCFT3vuzKgzm6-7L2qgNjxGL392cLDe7uA@mail.gmail.com>
+References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
+ <CAPDyKFoYPjB1bjRfFCFT3vuzKgzm6-7L2qgNjxGL392cLDe7uA@mail.gmail.com>
+Message-ID: <CAFBinCDGBZAAx_61eyu1_XM57fX62Mk03TEiO3uTL+i8dfPyZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sama5d2 has a mode were it is possible to cut power to the SoC while
-keeping the RAM in self refresh.
-Resuming from that mode needs support in the firmware/bootloader.
+Hi Ulf,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+On Wed, May 10, 2017 at 10:44 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 6 May 2017 at 19:18, Martin Blumenstingl
+> <martin.blumenstingl@googlemail.com> wrote:
+>> This is the successor to Carlo Caione's "Add support for Amlogic Meson
+>> MMC driver" series (v5) from [0].
+>>
+>> I would like you to specifically review:
+>> - whether I've (ab)used the MMC framework properly (as this is my first
+>>   "larger" contribution to an MMC driver)
+>
+> I take a look soonish.
+thank you!
 
-Changes in v2:
- - allow compilation on armv5
- - factorize setup of the backup mode in a single function
+>> - I think I have improved the locking compared to Carlo's version,
+>>   however I'd still like feedback on whether this looks sane now or if I
+>>   can improve that even further
+>>
+>> (notable) changes since Carlo's latest version are:
+>> - renamed the driver to meson-mx-sdio (Amlogic's reference kernel calls
+>>   the driver "aml_sdio" as there is a second MMC controller in these SoCs
+>>   which they call the "SDHC controller"). do the same with our driver to
+>
+> I don't like to renaming drivers, just because there are a reference
+> kernel using a different name.
+>
+> What's is really the difference between controllers? Why do they have
+> two variants?
+the driver from this thread is for the "SDSC/SDHC/SDXC card and SDIO
+interface with 1-bit and 4-bit data bus width supporting spec version
+2.x/3.x/4.x DS/HS modes up to UHS-I SDR50" (quote taken from the S805
+datasheet: [0])
+the "other" controller is an "eMMC and MMC card interface with
+1/4/8-bit data bus width supporting spec version 4.4x/4.5x HS200 (up
+to 100MHz clock), compatible with standard iNAND interface" (again,
+quote taken from the S805 datasheet: [0])
 
- arch/arm/mach-at91/generic.h         |   2 +
- arch/arm/mach-at91/pm.c              | 109 ++++++++++++++++++++++++++++++++++-
- arch/arm/mach-at91/pm.h              |   4 ++
- arch/arm/mach-at91/pm_data-offsets.c |   3 +
- arch/arm/mach-at91/pm_suspend.S      |  73 +++++++++++++++++------
- arch/arm/mach-at91/sama5.c           |  19 +++++-
- 6 files changed, 187 insertions(+), 23 deletions(-)
+>
+> Can they be managed by the same driver?
+>
+>>   avoid confusion once we add support for the second controller (which uses
+>>   a completely different register layout)
+>
+> Besides that, do they behave differently in some other way?
+both drivers/controllers have a totally different register layout - I
+don't see any way how they both could be handled by one driver (the
+registers for the controllers from this series are not part of the
+documentation, but the registers from the 8-bit capable controller
+are, see page 76 and following from the S805 datasheet: [0])
 
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index f1ead0f13c19..e2bd17237964 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -15,10 +15,12 @@
- extern void __init at91rm9200_pm_init(void);
- extern void __init at91sam9_pm_init(void);
- extern void __init sama5_pm_init(void);
-+extern void __init sama5d2_pm_init(void);
- #else
- static inline void __init at91rm9200_pm_init(void) { }
- static inline void __init at91sam9_pm_init(void) { }
- static inline void __init sama5_pm_init(void) { }
-+static inline void __init sama5d2_pm_init(void) { }
- #endif
- 
- #endif /* _AT91_GENERIC_H */
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 2cd27c830ab6..d138d19fa9f0 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -22,6 +22,7 @@
- #include <asm/cacheflush.h>
- #include <asm/fncpy.h>
- #include <asm/system_misc.h>
-+#include <asm/suspend.h>
- 
- #include "generic.h"
- #include "pm.h"
-@@ -58,6 +59,14 @@ static int at91_pm_valid_state(suspend_state_t state)
- 	}
- }
- 
-+static int canary = 0xA5A5A5A5;
-+
-+static struct at91_pm_bu {
-+	int suspended;
-+	unsigned long reserved;
-+	phys_addr_t canary;
-+	phys_addr_t resume;
-+} *pm_bu;
- 
- static suspend_state_t target_state;
- 
-@@ -123,15 +132,39 @@ static void (*at91_suspend_sram_fn)(struct at91_pm_data *);
- extern void at91_pm_suspend_in_sram(struct at91_pm_data *pm_data);
- extern u32 at91_pm_suspend_in_sram_sz;
- 
--static void at91_pm_suspend(suspend_state_t state)
-+static int at91_suspend_finish(unsigned long val)
- {
--	pm_data.mode = (state == PM_SUSPEND_MEM) ? AT91_PM_SLOW_CLOCK : 0;
--
- 	flush_cache_all();
- 	outer_disable();
- 
- 	at91_suspend_sram_fn(&pm_data);
- 
-+	return 0;
-+}
-+
-+static void at91_pm_suspend(suspend_state_t state)
-+{
-+	if (pm_data.deepest_state == AT91_PM_BACKUP)
-+		if (state == PM_SUSPEND_MEM)
-+			pm_data.mode = AT91_PM_BACKUP;
-+		else
-+			pm_data.mode = AT91_PM_SLOW_CLOCK;
-+	else
-+		pm_data.mode = (state == PM_SUSPEND_MEM) ? AT91_PM_SLOW_CLOCK : 0;
-+
-+	if (pm_data.mode == AT91_PM_BACKUP) {
-+		pm_bu->suspended = 1;
-+
-+		cpu_suspend(0, at91_suspend_finish);
-+
-+		/* The SRAM is lost between suspend cycles */
-+		at91_suspend_sram_fn = fncpy(at91_suspend_sram_fn,
-+					     &at91_pm_suspend_in_sram,
-+					     at91_pm_suspend_in_sram_sz);
-+	} else {
-+		at91_suspend_finish(0);
-+	}
-+
- 	outer_resume();
- }
- 
-@@ -436,6 +469,70 @@ static void __init at91_pm_sram_init(void)
- 			&at91_pm_suspend_in_sram, at91_pm_suspend_in_sram_sz);
- }
- 
-+static void __init at91_pm_backup_init(void)
-+{
-+	struct gen_pool *sram_pool;
-+	struct device_node *np;
-+	struct platform_device *pdev = NULL;
-+
-+	pm_bu = NULL;
-+
-+	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d2-shdwc");
-+	if (!np) {
-+		pr_warn("%s: failed to find shdwc!\n", __func__);
-+		return;
-+	}
-+
-+	pm_data.shdwc = of_iomap(np, 0);
-+	of_node_put(np);
-+
-+	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d2-sfrbu");
-+	if (!np) {
-+		pr_warn("%s: failed to find sfrbu!\n", __func__);
-+		goto sfrbu_fail;
-+	}
-+
-+	pm_data.sfrbu = of_iomap(np, 0);
-+	of_node_put(np);
-+	pm_bu = NULL;
-+
-+	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d2-securam");
-+	if (!np)
-+		goto securam_fail;
-+
-+	pdev = of_find_device_by_node(np);
-+	of_node_put(np);
-+	if (!pdev) {
-+		pr_warn("%s: failed to find securam device!\n", __func__);
-+		goto securam_fail;
-+	}
-+
-+	sram_pool = gen_pool_get(&pdev->dev, NULL);
-+	if (!sram_pool) {
-+		pr_warn("%s: securam pool unavailable!\n", __func__);
-+		goto securam_fail;
-+	}
-+
-+	pm_bu = (void *)gen_pool_alloc(sram_pool, sizeof(struct at91_pm_bu));
-+	if (!pm_bu) {
-+		pr_warn("%s: unable to alloc securam!\n", __func__);
-+		goto securam_fail;
-+	}
-+
-+	pm_bu->suspended = 0;
-+	pm_bu->canary = virt_to_phys(&canary);
-+	pm_bu->resume = virt_to_phys(cpu_resume);
-+
-+	return;
-+
-+sfrbu_fail:
-+	iounmap(pm_data.shdwc);
-+	pm_data.shdwc = NULL;
-+securam_fail:
-+	iounmap(pm_data.sfrbu);
-+	pm_data.sfrbu = NULL;
-+}
-+
- struct pmc_info {
- 	unsigned long uhp_udp_mask;
- };
-@@ -510,3 +607,9 @@ void __init sama5_pm_init(void)
- 	at91_dt_ramc();
- 	at91_pm_init(NULL);
- }
-+
-+void __init sama5d2_pm_init(void)
-+{
-+	at91_pm_backup_init();
-+	sama5_pm_init();
-+}
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index fc0f7d048187..d9c6612ef62f 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -22,6 +22,7 @@
- #define AT91_MEMCTRL_DDRSDR	2
- 
- #define	AT91_PM_SLOW_CLOCK	0x01
-+#define	AT91_PM_BACKUP		0x02
- 
- #ifndef __ASSEMBLY__
- struct at91_pm_data {
-@@ -30,6 +31,9 @@ struct at91_pm_data {
- 	unsigned long uhp_udp_mask;
- 	unsigned int memctrl;
- 	unsigned int mode;
-+	void __iomem *shdwc;
-+	void __iomem *sfrbu;
-+	unsigned int deepest_state;
- };
- #endif
- 
-diff --git a/arch/arm/mach-at91/pm_data-offsets.c b/arch/arm/mach-at91/pm_data-offsets.c
-index 30302cb16df0..c0a73e62b725 100644
---- a/arch/arm/mach-at91/pm_data-offsets.c
-+++ b/arch/arm/mach-at91/pm_data-offsets.c
-@@ -9,5 +9,8 @@ int main(void)
- 	DEFINE(PM_DATA_RAMC1,		offsetof(struct at91_pm_data, ramc[1]));
- 	DEFINE(PM_DATA_MEMCTRL,	offsetof(struct at91_pm_data, memctrl));
- 	DEFINE(PM_DATA_MODE,		offsetof(struct at91_pm_data, mode));
-+	DEFINE(PM_DATA_SHDWC,		offsetof(struct at91_pm_data, shdwc));
-+	DEFINE(PM_DATA_SFRBU,		offsetof(struct at91_pm_data, sfrbu));
-+
- 	return 0;
- }
-diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-index 96781daa671a..daca91feea6a 100644
---- a/arch/arm/mach-at91/pm_suspend.S
-+++ b/arch/arm/mach-at91/pm_suspend.S
-@@ -97,15 +97,61 @@ ENTRY(at91_pm_suspend_in_sram)
- 	str	tmp1, .memtype
- 	ldr	tmp1, [r0, #PM_DATA_MODE]
- 	str	tmp1, .pm_mode
-+	/* Both ldrne below are here to preload their address in the TLB */
-+	ldr	tmp1, [r0, #PM_DATA_SHDWC]
-+	str	tmp1, .shdwc
-+	cmp	tmp1, #0
-+	ldrne	tmp2, [tmp1, #0]
-+	ldr	tmp1, [r0, #PM_DATA_SFRBU]
-+	str	tmp1, .sfr
-+	cmp	tmp1, #0
-+	ldrne	tmp2, [tmp1, #0x10]
- 
- 	/* Active the self-refresh mode */
- 	mov	r0, #SRAMC_SELF_FRESH_ACTIVE
- 	bl	at91_sramc_self_refresh
- 
- 	ldr	r0, .pm_mode
--	tst	r0, #AT91_PM_SLOW_CLOCK
--	beq	skip_disable_main_clock
-+	cmp	r0, #AT91_PM_SLOW_CLOCK
-+	beq	slow_clock
-+	cmp	r0, #AT91_PM_BACKUP
-+	beq	backup_mode
- 
-+	/* Wait for interrupt */
-+	ldr	pmc, .pmc_base
-+	at91_cpu_idle
-+	b	exit_suspend
-+
-+slow_clock:
-+	bl	at91_slowck_mode
-+	b	exit_suspend
-+backup_mode:
-+	bl	at91_backup_mode
-+	b	exit_suspend
-+
-+exit_suspend:
-+	/* Exit the self-refresh mode */
-+	mov	r0, #SRAMC_SELF_FRESH_EXIT
-+	bl	at91_sramc_self_refresh
-+
-+	/* Restore registers, and return */
-+	ldmfd	sp!, {r4 - r12, pc}
-+ENDPROC(at91_pm_suspend_in_sram)
-+
-+ENTRY(at91_backup_mode)
-+	/*BUMEN*/
-+	ldr	r0, .sfr
-+	mov	tmp1, #0x1
-+	str	tmp1, [r0, #0x10]
-+
-+	/* Shutdown */
-+	ldr	r0, .shdwc
-+	mov	tmp1, #0xA5000000
-+	add	tmp1, tmp1, #0x1
-+	str	tmp1, [r0, #0]
-+ENDPROC(at91_backup_mode)
-+
-+ENTRY(at91_slowck_mode)
- 	ldr	pmc, .pmc_base
- 
- 	/* Save Master clock setting */
-@@ -134,18 +180,9 @@ ENTRY(at91_pm_suspend_in_sram)
- 	orr	tmp1, tmp1, #AT91_PMC_KEY
- 	str	tmp1, [pmc, #AT91_CKGR_MOR]
- 
--skip_disable_main_clock:
--	ldr	pmc, .pmc_base
--
- 	/* Wait for interrupt */
- 	at91_cpu_idle
- 
--	ldr	r0, .pm_mode
--	tst	r0, #AT91_PM_SLOW_CLOCK
--	beq	skip_enable_main_clock
--
--	ldr	pmc, .pmc_base
--
- 	/* Turn on the main oscillator */
- 	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
- 	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
-@@ -174,14 +211,8 @@ skip_disable_main_clock:
- 
- 	wait_mckrdy
- 
--skip_enable_main_clock:
--	/* Exit the self-refresh mode */
--	mov	r0, #SRAMC_SELF_FRESH_EXIT
--	bl	at91_sramc_self_refresh
--
--	/* Restore registers, and return */
--	ldmfd	sp!, {r4 - r12, pc}
--ENDPROC(at91_pm_suspend_in_sram)
-+	mov	pc, lr
-+ENDPROC(at91_slowck_mode)
- 
- /*
-  * void at91_sramc_self_refresh(unsigned int is_active)
-@@ -314,6 +345,10 @@ ENDPROC(at91_sramc_self_refresh)
- 	.word 0
- .sramc1_base:
- 	.word 0
-+.shdwc:
-+	.word 0
-+.sfr:
-+	.word 0
- .memtype:
- 	.word 0
- .pm_mode:
-diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
-index 6d157d0ead8e..3d0bf95a56ae 100644
---- a/arch/arm/mach-at91/sama5.c
-+++ b/arch/arm/mach-at91/sama5.c
-@@ -34,7 +34,6 @@ DT_MACHINE_START(sama5_dt, "Atmel SAMA5")
- MACHINE_END
- 
- static const char *const sama5_alt_dt_board_compat[] __initconst = {
--	"atmel,sama5d2",
- 	"atmel,sama5d4",
- 	NULL
- };
-@@ -45,3 +44,21 @@ DT_MACHINE_START(sama5_alt_dt, "Atmel SAMA5")
- 	.dt_compat	= sama5_alt_dt_board_compat,
- 	.l2c_aux_mask	= ~0UL,
- MACHINE_END
-+
-+static void __init sama5d2_init(void)
-+{
-+	of_platform_default_populate(NULL, NULL, NULL);
-+	sama5d2_pm_init();
-+}
-+
-+static const char *const sama5d2_compat[] __initconst = {
-+	"atmel,sama5d2",
-+	NULL
-+};
-+
-+DT_MACHINE_START(sama5d2, "Atmel SAMA5")
-+	/* Maintainer: Atmel */
-+	.init_machine	= sama5d2_init,
-+	.dt_compat	= sama5d2_compat,
-+	.l2c_aux_mask	= ~0UL,
-+MACHINE_END
--- 
-2.11.0
+>> - add support for the internal "mux" in this MMC controller (which allows
+>>   connecting up to three devices to the the controller - at the cost of
+>>   performance though since the controller can only process one request at
+>>   a time). The driver registers a new device for each sub-node, which is
+>>   then fed into the MMC framework to allow per-slot configuration using
+>>   devicetree (see the example in the documentation)
+>
+> Unless there really is deployment for more than one slot on some
+> boards/SoCs, I would strongly suggest to *not* implement this.
+>
+> Simply because of overhead and introduced complexity to the driver.
+actually there are lots of devices out there which need to use two slots:
+as mentioned above the S805 (Meson8b) SoC has two MMC controllers:
+- one which is typically used for the SD card and the SDIO wireless
+interface (the driver from this series handles this)
+- the other one is typically connects to eMMC flash (as it supports
+8-bit bus width - this controller is not related to the driver from
+this series)
+
+there are boards out there which use NAND flash instead of eMMC, but
+the majority of the consumer devices (based on Amlogic SoCs) out there
+uses eMMC flash.
+we (unfortunately) have to support the internal mux since there are
+three MMC devices (SD card, SDIO wifi and eMMC) but only two
+controllers.
+
+I agree with you that it adds extra complexity to the driver. I tried
+to keep it as simple as possible - but I think we cannot remove it
+(without "losing" access to one MMC devices on most boards)
+
+>> - use the common clock framework internally for managing the MMC clock
+>>   (there is a fixed-factor clock in the controller which takes clk81 as
+>>    input and divides it's clock by two and a divider clock which takes
+>>    the result from the fixed-factor clock as input)
+>> - support the regulators provided by the MMC framework
+>> - support for GPIO-based card-detection and read-only-detection through
+>>   the MMC framework
+>> - use of the <linux/bitfield.h> FIELD_PREP and FIELD_GET macros where it
+>>   make sense (and thus the code easier to read)
+>> - re-worked locking (based on the locking in dw_mmc as that also provides
+>>   multiple "MMC slots")
+>
+> Lots of changes!
+>
+> Before even start to review (or someone else), you really need to make
+> this review-able.
+>
+> So, please, one change per patch - and make sure to write good
+> changelogs. Then I can start to review.
+from the mainline tree's perspective this is a new driver:
+Carlo (the original author) initially sent this driver for review more
+than 14 months ago. unfortunately it was never merged since you
+spotted some issues while reviewing that code, see [1].
+I would have sent smaller patches for a driver which is already in mainline.
+
+I also wanted to avoid extra complexity for the internal mux if it was
+added later on (if we want to avoid breaking devicetree backwards
+compatibility then the driver would have to support both: parsing from
+the mmc node directly and parsing child "slot" nodes). we won't have
+to change the DT bindings when the first version that will be
+mainlined already has support for the mux
+
+please let me know if there's anything I can do to make the code
+easier to review.
+
+>>
+>> tests done so far:
+>> - reading an OLD 256MiB SD card (which uses only a 1-bit bus) works fine
+>>   (sha1sum of the whole device matches with what I get on my PC's
+>>   card-reader)
+>> - reading a somewhat more modern class 10 SD card and putting Arch Linux
+>>   ARM on it (and using that as root file system)
+>> - it successfully detects the RTL8723BS SDIO wifi chip in my device (even
+>>   if the SD card is also enabled)
+>> - reading a 128MiB file from the SD card while scanning wifi networks on
+>>   the RTL8723BS card does not seem to result in any corruption (sha1sum
+>>   of the read file seems to match)
+>> - read speed of my class 10 SD card: ~15MiB/s
+>> - (unfortunately I could NOT test downloading a file over wifi to the SD
+>>   card because the RTL8723BS driver refuses to see any wifi networks, but
+>>   that might be a problem on the RTL8723BS driver side since I don't get
+>>   any error and the driver has just landed a few weeks ago in staging)
+>>
+>>
+>> [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/412136.html
+>>
+>
+> [...]
+>
+> Kind regards
+> Uffe
+
+
+Regards,
+Martin
+
+
+[0] https://dn.odroid.com/S805/Datasheet/S805_Datasheet%20V0.8%2020150126.pdf
+[1] https://patchwork.kernel.org/patch/8444841/
