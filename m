@@ -1,44 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 10 May 2017 09:38:03 +0100
-Subject: [PATCH v3 3/3] arm64: Silence first allocation with
- CONFIG_ARM64_MODULE_PLTS=y
-In-Reply-To: <20170508100723.GF8526@arm.com>
-References: <20170427181902.28829-1-f.fainelli@gmail.com>
- <20170427181902.28829-4-f.fainelli@gmail.com>
- <20170503111814.GF8233@arm.com>
- <3af577ca-8f01-7a1c-997c-4c04914b4633@gmail.com>
- <20170508100723.GF8526@arm.com>
-Message-ID: <20170510083803.ur44myyb35lqcuw7@localhost>
+From: phil@raspberrypi.org (Phil Elwell)
+Date: Wed, 10 May 2017 09:42:43 +0100
+Subject: [PATCH] staging: vc04_services: Fix bulk cache maintenance
+In-Reply-To: <139394270.264573.1493920270267@email.1und1.de>
+References: <d0edaf52-45e2-6fda-bb86-1a9b5e1a5425@raspberrypi.org>
+ <139394270.264573.1493920270267@email.1und1.de>
+Message-ID: <bd72cc29-140e-dfd7-eac5-01ccc8b844b1@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 08, 2017 at 11:07:24AM +0100, Will Deacon wrote:
-> On Fri, May 05, 2017 at 02:07:28PM -0700, Florian Fainelli wrote:
-> > On 05/03/2017 04:18 AM, Will Deacon wrote:
-> > > On Thu, Apr 27, 2017 at 11:19:02AM -0700, Florian Fainelli wrote:
-> > >> When CONFIG_ARM64_MODULE_PLTS is enabled, the first allocation using the
-> > >> module space fails, because the module is too big, and then the module
-> > >> allocation is attempted from vmalloc space. Silence the first allocation
-> > >> failure in that case by setting __GFP_NOWARN.
-> > >>
-> > >> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> > >> ---
-> > >>  arch/arm64/kernel/module.c | 7 ++++++-
-> > >>  1 file changed, 6 insertions(+), 1 deletion(-)
-> > > 
-> > > I'm not sure what the merge plan is for these, but the arm64 bit here
-> > > looks fine to me:
-> > > 
-> > > Acked-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > Thanks, not sure either, would you or Catalin want to pick this series?
+On 04/05/2017 18:51, Stefan Wahren wrote:
 > 
-> We'd need an Ack from Russell on the arch/arm/ part before we could take
-> this series.
+>> Phil Elwell <phil@raspberrypi.org> hat am 4. Mai 2017 um 11:58 geschrieben:
+>>
+>>
+>> vchiq_arm supports transfers less than one page and at arbitrary
+>> alignment, using the dma-mapping API to perform its cache maintenance
+>> (even though the VPU drives the DMA hardware). Read (DMA_FROM_DEVICE)
+>> operations use cache invalidation for speed, falling back to
+>> clean+invalidate on partial cache lines, with writes (DMA_TO_DEVICE)
+>> using flushes.
+>>
+>> If a read transfer has ends which aren't page-aligned, performing cache
+>> maintenance as if they were whole pages can lead to memory corruption
+>> since the partial cache lines at the ends (and any cache lines before or
+>> after the transfer area) will be invalidated. This bug was masked until
+>> the disabling of the cache flush in flush_dcache_page().
+>>
+>> Honouring the requested transfer start- and end-points prevents the
+>> corruption.
+>>
+>> Fixes: cf9caf192988 ("staging: vc04_services: Replace dmac_map_area with dmac_map_sg")
+>> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+> 
+> Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+> 
+> In order to clarify the context of this issue:
+> 
+> http://lists.infradead.org/pipermail/linux-rpi-kernel/2017-April/006149.html
 
-The first patch touches mm/vmalloc.c, so we could also merge the series
-via akpm's tree. Andrew, do you have any preference?
+Thanks, Stefan.
 
--- 
-Catalin
+Is there no feedback other on this patch? It's been in the rpi-4.11.y downstream
+branch for a week now with favourable results - see issue
+https://github.com/raspberrypi/linux/issues/1977 and pr
+https://github.com/raspberrypi/linux/pull/1987.
+
+Phil
