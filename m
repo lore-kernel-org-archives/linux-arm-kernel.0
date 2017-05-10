@@ -1,75 +1,47 @@
-From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Wed, 10 May 2017 16:14:06 +0200
-Subject: Regression: 442ec4c04d1: PCI: dwc: all: Split struct pcie_port
- into host-only and core structures
-In-Reply-To: <1494423139.2322.60.camel@pengutronix.de>
-References: <20170508150224.GA7458@collabora.com>
- <CAOMZO5DjFxAus3B03Om0xoqxKuY2TkbcjCY1YEUK9s_R8C_DNA@mail.gmail.com>
- <20170509063439.GC9791@collabora.com>
- <CAOMZO5CXjb7LVT5ByP1RqgBPkkfRn7PcRPmW3hos=UNXGnok=A@mail.gmail.com>
- <20170510131722.GA29556@collabora.com>
- <CAOMZO5CwtT=Zz8+CrT2TA5W7YHFRnDKgthRyChvUpF+f_QsYcQ@mail.gmail.com>
- <1494423139.2322.60.camel@pengutronix.de>
-Message-ID: <20170510141406.GA24864@collabora.com>
+From: segher@kernel.crashing.org (Segher Boessenkool)
+Date: Wed, 10 May 2017 08:40:22 -0500
+Subject: Updating kernel.org cross compilers?
+In-Reply-To: <CAK8P3a38bCS2rSwtQzYROfVBQ549akQZKPUJhcwDrWPN4NA1+w@mail.gmail.com>
+References: <92b5ff36-ad2b-10bc-de4f-4774babd9625@arm.com>
+ <20170430052957.GJ19687@gate.crashing.org>
+ <ee8a7f2c-976d-fe2a-55f9-ab8eebbf22eb@arm.com>
+ <20170509221843.GZ19687@gate.crashing.org>
+ <CAK8P3a38bCS2rSwtQzYROfVBQ549akQZKPUJhcwDrWPN4NA1+w@mail.gmail.com>
+Message-ID: <20170510134019.GB19687@gate.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 10, 2017 at 03:32:19PM +0200, Lucas Stach wrote:
-> Am Mittwoch, den 10.05.2017, 10:27 -0300 schrieb Fabio Estevam:
-> > On Wed, May 10, 2017 at 10:17 AM, Peter Senna Tschudin
-> > <peter.senna@collabora.com> wrote:
-> > > On Tue, May 09, 2017 at 07:21:24AM -0300, Fabio Estevam wrote:
-> > >> Hi Peter,
-> > >>
-> > >> On Tue, May 9, 2017 at 3:34 AM, Peter Senna Tschudin
-> > >> <peter.senna@collabora.com> wrote:
-> > >>
-> > >> > Something that ocurred to me is that u-boot is initializing the PCI, and
-> > >> > the PCI networkd cards.  Ideally this should not affect anything, but
-> > >> > can this be related to the issue?
-> > >>
-> > >> Yes, in order to narrow things down: please boot 4.11 without PCI
-> > >> support in U-Boot.
-> > >
-> > > Yes, removing the PCI code from u-boot makes 4.11 to boot. But latest
-> > > next still hangs.
-> > 
-> > Ok, good. At least we see the same behaviour now.
-> > 
-> > We still need a fix for the mx6q hang on systems with PCI switch for
-> > linux/next or 4.12-rc1.
-> 
-> I will take a look at this today.
+Hi Arnd, long time no see,
 
-I'll be more than happy to help. Let me know if you need testing or any
-other thing.
+On Wed, May 10, 2017 at 09:58:13AM +0200, Arnd Bergmann wrote:
+> >> So in addition to GCC 7.1 I'd like to have at least GCC 6.3 around,
+> >> which builds kernels without warnings today.
+> >
+> > If you don't want warnings, turn off the warnings or just don't look at
+> > them...  or fix the problems?  Many of the new warnings point out actual
+> > problems.
+> >
+> > Many of those sprintf problems in the kernel have already been fixed.
+> 
+> I've been using gcc-7.0 for a long time and fixed a lot of bugs it found,
+> along with more harmless warnings, but I had disabled a couple of
+> warning options when I first installed gcc-7 and ended up ignoring
+> those.
+> 
+> The exact set of additional options I used is:
+> 
+> -Wimplicit-fallthrough=0 -Wno-duplicate-decl-specifier
+> -Wno-int-in-bool-context -Wno-bool-operation -Wno-format-truncation
+> -Wno-format-overflow
+> 
+> there were a couple of others that I sent kernel fixes for instead.
+> I should probably revisit that list and for each of them either
+> only enable it with "make W=1" or fix all known warnings.
+> In the long run, I'd actually hope to fix all W=1 warnings too
+> and enable them by default.
 
-> 
-> > 
-> > >> The problem is that mx6q does not have a way to properly reset the PCI block.
-> > >>
-> > >> On the board I tested there is no PCI support in U-Boot.
-> > >>
-> > >> Maybe we need the following approach in U-Boot as Lucas did for Barebox:
-> > >> https://git.pengutronix.de/cgit/barebox/commit/?id=f1da98da2760c21487bbba8f7fb957c843a22896
-> > >
-> > > Maybe we do need, but the kernel is working on v4.10 for our use case,
-> > > and it is not working any longer on v4.11. What is the way to continue
-> > > from here?
-> > 
-> > There is no other way other than fixing U-Boot on this case.
-> 
-> You could also revert the change in the kernel if you are absolutely
-> sure that this won't cause issues on your system (you are not using the
-> internal watchdog etc.).
-> 
-> But for the long run and to make sure that _all_ use-cases work
-> properly, there is no way around fixing your bootloader to behave
-> correctly.
+Most of those usually point out actual problems (at least code that
+isn't as clear as it should be).  I do hate that first one though.
 
-Thanks!
 
-> 
-> Regards,
-> Lucas
-> 
+Segher
