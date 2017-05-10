@@ -1,47 +1,98 @@
-From: segher@kernel.crashing.org (Segher Boessenkool)
-Date: Wed, 10 May 2017 08:40:22 -0500
-Subject: Updating kernel.org cross compilers?
-In-Reply-To: <CAK8P3a38bCS2rSwtQzYROfVBQ549akQZKPUJhcwDrWPN4NA1+w@mail.gmail.com>
-References: <92b5ff36-ad2b-10bc-de4f-4774babd9625@arm.com>
- <20170430052957.GJ19687@gate.crashing.org>
- <ee8a7f2c-976d-fe2a-55f9-ab8eebbf22eb@arm.com>
- <20170509221843.GZ19687@gate.crashing.org>
- <CAK8P3a38bCS2rSwtQzYROfVBQ549akQZKPUJhcwDrWPN4NA1+w@mail.gmail.com>
-Message-ID: <20170510134019.GB19687@gate.crashing.org>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Wed, 10 May 2017 16:27:53 +0200
+Subject: [PATCH v3] arm: dts: sun7i-a20-bananapi: name the GPIO lines
+In-Reply-To: <20170510124741.GI5465@flea.lan>
+References: <1494048638-24365-1-git-send-email-linux@rempel-privat.de>
+ <20170509202725.e2tkry7dmsgx7se5@lukather>
+ <17553199-cc74-96ae-bc75-5e91b866ccd1@rempel-privat.de>
+ <20170510124741.GI5465@flea.lan>
+Message-ID: <9d88e913-2848-a41a-a00c-78f95b4bd556@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, long time no see,
-
-On Wed, May 10, 2017 at 09:58:13AM +0200, Arnd Bergmann wrote:
-> >> So in addition to GCC 7.1 I'd like to have at least GCC 6.3 around,
-> >> which builds kernels without warnings today.
-> >
-> > If you don't want warnings, turn off the warnings or just don't look at
-> > them...  or fix the problems?  Many of the new warnings point out actual
-> > problems.
-> >
-> > Many of those sprintf problems in the kernel have already been fixed.
+Am 10.05.2017 um 14:47 schrieb Maxime Ripard:
+> On Wed, May 10, 2017 at 06:47:58AM +0200, Oleksij Rempel wrote:
+>>>> +		"", "", "", "", "SCL", "SDA", "", "",
+>>>
+>>> I'm not sure how it's called in the schematics / documentation, but
+>>> having a way to get which bus it's from would be helpful (like you did
+>>> for the PMIC I2C bus).
+>>
+>> I use only names provided by schematics. Using something different IMO
+>> makes no sense and confusing.
 > 
-> I've been using gcc-7.0 for a long time and fixed a lot of bugs it found,
-> along with more harmless warnings, but I had disabled a couple of
-> warning options when I first installed gcc-7 and ended up ignoring
-> those.
+> Indeed.
 > 
-> The exact set of additional options I used is:
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		/* PC */
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		/* PD */
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		/* PE */
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		/* PF */
+>>>> +		"SD0-D1", "SD0-D0", "SD0-CLK", "SD0-CMD", "SD0-D3",
+>>>> +			"SD0-D2", "", "",
+>>>
+>>> Why did you change the wrapping and indentation on those two lines?
+>>
+>> i use 8 entry per line to keep counting easier. If line is too wide, i
+>> wrap it with changed indentation.
 > 
-> -Wimplicit-fallthrough=0 -Wno-duplicate-decl-specifier
-> -Wno-int-in-bool-context -Wno-bool-operation -Wno-format-truncation
-> -Wno-format-overflow
+> Ack.
 > 
-> there were a couple of others that I sent kernel fixes for instead.
-> I should probably revisit that list and for each of them either
-> only enable it with "make W=1" or fix all known warnings.
-> In the long run, I'd actually hope to fix all W=1 warnings too
-> and enable them by default.
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		/* PG */
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		"", "", "", "", "", "", "", "",
+>>>> +		/* PH */
+>>>> +		"TXD0", "RXD0", "IO-1", "PH3", "USB0-IDDET", "PH5", "", "",
+>>>
+>>> What are PH3 and PH5 used for on the board? Can't we provide a more
+>>> explicit name?
+>>
+>> Only names used by schematic :) If we will use something different users
+>> will hate us even more.
+> 
+> Those schematics suck then :)
+> 
+>> I can image to use some kind of combination of connector name and pin
+>> name. For example: "JP1-RXD0", or some thing like this.
+> 
+> There's no mark on the PCB either?
 
-Most of those usually point out actual problems (at least code that
-isn't as clear as it should be).  I do hate that first one though.
+correct, no mark on the PCB.
 
+> RXD0 and the other are fine, the
+> only ones that concern me are PH3 and PH5, which are basically only
+> the SoC pin name, and nothing else.
+> 
+> I guess we don't really have the choice if the schematic uses that,
+> and there's nothing on the PCB..
 
-Segher
+ack.
+
+-- 
+Regards,
+Oleksij
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170510/8e922cbf/attachment.sig>
