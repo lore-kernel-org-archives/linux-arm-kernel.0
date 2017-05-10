@@ -1,49 +1,100 @@
-From: phil@raspberrypi.org (Phil Elwell)
-Date: Wed, 10 May 2017 09:42:43 +0100
-Subject: [PATCH] staging: vc04_services: Fix bulk cache maintenance
-In-Reply-To: <139394270.264573.1493920270267@email.1und1.de>
-References: <d0edaf52-45e2-6fda-bb86-1a9b5e1a5425@raspberrypi.org>
- <139394270.264573.1493920270267@email.1und1.de>
-Message-ID: <bd72cc29-140e-dfd7-eac5-01ccc8b844b1@raspberrypi.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 10 May 2017 10:44:34 +0200
+Subject: [RFC 0/2] Add support for Meson MX "SDIO" MMC driver
+In-Reply-To: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
+References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
+Message-ID: <CAPDyKFoYPjB1bjRfFCFT3vuzKgzm6-7L2qgNjxGL392cLDe7uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2017 18:51, Stefan Wahren wrote:
-> 
->> Phil Elwell <phil@raspberrypi.org> hat am 4. Mai 2017 um 11:58 geschrieben:
->>
->>
->> vchiq_arm supports transfers less than one page and at arbitrary
->> alignment, using the dma-mapping API to perform its cache maintenance
->> (even though the VPU drives the DMA hardware). Read (DMA_FROM_DEVICE)
->> operations use cache invalidation for speed, falling back to
->> clean+invalidate on partial cache lines, with writes (DMA_TO_DEVICE)
->> using flushes.
->>
->> If a read transfer has ends which aren't page-aligned, performing cache
->> maintenance as if they were whole pages can lead to memory corruption
->> since the partial cache lines at the ends (and any cache lines before or
->> after the transfer area) will be invalidated. This bug was masked until
->> the disabling of the cache flush in flush_dcache_page().
->>
->> Honouring the requested transfer start- and end-points prevents the
->> corruption.
->>
->> Fixes: cf9caf192988 ("staging: vc04_services: Replace dmac_map_area with dmac_map_sg")
->> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
-> 
-> Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
-> 
-> In order to clarify the context of this issue:
-> 
-> http://lists.infradead.org/pipermail/linux-rpi-kernel/2017-April/006149.html
+On 6 May 2017 at 19:18, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> This is the successor to Carlo Caione's "Add support for Amlogic Meson
+> MMC driver" series (v5) from [0].
+>
+> I would like you to specifically review:
+> - whether I've (ab)used the MMC framework properly (as this is my first
+>   "larger" contribution to an MMC driver)
 
-Thanks, Stefan.
+I take a look soonish.
 
-Is there no feedback other on this patch? It's been in the rpi-4.11.y downstream
-branch for a week now with favourable results - see issue
-https://github.com/raspberrypi/linux/issues/1977 and pr
-https://github.com/raspberrypi/linux/pull/1987.
+> - I think I have improved the locking compared to Carlo's version,
+>   however I'd still like feedback on whether this looks sane now or if I
+>   can improve that even further
+>
+> (notable) changes since Carlo's latest version are:
+> - renamed the driver to meson-mx-sdio (Amlogic's reference kernel calls
+>   the driver "aml_sdio" as there is a second MMC controller in these SoCs
+>   which they call the "SDHC controller"). do the same with our driver to
 
-Phil
+I don't like to renaming drivers, just because there are a reference
+kernel using a different name.
+
+What's is really the difference between controllers? Why do they have
+two variants?
+
+Can they be managed by the same driver?
+
+>   avoid confusion once we add support for the second controller (which uses
+>   a completely different register layout)
+
+Besides that, do they behave differently in some other way?
+
+> - add support for the internal "mux" in this MMC controller (which allows
+>   connecting up to three devices to the the controller - at the cost of
+>   performance though since the controller can only process one request at
+>   a time). The driver registers a new device for each sub-node, which is
+>   then fed into the MMC framework to allow per-slot configuration using
+>   devicetree (see the example in the documentation)
+
+Unless there really is deployment for more than one slot on some
+boards/SoCs, I would strongly suggest to *not* implement this.
+
+Simply because of overhead and introduced complexity to the driver.
+
+> - use the common clock framework internally for managing the MMC clock
+>   (there is a fixed-factor clock in the controller which takes clk81 as
+>    input and divides it's clock by two and a divider clock which takes
+>    the result from the fixed-factor clock as input)
+> - support the regulators provided by the MMC framework
+> - support for GPIO-based card-detection and read-only-detection through
+>   the MMC framework
+> - use of the <linux/bitfield.h> FIELD_PREP and FIELD_GET macros where it
+>   make sense (and thus the code easier to read)
+> - re-worked locking (based on the locking in dw_mmc as that also provides
+>   multiple "MMC slots")
+
+Lots of changes!
+
+Before even start to review (or someone else), you really need to make
+this review-able.
+
+So, please, one change per patch - and make sure to write good
+changelogs. Then I can start to review.
+
+>
+> tests done so far:
+> - reading an OLD 256MiB SD card (which uses only a 1-bit bus) works fine
+>   (sha1sum of the whole device matches with what I get on my PC's
+>   card-reader)
+> - reading a somewhat more modern class 10 SD card and putting Arch Linux
+>   ARM on it (and using that as root file system)
+> - it successfully detects the RTL8723BS SDIO wifi chip in my device (even
+>   if the SD card is also enabled)
+> - reading a 128MiB file from the SD card while scanning wifi networks on
+>   the RTL8723BS card does not seem to result in any corruption (sha1sum
+>   of the read file seems to match)
+> - read speed of my class 10 SD card: ~15MiB/s
+> - (unfortunately I could NOT test downloading a file over wifi to the SD
+>   card because the RTL8723BS driver refuses to see any wifi networks, but
+>   that might be a problem on the RTL8723BS driver side since I don't get
+>   any error and the driver has just landed a few weeks ago in staging)
+>
+>
+> [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/412136.html
+>
+
+[...]
+
+Kind regards
+Uffe
