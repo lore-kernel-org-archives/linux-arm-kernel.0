@@ -1,96 +1,30 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Wed, 10 May 2017 11:10:55 +0100
-Subject: [PATCH v5 0/5] Add ARM Mali Midgard device tree bindings and gpu
- node for rk3288
-In-Reply-To: <ddec5773-43ef-a4c3-2280-8f0c5b1f1c4d@rock-chips.com>
-References: <cover.1493804968.git.guillaume.tucker@collabora.com>
- <12996903.t3AZceNVOh@diego>
- <b63475e9-21f6-5995-90b6-e0eeae8144ab@rock-chips.com>
- <b43fc703-3c39-58e9-6006-1aa7f9d0cea6@collabora.com>
- <ddec5773-43ef-a4c3-2280-8f0c5b1f1c4d@rock-chips.com>
-Message-ID: <425541fd-e648-1db7-9c31-13d2d4f094b4@collabora.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 May 2017 11:23:06 +0100
+Subject: [PATCH] KVM: arm/arm64: Simplify active_change_prepare and plug
+ race
+In-Reply-To: <20170510100118.4189-1-cdall@linaro.org>
+References: <20170510100118.4189-1-cdall@linaro.org>
+Message-ID: <ab9a2195-6940-63ab-2ea6-a7a314253f2c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randi,
+On 10/05/17 11:01, Christoffer Dall wrote:
+> We don't need to stop a specific VCPU when changing the active state,
+> because private IRQs can only be modified by a running VCPU for the
+> VCPU itself and it is therefore already stopped.
+> 
+> However, it is also possible for two VCPUs to be modifying the active
+> state of SPIs at the same time, which can cause the thread being stuck
+> in the loop that checks other VCPU threads for a potentially very long
+> time, or to modify the active state of a running VCPU.  Fix this by
+> serializing all accesses to setting and clearing the active state of
+> interrupts using the KVM mutex.
+> 
+> Reported-by: Andrew Jones <drjones@redhat.com>
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
 
-On 09/05/17 08:45, Randy Li wrote:
->
->
-> On 05/09/2017 03:40 PM, Guillaume Tucker wrote:
->> On 09/05/17 02:16, Randy Li wrote:
->>>
->>>
->>> On 05/09/2017 12:27 AM, Heiko St?bner wrote:
->>>> Am Mittwoch, 3. Mai 2017, 10:56:24 CEST schrieb Guillaume Tucker:
->>>>> The ARM Mali Midgard GPU kernel driver is only available
->>>>> out-of-tree and is not going to be merged in its current form.
->>>>> However, it would be useful to have its device tree bindings
->>>>> merged.  In particular, this would enable distributions to create
->>>>> working driver packages (dkms...) without having to patch the
->>>>> kernel.
->>>>>
->>>>> The bindings for the earlier Mali Utgard GPU family have already
->>>>> been merged, so this is essentially the same scenario but for
->>>>> newer GPUs (Mali-T604 ~ Mali-T880).
->>>>>
->>>>> This series of patches first imports the bindings from the latest
->>>>> driver release with some clean-up then adds a gpu node for the
->>>>> rk3288 SoC.  This was successfully tested on Radxa Rock2 Square,
->>>>> Firefly, Veyron Minnie and Jerry boards using Mali kernel driver
->>>>> r16p0 and r12p0 user-space binary.
->>> I won't suggest such combine. We meet some problems at mali 400 serial.
->>> I would suggest the kernel version would match the user library.
->>
->> Well, I can test it again with r12p0 kernel driver (out-of-tree)
->> if you want.  The user-space driver checks the version of the
->> kernel driver and gives up if it's not compatible.  With Midgard,
->> there's a range of versions that maintain kernel/userspace
->> compatibility unlike Utgard and older Midgard releases where they
->> had to exactly match.  Again, if there was a mismatch then the
->> user-space would fail to initialise and report an error.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> Anyway, could you verify the mali userspace library r13p0?
-
-The latest user-space binary available from developer.arm.com for
-rk3288 is 12p0.  Maybe Rockchip could make some new binaries
-available to the public?
-
-> Rockchip would use this version to offer the support of X11, wayland and gbm.
-
-Sounds great, although windowing systems are quite far away from
-GPU device tree bindings so I don't think this is too relevant
-for this current patch series.
-
-On a side note, it would be fantastic to get all this available
-in Debian packages :)
-
->>> Also please notice there is rk3288w, the hardware version becomes r1p0.
->>
->> Sounds like a new SoC?  Does rk3288w affect rk3288 in any way?
-> It is not a new SoC, just a new version of rk3288. It fixes a various of the chip bug of the rk3288.
-
-I see.  I don't have access to any rk3288w platform but if you do
-then I guess it would be nice if you could test these patches on
-it :)  Also I'm not sure if all rk3288 device trees changes must
-be tested on rk3288w, and this SoC is not mentioned anywhere in
-the kernel (as far as I can tell).
-
-Is there anything you think should block these current patches
-which only claim to support rk3288 from being merged?
-
->> Unless it's a special case, it seems to me that any new SoC with
->> a Midgard GPU would need an extra vendor compatible string in the
->> binding documentation and maybe a separate gpu dt node.
->>
->>>> The actual devicetree parts are all Rockchip-specific, so I guess I'll just
->>>> pick up the whole series, including the binding doc, after the merge
->>>> window if nobody complains before that :-)
->>
->> Thanks!
-
-Guillaume
-
-
-P.S. kernel branch with a Mali driver I used for testing:
-https://git.collabora.com/cgit/user/gtucker/linux.git/log/?h=linux-4.11-mali-dt-rk3288
+	M.
+-- 
+Jazz is not dead. It just smells funny...
