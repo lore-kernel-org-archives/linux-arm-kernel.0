@@ -1,22 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 May 2017 15:34:28 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.12
-In-Reply-To: <cover.1493713942.git.horms+renesas@verge.net.au>
-References: <cover.1493713942.git.horms+renesas@verge.net.au>
-Message-ID: <CAK8P3a3Z2XL8zdWoQ9icQTioQaGQKGKaR=QCTq89h01Op=xmNQ@mail.gmail.com>
+Date: Wed, 10 May 2017 15:35:51 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.12 (#3)
+In-Reply-To: <87h9188t8n.fsf@free-electrons.com>
+References: <87h9188t8n.fsf@free-electrons.com>
+Message-ID: <CAK8P3a0q+cvi0-k7v0GjMJJWv1xyuVxOtLCQPADqWEhSnmo4Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 2, 2017 at 10:35 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Apr 28, 2017 at 5:08 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi,
 >
-> Please consider these Renesas ARM based SoC fixes for v4.12.
+> Here is the third pull request for dt64 for mvebu for v4.12.
 >
-> * Fix from Geert Uytterhoeven to avoid an undefined reference
->   to `rcar_rst_read_mode_pins' in the case where the R-Car RST driver
->   is not included.
->
+> It comes very late but the driver part has been merged just this week.
 >
 
 Pulled into fixes, thanks!
