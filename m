@@ -1,132 +1,50 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Wed, 10 May 2017 06:47:58 +0200
-Subject: [PATCH v3] arm: dts: sun7i-a20-bananapi: name the GPIO lines
-In-Reply-To: <20170509202725.e2tkry7dmsgx7se5@lukather>
-References: <1494048638-24365-1-git-send-email-linux@rempel-privat.de>
- <20170509202725.e2tkry7dmsgx7se5@lukather>
-Message-ID: <17553199-cc74-96ae-bc75-5e91b866ccd1@rempel-privat.de>
+From: yanjiang.jin@windriver.com (yanjiang.jin at windriver.com)
+Date: Wed, 10 May 2017 01:13:04 -0400
+Subject: [PATCH] socfpga_a10: reset CPU1 in socfpga_cpu_kill()
+In-Reply-To: <20170510051304.131042-1-yanjiang.jin@windriver.com>
+References: <20170510051304.131042-1-yanjiang.jin@windriver.com>
+Message-ID: <20170510051304.131042-2-yanjiang.jin@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 09.05.2017 um 22:27 schrieb Maxime Ripard:
-> Hi Oleksij,
-> 
-> It looks much better, thanks!
-> 
-> On Sat, May 06, 2017 at 07:30:38AM +0200, Oleksij Rempel wrote:
->> This names the GPIO lines on the Banana Pi board in accordance with
->> the A20_Banana_Pi v1.4 Specification.
->>
->> This will make these line names reflect through to user space
->> so that they can easily be identified and used with the new
->> character device ABI.
->>
->> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: Chen-Yu Tsai <wens@csie.org>
->> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
-> 
-> Usually, it's better here if you put a change log with the things that
-> changed from one version to another.
-> 
-> You probably remember all of the comments that were made on the
-> previous version of that patch, but I don't ;)
+From: Yanjiang Jin <yanjiang.jin@windriver.com>
 
-ok.
+Kexec's second kernel would hang if CPU1 isn't reset.
 
-> 
->>  arch/arm/boot/dts/sun7i-a20-bananapi.dts | 51 ++++++++++++++++++++++++++++++++
->>  1 file changed, 51 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
->> index 91f2e5f..6b326b3 100644
->> --- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
->> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
->> @@ -178,6 +178,57 @@
->>  };
->>  
->>  &pio {
->> +	gpio-line-names =
->> +		/* PA */
->> +		"ERXD3", "ERXD2", "ERXD1", "ERXD0", "ETXD3",
->> +			"ETXD2", "ETXD1", "ETXD0",
->> +		"ERXCK", "ERXERR", "ERXDV", "EMDC", "EMDIO",
->> +			"ETXEN", "ETXCK", "ECRS",
->> +		"ECOL", "ETXERR", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		/* PB */
->> +		"PMU-SCK", "PMU-SDA", "", "", "", "", "", "",
->> +		"", "USB0-DRV", "", "", "", "", "", "",
->> +		"", "", "", "", "SCL", "SDA", "", "",
-> 
-> I'm not sure how it's called in the schematics / documentation, but
-> having a way to get which bus it's from would be helpful (like you did
-> for the PMIC I2C bus).
+Signed-off-by: Yanjiang Jin <yanjiang.jin@windriver.com>
+---
+ arch/arm/mach-socfpga/platsmp.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-I use only names provided by schematics. Using something different IMO
-makes no sense and confusing.
-
->> +		"", "", "", "", "", "", "", "",
->> +		/* PC */
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		/* PD */
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		/* PE */
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		/* PF */
->> +		"SD0-D1", "SD0-D0", "SD0-CLK", "SD0-CMD", "SD0-D3",
->> +			"SD0-D2", "", "",
-> 
-> Why did you change the wrapping and indentation on those two lines?
-
-i use 8 entry per line to keep counting easier. If line is too wide, i
-wrap it with changed indentation.
-
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		/* PG */
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		"", "", "", "", "", "", "", "",
->> +		/* PH */
->> +		"TXD0", "RXD0", "IO-1", "PH3", "USB0-IDDET", "PH5", "", "",
-> 
-> What are PH3 and PH5 used for on the board? Can't we provide a more
-> explicit name?
-
-Only names used by schematic :) If we will use something different users
-will hate us even more.
-
-I can image to use some kind of combination of connector name and pin
-name. For example: "JP1-RXD0", or some thing like this.
-
-> Thanks!
-> Maxime
-> 
-
-
+diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
+index 0ee7677..db3940e 100644
+--- a/arch/arm/mach-socfpga/platsmp.c
++++ b/arch/arm/mach-socfpga/platsmp.c
+@@ -117,6 +117,16 @@ static int socfpga_cpu_kill(unsigned int cpu)
+ {
+ 	return 1;
+ }
++
++static int socfpga_a10_cpu_kill(unsigned int cpu)
++{
++	/* This will put CPU #1 into reset. */
++	if (socfpga_cpu1start_addr)
++		writel(RSTMGR_MPUMODRST_CPU1, rst_manager_base_addr +
++			SOCFPGA_A10_RSTMGR_MODMPURST);
++
++	return 1;
++}
+ #endif
+ 
+ static const struct smp_operations socfpga_smp_ops __initconst = {
+@@ -133,7 +143,7 @@ static int socfpga_cpu_kill(unsigned int cpu)
+ 	.smp_boot_secondary	= socfpga_a10_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= socfpga_cpu_die,
+-	.cpu_kill		= socfpga_cpu_kill,
++	.cpu_kill		= socfpga_a10_cpu_kill,
+ #endif
+ };
+ 
 -- 
-Regards,
-Oleksij
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 195 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170510/ef46205f/attachment.sig>
+1.9.1
