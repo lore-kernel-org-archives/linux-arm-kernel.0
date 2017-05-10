@@ -1,31 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 10 May 2017 16:54:06 +0200
-Subject: [PATCH v3] arm: dts: sun7i-a20-bananapi: name the GPIO lines
-In-Reply-To: <1494048638-24365-1-git-send-email-linux@rempel-privat.de>
-References: <1494048638-24365-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <20170510145406.GB23551@flea.lan>
+From: phil@raspberrypi.org (Phil Elwell)
+Date: Wed, 10 May 2017 16:07:58 +0100
+Subject: [PATCH] irqchip/bcm2836: Move SMP startup code to arch/arm
+In-Reply-To: <2c3f16ea-8806-9ae8-9bae-02e198a59092@arm.com>
+References: <20170510132620.19685-1-marc.zyngier@arm.com>
+ <2c3f16ea-8806-9ae8-9bae-02e198a59092@arm.com>
+Message-ID: <27076f41-1616-ea16-6422-11692f95bdec@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 06, 2017 at 07:30:38AM +0200, Oleksij Rempel wrote:
-> This names the GPIO lines on the Banana Pi board in accordance with
-> the A20_Banana_Pi v1.4 Specification.
+On 10/05/2017 14:32, Marc Zyngier wrote:
+> On 10/05/17 14:26, Marc Zyngier wrote:
+>> One of the RPi-2/3 irqchip's key features is that it contains some
+>> SMP startup code for the 32bit ARM architecture version. The only
+>> reason I can imagine for this is "RPi is special".
+>>
+>> Let's move this code where it belongs (in the platform support code),
+>> creating a shared include file for this purpose.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> This will make these line names reflect through to user space
-> so that they can easily be identified and used with the new
-> character device ABI.
+> Also:
+> Fixes: 41f4988cc287 ("irqchip/bcm2836: Add SMP support for the 2836")
+> 
+> 	M.
+> 
 
-Merged, thanks!
-Maxime
+The patch has some checkpatch warnings, but otherwise:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170510/1c927dc8/attachment.sig>
+Reviewed-by: Phil Elwell <phil@raspberrypi.org>
+Tested-by: Phil Elwell <phil@raspberrypi.org>
+
+Thanks,
+
+Phil
