@@ -1,28 +1,37 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Wed, 10 May 2017 00:15:11 -0700
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 May 2017 09:28:48 +0200
 Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
  limit before returning to user-mode
-In-Reply-To: <CAGXu5jL6PeQmmdxh5h--fgrMK8DW_XZYpNfDOvvv_o9E3-Kxdw@mail.gmail.com>
-References: <20170508073352.caqe3fqf7nuxypgi@gmail.com>
- <20170508124621.GA20705@kroah.com>
+In-Reply-To: <20170509160322.GA15902@infradead.org>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com> <20170508124621.GA20705@kroah.com>
  <20170509064522.anusoikaalvlux3w@gmail.com>
  <20170509085659.GA32555@infradead.org>
  <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
- <20170509130250.GA11381@infradead.org>
- <20170509160322.GA15902@infradead.org>
- <CAGXu5jKHVMRMKDfn+=kkbm+JkWPhoEtDwKx=QXAYxg1p9bn7PQ@mail.gmail.com>
- <CALCETrV73=cDvaSLOMvb299yaGNJYME8LC-=P+N6p7R1NN97Yg@mail.gmail.com>
- <CAGXu5jL6PeQmmdxh5h--fgrMK8DW_XZYpNfDOvvv_o9E3-Kxdw@mail.gmail.com>
-Message-ID: <20170510071511.GA17441@infradead.org>
+ <20170509130250.GA11381@infradead.org> <20170509160322.GA15902@infradead.org>
+Message-ID: <CAK8P3a1N6kVEBtSrA+A2QccT0t8P5nHJfui_dYxWd9Tz2Qb63w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 09, 2017 at 04:31:00PM -0700, Kees Cook wrote:
-> > I don't like silent fixups.  If we want to do this, we should BUG or
-> > at least WARN, not just change the addr limit.  But I'm also not
-> > convinced it's indicative of an actual bug here.
-> 
-> Nothing should enter that function with KERNEL_DS set, right?
+On Tue, May 9, 2017 at 6:03 PM, Christoph Hellwig <hch@infradead.org> wrote:
+> On Tue, May 09, 2017 at 06:02:50AM -0700, Christoph Hellwig wrote:
+>> On Tue, May 09, 2017 at 06:00:01AM -0700, Andy Lutomirski wrote:
+>> > fs/splice.c has some, ahem, interesting uses that have been the source
+>> > of nasty exploits in the past.  Converting them to use iov_iter
+>> > properly would be really, really nice.  Christoph, I don't suppose
+>> > you'd like to do that?
+>>
+>> I can take care of all the fs code including this one.
+>
+> I spent the afternoon hacking up where I'd like this to head.  It's
+> completely untested as of now:
+>
+>         http://git.infradead.org/users/hch/vfs.git/shortlog/refs/heads/setfs-elimination
 
-It might very well do.  Various drivers or the networking code mess
-with the address limits for fairly broad sections of code.
+My older time64_t syscall series has the side-effect of doing something
+like this to the time-related compat handlers in kernel/compat.c. If nobody
+else has started looking at removing set_fs from those, I can extract
+the relevant parts from my series.
+
+      Arnd
