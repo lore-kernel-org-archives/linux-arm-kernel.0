@@ -1,57 +1,60 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 10 May 2017 15:55:37 +0200
-Subject: [PATCH 3/4] ARM: dts: rockchip: use pin constants to describe IO
- in pinctrl
-In-Reply-To: <c98e2eaf-3e92-a6b6-5367-df31d0614d5c@rock-chips.com>
-References: <1491981044-24635-1-git-send-email-kever.yang@rock-chips.com>
- <3966386.YQGqDXjHSp@phil>
- <c98e2eaf-3e92-a6b6-5367-df31d0614d5c@rock-chips.com>
-Message-ID: <3502373.tsXPg1D3p7@phil>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 10 May 2017 15:59:38 +0200
+Subject: [PATCH 1/4] ata: Add DT bindings for Faraday Technology FTIDE010
+In-Reply-To: <CACRpkdbmOsrxKX8=a7bvcF+c=Q2tfwYQVt0=cz+_jhDyadwa2A@mail.gmail.com>
+References: <CGME20170506121118epcas2p1b2a2d1a8005a37582a73c0e7be4b1a1b@epcas2p1.samsung.com>
+ <1678111.DmiVNKW3dQ@amdc3058>
+ <CACRpkdbmOsrxKX8=a7bvcF+c=Q2tfwYQVt0=cz+_jhDyadwa2A@mail.gmail.com>
+Message-ID: <6650456.qCJGCGKGLl@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kever,
-
-Am Mittwoch, 10. Mai 2017, 09:25:25 CEST schrieb Kever Yang:
-> On 05/10/2017 05:43 AM, Heiko Stuebner wrote:
-> > Am Mittwoch, 12. April 2017, 15:10:43 CEST schrieb Kever Yang:
-> >> Use command below to replace the IO naming in pinctrl:
-> >> sed -i -e 's/ 31 RK_FUNC_/ RK_PD7 RK_FUNC_/' arch/arm/boot/dts/rk*
-> >> sed -i -e 's/ 0 RK_FUNC_/ RK_PA0 RK_FUNC_/'
-> >> arch/arm64/boot/dts/rockchip/*
-> >>
-> >> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> > I'm not sure, if we really want to mass-convert each and every pin.
-> > All pins in use right now seem to be working and it hides other
-> > history/blame for these entries.
+On Monday, May 08, 2017 10:26:49 PM Linus Walleij wrote:
+> On Mon, May 8, 2017 at 12:47 PM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
 > 
-> Do you mean you want to leave the code already there as is, and new
-> code using MACRO define for IO?
+> > Also for all current drivers we just put timing values (or a logic
+> > to calculate them from the standard ATA timings) into the driver
+> > itself and not device tree (as they are based on values are dictated
+> > by ATA standard and should not change for a given controller type).
 > 
-> This sounds reasonable, I can agree on this. I send this patch because I 
-> see there is
-> a patch from Andy using MACRO for many IOs, but not complete enough
-> and my patch suppose to make all Rockchip IO has update.
+> I had it like that at first (and I can of course switch it back). But I
+> came to think this is better.
+> 
+> I was looking at these values from the point that it depends a bit
+> on the silicon where it is synthesized. So the vendor tree has
+> things like this:
+> 
+> #ifndef SL2312_FPGA_IDE
+> static unsigned char PIO_TIMING[5] = { 0xaa, 0xa3, 0xa1, 0x33, 0x31 };
+> static unsigned char TIMING_MDMA_50M[3] = { 0x66, 0x22, 0x21 };
+> static unsigned char TIMING_MDMA_66M[3] = { 0x88, 0x32, 0x31 };
+> static unsigned char TIMING_UDMA_50M[6] = { 0x33, 0x31, 0x21, 0x21,
+> 0x11, 0x91 };
+> static unsigned char TIMING_UDMA_66M[7] = { 0x44, 0x42, 0x31, 0x21,
+> 0x11, 0x91,  0x91};
+> #else
+> static unsigned char PIO_TIMING[5] = { 0x88, 0x82, 0x81, 0x32, 0x21 };
+> static unsigned char TIMING_MDMA_50M[3] = { 0x33, 0x11, 0x11 };
+> static unsigned char TIMING_MDMA_66M[3] = { 0x33, 0x11, 0x11 };
+> static unsigned char TIMING_UDMA_50M[6] = { 0x22, 0x11, 0x11, 0x11 };
+> static unsigned char TIMING_UDMA_66M[7] = { 0x22, 0x11, 0x11, 0x11 };
+> #endif
+> 
+> (From D-Link DIR-685 source release from Storlink/Cortina board support.)
+> 
+> So depending on whether they use an FPGA or an ASIC the values are
+> different, no matter what frequency (50 or 66 MHz) is used. So it is not
+> derived from frequency.
+> 
+> So I think it makes most sense to have it in the device tree as we don't
+> know what designs are out there.
 
-As I said, I'm really not sure. On the one hand it's nicer and it will
-be easier to check devicetree against schematics, but mass-converting
-them makes me anxious. Andy did convert the rk3288-popmetal
-board which is somewhat sparsely used I think. If anything breaks with
-Firefly, Rock, Veyron etc we might make a lot of people unhappy :-) .
+I still would prefer to keep timing values private to the driver and just
+select the controller type (FPGA/ASIC) using the device tree.
 
-But having boards use both paradigms at the same time (pin number and
-names) could also be confusing.
-
-> > In any case though, this needs to be split into separate arm32/arm64
-> > patches.
-
-Maybe we could split not only on the arm/arm64 border, but also on
-something like soc-level (rk3188, rk3288, rk3368). That way the amount
-of changes per patch would go down making review easier :-) .
-
-
-Just to make sure you saw it, I've also had to drop patch2 again (see
-separate response from yesterday).
-
-
-Heiko
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
