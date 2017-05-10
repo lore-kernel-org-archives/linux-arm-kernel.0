@@ -1,164 +1,359 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed, 10 May 2017 13:45:03 -0700
-Subject: [PATCH v2 net-next 05/12] drivers: net: xgene: Refactor statistics
- error parsing code
+Date: Wed, 10 May 2017 13:45:05 -0700
+Subject: [PATCH v2 net-next 07/12] drivers: net: xgene: Extend ethtool
+ statistics
 In-Reply-To: <1494449110-23785-1-git-send-email-isubramanian@apm.com>
 References: <1494449110-23785-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1494449110-23785-6-git-send-email-isubramanian@apm.com>
+Message-ID: <1494449110-23785-8-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Quan Nguyen <qnguyen@apm.com>
 
-This patch fixes the tx error counters and adds more rx error counters.
+This patch adds extended ethtool statistics support.
 
 Signed-off-by: Quan Nguyen <qnguyen@apm.com>
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c   |  6 ------
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.h   |  2 --
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 26 +++++++++++++++---------
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h |  2 ++
- 4 files changed, 18 insertions(+), 18 deletions(-)
+ .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    | 89 +++++++++++++++++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     | 29 +++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     | 51 +++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c   |  8 ++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |  4 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h  |  1 +
+ 6 files changed, 181 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-index 47c5b75..02df577 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-@@ -205,30 +205,24 @@ static u32 xgene_enet_ring_len(struct xgene_enet_desc_ring *ring)
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c b/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
+index 217cde8..a7eed3b 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
+@@ -23,9 +23,17 @@
+ struct xgene_gstrings_stats {
+ 	char name[ETH_GSTRING_LEN];
+ 	int offset;
++	u32 addr;
++	u32 mask;
+ };
+ 
+ #define XGENE_STAT(m) { #m, offsetof(struct rtnl_link_stats64, m) }
++#define XGENE_EXTD_STAT(s, a, m)		\
++		{			\
++		.name = #s,		\
++		.addr = a ## _ADDR,	\
++		.mask = m		\
++		}
+ 
+ static const struct xgene_gstrings_stats gstrings_stats[] = {
+ 	XGENE_STAT(rx_packets),
+@@ -40,7 +48,51 @@ struct xgene_gstrings_stats {
+ 	XGENE_STAT(rx_fifo_errors)
+ };
+ 
++static const struct xgene_gstrings_stats gstrings_extd_stats[] = {
++	XGENE_EXTD_STAT(tx_rx_64b_frame_cntr, TR64, 31),
++	XGENE_EXTD_STAT(tx_rx_127b_frame_cntr, TR127, 31),
++	XGENE_EXTD_STAT(tx_rx_255b_frame_cntr, TR255, 31),
++	XGENE_EXTD_STAT(tx_rx_511b_frame_cntr, TR511, 31),
++	XGENE_EXTD_STAT(tx_rx_1023b_frame_cntr, TR1K, 31),
++	XGENE_EXTD_STAT(tx_rx_1518b_frame_cntr, TRMAX, 31),
++	XGENE_EXTD_STAT(tx_rx_1522b_frame_cntr, TRMGV, 31),
++	XGENE_EXTD_STAT(rx_fcs_error_cntr, RFCS, 16),
++	XGENE_EXTD_STAT(rx_multicast_pkt_cntr, RMCA, 31),
++	XGENE_EXTD_STAT(rx_broadcast_pkt_cntr, RBCA, 31),
++	XGENE_EXTD_STAT(rx_ctrl_frame_pkt_cntr, RXCF, 16),
++	XGENE_EXTD_STAT(rx_pause_frame_pkt_cntr, RXPF, 16),
++	XGENE_EXTD_STAT(rx_unk_opcode_cntr, RXUO, 16),
++	XGENE_EXTD_STAT(rx_align_err_cntr, RALN, 16),
++	XGENE_EXTD_STAT(rx_frame_len_err_cntr, RFLR, 16),
++	XGENE_EXTD_STAT(rx_code_err_cntr, RCDE, 16),
++	XGENE_EXTD_STAT(rx_carrier_sense_err_cntr, RCSE, 16),
++	XGENE_EXTD_STAT(rx_undersize_pkt_cntr, RUND, 16),
++	XGENE_EXTD_STAT(rx_oversize_pkt_cntr, ROVR, 16),
++	XGENE_EXTD_STAT(rx_fragments_cntr, RFRG, 16),
++	XGENE_EXTD_STAT(rx_jabber_cntr, RJBR, 16),
++	XGENE_EXTD_STAT(rx_dropped_pkt_cntr, RDRP, 16),
++	XGENE_EXTD_STAT(tx_multicast_pkt_cntr, TMCA, 31),
++	XGENE_EXTD_STAT(tx_broadcast_pkt_cntr, TBCA, 31),
++	XGENE_EXTD_STAT(tx_pause_ctrl_frame_cntr, TXPF, 16),
++	XGENE_EXTD_STAT(tx_defer_pkt_cntr, TDFR, 31),
++	XGENE_EXTD_STAT(tx_excv_defer_pkt_cntr, TEDF, 31),
++	XGENE_EXTD_STAT(tx_single_col_pkt_cntr, TSCL, 31),
++	XGENE_EXTD_STAT(tx_multi_col_pkt_cntr, TMCL, 31),
++	XGENE_EXTD_STAT(tx_late_col_pkt_cntr, TLCL, 31),
++	XGENE_EXTD_STAT(tx_excv_col_pkt_cntr, TXCL, 31),
++	XGENE_EXTD_STAT(tx_total_col_cntr, TNCL, 31),
++	XGENE_EXTD_STAT(tx_pause_frames_hnrd_cntr, TPFH, 16),
++	XGENE_EXTD_STAT(tx_drop_frame_cntr, TDRP, 16),
++	XGENE_EXTD_STAT(tx_jabber_frame_cntr, TJBR, 12),
++	XGENE_EXTD_STAT(tx_fcs_error_cntr, TFCS, 12),
++	XGENE_EXTD_STAT(tx_ctrl_frame_cntr, TXCF, 12),
++	XGENE_EXTD_STAT(tx_oversize_frame_cntr, TOVR, 12),
++	XGENE_EXTD_STAT(tx_undersize_frame_cntr, TUND, 12),
++	XGENE_EXTD_STAT(tx_fragments_cntr, TFRG, 12)
++};
++
+ #define XGENE_STATS_LEN		ARRAY_SIZE(gstrings_stats)
++#define XGENE_EXTD_STATS_LEN	ARRAY_SIZE(gstrings_extd_stats)
+ 
+ static void xgene_get_drvinfo(struct net_device *ndev,
+ 			      struct ethtool_drvinfo *info)
+@@ -142,6 +194,11 @@ static void xgene_get_strings(struct net_device *ndev, u32 stringset, u8 *data)
+ 		memcpy(p, gstrings_stats[i].name, ETH_GSTRING_LEN);
+ 		p += ETH_GSTRING_LEN;
+ 	}
++
++	for (i = 0; i < XGENE_EXTD_STATS_LEN; i++) {
++		memcpy(p, gstrings_extd_stats[i].name, ETH_GSTRING_LEN);
++		p += ETH_GSTRING_LEN;
++	}
  }
  
- void xgene_enet_parse_error(struct xgene_enet_desc_ring *ring,
--			    struct xgene_enet_pdata *pdata,
- 			    enum xgene_enet_err_code status)
- {
- 	switch (status) {
- 	case INGRESS_CRC:
- 		ring->rx_crc_errors++;
--		ring->rx_dropped++;
- 		break;
- 	case INGRESS_CHECKSUM:
- 	case INGRESS_CHECKSUM_COMPUTE:
- 		ring->rx_errors++;
--		ring->rx_dropped++;
- 		break;
- 	case INGRESS_TRUNC_FRAME:
- 		ring->rx_frame_errors++;
--		ring->rx_dropped++;
- 		break;
- 	case INGRESS_PKT_LEN:
- 		ring->rx_length_errors++;
--		ring->rx_dropped++;
- 		break;
- 	case INGRESS_PKT_UNDER:
- 		ring->rx_frame_errors++;
--		ring->rx_dropped++;
- 		break;
- 	case INGRESS_FIFO_OVERRUN:
- 		ring->rx_fifo_errors++;
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-index 057f951..3ce349f 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-@@ -380,9 +380,7 @@ static inline u16 xgene_enet_get_numslots(u16 id, u32 size)
- }
+ static int xgene_get_sset_count(struct net_device *ndev, int sset)
+@@ -149,19 +206,49 @@ static int xgene_get_sset_count(struct net_device *ndev, int sset)
+ 	if (sset != ETH_SS_STATS)
+ 		return -EINVAL;
  
- void xgene_enet_parse_error(struct xgene_enet_desc_ring *ring,
--			    struct xgene_enet_pdata *pdata,
- 			    enum xgene_enet_err_code status);
--
- int xgene_enet_mdio_config(struct xgene_enet_pdata *pdata);
- void xgene_enet_mdio_remove(struct xgene_enet_pdata *pdata);
- bool xgene_ring_mgr_init(struct xgene_enet_pdata *p);
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index e4f2ef2..3f24b83 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -246,9 +246,9 @@ static int xgene_enet_tx_completion(struct xgene_enet_desc_ring *cp_ring,
- 	skb_frag_t *frag;
- 	dma_addr_t *frag_dma_addr;
- 	u16 skb_index;
--	u8 status;
--	int i, ret = 0;
- 	u8 mss_index;
-+	u8 status;
+-	return XGENE_STATS_LEN;
++	return XGENE_STATS_LEN + XGENE_EXTD_STATS_LEN;
++}
++
++static void xgene_get_extd_stats(struct xgene_enet_pdata *pdata)
++{
++	u32 tmp;
 +	int i;
- 
- 	skb_index = GET_VAL(USERINFO, le64_to_cpu(raw_desc->m0));
- 	skb = cp_ring->cp_skb[skb_index];
-@@ -275,19 +275,17 @@ static int xgene_enet_tx_completion(struct xgene_enet_desc_ring *cp_ring,
- 	/* Checking for error */
- 	status = GET_VAL(LERR, le64_to_cpu(raw_desc->m0));
- 	if (unlikely(status > 2)) {
--		xgene_enet_parse_error(cp_ring, netdev_priv(cp_ring->ndev),
--				       status);
--		ret = -EIO;
-+		cp_ring->tx_dropped++;
-+		cp_ring->tx_errors++;
- 	}
- 
- 	if (likely(skb)) {
- 		dev_kfree_skb_any(skb);
- 	} else {
- 		netdev_err(cp_ring->ndev, "completion skb is NULL\n");
--		ret = -EIO;
- 	}
- 
--	return ret;
++
++	for (i = 0; i < XGENE_EXTD_STATS_LEN; i++) {
++		tmp = xgene_enet_rd_stat(pdata, gstrings_extd_stats[i].addr);
++		pdata->extd_stats[i] += tmp &
++			GENMASK(gstrings_extd_stats[i].mask - 1, 0);
++	}
++}
++
++int xgene_extd_stats_init(struct xgene_enet_pdata *pdata)
++{
++	pdata->extd_stats = devm_kmalloc_array(&pdata->pdev->dev,
++			XGENE_EXTD_STATS_LEN, sizeof(u64), GFP_KERNEL);
++	if (!pdata->extd_stats)
++		return -ENOMEM;
++
++	xgene_get_extd_stats(pdata);
++	memset(pdata->extd_stats, 0, XGENE_EXTD_STATS_LEN * sizeof(u64));
++
 +	return 0;
  }
  
- static int xgene_enet_setup_mss(struct net_device *ndev, u32 mss)
-@@ -711,7 +709,8 @@ static int xgene_enet_rx_frame(struct xgene_enet_desc_ring *rx_ring,
- 		if (!xgene_enet_errata_10GE_8(skb, datalen, status)) {
- 			dev_kfree_skb_any(skb);
- 			xgene_enet_free_pagepool(page_pool, raw_desc, exp_desc);
--			xgene_enet_parse_error(rx_ring, pdata, status);
-+			xgene_enet_parse_error(rx_ring, status);
-+			rx_ring->rx_dropped++;
- 			goto out;
- 		}
+ static void xgene_get_ethtool_stats(struct net_device *ndev,
+ 				    struct ethtool_stats *dummy,
+ 				    u64 *data)
+ {
++	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+ 	struct rtnl_link_stats64 stats;
+ 	int i;
+ 
+ 	dev_get_stats(ndev, &stats);
+ 	for (i = 0; i < XGENE_STATS_LEN; i++)
+ 		data[i] = *(u64 *)((char *)&stats + gstrings_stats[i].offset);
++
++	xgene_get_extd_stats(pdata);
++	for (i = 0; i < XGENE_EXTD_STATS_LEN; i++)
++		data[i + XGENE_STATS_LEN] = pdata->extd_stats[i];
+ }
+ 
+ static void xgene_get_pauseparam(struct net_device *ndev,
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+index 02df577..9e89193 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+@@ -359,6 +359,35 @@ u32 xgene_enet_rd_mac(struct xgene_enet_pdata *pdata, u32 rd_addr)
+ 	return rd_data;
+ }
+ 
++u32 xgene_enet_rd_stat(struct xgene_enet_pdata *pdata, u32 rd_addr)
++{
++	void __iomem *addr, *rd, *cmd, *cmd_done;
++	u32 done, rd_data;
++	u8 wait = 10;
++
++	addr = pdata->mcx_stats_addr + STAT_ADDR_REG_OFFSET;
++	rd = pdata->mcx_stats_addr + STAT_READ_REG_OFFSET;
++	cmd = pdata->mcx_stats_addr + STAT_COMMAND_REG_OFFSET;
++	cmd_done = pdata->mcx_stats_addr + STAT_COMMAND_DONE_REG_OFFSET;
++
++	spin_lock(&pdata->stats_lock);
++	iowrite32(rd_addr, addr);
++	iowrite32(XGENE_ENET_RD_CMD, cmd);
++
++	while (!(done = ioread32(cmd_done)) && wait--)
++		udelay(1);
++
++	if (!done)
++		netdev_err(pdata->ndev, "mac stats read failed, addr: %04x\n",
++			   rd_addr);
++
++	rd_data = ioread32(rd);
++	iowrite32(0, cmd);
++	spin_unlock(&pdata->stats_lock);
++
++	return rd_data;
++}
++
+ static void xgene_gmac_set_mac_addr(struct xgene_enet_pdata *pdata)
+ {
+ 	u32 addr0, addr1;
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+index ed51005..f1a4cfa 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+@@ -115,6 +115,7 @@ enum xgene_enet_rm {
+ #define BLOCK_ETH_CLKRST_CSR_OFFSET	0xc000
+ #define BLOCK_ETH_DIAG_CSR_OFFSET	0xD000
+ #define BLOCK_ETH_MAC_OFFSET		0x0000
++#define BLOCK_ETH_STATS_OFFSET		0x0000
+ #define BLOCK_ETH_MAC_CSR_OFFSET	0x2800
+ 
+ #define CLKEN_ADDR			0xc208
+@@ -126,6 +127,12 @@ enum xgene_enet_rm {
+ #define MAC_READ_REG_OFFSET		0x0c
+ #define MAC_COMMAND_DONE_REG_OFFSET	0x10
+ 
++#define STAT_ADDR_REG_OFFSET            0x14
++#define STAT_COMMAND_REG_OFFSET         0x18
++#define STAT_WRITE_REG_OFFSET           0x1c
++#define STAT_READ_REG_OFFSET            0x20
++#define STAT_COMMAND_DONE_REG_OFFSET    0x24
++
+ #define PCS_ADDR_REG_OFFSET		0x00
+ #define PCS_COMMAND_REG_OFFSET		0x04
+ #define PCS_WRITE_REG_OFFSET		0x08
+@@ -218,6 +225,49 @@ enum xgene_enet_rm {
+ #define PAD_CRC				BIT(2)
+ #define LENGTH_CHK			BIT(4)
+ 
++#define TR64_ADDR	0x20
++#define TR127_ADDR	0x21
++#define TR255_ADDR	0x22
++#define TR511_ADDR	0x23
++#define TR1K_ADDR	0x24
++#define TRMAX_ADDR	0x25
++#define TRMGV_ADDR	0x26
++
++#define RFCS_ADDR	0x29
++#define RMCA_ADDR	0x2a
++#define RBCA_ADDR	0x2b
++#define RXCF_ADDR	0x2c
++#define RXPF_ADDR	0x2d
++#define RXUO_ADDR	0x2e
++#define RALN_ADDR	0x2f
++#define RFLR_ADDR	0x30
++#define RCDE_ADDR	0x31
++#define RCSE_ADDR	0x32
++#define RUND_ADDR	0x33
++#define ROVR_ADDR	0x34
++#define RFRG_ADDR	0x35
++#define RJBR_ADDR	0x36
++#define RDRP_ADDR	0x37
++
++#define TMCA_ADDR	0x3a
++#define TBCA_ADDR	0x3b
++#define TXPF_ADDR	0x3c
++#define TDFR_ADDR	0x3d
++#define TEDF_ADDR	0x3e
++#define TSCL_ADDR	0x3f
++#define TMCL_ADDR	0x40
++#define TLCL_ADDR	0x41
++#define TXCL_ADDR	0x42
++#define TNCL_ADDR	0x43
++#define TPFH_ADDR	0x44
++#define TDRP_ADDR	0x45
++#define TJBR_ADDR	0x46
++#define TFCS_ADDR	0x47
++#define TXCF_ADDR	0x48
++#define TOVR_ADDR	0x49
++#define TUND_ADDR	0x4a
++#define TFRG_ADDR	0x4b
++
+ #define TSO_IPPROTO_TCP			1
+ 
+ #define USERINFO_POS			0
+@@ -383,6 +433,7 @@ void xgene_enet_parse_error(struct xgene_enet_desc_ring *ring,
+ u32 xgene_enet_rd_mac(struct xgene_enet_pdata *pdata, u32 rd_addr);
+ void xgene_enet_wr_mac(struct xgene_enet_pdata *pdata, u32 wr_addr,
+ 		       u32 wr_data);
++u32 xgene_enet_rd_stat(struct xgene_enet_pdata *pdata, u32 rd_addr);
+ 
+ extern const struct xgene_mac_ops xgene_gmac_ops;
+ extern const struct xgene_port_ops xgene_gport_ops;
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index 3f24b83..bd2486e 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -1792,12 +1792,15 @@ static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
+ 	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII ||
+ 	    pdata->phy_mode == PHY_INTERFACE_MODE_SGMII) {
+ 		pdata->mcx_mac_addr = pdata->base_addr + BLOCK_ETH_MAC_OFFSET;
++		pdata->mcx_stats_addr =
++			pdata->base_addr + BLOCK_ETH_STATS_OFFSET;
+ 		offset = (pdata->enet_id == XGENE_ENET1) ?
+ 			  BLOCK_ETH_MAC_CSR_OFFSET :
+ 			  X2_BLOCK_ETH_MAC_CSR_OFFSET;
+ 		pdata->mcx_mac_csr_addr = base_addr + offset;
+ 	} else {
+ 		pdata->mcx_mac_addr = base_addr + BLOCK_AXG_MAC_OFFSET;
++		pdata->mcx_stats_addr = base_addr + BLOCK_AXG_STATS_OFFSET;
+ 		pdata->mcx_mac_csr_addr = base_addr + BLOCK_AXG_MAC_CSR_OFFSET;
+ 		pdata->pcs_addr = base_addr + BLOCK_PCS_OFFSET;
  	}
-@@ -1477,6 +1476,8 @@ static void xgene_enet_get_stats64(
- 		if (ring) {
- 			stats->tx_packets += ring->tx_packets;
- 			stats->tx_bytes += ring->tx_bytes;
-+			stats->tx_dropped += ring->tx_dropped;
-+			stats->tx_errors += ring->tx_errors;
- 		}
+@@ -2090,6 +2093,11 @@ static int xgene_enet_probe(struct platform_device *pdev)
+ 			goto err1;
  	}
  
-@@ -1485,11 +1486,16 @@ static void xgene_enet_get_stats64(
- 		if (ring) {
- 			stats->rx_packets += ring->rx_packets;
- 			stats->rx_bytes += ring->rx_bytes;
--			stats->rx_errors += ring->rx_length_errors +
-+			stats->rx_dropped += ring->rx_dropped;
-+			stats->rx_errors += ring->rx_errors +
-+				ring->rx_length_errors +
- 				ring->rx_crc_errors +
- 				ring->rx_frame_errors +
- 				ring->rx_fifo_errors;
--			stats->rx_dropped += ring->rx_dropped;
-+			stats->rx_length_errors += ring->rx_length_errors;
-+			stats->rx_crc_errors += ring->rx_crc_errors;
-+			stats->rx_frame_errors += ring->rx_frame_errors;
-+			stats->rx_fifo_errors += ring->rx_fifo_errors;
- 		}
- 	}
- }
++	spin_lock_init(&pdata->stats_lock);
++	ret = xgene_extd_stats_init(pdata);
++	if (ret)
++		goto err2;
++
+ 	xgene_enet_napi_add(pdata);
+ 	ret = register_netdev(ndev);
+ 	if (ret) {
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-index 5e6fd71..3bf6638 100644
+index 3bf6638..cbdc09c 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-@@ -138,6 +138,8 @@ struct xgene_enet_desc_ring {
- 	__le64 *exp_bufs;
- 	u64 tx_packets;
- 	u64 tx_bytes;
-+	u64 tx_dropped;
-+	u64 tx_errors;
- 	u64 rx_packets;
- 	u64 rx_bytes;
- 	u64 rx_dropped;
+@@ -214,6 +214,7 @@ struct xgene_enet_pdata {
+ 	void __iomem *eth_diag_csr_addr;
+ 	void __iomem *mcx_mac_addr;
+ 	void __iomem *mcx_mac_csr_addr;
++	void __iomem *mcx_stats_addr;
+ 	void __iomem *base_addr;
+ 	void __iomem *pcs_addr;
+ 	void __iomem *ring_csr_addr;
+@@ -221,6 +222,8 @@ struct xgene_enet_pdata {
+ 	int phy_mode;
+ 	enum xgene_enet_rm rm;
+ 	struct xgene_enet_cle cle;
++	u64 *extd_stats;
++	spinlock_t stats_lock; /* statistics lock */
+ 	const struct xgene_mac_ops *mac_ops;
+ 	spinlock_t mac_lock; /* mac lock */
+ 	const struct xgene_port_ops *port_ops;
+@@ -265,5 +268,6 @@ static inline u16 xgene_enet_dst_ring_num(struct xgene_enet_desc_ring *ring)
+ }
+ 
+ void xgene_enet_set_ethtool_ops(struct net_device *netdev);
++int xgene_extd_stats_init(struct xgene_enet_pdata *pdata);
+ 
+ #endif /* __XGENE_ENET_MAIN_H__ */
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
+index e644a42..9b98c83 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
+@@ -23,6 +23,7 @@
+ 
+ #define X2_BLOCK_ETH_MAC_CSR_OFFSET	0x3000
+ #define BLOCK_AXG_MAC_OFFSET		0x0800
++#define BLOCK_AXG_STATS_OFFSET		0x0800
+ #define BLOCK_AXG_MAC_CSR_OFFSET	0x2000
+ #define BLOCK_PCS_OFFSET		0x3800
+ 
 -- 
 1.9.1
