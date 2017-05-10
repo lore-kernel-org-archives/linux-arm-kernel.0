@@ -1,74 +1,51 @@
-From: luto@kernel.org (Andy Lutomirski)
-Date: Tue, 9 May 2017 18:59:41 -0700
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <CAGXu5jL6PeQmmdxh5h--fgrMK8DW_XZYpNfDOvvv_o9E3-Kxdw@mail.gmail.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com> <20170508124621.GA20705@kroah.com>
- <20170509064522.anusoikaalvlux3w@gmail.com>
- <20170509085659.GA32555@infradead.org>
- <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
- <20170509130250.GA11381@infradead.org> <20170509160322.GA15902@infradead.org>
- <CAGXu5jKHVMRMKDfn+=kkbm+JkWPhoEtDwKx=QXAYxg1p9bn7PQ@mail.gmail.com>
- <CALCETrV73=cDvaSLOMvb299yaGNJYME8LC-=P+N6p7R1NN97Yg@mail.gmail.com>
- <CAGXu5jL6PeQmmdxh5h--fgrMK8DW_XZYpNfDOvvv_o9E3-Kxdw@mail.gmail.com>
-Message-ID: <CALCETrX+CP6e8bfhWBpan=37fuK=V0gEm+zeHQOmCOhcfr7Bqg@mail.gmail.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Wed, 10 May 2017 10:06:58 +0800
+Subject: [PATCH v3 0/2] Add PCIe host driver support for Mediatek SoCs
+Message-ID: <1494382020-26790-1-git-send-email-ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 9, 2017 at 4:31 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Tue, May 9, 2017 at 3:52 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->> On Tue, May 9, 2017 at 9:50 AM, Kees Cook <keescook@chromium.org> wrote:
->>> On Tue, May 9, 2017 at 9:03 AM, Christoph Hellwig <hch@infradead.org> wrote:
->>>> On Tue, May 09, 2017 at 06:02:50AM -0700, Christoph Hellwig wrote:
->>>>> On Tue, May 09, 2017 at 06:00:01AM -0700, Andy Lutomirski wrote:
->>>>> > fs/splice.c has some, ahem, interesting uses that have been the source
->>>>> > of nasty exploits in the past.  Converting them to use iov_iter
->>>>> > properly would be really, really nice.  Christoph, I don't suppose
->>>>> > you'd like to do that?
->>>>>
->>>>> I can take care of all the fs code including this one.
->>>>
->>>> I spent the afternoon hacking up where I'd like this to head.  It's
->>>> completely untested as of now:
->>>>
->>>>         http://git.infradead.org/users/hch/vfs.git/shortlog/refs/heads/setfs-elimination
->>>
->>> Ooooh yes! Nice work.
->>>
->>> I love this:
->>> http://git.infradead.org/users/hch/vfs.git/commitdiff/51e83f50f824ca23f5584c172138e6b7c2ff786d
->>> but I wonder what it'll cause out-of-tree code to do. I mean, I'd
->>> rather nothing out-of-tree be calling these, but I'd hate 3rd party
->>> hacks even more.
->>>
->>> http://git.infradead.org/users/hch/vfs.git/commitdiff/018e0e9030777121fe87e89d43066691e7366587
->>> This accidentally(?) removes the kernel-doc comments.
->>>
->>> http://git.infradead.org/users/hch/vfs.git/commitdiff/78b62c730254fc39fa888cdbdca08fde6e09a798
->>> Could this be made defensive? (Return 0 if ret wraps, for example?) I
->>> see what the comment says, but not everyone will read that. :(
->>>
->>> http://git.infradead.org/users/hch/vfs.git/commitdiff/a106276ca0294be054bc89ce97219933fe543df1
->>> Perhaps unconditionally set USER_DS on exit instead of retaining
->>> whatever was there?
->>
->> I don't like silent fixups.  If we want to do this, we should BUG or
->> at least WARN, not just change the addr limit.  But I'm also not
->> convinced it's indicative of an actual bug here.
->
-> Nothing should enter that function with KERNEL_DS set, right?
->
-> BUG_ON(get_fs() != USER_DS);
-> set_fs(KERNEL_DS);
-> ...
-> set_fs(USER_DS);
->
+Hi,
 
-It's not immediately obvious to me that this shouldn't happen.  Why
-not do it the way Christoph did and then, once the rest of set_fs() is
-tamed, consider this change (or trying to mass-convert file_operations
-implementations to get rid of it entirely)?
+This patch series add Mediatek Gen2 PCIe host controller driver and
+dt-binding document. It can be found on MT7623 series SoCs.
 
---Andy
+This driver was validated using Broadcom Tigon3 and Intel(R) 82575/82576
+gigabit ethernet card.
+
+Changes since v3:
+- correct sub-nodes unit addresses.
+
+Changes since v2:
+- modify Kconfig to avoid kbuild test error on some architecture.
+- change compatible string.
+- revise binding document:
+  add missing interrupt-names.
+  remove the board dts example and drop 'status' properties.
+  remove unnecessary descriptions bout standard PCI bus binding.
+
+Changes since v1:
+- add .suppress_bind_attrs.
+- remove unnecessary *_valid_device() pattern.
+- remove PCI_PROBE_ONLY.
+- use the regular readl() instead of readl_relaxed().
+- add .map_bus() and change to use pci_generic_config_read/pci_generic_config_write.
+- revise dt-binding document and move nonstandard properties to root node.
+- change compatible string.
+- use interrupt-map property and replace mtk_pcie_map_irq() with of_irq_parse_and_map_pci().
+- use the new pci_register_host_bridge() method instead of pci_scan_root_bus().
+
+Ryder Lee (2):
+  PCI: mediatek: Add Mediatek PCIe host controller support
+  dt-bindings: pcie: Add documentation for Mediatek PCIe
+
+ .../bindings/pci/mediatek,mt7623-pcie.txt          | 149 ++++++
+ drivers/pci/host/Kconfig                           |  11 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pcie-mediatek.c                   | 563 +++++++++++++++++++++
+ 4 files changed, 724 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-mediatek.c
+
+-- 
+1.9.1
