@@ -1,66 +1,103 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 10 May 2017 11:42:19 +0200
-Subject: [PATCH v4 0/3] Add Mediatek CIRQ interrupt controller
-In-Reply-To: <1491558884.24848.3.camel@mtksdaap41>
-References: <1491552397-7893-1-git-send-email-youlin.pei@mediatek.com>
- <771954fe-c994-96be-76ab-ece75383d058@arm.com>
- <1491558884.24848.3.camel@mtksdaap41>
-Message-ID: <36732dc3-e113-246c-0828-150e9b31f4fb@gmail.com>
+From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
+Date: Wed, 10 May 2017 15:13:23 +0530
+Subject: [PATCH][v3] arm64: Add flash node for ls1088a qds and rdb
+Message-ID: <1494409403-22369-1-git-send-email-prabhakar.kushwaha@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+LS1088AQDS consist of NOR, NAND and FPGA connected over IFC
+LS1088ARDB consist of NAND and FPGA connected over IFC.
 
+So add flash information in ifc node of device tree.
 
-On 07/04/17 11:54, Youlin Pei wrote:
-> On Fri, 2017-04-07 at 09:52 +0100, Marc Zyngier wrote:
->> On 07/04/17 09:06, Youlin Pei wrote:
->>> In Mediatek SOCs, the CIRQ is a low power interrupt controller designed to
->>> works outside MCUSYS which comprises with Cortex-Ax cores,CCI and GIC.
->>>
->>> The CIRQ controller is integrated in between MCUSYS and interrupt sources
->>> as the second level interrupt controller. The external interrupts which
->>> outside MCUSYS will feed through CIRQ then bypass to GIC.
->>>
->>> In normal mode(where MCUSYS is active), CIRQ is disabled and interrupts
->>> will directly issue to MCUSYS. When MCUSYS enters sleep mode, where GIC
->>> is power downed. CIRQ will be enabled and monitor all edge trigger
->>> interrupts(only edge trigger interrupts will be lost in this scenario).
->>> When an edge interrupt is triggered, CIRQ will record the status and
->>> generated a pulse signal to GIC when flush command is executed.
->>>
->>> With CIRQ, MCUSYS can be completely turned off to improve the system
->>> power consumption without losing interrupts.
->>>
->>> change in v4:
->>> 1. add some comment to explain CIRQ suspend callback.
->>> 2. rebase on 4.11
->>
->> Hi Youlin,
->>
->> I'm happy to take the first two patches through the irq tree. How do we
->> deal with the third one? It seems to me that it'd be better routed via
->> armsoc.
->>
->> Let me know what you and Matthias want to do.
-> 
-> Hi Marc,
-> 
-> Thanks for your review. I think that driver and dtsi can merged
-> separately.
-> 
-> Hi Matthias,
-> Could you help to review the dtsi patch?
+Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+---
+changes for v2: Incorporated Shawn's comments
+changes for v3: Incorporated Shawn's further comments
 
-queued now for v4.12-next/dts32
-sorry for the late answer.
+ arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts | 24 +++++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts | 16 +++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    |  5 +----
+ 3 files changed, 41 insertions(+), 4 deletions(-)
 
-Matthias
-
-> Thanks a lot!
-> 
->>
->> Thanks,
->>
->> 	M.
-> 
-> 
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
+index 8c3cae5..82e1615 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
+@@ -110,6 +110,30 @@
+ 	};
+ };
+ 
++&ifc {
++	ranges = <0 0 0x5 0x80000000 0x08000000
++		  2 0 0x5 0x30000000 0x00010000
++		  3 0 0x5 0x20000000 0x00010000>;
++	status = "okay";
++
++	nor at 0,0 {
++		compatible = "cfi-flash";
++		reg = <0x0 0x0 0x8000000>;
++		bank-width = <2>;
++		device-width = <1>;
++	};
++
++	nand at 2,0 {
++		compatible = "fsl,ifc-nand";
++		reg = <0x2 0x0 0x10000>;
++	};
++
++	fpga: board-control at 3,0 {
++		compatible = "fsl,ls1088aqds-fpga", "fsl,fpga-qixis";
++		reg = <0x3 0x0 0x0000100>;
++	};
++};
++
+ &duart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+index 8a04fbb..a93a588 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+@@ -94,6 +94,22 @@
+ 	};
+ };
+ 
++&ifc {
++	ranges = <0 0 0x5 0x30000000 0x00010000
++		  2 0 0x5 0x20000000 0x00010000>;
++	status = "okay";
++
++	nand at 0,0 {
++		compatible = "fsl,ifc-nand";
++		reg = <0x0 0x0 0x10000>;
++	};
++
++	fpga: board-control at 2,0 {
++		compatible = "fsl,ls1088ardb-fpga", "fsl,fpga-qixis";
++		reg = <0x2 0x0 0x0000100>;
++	};
++};
++
+ &duart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index 2946fd7..e852b22 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -216,11 +216,8 @@
+ 			little-endian;
+ 			#address-cells = <2>;
+ 			#size-cells = <1>;
+-
+-			ranges = <0 0 0x5 0x80000000 0x08000000
+-				  2 0 0x5 0x30000000 0x00010000
+-				  3 0 0x5 0x20000000 0x00010000>;
+ 			status = "disabled";
++
+ 		};
+ 
+ 		i2c0: i2c at 2000000 {
+-- 
+2.7.4
