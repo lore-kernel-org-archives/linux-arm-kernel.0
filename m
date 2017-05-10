@@ -1,41 +1,63 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Wed, 10 May 2017 11:51:38 +0000
-Subject: [linux-sunxi][PATCH] ARM: dts: sun8i-h3: orange-pi-2: Enable audio
- codec
-Message-ID: <20170510115138.21765-1-codekipper@gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 10 May 2017 14:20:55 +0200
+Subject: [PATCH v3 3/3] arm/arm64: signal SIBGUS and inject SEA Error
+In-Reply-To: <e8614b38-9c17-bcfc-2239-307ed0f98c94@huawei.com>
+References: <CAMj-D2BGTDKpOcMu2ip41_MTTj8VDwvs59Ds7yvLHcD8PeQzhg@mail.gmail.com>
+ <5910AAA2.4030304@arm.com> <20170508175416.GA32234@cbox>
+ <5911D204.7020304@arm.com>
+ <e8614b38-9c17-bcfc-2239-307ed0f98c94@huawei.com>
+Message-ID: <20170510122055.GE28721@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On Wed, May 10, 2017 at 05:15:04PM +0800, gengdongjiu wrote:
+> Thanks James's explanation.
+> 
+> Hi Christoffer,
+> 
+> On 2017/5/9 22:28, James Morse wrote:
+> > Hi Christoffer,
+> > 
+> > On 08/05/17 18:54, Christoffer Dall wrote:
+> >> On Mon, May 08, 2017 at 06:28:02PM +0100, James Morse wrote:
+> >> I must admit I am losing track of exactly what this proposed API was
+> >> supposed to do.
+> > 
+> > There are two, and we keep jumping between them!
+> > This is about two notification methods APEI has for arm64, 'SEA' and 'SEI'.
+> > 
+> > SEA is synchronous and looks like a data abort. Qemu/kvmtool can inject these
+> > today using the KVM_GET/SET_ONE_REG API whenever it wants to.
+> > 
+> > SEI uses SError, is asynchronous and can be masked. In addition these need to be
+> > consumed/synchronised by the ESB instruction, even when executed by a guest.
+> > Hardware has the necessary bits to drive all this, we need to expose an API to
+> > drive it.
+> > 
+> > (I try to spell them out each time so I don't confuse SEI with something
+> > synchronous!)
+> > 
+> > 
+> > This patch was about SEA. I think you've answered our question:
+> 
+> we are talking about the SEA(synchronous data abort) injection two methods:
+> 
+> (1)change vcpu registers in the Qemu/kvmtools and using the KVM_GET/SET_ONE_REG API to set.
 
-The Orange Pi 2 routes the LINEOUT pins through a SGM8900 PA which
-needs to be enabled. The onboard microphone is routed to MIC1, with
-MBIAS providing power.
+Yes, if this is possible, why would you want something more?
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> (2)using existed in-kernel API "kvm_inject_dabt" to inject through IOCTL command from Qemu.
+> 
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-index 5b6d14555b7c..3d9cc20761a1 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-@@ -104,6 +104,15 @@
- 	};
- };
- 
-+&codec {
-+	allwinner,pa-gpios = <&pio 0 16 GPIO_ACTIVE_HIGH>; /* PA16 */
-+	allwinner,audio-routing =
-+		"Speaker", "LINEOUT",
-+		"MIC1", "Mic",
-+		"Mic",  "MBIAS";
-+	status = "okay";
-+};
-+
- &ehci1 {
- 	status = "okay";
- };
--- 
-2.12.2
+I'm not really going to consider this, because "use internal API from
+userspace" doesn't work.
+
+So this should be:
+
+  (2) Introduce a new API to do X.
+
+I still think you know what my preference is; use the existing API if at
+all possible.
+
+Thanks,
+-Christoffer
