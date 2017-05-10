@@ -1,217 +1,96 @@
-From: linu.cherian@cavium.com (Linu Cherian)
-Date: Wed, 10 May 2017 11:01:05 +0530
-Subject: [v4 3/4] iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2
- erratum #74
-In-Reply-To: <20170509134856.GA1090@virtx40>
-References: <1494330314-30179-1-git-send-email-gakula@caviumnetworks.com>
- <1494330314-30179-4-git-send-email-gakula@caviumnetworks.com>
- <bd0b9567-ccc5-8bf2-b113-d0f7a1ab2ed2@arm.com>
- <20170509134856.GA1090@virtx40>
-Message-ID: <20170510053105.GA7576@virtx40>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 10 May 2017 14:06:27 +0800
+Subject: [PATCH 1/6] tty: serial: lpuart: introduce lpuart_soc_data to
+ represent SoC property
+In-Reply-To: <83e341e654f5e8e788ee684bf3de51e6@agner.ch>
+References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
+ <1494316248-24052-2-git-send-email-aisheng.dong@nxp.com>
+ <83e341e654f5e8e788ee684bf3de51e6@agner.ch>
+Message-ID: <CAA+hA=SNrjjuOcKYZQ7xkcL7dw_WKtCqffa_fD212vf1+wFj+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tue May 09, 2017 at 02:02:58PM +0100, Robin Murphy wrote:
-> > On 09/05/17 12:45, Geetha sowjanya wrote:
-> > > From: Linu Cherian <linu.cherian@cavium.com>
-> > > 
-> > > Cavium ThunderX2 SMMU implementation doesn't support page 1 register space
-> > > and PAGE0_REGS_ONLY option is enabled as an errata workaround.
-> > > This option when turned on, replaces all page 1 offsets used for
-> > > EVTQ_PROD/CONS, PRIQ_PROD/CONS register access with page 0 offsets.
-> > > 
-> > > SMMU resource size checks are now based on SMMU option PAGE0_REGS_ONLY,
-> > > since resource size can be either 64k/128k.
-> > > For this, arm_smmu_device_dt_probe/acpi_probe has been moved before
-> > > platform_get_resource call, so that SMMU options are set beforehand.
-> > > 
-> > > Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
-> > > Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
-> > > ---
-> > >  Documentation/arm64/silicon-errata.txt             |  1 +
-> > >  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |  6 ++
-> > >  drivers/iommu/arm-smmu-v3.c                        | 80 ++++++++++++++++------
-> > >  3 files changed, 66 insertions(+), 21 deletions(-)
-> > > 
-> > > diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> > > index 10f2ddd..4693a32 100644
-> > > --- a/Documentation/arm64/silicon-errata.txt
-> > > +++ b/Documentation/arm64/silicon-errata.txt
-> > > @@ -62,6 +62,7 @@ stable kernels.
-> > >  | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154        |
-> > >  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
-> > >  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
-> > > +| Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
-> > >  |                |                 |                 |                             |
-> > >  | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
-> > >  |                |                 |                 |                             |
-> > > diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> > > index be57550..e6da62b 100644
-> > > --- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> > > +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> > > @@ -49,6 +49,12 @@ the PCIe specification.
-> > >  - hisilicon,broken-prefetch-cmd
-> > >                      : Avoid sending CMD_PREFETCH_* commands to the SMMU.
-> > >  
-> > > +- cavium-cn99xx,broken-page1-regspace
-> > > +                    : Replaces all page 1 offsets used for EVTQ_PROD/CONS,
-> > > +						PRIQ_PROD/CONS register access with page 0 offsets.
-> > > +						Set for Caviun ThunderX2 silicon that doesn't support
-> > > +						SMMU page1 register space.
-> > > +
-> > >  ** Example
-> > >  
-> > >          smmu at 2b400000 {
-> > > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> > > index 380969a..1e986a0 100644
-> > > --- a/drivers/iommu/arm-smmu-v3.c
-> > > +++ b/drivers/iommu/arm-smmu-v3.c
-> > > @@ -176,15 +176,15 @@
-> > >  #define ARM_SMMU_CMDQ_CONS		0x9c
-> > >  
-> > >  #define ARM_SMMU_EVTQ_BASE		0xa0
-> > > -#define ARM_SMMU_EVTQ_PROD		0x100a8
-> > > -#define ARM_SMMU_EVTQ_CONS		0x100ac
-> > > +#define ARM_SMMU_EVTQ_PROD(smmu)	(page1_offset_adjust(0x100a8, smmu))
-> > > +#define ARM_SMMU_EVTQ_CONS(smmu)	(page1_offset_adjust(0x100ac, smmu))
-> > 
-> > Sorry, perhaps I should have communicated the rest of the idea more
-> > explicitly - you now don't need to change these definitions...
-> > 
-> 
-> Fine. 
-> 
-> 
-> > >  #define ARM_SMMU_EVTQ_IRQ_CFG0		0xb0
-> > >  #define ARM_SMMU_EVTQ_IRQ_CFG1		0xb8
-> > >  #define ARM_SMMU_EVTQ_IRQ_CFG2		0xbc
-> > >  
-> > >  #define ARM_SMMU_PRIQ_BASE		0xc0
-> > > -#define ARM_SMMU_PRIQ_PROD		0x100c8
-> > > -#define ARM_SMMU_PRIQ_CONS		0x100cc
-> > > +#define ARM_SMMU_PRIQ_PROD(smmu)	(page1_offset_adjust(0x100c8, smmu))
-> > > +#define ARM_SMMU_PRIQ_CONS(smmu)	(page1_offset_adjust(0x100cc, smmu))
-> > >  #define ARM_SMMU_PRIQ_IRQ_CFG0		0xd0
-> > >  #define ARM_SMMU_PRIQ_IRQ_CFG1		0xd8
-> > >  #define ARM_SMMU_PRIQ_IRQ_CFG2		0xdc
-> > > @@ -412,6 +412,9 @@
-> > >  #define MSI_IOVA_BASE			0x8000000
-> > >  #define MSI_IOVA_LENGTH			0x100000
-> > >  
-> > > +#define ARM_SMMU_PAGE0_REGS_ONLY(smmu)		\
-> > > +	((smmu)->options & ARM_SMMU_OPT_PAGE0_REGS_ONLY)
-> > > +
-> > >  static bool disable_bypass;
-> > >  module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
-> > >  MODULE_PARM_DESC(disable_bypass,
-> > > @@ -597,6 +600,7 @@ struct arm_smmu_device {
-> > >  	u32				features;
-> > >  
-> > >  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> > > +#define ARM_SMMU_OPT_PAGE0_REGS_ONLY    (1 << 1)
-> > >  	u32				options;
-> > >  
-> > >  	struct arm_smmu_cmdq		cmdq;
-> > > @@ -663,9 +667,19 @@ struct arm_smmu_option_prop {
-> > >  
-> > >  static struct arm_smmu_option_prop arm_smmu_options[] = {
-> > >  	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
-> > > +	{ ARM_SMMU_OPT_PAGE0_REGS_ONLY, "cavium-cn99xx,broken-page1-regspace"},
-> > >  	{ 0, NULL},
-> > >  };
-> > >  
-> > > +static inline unsigned long page1_offset_adjust(
-> > > +	unsigned long off, struct arm_smmu_device *smmu)
-> > > +{
-> > > +	if (off > SZ_64K && ARM_SMMU_PAGE0_REGS_ONLY(smmu))
-> > > +		return (off - SZ_64K);
-> > > +
-> > > +	return off;
-> > > +}
-> > > +
-> > >  static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
-> > >  {
-> > >  	return container_of(dom, struct arm_smmu_domain, domain);
-> > > @@ -1986,8 +2000,10 @@ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
-> > >  		return ret;
-> > >  
-> > >  	/* evtq */
-> > > -	ret = arm_smmu_init_one_queue(smmu, &smmu->evtq.q, ARM_SMMU_EVTQ_PROD,
-> > > -				      ARM_SMMU_EVTQ_CONS, EVTQ_ENT_DWORDS);
-> > > +	ret = arm_smmu_init_one_queue(smmu, &smmu->evtq.q,
-> > > +				      ARM_SMMU_EVTQ_PROD(smmu),
-> > > +				      ARM_SMMU_EVTQ_CONS(smmu),
-> > > +				      EVTQ_ENT_DWORDS);
-> > 
-> > ...or these callsites; you can just use page1_offset_adjust() directly
-> > within arm_smmu_init_one_queue(), i.e.
-> 
-> > 
-> > 
-> >        q->prod_reg = smmu->base + page1_offset_adjust(prod_off, smmu);
-> >        q->cons_reg = smmu->base + page1_offset_adjust(cons_off, smmu);
-> > 
-> > because it won't affect page 0 offsets either way.
-> > 
-> > >  	if (ret)
-> > >  		return ret;
-> > >  
-> > > @@ -1995,8 +2011,10 @@ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
-> > >  	if (!(smmu->features & ARM_SMMU_FEAT_PRI))
-> > >  		return 0;
-> > >  
-> > > -	return arm_smmu_init_one_queue(smmu, &smmu->priq.q, ARM_SMMU_PRIQ_PROD,
-> > > -				       ARM_SMMU_PRIQ_CONS, PRIQ_ENT_DWORDS);
-> > > +	return arm_smmu_init_one_queue(smmu, &smmu->priq.q,
-> > > +				       ARM_SMMU_PRIQ_PROD(smmu),
-> > > +				       ARM_SMMU_PRIQ_CONS(smmu),
-> > > +				       PRIQ_ENT_DWORDS);
-> > >  }
-> > >  
-> > >  static int arm_smmu_init_l1_strtab(struct arm_smmu_device *smmu)
-> > > @@ -2363,8 +2381,10 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
-> > >  
-> > >  	/* Event queue */
-> > >  	writeq_relaxed(smmu->evtq.q.q_base, smmu->base + ARM_SMMU_EVTQ_BASE);
-> > > -	writel_relaxed(smmu->evtq.q.prod, smmu->base + ARM_SMMU_EVTQ_PROD);
-> > > -	writel_relaxed(smmu->evtq.q.cons, smmu->base + ARM_SMMU_EVTQ_CONS);
-> > > +	writel_relaxed(smmu->evtq.q.prod, smmu->base +
-> > > +		       ARM_SMMU_EVTQ_PROD(smmu));
-> > 
-> > And correspondingly just use page1_offset_adjust(ARM_SMMU_EVTQ_*, smmu)
-> > explicitly for these writes.
-> > 
-> > In fact, if all the potential callsites are immediately converting the
-> > offset into an address, then it may be worth just factoring that into
-> > the helper as well, something like:
-> > 
-> > static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
-> > 					struct arm_smmu_device *smmu)
-> > {
-> > 	if (offset > SZ_64K && ARM_SMMU_PAGE0_REGS_ONLY(smmu))
-> > 		offset -= SZ_64K;
-> > 
-> > 	return smmu->base + offset;
-> > }
-> > 
-> > What do you reckon?
-> > 
-> 
-> Just had a opinion that, replacing all page1 offset macros(ARM_SMMU_EVTQ/PRIQ_PROD/CONS) with
-> page1_offset_adjust(ARM_SMMU_EVTQ/PRIQ_PROD/CONS, smmu) will make the changes 
-> more uniform. In that case, we wont need, offset > SZ_64K  check as
-> well.
-> 
-> Hope the intention is not to change the offset definitions.
-> 
-> 
+Hi Stefan,
 
-Will post v5 series with the approach you suggested (using
-arm_smmu_page1_fixup). Also realize that this will result in less
-number of changes as well.
+On Wed, May 10, 2017 at 11:50 AM, Stefan Agner <stefan@agner.ch> wrote:
+> On 2017-05-09 00:50, Dong Aisheng wrote:
+>> This is used to dynamically check the SoC specific lpuart properies.
+>> Currently only the checking of 32 bit register width is added which
+>> functions the same as before. More will be added later for supporting
+>> new chips.
+>>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Jiri Slaby <jslaby@suse.com>
+>> Cc: Fugang Duan <fugang.duan@nxp.com>
+>> Cc: Stefan Agner <stefan@agner.ch>
+>> Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
+>> Cc: Yangbo Lu <yangbo.lu@nxp.com>
+>> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>> ---
+>>  drivers/tty/serial/fsl_lpuart.c | 25 ++++++++++++++++++-------
+>>  1 file changed, 18 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+>> index 15df1ba7..cd4e905 100644
+>> --- a/drivers/tty/serial/fsl_lpuart.c
+>> +++ b/drivers/tty/serial/fsl_lpuart.c
+>> @@ -258,13 +258,21 @@ struct lpuart_port {
+>>       wait_queue_head_t       dma_wait;
+>>  };
+>>
+>> +struct lpuart_soc_data {
+>> +     bool    is_32;
+>> +};
+>> +
+>> +static struct lpuart_soc_data vf_data = {
+>> +     .is_32 = false,
+>> +};
+>> +
+>> +static struct lpuart_soc_data ls_data = {
+>> +     .is_32 = true,
+>> +};
+>
+> This could be const I guess?
+>
 
-Thanks.
+Yes, of course.
+Thanks for the pointing out.
 
+Regards
+Dong Aisheng
 
--- 
-Linu cherian
+> --
+> Stefan
+>
+>> +
+>>  static const struct of_device_id lpuart_dt_ids[] = {
+>> -     {
+>> -             .compatible = "fsl,vf610-lpuart",
+>> -     },
+>> -     {
+>> -             .compatible = "fsl,ls1021a-lpuart",
+>> -     },
+>> +     { .compatible = "fsl,vf610-lpuart", .data = &vf_data, },
+>> +     { .compatible = "fsl,ls1021a-lpuart", .data = &ls_data, },
+>>       { /* sentinel */ }
+>>  };
+>>  MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
+>> @@ -1971,6 +1979,9 @@ static struct uart_driver lpuart_reg = {
+>>
+>>  static int lpuart_probe(struct platform_device *pdev)
+>>  {
+>> +     const struct of_device_id *of_id = of_match_device(lpuart_dt_ids,
+>> +                                                        &pdev->dev);
+>> +     const struct lpuart_soc_data *sdata = of_id->data;
+>>       struct device_node *np = pdev->dev.of_node;
+>>       struct lpuart_port *sport;
+>>       struct resource *res;
+>> @@ -1988,7 +1999,7 @@ static int lpuart_probe(struct platform_device *pdev)
+>>               return ret;
+>>       }
+>>       sport->port.line = ret;
+>> -     sport->lpuart32 = of_device_is_compatible(np, "fsl,ls1021a-lpuart");
+>> +     sport->lpuart32 = sdata->is_32;
+>>
+>>       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>       sport->port.membase = devm_ioremap_resource(&pdev->dev, res);
