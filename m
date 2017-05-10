@@ -1,55 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 May 2017 09:37:04 +0200
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com> <20170508124621.GA20705@kroah.com>
- <20170509064522.anusoikaalvlux3w@gmail.com>
- <20170509085659.GA32555@infradead.org>
- <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
-Message-ID: <CAK8P3a2j6h2MAx3h2NCtadcFsNuFcf158F5OV1e2SK37acZRRg@mail.gmail.com>
+Date: Wed, 10 May 2017 09:58:13 +0200
+Subject: Updating kernel.org cross compilers?
+In-Reply-To: <20170509221843.GZ19687@gate.crashing.org>
+References: <92b5ff36-ad2b-10bc-de4f-4774babd9625@arm.com>
+ <20170430052957.GJ19687@gate.crashing.org>
+ <ee8a7f2c-976d-fe2a-55f9-ab8eebbf22eb@arm.com>
+ <20170509221843.GZ19687@gate.crashing.org>
+Message-ID: <CAK8P3a38bCS2rSwtQzYROfVBQ549akQZKPUJhcwDrWPN4NA1+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 9, 2017 at 3:00 PM, Andy Lutomirski <luto@kernel.org> wrote:
-> On Tue, May 9, 2017 at 1:56 AM, Christoph Hellwig <hch@infradead.org> wrote:
->> On Tue, May 09, 2017 at 08:45:22AM +0200, Ingo Molnar wrote:
->>> We only have ~115 code blocks in the kernel that set/restore KERNEL_DS, it would
->>> be a pity to add a runtime check to every system call ...
+On Wed, May 10, 2017 at 12:18 AM, Segher Boessenkool
+<segher@kernel.crashing.org> wrote:
+> On Tue, May 09, 2017 at 03:59:27PM +0100, Andre Przywara wrote:
+>> >> I was able to build (bare-metal) toolchains for
+>> >> all architectures except arc, m68k, tilegx and tilepro.
+>> >
+>> > arc needs a more recent GCC; the other probably as well.  GCC 7 should
+>> > be out very soon, you probably want to wait for that :-)
 >>
->> I think we should simply strive to remove all of them that aren't
->> in core scheduler / arch code.  Basically evetyytime we do the
->>
->>         oldfs = get_fs();
->>         set_fs(KERNEL_DS);
->>         ..
->>         set_fs(oldfs);
->>
->> trick we're doing something wrong, and there should always be better
->> ways to archive it.  E.g. using iov_iter with a ITER_KVEC type
->> consistently would already remove most of them.
+>> Well, GCC 7 indeed builds better, but then again is a very new compiler.
+>> For instance in the moment it spits a lot of warnings when compiling the
+>> kernel (mostly due to some *printf analysis). It's not hard to fix, but
+>> this will take a while to trickle in and it's questionable whether this
+>> will be backported everywhere.
+>> So in addition to GCC 7.1 I'd like to have at least GCC 6.3 around,
+>> which builds kernels without warnings today.
 >
-> How about trying to remove all of them?  If we could actually get rid
-> of all of them, we could drop the arch support, and we'd get faster,
-> simpler, shorter uaccess code throughout the kernel.
+> If you don't want warnings, turn off the warnings or just don't look at
+> them...  or fix the problems?  Many of the new warnings point out actual
+> problems.
 >
-> The ones in kernel/compat.c are generally garbage.  They should be
-> using compat_alloc_user_space().  Ditto for kernel/power/user.c.
+> Many of those sprintf problems in the kernel have already been fixed.
 
-compat_alloc_user_space() has some problems too, it adds
-complexity to a rarely-tested code path and can add some noticeable
-overhead in cases where user space access is slow because of
-extra checks.
+I've been using gcc-7.0 for a long time and fixed a lot of bugs it found,
+along with more harmless warnings, but I had disabled a couple of
+warning options when I first installed gcc-7 and ended up ignoring
+those.
 
-It's clearly better than set_fs(), but the way I prefer to convert the
-code is to avoid both and instead move compat handlers next to
-the native code, and splitting out the common code between native
-and compat mode into a helper that takes a regular kernel pointer.
+The exact set of additional options I used is:
 
-I think that's what both Al has done in the past on compat_ioctl()
-and select() and what Christoph does in his latest series, but
-it seems worth pointing out for others that decide to help out here.
+-Wimplicit-fallthrough=0 -Wno-duplicate-decl-specifier
+-Wno-int-in-bool-context -Wno-bool-operation -Wno-format-truncation
+-Wno-format-overflow
 
-     Arnd
+there were a couple of others that I sent kernel fixes for instead.
+I should probably revisit that list and for each of them either
+only enable it with "make W=1" or fix all known warnings.
+In the long run, I'd actually hope to fix all W=1 warnings too
+and enable them by default.
+
+      Arnd
