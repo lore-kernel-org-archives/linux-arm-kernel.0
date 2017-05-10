@@ -1,85 +1,54 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 10 May 2017 12:35:42 +0200
-Subject: [RESEND PATCH v3 1/2] dt-bindings: i2c: Add Mediatek MT2701 i2c
- binding
-In-Reply-To: <20170328192258.GA4525@katana>
-References: <1489029185-21447-1-git-send-email-jun.gao@mediatek.com>
- <1489029185-21447-2-git-send-email-jun.gao@mediatek.com>
- <20170322090543.sxacnddn2o7stjnq@ninjato>
- <1490694612.18582.11.camel@mhfsdcap03> <20170328192258.GA4525@katana>
-Message-ID: <4111ffc2-0a25-0811-fbd3-401649431315@gmail.com>
+Date: Wed, 10 May 2017 12:43:43 +0200
+Subject: [PATCH] soc: mediatek: PMIC wrap: Fix error handling
+In-Reply-To: <20170219131249.12010-1-christophe.jaillet@wanadoo.fr>
+References: <20170219131249.12010-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <106d786b-165c-ae5e-5180-3b8126d9e8bc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 28/03/17 21:22, Wolfram Sang wrote:
-> On Tue, Mar 28, 2017 at 05:50:12PM +0800, Jun Gao wrote:
->> On Wed, 2017-03-22 at 10:05 +0100, Wolfram Sang wrote:
->>> On Thu, Mar 09, 2017 at 11:13:04AM +0800, Jun Gao wrote:
->>>> From: Jun Gao <jun.gao@mediatek.com>
->>>>
->>>> Add MT2701 i2c binding to i2c-mt6577.txt and there is no need to
->>>> modify i2c driver.
->>>>
->>>> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
->>>
->>> There is still the issue which Matthias Brugger pointed out on January,
->>> 24th: you need to describe the fallback compatibles.
->>>
->>
->> IMHO the value under compatible are just inputs which can be accepted.
->> It's little strange to add fallback information in binding. Some other
->> bindings do not describe so detailedly.
->> Is it OK to make binding as minimum standard?
->> If we describe it very detailedly, we will have to modify binding if
->> there are some changes for mt2701.
+On 19/02/17 14:12, Christophe JAILLET wrote:
+> According to error handling in this function, it is likely that going to
+> 'err_out2' was expected here.
 > 
-> My reading of the below is that I could simply use "mediatek,mt2701-i2c"
-> as compatible and things will work. But it won't, we don't have that in
-> the driver IIRC. So, we need a fallback for that to work.
-> 
->> Rob, could you give some suggestions?  Thanks!
-> 
-> Would be welcome, yes. I lost track what the preferred solution is.
-> 
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 
-We will need to define the fallback binding for each SoC.
-As example take the rockchip mmc:
-http://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+Applied to v4.12-next/soc
 
-Regards,
+Sorry for the delay.
 Matthias
 
->>
->>>> ---
->>>>   .../devicetree/bindings/i2c/i2c-mt6577.txt         |   11 ++++++-----
->>>>   1 file changed, 6 insertions(+), 5 deletions(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
->>>> index 0ce6fa3..27dbbf9 100644
->>>> --- a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
->>>> +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
->>>> @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
->>>>   
->>>>   Required properties:
->>>>     - compatible: value should be either of the following.
->>>> -      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
->>>> -      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
->>>> -      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
->>>> -      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
->>>> -      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
->>>> +	"mediatek,mt2701-i2c"
->>>> +	"mediatek,mt6577-i2c"
->>>> +	"mediatek,mt6589-i2c"
->>>> +	"mediatek,mt8127-i2c"
->>>> +	"mediatek,mt8135-i2c"
->>>> +	"mediatek,mt8173-i2c"
->>>>     - reg: physical base address of the controller and dma base, length of memory
->>>>       mapped region.
->>>>     - interrupts: interrupt number to the cpu.
->>>> -- 
->>>> 1.7.9.5
->>>>
->>
->>
+> ---
+>   drivers/soc/mediatek/mtk-pmic-wrap.c | 9 ++++++---
+>   1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index a5f10936fb9c..285b434449a6 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -1200,7 +1200,8 @@ static int pwrap_probe(struct platform_device *pdev)
+>   
+>   	if (!(pwrap_readl(wrp, PWRAP_WACS2_RDATA) & PWRAP_STATE_INIT_DONE0)) {
+>   		dev_dbg(wrp->dev, "initialization isn't finished\n");
+> -		return -ENODEV;
+> +		ret = -ENODEV;
+> +		goto err_out2;
+>   	}
+>   
+>   	/* Initialize watchdog, may not be done by the bootloader */
+> @@ -1220,8 +1221,10 @@ static int pwrap_probe(struct platform_device *pdev)
+>   		goto err_out2;
+>   
+>   	wrp->regmap = devm_regmap_init(wrp->dev, NULL, wrp, &pwrap_regmap_config);
+> -	if (IS_ERR(wrp->regmap))
+> -		return PTR_ERR(wrp->regmap);
+> +	if (IS_ERR(wrp->regmap)) {
+> +		ret = PTR_ERR(wrp->regmap);
+> +		goto err_out2;
+> +	}
+>   
+>   	ret = of_platform_populate(np, NULL, NULL, wrp->dev);
+>   	if (ret) {
+> 
