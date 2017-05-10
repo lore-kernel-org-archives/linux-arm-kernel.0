@@ -1,160 +1,56 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Wed, 10 May 2017 21:22:10 +0200
-Subject: [RFC 0/2] Add support for Meson MX "SDIO" MMC driver
-In-Reply-To: <CAPDyKFoYPjB1bjRfFCFT3vuzKgzm6-7L2qgNjxGL392cLDe7uA@mail.gmail.com>
-References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
- <CAPDyKFoYPjB1bjRfFCFT3vuzKgzm6-7L2qgNjxGL392cLDe7uA@mail.gmail.com>
-Message-ID: <CAFBinCDGBZAAx_61eyu1_XM57fX62Mk03TEiO3uTL+i8dfPyZA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 10 May 2017 21:23:58 +0200
+Subject: [linux-sunxi] [PATCH v2 20/20] ARM: sun5i: a10s-olinuxino:
+ Enable HDMI
+In-Reply-To: <CAGb2v65S2pw3z8NZ+tkPkF=A=5z2toRkC+26pAs6La6CNyeXoQ@mail.gmail.com>
+References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
+ <c7ac6faa0568e6418291255af537c4b070bdea63.1493812478.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65S2pw3z8NZ+tkPkF=A=5z2toRkC+26pAs6La6CNyeXoQ@mail.gmail.com>
+Message-ID: <20170510192358.taufs5tsyifueued@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi,
 
-On Wed, May 10, 2017 at 10:44 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 6 May 2017 at 19:18, Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com> wrote:
->> This is the successor to Carlo Caione's "Add support for Amlogic Meson
->> MMC driver" series (v5) from [0].
->>
->> I would like you to specifically review:
->> - whether I've (ab)used the MMC framework properly (as this is my first
->>   "larger" contribution to an MMC driver)
->
-> I take a look soonish.
-thank you!
+On Thu, May 04, 2017 at 04:05:18PM +0800, Chen-Yu Tsai wrote:
+> On Wed, May 3, 2017 at 7:59 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The A10s Olinuxino has an HDMI connector. Make sure we can use it.
+> >
+> > Acked-by: Chen-Yu Tsai <wens@csie.org>
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 29 +++++++++++++++++-
+> >  1 file changed, 29 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+> > index 894f874a5beb..1d13b6407222 100644
+> > --- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+> > +++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+> > @@ -63,6 +63,17 @@
+> >                 stdout-path = "serial0:115200n8";
+> >         };
+> >
+> > +       connector {
+> > +               compatible = "hdmi-connector";
+> > +               type = "a";
+> 
+> Just curious, should we take this into consideration when creating
+> drm_connector?
 
->> - I think I have improved the locking compared to Carlo's version,
->>   however I'd still like feedback on whether this looks sane now or if I
->>   can improve that even further
->>
->> (notable) changes since Carlo's latest version are:
->> - renamed the driver to meson-mx-sdio (Amlogic's reference kernel calls
->>   the driver "aml_sdio" as there is a second MMC controller in these SoCs
->>   which they call the "SDHC controller"). do the same with our driver to
->
-> I don't like to renaming drivers, just because there are a reference
-> kernel using a different name.
->
-> What's is really the difference between controllers? Why do they have
-> two variants?
-the driver from this thread is for the "SDSC/SDHC/SDXC card and SDIO
-interface with 1-bit and 4-bit data bus width supporting spec version
-2.x/3.x/4.x DS/HS modes up to UHS-I SDR50" (quote taken from the S805
-datasheet: [0])
-the "other" controller is an "eMMC and MMC card interface with
-1/4/8-bit data bus width supporting spec version 4.4x/4.5x HS200 (up
-to 100MHz clock), compatible with standard iNAND interface" (again,
-quote taken from the S805 datasheet: [0])
+I'm not sure, no other driver does so. And I haven't seen any of our
+boards with a HDMI-B, C or mini-HDMI connector.
 
->
-> Can they be managed by the same driver?
->
->>   avoid confusion once we add support for the second controller (which uses
->>   a completely different register layout)
->
-> Besides that, do they behave differently in some other way?
-both drivers/controllers have a totally different register layout - I
-don't see any way how they both could be handled by one driver (the
-registers for the controllers from this series are not part of the
-documentation, but the registers from the 8-bit capable controller
-are, see page 76 and following from the S805 datasheet: [0])
+Maxime
 
->> - add support for the internal "mux" in this MMC controller (which allows
->>   connecting up to three devices to the the controller - at the cost of
->>   performance though since the controller can only process one request at
->>   a time). The driver registers a new device for each sub-node, which is
->>   then fed into the MMC framework to allow per-slot configuration using
->>   devicetree (see the example in the documentation)
->
-> Unless there really is deployment for more than one slot on some
-> boards/SoCs, I would strongly suggest to *not* implement this.
->
-> Simply because of overhead and introduced complexity to the driver.
-actually there are lots of devices out there which need to use two slots:
-as mentioned above the S805 (Meson8b) SoC has two MMC controllers:
-- one which is typically used for the SD card and the SDIO wireless
-interface (the driver from this series handles this)
-- the other one is typically connects to eMMC flash (as it supports
-8-bit bus width - this controller is not related to the driver from
-this series)
-
-there are boards out there which use NAND flash instead of eMMC, but
-the majority of the consumer devices (based on Amlogic SoCs) out there
-uses eMMC flash.
-we (unfortunately) have to support the internal mux since there are
-three MMC devices (SD card, SDIO wifi and eMMC) but only two
-controllers.
-
-I agree with you that it adds extra complexity to the driver. I tried
-to keep it as simple as possible - but I think we cannot remove it
-(without "losing" access to one MMC devices on most boards)
-
->> - use the common clock framework internally for managing the MMC clock
->>   (there is a fixed-factor clock in the controller which takes clk81 as
->>    input and divides it's clock by two and a divider clock which takes
->>    the result from the fixed-factor clock as input)
->> - support the regulators provided by the MMC framework
->> - support for GPIO-based card-detection and read-only-detection through
->>   the MMC framework
->> - use of the <linux/bitfield.h> FIELD_PREP and FIELD_GET macros where it
->>   make sense (and thus the code easier to read)
->> - re-worked locking (based on the locking in dw_mmc as that also provides
->>   multiple "MMC slots")
->
-> Lots of changes!
->
-> Before even start to review (or someone else), you really need to make
-> this review-able.
->
-> So, please, one change per patch - and make sure to write good
-> changelogs. Then I can start to review.
-from the mainline tree's perspective this is a new driver:
-Carlo (the original author) initially sent this driver for review more
-than 14 months ago. unfortunately it was never merged since you
-spotted some issues while reviewing that code, see [1].
-I would have sent smaller patches for a driver which is already in mainline.
-
-I also wanted to avoid extra complexity for the internal mux if it was
-added later on (if we want to avoid breaking devicetree backwards
-compatibility then the driver would have to support both: parsing from
-the mmc node directly and parsing child "slot" nodes). we won't have
-to change the DT bindings when the first version that will be
-mainlined already has support for the mux
-
-please let me know if there's anything I can do to make the code
-easier to review.
-
->>
->> tests done so far:
->> - reading an OLD 256MiB SD card (which uses only a 1-bit bus) works fine
->>   (sha1sum of the whole device matches with what I get on my PC's
->>   card-reader)
->> - reading a somewhat more modern class 10 SD card and putting Arch Linux
->>   ARM on it (and using that as root file system)
->> - it successfully detects the RTL8723BS SDIO wifi chip in my device (even
->>   if the SD card is also enabled)
->> - reading a 128MiB file from the SD card while scanning wifi networks on
->>   the RTL8723BS card does not seem to result in any corruption (sha1sum
->>   of the read file seems to match)
->> - read speed of my class 10 SD card: ~15MiB/s
->> - (unfortunately I could NOT test downloading a file over wifi to the SD
->>   card because the RTL8723BS driver refuses to see any wifi networks, but
->>   that might be a problem on the RTL8723BS driver side since I don't get
->>   any error and the driver has just landed a few weeks ago in staging)
->>
->>
->> [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/412136.html
->>
->
-> [...]
->
-> Kind regards
-> Uffe
-
-
-Regards,
-Martin
-
-
-[0] https://dn.odroid.com/S805/Datasheet/S805_Datasheet%20V0.8%2020150126.pdf
-[1] https://patchwork.kernel.org/patch/8444841/
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170510/17e0817b/attachment.sig>
