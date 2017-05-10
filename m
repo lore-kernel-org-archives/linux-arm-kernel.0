@@ -1,83 +1,41 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 10 May 2017 22:49:04 +0800
-Subject: [PATCH v2] ARM: dts: imx6sx-sdb: Remove OPP override
-In-Reply-To: <7b929a65b4893e081c2c04bb0588801f37ac2cca.1493981825.git.leonard.crestez@nxp.com>
-References: <7b929a65b4893e081c2c04bb0588801f37ac2cca.1493981825.git.leonard.crestez@nxp.com>
-Message-ID: <20170510144903.GC5833@dragon>
+From: wookey@wookware.org (Wookey)
+Date: Wed, 10 May 2017 15:52:05 +0100
+Subject: [PATCH v5 0/5] Add ARM Mali Midgard device tree bindings and gpu
+ node for rk3288
+In-Reply-To: <425541fd-e648-1db7-9c31-13d2d4f094b4@collabora.com>
+References: <cover.1493804968.git.guillaume.tucker@collabora.com>
+ <12996903.t3AZceNVOh@diego>
+ <b63475e9-21f6-5995-90b6-e0eeae8144ab@rock-chips.com>
+ <b43fc703-3c39-58e9-6006-1aa7f9d0cea6@collabora.com>
+ <ddec5773-43ef-a4c3-2280-8f0c5b1f1c4d@rock-chips.com>
+ <425541fd-e648-1db7-9c31-13d2d4f094b4@collabora.com>
+Message-ID: <20170510145205.GJ27127@mail.wookware.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 05, 2017 at 02:00:17PM +0300, Leonard Crestez wrote:
-> The board file for imx6sx-sdb overrides cpufreq operating points to use
-> higher voltages. This is done because the board has a shared rail for
-> VDD_ARM_IN and VDD_SOC_IN and when using LDO bypass the shared voltage
-> needs to be a value suitable for both ARM and SOC.
+On 2017-05-10 11:10 +0100, Guillaume Tucker wrote:
 > 
-> This only applies to LDO bypass mode, a feature not present in upstream.
-> When LDOs are enabled the effect is to use higher voltages than necessary
-> for no good reason.
-> 
-> Setting these higher voltages can make some boards fail to boot with ugly
-> semi-random crashes reminiscent of memory corruption. These failures only
-> happen on board rev. C, rev. B is reported to still work.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> CC: stable at vger.kernel.org
+> On a side note, it would be fantastic to get all this available
+> in Debian packages :)
 
-It should have the Fixes tag below.  I can add it when applying.
+There are prototype debian packages here:
+https://git.linaro.org/people/wookey/mali/mali-dkms.git/
+https://git.linaro.org/people/wookey/mali/mali-drivers.git/
 
-Fixes: 54183bd7f766 ("ARM: imx6sx-sdb: add revb board and make it default")
+Which I'm very happy to get feedback on if people try them with
+guillaume's DTB patches.
 
-> 
-> ---
-> 
-> It is not known exactly why setting these higher voltages causes crashes.
-> Maybe this means that it's not appropriate to CC stable?
+Quite hacky at the moment, but I want to prove they work at all before
+tarting up the packaging.
 
-It should depend on whether we care about the crashes on stable kernel
-running on Rev C board.  Do we?
-
-Shawn
-
-> 
-> Removing this override is a correct change anyway because these OPP
-> overrides do not serve a purpose without ldo bypass.
-> 
-> Changes since v1:
-> - Adjusted commit message
-> - Link: https://lkml.org/lkml/2017/4/25/636
-> 
->  arch/arm/boot/dts/imx6sx-sdb.dts | 17 -----------------
->  1 file changed, 17 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-> index 5bb8fd5..d71da30 100644
-> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
-> +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-> @@ -12,23 +12,6 @@
->  	model = "Freescale i.MX6 SoloX SDB RevB Board";
->  };
->  
-> -&cpu0 {
-> -	operating-points = <
-> -		/* kHz    uV */
-> -		996000  1250000
-> -		792000  1175000
-> -		396000  1175000
-> -		198000  1175000
-> -		>;
-> -	fsl,soc-operating-points = <
-> -		/* ARM kHz      SOC uV */
-> -		996000	1250000
-> -		792000	1175000
-> -		396000	1175000
-> -		198000  1175000
-> -	>;
-> -};
-> -
->  &i2c1 {
->  	clock-frequency = <100000>;
->  	pinctrl-names = "default";
-> -- 
-> 2.7.4
-> 
+Wookey
+-- 
+Principal hats:  Linaro, Debian, Wookware, ARM
+http://wookware.org/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170510/87d60ded/attachment.sig>
