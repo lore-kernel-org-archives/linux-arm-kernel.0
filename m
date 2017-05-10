@@ -1,100 +1,41 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 10 May 2017 17:01:04 +0930
-Subject: [PATCH v6 11/23] drivers/fsi: Add master unscan
-In-Reply-To: <20170410194706.64280-12-cbostic@linux.vnet.ibm.com>
-References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
- <20170410194706.64280-12-cbostic@linux.vnet.ibm.com>
-Message-ID: <CACPK8Xd5g+tZ7_pTO19YhDhyAUggp2fN2YDp7-1SSP+-9qZu9w@mail.gmail.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Wed, 10 May 2017 00:35:34 -0700
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <20170510072746.GF390@ZenIV.linux.org.uk>
+References: <20170509064522.anusoikaalvlux3w@gmail.com>
+ <20170509085659.GA32555@infradead.org>
+ <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
+ <20170509130250.GA11381@infradead.org>
+ <20170509160322.GA15902@infradead.org>
+ <20170510021118.GA390@ZenIV.linux.org.uk>
+ <20170510024524.GB390@ZenIV.linux.org.uk>
+ <20170510031254.GC390@ZenIV.linux.org.uk>
+ <20170510065301.GC4115@infradead.org>
+ <20170510072746.GF390@ZenIV.linux.org.uk>
+Message-ID: <20170510073534.GA19359@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 5:16 AM, Christopher Bostic
-<cbostic@linux.vnet.ibm.com> wrote:
-> From: Chris Bostic <cbostic@linux.vnet.ibm.com>
->
-> Allow a master to undo a previous scan.  Should a master scan a bus
-> twice it will need to ensure it doesn't double register any
-> previously detected device.
->
-> Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> ---
->  drivers/fsi/fsi-core.c | 40 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
->
-> diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-> index 4da0b030..75d2a88 100644
-> --- a/drivers/fsi/fsi-core.c
-> +++ b/drivers/fsi/fsi-core.c
-> @@ -69,6 +69,7 @@ struct fsi_slave {
->         uint32_t                size;   /* size of slave address space */
->  };
->
-> +#define to_fsi_master(d) container_of(d, struct fsi_master, dev)
->  #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
->
->  static int fsi_master_read(struct fsi_master *master, int link,
-> @@ -491,6 +492,37 @@ static int fsi_master_scan(struct fsi_master *master)
->         return 0;
->  }
->
-> +static int __fsi_slave_remove_device(struct device *dev, void *arg)
-> +{
-> +       device_unregister(dev);
-> +       return 0;
-> +}
-> +
-> +static int __fsi_master_remove_slave(struct device *dev, void *arg)
-> +{
-> +       device_for_each_child(dev, NULL, __fsi_slave_remove_device);
-> +       device_unregister(dev);
-> +       return 0;
-> +}
+On Wed, May 10, 2017 at 08:27:47AM +0100, Al Viro wrote:
+> And you *still* do the same.  Christoph, this is ridiculous - the worst
+> part of the area is not a couple of functions in fs/read_write.c, it's
+> a fucking lot of ->read() and ->write() instances in shitty driver code,
+> pardon the redundance.  And _that_ is still done under set_fs(KERNEL_DS).
 
-I can't see why the two above functions to have the __ prefix.
+For now yes.  But it provides a sane API on top, and then we can
+start moving the drivers that matter to the iter variants and drop
+support for the rest soon.  Most in-kernel I/O is done to files, and
+the rest to a very limited set of devices. (not accounting for sockets
+through their own APIs, thats another story)
 
-> +
-> +static void fsi_master_unscan(struct fsi_master *master)
-> +{
-> +       device_for_each_child(&master->dev, NULL, __fsi_master_remove_slave);
-> +}
-> +
-> +static ssize_t master_rescan_store(struct device *dev,
-> +               struct device_attribute *attr, const char *buf, size_t count)
-> +{
-> +       struct fsi_master *master = to_fsi_master(dev);
-> +
-> +       fsi_master_unscan(master);
-> +       fsi_master_scan(master);
+> That's what I'm objecting to.  Centralized kernel_readv() et.al. - sure,
+> and fs/read_write.c is the right place for those.  No arguments here.
+> Conversion to those - absolutely; drivers have no fucking business touching
+> set_fs() at all.  But your primitives are trouble waiting to happen.
+> Let them take kvec arrays.  And let them, in case when there's no
+> ->read_iter()/->write_iter(), do set_fs().  Statically, without this
+> if (iter->type & ITER_KVEC) ... stuff.
 
-These function can return errors. Do you want to return those errors
-to userspace?
-
-> +
-> +       return count;
-> +}
-> +
-> +static DEVICE_ATTR(rescan, 0200, NULL, master_rescan_store);
-> +
->  int fsi_master_register(struct fsi_master *master)
->  {
->         int rc;
-> @@ -507,7 +539,15 @@ int fsi_master_register(struct fsi_master *master)
->                 return rc;
->         }
->
-> +       rc = device_create_file(&master->dev, &dev_attr_rescan);
-> +       if (rc) {
-> +               device_unregister(&master->dev);
-> +               ida_simple_remove(&master_ida, master->idx);
-> +               return rc;
-> +       }
-> +
->         fsi_master_scan(master);
-> +
->         return 0;
->  }
->  EXPORT_SYMBOL_GPL(fsi_master_register);
-> --
-> 1.8.2.2
->
+Oh we?l.  I can do that first, but I think eventually we'll have to
+get back to what I've done now.
