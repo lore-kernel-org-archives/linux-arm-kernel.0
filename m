@@ -1,32 +1,61 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Tue, 9 May 2017 23:54:48 -0700
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <20170510033911.GE390@ZenIV.linux.org.uk>
-References: <20170509064522.anusoikaalvlux3w@gmail.com>
- <20170509085659.GA32555@infradead.org>
- <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
- <20170509130250.GA11381@infradead.org>
- <20170509160322.GA15902@infradead.org>
- <20170510021118.GA390@ZenIV.linux.org.uk>
- <20170510024524.GB390@ZenIV.linux.org.uk>
- <20170510031254.GC390@ZenIV.linux.org.uk>
- <20170510032137.GD390@ZenIV.linux.org.uk>
- <20170510033911.GE390@ZenIV.linux.org.uk>
-Message-ID: <20170510065448.GD4115@infradead.org>
+From: raviteja.garimella@broadcom.com (Raviteja Garimella)
+Date: Wed, 10 May 2017 12:24:24 +0530
+Subject: [RESEND PATCH v5 0/3] Support for USB DRD Phy driver for NS2
+Message-ID: <1494399267-21691-1-git-send-email-raviteja.garimella@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 10, 2017 at 04:39:12AM +0100, Al Viro wrote:
-> fcntl stuff: I've decided not to put something similar into work.compat
-> since I couldn't decide what to do with compat stuff - word-by-word copy
-> from userland converting to struct flock + conversion to posix_lock +
-> actual work + conversion to flock + word-by-word copy to userland...  Smells
-> like we might be better off with compat_flock_to_posix_lock() et.al.
-> I'm still not sure; played a bit one way and another and dediced to drop
-> it for now.  Hell knows...
+Resending the patchset v5.
+Commit message for dts patch is edited as suggested by Florian.
 
-My version already is an improvement in lines of code alone.  Between
-that and stopping to mess with the address limit I think it's a clear
-winner.  But it's pretty independent of the rest, and I'll just run
-it through Jeff and Bruce and ask them what they think.
+Changes in v5:
+=============
+Removed references to phy_ops in the same driver by connect_work
+event handler to change the phy modes.
+
+To support dynamically changing the mode of the phy, it does
+not require doing a phy reset/programming of PHY PLL. Changes
+are made to the connect_work routine to just program the required
+register bits to achieve this purpose.
+
+Changes in v4:
+=============
+Remove references to edev->name in debug prints.
+
+Changes in v3:
+=============
+Remove unnecessary checks for poweron as suggested in review.
+
+Changes in v2:
+=============
+1. Initialize file operations .owner field with THIS_MODULE.
+2. Remove unnecessary gpio example in DT bindings documentation.
+   This is previously acked by Rob Herring <robh@kernel.org>
+
+Introduction for PATCH v1:
+
+This patch adds support for USB Dual Role Device Phy for Broadcom
+Northstar2 SoC. Apart from the new phy driver, this patchset contains
+changes to Kconfig, Makefile, and Device tree files.
+
+This patchset is tested on Broadcom NS2 BCM958712K reference board.
+
+Repo: https://github.com/Broadcom/arm64-linux.git
+Branch: ns2_drdphy_v5
+
+Raviteja Garimella (3):
+  dt-bindings:phy:Add DT bindings documentation for NS2 USB DRD phy
+  phy:phy-bcm-ns2-usbdrd:Broadcom USB DRD Phy driver for Northstar2
+  arm64: dts: NS2: Add USB DRD PHY device tree node
+
+ .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   |  30 ++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  14 +
+ drivers/phy/Kconfig                                |  13 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-ns2-usbdrd.c                   | 595 +++++++++++++++++++++
+ 5 files changed, 653 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
+ create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
+
+-- 
+2.1.0
