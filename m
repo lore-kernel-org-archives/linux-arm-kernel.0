@@ -1,90 +1,56 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 10 May 2017 16:53:42 +0800
-Subject: [PATCH v3 1/3] arm64: kvm: support kvmtool to detect RAS
- extension feature
-In-Reply-To: <5910AB5D.8060105@arm.com>
-References: <CAMj-D2BS7UHLC3DGM5i7fSRsqDKHmLYg79UV7sT6yHGFy5aYfw@mail.gmail.com>
- <5910AB5D.8060105@arm.com>
-Message-ID: <568977d3-d2d5-9bea-13dd-62d525274b69@huawei.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 10 May 2017 11:06:26 +0200
+Subject: [PATCH] staging: vc04_services: Fix bulk cache maintenance
+In-Reply-To: <bd72cc29-140e-dfd7-eac5-01ccc8b844b1@raspberrypi.org>
+References: <d0edaf52-45e2-6fda-bb86-1a9b5e1a5425@raspberrypi.org>
+ <139394270.264573.1493920270267@email.1und1.de>
+ <bd72cc29-140e-dfd7-eac5-01ccc8b844b1@raspberrypi.org>
+Message-ID: <20170510090626.GA21141@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear, James
+On Wed, May 10, 2017 at 09:42:43AM +0100, Phil Elwell wrote:
+> On 04/05/2017 18:51, Stefan Wahren wrote:
+> > 
+> >> Phil Elwell <phil@raspberrypi.org> hat am 4. Mai 2017 um 11:58 geschrieben:
+> >>
+> >>
+> >> vchiq_arm supports transfers less than one page and at arbitrary
+> >> alignment, using the dma-mapping API to perform its cache maintenance
+> >> (even though the VPU drives the DMA hardware). Read (DMA_FROM_DEVICE)
+> >> operations use cache invalidation for speed, falling back to
+> >> clean+invalidate on partial cache lines, with writes (DMA_TO_DEVICE)
+> >> using flushes.
+> >>
+> >> If a read transfer has ends which aren't page-aligned, performing cache
+> >> maintenance as if they were whole pages can lead to memory corruption
+> >> since the partial cache lines at the ends (and any cache lines before or
+> >> after the transfer area) will be invalidated. This bug was masked until
+> >> the disabling of the cache flush in flush_dcache_page().
+> >>
+> >> Honouring the requested transfer start- and end-points prevents the
+> >> corruption.
+> >>
+> >> Fixes: cf9caf192988 ("staging: vc04_services: Replace dmac_map_area with dmac_map_sg")
+> >> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+> > 
+> > Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > 
+> > In order to clarify the context of this issue:
+> > 
+> > http://lists.infradead.org/pipermail/linux-rpi-kernel/2017-April/006149.html
+> 
+> Thanks, Stefan.
+> 
+> Is there no feedback other on this patch? It's been in the rpi-4.11.y downstream
+> branch for a week now with favourable results - see issue
+> https://github.com/raspberrypi/linux/issues/1977 and pr
+> https://github.com/raspberrypi/linux/pull/1987.
 
-On 2017/5/9 1:31, James Morse wrote:
-> Hi gengdongjiu,
-> 
-> On 04/05/17 18:20, gengdongjiu wrote:
->>> On 30/04/17 06:37, Dongjiu Geng wrote:
->>>> Handle kvmtool's detection for RAS extension, because sometimes
->>>> the APP needs to know the CPU's capacity
->>>
->>>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->>>> index d9e9697..1004039 100644
->>>> --- a/arch/arm64/kvm/reset.c
->>>> +++ b/arch/arm64/kvm/reset.c
->>>> @@ -64,6 +64,14 @@ static bool cpu_has_32bit_el1(void)
->>>>   return !!(pfr0 & 0x20);
->>>>  }
->>>>
->>>> +static bool kvm_arm_support_ras_extension(void)
->>>> +{
->>>> + u64 pfr0;
->>>> +
->>>> + pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
->>>> + return !!(pfr0 & 0x10000000);
->>>> +}
->>>
->>> Why are we telling user-space that the CPU has RAS extensions? EL0 can't do
->>> anything with this and the guest EL1 can detect it from the id registers.
->>>
->>>
->>> Are you using this to decide whether or not to generate a HEST for the guest?
->>
->> James, yes, it is.  my current user-space qemu EL0 patches indeed will
->> check the RAS  extensions.
->> if has the RAS extensions. for SEA, userspace qemu will generate the
->> CPER and inject the SEA to guest;
->> for SEI,  userspace qemu sets the virtual SEI with the specified
->> Syndrome(set the HCR_EL2.VSE and vsesr_el2 );
->> if not have RAS extensions, Qemu does nothing
-> 
-> But you can use APEI in a guest on CPUs without the RAS extensions: the host may
-> signal memory errors to Qemu for any number of reasons, user-space shouldn't
-> care how it knows. Examples are PCI-AER, any APEI event notified by polling or
-> one of the flavours of irq.
-> 
-> I would expect Qemu to generate a HEST based on its abilities, i.e. if it
-> supports any mechanism of notifying the guest about errors. Choosing the
-> mechanism then depends on the type of error.
-> 
-> Ideally the Qemu code for HEST/GHES/CPER generation code using some of the irqs
-> and polling could be shared with x86, as these should be possible using common
-> KVM APIs.
-Ok, got it.
+It's the middle of the merge window, I can't do anything with this
+until after 4.12-rc1 comes out.  Please be patient...
 
-> 
-> 
->>> If Qemu/kvmtool supports handling memory-failure notifications from signals you
->>> should always generate a HEST. The GHES notification method could be anything
->>> Qemu can deliver to the guest using the KVM APIs. Notifications from Qemu to the
->>> guest don't depend on the RAS extensions. KVM has APIs for IRQ and SEA (you can
->>> use KVM_SET_ONE_REG).
->>
->> I will consider your suggestion to  always generate a CPER instead of
-> 
-> (generate a HEST, CPER are the runtime records. There are too many acronyms in
-> this space!)
-  thanks James's correction.
+thanks,
 
-> 
->> relying on the RAS extensions, thanks
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> 
-> .
-> 
+greg k-h
