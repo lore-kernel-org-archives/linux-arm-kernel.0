@@ -1,32 +1,35 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 10 May 2017 11:55:21 -0700
-Subject: [GIT PULL] TEE driver infrastructure and OP-TEE drivers
-In-Reply-To: <CAK8P3a06+bG93H0XzAF1UUN_BbV-Cg3ERpVdR6qLuLpZUmp2Ug@mail.gmail.com>
-References: <CAK8P3a06+bG93H0XzAF1UUN_BbV-Cg3ERpVdR6qLuLpZUmp2Ug@mail.gmail.com>
-Message-ID: <CA+55aFxfBG5tc3ysXF_A_5mvsYk4Y2zdq+OD_oxoaDz0UrXMKA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 10 May 2017 16:04:47 -0300
+Subject: [PATCH] PCI: imx6: fix downstream bus scanning
+In-Reply-To: <CAOMZO5BYXx9VmhGrTv44O-njGQsz=GSRp9fA_VbkWapkqY+p=g@mail.gmail.com>
+References: <20170510175752.6519-1-l.stach@pengutronix.de>
+ <CAOMZO5BYXx9VmhGrTv44O-njGQsz=GSRp9fA_VbkWapkqY+p=g@mail.gmail.com>
+Message-ID: <CAOMZO5AnDRbuvp3G-ruM+1fo+9_JPCApRDQ9=kuDL0NZXgHmqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 9, 2017 at 12:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Wed, May 10, 2017 at 3:35 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Lucas,
 >
-> TEE driver infrastructure and OP-TEE drivers
+> On Wed, May 10, 2017 at 2:57 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+>> The change in Linux 4.12 to make PCI configuartion requests non-posted
+>> means that we are now getting a synchronous abort when the CFG space
+>> read to probe for downstream devices times out.
+>>
+>> Synchronous aborts need to be handled differently from the async aborts
+>> we were getting before, in particular the PC needs to be advanced when
+>> resolving the abort. This is mostly a copy of what other PCI drivers do
+>> on ARM to handle those aborts.
+>>
+>> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+>> ---
+>> This is a fix that needs to go in for 4.12, but I would hope to get
+>> some thorough testing before.
+>
+> This fixes the kernel crash on my mx6q board with a PCI switch, thanks!
+>
+> PCI Wifi card is also correctly detected.
 
-Another note: right now this adds a config question for TEE support,
-but the only actual TEE driver has a
+Forgot to add:
 
-        depends on HAVE_ARM_SMCCC
-
-on it.
-
-Until we get more TEE drivers, might I suggest that we perhaps make
-the TEE config option have
-
-        depends on HAVE_ARM_SMCCC || COMPILE_TEST
-
-so that the generic tee code still gets the compile test coverage, but
-we don't confuse people by asking about infrastructure that they can't
-possibly use..
-
-Hmm?
-
-                Linus
+Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
