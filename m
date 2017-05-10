@@ -1,109 +1,29 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Wed, 10 May 2017 13:33:27 -0500
-Subject: [PATCH v6 11/23] drivers/fsi: Add master unscan
-In-Reply-To: <CACPK8Xd5g+tZ7_pTO19YhDhyAUggp2fN2YDp7-1SSP+-9qZu9w@mail.gmail.com>
-References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
- <20170410194706.64280-12-cbostic@linux.vnet.ibm.com>
- <CACPK8Xd5g+tZ7_pTO19YhDhyAUggp2fN2YDp7-1SSP+-9qZu9w@mail.gmail.com>
-Message-ID: <875f5079-0157-6f86-5020-7cfab891664f@linux.vnet.ibm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 10 May 2017 15:35:17 -0300
+Subject: [PATCH] PCI: imx6: fix downstream bus scanning
+In-Reply-To: <20170510175752.6519-1-l.stach@pengutronix.de>
+References: <20170510175752.6519-1-l.stach@pengutronix.de>
+Message-ID: <CAOMZO5BYXx9VmhGrTv44O-njGQsz=GSRp9fA_VbkWapkqY+p=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Lucas,
 
-
-On 5/10/17 2:31 AM, Joel Stanley wrote:
-> On Tue, Apr 11, 2017 at 5:16 AM, Christopher Bostic
-> <cbostic@linux.vnet.ibm.com> wrote:
->> From: Chris Bostic <cbostic@linux.vnet.ibm.com>
->>
->> Allow a master to undo a previous scan.  Should a master scan a bus
->> twice it will need to ensure it doesn't double register any
->> previously detected device.
->>
->> Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
->> Signed-off-by: Joel Stanley <joel@jms.id.au>
->> ---
->>   drivers/fsi/fsi-core.c | 40 ++++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 40 insertions(+)
->>
->> diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
->> index 4da0b030..75d2a88 100644
->> --- a/drivers/fsi/fsi-core.c
->> +++ b/drivers/fsi/fsi-core.c
->> @@ -69,6 +69,7 @@ struct fsi_slave {
->>          uint32_t                size;   /* size of slave address space */
->>   };
->>
->> +#define to_fsi_master(d) container_of(d, struct fsi_master, dev)
->>   #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
->>
->>   static int fsi_master_read(struct fsi_master *master, int link,
->> @@ -491,6 +492,37 @@ static int fsi_master_scan(struct fsi_master *master)
->>          return 0;
->>   }
->>
->> +static int __fsi_slave_remove_device(struct device *dev, void *arg)
->> +{
->> +       device_unregister(dev);
->> +       return 0;
->> +}
->> +
->> +static int __fsi_master_remove_slave(struct device *dev, void *arg)
->> +{
->> +       device_for_each_child(dev, NULL, __fsi_slave_remove_device);
->> +       device_unregister(dev);
->> +       return 0;
->> +}
-> I can't see why the two above functions to have the __ prefix.
-
-Jeremy Kerr had introduced this convention.  Jeremy can you comment on 
-this?
-
+On Wed, May 10, 2017 at 2:57 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> The change in Linux 4.12 to make PCI configuartion requests non-posted
+> means that we are now getting a synchronous abort when the CFG space
+> read to probe for downstream devices times out.
 >
->> +
->> +static void fsi_master_unscan(struct fsi_master *master)
->> +{
->> +       device_for_each_child(&master->dev, NULL, __fsi_master_remove_slave);
->> +}
->> +
->> +static ssize_t master_rescan_store(struct device *dev,
->> +               struct device_attribute *attr, const char *buf, size_t count)
->> +{
->> +       struct fsi_master *master = to_fsi_master(dev);
->> +
->> +       fsi_master_unscan(master);
->> +       fsi_master_scan(master);
-> These function can return errors. Do you want to return those errors
-> to userspace?
-
-That would be the best approach yes... Will change.
-
+> Synchronous aborts need to be handled differently from the async aborts
+> we were getting before, in particular the PC needs to be advanced when
+> resolving the abort. This is mostly a copy of what other PCI drivers do
+> on ARM to handle those aborts.
 >
->> +
->> +       return count;
->> +}
->> +
->> +static DEVICE_ATTR(rescan, 0200, NULL, master_rescan_store);
->> +
->>   int fsi_master_register(struct fsi_master *master)
->>   {
->>          int rc;
->> @@ -507,7 +539,15 @@ int fsi_master_register(struct fsi_master *master)
->>                  return rc;
->>          }
->>
->> +       rc = device_create_file(&master->dev, &dev_attr_rescan);
->> +       if (rc) {
->> +               device_unregister(&master->dev);
->> +               ida_simple_remove(&master_ida, master->idx);
->> +               return rc;
->> +       }
->> +
->>          fsi_master_scan(master);
->> +
->>          return 0;
->>   }
->>   EXPORT_SYMBOL_GPL(fsi_master_register);
->> --
->> 1.8.2.2
->>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+> This is a fix that needs to go in for 4.12, but I would hope to get
+> some thorough testing before.
+
+This fixes the kernel crash on my mx6q board with a PCI switch, thanks!
+
+PCI Wifi card is also correctly detected.
