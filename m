@@ -1,139 +1,57 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 10 May 2017 13:37:07 -0700
-Subject: [PATCH 4/6] tty: serial: lpuart: add imx7ulp support
-In-Reply-To: <CAA+hA=RDjRwwT-O5Y3z-AAQxtPDU7agZdGe6KeFTT=QoW3ufFw@mail.gmail.com>
-References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
- <1494316248-24052-5-git-send-email-aisheng.dong@nxp.com>
- <697fae59cb4e5ff921bb83614325b3f1@agner.ch>
- <CAA+hA=RDjRwwT-O5Y3z-AAQxtPDU7agZdGe6KeFTT=QoW3ufFw@mail.gmail.com>
-Message-ID: <434c613240c36181a828ea090938b8c1@agner.ch>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Wed, 10 May 2017 13:44:58 -0700
+Subject: [PATCH v2 net-next 00/12] drivers: net: xgene: Add ethtool stats and
+ bug fixes
+Message-ID: <1494449110-23785-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-05-09 23:14, Dong Aisheng wrote:
-> Hi Stefan,
-> 
-> On Wed, May 10, 2017 at 12:10 PM, Stefan Agner <stefan@agner.ch> wrote:
->> On 2017-05-09 00:50, Dong Aisheng wrote:
->>> The lpuart of imx7ulp is basically the same as ls1021a. It's also
->>> 32 bit width register, but unlike ls1021a, it's little endian.
->>> Besides that, imx7ulp lpuart has a minor different register layout
->>> from ls1021a that it has four extra registers (verid, param, global,
->>> pincfg) located at the beginning of register map, which are currently
->>> not used by the driver and less to be used later.
->>>
->>> To ease the register difference handling, we add a reg_off member
->>> in lpuart_soc_data structure to represent if the normal
->>> lpuart32_{read|write} requires plus a offset to hide the issue.
->>>
->>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>> Cc: Jiri Slaby <jslaby@suse.com>
->>> Cc: Fugang Duan <fugang.duan@nxp.com>
->>> Cc: Stefan Agner <stefan@agner.ch>
->>> Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
->>> Cc: Yangbo Lu <yangbo.lu@nxp.com>
->>> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
->>> ---
->>>  drivers/tty/serial/fsl_lpuart.c | 21 ++++++++++++++++++---
->>>  1 file changed, 18 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
->>> index bddd041..1cdb3f9 100644
->>> --- a/drivers/tty/serial/fsl_lpuart.c
->>> +++ b/drivers/tty/serial/fsl_lpuart.c
->>> @@ -231,7 +231,11 @@
->>>  #define DEV_NAME     "ttyLP"
->>>  #define UART_NR              6
->>>
->>> +/* IMX lpuart has four extra unused regs located at the beginning */
->>> +#define IMX_REG_OFF  0x10
->>> +
->>>  static bool lpuart_is_be;
->>> +static u8 lpuart_reg_off;
->>
->> Global variables? That hardly works once you have two UARTs...
->>
-> 
-> lpuart_reg_off is SoC specific and there's no two UART
-> with two different reg offset.
-> 
->> Instead of adding a fixed offset to any write you could just add the
->> offset to sport->port.membase...
->>
-> 
-> That's intended as i don't want the changes to be too intrusive.
-> If adding offset in sport->port.xxx, then we have to change the basic
-> lpuart32_read/write API which is called through the whole driver.
+This patch set,
 
-Every lpuart32_write/read call passes port.membase, so if you offset
-port.membase when it is assigned in probe you should be fine not?
+- adds ethtool extended statistics support
+- addresses errata workarounds
+- fixes bugs related to statistics
 
---
-Stefan
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+---
+v2: Address review comments from v1
+	- Adds lock to protect mdio-xgene indirect MAC access
+	- Refactors xgene-enet indirect MAC read/write functions
+	- Uses mdio-xgene MAC access routines, if xgene-enet port
+	  use the same HW.
+v1:
+	- Initial version
+---
 
-> 
-> Regards
-> Dong Aisheng
-> 
->> --
->> Stefan
->>
->>>
->>>  struct lpuart_port {
->>>       struct uart_port        port;
->>> @@ -263,6 +267,7 @@ struct lpuart_port {
->>>  struct lpuart_soc_data {
->>>       bool    is_32;
->>>       bool    is_be;
->>> +     u8      reg_off;
->>>  };
->>>
->>>  static struct lpuart_soc_data vf_data = {
->>> @@ -272,11 +277,19 @@ static struct lpuart_soc_data vf_data = {
->>>  static struct lpuart_soc_data ls_data = {
->>>       .is_32 = true,
->>>       .is_be = true,
->>> +     .reg_off = 0x0,
->>> +};
->>> +
->>> +static struct lpuart_soc_data imx_data = {
->>> +     .is_32 = true,
->>> +     .is_be = false,
->>> +     .reg_off = IMX_REG_OFF,
->>>  };
->>>
->>>  static const struct of_device_id lpuart_dt_ids[] = {
->>>       { .compatible = "fsl,vf610-lpuart", .data = &vf_data, },
->>>       { .compatible = "fsl,ls1021a-lpuart", .data = &ls_data, },
->>> +     { .compatible = "fsl,imx7ulp-lpuart", .data = &imx_data, },
->>>       { /* sentinel */ }
->>>  };
->>>  MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
->>> @@ -286,15 +299,16 @@ static void lpuart_dma_tx_complete(void *arg);
->>>
->>>  static u32 lpuart32_read(void __iomem *addr)
->>>  {
->>> -     return lpuart_is_be ? ioread32be(addr) : readl(addr);
->>> +     return lpuart_is_be ? ioread32be(addr + lpuart_reg_off) :
->>> +                           readl(addr + lpuart_reg_off);
->>>  }
->>>
->>>  static void lpuart32_write(u32 val, void __iomem *addr)
->>>  {
->>>       if (lpuart_is_be)
->>> -             iowrite32be(val, addr);
->>> +             iowrite32be(val, addr + lpuart_reg_off);
->>>       else
->>> -             writel(val, addr);
->>> +             writel(val, addr + lpuart_reg_off);
->>>  }
->>>
->>>  static void lpuart_stop_tx(struct uart_port *port)
->>> @@ -2008,6 +2022,7 @@ static int lpuart_probe(struct platform_device *pdev)
->>>       sport->port.line = ret;
->>>       sport->lpuart32 = sdata->is_32;
->>>       lpuart_is_be = sdata->is_be;
->>> +     lpuart_reg_off = sdata->reg_off;
->>>
->>>       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>       sport->port.membase = devm_ioremap_resource(&pdev->dev, res);
+Iyappan Subramanian (3):
+  drivers: net: xgene: Protect indirect MAC access
+  drivers: net: xgene: Add rx_overrun/tx_underrun statistics
+  drivers: net: xgene: Fix redundant prefetch buffer cleanup
+
+Quan Nguyen (9):
+  drivers: net: phy: xgene: Add lock to protect mac access
+  drivers: net: xgene: Use rgmii mdio mac access
+  drivers: net: xgene: Remove redundant local stats
+  drivers: net: xgene: Refactor statistics error parsing code
+  drivers: net: xgene: Remove unused macros
+  drivers: net: xgene: Extend ethtool statistics
+  drivers: net: xgene: Workaround for HW errata 10GE_4
+  drivers: net: xgene: Add frame recovered statistics counter for errata
+    10GE_8/ENET_11
+  drivers: net: xgene: Workaround for HW errata 10GE_10/ENET_15
+
+ .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    | 132 ++++++++++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     | 188 +++++++++++----------
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |  70 +++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c   |  59 +++++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |  12 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c  | 110 +++---------
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c  |  77 +++------
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h  |   5 +
+ drivers/net/phy/mdio-xgene.c                       |  74 ++++----
+ drivers/net/phy/mdio-xgene.h                       |   3 +
+ 10 files changed, 428 insertions(+), 302 deletions(-)
+
+-- 
+1.9.1
