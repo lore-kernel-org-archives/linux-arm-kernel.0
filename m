@@ -1,60 +1,75 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 10 May 2017 15:59:38 +0200
-Subject: [PATCH 1/4] ata: Add DT bindings for Faraday Technology FTIDE010
-In-Reply-To: <CACRpkdbmOsrxKX8=a7bvcF+c=Q2tfwYQVt0=cz+_jhDyadwa2A@mail.gmail.com>
-References: <CGME20170506121118epcas2p1b2a2d1a8005a37582a73c0e7be4b1a1b@epcas2p1.samsung.com>
- <1678111.DmiVNKW3dQ@amdc3058>
- <CACRpkdbmOsrxKX8=a7bvcF+c=Q2tfwYQVt0=cz+_jhDyadwa2A@mail.gmail.com>
-Message-ID: <6650456.qCJGCGKGLl@amdc3058>
+From: peter.senna@collabora.com (Peter Senna Tschudin)
+Date: Wed, 10 May 2017 16:14:06 +0200
+Subject: Regression: 442ec4c04d1: PCI: dwc: all: Split struct pcie_port
+ into host-only and core structures
+In-Reply-To: <1494423139.2322.60.camel@pengutronix.de>
+References: <20170508150224.GA7458@collabora.com>
+ <CAOMZO5DjFxAus3B03Om0xoqxKuY2TkbcjCY1YEUK9s_R8C_DNA@mail.gmail.com>
+ <20170509063439.GC9791@collabora.com>
+ <CAOMZO5CXjb7LVT5ByP1RqgBPkkfRn7PcRPmW3hos=UNXGnok=A@mail.gmail.com>
+ <20170510131722.GA29556@collabora.com>
+ <CAOMZO5CwtT=Zz8+CrT2TA5W7YHFRnDKgthRyChvUpF+f_QsYcQ@mail.gmail.com>
+ <1494423139.2322.60.camel@pengutronix.de>
+Message-ID: <20170510141406.GA24864@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, May 08, 2017 10:26:49 PM Linus Walleij wrote:
-> On Mon, May 8, 2017 at 12:47 PM, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
+On Wed, May 10, 2017 at 03:32:19PM +0200, Lucas Stach wrote:
+> Am Mittwoch, den 10.05.2017, 10:27 -0300 schrieb Fabio Estevam:
+> > On Wed, May 10, 2017 at 10:17 AM, Peter Senna Tschudin
+> > <peter.senna@collabora.com> wrote:
+> > > On Tue, May 09, 2017 at 07:21:24AM -0300, Fabio Estevam wrote:
+> > >> Hi Peter,
+> > >>
+> > >> On Tue, May 9, 2017 at 3:34 AM, Peter Senna Tschudin
+> > >> <peter.senna@collabora.com> wrote:
+> > >>
+> > >> > Something that ocurred to me is that u-boot is initializing the PCI, and
+> > >> > the PCI networkd cards.  Ideally this should not affect anything, but
+> > >> > can this be related to the issue?
+> > >>
+> > >> Yes, in order to narrow things down: please boot 4.11 without PCI
+> > >> support in U-Boot.
+> > >
+> > > Yes, removing the PCI code from u-boot makes 4.11 to boot. But latest
+> > > next still hangs.
+> > 
+> > Ok, good. At least we see the same behaviour now.
+> > 
+> > We still need a fix for the mx6q hang on systems with PCI switch for
+> > linux/next or 4.12-rc1.
 > 
-> > Also for all current drivers we just put timing values (or a logic
-> > to calculate them from the standard ATA timings) into the driver
-> > itself and not device tree (as they are based on values are dictated
-> > by ATA standard and should not change for a given controller type).
-> 
-> I had it like that at first (and I can of course switch it back). But I
-> came to think this is better.
-> 
-> I was looking at these values from the point that it depends a bit
-> on the silicon where it is synthesized. So the vendor tree has
-> things like this:
-> 
-> #ifndef SL2312_FPGA_IDE
-> static unsigned char PIO_TIMING[5] = { 0xaa, 0xa3, 0xa1, 0x33, 0x31 };
-> static unsigned char TIMING_MDMA_50M[3] = { 0x66, 0x22, 0x21 };
-> static unsigned char TIMING_MDMA_66M[3] = { 0x88, 0x32, 0x31 };
-> static unsigned char TIMING_UDMA_50M[6] = { 0x33, 0x31, 0x21, 0x21,
-> 0x11, 0x91 };
-> static unsigned char TIMING_UDMA_66M[7] = { 0x44, 0x42, 0x31, 0x21,
-> 0x11, 0x91,  0x91};
-> #else
-> static unsigned char PIO_TIMING[5] = { 0x88, 0x82, 0x81, 0x32, 0x21 };
-> static unsigned char TIMING_MDMA_50M[3] = { 0x33, 0x11, 0x11 };
-> static unsigned char TIMING_MDMA_66M[3] = { 0x33, 0x11, 0x11 };
-> static unsigned char TIMING_UDMA_50M[6] = { 0x22, 0x11, 0x11, 0x11 };
-> static unsigned char TIMING_UDMA_66M[7] = { 0x22, 0x11, 0x11, 0x11 };
-> #endif
-> 
-> (From D-Link DIR-685 source release from Storlink/Cortina board support.)
-> 
-> So depending on whether they use an FPGA or an ASIC the values are
-> different, no matter what frequency (50 or 66 MHz) is used. So it is not
-> derived from frequency.
-> 
-> So I think it makes most sense to have it in the device tree as we don't
-> know what designs are out there.
+> I will take a look at this today.
 
-I still would prefer to keep timing values private to the driver and just
-select the controller type (FPGA/ASIC) using the device tree.
+I'll be more than happy to help. Let me know if you need testing or any
+other thing.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+> 
+> > 
+> > >> The problem is that mx6q does not have a way to properly reset the PCI block.
+> > >>
+> > >> On the board I tested there is no PCI support in U-Boot.
+> > >>
+> > >> Maybe we need the following approach in U-Boot as Lucas did for Barebox:
+> > >> https://git.pengutronix.de/cgit/barebox/commit/?id=f1da98da2760c21487bbba8f7fb957c843a22896
+> > >
+> > > Maybe we do need, but the kernel is working on v4.10 for our use case,
+> > > and it is not working any longer on v4.11. What is the way to continue
+> > > from here?
+> > 
+> > There is no other way other than fixing U-Boot on this case.
+> 
+> You could also revert the change in the kernel if you are absolutely
+> sure that this won't cause issues on your system (you are not using the
+> internal watchdog etc.).
+> 
+> But for the long run and to make sure that _all_ use-cases work
+> properly, there is no way around fixing your bootloader to behave
+> correctly.
+
+Thanks!
+
+> 
+> Regards,
+> Lucas
+> 
