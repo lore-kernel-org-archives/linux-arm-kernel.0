@@ -1,86 +1,66 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Wed, 10 May 2017 17:31:47 +0800
-Subject: [PATCH v3 2/2] dt-bindings: pcie: Add documentation for
- Mediatek PCIe
-In-Reply-To: <CAK8P3a193RxchvFAMWeZiP0sc0bd+VGg=_aVvipSgcbDpHXojg@mail.gmail.com>
-References: <1494382020-26790-1-git-send-email-ryder.lee@mediatek.com>
- <1494382020-26790-3-git-send-email-ryder.lee@mediatek.com>
- <CAK8P3a193RxchvFAMWeZiP0sc0bd+VGg=_aVvipSgcbDpHXojg@mail.gmail.com>
-Message-ID: <1494408707.31307.32.camel@mtkswgap22>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 10 May 2017 11:42:19 +0200
+Subject: [PATCH v4 0/3] Add Mediatek CIRQ interrupt controller
+In-Reply-To: <1491558884.24848.3.camel@mtksdaap41>
+References: <1491552397-7893-1-git-send-email-youlin.pei@mediatek.com>
+ <771954fe-c994-96be-76ab-ece75383d058@arm.com>
+ <1491558884.24848.3.camel@mtksdaap41>
+Message-ID: <36732dc3-e113-246c-0828-150e9b31f4fb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-05-10 at 10:08 +0200, Arnd Bergmann wrote:
-> On Wed, May 10, 2017 at 4:07 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+
+
+On 07/04/17 11:54, Youlin Pei wrote:
+> On Fri, 2017-04-07 at 09:52 +0100, Marc Zyngier wrote:
+>> On 07/04/17 09:06, Youlin Pei wrote:
+>>> In Mediatek SOCs, the CIRQ is a low power interrupt controller designed to
+>>> works outside MCUSYS which comprises with Cortex-Ax cores,CCI and GIC.
+>>>
+>>> The CIRQ controller is integrated in between MCUSYS and interrupt sources
+>>> as the second level interrupt controller. The external interrupts which
+>>> outside MCUSYS will feed through CIRQ then bypass to GIC.
+>>>
+>>> In normal mode(where MCUSYS is active), CIRQ is disabled and interrupts
+>>> will directly issue to MCUSYS. When MCUSYS enters sleep mode, where GIC
+>>> is power downed. CIRQ will be enabled and monitor all edge trigger
+>>> interrupts(only edge trigger interrupts will be lost in this scenario).
+>>> When an edge interrupt is triggered, CIRQ will record the status and
+>>> generated a pulse signal to GIC when flush command is executed.
+>>>
+>>> With CIRQ, MCUSYS can be completely turned off to improve the system
+>>> power consumption without losing interrupts.
+>>>
+>>> change in v4:
+>>> 1. add some comment to explain CIRQ suspend callback.
+>>> 2. rebase on 4.11
+>>
+>> Hi Youlin,
+>>
+>> I'm happy to take the first two patches through the irq tree. How do we
+>> deal with the third one? It seems to me that it'd be better routed via
+>> armsoc.
+>>
+>> Let me know what you and Matthias want to do.
 > 
-> > +- ranges:
-> > +  - The first three entries are expected to translate the addresses for the root
-> > +    port registers, which are referenced by the assigned-addresses property of
-> > +    the root port nodes (see below).
+> Hi Marc,
 > 
-> I don't understand this part. Why do you need a static translation for these?
-> Shouldn't they just be listed in the 'reg' property of the parent node now that
-> you have the clk/reset/phy properties in the parent as well?
-
-At first, I did like that. But I noticed that someone suggest it's
-better to use 'assigned-addresses' to handle per-port registers, the
-same path as tegra and marvell did, in other platform discussion thread.
-So I just put shared register in root node. It could be rolled back if
-you feel this is inappropriate.
-
-> > +Required properties:
-> > +- device_type: Must be "pci"
-> > +- assigned-addresses: Address and size of the port configuration registers
-> > +- reg: Only the first four bytes are used to refer to the correct bus number
-> > +  and device number.
-> > +- #address-cells: Must be 3
-> > +- #size-cells: Must be 2
-> > +- #interrupt-cells: Must be 1
-> > +- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
-> > +  Please refer to the standard PCI bus binding document for a more detailed
-> > +  explanation.
+> Thanks for your review. I think that driver and dtsi can merged
+> separately.
 > 
-> Child nodes do not normally have interrupt-map properties. Isn't this
-> already covered by the interrupt-map in the parent?
+> Hi Matthias,
+> Could you help to review the dtsi patch?
+
+queued now for v4.12-next/dts32
+sorry for the late answer.
+
+Matthias
+
+> Thanks a lot!
 > 
-
-I have one Intel 4 port ethernet card(0000:00:01) and MTK WLAN card
-(0000:00:02), probe message looks good to me.
-
-pci 0000:00:01.0: fixup irq: got 224
-pci 0000:00:01.0: assigning IRQ 224
-pci 0000:00:02.0: fixup irq: got 225
-pci 0000:00:02.0: assigning IRQ 225
-
-pci 0000:01:00.0: fixup irq: got 224
-pci 0000:01:00.0: assigning IRQ 224
-pci 0000:01:00.1: fixup irq: got 224
-pci 0000:01:00.1: assigning IRQ 224
-pci 0000:01:00.2: fixup irq: got 224
-pci 0000:01:00.2: assigning IRQ 224
-pci 0000:01:00.3: fixup irq: got 224
-pci 0000:01:00.3: assigning IRQ 224
-
-pci 0000:02:00.0: fixup irq: got 225
-pci 0000:02:00.0: assigning IRQ 225
-
-
-But child nodes without interrupt-map properties:
-It seems incorrect.
-
-pci 0000:00:01.0: fixup irq: got 224
-pci 0000:00:01.0: assigning IRQ 224
-pci 0000:00:02.0: fixup irq: got 225
-pci 0000:00:02.0: assigning IRQ 225
-
-pci 0000:01:00.0: fixup irq: got 223
-pci 0000:01:00.0: assigning IRQ 223
-pci 0000:01:00.1: fixup irq: got 223
-pci 0000:01:00.1: assigning IRQ 223
-pci 0000:01:00.2: fixup irq: got 223
-pci 0000:01:00.2: assigning IRQ 223
-pci 0000:01:00.3: fixup irq: got 223
-pci 0000:01:00.3: assigning IRQ 223
-
-pci 0000:02:00.0: fixup irq: got 223
-pci 0000:02:00.0: assigning IRQ 223
+>>
+>> Thanks,
+>>
+>> 	M.
+> 
+> 
