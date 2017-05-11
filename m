@@ -1,54 +1,59 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Thu, 11 May 2017 14:25:23 +0800
-Subject: [linux-sunxi] [PATCH v2 20/20] ARM: sun5i: a10s-olinuxino: Enable
- HDMI
-In-Reply-To: <20170510192358.taufs5tsyifueued@flea.home>
-References: <cover.d697f34bb7b0605c5e76cbc4167a64453e5e0984.1493812478.git-series.maxime.ripard@free-electrons.com>
- <c7ac6faa0568e6418291255af537c4b070bdea63.1493812478.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65S2pw3z8NZ+tkPkF=A=5z2toRkC+26pAs6La6CNyeXoQ@mail.gmail.com>
- <20170510192358.taufs5tsyifueued@flea.home>
-Message-ID: <e273b954cab66fb17d07c9eb987778b6@aosc.io>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Thu, 11 May 2017 12:17:40 +0530
+Subject: [PATCH v5 1/3] phy: qcom-usb: Remove unused ulpi phy header
+Message-ID: <1494485262-18995-1-git-send-email-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-05-11 03:23?Maxime Ripard ???
-> Hi,
-> 
-> On Thu, May 04, 2017 at 04:05:18PM +0800, Chen-Yu Tsai wrote:
->> On Wed, May 3, 2017 at 7:59 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > The A10s Olinuxino has an HDMI connector. Make sure we can use it.
->> >
->> > Acked-by: Chen-Yu Tsai <wens@csie.org>
->> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > ---
->> >  arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 29 +++++++++++++++++-
->> >  1 file changed, 29 insertions(+), 0 deletions(-)
->> >
->> > diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
->> > index 894f874a5beb..1d13b6407222 100644
->> > --- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
->> > +++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
->> > @@ -63,6 +63,17 @@
->> >                 stdout-path = "serial0:115200n8";
->> >         };
->> >
->> > +       connector {
->> > +               compatible = "hdmi-connector";
->> > +               type = "a";
->> 
->> Just curious, should we take this into consideration when creating
->> drm_connector?
-> 
-> I'm not sure, no other driver does so. And I haven't seen any of our
-> boards with a HDMI-B, C or mini-HDMI connector.
+Ulpi phy header is not used for anything. Remove the same
+from qcom-hs and qcom-hsic phy drivers.
 
-Tablets usually come with micro-HDMI connector.
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+Suggested-by: Stephen Boyd <stephen.boyd@linaro.org>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-arm-msm at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-usb at vger.kernel.org
+---
 
-> 
-> Maxime
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Changes since v4:
+ - None.
+
+Changes since v3:
+ - New patch added in the series.
+   Removing headers as per Stephen's suggestion.
+
+ drivers/phy/phy-qcom-usb-hs.c   | 2 --
+ drivers/phy/phy-qcom-usb-hsic.c | 2 --
+ 2 files changed, 4 deletions(-)
+
+diff --git a/drivers/phy/phy-qcom-usb-hs.c b/drivers/phy/phy-qcom-usb-hs.c
+index 94dfbfd739c3..43704f4f23e9 100644
+--- a/drivers/phy/phy-qcom-usb-hs.c
++++ b/drivers/phy/phy-qcom-usb-hs.c
+@@ -15,8 +15,6 @@
+ #include <linux/extcon.h>
+ #include <linux/notifier.h>
+ 
+-#include "ulpi_phy.h"
+-
+ #define ULPI_PWR_CLK_MNG_REG		0x88
+ # define ULPI_PWR_OTG_COMP_DISABLE	BIT(0)
+ 
+diff --git a/drivers/phy/phy-qcom-usb-hsic.c b/drivers/phy/phy-qcom-usb-hsic.c
+index 47690f9945b9..6dcaf04fa367 100644
+--- a/drivers/phy/phy-qcom-usb-hsic.c
++++ b/drivers/phy/phy-qcom-usb-hsic.c
+@@ -13,8 +13,6 @@
+ #include <linux/delay.h>
+ #include <linux/clk.h>
+ 
+-#include "ulpi_phy.h"
+-
+ #define ULPI_HSIC_CFG		0x30
+ #define ULPI_HSIC_IO_CAL	0x33
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
