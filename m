@@ -1,105 +1,105 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Thu, 11 May 2017 16:01:00 -0500
-Subject: [PATCH v7 23/23] drivers/fsi: Use asynchronous slave mode
-In-Reply-To: <20170511210101.78409-1-cbostic@linux.vnet.ibm.com>
-References: <20170511210101.78409-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170511210101.78409-24-cbostic@linux.vnet.ibm.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Thu, 11 May 2017 16:17:01 -0700
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508075209.7aluvpwildw325rf@gmail.com>
+ <1494256932.1167.1.camel@gmail.com>
+ <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
+ <20170509065619.wmqa6z6w3n6xpvrw@gmail.com> <20170509111007.GA14702@kroah.com>
+ <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
+Message-ID: <CAJcbSZEoRyewUtBHvqmNZL9FtT_q42Vmmd-EuC50x-ZRASiHHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+On Tue, May 9, 2017 at 7:29 AM, Thomas Garnier <thgarnie@google.com> wrote:
+>
+> On Tue, May 9, 2017 at 4:10 AM, Greg KH <greg@kroah.com> wrote:
+> > On Tue, May 09, 2017 at 08:56:19AM +0200, Ingo Molnar wrote:
+> >>
+> >> * Kees Cook <keescook@chromium.org> wrote:
+> >>
+> >> > > There's the option of using GCC plugins now that the infrastructure was
+> >> > > upstreamed from grsecurity. It can be used as part of the regular build
+> >> > > process and as long as the analysis is pretty simple it shouldn't hurt compile
+> >> > > time much.
+> >> >
+> >> > Well, and that the situation may arise due to memory corruption, not from
+> >> > poorly-matched set_fs() calls, which static analysis won't help solve. We need
+> >> > to catch this bad kernel state because it is a very bad state to run in.
+> >>
+> >> If memory corruption corrupted the task state into having addr_limit set to
+> >> KERNEL_DS then there's already a fair chance that it's game over: it could also
+> >> have set *uid to 0, or changed a sensitive PF_ flag, or a number of other
+> >> things...
+> >>
+> >> Furthermore, think about it: there's literally an infinite amount of corrupted
+> >> task states that could be a security problem and that could be checked after every
+> >> system call. Do we want to check every one of them?
+> >
+> > Ok, I'm all for not checking lots of stuff all the time, just to protect
+> > from crappy drivers that.  Especially as we _can_ audit and run checks
+> > on the source code for them in the kernel tree.
+> >
+> > But, and here's the problem, outside of the desktop/enterprise world,
+> > there are a ton of out-of-tree code that is crap.  The number of
+> > security/bug fixes and kernel crashes for out-of-tree code in systems
+> > like Android phones is just so high it's laughable.
+> >
+> > When you have a device that is running 3.2 million lines of kernel code,
+> > yet the diffstat of the tree compared to mainline adds 3 million lines
+> > of code, there is bound to be a ton of issues/problems there.
+> >
+> > So this is an entirely different thing we need to try to protect
+> > ourselves from.  A long time ago I laughed when I saw that Microsoft had
+> > to do lots of "hardening" of their kernel to protect themselves from
+> > crappy drivers, as I knew we didn't have to do that because we had the
+> > source for them and could fix the root issues.  But that has changed and
+> > now we don't all have that option.  That code is out-of-tree because the
+> > vendor doesn't care, and doesn't want to take any time at all to do
+> > anything resembling a real code review[1].
+>
+> That's a big part of why I thought would be useful. I am less worried
+> about edge cases upstream right now than forks with custom codes not
+> using set_fs correctly.
+>
+> >
+> > So, how about options like the ones being proposed here, go behind a new
+> > config option:
+> >         CONFIG_PROTECT_FROM_CRAPPY_DRIVERS
+> > that device owners can enable if they do not trust their vendor-provided
+> > code (hint, I sure don't.)  That way the "normal" path that all of us
+> > are used to running will be fine, but if you want to take the speed hit
+> > to try to protect yourself, then you can do that as well.
+>
+> Maybe another name but why not.
 
-For slaves that are behind a software-clocked master, we want FSI CFAMs
-to run asynchronously to the FSI clock, so set up our slaves to be in
-async mode.
+Ingo: Do you want the change as-is? Would you like it to be optional?
+What do you think?
 
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Christopher Bostic <cbostic@linux.vnet.ibm.com>
----
- drivers/fsi/fsi-core.c        | 22 +++++++++++++++++++++-
- drivers/fsi/fsi-master-gpio.c |  1 +
- drivers/fsi/fsi-master.h      |  2 ++
- 3 files changed, 24 insertions(+), 1 deletion(-)
+>
+> >
+> > Anyway, just an idea...
+> >
+> > thanks,
+> >
+> > greg k-h
+> >
+> > [1] I am working really hard with lots of vendors to try to fix their
+> >     broken development model, but that is going to take years to resolve
+> >     as their device pipelines are years long, and changing their
+> >     mindsets takes a long time...
+>
+>
+>
+> --
+> Thomas
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 6e7d778..f19f87a 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -49,6 +49,7 @@
- #define FSI_SMODE		0x0	/* R/W: Mode register */
- #define FSI_SISC		0x8	/* R/W: Interrupt condition */
- #define FSI_SSTAT		0x14	/* R  : Slave status */
-+#define FSI_LLMODE		0x100	/* R/W: Link layer mode register */
- 
- /*
-  * SMODE fields
-@@ -64,6 +65,11 @@
- #define FSI_SMODE_LBCRR_SHIFT	8		/* Clk ratio shift */
- #define FSI_SMODE_LBCRR_MASK	0xf		/* Clk ratio mask */
- 
-+/*
-+ * LLMODE fields
-+ */
-+#define FSI_LLMODE_ASYNC	0x1
-+
- #define FSI_SLAVE_SIZE_23b		0x800000
- 
- static DEFINE_IDA(master_ida);
-@@ -553,8 +559,8 @@ static void fsi_slave_release(struct device *dev)
- 
- static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- {
-+	uint32_t chip_id, llmode;
- 	struct fsi_slave *slave;
--	uint32_t chip_id;
- 	uint8_t crc;
- 	int rc;
- 
-@@ -590,6 +596,20 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- 		return -ENODEV;
- 	}
- 
-+	/* If we're behind a master that doesn't provide a self-running bus
-+	 * clock, put the slave into async mode
-+	 */
-+	if (master->flags & FSI_MASTER_FLAG_SWCLOCK) {
-+		llmode = cpu_to_be32(FSI_LLMODE_ASYNC);
-+		rc = fsi_master_write(master, link, id,
-+				FSI_SLAVE_BASE + FSI_LLMODE,
-+				&llmode, sizeof(llmode));
-+		if (rc)
-+			dev_warn(&master->dev,
-+				"can't set llmode on slave:%02x:%02x %d\n",
-+				link, id, rc);
-+	}
-+
- 	/* We can communicate with a slave; create the slave device and
- 	 * register.
- 	 */
-diff --git a/drivers/fsi/fsi-master-gpio.c b/drivers/fsi/fsi-master-gpio.c
-index a5d6e70..ae26187 100644
---- a/drivers/fsi/fsi-master-gpio.c
-+++ b/drivers/fsi/fsi-master-gpio.c
-@@ -554,6 +554,7 @@ static int fsi_master_gpio_probe(struct platform_device *pdev)
- 	master->gpio_mux = gpio;
- 
- 	master->master.n_links = 1;
-+	master->master.flags = FSI_MASTER_FLAG_SWCLOCK;
- 	master->master.read = fsi_master_gpio_read;
- 	master->master.write = fsi_master_gpio_write;
- 	master->master.term = fsi_master_gpio_term;
-diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
-index 7764b00..12f7b11 100644
---- a/drivers/fsi/fsi-master.h
-+++ b/drivers/fsi/fsi-master.h
-@@ -19,6 +19,8 @@
- 
- #include <linux/device.h>
- 
-+#define FSI_MASTER_FLAG_SWCLOCK		0x1
-+
- struct fsi_master {
- 	struct device	dev;
- 	int		idx;
+
+
+
 -- 
-1.8.2.2
+Thomas
