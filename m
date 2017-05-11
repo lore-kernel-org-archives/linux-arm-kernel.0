@@ -1,50 +1,57 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 11 May 2017 10:30:39 +0200 (CEST)
-Subject: [PATCHv3 0/2] arm64: fix hotplug rwsem boot fallout
-In-Reply-To: <alpine.DEB.2.20.1705102208290.2571@nanos>
-References: <1493377266-2205-1-git-send-email-mark.rutland@arm.com>
- <20170510180928.GA7102@leverpostej>
- <alpine.DEB.2.20.1705102208290.2571@nanos>
-Message-ID: <alpine.DEB.2.20.1705110949140.1758@nanos>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 May 2017 09:45:25 +0100
+Subject: [v5 1/4] ACPICA: IORT: Add Cavium ThunderX2 SMMUv3 model
+ definition.
+In-Reply-To: <3122711.vgvub3W1fy@aspire.rjw.lan>
+References: <1494415918-13770-1-git-send-email-gakula@caviumnetworks.com>
+ <1494415918-13770-2-git-send-email-gakula@caviumnetworks.com>
+ <3122711.vgvub3W1fy@aspire.rjw.lan>
+Message-ID: <20170511084525.GA18839@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 May 2017, Thomas Gleixner wrote:
-> On Wed, 10 May 2017, Mark Rutland wrote:
-> > [    0.182133] [<ffff200008155218>] lockdep_assert_hotplug_held+0x78/0x98
-> > [    0.182161] [<ffff20000840a36c>] __static_key_slow_inc+0x174/0x2e0
-> > [    0.182188] [<ffff20000840a654>] static_key_enable_cpuslocked+0x64/0xb0
-> > [    0.182215] [<ffff2000080a1120>] update_cpu_capabilities+0x178/0x2d8
-> > [    0.182243] [<ffff20000809e72c>] update_cpu_errata_workarounds_cpuslocked+0x1c/0x28
-> > [    0.182270] [<ffff2000080a1420>] check_local_cpu_capabilities+0x1a0/0x248
-> > [    0.182295] [<ffff2000080a2d18>] secondary_start_kernel+0x1e8/0x478
-> > [    0.182317] [<000000008219a1b4>] 0x8219a1b4
-> > [    0.182337] CPU features: enabling workaround for ARM erratum 834220
-> > [    0.182362] ------------[ cut here ]------------
+On Thu, May 11, 2017 at 02:26:02AM +0200, Rafael J. Wysocki wrote:
+> On Wednesday, May 10, 2017 05:01:55 PM Geetha sowjanya wrote:
+> > From: Linu Cherian <linu.cherian@cavium.com>
 > > 
-> > The problem is that the secondary CPU doesn't hold the rwsem when it
-> > calls __static_key_slow_inc() in its boot path. It cannot take the
-> > rwsem, since the primaary CPU holds this for the duration of onlining
-> > the secondary CPU.
+> > Add SMMUv3 model definition for ThunderX2.
+> > 
+> > Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+> > Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> 
+> This is an ACPICA change, but you have not included the ACPICA maintainers
+> into your original CC list (added now).
+> 
+> Bob, Lv, how should this be routed?
+> 
+> Do you want to apply this patch upstream first or can we make this change in
+> Linux and upstream in parallel?  That shouldn't be a big deal, right?
 
-Looking deeper into that:
+I think we're still waiting for the updated IORT document to be published (I
+think this should be in the next week or so), so I don't think we should
+commit the new ID before that happens.
 
-secondary_start_kernel()
-  check_local_cpu_capabilities()
-    update_cpu_errata_workarounds()
-      update_cpu_capabilities()
-        static_key_enable()
-	  __static_key_slow_inc()
-	    jump_label_lock()
-       	      mutex_lock(&jump_label_mutex);
+Will
 
-How is that supposed to work?
-
-That call path is the low level CPU bringup, running in the context of the
-idle task of that CPU with interrupts and preemption disabled. Taking a
-mutex in that context, even if in that case the mutex is uncontended, is a
-NONO.
-
-Thanks,
-
-	tglx
+> > ---
+> >  include/acpi/actbl2.h | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+> > index faa9f2c..76a6f5d 100644
+> > --- a/include/acpi/actbl2.h
+> > +++ b/include/acpi/actbl2.h
+> > @@ -779,6 +779,8 @@ struct acpi_iort_smmu {
+> >  #define ACPI_IORT_SMMU_CORELINK_MMU400  0x00000002	/* ARM Corelink MMU-400 */
+> >  #define ACPI_IORT_SMMU_CORELINK_MMU500  0x00000003	/* ARM Corelink MMU-500 */
+> >  
+> > +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX 0x00000002 /* Cavium ThunderX2 SMMUv3 */
+> > +
+> >  /* Masks for Flags field above */
+> >  
+> >  #define ACPI_IORT_SMMU_DVM_SUPPORTED    (1)
+> > 
+> 
+> Thanks,
+> Rafael
+> 
