@@ -1,139 +1,60 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Thu, 11 May 2017 15:02:31 +0530
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
-References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
- <20170510.212952.1440495072777358778.davem@davemloft.net>
- <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
- <20170510.215218.2185526627014393313.davem@davemloft.net>
- <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
-Message-ID: <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 11 May 2017 10:37:21 +0100
+Subject: [PATCHv3 0/2] arm64: fix hotplug rwsem boot fallout
+In-Reply-To: <alpine.DEB.2.20.1705110949140.1758@nanos>
+References: <1493377266-2205-1-git-send-email-mark.rutland@arm.com>
+ <20170510180928.GA7102@leverpostej>
+ <alpine.DEB.2.20.1705102208290.2571@nanos>
+ <alpine.DEB.2.20.1705110949140.1758@nanos>
+Message-ID: <20170511093721.GB14766@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi kees & Daniel,
+On Thu, May 11, 2017 at 10:30:39AM +0200, Thomas Gleixner wrote:
+> On Wed, 10 May 2017, Thomas Gleixner wrote:
+> > On Wed, 10 May 2017, Mark Rutland wrote:
+> > > [    0.182133] [<ffff200008155218>] lockdep_assert_hotplug_held+0x78/0x98
+> > > [    0.182161] [<ffff20000840a36c>] __static_key_slow_inc+0x174/0x2e0
+> > > [    0.182188] [<ffff20000840a654>] static_key_enable_cpuslocked+0x64/0xb0
+> > > [    0.182215] [<ffff2000080a1120>] update_cpu_capabilities+0x178/0x2d8
+> > > [    0.182243] [<ffff20000809e72c>] update_cpu_errata_workarounds_cpuslocked+0x1c/0x28
+> > > [    0.182270] [<ffff2000080a1420>] check_local_cpu_capabilities+0x1a0/0x248
+> > > [    0.182295] [<ffff2000080a2d18>] secondary_start_kernel+0x1e8/0x478
+> > > [    0.182317] [<000000008219a1b4>] 0x8219a1b4
+> > > [    0.182337] CPU features: enabling workaround for ARM erratum 834220
+> > > [    0.182362] ------------[ cut here ]------------
+> > > 
+> > > The problem is that the secondary CPU doesn't hold the rwsem when it
+> > > calls __static_key_slow_inc() in its boot path. It cannot take the
+> > > rwsem, since the primaary CPU holds this for the duration of onlining
+> > > the secondary CPU.
+> 
+> Looking deeper into that:
+> 
+> secondary_start_kernel()
+>   check_local_cpu_capabilities()
+>     update_cpu_errata_workarounds()
+>       update_cpu_capabilities()
+>         static_key_enable()
+> 	  __static_key_slow_inc()
+> 	    jump_label_lock()
+>        	      mutex_lock(&jump_label_mutex);
+> 
+> How is that supposed to work?
+> 
+> That call path is the low level CPU bringup, running in the context of the
+> idle task of that CPU with interrupts and preemption disabled. Taking a
+> mutex in that context, even if in that case the mutex is uncontended, is a
+> NONO.
 
-David suggested following :
+Urgh; good point. Thanks for taking a look.
 
-"""
-eBPF has registers 0 through 10 plus you need to allocate another
-temporary register for constant blinding (this is BPF_REG_AX).
+I think I can solve both issues by deferring poking the keys, so I'll
+give that a go.
 
-I would put all of BPF_REG_0 through BPF_REG_5 in registers if
-possible.  BPF_REG_FP is the frame pointer which you don't have to
-really allocate.  That leaves BPF_REG_6 through BPF_REG_9, which
-are callee saved, for perhaps stack slot allocation.
+As an aside, do we have anything that should detect the broken mutex
+usage? I've been testing kernels with LOCKDEP, PROVE_LOCKING,
+DEBUG_ATOMIC_SLEEP, and friends, and nothing has complained so far.
 
-You seem to have R0 through R10 on ARM plus a separate frame pointer.
-And then I see something called "LR" which is probably the function
-return address register.Why can't you just use R0 through R9
-for BPF_REG_0 through BPF_REG_9, BPF_REG_10 is just FP and then you
-have R10 for BPF_REG_AX?
-"""
-
-"""
-static const u8 bpf2a32[][2] = {
-        /* return value from in-kernel function, and exit value from eBPF */
-        [BPF_REG_0] = {ARM_R1, ARM_R0},
-        /* arguments from eBPF program to in-kernel function */
-        [BPF_REG_1] = {ARM_R1, ARM_R0},
-        [BPF_REG_2] = {ARM_R3, ARM_R2},
-        /* Stored on stack */
-        [BPF_REG_3] = {STACK_OFFSET(0), STACK_OFFSET(4)},
-        [BPF_REG_4] = {STACK_OFFSET(8), STACK_OFFSET(12)},
-        [BPF_REG_5] = {STACK_OFFSET(16), STACK_OFFSET(20)},
-"bpf_jit/* callee saved registers that in-kernel function will preserve */
-        [BPF_REG_6] = {ARM_R5, ARM_R4},
-        [BPF_REG_7] = {STACK_OFFSET(24), STACK_OFFSET(28)},
-        /* Stored on stack */
-        [BPF_REG_8] = {STACK_OFFSET(32), STACK_OFFSET(36)},
-        [BPF_REG_9] = {STACK_OFFSET(40), STACK_OFFSET(44)},
-        /* Read only Frame Pointer to access Stack */
-        [BPF_REG_FP] = {ARM_FP},
-        /* Temperory Register for internal BPF JIT, can be used
-         * for constant blindings and others. */
-        [TMP_REG_1] = {ARM_R7, ARM_R6},
-        [TMP_REG_2] = {ARM_R10, ARM_R8},
-        /* Tail call count. */
-        [TCALL_CNT] = {STACK_OFFSET(48), STACK_OFFSET(52)},
-
-        [BPF_REG_AX] = {STACK_OFFSET(56), STACK_OFFSET(60)},
-};
-
-> How register starved are you?
-Super Starved.
->
-> eBPF has registers 0 through 10 plus you need to allocate another
-> temporary register for constant blinding (this is BPF_REG_AX).
-I am storing BPF_REG_AX on stack as of now.
->
-> I would put all of BPF_REG_0 through BPF_REG_5 in registers if
-> possible.  BPF_REG_FP is the frame pointer which you don't have to
-> really allocate.  That leaves BPF_REG_6 through BPF_REG_9, which
-> are callee saved, for perhaps stack slot allocation.
->
-> You seem to have R0 through R10 on ARM plus a separate frame pointer.
-> And then I see something called "LR" which is probably the function
-> return address register.  Why can't you just use R0 through R9
-> for BPF_REG_0 through BPF_REG_9, BPF_REG_10 is just FP and then you
-> have R10 for BPF_REG_AX?
-I can't do that. BPF registers are 64 bits and ARM registers are 32
-bit. So I have to map each BPF register with 2 arm registers.
-Also, I need 4 temp registers which I am currently using.
-"""
-
-"""
->> I can't do that. BPF registers are 64 bits and ARM registers are 32
->> bit. So I have to map each BPF register with 2 arm registers.
->> Also, I need 4 temp registers which I am currently using.
->
-> Ummm, no you don't.
->
-> You can do proper data flow analysis on the register values and you
-> can just use plain 32-bit registers when that is all that the data
-> flow tells you the register is used for.
-I don't understand. Can you explain that with example?
-
->
-> This is what the netronome driver does, it is in the same situation
-> you are.  The NPU cpus on their networking card are 32-bits, and
-> they have to do 32-bit value analysis while JIT'ing into their
-> device.
-As far as I know their ISA is more like cBPF? isn't it?
->
-> It is actually rare for full 64-bit values to be used.  Those ususally
-> come from pointers.  But on arm32, pointers will be 32-bits therefore
-> any pointer relative value will be 32-bits as well.
-Well, in that case I have to rewrite the whole code. I asked what
-mapping I should use when I started and nobody replied so I went ahead
-and started implementing. :(
->
-> When you actually have to fabricate a full 64-bit operation, yeah
-> use a stack slot or something like that.
-So you are telling me to store the low 32 bit in registers and high 32
-bit in scratch memory?
-"""
-
-What do you guys suggest i should implement it? I am almost done with
-my current implementation but if you think I should change it to the
-way David suggested, its better to suggest now before I send the
-patch.
-
-Let me know if you have any questions.
-Best,
-Shubham Bansal
-
-
-On Thu, May 11, 2017 at 7:23 AM, Shubham Bansal
-<illusionist.neo@gmail.com> wrote:
-> Okay. My mistake.
->
-> -Shubham
->
-> On May 11, 2017 7:22 AM, "David Miller" <davem@davemloft.net> wrote:
->>
->>
->> Please keep this discussion on the mailing list.
->>
->> When you drop the CC:, you exclude the entire world from contributing
->> and continuing to help you.
+Thanks,
+Mark.
