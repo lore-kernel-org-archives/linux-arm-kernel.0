@@ -1,11 +1,12 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 May 2017 16:07:44 +0200
-Subject: [PATCH v2 4/4] pinctrl: meson: meson8: add the AO HDMI CEC pin
-In-Reply-To: <20170506165751.12442-5-martin.blumenstingl@googlemail.com>
+Date: Thu, 11 May 2017 16:06:52 +0200
+Subject: [PATCH v2 3/4] pinctrl: meson: meson8: add support for the AO
+ remote output pin
+In-Reply-To: <20170506165751.12442-4-martin.blumenstingl@googlemail.com>
 References: <20170504184932.5372-1-martin.blumenstingl@googlemail.com>
  <20170506165751.12442-1-martin.blumenstingl@googlemail.com>
- <20170506165751.12442-5-martin.blumenstingl@googlemail.com>
-Message-ID: <CACRpkdaO9RMfEeQV2WN=3jRxJhNo1wgN9eu54Ca+1yc9t3DJgg@mail.gmail.com>
+ <20170506165751.12442-4-martin.blumenstingl@googlemail.com>
+Message-ID: <CACRpkdZCqvQ6tx5D8jyDS-N5a00uP316bTA4VjT16DN3atc=3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
