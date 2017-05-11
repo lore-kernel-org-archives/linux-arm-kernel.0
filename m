@@ -1,32 +1,42 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 11 May 2017 08:30:28 -0700
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
-References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
- <20170510.212952.1440495072777358778.davem@davemloft.net>
- <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
- <20170510.215218.2185526627014393313.davem@davemloft.net>
- <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
- <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
-Message-ID: <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 11 May 2017 16:37:20 +0100
+Subject: [PATCHv2] arm64/cpufeature: don't use mutex in bringup path
+In-Reply-To: <498b2e16-538a-d5ea-7843-2ebbff2007df@arm.com>
+References: <1494514878-26878-1-git-send-email-mark.rutland@arm.com>
+ <498b2e16-538a-d5ea-7843-2ebbff2007df@arm.com>
+Message-ID: <20170511153719.GB19626@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 2:32 AM, Shubham Bansal
-<illusionist.neo@gmail.com> wrote:
-> What do you guys suggest i should implement it? I am almost done with
-> my current implementation but if you think I should change it to the
-> way David suggested, its better to suggest now before I send the
-> patch.
+On Thu, May 11, 2017 at 04:15:38PM +0100, Suzuki K Poulose wrote:
+> On 11/05/17 16:01, Mark Rutland wrote:
+> >+static inline bool cpus_have_const_cap(int num)
+> >+{
+> >+	if (static_branch_likely(&arm64_const_caps_ready))
+> >+		return __cpus_have_const_cap(num);
+> >+	else
+> >+		return cpus_have_cap(num);
+> 
+> We use cpus_have_const_cap() from hyp code, via has_vhe() and we could potentially
+> try to access unmapped kernel data from hyp if we fallback to cpus_have_cap().
+> However, it looks like we have already set arm64_const_caps_ready, so should not
+> hit it in practise. May be we could add a stricter version of the helper ?
+> 
+> static inline cpus_have_const_cap_strict(int num)
+> {
+> 	BUG_ON(!static_branch_likely(&arm64_const_caps_ready);
+> 	return __cpus_have_const_cap(num);
+> }
 
-I'd say send what you have right now, as it's a good starting point
-for future work. I'll be curious to see the benchmarks, etc. It can be
-a base for further optimization.
+Just to check, is that the only user of cpus_have_const_cap() at hyp?
 
-Thanks for chipping away at this!
+If so, I can do something like the above, patching <asm/virt.h> to use
+it for has_vhe().
 
--Kees
+We don't have a BUG handler at hyp, but that should trigger a hyp panic,
+which I guess is good enough.
 
--- 
-Kees Cook
-Pixel Security
+Marc, thoughts?
+
+Thanks,
+Mark.
