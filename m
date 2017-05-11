@@ -1,68 +1,101 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Thu, 11 May 2017 16:00:50 -0500
-Subject: [PATCH v7 13/23] drivers/fsi: Add client driver register utilities
+Date: Thu, 11 May 2017 16:00:52 -0500
+Subject: [PATCH v7 15/23] drivers/fsi: expose direct-access slave API
 In-Reply-To: <20170511210101.78409-1-cbostic@linux.vnet.ibm.com>
 References: <20170511210101.78409-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170511210101.78409-14-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170511210101.78409-16-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add driver_register and driver_unregister wrappers for FSI.
+From: Jeremy Kerr <jk@ozlabs.org>
 
-Signed-off-by: Christopher Bostic <cbostic@linux.vnet.ibm.com>
+Allow drivers to access the slave address ranges.
+
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
+Signed-off-by: Christopher Bostic <cbostic@linux.vnet.ibm.com>
 ---
- drivers/fsi/fsi-core.c | 17 +++++++++++++++++
+ drivers/fsi/fsi-core.c | 26 ++++++++++++++++++++------
  include/linux/fsi.h    | 12 ++++++++++++
- 2 files changed, 29 insertions(+)
+ 2 files changed, 32 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index fcb0c81..e9fbd9f 100644
+index 626cc06..d319f67 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -586,6 +586,23 @@ static int fsi_bus_match(struct device *dev, struct device_driver *drv)
+@@ -78,10 +78,6 @@ static int fsi_master_read(struct fsi_master *master, int link,
+ 		uint8_t slave_id, uint32_t addr, void *val, size_t size);
+ static int fsi_master_write(struct fsi_master *master, int link,
+ 		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
+-static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
+-		void *val, size_t size);
+-static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
+-		const void *val, size_t size);
+ 
+ /*
+  * fsi_device_read() / fsi_device_write() / fsi_device_peek()
+@@ -174,7 +170,7 @@ static int fsi_slave_calc_addr(struct fsi_slave *slave, uint32_t *addrp,
  	return 0;
  }
  
-+int fsi_driver_register(struct fsi_driver *fsi_drv)
+-static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
++int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
+ 			void *val, size_t size)
+ {
+ 	uint8_t id = slave->id;
+@@ -188,7 +184,7 @@ static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
+ 			addr, val, size);
+ }
+ 
+-static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
++int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
+ 			const void *val, size_t size)
+ {
+ 	uint8_t id = slave->id;
+@@ -202,6 +198,24 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
+ 			addr, val, size);
+ }
+ 
++extern int fsi_slave_claim_range(struct fsi_slave *slave,
++		uint32_t addr, uint32_t size)
 +{
-+	if (!fsi_drv)
-+		return -EINVAL;
-+	if (!fsi_drv->id_table)
++	if (addr + size < addr)
 +		return -EINVAL;
 +
-+	return driver_register(&fsi_drv->drv);
++	if (addr + size > slave->size)
++		return -EINVAL;
++
++	/* todo: check for overlapping claims */
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(fsi_driver_register);
 +
-+void fsi_driver_unregister(struct fsi_driver *fsi_drv)
++extern void fsi_slave_release_range(struct fsi_slave *slave,
++		uint32_t addr, uint32_t size)
 +{
-+	driver_unregister(&fsi_drv->drv);
 +}
-+EXPORT_SYMBOL_GPL(fsi_driver_unregister);
 +
- struct bus_type fsi_bus_type = {
- 	.name		= "fsi",
- 	.match		= fsi_bus_match,
+ static int fsi_slave_scan(struct fsi_slave *slave)
+ {
+ 	uint32_t engine_addr;
 diff --git a/include/linux/fsi.h b/include/linux/fsi.h
-index 66bce48..34f1e9a 100644
+index 34f1e9a..141fd38 100644
 --- a/include/linux/fsi.h
 +++ b/include/linux/fsi.h
-@@ -54,6 +54,18 @@ struct fsi_driver {
- #define to_fsi_dev(devp) container_of(devp, struct fsi_device, dev)
- #define to_fsi_drv(drvp) container_of(drvp, struct fsi_driver, drv)
+@@ -66,6 +66,18 @@ struct fsi_driver {
+ 		module_driver(__fsi_driver, fsi_driver_register, \
+ 				fsi_driver_unregister)
  
-+extern int fsi_driver_register(struct fsi_driver *fsi_drv);
-+extern void fsi_driver_unregister(struct fsi_driver *fsi_drv);
++/* direct slave API */
++extern int fsi_slave_claim_range(struct fsi_slave *slave,
++		uint32_t addr, uint32_t size);
++extern void fsi_slave_release_range(struct fsi_slave *slave,
++		uint32_t addr, uint32_t size);
++extern int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
++		void *val, size_t size);
++extern int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
++		const void *val, size_t size);
 +
-+/* module_fsi_driver() - Helper macro for drivers that don't do
-+ * anything special in module init/exit.  This eliminates a lot of
-+ * boilerplate.  Each module may only use this macro once, and
-+ * calling it replaces module_init() and module_exit()
-+ */
-+#define module_fsi_driver(__fsi_driver) \
-+		module_driver(__fsi_driver, fsi_driver_register, \
-+				fsi_driver_unregister)
++
 +
  extern struct bus_type fsi_bus_type;
  
