@@ -1,89 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 May 2017 15:00:51 +0100
-Subject: [PATCH] arm64/cpufeature: don't use mutex in bringup path
-In-Reply-To: <1494508331-31644-1-git-send-email-mark.rutland@arm.com>
-References: <1494508331-31644-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <f9cb7a24-534c-d7dd-412d-3722a90992cb@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 May 2017 16:01:54 +0200
+Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
+In-Reply-To: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
+References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <CACRpkdasvjBPcr5RrPwtTYaoGeTEJMWqXbSRaB5-cOEKXbpfRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/17 14:12, Mark Rutland wrote:
-> Currently, cpus_set_cap() calls static_branch_enable_cpuslocked(), which
-> must take the jump_label mutex.
-> 
-> We call cpus_set_cap() in the secondary bringup path, from the idle
-> thread where interrupts are disabled. Taking a mutex in this path "is a
-> NONO" regardless of whether it's contended, and something we must avoid.
-> Additionally, the secondary CPU doesn't hold the percpu rwsem (as this
-> is held by the primary CPU), so this triggers a lockdep splat.
-> 
-> This patch fixes both issues by moving the static_key poking from
-> cpus_set_cap() into enable_cpu_capabilities(). This means that there is
-> a period between detecting an erratum and cpus_have_const_cap(erratum)
-> being true, but largely this is fine. Features are only enabled later
-> regardless, and most errata workarounds are best-effort.
-> 
-> This rework means that we can remove the *_cpuslocked() helpers added in
-> commit d54bb72551b999dd ("arm64/cpufeature: Use
-> static_branch_enable_cpuslocked()").
-> 
-> Fixes: efd9e03facd075f5 ("arm64: Use static keys for CPU features")
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyniger <marc.zyngier@arm.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Sebastian Sewior <bigeasy@linutronix.de>
-> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Will Deacon <will.deacon@arm.com>
+On Thu, May 4, 2017 at 1:57 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+
+> When a pinctrl driver gets interrupted during its probe process
+> (returning -EPROBE_DEFER), the devres system cleans up all allocated
+> resources. During this process it calls pinmux_generic_free_functions()
+> and pinctrl_generic_free_groups(), which in turn use managed kmalloc
+> calls for temporarily allocating some memory. Now those calls seem to
+> get added to the devres list, but are apparently not covered by the
+> cleanup process, because this is actually just running and iterating the
+> existing list. This leads to those mallocs being left with the device,
+> which the devres manager complains about when the driver eventually gets
+> probed again:
+> [    0.825239] ------------[ cut here ]------------
+> [    0.825256] WARNING: CPU: 1 PID: 89 at drivers/base/dd.c:349 driver_probe_device+0x2ac/0x2e8
+> [    0.825258] Modules linked in:
+> [    0.825262]
+> [    0.825270] CPU: 1 PID: 89 Comm: kworker/1:1 Not tainted 4.11.0 #307
+> [    0.825272] Hardware name: Pine64+ (DT)
+> [    0.825283] Workqueue: events deferred_probe_work_func
+> [    0.825288] task: ffff80007c19c100 task.stack: ffff80007c16c000
+> [    0.825292] PC is at driver_probe_device+0x2ac/0x2e8
+> [    0.825296] LR is at driver_probe_device+0x108/0x2e8
+> [    0.825300] pc : [<ffff000008559234>] lr : [<ffff000008559090>] pstate: 20000045
+> ....
+> This warning is triggered because the devres list is not empty. In this
+> case the allocations were using 0 bytes, so no real leaks, but still this
+> ugly warning.
+> Looking more closely at these *cleanup* functions, devm_kzalloc() is actually
+> not needed, because the memory is just allocated temporarily and can be
+> freed just before returning from this function.
+> So fix this issue by using the bog standard kcalloc() call instead of
+> devm_kzalloc() and kfree()ing the memory at the end.
+>
+> This fixes above warnings on boot, which can be observed on *some* builds
+> for the Pine64, where the pinctrl driver gets loaded early, but it missing
+> resources, so gets deferred and is loaded again (successfully) later.
+> kernelci caught this as well [1].
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>
+> [1] https://storage.kernelci.org/net-next/master/v4.11-rc8-2122-gc08bac03d289/arm64/defconfig/lab-baylibre-seattle/boot-sun50i-a64-pine64-plus.html
 > ---
->  arch/arm64/include/asm/cpufeature.h |  3 +--
->  arch/arm64/kernel/cpu_errata.c      |  9 +--------
->  arch/arm64/kernel/cpufeature.c      | 16 +++++++++++++---
->  3 files changed, 15 insertions(+), 13 deletions(-)
-> 
-> I'm not sure what to do about ARM64_WORKAROUND_CAVIUM_23154.
-> 
-> This patch will defer enabling the workaround until all CPUs are up, and I
-> can't see a good way of having the workaround on by default, then subsequently
-> disabled if no CPUs are affected.
+> Hi,
+>
+> not sure this is the right fix, I am open to suggestions.
 
-Yeah, this is pretty horrible.
+I have queued this as a tentative v4.12-rc1 fix, but a bit undertain.
 
-The way I see it, we need an extra static key that would indicate that 
-the errata have been applied. In the interval, we need to use the slow 
-path and check the per-cpu state. Something like:
+Tejun, do I read your comments on the patch as an ACK?
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index c132f29322cc..b4cc5a3573eb 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -123,10 +123,17 @@ static void gic_redist_wait_for_rwp(void)
- 
- static u64 __maybe_unused gic_read_iar(void)
- {
--	if (cpus_have_const_cap(ARM64_WORKAROUND_CAVIUM_23154))
--		return gic_read_iar_cavium_thunderx();
--	else
--		return gic_read_iar_common();
-+	if (static_branch_likely(&arm64_workarounds_enabled)) {
-+		if (cpus_have_const_cap(ARM64_WORKAROUND_CAVIUM_23154))
-+			return gic_read_iar_cavium_thunderx();
-+		else
-+			return gic_read_iar_common();
-+	} else {
-+		if (this_cpu_has_cap(ARM64_WORKAROUND_CAVIUM_23154))
-+			return gic_read_iar_cavium_thunderx();
-+		else
-+			return gic_read_iar_common();
-+	}
- }
- #endif
- 
-You can probably easily turn it into something that looks less shit though.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Yours,
+Linus Walleij
