@@ -1,36 +1,44 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 11 May 2017 10:20:01 -0700
-Subject: [PATCH] ARM: remove duplicate 'const' annotations'
-In-Reply-To: <20170511115059.2997141-1-arnd@arndb.de>
-References: <20170511115059.2997141-1-arnd@arndb.de>
-Message-ID: <d4e668df-3a3a-f246-8b57-6faf2600cf1a@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 11 May 2017 11:20:30 -0600
+Subject: [PATCH v9 3/9] doc: Add coresight_cpu_debug.enable to
+ kernel-parameters.txt
+In-Reply-To: <1494298202-6739-4-git-send-email-leo.yan@linaro.org>
+References: <1494298202-6739-1-git-send-email-leo.yan@linaro.org>
+ <1494298202-6739-4-git-send-email-leo.yan@linaro.org>
+Message-ID: <20170511172030.GD22627@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2017 04:50 AM, Arnd Bergmann wrote:
-> gcc-7 warns about some declarations that are more 'const' than necessary:
+On Tue, May 09, 2017 at 10:49:56AM +0800, Leo Yan wrote:
+> Add coresight_cpu_debug.enable to kernel-parameters.txt, this flag is
+> used to enable/disable the CPU sampling based debugging.
 > 
-> arch/arm/mach-at91/pm.c:338:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct of_device_id const ramc_ids[] __initconst = {
-> arch/arm/mach-bcm/bcm_kona_smc.c:36:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct of_device_id const bcm_kona_smc_ids[] __initconst = {
-> arch/arm/mach-spear/time.c:207:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct of_device_id const timer_of_match[] __initconst = {
-> arch/arm/mach-omap2/prm_common.c:714:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct of_device_id const omap_prcm_dt_match_table[] __initconst = {
-> arch/arm/mach-omap2/vc.c:562:35: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct i2c_init_data const omap4_i2c_timing_data[] __initconst = {
-> 
-> The ones in arch/arm were apparently all introduced accidentally by one
-> commit that correctly marked a lot of variables as __initconst.
-> 
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Fixes: 19c233b79d1a ("ARM: appropriate __init annotation for const data")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+
 > ---
-
->  arch/arm/mach-bcm/bcm_kona_smc.c | 2 +-
-
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
--- 
-Florian
+>  Documentation/admin-guide/kernel-parameters.txt | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> index e4c9e0e..010ae02 100644
+> --- a/Documentation/admin-guide/kernel-parameters.txt
+> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> @@ -649,6 +649,13 @@
+>  			/proc/<pid>/coredump_filter.
+>  			See also Documentation/filesystems/proc.txt.
+>  
+> +	coresight_cpu_debug.enable
+> +			[ARM,ARM64]
+> +			Format: <bool>
+> +			Enable/disable the CPU sampling based debugging.
+> +			0: default value, disable debugging
+> +			1: enable debugging at boot time
+> +
+>  	cpuidle.off=1	[CPU_IDLE]
+>  			disable the cpuidle sub-system
+>  
+> -- 
+> 2.7.4
+> 
