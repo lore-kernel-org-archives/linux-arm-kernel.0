@@ -1,66 +1,157 @@
 From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Thu, 11 May 2017 15:29:23 +0200
-Subject: [PATCH 3/5] phy: bcm-ns-usb3: enable MDIO in the platform specific
- code
+Date: Thu, 11 May 2017 15:29:22 +0200
+Subject: [PATCH 2/5] phy: bcm-ns-usb3: use pointer for PHY writing function
 In-Reply-To: <20170511132925.14564-1-zajec5@gmail.com>
 References: <20170511132925.14564-1-zajec5@gmail.com>
-Message-ID: <20170511132925.14564-4-zajec5@gmail.com>
+Message-ID: <20170511132925.14564-3-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-When we finally start using MDIO layer then bus initialization will be
-handled in a separated driver. It means our code handling this has to be
-used for the platform driver only.
+Our current writing function accesses PHY directly bypassing MDIO layer.
+
+The aim is to extend this module to also behave as MDIO driver. This
+will require using different writing function which can be handled
+cleanly by having an extra pointer like this.
 
 Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 ---
- drivers/phy/phy-bcm-ns-usb3.c | 18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
+ drivers/phy/phy-bcm-ns-usb3.c | 98 ++++++++++++++++++++++++-------------------
+ 1 file changed, 56 insertions(+), 42 deletions(-)
 
 diff --git a/drivers/phy/phy-bcm-ns-usb3.c b/drivers/phy/phy-bcm-ns-usb3.c
-index 3d0fe5728029..2c9a0d5f43d8 100644
+index 5e89326886dc..3d0fe5728029 100644
 --- a/drivers/phy/phy-bcm-ns-usb3.c
 +++ b/drivers/phy/phy-bcm-ns-usb3.c
-@@ -80,12 +80,6 @@ static int bcm_ns_usb3_phy_init_ns_bx(struct bcm_ns_usb3 *usb3)
- {
- 	int err;
+@@ -53,6 +53,8 @@ struct bcm_ns_usb3 {
+ 	void __iomem *dmp;
+ 	void __iomem *ccb_mii;
+ 	struct phy *phy;
++
++	int (*phy_write)(struct bcm_ns_usb3 *usb3, u16 reg, u16 value);
+ };
  
--	/* Enable MDIO. Setting MDCDIV as 26  */
--	writel(0x0000009a, usb3->ccb_mii + BCMA_CCB_MII_MNG_CTL);
--
--	/* Wait for MDIO? */
--	udelay(2);
--
- 	/* USB3 PLL Block */
- 	err = bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PHY_BASE_ADDR_REG,
- 					 BCM_NS_USB3_PHY_PLL30_BLOCK);
-@@ -134,12 +128,6 @@ static int bcm_ns_usb3_phy_init_ns_ax(struct bcm_ns_usb3 *usb3)
- {
- 	int err;
+ static const struct of_device_id bcm_ns_usb3_id_table[] = {
+@@ -68,51 +70,10 @@ static const struct of_device_id bcm_ns_usb3_id_table[] = {
+ };
+ MODULE_DEVICE_TABLE(of, bcm_ns_usb3_id_table);
  
--	/* Enable MDIO. Setting MDCDIV as 26  */
--	writel(0x0000009a, usb3->ccb_mii + BCMA_CCB_MII_MNG_CTL);
+-static int bcm_ns_usb3_wait_reg(struct bcm_ns_usb3 *usb3, void __iomem *addr,
+-				u32 mask, u32 value, unsigned long timeout)
+-{
+-	unsigned long deadline = jiffies + timeout;
+-	u32 val;
 -
--	/* Wait for MDIO? */
--	udelay(2);
+-	do {
+-		val = readl(addr);
+-		if ((val & mask) == value)
+-			return 0;
+-		cpu_relax();
+-		udelay(10);
+-	} while (!time_after_eq(jiffies, deadline));
 -
- 	/* PLL30 block */
- 	err = bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PHY_BASE_ADDR_REG,
- 					 BCM_NS_USB3_PHY_PLL30_BLOCK);
-@@ -278,6 +266,12 @@ static int bcm_ns_usb3_probe(struct platform_device *pdev)
+-	dev_err(usb3->dev, "Timeout waiting for register %p\n", addr);
+-
+-	return -EBUSY;
+-}
+-
+-static inline int bcm_ns_usb3_mii_mng_wait_idle(struct bcm_ns_usb3 *usb3)
+-{
+-	return bcm_ns_usb3_wait_reg(usb3, usb3->ccb_mii + BCMA_CCB_MII_MNG_CTL,
+-				    0x0100, 0x0000,
+-				    usecs_to_jiffies(BCM_NS_USB3_MII_MNG_TIMEOUT_US));
+-}
+-
+ static int bcm_ns_usb3_mdio_phy_write(struct bcm_ns_usb3 *usb3, u16 reg,
+ 				      u16 value)
+ {
+-	u32 tmp = 0;
+-	int err;
+-
+-	err = bcm_ns_usb3_mii_mng_wait_idle(usb3);
+-	if (err < 0) {
+-		dev_err(usb3->dev, "Couldn't write 0x%08x value\n", value);
+-		return err;
+-	}
+-
+-	/* TODO: Use a proper MDIO bus layer */
+-	tmp |= 0x58020000; /* Magic value for MDIO PHY write */
+-	tmp |= reg << 18;
+-	tmp |= value;
+-	writel(tmp, usb3->ccb_mii + BCMA_CCB_MII_MNG_CMD_DATA);
+-
+-	return bcm_ns_usb3_mii_mng_wait_idle(usb3);
++	return usb3->phy_write(usb3, reg, value);
+ }
+ 
+ static int bcm_ns_usb3_phy_init_ns_bx(struct bcm_ns_usb3 *usb3)
+@@ -233,6 +194,57 @@ static const struct phy_ops ops = {
+ 	.owner		= THIS_MODULE,
+ };
+ 
++/**************************************************
++ * Platform driver code
++ **************************************************/
++
++static int bcm_ns_usb3_wait_reg(struct bcm_ns_usb3 *usb3, void __iomem *addr,
++				u32 mask, u32 value, unsigned long timeout)
++{
++	unsigned long deadline = jiffies + timeout;
++	u32 val;
++
++	do {
++		val = readl(addr);
++		if ((val & mask) == value)
++			return 0;
++		cpu_relax();
++		udelay(10);
++	} while (!time_after_eq(jiffies, deadline));
++
++	dev_err(usb3->dev, "Timeout waiting for register %p\n", addr);
++
++	return -EBUSY;
++}
++
++static inline int bcm_ns_usb3_mii_mng_wait_idle(struct bcm_ns_usb3 *usb3)
++{
++	return bcm_ns_usb3_wait_reg(usb3, usb3->ccb_mii + BCMA_CCB_MII_MNG_CTL,
++				    0x0100, 0x0000,
++				    usecs_to_jiffies(BCM_NS_USB3_MII_MNG_TIMEOUT_US));
++}
++
++static int bcm_ns_usb3_platform_phy_write(struct bcm_ns_usb3 *usb3, u16 reg,
++					  u16 value)
++{
++	u32 tmp = 0;
++	int err;
++
++	err = bcm_ns_usb3_mii_mng_wait_idle(usb3);
++	if (err < 0) {
++		dev_err(usb3->dev, "Couldn't write 0x%08x value\n", value);
++		return err;
++	}
++
++	/* TODO: Use a proper MDIO bus layer */
++	tmp |= 0x58020000; /* Magic value for MDIO PHY write */
++	tmp |= reg << 18;
++	tmp |= value;
++	writel(tmp, usb3->ccb_mii + BCMA_CCB_MII_MNG_CMD_DATA);
++
++	return bcm_ns_usb3_mii_mng_wait_idle(usb3);
++}
++
+ static int bcm_ns_usb3_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -266,6 +278,8 @@ static int bcm_ns_usb3_probe(struct platform_device *pdev)
  		return PTR_ERR(usb3->ccb_mii);
  	}
  
-+	/* Enable MDIO. Setting MDCDIV as 26  */
-+	writel(0x0000009a, usb3->ccb_mii + BCMA_CCB_MII_MNG_CTL);
++	usb3->phy_write = bcm_ns_usb3_platform_phy_write;
 +
-+	/* Wait for MDIO? */
-+	udelay(2);
-+
- 	usb3->phy_write = bcm_ns_usb3_platform_phy_write;
- 
  	usb3->phy = devm_phy_create(dev, NULL, &ops);
+ 	if (IS_ERR(usb3->phy)) {
+ 		dev_err(dev, "Failed to create PHY\n");
 -- 
 2.11.0
