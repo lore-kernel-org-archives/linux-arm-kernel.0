@@ -1,38 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 11 May 2017 17:48:31 +0200
-Subject: [PATCH/RFT 0/2] ARM: dts: gose: Enable UHS-I SDR-50 and SDR-104
-In-Reply-To: <1492494939-24568-1-git-send-email-horms+renesas@verge.net.au>
-References: <1492494939-24568-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20170511154831.GI21895@verge.net.au>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 11 May 2017 16:54:27 +0100
+Subject: [PATCHv2] arm64/cpufeature: don't use mutex in bringup path
+In-Reply-To: <20170511153719.GB19626@leverpostej>
+References: <1494514878-26878-1-git-send-email-mark.rutland@arm.com>
+ <498b2e16-538a-d5ea-7843-2ebbff2007df@arm.com>
+ <20170511153719.GB19626@leverpostej>
+Message-ID: <232510f0-115e-b2c6-022f-03efd2606d56@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 02:55:37PM +0900, Simon Horman wrote:
-> Enable
-> - SDR-50 and SDR-104 for SDHI0 and;
-> - SDR-50 for SDHI1
-> 
-> Verified:
-> - SDR104 for SDHI0
-> - SDR50 for SDHI1
-> - Results comprable to those listed for other Renesas R-Car Gen2 boards on
->   http://elinux.org/Tests:SD-SDHI-SDR104
-> Untested:
-> SDR50 for SDHI3
-> - HS C4 card present in slot on board which I access remotely
+On 11/05/17 16:37, Mark Rutland wrote:
+> On Thu, May 11, 2017 at 04:15:38PM +0100, Suzuki K Poulose wrote:
+>> On 11/05/17 16:01, Mark Rutland wrote:
+>>> +static inline bool cpus_have_const_cap(int num)
+>>> +{
+>>> +	if (static_branch_likely(&arm64_const_caps_ready))
+>>> +		return __cpus_have_const_cap(num);
+>>> +	else
+>>> +		return cpus_have_cap(num);
+>>
+>> We use cpus_have_const_cap() from hyp code, via has_vhe() and we could potentially
+>> try to access unmapped kernel data from hyp if we fallback to cpus_have_cap().
+>> However, it looks like we have already set arm64_const_caps_ready, so should not
+>> hit it in practise. May be we could add a stricter version of the helper ?
+>>
+>> static inline cpus_have_const_cap_strict(int num)
+>> {
+>> 	BUG_ON(!static_branch_likely(&arm64_const_caps_ready);
+>> 	return __cpus_have_const_cap(num);
+>> }
+>
+> Just to check, is that the only user of cpus_have_const_cap() at hyp?
 
-The above should read SDHI2 rather than SDHI3.
-I have now been able to test SDHI2 and have queued up this series
-with Wolfram's Acks.
+Uh, no we have one more, via system_supports_fpsimd() in __actvate_traps.
 
-> Simon Horman (2):
->   ARM: dts: r8a7793: set maximum frequency for SDHI clocks
->   ARM: dts: gose: Enable UHS-I SDR-50 and SDR-104
-> 
->  arch/arm/boot/dts/r8a7793-gose.dts | 34 +++++++++++++++++++++++++++++++---
->  arch/arm/boot/dts/r8a7793.dtsi     |  3 +++
->  2 files changed, 34 insertions(+), 3 deletions(-)
-> 
-> -- 
-> 2.7.0.rc3.207.g0ac5344
-> 
+Suzuki
+
+>
+> If so, I can do something like the above, patching <asm/virt.h> to use
+> it for has_vhe().
+>
+> We don't have a BUG handler at hyp, but that should trigger a hyp panic,
+> which I guess is good enough.
+>
+> Marc, thoughts?
+>
+> Thanks,
+> Mark.
+>
