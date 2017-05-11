@@ -1,96 +1,141 @@
-From: hongxing.zhu@nxp.com (Richard Zhu)
-Date: Thu, 11 May 2017 02:00:43 +0000
-Subject: [PATCH] PCI: imx6: fix downstream bus scanning
-In-Reply-To: <20170510175752.6519-1-l.stach@pengutronix.de>
-References: <20170510175752.6519-1-l.stach@pengutronix.de>
-Message-ID: <AM5PR0402MB28506F261345166D313D50F88CED0@AM5PR0402MB2850.eurprd04.prod.outlook.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Thu, 11 May 2017 10:44:10 +0800
+Subject: [PATCH v3 2/2] dt-bindings: pcie: Add documentation for
+ Mediatek PCIe
+In-Reply-To: <CAK8P3a1AUsUTNDnN+_9251sxC7R4vvkQRr37dvAke6ooCJ_oxg@mail.gmail.com>
+References: <1494382020-26790-1-git-send-email-ryder.lee@mediatek.com>
+ <1494382020-26790-3-git-send-email-ryder.lee@mediatek.com>
+ <CAK8P3a193RxchvFAMWeZiP0sc0bd+VGg=_aVvipSgcbDpHXojg@mail.gmail.com>
+ <1494408707.31307.32.camel@mtkswgap22>
+ <CAK8P3a1AUsUTNDnN+_9251sxC7R4vvkQRr37dvAke6ooCJ_oxg@mail.gmail.com>
+Message-ID: <1494470650.20742.36.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 2017-05-10 at 12:01 +0200, Arnd Bergmann wrote:
+> On Wed, May 10, 2017 at 11:31 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> > On Wed, 2017-05-10 at 10:08 +0200, Arnd Bergmann wrote:
+> >> On Wed, May 10, 2017 at 4:07 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> >>
+> >> > +- ranges:
+> >> > +  - The first three entries are expected to translate the addresses for the root
+> >> > +    port registers, which are referenced by the assigned-addresses property of
+> >> > +    the root port nodes (see below).
+> >>
+> >> I don't understand this part. Why do you need a static translation for these?
+> >> Shouldn't they just be listed in the 'reg' property of the parent node now that
+> >> you have the clk/reset/phy properties in the parent as well?
+> >
+> > At first, I did like that. But I noticed that someone suggest it's
+> > better to use 'assigned-addresses' to handle per-port registers, the
+> > same path as tegra and marvell did, in other platform discussion thread.
+> > So I just put shared register in root node. It could be rolled back if
+> > you feel this is inappropriate.
+> 
+> The marvell case is not a good example for your case: their top-level
+> device is made up by the OS to help with the shared resource allocation,
+> while in your case the bus bridge actually exists in hardware.
+> 
+> I'm not too familiar with the Tegra case, and haven't looked at that here,
+> but it could be an artifact of how for a while we used to list the config
+> space access in the top-level "ranges" instead of the "reg" property.
+> 
+> I'd vote for moving it back, for consistency with the other port specific
+> properties that are now in the root node. Once you do that, the port
+> nodes can be removed completely, which is what I was aiming for with
+> the comments on the previous version.
+ 
+I'll move it back.
 
-> -----Original Message-----
-> From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> Sent: Thursday, May 11, 2017 1:58 AM
-> To: linux-pci at vger.kernel.org
-> Cc: Peter Senna Tschudin <peter.senna@collabora.com>; Richard Zhu
-> <hongxing.zhu@nxp.com>; festevam at gmail.com; bhelgaas at google.com;
-> tharvey at gateworks.com; lorenzo.pieralisi at arm.com; linux-arm-
-> kernel at lists.infradead.org; kernel at pengutronix.de; patchwork-
-> lst at pengutronix.de
-> Subject: [PATCH] PCI: imx6: fix downstream bus scanning
+> >> > +Required properties:
+> >> > +- device_type: Must be "pci"
+> >> > +- assigned-addresses: Address and size of the port configuration registers
+> >> > +- reg: Only the first four bytes are used to refer to the correct bus number
+> >> > +  and device number.
+> >> > +- #address-cells: Must be 3
+> >> > +- #size-cells: Must be 2
+> >> > +- #interrupt-cells: Must be 1
+> >> > +- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
+> >> > +  Please refer to the standard PCI bus binding document for a more detailed
+> >> > +  explanation.
+> >>
+> >> Child nodes do not normally have interrupt-map properties. Isn't this
+> >> already covered by the interrupt-map in the parent?
+> >>
+> >
+> > I have one Intel 4 port ethernet card(0000:00:01) and MTK WLAN card
+> > (0000:00:02), probe message looks good to me.
+> >
+> > pci 0000:00:01.0: fixup irq: got 224
+> > pci 0000:00:01.0: assigning IRQ 224
+> > pci 0000:00:02.0: fixup irq: got 225
+> > pci 0000:00:02.0: assigning IRQ 225
+> >
+> > pci 0000:01:00.0: fixup irq: got 224
+> > pci 0000:01:00.0: assigning IRQ 224
+> > pci 0000:01:00.1: fixup irq: got 224
+> > pci 0000:01:00.1: assigning IRQ 224
+> > pci 0000:01:00.2: fixup irq: got 224
+> > pci 0000:01:00.2: assigning IRQ 224
+> > pci 0000:01:00.3: fixup irq: got 224
+> > pci 0000:01:00.3: assigning IRQ 224
+> >
+> > pci 0000:02:00.0: fixup irq: got 225
+> > pci 0000:02:00.0: assigning IRQ 225
+> >
+> >
+> > But child nodes without interrupt-map properties:
+> > It seems incorrect.
+> >
+> > pci 0000:00:01.0: fixup irq: got 224
+> > pci 0000:00:01.0: assigning IRQ 224
+> > pci 0000:00:02.0: fixup irq: got 225
+> > pci 0000:00:02.0: assigning IRQ 225
+> >
+> > pci 0000:01:00.0: fixup irq: got 223
+> > pci 0000:01:00.0: assigning IRQ 223
 > 
-> The change in Linux 4.12 to make PCI configuartion requests non-posted
-> means that we are now getting a synchronous abort when the CFG space
-> read to probe for downstream devices times out.
-> 
-> Synchronous aborts need to be handled differently from the async aborts we
-> were getting before, in particular the PC needs to be advanced when
-> resolving the abort. This is mostly a copy of what other PCI drivers do on ARM
-> to handle those aborts.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Not entirely sure what happens here, but I guess the problem
+> is that the 'reg' portion of the parent interrupt-map refers to
+> the port devices, not the devices attached the devices behind
+> them.
 
-Thanks lot for your great help at first.
-Only one little spell comment, "configuartion" in the commit message should be "configuration",
- the others are okay.
-Acked-by: Richard Zhu <hongxing.zhu@nxp.com>
+I agree with you. That's why I need additional interrupt-map properties
+to resolve IRQ correctly for the devices behind root ports.
 
-> ---
-> This is a fix that needs to go in for 4.12, but I would hope to get some
-> thorough testing before.
-> ---
->  drivers/pci/dwc/pci-imx6.c | 33 ++++++++++++++++++++++++++++++---
->  1 file changed, 30 insertions(+), 3 deletions(-)
+Not sure whether other platforms have similar case like me here.
+
+> On a related note, I see that you still list
 > 
-> diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c index
-> a98cba55c7f0..19a289b8cc94 100644
-> --- a/drivers/pci/dwc/pci-imx6.c
-> +++ b/drivers/pci/dwc/pci-imx6.c
-> @@ -252,7 +252,34 @@ static void imx6_pcie_reset_phy(struct imx6_pcie
-> *imx6_pcie)  static int imx6q_pcie_abort_handler(unsigned long addr,
->  		unsigned int fsr, struct pt_regs *regs)  {
-> -	return 0;
-> +	unsigned long pc = instruction_pointer(regs);
-> +	unsigned long instr = *(unsigned long *)pc;
-> +	int reg = (instr >> 12) & 15;
-> +
-> +	/*
-> +	 * If the instruction being executed was a read,
-> +	 * make it look like it read all-ones.
-> +	 */
-> +	if ((instr & 0x0c100000) == 0x04100000) {
-> +		unsigned long val;
-> +
-> +		if (instr & 0x00400000)
-> +			val = 255;
-> +		else
-> +			val = -1;
-> +
-> +		regs->uregs[reg] = val;
-> +		regs->ARM_pc += 4;
-> +		return 0;
-> +	}
-> +
-> +	if ((instr & 0x0e100090) == 0x00100090) {
-> +		regs->uregs[reg] = -1;
-> +		regs->ARM_pc += 4;
-> +		return 0;
-> +	}
-> +
-> +	return 1;
->  }
+> > +- interrupts: Three interrupt outputs of the controller. Must contain an
+> > +  entry for each entry in the interrupt-names property.
+> > +- interrupt-names: Must include the following names
+> > +  - "pcie-int0"
+> > +  - "pcie-int1"
+> > +  - "pcie-int2"
 > 
->  static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie) @@ -
-> 819,8 +846,8 @@ static int __init imx6_pcie_init(void)
->  	 * we can install the handler here without risking it
->  	 * accessing some uninitialized driver state.
->  	 */
-> -	hook_fault_code(16 + 6, imx6q_pcie_abort_handler, SIGBUS, 0,
-> -			"imprecise external abort");
-> +	hook_fault_code(8, imx6q_pcie_abort_handler, SIGBUS, 0,
-> +			"external abort on non-linefetch");
-> 
->  	return platform_driver_register(&imx6_pcie_driver);
->  }
-> --
-> 2.11.0
+> This seems to be an artifact from the older version and should be
+> removed as the driver correctly ignores the properties now.
+
+Actually, everything works fine without these properties however when it
+loads we see a few weird error message:
+
+pcieport 0000:00:01.0: Signaling PME with IRQ 232
+pcieport 0000:00:02.0: enabling device (0140 -> 0142)
+pcieport 0000:00:02.0: enabling bus mastering
+irq 232: nobody cared (try booting with the "irqpoll" option)
+...
+[<c03f6be4>] (pcie_pme_probe) from [<c03f47b8>] (pcie_port_probe_service
++0x44/0x6c)
+(pcie_port_probe_service) from [<c0454cf8>] (driver_probe_device
++0x280/0x470)
+...
+(pcie_port_device_register) from [<c03f51a0>] (pcie_portdrv_probe
++0x3c/0xb4)
+(pcie_portdrv_probe) from [<c03e7acc>] (pci_device_probe+0x98/0xfc)
+(pci_device_probe) from [<c0454cf8>] (driver_probe_device+0x280/0x470)
+handlers:
+[<c03f68b0>] pcie_pme_irq
+Disabling IRQ #233
+
+I haven't dig it out yet, but just keep them here to solve that.
