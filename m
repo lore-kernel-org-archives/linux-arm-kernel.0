@@ -1,70 +1,29 @@
-From: guochun.mao@mediatek.com (Guochun Mao)
-Date: Thu, 11 May 2017 09:30:11 +0800
-Subject: [PATCH v2 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <1a788098-1cf8-5fec-e847-5c14189f8586@gmail.com>
-References: <1485315515-29942-1-git-send-email-guochun.mao@mediatek.com>
- <1485315515-29942-3-git-send-email-guochun.mao@mediatek.com>
- <1486267249.10417.9.camel@mhfsdcap03> <20170206084544.24878633@bbrezillon>
- <77e0e3b0-2fe4-b32b-9099-11ce9811ba15@gmail.com>
- <1487044733.19037.0.camel@mhfsdcap03>
- <1a788098-1cf8-5fec-e847-5c14189f8586@gmail.com>
-Message-ID: <1494466211.6463.2.camel@mhfsdcap03>
+From: jk@ozlabs.org (Jeremy Kerr)
+Date: Thu, 11 May 2017 09:58:16 +0800
+Subject: [PATCH v6 19/23] drivers/fsi: Add GPIO based FSI master
+In-Reply-To: <c05599db-7767-e712-7199-7d5a4ac6486f@linux.vnet.ibm.com>
+References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
+ <20170410194706.64280-20-cbostic@linux.vnet.ibm.com>
+ <CACPK8Xf1Y31+HBHb0ErpnZ4xVM+bzfHV-khj-kz8Unk1cTx6gw@mail.gmail.com>
+ <c05599db-7767-e712-7199-7d5a4ac6486f@linux.vnet.ibm.com>
+Message-ID: <a079022b-8434-a204-c9b4-696a0580fc8c@ozlabs.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-05-10 at 12:49 +0200, Matthias Brugger wrote:
-> 
-> On 14/02/17 04:58, Guochun Mao wrote:
-> > On Sun, 2017-02-12 at 07:35 +0800, Matthias Brugger wrote:
-> >>
-> >> On 02/06/2017 08:45 AM, Boris Brezillon wrote:
-> >>> Hi Guochun,
-> >>>
-> >>> On Sun, 5 Feb 2017 12:00:49 +0800
-> >>> Guochun Mao <guochun.mao@mediatek.com> wrote:
-> >>>
-> >>>
-> >>>>>
-> >>>>> +   nor_flash: spi at 11014000 {
-> >>>>> +           compatible = "mediatek,mt2701-nor",
-> >>>>> +                        "mediatek,mt8173-nor";
-> >>>>> +           reg = <0 0x11014000 0 0xe0>;
-> >>>>> +           clocks = <&pericfg CLK_PERI_FLASH>,
-> >>>>> +                    <&topckgen CLK_TOP_FLASH_SEL>;
-> >>>>> +           clock-names = "spi", "sf";
-> >>>>> +           #address-cells = <1>;
-> >>>>> +           #size-cells = <0>;
-> >>>>> +           status = "disabled";
-> >>>>> +   };
-> >>>>> +
-> >>>>>      mmsys: syscon at 14000000 {
-> >>>>>              compatible = "mediatek,mt2701-mmsys", "syscon";
-> >>>>>              reg = <0 0x14000000 0 0x1000>;
-> >>>>
-> >>>> Hi,
-> >>>> mtk-quadspi.txt had been updated as suggested.
-> >>>> Is there suggestion about this patch?
-> >>>
-> >>> It should probably go through the Mediatek tree. Matthias, any opinion?
-> >>>
-> >>
-> >> Yes, I will take this one through mine tree.
-> >>
-> >> Thanks,
-> >> Matthias
-> > 
-> > Thanks,
-> > Guochun
-> > 
-> > 
-> 
-> Queued now for v4.12-next/dts32
-> Sorry for the delay.
-> 
-> Matthias
+Hi Chris,
 
-Hi, Matthias,
+> I don't think we'd want this per master.   The lock is for the 'top'
+> master issuing commands.  Only the top master can initiate any
+> transactions on the bus to any devices connected downstream. Downstream
+> masters such as hub masters, etc... cannot initiate a command.
 
-It's OK. Thanks a lot.
+I think what Joel meant there was that we have it per *GPIO* master; if
+there are two GPIO masters on a system, there's no need to provide
+mutual exclusion to each (separate) set of GPIOs.
 
-Guochun
+To implement this, we'd just move the lock into struct fsi_master_gpio.
+
+Cheers,
+
+
+Jeremy
