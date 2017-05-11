@@ -1,40 +1,76 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 11 May 2017 16:40:51 +0200
-Subject: [v5 1/4] ACPICA: IORT: Add Cavium ThunderX2 SMMUv3 model
- definition.
-In-Reply-To: <20170511084525.GA18839@arm.com>
-References: <1494415918-13770-1-git-send-email-gakula@caviumnetworks.com>
- <3122711.vgvub3W1fy@aspire.rjw.lan> <20170511084525.GA18839@arm.com>
-Message-ID: <3624921.NlXkYaVXxR@aspire.rjw.lan>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 11 May 2017 16:53:24 +0200
+Subject: [PATCH v3 2/3] arm64: dts: r8a7795: salvator-x: Add support for
+ R-Car H3 ES2.0
+In-Reply-To: <1494503934-23367-3-git-send-email-geert+renesas@glider.be>
+References: <1494503934-23367-1-git-send-email-geert+renesas@glider.be>
+ <1494503934-23367-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170511145324.GC21895@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, May 11, 2017 09:45:25 AM Will Deacon wrote:
-> On Thu, May 11, 2017 at 02:26:02AM +0200, Rafael J. Wysocki wrote:
-> > On Wednesday, May 10, 2017 05:01:55 PM Geetha sowjanya wrote:
-> > > From: Linu Cherian <linu.cherian@cavium.com>
-> > > 
-> > > Add SMMUv3 model definition for ThunderX2.
-> > > 
-> > > Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
-> > > Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
-> > 
-> > This is an ACPICA change, but you have not included the ACPICA maintainers
-> > into your original CC list (added now).
-> > 
-> > Bob, Lv, how should this be routed?
-> > 
-> > Do you want to apply this patch upstream first or can we make this change in
-> > Linux and upstream in parallel?  That shouldn't be a big deal, right?
+On Thu, May 11, 2017 at 01:58:53PM +0200, Geert Uytterhoeven wrote:
+> Split off support for Salvator-X boards with the ES1.x revision of the
+> R-Car H3 SoC into a separate file.  The main r8a7795-salvator-x.dts file
+> now corresponds to Salvator-X with R-Car H3 ES2.0 or later.
 > 
-> I think we're still waiting for the updated IORT document to be published (I
-> think this should be in the next week or so), so I don't think we should
-> commit the new ID before that happens.
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> v3:
+>   - Rebase on top of common Salvator-X board support extraction,
+> 
+> v2:
+>   - Use a separate file for ES1.x instead of for ES2.0, so
+>     r8a7795-salvator-x.dts always corresponds to the board with the
+>     latest SoC revision,
+>   - Add a dash between SoC part number and revision, for compatibility
+>     with the BSP,
+>   - Enhance the hardware description from basic support to everything
+>     already supported on ES1.x.
+> ---
+>  arch/arm64/boot/dts/renesas/Makefile                                  | 1 +
+>  .../renesas/{r8a7795-salvator-x.dts => r8a7795-es1-salvator-x.dts}    | 0
+>  arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts                    | 4 ++--
+>  3 files changed, 3 insertions(+), 2 deletions(-)
+>  copy arch/arm64/boot/dts/renesas/{r8a7795-salvator-x.dts => r8a7795-es1-salvator-x.dts} (100%)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
+> index 1618e0a3c81d48bd..b6c723d8f6875f2d 100644
+> --- a/arch/arm64/boot/dts/renesas/Makefile
+> +++ b/arch/arm64/boot/dts/renesas/Makefile
+> @@ -1,4 +1,5 @@
+>  dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-x.dtb r8a7795-h3ulcb.dtb
+> +dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-es1-salvator-x.dtb
 
-OK, thanks for the heads-up.
+Probably this was already discussed but I wonder if there is any value
+in a CONFIG_ARCH_R8A7795_ES1 Kconfig symbol to allow more fine grained
+control over what is compiled into the kernel.
 
-I think it's better to submit the actbl2.h update directly to ACPICA
-upstream when the doc is published and then work on top of that.
-
-Thanks,
-Rafael
+>  dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-x.dtb r8a7796-m3ulcb.dtb
+>  
+>  always		:= $(dtb-y)
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
+> similarity index 100%
+> copy from arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+> copy to arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+> index be5b2e966ea1700e..fc26909dfa47b61f 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+> @@ -11,11 +11,11 @@
+>  #define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
+>  
+>  /dts-v1/;
+> -#include "r8a7795-es1.dtsi"
+> +#include "r8a7795.dtsi"
+>  #include "salvator-x.dtsi"
+>  
+>  / {
+> -	model = "Renesas Salvator-X board based on r8a7795 ES1.x";
+> +	model = "Renesas Salvator-X board based on r8a7795 ES2.0+";
+>  	compatible = "renesas,salvator-x", "renesas,r8a7795";
+>  
+>  	memory at 48000000 {
+> -- 
+> 2.7.4
+> 
