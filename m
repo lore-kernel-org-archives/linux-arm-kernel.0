@@ -1,29 +1,40 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 11 May 2017 10:45:26 -0400
-Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
-In-Reply-To: <f529e2d1-68e0-2760-3fd0-c7b0e94dd003@arm.com>
-References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
- <CACRpkdasvjBPcr5RrPwtTYaoGeTEJMWqXbSRaB5-cOEKXbpfRg@mail.gmail.com>
- <f529e2d1-68e0-2760-3fd0-c7b0e94dd003@arm.com>
-Message-ID: <20170511144526.GA30473@htj.duckdns.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 11 May 2017 16:40:51 +0200
+Subject: [v5 1/4] ACPICA: IORT: Add Cavium ThunderX2 SMMUv3 model
+ definition.
+In-Reply-To: <20170511084525.GA18839@arm.com>
+References: <1494415918-13770-1-git-send-email-gakula@caviumnetworks.com>
+ <3122711.vgvub3W1fy@aspire.rjw.lan> <20170511084525.GA18839@arm.com>
+Message-ID: <3624921.NlXkYaVXxR@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, May 11, 2017 at 03:20:58PM +0100, Andre Przywara wrote:
-> > Tejun, do I read your comments on the patch as an ACK?
+On Thursday, May 11, 2017 09:45:25 AM Will Deacon wrote:
+> On Thu, May 11, 2017 at 02:26:02AM +0200, Rafael J. Wysocki wrote:
+> > On Wednesday, May 10, 2017 05:01:55 PM Geetha sowjanya wrote:
+> > > From: Linu Cherian <linu.cherian@cavium.com>
+> > > 
+> > > Add SMMUv3 model definition for ThunderX2.
+> > > 
+> > > Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+> > > Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+> > 
+> > This is an ACPICA change, but you have not included the ACPICA maintainers
+> > into your original CC list (added now).
+> > 
+> > Bob, Lv, how should this be routed?
+> > 
+> > Do you want to apply this patch upstream first or can we make this change in
+> > Linux and upstream in parallel?  That shouldn't be a big deal, right?
 > 
-> Tejun and I were wondering why we need this "create an array with the
-> indices" in the first place. If we can just call radix_tree_delete()
-> directly from the radix_tree_for_each_slot() loop, we can have a much
-> better fix (omitting the memory allocation at all)
+> I think we're still waiting for the updated IORT document to be published (I
+> think this should be in the next week or so), so I don't think we should
+> commit the new ID before that happens.
 
-Yeah, it doesn't make sense to allocate to destroy a radix tree.  It'd
-be much better to cleanup the code so that it doesn't need allocation
-in the first place.
+OK, thanks for the heads-up.
 
-Thanks.
+I think it's better to submit the actbl2.h update directly to ACPICA
+upstream when the doc is published and then work on top of that.
 
--- 
-tejun
+Thanks,
+Rafael
