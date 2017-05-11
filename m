@@ -1,100 +1,79 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 11 May 2017 15:51:36 +0800
-Subject: [PATCH] ARM: dts: imx28: add gpio-ranges for internal gpio
- controller
-In-Reply-To: <20170508085925.18342-1-u.kleine-koenig@pengutronix.de>
-References: <20170508085925.18342-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20170511075135.GF5833@dragon>
+From: andy.tang@nxp.com (Andy Tang)
+Date: Thu, 11 May 2017 07:57:20 +0000
+Subject: [PATCH] arm64: dts: ls1088a: update the sata node
+In-Reply-To: <20170511073514.GE5833@dragon>
+References: <1494213209-39673-1-git-send-email-andy.tang@nxp.com>
+ <20170511073514.GE5833@dragon>
+Message-ID: <HE1PR0402MB28280A817B291C3F141097FEF3ED0@HE1PR0402MB2828.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 08, 2017 at 10:59:25AM +0200, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> with this patch applied I get the following lines in dmesg which looks
-> fine:
-> 
-> 	[    0.227913] gpio gpiochip0: (80018000.pinctrl:gpio at 0): created GPIO range 0->31 ==> 80018000.pinctrl PIN 0->31
-> 	[    0.236100] gpio gpiochip1: (80018000.pinctrl:gpio at 1): created GPIO range 0->31 ==> 80018000.pinctrl PIN 32->63
-> 	[    0.244463] gpio gpiochip2: (80018000.pinctrl:gpio at 2): created GPIO range 0->31 ==> 80018000.pinctrl PIN 64->95
-> 	[    0.253020] gpio gpiochip3: (80018000.pinctrl:gpio at 3): created GPIO range 0->31 ==> 80018000.pinctrl PIN 96->127
-> 	[    0.261639] gpio gpiochip4: (80018000.pinctrl:gpio at 4): created GPIO range 0->31 ==> 80018000.pinctrl PIN 128->159
-> 
-> But when looking at a used gpio
-> 
-> 	# cat /sys/kernel/debug/gpio
-> 	gpiochip0: GPIOs 0-31, parent: platform/80018000.pinctrl:gpio at 0, 80018000.pinctrl:gpio at 0:
-> 	...
-> 	 gpio-20  (LED4                |?                   ) out hi
-> 	...
-> 
-> 	# grep "pin 20 " /sys/kernel/debug/pinctrl/80018000.pinctrl/pinmux-pins
-> 	pin 20 (GPMI_RDY0): leds (GPIO UNCLAIMED) function leds group leds.0
-> 
-> I wonder why there is still "GPIO UNCLAIMED". I would have expected that
-> this disappears and somehow references the gpio_request issued by the
-> led-gpio driver after my patch.
-> 
-> What am I missing?
+Hi Shawn,
 
-It seems that's only the case where @strict of struct pinmux_ops is
-true.  We should set it true for pinctrl-mxs, I guess?
+Please see my reply inline.
 
-Shawn
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Thursday, May 11, 2017 3:35 PM
+> To: Andy Tang <andy.tang@nxp.com>
+> Cc: mark.rutland at arm.com; devicetree at vger.kernel.org;
+> catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] arm64: dts: ls1088a: update the sata node
+> 
+> On Mon, May 08, 2017 at 11:13:29AM +0800, Yuantian Tang wrote:
+> > 1. Sata ecc should be disabled due to a erratum.
+> > Provide the ecc register address for driver to use.
+> 
+> This is a bit confusing.  Are you saying that the ECC register address is
+> provided in DT for SATA driver to disable ECC function?
+> 
+Yes, we have a ECC register to control all the IP's ecc status.
+This ECC register doesn't belong to any IP block.
 
+> > 2. Enable dma coherence operation
+> >
+> > Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+> > ---
+> >  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> > b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> > index 2946fd7..90edd76 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> > @@ -265,10 +265,13 @@
+> >
+> >  		sata: sata at 3200000 {
+> >  			compatible = "fsl,ls1088a-ahci", "fsl,ls1043a-ahci";
+> > -			reg = <0x0 0x3200000 0x0 0x10000>;
+> > +			reg = <0x0 0x3200000 0x0 0x10000>,
+> > +				<0x0 0x20140520 0x0 0x4>;
+> > +			reg-names = "ahci", "sata-ecc";
+> >  			interrupts = <0 133 IRQ_TYPE_LEVEL_HIGH>;
+> >  			clocks = <&clockgen 4 3>;
+> >  			status = "disabled";
+> > +			dma-coherent;
 > 
-> Best regards
-> Uwe
+> Please add it above 'status' line, which we generally keep at the bottom of
+> property list.
 > 
->  arch/arm/boot/dts/imx28.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
+OK, Will resend this patch.
+
+Thanks,
+Andy
+
+> Shawn
 > 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 148fcf4d3b98..cfad2295cc46 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -182,6 +182,7 @@
->  					#gpio-cells = <2>;
->  					interrupt-controller;
->  					#interrupt-cells = <2>;
-> +					gpio-ranges = <&pinctrl 0 0 32>;
->  				};
->  
->  				gpio1: gpio at 1 {
-> @@ -192,6 +193,7 @@
->  					#gpio-cells = <2>;
->  					interrupt-controller;
->  					#interrupt-cells = <2>;
-> +					gpio-ranges = <&pinctrl 0 32 32>;
->  				};
->  
->  				gpio2: gpio at 2 {
-> @@ -202,6 +204,7 @@
->  					#gpio-cells = <2>;
->  					interrupt-controller;
->  					#interrupt-cells = <2>;
-> +					gpio-ranges = <&pinctrl 0 64 32>;
->  				};
->  
->  				gpio3: gpio at 3 {
-> @@ -212,6 +215,7 @@
->  					#gpio-cells = <2>;
->  					interrupt-controller;
->  					#interrupt-cells = <2>;
-> +					gpio-ranges = <&pinctrl 0 96 32>;
->  				};
->  
->  				gpio4: gpio at 4 {
-> @@ -222,6 +226,7 @@
->  					#gpio-cells = <2>;
->  					interrupt-controller;
->  					#interrupt-cells = <2>;
-> +					gpio-ranges = <&pinctrl 0 128 32>;
->  				};
->  
->  				duart_pins_a: duart at 0 {
-> -- 
-> 2.11.0
-> 
+> >  		};
+> >  	};
+> >
+> > --
+> > 2.1.0.27.g96db324
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
