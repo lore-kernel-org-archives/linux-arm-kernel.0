@@ -1,60 +1,170 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 May 2017 10:37:21 +0100
-Subject: [PATCHv3 0/2] arm64: fix hotplug rwsem boot fallout
-In-Reply-To: <alpine.DEB.2.20.1705110949140.1758@nanos>
-References: <1493377266-2205-1-git-send-email-mark.rutland@arm.com>
- <20170510180928.GA7102@leverpostej>
- <alpine.DEB.2.20.1705102208290.2571@nanos>
- <alpine.DEB.2.20.1705110949140.1758@nanos>
-Message-ID: <20170511093721.GB14766@leverpostej>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 11 May 2017 11:39:21 +0200
+Subject: [RFC 0/2] Add support for Meson MX "SDIO" MMC driver
+In-Reply-To: <CAFBinCDGBZAAx_61eyu1_XM57fX62Mk03TEiO3uTL+i8dfPyZA@mail.gmail.com>
+References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
+ <CAPDyKFoYPjB1bjRfFCFT3vuzKgzm6-7L2qgNjxGL392cLDe7uA@mail.gmail.com>
+ <CAFBinCDGBZAAx_61eyu1_XM57fX62Mk03TEiO3uTL+i8dfPyZA@mail.gmail.com>
+Message-ID: <CAPDyKFoC-cCEY+n2383W+JgDANbBMFbsU5cyB51-kG4kbLNNcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 10:30:39AM +0200, Thomas Gleixner wrote:
-> On Wed, 10 May 2017, Thomas Gleixner wrote:
-> > On Wed, 10 May 2017, Mark Rutland wrote:
-> > > [    0.182133] [<ffff200008155218>] lockdep_assert_hotplug_held+0x78/0x98
-> > > [    0.182161] [<ffff20000840a36c>] __static_key_slow_inc+0x174/0x2e0
-> > > [    0.182188] [<ffff20000840a654>] static_key_enable_cpuslocked+0x64/0xb0
-> > > [    0.182215] [<ffff2000080a1120>] update_cpu_capabilities+0x178/0x2d8
-> > > [    0.182243] [<ffff20000809e72c>] update_cpu_errata_workarounds_cpuslocked+0x1c/0x28
-> > > [    0.182270] [<ffff2000080a1420>] check_local_cpu_capabilities+0x1a0/0x248
-> > > [    0.182295] [<ffff2000080a2d18>] secondary_start_kernel+0x1e8/0x478
-> > > [    0.182317] [<000000008219a1b4>] 0x8219a1b4
-> > > [    0.182337] CPU features: enabling workaround for ARM erratum 834220
-> > > [    0.182362] ------------[ cut here ]------------
-> > > 
-> > > The problem is that the secondary CPU doesn't hold the rwsem when it
-> > > calls __static_key_slow_inc() in its boot path. It cannot take the
-> > > rwsem, since the primaary CPU holds this for the duration of onlining
-> > > the secondary CPU.
-> 
-> Looking deeper into that:
-> 
-> secondary_start_kernel()
->   check_local_cpu_capabilities()
->     update_cpu_errata_workarounds()
->       update_cpu_capabilities()
->         static_key_enable()
-> 	  __static_key_slow_inc()
-> 	    jump_label_lock()
->        	      mutex_lock(&jump_label_mutex);
-> 
-> How is that supposed to work?
-> 
-> That call path is the low level CPU bringup, running in the context of the
-> idle task of that CPU with interrupts and preemption disabled. Taking a
-> mutex in that context, even if in that case the mutex is uncontended, is a
-> NONO.
+On 10 May 2017 at 21:22, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> Hi Ulf,
+>
+> On Wed, May 10, 2017 at 10:44 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 6 May 2017 at 19:18, Martin Blumenstingl
+>> <martin.blumenstingl@googlemail.com> wrote:
+>>> This is the successor to Carlo Caione's "Add support for Amlogic Meson
+>>> MMC driver" series (v5) from [0].
+>>>
+>>> I would like you to specifically review:
+>>> - whether I've (ab)used the MMC framework properly (as this is my first
+>>>   "larger" contribution to an MMC driver)
+>>
+>> I take a look soonish.
+> thank you!
+>
+>>> - I think I have improved the locking compared to Carlo's version,
+>>>   however I'd still like feedback on whether this looks sane now or if I
+>>>   can improve that even further
+>>>
+>>> (notable) changes since Carlo's latest version are:
+>>> - renamed the driver to meson-mx-sdio (Amlogic's reference kernel calls
+>>>   the driver "aml_sdio" as there is a second MMC controller in these SoCs
+>>>   which they call the "SDHC controller"). do the same with our driver to
+>>
+>> I don't like to renaming drivers, just because there are a reference
+>> kernel using a different name.
+>>
+>> What's is really the difference between controllers? Why do they have
+>> two variants?
+> the driver from this thread is for the "SDSC/SDHC/SDXC card and SDIO
+> interface with 1-bit and 4-bit data bus width supporting spec version
+> 2.x/3.x/4.x DS/HS modes up to UHS-I SDR50" (quote taken from the S805
+> datasheet: [0])
+> the "other" controller is an "eMMC and MMC card interface with
+> 1/4/8-bit data bus width supporting spec version 4.4x/4.5x HS200 (up
+> to 100MHz clock), compatible with standard iNAND interface" (again,
+> quote taken from the S805 datasheet: [0])
+>
+>>
+>> Can they be managed by the same driver?
+>>
+>>>   avoid confusion once we add support for the second controller (which uses
+>>>   a completely different register layout)
+>>
+>> Besides that, do they behave differently in some other way?
+> both drivers/controllers have a totally different register layout - I
+> don't see any way how they both could be handled by one driver (the
+> registers for the controllers from this series are not part of the
+> documentation, but the registers from the 8-bit capable controller
+> are, see page 76 and following from the S805 datasheet: [0])
 
-Urgh; good point. Thanks for taking a look.
+Okay, I am starting to understand. :-)
 
-I think I can solve both issues by deferring poking the keys, so I'll
-give that a go.
+The spec in section 13 describes a controller supporting "MMC/SD/SDIO"
+cards. However, there is yet another controller which @subject series
+implement support for.
+You don't happen to have a public datasheet for this controller as
+well? If not, never mind.
 
-As an aside, do we have anything that should detect the broken mutex
-usage? I've been testing kernels with LOCKDEP, PROVE_LOCKING,
-DEBUG_ATOMIC_SLEEP, and friends, and nothing has complained so far.
+Then, meson actually have three different MMC/SD/SDIO controllers, the
+one in the S805 spec, the one supported by the recently up-streamed
+meson-gx-mmc.c driver - and the one being supported in this series.
+Right? And all of them are completely separate and non-compatible?
 
-Thanks,
-Mark.
+>
+>>> - add support for the internal "mux" in this MMC controller (which allows
+>>>   connecting up to three devices to the the controller - at the cost of
+>>>   performance though since the controller can only process one request at
+>>>   a time). The driver registers a new device for each sub-node, which is
+>>>   then fed into the MMC framework to allow per-slot configuration using
+>>>   devicetree (see the example in the documentation)
+>>
+>> Unless there really is deployment for more than one slot on some
+>> boards/SoCs, I would strongly suggest to *not* implement this.
+>>
+>> Simply because of overhead and introduced complexity to the driver.
+> actually there are lots of devices out there which need to use two slots:
+> as mentioned above the S805 (Meson8b) SoC has two MMC controllers:
+> - one which is typically used for the SD card and the SDIO wireless
+> interface (the driver from this series handles this)
+> - the other one is typically connects to eMMC flash (as it supports
+> 8-bit bus width - this controller is not related to the driver from
+> this series)
+
+Okay.
+
+>
+> there are boards out there which use NAND flash instead of eMMC, but
+> the majority of the consumer devices (based on Amlogic SoCs) out there
+> uses eMMC flash.
+> we (unfortunately) have to support the internal mux since there are
+> three MMC devices (SD card, SDIO wifi and eMMC) but only two
+> controllers.
+
+I see.
+
+>
+> I agree with you that it adds extra complexity to the driver. I tried
+> to keep it as simple as possible - but I think we cannot remove it
+> (without "losing" access to one MMC devices on most boards)
+
+Of course.
+
+>
+>>> - use the common clock framework internally for managing the MMC clock
+>>>   (there is a fixed-factor clock in the controller which takes clk81 as
+>>>    input and divides it's clock by two and a divider clock which takes
+>>>    the result from the fixed-factor clock as input)
+>>> - support the regulators provided by the MMC framework
+>>> - support for GPIO-based card-detection and read-only-detection through
+>>>   the MMC framework
+>>> - use of the <linux/bitfield.h> FIELD_PREP and FIELD_GET macros where it
+>>>   make sense (and thus the code easier to read)
+>>> - re-worked locking (based on the locking in dw_mmc as that also provides
+>>>   multiple "MMC slots")
+>>
+>> Lots of changes!
+>>
+>> Before even start to review (or someone else), you really need to make
+>> this review-able.
+>>
+>> So, please, one change per patch - and make sure to write good
+>> changelogs. Then I can start to review.
+> from the mainline tree's perspective this is a new driver:
+
+Yes, I get it now.
+
+I first thought this series was related to the recently up-streamed
+meson-gx-mmc.c driver. Apologize for my ignorance.
+
+> Carlo (the original author) initially sent this driver for review more
+> than 14 months ago. unfortunately it was never merged since you
+> spotted some issues while reviewing that code, see [1].
+
+Yes, I recall that now.
+
+> I would have sent smaller patches for a driver which is already in mainline.
+
+Right.
+
+>
+> I also wanted to avoid extra complexity for the internal mux if it was
+> added later on (if we want to avoid breaking devicetree backwards
+> compatibility then the driver would have to support both: parsing from
+> the mmc node directly and parsing child "slot" nodes). we won't have
+> to change the DT bindings when the first version that will be
+> mainlined already has support for the mux
+>
+> please let me know if there's anything I can do to make the code
+> easier to review.
+
+No worries, let me have a look as is!
+
+[...]
+
+Kind regards
+Uffe
