@@ -1,60 +1,37 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 11 May 2017 13:58:54 +0200
-Subject: [PATCH v3 3/3] arm64: dts: r8a7795: h3ulcb: Add support for R-Car H3
- ES2.0
-In-Reply-To: <1494503934-23367-1-git-send-email-geert+renesas@glider.be>
-References: <1494503934-23367-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1494503934-23367-4-git-send-email-geert+renesas@glider.be>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 11 May 2017 20:04:35 +0800
+Subject: [PATCH] drm: mediatek: change the variable type of rdma threshold
+In-Reply-To: <1494387348-41170-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <201705111900.oYtnAV4s%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split off support for H3ULCB boards with the ES1.x revision of the R-Car
-H3 SoC into a separate file.  The main r8a7795-h3ulcb.dts file now
-corresponds to H3ULCB with R-Car H3 ES2.0 or later.
+Hi Bibby,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v3:
-  - New.
----
- arch/arm64/boot/dts/renesas/Makefile                                  | 2 +-
- .../boot/dts/renesas/{r8a7795-h3ulcb.dts => r8a7795-es1-h3ulcb.dts}   | 0
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts                        | 4 ++--
- 3 files changed, 3 insertions(+), 3 deletions(-)
- copy arch/arm64/boot/dts/renesas/{r8a7795-h3ulcb.dts => r8a7795-es1-h3ulcb.dts} (100%)
+[auto build test ERROR on v4.9-rc8]
+[cannot apply to drm/drm-next next-20170510]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
-index b6c723d8f6875f2d..d5451015950e3dfc 100644
---- a/arch/arm64/boot/dts/renesas/Makefile
-+++ b/arch/arm64/boot/dts/renesas/Makefile
-@@ -1,5 +1,5 @@
- dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-x.dtb r8a7795-h3ulcb.dtb
--dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-es1-salvator-x.dtb
-+dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-es1-salvator-x.dtb r8a7795-es1-h3ulcb.dtb
- dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-x.dtb r8a7796-m3ulcb.dtb
- 
- always		:= $(dtb-y)
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts
-similarity index 100%
-copy from arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-copy to arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-index 95fe207cb6a3fd2f..0426f41765f0bc68 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-@@ -12,11 +12,11 @@
- #define CPG_AUDIO_CLK_I		R8A7795_CLK_S0D4
- 
- /dts-v1/;
--#include "r8a7795-es1.dtsi"
-+#include "r8a7795.dtsi"
- #include "ulcb.dtsi"
- 
- / {
--	model = "Renesas H3ULCB board based on r8a7795 ES1.x";
-+	model = "Renesas H3ULCB board based on r8a7795 ES2.0+";
- 	compatible = "renesas,h3ulcb", "renesas,r8a7795";
- 
- 	memory at 48000000 {
--- 
-2.7.4
+url:    https://github.com/0day-ci/linux/commits/Bibby-Hsieh/drm-mediatek-change-the-variable-type-of-rdma-threshold/20170510-114823
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> ERROR: "__aeabi_uldivmod" [drivers/gpu/drm/mediatek/mediatek-drm.ko] undefined!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 59469 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170511/13772b99/attachment-0001.gz>
