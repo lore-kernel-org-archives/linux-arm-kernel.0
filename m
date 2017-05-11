@@ -1,117 +1,25 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 11 May 2017 17:11:46 +0100
-Subject: [PATCH 1/5] arm64: KVM: Do not use stack-protector to compile EL2
- code
-In-Reply-To: <62f8cd12-7d1a-e31e-c318-c5b11560b549@arm.com>
-References: <20170502133041.10980-1-marc.zyngier@arm.com>
- <20170502133041.10980-2-marc.zyngier@arm.com>
- <20170502144029.GB29224@e104818-lin.cambridge.arm.com>
- <334c4025-873d-d30c-534b-4194c78eb64b@arm.com>
- <62f8cd12-7d1a-e31e-c318-c5b11560b549@arm.com>
-Message-ID: <CAKv+Gu-6nOtsk_8R3RC9je_DOjYcqabF+=DH-bBdnqTEi5BusQ@mail.gmail.com>
+From: ohlf@mkt-sys.de (Marc Ohlf)
+Date: Thu, 11 May 2017 18:12:19 +0200
+Subject: [PATCH] soc: imx: gpc: build gpc only if hardware has gpc
+Message-ID: <20170511161215.GA24214@ohlf-Precision-7720>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 May 2017 at 17:02, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 02/05/17 15:50, Marc Zyngier wrote:
->> On 02/05/17 15:40, Catalin Marinas wrote:
->>> On Tue, May 02, 2017 at 02:30:37PM +0100, Marc Zyngier wrote:
->>>> We like living dangerously. Nothing explicitely forbids stack-protector
->>>> to be used in the EL2 code, while distributions routinely compile their
->>>> kernel with it. We're just lucky that no code actually triggers the
->>>> instrumentation.
->>>>
->>>> Let's not try our luck for much longer, and disable stack-protector
->>>> for code living at EL2.
->>>>
->>>> Cc: stable at vger.kernel.org
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm64/kvm/hyp/Makefile | 2 ++
->>>>  1 file changed, 2 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
->>>> index aaf42ae8d8c3..14c4e3b14bcb 100644
->>>> --- a/arch/arm64/kvm/hyp/Makefile
->>>> +++ b/arch/arm64/kvm/hyp/Makefile
->>>> @@ -2,6 +2,8 @@
->>>>  # Makefile for Kernel-based Virtual Machine module, HYP part
->>>>  #
->>>>
->>>> +ccflags-y += -fno-stack-protector
->>>> +
->>>
->>> While you are at it, should we have a -fpic here as well? The hyp code
->>> runs at a different location than the rest of the kernel.
->>
->> We definitely should. I've just tried this, and this doesn't seem to
->> work very well. At least this seems to break our jump label
->> implementation. I need to page in that part of the code base and see
->> what happens.
->
-> So here's the issue:
->
->   CC      arch/arm64/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.o
-> In file included from ./include/linux/jump_label.h:120:0,
->                  from ./include/linux/dynamic_debug.h:5,
->                  from ./include/linux/printk.h:329,
->                  from ./include/linux/kernel.h:13,
->                  from ./include/asm-generic/bug.h:15,
->                  from ./arch/arm64/include/asm/bug.h:66,
->                  from ./include/linux/bug.h:4,
->                  from ./include/linux/mmdebug.h:4,
->                  from ./include/linux/mm.h:8,
->                  from ./arch/arm64/include/asm/cacheflush.h:22,
->                  from ./arch/arm64/include/asm/arch_gicv3.h:27,
->                  from ./include/linux/irqchip/arm-gic-v3.h:453,
->                  from arch/arm64/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.c:19:
-> ./arch/arm64/include/asm/jump_label.h: In function '__vgic_v3_save_state':
-> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn't match constraints
->   asm goto("1: nop\n\t"
->   ^~~
-> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in 'asm'
-> ./arch/arm64/include/asm/jump_label.h: In function '__vgic_v3_restore_state':
-> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn't match constraints
->   asm goto("1: nop\n\t"
->   ^~~
-> scripts/Makefile.build:294: recipe for target 'arch/arm64/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.o' failed
-> make[1]: *** [arch/arm64/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.o] Error 1
-> Makefile:1664: recipe for target 'arch/arm64/kvm/hyp/' failed
->
-> The corresponding code does this:
->
-> static __always_inline bool arch_static_branch(struct static_key *key, bool branch)
-> {
->         asm goto("1: nop\n\t"
->                  ".pushsection __jump_table,  \"aw\"\n\t"
->                  ".align 3\n\t"
->                  ".quad 1b, %l[l_yes], %c0\n\t"
->                  ".popsection\n\t"
->                  :  :  "i"(&((char *)key)[branch]) :  : l_yes);
->
->         return false;
-> l_yes:
->         return true;
-> }
->
-> and the problem lies in the evaluation of "key", which probably
-> cannot be guaranteed a constant at that point. There is also the
-> issue that even if it was known, the branch cannot be easily
-> patched in from the rest of the kernel (how is the l_yes address
-> represented?).
->
-> It looks to me like we either need to rewrite the whole of our
-> static key infrastructure to cope with PIC, or switch over to
-> the hyp_alternate_select() hack, which I'd rather avoid spreading
-> further.
->
-> In the end, I wonder if that's even worth it...
->
+Add CONFIG_HAVE_IMX_GPC to goal definition of gpc.o,
+to avoid building it for hardware that does not need it.
 
-Could you check if it builds with
+Signed-off-by: Marc Ohlf <ohlf@mkt-sys.de>
+---
+ drivers/soc/imx/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->                  ".long 1b - ., %l[l_yes] - ., %c0 - .\n\t"
-
-instead? We'd still need to update the code that interprets the
-__jump_table fields, but it changes the references into relative ones,
-which also reduces the size as a bonus.
+diff --git a/drivers/soc/imx/Makefile b/drivers/soc/imx/Makefile
+index 5b6e396..aab41a5c 100644
+--- a/drivers/soc/imx/Makefile
++++ b/drivers/soc/imx/Makefile
+@@ -1,2 +1,2 @@
+-obj-y += gpc.o
++obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
+ obj-$(CONFIG_IMX7_PM_DOMAINS) += gpcv2.o
+-- 
+2.7.4
