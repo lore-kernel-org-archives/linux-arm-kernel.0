@@ -1,72 +1,135 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Thu, 11 May 2017 16:00:43 -0500
-Subject: [PATCH v7 06/23] drivers/fsi: Set up links for slave communication
+Date: Thu, 11 May 2017 16:00:44 -0500
+Subject: [PATCH v7 07/23] drivers/fsi: Implement slave initialisation
 In-Reply-To: <20170511210101.78409-1-cbostic@linux.vnet.ibm.com>
 References: <20170511210101.78409-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170511210101.78409-7-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170511210101.78409-8-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable each link and send a break command, and try to detect a slave by
-reading from the SMODE register.
+From: Jeremy Kerr <jk@ozlabs.org>
 
+Implement fsi_slave_init: if we can read a chip ID, create fsi_slave
+devices and register with the driver core.
+
+Includes changes from Christopher Bostic <cbostic@linux.vnet.ibm.com>.
+
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Christopher Bostic <cbostic@linux.vnet.ibm.com>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/fsi-core.c | 37 +++++++++++++++++++++++++++++++++++--
- 1 file changed, 35 insertions(+), 2 deletions(-)
+v7 - Change warning message to debug type when can't read slave
+---
+ drivers/fsi/Kconfig    |  1 +
+ drivers/fsi/fsi-core.c | 67 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 66 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/fsi/Kconfig b/drivers/fsi/Kconfig
+index 04c1a0e..e1006c6 100644
+--- a/drivers/fsi/Kconfig
++++ b/drivers/fsi/Kconfig
+@@ -6,6 +6,7 @@ menu "FSI support"
+ 
+ config FSI
+ 	tristate "FSI support"
++	select CRC4
+ 	---help---
+ 	  FSI - the FRU Support Interface - is a simple bus for low-level
+ 	  access to POWER-based hardware.
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 1ec9790..235f17a 100644
+index 235f17a..9d9adc1 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -133,12 +133,45 @@ static int fsi_master_write(struct fsi_master *master, int link,
- 	return master->write(master, link, slave_id, addr, val, size);
+@@ -13,13 +13,17 @@
+  * GNU General Public License for more details.
+  */
+ 
++#include <linux/crc4.h>
+ #include <linux/device.h>
+ #include <linux/fsi.h>
+ #include <linux/idr.h>
+ #include <linux/module.h>
++#include <linux/slab.h>
+ 
+ #include "fsi-master.h"
+ 
++#define FSI_SLAVE_SIZE_23b		0x800000
++
+ static DEFINE_IDA(master_ida);
+ 
+ struct fsi_slave {
+@@ -90,11 +94,70 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
+ 			addr, val, size);
  }
  
-+static int fsi_master_link_enable(struct fsi_master *master, int link)
++static void fsi_slave_release(struct device *dev)
 +{
-+	if (master->link_enable)
-+		return master->link_enable(master, link);
++	struct fsi_slave *slave = to_fsi_slave(dev);
 +
-+	return 0;
++	kfree(slave);
 +}
 +
-+/*
-+ * Issue a break command on this link
-+ */
-+static int fsi_master_break(struct fsi_master *master, int link)
-+{
-+	if (master->send_break)
-+		return master->send_break(master, link);
-+
-+	return 0;
-+}
-+
- static int fsi_master_scan(struct fsi_master *master)
+ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
  {
--	int link;
-+	int link, rc;
+-	/* todo: initialise slave device, perform engine scan */
++	struct fsi_slave *slave;
++	uint32_t chip_id;
++	uint8_t crc;
++	int rc;
 +
-+	for (link = 0; link < master->n_links; link++) {
-+		rc = fsi_master_link_enable(master, link);
-+		if (rc) {
-+			dev_dbg(&master->dev,
-+				"enable link %d failed: %d\n", link, rc);
-+			continue;
-+		}
-+		rc = fsi_master_break(master, link);
-+		if (rc) {
-+			dev_dbg(&master->dev,
-+				"break to link %d failed: %d\n", link, rc);
-+			continue;
-+		}
- 
--	for (link = 0; link < master->n_links; link++)
- 		fsi_slave_init(master, link, 0);
++	/* Currently, we only support single slaves on a link, and use the
++	 * full 23-bit address range
++	 */
++	if (id != 0)
++		return -EINVAL;
++
++	rc = fsi_master_read(master, link, id, 0, &chip_id, sizeof(chip_id));
++	if (rc) {
++		dev_dbg(&master->dev, "can't read slave %02x:%02x %d\n",
++				link, id, rc);
++		return -ENODEV;
 +	}
++	chip_id = be32_to_cpu(chip_id);
++
++	crc = crc4(0, chip_id, 32);
++	if (crc) {
++		dev_warn(&master->dev, "slave %02x:%02x invalid chip id CRC!\n",
++				link, id);
++		return -EIO;
++	}
++
++	dev_info(&master->dev, "fsi: found chip %08x at %02x:%02x:%02x\n",
++			chip_id, master->idx, link, id);
++
++	/* We can communicate with a slave; create the slave device and
++	 * register.
++	 */
++	slave = kzalloc(sizeof(*slave), GFP_KERNEL);
++	if (!slave)
++		return -ENOMEM;
++
++	slave->master = master;
++	slave->dev.parent = &master->dev;
++	slave->dev.release = fsi_slave_release;
++	slave->link = link;
++	slave->id = id;
++	slave->size = FSI_SLAVE_SIZE_23b;
++
++	dev_set_name(&slave->dev, "slave@%02x:%02x", link, id);
++	rc = device_register(&slave->dev);
++	if (rc < 0) {
++		dev_warn(&master->dev, "failed to create slave device: %d\n",
++				rc);
++		put_device(&slave->dev);
++		return rc;
++	}
++
++	/* todo: perform engine scan */
  
- 	return 0;
+-	return -ENODEV;
++	return rc;
  }
+ 
+ /* FSI master support */
 -- 
 1.8.2.2
