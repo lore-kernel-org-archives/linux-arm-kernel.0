@@ -1,44 +1,39 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 11 May 2017 11:20:30 -0600
-Subject: [PATCH v9 3/9] doc: Add coresight_cpu_debug.enable to
- kernel-parameters.txt
-In-Reply-To: <1494298202-6739-4-git-send-email-leo.yan@linaro.org>
+Date: Thu, 11 May 2017 11:21:22 -0600
+Subject: [PATCH v9 4/9] MAINTAINERS: update file entries for Coresight
+ subsystem
+In-Reply-To: <1494298202-6739-5-git-send-email-leo.yan@linaro.org>
 References: <1494298202-6739-1-git-send-email-leo.yan@linaro.org>
- <1494298202-6739-4-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170511172030.GD22627@linaro.org>
+ <1494298202-6739-5-git-send-email-leo.yan@linaro.org>
+Message-ID: <20170511172122.GE22627@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 09, 2017 at 10:49:56AM +0800, Leo Yan wrote:
-> Add coresight_cpu_debug.enable to kernel-parameters.txt, this flag is
-> used to enable/disable the CPU sampling based debugging.
+On Tue, May 09, 2017 at 10:49:57AM +0800, Leo Yan wrote:
+> Update document file entries for Coresight debug module.
 > 
 > Signed-off-by: Leo Yan <leo.yan@linaro.org>
 
 Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
 > ---
->  Documentation/admin-guide/kernel-parameters.txt | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  MAINTAINERS | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-> index e4c9e0e..010ae02 100644
-> --- a/Documentation/admin-guide/kernel-parameters.txt
-> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> @@ -649,6 +649,13 @@
->  			/proc/<pid>/coredump_filter.
->  			See also Documentation/filesystems/proc.txt.
->  
-> +	coresight_cpu_debug.enable
-> +			[ARM,ARM64]
-> +			Format: <bool>
-> +			Enable/disable the CPU sampling based debugging.
-> +			0: default value, disable debugging
-> +			1: enable debugging at boot time
-> +
->  	cpuidle.off=1	[CPU_IDLE]
->  			disable the cpuidle sub-system
->  
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index b948dfa..a4b1f60 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1191,7 +1191,9 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  F:	drivers/hwtracing/coresight/*
+>  F:	Documentation/trace/coresight.txt
+> +F:	Documentation/trace/coresight-cpu-debug.txt
+>  F:	Documentation/devicetree/bindings/arm/coresight.txt
+> +F:	Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
+>  F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
+>  F:	tools/perf/arch/arm/util/pmu.c
+>  F:	tools/perf/arch/arm/util/auxtrace.c
 > -- 
 > 2.7.4
 > 
