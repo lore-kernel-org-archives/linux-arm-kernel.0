@@ -1,39 +1,100 @@
-From: zhangshaokun@hisilicon.com (Shaokun Zhang)
-Date: Thu, 11 May 2017 16:19:32 +0800
-Subject: [PATCH] arm64: mm: check length in sync_icache_aliases for performance
-Message-ID: <1494490772-203184-1-git-send-email-zhangshaokun@hisilicon.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 11 May 2017 15:51:36 +0800
+Subject: [PATCH] ARM: dts: imx28: add gpio-ranges for internal gpio
+ controller
+In-Reply-To: <20170508085925.18342-1-u.kleine-koenig@pengutronix.de>
+References: <20170508085925.18342-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <20170511075135.GF5833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sync_icache_aliases calls flush_icache_range if icache is non-aliasing
-policy[see 0a28714 ("arm64: Use PoU cache instr for I/D coherency")].
-  
-If icache uses non-aliasing and page size is 64K, it will broadcast 1K
-DVMs(IC IVAU) to other cpu cores per page. In multi-cores system, so many
-DVMs would degenerate performance. Even if page size is 4K, 64 DVMs will
-be broadcasted and executed.
- 
-This patch fixes this issue using invalidation icache all instread of by
-VA when length is one or multiple PAGE_SIZE, especailly for
-__sync_icache_dcache.
+On Mon, May 08, 2017 at 10:59:25AM +0200, Uwe Kleine-K?nig wrote:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello,
+> 
+> with this patch applied I get the following lines in dmesg which looks
+> fine:
+> 
+> 	[    0.227913] gpio gpiochip0: (80018000.pinctrl:gpio at 0): created GPIO range 0->31 ==> 80018000.pinctrl PIN 0->31
+> 	[    0.236100] gpio gpiochip1: (80018000.pinctrl:gpio at 1): created GPIO range 0->31 ==> 80018000.pinctrl PIN 32->63
+> 	[    0.244463] gpio gpiochip2: (80018000.pinctrl:gpio at 2): created GPIO range 0->31 ==> 80018000.pinctrl PIN 64->95
+> 	[    0.253020] gpio gpiochip3: (80018000.pinctrl:gpio at 3): created GPIO range 0->31 ==> 80018000.pinctrl PIN 96->127
+> 	[    0.261639] gpio gpiochip4: (80018000.pinctrl:gpio at 4): created GPIO range 0->31 ==> 80018000.pinctrl PIN 128->159
+> 
+> But when looking at a used gpio
+> 
+> 	# cat /sys/kernel/debug/gpio
+> 	gpiochip0: GPIOs 0-31, parent: platform/80018000.pinctrl:gpio at 0, 80018000.pinctrl:gpio at 0:
+> 	...
+> 	 gpio-20  (LED4                |?                   ) out hi
+> 	...
+> 
+> 	# grep "pin 20 " /sys/kernel/debug/pinctrl/80018000.pinctrl/pinmux-pins
+> 	pin 20 (GPMI_RDY0): leds (GPIO UNCLAIMED) function leds group leds.0
+> 
+> I wonder why there is still "GPIO UNCLAIMED". I would have expected that
+> this disappears and somehow references the gpio_request issued by the
+> led-gpio driver after my patch.
+> 
+> What am I missing?
 
-Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
----
- arch/arm64/mm/flush.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+It seems that's only the case where @strict of struct pinmux_ops is
+true.  We should set it true for pinctrl-mxs, I guess?
 
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index 21a8d82..f71da2d 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -29,7 +29,7 @@ void sync_icache_aliases(void *kaddr, unsigned long len)
- {
- 	unsigned long addr = (unsigned long)kaddr;
- 
--	if (icache_is_aliasing()) {
-+	if ((len >= PAGE_SIZE) || icache_is_aliasing()) {
- 		__clean_dcache_area_pou(kaddr, len);
- 		__flush_icache_all();
- 	} else {
--- 
-1.9.1
+Shawn
+
+> 
+> Best regards
+> Uwe
+> 
+>  arch/arm/boot/dts/imx28.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 148fcf4d3b98..cfad2295cc46 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -182,6 +182,7 @@
+>  					#gpio-cells = <2>;
+>  					interrupt-controller;
+>  					#interrupt-cells = <2>;
+> +					gpio-ranges = <&pinctrl 0 0 32>;
+>  				};
+>  
+>  				gpio1: gpio at 1 {
+> @@ -192,6 +193,7 @@
+>  					#gpio-cells = <2>;
+>  					interrupt-controller;
+>  					#interrupt-cells = <2>;
+> +					gpio-ranges = <&pinctrl 0 32 32>;
+>  				};
+>  
+>  				gpio2: gpio at 2 {
+> @@ -202,6 +204,7 @@
+>  					#gpio-cells = <2>;
+>  					interrupt-controller;
+>  					#interrupt-cells = <2>;
+> +					gpio-ranges = <&pinctrl 0 64 32>;
+>  				};
+>  
+>  				gpio3: gpio at 3 {
+> @@ -212,6 +215,7 @@
+>  					#gpio-cells = <2>;
+>  					interrupt-controller;
+>  					#interrupt-cells = <2>;
+> +					gpio-ranges = <&pinctrl 0 96 32>;
+>  				};
+>  
+>  				gpio4: gpio at 4 {
+> @@ -222,6 +226,7 @@
+>  					#gpio-cells = <2>;
+>  					interrupt-controller;
+>  					#interrupt-cells = <2>;
+> +					gpio-ranges = <&pinctrl 0 128 32>;
+>  				};
+>  
+>  				duart_pins_a: duart at 0 {
+> -- 
+> 2.11.0
+> 
