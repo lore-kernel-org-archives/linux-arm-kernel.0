@@ -1,67 +1,63 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Thu, 11 May 2017 15:29:24 +0200
-Subject: [PATCH 4/5] dt-bindings: phy: Modify Broadcom NS USB 3.0 PHY binding
- to use MDIO
-In-Reply-To: <20170511132925.14564-1-zajec5@gmail.com>
-References: <20170511132925.14564-1-zajec5@gmail.com>
-Message-ID: <20170511132925.14564-5-zajec5@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 May 2017 15:44:54 +0200
+Subject: [PATCH v2 10/10] ARM: dts: sun8i: Add board dts file for Banana
+ Pi M2 Ultra
+In-Reply-To: <20170504135006.16483-11-icenowy@aosc.io>
+References: <20170504135006.16483-1-icenowy@aosc.io>
+ <20170504135006.16483-11-icenowy@aosc.io>
+Message-ID: <CACRpkdYg7jLymwi14BMJ3p6oeOwjt+PLzQFC1S8e01v9dtw3=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+On Thu, May 4, 2017 at 3:50 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
 
-Thanks to work done by Broadcom explaining their USB 3.0 PHY details we
-know it's attached to the MDIO bus. Use this knowledge to update the
-binding: make it a subnode to the MDIO bus and rework way of specifying
-required registers.
+> From: Chen-Yu Tsai <wens@csie.org>
+>
+> The Banana Pi M2 Ultra is an SBC based on the Allwinner R40 SoC. The
+> form factor and position of various connectors, leds and buttons is
+> similar to the Banana Pi M1+, Banana Pi M3, and is exactly the same
+> as the latest Banana Pi M64.
+>
+> It features:
+>
+>   - X-Powers AXP221s PMIC connected to i2c0
+>   - 2 GB DDR3 DRAM
+>   - 8 GB eMMC
+>   - micro SD card slot
+>   - DC power jack
+>   - HDMI output
+>   - MIPI DSI connector
+>   - 2x USB 2.0 hosts
+>   - 1x USB 2.0 OTG
+>   - gigabit ethernet with Realtek RTL8211E transceiver
+>   - WiFi/Bluetooth with AP6212 chip, with external antenna connector
+>   - SATA and power connectors for native SATA support
+>   - camera sensor connector
+>   - consumer IR receiver
+>   - audio out headphone jack
+>   - onboard microphone
+>   - red, green, and blue LEDs
+>   - debug UART pins
+>   - Li-Po battery connector
+>   - Raspberry Pi B+ compatible GPIO header
+>   - power, reset, and boot control buttons
+>
+> This patch adds a dts file that enables debug UART and MMC support.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
- .../devicetree/bindings/phy/bcm-ns-usb3-phy.txt    | 27 +++++++++++++++-------
- 1 file changed, 19 insertions(+), 8 deletions(-)
+Eric put a lot of time and effort into naming the GPIO lines on the
+other Pi board.
 
-diff --git a/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt b/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt
-index 09aeba94538d..32f057260351 100644
---- a/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt
-@@ -3,9 +3,10 @@ Driver for Broadcom Northstar USB 3.0 PHY
- Required properties:
- 
- - compatible: one of: "brcm,ns-ax-usb3-phy", "brcm,ns-bx-usb3-phy".
--- reg: register mappings for DMP (Device Management Plugin) and ChipCommon B
--       MMI.
--- reg-names: "dmp" and "ccb-mii"
-+- reg: address of MDIO bus device
-+- usb3-dmp-syscon: phandle to syscon with DMP (Device Management Plugin)
-+		   registers
-+- #phy-cells: must be 0
- 
- Initialization of USB 3.0 PHY depends on Northstar version. There are currently
- three known series: Ax, Bx and Cx.
-@@ -15,9 +16,19 @@ Known B1: BCM4707 rev 6
- Known C0: BCM47094 rev 0
- 
- Example:
--	usb3-phy {
--		compatible = "brcm,ns-ax-usb3-phy";
--		reg = <0x18105000 0x1000>, <0x18003000 0x1000>;
--		reg-names = "dmp", "ccb-mii";
--		#phy-cells = <0>;
-+	mdio: mdio at 0 {
-+		reg = <0x0>;
-+		#size-cells = <1>;
-+		#address-cells = <0>;
-+
-+		usb3-phy at 10 {
-+			compatible = "brcm,ns-ax-usb3-phy";
-+			reg = <0x10>;
-+			usb3-dmp-syscon = <&usb3_dmp>;
-+			#phy-cells = <0>;
-+		};
-+	};
-+
-+	usb3_dmp: syscon at 18105000 {
-+		reg = <0x18105000 0x1000>;
- 	};
--- 
-2.11.0
+So please follow the good example and name the GPIO lines on this board
+like in the other rpi boards, should be something like:
+
+&pio {
+    gpio-line-names = "...", "...";
+};
+
+This is very helpful for users.
+
+Yours,
+Linus Walleij
