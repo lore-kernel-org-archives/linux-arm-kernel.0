@@ -1,71 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 11 May 2017 18:18:47 +0100
-Subject: [GIT PULL] arm64 2nd set of updates for 4.12
-Message-ID: <20170511171844.GA27804@e104818-lin.cambridge.arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 11 May 2017 18:40:55 +0100
+Subject: [PATCH v9 7/9] coresight: add support for CPU debug module
+In-Reply-To: <1494298202-6739-8-git-send-email-leo.yan@linaro.org>
+References: <1494298202-6739-1-git-send-email-leo.yan@linaro.org>
+ <1494298202-6739-8-git-send-email-leo.yan@linaro.org>
+Message-ID: <b894bca9-b66f-32f5-4dd7-4593fa734701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 09/05/17 03:50, Leo Yan wrote:
+> Coresight includes debug module and usually the module connects with CPU
+> debug logic. ARMv8 architecture reference manual (ARM DDI 0487A.k) has
+> description for related info in "Part H: External Debug".
+>
+> Chapter H7 "The Sample-based Profiling Extension" introduces several
+> sampling registers, e.g. we can check program counter value with
+> combined CPU exception level, secure state, etc. So this is helpful for
+> analysis CPU lockup scenarios, e.g. if one CPU has run into infinite
+> loop with IRQ disabled. In this case the CPU cannot switch context and
+> handle any interrupt (including IPIs), as the result it cannot handle
+> SMP call for stack dump.
+>
+> This patch is to enable coresight debug module, so firstly this driver
+> is to bind apb clock for debug module and this is to ensure the debug
+> module can be accessed from program or external debugger. And the driver
+> uses sample-based registers for debug purpose, e.g. when system triggers
+> panic, the driver will dump program counter and combined context
+> registers (EDCIDSR, EDVIDSR); by parsing context registers so can
+> quickly get to know CPU secure state, exception level, etc.
+>
+> Some of the debug module registers are located in CPU power domain, so
+> this requires the CPU power domain stays on when access related debug
+> registers, but the power management for CPU power domain is quite
+> dependent on SoC integration for power management. For the platforms
+> which with sane power controller implementations, this driver follows
+> the method to set EDPRCR to try to pull the CPU out of low power state
+> and then set 'no power down request' bit so the CPU has no chance to
+> lose power.
+>
+> If the SoC has not followed up this design well for power management
+> controller, the user should use the command line parameter or sysfs
+> to constrain all or partial idle states to ensure the CPU power
+> domain is enabled and access coresight CPU debug component safely.
+>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 
-Please pull the arm64 updates below. The mm/vmalloc.c change was acked
-by Michal Hocko and the arch/arm one by Russell King. Thanks.
+With comments from Mathieu addressed,
 
-The following changes since commit 92f66f84d9695d07adf9bc987bbcce4bf9b8e87c:
-
-  arm64: Fix the DMA mmap and get_sgtable API with DMA_ATTR_FORCE_CONTIGUOUS (2017-05-05 11:41:35 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-upstream
-
-for you to fetch changes up to 0c2cf6d9487cb90be6ad7fac66044dfa8e8e5243:
-
-  arm64: Silence first allocation with CONFIG_ARM64_MODULE_PLTS=y (2017-05-11 14:43:40 +0100)
-
-----------------------------------------------------------------
-arm64 2nd set of updates for 4.12:
-
-- Silence module allocation failures when CONFIG_ARM*_MODULE_PLTS is
-  enabled. This requires a check for __GFP_NOWARN in alloc_vmap_area()
-
-- Improve/sanitise user tagged pointers handling in the kernel
-
-- Inline asm fixes/cleanups
-
-----------------------------------------------------------------
-Florian Fainelli (3):
-      mm: Silence vmap() allocation failures based on caller gfp_flags
-      ARM: Silence first allocation with CONFIG_ARM_MODULE_PLTS=y
-      arm64: Silence first allocation with CONFIG_ARM64_MODULE_PLTS=y
-
-Kristina Martsenko (4):
-      arm64: traps: fix userspace cache maintenance emulation on a tagged pointer
-      arm64: hw_breakpoint: fix watchpoint matching for tagged pointers
-      arm64: entry: improve data abort handling of tagged pointers
-      arm64: documentation: document tagged pointer stack constraints
-
-Mark Rutland (6):
-      arm64: xchg: hazard against entire exchange variable
-      arm64: ensure extension of smp_store_release value
-      arm64: uaccess: ensure extension of access_ok() addr
-      arm64: armv8_deprecated: ensure extension of addr
-      arm64: atomic_lse: match asm register sizes
-      arm64: uaccess: suppress spurious clang warning
-
- Documentation/arm64/tagged-pointers.txt | 62 +++++++++++++++++++++++++--------
- arch/arm/kernel/module.c                | 11 ++++--
- arch/arm64/include/asm/asm-uaccess.h    |  9 +++++
- arch/arm64/include/asm/atomic_lse.h     |  4 +--
- arch/arm64/include/asm/barrier.h        | 20 ++++++++---
- arch/arm64/include/asm/cmpxchg.h        |  2 +-
- arch/arm64/include/asm/uaccess.h        | 13 +++----
- arch/arm64/kernel/armv8_deprecated.c    |  3 +-
- arch/arm64/kernel/entry.S               |  5 +--
- arch/arm64/kernel/hw_breakpoint.c       |  3 ++
- arch/arm64/kernel/module.c              |  7 +++-
- arch/arm64/kernel/traps.c               |  4 +--
- mm/vmalloc.c                            |  2 +-
- 13 files changed, 107 insertions(+), 38 deletions(-)
-
--- 
-Catalin
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
