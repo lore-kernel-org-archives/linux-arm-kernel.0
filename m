@@ -1,40 +1,66 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 11 May 2017 12:46:21 +0300
-Subject: [PATCH] memory: omap-gpmc: Fix debug output for access width
-In-Reply-To: <20170505223706.4913-1-tony@atomide.com>
-References: <20170505223706.4913-1-tony@atomide.com>
-Message-ID: <247d2c59-d536-99b2-d7ef-1996325ec98e@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 11 May 2017 12:01:21 +0200 (CEST)
+Subject: [PATCHv3 0/2] arm64: fix hotplug rwsem boot fallout
+In-Reply-To: <20170511093721.GB14766@leverpostej>
+References: <1493377266-2205-1-git-send-email-mark.rutland@arm.com>
+ <20170510180928.GA7102@leverpostej>
+ <alpine.DEB.2.20.1705102208290.2571@nanos>
+ <alpine.DEB.2.20.1705110949140.1758@nanos>
+ <20170511093721.GB14766@leverpostej>
+Message-ID: <alpine.DEB.2.20.1705111200400.1758@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/17 01:37, Tony Lindgren wrote:
-> The width needs to be configured in bytes with 1 meaning 8-bit
-> access and 2 meaning 16-bit access.
+On Thu, 11 May 2017, Mark Rutland wrote:
+> On Thu, May 11, 2017 at 10:30:39AM +0200, Thomas Gleixner wrote:
+> > On Wed, 10 May 2017, Thomas Gleixner wrote:
+> > > On Wed, 10 May 2017, Mark Rutland wrote:
+> > > > [    0.182133] [<ffff200008155218>] lockdep_assert_hotplug_held+0x78/0x98
+> > > > [    0.182161] [<ffff20000840a36c>] __static_key_slow_inc+0x174/0x2e0
+> > > > [    0.182188] [<ffff20000840a654>] static_key_enable_cpuslocked+0x64/0xb0
+> > > > [    0.182215] [<ffff2000080a1120>] update_cpu_capabilities+0x178/0x2d8
+> > > > [    0.182243] [<ffff20000809e72c>] update_cpu_errata_workarounds_cpuslocked+0x1c/0x28
+> > > > [    0.182270] [<ffff2000080a1420>] check_local_cpu_capabilities+0x1a0/0x248
+> > > > [    0.182295] [<ffff2000080a2d18>] secondary_start_kernel+0x1e8/0x478
+> > > > [    0.182317] [<000000008219a1b4>] 0x8219a1b4
+> > > > [    0.182337] CPU features: enabling workaround for ARM erratum 834220
+> > > > [    0.182362] ------------[ cut here ]------------
+> > > > 
+> > > > The problem is that the secondary CPU doesn't hold the rwsem when it
+> > > > calls __static_key_slow_inc() in its boot path. It cannot take the
+> > > > rwsem, since the primaary CPU holds this for the duration of onlining
+> > > > the secondary CPU.
+> > 
+> > Looking deeper into that:
+> > 
+> > secondary_start_kernel()
+> >   check_local_cpu_capabilities()
+> >     update_cpu_errata_workarounds()
+> >       update_cpu_capabilities()
+> >         static_key_enable()
+> > 	  __static_key_slow_inc()
+> > 	    jump_label_lock()
+> >        	      mutex_lock(&jump_label_mutex);
+> > 
+> > How is that supposed to work?
+> > 
+> > That call path is the low level CPU bringup, running in the context of the
+> > idle task of that CPU with interrupts and preemption disabled. Taking a
+> > mutex in that context, even if in that case the mutex is uncontended, is a
+> > NONO.
 > 
-> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-Acked-by: Roger Quadros <rogerq@ti.com>
-
-> ---
->  drivers/memory/omap-gpmc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Urgh; good point. Thanks for taking a look.
 > 
-> diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
-> --- a/drivers/memory/omap-gpmc.c
-> +++ b/drivers/memory/omap-gpmc.c
-> @@ -513,7 +513,7 @@ static void gpmc_cs_show_timings(int cs, const char *desc)
->  	pr_info("gpmc cs%i access configuration:\n", cs);
->  	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1,  4,  4, "time-para-granularity");
->  	GPMC_GET_RAW(GPMC_CS_CONFIG1,  8,  9, "mux-add-data");
-> -	GPMC_GET_RAW_MAX(GPMC_CS_CONFIG1, 12, 13,
-> +	GPMC_GET_RAW_SHIFT_MAX(GPMC_CS_CONFIG1, 12, 13, 1,
->  			 GPMC_CONFIG1_DEVICESIZE_MAX, "device-width");
->  	GPMC_GET_RAW(GPMC_CS_CONFIG1, 16, 17, "wait-pin");
->  	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 21, 21, "wait-on-write");
+> I think I can solve both issues by deferring poking the keys, so I'll
+> give that a go.
 > 
+> As an aside, do we have anything that should detect the broken mutex
+> usage? I've been testing kernels with LOCKDEP, PROVE_LOCKING,
+> DEBUG_ATOMIC_SLEEP, and friends, and nothing has complained so far.
 
--- 
-cheers,
--roger
+Peter and myself were wondering about that already. No idea why that
+doesn't yell at you.
+
+Thanks,
+
+	tglx
