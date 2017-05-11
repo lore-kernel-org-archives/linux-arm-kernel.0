@@ -1,170 +1,57 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 11 May 2017 11:39:21 +0200
-Subject: [RFC 0/2] Add support for Meson MX "SDIO" MMC driver
-In-Reply-To: <CAFBinCDGBZAAx_61eyu1_XM57fX62Mk03TEiO3uTL+i8dfPyZA@mail.gmail.com>
-References: <20170506171857.16492-1-martin.blumenstingl@googlemail.com>
- <CAPDyKFoYPjB1bjRfFCFT3vuzKgzm6-7L2qgNjxGL392cLDe7uA@mail.gmail.com>
- <CAFBinCDGBZAAx_61eyu1_XM57fX62Mk03TEiO3uTL+i8dfPyZA@mail.gmail.com>
-Message-ID: <CAPDyKFoC-cCEY+n2383W+JgDANbBMFbsU5cyB51-kG4kbLNNcw@mail.gmail.com>
+From: olivier.moysan@st.com (olivier moysan)
+Date: Thu, 11 May 2017 11:45:01 +0200
+Subject: [PATCH v3 0/3] Add I2S driver
+Message-ID: <1494495904-18898-1-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 May 2017 at 21:22, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
-> Hi Ulf,
->
-> On Wed, May 10, 2017 at 10:44 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 6 May 2017 at 19:18, Martin Blumenstingl
->> <martin.blumenstingl@googlemail.com> wrote:
->>> This is the successor to Carlo Caione's "Add support for Amlogic Meson
->>> MMC driver" series (v5) from [0].
->>>
->>> I would like you to specifically review:
->>> - whether I've (ab)used the MMC framework properly (as this is my first
->>>   "larger" contribution to an MMC driver)
->>
->> I take a look soonish.
-> thank you!
->
->>> - I think I have improved the locking compared to Carlo's version,
->>>   however I'd still like feedback on whether this looks sane now or if I
->>>   can improve that even further
->>>
->>> (notable) changes since Carlo's latest version are:
->>> - renamed the driver to meson-mx-sdio (Amlogic's reference kernel calls
->>>   the driver "aml_sdio" as there is a second MMC controller in these SoCs
->>>   which they call the "SDHC controller"). do the same with our driver to
->>
->> I don't like to renaming drivers, just because there are a reference
->> kernel using a different name.
->>
->> What's is really the difference between controllers? Why do they have
->> two variants?
-> the driver from this thread is for the "SDSC/SDHC/SDXC card and SDIO
-> interface with 1-bit and 4-bit data bus width supporting spec version
-> 2.x/3.x/4.x DS/HS modes up to UHS-I SDR50" (quote taken from the S805
-> datasheet: [0])
-> the "other" controller is an "eMMC and MMC card interface with
-> 1/4/8-bit data bus width supporting spec version 4.4x/4.5x HS200 (up
-> to 100MHz clock), compatible with standard iNAND interface" (again,
-> quote taken from the S805 datasheet: [0])
->
->>
->> Can they be managed by the same driver?
->>
->>>   avoid confusion once we add support for the second controller (which uses
->>>   a completely different register layout)
->>
->> Besides that, do they behave differently in some other way?
-> both drivers/controllers have a totally different register layout - I
-> don't see any way how they both could be handled by one driver (the
-> registers for the controllers from this series are not part of the
-> documentation, but the registers from the 8-bit capable controller
-> are, see page 76 and following from the S805 datasheet: [0])
+This patch-set handles the SPI/I2S IP on STM32 platforms.
 
-Okay, I am starting to understand. :-)
+It applies to STM32 platforms implementing version 2 of SPI/I2S IP like STM32H7 series.
 
-The spec in section 13 describes a controller supporting "MMC/SD/SDIO"
-cards. However, there is yet another controller which @subject series
-implement support for.
-You don't happen to have a public datasheet for this controller as
-well? If not, never mind.
+The SPI/I2S block is a serial peripheral interface (SPI), which can also be configured to work on I2S/PCM mode.
+ASoC STM32 I2S driver only supports this I2S/PCM mode.
 
-Then, meson actually have three different MMC/SD/SDIO controllers, the
-one in the S805 spec, the one supported by the recently up-streamed
-meson-gx-mmc.c driver - and the one being supported in this series.
-Right? And all of them are completely separate and non-compatible?
+The I2S/PCM interface can either support full duplex or half-duplex communication
+(transmitter or receiver only). The change of mode requires to stop the interface.
+This means that the two audio paths cannot be basically managed independently.
 
->
->>> - add support for the internal "mux" in this MMC controller (which allows
->>>   connecting up to three devices to the the controller - at the cost of
->>>   performance though since the controller can only process one request at
->>>   a time). The driver registers a new device for each sub-node, which is
->>>   then fed into the MMC framework to allow per-slot configuration using
->>>   devicetree (see the example in the documentation)
->>
->> Unless there really is deployment for more than one slot on some
->> boards/SoCs, I would strongly suggest to *not* implement this.
->>
->> Simply because of overhead and introduced complexity to the driver.
-> actually there are lots of devices out there which need to use two slots:
-> as mentioned above the S805 (Meson8b) SoC has two MMC controllers:
-> - one which is typically used for the SD card and the SDIO wireless
-> interface (the driver from this series handles this)
-> - the other one is typically connects to eMMC flash (as it supports
-> 8-bit bus width - this controller is not related to the driver from
-> this series)
+The driver supports playback and capture through a single bidirectionnal DAI. 
+In the first version of the driver, playback and capture paths are made mutually exclusive.
 
-Okay.
+A second patch introduces support of full duplex mode. 
+In this implementation the interface is systematically configured in full-duplex mode
+from hardware point of view. So, when managing a single audio path, the interface
+is not configured as transmit or receive only, as it should be.
+This restriction is handled by masking underrun/overrun errors from the unused path.
 
->
-> there are boards out there which use NAND flash instead of eMMC, but
-> the majority of the consumer devices (based on Amlogic SoCs) out there
-> uses eMMC flash.
-> we (unfortunately) have to support the internal mux since there are
-> three MMC devices (SD card, SDIO wifi and eMMC) but only two
-> controllers.
+The I2S/PCM interface supports four audio standards:
+I2S Philips standard, MSB justified standard, LSB justified standard, PCM standard
+PCM standard is declined in two versions, PCM short and long,
+according frame synchronization duration.
 
-I see.
+These standards can be mapped to ASoC standards as follows:
+	- I2S: i2s
+	- MSB justified standard: left_j
+	- LSB justified standard: right_j
+	- PCM short: dsp_a
+PCM long format is not exposed as it does not match supported ASoC standards.
 
->
-> I agree with you that it adds extra complexity to the driver. I tried
-> to keep it as simple as possible - but I think we cannot remove it
-> (without "losing" access to one MMC devices on most boards)
+v2 -> v3
+	- fix spinlock handling
 
-Of course.
+olivier moysan (3):
+  dt-bindings: Document STM32 I2S bindings
+  ASoC: stm32: Add I2S driver
+  ASoC: stm32: Add full duplex support to i2s
 
->
->>> - use the common clock framework internally for managing the MMC clock
->>>   (there is a fixed-factor clock in the controller which takes clk81 as
->>>    input and divides it's clock by two and a divider clock which takes
->>>    the result from the fixed-factor clock as input)
->>> - support the regulators provided by the MMC framework
->>> - support for GPIO-based card-detection and read-only-detection through
->>>   the MMC framework
->>> - use of the <linux/bitfield.h> FIELD_PREP and FIELD_GET macros where it
->>>   make sense (and thus the code easier to read)
->>> - re-worked locking (based on the locking in dw_mmc as that also provides
->>>   multiple "MMC slots")
->>
->> Lots of changes!
->>
->> Before even start to review (or someone else), you really need to make
->> this review-able.
->>
->> So, please, one change per patch - and make sure to write good
->> changelogs. Then I can start to review.
-> from the mainline tree's perspective this is a new driver:
+ .../devicetree/bindings/sound/st,stm32-i2s.txt     |  68 ++
+ sound/soc/stm/Kconfig                              |   2 +-
+ sound/soc/stm/Makefile                             |   4 +
+ sound/soc/stm/stm32_i2s.c                          | 946 +++++++++++++++++++++
+ 4 files changed, 1019 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
+ create mode 100644 sound/soc/stm/stm32_i2s.c
 
-Yes, I get it now.
-
-I first thought this series was related to the recently up-streamed
-meson-gx-mmc.c driver. Apologize for my ignorance.
-
-> Carlo (the original author) initially sent this driver for review more
-> than 14 months ago. unfortunately it was never merged since you
-> spotted some issues while reviewing that code, see [1].
-
-Yes, I recall that now.
-
-> I would have sent smaller patches for a driver which is already in mainline.
-
-Right.
-
->
-> I also wanted to avoid extra complexity for the internal mux if it was
-> added later on (if we want to avoid breaking devicetree backwards
-> compatibility then the driver would have to support both: parsing from
-> the mmc node directly and parsing child "slot" nodes). we won't have
-> to change the DT bindings when the first version that will be
-> mainlined already has support for the mux
->
-> please let me know if there's anything I can do to make the code
-> easier to review.
-
-No worries, let me have a look as is!
-
-[...]
-
-Kind regards
-Uffe
+-- 
+1.9.1
