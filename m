@@ -1,122 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 11 May 2017 17:36:17 +0100
-Subject: [PATCH 1/5] arm64: KVM: Do not use stack-protector to compile EL2
- code
-In-Reply-To: <CAKv+Gu-6nOtsk_8R3RC9je_DOjYcqabF+=DH-bBdnqTEi5BusQ@mail.gmail.com>
-References: <20170502133041.10980-1-marc.zyngier@arm.com>
- <20170502133041.10980-2-marc.zyngier@arm.com>
- <20170502144029.GB29224@e104818-lin.cambridge.arm.com>
- <334c4025-873d-d30c-534b-4194c78eb64b@arm.com>
- <62f8cd12-7d1a-e31e-c318-c5b11560b549@arm.com>
- <CAKv+Gu-6nOtsk_8R3RC9je_DOjYcqabF+=DH-bBdnqTEi5BusQ@mail.gmail.com>
-Message-ID: <CAKv+Gu9q+3iqgwc9_tRkGcd2GnDoy8T47r5qj_fhNb3-h+Octw@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 11 May 2017 12:42:17 -0400 (EDT)
+Subject: [PATCH net] bpf, arm64: fix faulty emission of map access in
+ tail calls
+In-Reply-To: <0e928e7c351b962a16376a2ab29e2af1c5b4c027.1494459589.git.daniel@iogearbox.net>
+References: <0e928e7c351b962a16376a2ab29e2af1c5b4c027.1494459589.git.daniel@iogearbox.net>
+Message-ID: <20170511.124217.2072353083791799566.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 May 2017 at 17:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 11 May 2017 at 17:02, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 02/05/17 15:50, Marc Zyngier wrote:
->>> On 02/05/17 15:40, Catalin Marinas wrote:
->>>> On Tue, May 02, 2017 at 02:30:37PM +0100, Marc Zyngier wrote:
->>>>> We like living dangerously. Nothing explicitely forbids stack-protector
->>>>> to be used in the EL2 code, while distributions routinely compile their
->>>>> kernel with it. We're just lucky that no code actually triggers the
->>>>> instrumentation.
->>>>>
->>>>> Let's not try our luck for much longer, and disable stack-protector
->>>>> for code living at EL2.
->>>>>
->>>>> Cc: stable at vger.kernel.org
->>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>> ---
->>>>>  arch/arm64/kvm/hyp/Makefile | 2 ++
->>>>>  1 file changed, 2 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
->>>>> index aaf42ae8d8c3..14c4e3b14bcb 100644
->>>>> --- a/arch/arm64/kvm/hyp/Makefile
->>>>> +++ b/arch/arm64/kvm/hyp/Makefile
->>>>> @@ -2,6 +2,8 @@
->>>>>  # Makefile for Kernel-based Virtual Machine module, HYP part
->>>>>  #
->>>>>
->>>>> +ccflags-y += -fno-stack-protector
->>>>> +
->>>>
->>>> While you are at it, should we have a -fpic here as well? The hyp code
->>>> runs at a different location than the rest of the kernel.
->>>
->>> We definitely should. I've just tried this, and this doesn't seem to
->>> work very well. At least this seems to break our jump label
->>> implementation. I need to page in that part of the code base and see
->>> what happens.
->>
->> So here's the issue:
->>
->>   CC      arch/arm64/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.o
->> In file included from ./include/linux/jump_label.h:120:0,
->>                  from ./include/linux/dynamic_debug.h:5,
->>                  from ./include/linux/printk.h:329,
->>                  from ./include/linux/kernel.h:13,
->>                  from ./include/asm-generic/bug.h:15,
->>                  from ./arch/arm64/include/asm/bug.h:66,
->>                  from ./include/linux/bug.h:4,
->>                  from ./include/linux/mmdebug.h:4,
->>                  from ./include/linux/mm.h:8,
->>                  from ./arch/arm64/include/asm/cacheflush.h:22,
->>                  from ./arch/arm64/include/asm/arch_gicv3.h:27,
->>                  from ./include/linux/irqchip/arm-gic-v3.h:453,
->>                  from arch/arm64/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.c:19:
->> ./arch/arm64/include/asm/jump_label.h: In function '__vgic_v3_save_state':
->> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn't match constraints
->>   asm goto("1: nop\n\t"
->>   ^~~
->> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in 'asm'
->> ./arch/arm64/include/asm/jump_label.h: In function '__vgic_v3_restore_state':
->> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn't match constraints
->>   asm goto("1: nop\n\t"
->>   ^~~
->> scripts/Makefile.build:294: recipe for target 'arch/arm64/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.o' failed
->> make[1]: *** [arch/arm64/kvm/hyp/../../../../virt/kvm/arm/hyp/vgic-v3-sr.o] Error 1
->> Makefile:1664: recipe for target 'arch/arm64/kvm/hyp/' failed
->>
->> The corresponding code does this:
->>
->> static __always_inline bool arch_static_branch(struct static_key *key, bool branch)
->> {
->>         asm goto("1: nop\n\t"
->>                  ".pushsection __jump_table,  \"aw\"\n\t"
->>                  ".align 3\n\t"
->>                  ".quad 1b, %l[l_yes], %c0\n\t"
->>                  ".popsection\n\t"
->>                  :  :  "i"(&((char *)key)[branch]) :  : l_yes);
->>
->>         return false;
->> l_yes:
->>         return true;
->> }
->>
->> and the problem lies in the evaluation of "key", which probably
->> cannot be guaranteed a constant at that point. There is also the
->> issue that even if it was known, the branch cannot be easily
->> patched in from the rest of the kernel (how is the l_yes address
->> represented?).
->>
->> It looks to me like we either need to rewrite the whole of our
->> static key infrastructure to cope with PIC, or switch over to
->> the hyp_alternate_select() hack, which I'd rather avoid spreading
->> further.
->>
->> In the end, I wonder if that's even worth it...
->>
->
-> Could you check if it builds with
->
->>                  ".long 1b - ., %l[l_yes] - ., %c0 - .\n\t"
->
-> instead? We'd still need to update the code that interprets the
-> __jump_table fields, but it changes the references into relative ones,
-> which also reduces the size as a bonus.
+From: Daniel Borkmann <daniel@iogearbox.net>
+Date: Thu, 11 May 2017 01:53:15 +0200
 
-OK, strike that, this is more tricky than I thought. I am failing to
-reproduce this locally, though. Which gcc and tree are you using?
+> Shubham was recently asking on netdev why in arm64 JIT we don't multiply
+> the index for accessing the tail call map by 8. That led me into testing
+> out arm64 JIT wrt tail calls and it turned out I got a NULL pointer
+> dereference on the tail call.
+ ...
+> Fix this by emitting the following instead:
+> 
+>   [...]
+>   00000060:  d2800e0a  mov x10, #0x70 // #112
+>   00000064:  8b0a002a  add x10, x1, x10
+>   00000068:  d37df04b  lsl x11, x2, #3
+>   0000006c:  f86b694b  ldr x11, [x10,x11]
+>   00000070:  b40000ab  cbz x11, 0x00000084
+>   [...]
+> 
+> This basically adds the offset to ptrs to the base address of the bpf
+> array we got and we later on access the map with an index * 8 offset
+> relative to that. The tail call map itself is basically one large area
+> with meta data at the head followed by the array of prog pointers.
+> This makes tail calls working again, tested on Cavium ThunderX ARMv8.
+> 
+> Fixes: ddb55992b04d ("arm64: bpf: implement bpf_tail_call() helper")
+> Reported-by: Shubham Bansal <illusionist.neo@gmail.com>
+> Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
+
+Applied and queued up for -stable, thanks.
