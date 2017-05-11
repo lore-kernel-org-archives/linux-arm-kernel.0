@@ -1,32 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 May 2017 14:21:20 +0100
-Subject: [PATCH] arm64/cpufeature: don't use mutex in bringup path
-In-Reply-To: <20170511131706.cxsntl3dkurj2yja@linutronix.de>
-References: <1494508331-31644-1-git-send-email-mark.rutland@arm.com>
- <20170511131706.cxsntl3dkurj2yja@linutronix.de>
-Message-ID: <20170511132119.GA31333@leverpostej>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Thu, 11 May 2017 15:29:20 +0200
+Subject: [PATCH for 4.13 0/5] phy: bcm-ns-usb3: add MDIO driver
+Message-ID: <20170511132925.14564-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 03:17:06PM +0200, Sebastian Andrzej Siewior wrote:
-> On 2017-05-11 14:12:11 [+0100], Mark Rutland wrote:
-> > diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> > index 8a7ff73..5370626 100644
-> > --- a/arch/arm64/include/asm/cpufeature.h
-> > +++ b/arch/arm64/include/asm/cpufeature.h
-> > @@ -223,7 +222,7 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-> >  void check_local_cpu_capabilities(void);
-> >  
-> >  void update_cpu_errata_workarounds(void);
-> > -void update_cpu_errata_workarounds_cpuslocked(void);
-> > +void update_cpu_errata_workarounds(void);
-> >  void __init enable_errata_workarounds(void);
-> >  void verify_local_cpu_errata_workarounds(void);
-> 
-> No need to add update_cpu_errata_workarounds(), it is already there.
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Whoops; I'd meant to delete this instance rather than renaming it.
+As explained in the commit 9200c6f177638 ("Revert "phy: Add USB3 PHY support
+for Broadcom NSP SoC"") this module should be modified to use MDIO bus as
+this is how PHY is really attached.
 
-Fixed up locally now.
+This should allow reusing this driver on NSP and any other platform with
+MDIO bus and this particular PHY.
 
-Mark.
+This is material for the next merge window (4.13 kernel) obviously.
+
+Rafa? Mi?ecki (5):
+  phy: bcm-ns-usb3: always wait for idle after writing to the PHY reg
+  phy: bcm-ns-usb3: use pointer for PHY writing function
+  phy: bcm-ns-usb3: enable MDIO in the platform specific code
+  dt-bindings: phy: Modify Broadcom NS USB 3.0 PHY binding to use MDIO
+  phy: bcm-ns-usb3: add MDIO driver using proper bus layer
+
+ .../devicetree/bindings/phy/bcm-ns-usb3-phy.txt    |  27 ++-
+ drivers/phy/Kconfig                                |   1 +
+ drivers/phy/phy-bcm-ns-usb3.c                      | 223 +++++++++++++++------
+ 3 files changed, 179 insertions(+), 72 deletions(-)
+
+-- 
+2.11.0
