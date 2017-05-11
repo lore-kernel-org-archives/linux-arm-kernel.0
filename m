@@ -1,50 +1,87 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 11 May 2017 18:40:55 +0100
-Subject: [PATCH v9 7/9] coresight: add support for CPU debug module
-In-Reply-To: <1494298202-6739-8-git-send-email-leo.yan@linaro.org>
-References: <1494298202-6739-1-git-send-email-leo.yan@linaro.org>
- <1494298202-6739-8-git-send-email-leo.yan@linaro.org>
-Message-ID: <b894bca9-b66f-32f5-4dd7-4593fa734701@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 11 May 2017 18:53:58 +0100
+Subject: [PATCHv2] arm64/cpufeature: don't use mutex in bringup path
+In-Reply-To: <c6dfb0da-acec-620a-dba6-71aac6efce0b@arm.com>
+References: <1494514878-26878-1-git-send-email-mark.rutland@arm.com>
+ <498b2e16-538a-d5ea-7843-2ebbff2007df@arm.com>
+ <20170511153719.GB19626@leverpostej>
+ <232510f0-115e-b2c6-022f-03efd2606d56@arm.com>
+ <c6dfb0da-acec-620a-dba6-71aac6efce0b@arm.com>
+Message-ID: <20170511175357.GA29929@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/17 03:50, Leo Yan wrote:
-> Coresight includes debug module and usually the module connects with CPU
-> debug logic. ARMv8 architecture reference manual (ARM DDI 0487A.k) has
-> description for related info in "Part H: External Debug".
->
-> Chapter H7 "The Sample-based Profiling Extension" introduces several
-> sampling registers, e.g. we can check program counter value with
-> combined CPU exception level, secure state, etc. So this is helpful for
-> analysis CPU lockup scenarios, e.g. if one CPU has run into infinite
-> loop with IRQ disabled. In this case the CPU cannot switch context and
-> handle any interrupt (including IPIs), as the result it cannot handle
-> SMP call for stack dump.
->
-> This patch is to enable coresight debug module, so firstly this driver
-> is to bind apb clock for debug module and this is to ensure the debug
-> module can be accessed from program or external debugger. And the driver
-> uses sample-based registers for debug purpose, e.g. when system triggers
-> panic, the driver will dump program counter and combined context
-> registers (EDCIDSR, EDVIDSR); by parsing context registers so can
-> quickly get to know CPU secure state, exception level, etc.
->
-> Some of the debug module registers are located in CPU power domain, so
-> this requires the CPU power domain stays on when access related debug
-> registers, but the power management for CPU power domain is quite
-> dependent on SoC integration for power management. For the platforms
-> which with sane power controller implementations, this driver follows
-> the method to set EDPRCR to try to pull the CPU out of low power state
-> and then set 'no power down request' bit so the CPU has no chance to
-> lose power.
->
-> If the SoC has not followed up this design well for power management
-> controller, the user should use the command line parameter or sysfs
-> to constrain all or partial idle states to ensure the CPU power
-> domain is enabled and access coresight CPU debug component safely.
->
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+On Thu, May 11, 2017 at 05:08:19PM +0100, Marc Zyngier wrote:
+> On 11/05/17 16:54, Suzuki K Poulose wrote:
+> > On 11/05/17 16:37, Mark Rutland wrote:
+> >> On Thu, May 11, 2017 at 04:15:38PM +0100, Suzuki K Poulose wrote:
+> >>> On 11/05/17 16:01, Mark Rutland wrote:
+> >>>> +static inline bool cpus_have_const_cap(int num)
+> >>>> +{
+> >>>> +	if (static_branch_likely(&arm64_const_caps_ready))
+> >>>> +		return __cpus_have_const_cap(num);
+> >>>> +	else
+> >>>> +		return cpus_have_cap(num);
+> >>>
+> >>> We use cpus_have_const_cap() from hyp code, via has_vhe() and we could potentially
+> >>> try to access unmapped kernel data from hyp if we fallback to cpus_have_cap().
+> >>> However, it looks like we have already set arm64_const_caps_ready, so should not
+> >>> hit it in practise. May be we could add a stricter version of the helper ?
+> >>>
+> >>> static inline cpus_have_const_cap_strict(int num)
+> >>> {
+> >>> 	BUG_ON(!static_branch_likely(&arm64_const_caps_ready);
+> >>> 	return __cpus_have_const_cap(num);
+> >>> }
+> >>
+> >> Just to check, is that the only user of cpus_have_const_cap() at hyp?
+> > 
+> > Uh, no we have one more, via system_supports_fpsimd() in __actvate_traps.
+> 
+> Indeed, and I'd definitely expect to see more of that trickling in (if
+> only to deal with errata).
+> 
+> I'm OK with the BUG_ON version, TBH. It's not pretty, but it will be
+> perfectly visible if it fires.
 
-With comments from Mathieu addressed,
+We can't make system_supports_fpsimd() BUG_ON(), because that will fire
+the first time the boot CPU tries to switch thread, due to
+fpsimd_thread_switch().
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+However, thinking about it, there's no risk that this code runs at hyp
+before we've intialised the caps.
+
+We initialise hyp from kvm_arch_init(), which is a module initcall. As
+it's built-in, that's actually a device initcall, which happens long
+after we've finalised the cpucaps.
+
+So the v2 patch should be safe, though we can make that a little clearer
+with the below, which I'll fold into v3.
+
+Thanks,
+Mark.
+
+---->8----
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 5e19165..28bf4ea 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -24,6 +24,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/kvm_types.h>
++#include <asm/cpufeature.h>
+ #include <asm/kvm.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmio.h>
+@@ -356,8 +357,10 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+ {
+        /*
+         * Call initialization code, and switch to the full blown
+-        * HYP code.
++        * HYP code. If the cpucaps haven't been finialized yet,
++        * something has gone very wrong, and hyp will crash and burn.
+         */
++       BUG_ON(!static_branch_likely(&arm64_const_caps_ready));
+        __kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
+ }
