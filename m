@@ -1,127 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 May 2017 09:17:16 +0200
-Subject: [PATCH v3 2/2] dt-bindings: pcie: Add documentation for Mediatek
- PCIe
-In-Reply-To: <1494470650.20742.36.camel@mtkswgap22>
-References: <1494382020-26790-1-git-send-email-ryder.lee@mediatek.com>
- <1494382020-26790-3-git-send-email-ryder.lee@mediatek.com>
- <CAK8P3a193RxchvFAMWeZiP0sc0bd+VGg=_aVvipSgcbDpHXojg@mail.gmail.com>
- <1494408707.31307.32.camel@mtkswgap22>
- <CAK8P3a1AUsUTNDnN+_9251sxC7R4vvkQRr37dvAke6ooCJ_oxg@mail.gmail.com>
- <1494470650.20742.36.camel@mtkswgap22>
-Message-ID: <CAK8P3a1FVyoFufnbQFjGovoQpkxMj3kaAgjb5Q+v-DQnYKeA-g@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 11 May 2017 15:22:32 +0800
+Subject: [PATCH v3 6/6] watchdog: ts4600: add driver for TS-4600 watchdog
+In-Reply-To: <20170505193259.16517-7-sebastien.bourdelin@savoirfairelinux.com>
+References: <20170505193259.16517-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20170505193259.16517-7-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20170511072231.GD5833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 4:44 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> On Wed, 2017-05-10 at 12:01 +0200, Arnd Bergmann wrote:
->> On Wed, May 10, 2017 at 11:31 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
->> > On Wed, 2017-05-10 at 10:08 +0200, Arnd Bergmann wrote:
+On Fri, May 05, 2017 at 03:32:59PM -0400, Sebastien Bourdelin wrote:
+> This watchdog is instantiated in a FPGA and can only be access using a
+> GPIOs bit-banged bus, called the NBUS by Technologic Systems.
+> The watchdog is made of only one register, called the feed register.
+> Writing to this register will re-arm the watchdog for a given time (and
+> enable it if it was disable). It can be disabled by writing a special
+> value into it.
+> 
+> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+> ---
+> Changes v2 -> v3:
+>   - rebase on master
+>   - remove the timeout table to simplify the logic (suggested by
+>   Guenter Roeck)
+>   - fix the set_timeout function (suggested by Guenter Roeck)
+>   - hardcode the max_hw_heartbeat_ms value based on the ts4600 max
+>   timeout value supported (suggested by Guenter Roeck)
+>   - remove the max_timeout usage and set a default timeout value
+> (suggested by Guenter Roeck)
+>   - use the devm_watchdog_register_device function instead of
+>   watchdog_register_device (suggested by Guenter Roeck)
+> 
+> Changes v1 -> v2:
+>   - rebase on master
+>   - retrieve the ts_nbus instantiated by the parent node (suggested by
+>   Linus Walleij)
+>   - rename the wdt by watchdog in the device tree and in the
+>   documentation (suggested by Rob Herring)
+>   - add a dependency to the TS_NBUS driver in the Kconfig (suggested by
+>   Guenter Roeck)
+>   - simplify the set_timeout function (suggested by Guenter Roeck)
+>   - use the max_hw_heartbeat_ms callback instead of the max_timeout
+>   callback (suggested by Guenter Roeck)
+> ---
+>  .../devicetree/bindings/watchdog/ts4600-wdt.txt    |  16 ++
+>  arch/arm/boot/dts/imx28-ts4600-common.dtsi         |   5 +
 
->> >> > +Required properties:
->> >> > +- device_type: Must be "pci"
->> >> > +- assigned-addresses: Address and size of the port configuration registers
->> >> > +- reg: Only the first four bytes are used to refer to the correct bus number
->> >> > +  and device number.
->> >> > +- #address-cells: Must be 3
->> >> > +- #size-cells: Must be 2
->> >> > +- #interrupt-cells: Must be 1
->> >> > +- interrupt-map-mask and interrupt-map: Standard PCI IRQ mapping properties
->> >> > +  Please refer to the standard PCI bus binding document for a more detailed
->> >> > +  explanation.
->> >>
->> >> Child nodes do not normally have interrupt-map properties. Isn't this
->> >> already covered by the interrupt-map in the parent?
->> >>
->> >
->> > I have one Intel 4 port ethernet card(0000:00:01) and MTK WLAN card
->> > (0000:00:02), probe message looks good to me.
->> >
->> > pci 0000:00:01.0: fixup irq: got 224
->> > pci 0000:00:01.0: assigning IRQ 224
->> > pci 0000:00:02.0: fixup irq: got 225
->> > pci 0000:00:02.0: assigning IRQ 225
->> >
->> > pci 0000:01:00.0: fixup irq: got 224
->> > pci 0000:01:00.0: assigning IRQ 224
->> > pci 0000:01:00.1: fixup irq: got 224
->> > pci 0000:01:00.1: assigning IRQ 224
->> > pci 0000:01:00.2: fixup irq: got 224
->> > pci 0000:01:00.2: assigning IRQ 224
->> > pci 0000:01:00.3: fixup irq: got 224
->> > pci 0000:01:00.3: assigning IRQ 224
->> >
->> > pci 0000:02:00.0: fixup irq: got 225
->> > pci 0000:02:00.0: assigning IRQ 225
->> >
->> >
->> > But child nodes without interrupt-map properties:
->> > It seems incorrect.
->> >
->> > pci 0000:00:01.0: fixup irq: got 224
->> > pci 0000:00:01.0: assigning IRQ 224
->> > pci 0000:00:02.0: fixup irq: got 225
->> > pci 0000:00:02.0: assigning IRQ 225
->> >
->> > pci 0000:01:00.0: fixup irq: got 223
->> > pci 0000:01:00.0: assigning IRQ 223
->>
->> Not entirely sure what happens here, but I guess the problem
->> is that the 'reg' portion of the parent interrupt-map refers to
->> the port devices, not the devices attached the devices behind
->> them.
->
-> I agree with you. That's why I need additional interrupt-map properties
-> to resolve IRQ correctly for the devices behind root ports.
->
-> Not sure whether other platforms have similar case like me here.
+The dts change shouldn't be mixed within driver patch.
 
-I think it's just a bug in this specific chip where the HW designers
-wired the IRQs in a nonstandard way.
+Shawn
 
-However, you really should not need the interrupt-map properties
-in the child nodes, just change the address part in the parent
-interrupt-map. Specifically, the 'bus' portion of the device address
-in the interrupt-map would have to be nonzero to refer to
-child devices.
-
->> On a related note, I see that you still list
->>
->> > +- interrupts: Three interrupt outputs of the controller. Must contain an
->> > +  entry for each entry in the interrupt-names property.
->> > +- interrupt-names: Must include the following names
->> > +  - "pcie-int0"
->> > +  - "pcie-int1"
->> > +  - "pcie-int2"
->>
->> This seems to be an artifact from the older version and should be
->> removed as the driver correctly ignores the properties now.
->
-> Actually, everything works fine without these properties however when it
-> loads we see a few weird error message:
->
-> pcieport 0000:00:01.0: Signaling PME with IRQ 232
-> pcieport 0000:00:02.0: enabling device (0140 -> 0142)
-> pcieport 0000:00:02.0: enabling bus mastering
-> irq 232: nobody cared (try booting with the "irqpoll" option)
-> ...
-> [<c03f6be4>] (pcie_pme_probe) from [<c03f47b8>] (pcie_port_probe_service
-> +0x44/0x6c)
-> (pcie_port_probe_service) from [<c0454cf8>] (driver_probe_device
-> +0x280/0x470)
-> ...
-> (pcie_port_device_register) from [<c03f51a0>] (pcie_portdrv_probe
-> +0x3c/0xb4)
-> (pcie_portdrv_probe) from [<c03e7acc>] (pci_device_probe+0x98/0xfc)
-> (pci_device_probe) from [<c0454cf8>] (driver_probe_device+0x280/0x470)
-> handlers:
-> [<c03f68b0>] pcie_pme_irq
-> Disabling IRQ #233
->
-> I haven't dig it out yet, but just keep them here to solve that.
-
-Something is going very wrong if adding the properties helps. I can't
-think of what that is, but we have to find out before the binding can
-be merged.
-
-      Arnd
+>  drivers/watchdog/Kconfig                           |  11 ++
+>  drivers/watchdog/Makefile                          |   1 +
+>  drivers/watchdog/ts4600_wdt.c                      | 185 +++++++++++++++++++++
+>  5 files changed, 218 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
+>  create mode 100644 drivers/watchdog/ts4600_wdt.c
