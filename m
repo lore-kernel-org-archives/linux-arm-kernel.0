@@ -1,193 +1,126 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 May 2017 16:01:18 +0100
-Subject: [PATCHv2] arm64/cpufeature: don't use mutex in bringup path
-Message-ID: <1494514878-26878-1-git-send-email-mark.rutland@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 11 May 2017 11:07:39 -0400 (EDT)
+Subject: [PATCH] ARM: remove duplicate 'const' annotations'
+In-Reply-To: <20170511115059.2997141-1-arnd@arndb.de>
+References: <20170511115059.2997141-1-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.20.1705111106570.3061@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, cpus_set_cap() calls static_branch_enable_cpuslocked(), which
-must take the jump_label mutex.
+On Thu, 11 May 2017, Arnd Bergmann wrote:
 
-We call cpus_set_cap() in the secondary bringup path, from the idle
-thread where interrupts are disabled. Taking a mutex in this path "is a
-NONO" regardless of whether it's contended, and something we must avoid.
-Additionally, the secondary CPU doesn't hold the percpu rwsem (as this
-is held by the primary CPU), so this triggers a lockdep splat.
+> gcc-7 warns about some declarations that are more 'const' than necessary:
+> 
+> arch/arm/mach-at91/pm.c:338:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct of_device_id const ramc_ids[] __initconst = {
+> arch/arm/mach-bcm/bcm_kona_smc.c:36:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct of_device_id const bcm_kona_smc_ids[] __initconst = {
+> arch/arm/mach-spear/time.c:207:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct of_device_id const timer_of_match[] __initconst = {
+> arch/arm/mach-omap2/prm_common.c:714:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct of_device_id const omap_prcm_dt_match_table[] __initconst = {
+> arch/arm/mach-omap2/vc.c:562:35: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct i2c_init_data const omap4_i2c_timing_data[] __initconst = {
+> 
+> The ones in arch/arm were apparently all introduced accidentally by one
+> commit that correctly marked a lot of variables as __initconst.
+> 
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Fixes: 19c233b79d1a ("ARM: appropriate __init annotation for const data")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-This patch fixes both issues by moving the static_key poking from
-cpus_set_cap() into enable_cpu_capabilities(). To account for the static
-keys being set later, cpus_have_const_cap() is updated to use another
-static key to check whether the const cap keys have been initialised.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-This means that users of cpus_have_const_cap() gain should only gain a
-single additional NOP in the fast path once the const caps are
-initialised, but should always see the current cap value.
 
-This rework means that we can remove the *_cpuslocked() helpers added in
-commit d54bb72551b999dd ("arm64/cpufeature: Use
-static_branch_enable_cpuslocked()").
 
-Fixes: efd9e03facd075f5 ("arm64: Use static keys for CPU features")
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marc Zyniger <marc.zyngier@arm.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Sebastian Sewior <bigeasy@linutronix.de>
-Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/cpufeature.h | 13 ++++++++++---
- arch/arm64/kernel/cpu_errata.c      |  9 +--------
- arch/arm64/kernel/cpufeature.c      | 25 ++++++++++++++++++++++---
- 3 files changed, 33 insertions(+), 14 deletions(-)
-
-Catalin, Will, assuming you're happy with the patch, it will need to go via the
-tip tree.
-
-Since v1 [1]:
-* Kill redundant update_cpu_errata_workarounds() prototype
-* Introduce arm64_const_caps_ready
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/505731.html
-
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 8a7ff73..428ee1f 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -115,6 +115,7 @@ struct arm64_cpu_capabilities {
- 
- extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
-+extern struct static_key_false arm64_const_caps_ready;
- 
- bool this_cpu_has_cap(unsigned int cap);
- 
-@@ -124,7 +125,7 @@ static inline bool cpu_have_feature(unsigned int num)
- }
- 
- /* System capability check for constant caps */
--static inline bool cpus_have_const_cap(int num)
-+static inline bool __cpus_have_const_cap(int num)
- {
- 	if (num >= ARM64_NCAPS)
- 		return false;
-@@ -138,6 +139,14 @@ static inline bool cpus_have_cap(unsigned int num)
- 	return test_bit(num, cpu_hwcaps);
- }
- 
-+static inline bool cpus_have_const_cap(int num)
-+{
-+	if (static_branch_likely(&arm64_const_caps_ready))
-+		return __cpus_have_const_cap(num);
-+	else
-+		return cpus_have_cap(num);
-+}
-+
- static inline void cpus_set_cap(unsigned int num)
- {
- 	if (num >= ARM64_NCAPS) {
-@@ -145,7 +154,6 @@ static inline void cpus_set_cap(unsigned int num)
- 			num, ARM64_NCAPS);
- 	} else {
- 		__set_bit(num, cpu_hwcaps);
--		static_branch_enable_cpuslocked(&cpu_hwcap_keys[num]);
- 	}
- }
- 
-@@ -223,7 +231,6 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- void check_local_cpu_capabilities(void);
- 
- void update_cpu_errata_workarounds(void);
--void update_cpu_errata_workarounds_cpuslocked(void);
- void __init enable_errata_workarounds(void);
- void verify_local_cpu_errata_workarounds(void);
- 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 57d60fa..2ed2a76 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -190,16 +190,9 @@ void verify_local_cpu_errata_workarounds(void)
- 		}
- }
- 
--void update_cpu_errata_workarounds_cpuslocked(void)
--{
--	update_cpu_capabilities(arm64_errata, "enabling workaround for");
--}
--
- void update_cpu_errata_workarounds(void)
- {
--	get_online_cpus();
--	update_cpu_errata_workarounds_cpuslocked();
--	put_online_cpus();
-+	update_cpu_capabilities(arm64_errata, "enabling workaround for");
- }
- 
- void __init enable_errata_workarounds(void)
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 803afae..4a89f59 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -986,8 +986,16 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-  */
- void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
- {
--	for (; caps->matches; caps++)
--		if (caps->enable && cpus_have_cap(caps->capability))
-+	for (; caps->matches; caps++) {
-+		unsigned int num = caps->capability;
-+
-+		if (!cpus_have_cap(num))
-+			continue;
-+
-+		/* Ensure cpus_have_const_cap(num) works */
-+		static_branch_enable(&cpu_hwcap_keys[num]);
-+
-+		if (caps->enable) {
- 			/*
- 			 * Use stop_machine() as it schedules the work allowing
- 			 * us to modify PSTATE, instead of on_each_cpu() which
-@@ -995,6 +1003,8 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
- 			 * we return.
- 			 */
- 			stop_machine(caps->enable, NULL, cpu_online_mask);
-+		}
-+	}
- }
- 
- /*
-@@ -1086,7 +1096,7 @@ void check_local_cpu_capabilities(void)
- 	 * advertised capabilities.
- 	 */
- 	if (!sys_caps_initialised)
--		update_cpu_errata_workarounds_cpuslocked();
-+		update_cpu_errata_workarounds();
- 	else
- 		verify_local_cpu_capabilities();
- }
-@@ -1099,6 +1109,14 @@ static void __init setup_feature_capabilities(void)
- 	enable_cpu_capabilities(arm64_features);
- }
- 
-+DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
-+EXPORT_SYMBOL(arm64_const_caps_ready);
-+
-+static void __init mark_const_caps_ready(void)
-+{
-+	static_branch_enable(&arm64_const_caps_ready);
-+}
-+
- /*
-  * Check if the current CPU has a given feature capability.
-  * Should be called from non-preemptible context.
-@@ -1134,6 +1152,7 @@ void __init setup_cpu_features(void)
- 	/* Set the CPU feature capabilies */
- 	setup_feature_capabilities();
- 	enable_errata_workarounds();
-+	mark_const_caps_ready();
- 	setup_elf_hwcaps(arm64_elf_hwcaps);
- 
- 	if (system_supports_32bit_el0())
--- 
-1.9.1
+> ---
+>  arch/arm/mach-at91/pm.c          | 2 +-
+>  arch/arm/mach-bcm/bcm_kona_smc.c | 2 +-
+>  arch/arm/mach-cns3xxx/core.c     | 2 +-
+>  arch/arm/mach-omap2/prm_common.c | 2 +-
+>  arch/arm/mach-omap2/vc.c         | 2 +-
+>  arch/arm/mach-spear/time.c       | 2 +-
+>  6 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 2cd27c830ab6..283e79ab587d 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -335,7 +335,7 @@ static const struct ramc_info ramc_infos[] __initconst = {
+>  	{ .idle = sama5d3_ddr_standby, .memctrl = AT91_MEMCTRL_DDRSDR},
+>  };
+>  
+> -static const struct of_device_id const ramc_ids[] __initconst = {
+> +static const struct of_device_id ramc_ids[] __initconst = {
+>  	{ .compatible = "atmel,at91rm9200-sdramc", .data = &ramc_infos[0] },
+>  	{ .compatible = "atmel,at91sam9260-sdramc", .data = &ramc_infos[1] },
+>  	{ .compatible = "atmel,at91sam9g45-ddramc", .data = &ramc_infos[2] },
+> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
+> index 5157faa502eb..3937bd5d452f 100644
+> --- a/arch/arm/mach-bcm/bcm_kona_smc.c
+> +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
+> @@ -33,7 +33,7 @@ struct bcm_kona_smc_data {
+>  	unsigned result;
+>  };
+>  
+> -static const struct of_device_id const bcm_kona_smc_ids[] __initconst = {
+> +static const struct of_device_id bcm_kona_smc_ids[] __initconst = {
+>  	{.compatible = "brcm,kona-smc"},
+>  	{.compatible = "bcm,kona-smc"}, /* deprecated name */
+>  	{},
+> diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
+> index 03da3813f1ab..7d5a44a06648 100644
+> --- a/arch/arm/mach-cns3xxx/core.c
+> +++ b/arch/arm/mach-cns3xxx/core.c
+> @@ -346,7 +346,7 @@ static struct usb_ohci_pdata cns3xxx_usb_ohci_pdata = {
+>  	.power_off	= csn3xxx_usb_power_off,
+>  };
+>  
+> -static const struct of_dev_auxdata const cns3xxx_auxdata[] __initconst = {
+> +static const struct of_dev_auxdata cns3xxx_auxdata[] __initconst = {
+>  	{ "intel,usb-ehci", CNS3XXX_USB_BASE, "ehci-platform", &cns3xxx_usb_ehci_pdata },
+>  	{ "intel,usb-ohci", CNS3XXX_USB_OHCI_BASE, "ohci-platform", &cns3xxx_usb_ohci_pdata },
+>  	{ "cavium,cns3420-ahci", CNS3XXX_SATA2_BASE, "ahci", NULL },
+> diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+> index 2b138b65129a..dc11841ca334 100644
+> --- a/arch/arm/mach-omap2/prm_common.c
+> +++ b/arch/arm/mach-omap2/prm_common.c
+> @@ -711,7 +711,7 @@ static struct omap_prcm_init_data scrm_data __initdata = {
+>  };
+>  #endif
+>  
+> -static const struct of_device_id const omap_prcm_dt_match_table[] __initconst = {
+> +static const struct of_device_id omap_prcm_dt_match_table[] __initconst = {
+>  #ifdef CONFIG_SOC_AM33XX
+>  	{ .compatible = "ti,am3-prcm", .data = &am3_prm_data },
+>  #endif
+> diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+> index 2028167fff31..d76b1e5eb8ba 100644
+> --- a/arch/arm/mach-omap2/vc.c
+> +++ b/arch/arm/mach-omap2/vc.c
+> @@ -559,7 +559,7 @@ struct i2c_init_data {
+>  	u8 hsscll_12;
+>  };
+>  
+> -static const struct i2c_init_data const omap4_i2c_timing_data[] __initconst = {
+> +static const struct i2c_init_data omap4_i2c_timing_data[] __initconst = {
+>  	{
+>  		.load = 50,
+>  		.loadbits = 0x3,
+> diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
+> index 4878ba90026d..289e036c9c30 100644
+> --- a/arch/arm/mach-spear/time.c
+> +++ b/arch/arm/mach-spear/time.c
+> @@ -204,7 +204,7 @@ static void __init spear_clockevent_init(int irq)
+>  	setup_irq(irq, &spear_timer_irq);
+>  }
+>  
+> -static const struct of_device_id const timer_of_match[] __initconst = {
+> +static const struct of_device_id timer_of_match[] __initconst = {
+>  	{ .compatible = "st,spear-timer", },
+>  	{ },
+>  };
+> -- 
+> 2.9.0
+> 
+> 
