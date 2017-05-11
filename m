@@ -1,61 +1,65 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Thu, 11 May 2017 16:00:58 -0500
-Subject: [PATCH v7 21/23] drivers/fsi: Add SCOM FSI client device driver
+Date: Thu, 11 May 2017 16:00:59 -0500
+Subject: [PATCH v7 22/23] drivers/fsi: Add hub master support
 In-Reply-To: <20170511210101.78409-1-cbostic@linux.vnet.ibm.com>
 References: <20170511210101.78409-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170511210101.78409-22-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170511210101.78409-23-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a simple SCOM engine device driver that reads and writes
-its control registers via an FSI bus.
+Add an engine driver to expose a "hub" FSI master - which has a set of
+control registers in the engine address space, and uses a chunk of the
+slave address space for actual FSI communication.
 
-Includes changes from Edward A. James <eajames@us.ibm.com>.
+Additional changes from Jeremy Kerr <jk@ozlabs.org>.
 
 Signed-off-by: Christopher Bostic <cbostic@linux.vnet.ibm.com>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
-Signed-off-by: Edward A. James <eajames@us.ibm.com>
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/Kconfig    |   5 +
- drivers/fsi/Makefile   |   1 +
- drivers/fsi/fsi-scom.c | 263 +++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 269 insertions(+)
- create mode 100644 drivers/fsi/fsi-scom.c
+ drivers/fsi/Kconfig          |   8 ++
+ drivers/fsi/Makefile         |   1 +
+ drivers/fsi/fsi-master-hub.c | 327 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 336 insertions(+)
+ create mode 100644 drivers/fsi/fsi-master-hub.c
 
 diff --git a/drivers/fsi/Kconfig b/drivers/fsi/Kconfig
-index ba16637..5582523 100644
+index 5582523..6821ed0 100644
 --- a/drivers/fsi/Kconfig
 +++ b/drivers/fsi/Kconfig
-@@ -20,6 +20,11 @@ config FSI_MASTER_GPIO
+@@ -20,6 +20,14 @@ config FSI_MASTER_GPIO
  	---help---
  	This option enables a FSI master driver using GPIO lines.
  
-+config FSI_SCOM
-+	tristate "SCOM FSI client device driver"
++config FSI_MASTER_HUB
++	tristate "FSI hub master"
 +	---help---
-+	This option enables an FSI based SCOM device driver.
++	This option enables a FSI hub master driver.  Hub is a type of FSI
++	master that is connected to the upstream master via a slave.  Hubs
++	allow chaining of FSI links to an arbitrary depth.  This allows for
++	a high target device fanout.
 +
- endif
- 
- endmenu
+ config FSI_SCOM
+ 	tristate "SCOM FSI client device driver"
+ 	---help---
 diff --git a/drivers/fsi/Makefile b/drivers/fsi/Makefile
-index ed28ac0..3466f08 100644
+index 3466f08..65eb99d 100644
 --- a/drivers/fsi/Makefile
 +++ b/drivers/fsi/Makefile
-@@ -1,3 +1,4 @@
+@@ -1,4 +1,5 @@
  
  obj-$(CONFIG_FSI) += fsi-core.o
++obj-$(CONFIG_FSI_MASTER_HUB) += fsi-master-hub.o
  obj-$(CONFIG_FSI_MASTER_GPIO) += fsi-master-gpio.o
-+obj-$(CONFIG_FSI_SCOM) += fsi-scom.o
-diff --git a/drivers/fsi/fsi-scom.c b/drivers/fsi/fsi-scom.c
+ obj-$(CONFIG_FSI_SCOM) += fsi-scom.o
+diff --git a/drivers/fsi/fsi-master-hub.c b/drivers/fsi/fsi-master-hub.c
 new file mode 100644
-index 0000000..98d062f
+index 0000000..133b9bf
 --- /dev/null
-+++ b/drivers/fsi/fsi-scom.c
-@@ -0,0 +1,263 @@
++++ b/drivers/fsi/fsi-master-hub.c
+@@ -0,0 +1,327 @@
 +/*
-+ * SCOM FSI Client device driver
++ * FSI hub master driver
 + *
 + * Copyright (C) IBM Corporation 2016
 + *
@@ -65,257 +69,321 @@ index 0000000..98d062f
 + *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERGCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + */
 +
++#include <linux/delay.h>
 +#include <linux/fsi.h>
 +#include <linux/module.h>
-+#include <linux/cdev.h>
-+#include <linux/delay.h>
-+#include <linux/fs.h>
-+#include <linux/uaccess.h>
 +#include <linux/slab.h>
-+#include <linux/miscdevice.h>
-+#include <linux/list.h>
-+#include <linux/idr.h>
 +
-+#define FSI_ENGID_SCOM		0x5
++#include "fsi-master.h"
 +
-+#define SCOM_FSI2PIB_DELAY	50
++/* Control Registers */
++#define FSI_MMODE		0x0		/* R/W: mode */
++#define FSI_MDLYR		0x4		/* R/W: delay */
++#define FSI_MCRSP		0x8		/* R/W: clock rate */
++#define FSI_MENP0		0x10		/* R/W: enable */
++#define FSI_MLEVP0		0x18		/* R: plug detect */
++#define FSI_MSENP0		0x18		/* S: Set enable */
++#define FSI_MCENP0		0x20		/* C: Clear enable */
++#define FSI_MAEB		0x70		/* R: Error address */
++#define FSI_MVER		0x74		/* R: master version/type */
++#define FSI_MRESP0		0xd0		/* W: Port reset */
++#define FSI_MESRB0		0x1d0		/* R: Master error status */
++#define FSI_MRESB0		0x1d0		/* W: Reset bridge */
++#define FSI_MECTRL		0x2e0		/* W: Error control */
 +
-+/* SCOM engine register set */
-+#define SCOM_DATA0_REG		0x00
-+#define SCOM_DATA1_REG		0x04
-+#define SCOM_CMD_REG		0x08
-+#define SCOM_RESET_REG		0x1C
++/* MMODE: Mode control */
++#define FSI_MMODE_EIP		0x80000000	/* Enable interrupt polling */
++#define FSI_MMODE_ECRC		0x40000000	/* Enable error recovery */
++#define FSI_MMODE_EPC		0x10000000	/* Enable parity checking */
++#define FSI_MMODE_P8_TO_LSB	0x00000010	/* Timeout value LSB */
++						/*   MSB=1, LSB=0 is 0.8 ms */
++						/*   MSB=0, LSB=1 is 0.9 ms */
++#define FSI_MMODE_CRS0SHFT	18		/* Clk rate selection 0 shift */
++#define FSI_MMODE_CRS0MASK	0x3ff		/* Clk rate selection 0 mask */
++#define FSI_MMODE_CRS1SHFT	8		/* Clk rate selection 1 shift */
++#define FSI_MMODE_CRS1MASK	0x3ff		/* Clk rate selection 1 mask */
 +
-+#define SCOM_RESET_CMD		0x80000000
-+#define SCOM_WRITE_CMD		0x80000000
++/* MRESB: Reset brindge */
++#define FSI_MRESB_RST_GEN	0x80000000	/* General reset */
++#define FSI_MRESB_RST_ERR	0x40000000	/* Error Reset */
 +
-+struct scom_device {
-+	struct list_head link;
-+	struct fsi_device *fsi_dev;
-+	struct miscdevice mdev;
-+	char	name[32];
-+	int idx;
++/* MRESB: Reset port */
++#define FSI_MRESP_RST_ALL_MASTER 0x20000000	/* Reset all FSI masters */
++#define FSI_MRESP_RST_ALL_LINK	0x10000000	/* Reset all FSI port contr. */
++#define FSI_MRESP_RST_MCR	0x08000000	/* Reset FSI master reg. */
++#define FSI_MRESP_RST_PYE	0x04000000	/* Reset FSI parity error */
++#define FSI_MRESP_RST_ALL	0xfc000000	/* Reset any error */
++
++/* MECTRL: Error control */
++#define FSI_MECTRL_EOAE		0x8000		/* Enable machine check when */
++						/* master 0 in error */
++#define FSI_MECTRL_P8_AUTO_TERM	0x4000		/* Auto terminate */
++
++#define FSI_ENGID_HUB_MASTER		0x1c
++#define FSI_HUB_LINK_OFFSET		0x80000
++#define FSI_HUB_LINK_SIZE		0x80000
++#define FSI_HUB_MASTER_MAX_LINKS	8
++
++#define FSI_LINK_ENABLE_SETUP_TIME	10	/* in mS */
++
++/*
++ * FSI hub master support
++ *
++ * A hub master increases the number of potential target devices that the
++ * primary FSI master can access. For each link a primary master supports,
++ * each of those links can in turn be chained to a hub master with multiple
++ * links of its own.
++ *
++ * The hub is controlled by a set of control registers exposed as a regular fsi
++ * device (the hub->upstream device), and provides access to the downstream FSI
++ * bus as through an address range on the slave itself (->addr and ->size).
++ *
++ * [This differs from "cascaded" masters, which expose the entire downstream
++ * bus entirely through the fsi device address range, and so have a smaller
++ * accessible address space.]
++ */
++struct fsi_master_hub {
++	struct fsi_master	master;
++	struct fsi_device	*upstream;
++	uint32_t		addr, size;	/* slave-relative addr of */
++						/* master address space */
 +};
 +
-+#define to_scom_dev(x)		container_of((x), struct scom_device, mdev)
++#define to_fsi_master_hub(m) container_of(m, struct fsi_master_hub, master)
 +
-+static struct list_head scom_devices;
-+
-+static DEFINE_IDA(scom_ida);
-+
-+static int put_scom(struct scom_device *scom_dev, uint64_t value,
-+			uint32_t addr)
++static int hub_master_read(struct fsi_master *master, int link,
++			uint8_t id, uint32_t addr, void *val, size_t size)
 +{
-+	int rc;
-+	uint32_t data;
++	struct fsi_master_hub *hub = to_fsi_master_hub(master);
 +
-+	data = cpu_to_be32(SCOM_RESET_CMD);
-+	rc = fsi_device_write(scom_dev->fsi_dev, SCOM_RESET_REG, &data,
-+				sizeof(uint32_t));
-+	if (rc)
-+		return rc;
++	if (id != 0)
++		return -EINVAL;
 +
-+	data = cpu_to_be32((value >> 32) & 0xffffffff);
-+	rc = fsi_device_write(scom_dev->fsi_dev, SCOM_DATA0_REG, &data,
-+				sizeof(uint32_t));
-+	if (rc)
-+		return rc;
-+
-+	data = cpu_to_be32(value & 0xffffffff);
-+	rc = fsi_device_write(scom_dev->fsi_dev, SCOM_DATA1_REG, &data,
-+				sizeof(uint32_t));
-+	if (rc)
-+		return rc;
-+
-+	data = cpu_to_be32(SCOM_WRITE_CMD | addr);
-+	return fsi_device_write(scom_dev->fsi_dev, SCOM_CMD_REG, &data,
-+				sizeof(uint32_t));
++	addr += hub->addr + (link * FSI_HUB_LINK_SIZE);
++	return fsi_slave_read(hub->upstream->slave, addr, val, size);
 +}
 +
-+static int get_scom(struct scom_device *scom_dev, uint64_t *value,
-+			uint32_t addr)
++static int hub_master_write(struct fsi_master *master, int link,
++			uint8_t id, uint32_t addr, const void *val, size_t size)
 +{
-+	uint32_t result, data;
++	struct fsi_master_hub *hub = to_fsi_master_hub(master);
++
++	if (id != 0)
++		return -EINVAL;
++
++	addr += hub->addr + (link * FSI_HUB_LINK_SIZE);
++	return fsi_slave_write(hub->upstream->slave, addr, val, size);
++}
++
++static int hub_master_break(struct fsi_master *master, int link)
++{
++	uint32_t addr, cmd;
++
++	addr = 0x4;
++	cmd = cpu_to_be32(0xc0de0000);
++
++	return hub_master_write(master, link, 0, addr, &cmd, sizeof(cmd));
++}
++
++static int hub_master_link_enable(struct fsi_master *master, int link)
++{
++	struct fsi_master_hub *hub = to_fsi_master_hub(master);
++	int idx, bit;
++	__be32 reg;
 +	int rc;
 +
-+	*value = 0ULL;
-+	data = cpu_to_be32(addr);
-+	rc = fsi_device_write(scom_dev->fsi_dev, SCOM_CMD_REG, &data,
-+				sizeof(uint32_t));
++	idx = link / 32;
++	bit = link % 32;
++
++	reg = cpu_to_be32(0x80000000 >> bit);
++
++	rc = fsi_device_write(hub->upstream, FSI_MSENP0 + (4 * idx), &reg, 4);
++
++	mdelay(FSI_LINK_ENABLE_SETUP_TIME);
++
++	fsi_device_read(hub->upstream, FSI_MENP0 + (4 * idx), &reg, 4);
++
++	return rc;
++}
++
++static void hub_master_release(struct device *dev)
++{
++	struct fsi_master_hub *hub = to_fsi_master_hub(dev_to_fsi_master(dev));
++
++	kfree(hub);
++}
++
++/* mmode encoders */
++static inline u32 fsi_mmode_crs0(u32 x)
++{
++	return (x & FSI_MMODE_CRS0MASK) << FSI_MMODE_CRS0SHFT;
++}
++
++static inline u32 fsi_mmode_crs1(u32 x)
++{
++	return (x & FSI_MMODE_CRS1MASK) << FSI_MMODE_CRS1SHFT;
++}
++
++static int hub_master_init(struct fsi_master_hub *hub)
++{
++	struct fsi_device *dev = hub->upstream;
++	__be32 reg;
++	int rc;
++
++	reg = cpu_to_be32(FSI_MRESP_RST_ALL_MASTER | FSI_MRESP_RST_ALL_LINK
++			| FSI_MRESP_RST_MCR | FSI_MRESP_RST_PYE);
++	rc = fsi_device_write(dev, FSI_MRESP0, &reg, sizeof(reg));
 +	if (rc)
 +		return rc;
 +
-+	rc = fsi_device_read(scom_dev->fsi_dev, SCOM_DATA0_REG, &result,
-+				sizeof(uint32_t));
++	/* Initialize the MFSI (hub master) engine */
++	reg = cpu_to_be32(FSI_MRESP_RST_ALL_MASTER | FSI_MRESP_RST_ALL_LINK
++			| FSI_MRESP_RST_MCR | FSI_MRESP_RST_PYE);
++	rc = fsi_device_write(dev, FSI_MRESP0, &reg, sizeof(reg));
 +	if (rc)
 +		return rc;
 +
-+	*value |= (uint64_t)cpu_to_be32(result) << 32;
-+	rc = fsi_device_read(scom_dev->fsi_dev, SCOM_DATA1_REG, &result,
-+				sizeof(uint32_t));
++	reg = cpu_to_be32(FSI_MECTRL_EOAE | FSI_MECTRL_P8_AUTO_TERM);
++	rc = fsi_device_write(dev, FSI_MECTRL, &reg, sizeof(reg));
 +	if (rc)
 +		return rc;
 +
-+	*value |= cpu_to_be32(result);
++	reg = cpu_to_be32(FSI_MMODE_EIP | FSI_MMODE_ECRC | FSI_MMODE_EPC
++			| fsi_mmode_crs0(1) | fsi_mmode_crs1(1)
++			| FSI_MMODE_P8_TO_LSB);
++	rc = fsi_device_write(dev, FSI_MMODE, &reg, sizeof(reg));
++	if (rc)
++		return rc;
 +
++	reg = cpu_to_be32(0xffff0000);
++	rc = fsi_device_write(dev, FSI_MDLYR, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = ~0;
++	rc = fsi_device_write(dev, FSI_MSENP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	/* Leave enabled long enough for master logic to set up */
++	mdelay(FSI_LINK_ENABLE_SETUP_TIME);
++
++	rc = fsi_device_write(dev, FSI_MCENP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	rc = fsi_device_read(dev, FSI_MAEB, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = cpu_to_be32(FSI_MRESP_RST_ALL_MASTER | FSI_MRESP_RST_ALL_LINK);
++	rc = fsi_device_write(dev, FSI_MRESP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	rc = fsi_device_read(dev, FSI_MLEVP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	/* Reset the master bridge */
++	reg = cpu_to_be32(FSI_MRESB_RST_GEN);
++	rc = fsi_device_write(dev, FSI_MRESB0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = cpu_to_be32(FSI_MRESB_RST_ERR);
++	return fsi_device_write(dev, FSI_MRESB0, &reg, sizeof(reg));
++}
++
++static int hub_master_probe(struct device *dev)
++{
++	struct fsi_device *fsi_dev = to_fsi_dev(dev);
++	struct fsi_master_hub *hub;
++	uint32_t reg, links;
++	__be32 __reg;
++	int rc;
++
++	rc = fsi_device_read(fsi_dev, FSI_MVER, &__reg, sizeof(__reg));
++	if (rc)
++		return rc;
++
++	reg = be32_to_cpu(__reg);
++	links = (reg >> 8) & 0xff;
++	dev_info(dev, "hub version %08x (%d links)\n", reg, links);
++
++	rc = fsi_slave_claim_range(fsi_dev->slave, FSI_HUB_LINK_OFFSET,
++			FSI_HUB_LINK_SIZE * links);
++	if (rc) {
++		dev_err(dev, "can't claim slave address range for links");
++		return rc;
++	}
++
++	hub = kzalloc(sizeof(*hub), GFP_KERNEL);
++	if (!hub) {
++		rc = -ENOMEM;
++		goto err_release;
++	}
++
++	hub->addr = FSI_HUB_LINK_OFFSET;
++	hub->size = FSI_HUB_LINK_SIZE * links;
++	hub->upstream = fsi_dev;
++
++	hub->master.dev.parent = dev;
++	hub->master.dev.release = hub_master_release;
++
++	hub->master.n_links = links;
++	hub->master.read = hub_master_read;
++	hub->master.write = hub_master_write;
++	hub->master.send_break = hub_master_break;
++	hub->master.link_enable = hub_master_link_enable;
++
++	dev_set_drvdata(dev, hub);
++
++	hub_master_init(hub);
++
++	rc = fsi_master_register(&hub->master);
++	if (!rc)
++		return 0;
++
++	kfree(hub);
++err_release:
++	fsi_slave_release_range(fsi_dev->slave, FSI_HUB_LINK_OFFSET,
++			FSI_HUB_LINK_SIZE * links);
++	return rc;
++}
++
++static int hub_master_remove(struct device *dev)
++{
++	struct fsi_master_hub *hub = dev_get_drvdata(dev);
++
++	fsi_master_unregister(&hub->master);
++	fsi_slave_release_range(hub->upstream->slave, hub->addr, hub->size);
 +	return 0;
 +}
 +
-+static ssize_t scom_read(struct file *filep, char __user *buf, size_t len,
-+			loff_t *offset)
-+{
-+	int rc;
-+	struct miscdevice *mdev =
-+				(struct miscdevice *)filep->private_data;
-+	struct scom_device *scom = to_scom_dev(mdev);
-+	struct device *dev = &scom->fsi_dev->dev;
-+	uint64_t val;
-+
-+	if (len != sizeof(uint64_t))
-+		return -EINVAL;
-+
-+	rc = get_scom(scom, &val, *offset);
-+	if (rc) {
-+		dev_dbg(dev, "get_scom fail:%d\n", rc);
-+		return rc;
-+	}
-+
-+	rc = copy_to_user(buf, &val, len);
-+	if (rc)
-+		dev_dbg(dev, "copy to user failed:%d\n", rc);
-+
-+	return rc ? rc : len;
-+}
-+
-+static ssize_t scom_write(struct file *filep, const char __user *buf,
-+			size_t len, loff_t *offset)
-+{
-+	int rc;
-+	struct miscdevice *mdev = filep->private_data;
-+	struct scom_device *scom = to_scom_dev(mdev);
-+	struct device *dev = &scom->fsi_dev->dev;
-+	uint64_t val;
-+
-+	if (len != sizeof(uint64_t))
-+		return -EINVAL;
-+
-+	rc = copy_from_user(&val, buf, len);
-+	if (rc) {
-+		dev_dbg(dev, "copy from user failed:%d\n", rc);
-+		return -EINVAL;
-+	}
-+
-+	rc = put_scom(scom, val, *offset);
-+	if (rc) {
-+		dev_dbg(dev, "put_scom failed with:%d\n", rc);
-+		return rc;
-+	}
-+
-+	return len;
-+}
-+
-+static loff_t scom_llseek(struct file *file, loff_t offset, int whence)
-+{
-+	switch (whence) {
-+	case SEEK_CUR:
-+		break;
-+	case SEEK_SET:
-+		file->f_pos = offset;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return offset;
-+}
-+
-+static const struct file_operations scom_fops = {
-+	.owner	= THIS_MODULE,
-+	.llseek	= scom_llseek,
-+	.read	= scom_read,
-+	.write	= scom_write,
-+};
-+
-+static int scom_probe(struct device *dev)
-+{
-+	struct fsi_device *fsi_dev = to_fsi_dev(dev);
-+	struct scom_device *scom;
-+
-+	scom = devm_kzalloc(dev, sizeof(*scom), GFP_KERNEL);
-+	if (!scom)
-+		return -ENOMEM;
-+
-+	scom->idx = ida_simple_get(&scom_ida, 1, INT_MAX, GFP_KERNEL);
-+	snprintf(scom->name, sizeof(scom->name), "scom%d", scom->idx);
-+	scom->fsi_dev = fsi_dev;
-+	scom->mdev.minor = MISC_DYNAMIC_MINOR;
-+	scom->mdev.fops = &scom_fops;
-+	scom->mdev.name = scom->name;
-+	scom->mdev.parent = dev;
-+	list_add(&scom->link, &scom_devices);
-+
-+	return misc_register(&scom->mdev);
-+}
-+
-+static int scom_remove(struct device *dev)
-+{
-+	struct scom_device *scom, *scom_tmp;
-+	struct fsi_device *fsi_dev = to_fsi_dev(dev);
-+
-+	list_for_each_entry_safe(scom, scom_tmp, &scom_devices, link) {
-+		if (scom->fsi_dev == fsi_dev) {
-+			list_del(&scom->link);
-+			ida_simple_remove(&scom_ida, scom->idx);
-+			misc_deregister(&scom->mdev);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static struct fsi_device_id scom_ids[] = {
++static struct fsi_device_id hub_master_ids[] = {
 +	{
-+		.engine_type = FSI_ENGID_SCOM,
++		.engine_type = FSI_ENGID_HUB_MASTER,
 +		.version = FSI_VERSION_ANY,
 +	},
 +	{ 0 }
 +};
 +
-+static struct fsi_driver scom_drv = {
-+	.id_table = scom_ids,
++static struct fsi_driver hub_master_driver = {
++	.id_table = hub_master_ids,
 +	.drv = {
-+		.name = "scom",
++		.name = "fsi-master-hub",
 +		.bus = &fsi_bus_type,
-+		.probe = scom_probe,
-+		.remove = scom_remove,
++		.probe = hub_master_probe,
++		.remove = hub_master_remove,
 +	}
 +};
 +
-+static int scom_init(void)
-+{
-+	INIT_LIST_HEAD(&scom_devices);
-+	return fsi_driver_register(&scom_drv);
-+}
-+
-+static void scom_exit(void)
-+{
-+	struct list_head *pos;
-+	struct scom_device *scom;
-+
-+	list_for_each(pos, &scom_devices) {
-+		scom = list_entry(pos, struct scom_device, link);
-+		misc_deregister(&scom->mdev);
-+		devm_kfree(&scom->fsi_dev->dev, scom);
-+	}
-+	fsi_driver_unregister(&scom_drv);
-+}
-+
-+module_init(scom_init);
-+module_exit(scom_exit);
++module_fsi_driver(hub_master_driver);
 +MODULE_LICENSE("GPL");
 -- 
 1.8.2.2
