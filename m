@@ -1,39 +1,48 @@
-From: luto@kernel.org (Andy Lutomirski)
-Date: Wed, 10 May 2017 17:18:33 -0700
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <20170510081431.GA16610@infradead.org>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com> <20170508124621.GA20705@kroah.com>
- <20170509064522.anusoikaalvlux3w@gmail.com>
- <20170509085659.GA32555@infradead.org>
- <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
- <CAK8P3a2j6h2MAx3h2NCtadcFsNuFcf158F5OV1e2SK37acZRRg@mail.gmail.com>
- <20170510080841.GG390@ZenIV.linux.org.uk>
- <20170510081431.GA16610@infradead.org>
-Message-ID: <CALCETrX2Vi8vKk3Cee7EfiGxFUjS+Htn1gzyr_PQ+e9ktnAmTg@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 11 May 2017 02:26:02 +0200
+Subject: [v5 1/4] ACPICA: IORT: Add Cavium ThunderX2 SMMUv3 model
+ definition.
+In-Reply-To: <1494415918-13770-2-git-send-email-gakula@caviumnetworks.com>
+References: <1494415918-13770-1-git-send-email-gakula@caviumnetworks.com>
+ <1494415918-13770-2-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <3122711.vgvub3W1fy@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 10, 2017 at 1:14 AM, Christoph Hellwig <hch@infradead.org> wrote:
-> On Wed, May 10, 2017 at 09:08:41AM +0100, Al Viro wrote:
->> On Wed, May 10, 2017 at 09:37:04AM +0200, Arnd Bergmann wrote:
->>
->> > > How about trying to remove all of them?  If we could actually get rid
->> > > of all of them, we could drop the arch support, and we'd get faster,
->> > > simpler, shorter uaccess code throughout the kernel.
->>
->> BTW, not all get_user() under KERNEL_DS are plain loads.  There is an
->> exception - probe_kernel_read().
->
-> And various calls that looks like opencoded versions, e.g. drivers/dio
-> or the ELF loader.
->
-> But in the long run we'll just need a separate primitive for that,
-> but that can wait until the set_fs calls outside the core code are
-> gone.
+On Wednesday, May 10, 2017 05:01:55 PM Geetha sowjanya wrote:
+> From: Linu Cherian <linu.cherian@cavium.com>
+> 
+> Add SMMUv3 model definition for ThunderX2.
+> 
+> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
 
-I suspect that, on most arches, the primitive is called
-__copy_from_user().  We could make the generic code do that except
-where overridden.
+This is an ACPICA change, but you have not included the ACPICA maintainers
+into your original CC list (added now).
+
+Bob, Lv, how should this be routed?
+
+Do you want to apply this patch upstream first or can we make this change in
+Linux and upstream in parallel?  That shouldn't be a big deal, right?
+
+> ---
+>  include/acpi/actbl2.h | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+> index faa9f2c..76a6f5d 100644
+> --- a/include/acpi/actbl2.h
+> +++ b/include/acpi/actbl2.h
+> @@ -779,6 +779,8 @@ struct acpi_iort_smmu {
+>  #define ACPI_IORT_SMMU_CORELINK_MMU400  0x00000002	/* ARM Corelink MMU-400 */
+>  #define ACPI_IORT_SMMU_CORELINK_MMU500  0x00000003	/* ARM Corelink MMU-500 */
+>  
+> +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX 0x00000002 /* Cavium ThunderX2 SMMUv3 */
+> +
+>  /* Masks for Flags field above */
+>  
+>  #define ACPI_IORT_SMMU_DVM_SUPPORTED    (1)
+> 
+
+Thanks,
+Rafael
