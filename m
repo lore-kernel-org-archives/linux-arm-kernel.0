@@ -1,97 +1,46 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 11 May 2017 13:46:12 +0100
-Subject: [PATCH v2 2/2] KVM: arm: rename pm_fake handler to trap_raz_wi
-In-Reply-To: <20170511124612.11212-1-alex.bennee@linaro.org>
-References: <20170511124612.11212-1-alex.bennee@linaro.org>
-Message-ID: <20170511124612.11212-3-alex.bennee@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 11 May 2017 13:54:31 +0100
+Subject: [PATCHv3 0/2] arm64: fix hotplug rwsem boot fallout
+In-Reply-To: <alpine.DEB.2.20.1705111200400.1758@nanos>
+References: <1493377266-2205-1-git-send-email-mark.rutland@arm.com>
+ <20170510180928.GA7102@leverpostej>
+ <alpine.DEB.2.20.1705102208290.2571@nanos>
+ <alpine.DEB.2.20.1705110949140.1758@nanos>
+ <20170511093721.GB14766@leverpostej>
+ <alpine.DEB.2.20.1705111200400.1758@nanos>
+Message-ID: <20170511125430.GD14766@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhichao Huang <zhichao.huang@linaro.org>
+On Thu, May 11, 2017 at 12:01:21PM +0200, Thomas Gleixner wrote:
+> On Thu, 11 May 2017, Mark Rutland wrote:
+> > On Thu, May 11, 2017 at 10:30:39AM +0200, Thomas Gleixner wrote:
+> > > On Wed, 10 May 2017, Thomas Gleixner wrote:
+> > > secondary_start_kernel()
+> > >   check_local_cpu_capabilities()
+> > >     update_cpu_errata_workarounds()
+> > >       update_cpu_capabilities()
+> > >         static_key_enable()
+> > > 	  __static_key_slow_inc()
+> > > 	    jump_label_lock()
+> > >        	      mutex_lock(&jump_label_mutex);
+> > > 
+> > > How is that supposed to work?
+> > > 
+> > > That call path is the low level CPU bringup, running in the context of the
+> > > idle task of that CPU with interrupts and preemption disabled. Taking a
+> > > mutex in that context, even if in that case the mutex is uncontended, is a
+> > > NONO.
 
-pm_fake doesn't quite describe what the handler does (ignoring writes
-and returning 0 for reads).
+> > As an aside, do we have anything that should detect the broken mutex
+> > usage? I've been testing kernels with LOCKDEP, PROVE_LOCKING,
+> > DEBUG_ATOMIC_SLEEP, and friends, and nothing has complained so far.
+> 
+> Peter and myself were wondering about that already. No idea why that
+> doesn't yell at you.
 
-As we're about to use it (a lot) in a different context, rename it
-with a (admitedly cryptic) name that make sense for all users.
+AFAICT, this happens early enough that system_state is SYSTEM_BOOTING.
+In ___might_sleep(), we see this and bail out without a splat.
 
-Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
-Reviewed-by: Alex Bennee <alex.bennee@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-
----
-v2:
-  - fix minor merge conflicts
-  - add maz a-b
----
- arch/arm/kvm/coproc.c | 32 ++++++++++++++++----------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index c3ed6bd5ddf3..31bd9bb0b765 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -260,7 +260,7 @@ static bool access_gic_sre(struct kvm_vcpu *vcpu,
-  * must always support PMCCNTR (the cycle counter): we just RAZ/WI for
-  * all PM registers, which doesn't crash the guest kernel at least.
-  */
--static bool pm_fake(struct kvm_vcpu *vcpu,
-+static bool trap_raz_wi(struct kvm_vcpu *vcpu,
- 		    const struct coproc_params *p,
- 		    const struct coproc_reg *r)
- {
-@@ -270,19 +270,19 @@ static bool pm_fake(struct kvm_vcpu *vcpu,
- 		return read_zero(vcpu, p);
- }
- 
--#define access_pmcr pm_fake
--#define access_pmcntenset pm_fake
--#define access_pmcntenclr pm_fake
--#define access_pmovsr pm_fake
--#define access_pmselr pm_fake
--#define access_pmceid0 pm_fake
--#define access_pmceid1 pm_fake
--#define access_pmccntr pm_fake
--#define access_pmxevtyper pm_fake
--#define access_pmxevcntr pm_fake
--#define access_pmuserenr pm_fake
--#define access_pmintenset pm_fake
--#define access_pmintenclr pm_fake
-+#define access_pmcr trap_raz_wi
-+#define access_pmcntenset trap_raz_wi
-+#define access_pmcntenclr trap_raz_wi
-+#define access_pmovsr trap_raz_wi
-+#define access_pmselr trap_raz_wi
-+#define access_pmceid0 trap_raz_wi
-+#define access_pmceid1 trap_raz_wi
-+#define access_pmccntr trap_raz_wi
-+#define access_pmxevtyper trap_raz_wi
-+#define access_pmxevcntr trap_raz_wi
-+#define access_pmuserenr trap_raz_wi
-+#define access_pmintenset trap_raz_wi
-+#define access_pmintenclr trap_raz_wi
- 
- /* Architected CP15 registers.
-  * CRn denotes the primary register number, but is copied to the CRm in the
-@@ -547,7 +547,7 @@ int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	struct coproc_params params = decode_64bit_hsr(vcpu);
- 
- 	/* raz_wi cp14 */
--	pm_fake(vcpu, &params, NULL);
-+	trap_raz_wi(vcpu, &params, NULL);
- 
- 	/* handled */
- 	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-@@ -602,7 +602,7 @@ int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	struct coproc_params params = decode_32bit_hsr(vcpu);
- 
- 	/* raz_wi cp14 */
--	pm_fake(vcpu, &params, NULL);
-+	trap_raz_wi(vcpu, &params, NULL);
- 
- 	/* handled */
- 	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
--- 
-2.11.0
+Thanks,
+Mark.
