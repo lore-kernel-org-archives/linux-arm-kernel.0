@@ -1,29 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 May 2017 09:34:21 +0200
-Subject: [PATCH v5 1/1] pinctrl: armada-37xx: Add irqchip support
-In-Reply-To: <e7e0d7156844933efe5fdb997afa4cdca1ea6ec4.1493387770.git-series.gregory.clement@free-electrons.com>
-References: <cover.5e6e6649efd7d0482a5df17fb7f94fde29a54210.1493387770.git-series.gregory.clement@free-electrons.com>
- <e7e0d7156844933efe5fdb997afa4cdca1ea6ec4.1493387770.git-series.gregory.clement@free-electrons.com>
-Message-ID: <CACRpkdb3iM4VUhwrH7GORtNRmQbaMCQ8s72VBWdghhXEXMtPsQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 11 May 2017 15:35:15 +0800
+Subject: [PATCH] arm64: dts: ls1088a: update the sata node
+In-Reply-To: <1494213209-39673-1-git-send-email-andy.tang@nxp.com>
+References: <1494213209-39673-1-git-send-email-andy.tang@nxp.com>
+Message-ID: <20170511073514.GE5833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 28, 2017 at 4:01 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
+On Mon, May 08, 2017 at 11:13:29AM +0800, Yuantian Tang wrote:
+> 1. Sata ecc should be disabled due to a erratum.
+> Provide the ecc register address for driver to use.
 
-> The Armada 37xx SoCs can handle interrupt through GPIO. However it can
-> only manage the edge ones.
->
-> The way the interrupt are managed is classical so we can use the generic
-> interrupt chip model.
->
-> The only unusual "feature" is that many interrupts are connected to the
-> parent interrupt controller. But we do not take advantage of this and use
-> the chained irq with all of them.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+This is a bit confusing.  Are you saying that the ECC register address
+is provided in DT for SATA driver to disable ECC function?
 
-Patch applied for v4.13.
+> 2. Enable dma coherence operation
+> 
+> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> index 2946fd7..90edd76 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> @@ -265,10 +265,13 @@
+>  
+>  		sata: sata at 3200000 {
+>  			compatible = "fsl,ls1088a-ahci", "fsl,ls1043a-ahci";
+> -			reg = <0x0 0x3200000 0x0 0x10000>;
+> +			reg = <0x0 0x3200000 0x0 0x10000>,
+> +				<0x0 0x20140520 0x0 0x4>;
+> +			reg-names = "ahci", "sata-ecc";
+>  			interrupts = <0 133 IRQ_TYPE_LEVEL_HIGH>;
+>  			clocks = <&clockgen 4 3>;
+>  			status = "disabled";
+> +			dma-coherent;
 
-Yours,
-Linus Walleij
+Please add it above 'status' line, which we generally keep at the bottom
+of property list.
+
+Shawn
+
+>  		};
+>  	};
+>  
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
