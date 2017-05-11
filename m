@@ -1,56 +1,32 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 11 May 2017 16:30:24 +0100
-Subject: [RFC kvm-unit-tests PATCH 5/8] Makefile: add explicit mkdir for
- .o targets
-In-Reply-To: <a8eb190a-3487-1a89-0069-789b62860b3e@redhat.com>
-References: <20170406190727.5624-1-alex.bennee@linaro.org>
- <20170406190727.5624-6-alex.bennee@linaro.org>
- <a8eb190a-3487-1a89-0069-789b62860b3e@redhat.com>
-Message-ID: <87mvaj4din.fsf@linaro.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 11 May 2017 08:30:28 -0700
+Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
+In-Reply-To: <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
+References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
+ <20170510.212952.1440495072777358778.davem@davemloft.net>
+ <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
+ <20170510.215218.2185526627014393313.davem@davemloft.net>
+ <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
+ <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
+Message-ID: <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 11, 2017 at 2:32 AM, Shubham Bansal
+<illusionist.neo@gmail.com> wrote:
+> What do you guys suggest i should implement it? I am almost done with
+> my current implementation but if you think I should change it to the
+> way David suggested, its better to suggest now before I send the
+> patch.
 
-Paolo Bonzini <pbonzini@redhat.com> writes:
+I'd say send what you have right now, as it's a good starting point
+for future work. I'll be curious to see the benchmarks, etc. It can be
+a base for further optimization.
 
-> On 06/04/2017 21:07, Alex Benn?e wrote:
->> This is fairly direct way of ensuring the target build directories are
->> created before we build a binary blob. mkdir -p fails gracefully if
->> the directory is already there.
->>
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> ---
->>  Makefile | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/Makefile b/Makefile
->> index 781186e..56598df 100644
->> --- a/Makefile
->> +++ b/Makefile
->> @@ -79,8 +79,13 @@ $(LIBFDT_archive): $(addprefix $(LIBFDT_objdir)/,$(LIBFDT_OBJS))
->>  	$(AR) rcs $@ $^
->>
->>  %.o: %.S
->> +	mkdir -p $(dir $@)
->
-> Should this use @ for cleanliness?
+Thanks for chipping away at this!
 
-I'm not sure I follow. Did you mean use $(@D) directly?
+-Kees
 
->
-> Paolo
->
->>  	$(CC) $(CFLAGS) -c -nostdlib -o $@ $<
->>
->> +%.o: %.c
->> +	mkdir -p $(dir $@)
->> +	$(CC) $(CFLAGS) -c -o $@ $<
->> +
->>  -include */.*.d */*/.*.d
->>
->>  all: $(shell git -C $(SRCDIR) rev-parse --verify --short=8 HEAD >build-head 2>/dev/null)
->>
-
-
---
-Alex Benn?e
+-- 
+Kees Cook
+Pixel Security
