@@ -1,133 +1,70 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 11 May 2017 09:15:34 +0800
-Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING
-In-Reply-To: <MWHPR12MB1600AC957C7E3B0DB4F06D6CC8EE0@MWHPR12MB1600.namprd12.prod.outlook.com>
-References: <cover.1493678834.git.leedom@chelsio.com>
- <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
- <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
- <20170502165329.GB26406@linux.intel.com>
- <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
- <MWHPR12MB160095DF53CE981C923FE65DC8160@MWHPR12MB1600.namprd12.prod.outlook.com>
- <CAKgT0UdJ17DGAphuP5Y9co6ky-GBFdq2s-1nqctY_Tz_iz5__g@mail.gmail.com>
- <MWHPR12MB1600E78DD7F530AA9DC2433DC8EA0@MWHPR12MB1600.namprd12.prod.outlook.com>
- <CAKgT0Ucwkp+fi-9HhMbze6t_i15dj4e2WQBp13Coi6MegrDh=w@mail.gmail.com>
- <22c46382-5778-022f-d0bd-74abec9e9c7c@huawei.com>
- <CAKgT0Ufg6uebqj79e1FOHoPpF-GxPYMkp353r3Ok_=nM8wF6qA@mail.gmail.com>
- <MWHPR12MB1600AC957C7E3B0DB4F06D6CC8EE0@MWHPR12MB1600.namprd12.prod.outlook.com>
-Message-ID: <a8a0628f-ccf7-932e-7d1e-9ef767295a6c@huawei.com>
+From: guochun.mao@mediatek.com (Guochun Mao)
+Date: Thu, 11 May 2017 09:30:11 +0800
+Subject: [PATCH v2 2/2] arm: dts: mt2701: add nor flash node
+In-Reply-To: <1a788098-1cf8-5fec-e847-5c14189f8586@gmail.com>
+References: <1485315515-29942-1-git-send-email-guochun.mao@mediatek.com>
+ <1485315515-29942-3-git-send-email-guochun.mao@mediatek.com>
+ <1486267249.10417.9.camel@mhfsdcap03> <20170206084544.24878633@bbrezillon>
+ <77e0e3b0-2fe4-b32b-9099-11ce9811ba15@gmail.com>
+ <1487044733.19037.0.camel@mhfsdcap03>
+ <1a788098-1cf8-5fec-e847-5c14189f8586@gmail.com>
+Message-ID: <1494466211.6463.2.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 2017-05-10 at 12:49 +0200, Matthias Brugger wrote:
+> 
+> On 14/02/17 04:58, Guochun Mao wrote:
+> > On Sun, 2017-02-12 at 07:35 +0800, Matthias Brugger wrote:
+> >>
+> >> On 02/06/2017 08:45 AM, Boris Brezillon wrote:
+> >>> Hi Guochun,
+> >>>
+> >>> On Sun, 5 Feb 2017 12:00:49 +0800
+> >>> Guochun Mao <guochun.mao@mediatek.com> wrote:
+> >>>
+> >>>
+> >>>>>
+> >>>>> +   nor_flash: spi at 11014000 {
+> >>>>> +           compatible = "mediatek,mt2701-nor",
+> >>>>> +                        "mediatek,mt8173-nor";
+> >>>>> +           reg = <0 0x11014000 0 0xe0>;
+> >>>>> +           clocks = <&pericfg CLK_PERI_FLASH>,
+> >>>>> +                    <&topckgen CLK_TOP_FLASH_SEL>;
+> >>>>> +           clock-names = "spi", "sf";
+> >>>>> +           #address-cells = <1>;
+> >>>>> +           #size-cells = <0>;
+> >>>>> +           status = "disabled";
+> >>>>> +   };
+> >>>>> +
+> >>>>>      mmsys: syscon at 14000000 {
+> >>>>>              compatible = "mediatek,mt2701-mmsys", "syscon";
+> >>>>>              reg = <0 0x14000000 0 0x1000>;
+> >>>>
+> >>>> Hi,
+> >>>> mtk-quadspi.txt had been updated as suggested.
+> >>>> Is there suggestion about this patch?
+> >>>
+> >>> It should probably go through the Mediatek tree. Matthias, any opinion?
+> >>>
+> >>
+> >> Yes, I will take this one through mine tree.
+> >>
+> >> Thanks,
+> >> Matthias
+> > 
+> > Thanks,
+> > Guochun
+> > 
+> > 
+> 
+> Queued now for v4.12-next/dts32
+> Sorry for the delay.
+> 
+> Matthias
 
+Hi, Matthias,
 
-On 2017/5/9 8:48, Casey Leedom wrote:
-> 
-> | From: Alexander Duyck <alexander.duyck@gmail.com>
-> | Date: Saturday, May 6, 2017 11:07 AM
-> | 
-> | | From: Ding Tianhong <dingtianhong@huawei.com>
-> | | Date: Fri, May 5, 2017 at 8:08 PM
-> | | 
-> | | According the suggestion, I could only think of this code:
-> | | ..
-> | 
-> | This is a bit simplistic but it is a start.
-> 
->   Yes, something tells me that this is going to be more complicated than any
-> of us like ...
-> 
-> | The other bit I was getting at is that we need to update the core PCIe
-> | code so that when we configure devices and the root complex reports no
-> | support for relaxed ordering it should be clearing the relaxed
-> | ordering bits in the PCIe configuration registers on the upstream
-> | facing devices.
-> 
->   Of course, this can be written to by the Driver at any time ... and is in
-> the case of the cxgb4 Driver ...
-> 
->   After a lot of rummaging around, it does look like KVM prohibits writes to
-> the PCIe Capability Device Control register in drivers/xen/xen-pciback/
-> conf_space_capability.c and conf_space.c simply because writes aren't
-> allowed unless "permissive" is set.  So it ~looks~ like a driver running in
-> a Virtual Machine can't turn Enable Relaxed Ordering back on ...
-> 
-> | The last bit we need in all this is a way to allow for setups where
-> | peer-to-peer wants to perform relaxed ordering but for writes to the
-> | host we have to not use relaxed ordering. For that we need to enable a
-> | special case and that isn't handled right now in any of the solutions
-> | we have coded up so far.
-> 
->   Yes, we do need this.
-> 
-> 
-> | From: Alexander Duyck <alexander.duyck@gmail.com>
-> | Date: Saturday, May 8, 2017 08:22 AM
-> |
-> | The problem is we need to have something that can be communicated
-> | through a VM. Your change doesn't work in that regard. That was why I
-> | suggested just updating the code so that we when we initialized PCIe
-> | devices what we do is either set or clear the relaxed ordering bit in
-> | the PCIe device control register. That way when we direct assign an
-> | interface it could know just based on the bits int the PCIe
-> | configuration if it could use relaxed ordering or not.
-> | 
-> | At that point the driver code itself becomes very simple since you
-> | could just enable the relaxed ordering by default in the igb/ixgbe
-> | driver and if the bit is set or cleared in the PCIe configuration then
-> | we are either sending with relaxed ordering requests or not and don't
-> | have to try and locate the root complex.
-> | 
-> | So from the sound of it Casey has a special use case where he doesn't
-> | want to send relaxed ordering frames to the root complex, but instead
-> | would like to send them to another PCIe device. To do that he needs to
-> | have a way to enable the relaxed ordering bit in the PCIe
-> | configuration but then not send any to the root complex. Odds are that
-> | is something he might be able to just implement in the driver, but is
-> | something that may become a more general case in the future. I don't
-> | see our change here impacting it as long as we keep the solution
-> | generic and mostly confined to when we instantiate the devices as the
-> | driver could likely make the decision to change the behavior later.
-> 
->   It's not just me.  Intel has said that while RO directed at the Root
-> Complex Host Coherent Memory has a performance bug (not Data Corruption),
-> it's a performance win for Peer-to-Peer writes to MMIO Space.  (I'll be very
-> interested in hearing what the bug is if we get that much detail.  The very
-> same TLPs directed to the Root Complex Port without Relaxed Ordering set get
-> good performance.  So this is essentially a bug in the hardware that was
-> ~trying~ to implement a performance win.)
-> 
->   Meanwhile, I currently only know of a single PCIe End Point which causes
-> catastrophic results: the AMD A1100 ARM SoC ("SEATTLE").  And it's not even
-> clear that product is even alive anymore since I haven't been able to get
-> any responses from them for several months.
-> 
->   What I'm saying is: let's try to architect a solution which doesn't throw
-> the baby out with the bath water ...
-> 
->   I think that if a Device's Root Complex Port has problems with Relaxed
-> Ordering, it ~probably~ makes sense to turn off the PCIe Capability Device
-> Control[Enable Relaxed Ordering] when we assign a device to a Virtual
-> Machine since the Device Driver can no longer query the Relaxed Ordering
-> Support of the Root Complex Port.  The only down side of this would be if we
-> assigned two Peers to a VM in an application which wanted to do Peer-to-Peer
-> transfers.  But that seems like a hard application to support in any case
-> since the PCI Bus:Slot.Function IDs for assigned Devices within a VM don't
-> match the actual values.
-> 
->   For Devices running in the base OS/Hypervisor, their Drivers can query the
-> Relaxed Ordering Support for the Root Complex Port or a Peer Device.  So a
-> simple flag within the (struct pci_dev *)->dev_flags would serve for that
-> along with a per-Architecture/Platform mechanism for setting it ...
-> 
+It's OK. Thanks a lot.
 
-Hi Casey:
-
-Will you continue to work on this solution or send a new version patches?
-
-Thanks
-Ding
-> Casey
-> 
-> .
-> 
+Guochun
