@@ -1,84 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 12 May 2017 11:16:41 +0200
-Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
- host-only mode
-In-Reply-To: <0106707e-21f3-4aec-92ca-8b951af8a34e@googlegroups.com>
-References: <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
- <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
- <55F1CE2E.7010409@redhat.com> <20150914202533.GF4684@lukather>
- <CAOMqctTa7Q-_dSf_4HaGt34=+YF4Sct=WvHjzp-n67J72zyLrA@mail.gmail.com>
- <706aa130-3ace-4059-a7c9-44147cd56c28@googlegroups.com>
- <af013a0a-9257-4936-9e66-cb38f2e46369@googlegroups.com>
- <0106707e-21f3-4aec-92ca-8b951af8a34e@googlegroups.com>
-Message-ID: <20170512091641.iqsee4bxlwizl5ok@flea.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 12 May 2017 11:25:32 +0200
+Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
+In-Reply-To: <f529e2d1-68e0-2760-3fd0-c7b0e94dd003@arm.com>
+References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
+ <CACRpkdasvjBPcr5RrPwtTYaoGeTEJMWqXbSRaB5-cOEKXbpfRg@mail.gmail.com>
+ <f529e2d1-68e0-2760-3fd0-c7b0e94dd003@arm.com>
+Message-ID: <CACRpkdZhUnu09CcRwkLS9Qf83OLiKkTVCQxZY0tsJmBHNAirVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, May 11, 2017 at 02:45:11PM -0700, Bim Overbohm wrote:
-> Hi All,
-> 
-> I had a similar problem running a mainline 4.11 kernel on an A33 tablet 
-> (marked "Q8-2.4G 20140918". It came from a company called Trimeo and is 
-> simply called 7". It contains an APX223 power controller, RTL8189ETV WiFi 
-> controller, 2x Nanya NT5CB128M15FP-DY DRAM chips (2x256MB), a Hynix 
-> H27UCG8T2BTR-BC NAND-flash chip and a Goodix GT818 touch controller. 
-> Display resolution is 1024x600). The self-compiled u-boot dtb would 
-> initialize the USB, but the kernel dtb would not work.
-
-U-Boot doesn't use the DT for this USB setup.
-
-> The kernel messages were something along the lines of "[ 9.366994]
-> sun4i-usb-phy 1c19400.phy: could not find pctldev for node
-> /soc at 01c00000/pinctrl at 01c20800/usb0_id_detect_pin at 0, deferring
-> probe".
-
-That's not likely to be your issue. The probe should be deferred, and
-reattempted later.
-
-> I found no way to activate the pinctrl devices, so I fixed this by
-> decompiling the dts, removing all the USB id detect pin and vbus
-> settings and recompiling the dts (diff at end of message). The
-> device boots into LXDE now and I can use an USB keyboard and
-> mouse. I still have no WiFi though...
-> 
-> Pastebin of unpatched dts file: https://pastebin.com/kL6WELuC
-> 
-> A couple of questions:
+On Thu, May 11, 2017 at 4:20 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>> On Thu, May 4, 2017 at 1:57 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+>>
+>>> When a pinctrl driver gets interrupted during its probe process
+>>> (returning -EPROBE_DEFER), the devres system cleans up all allocated
+>>> resources. During this process it calls pinmux_generic_free_functions()
+>>> and pinctrl_generic_free_groups(), which in turn use managed kmalloc
+>>> calls for temporarily allocating some memory. Now those calls seem to
+>>> get added to the devres list, but are apparently not covered by the
+>>> cleanup process, because this is actually just running and iterating the
+>>> existing list. This leads to those mallocs being left with the device,
+>>> which the devres manager complains about when the driver eventually gets
+>>> probed again:
+>>> [    0.825239] ------------[ cut here ]------------
+>>> [    0.825256] WARNING: CPU: 1 PID: 89 at drivers/base/dd.c:349 driver_probe_device+0x2ac/0x2e8
+>>> [    0.825258] Modules linked in:
+>>> [    0.825262]
+>>> [    0.825270] CPU: 1 PID: 89 Comm: kworker/1:1 Not tainted 4.11.0 #307
+>>> [    0.825272] Hardware name: Pine64+ (DT)
+>>> [    0.825283] Workqueue: events deferred_probe_work_func
+>>> [    0.825288] task: ffff80007c19c100 task.stack: ffff80007c16c000
+>>> [    0.825292] PC is at driver_probe_device+0x2ac/0x2e8
+>>> [    0.825296] LR is at driver_probe_device+0x108/0x2e8
+>>> [    0.825300] pc : [<ffff000008559234>] lr : [<ffff000008559090>] pstate: 20000045
+>>> ....
+>>> This warning is triggered because the devres list is not empty. In this
+>>> case the allocations were using 0 bytes, so no real leaks, but still this
+>>> ugly warning.
+>>> Looking more closely at these *cleanup* functions, devm_kzalloc() is actually
+>>> not needed, because the memory is just allocated temporarily and can be
+>>> freed just before returning from this function.
+>>> So fix this issue by using the bog standard kcalloc() call instead of
+>>> devm_kzalloc() and kfree()ing the memory at the end.
+>>>
+>>> This fixes above warnings on boot, which can be observed on *some* builds
+>>> for the Pine64, where the pinctrl driver gets loaded early, but it missing
+>>> resources, so gets deferred and is loaded again (successfully) later.
+>>> kernelci caught this as well [1].
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>
+>>> [1] https://storage.kernelci.org/net-next/master/v4.11-rc8-2122-gc08bac03d289/arm64/defconfig/lab-baylibre-seattle/boot-sun50i-a64-pine64-plus.html
+>>> ---
+>>> Hi,
+>>>
+>>> not sure this is the right fix, I am open to suggestions.
+>>
+>> I have queued this as a tentative v4.12-rc1 fix, but a bit undertain.
+>>
+>> Tejun, do I read your comments on the patch as an ACK?
 >
-> - Is there a proper way to make the pinctrls and OTG dual mode work
->   on the device?! I suspect they are needed to activate WiFi too...
+> Tejun and I were wondering why we need this "create an array with the
+> indices" in the first place. If we can just call radix_tree_delete()
+> directly from the radix_tree_for_each_slot() loop, we can have a much
+> better fix (omitting the memory allocation at all)
 
-As I said, that's probably not your issue. Are you sure of your
-micro-USB cable? Is it setting the ID pin to the ground as it's
-supposed to?
+OK I pulled the patch out again for now.
 
-> - Is this a bug I should report for sunxi-next?
+> Linus, can you shed some light if this array creation serves some purpose?
 
-sunxi-next is just a merge of various upstream branches. It doesn't
-make sense to report bugs there. You've found the right place already.
+Tony [author of this function] can you look at this?
 
-> - Is there a driver for the GT818 in the mainline kernel or a way to
->   make that device work?
+The code in pinctrl_generic_free_groups() does look a bit weird,
+allocating these indices just to remove the radix tree.
+Do you think we can clean it up?
 
-It doesn't look like there is.
-
-> - Is there a driver for the RTL8189ETV in the mainline kernel or a way to 
-> make that device work?
-
-https://linux-sunxi.org/Wifi#RTL8189ES_.2F_RTL8189ETV
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170512/774c113d/attachment.sig>
+Yours,
+Linus Walleij
