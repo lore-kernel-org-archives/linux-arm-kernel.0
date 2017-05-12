@@ -1,153 +1,70 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 12 May 2017 11:29:33 +0800
-Subject: [PATCH] arm64: dts: ls1088a: Add TMU device tree support
-In-Reply-To: <1494489680-9544-2-git-send-email-andy.tang@nxp.com>
-References: <1494489680-9544-1-git-send-email-andy.tang@nxp.com>
- <1494489680-9544-2-git-send-email-andy.tang@nxp.com>
-Message-ID: <20170512032931.GF8471@dragon>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Fri, 12 May 2017 11:22:39 +0800
+Subject: [PATCH v3 1/3] dt-bindings: mt8173: Fix mdp device tree
+In-Reply-To: <1494559361-42835-1-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1494559361-42835-1-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <1494559361-42835-2-git-send-email-minghsiu.tsai@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 04:01:20PM +0800, Yuantian Tang wrote:
-> Add nodes and properties for thermal management support.
-> 
-> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-> ---
->  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 89 ++++++++++++++++++++++++++
->  1 file changed, 89 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> index caecd14..53dc1c1 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> @@ -44,6 +44,7 @@
->   *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/thermal/thermal.h>
->  
->  / {
->  	compatible = "fsl,ls1088a";
-> @@ -61,6 +62,7 @@
->  			compatible = "arm,cortex-a53";
->  			reg = <0x0>;
->  			clocks = <&clockgen 1 0>;
-> +			#cooling-cells = <2>;
->  		};
->  
->  		cpu1: cpu at 1 {
-> @@ -89,6 +91,7 @@
->  			compatible = "arm,cortex-a53";
->  			reg = <0x100>;
->  			clocks = <&clockgen 1 1>;
-> +			#cooling-cells = <2>;
->  		};
->  
->  		cpu5: cpu at 101 {
-> @@ -273,6 +276,92 @@
->  			dma-coherent;
->  			status = "disabled";
->  		};
-> +
-> +		tmu: tmu at 1f80000 {
+If the mdp_* nodes are under an mdp sub-node, their corresponding
+platform device does not automatically get its iommu assigned properly.
 
-We sort the devices under simple-bus in order of unit-address.  Please
-respect the order when adding new devices.
+Fix this by moving the mdp component nodes up a level such that they are
+siblings of mdp and all other SoC subsystems.  This also simplifies the
+device tree.
 
-Shawn
+Although it fixes iommu assignment issue, it also break compatibility
+with old device tree. So, the patch in driver is needed to iterate over
+sibling mdp device nodes, not child ones, to keep driver work properly.
 
-> +			compatible = "fsl,qoriq-tmu";
-> +			reg = <0x0 0x1f80000 0x0 0x10000>;
-> +			interrupts = <0 23 0x4>;
-> +			fsl,tmu-range = <0xb0000 0x9002a 0x6004c 0x30062>;
-> +			fsl,tmu-calibration =
-> +				/* Calibration data group 1 */
-> +				<0x00000000 0x00000026
-> +				0x00000001 0x0000002d
-> +				0x00000002 0x00000032
-> +				0x00000003 0x00000039
-> +				0x00000004 0x0000003f
-> +				0x00000005 0x00000046
-> +				0x00000006 0x0000004d
-> +				0x00000007 0x00000054
-> +				0x00000008 0x0000005a
-> +				0x00000009 0x00000061
-> +				0x0000000a 0x0000006a
-> +				0x0000000b 0x00000071
-> +				/* Calibration data group 2 */
-> +				0x00010000 0x00000025
-> +				0x00010001 0x0000002c
-> +				0x00010002 0x00000035
-> +				0x00010003 0x0000003d
-> +				0x00010004 0x00000045
-> +				0x00010005 0x0000004e
-> +				0x00010006 0x00000057
-> +				0x00010007 0x00000061
-> +				0x00010008 0x0000006b
-> +				0x00010009 0x00000076
-> +				/* Calibration data group 3 */
-> +				0x00020000 0x00000029
-> +				0x00020001 0x00000033
-> +				0x00020002 0x0000003d
-> +				0x00020003 0x00000049
-> +				0x00020004 0x00000056
-> +				0x00020005 0x00000061
-> +				0x00020006 0x0000006d
-> +				/* Calibration data group 4 */
-> +				0x00030000 0x00000021
-> +				0x00030001 0x0000002a
-> +				0x00030002 0x0000003c
-> +				0x00030003 0x0000004e>;
-> +			little-endian;
-> +			#thermal-sensor-cells = <1>;
-> +		};
-> +
-> +		thermal-zones {
-> +			cpu_thermal: cpu-thermal {
-> +				polling-delay-passive = <1000>;
-> +				polling-delay = <5000>;
-> +				thermal-sensors = <&tmu 0>;
-> +
-> +				trips {
-> +					cpu_alert: cpu-alert {
-> +						temperature = <85000>;
-> +						hysteresis = <2000>;
-> +						type = "passive";
-> +					};
-> +
-> +					cpu_crit: cpu-crit {
-> +						temperature = <95000>;
-> +						hysteresis = <2000>;
-> +						type = "critical";
-> +					};
-> +				};
-> +
-> +				cooling-maps {
-> +					map0 {
-> +						trip = <&cpu_alert>;
-> +						cooling-device =
-> +							<&cpu0 THERMAL_NO_LIMIT
-> +							THERMAL_NO_LIMIT>;
-> +					};
-> +
-> +					map1 {
-> +						trip = <&cpu_alert>;
-> +						cooling-device =
-> +							<&cpu4 THERMAL_NO_LIMIT
-> +							THERMAL_NO_LIMIT>;
-> +					};
-> +				};
-> +			};
-> +		};
-> +
->  	};
->  
->  };
-> -- 
-> 2.1.0.27.g96db324
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+
+---
+ Documentation/devicetree/bindings/media/mediatek-mdp.txt | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+index 4182063..0d03e3a 100644
+--- a/Documentation/devicetree/bindings/media/mediatek-mdp.txt
++++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+@@ -2,7 +2,7 @@
+ 
+ Media Data Path is used for scaling and color space conversion.
+ 
+-Required properties (controller (parent) node):
++Required properties (controller node):
+ - compatible: "mediatek,mt8173-mdp"
+ - mediatek,vpu: the node of video processor unit, see
+   Documentation/devicetree/bindings/media/mediatek-vpu.txt for details.
+@@ -32,21 +32,16 @@ Required properties (DMA function blocks, child node):
+   for details.
+ 
+ Example:
+-mdp {
+-	compatible = "mediatek,mt8173-mdp";
+-	#address-cells = <2>;
+-	#size-cells = <2>;
+-	ranges;
+-	mediatek,vpu = <&vpu>;
+-
+ 	mdp_rdma0: rdma at 14001000 {
+ 		compatible = "mediatek,mt8173-mdp-rdma";
++			     "mediatek,mt8173-mdp";
+ 		reg = <0 0x14001000 0 0x1000>;
+ 		clocks = <&mmsys CLK_MM_MDP_RDMA0>,
+ 			 <&mmsys CLK_MM_MUTEX_32K>;
+ 		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+ 		iommus = <&iommu M4U_PORT_MDP_RDMA0>;
+ 		mediatek,larb = <&larb0>;
++		mediatek,vpu = <&vpu>;
+ 	};
+ 
+ 	mdp_rdma1: rdma at 14002000 {
+@@ -106,4 +101,3 @@ mdp {
+ 		iommus = <&iommu M4U_PORT_MDP_WROT1>;
+ 		mediatek,larb = <&larb4>;
+ 	};
+-};
+-- 
+1.9.1
