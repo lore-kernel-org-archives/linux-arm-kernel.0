@@ -1,73 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 12 May 2017 11:36:47 +0100
-Subject: [PATCHv3] arm64/cpufeature: don't use mutex in bringup path
-In-Reply-To: <1494584120-15208-1-git-send-email-mark.rutland@arm.com>
-References: <1494584120-15208-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <8d037877-6fac-bf9c-ecf3-74b2e72b97f6@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 12 May 2017 11:41:42 +0100
+Subject: [PATCH 2/2] iommu/arm-smmu: Plumb in new ACPI identifiers
+In-Reply-To: <0bb462748c0a08dbf1db103d2a96b80c71412817.1494585645.git.robin.murphy@arm.com>
+References: <0bb462748c0a08dbf1db103d2a96b80c71412817.1494585645.git.robin.murphy@arm.com>
+Message-ID: <18776416ca1543f13b85209851b0e5dfab511b06.1494585645.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/17 11:15, Mark Rutland wrote:
-> Currently, cpus_set_cap() calls static_branch_enable_cpuslocked(), which
-> must take the jump_label mutex.
-> 
-> We call cpus_set_cap() in the secondary bringup path, from the idle
-> thread where interrupts are disabled. Taking a mutex in this path "is a
-> NONO" regardless of whether it's contended, and something we must avoid.
-> Additionally, the secondary CPU doesn't hold the percpu rwsem (as this
-> is held by the primary CPU), so this triggers a lockdep splat.
-> 
-> This patch fixes both issues. The poking of static keys is deferred
-> until enable_cpu_capabilities(), which runs in a suitable context on the
-> boot CPU. To account for the static keys being set later,
-> cpus_have_const_cap() is updated to use another static key to check
-> whether the const cap keys have been initialised, falling back to the
-> caps bitmap until this is the case.
-> 
-> This means that users of cpus_have_const_cap() gain should only gain a
-> single additional NOP in the fast path once the const caps are
-> initialised, but should always see the current cap value.
-> 
-> The hyp code should never dereference the caps array, since the caps are
-> initialized before we run the module initcall to initialise hyp. A check
-> is added to the hyp init code to docuemnt this requirement.
-> 
-> This rework means that we can remove the *_cpuslocked() helpers added in
-> commit d54bb72551b999dd ("arm64/cpufeature: Use
-> static_branch_enable_cpuslocked()").
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyniger <marc.zyngier@arm.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Sebastian Sewior <bigeasy@linutronix.de>
-> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/cpufeature.h | 13 ++++++++++---
->  arch/arm64/include/asm/kvm_host.h   |  8 ++++++--
->  arch/arm64/kernel/cpu_errata.c      |  9 +--------
->  arch/arm64/kernel/cpufeature.c      | 25 ++++++++++++++++++++++---
->  4 files changed, 39 insertions(+), 16 deletions(-)
-> 
-> Catalin, Will, assuming you're happy with the patch, it will need to go via the
-> tip tree.
-> 
-> Since v1 [1]:
-> * Kill redundant update_cpu_errata_workarounds() prototype
-> * Introduce arm64_const_caps_ready
-> Since v2 [2]:
-> * Add hyp init check
-> * Clean up commit message
-> * Drop fixes tag
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/505731.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/505763.html
+Revision C of IORT now allows us to identify ARM MMU-401 and the Cavium
+ThunderX implementation; wire them up so that the appropriate quirks get
+enabled when booting with ACPI.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-	M.
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 6dadd51d486c..d9ec840defc9 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -2018,6 +2018,10 @@ static int acpi_smmu_get_data(u32 model, struct arm_smmu_device *smmu)
+ 		smmu->version = ARM_SMMU_V1;
+ 		smmu->model = GENERIC_SMMU;
+ 		break;
++	case ACPI_IORT_SMMU_CORELINK_MMU401:
++		smmu->version = ARM_SMMU_V1_64K;
++		smmu->model = GENERIC_SMMU;
++		break;
+ 	case ACPI_IORT_SMMU_V2:
+ 		smmu->version = ARM_SMMU_V2;
+ 		smmu->model = GENERIC_SMMU;
+@@ -2026,6 +2030,10 @@ static int acpi_smmu_get_data(u32 model, struct arm_smmu_device *smmu)
+ 		smmu->version = ARM_SMMU_V2;
+ 		smmu->model = ARM_MMU500;
+ 		break;
++	case ACPI_IORT_SMMU_CAVIUM_SMMUV2:
++		smmu->version = ARM_SMMU_V2;
++		smmu->model = CAVIUM_SMMUV2;
++		break;
+ 	default:
+ 		ret = -ENODEV;
+ 	}
 -- 
-Jazz is not dead. It just smells funny...
+2.12.2.dirty
