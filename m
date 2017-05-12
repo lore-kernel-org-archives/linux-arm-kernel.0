@@ -1,28 +1,38 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 12 May 2017 22:17:03 +0200
-Subject: [PATCH V2] serial: efm32: Fix parity management in
- 'efm32_uart_console_get_options()'
-In-Reply-To: <20170512143545.15394-1-christophe.jaillet@wanadoo.fr>
-References: <20170512143545.15394-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <20170512201703.puk6xit34d3dnddv@pengutronix.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 12 May 2017 21:21:06 +0100
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <CAGXu5j+xmyJ6RhtPw9rUgs7k3sZ1KKWffvyGGG--oPfu9W42ng@mail.gmail.com>
+References: <20170509111007.GA14702@kroah.com>
+ <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
+ <CAJcbSZEoRyewUtBHvqmNZL9FtT_q42Vmmd-EuC50x-ZRASiHHg@mail.gmail.com>
+ <CA+55aFwvQfs_X+paQF6Luc0Rq+W3J2fKuHRou7=ANcquDdXdDA@mail.gmail.com>
+ <20170512072802.5a686f23@mschwideX1>
+ <CAGXu5j+EatK=DYONRkgovwLgytAnbG8jnAZaMSLckZFNVj3gig@mail.gmail.com>
+ <20170512075458.09a3a1ce@mschwideX1>
+ <CAGXu5jL9vUrn4kpjO+qa4cHmWBypeqP17OGbrMs=5Nz0YpQMZw@mail.gmail.com>
+ <CA+55aFzbiBqsYb7vwO=+L4Vp_GOgPu+DBOrq4fBnyzq5DbBehg@mail.gmail.com>
+ <CAGXu5j+xmyJ6RhtPw9rUgs7k3sZ1KKWffvyGGG--oPfu9W42ng@mail.gmail.com>
+Message-ID: <20170512202106.GO22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 04:35:45PM +0200, Christophe JAILLET wrote:
-> UARTn_FRAME_PARITY_ODD is 0x0300
-> UARTn_FRAME_PARITY_EVEN is 0x0200
-> So if the UART is configured for EVEN parity, it would be reported as ODD.
-> Fix it by correctly testing if the 2 bits are set.
-> 
-> Fixes: 3afbd89c9639 ("serial/efm32: add new driver")
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On Fri, May 12, 2017 at 12:30:02PM -0700, Kees Cook wrote:
+> I'm clearly not explaining things well enough. I shouldn't say
+> "corruption", I should say "malicious manipulation". The methodology
+> of attacks against the stack are quite different from the other kinds
+> of attacks like use-after-free, heap overflow, etc. Being able to
+> exhaust the kernel stack (either due to deep recursion or unbounded
+> alloca())
 
-Thanks for picking this topic up again.
+I really hope we don't have alloca() use in the kernel.  Do you have
+evidence to support that assertion?
 
-Best regards
-Uwe
+IMHO alloca() (or similar) should not be present in any kernel code
+because we have a limited stack - we have kmalloc() etc for that kind
+of thing.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
