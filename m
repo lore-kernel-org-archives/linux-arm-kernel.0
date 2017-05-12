@@ -1,50 +1,134 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 12 May 2017 16:39:03 +0200
-Subject: [PATCH/RFT renesas-devel] arm64: dts: ulcb: Set drive-strength
- for ravb pins
-In-Reply-To: <1493721024-15042-1-git-send-email-horms+renesas@verge.net.au>
-References: <1493721024-15042-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWeLAq7nZ7zu2xJ7vG-oM+-TSZm0eY68Cm-9eUREMjhXg@mail.gmail.com>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Fri, 12 May 2017 16:56:28 +0200
+Subject: [PATCH v1 2/3] dt-bindings: display: Add STM32 DSI host driver
+In-Reply-To: <1494600989-13507-1-git-send-email-philippe.cornu@st.com>
+References: <1494600989-13507-1-git-send-email-philippe.cornu@st.com>
+Message-ID: <1494600989-13507-3-git-send-email-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+This patch adds documentation of device tree bindings for the STM32
+DSI host driver based on the Synopsys DW MIPI DSI driver from Rockchip.
 
-On Tue, May 2, 2017 at 12:30 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> The EthernetAVB should not depend on the bootloader to setup correct
-> drive-strength values.  Values for drive-strength where found by
-> examining the registers after the bootloader has configured the
-> registers and successfully used the EthernetAVB.
->
-> Based on:
-> * commit 7d73a4da2681 ("arm64: dts: r8a7795: salvator-x: Set drive-strength
->   for ravb pins")
-> * commit 4903987033be ("arm64: dts: r8a7796: salvator-x: Set drive-strength
->   for ravb pins")
->
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+---
+ .../devicetree/bindings/display/st,stm32-ltdc.txt  | 92 +++++++++++++++++++++-
+ 1 file changed, 90 insertions(+), 2 deletions(-)
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-> * Compile tested only due to lack of hardware access
-
-So how did you examine the registers? ;-)
-
-Hence I examined the registers myself:
-  - H3ULCB has the same register settings as Salvator-X with H3 ES1.0
-  - M3ULCB has the same register settings as Salvator-X with M3-W ES1.0
-    or H3 ES2.0.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+index 8e14769..a61381b 100644
+--- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
++++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+@@ -1,7 +1,6 @@
+ * STMicroelectronics STM32 lcd-tft display controller
+ 
+ - ltdc: lcd-tft display controller host
+-  must be a sub-node of st-display-subsystem
+   Required properties:
+   - compatible: "st,stm32-ltdc"
+   - reg: Physical base address of the IP registers and length of memory mapped region.
+@@ -13,8 +12,25 @@
+   Required nodes:
+     - Video port for RGB output.
+ 
+-Example:
++* STMicroelectronics STM32 specific extensions to Synopsys Designware MIPI DSI
++(similar to "rockchip/dw_mipi_dsi_rockchip.txt")
+ 
++Required properties:
++- #address-cells: Should be <1>.
++- #size-cells: Should be <0>.
++- compatible: "st,stm32-dsi_host".
++- reg: Represent the physical address range of the controller.
++- clocks, clock-names: Phandles to the controller's pll reference
++  clock(ref) and APB clock(pclk). As described in [1].
++- ports: contain a port node with endpoint definitions as defined in [2].
++- resets: list of phandle + reset specifier pairs, as described in [3].
++- reset-names: string reset name, must be "apb".
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++[2] Documentation/devicetree/bindings/media/video-interfaces.txt
++[3] Documentation/devicetree/bindings/reset/reset.txt
++
++Example 1: RGB panel
+ / {
+ 	...
+ 	soc {
+@@ -34,3 +50,75 @@ Example:
+ 		};
+ 	};
+ };
++
++Example 2: DSI panel
++
++/ {
++	...
++	soc {
++	...
++		ltdc: display-controller at 40016800 {
++			compatible = "st,stm32-ltdc";
++			reg = <0x40016800 0x200>;
++			interrupts = <88>, <89>;
++			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
++			clocks = <&rcc 1 CLK_LCD>;
++			clock-names = "lcd";
++
++			port {
++				ltdc_out_dsi_host: endpoint {
++					remote-endpoint = <&dsi_host_in>;
++				};
++			};
++		};
++
++
++		dsi_host: dsi_host at 40016C00 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "st,stm32-dsi_host";
++			reg = <0x40016C00 0x800>;
++			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
++			clock-names = "ref", "pclk";
++			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
++			reset-names = "apb";
++			status = "okay";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					dsi_host_in: endpoint {
++						remote-endpoint = <&ltdc_out_dsi_host>;
++					};
++				};
++
++				port at 1 {
++					reg = <1>;
++					dsi_host_out_panel: endpoint {
++						remote-endpoint = <&dsi_host_in_panel>;
++					};
++				};
++
++			};
++
++			panel-dsi at 0 {
++				reg = <0>; /* dsi virtual channel (0..3) */
++				compatible = ...;
++				enable-gpios = ...;
++				status = "okay";
++
++				port {
++					dsi_host_in_panel: endpoint {
++						remote-endpoint = <&dsi_host_out_panel>;
++					};
++				};
++
++			};
++
++		};
++
++	};
++};
+-- 
+1.9.1
