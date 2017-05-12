@@ -1,61 +1,79 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sat, 13 May 2017 03:22:22 +0800
-Subject: [xlnx:master 553/592] drivers/mtd/spi-nor/spi-nor.c:2000:13: error:
- implicit declaration of function 'of_get_next_parent'
-Message-ID: <201705130318.dJh3d1Qi%fengguang.wu@intel.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 12 May 2017 12:30:02 -0700
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <CA+55aFzbiBqsYb7vwO=+L4Vp_GOgPu+DBOrq4fBnyzq5DbBehg@mail.gmail.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508075209.7aluvpwildw325rf@gmail.com>
+ <1494256932.1167.1.camel@gmail.com>
+ <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
+ <20170509065619.wmqa6z6w3n6xpvrw@gmail.com> <20170509111007.GA14702@kroah.com>
+ <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
+ <CAJcbSZEoRyewUtBHvqmNZL9FtT_q42Vmmd-EuC50x-ZRASiHHg@mail.gmail.com>
+ <CA+55aFwvQfs_X+paQF6Luc0Rq+W3J2fKuHRou7=ANcquDdXdDA@mail.gmail.com>
+ <20170512072802.5a686f23@mschwideX1>
+ <CAGXu5j+EatK=DYONRkgovwLgytAnbG8jnAZaMSLckZFNVj3gig@mail.gmail.com>
+ <20170512075458.09a3a1ce@mschwideX1>
+ <CAGXu5jL9vUrn4kpjO+qa4cHmWBypeqP17OGbrMs=5Nz0YpQMZw@mail.gmail.com>
+ <CA+55aFzbiBqsYb7vwO=+L4Vp_GOgPu+DBOrq4fBnyzq5DbBehg@mail.gmail.com>
+Message-ID: <CAGXu5j+xmyJ6RhtPw9rUgs7k3sZ1KKWffvyGGG--oPfu9W42ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   17360fb326e0a7fa424286973d0afa8da24f7b99
-commit: d80f6153e7c446e0c7dc8400b06d199c50bfd509 [553/592] mtd: spi-nor: Disable 4-Byte addressing for axi_quad_spi
-config: blackfin-BF526-EZBRD_defconfig (attached as .config)
-compiler: bfin-uclinux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout d80f6153e7c446e0c7dc8400b06d199c50bfd509
-        # save the attached .config to linux build tree
-        make.cross ARCH=blackfin 
+On Fri, May 12, 2017 at 12:08 PM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Fri, May 12, 2017 at 12:01 PM, Kees Cook <keescook@chromium.org> wrote:
+>> Yeah, the risk for "corrupted addr_limit" is mainly a concern for
+>> archs with addr_limit on the kernel stack. If I'm reading things
+>> correctly, that means, from the archs I've been paying closer
+>> attention to, it's an issue for arm, mips, and powerpc:
+>
+> I don't understand why people are looking at addr_limit as some kind
+> of special thing.
+>
+> If somebody is smashing the stack and corrupting thread info data, the
+> game is over. addr_limit is the *least* of your problems, and it's not
+> even all that likely that it will be increasing (it's much more likely
+> that it would be overwritten with a smaller value).
+>
+> Quite frankly, this kind of idiotic discussion just makes me question
+> the whole idea of the patch.
+>
+> Any "security" that is this specific is not real security, it's just
+> masturbatory garbage.
+>
+> It may be worth checking that people use "set_fs()" properly. But stop
+> this idiotic crap. It just makes the kernel security people look like
+> the crazies.
+>
+> There are enough incompetent crazy security people, don't go there.
+> The kinds of things it is worth protecting against are the big class
+> of generic issues, not the kind of "oh, but imagine if a cosmic ray
+> flips this particular word in memory" kind of crap that ignores all
+> the other words of memory.
+>
+> Seriously, Kees. You are just making security people look bad. Stop it.
 
-All error/warnings (new ones prefixed by >>):
+I'm clearly not explaining things well enough. I shouldn't say
+"corruption", I should say "malicious manipulation". The methodology
+of attacks against the stack are quite different from the other kinds
+of attacks like use-after-free, heap overflow, etc. Being able to
+exhaust the kernel stack (either due to deep recursion or unbounded
+alloca()) means attackers can control a write to addr_limit, and then
+leverage that into an actual arbitrary write via subsequent calls to
+copy_to_user() pointed at kernel memory. This isn't theoretical, this
+is how those attacks are performed. It may sound crazy, but it's real.
 
-   drivers/mtd/spi-nor/spi-nor.c: In function 'spi_nor_scan':
->> drivers/mtd/spi-nor/spi-nor.c:2000:13: error: implicit declaration of function 'of_get_next_parent' [-Werror=implicit-function-declaration]
-       np_spi = of_get_next_parent(np);
-                ^~~~~~~~~~~~~~~~~~
->> drivers/mtd/spi-nor/spi-nor.c:2000:11: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-       np_spi = of_get_next_parent(np);
-              ^
-   drivers/mtd/spi-nor/spi-nor.c:1728:6: warning: unused variable 'is_dual' [-Wunused-variable]
-     u32 is_dual;
-         ^~~~~~~
-   At top level:
-   drivers/mtd/spi-nor/spi-nor.c:266:12: warning: 'read_ear' defined but not used [-Wunused-function]
-    static int read_ear(struct spi_nor *nor, struct flash_info *info)
-               ^~~~~~~~
-   cc1: some warnings being treated as errors
+With thread_info off the stack, the whole problem goes away. It's
+wonderful that this has happened for x86, arm64, and s390. There are
+always going to be new methods of attack for everything, but while we
+slowly address the design weakness (set_fs()), we can fix the low
+hanging fruit too.
 
-vim +/of_get_next_parent +2000 drivers/mtd/spi-nor/spi-nor.c
+-Kees
 
-  1994				}
-  1995				nor->program_opcode = SPINOR_OP_PP_4B;
-  1996				/* No small sector erase for 4-byte command set */
-  1997				nor->erase_opcode = SPINOR_OP_SE_4B;
-  1998				mtd->erasesize = info->sector_size;
-  1999			} else {
-> 2000				np_spi = of_get_next_parent(np);
-  2001				if (of_property_match_string(np_spi, "compatible",
-  2002							"xlnx,xps-spi-2.00.a") >= 0) {
-  2003					nor->addr_width = 3;
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 14537 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170513/7c05738b/attachment.gz>
+-- 
+Kees Cook
+Pixel Security
