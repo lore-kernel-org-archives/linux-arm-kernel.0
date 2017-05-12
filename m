@@ -1,24 +1,36 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 12 May 2017 11:51:39 +0800
-Subject: [PATCH] soc: imx: add PM dependency for IMX7_PM_DOMAINS
-In-Reply-To: <20170511113806.2647189-1-arnd@arndb.de>
-References: <20170511113806.2647189-1-arnd@arndb.de>
-Message-ID: <20170512035137.GG8471@dragon>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 12 May 2017 09:54:21 +0530
+Subject: [PATCH] ARM: remove duplicate 'const' annotations'
+In-Reply-To: <20170511115059.2997141-1-arnd@arndb.de>
+References: <20170511115059.2997141-1-arnd@arndb.de>
+Message-ID: <20170512042421.GP17481@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 01:37:47PM +0200, Arnd Bergmann wrote:
-> The new pm domain driver causes a build failure when CONFIG_PM
-> is not set:
+On 11-05-17, 13:50, Arnd Bergmann wrote:
+> gcc-7 warns about some declarations that are more 'const' than necessary:
 > 
-> warning: (IMX7_PM_DOMAINS) selects PM_GENERIC_DOMAINS which has unmet direct dependencies (PM)
-> drivers/base/power/domain_governor.c: In function 'default_suspend_ok':
-> drivers/base/power/domain_governor.c:75:17: error: 'struct dev_pm_info' has no member named 'ignore_children'
+> arch/arm/mach-at91/pm.c:338:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct of_device_id const ramc_ids[] __initconst = {
+> arch/arm/mach-bcm/bcm_kona_smc.c:36:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct of_device_id const bcm_kona_smc_ids[] __initconst = {
+> arch/arm/mach-spear/time.c:207:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct of_device_id const timer_of_match[] __initconst = {
+> arch/arm/mach-omap2/prm_common.c:714:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct of_device_id const omap_prcm_dt_match_table[] __initconst = {
+> arch/arm/mach-omap2/vc.c:562:35: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct i2c_init_data const omap4_i2c_timing_data[] __initconst = {
 > 
-> This adds a dependency to ensure that we don't attempt to build the
-> driver without CONFIG_PM.
+> The ones in arch/arm were apparently all introduced accidentally by one
+> commit that correctly marked a lot of variables as __initconst.
 > 
-> Fixes: 03aa12629fc4 ("soc: imx: Add GPCv2 power gating driver")
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Fixes: 19c233b79d1a ("ARM: appropriate __init annotation for const data")
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-spear/time.c       | 2 +-
 
-Applied, thanks.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+-- 
+viresh
