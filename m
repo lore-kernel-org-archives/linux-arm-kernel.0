@@ -1,80 +1,95 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Fri, 12 May 2017 15:07:01 +0530
-Subject: [PATCH v5 3/3] phy: Group vendor specific phy drivers
-In-Reply-To: <5fe76bcc-5ff7-0bf1-7fdd-c141211d86dc@ti.com>
-References: <1494485262-18995-1-git-send-email-vivek.gautam@codeaurora.org>
- <1494485262-18995-3-git-send-email-vivek.gautam@codeaurora.org>
- <5fe76bcc-5ff7-0bf1-7fdd-c141211d86dc@ti.com>
-Message-ID: <8143c6b8-aaac-557b-98c1-00c957f3fcb6@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 12 May 2017 11:49:24 +0200
+Subject: [PATCH v3 1/3] arm64: dts: r8a7795: Add support for R-Car H3 ES2.0
+In-Reply-To: <20170512073229.GC27979@verge.net.au>
+References: <1494503934-23367-1-git-send-email-geert+renesas@glider.be>
+ <1494503934-23367-2-git-send-email-geert+renesas@glider.be>
+ <20170511145329.GD21895@verge.net.au>
+ <CAMuHMdU0NUFtqDOKnRHQuSXurP6NKy7bNVhBQB-_MOoSrnNpYQ@mail.gmail.com>
+ <20170512073229.GC27979@verge.net.au>
+Message-ID: <CAMuHMdXanb4R9NodxvEoKXXcw8kJP+YdoqTQLsa9UST14cMaBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon,
 
-
-On 05/12/2017 02:15 PM, Kishon Vijay Abraham I wrote:
-> Hi Vivek,
+On Fri, May 12, 2017 at 9:32 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, May 11, 2017 at 05:42:27PM +0200, Geert Uytterhoeven wrote:
+>> On Thu, May 11, 2017 at 4:53 PM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Thu, May 11, 2017 at 01:58:52PM +0200, Geert Uytterhoeven wrote:
+>> >> Update r8a7795.dtsi so it corresponds to R-Car H3 ES2.0 or later:
+>> >>   - The following devices no longer exist on ES2.0, and are thus removed:
+>> >>     fcpf2, fcpvd3, fcpvi2, fdp1-2, usb3-if1, vspd3, vspi2.
+>> >>   - The DU <-> VSPD topology is different on ES2.0, hence remove the
+>> >>     "compatible" and "vsps" properties from the DU node until the driver
+>> >>     can handle this.
+>> >>
+>> >> Move support for the ES1.x revision of the R-Car H3 SoC into a
+>> >> separate file.  To avoid duplication, r8a7795-es1.dtsi includes
+>> >> r8a7795.dtsi, add adds/removes/overrides device nodes and properties
+>> >> where needed.
+>> >
+>> > I think the above should be re-worded given your explanation below the
+>> > scissors that no deletion or overriding occurs.
+>>
+>> I wanted to document clearly what needs to be done in the generic case...
+>> I agree no removal or override is done right now.
+>>
+>> If you prefer it that way, I can reword it.
 >
-> On Thursday 11 May 2017 12:17 PM, Vivek Gautam wrote:
->> Adding vendor specific directories in phy to group
->> phy drivers under their respective vendor umbrella.
->>
->> Also updated the MAINTAINERS file to reflect the correct
->> directory structure for phy drivers.
->>
->> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
->> Acked-by: Heiko Stuebner <heiko@sntech.de>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
->> Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->> Reviewed-by: Jaehoon Chung <jh80.chung@samsung.com>
->> Cc: Kishon Vijay Abraham I <kishon@ti.com>
->> Cc: David S. Miller <davem@davemloft.net>
->> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->> Cc: Guenter Roeck <linux@roeck-us.net>
->> Cc: Heiko Stuebner <heiko@sntech.de>
->> Cc: Viresh Kumar <viresh.kumar@linaro.org>
->> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Cc: Chen-Yu Tsai <wens@csie.org>
->> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Cc: Krzysztof Kozlowski <krzk@kernel.org>
->> Cc: Jaehoon Chung <jh80.chung@samsung.com>
->> Cc: Stephen Boyd <stephen.boyd@linaro.org>
->> Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-arm-msm at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org
->> Cc: linux-omap at vger.kernel.org
->> Cc: linux-renesas-soc at vger.kernel.org
->> Cc: linux-rockchip at lists.infradead.org
->> Cc: linux-samsung-soc at vger.kernel.org
->> Cc: linux-usb at vger.kernel.org
->> ---
->>
->> Changes since v4:
->>   - Reprepared the patch based on latest torvalds/master.
->>   - Added new directory for amlogic, since there's a new patch [1]
->>     coming in for amlogic platforms.
-> I don't prefer placeholder directories but this is not a placeholder directory
-> since phy-meson8b-usb2.c is already added in amlogic.
-
-Right, since phy-meson8b-usb2.c was already there and phy-meson-gxl-usb2.c
-is also coming, i decided to add this directory.
-> Btw, thank you for sending this patch. Will queue this once -rc1 is tagged.
-
-Cool. Thanks Kishon.
-
-Regards
-Vivek
-
+> I think I would prefer that.
 >
-> Cheers
-> Kishon
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> >> Switch r8a7795-salvator-x.dts and r8a7795-h3ulcb.dts from r8a7795.dtsi
+>> >> to r8a7795-es1.dtsi to preserve compatibility.
+>> >>
+>> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> >> ---
+>> >> While currently r8a7795-es1.dtsi only adds device nodes, removal of
+>> >> devices nodes and properties can be implemented using the /delete-node/
+>> >> and /delete-property/ keywords, as shown below:
+>> >>
+>> >>       &soc {
+>> >>               /delete-node/ <name>@<addr>;
+>> >>       };
+>> >>
+>> >>       &<label> {
+>> >>               /delete-property/ <prop>;
+>> >>       };
+>> >
+>> > I would be interested to also see an example of an override and
+>> > for the examples to be included in the changelog itself.
+>>
+>> You mean above the scissors? ;-)
+>
+> Yes, that is what I meant.
+>
+>> Currently we don't have any devices or properties in DT that need removals
+>> or overrides. Note that I did test those.
+>>
+>> If we add the "vsps" property to the DU node for ES2.0, we can have an
+>> override for it now.  But we've plenty of experience with letting .dts
+>> override properties in .dtsi.
+>
+> Ok, point taken.
+>
+>> For node deletion, we'll have to wait until someone enables the extra USB
+>> channels on ES2.0.
+>>
+>> For property deletion, I don't have an actual example in mind, but I wanted
+>> to be sure that worked in case we ever need it.
+>
+> I appreciate you taking the time to test deletion.
+> I think its worth documenting above the scissors.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Will update in v4. I''l have to rebase anyway.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
