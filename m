@@ -1,95 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 12 May 2017 11:49:24 +0200
-Subject: [PATCH v3 1/3] arm64: dts: r8a7795: Add support for R-Car H3 ES2.0
-In-Reply-To: <20170512073229.GC27979@verge.net.au>
-References: <1494503934-23367-1-git-send-email-geert+renesas@glider.be>
- <1494503934-23367-2-git-send-email-geert+renesas@glider.be>
- <20170511145329.GD21895@verge.net.au>
- <CAMuHMdU0NUFtqDOKnRHQuSXurP6NKy7bNVhBQB-_MOoSrnNpYQ@mail.gmail.com>
- <20170512073229.GC27979@verge.net.au>
-Message-ID: <CAMuHMdXanb4R9NodxvEoKXXcw8kJP+YdoqTQLsa9UST14cMaBg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 May 2017 11:04:52 +0100
+Subject: [PATCH] ARM: KVM: Fix tracepoint generation after move to
+ virt/kvm/arm/
+Message-ID: <20170512100452.8245-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Moving most of the shared code to virt/kvm/arm had for consequence
+that KVM/ARM doesn't build anymore, because the code that used to
+define the tracepoints is now somewhere else.
 
-On Fri, May 12, 2017 at 9:32 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, May 11, 2017 at 05:42:27PM +0200, Geert Uytterhoeven wrote:
->> On Thu, May 11, 2017 at 4:53 PM, Simon Horman <horms@verge.net.au> wrote:
->> > On Thu, May 11, 2017 at 01:58:52PM +0200, Geert Uytterhoeven wrote:
->> >> Update r8a7795.dtsi so it corresponds to R-Car H3 ES2.0 or later:
->> >>   - The following devices no longer exist on ES2.0, and are thus removed:
->> >>     fcpf2, fcpvd3, fcpvi2, fdp1-2, usb3-if1, vspd3, vspi2.
->> >>   - The DU <-> VSPD topology is different on ES2.0, hence remove the
->> >>     "compatible" and "vsps" properties from the DU node until the driver
->> >>     can handle this.
->> >>
->> >> Move support for the ES1.x revision of the R-Car H3 SoC into a
->> >> separate file.  To avoid duplication, r8a7795-es1.dtsi includes
->> >> r8a7795.dtsi, add adds/removes/overrides device nodes and properties
->> >> where needed.
->> >
->> > I think the above should be re-worded given your explanation below the
->> > scissors that no deletion or overriding occurs.
->>
->> I wanted to document clearly what needs to be done in the generic case...
->> I agree no removal or override is done right now.
->>
->> If you prefer it that way, I can reword it.
->
-> I think I would prefer that.
->
->> >> Switch r8a7795-salvator-x.dts and r8a7795-h3ulcb.dts from r8a7795.dtsi
->> >> to r8a7795-es1.dtsi to preserve compatibility.
->> >>
->> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> >> ---
->> >> While currently r8a7795-es1.dtsi only adds device nodes, removal of
->> >> devices nodes and properties can be implemented using the /delete-node/
->> >> and /delete-property/ keywords, as shown below:
->> >>
->> >>       &soc {
->> >>               /delete-node/ <name>@<addr>;
->> >>       };
->> >>
->> >>       &<label> {
->> >>               /delete-property/ <prop>;
->> >>       };
->> >
->> > I would be interested to also see an example of an override and
->> > for the examples to be included in the changelog itself.
->>
->> You mean above the scissors? ;-)
->
-> Yes, that is what I meant.
->
->> Currently we don't have any devices or properties in DT that need removals
->> or overrides. Note that I did test those.
->>
->> If we add the "vsps" property to the DU node for ES2.0, we can have an
->> override for it now.  But we've plenty of experience with letting .dts
->> override properties in .dtsi.
->
-> Ok, point taken.
->
->> For node deletion, we'll have to wait until someone enables the extra USB
->> channels on ES2.0.
->>
->> For property deletion, I don't have an actual example in mind, but I wanted
->> to be sure that worked in case we ever need it.
->
-> I appreciate you taking the time to test deletion.
-> I think its worth documenting above the scissors.
+Fix this by defining CREATE_TRACE_POINTS in coproc.c, and clean-up
+trace.h as well.
 
-Will update in v4. I''l have to rebase anyway.
+Fixes: 35d2d5d490e2 ("KVM: arm/arm64: Move shared files to virt/kvm/arm")
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/coproc.c | 1 +
+ arch/arm/kvm/trace.h  | 8 ++++----
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index 2c14b69511e9..ac8d36da4d08 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -32,6 +32,7 @@
+ #include <asm/vfp.h>
+ #include "../vfp/vfpinstr.h"
+ 
++#define CREATE_TRACE_POINTS
+ #include "trace.h"
+ #include "coproc.h"
+ 
+diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
+index fc0943776db2..b0d10648c486 100644
+--- a/arch/arm/kvm/trace.h
++++ b/arch/arm/kvm/trace.h
+@@ -1,5 +1,5 @@
+-#if !defined(_TRACE_KVM_H) || defined(TRACE_HEADER_MULTI_READ)
+-#define _TRACE_KVM_H
++#if !defined(_TRACE_ARM_KVM_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_ARM_KVM_H
+ 
+ #include <linux/tracepoint.h>
+ 
+@@ -74,10 +74,10 @@ TRACE_EVENT(kvm_hvc,
+ 		  __entry->vcpu_pc, __entry->r0, __entry->imm)
+ );
+ 
+-#endif /* _TRACE_KVM_H */
++#endif /* _TRACE_ARM_KVM_H */
+ 
+ #undef TRACE_INCLUDE_PATH
+-#define TRACE_INCLUDE_PATH arch/arm/kvm
++#define TRACE_INCLUDE_PATH .
+ #undef TRACE_INCLUDE_FILE
+ #define TRACE_INCLUDE_FILE trace
+ 
+-- 
+2.11.0
