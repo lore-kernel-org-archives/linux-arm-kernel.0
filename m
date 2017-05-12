@@ -1,152 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 May 2017 10:14:17 -0700
-Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
-In-Reply-To: <20170512153522.GG3489@atomide.com>
-References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
- <CACRpkdasvjBPcr5RrPwtTYaoGeTEJMWqXbSRaB5-cOEKXbpfRg@mail.gmail.com>
- <f529e2d1-68e0-2760-3fd0-c7b0e94dd003@arm.com>
- <CACRpkdZhUnu09CcRwkLS9Qf83OLiKkTVCQxZY0tsJmBHNAirVw@mail.gmail.com>
- <20170512153522.GG3489@atomide.com>
-Message-ID: <20170512171417.GH3489@atomide.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 12 May 2017 18:24:19 +0100
+Subject: [PATCH v3 3/3] arm/arm64: signal SIBGUS and inject SEA Error
+In-Reply-To: <CAMj-D2A-ER8GEN32au774AY682yeMVyJwxhZoO+NkXKYYMwoQw@mail.gmail.com>
+References: <CAMj-D2BGTDKpOcMu2ip41_MTTj8VDwvs59Ds7yvLHcD8PeQzhg@mail.gmail.com>
+ <CAMj-D2A-ER8GEN32au774AY682yeMVyJwxhZoO+NkXKYYMwoQw@mail.gmail.com>
+Message-ID: <5915EFC3.9070507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [170512 08:39]:
-> * Linus Walleij <linus.walleij@linaro.org> [170512 02:28]:
-> > On Thu, May 11, 2017 at 4:20 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> > > Linus, can you shed some light if this array creation serves some purpose?
-> > 
-> > Tony [author of this function] can you look at this?
-> > 
-> > The code in pinctrl_generic_free_groups() does look a bit weird,
-> > allocating these indices just to remove the radix tree.
-> > Do you think we can clean it up?
+Hi gengdongjiu,
+
+On 05/05/17 13:31, gengdongjiu wrote:
+> when guest OS happen an SEA, My current solution is shown below:
 > 
-> Yup indeed it seems totally pointless. Also the same code can be
-> removed from pinmux_generic_free_functions().
-> 
-> It must be left over code from my initial attempts to to add
-> generic pinctrl groups and functions when I still though we need
-> to keep a static array around for the indices to keep pinctrl
-> happy. Then I probably did some robotic compile fixes after
-> updating things to use just the radix tree and added indices
-> locally to both functions..
+> (1) host EL3 firmware firstly handle the SEA error and generate the CPER record.
+> (2) EL3 firmware separately copy the esr_el3, elr_el3, SPSR_el3,
+> far_el3 to the esr_el2, elr_el2, SPSR_el2, far_el2.
 
-Hmm no that, can't be, I think I figured it out.. See the patch
-below.
+Copying {ELR,SPSR,FAR}_EL3 to the EL2 registers rings some alarm bells: I'm sure
+you exclude values from EL3 or the secure-world, we should never hand those to
+the normal world.
 
-Regards,
 
-Tony
+> (3) then jump the EL2 hypervisor
 
-8< ---------------------------
->From tony Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Fri, 12 May 2017 08:47:57 -0700
-Subject: [PATCH] pinctrl: core: Fix warning by removing bogus code
+> so the EL2 hypervisor uses the ESR that come from esr_el3,  here the
+> ESR(esr_el3) value may be different with the exist KVM API's ESR.
 
-Andre Przywara <andre.przywara@arm.com> noticed that we can get the
-following warning with -EPROBE_DEFER:
+The ESR may be different between EL3 and EL2. The ESR contains the severity of
+the event, the CPU will choose this when it takes the SError to EL3. If it had
+taken the SError to EL2, the CPU may have classified the error differently.
 
-"WARNING: CPU: 1 PID: 89 at drivers/base/dd.c:349
-driver_probe_device+0x2ac/0x2e8"
+Firmware may need to generate a more severe ESR if it receives an error that
+would be propagated by delivering SEI to a lower exception level, for example if
+an EL2 system register is 'infected'.
 
-Let's fix the issue by removing the indices as suggested by
-Tejun Heo <tj@kernel.org>. All we have to do here is kill the radix
-tree.
+This is the same for Qemu/kvmtool. A contained error at EL2 may be an
+uncontained error if we hand it to guest EL1. Linux's RAS code will decide this
+with its choice of signal to send, (and possibly which code to set).
+Qemu/kvmtool need to choose an appropriate APEI notification, which may involve
+generating a relevant ESR.
 
-I probably ended up with the indices after grepping for removal
-of all entries using radix_tree_for_each_slot() and the first
-match found was gmap_radix_tree_free(). Anyways, no need for
-indices here, and we can just do remove all the entries using
-radix_tree_for_each_slot() along how the item_kill_tree() test
-case does.
+Also relevant is the problem we discussed earlier with trying to deliver fake
+Physical-SError from software at EL3: If the SError is routed to EL2, and EL2
+has PSTATE.A masked, EL3 has to wait and try again later. This is another case
+where firmware may have to upgrade the classification of an error to uncontainable.
 
-Fixes: c7059c5ac70a ("pinctrl: core: Add generic pinctrl functions
-for managing groups")
-Fixes: a76edc89b100 ("pinctrl: core: Add generic pinctrl functions
-for managing groups")
-Reported-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- drivers/pinctrl/core.c   | 20 +++-----------------
- drivers/pinctrl/pinmux.c | 21 ++++-----------------
- 2 files changed, 7 insertions(+), 34 deletions(-)
 
-diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
---- a/drivers/pinctrl/core.c
-+++ b/drivers/pinctrl/core.c
-@@ -680,30 +680,16 @@ EXPORT_SYMBOL_GPL(pinctrl_generic_remove_group);
-  * pinctrl_generic_free_groups() - removes all pin groups
-  * @pctldev: pin controller device
-  *
-- * Note that the caller must take care of locking.
-+ * Note that the caller must take care of locking. The pinctrl groups
-+ * are allocated with devm_kzalloc() so no need to free them here.
-  */
- static void pinctrl_generic_free_groups(struct pinctrl_dev *pctldev)
- {
- 	struct radix_tree_iter iter;
--	struct group_desc *group;
--	unsigned long *indices;
- 	void **slot;
--	int i = 0;
--
--	indices = devm_kzalloc(pctldev->dev, sizeof(*indices) *
--			       pctldev->num_groups, GFP_KERNEL);
--	if (!indices)
--		return;
- 
- 	radix_tree_for_each_slot(slot, &pctldev->pin_group_tree, &iter, 0)
--		indices[i++] = iter.index;
--
--	for (i = 0; i < pctldev->num_groups; i++) {
--		group = radix_tree_lookup(&pctldev->pin_group_tree,
--					  indices[i]);
--		radix_tree_delete(&pctldev->pin_group_tree, indices[i]);
--		devm_kfree(pctldev->dev, group);
--	}
-+		radix_tree_delete(&pctldev->pin_group_tree, iter.index);
- 
- 	pctldev->num_groups = 0;
- }
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -826,30 +826,17 @@ EXPORT_SYMBOL_GPL(pinmux_generic_remove_function);
-  * pinmux_generic_free_functions() - removes all functions
-  * @pctldev: pin controller device
-  *
-- * Note that the caller must take care of locking.
-+ * Note that the caller must take care of locking. The pinctrl
-+ * functions are allocated with devm_kzalloc() so no need to free
-+ * them here.
-  */
- void pinmux_generic_free_functions(struct pinctrl_dev *pctldev)
- {
- 	struct radix_tree_iter iter;
--	struct function_desc *function;
--	unsigned long *indices;
- 	void **slot;
--	int i = 0;
--
--	indices = devm_kzalloc(pctldev->dev, sizeof(*indices) *
--			       pctldev->num_functions, GFP_KERNEL);
--	if (!indices)
--		return;
- 
- 	radix_tree_for_each_slot(slot, &pctldev->pin_function_tree, &iter, 0)
--		indices[i++] = iter.index;
--
--	for (i = 0; i < pctldev->num_functions; i++) {
--		function = radix_tree_lookup(&pctldev->pin_function_tree,
--					     indices[i]);
--		radix_tree_delete(&pctldev->pin_function_tree, indices[i]);
--		devm_kfree(pctldev->dev, function);
--	}
-+		radix_tree_delete(&pctldev->pin_function_tree, iter.index);
- 
- 	pctldev->num_functions = 0;
- }
--- 
-2.13.0
+Thanks,
+
+James
