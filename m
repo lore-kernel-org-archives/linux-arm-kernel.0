@@ -1,65 +1,44 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Fri, 12 May 2017 10:42:50 +0800
-Subject: [PATCH v2] [media] mtk-mdp: Fix g_/s_selection capture/compose logic
-Message-ID: <1494556970-12278-1-git-send-email-minghsiu.tsai@mediatek.com>
+From: finley.xiao@rock-chips.com (Finley Xiao)
+Date: Fri, 12 May 2017 10:44:20 +0800
+Subject: [PATCH] nvmem: rockchip-efuse: add support for rk322x-efuse
+Message-ID: <1494557060-105230-1-git-send-email-finley.xiao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Kurtz <djkurtz@chromium.org>
+This adds the necessary data for handling eFuse on the rk322x.
 
-Experiments show that the:
- (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
- (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
-
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
-
+Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
 ---
-Changes in v2:
-. Can not use *_MPLANE type in g_/s_selection 
----
- drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt | 1 +
+ drivers/nvmem/rockchip-efuse.c                             | 4 ++++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-index 13afe48..e18ac626 100644
---- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-+++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-@@ -838,10 +838,10 @@ static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
- 	bool valid = false;
- 
- 	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
--		if (mtk_mdp_is_target_compose(s->target))
-+		if (mtk_mdp_is_target_crop(s->target))
- 			valid = true;
- 	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
--		if (mtk_mdp_is_target_crop(s->target))
-+		if (mtk_mdp_is_target_compose(s->target))
- 			valid = true;
- 	}
- 	if (!valid) {
-@@ -908,10 +908,10 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
- 	bool valid = false;
- 
- 	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
--		if (s->target == V4L2_SEL_TGT_COMPOSE)
-+		if (s->target == V4L2_SEL_TGT_CROP)
- 			valid = true;
- 	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
--		if (s->target == V4L2_SEL_TGT_CROP)
-+		if (s->target == V4L2_SEL_TGT_COMPOSE)
- 			valid = true;
- 	}
- 	if (!valid) {
-@@ -925,7 +925,7 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
- 	if (ret)
- 		return ret;
- 
--	if (mtk_mdp_is_target_crop(s->target))
-+	if (mtk_mdp_is_target_compose(s->target))
- 		frame = &ctx->s_frame;
- 	else
- 		frame = &ctx->d_frame;
+diff --git a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
+index 94aeeea..194926f 100644
+--- a/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
++++ b/Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
+@@ -4,6 +4,7 @@ Required properties:
+ - compatible: Should be one of the following.
+   - "rockchip,rk3066a-efuse" - for RK3066a SoCs.
+   - "rockchip,rk3188-efuse" - for RK3188 SoCs.
++  - "rockchip,rk322x-efuse" - for RK322x SoCs.
+   - "rockchip,rk3288-efuse" - for RK3288 SoCs.
+   - "rockchip,rk3399-efuse" - for RK3399 SoCs.
+ - reg: Should contain the registers location and exact eFuse size
+diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+index 423907b..a0d4ede 100644
+--- a/drivers/nvmem/rockchip-efuse.c
++++ b/drivers/nvmem/rockchip-efuse.c
+@@ -170,6 +170,10 @@ static const struct of_device_id rockchip_efuse_match[] = {
+ 		.data = (void *)&rockchip_rk3288_efuse_read,
+ 	},
+ 	{
++		.compatible = "rockchip,rk322x-efuse",
++		.data = (void *)&rockchip_rk3288_efuse_read,
++	},
++	{
+ 		.compatible = "rockchip,rk3288-efuse",
+ 		.data = (void *)&rockchip_rk3288_efuse_read,
+ 	},
 -- 
-1.9.1
+2.7.4
