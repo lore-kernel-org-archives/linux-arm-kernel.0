@@ -1,92 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 May 2017 08:35:23 -0700
-Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
-In-Reply-To: <CACRpkdZhUnu09CcRwkLS9Qf83OLiKkTVCQxZY0tsJmBHNAirVw@mail.gmail.com>
-References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
- <CACRpkdasvjBPcr5RrPwtTYaoGeTEJMWqXbSRaB5-cOEKXbpfRg@mail.gmail.com>
- <f529e2d1-68e0-2760-3fd0-c7b0e94dd003@arm.com>
- <CACRpkdZhUnu09CcRwkLS9Qf83OLiKkTVCQxZY0tsJmBHNAirVw@mail.gmail.com>
-Message-ID: <20170512153522.GG3489@atomide.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 12 May 2017 17:46:06 +0200
+Subject: [PATCH v3 1/9] arm: dts: mt7623: add mt7623-mt6323.dtsi file
+In-Reply-To: <201705121837.eDU3hOId%fengguang.wu@intel.com>
+References: <201705121837.eDU3hOId%fengguang.wu@intel.com>
+Message-ID: <7f1d5fb3-5295-bb61-f21b-9d08bfaf070c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [170512 02:28]:
-> On Thu, May 11, 2017 at 4:20 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> >> On Thu, May 4, 2017 at 1:57 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> >>
-> >>> When a pinctrl driver gets interrupted during its probe process
-> >>> (returning -EPROBE_DEFER), the devres system cleans up all allocated
-> >>> resources. During this process it calls pinmux_generic_free_functions()
-> >>> and pinctrl_generic_free_groups(), which in turn use managed kmalloc
-> >>> calls for temporarily allocating some memory. Now those calls seem to
-> >>> get added to the devres list, but are apparently not covered by the
-> >>> cleanup process, because this is actually just running and iterating the
-> >>> existing list. This leads to those mallocs being left with the device,
-> >>> which the devres manager complains about when the driver eventually gets
-> >>> probed again:
-> >>> [    0.825239] ------------[ cut here ]------------
-> >>> [    0.825256] WARNING: CPU: 1 PID: 89 at drivers/base/dd.c:349 driver_probe_device+0x2ac/0x2e8
-> >>> [    0.825258] Modules linked in:
-> >>> [    0.825262]
-> >>> [    0.825270] CPU: 1 PID: 89 Comm: kworker/1:1 Not tainted 4.11.0 #307
-> >>> [    0.825272] Hardware name: Pine64+ (DT)
-> >>> [    0.825283] Workqueue: events deferred_probe_work_func
-> >>> [    0.825288] task: ffff80007c19c100 task.stack: ffff80007c16c000
-> >>> [    0.825292] PC is at driver_probe_device+0x2ac/0x2e8
-> >>> [    0.825296] LR is at driver_probe_device+0x108/0x2e8
-> >>> [    0.825300] pc : [<ffff000008559234>] lr : [<ffff000008559090>] pstate: 20000045
-> >>> ....
-> >>> This warning is triggered because the devres list is not empty. In this
-> >>> case the allocations were using 0 bytes, so no real leaks, but still this
-> >>> ugly warning.
-> >>> Looking more closely at these *cleanup* functions, devm_kzalloc() is actually
-> >>> not needed, because the memory is just allocated temporarily and can be
-> >>> freed just before returning from this function.
-> >>> So fix this issue by using the bog standard kcalloc() call instead of
-> >>> devm_kzalloc() and kfree()ing the memory at the end.
-> >>>
-> >>> This fixes above warnings on boot, which can be observed on *some* builds
-> >>> for the Pine64, where the pinctrl driver gets loaded early, but it missing
-> >>> resources, so gets deferred and is loaded again (successfully) later.
-> >>> kernelci caught this as well [1].
-> >>>
-> >>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >>>
-> >>> [1] https://storage.kernelci.org/net-next/master/v4.11-rc8-2122-gc08bac03d289/arm64/defconfig/lab-baylibre-seattle/boot-sun50i-a64-pine64-plus.html
-> >>> ---
-> >>> Hi,
-> >>>
-> >>> not sure this is the right fix, I am open to suggestions.
-> >>
-> >> I have queued this as a tentative v4.12-rc1 fix, but a bit undertain.
-> >>
-> >> Tejun, do I read your comments on the patch as an ACK?
-> >
-> > Tejun and I were wondering why we need this "create an array with the
-> > indices" in the first place. If we can just call radix_tree_delete()
-> > directly from the radix_tree_for_each_slot() loop, we can have a much
-> > better fix (omitting the memory allocation at all)
-> 
-> OK I pulled the patch out again for now.
-> 
-> > Linus, can you shed some light if this array creation serves some purpose?
-> 
-> Tony [author of this function] can you look at this?
-> 
-> The code in pinctrl_generic_free_groups() does look a bit weird,
-> allocating these indices just to remove the radix tree.
-> Do you think we can clean it up?
 
-Yup indeed it seems totally pointless. Also the same code can be
-removed from pinmux_generic_free_functions().
 
-It must be left over code from my initial attempts to to add
-generic pinctrl groups and functions when I still though we need
-to keep a static array around for the indices to keep pinctrl
-happy. Then I probably did some robotic compile fixes after
-updating things to use just the radix tree and added indices
-locally to both functions..
+On 12/05/17 12:46, kbuild test robot wrote:
+> Hi John,
+> 
+> [auto build test ERROR on robh/for-next]
+> [also build test ERROR on v4.11 next-20170512]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Regards,
+Mediatek dts patches should be tested against this branch:
+https://github.com/mbgg/linux-mediatek.git for-next
 
-Tony
+Thanks for maintaining the kbuild test robot.
+
+Matthias
+
+> 
+> url:    https://github.com/0day-ci/linux/commits/sean-wang-mediatek-com/arm-dts-extend-mt7623-support/20170512-165138
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+> config: arm-at91_dt_defconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>          wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>          chmod +x ~/bin/make.cross
+>          # save the attached .config to linux build tree
+>          make.cross ARCH=arm
+> 
+> All errors (new ones prefixed by >>):
+> 
+>>> Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:33.1-7 Label or path pwrap not found
+>>> Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:261.1-6 Label or path mmc0 not found
+>>> Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:266.1-6 Label or path mmc1 not found
+>     FATAL ERROR: Syntax error parsing input tree
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> 
