@@ -1,8 +1,8 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Fri, 12 May 2017 22:06:46 +0100
+From: danielmicay@gmail.com (Daniel Micay)
+Date: Fri, 12 May 2017 17:16:44 -0400
 Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
  limit before returning to user-mode
-In-Reply-To: <20170512202106.GO22219@n2100.armlinux.org.uk>
+In-Reply-To: <20170512210645.GS390@ZenIV.linux.org.uk>
 References: <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
  <CAJcbSZEoRyewUtBHvqmNZL9FtT_q42Vmmd-EuC50x-ZRASiHHg@mail.gmail.com>
  <CA+55aFwvQfs_X+paQF6Luc0Rq+W3J2fKuHRou7=ANcquDdXdDA@mail.gmail.com>
@@ -13,26 +13,40 @@ References: <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
  <CA+55aFzbiBqsYb7vwO=+L4Vp_GOgPu+DBOrq4fBnyzq5DbBehg@mail.gmail.com>
  <CAGXu5j+xmyJ6RhtPw9rUgs7k3sZ1KKWffvyGGG--oPfu9W42ng@mail.gmail.com>
  <20170512202106.GO22219@n2100.armlinux.org.uk>
-Message-ID: <20170512210645.GS390@ZenIV.linux.org.uk>
+ <20170512210645.GS390@ZenIV.linux.org.uk>
+Message-ID: <1494623804.4521.2.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 09:21:06PM +0100, Russell King - ARM Linux wrote:
-> On Fri, May 12, 2017 at 12:30:02PM -0700, Kees Cook wrote:
-> > I'm clearly not explaining things well enough. I shouldn't say
-> > "corruption", I should say "malicious manipulation". The methodology
-> > of attacks against the stack are quite different from the other kinds
-> > of attacks like use-after-free, heap overflow, etc. Being able to
-> > exhaust the kernel stack (either due to deep recursion or unbounded
-> > alloca())
+On Fri, 2017-05-12 at 22:06 +0100, Al Viro wrote:
+> On Fri, May 12, 2017 at 09:21:06PM +0100, Russell King - ARM Linux
+> wrote:
+> > On Fri, May 12, 2017 at 12:30:02PM -0700, Kees Cook wrote:
+> > > I'm clearly not explaining things well enough. I shouldn't say
+> > > "corruption", I should say "malicious manipulation". The
+> > > methodology
+> > > of attacks against the stack are quite different from the other
+> > > kinds
+> > > of attacks like use-after-free, heap overflow, etc. Being able to
+> > > exhaust the kernel stack (either due to deep recursion or
+> > > unbounded
+> > > alloca())
+> > 
+> > I really hope we don't have alloca() use in the kernel.  Do you have
+> > evidence to support that assertion?
+> > 
+> > IMHO alloca() (or similar) should not be present in any kernel code
+> > because we have a limited stack - we have kmalloc() etc for that
+> > kind
+> > of thing.
 > 
-> I really hope we don't have alloca() use in the kernel.  Do you have
-> evidence to support that assertion?
-> 
-> IMHO alloca() (or similar) should not be present in any kernel code
-> because we have a limited stack - we have kmalloc() etc for that kind
-> of thing.
+> No alloca(), but there are VLAs.  Said that, the whole "what if they
+> can bugger thread_info and/or task_struct and go after set_fs() state"
+> is idiocy, of course - in that case the box is fucked, no matter what.
 
-No alloca(), but there are VLAs.  Said that, the whole "what if they
-can bugger thread_info and/or task_struct and go after set_fs() state"
-is idiocy, of course - in that case the box is fucked, no matter what.
+VMAP_STACK + -fstack-check would prevent exploiting even an unbounded
+VLA / alloca size vs. it being an arbitrary write. -fstack-check
+guarantees that there's one byte per page as the stack grows, although
+there are some unfortunate GCC bugs making it less than perfect right
+now... but they recently started caring about it more including making
+it near zero overhead as it was always supposed to be.
