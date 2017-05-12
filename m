@@ -1,46 +1,41 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 12 May 2017 11:41:41 +0100
-Subject: [PATCH 1/2] acpica: iort: Update SMMU models for IORT rev. C
-Message-ID: <0bb462748c0a08dbf1db103d2a96b80c71412817.1494585645.git.robin.murphy@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 12 May 2017 18:46:13 +0800
+Subject: [PATCH v3 1/9] arm: dts: mt7623: add mt7623-mt6323.dtsi file
+In-Reply-To: <e8d8ba305d0e245753ffc78479b4ca4cfd4c4d5f.1494574682.git.sean.wang@mediatek.com>
+Message-ID: <201705121837.eDU3hOId%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IORT revision C has been published with a number of new SMMU
-implementation identifiers; define them.
+Hi John,
 
-CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-CC: Robert Moore <robert.moore@intel.com>
-CC: Lv Zheng <lv.zheng@intel.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.11 next-20170512]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/sean-wang-mediatek-com/arm-dts-extend-mt7623-support/20170512-165138
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:33.1-7 Label or path pwrap not found
+>> Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:261.1-6 Label or path mmc0 not found
+>> Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:266.1-6 Label or path mmc1 not found
+   FATAL ERROR: Syntax error parsing input tree
+
 ---
- include/acpi/actbl2.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
-index 7aee9fb3bd1f..0242be07f292 100644
---- a/include/acpi/actbl2.h
-+++ b/include/acpi/actbl2.h
-@@ -777,6 +777,8 @@ struct acpi_iort_smmu {
- #define ACPI_IORT_SMMU_V2               0x00000001	/* Generic SMMUv2 */
- #define ACPI_IORT_SMMU_CORELINK_MMU400  0x00000002	/* ARM Corelink MMU-400 */
- #define ACPI_IORT_SMMU_CORELINK_MMU500  0x00000003	/* ARM Corelink MMU-500 */
-+#define ACPI_IORT_SMMU_CORELINK_MMU401  0x00000004	/* ARM Corelink MMU-401 */
-+#define ACPI_IORT_SMMU_CAVIUM_SMMUV2    0x00000005	/* Cavium ThunderX SMMUv2 */
- 
- /* Masks for Flags field above */
- 
-@@ -795,6 +797,12 @@ struct acpi_iort_smmu_v3 {
- 	u32 sync_gsiv;
- };
- 
-+/* Values for Model field above */
-+
-+#define ACPI_IORT_SMMU_V3               0x00000000	/* Generic SMMUv3 */
-+#define ACPI_IORT_SMMU_HISILICON_HI161X 0x00000001	/* HiSilicon Hi161x SMMUv3 */
-+#define ACPI_IORT_SMMU_CAVIUM_CN99XX    0x00000002	/* Cavium CN99xx SMMUv3 */
-+
- /* Masks for Flags field above */
- 
- #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
--- 
-2.12.2.dirty
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 22403 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170512/5bc622c2/attachment-0001.gz>
