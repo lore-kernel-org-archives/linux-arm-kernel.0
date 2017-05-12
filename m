@@ -1,8 +1,9 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Fri, 12 May 2017 18:46:13 +0800
-Subject: [PATCH v3 1/9] arm: dts: mt7623: add mt7623-mt6323.dtsi file
-In-Reply-To: <e8d8ba305d0e245753ffc78479b4ca4cfd4c4d5f.1494574682.git.sean.wang@mediatek.com>
-Message-ID: <201705121837.eDU3hOId%fengguang.wu@intel.com>
+Date: Fri, 12 May 2017 19:11:51 +0800
+Subject: [PATCH v3 7/9] arm: dts: mt7623: enable the usb device on the
+ mt7623n rfb
+In-Reply-To: <98cb8c175852364c58425d7b59fe7b182e2b8d02.1494574682.git.sean.wang@mediatek.com>
+Message-ID: <201705121918.jtAZ9HaT%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,10 +25,11 @@ reproduce:
 
 All errors (new ones prefixed by >>):
 
->> Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:33.1-7 Label or path pwrap not found
->> Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:261.1-6 Label or path mmc0 not found
->> Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:266.1-6 Label or path mmc1 not found
-   FATAL ERROR: Syntax error parsing input tree
+   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:33.1-7 Label or path pwrap not found
+   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:261.1-6 Label or path mmc0 not found
+   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:266.1-6 Label or path mmc1 not found
+>> Error: arch/arm/boot/dts/mt7623n-rfb.dtsi:37.20-21 syntax error
+   FATAL ERROR: Unable to parse input tree
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -38,4 +40,4 @@ Name: .config.gz
 Type: application/gzip
 Size: 22403 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170512/5bc622c2/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170512/95d35b43/attachment-0001.gz>
