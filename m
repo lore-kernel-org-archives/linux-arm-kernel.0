@@ -1,68 +1,176 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Fri, 12 May 2017 10:05:58 -0700
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <20170512065818.mw7yqcdck7alqlzi@gmail.com>
-References: <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com>
- <20170508075209.7aluvpwildw325rf@gmail.com>
- <1494256932.1167.1.camel@gmail.com>
- <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
- <20170509065619.wmqa6z6w3n6xpvrw@gmail.com> <20170509111007.GA14702@kroah.com>
- <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
- <CAJcbSZEoRyewUtBHvqmNZL9FtT_q42Vmmd-EuC50x-ZRASiHHg@mail.gmail.com>
- <CA+55aFwvQfs_X+paQF6Luc0Rq+W3J2fKuHRou7=ANcquDdXdDA@mail.gmail.com>
- <20170512065818.mw7yqcdck7alqlzi@gmail.com>
-Message-ID: <CAJcbSZFyzanv6ji97+K2kQH1CFX6qeXWsGwRvjiK1Dk+f3niBA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 12 May 2017 18:07:22 +0100
+Subject: [PATCHv3] arm64/cpufeature: don't use mutex in bringup path
+In-Reply-To: <1494584120-15208-1-git-send-email-mark.rutland@arm.com>
+References: <1494584120-15208-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170512170722.GJ26181@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 11:58 PM, Ingo Molnar <mingo@kernel.org> wrote:
->
-> * Linus Torvalds <torvalds@linux-foundation.org> wrote:
->
->> On Thu, May 11, 2017 at 4:17 PM, Thomas Garnier <thgarnie@google.com> wrote:
->> >
->> > Ingo: Do you want the change as-is? Would you like it to be optional?
->> > What do you think?
->>
->> I'm not ingo, but I don't like that patch. It's in the wrong place -
->> that system call return code is too timing-critical to add address
->> limit checks.
->>
->> Now what I think you *could* do is:
->>
->>  - make "set_fs()" actually set a work flag in the current thread flags
->>
->>  - do the test in the slow-path (syscall_return_slowpath).
->>
->> Yes, yes, that ends up being architecture-specific, but it's fairly simple.
->>
->> And it only slows down the system calls that actually use "set_fs()".
->> Sure, it will slow those down a fair amount, but they are hopefully a
->> small subset of all cases.
->>
->> How does that sound to people?  Thats' where we currently do that
->>
->>         if (IS_ENABLED(CONFIG_PROVE_LOCKING) &&
->>             WARN(irqs_disabled(), "syscall %ld left IRQs disabled",
->> regs->orig_ax))
->>                 local_irq_enable();
->>
->> check too, which is a fairly similar issue.
->
-> I really like that idea and I'd be perfectly fine with that solution, because it
-> puts the overhead where the problem comes from, and adds an extra incentive for
-> code to move away from set_fs() facilities. Win-win.
+On Fri, May 12, 2017 at 11:15:20AM +0100, Mark Rutland wrote:
+> Currently, cpus_set_cap() calls static_branch_enable_cpuslocked(), which
+> must take the jump_label mutex.
+> 
+> We call cpus_set_cap() in the secondary bringup path, from the idle
+> thread where interrupts are disabled. Taking a mutex in this path "is a
+> NONO" regardless of whether it's contended, and something we must avoid.
+> Additionally, the secondary CPU doesn't hold the percpu rwsem (as this
+> is held by the primary CPU), so this triggers a lockdep splat.
+> 
+> This patch fixes both issues. The poking of static keys is deferred
+> until enable_cpu_capabilities(), which runs in a suitable context on the
+> boot CPU. To account for the static keys being set later,
+> cpus_have_const_cap() is updated to use another static key to check
+> whether the const cap keys have been initialised, falling back to the
+> caps bitmap until this is the case.
+> 
+> This means that users of cpus_have_const_cap() gain should only gain a
+> single additional NOP in the fast path once the const caps are
+> initialised, but should always see the current cap value.
+> 
+> The hyp code should never dereference the caps array, since the caps are
+> initialized before we run the module initcall to initialise hyp. A check
+> is added to the hyp init code to docuemnt this requirement.
+> 
+> This rework means that we can remove the *_cpuslocked() helpers added in
+> commit d54bb72551b999dd ("arm64/cpufeature: Use
+> static_branch_enable_cpuslocked()").
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyniger <marc.zyngier@arm.com>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Sebastian Sewior <bigeasy@linutronix.de>
+> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/cpufeature.h | 13 ++++++++++---
+>  arch/arm64/include/asm/kvm_host.h   |  8 ++++++--
+>  arch/arm64/kernel/cpu_errata.c      |  9 +--------
+>  arch/arm64/kernel/cpufeature.c      | 25 ++++++++++++++++++++++---
+>  4 files changed, 39 insertions(+), 16 deletions(-)
+> 
+> Catalin, Will, assuming you're happy with the patch, it will need to go via the
+> tip tree.
 
-Great, I will adapt the patch for that.
+Fine by me, although there's a typo in the comment (see below).
 
->
-> Thanks,
->
->         Ingo
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 5e19165..51d3d3c 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -24,6 +24,7 @@
+>  
+>  #include <linux/types.h>
+>  #include <linux/kvm_types.h>
+> +#include <asm/cpufeature.h>
+>  #include <asm/kvm.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_mmio.h>
+> @@ -355,9 +356,12 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>  				       unsigned long vector_ptr)
+>  {
+>  	/*
+> -	 * Call initialization code, and switch to the full blown
+> -	 * HYP code.
+> +	 * Call initialization code, and switch to the full blown HYP code.
+> +	 * If the cpucaps haven't been finialized yet, something has gone very
+> +	 * wrong, and hyp will crash and burn when it uses any
+> +	 * cpus_have_const_cap() wrapper.
 
+Typo: finialized
 
+>  	 */
+> +	BUG_ON(!static_branch_likely(&arm64_const_caps_ready));
+>  	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
+>  }
+>  
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index 57d60fa..2ed2a76 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -190,16 +190,9 @@ void verify_local_cpu_errata_workarounds(void)
+>  		}
+>  }
+>  
+> -void update_cpu_errata_workarounds_cpuslocked(void)
+> -{
+> -	update_cpu_capabilities(arm64_errata, "enabling workaround for");
+> -}
+> -
+>  void update_cpu_errata_workarounds(void)
+>  {
+> -	get_online_cpus();
+> -	update_cpu_errata_workarounds_cpuslocked();
+> -	put_online_cpus();
+> +	update_cpu_capabilities(arm64_errata, "enabling workaround for");
+>  }
+>  
+>  void __init enable_errata_workarounds(void)
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 803afae..4a89f59 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -986,8 +986,16 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+>   */
+>  void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+>  {
+> -	for (; caps->matches; caps++)
+> -		if (caps->enable && cpus_have_cap(caps->capability))
+> +	for (; caps->matches; caps++) {
+> +		unsigned int num = caps->capability;
+> +
+> +		if (!cpus_have_cap(num))
+> +			continue;
+> +
+> +		/* Ensure cpus_have_const_cap(num) works */
+> +		static_branch_enable(&cpu_hwcap_keys[num]);
+> +
+> +		if (caps->enable) {
+>  			/*
+>  			 * Use stop_machine() as it schedules the work allowing
+>  			 * us to modify PSTATE, instead of on_each_cpu() which
+> @@ -995,6 +1003,8 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+>  			 * we return.
+>  			 */
+>  			stop_machine(caps->enable, NULL, cpu_online_mask);
+> +		}
+> +	}
+>  }
+>  
+>  /*
+> @@ -1086,7 +1096,7 @@ void check_local_cpu_capabilities(void)
+>  	 * advertised capabilities.
+>  	 */
+>  	if (!sys_caps_initialised)
+> -		update_cpu_errata_workarounds_cpuslocked();
+> +		update_cpu_errata_workarounds();
+>  	else
+>  		verify_local_cpu_capabilities();
+>  }
+> @@ -1099,6 +1109,14 @@ static void __init setup_feature_capabilities(void)
+>  	enable_cpu_capabilities(arm64_features);
+>  }
+>  
+> +DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
+> +EXPORT_SYMBOL(arm64_const_caps_ready);
+> +
+> +static void __init mark_const_caps_ready(void)
+> +{
+> +	static_branch_enable(&arm64_const_caps_ready);
+> +}
+> +
+>  /*
+>   * Check if the current CPU has a given feature capability.
+>   * Should be called from non-preemptible context.
+> @@ -1134,6 +1152,7 @@ void __init setup_cpu_features(void)
+>  	/* Set the CPU feature capabilies */
+>  	setup_feature_capabilities();
+>  	enable_errata_workarounds();
+> +	mark_const_caps_ready();
 
--- 
-Thomas
+Does this make you the eponymous developer of the CPU capability framework?
+
+Will
