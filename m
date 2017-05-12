@@ -1,55 +1,119 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 12 May 2017 15:56:43 +0800
-Subject: [PATCH v3 6/9] arm: dts: mt7623: cleanup the mt7623n rfb uart nodes
+Date: Fri, 12 May 2017 15:56:45 +0800
+Subject: [PATCH v3 8/9] arm: dts: mt7623: enable the nand device on the
+ mt7623n nand rfb
 In-Reply-To: <cover.1494574682.git.sean.wang@mediatek.com>
 References: <cover.1494574682.git.sean.wang@mediatek.com>
-Message-ID: <73077cd39b9e999332666ae64e287350edf7d17a.1494574682.git.sean.wang@mediatek.com>
+Message-ID: <da3e3693ff8a10615e28303905e694dfb96c6629.1494574682.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: John Crispin <john@phrozen.org>
 
-This patch does a cleanup of the uart nodes in the dts file of the RFB. It
-adds aliases, enables 2 more uarts and explicitly sets the uart mode of the
-console.
+Enable the nand device and setup pinmux on the mt7632m rfb with nand
+support.
 
 Signed-off-by: John Crispin <john@phrozen.org>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- arch/arm/boot/dts/mt7623n-rfb.dtsi | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/mt7623n-rfb-nand.dts | 88 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 88 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt7623n-rfb.dtsi b/arch/arm/boot/dts/mt7623n-rfb.dtsi
-index c526116..4963e6a 100644
---- a/arch/arm/boot/dts/mt7623n-rfb.dtsi
-+++ b/arch/arm/boot/dts/mt7623n-rfb.dtsi
-@@ -16,12 +16,26 @@
- 
- / {
- 	chosen {
--		stdout-path = &uart2;
-+		stdout-path = "serial2:115200n8";
- 	};
- 
- 	memory at 80000000 {
- 		reg = <0 0x80000000 0 0x40000000>;
- 	};
+diff --git a/arch/arm/boot/dts/mt7623n-rfb-nand.dts b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
+index 436d51c..9356095 100644
+--- a/arch/arm/boot/dts/mt7623n-rfb-nand.dts
++++ b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
+@@ -19,3 +19,91 @@
+ 	model = "MediaTek MT7623N NAND reference board";
+ 	compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
+ };
 +
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
++&pio {
++	nand_pins_default: nanddefault {
++		pins_dat {
++			pinmux = <MT7623_PIN_111_MSDC0_DAT7_FUNC_NLD7>,
++				 <MT7623_PIN_112_MSDC0_DAT6_FUNC_NLD6>,
++				 <MT7623_PIN_114_MSDC0_DAT4_FUNC_NLD4>,
++				 <MT7623_PIN_118_MSDC0_DAT3_FUNC_NLD3>,
++				 <MT7623_PIN_121_MSDC0_DAT0_FUNC_NLD0>,
++				 <MT7623_PIN_120_MSDC0_DAT1_FUNC_NLD1>,
++				 <MT7623_PIN_113_MSDC0_DAT5_FUNC_NLD5>,
++				 <MT7623_PIN_115_MSDC0_RSTB_FUNC_NLD8>,
++				 <MT7623_PIN_119_MSDC0_DAT2_FUNC_NLD2>;
++			input-enable;
++			drive-strength = <MTK_DRIVE_8mA>;
++			bias-pull-up;
++		};
++
++		pins_we {
++			pinmux = <MT7623_PIN_117_MSDC0_CLK_FUNC_NWEB>;
++			drive-strength = <MTK_DRIVE_8mA>;
++			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
++		};
++
++		pins_ale {
++			pinmux = <MT7623_PIN_116_MSDC0_CMD_FUNC_NALE>;
++			drive-strength = <MTK_DRIVE_8mA>;
++			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
++		};
 +	};
 +};
 +
-+&uart0 {
++&nandc {
 +	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&nand_pins_default>;
++	nand at 0 {
++		reg = <0>;
++		spare_per_sector = <64>;
++		nand-ecc-mode = "hw";
++		nand-ecc-strength = <12>;
++		nand-ecc-step-size = <1024>;
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition at 0 {
++				label = "preloader";
++				reg = <0x0 0x40000>;
++			};
++
++			partition at 40000 {
++				label = "uboot";
++				reg = <0x40000 0x80000>;
++			};
++
++			partition at C0000 {
++				label = "uboot-env";
++				reg = <0xC0000 0x40000>;
++			};
++
++			partition at 140000 {
++				label = "bootimg";
++				reg = <0x140000 0x2000000>;
++			};
++
++			partition at 2140000 {
++				label = "recovery";
++				reg = <0x2140000 0x2000000>;
++			};
++
++			partition at 4140000 {
++				label = "rootfs";
++				reg = <0x4140000 0x1000000>;
++			};
++
++			partition at 5140000 {
++				label = "usrdata";
++				reg = <0x5140000 0x1000000>;
++			};
++		};
++	};
 +};
 +
-+&uart1 {
++&bch {
 +	status = "okay";
- };
- 
- &uart2 {
++};
 -- 
 2.7.4
