@@ -1,26 +1,30 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 12 May 2017 15:03:00 -0500
-Subject: [PATCH 1/8] mmc: dt: pwrseq-simple: Invent power-off-delay-us
-In-Reply-To: <1494260477-25163-2-git-send-email-ulf.hansson@linaro.org>
-References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
- <1494260477-25163-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20170512200300.a2hq546ra42ptlz5@rob-hp-laptop>
+Date: Fri, 12 May 2017 15:12:16 -0500
+Subject: [PATCH 3/6] dt-bindings: serial: fsl-lpuart: add i.MX7ULP support
+In-Reply-To: <1494316248-24052-4-git-send-email-aisheng.dong@nxp.com>
+References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
+ <1494316248-24052-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170512201216.vaa2dbwjq7dmouku@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 08, 2017 at 06:21:10PM +0200, Ulf Hansson wrote:
-> During power off, after the GPIO pin has been asserted, some devices like
-> the Wifi chip from TI, Wl18xx, needs a delay before the host continues with
-> clock gating and turning off regulators as to follow a graceful shutdown
-> sequence.
+On Tue, May 09, 2017 at 03:50:45PM +0800, Dong Aisheng wrote:
+> The lpuart of imx7ulp is basically the same as ls1021a. It's also
+> 32 bit width register, but unlike ls1021a, it's little endian.
+> Besides that, imx7ulp lpuart has a minor different register layout
+> from ls1021a.
 > 
-> Therefore invent an optional power-off-delay-us DT binding for
-> mmc-pwrseq-simple, to allow us to support this constraint.
+> Cc: devicetree at vger.kernel.org
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jiri Slaby <jslaby@suse.com>
+> Cc: Fugang Duan <fugang.duan@nxp.com>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
+> Cc: Yangbo Lu <yangbo.lu@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/serial/fsl-lpuart.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 
-Do you really need this to be programmable per device. A delay is not 
-going to hurt devices that don't need it.
-
-Sorry, but this is exactly what I don't like about "simple" bindings: 
-adding one property at a time.
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
