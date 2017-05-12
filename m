@@ -1,81 +1,80 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 12 May 2017 10:01:50 +0200
-Subject: [PATCH] ARM: dts: imx28: add gpio-ranges for internal gpio
- controller
-In-Reply-To: <20170512030536.GC8471@dragon>
-References: <20170508085925.18342-1-u.kleine-koenig@pengutronix.de>
- <20170511075135.GF5833@dragon>
- <20170511080916.gim5pyhj5jarzf4r@pengutronix.de>
- <20170512030536.GC8471@dragon>
-Message-ID: <20170512080150.uh5qmwu2tctpd6jk@pengutronix.de>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Fri, 12 May 2017 01:07:41 -0700
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <20170512073521.GA7091@infradead.org>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508124621.GA20705@kroah.com>
+ <20170509064522.anusoikaalvlux3w@gmail.com>
+ <20170509085659.GA32555@infradead.org>
+ <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
+ <20170512070012.7dysuhbkcas7ibaj@gmail.com>
+ <20170512071549.GP390@ZenIV.linux.org.uk>
+ <20170512073521.GA7091@infradead.org>
+Message-ID: <20170512080741.GA32228@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 11:05:38AM +0800, Shawn Guo wrote:
-> On Thu, May 11, 2017 at 10:09:16AM +0200, Uwe Kleine-K?nig wrote:
-> > On Thu, May 11, 2017 at 03:51:36PM +0800, Shawn Guo wrote:
-> > > On Mon, May 08, 2017 at 10:59:25AM +0200, Uwe Kleine-K?nig wrote:
-> > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > > ---
-> > > > Hello,
-> > > > 
-> > > > with this patch applied I get the following lines in dmesg which looks
-> > > > fine:
-> > > > 
-> > > > 	[    0.227913] gpio gpiochip0: (80018000.pinctrl:gpio at 0): created GPIO range 0->31 ==> 80018000.pinctrl PIN 0->31
-> > > > 	[    0.236100] gpio gpiochip1: (80018000.pinctrl:gpio at 1): created GPIO range 0->31 ==> 80018000.pinctrl PIN 32->63
-> > > > 	[    0.244463] gpio gpiochip2: (80018000.pinctrl:gpio at 2): created GPIO range 0->31 ==> 80018000.pinctrl PIN 64->95
-> > > > 	[    0.253020] gpio gpiochip3: (80018000.pinctrl:gpio at 3): created GPIO range 0->31 ==> 80018000.pinctrl PIN 96->127
-> > > > 	[    0.261639] gpio gpiochip4: (80018000.pinctrl:gpio at 4): created GPIO range 0->31 ==> 80018000.pinctrl PIN 128->159
-> > > > 
-> > > > But when looking at a used gpio
-> > > > 
-> > > > 	# cat /sys/kernel/debug/gpio
-> > > > 	gpiochip0: GPIOs 0-31, parent: platform/80018000.pinctrl:gpio at 0, 80018000.pinctrl:gpio at 0:
-> > > > 	...
-> > > > 	 gpio-20  (LED4                |?                   ) out hi
-> > > > 	...
-> > > > 
-> > > > 	# grep "pin 20 " /sys/kernel/debug/pinctrl/80018000.pinctrl/pinmux-pins
-> > > > 	pin 20 (GPMI_RDY0): leds (GPIO UNCLAIMED) function leds group leds.0
-> > > > 
-> > > > I wonder why there is still "GPIO UNCLAIMED". I would have expected that
-> > > > this disappears and somehow references the gpio_request issued by the
-> > > > led-gpio driver after my patch.
-> > > > 
-> > > > What am I missing?
-> > > 
-> > > It seems that's only the case where @strict of struct pinmux_ops is
-> > > true.  We should set it true for pinctrl-mxs, I guess?
-> > 
-> > The description is:
-> > 
-> >  * @strict: do not allow simultaneous use of the same pin for GPIO and another
-> >  *      function. Check both gpio_owner and mux_owner strictly before approving
-> >  *      the pin request.
+On Fri, May 12, 2017 at 12:35:21AM -0700, Christoph Hellwig wrote:
+> On Fri, May 12, 2017 at 08:15:49AM +0100, Al Viro wrote:
+> > And converting everything to ->read_iter()/->write_iter() means an insane
+> > amount of code churn, not to mention coping with random bogosities in
+> > semantics.  ->read() and ->write() are going to stay around, pretty
+> > much indefinitely.
 > 
-> Sorry, I misread the 'strict' code and my comment about it is
-> completely a noise.
-> 
-> I went through the code around requesting a pin, and found that we need
-> to call pinctrl_request_gpio() from gpio driver to get the result you
-> want.  In that case, pin_request() will be called with a valid
-> gpio_range as below.
-> 
->     pinctrl_request_gpio()
->         pinmux_request_gpio()
->             pin_request(..., gpio_range)
-> 
-> Right now, pin_request() is being called with a NULL gpio_range from
-> pinmux_enable_setting().  That gets us the mux_owner rather than
-> gpio_owner for the pin.
+> But I don't think kernel users of them have to.  I've been digging
+> through the calllers and will send an analysis to the list in a bit.
 
-But then again I cannot mux a pin to a different function when the gpio
-is requested, right?
+Ok, here is the cleaned up list.  The targets for in-kernel I/O
+are basically regular files on normal fs, block devices, pipes
+and sockets, with a few narrow exceptions and a few unclear cases.
 
-Best regards
-Uwe
+I've added a few maintainers to Cc to clarify, and the list is below:
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+When looking at kernel_read/kernel_readv/kernel_write/__kernel_write
+instances, or vfs_read/vfs_readv/vfs_write/vfs_writev inststances with
+set_fs tricks most of them simply require a regular file on a "real"
+fs or a block device, pipe, socket:
+
+ - various binary loaders: need to be regular files (+ on a "real" fs)
+ - nandsim: expect a regular file or maybe a block device
+ - code: expects a regular file
+ - ecryptfs: expects a regular file
+ - splice: can be a regular file or device file
+ - security/keys: regular file
+ - cachefiles: needs to be a regular file
+ - coredump: usually a regular file, but possibly a pipe
+ - acct: regular file
+ - target: regular file
+ - nfsd: regular file
+ - lustre: regular file
+ - f_mass_storage: regular file, or maybe block device
+ - autofs: pipe
+ - btrfs: regular file / pipe / socket
+ - ima: regular file on specific file systems
+
+Then there are a few interesting ones with specific targets:
+
+ - sysctl: regular file on procfs
+ - mconsole: procfs as far as I can tell.  Might be able to further
+   narrow it down?
+ - ashmem: regular file on shmem
+
+The nommu mmap code needs to read everything that wants to support
+a MAP_PRIVATE mmap, but as far as a I can tell: do a) address limits
+not matter for nommu, and b) I have no f***cking idea why it doesn't
+use readpage(s) to start with like the MMU code.
+
+And a few that I can't figure:
+
+ - cx25821: no idea what this opens, need to confirm with the maintainers
+   (on Cc)
+ - 9p: not clear.  looks like it might be sockets/pipes
+ 
+ Last but not least we have a driver that's a complete mess:
+
+ - series2002: /dev/tty* (drivers is in staging and needs to be rewritten
+   using the proper in-kernel APIs anyway)
+ 
