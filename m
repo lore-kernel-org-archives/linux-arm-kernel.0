@@ -1,58 +1,44 @@
 From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 12 May 2017 08:58:18 +0200
+Date: Fri, 12 May 2017 09:00:12 +0200
 Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
  limit before returning to user-mode
-In-Reply-To: <CA+55aFwvQfs_X+paQF6Luc0Rq+W3J2fKuHRou7=ANcquDdXdDA@mail.gmail.com>
-References: <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+In-Reply-To: <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
+References: <20170428153213.137279-1-thgarnie@google.com>
+ <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
  <20170508073352.caqe3fqf7nuxypgi@gmail.com>
- <20170508075209.7aluvpwildw325rf@gmail.com>
- <1494256932.1167.1.camel@gmail.com>
- <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
- <20170509065619.wmqa6z6w3n6xpvrw@gmail.com>
- <20170509111007.GA14702@kroah.com>
- <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
- <CAJcbSZEoRyewUtBHvqmNZL9FtT_q42Vmmd-EuC50x-ZRASiHHg@mail.gmail.com>
- <CA+55aFwvQfs_X+paQF6Luc0Rq+W3J2fKuHRou7=ANcquDdXdDA@mail.gmail.com>
-Message-ID: <20170512065818.mw7yqcdck7alqlzi@gmail.com>
+ <20170508124621.GA20705@kroah.com>
+ <20170509064522.anusoikaalvlux3w@gmail.com>
+ <20170509085659.GA32555@infradead.org>
+ <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
+Message-ID: <20170512070012.7dysuhbkcas7ibaj@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-* Linus Torvalds <torvalds@linux-foundation.org> wrote:
+* Andy Lutomirski <luto@kernel.org> wrote:
 
-> On Thu, May 11, 2017 at 4:17 PM, Thomas Garnier <thgarnie@google.com> wrote:
+> On Tue, May 9, 2017 at 1:56 AM, Christoph Hellwig <hch@infradead.org> wrote:
+> > On Tue, May 09, 2017 at 08:45:22AM +0200, Ingo Molnar wrote:
+> >> We only have ~115 code blocks in the kernel that set/restore KERNEL_DS, it would
+> >> be a pity to add a runtime check to every system call ...
 > >
-> > Ingo: Do you want the change as-is? Would you like it to be optional?
-> > What do you think?
+> > I think we should simply strive to remove all of them that aren't
+> > in core scheduler / arch code.  Basically evetyytime we do the
+> >
+> >         oldfs = get_fs();
+> >         set_fs(KERNEL_DS);
+> >         ..
+> >         set_fs(oldfs);
+> >
+> > trick we're doing something wrong, and there should always be better
+> > ways to archive it.  E.g. using iov_iter with a ITER_KVEC type
+> > consistently would already remove most of them.
 > 
-> I'm not ingo, but I don't like that patch. It's in the wrong place -
-> that system call return code is too timing-critical to add address
-> limit checks.
-> 
-> Now what I think you *could* do is:
-> 
->  - make "set_fs()" actually set a work flag in the current thread flags
-> 
->  - do the test in the slow-path (syscall_return_slowpath).
-> 
-> Yes, yes, that ends up being architecture-specific, but it's fairly simple.
-> 
-> And it only slows down the system calls that actually use "set_fs()".
-> Sure, it will slow those down a fair amount, but they are hopefully a
-> small subset of all cases.
-> 
-> How does that sound to people?  Thats' where we currently do that
-> 
->         if (IS_ENABLED(CONFIG_PROVE_LOCKING) &&
->             WARN(irqs_disabled(), "syscall %ld left IRQs disabled",
-> regs->orig_ax))
->                 local_irq_enable();
-> 
-> check too, which is a fairly similar issue.
+> How about trying to remove all of them?  If we could actually get rid
+> of all of them, we could drop the arch support, and we'd get faster,
+> simpler, shorter uaccess code throughout the kernel.
 
-I really like that idea and I'd be perfectly fine with that solution, because it 
-puts the overhead where the problem comes from, and adds an extra incentive for 
-code to move away from set_fs() facilities. Win-win.
+I'm all for that!
 
 Thanks,
 
