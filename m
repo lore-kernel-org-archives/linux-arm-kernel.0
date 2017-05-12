@@ -1,29 +1,43 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 12 May 2017 13:16:54 +0200
-Subject: [PATCH 1/2] ARM: at91/defconfig: make system tickless when idle
-In-Reply-To: <00d91ef0-14f8-6065-2208-f4d7116adab7@free-electrons.com>
-References: <20170505084343.10417-1-quentin.schulz@free-electrons.com>
- <00d91ef0-14f8-6065-2208-f4d7116adab7@free-electrons.com>
-Message-ID: <20170512111654.fn63hpsxvfqg4dkt@piout.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 12 May 2017 19:39:55 +0800
+Subject: [PATCH v3 9/9] arm: dts: mt7623: add dts file for Bananapi R2
+ (BPI-R2) board
+In-Reply-To: <0beebd0e209b4caeb349a062be7ef245d0689fb6.1494574682.git.sean.wang@mediatek.com>
+Message-ID: <201705121917.Yv6OkH4Y%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2017 at 08:39:50 +0200, Quentin Schulz wrote:
-> Hi all,
-> 
-> On 05/05/2017 10:43, Quentin Schulz wrote:
-> > This makes Atmel sama5 platforms' system tickless when idle.
-> > 
-> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> 
-> It's been a week since I posted this patch series. Any comment?
-> 
+Hi Sean,
 
-No but this was too late for the previous release and v4.12-rc1 is not
-tagged yet so I can't base the dt branch on it.
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.11 next-20170512]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
+url:    https://github.com/0day-ci/linux/commits/sean-wang-mediatek-com/arm-dts-extend-mt7623-support/20170512-165138
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+All errors (new ones prefixed by >>):
+
+   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:33.1-7 Label or path pwrap not found
+   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:261.1-6 Label or path mmc0 not found
+   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:266.1-6 Label or path mmc1 not found
+>> Error: arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts:69.22-23 syntax error
+   FATAL ERROR: Unable to parse input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 22403 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170512/4ba453ed/attachment-0001.gz>
