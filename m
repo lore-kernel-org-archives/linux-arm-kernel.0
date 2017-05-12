@@ -1,80 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 12 May 2017 15:36:01 +0100
-Subject: [PATCH] socfpga_a10: reset CPU1 in socfpga_cpu_kill()
-In-Reply-To: <20170510051304.131042-2-yanjiang.jin@windriver.com>
-References: <20170510051304.131042-1-yanjiang.jin@windriver.com>
- <20170510051304.131042-2-yanjiang.jin@windriver.com>
-Message-ID: <20170512143600.GB18818@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 12 May 2017 16:39:03 +0200
+Subject: [PATCH/RFT renesas-devel] arm64: dts: ulcb: Set drive-strength
+ for ravb pins
+In-Reply-To: <1493721024-15042-1-git-send-email-horms+renesas@verge.net.au>
+References: <1493721024-15042-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWeLAq7nZ7zu2xJ7vG-oM+-TSZm0eY68Cm-9eUREMjhXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 10, 2017 at 01:13:04AM -0400, yanjiang.jin at windriver.com wrote:
-> From: Yanjiang Jin <yanjiang.jin@windriver.com>
-> 
-> Kexec's second kernel would hang if CPU1 isn't reset.
-> 
-> Signed-off-by: Yanjiang Jin <yanjiang.jin@windriver.com>
-> ---
->  arch/arm/mach-socfpga/platsmp.c | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-> index 0ee7677..db3940e 100644
-> --- a/arch/arm/mach-socfpga/platsmp.c
-> +++ b/arch/arm/mach-socfpga/platsmp.c
-> @@ -117,6 +117,16 @@ static int socfpga_cpu_kill(unsigned int cpu)
->  {
->  	return 1;
->  }
-> +
-> +static int socfpga_a10_cpu_kill(unsigned int cpu)
-> +{
-> +	/* This will put CPU #1 into reset. */
-> +	if (socfpga_cpu1start_addr)
-> +		writel(RSTMGR_MPUMODRST_CPU1, rst_manager_base_addr +
-> +			SOCFPGA_A10_RSTMGR_MODMPURST);
-> +
-> +	return 1;
-> +}
->  #endif
+Hi Simon,
 
-I agree that currently, socfpga_cpu_die is completely bogus, as the CPU is just
-sat in WFI with the MMU, caches, etc enabled, and not actually off:
+On Tue, May 2, 2017 at 12:30 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> The EthernetAVB should not depend on the bootloader to setup correct
+> drive-strength values.  Values for drive-strength where found by
+> examining the registers after the bootloader has configured the
+> registers and successfully used the EthernetAVB.
+>
+> Based on:
+> * commit 7d73a4da2681 ("arm64: dts: r8a7795: salvator-x: Set drive-strength
+>   for ravb pins")
+> * commit 4903987033be ("arm64: dts: r8a7796: salvator-x: Set drive-strength
+>   for ravb pins")
+>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-static void socfpga_cpu_die(unsigned int cpu)
-{
-        /* Do WFI. If we wake up early, go back into WFI */
-        while (1)
-                cpu_do_idle();
-}
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-... so that goes wrong as soon as the kerenl text gets ovewritten.
+> * Compile tested only due to lack of hardware access
 
-However, AFAICT, this patch forcibly resets is without any teardown
-having happened. That will surely result in data being lost from the
-caches, for example.
+So how did you examine the registers? ;-)
 
-So I think this is incomplete.
+Hence I examined the registers myself:
+  - H3ULCB has the same register settings as Salvator-X with H3 ES1.0
+  - M3ULCB has the same register settings as Salvator-X with M3-W ES1.0
+    or H3 ES2.0.
 
-Thanks,
-Mark.
+Gr{oetje,eeting}s,
 
->  
->  static const struct smp_operations socfpga_smp_ops __initconst = {
-> @@ -133,7 +143,7 @@ static int socfpga_cpu_kill(unsigned int cpu)
->  	.smp_boot_secondary	= socfpga_a10_boot_secondary,
->  #ifdef CONFIG_HOTPLUG_CPU
->  	.cpu_die		= socfpga_cpu_die,
-> -	.cpu_kill		= socfpga_cpu_kill,
-> +	.cpu_kill		= socfpga_a10_cpu_kill,
->  #endif
->  };
->  
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
