@@ -1,71 +1,70 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 12 May 2017 11:05:38 +0800
-Subject: [PATCH] ARM: dts: imx28: add gpio-ranges for internal gpio
- controller
-In-Reply-To: <20170511080916.gim5pyhj5jarzf4r@pengutronix.de>
-References: <20170508085925.18342-1-u.kleine-koenig@pengutronix.de>
- <20170511075135.GF5833@dragon>
- <20170511080916.gim5pyhj5jarzf4r@pengutronix.de>
-Message-ID: <20170512030536.GC8471@dragon>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Fri, 12 May 2017 11:15:12 +0800
+Subject: [PATCH 1/3] dt-bindings: mt8173: Fix mdp device tree
+In-Reply-To: <1494558914-41591-1-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1494558914-41591-1-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <1494558914-41591-2-git-send-email-minghsiu.tsai@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 10:09:16AM +0200, Uwe Kleine-K?nig wrote:
-> On Thu, May 11, 2017 at 03:51:36PM +0800, Shawn Guo wrote:
-> > On Mon, May 08, 2017 at 10:59:25AM +0200, Uwe Kleine-K?nig wrote:
-> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > ---
-> > > Hello,
-> > > 
-> > > with this patch applied I get the following lines in dmesg which looks
-> > > fine:
-> > > 
-> > > 	[    0.227913] gpio gpiochip0: (80018000.pinctrl:gpio at 0): created GPIO range 0->31 ==> 80018000.pinctrl PIN 0->31
-> > > 	[    0.236100] gpio gpiochip1: (80018000.pinctrl:gpio at 1): created GPIO range 0->31 ==> 80018000.pinctrl PIN 32->63
-> > > 	[    0.244463] gpio gpiochip2: (80018000.pinctrl:gpio at 2): created GPIO range 0->31 ==> 80018000.pinctrl PIN 64->95
-> > > 	[    0.253020] gpio gpiochip3: (80018000.pinctrl:gpio at 3): created GPIO range 0->31 ==> 80018000.pinctrl PIN 96->127
-> > > 	[    0.261639] gpio gpiochip4: (80018000.pinctrl:gpio at 4): created GPIO range 0->31 ==> 80018000.pinctrl PIN 128->159
-> > > 
-> > > But when looking at a used gpio
-> > > 
-> > > 	# cat /sys/kernel/debug/gpio
-> > > 	gpiochip0: GPIOs 0-31, parent: platform/80018000.pinctrl:gpio at 0, 80018000.pinctrl:gpio at 0:
-> > > 	...
-> > > 	 gpio-20  (LED4                |?                   ) out hi
-> > > 	...
-> > > 
-> > > 	# grep "pin 20 " /sys/kernel/debug/pinctrl/80018000.pinctrl/pinmux-pins
-> > > 	pin 20 (GPMI_RDY0): leds (GPIO UNCLAIMED) function leds group leds.0
-> > > 
-> > > I wonder why there is still "GPIO UNCLAIMED". I would have expected that
-> > > this disappears and somehow references the gpio_request issued by the
-> > > led-gpio driver after my patch.
-> > > 
-> > > What am I missing?
-> > 
-> > It seems that's only the case where @strict of struct pinmux_ops is
-> > true.  We should set it true for pinctrl-mxs, I guess?
-> 
-> The description is:
-> 
->  * @strict: do not allow simultaneous use of the same pin for GPIO and another
->  *      function. Check both gpio_owner and mux_owner strictly before approving
->  *      the pin request.
+If the mdp_* nodes are under an mdp sub-node, their corresponding
+platform device does not automatically get its iommu assigned properly.
 
-Sorry, I misread the 'strict' code and my comment about it is
-completely a noise.
+Fix this by moving the mdp component nodes up a level such that they are
+siblings of mdp and all other SoC subsystems.  This also simplifies the
+device tree.
 
-I went through the code around requesting a pin, and found that we need
-to call pinctrl_request_gpio() from gpio driver to get the result you
-want.  In that case, pin_request() will be called with a valid
-gpio_range as below.
+Although it fixes iommu assignment issue, it also break compatibility
+with old device tree. So, the patch in driver is needed to iterate over
+sibling mdp device nodes, not child ones, to keep driver work properly.
 
-    pinctrl_request_gpio()
-        pinmux_request_gpio()
-            pin_request(..., gpio_range)
+Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
 
-Right now, pin_request() is being called with a NULL gpio_range from
-pinmux_enable_setting().  That gets us the mux_owner rather than
-gpio_owner for the pin.
+---
+ Documentation/devicetree/bindings/media/mediatek-mdp.txt | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-Shawn
+diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+index 4182063..0d03e3a 100644
+--- a/Documentation/devicetree/bindings/media/mediatek-mdp.txt
++++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+@@ -2,7 +2,7 @@
+ 
+ Media Data Path is used for scaling and color space conversion.
+ 
+-Required properties (controller (parent) node):
++Required properties (controller node):
+ - compatible: "mediatek,mt8173-mdp"
+ - mediatek,vpu: the node of video processor unit, see
+   Documentation/devicetree/bindings/media/mediatek-vpu.txt for details.
+@@ -32,21 +32,16 @@ Required properties (DMA function blocks, child node):
+   for details.
+ 
+ Example:
+-mdp {
+-	compatible = "mediatek,mt8173-mdp";
+-	#address-cells = <2>;
+-	#size-cells = <2>;
+-	ranges;
+-	mediatek,vpu = <&vpu>;
+-
+ 	mdp_rdma0: rdma at 14001000 {
+ 		compatible = "mediatek,mt8173-mdp-rdma";
++			     "mediatek,mt8173-mdp";
+ 		reg = <0 0x14001000 0 0x1000>;
+ 		clocks = <&mmsys CLK_MM_MDP_RDMA0>,
+ 			 <&mmsys CLK_MM_MUTEX_32K>;
+ 		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+ 		iommus = <&iommu M4U_PORT_MDP_RDMA0>;
+ 		mediatek,larb = <&larb0>;
++		mediatek,vpu = <&vpu>;
+ 	};
+ 
+ 	mdp_rdma1: rdma at 14002000 {
+@@ -106,4 +101,3 @@ mdp {
+ 		iommus = <&iommu M4U_PORT_MDP_WROT1>;
+ 		mediatek,larb = <&larb4>;
+ 	};
+-};
+-- 
+1.9.1
