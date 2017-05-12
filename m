@@ -1,43 +1,63 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 12 May 2017 19:39:55 +0800
-Subject: [PATCH v3 9/9] arm: dts: mt7623: add dts file for Bananapi R2
- (BPI-R2) board
-In-Reply-To: <0beebd0e209b4caeb349a062be7ef245d0689fb6.1494574682.git.sean.wang@mediatek.com>
-Message-ID: <201705121917.Yv6OkH4Y%fengguang.wu@intel.com>
+From: geethasowjanya.akula@gmail.com (Geetha Akula)
+Date: Fri, 12 May 2017 17:21:59 +0530
+Subject: [v5 1/4] ACPICA: IORT: Add Cavium ThunderX2 SMMUv3 model
+ definition.
+In-Reply-To: <20170512102459.GF26181@arm.com>
+References: <1494415918-13770-1-git-send-email-gakula@caviumnetworks.com>
+ <3122711.vgvub3W1fy@aspire.rjw.lan> <20170511084525.GA18839@arm.com>
+ <3624921.NlXkYaVXxR@aspire.rjw.lan> <20170512102459.GF26181@arm.com>
+Message-ID: <CANHdaib_fswMdcrht_PE+-A1trfcUU56+arvorNkB-Nj4ZRz2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+On Fri, May 12, 2017 at 3:54 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, May 11, 2017 at 04:40:51PM +0200, Rafael J. Wysocki wrote:
+>> On Thursday, May 11, 2017 09:45:25 AM Will Deacon wrote:
+>> > On Thu, May 11, 2017 at 02:26:02AM +0200, Rafael J. Wysocki wrote:
+>> > > On Wednesday, May 10, 2017 05:01:55 PM Geetha sowjanya wrote:
+>> > > > From: Linu Cherian <linu.cherian@cavium.com>
+>> > > >
+>> > > > Add SMMUv3 model definition for ThunderX2.
+>> > > >
+>> > > > Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+>> > > > Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
+>> > >
+>> > > This is an ACPICA change, but you have not included the ACPICA maintainers
+>> > > into your original CC list (added now).
+>> > >
+>> > > Bob, Lv, how should this be routed?
+>> > >
+>> > > Do you want to apply this patch upstream first or can we make this change in
+>> > > Linux and upstream in parallel?  That shouldn't be a big deal, right?
+>> >
+>> > I think we're still waiting for the updated IORT document to be published (I
+>> > think this should be in the next week or so), so I don't think we should
+>> > commit the new ID before that happens.
+>>
+>> OK, thanks for the heads-up.
+>>
+>> I think it's better to submit the actbl2.h update directly to ACPICA
+>> upstream when the doc is published and then work on top of that.
+>
+> The doc is now published:
+>
+> http://infocenter.arm.com/help/topic/com.arm.doc.den0049c/DEN0049C_IO_Remapping_Table.pdf
+>
+> so the new model numbers are confirmed.
+>
+> Cheers,
+>
+> Will
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.11 next-20170512]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Thanks Will.
 
-url:    https://github.com/0day-ci/linux/commits/sean-wang-mediatek-com/arm-dts-extend-mt7623-support/20170512-165138
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Will resubmit the patches based on Robin's latest patch "acpica: iort:
+Update SMMU models for IORT rev. C",
+as there is a miss match in the macro name used to define ThunderX2
+iort model number.
+https://lkml.org/lkml/2017/5/12/211
 
-All errors (new ones prefixed by >>):
 
-   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:33.1-7 Label or path pwrap not found
-   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:261.1-6 Label or path mmc0 not found
-   Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:266.1-6 Label or path mmc1 not found
->> Error: arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts:69.22-23 syntax error
-   FATAL ERROR: Unable to parse input tree
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 22403 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170512/4ba453ed/attachment-0001.gz>
+Thank you,
+Geetha.
