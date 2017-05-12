@@ -1,47 +1,66 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 12 May 2017 17:45:16 +0100
-Subject: [PATCH V15 06/11] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <9e26f779-5eae-2558-6045-10c1afde9bf2@codeaurora.org>
-References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
- <1492556723-9189-7-git-send-email-tbaicar@codeaurora.org>
- <5910AAB8.8070703@arm.com>
- <9e26f779-5eae-2558-6045-10c1afde9bf2@codeaurora.org>
-Message-ID: <5915E69C.5090201@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 12 May 2017 17:57:24 +0100
+Subject: [RFC PATCH v2 4/6] arm64: signal: Allocate extra sigcontext
+ space as needed
+In-Reply-To: <1492016495-19689-4-git-send-email-Dave.Martin@arm.com>
+References: <1492016239-19511-1-git-send-email-Dave.Martin@arm.com>
+ <1492016495-19689-1-git-send-email-Dave.Martin@arm.com>
+ <1492016495-19689-4-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170512165724.GB8387@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+Hi Dave,
 
-On 08/05/17 20:59, Baicar, Tyler wrote:
-> On 5/8/2017 11:28 AM, James Morse wrote:
->> I was tidying up the masking/unmasking in entry.S, something I wasn't aware of
->> that leads to a bug:
->> entry.S will unmask interrupts for instruction/data aborts that came from a
->> context with interrupts enabled. This makes sense for get_user() and friends...
->> For do_sea() we pull nmi_enter() as this can interrupt interrupts-masked code,
->> such as APEI, but if we end up in here with interrupts unmasked we can take an
->> IRQ from this 'NMI' context, which will inherit the in_nmi() and could lead to
->> the deadlock we were originally trying to avoid.
->>
->> Teaching entry.S to spot external aborts is messy. I think the two choices are
->> to either mask interrupts when calling nmi_enter() (as these things should be
->> mutually exclusive), or to conditionally call nmi_enter() based on
->> interrupts_enabled(regs). I prefer the second one as it matches the notify_sea()
->> while interruptible that happens when KVM takes one of these.
+On Wed, Apr 12, 2017 at 06:01:13PM +0100, Dave P Martin wrote:
+> --- a/arch/arm64/include/uapi/asm/sigcontext.h
+> +++ b/arch/arm64/include/uapi/asm/sigcontext.h
+> @@ -80,4 +80,31 @@ struct esr_context {
+>  	__u64 esr;
+>  };
+>  
+> +/*
+> + * Pointer to extra space for additional structures that don't fit in
+> + * sigcontext.__reserved[].  Note:
+> + *
+> + * 1) fpsimd_context, esr_context and extra_context must be placed in
+> + * sigcontext.__reserved[] if present.  They cannot be placed in the
+> + * extra space.  Any other record can be placed either in the extra
+> + * space or in sigcontext.__reserved[].
+> + *
+> + * 2) There must not be more than one extra_context.
+> + *
+> + * 3) If extra_context is present, it must be followed immediately in
+> + * sigcontext.__reserved[] by the terminating null _aarch64_ctx (i.e.,
+> + * extra_context must be the last record in sigcontext.__reserved[]
+> + * except for the terminator).
+> + *
+> + * 4) The extra space must itself be terminated with a null
+> + * _aarch64_ctx.
+> + */
 
-Thinking about this some more: the KVM case is different as we know it was a
-guest that triggered the external abort. Nothing the host kernel does is likely
-to trigger either the same error or a related one.
+IIUC, if we need to save some state that doesn't fit in what's left of
+sigcontext.__reserved[] (e.g. SVE with 1024-bit vector length), we
+ignore the available space and go for a memory block following the end
+of sigcontext.__reserved[] + 16. Is there a reason we can't store the
+new state across the end of sigcontext.__reserved[] and move fp/lr at
+the end of the new frame? I'm not sure the fp/lr position immediately
+after __reserved[] counts as ABI.
 
-But I can't think of a way this would trip twice on the host... yes your
-suggestion looks fine.
+> +#define EXTRA_MAGIC	0x45585401
+> +
+> +struct extra_context {
+> +	struct _aarch64_ctx head;
+> +	void __user *data;	/* 16-byte aligned pointer to extra space */
+"__user" is a kernel-only attribute, we shouldn't expose it in a uapi
+header.
 
-(When we add SError/SEI support too we will need to change it as SEA may
-interrupt SEI, and nmi_enter() has a BUG_ON(in_nmi()), so this nesting will need
-explicitly checking.)
+> +	__u32 size;		/* size in bytes of the extra space */
+> +};
 
+Do we need the size of the extra space? Can we not infer it anyway by
+walking the contexts save there? Surely we don't expect more than one
+extra context.
 
-Thanks,
-
-James
+-- 
+Catalin
