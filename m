@@ -1,51 +1,27 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 12 May 2017 08:10:11 +0800
-Subject: [PATCH v9 7/9] coresight: add support for CPU debug module
-In-Reply-To: <20170511171232.GA21765@linaro.org>
-References: <1494298202-6739-1-git-send-email-leo.yan@linaro.org>
- <1494298202-6739-8-git-send-email-leo.yan@linaro.org>
- <20170511171232.GA21765@linaro.org>
-Message-ID: <20170512001010.GA13845@leoy-ThinkPad-T440>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 12 May 2017 08:33:55 +0800
+Subject: [PATCH v2] ARM: dts: imx6sx-sdb: Remove OPP override
+In-Reply-To: <7b929a65b4893e081c2c04bb0588801f37ac2cca.1493981825.git.leonard.crestez@nxp.com>
+References: <7b929a65b4893e081c2c04bb0588801f37ac2cca.1493981825.git.leonard.crestez@nxp.com>
+Message-ID: <20170512003354.GA8471@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 11:12:32AM -0600, Mathieu Poirier wrote:
-
-[...]
-
-> > +static int debug_probe(struct amba_device *adev, const struct amba_id *id)
-> > +{
-> > +	void __iomem *base;
-> > +	struct device *dev = &adev->dev;
-> > +	struct debug_drvdata *drvdata;
-> > +	struct resource *res = &adev->res;
-> > +	struct device_node *np = adev->dev.of_node;
-> > +	int ret;
-> > +
-> > +	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
-> > +	if (!drvdata)
-> > +		return -ENOMEM;
-> > +
-> > +	drvdata->cpu = np ? of_coresight_get_cpu(np) : 0;
-> > +	if (per_cpu(debug_drvdata, drvdata->cpu)) {
-> > +		dev_err(dev, "CPU%d drvdata has been initialized, "
+On Fri, May 05, 2017 at 02:00:17PM +0300, Leonard Crestez wrote:
+> The board file for imx6sx-sdb overrides cpufreq operating points to use
+> higher voltages. This is done because the board has a shared rail for
+> VDD_ARM_IN and VDD_SOC_IN and when using LDO bypass the shared voltage
+> needs to be a value suitable for both ARM and SOC.
 > 
-> s/"has been"/"has already been"
+> This only applies to LDO bypass mode, a feature not present in upstream.
+> When LDOs are enabled the effect is to use higher voltages than necessary
+> for no good reason.
 > 
-> That way it really look like an error message.
+> Setting these higher voltages can make some boards fail to boot with ugly
+> semi-random crashes reminiscent of memory corruption. These failures only
+> happen on board rev. C, rev. B is reported to still work.
+> 
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> CC: stable at vger.kernel.org
 
-Will fix.
-
-> Also debug_probe() uses dev_xyz() but everywhere else in the driver it is
-> pr_xyz() - any specific reason for that?  I suggest moving to dev_xyz().
-
-Some logs are shared for all device instances, so I think should use
-pr_xyz(); will spin a new version to change other places to use
-dev_xyz() if the logs are for specific device instance.
-
-> Otherwise things look good.
-
-[...]
-
-Thanks,
-Leo Yan
+Applied, thanks.
