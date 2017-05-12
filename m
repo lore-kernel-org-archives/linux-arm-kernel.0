@@ -1,31 +1,61 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 12 May 2017 10:23:07 +0200
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <20170512080741.GA32228@infradead.org>
-References: <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com>
- <20170508124621.GA20705@kroah.com>
- <20170509064522.anusoikaalvlux3w@gmail.com>
- <20170509085659.GA32555@infradead.org>
- <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
- <20170512070012.7dysuhbkcas7ibaj@gmail.com>
- <20170512071549.GP390@ZenIV.linux.org.uk>
- <20170512073521.GA7091@infradead.org>
- <20170512080741.GA32228@infradead.org>
-Message-ID: <20170512082307.GA12285@kroah.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 12 May 2017 14:15:52 +0530
+Subject: [PATCH v5 3/3] phy: Group vendor specific phy drivers
+In-Reply-To: <1494485262-18995-3-git-send-email-vivek.gautam@codeaurora.org>
+References: <1494485262-18995-1-git-send-email-vivek.gautam@codeaurora.org>
+ <1494485262-18995-3-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <5fe76bcc-5ff7-0bf1-7fdd-c141211d86dc@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 01:07:41AM -0700, Christoph Hellwig wrote:
->  Last but not least we have a driver that's a complete mess:
+Hi Vivek,
+
+On Thursday 11 May 2017 12:17 PM, Vivek Gautam wrote:
+> Adding vendor specific directories in phy to group
+> phy drivers under their respective vendor umbrella.
 > 
->  - series2002: /dev/tty* (drivers is in staging and needs to be rewritten
->    using the proper in-kernel APIs anyway)
+> Also updated the MAINTAINERS file to reflect the correct
+> directory structure for phy drivers.
+> 
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> Acked-by: Heiko Stuebner <heiko@sntech.de>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> Reviewed-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: David S. Miller <davem@davemloft.net>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Jaehoon Chung <jh80.chung@samsung.com>
+> Cc: Stephen Boyd <stephen.boyd@linaro.org>
+> Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-renesas-soc at vger.kernel.org
+> Cc: linux-rockchip at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-usb at vger.kernel.org
+> ---
+> 
+> Changes since v4:
+>  - Reprepared the patch based on latest torvalds/master.
+>  - Added new directory for amlogic, since there's a new patch [1]
+>    coming in for amlogic platforms.
 
-I agree, that's a mess, and it needs to use the new serdev interface at
-the least.  Worse case, we just delete the thing :)
+I don't prefer placeholder directories but this is not a placeholder directory
+since phy-meson8b-usb2.c is already added in amlogic.
 
-thanks,
+Btw, thank you for sending this patch. Will queue this once -rc1 is tagged.
 
-greg k-h
+Cheers
+Kishon
