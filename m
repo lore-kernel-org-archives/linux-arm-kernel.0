@@ -1,540 +1,81 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 12 May 2017 15:56:46 +0800
-Subject: [PATCH v3 9/9] arm: dts: mt7623: add dts file for Bananapi R2
- (BPI-R2) board
-In-Reply-To: <cover.1494574682.git.sean.wang@mediatek.com>
-References: <cover.1494574682.git.sean.wang@mediatek.com>
-Message-ID: <0beebd0e209b4caeb349a062be7ef245d0689fb6.1494574682.git.sean.wang@mediatek.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 12 May 2017 10:01:50 +0200
+Subject: [PATCH] ARM: dts: imx28: add gpio-ranges for internal gpio
+ controller
+In-Reply-To: <20170512030536.GC8471@dragon>
+References: <20170508085925.18342-1-u.kleine-koenig@pengutronix.de>
+ <20170511075135.GF5833@dragon>
+ <20170511080916.gim5pyhj5jarzf4r@pengutronix.de>
+ <20170512030536.GC8471@dragon>
+Message-ID: <20170512080150.uh5qmwu2tctpd6jk@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Fri, May 12, 2017 at 11:05:38AM +0800, Shawn Guo wrote:
+> On Thu, May 11, 2017 at 10:09:16AM +0200, Uwe Kleine-K?nig wrote:
+> > On Thu, May 11, 2017 at 03:51:36PM +0800, Shawn Guo wrote:
+> > > On Mon, May 08, 2017 at 10:59:25AM +0200, Uwe Kleine-K?nig wrote:
+> > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > > ---
+> > > > Hello,
+> > > > 
+> > > > with this patch applied I get the following lines in dmesg which looks
+> > > > fine:
+> > > > 
+> > > > 	[    0.227913] gpio gpiochip0: (80018000.pinctrl:gpio at 0): created GPIO range 0->31 ==> 80018000.pinctrl PIN 0->31
+> > > > 	[    0.236100] gpio gpiochip1: (80018000.pinctrl:gpio at 1): created GPIO range 0->31 ==> 80018000.pinctrl PIN 32->63
+> > > > 	[    0.244463] gpio gpiochip2: (80018000.pinctrl:gpio at 2): created GPIO range 0->31 ==> 80018000.pinctrl PIN 64->95
+> > > > 	[    0.253020] gpio gpiochip3: (80018000.pinctrl:gpio at 3): created GPIO range 0->31 ==> 80018000.pinctrl PIN 96->127
+> > > > 	[    0.261639] gpio gpiochip4: (80018000.pinctrl:gpio at 4): created GPIO range 0->31 ==> 80018000.pinctrl PIN 128->159
+> > > > 
+> > > > But when looking at a used gpio
+> > > > 
+> > > > 	# cat /sys/kernel/debug/gpio
+> > > > 	gpiochip0: GPIOs 0-31, parent: platform/80018000.pinctrl:gpio at 0, 80018000.pinctrl:gpio at 0:
+> > > > 	...
+> > > > 	 gpio-20  (LED4                |?                   ) out hi
+> > > > 	...
+> > > > 
+> > > > 	# grep "pin 20 " /sys/kernel/debug/pinctrl/80018000.pinctrl/pinmux-pins
+> > > > 	pin 20 (GPMI_RDY0): leds (GPIO UNCLAIMED) function leds group leds.0
+> > > > 
+> > > > I wonder why there is still "GPIO UNCLAIMED". I would have expected that
+> > > > this disappears and somehow references the gpio_request issued by the
+> > > > led-gpio driver after my patch.
+> > > > 
+> > > > What am I missing?
+> > > 
+> > > It seems that's only the case where @strict of struct pinmux_ops is
+> > > true.  We should set it true for pinctrl-mxs, I guess?
+> > 
+> > The description is:
+> > 
+> >  * @strict: do not allow simultaneous use of the same pin for GPIO and another
+> >  *      function. Check both gpio_owner and mux_owner strictly before approving
+> >  *      the pin request.
+> 
+> Sorry, I misread the 'strict' code and my comment about it is
+> completely a noise.
+> 
+> I went through the code around requesting a pin, and found that we need
+> to call pinctrl_request_gpio() from gpio driver to get the result you
+> want.  In that case, pin_request() will be called with a valid
+> gpio_range as below.
+> 
+>     pinctrl_request_gpio()
+>         pinmux_request_gpio()
+>             pin_request(..., gpio_range)
+> 
+> Right now, pin_request() is being called with a NULL gpio_range from
+> pinmux_enable_setting().  That gets us the mux_owner rather than
+> gpio_owner for the pin.
 
-Add support for the Bananapi R2 (BPI-R2) development board from
-BIPAI KEJI. Detailed hardware information for BPI-R2 which could be
-found on http://www.banana-pi.org/r2.html
+But then again I cannot mux a pin to a different function when the gpio
+is requested, right?
 
-The patch currently only adds Mediatek GMAC, MT7530 Switch, the crypto
-engine, USB, IR, I2S, I2C, UART, SPI, PWM, GPIO keys, GPIO LEDs and
-PMIC LEDs. As to the other missing hardware and peripherals, they would
-be added and integrated continuously.
+Best regards
+Uwe
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- Documentation/devicetree/bindings/arm/mediatek.txt |   2 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      | 478 +++++++++++++++++++++
- 3 files changed, 481 insertions(+)
- create mode 100644 arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index 412c6bd..7b289bd 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -42,6 +42,8 @@ Supported boards:
- - Reference  board for MT7623n with NAND:
-     Required root node properties:
-       - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
-+- Bananapi BPI-R2 board:
-+      - compatible = "bananapi,bpi-r2", "mediatek,mt7623";
- - MTK mt8127 tablet moose EVB:
-     Required root node properties:
-       - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 20a7c9d..34eb03f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1035,6 +1035,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
- 	mt6589-aquaris5.dtb \
- 	mt6592-evb.dtb \
- 	mt7623n-rfb-nand.dtb \
-+	mt7623n-bananapi-bpi-r2.dtb \
- 	mt8127-moose.dtb \
- 	mt8135-evbp1.dtb
- dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
-diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-new file mode 100644
-index 0000000..cb1bd20
---- /dev/null
-+++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-@@ -0,0 +1,478 @@
-+/*
-+ * Copyright 2017 Sean Wang <sean.wang@mediatek.com>
-+ *
-+ * Sean Wang <sean.wang@mediatek.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include <dt-bindings/input/input.h>
-+#include "mt7623-mt6323.dtsi"
-+
-+/ {
-+	model = "Bananapi BPI-R2";
-+	compatible = "bananapi,bpi-r2", "mediatek,mt7623";
-+
-+	aliases {
-+		serial2 = &uart2;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial2:115200n8";
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&key_pins_a>;
-+
-+		factory {
-+			label = "factory";
-+			linux,code = <BTN_0>;
-+			gpios = <&pio 256 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		wps {
-+			label = "wps";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&pio 257 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_a>;
-+
-+		red {
-+			label = "bpi-r2:pio:red";
-+			gpios = <&pio 239 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		green {
-+			label = "bpi-r2:pio:green";
-+			gpios = <&pio 240 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		blue {
-+			label = "bpi-r2:pio:blue";
-+			gpios = <&pio 241 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+	};
-+
-+	memory at 80000000 {
-+		reg = <0 0x80000000 0 0x40000000>;
-+	};
-+
-+	sound:sound {
-+		compatible = "mediatek,mt2701-wm8960-machine";
-+		mediatek,platform = <&afe>;
-+		audio-routing =
-+			"Headphone", "HP_L",
-+			"Headphone", "HP_R",
-+			"LINPUT1", "AMIC",
-+			"RINPUT1", "AMIC";
-+		mediatek,audio-codec = <&wm8960>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2s0_pins_a>;
-+	};
-+};
-+
-+&pio {
-+	cir_pins_a:cir at 0 {
-+		pins_cir {
-+			pinmux = <MT7623_PIN_46_IR_FUNC_IR>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c0_pins_a: i2c at 0 {
-+		pins_i2c0 {
-+			pinmux = <MT7623_PIN_75_SDA0_FUNC_SDA0>,
-+				 <MT7623_PIN_76_SCL0_FUNC_SCL0>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c1_pins_a: i2c at 1 {
-+		pin_i2c1 {
-+			pinmux = <MT7623_PIN_57_SDA1_FUNC_SDA1>,
-+				 <MT7623_PIN_58_SCL1_FUNC_SCL1>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2s0_pins_a: i2s at 0 {
-+		pin_i2s0 {
-+			pinmux = <MT7623_PIN_49_I2S0_DATA_FUNC_I2S0_DATA>,
-+				 <MT7623_PIN_72_I2S0_DATA_IN_FUNC_I2S0_DATA_IN>,
-+				 <MT7623_PIN_73_I2S0_LRCK_FUNC_I2S0_LRCK>,
-+				 <MT7623_PIN_74_I2S0_BCK_FUNC_I2S0_BCK>,
-+				 <MT7623_PIN_126_I2S0_MCLK_FUNC_I2S0_MCLK>;
-+			drive-strength = <MTK_DRIVE_12mA>;
-+			bias-pull-down;
-+		};
-+	};
-+
-+	i2s1_pins_a: i2s at 1 {
-+		pin_i2s1 {
-+			pinmux = <MT7623_PIN_33_I2S1_DATA_FUNC_I2S1_DATA>,
-+				 <MT7623_PIN_34_I2S1_DATA_IN_FUNC_I2S1_DATA_IN>,
-+				 <MT7623_PIN_35_I2S1_BCK_FUNC_I2S1_BCK>,
-+				 <MT7623_PIN_36_I2S1_LRCK_FUNC_I2S1_LRCK>,
-+				 <MT7623_PIN_37_I2S1_MCLK_FUNC_I2S1_MCLK>;
-+			drive-strength = <MTK_DRIVE_12mA>;
-+			bias-pull-down;
-+		};
-+	};
-+
-+	key_pins_a: keys at 0 {
-+		pins_keys {
-+			pinmux = <MT7623_PIN_256_GPIO256_FUNC_GPIO256>,
-+				 <MT7623_PIN_257_GPIO257_FUNC_GPIO257> ;
-+			input-enable;
-+		};
-+	};
-+
-+	led_pins_a: leds at 0 {
-+		pins_leds {
-+			pinmux = <MT7623_PIN_239_EXT_SDIO0_FUNC_GPIO239>,
-+				 <MT7623_PIN_240_EXT_XCS_FUNC_GPIO240>,
-+				 <MT7623_PIN_241_EXT_SCK_FUNC_GPIO241>;
-+		};
-+	};
-+
-+	mmc0_pins_default: mmc0default {
-+		pins_cmd_dat {
-+			pinmux = <MT7623_PIN_111_MSDC0_DAT7_FUNC_MSDC0_DAT7>,
-+				 <MT7623_PIN_112_MSDC0_DAT6_FUNC_MSDC0_DAT6>,
-+				 <MT7623_PIN_113_MSDC0_DAT5_FUNC_MSDC0_DAT5>,
-+				 <MT7623_PIN_114_MSDC0_DAT4_FUNC_MSDC0_DAT4>,
-+				 <MT7623_PIN_118_MSDC0_DAT3_FUNC_MSDC0_DAT3>,
-+				 <MT7623_PIN_119_MSDC0_DAT2_FUNC_MSDC0_DAT2>,
-+				 <MT7623_PIN_120_MSDC0_DAT1_FUNC_MSDC0_DAT1>,
-+				 <MT7623_PIN_121_MSDC0_DAT0_FUNC_MSDC0_DAT0>,
-+				 <MT7623_PIN_116_MSDC0_CMD_FUNC_MSDC0_CMD>;
-+			input-enable;
-+			bias-pull-up;
-+		};
-+
-+		pins_clk {
-+			pinmux = <MT7623_PIN_117_MSDC0_CLK_FUNC_MSDC0_CLK>;
-+			bias-pull-down;
-+		};
-+
-+		pins_rst {
-+			pinmux = <MT7623_PIN_115_MSDC0_RSTB_FUNC_MSDC0_RSTB>;
-+			bias-pull-up;
-+		};
-+	};
-+
-+	mmc0_pins_uhs: mmc0 {
-+		pins_cmd_dat {
-+			pinmux = <MT7623_PIN_111_MSDC0_DAT7_FUNC_MSDC0_DAT7>,
-+				 <MT7623_PIN_112_MSDC0_DAT6_FUNC_MSDC0_DAT6>,
-+				 <MT7623_PIN_113_MSDC0_DAT5_FUNC_MSDC0_DAT5>,
-+				 <MT7623_PIN_114_MSDC0_DAT4_FUNC_MSDC0_DAT4>,
-+				 <MT7623_PIN_118_MSDC0_DAT3_FUNC_MSDC0_DAT3>,
-+				 <MT7623_PIN_119_MSDC0_DAT2_FUNC_MSDC0_DAT2>,
-+				 <MT7623_PIN_120_MSDC0_DAT1_FUNC_MSDC0_DAT1>,
-+				 <MT7623_PIN_121_MSDC0_DAT0_FUNC_MSDC0_DAT0>,
-+				 <MT7623_PIN_116_MSDC0_CMD_FUNC_MSDC0_CMD>;
-+			input-enable;
-+			drive-strength = <MTK_DRIVE_2mA>;
-+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
-+		};
-+
-+		pins_clk {
-+			pinmux = <MT7623_PIN_117_MSDC0_CLK_FUNC_MSDC0_CLK>;
-+			drive-strength = <MTK_DRIVE_2mA>;
-+			bias-pull-down = <MTK_PUPD_SET_R1R0_01>;
-+		};
-+
-+		pins_rst {
-+			pinmux = <MT7623_PIN_115_MSDC0_RSTB_FUNC_MSDC0_RSTB>;
-+			bias-pull-up;
-+		};
-+	};
-+
-+	mmc1_pins_default: mmc1default {
-+		pins_cmd_dat {
-+			pinmux = <MT7623_PIN_107_MSDC1_DAT0_FUNC_MSDC1_DAT0>,
-+				 <MT7623_PIN_108_MSDC1_DAT1_FUNC_MSDC1_DAT1>,
-+				 <MT7623_PIN_109_MSDC1_DAT2_FUNC_MSDC1_DAT2>,
-+				 <MT7623_PIN_110_MSDC1_DAT3_FUNC_MSDC1_DAT3>,
-+				 <MT7623_PIN_105_MSDC1_CMD_FUNC_MSDC1_CMD>;
-+			input-enable;
-+			drive-strength = <MTK_DRIVE_4mA>;
-+			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
-+		};
-+
-+		pins_clk {
-+			pinmux = <MT7623_PIN_106_MSDC1_CLK_FUNC_MSDC1_CLK>;
-+			bias-pull-down;
-+			drive-strength = <MTK_DRIVE_4mA>;
-+		};
-+	};
-+
-+	mmc1_pins_uhs: mmc1 {
-+		pins_cmd_dat {
-+			pinmux = <MT7623_PIN_107_MSDC1_DAT0_FUNC_MSDC1_DAT0>,
-+				 <MT7623_PIN_108_MSDC1_DAT1_FUNC_MSDC1_DAT1>,
-+				 <MT7623_PIN_109_MSDC1_DAT2_FUNC_MSDC1_DAT2>,
-+				 <MT7623_PIN_110_MSDC1_DAT3_FUNC_MSDC1_DAT3>,
-+				 <MT7623_PIN_105_MSDC1_CMD_FUNC_MSDC1_CMD>;
-+			input-enable;
-+			drive-strength = <MTK_DRIVE_4mA>;
-+			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
-+		};
-+
-+		pins_clk {
-+			pinmux = <MT7623_PIN_106_MSDC1_CLK_FUNC_MSDC1_CLK>;
-+			drive-strength = <MTK_DRIVE_4mA>;
-+			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
-+		};
-+	};
-+
-+	spi0_pins_a: spi at 0 {
-+		pins_spi {
-+			pinmux = <MT7623_PIN_53_SPI0_CSN_FUNC_SPI0_CS>,
-+				<MT7623_PIN_54_SPI0_CK_FUNC_SPI0_CK>,
-+				<MT7623_PIN_55_SPI0_MI_FUNC_SPI0_MI>,
-+				<MT7623_PIN_56_SPI0_MO_FUNC_SPI0_MO>;
-+			bias-disable;
-+		};
-+	};
-+
-+	pwm_pins_a: pwm at 0 {
-+		pins_pwm {
-+			pinmux = <MT7623_PIN_203_PWM0_FUNC_PWM0>,
-+				 <MT7623_PIN_204_PWM1_FUNC_PWM1>,
-+				 <MT7623_PIN_205_PWM2_FUNC_PWM2>,
-+				 <MT7623_PIN_206_PWM3_FUNC_PWM3>,
-+				 <MT7623_PIN_207_PWM4_FUNC_PWM4>;
-+		};
-+	};
-+
-+	uart0_pins_a: uart at 0 {
-+		pins_dat {
-+			pinmux = <MT7623_PIN_79_URXD0_FUNC_URXD0>,
-+				 <MT7623_PIN_80_UTXD0_FUNC_UTXD0>;
-+		};
-+	};
-+
-+	uart1_pins_a: uart at 1 {
-+		pins_dat {
-+			pinmux = <MT7623_PIN_81_URXD1_FUNC_URXD1>,
-+				 <MT7623_PIN_82_UTXD1_FUNC_UTXD1>;
-+		};
-+	};
-+};
-+
-+&cir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&cir_pins_a>;
-+	status = "okay";
-+};
-+
-+&crypto {
-+	status = "okay";
-+};
-+
-+&eth {
-+	status = "okay";
-+	gmac0: mac at 0 {
-+		compatible = "mediatek,eth-mac";
-+		reg = <0>;
-+		phy-mode = "trgmii";
-+		fixed-link {
-+			speed = <1000>;
-+			full-duplex;
-+			pause;
-+		};
-+	};
-+
-+	mdio: mdio-bus {
-+		switch at 0 {
-+			compatible = "mediatek,mt7530";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+
-+			pinctrl-names = "default";
-+			reset-gpios = <&pio 33 0>;
-+			core-supply = <&mt6323_vpa_reg>;
-+			io-supply = <&mt6323_vemc3v3_reg>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+				port at 0 {
-+					reg = <0>;
-+					label = "lan0";
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					label = "lan1";
-+				};
-+
-+				port at 2 {
-+					reg = <2>;
-+					label = "lan2";
-+				};
-+
-+				port at 3 {
-+					reg = <3>;
-+					label = "lan3";
-+				};
-+
-+				port at 4 {
-+					reg = <4>;
-+					label = "wan";
-+				};
-+
-+				port at 6 {
-+					reg = <6>;
-+					label = "cpu";
-+					ethernet = <&gmac0>;
-+					phy-mode = "rgmii";
-+					fixed-link {
-+						speed = <1000>;
-+						full-duplex;
-+					};
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&pwrap {
-+	mt6323 {
-+		mt6323led: led {
-+			compatible = "mediatek,mt6323-led";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			led at 0 {
-+				reg = <0>;
-+				label = "bpi-r2:isink:green";
-+				default-state = "off";
-+			};
-+			led at 1 {
-+				reg = <1>;
-+				label = "bpi-r2:isink:red";
-+				default-state = "off";
-+			};
-+			led at 2 {
-+				reg = <2>;
-+				label = "bpi-r2:isink:blue";
-+				default-state = "off";
-+			};
-+		};
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+
-+	wm8960: wm8960 at 1a {
-+		compatible = "wlf,wm8960";
-+		reg = <0x1a>;
-+	};
-+};
-+
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm_pins_a>;
-+	status = "okay";
-+};
-+
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "disabled";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_a>;
-+	status = "disabled";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&u3phy1 {
-+	status = "okay";
-+};
-+
-+&u3phy2 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	vusb33-supply = <&mt6323_vusb_reg>;
-+	status = "okay";
-+};
-+
-+&usb2 {
-+	vusb33-supply = <&mt6323_vusb_reg>;
-+	status = "okay";
-+};
 -- 
-2.7.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
