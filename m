@@ -1,61 +1,79 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Fri, 12 May 2017 15:22:25 +0200
-Subject: [PATCH v3 1/3] SoC: es8328-i2c: Add compatible for ES8323
-In-Reply-To: <20170512132227.24916-1-romain.perier@collabora.com>
-References: <20170512132227.24916-1-romain.perier@collabora.com>
-Message-ID: <20170512132227.24916-10-romain.perier@collabora.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Fri, 12 May 2017 21:28:00 +0800
+Subject: [PATCH 4/6] tty: serial: lpuart: add imx7ulp support
+In-Reply-To: <434c613240c36181a828ea090938b8c1@agner.ch>
+References: <1494316248-24052-1-git-send-email-aisheng.dong@nxp.com>
+ <1494316248-24052-5-git-send-email-aisheng.dong@nxp.com>
+ <697fae59cb4e5ff921bb83614325b3f1@agner.ch>
+ <CAA+hA=RDjRwwT-O5Y3z-AAQxtPDU7agZdGe6KeFTT=QoW3ufFw@mail.gmail.com>
+ <434c613240c36181a828ea090938b8c1@agner.ch>
+Message-ID: <20170512132800.GA31087@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a compatible string for everest,es8323. This is an
-audio codec that is compatible with es8328 and can be found for example
-on the Firefly-RK3288 board.
+On Wed, May 10, 2017 at 01:37:07PM -0700, Stefan Agner wrote:
+> On 2017-05-09 23:14, Dong Aisheng wrote:
+> > Hi Stefan,
+> > 
+> > On Wed, May 10, 2017 at 12:10 PM, Stefan Agner <stefan@agner.ch> wrote:
+> >> On 2017-05-09 00:50, Dong Aisheng wrote:
+> >>> The lpuart of imx7ulp is basically the same as ls1021a. It's also
+> >>> 32 bit width register, but unlike ls1021a, it's little endian.
+> >>> Besides that, imx7ulp lpuart has a minor different register layout
+> >>> from ls1021a that it has four extra registers (verid, param, global,
+> >>> pincfg) located at the beginning of register map, which are currently
+> >>> not used by the driver and less to be used later.
+> >>>
+> >>> To ease the register difference handling, we add a reg_off member
+> >>> in lpuart_soc_data structure to represent if the normal
+> >>> lpuart32_{read|write} requires plus a offset to hide the issue.
+> >>>
+> >>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >>> Cc: Jiri Slaby <jslaby@suse.com>
+> >>> Cc: Fugang Duan <fugang.duan@nxp.com>
+> >>> Cc: Stefan Agner <stefan@agner.ch>
+> >>> Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
+> >>> Cc: Yangbo Lu <yangbo.lu@nxp.com>
+> >>> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> >>> ---
+> >>>  drivers/tty/serial/fsl_lpuart.c | 21 ++++++++++++++++++---
+> >>>  1 file changed, 18 insertions(+), 3 deletions(-)
+> >>>
+> >>> diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+> >>> index bddd041..1cdb3f9 100644
+> >>> --- a/drivers/tty/serial/fsl_lpuart.c
+> >>> +++ b/drivers/tty/serial/fsl_lpuart.c
+> >>> @@ -231,7 +231,11 @@
+> >>>  #define DEV_NAME     "ttyLP"
+> >>>  #define UART_NR              6
+> >>>
+> >>> +/* IMX lpuart has four extra unused regs located at the beginning */
+> >>> +#define IMX_REG_OFF  0x10
+> >>> +
+> >>>  static bool lpuart_is_be;
+> >>> +static u8 lpuart_reg_off;
+> >>
+> >> Global variables? That hardly works once you have two UARTs...
+> >>
+> > 
+> > lpuart_reg_off is SoC specific and there's no two UART
+> > with two different reg offset.
+> > 
+> >> Instead of adding a fixed offset to any write you could just add the
+> >> offset to sport->port.membase...
+> >>
+> > 
+> > That's intended as i don't want the changes to be too intrusive.
+> > If adding offset in sport->port.xxx, then we have to change the basic
+> > lpuart32_read/write API which is called through the whole driver.
+> 
+> Every lpuart32_write/read call passes port.membase, so if you offset
+> port.membase when it is assigned in probe you should be fine not?
+> 
 
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
----
+Got your point now and that do seem better.
+Thanks for the suggestion.
+Will change in V2.
 
-Changes in v3: None
-Changes in v2: None
-
- Documentation/devicetree/bindings/sound/es8328.txt | 5 ++++-
- sound/soc/codecs/es8328-i2c.c                      | 2 ++
- 2 files changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/sound/es8328.txt b/Documentation/devicetree/bindings/sound/es8328.txt
-index 33fbf058c997..86b6d6e99732 100644
---- a/Documentation/devicetree/bindings/sound/es8328.txt
-+++ b/Documentation/devicetree/bindings/sound/es8328.txt
-@@ -4,7 +4,10 @@ This device supports both I2C and SPI.
- 
- Required properties:
- 
--  - compatible  : Should be "everest,es8328" or "everest,es8388"
-+  - compatible  : Should be one of the following:
-+	- "everest,es8323"
-+	- "everest,es8328"
-+	- "everest,es8388"
-   - DVDD-supply : Regulator providing digital core supply voltage 1.8 - 3.6V
-   - AVDD-supply : Regulator providing analog supply voltage 3.3V
-   - PVDD-supply : Regulator providing digital IO supply voltage 1.8 - 3.6V
-diff --git a/sound/soc/codecs/es8328-i2c.c b/sound/soc/codecs/es8328-i2c.c
-index 318ab28c5351..be3f03c35137 100644
---- a/sound/soc/codecs/es8328-i2c.c
-+++ b/sound/soc/codecs/es8328-i2c.c
-@@ -19,6 +19,7 @@
- #include "es8328.h"
- 
- static const struct i2c_device_id es8328_id[] = {
-+	{ "es8323", 0 },
- 	{ "es8328", 0 },
- 	{ "es8388", 0 },
- 	{ }
-@@ -26,6 +27,7 @@ static const struct i2c_device_id es8328_id[] = {
- MODULE_DEVICE_TABLE(i2c, es8328_id);
- 
- static const struct of_device_id es8328_of_match[] = {
-+	{ .compatible = "everest,es8323", },
- 	{ .compatible = "everest,es8328", },
- 	{ .compatible = "everest,es8388", },
- 	{ }
--- 
-2.11.0
+Regards
+Dong Aisheng
