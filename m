@@ -1,66 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 May 2017 17:57:24 +0100
-Subject: [RFC PATCH v2 4/6] arm64: signal: Allocate extra sigcontext
- space as needed
-In-Reply-To: <1492016495-19689-4-git-send-email-Dave.Martin@arm.com>
-References: <1492016239-19511-1-git-send-email-Dave.Martin@arm.com>
- <1492016495-19689-1-git-send-email-Dave.Martin@arm.com>
- <1492016495-19689-4-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170512165724.GB8387@e104818-lin.cambridge.arm.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Fri, 12 May 2017 10:05:58 -0700
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <20170512065818.mw7yqcdck7alqlzi@gmail.com>
+References: <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com>
+ <20170508075209.7aluvpwildw325rf@gmail.com>
+ <1494256932.1167.1.camel@gmail.com>
+ <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
+ <20170509065619.wmqa6z6w3n6xpvrw@gmail.com> <20170509111007.GA14702@kroah.com>
+ <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
+ <CAJcbSZEoRyewUtBHvqmNZL9FtT_q42Vmmd-EuC50x-ZRASiHHg@mail.gmail.com>
+ <CA+55aFwvQfs_X+paQF6Luc0Rq+W3J2fKuHRou7=ANcquDdXdDA@mail.gmail.com>
+ <20170512065818.mw7yqcdck7alqlzi@gmail.com>
+Message-ID: <CAJcbSZFyzanv6ji97+K2kQH1CFX6qeXWsGwRvjiK1Dk+f3niBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On Thu, May 11, 2017 at 11:58 PM, Ingo Molnar <mingo@kernel.org> wrote:
+>
+> * Linus Torvalds <torvalds@linux-foundation.org> wrote:
+>
+>> On Thu, May 11, 2017 at 4:17 PM, Thomas Garnier <thgarnie@google.com> wrote:
+>> >
+>> > Ingo: Do you want the change as-is? Would you like it to be optional?
+>> > What do you think?
+>>
+>> I'm not ingo, but I don't like that patch. It's in the wrong place -
+>> that system call return code is too timing-critical to add address
+>> limit checks.
+>>
+>> Now what I think you *could* do is:
+>>
+>>  - make "set_fs()" actually set a work flag in the current thread flags
+>>
+>>  - do the test in the slow-path (syscall_return_slowpath).
+>>
+>> Yes, yes, that ends up being architecture-specific, but it's fairly simple.
+>>
+>> And it only slows down the system calls that actually use "set_fs()".
+>> Sure, it will slow those down a fair amount, but they are hopefully a
+>> small subset of all cases.
+>>
+>> How does that sound to people?  Thats' where we currently do that
+>>
+>>         if (IS_ENABLED(CONFIG_PROVE_LOCKING) &&
+>>             WARN(irqs_disabled(), "syscall %ld left IRQs disabled",
+>> regs->orig_ax))
+>>                 local_irq_enable();
+>>
+>> check too, which is a fairly similar issue.
+>
+> I really like that idea and I'd be perfectly fine with that solution, because it
+> puts the overhead where the problem comes from, and adds an extra incentive for
+> code to move away from set_fs() facilities. Win-win.
 
-On Wed, Apr 12, 2017 at 06:01:13PM +0100, Dave P Martin wrote:
-> --- a/arch/arm64/include/uapi/asm/sigcontext.h
-> +++ b/arch/arm64/include/uapi/asm/sigcontext.h
-> @@ -80,4 +80,31 @@ struct esr_context {
->  	__u64 esr;
->  };
->  
-> +/*
-> + * Pointer to extra space for additional structures that don't fit in
-> + * sigcontext.__reserved[].  Note:
-> + *
-> + * 1) fpsimd_context, esr_context and extra_context must be placed in
-> + * sigcontext.__reserved[] if present.  They cannot be placed in the
-> + * extra space.  Any other record can be placed either in the extra
-> + * space or in sigcontext.__reserved[].
-> + *
-> + * 2) There must not be more than one extra_context.
-> + *
-> + * 3) If extra_context is present, it must be followed immediately in
-> + * sigcontext.__reserved[] by the terminating null _aarch64_ctx (i.e.,
-> + * extra_context must be the last record in sigcontext.__reserved[]
-> + * except for the terminator).
-> + *
-> + * 4) The extra space must itself be terminated with a null
-> + * _aarch64_ctx.
-> + */
+Great, I will adapt the patch for that.
 
-IIUC, if we need to save some state that doesn't fit in what's left of
-sigcontext.__reserved[] (e.g. SVE with 1024-bit vector length), we
-ignore the available space and go for a memory block following the end
-of sigcontext.__reserved[] + 16. Is there a reason we can't store the
-new state across the end of sigcontext.__reserved[] and move fp/lr at
-the end of the new frame? I'm not sure the fp/lr position immediately
-after __reserved[] counts as ABI.
+>
+> Thanks,
+>
+>         Ingo
 
-> +#define EXTRA_MAGIC	0x45585401
-> +
-> +struct extra_context {
-> +	struct _aarch64_ctx head;
-> +	void __user *data;	/* 16-byte aligned pointer to extra space */
-"__user" is a kernel-only attribute, we shouldn't expose it in a uapi
-header.
 
-> +	__u32 size;		/* size in bytes of the extra space */
-> +};
-
-Do we need the size of the extra space? Can we not infer it anyway by
-walking the contexts save there? Surely we don't expect more than one
-extra context.
 
 -- 
-Catalin
+Thomas
