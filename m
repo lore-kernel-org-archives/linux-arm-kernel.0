@@ -1,34 +1,42 @@
-From: luto@kernel.org (Andy Lutomirski)
-Date: Fri, 12 May 2017 16:20:31 -0700
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <20170512071549.GP390@ZenIV.linux.org.uk>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com> <20170508124621.GA20705@kroah.com>
- <20170509064522.anusoikaalvlux3w@gmail.com>
- <20170509085659.GA32555@infradead.org>
- <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
- <20170512070012.7dysuhbkcas7ibaj@gmail.com>
- <20170512071549.GP390@ZenIV.linux.org.uk>
-Message-ID: <CALCETrXMgx+pFsL-5s6jRHxsTCJk8U8f5AFMzchsy_L6DyMAvQ@mail.gmail.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Sat, 13 May 2017 00:53:57 +0100
+Subject: [PATCH] arm64: dts: rockchip: Drop explicit "include/" prefix from
+ #include
+Message-ID: <20170512235357.19486-1-ijc@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 12:15 AM, Al Viro <viro@zeniv.linux.org.uk> wrote:
+It not necessary and counter to how all the other files are done.
 
-> Folks, seriously, have you even looked through that zoo?  I have, and it's
-> really, really not fun.  Sure, we can say "fuck 'em, no need to allow
-> splice() on random crap".  Would be perfectly reasonable, expect that
-> it's not the only place doing kernel_write() and its ilk...
+It also happens to break the build in the split device tree repo
+https://git.kernel.org/pub/scm/linux/kernel/git/devicetree/devicetree-rebasing.git/
 
-Can you clarify this?  I think we really may be able to do exactly
-this.  From Christoph's list, there are only two things that need
-kernel_read/kernel_write to user-supplied fds that may come from a
-variety of sources: splice and exec.  If you're execing a chardev from
-a crappy driver, something is seriously wrong.  And returning -EINVAL
-from splice() to or from files that use ->read and ->write seems find
-(and splice(2) even documents -EINVAL as meaning that the target
-doesn't support splicing).
+Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+Cc: Brian Norris <briannorris@chromium.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---Andy
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+index 658bb9dc9dfd..7bd31066399b 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+@@ -44,7 +44,7 @@
+ 
+ /dts-v1/;
+ #include "rk3399-gru.dtsi"
+-#include <include/dt-bindings/input/linux-event-codes.h>
++#include <dt-bindings/input/linux-event-codes.h>
+ 
+ /*
+  * Kevin-specific things
+-- 
+2.11.0
