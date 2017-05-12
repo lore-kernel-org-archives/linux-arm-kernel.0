@@ -1,10 +1,10 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Fri, 12 May 2017 20:38:02 +0800
-Subject: [PATCH 2/5] pinctrl: imx: add soc specific mux_mode mask and shift
- property
+Date: Fri, 12 May 2017 20:38:03 +0800
+Subject: [PATCH 2/5] pinctrl: pinctrl-imx: add soc specific mux_mode mask and
+ shift property
 In-Reply-To: <1494592686-30967-1-git-send-email-aisheng.dong@nxp.com>
 References: <1494592686-30967-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1494592686-30967-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1494592686-30967-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,7 +25,7 @@ Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
  3 files changed, 11 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
-index db76e9d..8347197 100644
+index 406881d..ef4951f 100644
 --- a/drivers/pinctrl/freescale/pinctrl-imx.c
 +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
 @@ -197,8 +197,8 @@ static int imx_pmx_set(struct pinctrl_dev *pctldev, unsigned selector,
