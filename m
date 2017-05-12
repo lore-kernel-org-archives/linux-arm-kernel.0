@@ -1,241 +1,104 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 12 May 2017 18:50:18 +0100
-Subject: [PATCHv4] arm64/cpufeature: don't use mutex in bringup path
-Message-ID: <1494611418-14937-1-git-send-email-mark.rutland@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 12 May 2017 20:22:51 +0200
+Subject: [PATCH v2] clockevents/tcb_clksrc: implement suspend/resume
+Message-ID: <20170512182251.23948-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, cpus_set_cap() calls static_branch_enable_cpuslocked(), which
-must take the jump_label mutex.
+On sama5d2, power to the core may be cut while entering suspend mode. It is
+necessary to save and restore the TCB registers.
 
-We call cpus_set_cap() in the secondary bringup path, from the idle
-thread where interrupts are disabled. Taking a mutex in this path "is a
-NONO" regardless of whether it's contended, and something we must avoid.
-Additionally, the secondary CPU doesn't hold the percpu rwsem (as this
-is held by the primary CPU), so this triggers a lockdep splat.
-
-This patch fixes both issues. The poking of static keys is deferred
-until enable_cpu_capabilities(), which runs in a suitable context on the
-boot CPU. To account for the static keys being set later,
-cpus_have_const_cap() is updated to use another static key to check
-whether the const cap keys have been initialised, falling back to the
-caps bitmap until this is the case.
-
-This means that users of cpus_have_const_cap() gain should only gain a
-single additional NOP in the fast path once the const caps are
-initialised, but should always see the current cap value.
-
-The hyp code should never dereference the caps array, since the caps are
-initialized before we run the module initcall to initialise hyp. A check
-is added to the hyp init code to document this requirement.
-
-This rework means that we can remove the *_cpuslocked() helpers added in
-commit d54bb72551b999dd ("arm64/cpufeature: Use
-static_branch_enable_cpuslocked()").
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Marc Zyniger <marc.zyngier@arm.com>
-Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Sebastian Sewior <bigeasy@linutronix.de>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 13 ++++++++++---
- arch/arm64/include/asm/kvm_host.h   |  8 ++++++--
- arch/arm64/kernel/cpu_errata.c      |  9 +--------
- arch/arm64/kernel/cpufeature.c      | 25 ++++++++++++++++++++++---
- 4 files changed, 39 insertions(+), 16 deletions(-)
+Changes in v2:
+ - use writel instead of __raw_writel
+ - Document sequence
+ - use ARRAY_SIZE(tcb_cache) instead of 3
 
-Thomas, are you happy to pick this up?
+ drivers/clocksource/tcb_clksrc.c | 51 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
-Will's happy for this to go via tip. I've checked that this builds and boots
-atop of the tip smp/hotplug branch.
-
-Thanks,
-Mark.
-
-Since v1 [1]:
-* Kill redundant update_cpu_errata_workarounds() prototype
-* Introduce arm64_const_caps_ready
-Since v2 [2]:
-* Add hyp init check
-* Clean up commit message
-* Drop fixes tag
-Since v3 [3]:
-* Fix typos
-* Accumulate tags
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/505731.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/505763.html
-[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/505887.html
-
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index a8d1b5b..aba574c 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -115,6 +115,7 @@ struct arm64_cpu_capabilities {
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index d4ca9962a759..828729c70a0c 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -9,6 +9,7 @@
+ #include <linux/ioport.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
++#include <linux/syscore_ops.h>
+ #include <linux/atmel_tc.h>
  
- extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
-+extern struct static_key_false arm64_const_caps_ready;
  
- bool this_cpu_has_cap(unsigned int cap);
- 
-@@ -124,7 +125,7 @@ static inline bool cpu_have_feature(unsigned int num)
- }
- 
- /* System capability check for constant caps */
--static inline bool cpus_have_const_cap(int num)
-+static inline bool __cpus_have_const_cap(int num)
- {
- 	if (num >= ARM64_NCAPS)
- 		return false;
-@@ -138,6 +139,14 @@ static inline bool cpus_have_cap(unsigned int num)
- 	return test_bit(num, cpu_hwcaps);
- }
- 
-+static inline bool cpus_have_const_cap(int num)
-+{
-+	if (static_branch_likely(&arm64_const_caps_ready))
-+		return __cpus_have_const_cap(num);
-+	else
-+		return cpus_have_cap(num);
-+}
-+
- static inline void cpus_set_cap(unsigned int num)
- {
- 	if (num >= ARM64_NCAPS) {
-@@ -145,7 +154,6 @@ static inline void cpus_set_cap(unsigned int num)
- 			num, ARM64_NCAPS);
- 	} else {
- 		__set_bit(num, cpu_hwcaps);
--		static_branch_enable_cpuslocked(&cpu_hwcap_keys[num]);
- 	}
- }
- 
-@@ -223,7 +231,6 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- void check_local_cpu_capabilities(void);
- 
- void update_cpu_errata_workarounds(void);
--void update_cpu_errata_workarounds_cpuslocked(void);
- void __init enable_errata_workarounds(void);
- void verify_local_cpu_errata_workarounds(void);
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index e7705e7..9973f0a 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -24,6 +24,7 @@
- 
- #include <linux/types.h>
- #include <linux/kvm_types.h>
-+#include <asm/cpufeature.h>
- #include <asm/kvm.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmio.h>
-@@ -356,9 +357,12 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
- 				       unsigned long vector_ptr)
- {
- 	/*
--	 * Call initialization code, and switch to the full blown
--	 * HYP code.
-+	 * Call initialization code, and switch to the full blown HYP code.
-+	 * If the cpucaps haven't been finalized yet, something has gone very
-+	 * wrong, and hyp will crash and burn when it uses any
-+	 * cpus_have_const_cap() wrapper.
- 	 */
-+	BUG_ON(!static_branch_likely(&arm64_const_caps_ready));
- 	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
- }
- 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index e650cf8..f6cc67e 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -175,16 +175,9 @@ void verify_local_cpu_errata_workarounds(void)
- 		}
- }
- 
--void update_cpu_errata_workarounds_cpuslocked(void)
--{
--	update_cpu_capabilities(arm64_errata, "enabling workaround for");
--}
--
- void update_cpu_errata_workarounds(void)
- {
--	get_online_cpus();
--	update_cpu_errata_workarounds_cpuslocked();
--	put_online_cpus();
-+	update_cpu_capabilities(arm64_errata, "enabling workaround for");
- }
- 
- void __init enable_errata_workarounds(void)
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 113c06d..ebfd868 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -976,8 +976,16 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+@@ -40,6 +41,14 @@
   */
- void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
- {
--	for (; caps->matches; caps++)
--		if (caps->enable && cpus_have_cap(caps->capability))
-+	for (; caps->matches; caps++) {
-+		unsigned int num = caps->capability;
-+
-+		if (!cpus_have_cap(num))
-+			continue;
-+
-+		/* Ensure cpus_have_const_cap(num) works */
-+		static_branch_enable(&cpu_hwcap_keys[num]);
-+
-+		if (caps->enable) {
- 			/*
- 			 * Use stop_machine() as it schedules the work allowing
- 			 * us to modify PSTATE, instead of on_each_cpu() which
-@@ -985,6 +993,8 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
- 			 * we return.
- 			 */
- 			stop_machine(caps->enable, NULL, cpu_online_mask);
-+		}
-+	}
- }
  
- /*
-@@ -1076,7 +1086,7 @@ void check_local_cpu_capabilities(void)
- 	 * advertised capabilities.
- 	 */
- 	if (!sys_caps_initialised)
--		update_cpu_errata_workarounds_cpuslocked();
-+		update_cpu_errata_workarounds();
- 	else
- 		verify_local_cpu_capabilities();
- }
-@@ -1089,6 +1099,14 @@ static void __init setup_feature_capabilities(void)
- 	enable_cpu_capabilities(arm64_features);
- }
- 
-+DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
-+EXPORT_SYMBOL(arm64_const_caps_ready);
-+
-+static void __init mark_const_caps_ready(void)
+ static void __iomem *tcaddr;
++static struct
 +{
-+	static_branch_enable(&arm64_const_caps_ready);
++	u32 cmr;
++	u32 imr;
++	u32 rc;
++	bool clken;
++} tcb_cache[3];
++static u32 bmr_cache;
+ 
+ static u64 tc_get_cycles(struct clocksource *cs)
+ {
+@@ -61,12 +70,54 @@ static u64 tc_get_cycles32(struct clocksource *cs)
+ 	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
+ }
+ 
++void tc_clksrc_suspend(struct clocksource *cs)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(tcb_cache); i++) {
++		tcb_cache[i].cmr = readl(tcaddr + ATMEL_TC_REG(i, CMR));
++		tcb_cache[i].imr = readl(tcaddr + ATMEL_TC_REG(i, IMR));
++		tcb_cache[i].rc = readl(tcaddr + ATMEL_TC_REG(i, RC));
++		tcb_cache[i].clken = !!(readl(tcaddr + ATMEL_TC_REG(i, SR)) &
++					ATMEL_TC_CLKSTA);
++	}
++
++	bmr_cache = readl(tcaddr + ATMEL_TC_BMR);
 +}
 +
- /*
-  * Check if the current CPU has a given feature capability.
-  * Should be called from non-preemptible context.
-@@ -1115,6 +1133,7 @@ void __init setup_cpu_features(void)
- 	/* Set the CPU feature capabilies */
- 	setup_feature_capabilities();
- 	enable_errata_workarounds();
-+	mark_const_caps_ready();
- 	setup_elf_hwcaps(arm64_elf_hwcaps);
++void tc_clksrc_resume(struct clocksource *cs)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(tcb_cache); i++) {
++		/* Restore registers for the channel, RA and RB are not used  */
++		writel(tcb_cache[i].cmr, tcaddr + ATMEL_TC_REG(i, CMR));
++		writel(tcb_cache[i].rc, tcaddr + ATMEL_TC_REG(i, RC));
++		writel(0, tcaddr + ATMEL_TC_REG(i, RA));
++		writel(0, tcaddr + ATMEL_TC_REG(i, RB));
++		/* Disable all the interrupts */
++		writel(0xff, tcaddr + ATMEL_TC_REG(i, IDR));
++		/* Reenable interrupts that were enabled before suspending */
++		writel(tcb_cache[i].imr, tcaddr + ATMEL_TC_REG(i, IER));
++		/* Start the clock if it was used */
++		if (tcb_cache[i].clken)
++			writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(i, CCR));
++	}
++
++	/* Dual channel, chain channels */
++	writel(bmr_cache, tcaddr + ATMEL_TC_BMR);
++	/* Finally, trigger all the channels*/
++	writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
++}
++
+ static struct clocksource clksrc = {
+ 	.name           = "tcb_clksrc",
+ 	.rating         = 200,
+ 	.read           = tc_get_cycles,
+ 	.mask           = CLOCKSOURCE_MASK(32),
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
++	.suspend	= tc_clksrc_suspend,
++	.resume		= tc_clksrc_resume,
+ };
  
- 	if (system_supports_32bit_el0())
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS
 -- 
-1.9.1
+2.11.0
