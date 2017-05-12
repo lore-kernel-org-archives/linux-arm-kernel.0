@@ -1,72 +1,108 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 May 2017 09:43:40 +0200
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <20170512071549.GP390@ZenIV.linux.org.uk>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com> <20170508124621.GA20705@kroah.com>
- <20170509064522.anusoikaalvlux3w@gmail.com>
- <20170509085659.GA32555@infradead.org>
- <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
- <20170512070012.7dysuhbkcas7ibaj@gmail.com>
- <20170512071549.GP390@ZenIV.linux.org.uk>
-Message-ID: <CAK8P3a2ynRObJLn2Hh2r9_2k5+O08jErPC_UnnDmemd1jXsnkw@mail.gmail.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Fri, 12 May 2017 15:56:39 +0800
+Subject: [PATCH v3 2/9] arm: dts: mt7623: rename mt7623-evb.dts to
+ arch/arm/boot/dts/mt7623n-rfb.dtsi
+In-Reply-To: <cover.1494574682.git.sean.wang@mediatek.com>
+References: <cover.1494574682.git.sean.wang@mediatek.com>
+Message-ID: <b37ec1684cd40cecc31a077d4ae2aa415ae7dd0a.1494574682.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 9:15 AM, Al Viro <viro@zeniv.linux.org.uk> wrote:
-> On Fri, May 12, 2017 at 09:00:12AM +0200, Ingo Molnar wrote:
->
->> > How about trying to remove all of them?  If we could actually get rid
->> > of all of them, we could drop the arch support, and we'd get faster,
->> > simpler, shorter uaccess code throughout the kernel.
->>
->> I'm all for that!
->
-> Oh, for...  Ingo, do you really want to go through all ->write() and ->read()
-> instances, converting all of them to iov_iter?  Or, better yet, deal with
-> the patch flood from Nick Krause sock puppet brigade?
+From: Sean Wang <sean.wang@mediatek.com>
 
-How realistic and how useful would it be to first completely eliminate
-the ones that are in loadable modules and then wrapping the definition
-in #ifndef MODULE (or even make it an extern function)?
+There are 2 versions of the MT7623 SoC, the one is MT7623n and the other
+is MT7623a.  MT7623n is almost identical to MT7623a but has some
+additional multimedia features. The reference boards are available as
+NAND or MMC and might have a different ethernet setup. In order to reduce
+the duplication of devicetree code we add an intermediate dtsi file for
+these reference boards. Additionally Mediatek pointed out, that the EVB
+is yet another board and the board in question is infact the RFB. Take
+this into account while renaming the files.
 
-This should be a fairly complete list of the modular users:
+Signed-off-by: John Crispin <john@phrozen.org>
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ arch/arm/boot/dts/Makefile                          |  2 +-
+ arch/arm/boot/dts/mt7623n-rfb-nand.dts              | 21 +++++++++++++++++++++
+ .../boot/dts/{mt7623-evb.dts => mt7623n-rfb.dtsi}   |  8 ++------
+ 3 files changed, 24 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
+ rename arch/arm/boot/dts/{mt7623-evb.dts => mt7623n-rfb.dtsi} (79%)
 
-drivers/block/drbd/drbd_main.c: set_fs(KERNEL_DS);
-drivers/input/serio/hp_sdc.c:   set_fs(KERNEL_DS);
-drivers/media/v4l2-core/v4l2-compat-ioctl32.c:          set_fs(KERNEL_DS);
-drivers/misc/lkdtm_bugs.c:      set_fs(KERNEL_DS);
-drivers/s390/crypto/pkey_api.c: set_fs(KERNEL_DS);
-drivers/staging/comedi/drivers/serial2002.c:    set_fs(KERNEL_DS);
-drivers/staging/lustre/lnet/libcfs/tracefile.c: set_fs(get_ds());
-drivers/staging/media/atomisp/pci/atomisp2/atomisp_compat_ioctl32.c:
- set_fs(KERNEL_DS);
-drivers/staging/rtl8723bs/os_dep/osdep_service.c:               oldfs
-= get_fs(); set_fs(get_ds());
-drivers/usb/gadget/function/f_mass_storage.c:   set_fs(get_ds());
-drivers/usb/gadget/function/u_uac1.c:   set_fs(KERNEL_DS);
-drivers/vhost/vhost.c:  set_fs(USER_DS);
-drivers/video/fbdev/core/fbmem.c:       set_fs(KERNEL_DS);
-drivers/video/fbdev/hpfb.c:     set_fs(KERNEL_DS);
-fs/autofs4/waitq.c:     set_fs(KERNEL_DS);
-fs/binfmt_aout.c:       set_fs(KERNEL_DS);
-fs/binfmt_elf.c:                set_fs(USER_DS);
-fs/binfmt_elf_fdpic.c:  set_fs(KERNEL_DS);
-fs/btrfs/send.c:        set_fs(KERNEL_DS);
-fs/ext4/ioctl.c:                set_fs(KERNEL_DS);
-fs/nfsd/vfs.c:  set_fs(KERNEL_DS);
-net/9p/trans_fd.c:      set_fs(get_ds());
-net/ipv6/addrconf.c:                    set_fs(KERNEL_DS);
-net/ipv6/exthdrs.c:     set_fs(KERNEL_DS);
-net/sunrpc/svcsock.c:   oldfs = get_fs(); set_fs(KERNEL_DS);
-sound/core/oss/pcm_oss.c:       set_fs(get_ds());
-sound/core/pcm_native.c:        set_fs(get_ds());
-sound/drivers/opl3/opl3_oss.c:  set_fs(get_ds());
-sound/oss/dmabuf.c:     set_fs(get_ds());
-sound/oss/swarm_cs4297a.c:                set_fs(KERNEL_DS);
-sound/pci/emu10k1/emufx.c:      set_fs(get_ds());
-sound/pci/hda/hda_codec.c:              set_fs(get_ds());
-
-     Arnd
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9c5e1d9..20a7c9d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -1034,7 +1034,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
+ 	mt6580-evbp1.dtb \
+ 	mt6589-aquaris5.dtb \
+ 	mt6592-evb.dtb \
+-	mt7623-evb.dtb \
++	mt7623n-rfb-nand.dtb \
+ 	mt8127-moose.dtb \
+ 	mt8135-evbp1.dtb
+ dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
+diff --git a/arch/arm/boot/dts/mt7623n-rfb-nand.dts b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
+new file mode 100644
+index 0000000..436d51c
+--- /dev/null
++++ b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
+@@ -0,0 +1,21 @@
++/*
++ * Copyright (c) 2016 MediaTek Inc.
++ * Author: John Crispin <blogic@openwrt.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++#include "mt7623n-rfb.dtsi"
++
++/ {
++	model = "MediaTek MT7623N NAND reference board";
++	compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
++};
+diff --git a/arch/arm/boot/dts/mt7623-evb.dts b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+similarity index 79%
+rename from arch/arm/boot/dts/mt7623-evb.dts
+rename to arch/arm/boot/dts/mt7623n-rfb.dtsi
+index a769149..c526116 100644
+--- a/arch/arm/boot/dts/mt7623-evb.dts
++++ b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+@@ -1,6 +1,6 @@
+ /*
+  * Copyright (c) 2016 MediaTek Inc.
+- * Author: John Crispin <john@phrozen.org>
++ * Author: John Crispin <blogic@openwrt.org>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -12,18 +12,14 @@
+  * GNU General Public License for more details.
+  */
+ 
+-/dts-v1/;
+ #include "mt7623-mt6323.dtsi"
+ 
+ / {
+-	model = "MediaTek MT7623 evaluation board";
+-	compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
+-
+ 	chosen {
+ 		stdout-path = &uart2;
+ 	};
+ 
+-	memory {
++	memory at 80000000 {
+ 		reg = <0 0x80000000 0 0x40000000>;
+ 	};
+ };
+-- 
+2.7.4
