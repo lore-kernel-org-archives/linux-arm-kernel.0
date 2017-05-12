@@ -1,134 +1,163 @@
 From: philippe.cornu@st.com (Philippe CORNU)
-Date: Fri, 12 May 2017 16:56:28 +0200
-Subject: [PATCH v1 2/3] dt-bindings: display: Add STM32 DSI host driver
+Date: Fri, 12 May 2017 16:56:27 +0200
+Subject: [PATCH v1 1/3] drm/stm: ltdc: Add bridge support
 In-Reply-To: <1494600989-13507-1-git-send-email-philippe.cornu@st.com>
 References: <1494600989-13507-1-git-send-email-philippe.cornu@st.com>
-Message-ID: <1494600989-13507-3-git-send-email-philippe.cornu@st.com>
+Message-ID: <1494600989-13507-2-git-send-email-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation of device tree bindings for the STM32
-DSI host driver based on the Synopsys DW MIPI DSI driver from Rockchip.
+Add the bridge support, used by DSI host and HDMI/LVDS bridges.
 
 Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
 ---
- .../devicetree/bindings/display/st,stm32-ltdc.txt  | 92 +++++++++++++++++++++-
- 1 file changed, 90 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/stm/ltdc.c | 82 +++++++++++++++++++++++++++++++++++++++-------
+ drivers/gpu/drm/stm/ltdc.h |  1 +
+ 2 files changed, 72 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-index 8e14769..a61381b 100644
---- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-+++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-@@ -1,7 +1,6 @@
- * STMicroelectronics STM32 lcd-tft display controller
+diff --git a/drivers/gpu/drm/stm/ltdc.c b/drivers/gpu/drm/stm/ltdc.c
+index 7b2d63b..b0d1fba 100644
+--- a/drivers/gpu/drm/stm/ltdc.c
++++ b/drivers/gpu/drm/stm/ltdc.c
+@@ -858,6 +858,43 @@ static struct drm_encoder *ltdc_rgb_encoder_create(struct drm_device *ddev)
+ 	return encoder;
+ }
  
- - ltdc: lcd-tft display controller host
--  must be a sub-node of st-display-subsystem
-   Required properties:
-   - compatible: "st,stm32-ltdc"
-   - reg: Physical base address of the IP registers and length of memory mapped region.
-@@ -13,8 +12,25 @@
-   Required nodes:
-     - Video port for RGB output.
- 
--Example:
-+* STMicroelectronics STM32 specific extensions to Synopsys Designware MIPI DSI
-+(similar to "rockchip/dw_mipi_dsi_rockchip.txt")
- 
-+Required properties:
-+- #address-cells: Should be <1>.
-+- #size-cells: Should be <0>.
-+- compatible: "st,stm32-dsi_host".
-+- reg: Represent the physical address range of the controller.
-+- clocks, clock-names: Phandles to the controller's pll reference
-+  clock(ref) and APB clock(pclk). As described in [1].
-+- ports: contain a port node with endpoint definitions as defined in [2].
-+- resets: list of phandle + reset specifier pairs, as described in [3].
-+- reset-names: string reset name, must be "apb".
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+[2] Documentation/devicetree/bindings/media/video-interfaces.txt
-+[3] Documentation/devicetree/bindings/reset/reset.txt
-+
-+Example 1: RGB panel
- / {
- 	...
- 	soc {
-@@ -34,3 +50,75 @@ Example:
- 		};
- 	};
- };
-+
-+Example 2: DSI panel
-+
-+/ {
-+	...
-+	soc {
-+	...
-+		ltdc: display-controller at 40016800 {
-+			compatible = "st,stm32-ltdc";
-+			reg = <0x40016800 0x200>;
-+			interrupts = <88>, <89>;
-+			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
-+			clocks = <&rcc 1 CLK_LCD>;
-+			clock-names = "lcd";
-+
-+			port {
-+				ltdc_out_dsi_host: endpoint {
-+					remote-endpoint = <&dsi_host_in>;
-+				};
-+			};
-+		};
-+
-+
-+		dsi_host: dsi_host at 40016C00 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-dsi_host";
-+			reg = <0x40016C00 0x800>;
-+			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
-+			clock-names = "ref", "pclk";
-+			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
-+			reset-names = "apb";
-+			status = "okay";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					dsi_host_in: endpoint {
-+						remote-endpoint = <&ltdc_out_dsi_host>;
-+					};
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					dsi_host_out_panel: endpoint {
-+						remote-endpoint = <&dsi_host_in_panel>;
-+					};
-+				};
-+
-+			};
-+
-+			panel-dsi at 0 {
-+				reg = <0>; /* dsi virtual channel (0..3) */
-+				compatible = ...;
-+				enable-gpios = ...;
-+				status = "okay";
-+
-+				port {
-+					dsi_host_in_panel: endpoint {
-+						remote-endpoint = <&dsi_host_out_panel>;
-+					};
-+				};
-+
-+			};
-+
-+		};
-+
-+	};
++static const struct drm_encoder_funcs bridge_encoder_funcs = {
++	.destroy = drm_encoder_cleanup,
 +};
++
++struct drm_encoder *bridge_encoder_create(struct drm_device *ddev,
++					  struct drm_bridge *bridge)
++{
++	struct drm_encoder *encoder;
++	int ret;
++
++	encoder = devm_kzalloc(ddev->dev, sizeof(*encoder), GFP_KERNEL);
++	if (!encoder)
++		return NULL;
++
++	encoder->possible_crtcs = CRTC_MASK;
++	encoder->possible_clones = 0; /* No cloning support */
++
++	drm_encoder_init(ddev, encoder, &bridge_encoder_funcs,
++			 DRM_MODE_ENCODER_TMDS, NULL);
++
++	drm_encoder_helper_add(encoder, NULL);
++
++	/* Link drm_bridge to encoder */
++	bridge->encoder = encoder;
++	encoder->bridge = bridge;
++
++	ret = drm_bridge_attach(encoder, bridge, NULL);
++	if (ret) {
++		drm_encoder_cleanup(encoder);
++		return NULL;
++	}
++
++	DRM_DEBUG_DRIVER("Bridge encoder:%d created\n", encoder->base.id);
++
++	return encoder;
++}
++
+ /*
+  * DRM_CONNECTOR
+  */
+@@ -967,12 +1004,12 @@ static int ltdc_get_caps(struct drm_device *ddev)
+ 	return 0;
+ }
+ 
+-static struct drm_panel *ltdc_get_panel(struct drm_device *ddev)
++static int ltdc_parse_dt(struct drm_device *ddev)
+ {
++	struct ltdc_device *ldev = ddev->dev_private;
+ 	struct device *dev = ddev->dev;
+ 	struct device_node *np = dev->of_node;
+ 	struct device_node *entity, *port = NULL;
+-	struct drm_panel *panel = NULL;
+ 
+ 	DRM_DEBUG_DRIVER("\n");
+ 
+@@ -987,19 +1024,36 @@ static struct drm_panel *ltdc_get_panel(struct drm_device *ddev)
+ 
+ 		port = of_graph_get_remote_port_parent(entity);
+ 		if (port) {
++			struct drm_bridge *bridge;
++			struct drm_panel *panel;
++
++			bridge = of_drm_find_bridge(port);
+ 			panel = of_drm_find_panel(port);
+-			of_node_put(port);
++			if (!bridge && !panel) {
++				of_node_put(entity);
++				return -EPROBE_DEFER;
++			}
++
++			if (bridge) {
++				if (!ldev->bridge) {
++					ldev->bridge = bridge;
++					DRM_INFO("remote bridge %s\n",
++						 port->full_name);
++				}
++			}
++
+ 			if (panel) {
+-				DRM_DEBUG_DRIVER("remote panel %s\n",
++				if (!ldev->panel) {
++					ldev->panel = panel;
++					DRM_INFO("remote panel %s\n",
+ 						 port->full_name);
+-			} else {
+-				DRM_DEBUG_DRIVER("panel missing\n");
+-				of_node_put(entity);
++				}
+ 			}
++			of_node_put(port);
+ 		}
+ 	}
+ 
+-	return panel;
++	return 0;
+ }
+ 
+ int ltdc_load(struct drm_device *ddev)
+@@ -1017,9 +1071,9 @@ int ltdc_load(struct drm_device *ddev)
+ 
+ 	DRM_DEBUG_DRIVER("\n");
+ 
+-	ldev->panel = ltdc_get_panel(ddev);
+-	if (!ldev->panel)
+-		return -EPROBE_DEFER;
++	ret = ltdc_parse_dt(ddev);
++	if (ret)
++		return ret;
+ 
+ 	rstc = of_reset_control_get(np, NULL);
+ 
+@@ -1077,6 +1131,12 @@ int ltdc_load(struct drm_device *ddev)
+ 
+ 	DRM_INFO("ltdc hw version 0x%08x - ready\n", ldev->caps.hw_version);
+ 
++	if (ldev->bridge) {
++		encoder = bridge_encoder_create(ddev, ldev->bridge);
++		if (!encoder)
++			return -EINVAL;
++	}
++
+ 	if (ldev->panel) {
+ 		encoder = ltdc_rgb_encoder_create(ddev);
+ 		if (!encoder) {
+diff --git a/drivers/gpu/drm/stm/ltdc.h b/drivers/gpu/drm/stm/ltdc.h
+index 5427ef4..0083cad 100644
+--- a/drivers/gpu/drm/stm/ltdc.h
++++ b/drivers/gpu/drm/stm/ltdc.h
+@@ -25,6 +25,7 @@ struct ltdc_device {
+ 	void __iomem *regs;
+ 	struct clk *pixel_clk;	/* lcd pixel clock */
+ 	struct drm_panel *panel;
++	struct drm_bridge *bridge;
+ 	struct spinlock lock;	/* protecting irq status register */
+ 	struct ltdc_caps caps;
+ 	u32 clut[256];		/* color look up table */
 -- 
 1.9.1
