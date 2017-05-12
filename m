@@ -1,8 +1,8 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 12 May 2017 14:17:19 -0700
+From: danielmicay@gmail.com (Daniel Micay)
+Date: Fri, 12 May 2017 17:23:56 -0400
 Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
  limit before returning to user-mode
-In-Reply-To: <20170512210645.GS390@ZenIV.linux.org.uk>
+In-Reply-To: <CAGXu5jJu=VTqp2tzkPB4RAVxdGC+_SSQwrUwdzWpu24AA-zEcg@mail.gmail.com>
 References: <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
  <CAJcbSZEoRyewUtBHvqmNZL9FtT_q42Vmmd-EuC50x-ZRASiHHg@mail.gmail.com>
  <CA+55aFwvQfs_X+paQF6Luc0Rq+W3J2fKuHRou7=ANcquDdXdDA@mail.gmail.com>
@@ -14,38 +14,17 @@ References: <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
  <CAGXu5j+xmyJ6RhtPw9rUgs7k3sZ1KKWffvyGGG--oPfu9W42ng@mail.gmail.com>
  <20170512202106.GO22219@n2100.armlinux.org.uk>
  <20170512210645.GS390@ZenIV.linux.org.uk>
-Message-ID: <CAGXu5jJu=VTqp2tzkPB4RAVxdGC+_SSQwrUwdzWpu24AA-zEcg@mail.gmail.com>
+ <CAGXu5jJu=VTqp2tzkPB4RAVxdGC+_SSQwrUwdzWpu24AA-zEcg@mail.gmail.com>
+Message-ID: <1494624236.4521.4.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 2:06 PM, Al Viro <viro@zeniv.linux.org.uk> wrote:
-> On Fri, May 12, 2017 at 09:21:06PM +0100, Russell King - ARM Linux wrote:
->> On Fri, May 12, 2017 at 12:30:02PM -0700, Kees Cook wrote:
->> > I'm clearly not explaining things well enough. I shouldn't say
->> > "corruption", I should say "malicious manipulation". The methodology
->> > of attacks against the stack are quite different from the other kinds
->> > of attacks like use-after-free, heap overflow, etc. Being able to
->> > exhaust the kernel stack (either due to deep recursion or unbounded
->> > alloca())
->>
->> I really hope we don't have alloca() use in the kernel.  Do you have
->> evidence to support that assertion?
->>
->> IMHO alloca() (or similar) should not be present in any kernel code
->> because we have a limited stack - we have kmalloc() etc for that kind
->> of thing.
->
-> No alloca(), but there are VLAs.  Said that, the whole "what if they
-> can bugger thread_info and/or task_struct and go after set_fs() state"
-> is idiocy, of course - in that case the box is fucked, no matter what.
+> overflow into adjacent allocations (fixed by VMAP_STACK).
 
-Two things are at risk from stack exhaustion: thread_info (mainly
-addr_limit) when on the stack (fixed by THREAD_INFO_IN_TASK), and
-overflow into adjacent allocations (fixed by VMAP_STACK). The latter
-is fundamentally a heap overflow.
+99% fixed, but it's possible to skip over the guard page without
+-fstack-check enabled (plus some edge cases need to be fixed in GCC),
+unless VLAs were forbidden in addition to the existing large frame size
+warning.
 
--Kees
-
--- 
-Kees Cook
-Pixel Security
+I'm not sure about in-tree code, but Qualcomm had some of these
+improperly bounded VLA vulnerabilities in their MSM kernel...
