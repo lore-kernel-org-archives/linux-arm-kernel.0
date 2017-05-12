@@ -1,71 +1,43 @@
-From: luto@kernel.org (Andy Lutomirski)
-Date: Thu, 11 May 2017 23:13:49 -0700
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <CA+55aFwvQfs_X+paQF6Luc0Rq+W3J2fKuHRou7=ANcquDdXdDA@mail.gmail.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com>
- <20170508075209.7aluvpwildw325rf@gmail.com>
- <1494256932.1167.1.camel@gmail.com>
- <CAGXu5jL61K0bRSEg9a_LswNyrt3K1J57REbWVcvAXT54zWwtMA@mail.gmail.com>
- <20170509065619.wmqa6z6w3n6xpvrw@gmail.com> <20170509111007.GA14702@kroah.com>
- <CAJcbSZFswDWZoK-1UK+xkRMJ4ttSYbtH2Y5WD5_aPR-8ru6t8A@mail.gmail.com>
- <CAJcbSZEoRyewUtBHvqmNZL9FtT_q42Vmmd-EuC50x-ZRASiHHg@mail.gmail.com>
- <CA+55aFwvQfs_X+paQF6Luc0Rq+W3J2fKuHRou7=ANcquDdXdDA@mail.gmail.com>
-Message-ID: <CALCETrUYMSRV2vuhnDvb4myXgfsn-Z1PvprHSEL-xYfrANhr1g@mail.gmail.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Fri, 12 May 2017 08:39:50 +0200
+Subject: [PATCH 1/2] ARM: at91/defconfig: make system tickless when idle
+In-Reply-To: <20170505084343.10417-1-quentin.schulz@free-electrons.com>
+References: <20170505084343.10417-1-quentin.schulz@free-electrons.com>
+Message-ID: <00d91ef0-14f8-6065-2208-f4d7116adab7@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[resending because kernel.org seems to have mangled my SMTP
-credentials.  I wonder if this is a common problem.]
+Hi all,
 
-On Thu, May 11, 2017 at 4:44 PM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Thu, May 11, 2017 at 4:17 PM, Thomas Garnier <thgarnie@google.com> wrote:
->>
->> Ingo: Do you want the change as-is? Would you like it to be optional?
->> What do you think?
->
-> I'm not ingo, but I don't like that patch. It's in the wrong place -
-> that system call return code is too timing-critical to add address
-> limit checks.
->
-> Now what I think you *could* do is:
->
->  - make "set_fs()" actually set a work flag in the current thread flags
->
->  - do the test in the slow-path (syscall_return_slowpath).
->
-> Yes, yes, that ends up being architecture-specific, but it's fairly simple.
->
-> And it only slows down the system calls that actually use "set_fs()".
-> Sure, it will slow those down a fair amount, but they are hopefully a
-> small subset of all cases.
->
-> How does that sound to people?  Thats' where we currently do that
->
->         if (IS_ENABLED(CONFIG_PROVE_LOCKING) &&
->             WARN(irqs_disabled(), "syscall %ld left IRQs disabled",
-> regs->orig_ax))
->                 local_irq_enable();
->
-> check too, which is a fairly similar issue.
->
+On 05/05/2017 10:43, Quentin Schulz wrote:
+> This makes Atmel sama5 platforms' system tickless when idle.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-I like this.  It wouldn't help the problem that I suspect is a major
-part of the motivation for this patch: a stack overflow could
-overwrite addr_limit.  But we fixed that for real already.
+It's been a week since I posted this patch series. Any comment?
 
-Slightly off-topic: I would *love* to see syscall_return_slowpath() or
-similar moved or at least mostly moved into generic code.  Aside from
-the fact that it used to be written in asm, there's nothing
-fundamentally arch-specific about it.
+Thanks,
+Quentin
 
->
-> And it only slows down the system calls that actually use "set_fs()".
-> Sure, it will slow those down a fair amount, but they are hopefully a
-> small subset of all cases.
+> ---
+>  arch/arm/configs/sama5_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+> index 777c9e986425..2e1f096c96cb 100644
+> --- a/arch/arm/configs/sama5_defconfig
+> +++ b/arch/arm/configs/sama5_defconfig
+> @@ -3,6 +3,7 @@
+>  CONFIG_SYSVIPC=y
+>  CONFIG_FHANDLE=y
+>  CONFIG_IRQ_DOMAIN_DEBUG=y
+> +CONFIG_NO_HZ_IDLE=y
+>  CONFIG_LOG_BUF_SHIFT=14
+>  CONFIG_CGROUPS=y
+>  CONFIG_BLK_DEV_INITRD=y
+> 
 
-It won't even slow them down that much.  The slow path is reasonably
-fast these days.
+-- 
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
