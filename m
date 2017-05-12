@@ -1,75 +1,61 @@
 From: romain.perier@collabora.com (Romain Perier)
-Date: Fri, 12 May 2017 15:22:22 +0200
-Subject: [PATCH v3 2/3] arm: dts: rockchip: Don't set otp-gpio pinctrl by
- default in rk3288.dtsi
+Date: Fri, 12 May 2017 15:22:25 +0200
+Subject: [PATCH v3 1/3] SoC: es8328-i2c: Add compatible for ES8323
 In-Reply-To: <20170512132227.24916-1-romain.perier@collabora.com>
 References: <20170512132227.24916-1-romain.perier@collabora.com>
-Message-ID: <20170512132227.24916-7-romain.perier@collabora.com>
+Message-ID: <20170512132227.24916-10-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tsadc supports two reset methods: the cru and the otp_gpio. All
-boards except veyron and the evb simply use the cru-method and reuse the
-pin for something else. On the Firefly-RK3288 this is for example the
-case with the headphone. To prevent pinctrl-conflicts with these don't
-set the otp-gpio pinctrl by default but only in the boards using it.
+This commit adds a compatible string for everest,es8323. This is an
+audio codec that is compatible with es8328 and can be found for example
+on the Firefly-RK3288 board.
 
 Signed-off-by: Romain Perier <romain.perier@collabora.com>
 ---
 
 Changes in v3: None
-Changes in v2:
-- Added this patch
+Changes in v2: None
 
- arch/arm/boot/dts/rk3288-evb.dtsi    | 4 ++++
- arch/arm/boot/dts/rk3288-veyron.dtsi | 4 ++++
- arch/arm/boot/dts/rk3288.dtsi        | 4 ----
- 3 files changed, 8 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/sound/es8328.txt | 5 ++++-
+ sound/soc/codecs/es8328-i2c.c                      | 2 ++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 0dec94c3583b..28a69334b2d1 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -290,6 +290,10 @@
- };
+diff --git a/Documentation/devicetree/bindings/sound/es8328.txt b/Documentation/devicetree/bindings/sound/es8328.txt
+index 33fbf058c997..86b6d6e99732 100644
+--- a/Documentation/devicetree/bindings/sound/es8328.txt
++++ b/Documentation/devicetree/bindings/sound/es8328.txt
+@@ -4,7 +4,10 @@ This device supports both I2C and SPI.
  
- &tsadc {
-+	pinctrl-names = "init", "default", "sleep";
-+	pinctrl-0 = <&otp_gpio>;
-+	pinctrl-1 = <&otp_out>;
-+	pinctrl-2 = <&otp_gpio>;
- 	rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
- 	rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
-index 5d1eb0a25827..5603812494dd 100644
---- a/arch/arm/boot/dts/rk3288-veyron.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
-@@ -393,6 +393,10 @@
- &tsadc {
- 	status = "okay";
+ Required properties:
  
-+	pinctrl-names = "init", "default", "sleep";
-+	pinctrl-0 = <&otp_gpio>;
-+	pinctrl-1 = <&otp_out>;
-+	pinctrl-2 = <&otp_gpio>;
- 	rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
- 	rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
- };
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index df8a0dbe9d91..c41aa4f9d9c4 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -532,10 +532,6 @@
- 		clock-names = "tsadc", "apb_pclk";
- 		resets = <&cru SRST_TSADC>;
- 		reset-names = "tsadc-apb";
--		pinctrl-names = "init", "default", "sleep";
--		pinctrl-0 = <&otp_gpio>;
--		pinctrl-1 = <&otp_out>;
--		pinctrl-2 = <&otp_gpio>;
- 		#thermal-sensor-cells = <1>;
- 		rockchip,hw-tshut-temp = <95000>;
- 		status = "disabled";
+-  - compatible  : Should be "everest,es8328" or "everest,es8388"
++  - compatible  : Should be one of the following:
++	- "everest,es8323"
++	- "everest,es8328"
++	- "everest,es8388"
+   - DVDD-supply : Regulator providing digital core supply voltage 1.8 - 3.6V
+   - AVDD-supply : Regulator providing analog supply voltage 3.3V
+   - PVDD-supply : Regulator providing digital IO supply voltage 1.8 - 3.6V
+diff --git a/sound/soc/codecs/es8328-i2c.c b/sound/soc/codecs/es8328-i2c.c
+index 318ab28c5351..be3f03c35137 100644
+--- a/sound/soc/codecs/es8328-i2c.c
++++ b/sound/soc/codecs/es8328-i2c.c
+@@ -19,6 +19,7 @@
+ #include "es8328.h"
+ 
+ static const struct i2c_device_id es8328_id[] = {
++	{ "es8323", 0 },
+ 	{ "es8328", 0 },
+ 	{ "es8388", 0 },
+ 	{ }
+@@ -26,6 +27,7 @@ static const struct i2c_device_id es8328_id[] = {
+ MODULE_DEVICE_TABLE(i2c, es8328_id);
+ 
+ static const struct of_device_id es8328_of_match[] = {
++	{ .compatible = "everest,es8323", },
+ 	{ .compatible = "everest,es8328", },
+ 	{ .compatible = "everest,es8388", },
+ 	{ }
 -- 
 2.11.0
