@@ -1,9 +1,9 @@
 From: romain.perier@collabora.com (Romain Perier)
-Date: Fri, 12 May 2017 15:22:19 +0200
+Date: Fri, 12 May 2017 15:22:23 +0200
 Subject: [PATCH v3 3/3] arm: dts: Add support for ES8323 to the Firefly-RK3288
 In-Reply-To: <20170512132227.24916-1-romain.perier@collabora.com>
 References: <20170512132227.24916-1-romain.perier@collabora.com>
-Message-ID: <20170512132227.24916-4-romain.perier@collabora.com>
+Message-ID: <20170512132227.24916-8-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
