@@ -1,8 +1,8 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Fri, 12 May 2017 14:00:10 -0700
+Date: Fri, 12 May 2017 14:04:49 -0700
 Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
  limit before returning to user-mode
-In-Reply-To: <20170512204556.GP22219@n2100.armlinux.org.uk>
+In-Reply-To: <CAGXu5jL6FPuShBpZfi6+XHqOk4gxocUJRYPHT5oR3HYh3xm+sA@mail.gmail.com>
 References: <CAJcbSZEoRyewUtBHvqmNZL9FtT_q42Vmmd-EuC50x-ZRASiHHg@mail.gmail.com>
  <CA+55aFwvQfs_X+paQF6Luc0Rq+W3J2fKuHRou7=ANcquDdXdDA@mail.gmail.com>
  <20170512072802.5a686f23@mschwideX1>
@@ -14,44 +14,57 @@ References: <CAJcbSZEoRyewUtBHvqmNZL9FtT_q42Vmmd-EuC50x-ZRASiHHg@mail.gmail.com>
  <20170512202106.GO22219@n2100.armlinux.org.uk>
  <20170512203044.GI4626@worktop.programming.kicks-ass.net>
  <20170512204556.GP22219@n2100.armlinux.org.uk>
-Message-ID: <CAGXu5jL6FPuShBpZfi6+XHqOk4gxocUJRYPHT5oR3HYh3xm+sA@mail.gmail.com>
+ <CAGXu5jL6FPuShBpZfi6+XHqOk4gxocUJRYPHT5oR3HYh3xm+sA@mail.gmail.com>
+Message-ID: <CAGXu5jJEoTEkOdbVu+AQF8=_NRem3g5vECJYU=n8UNpfHbBHTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 1:45 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Fri, May 12, 2017 at 10:30:44PM +0200, Peter Zijlstra wrote:
->> On Fri, May 12, 2017 at 09:21:06PM +0100, Russell King - ARM Linux wrote:
->> > On Fri, May 12, 2017 at 12:30:02PM -0700, Kees Cook wrote:
->> > > I'm clearly not explaining things well enough. I shouldn't say
->> > > "corruption", I should say "malicious manipulation". The methodology
->> > > of attacks against the stack are quite different from the other kinds
->> > > of attacks like use-after-free, heap overflow, etc. Being able to
->> > > exhaust the kernel stack (either due to deep recursion or unbounded
->> > > alloca())
->> >
->> > I really hope we don't have alloca() use in the kernel.  Do you have
->> > evidence to support that assertion?
->> >
->> > IMHO alloca() (or similar) should not be present in any kernel code
->> > because we have a limited stack - we have kmalloc() etc for that kind
->> > of thing.
+On Fri, May 12, 2017 at 2:00 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Fri, May 12, 2017 at 1:45 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+>> On Fri, May 12, 2017 at 10:30:44PM +0200, Peter Zijlstra wrote:
+>>> On Fri, May 12, 2017 at 09:21:06PM +0100, Russell King - ARM Linux wrote:
+>>> > On Fri, May 12, 2017 at 12:30:02PM -0700, Kees Cook wrote:
+>>> > > I'm clearly not explaining things well enough. I shouldn't say
+>>> > > "corruption", I should say "malicious manipulation". The methodology
+>>> > > of attacks against the stack are quite different from the other kinds
+>>> > > of attacks like use-after-free, heap overflow, etc. Being able to
+>>> > > exhaust the kernel stack (either due to deep recursion or unbounded
+>>> > > alloca())
+>>> >
+>>> > I really hope we don't have alloca() use in the kernel.  Do you have
+>>> > evidence to support that assertion?
+>>> >
+>>> > IMHO alloca() (or similar) should not be present in any kernel code
+>>> > because we have a limited stack - we have kmalloc() etc for that kind
+>>> > of thing.
+>>>
+>>> On stack variable length arrays get implemented by the compiler doing
+>>> alloca(), and we sadly have a few of those around.
 >>
->> On stack variable length arrays get implemented by the compiler doing
->> alloca(), and we sadly have a few of those around.
+>> I hope their size is appropriately limited, but something tells me it
+>> would be foolish to assume that.
+>>
+>>> But yes, fully agreed on the desirability of alloca() and things.
+>>
+>> Hmm, I wonder if -fno-builtin-alloca would prevent those... it looks
+>> like it certainly would prevent an explicit alloca() call.
 >
-> I hope their size is appropriately limited, but something tells me it
-> would be foolish to assume that.
+> Building with -Werror=vla is exciting. :)
 >
->> But yes, fully agreed on the desirability of alloca() and things.
->
-> Hmm, I wonder if -fno-builtin-alloca would prevent those... it looks
-> like it certainly would prevent an explicit alloca() call.
+> A lot of it is in crypto (which are relatively static sizes, just
+> using function callbacks), but there is plenty more.
 
-Building with -Werror=vla is exciting. :)
+I meant to also paste an example (which is harmless, I haven't looked
+extensively at other examples):
 
-A lot of it is in crypto (which are relatively static sizes, just
-using function callbacks), but there is plenty more.
+        unsigned long alignmask = crypto_tfm_alg_alignmask(tfm);
+        unsigned int size = crypto_tfm_alg_blocksize(tfm);
+        u8 buffer[size + alignmask];
+
+Looking at all the places (and having tried to remove a few of these
+in pstore), I think it might be quite frustrating to eliminate them
+all and then declare VLAs dead. I'm not against trying, though. :)
 
 -Kees
 
