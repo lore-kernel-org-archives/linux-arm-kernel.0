@@ -1,70 +1,87 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 12 May 2017 10:12:06 +0100
-Subject: [PATCH 1/2] kvm: arm/arm64: Fix race in resetting stage2 PGD
-In-Reply-To: <1493821072-29713-2-git-send-email-suzuki.poulose@arm.com>
+Date: Fri, 12 May 2017 10:15:32 +0100
+Subject: [PATCH 2/2] kvm: arm/arm64: Fix use after free of stage2 page
+ table
+In-Reply-To: <1493821072-29713-3-git-send-email-suzuki.poulose@arm.com>
 References: <1493821072-29713-1-git-send-email-suzuki.poulose@arm.com>
- <1493821072-29713-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <91960d06-c0ff-38c3-4cab-6944cdb65766@arm.com>
+ <1493821072-29713-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <23e9374e-90d8-2240-58bc-15ff77d2d4ab@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 03/05/17 15:17, Suzuki K Poulose wrote:
-> In kvm_free_stage2_pgd() we check the stage2 PGD before holding
-> the lock and proceed to take the lock if it is valid. And we unmap
-> the page tables, followed by releasing the lock. We reset the PGD
-> only after dropping this lock, which could cause a race condition
-> where another thread waiting on or even holding the lock, could
-> potentially see that the PGD is still valid and proceed to perform
-> a stage2 operation and later encounter a NULL PGD.
+> We yield the kvm->mmu_lock occassionaly while performing an operation
+                             occasionally
+> (e.g, unmap or permission changes) on a large area of stage2 mappings.
+> However this could possibly cause another thread to clear and free up
+> the stage2 page tables while we were waiting for regaining the lock and
+> thus the original thread could end up in accessing memory that was
+> freed. This patch fixes the problem by making sure that the stage2
+> pagetable is still valid after we regain the lock. The fact that
+> mmu_notifer->release() could be called twice (via __mmu_notifier_release
+> and mmu_notifier_unregsister) enhances the possibility of hitting
+                   unregister
+> this race where there are two threads trying to unmap the entire guest
+> shadow pages.
 > 
-> [223090.242280] Unable to handle kernel NULL pointer dereference at
-> virtual address 00000040
-> [223090.262330] PC is at unmap_stage2_range+0x8c/0x428
-> [223090.262332] LR is at kvm_unmap_hva_handler+0x2c/0x3c
-> [223090.262531] Call trace:
-> [223090.262533] [<ffff0000080adb78>] unmap_stage2_range+0x8c/0x428
-> [223090.262535] [<ffff0000080adf40>] kvm_unmap_hva_handler+0x2c/0x3c
-> [223090.262537] [<ffff0000080ace2c>] handle_hva_to_gpa+0xb0/0x104
-> [223090.262539] [<ffff0000080af988>] kvm_unmap_hva+0x5c/0xbc
-> [223090.262543] [<ffff0000080a2478>]
-> kvm_mmu_notifier_invalidate_page+0x50/0x8c
-> [223090.262547] [<ffff0000082274f8>]
-> __mmu_notifier_invalidate_page+0x5c/0x84
-> [223090.262551] [<ffff00000820b700>] try_to_unmap_one+0x1d0/0x4a0
-> [223090.262553] [<ffff00000820c5c8>] rmap_walk+0x1cc/0x2e0
-> [223090.262555] [<ffff00000820c90c>] try_to_unmap+0x74/0xa4
-> [223090.262557] [<ffff000008230ce4>] migrate_pages+0x31c/0x5ac
-> [223090.262561] [<ffff0000081f869c>] compact_zone+0x3fc/0x7ac
-> [223090.262563] [<ffff0000081f8ae0>] compact_zone_order+0x94/0xb0
-> [223090.262564] [<ffff0000081f91c0>] try_to_compact_pages+0x108/0x290
-> [223090.262569] [<ffff0000081d5108>] __alloc_pages_direct_compact+0x70/0x1ac
-> [223090.262571] [<ffff0000081d64a0>] __alloc_pages_nodemask+0x434/0x9f4
-> [223090.262572] [<ffff0000082256f0>] alloc_pages_vma+0x230/0x254
-> [223090.262574] [<ffff000008235e5c>] do_huge_pmd_anonymous_page+0x114/0x538
-> [223090.262576] [<ffff000008201bec>] handle_mm_fault+0xd40/0x17a4
-> [223090.262577] [<ffff0000081fb324>] __get_user_pages+0x12c/0x36c
-> [223090.262578] [<ffff0000081fb804>] get_user_pages_unlocked+0xa4/0x1b8
-> [223090.262579] [<ffff0000080a3ce8>] __gfn_to_pfn_memslot+0x280/0x31c
-> [223090.262580] [<ffff0000080a3dd0>] gfn_to_pfn_prot+0x4c/0x5c
-> [223090.262582] [<ffff0000080af3f8>] kvm_handle_guest_abort+0x240/0x774
-> [223090.262584] [<ffff0000080b2bac>] handle_exit+0x11c/0x1ac
-> [223090.262586] [<ffff0000080ab99c>] kvm_arch_vcpu_ioctl_run+0x31c/0x648
-> [223090.262587] [<ffff0000080a1d78>] kvm_vcpu_ioctl+0x378/0x768
-> [223090.262590] [<ffff00000825df5c>] do_vfs_ioctl+0x324/0x5a4
-> [223090.262591] [<ffff00000825e26c>] SyS_ioctl+0x90/0xa4
-> [223090.262595] [<ffff000008085d84>] el0_svc_naked+0x38/0x3c
+> While at it, cleanup the redudant checks around cond_resched_lock in
+                           redundant
+> stage2_wp_range(), as cond_resched_lock already does the same checks.
 > 
-> This patch moves the stage2 PGD manipulation under the lock.
-> 
-> Reported-by: Alexander Graf <agraf@suse.de>
 > Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Radim Kr?m?? <rkrcmar@redhat.com>
+> Cc: andreyknvl at google.com
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
 > Cc: Marc Zyngier <marc.zyngier@arm.com>
 > Cc: Paolo Bonzini <pbonzini@redhat.com>
-> Cc: Radim Kr?m?? <rkrcmar@redhat.com>
-> Reviewed-by: Christoffer Dall <cdall@linaro.org>
 > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm/kvm/mmu.c | 17 ++++++++++++-----
+>  1 file changed, 12 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 909a1a7..5b3e0db 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -301,9 +301,14 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>  		/*
+>  		 * If the range is too large, release the kvm->mmu_lock
+>  		 * to prevent starvation and lockup detector warnings.
+> +		 * Make sure the page table is still active when we regain
+> +		 * the lock.
+>  		 */
+> -		if (next != end)
+> +		if (next != end) {
+>  			cond_resched_lock(&kvm->mmu_lock);
+> +			if (!READ_ONCE(kvm->arch.pgd))
+> +				break;
+> +		}
+>  	} while (pgd++, addr = next, addr != end);
+>  }
+>  
+> @@ -1170,11 +1175,13 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+>  		 * large. Otherwise, we may see kernel panics with
+>  		 * CONFIG_DETECT_HUNG_TASK, CONFIG_LOCKUP_DETECTOR,
+>  		 * CONFIG_LOCKDEP. Additionally, holding the lock too long
+> -		 * will also starve other vCPUs.
+> +		 * will also starve other vCPUs. We have to also make sure
+> +		 * that the page tables are not freed while we released
+> +		 * the lock.
+>  		 */
+> -		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+> -			cond_resched_lock(&kvm->mmu_lock);
+> -
+> +		cond_resched_lock(&kvm->mmu_lock);
+> +		if (!READ_ONCE(kvm->arch.pgd))
+> +			break;
+>  		next = stage2_pgd_addr_end(addr, end);
+>  		if (stage2_pgd_present(*pgd))
+>  			stage2_wp_puds(pgd, addr, next);
+> 
 
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Thanks,
 
 	M.
 -- 
