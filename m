@@ -1,33 +1,65 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 12 May 2017 08:46:43 +0800
-Subject: [v3, 0/5] Add eSDHC UHS-I/HS200 mode support for
- ls1012a/ls1046a/ls208xa
-In-Reply-To: <1494297429-12083-1-git-send-email-yangbo.lu@nxp.com>
-References: <1494297429-12083-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <20170512004641.GB8471@dragon>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Fri, 12 May 2017 10:42:50 +0800
+Subject: [PATCH v2] [media] mtk-mdp: Fix g_/s_selection capture/compose logic
+Message-ID: <1494556970-12278-1-git-send-email-minghsiu.tsai@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 09, 2017 at 10:37:04AM +0800, Yangbo Lu wrote:
-> This patchset is to add eSDHC UHS-I/HS200 mode support for ls1012a/ls1046a/ls208xa.
-> Also add eSDHC node for ls1088a. Because eSDHC is not a standard SD controller,
-> the specific speed mode support depends on board's peripheral circuit for eSDHC.
-> So, we have to add these speed modes support on board dts file.
-> 
-> In additon, these dts patches depends on esdhc driver patches which just had been merged
-> on mmc.git. Otherwise, the UHS-I SD card and eMMC HS200 card would fail to be initialized,
-> but other cards still could work fine.
-> https://patchwork.kernel.org/patch/9689875/
-> https://patchwork.kernel.org/patch/9689877/
-> https://patchwork.kernel.org/patch/9689879/
-> https://patchwork.kernel.org/patch/9689887/
-> https://patchwork.kernel.org/patch/9689885/
-> 
-> Yangbo Lu (5):
->   mmc: dt: add compatible into eSDHC required properties
->   arm64: dts: ls1046a: support SD UHS-I and eMMC HS200 on RDB
->   arm64: dts: ls208xa: support SD UHS-I on RDB and eMMC HS200 on QDS
->   arm64: dts: ls1012a: add eSDHC nodes
->   arm64: dts: ls1088a: add esdhc node
+From: Daniel Kurtz <djkurtz@chromium.org>
 
-Applied all, thanks.
+Experiments show that the:
+ (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
+ (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
+
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
+
+---
+Changes in v2:
+. Can not use *_MPLANE type in g_/s_selection 
+---
+ drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+index 13afe48..e18ac626 100644
+--- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
++++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+@@ -838,10 +838,10 @@ static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
+ 	bool valid = false;
+ 
+ 	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+-		if (mtk_mdp_is_target_compose(s->target))
++		if (mtk_mdp_is_target_crop(s->target))
+ 			valid = true;
+ 	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+-		if (mtk_mdp_is_target_crop(s->target))
++		if (mtk_mdp_is_target_compose(s->target))
+ 			valid = true;
+ 	}
+ 	if (!valid) {
+@@ -908,10 +908,10 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
+ 	bool valid = false;
+ 
+ 	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+-		if (s->target == V4L2_SEL_TGT_COMPOSE)
++		if (s->target == V4L2_SEL_TGT_CROP)
+ 			valid = true;
+ 	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+-		if (s->target == V4L2_SEL_TGT_CROP)
++		if (s->target == V4L2_SEL_TGT_COMPOSE)
+ 			valid = true;
+ 	}
+ 	if (!valid) {
+@@ -925,7 +925,7 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
+ 	if (ret)
+ 		return ret;
+ 
+-	if (mtk_mdp_is_target_crop(s->target))
++	if (mtk_mdp_is_target_compose(s->target))
+ 		frame = &ctx->s_frame;
+ 	else
+ 		frame = &ctx->d_frame;
+-- 
+1.9.1
