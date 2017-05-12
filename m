@@ -1,38 +1,54 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Fri, 12 May 2017 08:15:49 +0100
-Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
- limit before returning to user-mode
-In-Reply-To: <20170512070012.7dysuhbkcas7ibaj@gmail.com>
-References: <20170428153213.137279-1-thgarnie@google.com>
- <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com>
- <20170508124621.GA20705@kroah.com>
- <20170509064522.anusoikaalvlux3w@gmail.com>
- <20170509085659.GA32555@infradead.org>
- <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
- <20170512070012.7dysuhbkcas7ibaj@gmail.com>
-Message-ID: <20170512071549.GP390@ZenIV.linux.org.uk>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Fri, 12 May 2017 07:22:02 +0000
+Subject: [PATCH 1/1] ARM: compressed/head.S: fix __nop macro rept number
+ for ARMv7M
+In-Reply-To: <1493110893-21857-1-git-send-email-patrice.chotard@st.com>
+References: <1493110893-21857-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <ee014785-f025-8b16-14a7-7f1d86403421@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 09:00:12AM +0200, Ingo Molnar wrote:
+Hi all
 
-> > How about trying to remove all of them?  If we could actually get rid
-> > of all of them, we could drop the arch support, and we'd get faster,
-> > simpler, shorter uaccess code throughout the kernel.
-> 
-> I'm all for that!
+It's a gentle reminder to not forgot this patch.
 
-Oh, for...  Ingo, do you really want to go through all ->write() and ->read()
-instances, converting all of them to iov_iter?  Or, better yet, deal with
-the patch flood from Nick Krause sock puppet brigade?
+Thanks
 
-Folks, seriously, have you even looked through that zoo?  I have, and it's
-really, really not fun.  Sure, we can say "fuck 'em, no need to allow
-splice() on random crap".  Would be perfectly reasonable, expect that
-it's not the only place doing kernel_write() and its ilk...
+Patrice
 
-And converting everything to ->read_iter()/->write_iter() means an insane
-amount of code churn, not to mention coping with random bogosities in
-semantics.  ->read() and ->write() are going to stay around, pretty
-much indefinitely.
+On 04/25/2017 11:01 AM, patrice.chotard at st.com wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
+>
+> In zImage, _magic_sig is located at offset 0x24.
+> But for ARMv7M architecture which enable CPU_THUMBONLY
+> and !EFI_STUB kernel flag, _magic_sig is located at offset 0x14
+>
+> 00000000  00 46 00 46 00 46 00 46  00 46 00 46 00 46 0f f2  |.F.F.F.F.F.F.F.?|
+> 00000010  15 0c 60 47 18 28 6f 01  00 00 00 00 28 5c 0e 00  |..`G.(o.....(\..|
+> 00000020  01 02 03 04 0f 46 90 46  00 00 00 00 00 00 00 00  |.....F.F........|
+>
+> Reproduced with stm32_defconfig with XIP_KERNEL flag disabled.
+>
+> To restore correct _magic_sig offset at 0x24, we add 8 additional
+> "mov r0, r0" instruction.
+>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> ---
+>  arch/arm/boot/compressed/head.S | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 9150f97..5d9cda3 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -127,7 +127,8 @@
+>   AR_CLASS(	.arm	)
+>  start:
+>  		.type	start,#function
+> -		.rept	7
+> +   ARM(		.rept	7)
+> + THUMB(		.rept	15)
+>  		__nop
+>  		.endr
+>     ARM(		mov	r0, r0		)
+>
