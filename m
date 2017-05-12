@@ -1,92 +1,109 @@
 From: madalin.bucur@nxp.com (Madalin-Cristian Bucur)
-Date: Fri, 12 May 2017 14:14:12 +0000
-Subject: [PATCH 1/3] dts: arm64: add DPAA QBMan portals
-In-Reply-To: <20170331014945.GH683@dragon>
+Date: Fri, 12 May 2017 14:14:15 +0000
+Subject: [PATCH 2/3] dts: arm64: add LS1043A DPAA QBMan nodes
+In-Reply-To: <20170331020255.GI683@dragon>
 References: <1490884672-18294-1-git-send-email-madalin.bucur@nxp.com>
- <1490884672-18294-2-git-send-email-madalin.bucur@nxp.com>
- <20170331014945.GH683@dragon>
-Message-ID: <AM5PR0402MB269109AD8E249CAD01C94BA1ECE20@AM5PR0402MB2691.eurprd04.prod.outlook.com>
+ <1490884672-18294-3-git-send-email-madalin.bucur@nxp.com>
+ <20170331020255.GI683@dragon>
+Message-ID: <AM5PR0402MB269150AB044CD385DA2C07DAECE20@AM5PR0402MB2691.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
 > From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Friday, March 31, 2017 4:50 AM
-> On Thu, Mar 30, 2017 at 05:37:50PM +0300, Madalin Bucur wrote:
-> > Add the DPAA 1.x DPAA QMan and BMan portal nodes.
+> On Thu, Mar 30, 2017 at 05:37:51PM +0300, Madalin Bucur wrote:
+> > Add the DPAA 1.x QMan and BMan nodes in the LS1043A device tree.
 > >
 > > Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 > > Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
-> 
-> The patches should be prefixed like 'arm64: dts: ...'.
-> 
 > > ---
-> >  .../boot/dts/freescale/qoriq-bman1-portals.dtsi    | 67
-> +++++++++++++++++++
-> >  .../boot/dts/freescale/qoriq-qman1-portals.dtsi    | 76
-> ++++++++++++++++++++++
-> >  2 files changed, 143 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/freescale/qoriq-bman1-
-> portals.dtsi
-> >  create mode 100644 arch/arm64/boot/dts/freescale/qoriq-qman1-
-> portals.dtsi
-> 
-> What does the suffix number '1' mean here?
-
-Will be removed, was used to differentiate between different revisions
-on PPC, inherited from there.
-
+> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 52
+> ++++++++++++++++++++++++++
+> >  1 file changed, 52 insertions(+)
 > >
-> > diff --git a/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
-> b/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
-> > new file mode 100644
-> > index 0000000..b007344
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
-> > @@ -0,0 +1,67 @@
-> > +/*
-> > + * QorIQ BMan Portals device tree
-> > + *
-> > + * Copyright 2011-2016 Freescale Semiconductor Inc.
-> > + *
-> > + * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
-> > + */
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> > index ec13a6e..8434e89 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> > @@ -106,6 +106,33 @@
+> >  		      /* DRAM space 1, size: 2GiB DRAM */
+> >  	};
+> >
+> > +	reserved-memory {
+> > +		#address-cells = <2>;
+> > +		#size-cells = <2>;
+> > +		ranges;
 > > +
-> > +&bportals {
-> > +	#address-cells = <1>;
-> > +	#size-cells = <1>;
-> > +	compatible = "simple-bus";
+> > +		bman_fbpr: bman-fbpr {
+> > +			compatible = "shared-dma-pool";
+> > +			size = <0 0x1000000>;
+> > +			alignment = <0 0x1000000>;
+> > +			no-map;
+> > +		};
 > > +
-> > +	bman-portal at 0 {
-> > +		compatible = "fsl,bman-portal";
+> > +		qman_fqd: qman-fqd {
+> > +			compatible = "shared-dma-pool";
+> > +			size = <0 0x400000>;
+> > +			alignment = <0 0x400000>;
+> > +			no-map;
+> > +		};
+> > +
+> > +		qman_pfdr: qman-pfdr {
+> > +			compatible = "shared-dma-pool";
+> > +			size = <0 0x2000000>;
+> > +			alignment = <0 0x2000000>;
+> > +			no-map;
+> > +		};
+> > +	};
+> > +
+> >  	sysclk: sysclk {
+> >  		compatible = "fixed-clock";
+> >  		#clock-cells = <0>;
+> > @@ -333,6 +360,28 @@
+> >  			};
+> >  		};
+> >
+> > +		qman: qman at 1880000 {
+> > +			compatible = "fsl,qman";
+> > +			reg = <0x00 0x1880000 0x0 0x10000>;
 > 
-> The bindings/soc/fsl/bman-portals.txt says: Must include
-> "fsl,bman-portal-<hardware revision>".
-
-This is satisfied by device tree fix-ups performed by the bootloader
-adding the correct version. I'll introduce a comment about this here.
-
-> > +		reg = <0x0 0x4000 0x4000000 0x4000>;
+> s/0x00/0x0?
 > 
-> Can we write it in the same way how the example in the bindings doc
-> does?
-> 
-> 	reg = <0x0 0x4000>, <0x4000000 0x4000>;
-> 
-> It's more obvious to tell that it has two memory regions.
-
-Will change that.
- 
-> > +		interrupts = <0 173 0x4>;
-> 
-> Can we use GIC_SPI and IRQ_TYPE_LEVEL_HIGH which are defined by
-> headers in include/dt-bindings/interrupt-controller/ to make it more
-> readable?
-
-Yes, done.
-
 > Shawn
-<snip>
 
-Thanks,
-Madalin
+Yes, fixed all new introduced occurrences.
+
+> > +			interrupts = <0 45 0x4>;
+> > +			memory-region = <&qman_fqd &qman_pfdr>;
+> > +		};
+> > +
+> > +		bman: bman at 1890000 {
+> > +			compatible = "fsl,bman";
+> > +			reg = <0x00 0x1890000 0x0 0x10000>;
+> > +			interrupts = <0 45 0x4>;
+> > +			memory-region = <&bman_fbpr>;
+> > +		};
+> > +
+> > +		bportals: bman-portals at 508000000 {
+> > +			ranges = <0x0 0x5 0x08000000 0x8000000>;
+> > +		};
+> > +
+> > +		qportals: qman-portals at 500000000 {
+> > +			ranges = <0x0 0x5 0x00000000 0x8000000>;
+> > +		};
+> > +
+> >  		dspi0: dspi at 2100000 {
+> >  			compatible = "fsl,ls1043a-dspi", "fsl,ls1021a-v1.0-
+> dspi";
+> >  			#address-cells = <1>;
+> > @@ -686,3 +735,6 @@
+> >  	};
+> >
+> >  };
+> > +
+> > +#include "qoriq-qman1-portals.dtsi"
+> > +#include "qoriq-bman1-portals.dtsi"
+> > --
+> > 2.1.0
+> >
