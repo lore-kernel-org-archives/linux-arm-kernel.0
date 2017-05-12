@@ -1,44 +1,61 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Fri, 12 May 2017 09:25:32 -0500
-Subject: [PATCH] socfpga_a10: reset CPU1 in socfpga_cpu_kill()
-In-Reply-To: <20170510051304.131042-2-yanjiang.jin@windriver.com>
-References: <20170510051304.131042-1-yanjiang.jin@windriver.com>
- <20170510051304.131042-2-yanjiang.jin@windriver.com>
-Message-ID: <5c3ad20d-5d22-3164-e678-5122efed4d74@kernel.org>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Fri, 12 May 2017 16:35:45 +0200
+Subject: [PATCH V2] serial: efm32: Fix parity management in
+ 'efm32_uart_console_get_options()'
+Message-ID: <20170512143545.15394-1-christophe.jaillet@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+UARTn_FRAME_PARITY_ODD is 0x0300
+UARTn_FRAME_PARITY_EVEN is 0x0200
+So if the UART is configured for EVEN parity, it would be reported as ODD.
+Fix it by correctly testing if the 2 bits are set.
 
+Fixes: 3afbd89c9639 ("serial/efm32: add new driver")
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+---
+v2: Add UARTn_FRAME_PARITY__MASK
+    Test the 2 parity bits in the EVEN case
 
-On 05/10/2017 12:13 AM, yanjiang.jin at windriver.com wrote:
-> From: Yanjiang Jin <yanjiang.jin@windriver.com>
-> 
-> Kexec's second kernel would hang if CPU1 isn't reset.
-> 
+v1 and related comment are quite old and can be found at:
+   http://marc.info/?t=148676095800005&r=1&w=4
+I also added a __MASK to the proposed constant name to be consistent with
+UARTn_FRAME_DATABITS__MASK
+---
+ drivers/tty/serial/efm32-uart.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-Can you please be a bit more descriptive on the commit log? Is it
-because when kexec starts, the SMP on the kexec's kernel try to run on CPU1?
-
-
-> Signed-off-by: Yanjiang Jin <yanjiang.jin@windriver.com>
-> ---
->  arch/arm/mach-socfpga/platsmp.c | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-> index 0ee7677..db3940e 100644
-> --- a/arch/arm/mach-socfpga/platsmp.c
-> +++ b/arch/arm/mach-socfpga/platsmp.c
-> @@ -117,6 +117,16 @@ static int socfpga_cpu_kill(unsigned int cpu)
->  {
->  	return 1;
->  }
-> +
-> +static int socfpga_a10_cpu_kill(unsigned int cpu)
-> +{
-> +	/* This will put CPU #1 into reset. */
-> +	if (socfpga_cpu1start_addr)
-
-Do you need to check for socfpga_cpu1start_addr?
-
-Dinh
+diff --git a/drivers/tty/serial/efm32-uart.c b/drivers/tty/serial/efm32-uart.c
+index ebd8569f9ad5..9fff25be87f9 100644
+--- a/drivers/tty/serial/efm32-uart.c
++++ b/drivers/tty/serial/efm32-uart.c
+@@ -27,6 +27,7 @@
+ #define UARTn_FRAME		0x04
+ #define UARTn_FRAME_DATABITS__MASK	0x000f
+ #define UARTn_FRAME_DATABITS(n)		((n) - 3)
++#define UARTn_FRAME_PARITY__MASK	0x0300
+ #define UARTn_FRAME_PARITY_NONE		0x0000
+ #define UARTn_FRAME_PARITY_EVEN		0x0200
+ #define UARTn_FRAME_PARITY_ODD		0x0300
+@@ -572,12 +573,16 @@ static void efm32_uart_console_get_options(struct efm32_uart_port *efm_port,
+ 			16 * (4 + (clkdiv >> 6)));
+ 
+ 	frame = efm32_uart_read32(efm_port, UARTn_FRAME);
+-	if (frame & UARTn_FRAME_PARITY_ODD)
++	switch (frame & UARTn_FRAME_PARITY__MASK) {
++	case UARTn_FRAME_PARITY_ODD:
+ 		*parity = 'o';
+-	else if (frame & UARTn_FRAME_PARITY_EVEN)
++		break;
++	case UARTn_FRAME_PARITY_EVEN:
+ 		*parity = 'e';
+-	else
++		break;
++	default:
+ 		*parity = 'n';
++	}
+ 
+ 	*bits = (frame & UARTn_FRAME_DATABITS__MASK) -
+ 			UARTn_FRAME_DATABITS(4) + 4;
+-- 
+2.11.0
