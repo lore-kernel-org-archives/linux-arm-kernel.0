@@ -1,41 +1,34 @@
 From: luto@kernel.org (Andy Lutomirski)
-Date: Fri, 12 May 2017 16:15:56 -0700
-Subject: [PATCH v9 1/4] syscalls: Verify address limit before returning to
- user-mode
-In-Reply-To: <20170508204858.GT29622@ZenIV.linux.org.uk>
+Date: Fri, 12 May 2017 16:20:31 -0700
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <20170512071549.GP390@ZenIV.linux.org.uk>
 References: <20170428153213.137279-1-thgarnie@google.com>
  <CAJcbSZGQsRVg3QZ9QfLn2HBC+RP-7fUTab0bYDJ455d8y8GyNw@mail.gmail.com>
- <20170508073352.caqe3fqf7nuxypgi@gmail.com>
- <CAGXu5jKZRESgGhZ6GEoO784Q1G8V0DPcwM1T2PpyTqvEAsrUdg@mail.gmail.com>
- <20170508140230.23kxf2kfeazeo4zr@gmail.com>
- <CAG48ez0Hz=CimkPwuq903tgJkGj8gXUtiQJJb-P2zUes6bd6Hw@mail.gmail.com>
- <20170508204858.GT29622@ZenIV.linux.org.uk>
-Message-ID: <CALCETrXv1-B=gc3eWcgsztr6vdao6fs9U8ATNK8t414GkVCObw@mail.gmail.com>
+ <20170508073352.caqe3fqf7nuxypgi@gmail.com> <20170508124621.GA20705@kroah.com>
+ <20170509064522.anusoikaalvlux3w@gmail.com>
+ <20170509085659.GA32555@infradead.org>
+ <CALCETrUh8NO2scaqEM48K70Fo2+V3=Cpyk4JurCDiCYp4nm_+g@mail.gmail.com>
+ <20170512070012.7dysuhbkcas7ibaj@gmail.com>
+ <20170512071549.GP390@ZenIV.linux.org.uk>
+Message-ID: <CALCETrXMgx+pFsL-5s6jRHxsTCJk8U8f5AFMzchsy_L6DyMAvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 8, 2017 at 1:48 PM, Al Viro <viro@zeniv.linux.org.uk> wrote:
-> On Mon, May 08, 2017 at 04:06:35PM +0200, Jann Horn wrote:
->
->> I think Kees might be talking about
->> https://bugs.chromium.org/p/project-zero/issues/detail?id=822, fixed in
->> commit e6978e4bf181fb3b5f8cb6f71b4fe30fbf1b655c. The issue was that
->> perf code that can run in pretty much any context called access_ok().
->
-> And that commit has *NOT* solved the problem.  perf_callchain_user()
-> can be called synchronously, without passing through that code.
-> Tracepoint shite...
->
-> That set_fs() should be done in get_perf_callchain(), just around the call of
-> perf_callchain_user().  Along with pagefault_disable(), actually.
->
+On Fri, May 12, 2017 at 12:15 AM, Al Viro <viro@zeniv.linux.org.uk> wrote:
 
-Even that's not quite enough because of a different issue: perf nmis
-can hit during scheduling or when we're in lazy mm, leading to the
-entirely wrong set of page tables being used.  We need
-nmi_uaccess_begin() and nmi_uaccess_end(), and the former needs to be
-allowed to fail.
+> Folks, seriously, have you even looked through that zoo?  I have, and it's
+> really, really not fun.  Sure, we can say "fuck 'em, no need to allow
+> splice() on random crap".  Would be perfectly reasonable, expect that
+> it's not the only place doing kernel_write() and its ilk...
 
-AFAIK this isn't presently a security problem because it mainly
-affects kernel threads, and you need to be root to profile them, but
-maybe there's some race where it does matter.
+Can you clarify this?  I think we really may be able to do exactly
+this.  From Christoph's list, there are only two things that need
+kernel_read/kernel_write to user-supplied fds that may come from a
+variety of sources: splice and exec.  If you're execing a chardev from
+a crappy driver, something is seriously wrong.  And returning -EINVAL
+from splice() to or from files that use ->read and ->write seems find
+(and splice(2) even documents -EINVAL as meaning that the target
+doesn't support splicing).
+
+--Andy
