@@ -1,61 +1,80 @@
-From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Fri, 12 May 2017 16:35:45 +0200
-Subject: [PATCH V2] serial: efm32: Fix parity management in
- 'efm32_uart_console_get_options()'
-Message-ID: <20170512143545.15394-1-christophe.jaillet@wanadoo.fr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 12 May 2017 15:36:01 +0100
+Subject: [PATCH] socfpga_a10: reset CPU1 in socfpga_cpu_kill()
+In-Reply-To: <20170510051304.131042-2-yanjiang.jin@windriver.com>
+References: <20170510051304.131042-1-yanjiang.jin@windriver.com>
+ <20170510051304.131042-2-yanjiang.jin@windriver.com>
+Message-ID: <20170512143600.GB18818@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UARTn_FRAME_PARITY_ODD is 0x0300
-UARTn_FRAME_PARITY_EVEN is 0x0200
-So if the UART is configured for EVEN parity, it would be reported as ODD.
-Fix it by correctly testing if the 2 bits are set.
+On Wed, May 10, 2017 at 01:13:04AM -0400, yanjiang.jin at windriver.com wrote:
+> From: Yanjiang Jin <yanjiang.jin@windriver.com>
+> 
+> Kexec's second kernel would hang if CPU1 isn't reset.
+> 
+> Signed-off-by: Yanjiang Jin <yanjiang.jin@windriver.com>
+> ---
+>  arch/arm/mach-socfpga/platsmp.c | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
+> index 0ee7677..db3940e 100644
+> --- a/arch/arm/mach-socfpga/platsmp.c
+> +++ b/arch/arm/mach-socfpga/platsmp.c
+> @@ -117,6 +117,16 @@ static int socfpga_cpu_kill(unsigned int cpu)
+>  {
+>  	return 1;
+>  }
+> +
+> +static int socfpga_a10_cpu_kill(unsigned int cpu)
+> +{
+> +	/* This will put CPU #1 into reset. */
+> +	if (socfpga_cpu1start_addr)
+> +		writel(RSTMGR_MPUMODRST_CPU1, rst_manager_base_addr +
+> +			SOCFPGA_A10_RSTMGR_MODMPURST);
+> +
+> +	return 1;
+> +}
+>  #endif
 
-Fixes: 3afbd89c9639 ("serial/efm32: add new driver")
-Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
----
-v2: Add UARTn_FRAME_PARITY__MASK
-    Test the 2 parity bits in the EVEN case
+I agree that currently, socfpga_cpu_die is completely bogus, as the CPU is just
+sat in WFI with the MMU, caches, etc enabled, and not actually off:
 
-v1 and related comment are quite old and can be found at:
-   http://marc.info/?t=148676095800005&r=1&w=4
-I also added a __MASK to the proposed constant name to be consistent with
-UARTn_FRAME_DATABITS__MASK
----
- drivers/tty/serial/efm32-uart.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+static void socfpga_cpu_die(unsigned int cpu)
+{
+        /* Do WFI. If we wake up early, go back into WFI */
+        while (1)
+                cpu_do_idle();
+}
 
-diff --git a/drivers/tty/serial/efm32-uart.c b/drivers/tty/serial/efm32-uart.c
-index ebd8569f9ad5..9fff25be87f9 100644
---- a/drivers/tty/serial/efm32-uart.c
-+++ b/drivers/tty/serial/efm32-uart.c
-@@ -27,6 +27,7 @@
- #define UARTn_FRAME		0x04
- #define UARTn_FRAME_DATABITS__MASK	0x000f
- #define UARTn_FRAME_DATABITS(n)		((n) - 3)
-+#define UARTn_FRAME_PARITY__MASK	0x0300
- #define UARTn_FRAME_PARITY_NONE		0x0000
- #define UARTn_FRAME_PARITY_EVEN		0x0200
- #define UARTn_FRAME_PARITY_ODD		0x0300
-@@ -572,12 +573,16 @@ static void efm32_uart_console_get_options(struct efm32_uart_port *efm_port,
- 			16 * (4 + (clkdiv >> 6)));
- 
- 	frame = efm32_uart_read32(efm_port, UARTn_FRAME);
--	if (frame & UARTn_FRAME_PARITY_ODD)
-+	switch (frame & UARTn_FRAME_PARITY__MASK) {
-+	case UARTn_FRAME_PARITY_ODD:
- 		*parity = 'o';
--	else if (frame & UARTn_FRAME_PARITY_EVEN)
-+		break;
-+	case UARTn_FRAME_PARITY_EVEN:
- 		*parity = 'e';
--	else
-+		break;
-+	default:
- 		*parity = 'n';
-+	}
- 
- 	*bits = (frame & UARTn_FRAME_DATABITS__MASK) -
- 			UARTn_FRAME_DATABITS(4) + 4;
--- 
-2.11.0
+... so that goes wrong as soon as the kerenl text gets ovewritten.
+
+However, AFAICT, this patch forcibly resets is without any teardown
+having happened. That will surely result in data being lost from the
+caches, for example.
+
+So I think this is incomplete.
+
+Thanks,
+Mark.
+
+>  
+>  static const struct smp_operations socfpga_smp_ops __initconst = {
+> @@ -133,7 +143,7 @@ static int socfpga_cpu_kill(unsigned int cpu)
+>  	.smp_boot_secondary	= socfpga_a10_boot_secondary,
+>  #ifdef CONFIG_HOTPLUG_CPU
+>  	.cpu_die		= socfpga_cpu_die,
+> -	.cpu_kill		= socfpga_cpu_kill,
+> +	.cpu_kill		= socfpga_a10_cpu_kill,
+>  #endif
+>  };
+>  
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
