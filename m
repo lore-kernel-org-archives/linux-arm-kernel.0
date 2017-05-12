@@ -1,79 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 12 May 2017 11:25:32 +0200
-Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
-In-Reply-To: <f529e2d1-68e0-2760-3fd0-c7b0e94dd003@arm.com>
-References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
- <CACRpkdasvjBPcr5RrPwtTYaoGeTEJMWqXbSRaB5-cOEKXbpfRg@mail.gmail.com>
- <f529e2d1-68e0-2760-3fd0-c7b0e94dd003@arm.com>
-Message-ID: <CACRpkdZhUnu09CcRwkLS9Qf83OLiKkTVCQxZY0tsJmBHNAirVw@mail.gmail.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Fri, 12 May 2017 15:07:01 +0530
+Subject: [PATCH v5 3/3] phy: Group vendor specific phy drivers
+In-Reply-To: <5fe76bcc-5ff7-0bf1-7fdd-c141211d86dc@ti.com>
+References: <1494485262-18995-1-git-send-email-vivek.gautam@codeaurora.org>
+ <1494485262-18995-3-git-send-email-vivek.gautam@codeaurora.org>
+ <5fe76bcc-5ff7-0bf1-7fdd-c141211d86dc@ti.com>
+Message-ID: <8143c6b8-aaac-557b-98c1-00c957f3fcb6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 4:20 PM, Andre Przywara <andre.przywara@arm.com> wrote:
->> On Thu, May 4, 2017 at 1:57 AM, Andre Przywara <andre.przywara@arm.com> wrote:
->>
->>> When a pinctrl driver gets interrupted during its probe process
->>> (returning -EPROBE_DEFER), the devres system cleans up all allocated
->>> resources. During this process it calls pinmux_generic_free_functions()
->>> and pinctrl_generic_free_groups(), which in turn use managed kmalloc
->>> calls for temporarily allocating some memory. Now those calls seem to
->>> get added to the devres list, but are apparently not covered by the
->>> cleanup process, because this is actually just running and iterating the
->>> existing list. This leads to those mallocs being left with the device,
->>> which the devres manager complains about when the driver eventually gets
->>> probed again:
->>> [    0.825239] ------------[ cut here ]------------
->>> [    0.825256] WARNING: CPU: 1 PID: 89 at drivers/base/dd.c:349 driver_probe_device+0x2ac/0x2e8
->>> [    0.825258] Modules linked in:
->>> [    0.825262]
->>> [    0.825270] CPU: 1 PID: 89 Comm: kworker/1:1 Not tainted 4.11.0 #307
->>> [    0.825272] Hardware name: Pine64+ (DT)
->>> [    0.825283] Workqueue: events deferred_probe_work_func
->>> [    0.825288] task: ffff80007c19c100 task.stack: ffff80007c16c000
->>> [    0.825292] PC is at driver_probe_device+0x2ac/0x2e8
->>> [    0.825296] LR is at driver_probe_device+0x108/0x2e8
->>> [    0.825300] pc : [<ffff000008559234>] lr : [<ffff000008559090>] pstate: 20000045
->>> ....
->>> This warning is triggered because the devres list is not empty. In this
->>> case the allocations were using 0 bytes, so no real leaks, but still this
->>> ugly warning.
->>> Looking more closely at these *cleanup* functions, devm_kzalloc() is actually
->>> not needed, because the memory is just allocated temporarily and can be
->>> freed just before returning from this function.
->>> So fix this issue by using the bog standard kcalloc() call instead of
->>> devm_kzalloc() and kfree()ing the memory at the end.
->>>
->>> This fixes above warnings on boot, which can be observed on *some* builds
->>> for the Pine64, where the pinctrl driver gets loaded early, but it missing
->>> resources, so gets deferred and is loaded again (successfully) later.
->>> kernelci caught this as well [1].
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>
->>> [1] https://storage.kernelci.org/net-next/master/v4.11-rc8-2122-gc08bac03d289/arm64/defconfig/lab-baylibre-seattle/boot-sun50i-a64-pine64-plus.html
->>> ---
->>> Hi,
->>>
->>> not sure this is the right fix, I am open to suggestions.
->>
->> I have queued this as a tentative v4.12-rc1 fix, but a bit undertain.
->>
->> Tejun, do I read your comments on the patch as an ACK?
+
+
+On 05/12/2017 02:15 PM, Kishon Vijay Abraham I wrote:
+> Hi Vivek,
 >
-> Tejun and I were wondering why we need this "create an array with the
-> indices" in the first place. If we can just call radix_tree_delete()
-> directly from the radix_tree_for_each_slot() loop, we can have a much
-> better fix (omitting the memory allocation at all)
+> On Thursday 11 May 2017 12:17 PM, Vivek Gautam wrote:
+>> Adding vendor specific directories in phy to group
+>> phy drivers under their respective vendor umbrella.
+>>
+>> Also updated the MAINTAINERS file to reflect the correct
+>> directory structure for phy drivers.
+>>
+>> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+>> Acked-by: Heiko Stuebner <heiko@sntech.de>
+>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+>> Reviewed-by: Jaehoon Chung <jh80.chung@samsung.com>
+>> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+>> Cc: David S. Miller <davem@davemloft.net>
+>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+>> Cc: Guenter Roeck <linux@roeck-us.net>
+>> Cc: Heiko Stuebner <heiko@sntech.de>
+>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+>> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> Cc: Chen-Yu Tsai <wens@csie.org>
+>> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+>> Cc: Jaehoon Chung <jh80.chung@samsung.com>
+>> Cc: Stephen Boyd <stephen.boyd@linaro.org>
+>> Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-arm-msm at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: linux-omap at vger.kernel.org
+>> Cc: linux-renesas-soc at vger.kernel.org
+>> Cc: linux-rockchip at lists.infradead.org
+>> Cc: linux-samsung-soc at vger.kernel.org
+>> Cc: linux-usb at vger.kernel.org
+>> ---
+>>
+>> Changes since v4:
+>>   - Reprepared the patch based on latest torvalds/master.
+>>   - Added new directory for amlogic, since there's a new patch [1]
+>>     coming in for amlogic platforms.
+> I don't prefer placeholder directories but this is not a placeholder directory
+> since phy-meson8b-usb2.c is already added in amlogic.
 
-OK I pulled the patch out again for now.
+Right, since phy-meson8b-usb2.c was already there and phy-meson-gxl-usb2.c
+is also coming, i decided to add this directory.
+> Btw, thank you for sending this patch. Will queue this once -rc1 is tagged.
 
-> Linus, can you shed some light if this array creation serves some purpose?
+Cool. Thanks Kishon.
 
-Tony [author of this function] can you look at this?
+Regards
+Vivek
 
-The code in pinctrl_generic_free_groups() does look a bit weird,
-allocating these indices just to remove the radix tree.
-Do you think we can clean it up?
+>
+> Cheers
+> Kishon
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Yours,
-Linus Walleij
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
