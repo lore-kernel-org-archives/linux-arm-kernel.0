@@ -1,42 +1,38 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 12 May 2017 20:51:26 +0200
-Subject: [PATCH 1/3] coresight: etb10: Delete an error message for a failed
- memory allocation in etb_probe()
+Date: Fri, 12 May 2017 20:53:16 +0200
+Subject: [PATCH 3/3] coresight: etb10: Improve a size determination in
+ etb_alloc_buffer()
 In-Reply-To: <5d5cd752-f2f2-b511-6b1e-daf5bf1bc522@users.sourceforge.net>
 References: <5d5cd752-f2f2-b511-6b1e-daf5bf1bc522@users.sourceforge.net>
-Message-ID: <df23f2fa-ad4a-8338-8641-96782e50f6a7@users.sourceforge.net>
+Message-ID: <b8ed57f7-cdcf-9b35-4fdd-8833db008ff0@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Fri, 12 May 2017 20:23:43 +0200
+Date: Fri, 12 May 2017 20:36:03 +0200
 
-Omit an extra message for a memory allocation failure in this function.
+Replace the specification of a data structure by a pointer dereference
+as the parameter for the operator "sizeof" to make the corresponding size
+determination a bit safer according to the Linux coding style convention.
 
-This issue was detected by using the Coccinelle software.
-
-Link: http://events.linuxfoundation.org/sites/events/files/slides/LCJ16-Refactor_Strings-WSang_0.pdf
 Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ drivers/hwtracing/coresight/coresight-etb10.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 979ea6ec7902..837aebf22c45 100644
+index d5b96423e1a5..7096c4562e15 100644
 --- a/drivers/hwtracing/coresight/coresight-etb10.c
 +++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -675,11 +675,8 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+@@ -278,8 +278,7 @@ static void *etb_alloc_buffer(struct coresight_device *csdev, int cpu,
+ 	if (cpu == -1)
+ 		cpu = smp_processor_id();
+ 	node = cpu_to_node(cpu);
+-
+-	buf = kzalloc_node(sizeof(struct cs_buffers), GFP_KERNEL, node);
++	buf = kzalloc_node(sizeof(*buf), GFP_KERNEL, node);
+ 	if (!buf)
+ 		return NULL;
  
- 	drvdata->buf = devm_kzalloc(dev,
- 				    drvdata->buffer_depth * 4, GFP_KERNEL);
--	if (!drvdata->buf) {
--		dev_err(dev, "Failed to allocate %u bytes for buffer data\n",
--			drvdata->buffer_depth * 4);
-+	if (!drvdata->buf)
- 		return -ENOMEM;
--	}
- 
- 	desc.type = CORESIGHT_DEV_TYPE_SINK;
- 	desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
 -- 
 2.12.3
