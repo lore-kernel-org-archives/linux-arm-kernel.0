@@ -1,53 +1,55 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 12 May 2017 15:56:42 +0800
-Subject: [PATCH v3 5/9] ARM: mediatek: add MT7623a smp bringup code
+Date: Fri, 12 May 2017 15:56:43 +0800
+Subject: [PATCH v3 6/9] arm: dts: mt7623: cleanup the mt7623n rfb uart nodes
 In-Reply-To: <cover.1494574682.git.sean.wang@mediatek.com>
 References: <cover.1494574682.git.sean.wang@mediatek.com>
-Message-ID: <644cc644999cb00bb22dd42bceb60dab97ac5579.1494574682.git.sean.wang@mediatek.com>
+Message-ID: <73077cd39b9e999332666ae64e287350edf7d17a.1494574682.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+From: John Crispin <john@phrozen.org>
 
-Add support for booting secondary CPUs on MT7623a.
+This patch does a cleanup of the uart nodes in the dts file of the RFB. It
+adds aliases, enables 2 more uarts and explicitly sets the uart mode of the
+console.
 
+Signed-off-by: John Crispin <john@phrozen.org>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- arch/arm/mach-mediatek/mediatek.c | 2 ++
- arch/arm/mach-mediatek/platsmp.c  | 1 +
- 2 files changed, 3 insertions(+)
+ arch/arm/boot/dts/mt7623n-rfb.dtsi | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-index a6e3c98..1b52011 100644
---- a/arch/arm/mach-mediatek/mediatek.c
-+++ b/arch/arm/mach-mediatek/mediatek.c
-@@ -30,6 +30,7 @@ static void __init mediatek_timer_init(void)
+diff --git a/arch/arm/boot/dts/mt7623n-rfb.dtsi b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+index c526116..4963e6a 100644
+--- a/arch/arm/boot/dts/mt7623n-rfb.dtsi
++++ b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+@@ -16,12 +16,26 @@
  
- 	if (of_machine_is_compatible("mediatek,mt6589") ||
- 	    of_machine_is_compatible("mediatek,mt7623") ||
-+	    of_machine_is_compatible("mediatek,mt7623a") ||
- 	    of_machine_is_compatible("mediatek,mt8135") ||
- 	    of_machine_is_compatible("mediatek,mt8127")) {
- 		/* turn on GPT6 which ungates arch timer clocks */
-@@ -49,6 +50,7 @@ static const char * const mediatek_board_dt_compat[] = {
- 	"mediatek,mt6589",
- 	"mediatek,mt6592",
- 	"mediatek,mt7623",
-+	"mediatek,mt7623a",
- 	"mediatek,mt8127",
- 	"mediatek,mt8135",
- 	NULL,
-diff --git a/arch/arm/mach-mediatek/platsmp.c b/arch/arm/mach-mediatek/platsmp.c
-index 726eb69..27d78c9 100644
---- a/arch/arm/mach-mediatek/platsmp.c
-+++ b/arch/arm/mach-mediatek/platsmp.c
-@@ -59,6 +59,7 @@ static const struct of_device_id mtk_tz_smp_boot_infos[] __initconst = {
- static const struct of_device_id mtk_smp_boot_infos[] __initconst = {
- 	{ .compatible   = "mediatek,mt6589", .data = &mtk_mt6589_boot },
- 	{ .compatible   = "mediatek,mt7623", .data = &mtk_mt7623_boot },
-+	{ .compatible   = "mediatek,mt7623a", .data = &mtk_mt7623_boot },
+ / {
+ 	chosen {
+-		stdout-path = &uart2;
++		stdout-path = "serial2:115200n8";
+ 	};
+ 
+ 	memory at 80000000 {
+ 		reg = <0 0x80000000 0 0x40000000>;
+ 	};
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
  };
  
- static void __iomem *mtk_smp_base;
+ &uart2 {
 -- 
 2.7.4
