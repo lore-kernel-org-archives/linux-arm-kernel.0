@@ -1,36 +1,32 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 12 May 2017 09:54:21 +0530
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Fri, 12 May 2017 06:42:21 +0200
 Subject: [PATCH] ARM: remove duplicate 'const' annotations'
-In-Reply-To: <20170511115059.2997141-1-arnd@arndb.de>
+In-Reply-To: <20170511115059.2997141-1-arnd@arndb.de> (Arnd Bergmann's message
+ of "Thu, 11 May 2017 13:50:16 +0200")
 References: <20170511115059.2997141-1-arnd@arndb.de>
-Message-ID: <20170512042421.GP17481@vireshk-i7>
+Message-ID: <m3vap6hej6.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-05-17, 13:50, Arnd Bergmann wrote:
+Arnd Bergmann <arnd@arndb.de> writes:
+
 > gcc-7 warns about some declarations that are more 'const' than necessary:
-> 
-> arch/arm/mach-at91/pm.c:338:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct of_device_id const ramc_ids[] __initconst = {
-> arch/arm/mach-bcm/bcm_kona_smc.c:36:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct of_device_id const bcm_kona_smc_ids[] __initconst = {
-> arch/arm/mach-spear/time.c:207:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct of_device_id const timer_of_match[] __initconst = {
-> arch/arm/mach-omap2/prm_common.c:714:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct of_device_id const omap_prcm_dt_match_table[] __initconst = {
-> arch/arm/mach-omap2/vc.c:562:35: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct i2c_init_data const omap4_i2c_timing_data[] __initconst = {
-> 
-> The ones in arch/arm were apparently all introduced accidentally by one
-> commit that correctly marked a lot of variables as __initconst.
-> 
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Fixes: 19c233b79d1a ("ARM: appropriate __init annotation for const data")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-spear/time.c       | 2 +-
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> --- a/arch/arm/mach-cns3xxx/core.c
+> +++ b/arch/arm/mach-cns3xxx/core.c
+> @@ -346,7 +346,7 @@ static struct usb_ohci_pdata cns3xxx_usb_ohci_pdata = {
+>  	.power_off	= csn3xxx_usb_power_off,
+>  };
+>  
+> -static const struct of_dev_auxdata const cns3xxx_auxdata[] __initconst = {
+> +static const struct of_dev_auxdata cns3xxx_auxdata[] __initconst = {
+>  	{ "intel,usb-ehci", CNS3XXX_USB_BASE, "ehci-platform", &cns3xxx_usb_ehci_pdata },
+>  	{ "intel,usb-ohci", CNS3XXX_USB_OHCI_BASE, "ohci-platform", &cns3xxx_usb_ohci_pdata },
+>  	{ "cavium,cns3420-ahci", CNS3XXX_SATA2_BASE, "ahci", NULL },
 
+Acked-by: Krzysztof Ha?asa <khalasa@piap.pl>
 -- 
-viresh
+Krzysztof Halasa
+
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
