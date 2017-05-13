@@ -1,43 +1,37 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 13 May 2017 17:43:40 +0200
-Subject: [PATCH] arm64: dts: rockchip: Drop explicit "include/" prefix
- from #include
-In-Reply-To: <20170512235357.19486-1-ijc@hellion.org.uk>
-References: <20170512235357.19486-1-ijc@hellion.org.uk>
-Message-ID: <3956756.APWK7IdRuP@phil>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 14 May 2017 01:14:46 +0900
+Subject: [PATCH] arm64: dts: uniphier: add input-delay properties to
+ Cadence eMMC node
+In-Reply-To: <1490934045-18874-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1490934045-18874-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAQvub8HodmDUwWm8CStcNAbrafOzSKzB=fOc8qf_EkcyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+2017-03-31 13:20 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Since commit a04e2b383401 ("mmc: sdhci-cadence: Update PHY delay
+> configuration"), PHY parameters must be specified by DT.
+>
+> The hard-coded settings have been converted as follows:
+> - SDHCI_CDNS_PHY_DLY_SD_DEFAULT -> cdns,phy-input-delay-legacy
+> - SDHCI_CDNS_PHY_DLY_EMMC_SDR   -> cdns,phy-input-delay-mmc-highspeed
+> - SDHCI_CDNS_PHY_DLY_EMMC_DDR   -> cdns,phy-input-delay-mmc-ddr
+>
+> The following have not been moved:
+> - SDHCI_CDNS_PHY_DLY_SD_HS
+>    this is unneeded in the eMMC configuration
+> - SDHCI_CDNS_PHY_DLY_EMMC_LEGACY
+>    this is never enabled by the driver as it is covered by
+>    SDHCI_CDNS_PHY_DLY_SD_DEFAULT
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 
-Am Samstag, 13. Mai 2017, 00:53:57 CEST schrieb Ian Campbell:
-> It not necessary and counter to how all the other files are done.
-> 
-> It also happens to break the build in the split device tree repo
-> https://git.kernel.org/pub/scm/linux/kernel/git/devicetree/devicetree-rebasing.git/
-> 
-> Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
-> Cc: Brian Norris <briannorris@chromium.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-rockchip at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-
-that glitch also breaks Olof's patch [0] fixing a depmod symlink
-recursion in that it creates
-
-../arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:47:57: fatal error: include/dt-bindings/input/linux-event-codes.h: File or directory not found
- #include <include/dt-bindings/input/linux-event-codes.h>
-
-with only Olof's patch applied. So I guess both patches should go
-together with this one in front, so to be on the safe side, if some else
-is going to apply both:
-
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Applied to linux-uniphier.
 
 
-[0] https://www.spinics.net/lists/arm-kernel/msg580846.html
+
+
+-- 
+Best Regards
+Masahiro Yamada
