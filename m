@@ -1,318 +1,72 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 12 May 2017 20:34:31 -0700
-Subject: [PATCH] devicetree: Move include prefixes from arch to separate
- directory
-Message-ID: <1494646471-24624-1-git-send-email-olof@lixom.net>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 13 May 2017 12:18:26 +0800
+Subject: [arm-soc:to-build 1/1]
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:47:57: fatal error:
+ include/dt-bindings/input/linux-event-codes.h: No such file or directory
+Message-ID: <201705131223.4fYRjiWX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use a directory under arch/$ARCH/boot/dts as an include path
-that has links outside of the subtree to find dt-bindings from under
-include/dt-bindings. That's been working well, but new DT architectures
-haven't been adding them by default.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git to-build
+head:   4ab8a17555b2c193d0089010a1459d1206a901f0
+commit: 4ab8a17555b2c193d0089010a1459d1206a901f0 [1/1] devicetree: Move include prefixes from arch to separate directory
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 4ab8a17555b2c193d0089010a1459d1206a901f0
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Recently there's been a desire to share some of the DT material between
-arm and arm64, which originally caused developers to create symlinks or
-relative includes between the subtrees. This isn't ideal -- it breaks
-if the DT files aren't stored in the exact same hierarchy as the kernel
-tree, and generally it's just icky.
+All errors (new ones prefixed by >>):
 
-As a somewhat cleaner solution we decided to add a $ARCH/ prefix link
-once, and allow DTS files to reference dtsi (and dts) files in other
-architectures that way.
+>> arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:47:57: fatal error: include/dt-bindings/input/linux-event-codes.h: No such file or directory
+    #include <include/dt-bindings/input/linux-event-codes.h>
+                                                            ^
+   compilation terminated.
 
-Original approach was to create these links under each architecture,
-but it lead to the problem of recursive symlinks.
+vim +47 arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
 
-As a remedy, move the include link directories out of the architecture
-trees into a common location. At the same time, they can now share one
-directory and one dt-bindings/ link as well.
+48f4d979 Brian Norris 2017-03-20  31   *
+48f4d979 Brian Norris 2017-03-20  32   *     The above copyright notice and this permission notice shall be
+48f4d979 Brian Norris 2017-03-20  33   *     included in all copies or substantial portions of the Software.
+48f4d979 Brian Norris 2017-03-20  34   *
+48f4d979 Brian Norris 2017-03-20  35   *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+48f4d979 Brian Norris 2017-03-20  36   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+48f4d979 Brian Norris 2017-03-20  37   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+48f4d979 Brian Norris 2017-03-20  38   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+48f4d979 Brian Norris 2017-03-20  39   *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+48f4d979 Brian Norris 2017-03-20  40   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+48f4d979 Brian Norris 2017-03-20  41   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+48f4d979 Brian Norris 2017-03-20  42   *     OTHER DEALINGS IN THE SOFTWARE.
+48f4d979 Brian Norris 2017-03-20  43   */
+48f4d979 Brian Norris 2017-03-20  44  
+48f4d979 Brian Norris 2017-03-20  45  /dts-v1/;
+48f4d979 Brian Norris 2017-03-20  46  #include "rk3399-gru.dtsi"
+48f4d979 Brian Norris 2017-03-20 @47  #include <include/dt-bindings/input/linux-event-codes.h>
+48f4d979 Brian Norris 2017-03-20  48  
+48f4d979 Brian Norris 2017-03-20  49  /*
+48f4d979 Brian Norris 2017-03-20  50   * Kevin-specific things
+48f4d979 Brian Norris 2017-03-20  51   *
+48f4d979 Brian Norris 2017-03-20  52   * Things in this section should use names from Kevin schematic since no
+48f4d979 Brian Norris 2017-03-20  53   * equivalent exists in Gru schematic.  If referring to signals that exist
+48f4d979 Brian Norris 2017-03-20  54   * in Gru we use the Gru names, though.  Confusing enough for you?
+48f4d979 Brian Norris 2017-03-20  55   */
 
-Fixes: 4027494ae6e3 ('ARM: dts: add arm/arm64 include symlinks')
-Reported-by: Russell King <linux@armlinux.org.uk>
-Reported-by: Omar Sandoval <osandov@osandov.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mikael Starvik <starvik@axis.com>
-Cc: Jesper Nilsson <jesper.nilsson@axis.com>
-Cc: James Hogan <james.hogan@imgtec.com>
-Cc: Ralf Baechle <ralf@linux-mips.org>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
-Cc: Frank Rowand <frowand.list@gmail.com>
-Cc: linux-arch <linux-arch@vger.kernel.org>
-Signed-off-by: Olof Johansson <olof@lixom.net>
+:::::: The code at line 47 was first introduced by commit
+:::::: 48f4d9796d990850f6339b61eeeac9ca7fdb3695 arm64: dts: rockchip: add Gru/Kevin DTS
+
+:::::: TO: Brian Norris <briannorris@chromium.org>
+:::::: CC: Heiko Stuebner <heiko@sntech.de>
+
 ---
- arch/arm/boot/dts/include/arm             | 1 -
- arch/arm/boot/dts/include/arm64           | 1 -
- arch/arm/boot/dts/include/dt-bindings     | 1 -
- arch/arm64/boot/dts/include/arm           | 1 -
- arch/arm64/boot/dts/include/arm64         | 1 -
- arch/arm64/boot/dts/include/dt-bindings   | 1 -
- arch/cris/boot/dts/include/dt-bindings    | 1 -
- arch/metag/boot/dts/include/dt-bindings   | 1 -
- arch/mips/boot/dts/include/dt-bindings    | 1 -
- arch/powerpc/boot/dts/include/dt-bindings | 1 -
- scripts/Makefile.lib                      | 2 +-
- scripts/dtc/include-prefixes/arc          | 1 +
- scripts/dtc/include-prefixes/arm          | 1 +
- scripts/dtc/include-prefixes/arm64        | 1 +
- scripts/dtc/include-prefixes/c6x          | 1 +
- scripts/dtc/include-prefixes/cris         | 1 +
- scripts/dtc/include-prefixes/dt-bindings  | 1 +
- scripts/dtc/include-prefixes/h8300        | 1 +
- scripts/dtc/include-prefixes/metag        | 1 +
- scripts/dtc/include-prefixes/microblaze   | 1 +
- scripts/dtc/include-prefixes/mips         | 1 +
- scripts/dtc/include-prefixes/nios2        | 1 +
- scripts/dtc/include-prefixes/openrisc     | 1 +
- scripts/dtc/include-prefixes/powerpc      | 1 +
- scripts/dtc/include-prefixes/sh           | 1 +
- scripts/dtc/include-prefixes/xtensa       | 1 +
- 26 files changed, 16 insertions(+), 11 deletions(-)
- delete mode 120000 arch/arm/boot/dts/include/arm
- delete mode 120000 arch/arm/boot/dts/include/arm64
- delete mode 120000 arch/arm/boot/dts/include/dt-bindings
- delete mode 120000 arch/arm64/boot/dts/include/arm
- delete mode 120000 arch/arm64/boot/dts/include/arm64
- delete mode 120000 arch/arm64/boot/dts/include/dt-bindings
- delete mode 120000 arch/cris/boot/dts/include/dt-bindings
- delete mode 120000 arch/metag/boot/dts/include/dt-bindings
- delete mode 120000 arch/mips/boot/dts/include/dt-bindings
- delete mode 120000 arch/powerpc/boot/dts/include/dt-bindings
- create mode 120000 scripts/dtc/include-prefixes/arc
- create mode 120000 scripts/dtc/include-prefixes/arm
- create mode 120000 scripts/dtc/include-prefixes/arm64
- create mode 120000 scripts/dtc/include-prefixes/c6x
- create mode 120000 scripts/dtc/include-prefixes/cris
- create mode 120000 scripts/dtc/include-prefixes/dt-bindings
- create mode 120000 scripts/dtc/include-prefixes/h8300
- create mode 120000 scripts/dtc/include-prefixes/metag
- create mode 120000 scripts/dtc/include-prefixes/microblaze
- create mode 120000 scripts/dtc/include-prefixes/mips
- create mode 120000 scripts/dtc/include-prefixes/nios2
- create mode 120000 scripts/dtc/include-prefixes/openrisc
- create mode 120000 scripts/dtc/include-prefixes/powerpc
- create mode 120000 scripts/dtc/include-prefixes/sh
- create mode 120000 scripts/dtc/include-prefixes/xtensa
-
-diff --git a/arch/arm/boot/dts/include/arm b/arch/arm/boot/dts/include/arm
-deleted file mode 120000
-index a96aa0e..0000000
---- a/arch/arm/boot/dts/include/arm
-+++ /dev/null
-@@ -1 +0,0 @@
--..
-\ No newline at end of file
-diff --git a/arch/arm/boot/dts/include/arm64 b/arch/arm/boot/dts/include/arm64
-deleted file mode 120000
-index 074a835..0000000
---- a/arch/arm/boot/dts/include/arm64
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../arm64/boot/dts
-\ No newline at end of file
-diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
-deleted file mode 120000
-index 08c00e4..0000000
---- a/arch/arm/boot/dts/include/dt-bindings
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../../include/dt-bindings
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/include/arm b/arch/arm64/boot/dts/include/arm
-deleted file mode 120000
-index cf63d80..0000000
---- a/arch/arm64/boot/dts/include/arm
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../arm/boot/dts
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/include/arm64 b/arch/arm64/boot/dts/include/arm64
-deleted file mode 120000
-index a96aa0e..0000000
---- a/arch/arm64/boot/dts/include/arm64
-+++ /dev/null
-@@ -1 +0,0 @@
--..
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
-deleted file mode 120000
-index 08c00e4..0000000
---- a/arch/arm64/boot/dts/include/dt-bindings
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../../include/dt-bindings
-\ No newline at end of file
-diff --git a/arch/cris/boot/dts/include/dt-bindings b/arch/cris/boot/dts/include/dt-bindings
-deleted file mode 120000
-index 08c00e4..0000000
---- a/arch/cris/boot/dts/include/dt-bindings
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../../include/dt-bindings
-\ No newline at end of file
-diff --git a/arch/metag/boot/dts/include/dt-bindings b/arch/metag/boot/dts/include/dt-bindings
-deleted file mode 120000
-index 08c00e4..0000000
---- a/arch/metag/boot/dts/include/dt-bindings
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../../include/dt-bindings
-\ No newline at end of file
-diff --git a/arch/mips/boot/dts/include/dt-bindings b/arch/mips/boot/dts/include/dt-bindings
-deleted file mode 120000
-index 08c00e4..0000000
---- a/arch/mips/boot/dts/include/dt-bindings
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../../include/dt-bindings
-\ No newline at end of file
-diff --git a/arch/powerpc/boot/dts/include/dt-bindings b/arch/powerpc/boot/dts/include/dt-bindings
-deleted file mode 120000
-index 08c00e4..0000000
---- a/arch/powerpc/boot/dts/include/dt-bindings
-+++ /dev/null
-@@ -1 +0,0 @@
--../../../../../include/dt-bindings
-\ No newline at end of file
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index c9f975a..2c759b0 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -175,7 +175,7 @@ ld_flags       = $(LDFLAGS) $(ldflags-y)
- 
- dtc_cpp_flags  = -Wp,-MD,$(depfile).pre.tmp -nostdinc                    \
- 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
--		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
-+		 -I$(srctree)/scripts/dtc/include-prefixes               \
- 		 -I$(srctree)/drivers/of/testcase-data                   \
- 		 -undef -D__DTS__
- 
-diff --git a/scripts/dtc/include-prefixes/arc b/scripts/dtc/include-prefixes/arc
-new file mode 120000
-index 0000000..5d21b5a
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/arc
-@@ -0,0 +1 @@
-+../../../arch/arc/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/arm b/scripts/dtc/include-prefixes/arm
-new file mode 120000
-index 0000000..eb14d45
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/arm
-@@ -0,0 +1 @@
-+../../../arch/arm/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/arm64 b/scripts/dtc/include-prefixes/arm64
-new file mode 120000
-index 0000000..275c42c
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/arm64
-@@ -0,0 +1 @@
-+../../../arch/arm64/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/c6x b/scripts/dtc/include-prefixes/c6x
-new file mode 120000
-index 0000000..49ded4c
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/c6x
-@@ -0,0 +1 @@
-+../../../arch/c6x/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/cris b/scripts/dtc/include-prefixes/cris
-new file mode 120000
-index 0000000..736d998
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/cris
-@@ -0,0 +1 @@
-+../../../arch/cris/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/dt-bindings b/scripts/dtc/include-prefixes/dt-bindings
-new file mode 120000
-index 0000000..04fdbb3
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/dt-bindings
-@@ -0,0 +1 @@
-+../../../include/dt-bindings
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/h8300 b/scripts/dtc/include-prefixes/h8300
-new file mode 120000
-index 0000000..3bdaa33
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/h8300
-@@ -0,0 +1 @@
-+../../../arch/h8300/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/metag b/scripts/dtc/include-prefixes/metag
-new file mode 120000
-index 0000000..87a3c84
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/metag
-@@ -0,0 +1 @@
-+../../../arch/metag/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/microblaze b/scripts/dtc/include-prefixes/microblaze
-new file mode 120000
-index 0000000..d983033
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/microblaze
-@@ -0,0 +1 @@
-+../../../arch/microblaze/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/mips b/scripts/dtc/include-prefixes/mips
-new file mode 120000
-index 0000000..ae8d494
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/mips
-@@ -0,0 +1 @@
-+../../../arch/mips/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/nios2 b/scripts/dtc/include-prefixes/nios2
-new file mode 120000
-index 0000000..5177233
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/nios2
-@@ -0,0 +1 @@
-+../../../arch/nios2/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/openrisc b/scripts/dtc/include-prefixes/openrisc
-new file mode 120000
-index 0000000..71c3bc7
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/openrisc
-@@ -0,0 +1 @@
-+../../../arch/openrisc/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/powerpc b/scripts/dtc/include-prefixes/powerpc
-new file mode 120000
-index 0000000..7cd6ec1
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/powerpc
-@@ -0,0 +1 @@
-+../../../arch/powerpc/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/sh b/scripts/dtc/include-prefixes/sh
-new file mode 120000
-index 0000000..67d3780
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/sh
-@@ -0,0 +1 @@
-+../../../arch/sh/boot/dts
-\ No newline at end of file
-diff --git a/scripts/dtc/include-prefixes/xtensa b/scripts/dtc/include-prefixes/xtensa
-new file mode 120000
-index 0000000..d1eaf6e
---- /dev/null
-+++ b/scripts/dtc/include-prefixes/xtensa
-@@ -0,0 +1 @@
-+../../../arch/xtensa/boot/dts
-\ No newline at end of file
--- 
-2.1.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 35119 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170513/5aa68a77/attachment-0001.gz>
