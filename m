@@ -1,208 +1,318 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sat, 13 May 2017 11:29:05 +0800
-Subject: [xlnx:master 332/592] drivers/of/configfs.c:153:11: warning: format
- '%u' expects argument of type 'unsigned int', but argument 5 has type
- 'size_t {aka long unsigned int}'
-Message-ID: <201705131101.WWnDzyxU%fengguang.wu@intel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 12 May 2017 20:34:31 -0700
+Subject: [PATCH] devicetree: Move include prefixes from arch to separate
+ directory
+Message-ID: <1494646471-24624-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   17360fb326e0a7fa424286973d0afa8da24f7b99
-commit: 380e5d653ab51a38af4411fb16f49cbd6eb3b690 [332/592] OF: DT-Overlay configfs interface (v7)
-config: ia64-allmodconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 380e5d653ab51a38af4411fb16f49cbd6eb3b690
-        # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
+We use a directory under arch/$ARCH/boot/dts as an include path
+that has links outside of the subtree to find dt-bindings from under
+include/dt-bindings. That's been working well, but new DT architectures
+haven't been adding them by default.
 
-All warnings (new ones prefixed by >>):
+Recently there's been a desire to share some of the DT material between
+arm and arm64, which originally caused developers to create symlinks or
+relative includes between the subtrees. This isn't ideal -- it breaks
+if the DT files aren't stored in the exact same hierarchy as the kernel
+tree, and generally it's just icky.
 
-   In file included from include/linux/kernel.h:13:0,
-                    from include/linux/list.h:8,
-                    from include/linux/kobject.h:20,
-                    from include/linux/device.h:17,
-                    from include/linux/node.h:17,
-                    from include/linux/cpu.h:16,
-                    from drivers/of/configfs.c:12:
-   drivers/of/configfs.c: In function 'cfs_overlay_item_dtbo_read':
->> drivers/of/configfs.c:153:11: warning: format '%u' expects argument of type 'unsigned int', but argument 5 has type 'size_t {aka long unsigned int}' [-Wformat=]
-     pr_debug("%s: buf=%p max_count=%u\n", __func__,
-              ^
-   include/linux/printk.h:261:21: note: in definition of macro 'pr_fmt'
-    #define pr_fmt(fmt) fmt
-                        ^~~
-   include/linux/printk.h:309:2: note: in expansion of macro 'dynamic_pr_debug'
-     dynamic_pr_debug(fmt, ##__VA_ARGS__)
-     ^~~~~~~~~~~~~~~~
->> drivers/of/configfs.c:153:2: note: in expansion of macro 'pr_debug'
-     pr_debug("%s: buf=%p max_count=%u\n", __func__,
-     ^~~~~~~~
+As a somewhat cleaner solution we decided to add a $ARCH/ prefix link
+once, and allow DTS files to reference dtsi (and dts) files in other
+architectures that way.
 
-vim +153 drivers/of/configfs.c
+Original approach was to create these links under each architecture,
+but it lead to the problem of recursive symlinks.
 
-     6	 * This program is free software; you can redistribute it and/or
-     7	 * modify it under the terms of the GNU General Public License
-     8	 * as published by the Free Software Foundation; either version
-     9	 * 2 of the License, or (at your option) any later version.
-    10	 */
-    11	#include <linux/ctype.h>
-  > 12	#include <linux/cpu.h>
-    13	#include <linux/module.h>
-    14	#include <linux/of.h>
-    15	#include <linux/of_fdt.h>
-    16	#include <linux/spinlock.h>
-    17	#include <linux/sizes.h>
-    18	#include <linux/slab.h>
-    19	#include <linux/proc_fs.h>
-    20	#include <linux/configfs.h>
-    21	#include <linux/types.h>
-    22	#include <linux/stat.h>
-    23	#include <linux/limits.h>
-    24	#include <linux/file.h>
-    25	#include <linux/vmalloc.h>
-    26	#include <linux/firmware.h>
-    27	
-    28	#include "of_private.h"
-    29	
-    30	struct cfs_overlay_item {
-    31		struct config_item	item;
-    32	
-    33		char			path[PATH_MAX];
-    34	
-    35		const struct firmware	*fw;
-    36		struct device_node	*overlay;
-    37		int			ov_id;
-    38	
-    39		void			*dtbo;
-    40		int			dtbo_size;
-    41	};
-    42	
-    43	static int create_overlay(struct cfs_overlay_item *overlay, void *blob)
-    44	{
-    45		int err;
-    46	
-    47		/* unflatten the tree */
-    48		of_fdt_unflatten_tree(blob, NULL, &overlay->overlay);
-    49		if (overlay->overlay == NULL) {
-    50			pr_err("%s: failed to unflatten tree\n", __func__);
-    51			err = -EINVAL;
-    52			goto out_err;
-    53		}
-    54		pr_debug("%s: unflattened OK\n", __func__);
-    55	
-    56		/* mark it as detached */
-    57		of_node_set_flag(overlay->overlay, OF_DETACHED);
-    58	
-    59		/* perform resolution */
-    60		err = of_resolve_phandles(overlay->overlay);
-    61		if (err != 0) {
-    62			pr_err("%s: Failed to resolve tree\n", __func__);
-    63			goto out_err;
-    64		}
-    65		pr_debug("%s: resolved OK\n", __func__);
-    66	
-    67		err = of_overlay_create(overlay->overlay);
-    68		if (err < 0) {
-    69			pr_err("%s: Failed to create overlay (err=%d)\n",
-    70					__func__, err);
-    71			goto out_err;
-    72		}
-    73		overlay->ov_id = err;
-    74	
-    75	out_err:
-    76		return err;
-    77	}
-    78	
-    79	static inline struct cfs_overlay_item *to_cfs_overlay_item(
-    80			struct config_item *item)
-    81	{
-    82		return item ? container_of(item, struct cfs_overlay_item, item) : NULL;
-    83	}
-    84	
-    85	static ssize_t cfs_overlay_item_path_show(struct config_item *item, char *page)
-    86	{
-    87		return sprintf(page, "%s\n", to_cfs_overlay_item(item)->path);
-    88	}
-    89	
-    90	static ssize_t cfs_overlay_item_path_store(struct config_item *item,
-    91			const char *page, size_t count)
-    92	{
-    93		struct cfs_overlay_item *overlay = to_cfs_overlay_item(item);
-    94		const char *p = page;
-    95		char *s;
-    96		int err;
-    97	
-    98		/* if it's set do not allow changes */
-    99		if (overlay->path[0] != '\0' || overlay->dtbo_size > 0)
-   100			return -EPERM;
-   101	
-   102		/* copy to path buffer (and make sure it's always zero terminated */
-   103		count = snprintf(overlay->path, sizeof(overlay->path) - 1, "%s", p);
-   104		overlay->path[sizeof(overlay->path) - 1] = '\0';
-   105	
-   106		/* strip trailing newlines */
-   107		s = overlay->path + strlen(overlay->path);
-   108		while (s > overlay->path && *--s == '\n')
-   109			*s = '\0';
-   110	
-   111		pr_debug("%s: path is '%s'\n", __func__, overlay->path);
-   112	
-   113		err = request_firmware(&overlay->fw, overlay->path, NULL);
-   114		if (err != 0)
-   115			goto out_err;
-   116	
-   117		err = create_overlay(overlay, (void *)overlay->fw->data);
-   118		if (err < 0)
-   119			goto out_err;
-   120	
-   121		return count;
-   122	
-   123	out_err:
-   124	
-   125		release_firmware(overlay->fw);
-   126		overlay->fw = NULL;
-   127	
-   128		overlay->path[0] = '\0';
-   129		return err;
-   130	}
-   131	
-   132	static ssize_t cfs_overlay_item_status_show(struct config_item *item,
-   133			char *page)
-   134	{
-   135		return sprintf(page, "%s\n", to_cfs_overlay_item(item)->ov_id >= 0 ?
-   136						"applied" : "unapplied");
-   137	}
-   138	
-   139	CONFIGFS_ATTR(cfs_overlay_item_, path);
-   140	CONFIGFS_ATTR_RO(cfs_overlay_item_, status);
-   141	
-   142	static struct configfs_attribute *cfs_overlay_attrs[] = {
-   143		&cfs_overlay_item_attr_path,
-   144		&cfs_overlay_item_attr_status,
-   145		NULL,
-   146	};
-   147	
-   148	ssize_t cfs_overlay_item_dtbo_read(struct config_item *item, void *buf,
-   149			size_t max_count)
-   150	{
-   151		struct cfs_overlay_item *overlay = to_cfs_overlay_item(item);
-   152	
- > 153		pr_debug("%s: buf=%p max_count=%u\n", __func__,
-   154				buf, max_count);
-   155	
-   156		if (overlay->dtbo == NULL)
+As a remedy, move the include link directories out of the architecture
+trees into a common location. At the same time, they can now share one
+directory and one dt-bindings/ link as well.
 
+Fixes: 4027494ae6e3 ('ARM: dts: add arm/arm64 include symlinks')
+Reported-by: Russell King <linux@armlinux.org.uk>
+Reported-by: Omar Sandoval <osandov@osandov.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mikael Starvik <starvik@axis.com>
+Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+Cc: James Hogan <james.hogan@imgtec.com>
+Cc: Ralf Baechle <ralf@linux-mips.org>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Michael Ellerman <mpe@ellerman.id.au>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: linux-arch <linux-arch@vger.kernel.org>
+Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 45258 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170513/22724255/attachment-0001.gz>
+ arch/arm/boot/dts/include/arm             | 1 -
+ arch/arm/boot/dts/include/arm64           | 1 -
+ arch/arm/boot/dts/include/dt-bindings     | 1 -
+ arch/arm64/boot/dts/include/arm           | 1 -
+ arch/arm64/boot/dts/include/arm64         | 1 -
+ arch/arm64/boot/dts/include/dt-bindings   | 1 -
+ arch/cris/boot/dts/include/dt-bindings    | 1 -
+ arch/metag/boot/dts/include/dt-bindings   | 1 -
+ arch/mips/boot/dts/include/dt-bindings    | 1 -
+ arch/powerpc/boot/dts/include/dt-bindings | 1 -
+ scripts/Makefile.lib                      | 2 +-
+ scripts/dtc/include-prefixes/arc          | 1 +
+ scripts/dtc/include-prefixes/arm          | 1 +
+ scripts/dtc/include-prefixes/arm64        | 1 +
+ scripts/dtc/include-prefixes/c6x          | 1 +
+ scripts/dtc/include-prefixes/cris         | 1 +
+ scripts/dtc/include-prefixes/dt-bindings  | 1 +
+ scripts/dtc/include-prefixes/h8300        | 1 +
+ scripts/dtc/include-prefixes/metag        | 1 +
+ scripts/dtc/include-prefixes/microblaze   | 1 +
+ scripts/dtc/include-prefixes/mips         | 1 +
+ scripts/dtc/include-prefixes/nios2        | 1 +
+ scripts/dtc/include-prefixes/openrisc     | 1 +
+ scripts/dtc/include-prefixes/powerpc      | 1 +
+ scripts/dtc/include-prefixes/sh           | 1 +
+ scripts/dtc/include-prefixes/xtensa       | 1 +
+ 26 files changed, 16 insertions(+), 11 deletions(-)
+ delete mode 120000 arch/arm/boot/dts/include/arm
+ delete mode 120000 arch/arm/boot/dts/include/arm64
+ delete mode 120000 arch/arm/boot/dts/include/dt-bindings
+ delete mode 120000 arch/arm64/boot/dts/include/arm
+ delete mode 120000 arch/arm64/boot/dts/include/arm64
+ delete mode 120000 arch/arm64/boot/dts/include/dt-bindings
+ delete mode 120000 arch/cris/boot/dts/include/dt-bindings
+ delete mode 120000 arch/metag/boot/dts/include/dt-bindings
+ delete mode 120000 arch/mips/boot/dts/include/dt-bindings
+ delete mode 120000 arch/powerpc/boot/dts/include/dt-bindings
+ create mode 120000 scripts/dtc/include-prefixes/arc
+ create mode 120000 scripts/dtc/include-prefixes/arm
+ create mode 120000 scripts/dtc/include-prefixes/arm64
+ create mode 120000 scripts/dtc/include-prefixes/c6x
+ create mode 120000 scripts/dtc/include-prefixes/cris
+ create mode 120000 scripts/dtc/include-prefixes/dt-bindings
+ create mode 120000 scripts/dtc/include-prefixes/h8300
+ create mode 120000 scripts/dtc/include-prefixes/metag
+ create mode 120000 scripts/dtc/include-prefixes/microblaze
+ create mode 120000 scripts/dtc/include-prefixes/mips
+ create mode 120000 scripts/dtc/include-prefixes/nios2
+ create mode 120000 scripts/dtc/include-prefixes/openrisc
+ create mode 120000 scripts/dtc/include-prefixes/powerpc
+ create mode 120000 scripts/dtc/include-prefixes/sh
+ create mode 120000 scripts/dtc/include-prefixes/xtensa
+
+diff --git a/arch/arm/boot/dts/include/arm b/arch/arm/boot/dts/include/arm
+deleted file mode 120000
+index a96aa0e..0000000
+--- a/arch/arm/boot/dts/include/arm
++++ /dev/null
+@@ -1 +0,0 @@
+-..
+\ No newline at end of file
+diff --git a/arch/arm/boot/dts/include/arm64 b/arch/arm/boot/dts/include/arm64
+deleted file mode 120000
+index 074a835..0000000
+--- a/arch/arm/boot/dts/include/arm64
++++ /dev/null
+@@ -1 +0,0 @@
+-../../../../arm64/boot/dts
+\ No newline at end of file
+diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
+deleted file mode 120000
+index 08c00e4..0000000
+--- a/arch/arm/boot/dts/include/dt-bindings
++++ /dev/null
+@@ -1 +0,0 @@
+-../../../../../include/dt-bindings
+\ No newline at end of file
+diff --git a/arch/arm64/boot/dts/include/arm b/arch/arm64/boot/dts/include/arm
+deleted file mode 120000
+index cf63d80..0000000
+--- a/arch/arm64/boot/dts/include/arm
++++ /dev/null
+@@ -1 +0,0 @@
+-../../../../arm/boot/dts
+\ No newline at end of file
+diff --git a/arch/arm64/boot/dts/include/arm64 b/arch/arm64/boot/dts/include/arm64
+deleted file mode 120000
+index a96aa0e..0000000
+--- a/arch/arm64/boot/dts/include/arm64
++++ /dev/null
+@@ -1 +0,0 @@
+-..
+\ No newline at end of file
+diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
+deleted file mode 120000
+index 08c00e4..0000000
+--- a/arch/arm64/boot/dts/include/dt-bindings
++++ /dev/null
+@@ -1 +0,0 @@
+-../../../../../include/dt-bindings
+\ No newline at end of file
+diff --git a/arch/cris/boot/dts/include/dt-bindings b/arch/cris/boot/dts/include/dt-bindings
+deleted file mode 120000
+index 08c00e4..0000000
+--- a/arch/cris/boot/dts/include/dt-bindings
++++ /dev/null
+@@ -1 +0,0 @@
+-../../../../../include/dt-bindings
+\ No newline at end of file
+diff --git a/arch/metag/boot/dts/include/dt-bindings b/arch/metag/boot/dts/include/dt-bindings
+deleted file mode 120000
+index 08c00e4..0000000
+--- a/arch/metag/boot/dts/include/dt-bindings
++++ /dev/null
+@@ -1 +0,0 @@
+-../../../../../include/dt-bindings
+\ No newline at end of file
+diff --git a/arch/mips/boot/dts/include/dt-bindings b/arch/mips/boot/dts/include/dt-bindings
+deleted file mode 120000
+index 08c00e4..0000000
+--- a/arch/mips/boot/dts/include/dt-bindings
++++ /dev/null
+@@ -1 +0,0 @@
+-../../../../../include/dt-bindings
+\ No newline at end of file
+diff --git a/arch/powerpc/boot/dts/include/dt-bindings b/arch/powerpc/boot/dts/include/dt-bindings
+deleted file mode 120000
+index 08c00e4..0000000
+--- a/arch/powerpc/boot/dts/include/dt-bindings
++++ /dev/null
+@@ -1 +0,0 @@
+-../../../../../include/dt-bindings
+\ No newline at end of file
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index c9f975a..2c759b0 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -175,7 +175,7 @@ ld_flags       = $(LDFLAGS) $(ldflags-y)
+ 
+ dtc_cpp_flags  = -Wp,-MD,$(depfile).pre.tmp -nostdinc                    \
+ 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
+-		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
++		 -I$(srctree)/scripts/dtc/include-prefixes               \
+ 		 -I$(srctree)/drivers/of/testcase-data                   \
+ 		 -undef -D__DTS__
+ 
+diff --git a/scripts/dtc/include-prefixes/arc b/scripts/dtc/include-prefixes/arc
+new file mode 120000
+index 0000000..5d21b5a
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/arc
+@@ -0,0 +1 @@
++../../../arch/arc/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/arm b/scripts/dtc/include-prefixes/arm
+new file mode 120000
+index 0000000..eb14d45
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/arm
+@@ -0,0 +1 @@
++../../../arch/arm/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/arm64 b/scripts/dtc/include-prefixes/arm64
+new file mode 120000
+index 0000000..275c42c
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/arm64
+@@ -0,0 +1 @@
++../../../arch/arm64/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/c6x b/scripts/dtc/include-prefixes/c6x
+new file mode 120000
+index 0000000..49ded4c
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/c6x
+@@ -0,0 +1 @@
++../../../arch/c6x/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/cris b/scripts/dtc/include-prefixes/cris
+new file mode 120000
+index 0000000..736d998
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/cris
+@@ -0,0 +1 @@
++../../../arch/cris/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/dt-bindings b/scripts/dtc/include-prefixes/dt-bindings
+new file mode 120000
+index 0000000..04fdbb3
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/dt-bindings
+@@ -0,0 +1 @@
++../../../include/dt-bindings
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/h8300 b/scripts/dtc/include-prefixes/h8300
+new file mode 120000
+index 0000000..3bdaa33
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/h8300
+@@ -0,0 +1 @@
++../../../arch/h8300/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/metag b/scripts/dtc/include-prefixes/metag
+new file mode 120000
+index 0000000..87a3c84
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/metag
+@@ -0,0 +1 @@
++../../../arch/metag/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/microblaze b/scripts/dtc/include-prefixes/microblaze
+new file mode 120000
+index 0000000..d983033
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/microblaze
+@@ -0,0 +1 @@
++../../../arch/microblaze/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/mips b/scripts/dtc/include-prefixes/mips
+new file mode 120000
+index 0000000..ae8d494
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/mips
+@@ -0,0 +1 @@
++../../../arch/mips/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/nios2 b/scripts/dtc/include-prefixes/nios2
+new file mode 120000
+index 0000000..5177233
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/nios2
+@@ -0,0 +1 @@
++../../../arch/nios2/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/openrisc b/scripts/dtc/include-prefixes/openrisc
+new file mode 120000
+index 0000000..71c3bc7
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/openrisc
+@@ -0,0 +1 @@
++../../../arch/openrisc/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/powerpc b/scripts/dtc/include-prefixes/powerpc
+new file mode 120000
+index 0000000..7cd6ec1
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/powerpc
+@@ -0,0 +1 @@
++../../../arch/powerpc/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/sh b/scripts/dtc/include-prefixes/sh
+new file mode 120000
+index 0000000..67d3780
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/sh
+@@ -0,0 +1 @@
++../../../arch/sh/boot/dts
+\ No newline at end of file
+diff --git a/scripts/dtc/include-prefixes/xtensa b/scripts/dtc/include-prefixes/xtensa
+new file mode 120000
+index 0000000..d1eaf6e
+--- /dev/null
++++ b/scripts/dtc/include-prefixes/xtensa
+@@ -0,0 +1 @@
++../../../arch/xtensa/boot/dts
+\ No newline at end of file
+-- 
+2.1.4
