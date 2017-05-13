@@ -1,268 +1,112 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Sat, 13 May 2017 15:29:35 +0800
-Subject: [PATCH 2/2] timer: imx-tpm: add imx tpm timer support
-In-Reply-To: <1494660575-30465-1-git-send-email-aisheng.dong@nxp.com>
-References: <1494660575-30465-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1494660575-30465-2-git-send-email-aisheng.dong@nxp.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 13 May 2017 11:07:28 +0200 (CEST)
+Subject: [Bug] VCHIQ functional test broken
+In-Reply-To: <1381182989.263636.1493062504676@email.1und1.de>
+References: <331235003.222371.1491934205807@email.1und1.de>
+ <685482264.60263.1492105308873@email.1und1.de>
+ <20170413222915.GF17774@n2100.armlinux.org.uk>
+ <20170414074104.GA8704@laptop> <87pog7x7c5.fsf@eliezer.anholt.net>
+ <20170420195822.GA22677@laptop>
+ <696fb1c1-7751-caf0-e0d9-9c67b059b4cc@i2se.com>
+ <20170424164015.GP17774@n2100.armlinux.org.uk>
+ <1058502523.15283.1493055747531@email.1und1.de>
+ <20170424185931.GQ17774@n2100.armlinux.org.uk>
+ <1381182989.263636.1493062504676@email.1und1.de>
+Message-ID: <952745481.440383.1494666448727@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IMX Timer/PWM Module (TPM) supports both timer and pwm function while
-this patch only adds the timer support. PWM would be added later.
 
-The TPM counter, compare and capture registers are clocked by an
-asynchronous clock that can remain enabled in low power modes.
+> Stefan Wahren <stefan.wahren@i2se.com> hat am 24. April 2017 um 21:35 geschrieben:
+> 
+> 
+> 
+> > Russell King - ARM Linux <linux@armlinux.org.uk> hat am 24. April 2017 um 20:59 geschrieben:
+> > 
+> > 
+> > On Mon, Apr 24, 2017 at 07:42:27PM +0200, Stefan Wahren wrote:
+> > > > What I can't see is how changing flush_dcache_page() has possibly broken
+> > > > this: it seems to imply that you're getting flush_dcache_page() somehow
+> > > > called inbetween mapping it for DMA, using it for DMA and CPU accesses
+> > > > occuring.  However, the driver doesn't call flush_dcache_page() other
+> > > > than through get_user_pages() - and since dma_map_sg() is used in that
+> > > > path, it should be fine.
+> > > > 
+> > > > So, I don't have much to offer.
+> > > > 
+> > > > However, flush_dcache_page() is probably still a tad heavy - it currently
+> > > > flushes to the point of coherency, but it's really about making sure that
+> > > > the user vs kernel mappings are coherent, not about device coherency.
+> > > > That's the role of the DMA API.
+> > > 
+> > > Currently i don't care too much about performance. More important is to
+> > > fix this regression, because i'm not able to verify the function of this
+> > > driver efficiently.
+> > 
+> > This is a driver in staging, and the reason its in staging is because it
+> > has problems.  This is just another example of another problem it has...
+> > Yes, the regression is regrettable, but I don't think it's something to
+> > get hung up on.
+> > 
+> > > I'm thinking about 2 options:
+> > > 
+> > > 1) add a force parameter to flush_dcache_page() which make it possible
+> > >    to override the new logic
+> > > 2) create a second version of flush_dcache_page() with the old behavior
+> > 
+> > Neither, really, because, as I've already explained, flush_dcache_page()
+> > has nothing what so ever to do with DMA coherence - and if a driver
+> > breaks because we change its semantic slightly (but still in a compliant
+> > way) then it's uncovered a latent bug in _that_ driver.
+> > 
+> > Rather than trying to "fix" flush_dcache_page() to work how this driver
+> > wants it to (which is a totally crazy thing to propose - we can't go
+> > shoe-horning driver specific behaviour into these generic flushing
+> > functions), it would be much better to work out why the driver has
+> > broken.
+> 
+> I totally agree. I had the hope we could make a workaround within the driver until we found the real issue.
+> 
+> > 
+> > I see the kernel driver has its own logging (using vchiq_log_info() etc?)
+> > maybe a starting point would be to compare the output from a working
+> > kernel with a non-working kernel to get more of an idea where the problem
+> > actually is?
+> 
+> I will try ...
+> 
+> > 
+> > What I'm willing to do is to temporarily drop the offending patch for
+> > the next merge window to give more time for this driver to be debugged,
+> > but I will want to re-apply it after that merge window closes.
+> 
+> Since this is already in 4.11, please keep it. At least this makes it easier to reproduce. No need for more confusion and effort.
+> 
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-Signed-off-by: Bai Ping <ping.bai@nxp.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/clocksource/Kconfig         |   5 +
- drivers/clocksource/Makefile        |   1 +
- drivers/clocksource/timer-imx-tpm.c | 204 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 210 insertions(+)
- create mode 100644 drivers/clocksource/timer-imx-tpm.c
+In the meantime this issue has been fixed by Phil [1].
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 3356ab8..03dfd6a 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -590,6 +590,11 @@ config CLKSRC_IMX_GPT
- 	depends on ARM && CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
- 
-+config CLKSRC_IMX_TPM
-+	bool "Clocksource using i.MX TPM" if COMPILE_TEST
-+	depends on ARM && CLKDEV_LOOKUP && GENERIC_CLOCKEVENTS
-+	select CLKSRC_MMIO
-+
- config CLKSRC_ST_LPC
- 	bool "Low power clocksource found in the LPC" if COMPILE_TEST
- 	select CLKSRC_OF if OF
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index d227d13..7a8c0d1 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -67,6 +67,7 @@ obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
- obj-$(CONFIG_CLKSRC_MIPS_GIC)		+= mips-gic-timer.o
- obj-$(CONFIG_CLKSRC_TANGO_XTAL)		+= tango_xtal.o
- obj-$(CONFIG_CLKSRC_IMX_GPT)		+= timer-imx-gpt.o
-+obj-$(CONFIG_CLKSRC_IMX_TPM)		+= timer-imx-tpm.o
- obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
- obj-$(CONFIG_H8300_TMR8)		+= h8300_timer8.o
- obj-$(CONFIG_H8300_TMR16)		+= h8300_timer16.o
-diff --git a/drivers/clocksource/timer-imx-tpm.c b/drivers/clocksource/timer-imx-tpm.c
-new file mode 100644
-index 0000000..f8a8a04
---- /dev/null
-+++ b/drivers/clocksource/timer-imx-tpm.c
-@@ -0,0 +1,204 @@
-+/*
-+ * Copyright 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017 NXP
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/delay.h>
-+#include <linux/interrupt.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/sched_clock.h>
-+
-+#define TPM_SC				0x10
-+#define TPM_SC_CMOD_INC_PER_CNT		(0x1 << 3)
-+#define TPM_SC_CMOD_DIV_DEFAULT		0x3
-+#define TPM_CNT				0x14
-+#define TPM_MOD				0x18
-+#define TPM_STATUS			0x1c
-+#define TPM_STATUS_CH0F			BIT(0)
-+#define TPM_C0SC			0x20
-+#define TPM_C0SC_CHIE			BIT(6)
-+#define TPM_C0SC_MODE_SHIFT		2
-+#define TPM_C0SC_MODE_MASK		0x3c
-+#define TPM_C0SC_MODE_SW_COMPARE	0x4
-+#define TPM_C0V				0x24
-+
-+static void __iomem *timer_base;
-+static struct clock_event_device clockevent_tpm;
-+
-+static inline void tpm_timer_disable(void)
-+{
-+	unsigned int val;
-+
-+	/* channel disable */
-+	val = __raw_readl(timer_base + TPM_C0SC);
-+	val &= ~(TPM_C0SC_MODE_MASK | TPM_C0SC_CHIE);
-+	__raw_writel(val, timer_base + TPM_C0SC);
-+}
-+
-+static inline void tpm_timer_enable(void)
-+{
-+	unsigned int val;
-+
-+	/* channel enabled in sw compare mode */
-+	val = __raw_readl(timer_base + TPM_C0SC);
-+	val |= (TPM_C0SC_MODE_SW_COMPARE << TPM_C0SC_MODE_SHIFT) |
-+	       TPM_C0SC_CHIE;
-+	__raw_writel(val, timer_base + TPM_C0SC);
-+}
-+
-+static inline void tpm_irq_acknowledge(void)
-+{
-+	__raw_writel(TPM_STATUS_CH0F, timer_base + TPM_STATUS);
-+}
-+
-+static struct delay_timer tpm_delay_timer;
-+
-+static unsigned long tpm_read_current_timer(void)
-+{
-+	return __raw_readl(timer_base + TPM_CNT);
-+}
-+
-+static u64 notrace tpm_read_sched_clock(void)
-+{
-+	return __raw_readl(timer_base + TPM_CNT);
-+}
-+
-+static int __init tpm_clocksource_init(unsigned long rate)
-+{
-+	tpm_delay_timer.read_current_timer = &tpm_read_current_timer;
-+	tpm_delay_timer.freq = rate;
-+	register_current_timer_delay(&tpm_delay_timer);
-+
-+	sched_clock_register(tpm_read_sched_clock, 32, rate);
-+
-+	return clocksource_mmio_init(timer_base + TPM_CNT, "imx-tpm",
-+				     rate, 200, 32, clocksource_mmio_readl_up);
-+}
-+
-+static int tpm_set_next_event(unsigned long delta,
-+				struct clock_event_device *evt)
-+{
-+	unsigned long next, now;
-+
-+	next = __raw_readl(timer_base + TPM_CNT) + delta;
-+	__raw_writel(next, timer_base + TPM_C0V);
-+	now = __raw_readl(timer_base + TPM_CNT);
-+
-+	return (int)((next - now) <= 0) ? -ETIME : 0;
-+}
-+
-+static int tpm_set_state_oneshot(struct clock_event_device *evt)
-+{
-+	tpm_timer_enable();
-+
-+	return 0;
-+}
-+
-+static int tpm_set_state_shutdown(struct clock_event_device *evt)
-+{
-+	tpm_timer_disable();
-+
-+	return 0;
-+}
-+
-+static irqreturn_t tpm_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = &clockevent_tpm;
-+
-+	tpm_irq_acknowledge();
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct clock_event_device clockevent_tpm = {
-+	.name			= "i.MX7ULP TPM Timer",
-+	.features		= CLOCK_EVT_FEAT_ONESHOT,
-+	.set_state_oneshot	= tpm_set_state_oneshot,
-+	.set_next_event		= tpm_set_next_event,
-+	.set_state_shutdown	= tpm_set_state_shutdown,
-+	.rating			= 200,
-+};
-+
-+static struct irqaction tpm_timer_irq = {
-+	.name		= "i.MX7ULP TPM Timer",
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= tpm_timer_interrupt,
-+	.dev_id		= &clockevent_tpm,
-+};
-+
-+static int __init tpm_clockevent_init(unsigned long rate, int irq)
-+{
-+	setup_irq(irq, &tpm_timer_irq);
-+
-+	clockevent_tpm.cpumask = cpumask_of(0);
-+	clockevent_tpm.irq = irq;
-+	clockevents_config_and_register(&clockevent_tpm,
-+					rate, 0xff, 0xfffffffe);
-+
-+	return 0;
-+}
-+
-+static int __init tpm_timer_init(struct device_node *np)
-+{
-+	struct clk *ipg, *per;
-+	u32 rate;
-+	int irq;
-+
-+	timer_base = of_iomap(np, 0);
-+	if (!timer_base) {
-+		pr_err("tpm: failed to get base address\n");
-+		return -ENXIO;
-+	}
-+
-+	irq = irq_of_parse_and_map(np, 0);
-+	if (!irq)
-+		return -EINVAL;
-+
-+	ipg = of_clk_get_by_name(np, "ipg");
-+	per = of_clk_get_by_name(np, "per");
-+	if (IS_ERR(ipg) || IS_ERR(per)) {
-+		pr_err("tpm: failed to get igp or per clk\n");
-+		return -ENODEV;
-+	}
-+
-+	/* enable clk before accessing registers */
-+	clk_prepare_enable(ipg);
-+	clk_prepare_enable(per);
-+
-+	/*
-+	 * Initialize tpm module to a known state
-+	 * 1) Counter disabled
-+	 * 2) TPM counter operates in up counting mode
-+	 * 3) Timer Overflow Interrupt disabled
-+	 * 4) Channel0 disabled
-+	 * 5) DMA transfers disabled
-+	 */
-+	__raw_writel(0, timer_base + TPM_SC);
-+	__raw_writel(0, timer_base + TPM_CNT);
-+	__raw_writel(0, timer_base + TPM_C0SC);
-+
-+	/* increase per cnt, div 8 by default */
-+	__raw_writel(TPM_SC_CMOD_INC_PER_CNT | TPM_SC_CMOD_DIV_DEFAULT,
-+		     timer_base + TPM_SC);
-+
-+	/* set MOD register to maximum for free running mode */
-+	__raw_writel(0xffffffff, timer_base + TPM_MOD);
-+
-+	rate = clk_get_rate(per) / 8;
-+	tpm_clocksource_init(rate);
-+	tpm_clockevent_init(rate, irq);
-+
-+	return 0;
-+}
-+CLOCKSOURCE_OF_DECLARE(imx7ulp, "fsl,imx7ulp-tpm", tpm_timer_init);
--- 
-2.7.4
+Unfortunately i found another issue. If i enable CONFIG_HIGHMEM in the kernel config, the data during functional test gets corrupted. Phil said it's caused by the usage of get_user_pages() [2]. That makes me wonder, because there are a lot of gup users and it's hard to believe that they are also affected.
+
+Would that be hard to fix?
+
+In that case i tend to fix at least the dependency:
+
+diff --git a/drivers/staging/vc04_services/Kconfig b/drivers/staging/vc04_servic
+index 9e27636..6572903 100644
+--- a/drivers/staging/vc04_services/Kconfig
++++ b/drivers/staging/vc04_services/Kconfig
+@@ -2,7 +2,7 @@ menuconfig BCM_VIDEOCORE
+        tristate "Broadcom VideoCore support"
+        depends on HAS_DMA
+        depends on OF
+-       depends on RASPBERRYPI_FIRMWARE || (COMPILE_TEST && !RASPBERRYPI_FIRMWAR
++       depends on (RASPBERRYPI_FIRMWARE && !HIGHMEM) || (COMPILE_TEST && !RASPB
+        default y
+        help
+                Support for Broadcom VideoCore services including
+
+Thanks
+Stefan
+
+[1] - http://driverdev.linuxdriverproject.org/pipermail/driverdev-devel/2017-May/105443.html
+[2] - https://github.com/raspberrypi/linux/issues/1996
