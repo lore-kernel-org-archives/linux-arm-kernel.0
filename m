@@ -1,36 +1,67 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sat, 13 May 2017 16:33:22 +0200
-Subject: [PATCH v2 03/18] arm64: dts: meson-gxbb-vega-s95: Fix Wifi node name
+Date: Sat, 13 May 2017 16:33:20 +0200
+Subject: [PATCH v2 01/18] dt-bindings: arm: amlogic: Reorder boards
 In-Reply-To: <20170513143337.14278-1-afaerber@suse.de>
 References: <20170513143337.14278-1-afaerber@suse.de>
-Message-ID: <20170513143337.14278-4-afaerber@suse.de>
+Message-ID: <20170513143337.14278-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bcrmf -> brcmf -> wifi
+Enforce groupment by SoCs, and order alphabetically within the group
+(with some exceptions). This should facilitate adding new boards.
 
-Fixes: ab5b24fdd2d5 ("ARM64: dts: meson-gxbb-vega-s95: Add SD/SDIO/MMC and PWM nodes")
-Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v1 -> v2:
- * Renamed node brmcf -> wifi (Rob)
+ * Rebased (new boards added)
+ * Pointed out alphabetical order in the binding, too (Rob)
  
- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/amlogic.txt | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-index aefa66dff72d..f4bfee8e2e08 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-@@ -186,7 +186,7 @@
- 	vmmc-supply = <&vcc_3v3>;
- 	vqmmc-supply = <&vcc_1v8>;
+diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+index bfd5b558477d..cad5b5a48d92 100644
+--- a/Documentation/devicetree/bindings/arm/amlogic.txt
++++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+@@ -29,26 +29,32 @@ Boards with the Amlogic Meson GXM S912 SoC shall have the following properties:
+   Required root node property:
+     compatible: "amlogic,s912", "amlogic,meson-gxm";
  
--	brcmf: bcrmf at 1 {
-+	brcmf: wifi at 1 {
- 		reg = <1>;
- 		compatible = "brcm,bcm4329-fmac";
- 	};
+-Board compatible values:
++Board compatible values (alphabetically, grouped by SoC):
++
+   - "geniatech,atv1200" (Meson6)
++
+   - "minix,neo-x8" (Meson8)
+-  - "tronfy,mxq" (Meson8b)
++
+   - "hardkernel,odroid-c1" (Meson8b)
++  - "tronfy,mxq" (Meson8b)
++
++  - "amlogic,p200" (Meson gxbb)
++  - "amlogic,p201" (Meson gxbb)
++  - "hardkernel,odroid-c2" (Meson gxbb)
++  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+   - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
+   - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
+   - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
+-  - "hardkernel,odroid-c2" (Meson gxbb)
+-  - "amlogic,p200" (Meson gxbb)
+-  - "amlogic,p201" (Meson gxbb)
+   - "wetek,hub" (Meson gxbb)
+   - "wetek,play2" (Meson gxbb)
++
+   - "amlogic,p212" (Meson gxl s905x)
++  - "hwacom,amazetv" (Meson gxl s905x)
+   - "khadas,vim" (Meson gxl s905x)
+ 
+   - "amlogic,p230" (Meson gxl s905d)
+   - "amlogic,p231" (Meson gxl s905d)
+-  - "hwacom,amazetv" (Meson gxl s905x)
++
+   - "amlogic,q200" (Meson gxm s912)
+   - "amlogic,q201" (Meson gxm s912)
+-  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+   - "nexbox,a1" (Meson gxm s912)
 -- 
 2.12.0
