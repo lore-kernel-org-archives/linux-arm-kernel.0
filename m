@@ -1,77 +1,35 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 13 May 2017 18:18:23 +0200
-Subject: [PATCH] devicetree: Move include prefixes from arch to separate
- directory
-In-Reply-To: <1494646471-24624-1-git-send-email-olof@lixom.net>
-References: <1494646471-24624-1-git-send-email-olof@lixom.net>
-Message-ID: <5321739.niXTlG4pZX@phil>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 14 May 2017 01:23:52 +0900
+Subject: [PATCH V5 6/7] ARM: uniphier: Use - instead of @ for DT OPP
+ entries
+In-Reply-To: <1faba32eeaa493cc5463488af32eaea0dc2f7a94.1492685450.git.viresh.kumar@linaro.org>
+References: <cover.1492685450.git.viresh.kumar@linaro.org>
+ <1faba32eeaa493cc5463488af32eaea0dc2f7a94.1492685450.git.viresh.kumar@linaro.org>
+Message-ID: <CAK7LNASgFd1V=gRpEqOsQkRpqVZu25N10mCSjRR=Vbmwbxp6yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+2017-04-20 19:55 GMT+09:00 Viresh Kumar <viresh.kumar@linaro.org>:
+> Compiling the DT file with W=1, DTC warns like follows:
+>
+> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+> unit name, but no reg property
+>
+> Fix this by replacing '@' with '-' as the OPP nodes will never have a
+> "reg" property.
+>
+> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
 
-Am Freitag, 12. Mai 2017, 20:34:31 CEST schrieb Olof Johansson:
-> We use a directory under arch/$ARCH/boot/dts as an include path
-> that has links outside of the subtree to find dt-bindings from under
-> include/dt-bindings. That's been working well, but new DT architectures
-> haven't been adding them by default.
-> 
-> Recently there's been a desire to share some of the DT material between
-> arm and arm64, which originally caused developers to create symlinks or
-> relative includes between the subtrees. This isn't ideal -- it breaks
-> if the DT files aren't stored in the exact same hierarchy as the kernel
-> tree, and generally it's just icky.
-> 
-> As a somewhat cleaner solution we decided to add a $ARCH/ prefix link
-> once, and allow DTS files to reference dtsi (and dts) files in other
-> architectures that way.
-> 
-> Original approach was to create these links under each architecture,
-> but it lead to the problem of recursive symlinks.
-> 
-> As a remedy, move the include link directories out of the architecture
-> trees into a common location. At the same time, they can now share one
-> directory and one dt-bindings/ link as well.
-> 
-> Fixes: 4027494ae6e3 ('ARM: dts: add arm/arm64 include symlinks')
-> Reported-by: Russell King <linux@armlinux.org.uk>
-> Reported-by: Omar Sandoval <osandov@osandov.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mikael Starvik <starvik@axis.com>
-> Cc: Jesper Nilsson <jesper.nilsson@axis.com>
-> Cc: James Hogan <james.hogan@imgtec.com>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: Frank Rowand <frowand.list@gmail.com>
-> Cc: linux-arch <linux-arch@vger.kernel.org>
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-
-change itself looks good to me and also works, so
-
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-
-But we also have an overlooked glitch in the new rk3399-gru devicetrees
-that surfaces with this patch applied.
-
-../arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:47:57: fatal error: include/dt-bindings/input/linux-event-codes.h: File or directory not found
- #include <include/dt-bindings/input/linux-event-codes.h>
-
-so need the patch from Ian Campbell 
-"arm64: dts: rockchip: Drop explicit "include/" prefix from #include" [0]
-in front to not cause other build breakage.
-
-So if applicable, both patches should go in together, with the gru patch
-in front and I've added my Reviewed-by there if someone else is doing it.
+Applied to linux-uniphier.  Thanks!
 
 
-Heiko
 
-[0] https://www.spinics.net/lists/arm-kernel/msg580835.html
+-- 
+Best Regards
+Masahiro Yamada
