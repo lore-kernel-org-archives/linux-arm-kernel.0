@@ -1,56 +1,54 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 13 May 2017 08:33:59 +0800
-Subject: [v6 1/3] ACPI/IORT: Fixup SMMUv3 resource size for Cavium
- ThunderX2 SMMUv3 model
-In-Reply-To: <1494592866-14076-2-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <201705130808.K3USl83S%fengguang.wu@intel.com>
+From: lkp@intel.com (Fengguang Wu)
+Date: Sat, 13 May 2017 08:44:15 +0800
+Subject: [PATCH v3 1/9] arm: dts: mt7623: add mt7623-mt6323.dtsi file
+In-Reply-To: <7f1d5fb3-5295-bb61-f21b-9d08bfaf070c@gmail.com>
+References: <201705121837.eDU3hOId%fengguang.wu@intel.com>
+ <7f1d5fb3-5295-bb61-f21b-9d08bfaf070c@gmail.com>
+Message-ID: <20170513004415.5laehgg3mf7lcere@wfg-t540p.sh.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linu,
+On Fri, May 12, 2017 at 05:46:06PM +0200, Matthias Brugger wrote:
+>
+>
+>On 12/05/17 12:46, kbuild test robot wrote:
+>> Hi John,
+>>
+>> [auto build test ERROR on robh/for-next]
+>> [also build test ERROR on v4.11 next-20170512]
+>> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+>
+>Mediatek dts patches should be tested against this branch:
+>https://github.com/mbgg/linux-mediatek.git for-next
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.11 next-20170512]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+OK. I just send a patch for that.
 
-url:    https://github.com/0day-ci/linux/commits/Geetha-sowjanya/Cavium-ThunderX2-SMMUv3-errata-workarounds/20170513-065956
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+>Thanks for maintaining the kbuild test robot.
 
-All errors (new ones prefixed by >>):
+You are welcome!
 
-   drivers/acpi/arm64/iort.c: In function 'arm_smmu_v3_init_resources':
->> drivers/acpi/arm64/iort.c:777:21: error: 'ACPI_IORT_SMMU_CAVIUM_CN99XX' undeclared (first use in this function)
-     if (smmu->model == ACPI_IORT_SMMU_CAVIUM_CN99XX)
-                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/acpi/arm64/iort.c:777:21: note: each undeclared identifier is reported only once for each function it appears in
+Thanks,
+Fengguang
 
-vim +/ACPI_IORT_SMMU_CAVIUM_CN99XX +777 drivers/acpi/arm64/iort.c
-
-   771		smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-   772	
-   773		/*
-   774		 * Override the size, for Cavium ThunderX2 implementation
-   775		 * which doesn't support the page 1 SMMU register space.
-   776		 */
- > 777		if (smmu->model == ACPI_IORT_SMMU_CAVIUM_CN99XX)
-   778			size = SZ_64K;
-   779	
-   780		res[num_res].start = smmu->base_address;
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 34579 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170513/abc88f3b/attachment-0001.gz>
+>>
+>> url:    https://github.com/0day-ci/linux/commits/sean-wang-mediatek-com/arm-dts-extend-mt7623-support/20170512-165138
+>> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+>> config: arm-at91_dt_defconfig (attached as .config)
+>> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+>> reproduce:
+>>          wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>>          chmod +x ~/bin/make.cross
+>>          # save the attached .config to linux build tree
+>>          make.cross ARCH=arm
+>>
+>> All errors (new ones prefixed by >>):
+>>
+>>>> Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:33.1-7 Label or path pwrap not found
+>>>> Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:261.1-6 Label or path mmc0 not found
+>>>> Error: arch/arm/boot/dts/mt7623-mt6323.dtsi:266.1-6 Label or path mmc1 not found
+>>     FATAL ERROR: Syntax error parsing input tree
+>>
+>> ---
+>> 0-DAY kernel test infrastructure                Open Source Technology Center
+>> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>>
