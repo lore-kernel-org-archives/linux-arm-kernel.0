@@ -1,9 +1,9 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sat, 13 May 2017 16:33:33 +0200
-Subject: [PATCH v2 14/18] arm64: dts: meson-gxbb-p20x: Fix node order
+Date: Sat, 13 May 2017 16:33:36 +0200
+Subject: [PATCH v2 17/18] arm64: dts: meson-gxm-nexbox-a1: Fix node order
 In-Reply-To: <20170513143337.14278-1-afaerber@suse.de>
 References: <20170513143337.14278-1-afaerber@suse.de>
-Message-ID: <20170513143337.14278-15-afaerber@suse.de>
+Message-ID: <20170513143337.14278-18-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,107 +14,114 @@ Signed-off-by: Andreas F?rber <afaerber@suse.de>
  v1 -> v2:
  * Rebased (new nodes added)
  
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 62 ++++++++++++------------
- 1 file changed, 31 insertions(+), 31 deletions(-)
+ .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts | 86 +++++++++++-----------
+ 1 file changed, 43 insertions(+), 43 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-index 0ec1d19522dd..d904deb1018c 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-@@ -148,34 +148,36 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+index 920fac10de93..5f626d683088 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+@@ -113,10 +113,49 @@
  	};
  };
  
--/* This UART is brought out to the DB9 connector */
 -&uart_AO {
--	status = "okay";
--	pinctrl-0 = <&uart_ao_a_pins>;
--	pinctrl-names = "default";
 +&cvbs_vdac_port {
 +	cvbs_vdac_out: endpoint {
 +		remote-endpoint = <&cvbs_connector_in>;
 +	};
- };
- 
--&ir {
-+&hdmi_tx {
++};
++
++&ethmac {
  	status = "okay";
--	pinctrl-0 = <&remote_input_ao_pins>;
-+	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+-	pinctrl-0 = <&uart_ao_a_pins>;
++
++	pinctrl-0 = <&eth_pins>;
  	pinctrl-names = "default";
- };
- 
--&usb0_phy {
--	status = "okay";
--	phy-supply = <&usb_pwr>;
--};
--
--&usb1_phy {
--	status = "okay";
++
++	/* Select external PHY by default */
++	phy-handle = <&external_phy>;
++
++	amlogic,tx-delay-ns = <2>;
++
++	snps,reset-gpio = <&gpio GPIOZ_14 0>;
++	snps,reset-delays-us = <0 10000 1000000>;
++	snps,reset-active-low;
++
++	/* External PHY is in RGMII */
++	phy-mode = "rgmii";
++};
++
++&external_mdio {
++	external_phy: ethernet-phy at 0 {
++		compatible = "ethernet-phy-id001c.c916", "ethernet-phy-ieee802.3-c22";
++		reg = <0>;
++		max-speed = <1000>;
++	};
++};
++
++&hdmi_tx {
++	status = "okay";
++	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
++	pinctrl-names = "default";
++};
++
 +&hdmi_tx_tmds_port {
 +	hdmi_tx_tmds_out: endpoint {
 +		remote-endpoint = <&hdmi_connector_in>;
 +	};
  };
  
--&usb0 {
-+&ir {
- 	status = "okay";
-+	pinctrl-0 = <&remote_input_ao_pins>;
-+	pinctrl-names = "default";
- };
- 
--&usb1 {
-+&pwm_ef {
- 	status = "okay";
-+	pinctrl-0 = <&pwm_e_pins>;
-+	pinctrl-names = "default";
-+	clocks = <&clkc CLKID_FCLK_DIV4>;
-+	clock-names = "clkin0";
- };
- 
- /* Wireless SDIO Module */
-@@ -242,28 +244,26 @@
+ &ir {
+@@ -163,47 +202,8 @@
  	vqmmc-supply = <&vddio_boot>;
  };
  
--&pwm_ef {
-+/* This UART is brought out to the DB9 connector */
-+&uart_AO {
- 	status = "okay";
--	pinctrl-0 = <&pwm_e_pins>;
-+	pinctrl-0 = <&uart_ao_a_pins>;
- 	pinctrl-names = "default";
--	clocks = <&clkc CLKID_FCLK_DIV4>;
--	clock-names = "clkin0";
- };
- 
+-&ethmac {
+-	status = "okay";
+-
+-	pinctrl-0 = <&eth_pins>;
+-	pinctrl-names = "default";
+-
+-	/* Select external PHY by default */
+-	phy-handle = <&external_phy>;
+-
+-	amlogic,tx-delay-ns = <2>;
+-
+-	snps,reset-gpio = <&gpio GPIOZ_14 0>;
+-	snps,reset-delays-us = <0 10000 1000000>;
+-	snps,reset-active-low;
+-
+-	/* External PHY is in RGMII */
+-	phy-mode = "rgmii";
+-};
+-
+-&external_mdio {
+-	external_phy: ethernet-phy at 0 {
+-		compatible = "ethernet-phy-id001c.c916", "ethernet-phy-ieee802.3-c22";
+-		reg = <0>;
+-		max-speed = <1000>;
+-	};
+-};
+-
 -&cvbs_vdac_port {
 -	cvbs_vdac_out: endpoint {
 -		remote-endpoint = <&cvbs_connector_in>;
 -	};
-+&usb0_phy {
-+	status = "okay";
-+	phy-supply = <&usb_pwr>;
- };
- 
+-};
+-
 -&hdmi_tx {
-+&usb1_phy {
++&uart_AO {
  	status = "okay";
 -	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
--	pinctrl-names = "default";
++	pinctrl-0 = <&uart_ao_a_pins>;
+ 	pinctrl-names = "default";
  };
- 
+-
 -&hdmi_tx_tmds_port {
 -	hdmi_tx_tmds_out: endpoint {
 -		remote-endpoint = <&hdmi_connector_in>;
 -	};
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
- };
+-};
 -- 
 2.12.0
