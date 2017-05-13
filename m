@@ -1,9 +1,9 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sat, 13 May 2017 16:33:37 +0200
-Subject: [PATCH v2 18/18] arm64: dts: meson-gx-p23x-q20x: Fix node order
+Date: Sat, 13 May 2017 16:33:32 +0200
+Subject: [PATCH v2 13/18] arm64: dts: meson-gxbb-nexbox-a95x: Fix node order
 In-Reply-To: <20170513143337.14278-1-afaerber@suse.de>
 References: <20170513143337.14278-1-afaerber@suse.de>
-Message-ID: <20170513143337.14278-19-afaerber@suse.de>
+Message-ID: <20170513143337.14278-14-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,36 +14,38 @@ Signed-off-by: Andreas F?rber <afaerber@suse.de>
  v1 -> v2:
  * Rebased (new nodes added)
  
- .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 58 +++++++++++-----------
- 1 file changed, 29 insertions(+), 29 deletions(-)
+ .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 52 +++++++++++-----------
+ 1 file changed, 26 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-index 25eed18a7439..dc478d094c11 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-@@ -121,19 +121,42 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+index 87198eafb04b..a1078b3e1c76 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+@@ -165,10 +165,10 @@
  	};
  };
  
--/* This UART is brought out to the DB9 connector */
 -&uart_AO {
+-	status = "okay";
+-	pinctrl-0 = <&uart_ao_a_pins>;
+-	pinctrl-names = "default";
 +&cvbs_vdac_port {
 +	cvbs_vdac_out: endpoint {
 +		remote-endpoint = <&cvbs_connector_in>;
 +	};
-+};
-+
-+&ethmac {
- 	status = "okay";
--	pinctrl-0 = <&uart_ao_a_pins>;
-+};
-+
+ };
+ 
+ &ethmac {
+@@ -195,12 +195,32 @@
+ 	};
+ };
+ 
 +&hdmi_tx {
 +	status = "okay";
 +	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
- 	pinctrl-names = "default";
- };
- 
++	pinctrl-names = "default";
++};
++
 +&hdmi_tx_tmds_port {
 +	hdmi_tx_tmds_out: endpoint {
 +		remote-endpoint = <&hdmi_connector_in>;
@@ -67,7 +69,7 @@ index 25eed18a7439..dc478d094c11 100644
  /* Wireless SDIO Module */
  &sd_emmc_a {
  	status = "okay";
-@@ -198,32 +221,9 @@
+@@ -260,28 +280,8 @@
  	vqmmc-supply = <&vddio_boot>;
  };
  
@@ -79,10 +81,6 @@ index 25eed18a7439..dc478d094c11 100644
 -	clock-names = "clkin0";
 -};
 -
--&ethmac {
--	status = "okay";
--};
--
 -&cvbs_vdac_port {
 -	cvbs_vdac_out: endpoint {
 -		remote-endpoint = <&cvbs_connector_in>;
@@ -90,7 +88,6 @@ index 25eed18a7439..dc478d094c11 100644
 -};
 -
 -&hdmi_tx {
-+/* This UART is brought out to the DB9 connector */
 +&uart_AO {
  	status = "okay";
 -	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
