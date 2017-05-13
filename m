@@ -1,9 +1,9 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sat, 13 May 2017 16:33:29 +0200
-Subject: [PATCH v2 10/18] arm64: dts: meson-gxbb: Fix node order
+Date: Sat, 13 May 2017 16:33:31 +0200
+Subject: [PATCH v2 12/18] arm64: dts: meson-gxbb-vega-s95: Fix node order
 In-Reply-To: <20170513143337.14278-1-afaerber@suse.de>
 References: <20170513143337.14278-1-afaerber@suse.de>
-Message-ID: <20170513143337.14278-11-afaerber@suse.de>
+Message-ID: <20170513143337.14278-13-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,208 +14,91 @@ Signed-off-by: Andreas F?rber <afaerber@suse.de>
  v1 -> v2:
  * Rebased (new nodes added)
  
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 171 +++++++++++++++-------------
- 1 file changed, 91 insertions(+), 80 deletions(-)
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      | 54 +++++++++++-----------
+ 1 file changed, 27 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 4afe1c46ec11..92dd5d1d73c8 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -97,13 +97,6 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+index f4bfee8e2e08..346753fb6324 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+@@ -111,18 +111,6 @@
  	};
  };
  
--&ethmac {
--	clocks = <&clkc CLKID_ETH>,
--		 <&clkc CLKID_FCLK_DIV2>,
--		 <&clkc CLKID_MPLL2>;
--	clock-names = "stmmaceth", "clkin0", "clkin1";
+-&uart_AO {
+-	status = "okay";
+-	pinctrl-0 = <&uart_ao_a_pins>;
+-	pinctrl-names = "default";
 -};
 -
- &aobus {
- 	pinctrl_aobus: pinctrl at 14 {
- 		compatible = "amlogic,meson-gxbb-aobus-pinctrl";
-@@ -252,6 +245,97 @@
+-&ir {
+-	status = "okay";
+-	pinctrl-0 = <&remote_input_ao_pins>;
+-	pinctrl-names = "default";
+-};
+-
+ &ethmac {
+ 	status = "okay";
+ 	pinctrl-0 = <&eth_rgmii_pins>;
+@@ -149,21 +137,18 @@
  	};
  };
  
-+&apb {
-+	mali: gpu at c0000 {
-+		compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
-+		reg = <0x0 0xc0000 0x0 0x40000>;
-+		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "gp", "gpmmu", "pp", "pmu",
-+			"pp0", "ppmmu0", "pp1", "ppmmu1",
-+			"pp2", "ppmmu2";
-+		clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_MALI>;
-+		clock-names = "bus", "core";
-+
-+		/*
-+		 * Mali clocking is provided by two identical clock paths
-+		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
-+		 * free mux to safely change frequency while running.
-+		 */
-+		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
-+				  <&clkc CLKID_MALI_0>,
-+				  <&clkc CLKID_MALI>; /* Glitch free mux */
-+		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
-+					 <0>, /* Do Nothing */
-+					 <&clkc CLKID_MALI_0>;
-+		assigned-clock-rates = <0>, /* Do Nothing */
-+				       <666666666>,
-+				       <0>; /* Do Nothing */
-+	};
-+};
-+
-+&cbus {
-+	spifc: spi at 8c80 {
-+		compatible = "amlogic,meson-gxbb-spifc";
-+		reg = <0x0 0x08c80 0x0 0x80>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&clkc CLKID_SPI>;
-+		status = "disabled";
-+	};
-+};
-+
-+&ethmac {
-+	clocks = <&clkc CLKID_ETH>,
-+		 <&clkc CLKID_FCLK_DIV2>,
-+		 <&clkc CLKID_MPLL2>;
-+	clock-names = "stmmaceth", "clkin0", "clkin1";
-+};
-+
-+&hdmi_tx {
-+	compatible = "amlogic,meson-gxbb-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
-+	resets = <&reset RESET_HDMITX_CAPB3>,
-+		 <&reset RESET_HDMI_SYSTEM_RESET>,
-+		 <&reset RESET_HDMI_TX>;
-+	reset-names = "hdmitx_apb", "hdmitx", "hdmitx_phy";
-+	clocks = <&clkc CLKID_HDMI_PCLK>,
-+		 <&clkc CLKID_CLK81>,
-+		 <&clkc CLKID_GCLK_VENCI_INT0>;
-+	clock-names = "isfr", "iahb", "venci";
-+};
-+
-+&hiubus {
-+	clkc: clock-controller at 0 {
-+		compatible = "amlogic,gxbb-clkc";
-+		#clock-cells = <1>;
-+		reg = <0x0 0x0 0x0 0x3db>;
-+	};
-+};
-+
-+&i2c_A {
-+	clocks = <&clkc CLKID_I2C>;
-+};
-+
-+&i2c_AO {
-+	clocks = <&clkc CLKID_AO_I2C>;
-+};
-+
-+&i2c_B {
-+	clocks = <&clkc CLKID_I2C>;
-+};
-+
-+&i2c_C {
-+	clocks = <&clkc CLKID_I2C>;
-+};
-+
- &periphs {
- 	pinctrl_periphs: pinctrl at 4b0 {
- 		compatible = "amlogic,meson-gxbb-periphs-pinctrl";
-@@ -521,67 +605,6 @@
- 	};
+-&usb0_phy {
+-	status = "okay";
+-	phy-supply = <&usb_vbus>;
+-};
+-
+-&usb1_phy {
+-	status = "okay";
+-};
+-
+-&usb0 {
++&ir {
+ 	status = "okay";
++	pinctrl-0 = <&remote_input_ao_pins>;
++	pinctrl-names = "default";
  };
  
--&hiubus {
--	clkc: clock-controller at 0 {
--		compatible = "amlogic,gxbb-clkc";
--		#clock-cells = <1>;
--		reg = <0x0 0x0 0x0 0x3db>;
--	};
--};
--
--&apb {
--	mali: gpu at c0000 {
--		compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
--		reg = <0x0 0xc0000 0x0 0x40000>;
--		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
--		interrupt-names = "gp", "gpmmu", "pp", "pmu",
--			"pp0", "ppmmu0", "pp1", "ppmmu1",
--			"pp2", "ppmmu2";
--		clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_MALI>;
--		clock-names = "bus", "core";
--
--		/*
--		 * Mali clocking is provided by two identical clock paths
--		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
--		 * free mux to safely change frequency while running.
--		 */
--		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
--				  <&clkc CLKID_MALI_0>,
--				  <&clkc CLKID_MALI>; /* Glitch free mux */
--		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
--					 <0>, /* Do Nothing */
--					 <&clkc CLKID_MALI_0>;
--		assigned-clock-rates = <0>, /* Do Nothing */
--				       <666666666>,
--				       <0>; /* Do Nothing */
--	};
--};
--
--&i2c_A {
--	clocks = <&clkc CLKID_I2C>;
--};
--
--&i2c_AO {
--	clocks = <&clkc CLKID_AO_I2C>;
--};
--
--&i2c_B {
--	clocks = <&clkc CLKID_I2C>;
--};
--
--&i2c_C {
--	clocks = <&clkc CLKID_I2C>;
--};
--
- &saradc {
- 	compatible = "amlogic,meson-gxbb-saradc", "amlogic,meson-saradc";
- 	clocks = <&xtal>,
-@@ -620,15 +643,3 @@
- &vpu {
- 	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
+-&usb1 {
++&pwm_ef {
+ 	status = "okay";
++	pinctrl-0 = <&pwm_e_pins>;
++	pinctrl-names = "default";
++	clocks = <&clkc CLKID_FCLK_DIV4>;
++	clock-names = "clkin0";
  };
--
--&hdmi_tx {
--	compatible = "amlogic,meson-gxbb-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
--	resets = <&reset RESET_HDMITX_CAPB3>,
--		 <&reset RESET_HDMI_SYSTEM_RESET>,
--		 <&reset RESET_HDMI_TX>;
--	reset-names = "hdmitx_apb", "hdmitx", "hdmitx_phy";
--	clocks = <&clkc CLKID_HDMI_PCLK>,
--		 <&clkc CLKID_CLK81>,
--		 <&clkc CLKID_GCLK_VENCI_INT0>;
--	clock-names = "isfr", "iahb", "venci";
--};
+ 
+ /* Wireless SDIO Module */
+@@ -229,10 +214,25 @@
+ 	vmmcq-sumpply = <&vcc_1v8>;
+ };
+ 
+-&pwm_ef {
++&uart_AO {
+ 	status = "okay";
+-	pinctrl-0 = <&pwm_e_pins>;
++	pinctrl-0 = <&uart_ao_a_pins>;
+ 	pinctrl-names = "default";
+-	clocks = <&clkc CLKID_FCLK_DIV4>;
+-	clock-names = "clkin0";
++};
++
++&usb0_phy {
++	status = "okay";
++	phy-supply = <&usb_vbus>;
++};
++
++&usb1_phy {
++	status = "okay";
++};
++
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
+ };
 -- 
 2.12.0
