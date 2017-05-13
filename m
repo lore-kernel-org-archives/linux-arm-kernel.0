@@ -1,72 +1,26 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sat, 13 May 2017 12:18:26 +0800
-Subject: [arm-soc:to-build 1/1]
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:47:57: fatal error:
- include/dt-bindings/input/linux-event-codes.h: No such file or directory
-Message-ID: <201705131223.4fYRjiWX%fengguang.wu@intel.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Sat, 13 May 2017 00:21:37 -0700
+Subject: [kernel-hardening] Re: [PATCH v9 1/4] syscalls: Verify address
+ limit before returning to user-mode
+In-Reply-To: <20170512203044.GI4626@worktop.programming.kicks-ass.net>
+References: <CAJcbSZEoRyewUtBHvqmNZL9FtT_q42Vmmd-EuC50x-ZRASiHHg@mail.gmail.com>
+ <CA+55aFwvQfs_X+paQF6Luc0Rq+W3J2fKuHRou7=ANcquDdXdDA@mail.gmail.com>
+ <20170512072802.5a686f23@mschwideX1>
+ <CAGXu5j+EatK=DYONRkgovwLgytAnbG8jnAZaMSLckZFNVj3gig@mail.gmail.com>
+ <20170512075458.09a3a1ce@mschwideX1>
+ <CAGXu5jL9vUrn4kpjO+qa4cHmWBypeqP17OGbrMs=5Nz0YpQMZw@mail.gmail.com>
+ <CA+55aFzbiBqsYb7vwO=+L4Vp_GOgPu+DBOrq4fBnyzq5DbBehg@mail.gmail.com>
+ <CAGXu5j+xmyJ6RhtPw9rUgs7k3sZ1KKWffvyGGG--oPfu9W42ng@mail.gmail.com>
+ <20170512202106.GO22219@n2100.armlinux.org.uk>
+ <20170512203044.GI4626@worktop.programming.kicks-ass.net>
+Message-ID: <20170513072137.GA29771@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git to-build
-head:   4ab8a17555b2c193d0089010a1459d1206a901f0
-commit: 4ab8a17555b2c193d0089010a1459d1206a901f0 [1/1] devicetree: Move include prefixes from arch to separate directory
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 4ab8a17555b2c193d0089010a1459d1206a901f0
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+On Fri, May 12, 2017 at 10:30:44PM +0200, Peter Zijlstra wrote:
+> On stack variable length arrays get implemented by the compiler doing
+> alloca(), and we sadly have a few of those around.
 
-All errors (new ones prefixed by >>):
-
->> arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:47:57: fatal error: include/dt-bindings/input/linux-event-codes.h: No such file or directory
-    #include <include/dt-bindings/input/linux-event-codes.h>
-                                                            ^
-   compilation terminated.
-
-vim +47 arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-
-48f4d979 Brian Norris 2017-03-20  31   *
-48f4d979 Brian Norris 2017-03-20  32   *     The above copyright notice and this permission notice shall be
-48f4d979 Brian Norris 2017-03-20  33   *     included in all copies or substantial portions of the Software.
-48f4d979 Brian Norris 2017-03-20  34   *
-48f4d979 Brian Norris 2017-03-20  35   *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-48f4d979 Brian Norris 2017-03-20  36   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-48f4d979 Brian Norris 2017-03-20  37   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-48f4d979 Brian Norris 2017-03-20  38   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-48f4d979 Brian Norris 2017-03-20  39   *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-48f4d979 Brian Norris 2017-03-20  40   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-48f4d979 Brian Norris 2017-03-20  41   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-48f4d979 Brian Norris 2017-03-20  42   *     OTHER DEALINGS IN THE SOFTWARE.
-48f4d979 Brian Norris 2017-03-20  43   */
-48f4d979 Brian Norris 2017-03-20  44  
-48f4d979 Brian Norris 2017-03-20  45  /dts-v1/;
-48f4d979 Brian Norris 2017-03-20  46  #include "rk3399-gru.dtsi"
-48f4d979 Brian Norris 2017-03-20 @47  #include <include/dt-bindings/input/linux-event-codes.h>
-48f4d979 Brian Norris 2017-03-20  48  
-48f4d979 Brian Norris 2017-03-20  49  /*
-48f4d979 Brian Norris 2017-03-20  50   * Kevin-specific things
-48f4d979 Brian Norris 2017-03-20  51   *
-48f4d979 Brian Norris 2017-03-20  52   * Things in this section should use names from Kevin schematic since no
-48f4d979 Brian Norris 2017-03-20  53   * equivalent exists in Gru schematic.  If referring to signals that exist
-48f4d979 Brian Norris 2017-03-20  54   * in Gru we use the Gru names, though.  Confusing enough for you?
-48f4d979 Brian Norris 2017-03-20  55   */
-
-:::::: The code at line 47 was first introduced by commit
-:::::: 48f4d9796d990850f6339b61eeeac9ca7fdb3695 arm64: dts: rockchip: add Gru/Kevin DTS
-
-:::::: TO: Brian Norris <briannorris@chromium.org>
-:::::: CC: Heiko Stuebner <heiko@sntech.de>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 35119 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170513/5aa68a77/attachment-0001.gz>
+I've just got rid of one of those and I wish they would appear
+entirely as they are horrible in so many different ways.  Sparse
+warns about them, btw.
