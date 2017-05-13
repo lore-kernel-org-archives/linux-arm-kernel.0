@@ -1,178 +1,41 @@
-From: shameerali.kolothum.thodi@huawei.com (shameer)
-Date: Sat, 13 May 2017 10:47:31 +0100
-Subject: [RFC v1 7/7] iommu/arm-smmu-v3: Enable ACPI based HiSilicon erratum
- 161010801
-In-Reply-To: <20170513094731.3676-1-shameerali.kolothum.thodi@huawei.com>
-References: <20170513094731.3676-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20170513094731.3676-8-shameerali.kolothum.thodi@huawei.com>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Sat, 13 May 2017 13:40:05 +0200
+Subject: [PATCH 1/2] ARM: davinci: PM: Free resources in error handling path
+ in 'davinci_pm_init'
+Message-ID: <20170513114005.23617-1-christophe.jaillet@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HiSilicon erratum 161010801 describes the limitation of HiSilicon
-platforms Hip06/Hip07 to support the SMMU mappings for MSI transactions.
+If 'sram_alloc' fails, we need to free already allocated resources.
 
-On these platforms GICv3 ITS translator is presented with the deviceID
-by extending the MSI payload data to 64 bits to include the deviceID.
-Hence, the PCIe controller on this platforms has to differentiate the
-MSI payload against other DMA payload and has to modify the MSI payload.
-This basically makes it difficult for this platforms to have a SMMU
-translation for MSI.
-
-This patch implements a ACPI table based quirk to reserve the hw msi
-regions in the smmu-v3 driver which means these address regions will
-not be translated and will be excluded from iova allocations.
-
-ACPI CSRT vendor specific blobs are used to pass the reserve address
-region info on these platforms. HiSilicon CSRT table contains a resource
-group whose device Id matches with the SMMU device model id defined
-in the IORT spec. This SMMU group will not have the optional Resource
-group shared info.
-
-typedef struct {
-  UINT32  Length;
-  UINT32  VendorId;
-  UINT32  SubvendorId;
-  UINT16  DeviceId;      ---->Set to IORT SMMU Model number.
-  UINT16  SubdeviceId;
-  UINT16  Revision;
-  UINT8   Reserved[2];
-  UINT32  SharedInfoLength;  ---->Set to zero.
-  ACPI_CSRT_RESOURCE_DESCRIPTOR RsrcDesc;
-} ACPI_CSRT_RESOURCE_GROUP;
-
-The resource descriptor associated with this group will have the vendor
-specific section populated to represent the MSI region as below.
-
-typedef struct {
-  UINT32  Length;
-  UINT16  ResourceType;
-  UINT16  ResourceSubtype;
-  UINT32  UID;
-  /* Vendor defined info */
-  UINT64  Base;        -->Corresponding SMMU node base address.
-  UINT64  MSIResvStart; -----> HW MSI reserve start address.
-  UINT32  MSIResvLen; -------> HW MSI reserve len.
-} ACPI_CSRT_RESOURCE_DESCRIPTOR;
-
-Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
+Fixes: aa9aa1ec2df6 ("ARM: davinci: PM: rework init, remove platform device")
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 ---
- arch/arm64/Kconfig          | 10 ++++++
- drivers/iommu/arm-smmu-v3.c | 75 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 85 insertions(+)
+ arch/arm/mach-davinci/pm.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 21d61ff..e7ebd97 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -516,6 +516,16 @@ config HISILICON_ERRATUM_161010701
- 	  CMD_PREFETCH_CFG. This will skip the prefetch cmd usage.
+diff --git a/arch/arm/mach-davinci/pm.c b/arch/arm/mach-davinci/pm.c
+index efb80354f303..d282b0783ecf 100644
+--- a/arch/arm/mach-davinci/pm.c
++++ b/arch/arm/mach-davinci/pm.c
+@@ -153,7 +153,8 @@ int __init davinci_pm_init(void)
+ 	davinci_sram_suspend = sram_alloc(davinci_cpu_suspend_sz, NULL);
+ 	if (!davinci_sram_suspend) {
+ 		pr_err("PM: cannot allocate SRAM memory\n");
+-		return -ENOMEM;
++		ret = -ENOMEM;
++		goto no_sram_mem;
+ 	}
  
- 	  If unsure, say Y.
-+config HISILICON_ERRATUM_161010801
-+	bool "HiSilicon erratum 161010801: Reserve HW MSI regions"
-+	default y
-+	help
-+	  On HiSilicon Hip06/Hip07 platforms, the SMMU v3 has to bypass the
-+	  GIC ITS doorbel msi address regions. This will make sure that ITS
-+	  doorbell address regions are reserved and excluded from iova
-+	  allocations.
-+
-+	  If unsure, say Y.
+ 	davinci_sram_push(davinci_sram_suspend, davinci_cpu_suspend,
+@@ -161,6 +162,8 @@ int __init davinci_pm_init(void)
  
- endmenu
+ 	suspend_set_ops(&davinci_pm_ops);
  
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index e7a8a50..a33e339 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -663,6 +663,73 @@ void erratum_skip_prefetch_cmd(struct arm_smmu_device *smmu, void *arg)
- 	smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
- }
- 
-+#ifdef CONFIG_HISILICON_ERRATUM_161010801
-+static void parse_hisi_csrt_msi(struct arm_smmu_device *smmu,
-+		const struct acpi_iort_smmu_v3 *iort)
-+
-+{
-+	struct acpi_csrt_group *grp, *end;
-+	struct acpi_table_csrt *csrt;
-+	acpi_status status;
-+
-+	status = acpi_get_table(ACPI_SIG_CSRT, 0,
-+				(struct acpi_table_header **)&csrt);
-+	if (ACPI_FAILURE(status)) {
-+		dev_warn(smmu->dev, "HiSi CSRT table get failed: 0x%x\n",
-+								status);
-+		return;
-+	}
-+
-+	grp = (struct acpi_csrt_group *)(csrt + 1);
-+	end = (struct acpi_csrt_group *)((void *)csrt + csrt->header.length);
-+
-+	while (grp < end) {
-+		if (grp->device_id == iort->model) {
-+			/*
-+			 * We don't have the optional shared info for this grp
-+			 * and has only one resource descriptor with vendor
-+			 * defined msi region for this group. Go straight to
-+			 * vendor defined info.
-+			 */
-+			struct acpi_csrt_descriptor *desc =
-+					(struct acpi_csrt_descriptor *)&grp[1];
-+
-+			/*
-+			 * HiSilicon CSRT vendor info. First 8 bytes gives smmu
-+			 * node base addr, next 8 bytes HW MSI reserve region
-+			 * addr and the remaining 4 byte the len.
-+			 */
-+			void *vendor = &desc[1];
-+			u64 base = (*(u64 *)vendor);
-+
-+			if (base == iort->base_address && smmu->msi_region) {
-+				/* Replace the default SW msi with HW msi */
-+
-+				smmu->msi_region->start =
-+						*((u64 *)((u64 *)vendor+1));
-+				smmu->msi_region->length =
-+						*((u32 *)((u64 *)vendor+2));
-+				smmu->msi_region->type = IOMMU_RESV_MSI;
-+				dev_info(smmu->dev,
-+					"HiSi msi addr 0x%pa size 0x%zx\n",
-+					&smmu->msi_region->start,
-+					smmu->msi_region->length);
-+				return;
-+			}
-+		}
-+
-+		grp = (struct acpi_csrt_group *)((void *)grp + grp->length);
-+	}
-+
-+}
-+void erratum_hisi_resv_hw_msi(struct arm_smmu_device *smmu, void *arg)
-+{
-+	const struct acpi_iort_smmu_v3 *iort_smmu = arg;
-+
-+	parse_hisi_csrt_msi(smmu, iort_smmu);
-+}
-+#endif
-+
- struct smmu_erratum_workaround {
- 	enum smmu_erratum_match_type match_type;
- 	const void *id;	/* Indicate the Erratum ID */
-@@ -686,6 +753,14 @@ static const struct smmu_erratum_workaround smmu_workarounds[] = {
- 	},
- 
- #endif
-+#ifdef CONFIG_HISILICON_ERRATUM_161010801
-+	{
-+		.match_type = se_match_acpi_iort_model,
-+		.id = (void *)ACPI_IORT_SMMU_HISILICON_HI161X,
-+		.desc_str = "HiSilicon erratum 161010801",
-+		.enable = erratum_hisi_resv_hw_msi,
-+	},
-+#endif
- 	{
- 
- 	},
++no_sram_mem:
++	iounmap(pm_config.ddrpsc_reg_base);
+ no_ddrpsc_mem:
+ 	iounmap(pm_config.ddrpll_reg_base);
+ no_ddrpll_mem:
 -- 
-2.5.0
+2.11.0
