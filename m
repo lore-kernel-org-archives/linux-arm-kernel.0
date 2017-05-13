@@ -1,61 +1,105 @@
 From: shameerali.kolothum.thodi@huawei.com (shameer)
-Date: Sat, 13 May 2017 10:47:24 +0100
-Subject: [RFC v1 0/7] iommu/smmu-v3: Workaround for hisilicon 161010801
- erratum(reserve HW MSI)
-Message-ID: <20170513094731.3676-1-shameerali.kolothum.thodi@huawei.com>
+Date: Sat, 13 May 2017 10:47:26 +0100
+Subject: [RFC v1 2/7] iommu/arm-smmu-v3: Add erratum framework functions
+In-Reply-To: <20170513094731.3676-1-shameerali.kolothum.thodi@huawei.com>
+References: <20170513094731.3676-1-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170513094731.3676-3-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On certain HiSilicon platforms (Hip06/Hip07) the GIC ITS and
-PCIe RC deviates from the standard implementation and this breaks
-PCIe MSI functionality when SMMU is enabled.
+This will provide a way to replace the existing skip_prefetch_cmd
+erratum using the new framework.
 
-The HiSilicon erratum 161010801 describes this limitation of certain
-HiSilicon platforms to support the SMMU mappings for MSI transactions.
-On these platforms GICv3 ITS translator is presented with the deviceID
-by extending the MSI payload data to 64 bits to include the deviceID.
-Hence, the PCIe controller on this platforms has to differentiate the
-MSI payload against other DMA payload and has to modify the MSI payload.
-This basically makes it difficult for this platforms to have a SMMU
-translation for MSI.
+Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 58 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
-This patch implements a ACPI table based quirk to reserve the hw msi
-regions in the smmu-v3 driver which means these address regions will
-not be translated and will be excluded from iova alloactions.
-
-To implement this quirk, the following changes are incorporated 
-into smmu-v3:
-1. Added a general erratum framework based on arm_arch_timer erratum
-   framework. The intention is to have a common framework for dt and
-   acpi based quirk implementations.
-2. Replaced the existing hisilicon, broken_prefetch_cmd quirk using 
-   the new erratum framework (erratum-161010701)
-3. Introduced a ACPI based quirk for erratum-161010801.
-4. ACPI CSRT vendor specific blobs are used to pass the reserve address
-   region info on these platforms.
-
-Also please note that this patchset is based on Robin's patch series
-"acpica: iort: Update SMMU models for IORT rev. C".
-https://lkml.org/lkml/2017/5/12/211
-
-
-Thanks,
-Shameer
-
-shameer (7):
-  iommu/arm-smmu-v3: Add erratum framework structures
-  iommu/arm-smmu-v3: Add erratum framework functions
-  iommu/arm-smmu-v3: Replace the device tree binding for hisilicon
-    broken prefetch cmd with erratum id
-  iommu/arm-smmu-v3: Enable HiSilicon erratum 161010701
-  iommu/arm-smmu-v3: Enable ACPI based HiSilicon erratum 161010701
-  iommu/arm-smmu-v3: Rearrange msi resv alloc functions
-  iommu/arm-smmu-v3: Enable ACPI based HiSilicon erratum 161010801
-
- .../devicetree/bindings/iommu/arm,smmu-v3.txt      |   2 +-
- arch/arm64/Kconfig                                 |  20 +-
- drivers/iommu/arm-smmu-v3.c                        | 225 ++++++++++++++++++---
- 3 files changed, 218 insertions(+), 29 deletions(-)
-
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index a166590..f20d5d5 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -664,16 +664,72 @@ enum smmu_erratum_match_type {
+ 	se_match_dt,
+ };
+ 
++void erratum_skip_prefetch_cmd(struct arm_smmu_device *smmu, void *arg)
++{
++	smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
++}
++
+ struct smmu_erratum_workaround {
+ 	enum smmu_erratum_match_type match_type;
+ 	const void *id;	/* Indicate the Erratum ID */
+ 	const char *desc_str;
++	void (*enable)(struct arm_smmu_device *, void *);
+ };
+ 
+ static const struct smmu_erratum_workaround smmu_workarounds[] = {
+ 
+ };
+ 
++typedef bool (*se_match_fn_t)(const struct smmu_erratum_workaround *,
++							  const void *);
++static
++bool smmu_check_dt_erratum(const struct smmu_erratum_workaround *wa,
++						   const void *arg)
++{
++	const struct device_node *np = arg;
++
++	return of_property_read_bool(np, wa->id);
++}
++
++static void smmu_enable_errata(struct arm_smmu_device *smmu,
++				enum smmu_erratum_match_type type,
++				se_match_fn_t match_fn,
++				void *arg)
++{
++	const struct smmu_erratum_workaround *wa = smmu_workarounds;
++
++	for (; wa->desc_str; wa++) {
++		if (wa->match_type != type)
++			continue;
++
++		if (match_fn(wa, arg)) {
++			if (wa->enable) {
++				wa->enable(smmu, arg);
++				dev_info(smmu->dev,
++					"Enabling workaround for %s\n",
++					 wa->desc_str);
++			}
++		}
++	}
++}
++
++
++static void smmu_check_workarounds(struct arm_smmu_device *smmu,
++				  enum smmu_erratum_match_type type,
++				  void *arg)
++{
++	se_match_fn_t match_fn = NULL;
++
++	switch (type) {
++	case se_match_dt:
++		match_fn = smmu_check_dt_erratum;
++		break;
++	}
++
++	smmu_enable_errata(smmu, type, match_fn, arg);
++
++}
++
+ static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
+ {
+ 	return container_of(dom, struct arm_smmu_domain, domain);
+@@ -2641,6 +2697,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+ 
+ 	parse_driver_options(smmu);
+ 
++	smmu_check_workarounds(smmu, se_match_dt, dev->of_node);
++
+ 	if (of_dma_is_coherent(dev->of_node))
+ 		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
+ 
 -- 
 2.5.0
