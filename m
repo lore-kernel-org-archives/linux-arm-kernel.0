@@ -1,148 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 13 May 2017 16:15:53 +0200
-Subject: [PATCH 2/2 v6] ARM: dts: Qualcomm APQ8060 DragonBoard ALS sensor
-Message-ID: <20170513141553.24806-1-linus.walleij@linaro.org>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sat, 13 May 2017 16:33:21 +0200
+Subject: [PATCH v2 02/18] arm64: dts: amlogic: Sort Makefile
+In-Reply-To: <20170513143337.14278-1-afaerber@suse.de>
+References: <20170513143337.14278-1-afaerber@suse.de>
+Message-ID: <20170513143337.14278-3-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Capella CM3605 ambient light and proximity sensor
-to the APQ8060 DragonBoard device tree. Notice that we also set
-up pin config for the AOUT line and GPIO lines, and that we set
-the default trigger on the infrared LED to associate with the
-"cm3605" trigger so the IR LED is controlled by this the CM3605
-driver.
+Sort the .dtb files alphabetically to make clear where to add new ones.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
-ChangeLog v5->v6:
-- No changes just resending with the other patch.
-ChangeLog v1->v5:
-- Switch to the twocell addressing scheme specified in the new
-  bindings.
-- The bindings and IIO driver are both queued for v4.12 in the
-  IIO tree and pending in linux-next
----
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 80 ++++++++++++++++++++++++++
- 1 file changed, 80 insertions(+)
+ v1 -> v2:
+ * Rebased (new boards added)
+ * Extended commit message
+ 
+ arch/arm64/boot/dts/amlogic/Makefile | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-index 2da1413f5720..5225e489ef52 100644
---- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-+++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-@@ -23,6 +23,7 @@
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
-+#include <dt-bindings/pinctrl/qcom,pmic-mpp.h>
- #include "qcom-msm8660.dtsi"
+diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+index b9ad2db7398b..14fa27ccd589 100644
+--- a/arch/arm64/boot/dts/amlogic/Makefile
++++ b/arch/arm64/boot/dts/amlogic/Makefile
+@@ -7,15 +7,15 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-meta.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-telos.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-wetek-hub.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-wetek-play2.dtb
++dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-hwacom-amazetv.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-khadas-vim.dtb
++dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
+-dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-hwacom-amazetv.dtb
+-dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
++dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q200.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q201.dtb
+-dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
  
- / {
-@@ -83,6 +84,25 @@
- 		};
- 	};
- 
-+	/*
-+	 * Capella CM3605 light and proximity sensor mounted directly
-+	 * on the sensor board.
-+	 */
-+	cm3605 {
-+		compatible = "capella,cm3605";
-+		vdd-supply = <&pm8058_l14>; // 2.85V
-+		aset-gpios = <&pm8058_gpio 35 GPIO_ACTIVE_LOW>;
-+		capella,aset-resistance-ohms = <100000>;
-+		/* GPIO34 has interrupt 225 on the PM8058 */
-+		/* Trig on both edges - getting close or far away */
-+		interrupts-extended = <&pm8058 225 IRQ_TYPE_EDGE_BOTH>;
-+		/* MPP05 analog input to the XOADC */
-+		io-channels = <&xoadc 0x00 0x05>;
-+		io-channel-names = "aout";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&dragon_cm3605_gpios>, <&dragon_cm3605_mpps>;
-+	};
-+
- 	soc {
- 		pinctrl at 800000 {
- 			/* eMMMC pins, all 8 data lines connected */
-@@ -317,6 +337,24 @@
- 							power-source = <PM8058_GPIO_S3>;
- 						};
- 					};
-+					dragon_cm3605_gpios: cm3605-gpios {
-+						/* Pin 34 connected to the proxy IRQ */
-+						pinconf_gpio34 {
-+							pins = "gpio34";
-+							function = "normal";
-+							input-enable;
-+							bias-disable;
-+							power-source = <PM8058_GPIO_S3>;
-+						};
-+						/* Pin 35 connected to ASET */
-+						pinconf_gpio35 {
-+							pins = "gpio35";
-+							function = "normal";
-+							output-high;
-+							bias-disable;
-+							power-source = <PM8058_GPIO_S3>;
-+						};
-+					};
- 					dragon_veth_gpios: veth-gpios {
- 						pinconf {
- 							pins = "gpio40";
-@@ -327,6 +365,47 @@
- 					};
- 				};
- 
-+				mpps at 50 {
-+					dragon_cm3605_mpps: cm3605-mpps {
-+						pinconf {
-+							pins = "mpp5";
-+							function = "analog";
-+							input-enable;
-+							bias-high-impedance;
-+							/* Let's use channel 5 */
-+							qcom,amux-route = <PMIC_MPP_AMUX_ROUTE_CH5>;
-+							power-source = <PM8058_GPIO_S3>;
-+						};
-+					};
-+				};
-+
-+				xoadc at 197 {
-+					/* Reference voltage 2.2 V */
-+					xoadc-ref-supply = <&pm8058_l18>;
-+
-+					/* Board-specific channels */
-+					mpp5 at 05 {
-+						/* Connected to AOUT of ALS sensor */
-+						reg = <0x00 0x05>;
-+					};
-+					mpp6 at 06 {
-+						/* Connected to test point TP43 */
-+						reg = <0x00 0x06>;
-+					};
-+					mpp7 at 07 {
-+						/* Connected to battery thermistor */
-+						reg = <0x00 0x07>;
-+					};
-+					mpp8 at 08 {
-+						/* Connected to battery ID detector */
-+						reg = <0x00 0x08>;
-+					};
-+					mpp9 at 09 {
-+						/* Connected to XO thermistor */
-+						reg = <0x00 0x09>;
-+					};
-+				};
-+
- 				led at 48 {
- 					/*
- 					 * The keypad LED @0x48 is routed to
-@@ -340,6 +419,7 @@
- 					reg = <0x48>;
- 					label = "pm8058:infrared:proximitysensor";
- 					default-state = "off";
-+					linux,default-trigger = "cm3605";
- 				};
- 				led at 131 {
- 					compatible = "qcom,pm8058-led";
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
 -- 
-2.9.3
+2.12.0
