@@ -1,78 +1,161 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 12 May 2017 19:19:23 -0500
-Subject: [PATCH 4/5] dt-bindings: phy: Modify Broadcom NS USB 3.0 PHY
- binding to use MDIO
-In-Reply-To: <20170511132925.14564-5-zajec5@gmail.com>
-References: <20170511132925.14564-1-zajec5@gmail.com>
- <20170511132925.14564-5-zajec5@gmail.com>
-Message-ID: <20170513001923.z3paipm7vxwajqgl@rob-hp-laptop>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Sat, 13 May 2017 01:24:34 +0100
+Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
+In-Reply-To: <20170512171417.GH3489@atomide.com>
+References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
+ <CACRpkdasvjBPcr5RrPwtTYaoGeTEJMWqXbSRaB5-cOEKXbpfRg@mail.gmail.com>
+ <f529e2d1-68e0-2760-3fd0-c7b0e94dd003@arm.com>
+ <CACRpkdZhUnu09CcRwkLS9Qf83OLiKkTVCQxZY0tsJmBHNAirVw@mail.gmail.com>
+ <20170512153522.GG3489@atomide.com> <20170512171417.GH3489@atomide.com>
+Message-ID: <9b85ddfe-470e-14a7-58ae-906c988adb5a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 03:29:24PM +0200, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
+On 12/05/17 18:14, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [170512 08:39]:
+>> * Linus Walleij <linus.walleij@linaro.org> [170512 02:28]:
+>>> On Thu, May 11, 2017 at 4:20 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>>>> Linus, can you shed some light if this array creation serves some purpose?
+>>>
+>>> Tony [author of this function] can you look at this?
+>>>
+>>> The code in pinctrl_generic_free_groups() does look a bit weird,
+>>> allocating these indices just to remove the radix tree.
+>>> Do you think we can clean it up?
+>>
+>> Yup indeed it seems totally pointless. Also the same code can be
+>> removed from pinmux_generic_free_functions().
+>>
+>> It must be left over code from my initial attempts to to add
+>> generic pinctrl groups and functions when I still though we need
+>> to keep a static array around for the indices to keep pinctrl
+>> happy. Then I probably did some robotic compile fixes after
+>> updating things to use just the radix tree and added indices
+>> locally to both functions..
 > 
-> Thanks to work done by Broadcom explaining their USB 3.0 PHY details we
-> know it's attached to the MDIO bus. Use this knowledge to update the
-> binding: make it a subnode to the MDIO bus and rework way of specifying
-> required registers.
-
-Please document here that you are breaking compatibility and why you 
-think that is okay.
-
+> Hmm no that, can't be, I think I figured it out.. See the patch
+> below.
 > 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> Regards,
+> 
+> Tony
+> 
+> 8< ---------------------------
+> From tony Mon Sep 17 00:00:00 2001
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Fri, 12 May 2017 08:47:57 -0700
+> Subject: [PATCH] pinctrl: core: Fix warning by removing bogus code
+> 
+> Andre Przywara <andre.przywara@arm.com> noticed that we can get the
+> following warning with -EPROBE_DEFER:
+> 
+> "WARNING: CPU: 1 PID: 89 at drivers/base/dd.c:349
+> driver_probe_device+0x2ac/0x2e8"
+> 
+> Let's fix the issue by removing the indices as suggested by
+> Tejun Heo <tj@kernel.org>. All we have to do here is kill the radix
+> tree.
+> 
+> I probably ended up with the indices after grepping for removal
+> of all entries using radix_tree_for_each_slot() and the first
+> match found was gmap_radix_tree_free(). Anyways, no need for
+> indices here, and we can just do remove all the entries using
+> radix_tree_for_each_slot() along how the item_kill_tree() test
+> case does.
+
+Yeah, I was hoping for exactly that!
+
+> Fixes: c7059c5ac70a ("pinctrl: core: Add generic pinctrl functions
+> for managing groups")
+> Fixes: a76edc89b100 ("pinctrl: core: Add generic pinctrl functions
+> for managing groups")
+> Reported-by: Andre Przywara <andre.przywara@arm.com>
+
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Tested-by: Andre Przywara <andre.przywara@arm.com>
+
+Thanks!
+Andre
+
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
->  .../devicetree/bindings/phy/bcm-ns-usb3-phy.txt    | 27 +++++++++++++++-------
->  1 file changed, 19 insertions(+), 8 deletions(-)
+>  drivers/pinctrl/core.c   | 20 +++-----------------
+>  drivers/pinctrl/pinmux.c | 21 ++++-----------------
+>  2 files changed, 7 insertions(+), 34 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt b/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt
-> index 09aeba94538d..32f057260351 100644
-> --- a/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt
-> @@ -3,9 +3,10 @@ Driver for Broadcom Northstar USB 3.0 PHY
->  Required properties:
+> diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+> --- a/drivers/pinctrl/core.c
+> +++ b/drivers/pinctrl/core.c
+> @@ -680,30 +680,16 @@ EXPORT_SYMBOL_GPL(pinctrl_generic_remove_group);
+>   * pinctrl_generic_free_groups() - removes all pin groups
+>   * @pctldev: pin controller device
+>   *
+> - * Note that the caller must take care of locking.
+> + * Note that the caller must take care of locking. The pinctrl groups
+> + * are allocated with devm_kzalloc() so no need to free them here.
+>   */
+>  static void pinctrl_generic_free_groups(struct pinctrl_dev *pctldev)
+>  {
+>  	struct radix_tree_iter iter;
+> -	struct group_desc *group;
+> -	unsigned long *indices;
+>  	void **slot;
+> -	int i = 0;
+> -
+> -	indices = devm_kzalloc(pctldev->dev, sizeof(*indices) *
+> -			       pctldev->num_groups, GFP_KERNEL);
+> -	if (!indices)
+> -		return;
 >  
->  - compatible: one of: "brcm,ns-ax-usb3-phy", "brcm,ns-bx-usb3-phy".
-> -- reg: register mappings for DMP (Device Management Plugin) and ChipCommon B
-> -       MMI.
-> -- reg-names: "dmp" and "ccb-mii"
-> +- reg: address of MDIO bus device
-> +- usb3-dmp-syscon: phandle to syscon with DMP (Device Management Plugin)
-> +		   registers
-> +- #phy-cells: must be 0
+>  	radix_tree_for_each_slot(slot, &pctldev->pin_group_tree, &iter, 0)
+> -		indices[i++] = iter.index;
+> -
+> -	for (i = 0; i < pctldev->num_groups; i++) {
+> -		group = radix_tree_lookup(&pctldev->pin_group_tree,
+> -					  indices[i]);
+> -		radix_tree_delete(&pctldev->pin_group_tree, indices[i]);
+> -		devm_kfree(pctldev->dev, group);
+> -	}
+> +		radix_tree_delete(&pctldev->pin_group_tree, iter.index);
 >  
->  Initialization of USB 3.0 PHY depends on Northstar version. There are currently
->  three known series: Ax, Bx and Cx.
-> @@ -15,9 +16,19 @@ Known B1: BCM4707 rev 6
->  Known C0: BCM47094 rev 0
+>  	pctldev->num_groups = 0;
+>  }
+> diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+> --- a/drivers/pinctrl/pinmux.c
+> +++ b/drivers/pinctrl/pinmux.c
+> @@ -826,30 +826,17 @@ EXPORT_SYMBOL_GPL(pinmux_generic_remove_function);
+>   * pinmux_generic_free_functions() - removes all functions
+>   * @pctldev: pin controller device
+>   *
+> - * Note that the caller must take care of locking.
+> + * Note that the caller must take care of locking. The pinctrl
+> + * functions are allocated with devm_kzalloc() so no need to free
+> + * them here.
+>   */
+>  void pinmux_generic_free_functions(struct pinctrl_dev *pctldev)
+>  {
+>  	struct radix_tree_iter iter;
+> -	struct function_desc *function;
+> -	unsigned long *indices;
+>  	void **slot;
+> -	int i = 0;
+> -
+> -	indices = devm_kzalloc(pctldev->dev, sizeof(*indices) *
+> -			       pctldev->num_functions, GFP_KERNEL);
+> -	if (!indices)
+> -		return;
 >  
->  Example:
-> -	usb3-phy {
-> -		compatible = "brcm,ns-ax-usb3-phy";
-> -		reg = <0x18105000 0x1000>, <0x18003000 0x1000>;
-> -		reg-names = "dmp", "ccb-mii";
-> -		#phy-cells = <0>;
-> +	mdio: mdio at 0 {
-> +		reg = <0x0>;
-> +		#size-cells = <1>;
-> +		#address-cells = <0>;
-> +
-> +		usb3-phy at 10 {
-> +			compatible = "brcm,ns-ax-usb3-phy";
-> +			reg = <0x10>;
-> +			usb3-dmp-syscon = <&usb3_dmp>;
-> +			#phy-cells = <0>;
-> +		};
-> +	};
-> +
-> +	usb3_dmp: syscon at 18105000 {
-> +		reg = <0x18105000 0x1000>;
->  	};
-> -- 
-> 2.11.0
+>  	radix_tree_for_each_slot(slot, &pctldev->pin_function_tree, &iter, 0)
+> -		indices[i++] = iter.index;
+> -
+> -	for (i = 0; i < pctldev->num_functions; i++) {
+> -		function = radix_tree_lookup(&pctldev->pin_function_tree,
+> -					     indices[i]);
+> -		radix_tree_delete(&pctldev->pin_function_tree, indices[i]);
+> -		devm_kfree(pctldev->dev, function);
+> -	}
+> +		radix_tree_delete(&pctldev->pin_function_tree, iter.index);
+>  
+>  	pctldev->num_functions = 0;
+>  }
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
