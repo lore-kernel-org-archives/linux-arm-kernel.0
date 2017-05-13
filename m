@@ -1,127 +1,51 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 14 May 2017 02:20:49 +0900
-Subject: [PATCH 1/2] ARM: dts: uniphier: fix simple-bus unit address format
- error
-Message-ID: <1494696050-4615-1-git-send-email-yamada.masahiro@socionext.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 13 May 2017 11:21:28 -0700
+Subject: [PATCH 1/4] ARM: ep93xx: switch to SPARSEMEM
+In-Reply-To: <20170221181529.6780-2-hsweeten@visionengravers.com>
+References: <20170221181529.6780-1-hsweeten@visionengravers.com>
+ <20170221181529.6780-2-hsweeten@visionengravers.com>
+Message-ID: <440efa53-dbbf-5600-3441-87c6891c5389@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compiling the UniPhier DT files with W=1, DTC warns like follows:
+Le 02/21/17 ? 10:15, H Hartley Sweeten a ?crit :
+> The EP93xx has four chip selects that can be used for the SDRAM memory.
+> These chip selects are decoded to specify an address domain:
+> 
+>   SDCS3  0x00000000-0x0fffffff with Boot Option ASDO=1
+>   SDCS0  0xc0000000-0xcfffffff
+>   SDCS1  0xd0000000-0xdfffffff
+>   SDCS2  0xe0000000-x0efffffff
+>   SDCS3  0xf0000000-0xffffffff with Boot Option ASDO=0
+> 
+> Because of the row/column/bank architecture of SDRAM, the mapping of
+> these memories into the processor's memory space is discontiguous.
+> 
+> Most ep93xx systems only use one of the chip selects. For these systems,
+> ARCH_HAS_HOLES_MEMORYMODEL has worked fine to handle the discontiguous
+> memory.
+> 
+> But, some of the TS-72xx boards use multiple chip selects. The TS-7300 in
+> particular uses SDCS3 (with ASDO=1) and SDCS2. On that system with
+> ARCH_HAS_HOLES_MEMORYMODEL the SDCS2 memory does not get handled correctly
+> and results in the system not booting.
+> 
+> Change the EP93xx to ARCH_SPARSEMEM_ENABLE. This handles the discontiguous
+> memory for all configurations.
+> 
+> This has been tested on the following ep93xx platforms:
+> 
+> EDB9307A with 64 MiB on SDCS0
+> Vision EP9307 with 64 MiB on SDCS0
+> TS-7300 with 64 MiB on SDCS3 (with ASDO=1) and 64 MiB on SDCS2
+> sim.one with 64 MiB on SDCS0
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Tested-by: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Russell King <linux@armlinux.org.uk>
 
-Warning (simple_bus_reg): Node /soc/system-bus at 58c00000/support_card at 1,1f00000/ethernet at 00000000 simple-bus unit address format error, expected "0"
-Warning (simple_bus_reg): Node /soc/system-bus at 58c00000/support_card at 1,1f00000/uart at 000b0000 simple-bus unit address format error, expected "b0000"
-Warning (simple_bus_reg): Node /soc/smpctrl at 59800000 simple-bus unit address format error, expected "59801000"
+Tested-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- arch/arm/boot/dts/uniphier-ld4.dtsi          | 2 +-
- arch/arm/boot/dts/uniphier-pro4.dtsi         | 2 +-
- arch/arm/boot/dts/uniphier-pro5.dtsi         | 2 +-
- arch/arm/boot/dts/uniphier-pxs2.dtsi         | 2 +-
- arch/arm/boot/dts/uniphier-sld3.dtsi         | 2 +-
- arch/arm/boot/dts/uniphier-sld8.dtsi         | 2 +-
- arch/arm/boot/dts/uniphier-support-card.dtsi | 4 ++--
- 7 files changed, 8 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/boot/dts/uniphier-ld4.dtsi b/arch/arm/boot/dts/uniphier-ld4.dtsi
-index 4f5fe15..e608895 100644
---- a/arch/arm/boot/dts/uniphier-ld4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ld4.dtsi
-@@ -201,7 +201,7 @@
- 			pinctrl-0 = <&pinctrl_system_bus>;
- 		};
- 
--		smpctrl at 59800000 {
-+		smpctrl at 59801000 {
- 			compatible = "socionext,uniphier-smpctrl";
- 			reg = <0x59801000 0x400>;
- 		};
-diff --git a/arch/arm/boot/dts/uniphier-pro4.dtsi b/arch/arm/boot/dts/uniphier-pro4.dtsi
-index 794a85a..f55708e 100644
---- a/arch/arm/boot/dts/uniphier-pro4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pro4.dtsi
-@@ -233,7 +233,7 @@
- 			pinctrl-0 = <&pinctrl_system_bus>;
- 		};
- 
--		smpctrl at 59800000 {
-+		smpctrl at 59801000 {
- 			compatible = "socionext,uniphier-smpctrl";
- 			reg = <0x59801000 0x400>;
- 		};
-diff --git a/arch/arm/boot/dts/uniphier-pro5.dtsi b/arch/arm/boot/dts/uniphier-pro5.dtsi
-index 81605e3..9577769 100644
---- a/arch/arm/boot/dts/uniphier-pro5.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pro5.dtsi
-@@ -320,7 +320,7 @@
- 			pinctrl-0 = <&pinctrl_system_bus>;
- 		};
- 
--		smpctrl at 59800000 {
-+		smpctrl at 59801000 {
- 			compatible = "socionext,uniphier-smpctrl";
- 			reg = <0x59801000 0x400>;
- 		};
-diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-index bc5a1af..bf3bafc 100644
---- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-@@ -304,7 +304,7 @@
- 			pinctrl-0 = <&pinctrl_system_bus>;
- 		};
- 
--		smpctrl at 59800000 {
-+		smpctrl at 59801000 {
- 			compatible = "socionext,uniphier-smpctrl";
- 			reg = <0x59801000 0x400>;
- 		};
-diff --git a/arch/arm/boot/dts/uniphier-sld3.dtsi b/arch/arm/boot/dts/uniphier-sld3.dtsi
-index 01d77ed..7c9f41d 100644
---- a/arch/arm/boot/dts/uniphier-sld3.dtsi
-+++ b/arch/arm/boot/dts/uniphier-sld3.dtsi
-@@ -216,7 +216,7 @@
- 			#size-cells = <1>;
- 		};
- 
--		smpctrl at 59800000 {
-+		smpctrl at 59801000 {
- 			compatible = "socionext,uniphier-smpctrl";
- 			reg = <0x59801000 0x400>;
- 		};
-diff --git a/arch/arm/boot/dts/uniphier-sld8.dtsi b/arch/arm/boot/dts/uniphier-sld8.dtsi
-index eb06fdc..19aa139 100644
---- a/arch/arm/boot/dts/uniphier-sld8.dtsi
-+++ b/arch/arm/boot/dts/uniphier-sld8.dtsi
-@@ -201,7 +201,7 @@
- 			pinctrl-0 = <&pinctrl_system_bus>;
- 		};
- 
--		smpctrl at 59800000 {
-+		smpctrl at 59801000 {
- 			compatible = "socionext,uniphier-smpctrl";
- 			reg = <0x59801000 0x400>;
- 		};
-diff --git a/arch/arm/boot/dts/uniphier-support-card.dtsi b/arch/arm/boot/dts/uniphier-support-card.dtsi
-index f61dfec..fdbf0f6 100644
---- a/arch/arm/boot/dts/uniphier-support-card.dtsi
-+++ b/arch/arm/boot/dts/uniphier-support-card.dtsi
-@@ -53,14 +53,14 @@
- 		#size-cells = <1>;
- 		ranges = <0x00000000 1 0x01f00000 0x00100000>;
- 
--		ethsc: ethernet at 00000000 {
-+		ethsc: ethernet at 0 {
- 			compatible = "smsc,lan9118", "smsc,lan9115";
- 			reg = <0x00000000 0x1000>;
- 			phy-mode = "mii";
- 			reg-io-width = <4>;
- 		};
- 
--		serialsc: uart at 000b0000 {
-+		serialsc: uart at b0000 {
- 			compatible = "ns16550a";
- 			reg = <0x000b0000 0x20>;
- 			clock-frequency = <12288000>;
+On a TS-3700 with 32MiB of SDRAM, thanks!
 -- 
-2.7.4
+Florian
