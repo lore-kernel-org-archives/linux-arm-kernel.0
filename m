@@ -1,41 +1,37 @@
 From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Sat, 13 May 2017 13:40:05 +0200
-Subject: [PATCH 1/2] ARM: davinci: PM: Free resources in error handling path
- in 'davinci_pm_init'
-Message-ID: <20170513114005.23617-1-christophe.jaillet@wanadoo.fr>
+Date: Sat, 13 May 2017 13:40:20 +0200
+Subject: [PATCH 2/2] ARM: davinci: PM: Do not free useful resources in normal
+ path in 'davinci_pm_init'
+Message-ID: <20170513114020.23668-1-christophe.jaillet@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If 'sram_alloc' fails, we need to free already allocated resources.
+This looks spurious to iounmap resources in the normal path of this init
+function.
+The 3 ioremap'ed fields of 'pm_config' can be accessed later on in other
+functions, so it is likely that we should return 'success' before unrolling
+everything.
 
 Fixes: aa9aa1ec2df6 ("ARM: davinci: PM: rework init, remove platform device")
 Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 ---
- arch/arm/mach-davinci/pm.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+This patch is just a *guess*. The end of the function looks more like a
+error handling code rather than a normal path.
+---
+ arch/arm/mach-davinci/pm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/mach-davinci/pm.c b/arch/arm/mach-davinci/pm.c
-index efb80354f303..d282b0783ecf 100644
+index d282b0783ecf..163d865abbf9 100644
 --- a/arch/arm/mach-davinci/pm.c
 +++ b/arch/arm/mach-davinci/pm.c
-@@ -153,7 +153,8 @@ int __init davinci_pm_init(void)
- 	davinci_sram_suspend = sram_alloc(davinci_cpu_suspend_sz, NULL);
- 	if (!davinci_sram_suspend) {
- 		pr_err("PM: cannot allocate SRAM memory\n");
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto no_sram_mem;
- 	}
- 
- 	davinci_sram_push(davinci_sram_suspend, davinci_cpu_suspend,
-@@ -161,6 +162,8 @@ int __init davinci_pm_init(void)
+@@ -161,6 +161,7 @@ int __init davinci_pm_init(void)
+ 						davinci_cpu_suspend_sz);
  
  	suspend_set_ops(&davinci_pm_ops);
++	return 0;
  
-+no_sram_mem:
-+	iounmap(pm_config.ddrpsc_reg_base);
- no_ddrpsc_mem:
- 	iounmap(pm_config.ddrpll_reg_base);
- no_ddrpll_mem:
+ no_sram_mem:
+ 	iounmap(pm_config.ddrpsc_reg_base);
 -- 
 2.11.0
