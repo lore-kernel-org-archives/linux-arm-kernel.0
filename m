@@ -1,109 +1,78 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 12 May 2017 19:17:53 -0500
-Subject: [PATCH v3 1/3] dt-bindings: Document STM32 I2S bindings
-In-Reply-To: <1494495904-18898-2-git-send-email-olivier.moysan@st.com>
-References: <1494495904-18898-1-git-send-email-olivier.moysan@st.com>
- <1494495904-18898-2-git-send-email-olivier.moysan@st.com>
-Message-ID: <20170513001753.hygunrcjqejpbwl6@rob-hp-laptop>
+Date: Fri, 12 May 2017 19:19:23 -0500
+Subject: [PATCH 4/5] dt-bindings: phy: Modify Broadcom NS USB 3.0 PHY
+ binding to use MDIO
+In-Reply-To: <20170511132925.14564-5-zajec5@gmail.com>
+References: <20170511132925.14564-1-zajec5@gmail.com>
+ <20170511132925.14564-5-zajec5@gmail.com>
+Message-ID: <20170513001923.z3paipm7vxwajqgl@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 11:45:02AM +0200, olivier moysan wrote:
-> Add documentation of device tree bindings for STM32 SPI/I2S.
+On Thu, May 11, 2017 at 03:29:24PM +0200, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
-> Signed-off-by: olivier moysan <olivier.moysan@st.com>
+> Thanks to work done by Broadcom explaining their USB 3.0 PHY details we
+> know it's attached to the MDIO bus. Use this knowledge to update the
+> binding: make it a subnode to the MDIO bus and rework way of specifying
+> required registers.
+
+Please document here that you are breaking compatibility and why you 
+think that is okay.
+
+> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 > ---
->  .../devicetree/bindings/sound/st,stm32-i2s.txt     | 68 ++++++++++++++++++++++
->  1 file changed, 68 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
+>  .../devicetree/bindings/phy/bcm-ns-usb3-phy.txt    | 27 +++++++++++++++-------
+>  1 file changed, 19 insertions(+), 8 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-i2s.txt b/Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
-> new file mode 100644
-> index 0000000..67b854a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
-> @@ -0,0 +1,68 @@
-> +STMicroelectronics STM32 SPI/I2S Controller
+> diff --git a/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt b/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt
+> index 09aeba94538d..32f057260351 100644
+> --- a/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/bcm-ns-usb3-phy.txt
+> @@ -3,9 +3,10 @@ Driver for Broadcom Northstar USB 3.0 PHY
+>  Required properties:
+>  
+>  - compatible: one of: "brcm,ns-ax-usb3-phy", "brcm,ns-bx-usb3-phy".
+> -- reg: register mappings for DMP (Device Management Plugin) and ChipCommon B
+> -       MMI.
+> -- reg-names: "dmp" and "ccb-mii"
+> +- reg: address of MDIO bus device
+> +- usb3-dmp-syscon: phandle to syscon with DMP (Device Management Plugin)
+> +		   registers
+> +- #phy-cells: must be 0
+>  
+>  Initialization of USB 3.0 PHY depends on Northstar version. There are currently
+>  three known series: Ax, Bx and Cx.
+> @@ -15,9 +16,19 @@ Known B1: BCM4707 rev 6
+>  Known C0: BCM47094 rev 0
+>  
+>  Example:
+> -	usb3-phy {
+> -		compatible = "brcm,ns-ax-usb3-phy";
+> -		reg = <0x18105000 0x1000>, <0x18003000 0x1000>;
+> -		reg-names = "dmp", "ccb-mii";
+> -		#phy-cells = <0>;
+> +	mdio: mdio at 0 {
+> +		reg = <0x0>;
+> +		#size-cells = <1>;
+> +		#address-cells = <0>;
 > +
-> +The SPI/I2S block supports I2S/PCM protocols when configured on I2S mode.
-> +Only some SPI instances support I2S.
-> +
-> +Required properties:
-> +  - compatible: Must be "st,stm32h7-i2s"
-> +  - reg: Offset and length of the device's register set.
-> +  - interrupts: Must contain the interrupt line id.
-> +  - clocks: Must contain phandle and clock specifier pairs for each entry
-> +	in clock-names.
-> +  - clock-names: Must contain "i2sclk", "pclk", "x8k" and "x11k".
-> +	"i2sclk": clock which feeds the internal clock generator
-> +	"pclk": clock which feeds the peripheral bus interface
-> +	"x8k": I2S parent clock for sampling rates multiple of 8kHz.
-> +	"x11k": I2S parent clock for sampling rates multiple of 11.025kHz.
-> +  - dmas: DMA specifiers for tx and rx dma.
-> +    See Documentation/devicetree/bindings/dma/stm32-dma.txt.
-> +  - dma-names: Identifier for each DMA request line. Must be "tx" and "rx".
-> +  - pinctrl-names: should contain only value "default"
-> +  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
-> +
-> +Optional properties:
-> +  - resets: Reference to a reset controller asserting the reset controller
-> +
-> +The device node should contain one 'port' child node with one child 'endpoint'
-> +node, according to the bindings defined in Documentation/devicetree/bindings/
-> +graph.txt.
-> +
-> +Example:
-> +sound_card {
-> +	compatible = "audio-graph-card";
-> +	dais = <&i2s2_port 0>;
-
-What is the 0 representing?
-
-> +};
-> +
-> +i2s2: audio-controller at 40003800 {
-> +	compatible = "st,stm32h7-i2s";
-> +	#sound-dai-cells = <0>;
-
-Should be dropped.
-
-> +	reg = <0x40003800 0x400>;
-> +	interrupts = <36>;
-> +	clocks = <&rcc PCLK1>, <&rcc SPI2_CK>, <&rcc PLL1_Q>, <&rcc PLL2_P>;
-> +	clock-names = "pclk", "i2sclk",  "x8k", "x11k";
-> +	dmas = <&dmamux2 2 39 0x400 0x1>,
-> +           <&dmamux2 3 40 0x400 0x1>;
-> +	dma-names = "rx", "tx";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2s2>;
-> +
-> +	i2s2_port: port at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-
-This shouldn't even compile. You don't need these because because you 
-have no reg property in the endpoint. 
-
-You have a unit-address here w/o a reg property. You don't need a reg 
-prop because you only have 1 port.
-
-> +
-> +		cpu_endpoint: endpoint {
-> +			remote-endpoint = <&codec_endpoint>;
-> +			format = "i2s";
-> +			bitclock-master = <&codec_endpoint>;
-> +			frame-master = <&codec_endpoint>;
+> +		usb3-phy at 10 {
+> +			compatible = "brcm,ns-ax-usb3-phy";
+> +			reg = <0x10>;
+> +			usb3-dmp-syscon = <&usb3_dmp>;
+> +			#phy-cells = <0>;
 > +		};
 > +	};
-> +};
 > +
-> +audio-codec {
-> +		codec_port: port at 0 {
-> +			codec_endpoint: endpoint {
-> +				remote-endpoint = <&cpu_endpoint>;
-> +		};
-> +	};
-> +};
+> +	usb3_dmp: syscon at 18105000 {
+> +		reg = <0x18105000 0x1000>;
+>  	};
 > -- 
-> 1.9.1
+> 2.11.0
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
