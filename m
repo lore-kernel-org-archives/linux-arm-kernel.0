@@ -1,55 +1,32 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sat, 13 May 2017 16:33:28 +0200
-Subject: [PATCH v2 09/18] arm64: dts: meson-gxbb-wetek-hub: Reference CVBS
- node by label
+Date: Sat, 13 May 2017 16:33:27 +0200
+Subject: [PATCH v2 08/18] arm64: dts: meson-gxl-s905x: Comment typo fix
 In-Reply-To: <20170513143337.14278-1-afaerber@suse.de>
 References: <20170513143337.14278-1-afaerber@suse.de>
-Message-ID: <20170513143337.14278-10-afaerber@suse.de>
+Message-ID: <20170513143337.14278-9-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Makes the override safer.
-
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v1 -> v2:
- * Extended commit message
+ v1 -> v2: Unchanged
  
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi     | 2 +-
- arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts | 6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-index a5be438a5c03..0ec1d19522dd 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-@@ -126,7 +126,7 @@
- 		clock-names = "ext_clock";
- 	};
- 
--	cvbs-connector {
-+	cvbs_connector: cvbs-connector {
- 		compatible = "composite-video-connector";
- 
- 		port {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
-index f057fb48fee5..1878ac2b2b83 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
-@@ -59,10 +59,10 @@
- 			panic-indicator;
- 		};
- 	};
-+};
- 
--	cvbs-connector {
--		status = "disabled";
--	};
-+&cvbs_connector {
-+	status = "disabled";
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+index 0f78d836edaf..3314a0b3dad9 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+@@ -48,7 +48,7 @@
+ 	compatible = "amlogic,s905x", "amlogic,meson-gxl";
  };
  
+-/* S905X Only has access to its internal PHY */
++/* S905X only has access to its internal PHY */
  &ethmac {
+ 	phy-mode = "rmii";
+ 	phy-handle = <&internal_phy>;
 -- 
 2.12.0
