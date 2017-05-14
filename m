@@ -1,169 +1,55 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 15 May 2017 00:30:36 +0800
-Subject: [PATCH v7 04/13] drm/sun4i: return only planes for layers created
+Date: Mon, 15 May 2017 00:30:39 +0800
+Subject: [PATCH v7 07/13] drm/sun4i: add a Kconfig option for sun4i-backend
 In-Reply-To: <20170514163045.40366-1-icenowy@aosc.io>
 References: <20170514163045.40366-1-icenowy@aosc.io>
-Message-ID: <20170514163045.40366-5-icenowy@aosc.io>
+Message-ID: <20170514163045.40366-8-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are going to add support for the Allwinner DE2 Mixer in sun4i-drm
-driver, we will finally have two types of layers.
-
-Each layer is bound to a drm_plane that is CRTC-specific, so we create
-them when initializing CRTC (calling sun4i_layers_init, which will be
-generalized in next patch). The drm_plane's will be used when creating
-CRTC, but the CRTC initialization code do not care other properties of
-the layer, so we let the sun4i_layers_init function return drm_plane's
-only.
-
-As we have no need to trace the layers after the CRTC is properly
-created, we drop the layers pointer in sun4i_crtc struct.
-
-Doing this uncouples the CRTC code from the type of layer (the
-sun4i_layers_init function name is still hardcoded and will be changed
-in the next patch), so that we can finally gain support for the
-mixer in DE2, which has different layers.
+As sun4i-backend is now a dedicated module, add an Kconfig option for
+it to make it optional, since some build may only use other engines.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_crtc.c  | 23 ++++++++++++-----------
- drivers/gpu/drm/sun4i/sun4i_crtc.h  |  1 -
- drivers/gpu/drm/sun4i/sun4i_layer.c | 18 ++++++++++--------
- drivers/gpu/drm/sun4i/sun4i_layer.h |  4 ++--
- 4 files changed, 24 insertions(+), 22 deletions(-)
+Changes in v7:
+- Adjusted the position of BACKEND makefile item. (It's now after
+  common codes shared between sun4i-backend and sun8i-mixer.)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-index 3c876c3a356a..708b3543d4e9 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-@@ -139,6 +139,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
- 				   struct sun4i_tcon *tcon)
- {
- 	struct sun4i_crtc *scrtc;
-+	struct drm_plane **planes;
- 	struct drm_plane *primary = NULL, *cursor = NULL;
- 	int ret, i;
+ drivers/gpu/drm/sun4i/Kconfig  | 10 ++++++++++
+ drivers/gpu/drm/sun4i/Makefile |  3 ++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
+index a4b357db8856..5a8227f37cc4 100644
+--- a/drivers/gpu/drm/sun4i/Kconfig
++++ b/drivers/gpu/drm/sun4i/Kconfig
+@@ -12,3 +12,13 @@ config DRM_SUN4I
+ 	  Choose this option if you have an Allwinner SoC with a
+ 	  Display Engine. If M is selected the module will be called
+ 	  sun4i-drm.
++
++config DRM_SUN4I_BACKEND
++	tristate "Support for Allwinner A10 Display Engine Backend"
++	depends on DRM_SUN4I
++	default DRM_SUN4I
++	help
++	  Choose this option if you have an Allwinner SoC with the
++	  original Allwinner Display Engine, which has a backend to
++	  do some alpha blending and feed graphics to TCON. If M is
++	  selected the module will be called sun4i-backend.
+diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+index a251fb36c951..da561d064ab8 100644
+--- a/drivers/gpu/drm/sun4i/Makefile
++++ b/drivers/gpu/drm/sun4i/Makefile
+@@ -9,6 +9,7 @@ sun4i-tcon-y += sun4i_crtc.o
+ sun4i-backend-y += sun4i_backend.o sun4i_layer.o
  
-@@ -149,22 +150,22 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
- 	scrtc->tcon = tcon;
- 
- 	/* Create our layers */
--	scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
--	if (IS_ERR(scrtc->layers)) {
-+	planes = sun4i_layers_init(drm, scrtc);
-+	if (IS_ERR(planes)) {
- 		dev_err(drm->dev, "Couldn't create the planes\n");
- 		return NULL;
- 	}
- 
- 	/* find primary and cursor planes for drm_crtc_init_with_planes */
--	for (i = 0; scrtc->layers[i]; i++) {
--		struct sun4i_layer *layer = scrtc->layers[i];
-+	for (i = 0; planes[i]; i++) {
-+		struct drm_plane *plane = planes[i];
- 
--		switch (layer->plane.type) {
-+		switch (plane->type) {
- 		case DRM_PLANE_TYPE_PRIMARY:
--			primary = &layer->plane;
-+			primary = plane;
- 			break;
- 		case DRM_PLANE_TYPE_CURSOR:
--			cursor = &layer->plane;
-+			cursor = plane;
- 			break;
- 		default:
- 			break;
-@@ -188,12 +189,12 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
- 						   1);
- 
- 	/* Set possible_crtcs to this crtc for overlay planes */
--	for (i = 0; scrtc->layers[i]; i++) {
-+	for (i = 0; planes[i]; i++) {
- 		uint32_t possible_crtcs = BIT(drm_crtc_index(&scrtc->crtc));
--		struct sun4i_layer *layer = scrtc->layers[i];
-+		struct drm_plane *plane = planes[i];
- 
--		if (layer->plane.type == DRM_PLANE_TYPE_OVERLAY)
--			layer->plane.possible_crtcs = possible_crtcs;
-+		if (plane->type == DRM_PLANE_TYPE_OVERLAY)
-+			plane->possible_crtcs = possible_crtcs;
- 	}
- 
- 	return scrtc;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.h b/drivers/gpu/drm/sun4i/sun4i_crtc.h
-index 230cb8f0d601..4dae3508424a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.h
-@@ -19,7 +19,6 @@ struct sun4i_crtc {
- 
- 	struct sun4i_backend		*backend;
- 	struct sun4i_tcon		*tcon;
--	struct sun4i_layer		**layers;
- };
- 
- static inline struct sun4i_crtc *drm_crtc_to_sun4i_crtc(struct drm_crtc *crtc)
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index f26bde5b9117..e1f03e1cc0ac 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -16,6 +16,7 @@
- #include <drm/drmP.h>
- 
- #include "sun4i_backend.h"
-+#include "sun4i_crtc.h"
- #include "sun4i_layer.h"
- 
- struct sun4i_plane_desc {
-@@ -128,15 +129,16 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
- 	return layer;
- }
- 
--struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
--				       struct sun4i_backend *backend)
-+struct drm_plane **sun4i_layers_init(struct drm_device *drm,
-+				     struct sun4i_crtc *crtc)
- {
--	struct sun4i_layer **layers;
-+	struct drm_plane **planes;
-+	struct sun4i_backend *backend = crtc->backend;
- 	int i;
- 
--	layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
--			      sizeof(*layers), GFP_KERNEL);
--	if (!layers)
-+	planes = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
-+			      sizeof(*planes), GFP_KERNEL);
-+	if (!planes)
- 		return ERR_PTR(-ENOMEM);
- 
- 	/*
-@@ -178,8 +180,8 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
- 				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
- 
- 		layer->id = i;
--		layers[i] = layer;
-+		planes[i] = &layer->plane;
- 	};
- 
--	return layers;
-+	return planes;
- }
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
-index 4be1f0919df2..5ea5c994d6ea 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
-@@ -26,7 +26,7 @@ plane_to_sun4i_layer(struct drm_plane *plane)
- 	return container_of(plane, struct sun4i_layer, plane);
- }
- 
--struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
--				       struct sun4i_backend *backend);
-+struct drm_plane **sun4i_layers_init(struct drm_device *drm,
-+				     struct sun4i_crtc *crtc);
- 
- #endif /* _SUN4I_LAYER_H_ */
+ obj-$(CONFIG_DRM_SUN4I)		+= sun4i-drm.o sun4i-tcon.o
+-obj-$(CONFIG_DRM_SUN4I)		+= sun4i-backend.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun6i_drc.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
++
++obj-$(CONFIG_DRM_SUN4I_BACKEND)		+= sun4i-backend.o
 -- 
 2.12.2
