@@ -1,81 +1,32 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 15 May 2017 00:30:38 +0800
-Subject: [PATCH v7 06/13] drm/sun4i: add a dedicated module for sun4i-backend
- and sun4i-layer
-In-Reply-To: <20170514163045.40366-1-icenowy@aosc.io>
-References: <20170514163045.40366-1-icenowy@aosc.io>
-Message-ID: <20170514163045.40366-7-icenowy@aosc.io>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sun, 14 May 2017 20:27:18 +0200
+Subject: [patch 02/18] arm: Adjust system_state check
+References: <20170514182716.347236777@linutronix.de>
+Message-ID: <20170514183612.595794864@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the direct call from CRTC code to layer code has disappeared,
-instead the layer's init function is called via the backend's ops.
+To enable smp_processor_id() and might_sleep() debug checks earlier, it's
+required to add system states between SYSTEM_BOOTING and SYSTEM_RUNNING.
 
-Add a dedicated module for sun4i-backend and sun4i-layer, and drop the
-EXPORT_SYMBOL from backend code to layer code.
+Adjust the system_state check in ipi_cpu_stop() to handle the extra states.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
 ---
-Changes in v7:
-- Added Chen-Yu's Reviewed-by.
+ arch/arm/kernel/smp.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
- drivers/gpu/drm/sun4i/Makefile        | 5 +++--
- drivers/gpu/drm/sun4i/sun4i_backend.c | 4 ----
- 2 files changed, 3 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index 59b757350a1f..a251fb36c951 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -5,9 +5,10 @@ sun4i-tcon-y += sun4i_tcon.o
- sun4i-tcon-y += sun4i_rgb.o
- sun4i-tcon-y += sun4i_dotclock.o
- sun4i-tcon-y += sun4i_crtc.o
--sun4i-tcon-y += sun4i_layer.o
-+
-+sun4i-backend-y += sun4i_backend.o sun4i_layer.o
- 
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i-drm.o sun4i-tcon.o
--obj-$(CONFIG_DRM_SUN4I)		+= sun4i_backend.o
-+obj-$(CONFIG_DRM_SUN4I)		+= sun4i-backend.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun6i_drc.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 611cdcb9c182..fac1a414ba49 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -83,7 +83,6 @@ void sun4i_backend_layer_enable(struct sun4i_backend *backend,
- 	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_MODCTL_REG,
- 			   SUN4I_BACKEND_MODCTL_LAY_EN(layer), val);
- }
--EXPORT_SYMBOL(sun4i_backend_layer_enable);
- 
- static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
- 					     u32 format, u32 *mode)
-@@ -170,7 +169,6 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
- 
- 	return 0;
- }
--EXPORT_SYMBOL(sun4i_backend_update_layer_coord);
- 
- int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
- 				       int layer, struct drm_plane *plane)
-@@ -205,7 +203,6 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
- 
- 	return 0;
- }
--EXPORT_SYMBOL(sun4i_backend_update_layer_formats);
- 
- int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 				      int layer, struct drm_plane *plane)
-@@ -246,7 +243,6 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 
- 	return 0;
- }
--EXPORT_SYMBOL(sun4i_backend_update_layer_buffer);
- 
- static int sun4i_backend_init_sat(struct device *dev) {
- 	struct sun4i_backend *backend = dev_get_drvdata(dev);
--- 
-2.12.2
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -555,8 +555,7 @@ static DEFINE_RAW_SPINLOCK(stop_lock);
+  */
+ static void ipi_cpu_stop(unsigned int cpu)
+ {
+-	if (system_state == SYSTEM_BOOTING ||
+-	    system_state == SYSTEM_RUNNING) {
++	if (system_state <= SYSTEM_RUNNING) {
+ 		raw_spin_lock(&stop_lock);
+ 		pr_crit("CPU%u: stopping\n", cpu);
+ 		dump_stack();
