@@ -1,37 +1,29 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 14 May 2017 11:50:51 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6qdl-colibri: Fix audio channel swap
-In-Reply-To: <1494773451-11111-1-git-send-email-festevam@gmail.com>
-References: <1494773451-11111-1-git-send-email-festevam@gmail.com>
-Message-ID: <1494773451-11111-2-git-send-email-festevam@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 14 May 2017 16:59:17 +0200
+Subject: [PATCH] ARM: dts: rockchip: add missing grf phandle for rk3288
+In-Reply-To: <20170507143446.11502-1-ayaka@soulik.info>
+References: <20170507143446.11502-1-ayaka@soulik.info>
+Message-ID: <53387334.ADQf94xZqP@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi Randy,
 
-When running a stress playback/stop loop test on a mx6colibri channel
-swaps can be noticed randomly.
+Am Sonntag, 7. Mai 2017, 22:34:46 CEST schrieb Randy Li:
+> The PWM devices need to access the grf to switch the PWM IP.
 
-Increasing the SGTL5000 LRCLK pad strength to its maximum value fixes
-the issue, so add the 'lrclk-strength' property to avoid the audio
-channel swaps.
+The grf property is not part of the pwm binding and I remember
+this coming up in veyron times, when Thiery didn't want such settings
+in the pwm driver. So the kernel pwm driver does not switch anything
+right now.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6qdl-colibri.dtsi | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-colibri.dtsi b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-index e807875..e66360f 100644
---- a/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-@@ -254,6 +254,7 @@
- 		clocks = <&clks IMX6QDL_CLK_CKO>;
- 		VDDA-supply = <&reg_2p5v>;
- 		VDDIO-supply = <&reg_3p3v>;
-+		lrclk-strength = <3>;
- 	};
- 
- 	/* STMPE811 touch screen controller */
--- 
-2.7.4
+> And tsadc uses it to shutdown the system.
+
+No it doesn't. The tsadc on rk3288 does not do any grf settings right now,
+as it is using the v2_initialize function. Only rk3366 and rk3399 seem
+to do any grf settings in the current v4.12-rc1 . Or is there some tsadc
+patch from you pending to change that?
+
+
+Heiko
