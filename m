@@ -1,28 +1,22 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 14 May 2017 14:54:53 +0200
-Subject: [PATCH v2 6/6] ARM: dts: rockchip: rename RK1108-evb to RV1108-evb
-In-Reply-To: <20170317171840.4683-7-heiko@sntech.de>
-References: <20170317171840.4683-1-heiko@sntech.de>
- <20170317171840.4683-7-heiko@sntech.de>
-Message-ID: <17588038.0Ltp2v6IRL@phil>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sun, 14 May 2017 18:28:09 +0530
+Subject: [PATCH 00/10] dma: mv_xor_v2: fixes and improvements
+In-Reply-To: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1493978274-12805-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170514125809.GJ6263@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 17. M?rz 2017, 18:18:40 CEST schrieb Heiko Stuebner:
-> From: Andy Yan <andy.yan@rock-chips.com>
+On Fri, May 05, 2017 at 11:57:43AM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> Rockchip finally named the SOC as RV1108, so change it
-> for compatible.
-> 
-> The rk1108/rv1108 is completely new to the market, so there no real
-> devices exist in the wild, only the Rockchip internal evaluation
-> board. Therefore we're not breaking any existing devices when
-> changing compatible values.
-> 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
-> [added paragraph about no real devices existing]
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> This series brings a number of fixes (first 7 patches) and
+> improvements (last 3 patches) to the driver used for the Marvell XORv2
+> engine used in Marvell Armada 7K/8K.
 
-adapted for Makefile changes in 4.12-rc1 and applied for 4.13
+And 7 going to stable :(
+
+Anyway I have applied all, *after* fixing the subsystem name for all :(
+
+-- 
+~Vinod
