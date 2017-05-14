@@ -1,48 +1,112 @@
-From: moore@free.fr (Chris Moore)
-Date: Sun, 14 May 2017 06:28:48 +0200
-Subject: [PATCH v2 02/18] arm64: dts: amlogic: Sort Makefile
-In-Reply-To: <20170513143337.14278-3-afaerber@suse.de>
-References: <20170513143337.14278-1-afaerber@suse.de>
- <20170513143337.14278-3-afaerber@suse.de>
-Message-ID: <2e9efe9b-6bfe-ab69-8811-c85e1a8ec9f9@free.fr>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Sun, 14 May 2017 13:27:36 +0800
+Subject: [PATCH v3 2/2] dt-bindings: pcie: Add documentation for
+ Mediatek PCIe
+In-Reply-To: <1494504718.19420.10.camel@mtkswgap22>
+References: <1494382020-26790-1-git-send-email-ryder.lee@mediatek.com>
+ <1494382020-26790-3-git-send-email-ryder.lee@mediatek.com>
+ <CAK8P3a193RxchvFAMWeZiP0sc0bd+VGg=_aVvipSgcbDpHXojg@mail.gmail.com>
+ <1494408707.31307.32.camel@mtkswgap22>
+ <CAK8P3a1AUsUTNDnN+_9251sxC7R4vvkQRr37dvAke6ooCJ_oxg@mail.gmail.com>
+ <1494470650.20742.36.camel@mtkswgap22>
+ <CAK8P3a1FVyoFufnbQFjGovoQpkxMj3kaAgjb5Q+v-DQnYKeA-g@mail.gmail.com>
+ <1494493719.9564.26.camel@mtkswgap22>
+ <1494504718.19420.10.camel@mtkswgap22>
+Message-ID: <1494739656.22906.32.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/05/2017 ? 16:33, Andreas F?rber a ?crit :
-> Sort the .dtb files alphabetically to make clear where to add new ones.
->
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->   v1 -> v2:
->   * Rebased (new boards added)
->   * Extended commit message
->   
->   arch/arm64/boot/dts/amlogic/Makefile | 6 +++---
->   1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-> index b9ad2db7398b..14fa27ccd589 100644
-> --- a/arch/arm64/boot/dts/amlogic/Makefile
-> +++ b/arch/arm64/boot/dts/amlogic/Makefile
-> @@ -7,15 +7,15 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-meta.dtb
->   dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-telos.dtb
->   dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-wetek-hub.dtb
->   dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-wetek-play2.dtb
-> +dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-hwacom-amazetv.dtb
->   dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-khadas-vim.dtb
-> +dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
->   dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
->   dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
->   dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
 
-s905d should be before s905x if you are imposing alphabetical order.
+Hi Arnd,
 
-> -dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-hwacom-amazetv.dtb
-> -dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
-> +dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
->   dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q200.dtb
->   dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q201.dtb
-> -dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
->   
->   always		:= $(dtb-y)
->   subdir-y	:= $(dts-dirs)
+Sorry to bother you again.
+
+On Thu, 2017-05-11 at 20:11 +0800, Ryder Lee wrote:
+> > interrupt-map-mask = <0xff800 0 0 0>;
+> > interrupt-map = <0x0000 0 0 0 &gic GIC_SPI 193 IRQ_TYPE_NONE>,
+> > 		 <0x0800 0 0 0 &gic GIC_SPI 194 IRQ_TYPE_NONE>,
+> > 		 <0x1000 0 0 0 &gic GIC_SPI 195 IRQ_TYPE_NONE>,
+> > 
+> > 		 /* workaround here*/
+> > 		 <0x10000 0 0 0 &gic GIC_SPI 193 IRQ_TYPE_NONE>,
+> > 		 <0x20000 0 0 0 &gic GIC_SPI 194 IRQ_TYPE_NONE>,
+> > 	     <0x30000 0 0 0 &gic GIC_SPI 195 IRQ_TYPE_NONE>;
+> > 
+> > It works well. But how could we handle the situation if root port0
+> > status = "disabled" ? I think we cannot assign child bus number
+> > dynamically from binding.
+> 
+> That is to say, we route it statically if port0 (or port1) is
+> unavailable. The PCI child bus enumeration should look something like
+> this:
+> 
+>  pci 0000:00:01.0: fixup irq: got 224
+>  pci 0000:00:01.0: assigning IRQ 224
+>  pci 0000:00:02.0: fixup irq: got 225
+>  pci 0000:00:02.0: assigning IRQ 225
+>  
+>  Go wrong here! IRQ 223/224 should be assigned to the devices behind
+> port0 and port1.
+>  pci 0000:01:00.0: fixup irq: got 223
+>  pci 0000:01:00.0: assigning IRQ 223
+>  pci 0000:02:00.0: fixup irq: got 224
+>  pci 0000:02:00.0: assigning IRQ 224
+
+What I thought was wrong. I have misunderstood something in previous
+discussion. Actually it could work for the situation that I mentioned
+before. However, I'm not sure whether this is a proper representation
+you want to see.
+
+> > > >> On a related note, I see that you still list
+> > > >>
+> > > >> > +- interrupts: Three interrupt outputs of the controller. Must contain an
+> > > >> > +  entry for each entry in the interrupt-names property.
+> > > >> > +- interrupt-names: Must include the following names
+> > > >> > +  - "pcie-int0"
+> > > >> > +  - "pcie-int1"
+> > > >> > +  - "pcie-int2"
+> > > >>
+> > > >> This seems to be an artifact from the older version and should be
+> > > >> removed as the driver correctly ignores the properties now.
+> > > >
+> > > > Actually, everything works fine without these properties however when it
+> > > > loads we see a few weird error message:
+> > > >
+> > > > pcieport 0000:00:01.0: Signaling PME with IRQ 232
+> > > > pcieport 0000:00:02.0: enabling device (0140 -> 0142)
+> > > > pcieport 0000:00:02.0: enabling bus mastering
+> > > > irq 232: nobody cared (try booting with the "irqpoll" option)
+> > > > ...
+> > > > [<c03f6be4>] (pcie_pme_probe) from [<c03f47b8>] (pcie_port_probe_service
+> > > > +0x44/0x6c)
+> > > > (pcie_port_probe_service) from [<c0454cf8>] (driver_probe_device
+> > > > +0x280/0x470)
+> > > > ...
+> > > > (pcie_port_device_register) from [<c03f51a0>] (pcie_portdrv_probe
+> > > > +0x3c/0xb4)
+> > > > (pcie_portdrv_probe) from [<c03e7acc>] (pci_device_probe+0x98/0xfc)
+> > > > (pci_device_probe) from [<c0454cf8>] (driver_probe_device+0x280/0x470)
+> > > > handlers:
+> > > > [<c03f68b0>] pcie_pme_irq
+> > > > Disabling IRQ #233
+> > > >
+> > > > I haven't dig it out yet, but just keep them here to solve that.
+> > > 
+> > > Something is going very wrong if adding the properties helps. I can't
+> > > think of what that is, but we have to find out before the binding can
+> > > be merged.
+> > 
+> > Not really understand PME service. But I will find the reason here.
+> 
+> I have do some test here. PME needs port IRQs, which interrupt type was
+> set correctly(IRQ_TYPE_LEVEL_LOW). But we cannot set it from
+> interrupt-map, according to gic_set_type() /* SPIs have restrictions on
+> the supported types */ .
+> 
+> So we need to add additional interrupt properties.
+
+I could use iPerf to test my WLAN card normally. But just ignore this
+exception message. I would definitely appreciate if someone could give
+me some hint on how to properly solve it. 
+
+Thanks a lot.
