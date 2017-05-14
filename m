@@ -1,47 +1,39 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Sun, 14 May 2017 03:08:37 +0530
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
-References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
- <20170510.212952.1440495072777358778.davem@davemloft.net>
- <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
- <20170510.215218.2185526627014393313.davem@davemloft.net>
- <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
- <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
- <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
-Message-ID: <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sun, 14 May 2017 04:24:25 +0200
+Subject: [PATCH v3 1/5] dt-bindings: Add vendor prefix for Zidoo
+In-Reply-To: <20170514022429.11555-1-afaerber@suse.de>
+References: <20170514022429.11555-1-afaerber@suse.de>
+Message-ID: <20170514022429.11555-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Finally finished testing.
+Zidoo is a Chinese manufacturer of TV boxes.
 
-"test_bpf: Summary: 314 PASSED, 0 FAILED, [274/306 JIT'ed]"
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Roc He <hepeng@zidoo.tv>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ v2 -> v3: unchanged
+ 
+ v1 -> v2:
+ * Changed subject
+ * Extended commit message
+ 
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Will send the patch after code refactoring. Thanks for all the help
-you guys. I really really appreciate it.
-
-Special thanks to Kees and Daniel. :)
-
-Best,
-Shubham Bansal
-
-
-On Thu, May 11, 2017 at 9:00 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Thu, May 11, 2017 at 2:32 AM, Shubham Bansal
-> <illusionist.neo@gmail.com> wrote:
->> What do you guys suggest i should implement it? I am almost done with
->> my current implementation but if you think I should change it to the
->> way David suggested, its better to suggest now before I send the
->> patch.
->
-> I'd say send what you have right now, as it's a good starting point
-> for future work. I'll be curious to see the benchmarks, etc. It can be
-> a base for further optimization.
->
-> Thanks for chipping away at this!
->
-> -Kees
->
-> --
-> Kees Cook
-> Pixel Security
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index c03d20140366..f032fa69f9d1 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -356,6 +356,7 @@ xlnx	Xilinx
+ xunlong	Shenzhen Xunlong Software CO.,Limited
+ zarlink	Zarlink Semiconductor
+ zeitec	ZEITEC Semiconductor Co., LTD.
++zidoo	Shenzhen Zidoo Technology Co., Ltd.
+ zii	Zodiac Inflight Innovations
+ zte	ZTE Corp.
+ zyxel	ZyXEL Communications Corp.
+-- 
+2.12.0
