@@ -1,36 +1,47 @@
 From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Sun, 14 May 2017 11:29:50 +0200
-Subject: [PATCH v3 1/5] clk: ep93xx: Implement clk_get_parent()
+Date: Sun, 14 May 2017 11:29:51 +0200
+Subject: [PATCH v3 2/5] clk: ep93xx: Add ADC clock
 In-Reply-To: <20170514092954.12790-1-alexander.sverdlin@gmail.com>
 References: <20170514092954.12790-1-alexander.sverdlin@gmail.com>
-Message-ID: <20170514092954.12790-2-alexander.sverdlin@gmail.com>
+Message-ID: <20170514092954.12790-3-alexander.sverdlin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trivial implementation of clk_get_parent(), but necessary for some drivers,
-such as ADC.
+From: Alexander Sverdlin <alexander.sverdlin@gmx.de>
+
+ADC and keypad controller clocks share the same control register, so use the
+existing infrastructure to add ADC clock support for Cirrus Logic EP93xx SoCs.
 
 Signed-off-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 ---
- arch/arm/mach-ep93xx/clock.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mach-ep93xx/clock.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
-index 39ef3b613912..b9cd9d7da14d 100644
+index b9cd9d7da14d..425342637e47 100644
 --- a/arch/arm/mach-ep93xx/clock.c
 +++ b/arch/arm/mach-ep93xx/clock.c
-@@ -475,6 +475,12 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
- }
- EXPORT_SYMBOL(clk_set_rate);
- 
-+struct clk *clk_get_parent(struct clk *clk)
-+{
-+	return clk->parent;
-+}
-+EXPORT_SYMBOL(clk_get_parent);
-+
- 
- static char fclk_divisors[] = { 1, 2, 4, 8, 16, 1, 1, 1 };
- static char hclk_divisors[] = { 1, 2, 4, 5, 6, 8, 16, 32 };
+@@ -98,6 +98,13 @@ static struct clk clk_keypad = {
+ 	.enable_mask	= EP93XX_SYSCON_KEYTCHCLKDIV_KEN,
+ 	.set_rate	= set_keytchclk_rate,
+ };
++static struct clk clk_adc = {
++	.parent		= &clk_xtali,
++	.sw_locked	= 1,
++	.enable_reg	= EP93XX_SYSCON_KEYTCHCLKDIV,
++	.enable_mask	= EP93XX_SYSCON_KEYTCHCLKDIV_TSEN,
++	.set_rate	= set_keytchclk_rate,
++};
+ static struct clk clk_spi = {
+ 	.parent		= &clk_xtali,
+ 	.rate		= EP93XX_EXT_CLK_RATE,
+@@ -214,6 +221,7 @@ static struct clk_lookup clocks[] = {
+ 	INIT_CK(NULL,			"pll2",		&clk_pll2),
+ 	INIT_CK("ohci-platform",	NULL,		&clk_usb_host),
+ 	INIT_CK("ep93xx-keypad",	NULL,		&clk_keypad),
++	INIT_CK("ep93xx-adc",		NULL,		&clk_adc),
+ 	INIT_CK("ep93xx-fb",		NULL,		&clk_video),
+ 	INIT_CK("ep93xx-spi.0",		NULL,		&clk_spi),
+ 	INIT_CK("ep93xx-i2s",		"mclk",		&clk_i2s_mclk),
 -- 
 2.12.2
