@@ -1,89 +1,169 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 15 May 2017 00:30:35 +0800
-Subject: [PATCH v7 03/13] dt-bindings: add bindings for DE2 on V3s SoC
+Date: Mon, 15 May 2017 00:30:36 +0800
+Subject: [PATCH v7 04/13] drm/sun4i: return only planes for layers created
 In-Reply-To: <20170514163045.40366-1-icenowy@aosc.io>
 References: <20170514163045.40366-1-icenowy@aosc.io>
-Message-ID: <20170514163045.40366-4-icenowy@aosc.io>
+Message-ID: <20170514163045.40366-5-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner V3s SoC have a display engine which have a different pipeline
-with older SoCs.
+As we are going to add support for the Allwinner DE2 Mixer in sun4i-drm
+driver, we will finally have two types of layers.
 
-Add document for it (new compatibles and the new "mixer" part).
+Each layer is bound to a drm_plane that is CRTC-specific, so we create
+them when initializing CRTC (calling sun4i_layers_init, which will be
+generalized in next patch). The drm_plane's will be used when creating
+CRTC, but the CRTC initialization code do not care other properties of
+the layer, so we let the sun4i_layers_init function return drm_plane's
+only.
+
+As we have no need to trace the layers after the CRTC is properly
+created, we drop the layers pointer in sun4i_crtc struct.
+
+Doing this uncouples the CRTC code from the type of layer (the
+sun4i_layers_init function name is still hardcoded and will be changed
+in the next patch), so that we can finally gain support for the
+mixer in DE2, which has different layers.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
-Changes in v7:
-- Reduced some text.
-Changes in v4:
-- Removed the refactor at TCON chapter.
-Changes in v3:
-- Remove the description of having a BE directly as allwinner,pipeline.
+ drivers/gpu/drm/sun4i/sun4i_crtc.c  | 23 ++++++++++++-----------
+ drivers/gpu/drm/sun4i/sun4i_crtc.h  |  1 -
+ drivers/gpu/drm/sun4i/sun4i_layer.c | 18 ++++++++++--------
+ drivers/gpu/drm/sun4i/sun4i_layer.h |  4 ++--
+ 4 files changed, 24 insertions(+), 22 deletions(-)
 
- .../bindings/display/sunxi/sun4i-drm.txt           | 26 ++++++++++++++++++++--
- 1 file changed, 24 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 7acdbf14ae1c..66b85a195ef2 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -41,6 +41,7 @@ Required properties:
-    * allwinner,sun6i-a31-tcon
-    * allwinner,sun6i-a31s-tcon
-    * allwinner,sun8i-a33-tcon
-+   * allwinner,sun8i-v3s-tcon
-  - reg: base address and size of memory-mapped region
-  - interrupts: interrupt associated to this IP
-  - clocks: phandles to the clocks feeding the TCON. Three are needed:
-@@ -62,7 +63,7 @@ Required properties:
-   second the block connected to the TCON channel 1 (usually the TV
-   encoder)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index 3c876c3a356a..708b3543d4e9 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -139,6 +139,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
+ 				   struct sun4i_tcon *tcon)
+ {
+ 	struct sun4i_crtc *scrtc;
++	struct drm_plane **planes;
+ 	struct drm_plane *primary = NULL, *cursor = NULL;
+ 	int ret, i;
  
--On SoCs other than the A33, there is one more clock required:
-+On SoCs other than the A33 and V3s, there is one more clock required:
-    - 'tcon-ch1': The clock driving the TCON channel 1
+@@ -149,22 +150,22 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
+ 	scrtc->tcon = tcon;
  
- DRC
-@@ -148,6 +149,26 @@ Required properties:
-   Documentation/devicetree/bindings/media/video-interfaces.txt. The
-   first port should be the input endpoints, the second one the outputs
+ 	/* Create our layers */
+-	scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
+-	if (IS_ERR(scrtc->layers)) {
++	planes = sun4i_layers_init(drm, scrtc);
++	if (IS_ERR(planes)) {
+ 		dev_err(drm->dev, "Couldn't create the planes\n");
+ 		return NULL;
+ 	}
  
-+Display Engine 2.0 Mixer
-+------------------------
-+
-+The DE2 mixer have many functionalities, currently only layer blending is
-+supported.
-+
-+Required properties:
-+  - compatible: value must be one of:
-+    * allwinner,sun8i-v3s-de2-mixer
-+  - reg: base address and size of the memory-mapped region.
-+  - clocks: phandles to the clocks feeding the mixer
-+    * bus: the mixer interface clock
-+    * mod: the mixer module clock
-+  - clock-names: the clock names mentioned above
-+  - resets: phandles to the reset controllers driving the mixer
-+
-+- ports: A ports node with endpoint definitions as defined in
-+  Documentation/devicetree/bindings/media/video-interfaces.txt. The
-+  first port should be the input endpoints, the second one the output
-+
+ 	/* find primary and cursor planes for drm_crtc_init_with_planes */
+-	for (i = 0; scrtc->layers[i]; i++) {
+-		struct sun4i_layer *layer = scrtc->layers[i];
++	for (i = 0; planes[i]; i++) {
++		struct drm_plane *plane = planes[i];
  
- Display Engine Pipeline
- -----------------------
-@@ -162,9 +183,10 @@ Required properties:
-     * allwinner,sun6i-a31-display-engine
-     * allwinner,sun6i-a31s-display-engine
-     * allwinner,sun8i-a33-display-engine
-+    * allwinner,sun8i-v3s-display-engine
+-		switch (layer->plane.type) {
++		switch (plane->type) {
+ 		case DRM_PLANE_TYPE_PRIMARY:
+-			primary = &layer->plane;
++			primary = plane;
+ 			break;
+ 		case DRM_PLANE_TYPE_CURSOR:
+-			cursor = &layer->plane;
++			cursor = plane;
+ 			break;
+ 		default:
+ 			break;
+@@ -188,12 +189,12 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
+ 						   1);
  
-   - allwinner,pipelines: list of phandle to the display engine
--    frontends available.
-+    frontends (DE 1.0) or mixers (DE 2.0) available.
+ 	/* Set possible_crtcs to this crtc for overlay planes */
+-	for (i = 0; scrtc->layers[i]; i++) {
++	for (i = 0; planes[i]; i++) {
+ 		uint32_t possible_crtcs = BIT(drm_crtc_index(&scrtc->crtc));
+-		struct sun4i_layer *layer = scrtc->layers[i];
++		struct drm_plane *plane = planes[i];
  
- Example:
+-		if (layer->plane.type == DRM_PLANE_TYPE_OVERLAY)
+-			layer->plane.possible_crtcs = possible_crtcs;
++		if (plane->type == DRM_PLANE_TYPE_OVERLAY)
++			plane->possible_crtcs = possible_crtcs;
+ 	}
  
+ 	return scrtc;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.h b/drivers/gpu/drm/sun4i/sun4i_crtc.h
+index 230cb8f0d601..4dae3508424a 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.h
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.h
+@@ -19,7 +19,6 @@ struct sun4i_crtc {
+ 
+ 	struct sun4i_backend		*backend;
+ 	struct sun4i_tcon		*tcon;
+-	struct sun4i_layer		**layers;
+ };
+ 
+ static inline struct sun4i_crtc *drm_crtc_to_sun4i_crtc(struct drm_crtc *crtc)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index f26bde5b9117..e1f03e1cc0ac 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -16,6 +16,7 @@
+ #include <drm/drmP.h>
+ 
+ #include "sun4i_backend.h"
++#include "sun4i_crtc.h"
+ #include "sun4i_layer.h"
+ 
+ struct sun4i_plane_desc {
+@@ -128,15 +129,16 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 	return layer;
+ }
+ 
+-struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
+-				       struct sun4i_backend *backend)
++struct drm_plane **sun4i_layers_init(struct drm_device *drm,
++				     struct sun4i_crtc *crtc)
+ {
+-	struct sun4i_layer **layers;
++	struct drm_plane **planes;
++	struct sun4i_backend *backend = crtc->backend;
+ 	int i;
+ 
+-	layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
+-			      sizeof(*layers), GFP_KERNEL);
+-	if (!layers)
++	planes = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
++			      sizeof(*planes), GFP_KERNEL);
++	if (!planes)
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	/*
+@@ -178,8 +180,8 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
+ 				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
+ 
+ 		layer->id = i;
+-		layers[i] = layer;
++		planes[i] = &layer->plane;
+ 	};
+ 
+-	return layers;
++	return planes;
+ }
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
+index 4be1f0919df2..5ea5c994d6ea 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.h
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
+@@ -26,7 +26,7 @@ plane_to_sun4i_layer(struct drm_plane *plane)
+ 	return container_of(plane, struct sun4i_layer, plane);
+ }
+ 
+-struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
+-				       struct sun4i_backend *backend);
++struct drm_plane **sun4i_layers_init(struct drm_device *drm,
++				     struct sun4i_crtc *crtc);
+ 
+ #endif /* _SUN4I_LAYER_H_ */
 -- 
 2.12.2
