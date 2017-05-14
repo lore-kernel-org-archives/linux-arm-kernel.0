@@ -1,35 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 14 May 2017 09:20:57 +0200
-Subject: [PATCH 1/2 v6] ARM: dts: add XOADC and IIO HWMON to
- MSM8660/APQ8060
-In-Reply-To: <20170514033108.GB69278@Bjorns-MacBook-Pro-2.local>
-References: <20170513141543.24759-1-linus.walleij@linaro.org>
- <20170514033108.GB69278@Bjorns-MacBook-Pro-2.local>
-Message-ID: <CACRpkdYSGc6Y_VRe-gQ=WVGNONinpT6UGRqtMUuhfsc-Oz150A@mail.gmail.com>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Sun, 14 May 2017 11:29:49 +0200
+Subject: [PATCH v3 0/5] iio: ADC driver for EP93xx SoC
+Message-ID: <20170514092954.12790-1-alexander.sverdlin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 14, 2017 at 5:31 AM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> On Sat 13 May 07:15 PDT 2017, Linus Walleij wrote:
->
->> +                             xoadc: xoadc at 197 {
->> +                                     compatible = "qcom,pm8058-adc";
->> +                                     reg = <0x197>;
->> +                                     interrupts-extended = <&pm8058 76 IRQ_TYPE_EDGE_RISING>;
->> +                                     #address-cells = <2>;
->> +                                     #size-cells = <0>;
->> +                                     #io-channel-cells = <2>;
->> +
->> +                                     vcoin: adc-channel at 00 {
->
-> Is it possible to reference these nodes directly? Regardless they make
-> the dts human readable, so I'm fine either way.
+This series prepares the necessary infrastructure for ADC platform device on
+Cirrus Logic EP93xx family of SoCs and adds the driver for ADC device using
+IIO subsystem.
 
-The alias is there to make it human readable, indeed.
+Changelog
+v3:
+  Rebased to the current master
+  sizeof(struct foo) -> sizeof(*bar)
+v2:
+  Added Documentation/iio/ep93xx_adc.txt
+  Removed extend_name
+  Added timeout to the status polling loop
+  Used iio_device_register() instead of devm_iio_device_register()
 
-> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Alexander Sverdlin (5):
+  clk: ep93xx: Implement clk_get_parent()
+  clk: ep93xx: Add ADC clock
+  ep93xx: Add ADC platform device support to core
+  edb93xx: Add ADC platform device
+  iio: adc: New driver for Cirrus Logic EP93xx ADC
 
-Thanks!
+ Documentation/iio/ep93xx_adc.txt             |  29 +++
+ arch/arm/mach-ep93xx/clock.c                 |  14 ++
+ arch/arm/mach-ep93xx/core.c                  |  24 +++
+ arch/arm/mach-ep93xx/edb93xx.c               |   1 +
+ arch/arm/mach-ep93xx/include/mach/platform.h |   1 +
+ arch/arm/mach-ep93xx/soc.h                   |   1 +
+ drivers/iio/adc/Kconfig                      |  11 ++
+ drivers/iio/adc/Makefile                     |   1 +
+ drivers/iio/adc/ep93xx_adc.c                 | 260 +++++++++++++++++++++++++++
+ 9 files changed, 342 insertions(+)
+ create mode 100644 Documentation/iio/ep93xx_adc.txt
+ create mode 100644 drivers/iio/adc/ep93xx_adc.c
 
-Linus
+-- 
+2.12.2
