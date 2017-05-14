@@ -1,34 +1,35 @@
-From: ayaka@soulik.info (Randy Li)
-Date: Sun, 14 May 2017 14:50:09 +0800
-Subject: [PATCH] clk: rockchip: rk3288: prefer vdpu for vcodec clock source
-Message-ID: <20170514065009.3047-1-ayaka@soulik.info>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 14 May 2017 09:20:57 +0200
+Subject: [PATCH 1/2 v6] ARM: dts: add XOADC and IIO HWMON to
+ MSM8660/APQ8060
+In-Reply-To: <20170514033108.GB69278@Bjorns-MacBook-Pro-2.local>
+References: <20170513141543.24759-1-linus.walleij@linaro.org>
+ <20170514033108.GB69278@Bjorns-MacBook-Pro-2.local>
+Message-ID: <CACRpkdYSGc6Y_VRe-gQ=WVGNONinpT6UGRqtMUuhfsc-Oz150A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RK3288 CRU system clock solution would suggest use
-the vdpu clock source for the VPU(aclk_vpu and hclk_vpu).
+On Sun, May 14, 2017 at 5:31 AM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> On Sat 13 May 07:15 PDT 2017, Linus Walleij wrote:
+>
+>> +                             xoadc: xoadc at 197 {
+>> +                                     compatible = "qcom,pm8058-adc";
+>> +                                     reg = <0x197>;
+>> +                                     interrupts-extended = <&pm8058 76 IRQ_TYPE_EDGE_RISING>;
+>> +                                     #address-cells = <2>;
+>> +                                     #size-cells = <0>;
+>> +                                     #io-channel-cells = <2>;
+>> +
+>> +                                     vcoin: adc-channel at 00 {
+>
+> Is it possible to reference these nodes directly? Regardless they make
+> the dts human readable, so I'm fine either way.
 
-Reading the registers of VPU(both VEPU and VDPU) would become all high
-when the vepu is used as the clock source. It may be a bug in the SoC,
-not sure whether it is fixed at RK3288W.
+The alias is there to make it human readable, indeed.
 
-Signed-off-by: Randy Li <ayaka@soulik.info>
----
- drivers/clk/rockchip/clk-rk3288.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 68ba7d4..886b249 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -198,7 +198,7 @@ PNAME(mux_hsadcout_p)	= { "hsadc_src", "ext_hsadc" };
- PNAME(mux_edp_24m_p)	= { "ext_edp_24m", "xin24m" };
- PNAME(mux_tspout_p)	= { "cpll", "gpll", "npll", "xin27m" };
- 
--PNAME(mux_aclk_vcodec_pre_p)	= { "aclk_vepu", "aclk_vdpu" };
-+PNAME(mux_aclk_vcodec_pre_p)	= { "aclk_vdpu", "aclk_vepu" };
- PNAME(mux_usbphy480m_p)		= { "sclk_otgphy1_480m", "sclk_otgphy2_480m",
- 				    "sclk_otgphy0_480m" };
- PNAME(mux_hsicphy480m_p)	= { "cpll", "gpll", "usbphy480m_src" };
--- 
-2.9.3
+Thanks!
+
+Linus
