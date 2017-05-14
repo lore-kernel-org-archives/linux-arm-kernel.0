@@ -1,46 +1,46 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 15 May 2017 00:30:44 +0800
-Subject: [PATCH v7 12/13] ARM: sun8i: v3s: add pinmux for LCD pins of V3s SoC
-In-Reply-To: <20170514163045.40366-1-icenowy@aosc.io>
-References: <20170514163045.40366-1-icenowy@aosc.io>
-Message-ID: <20170514163045.40366-13-icenowy@aosc.io>
+From: colin.king@canonical.com (Colin King)
+Date: Sun, 14 May 2017 17:47:41 +0100
+Subject: [PATCH] [media] s5p-mfc: fix spelling mistake: "destionation" ->
+ "destination"
+Message-ID: <20170514164741.6483-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner V3s SoC features a set of pins that have functionality of RGB
-LCD, the pins are at different pin ban than other SoCs.
+From: Colin Ian King <colin.king@canonical.com>
 
-Add pinctrl node for them.
+Trivial fix to spelling mistake in mfc_err error messages
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
 ---
-Changes in v7:
-- Dropped the trailing "@0" in rgb666 pinmux node name.
-- Added Chen-Yu's ACK.
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c | 2 +-
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
- arch/arm/boot/dts/sun8i-v3s.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-index b71b35734515..a7026517ed99 100644
---- a/arch/arm/boot/dts/sun8i-v3s.dtsi
-+++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-@@ -297,6 +297,15 @@
- 				function = "i2c0";
- 			};
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
+index b41ee608c171..0913881219ff 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
+@@ -1293,7 +1293,7 @@ static int s5p_mfc_run_init_dec_buffers(struct s5p_mfc_ctx *ctx)
+ 	 * First set the output frame buffers
+ 	 */
+ 	if (ctx->capture_state != QUEUE_BUFS_MMAPED) {
+-		mfc_err("It seems that not all destionation buffers were mmaped\nMFC requires that all destination are mmaped before starting processing\n");
++		mfc_err("It seems that not all destination buffers were mmaped\nMFC requires that all destination are mmaped before starting processing\n");
+ 		return -EAGAIN;
+ 	}
+ 	if (list_empty(&ctx->src_queue)) {
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+index 85880e9106be..88dbb9c341ec 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+@@ -1650,7 +1650,7 @@ static inline int s5p_mfc_run_init_dec_buffers(struct s5p_mfc_ctx *ctx)
+ 	 * s5p_mfc_alloc_dec_buffers(ctx); */
  
-+			lcd_rgb666_pins: lcd_rgb666 {
-+				pins = "PE0", "PE1", "PE2", "PE3", "PE4",
-+				       "PE5", "PE6", "PE7", "PE8", "PE9",
-+				       "PE10", "PE11", "PE12", "PE13", "PE14",
-+				       "PE15", "PE16", "PE17", "PE18", "PE19",
-+				       "PE23", "PE24";
-+				function = "lcd";
-+			};
-+
- 			uart0_pins_a: uart0 at 0 {
- 				pins = "PB8", "PB9";
- 				function = "uart0";
+ 	if (ctx->capture_state != QUEUE_BUFS_MMAPED) {
+-		mfc_err("It seems that not all destionation buffers were\n"
++		mfc_err("It seems that not all destination buffers were\n"
+ 			"mmaped.MFC requires that all destination are mmaped\n"
+ 			"before starting processing.\n");
+ 		return -EAGAIN;
 -- 
-2.12.2
+2.11.0
