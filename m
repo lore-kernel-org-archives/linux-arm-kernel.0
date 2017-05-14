@@ -1,32 +1,34 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 14 May 2017 17:06:19 +0200
-Subject: [PATCH] clk: rockchip: rk3288: prefer vdpu for vcodec clock source
-In-Reply-To: <20170514065009.3047-1-ayaka@soulik.info>
-References: <20170514065009.3047-1-ayaka@soulik.info>
-Message-ID: <2067155.b6jtcnMS5V@phil>
+From: ayaka@soulik.info (ayaka)
+Date: Sun, 14 May 2017 23:10:48 +0800
+Subject: [PATCH] ARM: dts: rockchip: add missing grf phandle for rk3288
+In-Reply-To: <53387334.ADQf94xZqP@phil>
+References: <20170507143446.11502-1-ayaka@soulik.info>
+ <53387334.ADQf94xZqP@phil>
+Message-ID: <802d9787-92dd-ee9d-51a2-45e42a9ba430@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
-
-Am Sonntag, 14. Mai 2017, 14:50:09 CEST schrieb Randy Li:
-> The RK3288 CRU system clock solution would suggest use
-> the vdpu clock source for the VPU(aclk_vpu and hclk_vpu).
-> 
-> Reading the registers of VPU(both VEPU and VDPU) would become all high
-> when the vepu is used as the clock source. It may be a bug in the SoC,
-> not sure whether it is fixed at RK3288W.
-
-I don't think that is a case of "preference". GRF_SOC_CON0[7] indicates
-that value 0 means vepu gets selected as vcodec clock and value 1 means
-vdpu gets selected as vcodec.
-
-The array values below are supposed to match these values, so array
-index 0 represents the clock for value 0 and so on. So this is really only
-a description of the hardware clock layout.
-
-If you want to actually switch the mux value, please assign the vcodec
-clock an id and use the assigned-clocks mechanism in the devicetree.
 
 
-Heiko
+On 05/14/2017 10:59 PM, Heiko Stuebner wrote:
+> Hi Randy,
+>
+> Am Sonntag, 7. Mai 2017, 22:34:46 CEST schrieb Randy Li:
+>> The PWM devices need to access the grf to switch the PWM IP.
+> The grf property is not part of the pwm binding and I remember
+> this coming up in veyron times, when Thiery didn't want such settings
+> in the pwm driver. So the kernel pwm driver does not switch anything
+> right now.
+OK, I see, I will contact the u-boot, submit a patch there.
+>
+>
+>> And tsadc uses it to shutdown the system.
+> No it doesn't. The tsadc on rk3288 does not do any grf settings right now,
+> as it is using the v2_initialize function. Only rk3366 and rk3399 seem
+> to do any grf settings in the current v4.12-rc1 . Or is there some tsadc
+> patch from you pending to change that?
+Not yet, there is a register CRU_GLB_RST_ST at rk3288 cru. I think I 
+need to submit a patch for it.
+>
+>
+> Heiko
