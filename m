@@ -1,39 +1,38 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 14 May 2017 04:24:25 +0200
-Subject: [PATCH v3 1/5] dt-bindings: Add vendor prefix for Zidoo
+Date: Sun, 14 May 2017 04:24:27 +0200
+Subject: [PATCH v3 3/5] ARM64: Prepare Realtek RTD1295
 In-Reply-To: <20170514022429.11555-1-afaerber@suse.de>
 References: <20170514022429.11555-1-afaerber@suse.de>
-Message-ID: <20170514022429.11555-2-afaerber@suse.de>
+Message-ID: <20170514022429.11555-4-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zidoo is a Chinese manufacturer of TV boxes.
+Add a Kconfig option ARCH_REALTEK.
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Roc He <hepeng@zidoo.tv>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v2 -> v3: unchanged
+ v1 -> v2 -> v3: unchanged
  
- v1 -> v2:
- * Changed subject
- * Extended commit message
- 
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/Kconfig.platforms | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index c03d20140366..f032fa69f9d1 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -356,6 +356,7 @@ xlnx	Xilinx
- xunlong	Shenzhen Xunlong Software CO.,Limited
- zarlink	Zarlink Semiconductor
- zeitec	ZEITEC Semiconductor Co., LTD.
-+zidoo	Shenzhen Zidoo Technology Co., Ltd.
- zii	Zodiac Inflight Innovations
- zte	ZTE Corp.
- zyxel	ZyXEL Communications Corp.
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 73272f43ca01..b4e919ac73f6 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -126,6 +126,12 @@ config ARCH_QCOM
+ 	help
+ 	  This enables support for the ARMv8 based Qualcomm chipsets.
+ 
++config ARCH_REALTEK
++	bool "Realtek Platforms"
++	help
++	  This enables support for the ARMv8 based Realtek chipsets,
++	  like the RTD1295.
++
+ config ARCH_ROCKCHIP
+ 	bool "Rockchip Platforms"
+ 	select ARCH_HAS_RESET_CONTROLLER
 -- 
 2.12.0
