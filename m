@@ -1,29 +1,42 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Sat, 13 May 2017 20:31:08 -0700
-Subject: [PATCH 1/2 v6] ARM: dts: add XOADC and IIO HWMON to
- MSM8660/APQ8060
-In-Reply-To: <20170513141543.24759-1-linus.walleij@linaro.org>
-References: <20170513141543.24759-1-linus.walleij@linaro.org>
-Message-ID: <20170514033108.GB69278@Bjorns-MacBook-Pro-2.local>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 13 May 2017 20:35:25 -0700
+Subject: [GIT PULL 1/2] Broadcom devicetree changes for 4.12
+Message-ID: <20170514033526.21260-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 13 May 07:15 PDT 2017, Linus Walleij wrote:
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-> +				xoadc: xoadc at 197 {
-> +					compatible = "qcom,pm8058-adc";
-> +					reg = <0x197>;
-> +					interrupts-extended = <&pm8058 76 IRQ_TYPE_EDGE_RISING>;
-> +					#address-cells = <2>;
-> +					#size-cells = <0>;
-> +					#io-channel-cells = <2>;
-> +
-> +					vcoin: adc-channel at 00 {
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 
-Is it possible to reference these nodes directly? Regardless they make
-the dts human readable, so I'm fine either way.
+are available in the git repository at:
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/devicetree-fixes
 
-Regards,
-Bjorn
+for you to fetch changes up to b155f05dc578299557447a6fd6545ebc72c1d19b:
+
+  Merge tag 'bcm2835-dt-next-2017-03-30' into devicetree/fixes (2017-05-13 20:26:09 -0700)
+
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoC Device Tree fixes for
+4.12, please pull the following:
+
+- Baruch provides several fixes for the Raspberry Pi (BCM2835) Device
+  Tree source include file: uart0 pinctrl node names, pin number for
+  i2c0, uart0 rts/cts pins and invalid uart1 pin, missing numbers for
+  ethernet aliases
+
+----------------------------------------------------------------
+Baruch Siach (4):
+      ARM: dts: bcm2835: fix uart0 pinctrl node names
+      ARM: dts: bcm2835: fix i2c0 pins
+      ARM: dts: bcm2835: fix uart0/uart1 pins
+      ARM: dts: bcm2835: add index to the ethernet alias
+
+Florian Fainelli (1):
+      Merge tag 'bcm2835-dt-next-2017-03-30' into devicetree/fixes
+
+ arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi |  2 +-
+ arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi |  2 +-
+ arch/arm/boot/dts/bcm283x.dtsi              | 22 +++++++++++++---------
+ 3 files changed, 15 insertions(+), 11 deletions(-)
