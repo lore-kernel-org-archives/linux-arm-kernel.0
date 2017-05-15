@@ -1,32 +1,44 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 15 May 2017 12:18:29 +0200
-Subject: [PATCH v2] ARM: at91/defconfig: add MCAN driver to sama5_defconfig
-In-Reply-To: <20170515101246.8913-1-wenyou.yang@atmel.com>
-References: <20170515101246.8913-1-wenyou.yang@atmel.com>
-Message-ID: <20170515101829.b7pssniko5b4ncih@piout.net>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 15 May 2017 11:18:20 +0100
+Subject: [PATCH] ARM: NOMMU: provide pgprot_device() macro
+Message-ID: <1494843500-40124-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+NOMMU build leads to the following error:
 
-The correct subject prefix is ARM: configs: at91:
+  CC      drivers/pci/mmap.o
+drivers/pci/mmap.c: In function 'pci_mmap_resource_range':
+drivers/pci/mmap.c:60:3: error: implicit declaration of function 'pgprot_device' [-Werror=implicit-function-declaration]
+   vma->vm_page_prot = pgprot_device(vma->vm_page_prot);
+   ^
+cc1: some warnings being treated as errors
+scripts/Makefile.build:302: recipe for target 'drivers/pci/mmap.o' failed
+make[2]: *** [drivers/pci/mmap.o] Error 1
+scripts/Makefile.build:561: recipe for target 'drivers/pci' failed
+make[1]: *** [drivers/pci] Error 2
+Makefile:1016: recipe for target 'drivers' failed
+make: *** [drivers] Error 2
 
-On 15/05/2017 at 18:12:46 +0800, Wenyou Yang wrote:
-> Add the Controller Area Network (MCAN) driver compilation
-> for sama5 default configuration. Is used by sama5d2 SoC for instance.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
-> 
-> Changes in v2:
->  - Rebase on Linux-4.12-rc1.
-> 
->  arch/arm/configs/sama5_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-Applied, thanks.
+Fix it with support of pgprot_device() macro for NOMMU.
 
+Fixes: 00d2904ffeac ("ARM/PCI: Use generic pci_mmap_resource_range()")
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm/include/asm/pgtable-nommu.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/include/asm/pgtable-nommu.h b/arch/arm/include/asm/pgtable-nommu.h
+index 302240c..a0d726a 100644
+--- a/arch/arm/include/asm/pgtable-nommu.h
++++ b/arch/arm/include/asm/pgtable-nommu.h
+@@ -66,6 +66,7 @@
+ #define pgprot_noncached(prot)	(prot)
+ #define pgprot_writecombine(prot) (prot)
+ #define pgprot_dmacoherent(prot) (prot)
++#define pgprot_device(prot)	(prot)
+ 
+ 
+ /*
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
