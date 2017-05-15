@@ -1,39 +1,29 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 May 2017 11:00:34 +0100
-Subject: [PATCH] socfpga_a10: reset CPU1 in socfpga_cpu_kill()
-In-Reply-To: <20170512143600.GB18818@leverpostej>
-References: <20170510051304.131042-1-yanjiang.jin@windriver.com>
- <20170510051304.131042-2-yanjiang.jin@windriver.com>
- <20170512143600.GB18818@leverpostej>
-Message-ID: <20170515100033.GT22219@n2100.armlinux.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 15 May 2017 11:38:22 +0200
+Subject: [PATCH] memory: atmel-ebi: mark PM ops as __maybe_unused
+In-Reply-To: <20170419174824.4134087-1-arnd@arndb.de>
+References: <20170419174824.4134087-1-arnd@arndb.de>
+Message-ID: <20170515093822.hjj5pxine4jwmfqo@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 03:36:01PM +0100, Mark Rutland wrote:
-> However, AFAICT, this patch forcibly resets is without any teardown
-> having happened. That will surely result in data being lost from the
-> caches, for example.
-
-You're wrong on that point.  Having each bloody platform implement
-the same friggin teardown is utter madness, and leads to all sorts
-of synchronisation issues.
-
-The generic code already deals with the cache issues, and has
-synchronisation to ensure that the dying CPU completes the cache
-handling before the requesting CPU continues with the killing.
-The only thing that platform code need concern itself with is doing
-is the "make the CPU die" thing.
-
-It's not perfect, but it's good enough for the majority of cases.
-
-In any case, encouraging people to add flush_cache_all() into their
-cpu_die() function is NOT the way forward if there is a problem -
-that introduces a new race between flush_cache_all() walking all the
-cache lines and cpu_kill() actually turning the power off to the CPU,
-which could very well happen either before or during the
-flush_cache_all() execution.
+On 19/04/2017 at 19:48:07 +0200, Arnd Bergmann wrote:
+> We get a harmless warning without CONFIG_PM:
+> 
+> drivers/memory/atmel-ebi.c:584:12: error: 'atmel_ebi_resume' defined but not used [-Werror=unused-function]
+> 
+> Marking the function as __maybe_unused does the right thing here
+> and drops it silently when unused.
+> 
+> Fixes: a483fb10e5ea ("memory: atmel-ebi: Add PM ops")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/memory/atmel-ebi.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+Applied, thanks.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
