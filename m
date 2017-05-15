@@ -1,82 +1,78 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 15 May 2017 15:48:54 +0800
-Subject: [PATCH V2 1/6] tty: serial: lpuart: introduce lpuart_soc_data to
- represent SoC property
+Date: Mon, 15 May 2017 15:48:55 +0800
+Subject: [PATCH V2 2/6] tty: serial: lpuart: add little endian 32 bit register
+ support
 In-Reply-To: <1494834539-17523-1-git-send-email-aisheng.dong@nxp.com>
 References: <1494834539-17523-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1494834539-17523-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is used to dynamically check the SoC specific lpuart properies.
-Currently only the checking of 32 bit register width is added which
-functions the same as before. More will be added later for supporting
-new chips.
+It's based on the exist lpuart32 read/write implementation.
 
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.com>
+Cc: Jiri Slaby <jslaby@suse.com> (supporter:TTY LAYER)
 Cc: Stefan Agner <stefan@agner.ch>
 Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
 Cc: Yangbo Lu <yangbo.lu@nxp.com>
 Acked-by: Fugang Duan <fugang.duan@nxp.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-
 ---
-ChangeLog:
-v1->v2:
- * make all soc_data const
----
- drivers/tty/serial/fsl_lpuart.c | 25 ++++++++++++++++++-------
- 1 file changed, 18 insertions(+), 7 deletions(-)
+ drivers/tty/serial/fsl_lpuart.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 15df1ba7..7204103 100644
+index 7204103..e72b397 100644
 --- a/drivers/tty/serial/fsl_lpuart.c
 +++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -258,13 +258,21 @@ struct lpuart_port {
- 	wait_queue_head_t	dma_wait;
+@@ -231,6 +231,8 @@
+ #define DEV_NAME	"ttyLP"
+ #define UART_NR		6
+ 
++static bool lpuart_is_be;
++
+ struct lpuart_port {
+ 	struct uart_port	port;
+ 	struct clk		*clk;
+@@ -260,6 +262,7 @@ struct lpuart_port {
+ 
+ struct lpuart_soc_data {
+ 	bool	is_32;
++	bool	is_be;
  };
  
-+struct lpuart_soc_data {
-+	bool	is_32;
-+};
-+
-+static const struct lpuart_soc_data vf_data = {
-+	.is_32 = false,
-+};
-+
-+static const struct lpuart_soc_data ls_data = {
-+	.is_32 = true,
-+};
-+
+ static const struct lpuart_soc_data vf_data = {
+@@ -268,6 +271,7 @@ static const struct lpuart_soc_data vf_data = {
+ 
+ static const struct lpuart_soc_data ls_data = {
+ 	.is_32 = true,
++	.is_be = true,
+ };
+ 
  static const struct of_device_id lpuart_dt_ids[] = {
--	{
--		.compatible = "fsl,vf610-lpuart",
--	},
--	{
--		.compatible = "fsl,ls1021a-lpuart",
--	},
-+	{ .compatible = "fsl,vf610-lpuart", .data = &vf_data, },
-+	{ .compatible = "fsl,ls1021a-lpuart", .data = &ls_data, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
-@@ -1971,6 +1979,9 @@ static struct uart_driver lpuart_reg = {
+@@ -282,12 +286,15 @@ static void lpuart_dma_tx_complete(void *arg);
  
- static int lpuart_probe(struct platform_device *pdev)
+ static u32 lpuart32_read(void __iomem *addr)
  {
-+	const struct of_device_id *of_id = of_match_device(lpuart_dt_ids,
-+							   &pdev->dev);
-+	const struct lpuart_soc_data *sdata = of_id->data;
- 	struct device_node *np = pdev->dev.of_node;
- 	struct lpuart_port *sport;
- 	struct resource *res;
-@@ -1988,7 +1999,7 @@ static int lpuart_probe(struct platform_device *pdev)
- 		return ret;
+-	return ioread32be(addr);
++	return lpuart_is_be ? ioread32be(addr) : readl(addr);
+ }
+ 
+ static void lpuart32_write(u32 val, void __iomem *addr)
+ {
+-	iowrite32be(val, addr);
++	if (lpuart_is_be)
++		iowrite32be(val, addr);
++	else
++		writel(val, addr);
+ }
+ 
+ static void lpuart_stop_tx(struct uart_port *port)
+@@ -2000,6 +2007,7 @@ static int lpuart_probe(struct platform_device *pdev)
  	}
  	sport->port.line = ret;
--	sport->lpuart32 = of_device_is_compatible(np, "fsl,ls1021a-lpuart");
-+	sport->lpuart32 = sdata->is_32;
+ 	sport->lpuart32 = sdata->is_32;
++	lpuart_is_be = sdata->is_be;
  
  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
  	sport->port.membase = devm_ioremap_resource(&pdev->dev, res);
