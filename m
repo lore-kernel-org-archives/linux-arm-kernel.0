@@ -1,90 +1,81 @@
-From: aisheng.dong@nxp.com (A.S. Dong)
-Date: Mon, 15 May 2017 12:41:09 +0000
-Subject: [PATCH 3/5] dt-bindings: pinctrl: add imx7ulp pinctrl binding doc
-In-Reply-To: <20170515122032.GS8471@dragon>
-References: <1494592686-30967-1-git-send-email-aisheng.dong@nxp.com>
- <1494592686-30967-5-git-send-email-aisheng.dong@nxp.com>
- <20170515114319.GP8471@dragon>
- <AM3PR04MB3069C90F23CF9C9CC84BA7580E10@AM3PR04MB306.eurprd04.prod.outlook.com>
- <20170515122032.GS8471@dragon>
-Message-ID: <AM3PR04MB3069C788C96EE2854C2C68080E10@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 15 May 2017 14:47:25 +0200
+Subject: [RFC PATCH 07/30] iommu/arm-smmu-v3: Add second level of context
+ descriptor table
+In-Reply-To: <20170227195441.5170-8-jean-philippe.brucker@arm.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-8-jean-philippe.brucker@arm.com>
+Message-ID: <ef690c27-95cc-c15d-7e70-7e89de7bc08a@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Monday, May 15, 2017 8:21 PM
-> To: A.S. Dong
-> Cc: Mark Rutland; devicetree at vger.kernel.org; Andy Duan; Jacky Bai;
-> linus.walleij at linaro.org; stefan at agner.ch; linux-gpio at vger.kernel.org; Rob
-> Herring; kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 3/5] dt-bindings: pinctrl: add imx7ulp pinctrl binding
-> doc
-> 
-> On Mon, May 15, 2017 at 12:06:19PM +0000, A.S. Dong wrote:
-> > > > @@ -0,0 +1,56 @@
-> > > > +* Freescale i.MX7ULP IOMUX Controller
-> > > > +
-> > > > +Please refer to fsl,imx-pinctrl.txt in this directory for common
-> > > > +binding part and usage.
-> > >
-> > > Are imx7ulp-pinctrl bindings more alike to fsl,imx-pinctrl.txt or
-> > > generic pinctrl-bindings.txt?  My personal feeling is that it might
-> > > be better to take pinctrl-bindings.txt as the reference base and
-> > > highlight how imx7ulp- pinctrl bindings differ from it.
-> > >
-> >
-> > It seems still more like fsl,imx-pinctrl.txt.
-> >
-> > I know fsl,imx-pinctrl.txt is a bit out of date, especially after we
-> > add generic pinconf.
-> >
-> > I plan to update it later after adding generic pin conf support to
-> > legacy SoCs (MX6 & 7) as well, do you think it's ok?
-> 
-> Please do not.  Let's use generic pinconf support only for new SoCs, and
-> not bother with legacy SoCs.
-> 
+Hi Jean,
 
-I wonder there may be some guys interested more in generic Pinconfig format
-rather than old one when they add new board support, or someone else
-adding the support for legacy SoCs as the pinctrl-imx core already
-supports it after this patch series.
+On 27.02.2017 20:54, Jean-Philippe Brucker wrote:
+> @@ -1213,17 +1356,59 @@ static void arm_smmu_free_cd_tables(struct arm_smmu_master_data *master)
+>  __maybe_unused
+>  static int arm_smmu_alloc_cd(struct arm_smmu_master_data *master)
+>  {
+> +	int ssid;
+> +	int i, ret;
+>  	struct arm_smmu_cd_cfg *cfg = &master->ste.cd_cfg;
+>
+> -	return arm_smmu_bitmap_alloc(cfg->context_map, ilog2(cfg->num_entries));
+> +	if (cfg->linear)
+> +		return arm_smmu_bitmap_alloc(cfg->table.context_map,
+> +					     ilog2(cfg->num_entries));
+> +
+> +	/* Find first leaf table with an empty slot, or allocate a new leaf */
+> +	for (i = cfg->l1.cur_table; i < cfg->num_entries; i++) {
+> +		struct arm_smmu_cd_table *table = &cfg->l1.tables[i];
+> +
+> +		if (!table->cdptr) {
+> +			__le64 *l1ptr = cfg->l1.ptr + i * CTXDESC_L1_DESC_DWORD;
+> +
+> +			ret = arm_smmu_alloc_cd_leaf_table(master->smmu, table,
+> +							   CTXDESC_NUM_L2_ENTRIES);
+> +			if (ret)
+> +				return ret;
+> +
+> +			arm_smmu_write_cd_l1_desc(l1ptr, table);
+> +			arm_smmu_sync_cd(master, i << CTXDESC_SPLIT, false);
+> +		}
+> +
+> +		ssid = arm_smmu_bitmap_alloc(table->context_map, CTXDESC_SPLIT);
+> +		if (ssid < 0)
+> +			continue;
+> +
+> +		cfg->l1.cur_table = i;
+> +		return i << CTXDESC_SPLIT | ssid;
+> +	}
+> +
+> +	return -ENOSPC;
+>  }
+>
+>  __maybe_unused
+>  static void arm_smmu_free_cd(struct arm_smmu_master_data *master, u32 ssid)
+>  {
+> +	unsigned long l1_idx, idx;
+>  	struct arm_smmu_cd_cfg *cfg = &master->ste.cd_cfg;
+>
+> -	arm_smmu_bitmap_free(cfg->context_map, ssid);
+> +	if (cfg->linear) {
+> +		arm_smmu_bitmap_free(cfg->table.context_map, ssid);
+> +		return;
+> +	}
+> +
+> +	l1_idx = ssid >> CTXDESC_SPLIT;
+> +	idx = ssid & ((1 << CTXDESC_SPLIT) - 1);
+> +	arm_smmu_bitmap_free(cfg->l1.tables[l1_idx].context_map, idx);
+> +
+> +	/* Prepare next allocation */
+> +	if (cfg->l1.cur_table > idx)
+> +		cfg->l1.cur_table = idx;
+>  }
 
-So I'm not quite sure if there's strong reason to block to them to do it.
+I am not sure what is the logic here. idx becomes index of l1.tables in 
+arm_smmu_alloc_cd() which in turn may be out of allocated memory. I may 
+miss something. Can you please elaborate on this?
 
-> <snip>
-> 
-> > > > diff --git a/include/dt-bindings/pinctrl/imx7ulp-pinfunc.h
-> > > > b/include/dt-bindings/pinctrl/imx7ulp-pinfunc.h
-> > > > new file mode 100644
-> > > > index 0000000..b6db73f
-> > > > --- /dev/null
-> > > > +++ b/include/dt-bindings/pinctrl/imx7ulp-pinfunc.h
-> > >
-> > > The header will only be used by dts files, right?  If so,
-> > > arch/arm/boot/dts is the better place.
-> > >
-> >
-> > I can do it, but I'm just a bit confused that only IMX is still
-> > Putting pinctrl headfile under arch/arm/boot/dts/.
-> 
-> It makes sense to define DT constants in include/dt-bindings/pinctrl/ only
-> when they are referenced by both kernel and dts.  If it's only included by
-> dts, arch/arm/boot/dts/ should definitely be the better place.
-> 
-
-Okay, understand.
-In the future, I probably may added a pinctrl headfile for config macro defines.
-But since that is for config only, probably may need create a new file.
-e.g.
-include/dt-binding/pinctrl/imx7ulp.h
-or
-include/dt-binding/pinctrl/imx.h (if we supports legacy SoCs)
-
-So we could still keep imx7ulp-pinfunc.h in arch/arm/boot/dts.
-
-Regards
-Dong Aisheng
-
-> Shawn
+Thanks,
+Tomasz
