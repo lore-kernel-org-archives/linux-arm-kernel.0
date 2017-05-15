@@ -1,74 +1,161 @@
 From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Mon, 15 May 2017 15:27:57 -0600
-Subject: [PATCH V16 08/11] efi: print unrecognized CPER section
+Date: Mon, 15 May 2017 15:27:59 -0600
+Subject: [PATCH V16 10/11] trace, ras: add ARM processor error trace event
 In-Reply-To: <1494883680-25551-1-git-send-email-tbaicar@codeaurora.org>
 References: <1494883680-25551-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1494883680-25551-9-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1494883680-25551-11-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UEFI spec allows for non-standard section in Common Platform Error
-Record. This is defined in section N.2.3 of UEFI version 2.5.
-
-Currently if the CPER section's type (UUID) does not match with
-one of the section types that the kernel knows how to parse, the
-section is skipped. Therefore, user is not able to see
-such CPER data, for instance, error record of non-standard section.
-
-This change prints out the raw data in hex in the dmesg buffer so
-that non-standard sections are reported to the user. Non-standard
-section type errors should be reported to the user because these
-can include errors which are vendor specific. The data length is
-taken from Error Data length field of Generic Error Data Entry.
-
-The following is a sample output from dmesg:
-[  140.739180] {1}[Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
-[  140.739182] {1}[Hardware Error]: It has been corrected by h/w and requires no further action
-[  140.739191] {1}[Hardware Error]: event severity: corrected
-[  140.739196] {1}[Hardware Error]:  time: precise 2017-03-15 20:37:35
-[  140.739197] {1}[Hardware Error]:  Error 0, type: corrected
-[  140.739203] {1}[Hardware Error]:   section type: unknown, d2e2621c-f936-468d-0d84-15a4ed015c8b
-[  140.739205] {1}[Hardware Error]:   section length: 0x238
-[  140.739210] {1}[Hardware Error]:   00000000: 4d415201 4d492031 453a4d45 435f4343  .RAM1 IMEM:ECC_C
-[  140.739214] {1}[Hardware Error]:   00000010: 53515f45 44525f42 00000000 00000000  E_QSB_RD........
-[  140.739217] {1}[Hardware Error]:   00000020: 00000000 00000000 00000000 00000000  ................
-[  140.739220] {1}[Hardware Error]:   00000030: 00000000 00000000 01010000 01010000  ................
-[  140.739223] {1}[Hardware Error]:   00000040: 00000000 00000000 00000005 00000000  ................
-[  140.739226] {1}[Hardware Error]:   00000050: 01010000 00000000 00000001 00dddd00  ................
-...
-
-The raw data from the error can then be decoded using vendor
-specific tools.
+Currently there are trace events for the various RAS
+errors with the exception of ARM processor type errors.
+Add a new trace event for such errors so that the user
+will know when they occur. These trace events are
+consistent with the ARM processor error section type
+defined in UEFI 2.6 spec section N.2.4.4.
 
 Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-Reviewed-by: James Morse <james.morse@arm.com>
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
+Reviewed-by: Xie XiuQi <xiexiuqi@huawei.com>
 ---
- drivers/firmware/efi/cper.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ drivers/acpi/apei/ghes.c    |  6 +++++-
+ drivers/firmware/efi/cper.c |  1 +
+ drivers/ras/ras.c           |  6 ++++++
+ include/linux/ras.h         |  3 +++
+ include/ras/ras_event.h     | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 60 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index 1106722..2dddb3b 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -518,7 +518,11 @@ static void ghes_do_proc(struct ghes *ghes,
+ 
+ 		}
+ #endif
+-		else {
++		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM)) {
++			struct cper_sec_proc_arm *err = acpi_hest_get_payload(gdata);
++
++			call_arm_trace_event(err);
++		} else {
+ 			void *err = acpi_hest_get_payload(gdata);
+ 
+ 			call_non_standard_trace_event(&sec_type, fru_id,
 diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-index eac0854..d5a5855 100644
+index d5a5855..48a8f69 100644
 --- a/drivers/firmware/efi/cper.c
 +++ b/drivers/firmware/efi/cper.c
-@@ -585,8 +585,15 @@ static void cper_print_tstamp(const char *pfx,
- 		else
- 			goto err_section_too_small;
- #endif
--	} else
--		printk("%s""section type: unknown, %pUl\n", newpfx, sec_type);
-+	} else {
-+		const void *err = acpi_hest_get_payload(gdata);
+@@ -35,6 +35,7 @@
+ #include <linux/printk.h>
+ #include <linux/bcd.h>
+ #include <acpi/ghes.h>
++#include <ras/ras_event.h>
+ 
+ #define INDENT_SP	" "
+ 
+diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
+index 57363be..8655ef4 100644
+--- a/drivers/ras/ras.c
++++ b/drivers/ras/ras.c
+@@ -20,6 +20,11 @@ void call_non_standard_trace_event(const uuid_le *sec_type,
+ 	trace_non_standard_event(sec_type, fru_id, fru_text, sev, err, len);
+ }
+ 
++void call_arm_trace_event(struct cper_sec_proc_arm *err)
++{
++	trace_arm_event(err);
++}
 +
-+		printk("%ssection type: unknown, %pUl\n", newpfx, sec_type);
-+		printk("%ssection length: %#x\n", newpfx,
-+		       gdata->error_data_length);
-+		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4, err,
-+			       gdata->error_data_length, true);
-+	}
+ static int __init ras_init(void)
+ {
+ 	int rc = 0;
+@@ -36,3 +41,4 @@ static int __init ras_init(void)
+ #endif
+ EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
+ EXPORT_TRACEPOINT_SYMBOL_GPL(non_standard_event);
++EXPORT_TRACEPOINT_SYMBOL_GPL(arm_event);
+diff --git a/include/linux/ras.h b/include/linux/ras.h
+index 7d397a1..988e3ac 100644
+--- a/include/linux/ras.h
++++ b/include/linux/ras.h
+@@ -2,6 +2,7 @@
+ #define __RAS_H__
  
- 	return;
+ #include <linux/uuid.h>
++#include <linux/cper.h>
  
+ #ifdef CONFIG_DEBUG_FS
+ int ras_userspace_consumers(void);
+@@ -17,10 +18,12 @@
+ void call_non_standard_trace_event(const uuid_le *sec_type,
+ 		 const uuid_le *fru_id, const char *fru_text, const u8 sev,
+ 		 const u8 *err, const u32 len);
++void call_arm_trace_event(struct cper_sec_proc_arm *err);
+ #else
+ static void call_non_standard_trace_event(const uuid_le *sec_type,
+ 		 const uuid_le *fru_id, const char *fru_text, const u8 sev,
+ 		 const u8 *err, const u32 len) { return; }
++static void call_arm_trace_event(struct cper_sec_proc_arm *err) { return; }
+ #endif
+ 
+ #endif
+diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
+index 4f79ba9..429f46f 100644
+--- a/include/ras/ras_event.h
++++ b/include/ras/ras_event.h
+@@ -162,6 +162,51 @@
+ );
+ 
+ /*
++ * ARM Processor Events Report
++ *
++ * This event is generated when hardware detects an ARM processor error
++ * has occurred. UEFI 2.6 spec section N.2.4.4.
++ */
++TRACE_EVENT(arm_event,
++
++	TP_PROTO(const struct cper_sec_proc_arm *proc),
++
++	TP_ARGS(proc),
++
++	TP_STRUCT__entry(
++		__field(u64, mpidr)
++		__field(u64, midr)
++		__field(u32, running_state)
++		__field(u32, psci_state)
++		__field(u8, affinity)
++	),
++
++	TP_fast_assign(
++		if (proc->validation_bits & CPER_ARM_VALID_AFFINITY_LEVEL)
++			__entry->affinity = proc->affinity_level;
++		else
++			__entry->affinity = ~0;
++		if (proc->validation_bits & CPER_ARM_VALID_MPIDR)
++			__entry->mpidr = proc->mpidr;
++		else
++			__entry->mpidr = 0ULL;
++		__entry->midr = proc->midr;
++		if (proc->validation_bits & CPER_ARM_VALID_RUNNING_STATE) {
++			__entry->running_state = proc->running_state;
++			__entry->psci_state = proc->psci_state;
++		} else {
++			__entry->running_state = ~0;
++			__entry->psci_state = ~0;
++		}
++	),
++
++	TP_printk("affinity level: %d; MPIDR: %016llx; MIDR: %016llx; "
++		  "running state: %d; PSCI state: %d",
++		  __entry->affinity, __entry->mpidr, __entry->midr,
++		  __entry->running_state, __entry->psci_state)
++);
++
++/*
+  * Non-Standard Section Report
+  *
+  * This event is generated when hardware detected a hardware
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
