@@ -1,53 +1,84 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 15 May 2017 15:48:53 +0800
-Subject: [PATCH V2 0/6] tty: serial: lpuart: add imx7ulp support
-Message-ID: <1494834539-17523-1-git-send-email-aisheng.dong@nxp.com>
+Date: Mon, 15 May 2017 15:48:54 +0800
+Subject: [PATCH V2 1/6] tty: serial: lpuart: introduce lpuart_soc_data to
+ represent SoC property
+In-Reply-To: <1494834539-17523-1-git-send-email-aisheng.dong@nxp.com>
+References: <1494834539-17523-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1494834539-17523-2-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series mainly intends to add imx7ulp support which is also
-using FSL lpuart.
+This is used to dynamically check the SoC specific lpuart properies.
+Currently only the checking of 32 bit register width is added which
+functions the same as before. More will be added later for supporting
+new chips.
 
-The lpuart in imx7ulp is basically the same as ls1021a. It's also
-32 bit width register, but unlike ls1021a, it's little endian.
-Besides that, imx7ulp lpuart has a minor different register layout
-from ls1021a that it has four extra registers (verid, param, global,
-pincfg) located at the beginning of register map, which are currently
-not used by the driver and less to be used later.
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.com>
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
+Cc: Yangbo Lu <yangbo.lu@nxp.com>
+Acked-by: Fugang Duan <fugang.duan@nxp.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Furthermore, this patch serial also add a new more accurate baud rate
-calculation method as MX7ULP can't divide a suitable baud rate
-with the default setting.
-
-Currently the new baud rate calculation is only enabled on MX7ULP.
-However, i guess the Layerscape may also be able to use it as there
-seems to be no difference in baud rate setting register after checking
-the Layerscape Reference Manual.
-
-As i don't have Layerscape boards, i can't test it, so i only enable it
-for MX7ULP by default to avoid a potential break.
-
-I copied LayerScape guys in this series and hope they can help test later.
-If it works on Layerscape as well, then they can switch to the new setting
-too and totally remove the old stuff.
-
+---
 ChangeLog:
 v1->v2:
- * Patch 2/4/5 chagned, other no changes.
-   See individuals for details.
+ * make all soc_data const
+---
+ drivers/tty/serial/fsl_lpuart.c | 25 ++++++++++++++++++-------
+ 1 file changed, 18 insertions(+), 7 deletions(-)
 
-Dong Aisheng (6):
-  tty: serial: lpuart: introduce lpuart_soc_data to represent SoC
-    property
-  tty: serial: lpuart: add little endian 32 bit register support
-  dt-bindings: serial: fsl-lpuart: add i.MX7ULP support
-  tty: serial: lpuart: add imx7ulp support
-  tty: serial: lpuart: add earlycon support for imx7ulp
-  tty: serial: lpuart: add a more accurate baud rate calculation method
-
- .../devicetree/bindings/serial/fsl-lpuart.txt      |   2 +
- drivers/tty/serial/fsl_lpuart.c                    | 147 ++++++++++++++++++---
- 2 files changed, 134 insertions(+), 15 deletions(-)
-
+diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+index 15df1ba7..7204103 100644
+--- a/drivers/tty/serial/fsl_lpuart.c
++++ b/drivers/tty/serial/fsl_lpuart.c
+@@ -258,13 +258,21 @@ struct lpuart_port {
+ 	wait_queue_head_t	dma_wait;
+ };
+ 
++struct lpuart_soc_data {
++	bool	is_32;
++};
++
++static const struct lpuart_soc_data vf_data = {
++	.is_32 = false,
++};
++
++static const struct lpuart_soc_data ls_data = {
++	.is_32 = true,
++};
++
+ static const struct of_device_id lpuart_dt_ids[] = {
+-	{
+-		.compatible = "fsl,vf610-lpuart",
+-	},
+-	{
+-		.compatible = "fsl,ls1021a-lpuart",
+-	},
++	{ .compatible = "fsl,vf610-lpuart", .data = &vf_data, },
++	{ .compatible = "fsl,ls1021a-lpuart", .data = &ls_data, },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
+@@ -1971,6 +1979,9 @@ static struct uart_driver lpuart_reg = {
+ 
+ static int lpuart_probe(struct platform_device *pdev)
+ {
++	const struct of_device_id *of_id = of_match_device(lpuart_dt_ids,
++							   &pdev->dev);
++	const struct lpuart_soc_data *sdata = of_id->data;
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct lpuart_port *sport;
+ 	struct resource *res;
+@@ -1988,7 +1999,7 @@ static int lpuart_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 	sport->port.line = ret;
+-	sport->lpuart32 = of_device_is_compatible(np, "fsl,ls1021a-lpuart");
++	sport->lpuart32 = sdata->is_32;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	sport->port.membase = devm_ioremap_resource(&pdev->dev, res);
 -- 
 2.7.4
