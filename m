@@ -1,22 +1,23 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 15 May 2017 15:48:57 +0800
-Subject: [PATCH V2 4/6] tty: serial: lpuart: add imx7ulp support
+Date: Mon, 15 May 2017 15:48:59 +0800
+Subject: [PATCH V2 6/6] tty: serial: lpuart: add a more accurate baud rate
+ calculation method
 In-Reply-To: <1494834539-17523-1-git-send-email-aisheng.dong@nxp.com>
 References: <1494834539-17523-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1494834539-17523-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1494834539-17523-7-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The lpuart of imx7ulp is basically the same as ls1021a. It's also
-32 bit width register, but unlike ls1021a, it's little endian.
-Besides that, imx7ulp lpuart has a minor different register layout
-from ls1021a that it has four extra registers (verid, param, global,
-pincfg) located at the beginning of register map, which are currently
-not used by the driver and less to be used later.
+On new LPUART versions, the oversampling ratio for the receiver can be
+changed from 4x (00011) to 32x (11111) which could help us get a more
+accurate baud rate divider.
 
-To ease the register difference handling, we add a reg_off member
-in lpuart_soc_data structure to represent if the normal
-lpuart32_{read|write} requires plus a offset to hide the issue.
+The idea is to use the best OSR (over-sampling rate) possible.
+Note, OSR is typically hard-set to 16 in other LPUART instantiations.
+Loop to find the best OSR value possible, one that generates minimum
+baud diff iterate through the rest of the supported values of OSR.
+
+Currently only i.MX7ULP is using it.
 
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Jiri Slaby <jslaby@suse.com>
@@ -25,64 +26,119 @@ Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
 Cc: Yangbo Lu <yangbo.lu@nxp.com>
 Acked-by: Fugang Duan <fugang.duan@nxp.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-
 ---
-ChangeLog:
-v1->v2:
- * remove lpuart_reg_off according to Stefan's suggestion
----
- drivers/tty/serial/fsl_lpuart.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/tty/serial/fsl_lpuart.c | 85 ++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 79 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index e72b397..a3ee825 100644
+index 107d0911..bda4b0c 100644
 --- a/drivers/tty/serial/fsl_lpuart.c
 +++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -231,6 +231,9 @@
- #define DEV_NAME	"ttyLP"
- #define UART_NR		6
+@@ -140,6 +140,8 @@
+ #define UARTBAUD_SBNS		0x00002000
+ #define UARTBAUD_SBR		0x00000000
+ #define UARTBAUD_SBR_MASK	0x1fff
++#define UARTBAUD_OSR_MASK       0x1f
++#define UARTBAUD_OSR_SHIFT      24
  
-+/* IMX lpuart has four extra unused regs located at the beginning */
-+#define IMX_REG_OFF	0x10
+ #define UARTSTAT_LBKDIF		0x80000000
+ #define UARTSTAT_RXEDGIF	0x40000000
+@@ -1506,6 +1508,72 @@ lpuart_set_termios(struct uart_port *port, struct ktermios *termios,
+ }
+ 
+ static void
++lpuart32_serial_setbrg(struct lpuart_port *sport, unsigned int baudrate)
++{
++	u32 sbr, osr, baud_diff, tmp_osr, tmp_sbr, tmp_diff, tmp;
++	u32 clk = sport->port.uartclk;
 +
- static bool lpuart_is_be;
- 
- struct lpuart_port {
-@@ -263,6 +266,7 @@ struct lpuart_port {
- struct lpuart_soc_data {
- 	bool	is_32;
- 	bool	is_be;
-+	u8	reg_off;
- };
- 
- static const struct lpuart_soc_data vf_data = {
-@@ -272,11 +276,19 @@ static const struct lpuart_soc_data vf_data = {
- static const struct lpuart_soc_data ls_data = {
- 	.is_32 = true,
- 	.is_be = true,
-+	.reg_off = 0x0,
-+};
++	/*
++	 * The idea is to use the best OSR (over-sampling rate) possible.
++	 * Note, OSR is typically hard-set to 16 in other LPUART instantiations.
++	 * Loop to find the best OSR value possible, one that generates minimum
++	 * baud_diff iterate through the rest of the supported values of OSR.
++	 *
++	 * Calculation Formula:
++	 *  Baud Rate = baud clock / ((OSR+1) ? SBR)
++	 */
++	baud_diff = baudrate;
++	osr = 0;
++	sbr = 0;
 +
-+static struct lpuart_soc_data imx_data = {
-+	.is_32 = true,
-+	.is_be = false,
-+	.reg_off = IMX_REG_OFF,
- };
++	for (tmp_osr = 4; tmp_osr <= 32; tmp_osr++) {
++		/* calculate the temporary sbr value  */
++		tmp_sbr = (clk / (baudrate * tmp_osr));
++		if (tmp_sbr == 0)
++			tmp_sbr = 1;
++
++		/*
++		 * calculate the baud rate difference based on the temporary
++		 * osr and sbr values
++		 */
++		tmp_diff = clk / (tmp_osr * tmp_sbr) - baudrate;
++
++		/* select best values between sbr and sbr+1 */
++		tmp = clk / (tmp_osr * (tmp_sbr + 1));
++		if (tmp_diff > (baudrate - tmp)) {
++			tmp_diff = baudrate - tmp;
++			tmp_sbr++;
++		}
++
++		if (tmp_diff <= baud_diff) {
++			baud_diff = tmp_diff;
++			osr = tmp_osr;
++			sbr = tmp_sbr;
++		}
++	}
++
++	/* handle buadrate outside acceptable rate */
++	if (baud_diff > ((baudrate / 100) * 3))
++		dev_warn(sport->port.dev,
++			 "unacceptable baud rate difference of more than 3%%\n");
++
++	tmp = lpuart32_read(sport->port.membase + UARTBAUD);
++
++	if ((osr > 3) && (osr < 8))
++		tmp |= UARTBAUD_BOTHEDGE;
++
++	tmp &= ~(UARTBAUD_OSR_MASK << UARTBAUD_OSR_SHIFT);
++	tmp |= (((osr-1) & UARTBAUD_OSR_MASK) << UARTBAUD_OSR_SHIFT);
++
++	tmp &= ~UARTBAUD_SBR_MASK;
++	tmp |= sbr & UARTBAUD_SBR_MASK;
++
++	tmp &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
++
++	lpuart32_write(tmp, sport->port.membase + UARTBAUD);
++}
++
++static void
+ lpuart32_set_termios(struct uart_port *port, struct ktermios *termios,
+ 		   struct ktermios *old)
+ {
+@@ -1611,12 +1679,17 @@ lpuart32_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	lpuart32_write(old_ctrl & ~(UARTCTRL_TE | UARTCTRL_RE),
+ 			sport->port.membase + UARTCTRL);
  
- static const struct of_device_id lpuart_dt_ids[] = {
- 	{ .compatible = "fsl,vf610-lpuart", .data = &vf_data, },
- 	{ .compatible = "fsl,ls1021a-lpuart", .data = &ls_data, },
-+	{ .compatible = "fsl,imx7ulp-lpuart", .data = &imx_data, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, lpuart_dt_ids);
-@@ -2014,6 +2026,7 @@ static int lpuart_probe(struct platform_device *pdev)
- 	if (IS_ERR(sport->port.membase))
- 		return PTR_ERR(sport->port.membase);
- 
-+	sport->port.membase += sdata->reg_off;
- 	sport->port.mapbase = res->start;
- 	sport->port.dev = &pdev->dev;
- 	sport->port.type = PORT_LPUART;
+-	sbr = sport->port.uartclk / (16 * baud);
+-	bd &= ~UARTBAUD_SBR_MASK;
+-	bd |= sbr & UARTBAUD_SBR_MASK;
+-	bd |= UARTBAUD_BOTHEDGE;
+-	bd &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
+-	lpuart32_write(bd, sport->port.membase + UARTBAUD);
++	if (of_device_is_compatible(port->dev->of_node, "fsl,imx7ulp-lpuart")) {
++		lpuart32_serial_setbrg(sport, baud);
++	} else {
++		sbr = sport->port.uartclk / (16 * baud);
++		bd &= ~UARTBAUD_SBR_MASK;
++		bd |= sbr & UARTBAUD_SBR_MASK;
++		bd |= UARTBAUD_BOTHEDGE;
++		bd &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
++		lpuart32_write(bd, sport->port.membase + UARTBAUD);
++	}
++
+ 	lpuart32_write(modem, sport->port.membase + UARTMODIR);
+ 	lpuart32_write(ctrl, sport->port.membase + UARTCTRL);
+ 	/* restore control register */
 -- 
 2.7.4
