@@ -1,75 +1,58 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Mon, 15 May 2017 17:32:18 +0530
-Subject: [PATCH v2 08/11] arm64: dts: Add GPIO DT nodes for Stingray SOC
-In-Reply-To: <1494849741-21294-1-git-send-email-anup.patel@broadcom.com>
-References: <1494849741-21294-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1494849741-21294-9-git-send-email-anup.patel@broadcom.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 15 May 2017 20:20:33 +0800
+Subject: [PATCH 3/5] dt-bindings: pinctrl: add imx7ulp pinctrl binding doc
+In-Reply-To: <AM3PR04MB3069C90F23CF9C9CC84BA7580E10@AM3PR04MB306.eurprd04.prod.outlook.com>
+References: <1494592686-30967-1-git-send-email-aisheng.dong@nxp.com>
+ <1494592686-30967-5-git-send-email-aisheng.dong@nxp.com>
+ <20170515114319.GP8471@dragon>
+ <AM3PR04MB3069C90F23CF9C9CC84BA7580E10@AM3PR04MB306.eurprd04.prod.outlook.com>
+Message-ID: <20170515122032.GS8471@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pramod Kumar <pramod.kumar@broadcom.com>
+On Mon, May 15, 2017 at 12:06:19PM +0000, A.S. Dong wrote:
+> > > @@ -0,0 +1,56 @@
+> > > +* Freescale i.MX7ULP IOMUX Controller
+> > > +
+> > > +Please refer to fsl,imx-pinctrl.txt in this directory for common
+> > > +binding part and usage.
+> > 
+> > Are imx7ulp-pinctrl bindings more alike to fsl,imx-pinctrl.txt or generic
+> > pinctrl-bindings.txt?  My personal feeling is that it might be better to
+> > take pinctrl-bindings.txt as the reference base and highlight how imx7ulp-
+> > pinctrl bindings differ from it.
+> > 
+> 
+> It seems still more like fsl,imx-pinctrl.txt.
+> 
+> I know fsl,imx-pinctrl.txt is a bit out of date, especially after we add
+> generic pinconf.
+> 
+> I plan to update it later after adding generic pin conf support to legacy
+> SoCs (MX6 & 7) as well, do you think it's ok?
 
-The GPIOs on Stingray SOC are based on iProc GPIOs hence
-using this we add GPIO DT nodes for Stingray SOC.
+Please do not.  Let's use generic pinconf support only for new SoCs, and
+not bother with legacy SoCs.
 
-Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+<snip>
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-index c3a8cee..2b24d07 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-@@ -256,6 +256,14 @@
- 		ranges = <0x0 0x0 0x66400000 0x100000>;
- 
- 		#include "stingray-clock.dtsi"
-+
-+		gpio_crmu: gpio at 66424800 {
-+			compatible = "brcm,iproc-gpio";
-+			reg = <0x00024800 0x4c>;
-+			ngpios = <6>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+		};
- 	};
- 
- 	hsls {
-@@ -266,6 +274,32 @@
- 
- 		#include "stingray-pinctrl.dtsi"
- 
-+		gpio_hsls: gpio at 689d0000 {
-+			compatible = "brcm,iproc-gpio";
-+			reg = <0x000d0000 0x864>;
-+			ngpios = <151>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			interrupt-controller;
-+			interrupts = <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-ranges = <&pinmux 0 0 16>,
-+					<&pinmux 16 71 2>,
-+					<&pinmux 18 131 8>,
-+					<&pinmux 26 83 6>,
-+					<&pinmux 32 123 4>,
-+					<&pinmux 36 43 24>,
-+					<&pinmux 60 89 2>,
-+					<&pinmux 62 73 4>,
-+					<&pinmux 66 95 28>,
-+					<&pinmux 94 127 4>,
-+					<&pinmux 98 139 10>,
-+					<&pinmux 108 16 27>,
-+					<&pinmux 135 77 6>,
-+					<&pinmux 141 67 4>,
-+					<&pinmux 145 149 6>,
-+					<&pinmux 151 91 4>;
-+		};
-+
- 		uart0: uart at 68a00000 {
- 			device_type = "serial";
- 			compatible = "snps,dw-apb-uart";
--- 
-2.7.4
+> > > diff --git a/include/dt-bindings/pinctrl/imx7ulp-pinfunc.h
+> > > b/include/dt-bindings/pinctrl/imx7ulp-pinfunc.h
+> > > new file mode 100644
+> > > index 0000000..b6db73f
+> > > --- /dev/null
+> > > +++ b/include/dt-bindings/pinctrl/imx7ulp-pinfunc.h
+> > 
+> > The header will only be used by dts files, right?  If so,
+> > arch/arm/boot/dts is the better place.
+> > 
+> 
+> I can do it, but I'm just a bit confused that only IMX is still
+> Putting pinctrl headfile under arch/arm/boot/dts/.
+
+It makes sense to define DT constants in include/dt-bindings/pinctrl/
+only when they are referenced by both kernel and dts.  If it's only
+included by dts, arch/arm/boot/dts/ should definitely be the better
+place.
+
+Shawn
