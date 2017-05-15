@@ -1,101 +1,87 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Mon, 15 May 2017 17:19:35 +0800
-Subject: [PATCH v3 3/9] dt-bindings: arm: mediatek: update for MT7623n
- SoC and relevant boards
-In-Reply-To: <33b3a8a3-006b-91b3-e30d-56518fb9ae7a@gmail.com>
-References: <cover.1494574682.git.sean.wang@mediatek.com>
- <e8f5dc8578c3980ac9c6411ad7fae1c8d747f567.1494574682.git.sean.wang@mediatek.com>
- <33b3a8a3-006b-91b3-e30d-56518fb9ae7a@gmail.com>
-Message-ID: <1494839975.10505.24.camel@mtkswgap22>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 15 May 2017 11:20:01 +0200
+Subject: [PATCH v7 05/13] drm/sun4i: abstract a engine type
+In-Reply-To: <20170514163045.40366-6-icenowy@aosc.io>
+References: <20170514163045.40366-1-icenowy@aosc.io>
+ <20170514163045.40366-6-icenowy@aosc.io>
+Message-ID: <20170515092001.ik7qrqmg5pgtp2ct@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
-
-Appreciate your help on reviewing. Add my comments inline
-
-
-On Mon, 2017-05-15 at 09:53 +0200, Matthias Brugger wrote:
+On Mon, May 15, 2017 at 12:30:37AM +0800, Icenowy Zheng wrote:
+> As we are going to add support for the Allwinner DE2 engine in sun4i-drm
+> driver, we will finally have two types of display engines -- the DE1
+> backend and the DE2 mixer. They both do some display blending and feed
+> graphics data to TCON, and is part of the "Display Engine" called by
+> Allwinner, so I choose to call them both "engine" here.
 > 
-> On 12/05/17 09:56, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > Because there are two versions of MT7623 SoC that is MT7623a and MT7623n
-> > respectively. So update the part of MT7623n bindings to allow that people
-> > tend to differentiate which MT7623 SoC the boards applies.
-> > 
-> > Signed-off-by: John Crispin <john@phrozen.org>
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > ---
-> >   Documentation/devicetree/bindings/arm/mediatek.txt | 8 ++++----
-> >   1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-> > index c860b24..0924b62 100644
-> > --- a/Documentation/devicetree/bindings/arm/mediatek.txt
-> > +++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-> > @@ -1,6 +1,6 @@
-> >   MediaTek mt65xx, mt67xx & mt81xx Platforms Device Tree Bindings
-> >   
-> > -Boards with a MediaTek mt65xx/mt67xx/mt81xx SoC shall have the
-> > +Boards with a MediaTek mt65xx/mt67xx/mt762x/mt81xx SoC shall have the
-> >   following property:
-> >   
-> >   Required root node property:
-> > @@ -12,7 +12,7 @@ compatible: Must contain one of
-> >      "mediatek,mt6592"
-> >      "mediatek,mt6755"
-> >      "mediatek,mt6795"
-> > -   "mediatek,mt7623"
-> > +   "mediatek,mt7623" which is referred to MT7623N SoC
-> >      "mediatek,mt8127"
-> >      "mediatek,mt8135"
-> >      "mediatek,mt8173"
-> > @@ -38,9 +38,9 @@ Supported boards:
-> >   - Evaluation board for MT6795(Helio X10):
-> >       Required root node properties:
-> >         - compatible = "mediatek,mt6795-evb", "mediatek,mt6795";
-> > -- Evaluation board for MT7623:
-> > +- Reference  board for MT7623n with NAND:
-> >       Required root node properties:
-> > -      - compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
-> > +      - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
+> Abstract the engine type to a new struct with an ops struct, which contains
+> functions that should be called outside the engine-specified code (in
+> TCON, CRTC or TV Encoder code).
 > 
-> Please explain in the commit message why you change this binding and why 
-> this is not problematic. Either in this patch or add a new one.
-> 
-I will add more description for why changing binding here in the commit
-message of the patch. 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes in v7:
+> - Mention "Display Engine" for the name "engine".
+> - Fixed some small issues found by Chen-Yu and added his ACK.
+> Changes in v6:
+> - Rebased on wens's multi-pipeline patchset.
+> - Split out Makefile changes.
 
-"mediatek,mt7623-evb" can be safely changed to
-"mediatek,mt7623n-rfb-nand" because real users can't get the board that
-is a kind of debug board internally in Mediatek. Instead We should add
-more specific board variants as the adding here to let people easily
-know what board they uses. 
+You also added a get_id callback here...
 
-The similar description is done as (2/9) arm: dts: mt7623: rename
-mt7623-evb.dts to arch/arm/boot/dts/mt7623n-rfb.dtsi that states
-" Additionally Mediatek pointed out, that the EVB is yet another board
-and the board in question is infact the RFB. Take this into account
-while renaming the files." 
+> +static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
+> +	.commit				= sun4i_backend_commit,
+> +	.layers_init			= sun4i_layers_init,
+> +	.apply_color_correction		= sun4i_backend_apply_color_correction,
+> +	.disable_color_correction	= sun4i_backend_disable_color_correction,
+> +};
+> +
 
-However I didn't make similar sufficient statements into the patch when
-I split from the last version of the patch. Sorry:(
+... that you don't populate ...
 
+> @@ -477,7 +481,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+>  	dev_set_drvdata(dev, tcon);
+>  	tcon->drm = drm;
+>  	tcon->dev = dev;
+> -	tcon->id = backend->id;
+> +	tcon->id = sunxi_engine_get_id(engine);
 
-> For convenience for the device-tree maintainer, add the binding patches 
-> at the beginning of your patch list. It makes their life easier and a 
-> review faster, a clear win-win situation :)
-> 
+... that you call to fill the TCON ID ...
 
-Okay. thanks for the suggestion:) 
-I will reorder them to help direct them to the part they're interested
-in.
+> +/**
+> + * sunxi_engine_get_id - Get the ID of the engine.
+> + * @engine:	pointer to the engine
+> + *
+> + * If the ID is not necessary, just do not implement it in sunxi_engine_ops,
+> + * and a default -1 will be returned.
+> + */
+> +static inline int
+> +sunxi_engine_get_id(struct sunxi_engine *engine)
+> +{
+> +	if (engine->ops && engine->ops->get_id)
+> +		return engine->ops->get_id(engine);
+> +
+> +	return -1;
 
-> Thanks,
-> Matthias
-> 
-> >   - MTK mt8127 tablet moose EVB:
-> >       Required root node properties:
-> >         - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
-> > 
+... and will return -1 if not populated, which essentially means that
+instead of having 0 or 1, we're now having -1 as our id.
+
+This is a regression, and I'm even wondering if we can't just store
+the ID in the sunxi_engine structure. Is anything preventing us to do
+that, instead of using a callback?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170515/07f62b36/attachment.sig>
