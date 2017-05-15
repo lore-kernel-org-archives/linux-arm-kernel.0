@@ -1,40 +1,39 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Mon, 15 May 2017 13:00:29 +0300
-Subject: [PATCH] arm64: defconfig: Switch to the correct Qualcomm SMD driver
-Message-ID: <20170515100029.12501-1-georgi.djakov@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 May 2017 11:00:34 +0100
+Subject: [PATCH] socfpga_a10: reset CPU1 in socfpga_cpu_kill()
+In-Reply-To: <20170512143600.GB18818@leverpostej>
+References: <20170510051304.131042-1-yanjiang.jin@windriver.com>
+ <20170510051304.131042-2-yanjiang.jin@windriver.com>
+ <20170512143600.GB18818@leverpostej>
+Message-ID: <20170515100033.GT22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMD driver is migrated to a new RPMSG-based one and the old
-driver was removed with:
-commit 395a48053af6 ("soc: qcom: smd: Remove standalone driver")
+On Fri, May 12, 2017 at 03:36:01PM +0100, Mark Rutland wrote:
+> However, AFAICT, this patch forcibly resets is without any teardown
+> having happened. That will surely result in data being lost from the
+> caches, for example.
 
-However in defconfig we still have the old driver leaving the
-SMD-regulator driver with unsatisfied dependencies. The result
-is that the SMD-regulator driver is not compiled and the apq8016
-boards could not probe their onboard storage and mount rootfs.
+You're wrong on that point.  Having each bloody platform implement
+the same friggin teardown is utter madness, and leads to all sorts
+of synchronisation issues.
 
-Fix this by switching to the new SMD driver, so that the required
-driver is compiled again.
+The generic code already deals with the cache issues, and has
+synchronisation to ensure that the dying CPU completes the cache
+handling before the requesting CPU continues with the killing.
+The only thing that platform code need concern itself with is doing
+is the "make the CPU die" thing.
 
-Reported-by: Leo Yan <leo.yan@linaro.org>
-Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
----
- arch/arm64/configs/defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+It's not perfect, but it's good enough for the majority of cases.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index ce072859e3b2..08f6f96057d4 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -470,9 +470,9 @@ CONFIG_BCM2835_MBOX=y
- CONFIG_HI6220_MBOX=y
- CONFIG_ARM_SMMU=y
- CONFIG_ARM_SMMU_V3=y
-+CONFIG_RPMSG_QCOM_SMD=y
- CONFIG_RASPBERRYPI_POWER=y
- CONFIG_QCOM_SMEM=y
--CONFIG_QCOM_SMD=y
- CONFIG_QCOM_SMD_RPM=y
- CONFIG_ROCKCHIP_PM_DOMAINS=y
- CONFIG_ARCH_TEGRA_132_SOC=y
+In any case, encouraging people to add flush_cache_all() into their
+cpu_die() function is NOT the way forward if there is a problem -
+that introduces a new race between flush_cache_all() walking all the
+cache lines and cpu_kill() actually turning the power off to the CPU,
+which could very well happen either before or during the
+flush_cache_all() execution.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
