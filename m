@@ -1,54 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 15 May 2017 09:50:12 +0200
-Subject: [PATCH 1/2] ARM: dts: add GSBI8 defines to the MSM8660 family
-Message-ID: <20170515075012.3696-1-linus.walleij@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 15 May 2017 09:53:37 +0200
+Subject: [PATCH v3 3/9] dt-bindings: arm: mediatek: update for MT7623n SoC
+ and relevant boards
+In-Reply-To: <e8f5dc8578c3980ac9c6411ad7fae1c8d747f567.1494574682.git.sean.wang@mediatek.com>
+References: <cover.1494574682.git.sean.wang@mediatek.com>
+ <e8f5dc8578c3980ac9c6411ad7fae1c8d747f567.1494574682.git.sean.wang@mediatek.com>
+Message-ID: <33b3a8a3-006b-91b3-e30d-56518fb9ae7a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This defines the memory location and interrupt used by the GSBI8
-I2C adapter on the MSM8660 SoCs. We add it as "disabled" by
-default so that boards using this I2C can enable it.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/qcom-msm8660.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 747669a62aa8..a53c0f9970bd 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -107,6 +107,31 @@
- 			reg = <0x900000 0x4000>;
- 		};
- 
-+
-+		gsbi8: gsbi at 19800000 {
-+			compatible = "qcom,gsbi-v1.0.0";
-+			cell-index = <12>;
-+			reg = <0x19800000 0x100>;
-+			clocks = <&gcc GSBI8_H_CLK>;
-+			clock-names = "iface";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			syscon-tcsr = <&tcsr>;
-+
-+			gsbi8_i2c: i2c at 19880000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				reg = <0x19880000 0x1000>;
-+				interrupts = <0 161 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI8_QUP_CLK>, <&gcc GSBI8_H_CLK>;
-+				clock-names = "core", "iface";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+		};
-+
- 		gsbi12: gsbi at 19c00000 {
- 			compatible = "qcom,gsbi-v1.0.0";
- 			cell-index = <12>;
--- 
-2.9.3
+On 12/05/17 09:56, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> Because there are two versions of MT7623 SoC that is MT7623a and MT7623n
+> respectively. So update the part of MT7623n bindings to allow that people
+> tend to differentiate which MT7623 SoC the boards applies.
+> 
+> Signed-off-by: John Crispin <john@phrozen.org>
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>   Documentation/devicetree/bindings/arm/mediatek.txt | 8 ++++----
+>   1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+> index c860b24..0924b62 100644
+> --- a/Documentation/devicetree/bindings/arm/mediatek.txt
+> +++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+> @@ -1,6 +1,6 @@
+>   MediaTek mt65xx, mt67xx & mt81xx Platforms Device Tree Bindings
+>   
+> -Boards with a MediaTek mt65xx/mt67xx/mt81xx SoC shall have the
+> +Boards with a MediaTek mt65xx/mt67xx/mt762x/mt81xx SoC shall have the
+>   following property:
+>   
+>   Required root node property:
+> @@ -12,7 +12,7 @@ compatible: Must contain one of
+>      "mediatek,mt6592"
+>      "mediatek,mt6755"
+>      "mediatek,mt6795"
+> -   "mediatek,mt7623"
+> +   "mediatek,mt7623" which is referred to MT7623N SoC
+>      "mediatek,mt8127"
+>      "mediatek,mt8135"
+>      "mediatek,mt8173"
+> @@ -38,9 +38,9 @@ Supported boards:
+>   - Evaluation board for MT6795(Helio X10):
+>       Required root node properties:
+>         - compatible = "mediatek,mt6795-evb", "mediatek,mt6795";
+> -- Evaluation board for MT7623:
+> +- Reference  board for MT7623n with NAND:
+>       Required root node properties:
+> -      - compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
+> +      - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
+
+Please explain in the commit message why you change this binding and why 
+this is not problematic. Either in this patch or add a new one.
+
+For convenience for the device-tree maintainer, add the binding patches 
+at the beginning of your patch list. It makes their life easier and a 
+review faster, a clear win-win situation :)
+
+Thanks,
+Matthias
+
+>   - MTK mt8127 tablet moose EVB:
+>       Required root node properties:
+>         - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
+> 
