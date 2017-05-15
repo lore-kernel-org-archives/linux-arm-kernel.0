@@ -1,11 +1,11 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 15 May 2017 10:17:01 +0200
-Subject: [PATCH v2 16/18] arm64: dts: meson-gxl-s905x-nexbox-a95x: Fix
- node order
-In-Reply-To: <20170513143337.14278-17-afaerber@suse.de>
+Date: Mon, 15 May 2017 10:17:08 +0200
+Subject: [PATCH v2 13/18] arm64: dts: meson-gxbb-nexbox-a95x: Fix node
+ order
+In-Reply-To: <20170513143337.14278-14-afaerber@suse.de>
 References: <20170513143337.14278-1-afaerber@suse.de>
- <20170513143337.14278-17-afaerber@suse.de>
-Message-ID: <e50b3a0f-dab0-d2bc-26f2-a6edcc8af761@baylibre.com>
+ <20170513143337.14278-14-afaerber@suse.de>
+Message-ID: <22302468-9c71-18f2-0e2f-1ab7764a8e91@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,14 +17,14 @@ On 05/13/2017 04:33 PM, Andreas F?rber wrote:
 >  v1 -> v2:
 >  * Rebased (new nodes added)
 >  
->  .../dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    | 52 +++++++++++-----------
+>  .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 52 +++++++++++-----------
 >  1 file changed, 26 insertions(+), 26 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-> index 8873c058fad2..6633a5d8fdd3 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-> @@ -140,10 +140,10 @@
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> index 87198eafb04b..a1078b3e1c76 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> @@ -165,10 +165,10 @@
 >  	};
 >  };
 >  
@@ -39,8 +39,8 @@ On 05/13/2017 04:33 PM, Andreas F?rber wrote:
 >  };
 >  
 >  &ethmac {
-> @@ -152,12 +152,32 @@
->  	phy-handle = <&internal_phy>;
+> @@ -195,12 +195,32 @@
+>  	};
 >  };
 >  
 > +&hdmi_tx {
@@ -72,7 +72,7 @@ On 05/13/2017 04:33 PM, Andreas F?rber wrote:
 >  /* Wireless SDIO Module */
 >  &sd_emmc_a {
 >  	status = "okay";
-> @@ -217,28 +237,8 @@
+> @@ -260,28 +280,8 @@
 >  	vqmmc-supply = <&vddio_boot>;
 >  };
 >  
