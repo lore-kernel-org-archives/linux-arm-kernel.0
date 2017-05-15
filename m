@@ -1,55 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 15 May 2017 16:13:13 -0300
-Subject: [PATCH] ARM: dts: imx7s: Avoid using dummy clocks for usdhc
-Message-ID: <1494875593-22796-1-git-send-email-festevam@gmail.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Mon, 15 May 2017 21:34:33 +0200
+Subject: [PATCH 3/3] coresight: etb10: Improve a size determination in
+ etb_alloc_buffer()
+In-Reply-To: <CANLsYkwxkXZ5t5L1_=2e9FLdkwOg7KUT=u2o-KeEfH8QYOfStA@mail.gmail.com>
+References: <5d5cd752-f2f2-b511-6b1e-daf5bf1bc522@users.sourceforge.net>
+ <b8ed57f7-cdcf-9b35-4fdd-8833db008ff0@users.sourceforge.net>
+ <CANLsYkwxkXZ5t5L1_=2e9FLdkwOg7KUT=u2o-KeEfH8QYOfStA@mail.gmail.com>
+Message-ID: <483aafb4-c864-058b-6e61-1189be427d27@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+>> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
+>> @@ -278,8 +278,7 @@ static void *etb_alloc_buffer(struct coresight_device *csdev, int cpu,
+>>         if (cpu == -1)
+>>                 cpu = smp_processor_id();
+>>         node = cpu_to_node(cpu);
+>> -
+>> -       buf = kzalloc_node(sizeof(struct cs_buffers), GFP_KERNEL, node);
+>> +       buf = kzalloc_node(sizeof(*buf), GFP_KERNEL, node);
+> 
+> I'm fine with this change but if it's going to happen, it has to be in
+> all the coresight drivers and not just this one - please respin with
+> all instances fixed.  One patch per driver would be much appreciated.
 
-Use the proper usdhc clocks instead of passing dummy ones.
+Do you imagine that any more modules are affected in a similar way
+for this software area?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx7s.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+How do you think about other update suggestions from my selection
+which are waiting for a corresponding review?
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index c4f12fd..843eb37 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -934,8 +934,8 @@
- 				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
- 				reg = <0x30b40000 0x10000>;
- 				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&clks IMX7D_CLK_DUMMY>,
--					<&clks IMX7D_CLK_DUMMY>,
-+				clocks = <&clks IMX7D_IPG_ROOT_CLK>,
-+					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
- 					<&clks IMX7D_USDHC1_ROOT_CLK>;
- 				clock-names = "ipg", "ahb", "per";
- 				bus-width = <4>;
-@@ -946,8 +946,8 @@
- 				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
- 				reg = <0x30b50000 0x10000>;
- 				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&clks IMX7D_CLK_DUMMY>,
--					<&clks IMX7D_CLK_DUMMY>,
-+				clocks = <&clks IMX7D_IPG_ROOT_CLK>,
-+					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
- 					<&clks IMX7D_USDHC2_ROOT_CLK>;
- 				clock-names = "ipg", "ahb", "per";
- 				bus-width = <4>;
-@@ -958,8 +958,8 @@
- 				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
- 				reg = <0x30b60000 0x10000>;
- 				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&clks IMX7D_CLK_DUMMY>,
--					<&clks IMX7D_CLK_DUMMY>,
-+				clocks = <&clks IMX7D_IPG_ROOT_CLK>,
-+					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
- 					<&clks IMX7D_USDHC3_ROOT_CLK>;
- 				clock-names = "ipg", "ahb", "per";
- 				bus-width = <4>;
--- 
-2.7.4
+Regards,
+Markus
