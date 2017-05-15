@@ -1,87 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 15 May 2017 11:20:01 +0200
-Subject: [PATCH v7 05/13] drm/sun4i: abstract a engine type
-In-Reply-To: <20170514163045.40366-6-icenowy@aosc.io>
-References: <20170514163045.40366-1-icenowy@aosc.io>
- <20170514163045.40366-6-icenowy@aosc.io>
-Message-ID: <20170515092001.ik7qrqmg5pgtp2ct@flea.home>
+From: madalin.bucur@nxp.com (Madalin Bucur)
+Date: Mon, 15 May 2017 12:21:15 +0300
+Subject: [PATCH v2 0/3] arm64: dts: introduce QorIQ DPAA 1.x QBMan device tree
+ nodes
+Message-ID: <1494840078-22243-1-git-send-email-madalin.bucur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 12:30:37AM +0800, Icenowy Zheng wrote:
-> As we are going to add support for the Allwinner DE2 engine in sun4i-drm
-> driver, we will finally have two types of display engines -- the DE1
-> backend and the DE2 mixer. They both do some display blending and feed
-> graphics data to TCON, and is part of the "Display Engine" called by
-> Allwinner, so I choose to call them both "engine" here.
-> 
-> Abstract the engine type to a new struct with an ops struct, which contains
-> functions that should be called outside the engine-specified code (in
-> TCON, CRTC or TV Encoder code).
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes in v7:
-> - Mention "Display Engine" for the name "engine".
-> - Fixed some small issues found by Chen-Yu and added his ACK.
-> Changes in v6:
-> - Rebased on wens's multi-pipeline patchset.
-> - Split out Makefile changes.
+This patch set introduces the QorIQ Data Path Acceleration Arhitecture
+(DPAA) Queue Manager and Buffer Manager device tree nodes for the ARM
+based DPAA 1.x platforms.
 
-You also added a get_id callback here...
+Changes since v1 - addressed feedback received from Shawn Guo:
+ - renamed portal dtsi files
+ - added required newlines
+ - removed typos
 
-> +static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
-> +	.commit				= sun4i_backend_commit,
-> +	.layers_init			= sun4i_layers_init,
-> +	.apply_color_correction		= sun4i_backend_apply_color_correction,
-> +	.disable_color_correction	= sun4i_backend_disable_color_correction,
-> +};
-> +
+Madalin Bucur (3):
+  arm64: dts: add DPAA QBMan portals
+  arm64: dts: add LS1043A DPAA QBMan nodes
+  arm64: dts: add LS1046A DPAA QBMan nodes
 
-... that you don't populate ...
-
-> @@ -477,7 +481,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
->  	dev_set_drvdata(dev, tcon);
->  	tcon->drm = drm;
->  	tcon->dev = dev;
-> -	tcon->id = backend->id;
-> +	tcon->id = sunxi_engine_get_id(engine);
-
-... that you call to fill the TCON ID ...
-
-> +/**
-> + * sunxi_engine_get_id - Get the ID of the engine.
-> + * @engine:	pointer to the engine
-> + *
-> + * If the ID is not necessary, just do not implement it in sunxi_engine_ops,
-> + * and a default -1 will be returned.
-> + */
-> +static inline int
-> +sunxi_engine_get_id(struct sunxi_engine *engine)
-> +{
-> +	if (engine->ops && engine->ops->get_id)
-> +		return engine->ops->get_id(engine);
-> +
-> +	return -1;
-
-... and will return -1 if not populated, which essentially means that
-instead of having 0 or 1, we're now having -1 as our id.
-
-This is a regression, and I'm even wondering if we can't just store
-the ID in the sunxi_engine structure. Is anything preventing us to do
-that, instead of using a callback?
-
-Maxime
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     | 53 ++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     | 54 +++++++++++++++
+ .../boot/dts/freescale/qoriq-bman-portals.dtsi     | 71 +++++++++++++++++++
+ .../boot/dts/freescale/qoriq-qman-portals.dtsi     | 80 ++++++++++++++++++++++
+ 4 files changed, 258 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-bman-portals.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-qman-portals.dtsi
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170515/07f62b36/attachment.sig>
+2.1.0
