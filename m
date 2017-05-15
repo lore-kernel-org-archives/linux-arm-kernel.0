@@ -1,32 +1,31 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Mon, 15 May 2017 03:11:28 +0200
-Subject: [PATCH 0/2] arm64: meson-gxbb: NanoPi K2 enablement
-Message-ID: <20170515011130.29265-1-afaerber@suse.de>
+Date: Mon, 15 May 2017 03:11:29 +0200
+Subject: [PATCH 1/2] dt-bindings: arm: amlogic: Add NanoPi K2
+In-Reply-To: <20170515011130.29265-1-afaerber@suse.de>
+References: <20170515011130.29265-1-afaerber@suse.de>
+Message-ID: <20170515011130.29265-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The FriendlyARM NanoPi K2 is a single-board computer.
 
-This mini-series adds initial support for the Amlogic S905 based
-FriendlyARM NanoPi K2 SBC.
-
-Tested with mainline U-Boot.
-
-Regards,
-Andreas
-
-Cc: devicetree at vger.kernel.org
 Cc: techsupport at friendlyarm.com
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ Documentation/devicetree/bindings/arm/amlogic.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Andreas F?rber (2):
-  dt-bindings: arm: amlogic: Add NanoPi K2
-  arm64: dts: amlogic: Add NanoPi K2
-
- Documentation/devicetree/bindings/arm/amlogic.txt  |   1 +
- arch/arm64/boot/dts/amlogic/Makefile               |   1 +
- .../boot/dts/amlogic/meson-gxbb-nanopi-k2.dts      | 152 +++++++++++++++++++++
- 3 files changed, 154 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-
+diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+index cad5b5a48d92..d517c8b41758 100644
+--- a/Documentation/devicetree/bindings/arm/amlogic.txt
++++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+@@ -40,6 +40,7 @@ Board compatible values (alphabetically, grouped by SoC):
+ 
+   - "amlogic,p200" (Meson gxbb)
+   - "amlogic,p201" (Meson gxbb)
++  - "friendlyarm,nanopi-k2" (Meson gxbb)
+   - "hardkernel,odroid-c2" (Meson gxbb)
+   - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+   - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
 -- 
 2.12.0
