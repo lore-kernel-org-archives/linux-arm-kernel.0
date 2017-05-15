@@ -1,87 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 15 May 2017 09:50:34 +0200
-Subject: [PATCH 2/2] ARM: dts: add core I2C devices to the APQ8060 Dragonboard
-Message-ID: <20170515075034.3753-1-linus.walleij@linaro.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 15 May 2017 10:07:39 +0200
+Subject: [PATCH v2 01/18] dt-bindings: arm: amlogic: Reorder boards
+In-Reply-To: <20170513143337.14278-2-afaerber@suse.de>
+References: <20170513143337.14278-1-afaerber@suse.de>
+ <20170513143337.14278-2-afaerber@suse.de>
+Message-ID: <5fa88c96-f640-b439-5329-e3465ba41214@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The APQ8060 Dragonboard has an Atmel AT24c128 EEPROM and a
-Wolfson Micro WM8903 codec connected to its GSBI8 I2C bus.
-Add entries for these to the device tree. The interrupt line
-from the WM8903 chip is not routed anywhere on this design
-so it can not be used.
+On 05/13/2017 04:33 PM, Andreas F?rber wrote:
+> Enforce groupment by SoCs, and order alphabetically within the group
+> (with some exceptions). This should facilitate adding new boards.
+> 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v1 -> v2:
+>  * Rebased (new boards added)
+>  * Pointed out alphabetical order in the binding, too (Rob)
+>  
+>  Documentation/devicetree/bindings/arm/amlogic.txt | 20 +++++++++++++-------
+>  1 file changed, 13 insertions(+), 7 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+> index bfd5b558477d..cad5b5a48d92 100644
+> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
+> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+> @@ -29,26 +29,32 @@ Boards with the Amlogic Meson GXM S912 SoC shall have the following properties:
+>    Required root node property:
+>      compatible: "amlogic,s912", "amlogic,meson-gxm";
+>  
+> -Board compatible values:
+> +Board compatible values (alphabetically, grouped by SoC):
+> +
+>    - "geniatech,atv1200" (Meson6)
+> +
+>    - "minix,neo-x8" (Meson8)
+> -  - "tronfy,mxq" (Meson8b)
+> +
+>    - "hardkernel,odroid-c1" (Meson8b)
+> +  - "tronfy,mxq" (Meson8b)
+> +
+> +  - "amlogic,p200" (Meson gxbb)
+> +  - "amlogic,p201" (Meson gxbb)
+> +  - "hardkernel,odroid-c2" (Meson gxbb)
+> +  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+>    - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
+>    - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
+>    - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
+> -  - "hardkernel,odroid-c2" (Meson gxbb)
+> -  - "amlogic,p200" (Meson gxbb)
+> -  - "amlogic,p201" (Meson gxbb)
+>    - "wetek,hub" (Meson gxbb)
+>    - "wetek,play2" (Meson gxbb)
+> +
+>    - "amlogic,p212" (Meson gxl s905x)
+> +  - "hwacom,amazetv" (Meson gxl s905x)
+>    - "khadas,vim" (Meson gxl s905x)
+>  
+>    - "amlogic,p230" (Meson gxl s905d)
+>    - "amlogic,p231" (Meson gxl s905d)
+> -  - "hwacom,amazetv" (Meson gxl s905x)
+> +
+>    - "amlogic,q200" (Meson gxm s912)
+>    - "amlogic,q201" (Meson gxm s912)
+> -  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+>    - "nexbox,a1" (Meson gxm s912)
+> 
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 49 ++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+Like patch 2, S905X should go after S905D.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-index 2da1413f5720..32730c4742f6 100644
---- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-+++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-@@ -160,6 +160,19 @@
- 				};
- 			};
- 
-+			dragon_gsbi8_i2c_pins: gsbi8_i2c {
-+				mux {
-+					pins = "gpio64", "gpio65";
-+					function = "gsbi8";
-+				};
-+				pinconf {
-+					pins = "gpio64", "gpio65";
-+					drive-strength = <16>;
-+					/* These have external pull-up 2.2kOhm to 1.8V */
-+					bias-disable;
-+				};
-+			};
-+
- 			dragon_gsbi12_i2c_pins: gsbi12_i2c {
- 				mux {
- 					pins = "gpio115", "gpio116";
-@@ -368,6 +381,42 @@
- 			};
- 		};
- 
-+		gsbi at 19800000 {
-+			status = "ok";
-+			qcom,mode = <GSBI_PROT_I2C>;
-+
-+			i2c at 19880000 {
-+				status = "ok";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&dragon_gsbi8_i2c_pins>;
-+
-+				eeprom at 52 {
-+					/* A 16KiB Platform ID EEPROM on the CPU carrier board */
-+					compatible = "atmel,24c128";
-+					reg = <0x52>;
-+					vcc-supply = <&pm8058_s3>;
-+					pagesize = <64>;
-+				};
-+				wm8903: wm8903 at 1a {
-+					/* This Woolfson Micro device has an unrouted interrupt line */
-+					compatible = "wlf,wm8903";
-+					reg = <0x1a>;
-+
-+					AVDD-supply = <&pm8058_l16>;
-+					CPVDD-supply = <&pm8058_l16>;
-+					DBVDD-supply = <&pm8058_s3>;
-+					DCVDD-supply = <&pm8058_l0>;
-+
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+
-+					micdet-cfg = <0>;
-+					micdet-delay = <100>;
-+					gpio-cfg = <0xffffffff 0xffffffff 0 0xffffffff 0xffffffff>;
-+				};
-+			};
-+		};
-+
- 		gsbi at 19c00000 {
- 			status = "ok";
- 			qcom,mode = <GSBI_PROT_I2C_UART>;
--- 
-2.9.3
+Neil
