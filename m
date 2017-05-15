@@ -1,93 +1,50 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 15 May 2017 17:35:02 +0800
-Subject: [linux-sunxi] Re: [PATCH v7 05/13] drm/sun4i: abstract a engine
- type
-In-Reply-To: <20170515092001.ik7qrqmg5pgtp2ct@flea.home>
-References: <20170514163045.40366-1-icenowy@aosc.io>
- <20170514163045.40366-6-icenowy@aosc.io>
- <20170515092001.ik7qrqmg5pgtp2ct@flea.home>
-Message-ID: <4F7E36DB-B5F9-4DDE-A80D-0C1A75F0A882@aosc.io>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Mon, 15 May 2017 17:37:43 +0800
+Subject: [PATCH 1/3] arm64: dts: hi3660: add pcie node
+In-Reply-To: <CAFGCpxwmuEKdc6FF=OmQz8tEipbcO+PjkwmywXLtY5=UxSeKvg@mail.gmail.com>
+References: <20170515062745.70082-1-songxiaowei@hisilicon.com>
+ <201705151738.ls8RIrFp%fengguang.wu@intel.com>
+ <CAFGCpxwmuEKdc6FF=OmQz8tEipbcO+PjkwmywXLtY5=UxSeKvg@mail.gmail.com>
+Message-ID: <CAFGCpxwiBky85WPiusic_UOtMq2VtaG2XC0VG2Hrgz7jtBScUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This PCIe node has dependencies on &crg_ctrl and &gpio11. However,
+both of them are not appearing in mainline kernel tree yet. Sorry
+about that. But I do have a plan to send all dts related changes to
+maillist within this week, no later than this Wed (17/May). Would it
+be possible you maintainers review this patch in parallel?
 
++Device tree maintainers.
 
-? 2017?5?15? GMT+08:00 ??5:20:01, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
->On Mon, May 15, 2017 at 12:30:37AM +0800, Icenowy Zheng wrote:
->> As we are going to add support for the Allwinner DE2 engine in
->sun4i-drm
->> driver, we will finally have two types of display engines -- the DE1
->> backend and the DE2 mixer. They both do some display blending and
->feed
->> graphics data to TCON, and is part of the "Display Engine" called by
->> Allwinner, so I choose to call them both "engine" here.
->> 
->> Abstract the engine type to a new struct with an ops struct, which
->contains
->> functions that should be called outside the engine-specified code (in
->> TCON, CRTC or TV Encoder code).
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+-Guodong
+
+>
+> On Mon, May 15, 2017 at 5:18 PM, kbuild test robot <lkp@intel.com> wrote:
+>>
+>> Hi Song,
+>>
+>> [auto build test ERROR on pci/next]
+>> [also build test ERROR on v4.12-rc1 next-20170515]
+>> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+>>
+>> url:    https://github.com/0day-ci/linux/commits/Song-Xiaowei/arm64-dts-hi3660-add-pcie-node/20170515-144035
+>> base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
+>> config: arm64-defconfig (attached as .config)
+>> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+>> reproduce:
+>>         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>>         chmod +x ~/bin/make.cross
+>>         # save the attached .config to linux build tree
+>>         make.cross ARCH=arm64
+>>
+>> All errors (new ones prefixed by >>):
+>>
+>> >> Error: arch/arm64/boot/dts/hisilicon/hi3660.dtsi:180.24-25 syntax error
+>>    FATAL ERROR: Unable to parse input tree
+>>
 >> ---
->> Changes in v7:
->> - Mention "Display Engine" for the name "engine".
->> - Fixed some small issues found by Chen-Yu and added his ACK.
->> Changes in v6:
->> - Rebased on wens's multi-pipeline patchset.
->> - Split out Makefile changes.
+>> 0-DAY kernel test infrastructure                Open Source Technology Center
+>> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 >
->You also added a get_id callback here...
 >
->> +static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
->> +	.commit				= sun4i_backend_commit,
->> +	.layers_init			= sun4i_layers_init,
->> +	.apply_color_correction		= sun4i_backend_apply_color_correction,
->> +	.disable_color_correction	= sun4i_backend_disable_color_correction,
->> +};
->> +
->
->... that you don't populate ...
->
->> @@ -477,7 +481,7 @@ static int sun4i_tcon_bind(struct device *dev,
->struct device *master,
->>  	dev_set_drvdata(dev, tcon);
->>  	tcon->drm = drm;
->>  	tcon->dev = dev;
->> -	tcon->id = backend->id;
->> +	tcon->id = sunxi_engine_get_id(engine);
->
->... that you call to fill the TCON ID ...
->
->> +/**
->> + * sunxi_engine_get_id - Get the ID of the engine.
->> + * @engine:	pointer to the engine
->> + *
->> + * If the ID is not necessary, just do not implement it in
->sunxi_engine_ops,
->> + * and a default -1 will be returned.
->> + */
->> +static inline int
->> +sunxi_engine_get_id(struct sunxi_engine *engine)
->> +{
->> +	if (engine->ops && engine->ops->get_id)
->> +		return engine->ops->get_id(engine);
->> +
->> +	return -1;
->
->... and will return -1 if not populated, which essentially means that
->instead of having 0 or 1, we're now having -1 as our id.
->
->This is a regression, and I'm even wondering if we can't just store
->the ID in the sunxi_engine structure. Is anything preventing us to do
->that, instead of using a callback?
-
-Some engines (de2 mixer) doesn't use the ID. But 0 is a valid ID here.
-
-If we just store it in sunxi_engine, it should be assigned -1 for de2 mixer.
-Is this applicable?
-
-If it's okay I will do so.
-
->
->Maxime
