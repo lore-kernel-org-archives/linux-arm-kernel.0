@@ -1,98 +1,126 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 15 May 2017 08:27:54 -0700
-Subject: [PATCH] devicetree: Move include prefixes from arch to separate
- directory
-In-Reply-To: <CAL_JsqJzoe_xNxMOZ88+k+bZ+bSK6-j30HXk0ZsFxHUqVDzwzw@mail.gmail.com>
-References: <CAL_JsqKLxA8K8378z4nDBkDWnwM_zBbbf9D7EPtwQ1782dydTw@mail.gmail.com>
- <20170515142641.GU22219@n2100.armlinux.org.uk>
- <CAL_JsqJzoe_xNxMOZ88+k+bZ+bSK6-j30HXk0ZsFxHUqVDzwzw@mail.gmail.com>
-Message-ID: <CAOesGMgYDq5Sdk6OaK-mTyfdNGwcbgOVeKbeMSCOmwqd9k8TGQ@mail.gmail.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Mon, 15 May 2017 18:35:24 +0300
+Subject: [RFC v1 0/3] Introduce on-chip interconnect API
+Message-ID: <20170515153527.27649-1-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 7:47 AM, Rob Herring <robh+dt@kernel.org> wrote:
-> On Mon, May 15, 2017 at 9:26 AM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
->> On Mon, May 15, 2017 at 08:01:07AM -0500, Rob Herring wrote:
->>> I'd prefer not to mix things in scripts/dtc that aren't the import of
->>> dtc (yes, we do have a few other things already, but they are at least
->>> scripts). Couldn't this go in include/dt-bindings/ instead?
->>
->> I don't think that works.
->>
->> The include path used is "include", which means that we force people
->> to use:
->>
->> #include <dt-bindings/foo.dtsi>
->
-> No, I was thinking you'd add include/dt-bindings/include-prefix/ to
-> the include path instead of scripts/dtc/include-prefix/. The only
-> downside I can see is people could mistakenly do:
->
-> #include <dt-bindings/include-prefix/$arch/foo.dtsi>
+Modern SoCs have multiple processors and various dedicated cores (video, gpu,
+graphics, modem). These cores are talking to each other and can generate a lot
+of data flowing through the on-chip interconnects. These interconnect buses
+could form different topologies such as crossbar, point to point buses,
+hierarchical buses or use the network-on-chip concept.
 
-I considered that but thought it was a worse solution than the one I
-ended up with. It's just confusing to have -I paths that enter an
-include hierarchy at different levels like that.
+These buses have been sized usually to handle use cases with high data
+throughput but it is not necessary all the time and consume a lot of power.
+Furthermore, the priority between masters can vary depending on the running
+use case like video playback or cpu intensive tasks.
 
-Just see what already happened with the mistake on rockchip, where
-Heiko accidentally included <include/dt-include/...> instead -- it'd
-be nice to catch that when it happens through tools
+Having an API to control the requirement of the system in term of bandwidth
+and QoS, so we can adapt the interconnect configuration to match those by
+scaling the frequencies, setting link priority and tuning QoS parameters.
+This configuration can be a static, one-time operation done at boot for some
+platforms or a dynamic set of operations that happen at run-time.
 
->>
->> in their DT files.  This means that we'd need to populate $topdir/include
->> with per-architecture symlinks on top of the 26 or so directories already
->> there, so that:
->>
->> #include <arch/foo.dtsi>
->>
->> would work.  That's quite horrible, since $topdir/include is the main
->> include path for C headers.
->>
->> I guess we could have symlinks inside include/dt-bindings, but that
->> makes the includes:
->>
->> #include <dt-bindings/arch/foo.dtsi>
->>
->> but that's rather absurd because these _aren't_ dt-binding definitions.
->
-> True, but the same can be said that "scripts/dtc" is not includes nor
-> kernel build infrastructure.
->
->> Maybe what we should do is:
->>
->> mkdir include/dt
->> git mv include/dt-bindings include/dt
->> for arch in arch/*; do
->>   dts=$arch/boot/dts
->>   if [ -d $dts ]; then
->>      a=include/dt/$(basename $arch)
->>      ln -s $dts $a
->>      git add $a
->>   fi
->> done
->> ... fixup scripts/Makefile.lib ...
->> git commit
->
-> That would just break every existing include in dts files.
+This patchset introduce a new API to get the requirement and configure the
+interconnect buses across the entire chipset to fit with the current demand.
+The API is NOT for changing the performance of the endpoint devices, but only
+the interconnect path in between them.
 
-It doesn't break dts includes if done together with a change in -I,
-but it might break includes from the driver side (or needs another -I
-there).
+The API is using a consumer/provider-based model, where the providers are
+the interconnect controllers and the consumers could be various drivers.
+The consumers request interconnect resources (path) to an endpoint and set
+the desired constraints on this data flow path. The provider(s) receive
+requests from consumers and aggregate these requests for all master-slave
+pairs on that path. Then the providers configure each participating in the
+topology node according to the requested data flow path, physical links and
+constraints. The topology could be complicated and multi-tiered and is SoC
+specific.
 
->
-> Another idea. Could kbuild create all the symlinks at build time instead?
+Below is a simplified diagram of a real-world SoC topology. The interconnect
+providers are the memory front-end and the NoCs.
 
-I considered that, but given that we're talking about a few soft links
-that we need to find a good home for, it seemed like overkill that
-adds magic to the build process. Having somehting that is easily
-discovered when looking around the source tree is a lot better.
++----------------+    +----------------+
+| HW Accelerator |--->|      M NoC     |<---------------+
++----------------+    +----------------+                |
+                        |      |                    +------------+
+          +-------------+      V       +------+     |            |
+          |                +--------+  | PCIe |     |            |
+          |                | Slaves |  +------+     |            |
+          |                +--------+     |         |   C NoC    |
+          V                               V         |            |
++------------------+   +------------------------+   |            |   +-----+
+|                  |-->|                        |-->|            |-->| CPU |
+|                  |-->|                        |<--|            |   +-----+
+|      Memory      |   |         S NoC          |   +------------+
+|                  |<--|                        |---------+    |
+|                  |<--|                        |<------+ |    |   +--------+
++------------------+   +------------------------+       | |    +-->| Slaves |
+   ^     ^    ^           ^                             | |        +--------+
+   |     |    |           |                             | V
++-----+  |  +-----+    +-----+  +---------+   +----------------+   +--------+
+| CPU |  |  | GPU |    | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
++-----+  |  +-----+    +-----+  +---------+   +----------------+   +--------+
+         |
+     +-------+
+     | Modem |
+     +-------+
 
-I looked around the tree for suitable homes for this directory of
-links, and the least out-of-place I could find was under scripts/dtc.
-You even have a script for uprevving the imported dtc sources, so it's
-not like it's causing any problems from that point of view. But I do
-agree that it's not ideal -- it was just the least bad option I could
-find at the time. Better suggestions are welcome.
+This RFC does not implement all features but only main skeleton to check the
+validity of the proposal.
 
--Olof
+TODO:
+ * Constraints are currently stored in internal data structure. Should PM QoS
+ be used instead?
+ * Currently the interconnect_set() use one bandwidth integer value as parameter
+ but this might be extended to support a list of parameters and other QoS values.
+ * Cache the path between the nodes instead of walking the graph on each get().
+ * Sync interconnect requests with the idle state of the device.
+
+Summary of the patches:
+Patch 1 introduces the interconnect API.
+Patch 2 creates the first vendor specific interconnect controller driver.
+Patch 3 is a proposal for DT bindings
+
+Changes since RFC v0 (https://lkml.org/lkml/2017/3/1/599)
+* Removed DT support and added optional Patch 3 with new bindings proposal.
+* Converted the topology into internal driver data.
+* Made the framework modular.
+* interconnect_get() now takes (src and dst ports as arguments).
+* Removed public declarations of some structs.
+* Now passing prev/next nodes to the vendor driver.
+* Properly remove requests on _put().
+* Added refcounting.
+* Updated documentation.
+* Changed struct interconnect_path to use array instead of linked list.
+
+Georgi Djakov (3):
+  interconnect: Add generic interconnect controller API
+  interconnect: Add Qualcomm msm8916 interconnect provider driver
+  dt-binding: Interconnect device-tree bindings draft
+
+ .../bindings/interconnect/interconnect.txt         |  75 ++++
+ Documentation/interconnect/interconnect.txt        |  65 ++++
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/interconnect/Kconfig                       |  15 +
+ drivers/interconnect/Makefile                      |   2 +
+ drivers/interconnect/interconnect.c                | 317 +++++++++++++++++
+ drivers/interconnect/qcom/Kconfig                  |  12 +
+ drivers/interconnect/qcom/Makefile                 |   2 +
+ drivers/interconnect/qcom/interconnect_msm8916.c   | 394 +++++++++++++++++++++
+ include/dt-bindings/interconnect/qcom,msm8916.h    |  87 +++++
+ include/linux/interconnect-consumer.h              |  84 +++++
+ include/linux/interconnect-provider.h              | 110 ++++++
+ 13 files changed, 1166 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
+ create mode 100644 Documentation/interconnect/interconnect.txt
+ create mode 100644 drivers/interconnect/Kconfig
+ create mode 100644 drivers/interconnect/Makefile
+ create mode 100644 drivers/interconnect/interconnect.c
+ create mode 100644 drivers/interconnect/qcom/Kconfig
+ create mode 100644 drivers/interconnect/qcom/Makefile
+ create mode 100644 drivers/interconnect/qcom/interconnect_msm8916.c
+ create mode 100644 include/dt-bindings/interconnect/qcom,msm8916.h
+ create mode 100644 include/linux/interconnect-consumer.h
+ create mode 100644 include/linux/interconnect-provider.h
