@@ -1,10 +1,10 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 15 May 2017 10:17:20 +0200
-Subject: [PATCH v2 10/18] arm64: dts: meson-gxbb: Fix node order
-In-Reply-To: <20170513143337.14278-11-afaerber@suse.de>
+Date: Mon, 15 May 2017 10:17:12 +0200
+Subject: [PATCH v2 11/18] arm64: dts: meson-gxbb-odroidc2: Fix node order
+In-Reply-To: <20170513143337.14278-12-afaerber@suse.de>
 References: <20170513143337.14278-1-afaerber@suse.de>
- <20170513143337.14278-11-afaerber@suse.de>
-Message-ID: <9c51a1dd-8d70-31f8-6fd7-f33861763e2d@baylibre.com>
+ <20170513143337.14278-12-afaerber@suse.de>
+Message-ID: <995e63a7-f429-a335-7e9b-4994ae849505@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,210 +16,153 @@ On 05/13/2017 04:33 PM, Andreas F?rber wrote:
 >  v1 -> v2:
 >  * Rebased (new nodes added)
 >  
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 171 +++++++++++++++-------------
->  1 file changed, 91 insertions(+), 80 deletions(-)
+>  .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 108 ++++++++++-----------
+>  1 file changed, 54 insertions(+), 54 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> index 4afe1c46ec11..92dd5d1d73c8 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> @@ -97,13 +97,6 @@
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> index 54a9c6a6b392..d147c853ab05 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> @@ -137,16 +137,6 @@
 >  	};
 >  };
 >  
-> -&ethmac {
-> -	clocks = <&clkc CLKID_ETH>,
-> -		 <&clkc CLKID_FCLK_DIV2>,
-> -		 <&clkc CLKID_MPLL2>;
-> -	clock-names = "stmmaceth", "clkin0", "clkin1";
+> -&scpi_clocks {
+> -	status = "disabled";
 > -};
 > -
->  &aobus {
->  	pinctrl_aobus: pinctrl at 14 {
->  		compatible = "amlogic,meson-gxbb-aobus-pinctrl";
-> @@ -252,6 +245,97 @@
+> -&uart_AO {
+> -	status = "okay";
+> -	pinctrl-0 = <&uart_ao_a_pins>;
+> -	pinctrl-names = "default";
+> -};
+> -
+>  &ethmac {
+>  	status = "okay";
+>  	pinctrl-0 = <&eth_rgmii_pins>;
+> @@ -172,6 +162,33 @@
 >  	};
 >  };
 >  
-> +&apb {
-> +	mali: gpu at c0000 {
-> +		compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
-> +		reg = <0x0 0xc0000 0x0 0x40000>;
-> +		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-names = "gp", "gpmmu", "pp", "pmu",
-> +			"pp0", "ppmmu0", "pp1", "ppmmu1",
-> +			"pp2", "ppmmu2";
-> +		clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_MALI>;
-> +		clock-names = "bus", "core";
-> +
-> +		/*
-> +		 * Mali clocking is provided by two identical clock paths
-> +		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
-> +		 * free mux to safely change frequency while running.
-> +		 */
-> +		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
-> +				  <&clkc CLKID_MALI_0>,
-> +				  <&clkc CLKID_MALI>; /* Glitch free mux */
-> +		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
-> +					 <0>, /* Do Nothing */
-> +					 <&clkc CLKID_MALI_0>;
-> +		assigned-clock-rates = <0>, /* Do Nothing */
-> +				       <666666666>,
-> +				       <0>; /* Do Nothing */
-> +	};
-> +};
-> +
-> +&cbus {
-> +	spifc: spi at 8c80 {
-> +		compatible = "amlogic,meson-gxbb-spifc";
-> +		reg = <0x0 0x08c80 0x0 0x80>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		clocks = <&clkc CLKID_SPI>;
-> +		status = "disabled";
-> +	};
-> +};
-> +
-> +&ethmac {
-> +	clocks = <&clkc CLKID_ETH>,
-> +		 <&clkc CLKID_FCLK_DIV2>,
-> +		 <&clkc CLKID_MPLL2>;
-> +	clock-names = "stmmaceth", "clkin0", "clkin1";
-> +};
-> +
-> +&hdmi_tx {
-> +	compatible = "amlogic,meson-gxbb-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
-> +	resets = <&reset RESET_HDMITX_CAPB3>,
-> +		 <&reset RESET_HDMI_SYSTEM_RESET>,
-> +		 <&reset RESET_HDMI_TX>;
-> +	reset-names = "hdmitx_apb", "hdmitx", "hdmitx_phy";
-> +	clocks = <&clkc CLKID_HDMI_PCLK>,
-> +		 <&clkc CLKID_CLK81>,
-> +		 <&clkc CLKID_GCLK_VENCI_INT0>;
-> +	clock-names = "isfr", "iahb", "venci";
-> +};
-> +
-> +&hiubus {
-> +	clkc: clock-controller at 0 {
-> +		compatible = "amlogic,gxbb-clkc";
-> +		#clock-cells = <1>;
-> +		reg = <0x0 0x0 0x0 0x3db>;
+> +&gpio_ao {
+> +	/*
+> +	 * WARNING: The USB Hub on the Odroid-C2 needs a reset signal
+> +	 * to be turned high in order to be detected by the USB Controller
+> +	 * This signal should be handled by a USB specific power sequence
+> +	 * in order to reset the Hub when USB bus is powered down.
+> +	 */
+> +	usb-hub {
+> +		gpio-hog;
+> +		gpios = <GPIOAO_4 GPIO_ACTIVE_HIGH>;
+> +		output-high;
+> +		line-name = "usb-hub-reset";
 > +	};
 > +};
 > +
 > +&i2c_A {
-> +	clocks = <&clkc CLKID_I2C>;
+> +	status = "okay";
+> +	pinctrl-0 = <&i2c_a_pins>;
+> +	pinctrl-names = "default";
 > +};
 > +
-> +&i2c_AO {
-> +	clocks = <&clkc CLKID_AO_I2C>;
+> +&ir {
+> +	status = "okay";
+> +	pinctrl-0 = <&remote_input_ao_pins>;
+> +	pinctrl-names = "default";
 > +};
 > +
-> +&i2c_B {
-> +	clocks = <&clkc CLKID_I2C>;
-> +};
-> +
-> +&i2c_C {
-> +	clocks = <&clkc CLKID_I2C>;
-> +};
-> +
->  &periphs {
->  	pinctrl_periphs: pinctrl at 4b0 {
->  		compatible = "amlogic,meson-gxbb-periphs-pinctrl";
-> @@ -521,67 +605,6 @@
->  	};
+>  &pinctrl_aobus {
+>  	gpio-line-names = "UART TX", "UART RX", "VCCK En", "TF 3V3/1V8 En",
+>  			  "USB HUB nRESET", "USB OTG Power En",
+> @@ -223,55 +240,15 @@
+>  			  "";
 >  };
 >  
-> -&hiubus {
-> -	clkc: clock-controller at 0 {
-> -		compatible = "amlogic,gxbb-clkc";
-> -		#clock-cells = <1>;
-> -		reg = <0x0 0x0 0x0 0x3db>;
-> -	};
-> -};
-> -
-> -&apb {
-> -	mali: gpu at c0000 {
-> -		compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
-> -		reg = <0x0 0xc0000 0x0 0x40000>;
-> -		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-> -		interrupt-names = "gp", "gpmmu", "pp", "pmu",
-> -			"pp0", "ppmmu0", "pp1", "ppmmu1",
-> -			"pp2", "ppmmu2";
-> -		clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_MALI>;
-> -		clock-names = "bus", "core";
-> -
-> -		/*
-> -		 * Mali clocking is provided by two identical clock paths
-> -		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
-> -		 * free mux to safely change frequency while running.
-> -		 */
-> -		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
-> -				  <&clkc CLKID_MALI_0>,
-> -				  <&clkc CLKID_MALI>; /* Glitch free mux */
-> -		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
-> -					 <0>, /* Do Nothing */
-> -					 <&clkc CLKID_MALI_0>;
-> -		assigned-clock-rates = <0>, /* Do Nothing */
-> -				       <666666666>,
-> -				       <0>; /* Do Nothing */
-> -	};
+> -&ir {
+> -	status = "okay";
+> -	pinctrl-0 = <&remote_input_ao_pins>;
+> -	pinctrl-names = "default";
 > -};
 > -
 > -&i2c_A {
-> -	clocks = <&clkc CLKID_I2C>;
+> -	status = "okay";
+> -	pinctrl-0 = <&i2c_a_pins>;
+> -	pinctrl-names = "default";
 > -};
 > -
-> -&i2c_AO {
-> -	clocks = <&clkc CLKID_AO_I2C>;
+> -&gpio_ao {
+> -	/*
+> -	 * WARNING: The USB Hub on the Odroid-C2 needs a reset signal
+> -	 * to be turned high in order to be detected by the USB Controller
+> -	 * This signal should be handled by a USB specific power sequence
+> -	 * in order to reset the Hub when USB bus is powered down.
+> -	 */
+> -	usb-hub {
+> -		gpio-hog;
+> -		gpios = <GPIOAO_4 GPIO_ACTIVE_HIGH>;
+> -		output-high;
+> -		line-name = "usb-hub-reset";
+> -	};
 > -};
 > -
-> -&i2c_B {
-> -	clocks = <&clkc CLKID_I2C>;
+> -&usb0_phy {
+> -	status = "okay";
+> -	phy-supply = <&usb_otg_pwr>;
 > -};
 > -
-> -&i2c_C {
-> -	clocks = <&clkc CLKID_I2C>;
+> -&usb1_phy {
+> -	status = "okay";
+> -};
+> -
+> -&usb0 {
+> -	status = "okay";
+> -};
+> -
+> -&usb1 {
+> -	status = "okay";
 > -};
 > -
 >  &saradc {
->  	compatible = "amlogic,meson-gxbb-saradc", "amlogic,meson-saradc";
->  	clocks = <&xtal>,
-> @@ -620,15 +643,3 @@
->  &vpu {
->  	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
+>  	status = "okay";
+>  	vref-supply = <&vcc1v8>;
 >  };
-> -
-> -&hdmi_tx {
-> -	compatible = "amlogic,meson-gxbb-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
-> -	resets = <&reset RESET_HDMITX_CAPB3>,
-> -		 <&reset RESET_HDMI_SYSTEM_RESET>,
-> -		 <&reset RESET_HDMI_TX>;
-> -	reset-names = "hdmitx_apb", "hdmitx", "hdmitx_phy";
-> -	clocks = <&clkc CLKID_HDMI_PCLK>,
-> -		 <&clkc CLKID_CLK81>,
-> -		 <&clkc CLKID_GCLK_VENCI_INT0>;
-> -	clock-names = "isfr", "iahb", "venci";
-> -};
+>  
+> +&scpi_clocks {
+> +	status = "disabled";
+> +};
+> +
+>  /* SD */
+>  &sd_emmc_b {
+>  	status = "okay";
+> @@ -309,3 +286,26 @@
+>  	vmmc-supply = <&vcc3v3>;
+>  	vqmmc-supply = <&vcc1v8>;
+>  };
+> +
+> +&uart_AO {
+> +	status = "okay";
+> +	pinctrl-0 = <&uart_ao_a_pins>;
+> +	pinctrl-names = "default";
+> +};
+> +
+> +&usb0_phy {
+> +	status = "okay";
+> +	phy-supply = <&usb_otg_pwr>;
+> +};
+> +
+> +&usb1_phy {
+> +	status = "okay";
+> +};
+> +
+> +&usb0 {
+> +	status = "okay";
+> +};
+> +
+> +&usb1 {
+> +	status = "okay";
+> +};
 > 
+
 Hi Andreas,
 
 Like a previous attempt, I'm not OK with such rework since it will break bisect and add complexity for new patches handling.
