@@ -1,46 +1,47 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 15 May 2017 14:48:26 +0800
-Subject: [PATCH 2/2] pinctrl: pinctrl-imx: do not assume mux 0 is gpio
-In-Reply-To: <1494830906-6442-1-git-send-email-aisheng.dong@nxp.com>
-References: <1494830906-6442-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1494830906-6442-3-git-send-email-aisheng.dong@nxp.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 15 May 2017 08:57:44 +0200
+Subject: [PATCH/RFT renesas-devel] arm64: dts: ulcb: Set drive-strength
+ for ravb pins
+In-Reply-To: <CAMuHMdWeLAq7nZ7zu2xJ7vG-oM+-TSZm0eY68Cm-9eUREMjhXg@mail.gmail.com>
+References: <1493721024-15042-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWeLAq7nZ7zu2xJ7vG-oM+-TSZm0eY68Cm-9eUREMjhXg@mail.gmail.com>
+Message-ID: <20170515065743.GG16545@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not assume MUX 0 is GPIO function in core driver as a different
-SoC may have different value. e.g. MX7ULP Mux 1 is GPIO.
+On Fri, May 12, 2017 at 04:39:03PM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Tue, May 2, 2017 at 12:30 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > The EthernetAVB should not depend on the bootloader to setup correct
+> > drive-strength values.  Values for drive-strength where found by
+> > examining the registers after the bootloader has configured the
+> > registers and successfully used the EthernetAVB.
+> >
+> > Based on:
+> > * commit 7d73a4da2681 ("arm64: dts: r8a7795: salvator-x: Set drive-strength
+> >   for ravb pins")
+> > * commit 4903987033be ("arm64: dts: r8a7796: salvator-x: Set drive-strength
+> >   for ravb pins")
+> >
+> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Cc: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> > * Compile tested only due to lack of hardware access
+> 
+> So how did you examine the registers? ;-)
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Fugang Duan <fugang.duan@nxp.com>
-Cc: Bai Ping <ping.bai@nxp.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/pinctrl/freescale/pinctrl-imx.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+You got me there: copy-paste gone wrong.
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
-index 0d6aaca..ed8ea32 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-@@ -281,7 +281,7 @@ static int imx_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
- 			continue;
- 		for (pin = 0; pin < grp->num_pins; pin++) {
- 			imx_pin = &((struct imx_pin *)(grp->data))[pin];
--			if (imx_pin->pin == offset && !imx_pin->mux_mode)
-+			if (imx_pin->pin == offset)
- 				goto mux_pin;
- 		}
- 	}
-@@ -292,6 +292,7 @@ static int imx_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
- 	reg = readl(ipctl->base + pin_reg->mux_reg);
- 	reg &= ~info->mux_mask;
- 	reg |= imx_pin->config;
-+	reg |= imx_pin->mux_mode << info->mux_shift;
- 	writel(reg, ipctl->base + pin_reg->mux_reg);
- 
- 	return 0;
--- 
-2.7.4
+> Hence I examined the registers myself:
+>   - H3ULCB has the same register settings as Salvator-X with H3 ES1.0
+>   - M3ULCB has the same register settings as Salvator-X with M3-W ES1.0
+>     or H3 ES2.0.
+
+That was my assumption, which is what I should have written.
+But as you have checked - thanks for that - I will leave the changelog
+as-is and queue up the patch.
