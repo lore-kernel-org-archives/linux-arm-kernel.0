@@ -1,31 +1,96 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 May 2017 14:48:58 +0100
-Subject: [PATCH] arm64: Remove redundant mov from LL/SC cmpxchg
-In-Reply-To: <f197f5369dfa1fe2a220da0950e5f5475382a920.1494593043.git.robin.murphy@arm.com>
-References: <f197f5369dfa1fe2a220da0950e5f5475382a920.1494593043.git.robin.murphy@arm.com>
-Message-ID: <20170515134858.GA11941@e104818-lin.cambridge.arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 15 May 2017 14:57:15 +0100
+Subject: [RFC PATCH 07/30] iommu/arm-smmu-v3: Add second level of context
+ descriptor table
+In-Reply-To: <ef690c27-95cc-c15d-7e70-7e89de7bc08a@semihalf.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-8-jean-philippe.brucker@arm.com>
+ <ef690c27-95cc-c15d-7e70-7e89de7bc08a@semihalf.com>
+Message-ID: <7ba38e5b-cbce-f468-42fc-2949e1a06176@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 01:48:41PM +0100, Robin Murphy wrote:
-> The cmpxchg implementation introduced by commit c342f78217e8 ("arm64:
-> cmpxchg: patch in lse instructions when supported by the CPU") performs
-> an apparently redundant register move of [old] to [oldval] in the
-> success case - it always uses the same register width as [oldval] was
-> originally loaded with, and is only executed when [old] and [oldval] are
-> known to be equal anyway.
+On 15/05/17 13:47, Tomasz Nowicki wrote:
+> Hi Jean,
 > 
-> The only effect it seemingly does have is to take up a surprising amount
-> of space in the kernel text, as removing it reveals:
+> On 27.02.2017 20:54, Jean-Philippe Brucker wrote:
+>> @@ -1213,17 +1356,59 @@ static void arm_smmu_free_cd_tables(struct
+>> arm_smmu_master_data *master)
+>>  __maybe_unused
+>>  static int arm_smmu_alloc_cd(struct arm_smmu_master_data *master)
+>>  {
+>> +    int ssid;
+>> +    int i, ret;
+>>      struct arm_smmu_cd_cfg *cfg = &master->ste.cd_cfg;
+>>
+>> -    return arm_smmu_bitmap_alloc(cfg->context_map,
+>> ilog2(cfg->num_entries));
+>> +    if (cfg->linear)
+>> +        return arm_smmu_bitmap_alloc(cfg->table.context_map,
+>> +                         ilog2(cfg->num_entries));
+>> +
+>> +    /* Find first leaf table with an empty slot, or allocate a new leaf */
+>> +    for (i = cfg->l1.cur_table; i < cfg->num_entries; i++) {
+>> +        struct arm_smmu_cd_table *table = &cfg->l1.tables[i];
+>> +
+>> +        if (!table->cdptr) {
+>> +            __le64 *l1ptr = cfg->l1.ptr + i * CTXDESC_L1_DESC_DWORD;
+>> +
+>> +            ret = arm_smmu_alloc_cd_leaf_table(master->smmu, table,
+>> +                               CTXDESC_NUM_L2_ENTRIES);
+>> +            if (ret)
+>> +                return ret;
+>> +
+>> +            arm_smmu_write_cd_l1_desc(l1ptr, table);
+>> +            arm_smmu_sync_cd(master, i << CTXDESC_SPLIT, false);
+>> +        }
+>> +
+>> +        ssid = arm_smmu_bitmap_alloc(table->context_map, CTXDESC_SPLIT);
+>> +        if (ssid < 0)
+>> +            continue;
+>> +
+>> +        cfg->l1.cur_table = i;
+>> +        return i << CTXDESC_SPLIT | ssid;
+>> +    }
+>> +
+>> +    return -ENOSPC;
+>>  }
+>>
+>>  __maybe_unused
+>>  static void arm_smmu_free_cd(struct arm_smmu_master_data *master, u32
+>> ssid)
+>>  {
+>> +    unsigned long l1_idx, idx;
+>>      struct arm_smmu_cd_cfg *cfg = &master->ste.cd_cfg;
+>>
+>> -    arm_smmu_bitmap_free(cfg->context_map, ssid);
+>> +    if (cfg->linear) {
+>> +        arm_smmu_bitmap_free(cfg->table.context_map, ssid);
+>> +        return;
+>> +    }
+>> +
+>> +    l1_idx = ssid >> CTXDESC_SPLIT;
+>> +    idx = ssid & ((1 << CTXDESC_SPLIT) - 1);
+>> +    arm_smmu_bitmap_free(cfg->l1.tables[l1_idx].context_map, idx);
+>> +
+>> +    /* Prepare next allocation */
+>> +    if (cfg->l1.cur_table > idx)
+>> +        cfg->l1.cur_table = idx;
+>>  }
 > 
->    text	   data	    bss	    dec	    hex	filename
-> 12426658	1348614	4499749	18275021	116dacd	vmlinux.o.new
-> 12429238	1348614	4499749	18277601	116e4e1	vmlinux.o.old
-> 
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> I am not sure what is the logic here. idx becomes index of l1.tables in
+> arm_smmu_alloc_cd() which in turn may be out of allocated memory. I may
+> miss something. Can you please elaborate on this?
 
-Queued for 4.12. Thanks.
+The code is wrong, this should be:
 
--- 
-Catalin
++    if (cfg->l1.cur_table > l1_idx)
++        cfg->l1.cur_table = l1_idx;
+
+Which tells alloc_cd() that there is a free slot in table l1_idx. It would
+also look better with a min(). However this allocator will be replaced by
+a global (IDR) allocator in next version, as requested by other users of
+the IOMMU API.
+
+Thanks,
+Jean
