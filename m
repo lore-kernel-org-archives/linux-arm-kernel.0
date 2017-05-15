@@ -1,113 +1,212 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 15 May 2017 15:56:57 -0500
-Subject: [PATCH v3 9/9] arm: dts: mt7623: add dts file for Bananapi R2
- (BPI-R2) board
-In-Reply-To: <0beebd0e209b4caeb349a062be7ef245d0689fb6.1494574682.git.sean.wang@mediatek.com>
-References: <cover.1494574682.git.sean.wang@mediatek.com>
- <0beebd0e209b4caeb349a062be7ef245d0689fb6.1494574682.git.sean.wang@mediatek.com>
-Message-ID: <20170515205657.5dpt3smakpvwzgp4@rob-hp-laptop>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Mon, 15 May 2017 15:27:50 -0600
+Subject: [PATCH V16 01/11] acpi: apei: read ack upon ghes record consumption
+In-Reply-To: <1494883680-25551-1-git-send-email-tbaicar@codeaurora.org>
+References: <1494883680-25551-1-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1494883680-25551-2-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 03:56:46PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Add support for the Bananapi R2 (BPI-R2) development board from
-> BIPAI KEJI. Detailed hardware information for BPI-R2 which could be
-> found on http://www.banana-pi.org/r2.html
-> 
-> The patch currently only adds Mediatek GMAC, MT7530 Switch, the crypto
-> engine, USB, IR, I2S, I2C, UART, SPI, PWM, GPIO keys, GPIO LEDs and
-> PMIC LEDs. As to the other missing hardware and peripherals, they would
-> be added and integrated continuously.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/arm/mediatek.txt |   2 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      | 478 +++++++++++++++++++++
->  3 files changed, 481 insertions(+)
->  create mode 100644 arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-> index 412c6bd..7b289bd 100644
-> --- a/Documentation/devicetree/bindings/arm/mediatek.txt
-> +++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-> @@ -42,6 +42,8 @@ Supported boards:
->  - Reference  board for MT7623n with NAND:
->      Required root node properties:
->        - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
-> +- Bananapi BPI-R2 board:
-> +      - compatible = "bananapi,bpi-r2", "mediatek,mt7623";
->  - MTK mt8127 tablet moose EVB:
->      Required root node properties:
->        - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 20a7c9d..34eb03f 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -1035,6 +1035,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
->  	mt6589-aquaris5.dtb \
->  	mt6592-evb.dtb \
->  	mt7623n-rfb-nand.dtb \
-> +	mt7623n-bananapi-bpi-r2.dtb \
->  	mt8127-moose.dtb \
->  	mt8135-evbp1.dtb
->  dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
-> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> new file mode 100644
-> index 0000000..cb1bd20
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> @@ -0,0 +1,478 @@
-> +/*
-> + * Copyright 2017 Sean Wang <sean.wang@mediatek.com>
-> + *
-> + * Sean Wang <sean.wang@mediatek.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
+A RAS (Reliability, Availability, Serviceability) controller
+may be a separate processor running in parallel with OS
+execution, and may generate error records for consumption by
+the OS. If the RAS controller produces multiple error records,
+then they may be overwritten before the OS has consumed them.
 
-You can use SPDX tag here if you like:
+The Generic Hardware Error Source (GHES) v2 structure
+introduces the capability for the OS to acknowledge the
+consumption of the error record generated by the RAS
+controller. A RAS controller supporting GHESv2 shall wait for
+the acknowledgment before writing a new error record, thus
+eliminating the race condition.
 
-SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+Add support for parsing of GHESv2 sub-tables as well.
 
-Regardless,
+Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+Reviewed-by: James Morse <james.morse@arm.com>
+---
+ drivers/acpi/apei/ghes.c | 59 +++++++++++++++++++++++++++++++++++++++++++++---
+ drivers/acpi/apei/hest.c |  7 ++++--
+ include/acpi/ghes.h      |  5 +++-
+ 3 files changed, 65 insertions(+), 6 deletions(-)
 
-Acked-by: Rob Herring <robh@kernel.org> 
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index 79b3c9c..197b315 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -46,6 +46,7 @@
+ #include <linux/nmi.h>
+ #include <linux/sched/clock.h>
+ 
++#include <acpi/actbl1.h>
+ #include <acpi/ghes.h>
+ #include <acpi/apei.h>
+ #include <asm/tlbflush.h>
+@@ -80,6 +81,11 @@
+ 	((struct acpi_hest_generic_status *)				\
+ 	 ((struct ghes_estatus_node *)(estatus_node) + 1))
+ 
++static inline bool is_hest_type_generic_v2(struct ghes *ghes)
++{
++	return ghes->generic->header.type == ACPI_HEST_TYPE_GENERIC_ERROR_V2;
++}
++
+ /*
+  * This driver isn't really modular, however for the time being,
+  * continuing to use module_param is the easiest way to remain
+@@ -240,6 +246,16 @@ static int ghes_estatus_pool_expand(unsigned long len)
+ 	return 0;
+ }
+ 
++static int map_gen_v2(struct ghes *ghes)
++{
++	return apei_map_generic_address(&ghes->generic_v2->read_ack_register);
++}
++
++static void unmap_gen_v2(struct ghes *ghes)
++{
++	apei_unmap_generic_address(&ghes->generic_v2->read_ack_register);
++}
++
+ static struct ghes *ghes_new(struct acpi_hest_generic *generic)
+ {
+ 	struct ghes *ghes;
+@@ -249,10 +265,17 @@ static struct ghes *ghes_new(struct acpi_hest_generic *generic)
+ 	ghes = kzalloc(sizeof(*ghes), GFP_KERNEL);
+ 	if (!ghes)
+ 		return ERR_PTR(-ENOMEM);
++
+ 	ghes->generic = generic;
++	if (is_hest_type_generic_v2(ghes)) {
++		rc = map_gen_v2(ghes);
++		if (rc)
++			goto err_free;
++	}
++
+ 	rc = apei_map_generic_address(&generic->error_status_address);
+ 	if (rc)
+-		goto err_free;
++		goto err_unmap_read_ack_addr;
+ 	error_block_length = generic->error_block_length;
+ 	if (error_block_length > GHES_ESTATUS_MAX_SIZE) {
+ 		pr_warning(FW_WARN GHES_PFX
+@@ -264,13 +287,16 @@ static struct ghes *ghes_new(struct acpi_hest_generic *generic)
+ 	ghes->estatus = kmalloc(error_block_length, GFP_KERNEL);
+ 	if (!ghes->estatus) {
+ 		rc = -ENOMEM;
+-		goto err_unmap;
++		goto err_unmap_status_addr;
+ 	}
+ 
+ 	return ghes;
+ 
+-err_unmap:
++err_unmap_status_addr:
+ 	apei_unmap_generic_address(&generic->error_status_address);
++err_unmap_read_ack_addr:
++	if (is_hest_type_generic_v2(ghes))
++		unmap_gen_v2(ghes);
+ err_free:
+ 	kfree(ghes);
+ 	return ERR_PTR(rc);
+@@ -280,6 +306,8 @@ static void ghes_fini(struct ghes *ghes)
+ {
+ 	kfree(ghes->estatus);
+ 	apei_unmap_generic_address(&ghes->generic->error_status_address);
++	if (is_hest_type_generic_v2(ghes))
++		unmap_gen_v2(ghes);
+ }
+ 
+ static inline int ghes_severity(int severity)
+@@ -649,6 +677,21 @@ static void ghes_estatus_cache_add(
+ 	rcu_read_unlock();
+ }
+ 
++static int ghes_ack_error(struct acpi_hest_generic_v2 *gv2)
++{
++	int rc;
++	u64 val = 0;
++
++	rc = apei_read(&val, &gv2->read_ack_register);
++	if (rc)
++		return rc;
++
++	val &= gv2->read_ack_preserve << gv2->read_ack_register.bit_offset;
++	val |= gv2->read_ack_write    << gv2->read_ack_register.bit_offset;
++
++	return apei_write(val, &gv2->read_ack_register);
++}
++
+ static int ghes_proc(struct ghes *ghes)
+ {
+ 	int rc;
+@@ -661,6 +704,16 @@ static int ghes_proc(struct ghes *ghes)
+ 			ghes_estatus_cache_add(ghes->generic, ghes->estatus);
+ 	}
+ 	ghes_do_proc(ghes, ghes->estatus);
++
++	/*
++	 * GHESv2 type HEST entries introduce support for error acknowledgment,
++	 * so only acknowledge the error if this support is present.
++	 */
++	if (is_hest_type_generic_v2(ghes)) {
++		rc = ghes_ack_error(ghes->generic_v2);
++		if (rc)
++			return rc;
++	}
+ out:
+ 	ghes_clear_estatus(ghes);
+ 	return rc;
+diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
+index 8f2a98e..456b488 100644
+--- a/drivers/acpi/apei/hest.c
++++ b/drivers/acpi/apei/hest.c
+@@ -52,6 +52,7 @@
+ 	[ACPI_HEST_TYPE_AER_ENDPOINT] = sizeof(struct acpi_hest_aer),
+ 	[ACPI_HEST_TYPE_AER_BRIDGE] = sizeof(struct acpi_hest_aer_bridge),
+ 	[ACPI_HEST_TYPE_GENERIC_ERROR] = sizeof(struct acpi_hest_generic),
++	[ACPI_HEST_TYPE_GENERIC_ERROR_V2] = sizeof(struct acpi_hest_generic_v2),
+ };
+ 
+ static int hest_esrc_len(struct acpi_hest_header *hest_hdr)
+@@ -141,7 +142,8 @@ static int __init hest_parse_ghes_count(struct acpi_hest_header *hest_hdr, void
+ {
+ 	int *count = data;
+ 
+-	if (hest_hdr->type == ACPI_HEST_TYPE_GENERIC_ERROR)
++	if (hest_hdr->type == ACPI_HEST_TYPE_GENERIC_ERROR ||
++	    hest_hdr->type == ACPI_HEST_TYPE_GENERIC_ERROR_V2)
+ 		(*count)++;
+ 	return 0;
+ }
+@@ -152,7 +154,8 @@ static int __init hest_parse_ghes(struct acpi_hest_header *hest_hdr, void *data)
+ 	struct ghes_arr *ghes_arr = data;
+ 	int rc, i;
+ 
+-	if (hest_hdr->type != ACPI_HEST_TYPE_GENERIC_ERROR)
++	if (hest_hdr->type != ACPI_HEST_TYPE_GENERIC_ERROR &&
++	    hest_hdr->type != ACPI_HEST_TYPE_GENERIC_ERROR_V2)
+ 		return 0;
+ 
+ 	if (!((struct acpi_hest_generic *)hest_hdr)->enabled)
+diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+index 720446c..68f088a 100644
+--- a/include/acpi/ghes.h
++++ b/include/acpi/ghes.h
+@@ -13,7 +13,10 @@
+ #define GHES_EXITING		0x0002
+ 
+ struct ghes {
+-	struct acpi_hest_generic *generic;
++	union {
++		struct acpi_hest_generic *generic;
++		struct acpi_hest_generic_v2 *generic_v2;
++	};
+ 	struct acpi_hest_generic_status *estatus;
+ 	u64 buffer_paddr;
+ 	unsigned long flags;
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
