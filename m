@@ -1,108 +1,80 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 15 May 2017 20:22:06 +0200
-Subject: [PATCH 2/2] kvm: arm/arm64: Fix use after free of stage2 page
- table
-In-Reply-To: <49fee867-bc83-52ec-e197-843dcafcb5d9@arm.com>
-References: <1493821072-29713-1-git-send-email-suzuki.poulose@arm.com>
- <1493821072-29713-3-git-send-email-suzuki.poulose@arm.com>
- <20170515100017.GJ9309@cbox>
- <e8255936-1480-1306-edcb-5aef57271a5f@arm.com>
- <20170515174337.GC18755@cbox>
- <49fee867-bc83-52ec-e197-843dcafcb5d9@arm.com>
-Message-ID: <20170515182206.GD18755@cbox>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 15 May 2017 20:40:44 +0200
+Subject: [PATCH v4 0/3] arm64: dts: r8a7795: Add support for R-Car H3 ES2.0
+In-Reply-To: <1494852253-8572-1-git-send-email-geert+renesas@glider.be>
+References: <1494852253-8572-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170515184041.GA23926@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 06:51:26PM +0100, Suzuki K Poulose wrote:
-> On 15/05/17 18:43, Christoffer Dall wrote:
-> >On Mon, May 15, 2017 at 02:36:58PM +0100, Suzuki K Poulose wrote:
-> >>On 15/05/17 11:00, Christoffer Dall wrote:
-> >>>Hi Suzuki,
-> >>>So I don't think this change is wrong, but I wonder if it's sufficient.
-> >>>For example, I can see that this function is called from
-> >>>
-> >>>stage2_unmsp_vm
-> >>>-> stage2_unmap_memslot
-> >>>  -> unmap_stage2_range
-> >>>
-> >>>and
-> >>>
-> >>>kvm_arch_flush_shadow_memslot
-> >>>-> unmap_stage2_range
-> >>>
-> >>>which never check if the pgd pointer is valid,
-> >>
-> >>You are right. Those two callers do not check it. We could fix all of this by simply
-> >>moving the check to the beginning of the loop.
-> >>i.e, something like this :
-> >>
-> >>@@ -295,6 +295,12 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
-> >>	assert_spin_locked(&kvm->mmu_lock);
-> >>	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
-> >>	do {
-> >>+		/*
-> >>+		 * Make sure the page table is still active, as we could
-> >>+		 * another thread could have possibly freed the page table.
-> >>+		 */
-> >>+		if (!READ_ONCE(kvm->arch.pgd))
-> >>+			break;
-> >>		next = stage2_pgd_addr_end(addr, end);
-> >>		if (!stage2_pgd_none(*pgd))
-> >>			unmap_stage2_puds(kvm, pgd, addr, next);
-> >>
-> >>
-> >>
-> >>
-> >>>and finally, kvm_free_stage2_pgd also checks the pgd pointer outside of holding the
-> >>>kvm->mmu_lock so why is this not racy?
-> >>
-> >>This has been fixed by patch 1 in the series. So should be fine.
-> >>
-> >>
-> >>I can respin the patch with the changes if you are OK with it.
-> >>
-> >Yes, absolutely.  I've already applied patch 1 so no need to include
-> >that in your respin.
+On Mon, May 15, 2017 at 02:44:10PM +0200, Geert Uytterhoeven wrote:
+> 	Hi all,
 > 
-> I have made a minor change to the 1st patch, to make use of READ_ONCE/WRITE_ONCE,
-> to make sure we don't use the cached value of the kvm->arch.pgd. Something like :
+> This patch series adds support for Renesas Salvator-X and H3ULCB
+> development boards equipped with revision ES2.0 of the R-Car H3 SoC.
 > 
+> Our goal is to have a single kernel image supporting both ES1. and ES2.0
+> revisions of the R-Car H3 SoC, and let r8a7795-salvator-x.dtb and
+> r8a7795-h3ulcb.dtb represent the latest production hardware.
+> As R-Car H3 ES1.x SoCs are pre-production revisions, the DTB files for
+> these revisions are renamed to r8a7795-es1-salvator-x.dtb resp.
+> r8a7795-es1-h3ulcb.dtb.
 > 
-> @@ -829,22 +829,22 @@ void stage2_unmap_vm(struct kvm *kvm)
->   * Walks the level-1 page table pointed to by kvm->arch.pgd and frees all
->   * underlying level-2 and level-3 tables before freeing the actual level-1 table
->   * and setting the struct pointer to NULL.
-> - *
-> - * Note we don't need locking here as this is only called when the VM is
-> - * destroyed, which can only be done once.
->   */
->  void kvm_free_stage2_pgd(struct kvm *kvm)
->  {
-> -	if (kvm->arch.pgd == NULL)
-> -		return;
-> +	void *pgd = NULL;
->  	spin_lock(&kvm->mmu_lock);
-> -	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
-> +	if (kvm->arch.pgd) {
-> +		unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
-> +		pgd = READ_ONCE(kvm->arch.pgd);
-
-I'm not sure I understand this.  What do you use pgd for?  Wouldn't it
-be cleaner t use the READ_ONCE() in the if statement?
-
-> +		WRITE_ONCE(kvm->arch.pgd, NULL);
-> +	}
->         spin_unlock(&kvm->mmu_lock);
+> While this will cause a slight inconvenience for developers using
+> pre-production hardware, it will make it easier to deploy production
+> hardware, and phase out support for pre-production hardware later.
+> Note that unless you need access to new features not yet described in
+> DT, you can keep on using the existing DTBs on pre-production hardware.
 > 
-> Let me know if you could fix it up or I could send a fresh series.
+>   - Patch 1 adds support for the R-Car H3 ES2.0 Soc, by providing 2
+>     .dtsi files: r8a7795.dtsi (ES2.0), and r8a7795-es1.dtsi (ES1.x).
+>   - Patch 2 adds support for Salvator-X with R-Car H3 ES2.0 by providing
+>     2 .dts files: r8a7795-salvator-x.dts (ES2.0), and
+>     r8a7795-es1-salvator-x.dts(ES1.x),
+>   - Patch 3 adds support for ator-X with R-Car H3 ES2.0 by providing 2
+>     .dts files: r8a7795-salvator-x.dts (ES2.0), and
+>     r8a7795-es1-salvator-x.dts(ES1.x).
 > 
+> While patch 1 has no user-visible impact, patches 2 and 3 do.
+> 
+> Changes compared to v3:
+>   - Remove "/remove/overrides", as r8a7795-es1.dtsi does additions only,
+>   - Move node and property deletion guidelines above the scissors,
+>   - Rebase on top of r8a7795 HDMI support (but most of that is "hidden"
+>     thanks to git's smart copy from/to patch format),
+> 
+> Changes compared to v2:
+>   - Rebase on top of common Salvator-X board support extraction,
+>   - Remove the "compatible" property from the DU node in r8a7795.dtsi,
+>     in addition to the "vsps" property,
+>   - Add support for ES2.0-based H3ULCB.
+> 
+> For changes compared to v1 (which was not posted), please refer to the
+> individual patches.
+> 
+> Dependencies:
+>   - This patch series is against renesas-devel-20170515-v4.12-rc1,
+>   - Thanks to git's smart copy from/to patch format, it should be
+>     applicable with and without "[PATCH 0/2] arm64: dts: salvator-x: Move
+>     HDMI0 to common Salvator-X board support".
+> 
+> This series is available in the topic/r8a7795es2-dt-v4 branch of my
+> renesas-drivers git repository at
+> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
+> An integration branch (incl. all dependencies) for testing is provided
+> as topic/r8a7795es2-integration.  I plan to update this branch when any
+> of the dependencies are updated.
+> 
+> This has been tested on Salvator-X (H3 ES1.0 and ES2.0), and H3ULCB with
+> H3 ES1.1.
+> 
+> This has not been tested on H3ULCB with H3 ES2.0 due to lack of
+> hardware, so perhaps you want to defer patch 3. However, adding ES2.0
+> support to both boards at the same time has its advantages (e.g. to answer
+> the question "in which kernel version do I need a DTB with 'es1' in its
+> name?").
+> 
+> Thanks for applying (at least) the first two patches!
 
-At this point it may be better to send a new series with two patches
-against what I already have in kvmarm/master.
-
-> Sorry about that.
-
-No worries at all.
-
-Thanks,
--Christoffer
+Thanks, patches 1 and 2 queued up.
+I'd rather not take 3 until it can be tested somehow.
