@@ -1,47 +1,59 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 15 May 2017 08:57:44 +0200
-Subject: [PATCH/RFT renesas-devel] arm64: dts: ulcb: Set drive-strength
- for ravb pins
-In-Reply-To: <CAMuHMdWeLAq7nZ7zu2xJ7vG-oM+-TSZm0eY68Cm-9eUREMjhXg@mail.gmail.com>
-References: <1493721024-15042-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWeLAq7nZ7zu2xJ7vG-oM+-TSZm0eY68Cm-9eUREMjhXg@mail.gmail.com>
-Message-ID: <20170515065743.GG16545@verge.net.au>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Mon, 15 May 2017 14:59:26 +0800
+Subject: [PATCH 1/2] dt-bindings: dmaengine: Add Mediatek High-Speed DMA
+ controller bindings
+In-Reply-To: <cover.1494830885.git.sean.wang@mediatek.com>
+References: <cover.1494830885.git.sean.wang@mediatek.com>
+Message-ID: <07cc981fbf9620459d1ac63e8720eaa2dd110048.1494830885.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 04:39:03PM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Tue, May 2, 2017 at 12:30 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > The EthernetAVB should not depend on the bootloader to setup correct
-> > drive-strength values.  Values for drive-strength where found by
-> > examining the registers after the bootloader has configured the
-> > registers and successfully used the EthernetAVB.
-> >
-> > Based on:
-> > * commit 7d73a4da2681 ("arm64: dts: r8a7795: salvator-x: Set drive-strength
-> >   for ravb pins")
-> > * commit 4903987033be ("arm64: dts: r8a7796: salvator-x: Set drive-strength
-> >   for ravb pins")
-> >
-> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Cc: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> > * Compile tested only due to lack of hardware access
-> 
-> So how did you examine the registers? ;-)
+From: Sean Wang <sean.wang@mediatek.com>
 
-You got me there: copy-paste gone wrong.
+Document the devicetree bindings for Mediatek High-Speed DMA controller
+which could be found on MT7623 SoC or other similar Mediatek SoCs.
 
-> Hence I examined the registers myself:
->   - H3ULCB has the same register settings as Salvator-X with H3 ES1.0
->   - M3ULCB has the same register settings as Salvator-X with M3-W ES1.0
->     or H3 ES2.0.
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ .../devicetree/bindings/dma/mtk-hsdma.txt          | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/mtk-hsdma.txt
 
-That was my assumption, which is what I should have written.
-But as you have checked - thanks for that - I will leave the changelog
-as-is and queue up the patch.
+diff --git a/Documentation/devicetree/bindings/dma/mtk-hsdma.txt b/Documentation/devicetree/bindings/dma/mtk-hsdma.txt
+new file mode 100644
+index 0000000..62cdda4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/mtk-hsdma.txt
+@@ -0,0 +1,30 @@
++Mediatek High-Speed DMA Controller
++==================================
++
++This driver follows the generic DMA bindings defined in dma/dma.txt.
++
++Required properties:
++
++- compatible:	Must be one of
++		  "mediatek,mt7623-hsdma".
++- reg:		Should contain the register's base address and length.
++- interrupts:	Should contain a reference to the interrupt used by this
++		device.
++- clocks:	Should be the clock specifiers corresponding to the entry in
++		clock-names property.
++- clock-names:	Should contain "hsdma" entries.
++- #dma-cells: 	The length of the DMA specifier, must be <1>. This one cell
++		in dmas property of a client device represents the channel
++		number.
++Example:
++
++        hsdma: hsdma at 1b007000 {
++		compatible = "mediatek,mt7623-hsdma";
++		reg = <0 0x1b007000 0 0x1000>;
++		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&ethsys CLK_ETHSYS_HSDMA>;
++		clock-names = "hsdma";
++		status = "okay";
++	};
++
++DMA clients must use the format described in dma/dma.txt file.
+-- 
+2.7.4
