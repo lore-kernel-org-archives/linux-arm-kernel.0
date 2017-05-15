@@ -1,33 +1,48 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Mon, 15 May 2017 21:34:33 +0200
-Subject: [PATCH 3/3] coresight: etb10: Improve a size determination in
- etb_alloc_buffer()
-In-Reply-To: <CANLsYkwxkXZ5t5L1_=2e9FLdkwOg7KUT=u2o-KeEfH8QYOfStA@mail.gmail.com>
-References: <5d5cd752-f2f2-b511-6b1e-daf5bf1bc522@users.sourceforge.net>
- <b8ed57f7-cdcf-9b35-4fdd-8833db008ff0@users.sourceforge.net>
- <CANLsYkwxkXZ5t5L1_=2e9FLdkwOg7KUT=u2o-KeEfH8QYOfStA@mail.gmail.com>
-Message-ID: <483aafb4-c864-058b-6e61-1189be427d27@users.sourceforge.net>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 15 May 2017 21:36:13 +0200
+Subject: [PATCH v2 0/3] mtd: nand: fsmc: support SDR timing configuration
+In-Reply-To: <1493455956-18362-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1493455956-18362-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170515213613.47bfa595@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
->> @@ -278,8 +278,7 @@ static void *etb_alloc_buffer(struct coresight_device *csdev, int cpu,
->>         if (cpu == -1)
->>                 cpu = smp_processor_id();
->>         node = cpu_to_node(cpu);
->> -
->> -       buf = kzalloc_node(sizeof(struct cs_buffers), GFP_KERNEL, node);
->> +       buf = kzalloc_node(sizeof(*buf), GFP_KERNEL, node);
+On Sat, 29 Apr 2017 10:52:33 +0200
+Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+
+> Hello,
 > 
-> I'm fine with this change but if it's going to happen, it has to be in
-> all the coresight drivers and not just this one - please respin with
-> all instances fixed.  One patch per driver would be much appreciated.
+> This patch series add support for configuring the FSMC NAND controller
+> timings according to the SDR timings exposed by the NAND chip.
+> 
+> Changes since v1:
+> 
+>  - Dropped all patches from the series that have already been merged
+>    in nand/next.
+> 
+>  - Rework the implementation as suggested by Boris Brezillon, i.e by
+>    implementing ->setup_data_interface() only when we are going to use
+>    the NAND SDR timings. If there is a "timings" DT property, we keep
+>    using the old strategy without ->setup_data_interface().
+> 
+> The patch series is based on the nand/next branch.
 
-Do you imagine that any more modules are affected in a similar way
-for this software area?
+Applied to nand/next.
 
-How do you think about other update suggestions from my selection
-which are waiting for a corresponding review?
+Thanks,
 
-Regards,
-Markus
+Boris
+
+> 
+> Best regards,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (3):
+>   mtd: nand: fsmc: reduce number of arguments of fsmc_nand_setup()
+>   mtd: nand: fsmc: add support for SDR timings
+>   mtd: nand: fsmc: remove default timings
+> 
+>  drivers/mtd/nand/fsmc_nand.c | 120 +++++++++++++++++++++++++++++++++----------
+>  1 file changed, 94 insertions(+), 26 deletions(-)
+> 
