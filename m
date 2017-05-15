@@ -1,10 +1,11 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 15 May 2017 10:16:59 +0200
-Subject: [PATCH v2 17/18] arm64: dts: meson-gxm-nexbox-a1: Fix node order
-In-Reply-To: <20170513143337.14278-18-afaerber@suse.de>
+Date: Mon, 15 May 2017 10:17:01 +0200
+Subject: [PATCH v2 16/18] arm64: dts: meson-gxl-s905x-nexbox-a95x: Fix
+ node order
+In-Reply-To: <20170513143337.14278-17-afaerber@suse.de>
 References: <20170513143337.14278-1-afaerber@suse.de>
- <20170513143337.14278-18-afaerber@suse.de>
-Message-ID: <0b68ec71-c45c-95aa-ade6-74c15c0127ca@baylibre.com>
+ <20170513143337.14278-17-afaerber@suse.de>
+Message-ID: <e50b3a0f-dab0-d2bc-26f2-a6edcc8af761@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,52 +17,32 @@ On 05/13/2017 04:33 PM, Andreas F?rber wrote:
 >  v1 -> v2:
 >  * Rebased (new nodes added)
 >  
->  .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts | 86 +++++++++++-----------
->  1 file changed, 43 insertions(+), 43 deletions(-)
+>  .../dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    | 52 +++++++++++-----------
+>  1 file changed, 26 insertions(+), 26 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-> index 920fac10de93..5f626d683088 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-> @@ -113,10 +113,49 @@
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
+> index 8873c058fad2..6633a5d8fdd3 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
+> @@ -140,10 +140,10 @@
 >  	};
 >  };
 >  
 > -&uart_AO {
+> -	status = "okay";
+> -	pinctrl-0 = <&uart_ao_a_pins>;
+> -	pinctrl-names = "default";
 > +&cvbs_vdac_port {
 > +	cvbs_vdac_out: endpoint {
 > +		remote-endpoint = <&cvbs_connector_in>;
 > +	};
-> +};
-> +
-> +&ethmac {
->  	status = "okay";
-> -	pinctrl-0 = <&uart_ao_a_pins>;
-> +
-> +	pinctrl-0 = <&eth_pins>;
->  	pinctrl-names = "default";
-> +
-> +	/* Select external PHY by default */
-> +	phy-handle = <&external_phy>;
-> +
-> +	amlogic,tx-delay-ns = <2>;
-> +
-> +	snps,reset-gpio = <&gpio GPIOZ_14 0>;
-> +	snps,reset-delays-us = <0 10000 1000000>;
-> +	snps,reset-active-low;
-> +
-> +	/* External PHY is in RGMII */
-> +	phy-mode = "rgmii";
-> +};
-> +
-> +&external_mdio {
-> +	external_phy: ethernet-phy at 0 {
-> +		compatible = "ethernet-phy-id001c.c916", "ethernet-phy-ieee802.3-c22";
-> +		reg = <0>;
-> +		max-speed = <1000>;
-> +	};
-> +};
-> +
+>  };
+>  
+>  &ethmac {
+> @@ -152,12 +152,32 @@
+>  	phy-handle = <&internal_phy>;
+>  };
+>  
 > +&hdmi_tx {
 > +	status = "okay";
 > +	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
@@ -72,38 +53,35 @@ On 05/13/2017 04:33 PM, Andreas F?rber wrote:
 > +	hdmi_tx_tmds_out: endpoint {
 > +		remote-endpoint = <&hdmi_connector_in>;
 > +	};
+> +};
+> +
+>  &ir {
+>  	status = "okay";
+>  	pinctrl-0 = <&remote_input_ao_pins>;
+>  	pinctrl-names = "default";
 >  };
 >  
->  &ir {
-> @@ -163,47 +202,8 @@
+> +&pwm_ef {
+> +	status = "okay";
+> +	pinctrl-0 = <&pwm_e_pins>;
+> +	pinctrl-names = "default";
+> +	clocks = <&clkc CLKID_FCLK_DIV4>;
+> +	clock-names = "clkin0";
+> +};
+> +
+>  /* Wireless SDIO Module */
+>  &sd_emmc_a {
+>  	status = "okay";
+> @@ -217,28 +237,8 @@
 >  	vqmmc-supply = <&vddio_boot>;
 >  };
 >  
-> -&ethmac {
+> -&pwm_ef {
 > -	status = "okay";
-> -
-> -	pinctrl-0 = <&eth_pins>;
+> -	pinctrl-0 = <&pwm_e_pins>;
 > -	pinctrl-names = "default";
-> -
-> -	/* Select external PHY by default */
-> -	phy-handle = <&external_phy>;
-> -
-> -	amlogic,tx-delay-ns = <2>;
-> -
-> -	snps,reset-gpio = <&gpio GPIOZ_14 0>;
-> -	snps,reset-delays-us = <0 10000 1000000>;
-> -	snps,reset-active-low;
-> -
-> -	/* External PHY is in RGMII */
-> -	phy-mode = "rgmii";
-> -};
-> -
-> -&external_mdio {
-> -	external_phy: ethernet-phy at 0 {
-> -		compatible = "ethernet-phy-id001c.c916", "ethernet-phy-ieee802.3-c22";
-> -		reg = <0>;
-> -		max-speed = <1000>;
-> -	};
+> -	clocks = <&clkc CLKID_FCLK_DIV4>;
+> -	clock-names = "clkin0";
 > -};
 > -
 > -&cvbs_vdac_port {
