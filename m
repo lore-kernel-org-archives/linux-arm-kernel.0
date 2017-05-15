@@ -1,52 +1,127 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 15 May 2017 09:16:08 +0200
-Subject: [PATCH] ARM: dts: imx28: add gpio-ranges for internal gpio
- controller
-In-Reply-To: <20170515022129.GJ8471@dragon>
-References: <20170508085925.18342-1-u.kleine-koenig@pengutronix.de>
- <20170511075135.GF5833@dragon>
- <20170511080916.gim5pyhj5jarzf4r@pengutronix.de>
- <20170512030536.GC8471@dragon>
- <20170512080150.uh5qmwu2tctpd6jk@pengutronix.de>
- <20170515022129.GJ8471@dragon>
-Message-ID: <20170515071608.auju66dhylzaexkw@pengutronix.de>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 15 May 2017 09:27:52 +0200
+Subject: [PATCH v3 3/3] media: mtk-mdp: Fix mdp device tree
+In-Reply-To: <1494815512.31916.11.camel@mtksdaap41>
+References: <1494559361-42835-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1494559361-42835-4-git-send-email-minghsiu.tsai@mediatek.com>
+ <60f89b9a-f068-25a7-3f8b-d13b19357361@gmail.com>
+ <1494815512.31916.11.camel@mtksdaap41>
+Message-ID: <79df594b-33cb-e606-5ace-66f450f839e9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
 
-On Mon, May 15, 2017 at 10:21:30AM +0800, Shawn Guo wrote:
-> On Fri, May 12, 2017 at 10:01:50AM +0200, Uwe Kleine-K?nig wrote:
-> > On Fri, May 12, 2017 at 11:05:38AM +0800, Shawn Guo wrote:
-> > > I went through the code around requesting a pin, and found that we need
-> > > to call pinctrl_request_gpio() from gpio driver to get the result you
-> > > want.  In that case, pin_request() will be called with a valid
-> > > gpio_range as below.
-> > > 
-> > >     pinctrl_request_gpio()
-> > >         pinmux_request_gpio()
-> > >             pin_request(..., gpio_range)
-> > > 
-> > > Right now, pin_request() is being called with a NULL gpio_range from
-> > > pinmux_enable_setting().  That gets us the mux_owner rather than
-> > > gpio_owner for the pin.
-> > 
-> > But then again I cannot mux a pin to a different function when the gpio
-> > is requested, right?
 
-(Actually I intended to postpone this mail, but sent it instead by
-accident.)
- 
-> You will need to free the GPIO before muxing it to a different function,
-> I think.
+On 15/05/17 04:31, Minghsiu Tsai wrote:
+> On Fri, 2017-05-12 at 17:05 +0200, Matthias Brugger wrote:
+>>
+>> On 12/05/17 05:22, Minghsiu Tsai wrote:
+>>> From: Daniel Kurtz <djkurtz@chromium.org>
+>>>
+>>> If the mdp_* nodes are under an mdp sub-node, their corresponding
+>>> platform device does not automatically get its iommu assigned properly.
+>>>
+>>> Fix this by moving the mdp component nodes up a level such that they are
+>>> siblings of mdp and all other SoC subsystems.  This also simplifies the
+>>> device tree.
+>>>
+>>> Although it fixes iommu assignment issue, it also break compatibility
+>>> with old device tree. So, the patch in driver is needed to iterate over
+>>> sibling mdp device nodes, not child ones, to keep driver work properly.
+>>>
+>>
+>> Couldn't we preserve backwards compatibility by doing something like this:
+>> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+>> b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+>> index 9e4eb7dcc424..277d8fe6eb76 100644
+>> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+>> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+>> @@ -103,7 +103,7 @@ static int mtk_mdp_probe(struct platform_device *pdev)
+>>    {
+>>    	struct mtk_mdp_dev *mdp;
+>>    	struct device *dev = &pdev->dev;
+>> -	struct device_node *node;
+>> +	struct device_node *node, *parent;
+>>    	int i, ret = 0;
+>>
+>>    	mdp = devm_kzalloc(dev, sizeof(*mdp), GFP_KERNEL);
+>> @@ -117,8 +117,14 @@ static int mtk_mdp_probe(struct platform_device *pdev)
+>>    	mutex_init(&mdp->lock);
+>>    	mutex_init(&mdp->vpulock);
+>>
+>> +	/* Old dts had the components as child nodes */
+>> +	if (of_get_next_child(dev->of_node, NULL))
+>> +		parent = dev->of_node;
+>> +	else
+>> +		parent = dev->of_node->parent;
+>> +
+>>    	/* Iterate over sibling MDP function blocks */
+>> -	for_each_child_of_node(dev->of_node, node) {
+>> +	for_each_child_of_node(parent, node) {
+>>    		const struct of_device_id *of_id;
+>>    		enum mtk_mdp_comp_type comp_type;
+>>    		int comp_id;
+>>
+>> Maybe even by putting a warning in the if branch to make sure, people
+>> are aware of their out-of-date device tree blobs.
+>>
+>> Regards,
+>> Matthias
+>>
+> 
+> Hi Matthias,
+> 
+> It is a good idea to do compatible in such a way and put a warning the
+> device tree is out of date. People can find out cause soon if device
+> tree is old.
+> 
+> I modify the code as below:
+> 
+> +	/* Old dts had the components as child nodes */
+> +	if (of_get_next_child(dev->of_node, NULL)) {
+> +		parent = dev->of_node;
+> +		dev_warn(dev, "device tree is out of date\n");
+> +	} else {
+> +		parent = dev->of_node->parent;
+> +	}
+> 
+> Will you upload it in a separate patch?
+> If not, I can merge it in my patch series and upload v4.
+> 
 
-IMHO this is a bad concept. This makes GPIOs more special than for
-example PWMs or LEDs. And it breaks some configurations (for example the
-make-pins-highz-on-idle setup in my previous mails).
+Please integrate it into your patch series.
 
-Best regards
-Uwe
+Mauro, are you ok with the dev_warn about the out-of-date device-tree?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Matthias
+
+
+> 
+> Best Regards,
+> 
+> Ming Hsiu
+> 
+>>> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+>>> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+>>>
+>>> ---
+>>>    drivers/media/platform/mtk-mdp/mtk_mdp_core.c | 2 +-
+>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+>>> index 9e4eb7d..a5ad586 100644
+>>> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+>>> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+>>> @@ -118,7 +118,7 @@ static int mtk_mdp_probe(struct platform_device *pdev)
+>>>    	mutex_init(&mdp->vpulock);
+>>>    
+>>>    	/* Iterate over sibling MDP function blocks */
+>>> -	for_each_child_of_node(dev->of_node, node) {
+>>> +	for_each_child_of_node(dev->of_node->parent, node) {
+>>>    		const struct of_device_id *of_id;
+>>>    		enum mtk_mdp_comp_type comp_type;
+>>>    		int comp_id;
+>>>
+> 
+> 
