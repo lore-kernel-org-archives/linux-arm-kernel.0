@@ -1,18 +1,48 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 May 2017 10:25:06 -0600
-Subject: [PATCH 1/2] ARM: tegra: remove Whistler support
-In-Reply-To: <20170413185559.1939-1-swarren@wwwdotorg.org>
-References: <20170413185559.1939-1-swarren@wwwdotorg.org>
-Message-ID: <dc541285-7868-d0c6-4917-fa1cafc66c00@wwwdotorg.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 15 May 2017 09:33:31 -0700
+Subject: [PATCH] soc: imx: Select PM_GENERIC_DOMAINS only if PM is enabled
+Message-ID: <1494866011-23360-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/2017 12:55 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
->
-> Whistler is an ancient Tegra 2 reference board. I may have been the only
-> person who ever used it with upstream software, and I've just recycled
-> the board hardware. Hence, it makes sense to remove support from software.
+Selecting PM_GENERIC_DOMAINS without PM results in the following build
+errors, seen when building sparc32:allmodconfig.
 
-Thierry, now that the merge window is closed, does this series look 
-good? Thanks.
+drivers/base/power/domain.c: In function 'genpd_queue_power_off_work':
+drivers/base/power/domain.c:279:13: error: 'pm_wq' undeclared
+drivers/base/power/domain.c: In function 'genpd_dev_pm_qos_notifier':
+drivers/base/power/domain.c:462:25: error:
+	'struct dev_pm_info' has no member named 'ignore_children'
+drivers/base/power/domain.c: In function 'rtpm_status_str':
+drivers/base/power/domain.c:2207:16: error:
+	'struct dev_pm_info' has no member named 'runtime_error'
+drivers/base/power/domain.c:2209:21: error:
+	'struct dev_pm_info' has no member named 'disable_depth'
+drivers/base/power/domain.c:2211:21: error:
+	'struct dev_pm_info' has no member named 'runtime_status'
+drivers/base/power/domain.c:2212:31: error:
+	'struct dev_pm_info' has no member named 'runtime_status'
+
+Fixes: 03aa12629fc4 ("soc: imx: Add GPCv2 power gating driver")
+Cc: Andrey Smirnov <andrew.smirnov@gmail.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/soc/imx/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/soc/imx/Kconfig b/drivers/soc/imx/Kconfig
+index 357a5d8f8da0..9c1c75f282c2 100644
+--- a/drivers/soc/imx/Kconfig
++++ b/drivers/soc/imx/Kconfig
+@@ -2,7 +2,7 @@ menu "i.MX SoC drivers"
+ 
+ config IMX7_PM_DOMAINS
+ 	bool "i.MX7 PM domains"
+-	select PM_GENERIC_DOMAINS
++	select PM_GENERIC_DOMAINS if PM
+ 	depends on SOC_IMX7D || (COMPILE_TEST && OF)
+ 	default y if SOC_IMX7D
+ 
+-- 
+2.7.4
