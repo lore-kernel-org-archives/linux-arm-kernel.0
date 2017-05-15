@@ -1,43 +1,67 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 15 May 2017 13:08:25 +0200
-Subject: [PATCH 1/8] mmc: dt: pwrseq-simple: Invent power-off-delay-us
-In-Reply-To: <20170512200300.a2hq546ra42ptlz5@rob-hp-laptop>
-References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
- <1494260477-25163-2-git-send-email-ulf.hansson@linaro.org>
- <20170512200300.a2hq546ra42ptlz5@rob-hp-laptop>
-Message-ID: <CAPDyKFqhbGqanoQqFsLrLaBXsQ5WdFrrunkvB2eOoJqH+W6jdQ@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 15 May 2017 20:14:45 +0900
+Subject: [PATCH 2/5] ARM: dts: use #include "..." to include DT in the same
+ directory
+In-Reply-To: <1494846888-18966-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1494846888-18966-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1494846888-18966-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 May 2017 at 22:03, Rob Herring <robh@kernel.org> wrote:
-> On Mon, May 08, 2017 at 06:21:10PM +0200, Ulf Hansson wrote:
->> During power off, after the GPIO pin has been asserted, some devices like
->> the Wifi chip from TI, Wl18xx, needs a delay before the host continues with
->> clock gating and turning off regulators as to follow a graceful shutdown
->> sequence.
->>
->> Therefore invent an optional power-off-delay-us DT binding for
->> mmc-pwrseq-simple, to allow us to support this constraint.
->
-> Do you really need this to be programmable per device. A delay is not
-> going to hurt devices that don't need it.
+Most of DT files in ARM use #include "..." to make pre-processor
+include DT in the same directory, but we have 3 exceptional files
+that use #include <...> for that.
 
-Well, that depends on what "hurt" means. The device would still be
-properly shut down, only that it would take unnecessary longer to do
-so.
+They must be fixed to remove -I$(srctree)/arch/$(SRCARCH)/boot/dts
+path from dtc_cpp_flags.
 
-I think the problem here, is that this delay may also affect system
-suspend/resume time of the device, if the device powers off/on in this
-sequence.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
->
-> Sorry, but this is exactly what I don't like about "simple" bindings:
-> adding one property at a time.
+ arch/arm/boot/dts/imx6q-zii-rdu2.dts  | 4 ++--
+ arch/arm/boot/dts/imx6qp-zii-rdu2.dts | 4 ++--
+ arch/arm/boot/dts/versatile-pb.dts    | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-I understand you opinion, which in the end is a matter of taste/flavor.
-
-However, for me this just follows the existing approach - and suddenly
-say no to this, doesn't really seems right either.
-
-Kind regards
-Uffe
+diff --git a/arch/arm/boot/dts/imx6q-zii-rdu2.dts b/arch/arm/boot/dts/imx6q-zii-rdu2.dts
+index b2d3466..6be8a1e 100644
+--- a/arch/arm/boot/dts/imx6q-zii-rdu2.dts
++++ b/arch/arm/boot/dts/imx6q-zii-rdu2.dts
+@@ -41,8 +41,8 @@
+ 
+ /dts-v1/;
+ 
+-#include <imx6q.dtsi>
+-#include <imx6qdl-zii-rdu2.dtsi>
++#include "imx6q.dtsi"
++#include "imx6qdl-zii-rdu2.dtsi"
+ 
+ / {
+ 	model = "ZII RDU2 Board";
+diff --git a/arch/arm/boot/dts/imx6qp-zii-rdu2.dts b/arch/arm/boot/dts/imx6qp-zii-rdu2.dts
+index 882b3bd..547a766 100644
+--- a/arch/arm/boot/dts/imx6qp-zii-rdu2.dts
++++ b/arch/arm/boot/dts/imx6qp-zii-rdu2.dts
+@@ -41,8 +41,8 @@
+ 
+ /dts-v1/;
+ 
+-#include <imx6qp.dtsi>
+-#include <imx6qdl-zii-rdu2.dtsi>
++#include "imx6qp.dtsi"
++#include "imx6qdl-zii-rdu2.dtsi"
+ 
+ / {
+ 	model = "ZII RDU2+ Board";
+diff --git a/arch/arm/boot/dts/versatile-pb.dts b/arch/arm/boot/dts/versatile-pb.dts
+index 33a8eb2..06e2331 100644
+--- a/arch/arm/boot/dts/versatile-pb.dts
++++ b/arch/arm/boot/dts/versatile-pb.dts
+@@ -1,4 +1,4 @@
+-#include <versatile-ab.dts>
++#include "versatile-ab.dts"
+ 
+ / {
+ 	model = "ARM Versatile PB";
+-- 
+2.7.4
