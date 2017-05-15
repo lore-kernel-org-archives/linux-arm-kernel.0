@@ -1,70 +1,139 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Mon, 15 May 2017 09:04:20 -0700
-Subject: [PATCH v2 04/11] arm64: dts: Initial DTS files for Broadcom
- Stingray SOC
-In-Reply-To: <20170515131334.GE17776@leverpostej>
-References: <1494849741-21294-1-git-send-email-anup.patel@broadcom.com>
- <1494849741-21294-5-git-send-email-anup.patel@broadcom.com>
- <20170515131334.GE17776@leverpostej>
-Message-ID: <a8ada733-b1a0-b038-78da-e59de76c106c@broadcom.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 15 May 2017 09:09:14 -0700
+Subject: [PATCH] devicetree: Move include prefixes from arch to separate
+ directory
+In-Reply-To: <CAL_JsqJCjwvvta0n7dNpyVZkK5hp25fYO78q_pQZzUAPRDq+-w@mail.gmail.com>
+References: <CAL_JsqKLxA8K8378z4nDBkDWnwM_zBbbf9D7EPtwQ1782dydTw@mail.gmail.com>
+ <20170515142641.GU22219@n2100.armlinux.org.uk>
+ <CAL_JsqJzoe_xNxMOZ88+k+bZ+bSK6-j30HXk0ZsFxHUqVDzwzw@mail.gmail.com>
+ <CAOesGMgYDq5Sdk6OaK-mTyfdNGwcbgOVeKbeMSCOmwqd9k8TGQ@mail.gmail.com>
+ <CAL_JsqJCjwvvta0n7dNpyVZkK5hp25fYO78q_pQZzUAPRDq+-w@mail.gmail.com>
+Message-ID: <CAOesGMh3UxHPYQ7SDG7+NODuT5TnP_i23ru0ZRR-rOYxbOGe_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, May 15, 2017 at 8:52 AM, Rob Herring <robh+dt@kernel.org> wrote:
+> On Mon, May 15, 2017 at 10:27 AM, Olof Johansson <olof@lixom.net> wrote:
+>> On Mon, May 15, 2017 at 7:47 AM, Rob Herring <robh+dt@kernel.org> wrote:
+>>> On Mon, May 15, 2017 at 9:26 AM, Russell King - ARM Linux
+>>> <linux@armlinux.org.uk> wrote:
+>>>> On Mon, May 15, 2017 at 08:01:07AM -0500, Rob Herring wrote:
+>>>>> I'd prefer not to mix things in scripts/dtc that aren't the import of
+>>>>> dtc (yes, we do have a few other things already, but they are at least
+>>>>> scripts). Couldn't this go in include/dt-bindings/ instead?
+>>>>
+>>>> I don't think that works.
+>>>>
+>>>> The include path used is "include", which means that we force people
+>>>> to use:
+>>>>
+>>>> #include <dt-bindings/foo.dtsi>
+>>>
+>>> No, I was thinking you'd add include/dt-bindings/include-prefix/ to
+>>> the include path instead of scripts/dtc/include-prefix/. The only
+>>> downside I can see is people could mistakenly do:
+>>>
+>>> #include <dt-bindings/include-prefix/$arch/foo.dtsi>
+>>
+>> I considered that but thought it was a worse solution than the one I
+>> ended up with. It's just confusing to have -I paths that enter an
+>> include hierarchy at different levels like that.
+>>
+>> Just see what already happened with the mistake on rockchip, where
+>> Heiko accidentally included <include/dt-include/...> instead -- it'd
+>> be nice to catch that when it happens through tools
+>>
+>>>>
+>>>> in their DT files.  This means that we'd need to populate $topdir/include
+>>>> with per-architecture symlinks on top of the 26 or so directories already
+>>>> there, so that:
+>>>>
+>>>> #include <arch/foo.dtsi>
+>>>>
+>>>> would work.  That's quite horrible, since $topdir/include is the main
+>>>> include path for C headers.
+>>>>
+>>>> I guess we could have symlinks inside include/dt-bindings, but that
+>>>> makes the includes:
+>>>>
+>>>> #include <dt-bindings/arch/foo.dtsi>
+>>>>
+>>>> but that's rather absurd because these _aren't_ dt-binding definitions.
+>>>
+>>> True, but the same can be said that "scripts/dtc" is not includes nor
+>>> kernel build infrastructure.
+>>>
+>>>> Maybe what we should do is:
+>>>>
+>>>> mkdir include/dt
+>>>> git mv include/dt-bindings include/dt
+>>>> for arch in arch/*; do
+>>>>   dts=$arch/boot/dts
+>>>>   if [ -d $dts ]; then
+>>>>      a=include/dt/$(basename $arch)
+>>>>      ln -s $dts $a
+>>>>      git add $a
+>>>>   fi
+>>>> done
+>>>> ... fixup scripts/Makefile.lib ...
+>>>> git commit
+>>>
+>>> That would just break every existing include in dts files.
+>>
+>> It doesn't break dts includes if done together with a change in -I,
+>> but it might break includes from the driver side (or needs another -I
+>> there).
+>
+> Ah yes, I should have paid attention to the mkdir.
+>
+>>> Another idea. Could kbuild create all the symlinks at build time instead?
+>>
+>> I considered that, but given that we're talking about a few soft links
+>> that we need to find a good home for, it seemed like overkill that
+>> adds magic to the build process. Having somehting that is easily
+>> discovered when looking around the source tree is a lot better.
+>>
+>> I looked around the tree for suitable homes for this directory of
+>> links, and the least out-of-place I could find was under scripts/dtc.
+>> You even have a script for uprevving the imported dtc sources, so it's
+>> not like it's causing any problems from that point of view. But I do
+>> agree that it's not ideal -- it was just the least bad option I could
+>> find at the time. Better suggestions are welcome.
+>
+> Fair enough. Like I said, it was only a preference and certainly not
+> unprecedented. I'll just get less receptive with each addition. :)
+
+I'm familiar with that feeling. :)
+
+> When and by whom do you propose merging this?
+
+Given that it crosses architectures but fixes my mistaken recursive
+linking I was planning on either including it in arm-soc fixes or for
+full visibility just send it as a patch to Linus. Mind giving me an
+ack?
+
+Or, if you prefer to merge it that's fine with me too. I'd like to fix
+the tree for people who are seeing the problems soon though.
+
+> The only other comment I would have is at some point, we're going to
+> have overlays that aren't tied to any arch. Where are we going to put
+> those? Maybe they are tied to some vendor which tends to have most
+> stuff in $arch and we just continue this band-aid. Or we define some
+> common location. I bring this up now only because both could use that
+> location.
+
+Those are good questions. What kind of common overlays are you
+anticipating? Things like fragments describing connectors, etc?
+
+Rule so far has been that the first arch to introduce something keeps
+it (that's between arm/arm64): Mostly it's been arm64 referencing arm
+contents so far.
+
+I guess we could introduce the concept of a common/ directory
+somewhere. As you say, finding a good home for it isn't 100% obvious
+today, and we should make sure ownership of the directory is clear
+since we've seen things go badly when patches get merged through too
+many paths on these files.
 
 
-On 17-05-15 06:13 AM, Mark Rutland wrote:
-> Hi,
->
-> On Mon, May 15, 2017 at 05:32:14PM +0530, Anup Patel wrote:
->> +/ {
->> +	chosen { /* Default kernel args */
->> +		bootargs = "root=/dev/ram rw rootwait \
->> +			    earlycon=uart8250,mmio32,0x68a10000 \
->> +			    pci=pcie_bus_safe cma=64M";
->
-> Why do we need all of these?
-Agreed - we don't need the default kernels args here - they are passed 
-in by bootloader as needed.
->
->> +		linux,stdout-path = "serial0:115200n8";
->
-> Please drop the 'linux,' prefix here.
->
-> [...]
->
->> +	memory: memory at 80000000 {
->> +		device_type = "memory";
->> +		reg = <0x00000000 0x80000000 0 0x40000000>;
->> +	};
->> +
->> +	psci {
->> +		compatible = "arm,psci-0.2";
->> +		method = "smc";
->> +	};
->> +
->> +	pmu {
->> +		compatible = "arm,armv8-pmuv3";
->> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>;
->> +	};
->> +
->> +	timer {
->> +		compatible = "arm,armv8-timer";
->> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) |
->> +			      IRQ_TYPE_LEVEL_LOW)>,
->> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) |
->> +			      IRQ_TYPE_LEVEL_LOW)>,
->> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) |
->> +			      IRQ_TYPE_LEVEL_LOW)>,
->> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) |
->> +			      IRQ_TYPE_LEVEL_LOW)>;
->
-> GICv3 PPIs don't have a mask. See
->
-> Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
->
-> Please remove the GIC_CPU_MASK_*() uses here and in this dts. They
-> shouldn't be there.
->
-> Thanks,
-> Mark.
->
+-Olof
