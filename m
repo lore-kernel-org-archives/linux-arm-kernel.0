@@ -1,71 +1,60 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 15 May 2017 09:47:40 -0500
-Subject: [PATCH] devicetree: Move include prefixes from arch to separate
- directory
-In-Reply-To: <20170515142641.GU22219@n2100.armlinux.org.uk>
-References: <CAL_JsqKLxA8K8378z4nDBkDWnwM_zBbbf9D7EPtwQ1782dydTw@mail.gmail.com>
- <20170515142641.GU22219@n2100.armlinux.org.uk>
-Message-ID: <CAL_JsqJzoe_xNxMOZ88+k+bZ+bSK6-j30HXk0ZsFxHUqVDzwzw@mail.gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Mon, 15 May 2017 07:52:58 -0700
+Subject: [PATCH v3 0/7] i.MX7 PCIe related device tree changes
+Message-ID: <20170515145305.4465-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 9:26 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Mon, May 15, 2017 at 08:01:07AM -0500, Rob Herring wrote:
->> I'd prefer not to mix things in scripts/dtc that aren't the import of
->> dtc (yes, we do have a few other things already, but they are at least
->> scripts). Couldn't this go in include/dt-bindings/ instead?
->
-> I don't think that works.
->
-> The include path used is "include", which means that we force people
-> to use:
->
-> #include <dt-bindings/foo.dtsi>
+Shawn, everyone:
 
-No, I was thinking you'd add include/dt-bindings/include-prefix/ to
-the include path instead of scripts/dtc/include-prefix/. The only
-downside I can see is people could mistakenly do:
+This is third version of the series that includes changes made to
+device-tree in order to support PCIe on i.MX7 platform.
 
-#include <dt-bindings/include-prefix/$arch/foo.dtsi>
+These changes are also availible at:
 
->
-> in their DT files.  This means that we'd need to populate $topdir/include
-> with per-architecture symlinks on top of the 26 or so directories already
-> there, so that:
->
-> #include <arch/foo.dtsi>
->
-> would work.  That's quite horrible, since $topdir/include is the main
-> include path for C headers.
->
-> I guess we could have symlinks inside include/dt-bindings, but that
-> makes the includes:
->
-> #include <dt-bindings/arch/foo.dtsi>
->
-> but that's rather absurd because these _aren't_ dt-binding definitions.
+https://github.com/ndreys/linux/tree/imx7d/pcie-support-v11
 
-True, but the same can be said that "scripts/dtc" is not includes nor
-kernel build infrastructure.
+Changes since [v2]:
 
-> Maybe what we should do is:
->
-> mkdir include/dt
-> git mv include/dt-bindings include/dt
-> for arch in arch/*; do
->   dts=$arch/boot/dts
->   if [ -d $dts ]; then
->      a=include/dt/$(basename $arch)
->      ln -s $dts $a
->      git add $a
->   fi
-> done
-> ... fixup scripts/Makefile.lib ...
-> git commit
+	- Patchset rebased and tested against v4.12-rc1
 
-That would just break every existing include in dts files.
+	- Removed needless 'pinctrl-names' property from pcie node in imx7d-sdb.dts
 
-Another idea. Could kbuild create all the symlinks at build time instead?
+	- Moved 'select IMX_GPCV2' statement according to alphabetical order
 
-Rob
+	- Changed prefix for patch #1
+
+Changes since [v1]:
+
+	- All 'anatop-enable-bit' patches are squashed into one
+
+	- Added patch to enable GPCv2 driver on i.MX7
+
+	- Dropped accidentally introduced unsupported DT properties
+
+	- A number of node renaming for readability/clarity purpose
+
+[v1] http://lkml.kernel.org/r/20170413133242.5068-1-andrew.smirnov at gmail.com
+[v2] http://lkml.kernel.org/r/20170418150133.31679-1-andrew.smirnov at gmail.com
+
+Andrey Smirnov (7):
+  ARM: dts: imx: Reintroduce 'anatop-enable-bit' where appropriate
+  ARM: imx: Select GPCv2 for i.MX7
+  ARM: dts: imx7s: Add node for GPC
+  ARM: dts: imx7s: Mark 'gpr' compatible with i.MX6 variant
+  ARM: dts: imx7d-sdb: Add GPIO expander node
+  ARM: dts: imx7d: Add node for PCIe controller
+  ARM: dts: imx7d-sdb: Enable PCIe peripheral
+
+ arch/arm/boot/dts/imx6qdl.dtsi  |  3 +++
+ arch/arm/boot/dts/imx6sl.dtsi   |  3 +++
+ arch/arm/boot/dts/imx6sx.dtsi   |  3 +++
+ arch/arm/boot/dts/imx6ul.dtsi   |  1 +
+ arch/arm/boot/dts/imx7d-sdb.dts | 34 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx7d.dtsi    | 37 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx7s.dtsi    | 30 ++++++++++++++++++++++++++++--
+ arch/arm/mach-imx/Kconfig       |  1 +
+ 8 files changed, 110 insertions(+), 2 deletions(-)
+
+-- 
+2.9.3
