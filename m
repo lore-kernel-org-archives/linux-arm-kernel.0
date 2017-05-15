@@ -1,14 +1,14 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 15 May 2017 14:48:25 +0800
-Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add IBE and OBE SoC property
+Date: Mon, 15 May 2017 14:48:26 +0800
+Subject: [PATCH 2/2] pinctrl: pinctrl-imx: do not assume mux 0 is gpio
 In-Reply-To: <1494830906-6442-1-git-send-email-aisheng.dong@nxp.com>
 References: <1494830906-6442-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1494830906-6442-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1494830906-6442-3-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iMX ULP has different IOB/OBE shift from Vibrid, so let's make
-it a SoC property.
+Do not assume MUX 0 is GPIO function in core driver as a different
+SoC may have different value. e.g. MX7ULP Mux 1 is GPIO.
 
 Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Alexandre Courbot <gnurou@gmail.com>
@@ -18,77 +18,29 @@ Cc: Fugang Duan <fugang.duan@nxp.com>
 Cc: Bai Ping <ping.bai@nxp.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/pinctrl/freescale/pinctrl-imx.c     | 8 ++++----
- drivers/pinctrl/freescale/pinctrl-imx.h     | 2 ++
- drivers/pinctrl/freescale/pinctrl-imx7ulp.c | 2 ++
- drivers/pinctrl/freescale/pinctrl-vf610.c   | 2 ++
- 4 files changed, 10 insertions(+), 4 deletions(-)
+ drivers/pinctrl/freescale/pinctrl-imx.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
-index 57e1f7a..0d6aaca 100644
+index 0d6aaca..ed8ea32 100644
 --- a/drivers/pinctrl/freescale/pinctrl-imx.c
 +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-@@ -331,8 +331,8 @@ static int imx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
- 	u32 reg;
- 
- 	/*
--	 * Only Vybrid has the input/output buffer enable flags (IBE/OBE)
--	 * They are part of the shared mux/conf register.
-+	 * Only Vybrid and iMX ULP has the input/output buffer enable flags
-+	 * (IBE/OBE) They are part of the shared mux/conf register.
- 	 */
- 	if (!(info->flags & SHARE_MUX_CONF_REG))
- 		return 0;
-@@ -344,9 +344,9 @@ static int imx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
- 	/* IBE always enabled allows us to read the value "on the wire" */
+@@ -281,7 +281,7 @@ static int imx_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
+ 			continue;
+ 		for (pin = 0; pin < grp->num_pins; pin++) {
+ 			imx_pin = &((struct imx_pin *)(grp->data))[pin];
+-			if (imx_pin->pin == offset && !imx_pin->mux_mode)
++			if (imx_pin->pin == offset)
+ 				goto mux_pin;
+ 		}
+ 	}
+@@ -292,6 +292,7 @@ static int imx_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
  	reg = readl(ipctl->base + pin_reg->mux_reg);
- 	if (input)
--		reg &= ~0x2;
-+		reg = (reg & ~info->obe_bit) | info->ibe_bit;
- 	else
--		reg |= 0x2;
-+		reg = (reg & ~info->ibe_bit) | info->obe_bit;
+ 	reg &= ~info->mux_mask;
+ 	reg |= imx_pin->config;
++	reg |= imx_pin->mux_mode << info->mux_shift;
  	writel(reg, ipctl->base + pin_reg->mux_reg);
  
  	return 0;
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
-index eb0ce95..9ded65d 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx.h
-+++ b/drivers/pinctrl/freescale/pinctrl-imx.h
-@@ -67,6 +67,8 @@ struct imx_pinctrl_soc_info {
- 	/* MUX_MODE shift and mask in case SHARE_MUX_CONF_REG */
- 	unsigned int mux_mask;
- 	u8 mux_shift;
-+	u32 ibe_bit;
-+	u32 obe_bit;
- 
- 	/* generic pinconf */
- 	bool generic_pinconf;
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx7ulp.c b/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
-index dead416..f724a01 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
-@@ -324,6 +324,8 @@ static struct imx_pinctrl_soc_info imx7ulp_pinctrl_info = {
- 	.flags = ZERO_OFFSET_VALID | SHARE_MUX_CONF_REG,
- 	.mux_mask = 0xf00,
- 	.mux_shift = 8,
-+	.ibe_bit = BIT(16),
-+	.obe_bit = BIT(17),
- 	.generic_pinconf = true,
- 	.custom_params = imx7ulp_cfg_params,
- 	.num_custom_params = ARRAY_SIZE(imx7ulp_cfg_params),
-diff --git a/drivers/pinctrl/freescale/pinctrl-vf610.c b/drivers/pinctrl/freescale/pinctrl-vf610.c
-index 3bd8556..c0823f9 100644
---- a/drivers/pinctrl/freescale/pinctrl-vf610.c
-+++ b/drivers/pinctrl/freescale/pinctrl-vf610.c
-@@ -301,6 +301,8 @@ static struct imx_pinctrl_soc_info vf610_pinctrl_info = {
- 	.flags = SHARE_MUX_CONF_REG | ZERO_OFFSET_VALID,
- 	.mux_mask = 0x700000,
- 	.mux_shift = 20,
-+	.ibe_bit = BIT(0),
-+	.obe_bit = BIT(1),
- };
- 
- static const struct of_device_id vf610_pinctrl_of_match[] = {
 -- 
 2.7.4
