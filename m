@@ -1,139 +1,57 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 15 May 2017 09:09:14 -0700
-Subject: [PATCH] devicetree: Move include prefixes from arch to separate
- directory
-In-Reply-To: <CAL_JsqJCjwvvta0n7dNpyVZkK5hp25fYO78q_pQZzUAPRDq+-w@mail.gmail.com>
-References: <CAL_JsqKLxA8K8378z4nDBkDWnwM_zBbbf9D7EPtwQ1782dydTw@mail.gmail.com>
- <20170515142641.GU22219@n2100.armlinux.org.uk>
- <CAL_JsqJzoe_xNxMOZ88+k+bZ+bSK6-j30HXk0ZsFxHUqVDzwzw@mail.gmail.com>
- <CAOesGMgYDq5Sdk6OaK-mTyfdNGwcbgOVeKbeMSCOmwqd9k8TGQ@mail.gmail.com>
- <CAL_JsqJCjwvvta0n7dNpyVZkK5hp25fYO78q_pQZzUAPRDq+-w@mail.gmail.com>
-Message-ID: <CAOesGMh3UxHPYQ7SDG7+NODuT5TnP_i23ru0ZRR-rOYxbOGe_g@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 15 May 2017 11:16:31 -0500
+Subject: [PATCH 1/8] mmc: dt: pwrseq-simple: Invent power-off-delay-us
+In-Reply-To: <CAPDyKFqhbGqanoQqFsLrLaBXsQ5WdFrrunkvB2eOoJqH+W6jdQ@mail.gmail.com>
+References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
+ <1494260477-25163-2-git-send-email-ulf.hansson@linaro.org>
+ <20170512200300.a2hq546ra42ptlz5@rob-hp-laptop>
+ <CAPDyKFqhbGqanoQqFsLrLaBXsQ5WdFrrunkvB2eOoJqH+W6jdQ@mail.gmail.com>
+Message-ID: <CAL_JsqK4EnME2qH4j4+Nef7+1gAOKsjq00b8e7m0HWR4=w6FtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 8:52 AM, Rob Herring <robh+dt@kernel.org> wrote:
-> On Mon, May 15, 2017 at 10:27 AM, Olof Johansson <olof@lixom.net> wrote:
->> On Mon, May 15, 2017 at 7:47 AM, Rob Herring <robh+dt@kernel.org> wrote:
->>> On Mon, May 15, 2017 at 9:26 AM, Russell King - ARM Linux
->>> <linux@armlinux.org.uk> wrote:
->>>> On Mon, May 15, 2017 at 08:01:07AM -0500, Rob Herring wrote:
->>>>> I'd prefer not to mix things in scripts/dtc that aren't the import of
->>>>> dtc (yes, we do have a few other things already, but they are at least
->>>>> scripts). Couldn't this go in include/dt-bindings/ instead?
->>>>
->>>> I don't think that works.
->>>>
->>>> The include path used is "include", which means that we force people
->>>> to use:
->>>>
->>>> #include <dt-bindings/foo.dtsi>
+On Mon, May 15, 2017 at 6:08 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 12 May 2017 at 22:03, Rob Herring <robh@kernel.org> wrote:
+>> On Mon, May 08, 2017 at 06:21:10PM +0200, Ulf Hansson wrote:
+>>> During power off, after the GPIO pin has been asserted, some devices like
+>>> the Wifi chip from TI, Wl18xx, needs a delay before the host continues with
+>>> clock gating and turning off regulators as to follow a graceful shutdown
+>>> sequence.
 >>>
->>> No, I was thinking you'd add include/dt-bindings/include-prefix/ to
->>> the include path instead of scripts/dtc/include-prefix/. The only
->>> downside I can see is people could mistakenly do:
->>>
->>> #include <dt-bindings/include-prefix/$arch/foo.dtsi>
+>>> Therefore invent an optional power-off-delay-us DT binding for
+>>> mmc-pwrseq-simple, to allow us to support this constraint.
 >>
->> I considered that but thought it was a worse solution than the one I
->> ended up with. It's just confusing to have -I paths that enter an
->> include hierarchy at different levels like that.
->>
->> Just see what already happened with the mistake on rockchip, where
->> Heiko accidentally included <include/dt-include/...> instead -- it'd
->> be nice to catch that when it happens through tools
->>
->>>>
->>>> in their DT files.  This means that we'd need to populate $topdir/include
->>>> with per-architecture symlinks on top of the 26 or so directories already
->>>> there, so that:
->>>>
->>>> #include <arch/foo.dtsi>
->>>>
->>>> would work.  That's quite horrible, since $topdir/include is the main
->>>> include path for C headers.
->>>>
->>>> I guess we could have symlinks inside include/dt-bindings, but that
->>>> makes the includes:
->>>>
->>>> #include <dt-bindings/arch/foo.dtsi>
->>>>
->>>> but that's rather absurd because these _aren't_ dt-binding definitions.
->>>
->>> True, but the same can be said that "scripts/dtc" is not includes nor
->>> kernel build infrastructure.
->>>
->>>> Maybe what we should do is:
->>>>
->>>> mkdir include/dt
->>>> git mv include/dt-bindings include/dt
->>>> for arch in arch/*; do
->>>>   dts=$arch/boot/dts
->>>>   if [ -d $dts ]; then
->>>>      a=include/dt/$(basename $arch)
->>>>      ln -s $dts $a
->>>>      git add $a
->>>>   fi
->>>> done
->>>> ... fixup scripts/Makefile.lib ...
->>>> git commit
->>>
->>> That would just break every existing include in dts files.
->>
->> It doesn't break dts includes if done together with a change in -I,
->> but it might break includes from the driver side (or needs another -I
->> there).
+>> Do you really need this to be programmable per device. A delay is not
+>> going to hurt devices that don't need it.
 >
-> Ah yes, I should have paid attention to the mkdir.
+> Well, that depends on what "hurt" means. The device would still be
+> properly shut down, only that it would take unnecessary longer to do
+> so.
 >
->>> Another idea. Could kbuild create all the symlinks at build time instead?
->>
->> I considered that, but given that we're talking about a few soft links
->> that we need to find a good home for, it seemed like overkill that
->> adds magic to the build process. Having somehting that is easily
->> discovered when looking around the source tree is a lot better.
->>
->> I looked around the tree for suitable homes for this directory of
->> links, and the least out-of-place I could find was under scripts/dtc.
->> You even have a script for uprevving the imported dtc sources, so it's
->> not like it's causing any problems from that point of view. But I do
->> agree that it's not ideal -- it was just the least bad option I could
->> find at the time. Better suggestions are welcome.
+> I think the problem here, is that this delay may also affect system
+> suspend/resume time of the device, if the device powers off/on in this
+> sequence.
+
+I was assuming that given you changed the units the time was small
+enough to not be significant.
+
+>> Sorry, but this is exactly what I don't like about "simple" bindings:
+>> adding one property at a time.
 >
-> Fair enough. Like I said, it was only a preference and certainly not
-> unprecedented. I'll just get less receptive with each addition. :)
+> I understand you opinion, which in the end is a matter of taste/flavor.
 
-I'm familiar with that feeling. :)
+It's more than that. The problem is you would end up with a different
+binding if everything is defined up front versus reviewing one
+addition at a time.
 
-> When and by whom do you propose merging this?
+To give a trivial example here, now we have power on and off times in
+different units and if I was reviewing them together I would say make
+them both usec. That example is mostly taste, but different units also
+makes it more error prone for the dts writer.
 
-Given that it crosses architectures but fixes my mistaken recursive
-linking I was planning on either including it in arm-soc fixes or for
-full visibility just send it as a patch to Linus. Mind giving me an
-ack?
+> However, for me this just follows the existing approach - and suddenly
+> say no to this, doesn't really seems right either.
 
-Or, if you prefer to merge it that's fine with me too. I'd like to fix
-the tree for people who are seeing the problems soon though.
+I never said no.
 
-> The only other comment I would have is at some point, we're going to
-> have overlays that aren't tied to any arch. Where are we going to put
-> those? Maybe they are tied to some vendor which tends to have most
-> stuff in $arch and we just continue this band-aid. Or we define some
-> common location. I bring this up now only because both could use that
-> location.
-
-Those are good questions. What kind of common overlays are you
-anticipating? Things like fragments describing connectors, etc?
-
-Rule so far has been that the first arch to introduce something keeps
-it (that's between arm/arm64): Mostly it's been arm64 referencing arm
-contents so far.
-
-I guess we could introduce the concept of a common/ directory
-somewhere. As you say, finding a good home for it isn't 100% obvious
-today, and we should make sure ownership of the directory is clear
-since we've seen things go badly when patches get merged through too
-many paths on these files.
-
-
--Olof
+Rob
