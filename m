@@ -1,112 +1,75 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Mon, 15 May 2017 10:31:52 +0800
-Subject: [PATCH v3 3/3] media: mtk-mdp: Fix mdp device tree
-In-Reply-To: <60f89b9a-f068-25a7-3f8b-d13b19357361@gmail.com>
-References: <1494559361-42835-1-git-send-email-minghsiu.tsai@mediatek.com>
- <1494559361-42835-4-git-send-email-minghsiu.tsai@mediatek.com>
- <60f89b9a-f068-25a7-3f8b-d13b19357361@gmail.com>
-Message-ID: <1494815512.31916.11.camel@mtksdaap41>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Mon, 15 May 2017 11:09:53 +0800
+Subject: [PATCH v4 0/2] Add PCIe host driver support for Mediatek SoCs
+Message-ID: <1494817795-15366-1-git-send-email-ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-05-12 at 17:05 +0200, Matthias Brugger wrote:
-> 
-> On 12/05/17 05:22, Minghsiu Tsai wrote:
-> > From: Daniel Kurtz <djkurtz@chromium.org>
-> > 
-> > If the mdp_* nodes are under an mdp sub-node, their corresponding
-> > platform device does not automatically get its iommu assigned properly.
-> > 
-> > Fix this by moving the mdp component nodes up a level such that they are
-> > siblings of mdp and all other SoC subsystems.  This also simplifies the
-> > device tree.
-> > 
-> > Although it fixes iommu assignment issue, it also break compatibility
-> > with old device tree. So, the patch in driver is needed to iterate over
-> > sibling mdp device nodes, not child ones, to keep driver work properly.
-> > 
-> 
-> Couldn't we preserve backwards compatibility by doing something like this:
-> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c 
-> b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-> index 9e4eb7dcc424..277d8fe6eb76 100644
-> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-> @@ -103,7 +103,7 @@ static int mtk_mdp_probe(struct platform_device *pdev)
->   {
->   	struct mtk_mdp_dev *mdp;
->   	struct device *dev = &pdev->dev;
-> -	struct device_node *node;
-> +	struct device_node *node, *parent;
->   	int i, ret = 0;
-> 
->   	mdp = devm_kzalloc(dev, sizeof(*mdp), GFP_KERNEL);
-> @@ -117,8 +117,14 @@ static int mtk_mdp_probe(struct platform_device *pdev)
->   	mutex_init(&mdp->lock);
->   	mutex_init(&mdp->vpulock);
-> 
-> +	/* Old dts had the components as child nodes */
-> +	if (of_get_next_child(dev->of_node, NULL))
-> +		parent = dev->of_node;
-> +	else
-> +		parent = dev->of_node->parent;
-> +
->   	/* Iterate over sibling MDP function blocks */
-> -	for_each_child_of_node(dev->of_node, node) {
-> +	for_each_child_of_node(parent, node) {
->   		const struct of_device_id *of_id;
->   		enum mtk_mdp_comp_type comp_type;
->   		int comp_id;
-> 
-> Maybe even by putting a warning in the if branch to make sure, people 
-> are aware of their out-of-date device tree blobs.
-> 
-> Regards,
-> Matthias
-> 
+Hi,
 
-Hi Matthias,
+This patch series add Mediatek Gen2 PCIe host controller driver and
+dt-binding document. It can be found on MT7623 series SoCs.
 
-It is a good idea to do compatible in such a way and put a warning the
-device tree is out of date. People can find out cause soon if device
-tree is old.
-
-I modify the code as below:
-
-+	/* Old dts had the components as child nodes */
-+	if (of_get_next_child(dev->of_node, NULL)) {
-+		parent = dev->of_node;
-+		dev_warn(dev, "device tree is out of date\n");
-+	} else {
-+		parent = dev->of_node->parent;
-+	}
-
-Will you upload it in a separate patch? 
-If not, I can merge it in my patch series and upload v4.
+This driver was validated using Broadcom Tigon3 and Intel(R) 82575/82576
+gigabit ethernet card.
 
 
-Best Regards,
+P.S.
 
-Ming Hsiu
+Hi Arnd,
 
-> > Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> > 
-> > ---
-> >   drivers/media/platform/mtk-mdp/mtk_mdp_core.c | 2 +-
-> >   1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-> > index 9e4eb7d..a5ad586 100644
-> > --- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-> > +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-> > @@ -118,7 +118,7 @@ static int mtk_mdp_probe(struct platform_device *pdev)
-> >   	mutex_init(&mdp->vpulock);
-> >   
-> >   	/* Iterate over sibling MDP function blocks */
-> > -	for_each_child_of_node(dev->of_node, node) {
-> > +	for_each_child_of_node(dev->of_node->parent, node) {
-> >   		const struct of_device_id *of_id;
-> >   		enum mtk_mdp_comp_type comp_type;
-> >   		int comp_id;
-> > 
+I still keep interrupt-map properties of the child nodes in this version.
+Because I consider if some ports link down that will break the order
+of child buses we made in the binding. In such case, I'm not sure how to
+cover it just using the 'bus' portion of the device address in the
+interrupt-map properties from parent node.
+
+But if you feel this is inappropriate, I will remove those in next version.
+
+Changes since v4:
+- move the per-port registers to the parent node.
+- use a valid compatible for hifsys controller.
+- use the 'sysirq' instead of 'gic' as a correct 'interrupt-parent' of the
+  interrupt-map properties.
+ 
+  'sysirq' is an interrupt-controller that could help us to inverse GIC SPIs polarity
+  so that we could properly set irq type to level low without any extra properties.
+  I made a **big mistake** to select wrong interrupt-parent in previous version.
+  Now, we could remove interrupt properties entirely from binding.
+
+Changes since v3:
+- correct sub-nodes unit addresses.
+
+Changes since v2:
+- modify Kconfig to avoid kbuild test error on some architecture.
+- change compatible string.
+- revise binding document:
+  add missing interrupt-names.
+  remove the board dts example and drop 'status' properties.
+  remove unnecessary descriptions bout standard PCI bus binding.
+
+Changes since v1:
+- add .suppress_bind_attrs.
+- remove unnecessary *_valid_device() pattern.
+- remove PCI_PROBE_ONLY.
+- use the regular readl() instead of readl_relaxed().
+- add .map_bus() and change to use pci_generic_config_read/pci_generic_config_write.
+- revise dt-binding document and move nonstandard properties to root node.
+- change compatible string.
+- use interrupt-map property and replace mtk_pcie_map_irq() with of_irq_parse_and_map_pci().
+- use the new pci_register_host_bridge() method instead of pci_scan_root_bus()
+
+Ryder Lee (2):
+  PCI: mediatek: Add Mediatek PCIe host controller support
+  dt-bindings: pcie: Add documentation for Mediatek PCIe
+
+ .../bindings/pci/mediatek,mt7623-pcie.txt          | 130 +++++
+ drivers/pci/host/Kconfig                           |  11 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pcie-mediatek.c                   | 559 +++++++++++++++++++++
+ 4 files changed, 701 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-mediatek.c
+
+-- 
+1.9.1
