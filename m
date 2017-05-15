@@ -1,48 +1,48 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 15 May 2017 21:36:13 +0200
-Subject: [PATCH v2 0/3] mtd: nand: fsmc: support SDR timing configuration
-In-Reply-To: <1493455956-18362-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1493455956-18362-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170515213613.47bfa595@bbrezillon>
+Date: Mon, 15 May 2017 21:38:02 +0200
+Subject: [PATCH v2 0/5] mtd: nand: gpmi: add i.MX 7 support
+In-Reply-To: <20170422012338.4635-1-stefan@agner.ch>
+References: <20170422012338.4635-1-stefan@agner.ch>
+Message-ID: <20170515213802.4746dcda@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 29 Apr 2017 10:52:33 +0200
-Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Fri, 21 Apr 2017 18:23:33 -0700
+Stefan Agner <stefan@agner.ch> wrote:
 
-> Hello,
+> This patchset adds support for i.MX 7 SoC for the GPMI NAND controller.
+> There have been similar patchsets already:
+> https://lkml.org/lkml/2016/2/23/912
 > 
-> This patch series add support for configuring the FSMC NAND controller
-> timings according to the SDR timings exposed by the NAND chip.
+> However, this patchset does not make use of any of the new features.
+> The current feature set seems to work fine, I successfully run the MTD
+> tests on a Colibri iMX7.
+> 
+> --
+> Stefan
 > 
 > Changes since v1:
+> - Make clks_count const
+> - Introduce IS_IMX7D for i.MX 7 SoC's and make it part of GPMI_IS_MX6
 > 
->  - Dropped all patches from the series that have already been merged
->    in nand/next.
-> 
->  - Rework the implementation as suggested by Boris Brezillon, i.e by
->    implementing ->setup_data_interface() only when we are going to use
->    the NAND SDR timings. If there is a "timings" DT property, we keep
->    using the old strategy without ->setup_data_interface().
-> 
-> The patch series is based on the nand/next branch.
+> Stefan Agner (5):
+>   mtd: nand: gpmi: unify clock handling
+>   mtd: nand: gpmi: add i.MX 7 SoC support
+>   mtd: gpmi: document current clock requirements
 
-Applied to nand/next.
+Applied patch 1-3 to nand/next.
 
 Thanks,
 
 Boris
 
+>   ARM: dts: imx7: add GPMI NAND
+>   ARM: dts: imx7-colibri: add NAND support
 > 
-> Best regards,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (3):
->   mtd: nand: fsmc: reduce number of arguments of fsmc_nand_setup()
->   mtd: nand: fsmc: add support for SDR timings
->   mtd: nand: fsmc: remove default timings
-> 
->  drivers/mtd/nand/fsmc_nand.c | 120 +++++++++++++++++++++++++++++++++----------
->  1 file changed, 94 insertions(+), 26 deletions(-)
+>  .../devicetree/bindings/mtd/gpmi-nand.txt          | 14 +++++-
+>  arch/arm/boot/dts/imx7-colibri.dtsi                |  9 ++++
+>  arch/arm/boot/dts/imx7s.dtsi                       | 31 ++++++++++++
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c             | 56 +++++++++++++---------
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.h             |  9 +++-
+>  5 files changed, 93 insertions(+), 26 deletions(-)
 > 
