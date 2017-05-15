@@ -1,48 +1,105 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 15 May 2017 22:22:38 +0200
-Subject: [PATCH v4 0/3] arm64: dts: r8a7795: Add support for R-Car H3 ES2.0
-In-Reply-To: <20170515184041.GA23926@verge.net.au>
-References: <1494852253-8572-1-git-send-email-geert+renesas@glider.be>
- <20170515184041.GA23926@verge.net.au>
-Message-ID: <CAMuHMdU+FWLhB4sMq3HWkMrGN2aC+inA53-DNoB2pyXAiEJ8CA@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 15 May 2017 22:24:32 +0200
+Subject: [PATCH v2 00/18] ARM64: meson: DT cleanups
+In-Reply-To: <5fb0130c-473e-dc15-b60c-e5b6144031ad@suse.de>
+References: <20170513143337.14278-1-afaerber@suse.de>
+ <36c02d8a-d3e2-4330-f600-e49a1ba680e8@baylibre.com>
+ <5fb0130c-473e-dc15-b60c-e5b6144031ad@suse.de>
+Message-ID: <CAFBinCA18Y0CXvu4DtDnz=zvYxpqUNA5WRK5teO_T8zTVj4FnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Mon, May 15, 2017 at 8:40 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, May 15, 2017 at 02:44:10PM +0200, Geert Uytterhoeven wrote:
->> This patch series adds support for Renesas Salvator-X and H3ULCB
->> development boards equipped with revision ES2.0 of the R-Car H3 SoC.
-
-[...]
-
->> This has been tested on Salvator-X (H3 ES1.0 and ES2.0), and H3ULCB with
->> H3 ES1.1.
->>
->> This has not been tested on H3ULCB with H3 ES2.0 due to lack of
->> hardware, so perhaps you want to defer patch 3. However, adding ES2.0
->> support to both boards at the same time has its advantages (e.g. to answer
->> the question "in which kernel version do I need a DTB with 'es1' in its
->> name?").
->>
->> Thanks for applying (at least) the first two patches!
+On Mon, May 15, 2017 at 9:10 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Hi Neil,
 >
-> Thanks, patches 1 and 2 queued up.
+> Am 15.05.2017 um 10:16 schrieb Neil Armstrong:
+>> Hi Andreas,
+>>
+>> On 05/13/2017 04:33 PM, Andreas F?rber wrote:
+>>> Hello Kevin,
+>>>
+>>> This series fixes several cosmetic issues, on top of your for-next branch.
+>>>
+>>> Patches 3-6 rename a node, the rest should all be non-functional changes.
+>>
+>> These are OK.
+>>
+>>> PLEASE STOP merging random new nodes at the bottom of DT files!
+>>> Just like it's a convention to sort new nodes by unit address, it has been
+>>> a convention to sort by-label nodes by their label. As discussed here and
+>>> elsewhere, this helps avoid merge conflicts and makes nodes easy to find.
+>>> I don't care whether we order A0 before A or after, but adding new HDMI
+>>> or CVBS nodes at the very bottom is totally out of alphabetical order.
+>>> Since my v1 you really should've known that...
+>>
+>> It's not perfect, but now it's done, live with it, this has already been discussed.
+>
+> No.
+>
+> Copy&pasting your comment N times does not make it any more valid. My
+> files, my rules - I insist on vega-s95, gxbb and gx, which you guys
+> refactored out from my gxbb, to be tidy.
+>
+>> Please try to refactor boards DTS with their parent reference design instead
+>> like it was done with the P212 and what I did with the Wetek Hub and Play2.
+>
+> Negative, that means any additions and changes for the reference boards
+> will slip through into boards that you do not test.
+>
+> We've already seen how "well" that works with R-Box Pro having inherited
+> a broken U-Boot network configuration due to internal vs. external PHY.
+could you please share your vision how we can a) keep the amount of
+duplicate .dts code low while b) avoiding "accidental" changes? maybe
+there's a better way (compared to what we have now) which I've not
+thought of yet
 
-Thank you!
+>>> Similarly, Khadas Vim shouldn't have been merged with the "bcrmf" typo.
+>>
+>> Well, this is why we have 7 rc releases after the merge window...
+>
+> If Kevin is the maintainer, then he needs to carefully review patches.
+> It is not my job to review all patches when BayLibre gets paid for it!
+please stop these accusations, I have just sent a fix which should
+actually allow Kevin (and anybody else) to properly review the
+Broadcom FullMAC wireless SDIO devices in the future: [0]
 
-> I'd rather not take 3 until it can be tested somehow.
+>>> Which proves my point that we need to fix these issues now so that they
+>>> don't keep spreading (Broken Window Theory). New boards have not been
+>>> checked for sort order, only boards already touched in v1.
+>>>
+>>> Board and Makefile order affect my pending R-Box Pro patches.
+>>> Node order affects Martin's pending Bluetooth patches among others.
+>>
+>> Please order S905x after S905d, and we'll be OK.
+>
+> Isn't the historical SoC order S905X before S905D?
+>
+> Otherwise your strict interpretation leads to meson-gxbb before meson8,
+> which seems unlogical to me.
+>
+>>> Patches 7-9 (had and) have no dependency, please start applying.
+>>
+>> I'll wait for Kevin's advice, but I'm against these since they are
+>> only purely cosmetic and will break bisect and add unnecessary complexity
+>> to handle further patches on these board.
+>
+> See the gxbb patch for why that statement is wrong.
+>
+> Also note that not cleaning up an existing mess and making it worse are
+> two things.
+>
+> I will also remind that I was forced to clean up the node order in ALL
+> exynos5250 .dts files before I could get my new exynos5250-spring.dts
+> merged, so I have zero understanding about these "churn" and "live with
+> it" comments here. The same rules need to apply to all (that's ?galit?
+> for you!), BayLibre is not above everyone else.
+>
+> Regards,
+> Andreas
+>
+> --
+> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+> HRB 21284 (AG N?rnberg)
 
-No problem.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+[0] https://marc.info/?l=linux-wireless&m=149487928516583&w=2
