@@ -1,24 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 15 May 2017 16:44:55 -0500
-Subject: [PATCH v2 1/3] watchdog: bindings: dw_wdt: add reset lines
-In-Reply-To: <44e4e733055cfa2ed79091542c7bb17aa24afca9.1494595189.git-series.s.trumtrar@pengutronix.de>
-References: <cover.e174fd0fa926fadf54e0f76e07f238bed3e162fc.1494595189.git-series.s.trumtrar@pengutronix.de>
- <44e4e733055cfa2ed79091542c7bb17aa24afca9.1494595189.git-series.s.trumtrar@pengutronix.de>
-Message-ID: <20170515214455.f7jorcqou4oyvnkq@rob-hp-laptop>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 15 May 2017 16:53:26 -0500
+Subject: [PATCH] ARM: davinci_all_defconfig: enable LEGO MINDSTORMS EV3
+ battery module
+Message-ID: <1494885206-22805-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 03:34:35PM +0200, Steffen Trumtrar wrote:
-> Document the reset lines holding the watchdog core in reset.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-watchdog at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> ---
->  Documentation/devicetree/bindings/watchdog/dw_wdt.txt | 3 +++
->  1 file changed, 3 insertions(+)
+This enables the power supply module for the LEGO MINDSTORMS EV3 battery.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+
+Goes along with https://patchwork.kernel.org/patch/9676087/ (which I don't see
+in linux-davinci yet).
+
+ arch/arm/configs/davinci_all_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index 67db829..8857586 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -122,6 +122,7 @@ CONFIG_GPIO_PCA953X=y
+ CONFIG_GPIO_PCA953X_IRQ=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_GPIO=y
++CONFIG_BATTERY_LEGO_EV3=m
+ CONFIG_WATCHDOG=y
+ CONFIG_DAVINCI_WATCHDOG=m
+ CONFIG_MFD_DM355EVM_MSP=y
+-- 
+2.7.4
