@@ -1,142 +1,78 @@
-From: aisheng.dong@nxp.com (A.S. Dong)
-Date: Mon, 15 May 2017 09:00:32 +0000
-Subject: [PATCH 2/5] pinctrl: imx: add soc specific mux_mode mask and
- shift property
-In-Reply-To: <20170515085236.GM8471@dragon>
-References: <1494592686-30967-1-git-send-email-aisheng.dong@nxp.com>
- <1494592686-30967-3-git-send-email-aisheng.dong@nxp.com>
- <20170515085236.GM8471@dragon>
-Message-ID: <AM3PR04MB306F70328E49CB7EE68E2C380E10@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 15 May 2017 14:31:06 +0530
+Subject: [PATCH v3] arm64: perf: Ignore exclude_hv when kernel is running
+ in HYP
+In-Reply-To: <1493742574-25955-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+References: <1493742574-25955-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <CAFpQJXUy44-i-UbrXBS3qB2Gmk9nN3r79HHx00e13r6Bk1Q=Pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Monday, May 15, 2017 4:53 PM
-> To: A.S. Dong
-> Cc: linux-gpio at vger.kernel.org; Andy Duan; Jacky Bai;
-> linus.walleij at linaro.org; stefan at agner.ch; kernel at pengutronix.de; linux-
-> arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 2/5] pinctrl: imx: add soc specific mux_mode mask and
-> shift property
-> 
-> On Fri, May 12, 2017 at 08:38:02PM +0800, Dong Aisheng wrote:
-> > MX7ULP MUX mode mask and shift bit is different from VF610.
-> > Let's make it a platform specific property for the later easy of
-> > adding MX7ULP support.
-> >
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Stefan Agner <stefan@agner.ch>
-> > Cc: Bai Ping <ping.bai@nxp.com>
-> > Signed-off-by: Fugang Duan <fugang.duan@nxp.com>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  drivers/pinctrl/freescale/pinctrl-imx.c   | 10 +++++-----
-> >  drivers/pinctrl/freescale/pinctrl-imx.h   |  4 ++++
-> >  drivers/pinctrl/freescale/pinctrl-vf610.c |  2 ++
-> >  3 files changed, 11 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
-> > b/drivers/pinctrl/freescale/pinctrl-imx.c
-> > index db76e9d..8347197 100644
-> > --- a/drivers/pinctrl/freescale/pinctrl-imx.c
-> > +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-> > @@ -197,8 +197,8 @@ static int imx_pmx_set(struct pinctrl_dev *pctldev,
-> unsigned selector,
-> >  		if (info->flags & SHARE_MUX_CONF_REG) {
-> >  			u32 reg;
-> >  			reg = readl(ipctl->base + pin_reg->mux_reg);
-> > -			reg &= ~(0x7 << 20);
-> > -			reg |= (pin->mux_mode << 20);
-> > +			reg &= ~info->mux_mask;
-> > +			reg |= (pin->mux_mode << info->mux_shift);
-> >  			writel(reg, ipctl->base + pin_reg->mux_reg);
-> >  		} else {
-> >  			writel(pin->mux_mode, ipctl->base + pin_reg->mux_reg);
-> @@ -288,7
-> > +288,7 @@ static int imx_pmx_gpio_request_enable(struct pinctrl_dev
-> > *pctldev,
-> >
-> >  mux_pin:
-> >  	reg = readl(ipctl->base + pin_reg->mux_reg);
-> > -	reg &= ~(0x7 << 20);
-> > +	reg &= ~info->mux_mask;
-> >  	reg |= imx_pin->config;
-> >  	writel(reg, ipctl->base + pin_reg->mux_reg);
-> >
-> > @@ -432,7 +432,7 @@ static int imx_pinconf_get(struct pinctrl_dev
-> *pctldev,
-> >  	*config = readl(ipctl->base + pin_reg->conf_reg);
-> >
-> >  	if (info->flags & SHARE_MUX_CONF_REG)
-> > -		*config &= 0xffff;
-> > +		*config &= ~info->mux_mask;
-> 
-> It changes the way how code works.  We need a note in the commit log
-> explaining why it's safe.
-> 
+Hi Will,
 
-Well, that's Vybrid tricks that BIT[15-0] are all configs part.
-So it hardcoded 0xffff there.
+if this patch looks good, can it go in 4.12-rc2 as bug fix?
+or can it be queued for 4.13?
 
-But it's not true in ULP, so use mux_mask instead to address
-the difference.
+On Tue, May 2, 2017 at 9:59 PM, Ganapatrao Kulkarni
+<ganapatrao.kulkarni@cavium.com> wrote:
+> commit d98ecdaca296 ("arm64: perf: Count EL2 events if the kernel is
+> running in HYP") returns -EINVAL when perf system call perf_event_open is
+> called with exclude_hv != exclude_kernel. This change breaks applications
+> on VHE enabled ARMv8.1 platforms. The issue was observed with HHVM
+> application, which calls perf_event_open with exclude_hv = 1 and
+> exclude_kernel = 0.
+>
+> There is no separate hypervisor privilege level when VHE is enabled, the
+> host kernel runs at EL2. So when VHE is enabled, we should ignore
+> exclude_hv from the application. This behaviour is consistent with PowerPC
+> where the exclude_hv is ignored when the hypervisor is not present and with
+> x86 where this flag is ignored.
+>
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+>
+> Changelog:
+>
+> V2/V3:
+>  - Changes as per Will Deacon's suggestions.
+>
+> V1: Initial patch
+>
+>  arch/arm64/kernel/perf_event.c | 16 +++++++++-------
+>  1 file changed, 9 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 57ae9d9..f6748c0 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -871,15 +871,17 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+>
+>         if (attr->exclude_idle)
+>                 return -EPERM;
+> -       if (is_kernel_in_hyp_mode() &&
+> -           attr->exclude_kernel != attr->exclude_hv)
+> -               return -EINVAL;
+> +       if (is_kernel_in_hyp_mode()) {
+> +               if (!attr->exclude_kernel)
+> +                       config_base |= ARMV8_PMU_INCLUDE_EL2;
+> +       } else {
+> +               if (attr->exclude_kernel)
+> +                       config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> +               if (!attr->exclude_hv)
+> +                       config_base |= ARMV8_PMU_INCLUDE_EL2;
+> +       }
+>         if (attr->exclude_user)
+>                 config_base |= ARMV8_PMU_EXCLUDE_EL0;
+> -       if (!is_kernel_in_hyp_mode() && attr->exclude_kernel)
+> -               config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> -       if (!attr->exclude_hv)
+> -               config_base |= ARMV8_PMU_INCLUDE_EL2;
+>
+>         /*
+>          * Install the filter into config_base as this is used to
+> --
+> 1.8.1.4
+>
 
-Regards
-Dong Aisheng
-
-> Shawn
-> 
-> >
-> >  	return 0;
-> >  }
-> > @@ -459,7 +459,7 @@ static int imx_pinconf_set(struct pinctrl_dev
-> *pctldev,
-> >  		if (info->flags & SHARE_MUX_CONF_REG) {
-> >  			u32 reg;
-> >  			reg = readl(ipctl->base + pin_reg->conf_reg);
-> > -			reg &= ~0xffff;
-> > +			reg &= info->mux_mask;
-> >  			reg |= configs[i];
-> >  			writel(reg, ipctl->base + pin_reg->conf_reg);
-> >  		} else {
-> > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h
-> > b/drivers/pinctrl/freescale/pinctrl-imx.h
-> > index b5c8fe1..eb0ce95 100644
-> > --- a/drivers/pinctrl/freescale/pinctrl-imx.h
-> > +++ b/drivers/pinctrl/freescale/pinctrl-imx.h
-> > @@ -64,6 +64,10 @@ struct imx_pinctrl_soc_info {
-> >  	const char *gpr_compatible;
-> >  	struct mutex mutex;
-> >
-> > +	/* MUX_MODE shift and mask in case SHARE_MUX_CONF_REG */
-> > +	unsigned int mux_mask;
-> > +	u8 mux_shift;
-> > +
-> >  	/* generic pinconf */
-> >  	bool generic_pinconf;
-> >  	const struct pinconf_generic_params *custom_params; diff --git
-> > a/drivers/pinctrl/freescale/pinctrl-vf610.c
-> > b/drivers/pinctrl/freescale/pinctrl-vf610.c
-> > index 2b1e198..3bd8556 100644
-> > --- a/drivers/pinctrl/freescale/pinctrl-vf610.c
-> > +++ b/drivers/pinctrl/freescale/pinctrl-vf610.c
-> > @@ -299,6 +299,8 @@ static struct imx_pinctrl_soc_info
-> vf610_pinctrl_info = {
-> >  	.pins = vf610_pinctrl_pads,
-> >  	.npins = ARRAY_SIZE(vf610_pinctrl_pads),
-> >  	.flags = SHARE_MUX_CONF_REG | ZERO_OFFSET_VALID,
-> > +	.mux_mask = 0x700000,
-> > +	.mux_shift = 20,
-> >  };
-> >
-> >  static const struct of_device_id vf610_pinctrl_of_match[] = {
-> > --
-> > 2.7.4
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+thanks
+Ganapat
