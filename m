@@ -1,62 +1,36 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 15 May 2017 10:00:02 +0800
-Subject: [PATCH v3 6/6] watchdog: ts4600: add driver for TS-4600 watchdog
-In-Reply-To: <ef75bcab-e179-1891-83f6-d26d057f8758@roeck-us.net>
-References: <20170505193259.16517-1-sebastien.bourdelin@savoirfairelinux.com>
- <20170505193259.16517-7-sebastien.bourdelin@savoirfairelinux.com>
- <20170511072231.GD5833@dragon>
- <ef75bcab-e179-1891-83f6-d26d057f8758@roeck-us.net>
-Message-ID: <20170515020001.GI8471@dragon>
+Date: Mon, 15 May 2017 10:21:30 +0800
+Subject: [PATCH] ARM: dts: imx28: add gpio-ranges for internal gpio
+ controller
+In-Reply-To: <20170512080150.uh5qmwu2tctpd6jk@pengutronix.de>
+References: <20170508085925.18342-1-u.kleine-koenig@pengutronix.de>
+ <20170511075135.GF5833@dragon>
+ <20170511080916.gim5pyhj5jarzf4r@pengutronix.de>
+ <20170512030536.GC8471@dragon>
+ <20170512080150.uh5qmwu2tctpd6jk@pengutronix.de>
+Message-ID: <20170515022129.GJ8471@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 14, 2017 at 07:39:33AM -0700, Guenter Roeck wrote:
-> On 05/11/2017 12:22 AM, Shawn Guo wrote:
-> >On Fri, May 05, 2017 at 03:32:59PM -0400, Sebastien Bourdelin wrote:
-> >>This watchdog is instantiated in a FPGA and can only be access using a
-> >>GPIOs bit-banged bus, called the NBUS by Technologic Systems.
-> >>The watchdog is made of only one register, called the feed register.
-> >>Writing to this register will re-arm the watchdog for a given time (and
-> >>enable it if it was disable). It can be disabled by writing a special
-> >>value into it.
-> >>
-> >>Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
-> >>---
-> >>Changes v2 -> v3:
-> >>  - rebase on master
-> >>  - remove the timeout table to simplify the logic (suggested by
-> >>  Guenter Roeck)
-> >>  - fix the set_timeout function (suggested by Guenter Roeck)
-> >>  - hardcode the max_hw_heartbeat_ms value based on the ts4600 max
-> >>  timeout value supported (suggested by Guenter Roeck)
-> >>  - remove the max_timeout usage and set a default timeout value
-> >>(suggested by Guenter Roeck)
-> >>  - use the devm_watchdog_register_device function instead of
-> >>  watchdog_register_device (suggested by Guenter Roeck)
-> >>
-> >>Changes v1 -> v2:
-> >>  - rebase on master
-> >>  - retrieve the ts_nbus instantiated by the parent node (suggested by
-> >>  Linus Walleij)
-> >>  - rename the wdt by watchdog in the device tree and in the
-> >>  documentation (suggested by Rob Herring)
-> >>  - add a dependency to the TS_NBUS driver in the Kconfig (suggested by
-> >>  Guenter Roeck)
-> >>  - simplify the set_timeout function (suggested by Guenter Roeck)
-> >>  - use the max_hw_heartbeat_ms callback instead of the max_timeout
-> >>  callback (suggested by Guenter Roeck)
-> >>---
-> >> .../devicetree/bindings/watchdog/ts4600-wdt.txt    |  16 ++
-> >> arch/arm/boot/dts/imx28-ts4600-common.dtsi         |   5 +
-> >
-> >The dts change shouldn't be mixed within driver patch.
-> >
+On Fri, May 12, 2017 at 10:01:50AM +0200, Uwe Kleine-K?nig wrote:
+> On Fri, May 12, 2017 at 11:05:38AM +0800, Shawn Guo wrote:
+> > I went through the code around requesting a pin, and found that we need
+> > to call pinctrl_request_gpio() from gpio driver to get the result you
+> > want.  In that case, pin_request() will be called with a valid
+> > gpio_range as below.
+> > 
+> >     pinctrl_request_gpio()
+> >         pinmux_request_gpio()
+> >             pin_request(..., gpio_range)
+> > 
+> > Right now, pin_request() is being called with a NULL gpio_range from
+> > pinmux_enable_setting().  That gets us the mux_owner rather than
+> > gpio_owner for the pin.
 > 
-> Maybe, but Rob Acked the devicetree changes, so I don't see a reason
-> for splitting it up now.
+> But then again I cannot mux a pin to a different function when the gpio
+> is requested, right?
 
-What Rob Acked is devicetree bindings, and ARM dts changes should
-normally go via arm-soc tree, unless there is a good reason they
-shouldn't.
+You will need to free the GPIO before muxing it to a different function,
+I think.
 
 Shawn
