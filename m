@@ -1,44 +1,44 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 15 May 2017 11:18:20 +0100
-Subject: [PATCH] ARM: NOMMU: provide pgprot_device() macro
-Message-ID: <1494843500-40124-1-git-send-email-vladimir.murzin@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 May 2017 11:20:54 +0100
+Subject: [patch 07/18] ACPI: Adjust system_state check
+In-Reply-To: <20170514183613.002084749@linutronix.de>
+References: <20170514182716.347236777@linutronix.de>
+ <20170514183613.002084749@linutronix.de>
+Message-ID: <20170515102053.GA17776@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NOMMU build leads to the following error:
+On Sun, May 14, 2017 at 08:27:23PM +0200, Thomas Gleixner wrote:
+> To enable smp_processor_id() and might_sleep() debug checks earlier, it's
+> required to add system states between SYSTEM_BOOTING and SYSTEM_RUNNING.
+> 
+> Make the decision wether a pci root is hotplugged depend on SYSTEM_RUNNING
+> instead of !SYSTEM_BOOTING.
+> 
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/acpi/pci_root.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-  CC      drivers/pci/mmap.o
-drivers/pci/mmap.c: In function 'pci_mmap_resource_range':
-drivers/pci/mmap.c:60:3: error: implicit declaration of function 'pgprot_device' [-Werror=implicit-function-declaration]
-   vma->vm_page_prot = pgprot_device(vma->vm_page_prot);
-   ^
-cc1: some warnings being treated as errors
-scripts/Makefile.build:302: recipe for target 'drivers/pci/mmap.o' failed
-make[2]: *** [drivers/pci/mmap.o] Error 1
-scripts/Makefile.build:561: recipe for target 'drivers/pci' failed
-make[1]: *** [drivers/pci] Error 2
-Makefile:1016: recipe for target 'drivers' failed
-make: *** [drivers] Error 2
+This looks sane to me, but I assume this was meant to be Cc'd to the
+ACPI folk rather than the arm64 folk?
 
-Fix it with support of pgprot_device() macro for NOMMU.
+Mark.
 
-Fixes: 00d2904ffeac ("ARM/PCI: Use generic pci_mmap_resource_range()")
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/include/asm/pgtable-nommu.h | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/include/asm/pgtable-nommu.h b/arch/arm/include/asm/pgtable-nommu.h
-index 302240c..a0d726a 100644
---- a/arch/arm/include/asm/pgtable-nommu.h
-+++ b/arch/arm/include/asm/pgtable-nommu.h
-@@ -66,6 +66,7 @@
- #define pgprot_noncached(prot)	(prot)
- #define pgprot_writecombine(prot) (prot)
- #define pgprot_dmacoherent(prot) (prot)
-+#define pgprot_device(prot)	(prot)
- 
- 
- /*
--- 
-1.9.1
+> --- a/drivers/acpi/pci_root.c
+> +++ b/drivers/acpi/pci_root.c
+> @@ -523,7 +523,7 @@ static int acpi_pci_root_add(struct acpi
+>  	struct acpi_pci_root *root;
+>  	acpi_handle handle = device->handle;
+>  	int no_aspm = 0;
+> -	bool hotadd = system_state != SYSTEM_BOOTING;
+> +	bool hotadd = system_state == SYSTEM_RUNNING;
+>  
+>  	root = kzalloc(sizeof(struct acpi_pci_root), GFP_KERNEL);
+>  	if (!root)
+> 
+> 
