@@ -1,94 +1,55 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 15 May 2017 21:10:58 +0200
-Subject: [PATCH v2 00/18] ARM64: meson: DT cleanups
-In-Reply-To: <36c02d8a-d3e2-4330-f600-e49a1ba680e8@baylibre.com>
-References: <20170513143337.14278-1-afaerber@suse.de>
- <36c02d8a-d3e2-4330-f600-e49a1ba680e8@baylibre.com>
-Message-ID: <5fb0130c-473e-dc15-b60c-e5b6144031ad@suse.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 15 May 2017 16:13:13 -0300
+Subject: [PATCH] ARM: dts: imx7s: Avoid using dummy clocks for usdhc
+Message-ID: <1494875593-22796-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Am 15.05.2017 um 10:16 schrieb Neil Armstrong:
-> Hi Andreas,
-> 
-> On 05/13/2017 04:33 PM, Andreas F?rber wrote:
->> Hello Kevin,
->>
->> This series fixes several cosmetic issues, on top of your for-next branch.
->>
->> Patches 3-6 rename a node, the rest should all be non-functional changes.
-> 
-> These are OK.
-> 
->> PLEASE STOP merging random new nodes at the bottom of DT files!
->> Just like it's a convention to sort new nodes by unit address, it has been
->> a convention to sort by-label nodes by their label. As discussed here and
->> elsewhere, this helps avoid merge conflicts and makes nodes easy to find.
->> I don't care whether we order A0 before A or after, but adding new HDMI
->> or CVBS nodes at the very bottom is totally out of alphabetical order.
->> Since my v1 you really should've known that...
-> 
-> It's not perfect, but now it's done, live with it, this has already been discussed.
+Use the proper usdhc clocks instead of passing dummy ones.
 
-No.
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx7s.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-Copy&pasting your comment N times does not make it any more valid. My
-files, my rules - I insist on vega-s95, gxbb and gx, which you guys
-refactored out from my gxbb, to be tidy.
-
-> Please try to refactor boards DTS with their parent reference design instead
-> like it was done with the P212 and what I did with the Wetek Hub and Play2.
-
-Negative, that means any additions and changes for the reference boards
-will slip through into boards that you do not test.
-
-We've already seen how "well" that works with R-Box Pro having inherited
-a broken U-Boot network configuration due to internal vs. external PHY.
-
->> Similarly, Khadas Vim shouldn't have been merged with the "bcrmf" typo.
-> 
-> Well, this is why we have 7 rc releases after the merge window...
-
-If Kevin is the maintainer, then he needs to carefully review patches.
-It is not my job to review all patches when BayLibre gets paid for it!
-
->> Which proves my point that we need to fix these issues now so that they
->> don't keep spreading (Broken Window Theory). New boards have not been
->> checked for sort order, only boards already touched in v1.
->>
->> Board and Makefile order affect my pending R-Box Pro patches.
->> Node order affects Martin's pending Bluetooth patches among others.
-> 
-> Please order S905x after S905d, and we'll be OK.
-
-Isn't the historical SoC order S905X before S905D?
-
-Otherwise your strict interpretation leads to meson-gxbb before meson8,
-which seems unlogical to me.
-
->> Patches 7-9 (had and) have no dependency, please start applying.
-> 
-> I'll wait for Kevin's advice, but I'm against these since they are
-> only purely cosmetic and will break bisect and add unnecessary complexity
-> to handle further patches on these board.
-
-See the gxbb patch for why that statement is wrong.
-
-Also note that not cleaning up an existing mess and making it worse are
-two things.
-
-I will also remind that I was forced to clean up the node order in ALL
-exynos5250 .dts files before I could get my new exynos5250-spring.dts
-merged, so I have zero understanding about these "churn" and "live with
-it" comments here. The same rules need to apply to all (that's ?galit?
-for you!), BayLibre is not above everyone else.
-
-Regards,
-Andreas
-
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index c4f12fd..843eb37 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -934,8 +934,8 @@
+ 				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
+ 				reg = <0x30b40000 0x10000>;
+ 				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&clks IMX7D_CLK_DUMMY>,
+-					<&clks IMX7D_CLK_DUMMY>,
++				clocks = <&clks IMX7D_IPG_ROOT_CLK>,
++					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
+ 					<&clks IMX7D_USDHC1_ROOT_CLK>;
+ 				clock-names = "ipg", "ahb", "per";
+ 				bus-width = <4>;
+@@ -946,8 +946,8 @@
+ 				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
+ 				reg = <0x30b50000 0x10000>;
+ 				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&clks IMX7D_CLK_DUMMY>,
+-					<&clks IMX7D_CLK_DUMMY>,
++				clocks = <&clks IMX7D_IPG_ROOT_CLK>,
++					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
+ 					<&clks IMX7D_USDHC2_ROOT_CLK>;
+ 				clock-names = "ipg", "ahb", "per";
+ 				bus-width = <4>;
+@@ -958,8 +958,8 @@
+ 				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
+ 				reg = <0x30b60000 0x10000>;
+ 				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&clks IMX7D_CLK_DUMMY>,
+-					<&clks IMX7D_CLK_DUMMY>,
++				clocks = <&clks IMX7D_IPG_ROOT_CLK>,
++					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
+ 					<&clks IMX7D_USDHC3_ROOT_CLK>;
+ 				clock-names = "ipg", "ahb", "per";
+ 				bus-width = <4>;
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.7.4
