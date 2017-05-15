@@ -1,37 +1,62 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 15 May 2017 20:14:43 +0900
-Subject: [PATCH 0/5] devicetree: cleanup and improve DT cross-arch reference
-Message-ID: <1494846888-18966-1-git-send-email-yamada.masahiro@socionext.com>
+From: aisheng.dong@nxp.com (A.S. Dong)
+Date: Mon, 15 May 2017 11:16:57 +0000
+Subject: [PATCH 1/5] pinctrl: imx: add generic pin config core support
+In-Reply-To: <20170515105615.GN8471@dragon>
+References: <1494592686-30967-1-git-send-email-aisheng.dong@nxp.com>
+ <1494592686-30967-2-git-send-email-aisheng.dong@nxp.com>
+ <20170515083500.GL8471@dragon>
+ <AM3PR04MB3067B92ED9E3D62153536F880E10@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <20170515105615.GN8471@dragon>
+Message-ID: <AM3PR04MB3069DA0AEF0F56AB2F7808080E10@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series depends on Olof's
-"devicetree: Move include prefixes from arch to separate directory"
-https://patchwork.kernel.org/patch/9724995/
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Monday, May 15, 2017 6:56 PM
+> To: A.S. Dong
+> Cc: Andy Duan; Jacky Bai; linus.walleij at linaro.org; stefan at agner.ch;
+> linux-gpio at vger.kernel.org; kernel at pengutronix.de; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/5] pinctrl: imx: add generic pin config core support
+> 
+> On Mon, May 15, 2017 at 08:56:18AM +0000, A.S. Dong wrote:
+> > > > @@ -489,17 +547,29 @@ static int imx_pinctrl_parse_groups(struct
+> > > device_node *np,
+> > > >  		pin_size = SHARE_FSL_PIN_SIZE;
+> > > >  	else
+> > > >  		pin_size = FSL_PIN_SIZE;
+> > > > +
+> > > > +	if (info->generic_pinconf)
+> > > > +		pin_size -= 4;
+> > > > +
+> > > >  	/* Initialise group */
+> > > >  	grp->name = np->name;
+> > > >
+> > > >  	/*
+> > > > -	 * the binding format is fsl,pins = <PIN_FUNC_ID CONFIG ...>,
+> > > > +	 * the binding format is pins = <PIN_FUNC_ID CONFIG ...>,
+> > >
+> > > This is not correct for generic pinconf bindings.  CONIFIG shouldn't
+> > > be there.
+> > >
+> >
+> > Yes, that's for legacy stuff.
+> 
+> If that's for legacy bindings, you shouldn't change 'fsl,pins' to 'pins',
+> right?
+> 
 
-1/5: clean-up of unused include path
-2/5: Fixup of last three DT files in ARM (needed for 4/5)
-3/5: Fixup of last three DT files in PowerPC (needed for 4/5)
-4/5: Remove arch/$(SRCARCH)/boot/dts include path
-5/5: Make DT cross-arch reference available for /include/ directive
+I mean the binding format.
+For the legacy format, either the name of 'fsl,pins' or 'pins' is ok.
 
+But in order to increase the standard 'pins' priority, I change
+'fsl,pins' to 'pins' to make it more explicitly.
 
-Masahiro Yamada (5):
-  of: remove drivers/of/testcase-data from include search path for CPP
-  ARM: dts: use #include "..." to include DT in the same directory
-  powerpc: dts: use #include "..." to include DT in the same directory
-  of: remove arch/$(SRCARCH)/boot/dts from include search path for CPP
-  of: add scripts/dtc/include-prefixes to search path for both CPP and
-    DTC
+I do can leave "fsl,pins' not changed, but I think the new one
+may be better, right?
 
- arch/arm/boot/dts/imx6q-zii-rdu2.dts  | 4 ++--
- arch/arm/boot/dts/imx6qp-zii-rdu2.dts | 4 ++--
- arch/arm/boot/dts/versatile-pb.dts    | 2 +-
- arch/powerpc/boot/dts/ac14xx.dts      | 2 +-
- arch/powerpc/boot/dts/mpc5121ads.dts  | 2 +-
- arch/powerpc/boot/dts/pdm360ng.dts    | 2 +-
- scripts/Makefile.lib                  | 8 ++++----
- 7 files changed, 12 insertions(+), 12 deletions(-)
+Regards
+Dong Aisheng
 
--- 
-2.7.4
+> Shawn
