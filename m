@@ -1,70 +1,87 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 May 2017 17:04:35 +0900
-Subject: Applied "spi: bcm63xx-hsspi: Export OF device ID table as module
- aliases" to the spi tree
-In-Reply-To: <20170501201338.5368-1-andresgalacho@gmail.com>
-Message-ID: <E1dAAzb-0002el-44@finisterre>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 15 May 2017 09:50:34 +0200
+Subject: [PATCH 2/2] ARM: dts: add core I2C devices to the APQ8060 Dragonboard
+Message-ID: <20170515075034.3753-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+The APQ8060 Dragonboard has an Atmel AT24c128 EEPROM and a
+Wolfson Micro WM8903 codec connected to its GSBI8 I2C bus.
+Add entries for these to the device tree. The interrupt line
+from the WM8903 chip is not routed anywhere on this design
+so it can not be used.
 
-   spi: bcm63xx-hsspi: Export OF device ID table as module aliases
-
-has been applied to the spi tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 0b85a84217903e6d24342cc50bc5a685f8355711 Mon Sep 17 00:00:00 2001
-From: Andres Galacho <andresgalacho@gmail.com>
-Date: Mon, 1 May 2017 16:13:38 -0400
-Subject: [PATCH] spi: bcm63xx-hsspi: Export OF device ID table as module
- aliases
-
-The device table is required to load modules based on
-modaliases. After adding MODULE_DEVICE_TABLE, below entries
-for example will be added to module.alias:
-alias:          of:N*T*Cbrcm,bcm6328-hsspiC*
-alias:          of:N*T*Cbrcm,bcm6328-hsspi
-
-Signed-off-by: Andres Galacho <andresgalacho@gmail.com>
-Acked-by: Jonas Gorski <jonas.gorski@gmail.com>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/spi/spi-bcm63xx-hsspi.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 49 ++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-diff --git a/drivers/spi/spi-bcm63xx-hsspi.c b/drivers/spi/spi-bcm63xx-hsspi.c
-index 5514cd02e93a..4da2d4a524ca 100644
---- a/drivers/spi/spi-bcm63xx-hsspi.c
-+++ b/drivers/spi/spi-bcm63xx-hsspi.c
-@@ -484,6 +484,7 @@ static const struct of_device_id bcm63xx_hsspi_of_match[] = {
- 	{ .compatible = "brcm,bcm6328-hsspi", },
- 	{ },
- };
-+MODULE_DEVICE_TABLE(of, bcm63xx_hsspi_of_match);
+diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+index 2da1413f5720..32730c4742f6 100644
+--- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
++++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+@@ -160,6 +160,19 @@
+ 				};
+ 			};
  
- static struct platform_driver bcm63xx_hsspi_driver = {
- 	.driver = {
++			dragon_gsbi8_i2c_pins: gsbi8_i2c {
++				mux {
++					pins = "gpio64", "gpio65";
++					function = "gsbi8";
++				};
++				pinconf {
++					pins = "gpio64", "gpio65";
++					drive-strength = <16>;
++					/* These have external pull-up 2.2kOhm to 1.8V */
++					bias-disable;
++				};
++			};
++
+ 			dragon_gsbi12_i2c_pins: gsbi12_i2c {
+ 				mux {
+ 					pins = "gpio115", "gpio116";
+@@ -368,6 +381,42 @@
+ 			};
+ 		};
+ 
++		gsbi at 19800000 {
++			status = "ok";
++			qcom,mode = <GSBI_PROT_I2C>;
++
++			i2c at 19880000 {
++				status = "ok";
++				pinctrl-names = "default";
++				pinctrl-0 = <&dragon_gsbi8_i2c_pins>;
++
++				eeprom at 52 {
++					/* A 16KiB Platform ID EEPROM on the CPU carrier board */
++					compatible = "atmel,24c128";
++					reg = <0x52>;
++					vcc-supply = <&pm8058_s3>;
++					pagesize = <64>;
++				};
++				wm8903: wm8903 at 1a {
++					/* This Woolfson Micro device has an unrouted interrupt line */
++					compatible = "wlf,wm8903";
++					reg = <0x1a>;
++
++					AVDD-supply = <&pm8058_l16>;
++					CPVDD-supply = <&pm8058_l16>;
++					DBVDD-supply = <&pm8058_s3>;
++					DCVDD-supply = <&pm8058_l0>;
++
++					gpio-controller;
++					#gpio-cells = <2>;
++
++					micdet-cfg = <0>;
++					micdet-delay = <100>;
++					gpio-cfg = <0xffffffff 0xffffffff 0 0xffffffff 0xffffffff>;
++				};
++			};
++		};
++
+ 		gsbi at 19c00000 {
+ 			status = "ok";
+ 			qcom,mode = <GSBI_PROT_I2C_UART>;
 -- 
-2.11.0
+2.9.3
