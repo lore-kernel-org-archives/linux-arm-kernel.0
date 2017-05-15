@@ -1,62 +1,71 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 15 May 2017 23:44:56 +0900
-Subject: [GIT PULL] ARM: uniphier: UniPhier fixes for v4.12
-Message-ID: <CAK7LNAST-GjDVNGMuCPEo77D1DFiPpJRztbV-XsnjUfD1iWf=w@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 15 May 2017 09:47:40 -0500
+Subject: [PATCH] devicetree: Move include prefixes from arch to separate
+ directory
+In-Reply-To: <20170515142641.GU22219@n2100.armlinux.org.uk>
+References: <CAL_JsqKLxA8K8378z4nDBkDWnwM_zBbbf9D7EPtwQ1782dydTw@mail.gmail.com>
+ <20170515142641.GU22219@n2100.armlinux.org.uk>
+Message-ID: <CAL_JsqJzoe_xNxMOZ88+k+bZ+bSK6-j30HXk0ZsFxHUqVDzwzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Mon, May 15, 2017 at 9:26 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Mon, May 15, 2017 at 08:01:07AM -0500, Rob Herring wrote:
+>> I'd prefer not to mix things in scripts/dtc that aren't the import of
+>> dtc (yes, we do have a few other things already, but they are at least
+>> scripts). Couldn't this go in include/dt-bindings/ instead?
+>
+> I don't think that works.
+>
+> The include path used is "include", which means that we force people
+> to use:
+>
+> #include <dt-bindings/foo.dtsi>
 
-Here are some ARM UniPhier SoC fixes for v4.12.
-Due to the eMMC driver update, PHY parameters must be specified
-via DT to make the eMMC controller work again.
-The rest is DTC warning fixes reported when building DT with W=1.
-Please pull!
+No, I was thinking you'd add include/dt-bindings/include-prefix/ to
+the include path instead of scripts/dtc/include-prefix/. The only
+downside I can see is people could mistakenly do:
 
+#include <dt-bindings/include-prefix/$arch/foo.dtsi>
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+>
+> in their DT files.  This means that we'd need to populate $topdir/include
+> with per-architecture symlinks on top of the 26 or so directories already
+> there, so that:
+>
+> #include <arch/foo.dtsi>
+>
+> would work.  That's quite horrible, since $topdir/include is the main
+> include path for C headers.
+>
+> I guess we could have symlinks inside include/dt-bindings, but that
+> makes the includes:
+>
+> #include <dt-bindings/arch/foo.dtsi>
+>
+> but that's rather absurd because these _aren't_ dt-binding definitions.
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+True, but the same can be said that "scripts/dtc" is not includes nor
+kernel build infrastructure.
 
-are available in the git repository at:
+> Maybe what we should do is:
+>
+> mkdir include/dt
+> git mv include/dt-bindings include/dt
+> for arch in arch/*; do
+>   dts=$arch/boot/dts
+>   if [ -d $dts ]; then
+>      a=include/dt/$(basename $arch)
+>      ln -s $dts $a
+>      git add $a
+>   fi
+> done
+> ... fixup scripts/Makefile.lib ...
+> git commit
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-fixes-v4.12
+That would just break every existing include in dts files.
 
-for you to fetch changes up to 96abf9ded7954d9e6f3a7775353d9550b1283db9:
+Another idea. Could kbuild create all the symlinks at build time instead?
 
-  arm64: dts: uniphier: fix simple-bus unit address format error
-(2017-05-14 11:43:46 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM SoC fixes for v4.12
-
-- add necessary DT properties to get eMMC work again
-- fix DTC warnings when compiled with W=1
-
-----------------------------------------------------------------
-Masahiro Yamada (4):
-      arm64: dts: uniphier: add input-delay properties to Cadence eMMC node
-      arm64: dts: uniphier: add cdns, phy-dll-delay-sdclk(-hsmmc) for eMMC
-      ARM: dts: uniphier: fix simple-bus unit address format error
-      arm64: dts: uniphier: fix simple-bus unit address format error
-
-Viresh Kumar (2):
-      ARM: uniphier: Use - instead of @ for DT OPP entries
-      arm64: uniphier: Use - instead of @ for DT OPP entries
-
- arch/arm/boot/dts/uniphier-ld4.dtsi              |  2 +-
- arch/arm/boot/dts/uniphier-pro4.dtsi             |  2 +-
- arch/arm/boot/dts/uniphier-pro5.dtsi             | 34 ++++++++++-----------
- arch/arm/boot/dts/uniphier-pxs2.dtsi             | 18 +++++------
- arch/arm/boot/dts/uniphier-sld3.dtsi             |  2 +-
- arch/arm/boot/dts/uniphier-sld8.dtsi             |  2 +-
- arch/arm/boot/dts/uniphier-support-card.dtsi     |  4 +--
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 21 ++++++++-----
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 39 +++++++++++++-----------
- 9 files changed, 67 insertions(+), 57 deletions(-)
-
-
--- 
-Best Regards
-Masahiro Yamada
+Rob
