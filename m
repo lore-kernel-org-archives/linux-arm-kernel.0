@@ -1,48 +1,238 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 15 May 2017 16:41:38 -0500
-Subject: [PATCH v3 1/3] SoC: es8328-i2c: Add compatible for ES8323
-In-Reply-To: <20170512132227.24916-10-romain.perier@collabora.com>
-References: <20170512132227.24916-1-romain.perier@collabora.com>
- <20170512132227.24916-10-romain.perier@collabora.com>
-Message-ID: <20170515214138.u63u7j53jogk3prm@rob-hp-laptop>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Mon, 15 May 2017 15:27:58 -0600
+Subject: [PATCH V16 09/11] ras: acpi / apei: generate trace event for
+ unrecognized CPER section
+In-Reply-To: <1494883680-25551-1-git-send-email-tbaicar@codeaurora.org>
+References: <1494883680-25551-1-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1494883680-25551-10-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 03:22:25PM +0200, Romain Perier wrote:
-> This commit adds a compatible string for everest,es8323. This is an
-> audio codec that is compatible with es8328 and can be found for example
-> on the Firefly-RK3288 board.
+The UEFI spec includes non-standard section type support in the
+Common Platform Error Record. This is defined in section N.2.3 of
+UEFI version 2.5.
 
-If it is compatible with the es8328, then that should be a fallback and 
-you don't need the driver change.
+Currently if the CPER section's type (UUID) does not match any
+section type that the kernel knows how to parse, a trace event is
+not generated.
 
-> 
-> Signed-off-by: Romain Perier <romain.perier@collabora.com>
-> ---
-> 
-> Changes in v3: None
-> Changes in v2: None
-> 
->  Documentation/devicetree/bindings/sound/es8328.txt | 5 ++++-
->  sound/soc/codecs/es8328-i2c.c                      | 2 ++
->  2 files changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/es8328.txt b/Documentation/devicetree/bindings/sound/es8328.txt
-> index 33fbf058c997..86b6d6e99732 100644
-> --- a/Documentation/devicetree/bindings/sound/es8328.txt
-> +++ b/Documentation/devicetree/bindings/sound/es8328.txt
-> @@ -4,7 +4,10 @@ This device supports both I2C and SPI.
->  
->  Required properties:
->  
-> -  - compatible  : Should be "everest,es8328" or "everest,es8388"
-> +  - compatible  : Should be one of the following:
-> +	- "everest,es8323"
+Generate a trace event which contains the raw error data for
+non-standard section type error records.
 
-So this would be '"everest,es8323", "everest,es8328"' instead.
+Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+Tested-by: Shiju Jose <shiju.jose@huawei.com>
+---
+ drivers/acpi/apei/ghes.c  | 27 +++++++++++++++++++++++----
+ drivers/ras/ras.c         |  9 +++++++++
+ include/linux/ras.h       | 12 ++++++++++++
+ include/ras/ras_event.h   | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ include/uapi/linux/uuid.h |  6 ++++--
+ 5 files changed, 93 insertions(+), 6 deletions(-)
 
-> +	- "everest,es8328"
-> +	- "everest,es8388"
->    - DVDD-supply : Regulator providing digital core supply voltage 1.8 - 3.6V
->    - AVDD-supply : Regulator providing analog supply voltage 3.3V
->    - PVDD-supply : Regulator providing digital IO supply voltage 1.8 - 3.6V
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index 1a9240b..1106722 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -45,11 +45,14 @@
+ #include <linux/aer.h>
+ #include <linux/nmi.h>
+ #include <linux/sched/clock.h>
++#include <linux/uuid.h>
++#include <linux/ras.h>
+ 
+ #include <acpi/actbl1.h>
+ #include <acpi/ghes.h>
+ #include <acpi/apei.h>
+ #include <asm/tlbflush.h>
++#include <ras/ras_event.h>
+ 
+ #include "apei-internal.h"
+ 
+@@ -460,12 +463,22 @@ static void ghes_do_proc(struct ghes *ghes,
+ {
+ 	int sev, sec_sev;
+ 	struct acpi_hest_generic_data *gdata;
++	uuid_le sec_type;
++	uuid_le *fru_id = &NULL_UUID_LE;
++	char *fru_text = "";
+ 
+ 	sev = ghes_severity(estatus->error_severity);
+ 	apei_estatus_for_each_section(estatus, gdata) {
+ 		sec_sev = ghes_severity(gdata->error_severity);
+-		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+-				 CPER_SEC_PLATFORM_MEM)) {
++		sec_type = *(uuid_le *)gdata->section_type;
++
++		if (gdata->validation_bits & CPER_SEC_VALID_FRU_ID)
++			fru_id = (uuid_le *)gdata->fru_id;
++
++		if (gdata->validation_bits & CPER_SEC_VALID_FRU_TEXT)
++			fru_text = gdata->fru_text;
++
++		if (!uuid_le_cmp(sec_type, CPER_SEC_PLATFORM_MEM)) {
+ 			struct cper_sec_mem_err *mem_err = acpi_hest_get_payload(gdata);
+ 
+ 			ghes_edac_report_mem_error(ghes, sev, mem_err);
+@@ -474,8 +487,7 @@ static void ghes_do_proc(struct ghes *ghes,
+ 			ghes_handle_memory_failure(gdata, sev);
+ 		}
+ #ifdef CONFIG_ACPI_APEI_PCIEAER
+-		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+-				      CPER_SEC_PCIE)) {
++		else if (!uuid_le_cmp(sec_type, CPER_SEC_PCIE)) {
+ 			struct cper_sec_pcie *pcie_err = acpi_hest_get_payload(gdata);
+ 
+ 			if (sev == GHES_SEV_RECOVERABLE &&
+@@ -506,6 +518,13 @@ static void ghes_do_proc(struct ghes *ghes,
+ 
+ 		}
+ #endif
++		else {
++			void *err = acpi_hest_get_payload(gdata);
++
++			call_non_standard_trace_event(&sec_type, fru_id,
++						      fru_text, sec_sev, err,
++						      gdata->error_data_length);
++		}
+ 	}
+ }
+ 
+diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
+index b67dd36..57363be 100644
+--- a/drivers/ras/ras.c
++++ b/drivers/ras/ras.c
+@@ -7,11 +7,19 @@
+ 
+ #include <linux/init.h>
+ #include <linux/ras.h>
++#include <linux/uuid.h>
+ 
+ #define CREATE_TRACE_POINTS
+ #define TRACE_INCLUDE_PATH ../../include/ras
+ #include <ras/ras_event.h>
+ 
++void call_non_standard_trace_event(const uuid_le *sec_type,
++		 const uuid_le *fru_id, const char *fru_text, const u8 sev,
++		 const u8 *err, const u32 len)
++{
++	trace_non_standard_event(sec_type, fru_id, fru_text, sev, err, len);
++}
++
+ static int __init ras_init(void)
+ {
+ 	int rc = 0;
+@@ -27,3 +35,4 @@ static int __init ras_init(void)
+ EXPORT_TRACEPOINT_SYMBOL_GPL(extlog_mem_event);
+ #endif
+ EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
++EXPORT_TRACEPOINT_SYMBOL_GPL(non_standard_event);
+diff --git a/include/linux/ras.h b/include/linux/ras.h
+index 2aceeaf..7d397a1 100644
+--- a/include/linux/ras.h
++++ b/include/linux/ras.h
+@@ -1,6 +1,8 @@
+ #ifndef __RAS_H__
+ #define __RAS_H__
+ 
++#include <linux/uuid.h>
++
+ #ifdef CONFIG_DEBUG_FS
+ int ras_userspace_consumers(void);
+ void ras_debugfs_init(void);
+@@ -11,4 +13,14 @@
+ static inline int ras_add_daemon_trace(void) { return 0; }
+ #endif
+ 
++#ifdef CONFIG_RAS
++void call_non_standard_trace_event(const uuid_le *sec_type,
++		 const uuid_le *fru_id, const char *fru_text, const u8 sev,
++		 const u8 *err, const u32 len);
++#else
++static void call_non_standard_trace_event(const uuid_le *sec_type,
++		 const uuid_le *fru_id, const char *fru_text, const u8 sev,
++		 const u8 *err, const u32 len) { return; }
++#endif
++
+ #endif
+diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
+index 1791a12..4f79ba9 100644
+--- a/include/ras/ras_event.h
++++ b/include/ras/ras_event.h
+@@ -162,6 +162,51 @@
+ );
+ 
+ /*
++ * Non-Standard Section Report
++ *
++ * This event is generated when hardware detected a hardware
++ * error event, which may be of non-standard section as defined
++ * in UEFI spec appendix "Common Platform Error Record", or may
++ * be of sections for which TRACE_EVENT is not defined.
++ *
++ */
++TRACE_EVENT(non_standard_event,
++
++	TP_PROTO(const uuid_le *sec_type,
++		 const uuid_le *fru_id,
++		 const char *fru_text,
++		 const u8 sev,
++		 const u8 *err,
++		 const u32 len),
++
++	TP_ARGS(sec_type, fru_id, fru_text, sev, err, len),
++
++	TP_STRUCT__entry(
++		__array(char, sec_type, UUID_SIZE)
++		__array(char, fru_id, UUID_SIZE)
++		__string(fru_text, fru_text)
++		__field(u8, sev)
++		__field(u32, len)
++		__dynamic_array(u8, buf, len)
++	),
++
++	TP_fast_assign(
++		memcpy(__entry->sec_type, sec_type, UUID_SIZE);
++		memcpy(__entry->fru_id, fru_id, UUID_SIZE);
++		__assign_str(fru_text, fru_text);
++		__entry->sev = sev;
++		__entry->len = len;
++		memcpy(__get_dynamic_array(buf), err, len);
++	),
++
++	TP_printk("severity: %d; sec type:%pU; FRU: %pU %s; data len:%d; raw data:%s",
++		  __entry->sev, __entry->sec_type,
++		  __entry->fru_id, __get_str(fru_text),
++		  __entry->len,
++		  __print_hex(__get_dynamic_array(buf), __entry->len))
++);
++
++/*
+  * PCIe AER Trace event
+  *
+  * These events are generated when hardware detects a corrected or
+diff --git a/include/uapi/linux/uuid.h b/include/uapi/linux/uuid.h
+index 3738e5f..c477464 100644
+--- a/include/uapi/linux/uuid.h
++++ b/include/uapi/linux/uuid.h
+@@ -20,12 +20,14 @@
+ #include <linux/types.h>
+ #include <linux/string.h>
+ 
++#define UUID_SIZE 16
++
+ typedef struct {
+-	__u8 b[16];
++	__u8 b[UUID_SIZE];
+ } uuid_le;
+ 
+ typedef struct {
+-	__u8 b[16];
++	__u8 b[UUID_SIZE];
+ } uuid_be;
+ 
+ #define UUID_LE(a, b, c, d0, d1, d2, d3, d4, d5, d6, d7)		\
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
