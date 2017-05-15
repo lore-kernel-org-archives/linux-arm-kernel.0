@@ -1,77 +1,39 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 15 May 2017 12:55:22 +0200
-Subject: [PATCH v3 03/21] ARM: dts: omap: Add generic compatible string
- for I2C EEPROM
-In-Reply-To: <20170419235646.j6cc3vm7eru6buv6@rob-hp-laptop>
-References: <20170414010445.21727-1-javier@osg.samsung.com>
- <20170414010445.21727-4-javier@osg.samsung.com>
- <20170419235646.j6cc3vm7eru6buv6@rob-hp-laptop>
-Message-ID: <CABxcv=k7LbcQCiVYCPTTsG_-hxBseHzPy-55zDNJ+yW0BL0=3g@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 15 May 2017 18:56:16 +0800
+Subject: [PATCH 1/5] pinctrl: imx: add generic pin config core support
+In-Reply-To: <AM3PR04MB3067B92ED9E3D62153536F880E10@AM3PR04MB306.eurprd04.prod.outlook.com>
+References: <1494592686-30967-1-git-send-email-aisheng.dong@nxp.com>
+ <1494592686-30967-2-git-send-email-aisheng.dong@nxp.com>
+ <20170515083500.GL8471@dragon>
+ <AM3PR04MB3067B92ED9E3D62153536F880E10@AM3PR04MB306.eurprd04.prod.outlook.com>
+Message-ID: <20170515105615.GN8471@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
+On Mon, May 15, 2017 at 08:56:18AM +0000, A.S. Dong wrote:
+> > > @@ -489,17 +547,29 @@ static int imx_pinctrl_parse_groups(struct
+> > device_node *np,
+> > >  		pin_size = SHARE_FSL_PIN_SIZE;
+> > >  	else
+> > >  		pin_size = FSL_PIN_SIZE;
+> > > +
+> > > +	if (info->generic_pinconf)
+> > > +		pin_size -= 4;
+> > > +
+> > >  	/* Initialise group */
+> > >  	grp->name = np->name;
+> > >
+> > >  	/*
+> > > -	 * the binding format is fsl,pins = <PIN_FUNC_ID CONFIG ...>,
+> > > +	 * the binding format is pins = <PIN_FUNC_ID CONFIG ...>,
+> > 
+> > This is not correct for generic pinconf bindings.  CONIFIG shouldn't be
+> > there.
+> > 
+> 
+> Yes, that's for legacy stuff.
 
-On Thu, Apr 20, 2017 at 1:56 AM, Rob Herring <robh@kernel.org> wrote:
-> On Thu, Apr 13, 2017 at 10:04:27PM -0300, Javier Martinez Canillas wrote:
->> The at24 driver allows to register I2C EEPROM chips using different vendor
->> and devices, but the I2C subsystem does not take the vendor into account
->> when matching using the I2C table since it only has device entries.
->>
->> But when matching using an OF table, both the vendor and device has to be
->> taken into account so the driver defines only a set of compatible strings
->> using the "atmel" vendor as a generic fallback for compatible I2C devices.
->>
->> So add this generic fallback to the device node compatible string to make
->> the device to match the driver using the OF device ID table.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> ---
->>
->> Changes in v3: None
->> Changes in v2: None
->>
->>  arch/arm/boot/dts/am335x-baltos.dtsi            |  2 +-
->>  arch/arm/boot/dts/am335x-base0033.dts           |  2 +-
->>  arch/arm/boot/dts/am335x-bone-common.dtsi       | 10 +++++-----
->>  arch/arm/boot/dts/am335x-nano.dts               |  2 +-
->>  arch/arm/boot/dts/am335x-pepper.dts             |  2 +-
->>  arch/arm/boot/dts/am335x-shc.dts                |  2 +-
->>  arch/arm/boot/dts/am335x-sl50.dts               |  2 +-
->>  arch/arm/boot/dts/am437x-idk-evm.dts            |  2 +-
->>  arch/arm/boot/dts/am437x-sk-evm.dts             |  2 +-
->>  arch/arm/boot/dts/am43x-epos-evm.dts            |  2 +-
->>  arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi |  2 +-
->>  arch/arm/boot/dts/omap3-cm-t3x.dtsi             |  2 +-
->>  arch/arm/boot/dts/omap3-gta04.dtsi              |  2 +-
->>  arch/arm/boot/dts/omap3-sb-t35.dtsi             |  2 +-
->>  arch/arm/boot/dts/omap4-var-som-om44.dtsi       |  2 +-
->>  arch/arm/boot/dts/omap5-cm-t54.dts              |  2 +-
->>  arch/arm/boot/dts/omap5-sbc-t54.dts             |  2 +-
->>  17 files changed, 21 insertions(+), 21 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/am335x-baltos.dtsi b/arch/arm/boot/dts/am335x-baltos.dtsi
->> index d42b98f15e8b..6ca780d0623f 100644
->> --- a/arch/arm/boot/dts/am335x-baltos.dtsi
->> +++ b/arch/arm/boot/dts/am335x-baltos.dtsi
->> @@ -255,7 +255,7 @@
->>       };
->>
->>       at24 at 50 {
->> -             compatible = "at24,24c02";
->> +             compatible = "at24,24c02", "atmel,24c02";
->
-> I think you can just drop the at24 compatibles. A new kernel doesn't
-> need it. An old kernel ignores the manufacturer. I checked that u-boot
-> only matches on "atmel,*", so okay there. Don't know about the *BSDs. I
-> couldn't find anything.
->
+If that's for legacy bindings, you shouldn't change 'fsl,pins' to
+'pins', right?
 
-That's a very good point, it doesn't make sense indeed to keep them,
-since the vendor prefix can as you said be ignored (until the OF
-modalias report is fixed).
-
-I'll re-spin the series dropping them. Thanks a lot.
-
-Best regards,
-Javier
+Shawn
