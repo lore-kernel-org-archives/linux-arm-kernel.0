@@ -1,57 +1,49 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 15 May 2017 14:49:26 +0200
-Subject: Asking for guidance in writing IRQ controller driver
-Message-ID: <99c32a84-c064-06c8-799d-a5aa1794ba0d@free.fr>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 15 May 2017 20:59:07 +0800
+Subject: [PATCH 3/5] dt-bindings: pinctrl: add imx7ulp pinctrl binding doc
+In-Reply-To: <AM3PR04MB3069C788C96EE2854C2C68080E10@AM3PR04MB306.eurprd04.prod.outlook.com>
+References: <1494592686-30967-1-git-send-email-aisheng.dong@nxp.com>
+ <1494592686-30967-5-git-send-email-aisheng.dong@nxp.com>
+ <20170515114319.GP8471@dragon>
+ <AM3PR04MB3069C90F23CF9C9CC84BA7580E10@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <20170515122032.GS8471@dragon>
+ <AM3PR04MB3069C788C96EE2854C2C68080E10@AM3PR04MB306.eurprd04.prod.outlook.com>
+Message-ID: <20170515125905.GV8471@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, May 15, 2017 at 12:41:09PM +0000, A.S. Dong wrote:
+> > On Mon, May 15, 2017 at 12:06:19PM +0000, A.S. Dong wrote:
+> > > > > @@ -0,0 +1,56 @@
+> > > > > +* Freescale i.MX7ULP IOMUX Controller
+> > > > > +
+> > > > > +Please refer to fsl,imx-pinctrl.txt in this directory for common
+> > > > > +binding part and usage.
+> > > >
+> > > > Are imx7ulp-pinctrl bindings more alike to fsl,imx-pinctrl.txt or
+> > > > generic pinctrl-bindings.txt?  My personal feeling is that it might
+> > > > be better to take pinctrl-bindings.txt as the reference base and
+> > > > highlight how imx7ulp- pinctrl bindings differ from it.
+> > > >
+> > >
+> > > It seems still more like fsl,imx-pinctrl.txt.
+> > >
+> > > I know fsl,imx-pinctrl.txt is a bit out of date, especially after we
+> > > add generic pinconf.
+> > >
+> > > I plan to update it later after adding generic pin conf support to
+> > > legacy SoCs (MX6 & 7) as well, do you think it's ok?
+> > 
+> > Please do not.  Let's use generic pinconf support only for new SoCs, and
+> > not bother with legacy SoCs.
+> > 
+> 
+> I wonder there may be some guys interested more in generic Pinconfig format
+> rather than old one when they add new board support, or someone else
+> adding the support for legacy SoCs as the pinctrl-imx core already
+> supports it after this patch series.
 
-In the tango family, there are two revisions of the interrupt controller
-that I want to support, ideally within the same driver.
+I would take this as an unnecessary churn on existing code and increase
+of maintenance burden.  So that's definitely a NO from me.
 
-Rev 1:
- Input lines: 64 sources (63 devices + 1 SW)
-Output lines:  3 destinations, connected to GIC lines 2-4
-
-Sources can be ignored (disabled), or routed to one of
-the 3 destinations. Right now, sources get routed to
-a specific output based on which parent is declared in
-the DT. I think this was described as not quite correct
-in previous discussions?
-
-As a first approximation, routing everything to irq0 seems
-good enough. I suppose routing something to a different
-output would be useful only when trying to do some kind
-of interrupt load balancing?
-
-
-Rev 2: more of everything
- Input lines: 128 sources (124 devices + 1 SW + 3 reserved for backward-compatibility with Rev 1)
-Output lines:  24 destinations, connected to GIC lines 0-23
-
-
-Of course, the register layouts are completely different,
-since the HW designers felt that the solution in rev1
-(cloning register sets for each output) was inadequate
-for rev2.
-
-The driver I've been using until now is drivers/irqchip/irq-tango.c
-I'm willing to write a new driver from scratch, if necessary.
-
-IIUC, the DT node for the interrupt controller should just
-mention number of inputs, number of outputs?
-
-And let user-space assign devices to a specific output?
-(Using what user-space tool?)
-
-So the driver would initially map everything to output line 0,
-which would interrupt cpu0 (how to change that from user-space?)
-and then individual devices can be moved to other outputs,
-for specific use cases (implemented later as an optimization?)
-
-
-I have to give all this a bit more thought before I start coding
-something up.
-
-Regards.
+Shawn
