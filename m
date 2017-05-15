@@ -1,33 +1,24 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 15 May 2017 16:53:26 -0500
-Subject: [PATCH] ARM: davinci_all_defconfig: enable LEGO MINDSTORMS EV3
- battery module
-Message-ID: <1494885206-22805-1-git-send-email-david@lechnology.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 15 May 2017 15:27:27 -0700
+Subject: [PATCH] ARM: dts: Add devicetree for the Raspberry Pi 3, for
+ arm32 (v6)
+In-Reply-To: <20170425164508.32242-1-eric@anholt.net>
+References: <20170425164508.32242-1-eric@anholt.net>
+Message-ID: <CAOesGMjSR7AZ0o+bEHbjMDWwkyHgGSLLpVphCtTDVzKUyTzn5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the power supply module for the LEGO MINDSTORMS EV3 battery.
+Hi,
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
+On Tue, Apr 25, 2017 at 9:45 AM, Eric Anholt <eric@anholt.net> wrote:
+> Raspbian and Fedora have decided to support the Pi3 in 32-bit mode for
+> now, so it's useful to be able to test that mode on an upstream
+> kernel.  It's also been useful for me to use the same board for 32-bit
+> and 64-bit development.
+>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-Goes along with https://patchwork.kernel.org/patch/9676087/ (which I don't see
-in linux-davinci yet).
+Acked-by: Olof Johansson <olof@lixom.net>
 
- arch/arm/configs/davinci_all_defconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index 67db829..8857586 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -122,6 +122,7 @@ CONFIG_GPIO_PCA953X=y
- CONFIG_GPIO_PCA953X_IRQ=y
- CONFIG_POWER_RESET=y
- CONFIG_POWER_RESET_GPIO=y
-+CONFIG_BATTERY_LEGO_EV3=m
- CONFIG_WATCHDOG=y
- CONFIG_DAVINCI_WATCHDOG=m
- CONFIG_MFD_DM355EVM_MSP=y
--- 
-2.7.4
+-Olof
