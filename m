@@ -1,160 +1,122 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 15 May 2017 10:58:45 -0700
-Subject: [PATCH 2/2] gpio: gpio-vf610: add imx7ulp support
-In-Reply-To: <1494829706-5661-3-git-send-email-aisheng.dong@nxp.com>
-References: <1494829706-5661-1-git-send-email-aisheng.dong@nxp.com>
- <1494829706-5661-3-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <690d43f0314da9d340065b551700d6b7@agner.ch>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 15 May 2017 18:43:48 +0100
+Subject: [PATCH 00/11] arm64/firmware: Software Delegated Exception Interface
+Message-ID: <20170515174400.29735-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-05-14 23:28, Dong Aisheng wrote:
-> The Rapid General-Purpose Input and Output with 2 Ports (RGPIO2P)
-> on MX7ULP is similar to GPIO on Vibrid. But unlike Vibrid, the
-> RGPIO2P has an extra Port Data Direction Register (PDDR) used
-> to configure the individual port pins for input or output.
-> 
-> We introduce a FSL_GPIO_HAVE_PDDR with fsl_gpio_soc_data data
-> to distinguish this differences. And we support getting the output
-> status by checking the GPIO direction in PDDR.
-> 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: Fugang Duan <fugang.duan@nxp.com>
-> Cc: Peter Chen <peter.chen@nxp.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
->  drivers/gpio/gpio-vf610.c | 49 ++++++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 46 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
-> index 521fbe3..a439d27 100644
-> --- a/drivers/gpio/gpio-vf610.c
-> +++ b/drivers/gpio/gpio-vf610.c
-> @@ -30,10 +30,15 @@
->  
->  #define VF610_GPIO_PER_PORT		32
->  
-> +struct fsl_gpio_soc_data {
-> +	u32 flags;
-> +};
-> +
->  struct vf610_gpio_port {
->  	struct gpio_chip gc;
->  	void __iomem *base;
->  	void __iomem *gpio_base;
-> +	const struct fsl_gpio_soc_data *sdata;
->  	u8 irqc[VF610_GPIO_PER_PORT];
->  	int irq;
->  };
-> @@ -43,6 +48,7 @@ struct vf610_gpio_port {
->  #define GPIO_PCOR		0x08
->  #define GPIO_PTOR		0x0c
->  #define GPIO_PDIR		0x10
-> +#define GPIO_PDDR		0x14
->  
->  #define PORT_PCR(n)		((n) * 0x4)
->  #define PORT_PCR_IRQC_OFFSET	16
-> @@ -59,10 +65,18 @@ struct vf610_gpio_port {
->  #define PORT_INT_EITHER_EDGE	0xb
->  #define PORT_INT_LOGIC_ONE	0xc
->  
-> +/* SoC has a Port Data Direction Register (PDDR) */
-> +#define FSL_GPIO_HAVE_PDDR	BIT(0)
-> +
->  static struct irq_chip vf610_gpio_irq_chip;
->  
-> +static const struct fsl_gpio_soc_data imx_data = {
-> +	.flags = FSL_GPIO_HAVE_PDDR,
-> +};
-> +
->  static const struct of_device_id vf610_gpio_dt_ids[] = {
-> -	{ .compatible = "fsl,vf610-gpio" },
-> +	{ .compatible = "fsl,vf610-gpio",	.data = NULL, },
-> +	{ .compatible = "fsl,imx7ulp-gpio",	.data = &imx_data, },
->  	{ /* sentinel */ }
->  };
->  
-> @@ -79,8 +93,18 @@ static inline u32 vf610_gpio_readl(void __iomem *reg)
->  static int vf610_gpio_get(struct gpio_chip *gc, unsigned int gpio)
->  {
->  	struct vf610_gpio_port *port = gpiochip_get_data(gc);
-> -
-> -	return !!(vf610_gpio_readl(port->gpio_base + GPIO_PDIR) & BIT(gpio));
-> +	unsigned long mask = BIT(gpio);
-> +	void __iomem *addr;
-> +
-> +	if (port->sdata && port->sdata->flags & FSL_GPIO_HAVE_PDDR) {
-> +		mask &= vf610_gpio_readl(port->gpio_base + GPIO_PDDR);
-> +		addr = mask ? port->gpio_base + GPIO_PDOR :
-> +			      port->gpio_base + GPIO_PDIR;
-> +		return !!(vf610_gpio_readl(addr) & BIT(gpio));
-> +	} else {
-> +		return !!(vf610_gpio_readl(port->gpio_base + GPIO_PDIR)
-> +					   & BIT(gpio));
-> +	}
+Hello!
 
-I would rather prefer to read the actual value on the wire...
+The Software Delegated Exception Interface (SDEI) is an ARM specification
+for registering callbacks from the platform firmware into the OS.
+This is intended to be used to implement firmware-first RAS notifications.
 
->  }
->  
->  static void vf610_gpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
-> @@ -96,12 +120,28 @@ static void vf610_gpio_set(struct gpio_chip *gc,
-> unsigned int gpio, int val)
->  
->  static int vf610_gpio_direction_input(struct gpio_chip *chip, unsigned gpio)
->  {
-> +	struct vf610_gpio_port *port = gpiochip_get_data(chip);
-> +	unsigned long mask = BIT(gpio);
-> +	u32 val;
-> +
-> +	if (port->sdata && port->sdata->flags & FSL_GPIO_HAVE_PDDR) {
-> +		val = vf610_gpio_readl(port->gpio_base + GPIO_PDDR);
-> +		val &= ~mask;
-> +		vf610_gpio_writel(val, port->gpio_base + GPIO_PDDR);
+The document is here:
+http://infocenter.arm.com/help/topic/com.arm.doc.den0054a/ARM_DEN0054A_Software_Delegated_Exception_Interface.pdf
 
-As mentioned in the pinctrl patchset review, if we can do this
-orthogonal, I would rather prefer to not involve pinctrl here in the
-i.MX 7ULP case. So I would make sure that
-pinctrl_gpio_direction_input/output does not get called at all (e.g.
-returning in this if case)...
+This series (juggles some registers with KVM+VHE, then) adds a DT binding to
+trigger probing of the interface and support for the SDEI API.
+A future version of the ACPI spec should add the necessary parts to enable this
+to be used as a GHES notification.
 
---
-Stefan
 
-> +	}
-> +
->  	return pinctrl_gpio_direction_input(chip->base + gpio);
->  }
->  
->  static int vf610_gpio_direction_output(struct gpio_chip *chip, unsigned gpio,
->  				       int value)
->  {
-> +	struct vf610_gpio_port *port = gpiochip_get_data(chip);
-> +	unsigned long mask = BIT(gpio);
-> +
-> +	if (port->sdata && port->sdata->flags & FSL_GPIO_HAVE_PDDR)
-> +		vf610_gpio_writel(mask, port->gpio_base + GPIO_PDDR);
-> +
->  	vf610_gpio_set(chip, gpio, value);
->  
->  	return pinctrl_gpio_direction_output(chip->base + gpio);
-> @@ -216,6 +256,8 @@ static struct irq_chip vf610_gpio_irq_chip = {
->  
->  static int vf610_gpio_probe(struct platform_device *pdev)
->  {
-> +	const struct of_device_id *of_id = of_match_device(vf610_gpio_dt_ids,
-> +							   &pdev->dev);
->  	struct device *dev = &pdev->dev;
->  	struct device_node *np = dev->of_node;
->  	struct vf610_gpio_port *port;
-> @@ -227,6 +269,7 @@ static int vf610_gpio_probe(struct platform_device *pdev)
->  	if (!port)
->  		return -ENOMEM;
->  
-> +	port->sdata = of_id->data;
->  	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	port->base = devm_ioremap_resource(dev, iores);
->  	if (IS_ERR(port->base))
+SDEI runs between adjacent exception levels, so events will always be delivered
+to EL2 if firmware is at EL3. For VHE hosts we run the SDEI event handler
+behind KVM's back with all exceptions masked. Once the handler has done its
+work we return to the appropriate vbar+irq entry. This allows KVM to
+world-switch and deliver any signals sent by the handler to Qemu/kvmtool. We
+do the same thing if we interrupt host EL0. If we interrupted code with
+interrupts masked, we use a different API call to return to the interrupted
+context.
+
+What about non-VHE KVM? If you don't have VHE support and boot at EL2, the
+kernel drops to EL1. This driver will print an error message then give up. This
+is because events would still be delivered to EL2 hitting either KVM, or the
+hyp-stub. Supporting this is complicated, but because the main use-case is
+RAS, and ARM v8.2's RAS extensions imply v8.1's Virtual Host Extensions, we
+can assume all platforms with SDEI will support VHE too. (I have some ideas
+on how to support non-VHE if it turns out to be needed).
+
+
+Running the event handler behind VHE-KVM's back has some side effects: The
+event handler will blindly use any registers that are shared between the host
+and guest. The two that I think matter are TPIDR_EL1, and the debug state. The
+guest may have set MDSCR_EL1 so debug exceptions must remain masked. The
+guest's TPIDR_EL1 will be used by the event handler if it accesses per-cpu
+variables. This needs fixing. The first part of this series juggles KVMs use
+of TPIDR_EL2 so that we share it with the host on VHE systems. An equivalent
+change for 32bit is on my todo list. (one alternative to this is to have a
+parody world switch in the SDEI event handler, but this would mean special
+casing interrupted guests, and be an ABI link to KVM.)
+
+Causing a synchronous exception from an event handler will cause KVM to
+hyp-panic, but may silently succeed if the event didn't interrupt a guest.
+(I may WARN_ON() if this happens in a later patch). You because of this you
+should not kprobe anything that handles SDE events. Once we've called
+nmi_enter(), ftrace and friends should be safe.
+
+Is this another begins-with-S RAS mechanism for arm64? Yes.
+Why? Any notification delivered as an exception will overwrite the exception
+registers. This is fatal for the running thread if it happens during entry.S's
+kernel_enter or kernel_exit. Instead of adding masking and routing controls,
+events are delivered to a registered address at a fixed exception level and
+don't change the exception registers when delivered.
+
+This series can be retrieved from:
+git://linux-arm.org/linux-jm.git -b sdei/v1/base
+
+Questions and contradictions welcome!
+
+
+James Morse (11):
+  KVM: arm64: Store vcpu on the stack during __guest_enter()
+  KVM: arm/arm64: Convert kvm_host_cpu_state to a static per-cpu
+    allocation
+  KVM: arm64: Change hyp_panic()s dependency on tpidr_el2
+  arm64: alternatives: use tpidr_el2 on VHE hosts
+  arm64: KVM: Stop save/restoring host tpidr_el1 on VHE
+  dt-bindings: add devicetree binding for describing arm64 SDEI firmware
+  firmware: arm_sdei: Add driver for Software Delegated Exceptions
+  arm64: kernel: Add arch-specific SDEI entry code and CPU masking
+  firmware: arm_sdei: Add support for CPU and system power states
+  firmware: arm_sdei: add support for CPU private events
+  KVM: arm64: Delegate support for SDEI to userspace
+
+ Documentation/devicetree/bindings/arm/sdei.txt |   37 +
+ arch/arm64/Kconfig                             |    1 +
+ arch/arm64/include/asm/assembler.h             |    8 +
+ arch/arm64/include/asm/kvm_host.h              |    2 +
+ arch/arm64/include/asm/percpu.h                |   11 +-
+ arch/arm64/include/asm/processor.h             |    1 +
+ arch/arm64/include/asm/sdei.h                  |   45 +
+ arch/arm64/kernel/Makefile                     |    1 +
+ arch/arm64/kernel/asm-offsets.c                |    2 +
+ arch/arm64/kernel/cpufeature.c                 |   22 +
+ arch/arm64/kernel/entry.S                      |   68 ++
+ arch/arm64/kernel/sdei.c                       |  106 +++
+ arch/arm64/kernel/smp.c                        |    7 +
+ arch/arm64/kvm/handle_exit.c                   |   10 +-
+ arch/arm64/kvm/hyp-init.S                      |    4 +
+ arch/arm64/kvm/hyp/entry.S                     |   12 +-
+ arch/arm64/kvm/hyp/hyp-entry.S                 |   13 +-
+ arch/arm64/kvm/hyp/switch.c                    |   25 +-
+ arch/arm64/kvm/hyp/sysreg-sr.c                 |   16 +-
+ arch/arm64/mm/proc.S                           |    8 +
+ drivers/firmware/Kconfig                       |    8 +
+ drivers/firmware/Makefile                      |    1 +
+ drivers/firmware/arm_sdei.c                    | 1055 ++++++++++++++++++++++++
+ include/linux/cpuhotplug.h                     |    1 +
+ include/linux/sdei.h                           |  102 +++
+ include/uapi/linux/kvm.h                       |    1 +
+ include/uapi/linux/sdei.h                      |   91 ++
+ virt/kvm/arm/arm.c                             |   23 +-
+ 28 files changed, 1634 insertions(+), 47 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/sdei.txt
+ create mode 100644 arch/arm64/include/asm/sdei.h
+ create mode 100644 arch/arm64/kernel/sdei.c
+ create mode 100644 drivers/firmware/arm_sdei.c
+ create mode 100644 include/linux/sdei.h
+ create mode 100644 include/uapi/linux/sdei.h
+
+-- 
+2.10.1
