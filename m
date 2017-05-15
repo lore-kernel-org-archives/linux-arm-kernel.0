@@ -1,57 +1,80 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 May 2017 15:26:42 +0100
-Subject: [PATCH] devicetree: Move include prefixes from arch to separate
- directory
-In-Reply-To: <CAL_JsqKLxA8K8378z4nDBkDWnwM_zBbbf9D7EPtwQ1782dydTw@mail.gmail.com>
-References: <CAL_JsqKLxA8K8378z4nDBkDWnwM_zBbbf9D7EPtwQ1782dydTw@mail.gmail.com>
-Message-ID: <20170515142641.GU22219@n2100.armlinux.org.uk>
+From: phil@raspberrypi.org (Phil Elwell)
+Date: Mon, 15 May 2017 15:29:29 +0100
+Subject: [Bug] VCHIQ functional test broken
+In-Reply-To: <20170513093016.GQ22219@n2100.armlinux.org.uk>
+References: <20170413222915.GF17774@n2100.armlinux.org.uk>
+ <20170414074104.GA8704@laptop> <87pog7x7c5.fsf@eliezer.anholt.net>
+ <20170420195822.GA22677@laptop>
+ <696fb1c1-7751-caf0-e0d9-9c67b059b4cc@i2se.com>
+ <20170424164015.GP17774@n2100.armlinux.org.uk>
+ <1058502523.15283.1493055747531@email.1und1.de>
+ <20170424185931.GQ17774@n2100.armlinux.org.uk>
+ <1381182989.263636.1493062504676@email.1und1.de>
+ <952745481.440383.1494666448727@email.1und1.de>
+ <20170513093016.GQ22219@n2100.armlinux.org.uk>
+Message-ID: <34277896-d59f-9026-8700-d592c14458f5@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 08:01:07AM -0500, Rob Herring wrote:
-> I'd prefer not to mix things in scripts/dtc that aren't the import of
-> dtc (yes, we do have a few other things already, but they are at least
-> scripts). Couldn't this go in include/dt-bindings/ instead?
+On 13/05/2017 10:30, Russell King - ARM Linux wrote:
+> On Sat, May 13, 2017 at 11:07:28AM +0200, Stefan Wahren wrote:
+>> In the meantime this issue has been fixed by Phil [1].
+> 
+> Right - definitely a driver bug.  Mapping more memory for DMA than is
+> actually going to be DMA'd to and expecting data to be preserved is
+> really horrid.
 
-I don't think that works.
+That feature was added during the upstreaming process, and as Stefan says
+there is an outstanding patch for it.
 
-The include path used is "include", which means that we force people
-to use:
+>> Unfortunately i found another issue. If i enable CONFIG_HIGHMEM in
+>> the kernel config, the data during functional test gets corrupted.
+>> Phil said it's caused by the usage of get_user_pages() [2].
+> 
+> Without knowing who "Phil" is in that thread, but...
+> 
+>    HIGHMEM is a problem because you can't use get_user_pages on pages in
+>    HIGHMEM.
+> 
+> is an interesting statement, and without any reasoning or evidence.
+> 
+> I also believe it to be incorrect.  get_user_pages() returns an array
+> of struct page pointers for the user memory, calling flush_dcache_page()
+> and flush_anon_page() on them to ensure that any kernel mapping is
+> coherent with what is in userspace.
+> 
+> As far as returning the array of page pointers, get_user_pages() doesn't
+> care whether they're lowmem or highmem.
+> 
+> flush_dcache_page() doesn't care either - if it wants to flush the page
+> and the page is a highmem page, it will temporarily map it before
+> flushing it.
+> 
+> flush_anon_page() is a no-op for all non-aliasing caches.
+> 
+> get_user_pages() works fine for whatever memory on other platforms and
+> drivers such as etnaviv, so I think this comes down to the vchip driver
+> doing things in ways that the kernel interfaces its using don't expect -
+> exactly like the "lets pass full pages to the DMA API" broken-ness.
 
-#include <dt-bindings/foo.dtsi>
+See previous comment.
 
-in their DT files.  This means that we'd need to populate $topdir/include
-with per-architecture symlinks on top of the 26 or so directories already
-there, so that:
+> I would like to hear the justification for that statement, but without
+> any justification, I assert that the statement is false.
 
-#include <arch/foo.dtsi>
+I am the Phil in question, and the off-the-cuff comment was the result of
+a hazy memory of issues encountered with VCHIQ bulk transfers as a Broadcom
+employee (which would have been on a 2.6 kernel). I suspect there may have
+been some use of kernel virtual addresses as an intermediate representation,
+but I no longer have access to that code.
 
-would work.  That's quite horrible, since $topdir/include is the main
-include path for C headers.
+If get_user_pages is HIGHMEM-safe (and I can see why it would be), then the
+cause of the corruption Stefan saw is probably the special handling of
+unaligned reads, specifically:
 
-I guess we could have symlinks inside include/dt-bindings, but that
-makes the includes:
+			memcpy((char *)page_address(pages[0]) +
+				pagelist->offset,
+				fragments,
+				head_bytes);
 
-#include <dt-bindings/arch/foo.dtsi>
-
-but that's rather absurd because these _aren't_ dt-binding definitions.
-
-Maybe what we should do is:
-
-mkdir include/dt
-git mv include/dt-bindings include/dt
-for arch in arch/*; do
-  dts=$arch/boot/dts
-  if [ -d $dts ]; then
-     a=include/dt/$(basename $arch)
-     ln -s $dts $a
-     git add $a
-  fi
-done
-... fixup scripts/Makefile.lib ...
-git commit
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Phil
