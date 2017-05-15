@@ -1,101 +1,48 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Mon, 15 May 2017 18:35:27 +0300
-Subject: [RFC v1 3/3] dt-binding: Interconnect device-tree bindings draft
-In-Reply-To: <20170515153527.27649-1-georgi.djakov@linaro.org>
-References: <20170515153527.27649-1-georgi.djakov@linaro.org>
-Message-ID: <20170515153527.27649-4-georgi.djakov@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 May 2017 16:48:45 +0100
+Subject: [PATCH] devicetree: Move include prefixes from arch to separate
+ directory
+In-Reply-To: <CAOesGMgYDq5Sdk6OaK-mTyfdNGwcbgOVeKbeMSCOmwqd9k8TGQ@mail.gmail.com>
+References: <CAL_JsqKLxA8K8378z4nDBkDWnwM_zBbbf9D7EPtwQ1782dydTw@mail.gmail.com>
+ <20170515142641.GU22219@n2100.armlinux.org.uk>
+ <CAL_JsqJzoe_xNxMOZ88+k+bZ+bSK6-j30HXk0ZsFxHUqVDzwzw@mail.gmail.com>
+ <CAOesGMgYDq5Sdk6OaK-mTyfdNGwcbgOVeKbeMSCOmwqd9k8TGQ@mail.gmail.com>
+Message-ID: <20170515154845.GW22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The interconnect API is not yet using DT bindings for expressing
-the relations between the API consumers and providers. This is
-posted a separate patch as it needs further discussions on how
-to represent this with DT.
+On Mon, May 15, 2017 at 08:27:54AM -0700, Olof Johansson wrote:
+> On Mon, May 15, 2017 at 7:47 AM, Rob Herring <robh+dt@kernel.org> wrote:
+> > On Mon, May 15, 2017 at 9:26 AM, Russell King - ARM Linux
+> > <linux@armlinux.org.uk> wrote:
+> >> Maybe what we should do is:
+> >>
+> >> mkdir include/dt
+> >> git mv include/dt-bindings include/dt
+> >> for arch in arch/*; do
+> >>   dts=$arch/boot/dts
+> >>   if [ -d $dts ]; then
+> >>      a=include/dt/$(basename $arch)
+> >>      ln -s $dts $a
+> >>      git add $a
+> >>   fi
+> >> done
+> >> ... fixup scripts/Makefile.lib ...
+> >> git commit
+> >
+> > That would just break every existing include in dts files.
+> 
+> It doesn't break dts includes if done together with a change in -I,
+> but it might break includes from the driver side (or needs another -I
+> there).
 
-Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
----
- .../bindings/interconnect/interconnect.txt         | 75 ++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
+Good point.
 
-diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-new file mode 100644
-index 000000000000..e38a29db981e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-@@ -0,0 +1,75 @@
-+Interconnect Provider Device Tree Bindings
-+=========================================
-+
-+The purpose of this document is to define a common set of generic interconnect
-+providers/consumers properties.
-+
-+
-+= interconnect providers =
-+
-+The interconnect provider binding is intended to represent the interconnect
-+controllers in the system. Each provider registers a set of interconnect
-+nodes, which expose the interconnect related capabilities of the interconnect
-+to consumer drivers. These capabilities can be throughput, latency, priority
-+etc. The consumer drivers set constraints on interconnect path (or endpoints)
-+depending on the usecase. Interconnect providers can also be interconnect
-+consumers, such as in the case where two network-on-chip fabrics interface
-+directly
-+
-+Required properties:
-+- compatible : contains the interconnect provider vendor specific compatible
-+	       string
-+- reg : register space of the interconnect controller hardware
-+- #interconnect-cells : number of cells in a interconnect specifier needed to
-+		       encode the interconnect node id.
-+
-+Example:
-+
-+		snoc: snoc at 0580000 {
-+			compatible = "qcom,msm-bus-snoc";
-+			reg = <0x580000 0x14000>;
-+			#interconnect-cells = <1>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_SNOC_CLK>, <&rpmcc RPM_SMD_SNOC_A_CLK>;
-+			status = "okay";
-+		};
-+		bimc: bimc at 0400000 {
-+			compatible = "qcom,msm-bus-bimc";
-+			reg = <0x400000 0x62000>;
-+			#interconnect-cells = <1>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_BIMC_CLK>, <&rpmcc RPM_SMD_BIMC_A_CLK>;
-+			status = "okay";
-+		};
-+		pnoc: pnoc at 500000 {
-+			compatible = "qcom,msm-bus-pnoc";
-+			reg = <0x500000 0x11000>;
-+			#interconnect-cells = <1>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_PCNOC_CLK>, <&rpmcc RPM_SMD_PCNOC_A_CLK>;
-+			status = "okay";
-+		};
-+
-+= interconnect consumers =
-+
-+The interconnect consumers are device nodes which consume the interconnect
-+path(s) provided by the interconnect provider. There can be multiple
-+interconnect providers on a SoC and the consumer may consume multiple paths
-+from different providers depending on usecase and the components it has to
-+interact with.
-+
-+Required-properties:
-+interconnect-src : A phandle and interconnect provider specifier as defined by
-+		bindings of the interconnect provider specified by phandle.
-+		This denotes the source device port which will be used, as the
-+		device may have multiple master ports.
-+interconnect-dst : A phandle and internet provider specifier pointing to the
-+		local port of the target device.
-+
-+Example:
-+
-+	sdhci at 07864000 {
-+		...
-+		interconnect-src = <&pnoc MAS_PNOC_SDCC_2>;
-+		interconnect-dst = <&pnoc SLV_BLSP_1>;
-+	};
+We could leave include/dt-bindings where it is, and just do the rest of
+it for the cross-arch includes.  Slightly less tidy but should have a
+lower impact.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
