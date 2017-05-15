@@ -1,145 +1,91 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Mon, 15 May 2017 14:35:58 +0530
-Subject: [PATCH v2 1/5] pinctrl: qcom: Add ipq8074 pinctrl driver
-In-Reply-To: <20170514042307.GE69278@Bjorns-MacBook-Pro-2.local>
-References: <1493898841-20583-1-git-send-email-varada@codeaurora.org>
- <1493898841-20583-2-git-send-email-varada@codeaurora.org>
- <20170510224355.GE45273@Bjorns-MacBook-Pro-2.local>
- <1f4c9974-f6a4-bee7-4f37-ad8795e442a3@codeaurora.org>
- <20170514042307.GE69278@Bjorns-MacBook-Pro-2.local>
-Message-ID: <7afc7191-bcb1-a566-eac5-a4fe1293c773@codeaurora.org>
+From: yanjiang.jin@windriver.com (yjin)
+Date: Mon, 15 May 2017 17:05:49 +0800
+Subject: [PATCH] socfpga_a10: reset CPU1 in socfpga_cpu_kill()
+In-Reply-To: <20170512143600.GB18818@leverpostej>
+References: <20170510051304.131042-1-yanjiang.jin@windriver.com>
+ <20170510051304.131042-2-yanjiang.jin@windriver.com>
+ <20170512143600.GB18818@leverpostej>
+Message-ID: <59196F6D.40400@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/14/2017 9:53 AM, Bjorn Andersson wrote:
-> On Thu 11 May 03:33 PDT 2017, Varadarajan Narayanan wrote:
-> 
->> On 5/11/2017 4:13 AM, Bjorn Andersson wrote:
->>> On Thu 04 May 04:53 PDT 2017, Varadarajan Narayanan wrote:
->>>
-> [..]
->>>> +enum ipq8074_functions {
->>>
->>> Please keep these sorted alphabetically.
->>
->> Ok
->>
->>>> +	msm_mux_gpio,
->>>> +	msm_mux_qpic_pad,
->>>> +	msm_mux_blsp5_i2c,
->>>> +	msm_mux_blsp5_spi,
->>>> +	msm_mux_wci20,
->>>
->>> What does "20" mean here?
->>
->> This is for Wireless Coex Interface. The same functionality can be muxed on
->> to different GPIOs. WCI2, is the 2nd edition of the WCI standard and 0, 1
->> are for the muxing to different GPIOs (alternate muxes).
->>
-> 
-> In other Qualcomm platforms the alternative muxes are denoted by letters
-> (a,b,c...). Would you mind picking up this naming scheme, or do you see
-> any problems with that? (E.g. wci2a in this case)
 
-Ok
-
-> Btw, do you need any additional configuration for selecting alternative
-> muxing or is that automagical these days?
-
-No additional configuration is needed.
-
->>>> +	msm_mux_blsp3_spi3,
->>>> +	msm_mux_burn0,
->>>> +	msm_mux_pcm_zsi0,
->>>> +	msm_mux_blsp5_uart,
->>>> +	msm_mux_mac12,
->>>
->>> What does "12" mean here?
+On 2017?05?12? 22:36, Mark Rutland wrote:
+> On Wed, May 10, 2017 at 01:13:04AM -0400, yanjiang.jin at windriver.com wrote:
+>> From: Yanjiang Jin <yanjiang.jin@windriver.com>
 >>
->> The SoC has three MAC cores. Each core has two pins for the smart antenna
->> feature. macXY indicates the function select for MAC no. X and smart antenna
->> no. Y.
+>> Kexec's second kernel would hang if CPU1 isn't reset.
 >>
-> 
-> Ok
-> 
->>>> +	msm_mux_blsp3_spi0,
->>>> +	msm_mux_burn1,
->>>> +	msm_mux_mac01,
->>>> +	msm_mux_qdss_cti_trig_out_b0,
->>>> +	msm_mux_qdss_cti_trig_in_b0,
->>>> +	msm_mux_qpic_pad4,
->>>
->>> What are qpic_pad and qpic_pad0 through qpic_pad8? Different functions,
->>> alternative muxings...?
+>> Signed-off-by: Yanjiang Jin <yanjiang.jin@windriver.com>
+>> ---
+>>   arch/arm/mach-socfpga/platsmp.c | 12 +++++++++++-
+>>   1 file changed, 11 insertions(+), 1 deletion(-)
 >>
->> This is for the NAND and LCD display. The pins listed are the 9 data pins.
->>
-> 
-> Then you can describe them all as "qpic_pad" (or simply "qpic"?). (It's
-> possible to reference a partial group in the DTS, if that's necessary)
+>> diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
+>> index 0ee7677..db3940e 100644
+>> --- a/arch/arm/mach-socfpga/platsmp.c
+>> +++ b/arch/arm/mach-socfpga/platsmp.c
+>> @@ -117,6 +117,16 @@ static int socfpga_cpu_kill(unsigned int cpu)
+>>   {
+>>   	return 1;
+>>   }
+>> +
+>> +static int socfpga_a10_cpu_kill(unsigned int cpu)
+>> +{
+>> +	/* This will put CPU #1 into reset. */
+>> +	if (socfpga_cpu1start_addr)
+>> +		writel(RSTMGR_MPUMODRST_CPU1, rst_manager_base_addr +
+>> +			SOCFPGA_A10_RSTMGR_MODMPURST);
+>> +
+>> +	return 1;
+>> +}
+>>   #endif
+> I agree that currently, socfpga_cpu_die is completely bogus, as the CPU is just
+> sat in WFI with the MMU, caches, etc enabled, and not actually off:
+>
+> static void socfpga_cpu_die(unsigned int cpu)
+> {
+>          /* Do WFI. If we wake up early, go back into WFI */
+>          while (1)
+>                  cpu_do_idle();
+> }
+>
+> ... so that goes wrong as soon as the kerenl text gets ovewritten.
+>
+> However, AFAICT, this patch forcibly resets is without any teardown
+> having happened. That will surely result in data being lost from the
+> caches, for example.
+>
+> So I think this is incomplete.
+Hi Mark,
 
-There are two sets of 9 pins, either of which can go to NAND or LCD.
-Will rename qpic_pad as qpic_a and qpic_pad[0-8] as qpic_b.
-Is that ok?
+I think I got what you mean. So far, flush_cache is the only thing that 
+I can think of.
+Can we just add flush_cache_all in cpu_die() now, and add other missing 
+parts(if have) in the future.
 
->>>> +	msm_mux_blsp4_uart0,
->>>> +	msm_mux_blsp4_i2c0,
->>>> +	msm_mux_blsp4_spi0,
->>>> +	msm_mux_mac21,
->>>> +	msm_mux_qdss_cti_trig_out_b1,
->>>> +	msm_mux_qpic_pad5,
->>>> +	msm_mux_qdss_cti_trig_in_b1,
->>>> +	msm_mux_qpic_pad6,
->>>> +	msm_mux_qpic_pad7,
->>>> +	msm_mux_cxc0,
->>>> +	msm_mux_mac13,
->>>> +	msm_mux_qdss_cti_trig_in_a1,
->>>> +	msm_mux_qdss_cti_trig_out_a1,
->>>> +	msm_mux_wci22,
->>>> +	msm_mux_qdss_cti_trig_in_a0,
->>>> +	msm_mux_qpic_pad1,
->>>> +	msm_mux_qdss_cti_trig_out_a0,
->>>> +	msm_mux_qpic_pad2,
->>>> +	msm_mux_qpic_pad3,
->>>> +	msm_mux_qdss_traceclk_b,
->>>> +	msm_mux_qpic_pad0,
->>>> +	msm_mux_qdss_tracectl_b,
->>>> +	msm_mux_qpic_pad8,
->>>> +	msm_mux_pcm_zsi1,
->>>> +	msm_mux_qdss_tracedata_b,
->>>> +	msm_mux_led0,
->>>> +	msm_mux_pwm04,
->>>
->>> What does "04" mean here?
->>
->> There are 4 Pulse Width Modulation channels, pwmXY is pwm channel X and pin
->> Y.
-> 
-> So Y is alternative mux? Can we use letters for this as well?
+Thanks!
+Yanjiang
 
-Ok
-
->>>> +	msm_mux_led1,
->>>> +	msm_mux_pwm14,
->>>> +	msm_mux_led2,
->>>> +	msm_mux_pwm24,
->>>> +	msm_mux_pwm00,
->>>> +	msm_mux_blsp4_uart1,
->>>
->>> Are uart0 vs uart1 alternative muxes?
->>
->> These are two different uarts available at two independent pins.
->>
-> 
-> Ok, then I'm happy with the naming of this :)
-> 
 > Thanks,
-> Bjorn
-> 
-
-Thanks
-Varada
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum, a Linux Foundation Collaborative Project
+> Mark.
+>
+>>   
+>>   static const struct smp_operations socfpga_smp_ops __initconst = {
+>> @@ -133,7 +143,7 @@ static int socfpga_cpu_kill(unsigned int cpu)
+>>   	.smp_boot_secondary	= socfpga_a10_boot_secondary,
+>>   #ifdef CONFIG_HOTPLUG_CPU
+>>   	.cpu_die		= socfpga_cpu_die,
+>> -	.cpu_kill		= socfpga_cpu_kill,
+>> +	.cpu_kill		= socfpga_a10_cpu_kill,
+>>   #endif
+>>   };
+>>   
+>> -- 
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
