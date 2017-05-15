@@ -1,39 +1,94 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 15 May 2017 12:03:29 -0700
-Subject: [PATCH] clk: bcm2835: Correct the prediv logic
-In-Reply-To: <1373231207.445862.1494870459462@email.1und1.de>
-References: <20170515173504.11337-1-eric@anholt.net>
- <1373231207.445862.1494870459462@email.1und1.de>
-Message-ID: <87bmqundry.fsf@eliezer.anholt.net>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 15 May 2017 21:10:58 +0200
+Subject: [PATCH v2 00/18] ARM64: meson: DT cleanups
+In-Reply-To: <36c02d8a-d3e2-4330-f600-e49a1ba680e8@baylibre.com>
+References: <20170513143337.14278-1-afaerber@suse.de>
+ <36c02d8a-d3e2-4330-f600-e49a1ba680e8@baylibre.com>
+Message-ID: <5fb0130c-473e-dc15-b60c-e5b6144031ad@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+Hi Neil,
 
-> Hi Eric,
->
->> Eric Anholt <eric@anholt.net> hat am 15. Mai 2017 um 19:35 geschrieben:
->> 
->> 
->> From: Phil Elwell <phil@raspberrypi.org>
->> 
->> If a clock has the prediv flag set, both the integer and fractional
->> parts must be scaled when calculating the resulting frequency.
->> 
->> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> ---
->> 
->> While this is a bugfix, I haven't put a "Fixes:" line in here to get
->> it automatically backported to stable.  
->
-> sorry, i can't follow. How should this happen without "Fixes: "?
+Am 15.05.2017 um 10:16 schrieb Neil Armstrong:
+> Hi Andreas,
+> 
+> On 05/13/2017 04:33 PM, Andreas F?rber wrote:
+>> Hello Kevin,
+>>
+>> This series fixes several cosmetic issues, on top of your for-next branch.
+>>
+>> Patches 3-6 rename a node, the rest should all be non-functional changes.
+> 
+> These are OK.
+> 
+>> PLEASE STOP merging random new nodes at the bottom of DT files!
+>> Just like it's a convention to sort new nodes by unit address, it has been
+>> a convention to sort by-label nodes by their label. As discussed here and
+>> elsewhere, this helps avoid merge conflicts and makes nodes easy to find.
+>> I don't care whether we order A0 before A or after, but adding new HDMI
+>> or CVBS nodes at the very bottom is totally out of alphabetical order.
+>> Since my v1 you really should've known that...
+> 
+> It's not perfect, but now it's done, live with it, this has already been discussed.
 
-I didn't want it to be backported to stable, because of the risk.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170515/803ae7fe/attachment.sig>
+No.
+
+Copy&pasting your comment N times does not make it any more valid. My
+files, my rules - I insist on vega-s95, gxbb and gx, which you guys
+refactored out from my gxbb, to be tidy.
+
+> Please try to refactor boards DTS with their parent reference design instead
+> like it was done with the P212 and what I did with the Wetek Hub and Play2.
+
+Negative, that means any additions and changes for the reference boards
+will slip through into boards that you do not test.
+
+We've already seen how "well" that works with R-Box Pro having inherited
+a broken U-Boot network configuration due to internal vs. external PHY.
+
+>> Similarly, Khadas Vim shouldn't have been merged with the "bcrmf" typo.
+> 
+> Well, this is why we have 7 rc releases after the merge window...
+
+If Kevin is the maintainer, then he needs to carefully review patches.
+It is not my job to review all patches when BayLibre gets paid for it!
+
+>> Which proves my point that we need to fix these issues now so that they
+>> don't keep spreading (Broken Window Theory). New boards have not been
+>> checked for sort order, only boards already touched in v1.
+>>
+>> Board and Makefile order affect my pending R-Box Pro patches.
+>> Node order affects Martin's pending Bluetooth patches among others.
+> 
+> Please order S905x after S905d, and we'll be OK.
+
+Isn't the historical SoC order S905X before S905D?
+
+Otherwise your strict interpretation leads to meson-gxbb before meson8,
+which seems unlogical to me.
+
+>> Patches 7-9 (had and) have no dependency, please start applying.
+> 
+> I'll wait for Kevin's advice, but I'm against these since they are
+> only purely cosmetic and will break bisect and add unnecessary complexity
+> to handle further patches on these board.
+
+See the gxbb patch for why that statement is wrong.
+
+Also note that not cleaning up an existing mess and making it worse are
+two things.
+
+I will also remind that I was forced to clean up the node order in ALL
+exynos5250 .dts files before I could get my new exynos5250-spring.dts
+merged, so I have zero understanding about these "churn" and "live with
+it" comments here. The same rules need to apply to all (that's ?galit?
+for you!), BayLibre is not above everyone else.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
