@@ -1,18 +1,16 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 15 May 2017 21:59:18 +0800
-Subject: [PATCH 4/9] clk: imx: add pllv4 support
+Date: Mon, 15 May 2017 21:59:19 +0800
+Subject: [PATCH 5/9] clk: imx: add pfdv2 support
 In-Reply-To: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
 References: <1494856763-6543-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1494856763-6543-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1494856763-6543-6-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pllv4 is designed for System Clock Generation (SCG) module observed
-in IMX ULP SoC series. e.g. i.MX7ULP.
+The pfdv2 is designed for PLL Fractional Divide (PFD) observed in System
+Clock Generation (SCG) module in IMX ULP SoC series. e.g. i.MX7ULP.
 
-The SCG modules generates clock used to derive processor, system,
-peripheral bus and external memory interface clocks while this patch
-intends to support the PLL part.
+NOTE pfdv2 can only be operated when clk is gated.
 
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Michael Turquette <mturquette@baylibre.com>
@@ -21,30 +19,32 @@ Cc: Anson Huang <Anson.Huang@nxp.com>
 Cc: Bai Ping <ping.bai@nxp.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/clk/imx/Makefile    |   1 +
- drivers/clk/imx/clk-pllv4.c | 196 ++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/Makefile    |   3 +-
+ drivers/clk/imx/clk-pfdv2.c | 199 ++++++++++++++++++++++++++++++++++++++++++++
  drivers/clk/imx/clk.h       |   3 +
- 3 files changed, 200 insertions(+)
- create mode 100644 drivers/clk/imx/clk-pllv4.c
+ 3 files changed, 204 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/imx/clk-pfdv2.c
 
 diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
-index 1ada68a..1e308e2 100644
+index 1e308e2..ea4ef27 100644
 --- a/drivers/clk/imx/Makefile
 +++ b/drivers/clk/imx/Makefile
-@@ -10,6 +10,7 @@ obj-y += \
- 	clk-pllv1.o \
+@@ -11,7 +11,8 @@ obj-y += \
  	clk-pllv2.o \
  	clk-pllv3.o \
-+	clk-pllv4.o \
- 	clk-pfd.o
+ 	clk-pllv4.o \
+-	clk-pfd.o
++	clk-pfd.o \
++	clk-pfdv2.o
  
  obj-$(CONFIG_SOC_IMX1)   += clk-imx1.o
-diff --git a/drivers/clk/imx/clk-pllv4.c b/drivers/clk/imx/clk-pllv4.c
+ obj-$(CONFIG_SOC_IMX21)  += clk-imx21.o
+diff --git a/drivers/clk/imx/clk-pfdv2.c b/drivers/clk/imx/clk-pfdv2.c
 new file mode 100644
-index 0000000..502da64
+index 0000000..e5c4ad7
 --- /dev/null
-+++ b/drivers/clk/imx/clk-pllv4.c
-@@ -0,0 +1,196 @@
++++ b/drivers/clk/imx/clk-pfdv2.c
+@@ -0,0 +1,199 @@
 +/*
 + * Copyright (C) 2016 Freescale Semiconductor, Inc.
 + * Copyright 2017 NXP
@@ -62,198 +62,201 @@ index 0000000..502da64
 +
 +#include <linux/clk-provider.h>
 +#include <linux/clk.h>
-+#include <linux/delay.h>
 +#include <linux/err.h>
++#include <linux/io.h>
 +#include <linux/slab.h>
 +
-+/* PLL Control Status Register (xPLLCSR) */
-+#define PLL_CSR_OFFSET		0x0
-+#define PLL_VLD			BIT(24)
-+#define PLL_EN			BIT(0)
++/**
++ * struct clk_pfdv2 - IMX PFD clock
++ * @clk_hw:	clock source
++ * @reg:	PFD register address
++ * @gate_bit:	Gate bit offset
++ * @vld_bit:	Valid bit offset
++ * @frac_off:	PLL Fractional Divider offset
++ */
 +
-+/* PLL Configuration Register (xPLLCFG) */
-+#define PLL_CFG_OFFSET		0x08
-+#define BP_PLL_MULT		16
-+#define BM_PLL_MULT		(0x7f << 16)
-+
-+/* PLL Numerator Register (xPLLNUM) */
-+#define PLL_NUM_OFFSET		0x10
-+
-+/* PLL Denominator Register (xPLLDENOM) */
-+#define PLL_DENOM_OFFSET	0x14
-+
-+struct clk_pllv4 {
++struct clk_pfdv2 {
 +	struct clk_hw	hw;
-+	void __iomem	*base;
++	void __iomem	*reg;
++	u8		gate_bit;
++	u8		vld_bit;
++	u8		frac_off;
 +};
 +
-+/* Valid PLL MULT Table */
-+static const int pllv4_mult_table[] = {33, 27, 22, 20, 17, 16};
++#define to_clk_pfdv2(_hw) container_of(_hw, struct clk_pfdv2, hw)
 +
-+#define to_clk_pllv4(__hw) container_of(__hw, struct clk_pllv4, hw)
++#define CLK_PFDV2_FRAC_MASK 0x3f
 +
-+static int clk_pllv4_wait_lock(struct clk_pllv4 *pll)
++static int clk_pfdv2_wait(struct clk_pfdv2 *pfd)
 +{
-+	unsigned long timeout = jiffies + msecs_to_jiffies(5);
++	unsigned long timeout = jiffies + msecs_to_jiffies(10);
 +
-+	/* Wait for PLL to lock */
-+	do {
-+		if (readl_relaxed(pll->base  + PLL_CSR_OFFSET) & PLL_VLD)
-+			break;
++	while (!(readl_relaxed(pfd->reg) & pfd->vld_bit))
 +		if (time_after(jiffies, timeout))
-+			break;
-+			usleep_range(50, 500);
-+	} while (1);
-+
-+	return readl_relaxed(pll->base + PLL_CSR_OFFSET) & PLL_VLD ?
-+	       0 : -ETIMEDOUT;
-+}
-+
-+static int clk_pllv4_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_pllv4 *pll = to_clk_pllv4(hw);
-+
-+	if (readl_relaxed(pll->base) & PLL_EN)
-+		return 1;
++			return -ETIMEDOUT;
 +
 +	return 0;
 +}
 +
-+static unsigned long clk_pllv4_recalc_rate(struct clk_hw *hw,
++static int clk_pfdv2_enable(struct clk_hw *hw)
++{
++	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
++	u32 val;
++
++	val = readl_relaxed(pfd->reg);
++	val &= ~pfd->gate_bit;
++	writel_relaxed(val, pfd->reg);
++
++	return clk_pfdv2_wait(pfd);
++}
++
++static void clk_pfdv2_disable(struct clk_hw *hw)
++{
++	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
++	u32 val;
++
++	val = readl_relaxed(pfd->reg);
++	val |= pfd->gate_bit;
++	writel_relaxed(val, pfd->reg);
++}
++
++static unsigned long clk_pfdv2_recalc_rate(struct clk_hw *hw,
 +					   unsigned long parent_rate)
 +{
-+	struct clk_pllv4 *pll = to_clk_pllv4(hw);
-+	u32 div;
++	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
++	u64 tmp = parent_rate;
++	u8 frac;
 +
-+	div = (readl_relaxed(pll->base + PLL_CFG_OFFSET)
-+	       & BM_PLL_MULT) >> BP_PLL_MULT;
++	frac = (readl_relaxed(pfd->reg) >> pfd->frac_off)
++		& CLK_PFDV2_FRAC_MASK;
 +
-+	return parent_rate * div;
++	if (!frac) {
++		pr_debug("clk_pfdv2: %s invalid pfd frac value 0\n",
++			 clk_hw_get_name(hw));
++		return 0;
++	}
++
++	tmp *= 18;
++	do_div(tmp, frac);
++
++	return tmp;
 +}
 +
-+static long clk_pllv4_round_rate(struct clk_hw *hw, unsigned long rate,
++static long clk_pfdv2_round_rate(struct clk_hw *hw, unsigned long rate,
 +				 unsigned long *prate)
 +{
-+	unsigned long parent_rate = *prate;
-+	unsigned long round_rate, i;
++	u64 tmp = *prate;
++	u8 frac;
 +
-+	for (i = 0; i < ARRAY_SIZE(pllv4_mult_table); i++) {
-+		round_rate = parent_rate * pllv4_mult_table[i];
-+		if (rate >= round_rate)
-+			return round_rate;
-+	}
++	tmp = tmp * 18 + rate / 2;
++	do_div(tmp, rate);
++	frac = tmp;
 +
-+	return round_rate;
++	if (frac < 12)
++		frac = 12;
++	else if (frac > 35)
++		frac = 35;
++
++	tmp = *prate;
++	tmp *= 18;
++	do_div(tmp, frac);
++
++	return tmp;
 +}
 +
-+static bool clk_pllv4_is_valid_mult(unsigned int mult)
++static int clk_pfdv2_is_enabled(struct clk_hw *hw)
 +{
-+	int i;
++	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
 +
-+	/* check if mult is in valid MULT table */
-+	for (i = 0; i < ARRAY_SIZE(pllv4_mult_table); i++) {
-+		if (pllv4_mult_table[i] == mult)
-+			return true;
-+	}
++	if (readl_relaxed(pfd->reg) & pfd->gate_bit)
++		return 0;
 +
-+	return false;
++	return 1;
 +}
 +
-+static int clk_pllv4_set_rate(struct clk_hw *hw, unsigned long rate,
++static int clk_pfdv2_set_rate(struct clk_hw *hw, unsigned long rate,
 +			      unsigned long parent_rate)
 +{
-+	struct clk_pllv4 *pll = to_clk_pllv4(hw);
-+	u32 val, mult;
++	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
++	u64 tmp = parent_rate;
++	u32 val;
++	u8 frac;
 +
-+	if (clk_pllv4_is_enabled(hw)) {
-+		WARN(1, "clk_pllv4: can't change rate when pll is enabled");
++	if (clk_pfdv2_is_enabled(hw)) {
++		WARN(1, "clk_pfdv2: can't change rate when pfd is enabled");
 +		return -EINVAL;
 +	}
 +
-+	mult = rate / parent_rate;
++	tmp = tmp * 18 + rate / 2;
++	do_div(tmp, rate);
++	frac = tmp;
++	if (frac < 12)
++		frac = 12;
++	else if (frac > 35)
++		frac = 35;
 +
-+	if (clk_pllv4_is_valid_mult(mult))
-+		return -EINVAL;
-+
-+	val = readl_relaxed(pll->base + PLL_CFG_OFFSET);
-+	val &= ~BM_PLL_MULT;
-+	val |= mult << BP_PLL_MULT;
-+	writel_relaxed(val, pll->base + PLL_CFG_OFFSET);
++	val = readl_relaxed(pfd->reg);
++	val &= ~(CLK_PFDV2_FRAC_MASK << pfd->frac_off);
++	val |= frac << pfd->frac_off;
++	writel_relaxed(val, pfd->reg);
 +
 +	return 0;
 +}
 +
-+static int clk_pllv4_enable(struct clk_hw *hw)
-+{
-+	u32 val;
-+	struct clk_pllv4 *pll = to_clk_pllv4(hw);
-+
-+	val = readl_relaxed(pll->base);
-+	val |= PLL_EN;
-+	writel_relaxed(val, pll->base);
-+
-+	return clk_pllv4_wait_lock(pll);
-+}
-+
-+static void clk_pllv4_disable(struct clk_hw *hw)
-+{
-+	u32 val;
-+	struct clk_pllv4 *pll = to_clk_pllv4(hw);
-+
-+	val = readl_relaxed(pll->base);
-+	val &= ~PLL_EN;
-+	writel_relaxed(val, pll->base);
-+}
-+
-+static const struct clk_ops clk_pllv4_ops = {
-+	.recalc_rate	= clk_pllv4_recalc_rate,
-+	.round_rate	= clk_pllv4_round_rate,
-+	.set_rate	= clk_pllv4_set_rate,
-+	.enable		= clk_pllv4_enable,
-+	.disable	= clk_pllv4_disable,
-+	.is_enabled	= clk_pllv4_is_enabled,
++static const struct clk_ops clk_pfdv2_ops = {
++	.enable		= clk_pfdv2_enable,
++	.disable	= clk_pfdv2_disable,
++	.recalc_rate	= clk_pfdv2_recalc_rate,
++	.round_rate	= clk_pfdv2_round_rate,
++	.set_rate	= clk_pfdv2_set_rate,
++	.is_enabled     = clk_pfdv2_is_enabled,
 +};
 +
-+struct clk *imx_clk_pllv4(const char *name, const char *parent_name,
-+			  void __iomem *base)
++struct clk *imx_clk_pfdv2(const char *name, const char *parent_name,
++			void __iomem *reg, u8 idx)
 +{
-+	struct clk_pllv4 *pll;
++	struct clk_pfdv2 *pfd;
 +	struct clk *clk;
 +	struct clk_init_data init;
 +
-+	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
-+	if (!pll)
++	WARN_ON(idx > 3);
++
++	pfd = kzalloc(sizeof(*pfd), GFP_KERNEL);
++	if (!pfd)
 +		return ERR_PTR(-ENOMEM);
 +
-+	pll->base = base;
++	pfd->reg = reg;
++	pfd->gate_bit = 1 << ((idx + 1) * 8 - 1);
++	pfd->vld_bit = pfd->gate_bit - 1;
++	pfd->frac_off = idx * 8;
 +
 +	init.name = name;
-+	init.ops = &clk_pllv4_ops;
++	init.ops = &clk_pfdv2_ops;
 +	init.parent_names = &parent_name;
 +	init.num_parents = 1;
 +	init.flags = CLK_SET_RATE_GATE;
 +
-+	pll->hw.init = &init;
++	pfd->hw.init = &init;
 +
-+	clk = clk_register(NULL, &pll->hw);
++	clk = clk_register(NULL, &pfd->hw);
 +	if (IS_ERR(clk))
-+		kfree(pll);
++		kfree(pfd);
 +
 +	return clk;
 +}
 diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index e1f5e42..f599732 100644
+index f599732..51b84e4 100644
 --- a/drivers/clk/imx/clk.h
 +++ b/drivers/clk/imx/clk.h
-@@ -40,6 +40,9 @@ enum imx_pllv3_type {
- struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
- 		const char *parent_name, void __iomem *base, u32 div_mask);
+@@ -58,6 +58,9 @@ struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
+ struct clk *imx_clk_pfd(const char *name, const char *parent_name,
+ 		void __iomem *reg, u8 idx);
  
-+struct clk *imx_clk_pllv4(const char *name, const char *parent_name,
-+			  void __iomem *base);
++struct clk *imx_clk_pfdv2(const char *name, const char *parent_name,
++			  void __iomem *reg, u8 idx);
 +
- struct clk *clk_register_gate2(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 bit_idx, u8 cgr_val,
+ struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
+ 				 void __iomem *reg, u8 shift, u8 width,
+ 				 void __iomem *busy_reg, u8 busy_shift);
 -- 
 2.7.4
