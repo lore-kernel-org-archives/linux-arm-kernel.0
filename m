@@ -1,72 +1,55 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 15 May 2017 10:07:39 +0200
-Subject: [PATCH v2 01/18] dt-bindings: arm: amlogic: Reorder boards
-In-Reply-To: <20170513143337.14278-2-afaerber@suse.de>
-References: <20170513143337.14278-1-afaerber@suse.de>
- <20170513143337.14278-2-afaerber@suse.de>
-Message-ID: <5fa88c96-f640-b439-5329-e3465ba41214@baylibre.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Mon, 15 May 2017 10:16:42 +0200
+Subject: [PATCH v4 0/2] Tango PCIe controller support
+In-Reply-To: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+Message-ID: <f65112f3-f958-3f87-5527-fcba34975576@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2017 04:33 PM, Andreas F?rber wrote:
-> Enforce groupment by SoCs, and order alphabetically within the group
-> (with some exceptions). This should facilitate adding new boards.
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v1 -> v2:
->  * Rebased (new boards added)
->  * Pointed out alphabetical order in the binding, too (Rob)
->  
->  Documentation/devicetree/bindings/arm/amlogic.txt | 20 +++++++++++++-------
->  1 file changed, 13 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-> index bfd5b558477d..cad5b5a48d92 100644
-> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
-> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-> @@ -29,26 +29,32 @@ Boards with the Amlogic Meson GXM S912 SoC shall have the following properties:
->    Required root node property:
->      compatible: "amlogic,s912", "amlogic,meson-gxm";
->  
-> -Board compatible values:
-> +Board compatible values (alphabetically, grouped by SoC):
-> +
->    - "geniatech,atv1200" (Meson6)
-> +
->    - "minix,neo-x8" (Meson8)
-> -  - "tronfy,mxq" (Meson8b)
-> +
->    - "hardkernel,odroid-c1" (Meson8b)
-> +  - "tronfy,mxq" (Meson8b)
-> +
-> +  - "amlogic,p200" (Meson gxbb)
-> +  - "amlogic,p201" (Meson gxbb)
-> +  - "hardkernel,odroid-c2" (Meson gxbb)
-> +  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
->    - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
->    - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
->    - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
-> -  - "hardkernel,odroid-c2" (Meson gxbb)
-> -  - "amlogic,p200" (Meson gxbb)
-> -  - "amlogic,p201" (Meson gxbb)
->    - "wetek,hub" (Meson gxbb)
->    - "wetek,play2" (Meson gxbb)
-> +
->    - "amlogic,p212" (Meson gxl s905x)
-> +  - "hwacom,amazetv" (Meson gxl s905x)
->    - "khadas,vim" (Meson gxl s905x)
->  
->    - "amlogic,p230" (Meson gxl s905d)
->    - "amlogic,p231" (Meson gxl s905d)
-> -  - "hwacom,amazetv" (Meson gxl s905x)
-> +
->    - "amlogic,q200" (Meson gxm s912)
->    - "amlogic,q201" (Meson gxm s912)
-> -  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
->    - "nexbox,a1" (Meson gxm s912)
-> 
+On 20/04/2017 16:24, Marc Gonzalez wrote:
 
-Like patch 2, S905X should go after S905D.
+> This patch was split in two, to ease review of two orthogonal
+> parts (MSI controller and host bridge). NB: the patch is
+> just split in two where host bridge support starts.
+> 
+> Changes from v3 to v4
+> 
+> In the MSI part:
+> - Support 256 MSIs instead of only 32
+> - Define tango_{ack,mask,unmask} callbacks for the HW irq_chip
+> - Use a spinlock instead of a mutex
+> - Rename msi_mask register to msi_enable
+> 
+> In the host bridge part:
+> - Move several quirk-handling snippets out of the config space read function
+> - Check whether the PCIe link is up at probe-time
+> 
+> Other files
+> - Let the framework compute the bus-range from the config space width
+> - Be slightly more verbose in the Kconfig help
+> 
+> 
+> What has *not* changed, waiting from feedback from Bjorn:
+> 
+> - Pray that config and mem space accesses NEVER occur concurrently.
+> - Using of_device_is_compatible() vs of_device_get_match_data()
+> 
+> 
+> Marc Gonzalez (2):
+>   PCI: Add tango MSI controller support
+>   PCI: Add tango PCIe host bridge support
+> 
+>  Documentation/devicetree/bindings/pci/tango-pcie.txt |  32 ++++
+>  drivers/pci/host/Kconfig                             |   8 +
+>  drivers/pci/host/Makefile                            |   1 +
+>  drivers/pci/host/pcie-tango.c                        | 393 +++++++++++++++++++++++++++++++++++++++
+>  include/linux/pci_ids.h                              |   2 +
+>  5 files changed, 436 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/tango-pcie.txt
+>  create mode 100644 drivers/pci/host/pcie-tango.c
 
-Neil
+Now that Linus has closed the merge window for v4.12, I hope that this
+driver can be accepted in v4.13 ?
+
+Regards.
