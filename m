@@ -1,63 +1,70 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 15 May 2017 10:22:25 +0200
-Subject: [PATCH v1 3/3] drm/stm: Add STM32 DSI host driver
-In-Reply-To: <1494600989-13507-4-git-send-email-philippe.cornu@st.com>
-References: <1494600989-13507-1-git-send-email-philippe.cornu@st.com>
- <1494600989-13507-4-git-send-email-philippe.cornu@st.com>
-Message-ID: <a254c176-8064-1984-10b8-dce4308cc3d6@baylibre.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 15 May 2017 09:25:54 +0100
+Subject: Tegra baseline test results for v4.12-rc1
+Message-ID: <3c353038-d001-4560-4185-5d570a7c0839@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2017 04:56 PM, Philippe CORNU wrote:
-> This mipi dsi host driver is based on the Rockchip version of the
-> Synopsys Designware mipi dsi driver (rockchip/dw-mipi-dsi.c)
-> modified for the stm32 family:
-> - replace Rockchip digital & phy specific extensions with stm32's ones.
-> - add a bridge
-> 
-> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
-> ---
->  drivers/gpu/drm/stm/Kconfig       |    7 +
->  drivers/gpu/drm/stm/Makefile      |    2 +
->  drivers/gpu/drm/stm/dw-mipi-dsi.c | 1197 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 1206 insertions(+)
->  create mode 100644 drivers/gpu/drm/stm/dw-mipi-dsi.c
-> 
-> diff --git a/drivers/gpu/drm/stm/Kconfig b/drivers/gpu/drm/stm/Kconfig
-> index 2c4817f..0007789 100644
-> --- a/drivers/gpu/drm/stm/Kconfig
-> +++ b/drivers/gpu/drm/stm/Kconfig
-> @@ -14,3 +14,10 @@ config DRM_STM
->  	  STMicroelectronics STM32 MCUs.
->  	  To compile this driver as a module, choose M here: the module
->  	  will be called stm-drm.
-> +
-> +config DRM_STM_DSI
-> +	tristate "MIPI DSI support for STMicroelectronics SoC"
-> +	depends on DRM_STM
-> +	select DRM_MIPI_DSI
-> +	help
-> +	  Choose this option for MIPI DSI support on STMicroelectronics SoC.
-> diff --git a/drivers/gpu/drm/stm/Makefile b/drivers/gpu/drm/stm/Makefile
-> index e114d45..e448a93 100644
-> --- a/drivers/gpu/drm/stm/Makefile
-> +++ b/drivers/gpu/drm/stm/Makefile
-> @@ -4,4 +4,6 @@ stm-drm-y := \
->  	drv.o \
->  	ltdc.o
->  
-> +obj-$(CONFIG_DRM_STM_DSI) += dw-mipi-dsi.o
-> +
->  obj-$(CONFIG_DRM_STM) += stm-drm.o
-> diff --git a/drivers/gpu/drm/stm/dw-mipi-dsi.c b/drivers/gpu/drm/stm/dw-mipi-dsi.c
-> new file mode 100644
-> index 0000000..4b7f7b9
-> --- /dev/null
-> +++ b/drivers/gpu/drm/stm/dw-mipi-dsi.c
+Here are some basic Tegra test results for Linux v4.12-rc1.
+Logs and other details at:
+
+    https://nvtb.github.io//linux/test_v4.12-rc1/20170513133103/
 
 
-Hi Philippe,
+Test summary
+------------
 
-First question, why couldn't this be transformed as a bridge driver along the Synopsys DW-HDMI driver ?
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-Neil
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.11 (a351e9b9fc24e982ec2f0e76379a49826036da12)):
+   text     data      bss    total  kernel
++123259  +182072    +9736  +315067  defconfig
++665814  +536544  -129824  +1072534 multi_v7_defconfig
++1063940  +609176   +2560  +1675676 tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.11 (a351e9b9fc24e982ec2f0e76379a49826036da12))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+    -328k     328k        .        .      qemu-vexpress64            defconfig           __internal
+    -232k     232k        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+   -1436k    1436k        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+    -232k     232k        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+   -1436k    1436k        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+    -232k     232k        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+   -1436k    1436k        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+    -224k     224k        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+   -1428k    1428k        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+    -344k     344k        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+     736k    -736k        .        .       tegra210-smaug            defconfig       tegra210-smaug
+    -232k     232k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+   -1436k    1436k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
