@@ -1,2045 +1,251 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Mon, 15 May 2017 16:35:00 +0800
-Subject: [PATCH 1/3] arm64: dts: add SC9860 clock tree data
-In-Reply-To: <20170515083502.4492-1-chunyan.zhang@spreadtrum.com>
-References: <20170515083502.4492-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20170515083502.4492-2-chunyan.zhang@spreadtrum.com>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Mon, 15 May 2017 16:45:37 +0800
+Subject: [PATCH v3] arm64: fix the overlap between the kernel image and
+ vmalloc address
+In-Reply-To: <20170510085503.q374eqnt6f6rc2tv@localhost>
+References: <1494387440-51703-1-git-send-email-zhongjiang@huawei.com>
+ <20170510085503.q374eqnt6f6rc2tv@localhost>
+Message-ID: <59196AB1.1090106@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xiaolong Zhang <xiaolong.zhang@spreadtrum.com>
+ping,
 
-This patch addresses SC9860 clock topology structure and provides clock
-node to other devices (clock consumers) on chip.
+I have sent various version to solve the issue.  Unfortunately, it fails to receive
+any comments for a long time. 
 
-This patch also removed replicated node of 26m fixed clock.
-
-Signed-off-by: Xiaolong Zhang <xiaolong.zhang@spreadtrum.com>
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
----
- arch/arm64/boot/dts/sprd/sc9860-clocks.dtsi | 1984 +++++++++++++++++++++++++++
- arch/arm64/boot/dts/sprd/sc9860.dtsi        |    1 +
- arch/arm64/boot/dts/sprd/whale2.dtsi        |    7 -
- 3 files changed, 1985 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm64/boot/dts/sprd/sc9860-clocks.dtsi
-
-diff --git a/arch/arm64/boot/dts/sprd/sc9860-clocks.dtsi b/arch/arm64/boot/dts/sprd/sc9860-clocks.dtsi
-new file mode 100644
-index 0000000..5756933
---- /dev/null
-+++ b/arch/arm64/boot/dts/sprd/sc9860-clocks.dtsi
-@@ -0,0 +1,1984 @@
-+/*
-+ * Spreadtrum SC9860 SoC DTS file
-+ *
-+ * Copyright (C) 2015, Spreadtrum Communications Inc.
-+ *
-+ * This file is licensed under a dual GPLv2 or X11 license.
-+ */
-+&soc {
-+	aliases {
-+		apb_pclk = &clk_ap_apb;
-+	};
-+
-+	ext_26m: ext-26m {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <26000000>;
-+		clock-output-names = "ext_26m";
-+	};
-+
-+	ext_32m_sine0: ext-32m-sine0 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <32000000>;
-+		clock-output-names = "ext_32m_sine0";
-+	};
-+
-+	ext_32m_sine1: ext-32m-sine1 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <32000000>;
-+		clock-output-names = "ext_32m_sine1";
-+	};
-+
-+	clk_pll_in: clk-pll-in {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <26000000>;
-+		clock-output-names = "ext_26m";
-+	};
-+
-+	clk_4m: clk-4m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <6>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_4m";
-+	};
-+
-+	clk_2m: clk-2m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <13>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_2m";
-+	};
-+
-+	clk_1m: clk-1m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <26>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_1m";
-+	};
-+
-+	clk_250k: clk-250k {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <104>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_250k";
-+	};
-+
-+	ext_rco_100m: ext-rco-100m {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <100000000>;
-+		clock-output-names = "ext_rco_100m";
-+	};
-+
-+	ext_32k: ext-32k {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <32768>;
-+		clock-output-names = "ext_32k";
-+	};
-+
-+	clk_rpll0_26m: clk-rpll0-26m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <1>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_rpll0_26m";
-+	};
-+
-+	clk_rpll1_26m: clk-rpll1-26m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <1>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_rpll1_26m";
-+	};
-+
-+	clk_rpll_gates: clk at 402b016c {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x402b016c 0 0x3000>;
-+		clocks = <&ext_26m>;
-+		clock-indices = <2>, <18>;
-+		clock-output-names = "clk_rpll0_gate", "clk_rpll1_gate";
-+	};
-+
-+	clk_mpll_gates: clk at 402b00b0 {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x402b00b0 0 0x3000>;
-+		clocks = <&ext_26m>;
-+		clock-indices = <2>, <18>;
-+		clock-output-names = "clk_mpll0_gate", "clk_mpll1_gate";
-+	};
-+
-+	clk_dpll_gates: clk at 402b00b4 {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x402b00b4 0 0x3000>;
-+		clocks = <&ext_26m>;
-+		clock-indices = <2>, <18>;
-+		clock-output-names = "clk_dpll0_gate", "clk_dpll1_gate";
-+	};
-+
-+	clk_gpll_gate: clk at 402b032c {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402b032d 0 0x3000>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_gpll_gate";
-+	};
-+
-+	clk_cppll_gate: clk at 402b02b4 {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x402b02b4 0 0x3000>;
-+		clocks = <&ext_26m>;
-+		clock-indices = <2>;
-+		clock-output-names = "clk_cppll_gate";
-+	};
-+
-+	clk_ltepll0_gate: clk at 402b00b8 {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x402b00b8 0 0x3000>;
-+		clocks = <&ext_26m>;
-+		clock-indices = <2>;
-+		clock-output-names = "clk_ltepll0_gate";
-+	};
-+
-+	clk_ltepll1_gate: clk at 402b010c {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x402b010c 0 0x3000>;
-+		clocks = <&ext_26m>;
-+		clock-indices = <2>;
-+		clock-output-names = "clk_ltepll1_gate";
-+	};
-+
-+	clk_twpll_gate: clk at 402b00bc {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x402b00bc 0 0x3000>;
-+		clocks = <&ext_26m>;
-+		clock-indices = <2>;
-+		clock-output-names = "clk_twpll_gate";
-+	};
-+
-+	clk_rpll0: clk at 40400044 {
-+		compatible = "sprd,sc9860-adjustable-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x40400044 0 0x4>,
-+		      <0 0x40400048 0 0x4>,
-+		      <0 0x4040004c 0 0x4>;
-+		clocks = <&clk_rpll_gates 2>;
-+		clock-output-names = "clk_rpll0";
-+	};
-+
-+	clk_rpll1: clk at 40400050 {
-+		compatible = "sprd,sc9860-adjustable-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x40400050 0 0x4>,
-+		      <0 0x40400054 0 0x4>,
-+		      <0 0x40400058 0 0x4>;
-+		clocks = <&clk_rpll_gates 18>;
-+		clock-output-names = "clk_rpll1";
-+	};
-+
-+	clk_mpll0: clk at 40400024 {
-+		compatible = "sprd,sc9860-adjustable-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x40400024 0 0x4>,
-+		      <0 0x40400028 0 0x4>;
-+		clocks = <&clk_mpll_gates 2>;
-+		clock-output-names = "clk_mpll0";
-+	};
-+
-+	clk_mpll1: clk at 4040002c {
-+		compatible = "sprd,sc9860-adjustable-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x4040002c 0 0x4>,
-+		      <0 0x40400030 0 0x4>;
-+		clocks = <&clk_mpll_gates 18>;
-+		clock-output-names = "clk_mpll1";
-+	};
-+
-+	clk_dpll0: clk at 40400034 {
-+		compatible = "sprd,sc9860-adjustable-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x40400034 0 0x4>,
-+		      <0 0x40400038 0 0x4>;
-+		clocks = <&clk_dpll_gates 2>;
-+		clock-output-names = "clk_dpll0";
-+	};
-+
-+	clk_dpll1: clk at 4040003c {
-+		compatible = "sprd,sc9860-adjustable-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x4040003c 0 0x4>,
-+		      <0 0x40400040 0 0x4>;
-+		clocks = <&clk_dpll_gates 18>;
-+		clock-output-names = "clk_dpll1";
-+	};
-+
-+	clk_gpll: clk at 4040009c {
-+		compatible = "sprd,sc9860-adjustable-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x4040009c 0 0x4>,
-+		      <0 0x404000a0 0 0x4>;
-+		clocks = <&clk_gpll_gate>;
-+		clock-output-names = "clk_gpll";
-+	};
-+
-+	clk_cppll: clk at 404000c4 {
-+		compatible = "sprd,sc9860-adjustable-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x404000c4 0 0x4>,
-+		      <0 0x404000c8 0 0x4>;
-+		clocks = <&clk_cppll_gate 2>;
-+		clock-output-names = "clk_cppll";
-+	};
-+
-+	clk_ltepll0: clk at 40400064 {
-+		compatible = "sprd,sc9860-adjustable-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x40400064 0 0x4>,
-+		      <0 0x40400068 0 0x4>;
-+		clocks = <&clk_ltepll0_gate 2>;
-+		clock-output-names = "clk_ltepll0";
-+	};
-+
-+	clk_ltepll1: clk at 4040006c {
-+		compatible = "sprd,sc9860-adjustable-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x4040006c 0 0x4>,
-+		      <0 0x40400070 0 0x4>;
-+		clocks = <&clk_ltepll1_gate 2>;
-+		clock-output-names = "clk_ltepll1";
-+	};
-+
-+	clk_twpll: clk at 4040005c {
-+		compatible = "sprd,sc9860-adjustable-pll-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x4040005c 0 0x4>,
-+		      <0 0x40400060 0 0x4>;
-+		clocks = <&clk_twpll_gate 2>;
-+		clock-output-names = "clk_twpll";
-+	};
-+
-+	clk_gpll_42m5: clk-gpll-42m5 {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <20>;
-+		clocks = <&clk_gpll>;
-+		clock-output-names = "clk_gpll_42m5";
-+	};
-+
-+	clk_twpll_768m: clk-tw-768m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <2>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_768m";
-+	};
-+
-+	clk_twpll_384m: clk-tw-384m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <4>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_384m";
-+	};
-+
-+	clk_twpll_192m: clk-tw-192m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <8>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_192m";
-+	};
-+
-+	clk_twpll_96m: clk-tw-96m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <16>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_96m";
-+	};
-+
-+	clk_twpll_48m: clk-tw-48m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <32>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_48m";
-+	};
-+
-+	clk_twpll_24m: clk-tw-24m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <64>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_24m";
-+	};
-+
-+	clk_twpll_12m: clk-tw-12m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <128>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_12m";
-+	};
-+
-+	clk_twpll_512m: clk-tw-512m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <3>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_512m";
-+	};
-+
-+	clk_twpll_256m: clk-tw-256m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <6>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_256m";
-+	};
-+
-+	clk_twpll_128m: clk-tw-128m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <12>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_128m";
-+	};
-+
-+	clk_twpll_64m: clk-tw-64m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <24>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_64m";
-+	};
-+
-+	clk_twpll_307m2: clk-tw-307m2 {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <5>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_307m2";
-+	};
-+
-+	clk_twpll_153m6: clk-tw-153m6 {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <10>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_153m6";
-+	};
-+
-+	clk_twpll_76m8: clk-tw-76m8 {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <20>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_76m8";
-+	};
-+
-+	clk_twpll_51m2: clk-tw-51m2 {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <30>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_51m2";
-+	};
-+
-+	clk_twpll_38m4: clk-tw-38m4 {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <40>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_38m4";
-+	};
-+
-+	clk_twpll_19m2: clk-tw-19m2 {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <80>;
-+		clocks = <&clk_twpll>;
-+		clock-output-names = "clk_twpll_19m2";
-+	};
-+
-+	clk_l0_614m4: clk-l0-614m4 {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <2>;
-+		clocks = <&clk_ltepll0>;
-+		clock-output-names = "clk_l0_614m4";
-+	};
-+
-+	clk_l0_38m: clk-l0-38m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <32>;
-+		clocks = <&clk_ltepll0>;
-+		clock-output-names = "clk_l0_38m";
-+	};
-+
-+	clk_l0_409m6: clk-l0-409m6 {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <3>;
-+		clocks = <&clk_ltepll0>;
-+		clock-output-names = "clk_l0_409m6";
-+	};
-+
-+	clk_l1_38m: clk-l1-38m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <32>;
-+		clocks = <&clk_ltepll1>;
-+		clock-output-names = "clk_l1_38m";
-+	};
-+
-+	clk_rpll0_192m: clk-rpll0-192m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <6>;
-+		clocks = <&clk_rpll0>;
-+		clock-output-names = "clk_rpll0_192m";
-+	};
-+
-+	clk_rpll0_96m: clk-rpll0-96m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <12>;
-+		clocks = <&clk_rpll0>;
-+		clock-output-names = "clk_rpll0_96m";
-+	};
-+
-+	clk_rpll0_48m: clk-rpll0-48m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <24>;
-+		clocks = <&clk_rpll0>;
-+		clock-output-names = "clk_rpll0_48m";
-+	};
-+
-+	clk_rpll1_468m: clk-rpll1-468m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <2>;
-+		clocks = <&clk_rpll1>;
-+		clock-output-names = "clk_rpll1_468m";
-+	};
-+
-+	clk_rpll1_192m: clk-rpll1-192m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <6>;
-+		clocks = <&clk_rpll1>;
-+		clock-output-names = "clk_rpll1_192m";
-+	};
-+
-+	clk_rpll1_96m: clk-rpll1-96m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <12>;
-+		clocks = <&clk_rpll1>;
-+		clock-output-names = "clk_rpll1_96m";
-+	};
-+
-+	clk_rpll1_64m: clk-rpll1-64m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <18>;
-+		clocks = <&clk_rpll1>;
-+		clock-output-names = "clk_rpll1_64m";
-+	};
-+
-+	clk_rpll1_48m: clk-rpll1-48m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <24>;
-+		clocks = <&clk_rpll1>;
-+		clock-output-names = "clk_rpll1_48m";
-+	};
-+
-+	clk_dpll0_50m: clk-dpll0-50m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <16>;
-+		clocks = <&clk_dpll0>;
-+		clock-output-names = "clk_dpll0_50m";
-+	};
-+
-+	clk_dpll1_50m: clk-dpll1-50m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <16>;
-+		clocks = <&clk_dpll1>;
-+		clock-output-names = "clk_dpll1_50m";
-+	};
-+
-+	clk_cppll_50m: clk-cppll-50m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <18>;
-+		clocks = <&clk_cppll>;
-+		clock-output-names = "clk_cppll_50m";
-+	};
-+
-+	clk_rco_25m: clk-rco-25m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <4>;
-+		clocks = <&ext_rco_100m>;
-+		clock-output-names = "clk_rco_25m";
-+	};
-+
-+	clk_rco_4m: clk-rco-4m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <25>;
-+		clocks = <&ext_rco_100m>;
-+		clock-output-names = "clk_rco_4m";
-+	};
-+
-+	clk_rco_2m: clk-rco-2m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <50>;
-+		clocks = <&ext_rco_100m>;
-+		clock-output-names = "clk_rco_2m";
-+	};
-+
-+	clk_3k2: clk-3k2 {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <10>;
-+		clocks = <&ext_32k>;
-+		clock-output-names = "clk_3k2";
-+	};
-+
-+	clk_1k: clk-1k {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <32>;
-+		clocks = <&ext_32k>;
-+		clock-output-names = "clk_1k";
-+	};
-+
-+	clk_aon_apb: clk at 402d0230 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0230 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		sprd,div-msk = <0x300>;
-+		clocks = <&clk_rco_25m>, <&ext_26m>, <&ext_rco_100m>,
-+			 <&clk_twpll_96m>, <&clk_twpll_128m>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_aon_apb";
-+	};
-+
-+	clk_adi: clk at 402d0234 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0234 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_rco_4m>, <&ext_26m>, <&clk_rco_25m>,
-+			 <&clk_twpll_38m4>, <&clk_twpll_51m2>;
-+		clock-output-names = "clk_adi";
-+	};
-+
-+	clk_m0_39m: clk-m0-39m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <32>;
-+		clocks = <&clk_mpll0>;
-+		clock-output-names = "clk_m0_39m";
-+	};
-+
-+	clk_m1_63m: clk-m1-63m {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clock-mult = <1>;
-+		clock-div = <32>;
-+		clocks = <&clk_mpll1>;
-+		clock-output-names = "clk_m1_63m";
-+	};
-+
-+	clk_aux0: clk at 402d0238 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0238 0 0x4>;
-+		sprd,mux-msk = <0x1f>;
-+		sprd,div-msk = <0xf00>;
-+		clocks = <&ext_32k>, <&clk_rpll0_26m>, <&clk_rpll1_26m>,
-+			 <&ext_26m>, <&clk_cppll_50m>, <&clk_rco_25m>,
-+			 <&clk_dpll0_50m>, <&clk_dpll1_50m>, <&clk_gpll_42m5>,
-+			 <&clk_twpll_48m>, <&clk_m0_39m>, <&clk_m1_63m>,
-+			 <&clk_l0_38m>, <&clk_l1_38m>;
-+		clock-output-names = "clk_aux0";
-+	};
-+
-+	clk_aux1: clk at 402d023c {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d023c 0 0x4>;
-+		sprd,mux-msk = <0x1f>;
-+		sprd,div-msk = <0xf00>;
-+		clocks = <&ext_32k>, <&clk_rpll0_26m>, <&clk_rpll1_26m>,
-+			 <&ext_26m>, <&clk_cppll_50m>, <&clk_rco_25m>,
-+			 <&clk_dpll0_50m>, <&clk_dpll1_50m>, <&clk_gpll_42m5>,
-+			 <&clk_twpll_48m>, <&clk_m0_39m>, <&clk_m1_63m>,
-+			 <&clk_l0_38m>, <&clk_l1_38m>;
-+		clock-output-names = "clk_aux1";
-+	};
-+
-+	clk_aux2: clk at 402d0240 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0240 0 0x4>;
-+		sprd,mux-msk = <0x1f>;
-+		sprd,div-msk = <0xf00>;
-+		clocks = <&ext_32k>, <&clk_rpll0_26m>, <&clk_rpll1_26m>,
-+			 <&ext_26m>, <&clk_cppll_50m>, <&clk_rco_25m>,
-+			 <&clk_dpll0_50m>, <&clk_dpll1_50m>, <&clk_gpll_42m5>,
-+			 <&clk_twpll_48m>, <&clk_m0_39m>, <&clk_m1_63m>,
-+			 <&clk_l0_38m>, <&clk_l1_38m>;
-+		clock-output-names = "clk_aux2";
-+	};
-+
-+	clk_probe: clk at 402d0244 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0244 0 0x4>;
-+		sprd,mux-msk = <0x1f>;
-+		sprd,div-msk = <0xf00>;
-+		clocks = <&ext_32k>, <&clk_rpll0_26m>, <&clk_rpll1_26m>,
-+			 <&ext_26m>, <&clk_cppll_50m>, <&clk_rco_25m>,
-+			 <&clk_dpll0_50m>, <&clk_dpll1_50m>, <&clk_gpll_42m5>,
-+			 <&clk_twpll_48m>, <&clk_m0_39m>, <&clk_m1_63m>,
-+			 <&clk_l0_38m>, <&clk_l1_38m>;
-+		clock-output-names = "clk_probe";
-+	};
-+
-+	clk_pwm0: clk at 402d0248 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0248 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&ext_32k>, <&ext_26m>, <&clk_rco_4m>,
-+			 <&clk_rco_25m>, <&clk_twpll_48m>;
-+		clock-output-names = "clk_pwm0";
-+	};
-+
-+	clk_pwm1: clk at 402d024c {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d024c 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&ext_32k>, <&ext_26m>, <&clk_rco_4m>,
-+			 <&clk_rco_25m>, <&clk_twpll_48m>;
-+		clock-output-names = "clk_pwm1";
-+	};
-+
-+	clk_pwm2: clk at 402d0250 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0250 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&ext_32k>, <&ext_26m>, <&clk_rco_4m>,
-+			 <&clk_rco_25m>, <&clk_twpll_48m>;
-+		clock-output-names = "clk_pwm2";
-+	};
-+
-+	clk_pwm3: clk at 402d0254 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0254 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&ext_32k>, <&ext_26m>, <&clk_rco_4m>,
-+			 <&clk_rco_25m>, <&clk_twpll_48m>;
-+		clock-output-names = "clk_pwm3";
-+	};
-+
-+	clk_efuse: clk at 402d0258 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0258 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&clk_rco_25m>, <&ext_26m>;
-+		clock-output-names = "clk_efuse";
-+	};
-+
-+	clk_cm3_uart0: clk at 402d025c {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d025c 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_rco_4m>, <&ext_26m>,<&ext_rco_100m>,
-+			 <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_96m>, <&clk_twpll_128m>;
-+		clock-output-names = "clk_cm3_uart0";
-+	};
-+
-+	clk_cm3_uart1: clk at 402d0260 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0260 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_rco_4m>, <&ext_26m>,<&ext_rco_100m>,
-+			 <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_96m>, <&clk_twpll_128m>;
-+		clock-output-names = "clk_cm3_uart1";
-+	};
-+
-+	clk_thm: clk at 402d0270 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0270 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&ext_32k>, <&clk_250k>;
-+		clock-output-names = "clk_thm";
-+	};
-+
-+	clk_cm3_i2c0: clk at 402d0274 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0274 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_rco_4m>, <&ext_26m>, <&ext_rco_100m>,
-+			 <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_cm3_i2c0";
-+	};
-+
-+	clk_cm3_i2c1: clk at 402d0278 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0278 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_rco_4m>, <&ext_26m>, <&ext_rco_100m>,
-+			 <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_cm3_i2c1";
-+	};
-+
-+	clk_cm4_spi: clk at 402d027c {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d027c 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&ext_26m>, <&clk_twpll_96m>, <&ext_rco_100m>,
-+			 <&clk_twpll_128m>, <&clk_twpll_153m6>,
-+			 <&clk_twpll_192m>;
-+		clock-output-names = "clk_cm4_spi";
-+	};
-+
-+	clk_aon_i2c: clk at 402d0280 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0280 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_rco_4m>, <&ext_26m>, <&ext_rco_100m>,
-+			 <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_aon_i2c";
-+	};
-+
-+	clk_avs: clk at 402d0284 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0284 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_96m>;
-+		clock-output-names = "clk_avs";
-+	};
-+
-+	clk_ca53_dap: clk at 402d0288 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0288 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&ext_26m>, <&clk_rco_4m>, <&ext_rco_100m>,
-+			 <&clk_twpll_76m8>, <&clk_twpll_128m>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_ca53_dap";
-+	};
-+
-+	clk_ca53_ts: clk at 402d0290 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0290 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&ext_32k>, <&ext_26m>, <&clk_twpll_128m>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_ca53_ts";
-+	};
-+
-+	clk_26m_lvdsdis: clk at 402d0294 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0294 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_26m_lvdsdis";
-+	};
-+
-+	clk_lvdsrf_cali: clk at 402d02b8 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02b8 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_lvdsrf_cali";
-+	};
-+
-+	clk_mdar_chk: clk at 402d02bc {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02bc 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_mdar_chk";
-+	};
-+
-+	clk_rco100m_ref: clk at 402d02c0 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02c0 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&clk_2m>;
-+		clock-output-names = "clk_rco100m_ref";
-+	};
-+
-+	clk_rco100m_fdk: clk at 402d02c4 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02c4 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&clk_rco_2m>;
-+		clock-output-names = "clk_rco100m_fdk";
-+	};
-+
-+	clk_djtag_tck: clk at 402d02c8 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02c8 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&clk_rco_4m>, <&ext_26m>;
-+		clock-output-names = "clk_djtag_tck";
-+	};
-+
-+	clk_sp_ahb: clk at 402d02d0 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02d0 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		sprd,div-msk = <0x300>;
-+		clocks = <&clk_rco_4m>, <&ext_26m>, <&ext_rco_100m>,
-+			 <&clk_twpll_96m>, <&clk_twpll_128m>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_sp_ahb";
-+	};
-+
-+	clk_det_32k: clk at 402d02dc {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02dc 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&clk_rco_4m>;
-+		clock-output-names = "clk_det_32k";
-+	};
-+
-+	clk_pmu: clk at 402d02e0 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02e0 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&ext_32k>, <&clk_rco_4m>, <&clk_4m>;
-+		clock-output-names = "clk_pmu";
-+	};
-+
-+	clk_pmu_26m: clk at 402d02e4 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02e4 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&clk_rco_25m>, <&ext_26m>;
-+		clock-output-names = "clk_pmu_26m";
-+	};
-+
-+	clk_debounce: clk at 402d02e8 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02e8 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&ext_32k>, <&clk_rco_4m>,
-+			 <&clk_rco_25m>, <&ext_26m>;
-+		clock-output-names = "clk_debounce";
-+	};
-+
-+	clk_dphy_ref: clk at 402d02f0 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02f0 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_dphy_ref";
-+	};
-+
-+	clk_otg2_ref: clk at 402d02f4 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02f4 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&clk_twpll_12m>, <&clk_twpll_24m>;
-+		clock-output-names = "clk_otg2_ref";
-+	};
-+
-+	clk_usb3_ref: clk at 402d02f8 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02f8 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&clk_twpll_24m>, <&clk_twpll_19m2>, <&clk_twpll_48m>;
-+		clock-output-names = "clk_usb3_ref";
-+	};
-+
-+	clk_usb3_suspend: clk at 402d02fc {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d02fc 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&ext_32k>, <&clk_1m>;
-+		clock-output-names = "clk_usb3_suspend";
-+	};
-+
-+	clk_cci: clk at 402d0300 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0300 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x300>;
-+		clocks = <&ext_26m>, <&clk_twpll_384m>, <&clk_l0_614m4>,
-+			 <&clk_twpll_768m>;
-+		clock-output-names = "clk_cci";
-+	};
-+
-+	clk_gic: clk at 402d0304 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0304 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x300>;
-+		clocks = <&ext_26m>, <&clk_twpll_384m>, <&clk_l0_614m4>,
-+			 <&clk_twpll_768m>;
-+		clock-output-names = "clk_gic";
-+	};
-+
-+	clk_ap_axi: clk at 402d0324 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0324 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&ext_26m>, <&clk_twpll_76m8>, <&clk_twpll_128m>,
-+			 <&clk_twpll_256m>;
-+		clock-output-names = "clk_ap_axi";
-+	};
-+
-+	clk_sdio_gates: clk at 402e013c {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x402e013c 0 0x3000>;
-+		clock-indices = <2>, <3>,
-+				<4>, <5>, <6>, <7>,
-+				<8>, <9>;
-+		clock-output-names = "sdio0_2x_en", "sdio0_1x_en",
-+				     "sdio1_2x_en", "sdio1_1x_en",
-+				     "sdio2_2x_en", "sdio2_1x_en",
-+				     "emmc_1x_en", "emmc_2x_en";
-+	};
-+
-+	clk_sdio0_2x: clk at 402d0328 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0328 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		sprd,div-msk = <0xf00>;
-+		clocks = <&clk_1m>, <&ext_26m>, <&clk_twpll_307m2>,
-+			 <&clk_twpll_384m>, <&clk_l0_409m6>;
-+		clock-output-names = "clk_sdio0_2x";
-+	};
-+
-+	clk_sdio0_1x: clk at 402d032c {
-+		compatible = "sprd,divider-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d032c 0 0x4>;
-+		sprd,div-msk = <0x100>;
-+		clocks = <&clk_sdio0_2x>;
-+		clock-output-names = "clk_sdio0_1x";
-+	};
-+
-+	clk_sdio1_2x: clk at 402d0330 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0330 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		sprd,div-msk = <0xf00>;
-+		clocks = <&clk_1m>, <&ext_26m>, <&clk_twpll_307m2>,
-+			 <&clk_twpll_384m>, <&clk_l0_409m6>;
-+		clock-output-names = "clk_sdio1_2x";
-+	};
-+
-+	clk_sdio1_1x: clk at 402d0334 {
-+		compatible = "sprd,divider-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0334 0 0x4>;
-+		sprd,div-msk = <0x100>;
-+		clocks = <&clk_sdio1_2x>;
-+		clock-output-names = "clk_sdio1_1x";
-+	};
-+
-+	clk_sdio2_2x: clk at 402d0338 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0338 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		sprd,div-msk = <0xf00>;
-+		clocks = <&clk_1m>, <&ext_26m>, <&clk_twpll_307m2>,
-+			 <&clk_twpll_384m>, <&clk_l0_409m6>;
-+		clock-output-names = "clk_sdio2_2x";
-+	};
-+
-+	clk_sdio2_1x: clk at 402d033c {
-+		compatible = "sprd,divider-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d033c 0 0x4>;
-+		sprd,div-msk = <0x100>;
-+		clocks = <&clk_sdio2_2x>;
-+		clock-output-names = "clk_sdio2_1x";
-+	};
-+
-+	clk_emmc_2x: clk at 402d0340 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0340 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		sprd,div-msk = <0xf00>;
-+		clocks = <&clk_1m>, <&ext_26m>, <&clk_twpll_307m2>,
-+			 <&clk_twpll_384m>, <&clk_l0_409m6>;
-+		clock-output-names = "clk_emmc_2x";
-+	};
-+
-+	clk_emmc_1x: clk at 402d0344 {
-+		compatible = "sprd,divider-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x402d0344 0 0x4>;
-+		sprd,div-msk = <0x100>;
-+		clocks = <&clk_emmc_2x>;
-+		clock-output-names = "clk_emmc_1x";
-+	};
-+
-+	clk_ap_apb: clk at 20000020 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000020 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&ext_26m>, <&clk_twpll_64m>, <&clk_twpll_96m>,
-+			 <&clk_twpll_128m>;
-+		clock-output-names = "clk_ap_apb";
-+	};
-+
-+	clk_ap_usb3_ref: clk at 2000002c {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x2000002c 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&ext_32k>, <&clk_twpll_24m>;
-+		clock-output-names = "clk_ap_usb3_ref";
-+	};
-+
-+	clk_uart0: clk at 20000030 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000030 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_96m>;
-+		clock-output-names = "clk_uart0";
-+	};
-+
-+	clk_uart1: clk at 20000034 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000034 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_96m>;
-+		clock-output-names = "clk_uart1";
-+	};
-+
-+	clk_uart2: clk at 20000038 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000038 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_96m>;
-+		clock-output-names = "clk_uart2";
-+	};
-+
-+	clk_uart3: clk at 2000003c {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x2000003c 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_96m>;
-+		clock-output-names = "clk_uart3";
-+	};
-+
-+	clk_uart4: clk at 20000040 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000040 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_96m>;
-+		clock-output-names = "clk_uart4";
-+	};
-+
-+	clk_i2c0: clk at 20000044 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000044 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_i2c0";
-+	};
-+
-+	clk_i2c1: clk at 20000048 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000048 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_i2c1";
-+	};
-+
-+	clk_i2c2: clk at 2000004c {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x2000004c 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_i2c2";
-+	};
-+
-+	clk_i2c3: clk at 20000050 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000050 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_i2c3";
-+	};
-+
-+	clk_i2c4: clk at 20000054 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000054 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_i2c4";
-+	};
-+
-+	clk_i2c5: clk at 20000058 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000058 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_51m2>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_i2c5";
-+	};
-+
-+	clk_spi0: clk at 2000005c {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x2000005c 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_128m>, <&clk_twpll_153m6>,
-+			 <&clk_twpll_192m>;
-+		clock-output-names = "clk_spi0";
-+	};
-+
-+	clk_spi1: clk at 20000060 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000060 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_128m>, <&clk_twpll_153m6>,
-+			 <&clk_twpll_192m>;
-+		clock-output-names = "clk_spi1";
-+	};
-+
-+	clk_spi2: clk at 20000064 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000064 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_128m>, <&clk_twpll_153m6>,
-+			 <&clk_twpll_192m>;
-+		clock-output-names = "clk_spi2";
-+	};
-+
-+	clk_spi3: clk at 20000068 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000068 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_128m>, <&clk_twpll_153m6>,
-+			 <&clk_twpll_192m>;
-+		clock-output-names = "clk_spi3";
-+	};
-+
-+	clk_iis0: clk at 2000006c {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x2000006c 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x3f00>;
-+		clocks = <&ext_26m>, <&clk_twpll_128m>, <&clk_twpll_153m6>;
-+		clock-output-names = "clk_iis0";
-+	};
-+
-+	clk_iis1: clk at 20000070 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000070 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x3f00>;
-+		clocks = <&ext_26m>, <&clk_twpll_128m>, <&clk_twpll_153m6>;
-+		clock-output-names = "clk_iis1";
-+	};
-+
-+	clk_iis2: clk at 20000074 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000074 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x3f00>;
-+		clocks = <&ext_26m>, <&clk_twpll_128m>, <&clk_twpll_153m6>;
-+		clock-output-names = "clk_iis2";
-+	};
-+
-+	clk_iis3: clk at 20000078 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x20000078 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x3f00>;
-+		clocks = <&ext_26m>, <&clk_twpll_128m>, <&clk_twpll_153m6>;
-+		clock-output-names = "clk_iis3";
-+	};
-+
-+	clk_big_mcu: clk at 40880024 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x40880024 0 0x4>;
-+		sprd,mux-msk = <0xf>;
-+		sprd,div-msk = <0x70>;
-+		clocks = <&ext_26m>, <&clk_twpll_512m>, <&clk_twpll_768m>,
-+			 <&clk_ltepll0>, <&clk_twpll>, <&clk_twpll>,
-+			 <&clk_twpll>, <&clk_twpll>, <&clk_mpll1>;
-+		clock-output-names = "clk_big_mcu";
-+	};
-+
-+	clk_lit_mcu: clk at 40880020 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x40880020 0 0x4>;
-+		sprd,mux-msk = <0xf>;
-+		sprd,div-msk = <0x70>;
-+		clocks = <&ext_26m>, <&clk_twpll_512m>, <&clk_twpll_768m>,
-+			<&clk_ltepll0>, <&clk_twpll>, <&clk_twpll>,
-+			<&clk_twpll>, <&clk_twpll>, <&clk_mpll0>;
-+		clock-output-names = "clk_lit_mcu";
-+	};
-+
-+	/* gpu domain */
-+	clk_gpu: clk at 60200020 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x60200020 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0xf00>;
-+		clocks = <&clk_twpll_512m>, <&clk_twpll_768m>, <&clk_gpll>;
-+		clock-output-names = "clk_gpu";
-+	};
-+
-+	/* vsp domain */
-+	clk_ahb_vsp: clk at 61000020 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x61000020 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&ext_26m>, <&clk_twpll_96m>, <&clk_twpll_128m>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_ahb_vsp";
-+	};
-+
-+	clk_vsp: clk at 61000024 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x61000024 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		sprd,div-msk = <0x300>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_128m>,
-+			 <&clk_twpll_256m>, <&clk_twpll_307m2>,
-+			 <&clk_twpll_384m>;
-+		clock-output-names = "clk_vsp";
-+	};
-+
-+	clk_vsp_enc: clk at 61000028 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x61000028 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x300>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_128m>,
-+			 <&clk_twpll_256m>, <&clk_twpll_307m2>;
-+		clock-output-names = "clk_vsp_enc";
-+	};
-+
-+	clk_vpp: clk at 6100002c {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x6100002c 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&clk_twpll_96m>, <&clk_twpll_153m6>,
-+			 <&clk_twpll_192m>, <&clk_twpll_256m>;
-+		clock-output-names = "clk_vpp";
-+	};
-+
-+	clk_vsp_26m: clk at 61000030 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x61000030 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_vsp_26m";
-+	};
-+
-+	clk_ahb_disp: clk at 63000020 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x63000020 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&ext_26m>, <&clk_twpll_96m>, <&clk_twpll_128m>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_ahb_disp";
-+	};
-+
-+	clk_gsp0: clk at 63000024 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x63000024 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&clk_twpll_256m>, <&clk_twpll_307m2>,
-+			 <&clk_twpll_512m>, <&clk_l0_614m4>;
-+		clock-output-names = "clk_gsp0";
-+	};
-+
-+	clk_gsp1: clk at 63000028 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x63000028 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&clk_twpll_256m>, <&clk_twpll_307m2>,
-+			 <&clk_twpll_512m>, <&clk_l0_614m4>;
-+		clock-output-names = "clk_gsp1";
-+	};
-+
-+	clk_dispc0: clk at 6300002c {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x6300002c 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&clk_twpll_192m>, <&clk_twpll_256m>,
-+			 <&clk_twpll_384m>, <&clk_twpll_512m>;
-+		clock-output-names = "clk_dispc0";
-+	};
-+
-+	clk_dispc0_dbi: clk at 63000030 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x63000030 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&clk_twpll_128m>, <&clk_twpll_153m6>,
-+			 <&clk_twpll_192m>, <&clk_twpll_256m>;
-+		clock-output-names = "clk_dispc0_dbi";
-+	};
-+
-+	clk_dispc0_dpi: clk at 63000034 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x63000034 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x300>;
-+		clocks = <&clk_twpll_128m>, <&clk_twpll_153m6>,
-+			 <&clk_twpll_192m>, <&clk_twpll_256m>;
-+		clock-output-names = "clk_dispc0_dpi";
-+	};
-+
-+	clk_dispc1: clk at 63000038 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x63000038 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&clk_twpll_192m>, <&clk_twpll_256m>,
-+			 <&clk_twpll_384m>, <&clk_twpll_512m>;
-+		clock-output-names = "clk_dispc1";
-+	};
-+
-+	clk_dispc1_dbi: clk at 6300003c {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x6300003c 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&clk_twpll_128m>, <&clk_twpll_153m6>,
-+			 <&clk_twpll_192m>, <&clk_twpll_256m>;
-+		clock-output-names = "clk_dispc1_dbi";
-+	};
-+
-+	clk_dispc1_dpi: clk at 63000040 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x63000040 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x300>;
-+		clocks = <&clk_twpll_128m>, <&clk_twpll_153m6>,
-+			 <&clk_twpll_192m>, <&clk_twpll_256m>;
-+		clock-output-names = "clk_dispc1_dpi";
-+	};
-+
-+	clk_dphy0: clk at 6300004c {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x6300004c 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_dphy0";
-+	};
-+
-+	clk_dphy1: clk at 63000058 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x63000058 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_dphy1";
-+	};
-+
-+	clk_ahb_cam: clk at 62000020 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000020 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&ext_26m>, <&clk_twpll_96m>, <&clk_twpll_128m>,
-+			 <&clk_twpll_153m6>;
-+		clock-output-names = "clk_ahb_cam";
-+	};
-+
-+	clk_sensor0: clk at 62000024 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000024 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_76m8>,
-+			 <&clk_twpll_96m>;
-+		clock-output-names = "clk_sensor0";
-+	};
-+
-+	clk_sensor1: clk at 62000028 {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000028 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_76m8>,
-+			 <&clk_twpll_96m>;
-+		clock-output-names = "clk_sensor1";
-+	};
-+
-+	clk_sensor2: clk at 6200002c {
-+		compatible = "sprd,composite-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x6200002c 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		sprd,div-msk = <0x700>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_76m8>,
-+			 <&clk_twpll_96m>;
-+		clock-output-names = "clk_sensor2";
-+	};
-+
-+	clk_dcam0: clk at 62000030 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000030 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_153m6>,
-+			 <&clk_twpll_307m2>, <&clk_twpll_384m>;
-+		clock-output-names = "clk_dcam0";
-+	};
-+
-+	clk_dcam1: clk at 62000034 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000034 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_128m>,
-+			 <&clk_twpll_256m>, <&clk_twpll_307m2>,
-+			 <&clk_twpll_384m>;
-+		clock-output-names = "clk_dcam1";
-+	};
-+
-+	clk_dcam0_if: clk at 62000038 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000038 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_256m>,
-+			 <&clk_twpll_307m2>, <&clk_twpll_384m>,
-+			 <&clk_twpll_512m>;
-+		clock-output-names = "clk_dcam0_if";
-+	};
-+
-+	clk_isp0: clk at 6200003c {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x6200003c 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_256m>,
-+			 <&clk_twpll_307m2>, <&clk_twpll_384m>,
-+			 <&clk_twpll_512m>;
-+		clock-output-names = "clk_isp0";
-+	};
-+
-+	clk_isp1: clk at 62000040 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000040 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_256m>,
-+			 <&clk_twpll_307m2>, <&clk_twpll_384m>,
-+			 <&clk_twpll_512m>;
-+		clock-output-names = "clk_isp1";
-+	};
-+
-+	clk_jpg0: clk at 62000044 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000044 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_128m>,
-+			 <&clk_twpll_256m>, <&clk_twpll_307m2>;
-+		clock-output-names = "clk_jpg0";
-+	};
-+
-+	clk_jpg1: clk at 62000048 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000048 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_128m>,
-+			 <&clk_twpll_256m>, <&clk_twpll_307m2>;
-+		clock-output-names = "clk_jpg1";
-+	};
-+
-+	clk_mipi_csi0_gate: clk at 6200004c {
-+		compatible = "sprd,gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x6200004c 0 0x4>;
-+		clock-indices = <16>;
-+		clocks = <&clk_ahb_cam>;
-+		clock-output-names = "mipi_csi0_eb";
-+	};
-+
-+	clk_mipi_csi1_gate: clk at 62000050 {
-+		compatible = "sprd,gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x62000050 0 0x4>;
-+		clock-indices = <16>;
-+		clocks = <&clk_ahb_cam>;
-+		clock-output-names = "mipi_csi1_eb";
-+	};
-+
-+	clk_cpp: clk at 6200005c {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x6200005c 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_128m>,
-+			 <&clk_twpll_256m>, <&clk_twpll_307m2>,
-+			 <&clk_twpll_384m>;
-+		clock-output-names = "clk_cpp";
-+	};
-+
-+	clk_isp_mclk: clk at 62000060 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000060 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_128m>,
-+			 <&clk_twpll_256m>, <&clk_twpll_307m2>,
-+			 <&clk_twpll_384m>;
-+		clock-output-names = "clk_isp_mclk";
-+	};
-+
-+	clk_isp_pclk: clk at 62000064 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000064 0 0x4>;
-+		sprd,mux-msk = <0x3>;
-+		clocks = <&ext_26m>, <&clk_twpll_48m>, <&clk_twpll_76m8>;
-+		clock-output-names = "clk_isp_pclk";
-+	};
-+
-+	clk_isp_iclk: clk at 62000068 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000068 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_256m>,
-+			 <&clk_twpll_307m2>, <&clk_twpll_384m>,
-+			 <&clk_twpll_512m>;
-+		clock-output-names = "clk_isp_iclk";
-+	};
-+
-+	clk_isp_lclk: clk at 6200006c {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x6200006c 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_128m>,
-+			 <&clk_twpll_256m>, <&clk_twpll_307m2>,
-+			 <&clk_twpll_384m>;
-+		clock-output-names = "clk_isp_lclk";
-+	};
-+
-+	clk_isp2: clk at 62000070 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000070 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_128m>,
-+			 <&clk_twpll_256m>, <&clk_twpll_307m2>,
-+			 <&clk_twpll_384m>;
-+		clock-output-names = "clk_isp2";
-+	};
-+
-+	clk_isp2dcam: clk at 62000074 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000074 0 0x4>;
-+		sprd,mux-msk = <0x7>;
-+		clocks = <&clk_twpll_76m8>, <&clk_twpll_153m6>,
-+			 <&clk_twpll_307m2>, <&clk_twpll_384m>;
-+		clock-output-names = "clk_isp2dcam";
-+	};
-+
-+	clk_cam_26m: clk at 62000078 {
-+		compatible = "sprd,muxed-clock";
-+		#clock-cells = <0>;
-+		reg = <0 0x62000078 0 0x4>;
-+		sprd,mux-msk = <0x1>;
-+		clocks = <&ext_26m>;
-+		clock-output-names = "clk_cam_26m";
-+	};
-+
-+	clk_ap_ahb_gates: clk at 20210000 {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x20210000 0 0x3000>;
-+		clock-indices = <2>, <3>, <4>, <5>,
-+				<7>, <8>, <9>, <10>,
-+				<12>, <13>, <22>,
-+				<23>, <24>, <25>;
-+		clocks = <&clk_ap_axi>;
-+		clock-output-names = "usb3_eb", "usb3_suspend_eb",
-+				     "usb3_ref_eb", "dma_eb",
-+				     "sdio0_eb", "sdio1_eb",
-+				     "sdio2_eb", "emmc_eb",
-+				     "rom_eb", "busmon_eb",
-+				     "cc63s_eb", "cc63p_eb",
-+				     "ce0_eb", "ce1_eb";
-+	};
-+
-+	clk_aon_apb_gates0: clk at 402e0000 {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x402e0000 0 0x3000>;
-+		clocks = <&clk_aon_apb>;
-+		clock-output-names = "avs_ca53_lit_eb", "avs_ca53_big_eb",
-+				     "ap_intc5_eb", "gpio_eb",
-+				     "pwm0_eb", "pwm1_eb",
-+				     "pwm2_eb", "pwm3_eb",
-+				     "kpd_eb", "aon_syst_eb",
-+				     "ap_syst_eb", "aon_tmr_eb",
-+				     "ap_tmr0_eb", "efuse_eb",
-+				     "eic_eb", "pub1_reg_eb",
-+				     "adi_eb", "ap_intc0_eb",
-+				     "ap_intc1_eb", "ap_intc2_eb",
-+				     "ap_intc3_eb", "ap_intc4_eb",
-+				     "splk_eb", "mspi_eb",
-+				     "pub0_reg_eb", "pin_eb",
-+				     "aon_ckg_eb", "gpu_eb",
-+				     "apcpu_ts0_eb", "apcpu_ts1_eb",
-+				     "dap_eb", "i2c_eb";
-+	};
-+
-+	clk_aon_apb_gates1: clk at 402e0004 {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x402e0004 0 0x3000>;
-+		clocks = <&clk_aon_apb>;
-+		clock-output-names = "pmu_eb", "thm_eb",
-+				     "aux0_eb", "aux1_eb",
-+				     "aux2_eb", "probe_eb",
-+				     "gpu0_avs_eb", "gpu1_avs_eb",
-+				     "apcpu_wdg_eb", "ap_tmr1_eb",
-+				     "ap_tmr2_eb", "disp_emc_eb",
-+				     "zip_emc_eb", "gsp_emc_eb",
-+				     "osc_aon_eb", "lvds_trx_eb",
-+				     "lvds_tcxo_eb", "mdar_eb",
-+				     "rtc4m0_cal_eb", "rct100m_cal_eb",
-+				     "djtag_eb", "mbox_eb",
-+				     "aon_dma_eb", "dbg_emc_eb",
-+				     "lvds_pll_div_en", "def_eb",
-+				     "aon_apb_gate1_rsv0", "orp_jtag_eb",
-+				     "vsp_eb", "cam_eb",
-+				     "disp_eb", "dbg_axi_if_eb";
-+	};
-+
-+	clk_agcp_ahb_gates: clk at 415e0000 {
-+		compatible = "sprd,sc100-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x415e0000 0 0x300>;
-+		clock-indices = <0>, <1>, <2>, <3>,
-+				<4>, <5>, <6>,
-+				<10>, <11>,
-+				<12>, <13>, <14>, <15>,
-+				<16>, <17>, <18>, <19>,
-+				<20>;
-+		clock-output-names = "agcp_iis0_eb", "agcp_iis1_eb",
-+				     "agcp_iis2_eb", "agcp_iis3_eb",
-+				     "agcp_uart_eb", "agcp_dmacp_eb",
-+				     "agcp_dmaap_eb", "agcp_arc48k_eb",
-+				     "agcp_src44p1k_eb", "agcp_mcdt_eb",
-+				     "agcp_vbcifd_eb", "agcp_vbc_eb",
-+				     "agcp_spinlock_eb", "agcp_icu_eb",
-+				     "agcp_ap_ashb_eb", "agcp_cp_ashb_eb",
-+				     "agcp_aud_eb", "agcp_audif_eb";
-+	};
-+
-+	clk_ahb_vsp_gates: clk at 61100000 {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x61100000 0 0x3000>;
-+		clocks = <&clk_ahb_vsp>;
-+		clock-output-names = "vsp_dec_eb", "vsp_ckg_eb",
-+				     "vsp_mmu_eb", "vsp_enc_eb",
-+				     "vpp_eb", "vsp_26m_eb";
-+	};
-+
-+	clk_vsp_axi_gates: clk at 61100008 {
-+		compatible = "sprd,gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x61100008 0 0x4>;
-+		clock-indices = <0>, <1>, <2>,
-+				<8>, <9>, <10>;
-+		clocks = <&clk_ahb_vsp>;
-+		clock-output-names = "vsp_axi_gate", "vsp_enc_gate",
-+				     "vpp_axi_gate", "vsp_bm_gate",
-+				     "vsp_enc_bm_gate", "vpp_bm_gate";
-+	};
-+
-+	clk_ahb_cam_gates: clk at 62100000 {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x62100000 0 0x3000>;
-+		clocks = <&clk_ahb_cam>;
-+		clock-output-names = "dcam0_eb", "dcam1_eb",
-+				     "isp0_eb", "csi0_eb",
-+				     "csi1_eb", "jpg0_eb",
-+				     "jpg1_eb", "cam_ckg_eb",
-+				     "cam_mmu_eb", "isp1_eb",
-+				     "cpp_eb", "mmu_pf_eb",
-+				     "isp2_eb", "dcam2isp_if_eb",
-+				     "isp2dcam_if_eb", "isp_lclk_eb",
-+				     "isp_iclk_eb", "isp_mclk_eb",
-+				     "isp_pclk_eb", "isp_isp2dcam_eb",
-+				     "dcam0_if_eb", "clk26m_if_eb";
-+	};
-+
-+	clk_cam_axi_gates: clk at 62100008 {
-+		compatible = "sprd,gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x62100008 0 0x4>;
-+		clocks = <&clk_ahb_cam>;
-+		clock-output-names = "cphy0_gate", "mipi_csi0_gate",
-+				     "cphy1_gate", "mipi_csi1",
-+				     "dcam0_axi_gate", "dcam1_axi_gate",
-+				     "sensor0_gate", "sensor1_gate",
-+				     "jpg0_axi_gate", "gpg1_axi_gate",
-+				     "isp0_axi_gate", "isp1_axi_gate",
-+				     "isp2_axi_gate", "cpp_axi_gate",
-+				     "d0_if_axi_gate", "d2i_if_axi_gate",
-+				     "i2d_if_axi_gate", "spare_axi_gate",
-+				     "sensor2_gate";
-+	};
-+
-+	clk_cam_module_gates: clk at 62100028 {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x62100028 0 0x3000>;
-+		clocks = <&clk_ahb_cam>;
-+		clock-output-names = "d0if_in_d_en", "d1if_in_d_en",
-+				     "d0if_in_d2i_en", "d1if_in_d2i_en",
-+				     "ia_in_d2i_en", "ib_in_d2i_en",
-+				     "ic_in_d2i_en", "ia_in_i_en",
-+				     "ib_in_i_en", "ic_in_i_en";
-+	};
-+
-+	clk_ahb_disp_gates: clk at 63100000 {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x63100000 0 0x3000>;
-+		clock-indices = <0>, <1>, <2>, <3>,
-+				<4>, <5>, <6>, <7>,
-+				<8>, <9>, <10>,
-+				<13>, <14>, <15>,
-+				<16>;
-+		clocks = <&clk_ahb_disp>;
-+		clock-output-names = "dispc0_eb", "dispc1_eb",
-+				     "dispc_mmu_eb", "gsp0_eb",
-+				     "gsp1_eb", "gsp0_mmu_eb",
-+				     "gsp1_mmu_eb", "dsi0_eb",
-+				     "dsi1_eb", "disp_ckg_eb",
-+				     "disp_gpu_eb", "gpu_mtx_eb",
-+				     "gsp_mtx_eb", "tmc_mtx_eb",
-+				     "dispc_mtx_eb";
-+	};
-+
-+	clk_disp_axi_gates: clk at 63100008 {
-+		compatible = "sprd,gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x63100008 0 0x4>;
-+		clocks = <&clk_ahb_disp>;
-+		clock-output-names = "dphy0_gate", "dphy1_gate",
-+				     "gsp0_a_gate", "gsp1_a_gate",
-+				     "gsp0_f_gate", "gsp1_f_gate",
-+				     "d_mtx_f_gate", "d_mtx_a_gate",
-+				     "d_noc_f_gate", "d_noc_a_gate",
-+				     "gsp_mtx_f_gate", "gsp_mtx_a_gate",
-+				     "gsp_noc_f_gate", "gsp_noc_a_gate",
-+				     "dispm0idle_gate", "gspm0idle_gate";
-+	};
-+
-+	clk_ap_apb_gates: clk at 70b00000 {
-+		compatible = "sprd,sc1000-gates-clock";
-+		#clock-cells = <1>;
-+		reg = <0 0x70b00000 0 0x3000>;
-+		clocks = <&clk_ap_apb>;
-+		clock-output-names = "sim0_eb", "iis0_eb",
-+				     "iis1_eb", "iis2_eb",
-+				     "iis3_eb", "spi0_eb",
-+				     "spi1_eb", "spi2_eb",
-+				     "i2c0_eb", "i2c1_eb",
-+				     "i2c2_eb", "i2c3_eb",
-+				     "i2c4_eb", "i2c5_eb",
-+				     "uart0_eb", "uart1_eb",
-+				     "uart2_eb", "uart3_eb",
-+				     "uart4_eb", "ap_ckg_eb",
-+				     "spi3_eb";
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-index 7b7d8ce..97794fe 100644
---- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
-+++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-@@ -8,6 +8,7 @@
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include "whale2.dtsi"
-+#include "sc9860-clocks.dtsi"
- 
- / {
- 	cpus {
-diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
-index cd5a71f..8d1f8aa 100644
---- a/arch/arm64/boot/dts/sprd/whale2.dtsi
-+++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
-@@ -79,11 +79,4 @@
- 		};
- 
- 	};
--
--	ext_26m: ext-26m {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <26000000>;
--		clock-output-names = "ext_26m";
--	};
- };
--- 
-2.7.4
+Thanks
+zhongjiang
+On 2017/5/10 16:55, Catalin Marinas wrote:
+> Given that there are a lot more mm changes than arm64, cc'ing linux-mm
+> as well.
+>
+> Patch below:
+>
+> On Wed, May 10, 2017 at 11:37:20AM +0800, zhongjiang wrote:
+>> Recently, xiaojun report the following issue.
+>>
+>> [ 4544.984139] Unable to handle kernel paging request at virtual address ffff804392800000
+>> [ 4544.991995] pgd = ffff80096745f000
+>> [ 4544.995369] [ffff804392800000] *pgd=0000000000000000
+>> [ 4545.000297] Internal error: Oops: 96000005 [#1] PREEMPT SMP
+>> [ 4545.005815] Modules linked in:
+>> [ 4545.008843] CPU: 1 PID: 8976 Comm: cat Not tainted 4.11.0-rc6 #1
+>> [ 4545.014790] Hardware name: ARM Juno development board (r1) (DT)
+>> [ 4545.020653] task: ffff8009753fdb00 task.stack: ffff80097533c000
+>> [ 4545.026520] PC is at __memcpy+0x100/0x180
+>> [ 4545.030491] LR is at vread+0x144/0x280
+>> [ 4545.034202] pc : [<ffff0000083a1000>] lr : [<ffff0000081c126c>] pstate: 20000145
+>> [ 4545.041530] sp : ffff80097533fcb0
+>> [ 4545.044811] x29: ffff80097533fcb0 x28: ffff800962d24000
+>> [ 4545.050074] x27: 0000000000001000 x26: ffff8009753fdb00
+>> [ 4545.055337] x25: ffff000008200000 x24: ffff800977801380
+>> [ 4545.060600] x23: ffff8009753fdb00 x22: ffff800962d24000
+>> [ 4545.065863] x21: 0000000000001000 x20: ffff000008200000
+>> [ 4545.071125] x19: 0000000000001000 x18: 0000ffffefa323c0
+>> [ 4545.076387] x17: 0000ffffa9c87440 x16: ffff0000081fdfd0
+>> [ 4545.081649] x15: 0000ffffa9d01588 x14: 72a77346b2407be7
+>> [ 4545.086911] x13: 5299400690000000 x12: b0000001f9001a79
+>> [ 4545.092173] x11: 97fc098d91042260 x10: 0000000000000000
+>> [ 4545.097435] x9 : 0000000000000000 x8 : 9110626091260021
+>> [ 4545.102698] x7 : 0000000000001000 x6 : ffff800962d24000
+>> [ 4545.107960] x5 : ffff8009778013b0 x4 : 0000000000000000
+>> [ 4545.113222] x3 : 0400000000000001 x2 : 0000000000000f80
+>> [ 4545.118484] x1 : ffff804392800000 x0 : ffff800962d24000
+>> [ 4545.123745]
+>> [ 4545.125220] Process cat (pid: 8976, stack limit = 0xffff80097533c000)
+>> [ 4545.131598] Stack: (0xffff80097533fcb0 to 0xffff800975340000)
+>> [ 4545.137289] fca0:                                   ffff80097533fd30 ffff000008270f64
+>> [ 4545.145049] fcc0: 000000000000e000 000000003956f000 ffff000008f950d0 ffff80097533feb8
+>> [ 4545.152809] fce0: 0000000000002000 ffff8009753fdb00 ffff800962d24000 ffff000008e8d3d8
+>> [ 4545.160568] fd00: 0000000000001000 ffff000008200000 0000000000001000 ffff800962d24000
+>> [ 4545.168327] fd20: 0000000000001000 ffff000008e884a0 ffff80097533fdb0 ffff00000826340c
+>> [ 4545.176086] fd40: ffff800976bf2800 fffffffffffffffb 000000003956d000 ffff80097533feb8
+>> [ 4545.183846] fd60: 0000000060000000 0000000000000015 0000000000000124 000000000000003f
+>> [ 4545.191605] fd80: ffff000008962000 ffff8009753fdb00 ffff8009753fdb00 ffff8009753fdb00
+>> [ 4545.199364] fda0: 0000000300000124 0000000000002000 ffff80097533fdd0 ffff0000081fb83c
+>> [ 4545.207123] fdc0: 0000000000010000 ffff80097514f900 ffff80097533fe50 ffff0000081fcb28
+>> [ 4545.214883] fde0: 0000000000010000 ffff80097514f900 0000000000000000 0000000000000000
+>> [ 4545.222642] fe00: ffff80097533fe30 ffff0000081fca1c ffff80097514f900 0000000000000000
+>> [ 4545.230401] fe20: 000000003956d000 ffff80097533feb8 ffff80097533fe50 ffff0000081fcb04
+>> [ 4545.238160] fe40: 0000000000010000 ffff80097514f900 ffff80097533fe80 ffff0000081fe014
+>> [ 4545.245919] fe60: ffff80097514f900 ffff80097514f900 000000003956d000 0000000000010000
+>> [ 4545.253678] fe80: 0000000000000000 ffff000008082f30 0000000000000000 0000800977146000
+>> [ 4545.261438] fea0: ffffffffffffffff 0000ffffa9c8745c 0000000000000124 0000000008202000
+>> [ 4545.269197] fec0: 0000000000000003 000000003956d000 0000000000010000 0000000000000000
+>> [ 4545.276956] fee0: 0000000000011011 0000000000000001 0000000000000011 0000000000000002
+>> [ 4545.284715] ff00: 000000000000003f 1f3c201f7372686b 00000000ffffffff 0000000000000030
+>> [ 4545.292474] ff20: 0000000000000038 0000000000000000 0000ffffa9bcca94 0000ffffa9d01588
+>> [ 4545.300233] ff40: 0000000000000000 0000ffffa9c87440 0000ffffefa323c0 0000000000010000
+>> [ 4545.307993] ff60: 000000000041a310 000000003956d000 0000000000000003 000000007fffe000
+>> [ 4545.315751] ff80: 00000000004088d0 0000000000010000 0000000000000000 0000000000000000
+>> [ 4545.323511] ffa0: 0000000000010000 0000ffffefa32690 0000000000404dcc 0000ffffefa32690
+>> [ 4545.331270] ffc0: 0000ffffa9c8745c 0000000060000000 0000000000000003 000000000000003f
+>> [ 4545.339029] ffe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+>> [ 4545.346786] Call trace:
+>> [ 4545.349207] Exception stack(0xffff80097533fae0 to 0xffff80097533fc10)
+>> [ 4545.355586] fae0: 0000000000001000 0001000000000000 ffff80097533fcb0 ffff0000083a1000
+>> [ 4545.363345] fb00: 000000003957c000 ffff80097533fc00 0000000020000145 0000000000000025
+>> [ 4545.371105] fb20: ffff800962d24000 ffff000008e8d3d8 0000000000001000 ffff8009753fdb00
+>> [ 4545.378864] fb40: 0000000000000000 0000000000000002 ffff80097533fd30 ffff000008082604
+>> [ 4545.386623] fb60: 0000000000001000 0001000000000000 ffff80097533fd30 ffff0000083a0a90
+>> [ 4545.394382] fb80: ffff800962d24000 ffff804392800000 0000000000000f80 0400000000000001
+>> [ 4545.402140] fba0: 0000000000000000 ffff8009778013b0 ffff800962d24000 0000000000001000
+>> [ 4545.409899] fbc0: 9110626091260021 0000000000000000 0000000000000000 97fc098d91042260
+>> [ 4545.417658] fbe0: b0000001f9001a79 5299400690000000 72a77346b2407be7 0000ffffa9d01588
+>> [ 4545.425416] fc00: ffff0000081fdfd0 0000ffffa9c87440
+>> [ 4545.430248] [<ffff0000083a1000>] __memcpy+0x100/0x180
+>> [ 4545.435253] [<ffff000008270f64>] read_kcore+0x21c/0x3b0
+>> [ 4545.440429] [<ffff00000826340c>] proc_reg_read+0x64/0x90
+>> [ 4545.445691] [<ffff0000081fb83c>] __vfs_read+0x1c/0x108
+>> [ 4545.450779] [<ffff0000081fcb28>] vfs_read+0x80/0x130
+>> [ 4545.455696] [<ffff0000081fe014>] SyS_read+0x44/0xa0
+>> [ 4545.460528] [<ffff000008082f30>] el0_svc_naked+0x24/0x28
+>> [ 4545.465790] Code: d503201f d503201f d503201f d503201f (a8c12027)
+>> [ 4545.471852] ---[ end trace 4d1897f94759f461 ]---
+>> [ 4545.476435] note: cat[8976] exited with preempt_count 2
+>>
+>> I find the issue is introduced when applying commit f9040773b7bb
+>> ("arm64: move kernel image to base of vmalloc area"). This patch
+>> make the kernel image overlap with vmalloc area. It will result in
+>> vmalloc area have the huge page table. but the vmalloc_to_page is
+>> not realize the change. and the function is public to any arch.
+>>
+>> I fix it by adding the another kernel image condition in vmalloc_to_page
+>> to make it keep the accordance with previous vmalloc mapping.
+>>
+>> Fixes: f9040773b7bb ("arm64: move kernel image to base of vmalloc area")
+>> Reported-by: tan xiaojun <tanxiaojun@huawei.com>
+>> Signed-off-by: zhongjiang <zhongjiang@huawei.com>
+>> ---
+>>  arch/arm64/mm/mmu.c     |  2 +-
+>>  include/linux/vmalloc.h |  1 +
+>>  mm/vmalloc.c            | 35 ++++++++++++++++++++++++++++-------
+>>  3 files changed, 30 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index 0c429ec..2265c39 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -509,7 +509,7 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+>>  	vma->addr	= va_start;
+>>  	vma->phys_addr	= pa_start;
+>>  	vma->size	= size;
+>> -	vma->flags	= VM_MAP;
+>> +	vma->flags	= VM_KERNEL;
+>>  	vma->caller	= __builtin_return_address(0);
+>>  
+>>  	vm_area_add_early(vma);
+>> diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
+>> index 0328ce0..c9245af 100644
+>> --- a/include/linux/vmalloc.h
+>> +++ b/include/linux/vmalloc.h
+>> @@ -17,6 +17,7 @@
+>>  #define VM_ALLOC		0x00000002	/* vmalloc() */
+>>  #define VM_MAP			0x00000004	/* vmap()ed pages */
+>>  #define VM_USERMAP		0x00000008	/* suitable for remap_vmalloc_range */
+>> +#define VM_KERNEL		0x00000010	/* kernel pages */
+>>  #define VM_UNINITIALIZED	0x00000020	/* vm_struct is not fully initialized */
+>>  #define VM_NO_GUARD		0x00000040      /* don't add guard page */
+>>  #define VM_KASAN		0x00000080      /* has allocated kasan shadow memory */
+>> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+>> index 1dda6d8..601d940 100644
+>> --- a/mm/vmalloc.c
+>> +++ b/mm/vmalloc.c
+>> @@ -1967,11 +1967,28 @@ void *vmalloc_32_user(unsigned long size)
+>>  EXPORT_SYMBOL(vmalloc_32_user);
+>>  
+>>  /*
+>> + * kernel image overlap with the valloc area in arm64,it
+>> + * will make the huge talbe page existence, if we walk the
+>> + * all page talbe, it may be result in the panic.
+>> + */
+>> +static inline struct page *aligned_get_page(char *addr, struct vm_struct *vm)
+>> +{
+>> +	struct page *p = NULL;
+>> +
+>> +	if (vm->flags & VM_KERNEL)
+>> +		p = virt_to_page(lm_alias(addr));
+>> +	else
+>> +		p = vmalloc_to_page(addr);
+>> +
+>> +	return p;
+>> +}
+>> +
+>> +/*
+>>   * small helper routine , copy contents to buf from addr.
+>>   * If the page is not present, fill zero.
+>>   */
+>> -
+>> -static int aligned_vread(char *buf, char *addr, unsigned long count)
+>> +static int aligned_vread(char *buf, char *addr, unsigned long count,
+>> +					struct vm_struct *vm)
+>>  {
+>>  	struct page *p;
+>>  	int copied = 0;
+>> @@ -1983,7 +2000,7 @@ static int aligned_vread(char *buf, char *addr, unsigned long count)
+>>  		length = PAGE_SIZE - offset;
+>>  		if (length > count)
+>>  			length = count;
+>> -		p = vmalloc_to_page(addr);
+>> +		p = aligned_get_page(addr, vm);
+>>  		/*
+>>  		 * To do safe access to this _mapped_ area, we need
+>>  		 * lock. But adding lock here means that we need to add
+>> @@ -2010,7 +2027,8 @@ static int aligned_vread(char *buf, char *addr, unsigned long count)
+>>  	return copied;
+>>  }
+>>  
+>> -static int aligned_vwrite(char *buf, char *addr, unsigned long count)
+>> +static int aligned_vwrite(char *buf, char *addr, unsigned long count,
+>> +					struct vm_struct *vm)
+>>  {
+>>  	struct page *p;
+>>  	int copied = 0;
+>> @@ -2022,7 +2040,7 @@ static int aligned_vwrite(char *buf, char *addr, unsigned long count)
+>>  		length = PAGE_SIZE - offset;
+>>  		if (length > count)
+>>  			length = count;
+>> -		p = vmalloc_to_page(addr);
+>> +		p = aligned_get_page(addr, vm);
+>>  		/*
+>>  		 * To do safe access to this _mapped_ area, we need
+>>  		 * lock. But adding lock here means that we need to add
+>> @@ -2109,7 +2127,7 @@ long vread(char *buf, char *addr, unsigned long count)
+>>  		if (n > count)
+>>  			n = count;
+>>  		if (!(vm->flags & VM_IOREMAP))
+>> -			aligned_vread(buf, addr, n);
+>> +			aligned_vread(buf, addr, n, vm);
+>>  		else /* IOREMAP area is treated as memory hole */
+>>  			memset(buf, 0, n);
+>>  		buf += n;
+>> @@ -2190,7 +2208,7 @@ long vwrite(char *buf, char *addr, unsigned long count)
+>>  		if (n > count)
+>>  			n = count;
+>>  		if (!(vm->flags & VM_IOREMAP)) {
+>> -			aligned_vwrite(buf, addr, n);
+>> +			aligned_vwrite(buf, addr, n, vm);
+>>  			copied++;
+>>  		}
+>>  		buf += n;
+>> @@ -2710,6 +2728,9 @@ static int s_show(struct seq_file *m, void *p)
+>>  	if (v->flags & VM_USERMAP)
+>>  		seq_puts(m, " user");
+>>  
+>> +	if (v->flags & VM_KERNEL)
+>> +		seq_puts(m, " kernel");
+>> +
+>>  	if (is_vmalloc_addr(v->pages))
+>>  		seq_puts(m, " vpages");
+>>  
+>> -- 
+>> 1.7.12.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> .
+>
