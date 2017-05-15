@@ -1,61 +1,49 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 15 May 2017 10:44:07 -0700
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
-References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
- <20170510.212952.1440495072777358778.davem@davemloft.net>
- <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
- <20170510.215218.2185526627014393313.davem@davemloft.net>
- <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
- <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
- <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
- <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
-Message-ID: <CAGXu5jLeCB-H0nkVtpJN5SSz4r4idnKJbnV+rO610nw-o98wCQ@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 15 May 2017 11:44:37 -0600
+Subject: [PATCH 1/3] coresight: etb10: Delete an error message for a
+ failed memory allocation in etb_probe()
+In-Reply-To: <df23f2fa-ad4a-8338-8641-96782e50f6a7@users.sourceforge.net>
+References: <5d5cd752-f2f2-b511-6b1e-daf5bf1bc522@users.sourceforge.net>
+ <df23f2fa-ad4a-8338-8641-96782e50f6a7@users.sourceforge.net>
+Message-ID: <CANLsYky=-vmB+xMEZ4M0vWRx0Yimfb5E+whfJeTQ1jndj6GBUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 13, 2017 at 2:38 PM, Shubham Bansal
-<illusionist.neo@gmail.com> wrote:
-> Finally finished testing.
+On 12 May 2017 at 12:51, SF Markus Elfring
+<elfring@users.sourceforge.net> wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Fri, 12 May 2017 20:23:43 +0200
 >
-> "test_bpf: Summary: 314 PASSED, 0 FAILED, [274/306 JIT'ed]"
-
-Nice work! Glad you've been chipping away at this. Thanks!
-
--Kees
-
+> Omit an extra message for a memory allocation failure in this function.
 >
-> Will send the patch after code refactoring. Thanks for all the help
-> you guys. I really really appreciate it.
+> This issue was detected by using the Coccinelle software.
 >
-> Special thanks to Kees and Daniel. :)
+> Link: http://events.linuxfoundation.org/sites/events/files/slides/LCJ16-Refactor_Strings-WSang_0.pdf
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> ---
+>  drivers/hwtracing/coresight/coresight-etb10.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
 >
-> Best,
-> Shubham Bansal
+> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+> index 979ea6ec7902..837aebf22c45 100644
+> --- a/drivers/hwtracing/coresight/coresight-etb10.c
+> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
+> @@ -675,11 +675,8 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
 >
+>         drvdata->buf = devm_kzalloc(dev,
+>                                     drvdata->buffer_depth * 4, GFP_KERNEL);
+> -       if (!drvdata->buf) {
+> -               dev_err(dev, "Failed to allocate %u bytes for buffer data\n",
+> -                       drvdata->buffer_depth * 4);
+> +       if (!drvdata->buf)
+>                 return -ENOMEM;
+> -       }
 >
-> On Thu, May 11, 2017 at 9:00 PM, Kees Cook <keescook@chromium.org> wrote:
->> On Thu, May 11, 2017 at 2:32 AM, Shubham Bansal
->> <illusionist.neo@gmail.com> wrote:
->>> What do you guys suggest i should implement it? I am almost done with
->>> my current implementation but if you think I should change it to the
->>> way David suggested, its better to suggest now before I send the
->>> patch.
->>
->> I'd say send what you have right now, as it's a good starting point
->> for future work. I'll be curious to see the benchmarks, etc. It can be
->> a base for further optimization.
->>
->> Thanks for chipping away at this!
->>
->> -Kees
->>
->> --
->> Kees Cook
->> Pixel Security
+>         desc.type = CORESIGHT_DEV_TYPE_SINK;
+>         desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
 
+Applied - thanks.
 
-
--- 
-Kees Cook
-Pixel Security
+> --
+> 2.12.3
+>
