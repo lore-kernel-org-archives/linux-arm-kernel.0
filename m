@@ -1,92 +1,77 @@
-From: philippe.cornu@st.com (Philippe CORNU)
-Date: Mon, 15 May 2017 10:33:28 +0000
-Subject: [PATCH v1 3/3] drm/stm: Add STM32 DSI host driver
-In-Reply-To: <a254c176-8064-1984-10b8-dce4308cc3d6@baylibre.com>
-References: <1494600989-13507-1-git-send-email-philippe.cornu@st.com>
- <1494600989-13507-4-git-send-email-philippe.cornu@st.com>
- <a254c176-8064-1984-10b8-dce4308cc3d6@baylibre.com>
-Message-ID: <250fc42c-8961-c57e-6f59-9b1a6523a0a4@st.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 15 May 2017 12:55:22 +0200
+Subject: [PATCH v3 03/21] ARM: dts: omap: Add generic compatible string
+ for I2C EEPROM
+In-Reply-To: <20170419235646.j6cc3vm7eru6buv6@rob-hp-laptop>
+References: <20170414010445.21727-1-javier@osg.samsung.com>
+ <20170414010445.21727-4-javier@osg.samsung.com>
+ <20170419235646.j6cc3vm7eru6buv6@rob-hp-laptop>
+Message-ID: <CABxcv=k7LbcQCiVYCPTTsG_-hxBseHzPy-55zDNJ+yW0BL0=3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
-Many thanks for your comments.
+Hello Rob,
 
-The PHY part of the MIPI DSI is the main difference between all chipsets 
-based on the Synopsys DesignWare MIPI DSI.
-There is no "generic DSI PHY interface" and that is probably why all soc 
-vendors have implemented their own drivers (RockChip, NXP/Freescale, 
-HiSilicon and now STM32).
-
-Regarding creating a "generic dw MIPI DSI bridge" as the recent dw hdmi 
-bridge, several attempts have been done in the past but without success:
-* Liu Ying from Freescale in February 2015 
-(https://lkml.org/lkml/2015/2/12/38).
-* Chris Zhong from Rockchip in November 2015 
-(http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1024586.html).
-
-The Rockchip driver looks nice and is updated regularly.
-So, instead of creating a new driver for the STM32 family, we decided to 
-use Rockchip?s in our own drm/stm directory and replace the 
-Rockchip-specific PHY by the STM32.
-
-Comments are welcome :-)
-Many thanks,
-Philippe
-
-
-On 05/15/2017 10:22 AM, Neil Armstrong wrote:
-> On 05/12/2017 04:56 PM, Philippe CORNU wrote:
->> This mipi dsi host driver is based on the Rockchip version of the
->> Synopsys Designware mipi dsi driver (rockchip/dw-mipi-dsi.c)
->> modified for the stm32 family:
->> - replace Rockchip digital & phy specific extensions with stm32's ones.
->> - add a bridge
+On Thu, Apr 20, 2017 at 1:56 AM, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Apr 13, 2017 at 10:04:27PM -0300, Javier Martinez Canillas wrote:
+>> The at24 driver allows to register I2C EEPROM chips using different vendor
+>> and devices, but the I2C subsystem does not take the vendor into account
+>> when matching using the I2C table since it only has device entries.
 >>
->> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+>> But when matching using an OF table, both the vendor and device has to be
+>> taken into account so the driver defines only a set of compatible strings
+>> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+>>
+>> So add this generic fallback to the device node compatible string to make
+>> the device to match the driver using the OF device ID table.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 >> ---
->>  drivers/gpu/drm/stm/Kconfig       |    7 +
->>  drivers/gpu/drm/stm/Makefile      |    2 +
->>  drivers/gpu/drm/stm/dw-mipi-dsi.c | 1197 +++++++++++++++++++++++++++++++++++++
->>  3 files changed, 1206 insertions(+)
->>  create mode 100644 drivers/gpu/drm/stm/dw-mipi-dsi.c
 >>
->> diff --git a/drivers/gpu/drm/stm/Kconfig b/drivers/gpu/drm/stm/Kconfig
->> index 2c4817f..0007789 100644
->> --- a/drivers/gpu/drm/stm/Kconfig
->> +++ b/drivers/gpu/drm/stm/Kconfig
->> @@ -14,3 +14,10 @@ config DRM_STM
->>  	  STMicroelectronics STM32 MCUs.
->>  	  To compile this driver as a module, choose M here: the module
->>  	  will be called stm-drm.
->> +
->> +config DRM_STM_DSI
->> +	tristate "MIPI DSI support for STMicroelectronics SoC"
->> +	depends on DRM_STM
->> +	select DRM_MIPI_DSI
->> +	help
->> +	  Choose this option for MIPI DSI support on STMicroelectronics SoC.
->> diff --git a/drivers/gpu/drm/stm/Makefile b/drivers/gpu/drm/stm/Makefile
->> index e114d45..e448a93 100644
->> --- a/drivers/gpu/drm/stm/Makefile
->> +++ b/drivers/gpu/drm/stm/Makefile
->> @@ -4,4 +4,6 @@ stm-drm-y := \
->>  	drv.o \
->>  	ltdc.o
+>> Changes in v3: None
+>> Changes in v2: None
 >>
->> +obj-$(CONFIG_DRM_STM_DSI) += dw-mipi-dsi.o
->> +
->>  obj-$(CONFIG_DRM_STM) += stm-drm.o
->> diff --git a/drivers/gpu/drm/stm/dw-mipi-dsi.c b/drivers/gpu/drm/stm/dw-mipi-dsi.c
->> new file mode 100644
->> index 0000000..4b7f7b9
->> --- /dev/null
->> +++ b/drivers/gpu/drm/stm/dw-mipi-dsi.c
+>>  arch/arm/boot/dts/am335x-baltos.dtsi            |  2 +-
+>>  arch/arm/boot/dts/am335x-base0033.dts           |  2 +-
+>>  arch/arm/boot/dts/am335x-bone-common.dtsi       | 10 +++++-----
+>>  arch/arm/boot/dts/am335x-nano.dts               |  2 +-
+>>  arch/arm/boot/dts/am335x-pepper.dts             |  2 +-
+>>  arch/arm/boot/dts/am335x-shc.dts                |  2 +-
+>>  arch/arm/boot/dts/am335x-sl50.dts               |  2 +-
+>>  arch/arm/boot/dts/am437x-idk-evm.dts            |  2 +-
+>>  arch/arm/boot/dts/am437x-sk-evm.dts             |  2 +-
+>>  arch/arm/boot/dts/am43x-epos-evm.dts            |  2 +-
+>>  arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi |  2 +-
+>>  arch/arm/boot/dts/omap3-cm-t3x.dtsi             |  2 +-
+>>  arch/arm/boot/dts/omap3-gta04.dtsi              |  2 +-
+>>  arch/arm/boot/dts/omap3-sb-t35.dtsi             |  2 +-
+>>  arch/arm/boot/dts/omap4-var-som-om44.dtsi       |  2 +-
+>>  arch/arm/boot/dts/omap5-cm-t54.dts              |  2 +-
+>>  arch/arm/boot/dts/omap5-sbc-t54.dts             |  2 +-
+>>  17 files changed, 21 insertions(+), 21 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/am335x-baltos.dtsi b/arch/arm/boot/dts/am335x-baltos.dtsi
+>> index d42b98f15e8b..6ca780d0623f 100644
+>> --- a/arch/arm/boot/dts/am335x-baltos.dtsi
+>> +++ b/arch/arm/boot/dts/am335x-baltos.dtsi
+>> @@ -255,7 +255,7 @@
+>>       };
+>>
+>>       at24 at 50 {
+>> -             compatible = "at24,24c02";
+>> +             compatible = "at24,24c02", "atmel,24c02";
 >
+> I think you can just drop the at24 compatibles. A new kernel doesn't
+> need it. An old kernel ignores the manufacturer. I checked that u-boot
+> only matches on "atmel,*", so okay there. Don't know about the *BSDs. I
+> couldn't find anything.
 >
-> Hi Philippe,
->
-> First question, why couldn't this be transformed as a bridge driver along the Synopsys DW-HDMI driver ?
->
-> Neil
->
+
+That's a very good point, it doesn't make sense indeed to keep them,
+since the vendor prefix can as you said be ignored (until the OF
+modalias report is fixed).
+
+I'll re-spin the series dropping them. Thanks a lot.
+
+Best regards,
+Javier
