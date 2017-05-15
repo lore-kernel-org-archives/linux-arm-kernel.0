@@ -1,42 +1,95 @@
-From: aisheng.dong@nxp.com (A.S. Dong)
-Date: Mon, 15 May 2017 12:08:22 +0000
-Subject: [PATCH 5/5] pinctrl: imx: fix debug message for
- SHARE_MUX_CONF_REG case
-In-Reply-To: <20170515120555.GR8471@dragon>
-References: <1494592686-30967-1-git-send-email-aisheng.dong@nxp.com>
- <1494592686-30967-7-git-send-email-aisheng.dong@nxp.com>
- <20170515120555.GR8471@dragon>
-Message-ID: <AM3PR04MB306832D30685F0239BA37BC80E10@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Mon, 15 May 2017 17:32:19 +0530
+Subject: [PATCH v2 09/11] arm64: dts: Add I2C DT nodes for Stingray SoC
+In-Reply-To: <1494849741-21294-1-git-send-email-anup.patel@broadcom.com>
+References: <1494849741-21294-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1494849741-21294-10-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Monday, May 15, 2017 8:06 PM
-> To: A.S. Dong
-> Cc: linux-gpio at vger.kernel.org; Andy Duan; Jacky Bai;
-> linus.walleij at linaro.org; stefan at agner.ch; kernel at pengutronix.de; linux-
-> arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 5/5] pinctrl: imx: fix debug message for
-> SHARE_MUX_CONF_REG case
-> 
-> On Fri, May 12, 2017 at 08:38:06PM +0800, Dong Aisheng wrote:
-> > The original implemented debug message does not work for
-> > SHARE_MUX_CONF_REG case. This patch fixes it.
-> >
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Fixes: bf5a530971af ("pinctrl: imx: add VF610 support to imx pinctrl
-> > framework")
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> 
-> Fixes should go first in a patch series.
-> 
+From: Oza Pawandeep <oza.oza@broadcom.com>
 
-That's true.
-Thanks for the suggestion.
+This patch adds I2C DT nodes on Stingray SoC.
 
-Regards
-Dong Aisheng
+Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+---
+ .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 22 ++++++++++++++++++++++
+ .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 20 ++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
 
-> Shawn
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+index ce46224..e3f8c89 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+@@ -57,6 +57,28 @@
+ 	status = "okay";
+ };
+ 
++&i2c0 {
++	status = "okay";
++
++	pca9505: pca9505 at 20 {
++		compatible = "nxp,pca9505";
++		gpio-controller;
++		#gpio-cells = <2>;
++		reg = <0x20>;
++	};
++};
++
++&i2c1 {
++	status = "okay";
++
++	pcf8574: pcf8574 at 20 {
++		compatible = "nxp,pcf8574a";
++		gpio-controller;
++		#gpio-cells = <2>;
++		reg = <0x27>;
++	};
++};
++
+ &nand {
+ 	status = "ok";
+ 	nandcs at 0 {
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+index 2b24d07..476a6fa 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+@@ -274,6 +274,16 @@
+ 
+ 		#include "stingray-pinctrl.dtsi"
+ 
++		i2c0: i2c at 689b0000 {
++			compatible = "brcm,iproc-i2c";
++			reg = <0x000b0000 0x100>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			interrupts = <GIC_SPI 177 IRQ_TYPE_NONE>;
++			clock-frequency = <100000>;
++			status = "disabled";
++		};
++
+ 		gpio_hsls: gpio at 689d0000 {
+ 			compatible = "brcm,iproc-gpio";
+ 			reg = <0x000d0000 0x864>;
+@@ -300,6 +310,16 @@
+ 					<&pinmux 151 91 4>;
+ 		};
+ 
++		i2c1: i2c at 689e0000 {
++			compatible = "brcm,iproc-i2c";
++			reg = <0x000e0000 0x100>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			interrupts = <GIC_SPI 178 IRQ_TYPE_NONE>;
++			clock-frequency = <100000>;
++			status = "disabled";
++		};
++
+ 		uart0: uart at 68a00000 {
+ 			device_type = "serial";
+ 			compatible = "snps,dw-apb-uart";
+-- 
+2.7.4
