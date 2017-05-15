@@ -1,105 +1,115 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 15 May 2017 22:24:32 +0200
-Subject: [PATCH v2 00/18] ARM64: meson: DT cleanups
-In-Reply-To: <5fb0130c-473e-dc15-b60c-e5b6144031ad@suse.de>
-References: <20170513143337.14278-1-afaerber@suse.de>
- <36c02d8a-d3e2-4330-f600-e49a1ba680e8@baylibre.com>
- <5fb0130c-473e-dc15-b60c-e5b6144031ad@suse.de>
-Message-ID: <CAFBinCA18Y0CXvu4DtDnz=zvYxpqUNA5WRK5teO_T8zTVj4FnQ@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 15 May 2017 23:37:16 +0300
+Subject: [PATCH V8 07/11] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <26defadf-6380-4af4-6323-b51198376bc1@codeaurora.org>
+References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
+ <2bfd11dc-9f94-2b69-7b03-c640e53155e1@arm.com>
+ <26defadf-6380-4af4-6323-b51198376bc1@codeaurora.org>
+Message-ID: <1900421.tkAiezvoW8@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 9:10 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Hi Neil,
->
-> Am 15.05.2017 um 10:16 schrieb Neil Armstrong:
->> Hi Andreas,
->>
->> On 05/13/2017 04:33 PM, Andreas F?rber wrote:
->>> Hello Kevin,
->>>
->>> This series fixes several cosmetic issues, on top of your for-next branch.
->>>
->>> Patches 3-6 rename a node, the rest should all be non-functional changes.
->>
->> These are OK.
->>
->>> PLEASE STOP merging random new nodes at the bottom of DT files!
->>> Just like it's a convention to sort new nodes by unit address, it has been
->>> a convention to sort by-label nodes by their label. As discussed here and
->>> elsewhere, this helps avoid merge conflicts and makes nodes easy to find.
->>> I don't care whether we order A0 before A or after, but adding new HDMI
->>> or CVBS nodes at the very bottom is totally out of alphabetical order.
->>> Since my v1 you really should've known that...
->>
->> It's not perfect, but now it's done, live with it, this has already been discussed.
->
-> No.
->
-> Copy&pasting your comment N times does not make it any more valid. My
-> files, my rules - I insist on vega-s95, gxbb and gx, which you guys
-> refactored out from my gxbb, to be tidy.
->
->> Please try to refactor boards DTS with their parent reference design instead
->> like it was done with the P212 and what I did with the Wetek Hub and Play2.
->
-> Negative, that means any additions and changes for the reference boards
-> will slip through into boards that you do not test.
->
-> We've already seen how "well" that works with R-Box Pro having inherited
-> a broken U-Boot network configuration due to internal vs. external PHY.
-could you please share your vision how we can a) keep the amount of
-duplicate .dts code low while b) avoiding "accidental" changes? maybe
-there's a better way (compared to what we have now) which I've not
-thought of yet
+Hi Sricharan,
 
->>> Similarly, Khadas Vim shouldn't have been merged with the "bcrmf" typo.
->>
->> Well, this is why we have 7 rc releases after the merge window...
->
-> If Kevin is the maintainer, then he needs to carefully review patches.
-> It is not my job to review all patches when BayLibre gets paid for it!
-please stop these accusations, I have just sent a fix which should
-actually allow Kevin (and anybody else) to properly review the
-Broadcom FullMAC wireless SDIO devices in the future: [0]
+On Wednesday 03 May 2017 15:54:59 Sricharan R wrote:
+> On 5/3/2017 3:24 PM, Robin Murphy wrote:
+> > On 02/05/17 19:35, Geert Uytterhoeven wrote:
+> >> On Fri, Feb 3, 2017 at 4:48 PM, Sricharan R wrote:
+> >>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> >>> 
+> >>> Failures to look up an IOMMU when parsing the DT iommus property need to
+> >>> be handled separately from the .of_xlate() failures to support deferred
+> >>> probing.
+> >>> 
+> >>> The lack of a registered IOMMU can be caused by the lack of a driver for
+> >>> the IOMMU, the IOMMU device probe not having been performed yet, having
+> >>> been deferred, or having failed.
+> >>> 
+> >>> The first case occurs when the device tree describes the bus master and
+> >>> IOMMU topology correctly but no device driver exists for the IOMMU yet
+> >>> or the device driver has not been compiled in. Return NULL, the caller
+> >>> will configure the device without an IOMMU.
+> >>> 
+> >>> The second and third cases are handled by deferring the probe of the bus
+> >>> master device which will eventually get reprobed after the IOMMU.
+> >>> 
+> >>> The last case is currently handled by deferring the probe of the bus
+> >>> master device as well. A mechanism to either configure the bus master
+> >>> device without an IOMMU or to fail the bus master device probe depending
+> >>> on whether the IOMMU is optional or mandatory would be a good
+> >>> enhancement.
+> >>> 
+> >>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >>> Signed-off-by: Laurent Pichart
+> >>> <laurent.pinchart+renesas@ideasonboard.com>
+> >>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> >> 
+> >> This patch broke Renesas R-Car Gen3 platforms in renesas-drivers.
+> >> As the IOMMU nodes in DT are not yet enabled, all devices having iommus
+> >> properties in DT now fail to probe.
+> > 
+> > How exactly do they fail to probe? Per d7b0558230e4, if there are no ops
+> > registered then they should merely defer until we reach the point of
+> > giving up and ignoring the IOMMU. Is it just that you have no other
+> > late-probing drivers or post-init module loads to kick the deferred
+> > queue after that point? I did try to find a way to explicitly kick it
+> > from a suitably late initcall, but there didn't seem to be any obvious
+> > public interface - anyone have any suggestions?
+> > 
+> > I think that's more of a general problem with the probe deferral
+> > mechanism itself (I've seen the same thing happen with some of the
+> > CoreSight stuff on Juno due to the number of inter-component
+> > dependencies) rather than any specific fault of this series.
+> 
+> I was thinking of an additional check like below to avoid the
+> situation ?
+> 
+> From 499b6e662f60f23740b8880882b0a16f16434501 Mon Sep 17 00:00:00 2001
+> From: Sricharan R <sricharan@codeaurora.org>
+> Date: Wed, 3 May 2017 13:16:59 +0530
+> Subject: [PATCH] iommu: of: Fix check for returning EPROBE_DEFER
+> 
+> While returning EPROBE_DEFER for iommu masters
+> take in to account of iommu nodes that could be
+> marked in DT as 'status=disabled', in which case
+> simply return NULL and let the master's probe
+> continue rather than deferring.
+> 
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  drivers/iommu/of_iommu.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 9f44ee8..e6e9bec 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -118,6 +118,7 @@ static bool of_iommu_driver_present(struct device_node
+> *np)
+> 
+>         ops = iommu_ops_from_fwnode(fwnode);
+>         if ((ops && !ops->of_xlate) ||
+> +           !of_device_is_available(iommu_spec->np) ||
+>             (!ops && !of_iommu_driver_present(iommu_spec->np)))
+>                 return NULL;
 
->>> Which proves my point that we need to fix these issues now so that they
->>> don't keep spreading (Broken Window Theory). New boards have not been
->>> checked for sort order, only boards already touched in v1.
->>>
->>> Board and Makefile order affect my pending R-Box Pro patches.
->>> Node order affects Martin's pending Bluetooth patches among others.
->>
->> Please order S905x after S905d, and we'll be OK.
->
-> Isn't the historical SoC order S905X before S905D?
->
-> Otherwise your strict interpretation leads to meson-gxbb before meson8,
-> which seems unlogical to me.
->
->>> Patches 7-9 (had and) have no dependency, please start applying.
->>
->> I'll wait for Kevin's advice, but I'm against these since they are
->> only purely cosmetic and will break bisect and add unnecessary complexity
->> to handle further patches on these board.
->
-> See the gxbb patch for why that statement is wrong.
->
-> Also note that not cleaning up an existing mess and making it worse are
-> two things.
->
-> I will also remind that I was forced to clean up the node order in ALL
-> exynos5250 .dts files before I could get my new exynos5250-spring.dts
-> merged, so I have zero understanding about these "churn" and "live with
-> it" comments here. The same rules need to apply to all (that's ?galit?
-> for you!), BayLibre is not above everyone else.
->
-> Regards,
-> Andreas
->
-> --
-> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-> HRB 21284 (AG N?rnberg)
+This looks good to me, but won't be enough. The ipmmu-vmsa driver in v4.12-rc1 
+doesn't call iommu_device_register() and thus won't be found by 
+iommu_ops_from_fwnode(). Furthermore, it doesn't IOMMU_OF_DECLARE(), and thus 
+will always be considered as absent.
 
-[0] https://marc.info/?l=linux-wireless&m=149487928516583&w=2
+I agree that the ipmmu-vmsa driver needs to be fixed, but it would have been 
+nice to check existing IOMMU drivers before merging this patch series...
+
+> >> This can be fixed by either:
+> >>   - Disabling CONFIG_IPMMU_VMSA, or
+> >>   - Reverting commit 7b07cbefb68d486f (but keeping "int ret = 0;").
+> >> 
+> >> Note that this was a bit hard to investigate, as R-Car Gen3 support
+> >> wasn't upstreamed yet, so bisection pointed to a merge commit.
+
+-- 
+Regards,
+
+Laurent Pinchart
