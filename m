@@ -1,68 +1,130 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 15 May 2017 17:10:14 +0800
-Subject: [PATCH 3/3] clk: hi3660: Set PPLL2 to 2880M
-In-Reply-To: <20170515055423.1803-3-guodong.xu@linaro.org>
-Message-ID: <201705151623.5kc4IeTF%fengguang.wu@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 15 May 2017 11:11:48 +0200
+Subject: [PATCH] iio: adc: sun4i-gpadc-iio: fix parent device being used
+ in devm function
+In-Reply-To: <20170515073902.25994-1-quentin.schulz@free-electrons.com>
+References: <20170515073902.25994-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170515091148.gk2zvtjy5bdpbfzt@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhong,
+On Mon, May 15, 2017 at 09:39:02AM +0200, Quentin Schulz wrote:
+> For the sake of DT binding stability, this IIO driver is a child of an
+> MFD driver for Allwinner A10, A13 and A31 because there already exists a
+> DT binding for this IP. The MFD driver has a DT node but the IIO driver
+> does not.
+> 
+> The IIO device registers the temperature sensor in the thermal framework
+> using the DT node of the parent, the MFD device, so the thermal
+> framework could match the phandle to the MFD device in the DT and the
+> struct device used to register in the thermal framework.
+> 
+> devm_thermal_zone_of_sensor_register was previously used to register the
+> thermal sensor with the parent struct device of the IIO device,
+> representing the MFD device. By doing so, we registered actually the
+> parent in the devm routine and not the actual IIO device.
+> 
+> This lead to the devm unregister function not being called when the IIO
+> module driver is removed. It resulted in the thermal framework still
+> polling the get_temp function of the IIO module while the device doesn't
+> exist anymore, thus generated a kernel panic.
+> 
+> Use the non-devm function instead and do the unregister manually in the
+> remove function.
+> 
+> Fixes: d1caa9905538 ("iio: adc: add support for Allwinner SoCs ADC")
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Reported-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 31 ++++++++++++++++++-------------
+>  1 file changed, 18 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index b23527309088..0d3df17be405 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -105,6 +105,7 @@ struct sun4i_gpadc_iio {
+>  	bool				no_irq;
+>  	/* prevents concurrent reads of temperature and ADC */
+>  	struct mutex			mutex;
+> +	struct thermal_zone_device	*tzd;
+>  };
+>  
+>  #define SUN4I_GPADC_ADC_CHANNEL(_channel, _name) {		\
+> @@ -502,7 +503,6 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>  	const struct of_device_id *of_dev;
+> -	struct thermal_zone_device *tzd;
+>  	struct resource *mem;
+>  	void __iomem *base;
+>  	int ret;
+> @@ -532,13 +532,13 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+>  	if (!IS_ENABLED(CONFIG_THERMAL_OF))
+>  		return 0;
+>  
+> -	tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, info,
+> -						   &sun4i_ts_tz_ops);
+> -	if (IS_ERR(tzd))
+> +	info->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, info,
+> +						    &sun4i_ts_tz_ops);
+> +	if (IS_ERR(info->tzd))
+>  		dev_err(&pdev->dev, "could not register thermal sensor: %ld\n",
+> -			PTR_ERR(tzd));
+> +			PTR_ERR(info->tzd));
+>  
+> -	return PTR_ERR_OR_ZERO(tzd);
+> +	return PTR_ERR_OR_ZERO(info->tzd);
+>  }
+>  
+>  static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
+> @@ -584,15 +584,14 @@ static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
+>  		 * of_node, and the device from this driver as third argument to
+>  		 * return the temperature.
+>  		 */
+> -		struct thermal_zone_device *tzd;
+> -		tzd = devm_thermal_zone_of_sensor_register(pdev->dev.parent, 0,
+> -							   info,
+> -							   &sun4i_ts_tz_ops);
+> -		if (IS_ERR(tzd)) {
+> +		info->tzd = thermal_zone_of_sensor_register(pdev->dev.parent, 0,
+> +							    info,
+> +							    &sun4i_ts_tz_ops);
+> +		if (IS_ERR(info->tzd)) {
+>  			dev_err(&pdev->dev,
+>  				"could not register thermal sensor: %ld\n",
+> -				PTR_ERR(tzd));
+> -			return PTR_ERR(tzd);
+> +				PTR_ERR(info->tzd));
+> +			return PTR_ERR(info->tzd);
+>  		}
+>  	} else {
+>  		indio_dev->num_channels =
+> @@ -688,6 +687,12 @@ static int sun4i_gpadc_remove(struct platform_device *pdev)
+>  
+>  	pm_runtime_put(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+> +
+> +	if (pdev->dev.of_node)
+> +		thermal_zone_of_sensor_unregister(&pdev->dev, info->tzd);
+> +	else
+> +		thermal_zone_of_sensor_unregister(pdev->dev.parent, info->tzd);
+> +
 
-[auto build test WARNING on clk/clk-next]
-[also build test WARNING on v4.12-rc1 next-20170515]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Can't we just store the device used to create the zone in the
+structure as well, that would avoid that non-trivial logic.
 
-url:    https://github.com/0day-ci/linux/commits/Guodong-Xu/clk-hi3660-fix-wrong-parent-name-of-clk_mux_sysbus/20170515-135929
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Maxime
 
-All warnings (new ones prefixed by >>):
-
->> drivers/clk/hisilicon/clk-hi3660.c:23:2: warning: this decimal constant is unsigned only in ISO C90
-     { HI3660_CLK_PPLL2, "clk_ppll2", NULL, 0, 2880000000, },
-     ^
-
-vim +23 drivers/clk/hisilicon/clk-hi3660.c
-
-     7	 * the Free Software Foundation; either version 2 of the License, or
-     8	 * (at your option) any later version.
-     9	 */
-    10	
-    11	#include <dt-bindings/clock/hi3660-clock.h>
-    12	#include <linux/clk-provider.h>
-    13	#include <linux/of_device.h>
-    14	#include <linux/platform_device.h>
-    15	#include "clk.h"
-    16	
-    17	static const struct hisi_fixed_rate_clock hi3660_fixed_rate_clks[] = {
-    18		{ HI3660_CLKIN_SYS, "clkin_sys", NULL, 0, 19200000, },
-    19		{ HI3660_CLKIN_REF, "clkin_ref", NULL, 0, 32764, },
-    20		{ HI3660_CLK_FLL_SRC, "clk_fll_src", NULL, 0, 128000000, },
-    21		{ HI3660_CLK_PPLL0, "clk_ppll0", NULL, 0, 1600000000, },
-    22		{ HI3660_CLK_PPLL1, "clk_ppll1", NULL, 0, 1866000000, },
-  > 23		{ HI3660_CLK_PPLL2, "clk_ppll2", NULL, 0, 2880000000, },
-    24		{ HI3660_CLK_PPLL3, "clk_ppll3", NULL, 0, 1290000000, },
-    25		{ HI3660_CLK_SCPLL, "clk_scpll", NULL, 0, 245760000, },
-    26		{ HI3660_PCLK, "pclk", NULL, 0, 20000000, },
-    27		{ HI3660_CLK_UART0_DBG, "clk_uart0_dbg", NULL, 0, 19200000, },
-    28		{ HI3660_CLK_UART6, "clk_uart6", NULL, 0, 19200000, },
-    29		{ HI3660_OSC32K, "osc32k", NULL, 0, 32764, },
-    30		{ HI3660_OSC19M, "osc19m", NULL, 0, 19200000, },
-    31		{ HI3660_CLK_480M, "clk_480m", NULL, 0, 480000000, },
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 61381 bytes
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170515/3c87ff16/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170515/32153984/attachment.sig>
