@@ -1,41 +1,142 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 15 May 2017 10:59:07 +0200
-Subject: [PATCH 4/4] ARM: sun8i: v3s: add support for Lichee Pi Zero w/
- dock board
-In-Reply-To: <20170515084001.63123-4-icenowy@aosc.io>
-References: <20170515084001.63123-1-icenowy@aosc.io>
- <20170515084001.63123-4-icenowy@aosc.io>
-Message-ID: <20170515085907.cyitd47elgsy4cq4@flea.home>
+From: aisheng.dong@nxp.com (A.S. Dong)
+Date: Mon, 15 May 2017 09:00:32 +0000
+Subject: [PATCH 2/5] pinctrl: imx: add soc specific mux_mode mask and
+ shift property
+In-Reply-To: <20170515085236.GM8471@dragon>
+References: <1494592686-30967-1-git-send-email-aisheng.dong@nxp.com>
+ <1494592686-30967-3-git-send-email-aisheng.dong@nxp.com>
+ <20170515085236.GM8471@dragon>
+Message-ID: <AM3PR04MB306F70328E49CB7EE68E2C380E10@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 04:40:01PM +0800, Icenowy Zheng wrote:
-> The Lichee Pi Zero board has a "dock board" which needs to be soldered
-> with the 1.27mm stamp holes on a Lichee Pi Zero board.
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Monday, May 15, 2017 4:53 PM
+> To: A.S. Dong
+> Cc: linux-gpio at vger.kernel.org; Andy Duan; Jacky Bai;
+> linus.walleij at linaro.org; stefan at agner.ch; kernel at pengutronix.de; linux-
+> arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 2/5] pinctrl: imx: add soc specific mux_mode mask and
+> shift property
 > 
-> It features:
-> - Onboard MIC and headphone jack (not supported yet)
-> - Ethernet port (not supported yet)
-> - An extra MicroSD slot connected to MMC1 controller
-> - four keys connected to the LRADC.
+> On Fri, May 12, 2017 at 08:38:02PM +0800, Dong Aisheng wrote:
+> > MX7ULP MUX mode mask and shift bit is different from VF610.
+> > Let's make it a platform specific property for the later easy of
+> > adding MX7ULP support.
+> >
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: Stefan Agner <stefan@agner.ch>
+> > Cc: Bai Ping <ping.bai@nxp.com>
+> > Signed-off-by: Fugang Duan <fugang.duan@nxp.com>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> >  drivers/pinctrl/freescale/pinctrl-imx.c   | 10 +++++-----
+> >  drivers/pinctrl/freescale/pinctrl-imx.h   |  4 ++++
+> >  drivers/pinctrl/freescale/pinctrl-vf610.c |  2 ++
+> >  3 files changed, 11 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
+> > b/drivers/pinctrl/freescale/pinctrl-imx.c
+> > index db76e9d..8347197 100644
+> > --- a/drivers/pinctrl/freescale/pinctrl-imx.c
+> > +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+> > @@ -197,8 +197,8 @@ static int imx_pmx_set(struct pinctrl_dev *pctldev,
+> unsigned selector,
+> >  		if (info->flags & SHARE_MUX_CONF_REG) {
+> >  			u32 reg;
+> >  			reg = readl(ipctl->base + pin_reg->mux_reg);
+> > -			reg &= ~(0x7 << 20);
+> > -			reg |= (pin->mux_mode << 20);
+> > +			reg &= ~info->mux_mask;
+> > +			reg |= (pin->mux_mode << info->mux_shift);
+> >  			writel(reg, ipctl->base + pin_reg->mux_reg);
+> >  		} else {
+> >  			writel(pin->mux_mode, ipctl->base + pin_reg->mux_reg);
+> @@ -288,7
+> > +288,7 @@ static int imx_pmx_gpio_request_enable(struct pinctrl_dev
+> > *pctldev,
+> >
+> >  mux_pin:
+> >  	reg = readl(ipctl->base + pin_reg->mux_reg);
+> > -	reg &= ~(0x7 << 20);
+> > +	reg &= ~info->mux_mask;
+> >  	reg |= imx_pin->config;
+> >  	writel(reg, ipctl->base + pin_reg->mux_reg);
+> >
+> > @@ -432,7 +432,7 @@ static int imx_pinconf_get(struct pinctrl_dev
+> *pctldev,
+> >  	*config = readl(ipctl->base + pin_reg->conf_reg);
+> >
+> >  	if (info->flags & SHARE_MUX_CONF_REG)
+> > -		*config &= 0xffff;
+> > +		*config &= ~info->mux_mask;
 > 
-> As it needs to be soldered with the main board to use, add a stand-alone
-> device tree for it.
+> It changes the way how code works.  We need a note in the commit log
+> explaining why it's safe.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Applied all 4, thanks
+Well, that's Vybrid tricks that BIT[15-0] are all configs part.
+So it hardcoded 0xffff there.
 
-Maxime
+But it's not true in ULP, so use mux_mask instead to address
+the difference.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170515/20742b63/attachment.sig>
+Regards
+Dong Aisheng
+
+> Shawn
+> 
+> >
+> >  	return 0;
+> >  }
+> > @@ -459,7 +459,7 @@ static int imx_pinconf_set(struct pinctrl_dev
+> *pctldev,
+> >  		if (info->flags & SHARE_MUX_CONF_REG) {
+> >  			u32 reg;
+> >  			reg = readl(ipctl->base + pin_reg->conf_reg);
+> > -			reg &= ~0xffff;
+> > +			reg &= info->mux_mask;
+> >  			reg |= configs[i];
+> >  			writel(reg, ipctl->base + pin_reg->conf_reg);
+> >  		} else {
+> > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h
+> > b/drivers/pinctrl/freescale/pinctrl-imx.h
+> > index b5c8fe1..eb0ce95 100644
+> > --- a/drivers/pinctrl/freescale/pinctrl-imx.h
+> > +++ b/drivers/pinctrl/freescale/pinctrl-imx.h
+> > @@ -64,6 +64,10 @@ struct imx_pinctrl_soc_info {
+> >  	const char *gpr_compatible;
+> >  	struct mutex mutex;
+> >
+> > +	/* MUX_MODE shift and mask in case SHARE_MUX_CONF_REG */
+> > +	unsigned int mux_mask;
+> > +	u8 mux_shift;
+> > +
+> >  	/* generic pinconf */
+> >  	bool generic_pinconf;
+> >  	const struct pinconf_generic_params *custom_params; diff --git
+> > a/drivers/pinctrl/freescale/pinctrl-vf610.c
+> > b/drivers/pinctrl/freescale/pinctrl-vf610.c
+> > index 2b1e198..3bd8556 100644
+> > --- a/drivers/pinctrl/freescale/pinctrl-vf610.c
+> > +++ b/drivers/pinctrl/freescale/pinctrl-vf610.c
+> > @@ -299,6 +299,8 @@ static struct imx_pinctrl_soc_info
+> vf610_pinctrl_info = {
+> >  	.pins = vf610_pinctrl_pads,
+> >  	.npins = ARRAY_SIZE(vf610_pinctrl_pads),
+> >  	.flags = SHARE_MUX_CONF_REG | ZERO_OFFSET_VALID,
+> > +	.mux_mask = 0x700000,
+> > +	.mux_shift = 20,
+> >  };
+> >
+> >  static const struct of_device_id vf610_pinctrl_of_match[] = {
+> > --
+> > 2.7.4
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
