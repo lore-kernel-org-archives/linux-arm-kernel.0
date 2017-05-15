@@ -1,48 +1,89 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 15 May 2017 09:33:31 -0700
-Subject: [PATCH] soc: imx: Select PM_GENERIC_DOMAINS only if PM is enabled
-Message-ID: <1494866011-23360-1-git-send-email-linux@roeck-us.net>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 15 May 2017 11:40:09 -0500
+Subject: [PATCH] devicetree: Move include prefixes from arch to separate
+ directory
+In-Reply-To: <CAOesGMh3UxHPYQ7SDG7+NODuT5TnP_i23ru0ZRR-rOYxbOGe_g@mail.gmail.com>
+References: <CAL_JsqKLxA8K8378z4nDBkDWnwM_zBbbf9D7EPtwQ1782dydTw@mail.gmail.com>
+ <20170515142641.GU22219@n2100.armlinux.org.uk>
+ <CAL_JsqJzoe_xNxMOZ88+k+bZ+bSK6-j30HXk0ZsFxHUqVDzwzw@mail.gmail.com>
+ <CAOesGMgYDq5Sdk6OaK-mTyfdNGwcbgOVeKbeMSCOmwqd9k8TGQ@mail.gmail.com>
+ <CAL_JsqJCjwvvta0n7dNpyVZkK5hp25fYO78q_pQZzUAPRDq+-w@mail.gmail.com>
+ <CAOesGMh3UxHPYQ7SDG7+NODuT5TnP_i23ru0ZRR-rOYxbOGe_g@mail.gmail.com>
+Message-ID: <CAL_JsqL_nwRn-8L5bdcQ=0_HEiSRqF7yfonrq1GsYdcvtykRyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Selecting PM_GENERIC_DOMAINS without PM results in the following build
-errors, seen when building sparc32:allmodconfig.
+On Mon, May 15, 2017 at 11:09 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, May 15, 2017 at 8:52 AM, Rob Herring <robh+dt@kernel.org> wrote:
+>> On Mon, May 15, 2017 at 10:27 AM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Mon, May 15, 2017 at 7:47 AM, Rob Herring <robh+dt@kernel.org> wrote:
+>>>> On Mon, May 15, 2017 at 9:26 AM, Russell King - ARM Linux
+>>>> <linux@armlinux.org.uk> wrote:
+>>>>> On Mon, May 15, 2017 at 08:01:07AM -0500, Rob Herring wrote:
+>>>>>> I'd prefer not to mix things in scripts/dtc that aren't the import of
+>>>>>> dtc (yes, we do have a few other things already, but they are at least
+>>>>>> scripts). Couldn't this go in include/dt-bindings/ instead?
 
-drivers/base/power/domain.c: In function 'genpd_queue_power_off_work':
-drivers/base/power/domain.c:279:13: error: 'pm_wq' undeclared
-drivers/base/power/domain.c: In function 'genpd_dev_pm_qos_notifier':
-drivers/base/power/domain.c:462:25: error:
-	'struct dev_pm_info' has no member named 'ignore_children'
-drivers/base/power/domain.c: In function 'rtpm_status_str':
-drivers/base/power/domain.c:2207:16: error:
-	'struct dev_pm_info' has no member named 'runtime_error'
-drivers/base/power/domain.c:2209:21: error:
-	'struct dev_pm_info' has no member named 'disable_depth'
-drivers/base/power/domain.c:2211:21: error:
-	'struct dev_pm_info' has no member named 'runtime_status'
-drivers/base/power/domain.c:2212:31: error:
-	'struct dev_pm_info' has no member named 'runtime_status'
+[...]
 
-Fixes: 03aa12629fc4 ("soc: imx: Add GPCv2 power gating driver")
-Cc: Andrey Smirnov <andrew.smirnov@gmail.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- drivers/soc/imx/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>>>> Another idea. Could kbuild create all the symlinks at build time instead?
+>>>
+>>> I considered that, but given that we're talking about a few soft links
+>>> that we need to find a good home for, it seemed like overkill that
+>>> adds magic to the build process. Having somehting that is easily
+>>> discovered when looking around the source tree is a lot better.
+>>>
+>>> I looked around the tree for suitable homes for this directory of
+>>> links, and the least out-of-place I could find was under scripts/dtc.
+>>> You even have a script for uprevving the imported dtc sources, so it's
+>>> not like it's causing any problems from that point of view. But I do
+>>> agree that it's not ideal -- it was just the least bad option I could
+>>> find at the time. Better suggestions are welcome.
+>>
+>> Fair enough. Like I said, it was only a preference and certainly not
+>> unprecedented. I'll just get less receptive with each addition. :)
+>
+> I'm familiar with that feeling. :)
+>
+>> When and by whom do you propose merging this?
+>
+> Given that it crosses architectures but fixes my mistaken recursive
+> linking I was planning on either including it in arm-soc fixes or for
+> full visibility just send it as a patch to Linus. Mind giving me an
+> ack?
 
-diff --git a/drivers/soc/imx/Kconfig b/drivers/soc/imx/Kconfig
-index 357a5d8f8da0..9c1c75f282c2 100644
---- a/drivers/soc/imx/Kconfig
-+++ b/drivers/soc/imx/Kconfig
-@@ -2,7 +2,7 @@ menu "i.MX SoC drivers"
- 
- config IMX7_PM_DOMAINS
- 	bool "i.MX7 PM domains"
--	select PM_GENERIC_DOMAINS
-+	select PM_GENERIC_DOMAINS if PM
- 	depends on SOC_IMX7D || (COMPILE_TEST && OF)
- 	default y if SOC_IMX7D
- 
--- 
-2.7.4
+Given what it fixes, arm-soc probably makes the most sense.
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> Or, if you prefer to merge it that's fine with me too. I'd like to fix
+> the tree for people who are seeing the problems soon though.
+>
+>> The only other comment I would have is at some point, we're going to
+>> have overlays that aren't tied to any arch. Where are we going to put
+>> those? Maybe they are tied to some vendor which tends to have most
+>> stuff in $arch and we just continue this band-aid. Or we define some
+>> common location. I bring this up now only because both could use that
+>> location.
+>
+> Those are good questions. What kind of common overlays are you
+> anticipating? Things like fragments describing connectors, etc?
+
+Daughterboards on connectors is one. Another somewhat different case
+is non-probeable buses hanging off of probeable devices where the host
+system may not even be DT based. For example, GPIOs, I2C, UART, etc.
+devices behind a USB serial chip and standard USB connector.
+
+> Rule so far has been that the first arch to introduce something keeps
+> it (that's between arm/arm64): Mostly it's been arm64 referencing arm
+> contents so far.
+>
+> I guess we could introduce the concept of a common/ directory
+> somewhere. As you say, finding a good home for it isn't 100% obvious
+> today, and we should make sure ownership of the directory is clear
+> since we've seen things go badly when patches get merged through too
+> many paths on these files.
+
+Agreed. I'm happy for you to own that. ;)
+
+Rob
