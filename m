@@ -1,109 +1,43 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 15 May 2017 14:24:45 +0100
-Subject: [RFC PATCH v2 4/6] arm64: signal: Allocate extra sigcontext
- space as needed
-In-Reply-To: <20170512165724.GB8387@e104818-lin.cambridge.arm.com>
-References: <1492016239-19511-1-git-send-email-Dave.Martin@arm.com>
- <1492016495-19689-1-git-send-email-Dave.Martin@arm.com>
- <1492016495-19689-4-git-send-email-Dave.Martin@arm.com>
- <20170512165724.GB8387@e104818-lin.cambridge.arm.com>
-Message-ID: <20170515132442.GB3559@e103592.cambridge.arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 15 May 2017 21:31:21 +0800
+Subject: [PATCH 3/5] dt-bindings: pinctrl: add imx7ulp pinctrl binding doc
+In-Reply-To: <1494592686-30967-5-git-send-email-aisheng.dong@nxp.com>
+References: <1494592686-30967-1-git-send-email-aisheng.dong@nxp.com>
+ <1494592686-30967-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170515133120.GX8471@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 05:57:24PM +0100, Catalin Marinas wrote:
-> Hi Dave,
-> 
-> On Wed, Apr 12, 2017 at 06:01:13PM +0100, Dave P Martin wrote:
-> > --- a/arch/arm64/include/uapi/asm/sigcontext.h
-> > +++ b/arch/arm64/include/uapi/asm/sigcontext.h
-> > @@ -80,4 +80,31 @@ struct esr_context {
-> >  	__u64 esr;
-> >  };
-> >  
-> > +/*
-> > + * Pointer to extra space for additional structures that don't fit in
-> > + * sigcontext.__reserved[].  Note:
-> > + *
-> > + * 1) fpsimd_context, esr_context and extra_context must be placed in
-> > + * sigcontext.__reserved[] if present.  They cannot be placed in the
-> > + * extra space.  Any other record can be placed either in the extra
-> > + * space or in sigcontext.__reserved[].
-> > + *
-> > + * 2) There must not be more than one extra_context.
-> > + *
-> > + * 3) If extra_context is present, it must be followed immediately in
-> > + * sigcontext.__reserved[] by the terminating null _aarch64_ctx (i.e.,
-> > + * extra_context must be the last record in sigcontext.__reserved[]
-> > + * except for the terminator).
-> > + *
-> > + * 4) The extra space must itself be terminated with a null
-> > + * _aarch64_ctx.
-> > + */
-> 
-> IIUC, if we need to save some state that doesn't fit in what's left of
-> sigcontext.__reserved[] (e.g. SVE with 1024-bit vector length), we
-> ignore the available space and go for a memory block following the end
-> of sigcontext.__reserved[] + 16. Is there a reason we can't store the
-> new state across the end of sigcontext.__reserved[] and move fp/lr at
-> the end of the new frame? I'm not sure the fp/lr position immediately
-> after __reserved[] counts as ABI.
+On Fri, May 12, 2017 at 08:38:04PM +0800, Dong Aisheng wrote:
+> diff --git a/include/dt-bindings/pinctrl/imx7ulp-pinfunc.h b/include/dt-bindings/pinctrl/imx7ulp-pinfunc.h
+> new file mode 100644
+> index 0000000..b6db73f
+> --- /dev/null
+> +++ b/include/dt-bindings/pinctrl/imx7ulp-pinfunc.h
+> @@ -0,0 +1,468 @@
+> +/*
+> + * Copyright 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2017 NXP
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#ifndef __DTS_ULP1_PINFUNC_H
+> +#define __DTS_ULP1_PINFUNC_H
+> +
+> +/*
+> + * The pin function ID is a tuple of
+> + * <mux_conf_reg conf_reg input_reg mux_mode input_val>
 
-This was my original view.
+Forgot this one: it should have only 4 integers.
 
-Originally I preferred not to waste the space and did move fp/lr to the
-end, but someone (I think you or Will) expressed concern that the fp/lr
-position relative to the signal frame _might_ count as ABI.
+Shawn
 
-I think it's not that likely that software will be relying on this,
-since it appears easier just to follow the frame chain than to treat
-this as a special case.
-
-But it's hard to be certain.  It comes down to a judgement call.
-
-We could also move fp/lr later, if we require sigframe parsers to be
-a bit more permissive about where extra_context starts.
-
-> > +#define EXTRA_MAGIC	0x45585401
-> > +
-> > +struct extra_context {
-> > +	struct _aarch64_ctx head;
-> > +	void __user *data;	/* 16-byte aligned pointer to extra space */
-> "__user" is a kernel-only attribute, we shouldn't expose it in a uapi
-> header.
-
-This is filtered out by headers_install, just like #ifdef __KERNEL__.
-
-data really is a pointer to a user address.  Compare for example struct
-iovec in include/uapi/linux/uio.h.
-
-I think the __user is required to keep sparse happy, otherwise some
-additional casting is needed to bless a valid read from this field
-before passing it to get/put_user.  Or there may be some other reason
-I've forgotten...
-
-> 
-> > +	__u32 size;		/* size in bytes of the extra space */
-> > +};
-> 
-> Do we need the size of the extra space? Can we not infer it anyway by
-> walking the contexts save there? Surely we don't expect more than one
-> extra context.
-
-Strictly speaking we don't need it.  When userspace parses a signal
-frame generated by the kernel, it can trust the kernel to write a well-
-formed signal frame.
-
-In sigreturn it allows us to retain a sanity-check on overall size
-similar to what sizeof(__reserved) gives us.  This "feels cleaner"
-to me, but the value of it is debatable, since we can still apply
-SIGFRAME_MAXSZ and uaccess should protect us against gross overruns.
-
-The size parameter *may* provide some limited defence against
-sigreturn-mediated stack smashing in userspace, but it wasn't designed
-for this purpose and again the value is debatable.
-
-We can likely live without it if you're not keen on it.
-
-Cheers
----Dave
+> + */
+> +
+> +#define ULP1_PAD_PTC0__PTC0                                       0x0000 0x0000 0x1 0x0
+> +#define ULP1_PAD_PTC0__TRACE_D15                                  0x0000 0x0000 0xa 0x0
+> +#define ULP1_PAD_PTC0__LPUART4_CTS_B                              0x0000 0x0244 0x4 0x1
