@@ -1,279 +1,130 @@
-From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Mon, 15 May 2017 15:28:00 -0600
-Subject: [PATCH V16 11/11] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <1494883680-25551-1-git-send-email-tbaicar@codeaurora.org>
-References: <1494883680-25551-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1494883680-25551-12-git-send-email-tbaicar@codeaurora.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 16 May 2017 00:34:18 +0300
+Subject: [PATCH V8 07/11] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <1900421.tkAiezvoW8@avalon>
+References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
+ <26defadf-6380-4af4-6323-b51198376bc1@codeaurora.org>
+ <1900421.tkAiezvoW8@avalon>
+Message-ID: <1804176.uxVOFWagsb@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently external aborts are unsupported by the guest abort
-handling. Add handling for SEAs so that the host kernel reports
-SEAs which occur in the guest kernel.
+Hi Sricharan,
 
-When an SEA occurs in the guest kernel, the guest exits and is
-routed to kvm_handle_guest_abort(). Prior to this patch, a print
-message of an unsupported FSC would be printed and nothing else
-would happen. With this patch, the code gets routed to the APEI
-handling of SEAs in the host kernel to report the SEA information.
+On Monday 15 May 2017 23:37:16 Laurent Pinchart wrote:
+> On Wednesday 03 May 2017 15:54:59 Sricharan R wrote:
+> > On 5/3/2017 3:24 PM, Robin Murphy wrote:
+> >> On 02/05/17 19:35, Geert Uytterhoeven wrote:
+> >>> On Fri, Feb 3, 2017 at 4:48 PM, Sricharan R wrote:
+> >>>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> >>>> 
+> >>>> Failures to look up an IOMMU when parsing the DT iommus property need
+> >>>> to be handled separately from the .of_xlate() failures to support
+> >>>> deferred probing.
+> >>>> 
+> >>>> The lack of a registered IOMMU can be caused by the lack of a driver
+> >>>> for the IOMMU, the IOMMU device probe not having been performed yet,
+> >>>> having been deferred, or having failed.
+> >>>> 
+> >>>> The first case occurs when the device tree describes the bus master
+> >>>> and IOMMU topology correctly but no device driver exists for the IOMMU
+> >>>> yet or the device driver has not been compiled in. Return NULL, the
+> >>>> caller will configure the device without an IOMMU.
+> >>>> 
+> >>>> The second and third cases are handled by deferring the probe of the
+> >>>> bus master device which will eventually get reprobed after the IOMMU.
+> >>>> 
+> >>>> The last case is currently handled by deferring the probe of the bus
+> >>>> master device as well. A mechanism to either configure the bus master
+> >>>> device without an IOMMU or to fail the bus master device probe
+> >>>> depending on whether the IOMMU is optional or mandatory would be a good
+> >>>> enhancement.
+> >>>> 
+> >>>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >>>> Signed-off-by: Laurent Pichart
+> >>>> <laurent.pinchart+renesas@ideasonboard.com>
+> >>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> >>> 
+> >>> This patch broke Renesas R-Car Gen3 platforms in renesas-drivers.
+> >>> As the IOMMU nodes in DT are not yet enabled, all devices having iommus
+> >>> properties in DT now fail to probe.
+> >> 
+> >> How exactly do they fail to probe? Per d7b0558230e4, if there are no ops
+> >> registered then they should merely defer until we reach the point of
+> >> giving up and ignoring the IOMMU. Is it just that you have no other
+> >> late-probing drivers or post-init module loads to kick the deferred
+> >> queue after that point? I did try to find a way to explicitly kick it
+> >> from a suitably late initcall, but there didn't seem to be any obvious
+> >> public interface - anyone have any suggestions?
+> >> 
+> >> I think that's more of a general problem with the probe deferral
+> >> mechanism itself (I've seen the same thing happen with some of the
+> >> CoreSight stuff on Juno due to the number of inter-component
+> >> dependencies) rather than any specific fault of this series.
+> > 
+> > I was thinking of an additional check like below to avoid the
+> > situation ?
+> > 
+> > From 499b6e662f60f23740b8880882b0a16f16434501 Mon Sep 17 00:00:00 2001
+> > From: Sricharan R <sricharan@codeaurora.org>
+> > Date: Wed, 3 May 2017 13:16:59 +0530
+> > Subject: [PATCH] iommu: of: Fix check for returning EPROBE_DEFER
+> > 
+> > While returning EPROBE_DEFER for iommu masters
+> > take in to account of iommu nodes that could be
+> > marked in DT as 'status=disabled', in which case
+> > simply return NULL and let the master's probe
+> > continue rather than deferring.
+> > 
+> > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> > ---
+> > 
+> >  drivers/iommu/of_iommu.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> > index 9f44ee8..e6e9bec 100644
+> > --- a/drivers/iommu/of_iommu.c
+> > +++ b/drivers/iommu/of_iommu.c
+> > @@ -118,6 +118,7 @@ static bool of_iommu_driver_present(struct device_node
+> > *np)
+> > 
+> >         ops = iommu_ops_from_fwnode(fwnode);
+> >         if ((ops && !ops->of_xlate) ||
+> > +           !of_device_is_available(iommu_spec->np) ||
+> >             (!ops && !of_iommu_driver_present(iommu_spec->np)))
+> >                 return NULL;
+> 
+> This looks good to me, but won't be enough. The ipmmu-vmsa driver in
+> v4.12-rc1 doesn't call iommu_device_register() and thus won't be found by
+> iommu_ops_from_fwnode(). Furthermore, it doesn't IOMMU_OF_DECLARE(), and
+> thus will always be considered as absent.
+> 
+> I agree that the ipmmu-vmsa driver needs to be fixed, but it would have been
+> nice to check existing IOMMU drivers before merging this patch series...
 
-Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <cdall@linaro.org>
----
- arch/arm/include/asm/kvm_arm.h       | 10 ++++++++++
- arch/arm/include/asm/system_misc.h   |  5 +++++
- arch/arm/kvm/mmu.c                   | 36 +++++++++++++++++++++++++++++++++---
- arch/arm64/include/asm/kvm_arm.h     | 10 ++++++++++
- arch/arm64/include/asm/system_misc.h |  2 ++
- arch/arm64/mm/fault.c                | 22 ++++++++++++++++++++--
- drivers/acpi/apei/ghes.c             | 17 +++++++++++------
- include/acpi/ghes.h                  |  2 +-
- 8 files changed, 92 insertions(+), 12 deletions(-)
+Please pardon the question, but has this patch series been tested on ARM32 ?
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index a3f0b3d..ebf020b 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -187,6 +187,16 @@
- #define FSC_FAULT	(0x04)
- #define FSC_ACCESS	(0x08)
- #define FSC_PERM	(0x0c)
-+#define FSC_SEA		(0x10)
-+#define FSC_SEA_TTW0	(0x14)
-+#define FSC_SEA_TTW1	(0x15)
-+#define FSC_SEA_TTW2	(0x16)
-+#define FSC_SEA_TTW3	(0x17)
-+#define FSC_SECC	(0x18)
-+#define FSC_SECC_TTW0	(0x1c)
-+#define FSC_SECC_TTW1	(0x1d)
-+#define FSC_SECC_TTW2	(0x1e)
-+#define FSC_SECC_TTW3	(0x1f)
- 
- /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
- #define HPFAR_MASK	(~0xf)
-diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
-index a3d61ad..8c4a89f 100644
---- a/arch/arm/include/asm/system_misc.h
-+++ b/arch/arm/include/asm/system_misc.h
-@@ -22,6 +22,11 @@
- 
- extern unsigned int user_debug;
- 
-+static inline int handle_guest_sea(phys_addr_t addr, unsigned int esr)
-+{
-+	return -1;
-+}
-+
- #endif /* !__ASSEMBLY__ */
- 
- #endif /* __ASM_ARM_SYSTEM_MISC_H */
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 582a972..e247f73 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -29,6 +29,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/virt.h>
-+#include <asm/system_misc.h>
- 
- #include "trace.h"
- 
-@@ -1418,6 +1419,25 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
- 		kvm_set_pfn_accessed(pfn);
- }
- 
-+static bool is_abort_sea(unsigned long fault_status)
-+{
-+	switch (fault_status) {
-+	case FSC_SEA:
-+	case FSC_SEA_TTW0:
-+	case FSC_SEA_TTW1:
-+	case FSC_SEA_TTW2:
-+	case FSC_SEA_TTW3:
-+	case FSC_SECC:
-+	case FSC_SECC_TTW0:
-+	case FSC_SECC_TTW1:
-+	case FSC_SECC_TTW2:
-+	case FSC_SECC_TTW3:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
- /**
-  * kvm_handle_guest_abort - handles all 2nd stage aborts
-  * @vcpu:	the VCPU pointer
-@@ -1440,19 +1460,29 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	gfn_t gfn;
- 	int ret, idx;
- 
-+	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
-+
-+	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
-+
-+	/*
-+	 * The host kernel will handle the synchronous external abort. There
-+	 * is no need to pass the error into the guest.
-+	 */
-+	if (is_abort_sea(fault_status)) {
-+		if (!handle_guest_sea(fault_ipa, kvm_vcpu_get_hsr(vcpu)))
-+			return 1;
-+	}
-+
- 	is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
- 	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu))) {
- 		kvm_inject_vabt(vcpu);
- 		return 1;
- 	}
- 
--	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
--
- 	trace_kvm_guest_fault(*vcpu_pc(vcpu), kvm_vcpu_get_hsr(vcpu),
- 			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
- 
- 	/* Check the stage-2 fault is trans. fault or write fault */
--	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
- 	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
- 	    fault_status != FSC_ACCESS) {
- 		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 6e99978..61d694c 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -204,6 +204,16 @@
- #define FSC_FAULT	ESR_ELx_FSC_FAULT
- #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
- #define FSC_PERM	ESR_ELx_FSC_PERM
-+#define FSC_SEA		ESR_ELx_FSC_EXTABT
-+#define FSC_SEA_TTW0	(0x14)
-+#define FSC_SEA_TTW1	(0x15)
-+#define FSC_SEA_TTW2	(0x16)
-+#define FSC_SEA_TTW3	(0x17)
-+#define FSC_SECC	(0x18)
-+#define FSC_SECC_TTW0	(0x1c)
-+#define FSC_SECC_TTW1	(0x1d)
-+#define FSC_SECC_TTW2	(0x1e)
-+#define FSC_SECC_TTW3	(0x1f)
- 
- /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
- #define HPFAR_MASK	(~UL(0xf))
-diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-index bc81243..95aa442 100644
---- a/arch/arm64/include/asm/system_misc.h
-+++ b/arch/arm64/include/asm/system_misc.h
-@@ -56,6 +56,8 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
- 	__show_ratelimited;						\
- })
- 
-+int handle_guest_sea(phys_addr_t addr, unsigned int esr);
-+
- #endif	/* __ASSEMBLY__ */
- 
- #endif	/* __ASM_SYSTEM_MISC_H */
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 6b5ffb7..8d88517 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -515,6 +515,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- {
- 	struct siginfo info;
- 	const struct fault_info *inf;
-+	int ret = 0;
- 
- 	inf = esr_to_fault_info(esr);
- 	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
-@@ -529,7 +530,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- 		if (interrupts_enabled(regs))
- 			nmi_enter();
- 
--		ghes_notify_sea();
-+		ret = ghes_notify_sea();
- 
- 		if (interrupts_enabled(regs))
- 			nmi_exit();
-@@ -544,7 +545,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- 		info.si_addr  = (void __user *)addr;
- 	arm64_notify_die("", regs, &info, esr);
- 
--	return 0;
-+	return ret;
- }
- 
- static const struct fault_info fault_info[] = {
-@@ -615,6 +616,23 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- };
- 
- /*
-+ * Handle Synchronous External Aborts that occur in a guest kernel.
-+ *
-+ * The return value will be zero if the SEA was successfully handled
-+ * and non-zero if there was an error processing the error or there was
-+ * no error to process.
-+ */
-+int handle_guest_sea(phys_addr_t addr, unsigned int esr)
-+{
-+	int ret = -ENOENT;
-+
-+	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
-+		ret = ghes_notify_sea();
-+
-+	return ret;
-+}
-+
-+/*
-  * Dispatch a data abort to the relevant handler.
-  */
- asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 2dddb3b..a1cb286 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -817,17 +817,22 @@ static int ghes_notify_sci(struct notifier_block *this,
- #ifdef CONFIG_ACPI_APEI_SEA
- static LIST_HEAD(ghes_sea);
- 
--void ghes_notify_sea(void)
-+/*
-+ * Return 0 only if one of the SEA error sources successfully reported an error
-+ * record sent from the firmware.
-+ */
-+int ghes_notify_sea(void)
- {
- 	struct ghes *ghes;
-+	int ret = -ENOENT;
- 
--	/*
--	 * synchronize_rcu() will wait for nmi_exit(), so no need to
--	 * rcu_read_lock().
--	 */
-+	rcu_read_lock();
- 	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
--		ghes_proc(ghes);
-+		if (!ghes_proc(ghes))
-+			ret = 0;
- 	}
-+	rcu_read_unlock();
-+	return ret;
- }
- 
- static void ghes_sea_add(struct ghes *ghes)
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index 95305ae..9f26e01 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -113,6 +113,6 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
- 	return (void *)(gdata) + acpi_hest_get_record_size(gdata);
- }
- 
--void ghes_notify_sea(void);
-+int ghes_notify_sea(void);
- 
- #endif /* GHES_H */
+When the device is probed the arch_setup_dma_ops() function is called. It sets 
+the device's dma_ops and the mapping (in __arm_iommu_attach_device()). If 
+probe is deferred, arch_teardown_dma_ops() is called which in turn calls 
+arch_teardown_dma_ops(). This removes the mapping but doesn't touch the 
+dma_ops. The next time the device is probed, arch_setup_dma_ops() bails out 
+immediately as the dma_ops are already set, leaving us with a device bound to 
+IOMMU operations but with no mapping. This oopses later as soon as the kernel 
+tries to map memory for the device through the IOMMU.
+
+I might be missing something obvious, but I don't see how this can work.
+
+> >>> This can be fixed by either:
+> >>>   - Disabling CONFIG_IPMMU_VMSA, or
+> >>>   - Reverting commit 7b07cbefb68d486f (but keeping "int ret = 0;").
+> >>> 
+> >>> Note that this was a bit hard to investigate, as R-Car Gen3 support
+> >>> wasn't upstreamed yet, so bisection pointed to a merge commit.
+
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Regards,
+
+Laurent Pinchart
