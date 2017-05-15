@@ -1,29 +1,33 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 15 May 2017 11:38:22 +0200
-Subject: [PATCH] memory: atmel-ebi: mark PM ops as __maybe_unused
-In-Reply-To: <20170419174824.4134087-1-arnd@arndb.de>
-References: <20170419174824.4134087-1-arnd@arndb.de>
-Message-ID: <20170515093822.hjj5pxine4jwmfqo@piout.net>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Mon, 15 May 2017 18:12:46 +0800
+Subject: [PATCH v2] ARM: at91/defconfig: add MCAN driver to sama5_defconfig
+Message-ID: <20170515101246.8913-1-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/2017 at 19:48:07 +0200, Arnd Bergmann wrote:
-> We get a harmless warning without CONFIG_PM:
-> 
-> drivers/memory/atmel-ebi.c:584:12: error: 'atmel_ebi_resume' defined but not used [-Werror=unused-function]
-> 
-> Marking the function as __maybe_unused does the right thing here
-> and drops it silently when unused.
-> 
-> Fixes: a483fb10e5ea ("memory: atmel-ebi: Add PM ops")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/memory/atmel-ebi.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-Applied, thanks.
+Add the Controller Area Network (MCAN) driver compilation
+for sama5 default configuration. Is used by sama5d2 SoC for instance.
 
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+
+Changes in v2:
+ - Rebase on Linux-4.12-rc1.
+
+ arch/arm/configs/sama5_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+index 777c9e986425..01f7dedd570d 100644
+--- a/arch/arm/configs/sama5_defconfig
++++ b/arch/arm/configs/sama5_defconfig
+@@ -52,6 +52,7 @@ CONFIG_IP_PNP_RARP=y
+ CONFIG_IPV6_SIT_6RD=y
+ CONFIG_CAN=y
+ CONFIG_CAN_AT91=y
++CONFIG_CAN_M_CAN=y
+ CONFIG_CFG80211=y
+ CONFIG_MAC80211=y
+ CONFIG_MAC80211_LEDS=y
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.11.0
