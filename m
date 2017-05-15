@@ -1,71 +1,70 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 15 May 2017 09:53:37 +0200
-Subject: [PATCH v3 3/9] dt-bindings: arm: mediatek: update for MT7623n SoC
- and relevant boards
-In-Reply-To: <e8f5dc8578c3980ac9c6411ad7fae1c8d747f567.1494574682.git.sean.wang@mediatek.com>
-References: <cover.1494574682.git.sean.wang@mediatek.com>
- <e8f5dc8578c3980ac9c6411ad7fae1c8d747f567.1494574682.git.sean.wang@mediatek.com>
-Message-ID: <33b3a8a3-006b-91b3-e30d-56518fb9ae7a@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 May 2017 17:04:35 +0900
+Subject: Applied "spi: bcm63xx-hsspi: Export OF device ID table as module
+ aliases" to the spi tree
+In-Reply-To: <20170501201338.5368-1-andresgalacho@gmail.com>
+Message-ID: <E1dAAzb-0002el-44@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The patch
 
+   spi: bcm63xx-hsspi: Export OF device ID table as module aliases
 
-On 12/05/17 09:56, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Because there are two versions of MT7623 SoC that is MT7623a and MT7623n
-> respectively. So update the part of MT7623n bindings to allow that people
-> tend to differentiate which MT7623 SoC the boards applies.
-> 
-> Signed-off-by: John Crispin <john@phrozen.org>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->   Documentation/devicetree/bindings/arm/mediatek.txt | 8 ++++----
->   1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-> index c860b24..0924b62 100644
-> --- a/Documentation/devicetree/bindings/arm/mediatek.txt
-> +++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-> @@ -1,6 +1,6 @@
->   MediaTek mt65xx, mt67xx & mt81xx Platforms Device Tree Bindings
->   
-> -Boards with a MediaTek mt65xx/mt67xx/mt81xx SoC shall have the
-> +Boards with a MediaTek mt65xx/mt67xx/mt762x/mt81xx SoC shall have the
->   following property:
->   
->   Required root node property:
-> @@ -12,7 +12,7 @@ compatible: Must contain one of
->      "mediatek,mt6592"
->      "mediatek,mt6755"
->      "mediatek,mt6795"
-> -   "mediatek,mt7623"
-> +   "mediatek,mt7623" which is referred to MT7623N SoC
->      "mediatek,mt8127"
->      "mediatek,mt8135"
->      "mediatek,mt8173"
-> @@ -38,9 +38,9 @@ Supported boards:
->   - Evaluation board for MT6795(Helio X10):
->       Required root node properties:
->         - compatible = "mediatek,mt6795-evb", "mediatek,mt6795";
-> -- Evaluation board for MT7623:
-> +- Reference  board for MT7623n with NAND:
->       Required root node properties:
-> -      - compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
-> +      - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
+has been applied to the spi tree at
 
-Please explain in the commit message why you change this binding and why 
-this is not problematic. Either in this patch or add a new one.
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
-For convenience for the device-tree maintainer, add the binding patches 
-at the beginning of your patch list. It makes their life easier and a 
-review faster, a clear win-win situation :)
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
-Matthias
+Mark
 
->   - MTK mt8127 tablet moose EVB:
->       Required root node properties:
->         - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
-> 
+>From 0b85a84217903e6d24342cc50bc5a685f8355711 Mon Sep 17 00:00:00 2001
+From: Andres Galacho <andresgalacho@gmail.com>
+Date: Mon, 1 May 2017 16:13:38 -0400
+Subject: [PATCH] spi: bcm63xx-hsspi: Export OF device ID table as module
+ aliases
+
+The device table is required to load modules based on
+modaliases. After adding MODULE_DEVICE_TABLE, below entries
+for example will be added to module.alias:
+alias:          of:N*T*Cbrcm,bcm6328-hsspiC*
+alias:          of:N*T*Cbrcm,bcm6328-hsspi
+
+Signed-off-by: Andres Galacho <andresgalacho@gmail.com>
+Acked-by: Jonas Gorski <jonas.gorski@gmail.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-bcm63xx-hsspi.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/spi/spi-bcm63xx-hsspi.c b/drivers/spi/spi-bcm63xx-hsspi.c
+index 5514cd02e93a..4da2d4a524ca 100644
+--- a/drivers/spi/spi-bcm63xx-hsspi.c
++++ b/drivers/spi/spi-bcm63xx-hsspi.c
+@@ -484,6 +484,7 @@ static const struct of_device_id bcm63xx_hsspi_of_match[] = {
+ 	{ .compatible = "brcm,bcm6328-hsspi", },
+ 	{ },
+ };
++MODULE_DEVICE_TABLE(of, bcm63xx_hsspi_of_match);
+ 
+ static struct platform_driver bcm63xx_hsspi_driver = {
+ 	.driver = {
+-- 
+2.11.0
