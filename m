@@ -1,90 +1,68 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 May 2017 14:45:15 +0100
-Subject: [PATCH 1/2] arm64: marvell: dts: fill MachiatoBin board
- description
-In-Reply-To: <CAPv3WKep+c8tWGmQ8_zb1J8JcVSr3EDWqQ37Y_tVYDcuDEPzvw@mail.gmail.com>
-References: <1494890913-8360-1-git-send-email-mw@semihalf.com>
- <1494890913-8360-2-git-send-email-mw@semihalf.com>
- <20170515232825.GX22219@n2100.armlinux.org.uk>
- <CAPv3WKdULNEDcqJ=qsBEAApaJNiyJXAw6ZG=Ejd8TxE6LJkYLw@mail.gmail.com>
- <20170516095027.GZ22219@n2100.armlinux.org.uk>
- <20170516115535.2faf86ec@free-electrons.com>
- <20170516100236.GA22219@n2100.armlinux.org.uk>
- <20170516135217.016717e7@free-electrons.com>
- <20170516121355.GD22219@n2100.armlinux.org.uk>
- <CAPv3WKep+c8tWGmQ8_zb1J8JcVSr3EDWqQ37Y_tVYDcuDEPzvw@mail.gmail.com>
-Message-ID: <20170516134515.GG22219@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 16 May 2017 14:45:30 +0100
+Subject: [PATCH] arm64: dts: marvell: mcbin: add sdhci
+Message-ID: <E1dAcn4-0004z2-Fl@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 02:44:48PM +0200, Marcin Wojtas wrote:
-> Russel,
-> 
-> 2017-05-16 14:13 GMT+02:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
-> > On Tue, May 16, 2017 at 01:52:17PM +0200, Thomas Petazzoni wrote:
-> >> Hello,
-> >>
-> >> On Tue, 16 May 2017 11:02:37 +0100, Russell King - ARM Linux wrote:
-> >>
-> >> > > Correct, but Marcin has submitted patches, and you haven't.
-> >> >
-> >> > As I said, give me a friggin chance.  You know full well that I've been
-> >> > working on this, working with you and submitting patches.
-> >>
-> >> Correct. But Marcin patches are small and easy, they are ready today,
-> >> and they bring useful benefits for users. You're trying to provide a
-> >> full blown solution, which ultimately is good, but in the mean time it
-> >> would be good to enable the features that already work today.
-> >
-> > Unfortunately, they don't all work - see my other email.  The SD slot
-> > is non-functional with the latest sdhci-xenon driver.  The previous
-> > revision worked fine.
-> >
-> >> > > I believe if you say that, it's because you don't know how much work
-> >> > > Marcin is doing behind the scenes on supporting Marvell platforms, and
-> >> > > not only at the Linux kernel level.
-> >> >
-> >> > Maybe Marcin doesn't know how much work I'm doing supporting this board?
-> >>
-> >> Marcin also knows you're doing some work on this board.
-> >
-> > Right, so this is all one way.  It would have been nice to have had a
-> > heads-up or something, which would have aided co-operation instead of
-> > confrontation.
-> >
-> >> > It _has_ been submitted - a few months ago - so you're talking rubbish
-> >> > here.  You just need to check your mailbox.
-> >>
-> >> Could you please avoid insults? It doesn't bring any benefit.
-> >>
-> >> And in addition, you're deforming reality. The reality is:
-> >>
-> >>  - The patches you posted are related to pinmux/gpio support. This is
-> >>    one thing.
-> >
-> > The point you replied to was about pinmux/gpio, not about Marcin's patch.
-> > So you trying to twist this back to Marcin's patches is unhelpful.
-> > Stop being a problem.
-> >
-> >> Therefore, there is no reason to not merge Marcin patches, because they
-> >> do not conflict with anything you have already posted.
-> >
-> > Except that the SD slot is broken.
-> >
-> 
-> Rechecked, on my board - copied 100MB file back and forth to and from
-> SD card and it works properly, so indeed that may be some regression
-> in the latest version of the driver, but apparently not for all cards.
+Add sdhci support for MACCHIATOBin boards.  This uses the AP806 SDHCI
+for eMMC and CP110 master for the SD card slot.
 
-It doesn't seem to be "not for all cards" - if I boot without a card in
-the slot, I still get the kernel message spew.  Turns out to be a merge
-error, which I hadn't realised due to the pressure of this thread.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
 
-However, since I have a patch which adds SDHCI support with the comments
-that Tom has against yours already fixed (which is a trivial subset of
-my patch adding SDHCI with pinmux support) I'm about to send that.
+This version labels up the uSD connector, adds the vqmmc regulator for
+the uSD (the regulator itself already present in the DT), and supports
+the card detect signal.
 
+For eMMC, this version adds the vqmmc regulator, which again is already
+present in the DT, marks it as not supporting SD or SDIO, and also
+includes "slow mode" since testing with previous versions of the driver
+have shown that selecting faster speeds results in errors.
+
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts |   23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+index cc167e05941a..60111ed3234a 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+@@ -95,6 +95,21 @@
+ 	status = "okay";
+ };
+ 
++&ap_sdhci0 {
++	bus-width = <8>;
++	/*
++	 * Not stable in HS modes - phy needs "more calibration", so add
++	 * the "slow-mode" and disable SDR104, SDR50 and DDR50 modes.
++	 */
++	marvell,xenon-phy-slow-mode;
++	no-1-8-v;
++	no-sd;
++	no-sdio;
++	non-removable;
++	status = "okay";
++	vqmmc-supply = <&v_vddo_h>;
++};
++
+ &cpm_i2c0 {
+ 	clock-frequency = <100000>;
+ 	status = "okay";
+@@ -105,6 +120,14 @@
+ 	status = "okay";
+ };
+ 
++&cpm_sdhci0 {
++	/* U6 */
++	broken-cd;
++	bus-width = <4>;
++	status = "okay";
++	vqmmc-supply = <&v_3_3>;
++};
++
+ &cpm_usb3_0 {
+ 	/* J38? - USB2.0 only */
+ 	status = "okay";
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
