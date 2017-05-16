@@ -1,62 +1,18 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 16 May 2017 22:14:47 +0200
-Subject: [PATCH 0/2] PCI: Workaround for bus reset on Cavium cn8xxx root
- ports
-In-Reply-To: <20170516001736.4001-1-david.daney@cavium.com>
-References: <20170516001736.4001-1-david.daney@cavium.com>
-Message-ID: <d799ea9d-bef8-95d4-ebb9-de6447ba5bbc@redhat.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 16 May 2017 17:27:34 -0300
+Subject: [PATCH] ARM: dts: imx7d-pico: Add initial support
+In-Reply-To: <1494955971-5006-1-git-send-email-vanessa.maegima@nxp.com>
+References: <1494955971-5006-1-git-send-email-vanessa.maegima@nxp.com>
+Message-ID: <CAOMZO5BNZ_fm3wxrobR-uD5uDBbVgRTjhjJ4nNvZC6qjBjr9yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Vanessa,
 
-On 16/05/2017 02:17, David Daney wrote:
-> With the recent improvements in arm64 and vfio-pci, we are seeing
-> failures like this (on cn8890 based systems):
-> 
-> [  235.622361] Unhandled fault: synchronous external abort (0x96000210) at 0xfffffc00c1000100
-> [  235.630625] Internal error: : 96000210 [#1] PREEMPT SMP
-> .
-> .
-> .
-> [  236.208820] [<fffffc0008411250>] pci_generic_config_read+0x38/0x9c
-> [  236.214992] [<fffffc0008435ed4>] thunder_pem_config_read+0x54/0x1e8
-> [  236.221250] [<fffffc0008411620>] pci_bus_read_config_dword+0x74/0xa0
-> [  236.227596] [<fffffc000841853c>] pci_find_next_ext_capability.part.15+0x40/0xb8
-> [  236.234896] [<fffffc0008419428>] pci_find_ext_capability+0x20/0x30
-> [  236.241068] [<fffffc0008423e2c>] pci_restore_vc_state+0x34/0x88
-> [  236.246979] [<fffffc000841af3c>] pci_restore_state.part.37+0x2c/0x1fc
-> [  236.253410] [<fffffc000841b174>] pci_dev_restore+0x4c/0x50
-> [  236.258887] [<fffffc000841b19c>] pci_bus_restore+0x24/0x4c
-> [  236.264362] [<fffffc000841c2dc>] pci_try_reset_bus+0x7c/0xa0
-> [  236.270021] [<fffffc00060a1ab0>] vfio_pci_ioctl+0xc34/0xc3c [vfio_pci]
-> [  236.276547] [<fffffc0005eb0410>] vfio_device_fops_unl_ioctl+0x20/0x30 [vfio]
-> [  236.283587] [<fffffc000824b314>] do_vfs_ioctl+0xac/0x744
-> [  236.288890] [<fffffc000824ba30>] SyS_ioctl+0x84/0x98
-> [  236.293846] [<fffffc0008082ca0>] __sys_trace_return+0x0/0x4
-> 
-> These are caused by the inability of the PCIe root port and Intel
-> e1000e to sucessfully do a bus reset.
+On Tue, May 16, 2017 at 2:32 PM, Vanessa Maegima
+<vanessa.maegima@nxp.com> wrote:
 
-I tested the series on Cavium ThunderX with an e1000e device and it
-fixes the above issue.
+> +&usdhc3 {
+> +       pinctrl-names = "default", "state_100mhz", "state_200mhz";
 
-Feel free to add
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-Thanks
-
-Eric
-
-
-> 
-> The proposed fix is to not do a bus reset on these systems.
-> 
-> David Daney (2):
->   PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on bus device.
->   PCI: Avoid bus reset for Cavium cn8xxx root ports.
-> 
->  drivers/pci/pci.c    | 4 ++++
->  drivers/pci/quirks.c | 8 ++++++++
->  2 files changed, 12 insertions(+)
-> 
+As you are using only the 'default' entry, you could remove the other ones.
