@@ -1,23 +1,37 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 May 2017 15:46:36 +0800
-Subject: [PATCH] arm64: allwinner: h5: Remove syslink to shared DTSI
-In-Reply-To: <20170515085000.27965-1-maxime.ripard@free-electrons.com>
-References: <20170515085000.27965-1-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v67yp+GL+nMy7hSmFiccqnGjmdyfZMVnPXAGRqO8j7=R7Q@mail.gmail.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Tue, 16 May 2017 15:59:00 +0800
+Subject: [PATCH] arm: aspeed: Use 'ast2500' compatible strings where
+ appropriate
+Message-ID: <20170516075900.23202-1-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 4:50 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The arm64 H5 and arm H3 SoCs share roughly the same base, and therefore
-> share a significant part of their device tree.
->
-> The approach we took was to add a symlink from the arm64 DTSI to the arm
-> DTSI.
->
-> Now that the arm DT folder is exposed in the include path, we can just use
-> it and remove our symlink.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+---
+ arch/arm/boot/dts/aspeed-g5.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index a0bea4a6ec77..48a092e735d9 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -88,7 +88,7 @@
+ 		};
+ 
+ 		vic: interrupt-controller at 1e6c0080 {
+-			compatible = "aspeed,ast2400-vic";
++			compatible = "aspeed,ast2500-vic";
+ 			interrupt-controller;
+ 			#interrupt-cells = <1>;
+ 			valid-sources = <0xfefff7ff 0x0807ffff>;
+@@ -993,7 +993,7 @@
+ 			};
+ 
+ 			timer: timer at 1e782000 {
+-				compatible = "aspeed,ast2400-timer";
++				compatible = "aspeed,ast2500-timer";
+ 				reg = <0x1e782000 0x90>;
+ 				// The moxart_timer driver registers only one
+ 				// interrupt and assumes it's for timer 1
+-- 
+2.9.3
