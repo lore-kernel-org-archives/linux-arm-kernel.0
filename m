@@ -1,29 +1,30 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 16 May 2017 18:55:40 +0200
-Subject: [PATCH V16 08/11] efi: print unrecognized CPER section
-In-Reply-To: <5a4a5b58-3e31-9fa5-091d-bb63437da9ab@codeaurora.org>
-References: <1494883680-25551-1-git-send-email-tbaicar@codeaurora.org>
- <1494883680-25551-9-git-send-email-tbaicar@codeaurora.org>
- <20170516142927.guxwc3gdgpqshpks@pd.tnic>
- <5a4a5b58-3e31-9fa5-091d-bb63437da9ab@codeaurora.org>
-Message-ID: <20170516165540.xnbxdhrqeiorqhc5@pd.tnic>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 16 May 2017 19:05:16 +0200
+Subject: [PATCH] clk: sunxi-ng: explicitly include linux/spinlock.h
+In-Reply-To: <20170515102307.28743-1-tklauser@distanz.ch>
+References: <20170515102307.28743-1-tklauser@distanz.ch>
+Message-ID: <20170516170516.d6uvqzhuswj7skjj@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 10:44:43AM -0600, Baicar, Tyler wrote:
-> I meant to respond to this comment after I sent the v16 patch series, but
-> you beat me to it :)
+On Mon, May 15, 2017 at 12:23:07PM +0200, Tobias Klauser wrote:
+> ccu_reset.h and ccu_reset.c use spinlock_t and associated functions but
+> rely on implict inclusion of linux/spinlock.h which means that changes
+> in other headers could break the build. Thus, add an explicit include.
 > 
-> These prefixes are common to all the GHES/CPER printing to the kernel logs.
+> Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
 
-I don't mean that - I meant to remove them from this particular example
-in the commit message along with the timestamps. Because they are simply
-useless there.
-
-Of course they should stay in the actual printk calls.
+Applied, thanks!
+Maxime
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170516/c99cefe1/attachment.sig>
