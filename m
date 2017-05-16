@@ -1,50 +1,95 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 16 May 2017 11:27:19 +0200
-Subject: [PATCH 1/2] arm64: marvell: dts: fill MachiatoBin board
- description
-In-Reply-To: <20170515232825.GX22219@n2100.armlinux.org.uk>
-References: <1494890913-8360-1-git-send-email-mw@semihalf.com>
- <1494890913-8360-2-git-send-email-mw@semihalf.com>
- <20170515232825.GX22219@n2100.armlinux.org.uk>
-Message-ID: <CAPv3WKdULNEDcqJ=qsBEAApaJNiyJXAw6ZG=Ejd8TxE6LJkYLw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 16 May 2017 11:30:04 +0200
+Subject: [PATCH] iio: adc: sun4i-gpadc-iio: fix parent device being used
+ in devm function
+In-Reply-To: <73eb7674-dba9-8bdf-c886-6ad8177f4c1b@free-electrons.com>
+References: <20170515073902.25994-1-quentin.schulz@free-electrons.com>
+ <20170515091148.gk2zvtjy5bdpbfzt@flea.home>
+ <73eb7674-dba9-8bdf-c886-6ad8177f4c1b@free-electrons.com>
+Message-ID: <20170516093004.gkot2nkmhfdll3ym@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+On Mon, May 15, 2017 at 11:18:45AM +0200, Quentin Schulz wrote:
+> Hi Maxime,
+> 
+> On 15/05/2017 11:11, Maxime Ripard wrote:
+> > On Mon, May 15, 2017 at 09:39:02AM +0200, Quentin Schulz wrote:
+> >> For the sake of DT binding stability, this IIO driver is a child of an
+> >> MFD driver for Allwinner A10, A13 and A31 because there already exists a
+> >> DT binding for this IP. The MFD driver has a DT node but the IIO driver
+> >> does not.
+> >>
+> >> The IIO device registers the temperature sensor in the thermal framework
+> >> using the DT node of the parent, the MFD device, so the thermal
+> >> framework could match the phandle to the MFD device in the DT and the
+> >> struct device used to register in the thermal framework.
+> >>
+> >> devm_thermal_zone_of_sensor_register was previously used to register the
+> >> thermal sensor with the parent struct device of the IIO device,
+> >> representing the MFD device. By doing so, we registered actually the
+> >> parent in the devm routine and not the actual IIO device.
+> >>
+> >> This lead to the devm unregister function not being called when the IIO
+> >> module driver is removed. It resulted in the thermal framework still
+> >> polling the get_temp function of the IIO module while the device doesn't
+> >> exist anymore, thus generated a kernel panic.
+> >>
+> >> Use the non-devm function instead and do the unregister manually in the
+> >> remove function.
+> >>
+> >> Fixes: d1caa9905538 ("iio: adc: add support for Allwinner SoCs ADC")
+> >>
+> >> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> >> Reported-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> >> ---
+> [...]
+> >> @@ -688,6 +687,12 @@ static int sun4i_gpadc_remove(struct platform_device *pdev)
+> >>  
+> >>  	pm_runtime_put(&pdev->dev);
+> >>  	pm_runtime_disable(&pdev->dev);
+> >> +
+> >> +	if (pdev->dev.of_node)
+> >> +		thermal_zone_of_sensor_unregister(&pdev->dev, info->tzd);
+> >> +	else
+> >> +		thermal_zone_of_sensor_unregister(pdev->dev.parent, info->tzd);
+> >> +
+> > 
+> > Can't we just store the device used to create the zone in the
+> > structure as well, that would avoid that non-trivial logic.
+> > 
+> 
+> Yes we could.
+> 
+> I've that same condition in the probe function, if pdev->dev.of_node
+> then I continue in the probe dedicated to device probed from DT, or I
+> continue with the probe dedicated to device probed via MFD.
+> 
+> The thermal_zone_of_sensor_register is different in those two functions,
+> thus, I thought that it would make more sense to replicate the same
+> condition in the remove to make the relation between the device used in
+> thermal_zone_of_sensor_register and unregister clear.
+> 
+> That's just a matter of taste for me, so I'm definitely ok to write a v2
+> for this change.
 
-2017-05-16 1:28 GMT+02:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
->
-> On Tue, May 16, 2017 at 01:28:32AM +0200, Marcin Wojtas wrote:
-> > This patch adds following improvements to Armada 8040
-> > MachiatoBin:
-> >  * Add 'chosen' node with stdout-path assignment
-> >  * Enable 1G sgmii port
-> >  * Enable SDHCI controllers on AP and CP HW blocks
-> >
-> > Signed-off-by: Marcin Wojtas <mw@semihalf.com>
->
-> Please check my repository at:
->
->         git://git.armlinux.org.uk/~rmk/linux-arm.git mcbin
->
-> I'm currently in the big post-merge window rebase, but that branch has
-> almost complete support for the board, including work in progress for
-> upgrading phylib for 10G support.
->
+My point was only a cosmetic one. It's true that you have teh same
+condition somewhere else, but you also have a lot of comments to
+explain why there, and you don't have them here.
 
-I do not intend to interfere your work at all. I took a look on your
-branch, and my patch does not seem to be really colliding with it. The
-board is starting to get really popular and a lot has been happening
-around it recently - missing bits like 'chosen' node or the interfaces
-is pretty annoying. Therefore I think, the earlier such things get
-merged into the tree, the better (we can also enable &cpm_pcie0, just
-tested it), since with current kernel it's no-cost, quick DT update.
+Adding a pointer to the structure would make it trivial for the
+reader, without having to duplicate the comments.
 
-I have no problem if you insist to use your own DT patches - if so
-could you possibly submit them, so that there may be still some chance
-that they reach v4.12? I can see some significant work ahead on your
-branch (e.g. transition from out-of-tree network driver to mvpp2), so
-better not be blocked by this.
+Maxime
 
-Best regards,
-Marcin
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170516/eec08485/attachment-0001.sig>
