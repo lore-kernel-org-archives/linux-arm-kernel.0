@@ -1,111 +1,36 @@
-From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Tue, 16 May 2017 14:03:39 +0530
-Subject: [PATCH v3 4/4] perf vendor events arm64: Add ThunderX2 implementation
- defined pmu core events
-In-Reply-To: <1494923619-18687-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1494923619-18687-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <1494923619-18687-5-git-send-email-ganapatrao.kulkarni@cavium.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 16 May 2017 11:14:55 +0200
+Subject: [GIT PULL] Meson Kconfig fixes for 4.12-rc1
+Message-ID: <3059c91b-034c-3da3-9ca4-06ad11bcec42@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is not a full event list, but a short list of useful events.
+Hi Mike, Stephen,
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
----
- tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
- .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
- 2 files changed, 77 insertions(+)
- create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
- create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+Here is a single fix for the Meson Kconfig, that could go for 4.12-rc2.
 
-diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-new file mode 100644
-index 0000000..7167086
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-@@ -0,0 +1,15 @@
-+# Format:
-+#	MIDR,Version,JSON/file/pathname,Type
-+#
-+# where
-+#	MIDR	Processor version
-+#		Variant[23:20] and Revision [3:0] should be zero.
-+#	Version could be used to track version of of JSON file
-+#		but currently unused.
-+#	JSON/file/pathname is the path to JSON file, relative
-+#		to tools/perf/pmu-events/arch/arm64/.
-+#	Type is core, uncore etc
-+#
-+#
-+#Family-model,Version,Filename,EventType
-+0x00000000420f5160,v1,thunderx2,core
-diff --git a/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-new file mode 100644
-index 0000000..2db45c4
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-@@ -0,0 +1,62 @@
-+[
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, read",
-+        "EventCode": "0x40",
-+        "EventName": "l1d_cache_rd",
-+        "BriefDescription": "L1D cache read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, write ",
-+        "EventCode": "0x41",
-+        "EventName": "l1d_cache_wr",
-+        "BriefDescription": "L1D cache write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, read",
-+        "EventCode": "0x42",
-+        "EventName": "l1d_cache_refill_rd",
-+        "BriefDescription": "L1D cache refill read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, write",
-+        "EventCode": "0x43",
-+        "EventName": "l1d_cache_refill_wr",
-+        "BriefDescription": "L1D refill write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, read",
-+        "EventCode": "0x4C",
-+        "EventName": "l1d_tlb_refill_rd",
-+        "BriefDescription": "L1D tlb refill read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, write",
-+        "EventCode": "0x4D",
-+        "EventName": "l1d_tlb_refill_wr",
-+        "BriefDescription": "L1D tlb refill write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
-+        "EventCode": "0x4E",
-+        "EventName": "l1d_tlb_rd",
-+        "BriefDescription": "L1D tlb read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
-+        "EventCode": "0x4F",
-+        "EventName": "l1d_tlb_wr",
-+        "BriefDescription": "L1D tlb write",
-+    },
-+    {
-+        "PublicDescription": "Bus access read",
-+        "EventCode": "0x60",
-+        "EventName": "bus_access_rd",
-+        "BriefDescription": "Bus access read",
-+   },
-+   {
-+        "PublicDescription": "Bus access write",
-+        "EventCode": "0x61",
-+        "EventName": "bus_access_wr",
-+        "BriefDescription": "Bus access write",
-+   }
-+]
--- 
-1.8.1.4
+Thanks,
+Neil
+
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+
+are available in the git repository at:
+
+  git://github.com/baylibre/clk-meson.git tags/meson-clk-fixes-for-4.12-rc2
+
+for you to fetch changes up to dbed87a9d3a857a86f602775b5845f5f6d9652b5:
+
+  clk: meson: gxbb: fix build error without RESET_CONTROLLER (2017-05-16 11:05:01 +0200)
+
+----------------------------------------------------------------
+KConfig fix:
+- clk: meson: gxbb: fix build error without RESET_CONTROLLER
+
+----------------------------------------------------------------
+Tobias Regnery (1):
+      clk: meson: gxbb: fix build error without RESET_CONTROLLER
+
+ drivers/clk/meson/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
