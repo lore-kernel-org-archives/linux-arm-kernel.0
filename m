@@ -1,14 +1,21 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 May 2017 08:18:21 -0700
-Subject: [PATCH] ARM: dts: am335x-phycore-som: fix rv4162 compatible
-In-Reply-To: <20170419203012.8158-1-alexandre.belloni@free-electrons.com>
-References: <20170419203012.8158-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170516151821.GD31418@atomide.com>
+Date: Tue, 16 May 2017 08:19:14 -0700
+Subject: [PATCH V5 2/7] ARM: TI: Use - instead of @ for DT OPP entries
+In-Reply-To: <5f0656140309d53a45058c048ca059c4ba294756.1492685450.git.viresh.kumar@linaro.org>
+References: <cover.1492685450.git.viresh.kumar@linaro.org>
+ <5f0656140309d53a45058c048ca059c4ba294756.1492685450.git.viresh.kumar@linaro.org>
+Message-ID: <20170516151913.GE31418@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alexandre Belloni <alexandre.belloni@free-electrons.com> [170419 13:32]:
-> The rv4162 compatbile string is missing the vendor part, add it.
+* Viresh Kumar <viresh.kumar@linaro.org> [170420 03:58]:
+> Compiling the DT file with W=1, DTC warns like follows:
+> 
+> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+> unit name, but no reg property
+> 
+> Fix this by replacing '@' with '-' as the OPP nodes will never have a
+> "reg" property.
 
 Applying into omap-for-v4.13/dt thanks.
 
