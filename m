@@ -1,37 +1,50 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 16 May 2017 15:59:00 +0800
-Subject: [PATCH] arm: aspeed: Use 'ast2500' compatible strings where
- appropriate
-Message-ID: <20170516075900.23202-1-andrew@aj.id.au>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 16 May 2017 10:00:09 +0200
+Subject: [PATCH 2/2 v2] reset: Add a Gemini reset controller
+In-Reply-To: <CACRpkdbjFgCJwjZ8j8XfmOEDqQYHZdLNoswgfC83yAoTdyyz_g@mail.gmail.com>
+References: <20170508200740.26194-1-linus.walleij@linaro.org>
+ <1494593270.2965.5.camel@pengutronix.de>
+ <CACRpkdbjFgCJwjZ8j8XfmOEDqQYHZdLNoswgfC83yAoTdyyz_g@mail.gmail.com>
+Message-ID: <1494921609.2941.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
----
- arch/arm/boot/dts/aspeed-g5.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Mon, 2017-05-15 at 19:07 +0200, Linus Walleij wrote:
+> On Fri, May 12, 2017 at 2:47 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> > On Mon, 2017-05-08 at 22:07 +0200, Linus Walleij wrote:
+> >> The Cortina Systems Gemini reset controller is a simple
+> >> 32bit register with self-deasserting reset lines. It is
+> >> accessed using regmap over syscon.
+> >>
+> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> >> ---
+> >> ChangeLog v1->v2:
+> >> - Add an explicit GPL license statement.
+> >> - Move the reset controller to be identical to the sycon
+> >>   node, no need to a separate child node for this.
+> >> - Drop unneeded struct device *dev pointer from state
+> >>   container.
+> >> - Print error code on missing regmap.
+> >> - Use #define from the <dt-bindings/*> to indicate that we
+> >>   always set the CPU1 reset line to 1 when writing the
+> >>   resets.
+> >
+> > Thank you, looks good to me. I'll include this with the next pull
+> > request after v4.12-rc1 is released.
+> 
+> I have to repost it because Rob requested that the reset
+> controller and clock controller be probed directly from the
+> system controller without any special reset/clock nodes.
+> 
+> I was planning to ask you to ACK it for merge through
+> ARM SoC instead: as it uses the <dt-bindings/*> things
+> and that needs to be there to work with the DTS files, we
+> either need to merge this wholesome through ARM SoC,
+> or we apply the binding patch into all three trees
+> (either works with me).
 
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index a0bea4a6ec77..48a092e735d9 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -88,7 +88,7 @@
- 		};
- 
- 		vic: interrupt-controller at 1e6c0080 {
--			compatible = "aspeed,ast2400-vic";
-+			compatible = "aspeed,ast2500-vic";
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
- 			valid-sources = <0xfefff7ff 0x0807ffff>;
-@@ -993,7 +993,7 @@
- 			};
- 
- 			timer: timer at 1e782000 {
--				compatible = "aspeed,ast2400-timer";
-+				compatible = "aspeed,ast2500-timer";
- 				reg = <0x1e782000 0x90>;
- 				// The moxart_timer driver registers only one
- 				// interrupt and assumes it's for timer 1
--- 
-2.9.3
+Merging through arm-soc is fine, I've dropped the v2 patches from my
+branch.
+
+regards
+Philipp
