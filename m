@@ -1,49 +1,62 @@
 From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 16 May 2017 22:14:40 +0200
-Subject: [PATCH 2/2] PCI: Avoid bus reset for Cavium cn8xxx root ports.
-In-Reply-To: <20170516001736.4001-3-david.daney@cavium.com>
+Date: Tue, 16 May 2017 22:14:47 +0200
+Subject: [PATCH 0/2] PCI: Workaround for bus reset on Cavium cn8xxx root
+ ports
+In-Reply-To: <20170516001736.4001-1-david.daney@cavium.com>
 References: <20170516001736.4001-1-david.daney@cavium.com>
- <20170516001736.4001-3-david.daney@cavium.com>
-Message-ID: <235a9a51-df06-84af-4e5d-b6408ceb0b7d@redhat.com>
+Message-ID: <d799ea9d-bef8-95d4-ebb9-de6447ba5bbc@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi David,
 
 On 16/05/2017 02:17, David Daney wrote:
-> Root ports of cn8xxx do not function after bus reset when used with
-> some e1000e and LSI HBA devices.  Add a quirk to prevent bus reset on
-> these root ports.
-I understand the bus reset would work along with a variety of other
-child devices. I guess there is no way to be more accurate and forbid
-the bus reset only when incompatible child devices are found?
+> With the recent improvements in arm64 and vfio-pci, we are seeing
+> failures like this (on cn8890 based systems):
 > 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  drivers/pci/quirks.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> [  235.622361] Unhandled fault: synchronous external abort (0x96000210) at 0xfffffc00c1000100
+> [  235.630625] Internal error: : 96000210 [#1] PREEMPT SMP
+> .
+> .
+> .
+> [  236.208820] [<fffffc0008411250>] pci_generic_config_read+0x38/0x9c
+> [  236.214992] [<fffffc0008435ed4>] thunder_pem_config_read+0x54/0x1e8
+> [  236.221250] [<fffffc0008411620>] pci_bus_read_config_dword+0x74/0xa0
+> [  236.227596] [<fffffc000841853c>] pci_find_next_ext_capability.part.15+0x40/0xb8
+> [  236.234896] [<fffffc0008419428>] pci_find_ext_capability+0x20/0x30
+> [  236.241068] [<fffffc0008423e2c>] pci_restore_vc_state+0x34/0x88
+> [  236.246979] [<fffffc000841af3c>] pci_restore_state.part.37+0x2c/0x1fc
+> [  236.253410] [<fffffc000841b174>] pci_dev_restore+0x4c/0x50
+> [  236.258887] [<fffffc000841b19c>] pci_bus_restore+0x24/0x4c
+> [  236.264362] [<fffffc000841c2dc>] pci_try_reset_bus+0x7c/0xa0
+> [  236.270021] [<fffffc00060a1ab0>] vfio_pci_ioctl+0xc34/0xc3c [vfio_pci]
+> [  236.276547] [<fffffc0005eb0410>] vfio_device_fops_unl_ioctl+0x20/0x30 [vfio]
+> [  236.283587] [<fffffc000824b314>] do_vfs_ioctl+0xac/0x744
+> [  236.288890] [<fffffc000824ba30>] SyS_ioctl+0x84/0x98
+> [  236.293846] [<fffffc0008082ca0>] __sys_trace_return+0x0/0x4
 > 
-> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> index 085fb78..02cd847 100644
-> --- a/drivers/pci/quirks.c
-> +++ b/drivers/pci/quirks.c
-> @@ -3347,6 +3347,14 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x0032, quirk_no_bus_reset);
->  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x003c, quirk_no_bus_reset);
->  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x0033, quirk_no_bus_reset);
->  
-> +/*
-> + * Root port on some Cavium CN8xxx chips do not successfully complete
-> + * a bus reset when used with certain types child devices.  Config
-s/types /types of
+> These are caused by the inability of the PCIe root port and Intel
+> e1000e to sucessfully do a bus reset.
+
+I tested the series on Cavium ThunderX with an e1000e device and it
+fixes the above issue.
+
+Feel free to add
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+
 Thanks
 
 Eric
-> + * space access to the child may quit responding.  Flag the root port
-> + * as not supporting bus reset.
-> + */
-> +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_CAVIUM, 0xa100, quirk_no_bus_reset);
-> +
->  static void quirk_no_pm_reset(struct pci_dev *dev)
->  {
->  	/*
+
+
+> 
+> The proposed fix is to not do a bus reset on these systems.
+> 
+> David Daney (2):
+>   PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on bus device.
+>   PCI: Avoid bus reset for Cavium cn8xxx root ports.
+> 
+>  drivers/pci/pci.c    | 4 ++++
+>  drivers/pci/quirks.c | 8 ++++++++
+>  2 files changed, 12 insertions(+)
 > 
