@@ -1,71 +1,103 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 16 May 2017 20:45:47 +0200
-Subject: [PATCH v2 0/9] Userspace timer IRQ number control and PMU with
- userspace-gic
-Message-ID: <20170516184556.26785-1-cdall@linaro.org>
+Date: Tue, 16 May 2017 20:45:49 +0200
+Subject: [PATCH v2 2/9] KVM: arm: Handle VCPU device attributes in guest.c
+In-Reply-To: <20170516184556.26785-1-cdall@linaro.org>
+References: <20170516184556.26785-1-cdall@linaro.org>
+Message-ID: <20170516184556.26785-3-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far we have been getting away with letting the kernel choosing
-interrupt numbers for the timers in the kernel and we have crossed our
-fingers in hoping that the DT/ACPI provided by userspace matches with
-the interrupt number we use in the kernel for a given VCPU type.
+As we are about to support VCPU attributes to set the timer IRQ numbers
+in guest.c, move the static inlines for the VCPU attributes handlers
+from the header file to guest.c.
 
-But as we are generally moving towards letting userspace be in more fine
-grained control of what is being emulated, let userspace decide the irq
-numbers for the timers.
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+---
+ arch/arm/include/asm/kvm_host.h | 22 +++++++--------------
+ arch/arm/kvm/guest.c            | 42 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+), 15 deletions(-)
 
-Slightly related, and therefore included in this series, we have
-recently added support for a userspace GIC while still supporting the
-generic timers and the PMU from inside the VM.  Unfortunately we forgot
-to rework the code to actually let userspace create the PMU device
-without creating an in-kernel GIC.
-
-Patches 6-9 could be omitted and still support the basic functionality
-targeted by this series if preferred.
-
-Tested on APM X-Gene, Thunder-X, and TC2.
-
-QEMU patches used for testing can be found here:
-
-https://git.linaro.org/people/christoffer.dall/qemu-arm.git timer-pmu-irqs
-
-Changes since v1:
- - Rebased on v4.12-rc1
- - Check for irqchip_in_kernel() in kvm_arm_pmu_v3_get_attr
- - Slightly change the wording around default timer IRQs
- - Add fix for the PMU IRQ setting that assumes an initialized vgic
- - Introduce an allocator for IRQ lines so that in-kernel owned IRQ
-   lines cannot be signalled from userspace and such that an IRQ line
-   can only be assigned to a single device.
-
-Christoffer Dall (9):
-  KVM: arm64: Allow creating the PMU without the in-kernel GIC
-  KVM: arm: Handle VCPU device attributes in guest.c
-  KVM: arm/arm64: Move irq_is_ppi() to header file
-  KVM: arm/arm64: Move timer IRQ default init to arch_timer.c
-  KVM: arm/arm64: Allow setting the timer IRQ numbers from userspace
-  KVM: arm/arm64: Introduce an allocator for in-kernel irq lines
-  KVM: arm/arm64: Check if irq lines to the GIC are already used
-  KVM: arm/arm64: Disallow userspace control of in-kernel IRQ lines
-  KVM: arm/arm64: Don't assume initialized vgic when setting PMU IRQ
-
- Documentation/virtual/kvm/devices/vcpu.txt |  41 +++++++--
- arch/arm/include/asm/kvm_host.h            |  22 ++---
- arch/arm/include/uapi/asm/kvm.h            |   8 ++
- arch/arm/kvm/guest.c                       |  51 +++++++++++
- arch/arm/kvm/reset.c                       |  16 +---
- arch/arm64/include/uapi/asm/kvm.h          |   3 +
- arch/arm64/kvm/guest.c                     |   9 ++
- arch/arm64/kvm/reset.c                     |  16 +---
- include/kvm/arm_arch_timer.h               |   8 +-
- include/kvm/arm_vgic.h                     |  13 ++-
- virt/kvm/arm/arch_timer.c                  | 137 ++++++++++++++++++++++++++---
- virt/kvm/arm/arm.c                         |   4 +-
- virt/kvm/arm/pmu.c                         |  44 ++++++---
- virt/kvm/arm/vgic/vgic-irqfd.c             |   2 +-
- virt/kvm/arm/vgic/vgic.c                   |  48 +++++++++-
- 15 files changed, 330 insertions(+), 92 deletions(-)
-
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index f0e6657..26c1195 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -291,20 +291,12 @@ static inline void kvm_arm_init_debug(void) {}
+ static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
+-static inline int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+-					     struct kvm_device_attr *attr)
+-{
+-	return -ENXIO;
+-}
+-static inline int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+-					     struct kvm_device_attr *attr)
+-{
+-	return -ENXIO;
+-}
+-static inline int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+-					     struct kvm_device_attr *attr)
+-{
+-	return -ENXIO;
+-}
++
++int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr);
++int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr);
++int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr);
+ 
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index fa6182a..acea05e 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -301,3 +301,45 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+ {
+ 	return -EINVAL;
+ }
++
++int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr)
++{
++	int ret;
++
++	switch (attr->group) {
++	default:
++		ret = -ENXIO;
++		break;
++	}
++
++	return ret;
++}
++
++int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr)
++{
++	int ret;
++
++	switch (attr->group) {
++	default:
++		ret = -ENXIO;
++		break;
++	}
++
++	return ret;
++}
++
++int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
++			       struct kvm_device_attr *attr)
++{
++	int ret;
++
++	switch (attr->group) {
++	default:
++		ret = -ENXIO;
++		break;
++	}
++
++	return ret;
++}
 -- 
 2.9.0
