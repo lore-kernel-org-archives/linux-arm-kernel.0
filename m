@@ -1,61 +1,23 @@
-From: dlan@gentoo.org (Yixun Lan)
-Date: Tue, 16 May 2017 15:45:29 +0800
-Subject: [PATCH] serial: meson: add Magic SysRq support
-Message-ID: <20170516074529.10086-1-dlan@gentoo.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 16 May 2017 15:46:36 +0800
+Subject: [PATCH] arm64: allwinner: h5: Remove syslink to shared DTSI
+In-Reply-To: <20170515085000.27965-1-maxime.ripard@free-electrons.com>
+References: <20170515085000.27965-1-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67yp+GL+nMy7hSmFiccqnGjmdyfZMVnPXAGRqO8j7=R7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yixun Lan <dlan@gentoo.org>
----
- drivers/tty/serial/meson_uart.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+On Mon, May 15, 2017 at 4:50 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The arm64 H5 and arm H3 SoCs share roughly the same base, and therefore
+> share a significant part of their device tree.
+>
+> The approach we took was to add a symlink from the arm64 DTSI to the arm
+> DTSI.
+>
+> Now that the arm DT folder is exposed in the include path, we can just use
+> it and remove our symlink.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-index 60f16795d16b..f0d9222db82f 100644
---- a/drivers/tty/serial/meson_uart.c
-+++ b/drivers/tty/serial/meson_uart.c
-@@ -14,6 +14,10 @@
-  *
-  */
- 
-+#if defined(CONFIG_SERIAL_MESON_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
-+#define SUPPORT_SYSRQ
-+#endif
-+
- #include <linux/clk.h>
- #include <linux/console.h>
- #include <linux/delay.h>
-@@ -183,12 +187,12 @@ static void meson_receive_chars(struct uart_port *port)
- {
- 	struct tty_port *tport = &port->state->port;
- 	char flag;
--	u32 status, ch, mode;
-+	u32 ostatus, status, ch, mode;
- 
- 	do {
- 		flag = TTY_NORMAL;
- 		port->icount.rx++;
--		status = readl(port->membase + AML_UART_STATUS);
-+		ostatus = status = readl(port->membase + AML_UART_STATUS);
- 
- 		if (status & AML_UART_ERR) {
- 			if (status & AML_UART_TX_FIFO_WERR)
-@@ -216,6 +220,16 @@ static void meson_receive_chars(struct uart_port *port)
- 		ch = readl(port->membase + AML_UART_RFIFO);
- 		ch &= 0xff;
- 
-+		if ((ostatus & AML_UART_FRAME_ERR) && (ch == 0)) {
-+			port->icount.brk++;
-+			flag = TTY_BREAK;
-+			if (uart_handle_break(port))
-+				continue;
-+		}
-+
-+		if (uart_handle_sysrq_char(port, ch))
-+			continue;
-+
- 		if ((status & port->ignore_status_mask) == 0)
- 			tty_insert_flip_char(tport, ch, flag);
- 
--- 
-2.12.2
+Acked-by: Chen-Yu Tsai <wens@csie.org>
