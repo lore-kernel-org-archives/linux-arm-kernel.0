@@ -1,95 +1,51 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 16 May 2017 14:17:20 +0800
-Subject: [PATCH] mmc: sdhci-xenon: kill xenon_clean_phy()
-Message-ID: <20170516061720.1755-1-jszhang@marvell.com>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 16 May 2017 08:41:16 +0200
+Subject: [RESEND PATCH] iio: adc: bcm_iproc_adc: swap primary and
+ secondary isr handler's
+In-Reply-To: <20170516060826.wnw3mpq5makpnptt@sapphire.tkos.co.il>
+References: <1494913772-30904-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <20170516060110.GA25722@kroah.com>
+ <20170516060826.wnw3mpq5makpnptt@sapphire.tkos.co.il>
+Message-ID: <20170516064116.GA30503@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the xenon_clean_phy() is only used for freeing phy_params.
-The phy_params is allocated by devm_kzalloc(), there's no need to free
-is explicitly.
+On Tue, May 16, 2017 at 09:08:27AM +0300, Baruch Siach wrote:
+> Hi Greg,
+> 
+> On Tue, May 16, 2017 at 08:01:10AM +0200, Greg KH wrote:
+> > On Tue, May 16, 2017 at 11:19:32AM +0530, Raveendra Padasalagi wrote:
+> > > The third argument of devm_request_threaded_irq() is the primary
+> > > handler. It is called in hardirq context and checks whether the
+> > > interrupt is relevant to the device. If the primary handler returns
+> > > IRQ_WAKE_THREAD, the secondary handler (a.k.a. handler thread) is
+> > > scheduled to run in process context.
+> > > 
+> > > bcm_iproc_adc.c uses the secondary handler as the primary one
+> > > and the other way around. So this patch fixes the same, along with
+> > > re-naming the secondary handler and primary handler names properly.
+> > > 
+> > > Tested on the BCM9583XX iProc SoC based boards.
+> > > 
+> > > Reported-by: Pavel Roskin <plroskin@gmail.com>
+> > > Fixes: 4324c97ecedc("iio: Add driver for Broadcom iproc-static-adc")
+> > > Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+> > > ---
+> > >  drivers/iio/adc/bcm_iproc_adc.c | 8 ++++----
+> > >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > <formletter>
+> > 
+> > This is not the correct way to submit patches for inclusion in the
+> > stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
+> > for how to do this properly.
+> 
+> File moved to Documentation/process/stable-kernel-rules.rst since v4.10.
+> 
+> Maybe linking to 
+> https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html would 
+> be better.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/mmc/host/sdhci-xenon-phy.c | 14 +-------------
- drivers/mmc/host/sdhci-xenon.c     |  6 +-----
- drivers/mmc/host/sdhci-xenon.h     |  1 -
- 3 files changed, 2 insertions(+), 19 deletions(-)
+Ah, good point, I've updated my formletter now, thanks for this.
 
-diff --git a/drivers/mmc/host/sdhci-xenon-phy.c b/drivers/mmc/host/sdhci-xenon-phy.c
-index 6356781f1cca..f7e26b031e76 100644
---- a/drivers/mmc/host/sdhci-xenon-phy.c
-+++ b/drivers/mmc/host/sdhci-xenon-phy.c
-@@ -787,14 +787,6 @@ int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios)
- 	return ret;
- }
- 
--void xenon_clean_phy(struct sdhci_host *host)
--{
--	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
--
--	kfree(priv->phy_params);
--}
--
- static int xenon_add_phy(struct device_node *np, struct sdhci_host *host,
- 			 const char *phy_name)
- {
-@@ -819,11 +811,7 @@ static int xenon_add_phy(struct device_node *np, struct sdhci_host *host,
- 	if (ret)
- 		return ret;
- 
--	ret = xenon_emmc_phy_parse_param_dt(host, np, priv->phy_params);
--	if (ret)
--		xenon_clean_phy(host);
--
--	return ret;
-+	return xenon_emmc_phy_parse_param_dt(host, np, priv->phy_params);
- }
- 
- int xenon_phy_parse_dt(struct device_node *np, struct sdhci_host *host)
-diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
-index 67246655315b..bc1781bb070b 100644
---- a/drivers/mmc/host/sdhci-xenon.c
-+++ b/drivers/mmc/host/sdhci-xenon.c
-@@ -486,7 +486,7 @@ static int xenon_probe(struct platform_device *pdev)
- 
- 	err = xenon_sdhc_prepare(host);
- 	if (err)
--		goto clean_phy_param;
-+		goto err_clk;
- 
- 	err = sdhci_add_host(host);
- 	if (err)
-@@ -496,8 +496,6 @@ static int xenon_probe(struct platform_device *pdev)
- 
- remove_sdhc:
- 	xenon_sdhc_unprepare(host);
--clean_phy_param:
--	xenon_clean_phy(host);
- err_clk:
- 	clk_disable_unprepare(pltfm_host->clk);
- free_pltfm:
-@@ -510,8 +508,6 @@ static int xenon_remove(struct platform_device *pdev)
- 	struct sdhci_host *host = platform_get_drvdata(pdev);
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
- 
--	xenon_clean_phy(host);
--
- 	sdhci_remove_host(host, 0);
- 
- 	xenon_sdhc_unprepare(host);
-diff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
-index 6e6523ea01ce..73debb42dc2f 100644
---- a/drivers/mmc/host/sdhci-xenon.h
-+++ b/drivers/mmc/host/sdhci-xenon.h
-@@ -93,7 +93,6 @@ struct xenon_priv {
- };
- 
- int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios);
--void xenon_clean_phy(struct sdhci_host *host);
- int xenon_phy_parse_dt(struct device_node *np,
- 		       struct sdhci_host *host);
- void xenon_soc_pad_ctrl(struct sdhci_host *host,
--- 
-2.11.0
+greg k-h
