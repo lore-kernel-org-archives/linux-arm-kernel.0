@@ -1,102 +1,134 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 16 May 2017 13:59:16 +0200
-Subject: [PATCH 42/48] clocksource/drivers: Add a new driver for the
- Atmel ARM TC blocks
-In-Reply-To: <576D0645.2070805@linaro.org>
-References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1465596231-21766-43-git-send-email-alexandre.belloni@free-electrons.com>
- <576D0645.2070805@linaro.org>
-Message-ID: <20170516115916.ip3ea34bofg3jpuo@piout.net>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue, 16 May 2017 17:00:56 +0530
+Subject: [PATCH v3 11/11] arm64: dts: Add PWM and SDHCI DT nodes for Stingray
+ SOC
+In-Reply-To: <1494934256-1350-1-git-send-email-anup.patel@broadcom.com>
+References: <1494934256-1350-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1494934256-1350-12-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+From: Srinath Mannam <srinath.mannam@broadcom.com>
 
-Almost one year later, I'm back on that topic.
+The Stingray SoC has two instances of SDHCI controller
+and one instance of iProc PWM.
 
-On 24/06/2016 at 12:07:01 +0200, Daniel Lezcano wrote:
-> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> > index 47352d25c15e..ff7f4022c749 100644
-> > --- a/drivers/clocksource/Kconfig
-> > +++ b/drivers/clocksource/Kconfig
-> > @@ -258,6 +258,19 @@ config ATMEL_ST
-> >   	select CLKSRC_OF
-> >   	select MFD_SYSCON
-> > 
-> > +config ATMEL_ARM_TCB_CLKSRC
-> > +	bool "TC Block Clocksource"
-> 
-> The Kconfig options are set now with the COMPILE_TEST option in order to
-> increase the compilation test coverage.
-> 
-> Please, add bool "TC Block Clocksource" if COMPILE_TEST, ...
-> 
-> > +	select REGMAP_MMIO
-> > +	depends on GENERIC_CLOCKEVENTS
-> > +	depends on SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
-> > +	default SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
-> 
-> ... remove these dependencies and let the SoC's Kconfig to select the timer
-> like the other timers are.
-> 
+Let's enable above mentioned devices in Stingray DT.
 
-The main issue with what you suggest is that it removes the possibility
-to not compile the driver. This may be interesting for people using the
-PIT as the clocksource/clockevent and the TCBs for something else.
+Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+---
+ .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 39 ++++++++++++++++++++++
+ .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 28 ++++++++++++++++
+ 2 files changed, 67 insertions(+)
 
-> > +static cycle_t tc_get_cycles(struct clocksource *cs)
-> > +{
-> > +	unsigned long	flags;
-> > +	u32		lower, upper, tmp;
-> > +
-> > +	raw_local_irq_save(flags);
-> > +	do {
-> > +		regmap_read(tc.regmap, ATMEL_TC_CV(1), &upper);
-> > +		regmap_read(tc.regmap, ATMEL_TC_CV(0), &lower);
-> > +		regmap_read(tc.regmap, ATMEL_TC_CV(1), &tmp);
-> > +	} while (upper != tmp);
-> > +
-> > +	raw_local_irq_restore(flags);
-> 
-> Why is this lock needed ?
-> 
-
-I've taken that from the old driver, I'm not sure this is needed. Maybe
-to lower the chance to have upper != tmp.
-
-> > +	return (upper << 16) | lower;
-> > +}
-> > +
-
-
-> > +static int tcb_clkevt_oneshot(struct clock_event_device *dev)
-> > +{
-> > +	int ret;
-> > +
-> > +	if (tc.irq_requested)
-> > +		return 0;
-> > +
-> > +	ret = request_irq(tc.irq, tc_clkevt_irq, IRQF_TIMER | IRQF_SHARED,
-> > +			  "tcb_clkevt", &tc);
-> > +	if (!ret)
-> > +		tc.irq_requested = true;
-> 
-> The legacy driver checks clockevent_state_detached() and disables the clock.
-> 
-
-This feature is different from the legacy driver. Here, the driver is
-using a single TCB channel for both clocksource and clockevent while the
-legacy driver always uses at least two channels.
-
-> Why is 'irq_requested' and request_irq/free_irq cleaner ?
-> 
-> Isn't there a configuration with the TCB register to disable the clockevent
-> only ?
-> 
-
-I'll try something cleaner anyway.
-
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+index ff59a26..5dca7d1 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+@@ -43,6 +43,28 @@
+ 		serial2 = &uart2;
+ 		serial3 = &uart3;
+ 	};
++
++	sdio0_vddo_ctrl_reg: sdio0_vddo_ctrl {
++		compatible = "regulator-gpio";
++		regulator-name = "sdio0_vddo_ctrl_reg";
++		regulator-type = "voltage";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++		gpios = <&pca9505 18 0>;
++		states = <3300000 0x0
++			  1800000 0x1>;
++	};
++
++	sdio1_vddo_ctrl_reg: sdio1_vddo_ctrl {
++		compatible = "regulator-gpio";
++		regulator-name = "sdio1_vddo_ctrl_reg";
++		regulator-type = "voltage";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++		gpios = <&pca9505 19 0>;
++		states = <3300000 0x0
++			  1800000 0x1>;
++	};
+ };
+ 
+ &memory { /* Default DRAM banks */
+@@ -54,6 +76,10 @@
+ 	status = "okay";
+ };
+ 
++&pwm {
++	status = "okay";
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 
+@@ -90,3 +116,16 @@
+ 		#size-cells = <1>;
+ 	};
+ };
++
++&sdio0 {
++	vqmmc-supply = <&sdio0_vddo_ctrl_reg>;
++	non-removable;
++	full-pwr-cycle;
++	status = "okay";
++};
++
++&sdio1 {
++	vqmmc-supply = <&sdio1_vddo_ctrl_reg>;
++	full-pwr-cycle;
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+index 642d42c..44ed73c 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+@@ -269,6 +269,14 @@
+ 
+ 		#include "stingray-pinctrl.dtsi"
+ 
++		pwm: pwm at 68910000{
++			compatible = "brcm,iproc-pwm";
++			reg = <0x00010000 0x1000>;
++			clocks = <&crmu_ref25m>;
++			#pwm-cells = <3>;
++			status = "disabled";
++		};
++
+ 		i2c0: i2c at 689b0000 {
+ 			compatible = "brcm,iproc-i2c";
+ 			reg = <0x000b0000 0x100>;
+@@ -428,5 +436,25 @@
+ 			brcm,nand-has-wp;
+ 			status = "disabled";
+ 		};
++
++		sdio0: sdhci at 68cf1000 {
++			compatible = "brcm,sdhci-iproc";
++			reg = <0x003f1000 0x100>;
++			interrupts = <GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH>;
++			bus-width = <8>;
++			clocks = <&sdio0_clk>;
++			iommus = <&smmu 0x6002 0x0000>;
++			status = "disabled";
++		};
++
++		sdio1: sdhci at 68cf2000 {
++			compatible = "brcm,sdhci-iproc";
++			reg = <0x003f2000 0x100>;
++			interrupts = <GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH>;
++			bus-width = <8>;
++			clocks = <&sdio1_clk>;
++			iommus = <&smmu 0x6003 0x0000>;
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.7.4
