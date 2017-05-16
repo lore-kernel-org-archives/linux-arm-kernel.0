@@ -1,72 +1,71 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 16 May 2017 13:29:58 -0700
-Subject: [PATCH 2/2] PCI: Avoid bus reset for Cavium cn8xxx root ports.
-In-Reply-To: <235a9a51-df06-84af-4e5d-b6408ceb0b7d@redhat.com>
-References: <20170516001736.4001-1-david.daney@cavium.com>
- <20170516001736.4001-3-david.daney@cavium.com>
- <235a9a51-df06-84af-4e5d-b6408ceb0b7d@redhat.com>
-Message-ID: <3fbbda8a-a6ea-976e-46ba-d23646500b3a@caviumnetworks.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 16 May 2017 22:31:46 +0200
+Subject: [PATCH v2 07/11] KVM: arm/arm64: Register iodevs when setting
+ redist base and creating VCPUs
+In-Reply-To: <c6d828a8-e763-bdec-09fa-22d94a717acb@redhat.com>
+References: <20170509085618.28311-1-cdall@linaro.org>
+ <20170509085618.28311-8-cdall@linaro.org>
+ <de4eb037-2837-fe77-d5ee-514529bfcd99@arm.com>
+ <c6d828a8-e763-bdec-09fa-22d94a717acb@redhat.com>
+Message-ID: <20170516203146.GA24893@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2017 01:14 PM, Auger Eric wrote:
-> Hi,
+On Tue, May 16, 2017 at 02:39:18PM +0200, Auger Eric wrote:
+> Hi Jean, Christoffer,
 > 
-> On 16/05/2017 02:17, David Daney wrote:
->> Root ports of cn8xxx do not function after bus reset when used with
->> some e1000e and LSI HBA devices.  Add a quirk to prevent bus reset on
->> these root ports.
-> I understand the bus reset would work along with a variety of other
-> child devices. I guess there is no way to be more accurate and forbid
-> the bus reset only when incompatible child devices are found?
-
-That's right.  Conceptually we have a 2 dimensional array of all 
-possible upstream devices vs. all possible downstream devices.  The 
-maintenance burden of correctly populating this and keeping it up to 
-date would be impossible.
-
-The e1000e works well, I am sure, with most Intel root ports.  We 
-haven't investigated exactly which end of the link is responsible for 
-the failures against the cn8890 root port, but the simplest way forward 
-is to just say it cannot support bus reset.
-
->>
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> ---
->>   drivers/pci/quirks.c | 8 ++++++++
->>   1 file changed, 8 insertions(+)
->>
->> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
->> index 085fb78..02cd847 100644
->> --- a/drivers/pci/quirks.c
->> +++ b/drivers/pci/quirks.c
->> @@ -3347,6 +3347,14 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x0032, quirk_no_bus_reset);
->>   DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x003c, quirk_no_bus_reset);
->>   DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x0033, quirk_no_bus_reset);
->>   
->> +/*
->> + * Root port on some Cavium CN8xxx chips do not successfully complete
->> + * a bus reset when used with certain types child devices.  Config
-> s/types /types of
-
-Yeah, I need to be more careful.  We really need to improve the 
-grammatical analysis capabilities of checkpatch.pl, I think I will lay 
-the blame there.
-
-I can resubmit or Bjorn can fix it before committing, I will let him decide.
-
-David.
-
-
-> Thanks
+> On 16/05/2017 13:23, Jean-Philippe Brucker wrote:
+> > Hi,
+> > 
+> > On 09/05/17 09:56, Christoffer Dall wrote:
+> >> Instead of waiting with registering KVM iodevs until the first VCPU is
+> >> run, we can actually create the iodevs when the redist base address is
+> >> set.  The only downside is that we must now also check if we need to do
+> >> this for VCPUs which are created after creating the VGIC, because there
+> >> is no enforced ordering between creating the VGIC (and setting its base
+> >> addresses) and creating the VCPUs.
+> > 
+> > This triggers a BUG(), when the order is VGIC init, then VCPU init (which
+> > is what kvmtool does).
+> > 
+> > Issuing KVM_CREATE_VCPU after VGIC intialization produces the following calls:
+> > 
+> > kvm_vm_ioctl_create_vcpu
+> >  kvm_arch_vcpu_create
+> >   kvm_vcpu_init
+> >    kvm_arch_vcpu_init
+> >     kvm_vgic_vcpu_init
+> >      vgic_register_redist_iodev
+> >       kvm_vcpu_get_idx
+> >        ... no VCPU registered yet in kvm->vcpus :(
+> >        BUG();
 > 
-> Eric
->> + * space access to the child may quit responding.  Flag the root port
->> + * as not supporting bus reset.
->> + */
->> +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_CAVIUM, 0xa100, quirk_no_bus_reset);
->> +
->>   static void quirk_no_pm_reset(struct pci_dev *dev)
->>   {
->>   	/*
->>
+> in QEMU use case, kvm_vgic_vcpu_init/vgic_register_redist_iodev does
+> nothing since KVM_VGIC_V3_ADDR_TYPE_REDIST was not called yet and
+> vgic->vgic_redist_base is undefined. Thus we postpone the redist_iodev
+> registration until the redist base address is set.
+> 
+> In QEMU case KVM_VGIC_V3_ADDR_TYPE_REDIST is called when all the CPUs
+> are initialized and we were lucky.
+> > 
+> >  ... would later register vcpu:
+> >  kvm->vcpus[atomic_read(&kvm->online_vcpus)] = vcpu
+> > 
+> > My quick fix is to move kvm_vgic_vcpu_init into kvm_arch_vcpu_postcreate,
+> > but it discards the return value of kvm_vgic_vcpu_init, so I don't know
+> > how to do it properly.
+> 
+> changing the proto of kvm_arch_vcpu_postcreate and moving the
+> kvm_vgic_vcpu_init there could be an alternative.
+
+I think the whole point of postcreate is a hook that can be called where
+it doesn't produce an error (rolling back the create at that point is
+pretty horrid).
+
+I'll have a closer look in the morning at what we can do - perhaps the
+idx thing is just a ridiculous requirement and we can do something more
+clever.
+
+Thanks for the heads up, and sorry about breaking stuff.
+
+-Christoffer
