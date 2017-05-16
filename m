@@ -1,95 +1,35 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 16 May 2017 17:42:19 +0200
-Subject: [PATCH] arm64: dts: marvell: mcbin: add sdhci
-In-Reply-To: <CAPv3WKf4GcOc7g-2yMCjGN4HrftDL0Ro6jHErQL8-zSH-tC10w@mail.gmail.com>
-References: <E1dAcn4-0004z2-Fl@rmk-PC.armlinux.org.uk>
- <CAPv3WKf4GcOc7g-2yMCjGN4HrftDL0Ro6jHErQL8-zSH-tC10w@mail.gmail.com>
-Message-ID: <CAPv3WKeK9Z_1dGvBnc=NJrD7+nZOgf60iCNvvTkFGcP7GSyt=Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 16 May 2017 08:47:17 -0700
+Subject: [PATCH 0/8] ARM: OMAP2+: AM33XX/AM43XX: Add suspend-resume support
+In-Reply-To: <cd340d7a-c0cf-9227-1382-2277ffa5b1b0@ti.com>
+References: <20170329015801.22240-1-d-gerlach@ti.com>
+ <20170329171314.GD10760@atomide.com>
+ <cd340d7a-c0cf-9227-1382-2277ffa5b1b0@ti.com>
+Message-ID: <20170516154717.GF31418@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re-send in plain text.
+* Dave Gerlach <d-gerlach@ti.com> [170329 11:52]:
+> Hi Tony,
+> On 03/29/2017 12:13 PM, Tony Lindgren wrote:
+> > * Dave Gerlach <d-gerlach@ti.com> [170328 19:00]:
+> > > Hi,
+> > > This series contains the remaining code to enable suspend to mem and standby on
+> > > am335x and am437x platforms. It depends on the ti-emif-sram series sent here [1].
+> > 
+> > Looks good to me in general. To remove the dependency, can some
+> > of this be merged separately without breaking things before [1]?
+> > Maybe by disabling some of the PM states until [1] is in place?
+> 
+> Thanks for the feedback. Actually, patch 7 is the only patch with a
+> dependency to [1]. The rest of the patches just add platform PM support
+> needed for suspend but won't do much of anything until patch 7 actually
+> enables the suspend states, so there is no reason why patches 1-6 and patch
+> 8 can't be merged now.
 
-2017-05-16 17:40 GMT+02:00 Marcin Wojtas <mw@semihalf.com>:
-> Russel,
->
-> 2017-05-16 15:45 GMT+02:00 Russell King <rmk+kernel@armlinux.org.uk>:
->>
->> Add sdhci support for MACCHIATOBin boards.  This uses the AP806 SDHCI
->> for eMMC and CP110 master for the SD card slot.
->>
->> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->> ---
->>
->> This version labels up the uSD connector, adds the vqmmc regulator for
->> the uSD (the regulator itself already present in the DT), and supports
->> the card detect signal.
->>
->> For eMMC, this version adds the vqmmc regulator, which again is already
->> present in the DT, marks it as not supporting SD or SDIO, and also
->> includes "slow mode" since testing with previous versions of the driver
->> have shown that selecting faster speeds results in errors.
->>
->>  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts |   23
->> ++++++++++++++++++++++
->>  1 file changed, 23 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
->> b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
->> index cc167e05941a..60111ed3234a 100644
->> --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
->> +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
->> @@ -95,6 +95,21 @@
->>         status = "okay";
->>  };
->>
->> +&ap_sdhci0 {
->> +       bus-width = <8>;
->> +       /*
->> +        * Not stable in HS modes - phy needs "more calibration", so add
->> +        * the "slow-mode" and disable SDR104, SDR50 and DDR50 modes.
->> +        */
->> +       marvell,xenon-phy-slow-mode;
->
->
-> FYI, this property is by default present in armada-ap806.dtsi.
->
-> Marcin
->
->>
->> +       no-1-8-v;
->> +       no-sd;
->> +       no-sdio;
->> +       non-removable;
->> +       status = "okay";
->> +       vqmmc-supply = <&v_vddo_h>;
->> +};
->> +
->>  &cpm_i2c0 {
->>         clock-frequency = <100000>;
->>         status = "okay";
->> @@ -105,6 +120,14 @@
->>         status = "okay";
->>  };
->>
->> +&cpm_sdhci0 {
->> +       /* U6 */
->> +       broken-cd;
->> +       bus-width = <4>;
->> +       status = "okay";
->> +       vqmmc-supply = <&v_3_3>;
->> +};
->> +
->>  &cpm_usb3_0 {
->>         /* J38? - USB2.0 only */
->>         status = "okay";
->> --
->> 2.7.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+I'm applying patches 1-5 into omap-for-v4.13/soc. Patch 6 needs
+ack from Russell.
+
+Regards,
+
+Tony
