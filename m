@@ -1,31 +1,68 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Tue, 16 May 2017 15:19:31 -0700
-Subject: [GIT PULL] bcm2835 DT fixes for 4.12
-Message-ID: <20170516221931.31292-1-eric@anholt.net>
+Date: Tue, 16 May 2017 15:19:51 -0700
+Subject: [PATCH V2] ARM: dts: bcm283x: Reserve first page for firmware
+In-Reply-To: <e2718c25-fdf1-ead1-cbfa-d23bf729a079@gmail.com>
+References: <b6aef857-1454-7931-2c60-6d7b55b7a0a8@raspberrypi.org>
+ <e2718c25-fdf1-ead1-cbfa-d23bf729a079@gmail.com>
+Message-ID: <87pof8bg1k.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Florian Fainelli <f.fainelli@gmail.com> writes:
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> On 05/09/2017 02:04 AM, Phil Elwell wrote:
+>> The Raspberry Pi startup stub files for multi-core BCM27XX processors
+>> make the secondary CPUs spin until the corresponding mailbox is
+>> written. These stubs are loaded at physical address 0x00000xxx (as seen
+>> by the ARMs), but this page will be reused by the kernel unless it is
+>> explicitly reserved, causing the waiting cores to execute random code.
+>> 
+>> Use the /memreserve/ Device Tree directive to mark the first page as
+>> off-limits to the kernel.
+>
+> This reserves a 4KB page here, is this good enough, or should we just go
+> directly to the maximum page granule size possible on an ARM64/Linux
+> system to be on the safe side?
+>
+>> 
+>> See: https://github.com/raspberrypi/linux/issues/1989
+>> 
+>> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+>> ---
+>> 
+>> Changes in V2:
+>> - Rebase against linux-next
+>> - Drop downstream-only patch
+>> 
+>>  arch/arm/boot/dts/bcm283x.dtsi | 2 ++
+>>  1 file changed, 2 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+>> index a3106aa..6d12c3e8 100644
+>> --- a/arch/arm/boot/dts/bcm283x.dtsi
+>> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+>> @@ -3,6 +3,8 @@
+>>  #include <dt-bindings/clock/bcm2835-aux.h>
+>>  #include <dt-bindings/gpio/gpio.h>
+>>  
+>> +/memreserve/ 0x00000000 0x00001000;
+>
+> Can you put a comment above this /memreserve entry here to remind about
+> what this is useful for?
+>
+> Thanks!
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+Phil, I chatted with Florian and added in:
 
-are available in the git repository at:
++/* firmware-provided startup stubs live here, where the secondary CPUs are
++ * spinning.
++ */
 
-  git://github.com/anholt/linux tags/bcm2835-dt-fixes-2017-05-16
-
-for you to fetch changes up to b0804ed0cadd7e38d94d2f15cdcc0d9695818856:
-
-  ARM: dts: bcm283x: Reserve first page for firmware (2017-05-15 15:05:29 -0700)
-
-----------------------------------------------------------------
-This pull request brings in a fix for booting on SMP Raspberry Pis,
-particularly with maxcpus=1
-
-----------------------------------------------------------------
-Phil Elwell (1):
-      ARM: dts: bcm283x: Reserve first page for firmware
-
- arch/arm/boot/dts/bcm283x.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+and tagged and sent a PR for 4.12.  Thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170516/13a30993/attachment-0001.sig>
