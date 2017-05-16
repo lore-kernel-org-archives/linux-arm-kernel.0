@@ -1,31 +1,31 @@
 From: madalin.bucur@nxp.com (Madalin Bucur)
-Date: Tue, 16 May 2017 15:07:22 +0300
-Subject: [PATCH 2/3] arm64: dts: add LS1043A DPAA FMan support
+Date: Tue, 16 May 2017 15:07:23 +0300
+Subject: [PATCH 3/3] arm64: dts: add LS1046A DPAA FMan nodes
 In-Reply-To: <1494936443-14869-1-git-send-email-madalin.bucur@nxp.com>
 References: <1494936443-14869-1-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <1494936443-14869-3-git-send-email-madalin.bucur@nxp.com>
+Message-ID: <1494936443-14869-4-git-send-email-madalin.bucur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DPAA 1.x FMan device tree nodes for LS1043A boards.
+Add the DPAA 1.x FMan device tree nodes for LS1046A boards.
 
 Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls1043-post.dtsi | 45 +++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts  |  2 +
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts  | 73 ++++++++++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     | 13 +++-
- 4 files changed, 132 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043-post.dtsi
+ arch/arm64/boot/dts/freescale/fsl-ls1046-post.dtsi | 48 +++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts  |  2 +
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts  | 60 ++++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     | 11 +++-
+ 4 files changed, 120 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046-post.dtsi
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043-post.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043-post.dtsi
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046-post.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046-post.dtsi
 new file mode 100644
-index 0000000..169e171
+index 0000000..f5017db
 --- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043-post.dtsi
-@@ -0,0 +1,45 @@
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046-post.dtsi
+@@ -0,0 +1,48 @@
 +/*
-+ * QorIQ FMan v3 device tree nodes for ls1043
++ * QorIQ FMan v3 device tree nodes for ls1046
 + *
 + * Copyright 2015-2016 Freescale Semiconductor Inc.
 + *
@@ -43,7 +43,7 @@ index 0000000..169e171
 +#include "qoriq-fman3-0-1g-4.dtsi"
 +#include "qoriq-fman3-0-1g-5.dtsi"
 +#include "qoriq-fman3-0-10g-0.dtsi"
-+
++#include "qoriq-fman3-0-10g-1.dtsi"
 +};
 +
 +&fman0 {
@@ -68,61 +68,59 @@ index 0000000..169e171
 +
 +	enet6: ethernet at f0000 {
 +	};
++
++	enet7: ethernet at f2000 {
++	};
 +};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-index 0989d63..c5b93ea 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-@@ -181,3 +181,5 @@
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+index 290e5b0..40357b1 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+@@ -210,3 +210,5 @@
  		reg = <0>;
  	};
  };
 +
-+#include "fsl-ls1043-post.dtsi"
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-index c37110b..67dbc94 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-@@ -139,3 +139,76 @@
- &duart1 {
- 	status = "okay";
++#include "fsl-ls1046-post.dtsi"
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+index d1ccc00..af6e58d 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+@@ -148,3 +148,63 @@
+ 		reg = <1>;
+ 	};
  };
 +
-+#include "fsl-ls1043-post.dtsi"
++#include "fsl-ls1046-post.dtsi"
 +
 +&fman0 {
-+	ethernet at e0000 {
-+		phy-handle = <&qsgmii_phy1>;
-+		phy-connection-type = "qsgmii";
-+	};
-+
-+	ethernet at e2000 {
-+		phy-handle = <&qsgmii_phy2>;
-+		phy-connection-type = "qsgmii";
-+	};
-+
 +	ethernet at e4000 {
 +		phy-handle = <&rgmii_phy1>;
-+		phy-connection-type = "rgmii-txid";
++		phy-connection-type = "rgmii";
 +	};
 +
 +	ethernet at e6000 {
 +		phy-handle = <&rgmii_phy2>;
-+		phy-connection-type = "rgmii-txid";
++		phy-connection-type = "rgmii";
 +	};
 +
 +	ethernet at e8000 {
-+		phy-handle = <&qsgmii_phy3>;
-+		phy-connection-type = "qsgmii";
++		phy-handle = <&sgmii_phy1>;
++		phy-connection-type = "sgmii";
 +	};
 +
 +	ethernet at ea000 {
-+		phy-handle = <&qsgmii_phy4>;
-+		phy-connection-type = "qsgmii";
++		phy-handle = <&sgmii_phy2>;
++		phy-connection-type = "sgmii";
 +	};
 +
 +	ethernet at f0000 { /* 10GEC1 */
-+		phy-handle = <&aqr105_phy>;
++		phy-handle = <&aqr106_phy>;
++		phy-connection-type = "xgmii";
++	};
++
++	ethernet at f2000 { /* 10GEC2 */
++		fixed-link = <0 1 1000 0 0>;
 +		phy-connection-type = "xgmii";
 +	};
 +
@@ -135,40 +133,31 @@ index c37110b..67dbc94 100644
 +			reg = <0x2>;
 +		};
 +
-+		qsgmii_phy1: ethernet-phy at 4 {
++		sgmii_phy1: ethernet-phy at 3 {
++			reg = <0x3>;
++		};
++
++		sgmii_phy2: ethernet-phy at 4 {
 +			reg = <0x4>;
-+		};
-+
-+		qsgmii_phy2: ethernet-phy at 5 {
-+			reg = <0x5>;
-+		};
-+
-+		qsgmii_phy3: ethernet-phy at 6 {
-+			reg = <0x6>;
-+		};
-+
-+		qsgmii_phy4: ethernet-phy at 7 {
-+			reg = <0x7>;
 +		};
 +	};
 +
 +	mdio at fd000 {
-+		aqr105_phy: ethernet-phy at 1 {
++		aqr106_phy: ethernet-phy at 0 {
 +			compatible = "ethernet-phy-ieee802.3-c45";
-+			interrupts = <0 132 4>;
-+			reg = <0x1>;
++			interrupts = <0 131 4>;
++			reg = <0x0>;
 +		};
 +	};
 +};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 2247615..5efc088 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -53,6 +53,17 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index 55f1e4f..318539a 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -55,6 +55,15 @@
  
-+	aliases {
+ 	aliases {
+ 		crypto = &crypto;
 +		fman0 = &fman0;
 +		ethernet0 = &enet0;
 +		ethernet1 = &enet1;
@@ -177,13 +166,12 @@ index 2247615..5efc088 100644
 +		ethernet4 = &enet4;
 +		ethernet5 = &enet5;
 +		ethernet6 = &enet6;
-+	};
-+
++		ethernet7 = &enet7;
+ 	};
+ 
  	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -180,7 +191,7 @@
- 		interrupts = <1 9 0xf08>;
+@@ -174,7 +183,7 @@
+ 					 IRQ_TYPE_LEVEL_LOW)>;
  	};
  
 -	soc {
