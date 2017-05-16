@@ -1,74 +1,110 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 May 2017 13:13:55 +0100
-Subject: [PATCH 1/2] arm64: marvell: dts: fill MachiatoBin board
- description
-In-Reply-To: <20170516135217.016717e7@free-electrons.com>
-References: <1494890913-8360-1-git-send-email-mw@semihalf.com>
- <1494890913-8360-2-git-send-email-mw@semihalf.com>
- <20170515232825.GX22219@n2100.armlinux.org.uk>
- <CAPv3WKdULNEDcqJ=qsBEAApaJNiyJXAw6ZG=Ejd8TxE6LJkYLw@mail.gmail.com>
- <20170516095027.GZ22219@n2100.armlinux.org.uk>
- <20170516115535.2faf86ec@free-electrons.com>
- <20170516100236.GA22219@n2100.armlinux.org.uk>
- <20170516135217.016717e7@free-electrons.com>
-Message-ID: <20170516121355.GD22219@n2100.armlinux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 16 May 2017 14:14:50 +0200
+Subject: [linux-sunxi] Re: [PATCH v7 05/13] drm/sun4i: abstract a engine
+ type
+In-Reply-To: <4F7E36DB-B5F9-4DDE-A80D-0C1A75F0A882@aosc.io>
+References: <20170514163045.40366-1-icenowy@aosc.io>
+ <20170514163045.40366-6-icenowy@aosc.io>
+ <20170515092001.ik7qrqmg5pgtp2ct@flea.home>
+ <4F7E36DB-B5F9-4DDE-A80D-0C1A75F0A882@aosc.io>
+Message-ID: <20170516121450.oz3peeushg557lji@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 01:52:17PM +0200, Thomas Petazzoni wrote:
-> Hello,
+On Mon, May 15, 2017 at 05:35:02PM +0800, Icenowy Zheng wrote:
 > 
-> On Tue, 16 May 2017 11:02:37 +0100, Russell King - ARM Linux wrote:
 > 
-> > > Correct, but Marcin has submitted patches, and you haven't.  
-> > 
-> > As I said, give me a friggin chance.  You know full well that I've been
-> > working on this, working with you and submitting patches.
+> ? 2017?5?15? GMT+08:00 ??5:20:01, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+> >On Mon, May 15, 2017 at 12:30:37AM +0800, Icenowy Zheng wrote:
+> >> As we are going to add support for the Allwinner DE2 engine in
+> >sun4i-drm
+> >> driver, we will finally have two types of display engines -- the DE1
+> >> backend and the DE2 mixer. They both do some display blending and
+> >feed
+> >> graphics data to TCON, and is part of the "Display Engine" called by
+> >> Allwinner, so I choose to call them both "engine" here.
+> >> 
+> >> Abstract the engine type to a new struct with an ops struct, which
+> >contains
+> >> functions that should be called outside the engine-specified code (in
+> >> TCON, CRTC or TV Encoder code).
+> >> 
+> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >> Changes in v7:
+> >> - Mention "Display Engine" for the name "engine".
+> >> - Fixed some small issues found by Chen-Yu and added his ACK.
+> >> Changes in v6:
+> >> - Rebased on wens's multi-pipeline patchset.
+> >> - Split out Makefile changes.
+> >
+> >You also added a get_id callback here...
+> >
+> >> +static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
+> >> +	.commit				= sun4i_backend_commit,
+> >> +	.layers_init			= sun4i_layers_init,
+> >> +	.apply_color_correction		= sun4i_backend_apply_color_correction,
+> >> +	.disable_color_correction	= sun4i_backend_disable_color_correction,
+> >> +};
+> >> +
+> >
+> >... that you don't populate ...
+> >
+> >> @@ -477,7 +481,7 @@ static int sun4i_tcon_bind(struct device *dev,
+> >struct device *master,
+> >>  	dev_set_drvdata(dev, tcon);
+> >>  	tcon->drm = drm;
+> >>  	tcon->dev = dev;
+> >> -	tcon->id = backend->id;
+> >> +	tcon->id = sunxi_engine_get_id(engine);
+> >
+> >... that you call to fill the TCON ID ...
+> >
+> >> +/**
+> >> + * sunxi_engine_get_id - Get the ID of the engine.
+> >> + * @engine:	pointer to the engine
+> >> + *
+> >> + * If the ID is not necessary, just do not implement it in
+> >sunxi_engine_ops,
+> >> + * and a default -1 will be returned.
+> >> + */
+> >> +static inline int
+> >> +sunxi_engine_get_id(struct sunxi_engine *engine)
+> >> +{
+> >> +	if (engine->ops && engine->ops->get_id)
+> >> +		return engine->ops->get_id(engine);
+> >> +
+> >> +	return -1;
+> >
+> >... and will return -1 if not populated, which essentially means that
+> >instead of having 0 or 1, we're now having -1 as our id.
+> >
+> >This is a regression, and I'm even wondering if we can't just store
+> >the ID in the sunxi_engine structure. Is anything preventing us to do
+> >that, instead of using a callback?
 > 
-> Correct. But Marcin patches are small and easy, they are ready today,
-> and they bring useful benefits for users. You're trying to provide a
-> full blown solution, which ultimately is good, but in the mean time it
-> would be good to enable the features that already work today.
+> Some engines (de2 mixer) doesn't use the ID. But 0 is a valid ID here.
 
-Unfortunately, they don't all work - see my other email.  The SD slot
-is non-functional with the latest sdhci-xenon driver.  The previous
-revision worked fine.
+Surely it will at some point.
 
-> > > I believe if you say that, it's because you don't know how much work
-> > > Marcin is doing behind the scenes on supporting Marvell platforms, and
-> > > not only at the Linux kernel level.  
-> > 
-> > Maybe Marcin doesn't know how much work I'm doing supporting this board?
+> If we just store it in sunxi_engine, it should be assigned -1 for de2 mixer.
+> Is this applicable?
 > 
-> Marcin also knows you're doing some work on this board.
+> If it's okay I will do so.
 
-Right, so this is all one way.  It would have been nice to have had a
-heads-up or something, which would have aided co-operation instead of
-confrontation.
+Yes, it sounds reasonable.
 
-> > It _has_ been submitted - a few months ago - so you're talking rubbish
-> > here.  You just need to check your mailbox.
-> 
-> Could you please avoid insults? It doesn't bring any benefit.
-> 
-> And in addition, you're deforming reality. The reality is:
-> 
->  - The patches you posted are related to pinmux/gpio support. This is
->    one thing.
-
-The point you replied to was about pinmux/gpio, not about Marcin's patch.
-So you trying to twist this back to Marcin's patches is unhelpful.
-Stop being a problem.
-
-> Therefore, there is no reason to not merge Marcin patches, because they
-> do not conflict with anything you have already posted.
-
-Except that the SD slot is broken.
-
-Anyone can produce and post untested patches, but that's not really
-the point of kernel development.
+Maxime
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170516/e3df3d12/attachment-0001.sig>
