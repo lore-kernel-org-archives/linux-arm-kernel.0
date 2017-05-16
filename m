@@ -1,44 +1,28 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 16 May 2017 12:04:28 +0200
-Subject: [PATCH v2 0/3] Fix race condition and simplify vgic active handler
-Message-ID: <20170516100431.4101-1-cdall@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 16 May 2017 15:37:25 +0530
+Subject: [PATCH v5 1/3] phy: qcom-usb: Remove unused ulpi phy header
+In-Reply-To: <1494485262-18995-1-git-send-email-vivek.gautam@codeaurora.org>
+References: <1494485262-18995-1-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <02e495ea-5e21-d8bf-c869-d62ed5b70770@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a small series that reworks a problem in a previously submitted
-patch [1].  The previous patch version did not consider that userspace
-accesses already hold the KVM mutex and therefore end up in deadlock.
+Hi Vivek,
 
-These patches therefore introduces uaccess read/write functions for the
-GICv2 MMIO register descriptor framework, splits out the distributor
-active register write functionality into separate guest and userspace
-access functions, and then finally take the KVM mutex on the guest
-access path and gets rid of unneeded complexity from
-active_change_prepare/finish.
+On Thursday 11 May 2017 12:17 PM, Vivek Gautam wrote:
+> Ulpi phy header is not used for anything. Remove the same
+> from qcom-hs and qcom-hsic phy drivers.
+> 
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> Suggested-by: Stephen Boyd <stephen.boyd@linaro.org>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-usb at vger.kernel.org
 
-Applied on top of v4.12-rc1.
+this patch introduced a bunch of compiler errors because of missing "#include
+<linux/phy/phy.h>". I fixed it and merged to linux-phy fixes.
 
-[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2017-May/025542.html
-
-Changes from v1:
- - Separate guest and uaccess distributor active register writes.
- - Only take the mutex in the guest access path.
-
-
-Christoffer Dall (3):
-  KVM: arm/arm64: Allow GICv2 to supply a uaccess register function
-  KVM: arm/arm64: Separate guest and uaccess writes to dist {sc}active
-  KVM: arm/arm64: Simplify active_change_prepare and plug race
-
- arch/arm/include/asm/kvm_host.h   |  2 --
- arch/arm64/include/asm/kvm_host.h |  2 --
- virt/kvm/arm/arm.c                | 20 +++---------
- virt/kvm/arm/vgic/vgic-mmio-v2.c  | 24 +++++++-------
- virt/kvm/arm/vgic/vgic-mmio-v3.c  |  8 +++--
- virt/kvm/arm/vgic/vgic-mmio.c     | 68 ++++++++++++++++++++++++++++++---------
- virt/kvm/arm/vgic/vgic-mmio.h     | 12 ++++++-
- virt/kvm/arm/vgic/vgic.c          | 11 ++++---
- 8 files changed, 92 insertions(+), 55 deletions(-)
-
--- 
-2.9.0
+Thanks
+Kishon
