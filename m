@@ -1,97 +1,301 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 16 May 2017 11:53:04 -0700
-Subject: [PATCH v3 00/11] Broadcom Stingray SOC Initial Support
-In-Reply-To: <1494934256-1350-1-git-send-email-anup.patel@broadcom.com>
-References: <1494934256-1350-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <CAOesGMiwspTuVWp8nPcWK2MhuWh8x9XSkZWJE2x=FxTCtU47Sw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 16 May 2017 21:44:32 +0200
+Subject: [PATCH V10 1/3] irq: Allow to pass the IRQF_TIMER flag with percpu
+ irq request
+Message-ID: <1494963880-16160-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In the next changes, we track when the interrupts occur in order to
+statistically compute when is supposed to happen the next interrupt.
 
+In all the interruptions, it does not make sense to store the timer interrupt
+occurences and try to predict the next interrupt as when know the expiration
+time.
 
+The request_irq() has a irq flags parameter and the timer drivers use it to
+pass the IRQF_TIMER flag, letting us know the interrupt is coming from a timer.
+Based on this flag, we can discard these interrupts when tracking them.
 
-On Tue, May 16, 2017 at 4:30 AM, Anup Patel <anup.patel@broadcom.com> wrote:
-> This patchset adds initial support of Broadcom Stingray SOC
-> by reusing existing Broadcom iProc device drivers.
->
-> Most of the patches in this patchset are DT patches except
-> the Stingray clock tree support which just one patch.
->
-> This patchset is based on Linux-4.12-rc1 and it is also available
-> at stingray-v3 branch of https://github.com/Broadcom/arm64-linux.git
->
-> Changes since v2:
->  - Remove default bootargs from chosen DT node
->  - Remove "linux" prefix from stdout DT attribute of chosen DT node
->  - Remove use of GIC_CPU_MASK_xxx() for PPIs
->
-> Changes since v1:
->  - Rebased patches for Linux-4.12-rc1
->  - Removed unwanted /memreserve/ from bcm958742-base.dtsi
->  - Use ranges DT property to clear view of memory-layout
->  - Make bcm-sr.h part of clock DT bindings patch
->
-> Anup Patel (3):
->   dt-bindings: bcm: Add Broadcom Stingray bindings document
->   arm64: dts: Initial DTS files for Broadcom Stingray SOC
->   arm64: dts: Add PL022, PL330 and SP805 DT nodes for Stingray
->
-> Oza Pawandeep (1):
->   arm64: dts: Add I2C DT nodes for Stingray SoC
->
-> Pramod Kumar (3):
->   arm64: dts: Add NAND DT nodes for Stingray SOC
->   arm64: dts: Add pinctrl DT nodes for Stingray SOC
->   arm64: dts: Add GPIO DT nodes for Stingray SOC
->
-> Sandeep Tripathy (3):
->   dt-bindings: clk: Extend binding doc for Stingray SOC
->   clk: bcm: Add clocks for Stingray SOC
->   arm64: dts: Add clock DT nodes for Stingray SOC
->
-> Srinath Mannam (1):
->   arm64: dts: Add PWM and SDHCI DT nodes for Stingray SOC
->
->  .../devicetree/bindings/arm/bcm/brcm,stingray.txt  |  12 +
->  .../bindings/clock/brcm,iproc-clocks.txt           |  76 ++++
->  arch/arm64/boot/dts/broadcom/Makefile              |   1 +
->  arch/arm64/boot/dts/broadcom/stingray/Makefile     |   6 +
->  .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 131 ++++++
->  .../boot/dts/broadcom/stingray/bcm958742k.dts      |  78 ++++
->  .../boot/dts/broadcom/stingray/bcm958742t.dts      |  40 ++
->  .../boot/dts/broadcom/stingray/stingray-clock.dtsi | 170 ++++++++
->  .../dts/broadcom/stingray/stingray-pinctrl.dtsi    | 345 ++++++++++++++++
->  .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 460 +++++++++++++++++++++
->  drivers/clk/bcm/Kconfig                            |   8 +
->  drivers/clk/bcm/Makefile                           |   1 +
->  drivers/clk/bcm/clk-sr.c                           | 300 ++++++++++++++
->  include/dt-bindings/clock/bcm-sr.h                 | 101 +++++
->  .../dt-bindings/pinctrl/brcm,pinctrl-stingray.h    |  68 +++
->  15 files changed, 1797 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,stingray.txt
->  create mode 100644 arch/arm64/boot/dts/broadcom/stingray/Makefile
->  create mode 100644 arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
->  create mode 100644 arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
->  create mode 100644 arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
->  create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
->  create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-pinctrl.dtsi
->  create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
->  create mode 100644 drivers/clk/bcm/clk-sr.c
->  create mode 100644 include/dt-bindings/clock/bcm-sr.h
->  create mode 100644 include/dt-bindings/pinctrl/brcm,pinctrl-stingray.h
+But, the API request_percpu_irq does not allow to pass a flag, hence specifying
+if the interrupt type is a timer.
 
-Grouping as one patchset for review is fine, but when you submit this
-for merge you need to split it up:
+Add a function request_percpu_irq_flags() where we can specify the flags. The
+request_percpu_irq() function is changed to be a wrapper to
+request_percpu_irq_flags() passing a zero flag parameter.
 
-- Documentation/devicetree can go with the driver pieces or with the
-DT changes, your choice
-- DTS/DTSI changes should go through the Broadcom maintainers to arm-soc
-- clk changes should go to clk maintainers.
+Change the timers using request_percpu_irq() to use request_percpu_irq_flags()
+instead with the IRQF_TIMER flag set.
 
-Also, there's usually no need to split up a DT introduction and having
-separate pieces for NAND/pinctrl/GPIO/etc: They can all go in the main
-DT submission patch.
+For now, in order to prevent a misusage of this parameter, only the IRQF_TIMER
+flag (or zero) is a valid parameter to be passed to the
+request_percpu_irq_flags() function.
 
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Vineet Gupta <vgupta@synopsys.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Patrice Chotard <patrice.chotard@st.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Paolo Bonzini <pbonzini@redhat.com>
+Cc: Radim Kr?m?? <rkrcmar@redhat.com>
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+Changelog:
 
--Olof
+   V10:
+	- Drop the change for arch arm virtual timer
+	  https://lkml.org/lkml/2017/4/25/184
+   V9:
+	- Clarified the patch description
+	- Fixed EXPORT_SYMBOL_GPL(request_percpu_irq_flags)
+---
+ arch/arm/kernel/smp_twd.c                |  3 ++-
+ drivers/clocksource/arc_timer.c          |  4 ++--
+ drivers/clocksource/arm_arch_timer.c     | 20 ++++++++++++--------
+ drivers/clocksource/arm_global_timer.c   |  4 ++--
+ drivers/clocksource/exynos_mct.c         |  7 ++++---
+ drivers/clocksource/qcom-timer.c         |  4 ++--
+ drivers/clocksource/time-armada-370-xp.c |  9 +++++----
+ drivers/clocksource/timer-nps.c          |  6 +++---
+ include/linux/interrupt.h                | 11 ++++++++++-
+ kernel/irq/manage.c                      | 15 ++++++++++-----
+ 10 files changed, 52 insertions(+), 31 deletions(-)
+
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 895ae51..ce9fdcf 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -332,7 +332,8 @@ static int __init twd_local_timer_common_register(struct device_node *np)
+ 		goto out_free;
+ 	}
+ 
+-	err = request_percpu_irq(twd_ppi, twd_handler, "twd", twd_evt);
++	err = request_percpu_irq_flags(twd_ppi, twd_handler, IRQF_TIMER, "twd",
++				       twd_evt);
+ 	if (err) {
+ 		pr_err("twd: can't register interrupt %d (%d)\n", twd_ppi, err);
+ 		goto out_free;
+diff --git a/drivers/clocksource/arc_timer.c b/drivers/clocksource/arc_timer.c
+index 2164973..66f2632 100644
+--- a/drivers/clocksource/arc_timer.c
++++ b/drivers/clocksource/arc_timer.c
+@@ -301,8 +301,8 @@ static int __init arc_clockevent_setup(struct device_node *node)
+ 	}
+ 
+ 	/* Needs apriori irq_set_percpu_devid() done in intc map function */
+-	ret = request_percpu_irq(arc_timer_irq, timer_irq_handler,
+-				 "Timer0 (per-cpu-tick)", evt);
++	ret = request_percpu_irq_flags(arc_timer_irq, timer_irq_handler, IRQF_TIMER,
++				       "Timer0 (per-cpu-tick)", evt);
+ 	if (ret) {
+ 		pr_err("clockevent: unable to request irq\n");
+ 		return ret;
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 4bed671..22646b5 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -980,25 +980,29 @@ static int __init arch_timer_register(void)
+ 	ppi = arch_timer_ppi[arch_timer_uses_ppi];
+ 	switch (arch_timer_uses_ppi) {
+ 	case ARCH_TIMER_VIRT_PPI:
+-		err = request_percpu_irq(ppi, arch_timer_handler_virt,
+-					 "arch_timer", arch_timer_evt);
++		err = request_percpu_irq_flags(ppi, arch_timer_handler_virt,
++					       IRQF_TIMER, "arch_timer",
++					       arch_timer_evt);
+ 		break;
+ 	case ARCH_TIMER_PHYS_SECURE_PPI:
+ 	case ARCH_TIMER_PHYS_NONSECURE_PPI:
+-		err = request_percpu_irq(ppi, arch_timer_handler_phys,
+-					 "arch_timer", arch_timer_evt);
++		err = request_percpu_irq_flags(ppi, arch_timer_handler_phys,
++					       IRQF_TIMER, "arch_timer",
++					       arch_timer_evt);
+ 		if (!err && arch_timer_has_nonsecure_ppi()) {
+ 			ppi = arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI];
+-			err = request_percpu_irq(ppi, arch_timer_handler_phys,
+-						 "arch_timer", arch_timer_evt);
++			err = request_percpu_irq_flags(ppi, arch_timer_handler_phys,
++						       IRQF_TIMER, "arch_timer",
++						       arch_timer_evt);
+ 			if (err)
+ 				free_percpu_irq(arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI],
+ 						arch_timer_evt);
+ 		}
+ 		break;
+ 	case ARCH_TIMER_HYP_PPI:
+-		err = request_percpu_irq(ppi, arch_timer_handler_phys,
+-					 "arch_timer", arch_timer_evt);
++		err = request_percpu_irq_flags(ppi, arch_timer_handler_phys,
++					       IRQF_TIMER, "arch_timer",
++					       arch_timer_evt);
+ 		break;
+ 	default:
+ 		BUG();
+diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+index 123ed20..5a72ec1 100644
+--- a/drivers/clocksource/arm_global_timer.c
++++ b/drivers/clocksource/arm_global_timer.c
+@@ -302,8 +302,8 @@ static int __init global_timer_of_register(struct device_node *np)
+ 		goto out_clk;
+ 	}
+ 
+-	err = request_percpu_irq(gt_ppi, gt_clockevent_interrupt,
+-				 "gt", gt_evt);
++	err = request_percpu_irq_flags(gt_ppi, gt_clockevent_interrupt,
++				       IRQF_TIMER, "gt", gt_evt);
+ 	if (err) {
+ 		pr_warn("global-timer: can't register interrupt %d (%d)\n",
+ 			gt_ppi, err);
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 670ff0f..a48ca0f 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -524,9 +524,10 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
+ 
+ 	if (mct_int_type == MCT_INT_PPI) {
+ 
+-		err = request_percpu_irq(mct_irqs[MCT_L0_IRQ],
+-					 exynos4_mct_tick_isr, "MCT",
+-					 &percpu_mct_tick);
++		err = request_percpu_irq_flags(mct_irqs[MCT_L0_IRQ],
++					       exynos4_mct_tick_isr,
++					       IRQF_TIMER, "MCT",
++					       &percpu_mct_tick);
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     mct_irqs[MCT_L0_IRQ], err);
+ 	} else {
+diff --git a/drivers/clocksource/qcom-timer.c b/drivers/clocksource/qcom-timer.c
+index ee358cd..8e876fc 100644
+--- a/drivers/clocksource/qcom-timer.c
++++ b/drivers/clocksource/qcom-timer.c
+@@ -174,8 +174,8 @@ static int __init msm_timer_init(u32 dgt_hz, int sched_bits, int irq,
+ 	}
+ 
+ 	if (percpu)
+-		res = request_percpu_irq(irq, msm_timer_interrupt,
+-					 "gp_timer", msm_evt);
++		res = request_percpu_irq_flags(irq, msm_timer_interrupt,
++					       IRQF_TIMER, "gp_timer", msm_evt);
+ 
+ 	if (res) {
+ 		pr_err("request_percpu_irq failed\n");
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index aea4380..fea81ad 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -309,10 +309,11 @@ static int __init armada_370_xp_timer_common_init(struct device_node *np)
+ 	/*
+ 	 * Setup clockevent timer (interrupt-driven).
+ 	 */
+-	res = request_percpu_irq(armada_370_xp_clkevt_irq,
+-				armada_370_xp_timer_interrupt,
+-				"armada_370_xp_per_cpu_tick",
+-				armada_370_xp_evt);
++	res = request_percpu_irq_flags(armada_370_xp_clkevt_irq,
++				       armada_370_xp_timer_interrupt,
++				       IRQF_TIMER,
++				       "armada_370_xp_per_cpu_tick",
++				       armada_370_xp_evt);
+ 	/* Immediately configure the timer on the boot CPU */
+ 	if (res) {
+ 		pr_err("Failed to request percpu irq\n");
+diff --git a/drivers/clocksource/timer-nps.c b/drivers/clocksource/timer-nps.c
+index e74ea17..a83b6a4 100644
+--- a/drivers/clocksource/timer-nps.c
++++ b/drivers/clocksource/timer-nps.c
+@@ -256,9 +256,9 @@ static int __init nps_setup_clockevent(struct device_node *node)
+ 		return ret;
+ 
+ 	/* Needs apriori irq_set_percpu_devid() done in intc map function */
+-	ret = request_percpu_irq(nps_timer0_irq, timer_irq_handler,
+-				 "Timer0 (per-cpu-tick)",
+-				 &nps_clockevent_device);
++	ret = request_percpu_irq_flags(nps_timer0_irq, timer_irq_handler,
++				       IRQF_TIMER, "Timer0 (per-cpu-tick)",
++				       &nps_clockevent_device);
+ 	if (ret) {
+ 		pr_err("Couldn't request irq\n");
+ 		clk_disable_unprepare(clk);
+diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+index a6fba48..89defd5 100644
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -152,8 +152,17 @@ request_any_context_irq(unsigned int irq, irq_handler_t handler,
+ 			unsigned long flags, const char *name, void *dev_id);
+ 
+ extern int __must_check
++request_percpu_irq_flags(unsigned int irq, irq_handler_t handler,
++			 unsigned long flags, const char *devname,
++			 void __percpu *percpu_dev_id);
++
++static inline int __must_check
+ request_percpu_irq(unsigned int irq, irq_handler_t handler,
+-		   const char *devname, void __percpu *percpu_dev_id);
++		   const char *devname, void __percpu *percpu_dev_id)
++{
++	return request_percpu_irq_flags(irq, handler, 0,
++					devname, percpu_dev_id);
++}
+ 
+ extern const void *free_irq(unsigned int, void *);
+ extern void free_percpu_irq(unsigned int, void __percpu *);
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index 070be98..057fde8 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -1958,9 +1958,10 @@ int setup_percpu_irq(unsigned int irq, struct irqaction *act)
+ }
+ 
+ /**
+- *	request_percpu_irq - allocate a percpu interrupt line
++ *	request_percpu_irq_flags - allocate a percpu interrupt line
+  *	@irq: Interrupt line to allocate
+  *	@handler: Function to be called when the IRQ occurs.
++ *	@flags: Interrupt type flags (IRQF_TIMER only)
+  *	@devname: An ascii name for the claiming device
+  *	@dev_id: A percpu cookie passed back to the handler function
+  *
+@@ -1973,8 +1974,9 @@ int setup_percpu_irq(unsigned int irq, struct irqaction *act)
+  *	the handler gets called with the interrupted CPU's instance of
+  *	that variable.
+  */
+-int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+-		       const char *devname, void __percpu *dev_id)
++int request_percpu_irq_flags(unsigned int irq, irq_handler_t handler,
++			     unsigned long flags, const char *devname,
++			     void __percpu *dev_id)
+ {
+ 	struct irqaction *action;
+ 	struct irq_desc *desc;
+@@ -1988,12 +1990,15 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+ 	    !irq_settings_is_per_cpu_devid(desc))
+ 		return -EINVAL;
+ 
++	if (flags && flags != IRQF_TIMER)
++		return -EINVAL;
++
+ 	action = kzalloc(sizeof(struct irqaction), GFP_KERNEL);
+ 	if (!action)
+ 		return -ENOMEM;
+ 
+ 	action->handler = handler;
+-	action->flags = IRQF_PERCPU | IRQF_NO_SUSPEND;
++	action->flags = flags | IRQF_PERCPU | IRQF_NO_SUSPEND;
+ 	action->name = devname;
+ 	action->percpu_dev_id = dev_id;
+ 
+@@ -2014,7 +2019,7 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+ 
+ 	return retval;
+ }
+-EXPORT_SYMBOL_GPL(request_percpu_irq);
++EXPORT_SYMBOL_GPL(request_percpu_irq_flags);
+ 
+ /**
+  *	irq_get_irqchip_state - returns the irqchip state of a interrupt.
+-- 
+2.7.4
