@@ -1,51 +1,41 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Tue, 16 May 2017 16:56:53 -0500
-Subject: [pwm] question about potential division by zero
-Message-ID: <20170516165653.Horde.Xe6MBOoWtIt1Jni0nYqF1GM@gator4166.hostgator.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 16 May 2017 15:04:54 -0700
+Subject: arm64 vs arm tree for BCM2837 DT pull requests
+Message-ID: <87tw4kbgqh.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I'm looking for feedback on how the ARM folks would like to see pull
+requests for Raspberry Pi 3 devicetree changes.  My problem is trying to
+merge patches like:
 
-Hello everybody,
+https://patchwork.kernel.org/patch/9603689/
 
-While looking into Coverity ID 1408721 I ran into the following piece  
-of code at /drivers/pwm/pwm-mediatek.c:77:
+which depends on:
 
-  77static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-  78                          int duty_ns, int period_ns)
-  79{
-  80        struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
-  81        struct clk *clk = pc->clks[MTK_CLK_PWM1 + pwm->hwpwm];
-  82        u32 resolution, clkdiv = 0;
-  83
-  84        resolution = NSEC_PER_SEC / clk_get_rate(clk);
-  85
-  86        while (period_ns / resolution > 8191) {
-  87                resolution *= 2;
-  88                clkdiv++;
-  89        }
-  90
-  91        if (clkdiv > 7)
-  92                return -EINVAL;
-  93
-  94        mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | BIT(3) | clkdiv);
-  95        mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
-  96        mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
-  97
-  98        return 0;
-  99}
+https://patchwork.kernel.org/patch/9619573/
 
-The issue here is that in case _clk_ is null, function clk_get_rate()  
-at line 84 will return zero and a division by zero will occur.
+bcm2837's DT is in arm64/, but includes the bcm283x.dtsi under arm/
+(which also contains pi0-2), so we often end up with cross-tree
+dependencies when trying to merge a patch series affecting peripherals
+common to all of them.  How I've done this in the past is in
+http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-November/004804.html:
+Send a PR for bcm2835-dt-next for the arm/ BCM283x changes, merge that
+tag to bcm2835-dt-64-next, apply the arm64 change, and send a separate
+PR for that branch.
 
-So my question here is if there is any chance for _clk_ to be null at  
-line 81, hence ending up triggering a division by zero at line 84?
+This seems silly to me -- in trying to keep a small arm64/ change out of
+the branch for arm/, we end up pulling in much larger arm/ changes to
+the arm64/ branch.  Also, this process doesn't work if we need to make a
+single-commit change across both (like if we decided to change a node
+name that's referenced by '&' in the board-specific .dts files).
 
-I'm trying to figure out if this is a false positive or something that  
-needs to be fixed.
-
-I'd really appreciate any comment on this.
-
-Thank you
---
-Gustavo A. R. Silva
+So, I'd like to ask that I be able to merge all the BCM283x DT changes
+through my bcm2835-dt-next branch, if that's OK.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170516/2e9fc8df/attachment.sig>
