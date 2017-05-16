@@ -1,419 +1,270 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 16 May 2017 18:33:57 +0530
-Subject: [RESEND PATCH v5 2/3] phy:phy-bcm-ns2-usbdrd:Broadcom USB DRD Phy
- driver for Northstar2
-In-Reply-To: <1494399267-21691-3-git-send-email-raviteja.garimella@broadcom.com>
-References: <1494399267-21691-1-git-send-email-raviteja.garimella@broadcom.com>
- <1494399267-21691-3-git-send-email-raviteja.garimella@broadcom.com>
-Message-ID: <c436ff4a-ea1d-fb1d-68a0-ff792d2b99a4@ti.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 16 May 2017 14:39:18 +0200
+Subject: [PATCH v2 07/11] KVM: arm/arm64: Register iodevs when setting
+ redist base and creating VCPUs
+In-Reply-To: <de4eb037-2837-fe77-d5ee-514529bfcd99@arm.com>
+References: <20170509085618.28311-1-cdall@linaro.org>
+ <20170509085618.28311-8-cdall@linaro.org>
+ <de4eb037-2837-fe77-d5ee-514529bfcd99@arm.com>
+Message-ID: <c6d828a8-e763-bdec-09fa-22d94a717acb@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jean, Christoffer,
 
-On Wednesday 10 May 2017 12:24 PM, Raviteja Garimella wrote:
-> This is driver for USB DRD Phy used in Broadcom's Northstar2
-> SoC. The phy can be configured to be in Device mode or Host
-> mode based on the type of cable connected to the port. The
-> driver registers to  extcon framework to get appropriate
-> connect events for Host/Device cables connect/disconnect
-> states based on VBUS and ID interrupts.
+On 16/05/2017 13:23, Jean-Philippe Brucker wrote:
+> Hi,
 > 
-> Signed-off-by: Raviteja Garimella <raviteja.garimella@broadcom.com>
-> ---
->  drivers/phy/Kconfig              |  13 +
->  drivers/phy/Makefile             |   1 +
->  drivers/phy/phy-bcm-ns2-usbdrd.c | 595 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 609 insertions(+)
->  create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
+> On 09/05/17 09:56, Christoffer Dall wrote:
+>> Instead of waiting with registering KVM iodevs until the first VCPU is
+>> run, we can actually create the iodevs when the redist base address is
+>> set.  The only downside is that we must now also check if we need to do
+>> this for VCPUs which are created after creating the VGIC, because there
+>> is no enforced ordering between creating the VGIC (and setting its base
+>> addresses) and creating the VCPUs.
 > 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 005cadb..c9de9a9 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -488,6 +488,19 @@ config PHY_CYGNUS_PCIE
->  	  Enable this to support the Broadcom Cygnus PCIe PHY.
->  	  If unsure, say N.
->  
-> +config PHY_NS2_USB_DRD
-> +	tristate "Broadcom Northstar2 USB DRD PHY support"
-> +	depends on OF && (ARCH_BCM_IPROC || COMPILE_TEST)
-> +	select GENERIC_PHY
-> +	select EXTCON
-> +	default ARCH_BCM_IPROC
-> +	help
-> +	  Enable this to support the Broadcom Northstar2 USB DRD PHY.
-> +	  This driver initializes the PHY in either HOST or DEVICE mode.
-> +	  The host or device configuration is read from device tree.
-> +
-> +	  If unsure, say N.
-> +
->  source "drivers/phy/tegra/Kconfig"
->  
->  config PHY_NS2_PCIE
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> index dd8f3b5..9285f88 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -59,6 +59,7 @@ obj-$(CONFIG_PHY_TUSB1210)		+= phy-tusb1210.o
->  obj-$(CONFIG_PHY_BRCM_SATA)		+= phy-brcm-sata.o
->  obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
->  obj-$(CONFIG_PHY_CYGNUS_PCIE)		+= phy-bcm-cygnus-pcie.o
-> +obj-$(CONFIG_PHY_NS2_USB_DRD)		+= phy-bcm-ns2-usbdrd.o
->  obj-$(CONFIG_ARCH_TEGRA) += tegra/
->  obj-$(CONFIG_PHY_NS2_PCIE)		+= phy-bcm-ns2-pcie.o
->  obj-$(CONFIG_PHY_MESON8B_USB2)		+= phy-meson8b-usb2.o
-> diff --git a/drivers/phy/phy-bcm-ns2-usbdrd.c b/drivers/phy/phy-bcm-ns2-usbdrd.c
-> new file mode 100644
-> index 0000000..92b68b1
-> --- /dev/null
-> +++ b/drivers/phy/phy-bcm-ns2-usbdrd.c
-> @@ -0,0 +1,595 @@
-> +/*
-> + * Copyright (C) 2016 Broadcom
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/delay.h>
-> +#include <linux/extcon.h>
-> +#include <linux/gpio.h>
-> +#include <linux/gpio/consumer.h>
-> +#include <linux/init.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +#include <linux/workqueue.h>
-> +
-> +#define ICFG_DRD_AFE		0x0
-> +#define ICFG_MISC_STAT		0x18
-> +#define ICFG_DRD_P0CTL		0x1C
-> +#define ICFG_STRAP_CTRL		0x20
-> +#define ICFG_FSM_CTRL		0x24
-> +
-> +#define ICFG_DEV_BIT		BIT(2)
-> +#define IDM_RST_BIT		BIT(0)
-> +#define AFE_CORERDY_VDDC	BIT(18)
-> +#define PHY_PLL_RESETB		BIT(15)
-> +#define PHY_RESETB		BIT(14)
-> +#define PHY_PLL_LOCK		BIT(0)
-> +
-> +#define DRD_DEV_MODE		BIT(20)
-> +#define OHCI_OVRCUR_POL		BIT(11)
-> +#define ICFG_OFF_MODE		BIT(6)
-> +#define PLL_LOCK_RETRY		1000
-> +
-> +#define EVT_DEVICE		0
-> +#define EVT_HOST		1
-> +#define EVT_IDLE		2
-> +
-> +#define DRD_HOST_MODE		(BIT(2) | BIT(3))
-> +#define DRD_DEVICE_MODE		(BIT(4) | BIT(5))
-> +#define DRD_HOST_VAL		0x803
-> +#define DRD_DEV_VAL		0x807
-> +#define GPIO_DELAY		20
-> +#define PHY_WQ_DELAY		msecs_to_jiffies(600)
-> +
-> +struct ns2_phy_data;
-> +struct ns2_phy_driver {
-> +	void __iomem *icfgdrd_regs;
-> +	void __iomem *idmdrd_rst_ctrl;
-> +	void __iomem *crmu_usb2_ctrl;
-> +	void __iomem *usb2h_strap_reg;
-> +	spinlock_t lock; /* spin lock for phy driver */
-> +	struct ns2_phy_data *data;
-> +	struct extcon_specific_cable_nb extcon_dev;
-> +	struct extcon_specific_cable_nb extcon_host;
-> +	struct notifier_block host_nb;
-> +	struct notifier_block dev_nb;
-> +	struct delayed_work conn_work;
-> +	struct extcon_dev *edev;
-> +	struct gpio_desc *vbus_gpiod;
-> +	struct gpio_desc *id_gpiod;
-> +	int id_irq;
-> +	int vbus_irq;
-> +	unsigned long debounce_jiffies;
-> +	struct delayed_work wq_extcon;
-> +};
-> +
-> +struct ns2_phy_data {
-> +	struct ns2_phy_driver *driver;
-> +	struct phy *phy;
-> +	int new_state;
-> +};
-> +
-> +static const unsigned int usb_extcon_cable[] = {
-> +	EXTCON_USB,
-> +	EXTCON_USB_HOST,
-> +	EXTCON_NONE,
-> +};
-> +
-> +static inline int pll_lock_stat(u32 usb_reg, int reg_mask,
-> +				struct ns2_phy_driver *driver)
-> +{
-> +	int retry = PLL_LOCK_RETRY;
-> +	u32 val;
-> +
-> +	do {
-> +		udelay(1);
-> +		val = readl(driver->icfgdrd_regs + usb_reg);
-> +		if (val & reg_mask)
-> +			return 0;
-> +	} while (--retry > 0);
-> +
-> +	return -EBUSY;
-> +}
-> +
-> +static int ns2_drd_phy_init(struct phy *phy)
-> +{
-> +	struct ns2_phy_data *data = phy_get_drvdata(phy);
-> +	struct ns2_phy_driver *driver = data->driver;
-> +	unsigned long flags;
-> +	u32 val;
-> +
-> +	spin_lock_irqsave(&driver->lock, flags);
+> This triggers a BUG(), when the order is VGIC init, then VCPU init (which
+> is what kvmtool does).
+> 
+> Issuing KVM_CREATE_VCPU after VGIC intialization produces the following calls:
+> 
+> kvm_vm_ioctl_create_vcpu
+>  kvm_arch_vcpu_create
+>   kvm_vcpu_init
+>    kvm_arch_vcpu_init
+>     kvm_vgic_vcpu_init
+>      vgic_register_redist_iodev
+>       kvm_vcpu_get_idx
+>        ... no VCPU registered yet in kvm->vcpus :(
+>        BUG();
 
-Why do you need this spin_lock?
-> +
-> +	val = readl(driver->icfgdrd_regs + ICFG_FSM_CTRL);
-> +
-> +	if (data->new_state == EVT_HOST) {
-> +		val &= ~DRD_DEVICE_MODE;
-> +		val |= DRD_HOST_MODE;
-> +	} else {
-> +		val &= ~DRD_HOST_MODE;
-> +		val |= DRD_DEVICE_MODE;
-> +	}
-> +	writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-> +
-> +	spin_unlock_irqrestore(&driver->lock, flags);
-> +	return 0;
-> +}
-> +
-> +static int ns2_drd_phy_shutdown(struct phy *phy)
-> +{
-> +	struct ns2_phy_data *data = phy_get_drvdata(phy);
-> +	struct ns2_phy_driver *driver = data->driver;
-> +	unsigned long flags;
-> +	u32 val;
-> +
-> +	spin_lock_irqsave(&driver->lock, flags);
+in QEMU use case, kvm_vgic_vcpu_init/vgic_register_redist_iodev does
+nothing since KVM_VGIC_V3_ADDR_TYPE_REDIST was not called yet and
+vgic->vgic_redist_base is undefined. Thus we postpone the redist_iodev
+registration until the redist base address is set.
 
-here too..
-> +
-> +	val = readl(driver->crmu_usb2_ctrl);
-> +	val &= ~AFE_CORERDY_VDDC;
-> +	writel(val, driver->crmu_usb2_ctrl);
-> +
-> +	val = readl(driver->crmu_usb2_ctrl);
-> +	val &= ~DRD_DEV_MODE;
-> +	writel(val, driver->crmu_usb2_ctrl);
-> +
-> +	/* Disable Host and Device Mode */
-> +	val = readl(driver->icfgdrd_regs + ICFG_FSM_CTRL);
-> +	val &= ~(DRD_HOST_MODE | DRD_DEVICE_MODE | ICFG_OFF_MODE);
-> +	writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-> +
-> +	spin_unlock_irqrestore(&driver->lock, flags);
-> +	return 0;
-> +}
-> +
-> +static int ns2_drd_phy_poweron(struct phy *phy)
-> +{
-> +	struct ns2_phy_data *data = phy_get_drvdata(phy);
-> +	struct ns2_phy_driver *driver = data->driver;
-> +	u32 extcon_event = data->new_state;
-> +	unsigned long flags;
-> +	int ret;
-> +	u32 val;
-> +
-> +	spin_lock_irqsave(&driver->lock, flags);
+In QEMU case KVM_VGIC_V3_ADDR_TYPE_REDIST is called when all the CPUs
+are initialized and we were lucky.
+> 
+>  ... would later register vcpu:
+>  kvm->vcpus[atomic_read(&kvm->online_vcpus)] = vcpu
+> 
+> My quick fix is to move kvm_vgic_vcpu_init into kvm_arch_vcpu_postcreate,
+> but it discards the return value of kvm_vgic_vcpu_init, so I don't know
+> how to do it properly.
 
-same here..
-> +	if (extcon_event == EVT_DEVICE) {
-> +		writel(DRD_DEV_VAL, driver->icfgdrd_regs + ICFG_DRD_P0CTL);
-> +
-> +		val = readl(driver->icfgdrd_regs + ICFG_FSM_CTRL);
-> +		val &= ~(DRD_HOST_MODE | ICFG_OFF_MODE);
-> +		val |= DRD_DEVICE_MODE;
-> +		writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-> +
-> +		val = readl(driver->idmdrd_rst_ctrl);
-> +		val &= ~IDM_RST_BIT;
-> +		writel(val, driver->idmdrd_rst_ctrl);
-> +
-> +		val = readl(driver->crmu_usb2_ctrl);
-> +		val |= (AFE_CORERDY_VDDC | DRD_DEV_MODE);
-> +		writel(val, driver->crmu_usb2_ctrl);
-> +
-> +		/* Bring PHY and PHY_PLL out of Reset */
-> +		val = readl(driver->crmu_usb2_ctrl);
-> +		val |= (PHY_PLL_RESETB | PHY_RESETB);
-> +		writel(val, driver->crmu_usb2_ctrl);
-> +
-> +		ret = pll_lock_stat(ICFG_MISC_STAT, PHY_PLL_LOCK, driver);
-> +		if (ret < 0) {
-> +			dev_err(&phy->dev, "Phy PLL lock failed\n");
-> +			goto err_shutdown;
-> +		}
-> +	} else {
-> +		writel(DRD_HOST_VAL, driver->icfgdrd_regs + ICFG_DRD_P0CTL);
-> +
-> +		val = readl(driver->icfgdrd_regs + ICFG_FSM_CTRL);
-> +		val &= ~(DRD_DEVICE_MODE | ICFG_OFF_MODE);
-> +		val |= DRD_HOST_MODE;
-> +		writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-> +
-> +		val = readl(driver->crmu_usb2_ctrl);
-> +		val |= AFE_CORERDY_VDDC;
-> +		writel(val, driver->crmu_usb2_ctrl);
-> +
-> +		ret = pll_lock_stat(ICFG_MISC_STAT, PHY_PLL_LOCK, driver);
-> +		if (ret < 0) {
-> +			dev_err(&phy->dev, "Phy PLL lock failed\n");
-> +			goto err_shutdown;
-> +		}
-> +
-> +		val = readl(driver->idmdrd_rst_ctrl);
-> +		val &= ~IDM_RST_BIT;
-> +		writel(val, driver->idmdrd_rst_ctrl);
-> +
-> +		/* port over current Polarity */
-> +		val = readl(driver->usb2h_strap_reg);
-> +		val |= OHCI_OVRCUR_POL;
-> +		writel(val, driver->usb2h_strap_reg);
-> +	}
-> +	spin_unlock_irqrestore(&driver->lock, flags);
-> +	return 0;
-> +
-> +err_shutdown:
-> +	spin_unlock_irqrestore(&driver->lock, flags);
-> +	ns2_drd_phy_shutdown(phy);
-> +	return ret;
-> +}
-> +
-> +static void connect_work(struct work_struct *work)
-> +{
-> +	struct ns2_phy_driver *driver;
-> +	u32 extcon_event;
-> +	u32 val;
-> +
-> +	driver  = container_of(to_delayed_work(work),
-> +			       struct ns2_phy_driver, conn_work);
-> +	extcon_event = driver->data->new_state;
-> +
-> +	val = readl(driver->icfgdrd_regs + ICFG_FSM_CTRL);
-> +
-> +	switch (extcon_event) {
-> +	case EVT_DEVICE:
-> +		val = (val & ~DRD_HOST_MODE) | DRD_DEVICE_MODE;
-> +		writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-> +
-> +		val = readl(driver->icfgdrd_regs + ICFG_DRD_P0CTL);
-> +		val |= ICFG_DEV_BIT;
-> +		writel(val, driver->icfgdrd_regs + ICFG_DRD_P0CTL);
-> +		break;
-> +
-> +	case EVT_HOST:
-> +		val = (val & ~DRD_DEVICE_MODE) | DRD_HOST_MODE;
-> +		writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-> +
-> +		val = readl(driver->usb2h_strap_reg);
-> +		val |= OHCI_OVRCUR_POL;
-> +		writel(val, driver->usb2h_strap_reg);
-> +
-> +		val = readl(driver->icfgdrd_regs + ICFG_DRD_P0CTL);
-> +		val &= ~ICFG_DEV_BIT;
-> +		writel(val, driver->icfgdrd_regs + ICFG_DRD_P0CTL);
-> +		break;
-> +
-> +	case EVT_IDLE:
-> +		val &= ~(DRD_HOST_MODE | DRD_DEVICE_MODE);
-> +		writel(val, driver->icfgdrd_regs + ICFG_FSM_CTRL);
-> +		break;
-> +
-> +	default:
-> +		pr_err("Invalid extcon event\n");
-> +		break;
-> +	}
-> +}
-> +
-> +static int drd_device_notify(struct notifier_block *self,
-> +			     unsigned long event, void *ptr)
-> +{
-> +	struct ns2_phy_driver *driver = container_of(self,
-> +					struct ns2_phy_driver, dev_nb);
-> +
-> +	if (event) {
-> +		pr_debug("Device connected\n");
-> +		driver->data->new_state = EVT_DEVICE;
-> +		schedule_delayed_work(&driver->conn_work, 0);
-> +	} else {
-> +		pr_debug("Device disconnected\n");
-> +		driver->data->new_state = EVT_IDLE;
-> +		schedule_delayed_work(&driver->conn_work, PHY_WQ_DELAY);
-> +	}
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static int drd_host_notify(struct notifier_block *self,
-> +			   unsigned long event, void *ptr)
-> +{
-> +	struct ns2_phy_driver *driver = container_of(self,
-> +					struct ns2_phy_driver, host_nb);
-> +
-> +	if (event) {
-> +		pr_debug("Host connected\n");
-> +		driver->data->new_state = EVT_HOST;
+changing the proto of kvm_arch_vcpu_postcreate and moving the
+kvm_vgic_vcpu_init there could be an alternative.
+By the way kvm_arch_vcpu_postcreate calls kvm_vgic_early_init() which
+looks strange now that we do something clever before.
 
-Instead of having this notify, the USB controller can just use set_mode callback.
-> +		schedule_delayed_work(&driver->conn_work, 0);
-> +	} else {
-> +		pr_debug("Host disconnected\n");
-> +		driver->data->new_state = EVT_IDLE;
-> +		schedule_delayed_work(&driver->conn_work, PHY_WQ_DELAY);
-> +	}
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static void extcon_work(struct work_struct *work)
-> +{
-> +	struct ns2_phy_driver *driver;
-> +	int vbus;
-> +	int id;
-> +
-> +	driver  = container_of(to_delayed_work(work),
-> +			       struct ns2_phy_driver, wq_extcon);
-> +
-> +	id = gpiod_get_value_cansleep(driver->id_gpiod);
-> +	vbus = gpiod_get_value_cansleep(driver->vbus_gpiod);
-> +
-> +	if (!id && vbus) {
-> +		extcon_set_cable_state_(driver->edev, EXTCON_USB_HOST, true);
-> +	} else if (id && !vbus) {
-> +		extcon_set_cable_state_(driver->edev, EXTCON_USB_HOST, false);
-> +		extcon_set_cable_state_(driver->edev, EXTCON_USB, false);
-> +	} else if (id && vbus) {
-> +		extcon_set_cable_state_(driver->edev, EXTCON_USB, true);
+Thoughts?
 
-Er.. what's the use of having both extcon_set_cable_state_ and
-register_extcon_notifier in the same driver?
+Thanks
 
--Kishon
+Eric
+> 
+> Thanks,
+> Jean
+> 
+>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+>> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+>> ---
+>>  include/kvm/arm_vgic.h              |  1 +
+>>  virt/kvm/arm/arm.c                  |  2 +-
+>>  virt/kvm/arm/vgic/vgic-init.c       | 21 ++++++++++++++++++
+>>  virt/kvm/arm/vgic/vgic-kvm-device.c |  7 +++++-
+>>  virt/kvm/arm/vgic/vgic-mmio-v3.c    | 43 +++++++++++++++++++++++++++++++++++--
+>>  virt/kvm/arm/vgic/vgic-v3.c         |  6 ------
+>>  virt/kvm/arm/vgic/vgic.h            |  3 ++-
+>>  7 files changed, 72 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index fabcc64..4ff65ef 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -286,6 +286,7 @@ extern struct static_key_false vgic_v2_cpuif_trap;
+>>  
+>>  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+>>  void kvm_vgic_early_init(struct kvm *kvm);
+>> +int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu);
+>>  int kvm_vgic_create(struct kvm *kvm, u32 type);
+>>  void kvm_vgic_destroy(struct kvm *kvm);
+>>  void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu);
+>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+>> index 7941699..9f6f522a4b 100644
+>> --- a/virt/kvm/arm/arm.c
+>> +++ b/virt/kvm/arm/arm.c
+>> @@ -335,7 +335,7 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>>  
+>>  	kvm_arm_reset_debug_ptr(vcpu);
+>>  
+>> -	return 0;
+>> +	return kvm_vgic_vcpu_init(vcpu);
+>>  }
+>>  
+>>  void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+>> index 0ea64a1..962bb57 100644
+>> --- a/virt/kvm/arm/vgic/vgic-init.c
+>> +++ b/virt/kvm/arm/vgic/vgic-init.c
+>> @@ -226,6 +226,27 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
+>>  	return 0;
+>>  }
+>>  
+>> +/**
+>> + * kvm_vgic_vcpu_init() - Register VCPU-specific KVM iodevs
+>> + * @vcpu: pointer to the VCPU being created and initialized
+>> + */
+>> +int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+>> +{
+>> +	int ret = 0;
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +
+>> +	if (!irqchip_in_kernel(vcpu->kvm))
+>> +		return 0;
+>> +
+>> +	/*
+>> +	 * If we are creating a VCPU with a GICv3 we must also register the
+>> +	 * KVM io device for the redistributor that belongs to this VCPU.
+>> +	 */
+>> +	if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+>> +		ret = vgic_register_redist_iodev(vcpu);
+>> +	return ret;
+>> +}
+>> +
+>>  static void kvm_vgic_vcpu_enable(struct kvm_vcpu *vcpu)
+>>  {
+>>  	if (kvm_vgic_global_state.type == VGIC_V2)
+>> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> index 69ccfd5..10ae6f3 100644
+>> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> @@ -86,8 +86,13 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+>>  		break;
+>>  	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
+>>  		r = vgic_check_type(kvm, KVM_DEV_TYPE_ARM_VGIC_V3);
+>> +		if (r)
+>> +			break;
+>> +		if (write) {
+>> +			r = vgic_v3_set_redist_base(kvm, *addr);
+>> +			goto out;
+>> +		}
+>>  		addr_ptr = &vgic->vgic_redist_base;
+>> -		alignment = SZ_64K;
+>>  		break;
+>>  	default:
+>>  		r = -ENODEV;
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> index 168269b..99da1a2 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> @@ -565,7 +565,7 @@ unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
+>>   *
+>>   * Return 0 on success, -ERRNO otherwise.
+>>   */
+>> -static int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
+>> +int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
+>>  {
+>>  	struct kvm *kvm = vcpu->kvm;
+>>  	struct vgic_dist *vgic = &kvm->arch.vgic;
+>> @@ -574,6 +574,18 @@ static int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
+>>  	gpa_t rd_base, sgi_base;
+>>  	int ret;
+>>  
+>> +	/*
+>> +	 * We may be creating VCPUs before having set the base address for the
+>> +	 * redistributor region, in which case we will come back to this
+>> +	 * function for all VCPUs when the base address is set.  Just return
+>> +	 * without doing any work for now.
+>> +	 */
+>> +	if (IS_VGIC_ADDR_UNDEF(vgic->vgic_redist_base))
+>> +		return 0;
+>> +
+>> +	if (!vgic_v3_check_base(kvm))
+>> +		return -EINVAL;
+>> +
+>>  	rd_base = vgic->vgic_redist_base + kvm_vcpu_get_idx(vcpu) * SZ_64K * 2;
+>>  	sgi_base = rd_base + SZ_64K;
+>>  
+>> @@ -619,7 +631,7 @@ static void vgic_unregister_redist_iodev(struct kvm_vcpu *vcpu)
+>>  	kvm_io_bus_unregister_dev(vcpu->kvm, KVM_MMIO_BUS, &sgi_dev->dev);
+>>  }
+>>  
+>> -int vgic_register_redist_iodevs(struct kvm *kvm)
+>> +static int vgic_register_all_redist_iodevs(struct kvm *kvm)
+>>  {
+>>  	struct kvm_vcpu *vcpu;
+>>  	int c, ret = 0;
+>> @@ -641,6 +653,33 @@ int vgic_register_redist_iodevs(struct kvm *kvm)
+>>  	return ret;
+>>  }
+>>  
+>> +int vgic_v3_set_redist_base(struct kvm *kvm, u64 addr)
+>> +{
+>> +	struct vgic_dist *vgic = &kvm->arch.vgic;
+>> +	int ret;
+>> +
+>> +	/* vgic_check_ioaddr makes sure we don't do this twice */
+>> +	ret = vgic_check_ioaddr(kvm, &vgic->vgic_redist_base, addr, SZ_64K);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	vgic->vgic_redist_base = addr;
+>> +	if (!vgic_v3_check_base(kvm)) {
+>> +		vgic->vgic_redist_base = VGIC_ADDR_UNDEF;
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	/*
+>> +	 * Register iodevs for each existing VCPU.  Adding more VCPUs
+>> +	 * afterwards will register the iodevs when needed.
+>> +	 */
+>> +	ret = vgic_register_all_redist_iodevs(kvm);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  int vgic_v3_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+>>  {
+>>  	const struct vgic_register_region *region;
+>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+>> index 2d53d7a..bb35078 100644
+>> --- a/virt/kvm/arm/vgic/vgic-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+>> @@ -397,12 +397,6 @@ int vgic_v3_map_resources(struct kvm *kvm)
+>>  		goto out;
+>>  	}
+>>  
+>> -	ret = vgic_register_redist_iodevs(kvm);
+>> -	if (ret) {
+>> -		kvm_err("Unable to register VGICv3 redist MMIO regions\n");
+>> -		goto out;
+>> -	}
+>> -
+>>  	if (vgic_has_its(kvm)) {
+>>  		ret = vgic_register_its_iodevs(kvm);
+>>  		if (ret) {
+>> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+>> index 89eb935..5f17eac 100644
+>> --- a/virt/kvm/arm/vgic/vgic.h
+>> +++ b/virt/kvm/arm/vgic/vgic.h
+>> @@ -174,7 +174,8 @@ int vgic_v3_probe(const struct gic_kvm_info *info);
+>>  int vgic_v3_map_resources(struct kvm *kvm);
+>>  int vgic_v3_lpi_sync_pending_status(struct kvm *kvm, struct vgic_irq *irq);
+>>  int vgic_v3_save_pending_tables(struct kvm *kvm);
+>> -int vgic_register_redist_iodevs(struct kvm *kvm);
+>> +int vgic_v3_set_redist_base(struct kvm *kvm, u64 addr);
+>> +int vgic_register_redist_iodev(struct kvm_vcpu *vcpu);
+>>  bool vgic_v3_check_base(struct kvm *kvm);
+>>  
+>>  void vgic_v3_load(struct kvm_vcpu *vcpu);
+>>
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> 
