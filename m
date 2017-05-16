@@ -1,59 +1,102 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 16 May 2017 20:53:17 +0900
-Subject: [PATCH 2/5] ARM: dts: use #include "..." to include DT in the
- same directory
-In-Reply-To: <20170515131048.GW8471@dragon>
-References: <1494846888-18966-1-git-send-email-yamada.masahiro@socionext.com>
- <1494846888-18966-3-git-send-email-yamada.masahiro@socionext.com>
- <20170515131048.GW8471@dragon>
-Message-ID: <CAK7LNARJGwPfYcEWb7O0OcazWN2i_PsSJ1+vspPAiTnnwUqjnQ@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 16 May 2017 13:59:16 +0200
+Subject: [PATCH 42/48] clocksource/drivers: Add a new driver for the
+ Atmel ARM TC blocks
+In-Reply-To: <576D0645.2070805@linaro.org>
+References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1465596231-21766-43-git-send-email-alexandre.belloni@free-electrons.com>
+ <576D0645.2070805@linaro.org>
+Message-ID: <20170516115916.ip3ea34bofg3jpuo@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Daniel,
 
-2017-05-15 22:10 GMT+09:00 Shawn Guo <shawnguo@kernel.org>:
-> Hi Masahiro,
->
-> On Mon, May 15, 2017 at 08:14:45PM +0900, Masahiro Yamada wrote:
->> Most of DT files in ARM use #include "..." to make pre-processor
->> include DT in the same directory, but we have 3 exceptional files
->> that use #include <...> for that.
->>
->> They must be fixed to remove -I$(srctree)/arch/$(SRCARCH)/boot/dts
->> path from dtc_cpp_flags.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->> ---
->>
->>  arch/arm/boot/dts/imx6q-zii-rdu2.dts  | 4 ++--
->>  arch/arm/boot/dts/imx6qp-zii-rdu2.dts | 4 ++--
->
-> I see this patch depends on nothing and can be applied immediately.  But
-> versatile-pb.dts is not really in my charge.  In case you want to get
-> this series merged by arm-soc folks, here is my ACK:
->
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
->
-> Or you need to split versatile-pb.dts out, and then I can take it.
->
-> Shawn
+Almost one year later, I'm back on that topic.
+
+On 24/06/2016 at 12:07:01 +0200, Daniel Lezcano wrote:
+> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> > index 47352d25c15e..ff7f4022c749 100644
+> > --- a/drivers/clocksource/Kconfig
+> > +++ b/drivers/clocksource/Kconfig
+> > @@ -258,6 +258,19 @@ config ATMEL_ST
+> >   	select CLKSRC_OF
+> >   	select MFD_SYSCON
+> > 
+> > +config ATMEL_ARM_TCB_CLKSRC
+> > +	bool "TC Block Clocksource"
+> 
+> The Kconfig options are set now with the COMPILE_TEST option in order to
+> increase the compilation test coverage.
+> 
+> Please, add bool "TC Block Clocksource" if COMPILE_TEST, ...
+> 
+> > +	select REGMAP_MMIO
+> > +	depends on GENERIC_CLOCKEVENTS
+> > +	depends on SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
+> > +	default SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
+> 
+> ... remove these dependencies and let the SoC's Kconfig to select the timer
+> like the other timers are.
+> 
+
+The main issue with what you suggest is that it removes the possibility
+to not compile the driver. This may be interesting for people using the
+PIT as the clocksource/clockevent and the TCBs for something else.
+
+> > +static cycle_t tc_get_cycles(struct clocksource *cs)
+> > +{
+> > +	unsigned long	flags;
+> > +	u32		lower, upper, tmp;
+> > +
+> > +	raw_local_irq_save(flags);
+> > +	do {
+> > +		regmap_read(tc.regmap, ATMEL_TC_CV(1), &upper);
+> > +		regmap_read(tc.regmap, ATMEL_TC_CV(0), &lower);
+> > +		regmap_read(tc.regmap, ATMEL_TC_CV(1), &tmp);
+> > +	} while (upper != tmp);
+> > +
+> > +	raw_local_irq_restore(flags);
+> 
+> Why is this lock needed ?
+> 
+
+I've taken that from the old driver, I'm not sure this is needed. Maybe
+to lower the chance to have upper != tmp.
+
+> > +	return (upper << 16) | lower;
+> > +}
+> > +
 
 
-This is needed for 4/5:
-https://patchwork.kernel.org/patch/9726697/
+> > +static int tcb_clkevt_oneshot(struct clock_event_device *dev)
+> > +{
+> > +	int ret;
+> > +
+> > +	if (tc.irq_requested)
+> > +		return 0;
+> > +
+> > +	ret = request_irq(tc.irq, tc_clkevt_irq, IRQF_TIMER | IRQF_SHARED,
+> > +			  "tcb_clkevt", &tc);
+> > +	if (!ret)
+> > +		tc.irq_requested = true;
+> 
+> The legacy driver checks clockevent_state_detached() and disables the clock.
+> 
 
-Probably, no need to rush for this series.
+This feature is different from the legacy driver. Here, the driver is
+using a single TCB channel for both clocksource and clockevent while the
+legacy driver always uses at least two channels.
 
-So, perhaps we can apply DT changes for v4.13 (by splitting per-platform),
-then Makefile changes for 4.14.
+> Why is 'irq_requested' and request_irq/free_irq cleaner ?
+> 
+> Isn't there a configuration with the TCB register to disable the clockevent
+> only ?
+> 
 
-I will wait for comments for a while (if any).
-
-
-
-
+I'll try something cleaner anyway.
 
 -- 
-Best Regards
-Masahiro Yamada
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
