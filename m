@@ -1,53 +1,34 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 16 May 2017 20:45:56 +0200
-Subject: [PATCH v2 9/9] KVM: arm/arm64: Don't assume initialized vgic when
- setting PMU IRQ
-In-Reply-To: <20170516184556.26785-1-cdall@linaro.org>
-References: <20170516184556.26785-1-cdall@linaro.org>
-Message-ID: <20170516184556.26785-10-cdall@linaro.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 16 May 2017 20:42:34 +0200
+Subject: [patch V2 03/17] arm64: Adjust system_state check
+References: <20170516184231.564888231@linutronix.de>
+Message-ID: <20170516184735.112589728@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PMU IRQ number is set through the VCPU device's KVM_SET_DEVICE_ATTR
-ioctl handler for the KVM_ARM_VCPU_PMU_V3_IRQ attribute, but there is no
-enforced or stated requirement that this must happen after initializing
-the VGIC.  As a result, calling vgic_valid_spi() which relies on the
-nr_spis being set during the VGIC init can incorrectly fail.
+To enable smp_processor_id() and might_sleep() debug checks earlier, it's
+required to add system states between SYSTEM_BOOTING and SYSTEM_RUNNING.
 
-Introduce irq_is_spi, which determines if an IRQ number is within the
-SPI range without verifying it against the actual VGIC properties.
+Adjust the system_state check in smp_send_stop() to handle the extra states.
 
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
 ---
- include/kvm/arm_vgic.h | 2 ++
- virt/kvm/arm/pmu.c     | 2 +-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/smp.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 131668f..a2ae9d2 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -39,6 +39,8 @@
- #define KVM_IRQCHIP_NUM_PINS	(1020 - 32)
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -961,8 +961,7 @@ void smp_send_stop(void)
+ 		cpumask_copy(&mask, cpu_online_mask);
+ 		cpumask_clear_cpu(smp_processor_id(), &mask);
  
- #define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
-+#define irq_is_spi(irq) ((irq) >= VGIC_NR_PRIVATE_IRQS && \
-+			 (irq) <= VGIC_MAX_SPI)
- 
- enum vgic_type {
- 	VGIC_V2,		/* Good ol' GICv2 */
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 006a033..9b30b10 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -532,7 +532,7 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
- 			return -EFAULT;
- 
- 		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
--		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
-+		if (!(irq_is_ppi(irq) || irq_is_spi(irq)))
- 			return -EINVAL;
- 
- 		if (!pmu_irq_is_valid(vcpu->kvm, irq))
--- 
-2.9.0
+-		if (system_state == SYSTEM_BOOTING ||
+-		    system_state == SYSTEM_RUNNING)
++		if (system_state <= SYSTEM_RUNNING)
+ 			pr_crit("SMP: stopping secondary CPUs\n");
+ 		smp_cross_call(&mask, IPI_CPU_STOP);
+ 	}
