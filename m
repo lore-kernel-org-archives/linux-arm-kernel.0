@@ -1,86 +1,61 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 16 May 2017 00:40:13 -0700
-Subject: [PATCH] ARM: dts: imx7: use 3 PWM cells
-Message-ID: <20170516074013.3571-1-stefan@agner.ch>
+From: dlan@gentoo.org (Yixun Lan)
+Date: Tue, 16 May 2017 15:45:29 +0800
+Subject: [PATCH] serial: meson: add Magic SysRq support
+Message-ID: <20170516074529.10086-1-dlan@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM driver has now capability to specify the PWM polarity
-which is e.g. for backlight control. Allow to make use of PWM
-polarity by specifying pwm-cells to be 3 in the base dt.
-
-Signed-off-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Yixun Lan <dlan@gentoo.org>
 ---
- arch/arm/boot/dts/imx7-colibri.dtsi   | 2 +-
- arch/arm/boot/dts/imx7d-nitrogen7.dts | 2 +-
- arch/arm/boot/dts/imx7s.dtsi          | 8 ++++----
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/tty/serial/meson_uart.c | 18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index 2d87489f9105..d7753f79937a 100644
---- a/arch/arm/boot/dts/imx7-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -43,7 +43,7 @@
- / {
- 	bl: backlight {
- 		compatible = "pwm-backlight";
--		pwms = <&pwm1 0 5000000>;
-+		pwms = <&pwm1 0 5000000 0>;
- 	};
+diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+index 60f16795d16b..f0d9222db82f 100644
+--- a/drivers/tty/serial/meson_uart.c
++++ b/drivers/tty/serial/meson_uart.c
+@@ -14,6 +14,10 @@
+  *
+  */
  
- 	reg_module_3v3: regulator-module-3v3 {
-diff --git a/arch/arm/boot/dts/imx7d-nitrogen7.dts b/arch/arm/boot/dts/imx7d-nitrogen7.dts
-index 5d98e2b5d54b..37a7c6f4f8f1 100644
---- a/arch/arm/boot/dts/imx7d-nitrogen7.dts
-+++ b/arch/arm/boot/dts/imx7d-nitrogen7.dts
-@@ -67,7 +67,7 @@
++#if defined(CONFIG_SERIAL_MESON_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
++#define SUPPORT_SYSRQ
++#endif
++
+ #include <linux/clk.h>
+ #include <linux/console.h>
+ #include <linux/delay.h>
+@@ -183,12 +187,12 @@ static void meson_receive_chars(struct uart_port *port)
+ {
+ 	struct tty_port *tport = &port->state->port;
+ 	char flag;
+-	u32 status, ch, mode;
++	u32 ostatus, status, ch, mode;
  
- 	backlight-j20 {
- 		compatible = "pwm-backlight";
--		pwms = <&pwm1 0 5000000>;
-+		pwms = <&pwm1 0 5000000 0>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <6>;
- 		status = "okay";
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index c4f12fd2e044..56a2aeadfe65 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -609,7 +609,7 @@
- 				clocks = <&clks IMX7D_PWM1_ROOT_CLK>,
- 					 <&clks IMX7D_PWM1_ROOT_CLK>;
- 				clock-names = "ipg", "per";
--				#pwm-cells = <2>;
-+				#pwm-cells = <3>;
- 				status = "disabled";
- 			};
+ 	do {
+ 		flag = TTY_NORMAL;
+ 		port->icount.rx++;
+-		status = readl(port->membase + AML_UART_STATUS);
++		ostatus = status = readl(port->membase + AML_UART_STATUS);
  
-@@ -620,7 +620,7 @@
- 				clocks = <&clks IMX7D_PWM2_ROOT_CLK>,
- 					 <&clks IMX7D_PWM2_ROOT_CLK>;
- 				clock-names = "ipg", "per";
--				#pwm-cells = <2>;
-+				#pwm-cells = <3>;
- 				status = "disabled";
- 			};
+ 		if (status & AML_UART_ERR) {
+ 			if (status & AML_UART_TX_FIFO_WERR)
+@@ -216,6 +220,16 @@ static void meson_receive_chars(struct uart_port *port)
+ 		ch = readl(port->membase + AML_UART_RFIFO);
+ 		ch &= 0xff;
  
-@@ -631,7 +631,7 @@
- 				clocks = <&clks IMX7D_PWM3_ROOT_CLK>,
- 					 <&clks IMX7D_PWM3_ROOT_CLK>;
- 				clock-names = "ipg", "per";
--				#pwm-cells = <2>;
-+				#pwm-cells = <3>;
- 				status = "disabled";
- 			};
- 
-@@ -642,7 +642,7 @@
- 				clocks = <&clks IMX7D_PWM4_ROOT_CLK>,
- 					 <&clks IMX7D_PWM4_ROOT_CLK>;
- 				clock-names = "ipg", "per";
--				#pwm-cells = <2>;
-+				#pwm-cells = <3>;
- 				status = "disabled";
- 			};
++		if ((ostatus & AML_UART_FRAME_ERR) && (ch == 0)) {
++			port->icount.brk++;
++			flag = TTY_BREAK;
++			if (uart_handle_break(port))
++				continue;
++		}
++
++		if (uart_handle_sysrq_char(port, ch))
++			continue;
++
+ 		if ((status & port->ignore_status_mask) == 0)
+ 			tty_insert_flip_char(tport, ch, flag);
  
 -- 
-2.13.0
+2.12.2
