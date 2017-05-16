@@ -1,77 +1,144 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 16 May 2017 16:44:14 +0200
-Subject: [PATCH V16 10/11] trace, ras: add ARM processor error trace event
-In-Reply-To: <1494883680-25551-11-git-send-email-tbaicar@codeaurora.org>
-References: <1494883680-25551-1-git-send-email-tbaicar@codeaurora.org>
- <1494883680-25551-11-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170516144414.7ym6o4psxw3lu5p2@pd.tnic>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 16 May 2017 17:46:02 +0300
+Subject: [PATCH V8 07/11] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <4484f88d5ce342a3a27a00ef12869acc@codeaurora.org>
+References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
+ <1825810.fLbCv8umR7@avalon> <4484f88d5ce342a3a27a00ef12869acc@codeaurora.org>
+Message-ID: <2313289.Uacx9b3Shu@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 03:27:59PM -0600, Tyler Baicar wrote:
-> Currently there are trace events for the various RAS
-> errors with the exception of ARM processor type errors.
-> Add a new trace event for such errors so that the user
-> will know when they occur. These trace events are
-> consistent with the ARM processor error section type
-> defined in UEFI 2.6 spec section N.2.4.4.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Acked-by: Steven Rostedt <rostedt@goodmis.org>
-> Reviewed-by: Xie XiuQi <xiexiuqi@huawei.com>
-> ---
->  drivers/acpi/apei/ghes.c    |  6 +++++-
->  drivers/firmware/efi/cper.c |  1 +
->  drivers/ras/ras.c           |  6 ++++++
->  include/linux/ras.h         |  3 +++
->  include/ras/ras_event.h     | 45 +++++++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 60 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 1106722..2dddb3b 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -518,7 +518,11 @@ static void ghes_do_proc(struct ghes *ghes,
->  
->  		}
->  #endif
-> -		else {
-> +		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM)) {
-> +			struct cper_sec_proc_arm *err = acpi_hest_get_payload(gdata);
-> +
-> +			call_arm_trace_event(err);
-> +		} else {
->  			void *err = acpi_hest_get_payload(gdata);
->  
->  			call_non_standard_trace_event(&sec_type, fru_id,
-> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-> index d5a5855..48a8f69 100644
-> --- a/drivers/firmware/efi/cper.c
-> +++ b/drivers/firmware/efi/cper.c
-> @@ -35,6 +35,7 @@
->  #include <linux/printk.h>
->  #include <linux/bcd.h>
->  #include <acpi/ghes.h>
-> +#include <ras/ras_event.h>
->  
->  #define INDENT_SP	" "
->  
-> diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
-> index 57363be..8655ef4 100644
-> --- a/drivers/ras/ras.c
-> +++ b/drivers/ras/ras.c
-> @@ -20,6 +20,11 @@ void call_non_standard_trace_event(const uuid_le *sec_type,
->  	trace_non_standard_event(sec_type, fru_id, fru_text, sev, err, len);
->  }
->  
-> +void call_arm_trace_event(struct cper_sec_proc_arm *err)
+Hi Sricharan,
 
-log_arm_hw_error()
+On Tuesday 16 May 2017 19:59:01 sricharan at codeaurora.org wrote:
+> On 2017-05-16 19:40, Laurent Pinchart wrote:
+> > On Tuesday 16 May 2017 15:04:55 Robin Murphy wrote:
+> >> On 16/05/17 08:17, Laurent Pinchart wrote:
+> >> > On Tuesday 16 May 2017 07:53:57 sricharan at codeaurora.org wrote:
+> > [snip]
+> > 
+> >>>> arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops(),
+> >>>> dma_ops should be cleared in the teardown path. Otherwise
+> >>>> this causes problem when the probe of device is retried after
+> >>>> being deferred. The device's iommu structures are cleared
+> >>>> after EPROBEDEFER error, but on the next try dma_ops will still
+> >>>> be set to old value, which is not right.
+> >>>> 
+> >>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> >>>> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> >>>> ---
+> >>>> 
+> >>>>   arch/arm/mm/dma-mapping.c | 1 +
+> >>>>   1 file changed, 1 insertion(+)
+> >>>> 
+> >>>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> >>>> index ab4f745..a40f03e 100644
+> >>>> --- a/arch/arm/mm/dma-mapping.c
+> >>>> +++ b/arch/arm/mm/dma-mapping.c
+> >>>> @@ -2358,6 +2358,7 @@ static void arm_teardown_iommu_dma_ops(struct
+> >>>> device *dev)
+> >>>>
+> >>>>   	__arm_iommu_detach_device(dev);
+> >>>>   	arm_iommu_release_mapping(mapping);
+> >>>> +	set_dma_ops(dev, NULL);
+> >>>>   }
+> >>>>   #else
+> >>> 
+> >>> The subject mentions arch_teardown_dma_ops(), which I think is correct,
+> >>> but the patch adds the set_dma_ops() call to
+> >>> arm_teardown_iommu_dma_ops().
+> >>> 
+> >>> However, the situation is perhaps more complex. Note the check at the
+> >>> beginning of arch_setup_dma_ops():
+> >>> 
+> >>> 	/*
+> >>> 	 * Don't override the dma_ops if they have already been set. Ideally
+> >>> 	 * this should be the only location where dma_ops are set, remove this
+> >>> 	 * check when all other callers of set_dma_ops will have disappeared.
+> >>> 	 */
+> >>> 	if (dev->dma_ops)
+> >>> 		return;
+> >>> 
+> >>> If you set the dma_ops to NULL in arm_teardown_iommu_dma_ops() or
+> >>> arch_teardown_dma_ops(), the next call to arch_setup_dma_ops() will
+> >>> override them. To be safe you should only set them to NULL if they have
+> >>> been set by arch_setup_dma_ops(). More than that,
+> >>> arch_teardown_dma_ops()
+> >>> should probably not call arm_teardown_iommu_dma_ops() at all if the
+> >>> dma_ops were set by arm_iommu_attach_device() and not
+> >>> arch_teardown_dma_ops().
+> >> 
+> >> Under what circumstances is that an issue? We'll only be tearing down
+> >> the DMA ops when unbinding the driver,
+> > 
+> > Or when deferring probe.
+> > 
+> >> and I think it would be erroneous to expect the device to retain much
+> >> state after that. Everything else would be set up from scratch again if
+> >> it get reprobed later, so why not the DMA ops?
+> > 
+> > Because the DMA ops might have been set elsewhere than
+> > arch_setup_dma_ops(). If you look at the patch that added the above
+> > warning, its commit message states
+> > 
+> > commit 26b37b946a5c2658dbc37dd5d6df40aaa9685d70 (iommu-joerg/arm/core)
+> > Author: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > Date:   Fri May 15 02:00:02 2015 +0300
+> > 
+> >     arm: dma-mapping: Don't override dma_ops in arch_setup_dma_ops()
+> >     
+> >     The arch_setup_dma_ops() function is in charge of setting dma_ops
+> >     with a call to set_dma_ops(). set_dma_ops() is also called from
+> >     
+> >     - highbank and mvebu bus notifiers
+> >     - dmabounce (to be replaced with swiotlb)
+> >     - arm_iommu_attach_device
+> >     
+> >     (arm_iommu_attach_device is itself called from IOMMU and bus master
+> >     device drivers)
+> >     
+> >     To allow the arch_setup_dma_ops() call to be moved from device add
+> >     time to device probe time we must ensure that dma_ops already setup by
+> >     any of the above callers will not be overriden.
+> >     
+> >     Aftering replacing dmabounce with swiotlb, converting IOMMU drivers
+> >     to of_xlate and taking care of highbank and mvebu, the workaround
+> >     should be removed.
+> > 
+> > I'm concerned about potentially breaking these if we unconditionally
+> > remove the DMA ops and mapping.
+> 
+> arch_teardown_dma_ops does nothing if there is no mapping (not behind
+> iommu), dma_ops without iommu is ok. But when the
+> arm_iommu_create_mapping/arm_iommu_attach_device was called previously in
+> the iommu driver, after we teardown, that path in the iommu driver which
+> called those functions is not replayed.
 
-because it is exactly that - a hardware error.
+I've had a look at the code in more details, and I'm not sure how we've 
+reached the current situation (as I haven't followed the multiple versions of 
+this patch series due to lack of time), but it's a very big mess.
+
+arch_setup_dma_ops() is currently not the only way to create a mapping and 
+attach it to a device. Not only that, but with the current ARM32 dma-mapping 
+implementation, it can't be.
+
+arch_setup_dma_ops() will create a separate mapping for every device. That's 
+certainly fine when every device has its own IOMMU instance (or at least its 
+own TLB in a shared IOMMU), but that's far from being true in all cases. 
+Renesas R-Car Gen2 hardware, for instance, share IOMMUs and TLBs between 
+multiple devices. That's why the ipmmu-vmsa driver creates the mapping 
+manually with arm_iommu_create_mapping() and attaches it to the device with 
+arm_iommu_attach_device(). We need to keep supporting this mechanism until the 
+ARM32 dma-mapping API is brought in line with the ARM64 implementation that 
+lets the IOMMU core manage the IOVA address space.
+
+We're unfortunately far from that, so, for the time being, we need to keep 
+supporting arm_iommu_attach_device(). How that can work with deferred probing, 
+I will let you figure it out, but we need to at least fix the breakage for 
+v4.12.
 
 -- 
-Regards/Gruss,
-    Boris.
+Regards,
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Laurent Pinchart
