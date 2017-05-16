@@ -1,90 +1,111 @@
 From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Tue, 16 May 2017 14:03:38 +0530
-Subject: [PATCH v3 3/4] perf utils: Add helper function is_pmu_core to detect
- PMU CORE devices
+Date: Tue, 16 May 2017 14:03:39 +0530
+Subject: [PATCH v3 4/4] perf vendor events arm64: Add ThunderX2 implementation
+ defined pmu core events
 In-Reply-To: <1494923619-18687-1-git-send-email-ganapatrao.kulkarni@cavium.com>
 References: <1494923619-18687-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <1494923619-18687-4-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <1494923619-18687-5-git-send-email-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms, PMU core devices sysfs name is not cpu.
-Adding function is_pmu_core to detect as core device using
-core device specific hints in sysfs.
-
-For arm64 platforms, all core devices have file "cpus" in sysfs.
+This is not a full event list, but a short list of useful events.
 
 Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 ---
- tools/perf/util/pmu.c | 44 ++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 40 insertions(+), 4 deletions(-)
+ tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+ .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+ 2 files changed, 77 insertions(+)
+ create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+ create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
 
-diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
-index aefdbd1..0057d1c 100644
---- a/tools/perf/util/pmu.c
-+++ b/tools/perf/util/pmu.c
-@@ -506,6 +506,39 @@ static struct cpu_map *pmu_cpumask(const char *name)
- }
- 
- /*
-+ *  PMU CORE devices have different name other than cpu in sysfs on some
-+ *  platforms. looking for possible sysfs files to identify as core device.
-+ */
-+static int is_pmu_core(const char *name)
-+{
-+	struct stat st;
-+	char path[PATH_MAX];
-+	const char *sysfs = sysfs__mountpoint();
-+	const char **template;
-+	const char *templates[] = {
-+		 "%s/bus/event_source/devices/%s/cpus",
-+		 NULL
-+	};
-+
-+	if (!sysfs)
-+		return 0;
-+
-+	/* Look for cpu sysfs */
-+	snprintf(path, PATH_MAX, "%s/bus/event_source/devices/cpu", sysfs);
-+	if ((stat(path, &st) == 0) &&
-+			(strncmp(name, "cpu", strlen("cpu")) == 0))
-+		return 1;
-+
-+	for (template = templates; *template; template++) {
-+		snprintf(path, PATH_MAX, *template, sysfs, name);
-+		if (stat(path, &st) == 0)
-+			return 1;
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-  * Return the CPU id as a raw string.
-  *
-  * Each architecture should provide a more precise id string that
-@@ -558,15 +591,18 @@ static void pmu_add_cpu_aliases(struct list_head *head, const char *name,
- 	 */
- 	i = 0;
- 	while (1) {
--		const char *pname;
- 
- 		pe = &map->table[i++];
- 		if (!pe->name)
- 			break;
- 
--		pname = pe->pmu ? pe->pmu : "cpu";
--		if (strncmp(pname, name, strlen(pname)))
--			continue;
-+		if (!is_pmu_core(name)) {
-+			/* check for uncore devices */
-+			if (pe->pmu == NULL)
-+				continue;
-+			if (strncmp(pe->pmu, name, strlen(pe->pmu)))
-+				continue;
-+		}
- 
- 		/* need type casts to override 'const' */
- 		__perf_pmu__new_alias(head, NULL, (char *)pe->name,
+diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+new file mode 100644
+index 0000000..7167086
+--- /dev/null
++++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+@@ -0,0 +1,15 @@
++# Format:
++#	MIDR,Version,JSON/file/pathname,Type
++#
++# where
++#	MIDR	Processor version
++#		Variant[23:20] and Revision [3:0] should be zero.
++#	Version could be used to track version of of JSON file
++#		but currently unused.
++#	JSON/file/pathname is the path to JSON file, relative
++#		to tools/perf/pmu-events/arch/arm64/.
++#	Type is core, uncore etc
++#
++#
++#Family-model,Version,Filename,EventType
++0x00000000420f5160,v1,thunderx2,core
+diff --git a/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+new file mode 100644
+index 0000000..2db45c4
+--- /dev/null
++++ b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+@@ -0,0 +1,62 @@
++[
++    {
++        "PublicDescription": "Attributable Level 1 data cache access, read",
++        "EventCode": "0x40",
++        "EventName": "l1d_cache_rd",
++        "BriefDescription": "L1D cache read",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data cache access, write ",
++        "EventCode": "0x41",
++        "EventName": "l1d_cache_wr",
++        "BriefDescription": "L1D cache write",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data cache refill, read",
++        "EventCode": "0x42",
++        "EventName": "l1d_cache_refill_rd",
++        "BriefDescription": "L1D cache refill read",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data cache refill, write",
++        "EventCode": "0x43",
++        "EventName": "l1d_cache_refill_wr",
++        "BriefDescription": "L1D refill write",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data TLB refill, read",
++        "EventCode": "0x4C",
++        "EventName": "l1d_tlb_refill_rd",
++        "BriefDescription": "L1D tlb refill read",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data TLB refill, write",
++        "EventCode": "0x4D",
++        "EventName": "l1d_tlb_refill_wr",
++        "BriefDescription": "L1D tlb refill write",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
++        "EventCode": "0x4E",
++        "EventName": "l1d_tlb_rd",
++        "BriefDescription": "L1D tlb read",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
++        "EventCode": "0x4F",
++        "EventName": "l1d_tlb_wr",
++        "BriefDescription": "L1D tlb write",
++    },
++    {
++        "PublicDescription": "Bus access read",
++        "EventCode": "0x60",
++        "EventName": "bus_access_rd",
++        "BriefDescription": "Bus access read",
++   },
++   {
++        "PublicDescription": "Bus access write",
++        "EventCode": "0x61",
++        "EventName": "bus_access_wr",
++        "BriefDescription": "Bus access write",
++   }
++]
 -- 
 1.8.1.4
