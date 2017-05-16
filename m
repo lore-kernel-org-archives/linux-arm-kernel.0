@@ -1,67 +1,74 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 16 May 2017 16:35:37 +0200
-Subject: [PATCH 42/48] clocksource/drivers: Add a new driver for the
- Atmel ARM TC blocks
-In-Reply-To: <d2485b56-52fa-6532-76cb-222f0c139566@linaro.org>
-References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1465596231-21766-43-git-send-email-alexandre.belloni@free-electrons.com>
- <576D0645.2070805@linaro.org>
- <20170516115916.ip3ea34bofg3jpuo@piout.net>
- <d2485b56-52fa-6532-76cb-222f0c139566@linaro.org>
-Message-ID: <20170516143537.vib2o2t3nizrk363@piout.net>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 16 May 2017 16:38:02 +0200
+Subject: [PATCH V16 09/11] ras: acpi / apei: generate trace event for
+ unrecognized CPER section
+In-Reply-To: <1494883680-25551-10-git-send-email-tbaicar@codeaurora.org>
+References: <1494883680-25551-1-git-send-email-tbaicar@codeaurora.org>
+ <1494883680-25551-10-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20170516143802.tywhlubcg43h6iqe@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/05/2017 at 16:25:04 +0200, Daniel Lezcano wrote:
-> On 16/05/2017 13:59, Alexandre Belloni wrote:
-> > Hi Daniel,
-> > 
-> > Almost one year later, I'm back on that topic.
-> > 
-> > On 24/06/2016 at 12:07:01 +0200, Daniel Lezcano wrote:
-> >>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> >>> index 47352d25c15e..ff7f4022c749 100644
-> >>> --- a/drivers/clocksource/Kconfig
-> >>> +++ b/drivers/clocksource/Kconfig
-> >>> @@ -258,6 +258,19 @@ config ATMEL_ST
-> >>>   	select CLKSRC_OF
-> >>>   	select MFD_SYSCON
-> >>>
-> >>> +config ATMEL_ARM_TCB_CLKSRC
-> >>> +	bool "TC Block Clocksource"
-> >>
-> >> The Kconfig options are set now with the COMPILE_TEST option in order to
-> >> increase the compilation test coverage.
-> >>
-> >> Please, add bool "TC Block Clocksource" if COMPILE_TEST, ...
-> >>
-> >>> +	select REGMAP_MMIO
-> >>> +	depends on GENERIC_CLOCKEVENTS
-> >>> +	depends on SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
-> >>> +	default SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
-> >>
-> >> ... remove these dependencies and let the SoC's Kconfig to select the timer
-> >> like the other timers are.
-> >>
-> > 
-> > The main issue with what you suggest is that it removes the possibility
-> > to not compile the driver. This may be interesting for people using the
-> > PIT as the clocksource/clockevent and the TCBs for something else.
+On Mon, May 15, 2017 at 03:27:58PM -0600, Tyler Baicar wrote:
+> The UEFI spec includes non-standard section type support in the
+> Common Platform Error Record. This is defined in section N.2.3 of
+> UEFI version 2.5.
 > 
-> Is it really a problem? We tend as much as possible to make silent
-> options in order to let the platform config to select the right clock.
+> Currently if the CPER section's type (UUID) does not match any
+> section type that the kernel knows how to parse, a trace event is
+> not generated.
 > 
+> Generate a trace event which contains the raw error data for
+> non-standard section type error records.
+> 
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Tested-by: Shiju Jose <shiju.jose@huawei.com>
+> ---
+>  drivers/acpi/apei/ghes.c  | 27 +++++++++++++++++++++++----
+>  drivers/ras/ras.c         |  9 +++++++++
+>  include/linux/ras.h       | 12 ++++++++++++
+>  include/ras/ras_event.h   | 45 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/uapi/linux/uuid.h |  6 ++++--
+>  5 files changed, 93 insertions(+), 6 deletions(-)
 
-I depends on how much you care about being able to remove as much as
-possible from the kernel.
-Both the PIT and the TCB can be used by AT91SAM9 and SAMA5, similarly,
-both the system timer and the TCB can be used by AT91RM9200. I would
-prefer letting the user select which drivers have to be compiled in the
-kernel instead of pulling both with the SoC configuration.
+This patch doesn't apply cleanly against 4.12-rc1. Please rediff it.
 
+> diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
+> index b67dd36..57363be 100644
+> --- a/drivers/ras/ras.c
+> +++ b/drivers/ras/ras.c
+> @@ -7,11 +7,19 @@
+>  
+>  #include <linux/init.h>
+>  #include <linux/ras.h>
+> +#include <linux/uuid.h>
+>  
+>  #define CREATE_TRACE_POINTS
+>  #define TRACE_INCLUDE_PATH ../../include/ras
+>  #include <ras/ras_event.h>
+>  
+> +void call_non_standard_trace_event(const uuid_le *sec_type,
 
+You are not calling a non-standard trace event - you're logging it:
+
+log_non_standard_event()
+
+> +		 const uuid_le *fru_id, const char *fru_text, const u8 sev,
+> +		 const u8 *err, const u32 len)
+
+Align arguments at opening brace.
+
+> +{
+> +	trace_non_standard_event(sec_type, fru_id, fru_text, sev, err, len);
+> +}
+> +
+>  static int __init ras_init(void)
+>  {
+>  	int rc = 0;
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
