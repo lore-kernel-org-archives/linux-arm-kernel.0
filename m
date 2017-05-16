@@ -1,129 +1,93 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 16 May 2017 19:44:42 +0300
-Subject: [PATCH] ARM: dma-mapping: Don't tear third-party mappings
-In-Reply-To: <2602abb1-e777-700c-bc95-14e576372537@arm.com>
-References: <6d9fa319-4401-c47a-7985-9a349838bcaf@arm.com>
- <20170516151434.18830-1-laurent.pinchart+renesas@ideasonboard.com>
- <2602abb1-e777-700c-bc95-14e576372537@arm.com>
-Message-ID: <4043121.T8QnJes2jP@avalon>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Tue, 16 May 2017 10:44:43 -0600
+Subject: [PATCH V16 08/11] efi: print unrecognized CPER section
+In-Reply-To: <20170516142927.guxwc3gdgpqshpks@pd.tnic>
+References: <1494883680-25551-1-git-send-email-tbaicar@codeaurora.org>
+ <1494883680-25551-9-git-send-email-tbaicar@codeaurora.org>
+ <20170516142927.guxwc3gdgpqshpks@pd.tnic>
+Message-ID: <5a4a5b58-3e31-9fa5-091d-bb63437da9ab@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On 5/16/2017 8:29 AM, Borislav Petkov wrote:
+> On Mon, May 15, 2017 at 03:27:57PM -0600, Tyler Baicar wrote:
+>> UEFI spec allows for non-standard section in Common Platform Error
+>> Record. This is defined in section N.2.3 of UEFI version 2.5.
+>>
+>> Currently if the CPER section's type (UUID) does not match with
+>> one of the section types that the kernel knows how to parse, the
+>> section is skipped. Therefore, user is not able to see
+>> such CPER data, for instance, error record of non-standard section.
+>>
+>> This change prints out the raw data in hex in the dmesg buffer so
+>> that non-standard sections are reported to the user. Non-standard
+>> section type errors should be reported to the user because these
+>> can include errors which are vendor specific. The data length is
+>> taken from Error Data length field of Generic Error Data Entry.
+>>
+>> The following is a sample output from dmesg:
+>> [  140.739180] {1}[Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
+>> [  140.739182] {1}[Hardware Error]: It has been corrected by h/w and requires no further action
+>> [  140.739191] {1}[Hardware Error]: event severity: corrected
+>> [  140.739196] {1}[Hardware Error]:  time: precise 2017-03-15 20:37:35
+>> [  140.739197] {1}[Hardware Error]:  Error 0, type: corrected
+>> [  140.739203] {1}[Hardware Error]:   section type: unknown, d2e2621c-f936-468d-0d84-15a4ed015c8b
+>> [  140.739205] {1}[Hardware Error]:   section length: 0x238
+>> [  140.739210] {1}[Hardware Error]:   00000000: 4d415201 4d492031 453a4d45 435f4343  .RAM1 IMEM:ECC_C
+>> [  140.739214] {1}[Hardware Error]:   00000010: 53515f45 44525f42 00000000 00000000  E_QSB_RD........
+>> [  140.739217] {1}[Hardware Error]:   00000020: 00000000 00000000 00000000 00000000  ................
+>> [  140.739220] {1}[Hardware Error]:   00000030: 00000000 00000000 01010000 01010000  ................
+>> [  140.739223] {1}[Hardware Error]:   00000040: 00000000 00000000 00000005 00000000  ................
+>> [  140.739226] {1}[Hardware Error]:   00000050: 01010000 00000000 00000001 00dddd00  ................
+> Let me repeat myself from the last time:
+>
+> "Kill all those prefixes:
+>
+> " Hardware error from APEI Generic Hardware Error Source: 2
+>    It has been corrected by h/w and requires no further action
+>    event severity: corrected
+>     time: precise 2017-03-15 20:37:35
+>     Error 0, type: corrected
+>      section type: unknown, d2e2621c-f936-468d-0d84-15a4ed015c8b
+>      section length: 568 (0x238)
+>      00000000: 4d415201 4d492031 453a4d45 435f4343  .RAM1 IMEM:ECC_C
+>      00000010: 53515f45 44525f42 00000000 00000000  E_QSB_RD........
+>      00000020: 00000000 00000000 00000000 00000000  ................
+>      00000030: 00000000 00000000 01010000 01010000  ................
+>      00000040: 00000000 00000000 00000005 00000000  ................
+>      00000050: 01010000 00000000 00000001 00dddd00  ................
+> "
+>
+> to the important info only."
+Hello Boris,
 
-On Tuesday 16 May 2017 16:47:36 Robin Murphy wrote:
-> On 16/05/17 16:14, Laurent Pinchart wrote:
-> > arch_setup_dma_ops() is used in device probe code paths to create an
-> > IOMMU mapping and attach it to the device. The function assumes that the
-> > device is attached to a device-specific IOMMU instance (or at least a
-> > device-specific TLB in a shared IOMMU instance) and thus creates a
-> > separate mapping for every device.
-> > 
-> > On several systems (Renesas R-Car Gen2 being one of them), that
-> > assumption is not true, and IOMMU mappings must be shared between
-> > multiple devices. In those cases the IOMMU driver knows better than the
-> > generic ARM dma-mapping layer and attaches mapping to devices manually
-> > with arm_iommu_attach_device(), which sets the DMA ops for the device.
-> > 
-> > The arch_setup_dma_ops() function takes this into account and bails out
-> > immediately if the device already has DMA ops assigned. However, the
-> > corresponding arch_teardown_dma_ops() function, called from driver
-> > unbind code paths (including probe deferral), will tear the mapping down
-> > regardless of who created it. When the device is reprobed
-> > arch_setup_dma_ops() will be called again but won't perform any
-> > operation as the DMA ops will still be set.
-> > 
-> > We need to reset the DMA ops in arch_teardown_dma_ops() to fix this.
-> > However, we can't do so unconditionally, as then a new mapping would be
-> > created by arch_setup_dma_ops() when the device is reprobed, regardless
-> > of whether the device needs to share a mapping or not. We must thus keep
-> > track of whether arch_setup_dma_ops() created the mapping, and only in
-> > that case tear it down in arch_teardown_dma_ops().
-> > 
-> > Keep track of that information in the dev_archdata structure. As the
-> > structure is embedded in all instances of struct device let's not grow
-> > it, but turn the existing dma_coherent bool field into a bitfield that
-> > can be used for other purposes.
-> > 
-> > Fixes: 7b07cbefb68d ("iommu: of: Handle IOMMU lookup failure with deferred
-> > probing or error") Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com> ---
-> > 
-> >  arch/arm/include/asm/device.h | 3 ++-
-> >  arch/arm/mm/dma-mapping.c     | 5 +++++
-> >  2 files changed, 7 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-> > index 36ec9c8f6e16..3234fe9bba6e 100644
-> > --- a/arch/arm/include/asm/device.h
-> > +++ b/arch/arm/include/asm/device.h
-> > @@ -19,7 +19,8 @@ struct dev_archdata {
-> >  #ifdef CONFIG_XEN
-> >  	const struct dma_map_ops *dev_dma_ops;
-> >  #endif
-> > -	bool dma_coherent;
-> > +	unsigned int dma_coherent:1;
-> 
-> This should only ever be accessed by the Xen DMA code via the
-> is_device_dma_coherent() helper, so I can't see the change of storage
-> type causing any problems.
+I meant to respond to this comment after I sent the v16 patch series, 
+but you beat me to it :)
 
-Thank you for double-checking. I agree with your analysis.
+These prefixes are common to all the GHES/CPER printing to the kernel 
+logs. The first value here '{1}' is an increment based on the number of 
+error records that have been printed during the current boot. This value 
+can be very helpful when trying to parse the log which could have 
+hundreds or thousands of these errors. Just yesterday I saw a log with 
+~250 records printed. It was a lot easier to see that incremented number 
+and know how many were in the log than to actually parse the log to 
+count that information.
 
-> > +	unsigned int dma_ops_setup:1;
-> >  };
-> >  
-> >  struct omap_device;
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index c742dfd2967b..e0272f9140e2 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -2430,9 +2430,14 @@ void arch_setup_dma_ops(struct device *dev, u64
-> > dma_base, u64 size,
-> >  		dev->dma_ops = xen_dma_ops;
-> >  	}
-> >  #endif
-> > +	dev->archdata.dma_ops_setup = true;
-> >  }
-> >  
-> >  void arch_teardown_dma_ops(struct device *dev)
-> >  {
-> > +	if (!dev->archdata.dma_ops_setup)
-> > +		return;
-> > +
-> >  	arm_teardown_iommu_dma_ops(dev);
-> > +	set_dma_ops(dev, NULL);
-> 
-> Should we clear dma_ops_setup here for symmetry? I guess in practice
-> it's down to the IOMMU driver so will never change after the first
-> probe, but it still feels like a bit of a nagging loose end.
+The '[Hardware Error]' print I could see doing away with, but it does 
+actually have value when you're looking through the logs. It helps these 
+errors stand out especially to people who aren't looking for them. These 
+hardware errors shouldn't be happening, so it makes sense for them to 
+stand out in the logs. And it also helps to find all these records in a 
+log that could be littered with a lot of other prints. I find myself 
+doing "dmesg | grep 'Hardware error'" all the time.
 
-To make a difference, we would need an IOMMU driver that creates a mapping 
-after a first round of arch_setup_dma_ops() / arch_teardown_dma_ops() calls, 
-follow by a second round. I don't think this could happen, but if it did, I 
-believe we'd be screwed already, as there would be a time were an incorrect 
-mapping (created by arch_setup_dma_ops() while the IOMMU driver needs to take 
-care of mapping creation) exists.
+Hopefully that is enough justification to keep these. If not, then I can 
+add a separate patch in this series to remove them.
 
-> With that (or firm reassurance that it's OK not to),
-> 
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> Apologies for being too arm64-focused in the earlier reviews and
-> overlooking this. Should the patch supersede 8674/1 currently in
-> Russell's incoming box?
-
-Yes I think it should. Could you please take care of that ?
-
-You can also add my
-
-Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-as I've tested that this paptch restores proper IOMMU operation on the Renesas 
-R-Car H2 Lager board. I believe the problem related to Sricharan's patch 
-reported by Geert still affects us and needs to be addressed separately.
+Thanks,
+Tyler
 
 -- 
-Regards,
-
-Laurent Pinchart
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
