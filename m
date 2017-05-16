@@ -1,63 +1,46 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 15 May 2017 19:15:51 -0500
-Subject: [v6 2/3] iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2
- erratum #74
-In-Reply-To: <1494592866-14076-3-git-send-email-gakula@caviumnetworks.com>
-References: <1494592866-14076-1-git-send-email-gakula@caviumnetworks.com>
- <1494592866-14076-3-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <CAL_Jsq+FC8=T9pi7XpMHoqDSUW6c9o14=ybS8BP0fS_Q432NxQ@mail.gmail.com>
+From: david.daney@cavium.com (David Daney)
+Date: Mon, 15 May 2017 17:17:34 -0700
+Subject: [PATCH 0/2] PCI: Workaround for bus reset on Cavium cn8xxx root ports
+Message-ID: <20170516001736.4001-1-david.daney@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT changes should go to DT list.
+With the recent improvements in arm64 and vfio-pci, we are seeing
+failures like this (on cn8890 based systems):
 
-On Fri, May 12, 2017 at 7:41 AM, Geetha sowjanya
-<gakula@caviumnetworks.com> wrote:
-> From: Linu Cherian <linu.cherian@cavium.com>
->
-> Cavium ThunderX2 SMMU implementation doesn't support page 1 register space
-> and PAGE0_REGS_ONLY option is enabled as an errata workaround.
-> This option when turned on, replaces all page 1 offsets used for
-> EVTQ_PROD/CONS, PRIQ_PROD/CONS register access with page 0 offsets.
->
-> SMMU resource size checks are now based on SMMU option PAGE0_REGS_ONLY,
-> since resource size can be either 64k/128k.
-> For this, arm_smmu_device_dt_probe/acpi_probe has been moved before
-> platform_get_resource call, so that SMMU options are set beforehand.
->
-> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
-> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
-> ---
->  Documentation/arm64/silicon-errata.txt             |  1 +
->  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |  6 ++
->  drivers/iommu/arm-smmu-v3.c                        | 64 +++++++++++++++++-----
->  3 files changed, 56 insertions(+), 15 deletions(-)
->
-> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> index 10f2ddd..4693a32 100644
-> --- a/Documentation/arm64/silicon-errata.txt
-> +++ b/Documentation/arm64/silicon-errata.txt
-> @@ -62,6 +62,7 @@ stable kernels.
->  | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154        |
->  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
->  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
-> +| Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
->  |                |                 |                 |                             |
->  | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
->  |                |                 |                 |                             |
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> index be57550..e6da62b 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> @@ -49,6 +49,12 @@ the PCIe specification.
->  - hisilicon,broken-prefetch-cmd
->                      : Avoid sending CMD_PREFETCH_* commands to the SMMU.
->
-> +- cavium-cn99xx,broken-page1-regspace
+[  235.622361] Unhandled fault: synchronous external abort (0x96000210) at 0xfffffc00c1000100
+[  235.630625] Internal error: : 96000210 [#1] PREEMPT SMP
+.
+.
+.
+[  236.208820] [<fffffc0008411250>] pci_generic_config_read+0x38/0x9c
+[  236.214992] [<fffffc0008435ed4>] thunder_pem_config_read+0x54/0x1e8
+[  236.221250] [<fffffc0008411620>] pci_bus_read_config_dword+0x74/0xa0
+[  236.227596] [<fffffc000841853c>] pci_find_next_ext_capability.part.15+0x40/0xb8
+[  236.234896] [<fffffc0008419428>] pci_find_ext_capability+0x20/0x30
+[  236.241068] [<fffffc0008423e2c>] pci_restore_vc_state+0x34/0x88
+[  236.246979] [<fffffc000841af3c>] pci_restore_state.part.37+0x2c/0x1fc
+[  236.253410] [<fffffc000841b174>] pci_dev_restore+0x4c/0x50
+[  236.258887] [<fffffc000841b19c>] pci_bus_restore+0x24/0x4c
+[  236.264362] [<fffffc000841c2dc>] pci_try_reset_bus+0x7c/0xa0
+[  236.270021] [<fffffc00060a1ab0>] vfio_pci_ioctl+0xc34/0xc3c [vfio_pci]
+[  236.276547] [<fffffc0005eb0410>] vfio_device_fops_unl_ioctl+0x20/0x30 [vfio]
+[  236.283587] [<fffffc000824b314>] do_vfs_ioctl+0xac/0x744
+[  236.288890] [<fffffc000824ba30>] SyS_ioctl+0x84/0x98
+[  236.293846] [<fffffc0008082ca0>] __sys_trace_return+0x0/0x4
 
-"cavium-cn99xx" is not a vendor.
+These are caused by the inability of the PCIe root port and Intel
+e1000e to sucessfully do a bus reset.
 
-I'm sure you have an SoC specific compatible string, so use that to
-enable any errata work-arounds.
+The proposed fix is to not do a bus reset on these systems.
 
-Rob
+David Daney (2):
+  PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on bus device.
+  PCI: Avoid bus reset for Cavium cn8xxx root ports.
+
+ drivers/pci/pci.c    | 4 ++++
+ drivers/pci/quirks.c | 8 ++++++++
+ 2 files changed, 12 insertions(+)
+
+-- 
+2.9.4
