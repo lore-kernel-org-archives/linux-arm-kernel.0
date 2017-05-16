@@ -1,36 +1,50 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 16 May 2017 11:14:55 +0200
-Subject: [GIT PULL] Meson Kconfig fixes for 4.12-rc1
-Message-ID: <3059c91b-034c-3da3-9ca4-06ad11bcec42@baylibre.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 16 May 2017 11:27:19 +0200
+Subject: [PATCH 1/2] arm64: marvell: dts: fill MachiatoBin board
+ description
+In-Reply-To: <20170515232825.GX22219@n2100.armlinux.org.uk>
+References: <1494890913-8360-1-git-send-email-mw@semihalf.com>
+ <1494890913-8360-2-git-send-email-mw@semihalf.com>
+ <20170515232825.GX22219@n2100.armlinux.org.uk>
+Message-ID: <CAPv3WKdULNEDcqJ=qsBEAApaJNiyJXAw6ZG=Ejd8TxE6LJkYLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+Hi Russel,
 
-Here is a single fix for the Meson Kconfig, that could go for 4.12-rc2.
+2017-05-16 1:28 GMT+02:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
+>
+> On Tue, May 16, 2017 at 01:28:32AM +0200, Marcin Wojtas wrote:
+> > This patch adds following improvements to Armada 8040
+> > MachiatoBin:
+> >  * Add 'chosen' node with stdout-path assignment
+> >  * Enable 1G sgmii port
+> >  * Enable SDHCI controllers on AP and CP HW blocks
+> >
+> > Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+>
+> Please check my repository at:
+>
+>         git://git.armlinux.org.uk/~rmk/linux-arm.git mcbin
+>
+> I'm currently in the big post-merge window rebase, but that branch has
+> almost complete support for the board, including work in progress for
+> upgrading phylib for 10G support.
+>
 
-Thanks,
-Neil
+I do not intend to interfere your work at all. I took a look on your
+branch, and my patch does not seem to be really colliding with it. The
+board is starting to get really popular and a lot has been happening
+around it recently - missing bits like 'chosen' node or the interfaces
+is pretty annoying. Therefore I think, the earlier such things get
+merged into the tree, the better (we can also enable &cpm_pcie0, just
+tested it), since with current kernel it's no-cost, quick DT update.
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+I have no problem if you insist to use your own DT patches - if so
+could you possibly submit them, so that there may be still some chance
+that they reach v4.12? I can see some significant work ahead on your
+branch (e.g. transition from out-of-tree network driver to mvpp2), so
+better not be blocked by this.
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-
-are available in the git repository at:
-
-  git://github.com/baylibre/clk-meson.git tags/meson-clk-fixes-for-4.12-rc2
-
-for you to fetch changes up to dbed87a9d3a857a86f602775b5845f5f6d9652b5:
-
-  clk: meson: gxbb: fix build error without RESET_CONTROLLER (2017-05-16 11:05:01 +0200)
-
-----------------------------------------------------------------
-KConfig fix:
-- clk: meson: gxbb: fix build error without RESET_CONTROLLER
-
-----------------------------------------------------------------
-Tobias Regnery (1):
-      clk: meson: gxbb: fix build error without RESET_CONTROLLER
-
- drivers/clk/meson/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Best regards,
+Marcin
