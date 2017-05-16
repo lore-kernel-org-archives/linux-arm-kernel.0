@@ -1,103 +1,96 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 16 May 2017 20:45:49 +0200
-Subject: [PATCH v2 2/9] KVM: arm: Handle VCPU device attributes in guest.c
+Date: Tue, 16 May 2017 20:45:54 +0200
+Subject: [PATCH v2 7/9] KVM: arm/arm64: Check if irq lines to the GIC are
+ already used
 In-Reply-To: <20170516184556.26785-1-cdall@linaro.org>
 References: <20170516184556.26785-1-cdall@linaro.org>
-Message-ID: <20170516184556.26785-3-cdall@linaro.org>
+Message-ID: <20170516184556.26785-8-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are about to support VCPU attributes to set the timer IRQ numbers
-in guest.c, move the static inlines for the VCPU attributes handlers
-from the header file to guest.c.
+We check if other in-kernel devices have already been connected to the
+GIC for a particular interrupt line when possible.
+
+For the PMU, we can do this whenever setting the PMU interrupt number
+from userspace.
+
+For the timers, we have to wait until we try to enable the timer,
+because we have a concept of default IRQ numbers that userspace
+shouldn't have to work around in the initialization phase.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm/include/asm/kvm_host.h | 22 +++++++--------------
- arch/arm/kvm/guest.c            | 42 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 49 insertions(+), 15 deletions(-)
+ virt/kvm/arm/arch_timer.c | 18 ++++++++++--------
+ virt/kvm/arm/pmu.c        |  7 +++++++
+ 2 files changed, 17 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index f0e6657..26c1195 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -291,20 +291,12 @@ static inline void kvm_arm_init_debug(void) {}
- static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
--static inline int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
--					     struct kvm_device_attr *attr)
--{
--	return -ENXIO;
--}
--static inline int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
--					     struct kvm_device_attr *attr)
--{
--	return -ENXIO;
--}
--static inline int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
--					     struct kvm_device_attr *attr)
--{
--	return -ENXIO;
--}
-+
-+int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr);
-+int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr);
-+int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr);
- 
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index fa6182a..acea05e 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -301,3 +301,45 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- {
- 	return -EINVAL;
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index d3d1dce..528acf0 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -618,20 +618,22 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+ 	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
  }
+ 
+-static bool timer_irqs_are_valid(struct kvm *kvm)
++static bool timer_irqs_are_valid(struct kvm_vcpu *vcpu)
+ {
+-	struct kvm_vcpu *vcpu;
+ 	int vtimer_irq, ptimer_irq;
+-	int i;
++	int i, ret;
+ 
+-	vcpu = kvm_get_vcpu(kvm, 0);
+ 	vtimer_irq = vcpu_vtimer(vcpu)->irq.irq;
+-	ptimer_irq = vcpu_ptimer(vcpu)->irq.irq;
++	ret = kvm_vgic_set_owner(vcpu, vtimer_irq, vcpu_vtimer(vcpu));
++	if (ret)
++		return false;
+ 
+-	if (vtimer_irq == ptimer_irq)
++	ptimer_irq = vcpu_ptimer(vcpu)->irq.irq;
++	ret = kvm_vgic_set_owner(vcpu, ptimer_irq, vcpu_ptimer(vcpu));
++	if (ret)
+ 		return false;
+ 
+-	kvm_for_each_vcpu(i, vcpu, kvm) {
++	kvm_for_each_vcpu(i, vcpu, vcpu->kvm) {
+ 		if (vcpu_vtimer(vcpu)->irq.irq != vtimer_irq ||
+ 		    vcpu_ptimer(vcpu)->irq.irq != ptimer_irq)
+ 			return false;
+@@ -659,7 +661,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 	if (!vgic_initialized(vcpu->kvm))
+ 		return -ENODEV;
+ 
+-	if (!timer_irqs_are_valid(vcpu->kvm)) {
++	if (!timer_irqs_are_valid(vcpu)) {
+ 		kvm_debug("incorrectly configured timer irqs\n");
+ 		return -EINVAL;
+ 	}
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 0cf62b7..c354bd5 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -463,6 +463,8 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+ 		return -EBUSY;
+ 
+ 	if (irqchip_in_kernel(vcpu->kvm)) {
++		int ret;
 +
-+int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr)
-+{
-+	int ret;
+ 		/*
+ 		 * If using the PMU with an in-kernel virtual GIC
+ 		 * implementation, we require the GIC to be already
+@@ -473,6 +475,11 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+ 
+ 		if (!kvm_arm_pmu_irq_initialized(vcpu))
+ 			return -ENXIO;
 +
-+	switch (attr->group) {
-+	default:
-+		ret = -ENXIO;
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
-+int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr)
-+{
-+	int ret;
-+
-+	switch (attr->group) {
-+	default:
-+		ret = -ENXIO;
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
-+int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
-+			       struct kvm_device_attr *attr)
-+{
-+	int ret;
-+
-+	switch (attr->group) {
-+	default:
-+		ret = -ENXIO;
-+		break;
-+	}
-+
-+	return ret;
-+}
++		ret = kvm_vgic_set_owner(vcpu, vcpu->arch.pmu.irq_num,
++					 &vcpu->arch.pmu);
++		if (ret)
++			return ret;
+ 	}
+ 
+ 	kvm_pmu_vcpu_reset(vcpu);
 -- 
 2.9.0
