@@ -1,74 +1,221 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 16 May 2017 13:43:09 +0200
-Subject: Asking for guidance in writing IRQ controller driver
-In-Reply-To: <99c32a84-c064-06c8-799d-a5aa1794ba0d@free.fr>
-References: <99c32a84-c064-06c8-799d-a5aa1794ba0d@free.fr>
-Message-ID: <4cf2a2da-a229-8ff4-2d08-6cd2d78fce3f@free.fr>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue, 16 May 2017 17:00:50 +0530
+Subject: [PATCH v3 05/11] arm64: dts: Add clock DT nodes for Stingray SOC
+In-Reply-To: <1494934256-1350-1-git-send-email-anup.patel@broadcom.com>
+References: <1494934256-1350-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1494934256-1350-6-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/2017 14:49, Mason wrote:
+From: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
 
-> In the tango family, there are two revisions of the interrupt controller
-> that I want to support, ideally within the same driver.
-> 
-> Rev 1:
->  Input lines: 64 sources (63 devices + 1 SW)
-> Output lines:  3 destinations, connected to GIC lines 2-4
-> 
-> Sources can be ignored (disabled), or routed to one of
-> the 3 destinations. Right now, sources get routed to
-> a specific output based on which parent is declared in
-> the DT. I think this was described as not quite correct
-> in previous discussions?
-> 
-> As a first approximation, routing everything to irq0 seems
-> good enough. I suppose routing something to a different
-> output would be useful only when trying to do some kind
-> of interrupt load balancing?
-> 
-> 
-> Rev 2: more of everything
->  Input lines: 128 sources (124 devices + 1 SW + 3 reserved for backward-compatibility with Rev 1)
-> Output lines:  24 destinations, connected to GIC lines 0-23
-> 
-> 
-> Of course, the register layouts are completely different,
-> since the HW designers felt that the solution in rev1
-> (cloning register sets for each output) was inadequate
-> for rev2.
-> 
-> The driver I've been using until now is drivers/irqchip/irq-tango.c
-> I'm willing to write a new driver from scratch, if necessary.
-> 
-> IIUC, the DT node for the interrupt controller should just
-> mention number of inputs, number of outputs?
-> 
-> And let user-space assign devices to a specific output?
-> (Using what user-space tool?)
-> 
-> So the driver would initially map everything to output line 0,
-> which would interrupt cpu0 (how to change that from user-space?)
-> and then individual devices can be moved to other outputs,
-> for specific use cases (implemented later as an optimization?)
-> 
-> 
-> I have to give all this a bit more thought before I start coding
-> something up.
+This patch describes Stingray SOC clock tree using
+DT nodes in Stingray DTS.
 
-I'll try to ask specific questions.
+Signed-off-by: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+---
+ .../boot/dts/broadcom/stingray/stingray-clock.dtsi | 170 +++++++++++++++++++++
+ .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |   9 ++
+ 2 files changed, 179 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
 
-It seems clear that I'll need to define an irq_domain.
-
-I have used irq_domain_create_linear() in the past.
-
-But I also see other people use irq_domain_create_hierarchy()
-which calls irq_domain_create_linear() but also sets
-domain->parent
-
-But now I'm left wondering how the code that doesn't set
-domain->parent works... How does the irq framework know
-how to "tie" this new domain into the mix... Probably by
-walking the DT? So setting the parent is not required then?
-
-Regards.
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
+new file mode 100644
+index 0000000..070e22e2
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-clock.dtsi
+@@ -0,0 +1,170 @@
++/*
++ *  BSD LICENSE
++ *
++ *  Copyright(c) 2016-2017 Broadcom.  All rights reserved.
++ *
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
++ *
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom nor the names of its
++ *      contributors may be used to endorse or promote products derived
++ *      from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include <dt-bindings/clock/bcm-sr.h>
++
++		osc: oscillator {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <50000000>;
++		};
++
++		crmu_ref25m: crmu_ref25m {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&osc>;
++			clock-div = <2>;
++			clock-mult = <1>;
++		};
++
++		genpll0: genpll0 at 6641d104 {
++			#clock-cells = <1>;
++			compatible = "brcm,sr-genpll0";
++			reg = <0x0001d104 0x32>,
++			      <0x0001c854 0x4>;
++			clocks = <&osc>;
++			clock-output-names = "genpll0", "clk_125", "clk_scr",
++					     "clk_250", "clk_pcie_axi",
++					     "clk_paxc_axi_x2",
++					     "clk_paxc_axi";
++		};
++
++		genpll3: genpll3 at 6641d1e0 {
++			#clock-cells = <1>;
++			compatible = "brcm,sr-genpll3";
++			reg = <0x0001d1e0 0x32>,
++			      <0x0001c854 0x4>;
++			clocks = <&osc>;
++			clock-output-names = "genpll3", "clk_hsls",
++					     "clk_sdio";
++		};
++
++		genpll4: genpll4 at 6641d214 {
++			#clock-cells = <1>;
++			compatible = "brcm,sr-genpll4";
++			reg = <0x0001d214 0x32>,
++			      <0x0001c854 0x4>;
++			clocks = <&osc>;
++			clock-output-names = "genpll4", "clk_ccn",
++					     "clk_tpiu_pll", "noc_clk",
++					     "pll_chclk_fs4",
++					     "clk_bridge_fscpu";
++		};
++
++		genpll5: genpll5 at 6641d248 {
++			#clock-cells = <1>;
++			compatible = "brcm,sr-genpll5";
++			reg = <0x0001d248 0x32>,
++			      <0x0001c870 0x4>;
++			clocks = <&osc>;
++			clock-output-names = "genpll5", "fs4_hf_clk",
++					     "crypto_ae_clk", "raid_ae_clk";
++		};
++
++		lcpll0: lcpll0 {
++			#clock-cells = <1>;
++			compatible = "brcm,sr-lcpll0";
++			reg = <0x0001d0c4 0x3c>,
++			      <0x0001c870 0x4>;
++			clocks = <&osc>;
++			clock-output-names = "lcpll0", "clk_sata_refp",
++					     "clk_sata_refn", "clk_sata_350",
++					     "clk_sata_500";
++		};
++
++		lcpll1: lcpll1 {
++			#clock-cells = <1>;
++			compatible = "brcm,sr-lcpll1";
++			reg = <0x0001d138 0x3c>,
++			      <0x0001c870 0x4>;
++			clocks = <&osc>;
++			clock-output-names = "lcpll1", "clk_wanpn",
++					     "clk_usb_ref",
++					     "timesync_evt_clk";
++		};
++
++		hsls_clk: hsls_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&genpll3 1>;
++			clock-div = <1>;
++			clock-mult = <1>;
++		};
++
++		hsls_div2_clk: hsls_div2_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&genpll3 BCM_SR_GENPLL3_HSLS_CLK>;
++			clock-div = <2>;
++			clock-mult = <1>;
++
++		};
++
++		hsls_div4_clk: hsls_div4_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&genpll3 BCM_SR_GENPLL3_HSLS_CLK>;
++			clock-div = <4>;
++			clock-mult = <1>;
++		};
++
++		hsls_25m_clk: hsls_25m_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&crmu_ref25m>;
++			clock-div = <1>;
++			clock-mult = <1>;
++		};
++
++		hsls_25m_div2_clk: hsls_25m_div2_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&hsls_25m_clk>;
++			clock-div = <2>;
++			clock-mult = <1>;
++		};
++
++		sdio0_clk: sdio0_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&genpll3 BCM_SR_GENPLL3_SDIO_CLK>;
++			clock-div = <1>;
++			clock-mult = <1>;
++		};
++
++		sdio1_clk: sdio1_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&genpll3 BCM_SR_GENPLL3_SDIO_CLK>;
++			clock-div = <1>;
++			clock-mult = <1>;
++		};
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+index 9fe19a2..6b690db 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+@@ -244,6 +244,15 @@
+ 		};
+ 	};
+ 
++	crmu: crmu {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x0 0x66400000 0x100000>;
++
++		#include "stingray-clock.dtsi"
++	};
++
+ 	hsls {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+-- 
+2.7.4
