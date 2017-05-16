@@ -1,126 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 16 May 2017 15:52:52 +0100
-Subject: [PATCH V8 07/11] iommu: of: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <1825810.fLbCv8umR7@avalon>
-References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
- <1924197.MWBQ7kvoOo@avalon> <5724f819-40db-e830-1ec1-62c887ba39ee@arm.com>
- <1825810.fLbCv8umR7@avalon>
-Message-ID: <6d9fa319-4401-c47a-7985-9a349838bcaf@arm.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Tue, 16 May 2017 17:59:02 +0300
+Subject: [RFC v1 2/3] interconnect: Add Qualcomm msm8916 interconnect
+ provider driver
+In-Reply-To: <CAMuHMdXM3f+P8ZyydxnO5z2g3F2n2c3KzfDFbC6jYgZJt+1ULw@mail.gmail.com>
+References: <20170515153527.27649-1-georgi.djakov@linaro.org>
+ <20170515153527.27649-3-georgi.djakov@linaro.org>
+ <CAMuHMdXM3f+P8ZyydxnO5z2g3F2n2c3KzfDFbC6jYgZJt+1ULw@mail.gmail.com>
+Message-ID: <5bd5fbd9-ee12-a414-88ce-32b286318616@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/05/17 15:10, Laurent Pinchart wrote:
-> Hi Robin,
+On 05/15/2017 07:01 PM, Geert Uytterhoeven wrote:
+> Hi Georgi,
 > 
-> On Tuesday 16 May 2017 15:04:55 Robin Murphy wrote:
->> On 16/05/17 08:17, Laurent Pinchart wrote:
->>> On Tuesday 16 May 2017 07:53:57 sricharan at codeaurora.org wrote:
+> On Mon, May 15, 2017 at 5:35 PM, Georgi Djakov <georgi.djakov@linaro.org> wrote:
+>> --- /dev/null
+>> +++ b/drivers/interconnect/qcom/interconnect_msm8916.c
 > 
-> [snip]
+>> +struct qcom_interconnect_node {
+>> +       struct interconnect_node node;
+>> +       unsigned int id;
 > 
->>>> arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops()
->>>> ,dma_ops should be cleared in the teardown path. Otherwise
->>>> this causes problem when the probe of device is retried after
->>>> being deferred. The device's iommu structures are cleared
->>>> after EPROBEDEFER error, but on the next try dma_ops will still
->>>> be set to old value, which is not right.
->>>>
->>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->>>> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
->>>> ---
->>>>
->>>>   arch/arm/mm/dma-mapping.c | 1 +
->>>>   1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->>>> index ab4f745..a40f03e 100644
->>>> --- a/arch/arm/mm/dma-mapping.c
->>>> +++ b/arch/arm/mm/dma-mapping.c
->>>> @@ -2358,6 +2358,7 @@ static void arm_teardown_iommu_dma_ops(struct
->>>> device *dev)
->>>
->>>>   	__arm_iommu_detach_device(dev);
->>>>   	arm_iommu_release_mapping(mapping);
->>>> +	set_dma_ops(dev, NULL);
->>>>   }
->>>>   #else
->>>
->>> The subject mentions arch_teardown_dma_ops(), which I think is correct,
->>> but the patch adds the set_dma_ops() call to arm_teardown_iommu_dma_ops().
->>>
->>> However, the situation is perhaps more complex. Note the check at the
->>> beginning of arch_setup_dma_ops():
->>> 	/*
->>> 	 * Don't override the dma_ops if they have already been set. Ideally
->>> 	 * this should be the only location where dma_ops are set, remove this
->>> 	 * check when all other callers of set_dma_ops will have disappeared.
->>> 	 */
->>> 	if (dev->dma_ops)
->>> 		return;
->>>
->>> If you set the dma_ops to NULL in arm_teardown_iommu_dma_ops() or
->>> arch_teardown_dma_ops(), the next call to arch_setup_dma_ops() will
->>> override them. To be safe you should only set them to NULL if they have
->>> been set by arch_setup_dma_ops(). More than that, arch_teardown_dma_ops()
->>> should probably not call arm_teardown_iommu_dma_ops() at all if the
->>> dma_ops were set by arm_iommu_attach_device() and not
->>> arch_teardown_dma_ops().
->>
->> Under what circumstances is that an issue? We'll only be tearing down
->> the DMA ops when unbinding the driver,
+> 4 byte gap due to alignment rules on 64-bit.
 > 
-> Or when deferring probe.
+>> +       unsigned char *name;
+>> +       struct interconnect_node *links[8];
+>> +       int num_links;
+>> +       int port;
+>> +       int buswidth;
 > 
->> and I think it would be erroneous to expect the device to retain much state
->> after that. Everything else would be set up from scratch again if it get
->> reprobed later, so why not the DMA ops?
+> 4 byte gap due to alignment rules.
 > 
-> Because the DMA ops might have been set elsewhere than arch_setup_dma_ops(). 
-> If you look at the patch that added the above warning, its commit message 
-> states
+>> +       u64 ib;
+>> +       u64 ab;
+>> +       u64 rate;
+>> +};
 > 
-> commit 26b37b946a5c2658dbc37dd5d6df40aaa9685d70 (iommu-joerg/arm/core)
-> Author: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Date:   Fri May 15 02:00:02 2015 +0300
-> 
->     arm: dma-mapping: Don't override dma_ops in arch_setup_dma_ops()
->     
->     The arch_setup_dma_ops() function is in charge of setting dma_ops with a
->     call to set_dma_ops(). set_dma_ops() is also called from
->     
->     - highbank and mvebu bus notifiers
->     - dmabounce (to be replaced with swiotlb)
->     - arm_iommu_attach_device
->     
->     (arm_iommu_attach_device is itself called from IOMMU and bus master
->     device drivers)
->     
->     To allow the arch_setup_dma_ops() call to be moved from device add time
->     to device probe time we must ensure that dma_ops already setup by any of
->     the above callers will not be overriden.
->     
->     Aftering replacing dmabounce with swiotlb, converting IOMMU drivers to
->     of_xlate and taking care of highbank and mvebu, the workaround should be
->     removed.
-> 
-> I'm concerned about potentially breaking these if we unconditionally remove 
-> the DMA ops and mapping.
+> You can avoid the gaps by putting members of the same size and alignment
+> together.
 
-Ah, sorry, I see now - it was taking a long time to page the 32-bit code
-back in, and I'd forgotten the specifics of the mess of competing
-"default domain" notions. Indeed, it's not the device's driver expecting
-any state to be preserved as I got stuck on, it's the IOMMU driver,
-which does "know better" to an extent, expecting its changes to the
-struct device to stick for the lifetime of that structure.
+Thanks Geert, i will rearrange this to reduce the padding bytes!
 
-I agree there shouldn't be a disparity - arch_setup_dma_ops() only does
-things given certain circumstances, so arch_teardown_dma_ops() should
-only undo them under the same. With probe-deferral in place I'll be
-reviving my work to convert this path over to IOMMU API default domains,
-which will make some of these issues go away again, but in the meantime
-I also agree that the most expedient fix is indeed to add a flag to say
-whether the dma ops were automatically set or not (this is implicitly
-true on arm64, which was partly what was tripping me up).
-
-Robin.
+BR,
+Georgi
