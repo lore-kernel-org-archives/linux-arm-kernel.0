@@ -1,212 +1,54 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 16 May 2017 12:47:32 +0300
-Subject: [PATCH V8 07/11] iommu: of: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <1924197.MWBQ7kvoOo@avalon>
-References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
- <1804176.uxVOFWagsb@avalon>
- <9952978e7ac69193daf67ccb77eebe29@codeaurora.org>
- <1924197.MWBQ7kvoOo@avalon>
-Message-ID: <20170516094732.GM3227@valkosipuli.retiisi.org.uk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 May 2017 10:50:27 +0100
+Subject: [PATCH 1/2] arm64: marvell: dts: fill MachiatoBin board
+ description
+In-Reply-To: <CAPv3WKdULNEDcqJ=qsBEAApaJNiyJXAw6ZG=Ejd8TxE6LJkYLw@mail.gmail.com>
+References: <1494890913-8360-1-git-send-email-mw@semihalf.com>
+ <1494890913-8360-2-git-send-email-mw@semihalf.com>
+ <20170515232825.GX22219@n2100.armlinux.org.uk>
+ <CAPv3WKdULNEDcqJ=qsBEAApaJNiyJXAw6ZG=Ejd8TxE6LJkYLw@mail.gmail.com>
+Message-ID: <20170516095027.GZ22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Tue, May 16, 2017 at 11:27:19AM +0200, Marcin Wojtas wrote:
+> I do not intend to interfere your work at all. I took a look on your
+> branch, and my patch does not seem to be really colliding with it.
 
-On Tue, May 16, 2017 at 10:17:08AM +0300, Laurent Pinchart wrote:
-> Hi Sricharan,
-> 
-> On Tuesday 16 May 2017 07:53:57 sricharan at codeaurora.org wrote:
-> > On 2017-05-16 03:04, Laurent Pinchart wrote:
-> > > On Monday 15 May 2017 23:37:16 Laurent Pinchart wrote:
-> > >> On Wednesday 03 May 2017 15:54:59 Sricharan R wrote:
-> > >>> On 5/3/2017 3:24 PM, Robin Murphy wrote:
-> > >>>> On 02/05/17 19:35, Geert Uytterhoeven wrote:
-> > >>>>> On Fri, Feb 3, 2017 at 4:48 PM, Sricharan R wrote:
-> > >>>>>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > >>>>>> 
-> > >>>>>> Failures to look up an IOMMU when parsing the DT iommus property
-> > >>>>>> need to be handled separately from the .of_xlate() failures to
-> > >>>>>> support deferred probing.
-> > >>>>>> 
-> > >>>>>> The lack of a registered IOMMU can be caused by the lack of a driver
-> > >>>>>> for the IOMMU, the IOMMU device probe not having been performed yet,
-> > >>>>>> having been deferred, or having failed.
-> > >>>>>> 
-> > >>>>>> The first case occurs when the device tree describes the bus master
-> > >>>>>> and IOMMU topology correctly but no device driver exists for the
-> > >>>>>> IOMMU yet or the device driver has not been compiled in. Return NULL,
-> > >>>>>> the caller will configure the device without an IOMMU.
-> > >>>>>> 
-> > >>>>>> The second and third cases are handled by deferring the probe of the
-> > >>>>>> bus master device which will eventually get reprobed after the
-> > >>>>>> IOMMU.
-> > >>>>>> 
-> > >>>>>> The last case is currently handled by deferring the probe of the bus
-> > >>>>>> master device as well. A mechanism to either configure the bus
-> > >>>>>> master device without an IOMMU or to fail the bus master device probe
-> > >>>>>> depending on whether the IOMMU is optional or mandatory would be a
-> > >>>>>> good enhancement.
-> > >>>>>> 
-> > >>>>>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > >>>>>> Signed-off-by: Laurent Pichart
-> > >>>>>> <laurent.pinchart+renesas@ideasonboard.com>
-> > >>>>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> > >>>>> 
-> > >>>>> This patch broke Renesas R-Car Gen3 platforms in renesas-drivers.
-> > >>>>> As the IOMMU nodes in DT are not yet enabled, all devices having
-> > >>>>> iommus properties in DT now fail to probe.
-> > >>>> 
-> > >>>> How exactly do they fail to probe? Per d7b0558230e4, if there are no
-> > >>>> ops registered then they should merely defer until we reach the point
-> > >>>> of giving up and ignoring the IOMMU. Is it just that you have no other
-> > >>>> late-probing drivers or post-init module loads to kick the deferred
-> > >>>> queue after that point? I did try to find a way to explicitly kick it
-> > >>>> from a suitably late initcall, but there didn't seem to be any obvious
-> > >>>> public interface - anyone have any suggestions?
-> > >>>> 
-> > >>>> I think that's more of a general problem with the probe deferral
-> > >>>> mechanism itself (I've seen the same thing happen with some of the
-> > >>>> CoreSight stuff on Juno due to the number of inter-component
-> > >>>> dependencies) rather than any specific fault of this series.
-> > >>> 
-> > >>> I was thinking of an additional check like below to avoid the
-> > >>> situation ?
-> > >>> 
-> > >>> From 499b6e662f60f23740b8880882b0a16f16434501 Mon Sep 17 00:00:00 2001
-> > >>> From: Sricharan R <sricharan@codeaurora.org>
-> > >>> Date: Wed, 3 May 2017 13:16:59 +0530
-> > >>> Subject: [PATCH] iommu: of: Fix check for returning EPROBE_DEFER
-> > >>> 
-> > >>> While returning EPROBE_DEFER for iommu masters
-> > >>> take in to account of iommu nodes that could be
-> > >>> marked in DT as 'status=disabled', in which case
-> > >>> simply return NULL and let the master's probe
-> > >>> continue rather than deferring.
-> > >>> 
-> > >>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> > >>> ---
-> > >>> 
-> > >>>  drivers/iommu/of_iommu.c | 1 +
-> > >>>  1 file changed, 1 insertion(+)
-> > >>> 
-> > >>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> > >>> index 9f44ee8..e6e9bec 100644
-> > >>> --- a/drivers/iommu/of_iommu.c
-> > >>> +++ b/drivers/iommu/of_iommu.c
-> > >>> @@ -118,6 +118,7 @@ static bool of_iommu_driver_present(struct
-> > >>> device_node *np)
-> > >>> 
-> > >>>         ops = iommu_ops_from_fwnode(fwnode);
-> > >>>         if ((ops && !ops->of_xlate) ||
-> > >>> +           !of_device_is_available(iommu_spec->np) ||
-> > >>>             (!ops && !of_iommu_driver_present(iommu_spec->np)))
-> > >>>                 return NULL;
-> > >> 
-> > >> This looks good to me, but won't be enough. The ipmmu-vmsa driver in
-> > >> v4.12-rc1 doesn't call iommu_device_register() and thus won't be found
-> > >> by iommu_ops_from_fwnode(). Furthermore, it doesn't IOMMU_OF_DECLARE(),
-> > >> and thus will always be considered as absent.
-> > >> 
-> > >> I agree that the ipmmu-vmsa driver needs to be fixed, but it would
-> > >> have been nice to check existing IOMMU drivers before merging this patch
-> > >> series...
-> > > 
-> > > Please pardon the question, but has this patch series been tested on
-> > > ARM32 ?
-> > > 
-> > > When the device is probed the arch_setup_dma_ops() function is called.
-> > > It sets the device's dma_ops and the mapping (in
-> > > __arm_iommu_attach_device()). If probe is deferred,
-> > > arch_teardown_dma_ops() is called which in turn calls
-> > > arch_teardown_dma_ops(). This removes the mapping but doesn't touch the
-> > > dma_ops. The next time the device is probed, arch_setup_dma_ops() bails
-> > > out immediately as the dma_ops are already set, leaving us with a device
-> > > bound to IOMMU operations but with no mapping. This oopses later as soon
-> > > as the kernel tries to map memory for the device through the IOMMU.
-> > 
-> > Resetting the dma_ops for arm32 was added in this patch [1], which I
-> > missed to send in the original series, but now have added to Russell's patch
-> > tracking system.
-> 
-> Thank you. I fear that won't be enough though.
-> 
-> > [1] https://patchwork.kernel.org/patch/9434105/
-> 
-> Quoting the patch:
-> 
-> > arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops()
-> > ,dma_ops should be cleared in the teardown path. Otherwise
-> > this causes problem when the probe of device is retried after
-> > being deferred. The device's iommu structures are cleared
-> > after EPROBEDEFER error, but on the next try dma_ops will still
-> > be set to old value, which is not right.
-> >
-> > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> > Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> > ---
-> >   arch/arm/mm/dma-mapping.c | 1 +
-> >   1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index ab4f745..a40f03e 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -2358,6 +2358,7 @@ static void arm_teardown_iommu_dma_ops(struct device 
-> *dev)
-> >   	__arm_iommu_detach_device(dev);
-> >   	arm_iommu_release_mapping(mapping);
-> > +	set_dma_ops(dev, NULL);
-> >   }
-> >   #else
-> 
-> The subject mentions arch_teardown_dma_ops(), which I think is correct, but 
-> the patch adds the set_dma_ops() call to arm_teardown_iommu_dma_ops().
-> 
-> However, the situation is perhaps more complex. Note the check at the 
-> beginning of arch_setup_dma_ops():
-> 
-> 	/*
-> 	 * Don't override the dma_ops if they have already been set. Ideally
-> 	 * this should be the only location where dma_ops are set, remove this
-> 	 * check when all other callers of set_dma_ops will have disappeared.
-> 	 */
-> 	if (dev->dma_ops)
-> 		return;
-> 
-> If you set the dma_ops to NULL in arm_teardown_iommu_dma_ops() or 
-> arch_teardown_dma_ops(), the next call to arch_setup_dma_ops() will override 
-> them. To be safe you should only set them to NULL if they have been set by 
-> arch_setup_dma_ops(). More than that, arch_teardown_dma_ops() should probably 
-> not call arm_teardown_iommu_dma_ops() at all if the dma_ops were set by 
-> arm_iommu_attach_device() and not arch_teardown_dma_ops(). One option would be 
-> to add a field to struct dev_archdata to store that information. To avoid 
-> growing the structure, which is embedded in every struct device, you could 
-> possibly turn the dma_coherent bool into a bitfield.
-> 
-> @@ -19,7 +19,8 @@ struct dev_archdata {
->  #ifdef CONFIG_XEN
->  	const struct dma_map_ops *dev_dma_ops;
->  #endif
-> -	bool dma_coherent;
-> +	bool dma_coherent:1;
-> +	bool dma_ops_setup:1;
->  };
->  
->  struct omap_device;
-> 
-> I haven't checked, however, whether the dma_coherent field would need to be 
-> accessed atomically, so this might be a bad idea.
+I can't see how you can say that when the branch contains support for
+SDHCI and ethernet.  It obviously will collide, since it conflicts with
+the changes I have.
 
-A bool bit field? :-)
+> The board is starting to get really popular and a lot has been happening
+> around it recently - missing bits like 'chosen' node or the interfaces
+> is pretty annoying.
 
-I think I'd just use bool for both. I wouldn't expect dma_coherent change
-once it has been set before device driver probe though.
+Given that features like SDHCI and basic ethernet support have only just
+been merged during the merge window, how about giving those who are
+supporting the platform some time to organise their trees and get patches
+out there, rather than cutting across those who have put considerable
+effort into the platform already, or working with those who have.
 
-If you like a bit field, then I'd propose making it unsigned int.
+The whole Armada 8k support is all very new, and there's still lots of
+fundamental bits that are missing - pinmux and gpio are the two biggest
+ones.
+
+I've already put effort into cleaning up the mvebu pinmux code (already
+merged) so that we can cleanly merge the pinmux support, but both of
+these are a sticking point with free-electrons - they have a view on
+how it should be represented in DT which does not fit with the current
+orion-gpio usage, nor with the "system controller" being in drivers/clk.
+
+The code which I have in my tree is correct for the Armada 8k hardware
+(which has some weirdness about which gpios on each CP110 appear to the
+external world - some are used for inter-CP110 communication and must
+not be exposed) so any additional work should be based on the code in
+my tree.
+
+I have no solution for the sticking point at present, and this is an
+area that's worth additional effort to resolve.
 
 -- 
-Regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
