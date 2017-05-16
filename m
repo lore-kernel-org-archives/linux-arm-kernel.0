@@ -1,97 +1,169 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 16 May 2017 12:04:29 +0200
-Subject: [PATCH v2 1/3] KVM: arm/arm64: Allow GICv2 to supply a uaccess
- register function
+Date: Tue, 16 May 2017 12:04:30 +0200
+Subject: [PATCH v2 2/3] KVM: arm/arm64: Separate guest and uaccess writes to
+ dist {sc}active
 In-Reply-To: <20170516100431.4101-1-cdall@linaro.org>
 References: <20170516100431.4101-1-cdall@linaro.org>
-Message-ID: <20170516100431.4101-2-cdall@linaro.org>
+Message-ID: <20170516100431.4101-3-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are about to differentiate between writes from a VCPU and from
-userspace to the GIC's GICD_ISACTIVER and GICD_ICACTIVER registers due
-to different synchronization requirements.
-
-Expand the macro to define a register description for the GIC to take
-uaccess functions as well.
+Factor out the core register modifier functionality from the entry
+points from the register description table, and only call the
+prepare/finish functions from the guest path, not the uaccess path.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 22 +++++++++++-----------
- virt/kvm/arm/vgic/vgic-mmio.h    |  4 +++-
- 2 files changed, 14 insertions(+), 12 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  6 +++--
+ virt/kvm/arm/vgic/vgic-mmio-v3.c |  8 ++++---
+ virt/kvm/arm/vgic/vgic-mmio.c    | 50 ++++++++++++++++++++++++++++++++++------
+ virt/kvm/arm/vgic/vgic-mmio.h    |  8 +++++++
+ 4 files changed, 60 insertions(+), 12 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 0a4283e..95543a2 100644
+index 95543a2..8bafe9a 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -296,34 +296,34 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
--		vgic_mmio_read_rao, vgic_mmio_write_wi, 1,
-+		vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
--		vgic_mmio_read_enable, vgic_mmio_write_senable, 1,
-+		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
--		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1,
-+		vgic_mmio_read_enable, vgic_mmio_write_cenable, NULL, NULL, 1,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
--		vgic_mmio_read_pending, vgic_mmio_write_spending, 1,
-+		vgic_mmio_read_pending, vgic_mmio_write_spending, NULL, NULL, 1,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
--		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1,
-+		vgic_mmio_read_pending, vgic_mmio_write_cpending, NULL, NULL, 1,
+@@ -311,10 +311,12 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_pending, vgic_mmio_write_cpending, NULL, NULL, 1,
  		VGIC_ACCESS_32bit),
  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
--		vgic_mmio_read_active, vgic_mmio_write_sactive, 1,
-+		vgic_mmio_read_active, vgic_mmio_write_sactive, NULL, NULL, 1,
+-		vgic_mmio_read_active, vgic_mmio_write_sactive, NULL, NULL, 1,
++		vgic_mmio_read_active, vgic_mmio_write_sactive,
++		NULL, vgic_mmio_uaccess_write_sactive, 1,
  		VGIC_ACCESS_32bit),
  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
--		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
-+		vgic_mmio_read_active, vgic_mmio_write_cactive, NULL, NULL, 1,
+-		vgic_mmio_read_active, vgic_mmio_write_cactive, NULL, NULL, 1,
++		vgic_mmio_read_active, vgic_mmio_write_cactive,
++		NULL, vgic_mmio_uaccess_write_cactive, 1,
  		VGIC_ACCESS_32bit),
  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
--		vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
--		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
-+		vgic_mmio_read_priority, vgic_mmio_write_priority, NULL, NULL,
-+		8, VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
--		vgic_mmio_read_target, vgic_mmio_write_target, 8,
-+		vgic_mmio_read_target, vgic_mmio_write_target, NULL, NULL, 8,
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
--		vgic_mmio_read_config, vgic_mmio_write_config, 2,
-+		vgic_mmio_read_config, vgic_mmio_write_config, NULL, NULL, 2,
+ 		vgic_mmio_read_priority, vgic_mmio_write_priority, NULL, NULL,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 99da1a2..23c0d564 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -456,11 +456,13 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
  		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
- 		vgic_mmio_read_raz, vgic_mmio_write_sgir, 4,
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISACTIVER,
+-		vgic_mmio_read_active, vgic_mmio_write_sactive, NULL, NULL, 1,
++		vgic_mmio_read_active, vgic_mmio_write_sactive,
++		NULL, vgic_mmio_uaccess_write_sactive, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICACTIVER,
+-		vgic_mmio_read_active, vgic_mmio_write_cactive, NULL, NULL, 1,
+-		VGIC_ACCESS_32bit),
++		vgic_mmio_read_active, vgic_mmio_write_cactive,
++		NULL, vgic_mmio_uaccess_write_cactive,
++		1, VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IPRIORITYR,
+ 		vgic_mmio_read_priority, vgic_mmio_write_priority, NULL, NULL,
+ 		8, VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index 1c17b2a..64cbcb4 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -251,38 +251,74 @@ static void vgic_change_active_finish(struct kvm_vcpu *vcpu, u32 intid)
+ 		kvm_arm_resume_guest(vcpu->kvm);
+ }
+ 
+-void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+-			     gpa_t addr, unsigned int len,
+-			     unsigned long val)
++static void __vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
++				      gpa_t addr, unsigned int len,
++				      unsigned long val)
+ {
+ 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+ 	int i;
+ 
+-	vgic_change_active_prepare(vcpu, intid);
+ 	for_each_set_bit(i, &val, len * 8) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 		vgic_mmio_change_active(vcpu, irq, false);
+ 		vgic_put_irq(vcpu->kvm, irq);
+ 	}
+-	vgic_change_active_finish(vcpu, intid);
+ }
+ 
+-void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
++void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+ 			     gpa_t addr, unsigned int len,
+ 			     unsigned long val)
+ {
+ 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+-	int i;
+ 
+ 	vgic_change_active_prepare(vcpu, intid);
++
++	__vgic_mmio_write_cactive(vcpu, addr, len, val);
++
++	vgic_change_active_finish(vcpu, intid);
++}
++
++void vgic_mmio_uaccess_write_cactive(struct kvm_vcpu *vcpu,
++				     gpa_t addr, unsigned int len,
++				     unsigned long val)
++{
++	__vgic_mmio_write_cactive(vcpu, addr, len, val);
++}
++
++static void __vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
++				      gpa_t addr, unsigned int len,
++				      unsigned long val)
++{
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
++	int i;
++
+ 	for_each_set_bit(i, &val, len * 8) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 		vgic_mmio_change_active(vcpu, irq, true);
+ 		vgic_put_irq(vcpu->kvm, irq);
+ 	}
++}
++
++void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val)
++{
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
++
++	vgic_change_active_prepare(vcpu, intid);
++
++	__vgic_mmio_write_sactive(vcpu, addr, len, val);
++
+ 	vgic_change_active_finish(vcpu, intid);
+ }
+ 
++void vgic_mmio_uaccess_write_sactive(struct kvm_vcpu *vcpu,
++				     gpa_t addr, unsigned int len,
++				     unsigned long val)
++{
++	__vgic_mmio_write_sactive(vcpu, addr, len, val);
++}
++
+ unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
+ 				      gpa_t addr, unsigned int len)
+ {
 diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index ea4171a..27924a3 100644
+index 27924a3..5693f6df 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio.h
 +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -75,7 +75,7 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
-  * The _WITH_LENGTH version instantiates registers with a fixed length
-  * and is mutually exclusive with the _PER_IRQ version.
-  */
--#define REGISTER_DESC_WITH_BITS_PER_IRQ(off, rd, wr, bpi, acc)		\
-+#define REGISTER_DESC_WITH_BITS_PER_IRQ(off, rd, wr, ur, uw, bpi, acc)	\
- 	{								\
- 		.reg_offset = off,					\
- 		.bits_per_irq = bpi,					\
-@@ -83,6 +83,8 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
- 		.access_flags = acc,					\
- 		.read = rd,						\
- 		.write = wr,						\
-+		.uaccess_read = ur,					\
-+		.uaccess_write = uw,					\
- 	}
+@@ -167,6 +167,14 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+ 			     gpa_t addr, unsigned int len,
+ 			     unsigned long val);
  
- #define REGISTER_DESC_WITH_LENGTH(off, rd, wr, length, acc)		\
++void vgic_mmio_uaccess_write_cactive(struct kvm_vcpu *vcpu,
++				     gpa_t addr, unsigned int len,
++				     unsigned long val);
++
++void vgic_mmio_uaccess_write_sactive(struct kvm_vcpu *vcpu,
++				     gpa_t addr, unsigned int len,
++				     unsigned long val);
++
+ unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
+ 				      gpa_t addr, unsigned int len);
+ 
 -- 
 2.9.0
