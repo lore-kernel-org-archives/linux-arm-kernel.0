@@ -1,34 +1,43 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 16 May 2017 10:34:54 +0100
-Subject: [PATCH v3 1/2] kvm: arm/arm64: Force reading uncached stage2 PGD
-In-Reply-To: <1494927295-29369-1-git-send-email-suzuki.poulose@arm.com>
-References: <1494927295-29369-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1494927295-29369-2-git-send-email-suzuki.poulose@arm.com>
+Date: Tue, 16 May 2017 10:34:53 +0100
+Subject: [PATCH v3 0/2] kvm: arm/arm64: Fixes for race conditions
+Message-ID: <1494927295-29369-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure we don't use a cached value of the KVM stage2 PGD while
-resetting the PGD.
+The patches fixes race conditions in stage2 pgd accesses.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- virt/kvm/arm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Patch 1 is a fix up for the patch which has already been pushed to
+kvmarm/master.
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 909a1a7..704e35f 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -837,7 +837,7 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
- 	spin_lock(&kvm->mmu_lock);
- 	if (kvm->arch.pgd) {
- 		unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
--		pgd = kvm->arch.pgd;
-+		pgd = READ_ONCE(kvm->arch.pgd);
- 		kvm->arch.pgd = NULL;
- 	}
- 	spin_unlock(&kvm->mmu_lock);
+Patch 2 fixes a case where stage2 PGD could be free'd when we release
+the kvm->mmu_lock to prevent VCPU starvation.
+
+Applies on kvmarm/master tree
+
+Changes since V2:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/504401.html
+
+ - Patch 1 in V2 has been pushed to kvmarm/master. Added a fixup to the
+   original patch to make sure we don't use cached stage2 pgd.
+ - Patch 2: Handle cases where unmap_stage2_range may be called without
+   checking the validity of stage2 pgd.
+
+
+Changes since v1:
+ http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/502867.html
+
+ - Dropped patch for fixing mmu_notifier race condition, which couldn't be
+   reproduced.
+ - Added reviewed-by from Christoffer
+ - Added new patch to fix another race condition
+
+Suzuki K Poulose (2):
+  kvm: arm/arm64: Force reading uncached stage2 PGD
+  kvm: arm/arm64: Fix use after free of stage2 page table
+
+ virt/kvm/arm/mmu.c | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
+
 -- 
 2.7.4
