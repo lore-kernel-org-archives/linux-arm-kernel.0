@@ -1,66 +1,123 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Tue, 16 May 2017 16:11:25 +0800
-Subject: [PATCH] arm64: check return value of of_flat_dt_get_machine_name
-In-Reply-To: <CAMuHMdUpPDSkbMU2+TL5Z=ZXx8=K=V+75=pBPg_s-E9cww42GQ@mail.gmail.com>
-References: <1494920176-13986-1-git-send-email-wangkefeng.wang@huawei.com>
- <CAMuHMdUpPDSkbMU2+TL5Z=ZXx8=K=V+75=pBPg_s-E9cww42GQ@mail.gmail.com>
-Message-ID: <fe4bcf5f-c8fb-6e42-6084-0d8583ccaa99@huawei.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Tue, 16 May 2017 13:43:20 +0530
+Subject: [PATCH v1 3/3] drm/stm: Add STM32 DSI host driver
+In-Reply-To: <250fc42c-8961-c57e-6f59-9b1a6523a0a4@st.com>
+References: <1494600989-13507-1-git-send-email-philippe.cornu@st.com>
+ <1494600989-13507-4-git-send-email-philippe.cornu@st.com>
+ <a254c176-8064-1984-10b8-dce4308cc3d6@baylibre.com>
+ <250fc42c-8961-c57e-6f59-9b1a6523a0a4@st.com>
+Message-ID: <f8043f78-905f-c3cb-fe42-be58981cdaf6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ linux-arm-kernel
+Hi,
 
-On 2017/5/16 15:54, Geert Uytterhoeven wrote:
-> Hi Kefeng,
-> 
-> On Tue, May 16, 2017 at 9:36 AM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
->> It's useless to print machine name and setup arch-specific system
->> identifiers if of_flat_dt_get_machine_name() return NULL, especially
->> when ACPI-based boot.
-> 
-> Is there an ACPI-equivalent of the machine name?
-> If yes, it would be useful to use that instead.
+On 05/15/2017 04:03 PM, Philippe CORNU wrote:
+> Hi Neil,
+> Many thanks for your comments.
+>
+> The PHY part of the MIPI DSI is the main difference between all chipsets
+> based on the Synopsys DesignWare MIPI DSI.
+> There is no "generic DSI PHY interface" and that is probably why all soc
+> vendors have implemented their own drivers (RockChip, NXP/Freescale,
+> HiSilicon and now STM32).
 
-We will get system identification string(machine name) from SMBIOS, see drivers/firmware/dmi_scan.c
-and arch/arm64/kernel/efi.c.
-arm64_dmi_init
---dmi_scan_machine
-  --dmi_present/dmi_smbios3_present
-    --pr_info("DMI: %s\n", dmi_ids_string);
---dmi_set_dump_stack_arch_desc
+We don't really need a generic DSI PHY interface to ensure we use a common
+bridge driver. We need to do what's been done in the DW HDMI bridge driver.
+The dw_hdmi_plat_data struct contains phy ops, which can be used to abstract
+vendor PHYs.
 
-Kefeng.
-> 
->> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->> ---
->>  arch/arm64/kernel/setup.c | 3 +++
->>  1 file changed, 3 insertions(+)
+>
+> Regarding creating a "generic dw MIPI DSI bridge" as the recent dw hdmi
+> bridge, several attempts have been done in the past but without success:
+> * Liu Ying from Freescale in February 2015
+> (https://lkml.org/lkml/2015/2/12/38).
+> * Chris Zhong from Rockchip in November 2015
+> (http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1024586.html).
+
+We can't have 3 almost identical DW MIPI DSI implementations in the kernel.
+You'll need to separate out the vendor specific PHY pieces into ops (like
+it's done in the DW HDMI) and post a bridge driver for this.
+
+You don't need to convert the existing rockhip and hisilicon implementations
+into bridge drivers. We can CC the authors of the rockchip and hisil so that
+they can adapt to the bridge driver too.
+
+Thanks,
+Archit
+
+>
+> The Rockchip driver looks nice and is updated regularly.
+> So, instead of creating a new driver for the STM32 family, we decided to
+> use Rockchip?s in our own drm/stm directory and replace the
+> Rockchip-specific PHY by the STM32.
+>
+> Comments are welcome :-)
+> Many thanks,
+> Philippe
+>
+>
+> On 05/15/2017 10:22 AM, Neil Armstrong wrote:
+>> On 05/12/2017 04:56 PM, Philippe CORNU wrote:
+>>> This mipi dsi host driver is based on the Rockchip version of the
+>>> Synopsys Designware mipi dsi driver (rockchip/dw-mipi-dsi.c)
+>>> modified for the stm32 family:
+>>> - replace Rockchip digital & phy specific extensions with stm32's ones.
+>>> - add a bridge
+>>>
+>>> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+>>> ---
+>>>  drivers/gpu/drm/stm/Kconfig       |    7 +
+>>>  drivers/gpu/drm/stm/Makefile      |    2 +
+>>>  drivers/gpu/drm/stm/dw-mipi-dsi.c | 1197 +++++++++++++++++++++++++++++++++++++
+>>>  3 files changed, 1206 insertions(+)
+>>>  create mode 100644 drivers/gpu/drm/stm/dw-mipi-dsi.c
+>>>
+>>> diff --git a/drivers/gpu/drm/stm/Kconfig b/drivers/gpu/drm/stm/Kconfig
+>>> index 2c4817f..0007789 100644
+>>> --- a/drivers/gpu/drm/stm/Kconfig
+>>> +++ b/drivers/gpu/drm/stm/Kconfig
+>>> @@ -14,3 +14,10 @@ config DRM_STM
+>>>  	  STMicroelectronics STM32 MCUs.
+>>>  	  To compile this driver as a module, choose M here: the module
+>>>  	  will be called stm-drm.
+>>> +
+>>> +config DRM_STM_DSI
+>>> +	tristate "MIPI DSI support for STMicroelectronics SoC"
+>>> +	depends on DRM_STM
+>>> +	select DRM_MIPI_DSI
+>>> +	help
+>>> +	  Choose this option for MIPI DSI support on STMicroelectronics SoC.
+>>> diff --git a/drivers/gpu/drm/stm/Makefile b/drivers/gpu/drm/stm/Makefile
+>>> index e114d45..e448a93 100644
+>>> --- a/drivers/gpu/drm/stm/Makefile
+>>> +++ b/drivers/gpu/drm/stm/Makefile
+>>> @@ -4,4 +4,6 @@ stm-drm-y := \
+>>>  	drv.o \
+>>>  	ltdc.o
+>>>
+>>> +obj-$(CONFIG_DRM_STM_DSI) += dw-mipi-dsi.o
+>>> +
+>>>  obj-$(CONFIG_DRM_STM) += stm-drm.o
+>>> diff --git a/drivers/gpu/drm/stm/dw-mipi-dsi.c b/drivers/gpu/drm/stm/dw-mipi-dsi.c
+>>> new file mode 100644
+>>> index 0000000..4b7f7b9
+>>> --- /dev/null
+>>> +++ b/drivers/gpu/drm/stm/dw-mipi-dsi.c
 >>
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index 2c822ef..d4b7405 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -194,6 +194,9 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
->>         }
 >>
->>         name = of_flat_dt_get_machine_name();
->> +       if (!name)
->> +               return;
->> +
->>         pr_info("Machine model: %s\n", name);
->>         dump_stack_set_arch_desc("%s (DT)", name);
->>  }
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> 
-> .
-> 
+>> Hi Philippe,
+>>
+>> First question, why couldn't this be transformed as a bridge driver along the Synopsys DW-HDMI driver ?
+>>
+>> Neil
+>>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
