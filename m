@@ -1,204 +1,226 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 16 May 2017 15:18:05 +0100
-Subject: [PATCHv5] arm64/cpufeature: don't use mutex in bringup path
-Message-ID: <1494944285-12152-1-git-send-email-mark.rutland@arm.com>
+From: zhongjiang@huawei.com (zhongjiang)
+Date: Tue, 16 May 2017 22:15:27 +0800
+Subject: [PATCH v4] arm64: fix the overlap between the kernel image and
+ vmalloc address
+Message-ID: <1494944127-41737-1-git-send-email-zhongjiang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, cpus_set_cap() calls static_branch_enable_cpuslocked(), which
-must take the jump_label mutex.
+Recently, xiaojun report the following issue.
 
-We call cpus_set_cap() in the secondary bringup path, from the idle
-thread where interrupts are disabled. Taking a mutex in this path "is a
-NONO" regardless of whether it's contended, and something we must avoid.
-We didn't spot this until recently, as ___might_sleep() won't warn for
-this case until all CPUs have been brought up.
+[ 4544.984139] Unable to handle kernel paging request at virtual address ffff804392800000
+[ 4544.991995] pgd = ffff80096745f000
+[ 4544.995369] [ffff804392800000] *pgd=0000000000000000
+[ 4545.000297] Internal error: Oops: 96000005 [#1] PREEMPT SMP
+[ 4545.005815] Modules linked in:
+[ 4545.008843] CPU: 1 PID: 8976 Comm: cat Not tainted 4.11.0-rc6 #1
+[ 4545.014790] Hardware name: ARM Juno development board (r1) (DT)
+[ 4545.020653] task: ffff8009753fdb00 task.stack: ffff80097533c000
+[ 4545.026520] PC is at __memcpy+0x100/0x180
+[ 4545.030491] LR is at vread+0x144/0x280
+[ 4545.034202] pc : [<ffff0000083a1000>] lr : [<ffff0000081c126c>] pstate: 20000145
+[ 4545.041530] sp : ffff80097533fcb0
+[ 4545.044811] x29: ffff80097533fcb0 x28: ffff800962d24000
+[ 4545.050074] x27: 0000000000001000 x26: ffff8009753fdb00
+[ 4545.055337] x25: ffff000008200000 x24: ffff800977801380
+[ 4545.060600] x23: ffff8009753fdb00 x22: ffff800962d24000
+[ 4545.065863] x21: 0000000000001000 x20: ffff000008200000
+[ 4545.071125] x19: 0000000000001000 x18: 0000ffffefa323c0
+[ 4545.076387] x17: 0000ffffa9c87440 x16: ffff0000081fdfd0
+[ 4545.081649] x15: 0000ffffa9d01588 x14: 72a77346b2407be7
+[ 4545.086911] x13: 5299400690000000 x12: b0000001f9001a79
+[ 4545.092173] x11: 97fc098d91042260 x10: 0000000000000000
+[ 4545.097435] x9 : 0000000000000000 x8 : 9110626091260021
+[ 4545.102698] x7 : 0000000000001000 x6 : ffff800962d24000
+[ 4545.107960] x5 : ffff8009778013b0 x4 : 0000000000000000
+[ 4545.113222] x3 : 0400000000000001 x2 : 0000000000000f80
+[ 4545.118484] x1 : ffff804392800000 x0 : ffff800962d24000
+[ 4545.123745]
+[ 4545.125220] Process cat (pid: 8976, stack limit = 0xffff80097533c000)
+[ 4545.131598] Stack: (0xffff80097533fcb0 to 0xffff800975340000)
+[ 4545.137289] fca0:                                   ffff80097533fd30 ffff000008270f64
+[ 4545.145049] fcc0: 000000000000e000 000000003956f000 ffff000008f950d0 ffff80097533feb8
+[ 4545.152809] fce0: 0000000000002000 ffff8009753fdb00 ffff800962d24000 ffff000008e8d3d8
+[ 4545.160568] fd00: 0000000000001000 ffff000008200000 0000000000001000 ffff800962d24000
+[ 4545.168327] fd20: 0000000000001000 ffff000008e884a0 ffff80097533fdb0 ffff00000826340c
+[ 4545.176086] fd40: ffff800976bf2800 fffffffffffffffb 000000003956d000 ffff80097533feb8
+[ 4545.183846] fd60: 0000000060000000 0000000000000015 0000000000000124 000000000000003f
+[ 4545.191605] fd80: ffff000008962000 ffff8009753fdb00 ffff8009753fdb00 ffff8009753fdb00
+[ 4545.199364] fda0: 0000000300000124 0000000000002000 ffff80097533fdd0 ffff0000081fb83c
+[ 4545.207123] fdc0: 0000000000010000 ffff80097514f900 ffff80097533fe50 ffff0000081fcb28
+[ 4545.214883] fde0: 0000000000010000 ffff80097514f900 0000000000000000 0000000000000000
+[ 4545.222642] fe00: ffff80097533fe30 ffff0000081fca1c ffff80097514f900 0000000000000000
+[ 4545.230401] fe20: 000000003956d000 ffff80097533feb8 ffff80097533fe50 ffff0000081fcb04
+[ 4545.238160] fe40: 0000000000010000 ffff80097514f900 ffff80097533fe80 ffff0000081fe014
+[ 4545.245919] fe60: ffff80097514f900 ffff80097514f900 000000003956d000 0000000000010000
+[ 4545.253678] fe80: 0000000000000000 ffff000008082f30 0000000000000000 0000800977146000
+[ 4545.261438] fea0: ffffffffffffffff 0000ffffa9c8745c 0000000000000124 0000000008202000
+[ 4545.269197] fec0: 0000000000000003 000000003956d000 0000000000010000 0000000000000000
+[ 4545.276956] fee0: 0000000000011011 0000000000000001 0000000000000011 0000000000000002
+[ 4545.284715] ff00: 000000000000003f 1f3c201f7372686b 00000000ffffffff 0000000000000030
+[ 4545.292474] ff20: 0000000000000038 0000000000000000 0000ffffa9bcca94 0000ffffa9d01588
+[ 4545.300233] ff40: 0000000000000000 0000ffffa9c87440 0000ffffefa323c0 0000000000010000
+[ 4545.307993] ff60: 000000000041a310 000000003956d000 0000000000000003 000000007fffe000
+[ 4545.315751] ff80: 00000000004088d0 0000000000010000 0000000000000000 0000000000000000
+[ 4545.323511] ffa0: 0000000000010000 0000ffffefa32690 0000000000404dcc 0000ffffefa32690
+[ 4545.331270] ffc0: 0000ffffa9c8745c 0000000060000000 0000000000000003 000000000000003f
+[ 4545.339029] ffe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[ 4545.346786] Call trace:
+[ 4545.349207] Exception stack(0xffff80097533fae0 to 0xffff80097533fc10)
+[ 4545.355586] fae0: 0000000000001000 0001000000000000 ffff80097533fcb0 ffff0000083a1000
+[ 4545.363345] fb00: 000000003957c000 ffff80097533fc00 0000000020000145 0000000000000025
+[ 4545.371105] fb20: ffff800962d24000 ffff000008e8d3d8 0000000000001000 ffff8009753fdb00
+[ 4545.378864] fb40: 0000000000000000 0000000000000002 ffff80097533fd30 ffff000008082604
+[ 4545.386623] fb60: 0000000000001000 0001000000000000 ffff80097533fd30 ffff0000083a0a90
+[ 4545.394382] fb80: ffff800962d24000 ffff804392800000 0000000000000f80 0400000000000001
+[ 4545.402140] fba0: 0000000000000000 ffff8009778013b0 ffff800962d24000 0000000000001000
+[ 4545.409899] fbc0: 9110626091260021 0000000000000000 0000000000000000 97fc098d91042260
+[ 4545.417658] fbe0: b0000001f9001a79 5299400690000000 72a77346b2407be7 0000ffffa9d01588
+[ 4545.425416] fc00: ffff0000081fdfd0 0000ffffa9c87440
+[ 4545.430248] [<ffff0000083a1000>] __memcpy+0x100/0x180
+[ 4545.435253] [<ffff000008270f64>] read_kcore+0x21c/0x3b0
+[ 4545.440429] [<ffff00000826340c>] proc_reg_read+0x64/0x90
+[ 4545.445691] [<ffff0000081fb83c>] __vfs_read+0x1c/0x108
+[ 4545.450779] [<ffff0000081fcb28>] vfs_read+0x80/0x130
+[ 4545.455696] [<ffff0000081fe014>] SyS_read+0x44/0xa0
+[ 4545.460528] [<ffff000008082f30>] el0_svc_naked+0x24/0x28
+[ 4545.465790] Code: d503201f d503201f d503201f d503201f (a8c12027)
+[ 4545.471852] ---[ end trace 4d1897f94759f461 ]---
+[ 4545.476435] note: cat[8976] exited with preempt_count 2
 
-This patch avoids taking the mutex in the secondary bringup path. The
-poking of static keys is deferred until enable_cpu_capabilities(), which
-runs in a suitable context on the boot CPU. To account for the static
-keys being set later, cpus_have_const_cap() is updated to use another
-static key to check whether the const cap keys have been initialised,
-falling back to the caps bitmap until this is the case.
+I find the issue is introduced when applying commit f9040773b7bb
+("arm64: move kernel image to base of vmalloc area"). This patch
+make the kernel image overlap with vmalloc area. It will result in
+vmalloc area have the huge page table. but the vmalloc_to_page is
+not realize the change. and the function is public to any arch.
 
-This means that users of cpus_have_const_cap() gain should only gain a
-single additional NOP in the fast path once the const caps are
-initialised, but should always see the current cap value.
+I fix it by adding the another kernel image condition in vmalloc_to_page
+to make it keep the accordance with previous vmalloc mapping.
 
-The hyp code should never dereference the caps array, since the caps are
-initialized before we run the module initcall to initialise hyp. A check
-is added to the hyp init code to document this requirement.
-
-This change will sidestep a number of issues when the upcoming hotplug
-locking rework is merged.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Marc Zyniger <marc.zyngier@arm.com>
-Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Sebastian Sewior <bigeasy@linutronix.de>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+Fixes: f9040773b7bb ("arm64: move kernel image to base of vmalloc area")
+Reported-by: tan xiaojun <tanxiaojun@huawei.com>
+Signed-off-by: zhongjiang <zhongjiang@huawei.com>
+Reviewed-by: Laura Abbott <labbott@redhat.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 12 ++++++++++--
- arch/arm64/include/asm/kvm_host.h   |  8 ++++++--
- arch/arm64/kernel/cpufeature.c      | 23 +++++++++++++++++++++--
- 3 files changed, 37 insertions(+), 6 deletions(-)
+ arch/arm64/mm/mmu.c     |  2 +-
+ include/linux/vmalloc.h |  1 +
+ mm/vmalloc.c            | 34 +++++++++++++++++++++++++++-------
+ 3 files changed, 29 insertions(+), 8 deletions(-)
 
-Catalin, can you take this as a fix for v4.12?
-
-Thomas has zapped the tip smp/hotplug branch, so we won't see a conflict in
-linux-next with the prior attempt to clean this up.
-
-Thanks,
-Mark.
-
-Since v1 [1]:
-* Kill redundant update_cpu_errata_workarounds() prototype
-* Introduce arm64_const_caps_ready
-Since v2 [2]:
-* Add hyp init check
-* Clean up commit message
-* Drop fixes tag
-Since v3 [3]:
-* Fix typos
-* Accumulate tags
-Since v4 [4]:
-* Rebase to v4.12-rc1, so this can go via the arm64 tree
-* Clean up commit message
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/505731.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/505763.html
-[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/505887.html
-[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/505964.html
-
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index e7f84a7..428ee1f 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -115,6 +115,7 @@ struct arm64_cpu_capabilities {
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 0c429ec..2265c39 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -509,7 +509,7 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+ 	vma->addr	= va_start;
+ 	vma->phys_addr	= pa_start;
+ 	vma->size	= size;
+-	vma->flags	= VM_MAP;
++	vma->flags	= VM_KERNEL;
+ 	vma->caller	= __builtin_return_address(0);
  
- extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
-+extern struct static_key_false arm64_const_caps_ready;
+ 	vm_area_add_early(vma);
+diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
+index 0328ce0..c9245af 100644
+--- a/include/linux/vmalloc.h
++++ b/include/linux/vmalloc.h
+@@ -17,6 +17,7 @@
+ #define VM_ALLOC		0x00000002	/* vmalloc() */
+ #define VM_MAP			0x00000004	/* vmap()ed pages */
+ #define VM_USERMAP		0x00000008	/* suitable for remap_vmalloc_range */
++#define VM_KERNEL		0x00000010	/* kernel pages */
+ #define VM_UNINITIALIZED	0x00000020	/* vm_struct is not fully initialized */
+ #define VM_NO_GUARD		0x00000040      /* don't add guard page */
+ #define VM_KASAN		0x00000080      /* has allocated kasan shadow memory */
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 1dda6d8..b456803 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -1967,11 +1967,27 @@ void *vmalloc_32_user(unsigned long size)
+ EXPORT_SYMBOL(vmalloc_32_user);
  
- bool this_cpu_has_cap(unsigned int cap);
- 
-@@ -124,7 +125,7 @@ static inline bool cpu_have_feature(unsigned int num)
- }
- 
- /* System capability check for constant caps */
--static inline bool cpus_have_const_cap(int num)
-+static inline bool __cpus_have_const_cap(int num)
- {
- 	if (num >= ARM64_NCAPS)
- 		return false;
-@@ -138,6 +139,14 @@ static inline bool cpus_have_cap(unsigned int num)
- 	return test_bit(num, cpu_hwcaps);
- }
- 
-+static inline bool cpus_have_const_cap(int num)
+ /*
++ * VM_KERNEL indicates an address is mapped linearly.The linear mapping may
++ * use larger pages which vmalloc_to_page cannot handle.
++ */
++static inline struct page *aligned_get_page(char *addr, struct vm_struct *vm)
 +{
-+	if (static_branch_likely(&arm64_const_caps_ready))
-+		return __cpus_have_const_cap(num);
++	struct page *p = NULL;
++
++	if (vm->flags & VM_KERNEL)
++		p = virt_to_page(lm_alias(addr));
 +	else
-+		return cpus_have_cap(num);
++		p = vmalloc_to_page(addr);
++
++	return p;
 +}
 +
- static inline void cpus_set_cap(unsigned int num)
- {
- 	if (num >= ARM64_NCAPS) {
-@@ -145,7 +154,6 @@ static inline void cpus_set_cap(unsigned int num)
- 			num, ARM64_NCAPS);
- 	} else {
- 		__set_bit(num, cpu_hwcaps);
--		static_branch_enable(&cpu_hwcap_keys[num]);
- 	}
- }
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 5e19165..1f252a9 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -24,6 +24,7 @@
- 
- #include <linux/types.h>
- #include <linux/kvm_types.h>
-+#include <asm/cpufeature.h>
- #include <asm/kvm.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmio.h>
-@@ -355,9 +356,12 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
- 				       unsigned long vector_ptr)
- {
- 	/*
--	 * Call initialization code, and switch to the full blown
--	 * HYP code.
-+	 * Call initialization code, and switch to the full blown HYP code.
-+	 * If the cpucaps haven't been finalized yet, something has gone very
-+	 * wrong, and hyp will crash and burn when it uses any
-+	 * cpus_have_const_cap() wrapper.
- 	 */
-+	BUG_ON(!static_branch_likely(&arm64_const_caps_ready));
- 	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
- }
- 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 94b8f7f..817ce33 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -985,8 +985,16 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
++/*
+  * small helper routine , copy contents to buf from addr.
+  * If the page is not present, fill zero.
   */
- void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+-
+-static int aligned_vread(char *buf, char *addr, unsigned long count)
++static int aligned_vread(char *buf, char *addr, unsigned long count,
++					struct vm_struct *vm)
  {
--	for (; caps->matches; caps++)
--		if (caps->enable && cpus_have_cap(caps->capability))
-+	for (; caps->matches; caps++) {
-+		unsigned int num = caps->capability;
-+
-+		if (!cpus_have_cap(num))
-+			continue;
-+
-+		/* Ensure cpus_have_const_cap(num) works */
-+		static_branch_enable(&cpu_hwcap_keys[num]);
-+
-+		if (caps->enable) {
- 			/*
- 			 * Use stop_machine() as it schedules the work allowing
- 			 * us to modify PSTATE, instead of on_each_cpu() which
-@@ -994,6 +1002,8 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
- 			 * we return.
- 			 */
- 			stop_machine(caps->enable, NULL, cpu_online_mask);
-+		}
-+	}
+ 	struct page *p;
+ 	int copied = 0;
+@@ -1983,7 +1999,7 @@ static int aligned_vread(char *buf, char *addr, unsigned long count)
+ 		length = PAGE_SIZE - offset;
+ 		if (length > count)
+ 			length = count;
+-		p = vmalloc_to_page(addr);
++		p = aligned_get_page(addr, vm);
+ 		/*
+ 		 * To do safe access to this _mapped_ area, we need
+ 		 * lock. But adding lock here means that we need to add
+@@ -2010,7 +2026,8 @@ static int aligned_vread(char *buf, char *addr, unsigned long count)
+ 	return copied;
  }
  
- /*
-@@ -1096,6 +1106,14 @@ static void __init setup_feature_capabilities(void)
- 	enable_cpu_capabilities(arm64_features);
- }
+-static int aligned_vwrite(char *buf, char *addr, unsigned long count)
++static int aligned_vwrite(char *buf, char *addr, unsigned long count,
++					struct vm_struct *vm)
+ {
+ 	struct page *p;
+ 	int copied = 0;
+@@ -2022,7 +2039,7 @@ static int aligned_vwrite(char *buf, char *addr, unsigned long count)
+ 		length = PAGE_SIZE - offset;
+ 		if (length > count)
+ 			length = count;
+-		p = vmalloc_to_page(addr);
++		p = aligned_get_page(addr, vm);
+ 		/*
+ 		 * To do safe access to this _mapped_ area, we need
+ 		 * lock. But adding lock here means that we need to add
+@@ -2109,7 +2126,7 @@ long vread(char *buf, char *addr, unsigned long count)
+ 		if (n > count)
+ 			n = count;
+ 		if (!(vm->flags & VM_IOREMAP))
+-			aligned_vread(buf, addr, n);
++			aligned_vread(buf, addr, n, vm);
+ 		else /* IOREMAP area is treated as memory hole */
+ 			memset(buf, 0, n);
+ 		buf += n;
+@@ -2190,7 +2207,7 @@ long vwrite(char *buf, char *addr, unsigned long count)
+ 		if (n > count)
+ 			n = count;
+ 		if (!(vm->flags & VM_IOREMAP)) {
+-			aligned_vwrite(buf, addr, n);
++			aligned_vwrite(buf, addr, n, vm);
+ 			copied++;
+ 		}
+ 		buf += n;
+@@ -2710,6 +2727,9 @@ static int s_show(struct seq_file *m, void *p)
+ 	if (v->flags & VM_USERMAP)
+ 		seq_puts(m, " user");
  
-+DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
-+EXPORT_SYMBOL(arm64_const_caps_ready);
++	if (v->flags & VM_KERNEL)
++		seq_puts(m, " kernel");
 +
-+static void __init mark_const_caps_ready(void)
-+{
-+	static_branch_enable(&arm64_const_caps_ready);
-+}
-+
- /*
-  * Check if the current CPU has a given feature capability.
-  * Should be called from non-preemptible context.
-@@ -1131,6 +1149,7 @@ void __init setup_cpu_features(void)
- 	/* Set the CPU feature capabilies */
- 	setup_feature_capabilities();
- 	enable_errata_workarounds();
-+	mark_const_caps_ready();
- 	setup_elf_hwcaps(arm64_elf_hwcaps);
+ 	if (is_vmalloc_addr(v->pages))
+ 		seq_puts(m, " vpages");
  
- 	if (system_supports_32bit_el0())
 -- 
-1.9.1
+1.7.12.4
