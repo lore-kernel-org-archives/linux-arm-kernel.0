@@ -1,251 +1,51 @@
-From: cosardindar@gmail.com (Cosar Dindar)
-Date: Wed, 17 May 2017 00:18:50 +0300
-Subject: [PATCH] crypto: stm32 - Add CRC32 support for STM32F4XX
-Message-ID: <1494969530-91589-1-git-send-email-cosardindar@gmail.com>
+From: garsilva@embeddedor.com (Gustavo A. R. Silva)
+Date: Tue, 16 May 2017 16:56:53 -0500
+Subject: [pwm] question about potential division by zero
+Message-ID: <20170516165653.Horde.Xe6MBOoWtIt1Jni0nYqF1GM@gator4166.hostgator.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add hardware CRC32 ("Ethernet") calculation support
-for STMicroelectronics STM32F4XX series devices.
 
-As an hardware limitation polynomial and key setting are not supported
-as they are fixed as 0x4C11DB7 (poly) and 0xFFFFFFFF (key).
+Hello everybody,
 
-CRC32C Castagnoli algorithm is not supported also.
-Module is tested on STM32F429-disco board with crypto testmgr using
-cases within the key 0xFFFFFFFF.
+While looking into Coverity ID 1408721 I ran into the following piece  
+of code at /drivers/pwm/pwm-mediatek.c:77:
 
-Signed-off-by: Cosar Dindar <cosardindar@gmail.com>
----
- .../devicetree/bindings/crypto/st,stm32-crc.txt    |  4 +-
- arch/arm/boot/dts/stm32429i-eval.dts               |  4 ++
- arch/arm/boot/dts/stm32f429-disco.dts              |  4 ++
- arch/arm/boot/dts/stm32f429.dtsi                   |  7 +++
- arch/arm/boot/dts/stm32f469-disco.dts              |  4 ++
- drivers/crypto/stm32/stm32_crc32.c                 | 68 ++++++++++++++++++----
- 6 files changed, 79 insertions(+), 12 deletions(-)
+  77static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+  78                          int duty_ns, int period_ns)
+  79{
+  80        struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
+  81        struct clk *clk = pc->clks[MTK_CLK_PWM1 + pwm->hwpwm];
+  82        u32 resolution, clkdiv = 0;
+  83
+  84        resolution = NSEC_PER_SEC / clk_get_rate(clk);
+  85
+  86        while (period_ns / resolution > 8191) {
+  87                resolution *= 2;
+  88                clkdiv++;
+  89        }
+  90
+  91        if (clkdiv > 7)
+  92                return -EINVAL;
+  93
+  94        mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | BIT(3) | clkdiv);
+  95        mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
+  96        mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
+  97
+  98        return 0;
+  99}
 
-diff --git a/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt b/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
-index 3ba92a5..7b30f1e 100644
---- a/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
-+++ b/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
-@@ -1,7 +1,7 @@
- * STMicroelectronics STM32 CRC
- 
- Required properties:
--- compatible: Should be "st,stm32f7-crc".
-+- compatible: Can be either "st,stm32f7-crc" or "st,srm32f4-crc".
- - reg: The address and length of the peripheral registers space
- - clocks: The input clock of the CRC instance
- 
-@@ -10,7 +10,7 @@ Optional properties: none
- Example:
- 
- crc: crc at 40023000 {
--	compatible = "st,stm32f7-crc";
-+	compatible = "st,stm32f7-crc", "st,stm32f4-crc";
- 	reg = <0x40023000 0x400>;
- 	clocks = <&rcc 0 12>;
- };
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index b633114..360fb19 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -141,6 +141,10 @@
- 	clock-frequency = <25000000>;
- };
- 
-+&crc {
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	pinctrl-0 = <&i2c1_pins>;
- 	pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
-index 191fa50..ae47cde 100644
---- a/arch/arm/boot/dts/stm32f429-disco.dts
-+++ b/arch/arm/boot/dts/stm32f429-disco.dts
-@@ -102,6 +102,10 @@
- 	clock-frequency = <8000000>;
- };
- 
-+&crc {
-+	status = "okay";
-+};
-+
- &rtc {
- 	assigned-clocks = <&rcc 1 CLK_RTC>;
- 	assigned-clock-parents = <&rcc 1 CLK_LSI>;
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index b2a2b5c..18343de 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -766,6 +766,13 @@
- 			};
- 		};
- 
-+		crc: crc at 40023000 {
-+			compatible = "st,stm32f4-crc";
-+			reg = <0x40023000 0x400>;
-+			clocks = <&rcc 0 STM32F4_AHB1_CLOCK(CRC)>;
-+			status = "disabled";
-+		};
-+
- 		rcc: rcc at 40023810 {
- 			#reset-cells = <1>;
- 			#clock-cells = <2>;
-diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
-index 75470c3..8cb8b73 100644
---- a/arch/arm/boot/dts/stm32f469-disco.dts
-+++ b/arch/arm/boot/dts/stm32f469-disco.dts
-@@ -87,6 +87,10 @@
- 	clock-frequency = <8000000>;
- };
- 
-+&crc {
-+	status = "okay";
-+};
-+
- &rtc {
- 	status = "okay";
- };
-diff --git a/drivers/crypto/stm32/stm32_crc32.c b/drivers/crypto/stm32/stm32_crc32.c
-index ec83b1e..12fbd98 100644
---- a/drivers/crypto/stm32/stm32_crc32.c
-+++ b/drivers/crypto/stm32/stm32_crc32.c
-@@ -7,6 +7,7 @@
- #include <linux/bitrev.h>
- #include <linux/clk.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- 
- #include <crypto/internal/hash.h>
-@@ -39,6 +40,9 @@ struct stm32_crc {
- 	struct clk       *clk;
- 	u8               pending_data[sizeof(u32)];
- 	size_t           nb_pending_bytes;
-+	bool             key_support;
-+	bool             poly_support;
-+	bool             reverse_support;
- };
- 
- struct stm32_crc_list {
-@@ -106,13 +110,31 @@ static int stm32_crc_init(struct shash_desc *desc)
- 	}
- 	spin_unlock_bh(&crc_list.lock);
- 
--	/* Reset, set key, poly and configure in bit reverse mode */
--	writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
--	writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
--	writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
-+	/* set key */
-+	if (ctx->crc->key_support) {
-+		writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
-+	} else if (mctx->key != CRC_INIT_DEFAULT) {
-+		dev_err(ctx->crc->dev, "Unsupported key value! Should be: 0x%x\n",
-+			CRC_INIT_DEFAULT);
-+		return -EINVAL;
-+	}
-+
-+	/* set poly */
-+	if (ctx->crc->poly_support)
-+		writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
-+
-+	/* reset and configure in bit reverse mode if supported */
-+	if (ctx->crc->reverse_support)
-+		writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
-+	else
-+		writel(CRC_CR_RESET, ctx->crc->regs + CRC_CR);
-+
-+	/* store partial result */
-+	if (!ctx->crc->reverse_support)
-+		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
-+	else
-+		ctx->partial = readl(ctx->crc->regs + CRC_DR);
- 
--	/* Store partial result */
--	ctx->partial = readl(ctx->crc->regs + CRC_DR);
- 	ctx->crc->nb_pending_bytes = 0;
- 
- 	return 0;
-@@ -135,7 +157,12 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
- 
- 		if (crc->nb_pending_bytes == sizeof(u32)) {
- 			/* Process completed pending data */
--			writel(*(u32 *)crc->pending_data, crc->regs + CRC_DR);
-+			if (!ctx->crc->reverse_support)
-+				writel(bitrev32(*(u32 *)crc->pending_data),
-+				       crc->regs + CRC_DR);
-+			else
-+				writel(*(u32 *)crc->pending_data,
-+				       crc->regs + CRC_DR);
- 			crc->nb_pending_bytes = 0;
- 		}
- 	}
-@@ -143,10 +170,16 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
- 	d32 = (u32 *)d8;
- 	for (i = 0; i < length >> 2; i++)
- 		/* Process 32 bits data */
--		writel(*(d32++), crc->regs + CRC_DR);
-+		if (!ctx->crc->reverse_support)
-+			writel(bitrev32(*(d32++)), crc->regs + CRC_DR);
-+		else
-+			writel(*(d32++), crc->regs + CRC_DR);
- 
- 	/* Store partial result */
--	ctx->partial = readl(crc->regs + CRC_DR);
-+	if (!ctx->crc->reverse_support)
-+		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
-+	else
-+		ctx->partial = readl(crc->regs + CRC_DR);
- 
- 	/* Check for pending data (non 32 bits) */
- 	length &= 3;
-@@ -243,6 +276,7 @@ static int stm32_crc_probe(struct platform_device *pdev)
- 	struct stm32_crc *crc;
- 	struct resource *res;
- 	int ret;
-+	int algs_size;
- 
- 	crc = devm_kzalloc(dev, sizeof(*crc), GFP_KERNEL);
- 	if (!crc)
-@@ -269,13 +303,26 @@ static int stm32_crc_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	/* set key, poly and reverse support if device is of F7 series */
-+	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f7-crc")) {
-+		crc->key_support = true;
-+		crc->poly_support = true;
-+		crc->reverse_support = true;
-+	}
-+
- 	platform_set_drvdata(pdev, crc);
- 
- 	spin_lock(&crc_list.lock);
- 	list_add(&crc->list, &crc_list.dev_list);
- 	spin_unlock(&crc_list.lock);
- 
--	ret = crypto_register_shashes(algs, ARRAY_SIZE(algs));
-+	/* For F4 series only CRC32 algorithm will be used */
-+	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f4-crc"))
-+		algs_size = 1;
-+	else
-+		algs_size = ARRAY_SIZE(algs);
-+
-+	ret = crypto_register_shashes(algs, algs_size);
- 	if (ret) {
- 		dev_err(dev, "Failed to register\n");
- 		clk_disable_unprepare(crc->clk);
-@@ -304,6 +351,7 @@ static int stm32_crc_remove(struct platform_device *pdev)
- 
- static const struct of_device_id stm32_dt_ids[] = {
- 	{ .compatible = "st,stm32f7-crc", },
-+	{ .compatible = "st,stm32f4-crc", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, stm32_dt_ids);
--- 
-2.7.4
+The issue here is that in case _clk_ is null, function clk_get_rate()  
+at line 84 will return zero and a division by zero will occur.
+
+So my question here is if there is any chance for _clk_ to be null at  
+line 81, hence ending up triggering a division by zero at line 84?
+
+I'm trying to figure out if this is a false positive or something that  
+needs to be fixed.
+
+I'd really appreciate any comment on this.
+
+Thank you
+--
+Gustavo A. R. Silva
