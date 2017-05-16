@@ -1,151 +1,90 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Tue, 16 May 2017 13:45:17 +0000
-Subject: [RFC v1 2/7] iommu/arm-smmu-v3: Add erratum framework functions
-In-Reply-To: <44374533-c1ed-5f13-d70c-8a7431bf8451@arm.com>
-References: <20170513094731.3676-1-shameerali.kolothum.thodi@huawei.com>
- <20170513094731.3676-3-shameerali.kolothum.thodi@huawei.com>
- <44374533-c1ed-5f13-d70c-8a7431bf8451@arm.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA8383509FD@FRAEML521-MBX.china.huawei.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 May 2017 14:45:15 +0100
+Subject: [PATCH 1/2] arm64: marvell: dts: fill MachiatoBin board
+ description
+In-Reply-To: <CAPv3WKep+c8tWGmQ8_zb1J8JcVSr3EDWqQ37Y_tVYDcuDEPzvw@mail.gmail.com>
+References: <1494890913-8360-1-git-send-email-mw@semihalf.com>
+ <1494890913-8360-2-git-send-email-mw@semihalf.com>
+ <20170515232825.GX22219@n2100.armlinux.org.uk>
+ <CAPv3WKdULNEDcqJ=qsBEAApaJNiyJXAw6ZG=Ejd8TxE6LJkYLw@mail.gmail.com>
+ <20170516095027.GZ22219@n2100.armlinux.org.uk>
+ <20170516115535.2faf86ec@free-electrons.com>
+ <20170516100236.GA22219@n2100.armlinux.org.uk>
+ <20170516135217.016717e7@free-electrons.com>
+ <20170516121355.GD22219@n2100.armlinux.org.uk>
+ <CAPv3WKep+c8tWGmQ8_zb1J8JcVSr3EDWqQ37Y_tVYDcuDEPzvw@mail.gmail.com>
+Message-ID: <20170516134515.GG22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: Tuesday, May 16, 2017 2:08 PM
-> To: Shameerali Kolothum Thodi; will.deacon at arm.com;
-> mark.rutland at arm.com; lorenzo.pieralisi at arm.com; hanjun.guo at linaro.org
-> Cc: Gabriele Paoloni; John Garry; iommu at lists.linux-foundation.org;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; devel at acpica.org; Linuxarm; Wangzhou (B);
-> Guohanjun (Hanjun Guo)
-> Subject: Re: [RFC v1 2/7] iommu/arm-smmu-v3: Add erratum framework
-> functions
+On Tue, May 16, 2017 at 02:44:48PM +0200, Marcin Wojtas wrote:
+> Russel,
 > 
-> On 13/05/17 10:47, shameer wrote:
-> > This will provide a way to replace the existing skip_prefetch_cmd
-> > erratum using the new framework.
+> 2017-05-16 14:13 GMT+02:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
+> > On Tue, May 16, 2017 at 01:52:17PM +0200, Thomas Petazzoni wrote:
+> >> Hello,
+> >>
+> >> On Tue, 16 May 2017 11:02:37 +0100, Russell King - ARM Linux wrote:
+> >>
+> >> > > Correct, but Marcin has submitted patches, and you haven't.
+> >> >
+> >> > As I said, give me a friggin chance.  You know full well that I've been
+> >> > working on this, working with you and submitting patches.
+> >>
+> >> Correct. But Marcin patches are small and easy, they are ready today,
+> >> and they bring useful benefits for users. You're trying to provide a
+> >> full blown solution, which ultimately is good, but in the mean time it
+> >> would be good to enable the features that already work today.
+> >
+> > Unfortunately, they don't all work - see my other email.  The SD slot
+> > is non-functional with the latest sdhci-xenon driver.  The previous
+> > revision worked fine.
+> >
+> >> > > I believe if you say that, it's because you don't know how much work
+> >> > > Marcin is doing behind the scenes on supporting Marvell platforms, and
+> >> > > not only at the Linux kernel level.
+> >> >
+> >> > Maybe Marcin doesn't know how much work I'm doing supporting this board?
+> >>
+> >> Marcin also knows you're doing some work on this board.
+> >
+> > Right, so this is all one way.  It would have been nice to have had a
+> > heads-up or something, which would have aided co-operation instead of
+> > confrontation.
+> >
+> >> > It _has_ been submitted - a few months ago - so you're talking rubbish
+> >> > here.  You just need to check your mailbox.
+> >>
+> >> Could you please avoid insults? It doesn't bring any benefit.
+> >>
+> >> And in addition, you're deforming reality. The reality is:
+> >>
+> >>  - The patches you posted are related to pinmux/gpio support. This is
+> >>    one thing.
+> >
+> > The point you replied to was about pinmux/gpio, not about Marcin's patch.
+> > So you trying to twist this back to Marcin's patches is unhelpful.
+> > Stop being a problem.
+> >
+> >> Therefore, there is no reason to not merge Marcin patches, because they
+> >> do not conflict with anything you have already posted.
+> >
+> > Except that the SD slot is broken.
+> >
 > 
-> Yikes, between this and patch 1 we're already pushing 70 lines of new
-> code, and it still doesn't actually do anything yet. Implementing the
-> SMMUv3 equivalent of SMMUv2's acpi_smmu_get_data() would probably
-> be
-> about 10 lines; all you need to do is set some quirk flags based on a
-> compatible value. These quirks aren't really any different in principle
-> to the firmware COHACC overrides that we already process.
-> 
-> Sorry, I'm saying no to a massively overengineered "framework" for
-> something so relatively simple.
+> Rechecked, on my board - copied 100MB file back and forth to and from
+> SD card and it works properly, so indeed that may be some regression
+> in the latest version of the driver, but apparently not for all cards.
 
-Thanks Robin for going through patches. The "framework" was added thinking
-it might be useful when multiple quirk implementations are added to the
-SMMUv3 driver from different vendors. As you said it doesn't look like, 
-adding any value at the moment. I will revise patch set based on SMMUv2s
-way for ACPI and retain the broken-* for dtb. 
+It doesn't seem to be "not for all cards" - if I boot without a card in
+the slot, I still get the kernel message spew.  Turns out to be a merge
+error, which I hadn't realised due to the pressure of this thread.
 
-Thanks,
-Shameer
- 
-> Robin.
-> 
-> > Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
-> > ---
-> >  drivers/iommu/arm-smmu-v3.c | 58
-> +++++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 58 insertions(+)
-> >
-> > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-
-> v3.c
-> > index a166590..f20d5d5 100644
-> > --- a/drivers/iommu/arm-smmu-v3.c
-> > +++ b/drivers/iommu/arm-smmu-v3.c
-> > @@ -664,16 +664,72 @@ enum smmu_erratum_match_type {
-> >  	se_match_dt,
-> >  };
-> >
-> > +void erratum_skip_prefetch_cmd(struct arm_smmu_device *smmu, void
-> *arg)
-> > +{
-> > +	smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
-> > +}
-> > +
-> >  struct smmu_erratum_workaround {
-> >  	enum smmu_erratum_match_type match_type;
-> >  	const void *id;	/* Indicate the Erratum ID */
-> >  	const char *desc_str;
-> > +	void (*enable)(struct arm_smmu_device *, void *);
-> >  };
-> >
-> >  static const struct smmu_erratum_workaround smmu_workarounds[] = {
-> >
-> >  };
-> >
-> > +typedef bool (*se_match_fn_t)(const struct
-> smmu_erratum_workaround *,
-> > +							  const void *);
-> > +static
-> > +bool smmu_check_dt_erratum(const struct smmu_erratum_workaround
-> *wa,
-> > +						   const void *arg)
-> > +{
-> > +	const struct device_node *np = arg;
-> > +
-> > +	return of_property_read_bool(np, wa->id);
-> > +}
-> > +
-> > +static void smmu_enable_errata(struct arm_smmu_device *smmu,
-> > +				enum smmu_erratum_match_type type,
-> > +				se_match_fn_t match_fn,
-> > +				void *arg)
-> > +{
-> > +	const struct smmu_erratum_workaround *wa =
-> smmu_workarounds;
-> > +
-> > +	for (; wa->desc_str; wa++) {
-> > +		if (wa->match_type != type)
-> > +			continue;
-> > +
-> > +		if (match_fn(wa, arg)) {
-> > +			if (wa->enable) {
-> > +				wa->enable(smmu, arg);
-> > +				dev_info(smmu->dev,
-> > +					"Enabling workaround for %s\n",
-> > +					 wa->desc_str);
-> > +			}
-> > +		}
-> > +	}
-> > +}
-> > +
-> > +
-> > +static void smmu_check_workarounds(struct arm_smmu_device *smmu,
-> > +				  enum smmu_erratum_match_type type,
-> > +				  void *arg)
-> > +{
-> > +	se_match_fn_t match_fn = NULL;
-> > +
-> > +	switch (type) {
-> > +	case se_match_dt:
-> > +		match_fn = smmu_check_dt_erratum;
-> > +		break;
-> > +	}
-> > +
-> > +	smmu_enable_errata(smmu, type, match_fn, arg);
-> > +
-> > +}
-> > +
-> >  static struct arm_smmu_domain *to_smmu_domain(struct
-> iommu_domain *dom)
-> >  {
-> >  	return container_of(dom, struct arm_smmu_domain, domain);
-> > @@ -2641,6 +2697,8 @@ static int arm_smmu_device_dt_probe(struct
-> platform_device *pdev,
-> >
-> >  	parse_driver_options(smmu);
-> >
-> > +	smmu_check_workarounds(smmu, se_match_dt, dev->of_node);
-> > +
-> >  	if (of_dma_is_coherent(dev->of_node))
-> >  		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
-> >
-> >
+However, since I have a patch which adds SDHCI support with the comments
+that Tom has against yours already fixed (which is a trivial subset of
+my patch adding SDHCI with pinmux support) I'm about to send that.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
