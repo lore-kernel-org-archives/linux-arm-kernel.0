@@ -1,45 +1,46 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 16 May 2017 14:22:11 +0200
-Subject: [PATCH] mmc: sdhci-xenon: kill xenon_clean_phy()
-In-Reply-To: <20170516061720.1755-1-jszhang@marvell.com>
-References: <20170516061720.1755-1-jszhang@marvell.com>
-Message-ID: <20170516122211.GA27959@lunn.ch>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 May 2017 13:40:22 +0100
+Subject: [PATCH 1/2] arm64: marvell: dts: fill MachiatoBin board
+ description
+In-Reply-To: <20170516143446.4a25a306@free-electrons.com>
+References: <1494890913-8360-1-git-send-email-mw@semihalf.com>
+ <1494890913-8360-2-git-send-email-mw@semihalf.com>
+ <20170516143446.4a25a306@free-electrons.com>
+Message-ID: <20170516124022.GE22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 02:17:20PM +0800, Jisheng Zhang wrote:
-> Currently, the xenon_clean_phy() is only used for freeing phy_params.
-> The phy_params is allocated by devm_kzalloc(), there's no need to free
-> is explicitly.
+On Tue, May 16, 2017 at 02:34:46PM +0200, Thomas Petazzoni wrote:
+> > +&ap_sdhci0 {
+> > +	status = "okay";
+> > +	bus-width = <8>;
+> > +	no-1-8-v;
+> > +	non-removable;
+> > +};
+> > +
+> > +&cpm_sdhci0 {
+> > +	status = "okay";
+> > +	bus-width = <4>;
+> > +	no-1-8-v;
+> > +	non-removable;
+> > +};
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  drivers/mmc/host/sdhci-xenon-phy.c | 14 +-------------
->  drivers/mmc/host/sdhci-xenon.c     |  6 +-----
->  drivers/mmc/host/sdhci-xenon.h     |  1 -
->  3 files changed, 2 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-xenon-phy.c b/drivers/mmc/host/sdhci-xenon-phy.c
-> index 6356781f1cca..f7e26b031e76 100644
-> --- a/drivers/mmc/host/sdhci-xenon-phy.c
-> +++ b/drivers/mmc/host/sdhci-xenon-phy.c
-> @@ -787,14 +787,6 @@ int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios)
->  	return ret;
->  }
->  
-> -void xenon_clean_phy(struct sdhci_host *host)
-> -{
-> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	struct xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
-> -
-> -	kfree(priv->phy_params);
+> Same comment. Also, are they both really non-removable? I have a uSD
+> card connector on my MacchiatoBin board. It isn't covered by those new
+> entries ?
 
-Hi Jisheng
+ap_sdhci is the emmc.  cpm_sdhci is the SD slot.
 
-If the memory has been allocated using the devm_ API, calling kfree
-here is wrong, and can lead to a double free.
+Had Marcin looked at my tree, or you wait for me to post a mainline
+version of my "arm64: dts: marvell: mcbin: add sdhci" patch, you'd
+get an entry containing the correct description for the SD slot,
+including support for the card detect signal.
 
-So this patch should probably have a fixes: tag. Should it also goto
-stable?
+However, the SD slot is rather moot at the moment, because sdhci-xenon
+appears to be currently broken and non-functional, as I've already
+reported.
 
-	Andrew
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
