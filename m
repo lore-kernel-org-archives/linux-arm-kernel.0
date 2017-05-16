@@ -1,22 +1,43 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 May 2017 09:29:22 +0100
-Subject: PROBLEM: ARM Cache policy on single armv7 processor lead to low
- DRAM performance
-In-Reply-To: <CAOEkoLw3Y5h2P_aFeMKgHYyKZpQvsQsOPOLOuvaYZGOe+rHJWQ@mail.gmail.com>
-References: <CAOEkoLw3Y5h2P_aFeMKgHYyKZpQvsQsOPOLOuvaYZGOe+rHJWQ@mail.gmail.com>
-Message-ID: <20170516082922.GY22219@n2100.armlinux.org.uk>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Tue, 16 May 2017 14:03:35 +0530
+Subject: [PATCH v3 0/4] Add support for ThunderX2 pmu events using json files
+Message-ID: <1494923619-18687-1-git-send-email-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 11:59:30AM +0800, Zhao Yibin wrote:
-> We met some DDR performance issue caused by armv7 cache policy, hope you
-> can help.
-> On a single armv7(Cortex-A7) processor system, the arm linux kernel,
-> without CONFIG_SMP, the cache policy is set to write-back no-allocate,
+Extending json/jevent framework for parsing arm64 event files.
+Adding jevents for ThunderX2 implementation defined PMU events.
 
-It should be write-back read-allocate.
+v3:
+   - Addressed comments from Will Deacon and Jayachandran C.
+   - Rebased to 4.12-rc1
+
+v2:
+   - Updated as per Mark Rutland's suggestions.
+   - Added provision for get_cpuid_str to get cpu id string
+     from associated cpus of pmu core device.
+
+v1: Initial patchset.
+
+Ganapatrao Kulkarni (4):
+  perf utils: passing pmu as a parameter to function get_cpuid_str
+  perf tools arm64: Add support for get_cpuid_str function.
+  perf utils: Add helper function is_pmu_core to detect PMU CORE devices
+  perf vendor events arm64: Add ThunderX2 implementation defined pmu
+    core events
+
+ tools/perf/arch/arm64/util/Build                   |  1 +
+ tools/perf/arch/arm64/util/header.c                | 59 ++++++++++++++++++++
+ tools/perf/arch/powerpc/util/header.c              |  2 +-
+ tools/perf/arch/x86/util/header.c                  |  2 +-
+ tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+ .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+ tools/perf/util/header.h                           |  3 +-
+ tools/perf/util/pmu.c                              | 53 +++++++++++++++---
+ 8 files changed, 186 insertions(+), 11 deletions(-)
+ create mode 100644 tools/perf/arch/arm64/util/header.c
+ create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+ create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.8.1.4
