@@ -1,29 +1,80 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 16 May 2017 10:02:40 +0530
-Subject: [PATCH v8 0/4] Broadcom SBA RAID support
-In-Reply-To: <1494824695-21797-1-git-send-email-anup.patel@broadcom.com>
-References: <1494824695-21797-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20170516043239.GH15061@localhost>
+From: oza.oza@broadcom.com (Oza Pawandeep)
+Date: Tue, 16 May 2017 10:52:04 +0530
+Subject: [PATCH v6 0/3] OF/PCI address PCI inbound memory limitations
+Message-ID: <1494912127-12890-1-git-send-email-oza.oza@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 10:34:51AM +0530, Anup Patel wrote:
-> The Broadcom SBA RAID is a stream-based device which provides
-> RAID5/6 offload.
-> 
-> It requires a SoC specific ring manager (such as Broadcom FlexRM
-> ring manager) to provide ring-based programming interface. Due to
-> this, the Broadcom SBA RAID driver (mailbox client) implements
-> DMA device having one DMA channel using a set of mailbox channels
-> provided by Broadcom SoC specific ring manager driver (mailbox
-> controller).
-> 
-> The Broadcom SBA RAID hardware requires PQ disk position instead
-> of PQ disk coefficient. To address this, we have added raid_gflog
-> table which will help driver to convert PQ disk coefficient to PQ
-> disk position.
+It is possible that PCI device supports 64-bit DMA addressing,
+and thus it's driver sets device's dma_mask to DMA_BIT_MASK(64),
+however PCI host bridge may have limitations on the inbound 
+transaction addressing.
 
-Applied, now
+This is particularly problematic on ARM/ARM64 SOCs where the 
+IOMMU (i.e. SMMU) translates IOVA to PA for in-bound transactions
+only after PCI Host has forwarded these transactions on SOC IO bus. 
+
+This means, on such ARM/ARM64 SOCs the IOVA of in-bound transactions
+has to honor the addressing restrictions of the PCI Host.
+
+Current device framework and OF framework integration assumes
+dma-ranges in a way where memory-mapped devices define their
+dma-ranges. (child-bus-address, parent-bus-address, length).
+
+of_dma_configure is specifically written to take care of memory
+mapped devices but no implementation exists for pci devices.
+
+For e.g. iproc based SOCs and other SOCs (such as rcar) have
+PCI world dma-ranges.
+dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+
+This patchset
+reserves the IOVA ranges for PCI masters based
+on the PCI world dma-ranges.
+fix of_dma_get_range to cater to PCI dma-ranges.
+fix of_dma_get_range which currently returns size 0 for PCI devices.
+
+IOVA allocation patch:
+[PATCH 2/3] iommu/pci: reserve iova for PCI masters
+
+Fix of_dma_get_range bug and address PCI master.
+[PATCH 3/3] PCI/of fix of_dma_get_range; get PCI specific
+this patch fixes the following problems of_dma_get_range.
+1) return of wrong size as 0.
+2) not handling absence of dma-ranges, which is valid for PCI master.
+3) not handling multipe inbound windows.
+4) in order to get largest possible dma_mask. this patch also
+retuns the largest possible size based on dma-ranges,
+
+Base patch for both of the above patches:
+[PATCH 1/3] of/pci/dma: fix DMA configuration for PCI masters
+
+Changes since v6:
+- Robin's comments addressed.
+Changes since v5:
+Changes since v4:
+Changes since v3:
+Changes since v2:
+- minor changes, redudant checkes removed
+- removed internal review
+Changes since v1:
+- address Rob's comments.
+- Add a get_dma_ranges() function to of_bus struct..
+- Convert existing contents of of_dma_get_range function to
+  of_bus_default_dma_get_ranges and adding that to the
+  default of_bus struct.
+- Make of_dma_get_range call of_bus_match() and then bus->get_dma_ranges.
+
+Oza Pawandeep (3):
+  of/pci/dma: fix DMA configuration for PCI masters
+  iommu/pci: reserve IOVA for PCI masters
+  PCI/of fix of_dma_get_range; get PCI specific dma-ranges
+
+ drivers/iommu/dma-iommu.c |  35 ++++++++
+ drivers/of/address.c      | 215 ++++++++++++++++++++++++++++++++--------------
+ drivers/of/of_pci.c       |  95 ++++++++++++++++++++
+ include/linux/of_pci.h    |   7 ++
+ 4 files changed, 288 insertions(+), 64 deletions(-)
 
 -- 
-~Vinod
+1.9.1
