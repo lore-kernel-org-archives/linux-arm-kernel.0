@@ -1,26 +1,35 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Tue, 16 May 2017 14:15:08 +0300
-Subject: [V2, 2/6] tty: serial: lpuart: add little endian 32 bit register
- support
-In-Reply-To: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
-References: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <fb9fe0cd-5ca7-74e6-33dc-7638e205b2e3@cogentembedded.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 May 2017 12:16:29 +0100
+Subject: [PATCH 1/2] arm64: marvell: dts: fill MachiatoBin board
+ description
+In-Reply-To: <CAPv3WKdULNEDcqJ=qsBEAApaJNiyJXAw6ZG=Ejd8TxE6LJkYLw@mail.gmail.com>
+References: <1494890913-8360-1-git-send-email-mw@semihalf.com>
+ <1494890913-8360-2-git-send-email-mw@semihalf.com>
+ <20170515232825.GX22219@n2100.armlinux.org.uk>
+ <CAPv3WKdULNEDcqJ=qsBEAApaJNiyJXAw6ZG=Ejd8TxE6LJkYLw@mail.gmail.com>
+Message-ID: <20170516111629.GC22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  static u32 lpuart32_read(void __iomem *addr)
->  {
-> -	return ioread32be(addr);
-> +	return lpuart_is_be ? ioread32be(addr) : readl(addr);
->  }
->  
->  static void lpuart32_write(u32 val, void __iomem *addr)
->  {
-> -	iowrite32be(val, addr);
-> +	if (lpuart_is_be)
-> +		iowrite32be(val, addr);
-> +	else
-> +		writel(val, addr);
->  }
+On Tue, May 16, 2017 at 11:27:19AM +0200, Marcin Wojtas wrote:
+> I do not intend to interfere your work at all. I took a look on your
+> branch, and my patch does not seem to be really colliding with it. The
+> board is starting to get really popular and a lot has been happening
+> around it recently - missing bits like 'chosen' node or the interfaces
+> is pretty annoying.
 
-What if this is ever executed on big endian system?
+Can you describe what the problem is with the missing "chosen" node?
+
+It seems that command line arguments get passed into the kernel here
+just fine without it:
+
+Kernel command line: console=ttyS0,115200 panic=5 rootdelay=4 root=/dev/sda3 libata.force=3.0G
+
+for a kernel built with:
+
+CONFIG_CMDLINE=""
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
