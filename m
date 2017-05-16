@@ -1,46 +1,70 @@
-From: oss@buserror.net (Scott Wood)
-Date: Tue, 16 May 2017 00:41:28 -0500
-Subject: [PATCH v3 00/11] soc/fsl/qbman: Enable QBMan on ARM Platforms
-In-Reply-To: <1493674213-963-1-git-send-email-roy.pledge@nxp.com>
-References: <1493674213-963-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1494913288.29095.7.camel@buserror.net>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Tue, 16 May 2017 11:19:32 +0530
+Subject: [RESEND PATCH] iio: adc: bcm_iproc_adc: swap primary and secondary
+ isr handler's
+Message-ID: <1494913772-30904-1-git-send-email-raveendra.padasalagi@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-05-01 at 17:30 -0400, Roy Pledge wrote:
-> This patch series enables DPAA1 QBMan devices for ARM and
-> ARM64 architectures. This allows the LS1043A and LS1046A to use
-> QBMan functionality.
-> 
-> Changes since v2:
-> Fixed some misspellings
-> Added 'no-map' constraint to device tree bindings
-> Described ordering contraint on regions in the device tree
-> Removed confusing comment regarding non-shareable mappings
-> Added warning if old reserved-memory technique is used on ARM
-> 
-> Changes since v1:
-> Reworked private memory allocations to use shared-dma-pool on ARM platforms
-> 
-> Claudiu Manoil (2):
-> ? soc/fsl/qbman: Drop L1_CACHE_BYTES compile time check
-> ? soc/fsl/qbman: Add missing headers on ARM
-> 
-> Madalin Bucur (4):
-> ? soc/fsl/qbman: Drop set/clear_bits usage
-> ? soc/fsl/qbman: add QMAN_REV32
-> ? soc/fsl/qbman: different register offsets on ARM
-> ? fsl/soc/qbman: Enable FSL_LAYERSCAPE config on ARM
-> 
-> Roy Pledge (4):
-> ? soc/fsl/qbman: Use shared-dma-pool for BMan private memory allocations
-> ? soc/fsl/qbman: Use shared-dma-pool for QMan private memory allocations
-> ? dt-bindings: soc/fsl: Update reserved memory binding for QBMan
-> ? soc/fsl/qbman: Rework ioremap() calls for ARM/PPC
-> 
-> Valentin Rothberg (1):
-> ? soc/fsl/qbman: Fix ARM32 typo
+The third argument of devm_request_threaded_irq() is the primary
+handler. It is called in hardirq context and checks whether the
+interrupt is relevant to the device. If the primary handler returns
+IRQ_WAKE_THREAD, the secondary handler (a.k.a. handler thread) is
+scheduled to run in process context.
 
-Acked-by: Scott Wood <oss@buserror.net>
+bcm_iproc_adc.c uses the secondary handler as the primary one
+and the other way around. So this patch fixes the same, along with
+re-naming the secondary handler and primary handler names properly.
 
--Scott
+Tested on the BCM9583XX iProc SoC based boards.
+
+Reported-by: Pavel Roskin <plroskin@gmail.com>
+Fixes: 4324c97ecedc("iio: Add driver for Broadcom iproc-static-adc")
+Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+---
+ drivers/iio/adc/bcm_iproc_adc.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/iio/adc/bcm_iproc_adc.c b/drivers/iio/adc/bcm_iproc_adc.c
+index 21d38c8..7f4f9c4 100644
+--- a/drivers/iio/adc/bcm_iproc_adc.c
++++ b/drivers/iio/adc/bcm_iproc_adc.c
+@@ -143,7 +143,7 @@ static void iproc_adc_reg_dump(struct iio_dev *indio_dev)
+ 	iproc_adc_dbg_reg(dev, adc_priv, IPROC_SOFT_BYPASS_DATA);
+ }
+ 
+-static irqreturn_t iproc_adc_interrupt_handler(int irq, void *data)
++static irqreturn_t iproc_adc_interrupt_thread(int irq, void *data)
+ {
+ 	u32 channel_intr_status;
+ 	u32 intr_status;
+@@ -167,7 +167,7 @@ static irqreturn_t iproc_adc_interrupt_handler(int irq, void *data)
+ 	return IRQ_NONE;
+ }
+ 
+-static irqreturn_t iproc_adc_interrupt_thread(int irq, void *data)
++static irqreturn_t iproc_adc_interrupt_handler(int irq, void *data)
+ {
+ 	irqreturn_t retval = IRQ_NONE;
+ 	struct iproc_adc_priv *adc_priv;
+@@ -181,7 +181,7 @@ static irqreturn_t iproc_adc_interrupt_thread(int irq, void *data)
+ 	adc_priv = iio_priv(indio_dev);
+ 
+ 	regmap_read(adc_priv->regmap, IPROC_INTERRUPT_STATUS, &intr_status);
+-	dev_dbg(&indio_dev->dev, "iproc_adc_interrupt_thread(),INTRPT_STS:%x\n",
++	dev_dbg(&indio_dev->dev, "iproc_adc_interrupt_handler(),INTRPT_STS:%x\n",
+ 			intr_status);
+ 
+ 	intr_channels = (intr_status & IPROC_ADC_INTR_MASK) >> IPROC_ADC_INTR;
+@@ -566,8 +566,8 @@ static int iproc_adc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	ret = devm_request_threaded_irq(&pdev->dev, adc_priv->irqno,
+-				iproc_adc_interrupt_thread,
+ 				iproc_adc_interrupt_handler,
++				iproc_adc_interrupt_thread,
+ 				IRQF_SHARED, "iproc-adc", indio_dev);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "request_irq error %d\n", ret);
+-- 
+1.9.1
