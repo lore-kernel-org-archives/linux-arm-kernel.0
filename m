@@ -1,78 +1,97 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 May 2017 11:02:37 +0100
-Subject: [PATCH 1/2] arm64: marvell: dts: fill MachiatoBin board
- description
-In-Reply-To: <20170516115535.2faf86ec@free-electrons.com>
-References: <1494890913-8360-1-git-send-email-mw@semihalf.com>
- <1494890913-8360-2-git-send-email-mw@semihalf.com>
- <20170515232825.GX22219@n2100.armlinux.org.uk>
- <CAPv3WKdULNEDcqJ=qsBEAApaJNiyJXAw6ZG=Ejd8TxE6LJkYLw@mail.gmail.com>
- <20170516095027.GZ22219@n2100.armlinux.org.uk>
- <20170516115535.2faf86ec@free-electrons.com>
-Message-ID: <20170516100236.GA22219@n2100.armlinux.org.uk>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 16 May 2017 12:04:29 +0200
+Subject: [PATCH v2 1/3] KVM: arm/arm64: Allow GICv2 to supply a uaccess
+ register function
+In-Reply-To: <20170516100431.4101-1-cdall@linaro.org>
+References: <20170516100431.4101-1-cdall@linaro.org>
+Message-ID: <20170516100431.4101-2-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 11:55:35AM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Tue, 16 May 2017 10:50:27 +0100, Russell King - ARM Linux wrote:
-> 
-> > I can't see how you can say that when the branch contains support for
-> > SDHCI and ethernet.  It obviously will collide, since it conflicts with
-> > the changes I have.
-> 
-> Correct, but Marcin has submitted patches, and you haven't.
+We are about to differentiate between writes from a VCPU and from
+userspace to the GIC's GICD_ISACTIVER and GICD_ICACTIVER registers due
+to different synchronization requirements.
 
-As I said, give me a friggin chance.  You know full well that I've been
-working on this, working with you and submitting patches.
+Expand the macro to define a register description for the GIC to take
+uaccess functions as well.
 
-> > > The board is starting to get really popular and a lot has been happening
-> > > around it recently - missing bits like 'chosen' node or the interfaces
-> > > is pretty annoying.  
-> > 
-> > Given that features like SDHCI and basic ethernet support have only just
-> > been merged during the merge window, how about giving those who are
-> > supporting the platform some time to organise their trees and get patches
-> > out there, rather than cutting across those who have put considerable
-> > effort into the platform already, or working with those who have.
-> 
-> I believe if you say that, it's because you don't know how much work
-> Marcin is doing behind the scenes on supporting Marvell platforms, and
-> not only at the Linux kernel level.
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+---
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 22 +++++++++++-----------
+ virt/kvm/arm/vgic/vgic-mmio.h    |  4 +++-
+ 2 files changed, 14 insertions(+), 12 deletions(-)
 
-Maybe Marcin doesn't know how much work I'm doing supporting this board?
-
-> > The whole Armada 8k support is all very new, and there's still lots of
-> > fundamental bits that are missing - pinmux and gpio are the two biggest
-> > ones.
-> > 
-> > I've already put effort into cleaning up the mvebu pinmux code (already
-> > merged) so that we can cleanly merge the pinmux support, but both of
-> > these are a sticking point with free-electrons - they have a view on
-> > how it should be represented in DT which does not fit with the current
-> > orion-gpio usage, nor with the "system controller" being in drivers/clk.
-> 
-> Gr?gory Clement has been working on this, and he has a patch series
-> almost ready to submission.
-
-You've seen my patches, because I've sent them to you in the past.
-
-> > The code which I have in my tree is correct for the Armada 8k hardware
-> > (which has some weirdness about which gpios on each CP110 appear to the
-> > external world - some are used for inter-CP110 communication and must
-> > not be exposed) so any additional work should be based on the code in
-> > my tree.
-> 
-> No, there is no rule like this in the kernel community. Whatever is in
-> your private tree does not matter. Until it gets submitted, it doesn't
-> exist, and nobody is forced to base its work on top of your
-> unknown/private trees.
-
-It _has_ been submitted - a few months ago - so you're talking rubbish
-here.  You just need to check your mailbox.
-
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index 0a4283e..95543a2 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -296,34 +296,34 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+-		vgic_mmio_read_rao, vgic_mmio_write_wi, 1,
++		vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
+-		vgic_mmio_read_enable, vgic_mmio_write_senable, 1,
++		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
+-		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1,
++		vgic_mmio_read_enable, vgic_mmio_write_cenable, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
+-		vgic_mmio_read_pending, vgic_mmio_write_spending, 1,
++		vgic_mmio_read_pending, vgic_mmio_write_spending, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
+-		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1,
++		vgic_mmio_read_pending, vgic_mmio_write_cpending, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
+-		vgic_mmio_read_active, vgic_mmio_write_sactive, 1,
++		vgic_mmio_read_active, vgic_mmio_write_sactive, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
+-		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
++		vgic_mmio_read_active, vgic_mmio_write_cactive, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
+-		vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
+-		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
++		vgic_mmio_read_priority, vgic_mmio_write_priority, NULL, NULL,
++		8, VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+-		vgic_mmio_read_target, vgic_mmio_write_target, 8,
++		vgic_mmio_read_target, vgic_mmio_write_target, NULL, NULL, 8,
+ 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+-		vgic_mmio_read_config, vgic_mmio_write_config, 2,
++		vgic_mmio_read_config, vgic_mmio_write_config, NULL, NULL, 2,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+ 		vgic_mmio_read_raz, vgic_mmio_write_sgir, 4,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index ea4171a..27924a3 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -75,7 +75,7 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
+  * The _WITH_LENGTH version instantiates registers with a fixed length
+  * and is mutually exclusive with the _PER_IRQ version.
+  */
+-#define REGISTER_DESC_WITH_BITS_PER_IRQ(off, rd, wr, bpi, acc)		\
++#define REGISTER_DESC_WITH_BITS_PER_IRQ(off, rd, wr, ur, uw, bpi, acc)	\
+ 	{								\
+ 		.reg_offset = off,					\
+ 		.bits_per_irq = bpi,					\
+@@ -83,6 +83,8 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
+ 		.access_flags = acc,					\
+ 		.read = rd,						\
+ 		.write = wr,						\
++		.uaccess_read = ur,					\
++		.uaccess_write = uw,					\
+ 	}
+ 
+ #define REGISTER_DESC_WITH_LENGTH(off, rd, wr, length, acc)		\
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.9.0
