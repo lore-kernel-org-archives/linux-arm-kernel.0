@@ -1,41 +1,33 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 16 May 2017 15:04:54 -0700
-Subject: arm64 vs arm tree for BCM2837 DT pull requests
-Message-ID: <87tw4kbgqh.fsf@eliezer.anholt.net>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 16 May 2017 17:13:44 -0500
+Subject: [PATCH 0/3] Davinci DSP remoteproc device improvements
+Message-ID: <20170516221347.37990-1-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm looking for feedback on how the ARM folks would like to see pull
-requests for Raspberry Pi 3 devicetree changes.  My problem is trying to
-merge patches like:
+Hi Sekhar,
 
-https://patchwork.kernel.org/patch/9603689/
+The following series makes some minor improvements to the legacy-mode
+Davinci remoteproc device creation logic in preparation for adding the
+DT support to the Davinci remoteproc driver. The patches are baselined
+on 4.12-rc1. The changes include conditionally creating the DSP device
+based on memory supplied to the remoteproc device, and adds resource
+names and additional resources for publishing the DSP internal memory
+regions to the davinci remoteproc driver.
 
-which depends on:
+Patches tested on OMAP-L138 LCDK board by booting it in legacy-mode.
 
-https://patchwork.kernel.org/patch/9619573/
+regards
+Suman
 
-bcm2837's DT is in arm64/, but includes the bcm283x.dtsi under arm/
-(which also contains pi0-2), so we often end up with cross-tree
-dependencies when trying to merge a patch series affecting peripherals
-common to all of them.  How I've done this in the past is in
-http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-November/004804.html:
-Send a PR for bcm2835-dt-next for the arm/ BCM283x changes, merge that
-tag to bcm2835-dt-64-next, apply the arm64 change, and send a separate
-PR for that branch.
+Suman Anna (3):
+  ARM: davinci: da8xx: Create DSP device only when assigned memory
+  ARM: davinci: da8xx: Add names to DSP IOMEM resources
+  ARM: davinci: da8xx: Add DSP internal RAM memories as IOMEM resources
 
-This seems silly to me -- in trying to keep a small arm64/ change out of
-the branch for arm/, we end up pulling in much larger arm/ changes to
-the arm64/ branch.  Also, this process doesn't work if we need to make a
-single-commit change across both (like if we decided to change a node
-name that's referenced by '&' in the board-specific .dts files).
+ arch/arm/mach-davinci/devices-da8xx.c      | 30 ++++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/da8xx.h |  5 +++++
+ 2 files changed, 35 insertions(+)
 
-So, I'd like to ask that I be able to merge all the BCM283x DT changes
-through my bcm2835-dt-next branch, if that's OK.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170516/2e9fc8df/attachment.sig>
+-- 
+2.12.0
