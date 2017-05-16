@@ -1,90 +1,251 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Tue, 16 May 2017 14:48:04 -0600
-Subject: [PATCH 2/2] PCI: Avoid bus reset for Cavium cn8xxx root ports.
-In-Reply-To: <3fbbda8a-a6ea-976e-46ba-d23646500b3a@caviumnetworks.com>
-References: <20170516001736.4001-1-david.daney@cavium.com>
- <20170516001736.4001-3-david.daney@cavium.com>
- <235a9a51-df06-84af-4e5d-b6408ceb0b7d@redhat.com>
- <3fbbda8a-a6ea-976e-46ba-d23646500b3a@caviumnetworks.com>
-Message-ID: <20170516144804.1e52b616@w520.home>
+From: cosardindar@gmail.com (Cosar Dindar)
+Date: Wed, 17 May 2017 00:18:50 +0300
+Subject: [PATCH] crypto: stm32 - Add CRC32 support for STM32F4XX
+Message-ID: <1494969530-91589-1-git-send-email-cosardindar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 May 2017 13:29:58 -0700
-David Daney <ddaney@caviumnetworks.com> wrote:
+This patch series add hardware CRC32 ("Ethernet") calculation support
+for STMicroelectronics STM32F4XX series devices.
 
-> On 05/16/2017 01:14 PM, Auger Eric wrote:
-> > Hi,
-> > 
-> > On 16/05/2017 02:17, David Daney wrote:  
-> >> Root ports of cn8xxx do not function after bus reset when used with
-> >> some e1000e and LSI HBA devices.  Add a quirk to prevent bus reset on
-> >> these root ports.  
-> > I understand the bus reset would work along with a variety of other
-> > child devices. I guess there is no way to be more accurate and forbid
-> > the bus reset only when incompatible child devices are found?  
-> 
-> That's right.  Conceptually we have a 2 dimensional array of all 
-> possible upstream devices vs. all possible downstream devices.  The 
-> maintenance burden of correctly populating this and keeping it up to 
-> date would be impossible.
-> 
-> The e1000e works well, I am sure, with most Intel root ports.  We 
-> haven't investigated exactly which end of the link is responsible for 
-> the failures against the cn8890 root port, but the simplest way forward 
-> is to just say it cannot support bus reset.
+As an hardware limitation polynomial and key setting are not supported
+as they are fixed as 0x4C11DB7 (poly) and 0xFFFFFFFF (key).
 
-That's a pretty serious limitation though, you only need to look at the
-world of graphics cards where the device offers no capability for
-function level reset and PM reset does nothing useful.  The only way we
-can get the device to a fairly reproducible state is via bus reset.  So
-let's just throw out GPU assignment on this platform as unsupportable.
-What other sorts of devices are we going to find have inconsistent
-behavior compared to platforms where bus reset is possible?  What's
-going to be the user experience?  Tracking which devices have trouble
-with bus reset is a problem, but so is limiting access to bus reset
-where it really is useful.  Thanks,
+CRC32C Castagnoli algorithm is not supported also.
+Module is tested on STM32F429-disco board with crypto testmgr using
+cases within the key 0xFFFFFFFF.
 
-Alex
+Signed-off-by: Cosar Dindar <cosardindar@gmail.com>
+---
+ .../devicetree/bindings/crypto/st,stm32-crc.txt    |  4 +-
+ arch/arm/boot/dts/stm32429i-eval.dts               |  4 ++
+ arch/arm/boot/dts/stm32f429-disco.dts              |  4 ++
+ arch/arm/boot/dts/stm32f429.dtsi                   |  7 +++
+ arch/arm/boot/dts/stm32f469-disco.dts              |  4 ++
+ drivers/crypto/stm32/stm32_crc32.c                 | 68 ++++++++++++++++++----
+ 6 files changed, 79 insertions(+), 12 deletions(-)
 
-> >>
-> >> Signed-off-by: David Daney <david.daney@cavium.com>
-> >> ---
-> >>   drivers/pci/quirks.c | 8 ++++++++
-> >>   1 file changed, 8 insertions(+)
-> >>
-> >> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> >> index 085fb78..02cd847 100644
-> >> --- a/drivers/pci/quirks.c
-> >> +++ b/drivers/pci/quirks.c
-> >> @@ -3347,6 +3347,14 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x0032, quirk_no_bus_reset);
-> >>   DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x003c, quirk_no_bus_reset);
-> >>   DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x0033, quirk_no_bus_reset);
-> >>   
-> >> +/*
-> >> + * Root port on some Cavium CN8xxx chips do not successfully complete
-> >> + * a bus reset when used with certain types child devices.  Config  
-> > s/types /types of  
-> 
-> Yeah, I need to be more careful.  We really need to improve the 
-> grammatical analysis capabilities of checkpatch.pl, I think I will lay 
-> the blame there.
-> 
-> I can resubmit or Bjorn can fix it before committing, I will let him decide.
-> 
-> David.
-> 
-> 
-> > Thanks
-> > 
-> > Eric  
-> >> + * space access to the child may quit responding.  Flag the root port
-> >> + * as not supporting bus reset.
-> >> + */
-> >> +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_CAVIUM, 0xa100, quirk_no_bus_reset);
-> >> +
-> >>   static void quirk_no_pm_reset(struct pci_dev *dev)
-> >>   {
-> >>   	/*
-> >>  
-> 
+diff --git a/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt b/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
+index 3ba92a5..7b30f1e 100644
+--- a/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
++++ b/Documentation/devicetree/bindings/crypto/st,stm32-crc.txt
+@@ -1,7 +1,7 @@
+ * STMicroelectronics STM32 CRC
+ 
+ Required properties:
+-- compatible: Should be "st,stm32f7-crc".
++- compatible: Can be either "st,stm32f7-crc" or "st,srm32f4-crc".
+ - reg: The address and length of the peripheral registers space
+ - clocks: The input clock of the CRC instance
+ 
+@@ -10,7 +10,7 @@ Optional properties: none
+ Example:
+ 
+ crc: crc at 40023000 {
+-	compatible = "st,stm32f7-crc";
++	compatible = "st,stm32f7-crc", "st,stm32f4-crc";
+ 	reg = <0x40023000 0x400>;
+ 	clocks = <&rcc 0 12>;
+ };
+diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
+index b633114..360fb19 100644
+--- a/arch/arm/boot/dts/stm32429i-eval.dts
++++ b/arch/arm/boot/dts/stm32429i-eval.dts
+@@ -141,6 +141,10 @@
+ 	clock-frequency = <25000000>;
+ };
+ 
++&crc {
++	status = "okay";
++};
++
+ &i2c1 {
+ 	pinctrl-0 = <&i2c1_pins>;
+ 	pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
+index 191fa50..ae47cde 100644
+--- a/arch/arm/boot/dts/stm32f429-disco.dts
++++ b/arch/arm/boot/dts/stm32f429-disco.dts
+@@ -102,6 +102,10 @@
+ 	clock-frequency = <8000000>;
+ };
+ 
++&crc {
++	status = "okay";
++};
++
+ &rtc {
+ 	assigned-clocks = <&rcc 1 CLK_RTC>;
+ 	assigned-clock-parents = <&rcc 1 CLK_LSI>;
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index b2a2b5c..18343de 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -766,6 +766,13 @@
+ 			};
+ 		};
+ 
++		crc: crc at 40023000 {
++			compatible = "st,stm32f4-crc";
++			reg = <0x40023000 0x400>;
++			clocks = <&rcc 0 STM32F4_AHB1_CLOCK(CRC)>;
++			status = "disabled";
++		};
++
+ 		rcc: rcc at 40023810 {
+ 			#reset-cells = <1>;
+ 			#clock-cells = <2>;
+diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+index 75470c3..8cb8b73 100644
+--- a/arch/arm/boot/dts/stm32f469-disco.dts
++++ b/arch/arm/boot/dts/stm32f469-disco.dts
+@@ -87,6 +87,10 @@
+ 	clock-frequency = <8000000>;
+ };
+ 
++&crc {
++	status = "okay";
++};
++
+ &rtc {
+ 	status = "okay";
+ };
+diff --git a/drivers/crypto/stm32/stm32_crc32.c b/drivers/crypto/stm32/stm32_crc32.c
+index ec83b1e..12fbd98 100644
+--- a/drivers/crypto/stm32/stm32_crc32.c
++++ b/drivers/crypto/stm32/stm32_crc32.c
+@@ -7,6 +7,7 @@
+ #include <linux/bitrev.h>
+ #include <linux/clk.h>
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ 
+ #include <crypto/internal/hash.h>
+@@ -39,6 +40,9 @@ struct stm32_crc {
+ 	struct clk       *clk;
+ 	u8               pending_data[sizeof(u32)];
+ 	size_t           nb_pending_bytes;
++	bool             key_support;
++	bool             poly_support;
++	bool             reverse_support;
+ };
+ 
+ struct stm32_crc_list {
+@@ -106,13 +110,31 @@ static int stm32_crc_init(struct shash_desc *desc)
+ 	}
+ 	spin_unlock_bh(&crc_list.lock);
+ 
+-	/* Reset, set key, poly and configure in bit reverse mode */
+-	writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
+-	writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
+-	writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
++	/* set key */
++	if (ctx->crc->key_support) {
++		writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
++	} else if (mctx->key != CRC_INIT_DEFAULT) {
++		dev_err(ctx->crc->dev, "Unsupported key value! Should be: 0x%x\n",
++			CRC_INIT_DEFAULT);
++		return -EINVAL;
++	}
++
++	/* set poly */
++	if (ctx->crc->poly_support)
++		writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
++
++	/* reset and configure in bit reverse mode if supported */
++	if (ctx->crc->reverse_support)
++		writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
++	else
++		writel(CRC_CR_RESET, ctx->crc->regs + CRC_CR);
++
++	/* store partial result */
++	if (!ctx->crc->reverse_support)
++		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
++	else
++		ctx->partial = readl(ctx->crc->regs + CRC_DR);
+ 
+-	/* Store partial result */
+-	ctx->partial = readl(ctx->crc->regs + CRC_DR);
+ 	ctx->crc->nb_pending_bytes = 0;
+ 
+ 	return 0;
+@@ -135,7 +157,12 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
+ 
+ 		if (crc->nb_pending_bytes == sizeof(u32)) {
+ 			/* Process completed pending data */
+-			writel(*(u32 *)crc->pending_data, crc->regs + CRC_DR);
++			if (!ctx->crc->reverse_support)
++				writel(bitrev32(*(u32 *)crc->pending_data),
++				       crc->regs + CRC_DR);
++			else
++				writel(*(u32 *)crc->pending_data,
++				       crc->regs + CRC_DR);
+ 			crc->nb_pending_bytes = 0;
+ 		}
+ 	}
+@@ -143,10 +170,16 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
+ 	d32 = (u32 *)d8;
+ 	for (i = 0; i < length >> 2; i++)
+ 		/* Process 32 bits data */
+-		writel(*(d32++), crc->regs + CRC_DR);
++		if (!ctx->crc->reverse_support)
++			writel(bitrev32(*(d32++)), crc->regs + CRC_DR);
++		else
++			writel(*(d32++), crc->regs + CRC_DR);
+ 
+ 	/* Store partial result */
+-	ctx->partial = readl(crc->regs + CRC_DR);
++	if (!ctx->crc->reverse_support)
++		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
++	else
++		ctx->partial = readl(crc->regs + CRC_DR);
+ 
+ 	/* Check for pending data (non 32 bits) */
+ 	length &= 3;
+@@ -243,6 +276,7 @@ static int stm32_crc_probe(struct platform_device *pdev)
+ 	struct stm32_crc *crc;
+ 	struct resource *res;
+ 	int ret;
++	int algs_size;
+ 
+ 	crc = devm_kzalloc(dev, sizeof(*crc), GFP_KERNEL);
+ 	if (!crc)
+@@ -269,13 +303,26 @@ static int stm32_crc_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	/* set key, poly and reverse support if device is of F7 series */
++	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f7-crc")) {
++		crc->key_support = true;
++		crc->poly_support = true;
++		crc->reverse_support = true;
++	}
++
+ 	platform_set_drvdata(pdev, crc);
+ 
+ 	spin_lock(&crc_list.lock);
+ 	list_add(&crc->list, &crc_list.dev_list);
+ 	spin_unlock(&crc_list.lock);
+ 
+-	ret = crypto_register_shashes(algs, ARRAY_SIZE(algs));
++	/* For F4 series only CRC32 algorithm will be used */
++	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f4-crc"))
++		algs_size = 1;
++	else
++		algs_size = ARRAY_SIZE(algs);
++
++	ret = crypto_register_shashes(algs, algs_size);
+ 	if (ret) {
+ 		dev_err(dev, "Failed to register\n");
+ 		clk_disable_unprepare(crc->clk);
+@@ -304,6 +351,7 @@ static int stm32_crc_remove(struct platform_device *pdev)
+ 
+ static const struct of_device_id stm32_dt_ids[] = {
+ 	{ .compatible = "st,stm32f7-crc", },
++	{ .compatible = "st,stm32f4-crc", },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, stm32_dt_ids);
+-- 
+2.7.4
