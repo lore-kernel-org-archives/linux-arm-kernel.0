@@ -1,42 +1,81 @@
-From: alexander.duyck@gmail.com (Alexander Duyck)
-Date: Wed, 17 May 2017 07:49:44 -0700
-Subject: [PATCH 1/2] PCI: Add new PCIe Fabric End Node flag,
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING
-In-Reply-To: <MWHPR12MB1600A3E5F15C07CD88BA3C88C8E60@MWHPR12MB1600.namprd12.prod.outlook.com>
-References: <cover.1493678834.git.leedom@chelsio.com>
- <758d0e431c732fe133e7b0e660bde5fc1beccdba.1493678834.git.leedom@chelsio.com>
- <CAKgT0UeuW88AHBX14H8xHteeG7vR0AH3apbjOeEDx_6p46x7tA@mail.gmail.com>
- <20170502165329.GB26406@linux.intel.com>
- <CAKgT0UcxjGCZu_QV-eF7_yWkDBbQpLpdaPqBf1gji8XXM5Cc=w@mail.gmail.com>
- <MWHPR12MB160095DF53CE981C923FE65DC8160@MWHPR12MB1600.namprd12.prod.outlook.com>
- <CAKgT0UdJ17DGAphuP5Y9co6ky-GBFdq2s-1nqctY_Tz_iz5__g@mail.gmail.com>
- <MWHPR12MB1600E78DD7F530AA9DC2433DC8EA0@MWHPR12MB1600.namprd12.prod.outlook.com>
- <CAKgT0Ucwkp+fi-9HhMbze6t_i15dj4e2WQBp13Coi6MegrDh=w@mail.gmail.com>
- <22c46382-5778-022f-d0bd-74abec9e9c7c@huawei.com>
- <CAKgT0Ufg6uebqj79e1FOHoPpF-GxPYMkp353r3Ok_=nM8wF6qA@mail.gmail.com>
- <MWHPR12MB1600AC957C7E3B0DB4F06D6CC8EE0@MWHPR12MB1600.namprd12.prod.outlook.com>
- <a8a0628f-ccf7-932e-7d1e-9ef767295a6c@huawei.com>
- <MWHPR12MB1600A3E5F15C07CD88BA3C88C8E60@MWHPR12MB1600.namprd12.prod.outlook.com>
-Message-ID: <CAKgT0UcmC=7J7SmKkmKjvTG87tuFz1vHwX+Q8M8mR0LM3Ae-6g@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 17 May 2017 22:47:18 +0800
+Subject: [PATCH v8 2/9] drm/sun4i: add a dedicated module for sun4i-backend
+ and sun4i-layer
+In-Reply-To: <20170517144725.3463-1-icenowy@aosc.io>
+References: <20170517144725.3463-1-icenowy@aosc.io>
+Message-ID: <20170517144725.3463-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 11:38 AM, Casey Leedom <leedom@chelsio.com> wrote:
-> | From: Ding Tianhong <dingtianhong@huawei.com>
-> | Sent: Wednesday, May 10, 2017 6:15 PM
-> |
-> | Hi Casey:
-> |
-> | Will you continue to work on this solution or send a new version patches?
->
-> I won't be able to work on this any time soon given several other urgent
-> issues.  If you've got a desire to pick this up, I'd be happy to help code
-> review your efforts.
->
-> Casey
+Currently the direct call from CRTC code to layer code has disappeared,
+instead the layer's init function is called via the backend's ops.
 
-Thanks for the heads up. I'll see if I can find somebody in my team
-that might be able to take on the task though I can't make any
-promises either as we have quite a bit going on.
+Add a dedicated module for sun4i-backend and sun4i-layer, and drop the
+EXPORT_SYMBOL from backend code to layer code.
 
-- Alex
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+---
+Changes in v7:
+- Added Chen-Yu's Reviewed-by.
+
+ drivers/gpu/drm/sun4i/Makefile        | 5 +++--
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 4 ----
+ 2 files changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+index 59b757350a1f..a251fb36c951 100644
+--- a/drivers/gpu/drm/sun4i/Makefile
++++ b/drivers/gpu/drm/sun4i/Makefile
+@@ -5,9 +5,10 @@ sun4i-tcon-y += sun4i_tcon.o
+ sun4i-tcon-y += sun4i_rgb.o
+ sun4i-tcon-y += sun4i_dotclock.o
+ sun4i-tcon-y += sun4i_crtc.o
+-sun4i-tcon-y += sun4i_layer.o
++
++sun4i-backend-y += sun4i_backend.o sun4i_layer.o
+ 
+ obj-$(CONFIG_DRM_SUN4I)		+= sun4i-drm.o sun4i-tcon.o
+-obj-$(CONFIG_DRM_SUN4I)		+= sun4i_backend.o
++obj-$(CONFIG_DRM_SUN4I)		+= sun4i-backend.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun6i_drc.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 4af8ccb10bff..cf480218daa5 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -83,7 +83,6 @@ void sun4i_backend_layer_enable(struct sun4i_backend *backend,
+ 	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_MODCTL_REG,
+ 			   SUN4I_BACKEND_MODCTL_LAY_EN(layer), val);
+ }
+-EXPORT_SYMBOL(sun4i_backend_layer_enable);
+ 
+ static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
+ 					     u32 format, u32 *mode)
+@@ -170,7 +169,6 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
+ 
+ 	return 0;
+ }
+-EXPORT_SYMBOL(sun4i_backend_update_layer_coord);
+ 
+ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
+ 				       int layer, struct drm_plane *plane)
+@@ -205,7 +203,6 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
+ 
+ 	return 0;
+ }
+-EXPORT_SYMBOL(sun4i_backend_update_layer_formats);
+ 
+ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+ 				      int layer, struct drm_plane *plane)
+@@ -246,7 +243,6 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+ 
+ 	return 0;
+ }
+-EXPORT_SYMBOL(sun4i_backend_update_layer_buffer);
+ 
+ static int sun4i_backend_init_sat(struct device *dev) {
+ 	struct sun4i_backend *backend = dev_get_drvdata(dev);
+-- 
+2.12.2
