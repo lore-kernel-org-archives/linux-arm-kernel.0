@@ -1,34 +1,34 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 17 May 2017 16:37:35 +0800
-Subject: [PATCH 02/12] arm64: dts: hisilicon: update compatible string for
- hikey960
+Date: Wed, 17 May 2017 16:37:34 +0800
+Subject: [PATCH 01/12] dt-bindings: arm: hisilicon: add bindings for HiKey960
+ board
 In-Reply-To: <20170517083745.24479-1-guodong.xu@linaro.org>
 References: <20170517083745.24479-1-guodong.xu@linaro.org>
-Message-ID: <20170517083745.24479-3-guodong.xu@linaro.org>
+Message-ID: <20170517083745.24479-2-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update compatible string for hikey960. HiKey960 is a develpment board built
-with SoC Hi3660.
+Add bindings for HiKey960 Board.
 
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index 186251f..64875a5 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -12,7 +12,7 @@
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+index 2e73215..7111fbc8 100644
+--- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -4,6 +4,10 @@ Hi3660 SoC
+ Required root node properties:
+ 	- compatible = "hisilicon,hi3660";
  
- / {
- 	model = "HiKey960";
--	compatible = "hisilicon,hi3660";
-+	compatible = "hisilicon,hi3660-hikey960", "hisilicon,hi3660";
- 
- 	aliases {
- 		serial5 = &uart5;       /* console UART */
++HiKey960 Board
++Required root node properties:
++	- compatible = "hisilicon,hi3660-hikey960", "hisilicon,hi3660";
++
+ Hi3798cv200 SoC
+ Required root node properties:
+ 	- compatible = "hisilicon,hi3798cv200";
 -- 
 2.10.2
