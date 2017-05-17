@@ -1,26 +1,39 @@
 From: frank.wang@rock-chips.com (Frank Wang)
-Date: Wed, 17 May 2017 17:52:23 +0800
-Subject: [PATCH v2 0/3] add and fix some device node for rk322x SoC
-Message-ID: <1495014746-27621-1-git-send-email-frank.wang@rock-chips.com>
+Date: Wed, 17 May 2017 17:52:24 +0800
+Subject: [PATCH v2 1/3] arm: dts: rk322x: fix i2s1 pinctrl error
+In-Reply-To: <1495014746-27621-1-git-send-email-frank.wang@rock-chips.com>
+References: <1495014746-27621-1-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <1495014746-27621-2-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These series of patches fix some device node errors and add watchdog
-device node support for rk322x SoC.
+From: Sugar Zhang <sugar.zhang@rock-chips.com>
 
-Changes from v1:
- - Updated the 'Signed-off-by' tag with original authors' email id.
- - Dropped pinctrl-0 of uart2 emendation.
+Refer to Chapter 5.3.2 of rk3229 TRM, we can see that GPIO1A[2,4,5]
+using RK_FUNC_2 not RK_FUNC_1. This patch fixes it.
 
-Frank Wang (2):
-  arm: dts: rk322x: correct uart2 pinctrl and add another sets
-  arm: dts: rk322x: add watchdog device node.
+Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
+Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+---
+ arch/arm/boot/dts/rk322x.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Sugar Zhang (1):
-  arm: dts: rk322x: fix i2s1 pinctrl error
-
- arch/arm/boot/dts/rk322x.dtsi | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+index 48a0c1c..cc6a27d 100644
+--- a/arch/arm/boot/dts/rk322x.dtsi
++++ b/arch/arm/boot/dts/rk322x.dtsi
+@@ -621,9 +621,9 @@
+ 						<0 12 RK_FUNC_1 &pcfg_pull_none>,
+ 						<0 13 RK_FUNC_1 &pcfg_pull_none>,
+ 						<0 14 RK_FUNC_1 &pcfg_pull_none>,
+-						<1 2 RK_FUNC_1 &pcfg_pull_none>,
+-						<1 4 RK_FUNC_1 &pcfg_pull_none>,
+-						<1 5 RK_FUNC_1 &pcfg_pull_none>;
++						<1 2 RK_FUNC_2 &pcfg_pull_none>,
++						<1 4 RK_FUNC_2 &pcfg_pull_none>,
++						<1 5 RK_FUNC_2 &pcfg_pull_none>;
+ 			};
+ 		};
+ 
 -- 
 2.0.0
