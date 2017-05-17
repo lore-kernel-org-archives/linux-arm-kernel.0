@@ -1,81 +1,56 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Wed, 17 May 2017 15:35:42 +0800
-Subject: [PATCH 2/3] arm: dts: rk322x: correct uart2 pinctrl and add
- another sets
-In-Reply-To: <3974d438-89ca-04e2-03cd-6d3946dd461e@163.com>
-References: <1494992451-32542-1-git-send-email-frank.wang@rock-chips.com>
- <1494992451-32542-3-git-send-email-frank.wang@rock-chips.com>
- <3974d438-89ca-04e2-03cd-6d3946dd461e@163.com>
-Message-ID: <eb0f4b99-4e9a-7af3-a341-146a692fe49a@rock-chips.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 17 May 2017 09:40:42 +0200
+Subject: [PATCH v3 13/21] drm/sun4i: tcon: Change vertical total size
+ computation inconsistency
+In-Reply-To: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
+References: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <5f1e156ed132defe5ec58b4e2a97764d73eba5f3.1495006350.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kever,
+Both TCON channels need to have the resolution doubled, since the size the
+hardware is going to use is whatever we put in the register divided by two.
 
+However, we handle it differently for the two channels: in the channel 0,
+our register access macro does the multiplication of the value passed as
+paremeter, while in the channel 1, the macro doesn't do this, and we need
+to do it before calling it.
 
-On 2017/5/17 14:31, Kever Yang wrote:
-> Hi Frank,
->
->
-> On 05/17/2017 11:40 AM, Frank Wang wrote:
->> Correct UART2 PINCTRL flag and add another PINCTRL sets for UART2
->> in case of confict with SDMMC.
->>
->> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
->> ---
->>   arch/arm/boot/dts/rk322x.dtsi | 11 +++++++++--
->>   1 file changed, 9 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/rk322x.dtsi 
->> b/arch/arm/boot/dts/rk322x.dtsi
->> index cc6a27d..ea1239a 100644
->> --- a/arch/arm/boot/dts/rk322x.dtsi
->> +++ b/arch/arm/boot/dts/rk322x.dtsi
->> @@ -222,7 +222,7 @@
->>           clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
->>           clock-names = "baudclk", "apb_pclk";
->>           pinctrl-names = "default";
->> -        pinctrl-0 = <&uart2_xfer>;
->> +        pinctrl-0 = <&uart21_xfer>;
->
-> There are more than one group of UART in rk322x, maybe we need to move
-> or add this setting in the dts file to override dtsi setting?
->
+Make this consistent by aligning the channel 0 with the channel 1
+behaviour.
 
-That makes sense, I will delete above change in next version and 
-overwrite it in dts file later.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 2 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-BR.
-Frank
-
-
-> Thanks,
-> - Kever
->>           reg-shift = <2>;
->>           reg-io-width = <4>;
->>           status = "disabled";
->> @@ -693,7 +693,7 @@
->>             uart2 {
->>               uart2_xfer: uart2-xfer {
->> -                rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_none>,
->> +                rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_up>,
->>                           <1 19 RK_FUNC_2 &pcfg_pull_none>;
->>               };
->>   @@ -705,5 +705,12 @@
->>                   rockchip,pins = <0 24 RK_FUNC_1 &pcfg_pull_none>;
->>               };
->>           };
->> +
->> +        uart2-1 {
->> +            uart21_xfer: uart21-xfer {
->> +                rockchip,pins = <1 10 RK_FUNC_2 &pcfg_pull_up>,
->> +                        <1 9 RK_FUNC_2 &pcfg_pull_none>;
->> +            };
->> +        };
->>       };
->>   };
->
->
->
->
->
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 931dd374552e..62e254aedb57 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -194,7 +194,7 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+ 
+ 	/* Set vertical display timings */
+ 	regmap_write(tcon->regs, SUN4I_TCON0_BASIC2_REG,
+-		     SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal) |
++		     SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal * 2) |
+ 		     SUN4I_TCON0_BASIC2_V_BACKPORCH(bp));
+ 
+ 	/* Set Hsync and Vsync length */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index f60e0b4c6db8..e3c50ecdcd04 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -52,7 +52,7 @@
+ #define SUN4I_TCON0_BASIC1_H_BACKPORCH(bp)		(((bp) - 1) & 0xfff)
+ 
+ #define SUN4I_TCON0_BASIC2_REG			0x50
+-#define SUN4I_TCON0_BASIC2_V_TOTAL(total)		((((total) * 2) & 0x1fff) << 16)
++#define SUN4I_TCON0_BASIC2_V_TOTAL(total)		(((total) & 0x1fff) << 16)
+ #define SUN4I_TCON0_BASIC2_V_BACKPORCH(bp)		(((bp) - 1) & 0xfff)
+ 
+ #define SUN4I_TCON0_BASIC3_REG			0x54
+-- 
+git-series 0.9.1
