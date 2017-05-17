@@ -1,38 +1,84 @@
-From: jslaby@suse.cz (Jiri Slaby)
-Date: Wed, 17 May 2017 10:01:29 +0200
-Subject: [PATCH 1/1] futex: remove duplicated code
-In-Reply-To: <20170515131644.GA3605@arm.com>
-References: <20170515130742.18357-1-jslaby@suse.cz>
- <20170515131644.GA3605@arm.com>
-Message-ID: <14580dfc-9721-38ab-a1e0-6b4aba13b406@suse.cz>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Wed, 17 May 2017 11:04:04 +0300
+Subject: [V2, 2/6] tty: serial: lpuart: add little endian 32 bit register
+ support
+In-Reply-To: <20170517070019.GG9913@b29396-OptiPlex-7040>
+References: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
+ <b4a2ed13-c71f-c973-3b09-b632e083a88b@cogentembedded.com>
+ <20170517033139.GB9913@b29396-OptiPlex-7040>
+ <48819894-4943-7d14-ccf8-83cfd2195c9a@cogentembedded.com>
+ <AM3PR04MB306D5C86AED120D15C4D46A80E70@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <55bae8d2-0e23-b5e1-f304-63d9130ccb08@cogentembedded.com>
+ <20170517070019.GG9913@b29396-OptiPlex-7040>
+Message-ID: <045d1888-4a23-cf73-ab4c-009e29fde974@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2017, 03:16 PM, Will Deacon wrote:
-> Whilst I think this is a good idea, the code in question actually results
-> in undefined behaviour per the C spec and is reported by UBSAN.
+Hi
 
-Hi, yes, I know -- this patch was the 1st from the series of 3 which I
-sent a long time ago to fix that up too. But I remember your patch, so I
-sent only this one this time.
+My view of your statement is:
+- you currently assume only a few cases for this driver - builtin UART
+in vf610, ls1012a and imx7,
+- in each of these cases, all lpuart instances share same endian, thus
+having that in global var works for these cases,
+- having that in global var makes it possible for you to write less
+lines of code
 
-> See my
-> patch fixing arm64 here (which I'd forgotten about):
+My complain is:
+- in Linux, we are trying to keep drivers generic,
+- in Linux, having less lines of code has never been sufficient to break
+basic data structure consistency,
+- having driver to keep per-device capability in global var is a clear
+case of breaking consistency.
+
+
+>>> That's for special case, normally we wouldn't do that.
+>>
+>> For me this "special case" looks like "let's break data structure
+>> consistency to reuse several lines of code".
+>>
+>> With code snippets you show, it looks even worse: you assign same global
+>> variable in several places for different uses. 
 > 
-> https://www.spinics.net/lists/linux-arch/msg38564.html
-> 
-> But, as stated in the thread above, I think we should go a step further
-> and remove FUTEX_OP_{OR,ANDN,XOR,OPARG_SHIFT} altogether. They don't
-> appear to be used by userspace, and this whole thing is a total mess.
-> 
-> Any thoughts?
+> If you mean lpuart_is_be, it's not for different uses.
+> The purpose is the same to align the correct endian but in two places.
 
-Ok, I am all for that. I think the only question is who is going to do
-the work and submit it :)? Do I understand correctly to eliminate all
-these functions and the path into the kernel? But won't this break API
--- are there really no users of this interface?
+_probe() routine called for device X alters state already in use for
+device Y.
 
-thanks,
--- 
-js
-suse labs
+> 
+>> implicitly assuming that
+>> it is for same device. Which can be true in your current system, but not
+>> elsewhere (e.g. why not having lpuart programmed into fpga)?
+>>
+> 
+> Sorry, What issues for fpga?
+
+Connect FPGA to IMX7 based system and program LS1012a version of lpuart
+core into it.  Have your console on system UART broken at time when
+driver gets registered.
+
+
+> 
+>> Alternative solution could be - have separate write path for earlycon.
+> 
+> It looks to me having the same issue with a separate write patch
+> for earlycon as we still need distinguish Little or Big endian
+> for Layerscape and IMX.
+> 
+>> At a glance, it is dozen lines of code.
+> 
+> Would you please show some sample code?
+
+Do not reuse lpuart32_console_putchar() in earlycon code.
+
+Have two sets of early_setup/early_write/putchar - for BE and
+defaut-endian earlycon. And in these putchar's do not use
+lpuart_(read|write).
+
+
+As far as I can see, fsl_lpuart.c already has two drivers in one -
+there is separate set of routines for 8bit and 32bit cases.
+And those routines that are common, have if blocks that separate cases.
+I think these drivers will be cleaner if separated.
+However that's completely different story.
