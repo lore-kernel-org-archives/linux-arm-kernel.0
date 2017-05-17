@@ -1,82 +1,54 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 17 May 2017 11:54:33 +0200
-Subject: [PATCH 08/31] arm64: Add a facility to turn an ESR syndrome into
- a sysreg encoding
-In-Reply-To: <20170503104606.19342-9-marc.zyngier@arm.com>
-References: <20170503104606.19342-1-marc.zyngier@arm.com>
- <20170503104606.19342-9-marc.zyngier@arm.com>
-Message-ID: <9a81564d-8bb3-36ea-f0f8-a61cbc7fb345@redhat.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 17 May 2017 12:55:59 +0300
+Subject: [V2,
+ 2/6] tty: serial: lpuart: add little endian 32 bit register support
+In-Reply-To: <20170517054356.GE9913@b29396-OptiPlex-7040>
+References: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
+ <fb9fe0cd-5ca7-74e6-33dc-7638e205b2e3@cogentembedded.com>
+ <20170517033927.GC9913@b29396-OptiPlex-7040>
+ <8f4cf45e-45ab-e6e6-d95c-f3d4243697f4@cogentembedded.com>
+ <20170517054356.GE9913@b29396-OptiPlex-7040>
+Message-ID: <CAHp75VdL=rGHuupGmgmAVonEQgpyPRgoMQrZK0yQiaM=1Vac-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 17, 2017 at 8:43 AM, Dong Aisheng <dongas86@gmail.com> wrote:
+> On Wed, May 17, 2017 at 08:37:41AM +0300, Nikita Yushchenko wrote:
+>>
+>>
+>> 17.05.2017 06:39, Dong Aisheng wrote:
+>> > On Tue, May 16, 2017 at 02:15:08PM +0300, Nikita Yushchenko wrote:
+>> >>>  static u32 lpuart32_read(void __iomem *addr)
+>> >>>  {
+>> >>> - return ioread32be(addr);
+>> >>> + return lpuart_is_be ? ioread32be(addr) : readl(addr);
+>> >>>  }
+>> >>>
+>> >>>  static void lpuart32_write(u32 val, void __iomem *addr)
+>> >>>  {
+>> >>> - iowrite32be(val, addr);
+>> >>> + if (lpuart_is_be)
+>> >>> +         iowrite32be(val, addr);
+>> >>> + else
+>> >>> +         writel(val, addr);
+>> >>>  }
+>> >>
+>> >> What if this is ever executed on big endian system?
+>> >>
+>> >
+>> > Sorry, not catching the point...
+>> >
+>> > What issues will meet?
+>>
+>> Isn't writel() in host endian?
+>
+> On big endian systems, it is supposed to run iowrite32be.
 
-On 03/05/2017 12:45, Marc Zyngier wrote:
-> It is often useful to compare an ESR syndrome reporting the trapping
-> of a system register with a value matching that system register.
-> 
-> Since encoding both the sysreg and the ESR version seem to be a bit
-> overkill, let's add a set of macros that convert an ESR value into
-> the corresponding sysreg encoding.
-> 
-> We handle both AArch32 and AArch64, taking advantage of identical
-> encodings between system registers and CP15 accessors.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/esr.h | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-> index ad42e79a5d4d..db8f13137443 100644
-> --- a/arch/arm64/include/asm/esr.h
-> +++ b/arch/arm64/include/asm/esr.h
-> @@ -19,6 +19,7 @@
->  #define __ASM_ESR_H
->  
->  #include <asm/memory.h>
-> +#include <asm/sysreg.h>
->  
->  #define ESR_ELx_EC_UNKNOWN	(0x00)
->  #define ESR_ELx_EC_WFx		(0x01)
-> @@ -177,6 +178,30 @@
->  
->  #define ESR_ELx_SYS64_ISS_SYS_CNTVCT	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 2, 14, 0) | \
->  					 ESR_ELx_SYS64_ISS_DIR_READ)
-> +
-> +#define esr_sys64_to_sysreg(e)					\
-> +	sys_reg((((e) & ESR_ELx_SYS64_ISS_OP0_MASK) >>		\
-> +		 ESR_ELx_SYS64_ISS_OP0_SHIFT),			\
-> +		(((e) & ESR_ELx_SYS64_ISS_OP1_MASK) >>		\
-> +		 ESR_ELx_SYS64_ISS_OP1_SHIFT),			\
-> +		(((e) & ESR_ELx_SYS64_ISS_CRN_MASK) >>		\
-> +		 ESR_ELx_SYS64_ISS_CRN_SHIFT),			\
-> +		(((e) & ESR_ELx_SYS64_ISS_CRM_MASK) >>		\
-> +		 ESR_ELx_SYS64_ISS_CRM_SHIFT),			\
-> +		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
-> +		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
-> +
-> +#define esr_cp15_to_sysreg(e)					\
-> +	sys_reg(3,						\
-> +		(((e) & ESR_ELx_SYS64_ISS_OP1_MASK) >>		\
-> +		 ESR_ELx_SYS64_ISS_OP1_SHIFT),			\
-> +		(((e) & ESR_ELx_SYS64_ISS_CRN_MASK) >>		\
-> +		 ESR_ELx_SYS64_ISS_CRN_SHIFT),			\
-> +		(((e) & ESR_ELx_SYS64_ISS_CRM_MASK) >>		\
-> +		 ESR_ELx_SYS64_ISS_CRM_SHIFT),			\
-> +		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
-> +		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
-> +
->  #ifndef __ASSEMBLY__
->  #include <asm/types.h>
+It looks like you substituting *bus* side with CPU *side* of communication.
 
-Needs a rebase on top
-9842119  arm64: Add CNTFRQ_EL0 trap handler
+If you are talking about CPU side
+__raw_readl() / __raw_writel() will do the trick.
 
-Otherwise
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-Eric
-
->  
-> 
+-- 
+With Best Regards,
+Andy Shevchenko
