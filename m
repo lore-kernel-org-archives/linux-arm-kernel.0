@@ -1,54 +1,50 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 18 May 2017 00:43:54 +0800
-Subject: [RFC PATCH 11/11] [DO NOT MERGE] ARM: sun8i: h3: enable TV output on
- Orange Pi PC
+Date: Thu, 18 May 2017 00:43:52 +0800
+Subject: [RFC PATCH 09/11] clk: sunxi-ng: export CLK_PLL_DE for H3
 In-Reply-To: <20170517164354.16399-1-icenowy@aosc.io>
 References: <20170517164354.16399-1-icenowy@aosc.io>
-Message-ID: <20170517164354.16399-12-icenowy@aosc.io>
+Message-ID: <20170517164354.16399-10-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Orange Pi PC features a 3.5mm jack with TV output in it.
+The CLK_PLL_DE is needed to be referenced in device tree for H3, for
+both forcing the parent of PLL_DE.
 
-Enable the TV output.
-
-As it currently do not have jack detection feature, do not merge this
-patch.
+So export it to the device tree binding header.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.h      | 3 +--
+ include/dt-bindings/clock/sun8i-h3-ccu.h | 2 ++
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-index 1a044b17d6c6..9c50ac3e82f3 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -97,6 +97,10 @@
- 	status = "okay";
- };
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
+index 85973d1e8165..7029091a6c9f 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
+@@ -33,9 +33,8 @@
+ #define CLK_PLL_PERIPH0_2X	10
+ #define CLK_PLL_GPU		11
+ #define CLK_PLL_PERIPH1		12
+-#define CLK_PLL_DE		13
  
-+&de {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -169,6 +173,14 @@
- 	status = "okay";
- };
+-/* The CPUX clock is exported */
++/* The PLL_DE and CPUX clocks is exported */
  
-+&tcon1 {
-+	status = "okay";
-+};
+ #define CLK_AXI			15
+ #define CLK_AHB1		16
+diff --git a/include/dt-bindings/clock/sun8i-h3-ccu.h b/include/dt-bindings/clock/sun8i-h3-ccu.h
+index c2afc41d6964..82496a57efd4 100644
+--- a/include/dt-bindings/clock/sun8i-h3-ccu.h
++++ b/include/dt-bindings/clock/sun8i-h3-ccu.h
+@@ -43,6 +43,8 @@
+ #ifndef _DT_BINDINGS_CLK_SUN8I_H3_H_
+ #define _DT_BINDINGS_CLK_SUN8I_H3_H_
+ 
++#define CLK_PLL_DE		13
 +
-+&tve0 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+ #define CLK_CPUX		14
+ 
+ #define CLK_BUS_CE		20
 -- 
 2.12.2
