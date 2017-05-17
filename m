@@ -1,93 +1,90 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 17 May 2017 09:40:34 +0200
-Subject: [PATCH v3 05/21] clk: sunxi-ng: mux: split out the pre-divider
- computation code
+Date: Wed, 17 May 2017 09:40:36 +0200
+Subject: [PATCH v3 07/21] clk: sunxi-ng: mux: Re-adjust parent rate
 In-Reply-To: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
 References: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <6d3e9ce05c3f58e42975136481a71fa5d556ad1c.1495006350.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <d7558de4acfd568ea9f3d185c9530c9b0c311bbc.1495006350.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pre-divider retrieval code was merged into the function to apply the
-current pre-divider onto the parent clock rate so that we can use that
-adjusted value to do our factors computation.
+Currently, the parent rate given back to the clock framework in our
+request is the original parent rate we calculated before trying to round
+the rate of our clock.
 
-However, since we'll need to do the reverse operation, we need to split out
-that code into a function that will be shared.
+This works fine unless our clock also changes its parent rate, in which
+case we will simply ignore that change and still use the previous parent
+rate.
+
+Create a new function to re-adjust the parent rate to take the pre-dividers
+into account, and give that back to the clock framework.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/ccu_mux.c | 32 ++++++++++++++++++++------------
- 1 file changed, 20 insertions(+), 12 deletions(-)
+ drivers/clk/sunxi-ng/ccu_mux.c | 33 ++++++++++++++++++++++++++++-----
+ 1 file changed, 28 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-index 58b6e349a0ed..3eb23d4e6534 100644
+index c33210972581..748b172f9193 100644
 --- a/drivers/clk/sunxi-ng/ccu_mux.c
 +++ b/drivers/clk/sunxi-ng/ccu_mux.c
-@@ -15,24 +15,20 @@
- #include "ccu_gate.h"
- #include "ccu_mux.h"
- 
--void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
--					     struct ccu_mux_internal *cm,
--					     int parent_index,
--					     unsigned long *parent_rate)
-+static u16 ccu_mux_get_prediv(struct ccu_common *common,
-+			      struct ccu_mux_internal *cm,
-+			      int parent_index)
- {
- 	u16 prediv = 1;
- 	u32 reg;
--	int i;
- 
- 	if (!((common->features & CCU_FEATURE_FIXED_PREDIV) ||
- 	      (common->features & CCU_FEATURE_VARIABLE_PREDIV) ||
- 	      (common->features & CCU_FEATURE_ALL_PREDIV)))
--		return;
-+		return 1;
- 
--	if (common->features & CCU_FEATURE_ALL_PREDIV) {
--		*parent_rate = *parent_rate / common->prediv;
--		return;
--	}
-+	if (common->features & CCU_FEATURE_ALL_PREDIV)
-+		return common->prediv;
- 
- 	reg = readl(common->base + common->reg);
- 	if (parent_index < 0) {
-@@ -40,10 +36,13 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
- 		parent_index &= (1 << cm->width) - 1;
- 	}
- 
--	if (common->features & CCU_FEATURE_FIXED_PREDIV)
-+	if (common->features & CCU_FEATURE_FIXED_PREDIV) {
-+		int i;
-+
- 		for (i = 0; i < cm->n_predivs; i++)
- 			if (parent_index == cm->fixed_predivs[i].index)
- 				prediv = cm->fixed_predivs[i].div;
-+	}
- 
- 	if (common->features & CCU_FEATURE_VARIABLE_PREDIV)
- 		if (parent_index == cm->variable_prediv.index) {
-@@ -54,7 +53,16 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
- 			prediv = div + 1;
- 		}
- 
--	*parent_rate = *parent_rate / prediv;
-+	return prediv;
-+}
-+
-+void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
-+					     struct ccu_mux_internal *cm,
-+					     int parent_index,
-+					     unsigned long *parent_rate)
-+{
-+	*parent_rate = *parent_rate / ccu_mux_get_prediv(common, cm,
-+							 parent_index);
+@@ -64,6 +64,14 @@ unsigned long ccu_mux_helper_apply_prediv(struct ccu_common *common,
+ 	return parent_rate / ccu_mux_get_prediv(common, cm, parent_index);
  }
  
++unsigned long ccu_mux_helper_unapply_prediv(struct ccu_common *common,
++					    struct ccu_mux_internal *cm,
++					    int parent_index,
++					    unsigned long parent_rate)
++{
++	return parent_rate * ccu_mux_get_prediv(common, cm, parent_index);
++}
++
  int ccu_mux_helper_determine_rate(struct ccu_common *common,
+ 				  struct ccu_mux_internal *cm,
+ 				  struct clk_rate_request *req,
+@@ -89,22 +97,37 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
+ 		best_rate = round(cm, best_parent, &adj_parent_rate,
+ 				  req->rate, data);
+ 
++		/*
++		 * adj_parent_rate might have been modified by our clock.
++		 * Unapply the pre-divider if there's one, and give
++		 * the actual frequency the parent needs to run at.
++		 */
++		best_parent_rate = ccu_mux_helper_unapply_prediv(common, cm, -1,
++								 adj_parent_rate);
++
+ 		goto out;
+ 	}
+ 
+ 	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
+-		unsigned long tmp_rate, parent_rate, adj_parent_rate;
++		unsigned long tmp_rate, parent_rate;
+ 		struct clk_hw *parent;
+ 
+ 		parent = clk_hw_get_parent_by_index(hw, i);
+ 		if (!parent)
+ 			continue;
+ 
+-		parent_rate = clk_hw_get_rate(parent);
+-		adj_parent_rate = ccu_mux_helper_apply_prediv(common, cm, i,
+-							      parent_rate);
++		parent_rate = ccu_mux_helper_apply_prediv(common, cm, i,
++							  clk_hw_get_rate(parent));
++
++		tmp_rate = round(cm, parent, &parent_rate, req->rate, data);
+ 
+-		tmp_rate = round(cm, parent, &adj_parent_rate, req->rate, data);
++		/*
++		 * parent_rate might have been modified by our clock.
++		 * Unapply the pre-divider if there's one, and give
++		 * the actual frequency the parent needs to run at.
++		 */
++		parent_rate = ccu_mux_helper_unapply_prediv(common, cm, i,
++							    parent_rate);
+ 		if (tmp_rate == req->rate) {
+ 			best_parent = parent;
+ 			best_parent_rate = parent_rate;
 -- 
 git-series 0.9.1
