@@ -1,172 +1,56 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 17 May 2017 18:50:08 +0300
-Subject: [PATCHv3 3/4] dt-bindings: clk: add omap4 clkctrl definitions
-In-Reply-To: <1495036209-11298-1-git-send-email-t-kristo@ti.com>
-References: <1495036209-11298-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1495036209-11298-4-git-send-email-t-kristo@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 17 May 2017 17:10:41 +0100
+Subject: [PATCH] clocksource: arm_arch_timer: fix DEFINE_PER_CPU expansion
+Message-ID: <1495037441-11211-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contains offsets for all omap4 clkctrl main and optional clocks.
+Our ctags mangling script can't handle newlines inside of a
+DEFINE_PER_CPU(), leading to an annoying message whenever tags are
+built:
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
+  ctags: Warning: drivers/clocksource/arm_arch_timer.c:302: null expansion of name pattern "\1"
+
+This was dealt with elsewhere in commit:
+
+  25528213fe9f75f4 ("tags: Fix DEFINE_PER_CPU expansions")
+
+... by ensuring each DEFINE_PER_CPU() was contained on a single line,
+even where this would violate the usual code style (checkpatch warnings
+and all).
+
+Let's do the same for the arch timer driver, and get rid of the
+distraction.
+
+Fixes: 6acc71ccac7187fc ("arm64: arch_timer: Allows a CPU-specific erratum to only affect a subset of CPUs")
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
 ---
- include/dt-bindings/clock/omap4.h | 146 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 146 insertions(+)
- create mode 100644 include/dt-bindings/clock/omap4.h
+ drivers/clocksource/arm_arch_timer.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/include/dt-bindings/clock/omap4.h b/include/dt-bindings/clock/omap4.h
-new file mode 100644
-index 0000000..e86c758
---- /dev/null
-+++ b/include/dt-bindings/clock/omap4.h
-@@ -0,0 +1,146 @@
-+/*
-+ * Copyright 2017 Texas Instruments, Inc.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef __DT_BINDINGS_CLK_OMAP4_H
-+#define __DT_BINDINGS_CLK_OMAP4_H
-+
-+#define OMAP4_CLKCTRL_OFFSET	0x20
-+#define OMAP4_CLKCTRL_INDEX(offset)	((offset) - OMAP4_CLKCTRL_OFFSET)
-+
-+/* mpuss clocks */
-+#define OMAP4_MPU_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+
-+/* tesla clocks */
-+#define OMAP4_DSP_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+
-+/* abe clocks */
-+#define OMAP4_L4_ABE_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+#define OMAP4_AESS_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x28)
-+#define OMAP4_MCPDM_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x30)
-+#define OMAP4_DMIC_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x38)
-+#define OMAP4_MCASP_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x40)
-+#define OMAP4_MCBSP1_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x48)
-+#define OMAP4_MCBSP2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x50)
-+#define OMAP4_MCBSP3_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x58)
-+#define OMAP4_SLIMBUS1_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x60)
-+#define OMAP4_TIMER5_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x68)
-+#define OMAP4_TIMER6_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x70)
-+#define OMAP4_TIMER7_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x78)
-+#define OMAP4_TIMER8_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x80)
-+#define OMAP4_WD_TIMER3_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x88)
-+
-+/* l4_ao clocks */
-+#define OMAP4_SMARTREFLEX_MPU_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x28)
-+#define OMAP4_SMARTREFLEX_IVA_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x30)
-+#define OMAP4_SMARTREFLEX_CORE_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x38)
-+
-+/* l3_1 clocks */
-+#define OMAP4_L3_MAIN_1_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+
-+/* l3_2 clocks */
-+#define OMAP4_L3_MAIN_2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+#define OMAP4_GPMC_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x28)
-+#define OMAP4_OCMC_RAM_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x30)
-+
-+/* ducati clocks */
-+#define OMAP4_IPU_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+
-+/* l3_dma clocks */
-+#define OMAP4_DMA_SYSTEM_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+
-+/* l3_emif clocks */
-+#define OMAP4_DMM_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+#define OMAP4_EMIF1_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x30)
-+#define OMAP4_EMIF2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x38)
-+
-+/* d2d clocks */
-+#define OMAP4_C2C_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+
-+/* l4_cfg clocks */
-+#define OMAP4_L4_CFG_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+#define OMAP4_SPINLOCK_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x28)
-+#define OMAP4_MAILBOX_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x30)
-+
-+/* l3_instr clocks */
-+#define OMAP4_L3_MAIN_3_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+#define OMAP4_L3_INSTR_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x28)
-+#define OMAP4_OCP_WP_NOC_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x40)
-+
-+/* ivahd clocks */
-+#define OMAP4_IVA_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+#define OMAP4_SL2IF_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x28)
-+
-+/* iss clocks */
-+#define OMAP4_ISS_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+#define OMAP4_FDIF_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x28)
-+
-+/* l3_dss clocks */
-+#define OMAP4_DSS_CORE_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+
-+/* l3_gfx clocks */
-+#define OMAP4_GPU_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+
-+/* l3_init clocks */
-+#define OMAP4_MMC1_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x28)
-+#define OMAP4_MMC2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x30)
-+#define OMAP4_HSI_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x38)
-+#define OMAP4_USB_HOST_HS_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x58)
-+#define OMAP4_USB_OTG_HS_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x60)
-+#define OMAP4_USB_TLL_HS_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x68)
-+#define OMAP4_USB_HOST_FS_CLKCTRL	OMAP4_CLKCTRL_INDEX(0xd0)
-+#define OMAP4_OCP2SCP_USB_PHY_CLKCTRL	OMAP4_CLKCTRL_INDEX(0xe0)
-+
-+/* l4_per clocks */
-+#define OMAP4_TIMER10_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x28)
-+#define OMAP4_TIMER11_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x30)
-+#define OMAP4_TIMER2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x38)
-+#define OMAP4_TIMER3_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x40)
-+#define OMAP4_TIMER4_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x48)
-+#define OMAP4_TIMER9_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x50)
-+#define OMAP4_ELM_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x58)
-+#define OMAP4_GPIO2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x60)
-+#define OMAP4_GPIO3_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x68)
-+#define OMAP4_GPIO4_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x70)
-+#define OMAP4_GPIO5_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x78)
-+#define OMAP4_GPIO6_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x80)
-+#define OMAP4_HDQ1W_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x88)
-+#define OMAP4_I2C1_CLKCTRL	OMAP4_CLKCTRL_INDEX(0xa0)
-+#define OMAP4_I2C2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0xa8)
-+#define OMAP4_I2C3_CLKCTRL	OMAP4_CLKCTRL_INDEX(0xb0)
-+#define OMAP4_I2C4_CLKCTRL	OMAP4_CLKCTRL_INDEX(0xb8)
-+#define OMAP4_L4_PER_CLKCTRL	OMAP4_CLKCTRL_INDEX(0xc0)
-+#define OMAP4_MCBSP4_CLKCTRL	OMAP4_CLKCTRL_INDEX(0xe0)
-+#define OMAP4_MCSPI1_CLKCTRL	OMAP4_CLKCTRL_INDEX(0xf0)
-+#define OMAP4_MCSPI2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0xf8)
-+#define OMAP4_MCSPI3_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x100)
-+#define OMAP4_MCSPI4_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x108)
-+#define OMAP4_MMC3_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x120)
-+#define OMAP4_MMC4_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x128)
-+#define OMAP4_SLIMBUS2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x138)
-+#define OMAP4_UART1_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x140)
-+#define OMAP4_UART2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x148)
-+#define OMAP4_UART3_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x150)
-+#define OMAP4_UART4_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x158)
-+#define OMAP4_MMC5_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x160)
-+
-+/* l4_wkup clocks */
-+#define OMAP4_L4_WKUP_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+#define OMAP4_WD_TIMER2_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x30)
-+#define OMAP4_GPIO1_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x38)
-+#define OMAP4_TIMER1_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x40)
-+#define OMAP4_COUNTER_32K_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x50)
-+#define OMAP4_KBD_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x78)
-+
-+/* emu_sys clocks */
-+#define OMAP4_DEBUGSS_CLKCTRL	OMAP4_CLKCTRL_INDEX(0x20)
-+
-+#endif
+Daniel/Thomas, this fixes a small bit of fallout from the recent merge window.
+Would it be possible to pick it up as a fix for v4.12?
+
+Thanks,
+Mark.
+
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 4bed671..21669ec 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -299,8 +299,7 @@ static u64 notrace arm64_858921_read_cntvct_el0(void)
+ #endif
+ 
+ #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+-DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *,
+-	       timer_unstable_counter_workaround);
++DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *, timer_unstable_counter_workaround);
+ EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
+ 
+ DEFINE_STATIC_KEY_FALSE(arch_timer_read_ool_enabled);
 -- 
 1.9.1
