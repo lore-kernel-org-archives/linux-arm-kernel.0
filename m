@@ -1,183 +1,121 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 17 May 2017 09:40:31 +0200
-Subject: [PATCH v3 02/21] clk: sunxi-ng: Pass the parent and a pointer to the
- clocks round rate
+Date: Wed, 17 May 2017 09:40:45 +0200
+Subject: [PATCH v3 16/21] dt-bindings: display: sun4i: Add HDMI display
+ bindings
 In-Reply-To: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
 References: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <a5c349636d52f73ede2fe439730880393b38cd09.1495006350.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <67bd9d191ce9cc8a172abbc558901ac79da9daab.1495006350.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks might need to modify their parent clocks. In order to make that
-possible, give them access to the parent clock being evaluated, and to a
-pointer to the parent rate so that they can modify it if needed.
+One of the possible output of the display pipeline, on the SoCs that have
+it, is the HDMI controller.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Add a binding for it.
+
 Acked-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu_div.c  |  7 ++++---
- drivers/clk/sunxi-ng/ccu_mp.c   |  7 ++++---
- drivers/clk/sunxi-ng/ccu_mult.c | 11 ++++++-----
- drivers/clk/sunxi-ng/ccu_mux.c  |  8 +++++---
- drivers/clk/sunxi-ng/ccu_mux.h  |  3 ++-
- drivers/clk/sunxi-ng/ccu_nkm.c  |  7 ++++---
- 6 files changed, 25 insertions(+), 18 deletions(-)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 79 +++++++-
+ 1 file changed, 79 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
-index 4057e6021aa9..a489f18a3c01 100644
---- a/drivers/clk/sunxi-ng/ccu_div.c
-+++ b/drivers/clk/sunxi-ng/ccu_div.c
-@@ -14,7 +14,8 @@
- #include "ccu_div.h"
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 7acdbf14ae1c..e74794f20ec5 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -14,6 +14,34 @@ Conversely, for the output ports of the same group, the remote endpoint
+ ID must be the index of the local hardware block. If the local backend
+ is backend 1, then the remote endpoint ID must be 1.
  
- static unsigned long ccu_div_round_rate(struct ccu_mux_internal *mux,
--					unsigned long parent_rate,
-+					struct clk_hw *parent,
-+					unsigned long *parent_rate,
- 					unsigned long rate,
- 					void *data)
- {
-@@ -26,10 +27,10 @@ static unsigned long ccu_div_round_rate(struct ccu_mux_internal *mux,
- 	 * several parents, while we might be called to evaluate
- 	 * several different parents.
- 	 */
--	val = divider_get_val(rate, parent_rate, cd->div.table, cd->div.width,
-+	val = divider_get_val(rate, *parent_rate, cd->div.table, cd->div.width,
- 			      cd->div.flags);
++HDMI Encoder
++------------
++
++The HDMI Encoder supports the HDMI video and audio outputs, and does
++CEC. It is one end of the pipeline.
++
++Required properties:
++  - compatible: value must be one of:
++    * allwinner,sun5i-a10s-hdmi
++  - reg: base address and size of memory-mapped region
++  - interrupts: interrupt associated to this IP
++  - clocks: phandles to the clocks feeding the HDMI encoder
++    * ahb: the HDMI interface clock
++    * mod: the HDMI module clock
++    * pll-0: the first video PLL
++    * pll-1: the second video PLL
++  - clock-names: the clock names mentioned above
++  - dmas: phandles to the DMA channels used by the HDMI encoder
++    * ddc-tx: The channel for DDC transmission
++    * ddc-rx: The channel for DDC reception
++    * audio-tx: The channel used for audio transmission
++  - dma-names: the channel names mentioned above
++
++  - ports: A ports node with endpoint definitions as defined in
++    Documentation/devicetree/bindings/media/video-interfaces.txt. The
++    first port should be the input endpoint. The second should be the
++    output, usually to an HDMI connector.
++
+ TV Encoder
+ ----------
  
--	return divider_recalc_rate(&cd->common.hw, parent_rate, val,
-+	return divider_recalc_rate(&cd->common.hw, *parent_rate, val,
- 				   cd->div.table, cd->div.flags);
- }
+@@ -183,6 +211,57 @@ panel: panel {
+ 	};
+ };
  
-diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
-index b583f186a804..de02e6c386d8 100644
---- a/drivers/clk/sunxi-ng/ccu_mp.c
-+++ b/drivers/clk/sunxi-ng/ccu_mp.c
-@@ -41,7 +41,8 @@ static void ccu_mp_find_best(unsigned long parent, unsigned long rate,
- }
- 
- static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
--				       unsigned long parent_rate,
-+				       struct clk_hw *hw,
-+				       unsigned long *parent_rate,
- 				       unsigned long rate,
- 				       void *data)
- {
-@@ -52,9 +53,9 @@ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
- 	max_m = cmp->m.max ?: 1 << cmp->m.width;
- 	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
- 
--	ccu_mp_find_best(parent_rate, rate, max_m, max_p, &m, &p);
-+	ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
- 
--	return parent_rate / p / m;
-+	return *parent_rate / p / m;
- }
- 
- static void ccu_mp_disable(struct clk_hw *hw)
-diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
-index 671141359895..6ee7ba0738fb 100644
---- a/drivers/clk/sunxi-ng/ccu_mult.c
-+++ b/drivers/clk/sunxi-ng/ccu_mult.c
-@@ -33,9 +33,10 @@ static void ccu_mult_find_best(unsigned long parent, unsigned long rate,
- }
- 
- static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
--					unsigned long parent_rate,
--					unsigned long rate,
--					void *data)
-+					 struct clk_hw *parent,
-+					 unsigned long *parent_rate,
-+					 unsigned long rate,
-+					 void *data)
- {
- 	struct ccu_mult *cm = data;
- 	struct _ccu_mult _cm;
-@@ -47,9 +48,9 @@ static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
- 	else
- 		_cm.max = (1 << cm->mult.width) + cm->mult.offset - 1;
- 
--	ccu_mult_find_best(parent_rate, rate, &_cm);
-+	ccu_mult_find_best(*parent_rate, rate, &_cm);
- 
--	return parent_rate * _cm.mult;
-+	return *parent_rate * _cm.mult;
- }
- 
- static void ccu_mult_disable(struct clk_hw *hw)
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-index c6bb1f523232..bae735e252b6 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.c
-+++ b/drivers/clk/sunxi-ng/ccu_mux.c
-@@ -61,7 +61,8 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
- 				  struct ccu_mux_internal *cm,
- 				  struct clk_rate_request *req,
- 				  unsigned long (*round)(struct ccu_mux_internal *,
--							 unsigned long,
-+							 struct clk_hw *,
-+							 unsigned long *,
- 							 unsigned long,
- 							 void *),
- 				  void *data)
-@@ -80,7 +81,8 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
- 		ccu_mux_helper_adjust_parent_for_prediv(common, cm, -1,
- 							&adj_parent_rate);
- 
--		best_rate = round(cm, adj_parent_rate, req->rate, data);
-+		best_rate = round(cm, best_parent, &adj_parent_rate,
-+				  req->rate, data);
- 
- 		goto out;
- 	}
-@@ -109,7 +111,7 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
- 		ccu_mux_helper_adjust_parent_for_prediv(common, cm, i,
- 							&adj_parent_rate);
- 
--		tmp_rate = round(cm, adj_parent_rate, req->rate, data);
-+		tmp_rate = round(cm, parent, &adj_parent_rate, req->rate, data);
- 		if (tmp_rate == req->rate) {
- 			best_parent = parent;
- 			best_parent_rate = parent_rate;
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
-index 47aba3a48245..4be56eee2bfd 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.h
-+++ b/drivers/clk/sunxi-ng/ccu_mux.h
-@@ -86,7 +86,8 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
- 				  struct ccu_mux_internal *cm,
- 				  struct clk_rate_request *req,
- 				  unsigned long (*round)(struct ccu_mux_internal *,
--							 unsigned long,
-+							 struct clk_hw *,
-+							 unsigned long *,
- 							 unsigned long,
- 							 void *),
- 				  void *data);
-diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-index cba84afe1cf1..44b16dc8fea6 100644
---- a/drivers/clk/sunxi-ng/ccu_nkm.c
-+++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-@@ -102,7 +102,8 @@ static unsigned long ccu_nkm_recalc_rate(struct clk_hw *hw,
- }
- 
- static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
--					unsigned long parent_rate,
-+					struct clk_hw *hw,
-+					unsigned long *parent_rate,
- 					unsigned long rate,
- 					void *data)
- {
-@@ -116,9 +117,9 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
- 	_nkm.min_m = 1;
- 	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
- 
--	ccu_nkm_find_best(parent_rate, rate, &_nkm);
-+	ccu_nkm_find_best(*parent_rate, rate, &_nkm);
- 
--	return parent_rate * _nkm.n * _nkm.k / _nkm.m;
-+	return *parent_rate * _nkm.n * _nkm.k / _nkm.m;
- }
- 
- static int ccu_nkm_determine_rate(struct clk_hw *hw,
++connector {
++	compatible = "hdmi-connector";
++	type = "a";
++
++	port {
++		hdmi_con_in: endpoint {
++			remote-endpoint = <&hdmi_out_con>;
++		};
++	};
++};
++
++hdmi: hdmi at 01c16000 {
++	compatible = "allwinner,sun5i-a10s-hdmi";
++	reg = <0x01c16000 0x1000>;
++	interrupts = <58>;
++	clocks = <&ccu CLK_AHB_HDMI>, <&ccu CLK_HDMI>,
++		 <&ccu CLK_PLL_VIDEO0_2X>,
++		 <&ccu CLK_PLL_VIDEO1_2X>;
++	clock-names = "ahb", "mod", "pll-0", "pll-1";
++	dmas = <&dma SUN4I_DMA_NORMAL 16>,
++	       <&dma SUN4I_DMA_NORMAL 16>,
++	       <&dma SUN4I_DMA_DEDICATED 24>;
++	dma-names = "ddc-tx", "ddc-rx", "audio-tx";
++	status = "disabled";
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++
++			hdmi_in_tcon0: endpoint {
++				remote-endpoint = <&tcon0_out_hdmi>;
++			};
++		};
++
++		port at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			hdmi_out_con: endpoint {
++				remote-endpoint = <&hdmi_con_in>;
++			};
++		};
++	};
++};
++
+ tve0: tv-encoder at 01c0a000 {
+ 	compatible = "allwinner,sun4i-a10-tv-encoder";
+ 	reg = <0x01c0a000 0x1000>;
 -- 
 git-series 0.9.1
