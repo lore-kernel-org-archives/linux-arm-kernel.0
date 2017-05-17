@@ -1,67 +1,54 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 17 May 2017 09:40:32 +0200
-Subject: [PATCH v3 03/21] clk: sunxi-ng: div: Switch to divider_round_rate
+Date: Wed, 17 May 2017 09:40:44 +0200
+Subject: [PATCH v3 15/21] drm/sun4i: Ignore the generic connectors for
+ components
 In-Reply-To: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
 References: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <13c78d9da524cd9f123a75f56e097fa7bd07cc74.1495006350.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <a766ed0410e4c78e49f1e462775fdba1a70a88bf.1495006350.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-divider_round_rate_parent already evaluates changing the parent rate if
-CLK_SET_RATE_PARENT is set. Now that we can do that on muxes too, let's
-just use it.
+The generic connectors such as hdmi-connector doesn't have any driver in,
+so if they are added to the component list, we will be waiting forever for
+a non-existing driver to probe.
+
+Add a list of the connectors we want to ignore when building our component
+list.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/ccu_div.c | 27 ++++-----------------------
- 1 file changed, 4 insertions(+), 23 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
-index a489f18a3c01..419463375bc1 100644
---- a/drivers/clk/sunxi-ng/ccu_div.c
-+++ b/drivers/clk/sunxi-ng/ccu_div.c
-@@ -20,18 +20,11 @@ static unsigned long ccu_div_round_rate(struct ccu_mux_internal *mux,
- 					void *data)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index c52f7a9eb045..9b3e8c8d7c75 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -166,6 +166,11 @@ static const struct component_master_ops sun4i_drv_master_ops = {
+ 	.unbind	= sun4i_drv_unbind,
+ };
+ 
++static bool sun4i_drv_node_is_connector(struct device_node *node)
++{
++	return of_device_is_compatible(node, "hdmi-connector");
++}
++
+ static bool sun4i_drv_node_is_frontend(struct device_node *node)
  {
- 	struct ccu_div *cd = data;
--	unsigned long val;
--
--	/*
--	 * We can't use divider_round_rate that assumes that there's
--	 * several parents, while we might be called to evaluate
--	 * several different parents.
--	 */
--	val = divider_get_val(rate, *parent_rate, cd->div.table, cd->div.width,
--			      cd->div.flags);
+ 	return of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
+@@ -206,6 +211,13 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+ 	    !of_device_is_available(node))
+ 		return 0;
  
--	return divider_recalc_rate(&cd->common.hw, *parent_rate, val,
--				   cd->div.table, cd->div.flags);
-+	return divider_round_rate_parent(&cd->common.hw, parent,
-+					 rate, parent_rate,
-+					 cd->div.table, cd->div.width,
-+					 cd->div.flags);
- }
- 
- static void ccu_div_disable(struct clk_hw *hw)
-@@ -78,18 +71,6 @@ static int ccu_div_determine_rate(struct clk_hw *hw,
- {
- 	struct ccu_div *cd = hw_to_ccu_div(hw);
- 
--	if (clk_hw_get_num_parents(hw) == 1) {
--		req->rate = divider_round_rate(hw, req->rate,
--					       &req->best_parent_rate,
--					       cd->div.table,
--					       cd->div.width,
--					       cd->div.flags);
--
--		req->best_parent_hw = clk_hw_get_parent(hw);
--
--		return 0;
--	}
--
- 	return ccu_mux_helper_determine_rate(&cd->common, &cd->mux,
- 					     req, ccu_div_round_rate, cd);
- }
++	/*
++	 * The connectors will be the last nodes in our pipeline, we
++	 * can just bail out.
++	 */
++	if (sun4i_drv_node_is_connector(node))
++		return 0;
++
+ 	if (!sun4i_drv_node_is_frontend(node)) {
+ 		/* Add current component */
+ 		DRM_DEBUG_DRIVER("Adding component %s\n",
 -- 
 git-series 0.9.1
