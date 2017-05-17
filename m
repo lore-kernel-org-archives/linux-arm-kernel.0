@@ -1,68 +1,53 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 16 May 2017 15:19:51 -0700
-Subject: [PATCH V2] ARM: dts: bcm283x: Reserve first page for firmware
-In-Reply-To: <e2718c25-fdf1-ead1-cbfa-d23bf729a079@gmail.com>
-References: <b6aef857-1454-7931-2c60-6d7b55b7a0a8@raspberrypi.org>
- <e2718c25-fdf1-ead1-cbfa-d23bf729a079@gmail.com>
-Message-ID: <87pof8bg1k.fsf@eliezer.anholt.net>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Wed, 17 May 2017 02:13:42 +0100
+Subject: [PATCH] arm64: dts: rockchip: Drop explicit "include/" prefix
+ from #include
+In-Reply-To: <3956756.APWK7IdRuP@phil>
+References: <20170512235357.19486-1-ijc@hellion.org.uk>
+ <3956756.APWK7IdRuP@phil>
+Message-ID: <1494983622.32636.5.camel@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian Fainelli <f.fainelli@gmail.com> writes:
+On Sat, 2017-05-13 at 17:43 +0200, Heiko Stuebner wrote:
+> Hi Ian,
+> 
+> Am Samstag, 13. Mai 2017, 00:53:57 CEST schrieb Ian Campbell:
+> > It not necessary and counter to how all the other files are done.
+> > 
+> > It also happens to break the build in the split device tree repo
+> > https://git.kernel.org/pub/scm/linux/kernel/git/devicetree/devicetr
+> > ee-rebasing.git/
+> > 
+> > Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+> > Cc: Brian Norris <briannorris@chromium.org>
+> > Cc: Heiko Stuebner <heiko@sntech.de>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-rockchip at lists.infradead.org
+> > Cc: linux-kernel at vger.kernel.org
+> 
+> that glitch also breaks Olof's patch [0] fixing a depmod symlink
+> recursion in that it creates
+> 
+> ../arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:47:57: fatal
+> error: include/dt-bindings/input/linux-event-codes.h: File or
+> directory not found
+> ?#include <include/dt-bindings/input/linux-event-codes.h>
+> 
+> with only Olof's patch applied. So I guess both patches should go
+> together with this one in front, so to be on the safe side, if some
+> else
+> is going to apply both:
+> 
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-> On 05/09/2017 02:04 AM, Phil Elwell wrote:
->> The Raspberry Pi startup stub files for multi-core BCM27XX processors
->> make the secondary CPUs spin until the corresponding mailbox is
->> written. These stubs are loaded at physical address 0x00000xxx (as seen
->> by the ARMs), but this page will be reused by the kernel unless it is
->> explicitly reserved, causing the waiting cores to execute random code.
->> 
->> Use the /memreserve/ Device Tree directive to mark the first page as
->> off-limits to the kernel.
->
-> This reserves a 4KB page here, is this good enough, or should we just go
-> directly to the maximum page granule size possible on an ARM64/Linux
-> system to be on the safe side?
->
->> 
->> See: https://github.com/raspberrypi/linux/issues/1989
->> 
->> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
->> ---
->> 
->> Changes in V2:
->> - Rebase against linux-next
->> - Drop downstream-only patch
->> 
->>  arch/arm/boot/dts/bcm283x.dtsi | 2 ++
->>  1 file changed, 2 insertions(+)
->> 
->> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
->> index a3106aa..6d12c3e8 100644
->> --- a/arch/arm/boot/dts/bcm283x.dtsi
->> +++ b/arch/arm/boot/dts/bcm283x.dtsi
->> @@ -3,6 +3,8 @@
->>  #include <dt-bindings/clock/bcm2835-aux.h>
->>  #include <dt-bindings/gpio/gpio.h>
->>  
->> +/memreserve/ 0x00000000 0x00001000;
->
-> Can you put a comment above this /memreserve entry here to remind about
-> what this is useful for?
->
-> Thanks!
+Not sure who should/wil merge this, but it seems I neglected to Cc Arnd
+and Olof so I'm doing so now.
 
-Phil, I chatted with Florian and added in:
+Would be good to get this in soonish.
 
-+/* firmware-provided startup stubs live here, where the secondary CPUs are
-+ * spinning.
-+ */
-
-and tagged and sent a PR for 4.12.  Thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170516/13a30993/attachment-0001.sig>
+Ian
