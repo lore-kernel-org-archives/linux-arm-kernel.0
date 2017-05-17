@@ -1,60 +1,46 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 17 May 2017 22:47:22 +0800
-Subject: [PATCH v8 6/9] drm/sun4i: tcon: add support for V3s TCON
+Date: Wed, 17 May 2017 22:47:24 +0800
+Subject: [PATCH v8 8/9] ARM: sun8i: v3s: add pinmux for LCD pins of V3s SoC
 In-Reply-To: <20170517144725.3463-1-icenowy@aosc.io>
 References: <20170517144725.3463-1-icenowy@aosc.io>
-Message-ID: <20170517144725.3463-7-icenowy@aosc.io>
+Message-ID: <20170517144725.3463-9-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner V3s SoC features a TCON without channel 1.
+Allwinner V3s SoC features a set of pins that have functionality of RGB
+LCD, the pins are at different pin ban than other SoCs.
 
-Add support for it.
+Add pinctrl node for them.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
 Changes in v7:
-- Added Chen-Yu's Reviewed-by.
+- Dropped the trailing "@0" in rgb666 pinmux node name.
+- Added Chen-Yu's ACK.
 
- drivers/gpu/drm/sun4i/sun4i_drv.c  | 3 ++-
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 5 +++++
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-v3s.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 4a979d17ddaa..1dd1948025d2 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -178,7 +178,8 @@ static bool sun4i_drv_node_is_tcon(struct device_node *node)
- 	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
- 		of_device_is_compatible(node, "allwinner,sun6i-a31-tcon") ||
- 		of_device_is_compatible(node, "allwinner,sun6i-a31s-tcon") ||
--		of_device_is_compatible(node, "allwinner,sun8i-a33-tcon");
-+		of_device_is_compatible(node, "allwinner,sun8i-a33-tcon") ||
-+		of_device_is_compatible(node, "allwinner,sun8i-v3s-tcon");
- }
+diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
+index e47a9b29f55c..2dbc9d023adf 100644
+--- a/arch/arm/boot/dts/sun8i-v3s.dtsi
++++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
+@@ -297,6 +297,15 @@
+ 				function = "i2c0";
+ 			};
  
- static int compare_of(struct device *dev, void *data)
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 990c973c0334..f44a37a5993d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -601,11 +601,16 @@ static const struct sun4i_tcon_quirks sun8i_a33_quirks = {
- 	/* nothing is supported */
- };
- 
-+static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
-+	/* nothing is supported */
-+};
++			lcd_rgb666_pins: lcd_rgb666 {
++				pins = "PE0", "PE1", "PE2", "PE3", "PE4",
++				       "PE5", "PE6", "PE7", "PE8", "PE9",
++				       "PE10", "PE11", "PE12", "PE13", "PE14",
++				       "PE15", "PE16", "PE17", "PE18", "PE19",
++				       "PE23", "PE24";
++				function = "lcd";
++			};
 +
- static const struct of_device_id sun4i_tcon_of_table[] = {
- 	{ .compatible = "allwinner,sun5i-a13-tcon", .data = &sun5i_a13_quirks },
- 	{ .compatible = "allwinner,sun6i-a31-tcon", .data = &sun6i_a31_quirks },
- 	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = &sun6i_a31s_quirks },
- 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
-+	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, sun4i_tcon_of_table);
+ 			uart0_pins_a: uart0 at 0 {
+ 				pins = "PB8", "PB9";
+ 				function = "uart0";
 -- 
 2.12.2
