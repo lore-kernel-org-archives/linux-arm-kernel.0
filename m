@@ -1,52 +1,86 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 17 May 2017 16:22:28 +0200
-Subject: [PATCH] devicetree: Move include prefixes from arch to separate
- directory
-In-Reply-To: <CAOesGMh3UxHPYQ7SDG7+NODuT5TnP_i23ru0ZRR-rOYxbOGe_g@mail.gmail.com>
-References: <CAL_JsqKLxA8K8378z4nDBkDWnwM_zBbbf9D7EPtwQ1782dydTw@mail.gmail.com>
- <20170515142641.GU22219@n2100.armlinux.org.uk>
- <CAL_JsqJzoe_xNxMOZ88+k+bZ+bSK6-j30HXk0ZsFxHUqVDzwzw@mail.gmail.com>
- <CAOesGMgYDq5Sdk6OaK-mTyfdNGwcbgOVeKbeMSCOmwqd9k8TGQ@mail.gmail.com>
- <CAL_JsqJCjwvvta0n7dNpyVZkK5hp25fYO78q_pQZzUAPRDq+-w@mail.gmail.com>
- <CAOesGMh3UxHPYQ7SDG7+NODuT5TnP_i23ru0ZRR-rOYxbOGe_g@mail.gmail.com>
-Message-ID: <CAMuHMdVQPB57dckRDjjLLocE4=0J4fQZQux9LJoV6xzZW16eKA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 17 May 2017 16:05:39 +0200
+Subject: [PATCH 5/8] clocksource/drivers/fttmr010: Switch to use bitops
+In-Reply-To: <20170517140542.20016-1-linus.walleij@linaro.org>
+References: <20170517140542.20016-1-linus.walleij@linaro.org>
+Message-ID: <20170517140542.20016-6-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+This switches the drivers to use the bitops BIT() macro
+to define bits.
 
-On Mon, May 15, 2017 at 6:09 PM, Olof Johansson <olof@lixom.net> wrote:
->> The only other comment I would have is at some point, we're going to
->> have overlays that aren't tied to any arch. Where are we going to put
->> those? Maybe they are tied to some vendor which tends to have most
->> stuff in $arch and we just continue this band-aid. Or we define some
->> common location. I bring this up now only because both could use that
->> location.
->
-> Those are good questions. What kind of common overlays are you
-> anticipating? Things like fragments describing connectors, etc?
+Cc: Joel Stanley <joel@jms.id.au>
+Cc: Jonas Jensen <jonas.jensen@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/clocksource/timer-fttmr010.c | 43 ++++++++++++++++++------------------
+ 1 file changed, 22 insertions(+), 21 deletions(-)
 
-I'm mostly using overlays to describe custom test hardware that
-is connection to expansion connectors on standard development boards.
-These fall into one of two classes:
-  1. Overlays enabling an on-SoC device and configuring access to it from
-     an expansion connector,
-  2. Overlays describing hardware connected to a device from class1.
-
-Class 1 overlays are SoC and board-specific, so they belong in e.g.
-arch/arm/boot/dts/.
-Class 2 overlays are more universal (depending on what they extend; Pantelis'
-connectors work may help here), so they can be shared between architectures.
-
-Other people may have other use cases.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/clocksource/timer-fttmr010.c b/drivers/clocksource/timer-fttmr010.c
+index 9ad31489bbef..9df14cf13808 100644
+--- a/drivers/clocksource/timer-fttmr010.c
++++ b/drivers/clocksource/timer-fttmr010.c
+@@ -16,6 +16,7 @@
+ #include <linux/sched_clock.h>
+ #include <linux/clk.h>
+ #include <linux/slab.h>
++#include <linux/bitops.h>
+ 
+ /*
+  * Register definitions for the timers
+@@ -36,31 +37,31 @@
+ #define TIMER_INTR_STATE	(0x34)
+ #define TIMER_INTR_MASK		(0x38)
+ 
+-#define TIMER_1_CR_ENABLE	(1 << 0)
+-#define TIMER_1_CR_CLOCK	(1 << 1)
+-#define TIMER_1_CR_INT		(1 << 2)
+-#define TIMER_2_CR_ENABLE	(1 << 3)
+-#define TIMER_2_CR_CLOCK	(1 << 4)
+-#define TIMER_2_CR_INT		(1 << 5)
+-#define TIMER_3_CR_ENABLE	(1 << 6)
+-#define TIMER_3_CR_CLOCK	(1 << 7)
+-#define TIMER_3_CR_INT		(1 << 8)
+-#define TIMER_1_CR_UPDOWN	(1 << 9)
+-#define TIMER_2_CR_UPDOWN	(1 << 10)
+-#define TIMER_3_CR_UPDOWN	(1 << 11)
++#define TIMER_1_CR_ENABLE	BIT(0)
++#define TIMER_1_CR_CLOCK	BIT(1)
++#define TIMER_1_CR_INT		BIT(2)
++#define TIMER_2_CR_ENABLE	BIT(3)
++#define TIMER_2_CR_CLOCK	BIT(4)
++#define TIMER_2_CR_INT		BIT(5)
++#define TIMER_3_CR_ENABLE	BIT(6)
++#define TIMER_3_CR_CLOCK	BIT(7)
++#define TIMER_3_CR_INT		BIT(8)
++#define TIMER_1_CR_UPDOWN	BIT(9)
++#define TIMER_2_CR_UPDOWN	BIT(10)
++#define TIMER_3_CR_UPDOWN	BIT(11)
+ #define TIMER_DEFAULT_FLAGS	(TIMER_1_CR_UPDOWN | \
+ 				 TIMER_3_CR_ENABLE | \
+ 				 TIMER_3_CR_UPDOWN)
+ 
+-#define TIMER_1_INT_MATCH1	(1 << 0)
+-#define TIMER_1_INT_MATCH2	(1 << 1)
+-#define TIMER_1_INT_OVERFLOW	(1 << 2)
+-#define TIMER_2_INT_MATCH1	(1 << 3)
+-#define TIMER_2_INT_MATCH2	(1 << 4)
+-#define TIMER_2_INT_OVERFLOW	(1 << 5)
+-#define TIMER_3_INT_MATCH1	(1 << 6)
+-#define TIMER_3_INT_MATCH2	(1 << 7)
+-#define TIMER_3_INT_OVERFLOW	(1 << 8)
++#define TIMER_1_INT_MATCH1	BIT(0)
++#define TIMER_1_INT_MATCH2	BIT(1)
++#define TIMER_1_INT_OVERFLOW	BIT(2)
++#define TIMER_2_INT_MATCH1	BIT(3)
++#define TIMER_2_INT_MATCH2	BIT(4)
++#define TIMER_2_INT_OVERFLOW	BIT(5)
++#define TIMER_3_INT_MATCH1	BIT(6)
++#define TIMER_3_INT_MATCH2	BIT(7)
++#define TIMER_3_INT_OVERFLOW	BIT(8)
+ #define TIMER_INT_ALL_MASK	0x1ff
+ 
+ struct fttmr010 {
+-- 
+2.9.3
