@@ -1,45 +1,67 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 17 May 2017 17:48:13 +0200
-Subject: [PATCH-RFT 2/2] pinctrl: samsung: Split Exynos drivers per ARMv7
- and ARMv8
-In-Reply-To: <98c7c565-ba52-406b-2c9c-87ade2847880@samsung.com>
-References: <20170516200649.4730-1-krzk@kernel.org>
- <CGME20170516200714epcas1p37ff93d9362e8cb794308396871cca153@epcas1p3.samsung.com>
- <20170516200649.4730-3-krzk@kernel.org>
- <98c7c565-ba52-406b-2c9c-87ade2847880@samsung.com>
-Message-ID: <20170517154813.kygdzdkobitquhdg@kozik-lap>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Wed, 17 May 2017 23:50:13 +0800
+Subject: [PATCH 0/4] ARM: imx: add imx7ulp support
+Message-ID: <1495036217-20049-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 07:43:51AM +0200, Marek Szyprowski wrote:
-> Hi Krzysztof,
-> 
-> On 2017-05-16 22:06, Krzysztof Kozlowski wrote:
-> > Exynos pinctrl drivers contain pretty big per-SoC data structures.  The
-> > pinctrl-exynos object file contained code and data for both ARMv7 and
-> > ARMv8 SoCs thus it grew big.  There will not be a shared image between
-> > ARMv7 and ARMv8 so there is no need to combine all of this into one
-> > driver.
-> > 
-> > Splitting the data allows to make it more granular (e.g. code related to
-> > ARMv8 Exynos is self-contained), slightly speed up the compilation and
-> > reduce the effective size of compiled kernel.
-> > 
-> > The common data structures and functions reside still in existing
-> > pinctrl-exynos.c.  Only the SoC-specific parts were moved out to new
-> > files.  Except marking few functions non-static and adding them to
-> > header, there were no functional changes in the code.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > ---
-> > 
-> > Not tested on ARMv8 (Exynos5433, Exynos7).
-> 
-> Works fine on TM2 (Exynos5433).
-> 
-> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+This patch series adds the basic support for imx7ulp.
+It includes machine level support code and device tree.
 
-Great, thanks! Much appreciated.
+It depends on some of other driver patch series as follows which
+were sent out a few days ago and still under review:
 
-Best regards,
-Krzysztof
+[PATCH 0/9] clk: add imx7ulp clk support
+https://www.spinics.net/lists/linux-clk/msg17037.html
+
+[PATCH V2 0/6] tty: serial: lpuart: add imx7ulp support
+https://www.spinics.net/lists/arm-kernel/msg581005.html
+
+[PATCH 0/2] gpio: add imx7ulp gpio support
+https://www.spinics.net/lists/arm-kernel/msg580990.html
+
+[PATCH 0/2] pinctrl: pinctrl-imx: add gpio support for mx7ulp
+https://www.spinics.net/lists/arm-kernel/msg580993.html
+
+[PATCH 0/5] pinctrl: imx: add generic pin config and imx7ulp support
+https://www.spinics.net/lists/arm-kernel/msg580737.html
+
+[PATCH 1/2] dt-bindings: timer: add nxp tpm timer binding doc
+https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1395534.html
+
+[PATCH 2/2] timer: imx-tpm: add imx tpm timer support
+https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1395536.html
+
+[PATCH 0/2] gpio: add imx7ulp gpio support
+https://www.spinics.net/lists/arm-kernel/msg580990.html
+
+Shawn,
+
+i will let you know once they're merged by each subsystem.
+
+Dong Aisheng (4):
+  dt-bindings: fsl: add compatible for imx7ulp evk
+  ARM: imx: add initial support for imx7ulp
+  dts: imx: add imx7ulp evk support
+  ARM: imx_v6_v7_defconfig: add imx7ulp support
+
+ Documentation/devicetree/bindings/arm/fsl.txt |   8 +
+ arch/arm/boot/dts/Makefile                    |   2 +
+ arch/arm/boot/dts/imx7ulp-evk.dts             |  98 ++++++++
+ arch/arm/boot/dts/imx7ulp.dtsi                | 310 ++++++++++++++++++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig          |   5 +-
+ arch/arm/mach-imx/Kconfig                     |   9 +
+ arch/arm/mach-imx/Makefile                    |   1 +
+ arch/arm/mach-imx/common.h                    |   1 +
+ arch/arm/mach-imx/cpu.c                       |   3 +
+ arch/arm/mach-imx/mach-imx7ulp.c              |  37 +++
+ arch/arm/mach-imx/mxc.h                       |   1 +
+ arch/arm/mach-imx/pm-imx7ulp.c                |  33 +++
+ 12 files changed, 506 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx7ulp-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx7ulp.dtsi
+ create mode 100644 arch/arm/mach-imx/mach-imx7ulp.c
+ create mode 100644 arch/arm/mach-imx/pm-imx7ulp.c
+
+-- 
+2.7.4
