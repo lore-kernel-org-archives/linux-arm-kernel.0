@@ -1,95 +1,433 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 17 May 2017 16:05:42 +0200
-Subject: [PATCH 8/8] ARM: dts: augment Moxa and Aspeed DTS for FTTMR010
-In-Reply-To: <20170517140542.20016-1-linus.walleij@linaro.org>
-References: <20170517140542.20016-1-linus.walleij@linaro.org>
-Message-ID: <20170517140542.20016-9-linus.walleij@linaro.org>
+From: vanessa.maegima@nxp.com (Vanessa Maegima)
+Date: Wed, 17 May 2017 11:10:19 -0300
+Subject: [PATCH v3] ARM: dts: imx7d-pico: Add initial support
+Message-ID: <1495030219-2688-1-git-send-email-vanessa.maegima@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This augments the Moxa Art and Aspeed device trees to:
+Add the initial support for imx7d-pico board.
 
-- Explicitly name the clock "PCLK" as the Faraday FTTMR010
-  names it.
-- List the Moxa timer as compatible with the Faradat FTTMR010
-  vanilla version.
-- Add a comment that the Aspeed driver is a Faraday
-  FTTMR010 derivative.
-- Pass all IRQs to the timer from Aspeed: they are all there
-  so they should be in the device tree, we only use the
-  first one anyways.
+Add support for eMMC, USB host, USB device, PMIC, Ethernet and audio.
 
-Cc: Joel Stanley <joel@jms.id.au>
-Cc: Jonas Jensen <jonas.jensen@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+For more information about this board, please visit:
+http://www.technexion.org/products/pico/pico-som/pico-imx7-emmc
+
+Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
 ---
-Clocksource maintainers: I will ask the ARM SoC people to merge
-this patch orthogonally, it is only included in this series
-for reference and for testing.
----
- arch/arm/boot/dts/aspeed-g4.dtsi | 7 +++----
- arch/arm/boot/dts/aspeed-g5.dtsi | 6 +++---
- arch/arm/boot/dts/moxart.dtsi    | 3 ++-
- 3 files changed, 8 insertions(+), 8 deletions(-)
+Changes since v2:
+- Remove unused pin MX7D_PAD_SD3_STROBE__SD3_STROBE
+- Add pincrtl_usdhc3_100mhz and pincrtl_usdhc3_200mhz
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 8c6bc29eb7f6..8a04c7e2d818 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -886,13 +886,12 @@
- 			};
- 
- 			timer: timer at 1e782000 {
-+				/* This timer is a Faraday FTTMR010 derivative */
- 				compatible = "aspeed,ast2400-timer";
- 				reg = <0x1e782000 0x90>;
--				// The moxart_timer driver registers only one
--				// interrupt and assumes it's for timer 1
--				//interrupts = <16 17 18 35 36 37 38 39>;
--				interrupts = <16>;
-+				interrupts = <16 17 18 35 36 37 38 39>;
- 				clocks = <&clk_apb>;
-+				clock-names = "PCLK";
- 			};
- 
- 			wdt1: wdt at 1e785000 {
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index a0bea4a6ec77..2b613fb61804 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -993,13 +993,13 @@
- 			};
- 
- 			timer: timer at 1e782000 {
-+				/* This timer is a Faraday FTTMR010 derivative */
- 				compatible = "aspeed,ast2400-timer";
- 				reg = <0x1e782000 0x90>;
--				// The moxart_timer driver registers only one
--				// interrupt and assumes it's for timer 1
--				//interrupts = <16 17 18 35 36 37 38 39>;
-+				interrupts = <16 17 18 35 36 37 38 39>;
- 				interrupts = <16>;
- 				clocks = <&clk_apb>;
-+				clock-names = "PCLK";
- 			};
- 
- 
-diff --git a/arch/arm/boot/dts/moxart.dtsi b/arch/arm/boot/dts/moxart.dtsi
-index e86f8c905ac5..1f4c795d3f72 100644
---- a/arch/arm/boot/dts/moxart.dtsi
-+++ b/arch/arm/boot/dts/moxart.dtsi
-@@ -58,10 +58,11 @@
- 		};
- 
- 		timer: timer at 98400000 {
--			compatible = "moxa,moxart-timer";
-+			compatible = "moxa,moxart-timer", "faraday,fttmr010";
- 			reg = <0x98400000 0x42>;
- 			interrupts = <19 IRQ_TYPE_EDGE_FALLING>;
- 			clocks = <&clk_apb>;
-+			clock-names = "PCLK";
- 		};
- 
- 		gpio: gpio at 98700000 {
+ arch/arm/boot/dts/Makefile       |   1 +
+ arch/arm/boot/dts/imx7d-pico.dts | 388 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 389 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx7d-pico.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9c5e1d9..1d42979 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -476,6 +476,7 @@ dtb-$(CONFIG_SOC_IMX7D) += \
+ 	imx7d-cl-som-imx7.dtb \
+ 	imx7d-colibri-eval-v3.dtb \
+ 	imx7d-nitrogen7.dtb \
++	imx7d-pico.dtb \
+ 	imx7d-sbc-imx7.dtb \
+ 	imx7d-sdb.dtb \
+ 	imx7d-sdb-sht11.dtb \
+diff --git a/arch/arm/boot/dts/imx7d-pico.dts b/arch/arm/boot/dts/imx7d-pico.dts
+new file mode 100644
+index 0000000..84a7270
+--- /dev/null
++++ b/arch/arm/boot/dts/imx7d-pico.dts
+@@ -0,0 +1,388 @@
++/*
++ * Copyright 2017 NXP
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "imx7d.dtsi"
++
++/ {
++	model = "Technexion Pico i.MX7D Board";
++	compatible = "technexion,imx7d-pico", "fsl,imx7d";
++
++	memory {
++		reg = <0x80000000 0x80000000>;
++	};
++
++	reg_2p5v: regulator-2p5v {
++		compatible = "regulator-fixed";
++		regulator-name = "2P5V";
++		regulator-min-microvolt = <2500000>;
++		regulator-max-microvolt = <2500000>;
++		regulator-always-on;
++	};
++
++	reg_3p3v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_usb_otg1_vbus: regulator-usb-otg1-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio4 5 GPIO_ACTIVE_LOW>;
++		enable-active-low;
++	};
++
++	reg_usb_otg2_vbus: regulator-usb-otg2-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg2_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
++	reg_vref_1v8: regulator-vref-1v8 {
++		compatible = "regulator-fixed";
++		regulator-name = "vref-1v8";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "imx7-sgtl5000";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&dailink_master>;
++		simple-audio-card,frame-master = <&dailink_master>;
++		simple-audio-card,cpu {
++			sound-dai = <&sai1>;
++		};
++
++		dailink_master: simple-audio-card,codec {
++			sound-dai = <&codec>;
++			clocks = <&clks IMX7D_AUDIO_MCLK_ROOT_CLK>;
++		};
++	};
++};
++
++&fec1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet1>;
++	assigned-clocks = <&clks IMX7D_ENET1_TIME_ROOT_SRC>,
++			  <&clks IMX7D_ENET1_TIME_ROOT_CLK>;
++	assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>;
++	assigned-clock-rates = <0>, <100000000>;
++	phy-mode = "rgmii";
++	phy-handle = <&ethphy0>;
++	fsl,magic-packet;
++	status = "okay";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy0: ethernet-phy at 1 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <1>;
++			status = "okay";
++		};
++	};
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	codec: sgtl5000 at 0a {
++		#sound-dai-cells = <0>;
++		reg = <0x0a>;
++		compatible = "fsl,sgtl5000";
++		clocks = <&clks IMX7D_AUDIO_MCLK_ROOT_CLK>;
++		VDDA-supply = <&reg_2p5v>;
++		VDDIO-supply = <&reg_vref_1v8>;
++	};
++};
++
++&i2c4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c4>;
++	status = "okay";
++
++	pmic: pfuze3000 at 08 {
++		compatible = "fsl,pfuze3000";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1a {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++			/* use sw1c_reg to align with pfuze100/pfuze200 */
++			sw1c_reg: sw1b {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1475000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1850000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3 {
++				regulator-min-microvolt = <900000>;
++				regulator-max-microvolt = <1650000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vldo1 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen2_reg: vldo2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3_reg: vccsd {
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen4_reg: v33 {
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vldo3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vldo4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++&sai1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai1>;
++	assigned-clocks = <&clks IMX7D_SAI1_ROOT_SRC>,
++			  <&clks IMX7D_SAI1_ROOT_CLK>;
++	assigned-clock-parents = <&clks IMX7D_PLL_AUDIO_POST_DIV>;
++	assigned-clock-rates = <0>, <24576000>;
++	status = "okay";
++};
++
++&uart5 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart5>;
++	assigned-clocks = <&clks IMX7D_UART5_ROOT_SRC>;
++	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
++	status = "okay";
++};
++
++&usbotg1 {
++	vbus-supply = <&reg_usb_otg1_vbus>;
++	status = "okay";
++};
++
++&usbotg2 {
++	vbus-supply = <&reg_usb_otg2_vbus>;
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
++	assigned-clocks = <&clks IMX7D_USDHC3_ROOT_CLK>;
++	assigned-clock-rates = <400000000>;
++	bus-width = <8>;
++	fsl,tuning-step = <2>;
++	non-removable;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl_enet1: enet1grp {
++		fsl,pins = <
++			MX7D_PAD_SD2_CD_B__ENET1_MDIO			0x3
++			MX7D_PAD_SD2_WP__ENET1_MDC			0x3
++			MX7D_PAD_ENET1_RGMII_TXC__ENET1_RGMII_TXC	0x1
++			MX7D_PAD_ENET1_RGMII_TD0__ENET1_RGMII_TD0	0x1
++			MX7D_PAD_ENET1_RGMII_TD1__ENET1_RGMII_TD1	0x1
++			MX7D_PAD_ENET1_RGMII_TD2__ENET1_RGMII_TD2	0x1
++			MX7D_PAD_ENET1_RGMII_TD3__ENET1_RGMII_TD3	0x1
++			MX7D_PAD_ENET1_RGMII_TX_CTL__ENET1_RGMII_TX_CTL	0x1
++			MX7D_PAD_ENET1_RGMII_RXC__ENET1_RGMII_RXC	0x1
++			MX7D_PAD_ENET1_RGMII_RD0__ENET1_RGMII_RD0	0x1
++			MX7D_PAD_ENET1_RGMII_RD1__ENET1_RGMII_RD1	0x1
++			MX7D_PAD_ENET1_RGMII_RD2__ENET1_RGMII_RD2	0x1
++			MX7D_PAD_ENET1_RGMII_RD3__ENET1_RGMII_RD3	0x1
++			MX7D_PAD_ENET1_RGMII_RX_CTL__ENET1_RGMII_RX_CTL	0x1
++		>;
++	};
++
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			MX7D_PAD_UART1_TX_DATA__I2C1_SDA	0x4000007f
++			MX7D_PAD_UART1_RX_DATA__I2C1_SCL	0x4000007f
++		>;
++	};
++
++	pinctrl_i2c4: i2c4grp {
++		fsl,pins = <
++			MX7D_PAD_SAI1_RX_BCLK__I2C4_SDA		0x4000007f
++			MX7D_PAD_SAI1_RX_SYNC__I2C4_SCL		0x4000007f
++		>;
++	};
++
++	pinctrl_sai1: sai1grp {
++		fsl,pins = <
++			MX7D_PAD_ENET1_RX_CLK__SAI1_TX_BCLK	0x1f
++			MX7D_PAD_ENET1_CRS__SAI1_TX_SYNC	0x1f
++			MX7D_PAD_ENET1_COL__SAI1_TX_DATA0	0x30
++			MX7D_PAD_ENET1_TX_CLK__SAI1_RX_DATA0	0x1f
++		>;
++	};
++
++	pinctrl_uart5: uart5grp {
++		fsl,pins = <
++			MX7D_PAD_I2C4_SDA__UART5_DCE_TX		0x79
++			MX7D_PAD_I2C4_SCL__UART5_DCE_RX		0x79
++		>;
++	};
++
++	pinctrl_usbotg1_pwr: usbotg_pwr {
++		fsl,pins = <
++			MX7D_PAD_UART3_TX_DATA__GPIO4_IO5	0x14
++		>;
++	};
++
++	pinctrl_usdhc3: usdhc3grp {
++		fsl,pins = <
++			MX7D_PAD_SD3_CMD__SD3_CMD		0x59
++			MX7D_PAD_SD3_CLK__SD3_CLK		0x19
++			MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
++			MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
++			MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
++			MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
++			MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
++			MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
++			MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
++			MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
++		>;
++	};
++
++	pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
++		fsl,pins = <
++			MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
++			MX7D_PAD_SD3_CLK__SD3_CLK		0x1a
++			MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
++			MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5a
++			MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5a
++			MX7D_PAD_SD3_DATA3__SD3_DATA3		0x5a
++			MX7D_PAD_SD3_DATA4__SD3_DATA4		0x5a
++			MX7D_PAD_SD3_DATA5__SD3_DATA5		0x5a
++			MX7D_PAD_SD3_DATA6__SD3_DATA6		0x5a
++			MX7D_PAD_SD3_DATA7__SD3_DATA7		0x5a
++		>;
++	};
++
++	pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
++		fsl,pins = <
++			MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
++			MX7D_PAD_SD3_CLK__SD3_CLK		0x1b
++			MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5b
++			MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5b
++			MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5b
++			MX7D_PAD_SD3_DATA3__SD3_DATA3		0x5b
++			MX7D_PAD_SD3_DATA4__SD3_DATA4		0x5b
++			MX7D_PAD_SD3_DATA5__SD3_DATA5		0x5b
++			MX7D_PAD_SD3_DATA6__SD3_DATA6		0x5b
++			MX7D_PAD_SD3_DATA7__SD3_DATA7		0x5b
++		>;
++	};
++};
 -- 
-2.9.3
+1.9.1
