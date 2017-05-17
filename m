@@ -1,78 +1,54 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 17 May 2017 18:59:19 +0200 (CEST)
-Subject: [PATCH 1/2] ARM: dts: imx23-sansa: Remove 'enable-active-low'
- property
-In-Reply-To: <1495039381-23126-1-git-send-email-fabio.estevam@nxp.com>
-References: <1495039381-23126-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <764037594.21665.1495040359199@email.1und1.de>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 18 May 2017 00:43:54 +0800
+Subject: [RFC PATCH 11/11] [DO NOT MERGE] ARM: sun8i: h3: enable TV output on
+ Orange Pi PC
+In-Reply-To: <20170517164354.16399-1-icenowy@aosc.io>
+References: <20170517164354.16399-1-icenowy@aosc.io>
+Message-ID: <20170517164354.16399-12-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Orange Pi PC features a 3.5mm jack with TV output in it.
 
-> Fabio Estevam <fabio.estevam@nxp.com> hat am 17. Mai 2017 um 18:43 geschrieben:
-> 
-> 
-> Property 'enable-active-low' does not exist. Only 'enable-active-high' is
-> valid, and when this property is absent the gpio regulator will act as
-> active low by default.
-> 
-> So remove the unexisting 'enable-active-low' property. 
-> 
-> While at it, in order to make the gpio regulator description clearer pass
-> the GPIO_ACTIVE_LOW flag.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
->  arch/arm/boot/dts/imx23-sansa.dts | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx23-sansa.dts b/arch/arm/boot/dts/imx23-sansa.dts
-> index 4ec32f4..221fd55 100644
-> --- a/arch/arm/boot/dts/imx23-sansa.dts
-> +++ b/arch/arm/boot/dts/imx23-sansa.dts
-> @@ -42,6 +42,7 @@
->   */
->  
->  /dts-v1/;
-> +#include <dt-bindings/gpio/gpio.h>
->  #include "imx23.dtsi"
->  
->  / {
-> @@ -149,9 +150,8 @@
->  		regulator-name = "vdd-touchpad0";
->  		regulator-min-microvolt = <3300000>;
->  		regulator-max-microvolt = <3300000>;
-> -		gpio = <&gpio0 26 0>;
-> +		gpio = <&gpio0 26 GPIO_ACTIVE_LOW>;
+Enable the TV output.
 
-GPIO_ACTIVE_LOW = 1, GPIO_ACTIVE_HIGH = 0
+As it currently do not have jack detection feature, do not merge this
+patch.
 
-So this doesn't look save to me.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Stefan
-
->  		regulator-always-on;
-> -		enable-active-low;
->  	};
->  
->  	reg_vdd_tuner: regulator-vdd-tuner0 {
-> @@ -159,9 +159,8 @@
->  		regulator-name = "vdd-tuner0";
->  		regulator-min-microvolt = <3300000>;
->  		regulator-max-microvolt = <3300000>;
-> -		gpio = <&gpio0 29 0>;
-> +		gpio = <&gpio0 29 GPIO_ACTIVE_LOW>;
->  		regulator-always-on;
-> -		enable-active-low;
->  	};
->  
->  	backlight {
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index 1a044b17d6c6..9c50ac3e82f3 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -97,6 +97,10 @@
+ 	status = "okay";
+ };
+ 
++&de {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -169,6 +173,14 @@
+ 	status = "okay";
+ };
+ 
++&tcon1 {
++	status = "okay";
++};
++
++&tve0 {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+-- 
+2.12.2
