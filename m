@@ -1,194 +1,37 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Wed, 17 May 2017 10:13:01 +0000
-Subject: [v6 2/3] iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2
- erratum #74
-In-Reply-To: <1494592866-14076-3-git-send-email-gakula@caviumnetworks.com>
-References: <1494592866-14076-1-git-send-email-gakula@caviumnetworks.com>
- <1494592866-14076-3-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA838351762@FRAEML521-MBX.china.huawei.com>
+From: frank.wang@rock-chips.com (Frank Wang)
+Date: Wed, 17 May 2017 18:16:13 +0800
+Subject: [PATCH v2 0/4] amend some properties related clk and cpu for rk322x
+Message-ID: <1495016177-2413-1-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geetha,
+These series of patches amend some assigned-clocks and add cpu opp table
+for rk322x SoCs.
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Geetha sowjanya
-> Sent: Friday, May 12, 2017 1:41 PM
-> To: will.deacon at arm.com; robin.murphy at arm.com;
-> lorenzo.pieralisi at arm.com; hanjun.guo at linaro.org; sudeep.holla at arm.com;
-> iommu at lists.linux-foundation.org
-> Cc: Charles.Garcia-Tobin at arm.com; Geetha Sowjanya;
-> geethasowjanya.akula at gmail.com; jcm at redhat.com;
-> linu.cherian at cavium.com; rjw at rjwysocki.net; robert.moore at intel.com;
-> linux-kernel at vger.kernel.org; linux-acpi at vger.kernel.org;
-> robert.richter at cavium.com; lv.zheng at intel.com; catalin.marinas at arm.com;
-> sgoutham at cavium.com; linux-arm-kernel at lists.infradead.org;
-> devel at acpica.org
-> Subject: [v6 2/3] iommu/arm-smmu-v3: Add workaround for Cavium
-> ThunderX2 erratum #74
-> 
-> From: Linu Cherian <linu.cherian@cavium.com>
-> 
-> Cavium ThunderX2 SMMU implementation doesn't support page 1 register
-> space and PAGE0_REGS_ONLY option is enabled as an errata workaround.
-> This option when turned on, replaces all page 1 offsets used for
-> EVTQ_PROD/CONS, PRIQ_PROD/CONS register access with page 0 offsets.
-> 
-> SMMU resource size checks are now based on SMMU option
-> PAGE0_REGS_ONLY, since resource size can be either 64k/128k.
-> For this, arm_smmu_device_dt_probe/acpi_probe has been moved before
-> platform_get_resource call, so that SMMU options are set beforehand.
-> 
-> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
-> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
-> ---
->  Documentation/arm64/silicon-errata.txt             |  1 +
->  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |  6 ++
->  drivers/iommu/arm-smmu-v3.c                        | 64 +++++++++++++++++-----
->  3 files changed, 56 insertions(+), 15 deletions(-)
-> 
-> diff --git a/Documentation/arm64/silicon-errata.txt
-> b/Documentation/arm64/silicon-errata.txt
-> index 10f2ddd..4693a32 100644
-> --- a/Documentation/arm64/silicon-errata.txt
-> +++ b/Documentation/arm64/silicon-errata.txt
-> @@ -62,6 +62,7 @@ stable kernels.
->  | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154
-> |
->  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456
-> |
->  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
-> +| Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
->  |                |                 |                 |                             |
->  | Freescale/NXP  | LS2080A/LS1043A | A-008585        |
-> FSL_ERRATUM_A008585         |
->  |                |                 |                 |                             |
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> index be57550..e6da62b 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-> @@ -49,6 +49,12 @@ the PCIe specification.
->  - hisilicon,broken-prefetch-cmd
->                      : Avoid sending CMD_PREFETCH_* commands to the SMMU.
-> 
-> +- cavium-cn99xx,broken-page1-regspace
-> +                    : Replaces all page 1 offsets used for EVTQ_PROD/CONS,
-> +						PRIQ_PROD/CONS register
-> access with page 0 offsets.
-> +						Set for Caviun ThunderX2
-> silicon that doesn't support
-> +						SMMU page1 register space.
-> +
->  ** Example
-> 
->          smmu at 2b400000 {
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 380969a..c519927c 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -412,6 +412,9 @@
->  #define MSI_IOVA_BASE			0x8000000
->  #define MSI_IOVA_LENGTH			0x100000
-> 
-> +#define ARM_SMMU_PAGE0_REGS_ONLY(smmu)		\
-> +	((smmu)->options & ARM_SMMU_OPT_PAGE0_REGS_ONLY)
-> +
->  static bool disable_bypass;
->  module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
-> MODULE_PARM_DESC(disable_bypass, @@ -597,6 +600,7 @@ struct
-> arm_smmu_device {
->  	u32				features;
-> 
->  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-> +#define ARM_SMMU_OPT_PAGE0_REGS_ONLY    (1 << 1)
->  	u32				options;
-> 
->  	struct arm_smmu_cmdq		cmdq;
-> @@ -663,9 +667,19 @@ struct arm_smmu_option_prop {
-> 
->  static struct arm_smmu_option_prop arm_smmu_options[] = {
->  	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-
-> cmd" },
-> +	{ ARM_SMMU_OPT_PAGE0_REGS_ONLY,
-> +"cavium-cn99xx,broken-page1-regspace"},
->  	{ 0, NULL},
->  };
-> 
-> +static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
-> +						 struct arm_smmu_device
-> *smmu)
-> +{
-> +	if (offset > SZ_64K && ARM_SMMU_PAGE0_REGS_ONLY(smmu))
-> +		offset -= SZ_64K;
-> +
-> +	return smmu->base + offset;
-> +}
-> +
->  static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain
-> *dom)  {
->  	return container_of(dom, struct arm_smmu_domain, domain); @@ -
-> 1961,8 +1975,8 @@ static int arm_smmu_init_one_queue(struct
-> arm_smmu_device *smmu,
->  		return -ENOMEM;
->  	}
-> 
-> -	q->prod_reg	= smmu->base + prod_off;
-> -	q->cons_reg	= smmu->base + cons_off;
-> +	q->prod_reg	= arm_smmu_page1_fixup(prod_off, smmu);
-> +	q->cons_reg	= arm_smmu_page1_fixup(cons_off, smmu);
->  	q->ent_dwords	= dwords;
-> 
->  	q->q_base  = Q_BASE_RWA;
-> @@ -2363,8 +2377,10 @@ static int arm_smmu_device_reset(struct
-> arm_smmu_device *smmu, bool bypass)
-> 
->  	/* Event queue */
->  	writeq_relaxed(smmu->evtq.q.q_base, smmu->base +
-> ARM_SMMU_EVTQ_BASE);
-> -	writel_relaxed(smmu->evtq.q.prod, smmu->base +
-> ARM_SMMU_EVTQ_PROD);
-> -	writel_relaxed(smmu->evtq.q.cons, smmu->base +
-> ARM_SMMU_EVTQ_CONS);
-> +	writel_relaxed(smmu->evtq.q.prod,
-> +		       arm_smmu_page1_fixup(ARM_SMMU_EVTQ_PROD,
-> smmu));
-> +	writel_relaxed(smmu->evtq.q.cons,
-> +		       arm_smmu_page1_fixup(ARM_SMMU_EVTQ_CONS,
-> smmu));
-> 
->  	enables |= CR0_EVTQEN;
->  	ret = arm_smmu_write_reg_sync(smmu, enables,
-> ARM_SMMU_CR0, @@ -2379,9 +2395,9 @@ static int
-> arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
->  		writeq_relaxed(smmu->priq.q.q_base,
->  			       smmu->base + ARM_SMMU_PRIQ_BASE);
->  		writel_relaxed(smmu->priq.q.prod,
-> -			       smmu->base + ARM_SMMU_PRIQ_PROD);
-> +
-> arm_smmu_page1_fixup(ARM_SMMU_PRIQ_PROD, smmu));
->  		writel_relaxed(smmu->priq.q.cons,
-> -			       smmu->base + ARM_SMMU_PRIQ_CONS);
-> +
-> arm_smmu_page1_fixup(ARM_SMMU_PRIQ_CONS, smmu));
-> 
->  		enables |= CR0_PRIQEN;
->  		ret = arm_smmu_write_reg_sync(smmu, enables,
-> ARM_SMMU_CR0, @@ -2605,6 +2621,14 @@ static int
-> arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)  }
-> 
->  #ifdef CONFIG_ACPI
-> +static void acpi_smmu_get_options(u32 model, struct arm_smmu_device
-> +*smmu) {
-> +	if (model == ACPI_IORT_SMMU_CAVIUM_CN99XX)
-> +		smmu->options |= ARM_SMMU_OPT_PAGE0_REGS_ONLY;
+the following patches on patchwork are required for this change.
+https://patchwork.kernel.org/patch/9627639/
+https://patchwork.kernel.org/patch/9703945/
+https://patchwork.kernel.org/patch/9703939/
+https://patchwork.kernel.org/patch/9707517/
 
-HiSIlicon hip06/07 boards have a similar existing option to enable,
-ARM_SMMU_OPT_SKIP_PREFETCH. I have just sent out a similar patch to enable
-It-" [PATCH] iommu/arm-smmu-v3: Enable ACPI based HiSilicon CMD_PREFETCH
- quirk(erratum 161010701)".  May be it can be merged here, if this series goes through.
- Not sure about the protocol though.
+Changes from v1:
+ - Updated the 'Signed-off-by' tag with original authors' email id.
+ - Updated the 'Acked-by' tag from Viresh Kumar <viresh.kumar@linaro.org>.
 
-Thanks,
-Shameer
+Elaine Zhang (1):
+  arm: dts: rk322x: add some assigned-clocks
+
+Finley Xiao (2):
+  arm: dts: rk322x: add operating-points-v2 property for cpu
+  arm: dts: rk3229: add a new cpu opp table
+
+Rocky Hao (1):
+  arm: dts: rk322x: update tsadc's frequence setting
+
+ arch/arm/boot/dts/rk3229-cpu-opp.dtsi | 85 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/rk322x.dtsi         | 52 ++++++++++++++++++---
+ 2 files changed, 131 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/boot/dts/rk3229-cpu-opp.dtsi
+
+-- 
+2.0.0
