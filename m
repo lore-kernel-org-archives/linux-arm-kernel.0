@@ -1,60 +1,60 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Wed, 17 May 2017 13:44:19 -0300
-Subject: [PATCH] ARM: dts: omap3: Remove 'enable-active-low' property
-Message-ID: <1495039459-23223-1-git-send-email-fabio.estevam@nxp.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 18 May 2017 00:43:43 +0800
+Subject: [RFC PATCH 00/11] Support for H3 Composite Output support
+Message-ID: <20170517164354.16399-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <festevam@gmail.com>
+This patchset depends on the DE2 patchset, version 8 of that patchset
+is available at [1].
 
-Property 'enable-active-low' does not exist. Only 'enable-active-high' is
-valid, and when this property is absent the gpio regulator will act as
-active low by default.
+Allwinner H3 SoC features a TV Encoder like the one in Allwinner A13,
+which can only output TV Composite signal.
 
-So remove the unexisting 'enable-active-low' property. 
+The display pipeline of H3 is also special -- it has two mixers and
+two TCONs, of which the connection can be swapped. The TCONs do not
+have channel 0 (as they are all connected to internal bridges, TVE
+and HDMI TX).
 
-Signed-off-by: Fabio Estevam <festevam@gmail.com>
----
- arch/arm/boot/dts/omap3-evm-common.dtsi | 1 -
- arch/arm/boot/dts/omap3-sb-t35.dtsi     | 1 -
- arch/arm/boot/dts/omap3-tao3530.dtsi    | 1 -
- 3 files changed, 3 deletions(-)
+Add support for the display pipeline and the TVE in H3, in order to
+make it possible to display something with mainline kernel with H3.
 
-diff --git a/arch/arm/boot/dts/omap3-evm-common.dtsi b/arch/arm/boot/dts/omap3-evm-common.dtsi
-index 0904750..7780e25 100644
---- a/arch/arm/boot/dts/omap3-evm-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-evm-common.dtsi
-@@ -76,7 +76,6 @@
- 
- &lcd_3v3 {
- 	gpio = <&gpio5 25 GPIO_ACTIVE_LOW>;	/* gpio153 */
--	enable-active-low;
- };
- 
- &lcd0 {
-diff --git a/arch/arm/boot/dts/omap3-sb-t35.dtsi b/arch/arm/boot/dts/omap3-sb-t35.dtsi
-index 73643fa..91e15af 100644
---- a/arch/arm/boot/dts/omap3-sb-t35.dtsi
-+++ b/arch/arm/boot/dts/omap3-sb-t35.dtsi
-@@ -50,7 +50,6 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&sb_t35_audio_amp>;
- 		gpio = <&gpio2 29 GPIO_ACTIVE_LOW>;   /* gpio_61 */
--		enable-active-low;
- 		regulator-always-on;
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-tao3530.dtsi b/arch/arm/boot/dts/omap3-tao3530.dtsi
-index dc80886b..06ac0f8 100644
---- a/arch/arm/boot/dts/omap3-tao3530.dtsi
-+++ b/arch/arm/boot/dts/omap3-tao3530.dtsi
-@@ -63,7 +63,6 @@
- 		regulator-min-microvolt = <3150000>;
- 		regulator-max-microvolt = <3150000>;
- 		gpio = <&gpio5 29 GPIO_ACTIVE_LOW>;		/* gpio_157 */
--		enable-active-low;
- 		startup-delay-us = <10000>;
- 	};
- };
+The image quality of TVE is bad, so HDMI is a better output -- this
+patchset also prepared the mixers and TCONs for HDMI output, and
+the HDMI controller driver is already done by Jernej Skrabec.
+
+Currently the jack detection feature of the TVE is still not so
+clear -- so it's not implemented in this version. Thus the TV
+output shouldn't be defaultly enabled now.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/506806.html
+
+Icenowy Zheng (11):
+  dt-bindings: update the binding for Allwinner H3 TVE support
+  drm: sun4i: add support for H3 mixers
+  drm: sun4i: ignore swapped mixer<->tcon connection for DE2
+  drm: sun4i: add support for H3's TCON0/1
+  drm: sun4i: add compatible for H3 display engine
+  drm: sun4i: add color space correction support for DE2 mixer
+  drm: sun4i: add support for the TV encoder in H3 SoC
+  clk: sunxi-ng: allow CLK_DE to set CLK_PLL_DE for H3
+  clk: sunxi-ng: export CLK_PLL_DE for H3
+  ARM: sun8i: h3: add display engine pipeline for TVE
+  [DO NOT MERGE] ARM: sun8i: h3: enable TV output on Orange Pi PC
+
+ .../bindings/display/sunxi/sun4i-drm.txt           |  47 ++++-
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  12 ++
+ arch/arm/boot/dts/sun8i-h3.dtsi                    | 189 +++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |   2 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.h                |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |  28 +++
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 117 +++++++++----
+ drivers/gpu/drm/sun4i/sun4i_tcon.h                 |   5 +
+ drivers/gpu/drm/sun4i/sun4i_tv.c                   |  65 ++++++-
+ drivers/gpu/drm/sun4i/sun8i_mixer.c                |  53 ++++++
+ drivers/gpu/drm/sun4i/sun8i_mixer.h                |   6 +-
+ include/dt-bindings/clock/sun8i-h3-ccu.h           |   2 +
+ 12 files changed, 488 insertions(+), 41 deletions(-)
+
 -- 
-2.7.4
+2.12.2
