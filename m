@@ -1,43 +1,121 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 17 May 2017 09:40:41 +0200
-Subject: [PATCH v3 12/21] drm/sun4i: tcon: Fix tcon channel 1 backporch
- calculation
+Date: Wed, 17 May 2017 09:40:30 +0200
+Subject: [PATCH v3 01/21] clk: divider: Make divider_round_rate take the
+ parent clock
 In-Reply-To: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
 References: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <e4c28363d94e8966866792df3bbd786332c8e931.1495006350.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <af976be0ecc2ea335cd9694a83fb29174d87e17d.1495006350.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems like what's called a backporch in the datasheet is actually the
-backporch plus the sync period. Fix that in our driver.
+So far, divider_round_rate only considers the parent clock returned by
+clk_hw_get_parent.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+This works fine on clocks that have a single parents, this doesn't work on
+muxes, since we will only consider the first parent, while other parents
+may totally be able to provide a better combination.
+
+Clocks in that case cannot use divider_round_rate, so would have to come up
+with a very similar logic to work around it. Instead of having to do
+something like this, and duplicate that logic everywhere, create a
+divider_round_rate parent to allow caller to give an additional parameter
+for the parent clock to consider.
+
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/clk-divider.c    | 19 ++++++++++---------
+ include/linux/clk-provider.h | 16 +++++++++++++---
+ 2 files changed, 23 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 74aa01e75e32..931dd374552e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -269,7 +269,7 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
- 		     SUN4I_TCON1_BASIC2_Y(mode->crtc_vdisplay));
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 96386ffc8483..9bb472cccca6 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -275,7 +275,8 @@ static int _next_div(const struct clk_div_table *table, int div,
+ 	return div;
+ }
  
- 	/* Set horizontal display timings */
--	bp = mode->crtc_htotal - mode->crtc_hsync_end;
-+	bp = mode->crtc_htotal - mode->crtc_hsync_start;
- 	DRM_DEBUG_DRIVER("Setting horizontal total %d, backporch %d\n",
- 			 mode->htotal, bp);
- 	regmap_write(tcon->regs, SUN4I_TCON1_BASIC3_REG,
-@@ -277,7 +277,7 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
- 		     SUN4I_TCON1_BASIC3_H_BACKPORCH(bp));
+-static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
++static int clk_divider_bestdiv(struct clk_hw *hw, struct clk_hw *parent,
++			       unsigned long rate,
+ 			       unsigned long *best_parent_rate,
+ 			       const struct clk_div_table *table, u8 width,
+ 			       unsigned long flags)
+@@ -314,8 +315,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+ 			*best_parent_rate = parent_rate_saved;
+ 			return i;
+ 		}
+-		parent_rate = clk_hw_round_rate(clk_hw_get_parent(hw),
+-					       rate * i);
++		parent_rate = clk_hw_round_rate(parent, rate * i);
+ 		now = DIV_ROUND_UP_ULL((u64)parent_rate, i);
+ 		if (_is_best_div(rate, now, best, flags)) {
+ 			bestdiv = i;
+@@ -326,23 +326,24 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
  
- 	/* Set vertical display timings */
--	bp = mode->crtc_vtotal - mode->crtc_vsync_end;
-+	bp = mode->crtc_vtotal - mode->crtc_vsync_start;
- 	DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
- 			 mode->vtotal, bp);
- 	regmap_write(tcon->regs, SUN4I_TCON1_BASIC4_REG,
+ 	if (!bestdiv) {
+ 		bestdiv = _get_maxdiv(table, width, flags);
+-		*best_parent_rate = clk_hw_round_rate(clk_hw_get_parent(hw), 1);
++		*best_parent_rate = clk_hw_round_rate(parent, 1);
+ 	}
+ 
+ 	return bestdiv;
+ }
+ 
+-long divider_round_rate(struct clk_hw *hw, unsigned long rate,
+-			unsigned long *prate, const struct clk_div_table *table,
+-			u8 width, unsigned long flags)
++long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
++			       unsigned long rate, unsigned long *prate,
++			       const struct clk_div_table *table,
++			       u8 width, unsigned long flags)
+ {
+ 	int div;
+ 
+-	div = clk_divider_bestdiv(hw, rate, prate, table, width, flags);
++	div = clk_divider_bestdiv(hw, parent, rate, prate, table, width, flags);
+ 
+ 	return DIV_ROUND_UP_ULL((u64)*prate, div);
+ }
+-EXPORT_SYMBOL_GPL(divider_round_rate);
++EXPORT_SYMBOL_GPL(divider_round_rate_parent);
+ 
+ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+ 				unsigned long *prate)
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index a428aec36ace..c59c62571e4f 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -412,9 +412,10 @@ extern const struct clk_ops clk_divider_ro_ops;
+ unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
+ 		unsigned int val, const struct clk_div_table *table,
+ 		unsigned long flags);
+-long divider_round_rate(struct clk_hw *hw, unsigned long rate,
+-		unsigned long *prate, const struct clk_div_table *table,
+-		u8 width, unsigned long flags);
++long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
++			       unsigned long rate, unsigned long *prate,
++			       const struct clk_div_table *table,
++			       u8 width, unsigned long flags);
+ int divider_get_val(unsigned long rate, unsigned long parent_rate,
+ 		const struct clk_div_table *table, u8 width,
+ 		unsigned long flags);
+@@ -757,6 +758,15 @@ static inline void __clk_hw_set_clk(struct clk_hw *dst, struct clk_hw *src)
+ 	dst->core = src->core;
+ }
+ 
++static inline long divider_round_rate(struct clk_hw *hw, unsigned long rate,
++				      unsigned long *prate,
++				      const struct clk_div_table *table,
++				      u8 width, unsigned long flags)
++{
++	return divider_round_rate_parent(hw, clk_hw_get_parent(hw),
++					 rate, prate, table, width, flags);
++}
++
+ /*
+  * FIXME clock api without lock protection
+  */
 -- 
 git-series 0.9.1
