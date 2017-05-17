@@ -1,56 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 17 May 2017 09:40:42 +0200
-Subject: [PATCH v3 13/21] drm/sun4i: tcon: Change vertical total size
- computation inconsistency
+Date: Wed, 17 May 2017 09:40:41 +0200
+Subject: [PATCH v3 12/21] drm/sun4i: tcon: Fix tcon channel 1 backporch
+ calculation
 In-Reply-To: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
 References: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <5f1e156ed132defe5ec58b4e2a97764d73eba5f3.1495006350.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <e4c28363d94e8966866792df3bbd786332c8e931.1495006350.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both TCON channels need to have the resolution doubled, since the size the
-hardware is going to use is whatever we put in the register divided by two.
+It seems like what's called a backporch in the datasheet is actually the
+backporch plus the sync period. Fix that in our driver.
 
-However, we handle it differently for the two channels: in the channel 0,
-our register access macro does the multiplication of the value passed as
-paremeter, while in the channel 1, the macro doesn't do this, and we need
-to do it before calling it.
-
-Make this consistent by aligning the channel 0 with the channel 1
-behaviour.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 2 +-
- drivers/gpu/drm/sun4i/sun4i_tcon.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 931dd374552e..62e254aedb57 100644
+index 74aa01e75e32..931dd374552e 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -194,7 +194,7 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+@@ -269,7 +269,7 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+ 		     SUN4I_TCON1_BASIC2_Y(mode->crtc_vdisplay));
+ 
+ 	/* Set horizontal display timings */
+-	bp = mode->crtc_htotal - mode->crtc_hsync_end;
++	bp = mode->crtc_htotal - mode->crtc_hsync_start;
+ 	DRM_DEBUG_DRIVER("Setting horizontal total %d, backporch %d\n",
+ 			 mode->htotal, bp);
+ 	regmap_write(tcon->regs, SUN4I_TCON1_BASIC3_REG,
+@@ -277,7 +277,7 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+ 		     SUN4I_TCON1_BASIC3_H_BACKPORCH(bp));
  
  	/* Set vertical display timings */
- 	regmap_write(tcon->regs, SUN4I_TCON0_BASIC2_REG,
--		     SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal) |
-+		     SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal * 2) |
- 		     SUN4I_TCON0_BASIC2_V_BACKPORCH(bp));
- 
- 	/* Set Hsync and Vsync length */
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index f60e0b4c6db8..e3c50ecdcd04 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -52,7 +52,7 @@
- #define SUN4I_TCON0_BASIC1_H_BACKPORCH(bp)		(((bp) - 1) & 0xfff)
- 
- #define SUN4I_TCON0_BASIC2_REG			0x50
--#define SUN4I_TCON0_BASIC2_V_TOTAL(total)		((((total) * 2) & 0x1fff) << 16)
-+#define SUN4I_TCON0_BASIC2_V_TOTAL(total)		(((total) & 0x1fff) << 16)
- #define SUN4I_TCON0_BASIC2_V_BACKPORCH(bp)		(((bp) - 1) & 0xfff)
- 
- #define SUN4I_TCON0_BASIC3_REG			0x54
+-	bp = mode->crtc_vtotal - mode->crtc_vsync_end;
++	bp = mode->crtc_vtotal - mode->crtc_vsync_start;
+ 	DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
+ 			 mode->vtotal, bp);
+ 	regmap_write(tcon->regs, SUN4I_TCON1_BASIC4_REG,
 -- 
 git-series 0.9.1
