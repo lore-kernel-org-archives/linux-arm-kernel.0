@@ -1,56 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 17 May 2017 17:10:41 +0100
-Subject: [PATCH] clocksource: arm_arch_timer: fix DEFINE_PER_CPU expansion
-Message-ID: <1495037441-11211-1-git-send-email-mark.rutland@arm.com>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Wed, 17 May 2017 13:43:00 -0300
+Subject: [PATCH 1/2] ARM: dts: imx23-sansa: Remove 'enable-active-low' property
+Message-ID: <1495039381-23126-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our ctags mangling script can't handle newlines inside of a
-DEFINE_PER_CPU(), leading to an annoying message whenever tags are
-built:
+Property 'enable-active-low' does not exist. Only 'enable-active-high' is
+valid, and when this property is absent the gpio regulator will act as
+active low by default.
 
-  ctags: Warning: drivers/clocksource/arm_arch_timer.c:302: null expansion of name pattern "\1"
+So remove the unexisting 'enable-active-low' property. 
 
-This was dealt with elsewhere in commit:
+While at it, in order to make the gpio regulator description clearer pass
+the GPIO_ACTIVE_LOW flag.
 
-  25528213fe9f75f4 ("tags: Fix DEFINE_PER_CPU expansions")
-
-... by ensuring each DEFINE_PER_CPU() was contained on a single line,
-even where this would violate the usual code style (checkpatch warnings
-and all).
-
-Let's do the same for the arch timer driver, and get rid of the
-distraction.
-
-Fixes: 6acc71ccac7187fc ("arm64: arch_timer: Allows a CPU-specific erratum to only affect a subset of CPUs")
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/boot/dts/imx23-sansa.dts | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-Daniel/Thomas, this fixes a small bit of fallout from the recent merge window.
-Would it be possible to pick it up as a fix for v4.12?
-
-Thanks,
-Mark.
-
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 4bed671..21669ec 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -299,8 +299,7 @@ static u64 notrace arm64_858921_read_cntvct_el0(void)
- #endif
+diff --git a/arch/arm/boot/dts/imx23-sansa.dts b/arch/arm/boot/dts/imx23-sansa.dts
+index 4ec32f4..221fd55 100644
+--- a/arch/arm/boot/dts/imx23-sansa.dts
++++ b/arch/arm/boot/dts/imx23-sansa.dts
+@@ -42,6 +42,7 @@
+  */
  
- #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
--DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *,
--	       timer_unstable_counter_workaround);
-+DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *, timer_unstable_counter_workaround);
- EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
+ /dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
+ #include "imx23.dtsi"
  
- DEFINE_STATIC_KEY_FALSE(arch_timer_read_ool_enabled);
+ / {
+@@ -149,9 +150,8 @@
+ 		regulator-name = "vdd-touchpad0";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio0 26 0>;
++		gpio = <&gpio0 26 GPIO_ACTIVE_LOW>;
+ 		regulator-always-on;
+-		enable-active-low;
+ 	};
+ 
+ 	reg_vdd_tuner: regulator-vdd-tuner0 {
+@@ -159,9 +159,8 @@
+ 		regulator-name = "vdd-tuner0";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio0 29 0>;
++		gpio = <&gpio0 29 GPIO_ACTIVE_LOW>;
+ 		regulator-always-on;
+-		enable-active-low;
+ 	};
+ 
+ 	backlight {
 -- 
-1.9.1
+2.7.4
