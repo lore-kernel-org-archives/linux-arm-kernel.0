@@ -1,25 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 17 May 2017 16:25:48 -0500
-Subject: [PATCH v4 1/3] Documentation/bindings: Document the SafeXel
- cryptographic engine driver
-In-Reply-To: <20170427132459.23159-2-antoine.tenart@free-electrons.com>
-References: <20170427132459.23159-1-antoine.tenart@free-electrons.com>
- <20170427132459.23159-2-antoine.tenart@free-electrons.com>
-Message-ID: <CAL_JsqKB-D4UBJWX==pQdKsDd+rGP6JJD3jnwPBbLxpHS85XCw@mail.gmail.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Wed, 17 May 2017 14:29:59 -0700
+Subject: [PATCH net-next] drivers: net: xgene: Check all RGMII phy mode
+ variants
+In-Reply-To: <20170517202633.GA14413@lunn.ch>
+References: <1495051550-28961-1-git-send-email-isubramanian@apm.com>
+ <20170517202633.GA14413@lunn.ch>
+Message-ID: <CAKh23FkpYd0vC-AjqQu9ZStsRNp=kFh90eRfTU5WCC6Ln7E2AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 27, 2017 at 8:24 AM, Antoine Tenart
-<antoine.tenart@free-electrons.com> wrote:
-> The Inside Secure Safexcel cryptographic engine is found on some Marvell
-> SoCs (7k/8k). Document the bindings used by its driver.
+On Wed, May 17, 2017 at 1:26 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> +bool is_xgene_enet_phy_mode_rgmii(struct net_device *ndev)
+>> +{
+>> +     struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+>> +     int phy_mode = pdata->phy_mode;
+>> +     bool ret;
+>> +
+>> +     ret = phy_mode == PHY_INTERFACE_MODE_RGMII ||
+>> +           phy_mode == PHY_INTERFACE_MODE_RGMII_ID ||
+>> +           phy_mode == PHY_INTERFACE_MODE_RGMII_RXID ||
+>> +           phy_mode == PHY_INTERFACE_MODE_RGMII_TXID;
+>> +
+>> +     return ret;
+>> +}
 >
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  .../bindings/crypto/inside-secure-safexcel.txt     | 27 ++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
+> include/linux/phy.h:
+>
+> /**
+>  * phy_interface_is_rgmii - Convenience function for testing if a PHY interface
+>  * is RGMII (all variants)
+>  * @phydev: the phy_device struct
+>  */
+> static inline bool phy_interface_is_rgmii(struct phy_device *phydev)
+> {
+>         return phydev->interface >= PHY_INTERFACE_MODE_RGMII &&
+>                 phydev->interface <= PHY_INTERFACE_MODE_RGMII_TXID;
+> };
 
-If you would like this reviewed, please re-send to the DT list.
+Thanks.  I'll use this helper function.
 
-Rob
+>
+>         Andrew
