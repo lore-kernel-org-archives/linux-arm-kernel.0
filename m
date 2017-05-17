@@ -1,73 +1,79 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Wed, 17 May 2017 17:48:29 -0500
-Subject: [pwm] question about potential division by zero
-In-Reply-To: <89269556-bb5d-b2bf-b44c-a078d6ca274a@gmail.com>
-References: <20170516165653.Horde.Xe6MBOoWtIt1Jni0nYqF1GM@gator4166.hostgator.com>
- <89269556-bb5d-b2bf-b44c-a078d6ca274a@gmail.com>
-Message-ID: <20170517174829.Horde.T6_ImT2RRkpgldJZDNKUSr5@gator4166.hostgator.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 May 2017 00:02:36 +0100
+Subject: crash after receiving SIGCHLD during system call
+In-Reply-To: <CALnQHM0tUDkjbX+oBW5pEeuBWUoX2eOmA9Qrc9V2-RsnDV3d6Q@mail.gmail.com>
+References: <CALnQHM3wjH1CWwUUJX7KhGOOhoW-0r22nyBWmBUJYCUFe-JEtw@mail.gmail.com>
+ <20170517170940.GJ22219@n2100.armlinux.org.uk>
+ <CALnQHM0tUDkjbX+oBW5pEeuBWUoX2eOmA9Qrc9V2-RsnDV3d6Q@mail.gmail.com>
+Message-ID: <20170517230236.GK22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+On Wed, May 17, 2017 at 04:28:44PM -0600, David Mosberger wrote:
+> OK, since I see various faults, including SIGILL, I used
+> user_debug=63.  Here is one example:
+> 
+> 2017-05-17 22:12:20: (log.c.217) server started
+> [  129.810000] pgd = cf0b4000
+> [  129.810000] [00000073] *pgd=2f903831, *pte=00000000, *ppte=00000000
+> [  129.820000] CPU: 0 PID: 701 Comm: lighttpd Not tainted 4.9.28+ #58
+> [  129.820000] Hardware name: Atmel SAMA5
+> [  129.830000] task: cecfcd80 task.stack: cf102000
+> [  129.830000] PC is at 0x18af4 <-- points to "movle r6, r3" instruction
+> [  129.830000] LR is at 0xb6c04510
+> [  129.840000] pc : [<00018af4>]    lr : [<b6c04510>]    psr: 00070030
+> [  129.840000] sp : bee098ec  ip : ffffffff  fp : 01ee4740
+> [  129.850000] r10: 00000008  r9 : 00000000  r8 : b6d12c40
+> [  129.850000] r7 : 00034684  r6 : 00000062  r5 : ffffffff  r4 : 00000000
+> [  129.860000] r3 : ff000000  r2 : bee09978  r1 : bee098f8  r0 : 00000073
+> [  129.870000] Flags: nzcv  IRQs on  FIQs on  Mode USER_32  ISA Thumb
+> Segment user
+...
+> Program received signal SIGSEGV, Segmentation fault.
+> 
+> I'm not very good at reading ARM tombstones but if I read this right,
+> the kernel got a page fault due to a data access but a "movle r6, r3"
+> instruction doesn't access data memory.  Are we dealing with a
+> instruction cache issue?
+> 
+> And it says we're in "Thumb" mode?  That shouldn't be the case.
 
-Quoting Matthias Brugger <matthias.bgg@gmail.com>:
+That does appear to be the case - the PSR value confirms it.
 
-> On 16/05/17 23:56, Gustavo A. R. Silva wrote:
->>
->> Hello everybody,
->>
->> While looking into Coverity ID 1408721 I ran into the following  
->> piece of code at /drivers/pwm/pwm-mediatek.c:77:
->>
->>  77static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->>  78                          int duty_ns, int period_ns)
->>  79{
->>  80        struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
->>  81        struct clk *clk = pc->clks[MTK_CLK_PWM1 + pwm->hwpwm];
->>  82        u32 resolution, clkdiv = 0;
->>  83
->>  84        resolution = NSEC_PER_SEC / clk_get_rate(clk);
->>  85
->>  86        while (period_ns / resolution > 8191) {
->>  87                resolution *= 2;
->>  88                clkdiv++;
->>  89        }
->>  90
->>  91        if (clkdiv > 7)
->>  92                return -EINVAL;
->>  93
->>  94        mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | BIT(3)  
->> | clkdiv);
->>  95        mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns /  
->> resolution);
->>  96        mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
->>  97
->>  98        return 0;
->>  99}
->>
->> The issue here is that in case _clk_ is null, function  
->> clk_get_rate() at line 84 will return zero and a division by zero  
->> will occur.
->>
->> So my question here is if there is any chance for _clk_ to be null  
->> at line 81, hence ending up triggering a division by zero at line 84?
->
-> No it can't, in the probe function will error out if one of the  
-> seven clocks are not found.
->
-> for (i = 0; i < MTK_CLK_MAX; i++) {
-> 	pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
-> 	if (IS_ERR(pc->clks[i]))
-> 		return PTR_ERR(pc->clks[i]);
-> }
->
-> It registers a pwm chip with five PWMs. When the config function is  
-> called one of the five PWMs is identified (with a value from 0-4)  
-> which correspondents to the MTK_CLK_PWM[1-5], so no bug here neither.
->
+The segfault is at address 0x73, and an ARM "movle r6, r3" instruction
+assembles to 0xd1a06003, which would correspond with Thumb:
 
-I get it.
+   0:   d1a0            bne.n   ffffff44 <.text+0xffffff44>
+   2:   6003            str     r3, [r0, #0]
 
-Thank you very much for the clarification.
---
-Gustavo A. R. Silva
+Since r0 is 0x00000073, this ties up.
+
+So, the problem seems to be the T bit in the PSR is somehow getting
+set.
+
+The kernel signal handling merely saves the PSR value it got on entry
+(in the pt_regs structure) onto the userspace stack as part of the
+mcontext (see setup_sigframe in arch/arm/kernel/signal.c).  I think
+you've confirmed that the saved information looks correct.
+
+The question then becomes what happens after the signal handler
+returns.  If there is no sigreturn or rt_sigreturn syscall, then the
+return is being done entirely by userspace, which means userspace is
+responsible for unstacking the mcontext, including switching to the
+correct ISA.
+
+If there is a sigreturn syscall, the kernel will unstack the mcontext,
+(see sys_*sigreturn in arch/arm/kernel/signal.c) replacing the syscall's
+pt_regs with the saved mcontext registers.  The resulting state is
+validated (to prevent userspace gaining privileged modes) before
+returning.  So the T bit should be restored, unless something in
+userspace decided to set it.
+
+The validation will fix up the CPSR state if it looks bad (as a belt
+and braces) before returning zero to indicate illegal state, which
+will result in a forced SIGSEGV being delivered to the program.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
