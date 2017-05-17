@@ -1,38 +1,47 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 18 May 2017 00:43:51 +0800
-Subject: [RFC PATCH 08/11] clk: sunxi-ng: allow CLK_DE to set CLK_PLL_DE for H3
-In-Reply-To: <20170517164354.16399-1-icenowy@aosc.io>
-References: <20170517164354.16399-1-icenowy@aosc.io>
-Message-ID: <20170517164354.16399-9-icenowy@aosc.io>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 17 May 2017 18:50:05 +0300
+Subject: [PATCHv3 0/4] clk: ti: add support for clkctrl clocks
+Message-ID: <1495036209-11298-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H3 features a PLL named CLK_PLL_DE, and a mod clock for the
-"Display Engine 2.0" named CLK_DE. As the name indicated, the CLK_PLL_DE
-is a PLL for CLK_DE.
+Hi,
 
-Only CLK_DE and CLK_TVE have a parent of CLK_PLL_DE, and CLK_TVE is also
-one part of the display clocks.
+Basically a rebase on top of 4.12-rc1, with some minor fixes.
+This series is now against the clock driver only, and should be ready
+to pull in.
 
-So allow CLK_DE to set CLK_PLL_DE (add CLK_SET_RATE_PARENT to it).
+Changes compared to v2:
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Patch #1: fixed the typo for #clock-cells property in the example
+Patch #2: fixed a compile bug detected by kbuild bot, basically added
+	  default clkctrl data, and moved the registration of omap4
+	  version of the same to patch #4
+Patch #3: grouped the macro definitions based on clock instance and
+	  added header rows before the clock instances
+Patch #4: Moved the registration of the clkctrl data under this patch
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index 4cbc1b701b7c..6e39ba7cb173 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -439,7 +439,7 @@ static SUNXI_CCU_GATE(dram_ts_clk,	"dram-ts",	"dram",
- 
- static const char * const de_parents[] = { "pll-periph0-2x", "pll-de" };
- static SUNXI_CCU_M_WITH_MUX_GATE(de_clk, "de", de_parents,
--				 0x104, 0, 4, 24, 3, BIT(31), 0);
-+				 0x104, 0, 4, 24, 3, BIT(31), CLK_SET_RATE_PARENT);
- 
- static const char * const tcon_parents[] = { "pll-video" };
- static SUNXI_CCU_M_WITH_MUX_GATE(tcon_clk, "tcon", tcon_parents,
--- 
-2.12.2
+Dropped rest of the patches from series to be reviewed / pulled separately
+by Tony, as they are all against mach-omap2 / omap DTS. I will post the
+remaining patches separately on linux-omap list only.
+
+Boot testing done against:
+am335x-evm, am335x-evmsk, am37x-evm, am437x-sk, am43x-epos-evm,
+am437x-gp-evm, omap3-beagle-xm, omap3-beagle, am335x-boneblack,
+am335x-bone, craneboard, dra72x-evm, dra7xx-evm, omap3-n900,
+omap5-uevm, omap4-panda-es, omap4-panda, omap2430-sdp,
+omap3430-sdp, omap4-sdp-es23plus
+
+Boot failures detected on:
+am335x-evm, am43x-epos-evm, dra72x-evm, dra7xx-evm
+
+  => all board fail to mount NFS rootfs but are otherwise fine
+  => same failure seen on same boards on plain 4.12-rc1 also
+
+Basic suspend-resume test done on omap4-panda-es.
+
+Public branch:
+tree: https://github.com/t-kristo/linux-pm.git
+branch: 4.12-rc1-clkctrl
+
+-Tero
