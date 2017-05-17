@@ -1,37 +1,38 @@
 From: frank.wang@rock-chips.com (Frank Wang)
-Date: Wed, 17 May 2017 11:40:51 +0800
-Subject: [PATCH 3/3] arm: dts: rk322x: add watchdog device node.
+Date: Wed, 17 May 2017 11:40:49 +0800
+Subject: [PATCH 1/3] arm: dts: rk322x: fix i2s1 pinctrl error
 In-Reply-To: <1494992451-32542-1-git-send-email-frank.wang@rock-chips.com>
 References: <1494992451-32542-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1494992451-32542-4-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <1494992451-32542-2-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add watchdog device node for rk322x SoC.
+From: Sugar Zhang <sugar.zhang@rock-chips.com>
+
+Refer to Chapter 5.3.2 of rk3229 TRM, we can see that GPIO1A[2,4,5]
+using RK_FUNC_2 not RK_FUNC_1. This patch fixes it.
 
 Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
 ---
- arch/arm/boot/dts/rk322x.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/rk322x.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-index ea1239a..221251a 100644
+index 48a0c1c..cc6a27d 100644
 --- a/arch/arm/boot/dts/rk322x.dtsi
 +++ b/arch/arm/boot/dts/rk322x.dtsi
-@@ -280,6 +280,14 @@
- 		status = "disabled";
- 	};
+@@ -621,9 +621,9 @@
+ 						<0 12 RK_FUNC_1 &pcfg_pull_none>,
+ 						<0 13 RK_FUNC_1 &pcfg_pull_none>,
+ 						<0 14 RK_FUNC_1 &pcfg_pull_none>,
+-						<1 2 RK_FUNC_1 &pcfg_pull_none>,
+-						<1 4 RK_FUNC_1 &pcfg_pull_none>,
+-						<1 5 RK_FUNC_1 &pcfg_pull_none>;
++						<1 2 RK_FUNC_2 &pcfg_pull_none>,
++						<1 4 RK_FUNC_2 &pcfg_pull_none>,
++						<1 5 RK_FUNC_2 &pcfg_pull_none>;
+ 			};
+ 		};
  
-+	wdt: watchdog at 110a0000 {
-+		compatible = "snps,dw-wdt";
-+		reg = <0x110a0000 0x100>;
-+		clocks = <&cru PCLK_CPU>;
-+		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
- 	pwm0: pwm at 110b0000 {
- 		compatible = "rockchip,rk3288-pwm";
- 		reg = <0x110b0000 0x10>;
 -- 
 2.0.0
