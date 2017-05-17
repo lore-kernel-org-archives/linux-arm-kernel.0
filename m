@@ -1,59 +1,48 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 17 May 2017 21:18:06 +0200
-Subject: [PATCH] KVM: arm/arm64: Hold slots_lock when unregisering kvm io bus
- devices
-Message-ID: <20170517191806.3978-1-cdall@linaro.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 17 May 2017 12:33:15 -0700
+Subject: [PATCH v2 1/5] pinctrl: qcom: Add ipq8074 pinctrl driver
+In-Reply-To: <7afc7191-bcb1-a566-eac5-a4fe1293c773@codeaurora.org>
+References: <1493898841-20583-1-git-send-email-varada@codeaurora.org>
+ <1493898841-20583-2-git-send-email-varada@codeaurora.org>
+ <20170510224355.GE45273@Bjorns-MacBook-Pro-2.local>
+ <1f4c9974-f6a4-bee7-4f37-ad8795e442a3@codeaurora.org>
+ <20170514042307.GE69278@Bjorns-MacBook-Pro-2.local>
+ <7afc7191-bcb1-a566-eac5-a4fe1293c773@codeaurora.org>
+Message-ID: <20170517193315.GF12920@tuxbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We were not holding the kvm->slots_lock as required when calling
-kvm_io_bus_unregister_dev() as required.
+On Mon 15 May 02:05 PDT 2017, Varadarajan Narayanan wrote:
 
-This only affects the error path, but still, let's do our due
-dilligence.
+> On 5/14/2017 9:53 AM, Bjorn Andersson wrote:
+> > On Thu 11 May 03:33 PDT 2017, Varadarajan Narayanan wrote:
+> > 
+> > > On 5/11/2017 4:13 AM, Bjorn Andersson wrote:
+> > > > On Thu 04 May 04:53 PDT 2017, Varadarajan Narayanan wrote:
+[..]
+> > > > > +	msm_mux_qpic_pad4,
+> > > > 
+> > > > What are qpic_pad and qpic_pad0 through qpic_pad8? Different functions,
+> > > > alternative muxings...?
+> > > 
+> > > This is for the NAND and LCD display. The pins listed are the 9 data pins.
+> > > 
+> > 
+> > Then you can describe them all as "qpic_pad" (or simply "qpic"?). (It's
+> > possible to reference a partial group in the DTS, if that's necessary)
+> 
+> There are two sets of 9 pins, either of which can go to NAND or LCD.
+> Will rename qpic_pad as qpic_a and qpic_pad[0-8] as qpic_b.
+> Is that ok?
+> 
 
-Reported by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
----
- virt/kvm/arm/vgic/vgic-mmio-v3.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+So you have NAND and LCD hardware muxed to either "a" or "b" and then
+you mux either "a" or "b" out onto actual pins?
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 9b0f681..201d5e2 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -614,15 +614,16 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
- 	mutex_lock(&kvm->slots_lock);
- 	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, sgi_base,
- 				      SZ_64K, &sgi_dev->dev);
--	mutex_unlock(&kvm->slots_lock);
- 	if (ret) {
- 		kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
- 					  &rd_dev->dev);
--		return ret;
-+		goto out;
- 	}
- 
- 	vgic->vgic_redist_free_offset += 2 * SZ_64K;
--	return 0;
-+out:
-+	mutex_unlock(&kvm->slots_lock);
-+	return ret;
- }
- 
- static void vgic_unregister_redist_iodev(struct kvm_vcpu *vcpu)
-@@ -647,10 +648,12 @@ static int vgic_register_all_redist_iodevs(struct kvm *kvm)
- 
- 	if (ret) {
- 		/* The current c failed, so we start with the previous one. */
-+		mutex_lock(&kvm->slots_lock);
- 		for (c--; c >= 0; c--) {
- 			vcpu = kvm_get_vcpu(kvm, c);
- 			vgic_unregister_redist_iodev(vcpu);
- 		}
-+		mutex_unlock(&kvm->slots_lock);
- 	}
- 
- 	return ret;
--- 
-2.9.0
+How is this first mux configured?
+
+
+I think the a/b scheme sounds reasonable, if above is how it works.
+
+Regards,
+Bjorn
