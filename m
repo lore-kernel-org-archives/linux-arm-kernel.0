@@ -1,11 +1,11 @@
 From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Wed, 17 May 2017 13:43:01 -0300
-Subject: [PATCH 2/2] ARM: dts: tx6: Remove 'enable-active-low' property
-In-Reply-To: <1495039381-23126-1-git-send-email-fabio.estevam@nxp.com>
-References: <1495039381-23126-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <1495039381-23126-2-git-send-email-fabio.estevam@nxp.com>
+Date: Wed, 17 May 2017 13:44:19 -0300
+Subject: [PATCH] ARM: dts: omap3: Remove 'enable-active-low' property
+Message-ID: <1495039459-23223-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+From: Fabio Estevam <festevam@gmail.com>
 
 Property 'enable-active-low' does not exist. Only 'enable-active-high' is
 valid, and when this property is absent the gpio regulator will act as
@@ -13,42 +13,48 @@ active low by default.
 
 So remove the unexisting 'enable-active-low' property. 
 
-While at it in order to make the gpio regulator description clearer pass
-the GPIO_ACTIVE_LOW flag.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
 ---
- arch/arm/boot/dts/imx6qdl-tx6.dtsi  | 3 +--
- arch/arm/boot/dts/imx6ul-tx6ul.dtsi | 3 +--
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/omap3-evm-common.dtsi | 1 -
+ arch/arm/boot/dts/omap3-sb-t35.dtsi     | 1 -
+ arch/arm/boot/dts/omap3-tao3530.dtsi    | 1 -
+ 3 files changed, 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-index 1691714..a146fe7 100644
---- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-@@ -133,8 +133,7 @@
- 		regulator-max-microvolt = <3300000>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_flexcan_xcvr>;
--		gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
--		enable-active-low;
-+		gpio = <&gpio4 21 GPIO_ACTIVE_LOW>;
- 	};
+diff --git a/arch/arm/boot/dts/omap3-evm-common.dtsi b/arch/arm/boot/dts/omap3-evm-common.dtsi
+index 0904750..7780e25 100644
+--- a/arch/arm/boot/dts/omap3-evm-common.dtsi
++++ b/arch/arm/boot/dts/omap3-evm-common.dtsi
+@@ -76,7 +76,6 @@
  
- 	reg_lcd0_pwr: regulator-lcd0-pwr {
-diff --git a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-index c784a0b..4ccc9e9 100644
---- a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-@@ -173,8 +173,7 @@
- 		regulator-max-microvolt = <3300000>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_flexcan_xcvr>;
--		gpio = <&gpio3 5 GPIO_ACTIVE_HIGH>;
--		enable-active-low;
-+		gpio = <&gpio3 5 GPIO_ACTIVE_LOW>;
- 	};
+ &lcd_3v3 {
+ 	gpio = <&gpio5 25 GPIO_ACTIVE_LOW>;	/* gpio153 */
+-	enable-active-low;
+ };
  
- 	reg_lcd_pwr: regulator-lcdpwr {
+ &lcd0 {
+diff --git a/arch/arm/boot/dts/omap3-sb-t35.dtsi b/arch/arm/boot/dts/omap3-sb-t35.dtsi
+index 73643fa..91e15af 100644
+--- a/arch/arm/boot/dts/omap3-sb-t35.dtsi
++++ b/arch/arm/boot/dts/omap3-sb-t35.dtsi
+@@ -50,7 +50,6 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&sb_t35_audio_amp>;
+ 		gpio = <&gpio2 29 GPIO_ACTIVE_LOW>;   /* gpio_61 */
+-		enable-active-low;
+ 		regulator-always-on;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/omap3-tao3530.dtsi b/arch/arm/boot/dts/omap3-tao3530.dtsi
+index dc80886b..06ac0f8 100644
+--- a/arch/arm/boot/dts/omap3-tao3530.dtsi
++++ b/arch/arm/boot/dts/omap3-tao3530.dtsi
+@@ -63,7 +63,6 @@
+ 		regulator-min-microvolt = <3150000>;
+ 		regulator-max-microvolt = <3150000>;
+ 		gpio = <&gpio5 29 GPIO_ACTIVE_LOW>;		/* gpio_157 */
+-		enable-active-low;
+ 		startup-delay-us = <10000>;
+ 	};
+ };
 -- 
 2.7.4
