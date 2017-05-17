@@ -1,113 +1,85 @@
-From: aisheng.dong@nxp.com (A.S. Dong)
-Date: Wed, 17 May 2017 07:18:11 +0000
-Subject: [PATCH 2/2] pinctrl: pinctrl-imx: do not assume mux 0 is gpio
-In-Reply-To: <6d47abc0527ae6f2214a9b37dfbeb154@agner.ch>
-References: <1494830906-6442-1-git-send-email-aisheng.dong@nxp.com>
- <1494830906-6442-3-git-send-email-aisheng.dong@nxp.com>
- <6d47abc0527ae6f2214a9b37dfbeb154@agner.ch>
-Message-ID: <AM3PR04MB3061FB0760F94F2F816055A80E70@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 17 May 2017 09:32:59 +0200
+Subject: [PATCH v2 2/3] watchdog: dw_wdt: get reset lines from dt
+In-Reply-To: <4aa9252b45f2334eb429bb195d5d2963b4e61db1.1494595189.git-series.s.trumtrar@pengutronix.de>
+References: <44e4e733055cfa2ed79091542c7bb17aa24afca9.1494595189.git-series.s.trumtrar@pengutronix.de>
+ <4aa9252b45f2334eb429bb195d5d2963b4e61db1.1494595189.git-series.s.trumtrar@pengutronix.de>
+Message-ID: <1495006379.3030.9.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Stefan Agner [mailto:stefan at agner.ch]
-> Sent: Tuesday, May 16, 2017 1:27 AM
-> To: A.S. Dong
-> Cc: linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linus.walleij at linaro.org; shawnguo at kernel.org; Jacky Bai; Andy Duan;
-> kernel at pengutronix.de; Alexandre Courbot
-> Subject: Re: [PATCH 2/2] pinctrl: pinctrl-imx: do not assume mux 0 is gpio
+Hi Steffen,
+
+On Fri, 2017-05-12 at 15:34 +0200, Steffen Trumtrar wrote:
+> The dw_wdt has an external reset line, that can keep the device in reset
+> and therefore rendering it useless and also is the only way of stopping
+> the watchdog once it was started.
 > 
-> On 2017-05-14 23:48, Dong Aisheng wrote:
-> > Do not assume MUX 0 is GPIO function in core driver as a different SoC
-> > may have different value. e.g. MX7ULP Mux 1 is GPIO.
-> >
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Alexandre Courbot <gnurou@gmail.com>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Stefan Agner <stefan@agner.ch>
-> > Cc: Fugang Duan <fugang.duan@nxp.com>
-> > Cc: Bai Ping <ping.bai@nxp.com>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  drivers/pinctrl/freescale/pinctrl-imx.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
-> > b/drivers/pinctrl/freescale/pinctrl-imx.c
-> > index 0d6aaca..ed8ea32 100644
-> > --- a/drivers/pinctrl/freescale/pinctrl-imx.c
-> > +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-> > @@ -281,7 +281,7 @@ static int imx_pmx_gpio_request_enable(struct
-> > pinctrl_dev *pctldev,
-> >  			continue;
-> >  		for (pin = 0; pin < grp->num_pins; pin++) {
-> >  			imx_pin = &((struct imx_pin *)(grp->data))[pin];
-> > -			if (imx_pin->pin == offset && !imx_pin->mux_mode)
-> > +			if (imx_pin->pin == offset)
-> >  				goto mux_pin;
+> Get the reset lines for this core from the devicetree.
+> If resets are not specified just warn but don't fail probing to be compatible
+> with all users.
 > 
-> The reason I added that check was to make sure we pick a mux option which
-> is GPIO... With this change, any pinmux might be picked...
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Cc: Wim Van Sebroeck <wim@iguana.be>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: linux-watchdog at vger.kernel.org
+> ---
+>  drivers/watchdog/dw_wdt.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
+> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
+> index 914da3a4d334..3accddf1f381 100644
+> --- a/drivers/watchdog/dw_wdt.c
+> +++ b/drivers/watchdog/dw_wdt.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/of.h>
+>  #include <linux/pm.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/reset.h>
+>  #include <linux/watchdog.h>
+>  
+>  #define WDOG_CONTROL_REG_OFFSET		    0x00
+> @@ -54,6 +55,7 @@ struct dw_wdt {
+>  	struct clk		*clk;
+>  	unsigned long		rate;
+>  	struct watchdog_device	wdd;
+> +	struct reset_control	*rst;
+>  };
+>  
+>  #define to_dw_wdt(wdd)	container_of(wdd, struct dw_wdt, wdd)
+> @@ -234,6 +236,8 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
+>  		goto out_disable_clk;
+>  	}
+>  
+> +	dw_wdt->rst = devm_reset_control_get(&pdev->dev, NULL);
+> +
 
-First of all, this seems to be wrong to me that GPIO mux mode is SoC
-Dependant and should not be put in pinctrl-imx core driver.
+This should be
+	dw_wdt->rst = devm_reset_control_get_optional_shared(&pdev->dev, NULL);
+	if (IS_ERR(dw_wdt->rst))
+		return PTR_ERR(dw_wdt->rst);
+The optional variants return NULL if the reset is not specified in the
+DT.
 
-Secondly, I think we may be over worried and it's not quite necessary
-As we did not do the sanity check for both raw config and mux data read
->From Device tree, why only do it for GPIO?
+>  	wdd = &dw_wdt->wdd;
+>  	wdd->info = &dw_wdt_ident;
+>  	wdd->ops = &dw_wdt_ops;
+> @@ -267,6 +271,9 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto out_disable_clk;
+>  
+> +	if (dw_wdt->rst)
+> +		reset_control_deassert(dw_wdt->rst);
+> +
 
-We may trust the data in device tree.
+This can be changed to
+	reset_control_deassert(dw_wdt->rst);
 
-> >  		}
-> >  	}
-> > @@ -292,6 +292,7 @@ static int imx_pmx_gpio_request_enable(struct
-> > pinctrl_dev *pctldev,
-> >  	reg = readl(ipctl->base + pin_reg->mux_reg);
-> >  	reg &= ~info->mux_mask;
-> >  	reg |= imx_pin->config;
-> > +	reg |= imx_pin->mux_mode << info->mux_shift;
-> 
-> ... and muxed...
-> 
-> Not sure if we want that.
-> 
-> I had to control GPIO output/input through pinctrl since Vybrid does not
-> allow to control that from the GPIO block.
-> 
-> However, according to your GPIO patchset, the i.MX 7ULP has a new register
-> GPIO_PDDR to control output from the GPIO block. Is controlling the output
-> driver from IOMUXC still required? 
+>  	return 0;
+>  
+>  out_disable_clk:
 
-Yes, it's still required.
+Consider adding a call to reset_control_assert() in dw_wdt_drv_remove.
 
-> If not, I really would just not use all
-> that "find pinctrl config" hackery... e.g. add a new flag,
-> USE_IOMUXC_FOR_GPIO_OUTPUT, and set that only for Vybrid.
-> 
-> This would also align much better with the other i.MX devices, where
-> pinmuxing and GPIO is completely orthogonal.
-> 
-
-Actually this patch came only because to make the exist code
-not break MX7ULP.
-
-Actually I'm wondering why we need implement 
-imx_pmx_gpio_request_enable function?
-
-Per my understanding, IMX binding already set GPIO mux by
-Parsing MUX mode from device tree, so why need gpio_request_enable
-which looks like is duplicated.
-
-Can you help explain it?
-
-Regards
-Dong Aisheng
-
-> --
-> Stefan
-> 
-> >  	writel(reg, ipctl->base + pin_reg->mux_reg);
-> >
-> >  	return 0;
+regards
+Philipp
