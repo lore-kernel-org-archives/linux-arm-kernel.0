@@ -1,43 +1,40 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 17 May 2017 09:05:20 +0100
-Subject: [RFC v1 7/7] iommu/arm-smmu-v3: Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838350A62@FRAEML521-MBX.china.huawei.com>
-References: <20170513094731.3676-1-shameerali.kolothum.thodi@huawei.com>
- <20170513094731.3676-8-shameerali.kolothum.thodi@huawei.com>
- <a4e62cb2-9eb6-99a0-3443-df77ae9af8f8@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA838350A62@FRAEML521-MBX.china.huawei.com>
-Message-ID: <2271be83-fd92-a3d9-ce61-a5471cde51be@huawei.com>
+From: jglauber@cavium.com (Jan Glauber)
+Date: Wed, 17 May 2017 10:31:19 +0200
+Subject: [PATCH v5 0/3] Cavium ARM64 uncore PMU support
+Message-ID: <20170517083122.5050-1-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/05/2017 15:03, Shameerali Kolothum Thodi wrote:
->> > Lorenzo made a point that it might be relatively straightforward to just
->> > follow the IORT mapping for the SMMU through to the ITS MADT entry and
->> > pull the ITS geometry out of that. It would certainly be nicer to have
->> > such a helper abstracted away in the IORT code than have to go parsing
->> > vendor-specific tables directly in the SMMU driver. I reckon it might be
->> > worth taking that idea a bit further to see how it looks.
-> Ok. John has already mentioned this idea in our off-list discussion and we
-> have one implementation where we go through the IORT node ID mappings
-> array to find out the associated IORT ITS  node. It then iterates over the ACPI
-> MADT  GIC ITS table entries, , looking for a match for the GIC ITS id, and
-> retrieves the base address of the matching ITS.
->
-> But as you said, it requires some helper from the IORT code , otherwise we
-> will end up adding all the ACPI table parse code in SMMUv3. We will take
-> another look at this.
->
-> Thanks,
-> Shameer
->
+Here is another attempt of adding support for some PMU counters on Cavium SOCs.
 
-It could also be worth considering hard-coding the reserved address in 
-the SMMUv3 driver for this model. This would not involve (more) reliance 
-on CSRT or IORT driver. However, note that hip07 has multiple SMMUs, and 
-we only need to enable the quirk for the SMMU in front the PCIe host 
-controller.
+The major change is that I quit trying to merge the counters as it would
+not fit with your requirements [1].
 
-John
+Another big change is that now the EDAC driver for the devices
+carrying the PMU counters is upstream. I've added a simple callback
+to the EDAC driver which owns the devices, so probing is much simpler now.
 
-BTW, FYI, hi161x is alias for hip07/06
+The driver still provides common "uncore" functions to avoid
+code duplication and support adding more device PMUs (like L2 cache) in
+the future.
+
+[1] https://marc.info/?l=linux-arm-kernel&m=147940675216946&w=4
+
+Jan Glauber (3):
+  perf: export perf_event_update_userpage()
+  perf: cavium: Support memory controller PMU counters
+  perf: cavium: Support transmit-link PMU counters
+
+ drivers/edac/thunderx_edac.c    |  19 +-
+ drivers/perf/Kconfig            |   8 +
+ drivers/perf/Makefile           |   1 +
+ drivers/perf/cavium_pmu.c       | 629 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h      |   1 +
+ include/linux/perf/cavium_pmu.h |  35 +++
+ kernel/events/core.c            |   1 +
+ 7 files changed, 693 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/perf/cavium_pmu.c
+ create mode 100644 include/linux/perf/cavium_pmu.h
+
+-- 
+2.9.0.rc0.21.g7777322
