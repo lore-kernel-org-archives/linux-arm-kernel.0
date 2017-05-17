@@ -1,34 +1,47 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 17 May 2017 16:37:34 +0800
-Subject: [PATCH 01/12] dt-bindings: arm: hisilicon: add bindings for HiKey960
- board
+Date: Wed, 17 May 2017 16:37:41 +0800
+Subject: [PATCH 08/12] arm64: dts: hikey960: add WL1837 Bluetooth device node
 In-Reply-To: <20170517083745.24479-1-guodong.xu@linaro.org>
 References: <20170517083745.24479-1-guodong.xu@linaro.org>
-Message-ID: <20170517083745.24479-2-guodong.xu@linaro.org>
+Message-ID: <20170517083745.24479-9-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings for HiKey960 Board.
+This adds the serial slave device for the WL1837 Bluetooth interface.
 
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index 2e73215..7111fbc8 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -4,6 +4,10 @@ Hi3660 SoC
- Required root node properties:
- 	- compatible = "hisilicon,hi3660";
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+index 513c496..69aa207 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+@@ -9,6 +9,7 @@
  
-+HiKey960 Board
-+Required root node properties:
-+	- compatible = "hisilicon,hi3660-hikey960", "hisilicon,hi3660";
+ #include "hi3660.dtsi"
+ #include "hikey960-pinctrl.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "HiKey960";
+@@ -55,6 +56,16 @@
+ 	status = "okay";
+ };
+ 
++&uart4 {
++	status = "okay";
++	max-speed = <921600>;
 +
- Hi3798cv200 SoC
- Required root node properties:
- 	- compatible = "hisilicon,hi3798cv200";
++	bluetooth {
++		compatible = "ti,wl1837-st";
++		enable-gpios = <&gpio15 6 GPIO_ACTIVE_HIGH>;
++	};
++};
++
+ &uart6 {
+ 	status = "okay";
+ };
 -- 
 2.10.2
