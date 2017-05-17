@@ -1,65 +1,46 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 17 May 2017 15:33:36 +0530
-Subject: [PATCH 2/2] ARM: davinci: PM: Do not free useful resources in
- normal path in 'davinci_pm_init'
-In-Reply-To: <20170513114020.23668-1-christophe.jaillet@wanadoo.fr>
-References: <20170513114020.23668-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <68b895dc-1bcf-fb59-0e19-e69b2e72f8c1@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 17 May 2017 11:09:52 +0100
+Subject: [patch V2 03/17] arm64: Adjust system_state check
+In-Reply-To: <20170516184735.112589728@linutronix.de>
+References: <20170516184231.564888231@linutronix.de>
+ <20170516184735.112589728@linutronix.de>
+Message-ID: <20170517100951.GB14654@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 13 May 2017 05:10 PM, Christophe JAILLET wrote:
-> This looks spurious to iounmap resources in the normal path of this init
-> function.
-> The 3 ioremap'ed fields of 'pm_config' can be accessed later on in other
-> functions, so it is likely that we should return 'success' before unrolling
-> everything.
+On Tue, May 16, 2017 at 08:42:34PM +0200, Thomas Gleixner wrote:
+> To enable smp_processor_id() and might_sleep() debug checks earlier, it's
+> required to add system states between SYSTEM_BOOTING and SYSTEM_RUNNING.
 > 
-> Fixes: aa9aa1ec2df6 ("ARM: davinci: PM: rework init, remove platform device")
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-> ---
-> This patch is just a *guess*. The end of the function looks more like a
-> error handling code rather than a normal path.
-
-The patch is correct.
-
-> ---
->  arch/arm/mach-davinci/pm.c | 1 +
->  1 file changed, 1 insertion(+)
+> Adjust the system_state check in smp_send_stop() to handle the extra states.
 > 
-> diff --git a/arch/arm/mach-davinci/pm.c b/arch/arm/mach-davinci/pm.c
-> index d282b0783ecf..163d865abbf9 100644
-> --- a/arch/arm/mach-davinci/pm.c
-> +++ b/arch/arm/mach-davinci/pm.c
-> @@ -161,6 +161,7 @@ int __init davinci_pm_init(void)
->  						davinci_cpu_suspend_sz);
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm64/kernel/smp.c |    3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+
+FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> 
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -961,8 +961,7 @@ void smp_send_stop(void)
+>  		cpumask_copy(&mask, cpu_online_mask);
+>  		cpumask_clear_cpu(smp_processor_id(), &mask);
 >  
->  	suspend_set_ops(&davinci_pm_ops);
-> +	return 0;
-
-We normally have an empty line before return. I added that while 
-applying. Also, I modified the patch description to be more "sure" in 
-its language. Here is the final description:
-
-    ARM: davinci: PM: Do not free useful resources in normal path in 'davinci_pm_init'
-    
-    It is wrong to iounmap resources in the normal path of davinci_pm_init()
-    
-    The 3 ioremap'ed fields of 'pm_config' can be accessed later on in other
-    functions, so we should return 'success' instead of unrolling everything.
-    
-    Fixes: aa9aa1ec2df6 ("ARM: davinci: PM: rework init, remove platform device")
-    Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-    [nsekhar at ti.com: commit message and minor style fixes]
-    Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-
-I will let this go through some testing before sending for inclusion in 
-v4.12 kernel. Thanks for catching these.
-
-For future, when sending more than one patch, please add a cover 
-letter. And have the patches appear as replies to the cover letter. 
-This happens if you send the patches together with cover letter using 
-git-send-email and have chainreplyto set to false in your .gitconfig
-
-Thanks,
-Sekhar
+> -		if (system_state == SYSTEM_BOOTING ||
+> -		    system_state == SYSTEM_RUNNING)
+> +		if (system_state <= SYSTEM_RUNNING)
+>  			pr_crit("SMP: stopping secondary CPUs\n");
+>  		smp_cross_call(&mask, IPI_CPU_STOP);
+>  	}
+> 
+> 
