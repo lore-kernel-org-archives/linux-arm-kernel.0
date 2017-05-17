@@ -1,38 +1,28 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 17 May 2017 22:26:33 +0200
-Subject: [PATCH net-next] drivers: net: xgene: Check all RGMII phy mode
- variants
-In-Reply-To: <1495051550-28961-1-git-send-email-isubramanian@apm.com>
-References: <1495051550-28961-1-git-send-email-isubramanian@apm.com>
-Message-ID: <20170517202633.GA14413@lunn.ch>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 17 May 2017 17:32:59 -0300
+Subject: PROBLEM: ARM Cache policy on single armv7 processor lead to low
+ DRAM performance
+In-Reply-To: <CAOEkoLwq1fdVuhkm_Z4Lf1BL0XxLyumSxLF7gDPyK_NkzUdVgQ@mail.gmail.com>
+References: <CAOEkoLwq1fdVuhkm_Z4Lf1BL0XxLyumSxLF7gDPyK_NkzUdVgQ@mail.gmail.com>
+Message-ID: <CAOMZO5DOV9Riho1FO_PNJnXhdxQA9YE55sXqygi8eOvEf+vY+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +bool is_xgene_enet_phy_mode_rgmii(struct net_device *ndev)
-> +{
-> +	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
-> +	int phy_mode = pdata->phy_mode;
-> +	bool ret;
-> +
-> +	ret = phy_mode == PHY_INTERFACE_MODE_RGMII ||
-> +	      phy_mode == PHY_INTERFACE_MODE_RGMII_ID ||
-> +	      phy_mode == PHY_INTERFACE_MODE_RGMII_RXID ||
-> +	      phy_mode == PHY_INTERFACE_MODE_RGMII_TXID;
-> +
-> +	return ret;
-> +}
+Hi Zhao,
 
-include/linux/phy.h:
+On Tue, May 16, 2017 at 1:06 AM, Zhao Yibin <ybzhao1989@gmail.com> wrote:
+> Hi, ARM maintainers,
+>
+> We met some DDR performance issue caused by armv7 cache policy, hope
+> you can help.
+> On a single armv7(Cortex-A7) processor system, the arm linux kernel,
+> without CONFIG_SMP, the cache policy is set to write-back no-allocate,
+> which lead to very low DRAM speed,
+> around 7MB/s for write, 28MB/s for read.
 
-/**
- * phy_interface_is_rgmii - Convenience function for testing if a PHY interface
- * is RGMII (all variants)
- * @phydev: the phy_device struct
- */
-static inline bool phy_interface_is_rgmii(struct phy_device *phydev)
-{
-        return phydev->interface >= PHY_INTERFACE_MODE_RGMII &&
-                phydev->interface <= PHY_INTERFACE_MODE_RGMII_TXID;
-};
+I saw the same behaviour on a mx6ul, which also has a CortexA7.
 
-	Andrew
+To fix this issue we had to enable the SMP bit in the bootloader.
+
+As a reference you can look at this U-Boot patch:
+https://patchwork.ozlabs.org/patch/747074/
