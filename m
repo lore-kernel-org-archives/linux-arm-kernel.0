@@ -1,37 +1,122 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 17 May 2017 16:56:12 -0500
-Subject: [PATCH 0/2] arm64: acpi/pci: allow the firmware BAR
- configuration to be preserved
-In-Reply-To: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
-References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170517215611.GJ31462@bhelgaas-glaptop.roam.corp.google.com>
+Date: Wed, 17 May 2017 17:13:41 -0500
+Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
+ interrupts
+In-Reply-To: <1492182272-31132-1-git-send-email-bharatku@xilinx.com>
+References: <1492182272-31132-1-git-send-email-bharatku@xilinx.com>
+Message-ID: <20170517221341.GK31462@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 05:33:11PM +0100, Ard Biesheuvel wrote:
-> This is a followup to the discussion regarding whether ACPI/arm64 systems
-> should preserve the PCI configuration performed by the firmware, or always
-> reconfigure it from scratch.
+On Fri, Apr 14, 2017 at 08:34:32PM +0530, Bharat Kumar Gogada wrote:
+> - Adding spinlock for protecting legacy mask register
+> - Few wifi end points which only support legacy interrupts,
+> performs hardware reset functionalities after disabling interrupts
+> by invoking disable_irq and then re-enable using enable_irq, they
+> enable hardware interrupts first and then virtual irq line later.
+> - The legacy irq line goes low only after DEASSERT_INTx is
+> received.As the legacy irq line is high immediately after hardware
+> interrupts are enabled but virq of EP is still in disabled state
+> and EP handler is never executed resulting no DEASSERT_INTx.If dummy
+> irq chip is used, interrutps are not masked and system is
+> hanging with CPU stall.
+> - Adding irq chip functions instead of dummy irq chip for legacy
+> interrupts.
+> - Legacy interrupts are level sensitive, so using handle_level_irq
+> is more appropriate as it is masks interrupts until End point handles
+> interrupts and unmasks interrutps after End point handler is executed.
+> - Legacy interrupts are level triggered, virtual irq line of End
+> Point shows as edge in /proc/interrupts.
+> - Setting irq flags of virtual irq line of EP to level triggered
+> at the time of mapping.
 > 
-> This series proposes to put it under the control of the firmware, by invoking
-> the _DSM method, and preserving the firmware configuration only when it
-> returns 0.
-> 
-> Patch #1 is a preparatory bugfix that solves the issue that I/O bridge
-> windows starting at 0x0 are dismissed when looking for parent resources.
-> 
-> Patch #2 adds the logic to invoke the _DSM and claim the existing
-> configuration rather than reallocate it from scratch if it returns '0'
-> 
-> Ard Biesheuvel (2):
->   drivers: pci: do not disregard parent resources starting at 0x0
->   arm64: acpi/pci: invoke _DSM whether to preserve firmware PCI setup
-> 
->  arch/arm64/kernel/pci.c  | 20 ++++++++++++++++++--
->  drivers/pci/pci.c        |  2 +-
->  include/linux/pci-acpi.h |  7 ++++---
->  3 files changed, 23 insertions(+), 6 deletions(-)
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
 
-I applied the first to pci/resource for v4.13.  I didn't do anything
-with the second because I don't think we have consensus on what the
-right thing to do is yet.
+Applied to pci/host-xilinx for v4.13.
+
+> ---
+>  drivers/pci/host/pcie-xilinx-nwl.c | 45 +++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 44 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+> index 43eaa4a..36f4fb4 100644
+> --- a/drivers/pci/host/pcie-xilinx-nwl.c
+> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
+> @@ -184,6 +184,7 @@ struct nwl_pcie {
+>  	u8 root_busno;
+>  	struct nwl_msi msi;
+>  	struct irq_domain *legacy_irq_domain;
+> +	raw_spinlock_t leg_mask_lock;
+>  };
+>  
+>  static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off)
+> @@ -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct irq_desc *desc)
+>  	chained_irq_exit(chip, desc);
+>  }
+>  
+> +static void nwl_mask_leg_irq(struct irq_data *data)
+> +{
+> +	struct irq_desc *desc = irq_to_desc(data->irq);
+> +	struct nwl_pcie *pcie;
+> +	unsigned long flags;
+> +	u32 mask;
+> +	u32 val;
+> +
+> +	pcie = irq_desc_get_chip_data(desc);
+> +	mask = 1 << (data->hwirq - 1);
+> +	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
+> +	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
+> +	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
+> +	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
+> +}
+> +
+> +static void nwl_unmask_leg_irq(struct irq_data *data)
+> +{
+> +	struct irq_desc *desc = irq_to_desc(data->irq);
+> +	struct nwl_pcie *pcie;
+> +	unsigned long flags;
+> +	u32 mask;
+> +	u32 val;
+> +
+> +	pcie = irq_desc_get_chip_data(desc);
+> +	mask = 1 << (data->hwirq - 1);
+> +	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
+> +	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
+> +	nwl_bridge_writel(pcie, (val | mask), MSGF_LEG_MASK);
+> +	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
+> +}
+> +
+> +static struct irq_chip nwl_leg_irq_chip = {
+> +	.name = "nwl_pcie:legacy",
+> +	.irq_enable = nwl_unmask_leg_irq,
+> +	.irq_disable = nwl_mask_leg_irq,
+> +	.irq_mask = nwl_mask_leg_irq,
+> +	.irq_unmask = nwl_unmask_leg_irq,
+> +};
+> +
+>  static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
+>  			  irq_hw_number_t hwirq)
+>  {
+> -	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+> +	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_level_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> +	irq_set_status_flags(irq, IRQ_LEVEL);
+>  
+>  	return 0;
+>  }
+> @@ -538,6 +580,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
+>  		return -ENOMEM;
+>  	}
+>  
+> +	raw_spin_lock_init(&pcie->leg_mask_lock);
+>  	nwl_pcie_init_msi_irq_domain(pcie);
+>  	return 0;
+>  }
+> -- 
+> 2.1.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
