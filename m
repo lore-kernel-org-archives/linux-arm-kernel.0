@@ -1,7 +1,9 @@
 From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Wed, 17 May 2017 13:43:00 -0300
-Subject: [PATCH 1/2] ARM: dts: imx23-sansa: Remove 'enable-active-low' property
-Message-ID: <1495039381-23126-1-git-send-email-fabio.estevam@nxp.com>
+Date: Wed, 17 May 2017 13:43:01 -0300
+Subject: [PATCH 2/2] ARM: dts: tx6: Remove 'enable-active-low' property
+In-Reply-To: <1495039381-23126-1-git-send-email-fabio.estevam@nxp.com>
+References: <1495039381-23126-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <1495039381-23126-2-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,47 +13,42 @@ active low by default.
 
 So remove the unexisting 'enable-active-low' property. 
 
-While at it, in order to make the gpio regulator description clearer pass
+While at it in order to make the gpio regulator description clearer pass
 the GPIO_ACTIVE_LOW flag.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx23-sansa.dts | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/imx6qdl-tx6.dtsi  | 3 +--
+ arch/arm/boot/dts/imx6ul-tx6ul.dtsi | 3 +--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx23-sansa.dts b/arch/arm/boot/dts/imx23-sansa.dts
-index 4ec32f4..221fd55 100644
---- a/arch/arm/boot/dts/imx23-sansa.dts
-+++ b/arch/arm/boot/dts/imx23-sansa.dts
-@@ -42,6 +42,7 @@
-  */
- 
- /dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
- #include "imx23.dtsi"
- 
- / {
-@@ -149,9 +150,8 @@
- 		regulator-name = "vdd-touchpad0";
- 		regulator-min-microvolt = <3300000>;
+diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+index 1691714..a146fe7 100644
+--- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+@@ -133,8 +133,7 @@
  		regulator-max-microvolt = <3300000>;
--		gpio = <&gpio0 26 0>;
-+		gpio = <&gpio0 26 GPIO_ACTIVE_LOW>;
- 		regulator-always-on;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_flexcan_xcvr>;
+-		gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
 -		enable-active-low;
++		gpio = <&gpio4 21 GPIO_ACTIVE_LOW>;
  	};
  
- 	reg_vdd_tuner: regulator-vdd-tuner0 {
-@@ -159,9 +159,8 @@
- 		regulator-name = "vdd-tuner0";
- 		regulator-min-microvolt = <3300000>;
+ 	reg_lcd0_pwr: regulator-lcd0-pwr {
+diff --git a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
+index c784a0b..4ccc9e9 100644
+--- a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
+@@ -173,8 +173,7 @@
  		regulator-max-microvolt = <3300000>;
--		gpio = <&gpio0 29 0>;
-+		gpio = <&gpio0 29 GPIO_ACTIVE_LOW>;
- 		regulator-always-on;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_flexcan_xcvr>;
+-		gpio = <&gpio3 5 GPIO_ACTIVE_HIGH>;
 -		enable-active-low;
++		gpio = <&gpio3 5 GPIO_ACTIVE_LOW>;
  	};
  
- 	backlight {
+ 	reg_lcd_pwr: regulator-lcdpwr {
 -- 
 2.7.4
