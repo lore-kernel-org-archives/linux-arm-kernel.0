@@ -1,50 +1,163 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 18 May 2017 00:43:52 +0800
-Subject: [RFC PATCH 09/11] clk: sunxi-ng: export CLK_PLL_DE for H3
+Date: Thu, 18 May 2017 00:43:50 +0800
+Subject: [RFC PATCH 07/11] drm: sun4i: add support for the TV encoder in H3 SoC
 In-Reply-To: <20170517164354.16399-1-icenowy@aosc.io>
 References: <20170517164354.16399-1-icenowy@aosc.io>
-Message-ID: <20170517164354.16399-10-icenowy@aosc.io>
+Message-ID: <20170517164354.16399-8-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CLK_PLL_DE is needed to be referenced in device tree for H3, for
-both forcing the parent of PLL_DE.
+Allwinner H3 features a TV encoder similar to the one in earlier SoCs,
+but with some different points about clocks:
+- It has a mod clock and a bus clock.
+- The mod clock must be at a fixed rate to generate signal.
 
-So export it to the device tree binding header.
+Add support for it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-h3.h      | 3 +--
- include/dt-bindings/clock/sun8i-h3-ccu.h | 2 ++
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tv.c | 65 +++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 61 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
-index 85973d1e8165..7029091a6c9f 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
-@@ -33,9 +33,8 @@
- #define CLK_PLL_PERIPH0_2X	10
- #define CLK_PLL_GPU		11
- #define CLK_PLL_PERIPH1		12
--#define CLK_PLL_DE		13
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
+index a9cad00d4ee8..c9943103f499 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
+@@ -13,6 +13,7 @@
+ #include <linux/clk.h>
+ #include <linux/component.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/regmap.h>
+ #include <linux/reset.h>
  
--/* The CPUX clock is exported */
-+/* The PLL_DE and CPUX clocks is exported */
+@@ -169,14 +170,23 @@ struct tv_mode {
+ 	const struct resync_parameters	*resync_params;
+ };
  
- #define CLK_AXI			15
- #define CLK_AHB1		16
-diff --git a/include/dt-bindings/clock/sun8i-h3-ccu.h b/include/dt-bindings/clock/sun8i-h3-ccu.h
-index c2afc41d6964..82496a57efd4 100644
---- a/include/dt-bindings/clock/sun8i-h3-ccu.h
-+++ b/include/dt-bindings/clock/sun8i-h3-ccu.h
-@@ -43,6 +43,8 @@
- #ifndef _DT_BINDINGS_CLK_SUN8I_H3_H_
- #define _DT_BINDINGS_CLK_SUN8I_H3_H_
- 
-+#define CLK_PLL_DE		13
++struct sun4i_tv_quirks {
++	bool has_mod_clk;
++	bool fixed_clock;
++	unsigned long fixed_clock_rate;
++};
 +
- #define CLK_CPUX		14
+ struct sun4i_tv {
+ 	struct drm_connector	connector;
+ 	struct drm_encoder	encoder;
  
- #define CLK_BUS_CE		20
+ 	struct clk		*clk;
++	struct clk		*mod_clk;
+ 	struct regmap		*regs;
+ 	struct reset_control	*reset;
+ 
++	const struct sun4i_tv_quirks *quirks;
++
+ 	struct sun4i_drv	*drv;
+ };
+ 
+@@ -578,6 +588,10 @@ static int sun4i_tv_bind(struct device *dev, struct device *master,
+ 	tv->drv = drv;
+ 	dev_set_drvdata(dev, tv);
+ 
++	tv->quirks = of_device_get_match_data(dev);
++	if (!tv->quirks)
++		return -EINVAL;
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	regs = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(regs)) {
+@@ -604,7 +618,10 @@ static int sun4i_tv_bind(struct device *dev, struct device *master,
+ 		return ret;
+ 	}
+ 
+-	tv->clk = devm_clk_get(dev, NULL);
++	if (tv->quirks->has_mod_clk)
++		tv->clk = devm_clk_get(dev, "bus");
++	else
++		tv->clk = devm_clk_get(dev, NULL);
+ 	if (IS_ERR(tv->clk)) {
+ 		dev_err(dev, "Couldn't get the TV encoder clock\n");
+ 		ret = PTR_ERR(tv->clk);
+@@ -612,6 +629,26 @@ static int sun4i_tv_bind(struct device *dev, struct device *master,
+ 	}
+ 	clk_prepare_enable(tv->clk);
+ 
++	if (tv->quirks->has_mod_clk) {
++		tv->mod_clk = devm_clk_get(dev, "mod");
++		if (IS_ERR(tv->mod_clk)) {
++			dev_err(dev, "Couldn't get the TV encoder mod clock\n");
++			ret = PTR_ERR(tv->mod_clk);
++			goto err_disable_clk;
++		};
++
++		if (tv->quirks->fixed_clock) {
++			ret = clk_set_rate(tv->mod_clk,
++					   tv->quirks->fixed_clock_rate);
++			if (ret) {
++				dev_err(dev, "Couldn't set TV encoder mod clock rate\n");
++				goto err_disable_clk;
++			}
++		}
++
++		clk_prepare_enable(tv->mod_clk);
++	}
++
+ 	drm_encoder_helper_add(&tv->encoder,
+ 			       &sun4i_tv_helper_funcs);
+ 	ret = drm_encoder_init(drm,
+@@ -621,14 +658,14 @@ static int sun4i_tv_bind(struct device *dev, struct device *master,
+ 			       NULL);
+ 	if (ret) {
+ 		dev_err(dev, "Couldn't initialise the TV encoder\n");
+-		goto err_disable_clk;
++		goto err_disable_mod_clk;
+ 	}
+ 
+ 	tv->encoder.possible_crtcs = drm_of_find_possible_crtcs(drm,
+ 								dev->of_node);
+ 	if (!tv->encoder.possible_crtcs) {
+ 		ret = -EPROBE_DEFER;
+-		goto err_disable_clk;
++		goto err_disable_mod_clk;
+ 	}
+ 
+ 	drm_connector_helper_add(&tv->connector,
+@@ -649,6 +686,9 @@ static int sun4i_tv_bind(struct device *dev, struct device *master,
+ 
+ err_cleanup_connector:
+ 	drm_encoder_cleanup(&tv->encoder);
++err_disable_mod_clk:
++	if (tv->quirks->has_mod_clk)
++		clk_disable_unprepare(tv->mod_clk);
+ err_disable_clk:
+ 	clk_disable_unprepare(tv->clk);
+ err_assert_reset:
+@@ -683,8 +723,25 @@ static int sun4i_tv_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct sun4i_tv_quirks sun4i_a10_tv_quirks = {
++	/* Nothing special */
++};
++
++static const struct sun4i_tv_quirks sun8i_h3_tv_quirks = {
++	.has_mod_clk = true,
++	.fixed_clock = true,
++	.fixed_clock_rate = 216000000UL,
++};
++
+ static const struct of_device_id sun4i_tv_of_table[] = {
+-	{ .compatible = "allwinner,sun4i-a10-tv-encoder" },
++	{
++		.compatible = "allwinner,sun4i-a10-tv-encoder",
++		.data = &sun4i_a10_tv_quirks,
++	},
++	{
++		.compatible = "allwinner,sun8i-h3-tv-encoder",
++		.data = &sun8i_h3_tv_quirks,
++	},
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, sun4i_tv_of_table);
 -- 
 2.12.2
