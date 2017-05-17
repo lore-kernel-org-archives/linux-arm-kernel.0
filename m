@@ -1,141 +1,44 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 17 May 2017 22:47:23 +0800
-Subject: [PATCH v8 7/9] ARM: sun8i: v3s: add device nodes for DE2 display
- pipeline
-In-Reply-To: <20170517144725.3463-1-icenowy@aosc.io>
-References: <20170517144725.3463-1-icenowy@aosc.io>
-Message-ID: <20170517144725.3463-8-icenowy@aosc.io>
+From: pmladek@suse.com (Petr Mladek)
+Date: Wed, 17 May 2017 17:08:17 +0200
+Subject: [PATCH v2] printk: Use the main logbuf in NMI when logbuf_lock
+ is available
+In-Reply-To: <20170505022141.GA418@tigerII.localdomain>
+References: <1493912763-24873-1-git-send-email-pmladek@suse.com>
+ <20170505022141.GA418@tigerII.localdomain>
+Message-ID: <20170517150817.GD8621@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner V3s SoC features a "Display Engine 2.0" with only one mixer
-and only one TCON connected to this mixer, which have RGB LCD output.
+On Fri 2017-05-05 11:21:41, Sergey Senozhatsky wrote:
+> On (05/04/17 17:46), Petr Mladek wrote:
+> [..]
+> > Suggested-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+> > Signed-off-by: Petr Mladek <pmladek@suse.com>
+> 
+> Acked-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
 
-Add device nodes for this display pipeline.
+Thanks for ack.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
-Changes in v8:
-- Changed some label names.
-Changes in v7:
-- Change DE2 clock compatible to V3s one.
-- Mention only one TCON in commit message.
-- Changed commit brief.
+> a small nitpick,
+> 
+> [..]
+> >  void printk_nmi_enter(void)
+> >  {
+> > -	this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
+> > +	/*
+> > +	 * The size of the extra per-CPU buffer is limited. Use it only when
+> > +	 * the main one is locked. If this CPU is not in the safe context,
+> > +	 * the lock must be taken on another CPU and we could wait for it.
+> > +	 */
+> > +	if (raw_spin_is_locked(&logbuf_lock) &&
+> > +	    this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK) {
+> > +		this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
+> 
+> could we please check `printk_context' (local to a particular CPU)
+> first and, if positive, then access `logbuf_lock' (which is global)?
 
- arch/arm/boot/dts/sun8i-v3s.dtsi | 87 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 87 insertions(+)
+OK, I did so and queued the fix for-4.13, see
+https://git.kernel.org/pub/scm/linux/kernel/git/pmladek/printk.git/commit/?h=for-4.13&id=ad30113010b7b2dd886923261aea7034de07cce6
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-index 71075969e5e6..e47a9b29f55c 100644
---- a/arch/arm/boot/dts/sun8i-v3s.dtsi
-+++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-@@ -41,6 +41,10 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/sun8i-v3s-ccu.h>
-+#include <dt-bindings/clock/sun8i-de2.h>
-+#include <dt-bindings/reset/sun8i-v3s-ccu.h>
-+#include <dt-bindings/reset/sun8i-de2.h>
- 
- / {
- 	#address-cells = <1>;
-@@ -59,6 +63,12 @@
- 		};
- 	};
- 
-+	de: display-engine {
-+		compatible = "allwinner,sun8i-v3s-display-engine";
-+		allwinner,pipelines = <&mixer0>;
-+		status = "disabled";
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -93,6 +103,83 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		display_clocks: clock at 1000000 {
-+			compatible = "allwinner,sun8i-v3s-de2-clk";
-+			reg = <0x01000000 0x100000>;
-+			clocks = <&ccu CLK_DE>,
-+				 <&ccu CLK_BUS_DE>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&ccu RST_BUS_DE>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+
-+		mixer0: mixer at 1100000 {
-+			compatible = "allwinner,sun8i-v3s-de2-mixer";
-+			reg = <0x01100000 0x100000>;
-+			clocks = <&display_clocks CLK_MIXER0>,
-+				 <&display_clocks CLK_BUS_MIXER0>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&display_clocks RST_MIXER0>;
-+			assigned-clocks = <&display_clocks CLK_MIXER0>;
-+			assigned-clock-rates = <150000000>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				mixer0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					mixer0_out_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_in_mixer0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		tcon0: lcd-controller at 1c0c000 {
-+			compatible = "allwinner,sun8i-v3s-tcon";
-+			reg = <0x01c0c000 0x1000>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_TCON0>,
-+				 <&ccu CLK_TCON0>;
-+			clock-names = "ahb",
-+				      "tcon-ch0";
-+			clock-output-names = "tcon-pixel-clock";
-+			resets = <&ccu RST_BUS_TCON0>;
-+			reset-names = "lcd";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon0_in_mixer0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&mixer0_out_tcon0>;
-+					};
-+				};
-+
-+				tcon0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
-+
- 		mmc0: mmc at 01c0f000 {
- 			compatible = "allwinner,sun7i-a20-mmc";
- 			reg = <0x01c0f000 0x1000>;
--- 
-2.12.2
+Best Regards,
+Petr
