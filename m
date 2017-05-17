@@ -1,166 +1,108 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 May 2017 21:43:26 +0200
-Subject: [PATCH 2/3] Documentation: add sprd clock bindings
-In-Reply-To: <20170515083502.4492-3-chunyan.zhang@spreadtrum.com>
-References: <20170515083502.4492-1-chunyan.zhang@spreadtrum.com>
- <20170515083502.4492-3-chunyan.zhang@spreadtrum.com>
-Message-ID: <CAK8P3a0M6M9fUTpdnW+Eso0+HKD-MF-fKPmvj+wN8GBdzu_u8A@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 17 May 2017 21:45:59 +0200
+Subject: [PATCH] KVM: arm/arm64: Fix bug when registering redist iodevs
+In-Reply-To: <20170517131719.14274-1-cdall@linaro.org>
+References: <20170517131719.14274-1-cdall@linaro.org>
+Message-ID: <ff92c66a-f12f-08fe-6a53-3a42e8be95f3@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 10:35 AM, Chunyan Zhang
-<chunyan.zhang@spreadtrum.com> wrote:
-> This patch adds a new directory under the 'clock' for Spreadtrum platform,
-> also bindings which document compatible strings and properties used for
-> devicetree node of clocks on Spreadtrum SoCs.
->
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+Hi Christoffer,
+
+On 17/05/2017 15:17, Christoffer Dall wrote:
+> If userspace creates the VCPUs after initializing the VGIC, then we end
+> up in a situation where we trigger a bug in kvm_vcpu_get_idx(), because
+> it is called prior to adding the VCPU into the vcpus array on the VM.
+> 
+> There is no tight coupling between the VCPU index and the area of the
+> redistributor region used for the VCPU, so we can simply ensure that all
+> creations of redistributors are serialized per VM, and increment an
+> offset when we successfully add a redistributor.
+> 
+> The vgic_register_redist_iodev() function can be called from two paths:
+> vgic_redister_all_redist_iodev() which is called via the kvm_vgic_addr()
+> device attribute handler.  This patch already holds the kvm->lock mutex.
+> 
+> The other path is via kvm_vgic_vcpu_init, which is called through a
+> longer chain from kvm_vm_ioctl_create_vcpu(), which releases the
+> kvm->lock mutex just before calling kvm_arch_vcpu_create(), so we can
+> simply take this mutex again later for our purposes.
+> 
+> Fixes: ab6f468c10 ("KVM: arm/arm64: Register iodevs when setting redist base and creating VCPUs")
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> Tested-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+
+Thanks
+
+Eric
 > ---
->  .../clock/sprd/sprd,adjustable-pll-clock.txt       | 17 +++++
->  .../bindings/clock/sprd/sprd,composite-clock.txt   | 28 +++++++++
->  .../bindings/clock/sprd/sprd,divider-clock.txt     | 24 +++++++
->  .../bindings/clock/sprd/sprd,gates-clock.txt       | 73 ++++++++++++++++++++++
->  .../bindings/clock/sprd/sprd,muxed-clock.txt       | 23 +++++++
->  5 files changed, 165 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/sprd/sprd,adjustable-pll-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/sprd/sprd,composite-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/sprd/sprd,divider-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/sprd/sprd,gates-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/sprd/sprd,muxed-clock.txt
->
-> diff --git a/Documentation/devicetree/bindings/clock/sprd/sprd,adjustable-pll-clock.txt b/Documentation/devicetree/bindings/clock/sprd/sprd,adjustable-pll-clock.txt
-> new file mode 100644
-> index 0000000..476e315
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/sprd/sprd,adjustable-pll-clock.txt
-> @@ -0,0 +1,17 @@
-> +Spreadtrum adjustable pll clock driver
-> +
-> +Required properties:
-> +
-> +- compatible : must be one of:
-> +       "sprd,sc9836-adjustable-pll-clock"
-> +       "sprd,sc9860-adjustable-pll-clock"
-> +
-> +Example:
-> +       clk_mpll0: clk at 40400024 {
-> +               compatible = "sprd,sc9860-adjustable-pll-clock";
-> +               #clock-cells = <0>;
-> +               reg = <0 0x40400024 0 0x4>,
-> +                     <0 0x40400028 0 0x4>;
-> +               clocks = <&clk_mpll_gates 2>;
-> +               clock-output-names = "clk_mpll0";
-> +       };
-
-The properties listed in the example must all be either
-defined as "required" or "optional" properties and have a
-description.
-
-The reg property here is a bit odd, as it lists two consecutive
-4-byte areas, and both are suspiciously close to a round
-address (0x40400000), so I would guess that they are
-in fact part of a clock controller with several registers.
-
-If so, please define a node for the entire clock controller,
-the DT description should reflect the design of the hardware
-rather than the design of your device driver.
-
-> diff --git a/Documentation/devicetree/bindings/clock/sprd/sprd,composite-clock.txt b/Documentation/devicetree/bindings/clock/sprd/sprd,composite-clock.txt
-> new file mode 100644
-> index 0000000..a476eb6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/sprd/sprd,composite-clock.txt
-> @@ -0,0 +1,28 @@
-> +Spreadtrum composite clock driver.
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Required properties:
-> +
-> +- compatible:  should be "sprd,composite-clock"
-> +
-> +- sprd,mux-msk:        arbitrary bitmask for selecting clock input
-
-"arbitrary" is not a good word to use in a specification document ;-)
-
-Are there no constraints whatsoever on the allowed values? How
-many bits are there?
-
-> +- sprd,div-msk:        arbitrary bitmask for programming the divider,
-> +               denominator of divider is the value consisted
-> +               of these bits plus 1
-
-This sounds like it should just be the denominator, you can add
-or subtract one in the driver.
-
-> diff --git a/Documentation/devicetree/bindings/clock/sprd/sprd,gates-clock.txt b/Documentation/devicetree/bindings/clock/sprd/sprd,gates-clock.txt
-> new file mode 100644
-> index 0000000..f23ecb6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/sprd/sprd,gates-clock.txt
-> @@ -0,0 +1,73 @@
-> +Spreadtrum gate clock driver
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Spreadtrum's SoCs often use one register to control more than one gate clocks.
-> +Clock consumers can use index to get the correct gate clock.
-> +
-> +In Spreadtrum platform, some of gate clocks have three registers, respectively
-> +used for controlling, setting and clearing gate clock, the addresses of
-> +these three registers generally are <start>, <start + offset>, and
-> +<start + offset * 2>, and offset would be 0x1000 or 0x100, so the register
-> +size of gate clocks is either 0x3000 or 0x300. While for some historical issue
-> +there also are some clocks which don't have independent set/clear registers.
-> +Please see bellow for more specific information.
-> +
-> +Required properties:
-> +
-> +- compatible:  should be one of the following:
-> +               "sprd,sc1000-gates-clock"
-> +               - offset of the registers for setting gate is 0x1000
-> +
-> +               "sprd,sc100-gates-clock"
-> +               - offset of the registers for setting gate is 0x100
-> +
-> +               "sprd,gates-clock"
-> +               - for clocks without independent set/clear registers
-
-I think the compatible value should refer to at least some more
-specific product that uses these: I would guess that there are
-some chips that spreadtrum has made that have clock gates
-which are not compatible with this.
-
-Can all three appear in the same chip, or would you always
-have only one of them?
-
-> +- reg: the first cell represents the address of this clock gate controller
-> +       register, the second cell implies how is the offset of set/clear
-> +       registers of this clock gate, like addressed in the head of this
-> +       file
-> +
-> +optional properties:
-> +
-> +- clock-indices:       If the identifying number for the clocks in the node
-> +                       is not linear from zero, this property is necessary
-> +
-> +Example:
-> +
-> +       clk_mpll_gates: clk at 402b00b0 {
-> +               compatible = "sprd,sc1000-gates-clock";
-> +               #clock-cells = <1>;
-> +               reg = <0 0x402b00b0 0 0x3000>;
-> +               clocks = <&ext_26m>;
-> +               clock-indices = <2>, <18>;
-> +               clock-output-names = "clk_mpll0_gate", "clk_mpll1_gate";
-> +       };
->
-
-For clock-output-names, please drop the "clk_" prefix from each
-identifier, and maybe use '-' instead of '_' as the separator.
-
-       Arnd
+>  include/kvm/arm_vgic.h           | 5 ++++-
+>  virt/kvm/arm/vgic/vgic-init.c    | 5 ++++-
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 9 ++++++---
+>  3 files changed, 14 insertions(+), 5 deletions(-)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 97b8d37..ef71858 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -195,7 +195,10 @@ struct vgic_dist {
+>  		/* either a GICv2 CPU interface */
+>  		gpa_t			vgic_cpu_base;
+>  		/* or a number of GICv3 redistributor regions */
+> -		gpa_t			vgic_redist_base;
+> +		struct {
+> +			gpa_t		vgic_redist_base;
+> +			gpa_t		vgic_redist_free_offset;
+> +		};
+>  	};
+>  
+>  	/* distributor enabled */
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index dc68e2e..3a0b899 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -242,8 +242,11 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+>  	 * If we are creating a VCPU with a GICv3 we must also register the
+>  	 * KVM io device for the redistributor that belongs to this VCPU.
+>  	 */
+> -	if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+> +	if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) {
+> +		mutex_lock(&vcpu->kvm->lock);
+>  		ret = vgic_register_redist_iodev(vcpu);
+> +		mutex_unlock(&vcpu->kvm->lock);
+> +	}
+>  	return ret;
+>  }
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 99da1a2..9b0f681 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -586,7 +586,7 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
+>  	if (!vgic_v3_check_base(kvm))
+>  		return -EINVAL;
+>  
+> -	rd_base = vgic->vgic_redist_base + kvm_vcpu_get_idx(vcpu) * SZ_64K * 2;
+> +	rd_base = vgic->vgic_redist_base + vgic->vgic_redist_free_offset;
+>  	sgi_base = rd_base + SZ_64K;
+>  
+>  	kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
+> @@ -615,11 +615,14 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
+>  	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, sgi_base,
+>  				      SZ_64K, &sgi_dev->dev);
+>  	mutex_unlock(&kvm->slots_lock);
+> -	if (ret)
+> +	if (ret) {
+>  		kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+>  					  &rd_dev->dev);
+> +		return ret;
+> +	}
+>  
+> -	return ret;
+> +	vgic->vgic_redist_free_offset += 2 * SZ_64K;
+> +	return 0;
+>  }
+>  
+>  static void vgic_unregister_redist_iodev(struct kvm_vcpu *vcpu)
+> 
