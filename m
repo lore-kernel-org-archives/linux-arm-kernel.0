@@ -1,60 +1,139 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 18 May 2017 00:43:43 +0800
-Subject: [RFC PATCH 00/11] Support for H3 Composite Output support
-Message-ID: <20170517164354.16399-1-icenowy@aosc.io>
+Date: Thu, 18 May 2017 00:43:44 +0800
+Subject: [RFC PATCH 01/11] dt-bindings: update the binding for Allwinner H3
+ TVE support
+In-Reply-To: <20170517164354.16399-1-icenowy@aosc.io>
+References: <20170517164354.16399-1-icenowy@aosc.io>
+Message-ID: <20170517164354.16399-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset depends on the DE2 patchset, version 8 of that patchset
-is available at [1].
+Allwinner H3 features a "DE2.0" and a TV Encoder.
 
-Allwinner H3 SoC features a TV Encoder like the one in Allwinner A13,
-which can only output TV Composite signal.
+Add device tree bindings for the following parts:
+- H3 TCONs
+- H3 Mixers
+- The connection between H3 TCONs and H3 Mixers
+- H3 TV Encoder
+- H3 Display engine
 
-The display pipeline of H3 is also special -- it has two mixers and
-two TCONs, of which the connection can be swapped. The TCONs do not
-have channel 0 (as they are all connected to internal bridges, TVE
-and HDMI TX).
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ .../bindings/display/sunxi/sun4i-drm.txt           | 47 ++++++++++++++++++++--
+ 1 file changed, 43 insertions(+), 4 deletions(-)
 
-Add support for the display pipeline and the TVE in H3, in order to
-make it possible to display something with mainline kernel with H3.
-
-The image quality of TVE is bad, so HDMI is a better output -- this
-patchset also prepared the mixers and TCONs for HDMI output, and
-the HDMI controller driver is already done by Jernej Skrabec.
-
-Currently the jack detection feature of the TVE is still not so
-clear -- so it's not implemented in this version. Thus the TV
-output shouldn't be defaultly enabled now.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/506806.html
-
-Icenowy Zheng (11):
-  dt-bindings: update the binding for Allwinner H3 TVE support
-  drm: sun4i: add support for H3 mixers
-  drm: sun4i: ignore swapped mixer<->tcon connection for DE2
-  drm: sun4i: add support for H3's TCON0/1
-  drm: sun4i: add compatible for H3 display engine
-  drm: sun4i: add color space correction support for DE2 mixer
-  drm: sun4i: add support for the TV encoder in H3 SoC
-  clk: sunxi-ng: allow CLK_DE to set CLK_PLL_DE for H3
-  clk: sunxi-ng: export CLK_PLL_DE for H3
-  ARM: sun8i: h3: add display engine pipeline for TVE
-  [DO NOT MERGE] ARM: sun8i: h3: enable TV output on Orange Pi PC
-
- .../bindings/display/sunxi/sun4i-drm.txt           |  47 ++++-
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  12 ++
- arch/arm/boot/dts/sun8i-h3.dtsi                    | 189 +++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |   2 +-
- drivers/clk/sunxi-ng/ccu-sun8i-h3.h                |   3 +-
- drivers/gpu/drm/sun4i/sun4i_drv.c                  |  28 +++
- drivers/gpu/drm/sun4i/sun4i_tcon.c                 | 117 +++++++++----
- drivers/gpu/drm/sun4i/sun4i_tcon.h                 |   5 +
- drivers/gpu/drm/sun4i/sun4i_tv.c                   |  65 ++++++-
- drivers/gpu/drm/sun4i/sun8i_mixer.c                |  53 ++++++
- drivers/gpu/drm/sun4i/sun8i_mixer.h                |   6 +-
- include/dt-bindings/clock/sun8i-h3-ccu.h           |   2 +
- 12 files changed, 488 insertions(+), 41 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 66b85a195ef2..52781943713b 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -21,7 +21,9 @@ The TV Encoder supports the composite and VGA output. It is one end of
+ the pipeline.
+ 
+ Required properties:
+- - compatible: value should be "allwinner,sun4i-a10-tv-encoder".
++ - compatible: value must be either:
++    * allwinner,sun4i-a10-tv-encoder
++    * allwinner,sun8i-h3-tv-encoder
+  - reg: base address and size of memory-mapped region
+  - clocks: the clocks driving the TV encoder
+  - resets: phandle to the reset controller driving the encoder
+@@ -30,6 +32,13 @@ Required properties:
+   Documentation/devicetree/bindings/media/video-interfaces.txt. The
+   first port should be the input endpoint.
+ 
++For "allwinner,sun4i-a10-tv-encoder", there is only one clock required,
++and it's not named.
++
++For "allwinner,sun8i-h3-tv-encoder", these clocks are needed:
++    - 'bus': the AHB bus clock of TVE
++    - 'mod': the mod clock of TVE
++
+ TCON
+ ----
+ 
+@@ -41,29 +50,51 @@ Required properties:
+    * allwinner,sun6i-a31-tcon
+    * allwinner,sun6i-a31s-tcon
+    * allwinner,sun8i-a33-tcon
++   * allwinner,sun8i-h3-tcon0
++   * allwinner,sun8i-h3-tcon1
+    * allwinner,sun8i-v3s-tcon
+  - reg: base address and size of memory-mapped region
+  - interrupts: interrupt associated to this IP
+  - clocks: phandles to the clocks feeding the TCON. Three are needed:
+    - 'ahb': the interface clocks
+-   - 'tcon-ch0': The clock driving the TCON channel 0
+  - resets: phandles to the reset controllers driving the encoder
+    - "lcd": the reset line for the TCON channel 0
+ 
+  - clock-names: the clock names mentioned above
+  - reset-names: the reset names mentioned above
+- - clock-output-names: Name of the pixel clock created
+ 
+ - ports: A ports node with endpoint definitions as defined in
+   Documentation/devicetree/bindings/media/video-interfaces.txt. The
+   first port should be the input endpoint, the second one the output
+ 
++  In the situation of Display Engine 2.0 that the connection between
++  the mixer and the TCON can be swapped, the input should have two
++  endpoints. The first is the default mixer connected to the TCON,
++  the second the mixer which will be connected to the TCON if the
++  swap bit is set.
++
+   The output should have two endpoints. The first is the block
+   connected to the TCON channel 0 (usually a panel or a bridge), the
+   second the block connected to the TCON channel 1 (usually the TV
+   encoder)
+ 
+-On SoCs other than the A33 and V3s, there is one more clock required:
++For the following compatibles:
++   * allwinner,sun5i-a13-tcon
++   * allwinner,sun6i-a31-tcon
++   * allwinner,sun6i-a31s-tcon
++   * allwinner,sun8i-a33-tcon
++   * allwinner,sun8i-v3s-tcon
++there is one more clock and one more property required:
++ - clocks:
++   - 'tcon-ch0': The clock driving the TCON channel 0
++ - clock-output-names: Name of the pixel clock created
++
++For the following compatibles:
++   * allwinner,sun5i-a13-tcon
++   * allwinner,sun6i-a31-tcon
++   * allwinner,sun6i-a31s-tcon
++   * allwinner,sun8i-h3-tcon0
++there is one more clock required:
+    - 'tcon-ch1': The clock driving the TCON channel 1
+ 
+ DRC
+@@ -158,6 +189,8 @@ supported.
+ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun8i-v3s-de2-mixer
++    * allwinner,sun8i-h3-de2-mixer0
++    * allwinner,sun8i-h3-de2-mixer1
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
+     * bus: the mixer interface clock
+@@ -169,6 +202,11 @@ Required properties:
+   Documentation/devicetree/bindings/media/video-interfaces.txt. The
+   first port should be the input endpoints, the second one the output
+ 
++  In the situation of Display Engine 2.0 that the connection between
++  the mixer and the TCON can be swapped, the output should have two
++  endpoints. The first is the default TCON connected to the mixer,
++  the second the TCON which will be connected to the mixer if the
++  swap bit is set.
+ 
+ Display Engine Pipeline
+ -----------------------
+@@ -183,6 +221,7 @@ Required properties:
+     * allwinner,sun6i-a31-display-engine
+     * allwinner,sun6i-a31s-display-engine
+     * allwinner,sun8i-a33-display-engine
++    * allwinner,sun8i-h3-display-engine
+     * allwinner,sun8i-v3s-display-engine
+ 
+   - allwinner,pipelines: list of phandle to the display engine
 -- 
 2.12.2
