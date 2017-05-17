@@ -1,118 +1,177 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Wed, 17 May 2017 09:13:33 +0530
-Subject: [PATCH v5 3/3] phy: Group vendor specific phy drivers
-In-Reply-To: <16fc3965-d250-6c3d-7a62-ab8da1f034fc@ti.com>
-References: <1494485262-18995-1-git-send-email-vivek.gautam@codeaurora.org>
- <1494485262-18995-3-git-send-email-vivek.gautam@codeaurora.org>
- <16fc3965-d250-6c3d-7a62-ab8da1f034fc@ti.com>
-Message-ID: <8c6d715f-6ccf-7894-9b2f-6897597c7f32@codeaurora.org>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 17 May 2017 11:47:29 +0800
+Subject: [PATCH V2 6/6] tty: serial: lpuart: add a more accurate baud
+ rate calculation method
+In-Reply-To: <73a70b856adf28b34c793f03c4db43a9@agner.ch>
+References: <1494834539-17523-1-git-send-email-aisheng.dong@nxp.com>
+ <1494834539-17523-7-git-send-email-aisheng.dong@nxp.com>
+ <73a70b856adf28b34c793f03c4db43a9@agner.ch>
+Message-ID: <20170517034729.GD9913@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, May 15, 2017 at 10:06:41AM -0700, Stefan Agner wrote:
+> On 2017-05-15 00:48, Dong Aisheng wrote:
+> > On new LPUART versions, the oversampling ratio for the receiver can be
+> > changed from 4x (00011) to 32x (11111) which could help us get a more
+> > accurate baud rate divider.
+> > 
+> > The idea is to use the best OSR (over-sampling rate) possible.
+> > Note, OSR is typically hard-set to 16 in other LPUART instantiations.
+> > Loop to find the best OSR value possible, one that generates minimum
+> > baud diff iterate through the rest of the supported values of OSR.
+> > 
+> > Currently only i.MX7ULP is using it.
+> > 
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: Jiri Slaby <jslaby@suse.com>
+> > Cc: Stefan Agner <stefan@agner.ch>
+> > Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
+> > Cc: Yangbo Lu <yangbo.lu@nxp.com>
+> > Acked-by: Fugang Duan <fugang.duan@nxp.com>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> >  drivers/tty/serial/fsl_lpuart.c | 85 ++++++++++++++++++++++++++++++++++++++---
+> >  1 file changed, 79 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+> > index 107d0911..bda4b0c 100644
+> > --- a/drivers/tty/serial/fsl_lpuart.c
+> > +++ b/drivers/tty/serial/fsl_lpuart.c
+> > @@ -140,6 +140,8 @@
+> >  #define UARTBAUD_SBNS		0x00002000
+> >  #define UARTBAUD_SBR		0x00000000
+> >  #define UARTBAUD_SBR_MASK	0x1fff
+> > +#define UARTBAUD_OSR_MASK       0x1f
+> > +#define UARTBAUD_OSR_SHIFT      24
+> >  
+> >  #define UARTSTAT_LBKDIF		0x80000000
+> >  #define UARTSTAT_RXEDGIF	0x40000000
+> > @@ -1506,6 +1508,72 @@ lpuart_set_termios(struct uart_port *port,
+> > struct ktermios *termios,
+> >  }
+> >  
+> >  static void
+> > +lpuart32_serial_setbrg(struct lpuart_port *sport, unsigned int baudrate)
+> > +{
+> > +	u32 sbr, osr, baud_diff, tmp_osr, tmp_sbr, tmp_diff, tmp;
+> > +	u32 clk = sport->port.uartclk;
+> > +
+> > +	/*
+> > +	 * The idea is to use the best OSR (over-sampling rate) possible.
+> > +	 * Note, OSR is typically hard-set to 16 in other LPUART instantiations.
+> > +	 * Loop to find the best OSR value possible, one that generates minimum
+> > +	 * baud_diff iterate through the rest of the supported values of OSR.
+> > +	 *
+> > +	 * Calculation Formula:
+> > +	 *  Baud Rate = baud clock / ((OSR+1) ? SBR)
+> > +	 */
+> > +	baud_diff = baudrate;
+> > +	osr = 0;
+> > +	sbr = 0;
+> > +
+> > +	for (tmp_osr = 4; tmp_osr <= 32; tmp_osr++) {
+> > +		/* calculate the temporary sbr value  */
+> > +		tmp_sbr = (clk / (baudrate * tmp_osr));
+> > +		if (tmp_sbr == 0)
+> > +			tmp_sbr = 1;
+> > +
+> > +		/*
+> > +		 * calculate the baud rate difference based on the temporary
+> > +		 * osr and sbr values
+> > +		 */
+> > +		tmp_diff = clk / (tmp_osr * tmp_sbr) - baudrate;
+> > +
+> > +		/* select best values between sbr and sbr+1 */
+> > +		tmp = clk / (tmp_osr * (tmp_sbr + 1));
+> > +		if (tmp_diff > (baudrate - tmp)) {
+> > +			tmp_diff = baudrate - tmp;
+> > +			tmp_sbr++;
+> > +		}
+> > +
+> > +		if (tmp_diff <= baud_diff) {
+> > +			baud_diff = tmp_diff;
+> > +			osr = tmp_osr;
+> > +			sbr = tmp_sbr;
+> > +		}
+> > +	}
+> > +
+> > +	/* handle buadrate outside acceptable rate */
+> > +	if (baud_diff > ((baudrate / 100) * 3))
+> > +		dev_warn(sport->port.dev,
+> > +			 "unacceptable baud rate difference of more than 3%%\n");
+> > +
+> > +	tmp = lpuart32_read(sport->port.membase + UARTBAUD);
+> > +
+> > +	if ((osr > 3) && (osr < 8))
+> > +		tmp |= UARTBAUD_BOTHEDGE;
+> > +
+> > +	tmp &= ~(UARTBAUD_OSR_MASK << UARTBAUD_OSR_SHIFT);
+> > +	tmp |= (((osr-1) & UARTBAUD_OSR_MASK) << UARTBAUD_OSR_SHIFT);
+> > +
+> > +	tmp &= ~UARTBAUD_SBR_MASK;
+> > +	tmp |= sbr & UARTBAUD_SBR_MASK;
+> > +
+> > +	tmp &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
+> > +
+> > +	lpuart32_write(tmp, sport->port.membase + UARTBAUD);
+> > +}
+> > +
+> > +static void
+> >  lpuart32_set_termios(struct uart_port *port, struct ktermios *termios,
+> >  		   struct ktermios *old)
+> >  {
+> > @@ -1611,12 +1679,17 @@ lpuart32_set_termios(struct uart_port *port,
+> > struct ktermios *termios,
+> >  	lpuart32_write(old_ctrl & ~(UARTCTRL_TE | UARTCTRL_RE),
+> >  			sport->port.membase + UARTCTRL);
+> >  
+> > -	sbr = sport->port.uartclk / (16 * baud);
+> > -	bd &= ~UARTBAUD_SBR_MASK;
+> > -	bd |= sbr & UARTBAUD_SBR_MASK;
+> > -	bd |= UARTBAUD_BOTHEDGE;
+> > -	bd &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
+> > -	lpuart32_write(bd, sport->port.membase + UARTBAUD);
+> > +	if (of_device_is_compatible(port->dev->of_node, "fsl,imx7ulp-lpuart")) {
+> 
+> Shouldn't we be consequent here and also use a flag in the soc data
+> instead of of_device_is_compatible...?
+> 
 
+The original purpose is that this is a temporary code and supposed will
+be deleted later once LS platforms confirmed the new baud setting API
+works for them as well.
 
-On 05/16/2017 03:40 PM, Kishon Vijay Abraham I wrote:
-> Hi Vivek,
->
-> On Thursday 11 May 2017 12:17 PM, Vivek Gautam wrote:
->> Adding vendor specific directories in phy to group
->> phy drivers under their respective vendor umbrella.
->>
->> Also updated the MAINTAINERS file to reflect the correct
->> directory structure for phy drivers.
->>
->> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
->> Acked-by: Heiko Stuebner <heiko@sntech.de>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
->> Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->> Reviewed-by: Jaehoon Chung <jh80.chung@samsung.com>
->> Cc: Kishon Vijay Abraham I <kishon@ti.com>
->> Cc: David S. Miller <davem@davemloft.net>
->> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->> Cc: Guenter Roeck <linux@roeck-us.net>
->> Cc: Heiko Stuebner <heiko@sntech.de>
->> Cc: Viresh Kumar <viresh.kumar@linaro.org>
->> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Cc: Chen-Yu Tsai <wens@csie.org>
->> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Cc: Krzysztof Kozlowski <krzk@kernel.org>
->> Cc: Jaehoon Chung <jh80.chung@samsung.com>
->> Cc: Stephen Boyd <stephen.boyd@linaro.org>
->> Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-arm-msm at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org
->> Cc: linux-omap at vger.kernel.org
->> Cc: linux-renesas-soc at vger.kernel.org
->> Cc: linux-rockchip at lists.infradead.org
->> Cc: linux-samsung-soc at vger.kernel.org
->> Cc: linux-usb at vger.kernel.org
->> ---
->>
->> Changes since v4:
->>   - Reprepared the patch based on latest torvalds/master.
->>   - Added new directory for amlogic, since there's a new patch [1]
->>     coming in for amlogic platforms.
->>
->> Changes since v3:
->>   - Added 'Acked-by' and 'Reviewed by' tags received for this patch.
->>   - No functional change.
->>
->> Changes since v2:
->>   - Rebased on linux-phy/next.
->>   - Took care of drivers added/removed for each vendors since v2.
->>   - Updated the 'Signed-off-by' tag with my current email id.
->>
->> Changes from v1:
->>   - Updated the MAINTAINERS file to reflect the same change
->>     in directory structure.
->>   - Removed PHY_PLAT config as pointed out by Kishon.
->>     So we don't require the second patch in the v1 of this series:
->>     [PATCH 2/2] arm: mach-spear: Enable PHY_PLAT to meet dependency
->>   - Renamed sunxi --> allwinner; rcar --> renesas.
->>   - Fixed error coming with qcom Makefile.
->>
->> * Build tested multi_v7_defconfig.
->> * Build tested arm64 defconfig with all the involved configs enabled.
->>
->> [1] https://patchwork.kernel.org/patch/9684303/
->>
-> .
-> .
-> <snip>
-> .
-> .
->> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->> index afaf7b643eeb..b353ac603ea0 100644
->> --- a/drivers/phy/Kconfig
->> +++ b/drivers/phy/Kconfig
->> @@ -15,73 +15,6 @@ config GENERIC_PHY
->>   	  phy users can obtain reference to the PHY. All the users of this
-> .
-> .
-> <snip>
-> .
-> .
->> -
->> +menu "Platform Phy drivers"
-> I don't think creating a new menu is required. I removed it and merged into
-> linux-phy.
+That's why i did not make it a property, as i stated in the cover letter.
 
-Right. No need for a new menu. Thank you for fixing it and pushing out.
+> Btw, instead of using 3 bools, I would prefer using a single flags like
+> your patchset is proposing for the GPIO driver, what do you think?
+> 
 
-Best Regards
-Vivek
+Yes, good suggestion.
+Probably we could convert the below two.
+.is_32 = true,
+.is_be = true,
 
->
-> Thanks
-> Kishon
+But reg_off seems better to be kept.
+
+Regards
+Dong Aisheng
+
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> Stefan
+> 
+> 
+> > +		lpuart32_serial_setbrg(sport, baud);
+> > +	} else {
+> > +		sbr = sport->port.uartclk / (16 * baud);
+> > +		bd &= ~UARTBAUD_SBR_MASK;
+> > +		bd |= sbr & UARTBAUD_SBR_MASK;
+> > +		bd |= UARTBAUD_BOTHEDGE;
+> > +		bd &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
+> > +		lpuart32_write(bd, sport->port.membase + UARTBAUD);
+> > +	}
+> > +
+> >  	lpuart32_write(modem, sport->port.membase + UARTMODIR);
+> >  	lpuart32_write(ctrl, sport->port.membase + UARTCTRL);
+> >  	/* restore control register */
