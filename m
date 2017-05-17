@@ -1,28 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 17 May 2017 17:32:59 -0300
-Subject: PROBLEM: ARM Cache policy on single armv7 processor lead to low
- DRAM performance
-In-Reply-To: <CAOEkoLwq1fdVuhkm_Z4Lf1BL0XxLyumSxLF7gDPyK_NkzUdVgQ@mail.gmail.com>
-References: <CAOEkoLwq1fdVuhkm_Z4Lf1BL0XxLyumSxLF7gDPyK_NkzUdVgQ@mail.gmail.com>
-Message-ID: <CAOMZO5DOV9Riho1FO_PNJnXhdxQA9YE55sXqygi8eOvEf+vY+A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 May 2017 23:19:01 +0200
+Subject: [PATCH] clk: sunxi-ng: enable SUNXI_CCU_MP for PRCM
+Message-ID: <20170517212035.3100471-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhao,
+The newly added PRCM CCU driver uses SUNXI_CCU_MP_WITH_MUX_GATE, which causes
+a link error when no other driver enables SUNXI_CCU_MP:
 
-On Tue, May 16, 2017 at 1:06 AM, Zhao Yibin <ybzhao1989@gmail.com> wrote:
-> Hi, ARM maintainers,
->
-> We met some DDR performance issue caused by armv7 cache policy, hope
-> you can help.
-> On a single armv7(Cortex-A7) processor system, the arm linux kernel,
-> without CONFIG_SMP, the cache policy is set to write-back no-allocate,
-> which lead to very low DRAM speed,
-> around 7MB/s for write, 28MB/s for read.
+drivers/clk/built-in.o:(.data+0x5c8c8): undefined reference to `ccu_mp_ops'
 
-I saw the same behaviour on a mx6ul, which also has a CortexA7.
+This adds an explicit 'select' statement for it.
 
-To fix this issue we had to enable the SMP bit in the bootloader.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/clk/sunxi-ng/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-As a reference you can look at this U-Boot patch:
-https://patchwork.ozlabs.org/patch/747074/
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index b0d551a8efe4..eb89c7801f00 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -156,6 +156,7 @@ config SUN8I_R_CCU
+ 	bool "Support for Allwinner SoCs' PRCM CCUs"
+ 	select SUNXI_CCU_DIV
+ 	select SUNXI_CCU_GATE
++	select SUNXI_CCU_MP
+ 	default MACH_SUN8I || (ARCH_SUNXI && ARM64)
+ 
+ endif
+-- 
+2.9.0
