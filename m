@@ -1,117 +1,83 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Wed, 17 May 2017 17:32:15 +0800
-Subject: [PATCH v7 11/13] ARM: sun8i: v3s: add device nodes for DE2
- display pipeline
-In-Reply-To: <45e3b368b80fb74f33b18afcc3f783c5@aosc.io>
-References: <20170514163045.40366-1-icenowy@aosc.io>
- <20170514163045.40366-12-icenowy@aosc.io>
- <20170515092400.nzxmocrdqgt4u476@flea.home>
- <45e3b368b80fb74f33b18afcc3f783c5@aosc.io>
-Message-ID: <8c191ed093f97c60a1c758cc219ea63b@aosc.io>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 17 May 2017 17:50:45 +0800
+Subject: [PATCH v3 14/21] drm/sun4i: tcon: multiply the vtotal when not in
+ interlace
+In-Reply-To: <a8d8a93ddbac69e5dddd9c89a147f8cf2ad043a4.1495006350.git-series.maxime.ripard@free-electrons.com>
+References: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
+ <a8d8a93ddbac69e5dddd9c89a147f8cf2ad043a4.1495006350.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65ZWHi_Dhsy__yVrz7330pfyMbBDTqoEE37NcSXOU_W7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-05-17 17:27?icenowy at aosc.io ???
-> ? 2017-05-15 17:24?Maxime Ripard ???
->> On Mon, May 15, 2017 at 12:30:43AM +0800, Icenowy Zheng wrote:
->>> +		de2_clocks: clock at 1000000 {
->> 
->> display_clocks would be better there, we don't have to dissociate de1
->> with de2
-> 
-> How about de_clocks ? (See A80 DTSI)
+On Wed, May 17, 2017 at 3:40 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> It appears that the total vertical resolution needs to be doubled when
+> we're not in interlaced. Make sure that is the case.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 25 +++++++++++++++++++++----
+>  1 file changed, 21 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index 62e254aedb57..a0f9a8a516c7 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -153,7 +153,7 @@ static int sun4i_tcon_get_clk_delay(struct drm_display_mode *mode,
+>  void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+>                           struct drm_display_mode *mode)
+>  {
+> -       unsigned int bp, hsync, vsync;
+> +       unsigned int bp, hsync, vsync, vtotal;
+>         u8 clk_delay;
+>         u32 val = 0;
+>
+> @@ -192,9 +192,26 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+>         DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
+>                          mode->crtc_vtotal, bp);
+>
+> +       /*
+> +        * The vertical resolution needs to be doubled in all
+> +        * cases. We could use crtc_vtotal and always multiply by two,
+> +        * but that leads to a rounding error in interlace when vtotal
+> +        * is odd.
+> +        *
+> +        * This happens with TV's PAL for example, where vtotal will
+> +        * be 625, crtc_vtotal 312, and thus crtc_vtotal * 2 will be
+> +        * 624, which apparently confuses the hardware.
+> +        *
+> +        * To work around this, we will always use vtotal, and
+> +        * multiply by two only if we're not in interlace.
+> +        */
+> +       vtotal = mode->vtotal;
+> +       if (!(mode->flags & DRM_MODE_FLAG_INTERLACE))
+> +               vtotal = vtotal * 2;
+> +
+>         /* Set vertical display timings */
+>         regmap_write(tcon->regs, SUN4I_TCON0_BASIC2_REG,
+> -                    SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal * 2) |
+> +                    SUN4I_TCON0_BASIC2_V_TOTAL(vtotal) |
+>                      SUN4I_TCON0_BASIC2_V_BACKPORCH(bp));
+>
+>         /* Set Hsync and Vsync length */
+> @@ -279,9 +296,9 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+>         /* Set vertical display timings */
+>         bp = mode->crtc_vtotal - mode->crtc_vsync_start;
+>         DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
+> -                        mode->vtotal, bp);
+> +                        mode->crtc_vtotal, bp);
 
-Oh I regretted... de here indicates "de1".
+You should duplicate the logic from channel 0 to channel 1.
+In fact, interlaced modes happen predominantly on channel 1,
+for composite and HDMI modes.
 
-display_clocks is better.
+ChenYu
 
-> 
->> 
->>> +			compatible = "allwinner,sun8i-v3s-de2-clk";
->>> +			reg = <0x01000000 0x100000>;
->>> +			clocks = <&ccu CLK_DE>,
->>> +				 <&ccu CLK_BUS_DE>;
->>> +			clock-names = "mod",
->>> +				      "bus";
->>> +			resets = <&ccu RST_BUS_DE>;
->>> +			#clock-cells = <1>;
->>> +			#reset-cells = <1>;
->>> +		};
->>> +
->>> +		de2_mixer0: mixer at 1100000 {
->> 
->> and mixer0 here is enough too.
->> 
->> Is there several of them? Why not just use mixer if there's only one?
-> 
-> Nope, here it's tagged 0 only for consistency with other SoCs.
-> 
->> 
->>> +			compatible = "allwinner,sun8i-v3s-de2-mixer";
->>> +			reg = <0x01100000 0x100000>;
->>> +			clocks = <&de2_clocks CLK_MIXER0>,
->>> +				 <&de2_clocks CLK_BUS_MIXER0>;
->>> +			clock-names = "mod",
->>> +				      "bus";
->>> +			resets = <&de2_clocks RST_MIXER0>;
->>> +			assigned-clocks = <&de2_clocks CLK_MIXER0>;
->>> +			assigned-clock-rates = <150000000>;
->>> +
->>> +			ports {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <0>;
->>> +
->>> +				mixer0_out: port at 1 {
->>> +					#address-cells = <1>;
->>> +					#size-cells = <0>;
->>> +					reg = <1>;
->>> +
->>> +					mixer0_out_tcon0: endpoint at 0 {
->>> +						reg = <0>;
->>> +						remote-endpoint = <&tcon0_in_mixer0>;
->>> +					};
->>> +				};
->>> +			};
->>> +		};
->>> +
->>> +		tcon0: lcd-controller at 1c0c000 {
->>> +			compatible = "allwinner,sun8i-v3s-tcon";
->>> +			reg = <0x01c0c000 0x1000>;
->>> +			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
->>> +			clocks = <&ccu CLK_BUS_TCON0>,
->>> +				 <&ccu CLK_TCON0>;
->>> +			clock-names = "ahb",
->>> +				      "tcon-ch0";
->>> +			clock-output-names = "tcon-pixel-clock";
->>> +			resets = <&ccu RST_BUS_TCON0>;
->>> +			reset-names = "lcd";
->>> +			status = "disabled";
->>> +
->>> +			ports {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <0>;
->>> +
->>> +				tcon0_in: port at 0 {
->>> +					#address-cells = <1>;
->>> +					#size-cells = <0>;
->>> +					reg = <0>;
->>> +
->>> +					tcon0_in_mixer0: endpoint at 0 {
->>> +						reg = <0>;
->>> +						remote-endpoint = <&mixer0_out_tcon0>;
->>> +					};
->>> +				};
->>> +
->>> +				tcon0_out: port at 1 {
->>> +					#address-cells = <1>;
->>> +					#size-cells = <0>;
->>> +					reg = <1>;
->>> +				};
->>> +			};
->>> +		};
->>> +
->>> +
->> 
->> You have an extra new line here.
->> 
->> Maxime
+>         regmap_write(tcon->regs, SUN4I_TCON1_BASIC4_REG,
+> -                    SUN4I_TCON1_BASIC4_V_TOTAL(mode->vtotal) |
+> +                    SUN4I_TCON1_BASIC4_V_TOTAL(mode->crtc_vtotal * 2) |
+>                      SUN4I_TCON1_BASIC4_V_BACKPORCH(bp));
+>
+>         /* Set Hsync and Vsync length */
+> --
+> git-series 0.9.1
