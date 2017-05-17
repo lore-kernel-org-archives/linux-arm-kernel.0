@@ -1,36 +1,22 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 17 May 2017 11:39:27 +0800
-Subject: [V2, 2/6] tty: serial: lpuart: add little endian 32 bit register
- support
-In-Reply-To: <fb9fe0cd-5ca7-74e6-33dc-7638e205b2e3@cogentembedded.com>
-References: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
- <fb9fe0cd-5ca7-74e6-33dc-7638e205b2e3@cogentembedded.com>
-Message-ID: <20170517033927.GC9913@b29396-OptiPlex-7040>
+From: frank.wang@rock-chips.com (Frank Wang)
+Date: Wed, 17 May 2017 11:40:48 +0800
+Subject: [PATCH 0/3] add and fix some device node for rk322x SoC
+Message-ID: <1494992451-32542-1-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 02:15:08PM +0300, Nikita Yushchenko wrote:
-> >  static u32 lpuart32_read(void __iomem *addr)
-> >  {
-> > -	return ioread32be(addr);
-> > +	return lpuart_is_be ? ioread32be(addr) : readl(addr);
-> >  }
-> >  
-> >  static void lpuart32_write(u32 val, void __iomem *addr)
-> >  {
-> > -	iowrite32be(val, addr);
-> > +	if (lpuart_is_be)
-> > +		iowrite32be(val, addr);
-> > +	else
-> > +		writel(val, addr);
-> >  }
-> 
-> What if this is ever executed on big endian system?
-> 
+These series of patches fix some device node errors and add watchdog
+device node support for rk322x SoC.
 
-Sorry, not catching the point...
+Frank Wang (2):
+  arm: dts: rk322x: correct uart2 pinctrl and add another sets
+  arm: dts: rk322x: add watchdog device node.
 
-What issues will meet?
+Sugar Zhang (1):
+  arm: dts: rk322x: fix i2s1 pinctrl error
 
-Regards
-Dong Aisheng
+ arch/arm/boot/dts/rk322x.dtsi | 25 ++++++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
+
+-- 
+2.0.0
