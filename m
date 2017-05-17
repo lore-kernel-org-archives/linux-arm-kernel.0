@@ -1,28 +1,21 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 17 May 2017 20:26:30 +0200
-Subject: [PATCH v2 2/3] arm: dts: rk322x: correct uart2 pinctrl and add
- another sets
-In-Reply-To: <1495014746-27621-3-git-send-email-frank.wang@rock-chips.com>
-References: <1495014746-27621-1-git-send-email-frank.wang@rock-chips.com>
- <1495014746-27621-3-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1850566.MEFZHgNvCM@phil>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 17 May 2017 15:40:26 -0300
+Subject: imx7: mmc_select_hs200 failed, error -74
+In-Reply-To: <a548e1627b3a18382958fc66a3829289@agner.ch>
+References: <CAOMZO5ByTR1C4qUdc+hBcGTFVf-NH2gS5PmH3=w5-TrAoDQVUA@mail.gmail.com>
+ <CAOMZO5AXb3-YGc7hGRP_OY8C-Go0pBECbDoQo1SUB1i=t1Xi4w@mail.gmail.com>
+ <AM4PR0401MB232411A003DC9F9D2F9CAEA490E70@AM4PR0401MB2324.eurprd04.prod.outlook.com>
+ <CAOMZO5BeE_Lm+VM8d9TKv0b21cL6dVNYgBai3wBjjm=bssXWCA@mail.gmail.com>
+ <a548e1627b3a18382958fc66a3829289@agner.ch>
+Message-ID: <CAOMZO5D8bixZD9TtBpCv5fOvBq=ArpWicKOno_9Dw6vPCgBXYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 17. Mai 2017, 17:52:25 CEST schrieb Frank Wang:
-> Correct UART2 PINCTRL flag and add another PINCTRL sets for UART2
-> in case of confict with SDMMC.
-> 
-> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+Hi Stefan,
 
-I've split that into 2 patches:
-- pull-up fix
-- addition of alternative pinctrl
-  (also moved the uart21-xfer into the uart2 group directly below the
-   uart2-xfer pinctrl)
+On Wed, May 17, 2017 at 3:23 PM, Stefan Agner <stefan@agner.ch> wrote:
 
-I've fixed up the subject in both (ARM: dts: rockchip:) and applied
-everything for 4.13
+> E.g. mark that it is only 3.3V capable (no-1-8-v) and maybe other
+> capabilities (see Documentation/devicetree/bindings/mmc/mmc.txt).
 
-
-Heiko
+Passing 'no-1-8-v' to the dts did the trick, thanks!
