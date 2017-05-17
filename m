@@ -1,102 +1,43 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 17 May 2017 10:09:37 +0200
-Subject: [PATCH v1 2/3] dt-bindings: add bindings for rk312x clock
- controller
-In-Reply-To: <1495007362-10684-3-git-send-email-zhangqing@rock-chips.com>
-References: <1495007362-10684-1-git-send-email-zhangqing@rock-chips.com>
- <1495007362-10684-3-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1784310.zJGRWASetU@diego>
+From: john.garry@huawei.com (John Garry)
+Date: Wed, 17 May 2017 09:05:20 +0100
+Subject: [RFC v1 7/7] iommu/arm-smmu-v3: Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838350A62@FRAEML521-MBX.china.huawei.com>
+References: <20170513094731.3676-1-shameerali.kolothum.thodi@huawei.com>
+ <20170513094731.3676-8-shameerali.kolothum.thodi@huawei.com>
+ <a4e62cb2-9eb6-99a0-3443-df77ae9af8f8@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA838350A62@FRAEML521-MBX.china.huawei.com>
+Message-ID: <2271be83-fd92-a3d9-ce61-a5471cde51be@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine.
+On 16/05/2017 15:03, Shameerali Kolothum Thodi wrote:
+>> > Lorenzo made a point that it might be relatively straightforward to just
+>> > follow the IORT mapping for the SMMU through to the ITS MADT entry and
+>> > pull the ITS geometry out of that. It would certainly be nicer to have
+>> > such a helper abstracted away in the IORT code than have to go parsing
+>> > vendor-specific tables directly in the SMMU driver. I reckon it might be
+>> > worth taking that idea a bit further to see how it looks.
+> Ok. John has already mentioned this idea in our off-list discussion and we
+> have one implementation where we go through the IORT node ID mappings
+> array to find out the associated IORT ITS  node. It then iterates over the ACPI
+> MADT  GIC ITS table entries, , looking for a match for the GIC ITS id, and
+> retrieves the base address of the matching ITS.
+>
+> But as you said, it requires some helper from the IORT code , otherwise we
+> will end up adding all the ACPI table parse code in SMMUv3. We will take
+> another look at this.
+>
+> Thanks,
+> Shameer
+>
 
-Am Mittwoch, 17. Mai 2017, 15:49:21 CEST schrieb Elaine Zhang:
-> Add devicetree bindings for Rockchip cru which found on
-> Rockchip SoCs.
-> 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> ---
->  .../bindings/clock/rockchip,rk312x-cru.txt         | 56
+It could also be worth considering hard-coding the reserved address in 
+the SMMUv3 driver for this model. This would not involve (more) reliance 
+on CSRT or IORT driver. However, note that hip07 has multiple SMMUs, and 
+we only need to enable the quirk for the SMMU in front the PCIe host 
+controller.
 
-please no placeholders in dt-things. So while rk312x may be ok on the driver 
-side, it is not for devicetree things and especially compatible properties.
+John
 
-I haven't even found out for which soc this is, so if it's for the rk3128 for 
-example, please just name it accordingly.
-
-So ideally, just name _everything_ (compatible, dt-header file, driver, 
-everything) after the first soc it should support and we'll see later on, if it 
-matches for other socs as well.
-
-
-Thanks
-Heiko
-
-> ++++++++++++++++++++++ 1 file changed, 56 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/rockchip,rk312x-cru.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk312x-cru.txt
-> b/Documentation/devicetree/bindings/clock/rockchip,rk312x-cru.txt new file
-> mode 100644
-> index 000000000000..4a862fe9bea3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk312x-cru.txt
-> @@ -0,0 +1,56 @@
-> +* Rockchip RK312X Clock and Reset Unit
-> +
-> +The RK312X clock controller generates and supplies clock to various
-> +controllers within the SoC and also implements a reset controller for SoC
-> +peripherals.
-> +
-> +Required Properties:
-> +
-> +- compatible: should be "rockchip,rk312x-cru"
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- #clock-cells: should be 1.
-> +- #reset-cells: should be 1.
-> +
-> +Optional Properties:
-> +
-> +- rockchip,grf: phandle to the syscon managing the "general register files"
-> +  If missing pll rates are not changeable, due to the missing pll lock
-> status. +
-> +Each clock is assigned an identifier and client nodes can use this
-> identifier +to specify the clock which they consume. All available clocks
-> are defined as +preprocessor macros in the dt-bindings/clock/rk312x-cru.h
-> headers and can be +used in device tree sources. Similar macros exist for
-> the reset sources in +these files.
-> +
-> +External clocks:
-> +
-> +There are several clocks that are generated outside the SoC. It is expected
-> +that they are defined using standard clock bindings with following
-> +clock-output-names:
-> + - "xin24m" - crystal input - required,
-> + - "ext_i2s" - external I2S clock - optional,
-> + - "gmac_clkin" - external GMAC clock - optional
-> +
-> +Example: Clock controller node:
-> +
-> +	cru: cru at 20000000 {
-> +		compatible = "rockchip,rk312x-cru";
-> +		reg = <0x20000000 0x1000>;
-> +		rockchip,grf = <&grf>;
-> +
-> +		#clock-cells = <1>;
-> +		#reset-cells = <1>;
-> +	};
-> +
-> +Example: UART controller node that consumes the clock generated by the
-> clock +  controller:
-> +
-> +uart2: serial at 20068000 {
-> +		compatible = "rockchip,serial";
-> +		reg = <0x20068000 0x100>;
-> +		interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-> +		clock-frequency = <24000000>;
-> +		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
-> +		clock-names = "sclk_uart", "pclk_uart";
-> +	};
+BTW, FYI, hi161x is alias for hip07/06
