@@ -1,192 +1,186 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 17 May 2017 10:35:43 -0700
-Subject: [PATCH V2 6/6] tty: serial: lpuart: add a more accurate baud rate
- calculation method
-In-Reply-To: <20170517034729.GD9913@b29396-OptiPlex-7040>
-References: <1494834539-17523-1-git-send-email-aisheng.dong@nxp.com>
- <1494834539-17523-7-git-send-email-aisheng.dong@nxp.com>
- <73a70b856adf28b34c793f03c4db43a9@agner.ch>
- <20170517034729.GD9913@b29396-OptiPlex-7040>
-Message-ID: <90fa8850f9424712074217dff03b229e@agner.ch>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 17 May 2017 19:36:42 +0200 (CEST)
+Subject: [PATCH 2/4] ARM: imx: add initial support for imx7ulp
+In-Reply-To: <1495036217-20049-3-git-send-email-aisheng.dong@nxp.com>
+References: <1495036217-20049-1-git-send-email-aisheng.dong@nxp.com>
+ <1495036217-20049-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <51686046.22567.1495042602979@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-05-16 20:47, Dong Aisheng wrote:
-> On Mon, May 15, 2017 at 10:06:41AM -0700, Stefan Agner wrote:
->> On 2017-05-15 00:48, Dong Aisheng wrote:
->> > On new LPUART versions, the oversampling ratio for the receiver can be
->> > changed from 4x (00011) to 32x (11111) which could help us get a more
->> > accurate baud rate divider.
->> >
->> > The idea is to use the best OSR (over-sampling rate) possible.
->> > Note, OSR is typically hard-set to 16 in other LPUART instantiations.
->> > Loop to find the best OSR value possible, one that generates minimum
->> > baud diff iterate through the rest of the supported values of OSR.
->> >
->> > Currently only i.MX7ULP is using it.
->> >
->> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> > Cc: Jiri Slaby <jslaby@suse.com>
->> > Cc: Stefan Agner <stefan@agner.ch>
->> > Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
->> > Cc: Yangbo Lu <yangbo.lu@nxp.com>
->> > Acked-by: Fugang Duan <fugang.duan@nxp.com>
->> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
->> > ---
->> >  drivers/tty/serial/fsl_lpuart.c | 85 ++++++++++++++++++++++++++++++++++++++---
->> >  1 file changed, 79 insertions(+), 6 deletions(-)
->> >
->> > diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
->> > index 107d0911..bda4b0c 100644
->> > --- a/drivers/tty/serial/fsl_lpuart.c
->> > +++ b/drivers/tty/serial/fsl_lpuart.c
->> > @@ -140,6 +140,8 @@
->> >  #define UARTBAUD_SBNS		0x00002000
->> >  #define UARTBAUD_SBR		0x00000000
->> >  #define UARTBAUD_SBR_MASK	0x1fff
->> > +#define UARTBAUD_OSR_MASK       0x1f
->> > +#define UARTBAUD_OSR_SHIFT      24
->> >
->> >  #define UARTSTAT_LBKDIF		0x80000000
->> >  #define UARTSTAT_RXEDGIF	0x40000000
->> > @@ -1506,6 +1508,72 @@ lpuart_set_termios(struct uart_port *port,
->> > struct ktermios *termios,
->> >  }
->> >
->> >  static void
->> > +lpuart32_serial_setbrg(struct lpuart_port *sport, unsigned int baudrate)
->> > +{
->> > +	u32 sbr, osr, baud_diff, tmp_osr, tmp_sbr, tmp_diff, tmp;
->> > +	u32 clk = sport->port.uartclk;
->> > +
->> > +	/*
->> > +	 * The idea is to use the best OSR (over-sampling rate) possible.
->> > +	 * Note, OSR is typically hard-set to 16 in other LPUART instantiations.
->> > +	 * Loop to find the best OSR value possible, one that generates minimum
->> > +	 * baud_diff iterate through the rest of the supported values of OSR.
->> > +	 *
->> > +	 * Calculation Formula:
->> > +	 *  Baud Rate = baud clock / ((OSR+1) ? SBR)
->> > +	 */
->> > +	baud_diff = baudrate;
->> > +	osr = 0;
->> > +	sbr = 0;
->> > +
->> > +	for (tmp_osr = 4; tmp_osr <= 32; tmp_osr++) {
->> > +		/* calculate the temporary sbr value  */
->> > +		tmp_sbr = (clk / (baudrate * tmp_osr));
->> > +		if (tmp_sbr == 0)
->> > +			tmp_sbr = 1;
->> > +
->> > +		/*
->> > +		 * calculate the baud rate difference based on the temporary
->> > +		 * osr and sbr values
->> > +		 */
->> > +		tmp_diff = clk / (tmp_osr * tmp_sbr) - baudrate;
->> > +
->> > +		/* select best values between sbr and sbr+1 */
->> > +		tmp = clk / (tmp_osr * (tmp_sbr + 1));
->> > +		if (tmp_diff > (baudrate - tmp)) {
->> > +			tmp_diff = baudrate - tmp;
->> > +			tmp_sbr++;
->> > +		}
->> > +
->> > +		if (tmp_diff <= baud_diff) {
->> > +			baud_diff = tmp_diff;
->> > +			osr = tmp_osr;
->> > +			sbr = tmp_sbr;
->> > +		}
->> > +	}
->> > +
->> > +	/* handle buadrate outside acceptable rate */
->> > +	if (baud_diff > ((baudrate / 100) * 3))
->> > +		dev_warn(sport->port.dev,
->> > +			 "unacceptable baud rate difference of more than 3%%\n");
->> > +
->> > +	tmp = lpuart32_read(sport->port.membase + UARTBAUD);
->> > +
->> > +	if ((osr > 3) && (osr < 8))
->> > +		tmp |= UARTBAUD_BOTHEDGE;
->> > +
->> > +	tmp &= ~(UARTBAUD_OSR_MASK << UARTBAUD_OSR_SHIFT);
->> > +	tmp |= (((osr-1) & UARTBAUD_OSR_MASK) << UARTBAUD_OSR_SHIFT);
->> > +
->> > +	tmp &= ~UARTBAUD_SBR_MASK;
->> > +	tmp |= sbr & UARTBAUD_SBR_MASK;
->> > +
->> > +	tmp &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
->> > +
->> > +	lpuart32_write(tmp, sport->port.membase + UARTBAUD);
->> > +}
->> > +
->> > +static void
->> >  lpuart32_set_termios(struct uart_port *port, struct ktermios *termios,
->> >  		   struct ktermios *old)
->> >  {
->> > @@ -1611,12 +1679,17 @@ lpuart32_set_termios(struct uart_port *port,
->> > struct ktermios *termios,
->> >  	lpuart32_write(old_ctrl & ~(UARTCTRL_TE | UARTCTRL_RE),
->> >  			sport->port.membase + UARTCTRL);
->> >
->> > -	sbr = sport->port.uartclk / (16 * baud);
->> > -	bd &= ~UARTBAUD_SBR_MASK;
->> > -	bd |= sbr & UARTBAUD_SBR_MASK;
->> > -	bd |= UARTBAUD_BOTHEDGE;
->> > -	bd &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
->> > -	lpuart32_write(bd, sport->port.membase + UARTBAUD);
->> > +	if (of_device_is_compatible(port->dev->of_node, "fsl,imx7ulp-lpuart")) {
->>
->> Shouldn't we be consequent here and also use a flag in the soc data
->> instead of of_device_is_compatible...?
->>
-> 
-> The original purpose is that this is a temporary code and supposed will
-> be deleted later once LS platforms confirmed the new baud setting API
-> works for them as well.
-> 
-> That's why i did not make it a property, as i stated in the cover letter.
+Hi Dong,
 
-Ok, I see that is a good reason to not define a new feature property
-now... 
-
-But, if you are reasonable sure it should work, I am inclined to say
-just enable it for LS1021a so it also really gets tested...
-
+> Dong Aisheng <aisheng.dong@nxp.com> hat am 17. Mai 2017 um 17:50 geschrieben:
 > 
->> Btw, instead of using 3 bools, I would prefer using a single flags like
->> your patchset is proposing for the GPIO driver, what do you think?
->>
 > 
-> Yes, good suggestion.
-> Probably we could convert the below two.
-> .is_32 = true,
-> .is_be = true,
+> Add initial support for imx7ulp.
 > 
-> But reg_off seems better to be kept.
+> Note that we need configure power mode to Partial Stop mode 3 with
+> system/bus clock enabled first as the default enabled STOP mode will
+> gate off system/bus clock when execute WFI in MX7ULP SoC.
+> 
+> And there's still no MXC_CPU_IMX7ULP IDs read from register as ULP has no
+> anatop as before. So we encode one with 0xff in reverse order in case new
+> ones will be in the future.
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  arch/arm/mach-imx/Kconfig        |  9 +++++++++
+>  arch/arm/mach-imx/Makefile       |  1 +
+>  arch/arm/mach-imx/common.h       |  1 +
+>  arch/arm/mach-imx/cpu.c          |  3 +++
+>  arch/arm/mach-imx/mach-imx7ulp.c | 37 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-imx/mxc.h          |  1 +
+>  arch/arm/mach-imx/pm-imx7ulp.c   | 33 +++++++++++++++++++++++++++++++++
+>  7 files changed, 85 insertions(+)
+>  create mode 100644 arch/arm/mach-imx/mach-imx7ulp.c
+>  create mode 100644 arch/arm/mach-imx/pm-imx7ulp.c
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 936c59d..a07081d 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -553,6 +553,15 @@ comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
+>  
+>  if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+>  
+> +config SOC_IMX7ULP
+> +	bool "i.MX7ULP support"
+> +	select ARM_GIC
+> +	select CLKSRC_IMX_TPM
+> +	select HAVE_ARM_ARCH_TIMER
+> +	select PINCTRL_IMX7ULP
+> +	help
+> +	  This enables support for Freescale i.MX7 Ultra Low Power processor.
+> +
+>  config SOC_VF610
+>  	bool "Vybrid Family VF610 support"
+>  	select ARM_GIC if ARCH_MULTI_V7
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index cab1289..c5948b7 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -80,6 +80,7 @@ obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
+>  obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
+>  obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
+>  obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
+> +obj-$(CONFIG_SOC_IMX7ULP) += mach-imx7ulp.o pm-imx7ulp.o
+>  
+>  ifeq ($(CONFIG_SUSPEND),y)
+>  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index b09a2ec..b0e85df 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -128,6 +128,7 @@ void imx6dl_pm_init(void);
+>  void imx6sl_pm_init(void);
+>  void imx6sx_pm_init(void);
+>  void imx6ul_pm_init(void);
+> +void imx7ulp_pm_init(void);
+>  
+>  #ifdef CONFIG_PM
+>  void imx51_pm_init(void);
+> diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+> index b3347d3..3867e7f 100644
+> --- a/arch/arm/mach-imx/cpu.c
+> +++ b/arch/arm/mach-imx/cpu.c
+> @@ -134,6 +134,9 @@ struct device * __init imx_soc_device_init(void)
+>  	case MXC_CPU_IMX7D:
+>  		soc_id = "i.MX7D";
+>  		break;
+> +	case MXC_CPU_IMX7ULP:
+> +		soc_id = "i.MX7ULP";
+> +		break;
+>  	default:
+>  		soc_id = "Unknown";
+>  	}
+> diff --git a/arch/arm/mach-imx/mach-imx7ulp.c b/arch/arm/mach-imx/mach-imx7ulp.c
+> new file mode 100644
+> index 0000000..9f7a25c
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/mach-imx7ulp.c
+> @@ -0,0 +1,37 @@
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + * Copyright (C) 2017 NXP
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/irqchip.h>
+> +#include <linux/of_platform.h>
+> +#include <asm/mach/arch.h>
+> +
+> +#include "common.h"
+> +#include "hardware.h"
+> +
+> +static void __init imx7ulp_init_machine(void)
+> +{
+> +	imx7ulp_pm_init();
+> +
+> +	mxc_set_cpu_type(MXC_CPU_IMX7ULP);
+> +	imx_print_silicon_rev("i.MX7ULP", IMX_CHIP_REVISION_1_0);
+> +	of_platform_default_populate(NULL, NULL, imx_soc_device_init());
+> +}
+> +
+> +static const char *const imx7ulp_dt_compat[] __initconst = {
+> +	"fsl,imx7ulp",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(IMX7ulp, "Freescale i.MX7ULP (Device Tree)")
+> +	.init_machine	= imx7ulp_init_machine,
+> +	.dt_compat	= imx7ulp_dt_compat,
+> +MACHINE_END
+> diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+> index 34f2ff6..3dfb09c 100644
+> --- a/arch/arm/mach-imx/mxc.h
+> +++ b/arch/arm/mach-imx/mxc.h
+> @@ -40,6 +40,7 @@
+>  #define MXC_CPU_IMX6Q		0x63
+>  #define MXC_CPU_IMX6UL		0x64
+>  #define MXC_CPU_IMX7D		0x72
+> +#define MXC_CPU_IMX7ULP		0xff
+>  
+>  #define IMX_DDR_TYPE_LPDDR2		1
+>  
+> diff --git a/arch/arm/mach-imx/pm-imx7ulp.c b/arch/arm/mach-imx/pm-imx7ulp.c
+> new file mode 100644
+> index 0000000..df5d6b6
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/pm-imx7ulp.c
+> @@ -0,0 +1,33 @@
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + * Copyright (C) 2017 NXP
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +
+> +#define SMC_PMCTRL		0x10
+> +#define BP_PMCTRL_PSTOPO        16
+> +#define PSTOPO_PSTOP3		0x3
+> +
+> +void __init imx7ulp_pm_init(void)
+> +{
+> +	struct device_node *np;
+> +	void __iomem *smc1_base;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx7ulp-smc1");
 
-Sounds good!
-
---
-Stefan
-
-> 
-> Regards
-> Dong Aisheng
-> 
->> --
->> Stefan
->>
->>
->> > +		lpuart32_serial_setbrg(sport, baud);
->> > +	} else {
->> > +		sbr = sport->port.uartclk / (16 * baud);
->> > +		bd &= ~UARTBAUD_SBR_MASK;
->> > +		bd |= sbr & UARTBAUD_SBR_MASK;
->> > +		bd |= UARTBAUD_BOTHEDGE;
->> > +		bd &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
->> > +		lpuart32_write(bd, sport->port.membase + UARTBAUD);
->> > +	}
->> > +
->> >  	lpuart32_write(modem, sport->port.membase + UARTMODIR);
->> >  	lpuart32_write(ctrl, sport->port.membase + UARTCTRL);
->> >  	/* restore control register */
+so actually there no dt-binding for this compatible, because there is no driver?
