@@ -1,107 +1,55 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 18 May 2017 00:43:49 +0800
-Subject: [RFC PATCH 06/11] drm: sun4i: add color space correction support for
- DE2 mixer
-In-Reply-To: <20170517164354.16399-1-icenowy@aosc.io>
-References: <20170517164354.16399-1-icenowy@aosc.io>
-Message-ID: <20170517164354.16399-7-icenowy@aosc.io>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 17 May 2017 12:04:30 -0500
+Subject: [PATCH 1/3] iommu: of: Fix check for returning EPROBE_DEFER
+In-Reply-To: <1495020609-13397-1-git-send-email-sricharan@codeaurora.org>
+References: <1495020609-13397-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20170517170430.GD31462@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DE2 mixer can do color space correction needed by TV Encoder with
-its DCSC sub-engine.
+On Wed, May 17, 2017 at 05:00:07PM +0530, Sricharan R wrote:
+> Now with iommu probe deferral, we return -EPROBE_DEFER
+> for master's that are connected to an iommu which is not
 
-Add support for it.
+s/master's/masters/
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 35 +++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/sun4i/sun8i_mixer.h |  6 +++++-
- 2 files changed, 40 insertions(+), 1 deletion(-)
+s/iommu/IOMMU/ in your English text (changelogs and comments).  That seems
+to be the convention, based on "git log drivers/iommu/of_iommu.c"
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index d658a3a8159a..65f86641eca3 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -29,6 +29,14 @@
- #include "sun8i_layer.h"
- #include "sunxi_engine.h"
- 
-+static const u32 sun8i_rgb2yuv_coef[12] = {
-+	0x00000107, 0x00000204, 0x00000064, 0x00004200,
-+	0x00001f68, 0x00001ed6, 0x000001c2, 0x00020200,
-+	0x000001c2, 0x00001e87, 0x00001fb7, 0x00020200,
-+};
-+
-+static const u32 sun8i_rgb2yuv_dcsc_alpha = 0x00020200;
-+
- static void sun8i_mixer_commit(struct sunxi_engine *engine)
- {
- 	DRM_DEBUG_DRIVER("Committing changes\n");
-@@ -37,6 +45,31 @@ static void sun8i_mixer_commit(struct sunxi_engine *engine)
- 		     SUN8I_MIXER_GLOBAL_DBUFF_ENABLE);
- }
- 
-+static void sun8i_mixer_apply_color_correction(struct sunxi_engine *engine)
-+{
-+	int i;
-+
-+	DRM_DEBUG_DRIVER("Applying RGB to YUV color correction\n");
-+
-+	/* Set color correction */
-+	regmap_write(engine->regs, SUN8I_MIXER_DCSC_EN, 1);
-+
-+	for (i = 0; i < 12; i++)
-+		regmap_write(engine->regs, SUN8I_MIXER_DCSC_COEF_REG(i),
-+			     sun8i_rgb2yuv_coef[i]);
-+
-+	regmap_write(engine->regs, SUN8I_MIXER_DCSC_COEF_ALPHA,
-+		     sun8i_rgb2yuv_dcsc_alpha);
-+}
-+
-+static void sun8i_mixer_disable_color_correction(struct sunxi_engine *engine)
-+{
-+	DRM_DEBUG_DRIVER("Disabling color correction\n");
-+
-+	/* Disable color correction */
-+	regmap_write(engine->regs, SUN8I_MIXER_DCSC_EN, 0);
-+}
-+
- void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
- 				int layer, bool enable)
- {
-@@ -229,6 +262,8 @@ int sun8i_mixer_update_layer_buffer(struct sun8i_mixer *mixer,
- static const struct sunxi_engine_ops sun8i_engine_ops = {
- 	.commit		= sun8i_mixer_commit,
- 	.layers_init	= sun8i_layers_init,
-+	.apply_color_correction		= sun8i_mixer_apply_color_correction,
-+	.disable_color_correction	= sun8i_mixer_disable_color_correction,
- };
- 
- static struct regmap_config sun8i_mixer_regmap_config = {
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-index 4785ac090b8c..d7f7513898b6 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -88,6 +88,11 @@
- #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_RGB888	(8 << 8)
- #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF	(0xff << 24)
- 
-+/* The DCSC sub-engine is used to do color space conversation */
-+#define SUN8I_MIXER_DCSC_EN			0xb0000
-+#define SUN8I_MIXER_DCSC_COEF_REG(x)		(0xb0010 + 0x4 * x)
-+#define SUN8I_MIXER_DCSC_COEF_ALPHA		0xb0040
-+
- /*
-  * These sub-engines are still unknown now, the EN registers are here only to
-  * be used to disable these sub-engines.
-@@ -102,7 +107,6 @@
- #define SUN8I_MIXER_PEAK_EN			0xa6000
- #define SUN8I_MIXER_ASE_EN			0xa8000
- #define SUN8I_MIXER_FCC_EN			0xaa000
--#define SUN8I_MIXER_DCSC_EN			0xb0000
- 
- struct sun8i_mixer_cfg {
- 	int		vi_num;
--- 
-2.12.2
+> probed yet, but going to get probed, so that we can attach
+> the correct dma_ops. So while trying to defer the probe of
+> the master, check if the of_iommu node that it is connected
+> to is marked in DT as 'status=disabled', then the iommu is never
+> is going to get probed. So simply return NULL and let the master
+> work without an iommu.
+> 
+> Fixes: 7b07cbefb68d ("iommu: of: Handle IOMMU lookup failure with deferred probing or error")
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Tested-by: Will Deacon <will.deacon@arm.com>
+> Tested-by: Magnus Damn <magnus.damn@gmail.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/of_iommu.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 9f44ee8..e6e9bec 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -118,6 +118,7 @@ static bool of_iommu_driver_present(struct device_node *np)
+>  
+>  	ops = iommu_ops_from_fwnode(fwnode);
+>  	if ((ops && !ops->of_xlate) ||
+> +	    !of_device_is_available(iommu_spec->np) ||
+>  	    (!ops && !of_iommu_driver_present(iommu_spec->np)))
+>  		return NULL;
+>  
+> -- 
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
