@@ -1,37 +1,46 @@
 From: frank.wang@rock-chips.com (Frank Wang)
-Date: Wed, 17 May 2017 18:16:13 +0800
-Subject: [PATCH v2 0/4] amend some properties related clk and cpu for rk322x
-Message-ID: <1495016177-2413-1-git-send-email-frank.wang@rock-chips.com>
+Date: Wed, 17 May 2017 18:16:14 +0800
+Subject: [PATCH v2 1/4] arm: dts: rk322x: add some assigned-clocks
+In-Reply-To: <1495016177-2413-1-git-send-email-frank.wang@rock-chips.com>
+References: <1495016177-2413-1-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <1495016177-2413-2-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These series of patches amend some assigned-clocks and add cpu opp table
-for rk322x SoCs.
+From: Elaine Zhang <zhangqing@rock-chips.com>
 
-the following patches on patchwork are required for this change.
-https://patchwork.kernel.org/patch/9627639/
-https://patchwork.kernel.org/patch/9703945/
-https://patchwork.kernel.org/patch/9703939/
-https://patchwork.kernel.org/patch/9707517/
+Add CPLL, GPLL and some other assigned-clocks for rk322x SoC.
 
-Changes from v1:
- - Updated the 'Signed-off-by' tag with original authors' email id.
- - Updated the 'Acked-by' tag from Viresh Kumar <viresh.kumar@linaro.org>.
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+---
+ arch/arm/boot/dts/rk322x.dtsi | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-Elaine Zhang (1):
-  arm: dts: rk322x: add some assigned-clocks
-
-Finley Xiao (2):
-  arm: dts: rk322x: add operating-points-v2 property for cpu
-  arm: dts: rk3229: add a new cpu opp table
-
-Rocky Hao (1):
-  arm: dts: rk322x: update tsadc's frequence setting
-
- arch/arm/boot/dts/rk3229-cpu-opp.dtsi | 85 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/rk322x.dtsi         | 52 ++++++++++++++++++---
- 2 files changed, 131 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/boot/dts/rk3229-cpu-opp.dtsi
-
+diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+index f7498b3..64368b0 100644
+--- a/arch/arm/boot/dts/rk322x.dtsi
++++ b/arch/arm/boot/dts/rk322x.dtsi
+@@ -346,8 +346,18 @@
+ 		rockchip,grf = <&grf>;
+ 		#clock-cells = <1>;
+ 		#reset-cells = <1>;
+-		assigned-clocks = <&cru PLL_GPLL>;
+-		assigned-clock-rates = <594000000>;
++		assigned-clocks =
++			<&cru PLL_GPLL>, <&cru ARMCLK>,
++			<&cru PLL_CPLL>, <&cru ACLK_PERI>,
++			<&cru HCLK_PERI>, <&cru PCLK_PERI>,
++			<&cru ACLK_CPU>, <&cru HCLK_CPU>,
++			<&cru PCLK_CPU>;
++		assigned-clock-rates =
++			<594000000>, <816000000>,
++			<500000000>, <150000000>,
++			<150000000>, <75000000>,
++			<150000000>, <150000000>,
++			<75000000>;
+ 	};
+ 
+ 	thermal-zones {
 -- 
 2.0.0
