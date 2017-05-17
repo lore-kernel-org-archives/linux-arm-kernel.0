@@ -1,81 +1,327 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 17 May 2017 22:47:18 +0800
-Subject: [PATCH v8 2/9] drm/sun4i: add a dedicated module for sun4i-backend
- and sun4i-layer
-In-Reply-To: <20170517144725.3463-1-icenowy@aosc.io>
-References: <20170517144725.3463-1-icenowy@aosc.io>
-Message-ID: <20170517144725.3463-3-icenowy@aosc.io>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 17 May 2017 16:05:38 +0200
+Subject: [PATCH 4/8] clocksource/drivers/fttmr010: Use state container
+In-Reply-To: <20170517140542.20016-1-linus.walleij@linaro.org>
+References: <20170517140542.20016-1-linus.walleij@linaro.org>
+Message-ID: <20170517140542.20016-5-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the direct call from CRTC code to layer code has disappeared,
-instead the layer's init function is called via the backend's ops.
+This converts the Faraday FTTMR010 to use the state container
+design pattern. Take some care to handle the state container
+and free:ing of resources as has been done in the Moxa driver.
 
-Add a dedicated module for sun4i-backend and sun4i-layer, and drop the
-EXPORT_SYMBOL from backend code to layer code.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Cc: Joel Stanley <joel@jms.id.au>
+Cc: Jonas Jensen <jonas.jensen@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Changes in v7:
-- Added Chen-Yu's Reviewed-by.
+ drivers/clocksource/timer-fttmr010.c | 190 +++++++++++++++++++++--------------
+ 1 file changed, 116 insertions(+), 74 deletions(-)
 
- drivers/gpu/drm/sun4i/Makefile        | 5 +++--
- drivers/gpu/drm/sun4i/sun4i_backend.c | 4 ----
- 2 files changed, 3 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index 59b757350a1f..a251fb36c951 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -5,9 +5,10 @@ sun4i-tcon-y += sun4i_tcon.o
- sun4i-tcon-y += sun4i_rgb.o
- sun4i-tcon-y += sun4i_dotclock.o
- sun4i-tcon-y += sun4i_crtc.o
--sun4i-tcon-y += sun4i_layer.o
+diff --git a/drivers/clocksource/timer-fttmr010.c b/drivers/clocksource/timer-fttmr010.c
+index db097db346e3..9ad31489bbef 100644
+--- a/drivers/clocksource/timer-fttmr010.c
++++ b/drivers/clocksource/timer-fttmr010.c
+@@ -15,6 +15,7 @@
+ #include <linux/clocksource.h>
+ #include <linux/sched_clock.h>
+ #include <linux/clk.h>
++#include <linux/slab.h>
+ 
+ /*
+  * Register definitions for the timers
+@@ -62,23 +63,35 @@
+ #define TIMER_3_INT_OVERFLOW	(1 << 8)
+ #define TIMER_INT_ALL_MASK	0x1ff
+ 
+-static unsigned int tick_rate;
+-static void __iomem *base;
++struct fttmr010 {
++	void __iomem *base;
++	unsigned int tick_rate;
++	struct clock_event_device clkevt;
++};
 +
-+sun4i-backend-y += sun4i_backend.o sun4i_layer.o
++/* A local singleton used by sched_clock, which is stateless */
++static struct fttmr010 *local_fttmr;
++
++static inline struct fttmr010 *to_fttmr010(struct clock_event_device *evt)
++{
++	return container_of(evt, struct fttmr010, clkevt);
++}
  
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i-drm.o sun4i-tcon.o
--obj-$(CONFIG_DRM_SUN4I)		+= sun4i_backend.o
-+obj-$(CONFIG_DRM_SUN4I)		+= sun4i-backend.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun6i_drc.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 4af8ccb10bff..cf480218daa5 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -83,7 +83,6 @@ void sun4i_backend_layer_enable(struct sun4i_backend *backend,
- 	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_MODCTL_REG,
- 			   SUN4I_BACKEND_MODCTL_LAY_EN(layer), val);
+ static u64 notrace fttmr010_read_sched_clock(void)
+ {
+-	return readl(base + TIMER3_COUNT);
++	return readl(local_fttmr->base + TIMER3_COUNT);
  }
--EXPORT_SYMBOL(sun4i_backend_layer_enable);
  
- static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
- 					     u32 format, u32 *mode)
-@@ -170,7 +169,6 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
+ static int fttmr010_timer_set_next_event(unsigned long cycles,
+ 				       struct clock_event_device *evt)
+ {
++	struct fttmr010 *fttmr010 = to_fttmr010(evt);
+ 	u32 cr;
+ 
+ 	/* Setup the match register */
+-	cr = readl(base + TIMER1_COUNT);
+-	writel(cr + cycles, base + TIMER1_MATCH1);
+-	if (readl(base + TIMER1_COUNT) - cr > cycles)
++	cr = readl(fttmr010->base + TIMER1_COUNT);
++	writel(cr + cycles, fttmr010->base + TIMER1_MATCH1);
++	if (readl(fttmr010->base + TIMER1_COUNT) - cr > cycles)
+ 		return -ETIME;
+ 
+ 	return 0;
+@@ -86,99 +99,90 @@ static int fttmr010_timer_set_next_event(unsigned long cycles,
+ 
+ static int fttmr010_timer_shutdown(struct clock_event_device *evt)
+ {
++	struct fttmr010 *fttmr010 = to_fttmr010(evt);
++	u32 cr;
++
++	/* Stop timer and interrupt. */
++	cr = readl(fttmr010->base + TIMER_CR);
++	cr &= ~(TIMER_1_CR_ENABLE | TIMER_1_CR_INT);
++	writel(cr, fttmr010->base + TIMER_CR);
++
++	return 0;
++}
++
++static int fttmr010_timer_set_oneshot(struct clock_event_device *evt)
++{
++	struct fttmr010 *fttmr010 = to_fttmr010(evt);
+ 	u32 cr;
+ 
+-	/*
+-	 * Disable also for oneshot: the set_next() call will arm the timer
+-	 * instead.
+-	 */
+ 	/* Stop timer and interrupt. */
+-	cr = readl(base + TIMER_CR);
++	cr = readl(fttmr010->base + TIMER_CR);
+ 	cr &= ~(TIMER_1_CR_ENABLE | TIMER_1_CR_INT);
+-	writel(cr, base + TIMER_CR);
++	writel(cr, fttmr010->base + TIMER_CR);
+ 
+ 	/* Setup counter start from 0 */
+-	writel(0, base + TIMER1_COUNT);
+-	writel(0, base + TIMER1_LOAD);
++	writel(0, fttmr010->base + TIMER1_COUNT);
++	writel(0, fttmr010->base + TIMER1_LOAD);
+ 
+-	/* enable interrupt */
+-	cr = readl(base + TIMER_INTR_MASK);
++	/* Enable interrupt */
++	cr = readl(fttmr010->base + TIMER_INTR_MASK);
+ 	cr &= ~(TIMER_1_INT_OVERFLOW | TIMER_1_INT_MATCH2);
+ 	cr |= TIMER_1_INT_MATCH1;
+-	writel(cr, base + TIMER_INTR_MASK);
++	writel(cr, fttmr010->base + TIMER_INTR_MASK);
+ 
+-	/* start the timer */
+-	cr = readl(base + TIMER_CR);
++	/* Start the timer */
++	cr = readl(fttmr010->base + TIMER_CR);
+ 	cr |= TIMER_1_CR_ENABLE;
+-	writel(cr, base + TIMER_CR);
++	writel(cr, fttmr010->base + TIMER_CR);
  
  	return 0;
  }
--EXPORT_SYMBOL(sun4i_backend_update_layer_coord);
  
- int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
- 				       int layer, struct drm_plane *plane)
-@@ -205,7 +203,6 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
+ static int fttmr010_timer_set_periodic(struct clock_event_device *evt)
+ {
+-	u32 period = DIV_ROUND_CLOSEST(tick_rate, HZ);
++	struct fttmr010 *fttmr010 = to_fttmr010(evt);
++	u32 period = DIV_ROUND_CLOSEST(fttmr010->tick_rate, HZ);
+ 	u32 cr;
+ 
+ 	/* Stop timer and interrupt */
+-	cr = readl(base + TIMER_CR);
++	cr = readl(fttmr010->base + TIMER_CR);
+ 	cr &= ~(TIMER_1_CR_ENABLE | TIMER_1_CR_INT);
+-	writel(cr, base + TIMER_CR);
++	writel(cr, fttmr010->base + TIMER_CR);
+ 
+ 	/* Setup timer to fire at 1/HT intervals. */
+ 	cr = 0xffffffff - (period - 1);
+-	writel(cr, base + TIMER1_COUNT);
+-	writel(cr, base + TIMER1_LOAD);
++	writel(cr, fttmr010->base + TIMER1_COUNT);
++	writel(cr, fttmr010->base + TIMER1_LOAD);
+ 
+ 	/* enable interrupt on overflow */
+-	cr = readl(base + TIMER_INTR_MASK);
++	cr = readl(fttmr010->base + TIMER_INTR_MASK);
+ 	cr &= ~(TIMER_1_INT_MATCH1 | TIMER_1_INT_MATCH2);
+ 	cr |= TIMER_1_INT_OVERFLOW;
+-	writel(cr, base + TIMER_INTR_MASK);
++	writel(cr, fttmr010->base + TIMER_INTR_MASK);
+ 
+ 	/* Start the timer */
+-	cr = readl(base + TIMER_CR);
++	cr = readl(fttmr010->base + TIMER_CR);
+ 	cr |= TIMER_1_CR_ENABLE;
+ 	cr |= TIMER_1_CR_INT;
+-	writel(cr, base + TIMER_CR);
++	writel(cr, fttmr010->base + TIMER_CR);
  
  	return 0;
  }
--EXPORT_SYMBOL(sun4i_backend_update_layer_formats);
  
- int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 				      int layer, struct drm_plane *plane)
-@@ -246,7 +243,6 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+-/* Use TIMER1 as clock event */
+-static struct clock_event_device fttmr010_clockevent = {
+-	.name			= "TIMER1",
+-	/* Reasonably fast and accurate clock event */
+-	.rating			= 300,
+-	.shift                  = 32,
+-	.features		= CLOCK_EVT_FEAT_PERIODIC |
+-				  CLOCK_EVT_FEAT_ONESHOT,
+-	.set_next_event		= fttmr010_timer_set_next_event,
+-	.set_state_shutdown	= fttmr010_timer_shutdown,
+-	.set_state_periodic	= fttmr010_timer_set_periodic,
+-	.set_state_oneshot	= fttmr010_timer_shutdown,
+-	.tick_resume		= fttmr010_timer_shutdown,
+-};
+-
+ /*
+  * IRQ handler for the timer
+  */
+ static irqreturn_t fttmr010_timer_interrupt(int irq, void *dev_id)
+ {
+-	struct clock_event_device *evt = &fttmr010_clockevent;
++	struct clock_event_device *evt = dev_id;
+ 
+ 	evt->event_handler(evt);
+ 	return IRQ_HANDLED;
+ }
+ 
+-static struct irqaction fttmr010_timer_irq = {
+-	.name		= "Faraday FTTMR010 Timer Tick",
+-	.flags		= IRQF_TIMER,
+-	.handler	= fttmr010_timer_interrupt,
+-};
+-
+ static int __init fttmr010_timer_init(struct device_node *np)
+ {
++	struct fttmr010 *fttmr010;
+ 	int irq;
+ 	struct clk *clk;
+ 	int ret;
+@@ -198,53 +202,91 @@ static int __init fttmr010_timer_init(struct device_node *np)
+ 		pr_err("failed to enable PCLK\n");
+ 		return ret;
+ 	}
+-	tick_rate = clk_get_rate(clk);
+ 
+-	base = of_iomap(np, 0);
+-	if (!base) {
++	fttmr010 = kzalloc(sizeof(*fttmr010), GFP_KERNEL);
++	if (!fttmr010) {
++		ret = -ENOMEM;
++		goto out_disable_clock;
++	}
++	fttmr010->tick_rate = clk_get_rate(clk);
++
++	fttmr010->base = of_iomap(np, 0);
++	if (!fttmr010->base) {
+ 		pr_err("Can't remap registers");
+-		return -ENXIO;
++		ret = -ENXIO;
++		goto out_free;
+ 	}
+ 	/* IRQ for timer 1 */
+ 	irq = irq_of_parse_and_map(np, 0);
+ 	if (irq <= 0) {
+ 		pr_err("Can't parse IRQ");
+-		return -EINVAL;
++		ret = -EINVAL;
++		goto out_unmap;
+ 	}
+ 
+ 	/*
+ 	 * Reset the interrupt mask and status
+ 	 */
+-	writel(TIMER_INT_ALL_MASK, base + TIMER_INTR_MASK);
+-	writel(0, base + TIMER_INTR_STATE);
+-	writel(TIMER_DEFAULT_FLAGS, base + TIMER_CR);
++	writel(TIMER_INT_ALL_MASK, fttmr010->base + TIMER_INTR_MASK);
++	writel(0, fttmr010->base + TIMER_INTR_STATE);
++	writel(TIMER_DEFAULT_FLAGS, fttmr010->base + TIMER_CR);
+ 
+ 	/*
+ 	 * Setup free-running clocksource timer (interrupts
+ 	 * disabled.)
+ 	 */
+-	writel(0, base + TIMER3_COUNT);
+-	writel(0, base + TIMER3_LOAD);
+-	writel(0, base + TIMER3_MATCH1);
+-	writel(0, base + TIMER3_MATCH2);
+-	clocksource_mmio_init(base + TIMER3_COUNT,
+-			      "fttmr010_clocksource", tick_rate,
++	local_fttmr = fttmr010;
++	writel(0, fttmr010->base + TIMER3_COUNT);
++	writel(0, fttmr010->base + TIMER3_LOAD);
++	writel(0, fttmr010->base + TIMER3_MATCH1);
++	writel(0, fttmr010->base + TIMER3_MATCH2);
++	clocksource_mmio_init(fttmr010->base + TIMER3_COUNT,
++			      "FTTMR010-TIMER3",
++			      fttmr010->tick_rate,
+ 			      300, 32, clocksource_mmio_readl_up);
+-	sched_clock_register(fttmr010_read_sched_clock, 32, tick_rate);
++	sched_clock_register(fttmr010_read_sched_clock, 32,
++			     fttmr010->tick_rate);
+ 
+ 	/*
+-	 * Setup clockevent timer (interrupt-driven.)
++	 * Setup clockevent timer (interrupt-driven) on timer 1.
+ 	 */
+-	writel(0, base + TIMER1_COUNT);
+-	writel(0, base + TIMER1_LOAD);
+-	writel(0, base + TIMER1_MATCH1);
+-	writel(0, base + TIMER1_MATCH2);
+-	setup_irq(irq, &fttmr010_timer_irq);
+-	fttmr010_clockevent.cpumask = cpumask_of(0);
+-	clockevents_config_and_register(&fttmr010_clockevent, tick_rate,
++	writel(0, fttmr010->base + TIMER1_COUNT);
++	writel(0, fttmr010->base + TIMER1_LOAD);
++	writel(0, fttmr010->base + TIMER1_MATCH1);
++	writel(0, fttmr010->base + TIMER1_MATCH2);
++	ret = request_irq(irq, fttmr010_timer_interrupt, IRQF_TIMER,
++			  "FTTMR010-TIMER1", &fttmr010->clkevt);
++	if (ret) {
++		pr_err("FTTMR010-TIMER1 no IRQ\n");
++		goto out_unmap;
++	}
++
++	fttmr010->clkevt.name = "FTTMR010-TIMER1";
++	/* Reasonably fast and accurate clock event */
++	fttmr010->clkevt.rating = 300;
++	fttmr010->clkevt.features = CLOCK_EVT_FEAT_PERIODIC |
++		CLOCK_EVT_FEAT_ONESHOT;
++	fttmr010->clkevt.set_next_event = fttmr010_timer_set_next_event;
++	fttmr010->clkevt.set_state_shutdown = fttmr010_timer_shutdown;
++	fttmr010->clkevt.set_state_periodic = fttmr010_timer_set_periodic;
++	fttmr010->clkevt.set_state_oneshot = fttmr010_timer_set_oneshot;
++	fttmr010->clkevt.tick_resume = fttmr010_timer_shutdown;
++	fttmr010->clkevt.cpumask = cpumask_of(0);
++	fttmr010->clkevt.irq = irq;
++	clockevents_config_and_register(&fttmr010->clkevt,
++					fttmr010->tick_rate,
+ 					1, 0xffffffff);
  
  	return 0;
++
++out_unmap:
++	iounmap(fttmr010->base);
++out_free:
++	kfree(fttmr010);
++out_disable_clock:
++	clk_disable_unprepare(clk);
++
++	return ret;
  }
--EXPORT_SYMBOL(sun4i_backend_update_layer_buffer);
- 
- static int sun4i_backend_init_sat(struct device *dev) {
- 	struct sun4i_backend *backend = dev_get_drvdata(dev);
+ CLOCKSOURCE_OF_DECLARE(fttmr010, "faraday,fttmr010", fttmr010_timer_init);
+ CLOCKSOURCE_OF_DECLARE(gemini, "cortina,gemini-timer", fttmr010_timer_init);
 -- 
-2.12.2
+2.9.3
