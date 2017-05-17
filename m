@@ -1,47 +1,99 @@
-From: johannes@sipsolutions.net (Johannes Berg)
-Date: Wed, 17 May 2017 15:14:27 +0200
-Subject: [PATCH 1/2] wcn36xx: Pass used skb to ieee80211_tx_status()
-In-Reply-To: <87fugkrchl.fsf@kamboji.qca.qualcomm.com>
-References: <20170426220444.10539-1-bjorn.andersson@linaro.org>
- <1493281332.2529.1.camel@sipsolutions.net>	<20170428234247.GQ15143@minitux>
- <87fugkrchl.fsf@kamboji.qca.qualcomm.com>
-Message-ID: <1495026867.2442.9.camel@sipsolutions.net>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 17 May 2017 15:17:19 +0200
+Subject: [PATCH] KVM: arm/arm64: Fix bug when registering redist iodevs
+Message-ID: <20170517131719.14274-1-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-05-04 at 13:13 +0000, Kalle Valo wrote:
-> 
-> > > This code intentionally checked if TX status was requested, and
-> > > if not then it doesn't go to the effort of building it.
-> > > 
-> > 
-> > What I'm finding puzzling is the fact that the only caller of
-> > ieee80211_led_tx() is ieee80211_tx_status() and it seems like
-> > drivers, such as ath10k, call this for each packet handled - but
-> > I'm likely missing something.
+If userspace creates the VCPUs after initializing the VGIC, then we end
+up in a situation where we trigger a bug in kvm_vcpu_get_idx(), because
+it is called prior to adding the VCPU into the vcpus array on the VM.
 
-Yes, many drivers do call it for each packet, and as such, this
-deficiency was never noted.
+There is no tight coupling between the VCPU index and the area of the
+redistributor region used for the VCPU, so we can simply ensure that all
+creations of redistributors are serialized per VM, and increment an
+offset when we successfully add a redistributor.
 
-> > > As it is with your patch, it'll go and report the TX status
-> > > without any
-> > > TX status information - which is handled in
-> > > wcn36xx_dxe_tx_ack_ind()
-> > > for those frames needing it.
-> > > 
-> > 
-> > Right, it doesn't sound desired. However, during normal operation
-> > I'm not seeing IEEE80211_TX_CTL_REQ_TX_STATUS being set and as such
-> > ieee80211_led_tx() is never called.
-> 
-> So what's the conclusion? How do we get leds working?
+The vgic_register_redist_iodev() function can be called from two paths:
+vgic_redister_all_redist_iodev() which is called via the kvm_vgic_addr()
+device attribute handler.  This patch already holds the kvm->lock mutex.
 
-Well, frankly, I never thought the TX LED was a super good idea - but
-it had been supported by the original code IIRC, so never removed. Some
-people like frantic blinking I guess ;-)
+The other path is via kvm_vgic_vcpu_init, which is called through a
+longer chain from kvm_vm_ioctl_create_vcpu(), which releases the
+kvm->lock mutex just before calling kvm_arch_vcpu_create(), so we can
+simply take this mutex again later for our purposes.
 
-But I think the problem also applies to the throughput trigger thing,
-so perhaps we need to stick some LED feedback calls into other places,
-like _noskb() or provide an extra way to do it?
+Fixes: ab6f468c10 ("KVM: arm/arm64: Register iodevs when setting redist base and creating VCPUs")
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Tested-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+---
+ include/kvm/arm_vgic.h           | 5 ++++-
+ virt/kvm/arm/vgic/vgic-init.c    | 5 ++++-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 9 ++++++---
+ 3 files changed, 14 insertions(+), 5 deletions(-)
 
-johannes
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 97b8d37..ef71858 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -195,7 +195,10 @@ struct vgic_dist {
+ 		/* either a GICv2 CPU interface */
+ 		gpa_t			vgic_cpu_base;
+ 		/* or a number of GICv3 redistributor regions */
+-		gpa_t			vgic_redist_base;
++		struct {
++			gpa_t		vgic_redist_base;
++			gpa_t		vgic_redist_free_offset;
++		};
+ 	};
+ 
+ 	/* distributor enabled */
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index dc68e2e..3a0b899 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -242,8 +242,11 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 	 * If we are creating a VCPU with a GICv3 we must also register the
+ 	 * KVM io device for the redistributor that belongs to this VCPU.
+ 	 */
+-	if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++	if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) {
++		mutex_lock(&vcpu->kvm->lock);
+ 		ret = vgic_register_redist_iodev(vcpu);
++		mutex_unlock(&vcpu->kvm->lock);
++	}
+ 	return ret;
+ }
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 99da1a2..9b0f681 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -586,7 +586,7 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
+ 	if (!vgic_v3_check_base(kvm))
+ 		return -EINVAL;
+ 
+-	rd_base = vgic->vgic_redist_base + kvm_vcpu_get_idx(vcpu) * SZ_64K * 2;
++	rd_base = vgic->vgic_redist_base + vgic->vgic_redist_free_offset;
+ 	sgi_base = rd_base + SZ_64K;
+ 
+ 	kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
+@@ -615,11 +615,14 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
+ 	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, sgi_base,
+ 				      SZ_64K, &sgi_dev->dev);
+ 	mutex_unlock(&kvm->slots_lock);
+-	if (ret)
++	if (ret) {
+ 		kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+ 					  &rd_dev->dev);
++		return ret;
++	}
+ 
+-	return ret;
++	vgic->vgic_redist_free_offset += 2 * SZ_64K;
++	return 0;
+ }
+ 
+ static void vgic_unregister_redist_iodev(struct kvm_vcpu *vcpu)
+-- 
+2.9.0
