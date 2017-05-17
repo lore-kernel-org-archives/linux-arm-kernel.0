@@ -1,80 +1,44 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 17 May 2017 10:33:56 +0200
-Subject: [pwm] question about potential division by zero
-In-Reply-To: <20170516165653.Horde.Xe6MBOoWtIt1Jni0nYqF1GM@gator4166.hostgator.com>
-References: <20170516165653.Horde.Xe6MBOoWtIt1Jni0nYqF1GM@gator4166.hostgator.com>
-Message-ID: <89269556-bb5d-b2bf-b44c-a078d6ca274a@gmail.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Wed, 17 May 2017 16:37:33 +0800
+Subject: [PATCH 00/12] arm64: dts: hi3660: add device nodes
+Message-ID: <20170517083745.24479-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patchset adds various devices nodes for hi3660 and hikey960.
 
+HiKey960 is one of 96boards. For details information about it, please
+refer to [1].
 
-On 16/05/17 23:56, Gustavo A. R. Silva wrote:
-> 
-> Hello everybody,
-> 
-> While looking into Coverity ID 1408721 I ran into the following piece of 
-> code at /drivers/pwm/pwm-mediatek.c:77:
-> 
->   77static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device 
-> *pwm,
->   78                          int duty_ns, int period_ns)
->   79{
->   80        struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
->   81        struct clk *clk = pc->clks[MTK_CLK_PWM1 + pwm->hwpwm];
->   82        u32 resolution, clkdiv = 0;
->   83
->   84        resolution = NSEC_PER_SEC / clk_get_rate(clk);
->   85
->   86        while (period_ns / resolution > 8191) {
->   87                resolution *= 2;
->   88                clkdiv++;
->   89        }
->   90
->   91        if (clkdiv > 7)
->   92                return -EINVAL;
->   93
->   94        mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | BIT(3) | 
-> clkdiv);
->   95        mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / 
-> resolution);
->   96        mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
->   97
->   98        return 0;
->   99}
-> 
-> The issue here is that in case _clk_ is null, function clk_get_rate() at 
-> line 84 will return zero and a division by zero will occur.
-> 
-> So my question here is if there is any chance for _clk_ to be null at 
-> line 81, hence ending up triggering a division by zero at line 84?
+[1] https://github.com/96boards/documentation/tree/master/ConsumerEdition/HiKey960
 
-No it can't, in the probe function will error out if one of the seven 
-clocks are not found.
+Chen Feng (2):
+  arm64: dts: hi3660: Add uarts nodes
+  arm64: dts: hi3660: Add pl031 rtc node
 
-for (i = 0; i < MTK_CLK_MAX; i++) {
-	pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
-	if (IS_ERR(pc->clks[i]))
-		return PTR_ERR(pc->clks[i]);
-}
+Chen Jun (1):
+  arm64: dts: hi3660: add power key dts node
 
-It registers a pwm chip with five PWMs. When the config function is 
-called one of the five PWMs is identified (with a value from 0-4) which 
-correspondents to the MTK_CLK_PWM[1-5], so no bug here neither.
+Guodong Xu (4):
+  dt-bindings: arm: hisilicon: add bindings for HiKey960 board
+  arm64: dts: hisilicon: update compatible string for hikey960
+  arm64: dts: hikey960: add WL1837 Bluetooth device node
+  arm64: dts: hikey960: add LED nodes
 
-Regards,
-Matthias
+Wang Xiaoyin (3):
+  arm64: dts: hikey960: pinctrl: add more pinmux and pinconfig
+  arm64: dts: hi3660: add gpio dtsi file for Hisilicon Hi3660 SOC
+  arm64: dts: hi3660: add spi device nodes
 
-> 
-> I'm trying to figure out if this is a false positive or something that 
-> needs to be fixed.
-> 
-> I'd really appreciate any comment on this.
-> 
-> Thank you
-> -- 
-> Gustavo A. R. Silva
-> 
-> 
-> 
-> 
+Zhangfei Gao (2):
+  arm64: dts: hi3660: add resources for clock and reset
+  arm64: dts: Add I2C nodes for Hi3660
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |   4 +
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  | 122 +++-
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 616 +++++++++++++++-
+ .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 779 +++++++++++++++++++--
+ 4 files changed, 1448 insertions(+), 73 deletions(-)
+
+-- 
+2.10.2
