@@ -1,72 +1,150 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 17 May 2017 16:05:36 +0200
-Subject: [PATCH 2/8] clocksource/drivers/fttmr010: Merge FTTMR010 DT bindings
+Date: Wed, 17 May 2017 16:05:37 +0200
+Subject: [PATCH 3/8] clocksource/drivers/fttmr010: Drop Gemini specifics
 In-Reply-To: <20170517140542.20016-1-linus.walleij@linaro.org>
 References: <20170517140542.20016-1-linus.walleij@linaro.org>
-Message-ID: <20170517140542.20016-3-linus.walleij@linaro.org>
+Message-ID: <20170517140542.20016-4-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This merges the Moxa and FTTMR010 device tree bindings into the
-Faraday binding document to avoid confusion.
+The Gemini now has a proper clock driver and a proper PCLK
+assigned in its device tree. Drop the Gemini-specific hacks
+to look up the system speed and rely on the clock framework
+like everyone else.
 
-The FTTMR010 is the IP block used by these SoCs, in vanilla
-or modified variant.
-
-The Aspeed variant is modified such that it is no longer fully
-register-compatible with FTTMR010 so for this reason it is not
-listed with two compatible strings, instead just one.
-
-Cc: devicetree at vger.kernel.org
-Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Joel Stanley <joel@jms.id.au>
 Cc: Jonas Jensen <jonas.jensen@gmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../devicetree/bindings/timer/faraday,fttmr010.txt    |  4 +++-
- .../devicetree/bindings/timer/moxa,moxart-timer.txt   | 19 -------------------
- 2 files changed, 3 insertions(+), 20 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
+ drivers/clocksource/timer-fttmr010.c | 103 ++++++++---------------------------
+ 1 file changed, 22 insertions(+), 81 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/faraday,fttmr010.txt b/Documentation/devicetree/bindings/timer/faraday,fttmr010.txt
-index b73ca6cd07f8..6e18bd662ccb 100644
---- a/Documentation/devicetree/bindings/timer/faraday,fttmr010.txt
-+++ b/Documentation/devicetree/bindings/timer/faraday,fttmr010.txt
-@@ -7,7 +7,9 @@ Required properties:
+diff --git a/drivers/clocksource/timer-fttmr010.c b/drivers/clocksource/timer-fttmr010.c
+index 58ce017e4a65..db097db346e3 100644
+--- a/drivers/clocksource/timer-fttmr010.c
++++ b/drivers/clocksource/timer-fttmr010.c
+@@ -11,8 +11,6 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+-#include <linux/mfd/syscon.h>
+-#include <linux/regmap.h>
+ #include <linux/clockchips.h>
+ #include <linux/clocksource.h>
+ #include <linux/sched_clock.h>
+@@ -179,9 +177,28 @@ static struct irqaction fttmr010_timer_irq = {
+ 	.handler	= fttmr010_timer_interrupt,
+ };
  
- - compatible : Must be one of
-   "faraday,fttmr010"
--  "cortina,gemini-timer"
-+  "cortina,gemini-timer", "faraday,fttmr010"
-+  "moxa,moxart-timer", "faraday,fttmr010"
-+  "aspeed,ast2400-timer"
- - reg : Should contain registers location and length
- - interrupts : Should contain the three timer interrupts usually with
-   flags for falling edge
-diff --git a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-deleted file mode 100644
-index e207c11630af..000000000000
---- a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-+++ /dev/null
-@@ -1,19 +0,0 @@
--MOXA ART timer
+-static int __init fttmr010_timer_common_init(struct device_node *np)
++static int __init fttmr010_timer_init(struct device_node *np)
+ {
+ 	int irq;
++	struct clk *clk;
++	int ret;
++
++	/*
++	 * These implementations require a clock reference.
++	 * FIXME: we currently only support clocking using PCLK
++	 * and using EXTCLK is not supported in the driver.
++	 */
++	clk = of_clk_get_by_name(np, "PCLK");
++	if (IS_ERR(clk)) {
++		pr_err("could not get PCLK\n");
++		return PTR_ERR(clk);
++	}
++	ret = clk_prepare_enable(clk);
++	if (ret) {
++		pr_err("failed to enable PCLK\n");
++		return ret;
++	}
++	tick_rate = clk_get_rate(clk);
+ 
+ 	base = of_iomap(np, 0);
+ 	if (!base) {
+@@ -229,81 +246,5 @@ static int __init fttmr010_timer_common_init(struct device_node *np)
+ 
+ 	return 0;
+ }
 -
--Required properties:
+-static int __init fttmr010_timer_of_init(struct device_node *np)
+-{
+-	/*
+-	 * These implementations require a clock reference.
+-	 * FIXME: we currently only support clocking using PCLK
+-	 * and using EXTCLK is not supported in the driver.
+-	 */
+-	struct clk *clk;
+-	int ret;
 -
--- compatible : Must be one of:
-- 	- "moxa,moxart-timer"
-- 	- "aspeed,ast2400-timer"
--- reg : Should contain registers location and length
--- interrupts : Should contain the timer interrupt number
--- clocks : Should contain phandle for the clock that drives the counter
+-	clk = of_clk_get_by_name(np, "PCLK");
+-	if (IS_ERR(clk)) {
+-		pr_err("could not get PCLK\n");
+-		return PTR_ERR(clk);
+-	}
+-	ret = clk_prepare_enable(clk);
+-	if (ret) {
+-		pr_err("failed to enable PCLK\n");
+-		return ret;
+-	}
+-	tick_rate = clk_get_rate(clk);
 -
--Example:
+-	return fttmr010_timer_common_init(np);
+-}
+-CLOCKSOURCE_OF_DECLARE(fttmr010, "faraday,fttmr010", fttmr010_timer_of_init);
 -
--	timer: timer at 98400000 {
--		compatible = "moxa,moxart-timer";
--		reg = <0x98400000 0x42>;
--		interrupts = <19 1>;
--		clocks = <&coreclk>;
--	};
+-/*
+- * Gemini-specific: relevant registers in the global syscon
+- */
+-#define GLOBAL_STATUS		0x04
+-#define CPU_AHB_RATIO_MASK	(0x3 << 18)
+-#define CPU_AHB_1_1		(0x0 << 18)
+-#define CPU_AHB_3_2		(0x1 << 18)
+-#define CPU_AHB_24_13		(0x2 << 18)
+-#define CPU_AHB_2_1		(0x3 << 18)
+-#define REG_TO_AHB_SPEED(reg)	((((reg) >> 15) & 0x7) * 10 + 130)
+-
+-static int __init gemini_timer_of_init(struct device_node *np)
+-{
+-	static struct regmap *map;
+-	int ret;
+-	u32 val;
+-
+-	map = syscon_regmap_lookup_by_phandle(np, "syscon");
+-	if (IS_ERR(map)) {
+-		pr_err("Can't get regmap for syscon handle\n");
+-		return -ENODEV;
+-	}
+-	ret = regmap_read(map, GLOBAL_STATUS, &val);
+-	if (ret) {
+-		pr_err("Can't read syscon status register\n");
+-		return -ENXIO;
+-	}
+-
+-	tick_rate = REG_TO_AHB_SPEED(val) * 1000000;
+-	pr_info("Bus: %dMHz ", tick_rate / 1000000);
+-
+-	tick_rate /= 6;		/* APB bus run AHB*(1/6) */
+-
+-	switch (val & CPU_AHB_RATIO_MASK) {
+-	case CPU_AHB_1_1:
+-		pr_cont("(1/1)\n");
+-		break;
+-	case CPU_AHB_3_2:
+-		pr_cont("(3/2)\n");
+-		break;
+-	case CPU_AHB_24_13:
+-		pr_cont("(24/13)\n");
+-		break;
+-	case CPU_AHB_2_1:
+-		pr_cont("(2/1)\n");
+-		break;
+-	}
+-
+-	return fttmr010_timer_common_init(np);
+-}
+-CLOCKSOURCE_OF_DECLARE(gemini, "cortina,gemini-timer", gemini_timer_of_init);
++CLOCKSOURCE_OF_DECLARE(fttmr010, "faraday,fttmr010", fttmr010_timer_init);
++CLOCKSOURCE_OF_DECLARE(gemini, "cortina,gemini-timer", fttmr010_timer_init);
 -- 
 2.9.3
