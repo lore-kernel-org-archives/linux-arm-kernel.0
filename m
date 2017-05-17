@@ -1,46 +1,44 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Wed, 17 May 2017 17:52:25 +0800
-Subject: [PATCH v2 2/3] arm: dts: rk322x: correct uart2 pinctrl and add
- another sets
-In-Reply-To: <1495014746-27621-1-git-send-email-frank.wang@rock-chips.com>
-References: <1495014746-27621-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1495014746-27621-3-git-send-email-frank.wang@rock-chips.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 17 May 2017 11:54:11 +0200
+Subject: [PATCH 09/31] KVM: arm64: Make kvm_condition_valid32() accessible
+ from EL2
+In-Reply-To: <20170503104606.19342-10-marc.zyngier@arm.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <20170503104606.19342-10-marc.zyngier@arm.com>
+Message-ID: <877db426-38ee-9776-2ca7-29b727eb11b9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct UART2 PINCTRL flag and add another PINCTRL sets for UART2
-in case of confict with SDMMC.
+Hi,
+On 03/05/2017 12:45, Marc Zyngier wrote:
+> As we're about to trap CP15 accesses and handle them at EL2, we
+> need to evaluate whether or not the condition flags are valid,
+> as an implementation is allowed to trap despite the condition
+> not being met.
+> 
+> Tagging the function as __hyp_text allows this.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
----
- arch/arm/boot/dts/rk322x.dtsi | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-index cc6a27d..fe6530f 100644
---- a/arch/arm/boot/dts/rk322x.dtsi
-+++ b/arch/arm/boot/dts/rk322x.dtsi
-@@ -693,7 +693,7 @@
- 
- 		uart2 {
- 			uart2_xfer: uart2-xfer {
--				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_none>,
-+				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_up>,
- 						<1 19 RK_FUNC_2 &pcfg_pull_none>;
- 			};
- 
-@@ -705,5 +705,12 @@
- 				rockchip,pins = <0 24 RK_FUNC_1 &pcfg_pull_none>;
- 			};
- 		};
-+
-+		uart2-1 {
-+			uart21_xfer: uart21-xfer {
-+				rockchip,pins = <1 10 RK_FUNC_2 &pcfg_pull_up>,
-+						<1 9 RK_FUNC_2 &pcfg_pull_none>;
-+			};
-+		};
- 	};
- };
--- 
-2.0.0
+Eric
+
+> ---
+>  virt/kvm/arm/aarch32.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/aarch32.c b/virt/kvm/arm/aarch32.c
+> index 528af4b2d09e..79c7c357804b 100644
+> --- a/virt/kvm/arm/aarch32.c
+> +++ b/virt/kvm/arm/aarch32.c
+> @@ -60,7 +60,7 @@ static const unsigned short cc_map[16] = {
+>  /*
+>   * Check if a trapped instruction should have been executed or not.
+>   */
+> -bool kvm_condition_valid32(const struct kvm_vcpu *vcpu)
+> +bool __hyp_text kvm_condition_valid32(const struct kvm_vcpu *vcpu)
+>  {
+>  	unsigned long cpsr;
+>  	u32 cpsr_cond;
+> 
