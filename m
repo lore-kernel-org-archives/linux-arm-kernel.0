@@ -1,47 +1,23 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 17 May 2017 16:37:41 +0800
-Subject: [PATCH 08/12] arm64: dts: hikey960: add WL1837 Bluetooth device node
-In-Reply-To: <20170517083745.24479-1-guodong.xu@linaro.org>
-References: <20170517083745.24479-1-guodong.xu@linaro.org>
-Message-ID: <20170517083745.24479-9-guodong.xu@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 17 May 2017 17:00:02 +0800
+Subject: [PATCH v3 15/21] drm/sun4i: Ignore the generic connectors for
+ components
+In-Reply-To: <a766ed0410e4c78e49f1e462775fdba1a70a88bf.1495006350.git-series.maxime.ripard@free-electrons.com>
+References: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
+ <a766ed0410e4c78e49f1e462775fdba1a70a88bf.1495006350.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66Cxb84sRoESWQbqDxpTVAVFd0vFcKz+DB2TKD83Aw1JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the serial slave device for the WL1837 Bluetooth interface.
+On Wed, May 17, 2017 at 3:40 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The generic connectors such as hdmi-connector doesn't have any driver in,
+> so if they are added to the component list, we will be waiting forever for
+> a non-existing driver to probe.
+>
+> Add a list of the connectors we want to ignore when building our component
+> list.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index 513c496..69aa207 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -9,6 +9,7 @@
- 
- #include "hi3660.dtsi"
- #include "hikey960-pinctrl.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "HiKey960";
-@@ -55,6 +56,16 @@
- 	status = "okay";
- };
- 
-+&uart4 {
-+	status = "okay";
-+	max-speed = <921600>;
-+
-+	bluetooth {
-+		compatible = "ti,wl1837-st";
-+		enable-gpios = <&gpio15 6 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
- &uart6 {
- 	status = "okay";
- };
--- 
-2.10.2
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
