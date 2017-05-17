@@ -1,36 +1,68 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 17 May 2017 16:27:44 +0100
-Subject: [PATCH 1/3] arm64: hugetlb: Fix huge_pte_offset to return
- poisoned page table entries
-In-Reply-To: <CAOZdJXVrMSUkHcsJXg+qdA=Bxt0bT5Dn5-MCUvZdSv8_8XaU-Q@mail.gmail.com>
- (Timur Tabi's message of "Wed, 17 May 2017 09:35:22 -0500")
-References: <20170412140459.21824-1-punit.agrawal@arm.com>
- <20170412140459.21824-2-punit.agrawal@arm.com>
- <20170503124906.GA5622@e104818-lin.cambridge.arm.com>
- <87lgqcy5uw.fsf@e105922-lin.cambridge.arm.com>
- <CAOZdJXVrMSUkHcsJXg+qdA=Bxt0bT5Dn5-MCUvZdSv8_8XaU-Q@mail.gmail.com>
-Message-ID: <87tw4jlczz.fsf@e105922-lin.cambridge.arm.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 17 May 2017 17:39:17 +0200
+Subject: [PATCH 12/31] KVM: arm64: vgic-v3: Add ICV_IGRPEN1_EL1 handler
+In-Reply-To: <20170503104606.19342-13-marc.zyngier@arm.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <20170503104606.19342-13-marc.zyngier@arm.com>
+Message-ID: <cf890c5c-2c16-c5ef-cedf-b10616d7ef8c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Timur Tabi <timur@codeaurora.org> writes:
+Hi Marc,
 
-> On Thu, May 4, 2017 at 10:55 AM, Punit Agrawal <punit.agrawal@arm.com> wrote:
->> Indeed - I was avoiding changing the function to drop contiguous
->> hugepage support which follows this hunk.
->>
->> I've made changes locally based on your suggestion and will post a
->> revised version after the merge window.
->
-> Punit, will you be able to post a new version that could be a
-> candidate for 4.13?
+On 03/05/2017 12:45, Marc Zyngier wrote:
+> Add a handler for reading/writing the guest's view of the ICC_IGRPEN1_EL1
+> register, which is located in the ICH_VMCR_EL2.VENG1 field.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-Hi Timur,
+Thanks
 
-I've just posted v2 for this series. I was testing the patches on rc1
-when I saw your mail come through.
-
-Please shout out if you notice any problems with the new version.
-
-Thanks,
-Punit
+Eric
+> ---
+>  virt/kvm/arm/hyp/vgic-v3-sr.c | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index f0f038c490a5..473ef22508e6 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -395,6 +395,23 @@ static unsigned int __hyp_text __vgic_v3_get_bpr1(u32 vmcr)
+>  	return bpr;
+>  }
+>  
+> +static void __hyp_text __vgic_v3_read_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+> +{
+> +	vcpu_set_reg(vcpu, rt, !!(vmcr & ICH_VMCR_ENG1_MASK));
+> +}
+> +
+> +static void __hyp_text __vgic_v3_write_igrpen1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+> +{
+> +	u64 val = vcpu_get_reg(vcpu, rt);
+> +
+> +	if (val & 1)
+> +		vmcr |= ICH_VMCR_ENG1_MASK;
+> +	else
+> +		vmcr &= ~ICH_VMCR_ENG1_MASK;
+> +
+> +	__vgic_v3_write_vmcr(vmcr);
+> +}
+> +
+>  static void __hyp_text __vgic_v3_read_bpr1(struct kvm_vcpu *vcpu, u32 vmcr, int rt)
+>  {
+>  	vcpu_set_reg(vcpu, rt, __vgic_v3_get_bpr1(vmcr));
+> @@ -440,6 +457,12 @@ int __hyp_text __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu)
+>  	is_read = (esr & ESR_ELx_SYS64_ISS_DIR_MASK) == ESR_ELx_SYS64_ISS_DIR_READ;
+>  
+>  	switch (sysreg) {
+> +	case SYS_ICC_GRPEN1_EL1:
+> +		if (is_read)
+> +			fn = __vgic_v3_read_igrpen1;
+> +		else
+> +			fn = __vgic_v3_write_igrpen1;
+> +		break;
+>  	case SYS_ICC_BPR1_EL1:
+>  		if (is_read)
+>  			fn = __vgic_v3_read_bpr1;
+> 
