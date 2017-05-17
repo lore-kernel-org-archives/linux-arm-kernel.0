@@ -1,46 +1,194 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 17 May 2017 11:09:52 +0100
-Subject: [patch V2 03/17] arm64: Adjust system_state check
-In-Reply-To: <20170516184735.112589728@linutronix.de>
-References: <20170516184231.564888231@linutronix.de>
- <20170516184735.112589728@linutronix.de>
-Message-ID: <20170517100951.GB14654@leverpostej>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Wed, 17 May 2017 10:13:01 +0000
+Subject: [v6 2/3] iommu/arm-smmu-v3: Add workaround for Cavium ThunderX2
+ erratum #74
+In-Reply-To: <1494592866-14076-3-git-send-email-gakula@caviumnetworks.com>
+References: <1494592866-14076-1-git-send-email-gakula@caviumnetworks.com>
+ <1494592866-14076-3-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA838351762@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 08:42:34PM +0200, Thomas Gleixner wrote:
-> To enable smp_processor_id() and might_sleep() debug checks earlier, it's
-> required to add system states between SYSTEM_BOOTING and SYSTEM_RUNNING.
+Hi Geetha,
+
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Geetha sowjanya
+> Sent: Friday, May 12, 2017 1:41 PM
+> To: will.deacon at arm.com; robin.murphy at arm.com;
+> lorenzo.pieralisi at arm.com; hanjun.guo at linaro.org; sudeep.holla at arm.com;
+> iommu at lists.linux-foundation.org
+> Cc: Charles.Garcia-Tobin at arm.com; Geetha Sowjanya;
+> geethasowjanya.akula at gmail.com; jcm at redhat.com;
+> linu.cherian at cavium.com; rjw at rjwysocki.net; robert.moore at intel.com;
+> linux-kernel at vger.kernel.org; linux-acpi at vger.kernel.org;
+> robert.richter at cavium.com; lv.zheng at intel.com; catalin.marinas at arm.com;
+> sgoutham at cavium.com; linux-arm-kernel at lists.infradead.org;
+> devel at acpica.org
+> Subject: [v6 2/3] iommu/arm-smmu-v3: Add workaround for Cavium
+> ThunderX2 erratum #74
 > 
-> Adjust the system_state check in smp_send_stop() to handle the extra states.
+> From: Linu Cherian <linu.cherian@cavium.com>
 > 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
+> Cavium ThunderX2 SMMU implementation doesn't support page 1 register
+> space and PAGE0_REGS_ONLY option is enabled as an errata workaround.
+> This option when turned on, replaces all page 1 offsets used for
+> EVTQ_PROD/CONS, PRIQ_PROD/CONS register access with page 0 offsets.
+> 
+> SMMU resource size checks are now based on SMMU option
+> PAGE0_REGS_ONLY, since resource size can be either 64k/128k.
+> For this, arm_smmu_device_dt_probe/acpi_probe has been moved before
+> platform_get_resource call, so that SMMU options are set beforehand.
+> 
+> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+> Signed-off-by: Geetha Sowjanya <geethasowjanya.akula@cavium.com>
 > ---
->  arch/arm64/kernel/smp.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-
-FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
+>  Documentation/arm64/silicon-errata.txt             |  1 +
+>  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |  6 ++
+>  drivers/iommu/arm-smmu-v3.c                        | 64 +++++++++++++++++-----
+>  3 files changed, 56 insertions(+), 15 deletions(-)
 > 
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -961,8 +961,7 @@ void smp_send_stop(void)
->  		cpumask_copy(&mask, cpu_online_mask);
->  		cpumask_clear_cpu(smp_processor_id(), &mask);
->  
-> -		if (system_state == SYSTEM_BOOTING ||
-> -		    system_state == SYSTEM_RUNNING)
-> +		if (system_state <= SYSTEM_RUNNING)
->  			pr_crit("SMP: stopping secondary CPUs\n");
->  		smp_cross_call(&mask, IPI_CPU_STOP);
+> diff --git a/Documentation/arm64/silicon-errata.txt
+> b/Documentation/arm64/silicon-errata.txt
+> index 10f2ddd..4693a32 100644
+> --- a/Documentation/arm64/silicon-errata.txt
+> +++ b/Documentation/arm64/silicon-errata.txt
+> @@ -62,6 +62,7 @@ stable kernels.
+>  | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154
+> |
+>  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456
+> |
+>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
+> +| Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
+>  |                |                 |                 |                             |
+>  | Freescale/NXP  | LS2080A/LS1043A | A-008585        |
+> FSL_ERRATUM_A008585         |
+>  |                |                 |                 |                             |
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> index be57550..e6da62b 100644
+> --- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+> @@ -49,6 +49,12 @@ the PCIe specification.
+>  - hisilicon,broken-prefetch-cmd
+>                      : Avoid sending CMD_PREFETCH_* commands to the SMMU.
+> 
+> +- cavium-cn99xx,broken-page1-regspace
+> +                    : Replaces all page 1 offsets used for EVTQ_PROD/CONS,
+> +						PRIQ_PROD/CONS register
+> access with page 0 offsets.
+> +						Set for Caviun ThunderX2
+> silicon that doesn't support
+> +						SMMU page1 register space.
+> +
+>  ** Example
+> 
+>          smmu at 2b400000 {
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 380969a..c519927c 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -412,6 +412,9 @@
+>  #define MSI_IOVA_BASE			0x8000000
+>  #define MSI_IOVA_LENGTH			0x100000
+> 
+> +#define ARM_SMMU_PAGE0_REGS_ONLY(smmu)		\
+> +	((smmu)->options & ARM_SMMU_OPT_PAGE0_REGS_ONLY)
+> +
+>  static bool disable_bypass;
+>  module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
+> MODULE_PARM_DESC(disable_bypass, @@ -597,6 +600,7 @@ struct
+> arm_smmu_device {
+>  	u32				features;
+> 
+>  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+> +#define ARM_SMMU_OPT_PAGE0_REGS_ONLY    (1 << 1)
+>  	u32				options;
+> 
+>  	struct arm_smmu_cmdq		cmdq;
+> @@ -663,9 +667,19 @@ struct arm_smmu_option_prop {
+> 
+>  static struct arm_smmu_option_prop arm_smmu_options[] = {
+>  	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-
+> cmd" },
+> +	{ ARM_SMMU_OPT_PAGE0_REGS_ONLY,
+> +"cavium-cn99xx,broken-page1-regspace"},
+>  	{ 0, NULL},
+>  };
+> 
+> +static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
+> +						 struct arm_smmu_device
+> *smmu)
+> +{
+> +	if (offset > SZ_64K && ARM_SMMU_PAGE0_REGS_ONLY(smmu))
+> +		offset -= SZ_64K;
+> +
+> +	return smmu->base + offset;
+> +}
+> +
+>  static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain
+> *dom)  {
+>  	return container_of(dom, struct arm_smmu_domain, domain); @@ -
+> 1961,8 +1975,8 @@ static int arm_smmu_init_one_queue(struct
+> arm_smmu_device *smmu,
+>  		return -ENOMEM;
 >  	}
 > 
+> -	q->prod_reg	= smmu->base + prod_off;
+> -	q->cons_reg	= smmu->base + cons_off;
+> +	q->prod_reg	= arm_smmu_page1_fixup(prod_off, smmu);
+> +	q->cons_reg	= arm_smmu_page1_fixup(cons_off, smmu);
+>  	q->ent_dwords	= dwords;
 > 
+>  	q->q_base  = Q_BASE_RWA;
+> @@ -2363,8 +2377,10 @@ static int arm_smmu_device_reset(struct
+> arm_smmu_device *smmu, bool bypass)
+> 
+>  	/* Event queue */
+>  	writeq_relaxed(smmu->evtq.q.q_base, smmu->base +
+> ARM_SMMU_EVTQ_BASE);
+> -	writel_relaxed(smmu->evtq.q.prod, smmu->base +
+> ARM_SMMU_EVTQ_PROD);
+> -	writel_relaxed(smmu->evtq.q.cons, smmu->base +
+> ARM_SMMU_EVTQ_CONS);
+> +	writel_relaxed(smmu->evtq.q.prod,
+> +		       arm_smmu_page1_fixup(ARM_SMMU_EVTQ_PROD,
+> smmu));
+> +	writel_relaxed(smmu->evtq.q.cons,
+> +		       arm_smmu_page1_fixup(ARM_SMMU_EVTQ_CONS,
+> smmu));
+> 
+>  	enables |= CR0_EVTQEN;
+>  	ret = arm_smmu_write_reg_sync(smmu, enables,
+> ARM_SMMU_CR0, @@ -2379,9 +2395,9 @@ static int
+> arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+>  		writeq_relaxed(smmu->priq.q.q_base,
+>  			       smmu->base + ARM_SMMU_PRIQ_BASE);
+>  		writel_relaxed(smmu->priq.q.prod,
+> -			       smmu->base + ARM_SMMU_PRIQ_PROD);
+> +
+> arm_smmu_page1_fixup(ARM_SMMU_PRIQ_PROD, smmu));
+>  		writel_relaxed(smmu->priq.q.cons,
+> -			       smmu->base + ARM_SMMU_PRIQ_CONS);
+> +
+> arm_smmu_page1_fixup(ARM_SMMU_PRIQ_CONS, smmu));
+> 
+>  		enables |= CR0_PRIQEN;
+>  		ret = arm_smmu_write_reg_sync(smmu, enables,
+> ARM_SMMU_CR0, @@ -2605,6 +2621,14 @@ static int
+> arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)  }
+> 
+>  #ifdef CONFIG_ACPI
+> +static void acpi_smmu_get_options(u32 model, struct arm_smmu_device
+> +*smmu) {
+> +	if (model == ACPI_IORT_SMMU_CAVIUM_CN99XX)
+> +		smmu->options |= ARM_SMMU_OPT_PAGE0_REGS_ONLY;
+
+HiSIlicon hip06/07 boards have a similar existing option to enable,
+ARM_SMMU_OPT_SKIP_PREFETCH. I have just sent out a similar patch to enable
+It-" [PATCH] iommu/arm-smmu-v3: Enable ACPI based HiSilicon CMD_PREFETCH
+ quirk(erratum 161010701)".  May be it can be merged here, if this series goes through.
+ Not sure about the protocol though.
+
+Thanks,
+Shameer
