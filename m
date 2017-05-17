@@ -1,34 +1,55 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 May 2017 18:09:40 +0100
-Subject: crash after receiving SIGCHLD during system call
-In-Reply-To: <CALnQHM3wjH1CWwUUJX7KhGOOhoW-0r22nyBWmBUJYCUFe-JEtw@mail.gmail.com>
-References: <CALnQHM3wjH1CWwUUJX7KhGOOhoW-0r22nyBWmBUJYCUFe-JEtw@mail.gmail.com>
-Message-ID: <20170517170940.GJ22219@n2100.armlinux.org.uk>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 17 May 2017 12:10:16 -0500
+Subject: [PATCH v6 1/3] of/pci/dma: fix DMA configuration for PCI masters
+In-Reply-To: <1494912127-12890-2-git-send-email-oza.oza@broadcom.com>
+References: <1494912127-12890-1-git-send-email-oza.oza@broadcom.com>
+ <1494912127-12890-2-git-send-email-oza.oza@broadcom.com>
+Message-ID: <20170517171016.GE31462@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 10:04:32AM -0600, David Mosberger wrote:
-> I added some instrumentation code to the SIGCHLD handler of lighttpd
-> v1.4.45 and I have seen crashes after the SIGCHLD handler
-> interrupted __libc_fork() and close().  The one constant so far is
-> that the pc register in the signal handler machine-context
-> (mcontext_t) points to the instruction after the "svc 0" instruction.
+On Tue, May 16, 2017 at 10:52:05AM +0530, Oza Pawandeep wrote:
+> current device framework and OF framework integration assumes
 
-I don't think there's much to be read into that as signal delivery to
-a process always occurs on the thread's exit path from kernel mode to
-user mode.
+s/current/The current/
 
-This happens after:
+> dma-ranges in a way where memory-mapped devices define their
+> dma-ranges. (child-bus-address, parent-bus-address, length).
+> 
+> of_dma_configure is specifically written to take care of memory
+> mapped devices. but no implementation exists for pci to take
+> care of pcie based memory ranges.
 
-- completion of an interrupt handler
-- completion of a kernel syscall
-- completion of a page fault
+s/pci/PCI/	(also other occurrences below)
+s/pcie/PCIe/
 
-What would help is to enable CONFIG_DEBUG_USER and pass 'user_debug=31'
-to the kernel.  It should be more verbose about the cause of the fault
-from the kernel point of view.
+I don't see how PCIe is relevant here.  The bridge might support PCIe,
+but I don't think anything here is actually specific to PCIe.  If
+that's the case, I think it's confusing to mention PCIe.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> for e.g. iproc based SOCs and other SOCs(suc as rcar) have PCI
+> world dma-ranges.
+> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+> 
+> this patch serves following:
+> 
+> 1) exposes interface to the pci host driver for their
+> inbound memory ranges
+> 
+> 2) provide an interface to callers such as of_dma_get_ranges.
+> so then the returned size get best possible (largest) dma_mask.
+> because PCI RC drivers do not call APIs such as
+> dma_set_coherent_mask() and hence rather it shows its addressing
+> capabilities based on dma-ranges.
+> for e.g.
+> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+> we should get dev->coherent_dma_mask=0x7fffffffff.
+> 
+> 3) this patch handles multiple inbound windows and dma-ranges.
+> it is left to the caller, how it wants to use them.
+> the new function returns the resources in a standard and unform way
+> 
+> 4) this way the callers of for e.g. of_dma_get_ranges
+> does not need to change.
+
+Please start sentences with a capital letter.
