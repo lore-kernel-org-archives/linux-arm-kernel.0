@@ -1,38 +1,36 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 17 May 2017 16:23:36 +0100
-Subject: [PATCH v2 3/3] arm64: kconfig: allow support for memory failure
- handling
-In-Reply-To: <20170517152336.6052-1-punit.agrawal@arm.com>
-References: <20170517152336.6052-1-punit.agrawal@arm.com>
-Message-ID: <20170517152336.6052-4-punit.agrawal@arm.com>
+Date: Wed, 17 May 2017 16:27:44 +0100
+Subject: [PATCH 1/3] arm64: hugetlb: Fix huge_pte_offset to return
+ poisoned page table entries
+In-Reply-To: <CAOZdJXVrMSUkHcsJXg+qdA=Bxt0bT5Dn5-MCUvZdSv8_8XaU-Q@mail.gmail.com>
+ (Timur Tabi's message of "Wed, 17 May 2017 09:35:22 -0500")
+References: <20170412140459.21824-1-punit.agrawal@arm.com>
+ <20170412140459.21824-2-punit.agrawal@arm.com>
+ <20170503124906.GA5622@e104818-lin.cambridge.arm.com>
+ <87lgqcy5uw.fsf@e105922-lin.cambridge.arm.com>
+ <CAOZdJXVrMSUkHcsJXg+qdA=Bxt0bT5Dn5-MCUvZdSv8_8XaU-Q@mail.gmail.com>
+Message-ID: <87tw4jlczz.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+Timur Tabi <timur@codeaurora.org> writes:
 
-Declare ARCH_SUPPORTS_MEMORY_FAILURE, as arm64 does support
-memory failure recovery attempt.
+> On Thu, May 4, 2017 at 10:55 AM, Punit Agrawal <punit.agrawal@arm.com> wrote:
+>> Indeed - I was avoiding changing the function to drop contiguous
+>> hugepage support which follows this hunk.
+>>
+>> I've made changes locally based on your suggestion and will post a
+>> revised version after the merge window.
+>
+> Punit, will you be able to post a new version that could be a
+> candidate for 4.13?
 
-Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-(Dropped changes to ACPI APEI Kconfig and updated commit log)
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Acked-by: Steve Capper <steve.capper@arm.com>
----
- arch/arm64/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Hi Timur,
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 3dcd7ec69bca..39986b63383e 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -20,6 +20,7 @@ config ARM64
- 	select ARCH_HAS_STRICT_MODULE_RWX
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_USE_CMPXCHG_LOCKREF
-+	select ARCH_SUPPORTS_MEMORY_FAILURE
- 	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_SUPPORTS_NUMA_BALANCING
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
--- 
-2.11.0
+I've just posted v2 for this series. I was testing the patches on rc1
+when I saw your mail come through.
+
+Please shout out if you notice any problems with the new version.
+
+Thanks,
+Punit
