@@ -1,40 +1,30 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Wed, 17 May 2017 10:31:19 +0200
-Subject: [PATCH v5 0/3] Cavium ARM64 uncore PMU support
-Message-ID: <20170517083122.5050-1-jglauber@cavium.com>
+Date: Wed, 17 May 2017 10:31:20 +0200
+Subject: [PATCH v5 1/3] perf: export perf_event_update_userpage()
+In-Reply-To: <20170517083122.5050-1-jglauber@cavium.com>
+References: <20170517083122.5050-1-jglauber@cavium.com>
+Message-ID: <20170517083122.5050-2-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is another attempt of adding support for some PMU counters on Cavium SOCs.
+Export perf_event_update_userpage() to make it usable from a module.
 
-The major change is that I quit trying to merge the counters as it would
-not fit with your requirements [1].
+Signed-off-by: Jan Glauber <jglauber@cavium.com>
+---
+ kernel/events/core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Another big change is that now the EDAC driver for the devices
-carrying the PMU counters is upstream. I've added a simple callback
-to the EDAC driver which owns the devices, so probing is much simpler now.
-
-The driver still provides common "uncore" functions to avoid
-code duplication and support adding more device PMUs (like L2 cache) in
-the future.
-
-[1] https://marc.info/?l=linux-arm-kernel&m=147940675216946&w=4
-
-Jan Glauber (3):
-  perf: export perf_event_update_userpage()
-  perf: cavium: Support memory controller PMU counters
-  perf: cavium: Support transmit-link PMU counters
-
- drivers/edac/thunderx_edac.c    |  19 +-
- drivers/perf/Kconfig            |   8 +
- drivers/perf/Makefile           |   1 +
- drivers/perf/cavium_pmu.c       | 629 ++++++++++++++++++++++++++++++++++++++++
- include/linux/cpuhotplug.h      |   1 +
- include/linux/perf/cavium_pmu.h |  35 +++
- kernel/events/core.c            |   1 +
- 7 files changed, 693 insertions(+), 1 deletion(-)
- create mode 100644 drivers/perf/cavium_pmu.c
- create mode 100644 include/linux/perf/cavium_pmu.h
-
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 6e75a5c..6578b9f 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -4933,6 +4933,7 @@ void perf_event_update_userpage(struct perf_event *event)
+ unlock:
+ 	rcu_read_unlock();
+ }
++EXPORT_SYMBOL_GPL(perf_event_update_userpage);
+ 
+ static int perf_mmap_fault(struct vm_fault *vmf)
+ {
 -- 
 2.9.0.rc0.21.g7777322
