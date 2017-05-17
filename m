@@ -1,74 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 May 2017 21:13:38 +0200
-Subject: [PATCH v6 1/3] of/pci/dma: fix DMA configuration for PCI masters
-In-Reply-To: <1494912127-12890-2-git-send-email-oza.oza@broadcom.com>
-References: <1494912127-12890-1-git-send-email-oza.oza@broadcom.com>
- <1494912127-12890-2-git-send-email-oza.oza@broadcom.com>
-Message-ID: <CAK8P3a3hoeCET5Z+KUJDCHgGEJUmLF49bDozEE0ra5jcbjvoXQ@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 17 May 2017 21:18:06 +0200
+Subject: [PATCH] KVM: arm/arm64: Hold slots_lock when unregisering kvm io bus
+ devices
+Message-ID: <20170517191806.3978-1-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 7:22 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
-> current device framework and OF framework integration assumes
-> dma-ranges in a way where memory-mapped devices define their
-> dma-ranges. (child-bus-address, parent-bus-address, length).
->
-> of_dma_configure is specifically written to take care of memory
-> mapped devices. but no implementation exists for pci to take
-> care of pcie based memory ranges.
+We were not holding the kvm->slots_lock as required when calling
+kvm_io_bus_unregister_dev() as required.
 
-Hi Oza,
+This only affects the error path, but still, let's do our due
+dilligence.
 
-I'm trying to make sense of this, but am still rather puzzled. I have
-no idea what the distinction between memory-mapped devices and
-pcie based devices is in your description, as PCIe is usually memory
-mapped, and Linux doesn't actually support other kinds of PCIe
-devices on most architectures.
+Reported by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+---
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-> for e.g. iproc based SOCs and other SOCs(suc as rcar) have PCI
-> world dma-ranges.
-> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
->
-> this patch serves following:
->
-> 1) exposes interface to the pci host driver for their
-> inbound memory ranges
->
-> 2) provide an interface to callers such as of_dma_get_ranges.
-> so then the returned size get best possible (largest) dma_mask.
-> because PCI RC drivers do not call APIs such as
-> dma_set_coherent_mask() and hence rather it shows its addressing
-> capabilities based on dma-ranges.
->
-> for e.g.
-> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
-> we should get dev->coherent_dma_mask=0x7fffffffff.
-
-do you mean the coherent_dma_mask of the PCI host bridge
-or an attached device here?
-
-If you require PCI devices to come up with an initial
-coherent_dma_mask other than 0xffffffffff, there are other
-problems involved. In particular, you will need to use
-swiotlb, which is not supported on arm32 at the moment,
-and the dma_set_mask()/dma_set_coherent_mask()
-functions need to be modified.
-
-> +       while (1) {
-> +               dma_ranges = of_get_property(node, "dma-ranges", &rlen);
-> +
-> +               /* Ignore empty ranges, they imply no translation required. */
-> +               if (dma_ranges && rlen > 0)
-> +                       break;
-> +
-> +               /* no dma-ranges, they imply no translation required. */
-> +               if (!dma_ranges)
-> +                       break;
-
-A missing parent dma-ranges property here should really indicate that there
-is no valid translation. If we have existing cases where this happens
-in DT files, we may treat it as allowing only 32-bit DMA (as we already
-do for having no dma-ranges at all), but treating it the same way
-as an empty dma-ranges property sounds wrong.
-
-     Arnd
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 9b0f681..201d5e2 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -614,15 +614,16 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
+ 	mutex_lock(&kvm->slots_lock);
+ 	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, sgi_base,
+ 				      SZ_64K, &sgi_dev->dev);
+-	mutex_unlock(&kvm->slots_lock);
+ 	if (ret) {
+ 		kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+ 					  &rd_dev->dev);
+-		return ret;
++		goto out;
+ 	}
+ 
+ 	vgic->vgic_redist_free_offset += 2 * SZ_64K;
+-	return 0;
++out:
++	mutex_unlock(&kvm->slots_lock);
++	return ret;
+ }
+ 
+ static void vgic_unregister_redist_iodev(struct kvm_vcpu *vcpu)
+@@ -647,10 +648,12 @@ static int vgic_register_all_redist_iodevs(struct kvm *kvm)
+ 
+ 	if (ret) {
+ 		/* The current c failed, so we start with the previous one. */
++		mutex_lock(&kvm->slots_lock);
+ 		for (c--; c >= 0; c--) {
+ 			vcpu = kvm_get_vcpu(kvm, c);
+ 			vgic_unregister_redist_iodev(vcpu);
+ 		}
++		mutex_unlock(&kvm->slots_lock);
+ 	}
+ 
+ 	return ret;
+-- 
+2.9.0
