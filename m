@@ -1,463 +1,731 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 17 May 2017 23:50:16 +0800
-Subject: [PATCH 3/4] dts: imx: add imx7ulp evk support
-In-Reply-To: <1495036217-20049-1-git-send-email-aisheng.dong@nxp.com>
-References: <1495036217-20049-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1495036217-20049-4-git-send-email-aisheng.dong@nxp.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 17 May 2017 18:50:09 +0300
+Subject: [PATCHv3 4/4] clk: ti: omap4: add clkctrl clock data
+In-Reply-To: <1495036209-11298-1-git-send-email-t-kristo@ti.com>
+References: <1495036209-11298-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1495036209-11298-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It includes the following support:
-1) CLK
-2) GPIO PTC, PTD, PTE, PTF
-3) uSDHC 1/2
-4) LPUART 4/5/6/7
-5) LPI2C 6/7
+Add data for omap4 clkctrl clocks, and register it within the clkctrl
+driver.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-Signed-off-by: Bai Ping <ping.bai@nxp.com>
-Signed-off-by: Fugang Duan <fugang.duan@nxp.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/Makefile        |   2 +
- arch/arm/boot/dts/imx7ulp-evk.dts |  98 ++++++++++++
- arch/arm/boot/dts/imx7ulp.dtsi    | 310 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 410 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx7ulp-evk.dts
- create mode 100644 arch/arm/boot/dts/imx7ulp.dtsi
+ drivers/clk/ti/clk-44xx.c | 663 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/ti/clkctrl.c  |   5 +
+ drivers/clk/ti/clock.h    |   2 +
+ 3 files changed, 670 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0bff8e7..d4bf4fa 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -470,6 +470,8 @@ dtb-$(CONFIG_SOC_IMX7D) += \
- 	imx7d-sdb-sht11.dtb \
- 	imx7s-colibri-eval-v3.dtb \
- 	imx7s-warp.dtb
-+dtb-$(CONFIG_SOC_IMX7ULP) += \
-+	imx7ulp-evk.dtb
- dtb-$(CONFIG_SOC_LS1021A) += \
- 	ls1021a-qds.dtb \
- 	ls1021a-twr.dtb
-diff --git a/arch/arm/boot/dts/imx7ulp-evk.dts b/arch/arm/boot/dts/imx7ulp-evk.dts
-new file mode 100644
-index 0000000..ec8790d
---- /dev/null
-+++ b/arch/arm/boot/dts/imx7ulp-evk.dts
-@@ -0,0 +1,98 @@
-+/*
-+ * Copyright 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017 NXP
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx7ulp.dtsi"
-+
-+/ {
-+	model = "NXP i.MX7ULP EVK";
-+	compatible = "fsl,imx7ulp-evk", "fsl,imx7ulp", "Generic DT based system";
-+
-+	chosen {
-+		stdout-path = &lpuart4;
-+	};
-+
-+	memory {
-+		reg = <0x60000000 0x40000000>;
-+	};
-+
-+	reg_vsd_3v3: regulator-vsd-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VSD_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usdhc0_rst>;
-+		gpio = <&gpio_ptd 0 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
+diff --git a/drivers/clk/ti/clk-44xx.c b/drivers/clk/ti/clk-44xx.c
+index 1c8bb83..2005f03 100644
+--- a/drivers/clk/ti/clk-44xx.c
++++ b/drivers/clk/ti/clk-44xx.c
+@@ -15,6 +15,7 @@
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
+ #include <linux/clk/ti.h>
++#include <dt-bindings/clock/omap4.h>
+ 
+ #include "clock.h"
+ 
+@@ -33,6 +34,668 @@
+  */
+ #define OMAP4_DPLL_USB_DEFFREQ				960000000
+ 
++static const struct omap_clkctrl_reg_data omap4_mpuss_clkctrl_regs[] __initconst = {
++	{ OMAP4_MPU_CLKCTRL, NULL, CLKF_HW_SUP, "dpll_mpu_m2_ck" },
++	{ 0 },
 +};
 +
-+&lpuart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_lpuart4>;
-+	status = "okay";
++static const struct omap_clkctrl_reg_data omap4_tesla_clkctrl_regs[] __initconst = {
++	{ OMAP4_DSP_CLKCTRL, NULL, CLKF_HW_SUP, "dpll_iva_m4x2_ck" },
++	{ 0 },
 +};
 +
-+&usdhc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc0_cmd_data>, <&pinctrl_usdhc0_clk>,
-+		    <&pinctrl_usdhc0_cd>;
-+	cd-gpios = <&gpio_ptc 10 GPIO_ACTIVE_LOW>;
-+	vmmc-supply = <&reg_vsd_3v3>;
-+	status = "okay";
++static const char * const omap4_aess_fclk_parents[] __initconst = {
++	"abe_clk",
++	NULL,
 +};
 +
-+&iomuxc1 {
-+	pinctrl_lpuart4: lpuart4grp {
-+		pins = <
-+			ULP1_PAD_PTC3__LPUART4_RX
-+			ULP1_PAD_PTC2__LPUART4_TX
-+		>;
-+		bias-pull-up;
-+	};
-+
-+	pinctrl_usdhc0_cmd_data: usdhc0_cmd_data_0_3_grp {
-+		pins = <
-+			ULP1_PAD_PTD1__SDHC0_CMD
-+			ULP1_PAD_PTD2__SDHC0_CLK
-+			ULP1_PAD_PTD7__SDHC0_D3
-+			ULP1_PAD_PTD8__SDHC0_D2
-+			ULP1_PAD_PTD9__SDHC0_D1
-+			ULP1_PAD_PTD10__SDHC0_D0
-+		>;
-+		drive-strength = <1>;
-+		bias-pull-up;
-+	};
-+
-+	pinctrl_usdhc0_clk: usdhc0_clk_grp {
-+		pins = <
-+			ULP1_PAD_PTD2__SDHC0_CLK
-+		>;
-+		drive-strength = <1>;
-+		bias-pull-down;
-+	};
-+
-+	pinctrl_usdhc0_cd: usdhc0_gpios_cd_grp {
-+		pins = <
-+			ULP1_PAD_PTC10__PTC10		/* USDHC0 CD */
-+		>;
-+		nxp,input-buffer-enable;
-+		bias-pull-up;
-+	};
-+
-+	pinctrl_usdhc0_rst: usdhc0_gpios_rst_grp {
-+		pins = <
-+			ULP1_PAD_PTD0__PTD0		/* USDHC0 RST */
-+		>;
-+		nxp,output-buffer-enable;
-+		bias-pull-up;
-+	};
++static const struct omap_clkctrl_div_data omap4_aess_fclk_data __initconst = {
++	.max_div = 2,
 +};
-diff --git a/arch/arm/boot/dts/imx7ulp.dtsi b/arch/arm/boot/dts/imx7ulp.dtsi
-new file mode 100644
-index 0000000..514e063
---- /dev/null
-+++ b/arch/arm/boot/dts/imx7ulp.dtsi
-@@ -0,0 +1,310 @@
-+/*
-+ * Copyright 2016 Freescale Semiconductor, Inc
-+ * Copyright 2017 NXP
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
 +
-+#include <dt-bindings/clock/imx7ulp-clock.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton.dtsi"
-+
-+#include "imx7ulp-pinfunc.h"
-+
-+/ {
-+	interrupt-parent = <&intc>;
-+
-+	aliases {
-+		gpio0 = &gpio_ptc;
-+		gpio1 = &gpio_ptd;
-+		gpio2 = &gpio_pte;
-+		gpio3 = &gpio_ptf;
-+		i2c0 = &lpi2c6;
-+		i2c1 = &lpi2c7;
-+		mmc0 = &usdhc0;
-+		mmc1 = &usdhc1;
-+		serial0 = &lpuart4;
-+		serial1 = &lpuart5;
-+		serial2 = &lpuart6;
-+		serial3 = &lpuart7;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <0>;
-+		};
-+	};
-+
-+	intc: interrupt-controller at 40021000 {
-+		compatible = "arm,cortex-a7-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x40021000 0x1000>,
-+		      <0x40022000 0x100>;
-+	};
-+
-+	rosc: clock-rosc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <32768>;
-+		clock-output-names = "rosc";
-+		#clock-cells = <0>;
-+	};
-+
-+	sosc: clock-sosc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <24000000>;
-+		clock-output-names = "sosc";
-+		#clock-cells = <0>;
-+	};
-+
-+	sirc: clock-sirc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <16000000>;
-+		clock-output-names = "sirc";
-+		#clock-cells = <0>;
-+	};
-+
-+	firc: clock-firc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <48000000>;
-+		clock-output-names = "firc";
-+		#clock-cells = <0>;
-+	};
-+
-+	upll: clock-upll {
-+		compatible = "fixed-clock";
-+		clock-frequency = <480000000>;
-+		clock-output-names = "upll";
-+		#clock-cells = <0>;
-+	};
-+
-+	mpll: clock-mpll {
-+		compatible = "fixed-clock";
-+		clock-frequency = <480000000>;
-+		clock-output-names = "mpll";
-+		#clock-cells = <0>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		arm,cpu-registers-not-fw-configured;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		clock-frequency = <1000000>;
-+		status = "disabled";
-+	};
-+
-+	ahbbridge0: ahb-bridge at 40000000 {
-+		compatible = "fsl,aips-bus", "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x40000000 0x800000>;
-+		ranges;
-+
-+		lpuart4: serial at 402d0000 {
-+			compatible = "fsl,imx7ulp-lpuart";
-+			reg = <0x402d0000 0x1000>;
-+			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX7ULP_CLK_LPUART4>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&clks IMX7ULP_CLK_LPUART4>;
-+			assigned-clock-parents = <&clks IMX7ULP_CLK_SOSC_BUS_CLK>;
-+			assigned-clock-rates = <24000000>;
-+			status = "disabled";
-+		};
-+
-+		lpuart5: serial at 402e0000 {
-+			compatible = "fsl,imx7ulp-lpuart";
-+			reg = <0x402e0000 0x1000>;
-+			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX7ULP_CLK_LPUART5>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&clks IMX7ULP_CLK_LPUART5>;
-+			assigned-clock-parents = <&clks IMX7ULP_CLK_FIRC>;
-+			assigned-clock-rates = <48000000>;
-+			status = "disabled";
-+		};
-+
-+		tpm5: tpm at 40260000 {
-+			compatible = "fsl,imx7ulp-tpm";
-+			reg = <0x40260000 0x1000>;
-+			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX7ULP_CLK_NIC1_BUS_DIV>,
-+				 <&clks IMX7ULP_CLK_LPTPM5>;
-+			clock-names = "ipg", "per";
-+		};
-+
-+		usdhc0: usdhc at 40370000 {
-+			compatible = "fsl,imx7ulp-usdhc", "fsl,imx6sx-usdhc";
-+			reg = <0x40370000 0x10000>;
-+			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX7ULP_CLK_NIC1_BUS_DIV>,
-+				 <&clks IMX7ULP_CLK_NIC1_DIV>,
-+				 <&clks IMX7ULP_CLK_USDHC0>;
-+			clock-names ="ipg", "ahb", "per";
-+			assigned-clocks = <&clks IMX7ULP_CLK_USDHC0>;
-+			assigned-clock-parents = <&clks IMX7ULP_CLK_NIC1_DIV>;
-+			bus-width = <4>;
-+			fsl,tuning-start-tap = <20>;
-+			fsl,tuning-step= <2>;
-+			status = "disabled";
-+		};
-+
-+		usdhc1: usdhc at 40380000 {
-+			compatible = "fsl,imx7ulp-usdhc", "fsl,imx6sx-usdhc";
-+			reg = <0x40380000 0x10000>;
-+			interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX7ULP_CLK_NIC1_BUS_DIV>,
-+				 <&clks IMX7ULP_CLK_NIC1_DIV>,
-+				 <&clks IMX7ULP_CLK_USDHC1>;
-+			clock-names ="ipg", "ahb", "per";
-+			assigned-clocks = <&clks IMX7ULP_CLK_USDHC1>;
-+			assigned-clock-parents = <&clks IMX7ULP_CLK_NIC1_DIV>;
-+			bus-width = <4>;
-+			fsl,tuning-start-tap = <20>;
-+			fsl,tuning-step= <2>;
-+			status = "disabled";
-+		};
-+
-+		clks: scg at 403e0000 {
-+			compatible = "fsl,imx7ulp-clock";
-+			reg = <0x403e0000 0x10000>,
-+			      <0x403f0000 0x10000>,
-+			      <0x40b30000 0x10000>;
-+			reg-names = "scg1", "pcc2", "pcc3";
-+			clocks = <&rosc>, <&sosc>, <&sirc>,
-+				 <&firc>, <&upll>, <&mpll>;
-+			clock-names = "rosc", "sosc", "sirc",
-+				      "firc", "upll", "mpll";
-+			#clock-cells = <1>;
-+			assigned-clocks = <&clks IMX7ULP_CLK_LPTPM5>;
-+			assigned-clock-parents = <&clks IMX7ULP_CLK_SOSC_BUS_CLK>;
-+		};
-+
-+		smc1: smc at 40410000 {
-+			compatible = "fsl,imx7ulp-smc1";
-+			reg = <0x40410000 0x1000>;
-+		};
-+	};
-+
-+	ahbbridge1: ahb-bridge at 40800000 {
-+		compatible = "fsl,aips-bus", "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x40800000 0x800000>;
-+		ranges;
-+
-+		lpi2c6: lpi2c at 40a40000 {
-+			compatible = "fsl,imx7ulp-lpi2c";
-+			reg = <0x40a40000 0x10000>;
-+			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX7ULP_CLK_LPI2C6>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&clks IMX7ULP_CLK_LPI2C6>;
-+			assigned-clock-parents = <&clks IMX7ULP_CLK_FIRC>;
-+			assigned-clock-rates = <48000000>;
-+			status = "disabled";
-+		};
-+
-+		lpi2c7: lpi2c at 40a50000 {
-+			compatible = "fsl,imx7ulp-lpi2c";
-+			reg = <0x40a50000 0x10000>;
-+			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX7ULP_CLK_LPI2C7>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&clks IMX7ULP_CLK_LPI2C7>;
-+			assigned-clock-parents = <&clks IMX7ULP_CLK_FIRC>;
-+			assigned-clock-rates = <48000000>;
-+			status = "disabled";
-+		};
-+
-+		lpuart6: serial at 40a60000 {
-+			compatible = "fsl,imx7ulp-lpuart";
-+			reg = <0x40a60000 0x1000>;
-+			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX7ULP_CLK_LPUART6>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&clks IMX7ULP_CLK_LPUART6>;
-+			assigned-clock-parents = <&clks IMX7ULP_CLK_FIRC>;
-+			assigned-clock-rates = <48000000>;
-+			status = "disabled";
-+		};
-+
-+		lpuart7: serial at 40a70000 {
-+			compatible = "fsl,imx7ulp-lpuart";
-+			reg = <0x40a70000 0x1000>;
-+			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX7ULP_CLK_LPUART7>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&clks IMX7ULP_CLK_LPUART7>;
-+			assigned-clock-parents = <&clks IMX7ULP_CLK_FIRC>;
-+			assigned-clock-rates = <48000000>;
-+			status = "disabled";
-+		};
-+
-+		iomuxc1: iomuxc at 40ac0000 {
-+			compatible = "fsl,imx7ulp-iomuxc1";
-+			reg = <0x40ac0000 0x1000>;
-+		};
-+
-+		gpio_ptc: gpio at 40ae0000 {
-+			compatible = "fsl,vf610-gpio";
-+			reg = <0x40ae0000 0x1000 0x400f0000 0x40>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&clks IMX7ULP_CLK_PCTLC>;
-+			clock-names = "ipg";
-+			gpio-ranges = <&iomuxc1 0 0 32>;
-+		};
-+
-+		gpio_ptd: gpio at 40af0000 {
-+			compatible = "fsl,vf610-gpio";
-+			reg = <0x40af0000 0x1000 0x400f0040 0x40>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&clks IMX7ULP_CLK_PCTLD>;
-+			clock-names = "ipg";
-+			gpio-ranges = <&iomuxc1 0 32 32>;
-+		};
-+
-+		gpio_pte: gpio at 40b00000 {
-+			compatible = "fsl,vf610-gpio";
-+			reg = <0x40b00000 0x1000 0x400f0080 0x40>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&clks IMX7ULP_CLK_PCTLE>;
-+			clock-names = "ipg";
-+			gpio-ranges = <&iomuxc1 0 64 32>;
-+		};
-+
-+		gpio_ptf: gpio at 40b10000 {
-+			compatible = "fsl,vf610-gpio";
-+			reg = <0x40b10000 0x1000 0x400f00c0 0x40>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&clks IMX7ULP_CLK_PCTLF>;
-+			clock-names = "ipg";
-+			gpio-ranges = <&iomuxc1 0 96 32>;
-+		};
-+	};
++static const struct omap_clkctrl_bit_data omap4_aess_bit_data[] __initconst = {
++	{ 24, TI_CLK_DIVIDER, omap4_aess_fclk_parents, &omap4_aess_fclk_data },
++	{ 0 },
 +};
++
++static const char * const omap4_func_dmic_abe_gfclk_parents[] __initconst = {
++	"dmic_sync_mux_ck",
++	"pad_clks_ck",
++	"slimbus_clk",
++	NULL,
++};
++
++static const char * const omap4_dmic_sync_mux_ck_parents[] __initconst = {
++	"abe_24m_fclk",
++	"syc_clk_div_ck",
++	"func_24m_clk",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_dmic_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_func_dmic_abe_gfclk_parents, NULL },
++	{ 26, TI_CLK_MUX, omap4_dmic_sync_mux_ck_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_func_mcasp_abe_gfclk_parents[] __initconst = {
++	"mcasp_sync_mux_ck",
++	"pad_clks_ck",
++	"slimbus_clk",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_mcasp_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_func_mcasp_abe_gfclk_parents, NULL },
++	{ 26, TI_CLK_MUX, omap4_dmic_sync_mux_ck_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_func_mcbsp1_gfclk_parents[] __initconst = {
++	"mcbsp1_sync_mux_ck",
++	"pad_clks_ck",
++	"slimbus_clk",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_mcbsp1_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_func_mcbsp1_gfclk_parents, NULL },
++	{ 26, TI_CLK_MUX, omap4_dmic_sync_mux_ck_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_func_mcbsp2_gfclk_parents[] __initconst = {
++	"mcbsp2_sync_mux_ck",
++	"pad_clks_ck",
++	"slimbus_clk",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_mcbsp2_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_func_mcbsp2_gfclk_parents, NULL },
++	{ 26, TI_CLK_MUX, omap4_dmic_sync_mux_ck_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_func_mcbsp3_gfclk_parents[] __initconst = {
++	"mcbsp3_sync_mux_ck",
++	"pad_clks_ck",
++	"slimbus_clk",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_mcbsp3_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_func_mcbsp3_gfclk_parents, NULL },
++	{ 26, TI_CLK_MUX, omap4_dmic_sync_mux_ck_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_slimbus1_fclk_0_parents[] __initconst = {
++	"abe_24m_fclk",
++	NULL,
++};
++
++static const char * const omap4_slimbus1_fclk_1_parents[] __initconst = {
++	"func_24m_clk",
++	NULL,
++};
++
++static const char * const omap4_slimbus1_fclk_2_parents[] __initconst = {
++	"pad_clks_ck",
++	NULL,
++};
++
++static const char * const omap4_slimbus1_slimbus_clk_parents[] __initconst = {
++	"slimbus_clk",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_slimbus1_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_slimbus1_fclk_0_parents, NULL },
++	{ 9, TI_CLK_GATE, omap4_slimbus1_fclk_1_parents, NULL },
++	{ 10, TI_CLK_GATE, omap4_slimbus1_fclk_2_parents, NULL },
++	{ 11, TI_CLK_GATE, omap4_slimbus1_slimbus_clk_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_timer5_sync_mux_parents[] __initconst = {
++	"syc_clk_div_ck",
++	"sys_32k_ck",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_timer5_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_timer5_sync_mux_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_timer6_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_timer5_sync_mux_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_timer7_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_timer5_sync_mux_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_timer8_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_timer5_sync_mux_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_abe_clkctrl_regs[] __initconst = {
++	{ OMAP4_L4_ABE_CLKCTRL, NULL, 0, "ocp_abe_iclk" },
++	{ OMAP4_AESS_CLKCTRL, omap4_aess_bit_data, CLKF_SW_SUP, "aess_fclk" },
++	{ OMAP4_MCPDM_CLKCTRL, NULL, CLKF_SW_SUP, "pad_clks_ck" },
++	{ OMAP4_DMIC_CLKCTRL, omap4_dmic_bit_data, CLKF_SW_SUP, "func_dmic_abe_gfclk" },
++	{ OMAP4_MCASP_CLKCTRL, omap4_mcasp_bit_data, CLKF_SW_SUP, "func_mcasp_abe_gfclk" },
++	{ OMAP4_MCBSP1_CLKCTRL, omap4_mcbsp1_bit_data, CLKF_SW_SUP, "func_mcbsp1_gfclk" },
++	{ OMAP4_MCBSP2_CLKCTRL, omap4_mcbsp2_bit_data, CLKF_SW_SUP, "func_mcbsp2_gfclk" },
++	{ OMAP4_MCBSP3_CLKCTRL, omap4_mcbsp3_bit_data, CLKF_SW_SUP, "func_mcbsp3_gfclk" },
++	{ OMAP4_SLIMBUS1_CLKCTRL, omap4_slimbus1_bit_data, CLKF_SW_SUP, "slimbus1_fclk_0" },
++	{ OMAP4_TIMER5_CLKCTRL, omap4_timer5_bit_data, CLKF_SW_SUP, "timer5_sync_mux" },
++	{ OMAP4_TIMER6_CLKCTRL, omap4_timer6_bit_data, CLKF_SW_SUP, "timer6_sync_mux" },
++	{ OMAP4_TIMER7_CLKCTRL, omap4_timer7_bit_data, CLKF_SW_SUP, "timer7_sync_mux" },
++	{ OMAP4_TIMER8_CLKCTRL, omap4_timer8_bit_data, CLKF_SW_SUP, "timer8_sync_mux" },
++	{ OMAP4_WD_TIMER3_CLKCTRL, NULL, CLKF_SW_SUP, "sys_32k_ck" },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_l4_ao_clkctrl_regs[] __initconst = {
++	{ OMAP4_SMARTREFLEX_MPU_CLKCTRL, NULL, CLKF_SW_SUP, "l4_wkup_clk_mux_ck" },
++	{ OMAP4_SMARTREFLEX_IVA_CLKCTRL, NULL, CLKF_SW_SUP, "l4_wkup_clk_mux_ck" },
++	{ OMAP4_SMARTREFLEX_CORE_CLKCTRL, NULL, CLKF_SW_SUP, "l4_wkup_clk_mux_ck" },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_l3_1_clkctrl_regs[] __initconst = {
++	{ OMAP4_L3_MAIN_1_CLKCTRL, NULL, 0, "l3_div_ck" },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_l3_2_clkctrl_regs[] __initconst = {
++	{ OMAP4_L3_MAIN_2_CLKCTRL, NULL, 0, "l3_div_ck" },
++	{ OMAP4_GPMC_CLKCTRL, NULL, CLKF_HW_SUP, "l3_div_ck" },
++	{ OMAP4_OCMC_RAM_CLKCTRL, NULL, 0, "l3_div_ck" },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_ducati_clkctrl_regs[] __initconst = {
++	{ OMAP4_IPU_CLKCTRL, NULL, CLKF_HW_SUP, "ducati_clk_mux_ck" },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_l3_dma_clkctrl_regs[] __initconst = {
++	{ OMAP4_DMA_SYSTEM_CLKCTRL, NULL, 0, "l3_div_ck" },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_l3_emif_clkctrl_regs[] __initconst = {
++	{ OMAP4_DMM_CLKCTRL, NULL, 0, "l3_div_ck" },
++	{ OMAP4_EMIF1_CLKCTRL, NULL, CLKF_HW_SUP, "ddrphy_ck" },
++	{ OMAP4_EMIF2_CLKCTRL, NULL, CLKF_HW_SUP, "ddrphy_ck" },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_d2d_clkctrl_regs[] __initconst = {
++	{ OMAP4_C2C_CLKCTRL, NULL, 0, "div_core_ck" },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_l4_cfg_clkctrl_regs[] __initconst = {
++	{ OMAP4_L4_CFG_CLKCTRL, NULL, 0, "l4_div_ck" },
++	{ OMAP4_SPINLOCK_CLKCTRL, NULL, 0, "l4_div_ck" },
++	{ OMAP4_MAILBOX_CLKCTRL, NULL, 0, "l4_div_ck" },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_l3_instr_clkctrl_regs[] __initconst = {
++	{ OMAP4_L3_MAIN_3_CLKCTRL, NULL, CLKF_HW_SUP, "l3_div_ck" },
++	{ OMAP4_L3_INSTR_CLKCTRL, NULL, CLKF_HW_SUP, "l3_div_ck" },
++	{ OMAP4_OCP_WP_NOC_CLKCTRL, NULL, CLKF_HW_SUP, "l3_div_ck" },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_ivahd_clkctrl_regs[] __initconst = {
++	{ OMAP4_IVA_CLKCTRL, NULL, CLKF_HW_SUP, "dpll_iva_m5x2_ck" },
++	{ OMAP4_SL2IF_CLKCTRL, NULL, CLKF_HW_SUP, "dpll_iva_m5x2_ck" },
++	{ 0 },
++};
++
++static const char * const omap4_iss_ctrlclk_parents[] __initconst = {
++	"func_96m_fclk",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_iss_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_iss_ctrlclk_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_fdif_fck_parents[] __initconst = {
++	"dpll_per_m4x2_ck",
++	NULL,
++};
++
++static const struct omap_clkctrl_div_data omap4_fdif_fck_data __initconst = {
++	.max_div = 4,
++};
++
++static const struct omap_clkctrl_bit_data omap4_fdif_bit_data[] __initconst = {
++	{ 24, TI_CLK_DIVIDER, omap4_fdif_fck_parents, &omap4_fdif_fck_data },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_iss_clkctrl_regs[] __initconst = {
++	{ OMAP4_ISS_CLKCTRL, omap4_iss_bit_data, CLKF_SW_SUP, "ducati_clk_mux_ck" },
++	{ OMAP4_FDIF_CLKCTRL, omap4_fdif_bit_data, CLKF_SW_SUP, "fdif_fck" },
++	{ 0 },
++};
++
++static const char * const omap4_dss_dss_clk_parents[] __initconst = {
++	"dpll_per_m5x2_ck",
++	NULL,
++};
++
++static const char * const omap4_dss_48mhz_clk_parents[] __initconst = {
++	"func_48mc_fclk",
++	NULL,
++};
++
++static const char * const omap4_dss_sys_clk_parents[] __initconst = {
++	"syc_clk_div_ck",
++	NULL,
++};
++
++static const char * const omap4_dss_tv_clk_parents[] __initconst = {
++	"extalt_clkin_ck",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_dss_core_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_dss_dss_clk_parents, NULL },
++	{ 9, TI_CLK_GATE, omap4_dss_48mhz_clk_parents, NULL },
++	{ 10, TI_CLK_GATE, omap4_dss_sys_clk_parents, NULL },
++	{ 11, TI_CLK_GATE, omap4_dss_tv_clk_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_l3_dss_clkctrl_regs[] __initconst = {
++	{ OMAP4_DSS_CORE_CLKCTRL, omap4_dss_core_bit_data, CLKF_SW_SUP, "dss_dss_clk" },
++	{ 0 },
++};
++
++static const char * const omap4_sgx_clk_mux_parents[] __initconst = {
++	"dpll_core_m7x2_ck",
++	"dpll_per_m7x2_ck",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_gpu_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_sgx_clk_mux_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_l3_gfx_clkctrl_regs[] __initconst = {
++	{ OMAP4_GPU_CLKCTRL, omap4_gpu_bit_data, CLKF_SW_SUP, "sgx_clk_mux" },
++	{ 0 },
++};
++
++static const char * const omap4_hsmmc1_fclk_parents[] __initconst = {
++	"func_64m_fclk",
++	"func_96m_fclk",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_mmc1_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_hsmmc1_fclk_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_mmc2_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_hsmmc1_fclk_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_hsi_fck_parents[] __initconst = {
++	"dpll_per_m2x2_ck",
++	NULL,
++};
++
++static const struct omap_clkctrl_div_data omap4_hsi_fck_data __initconst = {
++	.max_div = 4,
++};
++
++static const struct omap_clkctrl_bit_data omap4_hsi_bit_data[] __initconst = {
++	{ 24, TI_CLK_DIVIDER, omap4_hsi_fck_parents, &omap4_hsi_fck_data },
++	{ 0 },
++};
++
++static const char * const omap4_usb_host_hs_utmi_p1_clk_parents[] __initconst = {
++	"utmi_p1_gfclk",
++	NULL,
++};
++
++static const char * const omap4_usb_host_hs_utmi_p2_clk_parents[] __initconst = {
++	"utmi_p2_gfclk",
++	NULL,
++};
++
++static const char * const omap4_usb_host_hs_utmi_p3_clk_parents[] __initconst = {
++	"init_60m_fclk",
++	NULL,
++};
++
++static const char * const omap4_usb_host_hs_hsic480m_p1_clk_parents[] __initconst = {
++	"dpll_usb_m2_ck",
++	NULL,
++};
++
++static const char * const omap4_utmi_p1_gfclk_parents[] __initconst = {
++	"init_60m_fclk",
++	"xclk60mhsp1_ck",
++	NULL,
++};
++
++static const char * const omap4_utmi_p2_gfclk_parents[] __initconst = {
++	"init_60m_fclk",
++	"xclk60mhsp2_ck",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_usb_host_hs_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_usb_host_hs_utmi_p1_clk_parents, NULL },
++	{ 9, TI_CLK_GATE, omap4_usb_host_hs_utmi_p2_clk_parents, NULL },
++	{ 10, TI_CLK_GATE, omap4_usb_host_hs_utmi_p3_clk_parents, NULL },
++	{ 11, TI_CLK_GATE, omap4_usb_host_hs_utmi_p3_clk_parents, NULL },
++	{ 12, TI_CLK_GATE, omap4_usb_host_hs_utmi_p3_clk_parents, NULL },
++	{ 13, TI_CLK_GATE, omap4_usb_host_hs_hsic480m_p1_clk_parents, NULL },
++	{ 14, TI_CLK_GATE, omap4_usb_host_hs_hsic480m_p1_clk_parents, NULL },
++	{ 15, TI_CLK_GATE, omap4_dss_48mhz_clk_parents, NULL },
++	{ 24, TI_CLK_MUX, omap4_utmi_p1_gfclk_parents, NULL },
++	{ 25, TI_CLK_MUX, omap4_utmi_p2_gfclk_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_usb_otg_hs_xclk_parents[] __initconst = {
++	"otg_60m_gfclk",
++	NULL,
++};
++
++static const char * const omap4_otg_60m_gfclk_parents[] __initconst = {
++	"utmi_phy_clkout_ck",
++	"xclk60motg_ck",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_usb_otg_hs_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_usb_otg_hs_xclk_parents, NULL },
++	{ 24, TI_CLK_MUX, omap4_otg_60m_gfclk_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_usb_tll_hs_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_usb_host_hs_utmi_p3_clk_parents, NULL },
++	{ 9, TI_CLK_GATE, omap4_usb_host_hs_utmi_p3_clk_parents, NULL },
++	{ 10, TI_CLK_GATE, omap4_usb_host_hs_utmi_p3_clk_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_ocp2scp_usb_phy_phy_48m_parents[] __initconst = {
++	"func_48m_fclk",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_ocp2scp_usb_phy_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_ocp2scp_usb_phy_phy_48m_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_l3_init_clkctrl_regs[] __initconst = {
++	{ OMAP4_MMC1_CLKCTRL, omap4_mmc1_bit_data, CLKF_SW_SUP, "hsmmc1_fclk" },
++	{ OMAP4_MMC2_CLKCTRL, omap4_mmc2_bit_data, CLKF_SW_SUP, "hsmmc2_fclk" },
++	{ OMAP4_HSI_CLKCTRL, omap4_hsi_bit_data, CLKF_HW_SUP, "hsi_fck" },
++	{ OMAP4_USB_HOST_HS_CLKCTRL, omap4_usb_host_hs_bit_data, CLKF_SW_SUP, "init_60m_fclk" },
++	{ OMAP4_USB_OTG_HS_CLKCTRL, omap4_usb_otg_hs_bit_data, CLKF_HW_SUP, "l3_div_ck" },
++	{ OMAP4_USB_TLL_HS_CLKCTRL, omap4_usb_tll_hs_bit_data, CLKF_HW_SUP, "l4_div_ck" },
++	{ OMAP4_USB_HOST_FS_CLKCTRL, NULL, CLKF_SW_SUP, "func_48mc_fclk" },
++	{ OMAP4_OCP2SCP_USB_PHY_CLKCTRL, omap4_ocp2scp_usb_phy_bit_data, CLKF_HW_SUP, "ocp2scp_usb_phy_phy_48m" },
++	{ 0 },
++};
++
++static const char * const omap4_cm2_dm10_mux_parents[] __initconst = {
++	"sys_clkin_ck",
++	"sys_32k_ck",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_timer10_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_cm2_dm10_mux_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_timer11_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_cm2_dm10_mux_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_timer2_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_cm2_dm10_mux_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_timer3_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_cm2_dm10_mux_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_timer4_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_cm2_dm10_mux_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_timer9_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_cm2_dm10_mux_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_gpio2_dbclk_parents[] __initconst = {
++	"sys_32k_ck",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_gpio2_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_gpio2_dbclk_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_gpio3_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_gpio2_dbclk_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_gpio4_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_gpio2_dbclk_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_gpio5_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_gpio2_dbclk_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_gpio6_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_gpio2_dbclk_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_per_mcbsp4_gfclk_parents[] __initconst = {
++	"mcbsp4_sync_mux_ck",
++	"pad_clks_ck",
++	NULL,
++};
++
++static const char * const omap4_mcbsp4_sync_mux_ck_parents[] __initconst = {
++	"func_96m_fclk",
++	"per_abe_nc_fclk",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_mcbsp4_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_per_mcbsp4_gfclk_parents, NULL },
++	{ 25, TI_CLK_MUX, omap4_mcbsp4_sync_mux_ck_parents, NULL },
++	{ 0 },
++};
++
++static const char * const omap4_slimbus2_fclk_0_parents[] __initconst = {
++	"func_24mc_fclk",
++	NULL,
++};
++
++static const char * const omap4_slimbus2_fclk_1_parents[] __initconst = {
++	"per_abe_24m_fclk",
++	NULL,
++};
++
++static const char * const omap4_slimbus2_slimbus_clk_parents[] __initconst = {
++	"pad_slimbus_core_clks_ck",
++	NULL,
++};
++
++static const struct omap_clkctrl_bit_data omap4_slimbus2_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_slimbus2_fclk_0_parents, NULL },
++	{ 9, TI_CLK_GATE, omap4_slimbus2_fclk_1_parents, NULL },
++	{ 10, TI_CLK_GATE, omap4_slimbus2_slimbus_clk_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_l4_per_clkctrl_regs[] __initconst = {
++	{ OMAP4_TIMER10_CLKCTRL, omap4_timer10_bit_data, CLKF_SW_SUP, "cm2_dm10_mux" },
++	{ OMAP4_TIMER11_CLKCTRL, omap4_timer11_bit_data, CLKF_SW_SUP, "cm2_dm11_mux" },
++	{ OMAP4_TIMER2_CLKCTRL, omap4_timer2_bit_data, CLKF_SW_SUP, "cm2_dm2_mux" },
++	{ OMAP4_TIMER3_CLKCTRL, omap4_timer3_bit_data, CLKF_SW_SUP, "cm2_dm3_mux" },
++	{ OMAP4_TIMER4_CLKCTRL, omap4_timer4_bit_data, CLKF_SW_SUP, "cm2_dm4_mux" },
++	{ OMAP4_TIMER9_CLKCTRL, omap4_timer9_bit_data, CLKF_SW_SUP, "cm2_dm9_mux" },
++	{ OMAP4_ELM_CLKCTRL, NULL, 0, "l4_div_ck" },
++	{ OMAP4_GPIO2_CLKCTRL, omap4_gpio2_bit_data, CLKF_HW_SUP, "l4_div_ck" },
++	{ OMAP4_GPIO3_CLKCTRL, omap4_gpio3_bit_data, CLKF_HW_SUP, "l4_div_ck" },
++	{ OMAP4_GPIO4_CLKCTRL, omap4_gpio4_bit_data, CLKF_HW_SUP, "l4_div_ck" },
++	{ OMAP4_GPIO5_CLKCTRL, omap4_gpio5_bit_data, CLKF_HW_SUP, "l4_div_ck" },
++	{ OMAP4_GPIO6_CLKCTRL, omap4_gpio6_bit_data, CLKF_HW_SUP, "l4_div_ck" },
++	{ OMAP4_HDQ1W_CLKCTRL, NULL, CLKF_SW_SUP, "func_12m_fclk" },
++	{ OMAP4_I2C1_CLKCTRL, NULL, CLKF_SW_SUP, "func_96m_fclk" },
++	{ OMAP4_I2C2_CLKCTRL, NULL, CLKF_SW_SUP, "func_96m_fclk" },
++	{ OMAP4_I2C3_CLKCTRL, NULL, CLKF_SW_SUP, "func_96m_fclk" },
++	{ OMAP4_I2C4_CLKCTRL, NULL, CLKF_SW_SUP, "func_96m_fclk" },
++	{ OMAP4_L4_PER_CLKCTRL, NULL, 0, "l4_div_ck" },
++	{ OMAP4_MCBSP4_CLKCTRL, omap4_mcbsp4_bit_data, CLKF_SW_SUP, "per_mcbsp4_gfclk" },
++	{ OMAP4_MCSPI1_CLKCTRL, NULL, CLKF_SW_SUP, "func_48m_fclk" },
++	{ OMAP4_MCSPI2_CLKCTRL, NULL, CLKF_SW_SUP, "func_48m_fclk" },
++	{ OMAP4_MCSPI3_CLKCTRL, NULL, CLKF_SW_SUP, "func_48m_fclk" },
++	{ OMAP4_MCSPI4_CLKCTRL, NULL, CLKF_SW_SUP, "func_48m_fclk" },
++	{ OMAP4_MMC3_CLKCTRL, NULL, CLKF_SW_SUP, "func_48m_fclk" },
++	{ OMAP4_MMC4_CLKCTRL, NULL, CLKF_SW_SUP, "func_48m_fclk" },
++	{ OMAP4_SLIMBUS2_CLKCTRL, omap4_slimbus2_bit_data, CLKF_SW_SUP, "slimbus2_fclk_0" },
++	{ OMAP4_UART1_CLKCTRL, NULL, CLKF_SW_SUP, "func_48m_fclk" },
++	{ OMAP4_UART2_CLKCTRL, NULL, CLKF_SW_SUP, "func_48m_fclk" },
++	{ OMAP4_UART3_CLKCTRL, NULL, CLKF_SW_SUP, "func_48m_fclk" },
++	{ OMAP4_UART4_CLKCTRL, NULL, CLKF_SW_SUP, "func_48m_fclk" },
++	{ OMAP4_MMC5_CLKCTRL, NULL, CLKF_SW_SUP, "func_48m_fclk" },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_gpio1_bit_data[] __initconst = {
++	{ 8, TI_CLK_GATE, omap4_gpio2_dbclk_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_bit_data omap4_timer1_bit_data[] __initconst = {
++	{ 24, TI_CLK_MUX, omap4_cm2_dm10_mux_parents, NULL },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_l4_wkup_clkctrl_regs[] __initconst = {
++	{ OMAP4_L4_WKUP_CLKCTRL, NULL, 0, "l4_wkup_clk_mux_ck" },
++	{ OMAP4_WD_TIMER2_CLKCTRL, NULL, CLKF_SW_SUP, "sys_32k_ck" },
++	{ OMAP4_GPIO1_CLKCTRL, omap4_gpio1_bit_data, CLKF_HW_SUP, "l4_wkup_clk_mux_ck" },
++	{ OMAP4_TIMER1_CLKCTRL, omap4_timer1_bit_data, CLKF_SW_SUP, "dmt1_clk_mux" },
++	{ OMAP4_COUNTER_32K_CLKCTRL, NULL, 0, "sys_32k_ck" },
++	{ OMAP4_KBD_CLKCTRL, NULL, CLKF_SW_SUP, "sys_32k_ck" },
++	{ 0 },
++};
++
++static const char * const omap4_pmd_stm_clock_mux_ck_parents[] __initconst = {
++	"sys_clkin_ck",
++	"dpll_core_m6x2_ck",
++	"tie_low_clock_ck",
++	NULL,
++};
++
++static const char * const omap4_trace_clk_div_div_ck_parents[] __initconst = {
++	"pmd_trace_clk_mux_ck",
++	NULL,
++};
++
++static const int omap4_trace_clk_div_div_ck_divs[] __initconst = {
++	0,
++	1,
++	2,
++	0,
++	4,
++	-1,
++};
++
++static const struct omap_clkctrl_div_data omap4_trace_clk_div_div_ck_data __initconst = {
++	.dividers = omap4_trace_clk_div_div_ck_divs,
++};
++
++static const char * const omap4_stm_clk_div_ck_parents[] __initconst = {
++	"pmd_stm_clock_mux_ck",
++	NULL,
++};
++
++static const struct omap_clkctrl_div_data omap4_stm_clk_div_ck_data __initconst = {
++	.max_div = 64,
++};
++
++static const struct omap_clkctrl_bit_data omap4_debugss_bit_data[] __initconst = {
++	{ 20, TI_CLK_MUX, omap4_pmd_stm_clock_mux_ck_parents, NULL },
++	{ 22, TI_CLK_MUX, omap4_pmd_stm_clock_mux_ck_parents, NULL },
++	{ 24, TI_CLK_DIVIDER, omap4_trace_clk_div_div_ck_parents, &omap4_trace_clk_div_div_ck_data },
++	{ 27, TI_CLK_DIVIDER, omap4_stm_clk_div_ck_parents, &omap4_stm_clk_div_ck_data },
++	{ 0 },
++};
++
++static const struct omap_clkctrl_reg_data omap4_emu_sys_clkctrl_regs[] __initconst = {
++	{ OMAP4_DEBUGSS_CLKCTRL, omap4_debugss_bit_data, 0, "trace_clk_div_ck" },
++	{ 0 },
++};
++
++const struct omap_clkctrl_data omap4_clkctrl_data[] __initconst = {
++	{ 0x4a004320, omap4_mpuss_clkctrl_regs },
++	{ 0x4a004420, omap4_tesla_clkctrl_regs },
++	{ 0x4a004520, omap4_abe_clkctrl_regs },
++	{ 0x4a008620, omap4_l4_ao_clkctrl_regs },
++	{ 0x4a008720, omap4_l3_1_clkctrl_regs },
++	{ 0x4a008820, omap4_l3_2_clkctrl_regs },
++	{ 0x4a008920, omap4_ducati_clkctrl_regs },
++	{ 0x4a008a20, omap4_l3_dma_clkctrl_regs },
++	{ 0x4a008b20, omap4_l3_emif_clkctrl_regs },
++	{ 0x4a008c20, omap4_d2d_clkctrl_regs },
++	{ 0x4a008d20, omap4_l4_cfg_clkctrl_regs },
++	{ 0x4a008e20, omap4_l3_instr_clkctrl_regs },
++	{ 0x4a008f20, omap4_ivahd_clkctrl_regs },
++	{ 0x4a009020, omap4_iss_clkctrl_regs },
++	{ 0x4a009120, omap4_l3_dss_clkctrl_regs },
++	{ 0x4a009220, omap4_l3_gfx_clkctrl_regs },
++	{ 0x4a009320, omap4_l3_init_clkctrl_regs },
++	{ 0x4a009420, omap4_l4_per_clkctrl_regs },
++	{ 0x4a307820, omap4_l4_wkup_clkctrl_regs },
++	{ 0x4a307a20, omap4_emu_sys_clkctrl_regs },
++	{ 0 },
++};
++
+ static struct ti_dt_clk omap44xx_clks[] = {
+ 	DT_CLK("smp_twd", NULL, "mpu_periphclk"),
+ 	DT_CLK("omapdss_dss", "ick", "dss_fck"),
+diff --git a/drivers/clk/ti/clkctrl.c b/drivers/clk/ti/clkctrl.c
+index cfdd97f..00332a6 100644
+--- a/drivers/clk/ti/clkctrl.c
++++ b/drivers/clk/ti/clkctrl.c
+@@ -408,6 +408,11 @@ static void __init _ti_omap4_clkctrl_setup(struct device_node *node)
+ 	addrp = of_get_address(node, 0, NULL, NULL);
+ 	addr = (u32)of_translate_address(node, addrp);
+ 
++#ifdef CONFIG_ARCH_OMAP4
++	if (of_machine_is_compatible("ti,omap4"))
++		data = omap4_clkctrl_data;
++#endif
++
+ 	while (data->addr) {
+ 		if (addr == data->addr)
+ 			break;
+diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
+index 1aa8d57..561dbe9 100644
+--- a/drivers/clk/ti/clock.h
++++ b/drivers/clk/ti/clock.h
+@@ -228,6 +228,8 @@ struct omap_clkctrl_data {
+ 	const struct omap_clkctrl_reg_data *regs;
+ };
+ 
++extern const struct omap_clkctrl_data omap4_clkctrl_data[];
++
+ #define CLKF_SW_SUP	BIT(0)
+ #define CLKF_HW_SUP	BIT(1)
+ #define CLKF_NO_IDLEST	BIT(2)
 -- 
-2.7.4
+1.9.1
