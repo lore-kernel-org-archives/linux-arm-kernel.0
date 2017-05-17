@@ -1,54 +1,65 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 17 May 2017 12:55:59 +0300
-Subject: [V2,
- 2/6] tty: serial: lpuart: add little endian 32 bit register support
-In-Reply-To: <20170517054356.GE9913@b29396-OptiPlex-7040>
-References: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
- <fb9fe0cd-5ca7-74e6-33dc-7638e205b2e3@cogentembedded.com>
- <20170517033927.GC9913@b29396-OptiPlex-7040>
- <8f4cf45e-45ab-e6e6-d95c-f3d4243697f4@cogentembedded.com>
- <20170517054356.GE9913@b29396-OptiPlex-7040>
-Message-ID: <CAHp75VdL=rGHuupGmgmAVonEQgpyPRgoMQrZK0yQiaM=1Vac-g@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 17 May 2017 15:33:36 +0530
+Subject: [PATCH 2/2] ARM: davinci: PM: Do not free useful resources in
+ normal path in 'davinci_pm_init'
+In-Reply-To: <20170513114020.23668-1-christophe.jaillet@wanadoo.fr>
+References: <20170513114020.23668-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <68b895dc-1bcf-fb59-0e19-e69b2e72f8c1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 8:43 AM, Dong Aisheng <dongas86@gmail.com> wrote:
-> On Wed, May 17, 2017 at 08:37:41AM +0300, Nikita Yushchenko wrote:
->>
->>
->> 17.05.2017 06:39, Dong Aisheng wrote:
->> > On Tue, May 16, 2017 at 02:15:08PM +0300, Nikita Yushchenko wrote:
->> >>>  static u32 lpuart32_read(void __iomem *addr)
->> >>>  {
->> >>> - return ioread32be(addr);
->> >>> + return lpuart_is_be ? ioread32be(addr) : readl(addr);
->> >>>  }
->> >>>
->> >>>  static void lpuart32_write(u32 val, void __iomem *addr)
->> >>>  {
->> >>> - iowrite32be(val, addr);
->> >>> + if (lpuart_is_be)
->> >>> +         iowrite32be(val, addr);
->> >>> + else
->> >>> +         writel(val, addr);
->> >>>  }
->> >>
->> >> What if this is ever executed on big endian system?
->> >>
->> >
->> > Sorry, not catching the point...
->> >
->> > What issues will meet?
->>
->> Isn't writel() in host endian?
->
-> On big endian systems, it is supposed to run iowrite32be.
+On Saturday 13 May 2017 05:10 PM, Christophe JAILLET wrote:
+> This looks spurious to iounmap resources in the normal path of this init
+> function.
+> The 3 ioremap'ed fields of 'pm_config' can be accessed later on in other
+> functions, so it is likely that we should return 'success' before unrolling
+> everything.
+> 
+> Fixes: aa9aa1ec2df6 ("ARM: davinci: PM: rework init, remove platform device")
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> ---
+> This patch is just a *guess*. The end of the function looks more like a
+> error handling code rather than a normal path.
 
-It looks like you substituting *bus* side with CPU *side* of communication.
+The patch is correct.
 
-If you are talking about CPU side
-__raw_readl() / __raw_writel() will do the trick.
+> ---
+>  arch/arm/mach-davinci/pm.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-davinci/pm.c b/arch/arm/mach-davinci/pm.c
+> index d282b0783ecf..163d865abbf9 100644
+> --- a/arch/arm/mach-davinci/pm.c
+> +++ b/arch/arm/mach-davinci/pm.c
+> @@ -161,6 +161,7 @@ int __init davinci_pm_init(void)
+>  						davinci_cpu_suspend_sz);
+>  
+>  	suspend_set_ops(&davinci_pm_ops);
+> +	return 0;
 
--- 
-With Best Regards,
-Andy Shevchenko
+We normally have an empty line before return. I added that while 
+applying. Also, I modified the patch description to be more "sure" in 
+its language. Here is the final description:
+
+    ARM: davinci: PM: Do not free useful resources in normal path in 'davinci_pm_init'
+    
+    It is wrong to iounmap resources in the normal path of davinci_pm_init()
+    
+    The 3 ioremap'ed fields of 'pm_config' can be accessed later on in other
+    functions, so we should return 'success' instead of unrolling everything.
+    
+    Fixes: aa9aa1ec2df6 ("ARM: davinci: PM: rework init, remove platform device")
+    Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+    [nsekhar at ti.com: commit message and minor style fixes]
+    Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+
+I will let this go through some testing before sending for inclusion in 
+v4.12 kernel. Thanks for catching these.
+
+For future, when sending more than one patch, please add a cover 
+letter. And have the patches appear as replies to the cover letter. 
+This happens if you send the patches together with cover letter using 
+git-send-email and have chainreplyto set to false in your .gitconfig
+
+Thanks,
+Sekhar
