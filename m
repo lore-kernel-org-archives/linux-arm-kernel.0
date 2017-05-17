@@ -1,73 +1,99 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 17 May 2017 09:40:43 +0200
-Subject: [PATCH v3 14/21] drm/sun4i: tcon: multiply the vtotal when not in
- interlace
+Date: Wed, 17 May 2017 09:40:49 +0200
+Subject: [PATCH v3 20/21] ARM: sun5i: a10s: Add the HDMI controller node
 In-Reply-To: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
 References: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <a8d8a93ddbac69e5dddd9c89a147f8cf2ad043a4.1495006350.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <204084676333bcb0c1bcae42eef6daa49d63bd82.1495006350.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It appears that the total vertical resolution needs to be doubled when
-we're not in interlaced. Make sure that is the case.
+The A10s has an HDMI controller connected to the second TCON channel. Add
+it to our DT.
 
+Since the TV Encoder was the only channel 1 user so far, also add the
+property now that we have several users.
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 47 ++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/sun5i.dtsi      |  1 +-
+ 2 files changed, 48 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 62e254aedb57..a0f9a8a516c7 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -153,7 +153,7 @@ static int sun4i_tcon_get_clk_delay(struct drm_display_mode *mode,
- void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
- 			  struct drm_display_mode *mode)
- {
--	unsigned int bp, hsync, vsync;
-+	unsigned int bp, hsync, vsync, vtotal;
- 	u8 clk_delay;
- 	u32 val = 0;
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index 1e38ff80366c..567cce46486b 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -71,7 +71,46 @@
+ 		};
+ 	};
  
-@@ -192,9 +192,26 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
- 	DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
- 			 mode->crtc_vtotal, bp);
- 
-+	/*
-+	 * The vertical resolution needs to be doubled in all
-+	 * cases. We could use crtc_vtotal and always multiply by two,
-+	 * but that leads to a rounding error in interlace when vtotal
-+	 * is odd.
-+	 *
-+	 * This happens with TV's PAL for example, where vtotal will
-+	 * be 625, crtc_vtotal 312, and thus crtc_vtotal * 2 will be
-+	 * 624, which apparently confuses the hardware.
-+	 *
-+	 * To work around this, we will always use vtotal, and
-+	 * multiply by two only if we're not in interlace.
-+	 */
-+	vtotal = mode->vtotal;
-+	if (!(mode->flags & DRM_MODE_FLAG_INTERLACE))
-+		vtotal = vtotal * 2;
++	display-engine {
++		compatible = "allwinner,sun5i-a10s-display-engine";
++		allwinner,pipelines = <&fe0>;
++	};
 +
- 	/* Set vertical display timings */
- 	regmap_write(tcon->regs, SUN4I_TCON0_BASIC2_REG,
--		     SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal * 2) |
-+		     SUN4I_TCON0_BASIC2_V_TOTAL(vtotal) |
- 		     SUN4I_TCON0_BASIC2_V_BACKPORCH(bp));
+ 	soc at 01c00000 {
++		hdmi: hdmi at 01c16000 {
++			compatible = "allwinner,sun5i-a10s-hdmi";
++			reg = <0x01c16000 0x1000>;
++			interrupts = <58>;
++			clocks = <&ccu CLK_AHB_HDMI>, <&ccu CLK_HDMI>,
++				 <&ccu CLK_PLL_VIDEO0_2X>,
++				 <&ccu CLK_PLL_VIDEO1_2X>;
++			clock-names = "ahb", "mod", "pll-0", "pll-1";
++			dmas = <&dma SUN4I_DMA_NORMAL 16>,
++			       <&dma SUN4I_DMA_NORMAL 16>,
++			       <&dma SUN4I_DMA_DEDICATED 24>;
++			dma-names = "ddc-tx", "ddc-rx", "audio-tx";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				hdmi_in: port at 0 {
++					reg = <0>;
++
++					hdmi_in_tcon0: endpoint {
++						remote-endpoint = <&tcon0_out_hdmi>;
++					};
++				};
++
++				hdmi_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
+ 		pwm: pwm at 01c20e00 {
+ 			compatible = "allwinner,sun5i-a10s-pwm";
+ 			reg = <0x01c20e00 0xc>;
+@@ -128,3 +167,11 @@
  
- 	/* Set Hsync and Vsync length */
-@@ -279,9 +296,9 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
- 	/* Set vertical display timings */
- 	bp = mode->crtc_vtotal - mode->crtc_vsync_start;
- 	DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
--			 mode->vtotal, bp);
-+			 mode->crtc_vtotal, bp);
- 	regmap_write(tcon->regs, SUN4I_TCON1_BASIC4_REG,
--		     SUN4I_TCON1_BASIC4_V_TOTAL(mode->vtotal) |
-+		     SUN4I_TCON1_BASIC4_V_TOTAL(mode->crtc_vtotal * 2) |
- 		     SUN4I_TCON1_BASIC4_V_BACKPORCH(bp));
- 
- 	/* Set Hsync and Vsync length */
+ &sram_a {
+ };
++
++&tcon0_out {
++	tcon0_out_hdmi: endpoint at 2 {
++		reg = <2>;
++		remote-endpoint = <&hdmi_in_tcon0>;
++		allwinner,tcon-channel = <1>;
++	};
++};
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 5175f9cc9bed..0e29f1d98a9e 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -272,6 +272,7 @@
+ 					tcon0_out_tve0: endpoint at 1 {
+ 						reg = <1>;
+ 						remote-endpoint = <&tve0_in_tcon0>;
++						allwinner,tcon-channel = <1>;
+ 					};
+ 				};
+ 			};
 -- 
 git-series 0.9.1
