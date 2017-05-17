@@ -1,39 +1,50 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 17 May 2017 18:41:54 +0800
-Subject: [PATCH 2/3] arm64: dts: add LS1043A DPAA FMan support
-In-Reply-To: <1494936443-14869-3-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <201705171805.DxANFDT3%fengguang.wu@intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 17 May 2017 11:45:44 +0100
+Subject: [PATCH v5 1/3] perf: export perf_event_update_userpage()
+In-Reply-To: <20170517083122.5050-2-jglauber@cavium.com>
+References: <20170517083122.5050-1-jglauber@cavium.com>
+ <20170517083122.5050-2-jglauber@cavium.com>
+Message-ID: <20170517104544.GE14654@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Madalin,
+Hi Jan,
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.12-rc1 next-20170517]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On Wed, May 17, 2017 at 10:31:20AM +0200, Jan Glauber wrote:
+> Export perf_event_update_userpage() to make it usable from a module.
+> 
+> Signed-off-by: Jan Glauber <jglauber@cavium.com>
 
-url:    https://github.com/0day-ci/linux/commits/Madalin-Bucur/arm64-dts-add-DPAA-FMan-nodes/20170517-103731
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Please make sure to Cc the relevant maintainers, e.g. those listed by:
 
-All errors (new ones prefixed by >>):
+	get_maintainer.pl -f kernel/events/core.c
 
->> Error: arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi:16.16-17 syntax error
-   FATAL ERROR: Unable to parse input tree
+... I've added them this time.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 34544 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170517/dc17e789/attachment-0001.gz>
+It would be nice for the commit message to state that this is the only
+thing blocking building some system PMU drivers as modules.
+
+Otherwise, this looks sane to me.
+
+Thanks,
+Mark.
+
+> ---
+>  kernel/events/core.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/kernel/events/core.c b/kernel/events/core.c
+> index 6e75a5c..6578b9f 100644
+> --- a/kernel/events/core.c
+> +++ b/kernel/events/core.c
+> @@ -4933,6 +4933,7 @@ void perf_event_update_userpage(struct perf_event *event)
+>  unlock:
+>  	rcu_read_unlock();
+>  }
+> +EXPORT_SYMBOL_GPL(perf_event_update_userpage);
+>  
+>  static int perf_mmap_fault(struct vm_fault *vmf)
+>  {
+> -- 
+> 2.9.0.rc0.21.g7777322
+> 
