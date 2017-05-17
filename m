@@ -1,110 +1,40 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Wed, 17 May 2017 17:27:00 +0800
-Subject: [PATCH v7 11/13] ARM: sun8i: v3s: add device nodes for DE2
- display pipeline
-In-Reply-To: <20170515092400.nzxmocrdqgt4u476@flea.home>
-References: <20170514163045.40366-1-icenowy@aosc.io>
- <20170514163045.40366-12-icenowy@aosc.io>
- <20170515092400.nzxmocrdqgt4u476@flea.home>
-Message-ID: <45e3b368b80fb74f33b18afcc3f783c5@aosc.io>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Wed, 17 May 2017 09:30:46 +0000
+Subject: [PATCH] powerpc: booke: fix boot crash due to null hugepd
+In-Reply-To: <20170517091547.GB17902@kroah.com>
+References: <20170516144752.8444-1-laurentiu.tudor@nxp.com>
+ <20170517091547.GB17902@kroah.com>
+Message-ID: <591C1845.7040105@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-05-15 17:24?Maxime Ripard ???
-> On Mon, May 15, 2017 at 12:30:43AM +0800, Icenowy Zheng wrote:
->> +		de2_clocks: clock at 1000000 {
-> 
-> display_clocks would be better there, we don't have to dissociate de1
-> with de2
+Hi Greg,
 
-How about de_clocks ? (See A80 DTSI)
+On 05/17/2017 12:15 PM, Greg KH wrote:
+> On Tue, May 16, 2017 at 09:47:52AM -0500, laurentiu.tudor at nxp.com wrote:
+>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>
+>> On 32-bit book-e machines, hugepd_ok() does not take
+>> into account null hugepd values, causing this crash at boot:
+>>
+>
+> $ ./scripts/get_maintainer.pl --file arch/powerpc/include/asm/nohash/pgtable.h
+> Benjamin Herrenschmidt <benh@kernel.crashing.org> (supporter:LINUX FOR POWERPC (32-BIT AND 64-BIT))
+> Paul Mackerras <paulus@samba.org> (supporter:LINUX FOR POWERPC (32-BIT AND 64-BIT))
+> Michael Ellerman <mpe@ellerman.id.au> (supporter:LINUX FOR POWERPC (32-BIT AND 64-BIT),commit_signer:2/3=67%)
+> "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com> (commit_signer:2/3=67%,authored:1/3=33%,added_lines:3/8=38%,removed_lines:2/3=67%)
+> Scott Wood <oss@buserror.net> (commit_signer:1/3=33%)
+> Laurentiu Tudor <laurentiu.tudor@nxp.com> (commit_signer:1/3=33%,authored:1/3=33%,added_lines:1/8=12%,removed_lines:1/3=33%)
+> Christophe Leroy <christophe.leroy@c-s.fr> (commit_signer:1/3=33%,authored:1/3=33%,added_lines:4/8=50%)
+> linuxppc-dev at lists.ozlabs.org (open list:LINUX FOR POWERPC (32-BIT AND 64-BIT))
+> linux-kernel at vger.kernel.org (open list)
+>
+> I'm not listed there at all, any specific reason you sent this to me?
+> Nothing I can do with it...
+>
 
-> 
->> +			compatible = "allwinner,sun8i-v3s-de2-clk";
->> +			reg = <0x01000000 0x100000>;
->> +			clocks = <&ccu CLK_DE>,
->> +				 <&ccu CLK_BUS_DE>;
->> +			clock-names = "mod",
->> +				      "bus";
->> +			resets = <&ccu RST_BUS_DE>;
->> +			#clock-cells = <1>;
->> +			#reset-cells = <1>;
->> +		};
->> +
->> +		de2_mixer0: mixer at 1100000 {
-> 
-> and mixer0 here is enough too.
-> 
-> Is there several of them? Why not just use mixer if there's only one?
+Just some finger trouble on my side. Please disregard and sorry for the 
+noise.
 
-Nope, here it's tagged 0 only for consistency with other SoCs.
-
-> 
->> +			compatible = "allwinner,sun8i-v3s-de2-mixer";
->> +			reg = <0x01100000 0x100000>;
->> +			clocks = <&de2_clocks CLK_MIXER0>,
->> +				 <&de2_clocks CLK_BUS_MIXER0>;
->> +			clock-names = "mod",
->> +				      "bus";
->> +			resets = <&de2_clocks RST_MIXER0>;
->> +			assigned-clocks = <&de2_clocks CLK_MIXER0>;
->> +			assigned-clock-rates = <150000000>;
->> +
->> +			ports {
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +
->> +				mixer0_out: port at 1 {
->> +					#address-cells = <1>;
->> +					#size-cells = <0>;
->> +					reg = <1>;
->> +
->> +					mixer0_out_tcon0: endpoint at 0 {
->> +						reg = <0>;
->> +						remote-endpoint = <&tcon0_in_mixer0>;
->> +					};
->> +				};
->> +			};
->> +		};
->> +
->> +		tcon0: lcd-controller at 1c0c000 {
->> +			compatible = "allwinner,sun8i-v3s-tcon";
->> +			reg = <0x01c0c000 0x1000>;
->> +			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks = <&ccu CLK_BUS_TCON0>,
->> +				 <&ccu CLK_TCON0>;
->> +			clock-names = "ahb",
->> +				      "tcon-ch0";
->> +			clock-output-names = "tcon-pixel-clock";
->> +			resets = <&ccu RST_BUS_TCON0>;
->> +			reset-names = "lcd";
->> +			status = "disabled";
->> +
->> +			ports {
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +
->> +				tcon0_in: port at 0 {
->> +					#address-cells = <1>;
->> +					#size-cells = <0>;
->> +					reg = <0>;
->> +
->> +					tcon0_in_mixer0: endpoint at 0 {
->> +						reg = <0>;
->> +						remote-endpoint = <&mixer0_out_tcon0>;
->> +					};
->> +				};
->> +
->> +				tcon0_out: port at 1 {
->> +					#address-cells = <1>;
->> +					#size-cells = <0>;
->> +					reg = <1>;
->> +				};
->> +			};
->> +		};
->> +
->> +
-> 
-> You have an extra new line here.
-> 
-> Maxime
+---
+Best Regards, Laurentiu
