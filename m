@@ -1,84 +1,102 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Wed, 17 May 2017 11:04:04 +0300
-Subject: [V2, 2/6] tty: serial: lpuart: add little endian 32 bit register
- support
-In-Reply-To: <20170517070019.GG9913@b29396-OptiPlex-7040>
-References: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
- <b4a2ed13-c71f-c973-3b09-b632e083a88b@cogentembedded.com>
- <20170517033139.GB9913@b29396-OptiPlex-7040>
- <48819894-4943-7d14-ccf8-83cfd2195c9a@cogentembedded.com>
- <AM3PR04MB306D5C86AED120D15C4D46A80E70@AM3PR04MB306.eurprd04.prod.outlook.com>
- <55bae8d2-0e23-b5e1-f304-63d9130ccb08@cogentembedded.com>
- <20170517070019.GG9913@b29396-OptiPlex-7040>
-Message-ID: <045d1888-4a23-cf73-ab4c-009e29fde974@cogentembedded.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 17 May 2017 10:09:37 +0200
+Subject: [PATCH v1 2/3] dt-bindings: add bindings for rk312x clock
+ controller
+In-Reply-To: <1495007362-10684-3-git-send-email-zhangqing@rock-chips.com>
+References: <1495007362-10684-1-git-send-email-zhangqing@rock-chips.com>
+ <1495007362-10684-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1784310.zJGRWASetU@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Elaine.
 
-My view of your statement is:
-- you currently assume only a few cases for this driver - builtin UART
-in vf610, ls1012a and imx7,
-- in each of these cases, all lpuart instances share same endian, thus
-having that in global var works for these cases,
-- having that in global var makes it possible for you to write less
-lines of code
-
-My complain is:
-- in Linux, we are trying to keep drivers generic,
-- in Linux, having less lines of code has never been sufficient to break
-basic data structure consistency,
-- having driver to keep per-device capability in global var is a clear
-case of breaking consistency.
-
-
->>> That's for special case, normally we wouldn't do that.
->>
->> For me this "special case" looks like "let's break data structure
->> consistency to reuse several lines of code".
->>
->> With code snippets you show, it looks even worse: you assign same global
->> variable in several places for different uses. 
+Am Mittwoch, 17. Mai 2017, 15:49:21 CEST schrieb Elaine Zhang:
+> Add devicetree bindings for Rockchip cru which found on
+> Rockchip SoCs.
 > 
-> If you mean lpuart_is_be, it's not for different uses.
-> The purpose is the same to align the correct endian but in two places.
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+>  .../bindings/clock/rockchip,rk312x-cru.txt         | 56
 
-_probe() routine called for device X alters state already in use for
-device Y.
+please no placeholders in dt-things. So while rk312x may be ok on the driver 
+side, it is not for devicetree things and especially compatible properties.
 
+I haven't even found out for which soc this is, so if it's for the rk3128 for 
+example, please just name it accordingly.
+
+So ideally, just name _everything_ (compatible, dt-header file, driver, 
+everything) after the first soc it should support and we'll see later on, if it 
+matches for other socs as well.
+
+
+Thanks
+Heiko
+
+> ++++++++++++++++++++++ 1 file changed, 56 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/rockchip,rk312x-cru.txt
 > 
->> implicitly assuming that
->> it is for same device. Which can be true in your current system, but not
->> elsewhere (e.g. why not having lpuart programmed into fpga)?
->>
-> 
-> Sorry, What issues for fpga?
-
-Connect FPGA to IMX7 based system and program LS1012a version of lpuart
-core into it.  Have your console on system UART broken at time when
-driver gets registered.
-
-
-> 
->> Alternative solution could be - have separate write path for earlycon.
-> 
-> It looks to me having the same issue with a separate write patch
-> for earlycon as we still need distinguish Little or Big endian
-> for Layerscape and IMX.
-> 
->> At a glance, it is dozen lines of code.
-> 
-> Would you please show some sample code?
-
-Do not reuse lpuart32_console_putchar() in earlycon code.
-
-Have two sets of early_setup/early_write/putchar - for BE and
-defaut-endian earlycon. And in these putchar's do not use
-lpuart_(read|write).
-
-
-As far as I can see, fsl_lpuart.c already has two drivers in one -
-there is separate set of routines for 8bit and 32bit cases.
-And those routines that are common, have if blocks that separate cases.
-I think these drivers will be cleaner if separated.
-However that's completely different story.
+> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk312x-cru.txt
+> b/Documentation/devicetree/bindings/clock/rockchip,rk312x-cru.txt new file
+> mode 100644
+> index 000000000000..4a862fe9bea3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk312x-cru.txt
+> @@ -0,0 +1,56 @@
+> +* Rockchip RK312X Clock and Reset Unit
+> +
+> +The RK312X clock controller generates and supplies clock to various
+> +controllers within the SoC and also implements a reset controller for SoC
+> +peripherals.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be "rockchip,rk312x-cru"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- #clock-cells: should be 1.
+> +- #reset-cells: should be 1.
+> +
+> +Optional Properties:
+> +
+> +- rockchip,grf: phandle to the syscon managing the "general register files"
+> +  If missing pll rates are not changeable, due to the missing pll lock
+> status. +
+> +Each clock is assigned an identifier and client nodes can use this
+> identifier +to specify the clock which they consume. All available clocks
+> are defined as +preprocessor macros in the dt-bindings/clock/rk312x-cru.h
+> headers and can be +used in device tree sources. Similar macros exist for
+> the reset sources in +these files.
+> +
+> +External clocks:
+> +
+> +There are several clocks that are generated outside the SoC. It is expected
+> +that they are defined using standard clock bindings with following
+> +clock-output-names:
+> + - "xin24m" - crystal input - required,
+> + - "ext_i2s" - external I2S clock - optional,
+> + - "gmac_clkin" - external GMAC clock - optional
+> +
+> +Example: Clock controller node:
+> +
+> +	cru: cru at 20000000 {
+> +		compatible = "rockchip,rk312x-cru";
+> +		reg = <0x20000000 0x1000>;
+> +		rockchip,grf = <&grf>;
+> +
+> +		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+> +	};
+> +
+> +Example: UART controller node that consumes the clock generated by the
+> clock +  controller:
+> +
+> +uart2: serial at 20068000 {
+> +		compatible = "rockchip,serial";
+> +		reg = <0x20068000 0x100>;
+> +		interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+> +		clock-frequency = <24000000>;
+> +		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
+> +		clock-names = "sclk_uart", "pclk_uart";
+> +	};
