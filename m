@@ -1,29 +1,23 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Wed, 17 May 2017 10:04:06 -0400 (EDT)
-Subject: [PATCH 2/2] PCI: Avoid bus reset for Cavium cn8xxx root ports.
-In-Reply-To: <1495004825.31562.20.camel@perches.com>
-References: <20170516001736.4001-1-david.daney@cavium.com>
- <20170516001736.4001-3-david.daney@cavium.com>
- <235a9a51-df06-84af-4e5d-b6408ceb0b7d@redhat.com>
- <3fbbda8a-a6ea-976e-46ba-d23646500b3a@caviumnetworks.com>
- <1495004825.31562.20.camel@perches.com>
-Message-ID: <925EB284-D73A-44A4-AAEB-C086041C5A3E@redhat.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 17 May 2017 19:34:33 +0530
+Subject: [PATCH] ARM: davinci_all_defconfig: enable LEGO MINDSTORMS EV3
+ battery module
+In-Reply-To: <1494885206-22805-1-git-send-email-david@lechnology.com>
+References: <1494885206-22805-1-git-send-email-david@lechnology.com>
+Message-ID: <a193ada5-d198-0af0-ddff-634361e3838f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hahahahahaha :)
+On Tuesday 16 May 2017 03:23 AM, David Lechner wrote:
+> This enables the power supply module for the LEGO MINDSTORMS EV3 battery.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
+> 
+> Goes along with https://patchwork.kernel.org/patch/9676087/ (which I don't see
+> in linux-davinci yet).
 
--- 
-Computer Architect | Sent from my 64-bit #ARM Powered phone
+I just pushed that out. And this patch is applied for v4.13 as well.
 
-> On May 17, 2017, at 03:08, Joe Perches <joe@perches.com> wrote:
-> 
->> On Tue, 2017-05-16 at 13:29 -0700, David Daney wrote:
->> We really need to improve the 
->> grammatical analysis capabilities of checkpatch.pl, I think I will lay 
->> the blame there.
-> 
-> Uh huh.  Best of luck.  Submit a patch...
-> 
-> ;)
-> 
+Thanks,
+Sekhar
