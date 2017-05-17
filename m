@@ -1,34 +1,46 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 17 May 2017 12:11:54 -0500
-Subject: [PATCH v6 2/3] iommu/pci: reserve IOVA for PCI masters
-In-Reply-To: <1494912127-12890-3-git-send-email-oza.oza@broadcom.com>
-References: <1494912127-12890-1-git-send-email-oza.oza@broadcom.com>
- <1494912127-12890-3-git-send-email-oza.oza@broadcom.com>
-Message-ID: <20170517171154.GF31462@bhelgaas-glaptop.roam.corp.google.com>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Wed, 17 May 2017 19:13:47 +0200
+Subject: [PATCH v4 0/5] iio: ADC driver for EP93xx SoC
+Message-ID: <20170517171352.20369-1-alexander.sverdlin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 10:52:06AM +0530, Oza Pawandeep wrote:
-> this patch reserves the IOVA for PCI masters.
-> ARM64 based SOCs may have scattered memory banks.
-> such as iproc based SOC has
-> 
-> <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
-> <0x00000008 0x80000000 0x3 0x80000000>, /* 14G @ 34G */
-> <0x00000090 0x00000000 0x4 0x00000000>, /* 16G @ 576G */
-> <0x000000a0 0x00000000 0x4 0x00000000>; /* 16G @ 640G */
-> 
-> but incoming PCI transcation addressing capability is limited
+This series prepares the necessary infrastructure for ADC platform device on
+Cirrus Logic EP93xx family of SoCs and adds the driver for ADC device using
+IIO subsystem.
 
-s/transcation/transaction/
+Changelog
+v4:
+  Spelling improvements
+  sign_extend32() usage
+v3:
+  Rebased to the current master
+  sizeof(struct foo) -> sizeof(*bar)
+v2:
+  Added Documentation/iio/ep93xx_adc.txt
+  Removed extend_name
+  Added timeout to the status polling loop
+  Used iio_device_register() instead of devm_iio_device_register()
 
-> by host bridge, for example if max incoming window capability
-> is 512 GB, then 0x00000090 and 0x000000a0 will fall beyond it.
-> 
-> to address this problem, iommu has to avoid allocating IOVA which
+Alexander Sverdlin (5):
+  clk: ep93xx: Implement clk_get_parent()
+  clk: ep93xx: Add ADC clock
+  ep93xx: Add ADC platform device support to core
+  edb93xx: Add ADC platform device
+  iio: adc: New driver for Cirrus Logic EP93xx ADC
 
-s/iommu/IOMMU/
+ Documentation/iio/ep93xx_adc.txt             |  29 +++
+ arch/arm/mach-ep93xx/clock.c                 |  14 ++
+ arch/arm/mach-ep93xx/core.c                  |  24 +++
+ arch/arm/mach-ep93xx/edb93xx.c               |   1 +
+ arch/arm/mach-ep93xx/include/mach/platform.h |   1 +
+ arch/arm/mach-ep93xx/soc.h                   |   1 +
+ drivers/iio/adc/Kconfig                      |  11 ++
+ drivers/iio/adc/Makefile                     |   1 +
+ drivers/iio/adc/ep93xx_adc.c                 | 255 +++++++++++++++++++++++++++
+ 9 files changed, 337 insertions(+)
+ create mode 100644 Documentation/iio/ep93xx_adc.txt
+ create mode 100644 drivers/iio/adc/ep93xx_adc.c
 
-> are reserved. which inturn does not allocate IOVA if it falls into hole.
-
-s/inturn/in turn/
+-- 
+2.12.2
