@@ -1,105 +1,59 @@
-From: huziji@marvell.com (Hu Ziji)
-Date: Wed, 17 May 2017 14:50:23 +0800
-Subject: [PATCH] mmc: sdhci-xenon: kill xenon_clean_phy()
-In-Reply-To: <20170516061720.1755-1-jszhang@marvell.com>
-References: <20170516061720.1755-1-jszhang@marvell.com>
-Message-ID: <c955067e-b092-7909-0f3d-b22b93741520@marvell.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 17 May 2017 15:00:19 +0800
+Subject: [V2, 2/6] tty: serial: lpuart: add little endian 32 bit register
+ support
+In-Reply-To: <55bae8d2-0e23-b5e1-f304-63d9130ccb08@cogentembedded.com>
+References: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
+ <b4a2ed13-c71f-c973-3b09-b632e083a88b@cogentembedded.com>
+ <20170517033139.GB9913@b29396-OptiPlex-7040>
+ <48819894-4943-7d14-ccf8-83cfd2195c9a@cogentembedded.com>
+ <AM3PR04MB306D5C86AED120D15C4D46A80E70@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <55bae8d2-0e23-b5e1-f304-63d9130ccb08@cogentembedded.com>
+Message-ID: <20170517070019.GG9913@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/5/16 14:17, Jisheng Zhang wrote:
-> Currently, the xenon_clean_phy() is only used for freeing phy_params.
-> The phy_params is allocated by devm_kzalloc(), there's no need to free
-> is explicitly.
+On Wed, May 17, 2017 at 09:25:51AM +0300, Nikita Yushchenko wrote:
+> >> Code should be consistent.
+> >>
+> > 
+> > Yes.
+> > 
+> >> There is no good reason to have sport->lpuart32 inside sport, but
+> >> lpuart_is_be outside of it. Both these values describe properties of
+> >> particular device, and thus should be in per-device structure.
+> >>
+> > 
+> > That's for special case, normally we wouldn't do that.
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-
-Thanks for the fix.
-
-Acked-by Hu Ziji <huziji@marvell.com>
-
-Best regards,
-Hu Ziji
-
-> ---
->  drivers/mmc/host/sdhci-xenon-phy.c | 14 +-------------
->  drivers/mmc/host/sdhci-xenon.c     |  6 +-----
->  drivers/mmc/host/sdhci-xenon.h     |  1 -
->  3 files changed, 2 insertions(+), 19 deletions(-)
+> For me this "special case" looks like "let's break data structure
+> consistency to reuse several lines of code".
 > 
-> diff --git a/drivers/mmc/host/sdhci-xenon-phy.c b/drivers/mmc/host/sdhci-xenon-phy.c
-> index 6356781f1cca..f7e26b031e76 100644
-> --- a/drivers/mmc/host/sdhci-xenon-phy.c
-> +++ b/drivers/mmc/host/sdhci-xenon-phy.c
-> @@ -787,14 +787,6 @@ int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios)
->  	return ret;
->  }
->  
-> -void xenon_clean_phy(struct sdhci_host *host)
-> -{
-> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	struct xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
-> -
-> -	kfree(priv->phy_params);
-> -}
-> -
->  static int xenon_add_phy(struct device_node *np, struct sdhci_host *host,
->  			 const char *phy_name)
->  {
-> @@ -819,11 +811,7 @@ static int xenon_add_phy(struct device_node *np, struct sdhci_host *host,
->  	if (ret)
->  		return ret;
->  
-> -	ret = xenon_emmc_phy_parse_param_dt(host, np, priv->phy_params);
-> -	if (ret)
-> -		xenon_clean_phy(host);
-> -
-> -	return ret;
-> +	return xenon_emmc_phy_parse_param_dt(host, np, priv->phy_params);
->  }
->  
->  int xenon_phy_parse_dt(struct device_node *np, struct sdhci_host *host)
-> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
-> index 67246655315b..bc1781bb070b 100644
-> --- a/drivers/mmc/host/sdhci-xenon.c
-> +++ b/drivers/mmc/host/sdhci-xenon.c
-> @@ -486,7 +486,7 @@ static int xenon_probe(struct platform_device *pdev)
->  
->  	err = xenon_sdhc_prepare(host);
->  	if (err)
-> -		goto clean_phy_param;
-> +		goto err_clk;
->  
->  	err = sdhci_add_host(host);
->  	if (err)
-> @@ -496,8 +496,6 @@ static int xenon_probe(struct platform_device *pdev)
->  
->  remove_sdhc:
->  	xenon_sdhc_unprepare(host);
-> -clean_phy_param:
-> -	xenon_clean_phy(host);
->  err_clk:
->  	clk_disable_unprepare(pltfm_host->clk);
->  free_pltfm:
-> @@ -510,8 +508,6 @@ static int xenon_remove(struct platform_device *pdev)
->  	struct sdhci_host *host = platform_get_drvdata(pdev);
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->  
-> -	xenon_clean_phy(host);
-> -
->  	sdhci_remove_host(host, 0);
->  
->  	xenon_sdhc_unprepare(host);
-> diff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
-> index 6e6523ea01ce..73debb42dc2f 100644
-> --- a/drivers/mmc/host/sdhci-xenon.h
-> +++ b/drivers/mmc/host/sdhci-xenon.h
-> @@ -93,7 +93,6 @@ struct xenon_priv {
->  };
->  
->  int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios);
-> -void xenon_clean_phy(struct sdhci_host *host);
->  int xenon_phy_parse_dt(struct device_node *np,
->  		       struct sdhci_host *host);
->  void xenon_soc_pad_ctrl(struct sdhci_host *host,
+> With code snippets you show, it looks even worse: you assign same global
+> variable in several places for different uses. 
+
+If you mean lpuart_is_be, it's not for different uses.
+The purpose is the same to align the correct endian but in two places.
+
+> implicitly assuming that
+> it is for same device. Which can be true in your current system, but not
+> elsewhere (e.g. why not having lpuart programmed into fpga)?
 > 
+
+Sorry, What issues for fpga?
+
+> Alternative solution could be - have separate write path for earlycon.
+
+It looks to me having the same issue with a separate write patch
+for earlycon as we still need distinguish Little or Big endian
+for Layerscape and IMX.
+
+> At a glance, it is dozen lines of code.
+
+Would you please show some sample code?
+Then we probably may understand better with each other.
+
+Anyway, thanks for detailed review.
+
+Regards
+Dong Aisheng
