@@ -1,54 +1,49 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 17 May 2017 11:01:00 +0200
-Subject: [PATCH 1/3] arm: dts: rk322x: fix i2s1 pinctrl error
-In-Reply-To: <1494992451-32542-2-git-send-email-frank.wang@rock-chips.com>
-References: <1494992451-32542-1-git-send-email-frank.wang@rock-chips.com>
- <1494992451-32542-2-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <2781249.GNsgFIKA50@diego>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 17 May 2017 11:13:17 +0200
+Subject: [PATCH v2] misc: sram-exec: Use aligned fncpy instead of memcpy
+In-Reply-To: <20170516160127.GH31418@atomide.com>
+References: <20170410145247.6023-1-d-gerlach@ti.com>
+ <20170503185533.GS23750@n2100.armlinux.org.uk>
+ <20170516160127.GH31418@atomide.com>
+Message-ID: <20170517091317.GA17902@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
-
-Am Mittwoch, 17. Mai 2017, 11:40:49 CEST schrieb Frank Wang:
-> From: Sugar Zhang <sugar.zhang@rock-chips.com>
+On Tue, May 16, 2017 at 09:01:27AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@armlinux.org.uk> [170503 11:58]:
+> > On Mon, Apr 10, 2017 at 09:52:47AM -0500, Dave Gerlach wrote:
+> > > Currently the sram-exec functionality, which allows allocation of
+> > > executable memory and provides an API to move code to it, is only
+> > > selected in configs for the ARM architecture. Based on commit
+> > > 5756e9dd0de6 ("ARM: 6640/1: Thumb-2: Symbol manipulation macros for
+> > > function body copying") simply copying a C function pointer address
+> > > using memcpy without consideration of alignment and Thumb is unsafe on
+> > > ARM platforms.
+> > > 
+> > > The aforementioned patch introduces the fncpy macro which is a safe way
+> > > to copy executable code on ARM platforms, so let's make use of that here
+> > > rather than the unsafe plain memcpy that was previously used by
+> > > sram_exec_copy. Now sram_exec_copy will move the code to "dst" and
+> > > return an address that is guaranteed to be safely callable.
+> > > 
+> > > In the future, architectures hoping to make use of the sram-exec
+> > > functionality must define an fncpy macro just as ARM has done to
+> > > guarantee or check for safe copying to executable memory before allowing
+> > > the arch to select CONFIG_SRAM_EXEC.
+> > > 
+> > > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> > 
+> > Looks a lot saner, thanks.  It's just a bit sad that we lose the type
+> > checking.
+> > 
+> > Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 > 
-> Refer to Chapter 5.3.2 of rk3229 TRM, we can see that GPIO1A[2,4,5]
-> using RK_FUNC_2 not RK_FUNC_1. This patch fixes it.
-> 
-> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+> Looks like this is still pending so I'll add it into
+> omap-for-v4.12/fixes so we can get this out of the way.
 
-if the patch has another author, you should preserve his/her Signed-off-by
-line, so for example this patch would look like:
+It's a "fix"?  Looked to be a 4.13 issue, sorry for the delay, otherwise
+I would have queued it up earlier.
 
-Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+No objection for you to take this through your tree.
 
-Same for all other patches with differing authors in your 2 series from
-today. As this touches the developer-certificate-of-origin, this is also
-something I cannot really correct myself.
-
-
-Heiko
-
-
-> ---
->  arch/arm/boot/dts/rk322x.dtsi | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-> index 48a0c1c..cc6a27d 100644
-> --- a/arch/arm/boot/dts/rk322x.dtsi
-> +++ b/arch/arm/boot/dts/rk322x.dtsi
-> @@ -621,9 +621,9 @@
->  						<0 12 RK_FUNC_1 &pcfg_pull_none>,
->  						<0 13 RK_FUNC_1 &pcfg_pull_none>,
->  						<0 14 RK_FUNC_1 &pcfg_pull_none>,
-> -						<1 2 RK_FUNC_1 &pcfg_pull_none>,
-> -						<1 4 RK_FUNC_1 &pcfg_pull_none>,
-> -						<1 5 RK_FUNC_1 &pcfg_pull_none>;
-> +						<1 2 RK_FUNC_2 &pcfg_pull_none>,
-> +						<1 4 RK_FUNC_2 &pcfg_pull_none>,
-> +						<1 5 RK_FUNC_2 &pcfg_pull_none>;
->  			};
->  		};
+greg k-h
