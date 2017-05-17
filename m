@@ -1,89 +1,123 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 17 May 2017 15:58:12 +0530
-Subject: [PATCH V8 07/11] iommu: of: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <CANqRtoSEwdoufUxP-Rm=qZJ7G8V3ow5F0ggV3tALrfiRad+j4Q@mail.gmail.com>
-References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
- <1486136933-20328-8-git-send-email-sricharan@codeaurora.org>
- <CAMuHMdV05uCcVss+V1E+_OQYosJO6P95rU1WynV-G08-iHJnyg@mail.gmail.com>
- <2bfd11dc-9f94-2b69-7b03-c640e53155e1@arm.com>
- <26defadf-6380-4af4-6323-b51198376bc1@codeaurora.org>
- <CAMuHMdUoLp1oVT_=NG8HS-jgG6AhOeVUsGgu7fLbGY+7A+0cOg@mail.gmail.com>
- <CANqRtoSEwdoufUxP-Rm=qZJ7G8V3ow5F0ggV3tALrfiRad+j4Q@mail.gmail.com>
-Message-ID: <3b154db4-6ebb-c05c-91f0-beefa75fae00@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 17 May 2017 11:36:02 +0100
+Subject: [PATCH V10 1/3] irq: Allow to pass the IRQF_TIMER flag with
+ percpu irq request
+In-Reply-To: <1494963880-16160-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1494963880-16160-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20170517103602.GD14654@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+On Tue, May 16, 2017 at 09:44:32PM +0200, Daniel Lezcano wrote:
+> In the next changes, we track when the interrupts occur in order to
+> statistically compute when is supposed to happen the next interrupt.
+> 
+> In all the interruptions, it does not make sense to store the timer interrupt
+> occurences and try to predict the next interrupt as when know the expiration
+> time.
+> 
+> The request_irq() has a irq flags parameter and the timer drivers use it to
+> pass the IRQF_TIMER flag, letting us know the interrupt is coming from a timer.
+> Based on this flag, we can discard these interrupts when tracking them.
+> 
+> But, the API request_percpu_irq does not allow to pass a flag, hence specifying
+> if the interrupt type is a timer.
+> 
+> Add a function request_percpu_irq_flags() where we can specify the flags. The
+> request_percpu_irq() function is changed to be a wrapper to
+> request_percpu_irq_flags() passing a zero flag parameter.
+> 
+> Change the timers using request_percpu_irq() to use request_percpu_irq_flags()
+> instead with the IRQF_TIMER flag set.
+> 
+> For now, in order to prevent a misusage of this parameter, only the IRQF_TIMER
+> flag (or zero) is a valid parameter to be passed to the
+> request_percpu_irq_flags() function.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Vineet Gupta <vgupta@synopsys.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Paolo Bonzini <pbonzini@redhat.com>
+> Cc: Radim Kr?m?? <rkrcmar@redhat.com>
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+> Changelog:
+> 
+>    V10:
+> 	- Drop the change for arch arm virtual timer
+> 	  https://lkml.org/lkml/2017/4/25/184
+>    V9:
+> 	- Clarified the patch description
+> 	- Fixed EXPORT_SYMBOL_GPL(request_percpu_irq_flags)
+> ---
+>  arch/arm/kernel/smp_twd.c                |  3 ++-
+>  drivers/clocksource/arc_timer.c          |  4 ++--
+>  drivers/clocksource/arm_arch_timer.c     | 20 ++++++++++++--------
+>  drivers/clocksource/arm_global_timer.c   |  4 ++--
+>  drivers/clocksource/exynos_mct.c         |  7 ++++---
+>  drivers/clocksource/qcom-timer.c         |  4 ++--
+>  drivers/clocksource/time-armada-370-xp.c |  9 +++++----
+>  drivers/clocksource/timer-nps.c          |  6 +++---
+>  include/linux/interrupt.h                | 11 ++++++++++-
+>  kernel/irq/manage.c                      | 15 ++++++++++-----
+>  10 files changed, 52 insertions(+), 31 deletions(-)
 
-<snip..>
+As an aside, perhaps it would make more sense to move the
+request_percpu_irq_flags() addition into a preparatory patch? That way
+it's clearly separated from the mechanical clocksource changes, and it's
+easy to see how it works.
 
->> Magnus, do you have a suggestion?
-> 
-> Thanks for your efforts guys!
-> 
-> I've recently been working on up-porting the IPMMU patches and
-> addressing review comments. Now with my local driver stack on top of
-> v4.12-rc (a95cfad) I did not notice these issues initially since I
-> only tested devices with IPMMU enabled. Once these issues were pointed
-> out to me by Geert I have now reproduced the 64-bit ARM specific ones
-> on r8a7796 Salvator-X.
-> 
-> On my r8a7796 platform I'm using the following IOMMU and DMA Engine devices:
-> 
-> IOMMU device IPMMU-DS0 - Connected to SYS-DMAC0
-> IOMMU device IPMMU-DS1 - Connected to SYS-DMAC1 and SYS-DMAC2
-> IOMMU device IPMMU-MM - Root device serving IPMMU-DS0 and IPMMU-DS1
-> 
-> For testing the serial port SCIF1 is used with DMA Engine devices
-> SYS-DMAC1 or SYS-DMAC2.
-> 
-> The software environment is configured as follows:
-> - The DTS comes with all devices above enabled except IPMMU-DS0 which
-> comes with status = "disabled".
-> - The IPMMU driver is during run time only allowing use of SYS-DMAC2.
-> For other devices ->of_xlate() returns -ENODEV.
-> 
-> The above used to work just fine with v4.11 or earlier.
-> 
-> My observations for v4.12-rc:
-> 
-> 1) Default state for a95cfad
-> 
-> The devices SYS-DMAC0 and SYS-DMAC1 will never probe. However SYS-DMAC2 is fine.
-> 
-> 2) After applying "[PATCH] iommu: of: Fix check for returning EPROBE_DEFER" [1]
-> 
-> This fixes SYS-DMAC0 that now probes and operates without IPMMU-DS0 as
-> expected. Same as v4.11 or earlier.
-> 
-> 3) After also applying "[PATCH] of: iommu: Ignore all errors except
-> EPROBE_DEFER" [2]
-> 
-> This fixes SYS-DMAC1 that now probes and operates without IPMMU-DS1 as
-> expected. Same as v4.11 or earlier.
-> 
-> With fix [1] and [2] things seem back to normal. Unless I'm mistaken
+Either way, for arm_arch_timer:
 
-Thanks, will use this as your Tested-by.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Regards,
- Sricharan
+Thanks,
+Mark.
 
-> it also seems that [1] allows me to drop the similar patch "[PATCH/RFC
-> v2 1/4] iommu/of: Skip IOMMU devices disabled in DT".
-> 
-> Thanks for your help.
-> 
-> Cheers,
-> 
-> / magnus
-> 
-> 
-> [1] https://lkml.org/lkml/2017/5/16/25
-> [2] https://www.spinics.net/lists/arm-kernel/msg581485.html
-> [3] https://patchwork.kernel.org/patch/9540605/
-> 
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 4bed671..22646b5 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -980,25 +980,29 @@ static int __init arch_timer_register(void)
+>  	ppi = arch_timer_ppi[arch_timer_uses_ppi];
+>  	switch (arch_timer_uses_ppi) {
+>  	case ARCH_TIMER_VIRT_PPI:
+> -		err = request_percpu_irq(ppi, arch_timer_handler_virt,
+> -					 "arch_timer", arch_timer_evt);
+> +		err = request_percpu_irq_flags(ppi, arch_timer_handler_virt,
+> +					       IRQF_TIMER, "arch_timer",
+> +					       arch_timer_evt);
+>  		break;
+>  	case ARCH_TIMER_PHYS_SECURE_PPI:
+>  	case ARCH_TIMER_PHYS_NONSECURE_PPI:
+> -		err = request_percpu_irq(ppi, arch_timer_handler_phys,
+> -					 "arch_timer", arch_timer_evt);
+> +		err = request_percpu_irq_flags(ppi, arch_timer_handler_phys,
+> +					       IRQF_TIMER, "arch_timer",
+> +					       arch_timer_evt);
+>  		if (!err && arch_timer_has_nonsecure_ppi()) {
+>  			ppi = arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI];
+> -			err = request_percpu_irq(ppi, arch_timer_handler_phys,
+> -						 "arch_timer", arch_timer_evt);
+> +			err = request_percpu_irq_flags(ppi, arch_timer_handler_phys,
+> +						       IRQF_TIMER, "arch_timer",
+> +						       arch_timer_evt);
+>  			if (err)
+>  				free_percpu_irq(arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI],
+>  						arch_timer_evt);
+>  		}
+>  		break;
+>  	case ARCH_TIMER_HYP_PPI:
+> -		err = request_percpu_irq(ppi, arch_timer_handler_phys,
+> -					 "arch_timer", arch_timer_evt);
+> +		err = request_percpu_irq_flags(ppi, arch_timer_handler_phys,
+> +					       IRQF_TIMER, "arch_timer",
+> +					       arch_timer_evt);
+>  		break;
+>  	default:
+>  		BUG();
