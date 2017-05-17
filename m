@@ -1,48 +1,74 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Wed, 17 May 2017 15:55:25 -0300
-Subject: [PATCH] ARM: dts: imx7s-warp: Pass 'no-1-8-v' property to the eMMC
-Message-ID: <1495047325-6010-1-git-send-email-fabio.estevam@nxp.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 May 2017 21:13:38 +0200
+Subject: [PATCH v6 1/3] of/pci/dma: fix DMA configuration for PCI masters
+In-Reply-To: <1494912127-12890-2-git-send-email-oza.oza@broadcom.com>
+References: <1494912127-12890-1-git-send-email-oza.oza@broadcom.com>
+ <1494912127-12890-2-git-send-email-oza.oza@broadcom.com>
+Message-ID: <CAK8P3a3hoeCET5Z+KUJDCHgGEJUmLF49bDozEE0ra5jcbjvoXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the following eMMC error is seen:
+On Tue, May 16, 2017 at 7:22 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
+> current device framework and OF framework integration assumes
+> dma-ranges in a way where memory-mapped devices define their
+> dma-ranges. (child-bus-address, parent-bus-address, length).
+>
+> of_dma_configure is specifically written to take care of memory
+> mapped devices. but no implementation exists for pci to take
+> care of pcie based memory ranges.
 
-mmc1: mmc_select_hs200 failed, error -74
-mmc1: new MMC card at address 0001
-mmcblk1: mmc1:0001 V10008 7.05 GiB
-mmcblk1boot0: mmc1:0001 V10008 partition 1 4.00 MiB
-mmcblk1boot1: mmc1:0001 V10008 partition 2 4.00 MiB
-mmcblk1rpmb: mmc1:0001 V10008 partition 3 4.00 MiB
+Hi Oza,
 
-On imx7s-warp the eMMC VCCQ is fixed at 3.15V, so pass the 'no-1-8-v'
-property to properly describe that 1.8V operation is not possible.
+I'm trying to make sense of this, but am still rather puzzled. I have
+no idea what the distinction between memory-mapped devices and
+pcie based devices is in your description, as PCIe is usually memory
+mapped, and Linux doesn't actually support other kinds of PCIe
+devices on most architectures.
 
-With this change HS200 error is gone and another benefit is that the
-card can operate in DDR52 mode now:
+> for e.g. iproc based SOCs and other SOCs(suc as rcar) have PCI
+> world dma-ranges.
+> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+>
+> this patch serves following:
+>
+> 1) exposes interface to the pci host driver for their
+> inbound memory ranges
+>
+> 2) provide an interface to callers such as of_dma_get_ranges.
+> so then the returned size get best possible (largest) dma_mask.
+> because PCI RC drivers do not call APIs such as
+> dma_set_coherent_mask() and hence rather it shows its addressing
+> capabilities based on dma-ranges.
+>
+> for e.g.
+> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+> we should get dev->coherent_dma_mask=0x7fffffffff.
 
-mmc1: new DDR MMC card at address 0001
-mmcblk1: mmc1:0001 V10008 7.05 GiB
-mmcblk1boot0: mmc1:0001 V10008 partition 1 4.00 MiB
-mmcblk1boot1: mmc1:0001 V10008 partition 2 4.00 MiB
-mmcblk1rpmb: mmc1:0001 V10008 partition 3 4.00 MiB
+do you mean the coherent_dma_mask of the PCI host bridge
+or an attached device here?
 
-Suggested-by: Stefan Agner <stefan@agner.ch>
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx7s-warp.dts | 1 +
- 1 file changed, 1 insertion(+)
+If you require PCI devices to come up with an initial
+coherent_dma_mask other than 0xffffffffff, there are other
+problems involved. In particular, you will need to use
+swiotlb, which is not supported on arm32 at the moment,
+and the dma_set_mask()/dma_set_coherent_mask()
+functions need to be modified.
 
-diff --git a/arch/arm/boot/dts/imx7s-warp.dts b/arch/arm/boot/dts/imx7s-warp.dts
-index d5237fd..8dfed85 100644
---- a/arch/arm/boot/dts/imx7s-warp.dts
-+++ b/arch/arm/boot/dts/imx7s-warp.dts
-@@ -295,6 +295,7 @@
- 	assigned-clocks = <&clks IMX7D_USDHC3_ROOT_CLK>;
- 	assigned-clock-rates = <400000000>;
- 	bus-width = <8>;
-+	no-1-8-v;
- 	fsl,tuning-step = <2>;
- 	non-removable;
- 	status = "okay";
--- 
-2.7.4
+> +       while (1) {
+> +               dma_ranges = of_get_property(node, "dma-ranges", &rlen);
+> +
+> +               /* Ignore empty ranges, they imply no translation required. */
+> +               if (dma_ranges && rlen > 0)
+> +                       break;
+> +
+> +               /* no dma-ranges, they imply no translation required. */
+> +               if (!dma_ranges)
+> +                       break;
+
+A missing parent dma-ranges property here should really indicate that there
+is no valid translation. If we have existing cases where this happens
+in DT files, we may treat it as allowing only 32-bit DMA (as we already
+do for having no dma-ranges at all), but treating it the same way
+as an empty dma-ranges property sounds wrong.
+
+     Arnd
