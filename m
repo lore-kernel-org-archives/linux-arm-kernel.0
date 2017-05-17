@@ -1,231 +1,570 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 18 May 2017 00:43:53 +0800
-Subject: [RFC PATCH 10/11] ARM: sun8i: h3: add display engine pipeline for TVE
-In-Reply-To: <20170517164354.16399-1-icenowy@aosc.io>
-References: <20170517164354.16399-1-icenowy@aosc.io>
-Message-ID: <20170517164354.16399-11-icenowy@aosc.io>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 17 May 2017 18:50:07 +0300
+Subject: [PATCHv3 2/4] clk: ti: add support for clkctrl clocks
+In-Reply-To: <1495036209-11298-1-git-send-email-t-kristo@ti.com>
+References: <1495036209-11298-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1495036209-11298-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we have already the support for the TV encoder on Allwinner H3, add
-the display engine pipeline device tree nodes to its DTSI file.
+Previously, hwmod core has been used for controlling the hwmod level
+clocks directly. This has certain drawbacks, like being unable to share
+the clocks for multiple users, missing usecounting and generally being
+totally incompatible with the common clock framework.
 
-The H5 pipeline has some differences and will be enabled later.
+This patch adds support for clkctrl clocks for addressing the above
+issues. These support the modulemode handling, which will replace the
+direct hwmod clkctrl linkage. Any optional clocks are also supported,
+gate, mux and divider.
 
-The currently-unused mixer0 and tcon0 are also needed, for the
-completement of the pipeline.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/sun8i-h3.dtsi | 189 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 189 insertions(+)
+ drivers/clk/ti/Makefile  |   3 +-
+ drivers/clk/ti/clkctrl.c | 481 +++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/ti/clock.h   |  29 +++
+ 3 files changed, 512 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/ti/clkctrl.c
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index b36f9f423c39..20172ef92415 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -41,6 +41,8 @@
-  */
+diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
+index 0deac98..edb9f47 100644
+--- a/drivers/clk/ti/Makefile
++++ b/drivers/clk/ti/Makefile
+@@ -3,7 +3,8 @@ ifeq ($(CONFIG_ARCH_OMAP2PLUS), y)
+ obj-y					+= clk.o autoidle.o clockdomain.o
+ clk-common				= dpll.o composite.o divider.o gate.o \
+ 					  fixed-factor.o mux.o apll.o \
+-					  clkt_dpll.o clkt_iclk.o clkt_dflt.o
++					  clkt_dpll.o clkt_iclk.o clkt_dflt.o \
++					  clkctrl.o
+ obj-$(CONFIG_SOC_AM33XX)		+= $(clk-common) clk-33xx.o dpll3xxx.o
+ obj-$(CONFIG_SOC_TI81XX)		+= $(clk-common) fapll.o clk-814x.o clk-816x.o
+ obj-$(CONFIG_ARCH_OMAP2)		+= $(clk-common) interface.o clk-2xxx.o
+diff --git a/drivers/clk/ti/clkctrl.c b/drivers/clk/ti/clkctrl.c
+new file mode 100644
+index 0000000..cfdd97f
+--- /dev/null
++++ b/drivers/clk/ti/clkctrl.c
+@@ -0,0 +1,481 @@
++/*
++ * OMAP clkctrl clock support
++ *
++ * Copyright (C) 2017 Texas Instruments, Inc.
++ *
++ * Tero Kristo <t-kristo@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/clk/ti.h>
++#include <linux/delay.h>
++#include "clock.h"
++
++#define NO_IDLEST			0x1
++
++#define OMAP4_MODULEMODE_MASK		0x3
++
++#define MODULEMODE_HWCTRL		0x1
++#define MODULEMODE_SWCTRL		0x2
++
++#define OMAP4_IDLEST_MASK		(0x3 << 16)
++#define OMAP4_IDLEST_SHIFT		16
++
++#define CLKCTRL_IDLEST_FUNCTIONAL	0x0
++#define CLKCTRL_IDLEST_INTERFACE_IDLE	0x2
++#define CLKCTRL_IDLEST_DISABLED		0x3
++
++/* These timeouts are in us */
++#define OMAP4_MAX_MODULE_READY_TIME	2000
++#define OMAP4_MAX_MODULE_DISABLE_TIME	5000
++
++static bool _early_timeout = true;
++
++struct omap_clkctrl_provider {
++	void __iomem *base;
++	struct list_head clocks;
++};
++
++struct omap_clkctrl_clk {
++	struct clk_hw *clk;
++	u16 reg_offset;
++	int bit_offset;
++	struct list_head node;
++};
++
++union omap4_timeout {
++	u32 cycles;
++	ktime_t start;
++};
++
++static const struct omap_clkctrl_data default_clkctrl_data[] __initconst = {
++	{ 0 },
++};
++
++static u32 _omap4_idlest(u32 val)
++{
++	val &= OMAP4_IDLEST_MASK;
++	val >>= OMAP4_IDLEST_SHIFT;
++
++	return val;
++}
++
++static bool _omap4_is_idle(u32 val)
++{
++	val = _omap4_idlest(val);
++
++	return val == CLKCTRL_IDLEST_DISABLED;
++}
++
++static bool _omap4_is_ready(u32 val)
++{
++	val = _omap4_idlest(val);
++
++	return val == CLKCTRL_IDLEST_FUNCTIONAL ||
++	       val == CLKCTRL_IDLEST_INTERFACE_IDLE;
++}
++
++static bool _omap4_is_timeout(union omap4_timeout *time, u32 timeout)
++{
++	if (unlikely(_early_timeout)) {
++		if (time->cycles++ < timeout) {
++			udelay(1);
++			return false;
++		}
++	} else {
++		if (!ktime_to_ns(time->start)) {
++			time->start = ktime_get();
++			return false;
++		}
++
++		if (ktime_us_delta(ktime_get(), time->start) < timeout) {
++			cpu_relax();
++			return false;
++		}
++	}
++
++	return true;
++}
++
++static int __init _omap4_disable_early_timeout(void)
++{
++	_early_timeout = false;
++
++	return 0;
++}
++arch_initcall(_omap4_disable_early_timeout);
++
++static int _omap4_clkctrl_clk_enable(struct clk_hw *hw)
++{
++	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
++	u32 val;
++	int ret;
++	union omap4_timeout timeout = { 0 };
++
++	if (!clk->enable_bit)
++		return 0;
++
++	if (clk->clkdm) {
++		ret = ti_clk_ll_ops->clkdm_clk_enable(clk->clkdm, hw->clk);
++		if (ret) {
++			WARN(1,
++			     "%s: could not enable %s's clockdomain %s: %d\n",
++			     __func__, clk_hw_get_name(hw),
++			     clk->clkdm_name, ret);
++			return ret;
++		}
++	}
++
++	val = ti_clk_ll_ops->clk_readl(&clk->enable_reg);
++
++	val &= ~OMAP4_MODULEMODE_MASK;
++	val |= clk->enable_bit;
++
++	ti_clk_ll_ops->clk_writel(val, &clk->enable_reg);
++
++	if (clk->flags & NO_IDLEST)
++		return 0;
++
++	/* Wait until module is enabled */
++	while (!_omap4_is_ready(ti_clk_ll_ops->clk_readl(&clk->enable_reg))) {
++		if (_omap4_is_timeout(&timeout, OMAP4_MAX_MODULE_READY_TIME)) {
++			pr_err("%s: failed to enable\n", clk_hw_get_name(hw));
++			return -EBUSY;
++		}
++	}
++
++	return 0;
++}
++
++static void _omap4_clkctrl_clk_disable(struct clk_hw *hw)
++{
++	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
++	u32 val;
++	union omap4_timeout timeout = { 0 };
++
++	if (!clk->enable_bit)
++		return;
++
++	val = ti_clk_ll_ops->clk_readl(&clk->enable_reg);
++
++	val &= ~OMAP4_MODULEMODE_MASK;
++
++	ti_clk_ll_ops->clk_writel(val, &clk->enable_reg);
++
++	if (clk->flags & NO_IDLEST)
++		goto exit;
++
++	/* Wait until module is disabled */
++	while (!_omap4_is_idle(ti_clk_ll_ops->clk_readl(&clk->enable_reg))) {
++		if (_omap4_is_timeout(&timeout,
++				      OMAP4_MAX_MODULE_DISABLE_TIME)) {
++			pr_err("%s: failed to disable\n", clk_hw_get_name(hw));
++			break;
++		}
++	}
++
++exit:
++	if (clk->clkdm)
++		ti_clk_ll_ops->clkdm_clk_disable(clk->clkdm, hw->clk);
++}
++
++static int _omap4_clkctrl_clk_is_enabled(struct clk_hw *hw)
++{
++	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
++	u32 val;
++
++	val = ti_clk_ll_ops->clk_readl(&clk->enable_reg);
++
++	if (val & clk->enable_bit)
++		return 1;
++
++	return 0;
++}
++
++static const struct clk_ops omap4_clkctrl_clk_ops = {
++	.enable		= _omap4_clkctrl_clk_enable,
++	.disable	= _omap4_clkctrl_clk_disable,
++	.is_enabled	= _omap4_clkctrl_clk_is_enabled,
++};
++
++static struct clk_hw *_ti_omap4_clkctrl_xlate(struct of_phandle_args *clkspec,
++					      void *data)
++{
++	struct omap_clkctrl_provider *provider = data;
++	struct omap_clkctrl_clk *entry;
++
++	if (clkspec->args_count != 2)
++		return ERR_PTR(-EINVAL);
++
++	pr_debug("%s: looking for %x:%x\n", __func__,
++		 clkspec->args[0], clkspec->args[1]);
++
++	list_for_each_entry(entry, &provider->clocks, node) {
++		if (entry->reg_offset == clkspec->args[0] &&
++		    entry->bit_offset == clkspec->args[1])
++			break;
++	}
++
++	if (!entry)
++		return ERR_PTR(-EINVAL);
++
++	return entry->clk;
++}
++
++static int __init
++_ti_clkctrl_clk_register(struct omap_clkctrl_provider *provider,
++			 struct device_node *node, struct clk_hw *clk_hw,
++			 u16 offset, u8 bit, const char * const *parents,
++			 int num_parents, const struct clk_ops *ops)
++{
++	struct clk_init_data init = { NULL };
++	struct clk *clk;
++	struct omap_clkctrl_clk *clkctrl_clk;
++
++	init.name = kasprintf(GFP_KERNEL, "%s:%s:%04x:%d", node->parent->name,
++			      node->name, offset, bit);
++	clkctrl_clk = kzalloc(sizeof(*clkctrl_clk), GFP_KERNEL);
++	if (!init.name || !clkctrl_clk) {
++		kfree(init.name);
++		return -ENOMEM;
++	}
++
++	clk_hw->init = &init;
++	init.parent_names = parents;
++	init.num_parents = num_parents;
++	init.ops = ops;
++	init.flags = CLK_IS_BASIC;
++
++	clk = ti_clk_register(NULL, clk_hw, init.name);
++
++	if (IS_ERR_OR_NULL(clk))
++		return -EINVAL;
++
++	clkctrl_clk->reg_offset = offset;
++	clkctrl_clk->bit_offset = bit;
++	clkctrl_clk->clk = clk_hw;
++
++	list_add(&clkctrl_clk->node, &provider->clocks);
++
++	return 0;
++}
++
++static void __init
++_ti_clkctrl_setup_gate(struct omap_clkctrl_provider *provider,
++		       struct device_node *node, u16 offset,
++		       const struct omap_clkctrl_bit_data *data,
++		       void __iomem *reg)
++{
++	struct clk_hw_omap *clk_hw;
++
++	clk_hw = kzalloc(sizeof(*clk_hw), GFP_KERNEL);
++	if (!clk_hw)
++		return;
++
++	clk_hw->enable_bit = data->bit;
++	clk_hw->enable_reg.ptr = reg;
++
++	if (_ti_clkctrl_clk_register(provider, node, &clk_hw->hw, offset,
++				     data->bit, data->parents, 1,
++				     &omap_gate_clk_ops))
++		kfree(clk_hw);
++}
++
++static void __init
++_ti_clkctrl_setup_mux(struct omap_clkctrl_provider *provider,
++		      struct device_node *node, u16 offset,
++		      const struct omap_clkctrl_bit_data *data,
++		      void __iomem *reg)
++{
++	struct clk_omap_mux *mux;
++	int num_parents = 0;
++	const char * const *pname;
++
++	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
++	if (!mux)
++		return;
++
++	pname = data->parents;
++	while (*pname) {
++		num_parents++;
++		pname++;
++	}
++
++	mux->mask = num_parents;
++	mux->mask = (1 << fls(mux->mask)) - 1;
++
++	mux->shift = data->bit;
++	mux->reg.ptr = reg;
++
++	if (_ti_clkctrl_clk_register(provider, node, &mux->hw, offset,
++				     data->bit, data->parents, num_parents,
++				     &ti_clk_mux_ops))
++		kfree(mux);
++}
++
++static void __init
++_ti_clkctrl_setup_div(struct omap_clkctrl_provider *provider,
++		      struct device_node *node, u16 offset,
++		      const struct omap_clkctrl_bit_data *data,
++		      void __iomem *reg)
++{
++	struct clk_omap_divider *div;
++	const struct omap_clkctrl_div_data *div_data = data->data;
++
++	div = kzalloc(sizeof(*div), GFP_KERNEL);
++	if (!div)
++		return;
++
++	div->reg.ptr = reg;
++	div->shift = data->bit;
++
++	if (ti_clk_parse_divider_data((int *)div_data->dividers,
++				      div_data->max_div, 0, 0,
++				      &div->width, &div->table)) {
++		pr_err("%s: Data parsing for %s:%04x:%d failed\n", __func__,
++		       node->name, offset, data->bit);
++		kfree(div);
++		return;
++	}
++
++	if (_ti_clkctrl_clk_register(provider, node, &div->hw, offset,
++				     data->bit, data->parents, 1,
++				     &ti_clk_divider_ops))
++		kfree(div);
++}
++
++static void __init
++_ti_clkctrl_setup_subclks(struct omap_clkctrl_provider *provider,
++			  struct device_node *node,
++			  const struct omap_clkctrl_reg_data *data,
++			  void __iomem *reg)
++{
++	const struct omap_clkctrl_bit_data *bits = data->bit_data;
++
++	if (!bits)
++		return;
++
++	while (bits->bit) {
++		switch (bits->type) {
++		case TI_CLK_GATE:
++			_ti_clkctrl_setup_gate(provider, node, data->offset,
++					       bits, reg);
++			break;
++
++		case TI_CLK_DIVIDER:
++			_ti_clkctrl_setup_div(provider, node, data->offset,
++					      bits, reg);
++			break;
++
++		case TI_CLK_MUX:
++			_ti_clkctrl_setup_mux(provider, node, data->offset,
++					      bits, reg);
++			break;
++
++		default:
++			pr_err("%s: bad subclk type: %d\n", __func__,
++			       bits->type);
++			return;
++		}
++		bits++;
++	}
++}
++
++static void __init _ti_omap4_clkctrl_setup(struct device_node *node)
++{
++	struct omap_clkctrl_provider *provider;
++	const struct omap_clkctrl_data *data = default_clkctrl_data;
++	const struct omap_clkctrl_reg_data *reg_data;
++	struct clk_init_data init = { NULL };
++	struct clk_hw_omap *hw;
++	struct clk *clk;
++	struct omap_clkctrl_clk *clkctrl_clk;
++	const __be32 *addrp;
++	u32 addr;
++
++	addrp = of_get_address(node, 0, NULL, NULL);
++	addr = (u32)of_translate_address(node, addrp);
++
++	while (data->addr) {
++		if (addr == data->addr)
++			break;
++
++		data++;
++	}
++
++	if (!data->addr) {
++		pr_err("%s not found from clkctrl data.\n", node->name);
++		return;
++	}
++
++	provider = kzalloc(sizeof(*provider), GFP_KERNEL);
++	if (!provider)
++		return;
++
++	provider->base = of_iomap(node, 0);
++
++	INIT_LIST_HEAD(&provider->clocks);
++
++	/* Generate clocks */
++	reg_data = data->regs;
++
++	while (reg_data->parent) {
++		hw = kzalloc(sizeof(*hw), GFP_KERNEL);
++		if (!hw)
++			return;
++
++		hw->enable_reg.ptr = provider->base + reg_data->offset;
++
++		_ti_clkctrl_setup_subclks(provider, node, reg_data,
++					  hw->enable_reg.ptr);
++
++		if (reg_data->flags & CLKF_SW_SUP)
++			hw->enable_bit = MODULEMODE_SWCTRL;
++		if (reg_data->flags & CLKF_HW_SUP)
++			hw->enable_bit = MODULEMODE_HWCTRL;
++		if (reg_data->flags & CLKF_NO_IDLEST)
++			hw->flags |= NO_IDLEST;
++
++		init.parent_names = &reg_data->parent;
++		init.num_parents = 1;
++		init.flags = 0;
++		init.name = kasprintf(GFP_KERNEL, "%s:%s:%04x:%d",
++				      node->parent->name, node->name,
++				      reg_data->offset, 0);
++		clkctrl_clk = kzalloc(sizeof(*clkctrl_clk), GFP_KERNEL);
++		if (!init.name || !clkctrl_clk) {
++			kfree(init.name);
++			kfree(hw);
++			return;
++		}
++		init.ops = &omap4_clkctrl_clk_ops;
++		hw->hw.init = &init;
++
++		clk = ti_clk_register(NULL, &hw->hw, init.name);
++		if (IS_ERR_OR_NULL(clk))
++			return;
++
++		clkctrl_clk->reg_offset = reg_data->offset;
++		clkctrl_clk->clk = &hw->hw;
++
++		list_add(&clkctrl_clk->node, &provider->clocks);
++
++		reg_data++;
++	}
++
++	of_clk_add_hw_provider(node, _ti_omap4_clkctrl_xlate, provider);
++}
++CLK_OF_DECLARE(ti_omap4_clkctrl_clock, "ti,clkctrl",
++	       _ti_omap4_clkctrl_setup);
+diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
+index 3f7b265..1aa8d57 100644
+--- a/drivers/clk/ti/clock.h
++++ b/drivers/clk/ti/clock.h
+@@ -203,6 +203,35 @@ struct ti_dt_clk {
+ 		.node_name = name,	\
+ 	}
  
- #include "sunxi-h3-h5.dtsi"
-+#include <dt-bindings/clock/sun8i-de2.h>
-+#include <dt-bindings/reset/sun8i-de2.h>
++/* CLKCTRL type definitions */
++struct omap_clkctrl_div_data {
++	const int *dividers;
++	int max_div;
++};
++
++struct omap_clkctrl_bit_data {
++	u8 bit;
++	u8 type;
++	const char * const *parents;
++	const void *data;
++};
++
++struct omap_clkctrl_reg_data {
++	u16 offset;
++	const struct omap_clkctrl_bit_data *bit_data;
++	u16 flags;
++	const char *parent;
++};
++
++struct omap_clkctrl_data {
++	u32 addr;
++	const struct omap_clkctrl_reg_data *regs;
++};
++
++#define CLKF_SW_SUP	BIT(0)
++#define CLKF_HW_SUP	BIT(1)
++#define CLKF_NO_IDLEST	BIT(2)
++
+ typedef void (*ti_of_clk_init_cb_t)(struct clk_hw *, struct device_node *);
  
- / {
- 	cpus {
-@@ -72,6 +74,193 @@
- 		};
- 	};
- 
-+	de: display-engine {
-+		compatible = "allwinner,sun8i-h3-display-engine";
-+		allwinner,pipelines = <&mixer0>,
-+				      <&mixer1>;
-+		status = "disabled";
-+	};
-+
-+	soc {
-+		display_clocks: clock at 1000000 {
-+			compatible = "allwinner,sun8i-a83t-de2-clk";
-+			reg = <0x01000000 0x100000>;
-+			clocks = <&ccu CLK_BUS_DE>,
-+				 <&ccu CLK_DE>;
-+			clock-names = "bus",
-+				      "mod";
-+			resets = <&ccu RST_BUS_DE>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+			assigned-clocks = <&ccu CLK_DE>;
-+			assigned-clock-parents = <&ccu CLK_PLL_DE>;
-+			assigned-clock-rates = <432000000>;
-+		};
-+
-+		mixer0: mixer at 1100000 {
-+			compatible = "allwinner,sun8i-h3-de2-mixer0";
-+			reg = <0x01100000 0x100000>;
-+			clocks = <&display_clocks CLK_BUS_MIXER0>,
-+				 <&display_clocks CLK_MIXER0>;
-+			clock-names = "bus",
-+				      "mod";
-+			resets = <&display_clocks RST_MIXER0>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				mixer0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					mixer0_out_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_in_mixer0>;
-+					};
-+
-+					mixer0_out_tcon1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&tcon1_in_mixer0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		mixer1: mixer at 1200000 {
-+			compatible = "allwinner,sun8i-h3-de2-mixer1";
-+			reg = <0x01200000 0x100000>;
-+			clocks = <&display_clocks CLK_BUS_MIXER1>,
-+				 <&display_clocks CLK_MIXER1>;
-+			clock-names = "bus",
-+				      "mod";
-+			resets = <&display_clocks RST_WB>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				mixer1_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					mixer1_out_tcon1: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon1_in_mixer1>;
-+					};
-+
-+					mixer1_out_tcon0: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&tcon0_in_mixer1>;
-+					};
-+				};
-+			};
-+		};
-+
-+		tcon0: lcd-controller at 1c0c000 {
-+			compatible = "allwinner,sun8i-h3-tcon0";
-+			reg = <0x01c0c000 0x1000>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_TCON0>,
-+				 <&ccu CLK_TCON0>;
-+			clock-names = "ahb",
-+				      "tcon-ch1";
-+			resets = <&ccu RST_BUS_TCON0>;
-+			reset-names = "lcd";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon0_in_mixer0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&mixer0_out_tcon0>;
-+					};
-+
-+					tcon0_in_mixer1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&mixer1_out_tcon0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		tcon1: lcd-controller at 1c0d000 {
-+			compatible = "allwinner,sun8i-h3-tcon1";
-+			reg = <0x01c0d000 0x1000>;
-+			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_TCON1>;
-+			clock-names = "ahb";
-+			resets = <&ccu RST_BUS_TCON1>;
-+			reset-names = "lcd";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon1_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon1_in_mixer1: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&mixer1_out_tcon1>;
-+					};
-+
-+					tcon1_in_mixer0: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&mixer0_out_tcon1>;
-+					};
-+				};
-+
-+				tcon1_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					tcon1_out_tve0: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&tve0_in_tcon1>;
-+					};
-+				};
-+			};
-+		};
-+
-+		tve0: tv-encoder at 1e00000 {
-+			compatible = "allwinner,sun8i-h3-tv-encoder";
-+			reg = <0x01e00000 0x1000>;
-+			clocks = <&ccu CLK_BUS_TVE>, <&ccu CLK_TVE>;
-+			clock-names = "bus", "mod";
-+			resets = <&ccu RST_BUS_TVE>;
-+			status = "disabled";
-+
-+			assigned-clocks = <&ccu CLK_TVE>;
-+			assigned-clock-parents = <&ccu CLK_PLL_DE>;
-+			assigned-clock-rates = <216000000>;
-+
-+			port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tve0_in_tcon1: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&tcon1_out_tve0>;
-+				};
-+			};
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+ struct clk *ti_clk_register_gate(struct ti_clk *setup);
 -- 
-2.12.2
+1.9.1
