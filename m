@@ -1,49 +1,54 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 17 May 2017 09:40:40 +0200
-Subject: [PATCH v3 11/21] drm/sun4i: tcon: Switch mux on only for composite
+Date: Wed, 17 May 2017 09:40:33 +0200
+Subject: [PATCH v3 04/21] clk: sunxi-ng: mux: Don't just rely on the parent
+ for CLK_SET_RATE_PARENT
 In-Reply-To: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
 References: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <c67a3f59ba50aace65f2c9b28330826944e682ce.1495006350.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <ce84114d26706769eb6f7c2404bd20b9f2b0d868.1495006350.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even though that mux is undocumented, it seems like it needs to be set to 1
-when using composite, and 0 when using HDMI.
+The current code only rely on the parent to change its rate in the case
+where CLK_SET_RATE_PARENT is set.
+
+However, some clock rates might be obtained only through a modification of
+the parent and the clock divider. Just rely on the round rate of the clocks
+to give us the best computation that might be achieved for a given rate.
+
+round_rate functions now need to honor CLK_SET_RATE_PARENT, but either the
+functions already do that if they modify the parent, or don't modify the
+praents at all.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c |  9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/clk/sunxi-ng/ccu_mux.c | 14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index a3fc6ab3c14b..74aa01e75e32 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -112,16 +112,23 @@ EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
- void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
- 			struct drm_encoder *encoder)
- {
-+	u32 val;
-+
- 	if (!tcon->quirks->has_unknown_mux)
- 		return;
+diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
+index bae735e252b6..58b6e349a0ed 100644
+--- a/drivers/clk/sunxi-ng/ccu_mux.c
++++ b/drivers/clk/sunxi-ng/ccu_mux.c
+@@ -95,19 +95,7 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
+ 		if (!parent)
+ 			continue;
  
- 	if (channel != 1)
- 		return;
- 
-+	if (encoder->encoder_type == DRM_MODE_ENCODER_TVDAC)
-+		val = 1;
-+	else
-+		val = 0;
-+
- 	/*
- 	 * FIXME: Undocumented bits
- 	 */
--	regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
-+	regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, val);
- }
- EXPORT_SYMBOL(sun4i_tcon_set_mux);
+-		if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
+-			struct clk_rate_request parent_req = *req;
+-			int ret = __clk_determine_rate(parent, &parent_req);
+-
+-			if (ret)
+-				continue;
+-
+-			parent_rate = parent_req.rate;
+-		} else {
+-			parent_rate = clk_hw_get_rate(parent);
+-		}
+-
+-		adj_parent_rate = parent_rate;
++		adj_parent_rate = parent_rate = clk_hw_get_rate(parent);
+ 		ccu_mux_helper_adjust_parent_for_prediv(common, cm, i,
+ 							&adj_parent_rate);
  
 -- 
 git-series 0.9.1
