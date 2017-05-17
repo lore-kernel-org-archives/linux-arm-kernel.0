@@ -1,25 +1,35 @@
-From: qiyaoltc@gmail.com (Yao Qi)
-Date: Wed, 17 May 2017 17:04:26 +0100
-Subject: Unwinding stop on irq handler or across it?
-Message-ID: <86o9ur8o6t.fsf@gmail.com>
+From: davidm@egauge.net (David Mosberger)
+Date: Wed, 17 May 2017 10:04:32 -0600
+Subject: crash after receiving SIGCHLD during system call
+Message-ID: <CALnQHM3wjH1CWwUUJX7KhGOOhoW-0r22nyBWmBUJYCUFe-JEtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I have been seeing occasional random crashes of lighttpd for a few
+months now.  I was hoping it was
+just a temporary glitch, but the problem has persisted across many
+different kernel versions
+(currently at 4.9.28) and BUILDROOT versions (currently at 2017.02.2).
+The issue sounds a lot like this bug report:
 
-Hi,
-When use GDB debug Linux kernel, GDB can't stop on unwinding from an irq
-handler,
+ http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241421.html
 
-#0  gic_handle_irq (regs=0xffffffc07d9c7e30) at drivers/irqchip/irq-gic.c:263
-#1  0xffffffc000083ce4 in el1_irq () at arch/arm64/kernel/entry.S:346
-#2  0xffffffc000083ce4 in el1_irq () at arch/arm64/kernel/entry.S:346
-#3  0xffffffc000083ce4 in el1_irq () at arch/arm64/kernel/entry.S:346
-....
+We use BUILDROOT with glibc v2.24 on a Cortex A5 processor (with hard-float).
 
-This problem can be fixed by either adding .cfi directives in entry.S
-or adding some Linux awareness into GDB.  I want to know what is the
-expected behavior?  Is it reasonable that stack unwinding stops on irq
-handler, like el1_irq in this case? or something else?
+At this point, I'm mostly wondering whether we're the only ones seeing
+this problem.
 
--- 
-Yao (??)
+strace indicates that lighttpd always crashes after receiving SIGCHLD
+(i.e., no further system calls until the
+SIGSEGV or SIGILL hits).
+
+I added some instrumentation code to the SIGCHLD handler of lighttpd
+v1.4.45 and I have seen crashes after the SIGCHLD handler
+interrupted __libc_fork() and close().  The one constant so far is
+that the pc register in the signal handler machine-context
+(mcontext_t)
+points to the instruction after the "svc 0" instruction.
+
+Anyone have seen anything similar?
+
+  --david
