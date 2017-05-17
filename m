@@ -1,47 +1,25 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 17 May 2017 10:47:30 +0530
-Subject: [PATCH] iommu: of: Fix check for returning EPROBE_DEFER
-In-Reply-To: <20170516140943.ps2yufiukz6iurpl@latitude>
-References: <1494912253-25957-1-git-send-email-sricharan@codeaurora.org>
- <20170516140943.ps2yufiukz6iurpl@latitude>
-Message-ID: <f5f8de4a-73a1-a32f-2736-2a7e64bfaa1a@codeaurora.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 17 May 2017 11:00:47 +0530
+Subject: [PATCH 3/4] arm: dts: rk3229: add a new cpu opp table
+In-Reply-To: <1494996323-4678-4-git-send-email-frank.wang@rock-chips.com>
+References: <1494996323-4678-1-git-send-email-frank.wang@rock-chips.com>
+ <1494996323-4678-4-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <20170517053047.GA17481@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 17-05-17, 12:45, Frank Wang wrote:
+> From: Finley Xiao <finley.xiao@rock-chips.com>
+> 
+> This patch adds some new frequencies for rk3229 board.
+> 
+> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+> ---
+>  arch/arm/boot/dts/rk3229-cpu-opp.dtsi | 85 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 85 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/rk3229-cpu-opp.dtsi
 
-On 5/16/2017 7:39 PM, Jonathan Neusch?fer wrote:
-> Hi, I have a few suggestions on how to make this commit message more
-> readable:
-> 
-> On Tue, May 16, 2017 at 10:54:13AM +0530, Sricharan R wrote:
->> While returning EPROBE_DEFER for iommu masters
-> 
-> Add a comma at the end of this line
-> 
->> take in to account of iommu nodes that could be
-> 
-> s/in to/into/
-> s/of iommu/of_iommu/
-> 
-
-ok, will correct the above.
-
-Regards,
- Sricharan
-
->> marked in DT as 'status=disabled', in which case
->> simply return NULL and let the master's probe
->> continue rather than deferring.
->>
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> Tested-by: Will Deacon <will.deacon@arm.com>
->> Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> 
-> Thanks,
-> Jonathan Neusch?fer
-> 
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+viresh
