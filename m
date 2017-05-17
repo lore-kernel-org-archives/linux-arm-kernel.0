@@ -1,80 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 17 May 2017 09:40:50 +0200
-Subject: [PATCH v3 21/21] ARM: sun5i: a10s-olinuxino: Enable HDMI
-In-Reply-To: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
-References: <cover.463df61c38224ecbfb5bf1cf192deeb63718b693.1495006350.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <231bed128af2b4d06093d2a5b24aed4e4ab86a6a.1495006350.git-series.maxime.ripard@free-electrons.com>
+From: jslaby@suse.cz (Jiri Slaby)
+Date: Wed, 17 May 2017 10:01:29 +0200
+Subject: [PATCH 1/1] futex: remove duplicated code
+In-Reply-To: <20170515131644.GA3605@arm.com>
+References: <20170515130742.18357-1-jslaby@suse.cz>
+ <20170515131644.GA3605@arm.com>
+Message-ID: <14580dfc-9721-38ab-a1e0-6b4aba13b406@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A10s Olinuxino has an HDMI connector. Make sure we can use it.
+On 05/15/2017, 03:16 PM, Will Deacon wrote:
+> Whilst I think this is a good idea, the code in question actually results
+> in undefined behaviour per the C spec and is reported by UBSAN.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 29 +++++++++++++++++-
- 1 file changed, 29 insertions(+)
+Hi, yes, I know -- this patch was the 1st from the series of 3 which I
+sent a long time ago to fix that up too. But I remember your patch, so I
+sent only this one this time.
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-index 894f874a5beb..1d13b6407222 100644
---- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-@@ -63,6 +63,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 		pinctrl-names = "default";
-@@ -76,6 +87,10 @@
- 	};
- };
- 
-+&be0 {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -91,6 +106,16 @@
- 	status = "okay";
- };
- 
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- &i2c0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c0_pins_a>;
-@@ -248,6 +273,10 @@
- 	status = "okay";
- };
- 
-+&tcon0 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+> See my
+> patch fixing arm64 here (which I'd forgotten about):
+> 
+> https://www.spinics.net/lists/linux-arch/msg38564.html
+> 
+> But, as stated in the thread above, I think we should go a step further
+> and remove FUTEX_OP_{OR,ANDN,XOR,OPARG_SHIFT} altogether. They don't
+> appear to be used by userspace, and this whole thing is a total mess.
+> 
+> Any thoughts?
+
+Ok, I am all for that. I think the only question is who is going to do
+the work and submit it :)? Do I understand correctly to eliminate all
+these functions and the path into the kernel? But won't this break API
+-- are there really no users of this interface?
+
+thanks,
 -- 
-git-series 0.9.1
+js
+suse labs
