@@ -1,36 +1,64 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Wed, 17 May 2017 09:25:51 +0300
-Subject: [V2, 2/6] tty: serial: lpuart: add little endian 32 bit register
- support
-In-Reply-To: <AM3PR04MB306D5C86AED120D15C4D46A80E70@AM3PR04MB306.eurprd04.prod.outlook.com>
-References: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
- <b4a2ed13-c71f-c973-3b09-b632e083a88b@cogentembedded.com>
- <20170517033139.GB9913@b29396-OptiPlex-7040>
- <48819894-4943-7d14-ccf8-83cfd2195c9a@cogentembedded.com>
- <AM3PR04MB306D5C86AED120D15C4D46A80E70@AM3PR04MB306.eurprd04.prod.outlook.com>
-Message-ID: <55bae8d2-0e23-b5e1-f304-63d9130ccb08@cogentembedded.com>
+From: ellisys@163.com (Kever Yang)
+Date: Wed, 17 May 2017 14:31:44 +0800
+Subject: [PATCH 2/3] arm: dts: rk322x: correct uart2 pinctrl and add
+ another sets
+In-Reply-To: <1494992451-32542-3-git-send-email-frank.wang@rock-chips.com>
+References: <1494992451-32542-1-git-send-email-frank.wang@rock-chips.com>
+ <1494992451-32542-3-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <3974d438-89ca-04e2-03cd-6d3946dd461e@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Code should be consistent.
->>
-> 
-> Yes.
-> 
->> There is no good reason to have sport->lpuart32 inside sport, but
->> lpuart_is_be outside of it. Both these values describe properties of
->> particular device, and thus should be in per-device structure.
->>
-> 
-> That's for special case, normally we wouldn't do that.
+Hi Frank,
 
-For me this "special case" looks like "let's break data structure
-consistency to reuse several lines of code".
 
-With code snippets you show, it looks even worse: you assign same global
-variable in several places for different uses. implicitly assuming that
-it is for same device. Which can be true in your current system, but not
-elsewhere (e.g. why not having lpuart programmed into fpga)?
+On 05/17/2017 11:40 AM, Frank Wang wrote:
+> Correct UART2 PINCTRL flag and add another PINCTRL sets for UART2
+> in case of confict with SDMMC.
+>
+> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+> ---
+>   arch/arm/boot/dts/rk322x.dtsi | 11 +++++++++--
+>   1 file changed, 9 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+> index cc6a27d..ea1239a 100644
+> --- a/arch/arm/boot/dts/rk322x.dtsi
+> +++ b/arch/arm/boot/dts/rk322x.dtsi
+> @@ -222,7 +222,7 @@
+>   		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
+>   		clock-names = "baudclk", "apb_pclk";
+>   		pinctrl-names = "default";
+> -		pinctrl-0 = <&uart2_xfer>;
+> +		pinctrl-0 = <&uart21_xfer>;
 
-Alternative solution could be - have separate write path for earlycon.
-At a glance, it is dozen lines of code.
+There are more than one group of UART in rk322x, maybe we need to move
+or add this setting in the dts file to override dtsi setting?
+
+Thanks,
+- Kever
+>   		reg-shift = <2>;
+>   		reg-io-width = <4>;
+>   		status = "disabled";
+> @@ -693,7 +693,7 @@
+>   
+>   		uart2 {
+>   			uart2_xfer: uart2-xfer {
+> -				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_none>,
+> +				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_up>,
+>   						<1 19 RK_FUNC_2 &pcfg_pull_none>;
+>   			};
+>   
+> @@ -705,5 +705,12 @@
+>   				rockchip,pins = <0 24 RK_FUNC_1 &pcfg_pull_none>;
+>   			};
+>   		};
+> +
+> +		uart2-1 {
+> +			uart21_xfer: uart21-xfer {
+> +				rockchip,pins = <1 10 RK_FUNC_2 &pcfg_pull_up>,
+> +						<1 9 RK_FUNC_2 &pcfg_pull_none>;
+> +			};
+> +		};
+>   	};
+>   };
