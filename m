@@ -1,66 +1,73 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 17 May 2017 14:33:40 -0700
-Subject: [PATCH net-next] drivers: net: xgene: Check all RGMII phy mode
- variants
-In-Reply-To: <CAKh23FkpYd0vC-AjqQu9ZStsRNp=kFh90eRfTU5WCC6Ln7E2AA@mail.gmail.com>
-References: <1495051550-28961-1-git-send-email-isubramanian@apm.com>
- <20170517202633.GA14413@lunn.ch>
- <CAKh23FkpYd0vC-AjqQu9ZStsRNp=kFh90eRfTU5WCC6Ln7E2AA@mail.gmail.com>
-Message-ID: <213c3447-6df7-ceb0-ed74-3e71342b7bf5@gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 17 May 2017 14:46:02 -0700
+Subject: [PATCH v2 00/18] ARM64: meson: DT cleanups
+In-Reply-To: <20170513143337.14278-1-afaerber@suse.de> ("Andreas
+ =?utf-8?Q?F=C3=A4rber=22's?=
+ message of "Sat, 13 May 2017 16:33:19 +0200")
+References: <20170513143337.14278-1-afaerber@suse.de>
+Message-ID: <m2mvab88dh.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2017 02:29 PM, Iyappan Subramanian wrote:
-> On Wed, May 17, 2017 at 1:26 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->>> +bool is_xgene_enet_phy_mode_rgmii(struct net_device *ndev)
->>> +{
->>> +     struct xgene_enet_pdata *pdata = netdev_priv(ndev);
->>> +     int phy_mode = pdata->phy_mode;
->>> +     bool ret;
->>> +
->>> +     ret = phy_mode == PHY_INTERFACE_MODE_RGMII ||
->>> +           phy_mode == PHY_INTERFACE_MODE_RGMII_ID ||
->>> +           phy_mode == PHY_INTERFACE_MODE_RGMII_RXID ||
->>> +           phy_mode == PHY_INTERFACE_MODE_RGMII_TXID;
->>> +
->>> +     return ret;
->>> +}
->>
->> include/linux/phy.h:
->>
->> /**
->>  * phy_interface_is_rgmii - Convenience function for testing if a PHY interface
->>  * is RGMII (all variants)
->>  * @phydev: the phy_device struct
->>  */
->> static inline bool phy_interface_is_rgmii(struct phy_device *phydev)
->> {
->>         return phydev->interface >= PHY_INTERFACE_MODE_RGMII &&
->>                 phydev->interface <= PHY_INTERFACE_MODE_RGMII_TXID;
->> };
-> 
-> Thanks.  I'll use this helper function.
+Hi Andreas,
 
-If you can use it, that's great, the reason why I did not recommend
-using it before was because it takes a phydev reference and your code
-clearly could have run before connecting to the PHY device.
+Andreas F?rber <afaerber@suse.de> writes:
 
-Alternatively, we could introduce a helper function that just checks a
-phy_interface_t type, something like:
+> This series fixes several cosmetic issues, on top of your for-next branch.
+>
+> Patches 3-6 rename a node, the rest should all be non-functional changes.
+>
+> PLEASE STOP merging random new nodes at the bottom of DT files!
+> Just like it's a convention to sort new nodes by unit address, it has been
+> a convention to sort by-label nodes by their label. As discussed here and
+> elsewhere, this helps avoid merge conflicts and makes nodes easy to find.
+> I don't care whether we order A0 before A or after, but adding new HDMI
+> or CVBS nodes at the very bottom is totally out of alphabetical order.
+> Since my v1 you really should've known that...
 
-static inline bool phy_interface_is_rgmii(phy_interface_t mode)
-{
-	...
-}
+Your tone is a bit tiresome and frankly makes me hesitate before
+reviewing the patches.  If you expect cordial dialogue and producitve
+collaboration, please dial the accusations back a notch.
 
-and introduce:
+[ ... deep breath ... ]
 
-static inline bool phydev_interface_is_rgmii(struct phy_device *phydev)
-{
-	return phy_interface_is_rgmii(phydev->interface);
-}
+Yes, your point was clear in v1, but that doesn't mean I agreed with it,
+or that I particularily pay attention to that in my reviews because
+honestly, alphabetical sorting is not very high on the list of things I
+care about.  Over many years of being a kernel maintainer, I've had to
+deal with my share of headaches, but conflicts caused by poorly sorted
+DT files hs never been on my list of pain points.
 
-which would use this helper function internally. Or just drop the second
-helper, and always pass phydev->interface where needed.
--- 
-Florian
+That being said, I understand your concerns and similar ones raised
+maintainers on other platforms.  I'm not a big fan of the churn caused
+by this kind of rework, *but* I'm also not opposed to keeping things
+better organized.  So, since there is an active contributor (and
+reviewer) that is willing to put in the time and effort to clean things
+up, I don't see a good (enough) reason to say no.
+
+So, I will apply the series as is to my v4.13/dt64 branch
+
+Going forward, I will try to keep an eye on the organization of DTS
+files, but honestly, it's low priority for me, so if this is something
+you care about, I trust that you will continue to help review DTS files.
+
+I know you're already doing many reviews along with your contributions,
+so thanks for that, and please keep it up. :)
+
+> Similarly, Khadas Vim shouldn't have been merged with the "bcrmf" typo.
+>
+> Which proves my point that we need to fix these issues now so that they
+> don't keep spreading (Broken Window Theory). New boards have not been
+> checked for sort order, only boards already touched in v1.
+>
+> Board and Makefile order affect my pending R-Box Pro patches.
+> Node order affects Martin's pending Bluetooth patches among others.
+
+Yes, this series will affect a few other series that are in flight, and
+I apologize to those developers for the needed rebase, but I'd rather
+apply a series like this that affects so many DT files early in the
+cycle.
+
+Thanks again for the fixes and cleanups,
+
+Kevin
