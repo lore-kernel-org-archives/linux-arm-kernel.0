@@ -1,68 +1,67 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 18 May 2017 15:19:58 -0700
-Subject: [PATCH v2 net-next 1/2] include: linux: Add helper function to
- check phy interface mode
-In-Reply-To: <1495145624-29463-2-git-send-email-isubramanian@apm.com>
-References: <1495145624-29463-1-git-send-email-isubramanian@apm.com>
- <1495145624-29463-2-git-send-email-isubramanian@apm.com>
-Message-ID: <0c55a097-564d-58ea-8e64-d642a1d8fad7@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 May 2017 23:30:00 +0100
+Subject: [PATCH 1/3] rtc: gemini: Add optional clock handling
+In-Reply-To: <20170518215635.13505-1-linus.walleij@linaro.org>
+References: <20170518215635.13505-1-linus.walleij@linaro.org>
+Message-ID: <20170518223000.GP22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2017 03:13 PM, Iyappan Subramanian wrote:
-> Added helper function that checks phy_mode is RGMII (all variants)
-> 'bool phy_interface_mode_is_rgmii(phy_interface_t mode)'
-> 
-> Changed the following function, to use the above.
-> 'bool phy_interface_is_rgmii(struct phy_device *phydev)'
-> 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Suggested-by: Florian Fainelli <f.fainelli@gmail.com>
-> Suggested-by: Andrew Lunn <andrew@lunn.ch>
+On Thu, May 18, 2017 at 11:56:33PM +0200, Linus Walleij wrote:
+> +	rtc->pclk = clk_get(dev, "PCLK");
+> +	if (IS_ERR(rtc->pclk)) {
+> +		dev_err(dev, "could not get PCLK\n");
+> +	} else {
+> +		ret = clk_prepare_enable(rtc->pclk);
+> +		if (ret) {
+> +			dev_err(dev, "failed to enable PCLK\n");
+> +			return ret;
 
-Not sure why you have chosen include: linux as the subject since all
-changes done to that file typically had the "phy: " prefix, but the code
-changes are fine, thanks!
+Proper cleanup?  Maybe consider using devm_clk_get() right from the get-go?
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+> +		}
+> +	}
+> +	rtc->extclk = clk_get(dev, "EXTCLK");
+> +	if (IS_ERR(rtc->extclk)) {
+> +		dev_err(dev, "could not get EXTCLK\n");
+> +	} else {
+> +		ret = clk_prepare_enable(rtc->extclk);
+> +		if (ret) {
+> +			dev_err(dev, "failed to enable EXTCLK\n");
+> +			return ret;
 
-> ---
->  include/linux/phy.h | 14 ++++++++++++--
->  1 file changed, 12 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/phy.h b/include/linux/phy.h
-> index 54ef458..5a808a2 100644
-> --- a/include/linux/phy.h
-> +++ b/include/linux/phy.h
-> @@ -716,14 +716,24 @@ static inline bool phy_is_internal(struct phy_device *phydev)
->  }
->  
->  /**
-> + * phy_interface_mode_is_rgmii - Convenience function for testing if a
-> + * PHY interface mode is RGMII (all variants)
-> + * @mode: the phy_interface_t enum
-> + */
-> +static inline bool phy_interface_mode_is_rgmii(phy_interface_t mode)
-> +{
-> +	return mode >= PHY_INTERFACE_MODE_RGMII &&
-> +		mode <= PHY_INTERFACE_MODE_RGMII_TXID;
-> +};
+Ditto.
+
+> +		}
+> +	}
 > +
-> +/**
->   * phy_interface_is_rgmii - Convenience function for testing if a PHY interface
->   * is RGMII (all variants)
->   * @phydev: the phy_device struct
->   */
->  static inline bool phy_interface_is_rgmii(struct phy_device *phydev)
+>  	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>  	if (!res)
+>  		return -ENODEV;
+> @@ -156,6 +180,10 @@ static int gemini_rtc_remove(struct platform_device *pdev)
 >  {
-> -	return phydev->interface >= PHY_INTERFACE_MODE_RGMII &&
-> -		phydev->interface <= PHY_INTERFACE_MODE_RGMII_TXID;
-> +	return phy_interface_mode_is_rgmii(phydev->interface);
->  };
+>  	struct gemini_rtc *rtc = platform_get_drvdata(pdev);
 >  
->  /*
-> 
+> +	if (!IS_ERR(rtc->extclk))
+> +		clk_disable_unprepare(rtc->extclk);
+> +	if (!IS_ERR(rtc->pclk))
+> +		clk_disable_unprepare(rtc->pclk);
 
+No clk_put(), but if you used devm_clk_get(), you don't need it.
+
+>  	rtc_device_unregister(rtc->rtc_dev);
+>  
+>  	return 0;
+> -- 
+> 2.9.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Florian
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
