@@ -1,72 +1,71 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Thu, 18 May 2017 14:09:26 +0530
-Subject: [PATCH v2 1/5] pinctrl: qcom: Add ipq8074 pinctrl driver
-In-Reply-To: <20170517193315.GF12920@tuxbook>
-References: <1493898841-20583-1-git-send-email-varada@codeaurora.org>
- <1493898841-20583-2-git-send-email-varada@codeaurora.org>
- <20170510224355.GE45273@Bjorns-MacBook-Pro-2.local>
- <1f4c9974-f6a4-bee7-4f37-ad8795e442a3@codeaurora.org>
- <20170514042307.GE69278@Bjorns-MacBook-Pro-2.local>
- <7afc7191-bcb1-a566-eac5-a4fe1293c773@codeaurora.org>
- <20170517193315.GF12920@tuxbook>
-Message-ID: <f5a3da8b-c3a4-3cb3-9f5f-0cbdb87688ed@codeaurora.org>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Thu, 18 May 2017 10:42:37 +0200
+Subject: [PATCH v3 2/3] watchdog: dw_wdt: get reset lines from dt
+In-Reply-To: <cover.9d687e41ad8d91c267143a43d703f656f7d5689c.1495096910.git-series.s.trumtrar@pengutronix.de>
+References: <cover.9d687e41ad8d91c267143a43d703f656f7d5689c.1495096910.git-series.s.trumtrar@pengutronix.de>
+Message-ID: <8b116c77d30013b067676fb2f61744840ef51c32.1495096910.git-series.s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The dw_wdt has an external reset line, that can keep the device in reset
+and therefore rendering it useless and also is the only way of stopping
+the watchdog once it was started.
 
+Get the reset lines for this core from the devicetree. As these lines are
+optional, use devm_reset_control_get_optional_shared. If the reset line
+is not specified in the devicetree, the reset framework will just skip
+deasserting and continue.
+This way all users of the driver will continue to function without
+any harm, even if the reset line is not specified in the devicetree.
 
-On 5/18/2017 1:03 AM, Bjorn Andersson wrote:
-> On Mon 15 May 02:05 PDT 2017, Varadarajan Narayanan wrote:
-> 
->> On 5/14/2017 9:53 AM, Bjorn Andersson wrote:
->>> On Thu 11 May 03:33 PDT 2017, Varadarajan Narayanan wrote:
->>>
->>>> On 5/11/2017 4:13 AM, Bjorn Andersson wrote:
->>>>> On Thu 04 May 04:53 PDT 2017, Varadarajan Narayanan wrote:
-> [..]
->>>>>> +	msm_mux_qpic_pad4,
->>>>>
->>>>> What are qpic_pad and qpic_pad0 through qpic_pad8? Different functions,
->>>>> alternative muxings...?
->>>>
->>>> This is for the NAND and LCD display. The pins listed are the 9 data pins.
->>>>
->>>
->>> Then you can describe them all as "qpic_pad" (or simply "qpic"?). (It's
->>> possible to reference a partial group in the DTS, if that's necessary)
->>
->> There are two sets of 9 pins, either of which can go to NAND or LCD.
->> Will rename qpic_pad as qpic_a and qpic_pad[0-8] as qpic_b.
->> Is that ok?
->>
-> 
-> So you have NAND and LCD hardware muxed to either "a" or "b" and then
-> you mux either "a" or "b" out onto actual pins?
-> 
-> How is this first mux configured?
-> 
-> I think the a/b scheme sounds reasonable, if above is how it works.
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: linux-watchdog at vger.kernel.org
+---
+ drivers/watchdog/dw_wdt.c |  9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Sorry, I was wrong. I had misread the documentation.
-
-There are 18 pins. 15 pins are common between LCD and NAND. The QPIC 
-controller arbitrates between LCD and NAND. Of the remaining 4, 2 are 
-for NAND and 2 are for LCD exclusively. We plan to group the qpic pins 
-into 3 groups namely, qpic_common, qpic_nand and qpic_lcd. Is that ok?
-
-Thanks
-Varada
-
-> 
-> Regards,
-> Bjorn
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
+diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
+index 914da3a4d334..61cbae3a9331 100644
+--- a/drivers/watchdog/dw_wdt.c
++++ b/drivers/watchdog/dw_wdt.c
+@@ -29,6 +29,7 @@
+ #include <linux/of.h>
+ #include <linux/pm.h>
+ #include <linux/platform_device.h>
++#include <linux/reset.h>
+ #include <linux/watchdog.h>
+ 
+ #define WDOG_CONTROL_REG_OFFSET		    0x00
+@@ -54,6 +55,7 @@ struct dw_wdt {
+ 	struct clk		*clk;
+ 	unsigned long		rate;
+ 	struct watchdog_device	wdd;
++	struct reset_control	*rst;
+ };
+ 
+ #define to_dw_wdt(wdd)	container_of(wdd, struct dw_wdt, wdd)
+@@ -234,6 +236,12 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
+ 		goto out_disable_clk;
+ 	}
+ 
++	dw_wdt->rst = devm_reset_control_get_optional_shared(&pdev->dev, NULL);
++	if (IS_ERR(dw_wdt->rst))
++		return PTR_ERR(dw_wdt->rst);
++
++	reset_control_deassert(dw_wdt->rst);
++
+ 	wdd = &dw_wdt->wdd;
+ 	wdd->info = &dw_wdt_ident;
+ 	wdd->ops = &dw_wdt_ops;
+@@ -278,6 +286,7 @@ static int dw_wdt_drv_remove(struct platform_device *pdev)
+ {
+ 	struct dw_wdt *dw_wdt = platform_get_drvdata(pdev);
+ 
++	reset_control_assert(dw_wdt->rst);
+ 	watchdog_unregister_device(&dw_wdt->wdd);
+ 	clk_disable_unprepare(dw_wdt->clk);
+ 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum, a Linux Foundation Collaborative Project
+git-series 0.9.1
