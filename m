@@ -1,58 +1,54 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 18 May 2017 12:10:45 +0800
-Subject: [PATCH 1/9] crypto: add hmac IPAD/OPAD constant
-In-Reply-To: <20170424141629.27155-1-clabbe.montjoie@gmail.com>
-References: <20170424141629.27155-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170518041045.GA32127@gondor.apana.org.au>
+From: qnguyen@apm.com (Quan Nguyen)
+Date: Thu, 18 May 2017 11:39:48 +0700
+Subject: [PATCH net-next] drivers: net: xgene: Check all RGMII phy mode
+ variants
+In-Reply-To: <20170517202633.GA14413@lunn.ch>
+References: <1495051550-28961-1-git-send-email-isubramanian@apm.com>
+ <20170517202633.GA14413@lunn.ch>
+Message-ID: <CAFopSPTP07TFcgc8pACQDF4ZXHOftUMBqBCgF4hVpAmUt0cCWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 24, 2017 at 04:16:21PM +0200, Corentin Labbe wrote:
-> Many HMAC users directly use directly 0x36/0x5c values.
-> It's better with crypto to use a name instead of directly some crypto
-> constant.
-> 
-> This patch simply add HMAC_IPAD_VALUE/HMAC_OPAD_VALUE defines.
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->  crypto/hmac.c         | 4 ++--
->  include/crypto/hash.h | 3 +++
->  2 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/crypto/hmac.c b/crypto/hmac.c
-> index 72e38c0..4a997ce 100644
-> --- a/crypto/hmac.c
-> +++ b/crypto/hmac.c
-> @@ -74,8 +74,8 @@ static int hmac_setkey(struct crypto_shash *parent,
->  	memcpy(opad, ipad, bs);
->  
->  	for (i = 0; i < bs; i++) {
-> -		ipad[i] ^= 0x36;
-> -		opad[i] ^= 0x5c;
-> +		ipad[i] ^= HMAC_IPAD_VALUE;
-> +		opad[i] ^= HMAC_OPAD_VALUE;
->  	}
->  
->  	return crypto_shash_init(shash) ?:
-> diff --git a/include/crypto/hash.h b/include/crypto/hash.h
-> index b5727bc..0f51ff1 100644
-> --- a/include/crypto/hash.h
-> +++ b/include/crypto/hash.h
-> @@ -922,4 +922,7 @@ static inline void shash_desc_zero(struct shash_desc *desc)
->  			 sizeof(*desc) + crypto_shash_descsize(desc->tfm));
->  }
->  
-> +#define HMAC_IPAD_VALUE 0x36
-> +#define HMAC_OPAD_VALUE 0x5c
-> +
->  #endif	/* _CRYPTO_HASH_H */
+On Thu, May 18, 2017 at 3:26 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> +bool is_xgene_enet_phy_mode_rgmii(struct net_device *ndev)
+>> +{
+>> +     struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+>> +     int phy_mode = pdata->phy_mode;
+>> +     bool ret;
+>> +
+>> +     ret = phy_mode == PHY_INTERFACE_MODE_RGMII ||
+>> +           phy_mode == PHY_INTERFACE_MODE_RGMII_ID ||
+>> +           phy_mode == PHY_INTERFACE_MODE_RGMII_RXID ||
+>> +           phy_mode == PHY_INTERFACE_MODE_RGMII_TXID;
+>> +
+>> +     return ret;
+>> +}
+>
+> include/linux/phy.h:
+>
+> /**
+>  * phy_interface_is_rgmii - Convenience function for testing if a PHY interface
+>  * is RGMII (all variants)
+>  * @phydev: the phy_device struct
+>  */
+> static inline bool phy_interface_is_rgmii(struct phy_device *phydev)
+> {
+>         return phydev->interface >= PHY_INTERFACE_MODE_RGMII &&
+>                 phydev->interface <= PHY_INTERFACE_MODE_RGMII_TXID;
+> };
+>
 
-I think this should go into a header file specific to hmac.  Since
-I don't see an existing hmac header file you should create one for it.
+Hi Andrew,
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Our purpose is to handle our internal pdata->phy_mode, so
+phy_interface_is_rgmii(phydev) seems not to fit.
+Instead, we're working on the below:
+
++bool is_xgene_enet_phy_mode_rgmii(struct net_device *ndev)
++{
++       struct xgene_enet_pdata *pdata = netdev_priv(ndev);
++
++       return pdata->phy_mode >= PHY_INTERFACE_MODE_RGMII &&
++              pdata->phy_mode <= PHY_INTERFACE_MODE_RGMII_TXID;
++}
++
