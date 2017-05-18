@@ -1,64 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 May 2017 08:59:39 -0700
-Subject: [GIT PULL] omap fixes for v4.12-rc cycle
-Message-ID: <pull-1495123127-412836>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 18 May 2017 12:01:04 -0400 (EDT)
+Subject: [PATCH v2] ARM: MCPM: ensure not to enter __hyp_soft_restart
+ from loopback and cpu_power_down
+In-Reply-To: <1495103028-29753-1-git-send-email-sudeep.holla@arm.com>
+References: <1495099592-10439-1-git-send-email-sudeep.holla@arm.com>
+ <1495103028-29753-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <alpine.LFD.2.20.1705181159590.4464@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+On Thu, 18 May 2017, Sudeep Holla wrote:
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> Commit 9da5ac236de6 ("ARM: soft-reboot into same mode that we entered
+> the kernel") added support to enter the new kernel in the same processor
+> mode as the previous one when we soft-reboot from one kernel into
+> another by pass a flag to cpu_reset() so it knows what to do exactly.
+> 
+> However it missed to make similar changes in MCPM code. Due to the
+> missing flag, the CPUs enter HYP mode which is not supported with MCPM.
+> MCPM works only in secure mode as it manages CCI.
+> 
+> This patch aligns the cpu_reset call in MCPM with other changes in the
+> above mentioned commit by making phys_reset_t to follow the prototype
+> of cpu_reset().
+> 
+> Fixes: 9da5ac236de6 ("ARM: soft-reboot into same mode that we entered the kernel")
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-are available in the git repository at:
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.12/fixes-v2-signed
+Please send it to RMK's patch system.
 
-for you to fetch changes up to bca5238816939436d72ae6bab124c4b0641a3a99:
 
-  ARM: dts: dra7: Reduce cpu thermal shutdown temperature (2017-05-17 06:51:38 -0700)
-
-----------------------------------------------------------------
-Fixes for omaps for v4.12-rc cycle most consisting of few minor dts fixes
-for various devices. Also included is a memory controller (GPMC) debug output
-fix as without that the shown bootloader configured GPMC bus width will
-be wrong and won't work for kernel timings:
-
-- Add dra7 powerhold configuration to be able to shut down pmic correctly
-
-- Fix polarity for gta04 mcbsp4 clocks for modem
-
-- Fix Pandaboard CEC pin pull making it usable
-
-- Fix LogicPD Torpedo camera pin mux
-
-- Fix GPMC debug bus width
-
-- Reduce cpu thermal shutdown temperature
-
-----------------------------------------------------------------
-Adam Ford (1):
-      ARM: dts: LogicPD Torpedo: Fix camera pin mux
-
-Andreas Kemnade (1):
-      ARM: dts: gta04: fix polarity of clocks for mcbsp4
-
-Hans Verkuil (1):
-      ARM: dts: omap4: enable CEC pin for Pandaboard A4 and ES
-
-Keerthy (1):
-      ARM: dts: dra7: Add power hold and power controller properties to palmas
-
-Ravikumar Kattekola (1):
-      ARM: dts: dra7: Reduce cpu thermal shutdown temperature
-
-Tony Lindgren (1):
-      memory: omap-gpmc: Fix debug output for access width
-
- arch/arm/boot/dts/dra7-evm.dts                    | 2 ++
- arch/arm/boot/dts/dra7.dtsi                       | 4 ++++
- arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts | 6 +++---
- arch/arm/boot/dts/omap3-gta04.dtsi                | 3 ++-
- arch/arm/boot/dts/omap4-panda-a4.dts              | 2 +-
- arch/arm/boot/dts/omap4-panda-es.dts              | 2 +-
- drivers/memory/omap-gpmc.c                        | 2 +-
- 7 files changed, 14 insertions(+), 7 deletions(-)
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm/common/mcpm_entry.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> Hi Nico, Russell,
+> 
+> I am seeing a boot failure without this patch on my TC2 where MCPM is
+> enabled and active. The loopback test fails on primary, if skipped fails
+> later on resume path.
+> 
+> Regards,
+> Sudeep
+> 
+> v1->v2:
+> 	- As suggested by Russell, changed phys_reset_t typedef to follow
+> 	  cpu_reset() prototype
+> 
+> diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+> index cf062472e07b..2b913f17d50f 100644
+> --- a/arch/arm/common/mcpm_entry.c
+> +++ b/arch/arm/common/mcpm_entry.c
+> @@ -235,7 +235,7 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster)
+>  	return ret;
+>  }
+> 
+> -typedef void (*phys_reset_t)(unsigned long);
+> +typedef typeof(cpu_reset) phys_reset_t;
+> 
+>  void mcpm_cpu_power_down(void)
+>  {
+> @@ -300,7 +300,7 @@ void mcpm_cpu_power_down(void)
+>  	 * on the CPU.
+>  	 */
+>  	phys_reset = (phys_reset_t)(unsigned long)__pa_symbol(cpu_reset);
+> -	phys_reset(__pa_symbol(mcpm_entry_point));
+> +	phys_reset(__pa_symbol(mcpm_entry_point), false);
+> 
+>  	/* should never get here */
+>  	BUG();
+> @@ -389,7 +389,7 @@ static int __init nocache_trampoline(unsigned long _arg)
+>  	__mcpm_cpu_down(cpu, cluster);
+> 
+>  	phys_reset = (phys_reset_t)(unsigned long)__pa_symbol(cpu_reset);
+> -	phys_reset(__pa_symbol(mcpm_entry_point));
+> +	phys_reset(__pa_symbol(mcpm_entry_point), false);
+>  	BUG();
+>  }
+> 
+> --
+> 2.7.4
+> 
+> 
