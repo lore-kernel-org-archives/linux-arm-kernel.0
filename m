@@ -1,60 +1,42 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 18 May 2017 17:56:49 +0300
-Subject: [PATCH V4 2/4] iommu: of: Ignore all errors except EPROBE_DEFER
-In-Reply-To: <1495119257-26724-2-git-send-email-sricharan@codeaurora.org>
-References: <1495119257-26724-1-git-send-email-sricharan@codeaurora.org>
- <1495119257-26724-2-git-send-email-sricharan@codeaurora.org>
-Message-ID: <2207666.NfkZRjnSBi@avalon>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 18 May 2017 22:56:41 +0800
+Subject: [GIT PULL] i.MX fixes for 4.12
+Message-ID: <20170518145638.GA26102@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-Thank you for the patch.
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 
-On Thursday 18 May 2017 20:24:15 Sricharan R wrote:
-> While deferring the probe of IOMMU masters, xlate and
-> add_device callbacks called from of_iommu_configure
-> can pass back error values like -ENODEV, which means
-> the IOMMU cannot be connected with that master for real
-> reasons. Before the IOMMU probe deferral, all such errors
-> were ignored. Now all those errors are propagated back,
-> killing the master's probe for such errors. Instead ignore
-> all the errors except EPROBE_DEFER, which is the only one
-> of concern and let the master work without IOMMU, thus
-> restoring the old behavior.
-> 
-> Fixes: 7b07cbefb68d ("iommu: of: Handle IOMMU lookup failure with deferred
-> probing or error") Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Tested-by: Magnus Damn <magnus.damn@gmail.com>
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+are available in the git repository at:
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.12
 
-> ---
-> [V4] Reworded commit log and changed dev_info to dev_dbg
-> 
->  drivers/iommu/of_iommu.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index e6e9bec..19779b8 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -237,6 +237,12 @@ const struct iommu_ops *of_iommu_configure(struct
-> device *dev, ops = ERR_PTR(err);
->  	}
-> 
-> +	/* Ignore all other errors apart from EPROBE_DEFER */
-> +	if (IS_ERR(ops) && (PTR_ERR(ops) != -EPROBE_DEFER)) {
-> +		dev_dbg(dev, "Adding to IOMMU failed: %ld\n", PTR_ERR(ops));
-> +		ops = NULL;
-> +	}
-> +
->  	return ops;
->  }
+for you to fetch changes up to e23c7f7d57831fdae444be9d507e67716ab601d4:
 
--- 
-Regards,
+  soc: imx: add PM dependency for IMX7_PM_DOMAINS (2017-05-15 09:33:22 +0800)
 
-Laurent Pinchart
+----------------------------------------------------------------
+i.MX fixes for 4.12:
+ - A fix on GPCv2 power domain driver Kconfig which causes a build
+   failure when CONFIG_PM is not set.
+ - Pull down PMIC IRQ pin for imx53-qsrb board to prevent spurious
+   PMIC interrupts from happening.
+ - Remove board level OPP override for imx6sx-sdb to fix a boot crash
+   seen on Rev.C boards.
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      soc: imx: add PM dependency for IMX7_PM_DOMAINS
+
+Fabio Estevam (1):
+      ARM: dts: imx53-qsrb: Pulldown PMIC IRQ pin
+
+Leonard Crestez (1):
+      ARM: dts: imx6sx-sdb: Remove OPP override
+
+ arch/arm/boot/dts/imx53-qsrb.dts |  2 +-
+ arch/arm/boot/dts/imx6sx-sdb.dts | 17 -----------------
+ drivers/soc/imx/Kconfig          |  3 ++-
+ 3 files changed, 3 insertions(+), 19 deletions(-)
