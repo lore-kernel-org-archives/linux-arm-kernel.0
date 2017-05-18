@@ -1,76 +1,99 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 18 May 2017 11:39:01 +0100
-Subject: [PATCH] arm64: cpufeature: check translation granule size based
- on kernel config
-In-Reply-To: <1495102873-10858-1-git-send-email-leo.yan@linaro.org>
-References: <1495102873-10858-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <c0c8bd7b-647d-092d-65ac-08a90000e30c@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 May 2017 13:39:19 +0300
+Subject: [PATCH V2 2/3] iommu: of: Ignore all errors except EPROBE_DEFER
+In-Reply-To: <1495102030-10548-2-git-send-email-sricharan@codeaurora.org>
+References: <1495102030-10548-1-git-send-email-sricharan@codeaurora.org>
+ <1495102030-10548-2-git-send-email-sricharan@codeaurora.org>
+Message-ID: <6863998.WsTHer29ZI@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/17 11:21, Leo Yan wrote:
-> In the big.LITTLE system with two clusters, one is CA53 cluster and
-> another is CA73 cluster. CA53 doesn't support 16KB memory translation
-> granule size (4.3.21 AArch64 Memory Model Feature Register 0, EL1; ARM
-> DDI 0500F), but CA73 supports this feature (4.3.27 AArch64 Memory Model
-> Feature Register 0, EL1; ARM 100048_0002_04_en). As result, the kernel
-> reports log for "Unexpected variation" as below.
->
-> [    0.182113] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1. Boot CPU: 0x00000000001122, CPU4: 0x00000000101122
+Hi Sricharan,
 
->
-> This patch is to change the checking CPU feature for memory translation
-> granule size based on kernel configuration. If kernel configuration has
-> selected to use one specific memory translation granule size, then we
-> will do strict sanity checking cross all CPUs. Otherwise we can skip to
-> check unused features for memory translation granule size if kernel
-> doesn't use it.
->
+Thank you for the patch.
 
-If we were to suppress the warning (more on that below), we could simply
-make this feature a NON_STRICT, since the unsupported CPUs won't boot
-with 16K to hit this sanity check.
+On Thursday 18 May 2017 15:37:09 Sricharan R wrote:
+> While deferring the probe of IOMMU masters,
+> xlate and add_device callback can pass back error values
+> like -ENODEV, which means IOMMU cannot be connected
+> with that master for real reasons. So rather than
+> killing the master's probe for such errors, just
+> ignore the errors and let the master work without
+> an IOMMU.
 
-However, there is a problem with disabling this warning. If a VM starts
-using 16KB page size on a 4K/64K host, the VM could end up in unknown
-failures when it switches to an unsupported CPU (after it has booted).
-Of course the real fix lies in making the KVM exposing the safe value
-for granule support to the VCPUs (which is currently being worked on by
-Douglas in Cc). So, when we have that ready, we could make it NON_STRICT
-instead of this approach.
+I don't think this is a good idea. Why should we allow IOMMU drivers to return 
+an error if we're always going to ignore the error value ? That will lead to 
+drivers implementing slightly different behaviours, which will be painful the 
+day we'll need to start acting based on the error value.
 
-Suzuki
+At the very least, if you want to give a specific meaning to -ENODEV, you 
+should check for that value specifically and not ignore all errors other than 
+-EPROBE_DEFER. You also need to document the meaning of the error value. This 
+can be done in the documentation of the of_xlate operation in 
+include/linux/iommu.h:
+
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 2cb54adc4a33..6ba553e7384a 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -181,7 +181,6 @@ struct iommu_resv_region {
+  * @domain_window_disable: Disable a particular window for a domain
+  * @domain_set_windows: Set the number of windows for a domain
+  * @domain_get_windows: Return the number of windows for a domain
+- * @of_xlate: add OF master IDs to iommu grouping
+  * @pgsize_bitmap: bitmap of all possible supported page sizes
+  */
+ struct iommu_ops {
+@@ -224,6 +223,11 @@ struct iommu_ops {
+ 	/* Get the number of windows per domain */
+ 	u32 (*domain_get_windows)(struct iommu_domain *domain);
+ 
++	/**
++	 * @of_xlate:
++	 *
++	 * Add OF master IDs to iommu grouping.
++	 */
+ 	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
+ 
+ 	unsigned long pgsize_bitmap;
 
 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+And add documentation for the error codes there.
+
+If you want to ignore some errors returned from the add_device operation you 
+should document it similarly, and in particular document which error check(s) 
+need to be performed by of_xlate and which are the responsibility of 
+add_device.
+
+> Fixes: 7b07cbefb68d ("iommu: of: Handle IOMMU lookup failure with deferred
+> probing or error")
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Tested-by: Magnus Damn <magnus.damn@gmail.com>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  arch/arm64/kernel/cpufeature.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 94b8f7f..938ddac 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -117,9 +117,21 @@
->  };
->
->  static const struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
-> +#ifdef CONFIG_ARM64_4K_PAGES
->  	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
-> +#else
-> +	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
-> +#endif
-> +#ifdef CONFIG_AARM64_64K_PAGES
->  	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
-> +#else
-> +	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
-> +#endif
-> +#ifdef CONFIG_AARM64_16K_PAGES
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
-> +#else
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
-> +#endif
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL0_SHIFT, 4, 0),
->  	/* Linux shouldn't care about secure memory */
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
->
+> [V2] Corrected spelling/case in commit log
+> 
+>  drivers/iommu/of_iommu.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index e6e9bec..f0d22c0 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -237,6 +237,12 @@ const struct iommu_ops *of_iommu_configure(struct
+> device *dev, ops = ERR_PTR(err);
+>  	}
+> 
+> +	/* Ignore all other errors apart from EPROBE_DEFER */
+> +	if (IS_ERR(ops) && (PTR_ERR(ops) != -EPROBE_DEFER)) {
+> +		dev_info(dev, "Adding to IOMMU failed: %ld\n", PTR_ERR(ops));
+> +		ops = NULL;
+> +	}
+> +
+>  	return ops;
+>  }
+
+-- 
+Regards,
+
+Laurent Pinchart
