@@ -1,140 +1,200 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 18 May 2017 09:01:54 -0500
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <f8773b97-7085-ddb3-5dc4-d65cc1f5bce0@linaro.org>
-References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
- <f8773b97-7085-ddb3-5dc4-d65cc1f5bce0@linaro.org>
-Message-ID: <20170518140154.GA24324@bhelgaas-glaptop.roam.corp.google.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 18 May 2017 19:35:05 +0530
+Subject: [PATCH V2 2/3] iommu: of: Ignore all errors except EPROBE_DEFER
+In-Reply-To: <26235811.RRFMmZMDyF@avalon>
+References: <1495102030-10548-1-git-send-email-sricharan@codeaurora.org>
+ <2111512.n9LmSLnVgL@avalon>
+ <c3dc5e41-b853-9519-53a3-df870ab26230@codeaurora.org>
+ <26235811.RRFMmZMDyF@avalon>
+Message-ID: <eb0a01bf-902d-cb45-a118-89743b6110d5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gary,
+Hi Laurent,
 
-Thanks for the question.
-
-On Wed, May 03, 2017 at 11:09:51AM +0800, Heyi Guo wrote:
-> Hi Ard,
+On 5/18/2017 7:13 PM, Laurent Pinchart wrote:
+> Hi Sricharan
 > 
-> I have one comment inclined.
+> On Thursday 18 May 2017 19:08:12 Sricharan R wrote:
+>> On 5/18/2017 6:00 PM, Laurent Pinchart wrote:
+>>> On Thursday 18 May 2017 17:26:14 Sricharan R wrote:
+>>>> On 5/18/2017 4:09 PM, Laurent Pinchart wrote:
+>>>>> On Thursday 18 May 2017 15:37:09 Sricharan R wrote:
+>>>>>> While deferring the probe of IOMMU masters,
+>>>>>> xlate and add_device callback can pass back error values
+>>>>>> like -ENODEV, which means IOMMU cannot be connected
+>>>>>> with that master for real reasons. So rather than
+>>>>>> killing the master's probe for such errors, just
+>>>>>> ignore the errors and let the master work without
+>>>>>> an IOMMU.
+>>>>>
+>>>>> I don't think this is a good idea. Why should we allow IOMMU drivers to
+>>>>> return an error if we're always going to ignore the error value ? That
+>>>>> will lead to drivers implementing slightly different behaviours, which
+>>>>> will be painful the day we'll need to start acting based on the error
+>>>>> value.
+>>>>
+>>>> The of_iommu_configure interface, before this series, was returning
+>>>> either correct 'iommu_ops' or NULL. Also there was no return value from
+>>>> of_dma_configure which calls of_iommu_configure. This means that if we
+>>>> block only -ENODEV now and let the other errors, the probe of the master
+>>>> devices can be killed for reasons apart from deferring. This would be a
+>>>> change in behavior introduced. All of xlate, add_device, of_pci_map_rid
+>>>> and others can return values apart from -ENODEV. So was thinking that
+>>>> restoring the old behavior, except for returning EPROBE_DEFER was the
+>>>> better thing to do ?
+>>>
+>>> We went from a situation where of_iommu_configure() could return either
+>>> valid operations in the case the device was to be handled by the IOMMU or
+>>> NULL otherwise, to a situation where we needed a third option for probe
+>>> deferral. The way we've done this, through error pointers, allows lots of
+>>> other errors to be returned as well from the of_xlate and add_device
+>>> operations.
+>>
+>> right, this was difference in the behavior now.
+>>
+>>> There is currently no use for returning error codes other than
+>>> -EPROBE_DEFFER from of_iommu_configure(), so your proposal is to block
+>>> errors returned from the of_xlate and add_device operations inside
+>>> of_iommu_configure(). My point is that, by doing so, we allow IOMMU
+>>> drivers to return random error codes that are then ignored. I believe
+>>> this can cause problems in the future when we will need to extend the API
+>>> and standardize more error codes, as by then IOMMU drivers will return
+>>> random errors (they actually do so already to some extent).
+>>>
+>>> For of_xlate I agree with you to some extent. v4.11 just checked whether
+>>> of_xlate succeeded or not, and just didn't use the IOMMU in case it
+>>> failed. The exact error value was ignored, and drivers already return
+>>> random errors. Going back to the v4.11 behaviour is what we need to do in
+>>> the short-term, even if I believe we should standardize the error values
+>>> returned from of_xlate after v4.12.
+>>>
+>>> For add_device, however, the situation is a bit different. The add_device
+>>> operation is called from the IOMMU bus notifier, and the -ENODEV error is
+>>> ignored by add_iommu_group(). Any other error will cause bus_set_iommu()
+>>> to fail, which makes IOMMU probing fail for the drivers that check the
+>>> return value of bus_set_iommu() (some of them don't :-/).
+>>>
+>>> Fixing all this properly requires standardizing the error codes, and going
+>>> through the existing IOMMU drivers to comply with the standardized
+>>> behaviour.
+>>
+>> I understand your concern on standardizing the error codes from xlate,
+>> add_device, others and handling them properly. As you said there are quite
+>> some errors returned from them today. Also another thing is standardizing
+>> the behavior of of_iommu_configure itself. So that API serves to connect a
+>> device to its correct iommu_ops. When that's not possible, what should be
+>> the output and how should that be handled by the caller. The current
+>> behavior is to either 1) connect to correct ops or 2) wait for it or 3)
+>> progress further with plain/default dma_ops. Anyways as you said
+>> standardizing the iommu api ops, would make the of_iommu_configure handling
+>> more specific. Having said that i think similar fix needs to be done for
+>> acpi's iort_iommu_configure as well.
 > 
+> I'm less knowledgeable about ACPI but I think you're right. Would you like to 
+> tackle this for v4.13 ? :-)
+
+Will add the fix for ACPI now in this series. ok, Will really see if i can
+address the standardizing part for 4.13.
+
 > 
-> ? 3/22/2017 11:30 PM, Ard Biesheuvel ??:
-> >On UEFI systems, the PCI subsystem is enumerated by the firmware,
-> >and if a graphical framebuffer is exposed by a PCI device, its base
-> >address and size are exposed to the OS via the Graphics Output
-> >Protocol (GOP).
-> >
-> >On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
-> >scratch at boot. This may result in the GOP framebuffer address to
-> >become stale, if the BAR covering the framebuffer is modified. This
-> >will cause the framebuffer to become unresponsive, and may in some
-> >cases result in unpredictable behavior if the range is reassigned to
-> >another device.
-> >
-> >So add a quirk to the EFI fb driver to find the BAR associated with
-> >the GOP base address, and set the IORESOURCE_PCI_FIXED attribute so
-> >that the PCI core will leave it alone.
-> >
-> >Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> >Cc: Peter Jones <pjones@redhat.com>
-> >Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >---
-> >v3: check device is enabled before attempting to claim the resource
-> >
-> >  drivers/video/fbdev/efifb.c | 60 +++++++++++++++++++-
-> >  1 file changed, 59 insertions(+), 1 deletion(-)
-> >
-> >diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
-> >index 8c4dc1e1f94f..88f653864a01 100644
-> >--- a/drivers/video/fbdev/efifb.c
-> >+++ b/drivers/video/fbdev/efifb.c
-> >@@ -10,6 +10,7 @@
-> >  #include <linux/efi.h>
-> >  #include <linux/errno.h>
-> >  #include <linux/fb.h>
-> >+#include <linux/pci.h>
-> >  #include <linux/platform_device.h>
-> >  #include <linux/screen_info.h>
-> >  #include <video/vga.h>
-> >@@ -143,6 +144,9 @@ static struct attribute *efifb_attrs[] = {
-> >  };
-> >  ATTRIBUTE_GROUPS(efifb);
-> >+static bool pci_bar_found;	/* did we find a BAR matching the efifb base? */
-> >+static bool pci_dev_disabled;	/* was the device disabled? */
-> >+
-> >  static int efifb_probe(struct platform_device *dev)
-> >  {
-> >  	struct fb_info *info;
-> >@@ -152,7 +156,7 @@ static int efifb_probe(struct platform_device *dev)
-> >  	unsigned int size_total;
-> >  	char *option = NULL;
-> >-	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
-> >+	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI || pci_dev_disabled)
-> >  		return -ENODEV;
-> >  	if (fb_get_options("efifb", &option))
-> >@@ -360,3 +364,57 @@ static struct platform_driver efifb_driver = {
-> >  };
-> >  builtin_platform_driver(efifb_driver);
-> >+
-> >+static void claim_efifb_bar(struct pci_dev *dev, int idx)
-> >+{
-> >+	u16 word;
-> >+
-> >+	pci_bar_found = true;
-> >+
-> >+	pci_read_config_word(dev, PCI_COMMAND, &word);
-> >+	if (!(word & PCI_COMMAND_MEMORY)) {
-> >+		pci_dev_disabled = true;
-> >+		dev_err(&dev->dev,
-> >+			"BAR %d: assigned to efifb but device is disabled!\n",
-> >+			idx);
-> >+		return;
-> >+	}
-> >+
-> >+	if (pci_claim_resource(dev, idx)) {
-> >+		pci_dev_disabled = true;
-> >+		dev_err(&dev->dev,
-> >+			"BAR %d: failed to claim resource for efifb!\n", idx);
-> >+		return;
-> >+	}
-> >+
-> >+	dev_info(&dev->dev, "BAR %d: assigned to efifb\n", idx);
-> >+}
-> >+
-> >+static void efifb_fixup_resources(struct pci_dev *dev)
-> >+{
-> >+	u64 base = screen_info.lfb_base;
-> >+	u64 size = screen_info.lfb_size;
-> >+	int i;
-> >+
-> >+	if (pci_bar_found || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
-> >+		return;
-> >+
-> >+	if (screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
-> >+		base |= (u64)screen_info.ext_lfb_base << 32;
-> >+
-> >+	if (!base)
-> >+		return;
-> >+
-> >+	for (i = 0; i < PCI_STD_RESOURCE_END; i++) {
-> >+		struct resource *res = &dev->resource[i];
-> >+
-> >+		if (!(res->flags & IORESOURCE_MEM))
-> >+			continue;
-> >+
-> >+		if (res->start <= base && res->end >= base + size - 1) {
-> Have we considered PCI address translation here? I suppose the
-> address reported by EFI GOP should be the address of CPU domain, not
-> address of PCI domain. Address read from PCI BAR is PCI address
-> which should add translation offset before being compared to CPU
-> domain address.
+>>> While this shouldn't be very difficult, it's likely not material for a
+>>> v4.12- rc fix. We will thus likely need to merge this patch (or something
+>>> very similar to it), but I'd really like to see this fixed properly for
+>>> v4.13.
+>>
+>> When you say "merge this patch (or something similar)", is that about
+>> documenting the error values for of_xlate and add_device that you showed
+>> down below  (or) about the patch in discussion ?
+> 
+> I meant the patch we're discussing, "[PATCH V2 2/3] iommu: of: Ignore all 
+> errors except EPROBE_DEFER". Sorry for the confusion. One more comment about 
+> this below.
 
-Every address in dev->resource[] is a CPU domain address, so address
-translation offset should be handled correctly.
+ok.
 
-This is because __pci_read_base() calls pcibios_bus_to_resource() when
-it fills in dev->resource[], and pcibios_bus_to_resource() applies any
-host bridge address translation.
+> 
+>>>>> At the very least, if you want to give a specific meaning to -ENODEV,
+>>>>> you should check for that value specifically and not ignore all errors
+>>>>> other than -EPROBE_DEFER. You also need to document the meaning of the
+>>>>> error value. This can be done in the documentation of the of_xlate
+>>>>> operation in include/linux/iommu.h:
+>>>>>
+>>>>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>>>>> index 2cb54adc4a33..6ba553e7384a 100644
+>>>>> --- a/include/linux/iommu.h
+>>>>> +++ b/include/linux/iommu.h
+>>>>> @@ -181,7 +181,6 @@ struct iommu_resv_region {
+>>>>>   * @domain_window_disable: Disable a particular window for a domain
+>>>>>   * @domain_set_windows: Set the number of windows for a domain
+>>>>>   * @domain_get_windows: Return the number of windows for a domain
+>>>>> - * @of_xlate: add OF master IDs to iommu grouping
+>>>>>   * @pgsize_bitmap: bitmap of all possible supported page sizes
+>>>>>   */
+>>>>>  struct iommu_ops {
+>>>>> @@ -224,6 +223,11 @@ struct iommu_ops {
+>>>>>  	/* Get the number of windows per domain */
+>>>>>  	u32 (*domain_get_windows)(struct iommu_domain *domain);
+>>>>>
+>>>>> +	/**
+>>>>> +	 * @of_xlate:
+>>>>> +	 *
+>>>>> +	 * Add OF master IDs to iommu grouping.
+>>>>> +	 */
+>>>>>  	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
+>>>>>  	
+>>>>>  	unsigned long pgsize_bitmap;
+>>>>>
+>>>>> And add documentation for the error codes there.
+>>>>>
+>>>>> If you want to ignore some errors returned from the add_device operation
+>>>>> you should document it similarly, and in particular document which error
+>>>>> check(s) need to be performed by of_xlate and which are the
+>>>>> responsibility of add_device.
+>>>>>
+>>>>>> Fixes: 7b07cbefb68d ("iommu: of: Handle IOMMU lookup failure with
+>>>>>> deferred probing or error")
+>>>>>> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+>>>>>> Tested-by: Magnus Damn <magnus.damn@gmail.com>
+>>>>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>>>>>> ---
+>>>>>> [V2] Corrected spelling/case in commit log
+>>>>>>
+>>>>>>  drivers/iommu/of_iommu.c | 6 ++++++
+>>>>>>  1 file changed, 6 insertions(+)
+>>>>>>
+>>>>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>>>>>> index e6e9bec..f0d22c0 100644
+>>>>>> --- a/drivers/iommu/of_iommu.c
+>>>>>> +++ b/drivers/iommu/of_iommu.c
+>>>>>> @@ -237,6 +237,12 @@ const struct iommu_ops *of_iommu_configure(struct
+>>>>>> device *dev,
+>>>>>> 			ops = ERR_PTR(err);
+>>>>>>  	}
+>>>>>>
+>>>>>> +	/* Ignore all other errors apart from EPROBE_DEFER */
+>>>>>> +	if (IS_ERR(ops) && (PTR_ERR(ops) != -EPROBE_DEFER)) {
+>>>>>> +		dev_info(dev, "Adding to IOMMU failed: %ld\n", 
+> PTR_ERR(ops));
+> 
+> I would turn this into a dev_dbg(), as at least the -ENODEV error returned 
+> from add_device has a defined meaning (see the comment in add_iommu_group()) 
+> and is in my opinion not a condition that should be reported in the kernel log 
+> by default.
+> 
 
-Bjorn
+ok, will turn this in to a dev_dbg.
+
+Regards,
+ Sricharan
+
+
+>>>>>> +		ops = NULL;
+>>>>>> +	}
+>>>>>> +
+>>>>>>  	return ops;
+>>>>>>  }
+> 
+
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
