@@ -1,79 +1,39 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Thu, 18 May 2017 08:49:03 +0800
-Subject: [PATCH v14 7/7] ARM: dts: imx6q-evi: Fix onboard hub reset line
-In-Reply-To: <1495068543-6938-1-git-send-email-peter.chen@nxp.com>
-References: <1495068543-6938-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1495068543-6938-8-git-send-email-peter.chen@nxp.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 18 May 2017 09:50:45 +0800
+Subject: [PATCH v2 0/2] Hi3660: enable sp804 timer
+Message-ID: <1495072247-25217-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joshua Clayton <stillcompiling@gmail.com>
+This patch set is to enable sp804 timer on Hi3660 for Hikey960 platform.
 
-Previously the onboard hub was made to work by treating its
-reset gpio as a regulator enable.
-Get rid of that kludge now that pwseq has added reset gpio support
-Move pin muxing the hub reset pin into the usbh1 group
+On Hi3660, the sp804 timer co-exists with CPUs' architecture timer; but
+sp804 timer is located in SoC level but CPU's architecture timer is in
+CPU power domain. sp804 timer is used as broadcast timer when CPU enters
+idle states and the CPU (includes architecture timer) power domain is
+powered off. So sp804 timer enabling is prerequisite before we enable
+CPUIdle on Hi3660.
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
----
- arch/arm/boot/dts/imx6q-evi.dts | 25 +++++++------------------
- 1 file changed, 7 insertions(+), 18 deletions(-)
+This patch set is to enable sp804 timer, the first patch is to adjust
+crgctrl clock regiseration so ensure clock is avaiable for timer. The
+second patch is to add description for timer in dts. Have rebased this
+patch set on Guodong's dts patch set [1] and verified this patch set on
+Hikey960.
 
-diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-index fd2220a..24fe093 100644
---- a/arch/arm/boot/dts/imx6q-evi.dts
-+++ b/arch/arm/boot/dts/imx6q-evi.dts
-@@ -54,18 +54,6 @@
- 		reg = <0x10000000 0x40000000>;
- 	};
- 
--	reg_usbh1_vbus: regulator-usbhubreset {
--		compatible = "regulator-fixed";
--		regulator-name = "usbh1_vbus";
--		regulator-min-microvolt = <5000000>;
--		regulator-max-microvolt = <5000000>;
--		enable-active-high;
--		startup-delay-us = <2>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_usbh1_hubreset>;
--		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
--	};
--
- 	reg_usb_otg_vbus: regulator-usbotgvbus {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb_otg_vbus";
-@@ -204,12 +192,18 @@
- };
- 
- &usbh1 {
--	vbus-supply = <&reg_usbh1_vbus>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh1>;
- 	dr_mode = "host";
- 	disable-over-current;
- 	status = "okay";
-+
-+	usb2415host: hub at 1 {
-+		compatible = "usb424,2513";
-+		reg = <1>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usbotg {
-@@ -465,11 +459,6 @@
- 			MX6QDL_PAD_GPIO_3__USB_H1_OC 0x1b0b0
- 			/* usbh1_b OC */
- 			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
--		>;
--	};
--
--	pinctrl_usbh1_hubreset: usbh1hubresetgrp {
--		fsl,pins = <
- 			MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x1b0b0
- 		>;
- 	};
+[1] http://archive.armlinux.org.uk/lurker/message/20170517.083733.8207a50e.en.html
+
+Changes from v1:
+* Follow Steven's suggestion on IRC, Change to only use
+  CLK_OF_DECLARE_DRIVER for crgctrl clock.
+
+Leo Yan (2):
+  clk: Hi3660: change to register crgctrl clock with
+    CLK_OF_DECLARE_DRIVER
+  arm64: dts: add sp804 timer node for Hi3660
+
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 11 +++++++++++
+ drivers/clk/hisilicon/clk-hi3660.c        |  4 ++--
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+
 -- 
-2.7.4
+1.9.1
