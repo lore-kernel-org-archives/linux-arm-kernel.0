@@ -1,63 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 18 May 2017 17:51:44 +0100
-Subject: [PATCH 0/2] arm64: acpi/pci: allow the firmware BAR configuration
- to be preserved
-In-Reply-To: <20170518154708.GA30182@red-moon>
-References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
- <20170517215611.GJ31462@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu9T7vH_LbKfS_40JUbLNK4PYrMi++eKbCq_MzBsuQxUDQ@mail.gmail.com>
- <20170518140553.GA22106@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_cug6cVrWP-zkptvNn3LxYk7b4Gd=iTzHHe3us3KwL3Q@mail.gmail.com>
- <20170518154708.GA30182@red-moon>
-Message-ID: <CAKv+Gu-NDR1PYUfOs4z-T9WoeBrYvFTTBt3XMiMg+AU76MbYBg@mail.gmail.com>
+From: srinath.mannam@broadcom.com (Srinath Mannam)
+Date: Thu, 18 May 2017 22:27:40 +0530
+Subject: [PATCH] mmc: sdhci-iproc: suppress spurious interrupt with Multiblock
+ read
+Message-ID: <1495126660-25044-1-git-send-email-srinath.mannam@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 May 2017 at 16:47, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Thu, May 18, 2017 at 04:10:28PM +0100, Ard Biesheuvel wrote:
->
-> [...]
->
->> >> Re _DSM: I think it makes sense to honour it, because it puts the
->> >> allocation under the control of the firmware, which completely removes
->> >> the burden of having to reason about a policy in the kernel. That
->> >> leaves the question which will be the default, but that is of minor
->> >> importance IMO.
->> >
->> > I agree; we should try to follow the spec unless we have a good reason
->> > not to, which argues for honoring the _DSM, so I think it's worth a
->> > try.  Booting with "pci=realloc" could override the _DSM and taint the
->> > kernel (because we don't know the effect of reassigning something the
->> > firmware told us not to touch).
->> >
->>
->> I'd like to hear Lorenzo's view on this first, but I can certainly
->> respin my _DSM patch to take pci=realloc into account, and move the
->> handling to generic code as well.
->
-> I agree with both of you on _DSM implementation and interpretation.
->
-> Now, if we use it correctly (ie by the FW standard) on ARM64 systems we
-> are going to trigger regressions, that's certain (ie we can then boot
-> with pci=realloc - still, we are breaking systems), that's the reason
-> why for patch(2) I'd like to create a branch and send a CFT for ARM64
-> ACPI testing before queuing it (either I can set-up a testing branch
-> or we ask Bjorn to do it - as you guys prefer - as long as we have
-> a branch for people to test patch(2) on ARM64 ACPI systems).
->
-> You still need to assign resources that could not be claimed though
-> so patch(2) still needs updating:
->
-> PCI FW spec 3.1 - 4.6.5
->
-> "...However, the operating system is free to configure the devices in this
-> hierarchy that have not been configured by the firmware."
->
-> Which in kernel-speak it means that you have to assign resources that
-> could not be claimed.
->
+The stingray SDHCI hardware supports ACMD12 and automatically
+issues after multi block transfer completed.
 
-Right. AFAICT this is the part that is typically handled by
-pcibios_resource_survey() et al, whose default __weak implementations
-are empty functions. Shall I override those for arm64 to host this
-logic?
+If ACMD12 in SDHCI is disabled, spurious tx done interrupts are seen
+on multi block read command with below error message:
+
+Got data interrupt 0x00000002 even though no data
+operation was in progress.
+
+This patch uses SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 to enable
+ACM12 support in SDHCI hardware and suppress spurious interrupt.
+
+Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+
+diff --git a/drivers/mmc/host/sdhci-iproc.c b/drivers/mmc/host/sdhci-iproc.c
+index 3275d49..61666d2 100644
+--- a/drivers/mmc/host/sdhci-iproc.c
++++ b/drivers/mmc/host/sdhci-iproc.c
+@@ -187,7 +187,8 @@ static const struct sdhci_iproc_data iproc_cygnus_data = {
+ };
+ 
+ static const struct sdhci_pltfm_data sdhci_iproc_pltfm_data = {
+-	.quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK,
++	.quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
++		  SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12,
+ 	.quirks2 = SDHCI_QUIRK2_ACMD23_BROKEN,
+ 	.ops = &sdhci_iproc_ops,
+ };
+-- 
+2.7.4
