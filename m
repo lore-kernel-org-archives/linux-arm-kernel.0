@@ -1,44 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 18 May 2017 18:30:10 +0100
-Subject: [PATCH 1/1] futex: remove duplicated code
-In-Reply-To: <14580dfc-9721-38ab-a1e0-6b4aba13b406@suse.cz>
-References: <20170515130742.18357-1-jslaby@suse.cz>
- <20170515131644.GA3605@arm.com>
- <14580dfc-9721-38ab-a1e0-6b4aba13b406@suse.cz>
-Message-ID: <20170518173010.GK21359@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 18 May 2017 18:46:12 +0100
+Subject: [PATCH 0/2] arm64: acpi/pci: allow the firmware BAR
+ configuration to be preserved
+In-Reply-To: <CAKv+Gu-NDR1PYUfOs4z-T9WoeBrYvFTTBt3XMiMg+AU76MbYBg@mail.gmail.com>
+References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
+ <20170517215611.GJ31462@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu9T7vH_LbKfS_40JUbLNK4PYrMi++eKbCq_MzBsuQxUDQ@mail.gmail.com>
+ <20170518140553.GA22106@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu_cug6cVrWP-zkptvNn3LxYk7b4Gd=iTzHHe3us3KwL3Q@mail.gmail.com>
+ <20170518154708.GA30182@red-moon>
+ <CAKv+Gu-NDR1PYUfOs4z-T9WoeBrYvFTTBt3XMiMg+AU76MbYBg@mail.gmail.com>
+Message-ID: <20170518174612.GA31373@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 10:01:29AM +0200, Jiri Slaby wrote:
-> On 05/15/2017, 03:16 PM, Will Deacon wrote:
-> > Whilst I think this is a good idea, the code in question actually results
-> > in undefined behaviour per the C spec and is reported by UBSAN.
+On Thu, May 18, 2017 at 05:51:44PM +0100, Ard Biesheuvel wrote:
+> On 18 May 2017 at 16:47, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> > On Thu, May 18, 2017 at 04:10:28PM +0100, Ard Biesheuvel wrote:
+> >
+> > [...]
+> >
+> >> >> Re _DSM: I think it makes sense to honour it, because it puts the
+> >> >> allocation under the control of the firmware, which completely removes
+> >> >> the burden of having to reason about a policy in the kernel. That
+> >> >> leaves the question which will be the default, but that is of minor
+> >> >> importance IMO.
+> >> >
+> >> > I agree; we should try to follow the spec unless we have a good reason
+> >> > not to, which argues for honoring the _DSM, so I think it's worth a
+> >> > try.  Booting with "pci=realloc" could override the _DSM and taint the
+> >> > kernel (because we don't know the effect of reassigning something the
+> >> > firmware told us not to touch).
+> >> >
+> >>
+> >> I'd like to hear Lorenzo's view on this first, but I can certainly
+> >> respin my _DSM patch to take pci=realloc into account, and move the
+> >> handling to generic code as well.
+> >
+> > I agree with both of you on _DSM implementation and interpretation.
+> >
+> > Now, if we use it correctly (ie by the FW standard) on ARM64 systems we
+> > are going to trigger regressions, that's certain (ie we can then boot
+> > with pci=realloc - still, we are breaking systems), that's the reason
+> > why for patch(2) I'd like to create a branch and send a CFT for ARM64
+> > ACPI testing before queuing it (either I can set-up a testing branch
+> > or we ask Bjorn to do it - as you guys prefer - as long as we have
+> > a branch for people to test patch(2) on ARM64 ACPI systems).
+> >
+> > You still need to assign resources that could not be claimed though
+> > so patch(2) still needs updating:
+> >
+> > PCI FW spec 3.1 - 4.6.5
+> >
+> > "...However, the operating system is free to configure the devices in this
+> > hierarchy that have not been configured by the firmware."
+> >
+> > Which in kernel-speak it means that you have to assign resources that
+> > could not be claimed.
+> >
 > 
-> Hi, yes, I know -- this patch was the 1st from the series of 3 which I
-> sent a long time ago to fix that up too. But I remember your patch, so I
-> sent only this one this time.
-> 
-> > See my
-> > patch fixing arm64 here (which I'd forgotten about):
-> > 
-> > https://www.spinics.net/lists/linux-arch/msg38564.html
-> > 
-> > But, as stated in the thread above, I think we should go a step further
-> > and remove FUTEX_OP_{OR,ANDN,XOR,OPARG_SHIFT} altogether. They don't
-> > appear to be used by userspace, and this whole thing is a total mess.
-> > 
-> > Any thoughts?
-> 
-> Ok, I am all for that. I think the only question is who is going to do
-> the work and submit it :)? Do I understand correctly to eliminate all
-> these functions and the path into the kernel? But won't this break API
-> -- are there really no users of this interface?
+> Right. AFAICT this is the part that is typically handled by
+> pcibios_resource_survey() et al, whose default __weak implementations
+> are empty functions. Shall I override those for arm64 to host this
+> logic?
 
-That's the million-dollar question, really. I don't know of any code using
-it, and I couldn't find any when I looked (also nothing reported by Debian
-Codesearch afaict), but I was hoping linux-arch might have some thoughts
-on this too.
+I think it makes sense yes unless Bjorn spots something wrong with that
+but you should also call it in ARM64 pci_acpi_scan_root() since it is
+not called by PCI core on non-hot-added bridges, I reckon you figured
+that out already though.
 
-For now, I'll queue my arm64 patch before I forget about it again!
-
-Will
+Thanks a lot !
+Lorenzo
