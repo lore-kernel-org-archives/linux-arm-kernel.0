@@ -1,75 +1,67 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 18 May 2017 11:47:09 +0200
-Subject: [PULL 00/13] KVM/ARM Fixes for v4.12-rc2
-Message-ID: <20170518094722.9926-1-cdall@linaro.org>
+Date: Thu, 18 May 2017 11:47:10 +0200
+Subject: [PULL 01/13] ARM: KVM: Fix tracepoint generation after move to
+ virt/kvm/arm/
+In-Reply-To: <20170518094722.9926-1-cdall@linaro.org>
+References: <20170518094722.9926-1-cdall@linaro.org>
+Message-ID: <20170518094722.9926-2-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Radim and Paolo,
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Here is a fairly large set of fixes post -rc1 for KVM/ARM.
+Moving most of the shared code to virt/kvm/arm had for consequence
+that KVM/ARM doesn't build anymore, because the code that used to
+define the tracepoints is now somewhere else.
 
-The fixes include:
- - A fix for a build failure introduced in -rc1 when tracepoints are
-   enabled on 32-bit ARM.
- - Disabling use of stack pointer protection in the hyp code which can
-   cause panics.
- - A handful of VGIC fixes.
- - A fix to the init of the redistributors on GICv3 systems that
-   prevented boot with kvmtool on GICv3 systems introduced in -rc1.
- - A number of race conditions fixed in our MMU handling code.
- - A fix for the guest being able to program the debug extensions for
-   the host on the 32-bit side.
+Fix this by defining CREATE_TRACE_POINTS in coproc.c, and clean-up
+trace.h as well.
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+Fixes: 35d2d5d490e2 ("KVM: arm/arm64: Move shared files to virt/kvm/arm")
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+---
+ arch/arm/kvm/coproc.c | 1 +
+ arch/arm/kvm/trace.h  | 8 ++++----
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.12-rc2
-
-for you to fetch changes up to fa472fa91a5a0b241f5ddae927d2e235d07545df:
-
-  KVM: arm/arm64: Hold slots_lock when unregistering kvm io bus devices (2017-05-18 11:18:16 +0200)
-
-
-Thanks,
--Christoffer
-
-Christoffer Dall (2):
-      KVM: arm/arm64: Fix bug when registering redist iodevs
-      KVM: arm/arm64: Hold slots_lock when unregistering kvm io bus devices
-
-Marc Zyngier (6):
-      ARM: KVM: Fix tracepoint generation after move to virt/kvm/arm/
-      arm64: KVM: Do not use stack-protector to compile EL2 code
-      arm: KVM: Do not use stack-protector to compile HYP code
-      KVM: arm/arm64: vgic-v2: Do not use Active+Pending state for a HW interrupt
-      KVM: arm/arm64: vgic-v3: Do not use Active+Pending state for a HW interrupt
-      KVM: arm/arm64: vgic-v3: Use PREbits to infer the number of ICH_APxRn_EL2 registers
-
-Suzuki K Poulose (3):
-      kvm: arm/arm64: Fix race in resetting stage2 PGD
-      kvm: arm/arm64: Force reading uncached stage2 PGD
-      kvm: arm/arm64: Fix use after free of stage2 page table
-
-Zhichao Huang (2):
-      KVM: arm: plug potential guest hardware debug leakage
-      KVM: arm: rename pm_fake handler to trap_raz_wi
-
- arch/arm/include/asm/kvm_coproc.h |   3 +-
- arch/arm/kvm/coproc.c             | 106 ++++++++++++++++++++++++++------------
- arch/arm/kvm/handle_exit.c        |   4 +-
- arch/arm/kvm/hyp/Makefile         |   2 +
- arch/arm/kvm/hyp/switch.c         |   4 +-
- arch/arm/kvm/trace.h              |   8 +--
- arch/arm64/kvm/hyp/Makefile       |   2 +
- include/kvm/arm_vgic.h            |   5 +-
- virt/kvm/arm/hyp/vgic-v3-sr.c     |  18 +++----
- virt/kvm/arm/mmu.c                |  33 +++++++-----
- virt/kvm/arm/vgic/vgic-init.c     |   5 +-
- virt/kvm/arm/vgic/vgic-mmio-v3.c  |  12 +++--
- virt/kvm/arm/vgic/vgic-v2.c       |   7 +++
- virt/kvm/arm/vgic/vgic-v3.c       |   7 +++
- 14 files changed, 150 insertions(+), 66 deletions(-)
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index 2c14b69..ac8d36d 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -32,6 +32,7 @@
+ #include <asm/vfp.h>
+ #include "../vfp/vfpinstr.h"
+ 
++#define CREATE_TRACE_POINTS
+ #include "trace.h"
+ #include "coproc.h"
+ 
+diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
+index fc09437..b0d1064 100644
+--- a/arch/arm/kvm/trace.h
++++ b/arch/arm/kvm/trace.h
+@@ -1,5 +1,5 @@
+-#if !defined(_TRACE_KVM_H) || defined(TRACE_HEADER_MULTI_READ)
+-#define _TRACE_KVM_H
++#if !defined(_TRACE_ARM_KVM_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_ARM_KVM_H
+ 
+ #include <linux/tracepoint.h>
+ 
+@@ -74,10 +74,10 @@ TRACE_EVENT(kvm_hvc,
+ 		  __entry->vcpu_pc, __entry->r0, __entry->imm)
+ );
+ 
+-#endif /* _TRACE_KVM_H */
++#endif /* _TRACE_ARM_KVM_H */
+ 
+ #undef TRACE_INCLUDE_PATH
+-#define TRACE_INCLUDE_PATH arch/arm/kvm
++#define TRACE_INCLUDE_PATH .
+ #undef TRACE_INCLUDE_FILE
+ #define TRACE_INCLUDE_FILE trace
+ 
+-- 
+2.9.0
