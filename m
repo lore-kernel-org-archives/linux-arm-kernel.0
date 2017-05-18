@@ -1,104 +1,108 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 18 May 2017 18:21:13 +0800
-Subject: [PATCH] arm64: cpufeature: check translation granule size based on
- kernel config
-Message-ID: <1495102873-10858-1-git-send-email-leo.yan@linaro.org>
+From: ybzhao1989@gmail.com (Zhao Yibin)
+Date: Thu, 18 May 2017 18:21:28 +0800
+Subject: PROBLEM: ARM Cache policy on single armv7 processor lead to low
+ DRAM performance
+In-Reply-To: <20170518093305.GL22219@n2100.armlinux.org.uk>
+References: <CAOEkoLw3Y5h2P_aFeMKgHYyKZpQvsQsOPOLOuvaYZGOe+rHJWQ@mail.gmail.com>
+ <20170516082922.GY22219@n2100.armlinux.org.uk>
+ <CAOEkoLziLQ4z1L=wdMF_5tcm3ETbSwLm-tvreB6uSFxobE8gjg@mail.gmail.com>
+ <20170518093305.GL22219@n2100.armlinux.org.uk>
+Message-ID: <CAOEkoLzZCfsFv+WKWJgqv-Qn0miJ4p_JxNMSs0bOCPtoPP0H3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the big.LITTLE system with two clusters, one is CA53 cluster and
-another is CA73 cluster. CA53 doesn't support 16KB memory translation
-granule size (4.3.21 AArch64 Memory Model Feature Register 0, EL1; ARM
-DDI 0500F), but CA73 supports this feature (4.3.27 AArch64 Memory Model
-Feature Register 0, EL1; ARM 100048_0002_04_en). As result, the kernel
-reports log for "Unexpected variation" as below.
+HI, Russell,
 
-[    0.182113] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1. Boot CPU: 0x00000000001122, CPU4: 0x00000000101122
-[    0.182118]
-[    0.182124] ------------[ cut here ]------------
-[    0.182140] WARNING: CPU: 4 PID: 0 at arch/arm64/kernel/cpufeature.c:636 update_cpu_features+0x400/0x408
-[    0.182141] Modules linked in:
-[    0.182144]
-[    0.182149] CPU: 4 PID: 0 Comm: swapper/4 Not tainted 4.11.0-08573-g2935db7 #1
-[    0.182151] Hardware name: HiKey960 (DT)
-[    0.182154] task: ffff8000bb2c4e00 task.stack: ffff8000bb2dc000
-[    0.182156] PC is at update_cpu_features+0x400/0x408
-[    0.182158] LR is at update_cpu_features+0x400/0x408
-[    0.182161] pc : [<ffff00000808e4a0>] lr : [<ffff00000808e4a0>] pstate: 600001c5
-[    0.182161] sp : ffff8000bb2dff70
-[    0.182163] x29: ffff8000bb2dff70 x28: 0000000000000000
-[    0.182166] x27: 0000000000000000 x26: 0000000000000000
-[    0.182168] x25: 0000000000000000 x24: 0000000000000000
-[    0.182170] x23: 0000000000000000 x22: ffff000008f9f108
-[    0.182173] x21: 0000000000000004 x20: ffff8000bef764d8
-[    0.182175] x19: 0000000000000001 x18: 0000000000000000
-[    0.182178] x17: 0000000000000000 x16: 0000000000000000
-[    0.182180] x15: 0000000000000000 x14: 455f3052464d4d34
-[    0.182182] x13: 3641415f44495f53 x12: 5953206e69206e6f
-[    0.182184] x11: 6974616972617620 x10: ffff000008fa6ae0
-[    0.182187] x9 : 0000000000000000 x8 : ffff000008fa88fc
-[    0.182189] x7 : 0000000000000000 x6 : 00000000007e6647
-[    0.182192] x5 : 0000000000000000 x4 : 0000000000000000
-[    0.182194] x3 : ffffffffffffffff x2 : 00008000b6120000
-[    0.182196] x1 : ffff8000bb2c4e00 x0 : 0000000000000022
-[    0.182198]
-[    0.182203] ---[ end trace e3d886f1604bd987 ]---
-[    0.182205] Call trace:
-[    0.182208] Exception stack(0xffff8000bb2dfda0 to 0xffff8000bb2dfed0)
-[    0.182211] fda0: 0000000000000001 0001000000000000 ffff8000bb2dff70 ffff00000808e4a0
-[    0.182214] fdc0: ffff8000bb2dfef0 ffff000008c53880 0000000000000000 0000000000000000
-[    0.182215] fde0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-[    0.182218] fe00: 0000000000000000 ffff000008c53880 ffff8000bb2dff70 ffff8000bb2dff70
-[    0.182220] fe20: ffff8000bb2dff30 00000000ffffffc8 ffff8000bb2dfe60 ffff000008110ac4
-[    0.182222] fe40: 0000000000000022 ffff8000bb2c4e00 00008000b6120000 ffffffffffffffff
-[    0.182224] fe60: 0000000000000000 0000000000000000 00000000007e6647 0000000000000000
-[    0.182227] fe80: ffff000008fa88fc 0000000000000000 ffff000008fa6ae0 6974616972617620
-[    0.182229] fea0: 5953206e69206e6f 3641415f44495f53 455f3052464d4d34 0000000000000000
-[    0.182230] fec0: 0000000000000000 0000000000000000
-[    0.182232] [<ffff00000808e4a0>] update_cpu_features+0x400/0x408
-[    0.182236] [<ffff00000808d568>] cpuinfo_store_cpu+0x48/0x50
-[    0.182238] [<ffff00000808f070>] secondary_start_kernel+0xa8/0x118
-[    0.182242] [<000000000098b1c4>] 0x98b1c4
+Thanks for your explanation,
+I did change the PMD_FLAGS.
 
-[...]
+Our CPU MIDR is 0x410FC075
 
-This patch is to change the checking CPU feature for memory translation
-granule size based on kernel configuration. If kernel configuration has
-selected to use one specific memory translation granule size, then we
-will do strict sanity checking cross all CPUs. Otherwise we can skip to
-check unused features for memory translation granule size if kernel
-doesn't use it.
+I tried Fabio's suggestion about enable ACTLR.SMP, and the cache
+behavior did changed,
+the performance improved a lot.
+According to cortex_a7 mpcore r0p5 trm,
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/kernel/cpufeature.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+[6] SMP Enables coherent requests to the processor:
+0  Disables coherent requests to the processor. This is the reset value.
+1  Enables coherent requests to the processor.
+When coherent requests are disabled:
+? loads to cacheable memory are not cached by the processor.
+? Load-Exclusive instructions take a precise abort if the memory attributes are:
+? Inner Write-Back and Outer Shareable.
+? Inner Write-Through and Outer Shareable.
+? Outer Write-Back and Outer Shareable.
+? Outer Write-Through and Outer Shareable.
+? Inner Write-Back and Inner Shareable.
+? Inner Write-Through and Inner Shareable.
+? Outer Write-Back and Inner Shareable.
+? Outer Write-Through and Inner Shareable.
+Note
+ You must ensure this bit is set to 1 before the caches and MMU are
+enabled, or any cache and TLB
+maintenance operations are performed. The only time this bit is set to
+0 is during a processor power-down
+sequence. See Power management on page 2-12.
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 94b8f7f..938ddac 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -117,9 +117,21 @@
- };
- 
- static const struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
-+#ifdef CONFIG_ARM64_4K_PAGES
- 	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
-+#else
-+	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
-+#endif
-+#ifdef CONFIG_AARM64_64K_PAGES
- 	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
-+#else
-+	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
-+#endif
-+#ifdef CONFIG_AARM64_16K_PAGES
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
-+#else
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
-+#endif
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_BIGENDEL0_SHIFT, 4, 0),
- 	/* Linux shouldn't care about secure memory */
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
--- 
-1.9.1
+If you can enable ACTLR.SMP for cortex-a7 single processor in kernel,
+that will be great,
+since it's hard to know the need to enable smp for a single processer.
+
+Thanks
+Bob
+
+2017-05-18 17:33 GMT+08:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
+> On Thu, May 18, 2017 at 04:25:12PM +0800, Zhao Yibin wrote:
+>> Hi, Russell,
+>>
+>> I traced the page table of TTBR0,  and the map descriptor of the page
+>> allocated from share ram,
+>> TEX[0]-C-B is 0-1-1, LPAE is not enable, the TRE is 1, so TEX[0]-C-B
+>> is mapped to the 3rd index of PRRR and NMRR.
+>> PRRR register is 0xFF0A81A8, NMRR register is 0x40E040E0.
+>> So the memory type is normal, and IR/OR is "Region is Write-Back, no
+>> Write-Allocate." according to armv7 TRM
+>>
+>> I don't know what read-allocate can be, if cortex-a7 is simliar to
+>> cortex-a15, then write-back read-allocate means
+>> "Write-Back Read-Allocate  => Write-Back Read-Write-Allocate",
+>
+> The ARMv7 ARM gives details about how the PRRR and NMRR are decoded,
+> giving pseudocode (see B3.19 for ConvertAttrsHints(), and B3.19.9 for
+> the TEX remap decode pseudocode.)
+>
+> The PRRR and NMRR settings give write-back cache policy with a read-
+> allocate _hint_.  The key thing here is that it's a _hint_, it doesn't
+> mandate what the hardware does.  Different CPUs are free to use the
+> hints in different ways.
+>
+> What this means is that while one CPU may interpret a "read-allocate"
+> hint as meaning that it can allocate cache lines on read accesses,
+> another CPU may do something different - it may either decide to
+> augment that with "write-allocate" as well, or it may decide
+> "no-allocate" (which seems to be your case.)
+>
+> There is no architected requirement here - it's implementation
+> dependent, and that implementation dependence makes it difficult to
+> deal with from a generic OS point of view.
+>
+> What may be right for one CPU may not be correct for another CPU.  In
+> other words, we can't change this without risking causing regressions
+> for the CPUs that we know work.  For example, if we changed to write-
+> allocate mode (aka read-write-allocate), there could be some other a
+> CPU out there which decides to implement that as no-allocate.
+>
+> However, if it's possible to identify your CPU uniquely, then it would
+> be possible to change it just for your CPU.  What is the CPU MIDR value?
+>
+>> I tried change the value of TTB_FLAGS_UP to  the same as TTB_FLAGS_SMP
+>> in arch/arm/mm/proc-v7-2level.S.
+>
+> You need to change PMD_FLAGS as well.  TTB determines the translation
+> table base register values, which are the attributes used by the page
+> table walker.  PMD determines what's used in the page tables themselves.
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
