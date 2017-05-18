@@ -1,59 +1,46 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 18 May 2017 09:18:23 +0200
-Subject: [PATCH 3/3] arm: dts: rk322x: add watchdog device node.
-In-Reply-To: <e39599a2-479a-11c3-a349-3c5a51fa130d@rock-chips.com>
-References: <201705181148.b4AgD8sU%fengguang.wu@intel.com>
- <e39599a2-479a-11c3-a349-3c5a51fa130d@rock-chips.com>
-Message-ID: <2701138.cVk9DUKsF1@diego>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 18 May 2017 15:16:48 +0800
+Subject: [PATCH v6 4/9] arm64: allwinner: a64: add AXP803 node to Pine64
+ device tree
+In-Reply-To: <20170518071653.36561-1-icenowy@aosc.io>
+References: <20170518071653.36561-1-icenowy@aosc.io>
+Message-ID: <20170518071653.36561-5-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 18. Mai 2017, 11:58:04 CEST schrieb Frank Wang:
-> Hi,
-> 
-> Sorry, I forgot to declare that this change required below patch on
-> patchwork.
-> https://patchwork.kernel.org/patch/9703945/
+The Pine64 (including Pine64+) boards have an AXP803 as its main PMIC.
 
-I found that yesterday already and brought everything in the correct order 
-when applying :-)
+Add its device node.
 
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+Changes in v6:
+- Rebase on next-20170517.
 
-Heiko
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-> 
-> 
-> BR.
-> Frank
-> 
-> On 2017/5/18 11:18, kbuild test robot wrote:
-> > Hi Frank,
-> > 
-> > [auto build test ERROR on rockchip/for-next]
-> > [also build test ERROR on v4.12-rc1 next-20170517]
-> > [if your patch is applied to the wrong git tree, please drop us a note to
-> > help improve the system]
-> > 
-> > url:   
-> > https://github.com/0day-ci/linux/commits/Frank-Wang/add-and-fix-some-devi
-> > ce-node-for-rk322x-SoC/20170518-081958 base:  
-> > https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git
-> > for-next config: arm-at91_dt_defconfig (attached as .config)
-> > compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> > 
-> > reproduce:
-> >          wget
-> >          https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/ma
-> >          ke.cross -O ~/bin/make.cross chmod +x ~/bin/make.cross
-> >          # save the attached .config to linux build tree
-> >          make.cross ARCH=arm
-> > 
-> > All errors (new ones prefixed by >>):
-> >>> Error: arch/arm/boot/dts/rk322x.dtsi:286.18-19 syntax error
-> >>> 
-> >     FATAL ERROR: Unable to parse input tree
-> > 
-> > ---
-> > 0-DAY kernel test infrastructure                Open Source Technology
-> > Center https://lists.01.org/pipermail/kbuild-all                   Intel
-> > Corporation
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index 7c533b6d4ba9..36001884ed33 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -107,6 +107,17 @@
+ 	status = "okay";
+ };
+ 
++&r_rsb {
++	status = "okay";
++
++	axp803: pmic at 3a3 {
++		compatible = "x-powers,axp803";
++		reg = <0x3a3>;
++		interrupt-parent = <&r_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
+ /* On Exp and Euler connectors */
+ &uart0 {
+ 	pinctrl-names = "default";
+-- 
+2.12.2
