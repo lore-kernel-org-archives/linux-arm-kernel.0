@@ -1,42 +1,47 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 18 May 2017 11:47:12 +0200
-Subject: [PULL 03/13] arm: KVM: Do not use stack-protector to compile HYP code
+Date: Thu, 18 May 2017 11:47:14 +0200
+Subject: [PULL 05/13] KVM: arm/arm64: vgic-v3: Do not use Active+Pending state
+ for a HW interrupt
 In-Reply-To: <20170518094722.9926-1-cdall@linaro.org>
 References: <20170518094722.9926-1-cdall@linaro.org>
-Message-ID: <20170518094722.9926-4-cdall@linaro.org>
+Message-ID: <20170518094722.9926-6-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-We like living dangerously. Nothing explicitely forbids stack-protector
-to be used in the HYP code, while distributions routinely compile their
-kernel with it. We're just lucky that no code actually triggers the
-instrumentation.
-
-Let's not try our luck for much longer, and disable stack-protector
-for code living at HYP.
+When an interrupt is injected with the HW bit set (indicating that
+deactivation should be propagated to the physical distributor),
+special care must be taken so that we never mark the corresponding
+LR with the Active+Pending state (as the pending state is kept in
+the physycal distributor).
 
 Cc: stable at vger.kernel.org
+Fixes: 59529f69f504 ("KVM: arm/arm64: vgic-new: Add GICv3 world switch backend")
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm/kvm/hyp/Makefile | 2 ++
- 1 file changed, 2 insertions(+)
+ virt/kvm/arm/vgic/vgic-v3.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-index 3023bb5..8679405 100644
---- a/arch/arm/kvm/hyp/Makefile
-+++ b/arch/arm/kvm/hyp/Makefile
-@@ -2,6 +2,8 @@
- # Makefile for Kernel-based Virtual Machine module, HYP part
- #
- 
-+ccflags-y += -fno-stack-protector
-+
- KVM=../../../../virt/kvm
- 
- obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 8fa737e..6fe3f00 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -127,6 +127,13 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ 	if (irq->hw) {
+ 		val |= ICH_LR_HW;
+ 		val |= ((u64)irq->hwintid) << ICH_LR_PHYS_ID_SHIFT;
++		/*
++		 * Never set pending+active on a HW interrupt, as the
++		 * pending state is kept@the physical distributor
++		 * level.
++		 */
++		if (irq->active && irq_is_pending(irq))
++			val &= ~ICH_LR_PENDING_BIT;
+ 	} else {
+ 		if (irq->config == VGIC_CONFIG_LEVEL)
+ 			val |= ICH_LR_EOI;
 -- 
 2.9.0
