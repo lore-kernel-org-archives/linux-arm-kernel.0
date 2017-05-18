@@ -1,32 +1,67 @@
-From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
-Date: Thu, 18 May 2017 15:12:23 +0200
-Subject: [PATCH 7/8] clocksource/drivers/fttmr010: Merge Moxa into FTTMR010
-In-Reply-To: <CACRpkdaWoGYh4D3D0+3mzVDTy78O2idyDmg9+U5zJc_mfn+WLQ@mail.gmail.com>
-References: <20170517140542.20016-1-linus.walleij@linaro.org>
- <20170517140542.20016-8-linus.walleij@linaro.org>
- <CACPK8XdRe8Khnj3YFoQYKpKHM-5PHTqkP8Nt+jZ=eo-FThN-aw@mail.gmail.com>
- <CACRpkdaWoGYh4D3D0+3mzVDTy78O2idyDmg9+U5zJc_mfn+WLQ@mail.gmail.com>
-Message-ID: <53dc1088-41bb-f272-2aa8-f0ade762d6d5@kaod.org>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 18 May 2017 14:13:59 +0100
+Subject: [PATCH] arm64: dts: juno: Enable some SMMUs
+In-Reply-To: <eeb81dbbd7ddfbbccb961c0f20c5cb90f120e89f.1495110010.git.robin.murphy@arm.com>
+References: <eeb81dbbd7ddfbbccb961c0f20c5cb90f120e89f.1495110010.git.robin.murphy@arm.com>
+Message-ID: <1495113239.3174.11.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> As an aside, we have a pretty decent model for the Aspeed SoCs in
->> Qemu. If you want to use it to smoketest your rework:
->>
->>  $ qemu-system-arm -m 512 -M ast2500-evb -nodefaults -nographic
->> -serial stdio -kernel arch/arm/boot/zImage -dtb
->> arch/arm/boot/dts/aspeed-ast2500-evb.dtb
->>
->> I tested with Ubuntu's qemu v2.8. It looks like we have a bug when the
->> kernel tries to use the clock the way your driver works, so we will
->> look at that. It does function properly for the current upstream code.
+On Thu, 2017-05-18 at 13:23 +0100, Robin Murphy wrote:
+> The IOMMU-backed DMA API support has now been in place for a while and
+> proven stable, so there's no real need to keep most of Juno's SMMUs
+> disabled. The USB, HDLCDs, and CoreSight ETR all just need to map RAM
+> buffers for DMA - enabling their SMMUs obviates CPU bounce buffering for
+> USB's streaming DMA to the upper memory bank, and lets the other two
+> allocate their relatively large coherent buffers without pressuring CMA.
 > 
-> Oh that's sweet! I'll test it if I can get it working like this.
+> Some more software work is still needed for the DMA-330 and PCIe before
+> those can accommodate SMMU translation correctly in all cases, so we
+> leave those alone for now.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
 
-In case you need a small ramfs, here is one :
+For those that don't already know, status = "disabled" for smmu is
+broken in Linux 4.12-rc1, and this fixes it...
+https://lkml.org/lkml/2017/5/17/344
 
-	https://openpower.xyz/job/openbmc-build/distro=ubuntu,target=evb-ast2500/lastSuccessfulBuild/artifact/images/evb-ast2500/obmc-phosphor-initramfs-evb-ast2500.cpio.lzma
-
-Cheers,
-
-C. 
+>  arch/arm64/boot/dts/arm/juno-base.dtsi | 4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index bfe7d683a42e..02aea43238fc 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -53,7 +53,6 @@
+>  		#global-interrupts = <1>;
+>  		dma-coherent;
+>  		power-domains = <&scpi_devpd 0>;
+> -		status = "disabled";
+>  	};
+>  
+>  	gic: interrupt-controller at 2c010000 {
+> @@ -546,7 +545,6 @@
+>  			     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
+>  		#iommu-cells = <1>;
+>  		#global-interrupts = <1>;
+> -		status = "disabled";
+>  	};
+>  
+>  	smmu_hdlcd0: iommu at 7fb20000 {
+> @@ -556,7 +554,6 @@
+>  			     <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+>  		#iommu-cells = <1>;
+>  		#global-interrupts = <1>;
+> -		status = "disabled";
+>  	};
+>  
+>  	smmu_usb: iommu at 7fb30000 {
+> @@ -567,7 +564,6 @@
+>  		#iommu-cells = <1>;
+>  		#global-interrupts = <1>;
+>  		dma-coherent;
+> -		status = "disabled";
+>  	};
+>  
+>  	dma at 7ff00000 {
