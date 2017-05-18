@@ -1,49 +1,54 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Thu, 18 May 2017 08:48:59 +0800
-Subject: [PATCH v14 3/7] binding-doc: usb: usb-device: add optional properties
- for power sequence
+Date: Thu, 18 May 2017 08:49:01 +0800
+Subject: [PATCH v14 5/7] ARM: dts: imx6qdl: Enable usb node children with <reg>
 In-Reply-To: <1495068543-6938-1-git-send-email-peter.chen@nxp.com>
 References: <1495068543-6938-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1495068543-6938-4-git-send-email-peter.chen@nxp.com>
+Message-ID: <1495068543-6938-6-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add optional properties for power sequence.
+From: Joshua Clayton <stillcompiling@gmail.com>
 
+Give usb nodes #address and #size attributes, so that a child node
+representing a permanently connected device such as an onboard hub may
+be addressed with a <reg> attribute
+
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 Signed-off-by: Peter Chen <peter.chen@nxp.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/usb/usb-device.txt | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
-index 1c35e7b..3661dd2 100644
---- a/Documentation/devicetree/bindings/usb/usb-device.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-device.txt
-@@ -13,6 +13,10 @@ Required properties:
- - reg: the port number which this device is connecting to, the range
-   is 1-31.
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index e426faa..8c064cb 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -945,6 +945,8 @@
  
-+Optional properties:
-+power sequence properties, see
-+Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt for detail
-+
- Example:
+ 			usbh1: usb at 02184200 {
+ 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x02184200 0x200>;
+ 				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+@@ -959,6 +961,8 @@
  
- &usb1 {
-@@ -21,8 +25,12 @@ Example:
- 	#address-cells = <1>;
- 	#size-cells = <0>;
+ 			usbh2: usb at 02184400 {
+ 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x02184400 0x200>;
+ 				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+@@ -972,6 +976,8 @@
  
--	hub: genesys at 1 {
-+	genesys: hub at 1 {
- 		compatible = "usb5e3,608";
- 		reg = <1>;
-+
-+		clocks = <&clks IMX6SX_CLK_CKO>;
-+		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
-+		reset-duration-us = <10>;
- 	};
- }
+ 			usbh3: usb at 02184600 {
+ 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x02184600 0x200>;
+ 				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
 -- 
 2.7.4
