@@ -1,40 +1,43 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 18 May 2017 10:42:38 +0200
-Subject: [PATCH v3 3/3] ARM: socfpga: dtsi: add dw-wdt reset lines
+Date: Thu, 18 May 2017 10:42:36 +0200
+Subject: [PATCH v3 1/3] watchdog: bindings: dw_wdt: add reset lines
 In-Reply-To: <cover.9d687e41ad8d91c267143a43d703f656f7d5689c.1495096910.git-series.s.trumtrar@pengutronix.de>
 References: <cover.9d687e41ad8d91c267143a43d703f656f7d5689c.1495096910.git-series.s.trumtrar@pengutronix.de>
-Message-ID: <f366b3ea2aa40313478c309a0e6deaadf624c343.1495096910.git-series.s.trumtrar@pengutronix.de>
+Message-ID: <77954d7b338db9956e15298064f21c028c2070f3.1495096910.git-series.s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the reset lines to both watchdogs.
+Document the reset lines holding the watchdog core in reset.
 
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
-Cc: linux-arm-kernel at lists.infradead.org
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-watchdog at vger.kernel.org
+Cc: devicetree at vger.kernel.org
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/socfpga.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/watchdog/dw_wdt.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index b2674bdb8e6a..547b2720abf5 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -924,6 +924,7 @@
- 			reg = <0xffd02000 0x1000>;
- 			interrupts = <0 171 4>;
- 			clocks = <&osc1>;
-+			resets = <&rst L4WD0_RESET>;
- 			status = "disabled";
- 		};
+diff --git a/Documentation/devicetree/bindings/watchdog/dw_wdt.txt b/Documentation/devicetree/bindings/watchdog/dw_wdt.txt
+index 08e16f684f2d..eb0914420c7c 100644
+--- a/Documentation/devicetree/bindings/watchdog/dw_wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/dw_wdt.txt
+@@ -10,6 +10,8 @@ Required Properties:
+ Optional Properties:
  
-@@ -932,6 +933,7 @@
- 			reg = <0xffd03000 0x1000>;
- 			interrupts = <0 172 4>;
- 			clocks = <&osc1>;
-+			resets = <&rst L4WD1_RESET>;
- 			status = "disabled";
- 		};
+ - interrupts	: The interrupt used for the watchdog timeout warning.
++- resets	: phandle pointing to the system reset controller with
++		line index for the watchdog.
+ 
+ Example:
+ 
+@@ -18,4 +20,5 @@ Example:
+ 		reg = <0xffd02000 0x1000>;
+ 		interrupts = <0 171 4>;
+ 		clocks = <&per_base_clk>;
++		resets = <&rst WDT0_RESET>;
  	};
 -- 
 git-series 0.9.1
