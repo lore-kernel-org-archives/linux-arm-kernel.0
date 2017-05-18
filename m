@@ -1,79 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 18 May 2017 13:41:15 +0100
-Subject: [PATCH] arm64: cpufeature: check translation granule size based
- on kernel config
-In-Reply-To: <20170518123840.GD21359@arm.com>
-References: <1495102873-10858-1-git-send-email-leo.yan@linaro.org>
- <c0c8bd7b-647d-092d-65ac-08a90000e30c@arm.com>
- <20170518113627.GC25294@leoy-ThinkPad-T440>
- <20170518123840.GD21359@arm.com>
-Message-ID: <20170518124115.GC4957@leverpostej>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 18 May 2017 14:43:27 +0200
+Subject: [PATCH 7/8] clocksource/drivers/fttmr010: Merge Moxa into FTTMR010
+In-Reply-To: <CACPK8XdRe8Khnj3YFoQYKpKHM-5PHTqkP8Nt+jZ=eo-FThN-aw@mail.gmail.com>
+References: <20170517140542.20016-1-linus.walleij@linaro.org>
+ <20170517140542.20016-8-linus.walleij@linaro.org>
+ <CACPK8XdRe8Khnj3YFoQYKpKHM-5PHTqkP8Nt+jZ=eo-FThN-aw@mail.gmail.com>
+Message-ID: <CACRpkdaWoGYh4D3D0+3mzVDTy78O2idyDmg9+U5zJc_mfn+WLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 01:38:41PM +0100, Will Deacon wrote:
-> On Thu, May 18, 2017 at 07:36:27PM +0800, Leo Yan wrote:
-> > On Thu, May 18, 2017 at 11:39:01AM +0100, Suzuki K Poulose wrote:
-> > > On 18/05/17 11:21, Leo Yan wrote:
-> > > >In the big.LITTLE system with two clusters, one is CA53 cluster and
-> > > >another is CA73 cluster. CA53 doesn't support 16KB memory translation
-> > > >granule size (4.3.21 AArch64 Memory Model Feature Register 0, EL1; ARM
-> > > >DDI 0500F), but CA73 supports this feature (4.3.27 AArch64 Memory Model
-> > > >Feature Register 0, EL1; ARM 100048_0002_04_en). As result, the kernel
-> > > >reports log for "Unexpected variation" as below.
-> > > >
-> > > >[    0.182113] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1. Boot CPU: 0x00000000001122, CPU4: 0x00000000101122
-> > > 
-> > > >
-> > > >This patch is to change the checking CPU feature for memory translation
-> > > >granule size based on kernel configuration. If kernel configuration has
-> > > >selected to use one specific memory translation granule size, then we
-> > > >will do strict sanity checking cross all CPUs. Otherwise we can skip to
-> > > >check unused features for memory translation granule size if kernel
-> > > >doesn't use it.
-> > > >
-> > > 
-> > > If we were to suppress the warning (more on that below), we could simply
-> > > make this feature a NON_STRICT, since the unsupported CPUs won't boot
-> > > with 16K to hit this sanity check.
-> > > 
-> > > However, there is a problem with disabling this warning. If a VM starts
-> > > using 16KB page size on a 4K/64K host, the VM could end up in unknown
-> > > failures when it switches to an unsupported CPU (after it has booted).
-> > > Of course the real fix lies in making the KVM exposing the safe value
-> > > for granule support to the VCPUs (which is currently being worked on by
-> > > Douglas in Cc). So, when we have that ready, we could make it NON_STRICT
-> > > instead of this approach.
-> > 
-> > Thanks for the info :)
-> > 
-> > I will use below patch for production branch temporarily. You could
-> > work out one formal patch for upstreaming when the dependency patches
-> > are get ready:
-> 
-> The other thing we could do is change the way we taint on mismatch so that
-> we don't dump the scary (and pointless) backtrace.
+On Thu, May 18, 2017 at 9:22 AM, Joel Stanley <joel@jms.id.au> wrote:
+> On Wed, May 17, 2017 at 10:05 PM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+>> This merges the Moxa Art timer driver into the Faraday FTTMR010
+>> driver and replaces all Kconfig symbols to use the Faraday
+>> driver instead. We are now so similar that the drivers can
+>> be merged by just adding a few lines to the Faraday timer.
+>
+> Nice work!
+>
+> I gave this a spin on hardware and it didn't work :(
 
-The backtrace is due to the WARN part of the WARN_TAINT_ONCE.
+How typical.
 
-We could chagne that as below, if we really want to get rid of the backtrace.
+> Thanks for the rework! Unfortunately the Aspeed IP does not have bits
+> to control the direction of counting, and the timers only count down.
+> Bits 3, 7 and 11 are marked reserved in the data sheet. Can you rework
+> the patch to count down?
 
-Thanks,
-Mark.
+How unintuitive.
 
----->8----
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 94b8f7f..1f53314 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -639,8 +639,8 @@ void update_cpu_features(int cpu,
-         * Mismatched CPU features are a recipe for disaster. Don't even
-         * pretend to support them.
-         */
--       WARN_TAINT_ONCE(taint, TAINT_CPU_OUT_OF_SPEC,
--                       "Unsupported CPU feature variation.\n");
-+       pr_warn_once("Unsupported CPU feature variation detected.\n");
-+       add_taint(TAINT_CPU_OUT_OF_SPEC);
- }
- 
- u64 read_sanitised_ftr_reg(u32 id)
+I guess I will just make it handle the Aspeed separately, so we
+count up on Gemini and Moxa and down on Aspeed if that is all
+it can do.
+
+> As an aside, we have a pretty decent model for the Aspeed SoCs in
+> Qemu. If you want to use it to smoketest your rework:
+>
+>  $ qemu-system-arm -m 512 -M ast2500-evb -nodefaults -nographic
+> -serial stdio -kernel arch/arm/boot/zImage -dtb
+> arch/arm/boot/dts/aspeed-ast2500-evb.dtb
+>
+> I tested with Ubuntu's qemu v2.8. It looks like we have a bug when the
+> kernel tries to use the clock the way your driver works, so we will
+> look at that. It does function properly for the current upstream code.
+
+Oh that's sweet! I'll test it if I can get it working like this.
+
+Yours,
+Linus Walleij
