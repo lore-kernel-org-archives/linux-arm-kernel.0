@@ -1,77 +1,210 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 18 May 2017 11:47:20 +0200
-Subject: [PULL 11/13] kvm: arm/arm64: Fix use after free of stage2 page table
+Date: Thu, 18 May 2017 11:47:17 +0200
+Subject: [PULL 08/13] KVM: arm: plug potential guest hardware debug leakage
 In-Reply-To: <20170518094722.9926-1-cdall@linaro.org>
 References: <20170518094722.9926-1-cdall@linaro.org>
-Message-ID: <20170518094722.9926-12-cdall@linaro.org>
+Message-ID: <20170518094722.9926-9-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+From: Zhichao Huang <zhichao.huang@linaro.org>
 
-We yield the kvm->mmu_lock occassionaly while performing an operation
-(e.g, unmap or permission changes) on a large area of stage2 mappings.
-However this could possibly cause another thread to clear and free up
-the stage2 page tables while we were waiting for regaining the lock and
-thus the original thread could end up in accessing memory that was
-freed. This patch fixes the problem by making sure that the stage2
-pagetable is still valid after we regain the lock. The fact that
-mmu_notifer->release() could be called twice (via __mmu_notifier_release
-and mmu_notifier_unregsister) enhances the possibility of hitting
-this race where there are two threads trying to unmap the entire guest
-shadow pages.
+Hardware debugging in guests is not intercepted currently, it means
+that a malicious guest can bring down the entire machine by writing
+to the debug registers.
 
-While at it, cleanup the redudant checks around cond_resched_lock in
-stage2_wp_range(), as cond_resched_lock already does the same checks.
+This patch enable trapping of all debug registers, preventing the
+guests to access the debug registers. This includes access to the
+debug mode(DBGDSCR) in the guest world all the time which could
+otherwise mess with the host state. Reads return 0 and writes are
+ignored (RAZ_WI).
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Radim Kr?m?? <rkrcmar@redhat.com>
-Cc: andreyknvl at google.com
-Cc: Paolo Bonzini <pbonzini@redhat.com>
+The result is the guest cannot detect any working hardware based debug
+support. As debug exceptions are still routed to the guest normal
+debug using software based breakpoints still works.
+
+To support debugging using hardware registers we need to implement a
+debug register aware world switch as well as special trapping for
+registers that may affect the host state.
+
 Cc: stable at vger.kernel.org
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/mmu.c | 17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/kvm_coproc.h |  3 +-
+ arch/arm/kvm/coproc.c             | 77 ++++++++++++++++++++++++++++++---------
+ arch/arm/kvm/handle_exit.c        |  4 +-
+ arch/arm/kvm/hyp/switch.c         |  4 +-
+ 4 files changed, 66 insertions(+), 22 deletions(-)
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 704e35f..a2d6324 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -295,6 +295,13 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
- 	assert_spin_locked(&kvm->mmu_lock);
- 	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
- 	do {
-+		/*
-+		 * Make sure the page table is still active, as another thread
-+		 * could have possibly freed the page table, while we released
-+		 * the lock.
-+		 */
-+		if (!READ_ONCE(kvm->arch.pgd))
-+			break;
- 		next = stage2_pgd_addr_end(addr, end);
- 		if (!stage2_pgd_none(*pgd))
- 			unmap_stage2_puds(kvm, pgd, addr, next);
-@@ -1170,11 +1177,13 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
- 		 * large. Otherwise, we may see kernel panics with
- 		 * CONFIG_DETECT_HUNG_TASK, CONFIG_LOCKUP_DETECTOR,
- 		 * CONFIG_LOCKDEP. Additionally, holding the lock too long
--		 * will also starve other vCPUs.
-+		 * will also starve other vCPUs. We have to also make sure
-+		 * that the page tables are not freed while we released
-+		 * the lock.
- 		 */
--		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
--			cond_resched_lock(&kvm->mmu_lock);
+diff --git a/arch/arm/include/asm/kvm_coproc.h b/arch/arm/include/asm/kvm_coproc.h
+index 4917c2f..e74ab0f 100644
+--- a/arch/arm/include/asm/kvm_coproc.h
++++ b/arch/arm/include/asm/kvm_coproc.h
+@@ -31,7 +31,8 @@ void kvm_register_target_coproc_table(struct kvm_coproc_target_table *table);
+ int kvm_handle_cp10_id(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_cp_0_13_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
+-int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ 
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index ac8d36d..1403ffb 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -112,12 +112,6 @@ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return 1;
+ }
+ 
+-int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
+-{
+-	kvm_inject_undefined(vcpu);
+-	return 1;
+-}
 -
-+		cond_resched_lock(&kvm->mmu_lock);
-+		if (!READ_ONCE(kvm->arch.pgd))
-+			break;
- 		next = stage2_pgd_addr_end(addr, end);
- 		if (stage2_pgd_present(*pgd))
- 			stage2_wp_puds(pgd, addr, next);
+ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
+ {
+ 	/*
+@@ -533,12 +527,7 @@ static int emulate_cp15(struct kvm_vcpu *vcpu,
+ 	return 1;
+ }
+ 
+-/**
+- * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
+- * @vcpu: The VCPU pointer
+- * @run:  The kvm_run struct
+- */
+-int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++static struct coproc_params decode_64bit_hsr(struct kvm_vcpu *vcpu)
+ {
+ 	struct coproc_params params;
+ 
+@@ -552,9 +541,38 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	params.Rt2 = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
+ 	params.CRm = 0;
+ 
++	return params;
++}
++
++/**
++ * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
++ * @vcpu: The VCPU pointer
++ * @run:  The kvm_run struct
++ */
++int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	struct coproc_params params = decode_64bit_hsr(vcpu);
++
+ 	return emulate_cp15(vcpu, &params);
+ }
+ 
++/**
++ * kvm_handle_cp14_64 -- handles a mrrc/mcrr trap on a guest CP14 access
++ * @vcpu: The VCPU pointer
++ * @run:  The kvm_run struct
++ */
++int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	struct coproc_params params = decode_64bit_hsr(vcpu);
++
++	/* raz_wi cp14 */
++	pm_fake(vcpu, &params, NULL);
++
++	/* handled */
++	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
++	return 1;
++}
++
+ static void reset_coproc_regs(struct kvm_vcpu *vcpu,
+ 			      const struct coproc_reg *table, size_t num)
+ {
+@@ -565,12 +583,7 @@ static void reset_coproc_regs(struct kvm_vcpu *vcpu,
+ 			table[i].reset(vcpu, &table[i]);
+ }
+ 
+-/**
+- * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
+- * @vcpu: The VCPU pointer
+- * @run:  The kvm_run struct
+- */
+-int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++static struct coproc_params decode_32bit_hsr(struct kvm_vcpu *vcpu)
+ {
+ 	struct coproc_params params;
+ 
+@@ -584,9 +597,37 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	params.Op2 = (kvm_vcpu_get_hsr(vcpu) >> 17) & 0x7;
+ 	params.Rt2 = 0;
+ 
++	return params;
++}
++
++/**
++ * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
++ * @vcpu: The VCPU pointer
++ * @run:  The kvm_run struct
++ */
++int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	struct coproc_params params = decode_32bit_hsr(vcpu);
+ 	return emulate_cp15(vcpu, &params);
+ }
+ 
++/**
++ * kvm_handle_cp14_32 -- handles a mrc/mcr trap on a guest CP14 access
++ * @vcpu: The VCPU pointer
++ * @run:  The kvm_run struct
++ */
++int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	struct coproc_params params = decode_32bit_hsr(vcpu);
++
++	/* raz_wi cp14 */
++	pm_fake(vcpu, &params, NULL);
++
++	/* handled */
++	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
++	return 1;
++}
++
+ /******************************************************************************
+  * Userspace API
+  *****************************************************************************/
+diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+index 5fd7968..f86a9aa 100644
+--- a/arch/arm/kvm/handle_exit.c
++++ b/arch/arm/kvm/handle_exit.c
+@@ -95,9 +95,9 @@ static exit_handle_fn arm_exit_handlers[] = {
+ 	[HSR_EC_WFI]		= kvm_handle_wfx,
+ 	[HSR_EC_CP15_32]	= kvm_handle_cp15_32,
+ 	[HSR_EC_CP15_64]	= kvm_handle_cp15_64,
+-	[HSR_EC_CP14_MR]	= kvm_handle_cp14_access,
++	[HSR_EC_CP14_MR]	= kvm_handle_cp14_32,
+ 	[HSR_EC_CP14_LS]	= kvm_handle_cp14_load_store,
+-	[HSR_EC_CP14_64]	= kvm_handle_cp14_access,
++	[HSR_EC_CP14_64]	= kvm_handle_cp14_64,
+ 	[HSR_EC_CP_0_13]	= kvm_handle_cp_0_13_access,
+ 	[HSR_EC_CP10_ID]	= kvm_handle_cp10_id,
+ 	[HSR_EC_HVC]		= handle_hvc,
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index 92678b7..624a510 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -48,7 +48,9 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu, u32 *fpexc_host)
+ 	write_sysreg(HSTR_T(15), HSTR);
+ 	write_sysreg(HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11), HCPTR);
+ 	val = read_sysreg(HDCR);
+-	write_sysreg(val | HDCR_TPM | HDCR_TPMCR, HDCR);
++	val |= HDCR_TPM | HDCR_TPMCR; /* trap performance monitors */
++	val |= HDCR_TDRA | HDCR_TDOSA | HDCR_TDA; /* trap debug regs */
++	write_sysreg(val, HDCR);
+ }
+ 
+ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
 -- 
 2.9.0
