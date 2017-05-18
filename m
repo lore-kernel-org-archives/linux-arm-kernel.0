@@ -1,37 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 May 2017 10:39:14 +0100
-Subject: [PATCH] ARM: MCPM: ensure not to enter __hyp_soft_restart from
- loopback and cpu_power_down
-In-Reply-To: <1495099592-10439-1-git-send-email-sudeep.holla@arm.com>
-References: <1495099592-10439-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20170518093913.GM22219@n2100.armlinux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 18 May 2017 10:45:13 +0100
+Subject: [PATCH] arm64: mm: explicity include linux/vmalloc.h
+In-Reply-To: <20170515114020.8198-1-tklauser@distanz.ch>
+References: <20170515114020.8198-1-tklauser@distanz.ch>
+Message-ID: <CAKv+Gu_N-2i=nANVnd+9Wvwv2J=74hyffOwA2mxjzi+_E9NxtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 10:26:32AM +0100, Sudeep Holla wrote:
-> Commit 9da5ac236de6 ("ARM: soft-reboot into same mode that we entered
-> the kernel") added support to enter the new kernel in the same processor
-> mode as the previous one when we soft-reboot from one kernel into
-> another by pass a flag to cpu_reset() so it knows what to do exactly.
-> 
-> However it missed to make similar changes in MCPM code. Due to the
-> missing flag, the CPUs enter HYP mode which is not supported with MCPM.
-> MCPM works only in secure mode as it manages CCI.
-> 
-> This patch aligns the cpu_reset call in MCPM with other changes in the
-> above mentioned commit.
+On 15 May 2017 at 12:40, Tobias Klauser <tklauser@distanz.ch> wrote:
+> arm64's mm/mmu.c uses vm_area_add_early, struct vm_area and other
+> definitions  but relies on implict inclusion of linux/vmalloc.h which
+> means that changes in other headers could break the build. Thus, add an
+> explicit include.
+>
+> Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
 
-I could say... welcome to why casts are bad!  The casts in this code
-have hidden the change of function prototype, which is why it's not been
-picked up by any of the build check systems.
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Please change typedef to this:
-
-typedef typeof(cpu_reset) *phys_reset_t;
-
-so phys_reset_t at least follows the prototype of cpu_reset().
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> ---
+>  arch/arm64/mm/mmu.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 0c429ec6fde8..23c2d89a362e 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -31,6 +31,7 @@
+>  #include <linux/fs.h>
+>  #include <linux/io.h>
+>  #include <linux/mm.h>
+> +#include <linux/vmalloc.h>
+>
+>  #include <asm/barrier.h>
+>  #include <asm/cputype.h>
+> --
+> 2.13.0
+>
+>
