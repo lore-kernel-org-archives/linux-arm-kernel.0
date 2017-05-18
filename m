@@ -1,55 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 May 2017 07:59:24 -0700
-Subject: [PATCH 0/8] ARM: OMAP2+: AM33XX/AM43XX: Add suspend-resume support
-In-Reply-To: <0bf4723f-dd94-bbbf-21a8-2ec60dff58cb@ti.com>
-References: <20170329015801.22240-1-d-gerlach@ti.com>
- <20170329171314.GD10760@atomide.com>
- <cd340d7a-c0cf-9227-1382-2277ffa5b1b0@ti.com>
- <20170516154717.GF31418@atomide.com>
- <597b3b18-154d-9e81-35c3-4790d813031b@ti.com>
- <0bf4723f-dd94-bbbf-21a8-2ec60dff58cb@ti.com>
-Message-ID: <20170518145923.GB10472@atomide.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 18 May 2017 17:01:34 +0200
+Subject: [PATCH v2] misc: sram-exec: Use aligned fncpy instead of memcpy
+In-Reply-To: <20170410145247.6023-1-d-gerlach@ti.com>
+References: <20170410145247.6023-1-d-gerlach@ti.com>
+Message-ID: <20170518150134.GA3142@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [170518 07:23]:
-> Tony,
-> On 05/16/2017 10:49 AM, Dave Gerlach wrote:
-> > On 05/16/2017 10:47 AM, Tony Lindgren wrote:
-> > > * Dave Gerlach <d-gerlach@ti.com> [170329 11:52]:
-> > > > Hi Tony,
-> > > > On 03/29/2017 12:13 PM, Tony Lindgren wrote:
-> > > > > * Dave Gerlach <d-gerlach@ti.com> [170328 19:00]:
-> > > > > > Hi,
-> > > > > > This series contains the remaining code to enable suspend to mem and
-> > > > > > standby on
-> > > > > > am335x and am437x platforms. It depends on the ti-emif-sram series sent
-> > > > > > here [1].
-> > > > > 
-> > > > > Looks good to me in general. To remove the dependency, can some
-> > > > > of this be merged separately without breaking things before [1]?
-> > > > > Maybe by disabling some of the PM states until [1] is in place?
-> > > > 
-> > > > Thanks for the feedback. Actually, patch 7 is the only patch with a
-> > > > dependency to [1]. The rest of the patches just add platform PM support
-> > > > needed for suspend but won't do much of anything until patch 7 actually
-> > > > enables the suspend states, so there is no reason why patches 1-6 and patch
-> > > > 8 can't be merged now.
-> > > 
-> > > I'm applying patches 1-5 into omap-for-v4.13/soc. Patch 6 needs
-> > > ack from Russell.
-> > > 
-> > 
-> > Thanks. I will resend patches 6-8 as a separate series.
+On Mon, Apr 10, 2017 at 09:52:47AM -0500, Dave Gerlach wrote:
+> Currently the sram-exec functionality, which allows allocation of
+> executable memory and provides an API to move code to it, is only
+> selected in configs for the ARM architecture. Based on commit
+> 5756e9dd0de6 ("ARM: 6640/1: Thumb-2: Symbol manipulation macros for
+> function body copying") simply copying a C function pointer address
+> using memcpy without consideration of alignment and Thumb is unsafe on
+> ARM platforms.
 > 
-> On second thought, it's probably best to keep patches 4 and 5 as part of the
-> new series as well for review purposes, as they are not added to the build
-> until patch 6 but also make use of the asm-offsets macros introduced in
-> patch 6. I will send them along with patch 6-8 resend, making the new series
-> patches 4-8.
+> The aforementioned patch introduces the fncpy macro which is a safe way
+> to copy executable code on ARM platforms, so let's make use of that here
+> rather than the unsafe plain memcpy that was previously used by
+> sram_exec_copy. Now sram_exec_copy will move the code to "dst" and
+> return an address that is guaranteed to be safely callable.
+> 
+> In the future, architectures hoping to make use of the sram-exec
+> functionality must define an fncpy macro just as ARM has done to
+> guarantee or check for safe copying to executable memory before allowing
+> the arch to select CONFIG_SRAM_EXEC.
+> 
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-OK dropping 4 and 5 today.
+Can you rebase this and resend as it doesn't apply to the tree right now
+:(
 
-Regards,
+thanks,
 
-Tony
+greg k-h
