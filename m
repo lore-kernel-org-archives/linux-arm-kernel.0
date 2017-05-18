@@ -1,59 +1,116 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 18 May 2017 11:58:07 +0800
-Subject: [PATCH v3 4/6] ARM: sun8i: a83t: Add CCU device nodes
-In-Reply-To: <20170518035809.15487-1-wens@csie.org>
-References: <20170518035809.15487-1-wens@csie.org>
-Message-ID: <20170518035809.15487-5-wens@csie.org>
+Date: Thu, 18 May 2017 11:58:03 +0800
+Subject: [PATCH v3 0/6] clk: sunxi-ng: Add support for A83T CCU
+Message-ID: <20170518035809.15487-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have support for the A83T CCU, add a device node for it,
-and replace any existing placeholder clock phandles with the correct
-ones.
+Hi everyone,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+This is v3 of my A83T CCU series. This is for 4.13.
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index c0a1e4f74b89..c9a5d07b2ada 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -162,13 +162,23 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		ccu: clock at 1c20000 {
-+			compatible = "allwinner,sun8i-a83t-ccu";
-+			reg = <0x01c20000 0x400>;
-+			clocks = <&osc24M>, <&osc16Md512>;
-+			clock-names = "hosc", "losc";
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+
- 		pio: pinctrl at 1c20800 {
- 			compatible = "allwinner,sun8i-a83t-pinctrl";
- 			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0x01c20800 0x400>;
--			clocks = <&osc24M>;
-+			clocks = <&ccu 45>, <&osc24M>, <&osc16Md512>;
-+			clock-names = "apb", "hosc", "losc";
- 			gpio-controller;
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
-@@ -214,7 +224,8 @@
- 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc24M>;
-+			clocks = <&ccu 53>;
-+			resets = <&ccu 40>;
- 			status = "disabled";
- 		};
- 
+Changes since v2:
+
+  - Dropped patches "clk: Provide option to query hardware for clk phase"
+    and "clk: sunxi-ng: Add class of phase clocks supporting MMC new timing
+    modes".
+    
+  - Dropped support for MMC new timing mode. This will be added later with
+    MMC support. The goal for this series is to get clk support for the A83t
+    in. This is long overdue.
+
+  - Explicitly include ccu_mux.h and select SUNXI_CCU_MUX
+
+Changes since v1:
+
+  - Dropped two patches that were merged
+
+  - Added clk core flag to disable caching of clock phases
+
+  - Added support for multiple variable pre-dividers
+
+  - Merged "pll-periph-ahb1" pre-divider clock into "ahb1" clock
+    with multiple variable pre-dividers
+
+  - Introduced new class of phase clocks that return -ENOTSUPP
+    when the clock is in new timing mode
+
+  - Force mmc2 clock to new timing mode
+
+  - Added back mmc2 output and sample clocks
+
+  - Fixed bit ops for forcing audio PLL configuration
+
+  - Added requirement for "losc" clock in device tree binding
+
+  - Stripped leading 0 in device node name
+
+  - Updated subject prefixes for various patches
+
+Patch 1 adds a compatible string for the A83T CCU to the sunxi-ccu
+bindings.
+
+Patch 2 adds support for multiple variable pre-dividers to the sunxi-ng
+mux class.
+
+Patch 3 adds the driver for the A83T CCU.
+
+Patch 4 adds the CCU device nodes, and fixes up any existing clock
+phandles in the dtsi, without using the macros.
+
+Patch 5 sets the clock accuracy for the main oscillator.
+
+Patch 6 is for the next -rc2, switch the clock indices from raw numbers
+to macros we introduced with the driver. This will be updated if more
+peripherals are introduced in the same cycle.
+
+Let me know what you think.
+
+Cover letter excerpt from v1:
+
+This is yet another series that adds support for the A83T CCU.
+The A83T CCU has a mix of new styled (like the A80) clocks at
+old (like A3x) offsets. Some differences include:
+
+  - D1/D2 style PLL clocks
+  - divisible audio module clocks
+  - new timing mode for mmc2 module clock
+
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (6):
+  dt-bindings: clock: sunxi-ccu: Add compatible string for A83T CCU
+  clk: sunxi-ng: Support multiple variable pre-dividers
+  clk: sunxi-ng: Add driver for A83T CCU
+  ARM: sun8i: a83t: Add CCU device nodes
+  ARM: sun8i: a83t: Set clock accuracy for 24MHz oscillator
+  ARM: sun8i: a83t: Switch to CCU device tree binding macros
+
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |   2 +
+ arch/arm/boot/dts/sun8i-a83t.dtsi                  |  19 +-
+ drivers/clk/sunxi-ng/Kconfig                       |  11 +
+ drivers/clk/sunxi-ng/Makefile                      |   1 +
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c              |  10 +-
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c               |  10 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-a23.c               |  10 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-a33.c               |  10 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.c              | 910 +++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.h              |  64 ++
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |  10 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-r.c                 |  10 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-v3s.c               |  10 +-
+ drivers/clk/sunxi-ng/ccu_mux.c                     |  15 +-
+ drivers/clk/sunxi-ng/ccu_mux.h                     |  13 +-
+ include/dt-bindings/clock/sun8i-a83t-ccu.h         | 140 ++++
+ include/dt-bindings/reset/sun8i-a83t-ccu.h         |  98 +++
+ 17 files changed, 1294 insertions(+), 49 deletions(-)
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a83t.h
+ create mode 100644 include/dt-bindings/clock/sun8i-a83t-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun8i-a83t-ccu.h
+
 -- 
 2.11.0
