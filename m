@@ -1,65 +1,162 @@
-From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
-Date: Thu, 18 May 2017 23:09:06 +0200
-Subject: [PATCH 7/8] clocksource/drivers/fttmr010: Merge Moxa into FTTMR010
-In-Reply-To: <CACRpkdb=HSEkFOM1APqK9q58OhADqeF7Z40oeXnVvuSDsQVkTw@mail.gmail.com>
-References: <20170517140542.20016-1-linus.walleij@linaro.org>
- <20170517140542.20016-8-linus.walleij@linaro.org>
- <CACPK8XdRe8Khnj3YFoQYKpKHM-5PHTqkP8Nt+jZ=eo-FThN-aw@mail.gmail.com>
- <CACRpkdaWoGYh4D3D0+3mzVDTy78O2idyDmg9+U5zJc_mfn+WLQ@mail.gmail.com>
- <CACRpkdb=HSEkFOM1APqK9q58OhADqeF7Z40oeXnVvuSDsQVkTw@mail.gmail.com>
-Message-ID: <92ab6fb5-7c4a-0909-ee5b-f573751427fa@kaod.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 18 May 2017 16:42:00 -0500
+Subject: [PATCH v1 2/3] dt-bindings: display: Add STM32 DSI host driver
+In-Reply-To: <1494600989-13507-3-git-send-email-philippe.cornu@st.com>
+References: <1494600989-13507-1-git-send-email-philippe.cornu@st.com>
+ <1494600989-13507-3-git-send-email-philippe.cornu@st.com>
+Message-ID: <20170518214200.e2mmsqpvm3rqnh72@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2017 10:20 PM, Linus Walleij wrote:
-> On Thu, May 18, 2017 at 2:43 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Thu, May 18, 2017 at 9:22 AM, Joel Stanley <joel@jms.id.au> wrote:
->>> On Wed, May 17, 2017 at 10:05 PM, Linus Walleij
->>> <linus.walleij@linaro.org> wrote:
->>>> This merges the Moxa Art timer driver into the Faraday FTTMR010
->>>> driver and replaces all Kconfig symbols to use the Faraday
->>>> driver instead. We are now so similar that the drivers can
->>>> be merged by just adding a few lines to the Faraday timer.
->>>
->>> Nice work!
->>>
->>> I gave this a spin on hardware and it didn't work :(
->>
->> How typical.
+On Fri, May 12, 2017 at 04:56:28PM +0200, Philippe CORNU wrote:
+> This patch adds documentation of device tree bindings for the STM32
+> DSI host driver based on the Synopsys DW MIPI DSI driver from Rockchip.
 > 
-> I sent a v2 patch set.
+> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+> ---
+>  .../devicetree/bindings/display/st,stm32-ltdc.txt  | 92 +++++++++++++++++++++-
+>  1 file changed, 90 insertions(+), 2 deletions(-)
 > 
-> I couldn't get qemu to work because Fedora's QEMU is not
-> up-to-date and I didn't want to venture into compiling from source...
+> diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> index 8e14769..a61381b 100644
+> --- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> +++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> @@ -1,7 +1,6 @@
+>  * STMicroelectronics STM32 lcd-tft display controller
+>  
+>  - ltdc: lcd-tft display controller host
+> -  must be a sub-node of st-display-subsystem
+
+Why is this removed? The "must" refers to the location, not whether 
+present or not if that's what you were trying to change.
+
+>    Required properties:
+>    - compatible: "st,stm32-ltdc"
+>    - reg: Physical base address of the IP registers and length of memory mapped region.
+> @@ -13,8 +12,25 @@
+>    Required nodes:
+>      - Video port for RGB output.
+>  
+> -Example:
+> +* STMicroelectronics STM32 specific extensions to Synopsys Designware MIPI DSI
+> +(similar to "rockchip/dw_mipi_dsi_rockchip.txt")
+>  
+> +Required properties:
+> +- #address-cells: Should be <1>.
+> +- #size-cells: Should be <0>.
+> +- compatible: "st,stm32-dsi_host".
+
+Don't use '_' and this needs to be more specific than just "stm32".
+
+> +- reg: Represent the physical address range of the controller.
+> +- clocks, clock-names: Phandles to the controller's pll reference
+> +  clock(ref) and APB clock(pclk). As described in [1].
+
+Ideally these should be in a common binding (like the driver) as a given 
+IP block doesn't have a varying number of clocks (typically).
+
+> +- ports: contain a port node with endpoint definitions as defined in [2].
+
+a single port? Need to be clear how many ports/endpoints and their 
+function.
+
+> +- resets: list of phandle + reset specifier pairs, as described in [3].
+> +- reset-names: string reset name, must be "apb".
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +[2] Documentation/devicetree/bindings/media/video-interfaces.txt
+> +[3] Documentation/devicetree/bindings/reset/reset.txt
+> +
+> +Example 1: RGB panel
+>  / {
+>  	...
+>  	soc {
+> @@ -34,3 +50,75 @@ Example:
+>  		};
+>  	};
+>  };
+> +
+> +Example 2: DSI panel
+> +
+> +/ {
+> +	...
+> +	soc {
+> +	...
+> +		ltdc: display-controller at 40016800 {
+> +			compatible = "st,stm32-ltdc";
+> +			reg = <0x40016800 0x200>;
+> +			interrupts = <88>, <89>;
+> +			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
+> +			clocks = <&rcc 1 CLK_LCD>;
+> +			clock-names = "lcd";
+> +
+> +			port {
+> +				ltdc_out_dsi_host: endpoint {
+> +					remote-endpoint = <&dsi_host_in>;
+> +				};
+> +			};
+> +		};
+> +
+> +
+> +		dsi_host: dsi_host at 40016C00 {
+
+dsi at ...
+
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "st,stm32-dsi_host";
+> +			reg = <0x40016C00 0x800>;
+> +			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
+> +			clock-names = "ref", "pclk";
+> +			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
+> +			reset-names = "apb";
+> +			status = "okay";
+
+Don't show status in examples.
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 0 {
+> +					reg = <0>;
+> +					dsi_host_in: endpoint {
+> +						remote-endpoint = <&ltdc_out_dsi_host>;
+> +					};
+> +				};
+> +
+> +				port at 1 {
+> +					reg = <1>;
+> +					dsi_host_out_panel: endpoint {
+> +						remote-endpoint = <&dsi_host_in_panel>;
+> +					};
+> +				};
+> +
+> +			};
+> +
+> +			panel-dsi at 0 {
+> +				reg = <0>; /* dsi virtual channel (0..3) */
+> +				compatible = ...;
+> +				enable-gpios = ...;
+> +				status = "okay";
+> +
+> +				port {
+> +					dsi_host_in_panel: endpoint {
+> +						remote-endpoint = <&dsi_host_out_panel>;
+> +					};
+> +				};
+> +
+> +			};
+> +
+> +		};
+> +
+> +	};
+> +};
+> -- 
+> 1.9.1
 > 
-> I did the second best and tested Gemini with downward counting
-> timers, after just adding that as general code path in the driver
-> in the commit merging the two drivers.
 > 
-> Please test it, and I hope I'm not wasting too much of your time :/
-> 
-> If it still doesn't work I guess I have to try to get qemu going.
-> 
-> The fttmr010 branch in my git is updated:
-> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git/
-
-So a real AST2500 evb board boot fines with this branch but the timer 
-model in QEMU crashes miserably :
-
-	[    0.000000] NR_IRQS:16 nr_irqs:16 16
-	Floating point exception (core dumped)
-
-that is just before :
-
-	[    0.000000] clocksource: FTTMR010-TIMER2: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 77222644334 ns
-	[    0.000025] sched_clock: 32 bits at 24MHz, resolution 40ns, wraps every 86767015915ns
-
-Something to look at in QEMU.
-
-Joel, do you confirm ? 
-
-Thanks,
-
-C.  
-
-	
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
