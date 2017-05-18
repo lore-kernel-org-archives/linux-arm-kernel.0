@@ -1,48 +1,39 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 18 May 2017 10:53:32 +0800
-Subject: [PATCH] ARM: sun8i: v3s: fix build of Lichee Pi Zero Dock dtb
-Message-ID: <20170518025332.55769-1-icenowy@aosc.io>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 18 May 2017 11:18:17 +0800
+Subject: [PATCH 3/3] arm: dts: rk322x: add watchdog device node.
+In-Reply-To: <1494992451-32542-4-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <201705181148.b4AgD8sU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Lichee Pi Zero Dock dtb file is not added to the Makefile, so that
-it won't be built; and the file contains a problem that prevents it
-from being correctly built.
+Hi Frank,
 
-Fix these issues.
+[auto build test ERROR on rockchip/for-next]
+[also build test ERROR on v4.12-rc1 next-20170517]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+url:    https://github.com/0day-ci/linux/commits/Frank-Wang/add-and-fix-some-device-node-for-rk322x-SoC/20170518-081958
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/rk322x.dtsi:286.18-19 syntax error
+   FATAL ERROR: Unable to parse input tree
+
 ---
- arch/arm/boot/dts/Makefile                         | 3 ++-
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts | 2 ++
- 2 files changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9c5e1d944d1c..929a4167fcaa 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -905,7 +905,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-h3-orangepi-plus.dtb \
- 	sun8i-h3-orangepi-plus2e.dtb \
- 	sun8i-r16-parrot.dtb \
--	sun8i-v3s-licheepi-zero.dtb
-+	sun8i-v3s-licheepi-zero.dtb \
-+	sun8i-v3s-licheepi-zero-dock.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-index d2bfccf47149..d1311098ea45 100644
---- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-@@ -42,6 +42,8 @@
- 
- #include "sun8i-v3s-licheepi-zero.dts"
- 
-+#include <dt-bindings/input/input.h>
-+
- / {
- 	model = "Lichee Pi Zero with Dock";
- 	compatible = "licheepi,licheepi-zero-dock", "licheepi,licheepi-zero",
--- 
-2.12.2
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 22761 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170518/62057d73/attachment-0001.gz>
