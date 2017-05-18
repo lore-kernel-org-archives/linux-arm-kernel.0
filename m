@@ -1,65 +1,66 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 18 May 2017 11:32:26 +0200
-Subject: [PATCH v2 1/2] clk: Hi3660: change to register crgctrl clock
- with CLK_OF_DECLARE_DRIVER
-In-Reply-To: <1495072247-25217-2-git-send-email-leo.yan@linaro.org>
-References: <1495072247-25217-1-git-send-email-leo.yan@linaro.org>
- <1495072247-25217-2-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170518093226.GA2125@mai>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 May 2017 10:33:05 +0100
+Subject: PROBLEM: ARM Cache policy on single armv7 processor lead to low
+ DRAM performance
+In-Reply-To: <CAOEkoLziLQ4z1L=wdMF_5tcm3ETbSwLm-tvreB6uSFxobE8gjg@mail.gmail.com>
+References: <CAOEkoLw3Y5h2P_aFeMKgHYyKZpQvsQsOPOLOuvaYZGOe+rHJWQ@mail.gmail.com>
+ <20170516082922.GY22219@n2100.armlinux.org.uk>
+ <CAOEkoLziLQ4z1L=wdMF_5tcm3ETbSwLm-tvreB6uSFxobE8gjg@mail.gmail.com>
+Message-ID: <20170518093305.GL22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 09:50:46AM +0800, Leo Yan wrote:
-> The timer will register into system at very early phase at kernel boot;
-> if timer needs to use clock, the clock should be get ready in function
-> of_clk_init() so later the timer driver probe can retrieve clock
-> successfully. This is finished in below flow on arm64:
+On Thu, May 18, 2017 at 04:25:12PM +0800, Zhao Yibin wrote:
+> Hi, Russell,
 > 
->   start_kernel()
->     `-> time_init()
->           `-> of_clk_init(NULL)    => register timer's clock
->           `-> clocksource_probe()  => register timer
+> I traced the page table of TTBR0,  and the map descriptor of the page
+> allocated from share ram,
+> TEX[0]-C-B is 0-1-1, LPAE is not enable, the TRE is 1, so TEX[0]-C-B
+> is mapped to the 3rd index of PRRR and NMRR.
+> PRRR register is 0xFF0A81A8, NMRR register is 0x40E040E0.
+> So the memory type is normal, and IR/OR is "Region is Write-Back, no
+> Write-Allocate." according to armv7 TRM
 > 
-> On Hi3660 the sp804 timer uses clock "osc32k", this clock is registered
-> as platform driver rather than CLK_OF_DECLARE_DRIVER method. As result,
-> sp804 timer probe returns failure due if cannot bind clock properly.
-> To fix the failure, this patch is to change crgctrl clock registration
-> from platform driver to CLK_OF_DECLARE_DRIVER method so the clocks can
-> be registered ahead with function of_clk_init() and then timer driver
-> can use it.
-> 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  drivers/clk/hisilicon/clk-hi3660.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/hisilicon/clk-hi3660.c b/drivers/clk/hisilicon/clk-hi3660.c
-> index fd5ce7f..4e5713b 100644
-> --- a/drivers/clk/hisilicon/clk-hi3660.c
-> +++ b/drivers/clk/hisilicon/clk-hi3660.c
-> @@ -547,10 +547,10 @@ static void hi3660_clk_crgctrl_init(struct device_node *np)
->  				  ARRAY_SIZE(hi3660_crgctrl_divider_clks),
->  				  clk_data);
->  }
-> +CLK_OF_DECLARE_DRIVER(hi3660_clk_crgctrl, "hisilicon,hi3660-crgctrl",
-> +		      hi3660_clk_crgctrl_init);
->  
->  static const struct of_device_id hi3660_clk_match_table[] = {
-> -	{ .compatible = "hisilicon,hi3660-crgctrl",
-> -	  .data = hi3660_clk_crgctrl_init },
->  	{ .compatible = "hisilicon,hi3660-pctrl",
->  	  .data = hi3660_clk_pctrl_init },
->  	{ .compatible = "hisilicon,hi3660-pmuctrl",
+> I don't know what read-allocate can be, if cortex-a7 is simliar to
+> cortex-a15, then write-back read-allocate means
+> "Write-Back Read-Allocate  => Write-Back Read-Write-Allocate",
 
-Why not do the change for all the clocks and remove the
-hi3660_clk_match_table[]? and all the related platform driver code?
+The ARMv7 ARM gives details about how the PRRR and NMRR are decoded,
+giving pseudocode (see B3.19 for ConvertAttrsHints(), and B3.19.9 for
+the TEX remap decode pseudocode.)
 
-That will be consistent with the other clk-hi* drivers.
+The PRRR and NMRR settings give write-back cache policy with a read-
+allocate _hint_.  The key thing here is that it's a _hint_, it doesn't
+mandate what the hardware does.  Different CPUs are free to use the
+hints in different ways.
+
+What this means is that while one CPU may interpret a "read-allocate"
+hint as meaning that it can allocate cache lines on read accesses,
+another CPU may do something different - it may either decide to
+augment that with "write-allocate" as well, or it may decide
+"no-allocate" (which seems to be your case.)
+
+There is no architected requirement here - it's implementation
+dependent, and that implementation dependence makes it difficult to
+deal with from a generic OS point of view.
+
+What may be right for one CPU may not be correct for another CPU.  In
+other words, we can't change this without risking causing regressions
+for the CPUs that we know work.  For example, if we changed to write-
+allocate mode (aka read-write-allocate), there could be some other a
+CPU out there which decides to implement that as no-allocate.
+
+However, if it's possible to identify your CPU uniquely, then it would
+be possible to change it just for your CPU.  What is the CPU MIDR value?
+
+> I tried change the value of TTB_FLAGS_UP to  the same as TTB_FLAGS_SMP
+> in arch/arm/mm/proc-v7-2level.S.
+
+You need to change PMD_FLAGS as well.  TTB determines the translation
+table base register values, which are the attributes used by the page
+table walker.  PMD determines what's used in the page tables themselves.
 
 -- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
