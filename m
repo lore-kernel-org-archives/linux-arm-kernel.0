@@ -1,48 +1,28 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 18 May 2017 09:50:47 +0800
-Subject: [PATCH v2 2/2] arm64: dts: add sp804 timer node for Hi3660
-In-Reply-To: <1495072247-25217-1-git-send-email-leo.yan@linaro.org>
-References: <1495072247-25217-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1495072247-25217-3-git-send-email-leo.yan@linaro.org>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Thu, 18 May 2017 10:16:56 +0800
+Subject: [PATCH v2 0/3] clk: rockchip: support clk controller for RK3128 SoC
+Message-ID: <1495073819-4160-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Hi3660 SoC comes with the sp804 timer in addition to the
-architecture timers. These ones are shutdown when reaching a deep idle
-states and a backup timer is needed. The sp804 belongs to another power
-domain and can fulfill the purpose of replacing temporarily an
-architecture timer when the CPU is idle.
+The driver and clk ID\SRST ID it's also applies to the RK3126 SoC.
 
-Describe it in the device tree, so it can be enabled at boot time.
+change in V2:
+rename the rk312x to rk3128. 
 
-Suggested-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Elaine Zhang (3):
+  clk: rockchip: add dt-binding header for rk3128
+  dt-bindings: add bindings for rk3128 clock controller
+  clk: rockchip: add clock controller for rk3128
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 138fcba..f75c792 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -173,6 +173,17 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		dual_timer0: timer at fff14000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			reg = <0x0 0xfff14000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg_ctrl HI3660_OSC32K>,
-+				 <&crg_ctrl HI3660_OSC32K>,
-+				 <&crg_ctrl HI3660_OSC32K>;
-+			clock-names = "timer1", "timer2", "apb_pclk";
-+		};
-+
- 		ufs: ufs at ff3b0000 {
- 			compatible = "jedec,ufs-1.1", "hisilicon,hi3660-ufs";
- 			reg = <0x0 0xff3b0000 0x0 0x1000>, /* 0: HCI standard */
+ .../bindings/clock/rockchip,rk3128-cru.txt         |  56 ++
+ drivers/clk/rockchip/Makefile                      |   1 +
+ drivers/clk/rockchip/clk-rk3128.c                  | 612 +++++++++++++++++++++
+ include/dt-bindings/clock/rk3128-cru.h             | 281 ++++++++++
+ 4 files changed, 950 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt
+ create mode 100644 drivers/clk/rockchip/clk-rk3128.c
+ create mode 100644 include/dt-bindings/clock/rk3128-cru.h
+
 -- 
 1.9.1
