@@ -1,71 +1,64 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 18 May 2017 10:59:07 -0500
-Subject: [PATCH 1/3] ARM: davinci: da8xx: Create DSP device only when
- assigned memory
-In-Reply-To: <098d38ab-4be3-ec01-044d-1fd2e0ac6130@ti.com>
-References: <20170516221347.37990-1-s-anna@ti.com>
- <20170516221347.37990-2-s-anna@ti.com>
- <098d38ab-4be3-ec01-044d-1fd2e0ac6130@ti.com>
-Message-ID: <6c37a43e-78d4-3fa4-21ca-3c94ad83cbe4@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 May 2017 08:59:39 -0700
+Subject: [GIT PULL] omap fixes for v4.12-rc cycle
+Message-ID: <pull-1495123127-412836>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-On 05/18/2017 01:10 AM, Sekhar Nori wrote:
-> On Wednesday 17 May 2017 03:43 AM, Suman Anna wrote:
->> The DSP device on Davinci platforms does not have an MMU and requires
->> specific DDR memory to boot. This memory is reserved using the rproc_mem
->> kernel boot parameter and is assigned to the device on non-DT boots.
->> The remoteproc core uses the DMA API and so will fall back to assigning
->> random memory if this memory is not assigned to the device, but the DSP
->> remote processor boot will not be successful in such cases. So, check
->> that memory has been reserved and assigned to the device specifically
->> before even creating the DSP device.
->>
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> ---
->>  arch/arm/mach-davinci/devices-da8xx.c | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
->> index 7cf529ffbe5a..1ccf52e49886 100644
->> --- a/arch/arm/mach-davinci/devices-da8xx.c
->> +++ b/arch/arm/mach-davinci/devices-da8xx.c
->> @@ -814,6 +814,8 @@ static struct platform_device da8xx_dsp = {
->>  	.resource	= da8xx_rproc_resources,
->>  };
->>  
->> +static bool rproc_mem_inited __initdata;
->> +
->>  #if IS_ENABLED(CONFIG_DA8XX_REMOTEPROC)
->>  
->>  static phys_addr_t rproc_base __initdata;
->> @@ -852,6 +854,8 @@ void __init da8xx_rproc_reserve_cma(void)
->>  	ret = dma_declare_contiguous(&da8xx_dsp.dev, rproc_size, rproc_base, 0);
->>  	if (ret)
->>  		pr_err("%s: dma_declare_contiguous failed %d\n", __func__, ret);
->> +	else
->> +		rproc_mem_inited = true;
->>  }
->>  
->>  #else
->> @@ -866,6 +870,12 @@ int __init da8xx_register_rproc(void)
->>  {
->>  	int ret;
->>  
->> +	if (!rproc_mem_inited) {
->> +		pr_warn("%s: memory not reserved for DSP, not registering DSP device\n",
->> +			__func__);
-> 
-> We now have a warning and an error if dma_declare_contiguous() fails. I
-> like this message better. So can you replace the existing error message
-> with this text instead ?
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 
-Hmm, this trace is not just covering the dma_declare_contiguous failure.
-There can be two different errors in da8xx_rproc_reserve_cma, and this
-trace only shows up when the device is being registered. So not sure how
-your suggestion improves anything by dropping/replacing one of them.
+are available in the git repository at:
 
-regards
-Suman
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.12/fixes-v2-signed
+
+for you to fetch changes up to bca5238816939436d72ae6bab124c4b0641a3a99:
+
+  ARM: dts: dra7: Reduce cpu thermal shutdown temperature (2017-05-17 06:51:38 -0700)
+
+----------------------------------------------------------------
+Fixes for omaps for v4.12-rc cycle most consisting of few minor dts fixes
+for various devices. Also included is a memory controller (GPMC) debug output
+fix as without that the shown bootloader configured GPMC bus width will
+be wrong and won't work for kernel timings:
+
+- Add dra7 powerhold configuration to be able to shut down pmic correctly
+
+- Fix polarity for gta04 mcbsp4 clocks for modem
+
+- Fix Pandaboard CEC pin pull making it usable
+
+- Fix LogicPD Torpedo camera pin mux
+
+- Fix GPMC debug bus width
+
+- Reduce cpu thermal shutdown temperature
+
+----------------------------------------------------------------
+Adam Ford (1):
+      ARM: dts: LogicPD Torpedo: Fix camera pin mux
+
+Andreas Kemnade (1):
+      ARM: dts: gta04: fix polarity of clocks for mcbsp4
+
+Hans Verkuil (1):
+      ARM: dts: omap4: enable CEC pin for Pandaboard A4 and ES
+
+Keerthy (1):
+      ARM: dts: dra7: Add power hold and power controller properties to palmas
+
+Ravikumar Kattekola (1):
+      ARM: dts: dra7: Reduce cpu thermal shutdown temperature
+
+Tony Lindgren (1):
+      memory: omap-gpmc: Fix debug output for access width
+
+ arch/arm/boot/dts/dra7-evm.dts                    | 2 ++
+ arch/arm/boot/dts/dra7.dtsi                       | 4 ++++
+ arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts | 6 +++---
+ arch/arm/boot/dts/omap3-gta04.dtsi                | 3 ++-
+ arch/arm/boot/dts/omap4-panda-a4.dts              | 2 +-
+ arch/arm/boot/dts/omap4-panda-es.dts              | 2 +-
+ drivers/memory/omap-gpmc.c                        | 2 +-
+ 7 files changed, 14 insertions(+), 7 deletions(-)
