@@ -1,43 +1,43 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 18 May 2017 10:42:36 +0200
-Subject: [PATCH v3 1/3] watchdog: bindings: dw_wdt: add reset lines
-In-Reply-To: <cover.9d687e41ad8d91c267143a43d703f656f7d5689c.1495096910.git-series.s.trumtrar@pengutronix.de>
-References: <cover.9d687e41ad8d91c267143a43d703f656f7d5689c.1495096910.git-series.s.trumtrar@pengutronix.de>
-Message-ID: <77954d7b338db9956e15298064f21c028c2070f3.1495096910.git-series.s.trumtrar@pengutronix.de>
+Date: Thu, 18 May 2017 10:42:35 +0200
+Subject: [PATCH v3 0/3] watchdog: dw_wdt: add reset lines
+Message-ID: <cover.9d687e41ad8d91c267143a43d703f656f7d5689c.1495096910.git-series.s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the reset lines holding the watchdog core in reset.
+Hi!
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-watchdog at vger.kernel.org
-Cc: devicetree at vger.kernel.org
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/watchdog/dw_wdt.txt | 3 +++
- 1 file changed, 3 insertions(+)
+This series adds support for the reset line that is (potentially) holding
+the watchdog in reset.
 
-diff --git a/Documentation/devicetree/bindings/watchdog/dw_wdt.txt b/Documentation/devicetree/bindings/watchdog/dw_wdt.txt
-index 08e16f684f2d..eb0914420c7c 100644
---- a/Documentation/devicetree/bindings/watchdog/dw_wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/dw_wdt.txt
-@@ -10,6 +10,8 @@ Required Properties:
- Optional Properties:
- 
- - interrupts	: The interrupt used for the watchdog timeout warning.
-+- resets	: phandle pointing to the system reset controller with
-+		line index for the watchdog.
- 
- Example:
- 
-@@ -18,4 +20,5 @@ Example:
- 		reg = <0xffd02000 0x1000>;
- 		interrupts = <0 171 4>;
- 		clocks = <&per_base_clk>;
-+		resets = <&rst WDT0_RESET>;
- 	};
+As the watchdog is useless if this happens, it needs to be deasserted in
+the probe function.
+
+Tested on a Socrates board.
+
+Regards,
+Steffen
+
+Changes since v2:
+
+  - use optional reset functions
+  - add Acked-by to devicetree bindings
+
+Changes since v1:
+
+  - remove reset-names property
+  - remove warning if reset property is missing
+
+Steffen Trumtrar (3):
+  watchdog: bindings: dw_wdt: add reset lines
+  watchdog: dw_wdt: get reset lines from dt
+  ARM: socfpga: dtsi: add dw-wdt reset lines
+
+ Documentation/devicetree/bindings/watchdog/dw_wdt.txt |  3 +++
+ arch/arm/boot/dts/socfpga.dtsi                        |  2 ++
+ drivers/watchdog/dw_wdt.c                             |  9 +++++++++
+ 3 files changed, 14 insertions(+)
+
+base-commit: 2ea659a9ef488125eb46da6eb571de5eae5c43f6
 -- 
 git-series 0.9.1
