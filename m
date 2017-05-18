@@ -1,58 +1,32 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 18 May 2017 16:47:08 +0100
-Subject: [PATCH 0/2] arm64: acpi/pci: allow the firmware BAR
- configuration to be preserved
-In-Reply-To: <CAKv+Gu_cug6cVrWP-zkptvNn3LxYk7b4Gd=iTzHHe3us3KwL3Q@mail.gmail.com>
-References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
- <20170517215611.GJ31462@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu9T7vH_LbKfS_40JUbLNK4PYrMi++eKbCq_MzBsuQxUDQ@mail.gmail.com>
- <20170518140553.GA22106@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_cug6cVrWP-zkptvNn3LxYk7b4Gd=iTzHHe3us3KwL3Q@mail.gmail.com>
-Message-ID: <20170518154708.GA30182@red-moon>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Thu, 18 May 2017 15:55:13 +0000
+Subject: [PATCH -next] clk: sunxi-ng: de2: fix wrong pointer passed to
+ PTR_ERR()
+Message-ID: <20170518155513.29628-1-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 04:10:28PM +0100, Ard Biesheuvel wrote:
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
-[...]
+PTR_ERR should access the value just tested by IS_ERR, otherwise
+the wrong error code will be returned.
 
-> >> Re _DSM: I think it makes sense to honour it, because it puts the
-> >> allocation under the control of the firmware, which completely removes
-> >> the burden of having to reason about a policy in the kernel. That
-> >> leaves the question which will be the default, but that is of minor
-> >> importance IMO.
-> >
-> > I agree; we should try to follow the spec unless we have a good reason
-> > not to, which argues for honoring the _DSM, so I think it's worth a
-> > try.  Booting with "pci=realloc" could override the _DSM and taint the
-> > kernel (because we don't know the effect of reassigning something the
-> > firmware told us not to touch).
-> >
-> 
-> I'd like to hear Lorenzo's view on this first, but I can certainly
-> respin my _DSM patch to take pci=realloc into account, and move the
-> handling to generic code as well.
+Fixes: b0d9a4bd52bd ("clk: sunxi-ng: add support for DE2 CCU")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I agree with both of you on _DSM implementation and interpretation.
-
-Now, if we use it correctly (ie by the FW standard) on ARM64 systems we
-are going to trigger regressions, that's certain (ie we can then boot
-with pci=realloc - still, we are breaking systems), that's the reason
-why for patch(2) I'd like to create a branch and send a CFT for ARM64
-ACPI testing before queuing it (either I can set-up a testing branch
-or we ask Bjorn to do it - as you guys prefer - as long as we have
-a branch for people to test patch(2) on ARM64 ACPI systems).
-
-You still need to assign resources that could not be claimed though
-so patch(2) still needs updating:
-
-PCI FW spec 3.1 - 4.6.5
-
-"...However, the operating system is free to configure the devices in this
-hierarchy that have not been configured by the firmware."
-
-Which in kernel-speak it means that you have to assign resources that
-could not be claimed.
-
-Thanks !
-Lorenzo
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+index 15aaa9c..5cdaf52 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+@@ -184,7 +184,7 @@ static int sunxi_de2_clk_probe(struct platform_device *pdev)
+ 
+ 	rstc = devm_reset_control_get_exclusive(&pdev->dev, NULL);
+ 	if (IS_ERR(rstc)) {
+-		ret = PTR_ERR(bus_clk);
++		ret = PTR_ERR(rstc);
+ 		if (ret != -EPROBE_DEFER)
+ 			dev_err(&pdev->dev,
+ 				"Couldn't get reset control: %d\n", ret);
