@@ -1,59 +1,87 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 18 May 2017 09:19:32 -0500
-Subject: [PATCH 0/8] ARM: OMAP2+: AM33XX/AM43XX: Add suspend-resume support
-In-Reply-To: <597b3b18-154d-9e81-35c3-4790d813031b@ti.com>
-References: <20170329015801.22240-1-d-gerlach@ti.com>
- <20170329171314.GD10760@atomide.com>
- <cd340d7a-c0cf-9227-1382-2277ffa5b1b0@ti.com>
- <20170516154717.GF31418@atomide.com>
- <597b3b18-154d-9e81-35c3-4790d813031b@ti.com>
-Message-ID: <0bf4723f-dd94-bbbf-21a8-2ec60dff58cb@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 18 May 2017 15:24:15 +0100
+Subject: [PATCH] arm64: cpufeature: check translation granule size based
+ on kernel config
+In-Reply-To: <20170518130250.GE25294@leoy-ThinkPad-T440>
+References: <1495102873-10858-1-git-send-email-leo.yan@linaro.org>
+ <c0c8bd7b-647d-092d-65ac-08a90000e30c@arm.com>
+ <20170518113627.GC25294@leoy-ThinkPad-T440>
+ <20170518123840.GD21359@arm.com>
+ <20170518124115.GC4957@leverpostej>
+ <20170518130250.GE25294@leoy-ThinkPad-T440>
+Message-ID: <20170518142415.GA6425@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-On 05/16/2017 10:49 AM, Dave Gerlach wrote:
-> On 05/16/2017 10:47 AM, Tony Lindgren wrote:
->> * Dave Gerlach <d-gerlach@ti.com> [170329 11:52]:
->>> Hi Tony,
->>> On 03/29/2017 12:13 PM, Tony Lindgren wrote:
->>>> * Dave Gerlach <d-gerlach@ti.com> [170328 19:00]:
->>>>> Hi,
->>>>> This series contains the remaining code to enable suspend to mem and
->>>>> standby on
->>>>> am335x and am437x platforms. It depends on the ti-emif-sram series sent
->>>>> here [1].
->>>>
->>>> Looks good to me in general. To remove the dependency, can some
->>>> of this be merged separately without breaking things before [1]?
->>>> Maybe by disabling some of the PM states until [1] is in place?
->>>
->>> Thanks for the feedback. Actually, patch 7 is the only patch with a
->>> dependency to [1]. The rest of the patches just add platform PM support
->>> needed for suspend but won't do much of anything until patch 7 actually
->>> enables the suspend states, so there is no reason why patches 1-6 and patch
->>> 8 can't be merged now.
->>
->> I'm applying patches 1-5 into omap-for-v4.13/soc. Patch 6 needs
->> ack from Russell.
->>
->
-> Thanks. I will resend patches 6-8 as a separate series.
+On Thu, May 18, 2017 at 09:02:50PM +0800, Leo Yan wrote:
+> On Thu, May 18, 2017 at 01:41:15PM +0100, Mark Rutland wrote:
+> > On Thu, May 18, 2017 at 01:38:41PM +0100, Will Deacon wrote:
+> > > On Thu, May 18, 2017 at 07:36:27PM +0800, Leo Yan wrote:
+> > > > On Thu, May 18, 2017 at 11:39:01AM +0100, Suzuki K Poulose wrote:
+> > > > > On 18/05/17 11:21, Leo Yan wrote:
+> > > > > >In the big.LITTLE system with two clusters, one is CA53 cluster and
+> > > > > >another is CA73 cluster. CA53 doesn't support 16KB memory translation
+> > > > > >granule size (4.3.21 AArch64 Memory Model Feature Register 0, EL1; ARM
+> > > > > >DDI 0500F), but CA73 supports this feature (4.3.27 AArch64 Memory Model
+> > > > > >Feature Register 0, EL1; ARM 100048_0002_04_en). As result, the kernel
+> > > > > >reports log for "Unexpected variation" as below.
+> > > > > >
+> > > > > >[    0.182113] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1. Boot CPU: 0x00000000001122, CPU4: 0x00000000101122
+> > > > > 
+> > > > > >
+> > > > > >This patch is to change the checking CPU feature for memory translation
+> > > > > >granule size based on kernel configuration. If kernel configuration has
+> > > > > >selected to use one specific memory translation granule size, then we
+> > > > > >will do strict sanity checking cross all CPUs. Otherwise we can skip to
+> > > > > >check unused features for memory translation granule size if kernel
+> > > > > >doesn't use it.
+> > > > > >
+> > > > > 
+> > > > > If we were to suppress the warning (more on that below), we could simply
+> > > > > make this feature a NON_STRICT, since the unsupported CPUs won't boot
+> > > > > with 16K to hit this sanity check.
+> > > > > 
+> > > > > However, there is a problem with disabling this warning. If a VM starts
+> > > > > using 16KB page size on a 4K/64K host, the VM could end up in unknown
+> > > > > failures when it switches to an unsupported CPU (after it has booted).
+> > > > > Of course the real fix lies in making the KVM exposing the safe value
+> > > > > for granule support to the VCPUs (which is currently being worked on by
+> > > > > Douglas in Cc). So, when we have that ready, we could make it NON_STRICT
+> > > > > instead of this approach.
+> > > > 
+> > > > Thanks for the info :)
+> > > > 
+> > > > I will use below patch for production branch temporarily. You could
+> > > > work out one formal patch for upstreaming when the dependency patches
+> > > > are get ready:
+> > > 
+> > > The other thing we could do is change the way we taint on mismatch so that
+> > > we don't dump the scary (and pointless) backtrace.
+> > 
+> > The backtrace is due to the WARN part of the WARN_TAINT_ONCE.
+> > 
+> > We could chagne that as below, if we really want to get rid of the backtrace.
+> > 
+> > Thanks,
+> > Mark.
+> > 
+> > ---->8----
+> > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> > index 94b8f7f..1f53314 100644
+> > --- a/arch/arm64/kernel/cpufeature.c
+> > +++ b/arch/arm64/kernel/cpufeature.c
+> > @@ -639,8 +639,8 @@ void update_cpu_features(int cpu,
+> >          * Mismatched CPU features are a recipe for disaster. Don't even
+> >          * pretend to support them.
+> >          */
+> > -       WARN_TAINT_ONCE(taint, TAINT_CPU_OUT_OF_SPEC,
+> > -                       "Unsupported CPU feature variation.\n");
+> > +       pr_warn_once("Unsupported CPU feature variation detected.\n");
+> > +       add_taint(TAINT_CPU_OUT_OF_SPEC);
+> 
+> Should be add_taint(TAINT_CPU_OUT_OF_SPEC, LOCKDEP_STILL_OK)?
 
-On second thought, it's probably best to keep patches 4 and 5 as part of the new 
-series as well for review purposes, as they are not added to the build until 
-patch 6 but also make use of the asm-offsets macros introduced in patch 6. I 
-will send them along with patch 6-8 resend, making the new series patches 4-8.
+Whoops; yes.
 
-Regards,
-Dave
-
->
-> Regards,
-> Dave
->
->> Regards,
->>
->> Tony
->>
->
+Thanks,
+Mark.
