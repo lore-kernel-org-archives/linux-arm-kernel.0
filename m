@@ -1,31 +1,20 @@
-From: srishtishar@gmail.com (srishti)
-Date: Thu, 18 May 2017 15:37:48 +0530
-Subject: [PATCH] Staging: bcm2835-audio: bcm2835_ctl.c: Fixed a comment coding
- style issue
-Message-ID: <1495102068-3288-1-git-send-email-srishtishar@gmail.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 18 May 2017 13:13:32 +0300
+Subject: [PATCH] Staging: bcm2835-audio: bcm2835_ctl.c: Fixed a comment
+ coding style issue
+In-Reply-To: <1495102068-3288-1-git-send-email-srishtishar@gmail.com>
+References: <1495102068-3288-1-git-send-email-srishtishar@gmail.com>
+Message-ID: <20170518101332.nuy3bkw2bluzn6qh@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed a trailing */ issue.
+On Thu, May 18, 2017 at 03:37:48PM +0530, srishti wrote:
+> Fixed a trailing */ issue.
+> 
+> Signed-off-by: srishti <srishtishar@gmail.com>
 
-Signed-off-by: srishti <srishtishar@gmail.com>
----
- drivers/staging/bcm2835-audio/bcm2835-ctl.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Fix your From header and your signed-off-by line to use your legal name
+as if you were signing a legal document.
 
-diff --git a/drivers/staging/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
-index a4ffa1b..38fabab 100644
---- a/drivers/staging/bcm2835-audio/bcm2835-ctl.c
-+++ b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
-@@ -247,8 +247,8 @@ static int snd_bcm2835_spdif_mask_get(struct snd_kcontrol *kcontrol,
- 	struct snd_ctl_elem_value *ucontrol)
- {
- 	/* bcm2835 supports only consumer mode and sets all other format flags
--	 * automatically. So the only thing left is signalling non-audio
--	 * content */
-+	 * automatically. So the only thing left is signalling non-audio content
-+	 */
- 	ucontrol->value.iec958.status[0] = IEC958_AES0_NONAUDIO;
- 	return 0;
- }
-2.7.4
+regards,
+dan carpenter
