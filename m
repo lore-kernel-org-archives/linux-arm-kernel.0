@@ -1,34 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 18 May 2017 10:07:40 +0200
-Subject: [PATCH v3 4/4] Revert "irqchip/armada-370-xp: Fix regression by
- clearing IRQ_NOAUTOEN"
-In-Reply-To: <1495094860-24709-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1495094860-24709-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1495094860-24709-5-git-send-email-thomas.petazzoni@free-electrons.com>
+From: majun258@huawei.com (Majun)
+Date: Thu, 18 May 2017 16:19:13 +0800
+Subject: [PATCH] irqchip/gicv3-its: skip irq affinity setting when target cpu
+ is the same as current setting
+Message-ID: <1495095553-6436-1-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 353d6d6c82e5d2533ba22e7f9fb081582bf50dc2, which is
-no longer needed, now that the irq-armada-370-xp driver properly
-re-enables per-CPU interrupt on both the boot CPU and secondary CPUs
-after resume.
+From: MaJun <majun258@huawei.com>
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Just skip the irq affinity setting when the target cpu is the same as
+current setting.
+This is a small optimization for irq affinity setting logic.
+
+Signed-off-by: MaJun <majun258@huawei.com>
 ---
- drivers/irqchip/irq-armada-370-xp.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/irqchip/irq-gic-v3-its.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 1d4de6e..577b428 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -365,7 +365,6 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
- 					handle_level_irq);
- 	}
- 	irq_set_probe(virq);
--	irq_clear_status_flags(virq, IRQ_NOAUTOEN);
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 45ea1933..b335280 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -644,9 +644,12 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 	if (cpu >= nr_cpu_ids)
+ 		return -EINVAL;
  
- 	return 0;
+-	target_col = &its_dev->its->collections[cpu];
+-	its_send_movi(its_dev, target_col, id);
+-	its_dev->event_map.col_map[id] = cpu;
++	/* don't set the affinity when the target cpu is same as current one */
++	if (cpu != its_dev->event_map.col_map[id]) {
++		target_col = &its_dev->its->collections[cpu];
++		its_send_movi(its_dev, target_col, id);
++		its_dev->event_map.col_map[id] = cpu;
++	}
+ 
+ 	return IRQ_SET_MASK_OK_DONE;
  }
 -- 
-2.7.4
+1.7.12.4
