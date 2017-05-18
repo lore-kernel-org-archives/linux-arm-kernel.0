@@ -1,23 +1,62 @@
-From: davidm@egauge.net (David Mosberger)
-Date: Wed, 17 May 2017 17:27:20 -0600
-Subject: crash after receiving SIGCHLD during system call
-In-Reply-To: <20170517230236.GK22219@n2100.armlinux.org.uk>
-References: <CALnQHM3wjH1CWwUUJX7KhGOOhoW-0r22nyBWmBUJYCUFe-JEtw@mail.gmail.com>
- <20170517170940.GJ22219@n2100.armlinux.org.uk>
- <CALnQHM0tUDkjbX+oBW5pEeuBWUoX2eOmA9Qrc9V2-RsnDV3d6Q@mail.gmail.com>
- <20170517230236.GK22219@n2100.armlinux.org.uk>
-Message-ID: <CALnQHM2ocw5ETbwsRF_c43tweHruunOjsfaBOT5Qxgt2K6Ww1g@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 17 May 2017 17:32:12 -0700
+Subject: [PATCH v3] net: dsa: b53: Add compatible strings for the
+ Cygnus-family BCM11360.
+Message-ID: <20170518003212.4028-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ah, yes, that makes sense now.  Thanks for decoding this properly!
+Cygnus is a small family of SoCs, of which we currently have
+devicetree for BCM11360 and BCM58300.  The 11360's B53 is mostly the
+same as 58xx, just requiring a tiny bit of setup that was previously
+missing.
 
-It does look like rt_sigreturn is being used:
+Signed-off-by: Eric Anholt <eric@anholt.net>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
---- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=4909,
-si_uid=33, si_status=0, si_utime=1, si_stime=2} ---
-rt_sigreturn()                          = 0
+v2: Reorder the entry in the docs (suggestion by Scott Branden), add
+    missing '"'
+v3: Resend now that 4.12-rc1 is out.
 
-Rather disconcerting this problem.  I'll keep digging...
+ Documentation/devicetree/bindings/net/dsa/b53.txt | 3 +++
+ drivers/net/dsa/b53/b53_srab.c                    | 2 ++
+ 2 files changed, 5 insertions(+)
 
-  --david
+diff --git a/Documentation/devicetree/bindings/net/dsa/b53.txt b/Documentation/devicetree/bindings/net/dsa/b53.txt
+index d6c6e41648d4..eb679e92d525 100644
+--- a/Documentation/devicetree/bindings/net/dsa/b53.txt
++++ b/Documentation/devicetree/bindings/net/dsa/b53.txt
+@@ -13,6 +13,9 @@ Required properties:
+       "brcm,bcm5397"
+       "brcm,bcm5398"
+ 
++  For the BCM11360 SoC, must be:
++      "brcm,bcm11360-srab" and the mandatory "brcm,cygnus-srab" string
++
+   For the BCM5310x SoCs with an integrated switch, must be one of:
+       "brcm,bcm53010-srab"
+       "brcm,bcm53011-srab"
+diff --git a/drivers/net/dsa/b53/b53_srab.c b/drivers/net/dsa/b53/b53_srab.c
+index 8a62b6a69703..c37ffd1b6833 100644
+--- a/drivers/net/dsa/b53/b53_srab.c
++++ b/drivers/net/dsa/b53/b53_srab.c
+@@ -364,6 +364,7 @@ static const struct of_device_id b53_srab_of_match[] = {
+ 	{ .compatible = "brcm,bcm53018-srab" },
+ 	{ .compatible = "brcm,bcm53019-srab" },
+ 	{ .compatible = "brcm,bcm5301x-srab" },
++	{ .compatible = "brcm,bcm11360-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ .compatible = "brcm,bcm58522-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ .compatible = "brcm,bcm58525-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ .compatible = "brcm,bcm58535-srab", .data = (void *)BCM58XX_DEVICE_ID },
+@@ -371,6 +372,7 @@ static const struct of_device_id b53_srab_of_match[] = {
+ 	{ .compatible = "brcm,bcm58623-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ .compatible = "brcm,bcm58625-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ .compatible = "brcm,bcm88312-srab", .data = (void *)BCM58XX_DEVICE_ID },
++	{ .compatible = "brcm,cygnus-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ .compatible = "brcm,nsp-srab", .data = (void *)BCM58XX_DEVICE_ID },
+ 	{ /* sentinel */ },
+ };
+-- 
+2.11.0
