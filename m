@@ -1,32 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 18 May 2017 09:43:48 +0200
-Subject: [PATCH] ARM: sun8i: v3s: fix build of Lichee Pi Zero Dock dtb
-In-Reply-To: <20170518025332.55769-1-icenowy@aosc.io>
-References: <20170518025332.55769-1-icenowy@aosc.io>
-Message-ID: <20170518074348.qa74i5nn6olszptx@flea.home>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 18 May 2017 09:45:50 +0200
+Subject: [PATCH v2 0/4] irqchip: armada-370-xp: remove IRQ_NOAUTOEN
+ workaround
+In-Reply-To: <20170227233540.GL11350@io.lakedaemon.net>
+References: <1488211940-26489-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170227233540.GL11350@io.lakedaemon.net>
+Message-ID: <20170518094550.1c363593@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 10:53:32AM +0800, Icenowy Zheng wrote:
-> The Lichee Pi Zero Dock dtb file is not added to the Makefile, so that
-> it won't be built; and the file contains a problem that prevents it
-> from being correctly built.
-> 
-> Fix these issues.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Hello,
 
-I squashed it into the previous patch, thanks!
-Maxime
+On Mon, 27 Feb 2017 23:35:40 +0000, Jason Cooper wrote:
 
+> >  drivers/irqchip/irq-armada-370-xp.c | 146 +++++++++++++++++++++++++++++++-----
+> >  1 file changed, 129 insertions(+), 17 deletions(-)  
+> 
+> Thanks for a great patch series!  I'll pick this up once -rc1 drops.
+
+Seems like you forgot to take this when 4.11-rc1 was published. So I
+will rebase on 4.12-rc1 and resend.
+
+Thanks,
+
+Thomas
 -- 
-Maxime Ripard, Free Electrons
+Thomas Petazzoni, CTO, Free Electrons
 Embedded Linux and Kernel engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170518/b315394e/attachment.sig>
