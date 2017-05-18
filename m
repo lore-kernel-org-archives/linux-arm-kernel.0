@@ -1,33 +1,55 @@
-From: srishtishar@gmail.com (srishti)
-Date: Thu, 18 May 2017 16:12:11 +0530
-Subject: [PATCH] Staging: bcm2835-audio: bcm2835_ctl.c: Fixed a comment coding
- style issue
-Message-ID: <1495104131-4493-1-git-send-email-srishtishar@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 May 2017 13:47 +0300
+Subject: [PATCH V2 1/3] iommu: of: Fix check for returning EPROBE_DEFER
+In-Reply-To: <1495102030-10548-1-git-send-email-sricharan@codeaurora.org>
+References: <1495102030-10548-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <24120310.hn6YiD4jDp@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: srishti sharma <srishtishar@gmail.com>
+Hi Sricharan,
 
-Fixed a trailing */ issue.
+Thank you for the patch.
 
-Signed-off-by: srishti sharma <srishtishar@gmail.com>
----
- drivers/staging/bcm2835-audio/bcm2835-ctl.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Thursday 18 May 2017 15:37:08 Sricharan R wrote:
+> Now with IOMMU probe deferral, we return -EPROBE_DEFER
+> for masters that are connected to an IOMMU which is not
+> probed yet, but going to get probed, so that we can attach
+> the correct dma_ops. So while trying to defer the probe of
+> the master, check if the of_iommu node that it is connected
+> to is marked in DT as 'status=disabled', then the IOMMU is never
+> is going to get probed. So simply return NULL and let the master
+> work without an IOMMU.
+> 
+> Fixes: 7b07cbefb68d ("iommu: of: Handle IOMMU lookup failure with deferred
+> probing or error") Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Tested-by: Will Deacon <will.deacon@arm.com>
+> Tested-by: Magnus Damn <magnus.damn@gmail.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/drivers/staging/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
-index a4ffa1b..38fabab 100644
---- a/drivers/staging/bcm2835-audio/bcm2835-ctl.c
-+++ b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
-@@ -247,8 +247,8 @@ static int snd_bcm2835_spdif_mask_get(struct snd_kcontrol *kcontrol,
- 	struct snd_ctl_elem_value *ucontrol)
- {
- 	/* bcm2835 supports only consumer mode and sets all other format flags
--	 * automatically. So the only thing left is signalling non-audio
--	 * content */
-+	 * automatically. So the only thing left is signalling non-audio content
-+	 */
- 	ucontrol->value.iec958.status[0] = IEC958_AES0_NONAUDIO;
- 	return 0;
- }
-2.7.4
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+> [V2] Corrected spelling/case in commit log
+> 
+>  drivers/iommu/of_iommu.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 9f44ee8..e6e9bec 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -118,6 +118,7 @@ static bool of_iommu_driver_present(struct device_node
+> *np)
+> 
+>  	ops = iommu_ops_from_fwnode(fwnode);
+>  	if ((ops && !ops->of_xlate) ||
+> +	    !of_device_is_available(iommu_spec->np) ||
+>  	    (!ops && !of_iommu_driver_present(iommu_spec->np)))
+>  		return NULL;
+
+-- 
+Regards,
+
+Laurent Pinchart
