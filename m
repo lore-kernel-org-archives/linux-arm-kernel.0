@@ -1,81 +1,114 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 18 May 2017 10:07:36 +0200
-Subject: [PATCH v3 0/4] irqchip: armada-370-xp: remove IRQ_NOAUTOEN workaround
-Message-ID: <1495094860-24709-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 18 May 2017 10:07:38 +0200
+Subject: [PATCH v3 2/4] irqchip: armada-370-xp: document the overall driver
+ logic
+In-Reply-To: <1495094860-24709-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1495094860-24709-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1495094860-24709-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Since the overall logic of the driver to handle the global and per-CPU
+masking of the interrupts is far from trivial, this commit adds a long
+comment detailing how the hardware operates and what strategy the
+driver implements on top of that.
 
-This is the third version of a patch series initially posted in
-October 2015, under the title:
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/irqchip/irq-armada-370-xp.c | 80 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 80 insertions(+)
 
-  [PATCH 0/5] Fix regression introduced by set_irq_flags() removal
-
-at the time, the regression was worked around in commit
-353d6d6c82e5d2533ba22e7f9fb081582bf50dc2 ("irqchip/armada-370-xp: Fix
-regression by clearing IRQ_NOAUTOEN") and this series brings the
-proper fix for the original issue, while reverting the work around.
-
-Changes since v2:
-
- - Rebased on top of v4.12-rc1.
-
-Changes since v1:
-
- - Rebased on top of v4.10.
-
- - Patch "kernel: irq: implement is_enabled_percpu_irq()" dropped,
-   since it has been merged upstream as commit
-   f0cb32207307e9d7b3ee8117078b7a37f8d0166e ("genirq: Implement
-   irq_percpu_is_enabled()")
-
- - Patch "irqchip: armada-370-xp: prepare additions to
-   armada_xp_mpic_secondary_init()" dropped, since similar changes
-   were merged as part of the overall CPU hotplug rework.
-
- - Patches "irqchip: armada-370-xp: re-order register definitions" and
-   "irqchip: armada-370-xp: document the overall driver logic" moved
-   at the beginning of the series.
-
- - Acked-by added on "irqchip: armada-370-xp: re-order register
-   definitions" and "irqchip: armada-370-xp: document the overall
-   driver logic"
-
- - In patch "irqchip: armada-370-xp: document the overall driver
-   logic", fix minor presentation detail in the ASCII art diagram.
-
- - In patch "irqchip: armada-370-xp: re-enable per-CPU interrupts at
-   resume time":
-
-   - Move the per-CPU interrupt re-enabling logic for secondary cores
-     into a utility function armada_xp_mpic_reenable_percpu() called
-     by both armada_xp_mpic_starting_cpu() and
-     mpic_cascaded_starting_cpu().
-
-   - Instead of iterating on all IRQs and filtering the per-CPU ones,
-     only iterate on the first ARMADA_370_XP_MAX_PER_CPU_IRQS, which
-     are the only per-CPU ones. Suggested by Gr?gory Clement.
-
-   - Use the irq_percpu_is_enabled() API, which was the one actually
-     merged, instead of the one originally proposed in the v1 of this
-     series.
-
- - Addition of a patch reverting the work around.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (4):
-  irqchip: armada-370-xp: re-order register definitions
-  irqchip: armada-370-xp: document the overall driver logic
-  irqchip: armada-370-xp: re-enable per-CPU interrupts at resume time
-  Revert "irqchip/armada-370-xp: Fix regression by clearing
-    IRQ_NOAUTOEN"
-
- drivers/irqchip/irq-armada-370-xp.c | 146 +++++++++++++++++++++++++++++++-----
- 1 file changed, 129 insertions(+), 17 deletions(-)
-
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index 76147df..1f7dea6 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -34,6 +34,86 @@
+ #include <asm/smp_plat.h>
+ #include <asm/mach/irq.h>
+ 
++/*
++ * Overall diagram of the Armada XP interrupt controller:
++ *
++ *    To CPU 0                 To CPU 1
++ *
++ *       /\                       /\
++ *       ||                       ||
++ * +---------------+     +---------------+
++ * |               |	 |               |
++ * |    per-CPU    |	 |    per-CPU    |
++ * |  mask/unmask  |	 |  mask/unmask  |
++ * |     CPU0      |	 |     CPU1      |
++ * |               |	 |               |
++ * +---------------+	 +---------------+
++ *        /\                       /\
++ *        ||                       ||
++ *        \\_______________________//
++ *                     ||
++ *            +-------------------+
++ *            |                   |
++ *            | Global interrupt  |
++ *            |    mask/unmask    |
++ *            |                   |
++ *            +-------------------+
++ *                     /\
++ *                     ||
++ *               interrupt from
++ *                   device
++ *
++ * The "global interrupt mask/unmask" is modified using the
++ * ARMADA_370_XP_INT_SET_ENABLE_OFFS and
++ * ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS registers, which are relative
++ * to "main_int_base".
++ *
++ * The "per-CPU mask/unmask" is modified using the
++ * ARMADA_370_XP_INT_SET_MASK_OFFS and
++ * ARMADA_370_XP_INT_CLEAR_MASK_OFFS registers, which are relative to
++ * "per_cpu_int_base". This base address points to a special address,
++ * which automatically accesses the registers of the current CPU.
++ *
++ * The per-CPU mask/unmask can also be adjusted using the global
++ * per-interrupt ARMADA_370_XP_INT_SOURCE_CTL register, which we use
++ * to configure interrupt affinity.
++ *
++ * Due to this model, all interrupts need to be mask/unmasked at two
++ * different levels: at the global level and at the per-CPU level.
++ *
++ * This driver takes the following approach to deal with this:
++ *
++ *  - For global interrupts:
++ *
++ *    At ->map() time, a global interrupt is unmasked at the per-CPU
++ *    mask/unmask level. It is therefore unmasked at this level for
++ *    the current CPU, running the ->map() code. This allows to have
++ *    the interrupt unmasked at this level in non-SMP
++ *    configurations. In SMP configurations, the ->set_affinity()
++ *    callback is called, which using the
++ *    ARMADA_370_XP_INT_SOURCE_CTL() readjusts the per-CPU mask/unmask
++ *    for the interrupt.
++ *
++ *    The ->mask() and ->unmask() operations only mask/unmask the
++ *    interrupt at the "global" level.
++ *
++ *    So, a global interrupt is enabled at the per-CPU level as soon
++ *    as it is mapped. At run time, the masking/unmasking takes place
++ *    at the global level.
++ *
++ *  - For per-CPU interrupts
++ *
++ *    At ->map() time, a per-CPU interrupt is unmasked at the global
++ *    mask/unmask level.
++ *
++ *    The ->mask() and ->unmask() operations mask/unmask the interrupt
++ *    at the per-CPU level.
++ *
++ *    So, a per-CPU interrupt is enabled at the global level as soon
++ *    as it is mapped. At run time, the masking/unmasking takes place
++ *    at the per-CPU level.
++ */
++
+ /* Registers relative to main_int_base */
+ #define ARMADA_370_XP_INT_CONTROL		(0x00)
+ #define ARMADA_370_XP_SW_TRIG_INT_OFFS		(0x04)
 -- 
 2.7.4
