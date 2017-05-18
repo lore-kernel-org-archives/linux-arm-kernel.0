@@ -1,39 +1,28 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 18 May 2017 11:18:17 +0800
-Subject: [PATCH 3/3] arm: dts: rk322x: add watchdog device node.
-In-Reply-To: <1494992451-32542-4-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <201705181148.b4AgD8sU%fengguang.wu@intel.com>
+From: frank.wang@rock-chips.com (Frank Wang)
+Date: Thu, 18 May 2017 11:42:58 +0800
+Subject: [PATCH 0/4] fix some issues for Rockchip usb2-phy and add rk322x
+ SoCs' support
+Message-ID: <1495078982-2555-1-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
+These series of patches fix some issues for rockchip usb2-phy and amend
+usb2-phy framework to support one phy which comprises with two host-ports.
 
-[auto build test ERROR on rockchip/for-next]
-[also build test ERROR on v4.12-rc1 next-20170517]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+In addition, this change also add rk322x usb2-phy support.
 
-url:    https://github.com/0day-ci/linux/commits/Frank-Wang/add-and-fix-some-device-node-for-rk322x-SoC/20170518-081958
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Frank Wang (1):
+  phy: rockchip-inno-usb2: add support of usb2-phy for rk322x SoCs
 
-All errors (new ones prefixed by >>):
+William Wu (3):
+  phy: rockchip-inno-usb2: add a delay after phy resume
+  phy: rockchip-inno-usb2: increase otg sm work first schedule time
+  phy: rockchip-inno-usb2: add one phy comprises with two host-ports    
+    support
 
->> Error: arch/arm/boot/dts/rk322x.dtsi:286.18-19 syntax error
-   FATAL ERROR: Unable to parse input tree
+ .../bindings/phy/phy-rockchip-inno-usb2.txt        |  1 +
+ drivers/phy/phy-rockchip-inno-usb2.c               | 74 ++++++++++++++++++++--
+ 2 files changed, 71 insertions(+), 4 deletions(-)
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 22761 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170518/62057d73/attachment-0001.gz>
+-- 
+2.0.0
