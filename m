@@ -1,70 +1,200 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 17 May 2017 22:05:38 -0700
-Subject: [PATCH 1/2] wcn36xx: Pass used skb to ieee80211_tx_status()
-In-Reply-To: <1495026867.2442.9.camel@sipsolutions.net>
-References: <20170426220444.10539-1-bjorn.andersson@linaro.org>
- <1493281332.2529.1.camel@sipsolutions.net>
- <20170428234247.GQ15143@minitux>
- <87fugkrchl.fsf@kamboji.qca.qualcomm.com>
- <1495026867.2442.9.camel@sipsolutions.net>
-Message-ID: <20170518050538.GL12920@tuxbook>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 18 May 2017 13:30:06 +0800
+Subject: [PATCH 2/4] ARM: imx: add initial support for imx7ulp
+In-Reply-To: <51686046.22567.1495042602979@email.1und1.de>
+References: <1495036217-20049-1-git-send-email-aisheng.dong@nxp.com>
+ <1495036217-20049-3-git-send-email-aisheng.dong@nxp.com>
+ <51686046.22567.1495042602979@email.1und1.de>
+Message-ID: <20170518053006.GA28011@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 17 May 06:14 PDT 2017, Johannes Berg wrote:
-
-> On Thu, 2017-05-04 at 13:13 +0000, Kalle Valo wrote:
+On Wed, May 17, 2017 at 07:36:42PM +0200, Stefan Wahren wrote:
+> Hi Dong,
+> 
+> > Dong Aisheng <aisheng.dong@nxp.com> hat am 17. Mai 2017 um 17:50 geschrieben:
 > > 
-> > > > This code intentionally checked if TX status was requested, and
-> > > > if not then it doesn't go to the effort of building it.
-> > > > 
-> > > 
-> > > What I'm finding puzzling is the fact that the only caller of
-> > > ieee80211_led_tx() is ieee80211_tx_status() and it seems like
-> > > drivers, such as ath10k, call this for each packet handled - but
-> > > I'm likely missing something.
-> 
-> Yes, many drivers do call it for each packet, and as such, this
-> deficiency was never noted.
-> 
-> > > > As it is with your patch, it'll go and report the TX status
-> > > > without any
-> > > > TX status information - which is handled in
-> > > > wcn36xx_dxe_tx_ack_ind()
-> > > > for those frames needing it.
-> > > > 
-> > > 
-> > > Right, it doesn't sound desired. However, during normal operation
-> > > I'm not seeing IEEE80211_TX_CTL_REQ_TX_STATUS being set and as such
-> > > ieee80211_led_tx() is never called.
 > > 
-> > So what's the conclusion? How do we get leds working?
+> > Add initial support for imx7ulp.
+> > 
+> > Note that we need configure power mode to Partial Stop mode 3 with
+> > system/bus clock enabled first as the default enabled STOP mode will
+> > gate off system/bus clock when execute WFI in MX7ULP SoC.
+> > 
+> > And there's still no MXC_CPU_IMX7ULP IDs read from register as ULP has no
+> > anatop as before. So we encode one with 0xff in reverse order in case new
+> > ones will be in the future.
+> > 
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> >  arch/arm/mach-imx/Kconfig        |  9 +++++++++
+> >  arch/arm/mach-imx/Makefile       |  1 +
+> >  arch/arm/mach-imx/common.h       |  1 +
+> >  arch/arm/mach-imx/cpu.c          |  3 +++
+> >  arch/arm/mach-imx/mach-imx7ulp.c | 37 +++++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-imx/mxc.h          |  1 +
+> >  arch/arm/mach-imx/pm-imx7ulp.c   | 33 +++++++++++++++++++++++++++++++++
+> >  7 files changed, 85 insertions(+)
+> >  create mode 100644 arch/arm/mach-imx/mach-imx7ulp.c
+> >  create mode 100644 arch/arm/mach-imx/pm-imx7ulp.c
+> > 
+> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > index 936c59d..a07081d 100644
+> > --- a/arch/arm/mach-imx/Kconfig
+> > +++ b/arch/arm/mach-imx/Kconfig
+> > @@ -553,6 +553,15 @@ comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
+> >  
+> >  if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+> >  
+> > +config SOC_IMX7ULP
+> > +	bool "i.MX7ULP support"
+> > +	select ARM_GIC
+> > +	select CLKSRC_IMX_TPM
+> > +	select HAVE_ARM_ARCH_TIMER
+> > +	select PINCTRL_IMX7ULP
+> > +	help
+> > +	  This enables support for Freescale i.MX7 Ultra Low Power processor.
+> > +
+> >  config SOC_VF610
+> >  	bool "Vybrid Family VF610 support"
+> >  	select ARM_GIC if ARCH_MULTI_V7
+> > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> > index cab1289..c5948b7 100644
+> > --- a/arch/arm/mach-imx/Makefile
+> > +++ b/arch/arm/mach-imx/Makefile
+> > @@ -80,6 +80,7 @@ obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
+> >  obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
+> >  obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
+> >  obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
+> > +obj-$(CONFIG_SOC_IMX7ULP) += mach-imx7ulp.o pm-imx7ulp.o
+> >  
+> >  ifeq ($(CONFIG_SUSPEND),y)
+> >  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+> > diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> > index b09a2ec..b0e85df 100644
+> > --- a/arch/arm/mach-imx/common.h
+> > +++ b/arch/arm/mach-imx/common.h
+> > @@ -128,6 +128,7 @@ void imx6dl_pm_init(void);
+> >  void imx6sl_pm_init(void);
+> >  void imx6sx_pm_init(void);
+> >  void imx6ul_pm_init(void);
+> > +void imx7ulp_pm_init(void);
+> >  
+> >  #ifdef CONFIG_PM
+> >  void imx51_pm_init(void);
+> > diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+> > index b3347d3..3867e7f 100644
+> > --- a/arch/arm/mach-imx/cpu.c
+> > +++ b/arch/arm/mach-imx/cpu.c
+> > @@ -134,6 +134,9 @@ struct device * __init imx_soc_device_init(void)
+> >  	case MXC_CPU_IMX7D:
+> >  		soc_id = "i.MX7D";
+> >  		break;
+> > +	case MXC_CPU_IMX7ULP:
+> > +		soc_id = "i.MX7ULP";
+> > +		break;
+> >  	default:
+> >  		soc_id = "Unknown";
+> >  	}
+> > diff --git a/arch/arm/mach-imx/mach-imx7ulp.c b/arch/arm/mach-imx/mach-imx7ulp.c
+> > new file mode 100644
+> > index 0000000..9f7a25c
+> > --- /dev/null
+> > +++ b/arch/arm/mach-imx/mach-imx7ulp.c
+> > @@ -0,0 +1,37 @@
+> > +/*
+> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > + * Copyright (C) 2017 NXP
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +#include <linux/irqchip.h>
+> > +#include <linux/of_platform.h>
+> > +#include <asm/mach/arch.h>
+> > +
+> > +#include "common.h"
+> > +#include "hardware.h"
+> > +
+> > +static void __init imx7ulp_init_machine(void)
+> > +{
+> > +	imx7ulp_pm_init();
+> > +
+> > +	mxc_set_cpu_type(MXC_CPU_IMX7ULP);
+> > +	imx_print_silicon_rev("i.MX7ULP", IMX_CHIP_REVISION_1_0);
+> > +	of_platform_default_populate(NULL, NULL, imx_soc_device_init());
+> > +}
+> > +
+> > +static const char *const imx7ulp_dt_compat[] __initconst = {
+> > +	"fsl,imx7ulp",
+> > +	NULL,
+> > +};
+> > +
+> > +DT_MACHINE_START(IMX7ulp, "Freescale i.MX7ULP (Device Tree)")
+> > +	.init_machine	= imx7ulp_init_machine,
+> > +	.dt_compat	= imx7ulp_dt_compat,
+> > +MACHINE_END
+> > diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+> > index 34f2ff6..3dfb09c 100644
+> > --- a/arch/arm/mach-imx/mxc.h
+> > +++ b/arch/arm/mach-imx/mxc.h
+> > @@ -40,6 +40,7 @@
+> >  #define MXC_CPU_IMX6Q		0x63
+> >  #define MXC_CPU_IMX6UL		0x64
+> >  #define MXC_CPU_IMX7D		0x72
+> > +#define MXC_CPU_IMX7ULP		0xff
+> >  
+> >  #define IMX_DDR_TYPE_LPDDR2		1
+> >  
+> > diff --git a/arch/arm/mach-imx/pm-imx7ulp.c b/arch/arm/mach-imx/pm-imx7ulp.c
+> > new file mode 100644
+> > index 0000000..df5d6b6
+> > --- /dev/null
+> > +++ b/arch/arm/mach-imx/pm-imx7ulp.c
+> > @@ -0,0 +1,33 @@
+> > +/*
+> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > + * Copyright (C) 2017 NXP
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +#include <linux/io.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> > +
+> > +#define SMC_PMCTRL		0x10
+> > +#define BP_PMCTRL_PSTOPO        16
+> > +#define PSTOPO_PSTOP3		0x3
+> > +
+> > +void __init imx7ulp_pm_init(void)
+> > +{
+> > +	struct device_node *np;
+> > +	void __iomem *smc1_base;
+> > +
+> > +	np = of_find_compatible_node(NULL, NULL, "fsl,imx7ulp-smc1");
 > 
-> Well, frankly, I never thought the TX LED was a super good idea - but
-> it had been supported by the original code IIRC, so never removed. Some
-> people like frantic blinking I guess ;-)
-> 
+> so actually there no dt-binding for this compatible, because there is no driver?
 
-It seems very important to a lot of people...
+Yes, probably we'd better add another binding doc for it under
+Documentation/devicetree/bindings/arm/freescale/.
+And there's another fsl,aips-bus also has no binding doc, i'm not sure
+whether we need add a binding doc it as well. It seems already exist
+on many imx dts files.
 
+Shawn,
+your suggestion?
 
-But if ieee80211_free_txskb() is the counterpart of
-ieee80211_tx_status() then we should be able to push the
-ieee80211_led_tx() call down into ieee80211_report_used_skb() and handle
-both cases.
-
-The ieee80211_free_txskb() seems to be used in various cases where we
-discard skbs, but perhaps this is not an issue in reality.
-
-> But I think the problem also applies to the throughput trigger thing,
-> so perhaps we need to stick some LED feedback calls into other places,
-> like _noskb() or provide an extra way to do it?
-> 
-
-Looking around it seems that we either have a call to free_txskb() or
-one of the tx_status(); where the _noskb() would need some special
-handling. Are there others or would it be reasonable to add a call in
-this one "special" case?
-
-Regards,
-Bjorn
+Regards
+Dong Aisheng
