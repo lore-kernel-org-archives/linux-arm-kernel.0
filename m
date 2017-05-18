@@ -1,35 +1,44 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 18 May 2017 10:09:51 +0100
-Subject: [PATCH 1/3] efi/libstub: arm64: use hidden attribute for struct
- screen_info reference
+Date: Thu, 18 May 2017 10:09:52 +0100
+Subject: [PATCH 2/3] efi/libstub: arm64: force 'hidden' visibility for section
+ markers
 In-Reply-To: <20170518090953.32628-1-ard.biesheuvel@linaro.org>
 References: <20170518090953.32628-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170518090953.32628-2-ard.biesheuvel@linaro.org>
+Message-ID: <20170518090953.32628-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prevent the compiler from emitting absolute references to screen_info
-when building position independent code, redeclare the symbol with hidden
-visibility.
+To prevent the compiler from emitting absolute references to the section
+markers when running in PIC mode, override the visibility to 'hidden' for
+all contents of asm/sections.h
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/efi.h | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/firmware/efi/libstub/arm64-stub.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index 8f3043aba873..464ac850c5e2 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -81,6 +81,9 @@ static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
- #define alloc_screen_info(x...)		&screen_info
- #define free_screen_info(x...)
- 
-+/* redeclare as 'hidden' so the compiler will generate relative references */
-+extern struct screen_info screen_info __attribute__((__visibility__("hidden")));
+diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
+index b4c2589d7c91..f7a6970e9abc 100644
+--- a/drivers/firmware/efi/libstub/arm64-stub.c
++++ b/drivers/firmware/efi/libstub/arm64-stub.c
+@@ -9,9 +9,17 @@
+  * published by the Free Software Foundation.
+  *
+  */
 +
- static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
- {
- }
++/*
++ * To prevent the compiler from emitting GOT-indirected (and thus absolute)
++ * references to the section markers, override their visibility as 'hidden'
++ */
++#pragma GCC visibility push(hidden)
++#include <asm/sections.h>
++#pragma GCC visibility pop
++
+ #include <linux/efi.h>
+ #include <asm/efi.h>
+-#include <asm/sections.h>
+ #include <asm/sysreg.h>
+ 
+ #include "efistub.h"
 -- 
 2.9.3
