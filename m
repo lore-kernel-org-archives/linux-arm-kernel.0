@@ -1,39 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 18 May 2017 10:45:13 +0100
-Subject: [PATCH] arm64: mm: explicity include linux/vmalloc.h
-In-Reply-To: <20170515114020.8198-1-tklauser@distanz.ch>
-References: <20170515114020.8198-1-tklauser@distanz.ch>
-Message-ID: <CAKv+Gu_N-2i=nANVnd+9Wvwv2J=74hyffOwA2mxjzi+_E9NxtA@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 18 May 2017 11:47:09 +0200
+Subject: [PULL 00/13] KVM/ARM Fixes for v4.12-rc2
+Message-ID: <20170518094722.9926-1-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 May 2017 at 12:40, Tobias Klauser <tklauser@distanz.ch> wrote:
-> arm64's mm/mmu.c uses vm_area_add_early, struct vm_area and other
-> definitions  but relies on implict inclusion of linux/vmalloc.h which
-> means that changes in other headers could break the build. Thus, add an
-> explicit include.
->
-> Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+Hi Radim and Paolo,
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Here is a fairly large set of fixes post -rc1 for KVM/ARM.
 
-> ---
->  arch/arm64/mm/mmu.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 0c429ec6fde8..23c2d89a362e 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -31,6 +31,7 @@
->  #include <linux/fs.h>
->  #include <linux/io.h>
->  #include <linux/mm.h>
-> +#include <linux/vmalloc.h>
->
->  #include <asm/barrier.h>
->  #include <asm/cputype.h>
-> --
-> 2.13.0
->
->
+The fixes include:
+ - A fix for a build failure introduced in -rc1 when tracepoints are
+   enabled on 32-bit ARM.
+ - Disabling use of stack pointer protection in the hyp code which can
+   cause panics.
+ - A handful of VGIC fixes.
+ - A fix to the init of the redistributors on GICv3 systems that
+   prevented boot with kvmtool on GICv3 systems introduced in -rc1.
+ - A number of race conditions fixed in our MMU handling code.
+ - A fix for the guest being able to program the debug extensions for
+   the host on the 32-bit side.
+
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.12-rc2
+
+for you to fetch changes up to fa472fa91a5a0b241f5ddae927d2e235d07545df:
+
+  KVM: arm/arm64: Hold slots_lock when unregistering kvm io bus devices (2017-05-18 11:18:16 +0200)
+
+
+Thanks,
+-Christoffer
+
+Christoffer Dall (2):
+      KVM: arm/arm64: Fix bug when registering redist iodevs
+      KVM: arm/arm64: Hold slots_lock when unregistering kvm io bus devices
+
+Marc Zyngier (6):
+      ARM: KVM: Fix tracepoint generation after move to virt/kvm/arm/
+      arm64: KVM: Do not use stack-protector to compile EL2 code
+      arm: KVM: Do not use stack-protector to compile HYP code
+      KVM: arm/arm64: vgic-v2: Do not use Active+Pending state for a HW interrupt
+      KVM: arm/arm64: vgic-v3: Do not use Active+Pending state for a HW interrupt
+      KVM: arm/arm64: vgic-v3: Use PREbits to infer the number of ICH_APxRn_EL2 registers
+
+Suzuki K Poulose (3):
+      kvm: arm/arm64: Fix race in resetting stage2 PGD
+      kvm: arm/arm64: Force reading uncached stage2 PGD
+      kvm: arm/arm64: Fix use after free of stage2 page table
+
+Zhichao Huang (2):
+      KVM: arm: plug potential guest hardware debug leakage
+      KVM: arm: rename pm_fake handler to trap_raz_wi
+
+ arch/arm/include/asm/kvm_coproc.h |   3 +-
+ arch/arm/kvm/coproc.c             | 106 ++++++++++++++++++++++++++------------
+ arch/arm/kvm/handle_exit.c        |   4 +-
+ arch/arm/kvm/hyp/Makefile         |   2 +
+ arch/arm/kvm/hyp/switch.c         |   4 +-
+ arch/arm/kvm/trace.h              |   8 +--
+ arch/arm64/kvm/hyp/Makefile       |   2 +
+ include/kvm/arm_vgic.h            |   5 +-
+ virt/kvm/arm/hyp/vgic-v3-sr.c     |  18 +++----
+ virt/kvm/arm/mmu.c                |  33 +++++++-----
+ virt/kvm/arm/vgic/vgic-init.c     |   5 +-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c  |  12 +++--
+ virt/kvm/arm/vgic/vgic-v2.c       |   7 +++
+ virt/kvm/arm/vgic/vgic-v3.c       |   7 +++
+ 14 files changed, 150 insertions(+), 66 deletions(-)
