@@ -1,89 +1,98 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 May 2017 22:17:02 +0200
-Subject: [PATCH 5/8 v2] clocksource/drivers/fttmr010: Switch to use bitops
+Date: Thu, 18 May 2017 22:17:05 +0200
+Subject: [PATCH 8/8 v2] ARM: dts: augment Moxa and Aspeed DTS for FTTMR010
 In-Reply-To: <20170518201705.28790-1-linus.walleij@linaro.org>
 References: <20170518201705.28790-1-linus.walleij@linaro.org>
-Message-ID: <20170518201705.28790-5-linus.walleij@linaro.org>
+Message-ID: <20170518201705.28790-8-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This switches the drivers to use the bitops BIT() macro
-to define bits.
+This augments the Moxa Art and Aspeed device trees to:
+
+- Explicitly name the clock "PCLK" as the Faraday FTTMR010
+  names it.
+- List the Moxa timer as compatible with the Faradat FTTMR010
+  vanilla version.
+- Add a comment that the Aspeed driver is a Faraday
+  FTTMR010 derivative.
+- Pass all IRQs to the timer from Aspeed: they are all there
+  so they should be in the device tree, we only use the
+  first one anyways.
 
 Cc: Joel Stanley <joel@jms.id.au>
-Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
+Cc: Jonas Jensen <jonas.jensen@gmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v1->v2:
-- Added Jonas' Tested-by, no functional changes.
----
- drivers/clocksource/timer-fttmr010.c | 43 ++++++++++++++++++------------------
- 1 file changed, 22 insertions(+), 21 deletions(-)
+- Fix a syntax error in the g5 DTSI file.
 
-diff --git a/drivers/clocksource/timer-fttmr010.c b/drivers/clocksource/timer-fttmr010.c
-index 9ad31489bbef..9df14cf13808 100644
---- a/drivers/clocksource/timer-fttmr010.c
-+++ b/drivers/clocksource/timer-fttmr010.c
-@@ -16,6 +16,7 @@
- #include <linux/sched_clock.h>
- #include <linux/clk.h>
- #include <linux/slab.h>
-+#include <linux/bitops.h>
+Clocksource maintainers: I will ask the ARM SoC people to merge
+this patch orthogonally, it is only included in this series
+for reference and for testing.
+---
+ arch/arm/boot/dts/aspeed-g4.dtsi | 7 +++----
+ arch/arm/boot/dts/aspeed-g5.dtsi | 7 +++----
+ arch/arm/boot/dts/moxart.dtsi    | 3 ++-
+ 3 files changed, 8 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+index 8c6bc29eb7f6..8a04c7e2d818 100644
+--- a/arch/arm/boot/dts/aspeed-g4.dtsi
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -886,13 +886,12 @@
+ 			};
  
- /*
-  * Register definitions for the timers
-@@ -36,31 +37,31 @@
- #define TIMER_INTR_STATE	(0x34)
- #define TIMER_INTR_MASK		(0x38)
+ 			timer: timer at 1e782000 {
++				/* This timer is a Faraday FTTMR010 derivative */
+ 				compatible = "aspeed,ast2400-timer";
+ 				reg = <0x1e782000 0x90>;
+-				// The moxart_timer driver registers only one
+-				// interrupt and assumes it's for timer 1
+-				//interrupts = <16 17 18 35 36 37 38 39>;
+-				interrupts = <16>;
++				interrupts = <16 17 18 35 36 37 38 39>;
+ 				clocks = <&clk_apb>;
++				clock-names = "PCLK";
+ 			};
  
--#define TIMER_1_CR_ENABLE	(1 << 0)
--#define TIMER_1_CR_CLOCK	(1 << 1)
--#define TIMER_1_CR_INT		(1 << 2)
--#define TIMER_2_CR_ENABLE	(1 << 3)
--#define TIMER_2_CR_CLOCK	(1 << 4)
--#define TIMER_2_CR_INT		(1 << 5)
--#define TIMER_3_CR_ENABLE	(1 << 6)
--#define TIMER_3_CR_CLOCK	(1 << 7)
--#define TIMER_3_CR_INT		(1 << 8)
--#define TIMER_1_CR_UPDOWN	(1 << 9)
--#define TIMER_2_CR_UPDOWN	(1 << 10)
--#define TIMER_3_CR_UPDOWN	(1 << 11)
-+#define TIMER_1_CR_ENABLE	BIT(0)
-+#define TIMER_1_CR_CLOCK	BIT(1)
-+#define TIMER_1_CR_INT		BIT(2)
-+#define TIMER_2_CR_ENABLE	BIT(3)
-+#define TIMER_2_CR_CLOCK	BIT(4)
-+#define TIMER_2_CR_INT		BIT(5)
-+#define TIMER_3_CR_ENABLE	BIT(6)
-+#define TIMER_3_CR_CLOCK	BIT(7)
-+#define TIMER_3_CR_INT		BIT(8)
-+#define TIMER_1_CR_UPDOWN	BIT(9)
-+#define TIMER_2_CR_UPDOWN	BIT(10)
-+#define TIMER_3_CR_UPDOWN	BIT(11)
- #define TIMER_DEFAULT_FLAGS	(TIMER_1_CR_UPDOWN | \
- 				 TIMER_3_CR_ENABLE | \
- 				 TIMER_3_CR_UPDOWN)
+ 			wdt1: wdt at 1e785000 {
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index a0bea4a6ec77..9cffe347b828 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -993,13 +993,12 @@
+ 			};
  
--#define TIMER_1_INT_MATCH1	(1 << 0)
--#define TIMER_1_INT_MATCH2	(1 << 1)
--#define TIMER_1_INT_OVERFLOW	(1 << 2)
--#define TIMER_2_INT_MATCH1	(1 << 3)
--#define TIMER_2_INT_MATCH2	(1 << 4)
--#define TIMER_2_INT_OVERFLOW	(1 << 5)
--#define TIMER_3_INT_MATCH1	(1 << 6)
--#define TIMER_3_INT_MATCH2	(1 << 7)
--#define TIMER_3_INT_OVERFLOW	(1 << 8)
-+#define TIMER_1_INT_MATCH1	BIT(0)
-+#define TIMER_1_INT_MATCH2	BIT(1)
-+#define TIMER_1_INT_OVERFLOW	BIT(2)
-+#define TIMER_2_INT_MATCH1	BIT(3)
-+#define TIMER_2_INT_MATCH2	BIT(4)
-+#define TIMER_2_INT_OVERFLOW	BIT(5)
-+#define TIMER_3_INT_MATCH1	BIT(6)
-+#define TIMER_3_INT_MATCH2	BIT(7)
-+#define TIMER_3_INT_OVERFLOW	BIT(8)
- #define TIMER_INT_ALL_MASK	0x1ff
+ 			timer: timer at 1e782000 {
++				/* This timer is a Faraday FTTMR010 derivative */
+ 				compatible = "aspeed,ast2400-timer";
+ 				reg = <0x1e782000 0x90>;
+-				// The moxart_timer driver registers only one
+-				// interrupt and assumes it's for timer 1
+-				//interrupts = <16 17 18 35 36 37 38 39>;
+-				interrupts = <16>;
++				interrupts = <16 17 18 35 36 37 38 39>;
+ 				clocks = <&clk_apb>;
++				clock-names = "PCLK";
+ 			};
  
- struct fttmr010 {
+ 
+diff --git a/arch/arm/boot/dts/moxart.dtsi b/arch/arm/boot/dts/moxart.dtsi
+index e86f8c905ac5..1f4c795d3f72 100644
+--- a/arch/arm/boot/dts/moxart.dtsi
++++ b/arch/arm/boot/dts/moxart.dtsi
+@@ -58,10 +58,11 @@
+ 		};
+ 
+ 		timer: timer at 98400000 {
+-			compatible = "moxa,moxart-timer";
++			compatible = "moxa,moxart-timer", "faraday,fttmr010";
+ 			reg = <0x98400000 0x42>;
+ 			interrupts = <19 IRQ_TYPE_EDGE_FALLING>;
+ 			clocks = <&clk_apb>;
++			clock-names = "PCLK";
+ 		};
+ 
+ 		gpio: gpio at 98700000 {
 -- 
 2.9.3
