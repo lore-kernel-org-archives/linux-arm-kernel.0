@@ -1,46 +1,37 @@
-From: ybzhao1989@gmail.com (Zhao Yibin)
-Date: Thu, 18 May 2017 17:35:18 +0800
-Subject: PROBLEM: ARM Cache policy on single armv7 processor lead to low
- DRAM performance
-In-Reply-To: <CAOMZO5DOV9Riho1FO_PNJnXhdxQA9YE55sXqygi8eOvEf+vY+A@mail.gmail.com>
-References: <CAOEkoLwq1fdVuhkm_Z4Lf1BL0XxLyumSxLF7gDPyK_NkzUdVgQ@mail.gmail.com>
- <CAOMZO5DOV9Riho1FO_PNJnXhdxQA9YE55sXqygi8eOvEf+vY+A@mail.gmail.com>
-Message-ID: <CAOEkoLzpmtoU3bWMgd1mhbhCre2uRLW1AG=f51ar=KMLq7yedQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 May 2017 10:39:14 +0100
+Subject: [PATCH] ARM: MCPM: ensure not to enter __hyp_soft_restart from
+ loopback and cpu_power_down
+In-Reply-To: <1495099592-10439-1-git-send-email-sudeep.holla@arm.com>
+References: <1495099592-10439-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20170518093913.GM22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Fabio,
+On Thu, May 18, 2017 at 10:26:32AM +0100, Sudeep Holla wrote:
+> Commit 9da5ac236de6 ("ARM: soft-reboot into same mode that we entered
+> the kernel") added support to enter the new kernel in the same processor
+> mode as the previous one when we soft-reboot from one kernel into
+> another by pass a flag to cpu_reset() so it knows what to do exactly.
+> 
+> However it missed to make similar changes in MCPM code. Due to the
+> missing flag, the CPUs enter HYP mode which is not supported with MCPM.
+> MCPM works only in secure mode as it manages CCI.
+> 
+> This patch aligns the cpu_reset call in MCPM with other changes in the
+> above mentioned commit.
 
-Thanks,
-Enable ACTLR.SMP did change the cache behavior, the result is same as
-enable CONFIG_SMP.
+I could say... welcome to why casts are bad!  The casts in this code
+have hidden the change of function prototype, which is why it's not been
+picked up by any of the build check systems.
 
-The TRM of cortex-a7 did mention this,
+Please change typedef to this:
 
-[6] SMP Enables coherent requests to the processor:
-0  Disables coherent requests to the processor. This is the reset value.
-1  Enables coherent requests to the processor.
-When coherent requests are disabled:
-? loads to cacheable memory are not cached by the processor.
-? Load-Exclusive instructions take a precise abort if the memory attributes are:
-? Inner Write-Back and Outer Shareable.
-? Inner Write-Through and Outer Shareable.
-? Outer Write-Back and Outer Shareable.
-? Outer Write-Through and Outer Shareable.
-? Inner Write-Back and Inner Shareable.
-? Inner Write-Through and Inner Shareable.
-? Outer Write-Back and Inner Shareable.
-? Outer Write-Through and Inner Shareable.
-Note
- You must ensure this bit is set to 1 before the caches and MMU are
-enabled, or any cache and TLB
-maintenance operations are performed. The only time this bit is set to
-0 is during a processor power-down
-sequence. See Power management on page 2-12.
+typedef typeof(cpu_reset) *phys_reset_t;
 
-I think It will be great for kernel to enable ACTLR.SMP for cortex-a7
-before enable cache, otherwise the cache is not actually used.
-And this is really hard to debug if haven't read the trm carefully.
+so phys_reset_t at least follows the prototype of cpu_reset().
 
-Thanks
-Bob
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
