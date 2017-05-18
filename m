@@ -1,28 +1,45 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 18 May 2017 12:03:08 -0700
-Subject: [PATCH 5/5] arm64: dts: qcom: Collapse usb support into one node
-In-Reply-To: <20170127004728.22490-6-stephen.boyd@linaro.org>
-References: <20170127004728.22490-1-stephen.boyd@linaro.org>
- <20170127004728.22490-6-stephen.boyd@linaro.org>
-Message-ID: <20170518190308.GP12920@tuxbook>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 18 May 2017 22:16:58 +0200
+Subject: [PATCH 1/8 v2] clocksource/drivers/fttmr010: Fix the clock handling
+Message-ID: <20170518201705.28790-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 26 Jan 16:47 PST 2017, Stephen Boyd wrote:
+We need to also prepare and enable the clock we are using to get
+the right reference count and avoid it being shut off.
 
-> We currently have three device nodes for the same USB hardware
-> block, as evident by the reuse of the same reg address multiple
-> times. Now that the chipidea driver fully supports OTG with the
-> MSM wrapper we can collapse all these nodes into one USB device
-> node, reflecting the true nature of the hardware.
-> 
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Added Jonas' Tested-by, no functional changes.
+---
+ drivers/clocksource/timer-fttmr010.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-This still applies and with some defconfig updates seems to make USB
-work again (thoroughly tested though). @Andy, would you mind picking
-this up.
-
-Regards,
-Bjorn
+diff --git a/drivers/clocksource/timer-fttmr010.c b/drivers/clocksource/timer-fttmr010.c
+index b4a6f1e4bc54..58ce017e4a65 100644
+--- a/drivers/clocksource/timer-fttmr010.c
++++ b/drivers/clocksource/timer-fttmr010.c
+@@ -238,12 +238,18 @@ static int __init fttmr010_timer_of_init(struct device_node *np)
+ 	 * and using EXTCLK is not supported in the driver.
+ 	 */
+ 	struct clk *clk;
++	int ret;
+ 
+ 	clk = of_clk_get_by_name(np, "PCLK");
+ 	if (IS_ERR(clk)) {
+-		pr_err("could not get PCLK");
++		pr_err("could not get PCLK\n");
+ 		return PTR_ERR(clk);
+ 	}
++	ret = clk_prepare_enable(clk);
++	if (ret) {
++		pr_err("failed to enable PCLK\n");
++		return ret;
++	}
+ 	tick_rate = clk_get_rate(clk);
+ 
+ 	return fttmr010_timer_common_init(np);
+-- 
+2.9.3
