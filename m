@@ -1,54 +1,83 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Thu, 18 May 2017 08:49:01 +0800
-Subject: [PATCH v14 5/7] ARM: dts: imx6qdl: Enable usb node children with <reg>
+Date: Thu, 18 May 2017 08:49:02 +0800
+Subject: [PATCH v14 6/7] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
+ property
 In-Reply-To: <1495068543-6938-1-git-send-email-peter.chen@nxp.com>
 References: <1495068543-6938-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1495068543-6938-6-git-send-email-peter.chen@nxp.com>
+Message-ID: <1495068543-6938-7-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joshua Clayton <stillcompiling@gmail.com>
+The current dts describes USB HUB's property at USB controller's
+entry, it is improper. The USB HUB should be the child node
+under USB controller, and power sequence properties are under
+it. Besides, using gpio pinctrl setting for USB2415's reset pin.
 
-Give usb nodes #address and #size attributes, so that a child node
-representing a permanently connected device such as an onboard hub may
-be addressed with a <reg> attribute
-
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 Signed-off-by: Peter Chen <peter.chen@nxp.com>
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi | 26 ++++++++++++--------------
+ 1 file changed, 12 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index e426faa..8c064cb 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -945,6 +945,8 @@
+diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+index c96c91d..a173de2 100644
+--- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+@@ -9,6 +9,8 @@
+  *
+  */
  
- 			usbh1: usb at 02184200 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x02184200 0x200>;
- 				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
-@@ -959,6 +961,8 @@
++#include <dt-bindings/gpio/gpio.h>
++
+ / {
+ 	aliases {
+ 		backlight = &backlight;
+@@ -58,17 +60,6 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
  
- 			usbh2: usb at 02184400 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x02184400 0x200>;
- 				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
-@@ -972,6 +976,8 @@
+-		reg_usb_h1_vbus: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "usb_h1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			enable-active-high;
+-			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
+-			gpio = <&gpio7 12 0>;
+-		};
+-
+ 		reg_panel: regulator at 1 {
+ 			compatible = "regulator-fixed";
+ 			reg = <1>;
+@@ -188,7 +179,7 @@
  
- 			usbh3: usb at 02184600 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x02184600 0x200>;
- 				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+ 		pinctrl_usbh: usbhgrp {
+ 			fsl,pins = <
+-				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x80000000
++				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0
+ 				MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x130b0
+ 			>;
+ 		};
+@@ -259,9 +250,16 @@
+ &usbh1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usbh>;
+-	vbus-supply = <&reg_usb_h1_vbus>;
+-	clocks = <&clks IMX6QDL_CLK_CKO>;
+ 	status = "okay";
++
++	usb2415: hub at 1 {
++		compatible = "usb424,2514";
++		reg = <1>;
++
++		clocks = <&clks IMX6QDL_CLK_CKO>;
++		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
++		reset-duration-us = <3000>;
++	};
+ };
+ 
+ &usdhc3 {
 -- 
 2.7.4
