@@ -1,43 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 18 May 2017 10:09:53 +0100
-Subject: [PATCH 3/3] efi/libstub: arm64: set -fpie when building the EFI stub
-In-Reply-To: <20170518090953.32628-1-ard.biesheuvel@linaro.org>
-References: <20170518090953.32628-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170518090953.32628-4-ard.biesheuvel@linaro.org>
+From: colin.king@canonical.com (Colin King)
+Date: Thu, 18 May 2017 10:22:34 +0100
+Subject: [PATCH] phy: rockchip-typec: make dp_pll_cfg and usb3_pll_cfg static
+Message-ID: <20170518092234.13276-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clang may emit absolute symbol references when building in non-PIC mode,
-even when using the default 'small' code model, which is already mostly
-position independent to begin with, due to its use of adrp/add pairs
-that have a relative range of +/- 4 GB. The remedy is to pass the -fpie
-flag, which can be done safely now that the code has been updated to avoid
-GOT indirections (which may be emitted due to the compiler assuming that
-the PIC/PIE code may end up in a shared library that is subject to ELF
-symbol preemption)
+From: Colin Ian King <colin.king@canonical.com>
 
-Passing -fpie when building code that needs to execute at an a priori
-unknown offset is arguably an improvement in any case, and given that
-the recent visibility changes allow the PIC build to pass with GCC as
-well, let's add -fpie for all arm64 builds rather than only for Clang.
+arrays dp_pll_cfg and usb3_pll_cfg can be made static as they do
+not need to be in global scope. Also make them const.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cleans up sparse warnings:
+  warning: symbol 'dp_pll_cfg' was not declared. Should it be static?
+  warning: symbol 'usb3_pll_cfg' was not declared. Should it be static?
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
 ---
- drivers/firmware/efi/libstub/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/phy/phy-rockchip-typec.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-index f7425960f6a5..e078390ba477 100644
---- a/drivers/firmware/efi/libstub/Makefile
-+++ b/drivers/firmware/efi/libstub/Makefile
-@@ -10,7 +10,7 @@ cflags-$(CONFIG_X86)		+= -m$(BITS) -D__KERNEL__ -O2 \
- 				   -fPIC -fno-strict-aliasing -mno-red-zone \
- 				   -mno-mmx -mno-sse
+diff --git a/drivers/phy/phy-rockchip-typec.c b/drivers/phy/phy-rockchip-typec.c
+index 7cfb0f8995de..66b54a6f00f6 100644
+--- a/drivers/phy/phy-rockchip-typec.c
++++ b/drivers/phy/phy-rockchip-typec.c
+@@ -292,7 +292,7 @@ struct phy_reg {
+ 	u32 addr;
+ };
  
--cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS))
-+cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS)) -fpie
- cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
- 				   -fno-builtin -fpic -mno-single-pic-base
+-struct phy_reg usb3_pll_cfg[] = {
++static const struct phy_reg usb3_pll_cfg[] = {
+ 	{ 0xf0,		CMN_PLL0_VCOCAL_INIT },
+ 	{ 0x18,		CMN_PLL0_VCOCAL_ITER },
+ 	{ 0xd0,		CMN_PLL0_INTDIV },
+@@ -309,7 +309,7 @@ struct phy_reg usb3_pll_cfg[] = {
+ 	{ 0x8,		CMN_DIAG_PLL0_LF_PROG },
+ };
  
+-struct phy_reg dp_pll_cfg[] = {
++static const struct phy_reg dp_pll_cfg[] = {
+ 	{ 0xf0,		CMN_PLL1_VCOCAL_INIT },
+ 	{ 0x18,		CMN_PLL1_VCOCAL_ITER },
+ 	{ 0x30b9,	CMN_PLL1_VCOCAL_START },
 -- 
-2.9.3
+2.11.0
