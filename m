@@ -1,29 +1,35 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 18 May 2017 10:09:50 +0100
-Subject: [PATCH 0/3] efi: arm64: use -fpie for building the stub
-Message-ID: <20170518090953.32628-1-ard.biesheuvel@linaro.org>
+Date: Thu, 18 May 2017 10:09:51 +0100
+Subject: [PATCH 1/3] efi/libstub: arm64: use hidden attribute for struct
+ screen_info reference
+In-Reply-To: <20170518090953.32628-1-ard.biesheuvel@linaro.org>
+References: <20170518090953.32628-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170518090953.32628-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clang requires the stub to be built with -fpie, or it may emit absolute
-symbol references that trigger the absolute relocation detection code and
-cause the build to fail.
+To prevent the compiler from emitting absolute references to screen_info
+when building position independent code, redeclare the symbol with hidden
+visibility.
 
-The remedy is to set -fpie (#3), but due to stupid ELF symbol preemption
-rules that only apply to shared libraries, this will result in more rather
-than fewer absolute references (i.e., GOT entries), which we have to massage
-away using visibility overrides first. (#1, #2)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/efi.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Ard Biesheuvel (3):
-  efi/libstub: arm64: use hidden attribute for struct screen_info
-    reference
-  efi/libstub: arm64: force 'hidden' visibility for section markers
-  efi/libstub: arm64: set -fpie when building the EFI stub
-
- arch/arm64/include/asm/efi.h              |  3 +++
- drivers/firmware/efi/libstub/Makefile     |  2 +-
- drivers/firmware/efi/libstub/arm64-stub.c | 10 +++++++++-
- 3 files changed, 13 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 8f3043aba873..464ac850c5e2 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -81,6 +81,9 @@ static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
+ #define alloc_screen_info(x...)		&screen_info
+ #define free_screen_info(x...)
+ 
++/* redeclare as 'hidden' so the compiler will generate relative references */
++extern struct screen_info screen_info __attribute__((__visibility__("hidden")));
++
+ static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
+ {
+ }
 -- 
 2.9.3
