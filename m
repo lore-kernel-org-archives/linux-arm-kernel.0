@@ -1,57 +1,87 @@
 From: olivier.moysan@st.com (olivier moysan)
-Date: Thu, 18 May 2017 17:19:50 +0200
-Subject: [PATCH v4 0/3] ASoC: Add STM32 I2S support
-Message-ID: <1495120793-11687-1-git-send-email-olivier.moysan@st.com>
+Date: Thu, 18 May 2017 17:19:51 +0200
+Subject: [PATCH v4 1/3] dt-bindings: Document STM32 I2S bindings
+In-Reply-To: <1495120793-11687-1-git-send-email-olivier.moysan@st.com>
+References: <1495120793-11687-1-git-send-email-olivier.moysan@st.com>
+Message-ID: <1495120793-11687-2-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set handles the SPI/I2S IP on STM32 platforms.
+Add documentation of device tree bindings for STM32 SPI/I2S.
 
-It applies to STM32 platforms implementing version 2 of SPI/I2S IP like STM32H7 series.
-
-The SPI/I2S block is a serial peripheral interface (SPI), which can also be configured to work on I2S/PCM mode.
-ASoC STM32 I2S driver only supports this I2S/PCM mode.
-
-The I2S/PCM interface can either support full duplex or half-duplex communication
-(transmitter or receiver only). The change of mode requires to stop the interface.
-This means that the two audio paths cannot be basically managed independently.
-
-The driver supports playback and capture through a single bidirectionnal DAI. 
-In the first version of the driver, playback and capture paths are made mutually exclusive.
-
-A second patch introduces support of full duplex mode. 
-In this implementation the interface is systematically configured in full-duplex mode
-from hardware point of view. So, when managing a single audio path, the interface
-is not configured as transmit or receive only, as it should be.
-This restriction is handled by masking underrun/overrun errors from the unused path.
-
-The I2S/PCM interface supports four audio standards:
-I2S Philips standard, MSB justified standard, LSB justified standard, PCM standard
-PCM standard is declined in two versions, PCM short and long,
-according frame synchronization duration.
-
-These standards can be mapped to ASoC standards as follows:
-	- I2S: i2s
-	- MSB justified standard: left_j
-	- LSB justified standard: right_j
-	- PCM short: dsp_a
-PCM long format is not exposed as it does not match supported ASoC standards.
-
-v3 -> v4
-	- update example in dt bindings
-
-olivier moysan (3):
-  dt-bindings: Document STM32 I2S bindings
-  ASoC: stm32: Add I2S driver
-  ASoC: stm32: Add full duplex support to i2s
-
- .../devicetree/bindings/sound/st,stm32-i2s.txt     |  62 ++
- sound/soc/stm/Kconfig                              |   2 +-
- sound/soc/stm/Makefile                             |   4 +
- sound/soc/stm/stm32_i2s.c                          | 946 +++++++++++++++++++++
- 4 files changed, 1013 insertions(+), 1 deletion(-)
+Signed-off-by: olivier moysan <olivier.moysan@st.com>
+---
+ .../devicetree/bindings/sound/st,stm32-i2s.txt     | 62 ++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
- create mode 100644 sound/soc/stm/stm32_i2s.c
 
+diff --git a/Documentation/devicetree/bindings/sound/st,stm32-i2s.txt b/Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
+new file mode 100644
+index 0000000..4bda520
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
+@@ -0,0 +1,62 @@
++STMicroelectronics STM32 SPI/I2S Controller
++
++The SPI/I2S block supports I2S/PCM protocols when configured on I2S mode.
++Only some SPI instances support I2S.
++
++Required properties:
++  - compatible: Must be "st,stm32h7-i2s"
++  - reg: Offset and length of the device's register set.
++  - interrupts: Must contain the interrupt line id.
++  - clocks: Must contain phandle and clock specifier pairs for each entry
++	in clock-names.
++  - clock-names: Must contain "i2sclk", "pclk", "x8k" and "x11k".
++	"i2sclk": clock which feeds the internal clock generator
++	"pclk": clock which feeds the peripheral bus interface
++	"x8k": I2S parent clock for sampling rates multiple of 8kHz.
++	"x11k": I2S parent clock for sampling rates multiple of 11.025kHz.
++  - dmas: DMA specifiers for tx and rx dma.
++    See Documentation/devicetree/bindings/dma/stm32-dma.txt.
++  - dma-names: Identifier for each DMA request line. Must be "tx" and "rx".
++  - pinctrl-names: should contain only value "default"
++  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
++
++Optional properties:
++  - resets: Reference to a reset controller asserting the reset controller
++
++The device node should contain one 'port' child node with one child 'endpoint'
++node, according to the bindings defined in Documentation/devicetree/bindings/
++graph.txt.
++
++Example:
++sound_card {
++	compatible = "audio-graph-card";
++	dais = <&i2s2_port>;
++};
++
++i2s2: audio-controller at 40003800 {
++	compatible = "st,stm32h7-i2s";
++	reg = <0x40003800 0x400>;
++	interrupts = <36>;
++	clocks = <&rcc PCLK1>, <&rcc SPI2_CK>, <&rcc PLL1_Q>, <&rcc PLL2_P>;
++	clock-names = "pclk", "i2sclk",  "x8k", "x11k";
++	dmas = <&dmamux2 2 39 0x400 0x1>,
++           <&dmamux2 3 40 0x400 0x1>;
++	dma-names = "rx", "tx";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2s2>;
++
++	i2s2_port: port at 0 {
++		cpu_endpoint: endpoint {
++			remote-endpoint = <&codec_endpoint>;
++			format = "i2s";
++		};
++	};
++};
++
++audio-codec {
++	codec_port: port at 0 {
++		codec_endpoint: endpoint {
++			remote-endpoint = <&cpu_endpoint>;
++		};
++	};
++};
 -- 
 1.9.1
