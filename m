@@ -1,27 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 May 2017 14:11:48 +0200
-Subject: [PATCH 0/8] clocksource: Generalize Faraday timer
-In-Reply-To: <CACmBeS2S=0Qg2jnWMw0PR4Rdkz8hhsdV5VYqMNMBbrdOn-CkrA@mail.gmail.com>
-References: <20170517140542.20016-1-linus.walleij@linaro.org>
- <CACmBeS2S=0Qg2jnWMw0PR4Rdkz8hhsdV5VYqMNMBbrdOn-CkrA@mail.gmail.com>
-Message-ID: <CACRpkdaJcUvCfNWJ28s54PbdPHko1SM+RJgKowYn3RP0ZBODFw@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 18 May 2017 13:23:36 +0100
+Subject: [PATCH] arm64: dts: juno: Enable some SMMUs
+Message-ID: <eeb81dbbd7ddfbbccb961c0f20c5cb90f120e89f.1495110010.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 12:32 PM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
-> On 17 May 2017 at 16:05, Linus Walleij <linus.walleij@linaro.org> wrote:
->> The patches can be applied as soon as Jonas Jensen and Joel
->> Stanley says they work for them.
->
-> Thanks! fttmr010 seem to work OK!
->
-> I did the usual test on UC-7112-LX [1] after merging
-> linux-nomadik/fttmr010 into next-20170518.
+The IOMMU-backed DMA API support has now been in place for a while and
+proven stable, so there's no real need to keep most of Juno's SMMUs
+disabled. The USB, HDLCDs, and CoreSight ETR all just need to map RAM
+buffers for DMA - enabling their SMMUs obviates CPU bounce buffering for
+USB's streaming DMA to the upper memory bank, and lets the other two
+allocate their relatively large coherent buffers without pressuring CMA.
 
-Thanks a lot! I'll add your Tested-by tags (if I need to repost, else
-I guess Daniel can add it when applying).
+Some more software work is still needed for the DMA-330 and PCIe before
+those can accommodate SMMU translation correctly in all cases, so we
+leave those alone for now.
 
-I'm really curious to see if it also works on Aspeed.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 4 ----
+ 1 file changed, 4 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index bfe7d683a42e..02aea43238fc 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -53,7 +53,6 @@
+ 		#global-interrupts = <1>;
+ 		dma-coherent;
+ 		power-domains = <&scpi_devpd 0>;
+-		status = "disabled";
+ 	};
+ 
+ 	gic: interrupt-controller at 2c010000 {
+@@ -546,7 +545,6 @@
+ 			     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
+ 		#iommu-cells = <1>;
+ 		#global-interrupts = <1>;
+-		status = "disabled";
+ 	};
+ 
+ 	smmu_hdlcd0: iommu at 7fb20000 {
+@@ -556,7 +554,6 @@
+ 			     <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+ 		#iommu-cells = <1>;
+ 		#global-interrupts = <1>;
+-		status = "disabled";
+ 	};
+ 
+ 	smmu_usb: iommu at 7fb30000 {
+@@ -567,7 +564,6 @@
+ 		#iommu-cells = <1>;
+ 		#global-interrupts = <1>;
+ 		dma-coherent;
+-		status = "disabled";
+ 	};
+ 
+ 	dma at 7ff00000 {
+-- 
+2.12.2.dirty
