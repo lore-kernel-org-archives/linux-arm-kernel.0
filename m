@@ -1,60 +1,143 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 18 May 2017 15:16:53 +0800
-Subject: [PATCH v6 9/9] arm64: allwinner: a64: enable Wi-Fi for Pine64
+Date: Thu, 18 May 2017 15:16:52 +0800
+Subject: [PATCH v6 8/9] arm64: allwinner: a64: enable AXP803 regulators for
+ Pine64
 In-Reply-To: <20170518071653.36561-1-icenowy@aosc.io>
 References: <20170518071653.36561-1-icenowy@aosc.io>
-Message-ID: <20170518071653.36561-10-icenowy@aosc.io>
+Message-ID: <20170518071653.36561-9-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Wi-Fi module of Pine64 is powered via DLDO4 and ELDO1 (the latter
-one provides I/O voltage).
-
-Add device node for it.
-
-Although the Wi-Fi module is an external module which should be inserted
-to a header, according to my personal talk with TL Lim, he does not want
-this header to be used as GPIO (so it's with 2.0mm pitch, not 2.54mm as
-other GPIO headers).
+Add support of AXP803 regulators in the Pine64 device tree, in order to
+enable many future functionalities, e.g. Wi-Fi.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Changes in v6:
+- Rebased on next-20170517.
+
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 109 +++++++++++++++++++++
+ 1 file changed, 109 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index 40921bacb39c..6e43e2c07025 100644
+index 36001884ed33..40921bacb39c 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -68,6 +68,11 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
+@@ -118,6 +118,115 @@
  	};
+ };
+ 
++#include "axp803.dtsi"
 +
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-+	};
- };
- 
- &ehci0 {
-@@ -99,6 +104,17 @@
- 	status = "okay";
- };
- 
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	vmmc-supply = <&reg_dldo4>;
-+	vqmmc-supply = <&reg_eldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	non-removable;
-+	bus-width = <4>;
-+	status = "okay";
++&reg_aldo1 {
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <2800000>;
++	regulator-name = "vcc-csi";
 +};
 +
- &ohci0 {
- 	status = "okay";
- };
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pl";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <2700000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pll-avcc";
++};
++
++&reg_dc1sw {
++	regulator-name = "vcc-phy";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-3v3";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1300000>;
++	regulator-name = "vdd-cpux";
++};
++
++/* DCDC3 is polyphased with DCDC2 */
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_dcdc6 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dldo1 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-hdmi";
++};
++
++&reg_dldo2 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-mipi";
++};
++
++&reg_dldo3 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "avdd-csi";
++};
++
++&reg_dldo4 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi";
++};
++
++&reg_eldo1 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "cpvdd";
++};
++
++&reg_eldo3 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "vdd-1v8-csi";
++};
++
++&reg_fldo1 {
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "vcc-1v2-hsic";
++};
++
++&reg_fldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc";
++};
++
+ /* On Exp and Euler connectors */
+ &uart0 {
+ 	pinctrl-names = "default";
 -- 
 2.12.2
