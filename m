@@ -1,39 +1,52 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 18 May 2017 09:50:45 +0800
-Subject: [PATCH v2 0/2] Hi3660: enable sp804 timer
-Message-ID: <1495072247-25217-1-git-send-email-leo.yan@linaro.org>
+Date: Thu, 18 May 2017 09:50:46 +0800
+Subject: [PATCH v2 1/2] clk: Hi3660: change to register crgctrl clock with
+ CLK_OF_DECLARE_DRIVER
+In-Reply-To: <1495072247-25217-1-git-send-email-leo.yan@linaro.org>
+References: <1495072247-25217-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1495072247-25217-2-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set is to enable sp804 timer on Hi3660 for Hikey960 platform.
+The timer will register into system at very early phase at kernel boot;
+if timer needs to use clock, the clock should be get ready in function
+of_clk_init() so later the timer driver probe can retrieve clock
+successfully. This is finished in below flow on arm64:
 
-On Hi3660, the sp804 timer co-exists with CPUs' architecture timer; but
-sp804 timer is located in SoC level but CPU's architecture timer is in
-CPU power domain. sp804 timer is used as broadcast timer when CPU enters
-idle states and the CPU (includes architecture timer) power domain is
-powered off. So sp804 timer enabling is prerequisite before we enable
-CPUIdle on Hi3660.
+  start_kernel()
+    `-> time_init()
+          `-> of_clk_init(NULL)    => register timer's clock
+          `-> clocksource_probe()  => register timer
 
-This patch set is to enable sp804 timer, the first patch is to adjust
-crgctrl clock regiseration so ensure clock is avaiable for timer. The
-second patch is to add description for timer in dts. Have rebased this
-patch set on Guodong's dts patch set [1] and verified this patch set on
-Hikey960.
+On Hi3660 the sp804 timer uses clock "osc32k", this clock is registered
+as platform driver rather than CLK_OF_DECLARE_DRIVER method. As result,
+sp804 timer probe returns failure due if cannot bind clock properly.
+To fix the failure, this patch is to change crgctrl clock registration
+from platform driver to CLK_OF_DECLARE_DRIVER method so the clocks can
+be registered ahead with function of_clk_init() and then timer driver
+can use it.
 
-[1] http://archive.armlinux.org.uk/lurker/message/20170517.083733.8207a50e.en.html
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ drivers/clk/hisilicon/clk-hi3660.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Changes from v1:
-* Follow Steven's suggestion on IRC, Change to only use
-  CLK_OF_DECLARE_DRIVER for crgctrl clock.
-
-Leo Yan (2):
-  clk: Hi3660: change to register crgctrl clock with
-    CLK_OF_DECLARE_DRIVER
-  arm64: dts: add sp804 timer node for Hi3660
-
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 11 +++++++++++
- drivers/clk/hisilicon/clk-hi3660.c        |  4 ++--
- 2 files changed, 13 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/clk/hisilicon/clk-hi3660.c b/drivers/clk/hisilicon/clk-hi3660.c
+index fd5ce7f..4e5713b 100644
+--- a/drivers/clk/hisilicon/clk-hi3660.c
++++ b/drivers/clk/hisilicon/clk-hi3660.c
+@@ -547,10 +547,10 @@ static void hi3660_clk_crgctrl_init(struct device_node *np)
+ 				  ARRAY_SIZE(hi3660_crgctrl_divider_clks),
+ 				  clk_data);
+ }
++CLK_OF_DECLARE_DRIVER(hi3660_clk_crgctrl, "hisilicon,hi3660-crgctrl",
++		      hi3660_clk_crgctrl_init);
+ 
+ static const struct of_device_id hi3660_clk_match_table[] = {
+-	{ .compatible = "hisilicon,hi3660-crgctrl",
+-	  .data = hi3660_clk_crgctrl_init },
+ 	{ .compatible = "hisilicon,hi3660-pctrl",
+ 	  .data = hi3660_clk_pctrl_init },
+ 	{ .compatible = "hisilicon,hi3660-pmuctrl",
 -- 
 1.9.1
