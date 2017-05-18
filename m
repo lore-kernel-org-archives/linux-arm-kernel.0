@@ -1,64 +1,65 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 May 2017 11:52:10 +0100
-Subject: [CFT] Always enable SMP mode on MP capable CPUs
-Message-ID: <20170518105209.GN22219@n2100.armlinux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 18 May 2017 11:59:14 +0100
+Subject: [PATCH 0/2] arm64: acpi/pci: allow the firmware BAR configuration
+ to be preserved
+In-Reply-To: <20170517215611.GJ31462@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
+ <20170517215611.GJ31462@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAKv+Gu9T7vH_LbKfS_40JUbLNK4PYrMi++eKbCq_MzBsuQxUDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a result of a recent bug report, it has been found that certain CPUs
-must always have SMP mode enabled in order for the caches to work.
+On 17 May 2017 at 22:56, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Tue, Apr 11, 2017 at 05:33:11PM +0100, Ard Biesheuvel wrote:
+>> This is a followup to the discussion regarding whether ACPI/arm64 systems
+>> should preserve the PCI configuration performed by the firmware, or always
+>> reconfigure it from scratch.
+>>
+>> This series proposes to put it under the control of the firmware, by invoking
+>> the _DSM method, and preserving the firmware configuration only when it
+>> returns 0.
+>>
+>> Patch #1 is a preparatory bugfix that solves the issue that I/O bridge
+>> windows starting at 0x0 are dismissed when looking for parent resources.
+>>
+>> Patch #2 adds the logic to invoke the _DSM and claim the existing
+>> configuration rather than reallocate it from scratch if it returns '0'
+>>
+>> Ard Biesheuvel (2):
+>>   drivers: pci: do not disregard parent resources starting at 0x0
+>>   arm64: acpi/pci: invoke _DSM whether to preserve firmware PCI setup
+>>
+>>  arch/arm64/kernel/pci.c  | 20 ++++++++++++++++++--
+>>  drivers/pci/pci.c        |  2 +-
+>>  include/linux/pci-acpi.h |  7 ++++---
+>>  3 files changed, 23 insertions(+), 6 deletions(-)
+>
+> I applied the first to pci/resource for v4.13.  I didn't do anything
+> with the second because I don't think we have consensus on what the
+> right thing to do is yet.
 
-Remove the conditional on setting the SMP bit(s).
+Thanks Bjorn.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
-This needs to be tested on:
+Re PCI reconfiguration: currently, the EFI framebuffer is broken on
+all systems where the associated BAR lives on a device that is not on
+bus 0, which is of course everything other than QEMU (which cannot use
+the EFI framebuffer for other reasons when running under KVM)
 
-- Cortex A5MP
-- Cortex A9MP
-- Cortex R7MP
-- Cortex A7MP
-- Cortex A12MP
-- Cortex A15MP
-- Cortex A17MP
-- Brahma B15
+So the first question is whether anyone cares. I do, but not deeply:
+the EFI framebuffer, while useful in cases where there is no real GFC
+driver, is a bit of a hack anyway.
 
-and any other CPU that mis-identifies itself with a MP-capable CPUID
-signature that might match one of those CPUs.  I'm aware of a Cortex
-A9 CPU out there that does mis-identify itself as SMP capable but
-isn't:
+Then we have the question whether we can work around it in another
+way: I already proposed an alternative patch which simply records the
+associated BAR before PCI is reconfigured, and refuses to enable EFIFB
+if the BAR has moves. This is a workaround rather than a real fix, but
+in many cases, the kernel and UEFI appear to arrive at similar
+conclusions regarding where to put the framebuffer BAR, probably
+because of the simple reason that its size (ergo alignment) will cause
+it to be allocated first.
 
-        @ Core indicates it is SMP. Check for Aegis SOC where a single
-        @ Cortex-A9 CPU is present but SMP operations fault.
-
-This will also need testing.
-
- arch/arm/mm/proc-v7.S | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 01d64c0b2563..4d48a4cf563b 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -286,14 +286,10 @@ ENDPROC(cpu_pj4b_do_resume)
- 	stmia	r12, {r1-r6, lr}		@ v7_invalidate_l1 touches r0-r6
- 	bl      v7_invalidate_l1
- 	ldmia	r12, {r1-r6, lr}
--#ifdef CONFIG_SMP
-+	mrc	p15, 0, r0, c1, c0, 1
- 	orr	r10, r10, #(1 << 6)		@ Enable SMP/nAMP mode
--	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
--	ALT_UP(mov	r0, r10)		@ fake it for UP
- 	orr	r10, r10, r0			@ Set required bits
--	teq	r10, r0				@ Were they already set?
--	mcrne	p15, 0, r10, c1, c0, 1		@ No, update register
--#endif
-+	mcr	p15, 0, r10, c1, c0, 1		@ No, update register
- 	b	__v7_setup_cont
- 
- /*
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+Re _DSM: I think it makes sense to honour it, because it puts the
+allocation under the control of the firmware, which completely removes
+the burden of having to reason about a policy in the kernel. That
+leaves the question which will be the default, but that is of minor
+importance IMO.
