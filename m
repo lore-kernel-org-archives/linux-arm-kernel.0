@@ -1,39 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 18 May 2017 16:13:30 +0100
-Subject: [PATCH] arm64: cpufeature: check translation granule size based
- on kernel config
-In-Reply-To: <20170518142415.GA6425@leverpostej>
-References: <1495102873-10858-1-git-send-email-leo.yan@linaro.org>
- <c0c8bd7b-647d-092d-65ac-08a90000e30c@arm.com>
- <20170518113627.GC25294@leoy-ThinkPad-T440>
- <20170518123840.GD21359@arm.com>
- <20170518124115.GC4957@leverpostej>
- <20170518130250.GE25294@leoy-ThinkPad-T440>
- <20170518142415.GA6425@leverpostej>
-Message-ID: <20170518151329.GF21359@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 18 May 2017 16:14:28 +0100
+Subject: [PATCH] coresight: tmc: Configure DMA mask appropriately
+Message-ID: <c93205f17b2d7609a1eb76fab74a7f929f4d25fb.1495119556.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 03:24:15PM +0100, Mark Rutland wrote:
-> On Thu, May 18, 2017 at 09:02:50PM +0800, Leo Yan wrote:
-> > On Thu, May 18, 2017 at 01:41:15PM +0100, Mark Rutland wrote:
-> > > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> > > index 94b8f7f..1f53314 100644
-> > > --- a/arch/arm64/kernel/cpufeature.c
-> > > +++ b/arch/arm64/kernel/cpufeature.c
-> > > @@ -639,8 +639,8 @@ void update_cpu_features(int cpu,
-> > >          * Mismatched CPU features are a recipe for disaster. Don't even
-> > >          * pretend to support them.
-> > >          */
-> > > -       WARN_TAINT_ONCE(taint, TAINT_CPU_OUT_OF_SPEC,
-> > > -                       "Unsupported CPU feature variation.\n");
-> > > +       pr_warn_once("Unsupported CPU feature variation detected.\n");
-> > > +       add_taint(TAINT_CPU_OUT_OF_SPEC);
-> > 
-> > Should be add_taint(TAINT_CPU_OUT_OF_SPEC, LOCKDEP_STILL_OK)?
-> 
-> Whoops; yes.
+Before making any DMA API calls, the ETR driver should really be setting
+its masks to ensure that DMA is possible. Especially since it can
+address more than the 32-bit default mask set by the AMBA bus code.
 
-I've picked this up with the fix above.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-tmc.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Will
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index d8517d2a968c..864488793f09 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -362,6 +362,13 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 		desc.type = CORESIGHT_DEV_TYPE_SINK;
+ 		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+ 		desc.ops = &tmc_etr_cs_ops;
++		/*
++		 * ETR configuration uses a 40-bit AXI master in place of
++		 * the embedded SRAM of ETB/ETF.
++		 */
++		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
++		if (ret)
++			goto out;
+ 	} else {
+ 		desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
+ 		desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
+-- 
+2.12.2.dirty
