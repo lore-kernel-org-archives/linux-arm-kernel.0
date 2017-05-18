@@ -1,68 +1,28 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 18 May 2017 20:16:12 +0300
-Subject: [PATCHv3 3/3] ARM: OMAP4: hwmod_data: add opt clks for dss_hdmi and
- dss_venc
-In-Reply-To: <1495127772-7486-1-git-send-email-t-kristo@ti.com>
-References: <1495127772-7486-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1495127772-7486-4-git-send-email-t-kristo@ti.com>
+Date: Thu, 18 May 2017 20:16:09 +0300
+Subject: [PATCHv3 0/3] ARM: OMAP2+: preparation for clk/clkctrl support
+Message-ID: <1495127772-7486-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These extra optional clocks are required as main clock for these modules
-are going to be routed to the main module clock. Otherwise, the hdmi / tv
-clocks are not going to be enabled during usage, leading to failure.
+Hi,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+This series contains a couple of fixes for supporting clkctrl driver
+for OMAP4. The patches in this series can be applied separately,
+they don't have any dependency towards the clock driver related patches.
+Once the clockctrl driver support itself [1] and this series have
+been applied, the DTS changes can start flowing in.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 94f09c7..0855434 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -775,6 +775,7 @@
- 
- static struct omap_hwmod_opt_clk dss_hdmi_opt_clks[] = {
- 	{ .role = "sys_clk", .clk = "dss_sys_clk" },
-+	{ .role = "hdmi_clk", .clk = "dss_48mhz_clk" },
- };
- 
- static struct omap_hwmod omap44xx_dss_hdmi_hwmod = {
-@@ -785,7 +786,7 @@
- 	 * HDMI audio requires to use no-idle mode. Hence,
- 	 * set idle mode by software.
- 	 */
--	.flags		= HWMOD_SWSUP_SIDLE,
-+	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_OPT_CLKS_NEEDED,
- 	.mpu_irqs	= omap44xx_dss_hdmi_irqs,
- 	.xlate_irq	= omap4_xlate_irq,
- 	.sdma_reqs	= omap44xx_dss_hdmi_sdma_reqs,
-@@ -858,11 +859,16 @@
- };
- 
- /* dss_venc */
-+static struct omap_hwmod_opt_clk dss_venc_opt_clks[] = {
-+	{ .role = "tv_clk", .clk = "dss_tv_clk" },
-+};
-+
- static struct omap_hwmod omap44xx_dss_venc_hwmod = {
- 	.name		= "dss_venc",
- 	.class		= &omap44xx_venc_hwmod_class,
- 	.clkdm_name	= "l3_dss_clkdm",
- 	.main_clk	= "dss_tv_clk",
-+	.flags		= HWMOD_OPT_CLKS_NEEDED,
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = OMAP4_CM_DSS_DSS_CLKCTRL_OFFSET,
-@@ -870,6 +876,8 @@
- 		},
- 	},
- 	.parent_hwmod	= &omap44xx_dss_hwmod,
-+	.opt_clks	= dss_venc_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(dss_venc_opt_clks),
- };
- 
- /*
--- 
-1.9.1
+Reference branch with the clkctrl driver, this series and
+preliminary DTS patches pushed here:
+
+Tree: https://github.com/t-kristo/linux-pm.git
+Branch: 4.12-rc1-clkctrl-integ
+
+Tested the integrated branch with omap4 boot, suspend-resume, and
+also with the HDMI external display test (this was failing with some
+older revision of the series.)
+
+-Tero
+
+[1] https://www.spinics.net/lists/arm-kernel/msg581685.html
