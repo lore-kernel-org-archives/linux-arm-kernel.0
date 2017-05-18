@@ -1,45 +1,70 @@
-From: colin.king@canonical.com (Colin King)
-Date: Thu, 18 May 2017 10:22:34 +0100
-Subject: [PATCH] phy: rockchip-typec: make dp_pll_cfg and usb3_pll_cfg static
-Message-ID: <20170518092234.13276-1-colin.king@canonical.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 18 May 2017 10:26:32 +0100
+Subject: [PATCH] ARM: MCPM: ensure not to enter __hyp_soft_restart from
+ loopback and cpu_power_down
+Message-ID: <1495099592-10439-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+Commit 9da5ac236de6 ("ARM: soft-reboot into same mode that we entered
+the kernel") added support to enter the new kernel in the same processor
+mode as the previous one when we soft-reboot from one kernel into
+another by pass a flag to cpu_reset() so it knows what to do exactly.
 
-arrays dp_pll_cfg and usb3_pll_cfg can be made static as they do
-not need to be in global scope. Also make them const.
+However it missed to make similar changes in MCPM code. Due to the
+missing flag, the CPUs enter HYP mode which is not supported with MCPM.
+MCPM works only in secure mode as it manages CCI.
 
-Cleans up sparse warnings:
-  warning: symbol 'dp_pll_cfg' was not declared. Should it be static?
-  warning: symbol 'usb3_pll_cfg' was not declared. Should it be static?
+This patch aligns the cpu_reset call in MCPM with other changes in the
+above mentioned commit.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Fixes: 9da5ac236de6 ("ARM: soft-reboot into same mode that we entered the kernel")
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/phy/phy-rockchip-typec.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/common/mcpm_entry.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/phy/phy-rockchip-typec.c b/drivers/phy/phy-rockchip-typec.c
-index 7cfb0f8995de..66b54a6f00f6 100644
---- a/drivers/phy/phy-rockchip-typec.c
-+++ b/drivers/phy/phy-rockchip-typec.c
-@@ -292,7 +292,7 @@ struct phy_reg {
- 	u32 addr;
- };
- 
--struct phy_reg usb3_pll_cfg[] = {
-+static const struct phy_reg usb3_pll_cfg[] = {
- 	{ 0xf0,		CMN_PLL0_VCOCAL_INIT },
- 	{ 0x18,		CMN_PLL0_VCOCAL_ITER },
- 	{ 0xd0,		CMN_PLL0_INTDIV },
-@@ -309,7 +309,7 @@ struct phy_reg usb3_pll_cfg[] = {
- 	{ 0x8,		CMN_DIAG_PLL0_LF_PROG },
- };
- 
--struct phy_reg dp_pll_cfg[] = {
-+static const struct phy_reg dp_pll_cfg[] = {
- 	{ 0xf0,		CMN_PLL1_VCOCAL_INIT },
- 	{ 0x18,		CMN_PLL1_VCOCAL_ITER },
- 	{ 0x30b9,	CMN_PLL1_VCOCAL_START },
--- 
-2.11.0
+Hi Nico, Russell,
+
+I am seeing a boot failure without this patch on my TC2 where MCPM is
+enabled and active. The loopback test fails on primary, if skipped fails
+later on resume path.
+
+Regards,
+Sudeep
+
+diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+index cf062472e07b..d2bd153484b6 100644
+--- a/arch/arm/common/mcpm_entry.c
++++ b/arch/arm/common/mcpm_entry.c
+@@ -235,7 +235,7 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster)
+ 	return ret;
+ }
+
+-typedef void (*phys_reset_t)(unsigned long);
++typedef void (*phys_reset_t)(unsigned long, bool);
+
+ void mcpm_cpu_power_down(void)
+ {
+@@ -300,7 +300,7 @@ void mcpm_cpu_power_down(void)
+ 	 * on the CPU.
+ 	 */
+ 	phys_reset = (phys_reset_t)(unsigned long)__pa_symbol(cpu_reset);
+-	phys_reset(__pa_symbol(mcpm_entry_point));
++	phys_reset(__pa_symbol(mcpm_entry_point), false);
+
+ 	/* should never get here */
+ 	BUG();
+@@ -389,7 +389,7 @@ static int __init nocache_trampoline(unsigned long _arg)
+ 	__mcpm_cpu_down(cpu, cluster);
+
+ 	phys_reset = (phys_reset_t)(unsigned long)__pa_symbol(cpu_reset);
+-	phys_reset(__pa_symbol(mcpm_entry_point));
++	phys_reset(__pa_symbol(mcpm_entry_point), false);
+ 	BUG();
+ }
+
+--
+2.7.4
