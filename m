@@ -1,85 +1,275 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 18 May 2017 21:02:50 +0800
-Subject: [PATCH] arm64: cpufeature: check translation granule size based
- on kernel config
-In-Reply-To: <20170518124115.GC4957@leverpostej>
-References: <1495102873-10858-1-git-send-email-leo.yan@linaro.org>
- <c0c8bd7b-647d-092d-65ac-08a90000e30c@arm.com>
- <20170518113627.GC25294@leoy-ThinkPad-T440>
- <20170518123840.GD21359@arm.com>
- <20170518124115.GC4957@leverpostej>
-Message-ID: <20170518130250.GE25294@leoy-ThinkPad-T440>
+Date: Thu, 18 May 2017 21:04:13 +0800
+Subject: [PATCH v9 0/9] coresight: enable debug module
+In-Reply-To: <20170518125926.GA28458@e107814-lin.cambridge.arm.com>
+References: <1494298202-6739-1-git-send-email-leo.yan@linaro.org>
+ <20170518125926.GA28458@e107814-lin.cambridge.arm.com>
+Message-ID: <20170518130413.GF25294@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 01:41:15PM +0100, Mark Rutland wrote:
-> On Thu, May 18, 2017 at 01:38:41PM +0100, Will Deacon wrote:
-> > On Thu, May 18, 2017 at 07:36:27PM +0800, Leo Yan wrote:
-> > > On Thu, May 18, 2017 at 11:39:01AM +0100, Suzuki K Poulose wrote:
-> > > > On 18/05/17 11:21, Leo Yan wrote:
-> > > > >In the big.LITTLE system with two clusters, one is CA53 cluster and
-> > > > >another is CA73 cluster. CA53 doesn't support 16KB memory translation
-> > > > >granule size (4.3.21 AArch64 Memory Model Feature Register 0, EL1; ARM
-> > > > >DDI 0500F), but CA73 supports this feature (4.3.27 AArch64 Memory Model
-> > > > >Feature Register 0, EL1; ARM 100048_0002_04_en). As result, the kernel
-> > > > >reports log for "Unexpected variation" as below.
-> > > > >
-> > > > >[    0.182113] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1. Boot CPU: 0x00000000001122, CPU4: 0x00000000101122
-> > > > 
-> > > > >
-> > > > >This patch is to change the checking CPU feature for memory translation
-> > > > >granule size based on kernel configuration. If kernel configuration has
-> > > > >selected to use one specific memory translation granule size, then we
-> > > > >will do strict sanity checking cross all CPUs. Otherwise we can skip to
-> > > > >check unused features for memory translation granule size if kernel
-> > > > >doesn't use it.
-> > > > >
-> > > > 
-> > > > If we were to suppress the warning (more on that below), we could simply
-> > > > make this feature a NON_STRICT, since the unsupported CPUs won't boot
-> > > > with 16K to hit this sanity check.
-> > > > 
-> > > > However, there is a problem with disabling this warning. If a VM starts
-> > > > using 16KB page size on a 4K/64K host, the VM could end up in unknown
-> > > > failures when it switches to an unsupported CPU (after it has booted).
-> > > > Of course the real fix lies in making the KVM exposing the safe value
-> > > > for granule support to the VCPUs (which is currently being worked on by
-> > > > Douglas in Cc). So, when we have that ready, we could make it NON_STRICT
-> > > > instead of this approach.
-> > > 
-> > > Thanks for the info :)
-> > > 
-> > > I will use below patch for production branch temporarily. You could
-> > > work out one formal patch for upstreaming when the dependency patches
-> > > are get ready:
+On Thu, May 18, 2017 at 01:59:26PM +0100, Suzuki K Poulose wrote:
+> On Tue, May 09, 2017 at 10:49:53AM +0800, Leo Yan wrote:
+> > ARMv8 architecture reference manual (ARM DDI 0487A.k) Chapter H7 "The
+> > Sample-based Profiling Extension" has description for sampling
+> > registers, we can utilize these registers to check program counter
+> > value with combined CPU exception level, secure state, etc. So this is
+> > helpful for CPU lockup bugs, e.g. if one CPU has run into infinite loop
+> > with IRQ disabled; the 'hang' CPU cannot switch context and handle any
+> > interrupt, so it cannot handle SMP call for stack dump, etc.
 > > 
-> > The other thing we could do is change the way we taint on mismatch so that
-> > we don't dump the scary (and pointless) backtrace.
+> > This patch series is to enable coresight debug module with sample-based
+> > registers and register call back notifier for PCSR register dumping
+> > when panic happens, so we can see below dumping info for panic; and
+> > this patch series has considered the conditions for access permission
+> > for debug registers self, so this can avoid access debug registers when
+> > CPU power domain is off; the driver also try to figure out the CPU is
+> > in secure or non-secure state.
+> > 
+> > Patch 0001 is to document the dt binding; patch 0002 adds one detailed
+> > document to describe the Coresight debug module implementation, the
+> > clock and power domain impaction on the driver, some examples for usage.
+> > 
+> > Patch 0003 is to document boot parameters used in kernel command line.
+> > 
+> > Patch 0004 is to add file entries for MAINTAINERS.
+> > 
+> > Patch 0005 is used to fix the func of_get_coresight_platform_data()
+> > doesn't properly drop the reference to the CPU node pointer; and
+> > patch 0006 is refactor to add new function of_coresight_get_cpu().
+> > 
+> > Patch 0007 is the driver for CPU debug module.
+> > 
+> > Patch 0008 in this series are to enable debug unit on 96boards Hikey,
+> > Patch 0009 is to enable debug on 96boards DB410c. Have verified on both
+> > two boards.
 > 
-> The backtrace is due to the WARN part of the WARN_TAINT_ONCE.
+> Leo,
 > 
-> We could chagne that as below, if we really want to get rid of the backtrace.
-> 
-> Thanks,
-> Mark.
-> 
-> ---->8----
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 94b8f7f..1f53314 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -639,8 +639,8 @@ void update_cpu_features(int cpu,
->          * Mismatched CPU features are a recipe for disaster. Don't even
->          * pretend to support them.
->          */
-> -       WARN_TAINT_ONCE(taint, TAINT_CPU_OUT_OF_SPEC,
-> -                       "Unsupported CPU feature variation.\n");
-> +       pr_warn_once("Unsupported CPU feature variation detected.\n");
-> +       add_taint(TAINT_CPU_OUT_OF_SPEC);
+> Please could you include the following patch in your series, which adds
+> the DT nodes for CPU debug on Juno boards ?
 
-Should be add_taint(TAINT_CPU_OUT_OF_SPEC, LOCKDEP_STILL_OK)?
+Sure, glad to include it. Sorry for delay, hope can catch up for
+this merge window.
 
->  }
+> ----8>----
+> From: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Date: Tue, 28 Mar 2017 13:40:24 +0100
+> Subject: [PATCH] arm64: dts: juno: Add Coresight CPU debug nodes
+> 
+> Add Coresight CPU debug nodes for Juno r0, r1 & r2. The CPU
+> debug areas are mapped at the same address for all revisions,
+> like the ETM, even though the CPUs have changed from r1 to r2.
+> 
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Leo Yan <leo.yan@linaro.org>
+> Cc: Mathieu Poirier <mathieu.porier@linaro.org>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/juno-base.dtsi | 54 ++++++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/arm/juno-r1.dts    | 24 +++++++++++++++
+>  arch/arm64/boot/dts/arm/juno-r2.dts    | 24 +++++++++++++++
+>  arch/arm64/boot/dts/arm/juno.dts       | 24 +++++++++++++++
+>  4 files changed, 126 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index df539e8..0613aed 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -216,6 +216,15 @@
+>  		};
+>  	};
 >  
->  u64 read_sanitised_ftr_reg(u32 id)
+> +	cpu_debug0: cpu_debug at 22010000 {
+> +		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+> +		reg = <0 0x22010000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+> +	};
+> +
+>  	funnel at 220c0000 { /* cluster0 funnel */
+>  		compatible = "arm,coresight-funnel", "arm,primecell";
+>  		reg = <0 0x220c0000 0 0x1000>;
+> @@ -266,6 +275,15 @@
+>  		};
+>  	};
+>  
+> +	cpu_debug1: cpu_debug at 22110000 {
+> +		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+> +		reg = <0 0x22110000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+> +	};
+> +
+>  	etm2: etm at 23040000 {
+>  		compatible = "arm,coresight-etm4x", "arm,primecell";
+>  		reg = <0 0x23040000 0 0x1000>;
+> @@ -280,6 +298,15 @@
+>  		};
+>  	};
+>  
+> +	cpu_debug2: cpu_debug at 23010000 {
+> +		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+> +		reg = <0 0x23010000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+> +	};
+> +
+>  	funnel at 230c0000 { /* cluster1 funnel */
+>  		compatible = "arm,coresight-funnel", "arm,primecell";
+>  		reg = <0 0x230c0000 0 0x1000>;
+> @@ -344,6 +371,15 @@
+>  		};
+>  	};
+>  
+> +	cpu_debug3: cpu_debug at 23110000 {
+> +		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+> +		reg = <0 0x23110000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+> +	};
+> +
+>  	etm4: etm at 23240000 {
+>  		compatible = "arm,coresight-etm4x", "arm,primecell";
+>  		reg = <0 0x23240000 0 0x1000>;
+> @@ -358,6 +394,15 @@
+>  		};
+>  	};
+>  
+> +	cpu_debug4: cpu_debug at 23210000 {
+> +		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+> +		reg = <0 0x23210000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+> +	};
+> +
+>  	etm5: etm at 23340000 {
+>  		compatible = "arm,coresight-etm4x", "arm,primecell";
+>  		reg = <0 0x23340000 0 0x1000>;
+> @@ -372,6 +417,15 @@
+>  		};
+>  	};
+>  
+> +	cpu_debug5: cpu_debug at 23310000 {
+> +		compatible = "arm,coresight-cpu-debug", "arm,primecell";
+> +		reg = <0 0x23310000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+> +	};
+> +
+>  	replicator at 20120000 {
+>  		compatible = "qcom,coresight-replicator1x", "arm,primecell";
+>  		reg = <0 0x20120000 0 0x1000>;
+> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+> index 0033c59..d6a4cda 100644
+> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
+> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+> @@ -239,3 +239,27 @@
+>  &stm_out_port {
+>  	remote-endpoint = <&csys1_funnel_in_port0>;
+>  };
+> +
+> +&cpu_debug0 {
+> +	cpu = <&A57_0>;
+> +};
+> +
+> +&cpu_debug1 {
+> +	cpu = <&A57_1>;
+> +};
+> +
+> +&cpu_debug2 {
+> +	cpu = <&A53_0>;
+> +};
+> +
+> +&cpu_debug3 {
+> +	cpu = <&A53_1>;
+> +};
+> +
+> +&cpu_debug4 {
+> +	cpu = <&A53_2>;
+> +};
+> +
+> +&cpu_debug5 {
+> +	cpu = <&A53_3>;
+> +};
+> diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
+> index 218d0e4..38a8ad6 100644
+> --- a/arch/arm64/boot/dts/arm/juno-r2.dts
+> +++ b/arch/arm64/boot/dts/arm/juno-r2.dts
+> @@ -239,3 +239,27 @@
+>  &stm_out_port {
+>  	remote-endpoint = <&csys1_funnel_in_port0>;
+>  };
+> +
+> +&cpu_debug0 {
+> +	cpu = <&A72_0>;
+> +};
+> +
+> +&cpu_debug1 {
+> +	cpu = <&A72_1>;
+> +};
+> +
+> +&cpu_debug2 {
+> +	cpu = <&A53_0>;
+> +};
+> +
+> +&cpu_debug3 {
+> +	cpu = <&A53_1>;
+> +};
+> +
+> +&cpu_debug4 {
+> +	cpu = <&A53_2>;
+> +};
+> +
+> +&cpu_debug5 {
+> +	cpu = <&A53_3>;
+> +};
+> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> index bb2820e..9f37dbb 100644
+> --- a/arch/arm64/boot/dts/arm/juno.dts
+> +++ b/arch/arm64/boot/dts/arm/juno.dts
+> @@ -226,3 +226,27 @@
+>  		};
+>  	};
+>  };
+> +
+> +&cpu_debug0 {
+> +	cpu = <&A57_0>;
+> +};
+> +
+> +&cpu_debug1 {
+> +	cpu = <&A57_1>;
+> +};
+> +
+> +&cpu_debug2 {
+> +	cpu = <&A53_0>;
+> +};
+> +
+> +&cpu_debug3 {
+> +	cpu = <&A53_1>;
+> +};
+> +
+> +&cpu_debug4 {
+> +	cpu = <&A53_2>;
+> +};
+> +
+> +&cpu_debug5 {
+> +	cpu = <&A53_3>;
+> +};
+> -- 
+> 2.7.4
+> 
 > 
