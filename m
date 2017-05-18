@@ -1,28 +1,59 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 18 May 2017 20:16:09 +0300
-Subject: [PATCHv3 0/3] ARM: OMAP2+: preparation for clk/clkctrl support
-Message-ID: <1495127772-7486-1-git-send-email-t-kristo@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 18 May 2017 18:24:30 +0100
+Subject: [PATCH v3 2/5] perf/core: Export AUX buffer helpers to modules
+In-Reply-To: <1495128273-13941-1-git-send-email-will.deacon@arm.com>
+References: <1495128273-13941-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1495128273-13941-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Perf PMU drivers using AUX buffers cannot be built as modules unless
+the AUX helpers are exported.
 
-This series contains a couple of fixes for supporting clkctrl driver
-for OMAP4. The patches in this series can be applied separately,
-they don't have any dependency towards the clock driver related patches.
-Once the clockctrl driver support itself [1] and this series have
-been applied, the DTS changes can start flowing in.
+This patch exports perf_aux_output_{begin,end,skip} and perf_get_aux to
+modules.
 
-Reference branch with the clkctrl driver, this series and
-preliminary DTS patches pushed here:
+Cc: Peter Zijlstra <peterz@infradead.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ kernel/events/ring_buffer.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Tree: https://github.com/t-kristo/linux-pm.git
-Branch: 4.12-rc1-clkctrl-integ
-
-Tested the integrated branch with omap4 boot, suspend-resume, and
-also with the HDMI external display test (this was failing with some
-older revision of the series.)
-
--Tero
-
-[1] https://www.spinics.net/lists/arm-kernel/msg581685.html
+diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
+index 2831480c63a2..cd5e902a27ac 100644
+--- a/kernel/events/ring_buffer.c
++++ b/kernel/events/ring_buffer.c
+@@ -411,6 +411,7 @@ void *perf_aux_output_begin(struct perf_output_handle *handle,
+ 
+ 	return NULL;
+ }
++EXPORT_SYMBOL_GPL(perf_aux_output_begin);
+ 
+ /*
+  * Commit the data written by hardware into the ring buffer by adjusting
+@@ -470,6 +471,7 @@ void perf_aux_output_end(struct perf_output_handle *handle, unsigned long size)
+ 	rb_free_aux(rb);
+ 	ring_buffer_put(rb);
+ }
++EXPORT_SYMBOL_GPL(perf_aux_output_end);
+ 
+ /*
+  * Skip over a given number of bytes in the AUX buffer, due to, for example,
+@@ -498,6 +500,7 @@ int perf_aux_output_skip(struct perf_output_handle *handle, unsigned long size)
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(perf_aux_output_skip);
+ 
+ void *perf_get_aux(struct perf_output_handle *handle)
+ {
+@@ -507,6 +510,7 @@ void *perf_get_aux(struct perf_output_handle *handle)
+ 
+ 	return handle->rb->aux_priv;
+ }
++EXPORT_SYMBOL_GPL(perf_get_aux);
+ 
+ #define PERF_AUX_GFP	(GFP_KERNEL | __GFP_ZERO | __GFP_NOWARN | __GFP_NORETRY)
+ 
+-- 
+2.1.4
