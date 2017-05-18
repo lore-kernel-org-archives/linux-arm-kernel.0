@@ -1,37 +1,85 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 18 May 2017 08:01:53 -0500
-Subject: [PATCH 2/2] arm64: defconfig: enable options needed for QCom
- DB410c board
-In-Reply-To: <20170517215230.15108-2-robh@kernel.org>
-References: <20170517215230.15108-1-robh@kernel.org>
- <20170517215230.15108-2-robh@kernel.org>
-Message-ID: <CAL_JsqK3jkQawSLigy1hMDTc5M6VSSsUomjMom-WFSKtWJzjsQ@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 18 May 2017 21:02:50 +0800
+Subject: [PATCH] arm64: cpufeature: check translation granule size based
+ on kernel config
+In-Reply-To: <20170518124115.GC4957@leverpostej>
+References: <1495102873-10858-1-git-send-email-leo.yan@linaro.org>
+ <c0c8bd7b-647d-092d-65ac-08a90000e30c@arm.com>
+ <20170518113627.GC25294@leoy-ThinkPad-T440>
+ <20170518123840.GD21359@arm.com>
+ <20170518124115.GC4957@leverpostej>
+Message-ID: <20170518130250.GE25294@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 4:52 PM, Rob Herring <robh@kernel.org> wrote:
-> Enable Qualcomm drivers needed to boot Dragonboard 410c with HDMI. This
-> enables support for clocks, regulators, and USB PHY.
->
-> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  arch/arm64/configs/defconfig | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index d916fc316698..5b94e3d24c16 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -303,6 +303,7 @@ CONFIG_MFD_CROS_EC_I2C=y
->  CONFIG_MFD_EXYNOS_LPASS=m
->  CONFIG_MFD_HI655X_PMIC=y
->  CONFIG_MFD_MAX77620=y
-> +CONFIG_MFD_QCOM_RPM=y
+On Thu, May 18, 2017 at 01:41:15PM +0100, Mark Rutland wrote:
+> On Thu, May 18, 2017 at 01:38:41PM +0100, Will Deacon wrote:
+> > On Thu, May 18, 2017 at 07:36:27PM +0800, Leo Yan wrote:
+> > > On Thu, May 18, 2017 at 11:39:01AM +0100, Suzuki K Poulose wrote:
+> > > > On 18/05/17 11:21, Leo Yan wrote:
+> > > > >In the big.LITTLE system with two clusters, one is CA53 cluster and
+> > > > >another is CA73 cluster. CA53 doesn't support 16KB memory translation
+> > > > >granule size (4.3.21 AArch64 Memory Model Feature Register 0, EL1; ARM
+> > > > >DDI 0500F), but CA73 supports this feature (4.3.27 AArch64 Memory Model
+> > > > >Feature Register 0, EL1; ARM 100048_0002_04_en). As result, the kernel
+> > > > >reports log for "Unexpected variation" as below.
+> > > > >
+> > > > >[    0.182113] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1. Boot CPU: 0x00000000001122, CPU4: 0x00000000101122
+> > > > 
+> > > > >
+> > > > >This patch is to change the checking CPU feature for memory translation
+> > > > >granule size based on kernel configuration. If kernel configuration has
+> > > > >selected to use one specific memory translation granule size, then we
+> > > > >will do strict sanity checking cross all CPUs. Otherwise we can skip to
+> > > > >check unused features for memory translation granule size if kernel
+> > > > >doesn't use it.
+> > > > >
+> > > > 
+> > > > If we were to suppress the warning (more on that below), we could simply
+> > > > make this feature a NON_STRICT, since the unsupported CPUs won't boot
+> > > > with 16K to hit this sanity check.
+> > > > 
+> > > > However, there is a problem with disabling this warning. If a VM starts
+> > > > using 16KB page size on a 4K/64K host, the VM could end up in unknown
+> > > > failures when it switches to an unsupported CPU (after it has booted).
+> > > > Of course the real fix lies in making the KVM exposing the safe value
+> > > > for granule support to the VCPUs (which is currently being worked on by
+> > > > Douglas in Cc). So, when we have that ready, we could make it NON_STRICT
+> > > > instead of this approach.
+> > > 
+> > > Thanks for the info :)
+> > > 
+> > > I will use below patch for production branch temporarily. You could
+> > > work out one formal patch for upstreaming when the dependency patches
+> > > are get ready:
+> > 
+> > The other thing we could do is change the way we taint on mismatch so that
+> > we don't dump the scary (and pointless) backtrace.
+> 
+> The backtrace is due to the WARN part of the WARN_TAINT_ONCE.
+> 
+> We could chagne that as below, if we really want to get rid of the backtrace.
+> 
+> Thanks,
+> Mark.
+> 
+> ---->8----
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 94b8f7f..1f53314 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -639,8 +639,8 @@ void update_cpu_features(int cpu,
+>          * Mismatched CPU features are a recipe for disaster. Don't even
+>          * pretend to support them.
+>          */
+> -       WARN_TAINT_ONCE(taint, TAINT_CPU_OUT_OF_SPEC,
+> -                       "Unsupported CPU feature variation.\n");
+> +       pr_warn_once("Unsupported CPU feature variation detected.\n");
+> +       add_taint(TAINT_CPU_OUT_OF_SPEC);
 
-According to Bjorn, this one is for 8064, so this hunk can be dropped.
+Should be add_taint(TAINT_CPU_OUT_OF_SPEC, LOCKDEP_STILL_OK)?
 
->  CONFIG_MFD_SPMI_PMIC=y
->  CONFIG_MFD_RK808=y
->  CONFIG_MFD_SEC_CORE=y
+>  }
+>  
+>  u64 read_sanitised_ftr_reg(u32 id)
+> 
