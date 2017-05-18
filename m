@@ -1,77 +1,60 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 18 May 2017 11:23:48 +0100
-Subject: [PATCH v2] ARM: MCPM: ensure not to enter __hyp_soft_restart from
- loopback and cpu_power_down
-In-Reply-To: <1495099592-10439-1-git-send-email-sudeep.holla@arm.com>
-References: <1495099592-10439-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1495103028-29753-1-git-send-email-sudeep.holla@arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 18 May 2017 11:27:56 +0100
+Subject: [PATCH v2 0/3] arm64: Add support for handling memory corruption
+In-Reply-To: <1495081650.3981.15@smtp.canonical.com> (Manoj Iyer's message of
+ "Wed, 17 May 2017 23:27:30 -0500")
+References: <20170517152336.6052-1-punit.agrawal@arm.com>
+ <1495081650.3981.15@smtp.canonical.com>
+Message-ID: <87y3tujw7n.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9da5ac236de6 ("ARM: soft-reboot into same mode that we entered
-the kernel") added support to enter the new kernel in the same processor
-mode as the previous one when we soft-reboot from one kernel into
-another by pass a flag to cpu_reset() so it knows what to do exactly.
+Hi Manoj,
 
-However it missed to make similar changes in MCPM code. Due to the
-missing flag, the CPUs enter HYP mode which is not supported with MCPM.
-MCPM works only in secure mode as it manages CCI.
+Manoj Iyer <manoj.iyer@canonical.com> writes:
 
-This patch aligns the cpu_reset call in MCPM with other changes in the
-above mentioned commit by making phys_reset_t to follow the prototype
-of cpu_reset().
+> On Wed, May 17, 2017 at 10:23 AM, Punit Agrawal
+> <punit.agrawal@arm.com> wrote:
+>
+>     Hi, This series enables memory failure handling for arm64.
+>     Previous posting can be found at [0]. Changes since v1: * Reworked
+>     Patch 1 based on Catalin's feedbak to symmetrically deal with PUD
+>     and PMD hugepages in huge_pte_offset() * Added Steve's acks With
+>     support for contiguous hugepages being turned off[1], some of the
+>     problems arising from swap entries go away[2]. This simplifies the
+>     changes needed to enable memory corruption handling for arm64
+>     (done in this seris). In this series, we updates huge_pte_offset()
+>     to correctly deal with swap entries (Patch 1). This function will
+>     need to be updated when contiguous hugepages are re-enabled. Patch
+>     2 adds support to send SIGBUS to processes that have their memory
+>     corrupted. With the prerequisites in place, enable memory
+>     corruption handling for arm64 (patch 3).
+>
+>     Thanks, Punit [0]
+>     https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1376052.html
+>    [1] https://lkml.org/lkml/2017/4/7/486 [2]
+>     https://lkml.org/lkml/2017/4/5/402 Jonathan (Zhixiong) Zhang (2):
+>     arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE] handling arm64:
+>     kconfig: allow support for memory failure handling Punit Agrawal
+>     (1): arm64: hugetlb: Fix huge_pte_offset to return poisoned page
+>     table entries arch/arm64/Kconfig | 1 +
+>     arch/arm64/include/asm/pgtable.h | 2 +- arch/arm64/mm/fault.c | 22
+>     +++++++++++++++++++--- arch/arm64/mm/hugetlbpage.c | 29
+>     ++++++++++------------------- 4 files changed, 31 insertions(+),
+>     23 deletions(-) 
+>     -- 
+>     2.11.0 
+>
+> I applied Jonathans 2 patches to Ubuntu Zesty kernel (4.10) and ran
+> the mce-test ./run_hugepage.sh after fixing a few things in the test
+> case. This generated the bad pmd messages.
+>
+> linux-4.10.0/mm/pgtable-generic.c:33: bad pmd 0000000172420074.
+>
+> Then I applied Punit's patch to the kernel and re-ran the mce-test and
+> did not see the bad pmd messages. The tests were done on a Qualcomm
+> Centriq 2400 platform. 
+>
+> Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
 
-Fixes: 9da5ac236de6 ("ARM: soft-reboot into same mode that we entered the kernel")
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/common/mcpm_entry.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-Hi Nico, Russell,
-
-I am seeing a boot failure without this patch on my TC2 where MCPM is
-enabled and active. The loopback test fails on primary, if skipped fails
-later on resume path.
-
-Regards,
-Sudeep
-
-v1->v2:
-	- As suggested by Russell, changed phys_reset_t typedef to follow
-	  cpu_reset() prototype
-
-diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
-index cf062472e07b..2b913f17d50f 100644
---- a/arch/arm/common/mcpm_entry.c
-+++ b/arch/arm/common/mcpm_entry.c
-@@ -235,7 +235,7 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster)
- 	return ret;
- }
-
--typedef void (*phys_reset_t)(unsigned long);
-+typedef typeof(cpu_reset) phys_reset_t;
-
- void mcpm_cpu_power_down(void)
- {
-@@ -300,7 +300,7 @@ void mcpm_cpu_power_down(void)
- 	 * on the CPU.
- 	 */
- 	phys_reset = (phys_reset_t)(unsigned long)__pa_symbol(cpu_reset);
--	phys_reset(__pa_symbol(mcpm_entry_point));
-+	phys_reset(__pa_symbol(mcpm_entry_point), false);
-
- 	/* should never get here */
- 	BUG();
-@@ -389,7 +389,7 @@ static int __init nocache_trampoline(unsigned long _arg)
- 	__mcpm_cpu_down(cpu, cluster);
-
- 	phys_reset = (phys_reset_t)(unsigned long)__pa_symbol(cpu_reset);
--	phys_reset(__pa_symbol(mcpm_entry_point));
-+	phys_reset(__pa_symbol(mcpm_entry_point), false);
- 	BUG();
- }
-
---
-2.7.4
+Thanks for taking the patches for a spin.
