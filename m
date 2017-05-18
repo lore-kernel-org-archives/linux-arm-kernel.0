@@ -1,49 +1,59 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Thu, 18 May 2017 11:06:45 -0300
-Subject: [PATCH 3/4] [media] s5p-jpeg: don't return a random width/height
-In-Reply-To: <754069659fbb44b458d8a8bef67d8f3f235d0c87.1495116400.git.mchehab@s-opensource.com>
-References: <754069659fbb44b458d8a8bef67d8f3f235d0c87.1495116400.git.mchehab@s-opensource.com>
-Message-ID: <db2a1b1de920cc4bccaadbbbeee11a854ab81f00.1495116400.git.mchehab@s-opensource.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 18 May 2017 09:19:32 -0500
+Subject: [PATCH 0/8] ARM: OMAP2+: AM33XX/AM43XX: Add suspend-resume support
+In-Reply-To: <597b3b18-154d-9e81-35c3-4790d813031b@ti.com>
+References: <20170329015801.22240-1-d-gerlach@ti.com>
+ <20170329171314.GD10760@atomide.com>
+ <cd340d7a-c0cf-9227-1382-2277ffa5b1b0@ti.com>
+ <20170516154717.GF31418@atomide.com>
+ <597b3b18-154d-9e81-35c3-4790d813031b@ti.com>
+Message-ID: <0bf4723f-dd94-bbbf-21a8-2ec60dff58cb@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gcc 7.1 complains about:
+Tony,
+On 05/16/2017 10:49 AM, Dave Gerlach wrote:
+> On 05/16/2017 10:47 AM, Tony Lindgren wrote:
+>> * Dave Gerlach <d-gerlach@ti.com> [170329 11:52]:
+>>> Hi Tony,
+>>> On 03/29/2017 12:13 PM, Tony Lindgren wrote:
+>>>> * Dave Gerlach <d-gerlach@ti.com> [170328 19:00]:
+>>>>> Hi,
+>>>>> This series contains the remaining code to enable suspend to mem and
+>>>>> standby on
+>>>>> am335x and am437x platforms. It depends on the ti-emif-sram series sent
+>>>>> here [1].
+>>>>
+>>>> Looks good to me in general. To remove the dependency, can some
+>>>> of this be merged separately without breaking things before [1]?
+>>>> Maybe by disabling some of the PM states until [1] is in place?
+>>>
+>>> Thanks for the feedback. Actually, patch 7 is the only patch with a
+>>> dependency to [1]. The rest of the patches just add platform PM support
+>>> needed for suspend but won't do much of anything until patch 7 actually
+>>> enables the suspend states, so there is no reason why patches 1-6 and patch
+>>> 8 can't be merged now.
+>>
+>> I'm applying patches 1-5 into omap-for-v4.13/soc. Patch 6 needs
+>> ack from Russell.
+>>
+>
+> Thanks. I will resend patches 6-8 as a separate series.
 
-drivers/media/platform/s5p-jpeg/jpeg-core.c: In function 's5p_jpeg_parse_hdr.isra.9':
-drivers/media/platform/s5p-jpeg/jpeg-core.c:1207:12: warning: 'width' may be used uninitialized in this function [-Wmaybe-uninitialized]
-  result->w = width;
-  ~~~~~~~~~~^~~~~~~
-drivers/media/platform/s5p-jpeg/jpeg-core.c:1208:12: warning: 'height' may be used uninitialized in this function [-Wmaybe-uninitialized]
-  result->h = height;
-  ~~~~~~~~~~^~~~~~~~
+On second thought, it's probably best to keep patches 4 and 5 as part of the new 
+series as well for review purposes, as they are not added to the build until 
+patch 6 but also make use of the asm-offsets macros introduced in patch 6. I 
+will send them along with patch 6-8 resend, making the new series patches 4-8.
 
-Indeed the code would allow it to return a random value (although
-it shouldn't happen, in practice). So, explicitly set both to zero,
-just in case.
+Regards,
+Dave
 
-Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
----
- drivers/media/platform/s5p-jpeg/jpeg-core.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-index 52dc7941db65..1da2c94e1dca 100644
---- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
-+++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-@@ -1099,10 +1099,10 @@ static bool s5p_jpeg_parse_hdr(struct s5p_jpeg_q_data *result,
- 			       struct s5p_jpeg_ctx *ctx)
- {
- 	int c, components = 0, notfound, n_dht = 0, n_dqt = 0;
--	unsigned int height, width, word, subsampling = 0, sos = 0, sof = 0,
--		     sof_len = 0;
--	unsigned int dht[S5P_JPEG_MAX_MARKER], dht_len[S5P_JPEG_MAX_MARKER],
--		     dqt[S5P_JPEG_MAX_MARKER], dqt_len[S5P_JPEG_MAX_MARKER];
-+	unsigned int height = 0, width = 0, word, subsampling = 0;
-+	unsigned int sos = 0, sof = 0, sof_len = 0;
-+	unsigned int dht[S5P_JPEG_MAX_MARKER], dht_len[S5P_JPEG_MAX_MARKER];
-+	unsigned int dqt[S5P_JPEG_MAX_MARKER], dqt_len[S5P_JPEG_MAX_MARKER];
- 	long length;
- 	struct s5p_jpeg_buffer jpeg_buffer;
- 
--- 
-2.9.3
+>
+> Regards,
+> Dave
+>
+>> Regards,
+>>
+>> Tony
+>>
+>
