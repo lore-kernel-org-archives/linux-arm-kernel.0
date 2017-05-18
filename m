@@ -1,73 +1,79 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 18 May 2017 18:46:12 +0100
-Subject: [PATCH 0/2] arm64: acpi/pci: allow the firmware BAR
- configuration to be preserved
-In-Reply-To: <CAKv+Gu-NDR1PYUfOs4z-T9WoeBrYvFTTBt3XMiMg+AU76MbYBg@mail.gmail.com>
-References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
- <20170517215611.GJ31462@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu9T7vH_LbKfS_40JUbLNK4PYrMi++eKbCq_MzBsuQxUDQ@mail.gmail.com>
- <20170518140553.GA22106@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_cug6cVrWP-zkptvNn3LxYk7b4Gd=iTzHHe3us3KwL3Q@mail.gmail.com>
- <20170518154708.GA30182@red-moon>
- <CAKv+Gu-NDR1PYUfOs4z-T9WoeBrYvFTTBt3XMiMg+AU76MbYBg@mail.gmail.com>
-Message-ID: <20170518174612.GA31373@red-moon>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 18 May 2017 15:09:20 -0300
+Subject: [CFT] Always enable SMP mode on MP capable CPUs
+In-Reply-To: <20170518105209.GN22219@n2100.armlinux.org.uk>
+References: <20170518105209.GN22219@n2100.armlinux.org.uk>
+Message-ID: <CAOMZO5Da2R2_t2nU+MdrJiSzvcBQKS4pwYS96r4UyfGc8DtWww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 05:51:44PM +0100, Ard Biesheuvel wrote:
-> On 18 May 2017 at 16:47, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> > On Thu, May 18, 2017 at 04:10:28PM +0100, Ard Biesheuvel wrote:
-> >
-> > [...]
-> >
-> >> >> Re _DSM: I think it makes sense to honour it, because it puts the
-> >> >> allocation under the control of the firmware, which completely removes
-> >> >> the burden of having to reason about a policy in the kernel. That
-> >> >> leaves the question which will be the default, but that is of minor
-> >> >> importance IMO.
-> >> >
-> >> > I agree; we should try to follow the spec unless we have a good reason
-> >> > not to, which argues for honoring the _DSM, so I think it's worth a
-> >> > try.  Booting with "pci=realloc" could override the _DSM and taint the
-> >> > kernel (because we don't know the effect of reassigning something the
-> >> > firmware told us not to touch).
-> >> >
-> >>
-> >> I'd like to hear Lorenzo's view on this first, but I can certainly
-> >> respin my _DSM patch to take pci=realloc into account, and move the
-> >> handling to generic code as well.
-> >
-> > I agree with both of you on _DSM implementation and interpretation.
-> >
-> > Now, if we use it correctly (ie by the FW standard) on ARM64 systems we
-> > are going to trigger regressions, that's certain (ie we can then boot
-> > with pci=realloc - still, we are breaking systems), that's the reason
-> > why for patch(2) I'd like to create a branch and send a CFT for ARM64
-> > ACPI testing before queuing it (either I can set-up a testing branch
-> > or we ask Bjorn to do it - as you guys prefer - as long as we have
-> > a branch for people to test patch(2) on ARM64 ACPI systems).
-> >
-> > You still need to assign resources that could not be claimed though
-> > so patch(2) still needs updating:
-> >
-> > PCI FW spec 3.1 - 4.6.5
-> >
-> > "...However, the operating system is free to configure the devices in this
-> > hierarchy that have not been configured by the firmware."
-> >
-> > Which in kernel-speak it means that you have to assign resources that
-> > could not be claimed.
-> >
-> 
-> Right. AFAICT this is the part that is typically handled by
-> pcibios_resource_survey() et al, whose default __weak implementations
-> are empty functions. Shall I override those for arm64 to host this
-> logic?
+Hi Russell,
 
-I think it makes sense yes unless Bjorn spots something wrong with that
-but you should also call it in ARM64 pci_acpi_scan_root() since it is
-not called by PCI core on non-hot-added bridges, I reckon you figured
-that out already though.
+On Thu, May 18, 2017 at 7:52 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> As a result of a recent bug report, it has been found that certain CPUs
+> must always have SMP mode enabled in order for the caches to work.
+>
+> Remove the conditional on setting the SMP bit(s).
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+> This needs to be tested on:
+>
+> - Cortex A5MP
+> - Cortex A9MP
+> - Cortex R7MP
+> - Cortex A7MP
+> - Cortex A12MP
+> - Cortex A15MP
+> - Cortex A17MP
+> - Brahma B15
+>
+> and any other CPU that mis-identifies itself with a MP-capable CPUID
+> signature that might match one of those CPUs.  I'm aware of a Cortex
+> A9 CPU out there that does mis-identify itself as SMP capable but
+> isn't:
+>
+>         @ Core indicates it is SMP. Check for Aegis SOC where a single
+>         @ Cortex-A9 CPU is present but SMP operations fault.
+>
+> This will also need testing.
+>
+>  arch/arm/mm/proc-v7.S | 8 ++------
+>  1 file changed, 2 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 01d64c0b2563..4d48a4cf563b 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -286,14 +286,10 @@ ENDPROC(cpu_pj4b_do_resume)
+>         stmia   r12, {r1-r6, lr}                @ v7_invalidate_l1 touches r0-r6
+>         bl      v7_invalidate_l1
+>         ldmia   r12, {r1-r6, lr}
+> -#ifdef CONFIG_SMP
+> +       mrc     p15, 0, r0, c1, c0, 1
+>         orr     r10, r10, #(1 << 6)             @ Enable SMP/nAMP mode
+> -       ALT_SMP(mrc     p15, 0, r0, c1, c0, 1)
+> -       ALT_UP(mov      r0, r10)                @ fake it for UP
+>         orr     r10, r10, r0                    @ Set required bits
+> -       teq     r10, r0                         @ Were they already set?
+> -       mcrne   p15, 0, r10, c1, c0, 1          @ No, update register
+> -#endif
+> +       mcr     p15, 0, r10, c1, c0, 1          @ No, update register
+>         b       __v7_setup_cont
 
-Thanks a lot !
-Lorenzo
+I tested this patch on a mx6ul, which is CortexA7 UP using USB serial
+download mode.
+
+In this boot mode the ROM code does not set the SMP bit and I can
+notice a very slow boot progress with CONFIG_SMP=n with an original
+4.12-rc1.
+
+With this patch applied it boots with the correct speed, so:
+
+Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
+
+Adding Kevin on Cc in case kernelci.org could run some tests with this
+patch applied on other platforms.
+
+Thanks
