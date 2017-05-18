@@ -1,62 +1,27 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 18 May 2017 11:31:20 -0700
-Subject: [PATCH v1 1/3] drm/stm: ltdc: Add bridge support
-In-Reply-To: <1494600989-13507-2-git-send-email-philippe.cornu@st.com>
-References: <1494600989-13507-1-git-send-email-philippe.cornu@st.com>
- <1494600989-13507-2-git-send-email-philippe.cornu@st.com>
-Message-ID: <87y3tuj9tz.fsf@eliezer.anholt.net>
+From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
+Date: Thu, 18 May 2017 20:34:05 +0200
+Subject: [PULL 00/13] KVM/ARM Fixes for v4.12-rc2
+In-Reply-To: <20170518094722.9926-1-cdall@linaro.org>
+References: <20170518094722.9926-1-cdall@linaro.org>
+Message-ID: <20170518183405.GB7438@potion>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philippe CORNU <philippe.cornu@st.com> writes:
+2017-05-18 11:47+0200, Christoffer Dall:
+> Hi Radim and Paolo,
+> 
+> Here is a fairly large set of fixes post -rc1 for KVM/ARM.
+> 
+> The fixes include:
+>  - A fix for a build failure introduced in -rc1 when tracepoints are
+>    enabled on 32-bit ARM.
+>  - Disabling use of stack pointer protection in the hyp code which can
+>    cause panics.
+>  - A handful of VGIC fixes.
+>  - A fix to the init of the redistributors on GICv3 systems that
+>    prevented boot with kvmtool on GICv3 systems introduced in -rc1.
+>  - A number of race conditions fixed in our MMU handling code.
+>  - A fix for the guest being able to program the debug extensions for
+>    the host on the 32-bit side.
 
-> Add the bridge support, used by DSI host and HDMI/LVDS bridges.
->
-> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
-
-> @@ -987,19 +1024,36 @@ static struct drm_panel *ltdc_get_panel(struct drm_device *ddev)
->  
->  		port = of_graph_get_remote_port_parent(entity);
->  		if (port) {
-> +			struct drm_bridge *bridge;
-> +			struct drm_panel *panel;
-> +
-> +			bridge = of_drm_find_bridge(port);
->  			panel = of_drm_find_panel(port);
-> -			of_node_put(port);
-> +			if (!bridge && !panel) {
-> +				of_node_put(entity);
-> +				return -EPROBE_DEFER;
-> +			}
-> +
-> +			if (bridge) {
-> +				if (!ldev->bridge) {
-> +					ldev->bridge = bridge;
-> +					DRM_INFO("remote bridge %s\n",
-> +						 port->full_name);
-> +				}
-> +			}
-> +
->  			if (panel) {
-> -				DRM_DEBUG_DRIVER("remote panel %s\n",
-> +				if (!ldev->panel) {
-> +					ldev->panel = panel;
-> +					DRM_INFO("remote panel %s\n",
->  						 port->full_name);
-> -			} else {
-> -				DRM_DEBUG_DRIVER("panel missing\n");
-> -				of_node_put(entity);
-> +				}
->  			}
-> +			of_node_put(port);
-
-Is it possible to use drm_of_find_panel_or_bridge() instead?  I don't
-think it makes sense to have both a bridge and a panel for the same
-node, does it?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170518/55a135d8/attachment.sig>
+Pulled, thanks.
