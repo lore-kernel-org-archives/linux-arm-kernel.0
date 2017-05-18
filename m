@@ -1,38 +1,62 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 18 May 2017 11:47:19 +0200
-Subject: [PULL 10/13] kvm: arm/arm64: Force reading uncached stage2 PGD
+Date: Thu, 18 May 2017 11:47:22 +0200
+Subject: [PULL 13/13] KVM: arm/arm64: Hold slots_lock when unregistering kvm
+ io bus devices
 In-Reply-To: <20170518094722.9926-1-cdall@linaro.org>
 References: <20170518094722.9926-1-cdall@linaro.org>
-Message-ID: <20170518094722.9926-11-cdall@linaro.org>
+Message-ID: <20170518094722.9926-14-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+We were not holding the kvm->slots_lock as required when calling
+kvm_io_bus_unregister_dev() as required.
 
-Make sure we don't use a cached value of the KVM stage2 PGD while
-resetting the PGD.
+This only affects the error path, but still, let's do our due
+diligence.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: stable at vger.kernel.org
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Reported by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 ---
- virt/kvm/arm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 909a1a7..704e35f 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -837,7 +837,7 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
- 	spin_lock(&kvm->mmu_lock);
- 	if (kvm->arch.pgd) {
- 		unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
--		pgd = kvm->arch.pgd;
-+		pgd = READ_ONCE(kvm->arch.pgd);
- 		kvm->arch.pgd = NULL;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 9b0f681..201d5e2 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -614,15 +614,16 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
+ 	mutex_lock(&kvm->slots_lock);
+ 	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, sgi_base,
+ 				      SZ_64K, &sgi_dev->dev);
+-	mutex_unlock(&kvm->slots_lock);
+ 	if (ret) {
+ 		kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+ 					  &rd_dev->dev);
+-		return ret;
++		goto out;
  	}
- 	spin_unlock(&kvm->mmu_lock);
+ 
+ 	vgic->vgic_redist_free_offset += 2 * SZ_64K;
+-	return 0;
++out:
++	mutex_unlock(&kvm->slots_lock);
++	return ret;
+ }
+ 
+ static void vgic_unregister_redist_iodev(struct kvm_vcpu *vcpu)
+@@ -647,10 +648,12 @@ static int vgic_register_all_redist_iodevs(struct kvm *kvm)
+ 
+ 	if (ret) {
+ 		/* The current c failed, so we start with the previous one. */
++		mutex_lock(&kvm->slots_lock);
+ 		for (c--; c >= 0; c--) {
+ 			vcpu = kvm_get_vcpu(kvm, c);
+ 			vgic_unregister_redist_iodev(vcpu);
+ 		}
++		mutex_unlock(&kvm->slots_lock);
+ 	}
+ 
+ 	return ret;
 -- 
 2.9.0
