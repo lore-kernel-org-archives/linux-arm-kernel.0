@@ -1,70 +1,65 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 18 May 2017 10:26:32 +0100
-Subject: [PATCH] ARM: MCPM: ensure not to enter __hyp_soft_restart from
- loopback and cpu_power_down
-Message-ID: <1495099592-10439-1-git-send-email-sudeep.holla@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 18 May 2017 11:32:26 +0200
+Subject: [PATCH v2 1/2] clk: Hi3660: change to register crgctrl clock
+ with CLK_OF_DECLARE_DRIVER
+In-Reply-To: <1495072247-25217-2-git-send-email-leo.yan@linaro.org>
+References: <1495072247-25217-1-git-send-email-leo.yan@linaro.org>
+ <1495072247-25217-2-git-send-email-leo.yan@linaro.org>
+Message-ID: <20170518093226.GA2125@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9da5ac236de6 ("ARM: soft-reboot into same mode that we entered
-the kernel") added support to enter the new kernel in the same processor
-mode as the previous one when we soft-reboot from one kernel into
-another by pass a flag to cpu_reset() so it knows what to do exactly.
+On Thu, May 18, 2017 at 09:50:46AM +0800, Leo Yan wrote:
+> The timer will register into system at very early phase at kernel boot;
+> if timer needs to use clock, the clock should be get ready in function
+> of_clk_init() so later the timer driver probe can retrieve clock
+> successfully. This is finished in below flow on arm64:
+> 
+>   start_kernel()
+>     `-> time_init()
+>           `-> of_clk_init(NULL)    => register timer's clock
+>           `-> clocksource_probe()  => register timer
+> 
+> On Hi3660 the sp804 timer uses clock "osc32k", this clock is registered
+> as platform driver rather than CLK_OF_DECLARE_DRIVER method. As result,
+> sp804 timer probe returns failure due if cannot bind clock properly.
+> To fix the failure, this patch is to change crgctrl clock registration
+> from platform driver to CLK_OF_DECLARE_DRIVER method so the clocks can
+> be registered ahead with function of_clk_init() and then timer driver
+> can use it.
+> 
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  drivers/clk/hisilicon/clk-hi3660.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/hisilicon/clk-hi3660.c b/drivers/clk/hisilicon/clk-hi3660.c
+> index fd5ce7f..4e5713b 100644
+> --- a/drivers/clk/hisilicon/clk-hi3660.c
+> +++ b/drivers/clk/hisilicon/clk-hi3660.c
+> @@ -547,10 +547,10 @@ static void hi3660_clk_crgctrl_init(struct device_node *np)
+>  				  ARRAY_SIZE(hi3660_crgctrl_divider_clks),
+>  				  clk_data);
+>  }
+> +CLK_OF_DECLARE_DRIVER(hi3660_clk_crgctrl, "hisilicon,hi3660-crgctrl",
+> +		      hi3660_clk_crgctrl_init);
+>  
+>  static const struct of_device_id hi3660_clk_match_table[] = {
+> -	{ .compatible = "hisilicon,hi3660-crgctrl",
+> -	  .data = hi3660_clk_crgctrl_init },
+>  	{ .compatible = "hisilicon,hi3660-pctrl",
+>  	  .data = hi3660_clk_pctrl_init },
+>  	{ .compatible = "hisilicon,hi3660-pmuctrl",
 
-However it missed to make similar changes in MCPM code. Due to the
-missing flag, the CPUs enter HYP mode which is not supported with MCPM.
-MCPM works only in secure mode as it manages CCI.
+Why not do the change for all the clocks and remove the
+hi3660_clk_match_table[]? and all the related platform driver code?
 
-This patch aligns the cpu_reset call in MCPM with other changes in the
-above mentioned commit.
+That will be consistent with the other clk-hi* drivers.
 
-Fixes: 9da5ac236de6 ("ARM: soft-reboot into same mode that we entered the kernel")
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/common/mcpm_entry.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+-- 
 
-Hi Nico, Russell,
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-I am seeing a boot failure without this patch on my TC2 where MCPM is
-enabled and active. The loopback test fails on primary, if skipped fails
-later on resume path.
-
-Regards,
-Sudeep
-
-diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
-index cf062472e07b..d2bd153484b6 100644
---- a/arch/arm/common/mcpm_entry.c
-+++ b/arch/arm/common/mcpm_entry.c
-@@ -235,7 +235,7 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster)
- 	return ret;
- }
-
--typedef void (*phys_reset_t)(unsigned long);
-+typedef void (*phys_reset_t)(unsigned long, bool);
-
- void mcpm_cpu_power_down(void)
- {
-@@ -300,7 +300,7 @@ void mcpm_cpu_power_down(void)
- 	 * on the CPU.
- 	 */
- 	phys_reset = (phys_reset_t)(unsigned long)__pa_symbol(cpu_reset);
--	phys_reset(__pa_symbol(mcpm_entry_point));
-+	phys_reset(__pa_symbol(mcpm_entry_point), false);
-
- 	/* should never get here */
- 	BUG();
-@@ -389,7 +389,7 @@ static int __init nocache_trampoline(unsigned long _arg)
- 	__mcpm_cpu_down(cpu, cluster);
-
- 	phys_reset = (phys_reset_t)(unsigned long)__pa_symbol(cpu_reset);
--	phys_reset(__pa_symbol(mcpm_entry_point));
-+	phys_reset(__pa_symbol(mcpm_entry_point), false);
- 	BUG();
- }
-
---
-2.7.4
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
