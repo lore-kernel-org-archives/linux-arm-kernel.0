@@ -1,210 +1,111 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 18 May 2017 11:47:17 +0200
-Subject: [PULL 08/13] KVM: arm: plug potential guest hardware debug leakage
+Date: Thu, 18 May 2017 11:47:15 +0200
+Subject: [PULL 06/13] KVM: arm/arm64: vgic-v3: Use PREbits to infer the number
+ of ICH_APxRn_EL2 registers
 In-Reply-To: <20170518094722.9926-1-cdall@linaro.org>
 References: <20170518094722.9926-1-cdall@linaro.org>
-Message-ID: <20170518094722.9926-9-cdall@linaro.org>
+Message-ID: <20170518094722.9926-7-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhichao Huang <zhichao.huang@linaro.org>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Hardware debugging in guests is not intercepted currently, it means
-that a malicious guest can bring down the entire machine by writing
-to the debug registers.
+The GICv3 documentation is extremely confusing, as it talks about
+the number of priorities represented by the ICH_APxRn_EL2 registers,
+while it should really talk about the number of preemption levels.
 
-This patch enable trapping of all debug registers, preventing the
-guests to access the debug registers. This includes access to the
-debug mode(DBGDSCR) in the guest world all the time which could
-otherwise mess with the host state. Reads return 0 and writes are
-ignored (RAZ_WI).
+This leads to a bug where we may access undefined ICH_APxRn_EL2
+registers, since PREbits is allowed to be smaller than PRIbits.
+Thankfully, nobody seem to have taken this path so far...
 
-The result is the guest cannot detect any working hardware based debug
-support. As debug exceptions are still routed to the guest normal
-debug using software based breakpoints still works.
+The fix is to use ICH_VTR_EL2.PREbits instead.
 
-To support debugging using hardware registers we need to implement a
-debug register aware world switch as well as special trapping for
-registers that may affect the host state.
-
-Cc: stable at vger.kernel.org
-Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm/include/asm/kvm_coproc.h |  3 +-
- arch/arm/kvm/coproc.c             | 77 ++++++++++++++++++++++++++++++---------
- arch/arm/kvm/handle_exit.c        |  4 +-
- arch/arm/kvm/hyp/switch.c         |  4 +-
- 4 files changed, 66 insertions(+), 22 deletions(-)
+ virt/kvm/arm/hyp/vgic-v3-sr.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_coproc.h b/arch/arm/include/asm/kvm_coproc.h
-index 4917c2f..e74ab0f 100644
---- a/arch/arm/include/asm/kvm_coproc.h
-+++ b/arch/arm/include/asm/kvm_coproc.h
-@@ -31,7 +31,8 @@ void kvm_register_target_coproc_table(struct kvm_coproc_target_table *table);
- int kvm_handle_cp10_id(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_cp_0_13_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
--int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index bce6037..32c3295 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -22,7 +22,7 @@
+ #include <asm/kvm_hyp.h>
  
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index ac8d36d..1403ffb 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -112,12 +112,6 @@ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	return 1;
- }
+ #define vtr_to_max_lr_idx(v)		((v) & 0xf)
+-#define vtr_to_nr_pri_bits(v)		(((u32)(v) >> 29) + 1)
++#define vtr_to_nr_pre_bits(v)		(((u32)(v) >> 26) + 1)
  
--int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
--{
--	kvm_inject_undefined(vcpu);
--	return 1;
--}
--
- static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
+ static u64 __hyp_text __gic_v3_get_lr(unsigned int lr)
  {
+@@ -135,13 +135,13 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 
+ 	if (used_lrs) {
+ 		int i;
+-		u32 nr_pri_bits;
++		u32 nr_pre_bits;
+ 
+ 		cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
+ 
+ 		write_gicreg(0, ICH_HCR_EL2);
+ 		val = read_gicreg(ICH_VTR_EL2);
+-		nr_pri_bits = vtr_to_nr_pri_bits(val);
++		nr_pre_bits = vtr_to_nr_pre_bits(val);
+ 
+ 		for (i = 0; i < used_lrs; i++) {
+ 			if (cpu_if->vgic_elrsr & (1 << i))
+@@ -152,7 +152,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 			__gic_v3_set_lr(0, i);
+ 		}
+ 
+-		switch (nr_pri_bits) {
++		switch (nr_pre_bits) {
+ 		case 7:
+ 			cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
+ 			cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
+@@ -162,7 +162,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 			cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
+ 		}
+ 
+-		switch (nr_pri_bits) {
++		switch (nr_pre_bits) {
+ 		case 7:
+ 			cpu_if->vgic_ap1r[3] = read_gicreg(ICH_AP1R3_EL2);
+ 			cpu_if->vgic_ap1r[2] = read_gicreg(ICH_AP1R2_EL2);
+@@ -198,7 +198,7 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+ 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+ 	u64 val;
+-	u32 nr_pri_bits;
++	u32 nr_pre_bits;
+ 	int i;
+ 
  	/*
-@@ -533,12 +527,7 @@ static int emulate_cp15(struct kvm_vcpu *vcpu,
- 	return 1;
- }
+@@ -217,12 +217,12 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 	}
  
--/**
-- * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
-- * @vcpu: The VCPU pointer
-- * @run:  The kvm_run struct
-- */
--int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+static struct coproc_params decode_64bit_hsr(struct kvm_vcpu *vcpu)
- {
- 	struct coproc_params params;
+ 	val = read_gicreg(ICH_VTR_EL2);
+-	nr_pri_bits = vtr_to_nr_pri_bits(val);
++	nr_pre_bits = vtr_to_nr_pre_bits(val);
  
-@@ -552,9 +541,38 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	params.Rt2 = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
- 	params.CRm = 0;
+ 	if (used_lrs) {
+ 		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
  
-+	return params;
-+}
-+
-+/**
-+ * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
-+ * @vcpu: The VCPU pointer
-+ * @run:  The kvm_run struct
-+ */
-+int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	struct coproc_params params = decode_64bit_hsr(vcpu);
-+
- 	return emulate_cp15(vcpu, &params);
- }
+-		switch (nr_pri_bits) {
++		switch (nr_pre_bits) {
+ 		case 7:
+ 			write_gicreg(cpu_if->vgic_ap0r[3], ICH_AP0R3_EL2);
+ 			write_gicreg(cpu_if->vgic_ap0r[2], ICH_AP0R2_EL2);
+@@ -232,7 +232,7 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 			write_gicreg(cpu_if->vgic_ap0r[0], ICH_AP0R0_EL2);
+ 		}
  
-+/**
-+ * kvm_handle_cp14_64 -- handles a mrrc/mcrr trap on a guest CP14 access
-+ * @vcpu: The VCPU pointer
-+ * @run:  The kvm_run struct
-+ */
-+int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	struct coproc_params params = decode_64bit_hsr(vcpu);
-+
-+	/* raz_wi cp14 */
-+	pm_fake(vcpu, &params, NULL);
-+
-+	/* handled */
-+	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-+	return 1;
-+}
-+
- static void reset_coproc_regs(struct kvm_vcpu *vcpu,
- 			      const struct coproc_reg *table, size_t num)
- {
-@@ -565,12 +583,7 @@ static void reset_coproc_regs(struct kvm_vcpu *vcpu,
- 			table[i].reset(vcpu, &table[i]);
- }
- 
--/**
-- * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
-- * @vcpu: The VCPU pointer
-- * @run:  The kvm_run struct
-- */
--int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+static struct coproc_params decode_32bit_hsr(struct kvm_vcpu *vcpu)
- {
- 	struct coproc_params params;
- 
-@@ -584,9 +597,37 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	params.Op2 = (kvm_vcpu_get_hsr(vcpu) >> 17) & 0x7;
- 	params.Rt2 = 0;
- 
-+	return params;
-+}
-+
-+/**
-+ * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
-+ * @vcpu: The VCPU pointer
-+ * @run:  The kvm_run struct
-+ */
-+int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	struct coproc_params params = decode_32bit_hsr(vcpu);
- 	return emulate_cp15(vcpu, &params);
- }
- 
-+/**
-+ * kvm_handle_cp14_32 -- handles a mrc/mcr trap on a guest CP14 access
-+ * @vcpu: The VCPU pointer
-+ * @run:  The kvm_run struct
-+ */
-+int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	struct coproc_params params = decode_32bit_hsr(vcpu);
-+
-+	/* raz_wi cp14 */
-+	pm_fake(vcpu, &params, NULL);
-+
-+	/* handled */
-+	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-+	return 1;
-+}
-+
- /******************************************************************************
-  * Userspace API
-  *****************************************************************************/
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index 5fd7968..f86a9aa 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -95,9 +95,9 @@ static exit_handle_fn arm_exit_handlers[] = {
- 	[HSR_EC_WFI]		= kvm_handle_wfx,
- 	[HSR_EC_CP15_32]	= kvm_handle_cp15_32,
- 	[HSR_EC_CP15_64]	= kvm_handle_cp15_64,
--	[HSR_EC_CP14_MR]	= kvm_handle_cp14_access,
-+	[HSR_EC_CP14_MR]	= kvm_handle_cp14_32,
- 	[HSR_EC_CP14_LS]	= kvm_handle_cp14_load_store,
--	[HSR_EC_CP14_64]	= kvm_handle_cp14_access,
-+	[HSR_EC_CP14_64]	= kvm_handle_cp14_64,
- 	[HSR_EC_CP_0_13]	= kvm_handle_cp_0_13_access,
- 	[HSR_EC_CP10_ID]	= kvm_handle_cp10_id,
- 	[HSR_EC_HVC]		= handle_hvc,
-diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
-index 92678b7..624a510 100644
---- a/arch/arm/kvm/hyp/switch.c
-+++ b/arch/arm/kvm/hyp/switch.c
-@@ -48,7 +48,9 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu, u32 *fpexc_host)
- 	write_sysreg(HSTR_T(15), HSTR);
- 	write_sysreg(HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11), HCPTR);
- 	val = read_sysreg(HDCR);
--	write_sysreg(val | HDCR_TPM | HDCR_TPMCR, HDCR);
-+	val |= HDCR_TPM | HDCR_TPMCR; /* trap performance monitors */
-+	val |= HDCR_TDRA | HDCR_TDOSA | HDCR_TDA; /* trap debug regs */
-+	write_sysreg(val, HDCR);
- }
- 
- static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+-		switch (nr_pri_bits) {
++		switch (nr_pre_bits) {
+ 		case 7:
+ 			write_gicreg(cpu_if->vgic_ap1r[3], ICH_AP1R3_EL2);
+ 			write_gicreg(cpu_if->vgic_ap1r[2], ICH_AP1R2_EL2);
 -- 
 2.9.0
