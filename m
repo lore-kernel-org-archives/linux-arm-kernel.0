@@ -1,62 +1,46 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Thu, 18 May 2017 11:43:01 +0800
-Subject: [PATCH 3/4] phy: rockchip-inno-usb2: add one phy comprises with two
- host-ports support
-In-Reply-To: <1495078982-2555-1-git-send-email-frank.wang@rock-chips.com>
-References: <1495078982-2555-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1495078982-2555-4-git-send-email-frank.wang@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 18 May 2017 11:58:04 +0800
+Subject: [PATCH v3 1/6] dt-bindings: clock: sunxi-ccu: Add compatible string
+ for A83T CCU
+In-Reply-To: <20170518035809.15487-1-wens@csie.org>
+References: <20170518035809.15487-1-wens@csie.org>
+Message-ID: <20170518035809.15487-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: William Wu <william.wu@rock-chips.com>
+The A83T clock control unit is a hybrid of some new style clock designs
+from the A80, and old style layout from the other Allwinner SoCs.
 
-At the current rockchip-inno-usb2 phy driver framework, it can
-only support usb2-phy which comprises with one otg-port and one
-host-port.
+Like the A80, the SoC does not have a low speed 32.768 kHz oscillator.
+Unlike the A80, there is no clock input either. The only low speed clock
+available is the internal oscillator which runs at around 16 MHz,
+divided by 512, yielding a low speed clock around 31.250 kHz.
 
-However, some Rockchip SoCs' (e.g RK3228, RK3229) usb2-phy comprises
-with two host-ports, so we use index of otg id for one host-port
-configuration, and make it work the same as otg-port host mode.
-
-Signed-off-by: William Wu <william.wu@rock-chips.com>
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/phy/phy-rockchip-inno-usb2.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
-index d6e459d..d026b4cf 100644
---- a/drivers/phy/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/phy-rockchip-inno-usb2.c
-@@ -406,7 +406,8 @@ static int rockchip_usb2phy_init(struct phy *phy)
- 	mutex_lock(&rport->mutex);
- 
- 	if (rport->port_id == USB2PHY_PORT_OTG) {
--		if (rport->mode != USB_DR_MODE_HOST) {
-+		if (rport->mode != USB_DR_MODE_HOST &&
-+		    rport->mode != USB_DR_MODE_UNKNOWN) {
- 			/* clear bvalid status and enable bvalid detect irq */
- 			ret = property_enable(rphy,
- 					      &rport->port_cfg->bvalid_det_clr,
-@@ -496,7 +497,8 @@ static int rockchip_usb2phy_exit(struct phy *phy)
- 	struct rockchip_usb2phy_port *rport = phy_get_drvdata(phy);
- 
- 	if (rport->port_id == USB2PHY_PORT_OTG &&
--	    rport->mode != USB_DR_MODE_HOST) {
-+	    rport->mode != USB_DR_MODE_HOST &&
-+	    rport->mode != USB_DR_MODE_UNKNOWN) {
- 		cancel_delayed_work_sync(&rport->otg_sm_work);
- 		cancel_delayed_work_sync(&rport->chg_work);
- 	} else if (rport->port_id == USB2PHY_PORT_HOST)
-@@ -973,7 +975,8 @@ static int rockchip_usb2phy_otg_port_init(struct rockchip_usb2phy *rphy,
- 	mutex_init(&rport->mutex);
- 
- 	rport->mode = of_usb_get_dr_mode_by_phy(child_np, -1);
--	if (rport->mode == USB_DR_MODE_HOST) {
-+	if (rport->mode == USB_DR_MODE_HOST ||
-+	    rport->mode == USB_DR_MODE_UNKNOWN) {
- 		ret = 0;
- 		goto out;
- 	}
+diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+index e9c5a1d9834a..34b2a9249a94 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+@@ -6,6 +6,7 @@ Required properties :
+ 		- "allwinner,sun6i-a31-ccu"
+ 		- "allwinner,sun8i-a23-ccu"
+ 		- "allwinner,sun8i-a33-ccu"
++		- "allwinner,sun8i-a83t-ccu"
+ 		- "allwinner,sun8i-h3-ccu"
+ 		- "allwinner,sun8i-h3-r-ccu"
+ 		- "allwinner,sun8i-v3s-ccu"
+@@ -18,6 +19,7 @@ Required properties :
+ - clocks: phandle to the oscillators feeding the CCU. Two are needed:
+   - "hosc": the high frequency oscillator (usually at 24MHz)
+   - "losc": the low frequency oscillator (usually at 32kHz)
++	    On the A83T, this is the internal 16MHz oscillator divided by 512
+ - clock-names: Must contain the clock names described just above
+ - #clock-cells : must contain 1
+ - #reset-cells : must contain 1
 -- 
-2.0.0
+2.11.0
