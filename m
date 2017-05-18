@@ -1,79 +1,62 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 18 May 2017 15:09:20 -0300
-Subject: [CFT] Always enable SMP mode on MP capable CPUs
-In-Reply-To: <20170518105209.GN22219@n2100.armlinux.org.uk>
-References: <20170518105209.GN22219@n2100.armlinux.org.uk>
-Message-ID: <CAOMZO5Da2R2_t2nU+MdrJiSzvcBQKS4pwYS96r4UyfGc8DtWww@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 18 May 2017 11:31:20 -0700
+Subject: [PATCH v1 1/3] drm/stm: ltdc: Add bridge support
+In-Reply-To: <1494600989-13507-2-git-send-email-philippe.cornu@st.com>
+References: <1494600989-13507-1-git-send-email-philippe.cornu@st.com>
+ <1494600989-13507-2-git-send-email-philippe.cornu@st.com>
+Message-ID: <87y3tuj9tz.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Philippe CORNU <philippe.cornu@st.com> writes:
 
-On Thu, May 18, 2017 at 7:52 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> As a result of a recent bug report, it has been found that certain CPUs
-> must always have SMP mode enabled in order for the caches to work.
+> Add the bridge support, used by DSI host and HDMI/LVDS bridges.
 >
-> Remove the conditional on setting the SMP bit(s).
->
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
-> This needs to be tested on:
->
-> - Cortex A5MP
-> - Cortex A9MP
-> - Cortex R7MP
-> - Cortex A7MP
-> - Cortex A12MP
-> - Cortex A15MP
-> - Cortex A17MP
-> - Brahma B15
->
-> and any other CPU that mis-identifies itself with a MP-capable CPUID
-> signature that might match one of those CPUs.  I'm aware of a Cortex
-> A9 CPU out there that does mis-identify itself as SMP capable but
-> isn't:
->
->         @ Core indicates it is SMP. Check for Aegis SOC where a single
->         @ Cortex-A9 CPU is present but SMP operations fault.
->
-> This will also need testing.
->
->  arch/arm/mm/proc-v7.S | 8 ++------
->  1 file changed, 2 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 01d64c0b2563..4d48a4cf563b 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -286,14 +286,10 @@ ENDPROC(cpu_pj4b_do_resume)
->         stmia   r12, {r1-r6, lr}                @ v7_invalidate_l1 touches r0-r6
->         bl      v7_invalidate_l1
->         ldmia   r12, {r1-r6, lr}
-> -#ifdef CONFIG_SMP
-> +       mrc     p15, 0, r0, c1, c0, 1
->         orr     r10, r10, #(1 << 6)             @ Enable SMP/nAMP mode
-> -       ALT_SMP(mrc     p15, 0, r0, c1, c0, 1)
-> -       ALT_UP(mov      r0, r10)                @ fake it for UP
->         orr     r10, r10, r0                    @ Set required bits
-> -       teq     r10, r0                         @ Were they already set?
-> -       mcrne   p15, 0, r10, c1, c0, 1          @ No, update register
-> -#endif
-> +       mcr     p15, 0, r10, c1, c0, 1          @ No, update register
->         b       __v7_setup_cont
+> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
 
-I tested this patch on a mx6ul, which is CortexA7 UP using USB serial
-download mode.
+> @@ -987,19 +1024,36 @@ static struct drm_panel *ltdc_get_panel(struct drm_device *ddev)
+>  
+>  		port = of_graph_get_remote_port_parent(entity);
+>  		if (port) {
+> +			struct drm_bridge *bridge;
+> +			struct drm_panel *panel;
+> +
+> +			bridge = of_drm_find_bridge(port);
+>  			panel = of_drm_find_panel(port);
+> -			of_node_put(port);
+> +			if (!bridge && !panel) {
+> +				of_node_put(entity);
+> +				return -EPROBE_DEFER;
+> +			}
+> +
+> +			if (bridge) {
+> +				if (!ldev->bridge) {
+> +					ldev->bridge = bridge;
+> +					DRM_INFO("remote bridge %s\n",
+> +						 port->full_name);
+> +				}
+> +			}
+> +
+>  			if (panel) {
+> -				DRM_DEBUG_DRIVER("remote panel %s\n",
+> +				if (!ldev->panel) {
+> +					ldev->panel = panel;
+> +					DRM_INFO("remote panel %s\n",
+>  						 port->full_name);
+> -			} else {
+> -				DRM_DEBUG_DRIVER("panel missing\n");
+> -				of_node_put(entity);
+> +				}
+>  			}
+> +			of_node_put(port);
 
-In this boot mode the ROM code does not set the SMP bit and I can
-notice a very slow boot progress with CONFIG_SMP=n with an original
-4.12-rc1.
-
-With this patch applied it boots with the correct speed, so:
-
-Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
-
-Adding Kevin on Cc in case kernelci.org could run some tests with this
-patch applied on other platforms.
-
-Thanks
+Is it possible to use drm_of_find_panel_or_bridge() instead?  I don't
+think it makes sense to have both a bridge and a panel for the same
+node, does it?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170518/55a135d8/attachment.sig>
