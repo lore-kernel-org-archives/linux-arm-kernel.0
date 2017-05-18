@@ -1,54 +1,70 @@
-From: qnguyen@apm.com (Quan Nguyen)
-Date: Thu, 18 May 2017 11:39:48 +0700
-Subject: [PATCH net-next] drivers: net: xgene: Check all RGMII phy mode
- variants
-In-Reply-To: <20170517202633.GA14413@lunn.ch>
-References: <1495051550-28961-1-git-send-email-isubramanian@apm.com>
- <20170517202633.GA14413@lunn.ch>
-Message-ID: <CAFopSPTP07TFcgc8pACQDF4ZXHOftUMBqBCgF4hVpAmUt0cCWw@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 17 May 2017 22:05:38 -0700
+Subject: [PATCH 1/2] wcn36xx: Pass used skb to ieee80211_tx_status()
+In-Reply-To: <1495026867.2442.9.camel@sipsolutions.net>
+References: <20170426220444.10539-1-bjorn.andersson@linaro.org>
+ <1493281332.2529.1.camel@sipsolutions.net>
+ <20170428234247.GQ15143@minitux>
+ <87fugkrchl.fsf@kamboji.qca.qualcomm.com>
+ <1495026867.2442.9.camel@sipsolutions.net>
+Message-ID: <20170518050538.GL12920@tuxbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 3:26 AM, Andrew Lunn <andrew@lunn.ch> wrote:
->> +bool is_xgene_enet_phy_mode_rgmii(struct net_device *ndev)
->> +{
->> +     struct xgene_enet_pdata *pdata = netdev_priv(ndev);
->> +     int phy_mode = pdata->phy_mode;
->> +     bool ret;
->> +
->> +     ret = phy_mode == PHY_INTERFACE_MODE_RGMII ||
->> +           phy_mode == PHY_INTERFACE_MODE_RGMII_ID ||
->> +           phy_mode == PHY_INTERFACE_MODE_RGMII_RXID ||
->> +           phy_mode == PHY_INTERFACE_MODE_RGMII_TXID;
->> +
->> +     return ret;
->> +}
->
-> include/linux/phy.h:
->
-> /**
->  * phy_interface_is_rgmii - Convenience function for testing if a PHY interface
->  * is RGMII (all variants)
->  * @phydev: the phy_device struct
->  */
-> static inline bool phy_interface_is_rgmii(struct phy_device *phydev)
-> {
->         return phydev->interface >= PHY_INTERFACE_MODE_RGMII &&
->                 phydev->interface <= PHY_INTERFACE_MODE_RGMII_TXID;
-> };
->
+On Wed 17 May 06:14 PDT 2017, Johannes Berg wrote:
 
-Hi Andrew,
+> On Thu, 2017-05-04 at 13:13 +0000, Kalle Valo wrote:
+> > 
+> > > > This code intentionally checked if TX status was requested, and
+> > > > if not then it doesn't go to the effort of building it.
+> > > > 
+> > > 
+> > > What I'm finding puzzling is the fact that the only caller of
+> > > ieee80211_led_tx() is ieee80211_tx_status() and it seems like
+> > > drivers, such as ath10k, call this for each packet handled - but
+> > > I'm likely missing something.
+> 
+> Yes, many drivers do call it for each packet, and as such, this
+> deficiency was never noted.
+> 
+> > > > As it is with your patch, it'll go and report the TX status
+> > > > without any
+> > > > TX status information - which is handled in
+> > > > wcn36xx_dxe_tx_ack_ind()
+> > > > for those frames needing it.
+> > > > 
+> > > 
+> > > Right, it doesn't sound desired. However, during normal operation
+> > > I'm not seeing IEEE80211_TX_CTL_REQ_TX_STATUS being set and as such
+> > > ieee80211_led_tx() is never called.
+> > 
+> > So what's the conclusion? How do we get leds working?
+> 
+> Well, frankly, I never thought the TX LED was a super good idea - but
+> it had been supported by the original code IIRC, so never removed. Some
+> people like frantic blinking I guess ;-)
+> 
 
-Our purpose is to handle our internal pdata->phy_mode, so
-phy_interface_is_rgmii(phydev) seems not to fit.
-Instead, we're working on the below:
+It seems very important to a lot of people...
 
-+bool is_xgene_enet_phy_mode_rgmii(struct net_device *ndev)
-+{
-+       struct xgene_enet_pdata *pdata = netdev_priv(ndev);
-+
-+       return pdata->phy_mode >= PHY_INTERFACE_MODE_RGMII &&
-+              pdata->phy_mode <= PHY_INTERFACE_MODE_RGMII_TXID;
-+}
-+
+
+But if ieee80211_free_txskb() is the counterpart of
+ieee80211_tx_status() then we should be able to push the
+ieee80211_led_tx() call down into ieee80211_report_used_skb() and handle
+both cases.
+
+The ieee80211_free_txskb() seems to be used in various cases where we
+discard skbs, but perhaps this is not an issue in reality.
+
+> But I think the problem also applies to the throughput trigger thing,
+> so perhaps we need to stick some LED feedback calls into other places,
+> like _noskb() or provide an extra way to do it?
+> 
+
+Looking around it seems that we either have a call to free_txskb() or
+one of the tx_status(); where the _noskb() would need some special
+handling. Are there others or would it be reasonable to add a call in
+this one "special" case?
+
+Regards,
+Bjorn
