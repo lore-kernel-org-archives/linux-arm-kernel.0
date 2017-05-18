@@ -1,51 +1,25 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 18 May 2017 16:31:30 +0530
-Subject: [PATCH 1/2] ARM: davinci_all_defconfig: cleanup with savedefconfig
-In-Reply-To: <cover.1495104570.git.nsekhar@ti.com>
-References: <cover.1495104570.git.nsekhar@ti.com>
-Message-ID: <f6b8224820c9859d42fc397a15540f123bb7065d.1495104570.git.nsekhar@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 18 May 2017 11:36:07 +0100
+Subject: next-20170518 build: 1 failures 4 warnings (next-20170518)
+In-Reply-To: <E1dBFeZ-0004Qr-Jp@optimist>
+References: <E1dBFeZ-0004Qr-Jp@optimist>
+Message-ID: <20170518103607.u7l7vr2rnv3rsysu@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-davinci_all_defconfig is out of sync with savedefconfig in some places.
-Regenerate the default settings by:
+On Thu, May 18, 2017 at 08:15:19AM +0100, Build bot for Mark Brown wrote:
 
-$ make davinci_all_config
-$ make savedefconfig
-$ cp defconfig arch/arm/configs/davinci_all_defconfig
+Today's -next fails to build an ARM allmodconfig due to:
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/configs/davinci_all_defconfig | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+> 	arm-allmodconfig
+> Error: ../arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts:69.17-18 syntax error
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index 67db82999c06..d8cdcfaa0206 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -83,14 +83,13 @@ CONFIG_NETCONSOLE=y
- CONFIG_TUN=m
- CONFIG_DM9000=y
- CONFIG_TI_DAVINCI_EMAC=y
-+CONFIG_LSI_ET1011C_PHY=y
- CONFIG_LXT_PHY=y
- CONFIG_SMSC_PHY=y
--CONFIG_LSI_ET1011C_PHY=y
- CONFIG_PPP=m
- CONFIG_PPP_DEFLATE=m
- CONFIG_PPP_ASYNC=m
- CONFIG_PPP_SYNC_TTY=m
--# CONFIG_INPUT_MOUSEDEV is not set
- CONFIG_INPUT_EVDEV=m
- CONFIG_INPUT_EVBUG=m
- CONFIG_KEYBOARD_ATKBD=m
-@@ -236,7 +235,6 @@ CONFIG_NLS_ASCII=m
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_UTF8=m
- CONFIG_DEBUG_FS=y
--CONFIG_TIMER_STATS=y
- CONFIG_DEBUG_RT_MUTEXES=y
- CONFIG_DEBUG_MUTEXES=y
- # CONFIG_ARM_UNWIND is not set
--- 
-2.9.0
+caused by ff175ef29e9069ac46 (ARM: sun8i: v3s: add support for Lichee Pi
+Zero w/ dock board).  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170518/e0bd7915/attachment.sig>
