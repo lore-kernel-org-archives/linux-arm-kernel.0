@@ -1,92 +1,123 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 19 May 2017 13:45:03 +0530
-Subject: [PATCH 03/41] mmc: host: omap_hsmmc: Program HCTL based on
- signal_voltage set by mmc core
+Date: Fri, 19 May 2017 13:45:08 +0530
+Subject: [PATCH 08/41] mmc: host: omap_hsmmc: Remove incorrect voltage switch
+ sequence
 In-Reply-To: <20170519081541.26753-1-kishon@ti.com>
 References: <20170519081541.26753-1-kishon@ti.com>
-Message-ID: <20170519081541.26753-4-kishon@ti.com>
+Message-ID: <20170519081541.26753-9-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HCTL is now set based on ios.signal_voltage set by mmc core and not
-hardcoded to 3V0 if OMAP_HSMMC_SUPPORTS_DUAL_VOLT is set. If
-OMAP_HSMMC_SUPPORTS_DUAL_VOLT is set, it means HCTL can be set to either
-3V0 or 1V8. And it should be set to 3V0 or 1V8 depending on
-ios.signal_voltage.
-Also it is now set on power mode status being changed to MMC_POWER_ON.
+ios->vdd is set only in mmc_power_up and mmc_power_off and not in
+mmc_select_voltage() as mentioned in the code comment. This seems to be
+legacy code that has been carried for a long time without being
+tested.
+
+This will be replaced with the correct voltage switch sequence and
+populated in start_signal_voltage_switch ops to be used by mmc core
+for switching voltages.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c | 16 +++++++---------
- 1 file changed, 7 insertions(+), 9 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c | 79 -------------------------------------------
+ 1 file changed, 79 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 42954efe12f7..893d1624a5a3 100644
+index d47ef51fbe51..30cd2be7141c 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -229,6 +229,7 @@ struct omap_mmc_of_data {
- };
- 
- static void omap_hsmmc_start_dma_transfer(struct omap_hsmmc_host *host);
-+static void omap_hsmmc_conf_bus_power(struct omap_hsmmc_host *host, int iov);
- 
- static int omap_hsmmc_card_detect(struct device *dev)
- {
-@@ -1664,6 +1665,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 			omap_hsmmc_set_power(host, 1, ios->vdd);
- 			break;
- 		case MMC_POWER_ON:
-+			omap_hsmmc_conf_bus_power(host, ios->signal_voltage);
- 			do_send_init_stream = 1;
- 			break;
- 		}
-@@ -1824,17 +1826,12 @@ static void omap_hsmmc_set_capabilities(struct omap_hsmmc_host *host)
- 	OMAP_HSMMC_WRITE(host->base, CAPA, val);
+@@ -1292,67 +1292,6 @@ static void set_sd_bus_power(struct omap_hsmmc_host *host)
+ 	}
  }
  
--static void omap_hsmmc_conf_bus_power(struct omap_hsmmc_host *host)
-+static void omap_hsmmc_conf_bus_power(struct omap_hsmmc_host *host, int iov)
- {
- 	u32 hctl, value;
- 
--	/* Only MMC1 supports 3.0V */
--	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT)
--		hctl = SDVS30;
--	else
--		hctl = SDVS18;
+-/*
+- * Switch MMC interface voltage ... only relevant for MMC1.
+- *
+- * MMC2 and MMC3 use fixed 1.8V levels, and maybe a transceiver.
+- * The MMC2 transceiver controls are used instead of DAT4..DAT7.
+- * Some chips, like eMMC ones, use internal transceivers.
+- */
+-static int omap_hsmmc_switch_opcond(struct omap_hsmmc_host *host, int vdd)
+-{
+-	u32 reg_val = 0;
+-	int ret;
 -
- 	value = OMAP_HSMMC_READ(host->base, HCTL) & ~SDVS_MASK;
-+	hctl = (iov == MMC_SIGNAL_VOLTAGE_180) ? SDVS18 : SDVS30;
- 	OMAP_HSMMC_WRITE(host->base, HCTL, value | hctl);
- 
- 	/* Set SD bus power bit */
-@@ -2144,7 +2141,6 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 	mmc->pm_caps |= mmc_pdata(host)->pm_caps;
- 
- 	omap_hsmmc_set_capabilities(host);
--	omap_hsmmc_conf_bus_power(host);
- 
- 	host->rx_chan = dma_request_chan(&pdev->dev, "rx");
- 	if (IS_ERR(host->rx_chan)) {
-@@ -2281,6 +2277,7 @@ static int omap_hsmmc_suspend(struct device *dev)
- static int omap_hsmmc_resume(struct device *dev)
+-	/* Disable the clocks */
+-	if (host->dbclk)
+-		clk_disable_unprepare(host->dbclk);
+-
+-	/* Turn the power off */
+-	ret = omap_hsmmc_set_power(host, 0, 0);
+-
+-	/* Turn the power ON with given VDD 1.8 or 3.0v */
+-	if (!ret)
+-		ret = omap_hsmmc_set_power(host, 1, vdd);
+-	if (host->dbclk)
+-		clk_prepare_enable(host->dbclk);
+-
+-	if (ret != 0)
+-		goto err;
+-
+-	OMAP_HSMMC_WRITE(host->base, HCTL,
+-		OMAP_HSMMC_READ(host->base, HCTL) & SDVSCLR);
+-	reg_val = OMAP_HSMMC_READ(host->base, HCTL);
+-
+-	/*
+-	 * If a MMC dual voltage card is detected, the set_ios fn calls
+-	 * this fn with VDD bit set for 1.8V. Upon card removal from the
+-	 * slot, omap_hsmmc_set_ios sets the VDD back to 3V on MMC_POWER_OFF.
+-	 *
+-	 * Cope with a bit of slop in the range ... per data sheets:
+-	 *  - "1.8V" for vdds_mmc1/vdds_mmc1a can be up to 2.45V max,
+-	 *    but recommended values are 1.71V to 1.89V
+-	 *  - "3.0V" for vdds_mmc1/vdds_mmc1a can be up to 3.5V max,
+-	 *    but recommended values are 2.7V to 3.3V
+-	 *
+-	 * Board setup code shouldn't permit anything very out-of-range.
+-	 * TWL4030-family VMMC1 and VSIM regulators are fine (avoiding the
+-	 * middle range) but VSIM can't power DAT4..DAT7 at more than 3V.
+-	 */
+-	if ((1 << vdd) <= MMC_VDD_23_24)
+-		reg_val |= SDVS18;
+-	else
+-		reg_val |= SDVS30;
+-
+-	OMAP_HSMMC_WRITE(host->base, HCTL, reg_val);
+-	set_sd_bus_power(host);
+-
+-	return 0;
+-err:
+-	dev_err(mmc_dev(host->mmc), "Unable to switch operating voltage\n");
+-	return ret;
+-}
+-
+ /* Protect the card while the cover is open */
+ static void omap_hsmmc_protect_card(struct omap_hsmmc_host *host)
  {
- 	struct omap_hsmmc_host *host = dev_get_drvdata(dev);
-+	struct mmc_ios *ios;
+@@ -1763,24 +1702,6 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
  
- 	if (!host)
- 		return 0;
-@@ -2290,8 +2287,9 @@ static int omap_hsmmc_resume(struct device *dev)
- 	if (host->dbclk)
- 		clk_prepare_enable(host->dbclk);
+ 	omap_hsmmc_set_bus_width(host);
  
-+	ios = &host->mmc->ios;
- 	if (!(host->mmc->pm_flags & MMC_PM_KEEP_POWER))
--		omap_hsmmc_conf_bus_power(host);
-+		omap_hsmmc_conf_bus_power(host, ios->signal_voltage);
+-	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT) {
+-		/* Only MMC1 can interface at 3V without some flavor
+-		 * of external transceiver; but they all handle 1.8V.
+-		 */
+-		if ((OMAP_HSMMC_READ(host->base, HCTL) & SDVSDET) &&
+-			(ios->vdd == DUAL_VOLT_OCR_BIT)) {
+-				/*
+-				 * The mmc_select_voltage fn of the core does
+-				 * not seem to set the power_mode to
+-				 * MMC_POWER_UP upon recalculating the voltage.
+-				 * vdd 1.8v.
+-				 */
+-			if (omap_hsmmc_switch_opcond(host, ios->vdd) != 0)
+-				dev_dbg(mmc_dev(host->mmc),
+-						"Switch operation failed\n");
+-		}
+-	}
+-
+ 	omap_hsmmc_set_clock(host);
  
- 	omap_hsmmc_protect_card(host);
- 	pm_runtime_mark_last_busy(host->dev);
+ 	if (ios->timing != host->timing) {
 -- 
 2.11.0
