@@ -1,33 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 18 May 2017 23:57:21 -0700
-Subject: [PATCH] ARM: configs: add a gemini defconfig
-In-Reply-To: <20170514214502.26243-1-linus.walleij@linaro.org>
-References: <20170514214502.26243-1-linus.walleij@linaro.org>
-Message-ID: <20170519065721.GC9628@localhost>
+Date: Fri, 19 May 2017 00:00:37 -0700
+Subject: [PATCH 2/2] arm64: defconfig: enable options needed for QCom
+ DB410c board
+In-Reply-To: <CAL_JsqK3jkQawSLigy1hMDTc5M6VSSsUomjMom-WFSKtWJzjsQ@mail.gmail.com>
+References: <20170517215230.15108-1-robh@kernel.org>
+ <20170517215230.15108-2-robh@kernel.org>
+ <CAL_JsqK3jkQawSLigy1hMDTc5M6VSSsUomjMom-WFSKtWJzjsQ@mail.gmail.com>
+Message-ID: <20170519070037.GD9628@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 14, 2017 at 11:45:02PM +0200, Linus Walleij wrote:
-> It makes sense to have a stripped-down defconfig for just Gemini, as
-> it is a pretty small platform used in NAS etc, and will use appended
-> device tree. It is also quick to compile and test. Hopefully this
-> defconfig can be a good base for distributions such as OpenWRT.
+On Thu, May 18, 2017 at 08:01:53AM -0500, Rob Herring wrote:
+> On Wed, May 17, 2017 at 4:52 PM, Rob Herring <robh@kernel.org> wrote:
+> > Enable Qualcomm drivers needed to boot Dragonboard 410c with HDMI. This
+> > enables support for clocks, regulators, and USB PHY.
+> >
+> > Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> > Cc: John Stultz <john.stultz@linaro.org>
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+> > ---
+> >  arch/arm64/configs/defconfig | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> >
+> > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> > index d916fc316698..5b94e3d24c16 100644
+> > --- a/arch/arm64/configs/defconfig
+> > +++ b/arch/arm64/configs/defconfig
+> > @@ -303,6 +303,7 @@ CONFIG_MFD_CROS_EC_I2C=y
+> >  CONFIG_MFD_EXYNOS_LPASS=m
+> >  CONFIG_MFD_HI655X_PMIC=y
+> >  CONFIG_MFD_MAX77620=y
+> > +CONFIG_MFD_QCOM_RPM=y
 > 
-> I plan to add in the config options needed for the different
-> variants of Gemini as we go along.
-> 
-> Cc: Janos Laube <janos.dev@gmail.com>
-> Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
-> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: please apply this where apropriate for v4.12.
+> According to Bjorn, this one is for 8064, so this hunk can be dropped.
 
-I'm usually not super-eager on adding new defconfigs, but since this seems to
-be an active platform it seems like the right thing to do.
-
-Applied to fixes.
+That made the clk and regulator controllers drop out of the refreshed
+defconfig too, since dependencies aren't met. Seems like the correct thing.
 
 
 -Olof
