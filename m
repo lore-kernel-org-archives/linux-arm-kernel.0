@@ -1,9 +1,9 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 19 May 2017 08:53:29 +0200
-Subject: [PATCH v2 7/9] crypto: qat - Use IPAD/OPAD constant
+Date: Fri, 19 May 2017 08:53:30 +0200
+Subject: [PATCH v2 8/9] crypto: mediatek - Use IPAD/OPAD constant
 In-Reply-To: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
 References: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170519065331.27670-8-clabbe.montjoie@gmail.com>
+Message-ID: <20170519065331.27670-9-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,31 +12,31 @@ define.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/crypto/qat/qat_common/qat_algs.c | 5 +++--
+ drivers/crypto/mediatek/mtk-sha.c | 5 +++--
  1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/crypto/qat/qat_common/qat_algs.c b/drivers/crypto/qat/qat_common/qat_algs.c
-index 20f35df8a01f..5b5efcc52cb5 100644
---- a/drivers/crypto/qat/qat_common/qat_algs.c
-+++ b/drivers/crypto/qat/qat_common/qat_algs.c
-@@ -51,6 +51,7 @@
- #include <crypto/aes.h>
- #include <crypto/sha.h>
- #include <crypto/hash.h>
+diff --git a/drivers/crypto/mediatek/mtk-sha.c b/drivers/crypto/mediatek/mtk-sha.c
+index 2226f12d1c7a..5f4f845adbb8 100644
+--- a/drivers/crypto/mediatek/mtk-sha.c
++++ b/drivers/crypto/mediatek/mtk-sha.c
+@@ -12,6 +12,7 @@
+  * Some ideas are from atmel-sha.c and omap-sham.c drivers.
+  */
+ 
 +#include <crypto/hmac.h>
- #include <crypto/algapi.h>
- #include <crypto/authenc.h>
- #include <linux/dma-mapping.h>
-@@ -178,8 +179,8 @@ static int qat_alg_do_precomputes(struct icp_qat_hw_auth_algo_blk *hash,
- 	for (i = 0; i < block_size; i++) {
- 		char *ipad_ptr = ipad + i;
- 		char *opad_ptr = opad + i;
--		*ipad_ptr ^= 0x36;
--		*opad_ptr ^= 0x5C;
-+		*ipad_ptr ^= HMAC_IPAD_VALUE;
-+		*opad_ptr ^= HMAC_OPAD_VALUE;
+ #include <crypto/sha.h>
+ #include "mtk-platform.h"
+ 
+@@ -825,8 +826,8 @@ static int mtk_sha_setkey(struct crypto_ahash *tfm, const u8 *key,
+ 	memcpy(bctx->opad, bctx->ipad, bs);
+ 
+ 	for (i = 0; i < bs; i++) {
+-		bctx->ipad[i] ^= 0x36;
+-		bctx->opad[i] ^= 0x5c;
++		bctx->ipad[i] ^= HMAC_IPAD_VALUE;
++		bctx->opad[i] ^= HMAC_OPAD_VALUE;
  	}
  
- 	if (crypto_shash_init(shash))
+ 	return 0;
 -- 
 2.13.0
