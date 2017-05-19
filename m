@@ -1,291 +1,426 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Fri, 19 May 2017 15:05:42 +0800
-Subject: [PATCH V2 2/5] pinctrl: imx: add generic pin config core support
+Date: Fri, 19 May 2017 15:05:45 +0800
+Subject: [PATCH V2 5/5] pinctrl: imx: add imx7ulp driver
 In-Reply-To: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
 References: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1495177545-23006-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1495177545-23006-6-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The design is based on the exist architecture that the core will
-provide a uniformed way to decode the generic pin config into platform
-config register raw data according to the imx_cfg_params_decode maps
-registered by platform.
+i.MX 7ULP has three IOMUXC instances: IOMUXC0 for M4 ports,
+IOMUXC1 for A7 ports and IOMUXC DDR for DDR interface.
 
-Two useful macros, IMX_CFG_PARAMS_DECODE and IMX_CFG_PARAMS_DECODE_INVERT,
-are created for platform to register decode map conveniently.
-
-In order to cope with some special case, a platform specific fixup()
-function is also available to use.
-
-Note that rather than fully utilizing the generic pinconf support
-provided by pinctrl core, IMX only adopts the device tree bindings
-of generic pinconf. The config used in .pin_config_get[set] are raw
-register data instead of generic one which makes us align the exist
-using. And that's also why we cannot set pinconf_ops.is_generic.
+This patch adds the IOMUXC1 support for A7.
+It only supports generic pin config.
 
 Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Bai Ping <ping.bai@nxp.com>
+Cc: Fugang Duan <fugang.duan@nxp.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
 ---
-ChangeLog:
-v1->v2:
- Minor changes including:
- * rename 'offset' field to 'shift' in structure imx_cfg_params_decode
- * comments improvement
- * add more clearer information about imx generic pin config in
-   commmit message.
+ * no changes
 ---
- drivers/pinctrl/freescale/Kconfig       |   2 +-
- drivers/pinctrl/freescale/pinctrl-imx.c | 108 +++++++++++++++++++++++++++++---
- drivers/pinctrl/freescale/pinctrl-imx.h |  25 ++++++++
- 3 files changed, 124 insertions(+), 11 deletions(-)
+ drivers/pinctrl/freescale/Kconfig           |   7 +
+ drivers/pinctrl/freescale/Makefile          |   1 +
+ drivers/pinctrl/freescale/pinctrl-imx7ulp.c | 358 ++++++++++++++++++++++++++++
+ 3 files changed, 366 insertions(+)
+ create mode 100644 drivers/pinctrl/freescale/pinctrl-imx7ulp.c
 
 diff --git a/drivers/pinctrl/freescale/Kconfig b/drivers/pinctrl/freescale/Kconfig
-index cae05e7..0b266b2 100644
+index 0b266b2..4dbc576 100644
 --- a/drivers/pinctrl/freescale/Kconfig
 +++ b/drivers/pinctrl/freescale/Kconfig
-@@ -2,7 +2,7 @@ config PINCTRL_IMX
- 	bool
- 	select GENERIC_PINCTRL_GROUPS
- 	select GENERIC_PINMUX_FUNCTIONS
--	select PINCONF
-+	select GENERIC_PINCONF
- 	select REGMAP
+@@ -103,6 +103,13 @@ config PINCTRL_IMX7D
+ 	help
+ 	  Say Y here to enable the imx7d pinctrl driver
  
- config PINCTRL_IMX1_CORE
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
-index 6882644..6d5a517 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-@@ -27,6 +27,7 @@
- #include <linux/regmap.h>
- 
- #include "../core.h"
-+#include "../pinconf.h"
- #include "../pinmux.h"
- #include "pinctrl-imx.h"
- 
-@@ -361,6 +362,62 @@ static const struct pinmux_ops imx_pmx_ops = {
- 	.gpio_set_direction = imx_pmx_gpio_set_direction,
- };
- 
-+/* decode generic config into raw register values */
-+static u32 imx_pinconf_decode_generic_config(struct imx_pinctrl *ipctl,
-+					      unsigned long *configs,
-+					      unsigned int num_configs)
-+{
-+	struct imx_pinctrl_soc_info *info = ipctl->info;
-+	struct imx_cfg_params_decode *decode;
-+	enum pin_config_param param;
-+	u32 raw_config = 0;
-+	u32 param_val;
-+	int i, j;
++config PINCTRL_IMX7ULP
++	bool "IMX7ULP pinctrl driver"
++	depends on SOC_IMX7ULP
++	select PINCTRL_IMX
++	help
++	  Say Y here to enable the imx7ulp pinctrl driver
 +
-+	WARN_ON(num_configs > info->num_decodes);
+ config PINCTRL_VF610
+ 	bool "Freescale Vybrid VF610 pinctrl driver"
+ 	depends on SOC_VF610
+diff --git a/drivers/pinctrl/freescale/Makefile b/drivers/pinctrl/freescale/Makefile
+index d44c9e2..525a5ff 100644
+--- a/drivers/pinctrl/freescale/Makefile
++++ b/drivers/pinctrl/freescale/Makefile
+@@ -14,6 +14,7 @@ obj-$(CONFIG_PINCTRL_IMX6SL)	+= pinctrl-imx6sl.o
+ obj-$(CONFIG_PINCTRL_IMX6SX)	+= pinctrl-imx6sx.o
+ obj-$(CONFIG_PINCTRL_IMX6UL)	+= pinctrl-imx6ul.o
+ obj-$(CONFIG_PINCTRL_IMX7D)	+= pinctrl-imx7d.o
++obj-$(CONFIG_PINCTRL_IMX7ULP)	+= pinctrl-imx7ulp.o
+ obj-$(CONFIG_PINCTRL_VF610)	+= pinctrl-vf610.o
+ obj-$(CONFIG_PINCTRL_MXS)	+= pinctrl-mxs.o
+ obj-$(CONFIG_PINCTRL_IMX23)	+= pinctrl-imx23.o
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx7ulp.c b/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
+new file mode 100644
+index 0000000..dead416
+--- /dev/null
++++ b/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
+@@ -0,0 +1,358 @@
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ * Copyright (C) 2017 NXP
++ *
++ * Author: Dong Aisheng <aisheng.dong@nxp.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/pinctrl/pinctrl.h>
++
++#include "pinctrl-imx.h"
++
++enum imx7ulp_pads {
++	ULP1_PAD_PTC0 = 0,
++	ULP1_PAD_PTC1,
++	ULP1_PAD_PTC2,
++	ULP1_PAD_PTC3,
++	ULP1_PAD_PTC4,
++	ULP1_PAD_PTC5,
++	ULP1_PAD_PTC6,
++	ULP1_PAD_PTC7,
++	ULP1_PAD_PTC8,
++	ULP1_PAD_PTC9,
++	ULP1_PAD_PTC10,
++	ULP1_PAD_PTC11,
++	ULP1_PAD_PTC12,
++	ULP1_PAD_PTC13,
++	ULP1_PAD_PTC14,
++	ULP1_PAD_PTC15,
++	ULP1_PAD_PTC16,
++	ULP1_PAD_PTC17,
++	ULP1_PAD_PTC18,
++	ULP1_PAD_PTC19,
++	ULP1_PAD_RESERVE0,
++	ULP1_PAD_RESERVE1,
++	ULP1_PAD_RESERVE2,
++	ULP1_PAD_RESERVE3,
++	ULP1_PAD_RESERVE4,
++	ULP1_PAD_RESERVE5,
++	ULP1_PAD_RESERVE6,
++	ULP1_PAD_RESERVE7,
++	ULP1_PAD_RESERVE8,
++	ULP1_PAD_RESERVE9,
++	ULP1_PAD_RESERVE10,
++	ULP1_PAD_RESERVE11,
++	ULP1_PAD_PTD0,
++	ULP1_PAD_PTD1,
++	ULP1_PAD_PTD2,
++	ULP1_PAD_PTD3,
++	ULP1_PAD_PTD4,
++	ULP1_PAD_PTD5,
++	ULP1_PAD_PTD6,
++	ULP1_PAD_PTD7,
++	ULP1_PAD_PTD8,
++	ULP1_PAD_PTD9,
++	ULP1_PAD_PTD10,
++	ULP1_PAD_PTD11,
++	ULP1_PAD_RESERVE12,
++	ULP1_PAD_RESERVE13,
++	ULP1_PAD_RESERVE14,
++	ULP1_PAD_RESERVE15,
++	ULP1_PAD_RESERVE16,
++	ULP1_PAD_RESERVE17,
++	ULP1_PAD_RESERVE18,
++	ULP1_PAD_RESERVE19,
++	ULP1_PAD_RESERVE20,
++	ULP1_PAD_RESERVE21,
++	ULP1_PAD_RESERVE22,
++	ULP1_PAD_RESERVE23,
++	ULP1_PAD_RESERVE24,
++	ULP1_PAD_RESERVE25,
++	ULP1_PAD_RESERVE26,
++	ULP1_PAD_RESERVE27,
++	ULP1_PAD_RESERVE28,
++	ULP1_PAD_RESERVE29,
++	ULP1_PAD_RESERVE30,
++	ULP1_PAD_RESERVE31,
++	ULP1_PAD_PTE0,
++	ULP1_PAD_PTE1,
++	ULP1_PAD_PTE2,
++	ULP1_PAD_PTE3,
++	ULP1_PAD_PTE4,
++	ULP1_PAD_PTE5,
++	ULP1_PAD_PTE6,
++	ULP1_PAD_PTE7,
++	ULP1_PAD_PTE8,
++	ULP1_PAD_PTE9,
++	ULP1_PAD_PTE10,
++	ULP1_PAD_PTE11,
++	ULP1_PAD_PTE12,
++	ULP1_PAD_PTE13,
++	ULP1_PAD_PTE14,
++	ULP1_PAD_PTE15,
++	ULP1_PAD_RESERVE32,
++	ULP1_PAD_RESERVE33,
++	ULP1_PAD_RESERVE34,
++	ULP1_PAD_RESERVE35,
++	ULP1_PAD_RESERVE36,
++	ULP1_PAD_RESERVE37,
++	ULP1_PAD_RESERVE38,
++	ULP1_PAD_RESERVE39,
++	ULP1_PAD_RESERVE40,
++	ULP1_PAD_RESERVE41,
++	ULP1_PAD_RESERVE42,
++	ULP1_PAD_RESERVE43,
++	ULP1_PAD_RESERVE44,
++	ULP1_PAD_RESERVE45,
++	ULP1_PAD_RESERVE46,
++	ULP1_PAD_RESERVE47,
++	ULP1_PAD_PTF0,
++	ULP1_PAD_PTF1,
++	ULP1_PAD_PTF2,
++	ULP1_PAD_PTF3,
++	ULP1_PAD_PTF4,
++	ULP1_PAD_PTF5,
++	ULP1_PAD_PTF6,
++	ULP1_PAD_PTF7,
++	ULP1_PAD_PTF8,
++	ULP1_PAD_PTF9,
++	ULP1_PAD_PTF10,
++	ULP1_PAD_PTF11,
++	ULP1_PAD_PTF12,
++	ULP1_PAD_PTF13,
++	ULP1_PAD_PTF14,
++	ULP1_PAD_PTF15,
++	ULP1_PAD_PTF16,
++	ULP1_PAD_PTF17,
++	ULP1_PAD_PTF18,
++	ULP1_PAD_PTF19,
++};
++
++/* Pad names for the pinmux subsystem */
++static const struct pinctrl_pin_desc imx7ulp_pinctrl_pads[] = {
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC0),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC1),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC2),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC3),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC4),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC5),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC6),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC7),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC8),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC9),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC10),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC11),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC12),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC13),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC14),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC15),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC16),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC17),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC18),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTC19),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE0),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE1),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE2),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE3),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE4),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE5),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE6),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE7),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE8),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE9),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE10),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE11),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTD0),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTD1),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTD2),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTD3),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTD4),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTD5),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTD6),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTD7),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTD8),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTD9),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTD10),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTD11),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE12),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE13),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE14),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE15),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE16),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE17),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE18),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE19),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE20),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE21),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE22),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE23),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE24),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE25),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE26),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE27),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE28),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE29),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE30),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE31),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE0),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE1),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE2),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE3),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE4),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE5),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE6),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE7),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE8),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE9),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE10),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE11),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE12),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE13),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE14),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTE15),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE32),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE33),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE34),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE35),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE36),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE37),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE38),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE39),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE40),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE41),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE42),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE43),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE44),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE45),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE46),
++	IMX_PINCTRL_PIN(ULP1_PAD_RESERVE47),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF0),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF1),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF2),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF3),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF4),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF5),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF6),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF7),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF8),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF9),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF10),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF11),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF12),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF13),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF14),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF15),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF16),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF17),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF18),
++	IMX_PINCTRL_PIN(ULP1_PAD_PTF19),
++};
++
++#define BM_LK_ENABLED		BIT(15)
++#define BM_PULL_ENABLED		BIT(1)
++
++enum imx7ulp_pinconf_param {
++	PIN_CONFIG_NXP_OUTPUT_BUFFER_ENABLE = PIN_CONFIG_END + 1,
++	PIN_CONFIG_NXP_INPUT_BUFFER_ENABLE,
++};
++
++static const struct pinconf_generic_params imx7ulp_cfg_params[] = {
++	{
++		.property = "nxp,output-buffer-enable",
++		.param = PIN_CONFIG_NXP_OUTPUT_BUFFER_ENABLE,
++		.default_value = 1,
++	}, {
++		.property = "nxp,input-buffer-enable",
++		.param = PIN_CONFIG_NXP_INPUT_BUFFER_ENABLE,
++		.default_value = 1,
++	},
++};
++
++struct imx_cfg_params_decode imx7ulp_cfg_decodes[] = {
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_NXP_OUTPUT_BUFFER_ENABLE,	BIT(17), 17),
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_NXP_INPUT_BUFFER_ENABLE,	BIT(16), 16),
++
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_DRIVE_STRENGTH, 		BIT(6), 6),
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_DRIVE_PUSH_PULL,		BIT(5), 5),
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_SLEW_RATE,			BIT(2), 2),
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_BIAS_DISABLE,			BIT(1), 1),
++	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_BIAS_PULL_UP,			BIT(0), 0),
++
++	IMX_CFG_PARAMS_DECODE_INVERT(PIN_CONFIG_DRIVE_OPEN_DRAIN,	BIT(5), 5),
++	IMX_CFG_PARAMS_DECODE_INVERT(PIN_CONFIG_BIAS_PULL_DOWN,		BIT(0), 0),
++};
++
++static void imx7ulp_cfg_params_fixup(unsigned long *configs,
++				    unsigned int num_configs,
++				    u32 *raw_config)
++{
++	enum pin_config_param param;
++	u32 param_val;
++	int i;
++
++	/* lock field disabled */
++	*raw_config &= ~BM_LK_ENABLED;
 +
 +	for (i = 0; i < num_configs; i++) {
 +		param = pinconf_to_config_param(configs[i]);
 +		param_val = pinconf_to_config_argument(configs[i]);
-+		decode = info->decodes;
-+		for (j = 0; j < info->num_decodes; j++) {
-+			if (param == decode->param) {
-+				if (decode->invert)
-+					param_val = !param_val;
-+				raw_config |= (param_val << decode->shift)
-+					      & decode->mask;
-+				break;
-+			}
-+			decode++;
++
++		if ((param == PIN_CONFIG_BIAS_PULL_UP) ||
++		    (param == PIN_CONFIG_BIAS_PULL_DOWN)) {
++			/* pull enabled */
++			*raw_config |= BM_PULL_ENABLED;
++
++			return;
 +		}
 +	}
-+
-+	if (info->fixup)
-+		info->fixup(configs, num_configs, &raw_config);
-+
-+	return raw_config;
 +}
 +
-+static u32 imx_pinconf_parse_generic_config(struct device_node *np,
-+					    struct imx_pinctrl *ipctl)
-+{
-+	struct imx_pinctrl_soc_info *info = ipctl->info;
-+	struct pinctrl_dev *pctl = ipctl->pctl;
-+	unsigned int num_configs;
-+	unsigned long *configs;
-+	int ret;
-+
-+	if (!info->generic_pinconf)
-+		return 0;
-+
-+	ret = pinconf_generic_parse_dt_config(np, pctl, &configs,
-+					      &num_configs);
-+	if (ret)
-+		return 0;
-+
-+	return imx_pinconf_decode_generic_config(ipctl, configs, num_configs);
-+}
-+
- static int imx_pinconf_get(struct pinctrl_dev *pctldev,
- 			     unsigned pin_id, unsigned long *config)
- {
-@@ -479,9 +536,10 @@ static const struct pinconf_ops imx_pinconf_ops = {
- 
- static int imx_pinctrl_parse_groups(struct device_node *np,
- 				    struct group_desc *grp,
--				    struct imx_pinctrl_soc_info *info,
-+				    struct imx_pinctrl *ipctl,
- 				    u32 index)
- {
-+	struct imx_pinctrl_soc_info *info = ipctl->info;
- 	int size, pin_size;
- 	const __be32 *list;
- 	int i;
-@@ -493,25 +551,44 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
- 		pin_size = SHARE_FSL_PIN_SIZE;
- 	else
- 		pin_size = FSL_PIN_SIZE;
-+
-+	if (info->generic_pinconf)
-+		pin_size -= 4;
-+
- 	/* Initialise group */
- 	grp->name = np->name;
- 
- 	/*
- 	 * the binding format is fsl,pins = <PIN_FUNC_ID CONFIG ...>,
- 	 * do sanity check and calculate pins number
-+	 *
-+	 * First try legacy 'fsl,pins' property, then fall back to the
-+	 * generic 'pins'.
-+	 *
-+	 * Note: for generic 'pins' case, there's no CONFIG part in
-+	 * the binding format.
- 	 */
- 	list = of_get_property(np, "fsl,pins", &size);
- 	if (!list) {
--		dev_err(info->dev, "no fsl,pins property in node %s\n", np->full_name);
--		return -EINVAL;
-+		list = of_get_property(np, "pins", &size);
-+		if (!list) {
-+			dev_err(info->dev,
-+				"no fsl,pins and pins property in node %s\n",
-+				np->full_name);
-+			return -EINVAL;
-+		}
- 	}
- 
- 	/* we do not check return since it's safe node passed down */
- 	if (!size || size % pin_size) {
--		dev_err(info->dev, "Invalid fsl,pins property in node %s\n", np->full_name);
-+		dev_err(info->dev, "Invalid fsl,pins or pins property in node %s\n",
-+			np->full_name);
- 		return -EINVAL;
- 	}
- 
-+	/* first try to parse the generic pin config */
-+	config = imx_pinconf_parse_generic_config(np, ipctl);
-+
- 	grp->num_pins = size / pin_size;
- 	grp->data = devm_kzalloc(info->dev, grp->num_pins *
- 				 sizeof(struct imx_pin), GFP_KERNEL);
-@@ -548,11 +625,18 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
- 		pin->mux_mode = be32_to_cpu(*list++);
- 		pin->input_val = be32_to_cpu(*list++);
- 
--		/* SION bit is in mux register */
--		config = be32_to_cpu(*list++);
--		if (config & IMX_PAD_SION)
--			pin->mux_mode |= IOMUXC_CONFIG_SION;
--		pin->config = config & ~IMX_PAD_SION;
-+		if (info->generic_pinconf) {
-+			/* generic pin config decoded */
-+			pin->config = config;
-+		} else {
-+			/* legacy pin config read from devicetree */
-+			config = be32_to_cpu(*list++);
-+
-+			/* SION bit is in mux register */
-+			if (config & IMX_PAD_SION)
-+				pin->mux_mode |= IOMUXC_CONFIG_SION;
-+			pin->config = config & ~IMX_PAD_SION;
-+		}
- 
- 		dev_dbg(info->dev, "%s: 0x%x 0x%08lx", info->pins[pin_id].name,
- 				pin->mux_mode, pin->config);
-@@ -602,7 +686,7 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
- 				  info->group_index++, grp);
- 		mutex_unlock(&info->mutex);
- 
--		imx_pinctrl_parse_groups(child, grp, info, i++);
-+		imx_pinctrl_parse_groups(child, grp, ipctl, i++);
- 	}
- 
- 	return 0;
-@@ -773,6 +857,10 @@ int imx_pinctrl_probe(struct platform_device *pdev,
- 	imx_pinctrl_desc->confops = &imx_pinconf_ops;
- 	imx_pinctrl_desc->owner = THIS_MODULE;
- 
-+	/* for generic pinconf */
-+	imx_pinctrl_desc->custom_params = info->custom_params;
-+	imx_pinctrl_desc->num_custom_params = info->num_custom_params;
-+
- 	mutex_init(&info->mutex);
- 
- 	ipctl->info = info;
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
-index ff2d3e5..38aa53c 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx.h
-+++ b/drivers/pinctrl/freescale/pinctrl-imx.h
-@@ -15,6 +15,8 @@
- #ifndef __DRIVERS_PINCTRL_IMX_H
- #define __DRIVERS_PINCTRL_IMX_H
- 
-+#include <linux/pinctrl/pinconf-generic.h>
-+
- struct platform_device;
- 
- /**
-@@ -44,6 +46,14 @@ struct imx_pin_reg {
- 	s16 conf_reg;
- };
- 
-+/* decode a generic config into raw register value */
-+struct imx_cfg_params_decode {
-+	enum pin_config_param param;
-+	u32 mask;
-+	u8 shift;
-+	bool invert;
++static struct imx_pinctrl_soc_info imx7ulp_pinctrl_info = {
++	.pins = imx7ulp_pinctrl_pads,
++	.npins = ARRAY_SIZE(imx7ulp_pinctrl_pads),
++	.flags = ZERO_OFFSET_VALID | SHARE_MUX_CONF_REG,
++	.mux_mask = 0xf00,
++	.mux_shift = 8,
++	.generic_pinconf = true,
++	.custom_params = imx7ulp_cfg_params,
++	.num_custom_params = ARRAY_SIZE(imx7ulp_cfg_params),
++	.decodes = imx7ulp_cfg_decodes,
++	.num_decodes = ARRAY_SIZE(imx7ulp_cfg_decodes),
++	.fixup = imx7ulp_cfg_params_fixup,
 +};
 +
- struct imx_pinctrl_soc_info {
- 	struct device *dev;
- 	const struct pinctrl_pin_desc *pins;
-@@ -53,8 +63,23 @@ struct imx_pinctrl_soc_info {
- 	unsigned int flags;
- 	const char *gpr_compatible;
- 	struct mutex mutex;
++static const struct of_device_id imx7ulp_pinctrl_of_match[] = {
++	{ .compatible = "fsl,imx7ulp-iomuxc1", },
++	{ /* sentinel */ }
++};
 +
-+	/* generic pinconf */
-+	bool generic_pinconf;
-+	const struct pinconf_generic_params *custom_params;
-+	unsigned int num_custom_params;
-+	struct imx_cfg_params_decode *decodes;
-+	unsigned int num_decodes;
-+	void (*fixup)(unsigned long *configs, unsigned int num_configs,
-+		      u32 *raw_config);
- };
- 
-+#define IMX_CFG_PARAMS_DECODE(p, m, o) \
-+	{ .param = p, .mask = m, .shift = o, .invert = false, }
++static int imx7ulp_pinctrl_probe(struct platform_device *pdev)
++{
++	return imx_pinctrl_probe(pdev, &imx7ulp_pinctrl_info);
++}
 +
-+#define IMX_CFG_PARAMS_DECODE_INVERT(p, m, o) \
-+	{ .param = p, .mask = m, .shift = o, .invert = true, }
++static struct platform_driver imx7ulp_pinctrl_driver = {
++	.driver = {
++		.name = "imx7ulp-pinctrl",
++		.of_match_table = of_match_ptr(imx7ulp_pinctrl_of_match),
++		.suppress_bind_attrs = true,
++	},
++	.probe = imx7ulp_pinctrl_probe,
++};
 +
- #define SHARE_MUX_CONF_REG	0x1
- #define ZERO_OFFSET_VALID	0x2
- 
++static int __init imx7ulp_pinctrl_init(void)
++{
++	return platform_driver_register(&imx7ulp_pinctrl_driver);
++}
++arch_initcall(imx7ulp_pinctrl_init);
 -- 
 2.7.4
