@@ -1,9 +1,9 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 19 May 2017 08:53:28 +0200
-Subject: [PATCH v2 6/9] crypto: omap-sham - Use IPAD/OPAD constant
+Date: Fri, 19 May 2017 08:53:25 +0200
+Subject: [PATCH v2 3/9] crypto: ixp4xx - Use IPAD/OPAD constant
 In-Reply-To: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
 References: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170519065331.27670-7-clabbe.montjoie@gmail.com>
+Message-ID: <20170519065331.27670-4-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,31 +12,29 @@ define.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/crypto/omap-sham.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/crypto/ixp4xx_crypto.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index d0b16e5e4ee5..1864a57caaa4 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -41,6 +41,7 @@
- #include <crypto/algapi.h>
- #include <crypto/sha.h>
- #include <crypto/hash.h>
+diff --git a/drivers/crypto/ixp4xx_crypto.c b/drivers/crypto/ixp4xx_crypto.c
+index 771dd26c7076..427cbe012729 100644
+--- a/drivers/crypto/ixp4xx_crypto.c
++++ b/drivers/crypto/ixp4xx_crypto.c
+@@ -23,6 +23,7 @@
+ #include <crypto/ctr.h>
+ #include <crypto/des.h>
+ #include <crypto/aes.h>
 +#include <crypto/hmac.h>
- #include <crypto/internal/hash.h>
+ #include <crypto/sha.h>
+ #include <crypto/algapi.h>
+ #include <crypto/internal/aead.h>
+@@ -90,8 +91,6 @@
+ #define CTL_FLAG_PERFORM_AEAD	0x0008
+ #define CTL_FLAG_MASK		0x000f
  
- #define MD5_DIGEST_SIZE			16
-@@ -1326,8 +1327,8 @@ static int omap_sham_setkey(struct crypto_ahash *tfm, const u8 *key,
- 		memcpy(bctx->opad, bctx->ipad, bs);
+-#define HMAC_IPAD_VALUE   0x36
+-#define HMAC_OPAD_VALUE   0x5C
+ #define HMAC_PAD_BLOCKLEN SHA1_BLOCK_SIZE
  
- 		for (i = 0; i < bs; i++) {
--			bctx->ipad[i] ^= 0x36;
--			bctx->opad[i] ^= 0x5c;
-+			bctx->ipad[i] ^= HMAC_IPAD_VALUE;
-+			bctx->opad[i] ^= HMAC_OPAD_VALUE;
- 		}
- 	}
- 
+ #define MD5_DIGEST_SIZE   16
 -- 
 2.13.0
