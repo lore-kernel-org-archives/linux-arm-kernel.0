@@ -1,41 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 May 2017 10:14:29 +0200
-Subject: [PATCH] ARM: remove duplicate 'const' annotations'
-In-Reply-To: <20170511115059.2997141-1-arnd@arndb.de>
-References: <20170511115059.2997141-1-arnd@arndb.de>
-Message-ID: <CAK8P3a2rxtL8oMt6TzX+KsZmKj03gZQQ7ptDGgJ3=LEEURoBjg@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 19 May 2017 13:45:02 +0530
+Subject: [PATCH 02/41] mmc: host: omap_hsmmc: Separate setting voltage
+ capabilities from bus power
+In-Reply-To: <20170519081541.26753-1-kishon@ti.com>
+References: <20170519081541.26753-1-kishon@ti.com>
+Message-ID: <20170519081541.26753-3-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 11, 2017 at 1:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> gcc-7 warns about some declarations that are more 'const' than necessary:
->
-> arch/arm/mach-at91/pm.c:338:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct of_device_id const ramc_ids[] __initconst = {
-> arch/arm/mach-bcm/bcm_kona_smc.c:36:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct of_device_id const bcm_kona_smc_ids[] __initconst = {
-> arch/arm/mach-spear/time.c:207:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct of_device_id const timer_of_match[] __initconst = {
-> arch/arm/mach-omap2/prm_common.c:714:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct of_device_id const omap_prcm_dt_match_table[] __initconst = {
-> arch/arm/mach-omap2/vc.c:562:35: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
->  static const struct i2c_init_data const omap4_i2c_timing_data[] __initconst = {
->
-> The ones in arch/arm were apparently all introduced accidentally by one
-> commit that correctly marked a lot of variables as __initconst.
->
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Fixes: 19c233b79d1a ("ARM: appropriate __init annotation for const data")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-at91/pm.c          | 2 +-
->  arch/arm/mach-bcm/bcm_kona_smc.c | 2 +-
->  arch/arm/mach-cns3xxx/core.c     | 2 +-
->  arch/arm/mach-omap2/prm_common.c | 2 +-
->  arch/arm/mach-omap2/vc.c         | 2 +-
->  arch/arm/mach-spear/time.c       | 2 +-
->  6 files changed, 6 insertions(+), 6 deletions(-)
+Add a separate function to set the voltage capabilities of the host
+controller. Voltage capabilities should be set only once during
+controller initialization but bus power can be changed every time there
+is a voltage switch and whenever a different card is inserted.
+This allows omap_hsmmc_conf_bus_power to be invoked every time there
+is a voltage switch.
 
-Applied to fixes now, thanks for the Acks!
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ drivers/mmc/host/omap_hsmmc.c | 28 +++++++++++++++++++---------
+ 1 file changed, 19 insertions(+), 9 deletions(-)
 
-      Arnd
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 2000aaa359c8..42954efe12f7 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1809,25 +1809,34 @@ static int omap_hsmmc_configure_wake_irq(struct omap_hsmmc_host *host)
+ 	return ret;
+ }
+ 
++static void omap_hsmmc_set_capabilities(struct omap_hsmmc_host *host)
++{
++	u32 val;
++
++	val = OMAP_HSMMC_READ(host->base, CAPA);
++
++	/* Only MMC1 supports 3.0V */
++	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT)
++		val |= (VS30 | VS18);
++	else
++		val |= VS18;
++
++	OMAP_HSMMC_WRITE(host->base, CAPA, val);
++}
++
+ static void omap_hsmmc_conf_bus_power(struct omap_hsmmc_host *host)
+ {
+-	u32 hctl, capa, value;
++	u32 hctl, value;
+ 
+ 	/* Only MMC1 supports 3.0V */
+-	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT) {
++	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT)
+ 		hctl = SDVS30;
+-		capa = VS30 | VS18;
+-	} else {
++	else
+ 		hctl = SDVS18;
+-		capa = VS18;
+-	}
+ 
+ 	value = OMAP_HSMMC_READ(host->base, HCTL) & ~SDVS_MASK;
+ 	OMAP_HSMMC_WRITE(host->base, HCTL, value | hctl);
+ 
+-	value = OMAP_HSMMC_READ(host->base, CAPA);
+-	OMAP_HSMMC_WRITE(host->base, CAPA, value | capa);
+-
+ 	/* Set SD bus power bit */
+ 	set_sd_bus_power(host);
+ }
+@@ -2134,6 +2143,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 
+ 	mmc->pm_caps |= mmc_pdata(host)->pm_caps;
+ 
++	omap_hsmmc_set_capabilities(host);
+ 	omap_hsmmc_conf_bus_power(host);
+ 
+ 	host->rx_chan = dma_request_chan(&pdev->dev, "rx");
+-- 
+2.11.0
