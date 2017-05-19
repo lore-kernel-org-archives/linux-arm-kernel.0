@@ -1,115 +1,34 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 19 May 2017 15:04:37 -0500
-Subject: [PATCH v2 4/5] soc: ti: Add pm33xx driver for basic suspend support
+Date: Fri, 19 May 2017 15:04:35 -0500
+Subject: [PATCH v2 2/5] ARM: OMAP2+: Introduce low-level suspend code for
+ AM43XX
 In-Reply-To: <20170519200438.9502-1-d-gerlach@ti.com>
 References: <20170519200438.9502-1-d-gerlach@ti.com>
-Message-ID: <20170519200438.9502-5-d-gerlach@ti.com>
+Message-ID: <20170519200438.9502-3-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM335x and AM437x support various low power modes as documented
-in section 8.1.4.3 of the AM335x Technical Reference Manual and
-section 6.4.3 of the AM437x Technical Reference Manual.
-
-DeepSleep0 mode offers the lowest power mode with limited
-wakeup sources without a system reboot and is mapped as
-the suspend state in the kernel. In this state, MPU and
-PER domains are turned off with the internal RAM held in
-retention to facilitate the resume process. As part of
-the boot process, the assembly code is copied over to OCMCRAM
-so it can be executed to turn of the EMIF and put DDR into self
-refresh.
-
-Both platforms have a Cortex-M3 (WKUP_M3) which assists the MPU
-in DeepSleep0 entry and exit. WKUP_M3 takes care
-of the clockdomain and powerdomain transitions based on the
-intended low power state. MPU needs to load the appropriate
-WKUP_M3 binary onto the WKUP_M3 memory space before it can
-leverage any of the PM features like DeepSleep. This loading
-is handled by the remoteproc driver wkup_m3_rproc.
-
-Communication with the WKUP_M3 is handled by a wkup_m3_ipc
-driver that exposes the specific PM functionality to be used
-the PM code.
-
-In the current implementation when the suspend process
-is initiated, MPU interrupts the WKUP_M3 to let it know about
-the intent of entering DeepSleep0 and waits for an ACK. When
-the ACK is received MPU continues with its suspend process
-to suspend all the drivers and then jumps to assembly in
-OCMC RAM. The assembly code puts the external RAM in self-refresh
-mode, gates the MPU clock, and then finally executes the WFI
-instruction. Execution of the WFI instruction with MPU clock gated
-triggers another interrupt to the WKUP_M3 which then continues
-with the power down sequence wherein the clockdomain and
-powerdomain transition takes place. As part of the sleep sequence,
-WKUP_M3 unmasks the interrupt lines for the wakeup sources. WFI
-execution on WKUP_M3 causes the hardware to disable the main
-oscillator of the SoC and from here system remains in sleep state
-until a wake source brings the system into resume path.
-
-When a wakeup event occurs, WKUP_M3 starts the power-up
-sequence by switching on the power domains and finally
-enabling the clock to MPU. Since the MPU gets powered down
-as part of the sleep sequence in the resume path ROM code
-starts executing. The ROM code detects a wakeup from sleep
-and then jumps to the resume location in OCMC which was
-populated in one of the IPC registers as part of the suspend
-sequence.
-
-Code is based on work by Vaibhav Bedia.
+Although similar to AM33XX, introduce a new low-level asm file for
+suspend containing new context save and restore paths for EMIF and l2
+cache disabling and enabling.
 
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- drivers/soc/ti/Kconfig               |   9 +
- drivers/soc/ti/Makefile              |   1 +
- drivers/soc/ti/pm33xx.c              | 337 +++++++++++++++++++++++++++++++++++
- include/linux/platform_data/pm33xx.h |   4 +-
- 4 files changed, 349 insertions(+), 2 deletions(-)
- create mode 100644 drivers/soc/ti/pm33xx.c
+ arch/arm/mach-omap2/sleep43xx.S | 394 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 394 insertions(+)
+ create mode 100644 arch/arm/mach-omap2/sleep43xx.S
 
-diff --git a/drivers/soc/ti/Kconfig b/drivers/soc/ti/Kconfig
-index 39e152abe6b9..92770d84a288 100644
---- a/drivers/soc/ti/Kconfig
-+++ b/drivers/soc/ti/Kconfig
-@@ -28,6 +28,15 @@ config KEYSTONE_NAVIGATOR_DMA
- 
- 	  If unsure, say N.
- 
-+config AMX3_PM
-+	tristate "AMx3 Power Management"
-+	depends on SOC_AM33XX || SOC_AM43XX
-+	depends on WKUP_M3_IPC && TI_EMIF_SRAM && SRAM
-+	help
-+	  Enable power management on AM335x and AM437x. Required for suspend to mem
-+	  and standby states on both AM335x and AM437x platforms and for deeper cpuidle
-+	  c-states on AM335x.
-+
- config WKUP_M3_IPC
- 	tristate "TI AMx3 Wkup-M3 IPC Driver"
- 	depends on WKUP_M3_RPROC
-diff --git a/drivers/soc/ti/Makefile b/drivers/soc/ti/Makefile
-index 7d572736c86e..d9bd4ba424be 100644
---- a/drivers/soc/ti/Makefile
-+++ b/drivers/soc/ti/Makefile
-@@ -4,5 +4,6 @@
- obj-$(CONFIG_KEYSTONE_NAVIGATOR_QMSS)	+= knav_qmss.o
- knav_qmss-y := knav_qmss_queue.o knav_qmss_acc.o
- obj-$(CONFIG_KEYSTONE_NAVIGATOR_DMA)	+= knav_dma.o
-+obj-$(CONFIG_AMX3_PM)			+= pm33xx.o
- obj-$(CONFIG_WKUP_M3_IPC)		+= wkup_m3_ipc.o
- obj-$(CONFIG_TI_SCI_PM_DOMAINS)		+= ti_sci_pm_domains.o
-diff --git a/drivers/soc/ti/pm33xx.c b/drivers/soc/ti/pm33xx.c
+diff --git a/arch/arm/mach-omap2/sleep43xx.S b/arch/arm/mach-omap2/sleep43xx.S
 new file mode 100644
-index 000000000000..cfeb8df7e82a
+index 000000000000..a3d71b53e936
 --- /dev/null
-+++ b/drivers/soc/ti/pm33xx.c
-@@ -0,0 +1,337 @@
++++ b/arch/arm/mach-omap2/sleep43xx.S
+@@ -0,0 +1,394 @@
 +/*
-+ * AM33XX Power Management Routines
++ * Low level suspend code for AM43XX SoCs
 + *
-+ * Copyright (C) 2012-2017 Texas Instruments Incorporated - http://www.ti.com/
-+ *	Vaibhav Bedia, Dave Gerlach
++ * Copyright (C) 2013-2017 Texas Instruments Incorporated - http://www.ti.com/
++ *	Dave Gerlach, Vaibhav Bedia
 + *
 + * This program is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU General Public License as
@@ -121,345 +40,383 @@ index 000000000000..cfeb8df7e82a
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/cpu.h>
-+#include <linux/err.h>
-+#include <linux/genalloc.h>
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_data/pm33xx.h>
-+#include <linux/platform_device.h>
-+#include <linux/sizes.h>
-+#include <linux/sram.h>
-+#include <linux/suspend.h>
++#include <linux/linkage.h>
 +#include <linux/ti-emif-sram.h>
-+#include <linux/wkup_m3_ipc.h>
 +
-+#include <asm/proc-fns.h>
-+#include <asm/suspend.h>
-+#include <asm/system_misc.h>
++#include <asm/asm-offsets.h>
++#include <asm/assembler.h>
++#include <asm/hardware/cache-l2x0.h>
++#include <asm/memory.h>
 +
-+#define AMX3_PM_SRAM_SYMBOL_OFFSET(sym) ((unsigned long)(sym) - \
-+					 (unsigned long)pm_sram->do_wfi)
++#include "cm33xx.h"
++#include "common.h"
++#include "iomap.h"
++#include "omap-secure.h"
++#include "omap44xx.h"
++#include "prm33xx.h"
++#include "prcm43xx.h"
 +
-+static int (*am33xx_do_wfi_sram)(unsigned long unused);
-+static phys_addr_t am33xx_do_wfi_sram_phys;
++#define AM33XX_CM_CLKCTRL_MODULESTATE_DISABLED		0x00030000
++#define AM33XX_CM_CLKCTRL_MODULEMODE_DISABLE		0x0003
++#define AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE		0x0002
 +
-+static struct gen_pool *sram_pool, *sram_pool_data;
-+static unsigned long ocmcram_location, ocmcram_location_data;
++#define AM43XX_EMIF_POWEROFF_ENABLE			0x1
++#define AM43XX_EMIF_POWEROFF_DISABLE			0x0
 +
-+static struct am33xx_pm_platform_data *pm_ops;
-+static struct am33xx_pm_sram_addr *pm_sram;
++#define AM43XX_CM_CLKSTCTRL_CLKTRCTRL_SW_SLEEP		0x1
++#define AM43XX_CM_CLKSTCTRL_CLKTRCTRL_HW_AUTO		0x3
 +
-+static struct wkup_m3_ipc *m3_ipc;
++#define AM43XX_CM_BASE					0x44DF0000
 +
-+static u32 sram_suspend_address(unsigned long addr)
-+{
-+	return ((unsigned long)am33xx_do_wfi_sram +
-+		AMX3_PM_SRAM_SYMBOL_OFFSET(addr));
-+}
++#define AM43XX_CM_REGADDR(inst, reg)                           \
++       AM33XX_L4_WK_IO_ADDRESS(AM43XX_CM_BASE + (inst) + (reg))
 +
-+#ifdef CONFIG_SUSPEND
-+static int am33xx_pm_suspend(suspend_state_t suspend_state)
-+{
-+	int i, ret = 0;
++#define AM43XX_CM_MPU_CLKSTCTRL AM43XX_CM_REGADDR(AM43XX_CM_MPU_INST, \
++					AM43XX_CM_MPU_MPU_CDOFFS)
++#define AM43XX_CM_MPU_MPU_CLKCTRL AM43XX_CM_REGADDR(AM43XX_CM_MPU_INST, \
++					AM43XX_CM_MPU_MPU_CLKCTRL_OFFSET)
++#define AM43XX_CM_PER_EMIF_CLKCTRL  AM43XX_CM_REGADDR(AM43XX_CM_PER_INST, \
++					AM43XX_CM_PER_EMIF_CLKCTRL_OFFSET)
++#define AM43XX_PRM_EMIF_CTRL_OFFSET			0x0030
 +
-+	ret = pm_ops->soc_suspend((unsigned long)suspend_state,
-+				  am33xx_do_wfi_sram);
++	.arm
++	.align 3
 +
-+	if (ret) {
-+		pr_err("PM: Kernel suspend failure\n");
-+	} else {
-+		i = m3_ipc->ops->request_pm_status(m3_ipc);
++ENTRY(am43xx_do_wfi)
++	stmfd	sp!, {r4 - r11, lr}	@ save registers on stack
 +
-+		switch (i) {
-+		case 0:
-+			pr_info("PM: Successfully put all powerdomains to target state\n");
-+			break;
-+		case 1:
-+			pr_err("PM: Could not transition all powerdomains to target state\n");
-+			ret = -1;
-+			break;
-+		default:
-+			pr_err("PM: CM3 returned unknown result = %d\n", i);
-+			ret = -1;
-+		}
-+	}
++	/* Retrieve l2 cache virt address BEFORE we shut off EMIF */
++	ldr	r1, get_l2cache_base
++	blx	r1
++	mov	r8, r0
 +
-+	return ret;
-+}
++	/*
++	 * Flush all data from the L1 and L2 data cache before disabling
++	 * SCTLR.C bit.
++	 */
++	ldr	r1, kernel_flush
++	blx	r1
 +
-+static int am33xx_pm_enter(suspend_state_t suspend_state)
-+{
-+	int ret = 0;
++	/*
++	 * Clear the SCTLR.C bit to prevent further data cache
++	 * allocation. Clearing SCTLR.C would make all the data accesses
++	 * strongly ordered and would not hit the cache.
++	 */
++	mrc	p15, 0, r0, c1, c0, 0
++	bic	r0, r0, #(1 << 2)	@ Disable the C bit
++	mcr	p15, 0, r0, c1, c0, 0
++	isb
++	dsb
 +
-+	switch (suspend_state) {
-+	case PM_SUSPEND_MEM:
-+	case PM_SUSPEND_STANDBY:
-+		ret = am33xx_pm_suspend(suspend_state);
-+		break;
-+	default:
-+		ret = -EINVAL;
-+	}
++	/*
++	 * Invalidate L1 and L2 data cache.
++	 */
++	ldr	r1, kernel_flush
++	blx	r1
 +
-+	return ret;
-+}
++#ifdef CONFIG_CACHE_L2X0
++	/*
++	 * Clean and invalidate the L2 cache.
++	 */
++#ifdef CONFIG_PL310_ERRATA_727915
++	mov	r0, #0x03
++	mov	r12, #OMAP4_MON_L2X0_DBG_CTRL_INDEX
++	dsb
++	smc	#0
++	dsb
++#endif
++	mov	r0, r8
++	adr	r4, am43xx_pm_ro_sram_data
++	ldr	r3, [r4, #AMX3_PM_RO_SRAM_DATA_VIRT_OFFSET]
 +
-+static int am33xx_pm_begin(suspend_state_t state)
-+{
-+	int ret = -EINVAL;
++	mov	r2, r0
++	ldr	r0, [r2, #L2X0_AUX_CTRL]
++	str	r0, [r3, #AMX3_PM_L2_AUX_CTRL_VAL_OFFSET]
++	ldr	r0, [r2, #L310_PREFETCH_CTRL]
++	str	r0, [r3, #AMX3_PM_L2_PREFETCH_CTRL_VAL_OFFSET]
 +
-+	switch (state) {
-+	case PM_SUSPEND_MEM:
-+		ret = m3_ipc->ops->prepare_low_power(m3_ipc, WKUP_M3_DEEPSLEEP);
-+		break;
-+	case PM_SUSPEND_STANDBY:
-+		ret = m3_ipc->ops->prepare_low_power(m3_ipc, WKUP_M3_STANDBY);
-+		break;
-+	}
++	ldr	r0, l2_val
++	str	r0, [r2, #L2X0_CLEAN_INV_WAY]
++wait:
++	ldr	r0, [r2, #L2X0_CLEAN_INV_WAY]
++	ldr	r1, l2_val
++	ands	r0, r0, r1
++	bne	wait
++#ifdef CONFIG_PL310_ERRATA_727915
++	mov	r0, #0x00
++	mov	r12, #OMAP4_MON_L2X0_DBG_CTRL_INDEX
++	dsb
++	smc	#0
++	dsb
++#endif
++l2x_sync:
++	mov	r0, r8
++	mov	r2, r0
++	mov	r0, #0x0
++	str	r0, [r2, #L2X0_CACHE_SYNC]
++sync:
++	ldr	r0, [r2, #L2X0_CACHE_SYNC]
++	ands	r0, r0, #0x1
++	bne	sync
++#endif
 +
-+	return ret;
-+}
++	adr     r9, am43xx_emif_sram_table
 +
-+static void am33xx_pm_end(void)
-+{
-+	m3_ipc->ops->finish_low_power(m3_ipc);
-+}
++	ldr     r3, [r9, #EMIF_PM_SAVE_CONTEXT_OFFSET]
++	blx     r3
 +
-+static int am33xx_pm_valid(suspend_state_t state)
-+{
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+	case PM_SUSPEND_MEM:
-+		return 1;
-+	default:
-+		return 0;
-+	}
-+}
++	ldr     r3, [r9, #EMIF_PM_ENTER_SR_OFFSET]
++	blx     r3
 +
-+static const struct platform_suspend_ops am33xx_pm_ops = {
-+	.begin		= am33xx_pm_begin,
-+	.end		= am33xx_pm_end,
-+	.enter		= am33xx_pm_enter,
-+	.valid		= am33xx_pm_valid,
-+};
-+#endif /* CONFIG_SUSPEND */
++	/* Disable EMIF */
++	ldr	r1, am43xx_virt_emif_clkctrl
++	ldr	r2, [r1]
++	bic	r2, r2, #AM33XX_CM_CLKCTRL_MODULEMODE_DISABLE
++	str	r2, [r1]
 +
-+static void am33xx_pm_set_ipc_ops(void)
-+{
-+	u32 resume_address;
-+	int temp;
++wait_emif_disable:
++	ldr	r2, [r1]
++	mov	r3, #AM33XX_CM_CLKCTRL_MODULESTATE_DISABLED
++	cmp	r2, r3
++	bne	wait_emif_disable
 +
-+	temp = ti_emif_get_mem_type();
-+	if (temp < 0) {
-+		pr_err("PM: Cannot determine memory type, no PM available\n");
-+		return;
-+	}
-+	m3_ipc->ops->set_mem_type(m3_ipc, temp);
++	/*
++	 * For the MPU WFI to be registered as an interrupt
++	 * to WKUP_M3, MPU_CLKCTRL.MODULEMODE needs to be set
++	 * to DISABLED
++	 */
++	ldr	r1, am43xx_virt_mpu_clkctrl
++	ldr	r2, [r1]
++	bic	r2, r2, #AM33XX_CM_CLKCTRL_MODULEMODE_DISABLE
++	str	r2, [r1]
 +
-+	/* Physical resume address to be used by ROM code */
-+	resume_address = am33xx_do_wfi_sram_phys +
-+			 *pm_sram->resume_offset + 0x4;
++	/*
++	 * Put MPU CLKDM to SW_SLEEP
++	 */
++	ldr	r1, am43xx_virt_mpu_clkstctrl
++	mov	r2, #AM43XX_CM_CLKSTCTRL_CLKTRCTRL_SW_SLEEP
++	str	r2, [r1]
 +
-+	m3_ipc->ops->set_resume_address(m3_ipc, (void *)resume_address);
-+}
++	/*
++	 * Execute a barrier instruction to ensure that all cache,
++	 * TLB and branch predictor maintenance operations issued
++	 * have completed.
++	 */
++	dsb
++	dmb
 +
-+static void am33xx_pm_free_sram(void)
-+{
-+	gen_pool_free(sram_pool, ocmcram_location, *pm_sram->do_wfi_sz);
-+	gen_pool_free(sram_pool_data, ocmcram_location_data,
-+		      sizeof(struct am33xx_pm_ro_sram_data));
-+}
++	/*
++	 * Execute a WFI instruction and wait until the
++	 * STANDBYWFI output is asserted to indicate that the
++	 * CPU is in idle and low power state. CPU can specualatively
++	 * prefetch the instructions so add NOPs after WFI. Sixteen
++	 * NOPs as per Cortex-A9 pipeline.
++	 */
++	wfi
++
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++	nop
++
++	/* We come here in case of an abort due to a late interrupt */
++	ldr	r1, am43xx_virt_mpu_clkstctrl
++	mov	r2, #AM43XX_CM_CLKSTCTRL_CLKTRCTRL_HW_AUTO
++	str	r2, [r1]
++
++	/* Set MPU_CLKCTRL.MODULEMODE back to ENABLE */
++	ldr	r1, am43xx_virt_mpu_clkctrl
++	mov	r2, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
++	str	r2, [r1]
++
++	/* Re-enable EMIF */
++	ldr	r1, am43xx_virt_emif_clkctrl
++	mov	r2, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
++	str	r2, [r1]
++wait_emif_enable:
++	ldr	r3, [r1]
++	cmp	r2, r3
++	bne	wait_emif_enable
++
++	/*
++	 * Set SCTLR.C bit to allow data cache allocation
++	 */
++	mrc	p15, 0, r0, c1, c0, 0
++	orr	r0, r0, #(1 << 2)	@ Enable the C bit
++	mcr	p15, 0, r0, c1, c0, 0
++	isb
++
++	ldr     r1, [r9, #EMIF_PM_ABORT_SR_OFFSET]
++	blx     r1
++
++	/* Let the suspend code know about the abort */
++	mov	r0, #1
++	ldmfd	sp!, {r4 - r11, pc}	@ restore regs and return
++ENDPROC(am43xx_do_wfi)
++
++	.align
++ENTRY(am43xx_resume_offset)
++	.word . - am43xx_do_wfi
++
++ENTRY(am43xx_resume_from_deep_sleep)
++	/* Set MPU CLKSTCTRL to HW AUTO so that CPUidle works properly */
++	ldr	r1, am43xx_virt_mpu_clkstctrl
++	mov	r2, #AM43XX_CM_CLKSTCTRL_CLKTRCTRL_HW_AUTO
++	str	r2, [r1]
++
++	/* For AM43xx, use EMIF power down until context is restored */
++	ldr	r2, am43xx_phys_emif_poweroff
++	mov	r1, #AM43XX_EMIF_POWEROFF_ENABLE
++	str	r1, [r2, #0x0]
++
++	/* Re-enable EMIF */
++	ldr	r1, am43xx_phys_emif_clkctrl
++	mov	r2, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
++	str	r2, [r1]
++wait_emif_enable1:
++	ldr	r3, [r1]
++	cmp	r2, r3
++	bne	wait_emif_enable1
++
++	adr     r9, am43xx_emif_sram_table
++
++	ldr     r1, [r9, #EMIF_PM_RESTORE_CONTEXT_OFFSET]
++	blx     r1
++
++	ldr     r1, [r9, #EMIF_PM_EXIT_SR_OFFSET]
++	blx     r1
++
++	ldr     r2, am43xx_phys_emif_poweroff
++	mov     r1, #AM43XX_EMIF_POWEROFF_DISABLE
++	str     r1, [r2, #0x0]
++
++#ifdef CONFIG_CACHE_L2X0
++	ldr	r2, l2_cache_base
++	ldr	r0, [r2, #L2X0_CTRL]
++	and	r0, #0x0f
++	cmp	r0, #1
++	beq	skip_l2en			@ Skip if already enabled
++
++	adr	r4, am43xx_pm_ro_sram_data
++	ldr	r3, [r4, #AMX3_PM_RO_SRAM_DATA_PHYS_OFFSET]
++	ldr     r0, [r3, #AMX3_PM_L2_PREFETCH_CTRL_VAL_OFFSET]
++
++	ldr	r12, l2_smc1
++	dsb
++	smc	#0
++	dsb
++set_aux_ctrl:
++	ldr     r0, [r3, #AMX3_PM_L2_AUX_CTRL_VAL_OFFSET]
++	ldr	r12, l2_smc2
++	dsb
++	smc	#0
++	dsb
++
++	/* L2 invalidate on resume */
++	ldr	r0, l2_val
++	ldr	r2, l2_cache_base
++	str	r0, [r2, #L2X0_INV_WAY]
++wait2:
++	ldr	r0, [r2, #L2X0_INV_WAY]
++	ldr	r1, l2_val
++	ands	r0, r0, r1
++	bne	wait2
++#ifdef CONFIG_PL310_ERRATA_727915
++	mov	r0, #0x00
++	mov	r12, #OMAP4_MON_L2X0_DBG_CTRL_INDEX
++	dsb
++	smc	#0
++	dsb
++#endif
++l2x_sync2:
++	ldr	r2, l2_cache_base
++	mov	r0, #0x0
++	str	r0, [r2, #L2X0_CACHE_SYNC]
++sync2:
++	ldr	r0, [r2, #L2X0_CACHE_SYNC]
++	ands	r0, r0, #0x1
++	bne	sync2
++
++	mov	r0, #0x1
++	ldr	r12, l2_smc3
++	dsb
++	smc	#0
++	dsb
++#endif
++skip_l2en:
++	/* We are back. Branch to the common CPU resume routine */
++	mov	r0, #0
++	ldr	pc, resume_addr
++ENDPROC(am43xx_resume_from_deep_sleep)
 +
 +/*
-+ * Push the minimal suspend-resume code to SRAM
++ * Local variables
 + */
-+static int am33xx_prepare_push_sram_idle(void)
-+{
-+	struct device_node *np;
++	.align
++resume_addr:
++	.word	cpu_resume - PAGE_OFFSET + 0x80000000
++get_l2cache_base:
++	.word	omap4_get_l2cache_base
++kernel_flush:
++	.word   v7_flush_dcache_all
++ddr_start:
++	.word	PAGE_OFFSET
 +
-+	np = of_find_compatible_node(NULL, NULL, "ti,omap3-mpu");
++am43xx_phys_emif_poweroff:
++	.word   (AM43XX_CM_BASE + AM43XX_PRM_DEVICE_INST + \
++		 AM43XX_PRM_EMIF_CTRL_OFFSET)
++am43xx_virt_mpu_clkstctrl:
++	.word	(AM43XX_CM_MPU_CLKSTCTRL)
++am43xx_virt_mpu_clkctrl:
++	.word	(AM43XX_CM_MPU_MPU_CLKCTRL)
++am43xx_virt_emif_clkctrl:
++	.word	(AM43XX_CM_PER_EMIF_CLKCTRL)
++am43xx_phys_emif_clkctrl:
++	.word	(AM43XX_CM_BASE + AM43XX_CM_PER_INST + \
++		 AM43XX_CM_PER_EMIF_CLKCTRL_OFFSET)
 +
-+	if (!np) {
-+		np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
-+		if (!np) {
-+			pr_warn("PM: %s: Unable to find device node for mpu\n",
-+				__func__);
-+			return -ENODEV;
-+		}
-+	}
++/* L2 cache related defines for AM437x */
++l2_cache_base:
++	.word	OMAP44XX_L2CACHE_BASE
++l2_smc1:
++	.word	OMAP4_MON_L2X0_PREFETCH_INDEX
++l2_smc2:
++	.word	OMAP4_MON_L2X0_AUXCTRL_INDEX
++l2_smc3:
++	.word	OMAP4_MON_L2X0_CTRL_INDEX
++l2_val:
++	.word	0xffff
 +
-+	sram_pool = of_gen_pool_get(np, "pm-sram", 0);
-+	if (!sram_pool) {
-+		pr_warn("PM: %s: Unable to get sram pool for ocmcram\n",
-+			__func__);
-+		return -ENODEV;
-+	}
++.align 3
++/* DDR related defines */
++ENTRY(am43xx_emif_sram_table)
++	.space EMIF_PM_FUNCTIONS_SIZE
 +
-+	sram_pool_data = of_gen_pool_get(np, "pm-sram", 1);
-+	if (!sram_pool_data) {
-+		pr_warn("PM: %s: Unable to get sram data pool for ocmcram\n",
-+			__func__);
-+		return -ENODEV;
-+	}
++ENTRY(am43xx_pm_sram)
++.word am43xx_do_wfi
++.word am43xx_do_wfi_sz
++.word am43xx_resume_offset
++.word am43xx_emif_sram_table
++.word am43xx_pm_ro_sram_data
 +
-+	ocmcram_location = gen_pool_alloc(sram_pool, *pm_sram->do_wfi_sz);
-+	if (!ocmcram_location) {
-+		pr_warn("PM: %s: Unable to allocate memory from ocmcram\n",
-+			__func__);
-+		return -ENOMEM;
-+	}
++.align 3
 +
-+	ocmcram_location_data = gen_pool_alloc(sram_pool_data,
-+					       sizeof(struct emif_regs_amx3));
-+	if (!ocmcram_location_data) {
-+		pr_err("PM: Unable to allocate memory from ocmcram\n");
-+		gen_pool_free(sram_pool, ocmcram_location, *pm_sram->do_wfi_sz);
-+		return -ENOMEM;
-+	}
++ENTRY(am43xx_pm_ro_sram_data)
++	.space AMX3_PM_RO_SRAM_DATA_SIZE
 +
-+	return 0;
-+}
-+
-+static int am33xx_push_sram_idle(void)
-+{
-+	struct am33xx_pm_ro_sram_data ro_sram_data;
-+	int ret;
-+	void *copy_addr;
-+
-+	ro_sram_data.amx3_pm_sram_data_virt = ocmcram_location_data;
-+	ro_sram_data.amx3_pm_sram_data_phys =
-+		gen_pool_virt_to_phys(sram_pool_data, ocmcram_location_data);
-+
-+	/* Save physical address to calculate resume offset during pm init */
-+	am33xx_do_wfi_sram_phys = gen_pool_virt_to_phys(sram_pool,
-+							ocmcram_location);
-+
-+	am33xx_do_wfi_sram = sram_exec_copy(sram_pool, (void *)ocmcram_location,
-+					    pm_sram->do_wfi,
-+					    *pm_sram->do_wfi_sz);
-+	if (!am33xx_do_wfi_sram) {
-+		pr_err("PM: %s: am33xx_do_wfi copy to sram failed\n", __func__);
-+		return -ENODEV;
-+	}
-+
-+	ret = ti_emif_copy_pm_function_table(sram_pool,
-+			(void *)sram_suspend_address((unsigned long)pm_sram->emif_sram_table));
-+	if (ret) {
-+		pr_warn("PM: %s: EMIF function copy failed\n", __func__);
-+		return -EPROBE_DEFER;
-+	}
-+
-+	copy_addr = sram_exec_copy(sram_pool,
-+			(void *)sram_suspend_address((unsigned long)pm_sram->ro_sram_data),
-+			&ro_sram_data,
-+			sizeof(ro_sram_data));
-+	if (!copy_addr) {
-+		pr_err("PM: %s: ro_sram_data copy to sram failed\n", __func__);
-+		return -ENODEV;
-+	}
-+
-+	return 0;
-+}
-+
-+static int am33xx_pm_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	int ret;
-+
-+	if (!of_machine_is_compatible("ti,am33xx") &&
-+	    !of_machine_is_compatible("ti,am43"))
-+		return -ENODEV;
-+
-+	pm_ops = dev->platform_data;
-+	if (!pm_ops) {
-+		pr_err("PM: Cannot get core PM ops!\n");
-+		return -ENODEV;
-+	}
-+
-+	pm_sram = pm_ops->get_sram_addrs();
-+	if (!pm_sram) {
-+		pr_err("PM: Cannot get PM asm function addresses!!\n");
-+		return -ENODEV;
-+	}
-+
-+	ret = am33xx_prepare_push_sram_idle();
-+	if (ret)
-+		return ret;
-+
-+	ret = am33xx_push_sram_idle();
-+	if (ret)
-+		goto err_free_sram;
-+
-+	m3_ipc = wkup_m3_ipc_get();
-+	if (!m3_ipc) {
-+		pr_err("PM: Cannot get wkup_m3_ipc handle\n");
-+		ret = -EPROBE_DEFER;
-+		goto err_free_sram;
-+	}
-+
-+	am33xx_pm_set_ipc_ops();
-+
-+#ifdef CONFIG_SUSPEND
-+	suspend_set_ops(&am33xx_pm_ops);
-+#endif /* CONFIG_SUSPEND */
-+
-+	ret = pm_ops->init();
-+	if (ret) {
-+		pr_err("Unable to call core pm init!\n");
-+		ret = -ENODEV;
-+		goto err_put_wkup_m3_ipc;
-+	}
-+
-+	return 0;
-+
-+err_put_wkup_m3_ipc:
-+	wkup_m3_ipc_put(m3_ipc);
-+err_free_sram:
-+	am33xx_pm_free_sram();
-+	return ret;
-+}
-+
-+static int am33xx_pm_remove(struct platform_device *pdev)
-+{
-+	suspend_set_ops(NULL);
-+	wkup_m3_ipc_put(m3_ipc);
-+	am33xx_pm_free_sram();
-+	return 0;
-+}
-+
-+static struct platform_driver am33xx_pm_driver = {
-+	.driver = {
-+		.name   = "pm33xx",
-+	},
-+	.probe = am33xx_pm_probe,
-+	.remove = am33xx_pm_remove,
-+};
-+module_platform_driver(am33xx_pm_driver);
-+
-+MODULE_ALIAS("platform:pm33xx");
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("am33xx power management driver");
-diff --git a/include/linux/platform_data/pm33xx.h b/include/linux/platform_data/pm33xx.h
-index c191ab681093..b8d6c3a9b46c 100644
---- a/include/linux/platform_data/pm33xx.h
-+++ b/include/linux/platform_data/pm33xx.h
-@@ -38,12 +38,12 @@ struct am33xx_pm_sram_data {
- 	u32 wfi_flags;
- 	u32 l2_aux_ctrl_val;
- 	u32 l2_prefetch_ctrl_val;
--};
-+} __packed __aligned(8);
- 
- struct am33xx_pm_ro_sram_data {
- 	u32 amx3_pm_sram_data_virt;
- 	u32 amx3_pm_sram_data_phys;
--};
-+} __packed __aligned(8);
- 
- extern inline void amx3_pm_asm_offsets(void)
- {
++ENTRY(am43xx_do_wfi_sz)
++	.word	. - am43xx_do_wfi
 -- 
 2.13.0
