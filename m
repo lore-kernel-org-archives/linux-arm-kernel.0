@@ -1,137 +1,180 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 19 May 2017 18:09:22 +0200
-Subject: [PATCH 3/6] gpio: dt-bindings: Add documentation for gpio controllers
- on Armada 7K/8K
+Date: Fri, 19 May 2017 18:09:25 +0200
+Subject: [PATCH 6/6] arm64: dts: marvell: add gpio support for Armada 7K/8K
 In-Reply-To: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
 References: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
-Message-ID: <306395ff39de3d3d3c8f55e5da4de8def29ae8d1.1495210061.git-series.gregory.clement@free-electrons.com>
+Message-ID: <c9e9208894902eb43cecd8809ea8c08e9bcdd814.1495210061.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device tree binding for the gpio controllers found on the
-Marvell Armada 7K and Armada 8K SoCs.
+Enable gpio support for CP and AP on the Marvell Armada 7K/8K SoCs.
+
+The Armada 8K has two CP110 blocks, each having two GPIO controllers.
+However, in each CP110 block, one of the GPIO controller cannot be
+used: in the master CP110, only the second GPIO controller can be used,
+while on the slave CP110, only the first GPIO controller can be used.
+
+On the other side, the Armada 7K has only one CP110, but both its GPIO
+controllers can be used.
+
+For this reason, the GPIO controllers are marked as "disabled" in the
+armada-cp110-master.dtsi and armada-cp110-slave.dtsi files, and only
+enabled in the per-SoC dtsi files.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt  | 20 ++++++++++++++++++++
- Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 24 +++++++++++++++++++++++-
- Documentation/devicetree/bindings/gpio/gpio-mvebu.txt                      | 24 +++++++++++++++++-------
- 3 files changed, 60 insertions(+), 8 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-70x0.dtsi         | 15 +++++++++-
+ arch/arm64/boot/dts/marvell/armada-80x0.dtsi         | 16 +++++++++-
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 10 ++++++-
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 21 ++++++++++++-
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 22 +++++++++++++-
+ 5 files changed, 84 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-index 4228d158fb31..0b887440e08a 100644
---- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-@@ -64,6 +64,17 @@ mpp17	17	gpio
- mpp18	18	gpio
- mpp19	19	gpio, uart0(rxd), sdio(pw_off)
+diff --git a/arch/arm64/boot/dts/marvell/armada-70x0.dtsi b/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
+index f6c22665d091..860b6ae9dcc5 100644
+--- a/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-70x0.dtsi
+@@ -46,6 +46,21 @@
  
-+GPIO:
-+-----
-+For common binding part and usage, refer to
-+Documentation/devicetree/bindings/gpio/gpio-mvebu.txt.
-+
-+Required properties:
-+
-+- compatible: "marvell,armada-8k-gpio"
-+
-+- offset: offset address inside the syscon block
-+
- Example:
- ap_syscon: system-controller at 6f4000 {
- 	compatible = "syscon", "simple-mfd";
-@@ -77,4 +88,13 @@ ap_syscon: system-controller at 6f4000 {
- 	ap_pinctrl: pinctrl {
- 		compatible = "marvell,ap806-pinctrl";
- 	};
-+
-+	ap_gpio: gpio {
-+		compatible = "marvell,armada-8k-gpio";
-+		offset = <0x1040>;
-+		ngpios = <19>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		gpio-ranges = <&ap_pinctrl 0 0 19>;
+ #include "armada-cp110-master.dtsi"
+ 
++/ {
++	aliases {
++		gpio1 = &cpm_gpio1;
++		gpio2 = &cpm_gpio2;
 +	};
- };
-diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-index 733beac7724e..655c114ef584 100644
---- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-@@ -149,6 +149,18 @@ mpp60	60	gpio, mss_gpio6, ptp(pulse), tdm(dtx), au(i2smclk), spi0(csn1), uart0(r
- mpp61	61	gpio, mss_gpio5, ptp(clk), tdm(pclk), au(i2sextclk), spi0(csn2), uart0(txd), uart2(txd), sata1(present_act), ge(mdio), sdio(d3)
- mpp62	62	gpio, mss_gpio4, synce1(clk), ptp(pclk_out), sata1(present_act), spi0(csn3), uart0(rxd), uart2(rxd), sata0(present_act), ge(mdc)
++};
++
++&cpm_gpio1 {
++	status = "okay";
++};
++
++&cpm_gpio2 {
++	status = "okay";
++};
++
+ &cpm_syscon0 {
+ 	cpm_pinctrl: pinctrl {
+ 		compatible = "marvell,armada-7k-pinctrl";
+diff --git a/arch/arm64/boot/dts/marvell/armada-80x0.dtsi b/arch/arm64/boot/dts/marvell/armada-80x0.dtsi
+index 93d1de03b39a..666ebe96ba0d 100644
+--- a/arch/arm64/boot/dts/marvell/armada-80x0.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-80x0.dtsi
+@@ -47,6 +47,22 @@
+ #include "armada-cp110-master.dtsi"
+ #include "armada-cp110-slave.dtsi"
  
-+GPIO:
-+-----
++/ {
++	aliases {
++		gpio1 = &cps_gpio1;
++		gpio2 = &cpm_gpio2;
++	};
++};
 +
-+For common binding part and usage, refer to
-+Documentation/devicetree/bindings/gpio/gpio-mvebu.txt.
++/* The 80x0 has two CP blocks, but uses only one block from each. */
++&cps_gpio1 {
++	status = "okay";
++};
 +
-+Required properties:
++&cpm_gpio2 {
++	status = "okay";
++};
 +
-+- compatible: "marvell,armada-8k-gpio"
-+
-+- offset: offset address inside the syscon block
-+
- Example:
- 
- cpm_syscon0: system-controller at 440000 {
-@@ -163,5 +175,15 @@ cpm_syscon0: system-controller at 440000 {
+ &cpm_syscon0 {
  	cpm_pinctrl: pinctrl {
  		compatible = "marvell,armada-8k-cpm-pinctrl";
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index 4a1b6e0a604a..64608658de5a 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -57,6 +57,7 @@
+ 	aliases {
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
++		gpio0 = &ap_gpio;
  	};
--};
  
-+	cpm_gpio1: gpio at 100 {
-+		compatible = "marvell,armada-8k-gpio";
-+		offset = <0x100>;
-+		ngpios = <32>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		gpio-ranges = <&cpm_pinctrl 0 0 32>;
-+		status = "disabled";
-+	};
+ 	psci {
+@@ -252,6 +253,15 @@
+ 				ap_pinctrl: pinctrl {
+ 					compatible = "marvell,ap806-pinctrl";
+ 				};
 +
-+};
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-index 42c3bb2d53e8..2c5304ff467c 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-@@ -2,17 +2,27 @@
- 
- Required properties:
- 
--- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio"
--  or "marvell,armadaxp-gpio". "marvell,orion-gpio" should be used for
--  Orion, Kirkwood, Dove, Discovery (except MV78200) and Armada
--  370. "marvell,mv78200-gpio" should be used for the Discovery
--  MV78200. "marvel,armadaxp-gpio" should be used for all Armada XP
--  SoCs (MV78230, MV78260, MV78460).
-+- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio",
-+  "marvell,armadaxp-gpio" or "marvell,armada-8k-gpio".
++				ap_gpio: gpio {
++					compatible = "marvell,armada-8k-gpio";
++					offset = <0x1040>;
++					ngpios = <19>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					gpio-ranges = <&ap_pinctrl 0 0 19>;
++				};
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 96a4ff75b3b0..f88618185d58 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -104,6 +104,27 @@
+ 					compatible = "marvell,cp110-clock";
+ 					#clock-cells = <2>;
+ 				};
 +
-+    "marvell,orion-gpio" should be used for Orion, Kirkwood, Dove,
-+    Discovery (except MV78200) and Armada 370. "marvell,mv78200-gpio"
-+    should be used for the Discovery MV78200.
++				cpm_gpio1: gpio at 100 {
++					compatible = "marvell,armada-8k-gpio";
++					offset = <0x100>;
++					ngpios = <32>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					gpio-ranges = <&cpm_pinctrl 0 0 32>;
++					status = "disabled";
 +
-+    "marvel,armadaxp-gpio" should be used for all Armada XP SoCs
-+    (MV78230, MV78260, MV78460).
++				};
 +
-+    "marvell,armada-8k-gpio" should be used for the Armada 7K and 8K
-+    SoCs (either from AP or CP), see
-+    Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-+    and
-+    Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-+    for specific details about the offset property.
++				cpm_gpio2: gpio at 140 {
++					compatible = "marvell,armada-8k-gpio";
++					offset = <0x140>;
++					ngpios = <31>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					gpio-ranges = <&cpm_pinctrl 0 32 31>;
++					status = "disabled";
++				};
+ 			};
  
- - reg: Address and length of the register set for the device. Only one
-   entry is expected, except for the "marvell,armadaxp-gpio" variant
-   for which two entries are expected: one for the general registers,
--  one for the per-cpu registers.
-+  one for the per-cpu registers. Not used for marvell,armada-8k-gpio.
+ 			cpm_rtc: rtc at 284000 {
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 48a658aa5b32..f3a6e6742442 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -111,6 +111,28 @@
+ 					compatible = "marvell,cp110-clock";
+ 					#clock-cells = <2>;
+ 				};
++
++				cps_gpio1: gpio at 100 {
++					compatible = "marvell,armada-8k-gpio";
++					offset = <0x100>;
++					ngpios = <32>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					gpio-ranges = <&cps_pinctrl 0 0 32>;
++					status = "disabled";
++
++				};
++
++				cps_gpio2: gpio at 140 {
++					compatible = "marvell,armada-8k-gpio";
++					offset = <0x140>;
++					ngpios = <31>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					gpio-ranges = <&cps_pinctrl 0 32 31>;
++					status = "disabled";
++				};
++
+ 			};
  
- - interrupts: The list of interrupts that are used for all the pins
-   managed by this GPIO bank. There can be more than one interrupt
+ 			cps_sata0: sata at 540000 {
 -- 
 git-series 0.9.1
