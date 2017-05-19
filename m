@@ -1,42 +1,61 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 19 May 2017 08:53:22 +0200
-Subject: [PATCH v2 0/9] crypto: add HMAC IPAD/OPAD constant
-Message-ID: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
+Date: Fri, 19 May 2017 08:53:23 +0200
+Subject: [PATCH v2 1/9] crypto: add hmac IPAD/OPAD constant
+In-Reply-To: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
+References: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170519065331.27670-2-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
-
 Many HMAC users directly use directly 0x36/0x5c values.
-It's better with crypto to use a name instead of directly some crypto constant.
+It's better with crypto to use a name instead of directly some crypto
+constant.
 
-Changes since v1:
-- Moved constant to include/crypto/hmac.h
-- Added <crypto/hmac.h> to includes
+This patch simply add HMAC_IPAD_VALUE/HMAC_OPAD_VALUE defines in a new
+include file "crypto/hmac.h" and use them in crypto/hmac.c
 
-Corentin Labbe (9):
-  crypto: add hmac IPAD/OPAD constant
-  crypto: brcm - Use IPAD/OPAD constant
-  crypto: ixp4xx - Use IPAD/OPAD constant
-  crypto: marvell - Use IPAD/OPAD constant
-  crypto: mv_cesa - Use IPAD/OPAD constant
-  crypto: omap-sham - Use IPAD/OPAD constant
-  crypto: qat - Use IPAD/OPAD constant
-  crypto: mediatek - Use IPAD/OPAD constant
-  crypto: ccp - Use IPAD/OPAD constant
-
- crypto/hmac.c                            | 5 +++--
- drivers/crypto/bcm/cipher.c              | 5 +++--
- drivers/crypto/ccp/ccp-crypto-sha.c      | 5 +++--
- drivers/crypto/ixp4xx_crypto.c           | 3 +--
- drivers/crypto/marvell/hash.c            | 5 +++--
- drivers/crypto/mediatek/mtk-sha.c        | 5 +++--
- drivers/crypto/mv_cesa.c                 | 5 +++--
- drivers/crypto/omap-sham.c               | 5 +++--
- drivers/crypto/qat/qat_common/qat_algs.c | 5 +++--
- include/crypto/hmac.h                    | 7 +++++++
- 10 files changed, 32 insertions(+), 18 deletions(-)
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ crypto/hmac.c         | 5 +++--
+ include/crypto/hmac.h | 7 +++++++
+ 2 files changed, 10 insertions(+), 2 deletions(-)
  create mode 100644 include/crypto/hmac.h
 
+diff --git a/crypto/hmac.c b/crypto/hmac.c
+index 72e38c098bb3..92871dc2a63e 100644
+--- a/crypto/hmac.c
++++ b/crypto/hmac.c
+@@ -16,6 +16,7 @@
+  *
+  */
+ 
++#include <crypto/hmac.h>
+ #include <crypto/internal/hash.h>
+ #include <crypto/scatterwalk.h>
+ #include <linux/err.h>
+@@ -74,8 +75,8 @@ static int hmac_setkey(struct crypto_shash *parent,
+ 	memcpy(opad, ipad, bs);
+ 
+ 	for (i = 0; i < bs; i++) {
+-		ipad[i] ^= 0x36;
+-		opad[i] ^= 0x5c;
++		ipad[i] ^= HMAC_IPAD_VALUE;
++		opad[i] ^= HMAC_OPAD_VALUE;
+ 	}
+ 
+ 	return crypto_shash_init(shash) ?:
+diff --git a/include/crypto/hmac.h b/include/crypto/hmac.h
+new file mode 100644
+index 000000000000..ef09f7938204
+--- /dev/null
++++ b/include/crypto/hmac.h
+@@ -0,0 +1,7 @@
++#ifndef _CRYPTO_HMAC_H
++#define _CRYPTO_HMAC_H
++
++#define HMAC_IPAD_VALUE 0x36
++#define HMAC_OPAD_VALUE 0x5c
++
++#endif /* _CRYPTO_HMAC_H */
 -- 
 2.13.0
