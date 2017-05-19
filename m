@@ -1,89 +1,36 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 18 May 2017 18:37:09 -0700
-Subject: [PATCH 03/11] clk: bcm: Add clocks for Stingray SOC
-In-Reply-To: <1494071686-19098-4-git-send-email-anup.patel@broadcom.com>
-References: <1494071686-19098-1-git-send-email-anup.patel@broadcom.com>
- <1494071686-19098-4-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20170519013709.GD20170@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 18 May 2017 20:36:49 -0500
+Subject: [PATCH 1/5 v3] dt-bindings: Augment Gemini for clocks, resets
+In-Reply-To: <20170515171839.953-1-linus.walleij@linaro.org>
+References: <20170515171839.953-1-linus.walleij@linaro.org>
+Message-ID: <20170519013649.trvu3ss6hc3edtcn@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06, Anup Patel wrote:
-> From: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
+On Mon, May 15, 2017 at 07:18:39PM +0200, Linus Walleij wrote:
+> This augments the platform bindings for the Gemini SoC to include
+> the fact that the system controller also provides clock and reset
+> lindes, and adds all the required include files.
 > 
-> This patch adds support for Stingray clocks in iproc
-> ccf. The Stingray SOC has various plls based on iproc
-> pll architecture.
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v2->v3:
+> - Essentially a new patch from the two old patches adding
+>   bindings to the reset and clock controller separately.
+>   Instead add it all into the system controller and use one
+>   single compatible.
 > 
+> Rob: I need to merge this together in front of the device tree
+> changes that sprinkle references to the headers all over the
+> Gemini device trees, so if this sits good with you please ACK
+> it.
+> ---
+>  Documentation/devicetree/bindings/arm/gemini.txt | 24 +++++++++++++++-
+>  include/dt-bindings/clock/cortina,gemini-clock.h | 29 +++++++++++++++++++
+>  include/dt-bindings/reset/cortina,gemini-reset.h | 36 ++++++++++++++++++++++++
+>  3 files changed, 88 insertions(+), 1 deletion(-)
+>  create mode 100644 include/dt-bindings/clock/cortina,gemini-clock.h
+>  create mode 100644 include/dt-bindings/reset/cortina,gemini-reset.h
 
-Does it have anything besides PLLs?
-
-> +CLK_OF_DECLARE(sr_genpll0_clk, "brcm,sr-genpll0",
-> +				sr_genpll0_clk_init);
-> +
-> +static const struct iproc_pll_ctrl genpll3 = {
-> +	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
-> +		IPROC_CLK_PLL_NEEDS_SW_CFG,
-> +	.aon = AON_VAL(0x0, 1, 19, 18),
-> +	.reset = RESET_VAL(0x0, 12, 11),
-> +	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
-> +	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
-> +	.ndiv_int = REG_VAL(0x10, 20, 10),
-> +	.ndiv_frac = REG_VAL(0x10, 0, 20),
-> +	.pdiv = REG_VAL(0x14, 0, 4),
-> +	.status = REG_VAL(0x30, 12, 1),
-> +};
-> +
-> +static const struct iproc_clk_ctrl genpll3_clk[] = {
-> +	[BCM_SR_GENPLL3_HSLS_CLK] = {
-> +		.channel = BCM_SR_GENPLL3_HSLS_CLK,
-> +		.flags = IPROC_CLK_AON,
-> +		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-> +		.mdiv = REG_VAL(0x18, 0, 9),
-> +	},
-> +	[BCM_SR_GENPLL3_SDIO_CLK] = {
-> +		.channel = BCM_SR_GENPLL3_SDIO_CLK,
-> +		.flags = IPROC_CLK_AON,
-> +		.enable = ENABLE_VAL(0x4, 7, 1, 13),
-> +		.mdiv = REG_VAL(0x18, 10, 9),
-> +	},
-> +};
-> +
-> +static void __init sr_genpll3_clk_init(struct device_node *node)
-> +{
-> +	iproc_pll_clk_setup(node, &genpll3, NULL, 0, genpll3_clk,
-> +				ARRAY_SIZE(genpll3_clk));
-> +}
-> +CLK_OF_DECLARE(sr_genpll3_clk, "brcm,sr-genpll3",
-> +			sr_genpll3_clk_init);
-
-Can you make this a platform driver instead? Are all these clks
-really used for getting the interrupt and timers running?
-
-> +
-> +static const struct iproc_pll_ctrl genpll4 = {
-> +	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
-> +		IPROC_CLK_PLL_NEEDS_SW_CFG,
-> +	.aon = AON_VAL(0x0, 1, 25, 24),
-> +	.reset = RESET_VAL(0x0, 12, 11),
-> +	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
-> +	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
-> +	.ndiv_int = REG_VAL(0x10, 20, 10),
-> +	.ndiv_frac = REG_VAL(0x10, 0, 20),
-> +	.pdiv = REG_VAL(0x14, 0, 4),
-> +	.status = REG_VAL(0x30, 12, 1),
-> +};
-> +
-> +static const struct iproc_clk_ctrl genpll4_clk[] = {
-> +	[BCM_SR_GENPLL4_CCN_CLK] = {
-> +		.channel = BCM_SR_GENPLL4_CCN_CLK,
-> +		.flags = IPROC_CLK_AON,
-> +		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-> +		.mdiv = REG_VAL(0x18, 0, 9),
-> +	},
-> +};
-> +
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Acked-by: Rob Herring <robh@kernel.org>
