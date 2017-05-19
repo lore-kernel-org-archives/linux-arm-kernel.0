@@ -1,170 +1,105 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 19 May 2017 16:29:01 +0800
-Subject: [linux-sunxi] [PATCH v6 8/9] arm64: allwinner: a64: enable AXP803
- regulators for Pine64
-In-Reply-To: <98ae1ea8-ef08-8859-63d8-57c56a6348a6@arm.com>
-References: <20170518071653.36561-1-icenowy@aosc.io>
- <20170518071653.36561-9-icenowy@aosc.io>
- <98ae1ea8-ef08-8859-63d8-57c56a6348a6@arm.com>
-Message-ID: <4B129FD0-4AEB-4DC3-AF33-C279468BD197@aosc.io>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 19 May 2017 10:30:13 +0200
+Subject: [PATCH] mmc: sdhci-xenon: kill xenon_clean_phy()
+In-Reply-To: <20170516061720.1755-1-jszhang@marvell.com>
+References: <20170516061720.1755-1-jszhang@marvell.com>
+Message-ID: <CAPDyKFoDgLGnNcOJi83=0G3tOitsyqgoorJGfp1+uhM24YEf7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2017?5?19? GMT+08:00 ??4:27:21, Andre Przywara <andre.przywara@arm.com> ??:
->Hi,
+On 16 May 2017 at 08:17, Jisheng Zhang <jszhang@marvell.com> wrote:
+> Currently, the xenon_clean_phy() is only used for freeing phy_params.
+> The phy_params is allocated by devm_kzalloc(), there's no need to free
+> is explicitly.
 >
->On 18/05/17 08:16, Icenowy Zheng wrote:
->> Add support of AXP803 regulators in the Pine64 device tree, in order
->to
->> enable many future functionalities, e.g. Wi-Fi.
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->> Changes in v6:
->> - Rebased on next-20170517.
->> 
->>  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 109
->+++++++++++++++++++++
->>  1 file changed, 109 insertions(+)
->> 
->> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
->b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
->> index 36001884ed33..40921bacb39c 100644
->> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
->> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
->> @@ -118,6 +118,115 @@
->>  	};
->>  };
->>  
->> +#include "axp803.dtsi"
->> +
->> +&reg_aldo1 {
->> +	regulator-min-microvolt = <2800000>;
->> +	regulator-max-microvolt = <2800000>;
->> +	regulator-name = "vcc-csi";
->> +};
->> +
->> +&reg_aldo2 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <1800000>;
->> +	regulator-max-microvolt = <3300000>;
->> +	regulator-name = "vcc-pl";
->> +};
->> +
->> +&reg_aldo3 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <2700000>;
->> +	regulator-max-microvolt = <3300000>;
->> +	regulator-name = "vcc-pll-avcc";
->> +};
->> +
->> +&reg_dc1sw {
->> +	regulator-name = "vcc-phy";
->> +};
->> +
->> +&reg_dcdc1 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <3300000>;
->> +	regulator-max-microvolt = <3300000>;
->> +	regulator-name = "vcc-3v3";
->> +};
->> +
->> +&reg_dcdc2 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <1000000>;
->> +	regulator-max-microvolt = <1300000>;
->> +	regulator-name = "vdd-cpux";
->> +};
->> +
->> +/* DCDC3 is polyphased with DCDC2 */
->> +
->> +&reg_dcdc5 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <1500000>;
->> +	regulator-max-microvolt = <1500000>;
->> +	regulator-name = "vcc-dram";
->> +};
->
->I think I mentioned this before, but the Pine64 has DDR3L DRAM, which
->is
->specified to run at 1.35V (1.36V with the 20mV granularity of the AXP).
->The reset value is even (wrongly?) configured to 1.24V.
->
->So is there any reason you set the voltage to 1.5V? Is that what the
->BSP
->does? Or did you see any problems with 1.36V?
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-I just set it based on the schematics.
+Thanks, applied for fixes!
 
-And 1.35v cannot be accurately achieved by dcdc5 and it's a problem whether to use 1.34v or 1.36v ;-)
+Kind regards
+Uffe
 
+> ---
+>  drivers/mmc/host/sdhci-xenon-phy.c | 14 +-------------
+>  drivers/mmc/host/sdhci-xenon.c     |  6 +-----
+>  drivers/mmc/host/sdhci-xenon.h     |  1 -
+>  3 files changed, 2 insertions(+), 19 deletions(-)
 >
->Cheers,
->Andre.
+> diff --git a/drivers/mmc/host/sdhci-xenon-phy.c b/drivers/mmc/host/sdhci-xenon-phy.c
+> index 6356781f1cca..f7e26b031e76 100644
+> --- a/drivers/mmc/host/sdhci-xenon-phy.c
+> +++ b/drivers/mmc/host/sdhci-xenon-phy.c
+> @@ -787,14 +787,6 @@ int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios)
+>         return ret;
+>  }
 >
->> +&reg_dcdc6 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <1100000>;
->> +	regulator-max-microvolt = <1100000>;
->> +	regulator-name = "vdd-sys";
->> +};
->> +
->> +&reg_dldo1 {
->> +	regulator-min-microvolt = <3300000>;
->> +	regulator-max-microvolt = <3300000>;
->> +	regulator-name = "vcc-hdmi";
->> +};
->> +
->> +&reg_dldo2 {
->> +	regulator-min-microvolt = <3300000>;
->> +	regulator-max-microvolt = <3300000>;
->> +	regulator-name = "vcc-mipi";
->> +};
->> +
->> +&reg_dldo3 {
->> +	regulator-min-microvolt = <3300000>;
->> +	regulator-max-microvolt = <3300000>;
->> +	regulator-name = "avdd-csi";
->> +};
->> +
->> +&reg_dldo4 {
->> +	regulator-min-microvolt = <3300000>;
->> +	regulator-max-microvolt = <3300000>;
->> +	regulator-name = "vcc-wifi";
->> +};
->> +
->> +&reg_eldo1 {
->> +	regulator-min-microvolt = <1800000>;
->> +	regulator-max-microvolt = <1800000>;
->> +	regulator-name = "cpvdd";
->> +};
->> +
->> +&reg_eldo3 {
->> +	regulator-min-microvolt = <1800000>;
->> +	regulator-max-microvolt = <1800000>;
->> +	regulator-name = "vdd-1v8-csi";
->> +};
->> +
->> +&reg_fldo1 {
->> +	regulator-min-microvolt = <1200000>;
->> +	regulator-max-microvolt = <1200000>;
->> +	regulator-name = "vcc-1v2-hsic";
->> +};
->> +
->> +&reg_fldo2 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <1100000>;
->> +	regulator-max-microvolt = <1100000>;
->> +	regulator-name = "vdd-cpus";
->> +};
->> +
->> +&reg_rtc_ldo {
->> +	regulator-name = "vcc-rtc";
->> +};
->> +
->>  /* On Exp and Euler connectors */
->>  &uart0 {
->>  	pinctrl-names = "default";
->> 
+> -void xenon_clean_phy(struct sdhci_host *host)
+> -{
+> -       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -       struct xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+> -
+> -       kfree(priv->phy_params);
+> -}
+> -
+>  static int xenon_add_phy(struct device_node *np, struct sdhci_host *host,
+>                          const char *phy_name)
+>  {
+> @@ -819,11 +811,7 @@ static int xenon_add_phy(struct device_node *np, struct sdhci_host *host,
+>         if (ret)
+>                 return ret;
+>
+> -       ret = xenon_emmc_phy_parse_param_dt(host, np, priv->phy_params);
+> -       if (ret)
+> -               xenon_clean_phy(host);
+> -
+> -       return ret;
+> +       return xenon_emmc_phy_parse_param_dt(host, np, priv->phy_params);
+>  }
+>
+>  int xenon_phy_parse_dt(struct device_node *np, struct sdhci_host *host)
+> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
+> index 67246655315b..bc1781bb070b 100644
+> --- a/drivers/mmc/host/sdhci-xenon.c
+> +++ b/drivers/mmc/host/sdhci-xenon.c
+> @@ -486,7 +486,7 @@ static int xenon_probe(struct platform_device *pdev)
+>
+>         err = xenon_sdhc_prepare(host);
+>         if (err)
+> -               goto clean_phy_param;
+> +               goto err_clk;
+>
+>         err = sdhci_add_host(host);
+>         if (err)
+> @@ -496,8 +496,6 @@ static int xenon_probe(struct platform_device *pdev)
+>
+>  remove_sdhc:
+>         xenon_sdhc_unprepare(host);
+> -clean_phy_param:
+> -       xenon_clean_phy(host);
+>  err_clk:
+>         clk_disable_unprepare(pltfm_host->clk);
+>  free_pltfm:
+> @@ -510,8 +508,6 @@ static int xenon_remove(struct platform_device *pdev)
+>         struct sdhci_host *host = platform_get_drvdata(pdev);
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>
+> -       xenon_clean_phy(host);
+> -
+>         sdhci_remove_host(host, 0);
+>
+>         xenon_sdhc_unprepare(host);
+> diff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
+> index 6e6523ea01ce..73debb42dc2f 100644
+> --- a/drivers/mmc/host/sdhci-xenon.h
+> +++ b/drivers/mmc/host/sdhci-xenon.h
+> @@ -93,7 +93,6 @@ struct xenon_priv {
+>  };
+>
+>  int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios);
+> -void xenon_clean_phy(struct sdhci_host *host);
+>  int xenon_phy_parse_dt(struct device_node *np,
+>                        struct sdhci_host *host);
+>  void xenon_soc_pad_ctrl(struct sdhci_host *host,
+> --
+> 2.11.0
+>
