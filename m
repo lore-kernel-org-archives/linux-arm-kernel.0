@@ -1,43 +1,67 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 19 May 2017 14:29:14 +0100
-Subject: [PATCH] coresight: tmc: Configure DMA mask appropriately
-In-Reply-To: <c93205f17b2d7609a1eb76fab74a7f929f4d25fb.1495119556.git.robin.murphy@arm.com>
-References: <c93205f17b2d7609a1eb76fab74a7f929f4d25fb.1495119556.git.robin.murphy@arm.com>
-Message-ID: <3659c485-88ca-4fa9-ce7b-dfb77d8a050a@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 19 May 2017 14:34:25 +0100
+Subject: [RFC PATCH] arm64: neon: Remove support for nested or hardirq
+ kernel-mode NEON
+In-Reply-To: <20170519131321.GD3559@e103592.cambridge.arm.com>
+References: <1495193199-1291-1-git-send-email-Dave.Martin@arm.com>
+ <20170519124952.GB22800@leverpostej>
+ <20170519131321.GD3559@e103592.cambridge.arm.com>
+Message-ID: <20170519133424.GC22800@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/17 16:14, Robin Murphy wrote:
-> Before making any DMA API calls, the ETR driver should really be setting
-> its masks to ensure that DMA is possible. Especially since it can
-> address more than the 32-bit default mask set by the AMBA bus code.
->
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc.c | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-> index d8517d2a968c..864488793f09 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-> @@ -362,6 +362,13 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
->  		desc.type = CORESIGHT_DEV_TYPE_SINK;
->  		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
->  		desc.ops = &tmc_etr_cs_ops;
-> +		/*
-> +		 * ETR configuration uses a 40-bit AXI master in place of
-> +		 * the embedded SRAM of ETB/ETF.
-> +		 */
-> +		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
-> +		if (ret)
-> +			goto out;
->  	} else {
->  		desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
->  		desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
->
+On Fri, May 19, 2017 at 02:13:21PM +0100, Dave Martin wrote:
+> On Fri, May 19, 2017 at 01:49:53PM +0100, Mark Rutland wrote:
+> > Hi,
+> > 
+> > On Fri, May 19, 2017 at 12:26:39PM +0100, Dave Martin wrote:
+> > > +static bool __maybe_unused kernel_neon_allowed(void)
+> > > +{
+> > > +	/*
+> > > +	 * The per_cpu_ptr() is racy if called with preemption enabled.
+> > > +	 * This is not a bug:  per_cpu(kernel_neon_busy) is only set
+> > > +	 * when preemption is disabled, so we cannot migrate to another
+> > > +	 * CPU while it is set, nor can we migrate to a CPU where it is set.
+> > > +	 * So, if we find it clear on some CPU then we're guaranteed to find it
+> > > +	 * clear on any CPU we could migrate to.
+> > > +	 *
+> > > +	 * If we are in between kernel_neon_begin()...kernel_neon_end(), the
+> > > +	 * flag will be set, but preemption is also disabled, so we can't
+> > > +	 * migrate to another CPU and spuriously see it become false.
+> > > +	 */
+> > > +	return !(in_irq() || in_nmi()) &&
+> > > +		!local_read(this_cpu_ptr(&kernel_neon_busy));
+> > > +}
+> > 
+> > I think it would be better to use the this_cpu ops for this, rather than
+> > manually messing with the pointer.
+> 
+> I had thought that the properties of local_t were important here, but
+> this_cpu ops seem equally appropriate.
+> 
+> > Here, we can use raw_cpu_read(kernel_neon_busy), given the comment
+> > above.
+> 
+> What's the difference?  The raw_ variants aren't documented.  Do these
+> not bother about atomicity between the address calculation and the read?
 
-Tested this patch on Juno, with the SMMU enabled for the etr. I was able to
-allocate 32M using (the CMA was only 16M). FWIW :
+Yup.
 
-Tested-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Comparing raw_cpu_{x}, __this_cpu_{x}, and this_cpu_{x}:
+
+* raw_cpu_{x} don't have any preemption checks, and don't disable
+  preemption internally. Due to this, the address gen and operation can
+  occur on different CPUs.
+
+* __this_cpu_{x} have lockdep annotations to check that preemption is
+  disabled, but otherwise behave the same as raw_cpu_{x}. i.e. they
+  don't try to disable preemption internally.
+
+* this_cpu_{x} ensure that preemption is disabled around the address gen
+  and operation.
+
+Since preemption may be possible, but we believe this is fine, we have
+to use the raw form. We'll want to keep the commment explaining why.
+
+Thanks,
+Mark.
