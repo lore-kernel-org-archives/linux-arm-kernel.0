@@ -1,39 +1,28 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 19 May 2017 14:38:01 +0200
-Subject: [PATCH] i2c: designware: don't infer timings described by ACPI
- from clock rate
-In-Reply-To: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
-References: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170519123801.l25pvu5n2bjfwzt6@ninjato>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Fri, 19 May 2017 14:45:23 +0200
+Subject: [PATCH 0/5] iio: add support for STM32H7 ADC
+Message-ID: <1495197928-1439-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 09:56:40AM +0100, Ard Biesheuvel wrote:
-> Commit bd698d24b1b57 ("i2c: designware: Get selected speed mode
-> sda-hold-time via ACPI") updated the logic that reads the timing
-> parameters for various I2C bus rates from the DSDT, to only read
-> the timing parameters for the currently selected mode.
-> 
-> This causes a WARN_ON() splat on platforms that legally omit the clock
-> frequency from the ACPI description, because in the new situation, the
-> core I2C designware driver still accesses the fields in the driver
-> struct that we no longer populate, and proceeds to calculate them from
-> the clock frequency. Since the clock frequency is unspecified, the
-> driver complains loudly using a WARN_ON().
-> 
-> So revert back to the old situation, where the struct fields for all
-> timings are populated, but retain the new logic which chooses the SDA
-> hold time from the timing mode that is currently in use.
-> 
-> Fixes: bd698d24b1b57 ("i2c: designware: Get selected speed mode ...")
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Add support for STM32H7 Analog to Digital Converter variant.
+It has up to 20 external channels, resolution ranges from 8 to 16bits.
+Differences are regarding clocking, registers and bitfields have also
+been re-arranged, but behavior is similar. It also has additional self
+calibration and power on/off procedures.
 
-Applied to for-current, thanks!
+Fabrice Gasnier (5):
+  dt-bindings: iio: stm32-adc: add support for STM32H7
+  iio: adc: stm32: make core adc clock optional by default
+  iio: adc: stm32: introduce compatible data cfg
+  iio: adc: stm32: make per instance bus clock optional
+  iio: adc: stm32: add support for STM32H7
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170519/405553a6/attachment.sig>
+ .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |  20 +-
+ drivers/iio/adc/stm32-adc-core.c                   | 269 ++++++-
+ drivers/iio/adc/stm32-adc-core.h                   |   2 +
+ drivers/iio/adc/stm32-adc.c                        | 775 +++++++++++++++++++--
+ 4 files changed, 980 insertions(+), 86 deletions(-)
+
+-- 
+1.9.1
