@@ -1,39 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 May 2017 10:32:23 +0200
-Subject: [PATCH] firmware: ti_sci: fix strncat length check
-In-Reply-To: <4e3a448e-da7e-4da5-96bf-327da2a8c7d0@oracle.com>
-References: <20170314211157.3424031-1-arnd@arndb.de>
- <4e3a448e-da7e-4da5-96bf-327da2a8c7d0@oracle.com>
-Message-ID: <CAK8P3a2bciJJyq8C4PYOMhSptZg0X2nYH30HvTaJkzW_fn5Jxg@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 19 May 2017 13:45:30 +0530
+Subject: [PATCH 30/41] ARM: dts: dra72-evm: Add pinmux configuration for MMC
+In-Reply-To: <20170519081541.26753-1-kishon@ti.com>
+References: <20170519081541.26753-1-kishon@ti.com>
+Message-ID: <20170519081541.26753-31-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 10:19 PM, santosh.shilimkar at oracle.com
-<santosh.shilimkar@oracle.com> wrote:
-> On 3/14/17 2:11 PM, Arnd Bergmann wrote:
->>
->> gcc-7 notices that the length we pass to strncat is wrong:
->>
->> drivers/firmware/ti_sci.c: In function 'ti_sci_probe':
->> drivers/firmware/ti_sci.c:204:32: error: specified bound 50 equals the
->> size of the destination [-Werror=stringop-overflow=]
->>
->> Instead of the total length, we must pass the length of the
->> remaining space here.
->>
->> Fixes: aa276781a64a ("firmware: Add basic support for TI System Control
->> Interface (TI-SCI) protocol")
->> Acked-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> ---
->> Originally submitted on Jan 11, patch is still needed on Linux-4.11-rc2.
->
->
-> Looks fine to me Arnd. Will you be applying it to SOC driver branch ?
->
-> Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+Include dra72x-mmc-iodelay.dtsi which has pinmux and IODelay
+configuration values for the various MMC modes for dra72 SoC
+and use it in the pinctrl properties of MMC devicetree
+nodes present in dra72-evm.dts.
 
-For some reason I dropped the ball in this patch, applied to arm-soc fixes
-now and marked for stable backports.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/dra72-evm.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-        Arnd
+diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
+index b25e7c67badf..6a47d2abf1ee 100644
+--- a/arch/arm/boot/dts/dra72-evm.dts
++++ b/arch/arm/boot/dts/dra72-evm.dts
+@@ -6,6 +6,7 @@
+  * published by the Free Software Foundation.
+  */
+ #include "dra72-evm-common.dtsi"
++#include "dra72x-mmc-iodelay.dtsi"
+ / {
+ 	model = "TI DRA722";
+ 
+@@ -55,9 +56,22 @@
+ };
+ 
+ &mmc1 {
++	pinctrl-names = "default", "hs", "sdr12", "sdr25", "sdr50", "ddr50", "sdr104";
++	pinctrl-0 = <&mmc1_pins_default>;
++	pinctrl-1 = <&mmc1_pins_hs>;
++	pinctrl-2 = <&mmc1_pins_sdr12>;
++	pinctrl-3 = <&mmc1_pins_sdr25>;
++	pinctrl-4 = <&mmc1_pins_sdr50>;
++	pinctrl-5 = <&mmc1_pins_ddr50_rev10>;
++	pinctrl-6 = <&mmc1_pins_sdr104 &mmc1_iodelay_sdr104_rev10_conf>;
+ 	vmmc_aux-supply = <&ldo1_reg>;
+ };
+ 
+ &mmc2 {
++	pinctrl-names = "default", "hs", "ddr_1_8v", "hs200_1_8v";
++	pinctrl-0 = <&mmc2_pins_default>;
++	pinctrl-1 = <&mmc2_pins_hs>;
++	pinctrl-2 = <&mmc2_pins_ddr_rev10>;
++	pinctrl-3 = <&mmc2_pins_hs200 &mmc2_iodelay_hs200_rev10_conf>;
+ 	vmmc-supply = <&evm_1v8_sw>;
+ };
+-- 
+2.11.0
