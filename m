@@ -1,56 +1,62 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Fri, 19 May 2017 15:05:40 +0800
-Subject: [PATCH V2 0/5] pinctrl: imx: add generic pin config and imx7ulp
- support
-Message-ID: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
+Date: Fri, 19 May 2017 15:05:41 +0800
+Subject: [PATCH V2 1/5] pinctrl: imx: fix debug message for SHARE_MUX_CONF_REG
+ case
+In-Reply-To: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
+References: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1495177545-23006-2-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series intends to add the generic pin config support for imx
-platforms.
+The original implemented debug message does not work for
+SHARE_MUX_CONF_REG case. This patch fixes it.
 
-The design is based on the exist architecture that the core will
-provide a uniformed way to decode the generic pin config into platform
-config register raw data according to the imx_cfg_params_decode maps
-registered by platform.
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Fixes: bf5a530971af ("pinctrl: imx: add VF610 support to imx pinctrl framework")
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Two useful macros, IMX_CFG_PARAMS_DECODE and IMX_CFG_PARAMS_DECODE_INVERT,
-are created for platform to register decode map conveniently.
+---
+ * no changes
+---
+ drivers/pinctrl/freescale/pinctrl-imx.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-In order to cope with some special case, a platform specific fixup()
-function is also available to use.
-
-The series also added the imx7ulp pinctrl support which only supports
-generic pin config.
-
-ChangeLog:
-v1->v2:
- Minor changes including:
- * comments/commit messages improvement
- * add more descriptions in binding doc
- * move dt-bindings/pinctrl/imx7ulp-pinfunc.h to arch/arm/boot/dts
- See individual for details.
- * Patch 5 moved to patch 1 in new series
-
-Dong Aisheng (5):
-  pinctrl: imx: fix debug message for SHARE_MUX_CONF_REG case
-  pinctrl: imx: add generic pin config core support
-  pinctrl: imx: add soc specific mux_mode mask and shift property
-  dt-bindings: pinctrl: add imx7ulp pinctrl binding doc
-  pinctrl: imx: add imx7ulp driver
-
- .../bindings/pinctrl/fsl,imx7ulp-pinctrl.txt       |  63 +++
- arch/arm/boot/dts/imx7ulp-pinfunc.h                | 468 +++++++++++++++++++++
- drivers/pinctrl/freescale/Kconfig                  |   9 +-
- drivers/pinctrl/freescale/Makefile                 |   1 +
- drivers/pinctrl/freescale/pinctrl-imx.c            | 130 +++++-
- drivers/pinctrl/freescale/pinctrl-imx.h            |  29 ++
- drivers/pinctrl/freescale/pinctrl-imx7ulp.c        | 358 ++++++++++++++++
- drivers/pinctrl/freescale/pinctrl-vf610.c          |   2 +
- 8 files changed, 1040 insertions(+), 20 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
- create mode 100644 arch/arm/boot/dts/imx7ulp-pinfunc.h
- create mode 100644 drivers/pinctrl/freescale/pinctrl-imx7ulp.c
-
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index a7ace9e..6882644 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -199,11 +199,13 @@ static int imx_pmx_set(struct pinctrl_dev *pctldev, unsigned selector,
+ 			reg &= ~(0x7 << 20);
+ 			reg |= (pin->mux_mode << 20);
+ 			writel(reg, ipctl->base + pin_reg->mux_reg);
++			dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%x\n",
++				pin_reg->mux_reg, reg);
+ 		} else {
+ 			writel(pin->mux_mode, ipctl->base + pin_reg->mux_reg);
++			dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%x\n",
++				pin_reg->mux_reg, pin->mux_mode);
+ 		}
+-		dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%x\n",
+-			pin_reg->mux_reg, pin->mux_mode);
+ 
+ 		/*
+ 		 * If the select input value begins with 0xff, it's a quirky
+@@ -405,11 +407,13 @@ static int imx_pinconf_set(struct pinctrl_dev *pctldev,
+ 			reg &= ~0xffff;
+ 			reg |= configs[i];
+ 			writel(reg, ipctl->base + pin_reg->conf_reg);
++			dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%x\n",
++				pin_reg->conf_reg, reg);
+ 		} else {
+ 			writel(configs[i], ipctl->base + pin_reg->conf_reg);
++			dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%lx\n",
++				pin_reg->conf_reg, configs[i]);
+ 		}
+-		dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%lx\n",
+-			pin_reg->conf_reg, configs[i]);
+ 	} /* for each config */
+ 
+ 	return 0;
 -- 
 2.7.4
