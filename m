@@ -1,36 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 19 May 2017 17:37:48 +0200
-Subject: [PATCH 3/5 v3] clk: Add Gemini SoC clock controller
-In-Reply-To: <20170515171922.1069-1-linus.walleij@linaro.org>
-References: <20170515171922.1069-1-linus.walleij@linaro.org>
-Message-ID: <CACRpkda0V8dcxgaFg5M3jEK+wgsWR8ndK=LYwLdnpqFeKwzCbQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 19 May 2017 16:42:00 +0100
+Subject: [PATCH v2] arm64: kernel: restrict /dev/mem read() calls to linear
+ region
+Message-ID: <20170519154200.14158-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 7:19 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+When running lscpu on an AArch64 system that has SMBIOS version 2.0
+tables, it will segfault in the following way:
 
-> The Cortina Systems Gemini (SL3516/CS3516) has an on-chip clock
-> controller that derive all clocks from a single crystal, using some
-> documented and some undocumented PLLs, half dividers, counters and
-> gates. This is a best attempt to construct a clock driver for the
-> clocks so at least we can gate off unused hardware and driver the
-> PCI bus clock.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v2->v3:
-> - Augment driver to probe directly from the system controller.
-> - Mike/Stephen: when you're happy with this please ACK it so I
->   can merge it through ARM SoC. This is needed because of
->   the mess of #include <dt-bindings/*> from the DT bindings
->   that is then used all over the DTS files.
+  Unable to handle kernel paging request at virtual address ffff8000bfff0000
+  pgd = ffff8000f9615000
+  [ffff8000bfff0000] *pgd=0000000000000000
+  Internal error: Oops: 96000007 [#1] PREEMPT SMP
+  Modules linked in:
+  CPU: 0 PID: 1284 Comm: lscpu Not tainted 4.11.0-rc3+ #103
+  Hardware name: QEMU QEMU Virtual Machine, BIOS 0.0.0 02/06/2015
+  task: ffff8000fa78e800 task.stack: ffff8000f9780000
+  PC is at __arch_copy_to_user+0x90/0x220
+  LR is at read_mem+0xcc/0x140
 
-Mike/Stephen:
+This is caused by the fact that lspci issues a read() on /dev/mem at the
+offset where it expects to find the SMBIOS structure array. However, this
+region is classified as EFI_RUNTIME_SERVICE_DATA (as per the UEFI spec),
+and so it is omitted from the linear mapping.
 
-Can I have an ACK from either of you if this looks all right?
+So let's restrict /dev/mem read/write access to those areas that are
+covered by the linear region.
 
-I want to merge this through ARM SoC to get the dependencies
-for the DTS includes right.
+Reported-by: Alexander Graf <agraf@suse.de>
+Fixes: 4dffbfc48d65 ("arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP")
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v2: check whether the entire region is covered by the same memblock that has
+    the MEMBLOCK_NOMAP attribute cleared
 
-Yours,
-Linus Walleij
+ arch/arm64/mm/mmap.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
+index 7b0d55756eb1..adc208c2ae9c 100644
+--- a/arch/arm64/mm/mmap.c
++++ b/arch/arm64/mm/mmap.c
+@@ -18,6 +18,7 @@
+ 
+ #include <linux/elf.h>
+ #include <linux/fs.h>
++#include <linux/memblock.h>
+ #include <linux/mm.h>
+ #include <linux/mman.h>
+ #include <linux/export.h>
+@@ -103,12 +104,18 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
+  */
+ int valid_phys_addr_range(phys_addr_t addr, size_t size)
+ {
+-	if (addr < PHYS_OFFSET)
+-		return 0;
+-	if (addr + size > __pa(high_memory - 1) + 1)
+-		return 0;
+-
+-	return 1;
++	/*
++	 * Check whether addr is covered by a memory region without the
++	 * MEMBLOCK_NOMAP attribute, and whether that region covers the
++	 * entire range. In theory, this could lead to false negatives
++	 * if the range is covered by distinct but adjacent memory regions
++	 * that only differ in other attributes. However, few of such
++	 * attributes have been defined, and it is debatable whether it
++	 * follows that /dev/mem read() calls should be able traverse
++	 * such boundaries.
++	 */
++	return memblock_is_region_memory(addr, size) &&
++	       memblock_is_map_memory(addr);
+ }
+ 
+ /*
+-- 
+2.9.3
