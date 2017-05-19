@@ -1,37 +1,29 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 19 May 2017 19:05:52 +0200
-Subject: [PATCH 5/6] gpio: mvebu: Add support for the Armada 7K/8K SoCs
-In-Reply-To: <20170519162736.GU22219@n2100.armlinux.org.uk>
-References: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
- <54efbdfb0a9800b2c72c6fa1d945c87182b242b4.1495210061.git-series.gregory.clement@free-electrons.com>
- <20170519162410.GT22219@n2100.armlinux.org.uk>
- <20170519162736.GU22219@n2100.armlinux.org.uk>
-Message-ID: <20170519190552.744183b0@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 19 May 2017 14:07:28 -0300
+Subject: [CFT] Always enable SMP mode on MP capable CPUs
+In-Reply-To: <CAOMZO5Da2R2_t2nU+MdrJiSzvcBQKS4pwYS96r4UyfGc8DtWww@mail.gmail.com>
+References: <20170518105209.GN22219@n2100.armlinux.org.uk>
+ <CAOMZO5Da2R2_t2nU+MdrJiSzvcBQKS4pwYS96r4UyfGc8DtWww@mail.gmail.com>
+Message-ID: <CAOMZO5Dc=i7UdQH=r5RRr_4GmyZZT+rh7BTNV4WbfqKvtVDfsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, May 18, 2017 at 3:09 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-On Fri, 19 May 2017 17:27:36 +0100, Russell King - ARM Linux wrote:
+> I tested this patch on a mx6ul, which is CortexA7 UP using USB serial
+> download mode.
+>
+> In this boot mode the ROM code does not set the SMP bit and I can
+> notice a very slow boot progress with CONFIG_SMP=n with an original
+> 4.12-rc1.
+>
+> With this patch applied it boots with the correct speed, so:
 
-> Hmm, in fact, mvebu->offset always appears to be zero in this driver,
-> so I think the changes that add this member are entirely rendundant to
-> the function of this patch.
+However the kernel still takes a long time to decompress when the
+bootloader or ROM does not set the SMP bit.
 
->From PATCH 6/6:
+After it decompress, then it boots quickly.
 
-+					offset = <0x1040>;
+Should the SMP bit be set inside arch/arm/boot/compressed/head.S?
 
-+					offset = <0x100>;
-
-+					offset = <0x140>;
-
-So, no mvchip->offset is not always 0.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks
