@@ -1,44 +1,105 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 May 2017 17:27:36 +0100
-Subject: [PATCH 5/6] gpio: mvebu: Add support for the Armada 7K/8K SoCs
-In-Reply-To: <20170519162410.GT22219@n2100.armlinux.org.uk>
-References: <cover.e10718b9c0f9fdd07327ae14e213be8da5b1f7ef.1495210061.git-series.gregory.clement@free-electrons.com>
- <54efbdfb0a9800b2c72c6fa1d945c87182b242b4.1495210061.git-series.gregory.clement@free-electrons.com>
- <20170519162410.GT22219@n2100.armlinux.org.uk>
-Message-ID: <20170519162736.GU22219@n2100.armlinux.org.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 19 May 2017 17:46:04 +0100
+Subject: [PATCH] arm: boot/compressed: fix decompressor header layout for
+ v7-M
+In-Reply-To: <20170519145959.26569-1-ard.biesheuvel@linaro.org>
+References: <20170519145959.26569-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170519164603.GH3559@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 05:24:10PM +0100, Russell King - ARM Linux wrote:
-> On Fri, May 19, 2017 at 06:09:24PM +0200, Gregory CLEMENT wrote:
-> > The Armada 7K and 8K SoCs use the same gpio controller as most of the
-> > other mvebu SoCs. However, the main difference is that the GPIO
-> > controller is part of a bigger system controller, and a syscon is used to
-> > control the overall system controller. Therefore, the driver needs to be
-> > adjusted to retrieve the regmap of the syscon to access registers, and
-> > account for the fact that registers are located at a certain offset
-> > within the regmap.
-> > 
-> > This commit add the support of the syscon and introduce a new variant for
-> > this case.
+On Fri, May 19, 2017 at 03:59:59PM +0100, Ard Biesheuvel wrote:
+> As reported by Patrice, the header layout of the decompressor is
+> incorrect when building for v7-M. In this case, the __nop macro
+> resolves to 'mov r0, r0', which is emitted as a narrow encoding,
+> resulting in the header data fields to end up at lower offsets than
+> required.
 > 
-> Do you really need all this complexity of merging what seems to be two
-> GPIO devices into one for DT purposes?  The device itself appears to be
-> two instances of the orion-gpio controller, one at 0x100 into the
-> system controller and a second one at 0x140.
+> Given the variety of targets we need to support with the same code,
+> the startup sequence is a bit of a jumble, and uses instructions
+> and macros whose encoding width cannot be specified (badr), or only
+> exists in a narrow encoding (bx)
 > 
-> If you instantiate two orion-gpio controllers, then you don't need to
-> add the "mvchip->offset" stuff.
+> So force the use of a wide encoding in __nop, and replace the start
+> sequence with a simple jump to the label marking the start of code,
+> preceded by a Thumb2 mode switch if required (using explicit wide
+> encodings where appropriate). The label itself can be moved to the
+> start of code [where it belongs] due to the larger range of branch
+> instructions as compared to adr instructions.
 > 
-> I'd also say that it was the more correct approach, rather than adding
-> more complexity to GPIO drivers to support whatever incarnation comes
-> next.
+> Reported-by: Patrice CHOTARD <patrice.chotard@st.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/boot/compressed/efi-header.S |  4 +---
+>  arch/arm/boot/compressed/head.S       | 14 +++++++-------
+>  2 files changed, 8 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+> index 9d5dc4fda3c1..3f7d1b74c5e0 100644
+> --- a/arch/arm/boot/compressed/efi-header.S
+> +++ b/arch/arm/boot/compressed/efi-header.S
+> @@ -17,14 +17,12 @@
+>  		@ there.
+>  		.inst	'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
+>  #else
+> -		mov	r0, r0
+> +		W(mov)	r0, r0
+>  #endif
+>  		.endm
+>  
+>  		.macro	__EFI_HEADER
+>  #ifdef CONFIG_EFI_STUB
+> -		b	__efi_start
+> -
+>  		.set	start_offset, __efi_start - start
+>  		.org	start + 0x3c
+>  		@
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 7c711ba61417..8c336a6da210 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -130,19 +130,19 @@ start:
+>  		.rept	7
+>  		__nop
+>  		.endr
+> -   ARM(		mov	r0, r0		)
+> -   ARM(		b	1f		)
+> - THUMB(		badr	r12, 1f		)
+> - THUMB(		bx	r12		)
+> +      ARM(	b	1f		)
+> + AR_CLASS(	sub	pc, pc, #3	)	@ A/R: switch to Thumb2 mode
+> +  M_CLASS(	nop.w			)	@ M: already in Thumb2 mode
+> +    THUMB(	.thumb			)
+> +    THUMB(	b.w	1f		)
 
-Hmm, in fact, mvebu->offset always appears to be zero in this driver,
-so I think the changes that add this member are entirely rendundant to
-the function of this patch.
+It's not so easy to see that this always assembles to two words, or that
+the "sub pc, pc, #3" is assembled but not executed in an ARM kernel.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Spelling it out might be more readable:
+
+   ARM(			mov	r0, r0		)
+   ARM(			mov	r0, r0		)
+
+ THUMB(	AR_CLASS(	sub	pc, pc, #3	))
+ THUMB(	M_CLASS(	nop.w			))
+ THUMB(			.thumb			)
+ THUMB(			b.w	1f		)
+
+But I guess it works either way.
+
+Cheers
+---Dave
+
+>  
+>  		.word	_magic_sig	@ Magic numbers to help the loader
+>  		.word	_magic_start	@ absolute load/run zImage address
+>  		.word	_magic_end	@ zImage end address
+>  		.word	0x04030201	@ endianness flag
+>  
+> - THUMB(		.thumb			)
+> -1:		__EFI_HEADER
+> -
+> +		__EFI_HEADER
+> +1:
+
+[...]
