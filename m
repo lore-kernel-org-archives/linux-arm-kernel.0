@@ -1,45 +1,45 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Fri, 19 May 2017 15:17:29 +0900
-Subject: [PATCH v5 4/5] arm64: dts: exynos: Remove the OF graph from DSI
- node
-In-Reply-To: <20170515164829.rfcqj5quw2jooh6u@kozik-lap>
-References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170308045502epcas1p21a483d429e2169b322e40fd833c47f27@epcas1p2.samsung.com>
- <1488948852-5380-5-git-send-email-hoegeun.kwon@samsung.com>
- <20170515164829.rfcqj5quw2jooh6u@kozik-lap>
-Message-ID: <9508dfc9-7cd3-3ed3-f642-2f69a5dcb5ce@samsung.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Fri, 19 May 2017 09:25:45 +0300
+Subject: [PATCH] mmc: sdhci-iproc: suppress spurious interrupt with
+ Multiblock read
+In-Reply-To: <1495126660-25044-1-git-send-email-srinath.mannam@broadcom.com>
+References: <1495126660-25044-1-git-send-email-srinath.mannam@broadcom.com>
+Message-ID: <58554ec9-1544-318a-e912-3c5f6ee40e90@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2017 01:48 AM, Krzysztof Kozlowski wrote:
-> On Wed, Mar 08, 2017 at 01:54:11PM +0900, Hoegeun Kwon wrote:
->> The OF graph is not needed because the panel is a child of dsi. Remove
->> the ports node in DSI node.
->>
->> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
->> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
->> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
->> ---
->>   arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 14 --------------
->>   1 file changed, 14 deletions(-)
->>
-> Hi,
->
-> I wanted to apply this (and 5/5) but it seems that DRM change is not
-> merged. Was it included in v4.12-rc1?
->
-> Best regards,
-> Krzysztof
+On 18/05/17 19:57, Srinath Mannam wrote:
+> The stingray SDHCI hardware supports ACMD12 and automatically
+> issues after multi block transfer completed.
+> 
+> If ACMD12 in SDHCI is disabled, spurious tx done interrupts are seen
+> on multi block read command with below error message:
+> 
+> Got data interrupt 0x00000002 even though no data
+> operation was in progress.
+> 
+> This patch uses SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 to enable
+> ACM12 support in SDHCI hardware and suppress spurious interrupt.
+> 
+> Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 
-Hi,
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-Sorry for my belated reply.
-
-The DRM patch(3/5) is not merged in v4.12-rc1 (mainline)...
-I have checked the David's branch, but not merged.
-However it was merged into Inki's exynos drm branch.
-
-Inki, Could you check the patch(3/5).
-
-Best regards,
-Hoegeun
+> 
+> diff --git a/drivers/mmc/host/sdhci-iproc.c b/drivers/mmc/host/sdhci-iproc.c
+> index 3275d49..61666d2 100644
+> --- a/drivers/mmc/host/sdhci-iproc.c
+> +++ b/drivers/mmc/host/sdhci-iproc.c
+> @@ -187,7 +187,8 @@ static const struct sdhci_iproc_data iproc_cygnus_data = {
+>  };
+>  
+>  static const struct sdhci_pltfm_data sdhci_iproc_pltfm_data = {
+> -	.quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK,
+> +	.quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
+> +		  SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12,
+>  	.quirks2 = SDHCI_QUIRK2_ACMD23_BROKEN,
+>  	.ops = &sdhci_iproc_ops,
+>  };
+> 
