@@ -1,162 +1,170 @@
-From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Fri, 19 May 2017 11:58:03 +0900
-Subject: [PATCH v2] printk: Use the main logbuf in NMI when logbuf_lock
- is available
-In-Reply-To: <1493912763-24873-1-git-send-email-pmladek@suse.com>
-References: <1493912763-24873-1-git-send-email-pmladek@suse.com>
-Message-ID: <20170519025803.GA593@jagdpanzerIV.localdomain>
+From: oza.oza@broadcom.com (Oza Oza)
+Date: Fri, 19 May 2017 08:28:06 +0530
+Subject: [PATCH v6 1/3] of/pci/dma: fix DMA configuration for PCI masters
+In-Reply-To: <CAK8P3a3hoeCET5Z+KUJDCHgGEJUmLF49bDozEE0ra5jcbjvoXQ@mail.gmail.com>
+References: <1494912127-12890-1-git-send-email-oza.oza@broadcom.com>
+ <1494912127-12890-2-git-send-email-oza.oza@broadcom.com>
+ <CAK8P3a3hoeCET5Z+KUJDCHgGEJUmLF49bDozEE0ra5jcbjvoXQ@mail.gmail.com>
+Message-ID: <CAMSpPPeh66YX4DXXX7eBKT9ZL00Uh+7DnPAnnOBN9bdVVmNk3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr,
+On Thu, May 18, 2017 at 12:43 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tue, May 16, 2017 at 7:22 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
+>> current device framework and OF framework integration assumes
+>> dma-ranges in a way where memory-mapped devices define their
+>> dma-ranges. (child-bus-address, parent-bus-address, length).
+>>
+>> of_dma_configure is specifically written to take care of memory
+>> mapped devices. but no implementation exists for pci to take
+>> care of pcie based memory ranges.
+>
+> Hi Oza,
+>
+> I'm trying to make sense of this, but am still rather puzzled. I have
+> no idea what the distinction between memory-mapped devices and
+> pcie based devices is in your description, as PCIe is usually memory
+> mapped, and Linux doesn't actually support other kinds of PCIe
+> devices on most architectures.
+>
+there are 2 problems which I am trying to address here.
 
-On (05/04/17 17:46), Petr Mladek wrote:
-[..]
-> +#define PRINTK_SAFE_CONTEXT_MASK	 0x3fffffff
-> +#define PRINTK_NMI_DEFERRED_CONTEXT_MASK 0x40000000
-> +#define PRINTK_NMI_CONTEXT_MASK		 0x80000000
-[..]
->  void printk_nmi_enter(void)
->  {
-> -	this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
-> +	/*
-> +	 * The size of the extra per-CPU buffer is limited. Use it only when
-> +	 * the main one is locked. If this CPU is not in the safe context,
-> +	 * the lock must be taken on another CPU and we could wait for it.
-> +	 */
-> +	if (raw_spin_is_locked(&logbuf_lock) &&
-> +	    this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK) {
-> +		this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
-> +	} else {
-> +		this_cpu_or(printk_context, PRINTK_NMI_DEFERRED_CONTEXT_MASK);
-> +	}
->  }
->  
->  void printk_nmi_exit(void)
->  {
-> -	this_cpu_and(printk_context, ~PRINTK_NMI_CONTEXT_MASK);
-> +	this_cpu_and(printk_context,
-> +		     ~(PRINTK_NMI_CONTEXT_MASK ||
-> +		       PRINTK_NMI_DEFERRED_CONTEXT_MASK));
->  }
+problem-1:
+let me explain our PCI RC's limitations first.
 
-this corrupts `printk_context' on my system and causes all sorts of
-problems later.
+IOVA allocaiton honours device's coherent_dma_mask/dma_mask.
+in PCI case, current code honours DMA mask set by EP,
+there is no concept of PCI host bridge dma-mask, which should be there
+and could truely reflect the limitaiton of PCI host bridge.
 
-[   15.784390] BUG: using smp_processor_id() in preemptible [00000000] code: mount/240
-[   15.827692] caller is debug_smp_processor_id+0x17/0x19
-[   15.871130] Call Trace:
-[   15.871130]  dump_stack+0x70/0x9a
-[   15.871130]  check_preemption_disabled+0xce/0xe0
-[   15.871131]  debug_smp_processor_id+0x17/0x19
-[   15.871132]  vprintk_func+0x45/0x96
-[   15.871132]  printk+0x43/0x4b
-[   15.871132]  __ext4_msg+0x8c/0x99
-[   15.871133]  ? trace_hardirqs_on+0xd/0xf
-[   15.871133]  ext4_fill_super+0x26fd/0x29f9
-[   15.871134]  mount_bdev+0x140/0x195
-[   15.871134]  ? ext4_calculate_overhead+0x372/0x372
-[   15.871135]  ext4_mount+0x15/0x17
-[   15.871135]  mount_fs+0x14/0x74
-[   15.871136]  vfs_kern_mount+0x6c/0x153
-[   15.871136]  do_mount+0x8bb/0xaf3
-[   15.871137]  ? strndup_user+0x3f/0x53
-[   15.871137]  SyS_mount+0x77/0x9f
-[   15.871138]  entry_SYSCALL_64_fastpath+0x18/0xad
+having said that we have
+dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+which means we can only address 512GB.
 
+now because of broken of_dma_get_range we end up getting 64bit dma_mask.
+please check the code:of_dma_configure()
+if (ret < 0) {
+dma_addr = offset = 0;
+size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
 
+now in this process I figred out problems in of_dma_get_range: hence the fix
+1) return of wrong size as 0 becasue of whole parsing problem.
+2) not handling absence of dma-ranges which is valid for PCI master.
+3) not handling multipe inbound windows.
+4) in order to get largest possible dma_mask. this patch also returns
+the largest possible size based on dma-ranges,
 
-the problem is that
+please have a look at
+[PATCH v6 3/3] PCI/of fix of_dma_get_range; get PCI specific dma-ranges
+I just made is bus specific leaving origional of_dma_get_range unmodified
+and defining new PCI handling of_bus_pci_get_dma_ranges
 
-	`PRINTK_NMI_CONTEXT_MASK || PRINTK_NMI_DEFERRED_CONTEXT_MASK' is 0x01
+also when I say memory-mapped and PCI device, I only mean to say with respect
+to the dma-ranges format. (of coure PCI is memory mapped as well).
+probbaly my commit description is misleading, sorry about that.
 
-and thus
-
-	printk_context & ~(PRINTK_NMI_CONTEXT_MASK || PRINTK_NMI_DEFERRED_CONTEXT_MASK)
-
-never clears NMI bits:
-
-	83 e0 fe             	and    $0xfffffffe,%eax
-
-while
-
-	printk_context & ~PRINTK_NMI_CONTEXT_MASK
-	printk_context & ~PRINTK_NMI_DEFERRED_CONTEXT_MASK
-
-does
-
-	25 ff ff ff 7f       	and    $0x7fffffff,%eax
-	25 ff ff ff bf       	and    $0xbfffffff,%eax
+so Problem1: is just bug fix, Nothing else
 
 
-as a result vprintk_func() starts to take wrong branches.
+Problem2: [PATCH v6 2/3] iommu/pci: reserve IOVA for PCI masters
 
-adding a simple PRINTK_NMI_DEFERRED_CONTEXT_MASK & preemptible() checks
+we have memory banks
 
-@@ -375,8 +375,14 @@ __printf(1, 0) int vprintk_func(const char *fmt, va_list args)
-         * Use the main logbuf when logbuf_lock is available in NMI.
-         * But avoid calling console drivers that might have their own locks.
-         */
--       if (this_cpu_read(printk_context) & PRINTK_NMI_DEFERRED_CONTEXT_MASK)
-+       if (this_cpu_read(printk_context) & PRINTK_NMI_DEFERRED_CONTEXT_MASK) {
-+               if (preemptible()) {
-+                       WARN_ON_ONCE(1);
-+               }
-                return vprintk_deferred(fmt, args);
-+       }
+<0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
+<0x00000008 0x80000000 0x3 0x80000000>, /* 14G @ 34G */
+<0x00000090 0x00000000 0x4 0x00000000>, /* 16G @ 576G */
+<0x000000a0 0x00000000 0x4 0x00000000>; /* 16G @ 640G */
 
+when I run SPDK (User sapce) which internally uses vfio to access PCI
+endpoint directly.
+vfio uses huge-pages which could coming from 640G/0x000000a0.
+and the way vfio maps the hugepage to user space and generates IOVA is different
+from the way kernel allocate IOVA.
 
-gives me
+vfio just maps one to one IOVA to Physical address.
+it just calls directly remap_pfn_range.
 
+so the way kernel allocates IOVA (where it honours device dma_mask)
+and the way userspace gets IOVA is totally different.
 
-[    2.113725] WARNING: CPU: 1 PID: 1 at kernel/printk/printk_safe.c:380 vprintk_func+0x83/0x96
-[    2.113727] Modules linked in:
-[    2.113738] task: ffff880133160000 task.stack: ffffc90000014000
-[    2.113741] RIP: 0010:vprintk_func+0x83/0x96
-[    2.113743] RSP: 0018:ffffc90000017a08 EFLAGS: 00010247
-[    2.113748] RAX: 0000000000000246 RBX: ffff88012fe25800 RCX: 00000000000000c9
-[    2.113750] RDX: 00000000001e3f02 RSI: ffffc90000017a30 RDI: ffffffff817d6c24
-[    2.113752] RBP: ffffc90000017a20 R08: 0000000000000001 R09: 0000000000000004
-[    2.113755] R10: ffffc90000017a90 R11: 0000000000000000 R12: 0000000000000001
-[    2.113757] R13: 0000000000000000 R14: ffffffff817d6c24 R15: 000000ffffffffff
-[    2.113759] FS:  0000000000000000(0000) GS:ffff880137c80000(0000) knlGS:0000000000000000
-[    2.113762] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-[    2.113764] CR2: 00007fad9d078cc4 CR3: 0000000001a0e000 CR4: 00000000000006e0
-[    2.113766] Call Trace:
-[    2.113771]  printk+0x43/0x4b
-[    2.113775]  ? trace_hardirqs_on+0xd/0xf
-[    2.113780]  ttm_mem_global_init+0x294/0x2e4
-[    2.113785]  nouveau_ttm_mem_global_init+0x12/0x14
-[    2.113789]  drm_global_item_ref+0x61/0xca
-[    2.113792]  nouveau_ttm_global_init+0x4a/0xe5
-[    2.113795]  nouveau_ttm_init+0x231/0x3e1
-[    2.113798]  nouveau_drm_load+0x294/0x7ed
-[    2.113801]  ? trace_hardirqs_on+0xd/0xf
-[    2.113805]  drm_dev_register+0xee/0x1cf
-[    2.113808]  drm_get_pci_dev+0xd5/0x143
-[    2.113811]  nouveau_drm_probe+0x19b/0x1ba
-[    2.113815]  ? __pm_runtime_resume+0x7a/0x87
-[    2.113818]  pci_device_probe+0x92/0x106
-[    2.113823]  driver_probe_device+0x136/0x292
-[    2.113826]  ? set_debug_rodata+0x17/0x17
-[    2.113829]  __driver_attach+0x73/0x95
-[    2.113832]  ? driver_probe_device+0x292/0x292
-[    2.113835]  bus_for_each_dev+0x6f/0x87
-[    2.113838]  driver_attach+0x1e/0x20
-[    2.113841]  bus_add_driver+0xf6/0x1e6
-[    2.113843]  driver_register+0x88/0xbf
-[    2.113846]  __pci_register_driver+0x60/0x63
-[    2.113849]  ? ttm_init+0x62/0x62
-[    2.113852]  drm_pci_init+0x4c/0xcd
-[    2.113855]  ? ttm_init+0x62/0x62
-[    2.113857]  ? set_debug_rodata+0x17/0x17
-[    2.113860]  nouveau_drm_init+0x1e5/0x1e7
-[    2.113863]  do_one_initcall+0x90/0x126
-[    2.113866]  kernel_init_freeable+0x13e/0x1c7
-[    2.113870]  ? rest_init+0x132/0x132
-[    2.113873]  kernel_init+0xe/0xf0
-[    2.113876]  ret_from_fork+0x2e/0x40
-[    2.113879] Code: 89 f2 48 89 fe 48 89 df e8 b3 fd ff ff eb 2a 0f ba e0 1e 73 1f 65 8b 05 cc e6 f7 7e a9 ff ff ff 7f 75 0a 9c 58 0f ba e0 09 73 02 <0f> ff e8 2d f4 ff ff eb 05 e8 39 ee ff ff 5a 59 5b 5d c3 66 66 
-[    2.114004] ---[ end trace 2b87962b417834f1 ]---
+so dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+will not work.
+instead we have to go for scatterred dma-ranges leaving holes.
 
-	-ss
+having said that we have to reserve IOVA allocations for inbound memory.
+I am in a process of addressing Robin Murphy's comment on that and rebasing
+my patch on rc12.
+
+this problem statement is more important to us.
+because it makes both kernel and use space IOVA allocations work when
+IOMMU is enabled.
+
+probably thing might be confusing because I am clubbing my patches to
+address both
+the problems. going forward I should just try to first send out patch
+for problem2 alone (not sure)
+because my next patch-set would bring some changes in pci/probe.c as well.
+
+>> for e.g. iproc based SOCs and other SOCs(suc as rcar) have PCI
+>> world dma-ranges.
+>> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+>>
+>> this patch serves following:
+>>
+>> 1) exposes interface to the pci host driver for their
+>> inbound memory ranges
+>>
+>> 2) provide an interface to callers such as of_dma_get_ranges.
+>> so then the returned size get best possible (largest) dma_mask.
+>> because PCI RC drivers do not call APIs such as
+>> dma_set_coherent_mask() and hence rather it shows its addressing
+>> capabilities based on dma-ranges.
+>>
+>> for e.g.
+>> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+>> we should get dev->coherent_dma_mask=0x7fffffffff.
+>
+> do you mean the coherent_dma_mask of the PCI host bridge
+> or an attached device here?
+>
+> If you require PCI devices to come up with an initial
+> coherent_dma_mask other than 0xffffffffff, there are other
+> problems involved. In particular, you will need to use
+> swiotlb, which is not supported on arm32 at the moment,
+> and the dma_set_mask()/dma_set_coherent_mask()
+> functions need to be modified.
+
+even without this patch also it comes up with coherent_dma_mask of 64bits.
+since it considers dma_mask set by Endpoint.
+
+please check [RFC PATCH 2/3] iommu/dma: account pci host bridge
+dma_mask for IOVA allocation
+this patch was in-fact inspired by Robin Murphy's earlier discussions.
+
+>
+>> +       while (1) {
+>> +               dma_ranges = of_get_property(node, "dma-ranges", &rlen);
+>> +
+>> +               /* Ignore empty ranges, they imply no translation required. */
+>> +               if (dma_ranges && rlen > 0)
+>> +                       break;
+>> +
+>> +               /* no dma-ranges, they imply no translation required. */
+>> +               if (!dma_ranges)
+>> +                       break;
+>
+> A missing parent dma-ranges property here should really indicate that there
+> is no valid translation. If we have existing cases where this happens
+> in DT files, we may treat it as allowing only 32-bit DMA (as we already
+> do for having no dma-ranges at all), but treating it the same way
+> as an empty dma-ranges property sounds wrong.
+
+not sure if I understood you:
+but we have dma-ranges property optional for one of our SOC, in the sense...
+PCI RC will allow all the incoming transactions because RC does not
+translate anything.
+what mask should it generate if dma-ranges property is not present ?
+how do you suggest to handle ?
+
+>
+>      Arnd
