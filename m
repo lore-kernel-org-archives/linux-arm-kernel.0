@@ -1,84 +1,200 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 19 May 2017 17:58:01 +0200
-Subject: [PATCH 1/5] clk: mvebu: ap806: cosmetic improvement
+Date: Fri, 19 May 2017 17:58:03 +0200
+Subject: [PATCH 3/5] clk: mvebu: ap806: introduce a new binding
 In-Reply-To: <cover.fd6093dbad53cdac70eef4e53b238768721218ac.1495209464.git-series.gregory.clement@free-electrons.com>
 References: <cover.fd6093dbad53cdac70eef4e53b238768721218ac.1495209464.git-series.gregory.clement@free-electrons.com>
-Message-ID: <5a55e081d96fc6d2a28331b59df90f56d32a9f24.1495209464.git-series.gregory.clement@free-electrons.com>
+Message-ID: <fd62952c043aec1d87ff65d9d69105103a195908.1495209464.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using &pdev->dev all over the place, introduce a pointer
-variable for it.
+As for cp110, the initial intent when the binding of the ap806 system
+controller was to have one flat node. The idea being that what is
+currently a clock-only driver in drivers would become a MFD driver,
+exposing the clock, GPIO and pinctrl functionality. However, after taking
+a step back, this would lead to a messy binding. Indeed, a single node
+would be a GPIO controller, clock controller, pinmux controller, and
+more.
+
+This patch adopts a more classical solution of a top-level syscon node
+with sub-nodes for the individual devices. The main benefit will be to
+have each functional block associated to its own sub-node where we can
+put its own properties.
+
+The introduction of the Armada 7K/8K is still in the early stage so the
+plan is to remove the old binding. However, we don't want to break the
+device tree compatibility for the few devices already in the field. For
+this we still keep the support of the legacy compatible string with a big
+warning in the kernel about updating the device tree.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/clk/mvebu/ap806-system-controller.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt | 20 +++++++++++++++-----
+ drivers/clk/mvebu/ap806-system-controller.c                               | 56 ++++++++++++++++++++++++++++++++++++++++++++------------
+ 2 files changed, 59 insertions(+), 17 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+index 3faab71dff9f..888c50e0d64f 100644
+--- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
++++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+@@ -7,6 +7,14 @@ registers giving access to numerous features: clocks, pin-muxing and
+ many other SoC configuration items. This DT binding allows to describe
+ this system controller.
+ 
++For the top level node:
++ - compatible: must be: "syscon", "simple-mfd";
++  - reg: register area of the AP806 system controller
++
++Clocks:
++-------
++
++
+ The Device Tree node representing the AP806 system controller provides
+ a number of clocks:
+ 
+@@ -17,15 +25,17 @@ a number of clocks:
+ 
+ Required properties:
+ 
+- - compatible: must be:
+-     "marvell,ap806-system-controller", "syscon"
+- - reg: register area of the AP806 system controller
++ - compatible: must be: "marvell,ap806-clock"
+  - #clock-cells: must be set to 1
+ 
+ Example:
+ 
+ 	syscon: system-controller at 6f4000 {
+-		compatible = "marvell,ap806-system-controller", "syscon";
+-		#clock-cells = <1>;
++		compatible = "syscon", "simple-mfd";
+ 		reg = <0x6f4000 0x1000>;
++
++		ap_clk: clock {
++			compatible = "marvell,ap806-clock";
++			#clock-cells = <1>;
++		};
+ 	};
 diff --git a/drivers/clk/mvebu/ap806-system-controller.c b/drivers/clk/mvebu/ap806-system-controller.c
-index 8155baccc98e..b2666b5c944f 100644
+index 95ae16e203ea..fa2fbd2cef4a 100644
 --- a/drivers/clk/mvebu/ap806-system-controller.c
 +++ b/drivers/clk/mvebu/ap806-system-controller.c
-@@ -36,20 +36,21 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
+@@ -44,7 +44,8 @@ static char *ap806_unique_name(struct device *dev, struct device_node *np,
+ 			(unsigned long long)addr, name);
+ }
+ 
+-static int ap806_syscon_clk_probe(struct platform_device *pdev)
++static int ap806_syscon_common_probe(struct platform_device *pdev,
++				     struct device_node *syscon_node)
  {
  	unsigned int freq_mode, cpuclk_freq;
  	const char *name, *fixedclk_name;
--	struct device_node *np = pdev->dev.of_node;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
- 	struct regmap *regmap;
+@@ -54,7 +55,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
  	u32 reg;
  	int ret;
  
- 	regmap = syscon_node_to_regmap(np);
+-	regmap = syscon_node_to_regmap(np);
++	regmap = syscon_node_to_regmap(syscon_node);
  	if (IS_ERR(regmap)) {
--		dev_err(&pdev->dev, "cannot get regmap\n");
-+		dev_err(dev, "cannot get regmap\n");
+ 		dev_err(dev, "cannot get regmap\n");
  		return PTR_ERR(regmap);
- 	}
+@@ -110,7 +111,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
+ 	cpuclk_freq *= 1000 * 1000;
  
- 	ret = regmap_read(regmap, AP806_SAR_REG, &reg);
- 	if (ret) {
--		dev_err(&pdev->dev, "cannot read from regmap\n");
-+		dev_err(dev, "cannot read from regmap\n");
- 		return ret;
- 	}
- 
-@@ -89,7 +90,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
- 		cpuclk_freq = 600;
- 		break;
- 	default:
--		dev_err(&pdev->dev, "invalid SAR value\n");
-+		dev_err(dev, "invalid SAR value\n");
- 		return -EINVAL;
- 	}
- 
-@@ -99,7 +100,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
  	/* CPU clocks depend on the Sample At Reset configuration */
- 	of_property_read_string_index(np, "clock-output-names",
- 				      0, &name);
--	ap806_clks[0] = clk_register_fixed_rate(&pdev->dev, name, NULL,
-+	ap806_clks[0] = clk_register_fixed_rate(dev, name, NULL,
+-	name = ap806_unique_name(dev, np, "cpu-cluster-0");
++	name = ap806_unique_name(dev, syscon_node, "cpu-cluster-0");
+ 	ap806_clks[0] = clk_register_fixed_rate(dev, name, NULL,
  						0, cpuclk_freq);
  	if (IS_ERR(ap806_clks[0])) {
- 		ret = PTR_ERR(ap806_clks[0]);
-@@ -108,7 +109,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
+@@ -118,7 +119,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
+ 		goto fail0;
+ 	}
  
- 	of_property_read_string_index(np, "clock-output-names",
- 				      1, &name);
--	ap806_clks[1] = clk_register_fixed_rate(&pdev->dev, name, NULL, 0,
-+	ap806_clks[1] = clk_register_fixed_rate(dev, name, NULL, 0,
+-	name = ap806_unique_name(dev, np, "cpu-cluster-1");
++	name = ap806_unique_name(dev, syscon_node, "cpu-cluster-1");
+ 	ap806_clks[1] = clk_register_fixed_rate(dev, name, NULL, 0,
  						cpuclk_freq);
  	if (IS_ERR(ap806_clks[1])) {
- 		ret = PTR_ERR(ap806_clks[1]);
-@@ -118,7 +119,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
+@@ -127,7 +128,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
+ 	}
+ 
  	/* Fixed clock is always 1200 Mhz */
- 	of_property_read_string_index(np, "clock-output-names",
- 				      2, &fixedclk_name);
--	ap806_clks[2] = clk_register_fixed_rate(&pdev->dev, fixedclk_name, NULL,
-+	ap806_clks[2] = clk_register_fixed_rate(dev, fixedclk_name, NULL,
+-	fixedclk_name = ap806_unique_name(dev, np, "fixed");
++	fixedclk_name = ap806_unique_name(dev, syscon_node, "fixed");
+ 	ap806_clks[2] = clk_register_fixed_rate(dev, fixedclk_name, NULL,
  						0, 1200 * 1000 * 1000);
  	if (IS_ERR(ap806_clks[2])) {
- 		ret = PTR_ERR(ap806_clks[2]);
+@@ -136,7 +137,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* MSS Clock is fixed clock divided by 6 */
+-	name = ap806_unique_name(dev, np, "mss");
++	name = ap806_unique_name(dev, syscon_node, "mss");
+ 	ap806_clks[3] = clk_register_fixed_factor(NULL, name, fixedclk_name,
+ 						  0, 1, 6);
+ 	if (IS_ERR(ap806_clks[3])) {
+@@ -145,7 +146,7 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* SDIO(/eMMC) Clock is fixed clock divided by 3 */
+-	name = ap806_unique_name(dev, np, "sdio");
++	name = ap806_unique_name(dev, syscon_node, "sdio");
+ 	ap806_clks[4] = clk_register_fixed_factor(NULL, name,
+ 						  fixedclk_name,
+ 						  0, 1, 3);
+@@ -175,17 +176,48 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
+-static const struct of_device_id ap806_syscon_of_match[] = {
++static int ap806_syscon_legacy_probe(struct platform_device *pdev)
++{
++	dev_warn(&pdev->dev, FW_WARN "Using legacy device tree binding\n");
++	dev_warn(&pdev->dev, FW_WARN "Update your device tree:\n");
++	dev_warn(&pdev->dev, FW_WARN
++		 "This binding won't be supported in future kernel\n");
++
++	return ap806_syscon_common_probe(pdev, pdev->dev.of_node);
++
++}
++
++static int ap806_clock_probe(struct platform_device *pdev)
++{
++	return ap806_syscon_common_probe(pdev, pdev->dev.of_node->parent);
++}
++
++static const struct of_device_id ap806_syscon_legacy_of_match[] = {
+ 	{ .compatible = "marvell,ap806-system-controller", },
+ 	{ }
+ };
+ 
+-static struct platform_driver ap806_syscon_driver = {
+-	.probe = ap806_syscon_clk_probe,
++static struct platform_driver ap806_syscon_legacy_driver = {
++	.probe = ap806_syscon_legacy_probe,
+ 	.driver		= {
+ 		.name	= "marvell-ap806-system-controller",
+-		.of_match_table = ap806_syscon_of_match,
++		.of_match_table = ap806_syscon_legacy_of_match,
++		.suppress_bind_attrs = true,
++	},
++};
++builtin_platform_driver(ap806_syscon_legacy_driver);
++
++static const struct of_device_id ap806_clock_of_match[] = {
++	{ .compatible = "marvell,ap806-clock", },
++	{ }
++};
++
++static struct platform_driver ap806_clock_driver = {
++	.probe = ap806_clock_probe,
++	.driver		= {
++		.name	= "marvell-ap806-clock",
++		.of_match_table = ap806_clock_of_match,
+ 		.suppress_bind_attrs = true,
+ 	},
+ };
+-builtin_platform_driver(ap806_syscon_driver);
++builtin_platform_driver(ap806_clock_driver);
 -- 
 git-series 0.9.1
