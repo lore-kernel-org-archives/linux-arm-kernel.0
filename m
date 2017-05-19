@@ -1,111 +1,74 @@
 From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Fri, 19 May 2017 14:32:07 -0600
-Subject: [PATCH V17 05/11] arm64: exception: handle Synchronous External Abort
+Date: Fri, 19 May 2017 14:32:10 -0600
+Subject: [PATCH V17 08/11] efi: print unrecognized CPER section
 In-Reply-To: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
 References: <1495225933-4410-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1495225933-4410-6-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1495225933-4410-9-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SEA exceptions are often caused by an uncorrected hardware
-error, and are handled when data abort and instruction abort
-exception classes have specific values for their Fault Status
-Code.
-When SEA occurs, before killing the process, report the error
-in the kernel logs.
-Update fault_info[] with specific SEA faults so that the
-new SEA handler is used.
+UEFI spec allows for non-standard section in Common Platform Error
+Record. This is defined in section N.2.3 of UEFI version 2.5.
+
+Currently if the CPER section's type (UUID) does not match with
+one of the section types that the kernel knows how to parse, the
+section is skipped. Therefore, user is not able to see
+such CPER data, for instance, error record of non-standard section.
+
+This change prints out the raw data in hex in the dmesg buffer so
+that non-standard sections are reported to the user. Non-standard
+section type errors should be reported to the user because these
+can include errors which are vendor specific. The data length is
+taken from Error Data length field of Generic Error Data Entry.
+
+The following is a sample output from dmesg:
+ Hardware error from APEI Generic Hardware Error Source: 2
+ It has been corrected by h/w and requires no further action
+ event severity: corrected
+  time: precise 2017-03-15 20:37:35
+  Error 0, type: corrected
+   section type: unknown, d2e2621c-f936-468d-0d84-15a4ed015c8b
+   section length: 0x238
+   00000000: 4d415201 4d492031 453a4d45 435f4343  .RAM1 IMEM:ECC_C
+   00000010: 53515f45 44525f42 00000000 00000000  E_QSB_RD........
+   00000020: 00000000 00000000 00000000 00000000  ................
+   00000030: 00000000 00000000 01010000 01010000  ................
+   00000040: 00000000 00000000 00000005 00000000  ................
+   00000050: 01010000 00000000 00000001 00dddd00  ................
+...
+
+The raw data from the error can then be decoded using vendor
+specific tools.
 
 Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
 CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
 Reviewed-by: James Morse <james.morse@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/esr.h |  1 +
- arch/arm64/mm/fault.c        | 45 ++++++++++++++++++++++++++++++++++----------
- 2 files changed, 36 insertions(+), 10 deletions(-)
+ drivers/firmware/efi/cper.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index 85997c0..28bf02e 100644
---- a/arch/arm64/include/asm/esr.h
-+++ b/arch/arm64/include/asm/esr.h
-@@ -83,6 +83,7 @@
- #define ESR_ELx_WNR		(UL(1) << 6)
+diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+index eac0854..d5a5855 100644
+--- a/drivers/firmware/efi/cper.c
++++ b/drivers/firmware/efi/cper.c
+@@ -585,8 +585,15 @@ static void cper_print_tstamp(const char *pfx,
+ 		else
+ 			goto err_section_too_small;
+ #endif
+-	} else
+-		printk("%s""section type: unknown, %pUl\n", newpfx, sec_type);
++	} else {
++		const void *err = acpi_hest_get_payload(gdata);
++
++		printk("%ssection type: unknown, %pUl\n", newpfx, sec_type);
++		printk("%ssection length: %#x\n", newpfx,
++		       gdata->error_data_length);
++		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4, err,
++			       gdata->error_data_length, true);
++	}
  
- /* Shared ISS field definitions for Data/Instruction aborts */
-+#define ESR_ELx_FnV		(UL(1) << 10)
- #define ESR_ELx_EA		(UL(1) << 9)
- #define ESR_ELx_S1PTW		(UL(1) << 7)
+ 	return;
  
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 37b95df..6697816 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -522,6 +522,31 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- 	return 1;
- }
- 
-+/*
-+ * This abort handler deals with Synchronous External Abort.
-+ * It calls notifiers, and then returns "fault".
-+ */
-+static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
-+{
-+	struct siginfo info;
-+	const struct fault_info *inf;
-+
-+	inf = esr_to_fault_info(esr);
-+	pr_err("Synchronous External Abort: %s (0x%08x)@0x%016lx\n",
-+		inf->name, esr, addr);
-+
-+	info.si_signo = SIGBUS;
-+	info.si_errno = 0;
-+	info.si_code  = 0;
-+	if (esr & ESR_ELx_FnV)
-+		info.si_addr = 0;
-+	else
-+		info.si_addr  = (void __user *)addr;
-+	arm64_notify_die("", regs, &info, esr);
-+
-+	return 0;
-+}
-+
- static const struct fault_info fault_info[] = {
- 	{ do_bad,		SIGBUS,  0,		"ttbr address size fault"	},
- 	{ do_bad,		SIGBUS,  0,		"level 1 address size fault"	},
-@@ -539,22 +564,22 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- 	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
- 	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
- 	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
--	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
-+	{ do_sea,		SIGBUS,  0,		"synchronous external abort"	},
- 	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
- 	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
- 	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
--	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
--	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
--	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
--	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
--	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
-+	{ do_sea,		SIGBUS,  0,		"level 0 (translation table walk)"	},
-+	{ do_sea,		SIGBUS,  0,		"level 1 (translation table walk)"	},
-+	{ do_sea,		SIGBUS,  0,		"level 2 (translation table walk)"	},
-+	{ do_sea,		SIGBUS,  0,		"level 3 (translation table walk)"	},
-+	{ do_sea,		SIGBUS,  0,		"synchronous parity or ECC error" },
- 	{ do_bad,		SIGBUS,  0,		"unknown 25"			},
- 	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
- 	{ do_bad,		SIGBUS,  0,		"unknown 27"			},
--	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
--	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
--	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
--	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
-+	{ do_sea,		SIGBUS,  0,		"level 0 synchronous parity error (translation table walk)"	},
-+	{ do_sea,		SIGBUS,  0,		"level 1 synchronous parity error (translation table walk)"	},
-+	{ do_sea,		SIGBUS,  0,		"level 2 synchronous parity error (translation table walk)"	},
-+	{ do_sea,		SIGBUS,  0,		"level 3 synchronous parity error (translation table walk)"	},
- 	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
- 	{ do_alignment_fault,	SIGBUS,  BUS_ADRALN,	"alignment fault"		},
- 	{ do_bad,		SIGBUS,  0,		"unknown 34"			},
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
