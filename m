@@ -1,74 +1,43 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat, 20 May 2017 01:49:58 +0800
-Subject: [linux-sunxi] Re: [RFC PATCH 02/11] drm: sun4i: add support for
- H3 mixers
-In-Reply-To: <20170519174729.q5qk2vqlibzx3zrv@flea.home>
-References: <20170517164354.16399-1-icenowy@aosc.io>
- <20170517164354.16399-3-icenowy@aosc.io>
- <20170519174729.q5qk2vqlibzx3zrv@flea.home>
-Message-ID: <695DFDD0-1925-433C-AB88-B90EE461C203@aosc.io>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 19 May 2017 18:38:33 +0100
+Subject: [PATCH] arm: boot/compressed: fix decompressor header layout for
+ v7-M
+In-Reply-To: <20170519173400.GJ3559@e103592.cambridge.arm.com>
+References: <20170519145959.26569-1-ard.biesheuvel@linaro.org>
+ <20170519164603.GH3559@e103592.cambridge.arm.com>
+ <CAKv+Gu-yAT+kZ_oMT_+n6_RSOKOoqkZtGYjBKq=Wwhj31BgUgQ@mail.gmail.com>
+ <67bd95eb-1f4b-d9d2-9a68-3574d03ac072@arm.com>
+ <20170519173400.GJ3559@e103592.cambridge.arm.com>
+Message-ID: <20170519173832.GL3559@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, May 19, 2017 at 06:34:01PM +0100, Dave Martin wrote:
+> On Fri, May 19, 2017 at 06:16:36PM +0100, Robin Murphy wrote:
 
+[...]
 
-? 2017?5?20? GMT+08:00 ??1:47:29, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
->On Thu, May 18, 2017 at 12:43:45AM +0800, Icenowy Zheng wrote:
->> From: Icenowy Zheng <icenowy@aosc.xyz>
->> 
->> Allwinner H3 SoC has two mixers, one has 1 VI channel and 3 UI
->channels,
->> and the other has 1 VI and 1 UI.
->> 
->> Add support for these two variants.
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ---
->>  drivers/gpu/drm/sun4i/sun8i_mixer.c | 18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->> 
->> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
->b/drivers/gpu/drm/sun4i/sun8i_mixer.c
->> index cb193c5f1686..d658a3a8159a 100644
->> --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
->> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
->> @@ -390,11 +390,29 @@ static const struct sun8i_mixer_cfg
->sun8i_v3s_mixer_cfg = {
->>  	.ui_num = 1,
->>  };
->>  
->> +static const struct sun8i_mixer_cfg sun8i_h3_mixer0_cfg = {
->> +	.vi_num = 1,
->> +	.ui_num = 3,
->> +};
->> +
->> +static const struct sun8i_mixer_cfg sun8i_h3_mixer1_cfg = {
->> +	.vi_num = 1,
->> +	.ui_num = 1,
->> +};
->> +
->>  static const struct of_device_id sun8i_mixer_of_table[] = {
->>  	{
->>  		.compatible = "allwinner,sun8i-v3s-de2-mixer",
->>  		.data = &sun8i_v3s_mixer_cfg,
->>  	},
->> +	{
->> +		.compatible = "allwinner,sun8i-h3-de2-mixer0",
->> +		.data = &sun8i_h3_mixer0_cfg
->> +	},
->> +	{
->> +		.compatible = "allwinner,sun8i-h3-de2-mixer1",
->> +		.data = &sun8i_h3_mixer1_cfg
->> +	},
->
->So the only difference between the two is the number of ui planes?
+> > Hmm, couldn't it be ISA-agnostic?
+> > 
+> > 	ldr pc, 1f
+> > 	.ltorg
+> > THUMB(	.thumb	)
+> > 	...
+> > 
+> > given that that should be interworking on anything where THUMB() is
+> > valid in the first place.
+> 
+> Did you mean
+> 
+> 	ldr	pc, =BSYM(1f)
+> ?
+> 
+> Otherwise this is quite neat: providing there are no pending literals
+> when the assembler reaches the ldr pc, and providing that the ldr pc is
+> word-aligned (it certainly should be) then that sequence should always
+> expand to two words.
 
-Not only., but currently we only implemented this.
+Modulo Ard's comment about position-independence...  Curses.
 
-More functions differ, but we still don't support them...
-
->
->Why not create a property to give the number then, instead of a
->compatible?
->
->Maxime
+Cheers
+---Dave
