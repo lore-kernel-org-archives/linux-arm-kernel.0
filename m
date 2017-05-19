@@ -1,40 +1,87 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 19 May 2017 13:45:37 +0530
-Subject: [PATCH 37/41] ARM: dts: am57xx-beagle-x15-common: Set MMC2 IO voltage
- to 3.3V
+Date: Fri, 19 May 2017 13:45:38 +0530
+Subject: [PATCH 38/41] ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM
 In-Reply-To: <20170519081541.26753-1-kishon@ti.com>
 References: <20170519081541.26753-1-kishon@ti.com>
-Message-ID: <20170519081541.26753-38-kishon@ti.com>
+Message-ID: <20170519081541.26753-39-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MMC2 interface on AM57xx Beagle-x15, connected to
-onboard eMMC, has IO voltage fixed to 3.3V.
+From: Sekhar Nori <nsekhar@ti.com>
 
-Add no-1-8-v device-tree property to mmc2 node
-in the board's device-tree file to reflect
-this.
+DRA74x EVM Rev H EVM comes with revision 2.0 silicon.
+However, earlier versions of EVM can come with either
+revision 1.1 or revision 1.0 of silicon.
 
-Note that the AM57xx SoC itself supports dual-voltage
-on MMC2. The limitation above is due to the board.
+The device-tree file is written to support rev 2.0 of
+silicon. pdata quirks are used to then override the
+settings needed for PG 1.1 silicon.
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+PG 1.1 silicon has limitations w.r.t frequencies at
+which MMC1/2/3 can operate as well as different IOdelay
+numbers.
+
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-omap2/pdata-quirks.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-index 064755e6fac5..8cef5d1460ec 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-@@ -445,6 +445,7 @@
- 	bus-width = <8>;
- 	ti,non-removable;
- 	cap-mmc-dual-data-rate;
-+	no-1-8-v;
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 9700a8ef0f16..6b433fce65a5 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -434,6 +434,26 @@ static void __init omap5_uevm_legacy_init(void)
+ }
+ #endif
+ 
++#ifdef CONFIG_SOC_DRA7XX
++static struct omap_hsmmc_platform_data dra7_hsmmc_data_mmc1;
++static struct omap_hsmmc_platform_data dra7_hsmmc_data_mmc2;
++static struct omap_hsmmc_platform_data dra7_hsmmc_data_mmc3;
++
++static void __init dra7x_evm_mmc_quirk(void)
++{
++	if (omap_rev() == DRA752_REV_ES1_1 || omap_rev() == DRA752_REV_ES1_0) {
++		dra7_hsmmc_data_mmc1.version = "rev11";
++		dra7_hsmmc_data_mmc1.max_freq = 96000000;
++
++		dra7_hsmmc_data_mmc2.version = "rev11";
++		dra7_hsmmc_data_mmc2.max_freq = 48000000;
++
++		dra7_hsmmc_data_mmc3.version = "rev11";
++		dra7_hsmmc_data_mmc3.max_freq = 48000000;
++	}
++}
++#endif
++
+ static struct pcs_pdata pcs_pdata;
+ 
+ void omap_pcs_legacy_init(int irq, void (*rearm)(void))
+@@ -561,6 +581,14 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x55082000, "55082000.mmu",
+ 		       &omap4_iommu_pdata),
+ #endif
++#ifdef CONFIG_SOC_DRA7XX
++	OF_DEV_AUXDATA("ti,dra7-hsmmc", 0x4809c000, "4809c000.mmc",
++		       &dra7_hsmmc_data_mmc1),
++	OF_DEV_AUXDATA("ti,dra7-hsmmc", 0x480b4000, "480b4000.mmc",
++		       &dra7_hsmmc_data_mmc2),
++	OF_DEV_AUXDATA("ti,dra7-hsmmc", 0x480ad000, "480ad000.mmc",
++		       &dra7_hsmmc_data_mmc3),
++#endif
+ 	/* Common auxdata */
+ 	OF_DEV_AUXDATA("pinctrl-single", 0, NULL, &pcs_pdata),
+ 	{ /* sentinel */ },
+@@ -590,6 +618,9 @@ static struct pdata_init pdata_quirks[] __initdata = {
+ #ifdef CONFIG_SOC_OMAP5
+ 	{ "ti,omap5-uevm", omap5_uevm_legacy_init, },
+ #endif
++#ifdef CONFIG_SOC_DRA7XX
++	{ "ti,dra7-evm", dra7x_evm_mmc_quirk, },
++#endif
+ 	{ /* sentinel */ },
  };
  
- &sata {
 -- 
 2.11.0
