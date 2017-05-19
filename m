@@ -1,119 +1,77 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 19 May 2017 10:56:47 +0200
-Subject: [linux-sunxi] [PATCH v6 8/9] arm64: allwinner: a64: enable
- AXP803 regulators for Pine64
-In-Reply-To: <4B129FD0-4AEB-4DC3-AF33-C279468BD197@aosc.io>
-References: <20170518071653.36561-1-icenowy@aosc.io>
- <20170518071653.36561-9-icenowy@aosc.io>
- <98ae1ea8-ef08-8859-63d8-57c56a6348a6@arm.com>
- <4B129FD0-4AEB-4DC3-AF33-C279468BD197@aosc.io>
-Message-ID: <20170519085647.cruo55p2662mysf7@flea.home>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 19 May 2017 09:56:40 +0100
+Subject: [PATCH] i2c: designware: don't infer timings described by ACPI from
+ clock rate
+Message-ID: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 04:29:01PM +0800, Icenowy Zheng wrote:
-> 
-> 
-> ? 2017?5?19? GMT+08:00 ??4:27:21, Andre Przywara <andre.przywara@arm.com> ??:
-> >Hi,
-> >
-> >On 18/05/17 08:16, Icenowy Zheng wrote:
-> >> Add support of AXP803 regulators in the Pine64 device tree, in order
-> >to
-> >> enable many future functionalities, e.g. Wi-Fi.
-> >> 
-> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >> ---
-> >> Changes in v6:
-> >> - Rebased on next-20170517.
-> >> 
-> >>  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 109
-> >+++++++++++++++++++++
-> >>  1 file changed, 109 insertions(+)
-> >> 
-> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> >b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> >> index 36001884ed33..40921bacb39c 100644
-> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> >> @@ -118,6 +118,115 @@
-> >>  	};
-> >>  };
-> >>  
-> >> +#include "axp803.dtsi"
-> >> +
-> >> +&reg_aldo1 {
-> >> +	regulator-min-microvolt = <2800000>;
-> >> +	regulator-max-microvolt = <2800000>;
-> >> +	regulator-name = "vcc-csi";
-> >> +};
-> >> +
-> >> +&reg_aldo2 {
-> >> +	regulator-always-on;
-> >> +	regulator-min-microvolt = <1800000>;
-> >> +	regulator-max-microvolt = <3300000>;
-> >> +	regulator-name = "vcc-pl";
-> >> +};
-> >> +
-> >> +&reg_aldo3 {
-> >> +	regulator-always-on;
-> >> +	regulator-min-microvolt = <2700000>;
-> >> +	regulator-max-microvolt = <3300000>;
-> >> +	regulator-name = "vcc-pll-avcc";
-> >> +};
-> >> +
-> >> +&reg_dc1sw {
-> >> +	regulator-name = "vcc-phy";
-> >> +};
-> >> +
-> >> +&reg_dcdc1 {
-> >> +	regulator-always-on;
-> >> +	regulator-min-microvolt = <3300000>;
-> >> +	regulator-max-microvolt = <3300000>;
-> >> +	regulator-name = "vcc-3v3";
-> >> +};
-> >> +
-> >> +&reg_dcdc2 {
-> >> +	regulator-always-on;
-> >> +	regulator-min-microvolt = <1000000>;
-> >> +	regulator-max-microvolt = <1300000>;
-> >> +	regulator-name = "vdd-cpux";
-> >> +};
-> >> +
-> >> +/* DCDC3 is polyphased with DCDC2 */
-> >> +
-> >> +&reg_dcdc5 {
-> >> +	regulator-always-on;
-> >> +	regulator-min-microvolt = <1500000>;
-> >> +	regulator-max-microvolt = <1500000>;
-> >> +	regulator-name = "vcc-dram";
-> >> +};
-> >
-> >I think I mentioned this before, but the Pine64 has DDR3L DRAM,
-> >which is specified to run at 1.35V (1.36V with the 20mV granularity
-> >of the AXP).  The reset value is even (wrongly?) configured to
-> >1.24V.
-> >
-> >So is there any reason you set the voltage to 1.5V? Is that what
-> >the BSP does? Or did you see any problems with 1.36V?
-> 
-> I just set it based on the schematics.
-> 
-> And 1.35v cannot be accurately achieved by dcdc5 and it's a problem
-> whether to use 1.34v or 1.36v ;-)
+Commit bd698d24b1b57 ("i2c: designware: Get selected speed mode
+sda-hold-time via ACPI") updated the logic that reads the timing
+parameters for various I2C bus rates from the DSDT, to only read
+the timing parameters for the currently selected mode.
 
-1.36V seems safer.
+This causes a WARN_ON() splat on platforms that legally omit the clock
+frequency from the ACPI description, because in the new situation, the
+core I2C designware driver still accesses the fields in the driver
+struct that we no longer populate, and proceeds to calculate them from
+the clock frequency. Since the clock frequency is unspecified, the
+driver complains loudly using a WARN_ON().
 
-Maxime
+So revert back to the old situation, where the struct fields for all
+timings are populated, but retain the new logic which chooses the SDA
+hold time from the timing mode that is currently in use.
 
+Fixes: bd698d24b1b57 ("i2c: designware: Get selected speed mode ...")
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/i2c/busses/i2c-designware-platdrv.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+index f2acd4b6bf01..6283b99d2b17 100644
+--- a/drivers/i2c/busses/i2c-designware-platdrv.c
++++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+@@ -96,6 +96,7 @@ static int dw_i2c_acpi_configure(struct platform_device *pdev)
+ 	struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
+ 	acpi_handle handle = ACPI_HANDLE(&pdev->dev);
+ 	const struct acpi_device_id *id;
++	u32 ss_ht, fp_ht, hs_ht, fs_ht;
+ 	struct acpi_device *adev;
+ 	const char *uid;
+ 
+@@ -107,23 +108,24 @@ static int dw_i2c_acpi_configure(struct platform_device *pdev)
+ 	 * Try to get SDA hold time and *CNT values from an ACPI method for
+ 	 * selected speed modes.
+ 	 */
++	dw_i2c_acpi_params(pdev, "SSCN", &dev->ss_hcnt, &dev->ss_lcnt, &ss_ht);
++	dw_i2c_acpi_params(pdev, "FPCN", &dev->fp_hcnt, &dev->fp_lcnt, &fp_ht);
++	dw_i2c_acpi_params(pdev, "HSCN", &dev->hs_hcnt, &dev->hs_lcnt, &hs_ht);
++	dw_i2c_acpi_params(pdev, "FMCN", &dev->fs_hcnt, &dev->fs_lcnt, &fs_ht);
++
+ 	switch (dev->clk_freq) {
+ 	case 100000:
+-		dw_i2c_acpi_params(pdev, "SSCN", &dev->ss_hcnt, &dev->ss_lcnt,
+-				   &dev->sda_hold_time);
++		dev->sda_hold_time = ss_ht;
+ 		break;
+ 	case 1000000:
+-		dw_i2c_acpi_params(pdev, "FPCN", &dev->fp_hcnt, &dev->fp_lcnt,
+-				   &dev->sda_hold_time);
++		dev->sda_hold_time = fp_ht;
+ 		break;
+ 	case 3400000:
+-		dw_i2c_acpi_params(pdev, "HSCN", &dev->hs_hcnt, &dev->hs_lcnt,
+-				   &dev->sda_hold_time);
++		dev->sda_hold_time = hs_ht;
+ 		break;
+ 	case 400000:
+ 	default:
+-		dw_i2c_acpi_params(pdev, "FMCN", &dev->fs_hcnt, &dev->fs_lcnt,
+-				   &dev->sda_hold_time);
++		dev->sda_hold_time = fs_ht;
+ 		break;
+ 	}
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170519/23b2a80b/attachment.sig>
+2.9.3
