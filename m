@@ -1,23 +1,33 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 19 May 2017 11:33:57 -0700
-Subject: [PATCH v3 2/3] thermal: broadcom: ns-thermal: default on iProc
- SoCs
-In-Reply-To: <1493410291-16679-3-git-send-email-jon.mason@broadcom.com>
-References: <1493410291-16679-1-git-send-email-jon.mason@broadcom.com>
- <1493410291-16679-3-git-send-email-jon.mason@broadcom.com>
-Message-ID: <95dacb24-8c10-8d3b-9764-a3c208031f6d@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 May 2017 19:33:49 +0100
+Subject: [PATCH] arm: boot/compressed: fix decompressor header layout for
+ v7-M
+In-Reply-To: <29254cb6-ded4-6707-1d75-d0eac53e2f65@arm.com>
+References: <20170519145959.26569-1-ard.biesheuvel@linaro.org>
+ <20170519164603.GH3559@e103592.cambridge.arm.com>
+ <CAKv+Gu-yAT+kZ_oMT_+n6_RSOKOoqkZtGYjBKq=Wwhj31BgUgQ@mail.gmail.com>
+ <67bd95eb-1f4b-d9d2-9a68-3574d03ac072@arm.com>
+ <2E764C85-57F3-4DC2-ADEB-B6B75A70B898@linaro.org>
+ <29254cb6-ded4-6707-1d75-d0eac53e2f65@arm.com>
+Message-ID: <20170519183349.GZ22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2017 01:11 PM, Jon Mason wrote:
-> Tweak the Kconfig description to mention support for NSP and make the
-> default on for iProc based platforms.
+On Fri, May 19, 2017 at 06:58:16PM +0100, Robin Murphy wrote:
+> Ah, I knew I'd have overlooked something - that makes sense.
 > 
-> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> FWIW, my final thought is this:
+> 
+> 	add	r12, pc, #5
+> 	mov	r0, r0
+> 	mov	pc, r12
+> 
+> Which I think should leave you in Thumb regardless of which ISA it's
+> assembled in, thanks to the wackiness of ALUWritePC().
 
-Zhang, Eduardo, please apply, the Kconfig and DTS changes have been
-queued for 4.13 in my ARM-SoC pull request for Broadcom SoCs.
+You only have four bytes to fit whatever code in here.
 
-Thanks!
---
-Florian
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
