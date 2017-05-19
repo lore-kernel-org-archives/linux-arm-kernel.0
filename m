@@ -1,216 +1,132 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Fri, 19 May 2017 21:49:06 +0800
-Subject: [PATCH V3 3/3] cpufreq: imx6q: refine clk operations
-In-Reply-To: <1495201746-31841-1-git-send-email-aisheng.dong@nxp.com>
-References: <1495201746-31841-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1495201746-31841-4-git-send-email-aisheng.dong@nxp.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 19 May 2017 14:56:20 +0100
+Subject: [RFC PATCH] arm64: neon: Remove support for nested or hardirq
+ kernel-mode NEON
+In-Reply-To: <20170519134650.GE3559@e103592.cambridge.arm.com>
+References: <1495193199-1291-1-git-send-email-Dave.Martin@arm.com>
+ <CAKv+Gu8KKuD6Rgbq++kzJayHN8X-Kb7vrS-aj=N_kymqSnfVdQ@mail.gmail.com>
+ <20170519134650.GE3559@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu-o5wofQwpC6Wp87GNniN2eTYmni_JGKNpPFFCWK48zWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use clk_bulk_get to ease the driver clocks handling.
+On 19 May 2017 at 14:46, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Fri, May 19, 2017 at 01:34:37PM +0100, Ard Biesheuvel wrote:
+>> On 19 May 2017 at 12:26, Dave Martin <Dave.Martin@arm.com> wrote:
+>> > The benefits of nested kernel-mode NEON may be marginal.  Likewise,
+>> > use of kernel-mode NEON in hardirq context is rare to nonexistent.
+>> >
+>>
+>> The only use case for kernel mode NEON outside of process context is
+>> the mac80211 subsystem which performs crypto on the packets in softirq
+>> context.
+>>
+>> > Removing support for these eliminates signifcant cost and complexity.
+>> >
+>>
+>> typo: significant
+>
+> Good spot -- thanks.
+>
+> [...]
+>
+>> > This patch is broken without some conversion of preempt_disable()/
+>> > enable() to local_bh_disable()/enable() around some of the context
+>> > handling code in fpsimd.c, in order to be robust against the task's
+>> > FPSIMD context being unexpectedly saved by a preempting softirq.
+>> >
+>>
+>> Yes, this is basically the issue we originally discussed in the
+>> context of SVE support.
+>
+> Agreed -- I'll come back to that.
+>
+> [...]
+>
+>> > diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
+>
+> [...]
+>
+>> > +#ifdef CONFIG_KERNEL_MODE_NEON
+>> > +
+>> > +extern DEFINE_PER_CPU(local_t, kernel_neon_busy);
+>>
+>> DECLARE_PER_CPU
+>
+> Arg, yes.
+>
+>>
+>> > +
+>> > +/*
+>> > + * Returns true if and only if it is safe to call kernel_neon_begin().
+>> > + * Callers must not assume that the result remains true beyond the next
+>> > + * preempt_enable() or return from softirq context.
+>> > + */
+>> > +static bool __maybe_unused kernel_neon_allowed(void)
+>>
+>> If you make it static inline, you don't need the __maybe_unused
+>
+> True.  I'm a bit prejudiced against inline due to the inconsistent
+> interpretations between C/C++/gcc.
+>
+> But it is cleaner and it's used with an appropriate meaning
+> elsewhere in the kernel.
+>
+> [...]
+>
+>> > +        * If we are in between kernel_neon_begin()...kernel_neon_end(), the
+>> > +        * flag will be set, but preemption is also disabled, so we can't
+>> > +        * migrate to another CPU and spuriously see it become false.
+>> > +        */
+>> > +       return !(in_irq() || in_nmi()) &&
+>> > +               !local_read(this_cpu_ptr(&kernel_neon_busy));
+>>
+>> For readability, could we change this to '!x && !y && !z' instead?
+>
+> Agreed, this mis-evolved from !in_irq() && !local_read(...
+>
+> [...]
+>
+>> static inline here as well
+>
+> Ditto
+>
+> [...]
+>
+>> > -       }
+>> > +
+>> > +       busy = local_xchg(this_cpu_ptr(&kernel_neon_busy), 0);
+>> > +       WARN_ON(!busy); /* No matching kernel_neon_begin()? */
+>> > +
+>> > +       preempt_enable();
+>> >  }
+>> >  EXPORT_SYMBOL(kernel_neon_end);
+>
+> [...]
+>
+>> I think the general approach is sound. I still think we could call
+>> kernel_neon_allowed() may_use_simd(), and let it override the
+>> asm-generic version in asm/simd.h. In any case, given this is a prereq
+>> for SVE support which is still far out, we should probably phase this
+>> change by migrating KMN users to kernel_neon_allowed/may_use_simd
+>> first (and add a 'return true' version for the former if needed), so
+>> that the crypto changes can be queued for v4.13
+>
+> OK -- when do you expect your kernel-mode-neon series (or relevant bits
+> of it) to be merged?  With that in place, I can carry this patch in
+> the SVE series, or propose it to be merged separately.
+>
 
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Anson Huang <anson.huang@nxp.com>
-Cc: Robin Gong <yibin.gong@nxp.com>
-Cc: Bai Ping <ping.bai@nxp.com>
-Cc: Leonard Crestez <leonard.crestez@nxp.com>
-Cc: Octavian Purdila <octavian.purdila@nxp.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-ChangeLog:
-v1->v3: No changes
----
- drivers/cpufreq/imx6q-cpufreq.c | 119 ++++++++++++++++++----------------------
- 1 file changed, 53 insertions(+), 66 deletions(-)
+There is no reason for any of this to go through the crypto tree or
+mailing list. So for now, let's go with kernel_neon_allowed(), and I
+can respin my patches against that and ask Catalin or Will to queue it
+for v4.13. I will be travelling next week, though, so no ETA yet.
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index 7719b02..6158910 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -24,15 +24,29 @@ static struct regulator *arm_reg;
- static struct regulator *pu_reg;
- static struct regulator *soc_reg;
- 
--static struct clk *arm_clk;
--static struct clk *pll1_sys_clk;
--static struct clk *pll1_sw_clk;
--static struct clk *step_clk;
--static struct clk *pll2_pfd2_396m_clk;
--
--/* clk used by i.MX6UL */
--static struct clk *pll2_bus_clk;
--static struct clk *secondary_sel_clk;
-+enum IMX6_CPUFREQ_CLKS {
-+	ARM,
-+	PLL1_SYS,
-+	STEP,
-+	PLL1_SW,
-+	PLL2_PFD2_396M,
-+	/* MX6UL requires two more clks */
-+	PLL2_BUS,
-+	SECONDARY_SEL,
-+};
-+#define IMX6Q_CPUFREQ_CLK_NUM		5
-+#define IMX6UL_CPUFREQ_CLK_NUM		7
-+
-+static int num_clks;
-+static struct clk_bulk_data clks[] = {
-+	{ .id = "arm" },
-+	{ .id = "pll1_sys" },
-+	{ .id = "step" },
-+	{ .id = "pll1_sw" },
-+	{ .id = "pll2_pfd2_396m" },
-+	{ .id = "pll2_bus" },
-+	{ .id = "secondary_sel" },
-+};
- 
- static struct device *cpu_dev;
- static bool free_opp;
-@@ -51,7 +65,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 
- 	new_freq = freq_table[index].frequency;
- 	freq_hz = new_freq * 1000;
--	old_freq = clk_get_rate(arm_clk) / 1000;
-+	old_freq = clk_get_rate(clks[ARM].clk) / 1000;
- 
- 	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_hz);
- 	if (IS_ERR(opp)) {
-@@ -109,25 +123,27 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 		 * voltage of 528MHz, so lower the CPU frequency to one
- 		 * half before changing CPU frequency.
- 		 */
--		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
--		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
--		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
--			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
-+		clk_set_rate(clks[ARM].clk, (old_freq >> 1) * 1000);
-+		clk_set_parent(clks[PLL1_SW].clk, clks[PLL1_SYS].clk);
-+		if (freq_hz > clk_get_rate(clks[PLL2_PFD2_396M].clk))
-+			clk_set_parent(clks[SECONDARY_SEL].clk,
-+				       clks[PLL2_BUS].clk);
- 		else
--			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
--		clk_set_parent(step_clk, secondary_sel_clk);
--		clk_set_parent(pll1_sw_clk, step_clk);
-+			clk_set_parent(clks[SECONDARY_SEL].clk,
-+				       clks[PLL2_PFD2_396M].clk);
-+		clk_set_parent(clks[STEP].clk, clks[SECONDARY_SEL].clk);
-+		clk_set_parent(clks[PLL1_SW].clk, clks[STEP].clk);
- 	} else {
--		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
--		clk_set_parent(pll1_sw_clk, step_clk);
--		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
--			clk_set_rate(pll1_sys_clk, new_freq * 1000);
--			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-+		clk_set_parent(clks[STEP].clk, clks[PLL2_PFD2_396M].clk);
-+		clk_set_parent(clks[PLL1_SW].clk, clks[STEP].clk);
-+		if (freq_hz > clk_get_rate(clks[PLL2_PFD2_396M].clk)) {
-+			clk_set_rate(clks[PLL1_SYS].clk, new_freq * 1000);
-+			clk_set_parent(clks[PLL1_SW].clk, clks[PLL1_SYS].clk);
- 		}
- 	}
- 
- 	/* Ensure the arm clock divider is what we expect */
--	ret = clk_set_rate(arm_clk, new_freq * 1000);
-+	ret = clk_set_rate(clks[ARM].clk, new_freq * 1000);
- 	if (ret) {
- 		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
- 		regulator_set_voltage_tol(arm_reg, volt_old, 0);
-@@ -161,7 +177,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 
- static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
- {
--	policy->clk = arm_clk;
-+	policy->clk = clks[ARM].clk;
- 	return cpufreq_generic_init(policy, freq_table, transition_latency);
- }
- 
-@@ -197,27 +213,14 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 		return -ENOENT;
- 	}
- 
--	arm_clk = clk_get(cpu_dev, "arm");
--	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
--	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
--	step_clk = clk_get(cpu_dev, "step");
--	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
--	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
--	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
--		dev_err(cpu_dev, "failed to get clocks\n");
--		ret = -ENOENT;
--		goto put_clk;
--	}
-+	if (of_machine_is_compatible("fsl,imx6ul"))
-+		num_clks = IMX6UL_CPUFREQ_CLK_NUM;
-+	else
-+		num_clks = IMX6Q_CPUFREQ_CLK_NUM;
- 
--	if (of_machine_is_compatible("fsl,imx6ul")) {
--		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
--		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
--		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
--			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
--			ret = -ENOENT;
--			goto put_clk;
--		}
--	}
-+	ret = clk_bulk_get(cpu_dev, num_clks, clks);
-+	if (ret)
-+		goto put_node;
- 
- 	arm_reg = regulator_get(cpu_dev, "arm");
- 	pu_reg = regulator_get_optional(cpu_dev, "pu");
-@@ -354,22 +357,11 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 		regulator_put(pu_reg);
- 	if (!IS_ERR(soc_reg))
- 		regulator_put(soc_reg);
--put_clk:
--	if (!IS_ERR(arm_clk))
--		clk_put(arm_clk);
--	if (!IS_ERR(pll1_sys_clk))
--		clk_put(pll1_sys_clk);
--	if (!IS_ERR(pll1_sw_clk))
--		clk_put(pll1_sw_clk);
--	if (!IS_ERR(step_clk))
--		clk_put(step_clk);
--	if (!IS_ERR(pll2_pfd2_396m_clk))
--		clk_put(pll2_pfd2_396m_clk);
--	if (!IS_ERR(pll2_bus_clk))
--		clk_put(pll2_bus_clk);
--	if (!IS_ERR(secondary_sel_clk))
--		clk_put(secondary_sel_clk);
-+
-+	clk_bulk_put(num_clks, clks);
-+put_node:
- 	of_node_put(np);
-+
- 	return ret;
- }
- 
-@@ -383,13 +375,8 @@ static int imx6q_cpufreq_remove(struct platform_device *pdev)
- 	if (!IS_ERR(pu_reg))
- 		regulator_put(pu_reg);
- 	regulator_put(soc_reg);
--	clk_put(arm_clk);
--	clk_put(pll1_sys_clk);
--	clk_put(pll1_sw_clk);
--	clk_put(step_clk);
--	clk_put(pll2_pfd2_396m_clk);
--	clk_put(pll2_bus_clk);
--	clk_put(secondary_sel_clk);
-+
-+	clk_bulk_put(num_clks, clks);
- 
- 	return 0;
- }
--- 
-2.7.4
+> I'd also expect CONFIG_KERNEL_NEON_MODE_NEON_FALLBACK and
+> kernel_neon_need_fallback() to be folded in (=y and true respectively),
+> since removal of nesting support will mean that fallback code is always
+> needed for clients that may run elsewhere than in task context.
+>
+
+Yes. So we no longer have to reason about whether a fallback should be
+provided, which is an improvement imo.
