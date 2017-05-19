@@ -1,44 +1,39 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 19 May 2017 07:35:39 -0500
-Subject: [PATCH v3 1/3] SoC: es8328-i2c: Add compatible for ES8323
-In-Reply-To: <a052da20-d9c7-69f5-21d9-9111d45702e6@collabora.com>
-References: <20170512132227.24916-1-romain.perier@collabora.com>
- <20170512132227.24916-10-romain.perier@collabora.com>
- <20170515214138.u63u7j53jogk3prm@rob-hp-laptop>
- <20170516111837.3uf5f5jbdkrnjudi@sirena.org.uk>
- <a052da20-d9c7-69f5-21d9-9111d45702e6@collabora.com>
-Message-ID: <CAL_JsqJpcR0P03nixJqVHLhbVuuWAogx9YJSK4Gf4=01t8yfDw@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 19 May 2017 14:38:01 +0200
+Subject: [PATCH] i2c: designware: don't infer timings described by ACPI
+ from clock rate
+In-Reply-To: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
+References: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170519123801.l25pvu5n2bjfwzt6@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 1:56 AM, Romain Perier
-<romain.perier@collabora.com> wrote:
-> Hello,
->
->
-> Le 16/05/2017 ? 13:18, Mark Brown a ?crit :
->> On Mon, May 15, 2017 at 04:41:38PM -0500, Rob Herring wrote:
->>> On Fri, May 12, 2017 at 03:22:25PM +0200, Romain Perier wrote:
->>>> This commit adds a compatible string for everest,es8323. This is an
->>>> audio codec that is compatible with es8328 and can be found for example
->>>> on the Firefly-RK3288 board.
->>> If it is compatible with the es8328, then that should be a fallback and
->>> you don't need the driver change.
->> While people don't strictly need the driver change it doesn't do any
->> harm either and encourages people to get the information into the DT
->> that it's a different chip.  Thinking about it it might be good to have
->> a way for something to validate if fallback compatibles are being listed
->> when they should - the drivers could provide the information fairly
->> easily I guess, or it could go into the binding docs once we have a
->> schema format.
->>
->> Even if it doesn't currently make a difference to software I'd rather
->> get the information in there for mixed signal devices like audio CODECs
->> - it's not that unknown to find later that supposedly register identical
->> chips have some differences in the analog which we want to care about.
-> So, what should I do for this patch, finally ? fallback or driver change ?
+On Fri, May 19, 2017 at 09:56:40AM +0100, Ard Biesheuvel wrote:
+> Commit bd698d24b1b57 ("i2c: designware: Get selected speed mode
+> sda-hold-time via ACPI") updated the logic that reads the timing
+> parameters for various I2C bus rates from the DSDT, to only read
+> the timing parameters for the currently selected mode.
+> 
+> This causes a WARN_ON() splat on platforms that legally omit the clock
+> frequency from the ACPI description, because in the new situation, the
+> core I2C designware driver still accesses the fields in the driver
+> struct that we no longer populate, and proceeds to calculate them from
+> the clock frequency. Since the clock frequency is unspecified, the
+> driver complains loudly using a WARN_ON().
+> 
+> So revert back to the old situation, where the struct fields for all
+> timings are populated, but retain the new logic which chooses the SDA
+> hold time from the timing mode that is currently in use.
+> 
+> Fixes: bd698d24b1b57 ("i2c: designware: Get selected speed mode ...")
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Well, you could do both. However, there's not much point if you do the
-driver change. So:
+Applied to for-current, thanks!
 
-Acked-by: Rob Herring <robh@kernel.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170519/405553a6/attachment.sig>
