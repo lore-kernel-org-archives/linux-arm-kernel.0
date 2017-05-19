@@ -1,111 +1,124 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Fri, 19 May 2017 21:49:03 +0800
-Subject: [PATCH V3 0/3] clk: introduce clk_bulk_get accessories
-Message-ID: <1495201746-31841-1-git-send-email-aisheng.dong@nxp.com>
+Date: Fri, 19 May 2017 21:49:05 +0800
+Subject: [PATCH V3 2/3] clk: add managed version of clk_bulk_get
+In-Reply-To: <1495201746-31841-1-git-send-email-aisheng.dong@nxp.com>
+References: <1495201746-31841-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1495201746-31841-3-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These helper function allows drivers to get several clk consumers in
-one operation.  If any of the clk cannot be acquired then any clks
-that were got will be put before returning to the caller.
+This patch introduces the managed version of clk_bulk_get.
 
-The idea firstly came out when i wanted to clean up and optimize
-imx6q-cpufreq driver which needs to handle a lot of clocks as it
-becomes a bit mess.
-
-e.g. drivers/cpufreq/imx6q-cpufreq.c
-
-You will see we need get 7 clocks during driver probe.
-(Add there will be more, e.g. pll1, pll1_bypass, pll1_bypass_src,
-in the future when adding busfreq support).
-
-static int imx6q_cpufreq_probe(struct platform_device *pdev)
-{
-....
-	arm_clk = clk_get(cpu_dev, "arm");
-	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
-	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
-	step_clk = clk_get(cpu_dev, "step");
-	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
-	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
-	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
-		dev_err(cpu_dev, "failed to get clocks\n");
-		ret = -ENOENT;
-		goto put_clk;
-	}
-
-	if (of_machine_is_compatible("fsl,imx6ul")) {
-		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
-		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
-		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
-			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
-			ret = -ENOENT;
-			goto put_clk;
-		}
-	}
-....
-put_clk: 
-        if (!IS_ERR(arm_clk))
-                clk_put(arm_clk);
-        if (!IS_ERR(pll1_sys_clk))
-                clk_put(pll1_sys_clk);
-	...........
-}
-
-Together with the err path handling for each clocks, it does make
-things a bit ugly.
-
-Since we already have regulator_bulk_get accessories, i thought we
-probably could introduce clk_bulk_get as well to handle such case to
-ease the driver owners' life. 
-
-Besides IMX cpufreq driver, there is also some similar cases
-in kernel which could befinit from this api as well.
-e.g.
-drivers/cpufreq/tegra124-cpufreq.c
-drivers/cpufreq/s3c2412-cpufreq.c
-sound/soc/samsung/smdk_spdif.c
-arch/arm/mach-omap1/serial.c
-...
-
-And actually, if we handle clocks more than 3, then it might be
-worthy to try, which there is quite many manay in kernel and
-that probably could save a lot codes.
-
-Comments are welcome and appreciated!
-
-Tested on MX6Q SabreSD board with CPUfreq stress.
-Also ran IA64 and m68k compiling test:
-make.cross ARCH=m68k 
-make.cross ARCH=ia64
-
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Anson Huang <anson.huang@nxp.com>
+Cc: Robin Gong <yibin.gong@nxp.com>
+Cc: Bai Ping <ping.bai@nxp.com>
+Cc: Leonard Crestez <leonard.crestez@nxp.com>
+Cc: Octavian Purdila <octavian.purdila@nxp.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
 ChangeLog:
-v2->v3:
- Only Patch 1 changed.
- * release resource in reversed order in case an error according to
-   Geert Uytterhoeven's suggestion
+v2->v3: no changes
+v1->v2: only one minor comment change
+---
+ drivers/clk/clk-devres.c | 36 ++++++++++++++++++++++++++++++++++++
+ include/linux/clk.h      | 21 +++++++++++++++++++++
+ 2 files changed, 57 insertions(+)
 
-v1->v2:
- * Most significant change is introducing clk-bulk.c to centrally
-   handle bulk_clks and fix !CONFIG_CLKDEV_LOOKUP platforms build break.
-   Other are comments fix, adding const annotation and etc.
-   Refer to individual patches for details.
-
-[v1] https://lkml.org/lkml/2017/4/11/335
-[v2] https://lkml.org/lkml/2017/5/8/276
-
-Dong Aisheng (3):
-  clk: add clk_bulk_get accessories
-  clk: add managed version of clk_bulk_get
-  cpufreq: imx6q: refine clk operations
-
- drivers/clk/Makefile            |   2 +-
- drivers/clk/clk-bulk.c          | 157 ++++++++++++++++++++++++++++++++++++++++
- drivers/clk/clk-devres.c        |  36 +++++++++
- drivers/cpufreq/imx6q-cpufreq.c | 119 ++++++++++++++----------------
- include/linux/clk.h             | 132 +++++++++++++++++++++++++++++++++
- 5 files changed, 379 insertions(+), 67 deletions(-)
- create mode 100644 drivers/clk/clk-bulk.c
-
+diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+index 3a218c3..d854e26 100644
+--- a/drivers/clk/clk-devres.c
++++ b/drivers/clk/clk-devres.c
+@@ -34,6 +34,42 @@ struct clk *devm_clk_get(struct device *dev, const char *id)
+ }
+ EXPORT_SYMBOL(devm_clk_get);
+ 
++struct clk_bulk_devres {
++	struct clk_bulk_data *clks;
++	int num_clks;
++};
++
++static void devm_clk_bulk_release(struct device *dev, void *res)
++{
++	struct clk_bulk_devres *devres = res;
++
++	clk_bulk_put(devres->num_clks, devres->clks);
++}
++
++int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
++		      struct clk_bulk_data *clks)
++{
++	struct clk_bulk_devres *devres;
++	int ret;
++
++	devres = devres_alloc(devm_clk_bulk_release,
++			      sizeof(*devres), GFP_KERNEL);
++	if (!devres)
++		return -ENOMEM;
++
++	ret = clk_bulk_get(dev, num_clks, clks);
++	if (!ret) {
++		devres->clks = clks;
++		devres->num_clks = num_clks;
++		devres_add(dev, devres);
++	} else {
++		devres_free(devres);
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(devm_clk_bulk_get);
++
+ static int devm_clk_match(struct device *dev, void *res, void *data)
+ {
+ 	struct clk **c = res;
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 1201944..1ebccf3 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -281,6 +281,21 @@ int __must_check clk_bulk_get(struct device *dev, int num_clks,
+ 			      struct clk_bulk_data *clks);
+ 
+ /**
++ * devm_clk_bulk_get - managed get multiple clk consumers
++ * @dev: device for clock "consumer"
++ * @num_clks: the number of clk_bulk_data
++ * @clks: the clk_bulk_data table of consumer
++ *
++ * Return 0 on success, an errno on failure.
++ *
++ * This helper function allows drivers to get several clk
++ * consumers in one operation with management, the clks will
++ * automatically be freed when the device is unbound.
++ */
++int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
++				   struct clk_bulk_data *clks);
++
++/**
+  * devm_clk_get - lookup and obtain a managed reference to a clock producer.
+  * @dev: device for clock "consumer"
+  * @id: clock consumer ID
+@@ -550,6 +565,12 @@ static inline struct clk *devm_clk_get(struct device *dev, const char *id)
+ 	return NULL;
+ }
+ 
++static inline int devm_clk_bulk_get(struct device *dev, int num_clks,
++				    struct clk_bulk_data *clks)
++{
++	return 0;
++}
++
+ static inline struct clk *devm_get_clk_from_child(struct device *dev,
+ 				struct device_node *np, const char *con_id)
+ {
 -- 
 2.7.4
