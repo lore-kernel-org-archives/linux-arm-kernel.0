@@ -1,169 +1,56 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 19 May 2017 15:06:44 +0100
-Subject: [PATCH] dmaengine: pl330: Add IOMMU support to slave tranfers
-Message-ID: <c10016eb9d96d80afcacf547b8a9ec47c6a4cb21.1495202642.git.robin.murphy@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 19 May 2017 15:09:47 +0100
+Subject: [RFC PATCH] arm64: neon: Remove support for nested or hardirq
+ kernel-mode NEON
+In-Reply-To: <CAKv+Gu-o5wofQwpC6Wp87GNniN2eTYmni_JGKNpPFFCWK48zWA@mail.gmail.com>
+References: <1495193199-1291-1-git-send-email-Dave.Martin@arm.com>
+ <CAKv+Gu8KKuD6Rgbq++kzJayHN8X-Kb7vrS-aj=N_kymqSnfVdQ@mail.gmail.com>
+ <20170519134650.GE3559@e103592.cambridge.arm.com>
+ <CAKv+Gu-o5wofQwpC6Wp87GNniN2eTYmni_JGKNpPFFCWK48zWA@mail.gmail.com>
+Message-ID: <20170519140947.GG3559@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire up dma_map_resource() for slave transfers, so that we can let the
-PL330 use IOMMU-backed DMA mapping ops on systems with an appropriate
-IOMMU and RAM above 4GB, to avoid CPU bounce buffering.
+On Fri, May 19, 2017 at 02:56:20PM +0100, Ard Biesheuvel wrote:
+> On 19 May 2017 at 14:46, Dave Martin <Dave.Martin@arm.com> wrote:
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/dma/pl330.c | 75 ++++++++++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 66 insertions(+), 9 deletions(-)
+[...]
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 8b0da7fa520d..a9451a14ad07 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -443,7 +443,10 @@ struct dma_pl330_chan {
- 	/* For D-to-M and M-to-D channels */
- 	int burst_sz; /* the peripheral fifo width */
- 	int burst_len; /* the number of burst */
--	dma_addr_t fifo_addr;
-+	phys_addr_t fifo_addr;
-+	/* DMA-mapped view of the FIFO; may differ if an IOMMU is present */
-+	dma_addr_t fifo_dma;
-+	enum dma_data_direction dir;
- 
- 	/* for cyclic capability */
- 	bool cyclic;
-@@ -2120,11 +2123,60 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
- 	return 1;
- }
- 
-+/*
-+ * We need the data direction between the DMAC (the dma-mapping "device") and
-+ * the FIFO (the dmaengine "dev"), from the FIFO's point of view. Confusing!
-+ */
-+static enum dma_data_direction
-+pl330_dma_slave_map_dir(enum dma_transfer_direction dir)
-+{
-+	switch (dir) {
-+	case DMA_MEM_TO_DEV:
-+		return DMA_FROM_DEVICE;
-+	case DMA_DEV_TO_MEM:
-+		return DMA_TO_DEVICE;
-+	case DMA_DEV_TO_DEV:
-+		return DMA_BIDIRECTIONAL;
-+	default:
-+		return DMA_NONE;
-+	}
-+}
-+
-+static void pl330_unprep_slave_fifo(struct dma_pl330_chan *pch)
-+{
-+	if (pch->dir != DMA_NONE)
-+		dma_unmap_resource(pch->chan.device->dev, pch->fifo_dma,
-+				   1 << pch->burst_sz, pch->dir, 0);
-+	pch->dir = DMA_NONE;
-+}
-+
-+
-+static bool pl330_prep_slave_fifo(struct dma_pl330_chan *pch,
-+				  enum dma_transfer_direction dir)
-+{
-+	struct device *dev = pch->chan.device->dev;
-+	enum dma_data_direction dma_dir = pl330_dma_slave_map_dir(dir);
-+
-+	/* Already mapped for this config? */
-+	if (pch->dir == dma_dir)
-+		return true;
-+
-+	pl330_unprep_slave_fifo(pch);
-+	pch->fifo_dma = dma_map_resource(dev, pch->fifo_addr,
-+					 1 << pch->burst_sz, dma_dir, 0);
-+	if (dma_mapping_error(dev, pch->fifo_dma))
-+		return false;
-+
-+	pch->dir = dma_dir;
-+	return true;
-+}
-+
- static int pl330_config(struct dma_chan *chan,
- 			struct dma_slave_config *slave_config)
- {
- 	struct dma_pl330_chan *pch = to_pchan(chan);
- 
-+	pl330_unprep_slave_fifo(pch);
- 	if (slave_config->direction == DMA_MEM_TO_DEV) {
- 		if (slave_config->dst_addr)
- 			pch->fifo_addr = slave_config->dst_addr;
-@@ -2235,6 +2287,7 @@ static void pl330_free_chan_resources(struct dma_chan *chan)
- 	spin_unlock_irqrestore(&pl330->lock, flags);
- 	pm_runtime_mark_last_busy(pch->dmac->ddma.dev);
- 	pm_runtime_put_autosuspend(pch->dmac->ddma.dev);
-+	pl330_unprep_slave_fifo(pch);
- }
- 
- static int pl330_get_current_xferred_count(struct dma_pl330_chan *pch,
-@@ -2564,6 +2617,9 @@ static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
- 		return NULL;
- 	}
- 
-+	if (!pl330_prep_slave_fifo(pch, direction))
-+		return NULL;
-+
- 	for (i = 0; i < len / period_len; i++) {
- 		desc = pl330_get_desc(pch);
- 		if (!desc) {
-@@ -2593,12 +2649,12 @@ static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
- 			desc->rqcfg.src_inc = 1;
- 			desc->rqcfg.dst_inc = 0;
- 			src = dma_addr;
--			dst = pch->fifo_addr;
-+			dst = pch->fifo_dma;
- 			break;
- 		case DMA_DEV_TO_MEM:
- 			desc->rqcfg.src_inc = 0;
- 			desc->rqcfg.dst_inc = 1;
--			src = pch->fifo_addr;
-+			src = pch->fifo_dma;
- 			dst = dma_addr;
- 			break;
- 		default:
-@@ -2711,12 +2767,12 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	struct dma_pl330_chan *pch = to_pchan(chan);
- 	struct scatterlist *sg;
- 	int i;
--	dma_addr_t addr;
- 
- 	if (unlikely(!pch || !sgl || !sg_len))
- 		return NULL;
- 
--	addr = pch->fifo_addr;
-+	if (!pl330_prep_slave_fifo(pch, direction))
-+		return NULL;
- 
- 	first = NULL;
- 
-@@ -2742,13 +2798,13 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 		if (direction == DMA_MEM_TO_DEV) {
- 			desc->rqcfg.src_inc = 1;
- 			desc->rqcfg.dst_inc = 0;
--			fill_px(&desc->px,
--				addr, sg_dma_address(sg), sg_dma_len(sg));
-+			fill_px(&desc->px, pch->fifo_dma, sg_dma_address(sg),
-+				sg_dma_len(sg));
- 		} else {
- 			desc->rqcfg.src_inc = 0;
- 			desc->rqcfg.dst_inc = 1;
--			fill_px(&desc->px,
--				sg_dma_address(sg), addr, sg_dma_len(sg));
-+			fill_px(&desc->px, sg_dma_address(sg), pch->fifo_dma,
-+				sg_dma_len(sg));
- 		}
- 
- 		desc->rqcfg.brst_size = pch->burst_sz;
-@@ -2906,6 +2962,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 		pch->thread = NULL;
- 		pch->chan.device = pd;
- 		pch->dmac = pl330;
-+		pch->dir = DMA_NONE;
- 
- 		/* Add the channel to the DMAC list */
- 		list_add_tail(&pch->chan.device_node, &pd->channels);
--- 
-2.12.2.dirty
+> > OK -- when do you expect your kernel-mode-neon series (or relevant bits
+> > of it) to be merged?  With that in place, I can carry this patch in
+> > the SVE series, or propose it to be merged separately.
+> >
+> 
+> There is no reason for any of this to go through the crypto tree or
+> mailing list. So for now, let's go with kernel_neon_allowed(), and I
+
+Arg, I just changed it back...
+
+What are the intended meanings of
+
+	!kernel_neon_allowed() && !may_use_simd()
+	!kernel_neon_allowed() && may_use_simd()
+	kernel_neon_allowed() && !may_use_simd()
+	kernel_neon_allowed() && may_use_simd()
+
+?
+
+I'm still a little confused here...
+
+> can respin my patches against that and ask Catalin or Will to queue it
+> for v4.13. I will be travelling next week, though, so no ETA yet.
+
+OK.  It they get queued for v4.13 that's fine for me.
+
+> > I'd also expect CONFIG_KERNEL_NEON_MODE_NEON_FALLBACK and
+> > kernel_neon_need_fallback() to be folded in (=y and true respectively),
+> > since removal of nesting support will mean that fallback code is always
+> > needed for clients that may run elsewhere than in task context.
+> 
+> Yes. So we no longer have to reason about whether a fallback should be
+> provided, which is an improvement imo.
+
+Agreed, it seems simpler this way.
+
+Cheers
+---Dave
