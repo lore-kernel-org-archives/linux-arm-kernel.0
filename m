@@ -1,97 +1,338 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 19 May 2017 17:59:47 +0100
-Subject: [PATCH] arm: boot/compressed: fix decompressor header layout for
- v7-M
-In-Reply-To: <20170519164603.GH3559@e103592.cambridge.arm.com>
-References: <20170519145959.26569-1-ard.biesheuvel@linaro.org>
- <20170519164603.GH3559@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu-yAT+kZ_oMT_+n6_RSOKOoqkZtGYjBKq=Wwhj31BgUgQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 19 May 2017 18:04:40 +0100
+Subject: Applied "regulator: axp20x-regulator: add support for AXP803" to the
+ regulator tree
+In-Reply-To: <20170426152023.41567-7-icenowy@aosc.io>
+Message-ID: <E1dBlKS-0003o8-BB@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2017 at 17:46, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Fri, May 19, 2017 at 03:59:59PM +0100, Ard Biesheuvel wrote:
->> As reported by Patrice, the header layout of the decompressor is
->> incorrect when building for v7-M. In this case, the __nop macro
->> resolves to 'mov r0, r0', which is emitted as a narrow encoding,
->> resulting in the header data fields to end up at lower offsets than
->> required.
->>
->> Given the variety of targets we need to support with the same code,
->> the startup sequence is a bit of a jumble, and uses instructions
->> and macros whose encoding width cannot be specified (badr), or only
->> exists in a narrow encoding (bx)
->>
->> So force the use of a wide encoding in __nop, and replace the start
->> sequence with a simple jump to the label marking the start of code,
->> preceded by a Thumb2 mode switch if required (using explicit wide
->> encodings where appropriate). The label itself can be moved to the
->> start of code [where it belongs] due to the larger range of branch
->> instructions as compared to adr instructions.
->>
->> Reported-by: Patrice CHOTARD <patrice.chotard@st.com>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm/boot/compressed/efi-header.S |  4 +---
->>  arch/arm/boot/compressed/head.S       | 14 +++++++-------
->>  2 files changed, 8 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
->> index 9d5dc4fda3c1..3f7d1b74c5e0 100644
->> --- a/arch/arm/boot/compressed/efi-header.S
->> +++ b/arch/arm/boot/compressed/efi-header.S
->> @@ -17,14 +17,12 @@
->>               @ there.
->>               .inst   'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
->>  #else
->> -             mov     r0, r0
->> +             W(mov)  r0, r0
->>  #endif
->>               .endm
->>
->>               .macro  __EFI_HEADER
->>  #ifdef CONFIG_EFI_STUB
->> -             b       __efi_start
->> -
->>               .set    start_offset, __efi_start - start
->>               .org    start + 0x3c
->>               @
->> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
->> index 7c711ba61417..8c336a6da210 100644
->> --- a/arch/arm/boot/compressed/head.S
->> +++ b/arch/arm/boot/compressed/head.S
->> @@ -130,19 +130,19 @@ start:
->>               .rept   7
->>               __nop
->>               .endr
->> -   ARM(              mov     r0, r0          )
->> -   ARM(              b       1f              )
->> - THUMB(              badr    r12, 1f         )
->> - THUMB(              bx      r12             )
->> +      ARM(   b       1f              )
->> + AR_CLASS(   sub     pc, pc, #3      )       @ A/R: switch to Thumb2 mode
->> +  M_CLASS(   nop.w                   )       @ M: already in Thumb2 mode
->> +    THUMB(   .thumb                  )
->> +    THUMB(   b.w     1f              )
->
-> It's not so easy to see that this always assembles to two words, or that
-> the "sub pc, pc, #3" is assembled but not executed in an ARM kernel.
->
-> Spelling it out might be more readable:
->
->    ARM(                 mov     r0, r0          )
->    ARM(                 mov     r0, r0          )
->
->  THUMB( AR_CLASS(       sub     pc, pc, #3      ))
->  THUMB( M_CLASS(        nop.w                   ))
->  THUMB(                 .thumb                  )
->  THUMB(                 b.w     1f              )
->
-> But I guess it works either way.
->
+The patch
 
-Indeed. Apart from the error in the second line, this sequence should
-be equivalent, but the nested macro invocations don't make it clearer
-imo.
+   regulator: axp20x-regulator: add support for AXP803
 
-I could add some more comments as well if that helps?
+has been applied to the regulator tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 1dbe0ccb0631c4ed399261934fe16f07407b078d Mon Sep 17 00:00:00 2001
+From: Icenowy Zheng <icenowy@aosc.io>
+Date: Thu, 18 May 2017 15:16:49 +0800
+Subject: [PATCH] regulator: axp20x-regulator: add support for AXP803
+
+AXP803 PMIC also have a series of regulators (DCDCs and LDOs)
+controllable via I2C/RSB bus.
+
+Add support for them.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/regulator/axp20x-regulator.c | 153 ++++++++++++++++++++++++++++++-----
+ include/linux/mfd/axp20x.h           |  37 +++++++++
+ 2 files changed, 168 insertions(+), 22 deletions(-)
+
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 0b9d4e3e52c7..e2608fe770b9 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -244,6 +244,82 @@ static const struct regulator_desc axp22x_drivevbus_regulator = {
+ 	.ops		= &axp20x_ops_sw,
+ };
+ 
++static const struct regulator_linear_range axp803_dcdc234_ranges[] = {
++	REGULATOR_LINEAR_RANGE(500000, 0x0, 0x46, 10000),
++	REGULATOR_LINEAR_RANGE(1220000, 0x47, 0x4b, 20000),
++};
++
++static const struct regulator_linear_range axp803_dcdc5_ranges[] = {
++	REGULATOR_LINEAR_RANGE(800000, 0x0, 0x20, 10000),
++	REGULATOR_LINEAR_RANGE(1140000, 0x21, 0x44, 20000),
++};
++
++static const struct regulator_linear_range axp803_dcdc6_ranges[] = {
++	REGULATOR_LINEAR_RANGE(600000, 0x0, 0x32, 10000),
++	REGULATOR_LINEAR_RANGE(1120000, 0x33, 0x47, 20000),
++};
++
++/* AXP806's CLDO2 and AXP809's DLDO1 shares the same range */
++static const struct regulator_linear_range axp803_dldo2_ranges[] = {
++	REGULATOR_LINEAR_RANGE(700000, 0x0, 0x1a, 100000),
++	REGULATOR_LINEAR_RANGE(3400000, 0x1b, 0x1f, 200000),
++};
++
++static const struct regulator_desc axp803_regulators[] = {
++	AXP_DESC(AXP803, DCDC1, "dcdc1", "vin1", 1600, 3400, 100,
++		 AXP803_DCDC1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(0)),
++	AXP_DESC_RANGES(AXP803, DCDC2, "dcdc2", "vin2", axp803_dcdc234_ranges,
++			76, AXP803_DCDC2_V_OUT, 0x7f, AXP22X_PWR_OUT_CTRL1,
++			BIT(1)),
++	AXP_DESC_RANGES(AXP803, DCDC3, "dcdc3", "vin3", axp803_dcdc234_ranges,
++			76, AXP803_DCDC3_V_OUT, 0x7f, AXP22X_PWR_OUT_CTRL1,
++			BIT(2)),
++	AXP_DESC_RANGES(AXP803, DCDC4, "dcdc4", "vin4", axp803_dcdc234_ranges,
++			76, AXP803_DCDC4_V_OUT, 0x7f, AXP22X_PWR_OUT_CTRL1,
++			BIT(3)),
++	AXP_DESC_RANGES(AXP803, DCDC5, "dcdc5", "vin5", axp803_dcdc5_ranges,
++			68, AXP803_DCDC5_V_OUT, 0x7f, AXP22X_PWR_OUT_CTRL1,
++			BIT(4)),
++	AXP_DESC_RANGES(AXP803, DCDC6, "dcdc6", "vin6", axp803_dcdc6_ranges,
++			72, AXP803_DCDC6_V_OUT, 0x7f, AXP22X_PWR_OUT_CTRL1,
++			BIT(5)),
++	/* secondary switchable output of DCDC1 */
++	AXP_DESC_SW(AXP803, DC1SW, "dc1sw", NULL, AXP22X_PWR_OUT_CTRL2,
++		    BIT(7)),
++	AXP_DESC(AXP803, ALDO1, "aldo1", "aldoin", 700, 3300, 100,
++		 AXP22X_ALDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL3, BIT(5)),
++	AXP_DESC(AXP803, ALDO2, "aldo2", "aldoin", 700, 3300, 100,
++		 AXP22X_ALDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL3, BIT(6)),
++	AXP_DESC(AXP803, ALDO3, "aldo3", "aldoin", 700, 3300, 100,
++		 AXP22X_ALDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL3, BIT(7)),
++	AXP_DESC(AXP803, DLDO1, "dldo1", "dldoin", 700, 3300, 100,
++		 AXP22X_DLDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(3)),
++	AXP_DESC_RANGES(AXP803, DLDO2, "dldo2", "dldoin", axp803_dldo2_ranges,
++			32, AXP22X_DLDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2,
++			BIT(4)),
++	AXP_DESC(AXP803, DLDO3, "dldo3", "dldoin", 700, 3300, 100,
++		 AXP22X_DLDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(5)),
++	AXP_DESC(AXP803, DLDO4, "dldo4", "dldoin", 700, 3300, 100,
++		 AXP22X_DLDO4_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(6)),
++	AXP_DESC(AXP803, ELDO1, "eldo1", "eldoin", 700, 1900, 50,
++		 AXP22X_ELDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(0)),
++	AXP_DESC(AXP803, ELDO2, "eldo2", "eldoin", 700, 1900, 50,
++		 AXP22X_ELDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(1)),
++	AXP_DESC(AXP803, ELDO3, "eldo3", "eldoin", 700, 1900, 50,
++		 AXP22X_ELDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(2)),
++	AXP_DESC(AXP803, FLDO1, "fldo1", "fldoin", 700, 1450, 50,
++		 AXP803_FLDO1_V_OUT, 0x0f, AXP22X_PWR_OUT_CTRL3, BIT(2)),
++	AXP_DESC(AXP803, FLDO2, "fldo2", "fldoin", 700, 1450, 50,
++		 AXP803_FLDO2_V_OUT, 0x0f, AXP22X_PWR_OUT_CTRL3, BIT(3)),
++	AXP_DESC_IO(AXP803, LDO_IO0, "ldo-io0", "ips", 700, 3300, 100,
++		    AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
++		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
++	AXP_DESC_IO(AXP803, LDO_IO1, "ldo-io1", "ips", 700, 3300, 100,
++		    AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
++		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
++	AXP_DESC_FIXED(AXP803, RTC_LDO, "rtc-ldo", "ips", 3000),
++};
++
+ static const struct regulator_linear_range axp806_dcdca_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(600000, 0x0, 0x32, 10000),
+ 	REGULATOR_LINEAR_RANGE(1120000, 0x33, 0x47, 20000),
+@@ -254,11 +330,6 @@ static const struct regulator_linear_range axp806_dcdcd_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(1600000, 0x2e, 0x3f, 100000),
+ };
+ 
+-static const struct regulator_linear_range axp806_cldo2_ranges[] = {
+-	REGULATOR_LINEAR_RANGE(700000, 0x0, 0x1a, 100000),
+-	REGULATOR_LINEAR_RANGE(3400000, 0x1b, 0x1f, 200000),
+-};
+-
+ static const struct regulator_desc axp806_regulators[] = {
+ 	AXP_DESC_RANGES(AXP806, DCDCA, "dcdca", "vina", axp806_dcdca_ranges,
+ 			72, AXP806_DCDCA_V_CTRL, 0x7f, AXP806_PWR_OUT_CTRL1,
+@@ -289,7 +360,7 @@ static const struct regulator_desc axp806_regulators[] = {
+ 		 AXP806_BLDO4_V_CTRL, 0x0f, AXP806_PWR_OUT_CTRL2, BIT(3)),
+ 	AXP_DESC(AXP806, CLDO1, "cldo1", "cldoin", 700, 3300, 100,
+ 		 AXP806_CLDO1_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL2, BIT(4)),
+-	AXP_DESC_RANGES(AXP806, CLDO2, "cldo2", "cldoin", axp806_cldo2_ranges,
++	AXP_DESC_RANGES(AXP806, CLDO2, "cldo2", "cldoin", axp803_dldo2_ranges,
+ 			32, AXP806_CLDO2_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL2,
+ 			BIT(5)),
+ 	AXP_DESC(AXP806, CLDO3, "cldo3", "cldoin", 700, 3300, 100,
+@@ -326,7 +397,7 @@ static const struct regulator_desc axp809_regulators[] = {
+ 		 AXP22X_ALDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(7)),
+ 	AXP_DESC(AXP809, ALDO3, "aldo3", "aldoin", 700, 3300, 100,
+ 		 AXP22X_ALDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(5)),
+-	AXP_DESC_RANGES(AXP809, DLDO1, "dldo1", "dldoin", axp806_cldo2_ranges,
++	AXP_DESC_RANGES(AXP809, DLDO1, "dldo1", "dldoin", axp803_dldo2_ranges,
+ 			32, AXP22X_DLDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2,
+ 			BIT(3)),
+ 	AXP_DESC(AXP809, DLDO2, "dldo2", "dldoin", 700, 3300, 100,
+@@ -369,14 +440,21 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
+ 		def = 1500;
+ 		step = 75;
+ 		break;
+-	case AXP806_ID:
++	case AXP803_ID:
+ 		/*
+-		 * AXP806 DCDC work frequency setting has the same range and
++		 * AXP803 DCDC work frequency setting has the same range and
+ 		 * step as AXP22X, but at a different register.
+ 		 * Fall through to the check below.
+ 		 * (See include/linux/mfd/axp20x.h)
+ 		 */
+-		reg = AXP806_DCDC_FREQ_CTRL;
++		reg = AXP803_DCDC_FREQ_CTRL;
++	case AXP806_ID:
++		/*
++		 * AXP806 also have DCDC work frequency setting register at a
++		 * different position.
++		 */
++		if (axp20x->variant == AXP806_ID)
++			reg = AXP806_DCDC_FREQ_CTRL;
+ 	case AXP221_ID:
+ 	case AXP223_ID:
+ 	case AXP809_ID:
+@@ -475,6 +553,14 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
+ 		workmode <<= id - AXP22X_DCDC1;
+ 		break;
+ 
++	case AXP803_ID:
++		if (id < AXP803_DCDC1 || id > AXP803_DCDC6)
++			return -EINVAL;
++
++		mask = AXP22X_WORKMODE_DCDCX_MASK(id - AXP803_DCDC1);
++		workmode <<= id - AXP803_DCDC1;
++		break;
++
+ 	default:
+ 		/* should not happen */
+ 		WARN_ON(1);
+@@ -492,20 +578,38 @@ static bool axp20x_is_polyphase_slave(struct axp20x_dev *axp20x, int id)
+ {
+ 	u32 reg = 0;
+ 
+-	/* Only AXP806 has poly-phase outputs */
+-	if (axp20x->variant != AXP806_ID)
+-		return false;
++	/*
++	 * Currently in our supported AXP variants, only AXP803 and AXP806
++	 * have polyphase regulators.
++	 */
++	switch (axp20x->variant) {
++	case AXP803_ID:
++		regmap_read(axp20x->regmap, AXP803_POLYPHASE_CTRL, &reg);
++
++		switch (id) {
++		case AXP803_DCDC3:
++			return !!(reg & BIT(6));
++		case AXP803_DCDC6:
++			return !!(reg & BIT(7));
++		}
++		break;
+ 
+-	regmap_read(axp20x->regmap, AXP806_DCDC_MODE_CTRL2, &reg);
++	case AXP806_ID:
++		regmap_read(axp20x->regmap, AXP806_DCDC_MODE_CTRL2, &reg);
++
++		switch (id) {
++		case AXP806_DCDCB:
++			return (((reg & GENMASK(7, 6)) == BIT(6)) ||
++				((reg & GENMASK(7, 6)) == BIT(7)));
++		case AXP806_DCDCC:
++			return ((reg & GENMASK(7, 6)) == BIT(7));
++		case AXP806_DCDCE:
++			return !!(reg & BIT(5));
++		}
++		break;
+ 
+-	switch (id) {
+-	case AXP806_DCDCB:
+-		return (((reg & GENMASK(7, 6)) == BIT(6)) ||
+-			((reg & GENMASK(7, 6)) == BIT(7)));
+-	case AXP806_DCDCC:
+-		return ((reg & GENMASK(7, 6)) == BIT(7));
+-	case AXP806_DCDCE:
+-		return !!(reg & BIT(5));
++	default:
++		return false;
+ 	}
+ 
+ 	return false;
+@@ -540,6 +644,10 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 		drivevbus = of_property_read_bool(pdev->dev.parent->of_node,
+ 						  "x-powers,drive-vbus-en");
+ 		break;
++	case AXP803_ID:
++		regulators = axp803_regulators;
++		nregulators = AXP803_REG_ID_MAX;
++		break;
+ 	case AXP806_ID:
+ 		regulators = axp806_regulators;
+ 		nregulators = AXP806_REG_ID_MAX;
+@@ -579,6 +687,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 		 * name.
+ 		 */
+ 		if ((regulators == axp22x_regulators && i == AXP22X_DC1SW) ||
++		    (regulators == axp803_regulators && i == AXP803_DC1SW) ||
+ 		    (regulators == axp809_regulators && i == AXP809_DC1SW)) {
+ 			new_desc = devm_kzalloc(&pdev->dev, sizeof(*desc),
+ 						GFP_KERNEL);
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+index cde56cfe8446..965b027e31b3 100644
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -119,6 +119,17 @@ enum axp20x_variants {
+ #define AXP806_BUS_ADDR_EXT		0xfe
+ #define AXP806_REG_ADDR_EXT		0xff
+ 
++#define AXP803_POLYPHASE_CTRL		0x14
++#define AXP803_FLDO1_V_OUT		0x1c
++#define AXP803_FLDO2_V_OUT		0x1d
++#define AXP803_DCDC1_V_OUT		0x20
++#define AXP803_DCDC2_V_OUT		0x21
++#define AXP803_DCDC3_V_OUT		0x22
++#define AXP803_DCDC4_V_OUT		0x23
++#define AXP803_DCDC5_V_OUT		0x24
++#define AXP803_DCDC6_V_OUT		0x25
++#define AXP803_DCDC_FREQ_CTRL		0x3b
++
+ /* Interrupt */
+ #define AXP152_IRQ1_EN			0x40
+ #define AXP152_IRQ2_EN			0x41
+@@ -350,6 +361,32 @@ enum {
+ 	AXP809_REG_ID_MAX,
+ };
+ 
++enum {
++	AXP803_DCDC1 = 0,
++	AXP803_DCDC2,
++	AXP803_DCDC3,
++	AXP803_DCDC4,
++	AXP803_DCDC5,
++	AXP803_DCDC6,
++	AXP803_DC1SW,
++	AXP803_ALDO1,
++	AXP803_ALDO2,
++	AXP803_ALDO3,
++	AXP803_DLDO1,
++	AXP803_DLDO2,
++	AXP803_DLDO3,
++	AXP803_DLDO4,
++	AXP803_ELDO1,
++	AXP803_ELDO2,
++	AXP803_ELDO3,
++	AXP803_FLDO1,
++	AXP803_FLDO2,
++	AXP803_RTC_LDO,
++	AXP803_LDO_IO0,
++	AXP803_LDO_IO1,
++	AXP803_REG_ID_MAX,
++};
++
+ /* IRQs */
+ enum {
+ 	AXP152_IRQ_LDO0IN_CONNECT = 1,
+-- 
+2.11.0
