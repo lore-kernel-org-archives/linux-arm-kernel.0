@@ -1,65 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 19 May 2017 18:33:59 +0100
-Subject: [PATCH v4 2/3] ASoC: stm32: Add I2S driver
-In-Reply-To: <1495120793-11687-3-git-send-email-olivier.moysan@st.com>
-References: <1495120793-11687-1-git-send-email-olivier.moysan@st.com>
- <1495120793-11687-3-git-send-email-olivier.moysan@st.com>
-Message-ID: <20170519173359.277lyg6fzwksqnin@sirena.org.uk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 May 2017 18:35:03 +0100
+Subject: [PATCH] arm: boot/compressed: fix decompressor header layout for
+ v7-M
+In-Reply-To: <20170519172934.GI3559@e103592.cambridge.arm.com>
+References: <20170519145959.26569-1-ard.biesheuvel@linaro.org>
+ <20170519164603.GH3559@e103592.cambridge.arm.com>
+ <CAKv+Gu-yAT+kZ_oMT_+n6_RSOKOoqkZtGYjBKq=Wwhj31BgUgQ@mail.gmail.com>
+ <20170519172934.GI3559@e103592.cambridge.arm.com>
+Message-ID: <20170519173503.GX22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 05:19:52PM +0200, olivier moysan wrote:
+On Fri, May 19, 2017 at 06:29:34PM +0100, Dave Martin wrote:
+> On Fri, May 19, 2017 at 05:59:47PM +0100, Ard Biesheuvel wrote:
+> > On 19 May 2017 at 17:46, Dave Martin <Dave.Martin@arm.com> wrote:
+> 
+> [...]
+> 
+> > > Spelling it out might be more readable:
+> > >
+> > >    ARM(                 mov     r0, r0          )
+> > >    ARM(                 mov     r0, r0          )
+> > >
+> > >  THUMB( AR_CLASS(       sub     pc, pc, #3      ))
+> > >  THUMB( M_CLASS(        nop.w                   ))
+> > >  THUMB(                 .thumb                  )
+> > >  THUMB(                 b.w     1f              )
+> > >
+> > > But I guess it works either way.
+> > >
+> > 
+> > Indeed. Apart from the error in the second line, this sequence should
+> > be equivalent, but the nested macro invocations don't make it clearer
+> > imo.
+> 
+> Err, yes.  Actually I means to write
+> 
+> 	b	1f
+> 	mov	r0, r0
+> 
+> (since executing that nop before branching is presumably pointless).
 
-This looks good so I'm going to apply it, a few things below though -
-can you please send a followup patch for the issue with the Kconfig
-symbol?
+That "nop" is part of the 8 nops at the start of the image, since the
+entry point (due to historical reasons) is at 0x20 into the image.
 
-> --- a/sound/soc/stm/Kconfig
-> +++ b/sound/soc/stm/Kconfig
-> @@ -5,4 +5,4 @@ menuconfig SND_SOC_STM32
->  	select SND_SOC_GENERIC_DMAENGINE_PCM
->  	select REGMAP_MMIO
->  	help
-> -	  Say Y if you want to enable ASoC-support for STM32
-> +	  Say Y if you want to enable ASoC support for STM32
-
-This appears to be an unrelated typo fix.
-
-> diff --git a/sound/soc/stm/Makefile b/sound/soc/stm/Makefile
-> index e466a47..8251931 100644
-> --- a/sound/soc/stm/Makefile
-> +++ b/sound/soc/stm/Makefile
-> @@ -4,3 +4,7 @@ obj-$(CONFIG_SND_SOC_STM32) += snd-soc-stm32-sai-sub.o
->  
->  snd-soc-stm32-sai-objs := stm32_sai.o
->  obj-$(CONFIG_SND_SOC_STM32) += snd-soc-stm32-sai.o
-> +
-> +# I2S
-> +snd-soc-stm32-i2s-objs := stm32_i2s.o
-> +obj-$(CONFIG_SND_SOC_STM32) += snd-soc-stm32-i2s.o
-
-Perhaps make this a separate option?  It probably makes sense to rename
-the option for the SAI at the same time.
-
-> +
-> +	ret = clk_prepare_enable(i2s->pclk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Enable pclk failed: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_prepare_enable(i2s->i2sclk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Enable i2sclk failed: %d\n", ret);
-> +		goto err_pclk_disable;
-> +	}
-
-It'd be nice to have runtime PM to disable these when the device is idle
-but that's not essential.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170519/66ffa55c/attachment.sig>
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
