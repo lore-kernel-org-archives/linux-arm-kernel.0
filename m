@@ -1,24 +1,27 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 18 May 2017 20:27:13 -0500
-Subject: [PATCH v2 01/18] dt-bindings: arm: amlogic: Reorder boards
-In-Reply-To: <20170513143337.14278-2-afaerber@suse.de>
-References: <20170513143337.14278-1-afaerber@suse.de>
- <20170513143337.14278-2-afaerber@suse.de>
-Message-ID: <20170519012713.ntuwon6wmkro6rho@rob-hp-laptop>
+Date: Thu, 18 May 2017 20:25:17 -0500
+Subject: [PATCH 1/2] dt-bindings: timer: add nxp tpm timer binding doc
+In-Reply-To: <1494660575-30465-1-git-send-email-aisheng.dong@nxp.com>
+References: <1494660575-30465-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170519012517.5ca273uie5wqe4vd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 13, 2017 at 04:33:20PM +0200, Andreas F?rber wrote:
-> Enforce groupment by SoCs, and order alphabetically within the group
-> (with some exceptions). This should facilitate adding new boards.
+On Sat, May 13, 2017 at 03:29:34PM +0800, Dong Aisheng wrote:
+> Adding NXP Low Power Timer/Pulse Width Modulation Module (TPM)
+> binding doc.
 > 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Bai Ping <ping.bai@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > ---
->  v1 -> v2:
->  * Rebased (new boards added)
->  * Pointed out alphabetical order in the binding, too (Rob)
->  
->  Documentation/devicetree/bindings/arm/amlogic.txt | 20 +++++++++++++-------
->  1 file changed, 13 insertions(+), 7 deletions(-)
+>  .../devicetree/bindings/timer/nxp,tpm-timer.txt    | 28 ++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/timer/nxp,tpm-timer.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
