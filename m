@@ -1,34 +1,31 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Fri, 19 May 2017 16:26:04 +0530
-Subject: [PATCH v1] PM / devfreq: exynos-ppmu : Handle return value of
- clk_prepare_enable
-Message-ID: <1495191364-16015-1-git-send-email-arvind.yadav.cs@gmail.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Fri, 19 May 2017 19:09:44 +0800
+Subject: [PATCH 0/2] Add basic support for Mediatek MT2712 SoC
+Message-ID: <1495192186-22480-1-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_prepare_enable() can fail here and we must check its return value.
+MT2712 is a SoC based on 64bit ARMv8 architecture.
+MT2712 share many HW IP with MT8173.  This patchset was tested
+on MT2712 evaluation board, and boot to shell ok.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/devfreq/event/exynos-ppmu.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+This series contains document bindings, device tree including
+interrupt, uart.
 
-diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
-index 9b73509..8f6537a 100644
---- a/drivers/devfreq/event/exynos-ppmu.c
-+++ b/drivers/devfreq/event/exynos-ppmu.c
-@@ -648,7 +648,11 @@ static int exynos_ppmu_probe(struct platform_device *pdev)
- 			dev_name(&pdev->dev), desc[i].name);
- 	}
- 
--	clk_prepare_enable(info->ppmu.clk);
-+	ret = clk_prepare_enable(info->ppmu.clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to prepare ppmu clock\n");
-+		return ret;
-+	}
- 
- 	return 0;
- }
+YT Shen (2):
+  Document: DT: Add bindings for Mediatek MT2712 SoC Platform
+  arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and
+    Makefile
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+ .../interrupt-controller/mediatek,sysirq.txt       |   1 +
+ .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
+ arch/arm64/boot/dts/mediatek/Makefile              |   1 +
+ arch/arm64/boot/dts/mediatek/mt2712-evb.dts        |  44 ++++++
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 172 +++++++++++++++++++++
+ 6 files changed, 223 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+
 -- 
 1.9.1
