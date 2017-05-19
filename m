@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 19 May 2017 18:37:17 +0100
-Subject: Applied "ASoC: stm32: Add full duplex support to i2s" to the asoc tree
-In-Reply-To: <1494495904-18898-4-git-send-email-olivier.moysan@st.com>
-Message-ID: <E1dBlq1-00054J-37@debutante>
+Date: Fri, 19 May 2017 18:37:36 +0100
+Subject: Applied "ASoC: stm32: Document STM32 I2S bindings" to the asoc tree
+In-Reply-To: <1495120793-11687-2-git-send-email-olivier.moysan@st.com>
+Message-ID: <E1dBlqK-00057c-5h@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: stm32: Add full duplex support to i2s
+   ASoC: stm32: Document STM32 I2S bindings
 
 has been applied to the asoc tree at
 
@@ -33,184 +33,87 @@ to this mail.
 Thanks,
 Mark
 
->From e7cc49b8adf25e7bae6acaeb37036ef8726b902c Mon Sep 17 00:00:00 2001
+>From da23173d5c6558b7435e71a4ad947390a9012c6c Mon Sep 17 00:00:00 2001
 From: olivier moysan <olivier.moysan@st.com>
-Date: Thu, 18 May 2017 17:19:53 +0200
-Subject: [PATCH] ASoC: stm32: Add full duplex support to i2s
+Date: Thu, 18 May 2017 17:19:51 +0200
+Subject: [PATCH] ASoC: stm32: Document STM32 I2S bindings
 
-This patch allows to use i2s interface either as single
-audio path (rx or tx), or bidirectional audio path.
-This patch is added separately, as the driver does not
-follow recommended use of the interface, to support this
-configuration.
+Add documentation of device tree bindings for STM32 SPI/I2S.
 
 Signed-off-by: olivier moysan <olivier.moysan@st.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/stm/stm32_i2s.c | 87 +++++++++++++++++++++++++----------------------
- 1 file changed, 46 insertions(+), 41 deletions(-)
+ .../devicetree/bindings/sound/st,stm32-i2s.txt     | 62 ++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
 
-diff --git a/sound/soc/stm/stm32_i2s.c b/sound/soc/stm/stm32_i2s.c
-index 22152a1ca733..8052629a89df 100644
---- a/sound/soc/stm/stm32_i2s.c
-+++ b/sound/soc/stm/stm32_i2s.c
-@@ -489,7 +489,6 @@ static int stm32_i2s_configure(struct snd_soc_dai *cpu_dai,
- 	struct stm32_i2s_data *i2s = snd_soc_dai_get_drvdata(cpu_dai);
- 	int format = params_width(params);
- 	u32 cfgr, cfgr_mask, cfg1, cfg1_mask;
--	bool playback_flg = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
- 	unsigned int fthlv;
- 	int ret;
- 
-@@ -515,19 +514,13 @@ static int stm32_i2s_configure(struct snd_soc_dai *cpu_dai,
- 	}
- 
- 	if (STM32_I2S_IS_SLAVE(i2s)) {
--		if (playback_flg)
--			cfgr |= I2S_CGFR_I2SCFG_SET(I2S_I2SMOD_TX_SLAVE);
--		else
--			cfgr |= I2S_CGFR_I2SCFG_SET(I2S_I2SMOD_RX_SLAVE);
-+		cfgr |= I2S_CGFR_I2SCFG_SET(I2S_I2SMOD_FD_SLAVE);
- 
- 		/* As data length is either 16 or 32 bits, fixch always set */
- 		cfgr |= I2S_CGFR_FIXCH;
- 		cfgr_mask |= I2S_CGFR_FIXCH;
- 	} else {
--		if (playback_flg)
--			cfgr |= I2S_CGFR_I2SCFG_SET(I2S_I2SMOD_TX_MASTER);
--		else
--			cfgr |= I2S_CGFR_I2SCFG_SET(I2S_I2SMOD_RX_MASTER);
-+		cfgr |= I2S_CGFR_I2SCFG_SET(I2S_I2SMOD_FD_MASTER);
- 	}
- 	cfgr_mask |= I2S_CGFR_I2SCFG_MASK;
- 
-@@ -536,9 +529,7 @@ static int stm32_i2s_configure(struct snd_soc_dai *cpu_dai,
- 	if (ret < 0)
- 		return ret;
- 
--	cfg1 = I2S_CFG1_RXDMAEN;
--	if (playback_flg)
--		cfg1 = I2S_CFG1_TXDMAEN;
-+	cfg1 = I2S_CFG1_RXDMAEN | I2S_CFG1_TXDMAEN;
- 	cfg1_mask = cfg1;
- 
- 	fthlv = STM32_I2S_FIFO_SIZE * I2S_FIFO_TH_ONE_QUARTER / 4;
-@@ -553,32 +544,15 @@ static int stm32_i2s_startup(struct snd_pcm_substream *substream,
- 			     struct snd_soc_dai *cpu_dai)
- {
- 	struct stm32_i2s_data *i2s = snd_soc_dai_get_drvdata(cpu_dai);
--	int ret, ier;
- 
- 	i2s->substream = substream;
- 
- 	spin_lock(&i2s->lock_fd);
--	if (i2s->refcount) {
--		dev_err(cpu_dai->dev, "%s stream already started\n",
--			(substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
--			"Capture" : "Playback"));
--		spin_unlock(&i2s->lock_fd);
--		return -EBUSY;
--	}
--	i2s->refcount = 1;
-+	i2s->refcount++;
- 	spin_unlock(&i2s->lock_fd);
- 
--	ret = regmap_update_bits(i2s->regmap, STM32_I2S_IFCR_REG,
--				 I2S_IFCR_MASK, I2S_IFCR_MASK);
--	if (ret < 0)
--		return ret;
--
--	/* Enable ITs */
--	ier = I2S_IER_OVRIE | I2S_IER_UDRIE;
--	if (STM32_I2S_IS_SLAVE(i2s))
--		ier |= I2S_IER_TIFREIE;
--
--	return regmap_update_bits(i2s->regmap, STM32_I2S_IER_REG, ier, ier);
-+	return regmap_update_bits(i2s->regmap, STM32_I2S_IFCR_REG,
-+				  I2S_IFCR_MASK, I2S_IFCR_MASK);
- }
- 
- static int stm32_i2s_hw_params(struct snd_pcm_substream *substream,
-@@ -605,7 +579,7 @@ static int stm32_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
- {
- 	struct stm32_i2s_data *i2s = snd_soc_dai_get_drvdata(cpu_dai);
- 	bool playback_flg = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
--	u32 cfg1_mask;
-+	u32 cfg1_mask, ier;
- 	int ret;
- 
- 	switch (cmd) {
-@@ -628,10 +602,48 @@ static int stm32_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
- 			dev_err(cpu_dai->dev, "Error %d starting I2S\n", ret);
- 			return ret;
- 		}
+diff --git a/Documentation/devicetree/bindings/sound/st,stm32-i2s.txt b/Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
+new file mode 100644
+index 000000000000..4bda52042402
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
+@@ -0,0 +1,62 @@
++STMicroelectronics STM32 SPI/I2S Controller
 +
-+		regmap_update_bits(i2s->regmap, STM32_I2S_IFCR_REG,
-+				   I2S_IFCR_MASK, I2S_IFCR_MASK);
++The SPI/I2S block supports I2S/PCM protocols when configured on I2S mode.
++Only some SPI instances support I2S.
 +
-+		if (playback_flg) {
-+			ier = I2S_IER_UDRIE;
-+		} else {
-+			ier = I2S_IER_OVRIE;
++Required properties:
++  - compatible: Must be "st,stm32h7-i2s"
++  - reg: Offset and length of the device's register set.
++  - interrupts: Must contain the interrupt line id.
++  - clocks: Must contain phandle and clock specifier pairs for each entry
++	in clock-names.
++  - clock-names: Must contain "i2sclk", "pclk", "x8k" and "x11k".
++	"i2sclk": clock which feeds the internal clock generator
++	"pclk": clock which feeds the peripheral bus interface
++	"x8k": I2S parent clock for sampling rates multiple of 8kHz.
++	"x11k": I2S parent clock for sampling rates multiple of 11.025kHz.
++  - dmas: DMA specifiers for tx and rx dma.
++    See Documentation/devicetree/bindings/dma/stm32-dma.txt.
++  - dma-names: Identifier for each DMA request line. Must be "tx" and "rx".
++  - pinctrl-names: should contain only value "default"
++  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
 +
-+			spin_lock(&i2s->lock_fd);
-+			if (i2s->refcount == 1)
-+				/* dummy write to trigger capture */
-+				regmap_write(i2s->regmap,
-+					     STM32_I2S_TXDR_REG, 0);
-+			spin_unlock(&i2s->lock_fd);
-+		}
++Optional properties:
++  - resets: Reference to a reset controller asserting the reset controller
 +
-+		if (STM32_I2S_IS_SLAVE(i2s))
-+			ier |= I2S_IER_TIFREIE;
++The device node should contain one 'port' child node with one child 'endpoint'
++node, according to the bindings defined in Documentation/devicetree/bindings/
++graph.txt.
 +
-+		regmap_update_bits(i2s->regmap, STM32_I2S_IER_REG, ier, ier);
- 		break;
- 	case SNDRV_PCM_TRIGGER_STOP:
- 	case SNDRV_PCM_TRIGGER_SUSPEND:
- 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-+		if (playback_flg)
-+			regmap_update_bits(i2s->regmap, STM32_I2S_IER_REG,
-+					   I2S_IER_UDRIE,
-+					   (unsigned int)~I2S_IER_UDRIE);
-+		else
-+			regmap_update_bits(i2s->regmap, STM32_I2S_IER_REG,
-+					   I2S_IER_OVRIE,
-+					   (unsigned int)~I2S_IER_OVRIE);
++Example:
++sound_card {
++	compatible = "audio-graph-card";
++	dais = <&i2s2_port>;
++};
 +
-+		spin_lock(&i2s->lock_fd);
-+		i2s->refcount--;
-+		if (i2s->refcount) {
-+			spin_unlock(&i2s->lock_fd);
-+			break;
-+		}
-+		spin_unlock(&i2s->lock_fd);
++i2s2: audio-controller at 40003800 {
++	compatible = "st,stm32h7-i2s";
++	reg = <0x40003800 0x400>;
++	interrupts = <36>;
++	clocks = <&rcc PCLK1>, <&rcc SPI2_CK>, <&rcc PLL1_Q>, <&rcc PLL2_P>;
++	clock-names = "pclk", "i2sclk",  "x8k", "x11k";
++	dmas = <&dmamux2 2 39 0x400 0x1>,
++           <&dmamux2 3 40 0x400 0x1>;
++	dma-names = "rx", "tx";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2s2>;
 +
- 		dev_dbg(cpu_dai->dev, "stop I2S\n");
- 
- 		ret = regmap_update_bits(i2s->regmap, STM32_I2S_CR1_REG,
-@@ -641,10 +653,7 @@ static int stm32_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
- 			return ret;
- 		}
- 
--		cfg1_mask = I2S_CFG1_RXDMAEN;
--		if (playback_flg)
--			cfg1_mask = I2S_CFG1_TXDMAEN;
--
-+		cfg1_mask = I2S_CFG1_RXDMAEN | I2S_CFG1_TXDMAEN;
- 		regmap_update_bits(i2s->regmap, STM32_I2S_CFG1_REG,
- 				   cfg1_mask, 0);
- 		break;
-@@ -662,10 +671,6 @@ static void stm32_i2s_shutdown(struct snd_pcm_substream *substream,
- 
- 	i2s->substream = NULL;
- 
--	spin_lock(&i2s->lock_fd);
--	i2s->refcount = 0;
--	spin_unlock(&i2s->lock_fd);
--
- 	regmap_update_bits(i2s->regmap, STM32_I2S_CGFR_REG,
- 			   I2S_CGFR_MCKOE, (unsigned int)~I2S_CGFR_MCKOE);
- }
++	i2s2_port: port at 0 {
++		cpu_endpoint: endpoint {
++			remote-endpoint = <&codec_endpoint>;
++			format = "i2s";
++		};
++	};
++};
++
++audio-codec {
++	codec_port: port at 0 {
++		codec_endpoint: endpoint {
++			remote-endpoint = <&cpu_endpoint>;
++		};
++	};
++};
 -- 
 2.11.0
