@@ -1,80 +1,31 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 19 May 2017 15:04:38 -0500
-Subject: [PATCH v2 5/5] ARM: OMAP2+: Create dummy platform_device for pm33xx
-In-Reply-To: <20170519200438.9502-1-d-gerlach@ti.com>
-References: <20170519200438.9502-1-d-gerlach@ti.com>
-Message-ID: <20170519200438.9502-6-d-gerlach@ti.com>
+From: srishtishar@gmail.com (srishti sharma)
+Date: Sat, 20 May 2017 02:00:24 +0530
+Subject: [PATCH] Staging: bcm2835-audio: bcm2835_ctl.c: Fixed a comment coding
+ style issue.
+Message-ID: <1495225824-4422-1-git-send-email-srishtishar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add amx3_common_pm_init to create a dummy platform_device for
-pm33xx so that our pm33xx module can probe and am335x and am437x
-platforms to enable basic suspend to mem and standby support.
+fixed a trailing */ issue .
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Signed-off-by: srishti sharma <srishtishar@gmail.com>
 ---
- arch/arm/mach-omap2/common.h      |  7 +++++++
- arch/arm/mach-omap2/io.c          |  2 ++
- arch/arm/mach-omap2/pm33xx-core.c | 12 ++++++++++++
- 3 files changed, 21 insertions(+)
+ drivers/staging/bcm2835-audio/bcm2835-ctl.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 3089d3bfa19b..cd7724d040f8 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -77,6 +77,13 @@ static inline int omap4_pm_init_early(void)
- }
- #endif
- 
-+#if defined(CONFIG_PM) && (defined(CONFIG_SOC_AM33XX) || \
-+	defined(CONFIG_SOC_AM43XX))
-+void amx3_common_pm_init(void);
-+#else
-+static inline void amx3_common_pm_init(void) { }
-+#endif
-+
- extern void omap2_init_common_infrastructure(void);
- 
- extern void omap_init_time(void);
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 5aafb8449c40..1bbbf19c93ea 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -652,6 +652,7 @@ void __init am33xx_init_early(void)
- void __init am33xx_init_late(void)
+diff --git a/drivers/staging/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
+index a4ffa1b..38fabab 100644
+--- a/drivers/staging/bcm2835-audio/bcm2835-ctl.c
++++ b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
+@@ -247,8 +247,8 @@ static int snd_bcm2835_spdif_mask_get(struct snd_kcontrol *kcontrol,
+ 	struct snd_ctl_elem_value *ucontrol)
  {
- 	omap_common_late_init();
-+	amx3_common_pm_init();
+ 	/* bcm2835 supports only consumer mode and sets all other format flags
+-	 * automatically. So the only thing left is signalling non-audio
+-	 * content */
++	 * automatically. So the only thing left is signalling non-audio content
++	 */
+ 	ucontrol->value.iec958.status[0] = IEC958_AES0_NONAUDIO;
+ 	return 0;
  }
- #endif
- 
-@@ -676,6 +677,7 @@ void __init am43xx_init_late(void)
- {
- 	omap_common_late_init();
- 	omap2_clk_enable_autoidle_all();
-+	amx3_common_pm_init();
- }
- #endif
- 
-diff --git a/arch/arm/mach-omap2/pm33xx-core.c b/arch/arm/mach-omap2/pm33xx-core.c
-index c84ffc4de2e9..b5d90841c27a 100644
---- a/arch/arm/mach-omap2/pm33xx-core.c
-+++ b/arch/arm/mach-omap2/pm33xx-core.c
-@@ -179,3 +179,15 @@ struct am33xx_pm_platform_data *am33xx_pm_get_pdata(void)
- 	else
- 		return NULL;
- }
-+
-+void __init amx3_common_pm_init(void)
-+{
-+	struct platform_device_info devinfo = { };
-+	struct am33xx_pm_platform_data *pdata;
-+
-+	pdata = am33xx_pm_get_pdata();
-+	devinfo.name = "pm33xx";
-+	devinfo.data = pdata;
-+	devinfo.size_data = sizeof(*pdata);
-+	platform_device_register_full(&devinfo);
-+}
--- 
-2.13.0
+2.7.4
