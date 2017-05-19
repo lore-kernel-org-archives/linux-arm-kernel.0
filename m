@@ -1,76 +1,85 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 19 May 2017 15:18:36 +0100
-Subject: [RFC PATCH] arm64: neon: Remove support for nested or hardirq
- kernel-mode NEON
-In-Reply-To: <20170519140947.GG3559@e103592.cambridge.arm.com>
-References: <1495193199-1291-1-git-send-email-Dave.Martin@arm.com>
- <CAKv+Gu8KKuD6Rgbq++kzJayHN8X-Kb7vrS-aj=N_kymqSnfVdQ@mail.gmail.com>
- <20170519134650.GE3559@e103592.cambridge.arm.com>
- <CAKv+Gu-o5wofQwpC6Wp87GNniN2eTYmni_JGKNpPFFCWK48zWA@mail.gmail.com>
- <20170519140947.GG3559@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu9LHPWW6es8z3CbCWg+imnhjbcWeYbp7VuHG3EsFAPBZA@mail.gmail.com>
+Date: Fri, 19 May 2017 15:59:59 +0100
+Subject: [PATCH] arm: boot/compressed: fix decompressor header layout for v7-M
+Message-ID: <20170519145959.26569-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2017 at 15:09, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Fri, May 19, 2017 at 02:56:20PM +0100, Ard Biesheuvel wrote:
->> On 19 May 2017 at 14:46, Dave Martin <Dave.Martin@arm.com> wrote:
->
-> [...]
->
->> > OK -- when do you expect your kernel-mode-neon series (or relevant bits
->> > of it) to be merged?  With that in place, I can carry this patch in
->> > the SVE series, or propose it to be merged separately.
->> >
->>
->> There is no reason for any of this to go through the crypto tree or
->> mailing list. So for now, let's go with kernel_neon_allowed(), and I
->
-> Arg, I just changed it back...
->
+As reported by Patrice, the header layout of the decompressor is
+incorrect when building for v7-M. In this case, the __nop macro
+resolves to 'mov r0, r0', which is emitted as a narrow encoding,
+resulting in the header data fields to end up at lower offsets than
+required.
 
-Sorry :-)
+Given the variety of targets we need to support with the same code,
+the startup sequence is a bit of a jumble, and uses instructions
+and macros whose encoding width cannot be specified (badr), or only
+exists in a narrow encoding (bx)
 
-The only reason I suggested that was to make your life easier given
-that we can always #define one to mean the other or vice versa. We can
-go with either, but I'd like to remove the distinction asap.
+So force the use of a wide encoding in __nop, and replace the start
+sequence with a simple jump to the label marking the start of code,
+preceded by a Thumb2 mode switch if required (using explicit wide
+encodings where appropriate). The label itself can be moved to the
+start of code [where it belongs] due to the larger range of branch
+instructions as compared to adr instructions.
 
-> What are the intended meanings of
->
->         !kernel_neon_allowed() && !may_use_simd()
->         !kernel_neon_allowed() && may_use_simd()
->         kernel_neon_allowed() && !may_use_simd()
->         kernel_neon_allowed() && may_use_simd()
->
-> ?
->
-> I'm still a little confused here...
->
+Reported-by: Patrice CHOTARD <patrice.chotard@st.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/boot/compressed/efi-header.S |  4 +---
+ arch/arm/boot/compressed/head.S       | 14 +++++++-------
+ 2 files changed, 8 insertions(+), 10 deletions(-)
 
-Ultimately, I think they should be the same. The partial state
-save/restore is potentially much more costly (e.g., when using the v8
-AES cipher that operates on 16 bytes at a time), and so a client of
-the async API should never see a performance hit caused by the fact
-that we are doing work in softirq context simply because we can and
-not because it is a good idea. But with nesting removed, doing the
-work in softirq context may still be strictly unnecessary, but at
-least it doesn't do more work.
-
-
->> can respin my patches against that and ask Catalin or Will to queue it
->> for v4.13. I will be travelling next week, though, so no ETA yet.
->
-> OK.  It they get queued for v4.13 that's fine for me.
->
->> > I'd also expect CONFIG_KERNEL_NEON_MODE_NEON_FALLBACK and
->> > kernel_neon_need_fallback() to be folded in (=y and true respectively),
->> > since removal of nesting support will mean that fallback code is always
->> > needed for clients that may run elsewhere than in task context.
->>
->> Yes. So we no longer have to reason about whether a fallback should be
->> provided, which is an improvement imo.
->
-> Agreed, it seems simpler this way.
->
-> Cheers
-> ---Dave
+diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+index 9d5dc4fda3c1..3f7d1b74c5e0 100644
+--- a/arch/arm/boot/compressed/efi-header.S
++++ b/arch/arm/boot/compressed/efi-header.S
+@@ -17,14 +17,12 @@
+ 		@ there.
+ 		.inst	'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
+ #else
+-		mov	r0, r0
++		W(mov)	r0, r0
+ #endif
+ 		.endm
+ 
+ 		.macro	__EFI_HEADER
+ #ifdef CONFIG_EFI_STUB
+-		b	__efi_start
+-
+ 		.set	start_offset, __efi_start - start
+ 		.org	start + 0x3c
+ 		@
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 7c711ba61417..8c336a6da210 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -130,19 +130,19 @@ start:
+ 		.rept	7
+ 		__nop
+ 		.endr
+-   ARM(		mov	r0, r0		)
+-   ARM(		b	1f		)
+- THUMB(		badr	r12, 1f		)
+- THUMB(		bx	r12		)
++      ARM(	b	1f		)
++ AR_CLASS(	sub	pc, pc, #3	)	@ A/R: switch to Thumb2 mode
++  M_CLASS(	nop.w			)	@ M: already in Thumb2 mode
++    THUMB(	.thumb			)
++    THUMB(	b.w	1f		)
+ 
+ 		.word	_magic_sig	@ Magic numbers to help the loader
+ 		.word	_magic_start	@ absolute load/run zImage address
+ 		.word	_magic_end	@ zImage end address
+ 		.word	0x04030201	@ endianness flag
+ 
+- THUMB(		.thumb			)
+-1:		__EFI_HEADER
+-
++		__EFI_HEADER
++1:
+  ARM_BE8(	setend	be		)	@ go BE8 if compiled for BE8
+  AR_CLASS(	mrs	r9, cpsr	)
+ #ifdef CONFIG_ARM_VIRT_EXT
+-- 
+2.9.3
