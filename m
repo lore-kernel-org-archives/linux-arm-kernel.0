@@ -1,58 +1,163 @@
-From: xuejiancheng@hisilicon.com (Jiancheng Xue)
-Date: Fri, 19 May 2017 19:29:37 +0800
-Subject: [PATCH] arm64: defconfig: enable several drivers for HiSilicon
- Hi3798CV200 SoC
-Message-ID: <1495193377-22143-1-git-send-email-xuejiancheng@hisilicon.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Fri, 19 May 2017 19:50:48 +0800
+Subject: [PATCH V2 6/6] tty: serial: lpuart: add a more accurate baud
+ rate calculation method
+In-Reply-To: <90fa8850f9424712074217dff03b229e@agner.ch>
+References: <1494834539-17523-1-git-send-email-aisheng.dong@nxp.com>
+ <1494834539-17523-7-git-send-email-aisheng.dong@nxp.com>
+ <73a70b856adf28b34c793f03c4db43a9@agner.ch>
+ <20170517034729.GD9913@b29396-OptiPlex-7040>
+ <90fa8850f9424712074217dff03b229e@agner.ch>
+Message-ID: <20170519115047.GA23227@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the following drivers for HiSilicon Hi3798CV200 SoC:
-ethernet, i2c and ir.
+On Wed, May 17, 2017 at 10:35:43AM -0700, Stefan Agner wrote:
+> On 2017-05-16 20:47, Dong Aisheng wrote:
+> > On Mon, May 15, 2017 at 10:06:41AM -0700, Stefan Agner wrote:
+> >> On 2017-05-15 00:48, Dong Aisheng wrote:
+> >> > On new LPUART versions, the oversampling ratio for the receiver can be
+> >> > changed from 4x (00011) to 32x (11111) which could help us get a more
+> >> > accurate baud rate divider.
+> >> >
+> >> > The idea is to use the best OSR (over-sampling rate) possible.
+> >> > Note, OSR is typically hard-set to 16 in other LPUART instantiations.
+> >> > Loop to find the best OSR value possible, one that generates minimum
+> >> > baud diff iterate through the rest of the supported values of OSR.
+> >> >
+> >> > Currently only i.MX7ULP is using it.
+> >> >
+> >> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >> > Cc: Jiri Slaby <jslaby@suse.com>
+> >> > Cc: Stefan Agner <stefan@agner.ch>
+> >> > Cc: Mingkai Hu <Mingkai.Hu@nxp.com>
+> >> > Cc: Yangbo Lu <yangbo.lu@nxp.com>
+> >> > Acked-by: Fugang Duan <fugang.duan@nxp.com>
+> >> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> >> > ---
+> >> >  drivers/tty/serial/fsl_lpuart.c | 85 ++++++++++++++++++++++++++++++++++++++---
+> >> >  1 file changed, 79 insertions(+), 6 deletions(-)
+> >> >
+> >> > diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+> >> > index 107d0911..bda4b0c 100644
+> >> > --- a/drivers/tty/serial/fsl_lpuart.c
+> >> > +++ b/drivers/tty/serial/fsl_lpuart.c
+> >> > @@ -140,6 +140,8 @@
+> >> >  #define UARTBAUD_SBNS		0x00002000
+> >> >  #define UARTBAUD_SBR		0x00000000
+> >> >  #define UARTBAUD_SBR_MASK	0x1fff
+> >> > +#define UARTBAUD_OSR_MASK       0x1f
+> >> > +#define UARTBAUD_OSR_SHIFT      24
+> >> >
+> >> >  #define UARTSTAT_LBKDIF		0x80000000
+> >> >  #define UARTSTAT_RXEDGIF	0x40000000
+> >> > @@ -1506,6 +1508,72 @@ lpuart_set_termios(struct uart_port *port,
+> >> > struct ktermios *termios,
+> >> >  }
+> >> >
+> >> >  static void
+> >> > +lpuart32_serial_setbrg(struct lpuart_port *sport, unsigned int baudrate)
+> >> > +{
+> >> > +	u32 sbr, osr, baud_diff, tmp_osr, tmp_sbr, tmp_diff, tmp;
+> >> > +	u32 clk = sport->port.uartclk;
+> >> > +
+> >> > +	/*
+> >> > +	 * The idea is to use the best OSR (over-sampling rate) possible.
+> >> > +	 * Note, OSR is typically hard-set to 16 in other LPUART instantiations.
+> >> > +	 * Loop to find the best OSR value possible, one that generates minimum
+> >> > +	 * baud_diff iterate through the rest of the supported values of OSR.
+> >> > +	 *
+> >> > +	 * Calculation Formula:
+> >> > +	 *  Baud Rate = baud clock / ((OSR+1) ? SBR)
+> >> > +	 */
+> >> > +	baud_diff = baudrate;
+> >> > +	osr = 0;
+> >> > +	sbr = 0;
+> >> > +
+> >> > +	for (tmp_osr = 4; tmp_osr <= 32; tmp_osr++) {
+> >> > +		/* calculate the temporary sbr value  */
+> >> > +		tmp_sbr = (clk / (baudrate * tmp_osr));
+> >> > +		if (tmp_sbr == 0)
+> >> > +			tmp_sbr = 1;
+> >> > +
+> >> > +		/*
+> >> > +		 * calculate the baud rate difference based on the temporary
+> >> > +		 * osr and sbr values
+> >> > +		 */
+> >> > +		tmp_diff = clk / (tmp_osr * tmp_sbr) - baudrate;
+> >> > +
+> >> > +		/* select best values between sbr and sbr+1 */
+> >> > +		tmp = clk / (tmp_osr * (tmp_sbr + 1));
+> >> > +		if (tmp_diff > (baudrate - tmp)) {
+> >> > +			tmp_diff = baudrate - tmp;
+> >> > +			tmp_sbr++;
+> >> > +		}
+> >> > +
+> >> > +		if (tmp_diff <= baud_diff) {
+> >> > +			baud_diff = tmp_diff;
+> >> > +			osr = tmp_osr;
+> >> > +			sbr = tmp_sbr;
+> >> > +		}
+> >> > +	}
+> >> > +
+> >> > +	/* handle buadrate outside acceptable rate */
+> >> > +	if (baud_diff > ((baudrate / 100) * 3))
+> >> > +		dev_warn(sport->port.dev,
+> >> > +			 "unacceptable baud rate difference of more than 3%%\n");
+> >> > +
+> >> > +	tmp = lpuart32_read(sport->port.membase + UARTBAUD);
+> >> > +
+> >> > +	if ((osr > 3) && (osr < 8))
+> >> > +		tmp |= UARTBAUD_BOTHEDGE;
+> >> > +
+> >> > +	tmp &= ~(UARTBAUD_OSR_MASK << UARTBAUD_OSR_SHIFT);
+> >> > +	tmp |= (((osr-1) & UARTBAUD_OSR_MASK) << UARTBAUD_OSR_SHIFT);
+> >> > +
+> >> > +	tmp &= ~UARTBAUD_SBR_MASK;
+> >> > +	tmp |= sbr & UARTBAUD_SBR_MASK;
+> >> > +
+> >> > +	tmp &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
+> >> > +
+> >> > +	lpuart32_write(tmp, sport->port.membase + UARTBAUD);
+> >> > +}
+> >> > +
+> >> > +static void
+> >> >  lpuart32_set_termios(struct uart_port *port, struct ktermios *termios,
+> >> >  		   struct ktermios *old)
+> >> >  {
+> >> > @@ -1611,12 +1679,17 @@ lpuart32_set_termios(struct uart_port *port,
+> >> > struct ktermios *termios,
+> >> >  	lpuart32_write(old_ctrl & ~(UARTCTRL_TE | UARTCTRL_RE),
+> >> >  			sport->port.membase + UARTCTRL);
+> >> >
+> >> > -	sbr = sport->port.uartclk / (16 * baud);
+> >> > -	bd &= ~UARTBAUD_SBR_MASK;
+> >> > -	bd |= sbr & UARTBAUD_SBR_MASK;
+> >> > -	bd |= UARTBAUD_BOTHEDGE;
+> >> > -	bd &= ~(UARTBAUD_TDMAE | UARTBAUD_RDMAE);
+> >> > -	lpuart32_write(bd, sport->port.membase + UARTBAUD);
+> >> > +	if (of_device_is_compatible(port->dev->of_node, "fsl,imx7ulp-lpuart")) {
+> >>
+> >> Shouldn't we be consequent here and also use a flag in the soc data
+> >> instead of of_device_is_compatible...?
+> >>
+> > 
+> > The original purpose is that this is a temporary code and supposed will
+> > be deleted later once LS platforms confirmed the new baud setting API
+> > works for them as well.
+> > 
+> > That's why i did not make it a property, as i stated in the cover letter.
+> 
+> Ok, I see that is a good reason to not define a new feature property
+> now... 
+> 
+> But, if you are reasonable sure it should work, I am inclined to say
+> just enable it for LS1021a so it also really gets tested...
+> 
 
-Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
----
- arch/arm64/configs/defconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Okay, i'll take this suggestion to get things started.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index ce07285..40251bd 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -181,6 +181,7 @@ CONFIG_VIRTIO_NET=y
- CONFIG_AMD_XGBE=y
- CONFIG_NET_XGENE=y
- CONFIG_MACB=y
-+CONFIG_HIX5HD2_GMAC=y
- CONFIG_HNS_DSAF=y
- CONFIG_HNS_ENET=y
- CONFIG_E1000E=y
-@@ -260,6 +261,7 @@ CONFIG_I2C_TEGRA=y
- CONFIG_I2C_UNIPHIER_F=y
- CONFIG_I2C_RCAR=y
- CONFIG_I2C_CROS_EC_TUNNEL=y
-+CONFIG_I2C_HIX5HD2=y
- CONFIG_SPI=y
- CONFIG_SPI_MESON_SPIFC=m
- CONFIG_SPI_BCM2835=m
-@@ -360,6 +362,11 @@ CONFIG_BACKLIGHT_GENERIC=m
- CONFIG_BACKLIGHT_LP855X=m
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_LOGO=y
-+CONFIG_MEDIA_SUPPORT=y
-+CONFIG_MEDIA_RC_SUPPORT=y
-+CONFIG_RC_DEVICES=y
-+CONFIG_IR_HIX5HD2=y
-+CONFIG_LIRC=y
- # CONFIG_LOGO_LINUX_MONO is not set
- # CONFIG_LOGO_LINUX_VGA16 is not set
- CONFIG_SOUND=y
-@@ -485,6 +492,7 @@ CONFIG_PWM_ROCKCHIP=y
- CONFIG_PWM_TEGRA=m
- CONFIG_PWM_MESON=m
- CONFIG_COMMON_RESET_HI6220=y
-+CONFIG_TI_SYSCON_RESET=y
- CONFIG_PHY_RCAR_GEN3_USB2=y
- CONFIG_PHY_HI6220_USB=y
- CONFIG_PHY_ROCKCHIP_INNO_USB2=y
--- 
-1.9.1
+Thanks
+
+Regards
+Dong Aisheng
