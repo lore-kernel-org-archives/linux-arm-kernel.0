@@ -1,45 +1,20 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 19 May 2017 16:42:03 -0700
-Subject: [PATCH] ARM64: defconfig: enable IR core,
- decoders and Meson IR device
-In-Reply-To: <1493105980-19724-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Tue, 25 Apr 2017 09:39:40 +0200")
-References: <1493105980-19724-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <m28tls4do4.fsf@baylibre.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 19 May 2017 19:42:14 -0400 (EDT)
+Subject: [PATCH v2 net-next 0/2] Check all RGMII phy mode variants
+In-Reply-To: <1495145624-29463-1-git-send-email-isubramanian@apm.com>
+References: <1495145624-29463-1-git-send-email-isubramanian@apm.com>
+Message-ID: <20170519.194214.524202632096560137.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+From: Iyappan Subramanian <isubramanian@apm.com>
+Date: Thu, 18 May 2017 15:13:42 -0700
 
-> This patch enables the MEDIA Infrared RC Decoders and Meson Infrared
-> decoder for ARM64 defconfig.
-> These drivers are selected as modules by default.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  arch/arm64/configs/defconfig | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index c021aefa..59c400f 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -321,6 +321,11 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
->  CONFIG_MEDIA_ANALOG_TV_SUPPORT=y
->  CONFIG_MEDIA_DIGITAL_TV_SUPPORT=y
->  CONFIG_MEDIA_CONTROLLER=y
-> +CONFIG_MEDIA_RC_SUPPORT=y
-> +CONFIG_RC_CORE=y
+> This patch set,
+>      - adds phy_interface_mode_is_rgmii() helper function
+>      - addresses review comment from previous patch set, by calling
+>        phy_interface_mode_is_rgmii() to address all RGMII variants
+> 
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 
-This one should be a module too.
-
-With that fixed, applied to v4.13/defconfig
-
-Kevin
-
-> +CONFIG_RC_DEVICES=y
-> +CONFIG_RC_DECODERS=y
-> +CONFIG_IR_MESON=m
->  CONFIG_VIDEO_V4L2_SUBDEV_API=y
->  # CONFIG_DVB_NET is not set
->  CONFIG_V4L_MEM2MEM_DRIVERS=y
+Series applied, thanks.
