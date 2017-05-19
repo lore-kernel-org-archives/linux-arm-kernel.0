@@ -1,131 +1,44 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 19 May 2017 13:45:21 +0530
-Subject: [PATCH 21/41] ARM: dts: dra72-evm-common: Correct vmmc-supply for mmc2
+Date: Fri, 19 May 2017 13:45:12 +0530
+Subject: [PATCH 12/41] mmc: host: omap_hsmmc: Fix error path sequence
 In-Reply-To: <20170519081541.26753-1-kishon@ti.com>
 References: <20170519081541.26753-1-kishon@ti.com>
-Message-ID: <20170519081541.26753-22-kishon@ti.com>
+Message-ID: <20170519081541.26753-13-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ravikumar Kattekola <rk@ti.com>
+Fix the error path sequence so that clk_disable, runtime_disable etc
+are done in the reverse order of how they were enabled.
 
-On dra72/dra71 evms, mmc2 vdd/ios are connected to a common 1.8V supply
-not 3.3V. Also the regulator that supplies 1.8V is different on dra71-evm
-so move the supply property from common dtsi to evm specific dts files.
-
-Fixes: a4240d3af677 ("ARM: dts: Add support for dra72-evm rev C (SR2.0)")
-Signed-off-by: Ravikumar Kattekola <rk@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/boot/dts/dra71-evm.dts         | 14 ++++++++++++++
- arch/arm/boot/dts/dra72-evm-common.dtsi |  2 --
- arch/arm/boot/dts/dra72-evm-revc.dts    | 14 ++++++++++++++
- arch/arm/boot/dts/dra72-evm.dts         | 14 ++++++++++++++
- 4 files changed, 42 insertions(+), 2 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dra71-evm.dts b/arch/arm/boot/dts/dra71-evm.dts
-index 4d57a55473af..c7a56b6263a6 100644
---- a/arch/arm/boot/dts/dra71-evm.dts
-+++ b/arch/arm/boot/dts/dra71-evm.dts
-@@ -32,6 +32,16 @@
- 			  3000000 0x1>;
- 	};
- 
-+	evm_1v8_sw: fixedregulator-evm_1v8 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "evm_1v8";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		vin-supply = <&lp8732_buck0_reg>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
- 	poweroff: gpio-poweroff {
- 		compatible = "gpio-poweroff";
- 		gpios = <&gpio7 30 GPIO_ACTIVE_HIGH>;
-@@ -165,6 +175,10 @@
- 	vmmc_aux-supply = <&vpo_sd_1v8_3v3>;
- };
- 
-+&mmc2 {
-+	vmmc-supply = <&evm_1v8_sw>;
-+};
-+
- &mac {
- 	mode-gpios = <&pcf_gpio_21 4 GPIO_ACTIVE_LOW>,
- 		     <&pcf_hdmi 9 GPIO_ACTIVE_LOW>,	/* P11 */
-diff --git a/arch/arm/boot/dts/dra72-evm-common.dtsi b/arch/arm/boot/dts/dra72-evm-common.dtsi
-index ad24544adf0f..d97370217eff 100644
---- a/arch/arm/boot/dts/dra72-evm-common.dtsi
-+++ b/arch/arm/boot/dts/dra72-evm-common.dtsi
-@@ -418,8 +418,6 @@
- 	status = "okay";
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_pins_default>;
--
--	vmmc-supply = <&evm_3v3_sw>;
- 	bus-width = <8>;
- 	ti,non-removable;
- 	max-frequency = <192000000>;
-diff --git a/arch/arm/boot/dts/dra72-evm-revc.dts b/arch/arm/boot/dts/dra72-evm-revc.dts
-index 58a2e6599ea7..40a399735533 100644
---- a/arch/arm/boot/dts/dra72-evm-revc.dts
-+++ b/arch/arm/boot/dts/dra72-evm-revc.dts
-@@ -15,6 +15,16 @@
- 		device_type = "memory";
- 		reg = <0x0 0x80000000 0x0 0x80000000>; /* 2GB */
- 	};
-+
-+	evm_1v8_sw: fixedregulator-evm_1v8 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "evm_1v8";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		vin-supply = <&smps4_reg>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
- };
- 
- &i2c1 {
-@@ -86,3 +96,7 @@
- &mmc1 {
- 	vmmc_aux-supply = <&ldo1_reg>;
- };
-+
-+&mmc2 {
-+	vmmc-supply = <&evm_1v8_sw>;
-+};
-diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
-index 1c570236a1a0..b25e7c67badf 100644
---- a/arch/arm/boot/dts/dra72-evm.dts
-+++ b/arch/arm/boot/dts/dra72-evm.dts
-@@ -13,6 +13,16 @@
- 		device_type = "memory";
- 		reg = <0x0 0x80000000 0x0 0x40000000>; /* 1024 MB */
- 	};
-+
-+	evm_1v8_sw: fixedregulator-evm_1v8 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "evm_1v8";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		vin-supply = <&smps4_reg>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
- };
- 
- &i2c1 {
-@@ -47,3 +57,7 @@
- &mmc1 {
- 	vmmc_aux-supply = <&ldo1_reg>;
- };
-+
-+&mmc2 {
-+	vmmc-supply = <&evm_1v8_sw>;
-+};
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 8114b8b73491..b28f0e9631ce 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -2602,16 +2602,16 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ err_slot_name:
+ 	mmc_remove_host(mmc);
+ err_irq:
+-	device_init_wakeup(&pdev->dev, false);
+ 	if (!IS_ERR_OR_NULL(host->tx_chan))
+ 		dma_release_channel(host->tx_chan);
+ 	if (!IS_ERR_OR_NULL(host->rx_chan))
+ 		dma_release_channel(host->rx_chan);
++	if (host->dbclk)
++		clk_disable_unprepare(host->dbclk);
+ 	pm_runtime_dont_use_autosuspend(host->dev);
+ 	pm_runtime_put_sync(host->dev);
+ 	pm_runtime_disable(host->dev);
+-	if (host->dbclk)
+-		clk_disable_unprepare(host->dbclk);
++	device_init_wakeup(&pdev->dev, false);
+ err1:
+ err_gpio:
+ 	mmc_free_host(mmc);
 -- 
 2.11.0
