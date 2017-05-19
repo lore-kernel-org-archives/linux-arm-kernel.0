@@ -1,67 +1,41 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 May 2017 23:30:00 +0100
-Subject: [PATCH 1/3] rtc: gemini: Add optional clock handling
-In-Reply-To: <20170518215635.13505-1-linus.walleij@linaro.org>
-References: <20170518215635.13505-1-linus.walleij@linaro.org>
-Message-ID: <20170518223000.GP22219@n2100.armlinux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 18 May 2017 18:17:55 -0700
+Subject: [PATCH/RFC 1/2] clk: renesas: Rework Kconfig and Makefile logic
+In-Reply-To: <1493137626-21404-2-git-send-email-geert+renesas@glider.be>
+References: <1493137626-21404-1-git-send-email-geert+renesas@glider.be>
+ <1493137626-21404-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170519011755.GB20170@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 11:56:33PM +0200, Linus Walleij wrote:
-> +	rtc->pclk = clk_get(dev, "PCLK");
-> +	if (IS_ERR(rtc->pclk)) {
-> +		dev_err(dev, "could not get PCLK\n");
-> +	} else {
-> +		ret = clk_prepare_enable(rtc->pclk);
-> +		if (ret) {
-> +			dev_err(dev, "failed to enable PCLK\n");
-> +			return ret;
-
-Proper cleanup?  Maybe consider using devm_clk_get() right from the get-go?
-
-> +		}
-> +	}
-> +	rtc->extclk = clk_get(dev, "EXTCLK");
-> +	if (IS_ERR(rtc->extclk)) {
-> +		dev_err(dev, "could not get EXTCLK\n");
-> +	} else {
-> +		ret = clk_prepare_enable(rtc->extclk);
-> +		if (ret) {
-> +			dev_err(dev, "failed to enable EXTCLK\n");
-> +			return ret;
-
-Ditto.
-
-> +		}
-> +	}
-> +
->  	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->  	if (!res)
->  		return -ENODEV;
-> @@ -156,6 +180,10 @@ static int gemini_rtc_remove(struct platform_device *pdev)
->  {
->  	struct gemini_rtc *rtc = platform_get_drvdata(pdev);
->  
-> +	if (!IS_ERR(rtc->extclk))
-> +		clk_disable_unprepare(rtc->extclk);
-> +	if (!IS_ERR(rtc->pclk))
-> +		clk_disable_unprepare(rtc->pclk);
-
-No clk_put(), but if you used devm_clk_get(), you don't need it.
-
->  	rtc_device_unregister(rtc->rtc_dev);
->  
->  	return 0;
-> -- 
-> 2.9.3
+On 04/25, Geert Uytterhoeven wrote:
+> The goals are to:
+>   - Allow precise control over and automatic selection of which
+>     (sub)drivers are used for which SoC (which may change in the
+>     future),
+>   - Allow adding support for new SoCs easily,
+>   - Allow compile-testing of all (sub)drivers,
+>   - Keep driver selection logic in the subsystem-specific Kconfig
+>     independent from the architecture-specific Kconfig (i.e. no "select"
+>     from arch/arm64/Kconfig.platforms), to avoid dependencies.
 > 
+> This is implemented by:
+>   - Introducing Kconfig symbols for all drivers and sub-drivers,
+>   - Introducing the Kconfig symbol CLK_RENESAS, which is enabled
+>     automatically when building for a Renesas ARM platform, and which
+>     enables all required drivers without interaction of the user, based
+>     on SoC-specific ARCH_* symbols,
+>   - Allowing the user to enable any Kconfig symbol manually if
+>     COMPILE_TEST is enabled,
+>   - Using the new Kconfig symbols instead of the ARCH_* symbols to
+>     control compilation in the Makefile,
+>   - Always entering drivers/clk/renesas/ during the build.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
