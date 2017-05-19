@@ -1,85 +1,127 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 19 May 2017 15:59:59 +0100
-Subject: [PATCH] arm: boot/compressed: fix decompressor header layout for v7-M
-Message-ID: <20170519145959.26569-1-ard.biesheuvel@linaro.org>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Fri, 19 May 2017 23:07:22 +0800
+Subject: [V2, 2/6] tty: serial: lpuart: add little endian 32 bit register
+ support
+In-Reply-To: <045d1888-4a23-cf73-ab4c-009e29fde974@cogentembedded.com>
+References: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
+ <b4a2ed13-c71f-c973-3b09-b632e083a88b@cogentembedded.com>
+ <20170517033139.GB9913@b29396-OptiPlex-7040>
+ <48819894-4943-7d14-ccf8-83cfd2195c9a@cogentembedded.com>
+ <AM3PR04MB306D5C86AED120D15C4D46A80E70@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <55bae8d2-0e23-b5e1-f304-63d9130ccb08@cogentembedded.com>
+ <20170517070019.GG9913@b29396-OptiPlex-7040>
+ <045d1888-4a23-cf73-ab4c-009e29fde974@cogentembedded.com>
+Message-ID: <20170519150722.GB23227@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported by Patrice, the header layout of the decompressor is
-incorrect when building for v7-M. In this case, the __nop macro
-resolves to 'mov r0, r0', which is emitted as a narrow encoding,
-resulting in the header data fields to end up at lower offsets than
-required.
+On Wed, May 17, 2017 at 11:04:04AM +0300, Nikita Yushchenko wrote:
+> Hi
+> 
+> My view of your statement is:
+> - you currently assume only a few cases for this driver - builtin UART
+> in vf610, ls1012a and imx7,
+> - in each of these cases, all lpuart instances share same endian, thus
+> having that in global var works for these cases,
+> - having that in global var makes it possible for you to write less
+> lines of code
+> 
+> My complain is:
+> - in Linux, we are trying to keep drivers generic,
+> - in Linux, having less lines of code has never been sufficient to break
+> basic data structure consistency,
+> - having driver to keep per-device capability in global var is a clear
+> case of breaking consistency.
+> 
 
-Given the variety of targets we need to support with the same code,
-the startup sequence is a bit of a jumble, and uses instructions
-and macros whose encoding width cannot be specified (badr), or only
-exists in a narrow encoding (bx)
+Yes, i do understand your concern and i absolutely agree with the rule
+you mentioned.
 
-So force the use of a wide encoding in __nop, and replace the start
-sequence with a simple jump to the label marking the start of code,
-preceded by a Thumb2 mode switch if required (using explicit wide
-encodings where appropriate). The label itself can be moved to the
-start of code [where it belongs] due to the larger range of branch
-instructions as compared to adr instructions.
+> 
+> >>> That's for special case, normally we wouldn't do that.
+> >>
+> >> For me this "special case" looks like "let's break data structure
+> >> consistency to reuse several lines of code".
+> >>
+> >> With code snippets you show, it looks even worse: you assign same global
+> >> variable in several places for different uses. 
+> > 
+> > If you mean lpuart_is_be, it's not for different uses.
+> > The purpose is the same to align the correct endian but in two places.
+> 
+> _probe() routine called for device X alters state already in use for
+> device Y.
+> 
 
-Reported-by: Patrice CHOTARD <patrice.chotard@st.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/boot/compressed/efi-header.S |  4 +---
- arch/arm/boot/compressed/head.S       | 14 +++++++-------
- 2 files changed, 8 insertions(+), 10 deletions(-)
+Okay, you're saying two different types of devices appeared in one SoC.
 
-diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
-index 9d5dc4fda3c1..3f7d1b74c5e0 100644
---- a/arch/arm/boot/compressed/efi-header.S
-+++ b/arch/arm/boot/compressed/efi-header.S
-@@ -17,14 +17,12 @@
- 		@ there.
- 		.inst	'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
- #else
--		mov	r0, r0
-+		W(mov)	r0, r0
- #endif
- 		.endm
- 
- 		.macro	__EFI_HEADER
- #ifdef CONFIG_EFI_STUB
--		b	__efi_start
--
- 		.set	start_offset, __efi_start - start
- 		.org	start + 0x3c
- 		@
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 7c711ba61417..8c336a6da210 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -130,19 +130,19 @@ start:
- 		.rept	7
- 		__nop
- 		.endr
--   ARM(		mov	r0, r0		)
--   ARM(		b	1f		)
-- THUMB(		badr	r12, 1f		)
-- THUMB(		bx	r12		)
-+      ARM(	b	1f		)
-+ AR_CLASS(	sub	pc, pc, #3	)	@ A/R: switch to Thumb2 mode
-+  M_CLASS(	nop.w			)	@ M: already in Thumb2 mode
-+    THUMB(	.thumb			)
-+    THUMB(	b.w	1f		)
- 
- 		.word	_magic_sig	@ Magic numbers to help the loader
- 		.word	_magic_start	@ absolute load/run zImage address
- 		.word	_magic_end	@ zImage end address
- 		.word	0x04030201	@ endianness flag
- 
-- THUMB(		.thumb			)
--1:		__EFI_HEADER
--
-+		__EFI_HEADER
-+1:
-  ARM_BE8(	setend	be		)	@ go BE8 if compiled for BE8
-  AR_CLASS(	mrs	r9, cpsr	)
- #ifdef CONFIG_ARM_VIRT_EXT
--- 
-2.9.3
+> > 
+> >> implicitly assuming that
+> >> it is for same device. Which can be true in your current system, but not
+> >> elsewhere (e.g. why not having lpuart programmed into fpga)?
+> >>
+> > 
+> > Sorry, What issues for fpga?
+> 
+> Connect FPGA to IMX7 based system and program LS1012a version of lpuart
+> core into it.  Have your console on system UART broken at time when
+> driver gets registered.
+> 
+
+Well, theoretically it may happen.
+
+> 
+> > 
+> >> Alternative solution could be - have separate write path for earlycon.
+> > 
+> > It looks to me having the same issue with a separate write patch
+> > for earlycon as we still need distinguish Little or Big endian
+> > for Layerscape and IMX.
+> > 
+> >> At a glance, it is dozen lines of code.
+> > 
+> > Would you please show some sample code?
+> 
+> Do not reuse lpuart32_console_putchar() in earlycon code.
+> 
+> Have two sets of early_setup/early_write/putchar - for BE and
+> defaut-endian earlycon. And in these putchar's do not use
+> lpuart_(read|write).
+> 
+
+Isn't that introducing another consistency break after fix one
+consistency break?
+
+If doing that, we then have two register read/write APIs.
+One for normal driver operation by dynamically checking lpuart_is_be
+property to distinguish the endian difference problem.
+Another is specifically implemented for only early console read/write
+and use hardcoded way to read/write register directly instead of using
+the standard API lpuart32_read/write, like follows:
+e.g.
+lpuart32_le_console_write() {
+	 writel();
+}
+
+lpuart32_be_console_write() {
+	 iowrite32be()
+}
+This also makes the driver a bit strange and ugly.
+
+It looks to me both way are trade offs and the later one seems sacrifice
+more. And i doubt if it's really necessary for probably a no real gain
+purpose as the FPGA you mentioned is a theoretical case and less
+possibility to exist.
+
+I'm still wondering how about keep using the exist way and adding more
+information in code to explain why use a global var?
+
+Regards
+Dong Aisheng
+
+> 
+> As far as I can see, fsl_lpuart.c already has two drivers in one -
+> there is separate set of routines for 8bit and 32bit cases.
+> And those routines that are common, have if blocks that separate cases.
+> I think these drivers will be cleaner if separated.
+> However that's completely different story.
