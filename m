@@ -1,49 +1,37 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Fri, 19 May 2017 17:57:23 +0800
-Subject: [PATCH v2] drm: mediatek: change the variable type of rdma threshold
-Message-ID: <1495187843-6882-1-git-send-email-bibby.hsieh@mediatek.com>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Fri, 19 May 2017 13:01:24 +0300
+Subject: [PATCH] i2c: designware: don't infer timings described by ACPI
+ from clock rate
+In-Reply-To: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
+References: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
+Message-ID: <ab57959e-7c00-7f92-8631-5204685c719c@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some greater resolution, the rdma threshold
-variable will overflow.
+On 05/19/2017 11:56 AM, Ard Biesheuvel wrote:
+> Commit bd698d24b1b57 ("i2c: designware: Get selected speed mode
+> sda-hold-time via ACPI") updated the logic that reads the timing
+> parameters for various I2C bus rates from the DSDT, to only read
+> the timing parameters for the currently selected mode.
+>
+> This causes a WARN_ON() splat on platforms that legally omit the clock
+> frequency from the ACPI description, because in the new situation, the
+> core I2C designware driver still accesses the fields in the driver
+> struct that we no longer populate, and proceeds to calculate them from
+> the clock frequency. Since the clock frequency is unspecified, the
+> driver complains loudly using a WARN_ON().
+>
+> So revert back to the old situation, where the struct fields for all
+> timings are populated, but retain the new logic which chooses the SDA
+> hold time from the timing mode that is currently in use.
+>
+> Fixes: bd698d24b1b57 ("i2c: designware: Get selected speed mode ...")
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/i2c/busses/i2c-designware-platdrv.c | 18 ++++++++++--------
+>  1 file changed, 10 insertions(+), 8 deletions(-)
+>
+Thanks, this is ok to me. Let's add also kudos to Lorenzo:
 
-Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-index 0df05f9..9afdcd7 100644
---- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-+++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-@@ -37,7 +37,7 @@
- #define DISP_REG_RDMA_FIFO_CON			0x0040
- #define RDMA_FIFO_UNDERFLOW_EN				BIT(31)
- #define RDMA_FIFO_PSEUDO_SIZE(bytes)			(((bytes) / 16) << 16)
--#define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes)		((bytes) / 16)
-+#define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes) (((bytes) / 16) & 0x3ff)
- 
- /**
-  * struct mtk_disp_rdma - DISP_RDMA driver structure
-@@ -109,7 +109,7 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
- 			    unsigned int height, unsigned int vrefresh,
- 			    unsigned int bpc)
- {
--	unsigned int threshold;
-+	unsigned long long threshold;
- 	unsigned int reg;
- 
- 	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xfff, width);
-@@ -121,7 +121,8 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
- 	 * output threshold to 6 microseconds with 7/6 overhead to
- 	 * account for blanking, and with a pixel depth of 4 bytes:
- 	 */
--	threshold = width * height * vrefresh * 4 * 7 / 1000000;
-+	threshold = (unsigned long long)width * height * vrefresh *
-+		    4 * 7 / 1000000;
- 	reg = RDMA_FIFO_UNDERFLOW_EN |
- 	      RDMA_FIFO_PSEUDO_SIZE(SZ_8K) |
- 	      RDMA_OUTPUT_VALID_FIFO_THRESHOLD(threshold);
--- 
-1.9.1
+Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
