@@ -1,34 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 18 May 2017 23:56:38 -0700
-Subject: [GIT PULL 2/2] Broadcom drivers changes for 4.12
-In-Reply-To: <20170514033526.21260-2-f.fainelli@gmail.com>
-References: <20170514033526.21260-1-f.fainelli@gmail.com>
- <20170514033526.21260-2-f.fainelli@gmail.com>
-Message-ID: <20170519065638.GB9628@localhost>
+Date: Thu, 18 May 2017 23:57:21 -0700
+Subject: [PATCH] ARM: configs: add a gemini defconfig
+In-Reply-To: <20170514214502.26243-1-linus.walleij@linaro.org>
+References: <20170514214502.26243-1-linus.walleij@linaro.org>
+Message-ID: <20170519065721.GC9628@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 13, 2017 at 08:35:26PM -0700, Florian Fainelli wrote:
-> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+On Sun, May 14, 2017 at 11:45:02PM +0200, Linus Walleij wrote:
+> It makes sense to have a stripped-down defconfig for just Gemini, as
+> it is a pretty small platform used in NAS etc, and will use appended
+> device tree. It is also quick to compile and test. Hopefully this
+> defconfig can be a good base for distributions such as OpenWRT.
 > 
->   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> I plan to add in the config options needed for the different
+> variants of Gemini as we go along.
 > 
-> are available in the git repository at:
-> 
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/drivers-fixes
-> 
-> for you to fetch changes up to 31d848aa1d85530770f0bdf1b61a042335d340ad:
-> 
->   soc: bcm: brcmstb: Correctly match 7435 SoC (2017-05-13 20:27:33 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request contains Broadcom SoC drivers fixes for 4.12, please
-> pull the following:
-> 
-> - Florian removes the duplicate compatible string matched by the
->   SUN_TOP_CTRL driver and instead uses the correct one for 7435
+> Cc: Janos Laube <janos.dev@gmail.com>
+> Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: please apply this where apropriate for v4.12.
 
-Thanks, merged.
+I'm usually not super-eager on adding new defconfigs, but since this seems to
+be an active platform it seems like the right thing to do.
+
+Applied to fixes.
 
 
 -Olof
