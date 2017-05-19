@@ -1,36 +1,17 @@
 From: riel@redhat.com (riel at redhat.com)
-Date: Fri, 19 May 2017 17:26:34 -0400
-Subject: [PATCH 3/5] x86: ascii armor the x86_64 boot init stack canary
-In-Reply-To: <20170519212636.30440-1-riel@redhat.com>
-References: <20170519212636.30440-1-riel@redhat.com>
-Message-ID: <20170519212636.30440-4-riel@redhat.com>
+Date: Fri, 19 May 2017 17:26:31 -0400
+Subject: stackprotector: ascii armor the stack canary
+Message-ID: <20170519212636.30440-1-riel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rik van Riel <riel@redhat.com>
-
-Use the ascii-armor canary to prevent unterminated C string overflows
-from being able to successfully overwrite the canary, even if they
-somehow obtain the canary value.
+Zero out the first byte of the stack canary value on 64 bit systems,
+in order to prevent unterminated C string overflows from being able
+to successfully overwrite the canary, even if an attacker somehow
+guessed or obtained the canary value.
 
 Inspired by execshield ascii-armor and PaX/grsecurity.
 
-Signed-off-by: Rik van Riel <riel@redhat.com>
----
- arch/x86/include/asm/stackprotector.h | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/x86/include/asm/stackprotector.h b/arch/x86/include/asm/stackprotector.h
-index dcbd9bcce714..8abedf1d650e 100644
---- a/arch/x86/include/asm/stackprotector.h
-+++ b/arch/x86/include/asm/stackprotector.h
-@@ -74,6 +74,7 @@ static __always_inline void boot_init_stack_canary(void)
- 	get_random_bytes(&canary, sizeof(canary));
- 	tsc = rdtsc();
- 	canary += tsc + (tsc << 32UL);
-+	canary &= CANARY_MASK;
- 
- 	current->stack_canary = canary;
- #ifdef CONFIG_X86_64
--- 
-2.9.3
+Thanks to Daniel Micay for extracting code of similar functionality
+from PaX/grsecurity and making it easy to find in his linux-hardened
+git tree on https://github.com/thestinger/linux-hardened/
