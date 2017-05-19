@@ -1,9 +1,9 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 19 May 2017 08:53:30 +0200
-Subject: [PATCH v2 8/9] crypto: mediatek - Use IPAD/OPAD constant
+Date: Fri, 19 May 2017 08:53:31 +0200
+Subject: [PATCH v2 9/9] crypto: ccp - Use IPAD/OPAD constant
 In-Reply-To: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
 References: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170519065331.27670-9-clabbe.montjoie@gmail.com>
+Message-ID: <20170519065331.27670-10-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,31 +12,31 @@ define.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/crypto/mediatek/mtk-sha.c | 5 +++--
+ drivers/crypto/ccp/ccp-crypto-sha.c | 5 +++--
  1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/crypto/mediatek/mtk-sha.c b/drivers/crypto/mediatek/mtk-sha.c
-index 2226f12d1c7a..5f4f845adbb8 100644
---- a/drivers/crypto/mediatek/mtk-sha.c
-+++ b/drivers/crypto/mediatek/mtk-sha.c
-@@ -12,6 +12,7 @@
-  * Some ideas are from atmel-sha.c and omap-sham.c drivers.
-  */
- 
+diff --git a/drivers/crypto/ccp/ccp-crypto-sha.c b/drivers/crypto/ccp/ccp-crypto-sha.c
+index 6b46eea94932..ce97b3868f4a 100644
+--- a/drivers/crypto/ccp/ccp-crypto-sha.c
++++ b/drivers/crypto/ccp/ccp-crypto-sha.c
+@@ -18,6 +18,7 @@
+ #include <linux/crypto.h>
+ #include <crypto/algapi.h>
+ #include <crypto/hash.h>
 +#include <crypto/hmac.h>
+ #include <crypto/internal/hash.h>
  #include <crypto/sha.h>
- #include "mtk-platform.h"
- 
-@@ -825,8 +826,8 @@ static int mtk_sha_setkey(struct crypto_ahash *tfm, const u8 *key,
- 	memcpy(bctx->opad, bctx->ipad, bs);
- 
- 	for (i = 0; i < bs; i++) {
--		bctx->ipad[i] ^= 0x36;
--		bctx->opad[i] ^= 0x5c;
-+		bctx->ipad[i] ^= HMAC_IPAD_VALUE;
-+		bctx->opad[i] ^= HMAC_OPAD_VALUE;
+ #include <crypto/scatterwalk.h>
+@@ -308,8 +309,8 @@ static int ccp_sha_setkey(struct crypto_ahash *tfm, const u8 *key,
  	}
  
- 	return 0;
+ 	for (i = 0; i < block_size; i++) {
+-		ctx->u.sha.ipad[i] = ctx->u.sha.key[i] ^ 0x36;
+-		ctx->u.sha.opad[i] = ctx->u.sha.key[i] ^ 0x5c;
++		ctx->u.sha.ipad[i] = ctx->u.sha.key[i] ^ HMAC_IPAD_VALUE;
++		ctx->u.sha.opad[i] = ctx->u.sha.key[i] ^ HMAC_OPAD_VALUE;
+ 	}
+ 
+ 	sg_init_one(&ctx->u.sha.opad_sg, ctx->u.sha.opad, block_size);
 -- 
 2.13.0
