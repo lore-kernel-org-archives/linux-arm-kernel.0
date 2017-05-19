@@ -1,55 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 19 May 2017 15:06:12 +0800
-Subject: [PATCH v4 6/6] ARM: sun8i: a83t: Switch to CCU device tree binding
- macros
-In-Reply-To: <20170519070612.32159-1-wens@csie.org>
-References: <20170519070612.32159-1-wens@csie.org>
-Message-ID: <20170519070612.32159-7-wens@csie.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 18 May 2017 23:56:15 -0700
+Subject: [GIT PULL 1/2] Broadcom devicetree changes for 4.12
+In-Reply-To: <20170514033526.21260-1-f.fainelli@gmail.com>
+References: <20170514033526.21260-1-f.fainelli@gmail.com>
+Message-ID: <20170519065615.GA9628@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the CCU device tree binding headers have been merged, we can
-use the properly named macros in the device tree, instead of raw
-numbers.
+On Sat, May 13, 2017 at 08:35:25PM -0700, Florian Fainelli wrote:
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> 
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> 
+> are available in the git repository at:
+> 
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/devicetree-fixes
+> 
+> for you to fetch changes up to b155f05dc578299557447a6fd6545ebc72c1d19b:
+> 
+>   Merge tag 'bcm2835-dt-next-2017-03-30' into devicetree/fixes (2017-05-13 20:26:09 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request contains Broadcom ARM-based SoC Device Tree fixes for
+> 4.12, please pull the following:
+> 
+> - Baruch provides several fixes for the Raspberry Pi (BCM2835) Device
+>   Tree source include file: uart0 pinctrl node names, pin number for
+>   i2c0, uart0 rts/cts pins and invalid uart1 pin, missing numbers for
+>   ethernet aliases
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+Thanks, merged.
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index e12dd7170b8f..050d3e347740 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -44,6 +44,9 @@
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
-+#include <dt-bindings/clock/sun8i-a83t-ccu.h>
-+#include <dt-bindings/reset/sun8i-a83t-ccu.h>
-+
- / {
- 	interrupt-parent = <&gic>;
- 	#address-cells = <1>;
-@@ -178,7 +181,7 @@
- 				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0x01c20800 0x400>;
--			clocks = <&ccu 45>, <&osc24M>, <&osc16Md512>;
-+			clocks = <&ccu CLK_BUS_PIO>, <&osc24M>, <&osc16Md512>;
- 			clock-names = "apb", "hosc", "losc";
- 			gpio-controller;
- 			interrupt-controller;
-@@ -225,8 +228,8 @@
- 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 53>;
--			resets = <&ccu 40>;
-+			clocks = <&ccu CLK_BUS_UART0>;
-+			resets = <&ccu RST_BUS_UART0>;
- 			status = "disabled";
- 		};
- 
--- 
-2.11.0
+
+-Olof
