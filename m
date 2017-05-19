@@ -1,35 +1,135 @@
-From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Sat, 20 May 2017 00:35:49 +0300
-Subject: [PATCH 1/2] ARM: dts: orange-pi-zero: interrupt triggering for XR819
- WiFi chip
-In-Reply-To: <20170519213550.8434-1-geomatsi@gmail.com>
-References: <20170519213550.8434-1-geomatsi@gmail.com>
-Message-ID: <20170519213550.8434-2-geomatsi@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 19 May 2017 23:46:13 +0200
+Subject: [PATCH v2 3/4] arm: dts: rk3229: add a new cpu opp table
+In-Reply-To: <1495016177-2413-4-git-send-email-frank.wang@rock-chips.com>
+References: <1495016177-2413-1-git-send-email-frank.wang@rock-chips.com>
+ <1495016177-2413-4-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <3157044.sksXPZM55k@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specify interrupt triggering for XR819 SDIO WiFi chip
-on orange-pi-zero board.
+Hi Frank,
 
-For more details see: http://linux-sunxi.org/Wifi#Allwinner
+Am Mittwoch, 17. Mai 2017, 18:16:16 CEST schrieb Frank Wang:
+> From: Finley Xiao <finley.xiao@rock-chips.com>
+> 
+> This patch adds some new frequencies for rk3229 board.
+> 
+> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  arch/arm/boot/dts/rk3229-cpu-opp.dtsi | 85 +++++++++++++++++++++++++++++++++++
 
-Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
----
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 2 ++
- 1 file changed, 2 insertions(+)
+I'm not yet sure if I like that approach. The other option I'm considering
+and also tend to prefer at the moment would be to have this in a
+rk3229.dtsi, creating a chain of
+	rk322x.dtsi
+		\- rk3228-evb.dts
+		\- rk3229.dtsi
+			\- rk3229-evb.dts
 
-diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-index 9e8b082c134f..34e4a5a80136 100644
---- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-+++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-@@ -128,6 +128,8 @@
- 	 */
- 	xr819: sdio_wifi at 1 {
- 		reg = <1>;
-+		interrupt-parent = <&pio>;
-+		interrupts = <6 10 IRQ_TYPE_EDGE_RISING>;
- 	};
- };
- 
--- 
-2.11.0
+similar to what we do with the rk3xxx.dtsi -> rk3188.dtsi.
+
+If I remember correctly, there are some other tiny differences between the
+rk3228 and rk3229, so having the rk3229.dtsi already would make it
+easier to place needed stuff into it later on.
+
+
+Heiko
+
+>  1 file changed, 85 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/rk3229-cpu-opp.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/rk3229-cpu-opp.dtsi b/arch/arm/boot/dts/rk3229-cpu-opp.dtsi
+> new file mode 100644
+> index 0000000..89e8413
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/rk3229-cpu-opp.dtsi
+> @@ -0,0 +1,85 @@
+> +/*
+> + * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + *  Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/ {
+> +	/delete-node/ opp-table0;
+> +
+> +	cpu0_opp_table: opp_table0 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +
+> +		opp-408000000 {
+> +			opp-hz = /bits/ 64 <408000000>;
+> +			opp-microvolt = <950000>;
+> +			clock-latency-ns = <40000>;
+> +			opp-suspend;
+> +		};
+> +		opp-600000000 {
+> +			opp-hz = /bits/ 64 <600000000>;
+> +			opp-microvolt = <975000>;
+> +		};
+> +		opp-816000000 {
+> +			opp-hz = /bits/ 64 <816000000>;
+> +			opp-microvolt = <1000000>;
+> +		};
+> +		opp-1008000000 {
+> +			opp-hz = /bits/ 64 <1008000000>;
+> +			opp-microvolt = <1175000>;
+> +		};
+> +		opp-1200000000 {
+> +			opp-hz = /bits/ 64 <1200000000>;
+> +			opp-microvolt = <1275000>;
+> +		};
+> +		opp-1296000000 {
+> +			opp-hz = /bits/ 64 <1296000000>;
+> +			opp-microvolt = <1325000>;
+> +		};
+> +		opp-1392000000 {
+> +			opp-hz = /bits/ 64 <1392000000>;
+> +			opp-microvolt = <1375000>;
+> +		};
+> +		opp-1464000000 {
+> +			opp-hz = /bits/ 64 <1464000000>;
+> +			opp-microvolt = <1400000>;
+> +		};
+> +	};
+> +};
+> 
