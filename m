@@ -1,31 +1,30 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 19 May 2017 18:42:56 +0100
-Subject: [PATCH] arm64: dts: juno: Enable some SMMUs
-In-Reply-To: <eeb81dbbd7ddfbbccb961c0f20c5cb90f120e89f.1495110010.git.robin.murphy@arm.com>
-References: <eeb81dbbd7ddfbbccb961c0f20c5cb90f120e89f.1495110010.git.robin.murphy@arm.com>
-Message-ID: <ef0cc8cd-9ddb-6e5d-0ca0-57e54c94b2c1@arm.com>
+Date: Fri, 19 May 2017 18:44:16 +0100
+Subject: [PATCH v10 10/10] arm64: dts: juno: Add Coresight CPU debug nodes
+In-Reply-To: <1495167957-14923-11-git-send-email-leo.yan@linaro.org>
+References: <1495167957-14923-1-git-send-email-leo.yan@linaro.org>
+ <1495167957-14923-11-git-send-email-leo.yan@linaro.org>
+Message-ID: <0e1cf263-f0a0-2e78-c636-4b5d8205b7f7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Suzuki, Leo,
 
-
-On 18/05/17 13:23, Robin Murphy wrote:
-> The IOMMU-backed DMA API support has now been in place for a while and
-> proven stable, so there's no real need to keep most of Juno's SMMUs
-> disabled. The USB, HDLCDs, and CoreSight ETR all just need to map RAM
-> buffers for DMA - enabling their SMMUs obviates CPU bounce buffering for
-> USB's streaming DMA to the upper memory bank, and lets the other two
-> allocate their relatively large coherent buffers without pressuring CMA.
+On 19/05/17 05:25, Leo Yan wrote:
+> From: Suzuki K Poulose <suzuki.poulose@arm.com>
 > 
-> Some more software work is still needed for the DMA-330 and PCIe before
-> those can accommodate SMMU translation correctly in all cases, so we
-> leave those alone for now.
+> Add Coresight CPU debug nodes for Juno r0, r1 & r2. The CPU
+> debug areas are mapped at the same address for all revisions,
+> like the ETM, even though the CPUs have changed from r1 to r2.
 > 
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Leo Yan <leo.yan@linaro.org>
+> Cc: Mathieu Poirier <mathieu.porier@linaro.org>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Queued for v4.13 [1]
-
-IIUC, it's not a fix and can wait for v4.13. Let me know if that's not
-the case.
+ARM-SoC team expect DTS to be routed via platform tree.
+So I have queued this for v4.13[1]
 
 -- 
 Regards,
