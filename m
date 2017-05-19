@@ -1,77 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 19 May 2017 09:56:40 +0100
-Subject: [PATCH] i2c: designware: don't infer timings described by ACPI from
- clock rate
-Message-ID: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 19 May 2017 11:11:06 +0200
+Subject: [PATCH v2 8/9] crypto: mediatek - Use IPAD/OPAD constant
+In-Reply-To: <20170519065331.27670-9-clabbe.montjoie@gmail.com>
+References: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
+ <20170519065331.27670-9-clabbe.montjoie@gmail.com>
+Message-ID: <bf63ad43-5648-d289-4414-5d187b37f229@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit bd698d24b1b57 ("i2c: designware: Get selected speed mode
-sda-hold-time via ACPI") updated the logic that reads the timing
-parameters for various I2C bus rates from the DSDT, to only read
-the timing parameters for the currently selected mode.
 
-This causes a WARN_ON() splat on platforms that legally omit the clock
-frequency from the ACPI description, because in the new situation, the
-core I2C designware driver still accesses the fields in the driver
-struct that we no longer populate, and proceeds to calculate them from
-the clock frequency. Since the clock frequency is unspecified, the
-driver complains loudly using a WARN_ON().
 
-So revert back to the old situation, where the struct fields for all
-timings are populated, but retain the new logic which chooses the SDA
-hold time from the timing mode that is currently in use.
+On 19/05/17 08:53, Corentin Labbe wrote:
+> This patch simply replace all occurrence of HMAC IPAD/OPAD value by their
+> define.
+> 
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
 
-Fixes: bd698d24b1b57 ("i2c: designware: Get selected speed mode ...")
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/i2c/busses/i2c-designware-platdrv.c | 18 ++++++++++--------
- 1 file changed, 10 insertions(+), 8 deletions(-)
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index f2acd4b6bf01..6283b99d2b17 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -96,6 +96,7 @@ static int dw_i2c_acpi_configure(struct platform_device *pdev)
- 	struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
- 	acpi_handle handle = ACPI_HANDLE(&pdev->dev);
- 	const struct acpi_device_id *id;
-+	u32 ss_ht, fp_ht, hs_ht, fs_ht;
- 	struct acpi_device *adev;
- 	const char *uid;
- 
-@@ -107,23 +108,24 @@ static int dw_i2c_acpi_configure(struct platform_device *pdev)
- 	 * Try to get SDA hold time and *CNT values from an ACPI method for
- 	 * selected speed modes.
- 	 */
-+	dw_i2c_acpi_params(pdev, "SSCN", &dev->ss_hcnt, &dev->ss_lcnt, &ss_ht);
-+	dw_i2c_acpi_params(pdev, "FPCN", &dev->fp_hcnt, &dev->fp_lcnt, &fp_ht);
-+	dw_i2c_acpi_params(pdev, "HSCN", &dev->hs_hcnt, &dev->hs_lcnt, &hs_ht);
-+	dw_i2c_acpi_params(pdev, "FMCN", &dev->fs_hcnt, &dev->fs_lcnt, &fs_ht);
-+
- 	switch (dev->clk_freq) {
- 	case 100000:
--		dw_i2c_acpi_params(pdev, "SSCN", &dev->ss_hcnt, &dev->ss_lcnt,
--				   &dev->sda_hold_time);
-+		dev->sda_hold_time = ss_ht;
- 		break;
- 	case 1000000:
--		dw_i2c_acpi_params(pdev, "FPCN", &dev->fp_hcnt, &dev->fp_lcnt,
--				   &dev->sda_hold_time);
-+		dev->sda_hold_time = fp_ht;
- 		break;
- 	case 3400000:
--		dw_i2c_acpi_params(pdev, "HSCN", &dev->hs_hcnt, &dev->hs_lcnt,
--				   &dev->sda_hold_time);
-+		dev->sda_hold_time = hs_ht;
- 		break;
- 	case 400000:
- 	default:
--		dw_i2c_acpi_params(pdev, "FMCN", &dev->fs_hcnt, &dev->fs_lcnt,
--				   &dev->sda_hold_time);
-+		dev->sda_hold_time = fs_ht;
- 		break;
- 	}
- 
--- 
-2.9.3
+>   drivers/crypto/mediatek/mtk-sha.c | 5 +++--
+>   1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/crypto/mediatek/mtk-sha.c b/drivers/crypto/mediatek/mtk-sha.c
+> index 2226f12d1c7a..5f4f845adbb8 100644
+> --- a/drivers/crypto/mediatek/mtk-sha.c
+> +++ b/drivers/crypto/mediatek/mtk-sha.c
+> @@ -12,6 +12,7 @@
+>    * Some ideas are from atmel-sha.c and omap-sham.c drivers.
+>    */
+>   
+> +#include <crypto/hmac.h>
+>   #include <crypto/sha.h>
+>   #include "mtk-platform.h"
+>   
+> @@ -825,8 +826,8 @@ static int mtk_sha_setkey(struct crypto_ahash *tfm, const u8 *key,
+>   	memcpy(bctx->opad, bctx->ipad, bs);
+>   
+>   	for (i = 0; i < bs; i++) {
+> -		bctx->ipad[i] ^= 0x36;
+> -		bctx->opad[i] ^= 0x5c;
+> +		bctx->ipad[i] ^= HMAC_IPAD_VALUE;
+> +		bctx->opad[i] ^= HMAC_OPAD_VALUE;
+>   	}
+>   
+>   	return 0;
+> 
