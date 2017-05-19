@@ -1,121 +1,140 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 19 May 2017 19:57:53 +0200
-Subject: [RFC PATCH 03/11] drm: sun4i: ignore swapped mixer<->tcon
- connection for DE2
-In-Reply-To: <20170517164354.16399-4-icenowy@aosc.io>
-References: <20170517164354.16399-1-icenowy@aosc.io>
- <20170517164354.16399-4-icenowy@aosc.io>
-Message-ID: <20170519175753.sygqnwopk7tuv35n@flea.home>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 19 May 2017 18:58:16 +0100
+Subject: [PATCH] arm: boot/compressed: fix decompressor header layout for
+ v7-M
+In-Reply-To: <2E764C85-57F3-4DC2-ADEB-B6B75A70B898@linaro.org>
+References: <20170519145959.26569-1-ard.biesheuvel@linaro.org>
+ <20170519164603.GH3559@e103592.cambridge.arm.com>
+ <CAKv+Gu-yAT+kZ_oMT_+n6_RSOKOoqkZtGYjBKq=Wwhj31BgUgQ@mail.gmail.com>
+ <67bd95eb-1f4b-d9d2-9a68-3574d03ac072@arm.com>
+ <2E764C85-57F3-4DC2-ADEB-B6B75A70B898@linaro.org>
+Message-ID: <29254cb6-ded4-6707-1d75-d0eac53e2f65@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 12:43:46AM +0800, Icenowy Zheng wrote:
-> Some SoC's DE2 has two mixers. Defaultly the mixer0 is connected to
-> tcon0 and mixer1 is connected to tcon1; however by setting a bit
-> the connection can be swapped.
+On 19/05/17 18:33, Ard Biesheuvel wrote:
 > 
-> As we now hardcode the default connection, ignore the bonus endpoint for
-> the mixer's output and the TCON's input, as they stands for the swapped
-> connection.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_drv.c  | 27 ++++++++++++++++++++++++++
->  drivers/gpu/drm/sun4i/sun4i_tcon.c | 39 +++++++++++++++++++++++++++++---------
->  drivers/gpu/drm/sun4i/sun4i_tcon.h |  2 ++
->  3 files changed, 59 insertions(+), 9 deletions(-)
+>> On 19 May 2017, at 18:16, Robin Murphy <robin.murphy@arm.com> wrote:
+>>
+>>> On 19/05/17 17:59, Ard Biesheuvel wrote:
+>>>> On 19 May 2017 at 17:46, Dave Martin <Dave.Martin@arm.com> wrote:
+>>>>> On Fri, May 19, 2017 at 03:59:59PM +0100, Ard Biesheuvel wrote:
+>>>>> As reported by Patrice, the header layout of the decompressor is
+>>>>> incorrect when building for v7-M. In this case, the __nop macro
+>>>>> resolves to 'mov r0, r0', which is emitted as a narrow encoding,
+>>>>> resulting in the header data fields to end up at lower offsets than
+>>>>> required.
+>>>>>
+>>>>> Given the variety of targets we need to support with the same code,
+>>>>> the startup sequence is a bit of a jumble, and uses instructions
+>>>>> and macros whose encoding width cannot be specified (badr), or only
+>>>>> exists in a narrow encoding (bx)
+>>>>>
+>>>>> So force the use of a wide encoding in __nop, and replace the start
+>>>>> sequence with a simple jump to the label marking the start of code,
+>>>>> preceded by a Thumb2 mode switch if required (using explicit wide
+>>>>> encodings where appropriate). The label itself can be moved to the
+>>>>> start of code [where it belongs] due to the larger range of branch
+>>>>> instructions as compared to adr instructions.
+>>>>>
+>>>>> Reported-by: Patrice CHOTARD <patrice.chotard@st.com>
+>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>> ---
+>>>>> arch/arm/boot/compressed/efi-header.S |  4 +---
+>>>>> arch/arm/boot/compressed/head.S       | 14 +++++++-------
+>>>>> 2 files changed, 8 insertions(+), 10 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+>>>>> index 9d5dc4fda3c1..3f7d1b74c5e0 100644
+>>>>> --- a/arch/arm/boot/compressed/efi-header.S
+>>>>> +++ b/arch/arm/boot/compressed/efi-header.S
+>>>>> @@ -17,14 +17,12 @@
+>>>>>              @ there.
+>>>>>              .inst   'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
+>>>>> #else
+>>>>> -             mov     r0, r0
+>>>>> +             W(mov)  r0, r0
+>>>>> #endif
+>>>>>              .endm
+>>>>>
+>>>>>              .macro  __EFI_HEADER
+>>>>> #ifdef CONFIG_EFI_STUB
+>>>>> -             b       __efi_start
+>>>>> -
+>>>>>              .set    start_offset, __efi_start - start
+>>>>>              .org    start + 0x3c
+>>>>>              @
+>>>>> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+>>>>> index 7c711ba61417..8c336a6da210 100644
+>>>>> --- a/arch/arm/boot/compressed/head.S
+>>>>> +++ b/arch/arm/boot/compressed/head.S
+>>>>> @@ -130,19 +130,19 @@ start:
+>>>>>              .rept   7
+>>>>>              __nop
+>>>>>              .endr
+>>>>> -   ARM(              mov     r0, r0          )
+>>>>> -   ARM(              b       1f              )
+>>>>> - THUMB(              badr    r12, 1f         )
+>>>>> - THUMB(              bx      r12             )
+>>>>> +      ARM(   b       1f              )
+>>>>> + AR_CLASS(   sub     pc, pc, #3      )       @ A/R: switch to Thumb2 mode
+>>>>> +  M_CLASS(   nop.w                   )       @ M: already in Thumb2 mode
+>>>>> +    THUMB(   .thumb                  )
+>>>>> +    THUMB(   b.w     1f              )
+>>>>
+>>>> It's not so easy to see that this always assembles to two words, or that
+>>>> the "sub pc, pc, #3" is assembled but not executed in an ARM kernel.
+>>>>
+>>>> Spelling it out might be more readable:
+>>>>
+>>>>   ARM(                 mov     r0, r0          )
+>>>>   ARM(                 mov     r0, r0          )
+>>>>
+>>>> THUMB( AR_CLASS(       sub     pc, pc, #3      ))
+>>>> THUMB( M_CLASS(        nop.w                   ))
+>>>> THUMB(                 .thumb                  )
+>>>> THUMB(                 b.w     1f              )
+>>>>
+>>>> But I guess it works either way.
+>>>>
+>>>
+>>> Indeed. Apart from the error in the second line, this sequence should
+>>> be equivalent, but the nested macro invocations don't make it clearer
+>>> imo.
+>>>
+>>> I could add some more comments as well if that helps?
+>>
+>> Hmm, couldn't it be ISA-agnostic?
+>>
+>>    ldr pc, 1f
+>>    .ltorg
+>> THUMB(    .thumb    )
+>>    ...
+>>
+>> given that that should be interworking on anything where THUMB() is
+>> valid in the first place.
+>>
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> index 1dd1948025d2..29bf1325ded6 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> @@ -173,6 +173,13 @@ static bool sun4i_drv_node_is_frontend(struct device_node *node)
->  		of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend");
->  }
->  
-> +static bool sun4i_drv_node_is_swappable_de2_mixer(struct device_node *node)
-> +{
-> +	/* The V3s has only one mixer-tcon pair, so it's not listed here. */
-> +	return of_device_is_compatible(node, "allwinner,sun8i-h3-de2-mixer0") ||
-> +		of_device_is_compatible(node, "allwinner,sun8i-h3-de2-mixer1");
-> +}
-> +
->  static bool sun4i_drv_node_is_tcon(struct device_node *node)
->  {
->  	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
-> @@ -249,6 +256,26 @@ static int sun4i_drv_add_endpoints(struct device *dev,
->  			}
->  		}
->  
-> +		/*
-> +		 * The second endpoint of the output of a swappable DE2 mixer
-> +		 * is the TCON after connection swapping.
-> +		 * Ignore it now, as we now hardcode mixer0->tcon0,
-> +		 * mixer1->tcon1 connection.
-> +		 */
-> +		if (sun4i_drv_node_is_swappable_de2_mixer(node)) {
-> +			struct of_endpoint endpoint;
-> +
-> +			if (of_graph_parse_endpoint(ep, &endpoint)) {
-> +				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
-> +				continue;
-> +			}
-> +
-> +			if (endpoint.id) {
-> +				DRM_DEBUG_DRIVER("Endpoint is an unused connection for DE2 mixer... skipping\n");
-> +				continue;
-> +			}
-> +		}
-> +
->  		/* Walk down our tree */
->  		count += sun4i_drv_add_endpoints(dev, match, remote);
->  
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index f44a37a5993d..89a215ff2370 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -425,7 +425,8 @@ static int sun4i_tcon_init_regmap(struct device *dev,
->   * requested via the get_id function of the engine.
->   */
->  static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
-> -						   struct device_node *node)
-> +						   struct device_node *node,
-> +						   bool skip_bonus_ep)
->  {
->  	struct device_node *port, *ep, *remote;
->  	struct sunxi_engine *engine;
-> @@ -439,6 +440,20 @@ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
->  		if (!remote)
->  			continue;
->  
-> +		if (skip_bonus_ep) {
-> +			struct of_endpoint endpoint;
-> +
-> +			if (of_graph_parse_endpoint(ep, &endpoint)) {
-> +				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
-> +				continue;
-> +			}
-> +
-> +			if (endpoint.id) {
-> +				DRM_DEBUG_DRIVER("Skipping bonus mixer->TCON connection when searching engine\n");
-> +				continue;
-> +			}
-> +		}
-> +
+> The decompressor runs at a a priori unknown offset so literals containing absolute values are not helpful here.
 
-You don't list the mixers in the tcon's output, why do you need that
-exactly?
+Ah, I knew I'd have overlooked something - that makes sense.
 
-Maxime
+FWIW, my final thought is this:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170519/eb1f9469/attachment.sig>
+	add	r12, pc, #5
+	mov	r0, r0
+	mov	pc, r12
+
+Which I think should leave you in Thumb regardless of which ISA it's
+assembled in, thanks to the wackiness of ALUWritePC().
+
+Robin.
+
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
