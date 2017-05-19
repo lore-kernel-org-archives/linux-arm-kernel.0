@@ -1,42 +1,52 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 19 May 2017 08:53:31 +0200
-Subject: [PATCH v2 9/9] crypto: ccp - Use IPAD/OPAD constant
-In-Reply-To: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
-References: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170519065331.27670-10-clabbe.montjoie@gmail.com>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Fri, 19 May 2017 15:56:25 +0900
+Subject: [PATCH v3 0/3] Add support for the S6E3HF2 panel on TM2e board
+In-Reply-To: <1492504836-19225-1-git-send-email-hoegeun.kwon@samsung.com>
+References: <CGME20170418084047epcas5p493261a4cb9204e682f60cde8d659565c@epcas5p4.samsung.com>
+ <1492504836-19225-1-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <4b974579-eb2f-1258-86e3-21ffeb22589a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch simply replace all occurrence of HMAC IPAD/OPAD value by their
-define.
+Dear Thierry,
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- drivers/crypto/ccp/ccp-crypto-sha.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Could you check these patches?
+I think this patches have accumulated enough dust.
+If you have a another opinion, please tell me.
 
-diff --git a/drivers/crypto/ccp/ccp-crypto-sha.c b/drivers/crypto/ccp/ccp-crypto-sha.c
-index 6b46eea94932..ce97b3868f4a 100644
---- a/drivers/crypto/ccp/ccp-crypto-sha.c
-+++ b/drivers/crypto/ccp/ccp-crypto-sha.c
-@@ -18,6 +18,7 @@
- #include <linux/crypto.h>
- #include <crypto/algapi.h>
- #include <crypto/hash.h>
-+#include <crypto/hmac.h>
- #include <crypto/internal/hash.h>
- #include <crypto/sha.h>
- #include <crypto/scatterwalk.h>
-@@ -308,8 +309,8 @@ static int ccp_sha_setkey(struct crypto_ahash *tfm, const u8 *key,
- 	}
- 
- 	for (i = 0; i < block_size; i++) {
--		ctx->u.sha.ipad[i] = ctx->u.sha.key[i] ^ 0x36;
--		ctx->u.sha.opad[i] = ctx->u.sha.key[i] ^ 0x5c;
-+		ctx->u.sha.ipad[i] = ctx->u.sha.key[i] ^ HMAC_IPAD_VALUE;
-+		ctx->u.sha.opad[i] = ctx->u.sha.key[i] ^ HMAC_OPAD_VALUE;
- 	}
- 
- 	sg_init_one(&ctx->u.sha.opad_sg, ctx->u.sha.opad, block_size);
--- 
-2.13.0
+Best regards,
+Hoegeun
+
+On 04/18/2017 05:40 PM, Hoegeun Kwon wrote:
+> Hi all,
+>
+> The purpose of this patch is add support for s6e3hf2 AMOLED panel on
+> the TM2e board. The panel has 1600x2560 resolution in 5.65" physical
+> panel in the TM2e device.
+>
+> The s6e3hf2 panel(5.65") is simliar to the previous s6e3ha2 panel(5.7"),
+> but resolution and some command message are different. So it can be
+> distinguished as a compatiblitiy string.
+>
+> Best regards,
+> Hoegeun
+>
+> Changes for V3:
+> - Remove te-gpios property in dts.
+> - Added Reviewed-by: Andrzej Hajda <a.hajda@samsung.com> on all patches.
+> - Added Reviewed-by: Inki Dae <inki.dae@samsung.com> on patch (2/3).
+>
+> Changes for V2:
+> - Add new compatible string to "samsung,s6e3ha2.txt binding with comments.
+> - Fix the panel name from s6e3ha2-e to s6e3hf2
+>
+> Hoegeun Kwon (3):
+>    dt-bindings: Add support for samsung s6e3hf2 panel
+>    drm/panel: s6e3ha2: Add support for s6e3hf2 panel on TM2e board
+>    arm64: dts: exynos: Add support for s6e3hf2 panel device on TM2e board
+>
+>   .../bindings/display/panel/samsung,s6e3ha2.txt     |  5 +-
+>   arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     | 11 ++++
+>   drivers/gpu/drm/panel/panel-samsung-s6e3ha2.c      | 64 +++++++++++++++++++---
+>   3 files changed, 72 insertions(+), 8 deletions(-)
+>
