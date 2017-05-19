@@ -1,111 +1,141 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 19 May 2017 14:13:21 +0100
-Subject: [RFC PATCH] arm64: neon: Remove support for nested or hardirq
- kernel-mode NEON
-In-Reply-To: <20170519124952.GB22800@leverpostej>
-References: <1495193199-1291-1-git-send-email-Dave.Martin@arm.com>
- <20170519124952.GB22800@leverpostej>
-Message-ID: <20170519131321.GD3559@e103592.cambridge.arm.com>
+From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
+Date: Fri, 19 May 2017 16:13:02 +0300
+Subject: [PATCH 0/3][v4] staging: fsl-mc: move bus driver out of staging
+Message-ID: <20170519131305.5068-1-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 01:49:53PM +0100, Mark Rutland wrote:
-> Hi,
-> 
-> On Fri, May 19, 2017 at 12:26:39PM +0100, Dave Martin wrote:
-> > +static bool __maybe_unused kernel_neon_allowed(void)
-> > +{
-> > +	/*
-> > +	 * The per_cpu_ptr() is racy if called with preemption enabled.
-> > +	 * This is not a bug:  per_cpu(kernel_neon_busy) is only set
-> > +	 * when preemption is disabled, so we cannot migrate to another
-> > +	 * CPU while it is set, nor can we migrate to a CPU where it is set.
-> > +	 * So, if we find it clear on some CPU then we're guaranteed to find it
-> > +	 * clear on any CPU we could migrate to.
-> > +	 *
-> > +	 * If we are in between kernel_neon_begin()...kernel_neon_end(), the
-> > +	 * flag will be set, but preemption is also disabled, so we can't
-> > +	 * migrate to another CPU and spuriously see it become false.
-> > +	 */
-> > +	return !(in_irq() || in_nmi()) &&
-> > +		!local_read(this_cpu_ptr(&kernel_neon_busy));
-> > +}
-> 
-> I think it would be better to use the this_cpu ops for this, rather than
-> manually messing with the pointer.
+From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-I had thought that the properties of local_t were important here, but
-this_cpu ops seem equally appropriate.
+Now that there is a functional ethernet driver probed on the
+mc bus this patch series requests that the fsl-mc bus driver
+be moved out of staging.
 
-> Here, we can use raw_cpu_read(kernel_neon_busy), given the comment
-> above.
+The proposed destination for the bus driver is drivers/bus.
+Proposed location for global header files for fsl-mc and dpaa2
+is the already existing include/linux/fsl.
 
-What's the difference?  The raw_ variants aren't documented.  Do these
-not bother about atomicity between the address calculation and the read?
+First couple of patches fix several checkpatch.pl issues and
+the last patch moves the bus out of staging, updating all
+the users (e.g. #include paths).
 
-> [...]
-> 
-> > +DEFINE_PER_CPU(local_t, kernel_neon_busy);
-> 
-> This can become a basic type like int or bool.
+Based on:
+git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/staging.git, staging-next
 
-Agreed -- probably bool, given how it's used.
+Link to previous version:
+https://lkml.org/lkml/2016/12/1/758
 
-> [...]
-> 
-> > +void kernel_neon_begin(void)
-> >  {
-> >  	if (WARN_ON(!system_supports_fpsimd()))
-> >  		return;
-> > -	if (in_interrupt()) {
-> > -		struct fpsimd_partial_state *s = this_cpu_ptr(
-> > -			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-> >  
-> > -		BUG_ON(num_regs > 32);
-> > -		fpsimd_save_partial_state(s, roundup(num_regs, 2));
-> > -	} else {
-> > -		/*
-> > -		 * Save the userland FPSIMD state if we have one and if we
-> > -		 * haven't done so already. Clear fpsimd_last_state to indicate
-> > -		 * that there is no longer userland FPSIMD state in the
-> > -		 * registers.
-> > -		 */
-> > -		preempt_disable();
-> > -		if (current->mm &&
-> > -		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
-> > -			fpsimd_save_state(&current->thread.fpsimd_state);
-> > +	BUG_ON(!kernel_neon_allowed());
-> > +
-> > +	preempt_disable();
-> > +	local_set(this_cpu_ptr(&kernel_neon_busy), 1);
-> 
-> As preemption is disabled:
-> 
-> 	__this_cpu_write(kernel_neon_busy, 1);
-> 
-> [...]
-> 
-> >  void kernel_neon_end(void)
-> >  {
-> > +	long busy;
-> > +
-> >  	if (!system_supports_fpsimd())
-> >  		return;
-> > -	if (in_interrupt()) {
-> > -		struct fpsimd_partial_state *s = this_cpu_ptr(
-> > -			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-> > -		fpsimd_load_partial_state(s);
-> > -	} else {
-> > -		preempt_enable();
-> > -	}
-> > +
-> > +	busy = local_xchg(this_cpu_ptr(&kernel_neon_busy), 0);
-> 
-> Likewise:
-> 
-> 	busy = __this_cpu_xchg(kernel_neon_busy, 0);
+Link to last round of driver model fixes & cleanups:
+https://lkml.org/lkml/2017/2/1/235
 
-Yup.  Will tweak.
+version 4 changes
+ - rebased on latest staging-next
+ - dpio was submitted separately so dropped from the series
+ - several checkpatch.pl --strict fixes (first 2 patches)
+ - update existing dpaa2 drivers to match the new fsl-mc bus location
 
-Cheers
----Dave
+version 3 changes
+   -zero memory allocated for a dpio store
+   -replace hardcoded dequeue token with a #define and look for
+    that token when checking for a new result
+
+version 2 changes (mostly feedback from Ioana Radulescu)
+   -removed unused structs and defines in dpio command definitions
+   -added setter/getter for the FD ctrl field
+   -corrected comment for SG format_offset field description
+   -added support for short length field in FD
+   -fix bug in buffer release command, by setting bpid field
+   -handle error (NULL) return value from qbman_swp_mc_complete()
+   -fix bug in sending management commands where the verb was
+    properly initialized
+   -use service_select_by_cpu() for re-arming DPIO interrupts
+   -replace use of NR_CPUS with num_possible_cpus()
+   -handle error case where number of DPIOs exceeds number of possible
+    CPUs
+   -error message cleanup
+   -updated MAINTAINERS file with proper location for both fsl-mc bus
+    driver and dpio driver
+
+Laurentiu Tudor (2):
+  staging: fsl-mc: fix several checkpath.pl warnings
+  staging: fsl-mc: add binding path to MAINTAINERS
+
+Stuart Yoder (1):
+  staging: fsl-mc: move bus driver out of staging
+
+ .../README.txt => Documentation/dpaa2/overview.txt    |  0
+ MAINTAINERS                                           |  3 ++-
+ drivers/bus/Kconfig                                   |  2 ++
+ drivers/bus/Makefile                                  |  3 +++
+ drivers/bus/fsl-mc/Kconfig                            | 17 +++++++++++++++++
+ drivers/bus/fsl-mc/Makefile                           | 19 +++++++++++++++++++
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp-cmd.h |  2 +-
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp.c     |  6 +++---
+ .../{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp-cmd.h    |  2 +-
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp.c    |  4 ++--
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp.h    |  0
+ .../{staging/fsl-mc/bus => bus/fsl-mc}/dpmng-cmd.h    |  2 +-
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmng.c    |  6 +++---
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc-cmd.h |  2 +-
+ .../{staging/fsl-mc/bus => bus/fsl-mc}/dprc-driver.c  |  6 +++---
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc.c     |  6 +++---
+ .../fsl-mc/bus => bus/fsl-mc}/fsl-mc-allocator.c      | 17 ++++++++++-------
+ .../{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-bus.c   | 18 ++++++------------
+ .../{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-msi.c   |  4 +++-
+ .../fsl-mc/bus => bus/fsl-mc}/fsl-mc-private.h        |  5 +++--
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/mc-io.c    |  5 +++--
+ drivers/{staging/fsl-mc/bus => bus/fsl-mc}/mc-sys.c   |  6 +++---
+ drivers/irqchip/Makefile                              |  1 +
+ .../bus => irqchip}/irq-gic-v3-its-fsl-mc-msi.c       |  3 +--
+ drivers/staging/fsl-dpaa2/ethernet/README             |  2 +-
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c        |  4 ++--
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h        |  2 +-
+ drivers/staging/fsl-dpaa2/ethernet/dpni.c             |  4 ++--
+ drivers/staging/fsl-mc/TODO                           | 18 ------------------
+ drivers/staging/fsl-mc/bus/Kconfig                    | 10 ----------
+ drivers/staging/fsl-mc/bus/Makefile                   | 15 +--------------
+ drivers/staging/fsl-mc/bus/dpcon.c                    |  8 ++++----
+ drivers/staging/fsl-mc/bus/dpio/dpio-driver.c         |  2 +-
+ drivers/staging/fsl-mc/bus/dpio/dpio-service.c        |  2 +-
+ drivers/staging/fsl-mc/bus/dpio/dpio.c                |  4 ++--
+ .../fsl-mc/include => include/linux/fsl}/dpbp.h       |  0
+ .../fsl-mc/bus => include/linux/fsl}/dpcon-cmd.h      |  0
+ .../fsl-mc/include => include/linux/fsl}/dpmng.h      |  0
+ .../fsl-mc/include => include/linux/fsl}/dprc.h       |  4 ----
+ .../fsl-mc/include => include/linux/fsl}/mc-bus.h     |  2 +-
+ .../fsl-mc/include => include/linux/fsl}/mc-cmd.h     |  0
+ .../fsl-mc/include => include/linux/fsl}/mc-sys.h     |  1 -
+ .../staging/fsl-mc/include => include/linux/fsl}/mc.h |  2 +-
+ 43 files changed, 108 insertions(+), 111 deletions(-)
+ rename drivers/staging/fsl-mc/README.txt => Documentation/dpaa2/overview.txt (100%)
+ create mode 100644 drivers/bus/fsl-mc/Kconfig
+ create mode 100644 drivers/bus/fsl-mc/Makefile
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp-cmd.h (97%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpbp.c (98%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp-cmd.h (96%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp.c (98%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmcp.h (100%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmng-cmd.h (96%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dpmng.c (96%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc-cmd.h (99%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc-driver.c (99%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/dprc.c (99%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-allocator.c (98%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-bus.c (98%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-msi.c (99%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/fsl-mc-private.h (96%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/mc-io.c (99%)
+ rename drivers/{staging/fsl-mc/bus => bus/fsl-mc}/mc-sys.c (99%)
+ rename drivers/{staging/fsl-mc/bus => irqchip}/irq-gic-v3-its-fsl-mc-msi.c (98%)
+ delete mode 100644 drivers/staging/fsl-mc/TODO
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/dpbp.h (100%)
+ rename {drivers/staging/fsl-mc/bus => include/linux/fsl}/dpcon-cmd.h (100%)
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/dpmng.h (100%)
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/dprc.h (99%)
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/mc-bus.h (99%)
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/mc-cmd.h (100%)
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/mc-sys.h (99%)
+ rename {drivers/staging/fsl-mc/include => include/linux/fsl}/mc.h (99%)
+
+-- 
+1.8.3.1
