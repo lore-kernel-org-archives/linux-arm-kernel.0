@@ -1,9 +1,9 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 19 May 2017 08:53:26 +0200
-Subject: [PATCH v2 4/9] crypto: marvell - Use IPAD/OPAD constant
+Date: Fri, 19 May 2017 08:53:27 +0200
+Subject: [PATCH v2 5/9] crypto: mv_cesa - Use IPAD/OPAD constant
 In-Reply-To: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
 References: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170519065331.27670-5-clabbe.montjoie@gmail.com>
+Message-ID: <20170519065331.27670-6-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,31 +12,31 @@ define.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/crypto/marvell/hash.c | 5 +++--
+ drivers/crypto/mv_cesa.c | 5 +++--
  1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
-index 77c0fb936f47..e61b08566093 100644
---- a/drivers/crypto/marvell/hash.c
-+++ b/drivers/crypto/marvell/hash.c
-@@ -12,6 +12,7 @@
-  * by the Free Software Foundation.
-  */
- 
+diff --git a/drivers/crypto/mv_cesa.c b/drivers/crypto/mv_cesa.c
+index 451fa18c1c7b..bf25f415eea6 100644
+--- a/drivers/crypto/mv_cesa.c
++++ b/drivers/crypto/mv_cesa.c
+@@ -18,6 +18,7 @@
+ #include <linux/slab.h>
+ #include <linux/module.h>
+ #include <linux/clk.h>
 +#include <crypto/hmac.h>
- #include <crypto/md5.h>
+ #include <crypto/internal/hash.h>
  #include <crypto/sha.h>
+ #include <linux/of.h>
+@@ -822,8 +823,8 @@ static int mv_hash_setkey(struct crypto_ahash *tfm, const u8 * key,
+ 		memcpy(opad, ipad, bs);
  
-@@ -1164,8 +1165,8 @@ static int mv_cesa_ahmac_pad_init(struct ahash_request *req,
- 	memcpy(opad, ipad, blocksize);
+ 		for (i = 0; i < bs; i++) {
+-			ipad[i] ^= 0x36;
+-			opad[i] ^= 0x5c;
++			ipad[i] ^= HMAC_IPAD_VALUE;
++			opad[i] ^= HMAC_OPAD_VALUE;
+ 		}
  
- 	for (i = 0; i < blocksize; i++) {
--		ipad[i] ^= 0x36;
--		opad[i] ^= 0x5c;
-+		ipad[i] ^= HMAC_IPAD_VALUE;
-+		opad[i] ^= HMAC_OPAD_VALUE;
- 	}
- 
- 	return 0;
+ 		rc = crypto_shash_init(shash) ? :
 -- 
 2.13.0
