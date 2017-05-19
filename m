@@ -1,27 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 19 May 2017 00:00:57 -0700
-Subject: [PATCH 1/2] arm64: defconfig: sync with savedefconfig
-In-Reply-To: <20170517215230.15108-1-robh@kernel.org>
-References: <20170517215230.15108-1-robh@kernel.org>
-Message-ID: <20170519070057.GE9628@localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 19 May 2017 09:19:22 +0200
+Subject: [linux-sunxi] [PATCH v6 9/9] arm64: allwinner: a64: enable Wi-Fi
+ for Pine64
+In-Reply-To: <79B00D42-3F95-4D5E-9A23-8E893CCF2462@aosc.io>
+References: <20170518071653.36561-1-icenowy@aosc.io>
+ <20170518071653.36561-10-icenowy@aosc.io>
+ <CAGb2v66mqMveibKKU9LiBm8jzAOj46hFCK6HvJx0k6077fqLZw@mail.gmail.com>
+ <79B00D42-3F95-4D5E-9A23-8E893CCF2462@aosc.io>
+Message-ID: <20170519071922.awmib4qphl6ac6mj@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 04:52:29PM -0500, Rob Herring wrote:
-> Sync the defconfig with savedefconfig as config options change/move over
-> time.
+On Fri, May 19, 2017 at 11:03:33AM +0800, Icenowy Zheng wrote:
+> >The patch looks OK, but given the module is removable, I think it
+> >should be
+> >an overlay. The overlay would enable WiFi + Bluetooth, and all the
+> >peripherals needed to connect them.
+> >
+> >That way, if the module is not installed, we avoid confusing the user
+> >with
+> >unused peripherals, and avoid having live voltage on an unoccupied
+> >header.
 > 
-> Generated with the following commands:
-> make defconfig
-> make savedefconfig
-> cp defconfig arch/arm64/configs/defconfig
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
-> I just found that Timur already sent pretty much the same thing. Take 
-> your pick what to apply. Mine is on top of 4.12-rc1.
+> But as this header have specific usage, we will also confuse user
+> if it's not enabled as its target usage.
 
-This one was sitting there so I applied it.
+Yet you would enable unused resources.
 
+This was already pointed out here:
+https://patchwork.kernel.org/patch/9670235/
 
--Olof
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170519/259493c5/attachment.sig>
