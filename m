@@ -1,24 +1,24 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 19 May 2017 13:29:26 +0200
-Subject: [PATCH v2 4/4] arm: dts: rk322x: update tsadc's frequence setting
-In-Reply-To: <1495016177-2413-5-git-send-email-frank.wang@rock-chips.com>
-References: <1495016177-2413-1-git-send-email-frank.wang@rock-chips.com>
- <1495016177-2413-5-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1810522.TkatQABEYk@phil>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 19 May 2017 12:31:16 +0100
+Subject: [RFC PATCH] arm64: neon: Remove support for nested or hardirq
+ kernel-mode NEON
+In-Reply-To: <1495193199-1291-1-git-send-email-Dave.Martin@arm.com>
+References: <1495193199-1291-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170519113113.GC3559@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 17. Mai 2017, 18:16:17 CEST schrieb Frank Wang:
-> From: Rocky Hao <rocky.hao@rock-chips.com>
-> 
-> Update freq of tsadc's working clock as 32768 hz, if not set, tsadc
-> will work at a default frequence.
-> 
-> Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
-> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+On Fri, May 19, 2017 at 12:26:39PM +0100, Dave Martin wrote:
 
-applied for 4.13 after adapting the subject a bit
+[...]
 
+> I've build-tested this only for now: no runtime testing, no
+> benchmarking.
 
-Thanks
-Heiko
+Note, there's a missing #include of <asm/neon.h> from fpsimd.c.
+(I moved/renamed kernel_neon_allowed() after build-testing...)
+
+[...]
+
+Cheers
+---Dave
