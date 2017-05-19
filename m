@@ -1,105 +1,132 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Fri, 19 May 2017 20:00:15 +0200
-Subject: [linux-sunxi] Re: [RFC PATCH 02/11] drm: sun4i: add support for
- H3 mixers
-In-Reply-To: <695DFDD0-1925-433C-AB88-B90EE461C203@aosc.io>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat, 20 May 2017 02:00:22 +0800
+Subject: [RFC PATCH 03/11] drm: sun4i: ignore swapped mixer<->tcon
+ connection for DE2
+In-Reply-To: <20170519175753.sygqnwopk7tuv35n@flea.home>
 References: <20170517164354.16399-1-icenowy@aosc.io>
- <20170519174729.q5qk2vqlibzx3zrv@flea.home>
- <695DFDD0-1925-433C-AB88-B90EE461C203@aosc.io>
-Message-ID: <2675772.KPXzA3y97S@jernej-laptop>
+ <20170517164354.16399-4-icenowy@aosc.io>
+ <20170519175753.sygqnwopk7tuv35n@flea.home>
+Message-ID: <ECF29F56-DF18-4E3C-9C85-B29F89BD4228@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
 
-Dne petek, 19. maj 2017 ob 19:49:58 CEST je Icenowy Zheng napisal(a):
-> ? 2017?5?20? GMT+08:00 ??1:47:29, Maxime Ripard <maxime.ripard@free-
-electrons.com> ??:
-> >On Thu, May 18, 2017 at 12:43:45AM +0800, Icenowy Zheng wrote:
-> >> From: Icenowy Zheng <icenowy@aosc.xyz>
-> >> 
-> >> Allwinner H3 SoC has two mixers, one has 1 VI channel and 3 UI
-> >
-> >channels,
-> >
-> >> and the other has 1 VI and 1 UI.
-> >> 
-> >> Add support for these two variants.
-> >> 
-> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> >> ---
-> >> 
-> >>  drivers/gpu/drm/sun4i/sun8i_mixer.c | 18 ++++++++++++++++++
-> >>  1 file changed, 18 insertions(+)
-> >> 
-> >> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> >
-> >b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> >
-> >> index cb193c5f1686..d658a3a8159a 100644
-> >> --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> >> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> >> @@ -390,11 +390,29 @@ static const struct sun8i_mixer_cfg
-> >
-> >sun8i_v3s_mixer_cfg = {
-> >
-> >>  	.ui_num = 1,
-> >>  
-> >>  };
-> >> 
-> >> +static const struct sun8i_mixer_cfg sun8i_h3_mixer0_cfg = {
-> >> +	.vi_num = 1,
-> >> +	.ui_num = 3,
-> >> +};
-> >> +
-> >> +static const struct sun8i_mixer_cfg sun8i_h3_mixer1_cfg = {
-> >> +	.vi_num = 1,
-> >> +	.ui_num = 1,
-> >> +};
-> >> +
-> >> 
-> >>  static const struct of_device_id sun8i_mixer_of_table[] = {
-> >>  
-> >>  	{
-> >>  	
-> >>  		.compatible = "allwinner,sun8i-v3s-de2-mixer",
-> >>  		.data = &sun8i_v3s_mixer_cfg,
-> >>  	
-> >>  	},
-> >> 
-> >> +	{
-> >> +		.compatible = "allwinner,sun8i-h3-de2-mixer0",
-> >> +		.data = &sun8i_h3_mixer0_cfg
-> >> +	},
-> >> +	{
-> >> +		.compatible = "allwinner,sun8i-h3-de2-mixer1",
-> >> +		.data = &sun8i_h3_mixer1_cfg
-> >> +	},
-> >
-> >So the only difference between the two is the number of ui planes?
-> 
-> Not only., but currently we only implemented this.
-> 
-> More functions differ, but we still don't support them...
-> 
 
-As far as I can tell, they only differ in ui & vi number of planes and between 
-different SoCs, max plane size.
+? 2017?5?20? GMT+08:00 ??1:57:53, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+>On Thu, May 18, 2017 at 12:43:46AM +0800, Icenowy Zheng wrote:
+>> Some SoC's DE2 has two mixers. Defaultly the mixer0 is connected to
+>> tcon0 and mixer1 is connected to tcon1; however by setting a bit
+>> the connection can be swapped.
+>> 
+>> As we now hardcode the default connection, ignore the bonus endpoint
+>for
+>> the mixer's output and the TCON's input, as they stands for the
+>swapped
+>> connection.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> ---
+>>  drivers/gpu/drm/sun4i/sun4i_drv.c  | 27 ++++++++++++++++++++++++++
+>>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 39
+>+++++++++++++++++++++++++++++---------
+>>  drivers/gpu/drm/sun4i/sun4i_tcon.h |  2 ++
+>>  3 files changed, 59 insertions(+), 9 deletions(-)
+>> 
+>> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c
+>b/drivers/gpu/drm/sun4i/sun4i_drv.c
+>> index 1dd1948025d2..29bf1325ded6 100644
+>> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+>> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+>> @@ -173,6 +173,13 @@ static bool sun4i_drv_node_is_frontend(struct
+>device_node *node)
+>>  		of_device_is_compatible(node,
+>"allwinner,sun8i-a33-display-frontend");
+>>  }
+>>  
+>> +static bool sun4i_drv_node_is_swappable_de2_mixer(struct device_node
+>*node)
+>> +{
+>> +	/* The V3s has only one mixer-tcon pair, so it's not listed here.
+>*/
+>> +	return of_device_is_compatible(node,
+>"allwinner,sun8i-h3-de2-mixer0") ||
+>> +		of_device_is_compatible(node, "allwinner,sun8i-h3-de2-mixer1");
+>> +}
+>> +
+>>  static bool sun4i_drv_node_is_tcon(struct device_node *node)
+>>  {
+>>  	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
+>> @@ -249,6 +256,26 @@ static int sun4i_drv_add_endpoints(struct device
+>*dev,
+>>  			}
+>>  		}
+>>  
+>> +		/*
+>> +		 * The second endpoint of the output of a swappable DE2 mixer
+>> +		 * is the TCON after connection swapping.
+>> +		 * Ignore it now, as we now hardcode mixer0->tcon0,
+>> +		 * mixer1->tcon1 connection.
+>> +		 */
+>> +		if (sun4i_drv_node_is_swappable_de2_mixer(node)) {
+>> +			struct of_endpoint endpoint;
+>> +
+>> +			if (of_graph_parse_endpoint(ep, &endpoint)) {
+>> +				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
+>> +				continue;
+>> +			}
+>> +
+>> +			if (endpoint.id) {
+>> +				DRM_DEBUG_DRIVER("Endpoint is an unused connection for DE2
+>mixer... skipping\n");
+>> +				continue;
+>> +			}
+>> +		}
+>> +
+>>  		/* Walk down our tree */
+>>  		count += sun4i_drv_add_endpoints(dev, match, remote);
+>>  
+>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> index f44a37a5993d..89a215ff2370 100644
+>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> @@ -425,7 +425,8 @@ static int sun4i_tcon_init_regmap(struct device
+>*dev,
+>>   * requested via the get_id function of the engine.
+>>   */
+>>  static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv
+>*drv,
+>> -						   struct device_node *node)
+>> +						   struct device_node *node,
+>> +						   bool skip_bonus_ep)
+>>  {
+>>  	struct device_node *port, *ep, *remote;
+>>  	struct sunxi_engine *engine;
+>> @@ -439,6 +440,20 @@ static struct sunxi_engine
+>*sun4i_tcon_find_engine(struct sun4i_drv *drv,
+>>  		if (!remote)
+>>  			continue;
+>>  
+>> +		if (skip_bonus_ep) {
+>> +			struct of_endpoint endpoint;
+>> +
+>> +			if (of_graph_parse_endpoint(ep, &endpoint)) {
+>> +				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
+>> +				continue;
+>> +			}
+>> +
+>> +			if (endpoint.id) {
+>> +				DRM_DEBUG_DRIVER("Skipping bonus mixer->TCON connection when
+>searching engine\n");
+>> +				continue;
+>> +			}
+>> +		}
+>> +
+>
+>You don't list the mixers in the tcon's output, why do you need that
+>exactly?
 
-Icenowy,
-Do you know any other property they differ? I think everything else is based 
-mostly on ui & vi number of planes.
+Mixers are TCONs' input, not output...
 
-Best regards,
-Jernej
-
-> >Why not create a property to give the number then, instead of a
-> >compatible?
-> >
-> >Maxime
-> 
-> --
-> You received this message because you are subscribed to the Google Groups
-> "linux-sunxi" group. To unsubscribe from this group and stop receiving
-> emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+>
+>Maxime
