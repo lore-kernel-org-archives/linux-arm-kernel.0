@@ -1,7 +1,7 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 20 May 2017 01:05:06 +0200
-Subject: [PATCH 1/4] ata: Add DT bindings for Faraday Technology FTIDE010
-Message-ID: <20170519230509.16655-1-linus.walleij@linaro.org>
+Date: Sat, 20 May 2017 01:05:57 +0200
+Subject: [PATCH 1/4 v2] ata: Add DT bindings for Faraday Technology FTIDE010
+Message-ID: <20170519230600.16782-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
