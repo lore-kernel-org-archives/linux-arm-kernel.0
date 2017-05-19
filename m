@@ -1,79 +1,52 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 19 May 2017 16:42:00 +0100
-Subject: [PATCH v2] arm64: kernel: restrict /dev/mem read() calls to linear
- region
-Message-ID: <20170519154200.14158-1-ard.biesheuvel@linaro.org>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 19 May 2017 16:42:02 +0100
+Subject: [PATCH] ARM: make configuration of userspace Thumb support an expert
+ option
+Message-ID: <E1dBk2U-0000eE-Ai@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running lscpu on an AArch64 system that has SMBIOS version 2.0
-tables, it will segfault in the following way:
+David Mosberger reports random segfaults and other problems when running
+his buildroot userspace.  It turns out that his kernel did not have
+support for Thumb userspace, nor did his application, but glibc made use
+of Thumb instructions in glibc.
 
-  Unable to handle kernel paging request at virtual address ffff8000bfff0000
-  pgd = ffff8000f9615000
-  [ffff8000bfff0000] *pgd=0000000000000000
-  Internal error: Oops: 96000007 [#1] PREEMPT SMP
-  Modules linked in:
-  CPU: 0 PID: 1284 Comm: lscpu Not tainted 4.11.0-rc3+ #103
-  Hardware name: QEMU QEMU Virtual Machine, BIOS 0.0.0 02/06/2015
-  task: ffff8000fa78e800 task.stack: ffff8000f9780000
-  PC is at __arch_copy_to_user+0x90/0x220
-  LR is at read_mem+0xcc/0x140
+The kernel Thumb support option already recommends being enabled, and
+is also so biased, but clearly this is not enough of a recommendation.
 
-This is caused by the fact that lspci issues a read() on /dev/mem at the
-offset where it expects to find the SMBIOS structure array. However, this
-region is classified as EFI_RUNTIME_SERVICE_DATA (as per the UEFI spec),
-and so it is omitted from the linear mapping.
+So, hide this behind CONFIG_EXPERT as well, and include a note to
+indicate the potential issues if it's turned off and userspace Thumb
+mode is made use of.
 
-So let's restrict /dev/mem read/write access to those areas that are
-covered by the linear region.
-
-Reported-by: Alexander Graf <agraf@suse.de>
-Fixes: 4dffbfc48d65 ("arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP")
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reported-by: David Mosberger <davidm@egauge.net>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
-v2: check whether the entire region is covered by the same memblock that has
-    the MEMBLOCK_NOMAP attribute cleared
+ arch/arm/mm/Kconfig | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
- arch/arm64/mm/mmap.c | 19 +++++++++++++------
- 1 file changed, 13 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
-index 7b0d55756eb1..adc208c2ae9c 100644
---- a/arch/arm64/mm/mmap.c
-+++ b/arch/arm64/mm/mmap.c
-@@ -18,6 +18,7 @@
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index c6c4c9c8824b..4f68659abe6c 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -679,7 +679,7 @@ config ARCH_DMA_ADDR_T_64BIT
+ 	bool
  
- #include <linux/elf.h>
- #include <linux/fs.h>
-+#include <linux/memblock.h>
- #include <linux/mm.h>
- #include <linux/mman.h>
- #include <linux/export.h>
-@@ -103,12 +104,18 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
-  */
- int valid_phys_addr_range(phys_addr_t addr, size_t size)
- {
--	if (addr < PHYS_OFFSET)
--		return 0;
--	if (addr + size > __pa(high_memory - 1) + 1)
--		return 0;
--
--	return 1;
-+	/*
-+	 * Check whether addr is covered by a memory region without the
-+	 * MEMBLOCK_NOMAP attribute, and whether that region covers the
-+	 * entire range. In theory, this could lead to false negatives
-+	 * if the range is covered by distinct but adjacent memory regions
-+	 * that only differ in other attributes. However, few of such
-+	 * attributes have been defined, and it is debatable whether it
-+	 * follows that /dev/mem read() calls should be able traverse
-+	 * such boundaries.
-+	 */
-+	return memblock_is_region_memory(addr, size) &&
-+	       memblock_is_map_memory(addr);
- }
+ config ARM_THUMB
+-	bool "Support Thumb user binaries" if !CPU_THUMBONLY
++	bool "Support Thumb user binaries" if !CPU_THUMBONLY && EXPERT
+ 	depends on CPU_THUMB_CAPABLE
+ 	default y
+ 	help
+@@ -690,6 +690,10 @@ config ARM_THUMB
+ 	  instruction set resulting in smaller binaries at the expense of
+ 	  slightly less efficient code.
  
- /*
++	  If this option is disabled, and you run userspace that switches to
++	  Thumb mode, signal handling will not work correctly, resulting in
++	  segmentation faults or illegal instruction aborts.
++
+ 	  If you don't know what this all is, saying Y is a safe choice.
+ 
+ config ARM_THUMBEE
 -- 
-2.9.3
+2.7.4
