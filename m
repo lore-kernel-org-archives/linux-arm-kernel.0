@@ -1,52 +1,61 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 19 May 2017 16:42:02 +0100
-Subject: [PATCH] ARM: make configuration of userspace Thumb support an expert
- option
-Message-ID: <E1dBk2U-0000eE-Ai@rmk-PC.armlinux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 19 May 2017 17:55:18 +0200
+Subject: [PATCH 0/7] Improve cp110 clk support on Marvell Armada 7K/8K
+Message-ID: <cover.737145f06ff0191d1a9210bcd141e679bf45fe5f.1495208533.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Mosberger reports random segfaults and other problems when running
-his buildroot userspace.  It turns out that his kernel did not have
-support for Thumb userspace, nor did his application, but glibc made use
-of Thumb instructions in glibc.
+Hi,
 
-The kernel Thumb support option already recommends being enabled, and
-is also so biased, but clearly this is not enough of a recommendation.
+We got more information about the clock controllers and the clock tree
+of the CP110 part that we find in the Marvell Armada 7K/8K SoCs.
 
-So, hide this behind CONFIG_EXPERT as well, and include a note to
-indicate the potential issues if it's turned off and userspace Thumb
-mode is made use of.
+The clock tree needs to be fixed, indeed the GOP clock is only the
+clock for the GOIP and not for the SDIO, it is fixed in the first
+patch.
 
-Reported-by: David Mosberger <davidm@egauge.net>
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/mm/Kconfig | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+The second patch does a small improve of the code itself.
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index c6c4c9c8824b..4f68659abe6c 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -679,7 +679,7 @@ config ARCH_DMA_ADDR_T_64BIT
- 	bool
- 
- config ARM_THUMB
--	bool "Support Thumb user binaries" if !CPU_THUMBONLY
-+	bool "Support Thumb user binaries" if !CPU_THUMBONLY && EXPERT
- 	depends on CPU_THUMB_CAPABLE
- 	default y
- 	help
-@@ -690,6 +690,10 @@ config ARM_THUMB
- 	  instruction set resulting in smaller binaries at the expense of
- 	  slightly less efficient code.
- 
-+	  If this option is disabled, and you run userspace that switches to
-+	  Thumb mode, signal handling will not work correctly, resulting in
-+	  segmentation faults or illegal instruction aborts.
-+
- 	  If you don't know what this all is, saying Y is a safe choice.
- 
- config ARM_THUMBEE
+The purpose of the third patch is to have an easier way to add new
+clocks without breaking the backward compatibility. Indeed, we expect
+to continue to have new update on the datasheet and this patch will
+allow integrating this change easier and faster.
+
+The forth patch is needed to ease the integration of the pinctrl node
+in the device tree.
+
+The fifth patch adds a new clock for the SDIO, it also fixes the clock
+tree.
+
+The last two patches modify the device tree to take into account
+theses changes. They must be merged through the mvebu tree to avoid
+future conflict.
+
+In this series, even if there is some change in the device tree
+binding, we paid attention to the backward compatibility, and the
+driver can still work with the old device tree.
+
+Thanks,
+
+Gregory
+
+Gregory CLEMENT (6):
+  clk: mvebu: cp110 fix name of the GOP gate clock
+  clk: mvebu: cp110: make failure labels more meaningful
+  clk: mvebu: cp110: do not depend anymore of the *-clock-output-names
+  clk: mvebu: cp110: introduce a new binding
+  arm64: dts: marvell: remove *-clock-output-names on cp110
+  arm64: dts: marvell: use new binding for the system controller on cp110
+
+Konstantin Porotchkin (1):
+  clk: mvebu: cp110: add sdio clock to cp-110 system controller
+
+ Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt |  35 +++++-------
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi                       |  54 +++++++------------
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi                        |  48 ++++++-----------
+ drivers/clk/mvebu/cp110-system-controller.c                                | 202 +++++++++++++++++++++++++++++++++++++++++++++++++-----------------------
+ 4 files changed, 196 insertions(+), 143 deletions(-)
+
+base-commit: 2ea659a9ef488125eb46da6eb571de5eae5c43f6
 -- 
-2.7.4
+git-series 0.9.1
