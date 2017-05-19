@@ -1,52 +1,39 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Fri, 19 May 2017 15:56:25 +0900
-Subject: [PATCH v3 0/3] Add support for the S6E3HF2 panel on TM2e board
-In-Reply-To: <1492504836-19225-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <CGME20170418084047epcas5p493261a4cb9204e682f60cde8d659565c@epcas5p4.samsung.com>
- <1492504836-19225-1-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <4b974579-eb2f-1258-86e3-21ffeb22589a@samsung.com>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Fri, 19 May 2017 08:56:53 +0200
+Subject: [PATCH v3 1/3] SoC: es8328-i2c: Add compatible for ES8323
+In-Reply-To: <20170516111837.3uf5f5jbdkrnjudi@sirena.org.uk>
+References: <20170512132227.24916-1-romain.perier@collabora.com>
+ <20170512132227.24916-10-romain.perier@collabora.com>
+ <20170515214138.u63u7j53jogk3prm@rob-hp-laptop>
+ <20170516111837.3uf5f5jbdkrnjudi@sirena.org.uk>
+Message-ID: <a052da20-d9c7-69f5-21d9-9111d45702e6@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry,
+Hello,
 
-Could you check these patches?
-I think this patches have accumulated enough dust.
-If you have a another opinion, please tell me.
 
-Best regards,
-Hoegeun
+Le 16/05/2017 ? 13:18, Mark Brown a ?crit :
+> On Mon, May 15, 2017 at 04:41:38PM -0500, Rob Herring wrote:
+>> On Fri, May 12, 2017 at 03:22:25PM +0200, Romain Perier wrote:
+>>> This commit adds a compatible string for everest,es8323. This is an
+>>> audio codec that is compatible with es8328 and can be found for example
+>>> on the Firefly-RK3288 board.
+>> If it is compatible with the es8328, then that should be a fallback and 
+>> you don't need the driver change.
+> While people don't strictly need the driver change it doesn't do any
+> harm either and encourages people to get the information into the DT
+> that it's a different chip.  Thinking about it it might be good to have
+> a way for something to validate if fallback compatibles are being listed
+> when they should - the drivers could provide the information fairly
+> easily I guess, or it could go into the binding docs once we have a
+> schema format.
+>
+> Even if it doesn't currently make a difference to software I'd rather
+> get the information in there for mixed signal devices like audio CODECs
+> - it's not that unknown to find later that supposedly register identical
+> chips have some differences in the analog which we want to care about.
+So, what should I do for this patch, finally ? fallback or driver change ?
 
-On 04/18/2017 05:40 PM, Hoegeun Kwon wrote:
-> Hi all,
->
-> The purpose of this patch is add support for s6e3hf2 AMOLED panel on
-> the TM2e board. The panel has 1600x2560 resolution in 5.65" physical
-> panel in the TM2e device.
->
-> The s6e3hf2 panel(5.65") is simliar to the previous s6e3ha2 panel(5.7"),
-> but resolution and some command message are different. So it can be
-> distinguished as a compatiblitiy string.
->
-> Best regards,
-> Hoegeun
->
-> Changes for V3:
-> - Remove te-gpios property in dts.
-> - Added Reviewed-by: Andrzej Hajda <a.hajda@samsung.com> on all patches.
-> - Added Reviewed-by: Inki Dae <inki.dae@samsung.com> on patch (2/3).
->
-> Changes for V2:
-> - Add new compatible string to "samsung,s6e3ha2.txt binding with comments.
-> - Fix the panel name from s6e3ha2-e to s6e3hf2
->
-> Hoegeun Kwon (3):
->    dt-bindings: Add support for samsung s6e3hf2 panel
->    drm/panel: s6e3ha2: Add support for s6e3hf2 panel on TM2e board
->    arm64: dts: exynos: Add support for s6e3hf2 panel device on TM2e board
->
->   .../bindings/display/panel/samsung,s6e3ha2.txt     |  5 +-
->   arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     | 11 ++++
->   drivers/gpu/drm/panel/panel-samsung-s6e3ha2.c      | 64 +++++++++++++++++++---
->   3 files changed, 72 insertions(+), 8 deletions(-)
->
+Thanks,
+Romain
