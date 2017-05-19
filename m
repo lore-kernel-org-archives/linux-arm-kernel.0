@@ -1,67 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 19 May 2017 14:34:25 +0100
-Subject: [RFC PATCH] arm64: neon: Remove support for nested or hardirq
- kernel-mode NEON
-In-Reply-To: <20170519131321.GD3559@e103592.cambridge.arm.com>
-References: <1495193199-1291-1-git-send-email-Dave.Martin@arm.com>
- <20170519124952.GB22800@leverpostej>
- <20170519131321.GD3559@e103592.cambridge.arm.com>
-Message-ID: <20170519133424.GC22800@leverpostej>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Fri, 19 May 2017 13:41:29 +0000
+Subject: [PATCH 1/1] ARM: compressed/head.S: fix __nop macro rept number
+ for ARMv7M
+In-Reply-To: <CAKv+Gu-_q-SQn3WKDObOW3_OMd2B_UbcdD+PHkzk7Q6nZbZTfA@mail.gmail.com>
+References: <1493110893-21857-1-git-send-email-patrice.chotard@st.com>
+ <ee014785-f025-8b16-14a7-7f1d86403421@st.com>
+ <CAKv+Gu-_q-SQn3WKDObOW3_OMd2B_UbcdD+PHkzk7Q6nZbZTfA@mail.gmail.com>
+Message-ID: <058263e4-458a-7939-1c1c-7bcd100cf2c5@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 02:13:21PM +0100, Dave Martin wrote:
-> On Fri, May 19, 2017 at 01:49:53PM +0100, Mark Rutland wrote:
-> > Hi,
-> > 
-> > On Fri, May 19, 2017 at 12:26:39PM +0100, Dave Martin wrote:
-> > > +static bool __maybe_unused kernel_neon_allowed(void)
-> > > +{
-> > > +	/*
-> > > +	 * The per_cpu_ptr() is racy if called with preemption enabled.
-> > > +	 * This is not a bug:  per_cpu(kernel_neon_busy) is only set
-> > > +	 * when preemption is disabled, so we cannot migrate to another
-> > > +	 * CPU while it is set, nor can we migrate to a CPU where it is set.
-> > > +	 * So, if we find it clear on some CPU then we're guaranteed to find it
-> > > +	 * clear on any CPU we could migrate to.
-> > > +	 *
-> > > +	 * If we are in between kernel_neon_begin()...kernel_neon_end(), the
-> > > +	 * flag will be set, but preemption is also disabled, so we can't
-> > > +	 * migrate to another CPU and spuriously see it become false.
-> > > +	 */
-> > > +	return !(in_irq() || in_nmi()) &&
-> > > +		!local_read(this_cpu_ptr(&kernel_neon_busy));
-> > > +}
-> > 
-> > I think it would be better to use the this_cpu ops for this, rather than
-> > manually messing with the pointer.
+Hi Ard
+
+On 05/18/2017 01:16 PM, Ard Biesheuvel wrote:
+> On 12 May 2017 at 08:22, Patrice CHOTARD <patrice.chotard@st.com> wrote:
+>> Hi all
+>>
+>> It's a gentle reminder to not forgot this patch.
+>>
+>> Thanks
+>>
+>> Patrice
+>>
+>> On 04/25/2017 11:01 AM, patrice.chotard at st.com wrote:
+>>> From: Patrice Chotard <patrice.chotard@st.com>
+>>>
+>>> In zImage, _magic_sig is located at offset 0x24.
+>>> But for ARMv7M architecture which enable CPU_THUMBONLY
+>>> and !EFI_STUB kernel flag, _magic_sig is located at offset 0x14
+>>>
+>>> 00000000  00 46 00 46 00 46 00 46  00 46 00 46 00 46 0f f2  |.F.F.F.F.F.F.F.?|
+>>> 00000010  15 0c 60 47 18 28 6f 01  00 00 00 00 28 5c 0e 00  |..`G.(o.....(\..|
+>>> 00000020  01 02 03 04 0f 46 90 46  00 00 00 00 00 00 00 00  |.....F.F........|
+>>>
+>>> Reproduced with stm32_defconfig with XIP_KERNEL flag disabled.
+>>>
+>>> To restore correct _magic_sig offset at 0x24, we add 8 additional
+>>> "mov r0, r0" instruction.
+>>>
+>>> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+>>> ---
+>>>   arch/arm/boot/compressed/head.S | 3 ++-
+>>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+>>> index 9150f97..5d9cda3 100644
+>>> --- a/arch/arm/boot/compressed/head.S
+>>> +++ b/arch/arm/boot/compressed/head.S
+>>> @@ -127,7 +127,8 @@
+>>>    AR_CLASS(   .arm    )
+>>>   start:
+>>>                .type   start,#function
+>>> -             .rept   7
+>>> +   ARM(              .rept   7)
+>>> + THUMB(              .rept   15)
+>>>
 > 
-> I had thought that the properties of local_t were important here, but
-> this_cpu ops seem equally appropriate.
-> 
-> > Here, we can use raw_cpu_read(kernel_neon_busy), given the comment
-> > above.
-> 
-> What's the difference?  The raw_ variants aren't documented.  Do these
-> not bother about atomicity between the address calculation and the read?
+> Could you try using W(mov) instead of mov in the definition of __nop ?
 
-Yup.
+If i use W(mov) instead of mov in __nop macro, i need to add one 
+additional "mov r0,r0" in THUMB case as following :
 
-Comparing raw_cpu_{x}, __this_cpu_{x}, and this_cpu_{x}:
 
-* raw_cpu_{x} don't have any preemption checks, and don't disable
-  preemption internally. Due to this, the address gen and operation can
-  occur on different CPUs.
+  start:
+  		.type	start,#function
+  		.rept	7
+  		__nop
+  		.endr
+     ARM(		mov	r0, r0		)
+     ARM(		b	1f		)
++ THUMB(		mov	r0, r0		)
+   THUMB(		badr	r12, 1f		)
+   THUMB(		bx	r12		)
 
-* __this_cpu_{x} have lockdep annotations to check that preemption is
-  disabled, but otherwise behave the same as raw_cpu_{x}. i.e. they
-  don't try to disable preemption internally.
+  		.word	_magic_sig	@ Magic numbers to help the loader
+  		.word	_magic_start	@ absolute load/run zImage address
+  		.word	_magic_end	@ zImage end address
+  		.word	0x04030201	@ endianness flag
 
-* this_cpu_{x} ensure that preemption is disabled around the address gen
-  and operation.
 
-Since preemption may be possible, but we believe this is fine, we have
-to use the raw form. We'll want to keep the commment explaining why.
+Which implementation do you prefer ?
 
-Thanks,
-Mark.
+Thanks
+
+Patrice
