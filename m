@@ -1,47 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 19 May 2017 11:17:24 +0200
-Subject: [PATCH v2 4/9] crypto: marvell - Use IPAD/OPAD constant
-In-Reply-To: <20170519065331.27670-5-clabbe.montjoie@gmail.com>
-References: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
- <20170519065331.27670-5-clabbe.montjoie@gmail.com>
-Message-ID: <20170519111724.3933c91d@bbrezillon>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 19 May 2017 10:46:39 +0100
+Subject: [RFC PATCH v2 0/7] ARM: NOMMU: MPU updates
+Message-ID: <1495187206-14303-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 May 2017 08:53:26 +0200
-Corentin Labbe <clabbe.montjoie@gmail.com> wrote:
+Hi,
 
-> This patch simply replace all occurrence of HMAC IPAD/OPAD value by their
-> define.
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+This is an update of the existent MPU code which consist set of
+clean-ups and enhancements. The most significant changes are in the way
+how MPU settings sync-up for secondaries (PATCH 3/7) and more flexible
+layout for memory (PATCH 7/7). Since there is no in-tree user of MPU,
+support for M-class has been added (PATCH 6/7).
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Thanks!
 
-> ---
->  drivers/crypto/marvell/hash.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
-> index 77c0fb936f47..e61b08566093 100644
-> --- a/drivers/crypto/marvell/hash.c
-> +++ b/drivers/crypto/marvell/hash.c
-> @@ -12,6 +12,7 @@
->   * by the Free Software Foundation.
->   */
->  
-> +#include <crypto/hmac.h>
->  #include <crypto/md5.h>
->  #include <crypto/sha.h>
->  
-> @@ -1164,8 +1165,8 @@ static int mv_cesa_ahmac_pad_init(struct ahash_request *req,
->  	memcpy(opad, ipad, blocksize);
->  
->  	for (i = 0; i < blocksize; i++) {
-> -		ipad[i] ^= 0x36;
-> -		opad[i] ^= 0x5c;
-> +		ipad[i] ^= HMAC_IPAD_VALUE;
-> +		opad[i] ^= HMAC_OPAD_VALUE;
->  	}
->  
->  	return 0;
+Changelog:
+	    RFC -> RFC v2
+	       - fixed MPU enable for v7m (PATCH 6/7)
+
+Vladimir Murzin (7):
+  ARM: NOMMU: Move out MPU setup in separate module
+  ARM: NOMMU: Update MPU accessors to use cp15 helpers
+  ARM: NOMMU: Rework MPU to be mostly done in C
+  ARM: NOMMU: Disallow MPU for XIP
+  ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+  ARM: V7M: Add support for MPU to M-class
+  ARM: NOMMU: Use more MPU regions to cover memory
+
+ arch/arm/Kconfig               |   9 -
+ arch/arm/Kconfig-nommu         |   4 +-
+ arch/arm/include/asm/cputype.h |  10 +
+ arch/arm/include/asm/mpu.h     |  23 ++-
+ arch/arm/include/asm/smp.h     |   2 +-
+ arch/arm/include/asm/v7m.h     |  10 +
+ arch/arm/kernel/asm-offsets.c  |  11 +
+ arch/arm/kernel/head-nommu.S   | 128 +++++++++---
+ arch/arm/kernel/smp.c          |   2 +-
+ arch/arm/mm/Makefile           |   1 +
+ arch/arm/mm/nommu.c            | 254 +----------------------
+ arch/arm/mm/pmsa-v7.c          | 445 +++++++++++++++++++++++++++++++++++++++++
+ 12 files changed, 598 insertions(+), 301 deletions(-)
+ create mode 100644 arch/arm/mm/pmsa-v7.c
+
+-- 
+2.0.0
