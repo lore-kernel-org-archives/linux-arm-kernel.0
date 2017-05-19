@@ -1,19 +1,23 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 19 May 2017 10:16:44 +0800
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Properly model the ARM and SOC
- regulator supplies
-In-Reply-To: <1494858309-10221-1-git-send-email-festevam@gmail.com>
-References: <1494858309-10221-1-git-send-email-festevam@gmail.com>
-Message-ID: <20170519021643.GB26102@dragon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 19 May 2017 10:27:28 +0800
+Subject: [PATCH v6 2/9] irqchip/sunxi-nmi: add support for the NMI in A64
+ R_INTC
+In-Reply-To: <20170518075227.ifjbaahp7bz4ektr@flea.home>
+References: <20170518071653.36561-1-icenowy@aosc.io>
+ <20170518071653.36561-3-icenowy@aosc.io>
+ <20170518075227.ifjbaahp7bz4ektr@flea.home>
+Message-ID: <CAGb2v650D5CeP1R56kcBwL=Okbb29o=yTi6sYrdNwLJ_TfzY0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 11:25:09AM -0300, Fabio Estevam wrote:
-> On imx6sx-sdb rev B/C the VDD_ARM_IN and VDD_SOC_IN supplies are connected
-> together and both are supplied by the SW1A PMIC output, so model this
-> correctly in the device tree.
-> 
-> Suggested-by: Marek Vasut <marex@denx.de>
-> Signed-off-by: Fabio Estevam <festevam@gmail.com>
+On Thu, May 18, 2017 at 3:52 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, May 18, 2017 at 03:16:46PM +0800, Icenowy Zheng wrote:
+>> Add support for the newly imported compatible for the A64 R_INTC in
+>> irq-sunxi-nmi driver.
+>>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Applied, thanks.
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
