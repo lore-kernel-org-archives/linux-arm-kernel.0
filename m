@@ -1,184 +1,87 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 19 May 2017 12:25:47 +0800
-Subject: [PATCH v10 00/10] coresight: enable debug module
-Message-ID: <1495167957-14923-1-git-send-email-leo.yan@linaro.org>
+Date: Fri, 19 May 2017 12:25:48 +0800
+Subject: [PATCH v10 01/10] coresight: bindings for CPU debug module
+In-Reply-To: <1495167957-14923-1-git-send-email-leo.yan@linaro.org>
+References: <1495167957-14923-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1495167957-14923-2-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8 architecture reference manual (ARM DDI 0487A.k) Chapter H7 "The
-Sample-based Profiling Extension" has description for sampling
-registers, we can utilize these registers to check program counter
-value with combined CPU exception level, secure state, etc. So this is
-helpful for CPU lockup bugs, e.g. if one CPU has run into infinite loop
-with IRQ disabled; the 'hang' CPU cannot switch context and handle any
-interrupt, so it cannot handle SMP call for stack dump, etc.
+According to ARMv8 architecture reference manual (ARM DDI 0487A.k)
+Chapter 'Part H: External debug', the CPU can integrate debug module
+and it can support self-hosted debug and external debug. Especially
+for supporting self-hosted debug, this means the program can access
+the debug module from mmio region; and usually the mmio region is
+integrated with coresight.
 
-This patch series is to enable coresight debug module with sample-based
-registers and register call back notifier for PCSR register dumping
-when panic happens, so we can see below dumping info for panic; and
-this patch series has considered the conditions for access permission
-for debug registers self, so this can avoid access debug registers when
-CPU power domain is off; the driver also try to figure out the CPU is
-in secure or non-secure state.
+So add document for binding debug component, includes binding to APB
+clock; and also need specify the CPU node which the debug module is
+dedicated to specific CPU.
 
-Patch 0001 is to document the dt binding; patch 0002 adds one detailed
-document to describe the Coresight debug module implementation, the
-clock and power domain impaction on the driver, some examples for usage.
-
-Patch 0003 is to document boot parameters used in kernel command line.
-
-Patch 0004 is to add file entries for MAINTAINERS.
-
-Patch 0005 is used to fix the func of_get_coresight_platform_data()
-doesn't properly drop the reference to the CPU node pointer; and
-patch 0006 is refactor to add new function of_coresight_get_cpu().
-
-Patch 0007 is the driver for CPU debug module.
-
-Patch 0008 in this series are to enable debug unit on 96boards Hikey,
-Patch 0009 is to enable debug on 96boards DB410c. Have verified on both
-two boards.
-Patch 0010 is to add Coresight CPU debug nodes for Juno r0, r1 & r2.
-
-We can enable debugging with two methods, adding parameters into kernel
-command line for build-in module:
-  coresight_cpu_debug.enable=1
-
-Or we can wait the system has booted up to use debugfs nodes to enable
-debugging:
-  # echo 1 > /sys/kernel/debug/coresight_cpu_debug/enable
-
-As result we can get below log after input command:
-echo c > /proc/sysrq-trigger:
-
-ARM external debug module:
-coresight-cpu-debug 850000.debug: CPU[0]:
-coresight-cpu-debug 850000.debug:  EDPRSR:  00000001 (Power:On DLK:Unlock)
-coresight-cpu-debug 850000.debug:  EDPCSR:  [<ffff00000808e9bc>] handle_IPI+0x174/0x1d8
-coresight-cpu-debug 850000.debug:  EDCIDSR: 00000000
-coresight-cpu-debug 850000.debug:  EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
-coresight-cpu-debug 852000.debug: CPU[1]:
-coresight-cpu-debug 852000.debug:  EDPRSR:  00000001 (Power:On DLK:Unlock)
-coresight-cpu-debug 852000.debug:  EDPCSR:  [<ffff0000087fab34>] debug_notifier_call+0x23c/0x358
-coresight-cpu-debug 852000.debug:  EDCIDSR: 00000000
-coresight-cpu-debug 852000.debug:  EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
-
-
-[...]
-
-Changes from v9:
-* Used dev_xyz() to replace pr_xyz() for print log.
-* Added DT binding patch for Juno shared by Suzuki.
-
-Changes from v8:
-* According to Mathieu suggestions to split the doc into two patches,
-  one is for kernel parameter and another is for driver documentation.
-* Add file entries to MAINTAINERS.
-* According to Mathieu suggestions, refined functions
-  debug_enable_func()/debug_disable_func().
-
-Changes from v7:
-* Fix operator priority bug.
-* Minor sequence adjustment for function debug_func_exit().
-
-Changes from v6:
-* According to Suzuki and Mathieu suggestions, refined debug module
-  driver to install panic notifier when insmod module; refined function
-  debug_force_cpu_powered_up() for CPU power state checking; some minor
-  fixing for output log, adding comments for memory barrier, code
-  alignment.
-
-Changes from v5:
-* According to Suzuki and Mathieu suggestions, refined debug module
-  driver to drop unused structure members, refactored initialization
-  code to distinguish hardware implementation features, refactored
-  flow for forcing CPU powered up, supported pm_runtime operations.
-* Added one new doc file: Documentation/trace/coresight-cpu-debug.txt,
-  which is used to describe detailed info for implementation, clock
-  and power domain impaction on debug module, and exmaples for common
-  usage.
-* Removed "idle constraints" from debug driver.
-
-Changes from v4:
-* This version is mainly credit to ARM colleagues many contribution
-  ideas for better quality (Thanks a lot Suzuki, Mike and Sudeep!).
-* According to Suzuki suggestion, refined debug module driver to avoid
-  memory leak for drvdata struct, handle PCSAMPLE_MODE=1, use flag
-  drvdata.pc_has_offset to indicate if PCSR has offset, minor fixes.
-* According to Mathieu suggestion, refined dt binding description.
-* Changed driver to support module mode;
-* According to Mike suggestion and very appreciate the pseudo code,
-  added support to force CPU powered up with register EDPRCR;
-* According to discussions, added command line and debugfs nodes to
-  support enabling debugging for boot time, or later can dynamically
-  enable/disable debugging by debugfs.
-* According to Rob Herring suggestion, one minor fixes in DT binding.
-* According to Stephen Boyd suggestion, add const quality to structure
-  device_node. And used use of_cpu_device_node_get() to replace
-  of_get_cpu_node() in patch 0003.
-
-Changes from v3:
-* Added Suzuki K Poulose's patch to fix issue for the func
-  of_get_coresight_platform_data() doesn't properly drop the reference
-  to the CPU node pointer.
-* According to Suzuki suggestion, added code to handl the corner case
-  for ARMv8 CPU with aarch32 mode.
-* According to Suzuki suggestion, changed compatible string to
-  "arm,coresight-cpu-debug".
-* According to Mathieu suggestion, added "power-domains" as optional
-  properties.
-
-Changes from v2:
-* According to Mathieu Poirier suggestion, applied some minor fixes.
-* Added two extra patches for enabling debug module on Hikey.
-
-Changes from v1:
-* According to Mike Leach suggestion, removed the binding for debug
-  module clocks which have been directly provided by CPU clocks.
-* According to Mathieu Poirier suggestion, added function
-  of_coresight_get_cpu() and some minor refactors for debug module
-  driver.
-
-Changes from RFC:
-* According to Mike Leach suggestion, added check for EDPRSR to avoid
-  lockup; added supporting EDVIDSR and EDCIDSR registers.
-* According to Mark Rutland and Mathieu Poirier suggestion, rewrote
-  the documentation for DT binding.
-* According to Mark and Mathieu suggestion, refined debug driver.
-
-Leo Yan (8):
-  coresight: bindings for CPU debug module
-  doc: Add documentation for Coresight CPU debug
-  doc: Add coresight_cpu_debug.enable to kernel-parameters.txt
-  MAINTAINERS: update file entries for Coresight subsystem
-  coresight: refactor with function of_coresight_get_cpu
-  coresight: add support for CPU debug module
-  arm64: dts: hi6220: register debug module
-  arm64: dts: qcom: msm8916: Add debug unit
-
-Suzuki K Poulose (2):
-  coresight: of_get_coresight_platform_data: Add missing of_node_put
-  arm64: dts: juno: Add Coresight CPU debug nodes
-
- Documentation/admin-guide/kernel-parameters.txt    |   7 +
- .../bindings/arm/coresight-cpu-debug.txt           |  49 ++
- Documentation/trace/coresight-cpu-debug.txt        | 174 ++++++
- MAINTAINERS                                        |   2 +
- arch/arm64/boot/dts/arm/juno-base.dtsi             |  54 ++
- arch/arm64/boot/dts/arm/juno-r1.dts                |  24 +
- arch/arm64/boot/dts/arm/juno-r2.dts                |  24 +
- arch/arm64/boot/dts/arm/juno.dts                   |  24 +
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  64 ++
- arch/arm64/boot/dts/qcom/msm8916.dtsi              |  32 +
- drivers/hwtracing/coresight/Kconfig                |  14 +
- drivers/hwtracing/coresight/Makefile               |   1 +
- drivers/hwtracing/coresight/coresight-cpu-debug.c  | 696 +++++++++++++++++++++
- drivers/hwtracing/coresight/of_coresight.c         |  40 +-
- include/linux/coresight.h                          |   3 +
- 15 files changed, 1196 insertions(+), 12 deletions(-)
+Suggested-by: Mike Leach <mike.leach@linaro.org>
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ .../bindings/arm/coresight-cpu-debug.txt           | 49 ++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
- create mode 100644 Documentation/trace/coresight-cpu-debug.txt
- create mode 100644 drivers/hwtracing/coresight/coresight-cpu-debug.c
 
+diff --git a/Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt b/Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
+new file mode 100644
+index 0000000..2982912
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
+@@ -0,0 +1,49 @@
++* CoreSight CPU Debug Component:
++
++CoreSight CPU debug component are compliant with the ARMv8 architecture
++reference manual (ARM DDI 0487A.k) Chapter 'Part H: External debug'. The
++external debug module is mainly used for two modes: self-hosted debug and
++external debug, and it can be accessed from mmio region from Coresight
++and eventually the debug module connects with CPU for debugging. And the
++debug module provides sample-based profiling extension, which can be used
++to sample CPU program counter, secure state and exception level, etc;
++usually every CPU has one dedicated debug module to be connected.
++
++Required properties:
++
++- compatible : should be "arm,coresight-cpu-debug"; supplemented with
++               "arm,primecell" since this driver is using the AMBA bus
++	       interface.
++
++- reg : physical base address and length of the register set.
++
++- clocks : the clock associated to this component.
++
++- clock-names : the name of the clock referenced by the code. Since we are
++                using the AMBA framework, the name of the clock providing
++		the interconnect should be "apb_pclk" and the clock is
++		mandatory. The interface between the debug logic and the
++		processor core is clocked by the internal CPU clock, so it
++		is enabled with CPU clock by default.
++
++- cpu : the CPU phandle the debug module is affined to. When omitted
++	the module is considered to belong to CPU0.
++
++Optional properties:
++
++- power-domains: a phandle to the debug power domain. We use "power-domains"
++                 binding to turn on the debug logic if it has own dedicated
++		 power domain and if necessary to use "cpuidle.off=1" or
++		 "nohlt" in the kernel command line or sysfs node to
++		 constrain idle states to ensure registers in the CPU power
++		 domain are accessible.
++
++Example:
++
++	debug at f6590000 {
++		compatible = "arm,coresight-cpu-debug","arm,primecell";
++		reg = <0 0xf6590000 0 0x1000>;
++		clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++		clock-names = "apb_pclk";
++		cpu = <&cpu0>;
++	};
 -- 
 2.7.4
