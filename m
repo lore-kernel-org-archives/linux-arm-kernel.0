@@ -1,75 +1,49 @@
-From: phil@raspberrypi.org (Phil Elwell)
-Date: Fri, 19 May 2017 16:07:23 +0100
-Subject: [PATCH] serial: 8250: Add CAP_MINI, set for bcm2835aux
-Message-ID: <8d9c605a-bff7-607c-2c5b-4ec75e68ac2d@raspberrypi.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 May 2017 17:11:27 +0200
+Subject: [PATCH] arm64: dts: rockchip: fix include reference
+In-Reply-To: <1543991.PRPgxyxrAr@phil>
+References: <20170519121434.1118129-1-arnd@arndb.de> <1543991.PRPgxyxrAr@phil>
+Message-ID: <CAK8P3a2srVLYxuUTAwLu91hzz=GERfgZTVHe7hhXaXrWBWw8KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AUX/mini-UART in the BCM2835 family of procesors is a cut-down
-8250 clone. In particular it is lacking support for the following
-features: CSTOPB PARENB PARODD CMSPAR CS5 CS6
+On Fri, May 19, 2017 at 2:47 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Hi Arnd,
+>
+> Am Freitag, 19. Mai 2017, 14:14:34 CEST schrieb Arnd Bergmann:
+>> The way we handle include paths for DT has changed a bit, which
+>> broke a file that had an unconventional way to reference a common
+>> header file:
+>>
+>> arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:47:10: fatal error: include/dt-bindings/input/linux-event-codes.h: No such file or directory
+>>
+>> This removes the leading "include/" from the path name, which fixes it.
+>>
+>> Fixes: d5d332d3f7e8 ("devicetree: Move include prefixes from arch to separate directory")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> This mimics the patch from Ian Campbell [0], which I also pointed at in
+> the "devicetree: Move include prefixes from arch to separate directory"
+> thread and I had originally hoped that both would get applied together.
+>
+> In any case, both patches look good, so this as well gets a
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+>
+> The other one also got a
+> Reviewed-by: Brian Norris <briannorris@chromium.org>
+>
+> It seems I don't have any other fixes for 4.12 at the moment, so
+> do you want to apply any of the two yourself, or should this make
+> a round through my tree? (Both ways are fine by me)
+>
+>
+> Heiko
+>
+> [0] https://patchwork.kernel.org/patch/9724957/
 
-Add a new capability (UART_CAP_MINI) that exposes the restrictions to
-the user of the termios API by turning off the unsupported features in
-the request.
+Ok, thanks!
 
-N.B. It is almost possible to automatically discover the missing
-features by reading back the LCR register, but the CSIZE bits don't
-cooperate (contrary to the documentation, both bits are significant,
-but CS5 and CS6 are mapped to CS7) and the code is much longer.
+I already applied my version to the fixes branch as I saw that we have
+the build regression after Olof applied his patch.
 
-See: https://github.com/raspberrypi/linux/issues/1561
-
-Signed-off-by: Phil Elwell <phil@raspberrypi.org>
----
- drivers/tty/serial/8250/8250.h            | 3 +++
- drivers/tty/serial/8250/8250_bcm2835aux.c | 2 +-
- drivers/tty/serial/8250/8250_port.c       | 6 ++++++
- 3 files changed, 10 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
-index ce8d4ff..b2bdc35 100644
---- a/drivers/tty/serial/8250/8250.h
-+++ b/drivers/tty/serial/8250/8250.h
-@@ -81,6 +81,9 @@ struct serial8250_config {
- #define UART_CAP_HFIFO	(1 << 14)	/* UART has a "hidden" FIFO */
- #define UART_CAP_RPM	(1 << 15)	/* Runtime PM is active while idle */
- #define UART_CAP_IRDA	(1 << 16)	/* UART supports IrDA line discipline */
-+#define UART_CAP_MINI	(1 << 17)	/* Mini UART on BCM283X family lacks:
-+					 * STOP PARITY EPAR SPAR WLEN5 WLEN6
-+					 */
- 
- #define UART_BUG_QUOT	(1 << 0)	/* UART has buggy quot LSB */
- #define UART_BUG_TXEN	(1 << 1)	/* UART has buggy TX IIR status */
-diff --git a/drivers/tty/serial/8250/8250_bcm2835aux.c b/drivers/tty/serial/8250/8250_bcm2835aux.c
-index e10f124..a23c7da 100644
---- a/drivers/tty/serial/8250/8250_bcm2835aux.c
-+++ b/drivers/tty/serial/8250/8250_bcm2835aux.c
-@@ -39,7 +39,7 @@ static int bcm2835aux_serial_probe(struct platform_device *pdev)
- 
- 	/* initialize data */
- 	spin_lock_init(&data->uart.port.lock);
--	data->uart.capabilities = UART_CAP_FIFO;
-+	data->uart.capabilities = UART_CAP_FIFO | UART_CAP_MINI;
- 	data->uart.port.dev = &pdev->dev;
- 	data->uart.port.regshift = 2;
- 	data->uart.port.type = PORT_16550;
-diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
-index 09a65a3..dd218a1 100644
---- a/drivers/tty/serial/8250/8250_port.c
-+++ b/drivers/tty/serial/8250/8250_port.c
-@@ -2584,6 +2584,12 @@ static unsigned int serial8250_get_baud_rate(struct uart_port *port,
- 	unsigned long flags;
- 	unsigned int baud, quot, frac = 0;
- 
-+	if (up->capabilities & UART_CAP_MINI) {
-+		termios->c_cflag &= ~(CSTOPB | PARENB | PARODD | CMSPAR);
-+		if ((termios->c_cflag & CSIZE) == CS5 ||
-+		    (termios->c_cflag & CSIZE) == CS6)
-+			termios->c_cflag = (termios->c_cflag & ~CSIZE) | CS7;
-+	}
- 	cval = serial8250_compute_lcr(up, termios->c_cflag);
- 
- 	baud = serial8250_get_baud_rate(port, termios, old);
--- 
-1.9.1
+      Arnd
