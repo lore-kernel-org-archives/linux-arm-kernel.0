@@ -1,37 +1,31 @@
-From: srishtishar@gmail.com (srishti sharma)
-Date: Sat, 20 May 2017 01:00:17 +0530
-Subject: [PATCH] Staging: bcm2835-audio: bcm2835_ctl.c: Fixed a comment
- coding style issue
-In-Reply-To: <20170518135850.GA24513@kroah.com>
-References: <1495104615-4752-1-git-send-email-srishtishar@gmail.com>
- <20170518135850.GA24513@kroah.com>
-Message-ID: <CAB3L5ozKAq7rj71UdK0GpRTmk72eSpAwXEgUFq4uKrfB8Hrs9g@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 19 May 2017 12:33:13 -0700
+Subject: [PATCH v2 1/5] drm/stm: ltdc: Add bridge support
+In-Reply-To: <1495207218-11372-2-git-send-email-philippe.cornu@st.com>
+References: <1495207218-11372-1-git-send-email-philippe.cornu@st.com>
+ <1495207218-11372-2-git-send-email-philippe.cornu@st.com>
+Message-ID: <87h90gfxqe.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Was the format of this patch acceptable ,the "from" matches the
-"signed-off-by" right , so this should be correct , were there any
-errors in this ? Should I resend it ?
+Philippe CORNU <philippe.cornu@st.com> writes:
 
-Regards,
-Srishti
+> Add the bridge support, used by DSI host and HDMI/LVDS bridges.
+>
+> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
 
-On Thu, May 18, 2017 at 7:28 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Thu, May 18, 2017 at 04:20:15PM +0530, srishti wrote:
->> From: srishti sharma <srishtishar@gmail.com>
->>
->> Fixed a trailing */ issue.
->>
->> Signed-off-by: srishti sharma <srishtishar@gmail.com>
->> ---
->>  drivers/staging/bcm2835-audio/bcm2835-ctl.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> You sent two copies of this, which am I supposed to apply?  And what
-> changed from the last version?
->
-> I'm dropping this, please fix and only send _one_ copy of the patch.
->
-> thanks,
->
-> greg k-h
+The DW DSI host is bridging from MIPI DPI to MIPI DSI, right?  I think
+you could just have ltdc always set up a DPI encoder (the
+ltdc_rgb_encoder_create() function), and then depending on whether
+drm_of_find_panel_or_bridge() finds you a panel or a bridge, you
+drm_panel_attach() or drm_bridge_attach().
+
+You wouldn't even need to wrap the drm_panel_prepare() and related calls
+with a check for the panel, because the inlines already do that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170519/5b2ecd02/attachment.sig>
