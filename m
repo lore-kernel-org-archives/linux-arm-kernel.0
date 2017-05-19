@@ -1,37 +1,77 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 19 May 2017 13:45:19 +0530
-Subject: [PATCH 19/41] ARM: dts: am57xx-beagle-x15-revb1: Fix supply name used
- for MMC1 IO lines
+Date: Fri, 19 May 2017 13:45:11 +0530
+Subject: [PATCH 11/41] mmc: host: omap_hsmmc: Add new compatible string to
+ support dra7
 In-Reply-To: <20170519081541.26753-1-kishon@ti.com>
 References: <20170519081541.26753-1-kishon@ti.com>
-Message-ID: <20170519081541.26753-20-kishon@ti.com>
+Message-ID: <20170519081541.26753-12-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dt binding documentation of omap-hsmmc recommends using
-"vmmc_aux" for IO supply lines. However
-commit 0af28cc92690d8c ("ARM: dts: am57xx-beagle-x15: Add support
-for rev B1") added it as "vmmc-aux". Fix it here.
+Add a new compatible string "ti,dra7-hsmmc" to support
+dra7 and dra72 controllers. Also create a new controller flag
+"OMAP_HSMMC_REQUIRE_IODELAY" to specify all controllers that use
+"ti,dra7-hsmmc" require iodealy configuration to be set.
 
-Fixes: commit 0af28cc92690d8c ("ARM: dts: am57xx-beagle-x15: Add
-support for rev B1")
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt |  1 +
+ drivers/mmc/host/omap_hsmmc.c                           | 10 ++++++++++
+ include/linux/platform_data/hsmmc-omap.h                |  1 +
+ 3 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts b/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-index 39a92aff0a0d..6ae94ab52b7b 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts
-@@ -20,7 +20,7 @@
+diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+index 74166a0d460d..258e25af10f7 100644
+--- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
++++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+@@ -12,6 +12,7 @@ Required properties:
+  Should be "ti,omap3-hsmmc", for OMAP3 controllers
+  Should be "ti,omap3-pre-es3-hsmmc" for OMAP3 controllers pre ES3.0
+  Should be "ti,omap4-hsmmc", for OMAP4 controllers
++ Should be "ti,dra7-hsmmc", for dra7 and dra72 controllers
+  Should be "ti,am33xx-hsmmc", for AM335x controllers
+ - ti,hwmods: Must be "mmc<n>", n is controller instance starting 1
  
- &mmc1 {
- 	vmmc-supply = <&vdd_3v3>;
--	vmmc-aux-supply = <&ldo1_reg>;
-+	vmmc_aux-supply = <&ldo1_reg>;
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 7088a88074a8..8114b8b73491 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -2314,6 +2314,12 @@ static const struct omap_mmc_of_data am33xx_mmc_of_data = {
+ 	.controller_flags = OMAP_HSMMC_SWAKEUP_MISSING,
  };
  
- /* errata i880 "Ethernet RGMII2 Limited to 10/100 Mbps" */
++static const struct omap_mmc_of_data dra7_mmc_of_data = {
++	.reg_offset = 0x100,
++	.controller_flags = OMAP_HSMMC_SWAKEUP_MISSING |
++			    OMAP_HSMMC_REQUIRE_IODELAY,
++};
++
+ static const struct of_device_id omap_mmc_of_match[] = {
+ 	{
+ 		.compatible = "ti,omap2-hsmmc",
+@@ -2333,6 +2339,10 @@ static const struct of_device_id omap_mmc_of_match[] = {
+ 		.compatible = "ti,am33xx-hsmmc",
+ 		.data = &am33xx_mmc_of_data,
+ 	},
++	{
++		.compatible = "ti,dra7-hsmmc",
++		.data = &dra7_mmc_of_data,
++	},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, omap_mmc_of_match);
+diff --git a/include/linux/platform_data/hsmmc-omap.h b/include/linux/platform_data/hsmmc-omap.h
+index 8e981be2e2c2..21832a357654 100644
+--- a/include/linux/platform_data/hsmmc-omap.h
++++ b/include/linux/platform_data/hsmmc-omap.h
+@@ -27,6 +27,7 @@
+ #define OMAP_HSMMC_SUPPORTS_DUAL_VOLT		BIT(0)
+ #define OMAP_HSMMC_BROKEN_MULTIBLOCK_READ	BIT(1)
+ #define OMAP_HSMMC_SWAKEUP_MISSING		BIT(2)
++#define OMAP_HSMMC_REQUIRE_IODELAY		BIT(3)
+ 
+ struct omap_hsmmc_dev_attr {
+ 	u8 flags;
 -- 
 2.11.0
