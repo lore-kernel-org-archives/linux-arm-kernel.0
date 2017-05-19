@@ -1,43 +1,35 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 19 May 2017 18:38:33 +0100
-Subject: [PATCH] arm: boot/compressed: fix decompressor header layout for
- v7-M
-In-Reply-To: <20170519173400.GJ3559@e103592.cambridge.arm.com>
-References: <20170519145959.26569-1-ard.biesheuvel@linaro.org>
- <20170519164603.GH3559@e103592.cambridge.arm.com>
- <CAKv+Gu-yAT+kZ_oMT_+n6_RSOKOoqkZtGYjBKq=Wwhj31BgUgQ@mail.gmail.com>
- <67bd95eb-1f4b-d9d2-9a68-3574d03ac072@arm.com>
- <20170519173400.GJ3559@e103592.cambridge.arm.com>
-Message-ID: <20170519173832.GL3559@e103592.cambridge.arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 19 May 2017 18:53:23 +0100
+Subject: [PATCH v10 10/10] arm64: dts: juno: Add Coresight CPU debug nodes
+In-Reply-To: <0e1cf263-f0a0-2e78-c636-4b5d8205b7f7@arm.com>
+References: <1495167957-14923-1-git-send-email-leo.yan@linaro.org>
+ <1495167957-14923-11-git-send-email-leo.yan@linaro.org>
+ <0e1cf263-f0a0-2e78-c636-4b5d8205b7f7@arm.com>
+Message-ID: <87991f3d-dcb6-7d57-781e-8b81ff24219d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 06:34:01PM +0100, Dave Martin wrote:
-> On Fri, May 19, 2017 at 06:16:36PM +0100, Robin Murphy wrote:
+On 19/05/17 18:44, Sudeep Holla wrote:
+> Hi Suzuki, Leo,
+>
+> On 19/05/17 05:25, Leo Yan wrote:
+>> From: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>
+>> Add Coresight CPU debug nodes for Juno r0, r1 & r2. The CPU
+>> debug areas are mapped at the same address for all revisions,
+>> like the ETM, even though the CPUs have changed from r1 to r2.
+>>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Leo Yan <leo.yan@linaro.org>
+>> Cc: Mathieu Poirier <mathieu.porier@linaro.org>
+>> Cc: Liviu Dudau <liviu.dudau@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>
+> ARM-SoC team expect DTS to be routed via platform tree.
+> So I have queued this for v4.13[1]
 
-[...]
+Sudeep
 
-> > Hmm, couldn't it be ISA-agnostic?
-> > 
-> > 	ldr pc, 1f
-> > 	.ltorg
-> > THUMB(	.thumb	)
-> > 	...
-> > 
-> > given that that should be interworking on anything where THUMB() is
-> > valid in the first place.
-> 
-> Did you mean
-> 
-> 	ldr	pc, =BSYM(1f)
-> ?
-> 
-> Otherwise this is quite neat: providing there are no pending literals
-> when the assembler reaches the ldr pc, and providing that the ldr pc is
-> word-aligned (it certainly should be) then that sequence should always
-> expand to two words.
+Thanks for picking that up.
 
-Modulo Ard's comment about position-independence...  Curses.
-
-Cheers
----Dave
+Suzuki
