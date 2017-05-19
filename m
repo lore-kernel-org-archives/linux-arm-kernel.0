@@ -1,44 +1,20 @@
-From: oza.oza@broadcom.com (Oza Oza)
-Date: Fri, 19 May 2017 06:51:28 +0530
-Subject: [PATCH v6 2/3] iommu/pci: reserve IOVA for PCI masters
-In-Reply-To: <20170517171154.GF31462@bhelgaas-glaptop.roam.corp.google.com>
-References: <1494912127-12890-1-git-send-email-oza.oza@broadcom.com>
- <1494912127-12890-3-git-send-email-oza.oza@broadcom.com>
- <20170517171154.GF31462@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAMSpPPfnhSb3w4te=k5aHGoC6wgn0iu7EAvc5gxwxGnNe4JehQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 18 May 2017 20:28:01 -0500
+Subject: [PATCH 1/2] dt-bindings: arm: amlogic: Add NanoPi K2
+In-Reply-To: <20170515011130.29265-2-afaerber@suse.de>
+References: <20170515011130.29265-1-afaerber@suse.de>
+ <20170515011130.29265-2-afaerber@suse.de>
+Message-ID: <20170519012801.iilj3fqnkum7mh26@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 10:41 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Tue, May 16, 2017 at 10:52:06AM +0530, Oza Pawandeep wrote:
->> this patch reserves the IOVA for PCI masters.
->> ARM64 based SOCs may have scattered memory banks.
->> such as iproc based SOC has
->>
->> <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
->> <0x00000008 0x80000000 0x3 0x80000000>, /* 14G @ 34G */
->> <0x00000090 0x00000000 0x4 0x00000000>, /* 16G @ 576G */
->> <0x000000a0 0x00000000 0x4 0x00000000>; /* 16G @ 640G */
->>
->> but incoming PCI transcation addressing capability is limited
->
-> s/transcation/transaction/
->
->> by host bridge, for example if max incoming window capability
->> is 512 GB, then 0x00000090 and 0x000000a0 will fall beyond it.
->>
->> to address this problem, iommu has to avoid allocating IOVA which
->
-> s/iommu/IOMMU/
->
->> are reserved. which inturn does not allocate IOVA if it falls into hole.
->
-> s/inturn/in turn/
+On Mon, May 15, 2017 at 03:11:29AM +0200, Andreas F?rber wrote:
+> The FriendlyARM NanoPi K2 is a single-board computer.
+> 
+> Cc: techsupport at friendlyarm.com
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  Documentation/devicetree/bindings/arm/amlogic.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Hi Bjorn,
-
-Thank you for the comments.
-Will take care of all your comments.
-
-Regards,
-Oza.
+Acked-by: Rob Herring <robh@kernel.org>
