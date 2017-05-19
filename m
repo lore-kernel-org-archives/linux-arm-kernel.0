@@ -1,52 +1,111 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 May 2017 14:48:50 +0100
-Subject: [GIT PULL] arm64 fixes for 4.12
-Message-ID: <20170519134846.GA21800@e104818-lin.cambridge.arm.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Fri, 19 May 2017 21:49:03 +0800
+Subject: [PATCH V3 0/3] clk: introduce clk_bulk_get accessories
+Message-ID: <1495201746-31841-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+These helper function allows drivers to get several clk consumers in
+one operation.  If any of the clk cannot be acquired then any clks
+that were got will be put before returning to the caller.
 
-Please pull the arm64 fixes below. Thanks.
+The idea firstly came out when i wanted to clean up and optimize
+imx6q-cpufreq driver which needs to handle a lot of clocks as it
+becomes a bit mess.
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+e.g. drivers/cpufreq/imx6q-cpufreq.c
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+You will see we need get 7 clocks during driver probe.
+(Add there will be more, e.g. pll1, pll1_bypass, pll1_bypass_src,
+in the future when adding busfreq support).
 
-are available in the git repository at:
+static int imx6q_cpufreq_probe(struct platform_device *pdev)
+{
+....
+	arm_clk = clk_get(cpu_dev, "arm");
+	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
+	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
+	step_clk = clk_get(cpu_dev, "step");
+	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
+	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
+	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
+		dev_err(cpu_dev, "failed to get clocks\n");
+		ret = -ENOENT;
+		goto put_clk;
+	}
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+	if (of_machine_is_compatible("fsl,imx6ul")) {
+		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
+		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
+		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
+			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
+			ret = -ENOENT;
+			goto put_clk;
+		}
+	}
+....
+put_clk: 
+        if (!IS_ERR(arm_clk))
+                clk_put(arm_clk);
+        if (!IS_ERR(pll1_sys_clk))
+                clk_put(pll1_sys_clk);
+	...........
+}
 
-for you to fetch changes up to 63a1e1c95e60e798fa09ab3c536fb555aa5bbf2b:
+Together with the err path handling for each clocks, it does make
+things a bit ugly.
 
-  arm64/cpufeature: don't use mutex in bringup path (2017-05-17 17:00:29 +0100)
+Since we already have regulator_bulk_get accessories, i thought we
+probably could introduce clk_bulk_get as well to handle such case to
+ease the driver owners' life. 
 
-----------------------------------------------------------------
-arm64 fixes/cleanups:
+Besides IMX cpufreq driver, there is also some similar cases
+in kernel which could befinit from this api as well.
+e.g.
+drivers/cpufreq/tegra124-cpufreq.c
+drivers/cpufreq/s3c2412-cpufreq.c
+sound/soc/samsung/smdk_spdif.c
+arch/arm/mach-omap1/serial.c
+...
 
-- Avoid taking a mutex in the secondary CPU bring-up path when
-  interrupts are disabled
+And actually, if we handle clocks more than 3, then it might be
+worthy to try, which there is quite many manay in kernel and
+that probably could save a lot codes.
 
-- Ignore perf exclude_hv when the kernel is running in Hyp mode
+Comments are welcome and appreciated!
 
-- Remove redundant instruction in cmpxchg
+Tested on MX6Q SabreSD board with CPUfreq stress.
+Also ran IA64 and m68k compiling test:
+make.cross ARCH=m68k 
+make.cross ARCH=ia64
 
-----------------------------------------------------------------
-Ganapatrao Kulkarni (1):
-      arm64: perf: Ignore exclude_hv when kernel is running in HYP
+ChangeLog:
+v2->v3:
+ Only Patch 1 changed.
+ * release resource in reversed order in case an error according to
+   Geert Uytterhoeven's suggestion
 
-Mark Rutland (1):
-      arm64/cpufeature: don't use mutex in bringup path
+v1->v2:
+ * Most significant change is introducing clk-bulk.c to centrally
+   handle bulk_clks and fix !CONFIG_CLKDEV_LOOKUP platforms build break.
+   Other are comments fix, adding const annotation and etc.
+   Refer to individual patches for details.
 
-Robin Murphy (1):
-      arm64: Remove redundant mov from LL/SC cmpxchg
+[v1] https://lkml.org/lkml/2017/4/11/335
+[v2] https://lkml.org/lkml/2017/5/8/276
 
- arch/arm64/include/asm/atomic_ll_sc.h |  1 -
- arch/arm64/include/asm/cpufeature.h   | 12 ++++++++++--
- arch/arm64/include/asm/kvm_host.h     |  8 ++++++--
- arch/arm64/kernel/cpufeature.c        | 23 +++++++++++++++++++++--
- arch/arm64/kernel/perf_event.c        | 23 ++++++++++++++++-------
- 5 files changed, 53 insertions(+), 14 deletions(-)
+Dong Aisheng (3):
+  clk: add clk_bulk_get accessories
+  clk: add managed version of clk_bulk_get
+  cpufreq: imx6q: refine clk operations
+
+ drivers/clk/Makefile            |   2 +-
+ drivers/clk/clk-bulk.c          | 157 ++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/clk-devres.c        |  36 +++++++++
+ drivers/cpufreq/imx6q-cpufreq.c | 119 ++++++++++++++----------------
+ include/linux/clk.h             | 132 +++++++++++++++++++++++++++++++++
+ 5 files changed, 379 insertions(+), 67 deletions(-)
+ create mode 100644 drivers/clk/clk-bulk.c
 
 -- 
-Catalin
+2.7.4
