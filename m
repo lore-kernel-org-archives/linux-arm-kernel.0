@@ -1,49 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 May 2017 17:11:27 +0200
-Subject: [PATCH] arm64: dts: rockchip: fix include reference
-In-Reply-To: <1543991.PRPgxyxrAr@phil>
-References: <20170519121434.1118129-1-arnd@arndb.de> <1543991.PRPgxyxrAr@phil>
-Message-ID: <CAK8P3a2srVLYxuUTAwLu91hzz=GERfgZTVHe7hhXaXrWBWw8KQ@mail.gmail.com>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Fri, 19 May 2017 17:20:15 +0200
+Subject: [PATCH v2 2/5] dt-bindings: display: Add Synopsys DW MIPI DSI DRM
+ bridge driver
+In-Reply-To: <1495207218-11372-1-git-send-email-philippe.cornu@st.com>
+References: <1495207218-11372-1-git-send-email-philippe.cornu@st.com>
+Message-ID: <1495207218-11372-3-git-send-email-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 2:47 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Hi Arnd,
->
-> Am Freitag, 19. Mai 2017, 14:14:34 CEST schrieb Arnd Bergmann:
->> The way we handle include paths for DT has changed a bit, which
->> broke a file that had an unconventional way to reference a common
->> header file:
->>
->> arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:47:10: fatal error: include/dt-bindings/input/linux-event-codes.h: No such file or directory
->>
->> This removes the leading "include/" from the path name, which fixes it.
->>
->> Fixes: d5d332d3f7e8 ("devicetree: Move include prefixes from arch to separate directory")
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> This mimics the patch from Ian Campbell [0], which I also pointed at in
-> the "devicetree: Move include prefixes from arch to separate directory"
-> thread and I had originally hoped that both would get applied together.
->
-> In any case, both patches look good, so this as well gets a
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
->
-> The other one also got a
-> Reviewed-by: Brian Norris <briannorris@chromium.org>
->
-> It seems I don't have any other fixes for 4.12 at the moment, so
-> do you want to apply any of the two yourself, or should this make
-> a round through my tree? (Both ways are fine by me)
->
->
-> Heiko
->
-> [0] https://patchwork.kernel.org/patch/9724957/
+This patch adds documentation of device tree bindings for the
+Synopsys DesignWare MIPI DSI host DRM bridge driver.
 
-Ok, thanks!
+Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+---
+ .../bindings/display/bridge/dw_mipi_dsi.txt        | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
 
-I already applied my version to the fixes branch as I saw that we have
-the build regression after Olof applied his patch.
-
-      Arnd
+diff --git a/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+new file mode 100644
+index 0000000..652c0f5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+@@ -0,0 +1,36 @@
++Synopsys DesignWare MIPI DSI host controller
++============================================
++
++This document defines device tree properties for the Synopsys DesignWare MIPI
++DSI host controller. It doesn't constitue a device tree binding specification
++by itself but is meant to be referenced by platform-specific device tree
++bindings.
++
++When referenced from platform device tree bindings the properties defined in
++this document are defined as follows. The platform device tree bindings are
++responsible for defining whether each property is required or optional.
++
++- reg: Memory mapped base address and length of the DWC MIPI DSI registers.
++
++- clocks: References to all the clocks specified in the clock-names property
++  as specified in [1].
++
++- clock-names: The DWC MIPI DSI host uses the following clocks.
++
++  - "pclk" is the peripheral clock for either AHB and APB (mandatory).
++  - "ref" is the pll reference clock (mandatory).
++
++- resets: References to all the resets specified in the reset-names property
++  as specified in [2]. (optional)
++
++- reset-names: string reset name, must be "apb" if used. (optional)
++
++- ports: The connectivity of the DWC MIPI DSI host controller
++  with the rest of the system is expressed in using ports as specified in the
++  device graph bindings in [3] & [4]. The numbering of the ports
++  is platform-specific.
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++[2] Documentation/devicetree/bindings/reset/reset.txt
++[3] Documentation/devicetree/bindings/media/video-interfaces.txt
++[4] Documentation/devicetree/bindings/graph.txt
+-- 
+1.9.1
