@@ -1,31 +1,50 @@
-From: srishtishar@gmail.com (srishti sharma)
-Date: Sat, 20 May 2017 02:00:24 +0530
-Subject: [PATCH] Staging: bcm2835-audio: bcm2835_ctl.c: Fixed a comment coding
- style issue.
-Message-ID: <1495225824-4422-1-git-send-email-srishtishar@gmail.com>
+From: gary.hook@amd.com (Gary R Hook)
+Date: Fri, 19 May 2017 15:32:09 -0500
+Subject: [PATCH v2 9/9] crypto: ccp - Use IPAD/OPAD constant
+In-Reply-To: <20170519065331.27670-10-clabbe.montjoie@gmail.com>
+References: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
+ <20170519065331.27670-10-clabbe.montjoie@gmail.com>
+Message-ID: <5f959f00-ca3b-0515-d743-33b251fb4b18@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fixed a trailing */ issue .
+On 5/19/2017 1:53 AM, Corentin Labbe wrote:
+> This patch simply replace all occurrence of HMAC IPAD/OPAD value by their
+> define.
+> 
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 
-Signed-off-by: srishti sharma <srishtishar@gmail.com>
----
- drivers/staging/bcm2835-audio/bcm2835-ctl.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Acked-by: Gary R Hook <gary.hook@amd.com>
 
-diff --git a/drivers/staging/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
-index a4ffa1b..38fabab 100644
---- a/drivers/staging/bcm2835-audio/bcm2835-ctl.c
-+++ b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
-@@ -247,8 +247,8 @@ static int snd_bcm2835_spdif_mask_get(struct snd_kcontrol *kcontrol,
- 	struct snd_ctl_elem_value *ucontrol)
- {
- 	/* bcm2835 supports only consumer mode and sets all other format flags
--	 * automatically. So the only thing left is signalling non-audio
--	 * content */
-+	 * automatically. So the only thing left is signalling non-audio content
-+	 */
- 	ucontrol->value.iec958.status[0] = IEC958_AES0_NONAUDIO;
- 	return 0;
- }
-2.7.4
+> ---
+>   drivers/crypto/ccp/ccp-crypto-sha.c | 5 +++--
+>   1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/crypto/ccp/ccp-crypto-sha.c 
+> b/drivers/crypto/ccp/ccp-crypto-sha.c
+> index 6b46eea94932..ce97b3868f4a 100644
+> --- a/drivers/crypto/ccp/ccp-crypto-sha.c
+> +++ b/drivers/crypto/ccp/ccp-crypto-sha.c
+> @@ -18,6 +18,7 @@
+>   #include <linux/crypto.h>
+>   #include <crypto/algapi.h>
+>   #include <crypto/hash.h>
+> +#include <crypto/hmac.h>
+>   #include <crypto/internal/hash.h>
+>   #include <crypto/sha.h>
+>   #include <crypto/scatterwalk.h>
+> @@ -308,8 +309,8 @@ static int ccp_sha_setkey(struct crypto_ahash *tfm, 
+> const u8 *key,
+>           }
+> 
+>           for (i = 0; i < block_size; i++) {
+> -               ctx->u.sha.ipad[i] = ctx->u.sha.key[i] ^ 0x36;
+> -               ctx->u.sha.opad[i] = ctx->u.sha.key[i] ^ 0x5c;
+> +               ctx->u.sha.ipad[i] = ctx->u.sha.key[i] ^ HMAC_IPAD_VALUE;
+> +               ctx->u.sha.opad[i] = ctx->u.sha.key[i] ^ HMAC_OPAD_VALUE;
+>           }
+> 
+>           sg_init_one(&ctx->u.sha.opad_sg, ctx->u.sha.opad, block_size);
+> -- 
+> 2.13.0
+> 
