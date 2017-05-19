@@ -1,33 +1,41 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 19 May 2017 15:06:11 +0800
-Subject: [PATCH v4 5/6] ARM: sun8i: a83t: Set clock accuracy for 24MHz
- oscillator
-In-Reply-To: <20170519070612.32159-1-wens@csie.org>
-References: <20170519070612.32159-1-wens@csie.org>
-Message-ID: <20170519070612.32159-6-wens@csie.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 May 2017 10:14:29 +0200
+Subject: [PATCH] ARM: remove duplicate 'const' annotations'
+In-Reply-To: <20170511115059.2997141-1-arnd@arndb.de>
+References: <20170511115059.2997141-1-arnd@arndb.de>
+Message-ID: <CAK8P3a2rxtL8oMt6TzX+KsZmKj03gZQQ7ptDGgJ3=LEEURoBjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The datasheets for Allwinner SoCs set strict requirements on the
-stability of the external crystal oscillators. Add the accuracy
-for the main 24MHz oscillator to the device tree.
+On Thu, May 11, 2017 at 1:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> gcc-7 warns about some declarations that are more 'const' than necessary:
+>
+> arch/arm/mach-at91/pm.c:338:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct of_device_id const ramc_ids[] __initconst = {
+> arch/arm/mach-bcm/bcm_kona_smc.c:36:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct of_device_id const bcm_kona_smc_ids[] __initconst = {
+> arch/arm/mach-spear/time.c:207:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct of_device_id const timer_of_match[] __initconst = {
+> arch/arm/mach-omap2/prm_common.c:714:34: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct of_device_id const omap_prcm_dt_match_table[] __initconst = {
+> arch/arm/mach-omap2/vc.c:562:35: error: duplicate 'const' declaration specifier [-Werror=duplicate-decl-specifier]
+>  static const struct i2c_init_data const omap4_i2c_timing_data[] __initconst = {
+>
+> The ones in arch/arm were apparently all introduced accidentally by one
+> commit that correctly marked a lot of variables as __initconst.
+>
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Fixes: 19c233b79d1a ("ARM: appropriate __init annotation for const data")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-at91/pm.c          | 2 +-
+>  arch/arm/mach-bcm/bcm_kona_smc.c | 2 +-
+>  arch/arm/mach-cns3xxx/core.c     | 2 +-
+>  arch/arm/mach-omap2/prm_common.c | 2 +-
+>  arch/arm/mach-omap2/vc.c         | 2 +-
+>  arch/arm/mach-spear/time.c       | 2 +-
+>  6 files changed, 6 insertions(+), 6 deletions(-)
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+Applied to fixes now, thanks for the Acks!
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index c9a5d07b2ada..e12dd7170b8f 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -126,6 +126,7 @@
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
- 			clock-frequency = <24000000>;
-+			clock-accuracy = <50000>;
- 			clock-output-names = "osc24M";
- 		};
- 
--- 
-2.11.0
+      Arnd
