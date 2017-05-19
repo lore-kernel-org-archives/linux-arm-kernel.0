@@ -1,144 +1,122 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 19 May 2017 13:45:01 +0530
-Subject: [PATCH 01/41] mmc: host: omap_hsmmc: Support pbias and vmmc_aux to
- switch to 1.8v
-In-Reply-To: <20170519081541.26753-1-kishon@ti.com>
-References: <20170519081541.26753-1-kishon@ti.com>
-Message-ID: <20170519081541.26753-2-kishon@ti.com>
+Date: Fri, 19 May 2017 13:45:00 +0530
+Subject: [PATCH 00/41] omap_hsmmc: Add ADMA support and UHS/HS200/DDR support
+Message-ID: <20170519081541.26753-1-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for vmmc_aux to switch to 1.8v. Also use "iov" instead of
-"vdd" to indicate io voltage. This is in preparation for adding support
-for io signal voltage switch.
+This series adds UHS, HS200, DDR mode and ADMA support to
+omap_hsmmc driver used to improve the throughput of MMC/SD in dra7
+SoCs.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- drivers/mmc/host/omap_hsmmc.c | 50 ++++++++++++++++++++++++++++---------------
- 1 file changed, 33 insertions(+), 17 deletions(-)
+The functionality implemented in this series was sent before ([1]) but
+was never followed up since supporting high speed modes in dra7 required
+IODelay values to be configured. With IODelay driver being merged into
+kernel, sending it as a fresh series with support for configuring IODelay
+values.
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 8c39dccacf39..2000aaa359c8 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -244,11 +244,12 @@ static int omap_hsmmc_get_cover_state(struct device *dev)
- 	return mmc_gpio_get_cd(host->mmc);
- }
- 
--static int omap_hsmmc_enable_supply(struct mmc_host *mmc)
-+static int omap_hsmmc_enable_supply(struct mmc_host *mmc, int iov)
- {
- 	int ret;
- 	struct omap_hsmmc_host *host = mmc_priv(mmc);
- 	struct mmc_ios *ios = &mmc->ios;
-+	int uvoltage;
- 
- 	if (mmc->supply.vmmc) {
- 		ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd);
-@@ -257,7 +258,25 @@ static int omap_hsmmc_enable_supply(struct mmc_host *mmc)
- 	}
- 
- 	/* Enable interface voltage rail, if needed */
--	if (mmc->supply.vqmmc && !host->vqmmc_enabled) {
-+	if (mmc->supply.vqmmc) {
-+		if (host->vqmmc_enabled) {
-+			ret = regulator_disable(mmc->supply.vqmmc);
-+			if (ret) {
-+				dev_err(mmc_dev(mmc),
-+					"vmmc_aux reg disable failed\n");
-+				goto err_vqmmc;
-+			}
-+			host->vqmmc_enabled = 0;
-+		}
-+
-+		uvoltage = (iov == VDD_165_195) ? VDD_1V8 : VDD_3V0;
-+		ret = regulator_set_voltage(mmc->supply.vqmmc, uvoltage,
-+					    uvoltage);
-+		if (ret) {
-+			dev_err(mmc_dev(mmc), "vmmc_aux set voltage failed\n");
-+			goto err_vqmmc;
-+		}
-+
- 		ret = regulator_enable(mmc->supply.vqmmc);
- 		if (ret) {
- 			dev_err(mmc_dev(mmc), "vmmc_aux reg enable failed\n");
-@@ -309,22 +328,19 @@ static int omap_hsmmc_disable_supply(struct mmc_host *mmc)
- }
- 
- static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on,
--				int vdd)
-+				int iov)
- {
- 	int ret;
-+	int uvoltage;
- 
- 	if (!host->pbias)
- 		return 0;
- 
- 	if (power_on) {
--		if (vdd <= VDD_165_195)
--			ret = regulator_set_voltage(host->pbias, VDD_1V8,
--						    VDD_1V8);
--		else
--			ret = regulator_set_voltage(host->pbias, VDD_3V0,
--						    VDD_3V0);
--		if (ret < 0) {
--			dev_err(host->dev, "pbias set voltage fail\n");
-+		uvoltage = (iov <= VDD_165_195) ? VDD_1V8 : VDD_3V0;
-+		ret = regulator_set_voltage(host->pbias, uvoltage, uvoltage);
-+		if (ret) {
-+			dev_err(host->dev, "pbias set voltage failed\n");
- 			return ret;
- 		}
- 
-@@ -351,13 +367,13 @@ static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on,
- }
- 
- static int omap_hsmmc_set_power(struct omap_hsmmc_host *host, int power_on,
--				int vdd)
-+				int iov)
- {
- 	struct mmc_host *mmc = host->mmc;
- 	int ret = 0;
- 
- 	if (mmc_pdata(host)->set_power)
--		return mmc_pdata(host)->set_power(host->dev, power_on, vdd);
-+		return mmc_pdata(host)->set_power(host->dev, power_on, iov);
- 
- 	/*
- 	 * If we don't see a Vcc regulator, assume it's a fixed
-@@ -367,7 +383,7 @@ static int omap_hsmmc_set_power(struct omap_hsmmc_host *host, int power_on,
- 		return 0;
- 
- 	if (mmc_pdata(host)->before_set_reg)
--		mmc_pdata(host)->before_set_reg(host->dev, power_on, vdd);
-+		mmc_pdata(host)->before_set_reg(host->dev, power_on, iov);
- 
- 	ret = omap_hsmmc_set_pbias(host, false, 0);
- 	if (ret)
-@@ -387,11 +403,11 @@ static int omap_hsmmc_set_power(struct omap_hsmmc_host *host, int power_on,
- 	 * chips/cards need an interface voltage rail too.
- 	 */
- 	if (power_on) {
--		ret = omap_hsmmc_enable_supply(mmc);
-+		ret = omap_hsmmc_enable_supply(mmc, iov);
- 		if (ret)
- 			return ret;
- 
--		ret = omap_hsmmc_set_pbias(host, true, vdd);
-+		ret = omap_hsmmc_set_pbias(host, true, iov);
- 		if (ret)
- 			goto err_set_voltage;
- 	} else {
-@@ -401,7 +417,7 @@ static int omap_hsmmc_set_power(struct omap_hsmmc_host *host, int power_on,
- 	}
- 
- 	if (mmc_pdata(host)->after_set_reg)
--		mmc_pdata(host)->after_set_reg(host->dev, power_on, vdd);
-+		mmc_pdata(host)->after_set_reg(host->dev, power_on, iov);
- 
- 	return 0;
- 
+Suggestions of migrating to sdhci driver (from omap_hsmmc driver) is not
+addressed since
+*) tuning ratio of MMC in dra7 is different from sdhci
+*) IOdelay is required for dra7
+*) GPIO based card detect is not supported in sdhci
+*) Some of the registers don't always have correct values as in sdhci
+   (like PSTATE).
+Supporting all of these in sdhci will result in adding lot of quirks in
+sdhci driver.
+
+This series has been tested on beagleboard, pandaboard, beaglebone-black,
+beaglebone, am335x-evm, am437x-evm, dra7xx-evm, dra72x-evm, am571x-idk
+and am572x-idk.
+
+I can split the series to go into Ulf Hansson's tree and Tony's tree 
+separately if that is required.
+
+[1] -> https://lkml.org/lkml/2015/8/25/213
+
+Balaji T K (1):
+  mmc: host: omap_hsmmc: Add voltage switch support for UHS SD card
+
+Kishon Vijay Abraham I (30):
+  mmc: host: omap_hsmmc: Support pbias and vmmc_aux to switch to 1.8v
+  mmc: host: omap_hsmmc: Separate setting voltage capabilities from bus
+    power
+  mmc: host: omap_hsmmc: Program HCTL based on signal_voltage set by mmc
+    core
+  mmc: host: omap_hsmmc: Set clk rate to the max frequency
+  mmc: host: omap_hsmmc: Add tuning support
+  mmc: host: omap_hsmmc: Allow io voltage switch even for fixed vdd
+  mmc: host: omap_hsmmc: Remove incorrect voltage switch  sequence
+  mmc: host: omap_hsmmc: Prepare *set_timing() to be used for iodelay
+    setting
+  mmc: host: omap_hsmmc: Add new compatible string to support dra7
+  mmc: host: omap_hsmmc: Fix error path sequence
+  mmc: host: omap_hsmmc: Add support to set IODELAY values
+  mmc: host: omap_hsmmc: Remove *use_dma* member
+  mmc: host: omap_hsmmc: Enable ADMA2
+  ARM: dts: dra72-evm: Add vmmc_aux supply to mmc1
+  ARM: dts: dra72-evm-revc: Add vmmc_aux supply to mmc1
+  ARM: dts: am57xx-beagle-x15-revb1: Fix supply name used for MMC1 IO
+    lines
+  ARM: dts: dra7-evm: Add pinmux configuration for MMC
+  ARM: dts: am57xx-beagle-x15: Add pinmux configuration for MMC
+  ARM: dts: am571x-idk: Add pinmux configuration for MMC
+  ARM: dts: am572x-idk: Add pinmux configuration for MMC
+  ARM: dts: dra72-evm: Add pinmux configuration for MMC
+  ARM: dts: dra72-evm-revc: Add pinmux configuration for MMC
+  ARM: dts: dra71-evm: Add pinmux configuration for MMC
+  ARM: dts: dra7: Add "max-frequency" property to MMC dt nodes
+  ARM: dts: dra7: Use new dra7-specific compatible string
+  ARM: dts: dra7: Add supported MMC/SD modes in MMC dt nodes
+  ARM: dts: am57xx-beagle-x15-common: Set MMC2 IO voltage to 3.3V
+  ARM: omap2plus_defconfig: Enable PINCTRL_TI_IODELAY
+  ARM: multi_v7_defconfig: Enable PINCTRL_TI_IODELAY
+  Documentation: ARM: Document new dependencies for MMC on DRA7
+
+Mugunthan V N (1):
+  mmc: host: omap_hsmmc: Add software timer when timeout greater than
+    hardware capablility
+
+Ravikumar Kattekola (2):
+  ARM: dts: dra7-evm: Correct the vmmc-supply for mmc2
+  ARM: dts: dra72-evm-common: Correct vmmc-supply for mmc2
+
+Sekhar Nori (6):
+  mmc: omap_hsmmc: Support non-1.8V IO controllers
+  ARM: dts: dra72x: Create a common file with MMC/SD IOdelay data
+  ARM: dts: dra74x: Create a common file with MMC/SD IOdelay data
+  ARM: dts: am57xx-idk: Move common MMC/SD properties to common file
+  ARM: dts: am57xx-idk: Set MMC2 IO voltage to 3.3V
+  ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM
+
+Tony Lindgren (1):
+  ARM: dts: Add dra7 iodelay configuration
+
+ Documentation/arm/OMAP/README                      |    4 +
+ .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    6 +
+ arch/arm/boot/dts/am571x-idk.dts                   |   27 +-
+ arch/arm/boot/dts/am572x-idk.dts                   |   27 +-
+ arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi    |   30 +-
+ arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts      |   18 +-
+ arch/arm/boot/dts/am57xx-beagle-x15.dts            |   17 +
+ arch/arm/boot/dts/am57xx-idk-common.dtsi           |   10 +
+ arch/arm/boot/dts/dra7-evm.dts                     |   28 +-
+ arch/arm/boot/dts/dra7.dtsi                        |   35 +-
+ arch/arm/boot/dts/dra71-evm.dts                    |   28 +
+ arch/arm/boot/dts/dra72-evm-common.dtsi            |    2 -
+ arch/arm/boot/dts/dra72-evm-revc.dts               |   32 +
+ arch/arm/boot/dts/dra72-evm.dts                    |   32 +
+ arch/arm/boot/dts/dra72x-mmc-iodelay.dtsi          |  350 ++++++
+ arch/arm/boot/dts/dra74x-mmc-iodelay.dtsi          |  648 +++++++++++
+ arch/arm/configs/multi_v7_defconfig                |    1 +
+ arch/arm/configs/omap2plus_defconfig               |    1 +
+ arch/arm/mach-omap2/pdata-quirks.c                 |   31 +
+ drivers/mmc/host/omap_hsmmc.c                      | 1158 ++++++++++++++++----
+ include/dt-bindings/pinctrl/dra.h                  |    3 +
+ include/linux/platform_data/hsmmc-omap.h           |   10 +
+ 22 files changed, 2256 insertions(+), 242 deletions(-)
+ create mode 100644 arch/arm/boot/dts/dra72x-mmc-iodelay.dtsi
+ create mode 100644 arch/arm/boot/dts/dra74x-mmc-iodelay.dtsi
+
 -- 
 2.11.0
