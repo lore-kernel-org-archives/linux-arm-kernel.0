@@ -1,104 +1,68 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 19 May 2017 14:45:25 +0200
-Subject: [PATCH 2/5] iio: adc: stm32: make core adc clock optional by default
+Date: Fri, 19 May 2017 14:45:24 +0200
+Subject: [PATCH 1/5] dt-bindings: iio: stm32-adc: add support for STM32H7
 In-Reply-To: <1495197928-1439-1-git-send-email-fabrice.gasnier@st.com>
 References: <1495197928-1439-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1495197928-1439-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1495197928-1439-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Analog clock input is mandatory on stm32f4. But newer version of
-ADC hardware block allow to select either bus clock or asynchronous
-clock, for analog circuitry.
-
-So, make it optional by default, but enforce clk presence on stm32f4.
+Document support for STM32H7 Analog to Digital Converter.
+Main difference is regarding compatible, clock definitions and new
+features like differential channels support:
+STM32H7 ADC block has two clock inputs, common clock for all ADCs.
+One 'bus' clock for registers access, and one optional 'adc' clock
+for analog circuitry (bus clock may be used for conversions).
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- drivers/iio/adc/stm32-adc-core.c | 38 ++++++++++++++++++++++++++------------
- 1 file changed, 26 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/iio/adc/st,stm32-adc.txt     | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
-index 22b7c93..597ab7a 100644
---- a/drivers/iio/adc/stm32-adc-core.c
-+++ b/drivers/iio/adc/stm32-adc-core.c
-@@ -85,13 +85,21 @@ static int stm32f4_adc_clk_sel(struct platform_device *pdev,
- 	u32 val;
- 	int i;
+diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+index e35f9f1..9519d2e 100644
+--- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+@@ -21,11 +21,17 @@ own configurable sequence and trigger:
+ Contents of a stm32 adc root node:
+ -----------------------------------
+ Required properties:
+-- compatible: Should be "st,stm32f4-adc-core".
++- compatible: Should be one of "st,stm32f4-adc-core" or "st,stm32h7-adc-core".
+ - reg: Offset and length of the ADC block register set.
+ - interrupts: Must contain the interrupt for ADC block.
+-- clocks: Clock for the analog circuitry (common to all ADCs).
+-- clock-names: Must be "adc".
++- clocks: Core can use up to two clocks, depending on part used:
++  - "adc" clock: for the analog circuitry, common to all ADCs.
++    It's required on stm32f4.
++    It's optional on stm32h7, bus clock will be used by default if not set.
++  - "bus" clock: for registers access, common to all ADCs.
++    It's unused on stm32f4.
++    It's required on stm32h7.
++- clock-names: Must be "adc" and/or "bus" depending on part used.
+ - interrupt-controller: Identifies the controller node as interrupt-parent
+ - vref-supply: Phandle to the vref input analog reference voltage.
+ - #interrupt-cells = <1>;
+@@ -42,14 +48,16 @@ An ADC block node should contain at least one subnode, representing an
+ ADC instance available on the machine.
  
-+	/* stm32f4 has one clk input for analog (mandatory), enforce it here */
-+	if (!priv->aclk) {
-+		dev_err(&pdev->dev, "No 'adc' clock found\n");
-+		return -ENOENT;
-+	}
-+
- 	rate = clk_get_rate(priv->aclk);
- 	for (i = 0; i < ARRAY_SIZE(stm32f4_pclk_div); i++) {
- 		if ((rate / stm32f4_pclk_div[i]) <= STM32F4_ADC_MAX_CLK_RATE)
- 			break;
- 	}
--	if (i >= ARRAY_SIZE(stm32f4_pclk_div))
-+	if (i >= ARRAY_SIZE(stm32f4_pclk_div)) {
-+		dev_err(&pdev->dev, "adc clk selection failed\n");
- 		return -EINVAL;
-+	}
+ Required properties:
+-- compatible: Should be "st,stm32f4-adc".
++- compatible: Should be one of "st,stm32f4-adc" or "st,stm32h7-adc".
+ - reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
+-- clocks: Input clock private to this ADC instance.
++- clocks: Input clock private to this ADC instance. It's required only on
++  stm32f4, that has per instance clock input for registers access.
+ - interrupt-parent: Phandle to the parent interrupt controller.
+ - interrupts: IRQ Line for the ADC (e.g. may be 0 for adc at 0, 1 for adc at 100 or
+   2 for adc at 200).
+ - st,adc-channels: List of single-ended channels muxed for this ADC.
+-  It can have up to 16 channels, numbered from 0 to 15 (resp. for in0..in15).
++  It can have up to 16 channels on stm32f4 or 20 channels on stm32h7, numbered
++  from 0 to 15 or 19 (resp. for in0..in15 or in0..in19).
+ - #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
+   Documentation/devicetree/bindings/iio/iio-bindings.txt
  
- 	val = readl_relaxed(priv->common.base + STM32F4_ADC_CCR);
- 	val &= ~STM32F4_ADC_ADCPRE_MASK;
-@@ -227,21 +235,25 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 	priv->aclk = devm_clk_get(&pdev->dev, "adc");
- 	if (IS_ERR(priv->aclk)) {
- 		ret = PTR_ERR(priv->aclk);
--		dev_err(&pdev->dev, "Can't get 'adc' clock\n");
--		goto err_regulator_disable;
-+		if (ret == -ENOENT) {
-+			priv->aclk = NULL;
-+		} else {
-+			dev_err(&pdev->dev, "Can't get 'adc' clock\n");
-+			goto err_regulator_disable;
-+		}
- 	}
- 
--	ret = clk_prepare_enable(priv->aclk);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "adc clk enable failed\n");
--		goto err_regulator_disable;
-+	if (priv->aclk) {
-+		ret = clk_prepare_enable(priv->aclk);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "adc clk enable failed\n");
-+			goto err_regulator_disable;
-+		}
- 	}
- 
- 	ret = stm32f4_adc_clk_sel(pdev, priv);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "adc clk selection failed\n");
-+	if (ret < 0)
- 		goto err_clk_disable;
--	}
- 
- 	ret = stm32_adc_irq_probe(pdev, priv);
- 	if (ret < 0)
-@@ -261,7 +273,8 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 	stm32_adc_irq_remove(pdev, priv);
- 
- err_clk_disable:
--	clk_disable_unprepare(priv->aclk);
-+	if (priv->aclk)
-+		clk_disable_unprepare(priv->aclk);
- 
- err_regulator_disable:
- 	regulator_disable(priv->vref);
-@@ -276,7 +289,8 @@ static int stm32_adc_remove(struct platform_device *pdev)
- 
- 	of_platform_depopulate(&pdev->dev);
- 	stm32_adc_irq_remove(pdev, priv);
--	clk_disable_unprepare(priv->aclk);
-+	if (priv->aclk)
-+		clk_disable_unprepare(priv->aclk);
- 	regulator_disable(priv->vref);
- 
- 	return 0;
 -- 
 1.9.1
