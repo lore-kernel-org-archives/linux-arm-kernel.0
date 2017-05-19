@@ -1,31 +1,31 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 19 May 2017 12:33:13 -0700
-Subject: [PATCH v2 1/5] drm/stm: ltdc: Add bridge support
-In-Reply-To: <1495207218-11372-2-git-send-email-philippe.cornu@st.com>
-References: <1495207218-11372-1-git-send-email-philippe.cornu@st.com>
- <1495207218-11372-2-git-send-email-philippe.cornu@st.com>
-Message-ID: <87h90gfxqe.fsf@eliezer.anholt.net>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Fri, 19 May 2017 22:33:33 +0300
+Subject: [PATCH] Staging: bcm2835-audio: bcm2835_ctl.c: Fixed a comment
+ coding style issue
+In-Reply-To: <CAB3L5ozKAq7rj71UdK0GpRTmk72eSpAwXEgUFq4uKrfB8Hrs9g@mail.gmail.com>
+References: <1495104615-4752-1-git-send-email-srishtishar@gmail.com>
+ <20170518135850.GA24513@kroah.com>
+ <CAB3L5ozKAq7rj71UdK0GpRTmk72eSpAwXEgUFq4uKrfB8Hrs9g@mail.gmail.com>
+Message-ID: <20170519193333.5sfsripy27k3xd7r@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philippe CORNU <philippe.cornu@st.com> writes:
+On Sat, May 20, 2017 at 01:00:17AM +0530, srishti sharma wrote:
+> Was the format of this patch acceptable ,the "from" matches the
+> "signed-off-by" right , so this should be correct , were there any
+> errors in this ? Should I resend it ?
+> 
+> Regards,
+> Srishti
+> 
 
-> Add the bridge support, used by DSI host and HDMI/LVDS bridges.
->
-> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
+You should capitalize your name in both since you're doing that here.
 
-The DW DSI host is bridging from MIPI DPI to MIPI DSI, right?  I think
-you could just have ltdc always set up a DPI encoder (the
-ltdc_rgb_encoder_create() function), and then depending on whether
-drm_of_find_panel_or_bridge() finds you a panel or a bridge, you
-drm_panel_attach() or drm_bridge_attach().
+Also I really think you can figure out how to fix your email headers so
+you don't need to use a From header.  Lots of people use gmail and they
+were able to figure it out.
 
-You wouldn't even need to wrap the drm_panel_prepare() and related calls
-with a check for the panel, because the inlines already do that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170519/5b2ecd02/attachment.sig>
+But yeah, the way you sent it is also fine.
+
+regards,
+dan carpenter
