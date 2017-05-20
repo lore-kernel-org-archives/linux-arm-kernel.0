@@ -1,39 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 20 May 2017 10:27:41 +0200
-Subject: [PATCH 4/4 v2] ARM: dts: add Gemini PATA/SATA support
-In-Reply-To: <20170519230600.16782-4-linus.walleij@linaro.org>
-References: <20170519230600.16782-1-linus.walleij@linaro.org>
- <20170519230600.16782-4-linus.walleij@linaro.org>
-Message-ID: <CACRpkdbubStWj+K0eORLXRfZCWAVHs4aC5yDaUzPCPkWLcenoA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 20 May 2017 10:38:46 +0200
+Subject: [PATCH] arm64: allwinner: h5: Remove syslink to shared DTSI
+In-Reply-To: <CAGb2v67yp+GL+nMy7hSmFiccqnGjmdyfZMVnPXAGRqO8j7=R7Q@mail.gmail.com>
+References: <20170515085000.27965-1-maxime.ripard@free-electrons.com>
+ <CAGb2v67yp+GL+nMy7hSmFiccqnGjmdyfZMVnPXAGRqO8j7=R7Q@mail.gmail.com>
+Message-ID: <20170520083846.wyyu6mckrbfr6qmv@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 20, 2017 at 1:06 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Tue, May 16, 2017 at 03:46:36PM +0800, Chen-Yu Tsai wrote:
+> On Mon, May 15, 2017 at 4:50 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The arm64 H5 and arm H3 SoCs share roughly the same base, and therefore
+> > share a significant part of their device tree.
+> >
+> > The approach we took was to add a symlink from the arm64 DTSI to the arm
+> > DTSI.
+> >
+> > Now that the arm DT folder is exposed in the include path, we can just use
+> > it and remove our symlink.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-> The NAS4229B and SQ201 Gemini systems have a PATA controller
-> which is linked to a SATA bridge in the SoC. Enable both
-> platforms to use the PATA/SATA devices.
->
-> Cc: John Feng-Hsin Chiang <john453@faraday-tech.com>
-> Cc: Greentime Hu <green.hu@gmail.com>
-> Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - Cut the timings
+Applied,
 
-(...)
+Maxime
 
-> +               ata at 63400000 {
-(...)
-> +                       /* PIO timings assume 33 MHz bus speed */
-> +                       faraday,pio-active-time = <10>, <10>, <10>, <3>, <3>;
-> +                       faraday,pio-recovery-time = <10>, <3>, <1>, <3>, <1>;
-(...)
-
-OK I forgot to cut the timings on the second instance, sorry.
-I have removed them now so they are not there when I send this
-to the ARM SoC tree.
-
-Yours,
-Linus Walleij
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170520/ecdca40f/attachment.sig>
