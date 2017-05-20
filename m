@@ -1,41 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 20 May 2017 10:38:46 +0200
-Subject: [PATCH] arm64: allwinner: h5: Remove syslink to shared DTSI
-In-Reply-To: <CAGb2v67yp+GL+nMy7hSmFiccqnGjmdyfZMVnPXAGRqO8j7=R7Q@mail.gmail.com>
-References: <20170515085000.27965-1-maxime.ripard@free-electrons.com>
- <CAGb2v67yp+GL+nMy7hSmFiccqnGjmdyfZMVnPXAGRqO8j7=R7Q@mail.gmail.com>
-Message-ID: <20170520083846.wyyu6mckrbfr6qmv@flea.home>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat, 20 May 2017 10:45:02 +0200
+Subject: [PATCH 1/2] ARM: dts: meson: organize devices in their
+ corresponding busses
+In-Reply-To: <m2inkw4g47.fsf@baylibre.com>
+References: <20170417213938.22626-1-martin.blumenstingl@googlemail.com>
+ <20170417213938.22626-2-martin.blumenstingl@googlemail.com>
+ <m2inkw4g47.fsf@baylibre.com>
+Message-ID: <CAFBinCBcWgS_qSMNEUH+QrPXxLyQo87paH3+wBkHf5LWarnmEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 03:46:36PM +0800, Chen-Yu Tsai wrote:
-> On Mon, May 15, 2017 at 4:50 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The arm64 H5 and arm H3 SoCs share roughly the same base, and therefore
-> > share a significant part of their device tree.
-> >
-> > The approach we took was to add a symlink from the arm64 DTSI to the arm
-> > DTSI.
-> >
-> > Now that the arm DT folder is exposed in the include path, we can just use
-> > it and remove our symlink.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+On Sat, May 20, 2017 at 12:49 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+>
+>> The Amlogic Meson SoCs have most of the internal peripherals organized
+>> in busses. Use them to make the dts easier to read and to avoid
+>> duplicated register (bus) offset definitions.
+>>
+>> The bus information is taken from the vendor kernel:
+>>       #define IO_CBUS_PHY_BASE        0xc1100000  ///2M
+>>       #define IO_AOBUS_PHY_BASE       0xc8100000  ///1M
+>>
+>> There are more internal busses (such as the abp bus which seems to
+>> contain audio, HDMI and Mali registers), but since we don't have
+>> drivers for them yet these are not added (yet).
+>>
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>
+> I tested this series on my meson8b-odroidc1 and it boots fine.
+>
+> Series looks fine to me, except...
+>
+> [...]
+>
+>>
+>>               ethmac: ethernet at c9410000 {
+>>                       compatible = "amlogic,meson6-dwmac", "snps,dwmac";
+>>                       reg = <0xc9410000 0x10000
+>> -                            0xc1108108 0x4>;
+>> +                     0xc1108108 0x4>;
+>
+> stray tab removal?
+oh, excellent catch - thank you!
 
-Applied,
+> I fixed that up locally and applied to v4.13/dt64 branch.
+nice, thank you!
 
-Maxime
+do the ARM maintainers still want separate pull-requests for 32-bit
+and 64-bit .dts/defconfig/etc. changes?
+you might want to move the three latest commits from v4.13/dt64 to
+v4.13/dt32 in that case, but this should be trivial (since these
+patches don't depend on anything else)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170520/ecdca40f/attachment.sig>
+> Thanks for the patches!
+you're welcome, hopefully more to follow!
+
+
+Regards,
+Martin
