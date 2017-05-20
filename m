@@ -1,36 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 20 May 2017 19:56:34 +0200
-Subject: [PATCH 4/6] dma: pl08x: Add support for Faraday Technology
- FTDMAC020
-In-Reply-To: <20170514123418.GH6263@localhost>
-References: <20170408120457.22750-1-linus.walleij@linaro.org>
- <20170408120457.22750-4-linus.walleij@linaro.org>
- <20170514123418.GH6263@localhost>
-Message-ID: <CACRpkdYm4LERyxi6jHkJMGB-D4JrE6oYcdSM_s_fW0jfHpso+A@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 20 May 2017 20:04:03 +0200
+Subject: [PATCH] ASoC: remove NULL pointer check for clk_disable_unprepare
+In-Reply-To: <1495302158-30951-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1495302158-30951-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20170520180403.mqwfrcjsyukv3phr@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 14, 2017 at 2:34 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Sat, Apr 08, 2017 at 02:04:55PM +0200, Linus Walleij wrote:
->
->> +#define FTDMAC020_CH_CSR_FIFOTH_MSK          (0x7 << 24)
->
-> IIUC we can have a GENMASK(27, 25), won't that be a bit better here and
-> other places?
+On Sun, May 21, 2017 at 02:42:38AM +0900, Masahiro Yamada wrote:
+> After long term efforts of fixing non-common clock implementations,
+> clk_disable() is a no-op for a NULL pointer input, and this is now
+> tree-wide consistent.
+> 
+> All clock consumers can safely call clk_disable(_unprepare) without
+> NULL pointer check.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+>  sound/soc/codecs/adau17x1.c                | 3 +--
+>  sound/soc/codecs/da7213.c                  | 3 +--
+>  sound/soc/codecs/da7218.c                  | 3 +--
+>  sound/soc/codecs/da7219-aad.c              | 5 ++---
+>  sound/soc/codecs/da7219.c                  | 3 +--
+>  sound/soc/codecs/es8328.c                  | 3 +--
+>  sound/soc/codecs/wm8731.c                  | 3 +--
+>  sound/soc/davinci/davinci-evm.c            | 3 +--
+>  sound/soc/fsl/imx-audmux.c                 | 6 ++----
+>  sound/soc/intel/boards/bytcr_rt5640.c      | 2 +-
+>  sound/soc/intel/boards/cht_bsw_rt5645.c    | 3 +--
+>  sound/soc/mediatek/mt8173/mt8173-afe-pcm.c | 6 ++----
+>  sound/soc/samsung/i2s.c                    | 3 +--
+>  13 files changed, 16 insertions(+), 30 deletions(-)
+> 
 
-I will send an additional patch at the end of the series switching *all*
-of these to use GENMASK() so we keep it to one technical step
-per patch, OK?
+(...)
 
->> +#define FTDMAC020_CH_CSR_FIFOTH_SHIFT                (24)
->
-> and you may use ffs(FTDMAC020_CH_CSR_FIFOTH_MSK) or keep a shift define
+> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+> index af3ba4d..3a06acd 100644
+> --- a/sound/soc/samsung/i2s.c
+> +++ b/sound/soc/samsung/i2s.c
+> @@ -1122,8 +1122,7 @@ static int i2s_runtime_suspend(struct device *dev)
+>  	i2s->suspend_i2scon = readl(i2s->addr + I2SCON);
+>  	i2s->suspend_i2spsr = readl(i2s->addr + I2SPSR);
+>  
+> -	if (i2s->op_clk)
+> -		clk_disable_unprepare(i2s->op_clk);
+> +	clk_disable_unprepare(i2s->op_clk);
+>  	clk_disable_unprepare(i2s->clk);
 
-I'm more convenient with the shift at least here.
+I think the check in i2s_runtime_resume() should be removed then as well
+to keep it symmetrical. Otherwise it looks suspicious.
 
-ffs(DEFINE) makes me thin ffs() is a function invoked all the
-time even if I know very well the compiler will mangle it into
-a constant... just confusing for my perception.
-
-Yours,
-Linus Walleij
+Best regards,
+Krzysztof
