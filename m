@@ -1,72 +1,36 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 19 May 2017 22:54:30 -0700
-Subject: [PATCH v2 1/5] pinctrl: qcom: Add ipq8074 pinctrl driver
-In-Reply-To: <f5a3da8b-c3a4-3cb3-9f5f-0cbdb87688ed@codeaurora.org>
-References: <1493898841-20583-1-git-send-email-varada@codeaurora.org>
- <1493898841-20583-2-git-send-email-varada@codeaurora.org>
- <20170510224355.GE45273@Bjorns-MacBook-Pro-2.local>
- <1f4c9974-f6a4-bee7-4f37-ad8795e442a3@codeaurora.org>
- <20170514042307.GE69278@Bjorns-MacBook-Pro-2.local>
- <7afc7191-bcb1-a566-eac5-a4fe1293c773@codeaurora.org>
- <20170517193315.GF12920@tuxbook>
- <f5a3da8b-c3a4-3cb3-9f5f-0cbdb87688ed@codeaurora.org>
-Message-ID: <20170520055430.GU12920@tuxbook>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 20 May 2017 07:43:15 +0100
+Subject: [PATCH 3/3][v4] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <b3980350-9663-d98b-6533-fd3c15f98671@gmail.com> (Matthias
+ Brugger's message of "Fri, 19 May 2017 15:41:43 +0200")
+References: <20170519131305.5068-1-laurentiu.tudor@nxp.com>
+ <20170519131305.5068-4-laurentiu.tudor@nxp.com>
+ <b3980350-9663-d98b-6533-fd3c15f98671@gmail.com>
+Message-ID: <86tw4g6nb0.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 18 May 01:39 PDT 2017, Varadarajan Narayanan wrote:
+On Fri, May 19 2017 at 02:41:43 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> On 19/05/17 15:13, laurentiu.tudor at nxp.com wrote:
+>> From: Stuart Yoder <stuart.yoder@nxp.com>
+>>
+>> Move the source files out of staging into their final locations:
+>>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
+>>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
+>
+> This driver has as compatible "arm,gic-v3-its". I wonder if this is
+> correct and if it should be moved like this out of staging.
 
-> 
-> 
-> On 5/18/2017 1:03 AM, Bjorn Andersson wrote:
-> > On Mon 15 May 02:05 PDT 2017, Varadarajan Narayanan wrote:
-> > 
-> > > On 5/14/2017 9:53 AM, Bjorn Andersson wrote:
-> > > > On Thu 11 May 03:33 PDT 2017, Varadarajan Narayanan wrote:
-> > > > 
-> > > > > On 5/11/2017 4:13 AM, Bjorn Andersson wrote:
-> > > > > > On Thu 04 May 04:53 PDT 2017, Varadarajan Narayanan wrote:
-> > [..]
-> > > > > > > +	msm_mux_qpic_pad4,
-> > > > > > 
-> > > > > > What are qpic_pad and qpic_pad0 through qpic_pad8? Different functions,
-> > > > > > alternative muxings...?
-> > > > > 
-> > > > > This is for the NAND and LCD display. The pins listed are the 9 data pins.
-> > > > > 
-> > > > 
-> > > > Then you can describe them all as "qpic_pad" (or simply "qpic"?). (It's
-> > > > possible to reference a partial group in the DTS, if that's necessary)
-> > > 
-> > > There are two sets of 9 pins, either of which can go to NAND or LCD.
-> > > Will rename qpic_pad as qpic_a and qpic_pad[0-8] as qpic_b.
-> > > Is that ok?
-> > > 
-> > 
-> > So you have NAND and LCD hardware muxed to either "a" or "b" and then
-> > you mux either "a" or "b" out onto actual pins?
-> > 
-> > How is this first mux configured?
-> > 
-> > I think the a/b scheme sounds reasonable, if above is how it works.
-> 
-> Sorry, I was wrong. I had misread the documentation.
-> 
-> There are 18 pins. 15 pins are common between LCD and NAND. The QPIC
-> controller arbitrates between LCD and NAND. Of the remaining 4, 2 are for
-> NAND and 2 are for LCD exclusively. We plan to group the qpic pins into 3
-> groups namely, qpic_common, qpic_nand and qpic_lcd. Is that ok?
-> 
+This is no different from the way we handle *any* bus that uses the
+GICv3 ITS as an MSI controller. Each bus provides its glue code that
+latches onto the ITS node, and calls into the generic code.
 
-If you consider that you are defining the available functions for this
-pinmuxer and then define the sets of pins exposing these available
-functions it does make sense to just name it "qpic".
+Now, when it comes to moving this out of staging, here is my concern:
+There is mention of a userspace tool (restool) used to control the
+HW. Where is this tool? Where is the user ABI documented?
 
-I think that naming them _common, _lcd and _nand is just adding
-confusion when it comes to writing the dts files.
+Thanks,
 
-
-@Linus, do you have a different preference here?
-
-Regards,
-Bjorn
+	M.
+-- 
+Jazz is not dead. It just smells funny.
