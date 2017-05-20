@@ -1,231 +1,149 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 20 May 2017 23:42:52 +0200
-Subject: [PATCH 3/5 v2] dma: pl08x: Make slave engine optional
+Date: Sat, 20 May 2017 23:42:54 +0200
+Subject: [PATCH 5/5 v2] dma: pl08x: use GENMASK() to create bitmasks
 In-Reply-To: <20170520214254.21541-1-linus.walleij@linaro.org>
 References: <20170520214254.21541-1-linus.walleij@linaro.org>
-Message-ID: <20170520214254.21541-3-linus.walleij@linaro.org>
+Message-ID: <20170520214254.21541-5-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the vendor data does not specify any signals, we do not
-have to support slave DMA. Make the registration of the slave
-DMA engine optional, so we can use this for the FTDMAC020
-in the Gemini that only has memcpy support.
+This switches the arbitrary shifting of hex constants in
+the pl080 header to use GENMASK().
 
+Suggested-by: Vinod Koul <vinod.koul@intel.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v1->v2:
-- No changes, just resending.
+- New patch at the end of the series in response to
+  Vinods request to use GENMASK().
 ---
- drivers/dma/amba-pl08x.c | 128 +++++++++++++++++++++++++++++------------------
- 1 file changed, 78 insertions(+), 50 deletions(-)
+ include/linux/amba/pl080.h | 50 +++++++++++++++++++++++-----------------------
+ 1 file changed, 25 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index d3d660a36ad7..6ddb029dac50 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -253,8 +253,9 @@ struct pl08x_dma_chan {
+diff --git a/include/linux/amba/pl080.h b/include/linux/amba/pl080.h
+index 10124c9f9db5..ab036b6b1804 100644
+--- a/include/linux/amba/pl080.h
++++ b/include/linux/amba/pl080.h
+@@ -70,12 +70,12 @@
+ #define FTDMAC020_CH_LLP			(0x10)
+ #define FTDMAC020_CH_SIZE			(0x14)
  
- /**
-  * struct pl08x_driver_data - the local state holder for the PL08x
-- * @slave: slave engine for this instance
-+ * @slave: optional slave engine for this instance
-  * @memcpy: memcpy engine for this instance
-+ * @has_slave: the PL08x has a slave engine (routed signals)
-  * @base: virtual memory base (remapped) for the PL08x
-  * @adev: the corresponding AMBA (PrimeCell) bus entry
-  * @vd: vendor data for this PL08x variant
-@@ -269,6 +270,7 @@ struct pl08x_dma_chan {
- struct pl08x_driver_data {
- 	struct dma_device slave;
- 	struct dma_device memcpy;
-+	bool has_slave;
- 	void __iomem *base;
- 	struct amba_device *adev;
- 	const struct vendor_data *vd;
-@@ -705,7 +707,7 @@ static void pl08x_phy_free(struct pl08x_dma_chan *plchan)
- 			break;
- 		}
+-#define PL080_LLI_ADDR_MASK			(0x3fffffff << 2)
++#define PL080_LLI_ADDR_MASK			GENMASK(31, 2)
+ #define PL080_LLI_ADDR_SHIFT			(2)
+ #define PL080_LLI_LM_AHB2			BIT(0)
  
--	if (!next) {
-+	if (!next && pl08x->has_slave) {
- 		list_for_each_entry(p, &pl08x->slave.channels, vc.chan.device_node)
- 			if (p->state == PL08X_CHAN_WAITING) {
- 				next = p;
-@@ -2085,12 +2087,15 @@ static int pl08x_debugfs_show(struct seq_file *s, void *data)
- 			   pl08x_state_str(chan->state));
- 	}
+ #define PL080_CONTROL_TC_IRQ_EN			BIT(31)
+-#define PL080_CONTROL_PROT_MASK			(0x7 << 28)
++#define PL080_CONTROL_PROT_MASK			GENMASK(30, 28)
+ #define PL080_CONTROL_PROT_SHIFT		(28)
+ #define PL080_CONTROL_PROT_CACHE		BIT(30)
+ #define PL080_CONTROL_PROT_BUFF			BIT(29)
+@@ -84,16 +84,16 @@
+ #define PL080_CONTROL_SRC_INCR			BIT(26)
+ #define PL080_CONTROL_DST_AHB2			BIT(25)
+ #define PL080_CONTROL_SRC_AHB2			BIT(24)
+-#define PL080_CONTROL_DWIDTH_MASK		(0x7 << 21)
++#define PL080_CONTROL_DWIDTH_MASK		GENMASK(23, 21)
+ #define PL080_CONTROL_DWIDTH_SHIFT		(21)
+-#define PL080_CONTROL_SWIDTH_MASK		(0x7 << 18)
++#define PL080_CONTROL_SWIDTH_MASK		GENMASK(20, 18)
+ #define PL080_CONTROL_SWIDTH_SHIFT		(18)
+-#define PL080_CONTROL_DB_SIZE_MASK		(0x7 << 15)
++#define PL080_CONTROL_DB_SIZE_MASK		GENMASK(17, 15)
+ #define PL080_CONTROL_DB_SIZE_SHIFT		(15)
+-#define PL080_CONTROL_SB_SIZE_MASK		(0x7 << 12)
++#define PL080_CONTROL_SB_SIZE_MASK		GENMASK(14, 12)
+ #define PL080_CONTROL_SB_SIZE_SHIFT		(12)
+-#define PL080_CONTROL_TRANSFER_SIZE_MASK	(0xfff << 0)
+-#define PL080S_CONTROL_TRANSFER_SIZE_MASK	(0x1ffffff << 0)
++#define PL080_CONTROL_TRANSFER_SIZE_MASK	GENMASK(11, 0)
++#define PL080S_CONTROL_TRANSFER_SIZE_MASK	GENMASK(24, 0)
+ #define PL080_CONTROL_TRANSFER_SIZE_SHIFT	(0)
  
--	seq_printf(s, "\nPL08x virtual slave channels:\n");
--	seq_printf(s, "CHANNEL:\tSTATE:\n");
--	seq_printf(s, "--------\t------\n");
--	list_for_each_entry(chan, &pl08x->slave.channels, vc.chan.device_node) {
--		seq_printf(s, "%s\t\t%s\n", chan->name,
--			   pl08x_state_str(chan->state));
-+	if (pl08x->has_slave) {
-+		seq_printf(s, "\nPL08x virtual slave channels:\n");
-+		seq_printf(s, "CHANNEL:\tSTATE:\n");
-+		seq_printf(s, "--------\t------\n");
-+		list_for_each_entry(chan, &pl08x->slave.channels,
-+				    vc.chan.device_node) {
-+			seq_printf(s, "%s\t\t%s\n", chan->name,
-+				   pl08x_state_str(chan->state));
-+		}
- 	}
+ #define PL080_BSIZE_1				(0x0)
+@@ -116,11 +116,11 @@
+ #define PL080_CONFIG_LOCK			BIT(16)
+ #define PL080_CONFIG_TC_IRQ_MASK		BIT(15)
+ #define PL080_CONFIG_ERR_IRQ_MASK		BIT(14)
+-#define PL080_CONFIG_FLOW_CONTROL_MASK		(0x7 << 11)
++#define PL080_CONFIG_FLOW_CONTROL_MASK		GENMASK(13, 11)
+ #define PL080_CONFIG_FLOW_CONTROL_SHIFT		(11)
+-#define PL080_CONFIG_DST_SEL_MASK		(0xf << 6)
++#define PL080_CONFIG_DST_SEL_MASK		GENMASK(9, 6)
+ #define PL080_CONFIG_DST_SEL_SHIFT		(6)
+-#define PL080_CONFIG_SRC_SEL_MASK		(0xf << 1)
++#define PL080_CONFIG_SRC_SEL_MASK		GENMASK(4, 1)
+ #define PL080_CONFIG_SRC_SEL_SHIFT		(1)
+ #define PL080_CONFIG_ENABLE			BIT(0)
  
- 	return 0;
-@@ -2128,6 +2133,10 @@ static struct dma_chan *pl08x_find_chan_id(struct pl08x_driver_data *pl08x,
- {
- 	struct pl08x_dma_chan *chan;
+@@ -135,24 +135,24 @@
  
-+	/* Trying to get a slave channel from something with no slave support */
-+	if (!pl08x->has_slave)
-+		return NULL;
-+
- 	list_for_each_entry(chan, &pl08x->slave.channels, vc.chan.device_node) {
- 		if (chan->signal == id)
- 			return &chan->vc.chan;
-@@ -2265,20 +2274,24 @@ static int pl08x_of_probe(struct amba_device *adev,
- 	 * for a device and have it's AHB interfaces set up at
- 	 * translation time.
- 	 */
--	chanp = devm_kcalloc(&adev->dev,
--			pl08x->vd->signals,
--			sizeof(struct pl08x_channel_data),
--			GFP_KERNEL);
--	if (!chanp)
--		return -ENOMEM;
-+	if (pl08x->vd->signals) {
-+		chanp = devm_kcalloc(&adev->dev,
-+				     pl08x->vd->signals,
-+				     sizeof(struct pl08x_channel_data),
-+				     GFP_KERNEL);
-+		if (!chanp)
-+			return -ENOMEM;
+ #define FTDMAC020_CH_CSR_TC_MSK			BIT(31)
+ /* Later versions have a threshold in bits 24..26,  */
+-#define FTDMAC020_CH_CSR_FIFOTH_MSK		(0x7 << 24)
++#define FTDMAC020_CH_CSR_FIFOTH_MSK		GENMASK(26, 24)
+ #define FTDMAC020_CH_CSR_FIFOTH_SHIFT		(24)
+-#define FTDMAC020_CH_CSR_CHPR1_MSK		(0x3 << 22)
++#define FTDMAC020_CH_CSR_CHPR1_MSK		GENMASK(23, 22)
+ #define FTDMAC020_CH_CSR_PROT3			BIT(21)
+ #define FTDMAC020_CH_CSR_PROT2			BIT(20)
+ #define FTDMAC020_CH_CSR_PROT1			BIT(19)
+-#define FTDMAC020_CH_CSR_SRC_SIZE_MSK		(0x7 << 16)
++#define FTDMAC020_CH_CSR_SRC_SIZE_MSK		GENMASK(18, 16)
+ #define FTDMAC020_CH_CSR_SRC_SIZE_SHIFT		(16)
+ #define FTDMAC020_CH_CSR_ABT			BIT(15)
+-#define FTDMAC020_CH_CSR_SRC_WIDTH_MSK		(0x7 << 11)
++#define FTDMAC020_CH_CSR_SRC_WIDTH_MSK		GENMASK(13, 11)
+ #define FTDMAC020_CH_CSR_SRC_WIDTH_SHIFT	(11)
+-#define FTDMAC020_CH_CSR_DST_WIDTH_MSK		(0x7 << 8)
++#define FTDMAC020_CH_CSR_DST_WIDTH_MSK		GENMASK(10, 8)
+ #define FTDMAC020_CH_CSR_DST_WIDTH_SHIFT	(8)
+ #define FTDMAC020_CH_CSR_MODE			BIT(7)
+ /* 00 = increase, 01 = decrease, 10 = fix */
+-#define FTDMAC020_CH_CSR_SRCAD_CTL_MSK		(0x3 << 5)
++#define FTDMAC020_CH_CSR_SRCAD_CTL_MSK		GENMASK(6, 5)
+ #define FTDMAC020_CH_CSR_SRCAD_CTL_SHIFT	(5)
+-#define FTDMAC020_CH_CSR_DSTAD_CTL_MSK		(0x3 << 3)
++#define FTDMAC020_CH_CSR_DSTAD_CTL_MSK		GENMASK(4, 3)
+ #define FTDMAC020_CH_CSR_DSTAD_CTL_SHIFT	(3)
+ #define FTDMAC020_CH_CSR_SRC_SEL		BIT(2)
+ #define FTDMAC020_CH_CSR_DST_SEL		BIT(1)
+@@ -171,7 +171,7 @@
+ #define FTDMAC020_CH_CSR_SRCAD_CTL_DEC		(0x1)
+ #define FTDMAC020_CH_CSR_SRCAD_CTL_FIXED	(0x2)
  
--	pd->slave_channels = chanp;
--	for (i = 0; i < pl08x->vd->signals; i++) {
--		/* chanp->periph_buses will be assigned at translation */
--		chanp->bus_id = kasprintf(GFP_KERNEL, "slave%d", i);
--		chanp++;
-+		pd->slave_channels = chanp;
-+		for (i = 0; i < pl08x->vd->signals; i++) {
-+			/*
-+			 * chanp->periph_buses will be assigned at translation
-+			 */
-+			chanp->bus_id = kasprintf(GFP_KERNEL, "slave%d", i);
-+			chanp++;
-+		}
-+		pd->num_slave_channels = pl08x->vd->signals;
- 	}
--	pd->num_slave_channels = pl08x->vd->signals;
+-#define FTDMAC020_CH_CFG_LLP_CNT_MASK		(0xf << 16)
++#define FTDMAC020_CH_CFG_LLP_CNT_MASK		GENMASK(19, 16)
+ #define FTDMAC020_CH_CFG_LLP_CNT_SHIFT		(16)
+ #define FTDMAC020_CH_CFG_BUSY			BIT(8)
+ #define FTDMAC020_CH_CFG_INT_ABT_MASK		BIT(2)
+@@ -180,20 +180,20 @@
  
- 	pl08x->pd = pd;
+ /* Inside the LLIs, the applicable CSR fields are mapped differently */
+ #define FTDMAC020_LLI_TC_MSK			BIT(28)
+-#define FTDMAC020_LLI_SRC_WIDTH_MSK		(0x7 << 25)
++#define FTDMAC020_LLI_SRC_WIDTH_MSK		GENMASK(27, 25)
+ #define FTDMAC020_LLI_SRC_WIDTH_SHIFT		(25)
+-#define FTDMAC020_LLI_DST_WIDTH_MSK		(0x7 << 22)
++#define FTDMAC020_LLI_DST_WIDTH_MSK		GENMASK(24, 22)
+ #define FTDMAC020_LLI_DST_WIDTH_SHIFT		(22)
+-#define FTDMAC020_LLI_SRCAD_CTL_MSK		(0x3 << 20)
++#define FTDMAC020_LLI_SRCAD_CTL_MSK		GENMASK(21, 20)
+ #define FTDMAC020_LLI_SRCAD_CTL_SHIFT		(20)
+-#define FTDMAC020_LLI_DSTAD_CTL_MSK		(0x3 << 18)
++#define FTDMAC020_LLI_DSTAD_CTL_MSK		GENMASK(19, 18)
+ #define FTDMAC020_LLI_DSTAD_CTL_SHIFT		(18)
+ #define FTDMAC020_LLI_SRC_SEL			BIT(17)
+ #define FTDMAC020_LLI_DST_SEL			BIT(16)
+-#define FTDMAC020_LLI_TRANSFER_SIZE_MASK	(0xfff << 0)
++#define FTDMAC020_LLI_TRANSFER_SIZE_MASK	GENMASK(11, 0)
+ #define FTDMAC020_LLI_TRANSFER_SIZE_SHIFT	(0)
  
-@@ -2340,24 +2353,34 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 	pl08x->memcpy.directions = BIT(DMA_MEM_TO_MEM);
- 	pl08x->memcpy.residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
- 
--	/* Initialize slave engine */
--	dma_cap_set(DMA_SLAVE, pl08x->slave.cap_mask);
--	dma_cap_set(DMA_CYCLIC, pl08x->slave.cap_mask);
--	pl08x->slave.dev = &adev->dev;
--	pl08x->slave.device_free_chan_resources = pl08x_free_chan_resources;
--	pl08x->slave.device_prep_dma_interrupt = pl08x_prep_dma_interrupt;
--	pl08x->slave.device_tx_status = pl08x_dma_tx_status;
--	pl08x->slave.device_issue_pending = pl08x_issue_pending;
--	pl08x->slave.device_prep_slave_sg = pl08x_prep_slave_sg;
--	pl08x->slave.device_prep_dma_cyclic = pl08x_prep_dma_cyclic;
--	pl08x->slave.device_config = pl08x_config;
--	pl08x->slave.device_pause = pl08x_pause;
--	pl08x->slave.device_resume = pl08x_resume;
--	pl08x->slave.device_terminate_all = pl08x_terminate_all;
--	pl08x->slave.src_addr_widths = PL80X_DMA_BUSWIDTHS;
--	pl08x->slave.dst_addr_widths = PL80X_DMA_BUSWIDTHS;
--	pl08x->slave.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
--	pl08x->slave.residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
-+	/*
-+	 * Initialize slave engine, if the block has no signals, that means
-+	 * we have no slave support.
-+	 */
-+	if (vd->signals) {
-+		pl08x->has_slave = true;
-+		dma_cap_set(DMA_SLAVE, pl08x->slave.cap_mask);
-+		dma_cap_set(DMA_CYCLIC, pl08x->slave.cap_mask);
-+		pl08x->slave.dev = &adev->dev;
-+		pl08x->slave.device_free_chan_resources =
-+			pl08x_free_chan_resources;
-+		pl08x->slave.device_prep_dma_interrupt =
-+			pl08x_prep_dma_interrupt;
-+		pl08x->slave.device_tx_status = pl08x_dma_tx_status;
-+		pl08x->slave.device_issue_pending = pl08x_issue_pending;
-+		pl08x->slave.device_prep_slave_sg = pl08x_prep_slave_sg;
-+		pl08x->slave.device_prep_dma_cyclic = pl08x_prep_dma_cyclic;
-+		pl08x->slave.device_config = pl08x_config;
-+		pl08x->slave.device_pause = pl08x_pause;
-+		pl08x->slave.device_resume = pl08x_resume;
-+		pl08x->slave.device_terminate_all = pl08x_terminate_all;
-+		pl08x->slave.src_addr_widths = PL80X_DMA_BUSWIDTHS;
-+		pl08x->slave.dst_addr_widths = PL80X_DMA_BUSWIDTHS;
-+		pl08x->slave.directions =
-+			BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+		pl08x->slave.residue_granularity =
-+			DMA_RESIDUE_GRANULARITY_SEGMENT;
-+	}
- 
- 	/* Get the platform data */
- 	pl08x->pd = dev_get_platdata(&adev->dev);
-@@ -2465,13 +2488,15 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 	}
- 
- 	/* Register slave channels */
--	ret = pl08x_dma_init_virtual_channels(pl08x, &pl08x->slave,
--			pl08x->pd->num_slave_channels, true);
--	if (ret < 0) {
--		dev_warn(&pl08x->adev->dev,
--			"%s failed to enumerate slave channels - %d\n",
--				__func__, ret);
--		goto out_no_slave;
-+	if (pl08x->has_slave) {
-+		ret = pl08x_dma_init_virtual_channels(pl08x, &pl08x->slave,
-+					pl08x->pd->num_slave_channels, true);
-+		if (ret < 0) {
-+			dev_warn(&pl08x->adev->dev,
-+				 "%s failed to enumerate slave channels - %d\n",
-+				 __func__, ret);
-+			goto out_no_slave;
-+		}
- 	}
- 
- 	ret = dma_async_device_register(&pl08x->memcpy);
-@@ -2482,12 +2507,14 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto out_no_memcpy_reg;
- 	}
- 
--	ret = dma_async_device_register(&pl08x->slave);
--	if (ret) {
--		dev_warn(&pl08x->adev->dev,
-+	if (pl08x->has_slave) {
-+		ret = dma_async_device_register(&pl08x->slave);
-+		if (ret) {
-+			dev_warn(&pl08x->adev->dev,
- 			"%s failed to register slave as an async device - %d\n",
- 			__func__, ret);
--		goto out_no_slave_reg;
-+			goto out_no_slave_reg;
-+		}
- 	}
- 
- 	amba_set_drvdata(adev, pl08x);
-@@ -2501,7 +2528,8 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- out_no_slave_reg:
- 	dma_async_device_unregister(&pl08x->memcpy);
- out_no_memcpy_reg:
--	pl08x_free_virtual_channels(&pl08x->slave);
-+	if (pl08x->has_slave)
-+		pl08x_free_virtual_channels(&pl08x->slave);
- out_no_slave:
- 	pl08x_free_virtual_channels(&pl08x->memcpy);
- out_no_memcpy:
+-#define FTDMAC020_CFG_LLP_CNT_MASK		(0x0f << 16)
++#define FTDMAC020_CFG_LLP_CNT_MASK		GENMASK(19, 16)
+ #define FTDMAC020_CFG_LLP_CNT_SHIFT		(16)
+ #define FTDMAC020_CFG_BUSY			BIT(8)
+ #define FTDMAC020_CFG_INT_ABT_MSK		BIT(2)
 -- 
 2.9.4
