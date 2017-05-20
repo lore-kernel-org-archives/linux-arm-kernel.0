@@ -1,7 +1,7 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 21 May 2017 02:42:38 +0900
-Subject: [PATCH] ASoC: remove NULL pointer check for clk_disable_unprepare
-Message-ID: <1495302158-30951-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Sun, 21 May 2017 02:52:13 +0900
+Subject: [PATCH] usb: remove NULL pointer check for clk_disable_unprepare
+Message-ID: <1495302733-6669-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,216 +15,204 @@ NULL pointer check.
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- sound/soc/codecs/adau17x1.c                | 3 +--
- sound/soc/codecs/da7213.c                  | 3 +--
- sound/soc/codecs/da7218.c                  | 3 +--
- sound/soc/codecs/da7219-aad.c              | 5 ++---
- sound/soc/codecs/da7219.c                  | 3 +--
- sound/soc/codecs/es8328.c                  | 3 +--
- sound/soc/codecs/wm8731.c                  | 3 +--
- sound/soc/davinci/davinci-evm.c            | 3 +--
- sound/soc/fsl/imx-audmux.c                 | 6 ++----
- sound/soc/intel/boards/bytcr_rt5640.c      | 2 +-
- sound/soc/intel/boards/cht_bsw_rt5645.c    | 3 +--
- sound/soc/mediatek/mt8173/mt8173-afe-pcm.c | 6 ++----
- sound/soc/samsung/i2s.c                    | 3 +--
- 13 files changed, 16 insertions(+), 30 deletions(-)
+ drivers/usb/dwc2/platform.c          | 3 +--
+ drivers/usb/gadget/udc/fsl_mxc_udc.c | 3 +--
+ drivers/usb/host/ehci-mxc.c          | 8 ++------
+ drivers/usb/host/ehci-platform.c     | 3 +--
+ drivers/usb/host/ehci-spear.c        | 3 +--
+ drivers/usb/host/ehci-st.c           | 3 +--
+ drivers/usb/host/fsl-mph-dr-of.c     | 3 +--
+ drivers/usb/host/ohci-platform.c     | 3 +--
+ drivers/usb/host/ohci-spear.c        | 3 +--
+ drivers/usb/host/ohci-st.c           | 3 +--
+ drivers/usb/misc/usb3503.c           | 9 +++------
+ 11 files changed, 14 insertions(+), 30 deletions(-)
 
-diff --git a/sound/soc/codecs/adau17x1.c b/sound/soc/codecs/adau17x1.c
-index 2c1bd27..f50739b 100644
---- a/sound/soc/codecs/adau17x1.c
-+++ b/sound/soc/codecs/adau17x1.c
-@@ -977,8 +977,7 @@ void adau17x1_remove(struct device *dev)
- 	struct adau *adau = dev_get_drvdata(dev);
+diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
+index daf0d37..8c5bf81 100644
+--- a/drivers/usb/dwc2/platform.c
++++ b/drivers/usb/dwc2/platform.c
+@@ -182,8 +182,7 @@ static int __dwc2_lowlevel_hw_disable(struct dwc2_hsotg *hsotg)
+ 	if (ret)
+ 		return ret;
  
- 	snd_soc_unregister_codec(dev);
--	if (adau->mclk)
--		clk_disable_unprepare(adau->mclk);
-+	clk_disable_unprepare(adau->mclk);
- }
- EXPORT_SYMBOL_GPL(adau17x1_remove);
+-	if (hsotg->clk)
+-		clk_disable_unprepare(hsotg->clk);
++	clk_disable_unprepare(hsotg->clk);
  
-diff --git a/sound/soc/codecs/da7213.c b/sound/soc/codecs/da7213.c
-index 6dd7578..130e16a 100644
---- a/sound/soc/codecs/da7213.c
-+++ b/sound/soc/codecs/da7213.c
-@@ -1516,8 +1516,7 @@ static int da7213_set_bias_level(struct snd_soc_codec *codec,
- 					    DA7213_VMID_EN | DA7213_BIAS_EN);
- 		} else {
- 			/* Remove MCLK */
--			if (da7213->mclk)
--				clk_disable_unprepare(da7213->mclk);
-+			clk_disable_unprepare(da7213->mclk);
- 		}
- 		break;
- 	case SND_SOC_BIAS_OFF:
-diff --git a/sound/soc/codecs/da7218.c b/sound/soc/codecs/da7218.c
-index d256ebf..eeb0bb6 100644
---- a/sound/soc/codecs/da7218.c
-+++ b/sound/soc/codecs/da7218.c
-@@ -2611,8 +2611,7 @@ static int da7218_set_bias_level(struct snd_soc_codec *codec,
- 					    DA7218_LDO_EN_MASK);
- 		} else {
- 			/* Remove MCLK */
--			if (da7218->mclk)
--				clk_disable_unprepare(da7218->mclk);
-+			clk_disable_unprepare(da7218->mclk);
- 		}
- 		break;
- 	case SND_SOC_BIAS_OFF:
-diff --git a/sound/soc/codecs/da7219-aad.c b/sound/soc/codecs/da7219-aad.c
-index 6274d79..31518df 100644
---- a/sound/soc/codecs/da7219-aad.c
-+++ b/sound/soc/codecs/da7219-aad.c
-@@ -302,9 +302,8 @@ static void da7219_aad_hptest_work(struct work_struct *work)
- 	snd_soc_update_bits(codec, DA7219_HP_R_CTRL, DA7219_HP_R_AMP_OE_MASK,
- 			    DA7219_HP_R_AMP_OE_MASK);
+ 	ret = regulator_bulk_disable(ARRAY_SIZE(hsotg->supplies),
+ 				     hsotg->supplies);
+diff --git a/drivers/usb/gadget/udc/fsl_mxc_udc.c b/drivers/usb/gadget/udc/fsl_mxc_udc.c
+index f16e149..59dbcf7 100644
+--- a/drivers/usb/gadget/udc/fsl_mxc_udc.c
++++ b/drivers/usb/gadget/udc/fsl_mxc_udc.c
+@@ -118,8 +118,7 @@ int fsl_udc_clk_finalize(struct platform_device *pdev)
  
--	/* Remove MCLK, if previously enabled */
--	if (da7219->mclk)
--		clk_disable_unprepare(da7219->mclk);
-+	/* Remove MCLK */
-+	clk_disable_unprepare(da7219->mclk);
- 
- 	mutex_unlock(&da7219->lock);
- 	snd_soc_dapm_mutex_unlock(dapm);
-diff --git a/sound/soc/codecs/da7219.c b/sound/soc/codecs/da7219.c
-index 9960162..307039e 100644
---- a/sound/soc/codecs/da7219.c
-+++ b/sound/soc/codecs/da7219.c
-@@ -1630,8 +1630,7 @@ static int da7219_set_bias_level(struct snd_soc_codec *codec,
- 
- 		if (snd_soc_codec_get_bias_level(codec) == SND_SOC_BIAS_PREPARE) {
- 			/* Remove MCLK */
--			if (da7219->mclk)
--				clk_disable_unprepare(da7219->mclk);
-+			clk_disable_unprepare(da7219->mclk);
- 		}
- 		break;
- 	case SND_SOC_BIAS_OFF:
-diff --git a/sound/soc/codecs/es8328.c b/sound/soc/codecs/es8328.c
-index ed7cc42..848e0b3 100644
---- a/sound/soc/codecs/es8328.c
-+++ b/sound/soc/codecs/es8328.c
-@@ -812,8 +812,7 @@ static int es8328_remove(struct snd_soc_codec *codec)
- 
- 	es8328 = snd_soc_codec_get_drvdata(codec);
- 
--	if (es8328->clk)
--		clk_disable_unprepare(es8328->clk);
-+	clk_disable_unprepare(es8328->clk);
- 
- 	regulator_bulk_disable(ARRAY_SIZE(es8328->supplies),
- 			       es8328->supplies);
-diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
-index 4f9a1eb..302ed88 100644
---- a/sound/soc/codecs/wm8731.c
-+++ b/sound/soc/codecs/wm8731.c
-@@ -517,8 +517,7 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
- 		snd_soc_write(codec, WM8731_PWR, reg | 0x0040);
- 		break;
- 	case SND_SOC_BIAS_OFF:
--		if (wm8731->mclk)
--			clk_disable_unprepare(wm8731->mclk);
-+		clk_disable_unprepare(wm8731->mclk);
- 		snd_soc_write(codec, WM8731_PWR, 0xffff);
- 		regulator_bulk_disable(ARRAY_SIZE(wm8731->supplies),
- 				       wm8731->supplies);
-diff --git a/sound/soc/davinci/davinci-evm.c b/sound/soc/davinci/davinci-evm.c
-index 7a369e0..07a91c7 100644
---- a/sound/soc/davinci/davinci-evm.c
-+++ b/sound/soc/davinci/davinci-evm.c
-@@ -49,8 +49,7 @@ static void evm_shutdown(struct snd_pcm_substream *substream)
- 	struct snd_soc_card_drvdata_davinci *drvdata =
- 		snd_soc_card_get_drvdata(soc_card);
- 
--	if (drvdata->mclk)
--		clk_disable_unprepare(drvdata->mclk);
-+	clk_disable_unprepare(drvdata->mclk);
- }
- 
- static int evm_hw_params(struct snd_pcm_substream *substream,
-diff --git a/sound/soc/fsl/imx-audmux.c b/sound/soc/fsl/imx-audmux.c
-index fc57da3..a7561e3 100644
---- a/sound/soc/fsl/imx-audmux.c
-+++ b/sound/soc/fsl/imx-audmux.c
-@@ -79,8 +79,7 @@ static ssize_t audmux_read_file(struct file *file, char __user *user_buf,
- 	ptcr = readl(audmux_base + IMX_AUDMUX_V2_PTCR(port));
- 	pdcr = readl(audmux_base + IMX_AUDMUX_V2_PDCR(port));
- 
--	if (audmux_clk)
--		clk_disable_unprepare(audmux_clk);
-+	clk_disable_unprepare(audmux_clk);
- 
- 	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
- 	if (!buf)
-@@ -245,8 +244,7 @@ int imx_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
- 	writel(ptcr, audmux_base + IMX_AUDMUX_V2_PTCR(port));
- 	writel(pdcr, audmux_base + IMX_AUDMUX_V2_PDCR(port));
- 
--	if (audmux_clk)
--		clk_disable_unprepare(audmux_clk);
-+	clk_disable_unprepare(audmux_clk);
- 
- 	return 0;
- }
-diff --git a/sound/soc/intel/boards/bytcr_rt5640.c b/sound/soc/intel/boards/bytcr_rt5640.c
-index 4a76b09..8c2a7a8 100644
---- a/sound/soc/intel/boards/bytcr_rt5640.c
-+++ b/sound/soc/intel/boards/bytcr_rt5640.c
-@@ -199,7 +199,7 @@ static int platform_clock_control(struct snd_soc_dapm_widget *w,
- 					     48000 * 512,
- 					     SND_SOC_CLOCK_IN);
- 		if (!ret) {
--			if ((byt_rt5640_quirk & BYT_RT5640_MCLK_EN) && priv->mclk)
-+			if (byt_rt5640_quirk & BYT_RT5640_MCLK_EN)
- 				clk_disable_unprepare(priv->mclk);
- 		}
- 	}
-diff --git a/sound/soc/intel/boards/cht_bsw_rt5645.c b/sound/soc/intel/boards/cht_bsw_rt5645.c
-index 5bcde01..cb6f587 100644
---- a/sound/soc/intel/boards/cht_bsw_rt5645.c
-+++ b/sound/soc/intel/boards/cht_bsw_rt5645.c
-@@ -122,8 +122,7 @@ static int platform_clock_control(struct snd_soc_dapm_widget *w,
- 			return ret;
- 		}
- 
--		if (ctx->mclk)
--			clk_disable_unprepare(ctx->mclk);
-+		clk_disable_unprepare(ctx->mclk);
- 	}
- 
- 	return 0;
-diff --git a/sound/soc/mediatek/mt8173/mt8173-afe-pcm.c b/sound/soc/mediatek/mt8173/mt8173-afe-pcm.c
-index 8a643a3..8857c08 100644
---- a/sound/soc/mediatek/mt8173/mt8173-afe-pcm.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-afe-pcm.c
-@@ -294,10 +294,8 @@ static int mt8173_afe_dais_set_clks(struct mtk_base_afe *afe,
- static void mt8173_afe_dais_disable_clks(struct mtk_base_afe *afe,
- 					 struct clk *m_ck, struct clk *b_ck)
+ void fsl_udc_clk_release(void)
  {
--	if (m_ck)
--		clk_disable_unprepare(m_ck);
--	if (b_ck)
--		clk_disable_unprepare(b_ck);
-+	clk_disable_unprepare(m_ck);
-+	clk_disable_unprepare(b_ck);
+-	if (mxc_per_clk)
+-		clk_disable_unprepare(mxc_per_clk);
++	clk_disable_unprepare(mxc_per_clk);
+ 	clk_disable_unprepare(mxc_ahb_clk);
+ 	clk_disable_unprepare(mxc_ipg_clk);
+ }
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index c7a9b31..1db5ef9 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -155,9 +155,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 	if (pdata && pdata->exit)
+ 		pdata->exit(pdev);
+ err_init:
+-	if (priv->phyclk)
+-		clk_disable_unprepare(priv->phyclk);
+-
++	clk_disable_unprepare(priv->phyclk);
+ 	clk_disable_unprepare(priv->ahbclk);
+ err_clk_ahb:
+ 	clk_disable_unprepare(priv->usbclk);
+@@ -183,9 +181,7 @@ static int ehci_mxc_drv_remove(struct platform_device *pdev)
+ 
+ 	clk_disable_unprepare(priv->usbclk);
+ 	clk_disable_unprepare(priv->ahbclk);
+-
+-	if (priv->phyclk)
+-		clk_disable_unprepare(priv->phyclk);
++	clk_disable_unprepare(priv->phyclk);
+ 
+ 	usb_put_hcd(hcd);
+ 	return 0;
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index bc7b9be..2d41447 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -127,8 +127,7 @@ static void ehci_platform_power_off(struct platform_device *dev)
+ 	}
+ 
+ 	for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
+-		if (priv->clks[clk])
+-			clk_disable_unprepare(priv->clks[clk]);
++		clk_disable_unprepare(priv->clks[clk]);
  }
  
- static int mt8173_afe_i2s_startup(struct snd_pcm_substream *substream,
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index af3ba4d..3a06acd 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -1122,8 +1122,7 @@ static int i2s_runtime_suspend(struct device *dev)
- 	i2s->suspend_i2scon = readl(i2s->addr + I2SCON);
- 	i2s->suspend_i2spsr = readl(i2s->addr + I2SPSR);
+ static struct hc_driver __read_mostly ehci_platform_hc_driver;
+diff --git a/drivers/usb/host/ehci-spear.c b/drivers/usb/host/ehci-spear.c
+index 1f25c79..57257aa 100644
+--- a/drivers/usb/host/ehci-spear.c
++++ b/drivers/usb/host/ehci-spear.c
+@@ -138,8 +138,7 @@ static int spear_ehci_hcd_drv_remove(struct platform_device *pdev)
  
--	if (i2s->op_clk)
--		clk_disable_unprepare(i2s->op_clk);
-+	clk_disable_unprepare(i2s->op_clk);
- 	clk_disable_unprepare(i2s->clk);
+ 	usb_remove_hcd(hcd);
+ 
+-	if (sehci->clk)
+-		clk_disable_unprepare(sehci->clk);
++	clk_disable_unprepare(sehci->clk);
+ 	usb_put_hcd(hcd);
  
  	return 0;
+diff --git a/drivers/usb/host/ehci-st.c b/drivers/usb/host/ehci-st.c
+index be4a278..f3c433d 100644
+--- a/drivers/usb/host/ehci-st.c
++++ b/drivers/usb/host/ehci-st.c
+@@ -130,8 +130,7 @@ static void st_ehci_platform_power_off(struct platform_device *dev)
+ 	phy_exit(priv->phy);
+ 
+ 	for (clk = USB_MAX_CLKS - 1; clk >= 0; clk--)
+-		if (priv->clks[clk])
+-			clk_disable_unprepare(priv->clks[clk]);
++		clk_disable_unprepare(priv->clks[clk]);
+ 
+ }
+ 
+diff --git a/drivers/usb/host/fsl-mph-dr-of.c b/drivers/usb/host/fsl-mph-dr-of.c
+index e90ddb5..ec5562d 100644
+--- a/drivers/usb/host/fsl-mph-dr-of.c
++++ b/drivers/usb/host/fsl-mph-dr-of.c
+@@ -325,8 +325,7 @@ static void fsl_usb2_mpc5121_exit(struct platform_device *pdev)
+ 
+ 	pdata->regs = NULL;
+ 
+-	if (pdata->clk)
+-		clk_disable_unprepare(pdata->clk);
++	clk_disable_unprepare(pdata->clk);
+ }
+ 
+ static struct fsl_usb2_platform_data fsl_usb2_mpc5121_pd = {
+diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
+index 6368fce..200137a 100644
+--- a/drivers/usb/host/ohci-platform.c
++++ b/drivers/usb/host/ohci-platform.c
+@@ -94,8 +94,7 @@ static void ohci_platform_power_off(struct platform_device *dev)
+ 	}
+ 
+ 	for (clk = OHCI_MAX_CLKS - 1; clk >= 0; clk--)
+-		if (priv->clks[clk])
+-			clk_disable_unprepare(priv->clks[clk]);
++		clk_disable_unprepare(priv->clks[clk]);
+ }
+ 
+ static struct hc_driver __read_mostly ohci_platform_hc_driver;
+diff --git a/drivers/usb/host/ohci-spear.c b/drivers/usb/host/ohci-spear.c
+index 56478ed..4037130 100644
+--- a/drivers/usb/host/ohci-spear.c
++++ b/drivers/usb/host/ohci-spear.c
+@@ -111,8 +111,7 @@ static int spear_ohci_hcd_drv_remove(struct platform_device *pdev)
+ 	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
+ 
+ 	usb_remove_hcd(hcd);
+-	if (sohci_p->clk)
+-		clk_disable_unprepare(sohci_p->clk);
++	clk_disable_unprepare(sohci_p->clk);
+ 
+ 	usb_put_hcd(hcd);
+ 	return 0;
+diff --git a/drivers/usb/host/ohci-st.c b/drivers/usb/host/ohci-st.c
+index 02816a1..05ede9d 100644
+--- a/drivers/usb/host/ohci-st.c
++++ b/drivers/usb/host/ohci-st.c
+@@ -112,8 +112,7 @@ static void st_ohci_platform_power_off(struct platform_device *dev)
+ 	phy_exit(priv->phy);
+ 
+ 	for (clk = USB_MAX_CLKS - 1; clk >= 0; clk--)
+-		if (priv->clks[clk])
+-			clk_disable_unprepare(priv->clks[clk]);
++		clk_disable_unprepare(priv->clks[clk]);
+ }
+ 
+ static struct hc_driver __read_mostly ohci_platform_hc_driver;
+diff --git a/drivers/usb/misc/usb3503.c b/drivers/usb/misc/usb3503.c
+index 8e7737d..1d4d1e4 100644
+--- a/drivers/usb/misc/usb3503.c
++++ b/drivers/usb/misc/usb3503.c
+@@ -335,8 +335,7 @@ static int usb3503_i2c_remove(struct i2c_client *i2c)
+ 	struct usb3503 *hub;
+ 
+ 	hub = i2c_get_clientdata(i2c);
+-	if (hub->clk)
+-		clk_disable_unprepare(hub->clk);
++	clk_disable_unprepare(hub->clk);
+ 
+ 	return 0;
+ }
+@@ -359,8 +358,7 @@ static int usb3503_platform_remove(struct platform_device *pdev)
+ 	struct usb3503 *hub;
+ 
+ 	hub = platform_get_drvdata(pdev);
+-	if (hub->clk)
+-		clk_disable_unprepare(hub->clk);
++	clk_disable_unprepare(hub->clk);
+ 
+ 	return 0;
+ }
+@@ -373,8 +371,7 @@ static int usb3503_i2c_suspend(struct device *dev)
+ 
+ 	usb3503_switch_mode(hub, USB3503_MODE_STANDBY);
+ 
+-	if (hub->clk)
+-		clk_disable_unprepare(hub->clk);
++	clk_disable_unprepare(hub->clk);
+ 
+ 	return 0;
+ }
 -- 
 2.7.4
