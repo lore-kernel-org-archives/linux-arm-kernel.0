@@ -1,37 +1,55 @@
-From: danielmicay@gmail.com (Daniel Micay)
-Date: Fri, 19 May 2017 19:57:07 -0400
-Subject: stackprotector: ascii armor the stack canary
-In-Reply-To: <20170519212636.30440-1-riel@redhat.com>
-References: <20170519212636.30440-1-riel@redhat.com>
-Message-ID: <1495238227.1190.1.camel@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 20 May 2017 09:37:53 +0800
+Subject: [linux-sunxi] Re: [RFC PATCH 07/11] drm: sun4i: add support for
+ the TV encoder in H3 SoC
+In-Reply-To: <1958057.WDKm0nQKgW@jernej-laptop>
+References: <20170517164354.16399-1-icenowy@aosc.io>
+ <20170519180330.7hpfkdqk3r2x3kn5@flea.home>
+ <3FCDBC05-20A1-460C-A21B-8C3E9C776768@aosc.io>
+ <1958057.WDKm0nQKgW@jernej-laptop>
+Message-ID: <CAGb2v66aD=G+V75N-_nYo=dGqhxpKhadM84h9G-B34=dnDwCbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-05-19 at 17:26 -0400, riel at redhat.com wrote:
-> Zero out the first byte of the stack canary value on 64 bit systems,
-> in order to prevent unterminated C string overflows from being able
-> to successfully overwrite the canary, even if an attacker somehow
-> guessed or obtained the canary value.
-> 
-> Inspired by execshield ascii-armor and PaX/grsecurity.
-> 
-> Thanks to Daniel Micay for extracting code of similar functionality
-> from PaX/grsecurity and making it easy to find in his linux-hardened
-> git tree on https://github.com/thestinger/linux-hardened/
+On Sat, May 20, 2017 at 2:23 AM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
+> Hi,
+>
+> Dne petek, 19. maj 2017 ob 20:08:18 CEST je Icenowy Zheng napisal(a):
+>> ? 2017?5?20? GMT+08:00 ??2:03:30, Maxime Ripard <maxime.ripard@free-
+> electrons.com> ??:
+>> >On Thu, May 18, 2017 at 12:43:50AM +0800, Icenowy Zheng wrote:
+>> >> Allwinner H3 features a TV encoder similar to the one in earlier
+>> >
+>> >SoCs,
+>> >
+>> >> but with some different points about clocks:
+>> >> - It has a mod clock and a bus clock.
+>> >> - The mod clock must be at a fixed rate to generate signal.
+>> >
+>> >Why?
+>>
+>> It's experiment result by Jernej.
+>>
+>> The clock rates in BSP kernel is also specially designed
+>> (PLL_DE at 432MHz) in order to be able to feed the TVE.
+>
+> My experiments and search through BSP code showed that TVE seems to have
+> additional fixed predivider 8. So if you want to generate 27 MHz clock, unit
+> has to be feed with 216 MHz.
+>
+> TVE has only one PLL source PLL_DE. And since 216 MHz is a bit low for DE2,
+> BSP defaults to 432 MHz for PLL_DE and use divider 2 to generate 216 MHz. This
+> clock is then divided by 8 internaly to get final 27 MHz.
+>
+> Please note that I don't have any hard evidence to support that, only
+> experimental data. However, only that explanation make sense to me.
+>
+> BTW, BSP H3/H5 TV driver supports only PAL and NTSC which both use 27 MHz base
+> clock. Further experiments are needed to check if there is any possibility to
+> have other resolutions by manipulating clocks and give other proper settings.
+> I plan to do that, but not in very near future.
 
-To clarify something this part isn't from PaX / grsecurity. I marked the
-commits from PaX / grsecurity as such in their commit messages and these
-are among the ones that aren't from there.
+You only have composite video output, and those are the only 2 standard
+resolutions that make any sense.
 
-This is from a set of changes that I did for CopperheadOS and forward
-ported to mainline recently to start linux-hardened. It was only arm64
-for CopperheadOS. The overlap with PaX is that when adding the leading
-zero byte for x86, I needed to first fix get_random_int being used for
-the per-task canary value. I didn't know PaX fixed it way back in 2007.
-
-I implemented heap canaries for our userspace malloc implementation and
-then later did the same thing for slub in the kernel. I added a leading
-zero byte to both of those heap canaries later on and then did the SSP
-implementation in Bionic and the kernel's arm64 code. I took the idea
-from glibc but limited it to 64-bit where there's entropy to spare. The
-glibc leading zero might have come from execshield, but I don't know.
+ChenYu
