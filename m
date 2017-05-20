@@ -1,36 +1,150 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 20 May 2017 07:43:15 +0100
-Subject: [PATCH 3/3][v4] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <b3980350-9663-d98b-6533-fd3c15f98671@gmail.com> (Matthias
- Brugger's message of "Fri, 19 May 2017 15:41:43 +0200")
-References: <20170519131305.5068-1-laurentiu.tudor@nxp.com>
- <20170519131305.5068-4-laurentiu.tudor@nxp.com>
- <b3980350-9663-d98b-6533-fd3c15f98671@gmail.com>
-Message-ID: <86tw4g6nb0.fsf@arm.com>
+From: heyi.guo@linaro.org (Heyi Guo)
+Date: Sat, 20 May 2017 16:19:31 +0800
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <20170518140154.GA24324@bhelgaas-glaptop.roam.corp.google.com>
+References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
+ <f8773b97-7085-ddb3-5dc4-d65cc1f5bce0@linaro.org>
+ <20170518140154.GA24324@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <76d19384-d915-ef97-9daf-3d3eded2ce47@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19 2017 at 02:41:43 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> On 19/05/17 15:13, laurentiu.tudor at nxp.com wrote:
->> From: Stuart Yoder <stuart.yoder@nxp.com>
->>
->> Move the source files out of staging into their final locations:
->>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
->>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
+Hi Bjorn,
+
+Many thanks for your clear answer.
+
+Regards,
+
+Gary (Heyi Guo)
+
+
+? 5/18/2017 10:01 PM, Bjorn Helgaas ??:
+> Hi Gary,
 >
-> This driver has as compatible "arm,gic-v3-its". I wonder if this is
-> correct and if it should be moved like this out of staging.
-
-This is no different from the way we handle *any* bus that uses the
-GICv3 ITS as an MSI controller. Each bus provides its glue code that
-latches onto the ITS node, and calls into the generic code.
-
-Now, when it comes to moving this out of staging, here is my concern:
-There is mention of a userspace tool (restool) used to control the
-HW. Where is this tool? Where is the user ABI documented?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+> Thanks for the question.
+>
+> On Wed, May 03, 2017 at 11:09:51AM +0800, Heyi Guo wrote:
+>> Hi Ard,
+>>
+>> I have one comment inclined.
+>>
+>>
+>> ? 3/22/2017 11:30 PM, Ard Biesheuvel ??:
+>>> On UEFI systems, the PCI subsystem is enumerated by the firmware,
+>>> and if a graphical framebuffer is exposed by a PCI device, its base
+>>> address and size are exposed to the OS via the Graphics Output
+>>> Protocol (GOP).
+>>>
+>>> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
+>>> scratch at boot. This may result in the GOP framebuffer address to
+>>> become stale, if the BAR covering the framebuffer is modified. This
+>>> will cause the framebuffer to become unresponsive, and may in some
+>>> cases result in unpredictable behavior if the range is reassigned to
+>>> another device.
+>>>
+>>> So add a quirk to the EFI fb driver to find the BAR associated with
+>>> the GOP base address, and set the IORESOURCE_PCI_FIXED attribute so
+>>> that the PCI core will leave it alone.
+>>>
+>>> Cc: Matt Fleming <matt@codeblueprint.co.uk>
+>>> Cc: Peter Jones <pjones@redhat.com>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>> v3: check device is enabled before attempting to claim the resource
+>>>
+>>>   drivers/video/fbdev/efifb.c | 60 +++++++++++++++++++-
+>>>   1 file changed, 59 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
+>>> index 8c4dc1e1f94f..88f653864a01 100644
+>>> --- a/drivers/video/fbdev/efifb.c
+>>> +++ b/drivers/video/fbdev/efifb.c
+>>> @@ -10,6 +10,7 @@
+>>>   #include <linux/efi.h>
+>>>   #include <linux/errno.h>
+>>>   #include <linux/fb.h>
+>>> +#include <linux/pci.h>
+>>>   #include <linux/platform_device.h>
+>>>   #include <linux/screen_info.h>
+>>>   #include <video/vga.h>
+>>> @@ -143,6 +144,9 @@ static struct attribute *efifb_attrs[] = {
+>>>   };
+>>>   ATTRIBUTE_GROUPS(efifb);
+>>> +static bool pci_bar_found;	/* did we find a BAR matching the efifb base? */
+>>> +static bool pci_dev_disabled;	/* was the device disabled? */
+>>> +
+>>>   static int efifb_probe(struct platform_device *dev)
+>>>   {
+>>>   	struct fb_info *info;
+>>> @@ -152,7 +156,7 @@ static int efifb_probe(struct platform_device *dev)
+>>>   	unsigned int size_total;
+>>>   	char *option = NULL;
+>>> -	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
+>>> +	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI || pci_dev_disabled)
+>>>   		return -ENODEV;
+>>>   	if (fb_get_options("efifb", &option))
+>>> @@ -360,3 +364,57 @@ static struct platform_driver efifb_driver = {
+>>>   };
+>>>   builtin_platform_driver(efifb_driver);
+>>> +
+>>> +static void claim_efifb_bar(struct pci_dev *dev, int idx)
+>>> +{
+>>> +	u16 word;
+>>> +
+>>> +	pci_bar_found = true;
+>>> +
+>>> +	pci_read_config_word(dev, PCI_COMMAND, &word);
+>>> +	if (!(word & PCI_COMMAND_MEMORY)) {
+>>> +		pci_dev_disabled = true;
+>>> +		dev_err(&dev->dev,
+>>> +			"BAR %d: assigned to efifb but device is disabled!\n",
+>>> +			idx);
+>>> +		return;
+>>> +	}
+>>> +
+>>> +	if (pci_claim_resource(dev, idx)) {
+>>> +		pci_dev_disabled = true;
+>>> +		dev_err(&dev->dev,
+>>> +			"BAR %d: failed to claim resource for efifb!\n", idx);
+>>> +		return;
+>>> +	}
+>>> +
+>>> +	dev_info(&dev->dev, "BAR %d: assigned to efifb\n", idx);
+>>> +}
+>>> +
+>>> +static void efifb_fixup_resources(struct pci_dev *dev)
+>>> +{
+>>> +	u64 base = screen_info.lfb_base;
+>>> +	u64 size = screen_info.lfb_size;
+>>> +	int i;
+>>> +
+>>> +	if (pci_bar_found || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
+>>> +		return;
+>>> +
+>>> +	if (screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
+>>> +		base |= (u64)screen_info.ext_lfb_base << 32;
+>>> +
+>>> +	if (!base)
+>>> +		return;
+>>> +
+>>> +	for (i = 0; i < PCI_STD_RESOURCE_END; i++) {
+>>> +		struct resource *res = &dev->resource[i];
+>>> +
+>>> +		if (!(res->flags & IORESOURCE_MEM))
+>>> +			continue;
+>>> +
+>>> +		if (res->start <= base && res->end >= base + size - 1) {
+>> Have we considered PCI address translation here? I suppose the
+>> address reported by EFI GOP should be the address of CPU domain, not
+>> address of PCI domain. Address read from PCI BAR is PCI address
+>> which should add translation offset before being compared to CPU
+>> domain address.
+> Every address in dev->resource[] is a CPU domain address, so address
+> translation offset should be handled correctly.
+>
+> This is because __pci_read_base() calls pcibios_bus_to_resource() when
+> it fills in dev->resource[], and pcibios_bus_to_resource() applies any
+> host bridge address translation.
+>
+> Bjorn
