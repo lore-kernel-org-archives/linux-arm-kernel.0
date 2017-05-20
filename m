@@ -1,34 +1,35 @@
-From: greg@kroah.com (Greg KH)
-Date: Sat, 20 May 2017 10:45:31 +0200
-Subject: [PATCH 2/2] ARM: dts: am335x-sl50: Fix cannot claim requested
- pins for spi0
-In-Reply-To: <20170519165144.11508-2-enric.balletbo@collabora.com>
-References: <20170519165144.11508-1-enric.balletbo@collabora.com>
- <20170519165144.11508-2-enric.balletbo@collabora.com>
-Message-ID: <20170520084531.GB4284@kroah.com>
+From: sergey.senozhatsky@gmail.com (Sergey Senozhatsky)
+Date: Sat, 20 May 2017 18:04:51 +0900
+Subject: [PATCH v2] printk: Use the main logbuf in NMI when logbuf_lock
+ is available
+In-Reply-To: <20170519130223.GB12489@pathway.suse.cz>
+References: <1493912763-24873-1-git-send-email-pmladek@suse.com>
+ <20170519025803.GA593@jagdpanzerIV.localdomain>
+ <20170519043815.GB593@jagdpanzerIV.localdomain>
+ <20170519130223.GB12489@pathway.suse.cz>
+Message-ID: <20170520090451.GA406@tigerII.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 06:51:44PM +0200, Enric Balletbo i Serra wrote:
-> We don't need to bitbang these pins anymore, instead we muxed these
-> pins as SPI, after this change, done in commit 6c69f726, we introduced
-> the following error:
+On (05/19/17 15:02), Petr Mladek wrote:
+> > [..]
+> > 
+> > > the problem is that
+> > > 
+> > > 	`PRINTK_NMI_CONTEXT_MASK || PRINTK_NMI_DEFERRED_CONTEXT_MASK' is 0x01
+> > 
+> > d'oh... forgot to copy-paste this...
 > 
->  pinctrl-single 44e10800.pinmux: pin PIN85 already requested \
->  by 44e10800.pinmux; cannot claim for 48030000.spi
->  pinctrl-single 44e10800.pinmux: pin-85 (48030000.spi) status -22
-> 
-> Fixes: 6c69f726 ("ARM: dts: am335x-sl50: Enable SPI0 interface and Flash Memory")
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> ---
->  arch/arm/boot/dts/am335x-sl50.dts | 4 ----
->  1 file changed, 4 deletions(-)
+> Grrr, thanks a lot for chasing this down and I am sorry for the troubles.
 
-<formletter>
+no worries :)
 
-This is not the correct way to submit patches for inclusion in the
-stable kernel tree.  Please read:
-    https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html
-for how to do this properly.
 
-</formletter>
+> I have rebased both for-4.13 and for-next branches in printk.git
+> with this fix. I wanted to get rid of this bug in linux-next
+> ASAP. Please, let me know if you would prefer to handle
+> this another way in the future.
+
+we are cool ;) thanks.
+
+	-ss
