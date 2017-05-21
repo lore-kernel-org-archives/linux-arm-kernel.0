@@ -1,9 +1,9 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 21 May 2017 23:57:26 +0200
-Subject: [PATCH 2/3] gpio: pcf857x: move header file out of I2C realm
-In-Reply-To: <20170521215727.1243-1-wsa@the-dreams.de>
-References: <20170521215727.1243-1-wsa@the-dreams.de>
-Message-ID: <20170521215727.1243-3-wsa@the-dreams.de>
+Date: Mon, 22 May 2017 00:02:09 +0200
+Subject: [PATCH 2/3] mfd: tps65010: move header file out of I2C realm
+In-Reply-To: <20170521220212.1404-1-wsa@the-dreams.de>
+References: <20170521220212.1404-1-wsa@the-dreams.de>
+Message-ID: <20170521220212.1404-3-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,111 +12,176 @@ more appropriate location.
 
 Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- arch/arm/mach-davinci/board-da830-evm.c        | 2 +-
- arch/arm/mach-davinci/board-dm644x-evm.c       | 2 +-
- arch/arm/mach-davinci/board-dm646x-evm.c       | 2 +-
- arch/arm/mach-pxa/balloon3.c                   | 2 +-
- arch/arm/mach-pxa/stargate2.c                  | 2 +-
- arch/mips/ath79/mach-pb44.c                    | 2 +-
- drivers/gpio/gpio-pcf857x.c                    | 2 +-
- include/linux/{i2c => platform_data}/pcf857x.h | 0
- 8 files changed, 7 insertions(+), 7 deletions(-)
- rename include/linux/{i2c => platform_data}/pcf857x.h (100%)
+ arch/arm/mach-omap1/board-h2-mmc.c      | 2 +-
+ arch/arm/mach-omap1/board-h2.c          | 2 +-
+ arch/arm/mach-omap1/board-h3-mmc.c      | 2 +-
+ arch/arm/mach-omap1/board-h3.c          | 2 +-
+ arch/arm/mach-omap1/board-osk.c         | 2 +-
+ arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 2 +-
+ arch/arm/mach-s3c24xx/mach-osiris.c     | 2 +-
+ drivers/mfd/tps65010.c                  | 2 +-
+ drivers/usb/host/ohci-omap.c            | 2 +-
+ drivers/usb/phy/phy-isp1301-omap.c      | 2 +-
+ drivers/video/fbdev/omap/lcd_h3.c       | 2 +-
+ include/linux/{i2c => mfd}/tps65010.h   | 2 +-
+ 12 files changed, 12 insertions(+), 12 deletions(-)
+ rename include/linux/{i2c => mfd}/tps65010.h (99%)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 58075627c6df3e..f673cd7a676658 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -17,7 +17,7 @@
- #include <linux/gpio/machine.h>
- #include <linux/platform_device.h>
- #include <linux/i2c.h>
--#include <linux/i2c/pcf857x.h>
-+#include <linux/platform_data/pcf857x.h>
- #include <linux/platform_data/at24.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 20f1874a5657e2..70e00dbeec9694 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+diff --git a/arch/arm/mach-omap1/board-h2-mmc.c b/arch/arm/mach-omap1/board-h2-mmc.c
+index 357be2debc9da8..91bda9c802ff38 100644
+--- a/arch/arm/mach-omap1/board-h2-mmc.c
++++ b/arch/arm/mach-omap1/board-h2-mmc.c
 @@ -14,7 +14,7 @@
- #include <linux/platform_device.h>
  #include <linux/gpio.h>
- #include <linux/i2c.h>
--#include <linux/i2c/pcf857x.h>
-+#include <linux/platform_data/pcf857x.h>
- #include <linux/platform_data/at24.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index cb176826d1cbe4..ca69d0b96a4f07 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -23,7 +23,7 @@
  #include <linux/platform_device.h>
- #include <linux/i2c.h>
- #include <linux/platform_data/at24.h>
--#include <linux/i2c/pcf857x.h>
-+#include <linux/platform_data/pcf857x.h>
+ #include <linux/platform_data/gpio-omap.h>
+-#include <linux/i2c/tps65010.h>
++#include <linux/mfd/tps65010.h>
  
- #include <media/i2c/tvp514x.h>
- #include <media/i2c/adv7343.h>
-diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
-index d452a49c039647..1467c1d1e54194 100644
---- a/arch/arm/mach-pxa/balloon3.c
-+++ b/arch/arm/mach-pxa/balloon3.c
-@@ -27,7 +27,7 @@
- #include <linux/mtd/mtd.h>
+ #include "board-h2.h"
+ #include "mmc.h"
+diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
+index 675254ee4b1e93..dece47d76282ac 100644
+--- a/arch/arm/mach-omap1/board-h2.c
++++ b/arch/arm/mach-omap1/board-h2.c
+@@ -28,7 +28,7 @@
  #include <linux/mtd/partitions.h>
- #include <linux/types.h>
--#include <linux/i2c/pcf857x.h>
-+#include <linux/platform_data/pcf857x.h>
- #include <linux/i2c/pxa-i2c.h>
- #include <linux/mtd/nand.h>
  #include <linux/mtd/physmap.h>
-diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
-index 7b6610e9dae46c..2d45d18b1a5e0a 100644
---- a/arch/arm/mach-pxa/stargate2.c
-+++ b/arch/arm/mach-pxa/stargate2.c
-@@ -26,7 +26,7 @@
- #include <linux/mtd/partitions.h>
- 
- #include <linux/i2c/pxa-i2c.h>
--#include <linux/i2c/pcf857x.h>
-+#include <linux/platform_data/pcf857x.h>
- #include <linux/platform_data/at24.h>
+ #include <linux/input.h>
+-#include <linux/i2c/tps65010.h>
++#include <linux/mfd/tps65010.h>
  #include <linux/smc91x.h>
+ #include <linux/omapfb.h>
+ #include <linux/platform_data/gpio-omap.h>
+diff --git a/arch/arm/mach-omap1/board-h3-mmc.c b/arch/arm/mach-omap1/board-h3-mmc.c
+index 4f58bfa5e7549e..692c267a9a9052 100644
+--- a/arch/arm/mach-omap1/board-h3-mmc.c
++++ b/arch/arm/mach-omap1/board-h3-mmc.c
+@@ -14,7 +14,7 @@
  #include <linux/gpio.h>
-diff --git a/arch/mips/ath79/mach-pb44.c b/arch/mips/ath79/mach-pb44.c
-index 67b980d94fb7aa..be78298dffb4f3 100644
---- a/arch/mips/ath79/mach-pb44.c
-+++ b/arch/mips/ath79/mach-pb44.c
-@@ -12,7 +12,7 @@
  #include <linux/platform_device.h>
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
--#include <linux/i2c/pcf857x.h>
-+#include <linux/platform_data/pcf857x.h>
  
- #include "machtypes.h"
- #include "dev-gpio-buttons.h"
-diff --git a/drivers/gpio/gpio-pcf857x.c b/drivers/gpio/gpio-pcf857x.c
-index 8ddf9302ce3b07..a4fd78b9c0e4e3 100644
---- a/drivers/gpio/gpio-pcf857x.c
-+++ b/drivers/gpio/gpio-pcf857x.c
-@@ -20,7 +20,7 @@
+-#include <linux/i2c/tps65010.h>
++#include <linux/mfd/tps65010.h>
  
+ #include "common.h"
+ #include "board-h3.h"
+diff --git a/arch/arm/mach-omap1/board-h3.c b/arch/arm/mach-omap1/board-h3.c
+index e62f9d454f1005..6d32beeb2d8857 100644
+--- a/arch/arm/mach-omap1/board-h3.c
++++ b/arch/arm/mach-omap1/board-h3.c
+@@ -28,7 +28,7 @@
+ #include <linux/mtd/physmap.h>
+ #include <linux/input.h>
+ #include <linux/spi/spi.h>
+-#include <linux/i2c/tps65010.h>
++#include <linux/mfd/tps65010.h>
+ #include <linux/smc91x.h>
+ #include <linux/omapfb.h>
+ #include <linux/platform_data/gpio-omap.h>
+diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
+index 4dfb995048103b..f20361b8ffb6e0 100644
+--- a/arch/arm/mach-omap1/board-osk.c
++++ b/arch/arm/mach-omap1/board-osk.c
+@@ -38,7 +38,7 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/mtd/physmap.h>
+-#include <linux/i2c/tps65010.h>
++#include <linux/mfd/tps65010.h>
+ #include <linux/platform_data/gpio-omap.h>
+ #include <linux/platform_data/omap1_bl.h>
+ 
+diff --git a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
+index 262ab07447483a..6cac7da15e2b0d 100644
+--- a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
++++ b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
+@@ -17,7 +17,7 @@
+ #include <linux/cpufreq.h>
  #include <linux/gpio.h>
- #include <linux/i2c.h>
--#include <linux/i2c/pcf857x.h>
-+#include <linux/platform_data/pcf857x.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
-diff --git a/include/linux/i2c/pcf857x.h b/include/linux/platform_data/pcf857x.h
-similarity index 100%
-rename from include/linux/i2c/pcf857x.h
-rename to include/linux/platform_data/pcf857x.h
+ 
+-#include <linux/i2c/tps65010.h>
++#include <linux/mfd/tps65010.h>
+ 
+ #include <plat/cpu-freq.h>
+ #include <mach/gpio-samsung.h>
+diff --git a/arch/arm/mach-s3c24xx/mach-osiris.c b/arch/arm/mach-s3c24xx/mach-osiris.c
+index 70b0eb7d31347f..64b1a0b7b803a1 100644
+--- a/arch/arm/mach-s3c24xx/mach-osiris.c
++++ b/arch/arm/mach-s3c24xx/mach-osiris.c
+@@ -24,7 +24,7 @@
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
+ 
+-#include <linux/i2c/tps65010.h>
++#include <linux/mfd/tps65010.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/drivers/mfd/tps65010.c b/drivers/mfd/tps65010.c
+index d829a6131f09e5..2ab67386b4ef1e 100644
+--- a/drivers/mfd/tps65010.c
++++ b/drivers/mfd/tps65010.c
+@@ -32,7 +32,7 @@
+ #include <linux/mutex.h>
+ #include <linux/platform_device.h>
+ 
+-#include <linux/i2c/tps65010.h>
++#include <linux/mfd/tps65010.h>
+ 
+ #include <linux/gpio/driver.h>
+ 
+diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
+index a4d814b7f38066..91393ec7d8503c 100644
+--- a/drivers/usb/host/ohci-omap.c
++++ b/drivers/usb/host/ohci-omap.c
+@@ -53,7 +53,7 @@
+ #define DRIVER_DESC "OHCI OMAP driver"
+ 
+ #ifdef CONFIG_TPS65010
+-#include <linux/i2c/tps65010.h>
++#include <linux/mfd/tps65010.h>
+ #else
+ 
+ #define LOW	0
+diff --git a/drivers/usb/phy/phy-isp1301-omap.c b/drivers/usb/phy/phy-isp1301-omap.c
+index 042c5a8fd423d8..c6052c814bcc24 100644
+--- a/drivers/usb/phy/phy-isp1301-omap.c
++++ b/drivers/usb/phy/phy-isp1301-omap.c
+@@ -96,7 +96,7 @@ struct isp1301 {
+ 
+ #if IS_REACHABLE(CONFIG_TPS65010)
+ 
+-#include <linux/i2c/tps65010.h>
++#include <linux/mfd/tps65010.h>
+ 
+ #else
+ 
+diff --git a/drivers/video/fbdev/omap/lcd_h3.c b/drivers/video/fbdev/omap/lcd_h3.c
+index 9d2da146813ef0..796f4634c4c6f1 100644
+--- a/drivers/video/fbdev/omap/lcd_h3.c
++++ b/drivers/video/fbdev/omap/lcd_h3.c
+@@ -21,7 +21,7 @@
+ 
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+-#include <linux/i2c/tps65010.h>
++#include <linux/mfd/tps65010.h>
+ #include <linux/gpio.h>
+ 
+ #include "omapfb.h"
+diff --git a/include/linux/i2c/tps65010.h b/include/linux/mfd/tps65010.h
+similarity index 99%
+rename from include/linux/i2c/tps65010.h
+rename to include/linux/mfd/tps65010.h
+index 08aa92278d71cd..a1fb9bc5311de4 100644
+--- a/include/linux/i2c/tps65010.h
++++ b/include/linux/mfd/tps65010.h
+@@ -1,4 +1,4 @@
+-/* linux/i2c/tps65010.h
++/* linux/mfd/tps65010.h
+  *
+  * Functions to access TPS65010 power management device.
+  *
 -- 
 2.11.0
