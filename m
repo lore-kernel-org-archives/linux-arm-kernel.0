@@ -1,43 +1,49 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Sun, 21 May 2017 21:06:32 +0200
-Subject: [PATCH v2] iio: adc: sun4i-gpadc-iio: fix parent device being
- used in devm function
-In-Reply-To: <20170518063607.11069-1-quentin.schulz@free-electrons.com>
-References: <20170518063607.11069-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170521190632.GB13344@Red>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Mon, 22 May 2017 06:29:08 +1000
+Subject: [PATCH v4 0/5] iio: ADC driver for EP93xx SoC
+In-Reply-To: <df337513-23c7-06b8-50e4-94560e75650c@kernel.org>
+References: <20170517171352.20369-1-alexander.sverdlin@gmail.com>
+ <df337513-23c7-06b8-50e4-94560e75650c@kernel.org>
+Message-ID: <5921F894.90809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 08:36:07AM +0200, Quentin Schulz wrote:
-> For the sake of DT binding stability, this IIO driver is a child of an
-> MFD driver for Allwinner A10, A13 and A31 because there already exists a
-> DT binding for this IP. The MFD driver has a DT node but the IIO driver
-> does not.
+On 22/05/17 00:03, Jonathan Cameron wrote:
+> On 17/05/17 18:13, Alexander Sverdlin wrote:
+>> This series prepares the necessary infrastructure for ADC platform
+>> device on
+>> Cirrus Logic EP93xx family of SoCs and adds the driver for ADC device
+>> using
+>> IIO subsystem.
+> Hartley, Ryan,
 > 
-> The IIO device registers the temperature sensor in the thermal framework
-> using the DT node of the parent, the MFD device, so the thermal
-> framework could match the phandle to the MFD device in the DT and the
-> struct device used to register in the thermal framework.
-> 
-> devm_thermal_zone_of_sensor_register was previously used to register the
-> thermal sensor with the parent struct device of the IIO device,
-> representing the MFD device. By doing so, we registered actually the
-> parent in the devm routine and not the actual IIO device.
-> 
-> This lead to the devm unregister function not being called when the IIO
-> module driver is removed. It resulted in the thermal framework still
-> polling the get_temp function of the IIO module while the device doesn't
-> exist anymore, thus generated a kernel panic.
-> 
-> Use the non-devm function instead and do the unregister manually in the
-> remove function.
-> 
-> Fixes: d1caa9905538 ("iio: adc: add support for Allwinner SoCs ADC")
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Reported-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
+> How do you want to handle taking this series forward.
+> Clearly we have a few arch specific bits and then the driver which
+> is dependent on some of them.
 
-Tested-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+I no longer maintain an ep93xx tree because the architecture gets very
+few patches now. Patches should go via the arm-soc tree, which is
+maintained by (I believe) Arnd and Olaf.
 
-Thanks
+> 
+> I'm happy to take the lot through the IIO tree, but will be wanting
+> a few acks.
+
+Sure, the series looks fine to me. For the ep93xx specific bits:
+
+Acked-by: Ryan Mallon <rmallon@gmail.com>
+
+> I'm interested to note how few implementations there are of clk_get_parent
+> in tree.  Any comments on that little bit of the code would be
+> particularly welcome.
+
+The ep93xx architecture is old and obsolete. Because of this, and the
+relatively few number of people developing for it and with hardware to
+test, it hasn't gotten upgraded to some of the more modern kernel apis
+like the common clock framework.
+
+It probably isn't too difficult to move ep93xx to the common clock
+framework, but it is a separate change and I don't think Alexander
+should have to do it as a prerequisite to getting this adc support merged.
+
+~Ryan
