@@ -1,120 +1,53 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 21 May 2017 18:16:55 -0300
-Subject: [PATCH] ARM: dts: sunxi: Fix BCM43xx node name
-Message-ID: <1495401415-14477-1-git-send-email-festevam@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 21 May 2017 23:57:24 +0200
+Subject: [PATCH 0/3] gpio: move include files out of include/linux/i2c
+Message-ID: <20170521215727.1243-1-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+It doesn't make sense to use include/linux/i2c for client drivers which may in
+fact rather be hwmon or input or whatever devices. As a result, I want to
+deprecate include/linux/i2c for good. This series moves the include files to a
+better location, largely include/linux/platform_data because that is what most
+of the moved include files contain.
 
-"bcrmf" is a typo and "wifi" is the preferred form to describe
-such node, so change it accordingly.
+I prefer the series to go upstream via the subsystem tree; if you prefer that I
+take it via I2C, just let me know.
 
-Reported-by: Andreas F?rber <afaerber@suse.de>
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Based on the following dt documentation commit:
-https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git/commit/?h=dt/next&id=442e1f7eb8e6858408a7ad58bb10813c19877ae5
+No runtime testing because of no HW, but buildbot is happy with this series at
+least. A branch can be found here:
 
- arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 2 +-
- arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts | 2 +-
- arch/arm/boot/dts/sun7i-a20-bananapro.dts        | 2 +-
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts       | 2 +-
- arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts        | 2 +-
- arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts | 2 +-
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts  | 2 +-
- 7 files changed, 7 insertions(+), 7 deletions(-)
+git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/platform_data
 
-diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-index bdfdce8..51e6f1d 100644
---- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-+++ b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-@@ -138,7 +138,7 @@
- 	non-removable;
- 	status = "okay";
- 
--	brcmf: bcrmf at 1 {
-+	brcmf: wifi at 1 {
- 		reg = <1>;
- 		compatible = "brcm,bcm4329-fmac";
- 		interrupt-parent = <&r_pio>;
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
-index 08e776a..4c03cc3 100644
---- a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
-@@ -172,7 +172,7 @@
- 	wakeup-source;
- 	status = "okay";
- 
--	brcmf: bcrmf at 1 {
-+	brcmf: wifi at 1 {
- 		reg = <1>;
- 		compatible = "brcm,bcm4329-fmac";
- 		interrupt-parent = <&pio>;
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-index 83516bc..e7af1b7 100644
---- a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-@@ -172,7 +172,7 @@
- 	non-removable;
- 	status = "okay";
- 
--	brcmf: bcrmf at 1 {
-+	brcmf: wifi at 1 {
- 		reg = <1>;
- 		compatible = "brcm,bcm4329-fmac";
- 		interrupt-parent = <&pio>;
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index 4ebeecf..8dbf732 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -195,7 +195,7 @@
- 	non-removable;
- 	status = "okay";
- 
--	brcmf: bcrmf at 1 {
-+	brcmf: wifi at 1 {
- 		reg = <1>;
- 		compatible = "brcm,bcm4329-fmac";
- 		interrupt-parent = <&pio>;
-diff --git a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
-index e5cbcad..5580997 100644
---- a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
-@@ -173,7 +173,7 @@
- 	non-removable;
- 	status = "okay";
- 
--	brcmf: bcrmf at 1 {
-+	brcmf: wifi at 1 {
- 		reg = <1>;
- 		compatible = "brcm,bcm4329-fmac";
- 		interrupt-parent = <&pio>;
-diff --git a/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts b/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
-index 84462d7..7f8405a 100644
---- a/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
-@@ -137,7 +137,7 @@
- 	non-removable;
- 	status = "okay";
- 
--	brcmf: bcrmf at 1 {
-+	brcmf: wifi at 1 {
- 		reg = <1>;
- 		compatible = "brcm,bcm4329-fmac";
- 		interrupt-parent = <&pio>;
-diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-index 17c7c08..883072b 100644
---- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-@@ -130,7 +130,7 @@
- 	non-removable;
- 	status = "okay";
- 
--	brcmf: bcrmf at 1 {
-+	brcmf: wifi at 1 {
- 		reg = <1>;
- 		compatible = "brcm,bcm4329-fmac";
- 		interrupt-parent = <&pio>;
+Thanks and kind regards,
+
+   Wolfram
+
+
+Wolfram Sang (3):
+  gpio: max732x: move header file out of I2C realm
+  gpio: pcf857x: move header file out of I2C realm
+  gpio: adp5588: move header file out of I2C realm
+
+ arch/arm/mach-davinci/board-da830-evm.c        | 2 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c       | 2 +-
+ arch/arm/mach-davinci/board-dm646x-evm.c       | 2 +-
+ arch/arm/mach-pxa/balloon3.c                   | 2 +-
+ arch/arm/mach-pxa/littleton.c                  | 2 +-
+ arch/arm/mach-pxa/stargate2.c                  | 2 +-
+ arch/blackfin/mach-bf537/boards/stamp.c        | 2 +-
+ arch/mips/ath79/mach-pb44.c                    | 2 +-
+ drivers/gpio/gpio-adp5588.c                    | 2 +-
+ drivers/gpio/gpio-max732x.c                    | 2 +-
+ drivers/gpio/gpio-pcf857x.c                    | 2 +-
+ drivers/input/keyboard/adp5588-keys.c          | 2 +-
+ include/linux/{i2c => platform_data}/adp5588.h | 0
+ include/linux/{i2c => platform_data}/max732x.h | 0
+ include/linux/{i2c => platform_data}/pcf857x.h | 0
+ 15 files changed, 12 insertions(+), 12 deletions(-)
+ rename include/linux/{i2c => platform_data}/adp5588.h (100%)
+ rename include/linux/{i2c => platform_data}/max732x.h (100%)
+ rename include/linux/{i2c => platform_data}/pcf857x.h (100%)
+
 -- 
-2.7.4
+2.11.0
