@@ -1,33 +1,33 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 21 May 2017 18:44:35 +0200
-Subject: [PATCH 0/4] ARM: dts: bcm2835-rpi-zero: Enable OTG mode
-Message-ID: <1495385079-3697-1-git-send-email-stefan.wahren@i2se.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Sun, 21 May 2017 19:02:41 +0200
+Subject: may_use_simd on aarch64, chacha20
+Message-ID: <CAHmME9qH=Wu-=9YUmxi7NPrczHu1UrB7phG0y68ipB+ProQ2TA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enable OTG mode for Raspberry Pi Zero because dwc2 driver
-has been fixed now.
+Hi folks,
 
-Patch 1 adds a new dtsi file to setup OTG mode (could also be used for boards
-like RPi Zero W or the Compute Module). The second patch adds the USB PHY and
-was part of Raspberry Pi Zero support patch series before split up [1].
-The enabling of OTG mode of RPi Zero is done by patch number 3. The last patch
-updates the BCM2835 defconfig.
+I noticed that the ARM implementation [1] of chacha20 makes a check to
+may_use_simd(), but the ARM64 implementation [2] does not. Question 1:
+is this a bug, in which case I'll submit a patch shortly, or is this
+intentional? In case of the latter, could somebody explain the
+reasoning? On a similar note, the only ARM64 glue code that uses
+may_use_simd() is sha256; everything else does not. Shall I submit a
+substantial patch series to fix this up everywhere?
 
-[1] - http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-July/004153.html
+Secondly, I noticed that may_use_simd() is essentially aliased to
+!in_interrupt(), since it uses the asm-generic variety. Question 2:
+Isn't this overkill? Couldn't we make an arm/arm64 variant of this
+that only checks in_irq()?
 
-Stefan Wahren (4):
-  ARM: dts: bcm283x: Add dtsi for OTG mode
-  ARM: dts: bcm283x: Add generic USB PHY
-  ARM: dts: bcm2835-rpi-zero: Enable OTG mode
-  ARM: bcm2835_defconfig: Enable serial & ethernet USB gadget support
+Lastly, APIs like pcrypts and padata execute with bottom halves
+disabled, even though their actual execution environment is process
+context, via a workqueue. Thus, here, in_interrupt() will always be
+true, even though this is likely a place where we want to use simd.
+Question 3: is there something better that could be done?
 
- arch/arm/boot/dts/bcm2835-rpi-zero.dts     |  2 +-
- arch/arm/boot/dts/bcm283x-rpi-usb-otg.dtsi | 10 ++++++++++
- arch/arm/boot/dts/bcm283x.dtsi             |  6 ++++++
- arch/arm/configs/bcm2835_defconfig         |  8 ++++++++
- 4 files changed, 25 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm283x-rpi-usb-otg.dtsi
+Thanks,
+Jason
 
--- 
-2.7.4
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm/crypto/chacha20-neon-glue.c#n67
+[2] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/crypto/chacha20-neon-glue.c#n66
