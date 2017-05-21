@@ -1,67 +1,55 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Sun, 21 May 2017 11:42:24 +0800
-Subject: [PATCH v5 1/2] PCI: mediatek: Add Mediatek PCIe host controller
- support
-In-Reply-To: <1495338145-9384-1-git-send-email-ryder.lee@mediatek.com>
-References: <1495338145-9384-1-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <1495338145-9384-2-git-send-email-ryder.lee@mediatek.com>
+Date: Sun, 21 May 2017 11:43:11 +0800
+Subject: [PATCH v2 1/2] phy: add PCIe PHY driver for mt7623 SoCs families
+In-Reply-To: <1495338192-9423-1-git-send-email-ryder.lee@mediatek.com>
+References: <1495338192-9423-1-git-send-email-ryder.lee@mediatek.com>
+Message-ID: <1495338192-9423-2-git-send-email-ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Mediatek PCIe Gen2 controller which can
-be found on MT7623 series SoCs.
+support PCIe PHY of MT7623 SoCs families
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- drivers/pci/host/Kconfig         |  11 +
- drivers/pci/host/Makefile        |   1 +
- drivers/pci/host/pcie-mediatek.c | 553 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 565 insertions(+)
- create mode 100644 drivers/pci/host/pcie-mediatek.c
+ drivers/phy/Kconfig           |   8 ++
+ drivers/phy/Makefile          |   1 +
+ drivers/phy/phy-mt7623-pcie.c | 290 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 299 insertions(+)
+ create mode 100644 drivers/phy/phy-mt7623-pcie.c
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 7f47cd5..d7d7c47 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -180,6 +180,17 @@ config PCIE_ROCKCHIP
- 	  There is 1 internal PCIe port available to support GEN2 with
- 	  4 slots.
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index afaf7b6..94b3e61 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -530,4 +530,12 @@ config PHY_MESON8B_USB2
+ 	  and GXBB SoCs.
+ 	  If unsure, say N.
  
-+config PCIE_MEDIATEK
-+	bool "Mediatek PCIe controller"
-+	depends on ARM && (ARCH_MEDIATEK || COMPILE_TEST)
-+	depends on OF
-+	depends on PCI
-+	select PCIEPORTBUS
++config PHY_MT7623_PCIE
++	tristate "Mediatek PCIe PHY driver for MT7623 SoC families"
++	depends on ARCH_MEDIATEK && OF
++	select GENERIC_PHY
++	select MFD_SYSCON
 +	help
-+	  Say Y here if you want to enable PCIe controller support on MT7623 series
-+	  SoCs. There is one single root complex with 3 root ports available.
-+	  Each port supports Gen2 lane x1.
-+
- config VMD
- 	depends on PCI_MSI && X86_64 && SRCU
- 	tristate "Intel Volume Management Device Driver"
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index cab8795..b10d104 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -18,6 +18,7 @@ obj-$(CONFIG_PCIE_IPROC_BCMA) += pcie-iproc-bcma.o
- obj-$(CONFIG_PCIE_ALTERA) += pcie-altera.o
- obj-$(CONFIG_PCIE_ALTERA_MSI) += pcie-altera-msi.o
- obj-$(CONFIG_PCIE_ROCKCHIP) += pcie-rockchip.o
-+obj-$(CONFIG_PCIE_MEDIATEK) += pcie-mediatek.o
- obj-$(CONFIG_VMD) += vmd.o
- 
- # The following drivers are for devices that use the generic ACPI
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
++	  Say 'Y' here to add support for Mediatek PCIe PHY driver which
++	  can be found on the MT7623 SoC families.
+ endmenu
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index f8047b4..0185f6a 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -64,3 +64,4 @@ obj-$(CONFIG_PHY_CYGNUS_PCIE)		+= phy-bcm-cygnus-pcie.o
+ obj-$(CONFIG_ARCH_TEGRA) += tegra/
+ obj-$(CONFIG_PHY_NS2_PCIE)		+= phy-bcm-ns2-pcie.o
+ obj-$(CONFIG_PHY_MESON8B_USB2)		+= phy-meson8b-usb2.o
++obj-$(CONFIG_PHY_MT7623_PCIE)		+= phy-mt7623-pcie.o
+diff --git a/drivers/phy/phy-mt7623-pcie.c b/drivers/phy/phy-mt7623-pcie.c
 new file mode 100644
-index 0000000..0cc7943
+index 0000000..9c32601
 --- /dev/null
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -0,0 +1,553 @@
++++ b/drivers/phy/phy-mt7623-pcie.c
+@@ -0,0 +1,290 @@
 +/*
-+ * Mediatek PCIe host controller driver.
-+ *
 + * Copyright (c) 2017 MediaTek Inc.
 + * Author: Ryder Lee <ryder.lee@mediatek.com>
 + *
@@ -77,540 +65,279 @@ index 0000000..0cc7943
 +
 +#include <linux/clk.h>
 +#include <linux/delay.h>
++#include <linux/io.h>
 +#include <linux/kernel.h>
-+#include <linux/of_address.h>
-+#include <linux/of_pci.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of.h>
 +#include <linux/of_platform.h>
-+#include <linux/pci.h>
 +#include <linux/phy/phy.h>
 +#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/reset.h>
++#include <linux/regmap.h>
 +
-+/* PCIe shared registers */
-+#define PCIE_SYS_CFG		0x00
-+#define PCIE_INT_ENABLE		0x0c
-+#define PCIE_CFG_ADDR		0x20
-+#define PCIE_CFG_DATA		0x24
++/* Offsets of sub-segment in each port registers */
++#define PCIE_SIFSLV_PHYD_BANK2_BASE	0xa00
++#define SSUSB_SIFSLV_PHYA_BASE		0xb00
++#define SSUSB_SIFSLV_PHYA_DA_BASE	0xc00
 +
-+/* PCIe per port registers */
-+#define PCIE_BAR0_SETUP		0x10
-+#define PCIE_BAR1_SETUP		0x14
-+#define PCIE_BAR0_MEM_BASE	0x18
-+#define PCIE_CLASS		0x34
-+#define PCIE_LINK_STATUS	0x50
-+
-+#define PCIE_PORT_INT_EN(x)	BIT(20 + (x))
-+#define PCIE_PORT_PERST(x)	BIT(1 + (x))
-+#define PCIE_PORT_LINKUP	BIT(0)
-+#define PCIE_BAR_MAP_MAX	GENMASK(31, 16)
-+
-+#define PCIE_BAR_ENABLE		BIT(0)
-+#define PCIE_REVISION_ID	BIT(0)
-+#define PCIE_CLASS_CODE		(0x60400 << 8)
-+#define PCIE_CONF_REG(regn)	(((regn) & GENMASK(7, 2)) | \
-+				((((regn) >> 8) & GENMASK(3, 0)) << 24))
-+#define PCIE_CONF_FUN(fun)	(((fun) << 8) & GENMASK(10, 8))
-+#define PCIE_CONF_DEV(dev)	(((dev) << 11) & GENMASK(15, 11))
-+#define PCIE_CONF_BUS(bus)	(((bus) << 16) & GENMASK(23, 16))
-+#define PCIE_CONF_ADDR(regn, fun, dev, bus) \
-+	(PCIE_CONF_REG(regn) | PCIE_CONF_FUN(fun) | \
-+	 PCIE_CONF_DEV(dev) | PCIE_CONF_BUS(bus))
-+
-+/* Mediatek specific configuration registers */
-+#define PCIE_FTS_NUM		0x70c
-+#define PCIE_FTS_NUM_MASK	GENMASK(15, 8)
-+#define PCIE_FTS_NUM_L0(x)	((x) & 0xff << 8)
-+
-+#define PCIE_FC_CREDIT		0x73c
-+#define PCIE_FC_CREDIT_MASK	(GENMASK(31, 31) | GENMASK(28, 16))
-+#define PCIE_FC_CREDIT_VAL(x)	((x) << 16)
-+
-+/**
-+ * struct mtk_pcie_port - PCIe port information
-+ * @base: IO mapped register base
-+ * @list: port list
-+ * @pcie: pointer to PCIe host info
-+ * @reset: pointer to port reset control
-+ * @sys_ck: pointer to bus clock
-+ * @phy: pointer to phy control block
-+ * @lane: lane count
-+ * @index: port index
++/*
++ * RX detection stable - 1 scale represent 8 reference cycles
++ * cover reference clock from 1M~100MHz, 7us~40us
 + */
-+struct mtk_pcie_port {
-+	void __iomem *base;
-+	struct list_head list;
-+	struct mtk_pcie *pcie;
-+	struct reset_control *reset;
-+	struct clk *sys_ck;
-+	struct phy *phy;
-+	u32 lane;
-+	u32 index;
-+};
++#define B2_PHYD_RXDET1			(PCIE_SIFSLV_PHYD_BANK2_BASE + 0x28)
++#define RG_SSUSB_RXDET_STB2		GENMASK(17, 9)
++#define RG_SSUSB_RXDET_STB2_VAL(x)	((0x1ff & (x)) << 9)
 +
-+/**
-+ * struct mtk_pcie - PCIe host information
-+ * @dev: pointer to PCIe device
-+ * @base: IO mapped register Base
-+ * @free_ck: free-run reference clock
-+ * @io: IO resource
-+ * @pio: PIO resource
-+ * @mem: non-prefetchable memory resource
-+ * @busn: bus range
-+ * @offset: IO / Memory offset
-+ * @ports: pointer to PCIe port information
-+ */
-+struct mtk_pcie {
++#define B2_PHYD_RXDET2			(PCIE_SIFSLV_PHYD_BANK2_BASE + 0x2c)
++#define RG_SSUSB_RXDET_STB2_P3		GENMASK(8, 0)
++#define RG_SSUSB_RXDET_STB2_P3_VAL(x)	(0x1ff & (x))
++
++#define U3_PHYA_REG0			(SSUSB_SIFSLV_PHYA_BASE + 0x00)
++#define RG_PCIE_CLKDRV_OFFSET		GENMASK(3, 1)
++#define RG_PCIE_CLKDRV_OFFSET_VAL(x)	((0x3 & (x)) << 2)
++
++#define U3_PHYA_REG1			(SSUSB_SIFSLV_PHYA_BASE + 0x04)
++#define RG_PCIE_CLKDRV_AMP		GENMASK(31, 29)
++#define RG_PCIE_CLKDRV_AMP_VAL(x)	((0x7 & (x)) << 29)
++
++#define DA_SSUSB_CDR_REFCK_SEL		(SSUSB_SIFSLV_PHYA_DA_BASE + 0x00)
++#define RG_SSUSB_XTAL_EXT_PE1H		GENMASK(13, 12)
++#define RG_SSUSB_XTAL_EXT_PE1H_VAL(x)	((0x3 & (x)) << 12)
++#define RG_SSUSB_XTAL_EXT_PE2H		GENMASK(17, 16)
++#define RG_SSUSB_XTAL_EXT_PE2H_VAL(x)		((0x3 & (x)) << 16)
++
++#define DA_SSUSB_PLL_IC			(SSUSB_SIFSLV_PHYA_DA_BASE + 0x0c)
++#define RG_SSUSB_PLL_IC_PE2H		GENMASK(15, 12)
++#define RG_SSUSB_PLL_IC_PE2H_VAL(x)	((0xf & (x)) << 12)
++#define RG_SSUSB_PLL_BR_PE2H		GENMASK(29, 28)
++#define RG_SSUSB_PLL_BR_PE2H_VAL(x)	((0x3 & (x)) << 28)
++
++#define DA_SSUSB_PLL_BC			(SSUSB_SIFSLV_PHYA_DA_BASE + 0x08)
++#define RG_SSUSB_PLL_DIVEN_PE2H		GENMASK(21, 19)
++#define RG_SSUSB_PLL_BC_PE2H		GENMASK(7, 6)
++#define RG_SSUSB_PLL_BC_PE2H_VAL(x)	((0x3 & (x)) << 6)
++
++#define DA_SSUSB_PLL_IR			(SSUSB_SIFSLV_PHYA_DA_BASE + 0x10)
++#define RG_SSUSB_PLL_IR_PE2H		GENMASK(19, 16)
++#define RG_SSUSB_PLL_IR_PE2H_VAL(x)	((0xf & (x)) << 16)
++
++#define DA_SSUSB_PLL_BP			(SSUSB_SIFSLV_PHYA_DA_BASE + 0x14)
++#define RG_SSUSB_PLL_BP_PE2H		GENMASK(19, 16)
++#define RG_SSUSB_PLL_BP_PE2H_VAL(x)	((0xf & (x)) << 16)
++
++#define DA_SSUSB_PLL_SSC_DELTA1_REG20	(SSUSB_SIFSLV_PHYA_DA_BASE + 0x3c)
++#define RG_SSUSB_PLL_SSC_DELTA1_PE2H		GENMASK(31, 16)
++#define RG_SSUSB_PLL_SSC_DELTA1_PE2H_VAL(x)	((0xffff & (x)) << 16)
++
++#define DA_SSUSB_PLL_SSC_DELTA_REG25	(SSUSB_SIFSLV_PHYA_DA_BASE + 0x48)
++#define RG_SSUSB_PLL_SSC_DELTA_PE2H		GENMASK(15, 0)
++#define RG_SSUSB_PLL_SSC_DELTA_PE2H_VAL(x)	(0xffff & (x))
++
++#define HIF_SYSCFG1			0x14
++#define HIF_SYSCFG1_PHY2_MASK		(0x3 << 20)
++
++struct mtk_pcie_phy {
 +	struct device *dev;
 +	void __iomem *base;
-+	struct clk *free_ck;
-+
-+	struct resource io;
-+	struct resource pio;
-+	struct resource mem;
-+	struct resource busn;
-+	struct {
-+		resource_size_t mem;
-+		resource_size_t io;
-+	} offset;
-+	struct list_head ports;
++	struct regmap *hif;
++	struct clk *phya_ref;
++	struct phy *phy;
 +};
 +
-+static inline bool mtk_pcie_link_is_up(struct mtk_pcie_port *port)
++static inline u32 phy_read(struct mtk_pcie_phy *phy, u32 reg)
 +{
-+	return !!(readl(port->base + PCIE_LINK_STATUS) &
-+		  PCIE_PORT_LINKUP);
++	return readl(phy->base + reg);
 +}
 +
-+static void mtk_pcie_port_free(struct mtk_pcie_port *port)
++static inline void phy_write(struct mtk_pcie_phy *phy, u32 val, u32 reg)
 +{
-+	struct mtk_pcie *pcie = port->pcie;
-+	struct device *dev = pcie->dev;
-+
-+	devm_iounmap(dev, port->base);
-+	list_del(&port->list);
-+	devm_kfree(dev, port);
++	writel(val, phy->base + reg);
 +}
 +
-+static void mtk_pcie_put_resources(struct mtk_pcie *pcie)
++static int mtk_pcie_phy_power_on(struct phy *phy)
 +{
-+	struct device *dev = pcie->dev;
-+	struct mtk_pcie_port *port, *tmp;
++	struct mtk_pcie_phy *mtk_phy = phy_get_drvdata(phy);
++	int err;
++	u32 val;
 +
-+	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
-+		phy_power_off(port->phy);
-+		clk_disable_unprepare(port->sys_ck);
-+		mtk_pcie_port_free(port);
++	/* enable PCIe mode */
++	if (mtk_phy->hif)
++		regmap_update_bits(mtk_phy->hif, HIF_SYSCFG1,
++				   HIF_SYSCFG1_PHY2_MASK, 0);
++
++	err = clk_prepare_enable(mtk_phy->phya_ref);
++	if (err) {
++		dev_err(mtk_phy->dev, "failed to enable PCIe phy clock\n");
++		return err;
 +	}
 +
-+	clk_disable_unprepare(pcie->free_ck);
-+	pm_runtime_put_sync(dev);
-+	pm_runtime_disable(dev);
++	val = phy_read(mtk_phy, DA_SSUSB_CDR_REFCK_SEL);
++	val &= ~(RG_SSUSB_XTAL_EXT_PE1H | RG_SSUSB_XTAL_EXT_PE2H);
++	val |= RG_SSUSB_XTAL_EXT_PE1H_VAL(0x2) |
++	       RG_SSUSB_XTAL_EXT_PE2H_VAL(0x2);
++	phy_write(mtk_phy, val, DA_SSUSB_CDR_REFCK_SEL);
++
++	/* ref clk drive */
++	val = phy_read(mtk_phy, U3_PHYA_REG1);
++	val &= ~RG_PCIE_CLKDRV_AMP;
++	val |= RG_PCIE_CLKDRV_AMP_VAL(0x4);
++	phy_write(mtk_phy, val, U3_PHYA_REG1);
++
++	val = phy_read(mtk_phy, U3_PHYA_REG0);
++	val &= ~RG_PCIE_CLKDRV_OFFSET;
++	val |= RG_PCIE_CLKDRV_OFFSET_VAL(0x1);
++	phy_write(mtk_phy, val, U3_PHYA_REG0);
++
++	/* SSC delta -5000ppm */
++	val = phy_read(mtk_phy, DA_SSUSB_PLL_SSC_DELTA1_REG20);
++	val &= ~RG_SSUSB_PLL_SSC_DELTA1_PE2H;
++	val |= RG_SSUSB_PLL_SSC_DELTA1_PE2H_VAL(0x3c);
++	phy_write(mtk_phy, val, DA_SSUSB_PLL_SSC_DELTA1_REG20);
++
++	val = phy_read(mtk_phy, DA_SSUSB_PLL_SSC_DELTA_REG25);
++	val &= ~RG_SSUSB_PLL_SSC_DELTA_PE2H;
++	val |= RG_SSUSB_PLL_SSC_DELTA_PE2H_VAL(0x36);
++	phy_write(mtk_phy, val, DA_SSUSB_PLL_SSC_DELTA_REG25);
++
++	/* change pll BW 0.6M */
++	val = phy_read(mtk_phy, DA_SSUSB_PLL_IC);
++	val &= ~RG_SSUSB_PLL_BR_PE2H;
++	val |= RG_SSUSB_PLL_BR_PE2H_VAL(0x1);
++	phy_write(mtk_phy, val, DA_SSUSB_PLL_IC);
++
++	val = phy_read(mtk_phy, DA_SSUSB_PLL_BC);
++	val &= ~(RG_SSUSB_PLL_DIVEN_PE2H | RG_SSUSB_PLL_BC_PE2H);
++	val |= RG_SSUSB_PLL_BC_PE2H_VAL(0x3);
++	phy_write(mtk_phy, val, DA_SSUSB_PLL_BC);
++
++	val = phy_read(mtk_phy, DA_SSUSB_PLL_IR);
++	val &= ~RG_SSUSB_PLL_IR_PE2H;
++	val |= RG_SSUSB_PLL_IR_PE2H_VAL(0x2);
++	phy_write(mtk_phy, val, DA_SSUSB_PLL_IR);
++
++	val = phy_read(mtk_phy, DA_SSUSB_PLL_IC);
++	val &= ~RG_SSUSB_PLL_IC_PE2H;
++	val |= RG_SSUSB_PLL_IC_PE2H_VAL(0x1);
++	phy_write(mtk_phy, val, DA_SSUSB_PLL_IC);
++
++	val = phy_read(mtk_phy, DA_SSUSB_PLL_BP);
++	val &= ~RG_SSUSB_PLL_BP_PE2H;
++	val |= RG_SSUSB_PLL_BP_PE2H_VAL(0xa);
++	phy_write(mtk_phy, val, DA_SSUSB_PLL_BP);
++
++	/* Tx Detect Rx Timing: 10us -> 5us */
++	val = phy_read(mtk_phy, B2_PHYD_RXDET1);
++	val &= ~RG_SSUSB_RXDET_STB2;
++	val |= RG_SSUSB_RXDET_STB2_VAL(0x10);
++	phy_write(mtk_phy, val, B2_PHYD_RXDET1);
++
++	val = phy_read(mtk_phy, B2_PHYD_RXDET2);
++	val &= ~RG_SSUSB_RXDET_STB2_P3;
++	val |= RG_SSUSB_RXDET_STB2_P3_VAL(0x10);
++	phy_write(mtk_phy, val, B2_PHYD_RXDET2);
++
++	/* wait for PCIe subsys register to active */
++	usleep_range(2500, 3000);
++
++	return 0;
 +}
 +
-+static void __iomem *mtk_pcie_map_bus(struct pci_bus *bus,
-+				      unsigned int devfn, int where)
++static int mtk_pcie_phy_power_off(struct phy *phy)
 +{
-+	struct pci_host_bridge *host = pci_find_host_bridge(bus);
-+	struct mtk_pcie *pcie = pci_host_bridge_priv(host);
++	struct mtk_pcie_phy *mtk_phy = phy_get_drvdata(phy);
 +
-+	writel(PCIE_CONF_ADDR(where, PCI_FUNC(devfn), PCI_SLOT(devfn),
-+			      bus->number), pcie->base + PCIE_CFG_ADDR);
++	clk_disable_unprepare(mtk_phy->phya_ref);
 +
-+	return pcie->base + PCIE_CFG_DATA + (where & 3);
++	return 0;
 +}
 +
-+static struct pci_ops mtk_pcie_ops = {
-+	.map_bus = mtk_pcie_map_bus,
-+	.read  = pci_generic_config_read,
-+	.write = pci_generic_config_write,
++static struct phy_ops mtk_pcie_phy_ops = {
++	.power_on	= mtk_pcie_phy_power_on,
++	.power_off	= mtk_pcie_phy_power_off,
++	.owner		= THIS_MODULE,
 +};
 +
-+static void mtk_pcie_configure_rc(struct mtk_pcie_port *port)
++static const struct of_device_id mtk_pcie_phy_of_match[];
++
++static int mtk_pcie_phy_probe(struct platform_device *pdev)
 +{
-+	struct mtk_pcie *pcie = port->pcie;
-+	u32 func = PCI_FUNC(port->index << 3);
-+	u32 slot = PCI_SLOT(port->index << 3);
-+	u32 val;
++	struct device_node *np = pdev->dev.of_node;
++	const struct of_device_id *match;
++	struct phy_provider *phy_provider;
++	struct mtk_pcie_phy *mtk_phy;
++	struct resource *res;
++	struct phy *phy;
 +
-+	/* enable interrupt */
-+	val = readl(pcie->base + PCIE_INT_ENABLE);
-+	val |= PCIE_PORT_INT_EN(port->index);
-+	writel(val, pcie->base + PCIE_INT_ENABLE);
++	match = of_match_device(mtk_pcie_phy_of_match, &pdev->dev);
++	if (!match)
++		return -ENODEV;
 +
-+	/* map to all DDR region. We need to set it before cfg operation. */
-+	writel(PCIE_BAR_MAP_MAX | PCIE_BAR_ENABLE,
-+	       port->base + PCIE_BAR0_SETUP);
-+
-+	/* configure class Code and revision ID */
-+	writel(PCIE_CLASS_CODE | PCIE_REVISION_ID,
-+	       port->base + PCIE_CLASS);
-+
-+	/* configure FC credit */
-+	writel(PCIE_CONF_ADDR(PCIE_FC_CREDIT, func, slot, 0),
-+	       pcie->base + PCIE_CFG_ADDR);
-+	val = readl(pcie->base + PCIE_CFG_DATA);
-+	val &= ~PCIE_FC_CREDIT_MASK;
-+	val |= PCIE_FC_CREDIT_VAL(0x806c);
-+	writel(PCIE_CONF_ADDR(PCIE_FC_CREDIT, func, slot, 0),
-+	       pcie->base + PCIE_CFG_ADDR);
-+	writel(val, pcie->base + PCIE_CFG_DATA);
-+
-+	/* configure RC FTS number to 250 when it leaves L0s */
-+	writel(PCIE_CONF_ADDR(PCIE_FTS_NUM, func, slot, 0),
-+	       pcie->base + PCIE_CFG_ADDR);
-+	val = readl(pcie->base + PCIE_CFG_DATA);
-+	val &= ~PCIE_FTS_NUM_MASK;
-+	val |= PCIE_FTS_NUM_L0(0x50);
-+	writel(PCIE_CONF_ADDR(PCIE_FTS_NUM, func, slot, 0),
-+	       pcie->base + PCIE_CFG_ADDR);
-+	writel(val, pcie->base + PCIE_CFG_DATA);
-+}
-+
-+static void mtk_pcie_assert_ports(struct mtk_pcie_port *port)
-+{
-+	struct mtk_pcie *pcie = port->pcie;
-+	u32 val;
-+
-+	/* assert port PERST_N */
-+	val = readl(pcie->base + PCIE_SYS_CFG);
-+	val |= PCIE_PORT_PERST(port->index);
-+	writel(val, pcie->base + PCIE_SYS_CFG);
-+
-+	/* de-assert port PERST_N */
-+	val = readl(pcie->base + PCIE_SYS_CFG);
-+	val &= ~PCIE_PORT_PERST(port->index);
-+	writel(val, pcie->base + PCIE_SYS_CFG);
-+
-+	/* PCIe v2.0 need at least 100ms delay to train from Gen1 to Gen2 */
-+	msleep(100);
-+}
-+
-+static int mtk_pcie_enable_ports(struct mtk_pcie_port *port)
-+{
-+	struct device *dev = port->pcie->dev;
-+	int err;
-+
-+	err = clk_prepare_enable(port->sys_ck);
-+	if (err) {
-+		dev_err(dev, "failed to enable port%d clock\n", port->index);
-+		goto err_sys_clk;
-+	}
-+
-+	reset_control_assert(port->reset);
-+	reset_control_deassert(port->reset);
-+
-+	err = phy_power_on(port->phy);
-+	if (err) {
-+		dev_err(dev, "failed to power on port%d phy\n", port->index);
-+		goto err_phy_on;
-+	}
-+
-+	mtk_pcie_assert_ports(port);
-+
-+	/* if link up, then setup root port configuration space */
-+	if (mtk_pcie_link_is_up(port)) {
-+		mtk_pcie_configure_rc(port);
-+		return 0;
-+	}
-+
-+	dev_info(dev, "Port%d link down\n", port->index);
-+
-+	phy_power_off(port->phy);
-+err_phy_on:
-+	clk_disable_unprepare(port->sys_ck);
-+	mtk_pcie_port_free(port);
-+err_sys_clk:
-+	return err;
-+}
-+
-+static int mtk_pcie_parse_ports(struct mtk_pcie *pcie,
-+				struct mtk_pcie_port **p,
-+				struct device_node *node,
-+				int index)
-+{
-+	struct mtk_pcie_port *port;
-+	struct resource *regs;
-+	struct device *dev = pcie->dev;
-+	struct platform_device *pdev = to_platform_device(dev);
-+	char name[10];
-+	int err;
-+
-+	*p = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
-+	if (!*p)
++	mtk_phy = devm_kzalloc(&pdev->dev, sizeof(*mtk_phy), GFP_KERNEL);
++	if (!mtk_phy)
 +		return -ENOMEM;
 +
-+	port = *p;
++	mtk_phy->dev = &pdev->dev;
 +
-+	err = of_property_read_u32(node, "num-lanes", &port->lane);
-+	if (err) {
-+		dev_err(dev, "missing num-lanes property\n");
-+		return err;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mtk_phy->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(mtk_phy->base)) {
++		dev_err(&pdev->dev, "failed to get phy base\n");
++		return PTR_ERR(mtk_phy->base);
 +	}
 +
-+	regs = platform_get_resource(pdev, IORESOURCE_MEM, index + 1);
-+	port->base = devm_ioremap_resource(dev, regs);
-+	if (IS_ERR(port->base)) {
-+		dev_err(dev, "failed to map port%d base\n", index);
-+		return PTR_ERR(port->base);
++	mtk_phy->phya_ref = devm_clk_get(&pdev->dev, "pciephya_ref");
++	if (IS_ERR(mtk_phy->phya_ref)) {
++		dev_err(&pdev->dev, "error to get pciephya_ref\n");
++		return PTR_ERR(mtk_phy->phya_ref);
 +	}
 +
-+	snprintf(name, sizeof(name), "sys_ck%d", index);
-+	port->sys_ck = devm_clk_get(dev, name);
-+	if (IS_ERR(port->sys_ck)) {
-+		dev_err(dev, "failed to get port%d clock\n", index);
-+		return PTR_ERR(port->sys_ck);
-+	}
-+
-+	snprintf(name, sizeof(name), "pcie-rst%d", index);
-+	port->reset = devm_reset_control_get(dev, name);
-+	if (IS_ERR(port->reset)) {
-+		dev_err(dev, "failed to get port%d reset\n", index);
-+		return PTR_ERR(port->reset);
-+	}
-+
-+	snprintf(name, sizeof(name), "pcie-phy%d", index);
-+	port->phy = devm_phy_get(dev, name);
-+	if (IS_ERR(port->phy)) {
-+		dev_err(dev, "failed to get port%d phy\n", index);
-+		return PTR_ERR(port->phy);
-+	}
-+
-+	port->index = index;
-+	port->pcie = pcie;
-+
-+	INIT_LIST_HEAD(&port->list);
-+	list_add_tail(&port->list, &pcie->ports);
-+
-+	return 0;
-+}
-+
-+static int mtk_pcie_handle_shared_resource(struct mtk_pcie *pcie)
-+{
-+	struct device *dev = pcie->dev;
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct resource *regs;
-+	int err;
-+
-+	/* get shared registers */
-+	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	pcie->base = devm_ioremap_resource(dev, regs);
-+	if (IS_ERR(pcie->base)) {
-+		dev_err(dev, "failed to map shared register\n");
-+		return PTR_ERR(pcie->base);
-+	}
-+
-+	pcie->free_ck = devm_clk_get(dev, "free_ck");
-+	if (IS_ERR(pcie->free_ck)) {
-+		dev_err(dev, "failed to get free_ck\n");
-+		return PTR_ERR(pcie->free_ck);
-+	}
-+
-+	pm_runtime_enable(dev);
-+	err = pm_runtime_get_sync(dev);
-+	if (err)
-+		goto err_pm;
-+
-+	/* enable top level clock */
-+	err = clk_prepare_enable(pcie->free_ck);
-+	if (err) {
-+		dev_err(dev, "failed to enable free_ck\n");
-+		goto err_free_ck;
-+	}
-+
-+	return 0;
-+
-+err_free_ck:
-+	pm_runtime_put_sync(dev);
-+err_pm:
-+	pm_runtime_disable(dev);
-+
-+	return err;
-+}
-+
-+static int mtk_pcie_parse_and_add_res(struct mtk_pcie *pcie)
-+{
-+	struct device *dev = pcie->dev;
-+	struct device_node *node = dev->of_node, *child;
-+	struct of_pci_range_parser parser;
-+	struct of_pci_range range;
-+	struct resource res;
-+	int err, linkup = 0;
-+
-+	/* parse shared resources */
-+	err = mtk_pcie_handle_shared_resource(pcie);
-+	if (err)
-+		return err;
-+
-+	if (of_pci_range_parser_init(&parser, node)) {
-+		dev_err(dev, "missing \"ranges\" property\n");
-+		return -EINVAL;
-+	}
-+
-+	for_each_of_pci_range(&parser, &range) {
-+		err = of_pci_range_to_resource(&range, node, &res);
-+		if (err < 0)
-+			return err;
-+
-+		switch (res.flags & IORESOURCE_TYPE_BITS) {
-+		case IORESOURCE_IO:
-+			pcie->offset.io = res.start - range.pci_addr;
-+
-+			memcpy(&pcie->pio, &res, sizeof(res));
-+			pcie->pio.name = node->full_name;
-+
-+			pcie->io.start = range.cpu_addr;
-+			pcie->io.end = range.cpu_addr + range.size - 1;
-+			pcie->io.flags = IORESOURCE_MEM;
-+			pcie->io.name = "I/O";
-+
-+			memcpy(&res, &pcie->io, sizeof(res));
-+			break;
-+
-+		case IORESOURCE_MEM:
-+			pcie->offset.mem = res.start - range.pci_addr;
-+
-+			memcpy(&pcie->mem, &res, sizeof(res));
-+			pcie->mem.name = "non-prefetchable";
-+			break;
++	if (of_find_property(np, "mediatek,phy-switch", NULL)) {
++		mtk_phy->hif = syscon_regmap_lookup_by_phandle(
++						np, "mediatek,phy-switch");
++		if (IS_ERR(mtk_phy->hif)) {
++			dev_err(&pdev->dev, "missing \"mediatek,phy-switch\" phandle\n");
++			return PTR_ERR(mtk_phy->hif);
 +		}
 +	}
 +
-+	err = of_pci_parse_bus_range(node, &pcie->busn);
-+	if (err < 0) {
-+		dev_err(dev, "failed to parse ranges property: %d\n", err);
-+		pcie->busn.name = node->name;
-+		pcie->busn.start = 0;
-+		pcie->busn.end = 0xff;
-+		pcie->busn.flags = IORESOURCE_BUS;
++	platform_set_drvdata(pdev, mtk_phy);
++	phy = devm_phy_create(&pdev->dev, NULL, &mtk_pcie_phy_ops);
++	if (IS_ERR(phy)) {
++		dev_err(&pdev->dev, "failed to create phy device\n");
++		return PTR_ERR(phy);
 +	}
 +
-+	for_each_child_of_node(node, child) {
-+		struct mtk_pcie_port *port;
-+		int index;
++	mtk_phy->phy = phy;
++	phy_set_drvdata(phy, mtk_phy);
 +
-+		err = of_pci_get_devfn(child);
-+		if (err < 0) {
-+			dev_err(dev, "failed to parse devfn: %d\n", err);
-+			return err;
-+		}
-+
-+		index = PCI_SLOT(err);
-+
-+		if (!of_device_is_available(child))
-+			continue;
-+
-+		err = mtk_pcie_parse_ports(pcie, &port, child, index);
-+		if (err)
-+			return err;
-+
-+		/* enable each port, and then check link status */
-+		err = mtk_pcie_enable_ports(port);
-+		if (!err)
-+			linkup++;
++	phy_provider = devm_of_phy_provider_register(&pdev->dev,
++						     of_phy_simple_xlate);
++	if (IS_ERR(phy_provider)) {
++		dev_err(&pdev->dev, "failed to register phy provider\n");
++		return PTR_ERR(phy_provider);
 +	}
 +
-+	return !linkup;
-+}
-+
-+static int mtk_pcie_request_resources(struct mtk_pcie *pcie)
-+{
-+	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-+	struct list_head *windows = &host->windows;
-+	struct device *dev = pcie->dev;
-+	int err;
-+
-+	pci_add_resource_offset(windows, &pcie->pio, pcie->offset.io);
-+	pci_add_resource_offset(windows, &pcie->mem, pcie->offset.mem);
-+	pci_add_resource(windows, &pcie->busn);
-+
-+	err = devm_request_pci_bus_resources(dev, windows);
-+	if (err < 0)
-+		return err;
-+
-+	pci_remap_iospace(&pcie->pio, pcie->io.start);
-+
 +	return 0;
 +}
 +
-+static int mtk_pcie_register_host(struct pci_host_bridge *host)
-+{
-+	struct mtk_pcie *pcie = pci_host_bridge_priv(host);
-+	struct pci_bus *child;
-+	int err;
-+
-+	pci_add_flags(PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS);
-+	host->busnr = pcie->busn.start;
-+	host->dev.parent = pcie->dev;
-+	host->ops = &mtk_pcie_ops;
-+
-+	err = pci_register_host_bridge(host);
-+	if (err < 0)
-+		return err;
-+
-+	pci_scan_child_bus(host->bus);
-+
-+	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-+	pci_bus_size_bridges(host->bus);
-+	pci_bus_assign_resources(host->bus);
-+
-+	list_for_each_entry(child, &host->bus->children, node)
-+		pcie_bus_configure_settings(child);
-+
-+	pci_bus_add_devices(host->bus);
-+
-+	return 0;
-+}
-+
-+static int mtk_pcie_probe(struct platform_device *pdev)
-+{
-+	struct mtk_pcie *pcie;
-+	struct pci_host_bridge *host;
-+	int err;
-+
-+	host = pci_alloc_host_bridge(sizeof(*pcie));
-+	if (!host)
-+		return -ENOMEM;
-+
-+	pcie = pci_host_bridge_priv(host);
-+
-+	pcie->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, pcie);
-+	INIT_LIST_HEAD(&pcie->ports);
-+
-+	err = mtk_pcie_parse_and_add_res(pcie);
-+	if (err)
-+		return err;
-+
-+	err = mtk_pcie_request_resources(pcie);
-+	if (err)
-+		goto put_resources;
-+
-+	err = mtk_pcie_register_host(host);
-+	if (err)
-+		goto put_resources;
-+
-+	return 0;
-+
-+put_resources:
-+	mtk_pcie_put_resources(pcie);
-+	return err;
-+}
-+
-+static const struct of_device_id mtk_pcie_ids[] = {
-+	{ .compatible = "mediatek,mt7623-pcie"},
-+	{ .compatible = "mediatek,mt2701-pcie"},
++static const struct of_device_id mtk_pcie_phy_of_match[] = {
++	{ .compatible = "mediatek,mt7623-pcie-phy"},
++	{ .compatible = "mediatek,mt2701-pcie-phy"},
 +	{},
 +};
++MODULE_DEVICE_TABLE(of, mtk_pcie_phy_of_match);
 +
-+static struct platform_driver mtk_pcie_driver = {
-+	.probe = mtk_pcie_probe,
++static struct platform_driver mtk_pcie_phy_driver = {
++	.probe	= mtk_pcie_phy_probe,
 +	.driver = {
-+		.name = "mtk-pcie",
-+		.of_match_table = mtk_pcie_ids,
-+		.suppress_bind_attrs = true,
-+	},
++		.name	= "mtk-pcie-phy",
++		.of_match_table	= mtk_pcie_phy_of_match,
++	}
 +};
-+builtin_platform_driver(mtk_pcie_driver);
++module_platform_driver(mtk_pcie_phy_driver);
++
++MODULE_AUTHOR("Ryder Lee <ryder.lee@mediatek.com>");
++MODULE_DESCRIPTION("Mediatek PCIe PHY driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
