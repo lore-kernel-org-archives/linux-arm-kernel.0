@@ -1,48 +1,68 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 21 May 2017 15:18:14 +0100
-Subject: [PATCH v2] iio: adc: sun4i-gpadc-iio: fix parent device being
- used in devm function
-In-Reply-To: <20170518065100.bn2t7ef2pw4wfaia@flea.home>
-References: <20170518063607.11069-1-quentin.schulz@free-electrons.com>
- <20170518065100.bn2t7ef2pw4wfaia@flea.home>
-Message-ID: <52a7fb4c-af4f-d9d1-4ed9-906a08eb41b3@kernel.org>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 21 May 2017 16:54:01 +0200
+Subject: [PATCH 1/1] dt-binding: net: wireless: fix node name in the
+ BCM43xx example
+In-Reply-To: <20170515201356.26384-2-martin.blumenstingl@googlemail.com>
+References: <20170515201356.26384-1-martin.blumenstingl@googlemail.com>
+ <20170515201356.26384-2-martin.blumenstingl@googlemail.com>
+Message-ID: <e0b336e6-538e-eeea-0ed4-33460dbef7e0@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/17 07:51, Maxime Ripard wrote:
-> On Thu, May 18, 2017 at 08:36:07AM +0200, Quentin Schulz wrote:
->> For the sake of DT binding stability, this IIO driver is a child of an
->> MFD driver for Allwinner A10, A13 and A31 because there already exists a
->> DT binding for this IP. The MFD driver has a DT node but the IIO driver
->> does not.
->>
->> The IIO device registers the temperature sensor in the thermal framework
->> using the DT node of the parent, the MFD device, so the thermal
->> framework could match the phandle to the MFD device in the DT and the
->> struct device used to register in the thermal framework.
->>
->> devm_thermal_zone_of_sensor_register was previously used to register the
->> thermal sensor with the parent struct device of the IIO device,
->> representing the MFD device. By doing so, we registered actually the
->> parent in the devm routine and not the actual IIO device.
->>
->> This lead to the devm unregister function not being called when the IIO
->> module driver is removed. It resulted in the thermal framework still
->> polling the get_temp function of the IIO module while the device doesn't
->> exist anymore, thus generated a kernel panic.
->>
->> Use the non-devm function instead and do the unregister manually in the
->> remove function.
->>
->> Fixes: d1caa9905538 ("iio: adc: add support for Allwinner SoCs ADC")
->>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> Reported-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> 
-> Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Maxime
-> 
-Thanks to all involved with tracking this one down.
+Am 15.05.2017 um 22:13 schrieb Martin Blumenstingl:
+> The example in the BCM43xx documentation uses "brcmf" as node name.
 
-Jonathan
+No, it doesn't, it uses "bcrmf".
+
+This typo has spread to all ARM device trees:
+
+$ git grep bcrmf -- arch/arm/boot/dts/
+arch/arm/boot/dts/imx6sx-nitrogen6sx.dts:       brcmf: bcrmf at 1 {
+arch/arm/boot/dts/imx6ul-opos6ul.dtsi:  brcmf: bcrmf at 1 {
+arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts:       brcmf: bcrmf at 1 {
+arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts:       brcmf: bcrmf at 1 {
+arch/arm/boot/dts/sun7i-a20-bananapro.dts:      brcmf: bcrmf at 1 {
+arch/arm/boot/dts/sun7i-a20-cubietruck.dts:     brcmf: bcrmf at 1 {
+arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts:      brcmf: bcrmf at 1 {
+arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts:       brcmf: bcrmf at 1 {
+arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts:        brcmf: bcrmf at 1 {
+
+For arch/arm64/boot/dts/amlogic/* I've already fixed it, originally by
+changing to "brcmf", in a second step "wifi" was requested.
+
+> However, wireless devices should be named "wifi" instead. Fix this to
+> make sure that .dts authors can simply use the documentation as
+> reference (or simply copy the node from the documentation and then
+> adjust only the board specific bits).
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+> index 5dbf169cd81c..590f622188de 100644
+> --- a/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+> +++ b/Documentation/devicetree/bindings/net/wireless/brcm,bcm43xx-fmac.txt
+> @@ -31,7 +31,7 @@ mmc3: mmc at 01c12000 {
+>  	non-removable;
+>  	status = "okay";
+>  
+> -	brcmf: bcrmf at 1 {
+> +	brcmf: wifi at 1 {
+>  		reg = <1>;
+>  		compatible = "brcm,bcm4329-fmac";
+>  		interrupt-parent = <&pio>;
+
+Thanks for fixing this at its source.
+
+Hopefully the maintainers in CC can make sure that at least it doesn't
+spread further into new DTs.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
