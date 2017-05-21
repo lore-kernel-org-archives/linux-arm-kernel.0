@@ -1,68 +1,45 @@
 From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Sun, 21 May 2017 14:48:59 +0200
-Subject: [PATCH 10/13] ARM: dts: armada-385-linksys: group pins in pinctrl
+Date: Sun, 21 May 2017 14:49:00 +0200
+Subject: [PATCH 11/13] ARM: dts: armada-385-linksys: fixup button node names
 In-Reply-To: <20170521124903.11050-1-ralph.sennhauser@gmail.com>
 References: <20170521124903.11050-1-ralph.sennhauser@gmail.com>
-Message-ID: <20170521124903.11050-11-ralph.sennhauser@gmail.com>
+Message-ID: <20170521124903.11050-12-ralph.sennhauser@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A pin group per node is sufficient, further specialisation only serves
-as documentation which can be a comment just as well. This simplifies
-configuring pins for nodes in dependants.
-
-Also use labels which end up right by the node they are intended for.
+Buttons don't have a reg property; drop pseudo address and fixup names
+of individual button nodes. Also drop #address-cells and #size-cells
+properties.
 
 Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
 ---
- arch/arm/boot/dts/armada-385-linksys.dtsi | 17 +++++++----------
- 1 file changed, 7 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/armada-385-linksys.dtsi | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
-index 485abff..1bb974a 100644
+index 1bb974a..e1f355f 100644
 --- a/arch/arm/boot/dts/armada-385-linksys.dtsi
 +++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
-@@ -83,7 +83,7 @@
+@@ -81,18 +81,16 @@
+ 
+ 	gpio_keys: gpio-keys {
  		compatible = "gpio-keys";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		pinctrl-0 = <&keys_pin>;
-+		pinctrl-0 = <&gpio_keys_pins>;
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+ 		pinctrl-0 = <&gpio_keys_pins>;
  		pinctrl-names = "default";
  
- 		button at 1 {
-@@ -101,7 +101,7 @@
+-		button at 1 {
++		wps {
+ 			label = "WPS";
+ 			linux,code = <KEY_WPS_BUTTON>;
+ 			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
+ 		};
  
- 	gpio_leds: gpio-leds {
- 		compatible = "gpio-leds";
--		pinctrl-0 = <&power_led_pin &sata_led_pin>;
-+		pinctrl-0 = <&gpio_leds_pins>;
- 		pinctrl-names = "default";
- 
- 		power {
-@@ -247,18 +247,15 @@
- };
- 
- &pinctrl {
--	keys_pin: keys-pin {
-+	gpio_keys_pins: gpio-keys-pins {
-+		/* mpp24: wps, mpp29: reset */
- 		marvell,pins = "mpp24", "mpp29";
- 		marvell,function = "gpio";
- 	};
- 
--	power_led_pin: power-led-pin {
--		marvell,pins = "mpp55";
--		marvell,function = "gpio";
--	};
--
--	sata_led_pin: sata-led-pin {
--		marvell,pins = "mpp54";
-+	gpio_leds_pins: gpio-leds-pins {
-+		/* mpp54: sata, mpp55: power */
-+		marvell,pins = "mpp54", "mpp55";
- 		marvell,function = "gpio";
- 	};
- 
+-		button at 2 {
++		reset {
+ 			label = "Factory Reset Button";
+ 			linux,code = <KEY_RESTART>;
+ 			gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
 -- 
 2.10.2
