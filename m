@@ -1,31 +1,33 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 21 May 2017 18:23:08 +0200
-Subject: [PATCH] ARM: dts: imx6: Fix BCM43xx node name
-In-Reply-To: <1495383034-2201-1-git-send-email-festevam@gmail.com>
-References: <1495383034-2201-1-git-send-email-festevam@gmail.com>
-Message-ID: <4f38ab11-dd44-7ccb-b41d-c6ce58f0898c@suse.de>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 21 May 2017 18:44:38 +0200
+Subject: [PATCH 3/4] ARM: dts: bcm2835-rpi-zero: Enable OTG mode
+In-Reply-To: <1495385079-3697-1-git-send-email-stefan.wahren@i2se.com>
+References: <1495385079-3697-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1495385079-3697-4-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 21.05.2017 um 18:10 schrieb Fabio Estevam:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> "bcrmf" is a typo and "wifi" is the preferred form to describe
-> such node, so change it accordingly.
-> 
-> Reported-by: Andreas F?rber <afaerber@suse.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
-> Based on the following dt documentation commit:
-> https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git/commit/?h=dt/next&id=442e1f7eb8e6858408a7ad58bb10813c19877ae5
+Since 635c21068cf ("usb: dwc2: gadget: Fix WARN_ON messages
+during FIFO init") the dwc2 driver is able to handle OTG and gadget
+mode for bcm2835. So enable this feature for the Raspberry Pi Zero.
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/bcm2835-rpi-zero.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks for the quick fix,
-
-Andreas
-
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero.dts b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
+index cc8b832..79a20d5 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-zero.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
+@@ -12,7 +12,7 @@
+ /dts-v1/;
+ #include "bcm2835.dtsi"
+ #include "bcm2835-rpi.dtsi"
+-#include "bcm283x-rpi-usb-host.dtsi"
++#include "bcm283x-rpi-usb-otg.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,model-zero", "brcm,bcm2835";
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.7.4
