@@ -1,17 +1,20 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 21 May 2017 09:59:52 +0800
-Subject: [PATCH] ARM: dts: imx7: use 3 PWM cells
-In-Reply-To: <20170516074013.3571-1-stefan@agner.ch>
-References: <20170516074013.3571-1-stefan@agner.ch>
-Message-ID: <20170521015951.GD26102@dragon>
+Date: Sun, 21 May 2017 10:14:47 +0800
+Subject: [PATCH 0/3] arm64: dts: introduce QorIQ DPAA 1.x FMan device
+ tree nodes
+In-Reply-To: <1494936443-14869-1-git-send-email-madalin.bucur@nxp.com>
+References: <1494936443-14869-1-git-send-email-madalin.bucur@nxp.com>
+Message-ID: <20170521021446.GE26102@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 16, 2017 at 12:40:13AM -0700, Stefan Agner wrote:
-> The PWM driver has now capability to specify the PWM polarity
-> which is e.g. for backlight control. Allow to make use of PWM
-> polarity by specifying pwm-cells to be 3 in the base dt.
+On Tue, May 16, 2017 at 03:07:20PM +0300, Madalin Bucur wrote:
+> This patch set introduces the QorIQ Data Path Acceleration Arhitecture
+> (DPAA) Frame Manager device tree nodes for the ARM based DPAA 1.x platforms.
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Madalin Bucur (3):
+>   arm64: dts: add DPAA FMan nodes
+>   arm64: dts: add LS1043A DPAA FMan support
+>   arm64: dts: add LS1046A DPAA FMan nodes
 
-Applied, thanks.
+Applied all, thanks.
