@@ -1,62 +1,93 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 21 May 2017 15:05:58 +0800
-Subject: [PATCH 2/4] ARM: imx: add initial support for imx7ulp
-In-Reply-To: <20170518053006.GA28011@b29396-OptiPlex-7040>
-References: <1495036217-20049-1-git-send-email-aisheng.dong@nxp.com>
- <1495036217-20049-3-git-send-email-aisheng.dong@nxp.com>
- <51686046.22567.1495042602979@email.1und1.de>
- <20170518053006.GA28011@b29396-OptiPlex-7040>
-Message-ID: <20170521070553.GF26102@dragon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 21 May 2017 07:50:41 +0000
+Subject: [PATCH v2] arm: boot/compressed: fix decompressor header layout for
+ v7-M
+Message-ID: <1495353041-24171-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 01:30:06PM +0800, Dong Aisheng wrote:
-> > > diff --git a/arch/arm/mach-imx/pm-imx7ulp.c b/arch/arm/mach-imx/pm-imx7ulp.c
-> > > new file mode 100644
-> > > index 0000000..df5d6b6
-> > > --- /dev/null
-> > > +++ b/arch/arm/mach-imx/pm-imx7ulp.c
-> > > @@ -0,0 +1,33 @@
-> > > +/*
-> > > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> > > + * Copyright (C) 2017 NXP
-> > > + *
-> > > + * The code contained herein is licensed under the GNU General Public
-> > > + * License. You may obtain a copy of the GNU General Public License
-> > > + * Version 2 or later at the following locations:
-> > > + *
-> > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > + * http://www.gnu.org/copyleft/gpl.html
-> > > + */
-> > > +
-> > > +#include <linux/io.h>
-> > > +#include <linux/of.h>
-> > > +#include <linux/of_address.h>
-> > > +
-> > > +#define SMC_PMCTRL		0x10
-> > > +#define BP_PMCTRL_PSTOPO        16
-> > > +#define PSTOPO_PSTOP3		0x3
-> > > +
-> > > +void __init imx7ulp_pm_init(void)
-> > > +{
-> > > +	struct device_node *np;
-> > > +	void __iomem *smc1_base;
-> > > +
-> > > +	np = of_find_compatible_node(NULL, NULL, "fsl,imx7ulp-smc1");
-> > 
-> > so actually there no dt-binding for this compatible, because there is no driver?
-> 
-> Yes, probably we'd better add another binding doc for it under
-> Documentation/devicetree/bindings/arm/freescale/.
-> And there's another fsl,aips-bus also has no binding doc, i'm not sure
-> whether we need add a binding doc it as well. It seems already exist
-> on many imx dts files.
-> 
-> Shawn,
-> your suggestion?
+As reported by Patrice, the header layout of the decompressor is
+incorrect when building for v7-M. In this case, the __nop macro
+resolves to 'mov r0, r0', which is emitted as a narrow encoding,
+resulting in the header data fields to end up at lower offsets than
+required.
 
-Strictly speaking, every compatible should be documented.  But in
-reality, some compatibles not used by kernel may be missing the
-documentation.  You're welcomed to add them.
+Given the variety of targets we need to support with the same code,
+the startup sequence is a bit of a jumble, and uses instructions
+and macros whose encoding width cannot be specified (badr), or only
+exists in a narrow encoding (bx)
 
-Shawn
+So force the use of a wide encoding in __nop, and replace the start
+sequence with a simple jump to the label marking the start of code,
+preceded by a Thumb2 mode switch if required (using explicit wide
+encodings where appropriate). The label itself can be moved to the
+start of code [where it belongs] due to the larger range of branch
+instructions as compared to adr instructions.
+
+Reported-by: Patrice CHOTARD <patrice.chotard@st.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v2: use #ifdefs to simplify the code
+    add Nico's ack
+
+ arch/arm/boot/compressed/efi-header.S |  4 +---
+ arch/arm/boot/compressed/head.S       | 17 ++++++++++-------
+ 2 files changed, 11 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+index 9d5dc4fda3c1..3f7d1b74c5e0 100644
+--- a/arch/arm/boot/compressed/efi-header.S
++++ b/arch/arm/boot/compressed/efi-header.S
+@@ -17,14 +17,12 @@
+ 		@ there.
+ 		.inst	'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
+ #else
+-		mov	r0, r0
++		W(mov)	r0, r0
+ #endif
+ 		.endm
+ 
+ 		.macro	__EFI_HEADER
+ #ifdef CONFIG_EFI_STUB
+-		b	__efi_start
+-
+ 		.set	start_offset, __efi_start - start
+ 		.org	start + 0x3c
+ 		@
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 7c711ba61417..8a756870c238 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -130,19 +130,22 @@ start:
+ 		.rept	7
+ 		__nop
+ 		.endr
+-   ARM(		mov	r0, r0		)
+-   ARM(		b	1f		)
+- THUMB(		badr	r12, 1f		)
+- THUMB(		bx	r12		)
++#ifndef CONFIG_THUMB2_KERNEL
++		mov	r0, r0
++#else
++ AR_CLASS(	sub	pc, pc, #3	)	@ A/R: switch to Thumb2 mode
++  M_CLASS(	nop.w			)	@ M: already in Thumb2 mode
++		.thumb
++#endif
++		W(b)	1f
+ 
+ 		.word	_magic_sig	@ Magic numbers to help the loader
+ 		.word	_magic_start	@ absolute load/run zImage address
+ 		.word	_magic_end	@ zImage end address
+ 		.word	0x04030201	@ endianness flag
+ 
+- THUMB(		.thumb			)
+-1:		__EFI_HEADER
+-
++		__EFI_HEADER
++1:
+  ARM_BE8(	setend	be		)	@ go BE8 if compiled for BE8
+  AR_CLASS(	mrs	r9, cpsr	)
+ #ifdef CONFIG_ARM_VIRT_EXT
+-- 
+2.7.4
