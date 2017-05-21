@@ -1,9 +1,9 @@
 From: tiwai@suse.de (Takashi Iwai)
-Date: Sun, 21 May 2017 21:02:54 +0200
-Subject: [PATCH 3/7] ALSA: cs46xx: Deliver indirect-PCM transfer error
+Date: Sun, 21 May 2017 21:02:53 +0200
+Subject: [PATCH 2/7] ALSA: mips: Deliver indirect-PCM transfer error
 In-Reply-To: <20170521190258.1178-1-tiwai@suse.de>
 References: <20170521190258.1178-1-tiwai@suse.de>
-Message-ID: <20170521190258.1178-4-tiwai@suse.de>
+Message-ID: <20170521190258.1178-3-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,34 +12,40 @@ should return the error from ack callbacks.
 
 Signed-off-by: Takashi Iwai <tiwai@suse.de>
 ---
- sound/pci/cs46xx/cs46xx_lib.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ sound/mips/hal2.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-diff --git a/sound/pci/cs46xx/cs46xx_lib.c b/sound/pci/cs46xx/cs46xx_lib.c
-index 00fa52e9a2f2..ae2aad52ea6f 100644
---- a/sound/pci/cs46xx/cs46xx_lib.c
-+++ b/sound/pci/cs46xx/cs46xx_lib.c
-@@ -887,8 +887,8 @@ static int snd_cs46xx_playback_transfer(struct snd_pcm_substream *substream)
- {
- 	struct snd_pcm_runtime *runtime = substream->runtime;
- 	struct snd_cs46xx_pcm * cpcm = runtime->private_data;
--	snd_pcm_indirect_playback_transfer(substream, &cpcm->pcm_rec, snd_cs46xx_pb_trans_copy);
+diff --git a/sound/mips/hal2.c b/sound/mips/hal2.c
+index 00fc9241d266..684dc4ddef41 100644
+--- a/sound/mips/hal2.c
++++ b/sound/mips/hal2.c
+@@ -616,10 +616,9 @@ static int hal2_playback_ack(struct snd_pcm_substream *substream)
+ 	struct hal2_codec *dac = &hal2->dac;
+ 
+ 	dac->pcm_indirect.hw_queue_size = H2_BUF_SIZE / 2;
+-	snd_pcm_indirect_playback_transfer(substream,
+-					   &dac->pcm_indirect,
+-					   hal2_playback_transfer);
 -	return 0;
-+	return snd_pcm_indirect_playback_transfer(substream, &cpcm->pcm_rec,
-+						  snd_cs46xx_pb_trans_copy);
++	return snd_pcm_indirect_playback_transfer(substream,
++						  &dac->pcm_indirect,
++						  hal2_playback_transfer);
  }
  
- static void snd_cs46xx_cp_trans_copy(struct snd_pcm_substream *substream,
-@@ -903,8 +903,8 @@ static void snd_cs46xx_cp_trans_copy(struct snd_pcm_substream *substream,
- static int snd_cs46xx_capture_transfer(struct snd_pcm_substream *substream)
- {
- 	struct snd_cs46xx *chip = snd_pcm_substream_chip(substream);
--	snd_pcm_indirect_capture_transfer(substream, &chip->capt.pcm_rec, snd_cs46xx_cp_trans_copy);
+ static int hal2_capture_open(struct snd_pcm_substream *substream)
+@@ -707,10 +706,9 @@ static int hal2_capture_ack(struct snd_pcm_substream *substream)
+ 	struct snd_hal2 *hal2 = snd_pcm_substream_chip(substream);
+ 	struct hal2_codec *adc = &hal2->adc;
+ 
+-	snd_pcm_indirect_capture_transfer(substream,
+-					  &adc->pcm_indirect,
+-					  hal2_capture_transfer);
 -	return 0;
-+	return snd_pcm_indirect_capture_transfer(substream, &chip->capt.pcm_rec,
-+						 snd_cs46xx_cp_trans_copy);
++	return snd_pcm_indirect_capture_transfer(substream,
++						 &adc->pcm_indirect,
++						 hal2_capture_transfer);
  }
  
- static snd_pcm_uframes_t snd_cs46xx_playback_direct_pointer(struct snd_pcm_substream *substream)
+ static struct snd_pcm_ops hal2_playback_ops = {
 -- 
 2.13.0
