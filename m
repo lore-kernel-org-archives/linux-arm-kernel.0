@@ -1,33 +1,34 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Sun, 21 May 2017 19:02:41 +0200
-Subject: may_use_simd on aarch64, chacha20
-Message-ID: <CAHmME9qH=Wu-=9YUmxi7NPrczHu1UrB7phG0y68ipB+ProQ2TA@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sun, 21 May 2017 20:51:03 +0200
+Subject: [PATCH v2 0/2] arm64: meson-gxbb: NanoPi K2 enablement
+Message-ID: <20170521185105.23448-1-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi folks,
+Hello,
 
-I noticed that the ARM implementation [1] of chacha20 makes a check to
-may_use_simd(), but the ARM64 implementation [2] does not. Question 1:
-is this a bug, in which case I'll submit a patch shortly, or is this
-intentional? In case of the latter, could somebody explain the
-reasoning? On a similar note, the only ARM64 glue code that uses
-may_use_simd() is sha256; everything else does not. Shall I submit a
-substantial patch series to fix this up everywhere?
+This mini-series adds initial support for the Amlogic S905 based
+FriendlyARM NanoPi K2 SBC.
 
-Secondly, I noticed that may_use_simd() is essentially aliased to
-!in_interrupt(), since it uses the asm-generic variety. Question 2:
-Isn't this overkill? Couldn't we make an arm/arm64 variant of this
-that only checks in_irq()?
+Tested with mainline U-Boot.
 
-Lastly, APIs like pcrypts and padata execute with bottom halves
-disabled, even though their actual execution environment is process
-context, via a workqueue. Thus, here, in_interrupt() will always be
-true, even though this is likely a place where we want to use simd.
-Question 3: is there something better that could be done?
+v2 adds USB and Wifi among others.
 
-Thanks,
-Jason
+Regards,
+Andreas
 
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm/crypto/chacha20-neon-glue.c#n67
-[2] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/crypto/chacha20-neon-glue.c#n66
+Cc: devicetree at vger.kernel.org
+Cc: techsupport at friendlyarm.com
+
+Andreas F?rber (2):
+  dt-bindings: arm: amlogic: Add NanoPi K2
+  arm64: dts: amlogic: Add NanoPi K2
+
+ Documentation/devicetree/bindings/arm/amlogic.txt  |   1 +
+ arch/arm64/boot/dts/amlogic/Makefile               |   1 +
+ .../boot/dts/amlogic/meson-gxbb-nanopi-k2.dts      | 291 +++++++++++++++++++++
+ 3 files changed, 293 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
+
+-- 
+2.12.0
