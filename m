@@ -1,37 +1,49 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 21 May 2017 18:44:36 +0200
-Subject: [PATCH 1/4] ARM: dts: bcm283x: Add dtsi for OTG mode
+Date: Sun, 21 May 2017 18:44:39 +0200
+Subject: [PATCH 4/4] ARM: bcm2835_defconfig: Enable serial & ethernet USB
+ gadget support
 In-Reply-To: <1495385079-3697-1-git-send-email-stefan.wahren@i2se.com>
 References: <1495385079-3697-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1495385079-3697-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1495385079-3697-5-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Raspberry Pi Zero also supports OTG mode. So provide a dtsi file
-to configure the USB interface accordingly. The fifo sizes are optimized
-for device endpoint 6 and 7 with the maximum of 768.
+In order to use the serial and ethernet USB gadget support on
+Raspberry Zero, we also need to enable the PHY driver, kernel module
+and OTG support.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/bcm283x-rpi-usb-otg.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm283x-rpi-usb-otg.dtsi
+ arch/arm/configs/bcm2835_defconfig | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm283x-rpi-usb-otg.dtsi b/arch/arm/boot/dts/bcm283x-rpi-usb-otg.dtsi
-new file mode 100644
-index 0000000..e7d217c
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm283x-rpi-usb-otg.dtsi
-@@ -0,0 +1,10 @@
-+&usb {
-+	dr_mode = "otg";
-+	g-rx-fifo-size = <256>;
-+	g-np-tx-fifo-size = <32>;
-+	/*
-+	 * According to dwc2 the sum of all device EP
-+	 * fifo sizes shouldn't exceed 3776 bytes.
-+	 */
-+	g-tx-fifo-size = <256 256 512 512 512 768 768>;
-+};
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index 3ba8cd3..3ee9d78 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -24,6 +24,8 @@ CONFIG_PROFILING=y
+ CONFIG_OPROFILE=y
+ CONFIG_JUMP_LABEL=y
+ CONFIG_CC_STACKPROTECTOR_REGULAR=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
+ CONFIG_ARCH_MULTI_V6=y
+ CONFIG_ARCH_BCM=y
+ CONFIG_ARCH_BCM2835=y
+@@ -86,8 +88,14 @@ CONFIG_SND=y
+ CONFIG_SND_SOC=y
+ CONFIG_SND_BCM2835_SOC_I2S=y
+ CONFIG_USB=y
++CONFIG_USB_OTG=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_DWC2=y
++CONFIG_NOP_USB_XCEIV=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_ETH=m
++CONFIG_USB_ETH_EEM=y
++CONFIG_USB_G_SERIAL=m
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
 -- 
 2.7.4
