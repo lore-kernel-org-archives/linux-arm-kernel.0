@@ -1,51 +1,63 @@
 From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Sun, 21 May 2017 14:48:51 +0200
-Subject: [PATCH 02/13] ARM: dts: armada-385-linksys: label nodes
+Date: Sun, 21 May 2017 14:48:53 +0200
+Subject: [PATCH 04/13] ARM: dts: armada-385-linksys: drop redundant properties
+ in dependants
 In-Reply-To: <20170521124903.11050-1-ralph.sennhauser@gmail.com>
 References: <20170521124903.11050-1-ralph.sennhauser@gmail.com>
-Message-ID: <20170521124903.11050-3-ralph.sennhauser@gmail.com>
+Message-ID: <20170521124903.11050-5-ralph.sennhauser@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add labels to nodes used by dependants. Also rename node gpio_keys to
-gpio-keys to mach the style of the rest of the file as well as the
-documented example.
+Drop redundant declaration of #address-cells and #size-cells.
 
 Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
 ---
- arch/arm/boot/dts/armada-385-linksys.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/armada-385-linksys-caiman.dts | 3 ---
+ arch/arm/boot/dts/armada-385-linksys-cobra.dts  | 3 ---
+ arch/arm/boot/dts/armada-385-linksys-shelby.dts | 3 ---
+ 3 files changed, 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
-index 481e4a3..b7f0a16 100644
---- a/arch/arm/boot/dts/armada-385-linksys.dtsi
-+++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
-@@ -79,7 +79,7 @@
- 		gpio = <&gpio1 18 GPIO_ACTIVE_HIGH>;
- 	};
+diff --git a/arch/arm/boot/dts/armada-385-linksys-caiman.dts b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
+index 765c939..05e854a 100644
+--- a/arch/arm/boot/dts/armada-385-linksys-caiman.dts
++++ b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
+@@ -47,9 +47,6 @@
+ };
  
--	gpio_keys {
-+	gpio_keys: gpio-keys {
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -99,7 +99,7 @@
- 		};
- 	};
+ &expander0 {
+-	#address-cells = <1>;
+-	#size-cells = <0>;
+-
+ 	wan_amber at 0 {
+ 		label = "caiman:amber:wan";
+ 		reg = <0x0>;
+diff --git a/arch/arm/boot/dts/armada-385-linksys-cobra.dts b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
+index 2ae1e71..5b1662b 100644
+--- a/arch/arm/boot/dts/armada-385-linksys-cobra.dts
++++ b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
+@@ -47,9 +47,6 @@
+ };
  
--	gpio-leds {
-+	gpio_leds: gpio-leds {
- 		compatible = "gpio-leds";
- 		pinctrl-0 = <&power_led_pin &sata_led_pin>;
- 		pinctrl-names = "default";
-@@ -210,7 +210,7 @@
- 		reg = <0x4c>;
- 	};
+ &expander0 {
+-	#address-cells = <1>;
+-	#size-cells = <0>;
+-
+ 	wan_amber at 0 {
+ 		label = "cobra:amber:wan";
+ 		reg = <0x0>;
+diff --git a/arch/arm/boot/dts/armada-385-linksys-shelby.dts b/arch/arm/boot/dts/armada-385-linksys-shelby.dts
+index 74f4273..a909371 100644
+--- a/arch/arm/boot/dts/armada-385-linksys-shelby.dts
++++ b/arch/arm/boot/dts/armada-385-linksys-shelby.dts
+@@ -47,9 +47,6 @@
+ };
  
--	pca9635 at 68 {
-+	expander0: pca9635 at 68 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		compatible = "nxp,pca9635";
+ &expander0 {
+-	#address-cells = <1>;
+-	#size-cells = <0>;
+-
+ 	wan_amber at 0 {
+ 		label = "shelby:amber:wan";
+ 		reg = <0x0>;
 -- 
 2.10.2
