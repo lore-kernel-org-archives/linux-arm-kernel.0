@@ -1,51 +1,120 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 21 May 2017 22:55:20 +0200
-Subject: may_use_simd on aarch64, chacha20
-In-Reply-To: <CAHmME9qH=Wu-=9YUmxi7NPrczHu1UrB7phG0y68ipB+ProQ2TA@mail.gmail.com>
-References: <CAHmME9qH=Wu-=9YUmxi7NPrczHu1UrB7phG0y68ipB+ProQ2TA@mail.gmail.com>
-Message-ID: <4150EFDC-CD3A-4C5C-9EF7-689F63C142C2@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 21 May 2017 18:16:55 -0300
+Subject: [PATCH] ARM: dts: sunxi: Fix BCM43xx node name
+Message-ID: <1495401415-14477-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ Dave)
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-> On 21 May 2017, at 19:02, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
-> 
-> Hi folks,
-> 
-> I noticed that the ARM implementation [1] of chacha20 makes a check to
-> may_use_simd(), but the ARM64 implementation [2] does not. Question 1:
-> is this a bug, in which case I'll submit a patch shortly, or is this
-> intentional? In case of the latter, could somebody explain the
-> reasoning?
+"bcrmf" is a typo and "wifi" is the preferred form to describe
+such node, so change it accordingly.
 
-This is intentional. arm64 supports kernel mode NEON in any context, whereas ARM only supports it in process context. This is due to the way lazy FP restore is implemented on ARM. However, we are about to
-change this on arm64 to only allow non-nested kernel mode NEON, similar to x86. This is necessary to support SVE.
+Reported-by: Andreas F?rber <afaerber@suse.de>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Based on the following dt documentation commit:
+https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git/commit/?h=dt/next&id=442e1f7eb8e6858408a7ad58bb10813c19877ae5
 
-> On a similar note, the only ARM64 glue code that uses
-> may_use_simd() is sha256; everything else does not. Shall I submit a
-> substantial patch series to fix this up everywhere?
-> 
+ arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 2 +-
+ arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts | 2 +-
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts        | 2 +-
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts       | 2 +-
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts        | 2 +-
+ arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts | 2 +-
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts  | 2 +-
+ 7 files changed, 7 insertions(+), 7 deletions(-)
 
-Currently, may_use_simd() is only used as a hint on arm64 whether it makes sense to offload crypto to process context. In the sha256
-code, whose arm64 neon implementation is only marginally faster than scalar on some micro-architectures, it is used to prefer the scalar code in interrupt context, because the NEON code preserves/restores the NEON state of the interrupted context eagerly, which is costly.
-
-> Secondly, I noticed that may_use_simd() is essentially aliased to
-> !in_interrupt(), since it uses the asm-generic variety. Question 2:
-> Isn't this overkill? Couldn't we make an arm/arm64 variant of this
-> that only checks in_irq()?
-> 
-
-No. ARM does not support kernel mode NEON in softirq
-context, and arm64 will soon have its own override that only allows non-nested use in softirq context.
-
-> Lastly, APIs like pcrypts and padata execute with bottom halves
-> disabled, even though their actual execution environment is process
-> context, via a workqueue. Thus, here, in_interrupt() will always be
-> true, even though this is likely a place where we want to use simd.
-> Question 3: is there something better that could be done?
-
-I guess we should switch to in_serving_softirq() instead.
-
-Thanks,
-Ard.
+diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
+index bdfdce8..51e6f1d 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
+@@ -138,7 +138,7 @@
+ 	non-removable;
+ 	status = "okay";
+ 
+-	brcmf: bcrmf at 1 {
++	brcmf: wifi at 1 {
+ 		reg = <1>;
+ 		compatible = "brcm,bcm4329-fmac";
+ 		interrupt-parent = <&r_pio>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+index 08e776a..4c03cc3 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+@@ -172,7 +172,7 @@
+ 	wakeup-source;
+ 	status = "okay";
+ 
+-	brcmf: bcrmf at 1 {
++	brcmf: wifi at 1 {
+ 		reg = <1>;
+ 		compatible = "brcm,bcm4329-fmac";
+ 		interrupt-parent = <&pio>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+index 83516bc..e7af1b7 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+@@ -172,7 +172,7 @@
+ 	non-removable;
+ 	status = "okay";
+ 
+-	brcmf: bcrmf at 1 {
++	brcmf: wifi at 1 {
+ 		reg = <1>;
+ 		compatible = "brcm,bcm4329-fmac";
+ 		interrupt-parent = <&pio>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index 4ebeecf..8dbf732 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -195,7 +195,7 @@
+ 	non-removable;
+ 	status = "okay";
+ 
+-	brcmf: bcrmf at 1 {
++	brcmf: wifi at 1 {
+ 		reg = <1>;
+ 		compatible = "brcm,bcm4329-fmac";
+ 		interrupt-parent = <&pio>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+index e5cbcad..5580997 100644
+--- a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
++++ b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+@@ -173,7 +173,7 @@
+ 	non-removable;
+ 	status = "okay";
+ 
+-	brcmf: bcrmf at 1 {
++	brcmf: wifi at 1 {
+ 		reg = <1>;
+ 		compatible = "brcm,bcm4329-fmac";
+ 		interrupt-parent = <&pio>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts b/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
+index 84462d7..7f8405a 100644
+--- a/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
++++ b/arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts
+@@ -137,7 +137,7 @@
+ 	non-removable;
+ 	status = "okay";
+ 
+-	brcmf: bcrmf at 1 {
++	brcmf: wifi at 1 {
+ 		reg = <1>;
+ 		compatible = "brcm,bcm4329-fmac";
+ 		interrupt-parent = <&pio>;
+diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index 17c7c08..883072b 100644
+--- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -130,7 +130,7 @@
+ 	non-removable;
+ 	status = "okay";
+ 
+-	brcmf: bcrmf at 1 {
++	brcmf: wifi at 1 {
+ 		reg = <1>;
+ 		compatible = "brcm,bcm4329-fmac";
+ 		interrupt-parent = <&pio>;
+-- 
+2.7.4
