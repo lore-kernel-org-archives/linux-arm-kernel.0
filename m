@@ -1,10 +1,10 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 21 May 2017 10:23:36 +0000
-Subject: [PATCH 1/5] crypto: arm/aes-ce - enable module autoloading based on
+Date: Sun, 21 May 2017 10:23:37 +0000
+Subject: [PATCH 2/5] crypto: arm/ghash-ce - enable module autoloading based on
  CPU feature bits
 In-Reply-To: <1495362220-30044-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1495362220-30044-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1495362220-30044-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1495362220-30044-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,37 +14,37 @@ by the current CPU.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/crypto/aes-ce-glue.c | 6 ++----
+ arch/arm/crypto/ghash-ce-glue.c | 6 ++----
  1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/crypto/aes-ce-glue.c b/arch/arm/crypto/aes-ce-glue.c
-index 883b84d828c5..0f966a8ca1ce 100644
---- a/arch/arm/crypto/aes-ce-glue.c
-+++ b/arch/arm/crypto/aes-ce-glue.c
-@@ -14,6 +14,7 @@
- #include <crypto/aes.h>
- #include <crypto/internal/simd.h>
- #include <crypto/internal/skcipher.h>
+diff --git a/arch/arm/crypto/ghash-ce-glue.c b/arch/arm/crypto/ghash-ce-glue.c
+index 7546b3c02466..6bac8bea9f1e 100644
+--- a/arch/arm/crypto/ghash-ce-glue.c
++++ b/arch/arm/crypto/ghash-ce-glue.c
+@@ -15,6 +15,7 @@
+ #include <crypto/cryptd.h>
+ #include <crypto/internal/hash.h>
+ #include <crypto/gf128mul.h>
 +#include <linux/cpufeature.h>
+ #include <linux/crypto.h>
  #include <linux/module.h>
- #include <crypto/xts.h>
  
-@@ -425,9 +426,6 @@ static int __init aes_init(void)
+@@ -311,9 +312,6 @@ static int __init ghash_ce_mod_init(void)
+ {
  	int err;
- 	int i;
  
--	if (!(elf_hwcap2 & HWCAP2_AES))
+-	if (!(elf_hwcap2 & HWCAP2_PMULL))
 -		return -ENODEV;
 -
- 	err = crypto_register_skciphers(aes_algs, ARRAY_SIZE(aes_algs));
+ 	err = crypto_register_shash(&ghash_alg);
  	if (err)
  		return err;
-@@ -451,5 +449,5 @@ static int __init aes_init(void)
- 	return err;
+@@ -334,5 +332,5 @@ static void __exit ghash_ce_mod_exit(void)
+ 	crypto_unregister_shash(&ghash_alg);
  }
  
--module_init(aes_init);
-+module_cpu_feature_match(AES, aes_init);
- module_exit(aes_exit);
+-module_init(ghash_ce_mod_init);
++module_cpu_feature_match(PMULL, ghash_ce_mod_init);
+ module_exit(ghash_ce_mod_exit);
 -- 
 2.7.4
