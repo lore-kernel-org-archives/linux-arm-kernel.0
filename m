@@ -1,125 +1,51 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 21 May 2017 22:36:19 +0200 (CEST)
-Subject: [PATCH v3 4/5] drivers/perf: Add support for ARMv8.2 Statistical
- Profiling Extension
-In-Reply-To: <1495128273-13941-5-git-send-email-will.deacon@arm.com>
-References: <1495128273-13941-1-git-send-email-will.deacon@arm.com>
- <1495128273-13941-5-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.DEB.2.20.1705212207020.3023@nanos>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 21 May 2017 22:55:20 +0200
+Subject: may_use_simd on aarch64, chacha20
+In-Reply-To: <CAHmME9qH=Wu-=9YUmxi7NPrczHu1UrB7phG0y68ipB+ProQ2TA@mail.gmail.com>
+References: <CAHmME9qH=Wu-=9YUmxi7NPrczHu1UrB7phG0y68ipB+ProQ2TA@mail.gmail.com>
+Message-ID: <4150EFDC-CD3A-4C5C-9EF7-689F63C142C2@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 May 2017, Will Deacon wrote:
-> +static void __arm_spe_pmu_dev_probe(void *info)
-> +{
-> +	dev_info(dev,
-> +		 "probed for CPUs %*pbl [max_record_sz %u, align %u, features 0x%llx]\n",
-> +		 cpumask_pr_args(&spe_pmu->supported_cpus),
-> +		 spe_pmu->max_record_sz, spe_pmu->align, spe_pmu->features);
+(+ Dave)
 
-I have a hard time to spot the place which actually sets a CPU in the
-supported_cpus mask. I must be missing something, but that's what grep
-gives me:
+> On 21 May 2017, at 19:02, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+> 
+> Hi folks,
+> 
+> I noticed that the ARM implementation [1] of chacha20 makes a check to
+> may_use_simd(), but the ARM64 implementation [2] does not. Question 1:
+> is this a bug, in which case I'll submit a patch shortly, or is this
+> intentional? In case of the latter, could somebody explain the
+> reasoning?
 
-+	cpumask_t				supported_cpus;
-+	return cpumap_print_to_pagebuf(true, buf, &spe_pmu->supported_cpus);
-+	    !cpumask_test_cpu(event->cpu, &spe_pmu->supported_cpus))
-+	if (!cpumask_test_cpu(cpu, &spe_pmu->supported_cpus))
-+		 cpumask_pr_args(&spe_pmu->supported_cpus),
-+	if (!cpumask_test_cpu(cpu, &spe_pmu->supported_cpus))
-+	if (!cpumask_test_cpu(cpu, &spe_pmu->supported_cpus))
-+	cpumask_t *mask = &spe_pmu->supported_cpus;
-+	if (irq_get_percpu_devid_partition(irq, &spe_pmu->supported_cpus)) {
-+	cpumask_t *mask = &spe_pmu->supported_cpus;
+This is intentional. arm64 supports kernel mode NEON in any context, whereas ARM only supports it in process context. This is due to the way lazy FP restore is implemented on ARM. However, we are about to
+change this on arm64 to only allow non-nested kernel mode NEON, similar to x86. This is necessary to support SVE.
 
-> +static int arm_spe_pmu_dev_init(struct arm_spe_pmu *spe_pmu)
-> +{
-> +	int ret;
-> +	cpumask_t *mask = &spe_pmu->supported_cpus;
-> +
-> +	/* Keep the hotplug state steady whilst we probe */
-> +	get_online_cpus();
-> +
-> +	/* Make sure we probe the hardware on a relevant CPU */
-> +	ret = smp_call_function_any(mask,  __arm_spe_pmu_dev_probe, spe_pmu, 1);
+> On a similar note, the only ARM64 glue code that uses
+> may_use_simd() is sha256; everything else does not. Shall I submit a
+> substantial patch series to fix this up everywhere?
+> 
 
-You can release the hotplug lock here again and spare all the goto magic.
+Currently, may_use_simd() is only used as a hint on arm64 whether it makes sense to offload crypto to process context. In the sha256
+code, whose arm64 neon implementation is only marginally faster than scalar on some micro-architectures, it is used to prefer the scalar code in interrupt context, because the NEON code preserves/restores the NEON state of the interrupted context eagerly, which is costly.
 
-> +	if (ret || !(spe_pmu->features & SPE_PMU_FEAT_DEV_PROBED)) {
-> +		ret = -ENXIO;
-> +		goto out_put_cpus;
-> +	}
-> +
-> +	/* Request our PPIs (note that the IRQ is still disabled) */
-> +	ret = request_percpu_irq(spe_pmu->irq, arm_spe_pmu_irq_handler, DRVNAME,
-> +				 spe_pmu->handle);
-> +	if (ret)
-> +		goto out_put_cpus;
-> +
-> +	/* Setup the CPUs in our mask -- this enables the IRQ */
-> +	on_each_cpu_mask(mask, __arm_spe_pmu_setup_one, spe_pmu, 1);
-> +
-> +	/* Register our hotplug notifier now so we don't miss any events */
-> +	ret = cpuhp_state_add_instance_nocalls(arm_spe_pmu_online,
-> +					       &spe_pmu->hotplug_node);
+> Secondly, I noticed that may_use_simd() is essentially aliased to
+> !in_interrupt(), since it uses the asm-generic variety. Question 2:
+> Isn't this overkill? Couldn't we make an arm/arm64 variant of this
+> that only checks in_irq()?
+> 
 
-If you use cpuhp_state_add_instance() then you can spare the
-on_each_cpu_mask(). The downside is that it will invoke the callback on the
-non-supported CPUs as well, but you have protection in the callbacks anyway.
+No. ARM does not support kernel mode NEON in softirq
+context, and arm64 will soon have its own override that only allows non-nested use in softirq context.
 
-> +static int arm_spe_pmu_device_dt_probe(struct platform_device *pdev)
-> +{
-> +	int ret;
-> +	struct arm_spe_pmu *spe_pmu;
-> +	struct device *dev = &pdev->dev;
-> +
-> +	spe_pmu = devm_kzalloc(dev, sizeof(*spe_pmu), GFP_KERNEL);
-> +	if (!spe_pmu) {
-> +		dev_err(dev, "failed to allocate spe_pmu\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	spe_pmu->handle = alloc_percpu(typeof(*spe_pmu->handle));
-> +	if (!spe_pmu->handle)
-> +		return -ENOMEM;
-> +
-> +	spe_pmu->pdev = pdev;
-> +	platform_set_drvdata(pdev, spe_pmu);
-> +
-> +	ret = arm_spe_pmu_irq_probe(spe_pmu);
-> +	if (ret)
-> +		goto out_free_handle;
-> +
-> +	ret = arm_spe_pmu_dev_init(spe_pmu);
-> +	if (ret)
-> +		goto out_free_handle;
-> +
-> +	ret = arm_spe_pmu_perf_init(spe_pmu);
-> +	if (ret)
-> +		goto out_free_handle;
+> Lastly, APIs like pcrypts and padata execute with bottom halves
+> disabled, even though their actual execution environment is process
+> context, via a workqueue. Thus, here, in_interrupt() will always be
+> true, even though this is likely a place where we want to use simd.
+> Question 3: is there something better that could be done?
 
-If that fails you leak the cpu hotplug instance. It's still enqueued.
+I guess we should switch to in_serving_softirq() instead.
 
-> +static int arm_spe_pmu_device_remove(struct platform_device *pdev)
-> +{
-> +	struct arm_spe_pmu *spe_pmu = platform_get_drvdata(pdev);
-> +	cpumask_t *mask = &spe_pmu->supported_cpus;
-> +
-> +	arm_spe_pmu_perf_destroy(spe_pmu);
-> +
-> +	get_online_cpus();
-> +	cpuhp_state_remove_instance_nocalls(arm_spe_pmu_online,
-> +					    &spe_pmu->hotplug_node);
-> +	on_each_cpu_mask(mask, __arm_spe_pmu_stop_one, spe_pmu, 1);
-
-
-You can spare that dance and just use cpuhp_state_remove_instance().
-
-> +	free_percpu_irq(spe_pmu->irq, spe_pmu->handle);
-> +	free_percpu(spe_pmu->handle);
-
-Those two do not need hotplug protection.
-
-Thanks
-
-	tglx
+Thanks,
+Ard.
