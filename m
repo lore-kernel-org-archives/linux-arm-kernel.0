@@ -1,45 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 21 May 2017 10:23:40 +0000
-Subject: [PATCH 5/5] crypto: arm/crc32 - enable module autoloading based on
- CPU feature bits
-In-Reply-To: <1495362220-30044-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1495362220-30044-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1495362220-30044-6-git-send-email-ard.biesheuvel@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 21 May 2017 19:00:37 +0800
+Subject: [PATCH V2 4/5] dt-bindings: pinctrl: add imx7ulp pinctrl binding
+ doc
+In-Reply-To: <AM3PR04MB306654DEA7C2B7676D5C0EC80FB0@AM3PR04MB306.eurprd04.prod.outlook.com>
+References: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
+ <1495177545-23006-5-git-send-email-aisheng.dong@nxp.com>
+ <20170521093049.GM26102@dragon>
+ <AM3PR04MB306654DEA7C2B7676D5C0EC80FB0@AM3PR04MB306.eurprd04.prod.outlook.com>
+Message-ID: <20170521110036.GO26102@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the module autoloadable by tying it to the CPU feature bits that
-describe whether the optional instructions it relies on are implemented
-by the current CPU.
+On Sun, May 21, 2017 at 09:40:25AM +0000, A.S. Dong wrote:
+> > -----Original Message-----
+> > From: Shawn Guo [mailto:shawnguo at kernel.org]
+> > Sent: Sunday, May 21, 2017 5:31 PM
+> > To: A.S. Dong
+> > Cc: linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > linus.walleij at linaro.org; stefan at agner.ch; Jacky Bai; Andy Duan;
+> > kernel at pengutronix.de; Rob Herring; Mark Rutland;
+> > devicetree at vger.kernel.org
+> > Subject: Re: [PATCH V2 4/5] dt-bindings: pinctrl: add imx7ulp pinctrl
+> > binding doc
+> > 
+> > On Fri, May 19, 2017 at 03:05:44PM +0800, Dong Aisheng wrote:
+> > > i.MX 7ULP has three IOMUXC instances: IOMUXC0 for M4 ports,
+> > > IOMUXC1 for A7 ports and IOMUXC DDR for DDR interface.
+> > >
+> > > This patch adds the IOMUXC1 support for A7.
+> > >
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: devicetree at vger.kernel.org
+> > > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > >
+> > > ---
+> > > ChangeLog:
+> > > v1->v2:
+> > >  * add more descriptions in binding doc
+> > >  * add missed prefix for private properties.
+> > >  * move dt-bindings/pinctrl/imx7ulp-pinfunc.h to arch/arm/boot/dts
+> > > ---
+> > >  .../bindings/pinctrl/fsl,imx7ulp-pinctrl.txt       |  63 +++
+> > >  arch/arm/boot/dts/imx7ulp-pinfunc.h                | 468
+> > +++++++++++++++++++++
+> > 
+> > Rather than being part of bindings doc patch, this pinfunc header should
+> > be included in dts patches that add imx7ulp SoC support.
+> > 
+> 
+> Okay.
+> One question is that imx7ulp-pinfunc.h is mentioned in this binding doc, 
+> that means after this patch applied, users still can't see it if separate,
+> Should we worry about this issue or not?
+>  
+> +       Refer to imx7ulp-pinfunc.h in in device tree source folder for all
+> +       available imx7ulp PIN_FUNC_ID.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/crypto/crc32-ce-glue.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Ah, okay, there is a reason to have it in the bindings doc patch.  If
+LinusW and Rob have no problem with it, I'm fine then.
 
-diff --git a/arch/arm/crypto/crc32-ce-glue.c b/arch/arm/crypto/crc32-ce-glue.c
-index e1566bec1016..1b0e0e86ee9c 100644
---- a/arch/arm/crypto/crc32-ce-glue.c
-+++ b/arch/arm/crypto/crc32-ce-glue.c
-@@ -8,6 +8,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/cpufeature.h>
- #include <linux/crc32.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
-@@ -233,6 +234,11 @@ static void __exit crc32_pmull_mod_exit(void)
- 				  ARRAY_SIZE(crc32_pmull_algs));
- }
- 
-+static const struct cpu_feature crc32_cpu_feature[] = {
-+	{ cpu_feature(CRC32) }, { cpu_feature(PMULL) }, { }
-+};
-+MODULE_DEVICE_TABLE(cpu, crc32_cpu_feature);
-+
- module_init(crc32_pmull_mod_init);
- module_exit(crc32_pmull_mod_exit);
- 
--- 
-2.7.4
+Acked-by: Shawn Guo <shawnguo@kernel.org>
