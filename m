@@ -1,29 +1,42 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 21 May 2017 17:28:05 +0800
-Subject: [PATCH V2 3/5] pinctrl: imx: add soc specific mux_mode mask and
- shift property
-In-Reply-To: <1495177545-23006-4-git-send-email-aisheng.dong@nxp.com>
+Date: Sun, 21 May 2017 17:30:50 +0800
+Subject: [PATCH V2 4/5] dt-bindings: pinctrl: add imx7ulp pinctrl binding
+ doc
+In-Reply-To: <1495177545-23006-5-git-send-email-aisheng.dong@nxp.com>
 References: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
- <1495177545-23006-4-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20170521092804.GL26102@dragon>
+ <1495177545-23006-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170521093049.GM26102@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 03:05:43PM +0800, Dong Aisheng wrote:
-> MX7ULP MUX mode mask and shift bit is different from VF610.
-> Let's make it a platform specific property for the later easy of
-> adding MX7ULP support.
+On Fri, May 19, 2017 at 03:05:44PM +0800, Dong Aisheng wrote:
+> i.MX 7ULP has three IOMUXC instances: IOMUXC0 for M4 ports,
+> IOMUXC1 for A7 ports and IOMUXC DDR for DDR interface.
 > 
-> One trick in exist code that Vybrid hardcoded the config part
-> as 0xffff because its mux_config register BIT[15-0] are all configs
-> part. But it's not true in ULP, so use mux_mask instead to address
-> the difference.
+> This patch adds the IOMUXC1 support for A7.
 > 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
 > Cc: Linus Walleij <linus.walleij@linaro.org>
 > Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: Bai Ping <ping.bai@nxp.com>
-> Signed-off-by: Fugang Duan <fugang.duan@nxp.com>
 > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> 
+> ---
+> ChangeLog:
+> v1->v2:
+>  * add more descriptions in binding doc
+>  * add missed prefix for private properties.
+>  * move dt-bindings/pinctrl/imx7ulp-pinfunc.h to arch/arm/boot/dts
+> ---
+>  .../bindings/pinctrl/fsl,imx7ulp-pinctrl.txt       |  63 +++
+>  arch/arm/boot/dts/imx7ulp-pinfunc.h                | 468 +++++++++++++++++++++
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+Rather than being part of bindings doc patch, this pinfunc header should
+be included in dts patches that add imx7ulp SoC support.
+
+Shawn
+
+>  2 files changed, 531 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
+>  create mode 100644 arch/arm/boot/dts/imx7ulp-pinfunc.h
