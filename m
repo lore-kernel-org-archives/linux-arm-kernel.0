@@ -1,67 +1,76 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 22 May 2017 08:11:27 -0700
-Subject: [GIT PULL] ARM: SoC fixes (and a cross-arch dt-include fix)
-In-Reply-To: <CACRpkdaRdZTB39-=sAojO+OyHtP02KaFChqGcxy+fWA8qaB2bw@mail.gmail.com>
-References: <20170519193455.GA24206@localhost>
- <CACRpkdaRdZTB39-=sAojO+OyHtP02KaFChqGcxy+fWA8qaB2bw@mail.gmail.com>
-Message-ID: <CAOesGMhfrWSvLtDtGRWBTJiAoeSwzGgsdUTm26j1mpoVu0ghDg@mail.gmail.com>
+From: olivier.moysan@st.com (Olivier MOYSAN)
+Date: Mon, 22 May 2017 15:11:45 +0000
+Subject: [PATCH v4 2/3] ASoC: stm32: Add I2S driver
+In-Reply-To: <20170519173359.277lyg6fzwksqnin@sirena.org.uk>
+References: <1495120793-11687-1-git-send-email-olivier.moysan@st.com>
+ <1495120793-11687-3-git-send-email-olivier.moysan@st.com>
+ <20170519173359.277lyg6fzwksqnin@sirena.org.uk>
+Message-ID: <3b507e82-d8d1-c2c4-8a50-ca130382171a@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding ksummit-discuss]
+Hello Mark,
 
-On Mon, May 22, 2017 at 4:44 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, May 19, 2017 at 9:34 PM, Olof Johansson <olof@lixom.net> wrote:
->
->>  - We've started telling people to avoid cross-tree shared branches if all
->>    they're doing is picking up one or two DT-used constants from a
->>    shared include file, and instead to use the numeric values on first
->>    submission. Follow-up moving over to symbolic names are sent in right
->>    after -rc1, i.e. here. It's only a few minor patches of this type.
->
-> OK it seems like a reasonable process.
->
-> It's not like I can think about anything better.
->
-> I was more opting for doing things this way:
->
-> - Create bindings and <dt-bindings/foo/bar.h> merge it into the
->   foo subsystem.
->
-> - Merge driver into drivers/foo/bar.c that use <dt-bindings/foo/bar.h>
->
-> - Submit DTS patch to ARM SoC (or whetever) using only numerical
->   values.
->
-> - After the merge window, follow up with a patch replacing the
->   numerical constants with #defines from <dt-bindings/foo/bar.h>
+Thanks, for applying the patches.
 
-You're describing exactly what we've been pushing people towards.
+On 05/19/2017 07:33 PM, Mark Brown wrote:
+> On Thu, May 18, 2017 at 05:19:52PM +0200, olivier moysan wrote:
+> 
+> This looks good so I'm going to apply it, a few things below though -
+> can you please send a followup patch for the issue with the Kconfig
+> symbol?
+> 
+>> --- a/sound/soc/stm/Kconfig
+>> +++ b/sound/soc/stm/Kconfig
+>> @@ -5,4 +5,4 @@ menuconfig SND_SOC_STM32
+>>   	select SND_SOC_GENERIC_DMAENGINE_PCM
+>>   	select REGMAP_MMIO
+>>   	help
+>> -	  Say Y if you want to enable ASoC-support for STM32
+>> +	  Say Y if you want to enable ASoC support for STM32
+> 
+> This appears to be an unrelated typo fix.
+> 
 
-If it's just a few simple references it's not significantly more
-awkward, and decouples merges and removes need for stable branches.
-Essentially we've become slightly more lax in what we're willing to
-consider _right after_ -rc1 to include these tweaks (and often patches
-to turn on new drivers in defconfigs).
+ok
 
-If the amount of contents grows too large we might need to tweak
-things further, maybe with something pre-rc1 but that's more awkward.
+>> diff --git a/sound/soc/stm/Makefile b/sound/soc/stm/Makefile
+>> index e466a47..8251931 100644
+>> --- a/sound/soc/stm/Makefile
+>> +++ b/sound/soc/stm/Makefile
+>> @@ -4,3 +4,7 @@ obj-$(CONFIG_SND_SOC_STM32) += snd-soc-stm32-sai-sub.o
+>>   
+>>   snd-soc-stm32-sai-objs := stm32_sai.o
+>>   obj-$(CONFIG_SND_SOC_STM32) += snd-soc-stm32-sai.o
+>> +
+>> +# I2S
+>> +snd-soc-stm32-i2s-objs := stm32_i2s.o
+>> +obj-$(CONFIG_SND_SOC_STM32) += snd-soc-stm32-i2s.o
+> 
+> Perhaps make this a separate option?  It probably makes sense to rename
+> the option for the SAI at the same time.
+> 
 
-> An alternative would obviously be to wait for the next merge window
-> after merging the driver patch but I guess people are too impatient
-> to do that (including me).
+ok, I will fix it in a new patch.
 
-Yeah, asking people to spread out across releases would remove
-dependencies a lot, but it would also slow down progress and frustrate
-a lot of contributors so we don't do that.
+>> +
+>> +	ret = clk_prepare_enable(i2s->pclk);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "Enable pclk failed: %d\n", ret);
+>> +		return ret;
+>> +	}
+>> +
+>> +	ret = clk_prepare_enable(i2s->i2sclk);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "Enable i2sclk failed: %d\n", ret);
+>> +		goto err_pclk_disable;
+>> +	}
+> 
+> It'd be nice to have runtime PM to disable these when the device is idle
+> but that's not essential.
+> 
 
-> We discussed cross-tree dependencies a bit on ksummit-discuss
-> but this solution was not mentioned back then.
+Yes, I agree.
 
-I thought it was, but I wasn't fully engaged in the discussion. We've
-also only started this over the last release or two so it's early to
-tell just how well it'll work in reality. Cc:ing the list.
-
-
-
--Olof
+BRs
+olivier
