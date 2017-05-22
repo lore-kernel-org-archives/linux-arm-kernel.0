@@ -1,58 +1,31 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 May 2017 15:58:37 +0200
-Subject: [PATCH 04/35] arm64: dts: r8a7795: salvator-x: Update memory node to
- 4 GiB map
+Date: Mon, 22 May 2017 15:58:38 +0200
+Subject: [PATCH 05/35] arm64: dts: r8a7795: salvator-x: enable HS200 for eMMC
 In-Reply-To: <cover.1495457812.git.horms+renesas@verge.net.au>
 References: <cover.1495457812.git.horms+renesas@verge.net.au>
-Message-ID: <63e76b90f0725c2a61dea4f067f6d652926ac074.1495457812.git.horms+renesas@verge.net.au>
+Message-ID: <93328f0089f81a3083b4ef749903c2b8b27a3b09.1495457812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-This patch addes memory region:
-
-  - After changes, the Salvator-X board has the following map:
-    Bank0: 1GiB RAM : 0x000048000000 -> 0x0007fffffff
-    Bank1: 1GiB RAM : 0x000500000000 -> 0x0053fffffff
-    Bank2: 1GiB RAM : 0x000600000000 -> 0x0063fffffff
-    Bank3: 1GiB RAM : 0x000700000000 -> 0x0073fffffff
-
-  - Before changes, the old map looked like this:
-    Bank0: 1GiB RAM : 0x000048000000 -> 0x0007fffffff
-
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index 639aa085d996..f1b6ad3def15 100644
+index f1b6ad3def15..ff68bac4cd7e 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
 +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -56,6 +56,21 @@
- 		reg = <0x0 0x48000000 0x0 0x38000000>;
- 	};
- 
-+	memory at 500000000 {
-+		device_type = "memory";
-+		reg = <0x5 0x00000000 0x0 0x40000000>;
-+	};
-+
-+	memory at 600000000 {
-+		device_type = "memory";
-+		reg = <0x6 0x00000000 0x0 0x40000000>;
-+	};
-+
-+	memory at 700000000 {
-+		device_type = "memory";
-+		reg = <0x7 0x00000000 0x0 0x40000000>;
-+	};
-+
- 	x12_clk: x12 {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
+@@ -482,6 +482,7 @@
+ 	vmmc-supply = <&reg_3p3v>;
+ 	vqmmc-supply = <&reg_1p8v>;
+ 	bus-width = <8>;
++	mmc-hs200-1_8v;
+ 	non-removable;
+ 	status = "okay";
+ };
 -- 
 2.1.4
