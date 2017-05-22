@@ -1,101 +1,85 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 22 May 2017 11:52:50 -0500
-Subject: [PATCH v4 00/20] eeprom: at24: Add OF device ID table
-In-Reply-To: <CABxcv==xw7UxF1Ey+hDhGb_wzgAcFR9JLm6iuirvYSTTvSxb0A@mail.gmail.com>
-References: <20170522140208.24652-1-javier@dowhile0.org>
- <CAMuHMdXbhkGGFC80-39Axzv=BdEXyBNuPuHCSWW3eXWDB=SQ+w@mail.gmail.com>
- <CAL_JsqL2P=C+xRyL-BCC=RtFah4BRf8BHSvWNPZ+6r2ioSk_Yw@mail.gmail.com>
- <CABxcv==xw7UxF1Ey+hDhGb_wzgAcFR9JLm6iuirvYSTTvSxb0A@mail.gmail.com>
-Message-ID: <CAL_JsqKj_f-jY3wi78QyAAov=a9-ReaT9qU=ytwSp+5RL0eutg@mail.gmail.com>
+From: oza.oza@broadcom.com (Oza Oza)
+Date: Mon, 22 May 2017 22:12:43 +0530
+Subject: [PATCH v6 1/3] of/pci/dma: fix DMA configuration for PCI masters
+In-Reply-To: <CAK8P3a3hoeCET5Z+KUJDCHgGEJUmLF49bDozEE0ra5jcbjvoXQ@mail.gmail.com>
+References: <1494912127-12890-1-git-send-email-oza.oza@broadcom.com>
+ <1494912127-12890-2-git-send-email-oza.oza@broadcom.com>
+ <CAK8P3a3hoeCET5Z+KUJDCHgGEJUmLF49bDozEE0ra5jcbjvoXQ@mail.gmail.com>
+Message-ID: <CAMSpPPeF6c5exM5cs2Gr85gWNpMmq2aG33oh81H00Y1n=+XdhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 9:46 AM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> Hello Geert and Rob,
->
-> On Mon, May 22, 2017 at 4:26 PM, Rob Herring <robh@kernel.org> wrote:
->> On Mon, May 22, 2017 at 9:23 AM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->>> Hi Javier,
->>>
->>> On Mon, May 22, 2017 at 4:01 PM, Javier Martinez Canillas
->>> <javier@dowhile0.org> wrote:
->>>> This series is a follow-up to patch [0] that added an OF device ID table
->>>> to the at24 EEPROM driver. As you suggested [1], this version instead of
->>>> adding entries for every used <vendor,device> tuple, only adds a single
->>>> entry for each chip type using the "atmel" vendor as a generic fallback.
->>>>
->>>> This is a re-spin that addresses some issues pointed out by Rob Herring.
->>>>
->>>> The first patch documents in the DT binding what's the correct vendor to
->>>> use and what are the ones that are being deprecated. The second one adds
->>>> the OF device ID table for the at24 driver and the next patches use this
->>>> vendor in the compatible string to each DTS that defines a compatible I2C
->>>> EEPROM device node.
->>>>
->>>> Patches can be applied independently since the DTS changes without driver
->>>> changes are no-op and the OF table won't be used without the DTS changes.
->>>>
->>>> [0]: https://lkml.org/lkml/2017/3/14/589
->>>> [1]: https://lkml.org/lkml/2017/3/15/99
->>>>
->>>> Best regards,
->>>> Javier
->>>>
->>>> Changes in v4:
->>>> - Document the manufacturers that have been deprecated (Rob Herring).
->>>> - Only use the atmel manufacturer in the compatible string instead of
->>>>   keeping the deprecated ones (Rob Herring).
->>>
->>> I think you're referring to this (https://lkml.org/lkml/2017/4/19/1136)?
->>>
->>> | > --- a/arch/arm/boot/dts/am335x-baltos.dtsi
->>> | > +++ b/arch/arm/boot/dts/am335x-baltos.dtsi
->>> | > @@ -255,7 +255,7 @@
->>> | >     };
->>> | >
->>> | >     at24 at 50 {
->>> | > -           compatible = "at24,24c02";
->>> | > +           compatible = "at24,24c02", "atmel,24c02";
->>> |
->>> | I think you can just drop the at24 compatibles. A new kernel doesn't
->>> | need it. An old kernel ignores the manufacturer. I checked that u-boot
->>> | only matches on "atmel,*", so okay there. Don't know about the *BSDs. I
->>> | couldn't find anything.
->>>
->>> I think you misunderstood what Rob means.
->>>
->>> In the case above it makes sense to drop the first compatible, as "at24" is
->>> not a manufacturer, but refers to ATMEL's "AT24" line of i2c FLASH ROMs.
->>>
->>> However, in cases where a real vendor/part combo is specified, like on
->>> r8a7791-koelsch.dts:
->>>
->>> -               compatible = "renesas,24c02";
->>> +               compatible = "atmel,24c02";
->>>
->>> you do want to keep the real vendor/part combo, i.e.
->>>
->>>      compatible = "renesas,24c02", "atmel,24c02";
+On Thu, May 18, 2017 at 12:43 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tue, May 16, 2017 at 7:22 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
+>> current device framework and OF framework integration assumes
+>> dma-ranges in a way where memory-mapped devices define their
+>> dma-ranges. (child-bus-address, parent-bus-address, length).
 >>
->> Yes, Geert is correct.
+>> of_dma_configure is specifically written to take care of memory
+>> mapped devices. but no implementation exists for pci to take
+>> care of pcie based memory ranges.
+>
+> Hi Oza,
+>
+> I'm trying to make sense of this, but am still rather puzzled. I have
+> no idea what the distinction between memory-mapped devices and
+> pcie based devices is in your description, as PCIe is usually memory
+> mapped, and Linux doesn't actually support other kinds of PCIe
+> devices on most architectures.
+>
+>> for e.g. iproc based SOCs and other SOCs(suc as rcar) have PCI
+>> world dma-ranges.
+>> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
 >>
+>> this patch serves following:
+>>
+>> 1) exposes interface to the pci host driver for their
+>> inbound memory ranges
+>>
+>> 2) provide an interface to callers such as of_dma_get_ranges.
+>> so then the returned size get best possible (largest) dma_mask.
+>> because PCI RC drivers do not call APIs such as
+>> dma_set_coherent_mask() and hence rather it shows its addressing
+>> capabilities based on dma-ranges.
+>>
+>> for e.g.
+>> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+>> we should get dev->coherent_dma_mask=0x7fffffffff.
 >
-> Sorry for misunderstanding your previous comment...
+> do you mean the coherent_dma_mask of the PCI host bridge
+> or an attached device here?
 >
-> How this should be documented in the DT binding? Should I include
-> "renesas" as a valid manufacturer or only list the used
-> <vendor,device> pairs (i.e: "renesas,24c02")?
+> If you require PCI devices to come up with an initial
+> coherent_dma_mask other than 0xffffffffff, there are other
+> problems involved. In particular, you will need to use
+> swiotlb, which is not supported on arm32 at the moment,
+> and the dma_set_mask()/dma_set_coherent_mask()
+> functions need to be modified.
+>
+>> +       while (1) {
+>> +               dma_ranges = of_get_property(node, "dma-ranges", &rlen);
+>> +
+>> +               /* Ignore empty ranges, they imply no translation required. */
+>> +               if (dma_ranges && rlen > 0)
+>> +                       break;
+>> +
+>> +               /* no dma-ranges, they imply no translation required. */
+>> +               if (!dma_ranges)
+>> +                       break;
+>
+> A missing parent dma-ranges property here should really indicate that there
+> is no valid translation. If we have existing cases where this happens
+> in DT files, we may treat it as allowing only 32-bit DMA (as we already
+> do for having no dma-ranges at all), but treating it the same way
+> as an empty dma-ranges property sounds wrong.
+>
+>      Arnd
 
-However you are handling any of the vendors. I'll have to go look.
 
-> I also wonder why this is really needed if AFAIU "renesas,24c02" is
-> compatible with "atmel,24c02". IOW, the driver doesn't need to
-> differentiate between the two since the devices are the same and will
-> always match using "atmel,24c02".
+Hi Arnd and Bjorn,
 
-It is needed, so that when a difference is found, it can be handled
-without updating the DT.
+Can you please have a look at PATCH v7 ?
+It addresses problem2 alone.
 
-Rob
+Regards,
+Oza
