@@ -1,9 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 May 2017 14:30:11 +0200
-Subject: [PATCH 01/14] ARM: dts: emev2: update PFC node name to pin-controller
+Date: Mon, 22 May 2017 14:30:17 +0200
+Subject: [PATCH 07/14] ARM: dts: r8a7791: update PFC node name to
+ pin-controller
 In-Reply-To: <cover.1495455272.git.horms+renesas@verge.net.au>
 References: <cover.1495455272.git.horms+renesas@verge.net.au>
-Message-ID: <6559b3915592b32fc43f78ef7ae04f614595a6cf.1495455272.git.horms+renesas@verge.net.au>
+Message-ID: <12cc7145d4dbb7849468fa3c834de4f66e60323a.1495455272.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,27 +14,27 @@ unifying the node name used as pin-controller which appears to be the more
 generic of the two and thus more in keeping with the DT specs.
 
 My analysis is that this is a user-visible change to the extent that kernel
-logs, and sysfs entries change from e0140200.pfc and pfc at e0140200 to
-e0140200.pin-controller and pin-controller at e0140200.
+logs, and sysfs entries change from e6060000.pfc and pfc at e6060000 to
+e6060000.pin-controller and pin-controller at e6060000.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/emev2.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7791.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/emev2.dtsi b/arch/arm/boot/dts/emev2.dtsi
-index 0124faf175c8..42ea246e71cb 100644
---- a/arch/arm/boot/dts/emev2.dtsi
-+++ b/arch/arm/boot/dts/emev2.dtsi
-@@ -197,7 +197,7 @@
- 		clock-names = "sclk";
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 4d0c2ce59900..540c5b27b842 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -562,7 +562,7 @@
+ 		status = "disabled";
  	};
  
--	pfc: pfc at e0140200 {
-+	pfc: pin-controller at e0140200 {
- 		compatible = "renesas,pfc-emev2";
- 		reg = <0xe0140200 0x100>;
+-	pfc: pfc at e6060000 {
++	pfc: pin-controller at e6060000 {
+ 		compatible = "renesas,pfc-r8a7791";
+ 		reg = <0 0xe6060000 0 0x250>;
  	};
 -- 
 2.1.4
