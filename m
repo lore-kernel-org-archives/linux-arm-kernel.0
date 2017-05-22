@@ -1,37 +1,28 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 22 May 2017 09:34:35 +0200
-Subject: [PATCH 2/3] mfd: tps65010: move header file out of I2C realm
-In-Reply-To: <20170521220212.1404-3-wsa@the-dreams.de>
-References: <20170521220212.1404-1-wsa@the-dreams.de>
- <20170521220212.1404-3-wsa@the-dreams.de>
-Message-ID: <CAJKOXPdsvHfz4m=UMzjakJ86iGotHFmGaPiKvhQzCaTswNAM3w@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 22 May 2017 15:35:57 +0800
+Subject: [PATCH 2/6] clk: sunxi-ng: a83t: Fix audio PLL divider offset
+In-Reply-To: <20170522072047.bffdbwkz2nqvhums@flea.lan>
+References: <20170522062552.19026-1-wens@csie.org>
+ <20170522062552.19026-3-wens@csie.org>
+ <20170522072047.bffdbwkz2nqvhums@flea.lan>
+Message-ID: <CAGb2v65SUR2NvGOFFgzUpDh_9Dm6SAhzwC31KBOqFZubOhkK9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 12:02 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> include/linux/i2c is not for client devices. Move the header file to a
-> more appropriate location.
+On Mon, May 22, 2017 at 3:20 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, May 22, 2017 at 02:25:48PM +0800, Chen-Yu Tsai wrote:
+>> The divider of the audio PLL has an offset of 1.
+>> Fix this in the driver.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 >
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> ---
->  arch/arm/mach-omap1/board-h2-mmc.c      | 2 +-
->  arch/arm/mach-omap1/board-h2.c          | 2 +-
->  arch/arm/mach-omap1/board-h3-mmc.c      | 2 +-
->  arch/arm/mach-omap1/board-h3.c          | 2 +-
->  arch/arm/mach-omap1/board-osk.c         | 2 +-
->  arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 2 +-
->  arch/arm/mach-s3c24xx/mach-osiris.c     | 2 +-
+> Applied, thanks!
 
-For s3c24xx:
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+So even with this patch applied, the audio is still slow and off pitch.
+It's even worse without this patch...
 
-Best regards,
-Krzysztof
+Maybe it's time we added a special class of clks for the audio PLL
+to deal with sigma-delta modulation of the divider?
 
->  drivers/mfd/tps65010.c                  | 2 +-
->  drivers/usb/host/ohci-omap.c            | 2 +-
->  drivers/usb/phy/phy-isp1301-omap.c      | 2 +-
->  drivers/video/fbdev/omap/lcd_h3.c       | 2 +-
->  include/linux/{i2c => mfd}/tps65010.h   | 2 +-
->  12 files changed, 12 insertions(+), 12 deletions(-)
->  rename include/linux/{i2c => mfd}/tps65010.h (99%)
+ChenYu
