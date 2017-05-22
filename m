@@ -1,76 +1,46 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 22 May 2017 15:39:47 +0100
-Subject: [PATCH v3 00/11] arm64: Enable contiguous pte hugepage support
+Date: Mon, 22 May 2017 15:39:48 +0100
+Subject: [PATCH v3 01/11] arm64: hugetlb: set_huge_pte_at Add WARN_ON on
+ !pte_present
 In-Reply-To: <20170522143958.12867-1-punit.agrawal@arm.com>
 References: <20170522143958.12867-1-punit.agrawal@arm.com>
-Message-ID: <20170522143958.12867-2-punit.agrawal@arm.com>
+Message-ID: <20170522143958.12867-3-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Steve Capper <steve.capper@arm.com>
 
-This patchset addresses all the known issues with contiguous hugetlb
-pages. Support for contiguous hugepages is useful on systems where the
-PMD hugepage size is too large (512MB hugepage when using 64k page
-granule).
+This patch adds a WARN_ON to set_huge_pte_at as the accessor assumes
+that entries to be written down are all present. (There are separate
+accessors to clear huge ptes).
 
-The patches can be split as 
+We will need to handle the !pte_present case where memory offlining
+is used on hugetlb pages. swap and migration entries will be supplied
+to set_huge_pte_at in this case.
 
-* Patches 1-5, 11 cleanups and improvements
+Cc: David Woods <dwoods@mellanox.com>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-* Patch 6 addresses the break-before-make requirement of the
-  architecture for contiguous hugepages. These patches depend on
-  enabling memory failure handling on arm64[2].
-
-* Patch 7-9 add support for handling swap entries for contiguous pte
-  hugepages. These patches depend on fixes to core code required to
-  support contiguous hugepages[3].
-
-* Patch 10 enables contiguous hugepage support for arm64
-
-The patches are based on v4.12-rc2. Previous postings can be found at
-[0], [1].
-
-All feedback welcome.
-
-Thanks,
-Punit
-
-[0] https://www.spinics.net/lists/arm-kernel/msg570422.html
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/497027.html
-[2] https://www.spinics.net/lists/arm-kernel/msg581657.html
-[3] https://www.spinics.net/lists/arm-kernel/msg582682.html
-
-Changes v2 -> v3
-* Rebased on v4.12-rc2
-* Included swap related fixes in this series
-* Enable contiguous pte hugepages
-
-Changes v1 -> v2:
-* Marked patch 2 for stable
-* Fixed comment issues in patch 7
-* Added tags
-
-Punit Agrawal (4):
-  arm64: hugetlbpages: Handle swap entries in huge_pte_offset() for
-    contiguous hugepages
-  arm64: hugetlb: Override huge_pte_clear() to support contiguous
-    hugepages
-  arm64: hugetlb: Override set_huge_swap_pte_at() to support contiguous
-    hugepages
-  arm64: Re-enable support for contiguous hugepages
-
-Steve Capper (7):
-  arm64: hugetlb: set_huge_pte_at Add WARN_ON on !pte_present
-  arm64: hugetlb: Refactor find_num_contig
-  arm64: hugetlb: Introduce pte_pgprot helper
-  arm64: hugetlb: Remove spurious calls to huge_ptep_offset
-  arm64: hugetlb: Spring clean huge pte accessors
-  arm64: hugetlb: Add break-before-make logic for contiguous entries
-  arm64: hugetlb: Cleanup setup_hugepagesz
-
- arch/arm64/mm/hugetlbpage.c | 305 ++++++++++++++++++++++++++++++--------------
- 1 file changed, 209 insertions(+), 96 deletions(-)
-
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index 425a8fcd3d38..0389e2ed51f1 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -69,6 +69,12 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 	unsigned long pfn;
+ 	pgprot_t hugeprot;
+ 
++	/*
++	 * Code needs to be expanded to handle huge swap and migration
++	 * entries. Needed for HUGETLB and MEMORY_FAILURE.
++	 */
++	WARN_ON(!pte_present(pte));
++
+ 	if (ncontig == 1) {
+ 		set_pte_at(mm, addr, ptep, pte);
+ 		return;
 -- 
 2.11.0
