@@ -1,28 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 22 May 2017 05:52:08 +0000
-Subject: [PATCH 2/2] MAINTAINERS: add irqchip related drivers to Marvell
- EBU maintainers
-In-Reply-To: <1495112333-10494-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1495112333-10494-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1495112333-10494-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170522055208.GB23967@io.lakedaemon.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 22 May 2017 08:02:29 +0200
+Subject: [PATCH] i2c: designware: Fix bogus sda_hold_time due to
+ uninitialized vars
+In-Reply-To: <743ebd23-17ab-03d2-ebd9-66acc9aee417@siemens.com>
+References: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
+ <CAKv+Gu9x_KCdEGBBOw9yaYOcYBcYtxJX-xTX=4kQuWqY=VK0PA@mail.gmail.com>
+ <743ebd23-17ab-03d2-ebd9-66acc9aee417@siemens.com>
+Message-ID: <8F61EF18-169A-4FB5-B9C7-9A2ACD4C92B4@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
 
-On Thu, May 18, 2017 at 02:58:53PM +0200, Thomas Petazzoni wrote:
-> This commit updates the MAINTAINERS file so that the Marvell EBU
-> maintainers are also responsible for their irqchip drivers in
-> drivers/irqchip/.
+
+> On 22 May 2017, at 07:46, Jan Kiszka <jan.kiszka@siemens.com> wrote:
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> We need to initializes those variables to 0 for platforms that do not
+> provide ACPI parameters. Otherwise, we set sda_hold_time to random
+> values, breaking e.g. Galileo and IOT2000 boards.
+> 
+> Fixes: 9d6408433019 ("i2c: designware: don't infer timings described by ACPI from clock rate")
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
 > ---
->  MAINTAINERS | 2 ++
->  1 file changed, 2 insertions(+)
-
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
+> 
+> Affects 4.12-rc2.
+> 
+> drivers/i2c/busses/i2c-designware-platdrv.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+> index 6283b99d2b17..d1263b82d646 100644
+> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+> @@ -94,9 +94,9 @@ static void dw_i2c_acpi_params(struct platform_device *pdev, char method[],
+> static int dw_i2c_acpi_configure(struct platform_device *pdev)
+> {
+>    struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
+> +    u32 ss_ht = 0, fp_ht = 0, hs_ht = 0, fs_ht = 0;
+>    acpi_handle handle = ACPI_HANDLE(&pdev->dev);
+>    const struct acpi_device_id *id;
+> -    u32 ss_ht, fp_ht, hs_ht, fs_ht;
+>    struct acpi_device *adev;
+>    const char *uid;
+> 
