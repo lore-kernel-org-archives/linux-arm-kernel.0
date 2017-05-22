@@ -1,74 +1,53 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 22 May 2017 16:14:26 +0200
-Subject: [PATCH v3 0/3] Fix mdp device tree
-In-Reply-To: <20ba4f83-7d22-2a8e-4eb6-7d4eba92e2ae@xs4all.nl>
-References: <1494559361-42835-1-git-send-email-minghsiu.tsai@mediatek.com>
- <20ba4f83-7d22-2a8e-4eb6-7d4eba92e2ae@xs4all.nl>
-Message-ID: <1f7de9e7-2c18-6662-4b95-519d22a70723@gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Mon, 22 May 2017 14:21:00 +0000
+Subject: [PATCH 0/2] ioremap_wc on arm64
+In-Reply-To: <20170522122236.GG1107@arm.com>
+References: <1495436507-81890-1-git-send-email-jnair@caviumnetworks.com>
+ <20170522085615.GC30129@e104818-lin.cambridge.arm.com>
+ <20170522115349.GA82957@localhost> <20170522122236.GG1107@arm.com>
+Message-ID: <20170522142059.GA83004@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, May 22, 2017 at 01:22:37PM +0100, Will Deacon wrote:
+> On Mon, May 22, 2017 at 11:53:50AM +0000, Jayachandran C wrote:
+> > On Mon, May 22, 2017 at 09:56:16AM +0100, Catalin Marinas wrote:
+> > > On Mon, May 22, 2017 at 07:01:45AM +0000, Jayachandran C wrote:
+> > > > From its definition, the device "gather" attribute seems to be a better
+> > > > fit for implementing write combining mapping in ioremap_wc().  And on
+> > > > ThunderX2, Device GRE mapping has optimizations that makes it much faster
+> > > > than normal uncached mapping.
+> > > > 
+> > > > I am not sure of the reasoning behind the original decision to make
+> > > > ioremap_wc use "Normal Non-Cached" attribute, since all the other variants
+> > > > of ioremap use device attributes, and ioremap_wc looks like an exception.
+> > > 
+> > > The reason we kept it as Normal NC is that Device_GRE does not allow
+> > > unaligned accesses.
+> > 
+> > There does not to be an expectation to have unaligned access on __iomem
+> > pointers. I also see that memremap can call ioremap_wc (which is a Normal
+> > mapping) or ioremap_wt(which is a Device mapping), so that is inconsistent
+> > as well.
+> > 
+> > Was this added for a specific use case? Also, do you think this patchset
+> > is acceptable?
+> 
+> I think it was used for framebuffers. Note that using normal-NC also aligns
+> with arch/arm/ and, since normal-NC is strictly a more relaxed memory type
+> than Device-GRE, I'm really not keen making on this change.
 
+If there is a hardware requirement that Normal-NC has to be implemented
+as more relaxed attribute than Device GRE, I can go back to the hardware
+team on this. I did not see any text in the ARM ARM requiring this.
 
-On 22/05/17 11:09, Hans Verkuil wrote:
-> On 05/12/2017 05:22 AM, Minghsiu Tsai wrote:
-> 
-> Who should take care of the dtsi changes? I'm not sure who maintains the mdp dts.
+Even if that is the case, having Normal attribute for ioremap just for
+ioremap_wc is inconsistent. The Device Gathering attribute by its definition
+is exactly what write combining requires. The memremap() API looks like a
+better way to expose Normal-NC mapping (with additional features like
+speculation etc.) if implemented correctly.
 
-I will take care of the dtsi patches.
+Also, patch 1/2 should be useful anyway - can that be picked up?
 
-> 
-> The driver change and the dtsi change need to be in sync, so it is probably easiest
-> to merge this via one tree.
-> 
-> Here is my Acked-by for these three patches:
-> 
-> Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-> 
-> I can take all three, provided I have the Ack of the mdp dts maintainer. Or it can
-> go through him with my Ack.
-> 
-
-I think we should provide backwards compability instead, as proposed here:
-http://lists.infradead.org/pipermail/linux-mediatek/2017-May/008811.html
-
-If this change is ok for you, please let Minghsiu know so that he can 
-provide a v4.
-
-Regards,
-Matthias
-
-> Regards,
-> 
-> 	Hans
-> 
->> Changes in v3:
->> - Upload patches again because forget to add v2 in title
->>
->> Changes in v2:
->> - Update commit message
->>
->> If the mdp_* nodes are under an mdp sub-node, their corresponding
->> platform device does not automatically get its iommu assigned properly.
->>
->> Fix this by moving the mdp component nodes up a level such that they are
->> siblings of mdp and all other SoC subsystems.  This also simplifies the
->> device tree.
->>
->> Although it fixes iommu assignment issue, it also break compatibility
->> with old device tree. So, the patch in driver is needed to iterate over
->> sibling mdp device nodes, not child ones, to keep driver work properly.
->>
->> Daniel Kurtz (2):
->>    arm64: dts: mt8173: Fix mdp device tree
->>    media: mtk-mdp: Fix mdp device tree
->>
->> Minghsiu Tsai (1):
->>    dt-bindings: mt8173: Fix mdp device tree
->>
->>   .../devicetree/bindings/media/mediatek-mdp.txt     |  12 +-
->>   arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 126 ++++++++++-----------
->>   drivers/media/platform/mtk-mdp/mtk_mdp_core.c      |   2 +-
->>   3 files changed, 64 insertions(+), 76 deletions(-)
->>
-> 
+Thanks,
+JC.
