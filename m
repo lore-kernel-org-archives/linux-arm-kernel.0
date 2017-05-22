@@ -1,72 +1,62 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Mon, 22 May 2017 19:55:56 +0200
-Subject: [linux-sunxi] Re: [RFC PATCH 07/11] drm: sun4i: add support for
- the TV encoder in H3 SoC
-In-Reply-To: <CAGb2v66aD=G+V75N-_nYo=dGqhxpKhadM84h9G-B34=dnDwCbg@mail.gmail.com>
-References: <20170517164354.16399-1-icenowy@aosc.io>
- <1958057.WDKm0nQKgW@jernej-laptop>
- <CAGb2v66aD=G+V75N-_nYo=dGqhxpKhadM84h9G-B34=dnDwCbg@mail.gmail.com>
-Message-ID: <3164416.5xR36OcyjH@jernej-laptop>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Mon, 22 May 2017 20:13:17 +0200
+Subject: [PATCH 06/13] ARM: dts: armada-385-linksys: usb3 label cleanup
+In-Reply-To: <20170522145515.GK29447@lunn.ch>
+References: <20170521124903.11050-1-ralph.sennhauser@gmail.com>
+ <20170521124903.11050-7-ralph.sennhauser@gmail.com>
+ <20170522145515.GK29447@lunn.ch>
+Message-ID: <20170522201317.3f9a4d4b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 22 May 2017 16:55:15 +0200
+Andrew Lunn <andrew@lunn.ch> wrote:
 
-Dne sobota, 20. maj 2017 ob 03:37:53 CEST je Chen-Yu Tsai napisal(a):
-> On Sat, May 20, 2017 at 2:23 AM, Jernej ?krabec <jernej.skrabec@siol.net> 
-wrote:
-> > Hi,
+> On Sun, May 21, 2017 at 02:48:55PM +0200, Ralph Sennhauser wrote:
+> > Now that we use the reference for the USB3.0 port update the node
+> > name and labels for the phy and vbus to match the label used by
+> > armada-38x.dtsi.
 > > 
-> > Dne petek, 19. maj 2017 ob 20:08:18 CEST je Icenowy Zheng napisal(a):
-> >> ? 2017?5?20? GMT+08:00 ??2:03:30, Maxime Ripard <maxime.ripard@free-
+> > Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
 > > 
-> > electrons.com> ??:
-> >> >On Thu, May 18, 2017 at 12:43:50AM +0800, Icenowy Zheng wrote:
-> >> >> Allwinner H3 features a TV encoder similar to the one in earlier
-> >> >
-> >> >SoCs,
-> >> >
-> >> >> but with some different points about clocks:
-> >> >> - It has a mod clock and a bus clock.
-> >> >> - The mod clock must be at a fixed rate to generate signal.
-> >> >
-> >> >Why?
-> >> 
-> >> It's experiment result by Jernej.
-> >> 
-> >> The clock rates in BSP kernel is also specially designed
-> >> (PLL_DE at 432MHz) in order to be able to feed the TVE.
+> > ---
 > > 
-> > My experiments and search through BSP code showed that TVE seems to have
-> > additional fixed predivider 8. So if you want to generate 27 MHz clock,
-> > unit has to be feed with 216 MHz.
+> > Notes:
 > > 
-> > TVE has only one PLL source PLL_DE. And since 216 MHz is a bit low for
-> > DE2,
-> > BSP defaults to 432 MHz for PLL_DE and use divider 2 to generate 216 MHz.
-> > This clock is then divided by 8 internaly to get final 27 MHz.
-> > 
-> > Please note that I don't have any hard evidence to support that, only
-> > experimental data. However, only that explanation make sense to me.
-> > 
-> > BTW, BSP H3/H5 TV driver supports only PAL and NTSC which both use 27 MHz
-> > base clock. Further experiments are needed to check if there is any
-> > possibility to have other resolutions by manipulating clocks and give
-> > other proper settings. I plan to do that, but not in very near future.
+> >   Going by documentation regulator-name is only of informative
+> > nature so changing it should be a non issue.  
 > 
-> You only have composite video output, and those are the only 2 standard
-> resolutions that make any sense.
+> Does the regulator name appear in /sys somewhere?
 
-Right, other resolutions are for VGA.
+To differentiate between node-name and regulator-name property I changed
+the regulator name to usb3_1-vbus-regulator-name
 
-Anyway, I did some more digging in A10 and R40 datasheets. I think that H3 TVE 
-unit is something in between. R40 TVE has a setting to select "up sample". 
-Possible settings are 27 MHz, 54 MHz, 108 MHz and 216 MHz. BSP driver on R40 
-has this setting enabled only for PAL and NTSC and it is always 216 MHz. I 
-think that H3 may have this hardwired to 216 MHz and this would be the reason 
-why 216 MHz is needed.
+# find /sys -name *usb3_1-vbus*
+/sys/kernel/debug/regulator/usb3_1-vbus-regulator-name
+/sys/devices/platform/usb3_1-vbus
+/sys/firmware/devicetree/base/soc/internal-regs/pinctrl at 18000/usb3_1-vbus-pins
+/sys/firmware/devicetree/base/usb3_1-vbus
+/sys/bus/platform/devices/usb3_1-vbus
+/sys/bus/platform/drivers/reg-fixed-voltage/usb3_1-vbus
 
-Has anyone else any better explanation?
+So yes, however, only under /sys/kernel/debug and more importantly not
+under /sys/class which would be covered by
+Documentation/ABI/testing/sysfs-class-regulator.
 
-Best regards,
-Jernej
+How the description is worded in regulator.txt [1] under optional
+properties, "regulator-name: A string used as a descriptive name for
+regulator outputs" doesn't give the impression its considered part of
+the ABI implicitly either, well, as you know this might just be my lack
+of English skill. As I was uncertain and still am not under the
+impression this to be an issue I decided to change it and leave a note
+so it doesn't make it in unnoticed and can be discussed / clarified.
+
+Changing the node name has a similar impact but the same can be said
+for gpio_keys vs gpio-keys which got your Reviewed-by already.
+
+The new name would better match some recent dts additions beside being
+the more obvious choice with the related changes.
+
+[1] Documentation/devicetree/bindings/regulator/regulator.txt 
+
+Ralph
