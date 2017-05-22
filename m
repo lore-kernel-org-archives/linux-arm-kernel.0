@@ -1,84 +1,63 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 22 May 2017 17:41:52 +0800
-Subject: [PATCH v6 2/9] irqchip/sunxi-nmi: add support for the NMI in A64
- R_INTC
-In-Reply-To: <ed99d87b-86eb-cf8a-8614-51d59fa00c8c@arm.com>
-References: <20170518071653.36561-1-icenowy@aosc.io>
- <20170518071653.36561-3-icenowy@aosc.io>
- <ed99d87b-86eb-cf8a-8614-51d59fa00c8c@arm.com>
-Message-ID: <98014597-29BA-4D02-8137-4E399955F4FD@aosc.io>
+From: sza@esh.hu (=?utf-8?B?U3plbXrFkSBBbmRyw6Fz?=)
+Date: Mon, 22 May 2017 12:05:05 +0200
+Subject: [RFC PATCH v2 0/7] ARM: NOMMU: MPU updates
+In-Reply-To: <1495187206-14303-1-git-send-email-vladimir.murzin@arm.com>
+References: <1495187206-14303-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <907F9677-52F3-4379-BDB2-E703FAAED59A@esh.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+> On 2017. May 19., at 11:46, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
+> 
+> Hi,
+> 
+> This is an update of the existent MPU code which consist set of
+> clean-ups and enhancements. The most significant changes are in the way
+> how MPU settings sync-up for secondaries (PATCH 3/7) and more flexible
+> layout for memory (PATCH 7/7). Since there is no in-tree user of MPU,
+> support for M-class has been added (PATCH 6/7).
+> 
+> Thanks!
+> 
+> Changelog:
+> 	    RFC -> RFC v2
+> 	       - fixed MPU enable for v7m (PATCH 6/7)
+> 
+> Vladimir Murzin (7):
+>  ARM: NOMMU: Move out MPU setup in separate module
+>  ARM: NOMMU: Update MPU accessors to use cp15 helpers
+>  ARM: NOMMU: Rework MPU to be mostly done in C
+>  ARM: NOMMU: Disallow MPU for XIP
+>  ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+>  ARM: V7M: Add support for MPU to M-class
+>  ARM: NOMMU: Use more MPU regions to cover memory
+> 
+> 
+
+ I?ve tested these patches on my custom Atmel SAME70 armv7m board, along with the 
+"ARM: Fix dma_alloc_coherent() and friends for NOMMU" patches.
+
+Both series works fine for me. These MPU patches introduce a nice feature that it simplifies the bootloader:
+do not need to setup the MPU, for example for coherent DMA region, which is described in device-tree too.
+
+So you can add my Tested-by.
 
 
-? 2017?5?22? GMT+08:00 ??5:39:22, Marc Zyngier <marc.zyngier@arm.com> ??:
->On 18/05/17 08:16, Icenowy Zheng wrote:
->> Add support for the newly imported compatible for the A64 R_INTC in
->> irq-sunxi-nmi driver.
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->> Changes in v5:
->> - Fix A64 R_INTC compatible.
->> 
->>  drivers/irqchip/irq-sunxi-nmi.c | 13 +++++++++++++
->>  1 file changed, 13 insertions(+)
->> 
->> diff --git a/drivers/irqchip/irq-sunxi-nmi.c
->b/drivers/irqchip/irq-sunxi-nmi.c
->> index 668730c5cb66..5559c1d593bf 100644
->> --- a/drivers/irqchip/irq-sunxi-nmi.c
->> +++ b/drivers/irqchip/irq-sunxi-nmi.c
->> @@ -56,6 +56,12 @@ static struct sunxi_sc_nmi_reg_offs sun9i_reg_offs
->= {
->>  	.enable	= 0x04,
->>  };
->>  
->> +static struct sunxi_sc_nmi_reg_offs sun50i_reg_offs = {
->> +	.ctrl	= 0x0c,
->> +	.pend	= 0x10,
->> +	.enable	= 0x40,
->> +};
->> +
->
->Magic values? Even if no #define is provided, a pointer to the
->corresponding documentation would be appreciated (assuming
->documentation
->exists).
+Booting Linux on physical CPU 0x0
+Linux version 4.12.0-rc1 (root at devel) (gcc version 4.9.2 ( 4.9.2-10) ) #1 Fri May 19 06:26:34 EDT 2017
+CPU: ARMv7-M [410fc271] revision 1 (ARMv7M), cr=00000000
+CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+OF: fdt: Machine model: SAME70-sampione board
+bootconsole [earlycon0] enabled
+Reserved memory: created DMA memory pool at 0x73e00000, size 2 MiB
+OF: reserved mem: initialized node linux,cma, compatible id shared-dma-pool
+Using ARMv7 PMSA Compliant MPU. Region independence: No, Used 4 of 16 regions
+?
 
-No documents is available for A64 R_INTC.
 
->
->>  static inline void sunxi_sc_nmi_write(struct irq_chip_generic *gc,
->u32 off,
->>  				      u32 val)
->>  {
->> @@ -220,3 +226,10 @@ static int __init sun9i_nmi_irq_init(struct
->device_node *node,
->>  	return sunxi_sc_nmi_irq_init(node, &sun9i_reg_offs);
->>  }
->>  IRQCHIP_DECLARE(sun9i_nmi, "allwinner,sun9i-a80-nmi",
->sun9i_nmi_irq_init);
->> +
->> +static int __init sun50i_nmi_irq_init(struct device_node *node,
->> +				     struct device_node *parent)
->> +{
->> +	return sunxi_sc_nmi_irq_init(node, &sun50i_reg_offs);
->> +}
->> +IRQCHIP_DECLARE(sun50i_nmi, "allwinner,sun50i-a64-r-intc",
->sun50i_nmi_irq_init);
->> 
->
->Apart from the above:
->
->Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->
->Let me know how you want this to be merged.
+Thanks for the patches!
 
-I think it can just go via IRQ subsystem.
-
->
->Thanks,
->
->	M.
+Regards,
+Andras
