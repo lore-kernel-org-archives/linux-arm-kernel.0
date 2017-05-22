@@ -1,46 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 May 2017 13:21:16 +0100
-Subject: [PATCH 2/2] arm64: mm: don't print out page table entries on EL0
- faults
-In-Reply-To: <1495453554-9412-2-git-send-email-kristina.martsenko@arm.com>
-References: <1495453554-9412-1-git-send-email-kristina.martsenko@arm.com>
- <1495453554-9412-2-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <20170522122115.GF1107@arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 22 May 2017 17:50:44 +0530
+Subject: [PATCH 00/41] omap_hsmmc: Add ADMA support and UHS/HS200/DDR
+ support
+In-Reply-To: <20170519221344.GI10472@atomide.com>
+References: <20170519081541.26753-1-kishon@ti.com>
+ <20170519221344.GI10472@atomide.com>
+Message-ID: <d5bdc61e-abb0-7833-ea2f-a3cca4c4033e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 12:45:54PM +0100, Kristina Martsenko wrote:
-> When we take a fault from EL0 that can't be handled, we print out the
-> page table entries associated with the faulting address. This allows
-> userspace to print out any current page table entries, including kernel
-> (TTBR1) entries.  Exposing kernel mappings like this could pose a
-> security risk, so don't print out page table information on EL0 faults.
-> (But still print it out for EL1 faults.)
-> 
-> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+Hi,
 
-It might be worth mentioning that this follows the same behaviour as x86.
-In fact, they print the name of the faulting VMA using print_vma_addr,
-which might be useful too.
-
-Will
-
-> ---
->  arch/arm64/mm/fault.c | 1 -
->  1 file changed, 1 deletion(-)
+On Saturday 20 May 2017 03:43 AM, Tony Lindgren wrote:
+> Hi,
 > 
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 0c32f34fb4af..798841f4b00a 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -260,7 +260,6 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
->  		pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
->  			tsk->comm, task_pid_nr(tsk), inf->name, sig,
->  			addr, esr);
-> -		show_pte(addr);
->  		show_regs(regs);
->  	}
->  
-> -- 
-> 2.1.4
+> * Kishon Vijay Abraham I <kishon@ti.com> [170519 01:19]:
+>> This series adds UHS, HS200, DDR mode and ADMA support to
+>> omap_hsmmc driver used to improve the throughput of MMC/SD in dra7
+>> SoCs.
 > 
+> Certainly seems way less intrusive than earlier before the
+> dmaengine changes :)
+> 
+>> *) tuning ratio of MMC in dra7 is different from sdhci
+> 
+> Hmm what's the tuning ratio?
+
+For high speed modes like UHS SDR104 and HS200, sampling clock has to adjusted
+according to the position of the data window and it varies depending on the
+host and the card.
+For this we configure the controller with phase delay from 0 to 0x7c (in steps
+of 4) and send the tuning command (CMD19 or CMD21) for which the card responds
+with a known pattern. We keep track of the phase delay's for which we received
+the known patterns (without errors) and select one of the phase delays (3/4th
+ratio from largest consecutive successful phase delay window).
+
+sdhci driver makes use of the HW feature for tuning (no manual setting of phase
+delays etc). Sdhci has an ops for platform specific tuning but that again has
+to be implemented in omap_hsmmc driver.
+> 
+>> This series has been tested on beagleboard, pandaboard, beaglebone-black,
+>> beaglebone, am335x-evm, am437x-evm, dra7xx-evm, dra72x-evm, am571x-idk
+>> and am572x-idk.
+> 
+> I gave this a quick try after manally applying next-20170519
+> after reverting 67d0687224a9 ("mm: drop HASH_ADAPT"). Looks like
+> something is missing as I got:
+> 
+> arch/arm/mach-omap2/pdata-quirks.c:445:23: error:
+> 'struct omap_hsmmc_platform_data' has no member named 'version'
+> ...
+> 
+> It's possible I messed up something while manually applying.
+
+[PATCH 13/41] mmc: host: omap_hsmmc: Add support to set IODELAY values adds
+version member to 'struct omap_hsmmc_platform_data'.
+> 
+>> I can split the series to go into Ulf Hansson's tree and Tony's tree 
+>> separately if that is required.
+> 
+> Yes please. Maybe send the dts parts first that are ready to
+> get merged, like the fixes and all the iodelay configuration.
+> 
+> Then the mmc driver changes as a separate set.
+> 
+> Then third set to follow-up and enable things once the mmc
+> driver changes are merged.
+
+Sure.
+
+Thanks
+Kishon
