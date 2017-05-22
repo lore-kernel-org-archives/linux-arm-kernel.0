@@ -1,53 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 May 2017 07:56:54 -0700
-Subject: [PATCH v2 3/5] ARM: OMAP2+: pm33xx-core: Add platform code
- needed for PM
-In-Reply-To: <20170519200438.9502-4-d-gerlach@ti.com>
-References: <20170519200438.9502-1-d-gerlach@ti.com>
- <20170519200438.9502-4-d-gerlach@ti.com>
-Message-ID: <20170522145654.GQ10472@atomide.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 22 May 2017 17:02:23 +0200
+Subject: [PATCH] arm64: dts: rockchip: update cpu opp table for rk3399 op1
+In-Reply-To: <CAJrj+DPzj0hieOHHpoxL4_uPUyaOa7LADJw+4_82VDZiPKxy1g@mail.gmail.com>
+References: <1493014730-9670-1-git-send-email-wxt@rock-chips.com>
+ <3119382.DFiP2J6FnE@diego>
+ <CAJrj+DPzj0hieOHHpoxL4_uPUyaOa7LADJw+4_82VDZiPKxy1g@mail.gmail.com>
+Message-ID: <2392465.b79CVULcOX@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Eddie, Caesar,
 
-* Dave Gerlach <d-gerlach@ti.com> [170519 13:08]:
-> In addition to this, to be able to share data structures between C and
-> the sleep33xx and sleep43xx assembly code, we can automatically generate
-> all of the C struct member offsets and sizes as macros by making use of
-> the ARM asm-offsets file. In the same header that we define our data
-> structures in we also define all the macros in an inline function and by
-> adding a call to this in the asm_offsets file all macros are properly
-> generated and available to the assembly code without cluttering up the
-> asm-offsets file.
-...
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index d728b5660e36..62253e7bfac4 100644
-> --- a/arch/arm/kernel/asm-offsets.c
-> +++ b/arch/arm/kernel/asm-offsets.c
-> @@ -28,6 +28,7 @@
->  #include <asm/vdso_datapage.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include <linux/kbuild.h>
-> +#include <linux/platform_data/pm33xx.h>
->  #include <linux/ti-emif-sram.h>
->  
->  /*
-> @@ -187,6 +188,7 @@ int main(void)
->  #if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
->    BLANK();
->    ti_emif_offsets();
-> +  amx3_pm_asm_offsets();
->  #endif
->  
->    return 0; 
+Am Montag, 24. April 2017, 18:29:26 CEST schrieb Eddie Cai:
+> Hi Heiko
+> 
+> 2017-04-24 17:15 GMT+08:00 Heiko St?bner <heiko@sntech.de>:
+> > Am Montag, 24. April 2017, 16:49:08 CEST schrieb Caesar Wang:
+> >> ? 2017?04?24? 16:26, Heiko St?bner ??:
+> >> > Hi Caesar,
+> >> >
+> >> > Am Montag, 24. April 2017, 14:18:50 CEST schrieb Caesar Wang:
+> >> >> Update the cpu opp table for rk3399 op1.
+> >> >
+> >> > Ideally this should contain something about the "why".
+> >> > Are these new voltage settings safer to operate under?
+> >>
+> >> The before opp table is for earlier batch of rk3399 SoCs,  that's no
+> >> enough for the current and
+> >> newer batch of rk3399 op1. In order to suit for the rk3399 op1, we need
+> >> to little voltages changed.
+> >
+> > just to make sure, this is also safe for all the non-chromebook rk3399 socs
+> > (like the firefly and tv-boxes, etc), right?
+> This is only for op1. other 3399s should have a different opp table
 
-Russell, care to take a look at the above if you're OK with it or
-if you prefer to do it some other way?
+digging this up, as I'm right now working on a rk3399-firefly, could you
+provide the correct opp tables for the available rk3399 variants please?
 
-Also please see thread "[PATCH v2 0/2] memory: Introduce ti-emif-sram
-driver" for similar changes.
+I.e. generally safe opps for boards like the firefly and the special ones
+for op1-based devices?
 
-Thanks,
 
-Tony
+Thanks
+Heiko
