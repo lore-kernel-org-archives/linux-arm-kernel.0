@@ -1,29 +1,55 @@
-From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Mon, 22 May 2017 15:30:21 +0200
-Subject: [PATCH] MAINTAINERS: EP93XX: Update maintainership
-Message-ID: <20170522133021.24034-1-alexander.sverdlin@gmail.com>
+From: srinath.mannam@broadcom.com (Srinath Mannam)
+Date: Mon, 22 May 2017 19:03:17 +0530
+Subject: [PATCH] mmc: sdhci-iproc: suppress spurious interrupt with
+ Multiblock read
+In-Reply-To: <CAPDyKFrDZXHqrb-GcXrgvCMaUAhpOXDd-OdPyRw1Qq54cSxZDg@mail.gmail.com>
+References: <1495126660-25044-1-git-send-email-srinath.mannam@broadcom.com>
+ <58554ec9-1544-318a-e912-3c5f6ee40e90@intel.com>
+ <CABe79T5hKmn49cKEy-KdMQ-S5HMFuhextddV=D_YY+6_QwEPUQ@mail.gmail.com>
+ <CAPDyKFrDZXHqrb-GcXrgvCMaUAhpOXDd-OdPyRw1Qq54cSxZDg@mail.gmail.com>
+Message-ID: <CABe79T4_r0Was5AwFgrnkbazxe4txe9bU73L+rFJTZCC5o=u3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As agreed with Ryan, change the maintainership.
+On Mon, May 22, 2017 at 5:31 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 22 May 2017 at 13:52, Srinath Mannam <srinath.mannam@broadcom.com> wrote:
+>> On Fri, May 19, 2017 at 11:55 AM, Adrian Hunter <adrian.hunter@intel.com> wrote:
+>>> On 18/05/17 19:57, Srinath Mannam wrote:
+>>>> The stingray SDHCI hardware supports ACMD12 and automatically
+>>>> issues after multi block transfer completed.
+>>>>
+>>>> If ACMD12 in SDHCI is disabled, spurious tx done interrupts are seen
+>>>> on multi block read command with below error message:
+>>>>
+>>>> Got data interrupt 0x00000002 even though no data
+>>>> operation was in progress.
+>>>>
+>>>> This patch uses SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 to enable
+>>>> ACM12 support in SDHCI hardware and suppress spurious interrupt.
+>>>>
+>>>> Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
+>>>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>
+>>> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+>>
+>> Thanks Adrian...
+>>
+>> Will it be possible to take this for Linux-4.12??
+>
+> It's queued for 4.13, however are you saying it's a regression for
+> 4.12? Then what commit fixes it?
+>
+> Perhaps you even want this to go stable?
+>
+> Kind regards
+> Uffe
 
-Signed-off-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
----
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Yes, this is regression for 4.12.
+Fixes: b580c52d58d9 ("mmc: sdhci-iproc: add IPROC SDHCI driver")
+Yes we want this to go in stable.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9e984645c4b0..5a248ffffd0f 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1172,7 +1172,7 @@ N:	clps711x
- 
- ARM/CIRRUS LOGIC EP93XX ARM ARCHITECTURE
- M:	Hartley Sweeten <hsweeten@visionengravers.com>
--M:	Ryan Mallon <rmallon@gmail.com>
-+M:	Alexander Sverdlin <alexander.sverdlin@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-ep93xx/
--- 
-2.12.2
+Thank you.
+
+Regards,
+Srinath.
