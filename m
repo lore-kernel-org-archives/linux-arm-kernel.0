@@ -1,24 +1,40 @@
-From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Mon, 22 May 2017 09:37:13 +0300
-Subject: [PATCH] i2c: designware: Fix bogus sda_hold_time due to
- uninitialized vars
-In-Reply-To: <743ebd23-17ab-03d2-ebd9-66acc9aee417@siemens.com>
-References: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
- <CAKv+Gu9x_KCdEGBBOw9yaYOcYBcYtxJX-xTX=4kQuWqY=VK0PA@mail.gmail.com>
- <743ebd23-17ab-03d2-ebd9-66acc9aee417@siemens.com>
-Message-ID: <aad364b9-75ce-553e-28da-a5458b90b332@linux.intel.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Mon, 22 May 2017 08:46:56 +0200
+Subject: [PATCH 0/7] ALSA: Fix/improve PCM ack callback
+In-Reply-To: <6cb4bbc8-2d5f-45d0-0635-37f1737972c3@sakamocchi.jp>
+References: <20170521190258.1178-1-tiwai@suse.de>
+ <7685a366-5b2f-0a96-a686-c49b79975c56@sakamocchi.jp>
+ <s5htw4dihpv.wl-tiwai@suse.de>
+ <6cb4bbc8-2d5f-45d0-0635-37f1737972c3@sakamocchi.jp>
+Message-ID: <s5hmva5ie1r.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2017 08:46 AM, Jan Kiszka wrote:
-> We need to initializes those variables to 0 for platforms that do not
-> provide ACPI parameters. Otherwise, we set sda_hold_time to random
-> values, breaking e.g. Galileo and IOT2000 boards.
->
-> Fixes: 9d6408433019 ("i2c: designware: don't infer timings described by ACPI from clock rate")
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> ---
->
-> Affects 4.12-rc2.
->
-Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
+On Mon, 22 May 2017 08:31:13 +0200,
+Takashi Sakamoto wrote:
+> 
+> On May 22 2017 14:27, Takashi Iwai wrote:
+> > These functions will be modified again by other upcoming patchsets, so
+> > I'd like not to touch so much for minor optimization at this stage.
+> 
+> If you address to your latest patchset[1], it might not be applied
+> promptly because I have some comments (not posted yet, in this
+> night). It's not good to avoid better bahaviour in a reason of
+> patchset dependency, at least you seems to be too hasty.
+
+Come on, your suggestion is an optimization change that can be applied
+anytime later easily.  If it were a mandatory fix, we should apply or
+fold it immediately, but that's not the case.  The only necessary
+thing is not to forget it.
+
+
+Takashi
+
+> 
+> 
+> [1] [alsa-devel] [PATCH 00/16] ALSA: Convert to new copy_silence PCM ops
+> 
+> Regards
+> 
+> Takashi Sakamoto
+> 
