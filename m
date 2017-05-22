@@ -1,123 +1,59 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 22 May 2017 14:36:02 +0100
-Subject: [PATCH v3 4/6] mm/hugetlb: Allow architectures to override
- huge_pte_clear()
-In-Reply-To: <20170522133604.11392-1-punit.agrawal@arm.com>
-References: <20170522133604.11392-1-punit.agrawal@arm.com>
-Message-ID: <20170522133604.11392-5-punit.agrawal@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 May 2017 15:37:03 +0200
+Subject: [PATCH] serial: meson: hide an unused function
+Message-ID: <20170522133746.880230-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When unmapping a hugepage range, huge_pte_clear() is used to clear the
-page table entries that are marked as not present. huge_pte_clear()
-internally just ends up calling pte_clear() which does not correctly
-deal with hugepages consisting of contiguous page table entries.
+The newly added meson_uart_enable_tx_engine function is only called
+from the console setup, not the runtime uart, which has an open-coded
+version of the same register access. This produces a harmless warning
+when the console code is disabled:
 
-Add a size argument to address this issue and allow architectures to
-override huge_pte_clear() in subsequent patches by making it a weak
-function.
+drivers/tty/serial/meson_uart.c:127:13: error: 'meson_uart_enable_tx_engine' defined but not used [-Werror=unused-function]
 
-Update the s390 to use the new mechanism to override huge_pte_clear().
+Let's move the function inside of the #ifdef to avoid the warning.
 
-Note that the change only affects huge_pte_clear() - the other generic
-hugetlb functions don't need any change.
-
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
-Cc: Mike Kravetz <mike.kravetz@oracle.com>
+Fixes: ba50f1df13c8 ("serial: meson: remove unneeded variable assignment in meson_serial_port_write")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/s390/include/asm/hugetlb.h | 10 ++--------
- arch/s390/mm/hugetlbpage.c      |  9 +++++++++
- include/asm-generic/hugetlb.h   |  7 ++-----
- mm/hugetlb.c                    |  8 +++++++-
- 4 files changed, 20 insertions(+), 14 deletions(-)
+ drivers/tty/serial/meson_uart.c | 17 ++++++++---------
+ 1 file changed, 8 insertions(+), 9 deletions(-)
 
-diff --git a/arch/s390/include/asm/hugetlb.h b/arch/s390/include/asm/hugetlb.h
-index cd546a245c68..aa8489c07f24 100644
---- a/arch/s390/include/asm/hugetlb.h
-+++ b/arch/s390/include/asm/hugetlb.h
-@@ -38,14 +38,8 @@ static inline int prepare_hugepage_range(struct file *file,
- 
- #define arch_clear_hugepage_flags(page)		do { } while (0)
- 
--static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
--				  pte_t *ptep)
--{
--	if ((pte_val(*ptep) & _REGION_ENTRY_TYPE_MASK) == _REGION_ENTRY_TYPE_R3)
--		pte_val(*ptep) = _REGION3_ENTRY_EMPTY;
--	else
--		pte_val(*ptep) = _SEGMENT_ENTRY_EMPTY;
--}
-+void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-+		    pte_t *ptep, unsigned long sz);
- 
- static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 					 unsigned long address, pte_t *ptep)
-diff --git a/arch/s390/mm/hugetlbpage.c b/arch/s390/mm/hugetlbpage.c
-index ae23afc18493..48e19b324017 100644
---- a/arch/s390/mm/hugetlbpage.c
-+++ b/arch/s390/mm/hugetlbpage.c
-@@ -144,6 +144,15 @@ pte_t huge_ptep_get(pte_t *ptep)
- 	return __rste_to_pte(pte_val(*ptep));
+diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+index 082e038e67f8..c0e34dabadd8 100644
+--- a/drivers/tty/serial/meson_uart.c
++++ b/drivers/tty/serial/meson_uart.c
+@@ -124,15 +124,6 @@ static void meson_uart_stop_rx(struct uart_port *port)
+ 	writel(val, port->membase + AML_UART_CONTROL);
  }
  
-+void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-+		    pte_t *ptep, unsigned long sz)
-+{
-+	if ((pte_val(*ptep) & _REGION_ENTRY_TYPE_MASK) == _REGION_ENTRY_TYPE_R3)
-+		pte_val(*ptep) = _REGION3_ENTRY_EMPTY;
-+	else
-+		pte_val(*ptep) = _SEGMENT_ENTRY_EMPTY;
-+}
-+
- pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 			      unsigned long addr, pte_t *ptep)
+-static void meson_uart_enable_tx_engine(struct uart_port *port)
+-{
+-	u32 val;
+-
+-	val = readl(port->membase + AML_UART_CONTROL);
+-	val |= AML_UART_TX_EN;
+-	writel(val, port->membase + AML_UART_CONTROL);
+-}
+-
+ static void meson_uart_shutdown(struct uart_port *port)
  {
-diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
-index 99b490b4d05a..3138e126f43b 100644
---- a/include/asm-generic/hugetlb.h
-+++ b/include/asm-generic/hugetlb.h
-@@ -31,10 +31,7 @@ static inline pte_t huge_pte_modify(pte_t pte, pgprot_t newprot)
- 	return pte_modify(pte, newprot);
- }
+ 	unsigned long flags;
+@@ -451,6 +442,14 @@ static struct uart_ops meson_uart_ops = {
+ };
  
--static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
--				  pte_t *ptep)
--{
--	pte_clear(mm, addr, ptep);
--}
-+void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-+		    pte_t *ptep, unsigned long sz);
- 
- #endif /* _ASM_GENERIC_HUGETLB_H */
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index 0e4d1fb3122f..2b0f6f96f2c1 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -3289,6 +3289,12 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
- 	return ret;
- }
- 
-+void __weak huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-+			   pte_t *ptep, unsigned long sz)
+ #ifdef CONFIG_SERIAL_MESON_CONSOLE
++static void meson_uart_enable_tx_engine(struct uart_port *port)
 +{
-+	pte_clear(mm, addr, ptep);
-+}
++	u32 val;
 +
- void __unmap_hugepage_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
- 			    unsigned long start, unsigned long end,
- 			    struct page *ref_page)
-@@ -3338,7 +3344,7 @@ void __unmap_hugepage_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
- 		 * unmapped and its refcount is dropped, so just clear pte here.
- 		 */
- 		if (unlikely(!pte_present(pte))) {
--			huge_pte_clear(mm, address, ptep);
-+			huge_pte_clear(mm, address, ptep, sz);
- 			spin_unlock(ptl);
- 			continue;
- 		}
++	val = readl(port->membase + AML_UART_CONTROL);
++	val |= AML_UART_TX_EN;
++	writel(val, port->membase + AML_UART_CONTROL);
++}
+ 
+ static void meson_console_putchar(struct uart_port *port, int ch)
+ {
 -- 
-2.11.0
+2.9.0
