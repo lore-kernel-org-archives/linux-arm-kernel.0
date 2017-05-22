@@ -1,10 +1,10 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 22 May 2017 16:01:54 +0200
-Subject: [PATCH v4 06/20] ARM: dts: imx: Add generic compatible string for I2C
- EEPROM
+Date: Mon, 22 May 2017 16:01:56 +0200
+Subject: [PATCH v4 08/20] ARM: dts: lpc18xx: Add generic compatible string for
+ I2C EEPROM
 In-Reply-To: <20170522140208.24652-1-javier@dowhile0.org>
 References: <20170522140208.24652-1-javier@dowhile0.org>
-Message-ID: <20170522140208.24652-7-javier@dowhile0.org>
+Message-ID: <20170522140208.24652-9-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -30,91 +30,61 @@ Changes in v4:
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi | 2 +-
- arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi   | 2 +-
- arch/arm/boot/dts/imx28-evk.dts                   | 2 +-
- arch/arm/boot/dts/imx53-tqma53.dtsi               | 2 +-
- arch/arm/boot/dts/imx6q-cm-fx6.dts                | 2 +-
- arch/arm/boot/dts/imx6q-utilite-pro.dts           | 2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/lpc4337-ciaa.dts          | 6 +++---
+ arch/arm/boot/dts/lpc4350-hitex-eval.dts    | 2 +-
+ arch/arm/boot/dts/lpc4357-ea4357-devkit.dts | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi
-index 4f3e0f473581..0b8490b21a38 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi
-+++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi
-@@ -40,7 +40,7 @@
- 	status = "okay";
- 
- 	at24 at 52 {
--		compatible = "at,24c32";
-+		compatible = "atmel,24c32";
- 		pagesize = <32>;
- 		reg = <0x52>;
- 	};
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-index 82fec935ce83..c973c5d91875 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-@@ -193,7 +193,7 @@
- 	status = "okay";
- 
- 	at24 at 52 {
--		compatible = "at,24c32";
-+		compatible = "atmel,24c32";
- 		pagesize = <32>;
- 		reg = <0x52>;
- 	};
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index a5ba669b4eaa..b88c087f1fea 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -203,7 +203,7 @@
- 				};
- 
- 				at24 at 51 {
--					compatible = "at24,24c32";
-+					compatible = "atmel,24c32";
- 					pagesize = <32>;
- 					reg = <0x51>;
- 				};
-diff --git a/arch/arm/boot/dts/imx53-tqma53.dtsi b/arch/arm/boot/dts/imx53-tqma53.dtsi
-index 85972f2201c2..eecdc1c55eef 100644
---- a/arch/arm/boot/dts/imx53-tqma53.dtsi
-+++ b/arch/arm/boot/dts/imx53-tqma53.dtsi
-@@ -272,7 +272,7 @@
- 	};
- 
- 	eeprom: 24c64 at 50 {
--		compatible = "at,24c64";
-+		compatible = "atmel,24c64";
- 		pagesize = <32>;
- 		reg = <0x50>;
- 	};
-diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-index 66cac5328b86..a8af3822d9df 100644
---- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
-+++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-@@ -215,7 +215,7 @@
- 	clock-frequency = <100000>;
+diff --git a/arch/arm/boot/dts/lpc4337-ciaa.dts b/arch/arm/boot/dts/lpc4337-ciaa.dts
+index 7c16d639a1b4..1c1036137f86 100644
+--- a/arch/arm/boot/dts/lpc4337-ciaa.dts
++++ b/arch/arm/boot/dts/lpc4337-ciaa.dts
+@@ -174,17 +174,17 @@
+ 	clock-frequency = <400000>;
  
  	eeprom at 50 {
--		compatible = "at24,24c02";
+-		compatible = "microchip,24c512";
++		compatible = "atmel,24c512";
+ 		reg = <0x50>;
+ 	};
+ 
+ 	eeprom at 51 {
+-		compatible = "microchip,24c02";
++		compatible = "atmel,24c02";
+ 		reg = <0x51>;
+ 	};
+ 
+ 	eeprom at 54 {
+-		compatible = "microchip,24c512";
++		compatible = "atmel,24c512";
+ 		reg = <0x54>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/lpc4350-hitex-eval.dts b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
+index 874c75d44013..32c940230df7 100644
+--- a/arch/arm/boot/dts/lpc4350-hitex-eval.dts
++++ b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
+@@ -429,7 +429,7 @@
+ 	};
+ 
+ 	eeprom at 50 {
+-		compatible = "nxp,24c02";
 +		compatible = "atmel,24c02";
  		reg = <0x50>;
- 		pagesize = <16>;
  	};
-diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-index d900ad6ec5f8..16d5be1aeb3c 100644
---- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
-+++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-@@ -130,7 +130,7 @@
- 			#size-cells = <0>;
  
- 			eeprom at 50 {
--				compatible = "at24,24c02";
-+				compatible = "atmel,24c02";
- 				reg = <0x50>;
- 				pagesize = <16>;
- 			};
+diff --git a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
+index 9b5fad622522..48039e27e27c 100644
+--- a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
++++ b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
+@@ -490,7 +490,7 @@
+ 	};
+ 
+ 	eeprom at 57 {
+-		compatible = "microchip,24c64";
++		compatible = "atmel,24c64";
+ 		reg = <0x57>;
+ 	};
+ };
 -- 
 2.9.3
