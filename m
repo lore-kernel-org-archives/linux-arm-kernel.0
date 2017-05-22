@@ -1,48 +1,98 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 22 May 2017 23:11:33 +0200 (CEST)
-Subject: [PATCH 1/1] futex: remove duplicated code
-In-Reply-To: <20170515131644.GA3605@arm.com>
-References: <20170515130742.18357-1-jslaby@suse.cz>
- <20170515131644.GA3605@arm.com>
-Message-ID: <alpine.DEB.2.20.1705222259580.2407@nanos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 May 2017 23:37:56 +0200
+Subject: [PATCH] drm/pl111: add ARM_AMBA dependency
+In-Reply-To: <20170522163231.bk6zltgzse4szm2o@kozik-lap>
+References: <20170522152058.3346428-1-arnd@arndb.de>
+ <20170522163231.bk6zltgzse4szm2o@kozik-lap>
+Message-ID: <CAK8P3a2Rbd2tnehO4vnqgmMYTPqgvws3ZEtbzJ86AxVWd9j6nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 May 2017, Will Deacon wrote:
-> Hi Jiri,
-> 
-> On Mon, May 15, 2017 at 03:07:42PM +0200, Jiri Slaby wrote:
-> > There is code duplicated over all architecture's headers for
-> > futex_atomic_op_inuser. Namely op decoding, access_ok check for uaddr,
-> > and comparison of the result.
-> > 
-> > Remove this duplication and leave up to the arches only the needed
-> > assembly which is now in arch_futex_atomic_op_inuser.
-> > 
-> > Note that s390 removed access_ok check in d12a29703 ("s390/uaccess:
-> > remove pointless access_ok() checks") as access_ok there returns true.
-> > We introduce it back to the helper for the sake of simplicity (it gets
-> > optimized away anyway).
-> 
-> Whilst I think this is a good idea, the code in question actually results
-> in undefined behaviour per the C spec and is reported by UBSAN. See my
-> patch fixing arm64 here (which I'd forgotten about):
-> 
-> https://www.spinics.net/lists/linux-arch/msg38564.html
-> 
-> But, as stated in the thread above, I think we should go a step further
-> and remove FUTEX_OP_{OR,ANDN,XOR,OPARG_SHIFT} altogether. They don't
-> appear to be used by userspace, and this whole thing is a total mess.
+On Mon, May 22, 2017 at 6:32 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Mon, May 22, 2017 at 05:20:08PM +0200, Arnd Bergmann wrote:
+>> The driver is written in a way to enable compile-testing without CONFIG_ARM_AMBA,
+>> but it just causes needless warnings:
+>>
+>> drivers/gpu/drm/pl111/pl111_drv.c:149:26: error: 'pl111_drm_driver' defined but not used [-Werror=unused-variable]
+>> drivers/gpu/drm/pl111/pl111_drv.c:81:12: error: 'pl111_modeset_init' defined but not used [-Werror=unused-function]
+>>
+>> This removes the #ifdef instead, and adds a dependency on ARM_AMBA to
+>> only let us build the driver when the base support is enabled.
+>>
+>> Unfortunately, this requires removing one redundant 'select ARM_AMBA'
+>> line from mach-s3c64xx to avoid a circular dependency.
+>>
+>> It might be good to allow manually enabling ARM_AMBA when COMPILE_TEST
+>> is turned on, but that should be a separate patch and may cause other
+>> build regressions.
+>>
+>> Fixes: bed41005e617 ("drm/pl111: Initial drm/kms driver for pl111")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>>  arch/arm/mach-s3c64xx/Kconfig     | 1 -
+>>  drivers/gpu/drm/pl111/Kconfig     | 1 +
+>>  drivers/gpu/drm/pl111/pl111_drv.c | 2 --
+>>  3 files changed, 1 insertion(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+>> index 459214fa20b4..5ee5ad74a3d6 100644
+>> --- a/arch/arm/mach-s3c64xx/Kconfig
+>> +++ b/arch/arm/mach-s3c64xx/Kconfig
+>> @@ -40,7 +40,6 @@ config CPU_S3C6410
+>>
+>>  config S3C64XX_PL080
+>>       def_bool DMADEVICES
+>> -     select ARM_AMBA
+>
+> I must admit that I miss how pl111 DRM driver create circular dependency
+> with S3C64XX_PL080 (or AMBA_PL08X?). Maybe it is unrelated change and
+> should be a separate patch?
 
-You wish. The constants are not used, but FUTEX_WAKE_OP _IS_ used by
-glibc. They only have one argument it seems:
+When I add 'depends on ARM_AMBA' for pl111, I get this dependency loop:
 
-   #define FUTEX_OP_CLEAR_WAKE_IF_GT_ONE      ((4 << 24) | 1)
+drivers/i2c/Kconfig:7: symbol I2C is selected by FB_DDC
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:63: symbol FB_DDC is selected by FB_CYBER2000_DDC
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:381: symbol FB_CYBER2000_DDC depends on FB_CYBER2000
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:369: symbol FB_CYBER2000 depends on FB
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:5: symbol FB is selected by DRM_KMS_FB_HELPER
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/drm/Kconfig:72: symbol DRM_KMS_FB_HELPER is selected by
+DRM_KMS_CMA_HELPER
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/drm/Kconfig:137: symbol DRM_KMS_CMA_HELPER is selected by DRM_PL111
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/drm/pl111/Kconfig:1: symbol DRM_PL111 depends on ARM_AMBA
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/amba/Kconfig:1: symbol ARM_AMBA is selected by S3C64XX_PL080
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+arch/arm/mach-s3c64xx/Kconfig:42: symbol S3C64XX_PL080 default value
+contains DMADEVICES
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/dma/Kconfig:5: symbol DMADEVICES is selected by SND_SOC_SH4_SIU
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+sound/soc/sh/Kconfig:29: symbol SND_SOC_SH4_SIU is selected by SND_SIU_MIGOR
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+sound/soc/sh/Kconfig:59: symbol SND_SIU_MIGOR depends on I2C
 
-but I'm pretty sure that there is enough (probably horrible) code (think
-java) out there using FUTEX_WAKE_OP for whatever (non)sensical reasons in
-any available combination.
+We could break the loop at any of those places, but the
+S3C64XX_PL080 symbol seemed the easiest way since the
+'select' there is completely unnecessary and it directly relates
+to the change I made in PL111.
 
-Thanks,
-
-	tglx
+        Arnd
