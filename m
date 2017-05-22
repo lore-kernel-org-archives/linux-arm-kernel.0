@@ -1,80 +1,58 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 May 2017 15:58:36 +0200
-Subject: [PATCH 03/35] arm64: dts: m3ulcb: enable EthernetAVB
-In-Reply-To: <cover.1495457812.git.horms+renesas@verge.net.au>
-References: <cover.1495457812.git.horms+renesas@verge.net.au>
-Message-ID: <883fae315a6af7d2b7dd32e79471c787d9b29baf.1495457812.git.horms+renesas@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 May 2017 15:59:43 +0200
+Subject: [PATCH v3 4/6] mm/hugetlb: Allow architectures to override
+ huge_pte_clear()
+In-Reply-To: <20170522133604.11392-5-punit.agrawal@arm.com>
+References: <20170522133604.11392-1-punit.agrawal@arm.com>
+ <20170522133604.11392-5-punit.agrawal@arm.com>
+Message-ID: <CAK8P3a3d=Yx3_stYiz25Qeh8wfFr5EGuGYGfCoXqrQPxz6oUAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Barinov <vladimir.barinov+renesas@cogentembedded.com>
+On Mon, May 22, 2017 at 3:36 PM, Punit Agrawal <punit.agrawal@arm.com> wrote:
+> diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
+> index 99b490b4d05a..3138e126f43b 100644
+> --- a/include/asm-generic/hugetlb.h
+> +++ b/include/asm-generic/hugetlb.h
+> @@ -31,10 +31,7 @@ static inline pte_t huge_pte_modify(pte_t pte, pgprot_t newprot)
+>         return pte_modify(pte, newprot);
+>  }
+>
+> -static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+> -                                 pte_t *ptep)
+> -{
+> -       pte_clear(mm, addr, ptep);
+> -}
+> +void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+> +                   pte_t *ptep, unsigned long sz);
+>
+>  #endif /* _ASM_GENERIC_HUGETLB_H */
+> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+> index 0e4d1fb3122f..2b0f6f96f2c1 100644
+> --- a/mm/hugetlb.c
+> +++ b/mm/hugetlb.c
+> @@ -3289,6 +3289,12 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
+>         return ret;
+>  }
+>
+> +void __weak huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+> +                          pte_t *ptep, unsigned long sz)
+> +{
+> +       pte_clear(mm, addr, ptep);
+> +}
+> +
+>  void __unmap_hugepage_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
+>                             unsigned long start, unsigned long end,
+>                             struct page *ref_page)
 
-This supports Ethernet AVB on M3ULCB board
+I don't really like how this moves the inline version from asm-generic into
+a __weak function here. I think it would be better to either stop
+using asm-generic/hugetlb.h
+on s390, or enclose the generic definition in
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov+renesas@cogentembedded.com>
-Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts | 32 ++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+#ifndef huge_pte_clear
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-index 02051a3236a5..75974b246dd1 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-@@ -20,6 +20,7 @@
- 
- 	aliases {
- 		serial0 = &scif2;
-+		ethernet0 = &avb;
- 	};
- 
- 	chosen {
-@@ -115,6 +116,11 @@
- 	pinctrl-0 = <&scif_clk_pins>;
- 	pinctrl-names = "default";
- 
-+	avb_pins: avb {
-+		groups = "avb_mdc";
-+		function = "avb";
-+	};
-+
- 	scif2_pins: scif2 {
- 		groups = "scif2_data_a";
- 		function = "scif2";
-@@ -155,6 +161,32 @@
- 	};
- };
- 
-+&avb {
-+	pinctrl-0 = <&avb_pins>;
-+	pinctrl-names = "default";
-+	renesas,no-ether-link;
-+	phy-handle = <&phy0>;
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		rxc-skew-ps = <900>;
-+		rxdv-skew-ps = <0>;
-+		rxd0-skew-ps = <0>;
-+		rxd1-skew-ps = <0>;
-+		rxd2-skew-ps = <0>;
-+		rxd3-skew-ps = <0>;
-+		txc-skew-ps = <900>;
-+		txen-skew-ps = <0>;
-+		txd0-skew-ps = <0>;
-+		txd1-skew-ps = <0>;
-+		txd2-skew-ps = <0>;
-+		txd3-skew-ps = <0>;
-+		reg = <0>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
- 	pinctrl-1 = <&sdhi0_pins_uhs>;
--- 
-2.1.4
+and then override by defining a macro in s390 as we do in other files
+in asm-generic.
+
+       Arnd
