@@ -1,50 +1,48 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Mon, 22 May 2017 16:10:10 +0300
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: add hi8435 device
-Message-ID: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 22 May 2017 15:23:46 +0200
+Subject: [PATCH] clk: meson-gxbb: Expose SPICC gate
+In-Reply-To: <1495457326-32659-1-git-send-email-narmstrong@baylibre.com>
+References: <1495457326-32659-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1495459426.2344.1.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ZII dev board rev B has a Holt Hi8435 connected to dspi2.
-Add it to device tree.
+On Mon, 2017-05-22 at 14:48 +0200, Neil Armstrong wrote:
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-ZII dev board rev C does not have that, so use rev-b dts file,
-not common dtsi file.
+I would prefer to have a short commit message here. With it included:
 
-Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
----
- arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Acked-by: Jerome Brunet <jbrunet@baylibre.com>
 
-diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-index 37f95427616f..f433465c3a7c 100644
---- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-+++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-@@ -348,6 +348,25 @@
- 	};
- };
- 
-+&edma1 {
-+	status = "okay";
-+};
-+
-+&dspi2 {
-+	bus-num = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_dspi2>;
-+	status = "okay";
-+	spi-num-chipselects = <2>;
-+
-+	hi8435 at 1 {
-+		compatible = "holt,hi8435";
-+		reg = <1>;
-+		spi-max-frequency = <20000000>;
-+		gpios = <&gpio5 3 0>;
-+	};
-+};
-+
- &i2c0 {
- 	clock-frequency = <100000>;
- 	pinctrl-names = "default";
--- 
-2.11.0
+
+> ---
+> ?drivers/clk/meson/gxbb.h??????????????| 2 +-
+> ?include/dt-bindings/clock/gxbb-clkc.h | 1 +
+> ?2 files changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+> index 93b8f07..cc7b35c 100644
+> --- a/drivers/clk/meson/gxbb.h
+> +++ b/drivers/clk/meson/gxbb.h
+> @@ -191,7 +191,7 @@
+> ?#define CLKID_ISA		??18
+> ?#define CLKID_PL301		??19
+> ?#define CLKID_PERIPHS		??20
+> -#define CLKID_SPICC		??21
+> +/* CLKID_SPICC */
+> ?/* CLKID_I2C */
+> ?/* #define CLKID_SAR_ADC */
+> ?#define CLKID_SMART_CARD	??24
+> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-
+> bindings/clock/gxbb-clkc.h
+> index 3190e30..88da194 100644
+> --- a/include/dt-bindings/clock/gxbb-clkc.h
+> +++ b/include/dt-bindings/clock/gxbb-clkc.h
+> @@ -13,6 +13,7 @@
+> ?#define CLKID_GP0_PLL		9
+> ?#define CLKID_CLK81		12
+> ?#define CLKID_MPLL2		15
+> +#define CLKID_SPICC		21
+> ?#define CLKID_I2C		22
+> ?#define CLKID_SAR_ADC		23
+> ?#define CLKID_RNG0		25
