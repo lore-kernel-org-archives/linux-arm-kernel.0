@@ -1,47 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 May 2017 08:02:29 +0200
-Subject: [PATCH] i2c: designware: Fix bogus sda_hold_time due to
- uninitialized vars
-In-Reply-To: <743ebd23-17ab-03d2-ebd9-66acc9aee417@siemens.com>
-References: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
- <CAKv+Gu9x_KCdEGBBOw9yaYOcYBcYtxJX-xTX=4kQuWqY=VK0PA@mail.gmail.com>
- <743ebd23-17ab-03d2-ebd9-66acc9aee417@siemens.com>
-Message-ID: <8F61EF18-169A-4FB5-B9C7-9A2ACD4C92B4@linaro.org>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 22 May 2017 14:07:16 +0800
+Subject: [PATCH] drm/mediatek: fix
+ mtk_hdmi_setup_vendor_specific_infoframe mistake
+In-Reply-To: <1490084823-3968-1-git-send-email-nickey.yang@rock-chips.com>
+References: <1490084823-3968-1-git-send-email-nickey.yang@rock-chips.com>
+Message-ID: <1495433236.20811.13.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Nickey:
 
+Sorry for the late reply. I've applied this patch to my branch
+mediatek-drm-fixes-4.12-rc1.
 
-> On 22 May 2017, at 07:46, Jan Kiszka <jan.kiszka@siemens.com> wrote:
+Regards,
+CK
+
+On Tue, 2017-03-21 at 16:27 +0800, Nickey Yang wrote:
+> mtk_hdmi_setup_vendor_specific_infoframe will return before handle
+> mtk_hdmi_hw_send_info_frame.Because hdmi_vendor_infoframe_pack
+> returns the number of bytes packed into the binary buffer or
+> a negative error code on failure.
+> So correct it.
 > 
-> We need to initializes those variables to 0 for platforms that do not
-> provide ACPI parameters. Otherwise, we set sda_hold_time to random
-> values, breaking e.g. Galileo and IOT2000 boards.
-> 
-> Fixes: 9d6408433019 ("i2c: designware: don't infer timings described by ACPI from clock rate")
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
+> Signed-off-by: Nickey Yang <nickey.yang@rock-chips.com>
 > ---
+>  drivers/gpu/drm/mediatek/mtk_hdmi.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Affects 4.12-rc2.
-> 
-> drivers/i2c/busses/i2c-designware-platdrv.c | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index 6283b99d2b17..d1263b82d646 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -94,9 +94,9 @@ static void dw_i2c_acpi_params(struct platform_device *pdev, char method[],
-> static int dw_i2c_acpi_configure(struct platform_device *pdev)
-> {
->    struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
-> +    u32 ss_ht = 0, fp_ht = 0, hs_ht = 0, fs_ht = 0;
->    acpi_handle handle = ACPI_HANDLE(&pdev->dev);
->    const struct acpi_device_id *id;
-> -    u32 ss_ht, fp_ht, hs_ht, fs_ht;
->    struct acpi_device *adev;
->    const char *uid;
-> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+> index c262512..b43aa29 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+> @@ -1062,7 +1062,7 @@ static int mtk_hdmi_setup_vendor_specific_infoframe(struct mtk_hdmi *hdmi,
+>  	}
+>  
+>  	err = hdmi_vendor_infoframe_pack(&frame, buffer, sizeof(buffer));
+> -	if (err) {
+> +	if (err < 0) {
+>  		dev_err(hdmi->dev, "Failed to pack vendor infoframe: %zd\n",
+>  			err);
+>  		return err;
