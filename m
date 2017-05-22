@@ -1,45 +1,25 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Mon, 22 May 2017 11:01:52 +0200
-Subject: [PATCH v2 1/2] ARM: dts: am335x-sl50: Fix card detect pin for mmc1
-Message-ID: <20170522090153.5596-1-enric.balletbo@collabora.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 22 May 2017 11:02:47 +0200
+Subject: [PATCH V2 1/5] pinctrl: imx: fix debug message for
+ SHARE_MUX_CONF_REG case
+In-Reply-To: <1495177545-23006-2-git-send-email-aisheng.dong@nxp.com>
+References: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
+ <1495177545-23006-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CACRpkdYg9Ev2NPLR17bTx0kmNJQAHBHXTOWvejaK=uLtvFgZLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The second version of the hardware moved the card detect pin from gpio0_6
-to gpio1_9, as we won't support the first hardware version fix the pinmux
-configuration of this pin.
+On Fri, May 19, 2017 at 9:05 AM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
 
-Fixes: 8584d4fc ("ARM: dts: am335x-sl50: Add Toby-Churchill SL50 board support.")
-Cc: <stable@vger.kernel.org> # 4.11
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
-Changelog since v1:
- - Cc stable and add kernel version to be applied
+> The original implemented debug message does not work for
+> SHARE_MUX_CONF_REG case. This patch fixes it.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Fixes: bf5a530971af ("pinctrl: imx: add VF610 support to imx pinctrl framework")
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
- arch/arm/boot/dts/am335x-sl50.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Patch applied with Shawn's ACK.
 
-diff --git a/arch/arm/boot/dts/am335x-sl50.dts b/arch/arm/boot/dts/am335x-sl50.dts
-index c5d2589..da4f8e3 100644
---- a/arch/arm/boot/dts/am335x-sl50.dts
-+++ b/arch/arm/boot/dts/am335x-sl50.dts
-@@ -220,7 +220,7 @@
- 
- 	mmc1_pins: pinmux_mmc1_pins {
- 		pinctrl-single,pins = <
--			AM33XX_IOPAD(0x960, PIN_INPUT | MUX_MODE7)		/* spi0_cs1.gpio0_6 */
-+			AM33XX_IOPAD(0x96c, PIN_INPUT | MUX_MODE7)		/* uart0_rtsn.gpio1_9 */
- 		>;
- 	};
- 
-@@ -384,7 +384,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc1_pins>;
- 	bus-width = <4>;
--	cd-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
-+	cd-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
- 	vmmc-supply = <&vmmcsd_fixed>;
- };
- 
--- 
-2.9.3
+Yours,
+Linus Walleij
