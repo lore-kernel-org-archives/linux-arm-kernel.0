@@ -1,69 +1,19 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 22 May 2017 11:27:45 +0800
-Subject: [PATCH v3 1/2] PCI: mediatek: Add Mediatek PCIe host controller
- support
-In-Reply-To: <CAP=VYLrjeq57S+o0bBBH4oi8Bgwp=XgTsdO8RkWY8xuJyhLP9g@mail.gmail.com>
-References: <1494382020-26790-1-git-send-email-ryder.lee@mediatek.com>
- <1494382020-26790-2-git-send-email-ryder.lee@mediatek.com>
- <CAP=VYLrjeq57S+o0bBBH4oi8Bgwp=XgTsdO8RkWY8xuJyhLP9g@mail.gmail.com>
-Message-ID: <1495423665.21021.6.camel@mtkswgap22>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 22 May 2017 11:40:12 +0800
+Subject: [PATCH] ARM: dts: sunxi: Fix BCM43xx node name
+In-Reply-To: <1495401415-14477-1-git-send-email-festevam@gmail.com>
+References: <1495401415-14477-1-git-send-email-festevam@gmail.com>
+Message-ID: <CAGb2v65g7QzFGenWE7Xyn0KRxUQbEYhRCtXY4LW2pDiUPuvUkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2017-05-20 at 15:46 -0400, Paul Gortmaker wrote:
-> On Tue, May 9, 2017 at 10:06 PM, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> > Add support for the Mediatek PCIe Gen2 controller which can
-> > be found on MT7623 series SoCs.
-> >
-> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> > ---
-> >  drivers/pci/host/Kconfig         |  11 +
-> >  drivers/pci/host/Makefile        |   1 +
-> >  drivers/pci/host/pcie-mediatek.c | 563 +++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 575 insertions(+)
-> >  create mode 100644 drivers/pci/host/pcie-mediatek.c
-> >
-> > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> > index f7c1d4d..aef0de9 100644
-> > --- a/drivers/pci/host/Kconfig
-> > +++ b/drivers/pci/host/Kconfig
-> > @@ -174,6 +174,17 @@ config PCIE_ROCKCHIP
-> >           There is 1 internal PCIe port available to support GEN2 with
-> >           4 slots.
-> >
-> > +config PCIE_MEDIATEK
-> > +       bool "Mediatek PCIe controller"
-> 
-> You've got bool here and correctly use the builtin register
-> function, but you still have a couple stray references to
-> the module.h header and MODULE macros.  Can you
-> please also clean them up and resend with those gone?
-> 
-> Thanks,
-> Paul.
-> --
+On Mon, May 22, 2017 at 5:16 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+>
+> "bcrmf" is a typo and "wifi" is the preferred form to describe
+> such node, so change it accordingly.
+>
+> Reported-by: Andreas F?rber <afaerber@suse.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> 
-> [....]
-> 
-> > +};
-> > +MODULE_DEVICE_TABLE(of, mtk_pcie_ids);
-> > +
-> > +static struct platform_driver mtk_pcie_driver = {
-> > +       .probe = mtk_pcie_probe,
-> > +       .driver = {
-> > +               .name = "mtk-pcie",
-> > +               .of_match_table = mtk_pcie_ids,
-> > +               .suppress_bind_attrs = true,
-> > +       },
-> > +};
-> > +
-> > +builtin_platform_driver(mtk_pcie_driver);
-> > +
-> > +MODULE_DESCRIPTION("Mediatek PCIe host controller driver.");
-> > +MODULE_LICENSE("GPL v2");
-
-
-I've already removed them at patch v5. Thanks a lot, Paul!
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
