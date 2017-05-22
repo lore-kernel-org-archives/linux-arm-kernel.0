@@ -1,59 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 May 2017 15:37:03 +0200
-Subject: [PATCH] serial: meson: hide an unused function
-Message-ID: <20170522133746.880230-1-arnd@arndb.de>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Mon, 22 May 2017 21:50:42 +0800
+Subject: [PATCH] Bluetooth: hci_ll: Fix download_firmware() return when
+ __hci_cmd_sync fails
+Message-ID: <20170522135042.10921-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added meson_uart_enable_tx_engine function is only called
-from the console setup, not the runtime uart, which has an open-coded
-version of the same register access. This produces a harmless warning
-when the console code is disabled:
+When __hci_cmd_sync() fails, download_firmware() should also fail, and
+the same error value should be returned as PTR_ERR(skb).
 
-drivers/tty/serial/meson_uart.c:127:13: error: 'meson_uart_enable_tx_engine' defined but not used [-Werror=unused-function]
+Without this fix, download_firmware() will return a success when it actually
+failed in __hci_cmd_sync().
 
-Let's move the function inside of the #ifdef to avoid the warning.
-
-Fixes: ba50f1df13c8 ("serial: meson: remove unneeded variable assignment in meson_serial_port_write")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 371805522f87 ("bluetooth: hci_uart: add LL protocol serdev driver support")
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
- drivers/tty/serial/meson_uart.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ drivers/bluetooth/hci_ll.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-index 082e038e67f8..c0e34dabadd8 100644
---- a/drivers/tty/serial/meson_uart.c
-+++ b/drivers/tty/serial/meson_uart.c
-@@ -124,15 +124,6 @@ static void meson_uart_stop_rx(struct uart_port *port)
- 	writel(val, port->membase + AML_UART_CONTROL);
- }
- 
--static void meson_uart_enable_tx_engine(struct uart_port *port)
--{
--	u32 val;
--
--	val = readl(port->membase + AML_UART_CONTROL);
--	val |= AML_UART_TX_EN;
--	writel(val, port->membase + AML_UART_CONTROL);
--}
--
- static void meson_uart_shutdown(struct uart_port *port)
- {
- 	unsigned long flags;
-@@ -451,6 +442,14 @@ static struct uart_ops meson_uart_ops = {
- };
- 
- #ifdef CONFIG_SERIAL_MESON_CONSOLE
-+static void meson_uart_enable_tx_engine(struct uart_port *port)
-+{
-+	u32 val;
-+
-+	val = readl(port->membase + AML_UART_CONTROL);
-+	val |= AML_UART_TX_EN;
-+	writel(val, port->membase + AML_UART_CONTROL);
-+}
- 
- static void meson_console_putchar(struct uart_port *port, int ch)
- {
+diff --git a/drivers/bluetooth/hci_ll.c b/drivers/bluetooth/hci_ll.c
+index adc444f..200288c 100644
+--- a/drivers/bluetooth/hci_ll.c
++++ b/drivers/bluetooth/hci_ll.c
+@@ -624,6 +624,7 @@ static int download_firmware(struct ll_device *lldev)
+ 			skb = __hci_cmd_sync(lldev->hu.hdev, cmd->opcode, cmd->plen, &cmd->speed, HCI_INIT_TIMEOUT);
+ 			if (IS_ERR(skb)) {
+ 				bt_dev_err(lldev->hu.hdev, "send command failed\n");
++				err = PTR_ERR(skb);
+ 				goto out_rel_fw;
+ 			}
+ 			kfree_skb(skb);
 -- 
-2.9.0
+2.10.2
