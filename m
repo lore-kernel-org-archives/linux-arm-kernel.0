@@ -1,7 +1,9 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 22 May 2017 15:39:46 +0100
+Date: Mon, 22 May 2017 15:39:47 +0100
 Subject: [PATCH v3 00/11] arm64: Enable contiguous pte hugepage support
-Message-ID: <20170522143958.12867-1-punit.agrawal@arm.com>
+In-Reply-To: <20170522143958.12867-1-punit.agrawal@arm.com>
+References: <20170522143958.12867-1-punit.agrawal@arm.com>
+Message-ID: <20170522143958.12867-2-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,8 +12,7 @@ Hi,
 This patchset addresses all the known issues with contiguous hugetlb
 pages. Support for contiguous hugepages is useful on systems where the
 PMD hugepage size is too large (512MB hugepage when using 64k page
-granule) and contiguous hugepages can be used to provide reasonable
-hugepage sizes to the user.
+granule).
 
 The patches can be split as 
 
