@@ -1,382 +1,533 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Mon, 22 May 2017 17:28:19 +0530
-Subject: [PATCH v4 03/11] clk: bcm: Add clocks for Stingray SOC
+Date: Mon, 22 May 2017 17:28:20 +0530
+Subject: [PATCH v4 04/11] arm64: dts: Initial DTS files for Broadcom Stingray
+ SOC
 In-Reply-To: <1495454307-23464-1-git-send-email-anup.patel@broadcom.com>
 References: <1495454307-23464-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1495454307-23464-4-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1495454307-23464-5-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
+The Broadcom Stingray SoC is a new member in Broadcom iProc
+SoC family.
 
-This patch adds support for Stingray clocks in iproc
-ccf. The Stingray SOC has various plls based on iproc
-pll architecture.
+This patch adds initial DTS files for Broadcom Stingray SoC
+and two of its reference boards (bcm958742k and bcm958742t).
 
-Signed-off-by: Sandeep Tripathy <sandeep.tripathy@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+We have lot of reference boards and large number of devices
+in Broadcom Stingray SoC so eventually we will have quite
+a few DTS files for Stingray. To tackle, we have added a
+separate directory for Stingray DTS files.
+
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
 ---
- drivers/clk/bcm/Kconfig  |   8 ++
- drivers/clk/bcm/Makefile |   1 +
- drivers/clk/bcm/clk-sr.c | 324 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 333 insertions(+)
- create mode 100644 drivers/clk/bcm/clk-sr.c
+ arch/arm64/boot/dts/broadcom/Makefile              |   1 +
+ arch/arm64/boot/dts/broadcom/stingray/Makefile     |   6 +
+ .../boot/dts/broadcom/stingray/bcm958742-base.dtsi |  55 ++++
+ .../boot/dts/broadcom/stingray/bcm958742k.dts      |  48 ++++
+ .../boot/dts/broadcom/stingray/bcm958742t.dts      |  40 +++
+ .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 302 +++++++++++++++++++++
+ 6 files changed, 452 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/Makefile
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
 
-diff --git a/drivers/clk/bcm/Kconfig b/drivers/clk/bcm/Kconfig
-index b5ae531..1d9187d 100644
---- a/drivers/clk/bcm/Kconfig
-+++ b/drivers/clk/bcm/Kconfig
-@@ -46,3 +46,11 @@ config CLK_BCM_NS2
- 	default ARCH_BCM_IPROC
- 	help
- 	  Enable common clock framework support for the Broadcom Northstar 2 SoC
-+
-+config CLK_BCM_SR
-+	bool "Broadcom Stingray clock support"
-+	depends on ARCH_BCM_IPROC || COMPILE_TEST
-+	select COMMON_CLK_IPROC
-+	default ARCH_BCM_IPROC
-+	help
-+	  Enable common clock framework support for the Broadcom Stingray SoC
-diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
-index d9dc848..a0c14fa 100644
---- a/drivers/clk/bcm/Makefile
-+++ b/drivers/clk/bcm/Makefile
-@@ -10,3 +10,4 @@ obj-$(CONFIG_ARCH_BCM_53573)	+= clk-bcm53573-ilp.o
- obj-$(CONFIG_CLK_BCM_CYGNUS)	+= clk-cygnus.o
- obj-$(CONFIG_CLK_BCM_NSP)	+= clk-nsp.o
- obj-$(CONFIG_CLK_BCM_NS2)	+= clk-ns2.o
-+obj-$(CONFIG_CLK_BCM_SR)	+= clk-sr.o
-diff --git a/drivers/clk/bcm/clk-sr.c b/drivers/clk/bcm/clk-sr.c
+diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
+index bfa8f8e..f11bdd6 100644
+--- a/arch/arm64/boot/dts/broadcom/Makefile
++++ b/arch/arm64/boot/dts/broadcom/Makefile
+@@ -1,6 +1,7 @@
+ dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb
+ dtb-$(CONFIG_ARCH_BCM_IPROC) += ns2-svk.dtb ns2-xmc.dtb
+ 
++dts-dirs	:= stingray
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+ clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/Makefile b/arch/arm64/boot/dts/broadcom/stingray/Makefile
 new file mode 100644
-index 0000000..87b9543
+index 0000000..f70028e
 --- /dev/null
-+++ b/drivers/clk/bcm/clk-sr.c
-@@ -0,0 +1,324 @@
++++ b/arch/arm64/boot/dts/broadcom/stingray/Makefile
+@@ -0,0 +1,6 @@
++dtb-$(CONFIG_ARCH_BCM_IPROC) += bcm958742k.dtb
++dtb-$(CONFIG_ARCH_BCM_IPROC) += bcm958742t.dtb
++
++always		:= $(dtb-y)
++subdir-y	:= $(dts-dirs)
++clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+new file mode 100644
+index 0000000..992944b
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+@@ -0,0 +1,55 @@
 +/*
-+ * Copyright 2017 Broadcom
++ *  BSD LICENSE
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
-+ * published by the Free Software Foundation (the "GPL").
++ *  Copyright(c) 2016-2017 Broadcom.  All rights reserved.
 + *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License version 2 (GPLv2) for more details.
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
 + *
-+ * You should have received a copy of the GNU General Public License
-+ * version 2 (GPLv2) along with this source code.
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom nor the names of its
++ *      contributors may be used to endorse or promote products derived
++ *      from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/err.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
++#include "stingray.dtsi"
 +
-+#include <dt-bindings/clock/bcm-sr.h>
-+#include "clk-iproc.h"
++/ {
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
 +
-+#define REG_VAL(o, s, w) { .offset = o, .shift = s, .width = w, }
-+
-+#define AON_VAL(o, pw, ps, is) { .offset = o, .pwr_width = pw, \
-+	.pwr_shift = ps, .iso_shift = is }
-+
-+#define SW_CTRL_VAL(o, s) { .offset = o, .shift = s, }
-+
-+#define RESET_VAL(o, rs, prs) { .offset = o, .reset_shift = rs, \
-+	.p_reset_shift = prs }
-+
-+#define DF_VAL(o, kis, kiw, kps, kpw, kas, kaw) { .offset = o, \
-+	.ki_shift = kis, .ki_width = kiw, .kp_shift = kps, .kp_width = kpw, \
-+	.ka_shift = kas, .ka_width = kaw }
-+
-+#define VCO_CTRL_VAL(uo, lo) { .u_offset = uo, .l_offset = lo }
-+
-+#define ENABLE_VAL(o, es, hs, bs) { .offset = o, .enable_shift = es, \
-+	.hold_shift = hs, .bypass_shift = bs }
-+
-+
-+static const struct iproc_pll_ctrl genpll0 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
-+		IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 5, 1, 0),
-+	.reset = RESET_VAL(0x0, 12, 11),
-+	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
-+	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
-+	.ndiv_int = REG_VAL(0x10, 20, 10),
-+	.ndiv_frac = REG_VAL(0x10, 0, 20),
-+	.pdiv = REG_VAL(0x14, 0, 4),
-+	.status = REG_VAL(0x30, 12, 1),
++	aliases {
++		serial0 = &uart1;
++		serial1 = &uart0;
++		serial2 = &uart2;
++		serial3 = &uart3;
++	};
 +};
 +
-+static const struct iproc_clk_ctrl genpll0_clk[] = {
-+	[BCM_SR_GENPLL0_SATA_CLK] = {
-+		.channel = BCM_SR_GENPLL0_SATA_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+		.mdiv = REG_VAL(0x18, 0, 9),
-+	},
-+	[BCM_SR_GENPLL0_SCR_CLK] = {
-+		.channel = BCM_SR_GENPLL0_SCR_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 7, 1, 13),
-+		.mdiv = REG_VAL(0x18, 10, 9),
-+	},
-+	[BCM_SR_GENPLL0_250M_CLK] = {
-+		.channel = BCM_SR_GENPLL0_250M_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 8, 2, 14),
-+		.mdiv = REG_VAL(0x18, 20, 9),
-+	},
-+	[BCM_SR_GENPLL0_PCIE_AXI_CLK] = {
-+		.channel = BCM_SR_GENPLL0_PCIE_AXI_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 9, 3, 15),
-+		.mdiv = REG_VAL(0x1c, 0, 9),
-+	},
-+	[BCM_SR_GENPLL0_PAXC_AXI_X2_CLK] = {
-+		.channel = BCM_SR_GENPLL0_PAXC_AXI_X2_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 10, 4, 16),
-+		.mdiv = REG_VAL(0x1c, 10, 9),
-+	},
-+	[BCM_SR_GENPLL0_PAXC_AXI_CLK] = {
-+		.channel = BCM_SR_GENPLL0_PAXC_AXI_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 11, 5, 17),
-+		.mdiv = REG_VAL(0x1c, 20, 9),
-+	},
++&memory { /* Default DRAM banks */
++	reg = <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
++	      <0x00000008 0x80000000 0x1 0x80000000>; /* 6G @ 34G */
 +};
 +
-+static void __init sr_genpll0_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &genpll0, NULL, 0, genpll0_clk,
-+				ARRAY_SIZE(genpll0_clk));
-+}
++&uart1 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
+new file mode 100644
+index 0000000..c309cda
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
+@@ -0,0 +1,48 @@
++/*
++ *  BSD LICENSE
++ *
++ *  Copyright(c) 2016-2017 Broadcom.  All rights reserved.
++ *
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
++ *
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom nor the names of its
++ *      contributors may be used to endorse or promote products derived
++ *      from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
 +
-+static const struct iproc_pll_ctrl genpll3 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
-+		IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 1, 19, 18),
-+	.reset = RESET_VAL(0x0, 12, 11),
-+	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
-+	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
-+	.ndiv_int = REG_VAL(0x10, 20, 10),
-+	.ndiv_frac = REG_VAL(0x10, 0, 20),
-+	.pdiv = REG_VAL(0x14, 0, 4),
-+	.status = REG_VAL(0x30, 12, 1),
++/dts-v1/;
++
++#include "bcm958742-base.dtsi"
++
++/ {
++	compatible = "brcm,bcm958742k", "brcm,stingray";
++	model = "Stingray Combo SVK (BCM958742K)";
 +};
 +
-+static const struct iproc_clk_ctrl genpll3_clk[] = {
-+	[BCM_SR_GENPLL3_HSLS_CLK] = {
-+		.channel = BCM_SR_GENPLL3_HSLS_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+		.mdiv = REG_VAL(0x18, 0, 9),
-+	},
-+	[BCM_SR_GENPLL3_SDIO_CLK] = {
-+		.channel = BCM_SR_GENPLL3_SDIO_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 7, 1, 13),
-+		.mdiv = REG_VAL(0x18, 10, 9),
-+	},
++&uart2 {
++	status = "okay";
 +};
 +
-+static void __init sr_genpll3_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &genpll3, NULL, 0, genpll3_clk,
-+				ARRAY_SIZE(genpll3_clk));
-+}
-+CLK_OF_DECLARE(sr_genpll3_clk, "brcm,sr-genpll3",
-+			sr_genpll3_clk_init);
-+
-+static const struct iproc_pll_ctrl genpll4 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
-+		IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 1, 25, 24),
-+	.reset = RESET_VAL(0x0, 12, 11),
-+	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
-+	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
-+	.ndiv_int = REG_VAL(0x10, 20, 10),
-+	.ndiv_frac = REG_VAL(0x10, 0, 20),
-+	.pdiv = REG_VAL(0x14, 0, 4),
-+	.status = REG_VAL(0x30, 12, 1),
++&uart3 {
++	status = "okay";
 +};
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
+new file mode 100644
+index 0000000..6ebe399
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
+@@ -0,0 +1,40 @@
++/*
++ *  BSD LICENSE
++ *
++ *  Copyright(c) 2017 Broadcom.  All rights reserved.
++ *
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
++ *
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom nor the names of its
++ *      contributors may be used to endorse or promote products derived
++ *      from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
 +
-+static const struct iproc_clk_ctrl genpll4_clk[] = {
-+	[BCM_SR_GENPLL4_CCN_CLK] = {
-+		.channel = BCM_SR_GENPLL4_CCN_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+		.mdiv = REG_VAL(0x18, 0, 9),
-+	},
++/dts-v1/;
++
++#include "bcm958742-base.dtsi"
++
++/ {
++	compatible = "brcm,bcm958742t", "brcm,stingray";
++	model = "Stingray SST100 (BCM958742T)";
 +};
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+new file mode 100644
+index 0000000..9fe19a2
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+@@ -0,0 +1,302 @@
++/*
++ *  BSD LICENSE
++ *
++ *  Copyright(c) 2015-2017 Broadcom.  All rights reserved.
++ *
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
++ *
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom nor the names of its
++ *      contributors may be used to endorse or promote products derived
++ *      from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
 +
-+static void __init sr_genpll4_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &genpll4, NULL, 0, genpll4_clk,
-+				ARRAY_SIZE(genpll4_clk));
-+}
++#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
-+static const struct iproc_pll_ctrl genpll5 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_HAS_NDIV_FRAC |
-+		IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 1, 1, 0),
-+	.reset = RESET_VAL(0x0, 12, 11),
-+	.dig_filter = DF_VAL(0x0, 4, 3, 0, 4, 7, 3),
-+	.sw_ctrl = SW_CTRL_VAL(0x10, 31),
-+	.ndiv_int = REG_VAL(0x10, 20, 10),
-+	.ndiv_frac = REG_VAL(0x10, 0, 20),
-+	.pdiv = REG_VAL(0x14, 0, 4),
-+	.status = REG_VAL(0x30, 12, 1),
++/ {
++	compatible = "brcm,stingray";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu at 000 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a72", "arm,armv8";
++			reg = <0x0 0x0>;
++			enable-method = "psci";
++			next-level-cache = <&CLUSTER0_L2>;
++		};
++
++		cpu at 001 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a72", "arm,armv8";
++			reg = <0x0 0x1>;
++			enable-method = "psci";
++			next-level-cache = <&CLUSTER0_L2>;
++		};
++
++		cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a72", "arm,armv8";
++			reg = <0x0 0x100>;
++			enable-method = "psci";
++			next-level-cache = <&CLUSTER1_L2>;
++		};
++
++		cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a72", "arm,armv8";
++			reg = <0x0 0x101>;
++			enable-method = "psci";
++			next-level-cache = <&CLUSTER1_L2>;
++		};
++
++		cpu at 200 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a72", "arm,armv8";
++			reg = <0x0 0x200>;
++			enable-method = "psci";
++			next-level-cache = <&CLUSTER2_L2>;
++		};
++
++		cpu at 201 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a72", "arm,armv8";
++			reg = <0x0 0x201>;
++			enable-method = "psci";
++			next-level-cache = <&CLUSTER2_L2>;
++		};
++
++		cpu at 300 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a72", "arm,armv8";
++			reg = <0x0 0x300>;
++			enable-method = "psci";
++			next-level-cache = <&CLUSTER3_L2>;
++		};
++
++		cpu at 301 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a72", "arm,armv8";
++			reg = <0x0 0x301>;
++			enable-method = "psci";
++			next-level-cache = <&CLUSTER3_L2>;
++		};
++
++		CLUSTER0_L2: l2-cache at 000 {
++			compatible = "cache";
++		};
++
++		CLUSTER1_L2: l2-cache at 100 {
++			compatible = "cache";
++		};
++
++		CLUSTER2_L2: l2-cache at 200 {
++			compatible = "cache";
++		};
++
++		CLUSTER3_L2: l2-cache at 300 {
++			compatible = "cache";
++		};
++	};
++
++	memory: memory at 80000000 {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000 0 0x40000000>;
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	scr {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x0 0x61000000 0x05000000>;
++
++		gic: interrupt-controller at 63c00000 {
++			compatible = "arm,gic-v3";
++			#interrupt-cells = <3>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			interrupt-controller;
++			reg = <0x02c00000 0x010000>, /* GICD */
++			      <0x02e00000 0x600000>; /* GICR */
++			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
++
++			gic_its: gic-its at 63c20000 {
++				compatible = "arm,gic-v3-its";
++				msi-controller;
++				#msi-cells = <1>;
++				reg = <0x02c20000 0x10000>;
++			};
++		};
++
++		smmu: mmu at 64000000 {
++			compatible = "arm,mmu-500";
++			reg = <0x03000000 0x80000>;
++			#global-interrupts = <1>;
++			interrupts = <GIC_SPI 704 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 711 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 712 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 713 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 714 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 715 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 716 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 717 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 718 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 719 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 720 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 721 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 722 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 723 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 724 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 725 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 726 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 727 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 728 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 729 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 730 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 731 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 732 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 733 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 734 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 735 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 736 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 737 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 738 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 739 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 740 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 741 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 742 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 743 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 744 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 745 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 746 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 747 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 748 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 749 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 750 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 751 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 752 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 753 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 754 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 755 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 756 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 757 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 758 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 759 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 760 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 761 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 762 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 763 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 764 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 765 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 766 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 767 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 768 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 769 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 770 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 771 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 772 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 773 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 774 IRQ_TYPE_LEVEL_HIGH>;
++			#iommu-cells = <2>;
++		};
++	};
++
++	hsls {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x0 0x68900000 0x17700000>;
++
++		uart0: uart at 68a00000 {
++			device_type = "serial";
++			compatible = "snps,dw-apb-uart";
++			reg = <0x00100000 0x1000>;
++			reg-shift = <2>;
++			clock-frequency = <25000000>;
++			interrupt-parent = <&gic>;
++			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		uart1: uart at 68a10000 {
++			device_type = "serial";
++			compatible = "snps,dw-apb-uart";
++			reg = <0x00110000 0x1000>;
++			reg-shift = <2>;
++			clock-frequency = <25000000>;
++			interrupt-parent = <&gic>;
++			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		uart2: uart at 68a20000 {
++			device_type = "serial";
++			compatible = "snps,dw-apb-uart";
++			reg = <0x00120000 0x1000>;
++			reg-shift = <2>;
++			clock-frequency = <25000000>;
++			interrupt-parent = <&gic>;
++			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		uart3: uart at 68a30000 {
++			device_type = "serial";
++			compatible = "snps,dw-apb-uart";
++			reg = <0x00130000 0x1000>;
++			reg-shift = <2>;
++			clock-frequency = <25000000>;
++			interrupt-parent = <&gic>;
++			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		hwrng: hwrng at 68b20000 {
++			compatible = "brcm,iproc-rng200";
++			reg = <0x00220000 0x28>;
++		};
++	};
 +};
-+
-+static const struct iproc_clk_ctrl genpll5_clk[] = {
-+	[BCM_SR_GENPLL5_FS_CLK] = {
-+		.channel = BCM_SR_GENPLL5_FS_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+		.mdiv = REG_VAL(0x18, 0, 9),
-+	},
-+	[BCM_SR_GENPLL5_SPU_CLK] = {
-+		.channel = BCM_SR_GENPLL5_SPU_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x4, 6, 0, 12),
-+		.mdiv = REG_VAL(0x18, 10, 9),
-+	},
-+};
-+
-+static void __init sr_genpll5_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &genpll5, NULL, 0, genpll5_clk,
-+				ARRAY_SIZE(genpll5_clk));
-+}
-+
-+static const struct iproc_pll_ctrl lcpll0 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 2, 19, 18),
-+	.reset = RESET_VAL(0x0, 31, 30),
-+	.sw_ctrl = SW_CTRL_VAL(0x4, 31),
-+	.ndiv_int = REG_VAL(0x4, 16, 10),
-+	.pdiv = REG_VAL(0x4, 26, 4),
-+	.status = REG_VAL(0x38, 12, 1),
-+};
-+
-+static const struct iproc_clk_ctrl lcpll0_clk[] = {
-+	[BCM_SR_LCPLL0_SATA_REF_CLK] = {
-+		.channel = BCM_SR_LCPLL0_SATA_REF_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 7, 1, 13),
-+		.mdiv = REG_VAL(0x14, 0, 9),
-+	},
-+	[BCM_SR_LCPLL0_USB_REF_CLK] = {
-+		.channel = BCM_SR_LCPLL0_USB_REF_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 8, 2, 14),
-+		.mdiv = REG_VAL(0x14, 10, 9),
-+	},
-+	[BCM_SR_LCPLL0_SATA_REFPN_CLK] = {
-+		.channel = BCM_SR_LCPLL0_SATA_REFPN_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 9, 3, 15),
-+		.mdiv = REG_VAL(0x14, 20, 9),
-+	},
-+};
-+
-+static void __init sr_lcpll0_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &lcpll0, NULL, 0, lcpll0_clk,
-+				ARRAY_SIZE(lcpll0_clk));
-+}
-+
-+static const struct iproc_pll_ctrl lcpll1 = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 2, 22, 21),
-+	.reset = RESET_VAL(0x0, 31, 30),
-+	.sw_ctrl = SW_CTRL_VAL(0x4, 31),
-+	.ndiv_int = REG_VAL(0x4, 16, 10),
-+	.pdiv = REG_VAL(0x4, 26, 4),
-+	.status = REG_VAL(0x38, 12, 1),
-+};
-+
-+static const struct iproc_clk_ctrl lcpll1_clk[] = {
-+	[BCM_SR_LCPLL1_WAN_CLK] = {
-+		.channel = BCM_SR_LCPLL1_WAN_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 7, 1, 13),
-+		.mdiv = REG_VAL(0x14, 0, 9),
-+	},
-+};
-+
-+static void __init sr_lcpll1_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &lcpll1, NULL, 0, lcpll1_clk,
-+				ARRAY_SIZE(lcpll1_clk));
-+}
-+
-+static const struct iproc_pll_ctrl lcpll_pcie = {
-+	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_NEEDS_SW_CFG,
-+	.aon = AON_VAL(0x0, 2, 25, 24),
-+	.reset = RESET_VAL(0x0, 31, 30),
-+	.sw_ctrl = SW_CTRL_VAL(0x4, 31),
-+	.ndiv_int = REG_VAL(0x4, 16, 10),
-+	.pdiv = REG_VAL(0x4, 26, 4),
-+	.status = REG_VAL(0x38, 12, 1),
-+};
-+
-+static const struct iproc_clk_ctrl lcpll_pcie_clk[] = {
-+	[BCM_SR_LCPLL_PCIE_PHY_REF_CLK] = {
-+		.channel = BCM_SR_LCPLL_PCIE_PHY_REF_CLK,
-+		.flags = IPROC_CLK_AON,
-+		.enable = ENABLE_VAL(0x0, 7, 1, 13),
-+		.mdiv = REG_VAL(0x14, 0, 9),
-+	},
-+};
-+
-+static void __init sr_lcpll_pcie_clk_init(struct device_node *node)
-+{
-+	iproc_pll_clk_setup(node, &lcpll_pcie, NULL, 0, lcpll_pcie_clk,
-+		ARRAY_SIZE(lcpll_pcie_clk));
-+}
-+
-+static const struct of_device_id sr_clk_dt_ids[] = {
-+{ .compatible = "brcm,sr-genpll0", .data = sr_genpll0_clk_init, },
-+{ .compatible = "brcm,sr-genpll4", .data = sr_genpll4_clk_init, },
-+{ .compatible = "brcm,sr-genpll5", .data = sr_genpll5_clk_init, },
-+{ .compatible = "brcm,sr-lcpll0", .data = sr_lcpll0_clk_init, },
-+{ .compatible = "brcm,sr-lcpll1", .data = sr_lcpll1_clk_init, },
-+{ .compatible = "brcm,sr-lcpll-pcie", .data = sr_lcpll_pcie_clk_init, },
-+{ /* sentinel */ }
-+};
-+
-+static int sr_clk_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *device;
-+	void (*init_func)(struct device_node *);
-+
-+	device = of_match_device(sr_clk_dt_ids, &pdev->dev);
-+	if (!device)
-+		return -ENODEV;
-+	init_func = device->data;
-+
-+	init_func(pdev->dev.of_node);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver sr_clk_driver = {
-+	.driver = {
-+		.name = "sr-clk",
-+		.of_match_table = sr_clk_dt_ids,
-+	},
-+	.probe = sr_clk_probe,
-+};
-+builtin_platform_driver(sr_clk_driver);
 -- 
 2.7.4
