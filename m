@@ -1,95 +1,53 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 22 May 2017 13:18:38 -0600
-Subject: [PATCH v7 0/3] PCI/IOMMU: Reserve IOVAs for PCI inbound memory
-In-Reply-To: <1495471182-12490-1-git-send-email-oza.oza@broadcom.com>
-References: <1495471182-12490-1-git-send-email-oza.oza@broadcom.com>
-Message-ID: <20170522131838.71258483@w520.home>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 22 May 2017 21:30:22 +0200
+Subject: [PATCH v4 00/20] eeprom: at24: Add OF device ID table
+In-Reply-To: <CABxcv==8R5_tG8-rsp-9UdS_5N7X8QXkd0OFnN63Ct7L2jFvhA@mail.gmail.com>
+References: <20170522140208.24652-1-javier@dowhile0.org>
+ <CAMuHMdXbhkGGFC80-39Axzv=BdEXyBNuPuHCSWW3eXWDB=SQ+w@mail.gmail.com>
+ <CAL_JsqL2P=C+xRyL-BCC=RtFah4BRf8BHSvWNPZ+6r2ioSk_Yw@mail.gmail.com>
+ <CABxcv==xw7UxF1Ey+hDhGb_wzgAcFR9JLm6iuirvYSTTvSxb0A@mail.gmail.com>
+ <CAL_JsqKj_f-jY3wi78QyAAov=a9-ReaT9qU=ytwSp+5RL0eutg@mail.gmail.com>
+ <CABxcv==8R5_tG8-rsp-9UdS_5N7X8QXkd0OFnN63Ct7L2jFvhA@mail.gmail.com>
+Message-ID: <CAMuHMdVaY6J04TL=cEBVkCx=qhQuvbprxXt4VCjh_oEedRYnzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 May 2017 22:09:39 +0530
-Oza Pawandeep <oza.oza@broadcom.com> wrote:
+Hi Javier,
 
-> iproc based PCI RC and Stingray SOC has limitaiton of addressing only 512GB
-> memory at once.
-> 
-> IOVA allocation honors device's coherent_dma_mask/dma_mask.
-> In PCI case, current code honors DMA mask set by EP, there is no
-> concept of PCI host bridge dma-mask,  should be there and hence
-> could truly reflect the limitation of PCI host bridge.
-> 
-> However assuming Linux takes care of largest possible dma_mask, still the
-> limitation could exist, because of the way memory banks are implemented.
-> 
-> for e.g. memory banks:
-> <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
-> <0x00000008 0x80000000 0x3 0x80000000>, /* 14G @ 34G */
-> <0x00000090 0x00000000 0x4 0x00000000>, /* 16G @ 576G */
-> <0x000000a0 0x00000000 0x4 0x00000000>; /* 16G @ 640G */
-> 
-> When run User space (SPDK) which internally uses vfio in order to access
-> PCI EndPoint directly.
-> 
-> Vfio uses huge-pages which could come from 640G/0x000000a0. 
-> And the way vfio maps the hugepage is to have phys addr as iova,
-> and ends up calling VFIO_IOMMU_MAP_DMA ends up calling iommu_map,
-> inturn arm_lpae_map mapping iovas out of range.
-> 
-> So the way kernel allocates IOVA (where it honours device dma_mask) and
-> the way userspace gets IOVA is different.
-> 
-> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>; will not work.
-> 
-> Instead we have to go for scattered dma-ranges leaving holes.
-> Hence, we have to reserve IOVA allocations for inbound memory.
-> The patch-set caters to only addressing IOVA allocation problem.
+On Mon, May 22, 2017 at 7:15 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+>>> I also wonder why this is really needed if AFAIU "renesas,24c02" is
+>>> compatible with "atmel,24c02". IOW, the driver doesn't need to
+>>> differentiate between the two since the devices are the same and will
+>>> always match using "atmel,24c02".
+>>
+>> It is needed, so that when a difference is found, it can be handled
+>> without updating the DT.
+>
+> Yes, I understand this. What I tried to ask is if there could really
+> be a difference for the same chip type between different vendors, or
+> is just that people were using other manufacturers in the compatible
+> string as a consequence of the DT binding doc and the I2C core
+> ignoring the vendor prefix.
 
+The devices from different vendors are not the same. They contain FLASH
+ROM of a specific size, and glue logic to expose an i2c slave
+interface providing
+an AT24-compatible command set.  They should behave similar within
+the limits of the AT24 "spec".  But the actual implementation may be different.
 
-The description here confuses me, with vfio the user owns the iova
-allocation problem.  Mappings are only identity mapped if the user
-chooses to do so.  The dma_mask of the device is set by the driver and
-only relevant to the DMA-API.  vfio is a meta-driver and doesn't know
-the dma_mask of any particular device, that's the user's job.  Is the
-net result of what's happening here for the vfio case simply to expose
-extra reserved regions in sysfs, which the user can then consume to
-craft a compatible iova?  Thanks,
+> I don't mind though, I will leave the manufacturers that are different
+> than the atmel variants in the mainline DTS as you and Geert asked.
 
-Alex
+OK, thanks!
 
-> 
-> Changes since v7:
-> - Robin's comment addressed
-> where he wanted to remove depedency between IOMMU and OF layer.
-> - Bjorn Helgaas's comments addressed.
-> 
-> Changes since v6:
-> - Robin's comments addressed.
-> 
-> Changes since v5:
-> Changes since v4:
-> Changes since v3:
-> Changes since v2:
-> - minor changes, redudant checkes removed
-> - removed internal review
-> 
-> Changes since v1:
-> - address Rob's comments.
-> - Add a get_dma_ranges() function to of_bus struct..
-> - Convert existing contents of of_dma_get_range function to
->   of_bus_default_dma_get_ranges and adding that to the
->   default of_bus struct.
-> - Make of_dma_get_range call of_bus_match() and then bus->get_dma_ranges.
-> 
-> 
-> Oza Pawandeep (3):
->   OF/PCI: expose inbound memory interface to PCI RC drivers.
->   IOMMU/PCI: reserve IOVA for inbound memory for PCI masters
->   PCI: add support for inbound windows resources
-> 
->  drivers/iommu/dma-iommu.c | 44 ++++++++++++++++++++--
->  drivers/of/of_pci.c       | 96 +++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/pci/probe.c       | 30 +++++++++++++--
->  include/linux/of_pci.h    |  7 ++++
->  include/linux/pci.h       |  1 +
->  5 files changed, 170 insertions(+), 8 deletions(-)
-> 
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
