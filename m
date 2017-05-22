@@ -1,41 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 May 2017 07:53:04 -0700
-Subject: [PATCH v2 2/2] memory: ti-emif-sram: introduce relocatable
- suspend/resume handlers
-In-Reply-To: <20170519175708.6070-3-d-gerlach@ti.com>
-References: <20170519175708.6070-1-d-gerlach@ti.com>
- <20170519175708.6070-3-d-gerlach@ti.com>
-Message-ID: <20170522145304.GO10472@atomide.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 22 May 2017 16:54:40 +0200
+Subject: [PATCH v3 1/3] Documentation/bindings: Document the SafeXel
+ cryptographic engine driver
+In-Reply-To: <e8ef1f11-539c-9abc-9977-36366d4994b1@arm.com>
+References: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
+ <20170424075407.19730-2-antoine.tenart@free-electrons.com>
+ <7986721e-3a2b-23fb-61d7-7032f0d65533@arm.com>
+ <20170522143049.GD14976@kwain.lan>
+ <e8ef1f11-539c-9abc-9977-36366d4994b1@arm.com>
+Message-ID: <20170522145440.GE14976@kwain.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [170519 11:00]:
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index 608008229c7d..d728b5660e36 100644
-> --- a/arch/arm/kernel/asm-offsets.c
-> +++ b/arch/arm/kernel/asm-offsets.c
-> @@ -28,6 +28,7 @@
->  #include <asm/vdso_datapage.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include <linux/kbuild.h>
-> +#include <linux/ti-emif-sram.h>
->  
->  /*
->   * Make sure that the compiler and target are compatible.
-> @@ -183,5 +184,10 @@ int main(void)
->  #ifdef CONFIG_VDSO
->    DEFINE(VDSO_DATA_SIZE,	sizeof(union vdso_data_store));
->  #endif
-> +#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
-> +  BLANK();
-> +  ti_emif_offsets();
-> +#endif
-> +
->    return 0; 
->  }
+On Mon, May 22, 2017 at 03:48:30PM +0100, Marc Zyngier wrote:
+> On 22/05/17 15:30, Antoine Tenart wrote:
+> > On Wed, May 03, 2017 at 05:36:38PM +0100, Marc Zyngier wrote:
+> >> On 24/04/17 08:54, Antoine Tenart wrote:
+> >>> +
+> >>> +	crypto: crypto at 800000 {
+> >>> +		compatible = "inside-secure,safexcel-eip197";
+> >>> +		reg = <0x800000 0x200000>;
+> >>> +		interrupts = <GIC_SPI 34 (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH)>,
+> >>
+> >> I'm puzzled. How can the interrupt can be both level *and* edge? That
+> >> doesn't make any sense.
+> > 
+> > I agree this looks odd. I took it from Russel's ICU mapping:
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/489040.html
+> 
+> This emails says:
+> 
+> ICU-irq => GIC-SPI-num Enable Edge/Level ICU-group
+> [...]
+>    24 =>  34 En Lv 0
 
-Above still needs to be commented by Russell.
+It also says: 87 =>  34 En Lv 5, which is the IRQ I'm looking for.
 
-As far as I'm concerned:
+Antoine.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
