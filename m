@@ -1,40 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 May 2017 14:30:16 +0200
-Subject: [PATCH 06/14] ARM: dts: r8a7790: update PFC node name to
- pin-controller
+Date: Mon, 22 May 2017 14:30:20 +0200
+Subject: [PATCH 10/14] ARM: dts: r7s72100: add usb clocks to device tree
 In-Reply-To: <cover.1495455272.git.horms+renesas@verge.net.au>
 References: <cover.1495455272.git.horms+renesas@verge.net.au>
-Message-ID: <a5f4ae3c3165134599ad850f8d34c6a35d6c0f97.1495455272.git.horms+renesas@verge.net.au>
+Message-ID: <9907a4a00f6df0796d6e838c9dbf3ecce2ec4600.1495455272.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device trees for Renesas SoCs use either pfc or pin-controller as the
-node name for the PFC device. This patch is intended to take a step towards
-unifying the node name used as pin-controller which appears to be the more
-generic of the two and thus more in keeping with the DT specs.
+From: Chris Brandt <chris.brandt@renesas.com>
 
-My analysis is that this is a user-visible change to the extent that kernel
-logs, and sysfs entries change from e6060000.pfc and pfc at e6060000 to
-e6060000.pin-controller and pin-controller at e6060000.
+This adds the USB0 and USB1 clocks to the device tree.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r7s72100.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 99269aaca6fc..416956a42c93 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -614,7 +614,7 @@
- 		max-frequency = <97500000>;
- 	};
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index 0423996e4dcc..5cf53e9943af 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -144,9 +144,9 @@
+ 			#clock-cells = <1>;
+ 			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0xfcfe0430 4>;
+-			clocks = <&b_clk>;
+-			clock-indices = <R7S72100_CLK_ETHER>;
+-			clock-output-names = "ether";
++			clocks = <&b_clk>, <&p1_clk>, <&p1_clk>;
++			clock-indices = <R7S72100_CLK_ETHER R7S72100_CLK_USB0 R7S72100_CLK_USB1>;
++			clock-output-names = "ether", "usb0", "usb1";
+ 		};
  
--	pfc: pfc at e6060000 {
-+	pfc: pin-controller at e6060000 {
- 		compatible = "renesas,pfc-r8a7790";
- 		reg = <0 0xe6060000 0 0x250>;
- 	};
+ 		mstp8_clks: mstp8_clks at fcfe0434 {
 -- 
 2.1.4
