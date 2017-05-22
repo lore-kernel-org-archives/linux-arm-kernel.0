@@ -1,37 +1,34 @@
-From: srinath.mannam@broadcom.com (Srinath Mannam)
-Date: Mon, 22 May 2017 17:22:55 +0530
-Subject: [PATCH] mmc: sdhci-iproc: suppress spurious interrupt with
- Multiblock read
-In-Reply-To: <58554ec9-1544-318a-e912-3c5f6ee40e90@intel.com>
-References: <1495126660-25044-1-git-send-email-srinath.mannam@broadcom.com>
- <58554ec9-1544-318a-e912-3c5f6ee40e90@intel.com>
-Message-ID: <CABe79T5hKmn49cKEy-KdMQ-S5HMFuhextddV=D_YY+6_QwEPUQ@mail.gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Mon, 22 May 2017 11:53:50 +0000
+Subject: [PATCH 0/2] ioremap_wc on arm64
+In-Reply-To: <20170522085615.GC30129@e104818-lin.cambridge.arm.com>
+References: <1495436507-81890-1-git-send-email-jnair@caviumnetworks.com>
+ <20170522085615.GC30129@e104818-lin.cambridge.arm.com>
+Message-ID: <20170522115349.GA82957@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 11:55 AM, Adrian Hunter <adrian.hunter@intel.com> wrote:
-> On 18/05/17 19:57, Srinath Mannam wrote:
->> The stingray SDHCI hardware supports ACMD12 and automatically
->> issues after multi block transfer completed.
->>
->> If ACMD12 in SDHCI is disabled, spurious tx done interrupts are seen
->> on multi block read command with below error message:
->>
->> Got data interrupt 0x00000002 even though no data
->> operation was in progress.
->>
->> This patch uses SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 to enable
->> ACM12 support in SDHCI hardware and suppress spurious interrupt.
->>
->> Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
->> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->
-> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+On Mon, May 22, 2017 at 09:56:16AM +0100, Catalin Marinas wrote:
+> On Mon, May 22, 2017 at 07:01:45AM +0000, Jayachandran C wrote:
+> > From its definition, the device "gather" attribute seems to be a better
+> > fit for implementing write combining mapping in ioremap_wc().  And on
+> > ThunderX2, Device GRE mapping has optimizations that makes it much faster
+> > than normal uncached mapping.
+> > 
+> > I am not sure of the reasoning behind the original decision to make
+> > ioremap_wc use "Normal Non-Cached" attribute, since all the other variants
+> > of ioremap use device attributes, and ioremap_wc looks like an exception.
+> 
+> The reason we kept it as Normal NC is that Device_GRE does not allow
+> unaligned accesses.
 
-Thanks Adrian...
+There does not to be an expectation to have unaligned access on __iomem
+pointers. I also see that memremap can call ioremap_wc (which is a Normal
+mapping) or ioremap_wt(which is a Device mapping), so that is inconsistent
+as well.
 
-Will it be possible to take this for Linux-4.12??
+Was this added for a specific use case? Also, do you think this patchset
+is acceptable?
 
-Regards,
-Srinath
+Thanks,
+JC.
