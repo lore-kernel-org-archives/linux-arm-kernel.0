@@ -1,52 +1,78 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 May 2017 15:58:56 +0200
-Subject: [PATCH 23/35] arm64: dts: r8a7796: add Sound DVC support
-In-Reply-To: <cover.1495457812.git.horms+renesas@verge.net.au>
-References: <cover.1495457812.git.horms+renesas@verge.net.au>
-Message-ID: <688d98138bd00e3c8cb0a6044856449449d0d9e7.1495457812.git.horms+renesas@verge.net.au>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 22 May 2017 16:02:00 +0200
+Subject: [PATCH v4 12/20] ARM: dts: uniphier: Add generic compatible string
+ for I2C EEPROM
+In-Reply-To: <20170522140208.24652-1-javier@dowhile0.org>
+References: <20170522140208.24652-1-javier@dowhile0.org>
+Message-ID: <20170522140208.24652-13-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+The at24 driver allows to register I2C EEPROM chips using different vendor
+and devices, but the I2C subsystem does not take the vendor into account
+when matching using the I2C table since it only has device entries.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+But when matching using an OF table, both the vendor and device has to be
+taken into account so the driver defines only a set of compatible strings
+using the "atmel" vendor as a generic fallback for compatible I2C devices.
+
+So add this generic fallback to the device node compatible string to make
+the device to match the driver using the OF device ID table.
+
+Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 778275a980d3..156c0f8a81ba 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -1196,6 +1196,7 @@
- 				 <&cpg CPG_MOD 1026>, <&cpg CPG_MOD 1027>,
- 				 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
- 				 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
-+				 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
- 				 <&audio_clk_a>, <&audio_clk_b>,
- 				 <&audio_clk_c>,
- 				 <&cpg CPG_CORE R8A7796_CLK_S0D4>;
-@@ -1206,15 +1207,19 @@
- 				      "src.9", "src.8", "src.7", "src.6",
- 				      "src.5", "src.4", "src.3", "src.2",
- 				      "src.1", "src.0",
-+				      "dvc.0", "dvc.1",
- 				      "clk_a", "clk_b", "clk_c", "clk_i";
- 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
- 			status = "disabled";
+Changes in v4:
+- Only use the atmel manufacturer in the compatible string instead of
+  keeping the deprecated ones (Rob Herring).
+
+Changes in v3: None
+Changes in v2: None
+
+ arch/arm/boot/dts/uniphier-pro4-ace.dts    | 2 +-
+ arch/arm/boot/dts/uniphier-pro4-sanji.dts  | 2 +-
+ arch/arm/boot/dts/uniphier-pxs2-gentil.dts | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/uniphier-pro4-ace.dts b/arch/arm/boot/dts/uniphier-pro4-ace.dts
+index fefc89149234..30ed82b2e90d 100644
+--- a/arch/arm/boot/dts/uniphier-pro4-ace.dts
++++ b/arch/arm/boot/dts/uniphier-pro4-ace.dts
+@@ -88,7 +88,7 @@
+ 	status = "okay";
  
- 			rcar_sound,dvc {
- 				dvc0: dvc-0 {
-+					dmas = <&audma1 0xbc>;
-+					dma-names = "tx";
- 				};
--
- 				dvc1: dvc-1 {
-+					dmas = <&audma1 0xbe>;
-+					dma-names = "tx";
- 				};
- 			};
+ 	eeprom at 54 {
+-		compatible = "st,24c64";
++		compatible = "atmel,24c64";
+ 		reg = <0x54>;
+ 		pagesize = <32>;
+ 	};
+diff --git a/arch/arm/boot/dts/uniphier-pro4-sanji.dts b/arch/arm/boot/dts/uniphier-pro4-sanji.dts
+index 6c63c8bad825..42d0ea85a1e1 100644
+--- a/arch/arm/boot/dts/uniphier-pro4-sanji.dts
++++ b/arch/arm/boot/dts/uniphier-pro4-sanji.dts
+@@ -83,7 +83,7 @@
+ 	status = "okay";
  
+ 	eeprom at 54 {
+-		compatible = "st,24c64";
++		compatible = "atmel,24c64";
+ 		reg = <0x54>;
+ 		pagesize = <32>;
+ 	};
+diff --git a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
+index cccc86658d20..f2368107699e 100644
+--- a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
++++ b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
+@@ -80,7 +80,7 @@
+ 	status = "okay";
+ 
+ 	eeprom at 54 {
+-		compatible = "st,24c64";
++		compatible = "atmel,24c64";
+ 		reg = <0x54>;
+ 		pagesize = <32>;
+ 	};
 -- 
-2.1.4
+2.9.3
