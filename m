@@ -1,36 +1,32 @@
 From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Mon, 22 May 2017 07:36:04 +0000
-Subject: [PATCH 1/2] arm64: disable Broadcom Vulcan platform
+Date: Mon, 22 May 2017 07:36:05 +0000
+Subject: [PATCH 2/2] arm64: defconfig: drop ARCH_VULCAN
 In-Reply-To: <1495438565-82495-1-git-send-email-jnair@caviumnetworks.com>
 References: <1495438565-82495-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <1495438565-82495-2-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <1495438565-82495-3-git-send-email-jnair@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disable the option ARCH_VULCAN as a step towards deleting it entirely.
-There is still a reference in the kernel tree for ARCH_VULCAN, so we
-have to keep the config option around until that reference is removed.
+ARCH_VULCAN (Broadcom Vulcan) has been discontinued and all its
+dependencies have been moved to ARCH_THUNDER2. It can be dropped
+from defconfig now.
 
 Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
 ---
- arch/arm64/Kconfig.platforms | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ arch/arm64/configs/defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 73272f4..fa3715c 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -225,10 +225,7 @@ config ARCH_VEXPRESS
- 	  Express).
- 
- config ARCH_VULCAN
--	bool "Broadcom Vulcan SOC Family"
--	select GPIOLIB
--	help
--	  This enables support for Broadcom Vulcan SoC Family
-+	def_bool n
- 
- config ARCH_XGENE
- 	bool "AppliedMicro X-Gene SOC Family"
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 65cdd87..96224b2 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -56,7 +56,6 @@ CONFIG_ARCH_THUNDER=y
+ CONFIG_ARCH_THUNDER2=y
+ CONFIG_ARCH_UNIPHIER=y
+ CONFIG_ARCH_VEXPRESS=y
+-CONFIG_ARCH_VULCAN=y
+ CONFIG_ARCH_XGENE=y
+ CONFIG_ARCH_ZX=y
+ CONFIG_ARCH_ZYNQMP=y
 -- 
 2.7.4
