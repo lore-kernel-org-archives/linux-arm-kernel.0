@@ -1,30 +1,34 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Mon, 22 May 2017 17:53:54 +0200
-Subject: [PATCH v2 1/2] ACPICA: IORT: Update SMMU models for IORT rev. C
-In-Reply-To: <20170522154917.GA16981@rric.localdomain>
-References: <11ef7d28c535c01d42b7b3c8e632934f0e0f1048.1495459319.git.robin.murphy@arm.com>
- <20170522154917.GA16981@rric.localdomain>
-Message-ID: <20170522155354.GB16981@rric.localdomain>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 22 May 2017 17:54:58 +0200
+Subject: [PATCH] ARM: dts: imx28: add gpio-ranges for internal gpio
+ controller
+In-Reply-To: <20170515071608.auju66dhylzaexkw@pengutronix.de>
+References: <20170508085925.18342-1-u.kleine-koenig@pengutronix.de>
+ <20170511075135.GF5833@dragon>
+ <20170511080916.gim5pyhj5jarzf4r@pengutronix.de>
+ <20170512030536.GC8471@dragon>
+ <20170512080150.uh5qmwu2tctpd6jk@pengutronix.de>
+ <20170515022129.GJ8471@dragon>
+ <20170515071608.auju66dhylzaexkw@pengutronix.de>
+Message-ID: <CACRpkdYvQdDXfK5QkWM6x6F4+UEQ=4oX_1gqdbjkk9n7tM5FSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.05.17 17:49:17, Robert Richter wrote:
-> On 22.05.17 16:06:37, Robin Murphy wrote:
-> > IORT revision C has been published with a number of new SMMU
-> > implementation identifiers. Since IORT doesn't have any way of falling
-> > back to a more generic model code, we really need Linux to know about
-> > these before vendors start updating their firmware tables to use them.
-> > 
-> > CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> > CC: Robert Moore <robert.moore@intel.com>
-> > CC: Lv Zheng <lv.zheng@intel.com>
-> > Acked-by: Robert Richter <rrichter@cavium.com>
-> > Tested-by: Robert Richter <rrichter@cavium.com>
-> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> Robin, the stable tag is missing here, but we will need it for #2.
+On Mon, May 15, 2017 at 9:16 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Mon, May 15, 2017 at 10:21:30AM +0800, Shawn Guo wrote:
 
-I just noticed the additional #defines in #2. So no need to mark this
-one stable too.
+>> You will need to free the GPIO before muxing it to a different function,
+>> I think.
+>
+> IMHO this is a bad concept. This makes GPIOs more special than for
+> example PWMs or LEDs. And it breaks some configurations (for example the
+> make-pins-highz-on-idle setup in my previous mails).
 
--Robert
+So this is the reason why pin controllers can choose to be strict
+or not: people disagree on the semantics.
+
+But it's good if the driver maintainers agree for a certain driver :D
+
+Yours,
+Linus Walleij
