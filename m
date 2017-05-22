@@ -1,191 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 22 May 2017 18:52:33 +0100
-Subject: [PATCH 13/31] KVM: arm64: vgic-v3: Add ICV_IAR1_EL1 handler
-In-Reply-To: <9c11669c-ea66-bbe1-093d-907bcd190bab@redhat.com>
-References: <20170503104606.19342-1-marc.zyngier@arm.com>
- <20170503104606.19342-14-marc.zyngier@arm.com>
- <9c11669c-ea66-bbe1-093d-907bcd190bab@redhat.com>
-Message-ID: <81c9f8bc-8913-3e00-5360-1c61c9399854@arm.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Mon, 22 May 2017 19:55:56 +0200
+Subject: [linux-sunxi] Re: [RFC PATCH 07/11] drm: sun4i: add support for
+ the TV encoder in H3 SoC
+In-Reply-To: <CAGb2v66aD=G+V75N-_nYo=dGqhxpKhadM84h9G-B34=dnDwCbg@mail.gmail.com>
+References: <20170517164354.16399-1-icenowy@aosc.io>
+ <1958057.WDKm0nQKgW@jernej-laptop>
+ <CAGb2v66aD=G+V75N-_nYo=dGqhxpKhadM84h9G-B34=dnDwCbg@mail.gmail.com>
+Message-ID: <3164416.5xR36OcyjH@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi,
 
-On 18/05/17 08:41, Auger Eric wrote:
-> Hi Marc,
+Dne sobota, 20. maj 2017 ob 03:37:53 CEST je Chen-Yu Tsai napisal(a):
+> On Sat, May 20, 2017 at 2:23 AM, Jernej ?krabec <jernej.skrabec@siol.net> 
+wrote:
+> > Hi,
+> > 
+> > Dne petek, 19. maj 2017 ob 20:08:18 CEST je Icenowy Zheng napisal(a):
+> >> ? 2017?5?20? GMT+08:00 ??2:03:30, Maxime Ripard <maxime.ripard@free-
+> > 
+> > electrons.com> ??:
+> >> >On Thu, May 18, 2017 at 12:43:50AM +0800, Icenowy Zheng wrote:
+> >> >> Allwinner H3 features a TV encoder similar to the one in earlier
+> >> >
+> >> >SoCs,
+> >> >
+> >> >> but with some different points about clocks:
+> >> >> - It has a mod clock and a bus clock.
+> >> >> - The mod clock must be at a fixed rate to generate signal.
+> >> >
+> >> >Why?
+> >> 
+> >> It's experiment result by Jernej.
+> >> 
+> >> The clock rates in BSP kernel is also specially designed
+> >> (PLL_DE at 432MHz) in order to be able to feed the TVE.
+> > 
+> > My experiments and search through BSP code showed that TVE seems to have
+> > additional fixed predivider 8. So if you want to generate 27 MHz clock,
+> > unit has to be feed with 216 MHz.
+> > 
+> > TVE has only one PLL source PLL_DE. And since 216 MHz is a bit low for
+> > DE2,
+> > BSP defaults to 432 MHz for PLL_DE and use divider 2 to generate 216 MHz.
+> > This clock is then divided by 8 internaly to get final 27 MHz.
+> > 
+> > Please note that I don't have any hard evidence to support that, only
+> > experimental data. However, only that explanation make sense to me.
+> > 
+> > BTW, BSP H3/H5 TV driver supports only PAL and NTSC which both use 27 MHz
+> > base clock. Further experiments are needed to check if there is any
+> > possibility to have other resolutions by manipulating clocks and give
+> > other proper settings. I plan to do that, but not in very near future.
 > 
-> On 03/05/2017 12:45, Marc Zyngier wrote:
->> Add a handler for reading the guest's view of the ICC_IAR1_EL1
->> register. This involves finding the highest priority Group-1
->> interrupt, checking against both PMR and the active group
->> priority, activating the interrupt and setting the group
->> priority as active.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  include/linux/irqchip/arm-gic-v3.h |   1 +
->>  virt/kvm/arm/hyp/vgic-v3-sr.c      | 134 +++++++++++++++++++++++++++++++++++++
->>  2 files changed, 135 insertions(+)
->>
->> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
->> index 97cbca19430d..7610ea4e8337 100644
->> --- a/include/linux/irqchip/arm-gic-v3.h
->> +++ b/include/linux/irqchip/arm-gic-v3.h
->> @@ -391,6 +391,7 @@
->>  #define ICH_LR_PHYS_ID_SHIFT		32
->>  #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
->>  #define ICH_LR_PRIORITY_SHIFT		48
->> +#define ICH_LR_PRIORITY_MASK		(0xffULL << ICH_LR_PRIORITY_SHIFT)
->>  
->>  /* These are for GICv2 emulation only */
->>  #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
->> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
->> index 473ef22508e6..49aad1de3ac8 100644
->> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
->> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
->> @@ -375,6 +375,77 @@ void __hyp_text __vgic_v3_write_vmcr(u32 vmcr)
->>  
->>  #ifdef CONFIG_ARM64
->>  
->> +static int __hyp_text __vgic_v3_get_group(struct kvm_vcpu *vcpu)
->> +{
->> +	u32 esr = kvm_vcpu_get_hsr(vcpu);
->> +	u8 crm = (esr & ESR_ELx_SYS64_ISS_CRM_MASK) >> ESR_ELx_SYS64_ISS_CRM_SHIFT;
->> +
->> +	return crm != 8;
->> +}
->> +
->> +#define GICv3_IDLE_PRIORITY	0xff
->> +
->> +static int __hyp_text __vgic_v3_highest_priority_lr(struct kvm_vcpu *vcpu,
->> +						    u32 vmcr,
->> +						    u64 *lr_val)
->> +{
->> +	unsigned int used_lrs = vcpu->arch.vgic_cpu.used_lrs;
->> +	u8 priority = GICv3_IDLE_PRIORITY;
->> +	int i, lr = -1;
->> +
->> +	for (i = 0; i < used_lrs; i++) {
->> +		u64 val = __gic_v3_get_lr(i);
->> +		u8 lr_prio = (val & ICH_LR_PRIORITY_MASK) >> ICH_LR_PRIORITY_SHIFT;
->> +
->> +		/* Not pending in the state? */
->> +		if ((val & ICH_LR_STATE) != ICH_LR_PENDING_BIT)
->> +			continue;
->> +
->> +		/* Group-0 interrupt, but Group-0 disabled? */
->> +		if (!(val & ICH_LR_GROUP) && !(vmcr & ICH_VMCR_ENG0_MASK))
->> +			continue;
->> +
->> +		/* Group-1 interrupt, but Group-1 disabled? */
->> +		if ((val & ICH_LR_GROUP) && !(vmcr & ICH_VMCR_ENG1_MASK))
->> +			continue;
->> +
->> +		/* Not the highest priority? */
->> +		if (lr_prio >= priority)
->> +			continue;
->> +
->> +		/* This is a candidate */
->> +		priority = lr_prio;
->> +		*lr_val = val;
->> +		lr = i;
->> +	}
->> +
->> +	if (lr == -1)
->> +		*lr_val = ICC_IAR1_EL1_SPURIOUS;
->> +
->> +	return lr;
->> +}
->> +
->> +static int __hyp_text __vgic_v3_get_highest_active_priority(void)
->> +{
->> +	u8 nr_pre_bits = vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
->> +	u8 nr_aprs = 1 << (nr_pre_bits - 5);
-> s/nr_aprs/nr_apr_regs ?
+> You only have composite video output, and those are the only 2 standard
+> resolutions that make any sense.
 
-Sure, I can do that if that helps.
+Right, other resolutions are for VGA.
 
->> +	u32 hap = 0;
->> +	int i;
->> +
->> +	for (i = 0; i < nr_aprs; i++) {
->> +		u32 val;
->> +
->> +		val  = __vgic_v3_read_ap0rn(i);
->> +		val |= __vgic_v3_read_ap1rn(i);
->> +		if (val)
->> +			return (hap + __ffs(val)) << (8 - nr_pre_bits);
-> here don't we need to shift by the actual number of subpriority bits?
-> isn't nr_pre_bits the max implemented preemption bits but not
-> necessarily the actual chosen number set by bpr?
+Anyway, I did some more digging in A10 and R40 datasheets. I think that H3 TVE 
+unit is something in between. R40 TVE has a setting to select "up sample". 
+Possible settings are 27 MHz, 54 MHz, 108 MHz and 216 MHz. BSP driver on R40 
+has this setting enabled only for PAL and NTSC and it is always 216 MHz. I 
+think that H3 may have this hardwired to 216 MHz and this would be the reason 
+why 216 MHz is needed.
 
-Hmmm. I don't think that works. If you did that, you could end-up in a
-bizarre situation where you can completely miss the current active
-priority. Try for example:
+Has anyone else any better explanation?
 
-	nr_pre_bits=5
-	set BPR1=3 (5 preemption bits)
-	read IAR, interrupt priority = 0x10, set bit 2 in AP1R0
-	set BPR=4 (4 preemption bits)
-
-With this setting, you've changed the active priority from being 0x10
-(with BPR1=3) to being 8. This is wrong, as this should be an invariant.
-
-The only way to avoid this unfortunate state of affair is to always
-normalize the active priority to always be stored as if BPR had its
-smallest possible value (which happens to be nr_pre_bits).
-
->> +
->> +		hap += 32;
->> +	}
->> +
->> +	return GICv3_IDLE_PRIORITY;
->> +}
->> +
->>  static unsigned int __hyp_text __vgic_v3_get_bpr0(u32 vmcr)
->>  {
->>  	return (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
->> @@ -395,6 +466,66 @@ static unsigned int __hyp_text __vgic_v3_get_bpr1(u32 vmcr)
->>  	return bpr;
->>  }
->>  
-> Would be nice to have a short doc comment.
-> I understand this zeros the subpriority field in the priority value, is
-> it correct? pseudocode PriorityGroup()?
-
-Yes, I should probably add some references to the pseudocode.
-
->> +static u8 __hyp_text __vgic_v3_pri_to_pre(u8 pri, u32 vmcr, int grp)
->> +{
->> +	unsigned int bpr;
->> +
->> +	if (!grp)
->> +		bpr = __vgic_v3_get_bpr0(vmcr) + 1;
->> +	else
->> +		bpr = __vgic_v3_get_bpr1(vmcr);
->> +
->> +	return pri & (GENMASK(7, 0) << bpr);
->  & GENMASK(7, bpr)?
-
-Not sure about that. If grp==0, bpr can range from 1 to 8. If it is 8,
-what is the meaning of GENMASK(7,8)?
-
->> +}
->> +
->> +static void __hyp_text __vgic_v3_set_active_priority(u8 pre)
->> +{
->> +	u8 nr_pre_bits = vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
->> +	u8 hap = pre >> (8 - nr_pre_bits);
-> Could you add a comment about what is hap. I tend to think it is the
-> group priority but then I don't get why we don't shift by 8 -bpr
-
-"hap" stands for Highest Active Priority. And for the reasons describer
-above, we need to normalize it, irrespective of the BPR.
-
-Does it make sense?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best regards,
+Jernej
