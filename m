@@ -1,72 +1,29 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 22 May 2017 09:03:13 +0100
-Subject: Tegra baseline test results for v4.12-rc2
-Message-ID: <74d0ac0e-c04f-564a-fdf5-63cae593270b@nvidia.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 22 May 2017 10:36:21 +0200
+Subject: [PATCH] i2c: designware: Fix bogus sda_hold_time due to
+ uninitialized vars
+In-Reply-To: <743ebd23-17ab-03d2-ebd9-66acc9aee417@siemens.com>
+References: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
+ <CAKv+Gu9x_KCdEGBBOw9yaYOcYBcYtxJX-xTX=4kQuWqY=VK0PA@mail.gmail.com>
+ <743ebd23-17ab-03d2-ebd9-66acc9aee417@siemens.com>
+Message-ID: <20170522083621.upovyjqo56ywqdrl@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.12-rc2.
-Logs and other details at:
+On Mon, May 22, 2017 at 07:46:55AM +0200, Jan Kiszka wrote:
+> We need to initializes those variables to 0 for platforms that do not
+> provide ACPI parameters. Otherwise, we set sda_hold_time to random
+> values, breaking e.g. Galileo and IOT2000 boards.
+> 
+> Fixes: 9d6408433019 ("i2c: designware: don't infer timings described by ACPI from clock rate")
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 
-    https://nvtb.github.io//linux/test_v4.12-rc2/20170521200103/
+Applied to for-current, thanks!
 
-
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.12-rc1 (2ea659a9ef488125eb46da6eb571de5eae5c43f6)):
-   text     data      bss    total  kernel
- +21421   +35672        0   +57093  defconfig
-  +1340        0        0    +1340  multi_v7_defconfig
-   +780        0        0     +780  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.12-rc1 (2ea659a9ef488125eb46da6eb571de5eae5c43f6))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-     -76k      76k        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-     -76k      76k        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-     -76k      76k        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-     -80k      80k        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
-
---
-nvpublic
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170522/312b1807/attachment.sig>
