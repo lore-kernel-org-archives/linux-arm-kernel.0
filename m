@@ -1,100 +1,74 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 May 2017 15:59:01 +0200
-Subject: [PATCH 28/35] arm64: dts: renesas: r8a7795: Add HDMI encoder support
-In-Reply-To: <cover.1495457812.git.horms+renesas@verge.net.au>
-References: <cover.1495457812.git.horms+renesas@verge.net.au>
-Message-ID: <12daaf78a723ef7cb7ec46bc604844f31111bc7b.1495457812.git.horms+renesas@verge.net.au>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 22 May 2017 16:14:26 +0200
+Subject: [PATCH v3 0/3] Fix mdp device tree
+In-Reply-To: <20ba4f83-7d22-2a8e-4eb6-7d4eba92e2ae@xs4all.nl>
+References: <1494559361-42835-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <20ba4f83-7d22-2a8e-4eb6-7d4eba92e2ae@xs4all.nl>
+Message-ID: <1f7de9e7-2c18-6662-4b95-519d22a70723@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Add DT nodes for the two HDMI encoders in disabled state.
 
-Based on work by Koji Matsuoka.
+On 22/05/17 11:09, Hans Verkuil wrote:
+> On 05/12/2017 05:22 AM, Minghsiu Tsai wrote:
+> 
+> Who should take care of the dtsi changes? I'm not sure who maintains the mdp dts.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 52 ++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+I will take care of the dtsi patches.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 7d87dff70ac8..ee0129634cdf 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1758,6 +1758,56 @@
- 			renesas,fcp = <&fcpf2>;
- 		};
- 
-+		hdmi0: hdmi0 at fead0000 {
-+			compatible = "renesas,r8a7795-hdmi", "renesas,rcar-gen3-hdmi";
-+			reg = <0 0xfead0000 0 0x10000>;
-+			interrupts = <GIC_SPI 389 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 729>, <&cpg CPG_CORE R8A7795_CLK_HDMI>;
-+			clock-names = "iahb", "isfr";
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			resets = <&cpg 729>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				port at 0 {
-+					reg = <0>;
-+					dw_hdmi0_in: endpoint {
-+						remote-endpoint = <&du_out_hdmi0>;
-+					};
-+				};
-+				port at 1 {
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
-+		hdmi1: hdmi1 at feae0000 {
-+			compatible = "renesas,r8a7795-hdmi", "renesas,rcar-gen3-hdmi";
-+			reg = <0 0xfeae0000 0 0x10000>;
-+			interrupts = <GIC_SPI 436 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 728>, <&cpg CPG_CORE R8A7795_CLK_HDMI>;
-+			clock-names = "iahb", "isfr";
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			resets = <&cpg 728>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				port at 0 {
-+					reg = <0>;
-+					dw_hdmi1_in: endpoint {
-+						remote-endpoint = <&du_out_hdmi1>;
-+					};
-+				};
-+				port at 1 {
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
- 		du: display at feb00000 {
- 			compatible = "renesas,du-r8a7795";
- 			reg = <0 0xfeb00000 0 0x80000>,
-@@ -1789,11 +1839,13 @@
- 				port at 1 {
- 					reg = <1>;
- 					du_out_hdmi0: endpoint {
-+						remote-endpoint = <&dw_hdmi0_in>;
- 					};
- 				};
- 				port at 2 {
- 					reg = <2>;
- 					du_out_hdmi1: endpoint {
-+						remote-endpoint = <&dw_hdmi1_in>;
- 					};
- 				};
- 				port at 3 {
--- 
-2.1.4
+> 
+> The driver change and the dtsi change need to be in sync, so it is probably easiest
+> to merge this via one tree.
+> 
+> Here is my Acked-by for these three patches:
+> 
+> Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+> 
+> I can take all three, provided I have the Ack of the mdp dts maintainer. Or it can
+> go through him with my Ack.
+> 
+
+I think we should provide backwards compability instead, as proposed here:
+http://lists.infradead.org/pipermail/linux-mediatek/2017-May/008811.html
+
+If this change is ok for you, please let Minghsiu know so that he can 
+provide a v4.
+
+Regards,
+Matthias
+
+> Regards,
+> 
+> 	Hans
+> 
+>> Changes in v3:
+>> - Upload patches again because forget to add v2 in title
+>>
+>> Changes in v2:
+>> - Update commit message
+>>
+>> If the mdp_* nodes are under an mdp sub-node, their corresponding
+>> platform device does not automatically get its iommu assigned properly.
+>>
+>> Fix this by moving the mdp component nodes up a level such that they are
+>> siblings of mdp and all other SoC subsystems.  This also simplifies the
+>> device tree.
+>>
+>> Although it fixes iommu assignment issue, it also break compatibility
+>> with old device tree. So, the patch in driver is needed to iterate over
+>> sibling mdp device nodes, not child ones, to keep driver work properly.
+>>
+>> Daniel Kurtz (2):
+>>    arm64: dts: mt8173: Fix mdp device tree
+>>    media: mtk-mdp: Fix mdp device tree
+>>
+>> Minghsiu Tsai (1):
+>>    dt-bindings: mt8173: Fix mdp device tree
+>>
+>>   .../devicetree/bindings/media/mediatek-mdp.txt     |  12 +-
+>>   arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 126 ++++++++++-----------
+>>   drivers/media/platform/mtk-mdp/mtk_mdp_core.c      |   2 +-
+>>   3 files changed, 64 insertions(+), 76 deletions(-)
+>>
+> 
