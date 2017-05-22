@@ -1,57 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 May 2017 15:58:44 +0200
-Subject: [PATCH 11/35] arm64: dts: r8a7796: salvator-x: Set drive-strength for
- ravb pins
+Date: Mon, 22 May 2017 15:58:45 +0200
+Subject: [PATCH 12/35] arm64: dts: r8a7795: update PFC node name to
+ pin-controller
 In-Reply-To: <cover.1495457812.git.horms+renesas@verge.net.au>
 References: <cover.1495457812.git.horms+renesas@verge.net.au>
-Message-ID: <b04650d40f4b970e67cd78295ec2a3d00d959866.1495457812.git.horms+renesas@verge.net.au>
+Message-ID: <3e7a5b3c8d40b5251bdab82df6289493190583cd.1495457812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+The device trees for Renesas SoCs use either pfc or pin-controller as the
+node name for the PFC device. This patch is intended to take a step towards
+unifying the node name used as pin-controller which appears to be the more
+generic of the two and thus more in keeping with the DT specs.
 
-The EthernetAVB should not depend on the bootloader to setup correct
-drive-strength values.  Values for drive-strength where found by
-examining the registers after the bootloader has configured the
-registers and successfully used the EthernetAVB.
+My analysis is that this is a user-visible change to the extent that kernel
+logs, and sysfs entries change from e6060000.pfc and pfc at e6060000 to
+e6060000.pin-controller and pin-controller at e6060000.
 
-Based on commit 7d73a4da2681dc5d ("arm64: dts: r8a7795: salvator-x: Set
-drive-strength for ravb pins").
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-index 18b478be484c..31f02219ed2f 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-@@ -110,8 +110,22 @@
- 	pinctrl-names = "default";
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index e99d6443b3e4..7d87dff70ac8 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -398,7 +398,7 @@
+ 			#power-domain-cells = <1>;
+ 		};
  
- 	avb_pins: avb {
--		groups = "avb_mdc";
--		function = "avb";
-+		mux {
-+			groups = "avb_link", "avb_phy_int", "avb_mdc",
-+				 "avb_mii";
-+			function = "avb";
-+		};
-+
-+		pins_mdc {
-+			groups = "avb_mdc";
-+			drive-strength = <24>;
-+		};
-+
-+		pins_mii_tx {
-+			pins = "PIN_AVB_TX_CTL", "PIN_AVB_TXC", "PIN_AVB_TD0",
-+			       "PIN_AVB_TD1", "PIN_AVB_TD2", "PIN_AVB_TD3";
-+			drive-strength = <12>;
-+		};
- 	};
- 
- 	scif1_pins: scif1 {
+-		pfc: pfc at e6060000 {
++		pfc: pin-controller at e6060000 {
+ 			compatible = "renesas,pfc-r8a7795";
+ 			reg = <0 0xe6060000 0 0x50c>;
+ 		};
 -- 
 2.1.4
