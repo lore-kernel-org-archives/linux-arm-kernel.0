@@ -1,93 +1,111 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 22 May 2017 15:02:45 +0100
-Subject: [RFC PATCH 05/30] iommu/arm-smmu-v3: Disable tagged pointers when
- ATS is in use
-In-Reply-To: <592284D7.60002@huawei.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-6-jean-philippe.brucker@arm.com>
- <592284D7.60002@huawei.com>
-Message-ID: <050392bb-eab9-a80e-f89c-d3c5a0205032@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 22 May 2017 15:58:46 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.13
+Message-ID: <cover.1495457812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/05/17 07:27, Leizhen (ThunderTown) wrote:
-> On 2017/2/28 3:54, Jean-Philippe Brucker wrote:
->> The ARM architecture has a "Top Byte Ignore" (TBI) option that makes the
->> MMU mask out bits [63:56] of an address, allowing a userspace application
->> to store data in its pointers.
->>
->> The ATS doesn't have an architected mechanism to enable TBI, and might
->> create ATC entries for addresses that include a tag. Software would then
->> have to send ATC invalidation packets for each 255 possible alias of an
->> address, or just wipe the whole address space. This is not a viable
->> option, so disable TBI when ATS is in use.
->>
->> It is unclear for the moment how this restriction will affect user
->> applications. One example I can imagine (with my complete lack of
->> knowledge about JIT engines and their use of tagged pointers) is a JIT
->> translating a WebCL applications that uses SVM. Since this kind of
->> interpreted language doesn't expose addresses, the interpreter and SVM
->> implementations will be given the opportunity to do the right thing and
->> remove tags before handing pointers to devices.
->>
->> Ideally we should remove TBI only for domains that are susceptible to use
->> ATS. But at the point we're writing the context descriptor of a domain, we
->> are still probing the first device in the group. If that device doesn't
->> have an ATC but the next one does, we would then have to clear the TBI
->> bit, invalidate the ATCs of previous devices, and notify the drivers that
->> their devices cannot use tagged pointers anymore. Such a level of
->> complexity doesn't make any sense here since it is unlikely devices will
->> use tagged pointers at all.
->>
->> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 7 ++++---
->>  1 file changed, 4 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index e7b940146ae3..06b29d4fcf65 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -987,7 +987,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
->>  }
->>  
->>  /* Context descriptor manipulation functions */
->> -static u64 arm_smmu_cpu_tcr_to_cd(u64 tcr)
->> +static u64 arm_smmu_cpu_tcr_to_cd(struct arm_smmu_device *smmu, u64 tcr)
->>  {
->>  	u64 val = 0;
->>  
->> @@ -1000,7 +1000,8 @@ static u64 arm_smmu_cpu_tcr_to_cd(u64 tcr)
->>  	val |= ARM_SMMU_TCR2CD(tcr, EPD0);
->>  	val |= ARM_SMMU_TCR2CD(tcr, EPD1);
->>  	val |= ARM_SMMU_TCR2CD(tcr, IPS);
->> -	val |= ARM_SMMU_TCR2CD(tcr, TBI0);
->> +	if (!(smmu->features & ARM_SMMU_FEAT_ATS))
->> +		val |= ARM_SMMU_TCR2CD(tcr, TBI0);
-> Maybe we should always disable TBI. Otherwise, a device behind a ATS supported or
-> non-supported SMMU should use different strategies.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-I don't have any objection to this. Since ATS state shouldn't be visible
-to userspace, the responsibility of sanitizing tagged pointers for DMA
-already lies on the rare applications that use of them. I haven't thought
-about the stall handling code yet, but I'm sure there are creative ways to
-break it using tagged pointers, and I'd rather not go down that rabbit hole.
+Please consider these Renesas ARM64 based SoC DT updates for v4.13.
 
-I'll update this patch accordingly in next version.
 
-Thanks,
-Jean
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
->>  	return val;
->>  }
->> @@ -1014,7 +1015,7 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_device *smmu,
->>  	 * We don't need to issue any invalidation here, as we'll invalidate
->>  	 * the STE when installing the new entry anyway.
->>  	 */
->> -	val = arm_smmu_cpu_tcr_to_cd(cfg->cd.tcr) |
->> +	val = arm_smmu_cpu_tcr_to_cd(smmu, cfg->cd.tcr) |
->>  #ifdef __BIG_ENDIAN
->>  	      CTXDESC_CD_0_ENDI |
->>  #endif
->>
-> 
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.13
+
+for you to fetch changes up to 0b03c32db03d63de695c1e0ab1950eb12b135fa7:
+
+  arm64: dts: r8a7795: salvator-x: Add support for R-Car H3 ES2.0 (2017-05-22 14:54:57 +0200)
+
+----------------------------------------------------------------
+Renesas ARM64 Based SoC DT Updates for v4.13
+
+* Add support for R-Car H3 ES2.0
+* Break out common board support
+* Set drive-strength for ravb pins for r8a7795/h3ulcb and r8a7796/m3ulcb
+* Enable HDMI outputs on r8a7795/salvator-x
+* Add R-Car audio to DT of r8a7796 SoC
+* Add current sense amplifiers to DT of r8a779[56]/salvator-x
+* Enable NFS-root on r8a7796/salvator-x
+* Enable HS200 for eMMC on r8a779[56]/salvator-x,
+  r8a7795/h3ulcb and r8a7796/m3ulcb
+* Enable EthernetAVB, I2C r8a7796/m3ulcb
+* Update memory node to 2 GiB map on r8a7796/m3ulcb
+
+----------------------------------------------------------------
+Geert Uytterhoeven (9):
+      arm64: dts: r8a7796: salvator-x: Enable NFS root
+      arm64: dts: r8a7796: salvator-x: Set drive-strength for ravb pins
+      arm64: dts: r8a7796: Add external audio clocks
+      arm64: dts: r8a7796: Add external PCIe bus clock
+      arm64: dts: r8a7796: Add placeholders for various devices
+      arm64: dts: renesas: Extract common Salvator-X board support
+      arm64: dts: renesas: Extract common ULCB board support
+      arm64: dts: r8a7795: Add support for R-Car H3 ES2.0
+      arm64: dts: r8a7795: salvator-x: Add support for R-Car H3 ES2.0
+
+Jacopo Mondi (1):
+      arm64: dts: salvator-x: Add current sense amplifiers
+
+Koji Matsuoka (1):
+      arm64: dts: renesas: r8a7795-salvator-x: Enable HDMI outputs
+
+Kuninori Morimoto (7):
+      arm64: dts: r8a7796: add AUDIO_DMAC support
+      arm64: dts: r8a7796: add Sound SSI PIO support
+      arm64: dts: r8a7796: add Sound SSI DMA support
+      arm64: dts: r8a7796: add Sound SRC support
+      arm64: dts: r8a7796: add Sound DVC support
+      arm64: dts: r8a7796: add Sound CTU support
+      arm64: dts: r8a7796: add Sound MIX support
+
+Laurent Pinchart (4):
+      arm64: dts: salvator-x: Add panel backlight support
+      arm64: dts: renesas: salvator-x: Add DU external dot clock sources
+      arm64: dts: renesas: salvator-x: Add HDMI output connectors
+      arm64: dts: renesas: r8a7795-salvator-x: Add DU external dot clocks
+
+Simon Horman (3):
+      arm64: dts: m3ulcb: Fix EthernetAVB PHY timing
+      arm64: dts: r8a7795: update PFC node name to pin-controller
+      arm64: dts: ulcb: Set drive-strength for ravb pins
+
+Takeshi Kihara (2):
+      arm64: dts: r8a7795: salvator-x: Update memory node to 4 GiB map
+      arm64: dts: r8a7796: Add PWM device nodes
+
+Ulrich Hecht (1):
+      arm64: dts: renesas: r8a7795: Add HDMI encoder support
+
+Vladimir Barinov (5):
+      arm64: dts: m3ulcb: enable I2C
+      arm64: dts: m3ulcb: Update memory node to 2 GiB map
+      arm64: dts: m3ulcb: enable EthernetAVB
+      arm64: dts: m3ulcb: enable HS200 for eMMC
+      arm64: dts: h3ulcb: enable HS200 for eMMC
+
+Wolfram Sang (2):
+      arm64: dts: r8a7795: salvator-x: enable HS200 for eMMC
+      arm64: dts: r8a7796: salvator-x: enable HS200 for eMMC
+
+ arch/arm64/boot/dts/renesas/Makefile               |   1 +
+ .../boot/dts/renesas/r8a7795-es1-salvator-x.dts    | 115 ++++
+ arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi       |  84 +++
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     | 344 +----------
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 565 ++----------------
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 121 ++--
+ arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts     | 168 +-----
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 244 +-------
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 409 +++++++++++++
+ arch/arm64/boot/dts/renesas/salvator-x.dtsi        | 644 +++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/ulcb.dtsi              | 367 ++++++++++++
+ 11 files changed, 1734 insertions(+), 1328 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+ create mode 100644 arch/arm64/boot/dts/renesas/salvator-x.dtsi
+ create mode 100644 arch/arm64/boot/dts/renesas/ulcb.dtsi
