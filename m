@@ -1,83 +1,94 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 22 May 2017 17:30:31 +0100
-Subject: [PATCH v3.1 5/6] mm/hugetlb: Introduce set_huge_swap_pte_at() helper
-In-Reply-To: <20170522133604.11392-6-punit.agrawal@arm.com>
-References: <20170522133604.11392-6-punit.agrawal@arm.com>
-Message-ID: <20170522163031.4480-1-punit.agrawal@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 22 May 2017 18:32:31 +0200
+Subject: [PATCH] drm/pl111: add ARM_AMBA dependency
+In-Reply-To: <20170522152058.3346428-1-arnd@arndb.de>
+References: <20170522152058.3346428-1-arnd@arndb.de>
+Message-ID: <20170522163231.bk6zltgzse4szm2o@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-set_huge_pte_at(), an architecture callback to populate hugepage ptes,
-does not provide the range of virtual memory that is targeted. This
-leads to ambiguity when dealing with swap entries on architectures that
-support hugepages consisting of contiguous ptes.
+On Mon, May 22, 2017 at 05:20:08PM +0200, Arnd Bergmann wrote:
+> The driver is written in a way to enable compile-testing without CONFIG_ARM_AMBA,
+> but it just causes needless warnings:
+> 
+> drivers/gpu/drm/pl111/pl111_drv.c:149:26: error: 'pl111_drm_driver' defined but not used [-Werror=unused-variable]
+> drivers/gpu/drm/pl111/pl111_drv.c:81:12: error: 'pl111_modeset_init' defined but not used [-Werror=unused-function]
+> 
+> This removes the #ifdef instead, and adds a dependency on ARM_AMBA to
+> only let us build the driver when the base support is enabled.
+> 
+> Unfortunately, this requires removing one redundant 'select ARM_AMBA'
+> line from mach-s3c64xx to avoid a circular dependency.
+> 
+> It might be good to allow manually enabling ARM_AMBA when COMPILE_TEST
+> is turned on, but that should be a separate patch and may cause other
+> build regressions.
+> 
+> Fixes: bed41005e617 ("drm/pl111: Initial drm/kms driver for pl111")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-s3c64xx/Kconfig     | 1 -
+>  drivers/gpu/drm/pl111/Kconfig     | 1 +
+>  drivers/gpu/drm/pl111/pl111_drv.c | 2 --
+>  3 files changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+> index 459214fa20b4..5ee5ad74a3d6 100644
+> --- a/arch/arm/mach-s3c64xx/Kconfig
+> +++ b/arch/arm/mach-s3c64xx/Kconfig
+> @@ -40,7 +40,6 @@ config CPU_S3C6410
+>  
+>  config S3C64XX_PL080
+>  	def_bool DMADEVICES
+> -	select ARM_AMBA
 
-Fix the problem by introducing an overridable helper for architectures
-needing this support. The helper is called when populating the page
-tables with swap entries. The size of the targeted region is provided to
-the helper to help determine the number of entries to be updated.
+I must admit that I miss how pl111 DRM driver create circular dependency
+with S3C64XX_PL080 (or AMBA_PL08X?). Maybe it is unrelated change and
+should be a separate patch?
 
-Provide a default implementation that maintains the current behaviour.
+Best regards,
+Krzysztof
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Acked-by: Steve Capper <steve.capper@arm.com>
-Cc: Mike Kravetz <mike.kravetz@oracle.com>
-Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
----
 
-Changes since v3:
-
-* Use #ifndef block instead of weak function
-
- include/linux/hugetlb.h | 8 ++++++++
- mm/hugetlb.c            | 8 +++++---
- 2 files changed, 13 insertions(+), 3 deletions(-)
-
-diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
-index 23010a3b2047..879eb063fb95 100644
---- a/include/linux/hugetlb.h
-+++ b/include/linux/hugetlb.h
-@@ -435,6 +435,14 @@ static inline pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
- }
- #endif
- 
-+#ifndef set_huge_swap_pte_at
-+static inline void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
-+					pte_t *ptep, pte_t pte, unsigned long sz)
-+{
-+	set_huge_pte_at(mm, addr, ptep, pte);
-+}
-+#endif
-+
- static inline struct hstate *page_hstate(struct page *page)
- {
- 	VM_BUG_ON_PAGE(!PageHuge(page), page);
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index ddfed20cd637..e3052c16d29a 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -3263,9 +3263,10 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
- 				 */
- 				make_migration_entry_read(&swp_entry);
- 				entry = swp_entry_to_pte(swp_entry);
--				set_huge_pte_at(src, addr, src_pte, entry);
-+				set_huge_swap_pte_at(src, addr, src_pte,
-+						     entry, sz);
- 			}
--			set_huge_pte_at(dst, addr, dst_pte, entry);
-+			set_huge_swap_pte_at(dst, addr, dst_pte, entry, sz);
- 		} else {
- 			if (cow) {
- 				huge_ptep_set_wrprotect(src, addr, src_pte);
-@@ -4277,7 +4278,8 @@ unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
- 
- 				make_migration_entry_read(&entry);
- 				newpte = swp_entry_to_pte(entry);
--				set_huge_pte_at(mm, address, ptep, newpte);
-+				set_huge_swap_pte_at(mm, address, ptep,
-+						     newpte, huge_page_size(h));
- 				pages++;
- 			}
- 			spin_unlock(ptl);
--- 
-2.11.0
+>  	select AMBA_PL08X
+>  
+>  config S3C64XX_SETUP_SDHCI
+> diff --git a/drivers/gpu/drm/pl111/Kconfig b/drivers/gpu/drm/pl111/Kconfig
+> index 309f4fd52de7..e2f393fcc4bf 100644
+> --- a/drivers/gpu/drm/pl111/Kconfig
+> +++ b/drivers/gpu/drm/pl111/Kconfig
+> @@ -2,6 +2,7 @@ config DRM_PL111
+>  	tristate "DRM Support for PL111 CLCD Controller"
+>  	depends on DRM
+>  	depends on ARM || ARM64 || COMPILE_TEST
+> +	depends on ARM_AMBA
+>  	depends on COMMON_CLK
+>  	select DRM_KMS_HELPER
+>  	select DRM_KMS_CMA_HELPER
+> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
+> index 97095b1aa961..dce382f97f8c 100644
+> --- a/drivers/gpu/drm/pl111/pl111_drv.c
+> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
+> @@ -179,7 +179,6 @@ static struct drm_driver pl111_drm_driver = {
+>  #endif
+>  };
+>  
+> -#ifdef CONFIG_ARM_AMBA
+>  static int pl111_amba_probe(struct amba_device *amba_dev,
+>  			    const struct amba_id *id)
+>  {
+> @@ -262,7 +261,6 @@ static struct amba_driver pl111_amba_driver = {
+>  };
+>  
+>  module_amba_driver(pl111_amba_driver);
+> -#endif /* CONFIG_ARM_AMBA */
+>  
+>  MODULE_DESCRIPTION(DRIVER_DESC);
+>  MODULE_AUTHOR("ARM Ltd.");
+> -- 
+> 2.9.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
