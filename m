@@ -1,68 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 May 2017 11:27:11 +0200
-Subject: [PATCH V2 4/5] dt-bindings: pinctrl: add imx7ulp pinctrl binding
- doc
-In-Reply-To: <1495177545-23006-5-git-send-email-aisheng.dong@nxp.com>
-References: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
- <1495177545-23006-5-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CACRpkdb6B-f0uHUo9ecUmGCzY8GfFbCjNtJFeQJqtKEYwyB87A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 May 2017 11:29:00 +0200
+Subject: [PATCH 2/2] ARM: dts: orange-pi-zero: enable SPI NOR
+In-Reply-To: <20170519213550.8434-3-geomatsi@gmail.com>
+References: <20170519213550.8434-1-geomatsi@gmail.com>
+ <20170519213550.8434-3-geomatsi@gmail.com>
+Message-ID: <20170522092900.7v2mg5zkbt6eclhr@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 9:05 AM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
+Hi Sergey,
 
-> i.MX 7ULP has three IOMUXC instances: IOMUXC0 for M4 ports,
-> IOMUXC1 for A7 ports and IOMUXC DDR for DDR interface.
->
-> This patch adds the IOMUXC1 support for A7.
->
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+On Sat, May 20, 2017 at 12:35:50AM +0300, Sergey Matyukevich wrote:
+> Enable SPI NOR on orange-pi-zero board.
+> 
+> For more information see:
+> - http://linux-sunxi.org/Orange_Pi_Zero#SPI_NOR_flash
 
-(...)
-> +=== Pin Configuration Node ===
-> +- pins: One integers array, represents a group of pins mux setting.
-> +       The format is fsl,pins = <PIN_FUNC_ID>, PIN_FUNC_ID is a pin working on
-> +       a specific function.
+Same remark here than on the first patch
+
+> 
+> Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> index 34e4a5a80136..fe39e96cee65 100644
+> --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> @@ -177,3 +177,19 @@
+>  	status = "okay";
+>  	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
+>  };
 > +
-> +       NOTE: i.MX7ULP PIN_FUNC_ID consists of 4 integers as it shares one mux
-> +       and config register as follows:
-> +       <mux_conf_reg input_reg mux_mode input_val>
+> +&spi0 {
+> +	status = "okay";
 > +
-> +       Refer to imx7ulp-pinfunc.h in in device tree source folder for all
-> +       available imx7ulp PIN_FUNC_ID.
+> +	flash at 0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "mxicy,mx25l1606e", "winbond,w25q128";
+> +		reg = <0>;
+> +		spi-max-frequency = <40000000>;
+
+How do the other OPi Zero that doesn't have that SPI flash behave?
+
 > +
-> +Optional Properties:
-> +- nxp,output-buffer-enable:    Bool. Output buffer enabled
-> +- nxp,input-buffer-enable:     Bool. Input buffer enabled
-> +- drive-strength               Integer. Controls Drive Strength
-> +                                       0: Standard
-> +                                       1: Hi Driver
-(...)
+> +		partition at 00000000 {
+> +			reg = <0x00000000 0x200000>;	/* 2Mb */
+> +		};
 
-WELL LOOK AT THAT
+There's no need to create a first partition, this needs to be
+user-defined.
 
-Custom input/output buffer enable properties eh?
+Maxime
 
-We had this really really long discussion with the Renesas people
-about whether they make this a custom property or a generic
-one or whether anyone else would ever have the same need.
-
-This would be a vote for adding output-buffer-enable and
-input-buffer-enable as generic properies hm?
-
-UNLESS the existing device tree properties already cover the
-usecases.
-
-Andy has made some good points there.
-
-Can you please read up on the discussion thread for subject
-"[PATCH v5 01/10] pinctrl: generic: Add bi-directional and output-enable"
-and contribute to this discussion?
-
-Yours,
-Linus Walleij
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170522/2c848e31/attachment.sig>
