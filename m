@@ -1,15 +1,16 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 May 2017 23:37:56 +0200
+Date: Mon, 22 May 2017 23:43:22 +0200
 Subject: [PATCH] drm/pl111: add ARM_AMBA dependency
-In-Reply-To: <20170522163231.bk6zltgzse4szm2o@kozik-lap>
+In-Reply-To: <878tlolv1z.fsf@eliezer.anholt.net>
 References: <20170522152058.3346428-1-arnd@arndb.de>
- <20170522163231.bk6zltgzse4szm2o@kozik-lap>
-Message-ID: <CAK8P3a2Rbd2tnehO4vnqgmMYTPqgvws3ZEtbzJ86AxVWd9j6nA@mail.gmail.com>
+ <878tlolv1z.fsf@eliezer.anholt.net>
+Message-ID: <CAK8P3a3UjWM0OGVO1nNyEtrRUyFKDuBOboYVSnVLcg4MTKfFMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 6:32 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Mon, May 22, 2017 at 05:20:08PM +0200, Arnd Bergmann wrote:
+On Mon, May 22, 2017 at 6:23 PM, Eric Anholt <eric@anholt.net> wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+>
 >> The driver is written in a way to enable compile-testing without CONFIG_ARM_AMBA,
 >> but it just causes needless warnings:
 >>
@@ -25,74 +26,22 @@ On Mon, May 22, 2017 at 6:32 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
 >> It might be good to allow manually enabling ARM_AMBA when COMPILE_TEST
 >> is turned on, but that should be a separate patch and may cause other
 >> build regressions.
->>
->> Fixes: bed41005e617 ("drm/pl111: Initial drm/kms driver for pl111")
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> ---
->>  arch/arm/mach-s3c64xx/Kconfig     | 1 -
->>  drivers/gpu/drm/pl111/Kconfig     | 1 +
->>  drivers/gpu/drm/pl111/pl111_drv.c | 2 --
->>  3 files changed, 1 insertion(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
->> index 459214fa20b4..5ee5ad74a3d6 100644
->> --- a/arch/arm/mach-s3c64xx/Kconfig
->> +++ b/arch/arm/mach-s3c64xx/Kconfig
->> @@ -40,7 +40,6 @@ config CPU_S3C6410
->>
->>  config S3C64XX_PL080
->>       def_bool DMADEVICES
->> -     select ARM_AMBA
 >
-> I must admit that I miss how pl111 DRM driver create circular dependency
-> with S3C64XX_PL080 (or AMBA_PL08X?). Maybe it is unrelated change and
-> should be a separate patch?
+> If I understand the Kconfig, you're effectively disabling the build on
+> COMPILE_TEST && !ARM.  I'd rather that we just fix up the warnings, so
+> that people can keep build-testing DRM drivers:
+>
+> https://patchwork.kernel.org/patch/9737857/
 
-When I add 'depends on ARM_AMBA' for pl111, I get this dependency loop:
+That works too. When I tried the same, I thought it was a little too silly to
+have a file that effectively compiles into nothing.
 
-drivers/i2c/Kconfig:7: symbol I2C is selected by FB_DDC
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/fbdev/Kconfig:63: symbol FB_DDC is selected by FB_CYBER2000_DDC
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/fbdev/Kconfig:381: symbol FB_CYBER2000_DDC depends on FB_CYBER2000
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/fbdev/Kconfig:369: symbol FB_CYBER2000 depends on FB
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/fbdev/Kconfig:5: symbol FB is selected by DRM_KMS_FB_HELPER
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/gpu/drm/Kconfig:72: symbol DRM_KMS_FB_HELPER is selected by
-DRM_KMS_CMA_HELPER
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/gpu/drm/Kconfig:137: symbol DRM_KMS_CMA_HELPER is selected by DRM_PL111
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/gpu/drm/pl111/Kconfig:1: symbol DRM_PL111 depends on ARM_AMBA
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/amba/Kconfig:1: symbol ARM_AMBA is selected by S3C64XX_PL080
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-arch/arm/mach-s3c64xx/Kconfig:42: symbol S3C64XX_PL080 default value
-contains DMADEVICES
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/dma/Kconfig:5: symbol DMADEVICES is selected by SND_SOC_SH4_SIU
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-sound/soc/sh/Kconfig:29: symbol SND_SOC_SH4_SIU is selected by SND_SIU_MIGOR
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-sound/soc/sh/Kconfig:59: symbol SND_SIU_MIGOR depends on I2C
+My initial approach did two things differently though:
 
-We could break the loop at any of those places, but the
-S3C64XX_PL080 symbol seemed the easiest way since the
-'select' there is completely unnecessary and it directly relates
-to the change I made in PL111.
+- use __maybe_unused instead of __used, since
 
-        Arnd
+- annotate pl111_amba_driver instead of
+  pl111_drm_driver/pl111_modeset_init, and keep only
+  module_amba_driver() in the #ifdef.
+
+       Arnd
