@@ -1,40 +1,84 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 May 2017 14:30:15 +0200
-Subject: [PATCH 05/14] ARM: dts: r8a7779: update PFC node name to
- pin-controller
-In-Reply-To: <cover.1495455272.git.horms+renesas@verge.net.au>
-References: <cover.1495455272.git.horms+renesas@verge.net.au>
-Message-ID: <b07b763c5255cf400ddfd4b6a7899adf0538dea9.1495455272.git.horms+renesas@verge.net.au>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Mon, 22 May 2017 07:32:49 -0500
+Subject: [PATCH v3 4/5] drivers/perf: Add support for ARMv8.2
+ Statistical Profiling Extension
+In-Reply-To: <1495128273-13941-5-git-send-email-will.deacon@arm.com>
+References: <1495128273-13941-1-git-send-email-will.deacon@arm.com>
+ <1495128273-13941-5-git-send-email-will.deacon@arm.com>
+Message-ID: <20170522073249.d95a6d7050d24e99261ceae6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device trees for Renesas SoCs use either pfc or pin-controller as the
-node name for the PFC device. This patch is intended to take a step towards
-unifying the node name used as pin-controller which appears to be the more
-generic of the two and thus more in keeping with the DT specs.
+On Thu, 18 May 2017 18:24:32 +0100
+Will Deacon <will.deacon@arm.com> wrote:
 
-My analysis is that this is a user-visible change to the extent that kernel
-logs, and sysfs entries change from fffc0000.pfc and pfc at fffc0000 to
-fffc0000.pin-controller and pin-controller at fffc0000.
+> +/* Perf callbacks */
+> +static int arm_spe_pmu_event_init(struct perf_event *event)
+> +{
+> +	u64 reg;
+> +	struct perf_event_attr *attr = &event->attr;
+> +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
+> +
+> +	/* This is, of course, deeply driver-specific */
+> +	if (attr->type != event->pmu->type)
+> +		return -ENOENT;
+> +
+> +	if (event->cpu >= 0 &&
+> +	    !cpumask_test_cpu(event->cpu, &spe_pmu->supported_cpus))
+> +		return -ENOENT;
+> +
+> +	if (arm_spe_event_to_pmsevfr(event) & PMSEVFR_EL1_RES0)
+> +		return -EOPNOTSUPP;
+> +
+> +	if (event->hw.sample_period < spe_pmu->min_period ||
+> +	    event->hw.sample_period & PMSIRR_EL1_IVAL_MASK)
+> +		return -EOPNOTSUPP;
+> +
+> +	if (attr->exclude_idle)
+> +		return -EOPNOTSUPP;
+> +
+> +	/*
+> +	 * Feedback-directed frequency throttling doesn't work when we
+> +	 * have a buffer of samples. We'd need to manually count the
+> +	 * samples in the buffer when it fills up and adjust the event
+> +	 * count to reflect that. Instead, force the user to specify a
+> +	 * sample period instead.
+> +	 */
+> +	if (attr->freq)
+> +		return -EINVAL;
+> +
+> +	reg = arm_spe_event_to_pmsfcr(event);
+> +	if ((reg & BIT(PMSFCR_EL1_FE_SHIFT)) &&
+> +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_EVT))
+> +		return -EOPNOTSUPP;
+> +
+> +	if ((reg & BIT(PMSFCR_EL1_FT_SHIFT)) &&
+> +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_TYP))
+> +		return -EOPNOTSUPP;
+> +
+> +	if ((reg & BIT(PMSFCR_EL1_FL_SHIFT)) &&
+> +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_LAT))
+> +		return -EOPNOTSUPP;
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7779.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I've consistently brought up lack of proper user error messaging in all
+previous submissions of this driver:
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index ae2d9a9c65af..8ee0b2ca5d39 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -286,7 +286,7 @@
- 		status = "disabled";
- 	};
- 
--	pfc: pfc at fffc0000 {
-+	pfc: pin-controller at fffc0000 {
- 		compatible = "renesas,pfc-r8a7779";
- 		reg = <0xfffc0000 0x23c>;
- 	};
--- 
-2.1.4
+Jan. 10 2017 (first RFC):
+https://www.spinics.net/lists/arm-kernel/msg553322.html
+
+Jan. 13 (second RFC):
+https://patchwork.kernel.org/patch/9515967/
+
+[I just went ahead and re-read https://lkml.org/lkml/2015/8/26/661 and
+still think it's not a reason to not do this]
+
+30 Jan 2017 (first PATCH series):
+https://www.spinics.net/lists/arm-kernel/msg559232.html
+
+6 apr 2017 (PATCH v2 series):
+https://lkml.org/lkml/2017/4/6/790
+
+AFAICT, my comments hold, yet the driver still gets resubmitted without
+them being addressed.  How do we get out of this loop?
+
+Kim
