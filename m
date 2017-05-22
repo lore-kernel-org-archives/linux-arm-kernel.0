@@ -1,76 +1,102 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 22 May 2017 10:40:58 +0200
-Subject: [PATCH 0/8] arm64: hi6220-hikey: Fix WiFi support
-In-Reply-To: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
-References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAPDyKFqi2jiqKESdz8izq6thr6GT0HQDKt6xRKzwaCQ-mkMNSw@mail.gmail.com>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Mon, 22 May 2017 08:42:54 +0000
+Subject: [PATCH 3/3][v4] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <878tlpmj9l.fsf@arm.com>
+References: <20170519131305.5068-1-laurentiu.tudor@nxp.com>
+ <20170519131305.5068-4-laurentiu.tudor@nxp.com>
+ <b3980350-9663-d98b-6533-fd3c15f98671@gmail.com>	<86tw4g6nb0.fsf@arm.com>
+ <VI1PR0401MB1856C0396AE7608FF2FC8CF1ECF80@VI1PR0401MB1856.eurprd04.prod.outlook.com>
+ <878tlpmj9l.fsf@arm.com>
+Message-ID: <VI1PR0401MB1856FCA799A6C18CB85207EEECF80@VI1PR0401MB1856.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Arnd, Rob
+Hi Marc,
 
-On 8 May 2017 at 18:21, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> The Hikey board has a Wifi chip attached to the SDIO bus, which is managed by a
-> dwmmc controller. This is currently broken in that way that not even the SDIO
-> card is being detected.
->
-> To fix this we need to make sure the correct resources are described for the
-> dwmmc controller, so the mmc core can power on/off the SDIO/WiFi chip
-> correctly. This is the main issue today.
->
-> I have picked up one change from Daniel Lezcano's earlier submission [1] and
-> folded that into this series, as the Wifi support depends on it. As a matter of
-> fact I have even split Daniel's change into two halves, one for DT
-> documentation and one for arm64 hikey dts.
->
-> It's important that this series goes together as to conform with TI's HW spec
-> of the wl18xx Wifi chip, as to prevent it from being damaged. We can either go
-> via arm-soc, unless Wei Xu the Hikey SoC maintainer, prefers to ack the dts
-> changes, then I can pick the series via my mmc tree.
->
-> Moreover, I would suggest we send this as fixes for the 4.12 rcs to get the
-> Wifi working for Hikey again.
->
-> Kind regards
-> Ulf Hansson
->
-> [1]
-> https://patchwork.kernel.org/patch/9697189/
->
-> Daniel Lezcano (2):
->   mfd: dts: hi655x: Add clock binding for the pmic
->   arm64: dts: hikey: Add clock for the pmic mfd
->
-> Ulf Hansson (6):
->   mmc: dt: pwrseq-simple: Invent power-off-delay-us
->   mmc: pwrseq_simple: Parse DTS for the power-off-delay-us property
->   arm64: dts: hi6220: Move the fixed_5v_hub regulator to the hikey dts
->   arm64: dts: hikey: Add the SYS_5V and the VDD_3V3 regulators
->   arm64: dts: hi6220: Move board data from the dwmmc nodes to hikey dts
->   arm64: dts: hikey: Fix WiFi support
->
->  .../devicetree/bindings/mfd/hisilicon,hi655x.txt   |  6 ++
->  .../devicetree/bindings/mmc/mmc-pwrseq-simple.txt  |  2 +
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     | 78 +++++++++++++++++-----
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 31 +--------
->  drivers/mmc/core/pwrseq_simple.c                   |  7 ++
->  5 files changed, 79 insertions(+), 45 deletions(-)
->
-> --
-> 2.7.4
->
+> -----Original Message-----
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Monday, May 22, 2017 10:41 AM
+> 
+> On Mon, May 22 2017 at  7:12:39 am GMT, Laurentiu Tudor
+> <laurentiu.tudor@nxp.com> wrote:
+> 
+> Hi Laurentiu,
+> 
+> > Hi Marc,
+> >
+> >> -----Original Message-----
+> >> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> >> Sent: Saturday, May 20, 2017 9:43 AM
+> >> To: Matthias Brugger <matthias.bgg@gmail.com>
+> >>
+> >> On Fri, May 19 2017 at 02:41:43 PM, Matthias Brugger
+> >> <matthias.bgg@gmail.com> wrote:
+> >> > On 19/05/17 15:13, laurentiu.tudor at nxp.com wrote:
+> >> >> From: Stuart Yoder <stuart.yoder@nxp.com>
+> >> >>
+> >> >> Move the source files out of staging into their final locations:
+> >> >>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
+> >> >>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
+> >> >
+> >> > This driver has as compatible "arm,gic-v3-its". I wonder if this is
+> >> > correct and if it should be moved like this out of staging.
+> >>
+> >> This is no different from the way we handle *any* bus that uses the
+> >> GICv3 ITS as an MSI controller. Each bus provides its glue code that
+> >> latches onto the ITS node, and calls into the generic code.
+> >>
+> >> Now, when it comes to moving this out of staging, here is my concern:
+> >> There is mention of a userspace tool (restool) used to control the
+> >> HW. Where is this tool? Where is the user ABI documented?
+> >
+> > The tool is published here:
+> >
+> > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fgit
+> > hub.com%2Fqoriq-open-
+> source%2Frestool&data=01%7C01%7Claurentiu.tudor%4
+> >
+> 0nxp.com%7Cd3c05908969d499cd4a008d4a0e5eaae%7C686ea1d3bc2b4c6fa92
+> cd99c
+> >
+> 5c301635%7C0&sdata=2sEXCZ%2BAFlTtle8N3yWJPsGRve8cXMRPzyumlwqOhbg
+> %3D&re
+> > served=0
+> >
+> > There are two ways of configuring the mc-bus:
+> >  - a static one, through a FDT based configuration file (we call it
+> > DPL), documented in the refman linked below, chapter 22.
+> >  - a dynamic one, using this restool utility.
+> > Please note the usage of restool is optional.
+> 
+> Optional or not, it still is a userspace ABI, and while I can see restool issuing ioctl
+> system calls to configure the HW, I cannot see the corresponding code in the
+> kernel tree. So how does it work?
+> If the syscall interface is not present in the mainline kernel, drop the reference
+> to it in the documentation. If it is there (and I obviously missed it), document it,
+> and get it reviewed. 
 
-Wei Xu,
+Our original plan was to first get the bus out of staging and after that submit the restool support ASAP (patches are done - so I'm thinking at few days timeframe).
+if this is not acceptable, I can drop the restool reference from the README and resubmit the patch series. We'll re-add the reference together with the restool support patches.
 
-This series fixes my wifi issues on the Hikey board and currently all
-but the hikey dts changes seems to be okay/acked.
+> If there are associated DT bindings to the kernel code, they
+> must be documented (and reviewed) as part of the device-tree documentation,
+> and not in some obscure, hard to access document.
 
-Rob and me had some discussions regarding the new mmc DT binding,
-however in the last response from Rob he indicates that he is not
-objecting to adding the new binding.
+There's only one binding involved and it's already accepted [1].
 
-So, unless I hear some objection from any of you, I am going to queue
-this up for fixes via my mmc tree within a day or so.
+[snip]
 
-Kind regards
-Uffe
+> >
+> > We're also working on publishing the docs on github so that they're
+> > more accessible.
+> 
+> That'd be great, because the way the registration process is presented, I'd have
+> to agree to the Access Agreement *before* having a chance to read it. Not
+> going to happen...
+
+Sorry about that. Not much I can do. :-( 
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+
+---
+Best Regards, Laurentiu
