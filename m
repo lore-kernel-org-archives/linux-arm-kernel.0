@@ -1,48 +1,27 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 22 May 2017 16:48:28 +0100
-Subject: [PATCH] ARM64: PCI: Fix struct acpi_pci_root_ops allocation failure
- path
-Message-ID: <20170522154828.10872-1-lorenzo.pieralisi@arm.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Mon, 22 May 2017 17:49:17 +0200
+Subject: [PATCH v2 1/2] ACPICA: IORT: Update SMMU models for IORT rev. C
+In-Reply-To: <11ef7d28c535c01d42b7b3c8e632934f0e0f1048.1495459319.git.robin.murphy@arm.com>
+References: <11ef7d28c535c01d42b7b3c8e632934f0e0f1048.1495459319.git.robin.murphy@arm.com>
+Message-ID: <20170522154917.GA16981@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Timmy Li <lixiaoping3@huawei.com>
+On 22.05.17 16:06:37, Robin Murphy wrote:
+> IORT revision C has been published with a number of new SMMU
+> implementation identifiers. Since IORT doesn't have any way of falling
+> back to a more generic model code, we really need Linux to know about
+> these before vendors start updating their firmware tables to use them.
+> 
+> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+> CC: Robert Moore <robert.moore@intel.com>
+> CC: Lv Zheng <lv.zheng@intel.com>
+> Acked-by: Robert Richter <rrichter@cavium.com>
+> Tested-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Commit 093d24a20442 ("arm64: PCI: Manage controller-specific data on
-per-controller basis") added code to allocate ACPI PCI root_ops
-dynamically on a per host bridge basis but failed to update the
-corresponding memory allocation failure path in pci_acpi_scan_root()
-leading to a potential memory leakage.
+Robin, the stable tag is missing here, but we will need it for #2.
 
-Fix it by adding the required kfree call.
+Thanks,
 
-Fixes: 093d24a20442 ("arm64: PCI: Manage controller-specific data on per-controller basis")
-Signed-off-by: Timmy Li <lixiaoping3@huawei.com>
-[lorenzo.pieralisi at arm.com: refactored code, rewrote commit log]
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
-CC: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Tomasz Nowicki <tn@semihalf.com>
----
- arch/arm64/kernel/pci.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 4f0e3eb..c7e3e63 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -191,8 +191,10 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 		return NULL;
- 
- 	root_ops = kzalloc_node(sizeof(*root_ops), GFP_KERNEL, node);
--	if (!root_ops)
-+	if (!root_ops) {
-+		kfree(ri);
- 		return NULL;
-+	}
- 
- 	ri->cfg = pci_acpi_setup_ecam_mapping(root);
- 	if (!ri->cfg) {
--- 
-2.10.0
+-Robert
