@@ -1,508 +1,119 @@
-From: zhangshaokun@hisilicon.com (Shaokun Zhang)
-Date: Mon, 22 May 2017 20:48:37 +0800
-Subject: [PATCH v8 8/9] drivers: perf: hisi: Miscellanous node(MN) event
- counting in perf
-Message-ID: <1495457317-239399-1-git-send-email-zhangshaokun@hisilicon.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 22 May 2017 14:34:30 +0200
+Subject: [PATCH v6 1/4] clk: Add support for runtime PM
+In-Reply-To: <5b4b2f3e-dc4b-0866-c4b8-4c7e4dba2be0@samsung.com>
+References: <1490182543-28550-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170322113554eucas1p27471f0de278c55d5dce7fdf120395e09@eucas1p2.samsung.com>
+ <1490182543-28550-2-git-send-email-m.szyprowski@samsung.com>
+ <149081897388.31513.7062843004022908296@resonance>
+ <75509e0f-26cd-52e7-8c71-b004ab6abc81@samsung.com>
+ <149089387341.31513.7531874072502656432@resonance>
+ <5b4b2f3e-dc4b-0866-c4b8-4c7e4dba2be0@samsung.com>
+Message-ID: <4049980f-1837-93cc-49e0-e9dee2760cf1@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. Add support to count MN hardware events.
-2. Mn events are listed in sysfs at /sys/devices/hisi_mn_2/events/
-   The events can be selected as shown in perf list
-   e.g.: For MN_READ_REQUEST event for Super CPU cluster 2 the
-   event format is -e "hisi_mn_2/read_req/"
-3. MN PMU doesnot support counter overflow IRQ in HiP05/06/07, So
-   use hrtimer to poll and avoid counter overflow.
-4. The driver supports DT and ACPI mode.
+Hi All,
 
-Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
-Signed-off-by: Anurup M <anurup.m@huawei.com>
----
- drivers/perf/hisilicon/Makefile         |   2 +-
- drivers/perf/hisilicon/hisi_uncore_mn.c | 468 ++++++++++++++++++++++++++++++++
- 2 files changed, 469 insertions(+), 1 deletion(-)
- create mode 100644 drivers/perf/hisilicon/hisi_uncore_mn.c
+On 2017-04-06 14:46, Marek Szyprowski wrote:
+> Hi Michael,
+>
+> On 2017-03-30 19:11, Michael Turquette wrote:
+>> Quoting Marek Szyprowski (2017-03-30 00:24:15)
+>>> On 2017-03-29 22:22, Michael Turquette wrote:
+>>>> Quoting Marek Szyprowski (2017-03-22 04:35:40)
+>>>>> Registers for some clocks might be located in the SOC area, which 
+>>>>> are under the
+>>>>> power domain. To enable access to those registers respective 
+>>>>> domain has to be
+>>>>> turned on. Additionally, registers for such clocks will usually 
+>>>>> loose its
+>>>>> contents when power domain is turned off, so additional saving and 
+>>>>> restoring of
+>>>>> them might be needed in the clock controller driver.
+>>>>>
+>>>>> This patch adds basic infrastructure in the clocks core to allow 
+>>>>> implementing
+>>>>> driver for such clocks under power domains. Clock provider can 
+>>>>> supply a
+>>>>> struct device pointer, which is the used by clock core for 
+>>>>> tracking and managing
+>>>>> clock's controller runtime pm state. Each clk_prepare() operation
+>>>>> will first call pm_runtime_get_sync() on the supplied device, while
+>>>>> clk_unprepare() will do pm_runtime_put_sync() at the end.
+>>>>>
+>>>>> Additional calls to pm_runtime_get/put functions are required to 
+>>>>> ensure that any
+>>>>> register access (like calculating/changing clock rates and 
+>>>>> unpreparing/disabling
+>>>>> unused clocks on boot) will be done with clock controller in 
+>>>>> runtime resumend
+>>>>> state.
+>>>> The above is a bit confusing. Is clk_prepare really special? It 
+>>>> seems to
+>>>> me that every single clk_ops callback will need this?
+>>> clk_prepare/unprepare are special, because they allow sleeping, so they
+>>> are natural
+>>> candidates for the place for calling runtime PM operations.
+>>> clk_enable()/disable()
+>>> is called under a spinlock, so runtime pm cannot be called efficiently
+>>> there, but
+>>> core guarantees that they are called after clk_prepare(), so accessing
+>>> hw registers
+>>> is safe. The only remaining calls are not guaranteed to be called 
+>>> always
+>>> after
+>>> clk_prepare(), so those additional calls and checks in runtime pm are
+>>> needed there.
+>> Right, so any call that holds prepare_lock and might touch the hardware
+>> needs to first call pm_runtime_get_sync.
+>>
+>>>> That leads to my second question: why put this in the clk core? Can 
+>>>> the
+>>>> clk provider driver simply add pm_runtime_{get,put} calls into its
+>>>> clk_ops callbacks instead? The clk core does not directly touch 
+>>>> hardware
+>>>> (e.g. reading registers) so putting the pm runtime calls into the
+>>>> provider callbacks should be sufficient.
+>>> In theory is should be possible to duplicate all kind of clock build 
+>>> blocks
+>>> (gates, muxes, dividers, ...) with additional runtime pm calls. This
+>>> would however
+>>> end in much more code and a bit more complicated locking. Implementing
+>>> it in clk
+>>> core made the code simpler. It also turned out that runtime pm
+>>> integration is
+>>> needed for more that a single clock provider: besides Samsung SoCs
+>>> (Exynos 5433
+>>> and newer, Exynos 4412 ISP, Exynos Audio Subsystem, hacks in Exynos 
+>>> 542x
+>>> can be
+>>> also replaced by runtime PM calls), Ulf mentioned that exactly similar
+>>> pattern
+>>> is used for some UX500 SoCs (STE). More will probably come once the
+>>> feature is
+>>> in, because for now such drivers simply forces runtime active state 
+>>> as a
+>>> workaround or don't instantiate related power domains at all.
+>> I agree with the above, but I'm also wondering about the folks that use
+>> regmap internally to their own clock provider drivers. I guess they will
+>> have the option to either do their own thing or use this framework-level
+>> solution.
+>>
+>> I've started reviewing the code itself and will respond to those mails
+>> separately.
+>
+> Is there a chance to get your comments soon? I would really like to give
+> this patchset a try in linux-next for a few days, but for now Sylwester
+> waits for you.
+>
+> Stephen: what is your opinion on this patchset? Would you like to give it
+> a try in -next?
+>
 
-diff --git a/drivers/perf/hisilicon/Makefile b/drivers/perf/hisilicon/Makefile
-index 0887b56..26b2507 100644
---- a/drivers/perf/hisilicon/Makefile
-+++ b/drivers/perf/hisilicon/Makefile
-@@ -1 +1 @@
--obj-$(CONFIG_HISI_PMU) += djtag.o hisi_uncore_pmu.o hisi_uncore_l3c.o
-+obj-$(CONFIG_HISI_PMU) += djtag.o hisi_uncore_pmu.o hisi_uncore_l3c.o hisi_uncore_mn.o
-diff --git a/drivers/perf/hisilicon/hisi_uncore_mn.c b/drivers/perf/hisilicon/hisi_uncore_mn.c
-new file mode 100644
-index 0000000..89e28ae
---- /dev/null
-+++ b/drivers/perf/hisilicon/hisi_uncore_mn.c
-@@ -0,0 +1,468 @@
-+/*
-+ * HiSilicon SoC MN Hardware event counters support
-+ *
-+ * Copyright (C) 2017 Hisilicon Limited
-+ * Author: Shaokun Zhang <zhangshaokun@hisilicon.com>
-+ *
-+ * This code is based on the uncore PMUs like arm-cci and arm-ccn.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/acpi.h>
-+#include <linux/bitmap.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/perf_event.h>
-+#include "hisi_uncore_pmu.h"
-+
-+/*
-+ * ARMv8 HiSilicon MN event types.
-+ */
-+enum hisi_mn_pmu_event_types {
-+	HISI_HWEVENT_MN_EO_BARR_REQ	= 0x0,
-+	HISI_HWEVENT_MN_EC_BARR_REQ	= 0x01,
-+	HISI_HWEVENT_MN_DVM_OP_REQ	= 0x02,
-+	HISI_HWEVENT_MN_DVM_SYNC_REQ	= 0x03,
-+	HISI_HWEVENT_MN_READ_REQ	= 0x04,
-+	HISI_HWEVENT_MN_WRITE_REQ	= 0x05,
-+	HISI_HWEVENT_MN_EVENT_MAX	= 0x08,
-+};
-+
-+/*
-+ * ARMv8 HiSilicon Hardware counter Index.
-+ */
-+enum hisi_mn_pmu_counters {
-+	HISI_IDX_MN_COUNTER0	= 0x0,
-+	HISI_IDX_MN_COUNTER_MAX	= 0x4,
-+};
-+
-+#define MN1_EVTYPE_REG_OFF 0x48
-+#define MN1_EVCTRL_REG_OFF 0x40
-+#define MN1_CNT0_REG_OFF 0x30
-+#define MN1_EVENT_EN 0x01
-+#define MN1_BANK_SELECT 0x01
-+
-+#define GET_MODULE_ID(hwmod_data) hwmod_data->module_id
-+
-+/*
-+ * Default timer frequency to poll and avoid counter overflow.
-+ * CPU speed = 2.4Ghz and number of CPU cores in a SCCL is 16.
-+ * For a single MN event on a CPU core consumes 200 cycles.
-+ * So overflow time = (2^31 * 200) / (16 * 2.4G) which is about 21 seconds
-+ * So on a safe side we use a timer interval of 8sec
-+ */
-+#define MN1_HRTIMER_INTERVAL (8LL * MSEC_PER_SEC)
-+
-+struct hisi_mn_data {
-+	struct hisi_djtag_client *client;
-+	u32 module_id;
-+};
-+
-+static inline int hisi_mn_pmu_counter_valid(int idx)
-+{
-+	return (idx >= HISI_IDX_MN_COUNTER0 && idx < HISI_IDX_MN_COUNTER_MAX);
-+}
-+
-+/* Select the counter register offset from the index */
-+static inline u32 get_counter_reg_off(int cntr_idx)
-+{
-+	return (MN1_CNT0_REG_OFF + (cntr_idx * 4));
-+}
-+
-+static u64 hisi_mn_pmu_read_counter(struct hisi_pmu *mn_pmu, int cntr_idx)
-+{
-+	struct hisi_mn_data *mn_data = mn_pmu->hwmod_data;
-+	struct hisi_djtag_client *client = mn_data->client;
-+	u32 module_id = GET_MODULE_ID(mn_data);
-+	u32 reg_off, value;
-+
-+	reg_off = get_counter_reg_off(cntr_idx);
-+	hisi_djtag_readreg(module_id, MN1_BANK_SELECT, reg_off,
-+			   client, &value);
-+
-+	return value;
-+}
-+
-+static void hisi_mn_pmu_set_evtype(struct hisi_pmu *mn_pmu, int idx, u32 val)
-+{
-+	struct hisi_mn_data *mn_data = mn_pmu->hwmod_data;
-+	struct hisi_djtag_client *client = mn_data->client;
-+	u32 module_id = GET_MODULE_ID(mn_data);
-+	u32 event_value, value = 0;
-+
-+	event_value = (val - HISI_HWEVENT_MN_EO_BARR_REQ);
-+
-+	/*
-+	 * Write the event code in event select register.
-+	 * Each byte in the 32 bit event select register is used
-+	 * to configure the event code. Each byte correspond to a
-+	 * counter register to use.
-+	 */
-+	val = event_value << (8 * idx);
-+
-+	hisi_djtag_readreg(module_id, MN1_BANK_SELECT, MN1_EVTYPE_REG_OFF,
-+			   client, &value);
-+	value &= ~(0xff << (8 * idx));
-+	value |= val;
-+	hisi_djtag_writereg(module_id, MN1_BANK_SELECT, MN1_EVTYPE_REG_OFF,
-+			    value, client);
-+}
-+
-+static void hisi_mn_pmu_clear_evtype(struct hisi_pmu *mn_pmu, int idx)
-+{
-+	struct hisi_mn_data *mn_data = mn_pmu->hwmod_data;
-+	struct hisi_djtag_client *client = mn_data->client;
-+	u32 module_id = GET_MODULE_ID(mn_data);
-+	u32 value;
-+
-+	if (!hisi_mn_pmu_counter_valid(idx)) {
-+		dev_err(mn_pmu->dev, "Unsupported event index:%d!\n", idx);
-+		return;
-+	}
-+
-+	/*
-+	 * Clear the event code in event select register by writing value 0xff.
-+	 * Each byte in the 32 bit event select register is used to configure
-+	 * the event code. Each byte correspond to a counter register to use.
-+	 */
-+	hisi_djtag_readreg(module_id, MN1_BANK_SELECT, MN1_EVTYPE_REG_OFF,
-+			   client, &value);
-+	value &= ~(0xff << (8 * idx));
-+	value |= (0xff << (8 * idx));
-+	hisi_djtag_writereg(module_id, MN1_BANK_SELECT, MN1_EVTYPE_REG_OFF,
-+			    value, client);
-+}
-+
-+static void hisi_mn_pmu_write_counter(struct hisi_pmu *mn_pmu,
-+				      struct hw_perf_event *hwc, u32 value)
-+{
-+	struct hisi_mn_data *mn_data = mn_pmu->hwmod_data;
-+	struct hisi_djtag_client *client = mn_data->client;
-+	u32 module_id = GET_MODULE_ID(mn_data);
-+	u32 reg_off;
-+	int idx = GET_CNTR_IDX(hwc);
-+
-+	reg_off = get_counter_reg_off(idx);
-+	hisi_djtag_writereg(module_id, MN1_BANK_SELECT, reg_off, value, client);
-+}
-+
-+static void hisi_mn_pmu_start_counters(struct hisi_pmu *mn_pmu)
-+{
-+	struct hisi_mn_data *mn_data = mn_pmu->hwmod_data;
-+	struct hisi_djtag_client *client = mn_data->client;
-+	unsigned long *used_mask = mn_pmu->pmu_events.used_mask;
-+	u32 module_id = GET_MODULE_ID(mn_data);
-+	u32 num_counters = mn_pmu->num_counters;
-+	u32 value;
-+	int enabled = bitmap_weight(used_mask, num_counters);
-+
-+	if (!enabled)
-+		return;
-+
-+	/* Set the event_bus_en bit in MN_EVENT_CTRL to start counting */
-+	hisi_djtag_readreg(module_id, MN1_BANK_SELECT, MN1_EVCTRL_REG_OFF,
-+			   client, &value);
-+	value |= MN1_EVENT_EN;
-+	hisi_djtag_writereg(module_id, MN1_BANK_SELECT, MN1_EVCTRL_REG_OFF,
-+			    value, client);
-+}
-+
-+static void hisi_mn_pmu_stop_counters(struct hisi_pmu *mn_pmu)
-+{
-+	struct hisi_mn_data *mn_data = mn_pmu->hwmod_data;
-+	struct hisi_djtag_client *client = mn_data->client;
-+	u32 module_id = GET_MODULE_ID(mn_data);
-+	u32 value;
-+
-+	/*
-+	 * Clear the event_bus_en bit in MN_EVENT_CTRL
-+	 */
-+	hisi_djtag_readreg(module_id, MN1_BANK_SELECT, MN1_EVCTRL_REG_OFF,
-+			   client, &value);
-+	value &= ~(MN1_EVENT_EN);
-+	hisi_djtag_writereg(module_id, MN1_BANK_SELECT, MN1_EVCTRL_REG_OFF,
-+			    value, client);
-+}
-+
-+static void hisi_mn_pmu_clear_event_idx(struct hisi_pmu *mn_pmu, int idx)
-+{
-+	if (!hisi_mn_pmu_counter_valid(idx)) {
-+		dev_err(mn_pmu->dev, "Unsupported event index:%d!\n", idx);
-+		return;
-+	}
-+	clear_bit(idx, mn_pmu->pmu_events.used_mask);
-+}
-+
-+static int hisi_mn_pmu_get_event_idx(struct perf_event *event)
-+{
-+	struct hisi_pmu *mn_pmu = to_hisi_pmu(event->pmu);
-+	unsigned long *used_mask = mn_pmu->pmu_events.used_mask;
-+	u32 num_counters = mn_pmu->num_counters;
-+	int event_idx;
-+
-+	event_idx = find_first_zero_bit(used_mask, num_counters);
-+	if (event_idx == num_counters)
-+		return -EAGAIN;
-+
-+	set_bit(event_idx, used_mask);
-+
-+	return event_idx;
-+}
-+
-+static const struct of_device_id hisi_mn_pmu_of_match[] = {
-+	{ .compatible = "hisilicon,hip05-pmu-mn-v1", },
-+	{ .compatible = "hisilicon,hip06-pmu-mn-v1", },
-+	{ .compatible = "hisilicon,hip07-pmu-mn-v2", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, hisi_mn_pmu_of_match);
-+
-+static const struct acpi_device_id hisi_mn_pmu_acpi_match[] = {
-+	{ "HISI0221", },
-+	{ "HISI0222", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(acpi, hisi_mn_pmu_acpi_match);
-+
-+static struct attribute *hisi_mn_pmu_format_attr[] = {
-+	HISI_PMU_FORMAT_ATTR(event, "config:0-7"),
-+	NULL,
-+};
-+
-+static const struct attribute_group hisi_mn_pmu_format_group = {
-+	.name = "format",
-+	.attrs = hisi_mn_pmu_format_attr,
-+};
-+
-+static struct attribute *hisi_mn_pmu_events_attr[] = {
-+	HISI_PMU_EVENT_ATTR_STR(eo_barrier_req, "event=0x0"),
-+	HISI_PMU_EVENT_ATTR_STR(ec_barrier_req,	"event=0x01"),
-+	HISI_PMU_EVENT_ATTR_STR(dvm_op_req, "event=0x02"),
-+	HISI_PMU_EVENT_ATTR_STR(dvm_sync_req, "event=0x03"),
-+	HISI_PMU_EVENT_ATTR_STR(read_req, "event=0x04"),
-+	HISI_PMU_EVENT_ATTR_STR(write_req, "event=0x05"),
-+	NULL,
-+};
-+
-+static const struct attribute_group hisi_mn_pmu_events_group = {
-+	.name = "events",
-+	.attrs = hisi_mn_pmu_events_attr,
-+};
-+
-+static struct attribute *hisi_mn_pmu_attrs[] = {
-+	NULL,
-+};
-+
-+static const struct attribute_group hisi_mn_pmu_attr_group = {
-+	.attrs = hisi_mn_pmu_attrs,
-+};
-+
-+static DEVICE_ATTR(cpumask, 0444, hisi_cpumask_sysfs_show, NULL);
-+
-+static struct attribute *hisi_mn_pmu_cpumask_attrs[] = {
-+	&dev_attr_cpumask.attr,
-+	NULL,
-+};
-+
-+static const struct attribute_group hisi_mn_pmu_cpumask_attr_group = {
-+	.attrs = hisi_mn_pmu_cpumask_attrs,
-+};
-+
-+static const struct attribute_group *hisi_mn_pmu_pmu_attr_groups[] = {
-+	&hisi_mn_pmu_attr_group,
-+	&hisi_mn_pmu_format_group,
-+	&hisi_mn_pmu_events_group,
-+	&hisi_mn_pmu_cpumask_attr_group,
-+	NULL,
-+};
-+
-+static struct hisi_uncore_ops hisi_uncore_mn_ops = {
-+	.set_evtype = hisi_mn_pmu_set_evtype,
-+	.clear_evtype = hisi_mn_pmu_clear_evtype,
-+	.set_event_period = hisi_uncore_pmu_set_event_period,
-+	.get_event_idx = hisi_mn_pmu_get_event_idx,
-+	.clear_event_idx = hisi_mn_pmu_clear_event_idx,
-+	.event_update = hisi_uncore_pmu_event_update,
-+	.start_counters = hisi_mn_pmu_start_counters,
-+	.stop_counters = hisi_mn_pmu_stop_counters,
-+	.write_counter = hisi_mn_pmu_write_counter,
-+	.read_counter = hisi_mn_pmu_read_counter,
-+};
-+
-+/* Use hrtimer when no IRQ, to poll for avoiding counter overflow */
-+static void hisi_mn_pmu_hrtimer_init(struct hisi_pmu *mn_pmu)
-+{
-+	INIT_LIST_HEAD(&mn_pmu->active_list);
-+	mn_pmu->ops->start_hrtimer = hisi_hrtimer_start;
-+	mn_pmu->ops->stop_hrtimer = hisi_hrtimer_stop;
-+	hisi_hrtimer_init(mn_pmu, MN1_HRTIMER_INTERVAL);
-+}
-+
-+static void hisi_mn_pmu_init_data(struct hisi_pmu *mn_pmu,
-+				  struct hisi_djtag_client *client)
-+{
-+	struct device *dev = &client->dev;
-+
-+	mn_pmu->num_events = HISI_HWEVENT_MN_EVENT_MAX;
-+	mn_pmu->num_counters = HISI_IDX_MN_COUNTER_MAX;
-+	mn_pmu->counter_bits = 32;
-+	mn_pmu->num_active = 0;
-+	mn_pmu->scl_id = hisi_djtag_get_sclid(client);
-+
-+	mn_pmu->name = kasprintf(GFP_KERNEL, "hisi_mn_pmu_%d", mn_pmu->scl_id);
-+	mn_pmu->ops = &hisi_uncore_mn_ops;
-+	mn_pmu->dev = dev;
-+
-+	/* Pick one core to use for cpumask attributes */
-+	cpumask_set_cpu(smp_processor_id(), &mn_pmu->cpus);
-+
-+	/*
-+	 * Use poll method to avoid counter overflow as overflow IRQ
-+	 * is not supported in v1, v2 hardware.
-+	 */
-+	hisi_mn_pmu_hrtimer_init(mn_pmu);
-+}
-+
-+static int hisi_mn_pmu_dev_probe(struct hisi_pmu *mn_pmu,
-+				 struct hisi_djtag_client *client)
-+{
-+	struct hisi_mn_data *mn_data;
-+	struct device *dev = &client->dev;
-+	int ret;
-+
-+	mn_data = devm_kzalloc(dev, sizeof(*mn_data), GFP_KERNEL);
-+	if (!mn_data)
-+		return -ENOMEM;
-+
-+	/* Set the djtag Identifier */
-+	mn_data->client = client;
-+	mn_pmu->hwmod_data = mn_data;
-+
-+	if (dev->of_node) {
-+		const struct of_device_id *of_id;
-+
-+		of_id = of_match_device(hisi_mn_pmu_of_match, dev);
-+		if (!of_id) {
-+			dev_err(dev, "DT: Match device fail!\n");
-+			return -EINVAL;
-+		}
-+	} else if (ACPI_COMPANION(dev)) {
-+		const struct acpi_device_id *acpi_id;
-+
-+		acpi_id = acpi_match_device(hisi_mn_pmu_acpi_match, dev);
-+		if (!acpi_id) {
-+			dev_err(dev, "ACPI: Match device fail!\n");
-+			return -EINVAL;
-+		}
-+	} else
-+		return -EINVAL;
-+
-+	ret = device_property_read_u32(dev, "hisilicon,module-id",
-+				       &mn_data->module_id);
-+	if (ret < 0) {
-+		dev_err(dev, "DT: Could not read module-id!\n");
-+		return -EINVAL;
-+	}
-+
-+	hisi_mn_pmu_init_data(mn_pmu, client);
-+
-+	return 0;
-+}
-+
-+static int hisi_mn_pmu_probe(struct hisi_djtag_client *client)
-+{
-+	struct hisi_pmu *mn_pmu;
-+	struct device *dev = &client->dev;
-+	int ret;
-+
-+	mn_pmu = hisi_pmu_alloc(dev, HISI_IDX_MN_COUNTER_MAX);
-+	if (!mn_pmu)
-+		return -ENOMEM;
-+
-+	ret = hisi_mn_pmu_dev_probe(mn_pmu, client);
-+	if (ret)
-+		return ret;
-+
-+	mn_pmu->pmu = (struct pmu) {
-+		.name = mn_pmu->name,
-+			.task_ctx_nr = perf_invalid_context,
-+			.event_init = hisi_uncore_pmu_event_init,
-+			.pmu_enable = hisi_uncore_pmu_enable,
-+			.pmu_disable = hisi_uncore_pmu_disable,
-+			.add = hisi_uncore_pmu_add,
-+			.del = hisi_uncore_pmu_del,
-+			.start = hisi_uncore_pmu_start,
-+			.stop = hisi_uncore_pmu_stop,
-+			.read = hisi_uncore_pmu_read,
-+			.attr_groups = hisi_mn_pmu_pmu_attr_groups,
-+	};
-+
-+	ret = hisi_uncore_pmu_setup(mn_pmu, mn_pmu->name);
-+	if (ret) {
-+		dev_err(dev, "hisi_uncore_pmu_init FAILED!!\n");
-+		kfree(mn_pmu->name);
-+		return ret;
-+	}
-+
-+	/* Set the drv data to MN pmu */
-+	dev_set_drvdata(dev, mn_pmu);
-+
-+	return 0;
-+}
-+
-+static int hisi_mn_pmu_remove(struct hisi_djtag_client *client)
-+{
-+	struct hisi_pmu *mn_pmu;
-+	struct device *dev = &client->dev;
-+
-+	mn_pmu = dev_get_drvdata(dev);
-+	perf_pmu_unregister(&mn_pmu->pmu);
-+	kfree(mn_pmu->name);
-+
-+	return 0;
-+}
-+
-+static struct hisi_djtag_driver hisi_mn_pmu_driver = {
-+	.driver = {
-+		.name = "hisi-mn-pmu",
-+		.of_match_table = hisi_mn_pmu_of_match,
-+		.acpi_match_table = ACPI_PTR(hisi_mn_pmu_acpi_match),
-+	},
-+	.probe = hisi_mn_pmu_probe,
-+	.remove = hisi_mn_pmu_remove,
-+};
-+
-+static int __init hisi_mn_pmu_init(void)
-+{
-+	int ret;
-+
-+	ret = hisi_djtag_register_driver(THIS_MODULE, &hisi_mn_pmu_driver);
-+	if (ret < 0) {
-+		pr_err("hisi pmu MN init failed, ret=%d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+module_init(hisi_mn_pmu_init);
-+
-+static void __exit hisi_mn_pmu_exit(void)
-+{
-+	hisi_djtag_unregister_driver(&hisi_mn_pmu_driver);
-+}
-+module_exit(hisi_mn_pmu_exit);
-+
-+MODULE_DESCRIPTION("HiSilicon SoC HIP0x MN PMU driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Shaokun Zhang");
+Mike, Stephen: any comments? We already missed v4.12 merge window...
+
+Best regards
 -- 
-1.9.1
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
