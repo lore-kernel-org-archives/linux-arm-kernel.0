@@ -1,49 +1,134 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 22 May 2017 13:17:49 +0100
-Subject: [PATCH v6 6/9] mfd: axp20x: add axp20x-regulator cell for AXP803
-In-Reply-To: <20170518071653.36561-7-icenowy@aosc.io>
-References: <20170518071653.36561-1-icenowy@aosc.io>
- <20170518071653.36561-7-icenowy@aosc.io>
-Message-ID: <20170522121749.lqedysms2dywcyfl@dell>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Mon, 22 May 2017 17:28:27 +0530
+Subject: [PATCH v4 11/11] arm64: dts: Add PWM and SDHCI DT nodes for Stingray
+ SOC
+In-Reply-To: <1495454307-23464-1-git-send-email-anup.patel@broadcom.com>
+References: <1495454307-23464-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1495454307-23464-12-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 May 2017, Icenowy Zheng wrote:
+From: Srinath Mannam <srinath.mannam@broadcom.com>
 
-> As axp20x-regulator now supports AXP803, add a cell for it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes in v5:
-> - Removed wrong snippet.
-> Changes in v4:
-> - Added a trailing comma for new cell, for easier further cell addition.
-> Changes in v3:
-> - Make the new cell one-liner.
-> 
->  drivers/mfd/axp20x.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+The Stingray SoC has two instances of SDHCI controller
+and one instance of iProc PWM.
 
-Applied, thanks.
+Let's enable above mentioned devices in Stingray DT.
 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 1dc6235778eb..917b6ddc4f15 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -848,7 +848,8 @@ static struct mfd_cell axp803_cells[] = {
->  		.name			= "axp20x-pek",
->  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
->  		.resources		= axp803_pek_resources,
-> -	}
-> +	},
-> +	{	.name			= "axp20x-regulator" },
->  };
->  
->  static struct mfd_cell axp806_cells[] = {
+Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+---
+ .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 39 ++++++++++++++++++++++
+ .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 28 ++++++++++++++++
+ 2 files changed, 67 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+index ff59a26..5dca7d1 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+@@ -43,6 +43,28 @@
+ 		serial2 = &uart2;
+ 		serial3 = &uart3;
+ 	};
++
++	sdio0_vddo_ctrl_reg: sdio0_vddo_ctrl {
++		compatible = "regulator-gpio";
++		regulator-name = "sdio0_vddo_ctrl_reg";
++		regulator-type = "voltage";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++		gpios = <&pca9505 18 0>;
++		states = <3300000 0x0
++			  1800000 0x1>;
++	};
++
++	sdio1_vddo_ctrl_reg: sdio1_vddo_ctrl {
++		compatible = "regulator-gpio";
++		regulator-name = "sdio1_vddo_ctrl_reg";
++		regulator-type = "voltage";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++		gpios = <&pca9505 19 0>;
++		states = <3300000 0x0
++			  1800000 0x1>;
++	};
+ };
+ 
+ &memory { /* Default DRAM banks */
+@@ -54,6 +76,10 @@
+ 	status = "okay";
+ };
+ 
++&pwm {
++	status = "okay";
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 
+@@ -90,3 +116,16 @@
+ 		#size-cells = <1>;
+ 	};
+ };
++
++&sdio0 {
++	vqmmc-supply = <&sdio0_vddo_ctrl_reg>;
++	non-removable;
++	full-pwr-cycle;
++	status = "okay";
++};
++
++&sdio1 {
++	vqmmc-supply = <&sdio1_vddo_ctrl_reg>;
++	full-pwr-cycle;
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+index 642d42c..44ed73c 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+@@ -269,6 +269,14 @@
+ 
+ 		#include "stingray-pinctrl.dtsi"
+ 
++		pwm: pwm at 68910000{
++			compatible = "brcm,iproc-pwm";
++			reg = <0x00010000 0x1000>;
++			clocks = <&crmu_ref25m>;
++			#pwm-cells = <3>;
++			status = "disabled";
++		};
++
+ 		i2c0: i2c at 689b0000 {
+ 			compatible = "brcm,iproc-i2c";
+ 			reg = <0x000b0000 0x100>;
+@@ -428,5 +436,25 @@
+ 			brcm,nand-has-wp;
+ 			status = "disabled";
+ 		};
++
++		sdio0: sdhci at 68cf1000 {
++			compatible = "brcm,sdhci-iproc";
++			reg = <0x003f1000 0x100>;
++			interrupts = <GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH>;
++			bus-width = <8>;
++			clocks = <&sdio0_clk>;
++			iommus = <&smmu 0x6002 0x0000>;
++			status = "disabled";
++		};
++
++		sdio1: sdhci at 68cf2000 {
++			compatible = "brcm,sdhci-iproc";
++			reg = <0x003f2000 0x100>;
++			interrupts = <GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH>;
++			bus-width = <8>;
++			clocks = <&sdio1_clk>;
++			iommus = <&smmu 0x6003 0x0000>;
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.7.4
