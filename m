@@ -1,32 +1,41 @@
 From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Mon, 22 May 2017 07:01:46 +0000
-Subject: [PATCH 1/2] arm64: add PROT_DEVICE_GRE for Device GRE mapping
+Date: Mon, 22 May 2017 07:01:47 +0000
+Subject: [PATCH 2/2] arm64: switch ioremap_wc to use Device GRE
 In-Reply-To: <1495436507-81890-1-git-send-email-jnair@caviumnetworks.com>
 References: <1495436507-81890-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <1495436507-81890-2-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <1495436507-81890-3-git-send-email-jnair@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MAIR is programmed with attribute "Device GRE" (0x0C) at index 3,
-but there is no corresponding page protection value defined. Make the
-page attribute available for use by defining PROT_DEVICE_GRE.
+The device "Gather" attribute is defined in the ARMv8 ARM as:
+"The Gathering attribute determines whether it is permissible for either:
+* Multiple memory accesses of the same type, read or write, to the same
+  memory location to be merged into a single transaction.
+* Multiple memory accesses of the same type, read or write, to different
+  memory locations to be merged into a single memory transaction on an
+  interconnect."
+
+This attribute is more appropriate for the write combining ioremap_wc()
+than the non-cached memory attribute used now, so update the ioremap_wc
+implementation to use it.
 
 Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
 ---
- arch/arm64/include/asm/pgtable-prot.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/include/asm/io.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-index 2142c77..216f9f9 100644
---- a/arch/arm64/include/asm/pgtable-prot.h
-+++ b/arch/arm64/include/asm/pgtable-prot.h
-@@ -39,6 +39,7 @@
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 35b2e50..b1c92e3 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -168,7 +168,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
  
- #define PROT_DEVICE_nGnRnE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
- #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRE))
-+#define PROT_DEVICE_GRE		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_GRE))
- #define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_NC))
- #define PROT_NORMAL_WT		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_WT))
- #define PROT_NORMAL		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL))
+ #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+-#define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
++#define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_GRE))
+ #define ioremap_wt(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define iounmap				__iounmap
+ 
 -- 
 2.7.4
