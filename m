@@ -1,67 +1,146 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 22 May 2017 11:03:49 +0900
-Subject: [GIT PULL (RESEND)] ARM: uniphier: UniPhier fixes for v4.12
-Message-ID: <CAK7LNARbSkbEOhs7QMd+6VV+KWbkjK4LR9rmQ=YBWqPY+8_XPQ@mail.gmail.com>
+From: frank.wang@rock-chips.com (Frank Wang)
+Date: Mon, 22 May 2017 10:29:57 +0800
+Subject: [PATCH v2 3/4] arm: dts: rk3229: add a new cpu opp table
+In-Reply-To: <3157044.sksXPZM55k@phil>
+References: <1495016177-2413-1-git-send-email-frank.wang@rock-chips.com>
+ <1495016177-2413-4-git-send-email-frank.wang@rock-chips.com>
+ <3157044.sksXPZM55k@phil>
+Message-ID: <8d8af44c-353a-5415-ed15-ccc68db81159@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Heiko,
 
-Last week, I thought I found a problem in my pull request,
-but it turned out my misunderstanding.
+On 2017/5/20 5:46, Heiko Stuebner wrote:
+> Hi Frank,
+>
+> Am Mittwoch, 17. Mai 2017, 18:16:16 CEST schrieb Frank Wang:
+>> From: Finley Xiao<finley.xiao@rock-chips.com>
+>>
+>> This patch adds some new frequencies for rk3229 board.
+>>
+>> Signed-off-by: Finley Xiao<finley.xiao@rock-chips.com>
+>> Signed-off-by: Frank Wang<frank.wang@rock-chips.com>
+>> Acked-by: Viresh Kumar<viresh.kumar@linaro.org>
+>> ---
+>>   arch/arm/boot/dts/rk3229-cpu-opp.dtsi | 85 +++++++++++++++++++++++++++++++++++
+> I'm not yet sure if I like that approach. The other option I'm considering
+> and also tend to prefer at the moment would be to have this in a
+> rk3229.dtsi, creating a chain of
+> 	rk322x.dtsi
+> 		\- rk3228-evb.dts
+> 		\- rk3229.dtsi
+> 			\- rk3229-evb.dts
+>
+> similar to what we do with the rk3xxx.dtsi -> rk3188.dtsi.
+>
+> If I remember correctly, there are some other tiny differences between the
+> rk3228 and rk3229, so having the rk3229.dtsi already would make it
+> easier to place needed stuff into it later on.
 
-So, my pull request I sent is OK.
-I am re-sending this request mail for clarification.
-
-Here are some ARM UniPhier SoC fixes for v4.12.
-Due to the eMMC driver update, PHY parameters must be specified
-via DT to make the eMMC controller work again.
-The rest is DTC warning fixes reported when building DT with W=1.
-Please pull!
+That makes sense, I will amend that based on your comments.
 
 
-The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+BR.
+Frank
 
-  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-fixes-v4.12
-
-for you to fetch changes up to 96abf9ded7954d9e6f3a7775353d9550b1283db9:
-
-  arm64: dts: uniphier: fix simple-bus unit address format error
-(2017-05-14 11:43:46 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM SoC fixes for v4.12
-
-- add necessary DT properties to get eMMC work again
-- fix DTC warnings when compiled with W=1
-
-----------------------------------------------------------------
-Masahiro Yamada (4):
-      arm64: dts: uniphier: add input-delay properties to Cadence eMMC node
-      arm64: dts: uniphier: add cdns, phy-dll-delay-sdclk(-hsmmc) for eMMC
-      ARM: dts: uniphier: fix simple-bus unit address format error
-      arm64: dts: uniphier: fix simple-bus unit address format error
-
-Viresh Kumar (2):
-      ARM: uniphier: Use - instead of @ for DT OPP entries
-      arm64: uniphier: Use - instead of @ for DT OPP entries
-
- arch/arm/boot/dts/uniphier-ld4.dtsi              |  2 +-
- arch/arm/boot/dts/uniphier-pro4.dtsi             |  2 +-
- arch/arm/boot/dts/uniphier-pro5.dtsi             | 34 ++++++++++-----------
- arch/arm/boot/dts/uniphier-pxs2.dtsi             | 18 +++++------
- arch/arm/boot/dts/uniphier-sld3.dtsi             |  2 +-
- arch/arm/boot/dts/uniphier-sld8.dtsi             |  2 +-
- arch/arm/boot/dts/uniphier-support-card.dtsi     |  4 +--
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 21 ++++++++-----
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 39 +++++++++++++-----------
- 9 files changed, 67 insertions(+), 57 deletions(-)
-
--- 
-Best Regards
-Masahiro Yamada
+> Heiko
+>
+>>   1 file changed, 85 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/rk3229-cpu-opp.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/rk3229-cpu-opp.dtsi b/arch/arm/boot/dts/rk3229-cpu-opp.dtsi
+>> new file mode 100644
+>> index 0000000..89e8413
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/rk3229-cpu-opp.dtsi
+>> @@ -0,0 +1,85 @@
+>> +/*
+>> + * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This library is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of the
+>> + *     License, or (at your option) any later version.
+>> + *
+>> + *     This library is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + *  Or, alternatively,
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use,
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + */
+>> +
+>> +/ {
+>> +	/delete-node/ opp-table0;
+>> +
+>> +	cpu0_opp_table: opp_table0 {
+>> +		compatible = "operating-points-v2";
+>> +		opp-shared;
+>> +
+>> +		opp-408000000 {
+>> +			opp-hz = /bits/ 64 <408000000>;
+>> +			opp-microvolt = <950000>;
+>> +			clock-latency-ns = <40000>;
+>> +			opp-suspend;
+>> +		};
+>> +		opp-600000000 {
+>> +			opp-hz = /bits/ 64 <600000000>;
+>> +			opp-microvolt = <975000>;
+>> +		};
+>> +		opp-816000000 {
+>> +			opp-hz = /bits/ 64 <816000000>;
+>> +			opp-microvolt = <1000000>;
+>> +		};
+>> +		opp-1008000000 {
+>> +			opp-hz = /bits/ 64 <1008000000>;
+>> +			opp-microvolt = <1175000>;
+>> +		};
+>> +		opp-1200000000 {
+>> +			opp-hz = /bits/ 64 <1200000000>;
+>> +			opp-microvolt = <1275000>;
+>> +		};
+>> +		opp-1296000000 {
+>> +			opp-hz = /bits/ 64 <1296000000>;
+>> +			opp-microvolt = <1325000>;
+>> +		};
+>> +		opp-1392000000 {
+>> +			opp-hz = /bits/ 64 <1392000000>;
+>> +			opp-microvolt = <1375000>;
+>> +		};
+>> +		opp-1464000000 {
+>> +			opp-hz = /bits/ 64 <1464000000>;
+>> +			opp-microvolt = <1400000>;
+>> +		};
+>> +	};
+>> +};
+>>
+>
+>
+>
