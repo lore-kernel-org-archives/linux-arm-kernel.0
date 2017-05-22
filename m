@@ -1,52 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 May 2017 15:58:34 +0200
-Subject: [PATCH 01/35] arm64: dts: m3ulcb: enable I2C
+Date: Mon, 22 May 2017 15:58:35 +0200
+Subject: [PATCH 02/35] arm64: dts: m3ulcb: Update memory node to 2 GiB map
 In-Reply-To: <cover.1495457812.git.horms+renesas@verge.net.au>
 References: <cover.1495457812.git.horms+renesas@verge.net.au>
-Message-ID: <82c906fac243f1a5d99867551c0933aee414bfbb.1495457812.git.horms+renesas@verge.net.au>
+Message-ID: <2a3ee629ed8b2f1de496f57edd3f30cd5e8584cf.1495457812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vladimir Barinov <vladimir.barinov+renesas@cogentembedded.com>
 
-This supports I2C2 bus on M3ULCB board
+This patch updates memory region:
+
+  - After changes, the new map of the m3ulcb board on R8A7796 SoC
+    Bank0: 1GiB RAM : 0x000048000000 -> 0x0007fffffff
+    Bank1: 1GiB RAM : 0x000600000000 -> 0x0063fffffff
+
+  - Before changes, the old map looked like this:
+    Bank0: 1GiB RAM : 0x000048000000 -> 0x0007fffffff
 
 Signed-off-by: Vladimir Barinov <vladimir.barinov+renesas@cogentembedded.com>
+Tested-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-index 372b2a944716..5554b555b874 100644
+index 5554b555b874..02051a3236a5 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
 +++ b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-@@ -120,6 +120,11 @@
- 		function = "scif_clk";
+@@ -32,6 +32,11 @@
+ 		reg = <0x0 0x48000000 0x0 0x38000000>;
  	};
  
-+	i2c2_pins: i2c2 {
-+		groups = "i2c2_a";
-+		function = "i2c2";
++	memory at 600000000 {
++		device_type = "memory";
++		reg = <0x6 0x00000000 0x0 0x40000000>;
 +	};
 +
- 	sdhi0_pins: sd0 {
- 		groups = "sdhi0_data4", "sdhi0_ctrl";
- 		function = "sdhi0";
-@@ -182,6 +187,13 @@
- 	clock-frequency = <14745600>;
- };
+ 	leds {
+ 		compatible = "gpio-leds";
  
-+&i2c2 {
-+	pinctrl-0 = <&i2c2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
- &wdt0 {
- 	timeout-sec = <60>;
- 	status = "okay";
 -- 
 2.1.4
