@@ -1,24 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 22 May 2017 09:56:16 +0100
-Subject: [PATCH 0/2] ioremap_wc on arm64
-In-Reply-To: <1495436507-81890-1-git-send-email-jnair@caviumnetworks.com>
-References: <1495436507-81890-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <20170522085615.GC30129@e104818-lin.cambridge.arm.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Mon, 22 May 2017 11:01:53 +0200
+Subject: [PATCH v2 2/2] ARM: dts: am335x-sl50: Fix cannot claim requested pins
+ for spi0
+In-Reply-To: <20170522090153.5596-1-enric.balletbo@collabora.com>
+References: <20170522090153.5596-1-enric.balletbo@collabora.com>
+Message-ID: <20170522090153.5596-2-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 07:01:45AM +0000, Jayachandran C wrote:
-> From its definition, the device "gather" attribute seems to be a better
-> fit for implementing write combining mapping in ioremap_wc().  And on
-> ThunderX2, Device GRE mapping has optimizations that makes it much faster
-> than normal uncached mapping.
-> 
-> I am not sure of the reasoning behind the original decision to make
-> ioremap_wc use "Normal Non-Cached" attribute, since all the other variants
-> of ioremap use device attributes, and ioremap_wc looks like an exception.
+We don't need to bitbang these pins anymore, instead we muxed these
+pins as SPI, after this change, done in commit 6c69f726, we introduced
+the following error:
 
-The reason we kept it as Normal NC is that Device_GRE does not allow
-unaligned accesses.
+ pinctrl-single 44e10800.pinmux: pin PIN85 already requested \
+ by 44e10800.pinmux; cannot claim for 48030000.spi
+ pinctrl-single 44e10800.pinmux: pin-85 (48030000.spi) status -22
 
+Fixes: 6c69f726 ("ARM: dts: am335x-sl50: Enable SPI0 interface and Flash Memory")
+Cc: <stable@vger.kernel.org> # 4.11
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+Changelog since v1:
+ - Cc stable and add kernel version to be applied
+
+ arch/arm/boot/dts/am335x-sl50.dts | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/am335x-sl50.dts b/arch/arm/boot/dts/am335x-sl50.dts
+index da4f8e3..fc864a8 100644
+--- a/arch/arm/boot/dts/am335x-sl50.dts
++++ b/arch/arm/boot/dts/am335x-sl50.dts
+@@ -280,10 +280,6 @@
+ 			AM33XX_IOPAD(0x834, PIN_INPUT_PULLUP | MUX_MODE7)	/* nKbdReset - gpmc_ad13.gpio1_13 */
+ 			AM33XX_IOPAD(0x838, PIN_INPUT_PULLUP | MUX_MODE7)	/* nDispReset - gpmc_ad14.gpio1_14 */
+ 			AM33XX_IOPAD(0x844, PIN_INPUT_PULLUP | MUX_MODE7)	/* USB1_enPower - gpmc_a1.gpio1_17 */
+-			/* AVR Programming - SPI Bus (bit bang) - Screen and Keyboard */
+-			AM33XX_IOPAD(0x954, PIN_INPUT_PULLUP | MUX_MODE7)	/* Kbd/Disp/BattMOSI spi0_d0.gpio0_3 */
+-			AM33XX_IOPAD(0x958, PIN_INPUT_PULLUP | MUX_MODE7)	/* Kbd/Disp/BattMISO spi0_d1.gpio0_4 */
+-			AM33XX_IOPAD(0x950, PIN_INPUT_PULLUP | MUX_MODE7)	/* Kbd/Disp/BattSCLK spi0_clk.gpio0_2 */
+ 			/* PDI Bus - Battery system */
+ 			AM33XX_IOPAD(0x840, PIN_INPUT_PULLUP | MUX_MODE7)	/* nBattReset  gpmc_a0.gpio1_16 */
+ 			AM33XX_IOPAD(0x83c, PIN_INPUT_PULLUP | MUX_MODE7)	/* BattPDIData gpmc_ad15.gpio1_15 */
 -- 
-Catalin
+2.9.3
