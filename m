@@ -1,65 +1,101 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 22 May 2017 17:48:19 +0100
-Subject: [PATCH v3.1 9/11] arm64: hugetlb: Override set_huge_swap_pte_at() to
- support contiguous hugepages
-In-Reply-To: <20170522143958.12867-11-punit.agrawal@arm.com>
-References: <20170522143958.12867-11-punit.agrawal@arm.com>
-Message-ID: <20170522164819.5192-1-punit.agrawal@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 22 May 2017 11:52:50 -0500
+Subject: [PATCH v4 00/20] eeprom: at24: Add OF device ID table
+In-Reply-To: <CABxcv==xw7UxF1Ey+hDhGb_wzgAcFR9JLm6iuirvYSTTvSxb0A@mail.gmail.com>
+References: <20170522140208.24652-1-javier@dowhile0.org>
+ <CAMuHMdXbhkGGFC80-39Axzv=BdEXyBNuPuHCSWW3eXWDB=SQ+w@mail.gmail.com>
+ <CAL_JsqL2P=C+xRyL-BCC=RtFah4BRf8BHSvWNPZ+6r2ioSk_Yw@mail.gmail.com>
+ <CABxcv==xw7UxF1Ey+hDhGb_wzgAcFR9JLm6iuirvYSTTvSxb0A@mail.gmail.com>
+Message-ID: <CAL_JsqKj_f-jY3wi78QyAAov=a9-ReaT9qU=ytwSp+5RL0eutg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default implementation of set_huge_swap_pte_at() does not support
-hugepages consisting of contiguous ptes. Override it to add support for
-contiguous hugepages.
+On Mon, May 22, 2017 at 9:46 AM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Geert and Rob,
+>
+> On Mon, May 22, 2017 at 4:26 PM, Rob Herring <robh@kernel.org> wrote:
+>> On Mon, May 22, 2017 at 9:23 AM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
+>>> Hi Javier,
+>>>
+>>> On Mon, May 22, 2017 at 4:01 PM, Javier Martinez Canillas
+>>> <javier@dowhile0.org> wrote:
+>>>> This series is a follow-up to patch [0] that added an OF device ID table
+>>>> to the at24 EEPROM driver. As you suggested [1], this version instead of
+>>>> adding entries for every used <vendor,device> tuple, only adds a single
+>>>> entry for each chip type using the "atmel" vendor as a generic fallback.
+>>>>
+>>>> This is a re-spin that addresses some issues pointed out by Rob Herring.
+>>>>
+>>>> The first patch documents in the DT binding what's the correct vendor to
+>>>> use and what are the ones that are being deprecated. The second one adds
+>>>> the OF device ID table for the at24 driver and the next patches use this
+>>>> vendor in the compatible string to each DTS that defines a compatible I2C
+>>>> EEPROM device node.
+>>>>
+>>>> Patches can be applied independently since the DTS changes without driver
+>>>> changes are no-op and the OF table won't be used without the DTS changes.
+>>>>
+>>>> [0]: https://lkml.org/lkml/2017/3/14/589
+>>>> [1]: https://lkml.org/lkml/2017/3/15/99
+>>>>
+>>>> Best regards,
+>>>> Javier
+>>>>
+>>>> Changes in v4:
+>>>> - Document the manufacturers that have been deprecated (Rob Herring).
+>>>> - Only use the atmel manufacturer in the compatible string instead of
+>>>>   keeping the deprecated ones (Rob Herring).
+>>>
+>>> I think you're referring to this (https://lkml.org/lkml/2017/4/19/1136)?
+>>>
+>>> | > --- a/arch/arm/boot/dts/am335x-baltos.dtsi
+>>> | > +++ b/arch/arm/boot/dts/am335x-baltos.dtsi
+>>> | > @@ -255,7 +255,7 @@
+>>> | >     };
+>>> | >
+>>> | >     at24 at 50 {
+>>> | > -           compatible = "at24,24c02";
+>>> | > +           compatible = "at24,24c02", "atmel,24c02";
+>>> |
+>>> | I think you can just drop the at24 compatibles. A new kernel doesn't
+>>> | need it. An old kernel ignores the manufacturer. I checked that u-boot
+>>> | only matches on "atmel,*", so okay there. Don't know about the *BSDs. I
+>>> | couldn't find anything.
+>>>
+>>> I think you misunderstood what Rob means.
+>>>
+>>> In the case above it makes sense to drop the first compatible, as "at24" is
+>>> not a manufacturer, but refers to ATMEL's "AT24" line of i2c FLASH ROMs.
+>>>
+>>> However, in cases where a real vendor/part combo is specified, like on
+>>> r8a7791-koelsch.dts:
+>>>
+>>> -               compatible = "renesas,24c02";
+>>> +               compatible = "atmel,24c02";
+>>>
+>>> you do want to keep the real vendor/part combo, i.e.
+>>>
+>>>      compatible = "renesas,24c02", "atmel,24c02";
+>>
+>> Yes, Geert is correct.
+>>
+>
+> Sorry for misunderstanding your previous comment...
+>
+> How this should be documented in the DT binding? Should I include
+> "renesas" as a valid manufacturer or only list the used
+> <vendor,device> pairs (i.e: "renesas,24c02")?
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: David Woods <dwoods@mellanox.com>
----
+However you are handling any of the vendors. I'll have to go look.
 
-Changes since v3:
+> I also wonder why this is really needed if AFAIU "renesas,24c02" is
+> compatible with "atmel,24c02". IOW, the driver doesn't need to
+> differentiate between the two since the devices are the same and will
+> always match using "atmel,24c02".
 
-* Update patch based on core changes update to use #ifndef block
+It is needed, so that when a difference is found, it can be handled
+without updating the DT.
 
- arch/arm64/include/asm/hugetlb.h |  3 +++
- arch/arm64/mm/hugetlbpage.c      | 12 ++++++++++++
- 2 files changed, 15 insertions(+)
-
-diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index bb86f0741863..e5f6210d1321 100644
---- a/arch/arm64/include/asm/hugetlb.h
-+++ b/arch/arm64/include/asm/hugetlb.h
-@@ -84,6 +84,9 @@ extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
- extern void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
- 			   pte_t *ptep, unsigned long sz);
- #define huge_pte_clear huge_pte_clear
-+extern void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
-+				 pte_t *ptep, pte_t pte, unsigned long sz);
-+#define set_huge_swap_pte_at set_huge_swap_pte_at
- 
- #include <asm-generic/hugetlb.h>
- 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 240b2fd53266..3e78673b1bcb 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -167,6 +167,18 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 	}
- }
- 
-+void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
-+			  pte_t *ptep, pte_t pte, unsigned long sz)
-+{
-+	int i, ncontig;
-+	size_t pgsize;
-+
-+	ncontig = num_contig_ptes(sz, &pgsize);
-+
-+	for (i = 0; i < ncontig; i++, ptep++)
-+		set_pte(ptep, pte);
-+}
-+
- pte_t *huge_pte_alloc(struct mm_struct *mm,
- 		      unsigned long addr, unsigned long sz)
- {
--- 
-2.11.0
+Rob
