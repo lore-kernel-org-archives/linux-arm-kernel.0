@@ -1,19 +1,16 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 22 May 2017 17:45:28 +0100
-Subject: [PATCH v3.1 8/11] arm64: hugetlb: Override huge_pte_clear() to
+Date: Mon, 22 May 2017 17:48:19 +0100
+Subject: [PATCH v3.1 9/11] arm64: hugetlb: Override set_huge_swap_pte_at() to
  support contiguous hugepages
-In-Reply-To: <20170522143958.12867-10-punit.agrawal@arm.com>
-References: <20170522143958.12867-10-punit.agrawal@arm.com>
-Message-ID: <20170522164528.4999-1-punit.agrawal@arm.com>
+In-Reply-To: <20170522143958.12867-11-punit.agrawal@arm.com>
+References: <20170522143958.12867-11-punit.agrawal@arm.com>
+Message-ID: <20170522164819.5192-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default huge_pte_clear() implementation does not clear contiguous
-page table entries when it encounters contiguous hugepages that are
-supported on arm64.
-
-Fix this by overriding the default implementation to clear all the
-entries associated with contiguous hugepages.
+The default implementation of set_huge_swap_pte_at() does not support
+hugepages consisting of contiguous ptes. Override it to add support for
+contiguous hugepages.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Cc: David Woods <dwoods@mellanox.com>
@@ -21,88 +18,48 @@ Cc: David Woods <dwoods@mellanox.com>
 
 Changes since v3:
 
-* Update patch to use #ifndef block to override huge_pte_clear()
+* Update patch based on core changes update to use #ifndef block
 
- arch/arm64/include/asm/hugetlb.h |  6 +++++-
- arch/arm64/mm/hugetlbpage.c      | 36 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/hugetlb.h |  3 +++
+ arch/arm64/mm/hugetlbpage.c      | 12 ++++++++++++
+ 2 files changed, 15 insertions(+)
 
 diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index bbc1e35aa601..bb86f0741863 100644
+index bb86f0741863..e5f6210d1321 100644
 --- a/arch/arm64/include/asm/hugetlb.h
 +++ b/arch/arm64/include/asm/hugetlb.h
-@@ -18,7 +18,6 @@
- #ifndef __ASM_HUGETLB_H
- #define __ASM_HUGETLB_H
+@@ -84,6 +84,9 @@ extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ extern void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+ 			   pte_t *ptep, unsigned long sz);
+ #define huge_pte_clear huge_pte_clear
++extern void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
++				 pte_t *ptep, pte_t pte, unsigned long sz);
++#define set_huge_swap_pte_at set_huge_swap_pte_at
  
--#include <asm-generic/hugetlb.h>
- #include <asm/page.h>
+ #include <asm-generic/hugetlb.h>
  
- static inline pte_t huge_ptep_get(pte_t *ptep)
-@@ -82,5 +81,10 @@ extern void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 				    unsigned long addr, pte_t *ptep);
- extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 				  unsigned long addr, pte_t *ptep);
-+extern void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-+			   pte_t *ptep, unsigned long sz);
-+#define huge_pte_clear huge_pte_clear
-+
-+#include <asm-generic/hugetlb.h>
- 
- #endif /* __ASM_HUGETLB_H */
 diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index e9061704aec3..240b2fd53266 100644
+index 240b2fd53266..3e78673b1bcb 100644
 --- a/arch/arm64/mm/hugetlbpage.c
 +++ b/arch/arm64/mm/hugetlbpage.c
-@@ -68,6 +68,30 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
- 	return CONT_PTES;
+@@ -167,6 +167,18 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 	}
  }
  
-+static inline int num_contig_ptes(unsigned long size, size_t *pgsize)
-+{
-+	int contig_ptes = 0;
-+
-+	*pgsize = size;
-+
-+	switch (size) {
-+	case PUD_SIZE:
-+	case PMD_SIZE:
-+		contig_ptes = 1;
-+		break;
-+	case CONT_PMD_SIZE:
-+		*pgsize = PMD_SIZE;
-+		contig_ptes = CONT_PMDS;
-+		break;
-+	case CONT_PTE_SIZE:
-+		*pgsize = PAGE_SIZE;
-+		contig_ptes = CONT_PTES;
-+		break;
-+	}
-+
-+	return contig_ptes;
-+}
-+
- /*
-  * Changing some bits of contiguous entries requires us to follow a
-  * Break-Before-Make approach, breaking the whole contiguous set
-@@ -245,6 +269,18 @@ pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
- 	return entry;
- }
- 
-+void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-+		    pte_t *ptep, unsigned long sz)
++void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
++			  pte_t *ptep, pte_t pte, unsigned long sz)
 +{
 +	int i, ncontig;
 +	size_t pgsize;
 +
 +	ncontig = num_contig_ptes(sz, &pgsize);
 +
-+	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++)
-+		pte_clear(mm, addr, ptep);
++	for (i = 0; i < ncontig; i++, ptep++)
++		set_pte(ptep, pte);
 +}
 +
- pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 			      unsigned long addr, pte_t *ptep)
+ pte_t *huge_pte_alloc(struct mm_struct *mm,
+ 		      unsigned long addr, unsigned long sz)
  {
 -- 
 2.11.0
