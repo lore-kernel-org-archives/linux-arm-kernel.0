@@ -1,97 +1,84 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 22 May 2017 10:50:19 +0100
-Subject: [PATCH] iommu/arm-smmu: Use context bank TLBSTATUS registers
-In-Reply-To: <1495443328-19646-1-git-send-email-vjitta@codeaurora.org>
-References: <1495443328-19646-1-git-send-email-vjitta@codeaurora.org>
-Message-ID: <47a51b35-5a0a-0034-cf7c-8428d63f60b3@arm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon, 22 May 2017 17:41:52 +0800
+Subject: [PATCH v6 2/9] irqchip/sunxi-nmi: add support for the NMI in A64
+ R_INTC
+In-Reply-To: <ed99d87b-86eb-cf8a-8614-51d59fa00c8c@arm.com>
+References: <20170518071653.36561-1-icenowy@aosc.io>
+ <20170518071653.36561-3-icenowy@aosc.io>
+ <ed99d87b-86eb-cf8a-8614-51d59fa00c8c@arm.com>
+Message-ID: <98014597-29BA-4D02-8137-4E399955F4FD@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/05/17 09:55, vjitta at codeaurora.org wrote:
-> From: Vijayanand Jitta <vjitta@codeaurora.org>
-> 
-> There are TLBSTATUS registers in SMMU global register space as well as
-> context bank register space.  Currently we're polling the global
-> TLBSTATUS registers after TLB invalidation, even when using the TLB
-> invalidation registers from context bank address space.  This violates
-> the usage model described in the ARM SMMU spec.  Fix this by polling
-> context bank TLBSTATUS registers for context bank TLB operations, and
-> global TLBSTATUS registers for global TLB operations.
 
-Note that these registers don't exist for SMMUv1 stage 2 contexts...
 
-> Signed-off-by: Vijayanand Jitta <vjitta@codeaurora.org>
-> ---
->  drivers/iommu/arm-smmu.c | 22 +++++++++++++++++++---
->  1 file changed, 19 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 7cecc37..8dc6da9 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -233,6 +233,9 @@ enum arm_smmu_s2cr_privcfg {
->  #define ARM_SMMU_CB_S1_TLBIVAL		0x620
->  #define ARM_SMMU_CB_S2_TLBIIPAS2	0x630
->  #define ARM_SMMU_CB_S2_TLBIIPAS2L	0x638
-> +#define ARM_SMMU_CB_TLBSYNC		0x7f0
-> +#define ARM_SMMU_CB_TLBSTATUS		0x7f4
-> +#define TLBSTATUS_SACTIVE		(1 << 0)
->  #define ARM_SMMU_CB_ATS1PR		0x800
->  #define ARM_SMMU_CB_ATSR		0x8f0
->  
-> @@ -580,6 +583,19 @@ static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
->  }
->  
->  /* Wait for any pending TLB invalidations to complete */
-> +static void arm_smmu_tlb_sync_cb(struct arm_smmu_device *smmu,
-> +				int cbndx)
-> +{
-> +	void __iomem *base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cbndx);
-> +	u32 val;
-> +
-> +	writel_relaxed(0, base + ARM_SMMU_CB_TLBSYNC);
-> +	if (readl_poll_timeout_atomic(base + ARM_SMMU_CB_TLBSTATUS, val,
-> +				      !(val & TLBSTATUS_SACTIVE),
-> +				      0, TLB_LOOP_TIMEOUT))
-> +		dev_err(smmu->dev, "TLBSYNC timeout!\n");
-> +}
-> +
->  static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
->  {
->  	int count = 0;
-> @@ -601,7 +617,7 @@ static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
->  static void arm_smmu_tlb_sync(void *cookie)
->  {
->  	struct arm_smmu_domain *smmu_domain = cookie;
-> -	__arm_smmu_tlb_sync(smmu_domain->smmu);
-> +	arm_smmu_tlb_sync_cb(smmu_domain->smmu, smmu_domain->cfg.cbndx);
+? 2017?5?22? GMT+08:00 ??5:39:22, Marc Zyngier <marc.zyngier@arm.com> ??:
+>On 18/05/17 08:16, Icenowy Zheng wrote:
+>> Add support for the newly imported compatible for the A64 R_INTC in
+>> irq-sunxi-nmi driver.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> ---
+>> Changes in v5:
+>> - Fix A64 R_INTC compatible.
+>> 
+>>  drivers/irqchip/irq-sunxi-nmi.c | 13 +++++++++++++
+>>  1 file changed, 13 insertions(+)
+>> 
+>> diff --git a/drivers/irqchip/irq-sunxi-nmi.c
+>b/drivers/irqchip/irq-sunxi-nmi.c
+>> index 668730c5cb66..5559c1d593bf 100644
+>> --- a/drivers/irqchip/irq-sunxi-nmi.c
+>> +++ b/drivers/irqchip/irq-sunxi-nmi.c
+>> @@ -56,6 +56,12 @@ static struct sunxi_sc_nmi_reg_offs sun9i_reg_offs
+>= {
+>>  	.enable	= 0x04,
+>>  };
+>>  
+>> +static struct sunxi_sc_nmi_reg_offs sun50i_reg_offs = {
+>> +	.ctrl	= 0x0c,
+>> +	.pend	= 0x10,
+>> +	.enable	= 0x40,
+>> +};
+>> +
+>
+>Magic values? Even if no #define is provided, a pointer to the
+>corresponding documentation would be appreciated (assuming
+>documentation
+>exists).
 
-...which makes this goes wrong for sync-on-unmap with MMU-400/401 (and
-any other implementations which may exist) - in practice they will
-probably RAZ, leading us to believe it's always inactive.
+No documents is available for A64 R_INTC.
 
-Anyway, this patch isn't going to apply against 4.12-rc - guess how I
-know ;)
+>
+>>  static inline void sunxi_sc_nmi_write(struct irq_chip_generic *gc,
+>u32 off,
+>>  				      u32 val)
+>>  {
+>> @@ -220,3 +226,10 @@ static int __init sun9i_nmi_irq_init(struct
+>device_node *node,
+>>  	return sunxi_sc_nmi_irq_init(node, &sun9i_reg_offs);
+>>  }
+>>  IRQCHIP_DECLARE(sun9i_nmi, "allwinner,sun9i-a80-nmi",
+>sun9i_nmi_irq_init);
+>> +
+>> +static int __init sun50i_nmi_irq_init(struct device_node *node,
+>> +				     struct device_node *parent)
+>> +{
+>> +	return sunxi_sc_nmi_irq_init(node, &sun50i_reg_offs);
+>> +}
+>> +IRQCHIP_DECLARE(sun50i_nmi, "allwinner,sun50i-a64-r-intc",
+>sun50i_nmi_irq_init);
+>> 
+>
+>Apart from the above:
+>
+>Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>
+>Let me know how you want this to be merged.
 
-Robin.
+I think it can just go via IRQ subsystem.
 
->  }
->  
->  static void arm_smmu_tlb_inv_context(void *cookie)
-> @@ -616,13 +632,13 @@ static void arm_smmu_tlb_inv_context(void *cookie)
->  		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
->  		writel_relaxed(ARM_SMMU_CB_ASID(smmu, cfg),
->  			       base + ARM_SMMU_CB_S1_TLBIASID);
-> +		arm_smmu_tlb_sync_cb(smmu, cfg->cbndx);
->  	} else {
->  		base = ARM_SMMU_GR0(smmu);
->  		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg),
->  			       base + ARM_SMMU_GR0_TLBIVMID);
-> +		__arm_smmu_tlb_sync(smmu);
->  	}
-> -
-> -	__arm_smmu_tlb_sync(smmu);
->  }
->  
->  static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
-> 
+>
+>Thanks,
+>
+>	M.
