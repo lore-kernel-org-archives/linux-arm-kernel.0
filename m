@@ -1,55 +1,51 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 22 May 2017 16:02:02 +0200
-Subject: [PATCH v4 14/20] arm64: dts: ls1043a: Add generic compatible string
- for I2C EEPROM
-In-Reply-To: <20170522140208.24652-1-javier@dowhile0.org>
-References: <20170522140208.24652-1-javier@dowhile0.org>
-Message-ID: <20170522140208.24652-15-javier@dowhile0.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 22 May 2017 15:58:58 +0200
+Subject: [PATCH 25/35] arm64: dts: r8a7796: add Sound MIX support
+In-Reply-To: <cover.1495457812.git.horms+renesas@verge.net.au>
+References: <cover.1495457812.git.horms+renesas@verge.net.au>
+Message-ID: <53394b600bda5d4793d37b0010410a379fd09905.1495457812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The at24 driver allows to register I2C EEPROM chips using different vendor
-and devices, but the I2C subsystem does not take the vendor into account
-when matching using the I2C table since it only has device entries.
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-But when matching using an OF table, both the vendor and device has to be
-taken into account so the driver defines only a set of compatible strings
-using the "atmel" vendor as a generic fallback for compatible I2C devices.
-
-So add this generic fallback to the device node compatible string to make
-the device to match the driver using the OF device ID table.
-
-Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
-
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Changes in v4:
-- Only use the atmel manufacturer in the compatible string instead of
-  keeping the deprecated ones (Rob Herring).
-
-Changes in v3: None
-Changes in v2: None
-
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-index d64370ed0738..0a3853240c8b 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-@@ -75,11 +75,11 @@
- 		reg = <0x4c>;
- 	};
- 	eeprom at 52 {
--		compatible = "at24,24c512";
-+		compatible = "atmel,24c512";
- 		reg = <0x52>;
- 	};
- 	eeprom at 53 {
--		compatible = "at24,24c512";
-+		compatible = "atmel,24c512";
- 		reg = <0x53>;
- 	};
- 	rtc at 68 {
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 7b74da1d1568..8651fc93304d 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -1197,6 +1197,7 @@
+ 				 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
+ 				 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
+ 				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
++				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
+ 				 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
+ 				 <&audio_clk_a>, <&audio_clk_b>,
+ 				 <&audio_clk_c>,
+@@ -1208,6 +1209,7 @@
+ 				      "src.9", "src.8", "src.7", "src.6",
+ 				      "src.5", "src.4", "src.3", "src.2",
+ 				      "src.1", "src.0",
++				      "mix.1", "mix.0",
+ 				      "ctu.1", "ctu.0",
+ 				      "dvc.0", "dvc.1",
+ 				      "clk_a", "clk_b", "clk_c", "clk_i";
+@@ -1225,6 +1227,11 @@
+ 				};
+ 			};
+ 
++			rcar_sound,mix {
++				mix0: mix-0 { };
++				mix1: mix-1 { };
++			};
++
+ 			rcar_sound,ctu {
+ 				ctu00: ctu-0 { };
+ 				ctu01: ctu-1 { };
 -- 
-2.9.3
+2.1.4
