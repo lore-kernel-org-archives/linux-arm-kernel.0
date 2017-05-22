@@ -1,46 +1,56 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 22 May 2017 16:45:14 +0200
-Subject: [PATCH v5 4/4] arm64: marvell: dts: add dma-mask in crypto nodes for
- 7k/8k
+Date: Mon, 22 May 2017 16:45:11 +0200
+Subject: [PATCH v5 1/4] Documentation/bindings: Document the SafeXel
+ cryptographic engine driver
 In-Reply-To: <20170522144514.6654-1-antoine.tenart@free-electrons.com>
 References: <20170522144514.6654-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170522144514.6654-5-antoine.tenart@free-electrons.com>
+Message-ID: <20170522144514.6654-2-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EIP197 cryptographic engine supports 64 bits address width but is
-limited to 40 bits on 7k/8k. Add a dma-mask property in the
-cryptographic engine nodes to reflect this.
+The Inside Secure Safexcel cryptographic engine is found on some Marvell
+SoCs (7k/8k). Document the bindings used by its driver.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 1 +
- 2 files changed, 2 insertions(+)
+ .../bindings/crypto/inside-secure-safexcel.txt     | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index ac8df5201cd6..e040677b67dc 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -241,6 +241,7 @@
- 				interrupt-names = "mem", "ring0", "ring1",
- 				"ring2", "ring3", "eip";
- 				clocks = <&cpm_syscon0 1 26>;
-+				dma-mask = <0xff 0xffffffff>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 7740a75a8230..1a69fb006f16 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -231,6 +231,7 @@
- 				interrupt-names = "mem", "ring0", "ring1",
- 						  "ring2", "ring3", "eip";
- 				clocks = <&cps_syscon0 1 26>;
-+				dma-mask = <0xff 0xffffffff>;
- 				status = "disabled";
- 			};
- 		};
+diff --git a/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt b/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
+new file mode 100644
+index 000000000000..37abbb2ca250
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
+@@ -0,0 +1,29 @@
++Inside Secure SafeXcel cryptographic engine
++
++Required properties:
++- compatible: Should be "inside-secure,safexcel-eip197".
++- reg: Base physical address of the engine and length of memory mapped region.
++- interrupts: Interrupt numbers for the rings and engine.
++- interrupt-names: Should be "ring0", "ring1", "ring2", "ring3", "eip", "mem".
++
++Optional properties:
++- clocks: Reference to the crypto engine clock.
++- dma-mask: The address mask limitation. Defaults to 64.
++
++Example:
++
++	crypto: crypto at 800000 {
++		compatible = "inside-secure,safexcel-eip197";
++		reg = <0x800000 0x200000>;
++		interrupts = <GIC_SPI 34 (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "mem", "ring0", "ring1", "ring2", "ring3",
++				  "eip";
++		clocks = <&cpm_syscon0 1 26>;
++		dma-mask = <0xff 0xffffffff>;
++		status = "disabled";
++	};
 -- 
 2.9.4
