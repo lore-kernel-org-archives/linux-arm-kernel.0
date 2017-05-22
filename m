@@ -1,40 +1,68 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Mon, 22 May 2017 09:07:28 +0200
-Subject: [PATCH 0/7] ALSA: Fix/improve PCM ack callback
-In-Reply-To: <s5hmva5ie1r.wl-tiwai@suse.de>
-References: <20170521190258.1178-1-tiwai@suse.de>
- <7685a366-5b2f-0a96-a686-c49b79975c56@sakamocchi.jp>
- <s5htw4dihpv.wl-tiwai@suse.de>
- <6cb4bbc8-2d5f-45d0-0635-37f1737972c3@sakamocchi.jp>
- <s5hmva5ie1r.wl-tiwai@suse.de>
-Message-ID: <s5hh90did3j.wl-tiwai@suse.de>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Mon, 22 May 2017 07:12:39 +0000
+Subject: [PATCH 3/3][v4] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <86tw4g6nb0.fsf@arm.com>
+References: <20170519131305.5068-1-laurentiu.tudor@nxp.com>
+ <20170519131305.5068-4-laurentiu.tudor@nxp.com>
+ <b3980350-9663-d98b-6533-fd3c15f98671@gmail.com> <86tw4g6nb0.fsf@arm.com>
+Message-ID: <VI1PR0401MB1856C0396AE7608FF2FC8CF1ECF80@VI1PR0401MB1856.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 May 2017 08:46:56 +0200,
-Takashi Iwai wrote:
+Hi Marc,
+
+> -----Original Message-----
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Saturday, May 20, 2017 9:43 AM
+> To: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Laurentiu Tudor <laurentiu.tudor@nxp.com>; gregkh at linuxfoundation.org;
+> stuyoder at gmail.com; devel at driverdev.osuosl.org; arnd at arndb.de; Ruxandra
+> Ioana Radulescu <ruxandra.radulescu@nxp.com>; Stuart Yoder
+> <stuart.yoder@nxp.com>; Roy Pledge <roy.pledge@nxp.com>; linux-
+> kernel at vger.kernel.org; agraf at suse.de; Catalin Horghidan
+> <catalin.horghidan@nxp.com>; Ioana Ciornei <ioana.ciornei@nxp.com>;
+> Thomas Gleixner <tglx@linutronix.de>; Leo Li <leoyang.li@nxp.com>; Bharat
+> Bhushan <bharat.bhushan@nxp.com>; Jason Cooper <jason@lakedaemon.net>;
+> linux-arm-kernel at lists.infradead.org; Rob Herring <robh+dt@kernel.org>
+> Subject: Re: [PATCH 3/3][v4] staging: fsl-mc: move bus driver out of staging
+> Importance: High
 > 
-> On Mon, 22 May 2017 08:31:13 +0200,
-> Takashi Sakamoto wrote:
-> > 
-> > On May 22 2017 14:27, Takashi Iwai wrote:
-> > > These functions will be modified again by other upcoming patchsets, so
-> > > I'd like not to touch so much for minor optimization at this stage.
-> > 
-> > If you address to your latest patchset[1], it might not be applied
-> > promptly because I have some comments (not posted yet, in this
-> > night). It's not good to avoid better bahaviour in a reason of
-> > patchset dependency, at least you seems to be too hasty.
+> On Fri, May 19 2017 at 02:41:43 PM, Matthias Brugger
+> <matthias.bgg@gmail.com> wrote:
+> > On 19/05/17 15:13, laurentiu.tudor at nxp.com wrote:
+> >> From: Stuart Yoder <stuart.yoder@nxp.com>
+> >>
+> >> Move the source files out of staging into their final locations:
+> >>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
+> >>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
+> >
+> > This driver has as compatible "arm,gic-v3-its". I wonder if this is
+> > correct and if it should be moved like this out of staging.
 > 
-> Come on, your suggestion is an optimization change that can be applied
-> anytime later easily.  If it were a mandatory fix, we should apply or
-> fold it immediately, but that's not the case.  The only necessary
-> thing is not to forget it.
+> This is no different from the way we handle *any* bus that uses the
+> GICv3 ITS as an MSI controller. Each bus provides its glue code that latches onto
+> the ITS node, and calls into the generic code.
+> 
+> Now, when it comes to moving this out of staging, here is my concern:
+> There is mention of a userspace tool (restool) used to control the HW. Where is
+> this tool? Where is the user ABI documented?
 
-That implies: just submit your proposed change as an incremental patch
-on top of mine.  Then I'll queue it.
+The tool is published here:
 
+https://github.com/qoriq-open-source/restool
 
-thanks,
+There are two ways of configuring the mc-bus:
+ - a static one, through a FDT based configuration file (we call it DPL), documented in the refman linked below, chapter 22.
+ - a dynamic one, using this restool utility.
+Please note the usage of restool is optional.
 
-Takashi
+The reference manual documenting the ABI can be found here (registration required):
+
+https://freescale.sdlproducts.com/LiveContent/content/en-US/QorIQ_SDK/GUID-53BEBDD8-1A5E-4DD0-8354-A9647AD35755
+
+Click on the DPAA2 user manual link.
+
+We're also working on publishing the docs on github so that they're more accessible.
+
+---
+Thanks & Best Regards, Laurentiu
