@@ -1,26 +1,34 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 22 May 2017 05:50:32 +0000
-Subject: [PATCH 1/2] MAINTAINERS: sort F entries for Marvell EBU
- maintainers
-In-Reply-To: <1495112333-10494-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1495112333-10494-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170522055032.GA23967@io.lakedaemon.net>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Sun, 21 May 2017 22:51:30 -0700
+Subject: [PATCH v2 0/4] ARM: dts: keystone: Add support for new K2G evm
+In-Reply-To: <6e039dc0-7054-66a9-5cee-ce00e0898882@oracle.com>
+References: <20170424202204.24170-1-fcooper@ti.com>
+ <6e039dc0-7054-66a9-5cee-ce00e0898882@oracle.com>
+Message-ID: <47f78dd7-de70-0eb6-181b-127de0638828@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 5/10/17 9:08 AM, Santosh Shilimkar wrote:
+> On 4/24/2017 1:22 PM, Franklin S Cooper Jr wrote:
+>> This patchset adds support for new K2G Industrial Communication Engine
+>> evm. For now only a bare minimal dts which will allow ram boot.
+>> Additional
+>> peripherals will be added when base K2G SoC patches are upstreamed
+>> allowing
+>> peripherals to be enabled.
+>>
+>> Version 2 changes:
+>> Make various tweaks to allow unit address to be added to memory node.
+>>
+>> Franklin S Cooper Jr (4):
+>>   ARM: dts: keystone-k2g: Remove skeleton.dtsi
+>>   ARM: dts: k2g-evm: Add unit address to memory node
+>>   ARM: keystone: Create new binding for K2G ICE evm
+>>   ARM: dts: keystone: Add minimum support for K2G ICE evm
+>>
+> Will pick this up for next merge window. Thanks !!
+>
+Applied to 'for_4.13/keystone_dts'. Should show up in next soon.
 
-On Thu, May 18, 2017 at 02:58:52PM +0200, Thomas Petazzoni wrote:
-> This commit sorts alphabetically the file entries of the Marvell EBU
-> maintainers in the MAINTAINERS file.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  MAINTAINERS | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
+Regards,
+Santosh
