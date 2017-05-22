@@ -1,48 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 May 2017 17:37:31 +0200
-Subject: [PATCH] pinctrl: use non-devm kmalloc versions for free functions
-In-Reply-To: <20170512171417.GH3489@atomide.com>
-References: <1493855857-4453-1-git-send-email-andre.przywara@arm.com>
- <CACRpkdasvjBPcr5RrPwtTYaoGeTEJMWqXbSRaB5-cOEKXbpfRg@mail.gmail.com>
- <f529e2d1-68e0-2760-3fd0-c7b0e94dd003@arm.com>
- <CACRpkdZhUnu09CcRwkLS9Qf83OLiKkTVCQxZY0tsJmBHNAirVw@mail.gmail.com>
- <20170512153522.GG3489@atomide.com> <20170512171417.GH3489@atomide.com>
-Message-ID: <CACRpkdYXQFnAHORAKBzOGzpQ_92p+Uj1DE9z-L2vz-bFj38MJQ@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 22 May 2017 16:40:26 +0100
+Subject: [PATCH v3 4/6] mm/hugetlb: Allow architectures to override
+ huge_pte_clear()
+In-Reply-To: <CAK8P3a3d=Yx3_stYiz25Qeh8wfFr5EGuGYGfCoXqrQPxz6oUAQ@mail.gmail.com>
+ (Arnd Bergmann's message of "Mon, 22 May 2017 15:59:43 +0200")
+References: <20170522133604.11392-1-punit.agrawal@arm.com>
+ <20170522133604.11392-5-punit.agrawal@arm.com>
+ <CAK8P3a3d=Yx3_stYiz25Qeh8wfFr5EGuGYGfCoXqrQPxz6oUAQ@mail.gmail.com>
+Message-ID: <87vaosj3x1.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 12, 2017 at 7:14 PM, Tony Lindgren <tony@atomide.com> wrote:
+Arnd Bergmann <arnd@arndb.de> writes:
 
-> From tony Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Fri, 12 May 2017 08:47:57 -0700
-> Subject: [PATCH] pinctrl: core: Fix warning by removing bogus code
+> On Mon, May 22, 2017 at 3:36 PM, Punit Agrawal <punit.agrawal@arm.com> wrote:
+>> diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
+>> index 99b490b4d05a..3138e126f43b 100644
+>> --- a/include/asm-generic/hugetlb.h
+>> +++ b/include/asm-generic/hugetlb.h
+>> @@ -31,10 +31,7 @@ static inline pte_t huge_pte_modify(pte_t pte, pgprot_t newprot)
+>>         return pte_modify(pte, newprot);
+>>  }
+>>
+>> -static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+>> -                                 pte_t *ptep)
+>> -{
+>> -       pte_clear(mm, addr, ptep);
+>> -}
+>> +void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+>> +                   pte_t *ptep, unsigned long sz);
+>>
+>>  #endif /* _ASM_GENERIC_HUGETLB_H */
+>> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+>> index 0e4d1fb3122f..2b0f6f96f2c1 100644
+>> --- a/mm/hugetlb.c
+>> +++ b/mm/hugetlb.c
+>> @@ -3289,6 +3289,12 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
+>>         return ret;
+>>  }
+>>
+>> +void __weak huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+>> +                          pte_t *ptep, unsigned long sz)
+>> +{
+>> +       pte_clear(mm, addr, ptep);
+>> +}
+>> +
+>>  void __unmap_hugepage_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
+>>                             unsigned long start, unsigned long end,
+>>                             struct page *ref_page)
 >
-> Andre Przywara <andre.przywara@arm.com> noticed that we can get the
-> following warning with -EPROBE_DEFER:
+> I don't really like how this moves the inline version from asm-generic into
+> a __weak function here. I think it would be better to either stop
+> using asm-generic/hugetlb.h
+> on s390, or enclose the generic definition in
 >
-> "WARNING: CPU: 1 PID: 89 at drivers/base/dd.c:349
-> driver_probe_device+0x2ac/0x2e8"
+> #ifndef huge_pte_clear
 >
-> Let's fix the issue by removing the indices as suggested by
-> Tejun Heo <tj@kernel.org>. All we have to do here is kill the radix
-> tree.
->
-> I probably ended up with the indices after grepping for removal
-> of all entries using radix_tree_for_each_slot() and the first
-> match found was gmap_radix_tree_free(). Anyways, no need for
-> indices here, and we can just do remove all the entries using
-> radix_tree_for_each_slot() along how the item_kill_tree() test
-> case does.
->
-> Fixes: c7059c5ac70a ("pinctrl: core: Add generic pinctrl functions
-> for managing groups")
-> Fixes: a76edc89b100 ("pinctrl: core: Add generic pinctrl functions
-> for managing groups")
-> Reported-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> and then override by defining a macro in s390 as we do in other files
+> in asm-generic.
 
-Thanks! This nice inline patch applied for fixes with Andr?'s tags.
+Nice! I wasn't aware asm-generic follows this as a standard pattern.
 
-Yours,
-Linus Walleij
+s390 doesn't use asm-generic, but I needed to update the prototype with
+an additional parameter (size) and needlessly moved the function. I'll
+update the patch.
+
+The changes is needed to enable contiguous pte hugepage support on arm64
+[0].
+
+Thanks for taking a look.
+
+Punit
+
+[0] https://www.spinics.net/lists/arm-kernel/msg582758.html
