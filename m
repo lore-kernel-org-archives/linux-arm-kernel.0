@@ -1,35 +1,83 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Mon, 22 May 2017 19:29:14 +0300
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: add hi8435 device
-In-Reply-To: <a74ee28c1c62fee5a5e75dda70a02990@agner.ch>
-References: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
- <a74ee28c1c62fee5a5e75dda70a02990@agner.ch>
-Message-ID: <076f6258-f0b4-6ba5-9670-e2c0582a92b5@cogentembedded.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 22 May 2017 17:30:31 +0100
+Subject: [PATCH v3.1 5/6] mm/hugetlb: Introduce set_huge_swap_pte_at() helper
+In-Reply-To: <20170522133604.11392-6-punit.agrawal@arm.com>
+References: <20170522133604.11392-6-punit.agrawal@arm.com>
+Message-ID: <20170522163031.4480-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +	hi8435 at 1 {
->> +		compatible = "holt,hi8435";
->> +		reg = <1>;
->> +		spi-max-frequency = <20000000>;
->> +		gpios = <&gpio5 3 0>;
-> 
-> Nit: GPIO_ACTIVE_HIGH instead of 0?
+set_huge_pte_at(), an architecture callback to populate hugepage ptes,
+does not provide the range of virtual memory that is targeted. This
+leads to ambiguity when dealing with swap entries on architectures that
+support hugepages consisting of contiguous ptes.
 
-Gray area here.
+Fix the problem by introducing an overridable helper for architectures
+needing this support. The helper is called when populating the page
+tables with swap entries. The size of the targeted region is provided to
+the helper to help determine the number of entries to be updated.
 
-Chip's reset input is active LOW.
+Provide a default implementation that maintains the current behaviour.
 
-However, hi8435 driver historically was coded using inverted values
-passed to gpiolib calls.  And there are setups in the wild with device
-trees containing GPIO_ACTIVE_HIGH that I'd prefer not breaking.
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Acked-by: Steve Capper <steve.capper@arm.com>
+Cc: Mike Kravetz <mike.kravetz@oracle.com>
+Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
+---
 
-To solve, I submitted a patch on hi8435 driver that changes to _raw()
-gpio calls (thus making it independent of what is written in device
-tree), and want [future] device trees not to contain explicitly written
-gpio polarity.
+Changes since v3:
 
-Far not ideal but better than device trees explicitly stating
-GPIO_ACTIVE_HIGH while it is active low.
+* Use #ifndef block instead of weak function
 
-Nikita
+ include/linux/hugetlb.h | 8 ++++++++
+ mm/hugetlb.c            | 8 +++++---
+ 2 files changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
+index 23010a3b2047..879eb063fb95 100644
+--- a/include/linux/hugetlb.h
++++ b/include/linux/hugetlb.h
+@@ -435,6 +435,14 @@ static inline pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
+ }
+ #endif
+ 
++#ifndef set_huge_swap_pte_at
++static inline void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
++					pte_t *ptep, pte_t pte, unsigned long sz)
++{
++	set_huge_pte_at(mm, addr, ptep, pte);
++}
++#endif
++
+ static inline struct hstate *page_hstate(struct page *page)
+ {
+ 	VM_BUG_ON_PAGE(!PageHuge(page), page);
+diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+index ddfed20cd637..e3052c16d29a 100644
+--- a/mm/hugetlb.c
++++ b/mm/hugetlb.c
+@@ -3263,9 +3263,10 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
+ 				 */
+ 				make_migration_entry_read(&swp_entry);
+ 				entry = swp_entry_to_pte(swp_entry);
+-				set_huge_pte_at(src, addr, src_pte, entry);
++				set_huge_swap_pte_at(src, addr, src_pte,
++						     entry, sz);
+ 			}
+-			set_huge_pte_at(dst, addr, dst_pte, entry);
++			set_huge_swap_pte_at(dst, addr, dst_pte, entry, sz);
+ 		} else {
+ 			if (cow) {
+ 				huge_ptep_set_wrprotect(src, addr, src_pte);
+@@ -4277,7 +4278,8 @@ unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
+ 
+ 				make_migration_entry_read(&entry);
+ 				newpte = swp_entry_to_pte(entry);
+-				set_huge_pte_at(mm, address, ptep, newpte);
++				set_huge_swap_pte_at(mm, address, ptep,
++						     newpte, huge_page_size(h));
+ 				pages++;
+ 			}
+ 			spin_unlock(ptl);
+-- 
+2.11.0
