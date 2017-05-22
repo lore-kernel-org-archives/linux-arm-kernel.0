@@ -1,31 +1,97 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 22 May 2017 11:40:21 +0200
-Subject: [PATCH 4/4] dt-bindings: i2c-mtk: Add mt7623 binding
-In-Reply-To: <20170522094021.7837-1-matthias.bgg@gmail.com>
-References: <20170522094021.7837-1-matthias.bgg@gmail.com>
-Message-ID: <20170522094021.7837-4-matthias.bgg@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 22 May 2017 10:50:19 +0100
+Subject: [PATCH] iommu/arm-smmu: Use context bank TLBSTATUS registers
+In-Reply-To: <1495443328-19646-1-git-send-email-vjitta@codeaurora.org>
+References: <1495443328-19646-1-git-send-email-vjitta@codeaurora.org>
+Message-ID: <47a51b35-5a0a-0034-cf7c-8428d63f60b3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mt7623 dtsi has support for the i2c block, but this is not documented.
-Add the documentation for SoC mt7623 to de description.
+On 22/05/17 09:55, vjitta at codeaurora.org wrote:
+> From: Vijayanand Jitta <vjitta@codeaurora.org>
+> 
+> There are TLBSTATUS registers in SMMU global register space as well as
+> context bank register space.  Currently we're polling the global
+> TLBSTATUS registers after TLB invalidation, even when using the TLB
+> invalidation registers from context bank address space.  This violates
+> the usage model described in the ARM SMMU spec.  Fix this by polling
+> context bank TLBSTATUS registers for context bank TLB operations, and
+> global TLBSTATUS registers for global TLB operations.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- Documentation/devicetree/bindings/i2c/i2c-mtk.txt | 1 +
- 1 file changed, 1 insertion(+)
+Note that these registers don't exist for SMMUv1 stage 2 contexts...
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-index 060a9ec98215..aa36099dcee7 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-@@ -6,6 +6,7 @@ Required properties:
-   - compatible: value should be either of the following.
-       "mediatek,mt6577-i2c": for i2c compatible with mt6577.
-       "mediatek,mt6589-i2c": for i2c compatible with mt6589.
-+      "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for i2c compatible with mt7623.
-       "mediatek,mt8173-i2c": for i2c compatible with mt8173.
-   - reg: physical base address of the controller and dma base, length of memory
-     mapped region.
--- 
-2.12.0
+> Signed-off-by: Vijayanand Jitta <vjitta@codeaurora.org>
+> ---
+>  drivers/iommu/arm-smmu.c | 22 +++++++++++++++++++---
+>  1 file changed, 19 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 7cecc37..8dc6da9 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -233,6 +233,9 @@ enum arm_smmu_s2cr_privcfg {
+>  #define ARM_SMMU_CB_S1_TLBIVAL		0x620
+>  #define ARM_SMMU_CB_S2_TLBIIPAS2	0x630
+>  #define ARM_SMMU_CB_S2_TLBIIPAS2L	0x638
+> +#define ARM_SMMU_CB_TLBSYNC		0x7f0
+> +#define ARM_SMMU_CB_TLBSTATUS		0x7f4
+> +#define TLBSTATUS_SACTIVE		(1 << 0)
+>  #define ARM_SMMU_CB_ATS1PR		0x800
+>  #define ARM_SMMU_CB_ATSR		0x8f0
+>  
+> @@ -580,6 +583,19 @@ static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
+>  }
+>  
+>  /* Wait for any pending TLB invalidations to complete */
+> +static void arm_smmu_tlb_sync_cb(struct arm_smmu_device *smmu,
+> +				int cbndx)
+> +{
+> +	void __iomem *base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cbndx);
+> +	u32 val;
+> +
+> +	writel_relaxed(0, base + ARM_SMMU_CB_TLBSYNC);
+> +	if (readl_poll_timeout_atomic(base + ARM_SMMU_CB_TLBSTATUS, val,
+> +				      !(val & TLBSTATUS_SACTIVE),
+> +				      0, TLB_LOOP_TIMEOUT))
+> +		dev_err(smmu->dev, "TLBSYNC timeout!\n");
+> +}
+> +
+>  static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
+>  {
+>  	int count = 0;
+> @@ -601,7 +617,7 @@ static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
+>  static void arm_smmu_tlb_sync(void *cookie)
+>  {
+>  	struct arm_smmu_domain *smmu_domain = cookie;
+> -	__arm_smmu_tlb_sync(smmu_domain->smmu);
+> +	arm_smmu_tlb_sync_cb(smmu_domain->smmu, smmu_domain->cfg.cbndx);
+
+...which makes this goes wrong for sync-on-unmap with MMU-400/401 (and
+any other implementations which may exist) - in practice they will
+probably RAZ, leading us to believe it's always inactive.
+
+Anyway, this patch isn't going to apply against 4.12-rc - guess how I
+know ;)
+
+Robin.
+
+>  }
+>  
+>  static void arm_smmu_tlb_inv_context(void *cookie)
+> @@ -616,13 +632,13 @@ static void arm_smmu_tlb_inv_context(void *cookie)
+>  		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+>  		writel_relaxed(ARM_SMMU_CB_ASID(smmu, cfg),
+>  			       base + ARM_SMMU_CB_S1_TLBIASID);
+> +		arm_smmu_tlb_sync_cb(smmu, cfg->cbndx);
+>  	} else {
+>  		base = ARM_SMMU_GR0(smmu);
+>  		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg),
+>  			       base + ARM_SMMU_GR0_TLBIVMID);
+> +		__arm_smmu_tlb_sync(smmu);
+>  	}
+> -
+> -	__arm_smmu_tlb_sync(smmu);
+>  }
+>  
+>  static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+> 
