@@ -1,53 +1,30 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Mon, 22 May 2017 09:18:49 +0200
-Subject: [linux-sunxi] [PATCH 4/6] ARM: sun8i: a83t: Add device node for
- DMA controller
-In-Reply-To: <20170522062552.19026-5-wens@csie.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 May 2017 09:20:47 +0200
+Subject: [PATCH 2/6] clk: sunxi-ng: a83t: Fix audio PLL divider offset
+In-Reply-To: <20170522062552.19026-3-wens@csie.org>
 References: <20170522062552.19026-1-wens@csie.org>
- <20170522062552.19026-5-wens@csie.org>
-Message-ID: <CAEKpxB=daPuD0YNToTiEzcD0VAUjVen0nTDY0BhkLfQzcLFoTw@mail.gmail.com>
+ <20170522062552.19026-3-wens@csie.org>
+Message-ID: <20170522072047.bffdbwkz2nqvhums@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 May 2017 at 08:25, Chen-Yu Tsai <wens@csie.org> wrote:
-> The A83T SoC has a DMA controller that supports 8 DMA channels
-> to and from various peripherals.
->
-> Add a device node for it.
->
+On Mon, May 22, 2017 at 02:25:48PM +0800, Chen-Yu Tsai wrote:
+> The divider of the audio PLL has an offset of 1.
+> Fix this in the driver.
+> 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun8i-a83t.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> index e12dd7170b8f..47196feda26b 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -163,6 +163,15 @@
->                 #size-cells = <1>;
->                 ranges;
->
-> +               dma: dma-controller at 1c02000 {
-> +                       compatible = "allwinner,sun8i-a83t-dma";
-> +                       reg = <0x01c02000 0x1000>;
-> +                       interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&ccu 21>;
-> +                       resets = <&ccu 7>;
-Hi Wens,
-these should be ccu defines, otherwise everything else looks great.
-Great Work,
-CK
-> +                       #dma-cells = <1>;
-> +               };
-> +
->                 ccu: clock at 1c20000 {
->                         compatible = "allwinner,sun8i-a83t-ccu";
->                         reg = <0x01c20000 0x400>;
-> --
-> 2.11.0
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+
+Applied, thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170522/9e4c4f2e/attachment.sig>
