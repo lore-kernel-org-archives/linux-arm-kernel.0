@@ -1,134 +1,50 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Mon, 22 May 2017 17:28:27 +0530
-Subject: [PATCH v4 11/11] arm64: dts: Add PWM and SDHCI DT nodes for Stingray
- SOC
-In-Reply-To: <1495454307-23464-1-git-send-email-anup.patel@broadcom.com>
-References: <1495454307-23464-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1495454307-23464-12-git-send-email-anup.patel@broadcom.com>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Mon, 22 May 2017 16:10:10 +0300
+Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: add hi8435 device
+Message-ID: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinath Mannam <srinath.mannam@broadcom.com>
+ZII dev board rev B has a Holt Hi8435 connected to dspi2.
+Add it to device tree.
 
-The Stingray SoC has two instances of SDHCI controller
-and one instance of iProc PWM.
+ZII dev board rev C does not have that, so use rev-b dts file,
+not common dtsi file.
 
-Let's enable above mentioned devices in Stingray DT.
-
-Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
 ---
- .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 39 ++++++++++++++++++++++
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 28 ++++++++++++++++
- 2 files changed, 67 insertions(+)
+ arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-index ff59a26..5dca7d1 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-@@ -43,6 +43,28 @@
- 		serial2 = &uart2;
- 		serial3 = &uart3;
+diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+index 37f95427616f..f433465c3a7c 100644
+--- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
++++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+@@ -348,6 +348,25 @@
  	};
-+
-+	sdio0_vddo_ctrl_reg: sdio0_vddo_ctrl {
-+		compatible = "regulator-gpio";
-+		regulator-name = "sdio0_vddo_ctrl_reg";
-+		regulator-type = "voltage";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpios = <&pca9505 18 0>;
-+		states = <3300000 0x0
-+			  1800000 0x1>;
-+	};
-+
-+	sdio1_vddo_ctrl_reg: sdio1_vddo_ctrl {
-+		compatible = "regulator-gpio";
-+		regulator-name = "sdio1_vddo_ctrl_reg";
-+		regulator-type = "voltage";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpios = <&pca9505 19 0>;
-+		states = <3300000 0x0
-+			  1800000 0x1>;
-+	};
  };
  
- &memory { /* Default DRAM banks */
-@@ -54,6 +76,10 @@
- 	status = "okay";
- };
- 
-+&pwm {
++&edma1 {
 +	status = "okay";
++};
++
++&dspi2 {
++	bus-num = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_dspi2>;
++	status = "okay";
++	spi-num-chipselects = <2>;
++
++	hi8435 at 1 {
++		compatible = "holt,hi8435";
++		reg = <1>;
++		spi-max-frequency = <20000000>;
++		gpios = <&gpio5 3 0>;
++	};
 +};
 +
  &i2c0 {
- 	status = "okay";
- 
-@@ -90,3 +116,16 @@
- 		#size-cells = <1>;
- 	};
- };
-+
-+&sdio0 {
-+	vqmmc-supply = <&sdio0_vddo_ctrl_reg>;
-+	non-removable;
-+	full-pwr-cycle;
-+	status = "okay";
-+};
-+
-+&sdio1 {
-+	vqmmc-supply = <&sdio1_vddo_ctrl_reg>;
-+	full-pwr-cycle;
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-index 642d42c..44ed73c 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-@@ -269,6 +269,14 @@
- 
- 		#include "stingray-pinctrl.dtsi"
- 
-+		pwm: pwm at 68910000{
-+			compatible = "brcm,iproc-pwm";
-+			reg = <0x00010000 0x1000>;
-+			clocks = <&crmu_ref25m>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
-+		};
-+
- 		i2c0: i2c at 689b0000 {
- 			compatible = "brcm,iproc-i2c";
- 			reg = <0x000b0000 0x100>;
-@@ -428,5 +436,25 @@
- 			brcm,nand-has-wp;
- 			status = "disabled";
- 		};
-+
-+		sdio0: sdhci at 68cf1000 {
-+			compatible = "brcm,sdhci-iproc";
-+			reg = <0x003f1000 0x100>;
-+			interrupts = <GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH>;
-+			bus-width = <8>;
-+			clocks = <&sdio0_clk>;
-+			iommus = <&smmu 0x6002 0x0000>;
-+			status = "disabled";
-+		};
-+
-+		sdio1: sdhci at 68cf2000 {
-+			compatible = "brcm,sdhci-iproc";
-+			reg = <0x003f2000 0x100>;
-+			interrupts = <GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH>;
-+			bus-width = <8>;
-+			clocks = <&sdio1_clk>;
-+			iommus = <&smmu 0x6003 0x0000>;
-+			status = "disabled";
-+		};
- 	};
- };
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
 -- 
-2.7.4
+2.11.0
