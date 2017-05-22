@@ -1,45 +1,38 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 22 May 2017 15:39:56 +0100
-Subject: [PATCH v3 09/11] arm64: hugetlb: Override set_huge_swap_pte_at() to
- support contiguous hugepages
-In-Reply-To: <20170522143958.12867-1-punit.agrawal@arm.com>
-References: <20170522143958.12867-1-punit.agrawal@arm.com>
-Message-ID: <20170522143958.12867-11-punit.agrawal@arm.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 22 May 2017 16:45:13 +0200
+Subject: [PATCH v5 3/4] MAINTAINERS: add a maintainer for the Inside Secure
+ crypto driver
+In-Reply-To: <20170522144514.6654-1-antoine.tenart@free-electrons.com>
+References: <20170522144514.6654-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170522144514.6654-4-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default implementation of set_huge_swap_pte_at() does not support
-hugepages consisting of contiguous ptes. Override it to add support for
-contiguous hugepages.
+A new cryptographic engine driver was added in
+drivers/crypto/inside-secure. Add myself as a maintainer for this
+driver.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: David Woods <dwoods@mellanox.com>
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm64/mm/hugetlbpage.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 240b2fd53266..3e78673b1bcb 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -167,6 +167,18 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 	}
- }
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f7d568b8f133..1f2017604f16 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6602,6 +6602,12 @@ F:	Documentation/input/multi-touch-protocol.rst
+ F:	drivers/input/input-mt.c
+ K:	\b(ABS|SYN)_MT_
  
-+void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
-+			  pte_t *ptep, pte_t pte, unsigned long sz)
-+{
-+	int i, ncontig;
-+	size_t pgsize;
++INSIDE SECURE CRYPTO DRIVER
++M:	Antoine Tenart <antoine.tenart@free-electrons.com>
++F:	drivers/crypto/inside-secure/
++S:	Maintained
++L:	linux-crypto at vger.kernel.org
 +
-+	ncontig = num_contig_ptes(sz, &pgsize);
-+
-+	for (i = 0; i < ncontig; i++, ptep++)
-+		set_pte(ptep, pte);
-+}
-+
- pte_t *huge_pte_alloc(struct mm_struct *mm,
- 		      unsigned long addr, unsigned long sz)
- {
+ INTEL ASoC BDW/HSW DRIVERS
+ M:	Jie Yang <yang.jie@linux.intel.com>
+ L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
 -- 
-2.11.0
+2.9.4
