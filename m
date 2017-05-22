@@ -1,10 +1,10 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 22 May 2017 16:02:03 +0200
-Subject: [PATCH v4 15/20] arm64: zynqmp: Add generic compatible string for I2C
- EEPROM
+Date: Mon, 22 May 2017 16:02:02 +0200
+Subject: [PATCH v4 14/20] arm64: dts: ls1043a: Add generic compatible string
+ for I2C EEPROM
 In-Reply-To: <20170522140208.24652-1-javier@dowhile0.org>
 References: <20170522140208.24652-1-javier@dowhile0.org>
-Message-ID: <20170522140208.24652-16-javier@dowhile0.org>
+Message-ID: <20170522140208.24652-15-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -30,30 +30,26 @@ Changes in v4:
 Changes in v3: None
 Changes in v2: None
 
- arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 4 ++--
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-index ef1b9e573af0..53907b7a7fd9 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-@@ -55,7 +55,7 @@
- 	status = "okay";
- 	clock-frequency = <400000>;
- 	eeprom at 54 {
--		compatible = "at,24c64";
-+		compatible = "atmel,24c64";
- 		reg = <0x54>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+index d64370ed0738..0a3853240c8b 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+@@ -75,11 +75,11 @@
+ 		reg = <0x4c>;
  	};
- };
-@@ -64,7 +64,7 @@
- 	status = "okay";
- 	clock-frequency = <400000>;
- 	eeprom at 55 {
--		compatible = "at,24c64";
-+		compatible = "atmel,24c64";
- 		reg = <0x55>;
+ 	eeprom at 52 {
+-		compatible = "at24,24c512";
++		compatible = "atmel,24c512";
+ 		reg = <0x52>;
  	};
- };
+ 	eeprom at 53 {
+-		compatible = "at24,24c512";
++		compatible = "atmel,24c512";
+ 		reg = <0x53>;
+ 	};
+ 	rtc at 68 {
 -- 
 2.9.3
