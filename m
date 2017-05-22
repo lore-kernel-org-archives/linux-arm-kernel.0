@@ -1,90 +1,77 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 22 May 2017 16:01:56 +0200
-Subject: [PATCH v4 08/20] ARM: dts: lpc18xx: Add generic compatible string for
- I2C EEPROM
-In-Reply-To: <20170522140208.24652-1-javier@dowhile0.org>
-References: <20170522140208.24652-1-javier@dowhile0.org>
-Message-ID: <20170522140208.24652-9-javier@dowhile0.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 22 May 2017 15:58:54 +0200
+Subject: [PATCH 21/35] arm64: dts: r8a7796: add Sound SSI DMA support
+In-Reply-To: <cover.1495457812.git.horms+renesas@verge.net.au>
+References: <cover.1495457812.git.horms+renesas@verge.net.au>
+Message-ID: <c93b98e5efb84a06e1227c52e2dd79097a037d80.1495457812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The at24 driver allows to register I2C EEPROM chips using different vendor
-and devices, but the I2C subsystem does not take the vendor into account
-when matching using the I2C table since it only has device entries.
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-But when matching using an OF table, both the vendor and device has to be
-taken into account so the driver defines only a set of compatible strings
-using the "atmel" vendor as a generic fallback for compatible I2C devices.
-
-So add this generic fallback to the device node compatible string to make
-the device to match the driver using the OF device ID table.
-
-Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
-
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Changes in v4:
-- Only use the atmel manufacturer in the compatible string instead of
-  keeping the deprecated ones (Rob Herring).
-
-Changes in v3: None
-Changes in v2: None
-
- arch/arm/boot/dts/lpc4337-ciaa.dts          | 6 +++---
- arch/arm/boot/dts/lpc4350-hitex-eval.dts    | 2 +-
- arch/arm/boot/dts/lpc4357-ea4357-devkit.dts | 2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/lpc4337-ciaa.dts b/arch/arm/boot/dts/lpc4337-ciaa.dts
-index 7c16d639a1b4..1c1036137f86 100644
---- a/arch/arm/boot/dts/lpc4337-ciaa.dts
-+++ b/arch/arm/boot/dts/lpc4337-ciaa.dts
-@@ -174,17 +174,17 @@
- 	clock-frequency = <400000>;
- 
- 	eeprom at 50 {
--		compatible = "microchip,24c512";
-+		compatible = "atmel,24c512";
- 		reg = <0x50>;
- 	};
- 
- 	eeprom at 51 {
--		compatible = "microchip,24c02";
-+		compatible = "atmel,24c02";
- 		reg = <0x51>;
- 	};
- 
- 	eeprom at 54 {
--		compatible = "microchip,24c512";
-+		compatible = "atmel,24c512";
- 		reg = <0x54>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/lpc4350-hitex-eval.dts b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
-index 874c75d44013..32c940230df7 100644
---- a/arch/arm/boot/dts/lpc4350-hitex-eval.dts
-+++ b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
-@@ -429,7 +429,7 @@
- 	};
- 
- 	eeprom at 50 {
--		compatible = "nxp,24c02";
-+		compatible = "atmel,24c02";
- 		reg = <0x50>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
-index 9b5fad622522..48039e27e27c 100644
---- a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
-+++ b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
-@@ -490,7 +490,7 @@
- 	};
- 
- 	eeprom at 57 {
--		compatible = "microchip,24c64";
-+		compatible = "atmel,24c64";
- 		reg = <0x57>;
- 	};
- };
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 5c6e54a1e27a..a1d08c89ceed 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -1220,33 +1220,53 @@
+ 			rcar_sound,ssi {
+ 				ssi0: ssi-0 {
+ 					interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x01>, <&audma1 0x02>, <&audma0 0x15>, <&audma1 0x16>;
++					dma-names = "rx", "tx", "rxu", "txu";
+ 				};
+ 				ssi1: ssi-1 {
+ 					interrupts = <GIC_SPI 371 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x03>, <&audma1 0x04>, <&audma0 0x49>, <&audma1 0x4a>;
++					dma-names = "rx", "tx", "rxu", "txu";
+ 				};
+ 				ssi2: ssi-2 {
+ 					interrupts = <GIC_SPI 372 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x05>, <&audma1 0x06>, <&audma0 0x63>, <&audma1 0x64>;
++					dma-names = "rx", "tx", "rxu", "txu";
+ 				};
+ 				ssi3: ssi-3 {
+ 					interrupts = <GIC_SPI 373 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x07>, <&audma1 0x08>, <&audma0 0x6f>, <&audma1 0x70>;
++					dma-names = "rx", "tx", "rxu", "txu";
+ 				};
+ 				ssi4: ssi-4 {
+ 					interrupts = <GIC_SPI 374 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x09>, <&audma1 0x0a>, <&audma0 0x71>, <&audma1 0x72>;
++					dma-names = "rx", "tx", "rxu", "txu";
+ 				};
+ 				ssi5: ssi-5 {
+ 					interrupts = <GIC_SPI 375 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x0b>, <&audma1 0x0c>, <&audma0 0x73>, <&audma1 0x74>;
++					dma-names = "rx", "tx", "rxu", "txu";
+ 				};
+ 				ssi6: ssi-6 {
+ 					interrupts = <GIC_SPI 376 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x0d>, <&audma1 0x0e>, <&audma0 0x75>, <&audma1 0x76>;
++					dma-names = "rx", "tx", "rxu", "txu";
+ 				};
+ 				ssi7: ssi-7 {
+ 					interrupts = <GIC_SPI 377 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x0f>, <&audma1 0x10>, <&audma0 0x79>, <&audma1 0x7a>;
++					dma-names = "rx", "tx", "rxu", "txu";
+ 				};
+ 				ssi8: ssi-8 {
+ 					interrupts = <GIC_SPI 378 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x11>, <&audma1 0x12>, <&audma0 0x7b>, <&audma1 0x7c>;
++					dma-names = "rx", "tx", "rxu", "txu";
+ 				};
+ 				ssi9: ssi-9 {
+ 					interrupts = <GIC_SPI 379 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x13>, <&audma1 0x14>, <&audma0 0x7d>, <&audma1 0x7e>;
++					dma-names = "rx", "tx", "rxu", "txu";
+ 				};
+ 			};
+ 		};
 -- 
-2.9.3
+2.1.4
