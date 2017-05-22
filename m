@@ -1,108 +1,840 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 22 May 2017 18:32:29 +0530
-Subject: [PATCH V4 3/4] ACPI/IORT: Ignore all errors except EPROBE_DEFER
-In-Reply-To: <20170522113116.GB10449@red-moon>
-References: <1495119257-26724-1-git-send-email-sricharan@codeaurora.org>
- <1495119257-26724-3-git-send-email-sricharan@codeaurora.org>
- <20170522103730.GB7553@red-moon>
- <ffb088d6-e40f-7a7d-dafb-e52dc86704fc@codeaurora.org>
- <20170522113116.GB10449@red-moon>
-Message-ID: <0c599944-5815-778b-57ae-5b3a6105c8d4@codeaurora.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 22 May 2017 16:01:53 +0300
+Subject: [PATCHv4 2/2] clk: keystone: Add sci-clk driver support
+In-Reply-To: <1495458113-7366-1-git-send-email-t-kristo@ti.com>
+References: <1495458113-7366-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1495458113-7366-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+In K2G, the clock handling is done through firmware executing on a
+separate core. Linux kernel needs to communicate to the firmware
+through TI system control interface to access any power management
+related resources, including clocks.
 
-On 5/22/2017 5:01 PM, Lorenzo Pieralisi wrote:
-> On Mon, May 22, 2017 at 04:35:43PM +0530, Sricharan R wrote:
->> Hi Lorenzo,
->>
->> On 5/22/2017 4:07 PM, Lorenzo Pieralisi wrote:
->>> Hi Sricharan,
->>>
->>> On Thu, May 18, 2017 at 08:24:16PM +0530, Sricharan R wrote:
->>>> While deferring the probe of IOMMU masters, xlate and
->>>> add_device callbacks called from iort_iommu_configure
->>>> can pass back error values like -ENODEV, which means
->>>> the IOMMU cannot be connected with that master for real
->>>> reasons. Before the IOMMU probe deferral, all such errors
->>>> were ignored. Now all those errors are propagated back,
->>>> killing the master's probe for such errors. Instead ignore
->>>> all the errors except EPROBE_DEFER, which is the only one
->>>> of concern and let the master work without IOMMU, thus
->>>> restoring the old behavior.
->>>>
->>>> Fixes: 5a1bb638d567 ("drivers: acpi: Handle IOMMU lookup failure with deferred probing or error")
->>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->>>> ---
->>>> [V4] Added this patch newly.
->>>>
->>>>  drivers/acpi/arm64/iort.c | 6 ++++++
->>>>  1 file changed, 6 insertions(+)
->>>>
->>>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
->>>> index c5fecf9..16e101f 100644
->>>> --- a/drivers/acpi/arm64/iort.c
->>>> +++ b/drivers/acpi/arm64/iort.c
->>>> @@ -782,6 +782,12 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
->>>>  	if (err)
->>>>  		ops = ERR_PTR(err);
->>>>  
->>>> +	/* Ignore all other errors apart from EPROBE_DEFER */
->>>> +	if (IS_ERR(ops) && (PTR_ERR(ops) != -EPROBE_DEFER)) {
->>>> +		dev_dbg(dev, "Adding to IOMMU failed: %ld\n", PTR_ERR(ops));
->>>> +		ops = NULL;
->>>> +	}
->>>> +
->>>>  	return ops;
->>>>  }
->>>>  
->>>
->>> It is getting a bit convoluted. Is not it better to propagate the
->>> error back and let acpi_dma_configure() make a decision accordingly ?
->>>
->>
->> ok, I was trying to keep it in same way as DT, where of_dma_configure
->> (here acpi_dma_configure) calls of_iommu_configure(here iort_iommu_configure)
->> which ends up doing the check. So will have to be changed in both places
->> for symmetry.
->>
->>> Something like:
->>>
->>> -- >8 --
->>> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
->>> index e39ec7b..3a10d757 100644
->>> --- a/drivers/acpi/scan.c
->>> +++ b/drivers/acpi/scan.c
->>> @@ -1371,8 +1371,8 @@ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
->>>  	iort_set_dma_mask(dev);
->>>  
->>>  	iommu = iort_iommu_configure(dev);
->>> -	if (IS_ERR(iommu))
->>> -		return PTR_ERR(iommu);
->>> +	if (IS_ERR(iommu) && PTR_ERR(iommu) == -EPROBE_DEFER)
->>> +		return -EPROBE_DEFER;
->>
->> In case of other errors apart from EPROBE_DEFER,
->> iommu = NULL should be set, before passing it on to
->> arch_setup_dma_ops.
-> 
-> Ah yes, sorry, that makes it uglier :(
-> 
-> Point is, it does not make sense to me to have of/acpi_dma_configure()
-> check a return code with (IS_ERR()) whilst we know the only error
-> code you are allowed to handle is -EPROBE_DEFER, while at it it is
-> better to make the -EPROBE_DEFER check explicit (otherwise it may
-> seem that of/acpi_dma_configure() can handle an error code that
-> is different from -EPROBE_DEFER - but they don't), no big deal either
-> way though.
-> 
+The keystone sci-clk driver does this, by communicating to the
+firmware through the TI SCI driver. The driver adds support for
+registering clocks through DT, and basic required clock operations
+like prepare/get_rate, etc.
 
-ok, in which case, the above check that you have shown
-to be added additionally to the original patch.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ MAINTAINERS                    |   1 +
+ drivers/clk/Kconfig            |   8 +-
+ drivers/clk/Makefile           |   2 +-
+ drivers/clk/keystone/Kconfig   |  15 +
+ drivers/clk/keystone/Makefile  |   3 +-
+ drivers/clk/keystone/sci-clk.c | 720 +++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 740 insertions(+), 9 deletions(-)
+ create mode 100644 drivers/clk/keystone/Kconfig
+ create mode 100644 drivers/clk/keystone/sci-clk.c
 
-Regards,
- Sricharan
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 880a23d..1ba72e6 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -12631,6 +12631,7 @@ F:	Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+ F:	include/dt-bindings/genpd/k2g.h
+ F:	drivers/soc/ti/ti_sci_pm_domains.c
+ F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
++F:	drivers/clk/keystone/sci-clk.c
+ 
+ THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
+ M:	Hans Verkuil <hverkuil@xs4all.nl>
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 36cfea3..10fef77 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -164,13 +164,6 @@ config COMMON_CLK_XGENE
+ 	---help---
+ 	  Sypport for the APM X-Gene SoC reference, PLL, and device clocks.
+ 
+-config COMMON_CLK_KEYSTONE
+-	tristate "Clock drivers for Keystone based SOCs"
+-	depends on (ARCH_KEYSTONE || COMPILE_TEST) && OF
+-	---help---
+-          Supports clock drivers for Keystone based SOCs. These SOCs have local
+-	  a power sleep control module that gate the clock to the IPs and PLLs.
+-
+ config COMMON_CLK_NXP
+ 	def_bool COMMON_CLK && (ARCH_LPC18XX || ARCH_LPC32XX)
+ 	select REGMAP_MMIO if ARCH_LPC32XX
+@@ -219,6 +212,7 @@ config COMMON_CLK_VC5
+ 
+ source "drivers/clk/bcm/Kconfig"
+ source "drivers/clk/hisilicon/Kconfig"
++source "drivers/clk/keystone/Kconfig"
+ source "drivers/clk/mediatek/Kconfig"
+ source "drivers/clk/meson/Kconfig"
+ source "drivers/clk/mvebu/Kconfig"
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index c19983a..40694e6 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -61,7 +61,7 @@ obj-$(CONFIG_H8300)			+= h8300/
+ obj-$(CONFIG_ARCH_HISI)			+= hisilicon/
+ obj-$(CONFIG_ARCH_MXC)			+= imx/
+ obj-$(CONFIG_MACH_INGENIC)		+= ingenic/
+-obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= keystone/
++obj-$(CONFIG_ARCH_KEYSTONE)		+= keystone/
+ obj-$(CONFIG_MACH_LOONGSON32)		+= loongson1/
+ obj-$(CONFIG_ARCH_MEDIATEK)		+= mediatek/
+ obj-$(CONFIG_COMMON_CLK_AMLOGIC)	+= meson/
+diff --git a/drivers/clk/keystone/Kconfig b/drivers/clk/keystone/Kconfig
+new file mode 100644
+index 0000000..6337ca8
+--- /dev/null
++++ b/drivers/clk/keystone/Kconfig
+@@ -0,0 +1,15 @@
++config COMMON_CLK_KEYSTONE
++	tristate "Clock drivers for Keystone based SOCs"
++	depends on (ARCH_KEYSTONE || COMPILE_TEST) && OF
++	---help---
++	  Supports clock drivers for Keystone based SOCs. These SOCs have local
++	  a power sleep control module that gate the clock to the IPs and PLLs.
++
++config TI_SCI_CLK
++	tristate "TI System Control Interface clock drivers"
++	depends on (ARCH_KEYSTONE || COMPILE_TEST) && OF
++	default TI_SCI_PROTOCOL
++	---help---
++	  This adds the clock driver support over TI System Control Interface.
++	  If you wish to use clock resources from the PMMC firmware, say Y.
++	  Otherwise, say N.
+diff --git a/drivers/clk/keystone/Makefile b/drivers/clk/keystone/Makefile
+index 0477cf6..c125939 100644
+--- a/drivers/clk/keystone/Makefile
++++ b/drivers/clk/keystone/Makefile
+@@ -1 +1,2 @@
+-obj-y			+= pll.o gate.o
++obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= pll.o gate.o
++obj-$(CONFIG_TI_SCI_CLK)		+= sci-clk.o
+diff --git a/drivers/clk/keystone/sci-clk.c b/drivers/clk/keystone/sci-clk.c
+new file mode 100644
+index 0000000..b0067c5
+--- /dev/null
++++ b/drivers/clk/keystone/sci-clk.c
+@@ -0,0 +1,721 @@
++/*
++ * SCI Clock driver for keystone based devices
++ *
++ * Copyright (C) 2015-2016 Texas Instruments Incorporated - http://www.ti.com/
++ *	Tero Kristo <t-kristo@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/soc/ti/ti_sci_protocol.h>
++
++#define SCI_CLK_SSC_ENABLE		BIT(0)
++#define SCI_CLK_ALLOW_FREQ_CHANGE	BIT(1)
++#define SCI_CLK_INPUT_TERMINATION	BIT(2)
++
++/**
++ * struct sci_clk_data - TI SCI clock data
++ * @dev: device index
++ * @num_clks: number of clocks for this device
++ * @clocks: clocks array for this device
++ */
++struct sci_clk_data {
++	u16 dev;
++	u16 num_clks;
++	struct clk_hw **clocks;
++};
++
++/**
++ * struct sci_clk_provider - TI SCI clock provider representation
++ * @sci:    Handle to the System Control Interface protocol handler
++ * @ops:    Pointer to the SCI ops to be used by the clocks
++ * @dev:    Device pointer for the clock provider
++ * @clocks:	Clock data
++ */
++struct sci_clk_provider {
++	const struct ti_sci_handle *sci;
++	const struct ti_sci_clk_ops *ops;
++	struct device *dev;
++	struct sci_clk_data *clocks;
++};
++
++/**
++ * struct sci_clk - TI SCI clock representation
++ * @hw:		 Hardware clock cookie for common clock framework
++ * @dev_id:	 Device index
++ * @clk_id:	 Clock index
++ * @node:	 Clocks list link
++ * @provider:	 Master clock provider
++ * @flags:	 Flags for the clock
++ */
++struct sci_clk {
++	struct clk_hw hw;
++	u16 dev_id;
++	u8 clk_id;
++	struct list_head node;
++	struct sci_clk_provider *provider;
++	u8 flags;
++};
++
++#define to_sci_clk(_hw) container_of(_hw, struct sci_clk, hw)
++
++/**
++ * sci_clk_prepare - Prepare (enable) a TI SCI clock
++ * @hw: clock to prepare
++ *
++ * Prepares a clock to be actively used. Returns the SCI protocol status.
++ */
++static int sci_clk_prepare(struct clk_hw *hw)
++{
++	struct sci_clk *clk = to_sci_clk(hw);
++	bool enable_ssc = clk->flags & SCI_CLK_SSC_ENABLE;
++	bool allow_freq_change = clk->flags & SCI_CLK_ALLOW_FREQ_CHANGE;
++	bool input_termination = clk->flags & SCI_CLK_INPUT_TERMINATION;
++
++	return clk->provider->ops->get_clock(clk->provider->sci, clk->dev_id,
++					     clk->clk_id, enable_ssc,
++					     allow_freq_change,
++					     input_termination);
++}
++
++/**
++ * sci_clk_unprepare - Un-prepares (disables) a TI SCI clock
++ * @hw: clock to unprepare
++ *
++ * Un-prepares a clock from active state.
++ */
++static void sci_clk_unprepare(struct clk_hw *hw)
++{
++	struct sci_clk *clk = to_sci_clk(hw);
++	int ret;
++
++	ret = clk->provider->ops->put_clock(clk->provider->sci, clk->dev_id,
++					    clk->clk_id);
++	if (ret)
++		dev_err(clk->provider->dev,
++			"unprepare failed for dev=%d, clk=%d, ret=%d\n",
++			clk->dev_id, clk->clk_id, ret);
++}
++
++/**
++ * sci_clk_is_prepared - Check if a TI SCI clock is prepared or not
++ * @hw: clock to check status for
++ *
++ * Checks if a clock is prepared (enabled) in hardware. Returns non-zero
++ * value if clock is enabled, zero otherwise.
++ */
++static int sci_clk_is_prepared(struct clk_hw *hw)
++{
++	struct sci_clk *clk = to_sci_clk(hw);
++	bool req_state, current_state;
++	int ret;
++
++	ret = clk->provider->ops->is_on(clk->provider->sci, clk->dev_id,
++					clk->clk_id, &req_state,
++					&current_state);
++	if (ret) {
++		dev_err(clk->provider->dev,
++			"is_prepared failed for dev=%d, clk=%d, ret=%d\n",
++			clk->dev_id, clk->clk_id, ret);
++		return 0;
++	}
++
++	return req_state;
++}
++
++/**
++ * sci_clk_recalc_rate - Get clock rate for a TI SCI clock
++ * @hw: clock to get rate for
++ * @parent_rate: parent rate provided by common clock framework, not used
++ *
++ * Gets the current clock rate of a TI SCI clock. Returns the current
++ * clock rate, or zero in failure.
++ */
++static unsigned long sci_clk_recalc_rate(struct clk_hw *hw,
++					 unsigned long parent_rate)
++{
++	struct sci_clk *clk = to_sci_clk(hw);
++	u64 freq;
++	int ret;
++
++	ret = clk->provider->ops->get_freq(clk->provider->sci, clk->dev_id,
++					   clk->clk_id, &freq);
++	if (ret) {
++		dev_err(clk->provider->dev,
++			"recalc-rate failed for dev=%d, clk=%d, ret=%d\n",
++			clk->dev_id, clk->clk_id, ret);
++		return 0;
++	}
++
++	return freq;
++}
++
++/**
++ * sci_clk_determine_rate - Determines a clock rate a clock can be set to
++ * @hw: clock to change rate for
++ * @req: requested rate configuration for the clock
++ *
++ * Determines a suitable clock rate and parent for a TI SCI clock.
++ * The parent handling is un-used, as generally the parent clock rates
++ * are not known by the kernel; instead these are internally handled
++ * by the firmware. Returns 0 on success, negative error value on failure.
++ */
++static int sci_clk_determine_rate(struct clk_hw *hw,
++				  struct clk_rate_request *req)
++{
++	struct sci_clk *clk = to_sci_clk(hw);
++	int ret;
++	u64 new_rate;
++
++	ret = clk->provider->ops->get_best_match_freq(clk->provider->sci,
++						      clk->dev_id,
++						      clk->clk_id,
++						      req->min_rate,
++						      req->rate,
++						      req->max_rate,
++						      &new_rate);
++	if (ret) {
++		dev_err(clk->provider->dev,
++			"determine-rate failed for dev=%d, clk=%d, ret=%d\n",
++			clk->dev_id, clk->clk_id, ret);
++		return ret;
++	}
++
++	req->rate = new_rate;
++
++	return 0;
++}
++
++/**
++ * sci_clk_set_rate - Set rate for a TI SCI clock
++ * @hw: clock to change rate for
++ * @rate: target rate for the clock
++ * @parent_rate: rate of the clock parent, not used for TI SCI clocks
++ *
++ * Sets a clock frequency for a TI SCI clock. Returns the TI SCI
++ * protocol status.
++ */
++static int sci_clk_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct sci_clk *clk = to_sci_clk(hw);
++
++	return clk->provider->ops->set_freq(clk->provider->sci, clk->dev_id,
++					    clk->clk_id, rate, rate, rate);
++}
++
++/**
++ * sci_clk_get_parent - Get the current parent of a TI SCI clock
++ * @hw: clock to get parent for
++ *
++ * Returns the index of the currently selected parent for a TI SCI clock.
++ */
++static u8 sci_clk_get_parent(struct clk_hw *hw)
++{
++	struct sci_clk *clk = to_sci_clk(hw);
++	u8 parent_id;
++	int ret;
++
++	ret = clk->provider->ops->get_parent(clk->provider->sci, clk->dev_id,
++					     clk->clk_id, &parent_id);
++	if (ret) {
++		dev_err(clk->provider->dev,
++			"get-parent failed for dev=%d, clk=%d, ret=%d\n",
++			clk->dev_id, clk->clk_id, ret);
++		return 0;
++	}
++
++	return parent_id - clk->clk_id - 1;
++}
++
++/**
++ * sci_clk_set_parent - Set the parent of a TI SCI clock
++ * @hw: clock to set parent for
++ * @index: new parent index for the clock
++ *
++ * Sets the parent of a TI SCI clock. Return TI SCI protocol status.
++ */
++static int sci_clk_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct sci_clk *clk = to_sci_clk(hw);
++
++	return clk->provider->ops->set_parent(clk->provider->sci, clk->dev_id,
++					      clk->clk_id,
++					      index + 1 + clk->clk_id);
++}
++
++static const struct clk_ops sci_clk_ops = {
++	.prepare = sci_clk_prepare,
++	.unprepare = sci_clk_unprepare,
++	.is_prepared = sci_clk_is_prepared,
++	.recalc_rate = sci_clk_recalc_rate,
++	.determine_rate = sci_clk_determine_rate,
++	.set_rate = sci_clk_set_rate,
++	.get_parent = sci_clk_get_parent,
++	.set_parent = sci_clk_set_parent,
++};
++
++/**
++ * _sci_clk_get - Gets a handle for an SCI clock
++ * @provider: Handle to SCI clock provider
++ * @dev_id: device ID for the clock to register
++ * @clk_id: clock ID for the clock to register
++ *
++ * Gets a handle to an existing TI SCI hw clock, or builds a new clock
++ * entry and registers it with the common clock framework. Called from
++ * the common clock framework, when a corresponding of_clk_get call is
++ * executed, or recursively from itself when parsing parent clocks.
++ * Returns a pointer to the hw clock struct, or ERR_PTR value in failure.
++ */
++static struct clk_hw *_sci_clk_build(struct sci_clk_provider *provider,
++				     u16 dev_id, u8 clk_id)
++{
++	struct clk_init_data init = { NULL };
++	struct sci_clk *sci_clk = NULL;
++	char *name = NULL;
++	char **parent_names = NULL;
++	int i;
++	int ret;
++
++	sci_clk = devm_kzalloc(provider->dev, sizeof(*sci_clk), GFP_KERNEL);
++	if (!sci_clk)
++		return ERR_PTR(-ENOMEM);
++
++	sci_clk->dev_id = dev_id;
++	sci_clk->clk_id = clk_id;
++	sci_clk->provider = provider;
++
++	ret = provider->ops->get_num_parents(provider->sci, dev_id,
++					     clk_id,
++					     &init.num_parents);
++	if (ret)
++		goto err;
++
++	name = kasprintf(GFP_KERNEL, "%s:%d:%d", dev_name(provider->dev),
++			 sci_clk->dev_id, sci_clk->clk_id);
++
++	init.name = name;
++
++	/*
++	 * From kernel point of view, we only care about a clocks parents,
++	 * if it has more than 1 possible parent. In this case, it is going
++	 * to have mux functionality. Otherwise it is going to act as a root
++	 * clock.
++	 */
++	if (init.num_parents < 2)
++		init.num_parents = 0;
++
++	if (init.num_parents) {
++		parent_names = kcalloc(init.num_parents, sizeof(char *),
++				       GFP_KERNEL);
++
++		if (!parent_names) {
++			ret = -ENOMEM;
++			goto err;
++		}
++
++		for (i = 0; i < init.num_parents; i++) {
++			char *parent_name;
++
++			parent_name = kasprintf(GFP_KERNEL, "%s:%d:%d",
++						dev_name(provider->dev),
++						sci_clk->dev_id,
++						sci_clk->clk_id + 1 + i);
++			if (!parent_name) {
++				ret = -ENOMEM;
++				goto err;
++			}
++			parent_names[i] = parent_name;
++		}
++		init.parent_names = (void *)parent_names;
++	}
++
++	init.ops = &sci_clk_ops;
++	sci_clk->hw.init = &init;
++
++	ret = devm_clk_hw_register(provider->dev, &sci_clk->hw);
++	if (ret)
++		dev_err(provider->dev, "failed clk register with %d\n", ret);
++
++err:
++	if (parent_names) {
++		for (i = 0; i < init.num_parents; i++)
++			kfree(parent_names[i]);
++
++		kfree(parent_names);
++	}
++
++	kfree(name);
++
++	if (ret)
++		return ERR_PTR(ret);
++
++	return &sci_clk->hw;
++}
++
++/**
++ * sci_clk_get - Xlate function for getting clock handles
++ * @clkspec: device tree clock specifier
++ * @data: pointer to the clock provider
++ *
++ * Xlate function for retrieving clock TI SCI hw clock handles based on
++ * device tree clock specifier. Called from the common clock framework,
++ * when a corresponding of_clk_get call is executed. Returns a pointer
++ * to the TI SCI hw clock struct, or ERR_PTR value in failure.
++ */
++static struct clk_hw *sci_clk_get(struct of_phandle_args *clkspec, void *data)
++{
++	struct sci_clk_provider *provider = data;
++	u16 dev_id;
++	u8 clk_id;
++	struct sci_clk_data *clks = provider->clocks;
++
++	if (clkspec->args_count != 2)
++		return ERR_PTR(-EINVAL);
++
++	dev_id = clkspec->args[0];
++	clk_id = clkspec->args[1];
++
++	while (clks->num_clks) {
++		if (clks->dev == dev_id) {
++			if (clk_id >= clks->num_clks)
++				return ERR_PTR(-EINVAL);
++
++			return clks->clocks[clk_id];
++		}
++
++		clks++;
++	}
++
++	return ERR_PTR(-ENODEV);
++}
++
++int ti_sci_init_clocks(struct sci_clk_provider *p)
++{
++	struct sci_clk_data *data = p->clocks;
++	struct clk_hw *hw;
++	int i;
++
++	while (data->num_clks) {
++		data->clocks = devm_kcalloc(p->dev, data->num_clks,
++					    sizeof(struct sci_clk),
++					    GFP_KERNEL);
++		if (!data->clocks)
++			return -ENOMEM;
++
++		for (i = 0; i < data->num_clks; i++) {
++			hw = _sci_clk_build(p, data->dev, i);
++			if (!IS_ERR(hw)) {
++				data->clocks[i] = hw;
++				continue;
++			}
++
++			/* Skip any holes in the clock lists */
++			if (PTR_ERR(hw) == -ENODEV)
++				continue;
++
++			return PTR_ERR(hw);
++		}
++		data++;
++	}
++
++	return 0;
++}
++
++static const struct sci_clk_data k2g_clk_data[] = {
++	/* pmmc */
++	{ .dev = 0x0, .num_clks = 4 },
++
++	/* mlb0 */
++	{ .dev = 0x1, .num_clks = 5 },
++
++	/* dss0 */
++	{ .dev = 0x2, .num_clks = 2 },
++
++	/* mcbsp0 */
++	{ .dev = 0x3, .num_clks = 8 },
++
++	/* mcasp0 */
++	{ .dev = 0x4, .num_clks = 8 },
++
++	/* mcasp1 */
++	{ .dev = 0x5, .num_clks = 8 },
++
++	/* mcasp2 */
++	{ .dev = 0x6, .num_clks = 8 },
++
++	/* dcan0 */
++	{ .dev = 0x8, .num_clks = 2 },
++
++	/* dcan1 */
++	{ .dev = 0x9, .num_clks = 2 },
++
++	/* emif0 */
++	{ .dev = 0xa, .num_clks = 6 },
++
++	/* mmchs0 */
++	{ .dev = 0xb, .num_clks = 3 },
++
++	/* mmchs1 */
++	{ .dev = 0xc, .num_clks = 3 },
++
++	/* gpmc0 */
++	{ .dev = 0xd, .num_clks = 1 },
++
++	/* elm0 */
++	{ .dev = 0xe, .num_clks = 1 },
++
++	/* spi0 */
++	{ .dev = 0x10, .num_clks = 1 },
++
++	/* spi1 */
++	{ .dev = 0x11, .num_clks = 1 },
++
++	/* spi2 */
++	{ .dev = 0x12, .num_clks = 1 },
++
++	/* spi3 */
++	{ .dev = 0x13, .num_clks = 1 },
++
++	/* icss0 */
++	{ .dev = 0x14, .num_clks = 6 },
++
++	/* icss1 */
++	{ .dev = 0x15, .num_clks = 6 },
++
++	/* usb0 */
++	{ .dev = 0x16, .num_clks = 7 },
++
++	/* usb1 */
++	{ .dev = 0x17, .num_clks = 7 },
++
++	/* nss0 */
++	{ .dev = 0x18, .num_clks = 14 },
++
++	/* pcie0 */
++	{ .dev = 0x19, .num_clks = 1 },
++
++	/* gpio0 */
++	{ .dev = 0x1b, .num_clks = 1 },
++
++	/* gpio1 */
++	{ .dev = 0x1c, .num_clks = 1 },
++
++	/* timer64_0 */
++	{ .dev = 0x1d, .num_clks = 9 },
++
++	/* timer64_1 */
++	{ .dev = 0x1e, .num_clks = 9 },
++
++	/* timer64_2 */
++	{ .dev = 0x1f, .num_clks = 9 },
++
++	/* timer64_3 */
++	{ .dev = 0x20, .num_clks = 9 },
++
++	/* timer64_4 */
++	{ .dev = 0x21, .num_clks = 9 },
++
++	/* timer64_5 */
++	{ .dev = 0x22, .num_clks = 9 },
++
++	/* timer64_6 */
++	{ .dev = 0x23, .num_clks = 9 },
++
++	/* msgmgr0 */
++	{ .dev = 0x25, .num_clks = 1 },
++
++	/* bootcfg0 */
++	{ .dev = 0x26, .num_clks = 1 },
++
++	/* arm_bootrom0 */
++	{ .dev = 0x27, .num_clks = 1 },
++
++	/* dsp_bootrom0 */
++	{ .dev = 0x29, .num_clks = 1 },
++
++	/* debugss0 */
++	{ .dev = 0x2b, .num_clks = 8 },
++
++	/* uart0 */
++	{ .dev = 0x2c, .num_clks = 1 },
++
++	/* uart1 */
++	{ .dev = 0x2d, .num_clks = 1 },
++
++	/* uart2 */
++	{ .dev = 0x2e, .num_clks = 1 },
++
++	/* ehrpwm0 */
++	{ .dev = 0x2f, .num_clks = 1 },
++
++	/* ehrpwm1 */
++	{ .dev = 0x30, .num_clks = 1 },
++
++	/* ehrpwm2 */
++	{ .dev = 0x31, .num_clks = 1 },
++
++	/* ehrpwm3 */
++	{ .dev = 0x32, .num_clks = 1 },
++
++	/* ehrpwm4 */
++	{ .dev = 0x33, .num_clks = 1 },
++
++	/* ehrpwm5 */
++	{ .dev = 0x34, .num_clks = 1 },
++
++	/* eqep0 */
++	{ .dev = 0x35, .num_clks = 1 },
++
++	/* eqep1 */
++	{ .dev = 0x36, .num_clks = 1 },
++
++	/* eqep2 */
++	{ .dev = 0x37, .num_clks = 1 },
++
++	/* ecap0 */
++	{ .dev = 0x38, .num_clks = 1 },
++
++	/* ecap1 */
++	{ .dev = 0x39, .num_clks = 1 },
++
++	/* i2c0 */
++	{ .dev = 0x3a, .num_clks = 1 },
++
++	/* i2c1 */
++	{ .dev = 0x3b, .num_clks = 1 },
++
++	/* i2c2 */
++	{ .dev = 0x3c, .num_clks = 1 },
++
++	/* edma0 */
++	{ .dev = 0x3f, .num_clks = 2 },
++
++	/* semaphore0 */
++	{ .dev = 0x40, .num_clks = 1 },
++
++	/* intc0 */
++	{ .dev = 0x41, .num_clks = 1 },
++
++	/* gic0 */
++	{ .dev = 0x42, .num_clks = 1 },
++
++	/* qspi0 */
++	{ .dev = 0x43, .num_clks = 5 },
++
++	/* arm_64b_counter0 */
++	{ .dev = 0x44, .num_clks = 2 },
++
++	/* tetris0 */
++	{ .dev = 0x45, .num_clks = 2 },
++
++	/* cgem0 */
++	{ .dev = 0x46, .num_clks = 2 },
++
++	/* msmc0 */
++	{ .dev = 0x47, .num_clks = 1 },
++
++	/* cbass0 */
++	{ .dev = 0x49, .num_clks = 1 },
++
++	/* board0 */
++	{ .dev = 0x4c, .num_clks = 36 },
++
++	/* edma1 */
++	{ .dev = 0x4f, .num_clks = 2 },
++	{ .num_clks = 0 },
++};
++
++static const struct of_device_id ti_sci_clk_of_match[] = {
++	{ .compatible = "ti,k2g-sci-clk", .data = &k2g_clk_data },
++	{ /* Sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, ti_sci_clk_of_match);
++
++/**
++ * ti_sci_clk_probe - Probe function for the TI SCI clock driver
++ * @pdev: platform device pointer to be probed
++ *
++ * Probes the TI SCI clock device. Allocates a new clock provider
++ * and registers this to the common clock framework. Also applies
++ * any required flags to the identified clocks via clock lists
++ * supplied from DT. Returns 0 for success, negative error value
++ * for failure.
++ */
++static int ti_sci_clk_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct sci_clk_provider *provider;
++	const struct ti_sci_handle *handle;
++	struct sci_clk_data *data;
++	int ret;
++
++	data = (struct sci_clk_data *)of_device_get_match_data(dev);
++
++	handle = devm_ti_sci_get_handle(dev);
++	if (IS_ERR(handle))
++		return PTR_ERR(handle);
++
++	provider = devm_kzalloc(dev, sizeof(*provider), GFP_KERNEL);
++	if (!provider)
++		return -ENOMEM;
++
++	provider->clocks = data;
++
++	provider->sci = handle;
++	provider->ops = &handle->ops.clk_ops;
++	provider->dev = dev;
++
++	ret = ti_sci_init_clocks(provider);
++	if (ret) {
++		pr_err("ti-sci-init-clocks failed.\n");
++		return ret;
++	}
++
++	return of_clk_add_hw_provider(np, sci_clk_get, provider);
++}
++
++/**
++ * ti_sci_clk_remove - Remove TI SCI clock device
++ * @pdev: platform device pointer for the device to be removed
++ *
++ * Removes the TI SCI device. Unregisters the clock provider registered
++ * via common clock framework. Any memory allocated for the device will
++ * be free'd silently via the devm framework. Returns 0 always.
++ */
++static int ti_sci_clk_remove(struct platform_device *pdev)
++{
++	of_clk_del_provider(pdev->dev.of_node);
++
++	return 0;
++}
++
++static struct platform_driver ti_sci_clk_driver = {
++	.probe = ti_sci_clk_probe,
++	.remove = ti_sci_clk_remove,
++	.driver = {
++		.name = "ti-sci-clk",
++		.of_match_table = of_match_ptr(ti_sci_clk_of_match),
++	},
++};
++module_platform_driver(ti_sci_clk_driver);
++
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("TI System Control Interface(SCI) Clock driver");
++MODULE_AUTHOR("Tero Kristo");
++MODULE_ALIAS("platform:ti-sci-clk");
 -- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1.9.1
