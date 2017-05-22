@@ -1,19 +1,27 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 22 May 2017 17:00:01 +0200
-Subject: [PATCH 08/13] ARM: dts: armada-385-linksys: use binary unit
- prefixes
-In-Reply-To: <20170521124903.11050-9-ralph.sennhauser@gmail.com>
-References: <20170521124903.11050-1-ralph.sennhauser@gmail.com>
- <20170521124903.11050-9-ralph.sennhauser@gmail.com>
-Message-ID: <20170522150001.GM29447@lunn.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 May 2017 07:53:50 -0700
+Subject: [PATCH v2 1/2] Documentation: dt: Update ti,emif bindings
+In-Reply-To: <20170520014554.qisnvr27542n5p7f@rob-hp-laptop>
+References: <20170519175708.6070-1-d-gerlach@ti.com>
+ <20170519175708.6070-2-d-gerlach@ti.com>
+ <20170520014554.qisnvr27542n5p7f@rob-hp-laptop>
+Message-ID: <20170522145350.GP10472@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 21, 2017 at 02:48:57PM +0200, Ralph Sennhauser wrote:
-> Use IEEE 1541-2002 unit prefixes for sizes.
+* Rob Herring <robh@kernel.org> [170519 18:49]:
+> On Fri, May 19, 2017 at 12:57:07PM -0500, Dave Gerlach wrote:
+> > Update the Texas Instruments EMIF binding document to include the device
+> > tree bindings for ti,emif-am3352 and ti,emif-am4372 which are used by
+> > the ti-emif-sram driver to provide low-level PM functionality.
+> > 
+> > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> > ---
+> >  .../devicetree/bindings/memory-controllers/ti/emif.txt | 18 +++++++++++++++++-
+> >  1 file changed, 17 insertions(+), 1 deletion(-)
+> 
+> I acked v1. Please add acks when posting new versions.
 
-Does ePAPR recommend this?
+And if I did not do so already:
 
-I think this looks ugly, so i would not do it.
-
-  Andrew
+Acked-by: Tony Lindgren <tony@atomide.com>
