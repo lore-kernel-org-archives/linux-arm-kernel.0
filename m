@@ -1,66 +1,39 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Mon, 22 May 2017 13:46:04 +0800
-Subject: [PATCH v2] drm: mediatek: change the variable type of rdma
- threshold
-In-Reply-To: <1495187843-6882-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1495187843-6882-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1495431964.20811.8.camel@mtksdaap41>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Mon, 22 May 2017 07:46:55 +0200
+Subject: [PATCH] i2c: designware: Fix bogus sda_hold_time due to uninitialized
+ vars
+In-Reply-To: <CAKv+Gu9x_KCdEGBBOw9yaYOcYBcYtxJX-xTX=4kQuWqY=VK0PA@mail.gmail.com>
+References: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
+ <CAKv+Gu9x_KCdEGBBOw9yaYOcYBcYtxJX-xTX=4kQuWqY=VK0PA@mail.gmail.com>
+Message-ID: <743ebd23-17ab-03d2-ebd9-66acc9aee417@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
+We need to initializes those variables to 0 for platforms that do not
+provide ACPI parameters. Otherwise, we set sda_hold_time to random
+values, breaking e.g. Galileo and IOT2000 boards.
 
-One comment inline.
+Fixes: 9d6408433019 ("i2c: designware: don't infer timings described by ACPI from clock rate")
+Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+---
 
-On Fri, 2017-05-19 at 17:57 +0800, Bibby Hsieh wrote:
-> For some greater resolution, the rdma threshold
-> variable will overflow.
-> 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> index 0df05f9..9afdcd7 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> @@ -37,7 +37,7 @@
->  #define DISP_REG_RDMA_FIFO_CON			0x0040
->  #define RDMA_FIFO_UNDERFLOW_EN				BIT(31)
->  #define RDMA_FIFO_PSEUDO_SIZE(bytes)			(((bytes) / 16) << 16)
-> -#define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes)		((bytes) / 16)
-> +#define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes) (((bytes) / 16) & 0x3ff)
+Affects 4.12-rc2.
 
-I think it's not necessary to do this mask operation. Before calling
-RDMA_OUTPUT_VALID_FIFO_THRESHOLD(), you should make sure that width,
-height, and vrefresh matches the HW spec, so the result of threshold
-likely does not exceed 0x3ff. If width, height, and vrefresh matches the
-HW spec but threshold exceed 0x3ff, maybe you should limited it to 0x3ff
-rather than truncating it.
+ drivers/i2c/busses/i2c-designware-platdrv.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Regards,
-CK
-
->  
->  /**
->   * struct mtk_disp_rdma - DISP_RDMA driver structure
-> @@ -109,7 +109,7 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
->  			    unsigned int height, unsigned int vrefresh,
->  			    unsigned int bpc)
->  {
-> -	unsigned int threshold;
-> +	unsigned long long threshold;
->  	unsigned int reg;
->  
->  	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xfff, width);
-> @@ -121,7 +121,8 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
->  	 * output threshold to 6 microseconds with 7/6 overhead to
->  	 * account for blanking, and with a pixel depth of 4 bytes:
->  	 */
-> -	threshold = width * height * vrefresh * 4 * 7 / 1000000;
-> +	threshold = (unsigned long long)width * height * vrefresh *
-> +		    4 * 7 / 1000000;
->  	reg = RDMA_FIFO_UNDERFLOW_EN |
->  	      RDMA_FIFO_PSEUDO_SIZE(SZ_8K) |
->  	      RDMA_OUTPUT_VALID_FIFO_THRESHOLD(threshold);
+diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+index 6283b99d2b17..d1263b82d646 100644
+--- a/drivers/i2c/busses/i2c-designware-platdrv.c
++++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+@@ -94,9 +94,9 @@ static void dw_i2c_acpi_params(struct platform_device *pdev, char method[],
+ static int dw_i2c_acpi_configure(struct platform_device *pdev)
+ {
+ 	struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
++	u32 ss_ht = 0, fp_ht = 0, hs_ht = 0, fs_ht = 0;
+ 	acpi_handle handle = ACPI_HANDLE(&pdev->dev);
+ 	const struct acpi_device_id *id;
+-	u32 ss_ht, fp_ht, hs_ht, fs_ht;
+ 	struct acpi_device *adev;
+ 	const char *uid;
+ 
