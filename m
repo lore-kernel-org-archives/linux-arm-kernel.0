@@ -1,27 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 22 May 2017 12:12:02 +0100
-Subject: [PATCH 3/3] mfd: twl: move header file out of I2C realm
-In-Reply-To: <20170522102812.GA1459@katana>
-References: <20170521220212.1404-1-wsa@the-dreams.de>
- <20170521220212.1404-4-wsa@the-dreams.de>
- <20170522095243.ff5uygzzrvo57jkd@sirena.org.uk>
- <20170522102812.GA1459@katana>
-Message-ID: <20170522111202.ho52rve7kwloytef@sirena.org.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 22 May 2017 19:14:13 +0800
+Subject: [PATCH v2 3/5] ARM: dts: stm32: enable CRC32 on stm32429-disco
+ board
+In-Reply-To: <d042019ac4871cc8cacd2cea04b7933feb96dda8.1495285223.git.cosardindar@gmail.com>
+Message-ID: <201705221955.jjTOXBxu%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 12:28:12PM +0200, Wolfram Sang wrote:
+Hi Cosar,
 
-> If you were not CCed on the other patches, then you are likely not
-> listed as a maintainer for them?
+[auto build test ERROR on cryptodev/master]
+[also build test ERROR on v4.12-rc2 next-20170522]
+[cannot apply to robh/for-next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Right, but it does mean that the people who only get a subset of patches
-are missing context for how things are expected to be handled.
-Sometimes it's clear but often it isn't.
+url:    https://github.com/0day-ci/linux/commits/Cosar-Dindar/Add-support-for-the-STM32F4-CRC32/20170522-151254
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/herbert/cryptodev-2.6.git master
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+Note: the linux-review/Cosar-Dindar/Add-support-for-the-STM32F4-CRC32/20170522-151254 HEAD 6822bdfe94793c70fe6812817f26f02db23e2593 builds fine.
+      It only hurts bisectibility.
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/stm32f429-disco.dts:105.1-5 Label or path crc not found
+   FATAL ERROR: Syntax error parsing input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
+Name: .config.gz
+Type: application/gzip
+Size: 22761 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170522/38c4c13d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170522/b0aa82de/attachment-0001.gz>
