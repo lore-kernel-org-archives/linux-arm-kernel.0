@@ -1,76 +1,143 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 22 May 2017 16:06:37 +0100
-Subject: [PATCH v2 1/2] ACPICA: IORT: Update SMMU models for IORT rev. C
-Message-ID: <11ef7d28c535c01d42b7b3c8e632934f0e0f1048.1495459319.git.robin.murphy@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 22 May 2017 09:15:55 -0700
+Subject: [PATCH V2 4/5] dt-bindings: pinctrl: add imx7ulp pinctrl binding
+ doc
+In-Reply-To: <1495177545-23006-5-git-send-email-aisheng.dong@nxp.com>
+References: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
+ <1495177545-23006-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <5e78ef100319f229a87e33804384e5b3@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IORT revision C has been published with a number of new SMMU
-implementation identifiers. Since IORT doesn't have any way of falling
-back to a more generic model code, we really need Linux to know about
-these before vendors start updating their firmware tables to use them.
+On 2017-05-19 00:05, Dong Aisheng wrote:
+> i.MX 7ULP has three IOMUXC instances: IOMUXC0 for M4 ports,
+> IOMUXC1 for A7 ports and IOMUXC DDR for DDR interface.
+> 
+> This patch adds the IOMUXC1 support for A7.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> 
+> ---
+> ChangeLog:
+> v1->v2:
+>  * add more descriptions in binding doc
+>  * add missed prefix for private properties.
+>  * move dt-bindings/pinctrl/imx7ulp-pinfunc.h to arch/arm/boot/dts
+> ---
+>  .../bindings/pinctrl/fsl,imx7ulp-pinctrl.txt       |  63 +++
+>  arch/arm/boot/dts/imx7ulp-pinfunc.h                | 468 +++++++++++++++++++++
+>  2 files changed, 531 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
+>  create mode 100644 arch/arm/boot/dts/imx7ulp-pinfunc.h
+> 
+> diff --git
+> a/Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
+> b/Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
+> new file mode 100644
+> index 0000000..7fbf367
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
+> @@ -0,0 +1,63 @@
+> +* Freescale i.MX7ULP IOMUX Controller
+> +
+> +i.MX 7ULP has three IOMUXC instances: IOMUXC0 for M4 ports, IOMUXC1 for A7
+> +ports and IOMUXC DDR for DDR interface.
+> +
+> +Note:
+> +This binding doc is only for the IOMUXC1 support in A7 Domain and it only
+> +supports generic pin config.
+> +
+> +Please also refer to fsl,imx-pinctrl.txt in this directory for IMX common
+> +binding part and pinctrl-bindings.txt for the generic config binding.
+> +
+> +=== Pin Controller Node ===
+> +
+> +Required properties:
+> +- compatible:	"fsl,imx7ulp-iomuxc1"
+> +- reg:		Should contain the base physical address and size of the iomuxc
+> +		registers.
+> +
+> +=== Pin Configuration Node ===
+> +- pins: One integers array, represents a group of pins mux setting.
+> +	The format is fsl,pins = <PIN_FUNC_ID>, PIN_FUNC_ID is a pin working on
+> +	a specific function.
+> +
+> +	NOTE: i.MX7ULP PIN_FUNC_ID consists of 4 integers as it shares one mux
+> +	and config register as follows:
+> +	<mux_conf_reg input_reg mux_mode input_val>
+> +
+> +	Refer to imx7ulp-pinfunc.h in in device tree source folder for all
+> +	available imx7ulp PIN_FUNC_ID.
+> +
+> +Optional Properties:
+> +- nxp,output-buffer-enable:	Bool. Output buffer enabled
+> +- nxp,input-buffer-enable:	Bool. Input buffer enabled
+> +- drive-strength		Integer. Controls Drive Strength
+> +					0: Standard
+> +					1: Hi Driver
+> +- drive-push-pull		Bool. Enable Pin Push-pull
+> +- drive-open-drain		Bool. Enable Pin Open-drian
+> +- slew-rate:			Integer. Controls Slew Rate
+> +					0: Standard
+> +					1: Slow
+> +- bias-disable:			Bool. Pull disabled
+> +- bias-pull-down:		Bool. Pull down on pin
+> +- bias-pull-up:			Bool. Pull up on pin
+> +
+> +Examples:
+> +#include "imx7ulp-pinfunc.h"
+> +
+> +/* Pin Controller Node */
+> +iomuxc1: iomuxc at 40ac0000 {
+> +	compatible = "fsl,imx7ulp-iomuxc1";
+> +	reg = <0x40ac0000 0x1000>;
+> +
+> +	/* Pin Configuration Node */
+> +	pinctrl_lpuart4: lpuart4grp {
+> +		pins = <
+> +			ULP1_PAD_PTC3__LPUART4_RX
+> +			ULP1_PAD_PTC2__LPUART4_TX
+> +		>;
+> +		bias-pull-up;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/imx7ulp-pinfunc.h
+> b/arch/arm/boot/dts/imx7ulp-pinfunc.h
+> new file mode 100644
+> index 0000000..cafd3ed
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx7ulp-pinfunc.h
+> @@ -0,0 +1,468 @@
+> +/*
+> + * Copyright 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2017 NXP
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#ifndef __DTS_IMX7ULP_PINFUNC_H
+> +#define __DTS_IMX7ULP_PINFUNC_H
+> +
+> +/*
+> + * The pin function ID is a tuple of
+> + * <mux_conf_reg input_reg mux_mode input_val>
+> + */
+> +
+> +#define ULP1_PAD_PTC0__PTC0                                      
+> 0x0000 0x0000 0x1 0x0
 
-CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-CC: Robert Moore <robert.moore@intel.com>
-CC: Lv Zheng <lv.zheng@intel.com>
-Acked-by: Robert Richter <rrichter@cavium.com>
-Tested-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
 
-v2: Update more comments, add Robert's tags.
+For consistency with other SoCs, can we add MX7 to the define? E.g.
+MX7ULP1?
 
-I'm including this here as a kernel patch just for context - once I've
-figured out how we actually submit patches to ACPICA directly, I'll do
-that per the preferred process.
-
-Robin.
-
- include/acpi/actbl2.h | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
-
-diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
-index faa9f2c0d5de..f469ea41f2fd 100644
---- a/include/acpi/actbl2.h
-+++ b/include/acpi/actbl2.h
-@@ -663,7 +663,7 @@ struct acpi_ibft_target {
-  * IORT - IO Remapping Table
-  *
-  * Conforms to "IO Remapping Table System Software on ARM Platforms",
-- * Document number: ARM DEN 0049B, October 2015
-+ * Document number: ARM DEN 0049C, May 2017
-  *
-  ******************************************************************************/
- 
-@@ -778,6 +778,8 @@ struct acpi_iort_smmu {
- #define ACPI_IORT_SMMU_V2               0x00000001	/* Generic SMMUv2 */
- #define ACPI_IORT_SMMU_CORELINK_MMU400  0x00000002	/* ARM Corelink MMU-400 */
- #define ACPI_IORT_SMMU_CORELINK_MMU500  0x00000003	/* ARM Corelink MMU-500 */
-+#define ACPI_IORT_SMMU_CORELINK_MMU401  0x00000004	/* ARM Corelink MMU-401 */
-+#define ACPI_IORT_SMMU_CAVIUM_SMMUV2    0x00000005	/* Cavium ThunderX SMMUv2 */
- 
- /* Masks for Flags field above */
- 
-@@ -798,13 +800,19 @@ struct acpi_iort_smmu_v3 {
- 	u32 flags;
- 	u32 reserved;
- 	u64 vatos_address;
--	u32 model;		/* O: generic SMMUv3 */
-+	u32 model;
- 	u32 event_gsiv;
- 	u32 pri_gsiv;
- 	u32 gerr_gsiv;
- 	u32 sync_gsiv;
- };
- 
-+/* Values for Model field above */
-+
-+#define ACPI_IORT_SMMU_V3               0x00000000	/* Generic SMMUv3 */
-+#define ACPI_IORT_SMMU_HISILICON_HI161X 0x00000001	/* HiSilicon Hi161x SMMUv3 */
-+#define ACPI_IORT_SMMU_CAVIUM_CN99XX    0x00000002	/* Cavium CN99xx SMMUv3 */
-+
- /* Masks for Flags field above */
- 
- #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
--- 
-2.12.2.dirty
+--
+Stefan
