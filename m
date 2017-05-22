@@ -1,51 +1,69 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 May 2017 15:58:58 +0200
-Subject: [PATCH 25/35] arm64: dts: r8a7796: add Sound MIX support
+Date: Mon, 22 May 2017 15:59:00 +0200
+Subject: [PATCH 27/35] arm64: dts: salvator-x: Add panel backlight support
 In-Reply-To: <cover.1495457812.git.horms+renesas@verge.net.au>
 References: <cover.1495457812.git.horms+renesas@verge.net.au>
-Message-ID: <53394b600bda5d4793d37b0010410a379fd09905.1495457812.git.horms+renesas@verge.net.au>
+Message-ID: <b33be336702175334031f558951374b694bc4cb1.1495457812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+The panel backlight is controlled through a GPIO and a PWM channel.
+
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+[simon: apply to salvator-x.dtsi instead of r8a7795-salvator-x.dts]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/renesas/salvator-x.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 7b74da1d1568..8651fc93304d 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -1197,6 +1197,7 @@
- 				 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
- 				 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
- 				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
-+				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
- 				 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
- 				 <&audio_clk_a>, <&audio_clk_b>,
- 				 <&audio_clk_c>,
-@@ -1208,6 +1209,7 @@
- 				      "src.9", "src.8", "src.7", "src.6",
- 				      "src.5", "src.4", "src.3", "src.2",
- 				      "src.1", "src.0",
-+				      "mix.1", "mix.0",
- 				      "ctu.1", "ctu.0",
- 				      "dvc.0", "dvc.1",
- 				      "clk_a", "clk_b", "clk_c", "clk_i";
-@@ -1225,6 +1227,11 @@
- 				};
- 			};
+diff --git a/arch/arm64/boot/dts/renesas/salvator-x.dtsi b/arch/arm64/boot/dts/renesas/salvator-x.dtsi
+index d5eb022d247c..7240bcd75918 100644
+--- a/arch/arm64/boot/dts/renesas/salvator-x.dtsi
++++ b/arch/arm64/boot/dts/renesas/salvator-x.dtsi
+@@ -58,6 +58,16 @@
+ 		clock-frequency = <11289600>;
+ 	};
  
-+			rcar_sound,mix {
-+				mix0: mix-0 { };
-+				mix1: mix-1 { };
-+			};
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm1 0 50000>;
 +
- 			rcar_sound,ctu {
- 				ctu00: ctu-0 { };
- 				ctu01: ctu-1 { };
++		brightness-levels = <256 128 64 16 8 4 0>;
++		default-brightness-level = <6>;
++
++		enable-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
++	};
++
+ 	reg_1p8v: regulator0 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "fixed-1.8V";
+@@ -358,6 +368,11 @@
+ 		function = "i2c2";
+ 	};
+ 
++	pwm1_pins: pwm {
++		groups = "pwm1_a";
++		function = "pwm1";
++	};
++
+ 	scif1_pins: scif1 {
+ 		groups = "scif1_data_a", "scif1_ctrl";
+ 		function = "scif1";
+@@ -443,6 +458,13 @@
+ 	};
+ };
+ 
++&pwm1 {
++	pinctrl-0 = <&pwm1_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
+ &rcar_sound {
+ 	pinctrl-0 = <&sound_pins &sound_clk_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.1.4
