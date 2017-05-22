@@ -1,92 +1,96 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 22 May 2017 16:45:10 +0200
-Subject: [PATCH v5 0/4] arm64: marvell: add cryptographic engine support for
- 7k/8k
-Message-ID: <20170522144514.6654-1-antoine.tenart@free-electrons.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 22 May 2017 16:46:09 +0200
+Subject: [PATCH v4 00/20] eeprom: at24: Add OF device ID table
+In-Reply-To: <CAL_JsqL2P=C+xRyL-BCC=RtFah4BRf8BHSvWNPZ+6r2ioSk_Yw@mail.gmail.com>
+References: <20170522140208.24652-1-javier@dowhile0.org>
+ <CAMuHMdXbhkGGFC80-39Axzv=BdEXyBNuPuHCSWW3eXWDB=SQ+w@mail.gmail.com>
+ <CAL_JsqL2P=C+xRyL-BCC=RtFah4BRf8BHSvWNPZ+6r2ioSk_Yw@mail.gmail.com>
+Message-ID: <CABxcv==xw7UxF1Ey+hDhGb_wzgAcFR9JLm6iuirvYSTTvSxb0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hello Geert and Rob,
 
-This series adds support for the Inside Secure SafeXcel EIP197
-cryptographic engine which can be found on Marvell Armada 7k and 8k
-boards. A new cryptographic engine driver is added, as well as the
-relevant device tree definition for the Armada 7040 DB and 8040 DB
-boards.
+On Mon, May 22, 2017 at 4:26 PM, Rob Herring <robh@kernel.org> wrote:
+> On Mon, May 22, 2017 at 9:23 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> Hi Javier,
+>>
+>> On Mon, May 22, 2017 at 4:01 PM, Javier Martinez Canillas
+>> <javier@dowhile0.org> wrote:
+>>> This series is a follow-up to patch [0] that added an OF device ID table
+>>> to the at24 EEPROM driver. As you suggested [1], this version instead of
+>>> adding entries for every used <vendor,device> tuple, only adds a single
+>>> entry for each chip type using the "atmel" vendor as a generic fallback.
+>>>
+>>> This is a re-spin that addresses some issues pointed out by Rob Herring.
+>>>
+>>> The first patch documents in the DT binding what's the correct vendor to
+>>> use and what are the ones that are being deprecated. The second one adds
+>>> the OF device ID table for the at24 driver and the next patches use this
+>>> vendor in the compatible string to each DTS that defines a compatible I2C
+>>> EEPROM device node.
+>>>
+>>> Patches can be applied independently since the DTS changes without driver
+>>> changes are no-op and the OF table won't be used without the DTS changes.
+>>>
+>>> [0]: https://lkml.org/lkml/2017/3/14/589
+>>> [1]: https://lkml.org/lkml/2017/3/15/99
+>>>
+>>> Best regards,
+>>> Javier
+>>>
+>>> Changes in v4:
+>>> - Document the manufacturers that have been deprecated (Rob Herring).
+>>> - Only use the atmel manufacturer in the compatible string instead of
+>>>   keeping the deprecated ones (Rob Herring).
+>>
+>> I think you're referring to this (https://lkml.org/lkml/2017/4/19/1136)?
+>>
+>> | > --- a/arch/arm/boot/dts/am335x-baltos.dtsi
+>> | > +++ b/arch/arm/boot/dts/am335x-baltos.dtsi
+>> | > @@ -255,7 +255,7 @@
+>> | >     };
+>> | >
+>> | >     at24 at 50 {
+>> | > -           compatible = "at24,24c02";
+>> | > +           compatible = "at24,24c02", "atmel,24c02";
+>> |
+>> | I think you can just drop the at24 compatibles. A new kernel doesn't
+>> | need it. An old kernel ignores the manufacturer. I checked that u-boot
+>> | only matches on "atmel,*", so okay there. Don't know about the *BSDs. I
+>> | couldn't find anything.
+>>
+>> I think you misunderstood what Rob means.
+>>
+>> In the case above it makes sense to drop the first compatible, as "at24" is
+>> not a manufacturer, but refers to ATMEL's "AT24" line of i2c FLASH ROMs.
+>>
+>> However, in cases where a real vendor/part combo is specified, like on
+>> r8a7791-koelsch.dts:
+>>
+>> -               compatible = "renesas,24c02";
+>> +               compatible = "atmel,24c02";
+>>
+>> you do want to keep the real vendor/part combo, i.e.
+>>
+>>      compatible = "renesas,24c02", "atmel,24c02";
+>
+> Yes, Geert is correct.
+>
 
-This driver needs two firmwares to work correctly. These firmware are
-usually used for more advanced operations than the ones supported (as of
-now), but we still need them to pass the data to the internal
-cryptographic engine.
+Sorry for misunderstanding your previous comment...
 
-This series was tested in various ways on both the Armada 7040 DB and
-the Armada 8040 DB: using the crypto framework self tests, using tcrypt
-and while performing various transfers with iperf on top of IPsec.
+How this should be documented in the DT binding? Should I include
+"renesas" as a valid manufacturer or only list the used
+<vendor,device> pairs (i.e: "renesas,24c02")?
 
-This series is based on top of v4.12-rc1, and is available at:
-https://github.com/atenart/linux  v4.12-rc1/7k8k-crypto
-I can rebase if needed. Patches adding device tree nodes and modifying
-the arm64 defconfig have been applied to the mvebu tree already.
+I also wonder why this is really needed if AFAIU "renesas,24c02" is
+compatible with "atmel,24c02". IOW, the driver doesn't need to
+differentiate between the two since the devices are the same and will
+always match using "atmel,24c02".
 
-I'd like to thank Ofer Heifetz and Igal Liberman who helped me to do
-this driver by adding functionalities, optimizing functions and testing
-(a lot).
+> Rob
 
-Thanks,
-Antoine
-
-Since v4:
-  - Added a dma-mask property and updated the default DMA mask to 64.
-  - Replaced all <asm/dma-mapping.h> to <linux/dma-mapping.h>.
-  - Rebased on top of 4.12-rc1.
-
-Since v3:
-  - Updated to use the skcipher API instead of the ablkcipher one.
-  - Added explicit zeroing of the keys.
-  - Fixed the DMA mask.
-  - Removed a few remaining phys_addr_t.
-
-Since v2:
-  - Used sha*_zero_message_hash definitions instead of custom ones.
-  - Used memzero_explicit() instead of memset() to avoid leaks.
-  - Misc cosmetic updates.
-
-Since v1:
-  - Fixed two compilation issues reported by Kbuild.
-  - Removed all dma_to_phys() calls and used the dma addresses instead.
-  - Added a call to dma_set_mask_and_coherent() before calling any DMA
-    API helper.
-  - Removed some DMA free functions to avoid double-freeing.
-  - Do not rely on sg_nents_for_len() to get the number of sg anymore.
-  - Added a dedicated kmalloc'ed cache to use for dma_map_single().
-
-Antoine Tenart (4):
-  Documentation/bindings: Document the SafeXel cryptographic engine
-    driver
-  crypto: inside-secure: add SafeXcel EIP197 crypto engine driver
-  MAINTAINERS: add a maintainer for the Inside Secure crypto driver
-  arm64: marvell: dts: add dma-mask in crypto nodes for 7k/8k
-
- .../bindings/crypto/inside-secure-safexcel.txt     |   29 +
- MAINTAINERS                                        |    6 +
- .../boot/dts/marvell/armada-cp110-master.dtsi      |    1 +
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |    1 +
- drivers/crypto/Kconfig                             |   17 +
- drivers/crypto/Makefile                            |    1 +
- drivers/crypto/inside-secure/Makefile              |    2 +
- drivers/crypto/inside-secure/safexcel.c            |  930 +++++++++++++++++
- drivers/crypto/inside-secure/safexcel.h            |  572 +++++++++++
- drivers/crypto/inside-secure/safexcel_cipher.c     |  556 +++++++++++
- drivers/crypto/inside-secure/safexcel_hash.c       | 1045 ++++++++++++++++++++
- drivers/crypto/inside-secure/safexcel_ring.c       |  157 +++
- 12 files changed, 3317 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
- create mode 100644 drivers/crypto/inside-secure/Makefile
- create mode 100644 drivers/crypto/inside-secure/safexcel.c
- create mode 100644 drivers/crypto/inside-secure/safexcel.h
- create mode 100644 drivers/crypto/inside-secure/safexcel_cipher.c
- create mode 100644 drivers/crypto/inside-secure/safexcel_hash.c
- create mode 100644 drivers/crypto/inside-secure/safexcel_ring.c
-
--- 
-2.9.4
+Best regards,
+Javier
