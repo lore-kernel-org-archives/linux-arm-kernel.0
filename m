@@ -1,86 +1,40 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 22 May 2017 14:27:35 +0800
-Subject: [RFC PATCH 05/30] iommu/arm-smmu-v3: Disable tagged pointers when
- ATS is in use
-In-Reply-To: <20170227195441.5170-6-jean-philippe.brucker@arm.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-6-jean-philippe.brucker@arm.com>
-Message-ID: <592284D7.60002@huawei.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Mon, 22 May 2017 09:07:28 +0200
+Subject: [PATCH 0/7] ALSA: Fix/improve PCM ack callback
+In-Reply-To: <s5hmva5ie1r.wl-tiwai@suse.de>
+References: <20170521190258.1178-1-tiwai@suse.de>
+ <7685a366-5b2f-0a96-a686-c49b79975c56@sakamocchi.jp>
+ <s5htw4dihpv.wl-tiwai@suse.de>
+ <6cb4bbc8-2d5f-45d0-0635-37f1737972c3@sakamocchi.jp>
+ <s5hmva5ie1r.wl-tiwai@suse.de>
+Message-ID: <s5hh90did3j.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 22 May 2017 08:46:56 +0200,
+Takashi Iwai wrote:
+> 
+> On Mon, 22 May 2017 08:31:13 +0200,
+> Takashi Sakamoto wrote:
+> > 
+> > On May 22 2017 14:27, Takashi Iwai wrote:
+> > > These functions will be modified again by other upcoming patchsets, so
+> > > I'd like not to touch so much for minor optimization at this stage.
+> > 
+> > If you address to your latest patchset[1], it might not be applied
+> > promptly because I have some comments (not posted yet, in this
+> > night). It's not good to avoid better bahaviour in a reason of
+> > patchset dependency, at least you seems to be too hasty.
+> 
+> Come on, your suggestion is an optimization change that can be applied
+> anytime later easily.  If it were a mandatory fix, we should apply or
+> fold it immediately, but that's not the case.  The only necessary
+> thing is not to forget it.
+
+That implies: just submit your proposed change as an incremental patch
+on top of mine.  Then I'll queue it.
 
 
-On 2017/2/28 3:54, Jean-Philippe Brucker wrote:
-> The ARM architecture has a "Top Byte Ignore" (TBI) option that makes the
-> MMU mask out bits [63:56] of an address, allowing a userspace application
-> to store data in its pointers.
-> 
-> The ATS doesn't have an architected mechanism to enable TBI, and might
-> create ATC entries for addresses that include a tag. Software would then
-> have to send ATC invalidation packets for each 255 possible alias of an
-> address, or just wipe the whole address space. This is not a viable
-> option, so disable TBI when ATS is in use.
-> 
-> It is unclear for the moment how this restriction will affect user
-> applications. One example I can imagine (with my complete lack of
-> knowledge about JIT engines and their use of tagged pointers) is a JIT
-> translating a WebCL applications that uses SVM. Since this kind of
-> interpreted language doesn't expose addresses, the interpreter and SVM
-> implementations will be given the opportunity to do the right thing and
-> remove tags before handing pointers to devices.
-> 
-> Ideally we should remove TBI only for domains that are susceptible to use
-> ATS. But at the point we're writing the context descriptor of a domain, we
-> are still probing the first device in the group. If that device doesn't
-> have an ATC but the next one does, we would then have to clear the TBI
-> bit, invalidate the ATCs of previous devices, and notify the drivers that
-> their devices cannot use tagged pointers anymore. Such a level of
-> complexity doesn't make any sense here since it is unlikely devices will
-> use tagged pointers at all.
-> 
-> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index e7b940146ae3..06b29d4fcf65 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -987,7 +987,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
->  }
->  
->  /* Context descriptor manipulation functions */
-> -static u64 arm_smmu_cpu_tcr_to_cd(u64 tcr)
-> +static u64 arm_smmu_cpu_tcr_to_cd(struct arm_smmu_device *smmu, u64 tcr)
->  {
->  	u64 val = 0;
->  
-> @@ -1000,7 +1000,8 @@ static u64 arm_smmu_cpu_tcr_to_cd(u64 tcr)
->  	val |= ARM_SMMU_TCR2CD(tcr, EPD0);
->  	val |= ARM_SMMU_TCR2CD(tcr, EPD1);
->  	val |= ARM_SMMU_TCR2CD(tcr, IPS);
-> -	val |= ARM_SMMU_TCR2CD(tcr, TBI0);
-> +	if (!(smmu->features & ARM_SMMU_FEAT_ATS))
-> +		val |= ARM_SMMU_TCR2CD(tcr, TBI0);
-Maybe we should always disable TBI. Otherwise, a device behind a ATS supported or
-non-supported SMMU should use different strategies.
+thanks,
 
->  
->  	return val;
->  }
-> @@ -1014,7 +1015,7 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_device *smmu,
->  	 * We don't need to issue any invalidation here, as we'll invalidate
->  	 * the STE when installing the new entry anyway.
->  	 */
-> -	val = arm_smmu_cpu_tcr_to_cd(cfg->cd.tcr) |
-> +	val = arm_smmu_cpu_tcr_to_cd(smmu, cfg->cd.tcr) |
->  #ifdef __BIG_ENDIAN
->  	      CTXDESC_CD_0_ENDI |
->  #endif
-> 
-
--- 
-Thanks!
-BestRegards
+Takashi
