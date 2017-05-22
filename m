@@ -1,10 +1,10 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 22 May 2017 16:01:58 +0200
-Subject: [PATCH v4 10/20] ARM: dts: koelsch: Add generic compatible string for
- I2C EEPROM
+Date: Mon, 22 May 2017 16:01:57 +0200
+Subject: [PATCH v4 09/20] ARM: dts: r7s72100: Add generic compatible string
+ for I2C EEPROM
 In-Reply-To: <20170522140208.24652-1-javier@dowhile0.org>
 References: <20170522140208.24652-1-javier@dowhile0.org>
-Message-ID: <20170522140208.24652-11-javier@dowhile0.org>
+Message-ID: <20170522140208.24652-10-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -33,21 +33,21 @@ Changes in v3:
 
 Changes in v2: None
 
- arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
+ arch/arm/boot/dts/r7s72100-genmai.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 001e6116c47c..4234667da2b8 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -702,7 +702,7 @@
- 	};
+diff --git a/arch/arm/boot/dts/r7s72100-genmai.dts b/arch/arm/boot/dts/r7s72100-genmai.dts
+index 52a7b586bac7..0184490ce0ad 100644
+--- a/arch/arm/boot/dts/r7s72100-genmai.dts
++++ b/arch/arm/boot/dts/r7s72100-genmai.dts
+@@ -57,7 +57,7 @@
+ 	clock-frequency = <400000>;
  
  	eeprom at 50 {
--		compatible = "renesas,24c02";
-+		compatible = "atmel,24c02";
+-		compatible = "renesas,24c128";
++		compatible = "atmel,24c128";
  		reg = <0x50>;
- 		pagesize = <16>;
+ 		pagesize = <64>;
  	};
 -- 
 2.9.3
