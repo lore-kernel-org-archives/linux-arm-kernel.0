@@ -1,34 +1,78 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 May 2017 17:54:58 +0200
-Subject: [PATCH] ARM: dts: imx28: add gpio-ranges for internal gpio
- controller
-In-Reply-To: <20170515071608.auju66dhylzaexkw@pengutronix.de>
-References: <20170508085925.18342-1-u.kleine-koenig@pengutronix.de>
- <20170511075135.GF5833@dragon>
- <20170511080916.gim5pyhj5jarzf4r@pengutronix.de>
- <20170512030536.GC8471@dragon>
- <20170512080150.uh5qmwu2tctpd6jk@pengutronix.de>
- <20170515022129.GJ8471@dragon>
- <20170515071608.auju66dhylzaexkw@pengutronix.de>
-Message-ID: <CACRpkdYvQdDXfK5QkWM6x6F4+UEQ=4oX_1gqdbjkk9n7tM5FSQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 22 May 2017 16:06:38 +0100
+Subject: [PATCH v2 2/2] iommu/arm-smmu: Plumb in new ACPI identifiers
+In-Reply-To: <11ef7d28c535c01d42b7b3c8e632934f0e0f1048.1495459319.git.robin.murphy@arm.com>
+References: <11ef7d28c535c01d42b7b3c8e632934f0e0f1048.1495459319.git.robin.murphy@arm.com>
+Message-ID: <ac4e7adc7ca636fc71e6a10f0d8ab273b3dfd5dc.1495459319.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 9:16 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Mon, May 15, 2017 at 10:21:30AM +0800, Shawn Guo wrote:
+Revision C of IORT now allows us to identify ARM MMU-401 and the Cavium
+ThunderX implementation. Wire them up so that we can probe these models
+once firmware starts using the new codes, and so that the appropriate
+features and quirks get enabled when we do.
 
->> You will need to free the GPIO before muxing it to a different function,
->> I think.
->
-> IMHO this is a bad concept. This makes GPIOs more special than for
-> example PWMs or LEDs. And it breaks some configurations (for example the
-> make-pins-highz-on-idle setup in my previous mails).
+For the sake of backports and mitigating sychronisation problems with
+the ACPICA headers, we'll carry a backup copy of the new definitions
+locally for the short term to make life simpler.
 
-So this is the reason why pin controllers can choose to be strict
-or not: people disagree on the semantics.
+CC: stable at vger.kernel.org # 4.10
+Acked-by: Robert Richter <rrichter@cavium.com>
+Tested-by: Robert Richter <rrichter@cavium.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-But it's good if the driver maintainers agree for a certain driver :D
+v2: Add local backup definitions
 
-Yours,
-Linus Walleij
+This is ready to go regardless of patch 1. The stable backport is in likely
+anticipation of machines with updated firmware paired with stable distro
+kernels, which would be unable to recognise and probe the SMMU otherwise.
+
+Robin.
+
+ drivers/iommu/arm-smmu.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 7ec30b08b3bd..79b9bb7d4783 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -312,6 +312,14 @@ enum arm_smmu_implementation {
+ 	CAVIUM_SMMUV2,
+ };
+ 
++/* Until ACPICA headers cover IORT rev. C */
++#ifndef ACPI_IORT_SMMU_CORELINK_MMU401
++#define ACPI_IORT_SMMU_CORELINK_MMU401	0x4
++#endif
++#ifndef ACPI_IORT_SMMU_CAVIUM_SMMUV2
++#define ACPI_IORT_SMMU_CAVIUM_SMMUV2	0x5
++#endif
++
+ struct arm_smmu_s2cr {
+ 	struct iommu_group		*group;
+ 	int				count;
+@@ -2073,6 +2081,10 @@ static int acpi_smmu_get_data(u32 model, struct arm_smmu_device *smmu)
+ 		smmu->version = ARM_SMMU_V1;
+ 		smmu->model = GENERIC_SMMU;
+ 		break;
++	case ACPI_IORT_SMMU_CORELINK_MMU401:
++		smmu->version = ARM_SMMU_V1_64K;
++		smmu->model = GENERIC_SMMU;
++		break;
+ 	case ACPI_IORT_SMMU_V2:
+ 		smmu->version = ARM_SMMU_V2;
+ 		smmu->model = GENERIC_SMMU;
+@@ -2081,6 +2093,10 @@ static int acpi_smmu_get_data(u32 model, struct arm_smmu_device *smmu)
+ 		smmu->version = ARM_SMMU_V2;
+ 		smmu->model = ARM_MMU500;
+ 		break;
++	case ACPI_IORT_SMMU_CAVIUM_SMMUV2:
++		smmu->version = ARM_SMMU_V2;
++		smmu->model = CAVIUM_SMMUV2;
++		break;
+ 	default:
+ 		ret = -ENODEV;
+ 	}
+-- 
+2.12.2.dirty
