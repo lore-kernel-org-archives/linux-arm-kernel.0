@@ -1,121 +1,76 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Mon, 22 May 2017 09:15:20 +0000
-Subject: [PATCH 3/3][v4] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <4420f96d-19e0-3bfc-cda2-e263f30ad94a@arm.com>
-References: <20170519131305.5068-1-laurentiu.tudor@nxp.com>
- <20170519131305.5068-4-laurentiu.tudor@nxp.com>
- <b3980350-9663-d98b-6533-fd3c15f98671@gmail.com> <86tw4g6nb0.fsf@arm.com>
- <VI1PR0401MB1856C0396AE7608FF2FC8CF1ECF80@VI1PR0401MB1856.eurprd04.prod.outlook.com>
- <878tlpmj9l.fsf@arm.com>
- <VI1PR0401MB1856FCA799A6C18CB85207EEECF80@VI1PR0401MB1856.eurprd04.prod.outlook.com>
- <4420f96d-19e0-3bfc-cda2-e263f30ad94a@arm.com>
-Message-ID: <VI1PR0401MB1856584067178ECA1B1AA983ECF80@VI1PR0401MB1856.eurprd04.prod.outlook.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 22 May 2017 14:49:29 +0530
+Subject: [PATCH 1/3] ARM: davinci: da8xx: Create DSP device only when
+ assigned memory
+In-Reply-To: <6c37a43e-78d4-3fa4-21ca-3c94ad83cbe4@ti.com>
+References: <20170516221347.37990-1-s-anna@ti.com>
+ <20170516221347.37990-2-s-anna@ti.com>
+ <098d38ab-4be3-ec01-044d-1fd2e0ac6130@ti.com>
+ <6c37a43e-78d4-3fa4-21ca-3c94ad83cbe4@ti.com>
+Message-ID: <ebf2a3e7-4d21-00a8-f6d7-6461ef3e0ec6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Monday, May 22, 2017 12:06 PM
-> To: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+On Thursday 18 May 2017 09:29 PM, Suman Anna wrote:
+> Hi Sekhar,
 > 
-> On 22/05/17 09:42, Laurentiu Tudor wrote:
-> > Hi Marc,
-> >
-> >> -----Original Message-----
-> >> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> >> Sent: Monday, May 22, 2017 10:41 AM
-> >>
-> >> On Mon, May 22 2017 at  7:12:39 am GMT, Laurentiu Tudor
-> >> <laurentiu.tudor@nxp.com> wrote:
-> >>
-> >> Hi Laurentiu,
-> >>
-> >>> Hi Marc,
-> >>>
-> >>>> -----Original Message-----
-> >>>> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> >>>> Sent: Saturday, May 20, 2017 9:43 AM
-> >>>> To: Matthias Brugger <matthias.bgg@gmail.com>
-> >>>>
-> >>>> On Fri, May 19 2017 at 02:41:43 PM, Matthias Brugger
-> >>>> <matthias.bgg@gmail.com> wrote:
-> >>>>> On 19/05/17 15:13, laurentiu.tudor at nxp.com wrote:
-> >>>>>> From: Stuart Yoder <stuart.yoder@nxp.com>
-> >>>>>>
-> >>>>>> Move the source files out of staging into their final locations:
-> >>>>>>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
-> >>>>>>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
-> >>>>>
-> >>>>> This driver has as compatible "arm,gic-v3-its". I wonder if this
-> >>>>> is correct and if it should be moved like this out of staging.
-> >>>>
-> >>>> This is no different from the way we handle *any* bus that uses the
-> >>>> GICv3 ITS as an MSI controller. Each bus provides its glue code
-> >>>> that latches onto the ITS node, and calls into the generic code.
-> >>>>
-> >>>> Now, when it comes to moving this out of staging, here is my concern:
-> >>>> There is mention of a userspace tool (restool) used to control the
-> >>>> HW. Where is this tool? Where is the user ABI documented?
-> >>>
-> >>> The tool is published here:
-
-[snip]
-
-> >>> There are two ways of configuring the mc-bus:
-> >>>  - a static one, through a FDT based configuration file (we call it
-> >>> DPL), documented in the refman linked below, chapter 22.
-> >>>  - a dynamic one, using this restool utility.
-> >>> Please note the usage of restool is optional.
-> >>
-> >> Optional or not, it still is a userspace ABI, and while I can see
-> >> restool issuing ioctl system calls to configure the HW, I cannot see
-> >> the corresponding code in the kernel tree. So how does it work?
-> >> If the syscall interface is not present in the mainline kernel, drop
-> >> the reference to it in the documentation. If it is there (and I
-> >> obviously missed it), document it, and get it reviewed.
-> >
-> > Our original plan was to first get the bus out of staging and after that submit
-> the restool support ASAP (patches are done - so I'm thinking at few days
-> timeframe).
-> > if this is not acceptable, I can drop the restool reference from the README
-> and resubmit the patch series. We'll re-add the reference together with the
-> restool support patches.
+> On 05/18/2017 01:10 AM, Sekhar Nori wrote:
+>> On Wednesday 17 May 2017 03:43 AM, Suman Anna wrote:
+>>> The DSP device on Davinci platforms does not have an MMU and requires
+>>> specific DDR memory to boot. This memory is reserved using the rproc_mem
+>>> kernel boot parameter and is assigned to the device on non-DT boots.
+>>> The remoteproc core uses the DMA API and so will fall back to assigning
+>>> random memory if this memory is not assigned to the device, but the DSP
+>>> remote processor boot will not be successful in such cases. So, check
+>>> that memory has been reserved and assigned to the device specifically
+>>> before even creating the DSP device.
+>>>
+>>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>>> ---
+>>>  arch/arm/mach-davinci/devices-da8xx.c | 10 ++++++++++
+>>>  1 file changed, 10 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+>>> index 7cf529ffbe5a..1ccf52e49886 100644
+>>> --- a/arch/arm/mach-davinci/devices-da8xx.c
+>>> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+>>> @@ -814,6 +814,8 @@ static struct platform_device da8xx_dsp = {
+>>>  	.resource	= da8xx_rproc_resources,
+>>>  };
+>>>  
+>>> +static bool rproc_mem_inited __initdata;
+>>> +
+>>>  #if IS_ENABLED(CONFIG_DA8XX_REMOTEPROC)
+>>>  
+>>>  static phys_addr_t rproc_base __initdata;
+>>> @@ -852,6 +854,8 @@ void __init da8xx_rproc_reserve_cma(void)
+>>>  	ret = dma_declare_contiguous(&da8xx_dsp.dev, rproc_size, rproc_base, 0);
+>>>  	if (ret)
+>>>  		pr_err("%s: dma_declare_contiguous failed %d\n", __func__, ret);
+>>> +	else
+>>> +		rproc_mem_inited = true;
+>>>  }
+>>>  
+>>>  #else
+>>> @@ -866,6 +870,12 @@ int __init da8xx_register_rproc(void)
+>>>  {
+>>>  	int ret;
+>>>  
+>>> +	if (!rproc_mem_inited) {
+>>> +		pr_warn("%s: memory not reserved for DSP, not registering DSP device\n",
+>>> +			__func__);
+>>
+>> We now have a warning and an error if dma_declare_contiguous() fails. I
+>> like this message better. So can you replace the existing error message
+>> with this text instead ?
 > 
-> I think it would make a lot more sense to drop anything that is not implemented
-> by the current code. Once you have patches that implement this userspace
-> interface, they can be reviewed together with the corresponding
-> documentation.
+> Hmm, this trace is not just covering the dma_declare_contiguous failure.
+> There can be two different errors in da8xx_rproc_reserve_cma, and this
 
-Ok, sounds good. I'll respin the patch series. 
+I seem to have missed that part. I now applied this series to v4.13/soc.
+I don't have a branch in linux-next. So, it may be a while before it
+ends up there. But I do merge all the patches I apply to master branch
+of my tree.
 
-> >> If there are associated DT bindings to the kernel code, they must be
-> >> documented (and reviewed) as part of the device-tree documentation,
-> >> and not in some obscure, hard to access document.
-> >
-> > There's only one binding involved and it's already accepted [1].
-> 
-> Ah, I missed it. It would be good to mention it in the documentation as well.
-
-Good point. I'll add a reference in the next respin.
-
-> > [snip]
-> >
-> >>>
-> >>> We're also working on publishing the docs on github so that they're
-> >>> more accessible.
-> >>
-> >> That'd be great, because the way the registration process is
-> >> presented, I'd have to agree to the Access Agreement *before* having
-> >> a chance to read it. Not going to happen...
-> >
-> > Sorry about that. Not much I can do. :-(
-> 
-> I understand this is not your job ;-). But maybe making people inside NXP aware
-> of the issue would help... Oh well.
-
-I'll make sure your comments will reach our guys and in the meantime push to get the docs on github.
-
----
-Thanks & Best Regards, Laurentiu
+Thanks,
+Sekhar
