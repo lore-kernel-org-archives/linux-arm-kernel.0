@@ -1,50 +1,100 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 May 2017 15:59:04 +0200
-Subject: [PATCH 31/35] arm64: dts: renesas: r8a7795-salvator-x: Add DU
- external dot clocks
+Date: Mon, 22 May 2017 15:59:01 +0200
+Subject: [PATCH 28/35] arm64: dts: renesas: r8a7795: Add HDMI encoder support
 In-Reply-To: <cover.1495457812.git.horms+renesas@verge.net.au>
 References: <cover.1495457812.git.horms+renesas@verge.net.au>
-Message-ID: <68b0a3cde86431285d57f33f34df3fea00584960.1495457812.git.horms+renesas@verge.net.au>
+Message-ID: <12daaf78a723ef7cb7ec46bc604844f31111bc7b.1495457812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-The DU1 and DU2 external dot clocks are provided by the fixed frequency
-clock generators X21 and X22, while the DU0 and DU3 clocks are provided
-by the programmable Versaclock5 clock generator.
+Add DT nodes for the two HDMI encoders in disabled state.
 
+Based on work by Koji Matsuoka.
+
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 52 ++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index 52fce67df341..2a5358b8f229 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -40,6 +40,20 @@
- 	};
- };
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 7d87dff70ac8..ee0129634cdf 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1758,6 +1758,56 @@
+ 			renesas,fcp = <&fcpf2>;
+ 		};
  
-+&du {
-+	clocks = <&cpg CPG_MOD 724>,
-+		 <&cpg CPG_MOD 723>,
-+		 <&cpg CPG_MOD 722>,
-+		 <&cpg CPG_MOD 721>,
-+		 <&cpg CPG_MOD 727>,
-+		 <&versaclock5 1>,
-+		 <&x21_clk>,
-+		 <&x22_clk>,
-+		 <&versaclock5 2>;
-+	clock-names = "du.0", "du.1", "du.2", "du.3", "lvds.0",
-+		      "dclkin.0", "dclkin.1", "dclkin.2", "dclkin.3";
-+};
++		hdmi0: hdmi0 at fead0000 {
++			compatible = "renesas,r8a7795-hdmi", "renesas,rcar-gen3-hdmi";
++			reg = <0 0xfead0000 0 0x10000>;
++			interrupts = <GIC_SPI 389 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 729>, <&cpg CPG_CORE R8A7795_CLK_HDMI>;
++			clock-names = "iahb", "isfr";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 729>;
++			status = "disabled";
 +
- &ehci2 {
- 	status = "okay";
- };
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				port at 0 {
++					reg = <0>;
++					dw_hdmi0_in: endpoint {
++						remote-endpoint = <&du_out_hdmi0>;
++					};
++				};
++				port at 1 {
++					reg = <1>;
++				};
++			};
++		};
++
++		hdmi1: hdmi1 at feae0000 {
++			compatible = "renesas,r8a7795-hdmi", "renesas,rcar-gen3-hdmi";
++			reg = <0 0xfeae0000 0 0x10000>;
++			interrupts = <GIC_SPI 436 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 728>, <&cpg CPG_CORE R8A7795_CLK_HDMI>;
++			clock-names = "iahb", "isfr";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 728>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				port at 0 {
++					reg = <0>;
++					dw_hdmi1_in: endpoint {
++						remote-endpoint = <&du_out_hdmi1>;
++					};
++				};
++				port at 1 {
++					reg = <1>;
++				};
++			};
++		};
++
+ 		du: display at feb00000 {
+ 			compatible = "renesas,du-r8a7795";
+ 			reg = <0 0xfeb00000 0 0x80000>,
+@@ -1789,11 +1839,13 @@
+ 				port at 1 {
+ 					reg = <1>;
+ 					du_out_hdmi0: endpoint {
++						remote-endpoint = <&dw_hdmi0_in>;
+ 					};
+ 				};
+ 				port at 2 {
+ 					reg = <2>;
+ 					du_out_hdmi1: endpoint {
++						remote-endpoint = <&dw_hdmi1_in>;
+ 					};
+ 				};
+ 				port at 3 {
 -- 
 2.1.4
