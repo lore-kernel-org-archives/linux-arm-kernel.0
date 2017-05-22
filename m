@@ -1,120 +1,44 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 22 May 2017 19:15:54 +0200
-Subject: [PATCH v4 00/20] eeprom: at24: Add OF device ID table
-In-Reply-To: <CAL_JsqKj_f-jY3wi78QyAAov=a9-ReaT9qU=ytwSp+5RL0eutg@mail.gmail.com>
-References: <20170522140208.24652-1-javier@dowhile0.org>
- <CAMuHMdXbhkGGFC80-39Axzv=BdEXyBNuPuHCSWW3eXWDB=SQ+w@mail.gmail.com>
- <CAL_JsqL2P=C+xRyL-BCC=RtFah4BRf8BHSvWNPZ+6r2ioSk_Yw@mail.gmail.com>
- <CABxcv==xw7UxF1Ey+hDhGb_wzgAcFR9JLm6iuirvYSTTvSxb0A@mail.gmail.com>
- <CAL_JsqKj_f-jY3wi78QyAAov=a9-ReaT9qU=ytwSp+5RL0eutg@mail.gmail.com>
-Message-ID: <CABxcv==8R5_tG8-rsp-9UdS_5N7X8QXkd0OFnN63Ct7L2jFvhA@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 22 May 2017 11:30:50 -0600
+Subject: [PATCH] coresight: tmc: Configure DMA mask appropriately
+In-Reply-To: <c93205f17b2d7609a1eb76fab74a7f929f4d25fb.1495119556.git.robin.murphy@arm.com>
+References: <c93205f17b2d7609a1eb76fab74a7f929f4d25fb.1495119556.git.robin.murphy@arm.com>
+Message-ID: <CANLsYkw6nk8vfD4YHHPJgbzBDc_mbJP8mJzjJm5PurX_vJFyvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
-
-Thanks a lot for your feedback.
-
-On Mon, May 22, 2017 at 6:52 PM, Rob Herring <robh@kernel.org> wrote:
-> On Mon, May 22, 2017 at 9:46 AM, Javier Martinez Canillas
-> <javier@dowhile0.org> wrote:
-
-[snip]
-
->>>> | >
->>>> | >     at24 at 50 {
->>>> | > -           compatible = "at24,24c02";
->>>> | > +           compatible = "at24,24c02", "atmel,24c02";
->>>> |
->>>> | I think you can just drop the at24 compatibles. A new kernel doesn't
->>>> | need it. An old kernel ignores the manufacturer. I checked that u-boot
->>>> | only matches on "atmel,*", so okay there. Don't know about the *BSDs. I
->>>> | couldn't find anything.
->>>>
->>>> I think you misunderstood what Rob means.
->>>>
->>>> In the case above it makes sense to drop the first compatible, as "at24" is
->>>> not a manufacturer, but refers to ATMEL's "AT24" line of i2c FLASH ROMs.
->>>>
->>>> However, in cases where a real vendor/part combo is specified, like on
->>>> r8a7791-koelsch.dts:
->>>>
->>>> -               compatible = "renesas,24c02";
->>>> +               compatible = "atmel,24c02";
->>>>
->>>> you do want to keep the real vendor/part combo, i.e.
->>>>
->>>>      compatible = "renesas,24c02", "atmel,24c02";
->>>
->>> Yes, Geert is correct.
->>>
->>
->> Sorry for misunderstanding your previous comment...
->>
->> How this should be documented in the DT binding? Should I include
->> "renesas" as a valid manufacturer or only list the used
->> <vendor,device> pairs (i.e: "renesas,24c02")?
+On 18 May 2017 at 09:14, Robin Murphy <robin.murphy@arm.com> wrote:
+> Before making any DMA API calls, the ETR driver should really be setting
+> its masks to ensure that DMA is possible. Especially since it can
+> address more than the 32-bit default mask set by the AMBA bus code.
 >
-> However you are handling any of the vendors. I'll have to go look.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-tmc.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
 >
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+> index d8517d2a968c..864488793f09 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
+> @@ -362,6 +362,13 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+>                 desc.type = CORESIGHT_DEV_TYPE_SINK;
+>                 desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+>                 desc.ops = &tmc_etr_cs_ops;
+> +               /*
+> +                * ETR configuration uses a 40-bit AXI master in place of
+> +                * the embedded SRAM of ETB/ETF.
+> +                */
+> +               ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
+> +               if (ret)
+> +                       goto out;
+>         } else {
+>                 desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
+>                 desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
 
-The current DT binding is quite lax when describing this. From
-Documentation/devicetree/bindings/eeprom/eeprom.txt:
+Applied - thanks.
+Mathieu
 
-----------------------------------
-EEPROMs (I2C)
-
-Required properties:
-
-  - compatible : should be "<manufacturer>,<type>", like these:
-
-"atmel,24c00", "atmel,24c01", "atmel,24c02", "atmel,24c04",
-"atmel,24c08", "atmel,24c16", "atmel,24c32", "atmel,24c64",
-"atmel,24c128", "atmel,24c256", "atmel,24c512", "atmel,24c1024"
-
-"catalyst,24c32"
-
-"microchip,24c128"
-
-"ramtron,24c64"
-
-"renesas,r1ex24002"
-
-If there is no specific driver for <manufacturer>, a generic
-driver based on <type> is selected. Possible types are:
-"24c00", "24c01", "24c02", "24c04", "24c08", "24c16", "24c32", "24c64",
-"24c128", "24c256", "24c512", "24c1024", "spd"
-
-  - reg : the I2C address of the EEPROM
-----------------------------------
-
-I think though that this is one of the cases where the Linux I2C
-subsystem matching logic is leaking into the DT binding doc, since the
-manufacturer prefix is ignored by the I2C core (the I2C device ID
-table is used to match and to report a MODALIAS).
-
-But I'll keep the description generic as it is now and only mention
-the atmel variants (at and at24) as deprecated then.
-
->> I also wonder why this is really needed if AFAIU "renesas,24c02" is
->> compatible with "atmel,24c02". IOW, the driver doesn't need to
->> differentiate between the two since the devices are the same and will
->> always match using "atmel,24c02".
+> --
+> 2.12.2.dirty
 >
-> It is needed, so that when a difference is found, it can be handled
-> without updating the DT.
->
-
-Yes, I understand this. What I tried to ask is if there could really
-be a difference for the same chip type between different vendors, or
-is just that people were using other manufacturers in the compatible
-string as a consequence of the DT binding doc and the I2C core
-ignoring the vendor prefix.
-
-I don't mind though, I will leave the manufacturers that are different
-than the atmel variants in the mainline DTS as you and Geert asked.
-
-> Rob
-
-Best regards,
-Javier
