@@ -1,70 +1,95 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 22 May 2017 12:08:17 -0700
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <CAGXu5j+k+NMQGmmhuW-4pHFd6agfndJfxQ9k--h+ZpsDBVB8ig@mail.gmail.com>
-References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
- <20170510.212952.1440495072777358778.davem@davemloft.net>
- <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
- <20170510.215218.2185526627014393313.davem@davemloft.net>
- <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
- <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
- <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
- <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
- <591A07A1.1030006@iogearbox.net>
- <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
- <CAGXu5j+k+NMQGmmhuW-4pHFd6agfndJfxQ9k--h+ZpsDBVB8ig@mail.gmail.com>
-Message-ID: <8c53012b-cb81-5228-de79-f55457d1cf69@gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Mon, 22 May 2017 13:18:38 -0600
+Subject: [PATCH v7 0/3] PCI/IOMMU: Reserve IOVAs for PCI inbound memory
+In-Reply-To: <1495471182-12490-1-git-send-email-oza.oza@broadcom.com>
+References: <1495471182-12490-1-git-send-email-oza.oza@broadcom.com>
+Message-ID: <20170522131838.71258483@w520.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2017 11:58 AM, Kees Cook wrote:
-> On Sat, May 20, 2017 at 1:01 PM, Shubham Bansal
-> <illusionist.neo@gmail.com> wrote:
->> Hi Daniel and Kees,
->>
->> Before I send the patch, I have tested the JIT compiler on ARMv7 but
->> not on ARMv5 or ARMv6. So can you tell me which arch versions I should
->> test it for?
->> Also for my testing, CONFIG_FRAME_POINTER and CONFIG_CPU_BIG_ENDIAN
->> are both disabled. But I need to test JIT with these flags as well.
->> Whenever I put these flags in .config file, the arm kernel is not
->> getting compiler with these flags. Can you tell me why? If you need
->> more information regarding this, please let me know.
+On Mon, 22 May 2017 22:09:39 +0530
+Oza Pawandeep <oza.oza@broadcom.com> wrote:
+
+> iproc based PCI RC and Stingray SOC has limitaiton of addressing only 512GB
+> memory at once.
 > 
-> I think it is fine to only target ARMv7. It is harder and harder to
-> find devices on v5 or v6 CPUs that would want to be using BPF JIT,
-> IMO.
+> IOVA allocation honors device's coherent_dma_mask/dma_mask.
+> In PCI case, current code honors DMA mask set by EP, there is no
+> concept of PCI host bridge dma-mask,  should be there and hence
+> could truly reflect the limitation of PCI host bridge.
+> 
+> However assuming Linux takes care of largest possible dma_mask, still the
+> limitation could exist, because of the way memory banks are implemented.
+> 
+> for e.g. memory banks:
+> <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
+> <0x00000008 0x80000000 0x3 0x80000000>, /* 14G @ 34G */
+> <0x00000090 0x00000000 0x4 0x00000000>, /* 16G @ 576G */
+> <0x000000a0 0x00000000 0x4 0x00000000>; /* 16G @ 640G */
+> 
+> When run User space (SPDK) which internally uses vfio in order to access
+> PCI EndPoint directly.
+> 
+> Vfio uses huge-pages which could come from 640G/0x000000a0. 
+> And the way vfio maps the hugepage is to have phys addr as iova,
+> and ends up calling VFIO_IOMMU_MAP_DMA ends up calling iommu_map,
+> inturn arm_lpae_map mapping iovas out of range.
+> 
+> So the way kernel allocates IOVA (where it honours device dma_mask) and
+> the way userspace gets IOVA is different.
+> 
+> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>; will not work.
+> 
+> Instead we have to go for scattered dma-ranges leaving holes.
+> Hence, we have to reserve IOVA allocations for inbound memory.
+> The patch-set caters to only addressing IOVA allocation problem.
 
-There are still a ton of Marvell-based routers out there (e.g: Kirkwood,
-Orion5x) that are ARMv5 and that prompted Nicholas (hey there) to fix
-the cBPF JIT a while ago. I don't think you can just ignore those, it's
-fine not to target them initially, but arguably, QEMU has decent support
-for some ARMv5 platforms that could be used for testing as well
-(realview-eb, versatileab/pbm.
 
-These devices are actually perfect candidates for running eBPF and to
-some extent XDP because they are slightly under powered compared to
-their newest ARMv7/ARMv8 counterparts.
+The description here confuses me, with vfio the user owns the iova
+allocation problem.  Mappings are only identity mapped if the user
+chooses to do so.  The dma_mask of the device is set by the driver and
+only relevant to the DMA-API.  vfio is a meta-driver and doesn't know
+the dma_mask of any particular device, that's the user's job.  Is the
+net result of what's happening here for the vfio case simply to expose
+extra reserved regions in sysfs, which the user can then consume to
+craft a compatible iova?  Thanks,
+
+Alex
 
 > 
-> When they "disappear", it's because there isn't a prerequisite met. I
-> either read the Kconfig files or use "make menuconfig" and "search" to
-> tell me where a config is defined and what is needed to meet the
-> prerequisites.
+> Changes since v7:
+> - Robin's comment addressed
+> where he wanted to remove depedency between IOMMU and OF layer.
+> - Bjorn Helgaas's comments addressed.
 > 
-> In the case of CPU_BIG_ENDIAN, you need ARCH_SUPPORTS_BIG_ENDIAN,
-> which appears to be only ARCH_IXP4XX. I don't think you're going to
-> find an emulator that will handle this, so I'd suggest ignoring this
-> config for now unless you can find someone with that hardware that you
-> can work with to test it.
+> Changes since v6:
+> - Robin's comments addressed.
 > 
-> In the case of CONFIG_FRAME_POINTER, I assume you built a
-> THUMB2_KERNEL? I'd read the notes in arch/arm/Kconfig.debug for
-> 'config FRAME_POINTER'.
-
-It sounds like we are at the point where Shubham's patches should be
-posted so people could test/fix on earlier ARM devices for instance.
-
-Thanks
--- 
-Florian
+> Changes since v5:
+> Changes since v4:
+> Changes since v3:
+> Changes since v2:
+> - minor changes, redudant checkes removed
+> - removed internal review
+> 
+> Changes since v1:
+> - address Rob's comments.
+> - Add a get_dma_ranges() function to of_bus struct..
+> - Convert existing contents of of_dma_get_range function to
+>   of_bus_default_dma_get_ranges and adding that to the
+>   default of_bus struct.
+> - Make of_dma_get_range call of_bus_match() and then bus->get_dma_ranges.
+> 
+> 
+> Oza Pawandeep (3):
+>   OF/PCI: expose inbound memory interface to PCI RC drivers.
+>   IOMMU/PCI: reserve IOVA for inbound memory for PCI masters
+>   PCI: add support for inbound windows resources
+> 
+>  drivers/iommu/dma-iommu.c | 44 ++++++++++++++++++++--
+>  drivers/of/of_pci.c       | 96 +++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/pci/probe.c       | 30 +++++++++++++--
+>  include/linux/of_pci.h    |  7 ++++
+>  include/linux/pci.h       |  1 +
+>  5 files changed, 170 insertions(+), 8 deletions(-)
+> 
