@@ -1,100 +1,77 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 22 May 2017 22:25:51 +0800
-Subject: [linux-sunxi] Re: [PATCH v6 2/9] irqchip/sunxi-nmi: add support
- for the NMI in A64 R_INTC
-In-Reply-To: <98014597-29BA-4D02-8137-4E399955F4FD@aosc.io>
-References: <20170518071653.36561-1-icenowy@aosc.io>
- <20170518071653.36561-3-icenowy@aosc.io>
- <ed99d87b-86eb-cf8a-8614-51d59fa00c8c@arm.com>
- <98014597-29BA-4D02-8137-4E399955F4FD@aosc.io>
-Message-ID: <CAGb2v66NY49OL0J3C64CKzngri5-Na6uPBizj-BNJW3vNkFUQw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 22 May 2017 09:26:08 -0500
+Subject: [PATCH v4 00/20] eeprom: at24: Add OF device ID table
+In-Reply-To: <CAMuHMdXbhkGGFC80-39Axzv=BdEXyBNuPuHCSWW3eXWDB=SQ+w@mail.gmail.com>
+References: <20170522140208.24652-1-javier@dowhile0.org>
+ <CAMuHMdXbhkGGFC80-39Axzv=BdEXyBNuPuHCSWW3eXWDB=SQ+w@mail.gmail.com>
+Message-ID: <CAL_JsqL2P=C+xRyL-BCC=RtFah4BRf8BHSvWNPZ+6r2ioSk_Yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 5:41 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+On Mon, May 22, 2017 at 9:23 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Javier,
 >
->
-> ? 2017?5?22? GMT+08:00 ??5:39:22, Marc Zyngier <marc.zyngier@arm.com> ??:
->>On 18/05/17 08:16, Icenowy Zheng wrote:
->>> Add support for the newly imported compatible for the A64 R_INTC in
->>> irq-sunxi-nmi driver.
->>>
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> ---
->>> Changes in v5:
->>> - Fix A64 R_INTC compatible.
->>>
->>>  drivers/irqchip/irq-sunxi-nmi.c | 13 +++++++++++++
->>>  1 file changed, 13 insertions(+)
->>>
->>> diff --git a/drivers/irqchip/irq-sunxi-nmi.c
->>b/drivers/irqchip/irq-sunxi-nmi.c
->>> index 668730c5cb66..5559c1d593bf 100644
->>> --- a/drivers/irqchip/irq-sunxi-nmi.c
->>> +++ b/drivers/irqchip/irq-sunxi-nmi.c
->>> @@ -56,6 +56,12 @@ static struct sunxi_sc_nmi_reg_offs sun9i_reg_offs
->>= {
->>>      .enable = 0x04,
->>>  };
->>>
->>> +static struct sunxi_sc_nmi_reg_offs sun50i_reg_offs = {
->>> +    .ctrl   = 0x0c,
->>> +    .pend   = 0x10,
->>> +    .enable = 0x40,
->>> +};
->>> +
+> On Mon, May 22, 2017 at 4:01 PM, Javier Martinez Canillas
+> <javier@dowhile0.org> wrote:
+>> This series is a follow-up to patch [0] that added an OF device ID table
+>> to the at24 EEPROM driver. As you suggested [1], this version instead of
+>> adding entries for every used <vendor,device> tuple, only adds a single
+>> entry for each chip type using the "atmel" vendor as a generic fallback.
 >>
->>Magic values? Even if no #define is provided, a pointer to the
->>corresponding documentation would be appreciated (assuming
->>documentation
->>exists).
+>> This is a re-spin that addresses some issues pointed out by Rob Herring.
+>>
+>> The first patch documents in the DT binding what's the correct vendor to
+>> use and what are the ones that are being deprecated. The second one adds
+>> the OF device ID table for the at24 driver and the next patches use this
+>> vendor in the compatible string to each DTS that defines a compatible I2C
+>> EEPROM device node.
+>>
+>> Patches can be applied independently since the DTS changes without driver
+>> changes are no-op and the OF table won't be used without the DTS changes.
+>>
+>> [0]: https://lkml.org/lkml/2017/3/14/589
+>> [1]: https://lkml.org/lkml/2017/3/15/99
+>>
+>> Best regards,
+>> Javier
+>>
+>> Changes in v4:
+>> - Document the manufacturers that have been deprecated (Rob Herring).
+>> - Only use the atmel manufacturer in the compatible string instead of
+>>   keeping the deprecated ones (Rob Herring).
 >
-> No documents is available for A64 R_INTC.
+> I think you're referring to this (https://lkml.org/lkml/2017/4/19/1136)?
+>
+> | > --- a/arch/arm/boot/dts/am335x-baltos.dtsi
+> | > +++ b/arch/arm/boot/dts/am335x-baltos.dtsi
+> | > @@ -255,7 +255,7 @@
+> | >     };
+> | >
+> | >     at24 at 50 {
+> | > -           compatible = "at24,24c02";
+> | > +           compatible = "at24,24c02", "atmel,24c02";
+> |
+> | I think you can just drop the at24 compatibles. A new kernel doesn't
+> | need it. An old kernel ignores the manufacturer. I checked that u-boot
+> | only matches on "atmel,*", so okay there. Don't know about the *BSDs. I
+> | couldn't find anything.
+>
+> I think you misunderstood what Rob means.
+>
+> In the case above it makes sense to drop the first compatible, as "at24" is
+> not a manufacturer, but refers to ATMEL's "AT24" line of i2c FLASH ROMs.
+>
+> However, in cases where a real vendor/part combo is specified, like on
+> r8a7791-koelsch.dts:
+>
+> -               compatible = "renesas,24c02";
+> +               compatible = "atmel,24c02";
+>
+> you do want to keep the real vendor/part combo, i.e.
+>
+>      compatible = "renesas,24c02", "atmel,24c02";
 
-No code either. In Allwinner's BSP, the interrupts for the PMICs go
-through the (closed source) OpenRISC firmware, so there's no driver
-for it in the kernel.
+Yes, Geert is correct.
 
-The registers line up with the old interrupt controller from the A10,
-but it seems only the NMI interrupt is wired up.
-
-ChenYu
-
->>
->>>  static inline void sunxi_sc_nmi_write(struct irq_chip_generic *gc,
->>u32 off,
->>>                                    u32 val)
->>>  {
->>> @@ -220,3 +226,10 @@ static int __init sun9i_nmi_irq_init(struct
->>device_node *node,
->>>      return sunxi_sc_nmi_irq_init(node, &sun9i_reg_offs);
->>>  }
->>>  IRQCHIP_DECLARE(sun9i_nmi, "allwinner,sun9i-a80-nmi",
->>sun9i_nmi_irq_init);
->>> +
->>> +static int __init sun50i_nmi_irq_init(struct device_node *node,
->>> +                                 struct device_node *parent)
->>> +{
->>> +    return sunxi_sc_nmi_irq_init(node, &sun50i_reg_offs);
->>> +}
->>> +IRQCHIP_DECLARE(sun50i_nmi, "allwinner,sun50i-a64-r-intc",
->>sun50i_nmi_irq_init);
->>>
->>
->>Apart from the above:
->>
->>Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>
->>Let me know how you want this to be merged.
->
-> I think it can just go via IRQ subsystem.
->
->>
->>Thanks,
->>
->>       M.
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Rob
