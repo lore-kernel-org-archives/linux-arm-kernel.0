@@ -1,26 +1,79 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 22 May 2017 09:33:19 -0700
-Subject: [PATCH 6/7] staging: bcm2835-audio: Deliver indirect-PCM transfer
- error
-In-Reply-To: <20170521190258.1178-7-tiwai@suse.de>
-References: <20170521190258.1178-1-tiwai@suse.de>
- <20170521190258.1178-7-tiwai@suse.de>
-Message-ID: <87tw4cn968.fsf@eliezer.anholt.net>
+From: oza.oza@broadcom.com (Oza Pawandeep)
+Date: Mon, 22 May 2017 22:09:39 +0530
+Subject: [PATCH v7 0/3] PCI/IOMMU: Reserve IOVAs for PCI inbound memory
+Message-ID: <1495471182-12490-1-git-send-email-oza.oza@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Takashi Iwai <tiwai@suse.de> writes:
+iproc based PCI RC and Stingray SOC has limitaiton of addressing only 512GB
+memory at once.
 
-> Now that the indirect-PCM transfer helper gives back an error, we
-> should return the error from ack callbacks.
+IOVA allocation honors device's coherent_dma_mask/dma_mask.
+In PCI case, current code honors DMA mask set by EP, there is no
+concept of PCI host bridge dma-mask,  should be there and hence
+could truly reflect the limitation of PCI host bridge.
 
-As far as bcm2835 goes:
+However assuming Linux takes care of largest possible dma_mask, still the
+limitation could exist, because of the way memory banks are implemented.
 
-Acked-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170522/e51eb81a/attachment.sig>
+for e.g. memory banks:
+<0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
+<0x00000008 0x80000000 0x3 0x80000000>, /* 14G @ 34G */
+<0x00000090 0x00000000 0x4 0x00000000>, /* 16G @ 576G */
+<0x000000a0 0x00000000 0x4 0x00000000>; /* 16G @ 640G */
+
+When run User space (SPDK) which internally uses vfio in order to access
+PCI EndPoint directly.
+
+Vfio uses huge-pages which could come from 640G/0x000000a0. 
+And the way vfio maps the hugepage is to have phys addr as iova,
+and ends up calling VFIO_IOMMU_MAP_DMA ends up calling iommu_map,
+inturn arm_lpae_map mapping iovas out of range.
+
+So the way kernel allocates IOVA (where it honours device dma_mask) and
+the way userspace gets IOVA is different.
+
+dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>; will not work.
+
+Instead we have to go for scattered dma-ranges leaving holes.
+Hence, we have to reserve IOVA allocations for inbound memory.
+The patch-set caters to only addressing IOVA allocation problem.
+
+Changes since v7:
+- Robin's comment addressed
+where he wanted to remove depedency between IOMMU and OF layer.
+- Bjorn Helgaas's comments addressed.
+
+Changes since v6:
+- Robin's comments addressed.
+
+Changes since v5:
+Changes since v4:
+Changes since v3:
+Changes since v2:
+- minor changes, redudant checkes removed
+- removed internal review
+
+Changes since v1:
+- address Rob's comments.
+- Add a get_dma_ranges() function to of_bus struct..
+- Convert existing contents of of_dma_get_range function to
+  of_bus_default_dma_get_ranges and adding that to the
+  default of_bus struct.
+- Make of_dma_get_range call of_bus_match() and then bus->get_dma_ranges.
+
+
+Oza Pawandeep (3):
+  OF/PCI: expose inbound memory interface to PCI RC drivers.
+  IOMMU/PCI: reserve IOVA for inbound memory for PCI masters
+  PCI: add support for inbound windows resources
+
+ drivers/iommu/dma-iommu.c | 44 ++++++++++++++++++++--
+ drivers/of/of_pci.c       | 96 +++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/pci/probe.c       | 30 +++++++++++++--
+ include/linux/of_pci.h    |  7 ++++
+ include/linux/pci.h       |  1 +
+ 5 files changed, 170 insertions(+), 8 deletions(-)
+
+-- 
+1.9.1
