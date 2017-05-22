@@ -1,28 +1,25 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 22 May 2017 15:35:57 +0800
-Subject: [PATCH 2/6] clk: sunxi-ng: a83t: Fix audio PLL divider offset
-In-Reply-To: <20170522072047.bffdbwkz2nqvhums@flea.lan>
-References: <20170522062552.19026-1-wens@csie.org>
- <20170522062552.19026-3-wens@csie.org>
- <20170522072047.bffdbwkz2nqvhums@flea.lan>
-Message-ID: <CAGb2v65SUR2NvGOFFgzUpDh_9Dm6SAhzwC31KBOqFZubOhkK9w@mail.gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Mon, 22 May 2017 07:36:03 +0000
+Subject: [PATCH 0/2] ARCH_VULCAN removal
+Message-ID: <1495438565-82495-1-git-send-email-jnair@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 3:20 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, May 22, 2017 at 02:25:48PM +0800, Chen-Yu Tsai wrote:
->> The divider of the audio PLL has an offset of 1.
->> Fix this in the driver.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> Applied, thanks!
+Another couple of patches to remove more of ARCH_VULCAN platform.
 
-So even with this patch applied, the audio is still slow and off pitch.
-It's even worse without this patch...
+There is still a reference in drivers/gpio/Kconfig for ARCH_VULCAN.
+I am sending a patch to remove that, and after that we can completely
+remove ARCH_VULCAN.
 
-Maybe it's time we added a special class of clks for the audio PLL
-to deal with sigma-delta modulation of the divider?
+JC.
 
-ChenYu
+Jayachandran C (2):
+  arm64: disable Broadcom Vulcan platform
+  arm64: defconfig: drop ARCH_VULCAN
+
+ arch/arm64/Kconfig.platforms | 5 +----
+ arch/arm64/configs/defconfig | 1 -
+ 2 files changed, 1 insertion(+), 5 deletions(-)
+
+-- 
+2.7.4
