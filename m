@@ -1,26 +1,65 @@
-From: o-takashi@sakamocchi.jp (Takashi Sakamoto)
-Date: Mon, 22 May 2017 15:31:13 +0900
-Subject: [PATCH 0/7] ALSA: Fix/improve PCM ack callback
-In-Reply-To: <s5htw4dihpv.wl-tiwai@suse.de>
-References: <20170521190258.1178-1-tiwai@suse.de>
- <7685a366-5b2f-0a96-a686-c49b79975c56@sakamocchi.jp>
- <s5htw4dihpv.wl-tiwai@suse.de>
-Message-ID: <6cb4bbc8-2d5f-45d0-0635-37f1737972c3@sakamocchi.jp>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Mon, 22 May 2017 09:35:24 +0300
+Subject: [PATCH] i2c: designware: don't infer timings described by ACPI
+ from clock rate
+In-Reply-To: <62548890-2541-32b2-2015-74b5ed40f115@siemens.com>
+References: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
+ <CAKv+Gu9x_KCdEGBBOw9yaYOcYBcYtxJX-xTX=4kQuWqY=VK0PA@mail.gmail.com>
+ <62548890-2541-32b2-2015-74b5ed40f115@siemens.com>
+Message-ID: <a254b8bf-cbca-599a-2986-6775fbadb79c@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On May 22 2017 14:27, Takashi Iwai wrote:
-> These functions will be modified again by other upcoming patchsets, so
-> I'd like not to touch so much for minor optimization at this stage.
+On 05/22/2017 08:44 AM, Jan Kiszka wrote:
+> On 2017-05-21 10:09, Ard Biesheuvel wrote:
+>> On 19 May 2017 at 09:56, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>> Commit bd698d24b1b57 ("i2c: designware: Get selected speed mode
+>>> sda-hold-time via ACPI") updated the logic that reads the timing
+>>> parameters for various I2C bus rates from the DSDT, to only read
+>>> the timing parameters for the currently selected mode.
+>>>
+>>> This causes a WARN_ON() splat on platforms that legally omit the clock
+>>> frequency from the ACPI description, because in the new situation, the
+>>> core I2C designware driver still accesses the fields in the driver
+>>> struct that we no longer populate, and proceeds to calculate them from
+>>> the clock frequency. Since the clock frequency is unspecified, the
+>>> driver complains loudly using a WARN_ON().
+>>>
+>>> So revert back to the old situation, where the struct fields for all
+>>> timings are populated, but retain the new logic which chooses the SDA
+>>> hold time from the timing mode that is currently in use.
+>>>
+>>> Fixes: bd698d24b1b57 ("i2c: designware: Get selected speed mode ...")
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>>  drivers/i2c/busses/i2c-designware-platdrv.c | 18 ++++++++++--------
+>>>  1 file changed, 10 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+>>> index f2acd4b6bf01..6283b99d2b17 100644
+>>> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+>>> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+>>> @@ -96,6 +96,7 @@ static int dw_i2c_acpi_configure(struct platform_device *pdev)
+>>>         struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
+>>>         acpi_handle handle = ACPI_HANDLE(&pdev->dev);
+>>>         const struct acpi_device_id *id;
+>>> +       u32 ss_ht, fp_ht, hs_ht, fs_ht;
+>>
+>> Should these be initialized to zero? I realized that
+>> dw_i2c_acpi_params() could fail, resulting in bogus hold time values
+>> being returnted, but it is unclear to me how that affects the logic in
+>> the core driver.
+>
+Oh, indeed, great you found this quickly and we got also report and fix 
+quickly from Jan. In bad case this could have been difficult to bisect.
 
-If you address to your latest patchset[1], it might not be applied 
-promptly because I have some comments (not posted yet, in this night). 
-It's not good to avoid better bahaviour in a reason of patchset 
-dependency, at least you seems to be too hasty.
+> I can tell you what happens: this breaks e.g. the Galileo and the
+> IOT2000 boards. Will send a patch to initialize the vars to 0, restoring
+> the previous behavior in the absence to the ACPI parameters. The core is
+> prepared for sda_hold_time == 0.
+>
+Yes, i2c-designware-core.c will read the hold time from HW set by 
+bootloader or the reset default when dev->sda_hold_time is zero.
 
-
-[1] [alsa-devel] [PATCH 00/16] ALSA: Convert to new copy_silence PCM ops
-
-Regards
-
-Takashi Sakamoto
+-- 
+Jarkko
