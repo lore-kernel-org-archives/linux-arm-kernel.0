@@ -1,53 +1,24 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 22 May 2017 11:40:18 +0200
-Subject: [PATCH 1/4] dt-bindings: mtk-sysirq: Correct bindings for supported
- SoCs
-Message-ID: <20170522094021.7837-1-matthias.bgg@gmail.com>
+Date: Mon, 22 May 2017 11:40:19 +0200
+Subject: [PATCH 2/4] dt-bindings: i2c-mt6577: Rename file to reflect bindings
+In-Reply-To: <20170522094021.7837-1-matthias.bgg@gmail.com>
+References: <20170522094021.7837-1-matthias.bgg@gmail.com>
+Message-ID: <20170522094021.7837-2-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All SoCs supported up to now rely on the fallback binding of mt6577.
-Fix the binding description to reflect this.
+The i2c-mt6577.txt actually holds the bindings for all mediatek supported i2c
+controller. Change the name to i2c.mtk.txt to reflect that.
 
 Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- .../interrupt-controller/mediatek,sysirq.txt       | 24 +++++++++++-----------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ Documentation/devicetree/bindings/i2c/{i2c-mt6577.txt => i2c-mtk.txt} | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/i2c/{i2c-mt6577.txt => i2c-mtk.txt} (100%)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-index a89c03bb1a81..aff3bb2a704b 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-@@ -4,18 +4,18 @@ Mediatek SOCs sysirq support controllable irq inverter for each GIC SPI
- interrupt.
- 
- Required properties:
--- compatible: should be one of:
--	"mediatek,mt8173-sysirq"
--	"mediatek,mt8135-sysirq"
--	"mediatek,mt8127-sysirq"
--	"mediatek,mt6795-sysirq"
--	"mediatek,mt6755-sysirq"
--	"mediatek,mt6592-sysirq"
--	"mediatek,mt6589-sysirq"
--	"mediatek,mt6582-sysirq"
--	"mediatek,mt6580-sysirq"
--	"mediatek,mt6577-sysirq"
--	"mediatek,mt2701-sysirq"
-+- compatible: should be
-+	"mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq": for MT8173
-+	"mediatek,mt8135-sysirq", "mediatek,mt6577-sysirq": for MT8135
-+	"mediatek,mt8127-sysirq", "mediatek,mt6577-sysirq": for MT8127
-+	"mediatek,mt6795-sysirq", "mediatek,mt6577-sysirq": for MT6795
-+	"mediatek,mt6755-sysirq", "mediatek,mt6577-sysirq": for MT6755
-+	"mediatek,mt6592-sysirq", "mediatek,mt6577-sysirq": for MT6592
-+	"mediatek,mt6589-sysirq", "mediatek,mt6577-sysirq": for MT6589
-+	"mediatek,mt6582-sysirq", "mediatek,mt6577-sysirq": for MT6582
-+	"mediatek,mt6580-sysirq", "mediatek,mt6577-sysirq": for MT6580
-+	"mediatek,mt6577-sysirq": for MT6577
-+	"mediatek,mt2701-sysirq", "mediatek,mt6577-sysirq": for MT2701
- - interrupt-controller : Identifies the node as an interrupt controller
- - #interrupt-cells : Use the same format as specified by GIC in arm,gic.txt.
- - interrupt-parent: phandle of irq parent for sysirq. The parent must
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-mtk.txt
 -- 
 2.12.0
