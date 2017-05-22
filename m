@@ -1,188 +1,387 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Mon, 22 May 2017 18:24:33 -0500
-Subject: [PATCH v3 4/5] drivers/perf: Add support for ARMv8.2
- Statistical Profiling Extension
-In-Reply-To: <20170522162211.GA29333@leverpostej>
-References: <1495128273-13941-1-git-send-email-will.deacon@arm.com>
- <1495128273-13941-5-git-send-email-will.deacon@arm.com>
- <20170522073249.d95a6d7050d24e99261ceae6@arm.com>
- <20170522124446.GE1478@leverpostej>
- <20170522104521.942a45a207d541edcf738b4c@arm.com>
- <20170522162211.GA29333@leverpostej>
-Message-ID: <20170522182433.be8441516e267ca109771496@arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 22 May 2017 16:37:58 -0700
+Subject: [PATCH 3/3] mfd: twl: move header file out of I2C realm
+In-Reply-To: <20170521220212.1404-4-wsa@the-dreams.de>
+References: <20170521220212.1404-1-wsa@the-dreams.de>
+ <20170521220212.1404-4-wsa@the-dreams.de>
+Message-ID: <20170522233758.GC12016@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 May 2017 17:22:12 +0100
-Mark Rutland <mark.rutland@arm.com> wrote:
-
-> On Mon, May 22, 2017 at 10:45:21AM -0500, Kim Phillips wrote:
-> > On Mon, 22 May 2017 13:44:46 +0100
-> > Mark Rutland <mark.rutland@arm.com> wrote:
-> > > On Mon, May 22, 2017 at 07:32:49AM -0500, Kim Phillips wrote:
-> > > > On Thu, 18 May 2017 18:24:32 +0100
-> > > > Will Deacon <will.deacon@arm.com> wrote:
-> > > > > +/* Perf callbacks */
-> > > > > +static int arm_spe_pmu_event_init(struct perf_event *event)
-> > > > > +{
-> > > > > +	u64 reg;
-> > > > > +	struct perf_event_attr *attr = &event->attr;
-> > > > > +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
-> > > > > +
-> > > > > +	/* This is, of course, deeply driver-specific */
-> > > > > +	if (attr->type != event->pmu->type)
-> > > > > +		return -ENOENT;
-> > > > > +
-> > > 
-> > > [trimming other return sites]
-> > 
-> > Thanks but other conditions, such as the user specified sample period
-> > check would be more appropriate to be left in for this discussion.
+On Mon, May 22, 2017 at 12:02:10AM +0200, Wolfram Sang wrote:
+> include/linux/i2c is not for client devices. Move the header file to a
+> more appropriate location.
 > 
-> Sure, I was just trimming to a single example for brevity.  I appreciate
-> there are cases where it may not be as simple to determine the cause
-> from userspace today.
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> ---
+>  arch/arm/mach-omap2/common.h            | 2 +-
+>  arch/arm/mach-omap2/omap_twl.c          | 2 +-
+>  drivers/gpio/gpio-twl4030.c             | 2 +-
+>  drivers/iio/adc/twl4030-madc.c          | 2 +-
+>  drivers/iio/adc/twl6030-gpadc.c         | 2 +-
+>  drivers/input/keyboard/twl4030_keypad.c | 2 +-
+>  drivers/input/misc/twl4030-pwrbutton.c  | 2 +-
+>  drivers/input/misc/twl4030-vibra.c      | 2 +-
 
-That helps, thanks.
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-> > > > I've consistently brought up lack of proper user error messaging in all
-> > > > previous submissions of this driver:
-> > > > 
-> > > ... and we've consistently explained why logging such things to dmesg by
-> > > default will not fly. As before, while we call these return codes error
-> > > values, they are *not* errors in the same sense as pr_err().
-> > 
-> > I've expressed my disagreement to that matter here:
-> >  
-> > https://lkml.org/lkml/2017/4/7/223
-> >  
-> > yet it got no response.
+>  drivers/mfd/twl-core.c                  | 6 +++---
+>  drivers/mfd/twl4030-audio.c             | 2 +-
+>  drivers/mfd/twl4030-irq.c               | 2 +-
+>  drivers/mfd/twl4030-power.c             | 2 +-
+>  drivers/mfd/twl6030-irq.c               | 2 +-
+>  drivers/phy/phy-twl4030-usb.c           | 2 +-
+>  drivers/power/supply/twl4030_charger.c  | 2 +-
+>  drivers/pwm/pwm-twl-led.c               | 2 +-
+>  drivers/pwm/pwm-twl.c                   | 2 +-
+>  drivers/regulator/twl-regulator.c       | 2 +-
+>  drivers/regulator/twl6030-regulator.c   | 2 +-
+>  drivers/rtc/rtc-twl.c                   | 2 +-
+>  drivers/usb/phy/phy-twl6030-usb.c       | 2 +-
+>  drivers/video/backlight/pandora_bl.c    | 2 +-
+>  drivers/watchdog/twl4030_wdt.c          | 2 +-
+>  include/linux/{i2c => mfd}/twl.h        | 0
+>  sound/soc/codecs/twl4030.c              | 2 +-
+>  25 files changed, 26 insertions(+), 26 deletions(-)
+>  rename include/linux/{i2c => mfd}/twl.h (100%)
 > 
-> That's not strictly true.
+> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+> index 8cc6338fcb1288..b5ad7fcb80ed24 100644
+> --- a/arch/arm/mach-omap2/common.h
+> +++ b/arch/arm/mach-omap2/common.h
+> @@ -29,7 +29,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/delay.h>
+>  #include <linux/i2c.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/i2c-omap.h>
+>  #include <linux/reboot.h>
+>  #include <linux/irqchip/irq-omap-intc.h>
+> diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
+> index 1346b3ab34a5e3..295124b248ae3f 100644
+> --- a/arch/arm/mach-omap2/omap_twl.c
+> +++ b/arch/arm/mach-omap2/omap_twl.c
+> @@ -16,7 +16,7 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  #include <linux/kernel.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  
+>  #include "soc.h"
+>  #include "voltage.h"
+> diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+> index 24f388ed46d4c4..9b511df5450eb6 100644
+> --- a/drivers/gpio/gpio-twl4030.c
+> +++ b/drivers/gpio/gpio-twl4030.c
+> @@ -35,7 +35,7 @@
+>  #include <linux/of.h>
+>  #include <linux/irqdomain.h>
+>  
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  
+>  /*
+>   * The GPIO "subchip" supports 18 GPIOs which can be configured as
+> diff --git a/drivers/iio/adc/twl4030-madc.c b/drivers/iio/adc/twl4030-madc.c
+> index 0c74869a540ad3..5a64eda1652061 100644
+> --- a/drivers/iio/adc/twl4030-madc.c
+> +++ b/drivers/iio/adc/twl4030-madc.c
+> @@ -35,7 +35,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/i2c/twl4030-madc.h>
+>  #include <linux/module.h>
+>  #include <linux/stddef.h>
+> diff --git a/drivers/iio/adc/twl6030-gpadc.c b/drivers/iio/adc/twl6030-gpadc.c
+> index becbb0aef232b9..bc0e60b9da452e 100644
+> --- a/drivers/iio/adc/twl6030-gpadc.c
+> +++ b/drivers/iio/adc/twl6030-gpadc.c
+> @@ -33,7 +33,7 @@
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/of_platform.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/iio/iio.h>
+>  #include <linux/iio/sysfs.h>
+>  
+> diff --git a/drivers/input/keyboard/twl4030_keypad.c b/drivers/input/keyboard/twl4030_keypad.c
+> index 39e72b3219d8a4..f9f98ef1d98e3f 100644
+> --- a/drivers/input/keyboard/twl4030_keypad.c
+> +++ b/drivers/input/keyboard/twl4030_keypad.c
+> @@ -30,7 +30,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/input.h>
+>  #include <linux/platform_device.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/slab.h>
+>  #include <linux/of.h>
+>  
+> diff --git a/drivers/input/misc/twl4030-pwrbutton.c b/drivers/input/misc/twl4030-pwrbutton.c
+> index 1c13005b228fa7..b307cca1702226 100644
+> --- a/drivers/input/misc/twl4030-pwrbutton.c
+> +++ b/drivers/input/misc/twl4030-pwrbutton.c
+> @@ -27,7 +27,7 @@
+>  #include <linux/input.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/platform_device.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  
+>  #define PWR_PWRON_IRQ (1 << 0)
+>  
+> diff --git a/drivers/input/misc/twl4030-vibra.c b/drivers/input/misc/twl4030-vibra.c
+> index caa5a62c42fbe0..6c51d404874bbd 100644
+> --- a/drivers/input/misc/twl4030-vibra.c
+> +++ b/drivers/input/misc/twl4030-vibra.c
+> @@ -28,7 +28,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/of.h>
+>  #include <linux/workqueue.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/mfd/twl4030-audio.h>
+>  #include <linux/input.h>
+>  #include <linux/slab.h>
+> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+> index c64615dca2bd33..2a09dde4ca6efc 100644
+> --- a/drivers/mfd/twl-core.c
+> +++ b/drivers/mfd/twl-core.c
+> @@ -44,7 +44,7 @@
+>  #include <linux/regulator/machine.h>
+>  
+>  #include <linux/i2c.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  
+>  /* Register descriptions for audio */
+>  #include <linux/mfd/twl4030-audio.h>
+> @@ -173,7 +173,7 @@ static struct twl_private *twl_priv;
+>  static struct twl_mapping twl4030_map[] = {
+>  	/*
+>  	 * NOTE:  don't change this table without updating the
+> -	 * <linux/i2c/twl.h> defines for TWL4030_MODULE_*
+> +	 * <linux/mfd/twl.h> defines for TWL4030_MODULE_*
+>  	 * so they continue to match the order in this table.
+>  	 */
+>  
+> @@ -344,7 +344,7 @@ static const struct regmap_config twl4030_regmap_config[4] = {
+>  static struct twl_mapping twl6030_map[] = {
+>  	/*
+>  	 * NOTE:  don't change this table without updating the
+> -	 * <linux/i2c/twl.h> defines for TWL4030_MODULE_*
+> +	 * <linux/mfd/twl.h> defines for TWL4030_MODULE_*
+>  	 * so they continue to match the order in this table.
+>  	 */
+>  
+> diff --git a/drivers/mfd/twl4030-audio.c b/drivers/mfd/twl4030-audio.c
+> index 0a1606480023f9..da16bf45fab43e 100644
+> --- a/drivers/mfd/twl4030-audio.c
+> +++ b/drivers/mfd/twl4030-audio.c
+> @@ -30,7 +30,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/of.h>
+>  #include <linux/of_platform.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/mfd/core.h>
+>  #include <linux/mfd/twl4030-audio.h>
+>  
+> diff --git a/drivers/mfd/twl4030-irq.c b/drivers/mfd/twl4030-irq.c
+> index b46c0cfc27d958..86f8fd8e81e4b5 100644
+> --- a/drivers/mfd/twl4030-irq.c
+> +++ b/drivers/mfd/twl4030-irq.c
+> @@ -33,7 +33,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/of.h>
+>  #include <linux/irqdomain.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  
+>  #include "twl-core.h"
+>  
+> diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
+> index f4b2c29d77e330..6b36932263ba78 100644
+> --- a/drivers/mfd/twl4030-power.c
+> +++ b/drivers/mfd/twl4030-power.c
+> @@ -25,7 +25,7 @@
+>  
+>  #include <linux/module.h>
+>  #include <linux/pm.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> diff --git a/drivers/mfd/twl6030-irq.c b/drivers/mfd/twl6030-irq.c
+> index 53574508a613f2..e3ec8dfa9f1ec0 100644
+> --- a/drivers/mfd/twl6030-irq.c
+> +++ b/drivers/mfd/twl6030-irq.c
+> @@ -35,7 +35,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+>  #include <linux/kthread.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/suspend.h>
+>  #include <linux/of.h>
+> diff --git a/drivers/phy/phy-twl4030-usb.c b/drivers/phy/phy-twl4030-usb.c
+> index 2990b3965460e8..28f49902760d82 100644
+> --- a/drivers/phy/phy-twl4030-usb.c
+> +++ b/drivers/phy/phy-twl4030-usb.c
+> @@ -36,7 +36,7 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/usb/musb.h>
+>  #include <linux/usb/ulpi.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/err.h>
+>  #include <linux/slab.h>
+> diff --git a/drivers/power/supply/twl4030_charger.c b/drivers/power/supply/twl4030_charger.c
+> index 2f82d0e9ec1bf7..390bfde86ae39b 100644
+> --- a/drivers/power/supply/twl4030_charger.c
+> +++ b/drivers/power/supply/twl4030_charger.c
+> @@ -18,7 +18,7 @@
+>  #include <linux/err.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/interrupt.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/power_supply.h>
+>  #include <linux/notifier.h>
+>  #include <linux/usb/otg.h>
+> diff --git a/drivers/pwm/pwm-twl-led.c b/drivers/pwm/pwm-twl-led.c
+> index 21eff991d0e355..01153622778bad 100644
+> --- a/drivers/pwm/pwm-twl-led.c
+> +++ b/drivers/pwm/pwm-twl-led.c
+> @@ -24,7 +24,7 @@
+>  #include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pwm.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/slab.h>
+>  
+>  /*
+> diff --git a/drivers/pwm/pwm-twl.c b/drivers/pwm/pwm-twl.c
+> index 9de617b766801b..b7a45be998153b 100644
+> --- a/drivers/pwm/pwm-twl.c
+> +++ b/drivers/pwm/pwm-twl.c
+> @@ -21,7 +21,7 @@
+>  #include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pwm.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/slab.h>
+>  
+>  /*
+> diff --git a/drivers/regulator/twl-regulator.c b/drivers/regulator/twl-regulator.c
+> index 6c9ec84121bde4..a4456db5849d06 100644
+> --- a/drivers/regulator/twl-regulator.c
+> +++ b/drivers/regulator/twl-regulator.c
+> @@ -20,7 +20,7 @@
+>  #include <linux/regulator/driver.h>
+>  #include <linux/regulator/machine.h>
+>  #include <linux/regulator/of_regulator.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/delay.h>
+>  
+>  /*
+> diff --git a/drivers/regulator/twl6030-regulator.c b/drivers/regulator/twl6030-regulator.c
+> index 56aada38788776..219cbd910dbf52 100644
+> --- a/drivers/regulator/twl6030-regulator.c
+> +++ b/drivers/regulator/twl6030-regulator.c
+> @@ -21,7 +21,7 @@
+>  #include <linux/regulator/driver.h>
+>  #include <linux/regulator/machine.h>
+>  #include <linux/regulator/of_regulator.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/delay.h>
+>  
+>  struct twlreg_info {
+> diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
+> index c18c39212ce680..3472e79f2b1782 100644
+> --- a/drivers/rtc/rtc-twl.c
+> +++ b/drivers/rtc/rtc-twl.c
+> @@ -31,7 +31,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/of.h>
+>  
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  
+>  enum twl_class {
+>  	TWL_4030 = 0,
+> diff --git a/drivers/usb/phy/phy-twl6030-usb.c b/drivers/usb/phy/phy-twl6030-usb.c
+> index 628b600b02b174..b5dc077ed7d3c6 100644
+> --- a/drivers/usb/phy/phy-twl6030-usb.c
+> +++ b/drivers/usb/phy/phy-twl6030-usb.c
+> @@ -28,7 +28,7 @@
+>  #include <linux/usb/musb.h>
+>  #include <linux/usb/phy_companion.h>
+>  #include <linux/phy/omap_usb.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/err.h>
+>  #include <linux/slab.h>
+> diff --git a/drivers/video/backlight/pandora_bl.c b/drivers/video/backlight/pandora_bl.c
+> index 5d8bb8b201835d..a186bc677c7d80 100644
+> --- a/drivers/video/backlight/pandora_bl.c
+> +++ b/drivers/video/backlight/pandora_bl.c
+> @@ -16,7 +16,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/fb.h>
+>  #include <linux/backlight.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/err.h>
+>  
+>  #define TWL_PWM0_ON		0x00
+> diff --git a/drivers/watchdog/twl4030_wdt.c b/drivers/watchdog/twl4030_wdt.c
+> index 9bf3cc0f396106..569fe85e52da75 100644
+> --- a/drivers/watchdog/twl4030_wdt.c
+> +++ b/drivers/watchdog/twl4030_wdt.c
+> @@ -24,7 +24,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/watchdog.h>
+>  #include <linux/platform_device.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  
+>  #define TWL4030_WATCHDOG_CFG_REG_OFFS	0x3
+>  
+> diff --git a/include/linux/i2c/twl.h b/include/linux/mfd/twl.h
+> similarity index 100%
+> rename from include/linux/i2c/twl.h
+> rename to include/linux/mfd/twl.h
+> diff --git a/sound/soc/codecs/twl4030.c b/sound/soc/codecs/twl4030.c
+> index a2104d68169d9e..bd86a2d78c5ff2 100644
+> --- a/sound/soc/codecs/twl4030.c
+> +++ b/sound/soc/codecs/twl4030.c
+> @@ -28,7 +28,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/of.h>
+>  #include <linux/of_gpio.h>
+> -#include <linux/i2c/twl.h>
+> +#include <linux/mfd/twl.h>
+>  #include <linux/slab.h>
+>  #include <linux/gpio.h>
+>  #include <sound/core.h>
+> -- 
+> 2.11.0
 > 
-> I replied to the mail you cited, attempting to clarify as best I could.
-> You replied again, and it's true I didn't respond there, but there was
-> no new substantiative argument. To summarize that thread, to the best of
-> my understanding:
-> 
-> * We disagree on the semantic of "an error" in this context. Clearly we
->   aren't going to agree.
 
-That's bad.  We ought to agree on what an error is, in this and any
-other context.  I'm willing to listen if you have a convincing
-argument, but none was given after my last reply:
-
-"The driver is trying to report an error:  in the above example, it's
-reporting that it cannot support an operation by returning
--*E*OPNOTSUPP: an ERROR because it was unable to complete the request:
-the request failed.  Unlike e.g., a warning where something may not
-have been quite right, but went along with executing the operation
-anyway."
-
-To put it another way, perf_event_open returning errno EINVAL is no
-different than open() returning the same with the meaning 'Invalid
-value in flags.'  In fact, the perf_event_open manpage says errors in
-setting the sample frequency make the syscall return the error code -1
-and EINVAL in errno.
-
-Prior to that I see what might possibly be the underlying cause for the
-discrepancy:  you said:
-
-> > > The above cases are not (system) errors, and using dev_err (even
-> > > ratelimited) is certainly not appropriate. These are pr_debug() at best.
-
-So is it that you are resisting technically calling it an error because
-that would imply we use pr_err() instead of pr_debug() perhaps?  In
-which case, is that because of fuzzing?:
-
-quoting you again:
-
-"There are some cases where they're actively harmful (e.g. when fuzzing)."
-
-to which my response remains:
-
-"I'd expect fuzzer users to be more amenable to manually modifying the
-driver rather than regular users of the driver."
-
-to which your then-response was seemingly irrelevant, and against the
-benefit of normal user of the driver:
-
-"When fuzzing, I take a mainline, defconfig kernel, and run it through
-its paces. I don't touch each and every driver."
-
-If this is the case, can we find another solution to make both regular
-fuzzer runners and regular users happy?
-
-> * We agree that error reporting and handling is painful in this area.
-> 
-> * We disagree w.r.t. using printk() and friends. My position has not
->   been swayed. 
-> 
-> [...]
-
-I beg you to please reconsider, given we agree that this particular
-syscall is bad, and the alternative (no messaging) will truly be worse
-for our users.
-
-> > > > AFAICT, my comments hold, yet the driver still gets resubmitted without
-> > > > them being addressed.  How do we get out of this loop?
-> > > 
-> > > We've repeatedly explained why the approach you suggest is not feasible.
-> > > Perhaps you could try to explain why our approach doesn't seem feasible
-> > > to you.
-> > 
-> > I don't want SPE users to have to manually instrument the driver
-> > in order to find out what it didn't like about the parameters they
-> > specified.  This problem has already been reported by other early
-> > adopters.  perf itself says "dmesg may provide additional information",
-> > so let's please use it.
-> 
-> Sorry, but regardless of any argument there is to be had on how best to
-> handle errors, I'm not going to be swayed to the position that the
-> solution is printk() or its ilk, for the reasons that I have outlined
-> several times previously.
-> 
-> As one of the maintainers of PMU code, I must NAK such code in any PMU
-> driver.
-
-We disagree here:  I am of the belief that users should be made aware
-of what they're doing wrong, and right now, dmesg is the vehicle to do
-so.
-
-> FWIW, I'm more than happy to:
-> 
-> * Add pr_debug() statements so that developers directly using the perf
->   interfaces can debug their userspace code and without having to first
->   develop a full knowledge of what is and isn't permitted.
-
-Perhaps this is a terminology context problem again, but to be
-abundantly clear: This isn't for developers per se; this is for normal,
-regular perf users trying to use perf to debug the performance of their
-applications.  I don't expect these users to have to know how to turn
-on pr_debug messaging, esp. because it might turn on other noisy
-drivers in use at the same time.
-
-> * Add documentation such that userspace developers can figure out what
->   is and is not supported.
-> 
-> * Add interfaces as appropriate such that userspace can more reliably
->   determine the reason(s) an error code has been returned. For example,
->   we might expose sample period information under sysfs.
-> 
-> * Help with any userspace error handling code. I am more than happy to
->   review such code and to provide improvements myself.
-> 
-> ... so if you want to make any progress on this front, please either
-> look at one of those, or make a *new* suggestion that does not involve
-> printk.
-
-Not that I was looking, but I did just happen to notice this posting
-today:
-
-https://lkml.org/lkml/2017/5/22/578
-
-but I have no clue if or when it will be accepted, let alone whether
-it's applicable to perf, so *for the time being*, dmesg is what we have
-for now.
-
-Kim
+-- 
+Dmitry
