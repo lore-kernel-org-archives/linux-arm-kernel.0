@@ -1,58 +1,58 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 22 May 2017 18:20:34 +0200
-Subject: [PATCH] mmc: sdhci-iproc: suppress spurious interrupt with
- Multiblock read
-In-Reply-To: <CABe79T4_r0Was5AwFgrnkbazxe4txe9bU73L+rFJTZCC5o=u3g@mail.gmail.com>
-References: <1495126660-25044-1-git-send-email-srinath.mannam@broadcom.com>
- <58554ec9-1544-318a-e912-3c5f6ee40e90@intel.com>
- <CABe79T5hKmn49cKEy-KdMQ-S5HMFuhextddV=D_YY+6_QwEPUQ@mail.gmail.com>
- <CAPDyKFrDZXHqrb-GcXrgvCMaUAhpOXDd-OdPyRw1Qq54cSxZDg@mail.gmail.com>
- <CABe79T4_r0Was5AwFgrnkbazxe4txe9bU73L+rFJTZCC5o=u3g@mail.gmail.com>
-Message-ID: <CAPDyKFp3AD-q3d4xj-7GyRBG045t0-NPS0o__JP3AnyqsZqVwg@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 22 May 2017 09:20:18 -0700
+Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: add hi8435 device
+In-Reply-To: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
+References: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
+Message-ID: <a74ee28c1c62fee5a5e75dda70a02990@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 May 2017 at 15:33, Srinath Mannam <srinath.mannam@broadcom.com> wrote:
-> On Mon, May 22, 2017 at 5:31 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 22 May 2017 at 13:52, Srinath Mannam <srinath.mannam@broadcom.com> wrote:
->>> On Fri, May 19, 2017 at 11:55 AM, Adrian Hunter <adrian.hunter@intel.com> wrote:
->>>> On 18/05/17 19:57, Srinath Mannam wrote:
->>>>> The stingray SDHCI hardware supports ACMD12 and automatically
->>>>> issues after multi block transfer completed.
->>>>>
->>>>> If ACMD12 in SDHCI is disabled, spurious tx done interrupts are seen
->>>>> on multi block read command with below error message:
->>>>>
->>>>> Got data interrupt 0x00000002 even though no data
->>>>> operation was in progress.
->>>>>
->>>>> This patch uses SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 to enable
->>>>> ACM12 support in SDHCI hardware and suppress spurious interrupt.
->>>>>
->>>>> Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
->>>>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>>>
->>>> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
->>>
->>> Thanks Adrian...
->>>
->>> Will it be possible to take this for Linux-4.12??
->>
->> It's queued for 4.13, however are you saying it's a regression for
->> 4.12? Then what commit fixes it?
->>
->> Perhaps you even want this to go stable?
->>
->> Kind regards
->> Uffe
->
-> Yes, this is regression for 4.12.
-> Fixes: b580c52d58d9 ("mmc: sdhci-iproc: add IPROC SDHCI driver")
-> Yes we want this to go in stable.
->
+On 2017-05-22 06:10, Nikita Yushchenko wrote:
+> ZII dev board rev B has a Holt Hi8435 connected to dspi2.
+> Add it to device tree.
+> 
+> ZII dev board rev C does not have that, so use rev-b dts file,
+> not common dtsi file.
+> 
+> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+> ---
+>  arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+> b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+> index 37f95427616f..f433465c3a7c 100644
+> --- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+> +++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+> @@ -348,6 +348,25 @@
+>  	};
+>  };
+>  
+> +&edma1 {
+> +	status = "okay";
+> +};
+> +
+> +&dspi2 {
+> +	bus-num = <1>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_dspi2>;
+> +	status = "okay";
+> +	spi-num-chipselects = <2>;
+> +
+> +	hi8435 at 1 {
+> +		compatible = "holt,hi8435";
+> +		reg = <1>;
+> +		spi-max-frequency = <20000000>;
+> +		gpios = <&gpio5 3 0>;
 
-Alright, applied for fixes and added a stable tag.
+Nit: GPIO_ACTIVE_HIGH instead of 0?
 
-Kind regards
-Uffe
+--
+Stefan
+
+> +	};
+> +};
+> +
+>  &i2c0 {
+>  	clock-frequency = <100000>;
+>  	pinctrl-names = "default";
