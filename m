@@ -1,176 +1,108 @@
-From: oza.oza@broadcom.com (Oza Oza)
-Date: Mon, 22 May 2017 22:15:13 +0530
-Subject: [PATCH 2/3] iommu/pci: reserve iova for PCI masters
-In-Reply-To: <d063a61c-44f6-11f3-a25b-01cfb5d46172@arm.com>
-References: <1493786795-28153-1-git-send-email-oza.oza@broadcom.com>
- <1493786795-28153-2-git-send-email-oza.oza@broadcom.com>
- <0c9a6b09-139c-df49-cf73-6a3935a6aacd@arm.com>
- <CAMSpPPdtfMMkTpi9cWn0QV2qnfBoHayQQg5cGANAswSwFoHX3w@mail.gmail.com>
- <d063a61c-44f6-11f3-a25b-01cfb5d46172@arm.com>
-Message-ID: <CAMSpPPcaM_10FJGjsjwuSSTcsOB2bONJwOYpeHRemWmw9cJttQ@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 22 May 2017 17:45:28 +0100
+Subject: [PATCH v3.1 8/11] arm64: hugetlb: Override huge_pte_clear() to
+ support contiguous hugepages
+In-Reply-To: <20170522143958.12867-10-punit.agrawal@arm.com>
+References: <20170522143958.12867-10-punit.agrawal@arm.com>
+Message-ID: <20170522164528.4999-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 5, 2017 at 9:21 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 04/05/17 19:52, Oza Oza wrote:
->> On Thu, May 4, 2017 at 11:50 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->>> On 03/05/17 05:46, Oza Pawandeep wrote:
->>>> this patch reserves the iova for PCI masters.
->>>> ARM64 based SOCs may have scattered memory banks.
->>>> such as iproc based SOC has
->>>>
->>>> <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
->>>> <0x00000008 0x80000000 0x3 0x80000000>, /* 14G @ 34G */
->>>> <0x00000090 0x00000000 0x4 0x00000000>, /* 16G @ 576G */
->>>> <0x000000a0 0x00000000 0x4 0x00000000>; /* 16G @ 640G */
->>>>
->>>> but incoming PCI transcation addressing capability is limited
->>>> by host bridge, for example if max incoming window capability
->>>> is 512 GB, then 0x00000090 and 0x000000a0 will fall beyond it.
->>>>
->>>> to address this problem, iommu has to avoid allocating iovas which
->>>> are reserved. which inturn does not allocate iova if it falls into hole.
->>>
->>> I don't necessarily disagree with doing this, as we could do with facing
->>> up to the issue of discontiguous DMA ranges in particular (I too have a
->>> platform with this problem), but I'm still not overly keen on pulling DT
->>> specifics into this layer. More than that, though, if we are going to do
->>> it, then we should do it for all devices with a restrictive
->>> "dma-ranges", not just PCI ones.
->>>
->>
->> How do you propose to do it ?
->>
->> my thinking is this:
->> iova_reserve_pci_windows is written specific for PCI, and I am adding there.
->>
->> ideally
->> struct pci_host_bridge should have new member:
->>
->> struct list_head inbound_windows; /* resource_entry */
->>
->> but somehow this resource have to be filled much before
->> iommu_dma_init_domain happens.
->> and use brdge resource directly in iova_reserve_pci_windows as it is
->> already doing it for outbound memory.
->>
->> this will detach the DT specifics from dma-immu layer.
->> let me know how this sounds.
->
-> Please check the state of the code currently queued in Joerg's tree and
-> in linux-next - iommu_dma_get_resv_regions() has room for
-> device-agnostic stuff before the if (!dev_is_pci(dev)) check.
->
-> Furthermore, with the probe-deferral changes we end up with a common
-> dma_configure() routine to abstract the firmware-specifics of
-> of_dma_configure() vs. acpi_dma_configure(), so it would make sense to
-> give drivers etc. a similar interface for interrogating ranges. i.e.
-> some common function that abstracts the difference between parsing DT
-> dma-ranges vs. the ACPI _DMA object, either with a list-based get/put
-> model or perhaps an iterator with a user-provided callback (so users
-> could process in-place or create their own list as necessary). Unless of
-> course we go all the way to making the ranges an inherent part of the
-> device layer like some MIPS platforms currently do.
->
-> Robin.
->
+The default huge_pte_clear() implementation does not clear contiguous
+page table entries when it encounters contiguous hugepages that are
+supported on arm64.
 
-Hi Robin,
+Fix this by overriding the default implementation to clear all the
+entries associated with contiguous hugepages.
 
-your above comments are taken care to the best of my understanding.
-Kindly have a look at the PATCH v7.
-the whole patch-set takes care of IOVA reservation for PCI inbound memory.
-now there is no dependency on IOMMU and OF layer.
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: David Woods <dwoods@mellanox.com>
+---
 
-Regards,
-Oza.
+Changes since v3:
 
+* Update patch to use #ifndef block to override huge_pte_clear()
 
->>>> Bug: SOC-5216
->>>> Change-Id: Icbfc99a045d730be143fef427098c937b9d46353
->>>> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
->>>> Reviewed-on: http://gerrit-ccxsw.broadcom.net/40760
->>>> Reviewed-by: vpx_checkpatch status <vpx_checkpatch@broadcom.com>
->>>> Reviewed-by: CCXSW <ccxswbuild@broadcom.com>
->>>> Tested-by: vpx_autobuild status <vpx_autobuild@broadcom.com>
->>>> Tested-by: vpx_smoketest status <vpx_smoketest@broadcom.com>
->>>> Tested-by: CCXSW <ccxswbuild@broadcom.com>
->>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>>>
->>>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->>>> index 48d36ce..08764b0 100644
->>>> --- a/drivers/iommu/dma-iommu.c
->>>> +++ b/drivers/iommu/dma-iommu.c
->>>> @@ -27,6 +27,7 @@
->>>>  #include <linux/iova.h>
->>>>  #include <linux/irq.h>
->>>>  #include <linux/mm.h>
->>>> +#include <linux/of_pci.h>
->>>>  #include <linux/pci.h>
->>>>  #include <linux/scatterlist.h>
->>>>  #include <linux/vmalloc.h>
->>>> @@ -171,8 +172,12 @@ static void iova_reserve_pci_windows(struct pci_dev *dev,
->>>>               struct iova_domain *iovad)
->>>>  {
->>>>       struct pci_host_bridge *bridge = pci_find_host_bridge(dev->bus);
->>>> +     struct device_node *np = bridge->dev.parent->of_node;
->>>>       struct resource_entry *window;
->>>>       unsigned long lo, hi;
->>>> +     int ret;
->>>> +     dma_addr_t tmp_dma_addr = 0, dma_addr;
->>>> +     LIST_HEAD(res);
->>>>
->>>>       resource_list_for_each_entry(window, &bridge->windows) {
->>>>               if (resource_type(window->res) != IORESOURCE_MEM &&
->>>> @@ -183,6 +188,36 @@ static void iova_reserve_pci_windows(struct pci_dev *dev,
->>>>               hi = iova_pfn(iovad, window->res->end - window->offset);
->>>>               reserve_iova(iovad, lo, hi);
->>>>       }
->>>> +
->>>> +     /* PCI inbound memory reservation. */
->>>> +     ret = of_pci_get_dma_ranges(np, &res);
->>>> +     if (!ret) {
->>>> +             resource_list_for_each_entry(window, &res) {
->>>> +                     struct resource *res_dma = window->res;
->>>> +
->>>> +                     dma_addr = res_dma->start - window->offset;
->>>> +                     if (tmp_dma_addr > dma_addr) {
->>>> +                             pr_warn("PCI: failed to reserve iovas; ranges should be sorted\n");
->>>
->>> I don't see anything in the DT spec about the entries having to be
->>> sorted, and it's not exactly impossible to sort a list if you need it so
->>> (and if I'm being really pedantic, one could still trigger this with a
->>> list that *is* sorted, only by different criteria).
->>>
->>
->> we have to sort it the way we want then. I can make it sort then.
->> thanks for the suggestion.
->>
->>> Robin.
->>>
->>>> +                             return;
->>>> +                     }
->>>> +                     if (tmp_dma_addr != dma_addr) {
->>>> +                             lo = iova_pfn(iovad, tmp_dma_addr);
->>>> +                             hi = iova_pfn(iovad, dma_addr - 1);
->>>> +                             reserve_iova(iovad, lo, hi);
->>>> +                     }
->>>> +                     tmp_dma_addr = window->res->end - window->offset;
->>>> +             }
->>>> +             /*
->>>> +              * the last dma-range should honour based on the
->>>> +              * 32/64-bit dma addresses.
->>>> +              */
->>>> +             if (tmp_dma_addr < DMA_BIT_MASK(sizeof(dma_addr_t) * 8)) {
->>>> +                     lo = iova_pfn(iovad, tmp_dma_addr);
->>>> +                     hi = iova_pfn(iovad,
->>>> +                                   DMA_BIT_MASK(sizeof(dma_addr_t) * 8) - 1);
->>>> +                     reserve_iova(iovad, lo, hi);
->>>> +             }
->>>> +     }
->>>>  }
->>>>
->>>>  /**
->>>>
->>>
->
+ arch/arm64/include/asm/hugetlb.h |  6 +++++-
+ arch/arm64/mm/hugetlbpage.c      | 36 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
+index bbc1e35aa601..bb86f0741863 100644
+--- a/arch/arm64/include/asm/hugetlb.h
++++ b/arch/arm64/include/asm/hugetlb.h
+@@ -18,7 +18,6 @@
+ #ifndef __ASM_HUGETLB_H
+ #define __ASM_HUGETLB_H
+ 
+-#include <asm-generic/hugetlb.h>
+ #include <asm/page.h>
+ 
+ static inline pte_t huge_ptep_get(pte_t *ptep)
+@@ -82,5 +81,10 @@ extern void huge_ptep_set_wrprotect(struct mm_struct *mm,
+ 				    unsigned long addr, pte_t *ptep);
+ extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 				  unsigned long addr, pte_t *ptep);
++extern void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
++			   pte_t *ptep, unsigned long sz);
++#define huge_pte_clear huge_pte_clear
++
++#include <asm-generic/hugetlb.h>
+ 
+ #endif /* __ASM_HUGETLB_H */
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index e9061704aec3..240b2fd53266 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -68,6 +68,30 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
+ 	return CONT_PTES;
+ }
+ 
++static inline int num_contig_ptes(unsigned long size, size_t *pgsize)
++{
++	int contig_ptes = 0;
++
++	*pgsize = size;
++
++	switch (size) {
++	case PUD_SIZE:
++	case PMD_SIZE:
++		contig_ptes = 1;
++		break;
++	case CONT_PMD_SIZE:
++		*pgsize = PMD_SIZE;
++		contig_ptes = CONT_PMDS;
++		break;
++	case CONT_PTE_SIZE:
++		*pgsize = PAGE_SIZE;
++		contig_ptes = CONT_PTES;
++		break;
++	}
++
++	return contig_ptes;
++}
++
+ /*
+  * Changing some bits of contiguous entries requires us to follow a
+  * Break-Before-Make approach, breaking the whole contiguous set
+@@ -245,6 +269,18 @@ pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
+ 	return entry;
+ }
+ 
++void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
++		    pte_t *ptep, unsigned long sz)
++{
++	int i, ncontig;
++	size_t pgsize;
++
++	ncontig = num_contig_ptes(sz, &pgsize);
++
++	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++)
++		pte_clear(mm, addr, ptep);
++}
++
+ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 			      unsigned long addr, pte_t *ptep)
+ {
+-- 
+2.11.0
