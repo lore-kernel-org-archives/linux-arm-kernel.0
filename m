@@ -1,34 +1,93 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon, 22 May 2017 21:50:42 +0800
-Subject: [PATCH] Bluetooth: hci_ll: Fix download_firmware() return when
- __hci_cmd_sync fails
-Message-ID: <20170522135042.10921-1-guodong.xu@linaro.org>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 22 May 2017 15:02:45 +0100
+Subject: [RFC PATCH 05/30] iommu/arm-smmu-v3: Disable tagged pointers when
+ ATS is in use
+In-Reply-To: <592284D7.60002@huawei.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-6-jean-philippe.brucker@arm.com>
+ <592284D7.60002@huawei.com>
+Message-ID: <050392bb-eab9-a80e-f89c-d3c5a0205032@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When __hci_cmd_sync() fails, download_firmware() should also fail, and
-the same error value should be returned as PTR_ERR(skb).
+On 22/05/17 07:27, Leizhen (ThunderTown) wrote:
+> On 2017/2/28 3:54, Jean-Philippe Brucker wrote:
+>> The ARM architecture has a "Top Byte Ignore" (TBI) option that makes the
+>> MMU mask out bits [63:56] of an address, allowing a userspace application
+>> to store data in its pointers.
+>>
+>> The ATS doesn't have an architected mechanism to enable TBI, and might
+>> create ATC entries for addresses that include a tag. Software would then
+>> have to send ATC invalidation packets for each 255 possible alias of an
+>> address, or just wipe the whole address space. This is not a viable
+>> option, so disable TBI when ATS is in use.
+>>
+>> It is unclear for the moment how this restriction will affect user
+>> applications. One example I can imagine (with my complete lack of
+>> knowledge about JIT engines and their use of tagged pointers) is a JIT
+>> translating a WebCL applications that uses SVM. Since this kind of
+>> interpreted language doesn't expose addresses, the interpreter and SVM
+>> implementations will be given the opportunity to do the right thing and
+>> remove tags before handing pointers to devices.
+>>
+>> Ideally we should remove TBI only for domains that are susceptible to use
+>> ATS. But at the point we're writing the context descriptor of a domain, we
+>> are still probing the first device in the group. If that device doesn't
+>> have an ATC but the next one does, we would then have to clear the TBI
+>> bit, invalidate the ATCs of previous devices, and notify the drivers that
+>> their devices cannot use tagged pointers anymore. Such a level of
+>> complexity doesn't make any sense here since it is unlikely devices will
+>> use tagged pointers at all.
+>>
+>> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+>> ---
+>>  drivers/iommu/arm-smmu-v3.c | 7 ++++---
+>>  1 file changed, 4 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index e7b940146ae3..06b29d4fcf65 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -987,7 +987,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+>>  }
+>>  
+>>  /* Context descriptor manipulation functions */
+>> -static u64 arm_smmu_cpu_tcr_to_cd(u64 tcr)
+>> +static u64 arm_smmu_cpu_tcr_to_cd(struct arm_smmu_device *smmu, u64 tcr)
+>>  {
+>>  	u64 val = 0;
+>>  
+>> @@ -1000,7 +1000,8 @@ static u64 arm_smmu_cpu_tcr_to_cd(u64 tcr)
+>>  	val |= ARM_SMMU_TCR2CD(tcr, EPD0);
+>>  	val |= ARM_SMMU_TCR2CD(tcr, EPD1);
+>>  	val |= ARM_SMMU_TCR2CD(tcr, IPS);
+>> -	val |= ARM_SMMU_TCR2CD(tcr, TBI0);
+>> +	if (!(smmu->features & ARM_SMMU_FEAT_ATS))
+>> +		val |= ARM_SMMU_TCR2CD(tcr, TBI0);
+> Maybe we should always disable TBI. Otherwise, a device behind a ATS supported or
+> non-supported SMMU should use different strategies.
 
-Without this fix, download_firmware() will return a success when it actually
-failed in __hci_cmd_sync().
+I don't have any objection to this. Since ATS state shouldn't be visible
+to userspace, the responsibility of sanitizing tagged pointers for DMA
+already lies on the rare applications that use of them. I haven't thought
+about the stall handling code yet, but I'm sure there are creative ways to
+break it using tagged pointers, and I'd rather not go down that rabbit hole.
 
-Fixes: 371805522f87 ("bluetooth: hci_uart: add LL protocol serdev driver support")
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- drivers/bluetooth/hci_ll.c | 1 +
- 1 file changed, 1 insertion(+)
+I'll update this patch accordingly in next version.
 
-diff --git a/drivers/bluetooth/hci_ll.c b/drivers/bluetooth/hci_ll.c
-index adc444f..200288c 100644
---- a/drivers/bluetooth/hci_ll.c
-+++ b/drivers/bluetooth/hci_ll.c
-@@ -624,6 +624,7 @@ static int download_firmware(struct ll_device *lldev)
- 			skb = __hci_cmd_sync(lldev->hu.hdev, cmd->opcode, cmd->plen, &cmd->speed, HCI_INIT_TIMEOUT);
- 			if (IS_ERR(skb)) {
- 				bt_dev_err(lldev->hu.hdev, "send command failed\n");
-+				err = PTR_ERR(skb);
- 				goto out_rel_fw;
- 			}
- 			kfree_skb(skb);
--- 
-2.10.2
+Thanks,
+Jean
+
+>>  	return val;
+>>  }
+>> @@ -1014,7 +1015,7 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_device *smmu,
+>>  	 * We don't need to issue any invalidation here, as we'll invalidate
+>>  	 * the STE when installing the new entry anyway.
+>>  	 */
+>> -	val = arm_smmu_cpu_tcr_to_cd(cfg->cd.tcr) |
+>> +	val = arm_smmu_cpu_tcr_to_cd(smmu, cfg->cd.tcr) |
+>>  #ifdef __BIG_ENDIAN
+>>  	      CTXDESC_CD_0_ENDI |
+>>  #endif
+>>
+> 
