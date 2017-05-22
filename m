@@ -1,44 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 22 May 2017 20:21:19 +0200
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: add hi8435 device
-In-Reply-To: <076f6258-f0b4-6ba5-9670-e2c0582a92b5@cogentembedded.com>
-References: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
- <a74ee28c1c62fee5a5e75dda70a02990@agner.ch>
- <076f6258-f0b4-6ba5-9670-e2c0582a92b5@cogentembedded.com>
-Message-ID: <20170522182119.GN29447@lunn.ch>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Mon, 22 May 2017 20:24:16 +0200
+Subject: [PATCH 08/13] ARM: dts: armada-385-linksys: use binary unit
+ prefixes
+In-Reply-To: <20170522150001.GM29447@lunn.ch>
+References: <20170521124903.11050-1-ralph.sennhauser@gmail.com>
+ <20170521124903.11050-9-ralph.sennhauser@gmail.com>
+ <20170522150001.GM29447@lunn.ch>
+Message-ID: <20170522202416.1c48d91a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 07:29:14PM +0300, Nikita Yushchenko wrote:
-> >> +	hi8435 at 1 {
-> >> +		compatible = "holt,hi8435";
-> >> +		reg = <1>;
-> >> +		spi-max-frequency = <20000000>;
-> >> +		gpios = <&gpio5 3 0>;
-> > 
-> > Nit: GPIO_ACTIVE_HIGH instead of 0?
+On Mon, 22 May 2017 17:00:01 +0200
+Andrew Lunn <andrew@lunn.ch> wrote:
+
+> On Sun, May 21, 2017 at 02:48:57PM +0200, Ralph Sennhauser wrote:
+> > Use IEEE 1541-2002 unit prefixes for sizes.  
 > 
-> Gray area here.
+> Does ePAPR recommend this?
+
+Not directly, but the paper (v1.1) itself is using MiB as well which
+could be seen as a recommendation.
+
+SI and NIST to my knowledge explicitly state to not use SI prefixes for
+anything but powers of 10. Also as far as I'm aware any relevant
+standard body adopted / endorsed these.
+
 > 
-> Chip's reset input is active LOW.
+> I think this looks ugly, so i would not do it.
 
-Nikita
+Needs getting used to indeed. I for myself I can say I've gotten over
+it by now. Grepping the Linux tree shows quite a few other examples of
+MiB so this one wont feel lonely either.
 
-There second issue here is that you are going to be getting newbies
-looking at .dts files and submitting patches to replace the 0 with
-GPIO_ACTIVE_HIGH in all files, just like they submit patches fixing
-checkpatch warnings. 
-
-> However, hi8435 driver historically was coded using inverted values
-> passed to gpiolib calls.  And there are setups in the wild with device
-> trees containing GPIO_ACTIVE_HIGH that I'd prefer not breaking.
-> 
-> To solve, I submitted a patch on hi8435 driver that changes to _raw()
-> gpio calls (thus making it independent of what is written in device
-> tree), and want [future] device trees not to contain explicitly written
-> gpio polarity.
-
-So maybe add another #define, GPIO_ACTIVE_IGNORED, to make it clear
-that it does not matter what value you put there, it is ignored.
-
-     Andrew
+Ralph
