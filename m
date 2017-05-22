@@ -1,102 +1,23 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Mon, 22 May 2017 08:42:54 +0000
-Subject: [PATCH 3/3][v4] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <878tlpmj9l.fsf@arm.com>
-References: <20170519131305.5068-1-laurentiu.tudor@nxp.com>
- <20170519131305.5068-4-laurentiu.tudor@nxp.com>
- <b3980350-9663-d98b-6533-fd3c15f98671@gmail.com>	<86tw4g6nb0.fsf@arm.com>
- <VI1PR0401MB1856C0396AE7608FF2FC8CF1ECF80@VI1PR0401MB1856.eurprd04.prod.outlook.com>
- <878tlpmj9l.fsf@arm.com>
-Message-ID: <VI1PR0401MB1856FCA799A6C18CB85207EEECF80@VI1PR0401MB1856.eurprd04.prod.outlook.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 22 May 2017 10:43:29 +0200
+Subject: [DT Question] "simple-mfd" DT binding
+In-Reply-To: <CAK7LNARQmfX+3RwFgwtvf2Qu79XNX1zh0O741-pPFWS6npytLw@mail.gmail.com>
+References: <CAK7LNARQmfX+3RwFgwtvf2Qu79XNX1zh0O741-pPFWS6npytLw@mail.gmail.com>
+Message-ID: <CACRpkdY88Zdp2zqabWPfYPnTwSzYuCqSQHQg9vF_+Zd=TFOvaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Mon, May 22, 2017 at 3:29 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-> -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Monday, May 22, 2017 10:41 AM
-> 
-> On Mon, May 22 2017 at  7:12:39 am GMT, Laurentiu Tudor
-> <laurentiu.tudor@nxp.com> wrote:
-> 
-> Hi Laurentiu,
-> 
-> > Hi Marc,
-> >
-> >> -----Original Message-----
-> >> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> >> Sent: Saturday, May 20, 2017 9:43 AM
-> >> To: Matthias Brugger <matthias.bgg@gmail.com>
-> >>
-> >> On Fri, May 19 2017 at 02:41:43 PM, Matthias Brugger
-> >> <matthias.bgg@gmail.com> wrote:
-> >> > On 19/05/17 15:13, laurentiu.tudor at nxp.com wrote:
-> >> >> From: Stuart Yoder <stuart.yoder@nxp.com>
-> >> >>
-> >> >> Move the source files out of staging into their final locations:
-> >> >>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
-> >> >>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
-> >> >
-> >> > This driver has as compatible "arm,gic-v3-its". I wonder if this is
-> >> > correct and if it should be moved like this out of staging.
-> >>
-> >> This is no different from the way we handle *any* bus that uses the
-> >> GICv3 ITS as an MSI controller. Each bus provides its glue code that
-> >> latches onto the ITS node, and calls into the generic code.
-> >>
-> >> Now, when it comes to moving this out of staging, here is my concern:
-> >> There is mention of a userspace tool (restool) used to control the
-> >> HW. Where is this tool? Where is the user ABI documented?
-> >
-> > The tool is published here:
-> >
-> > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fgit
-> > hub.com%2Fqoriq-open-
-> source%2Frestool&data=01%7C01%7Claurentiu.tudor%4
-> >
-> 0nxp.com%7Cd3c05908969d499cd4a008d4a0e5eaae%7C686ea1d3bc2b4c6fa92
-> cd99c
-> >
-> 5c301635%7C0&sdata=2sEXCZ%2BAFlTtle8N3yWJPsGRve8cXMRPzyumlwqOhbg
-> %3D&re
-> > served=0
-> >
-> > There are two ways of configuring the mc-bus:
-> >  - a static one, through a FDT based configuration file (we call it
-> > DPL), documented in the refman linked below, chapter 22.
-> >  - a dynamic one, using this restool utility.
-> > Please note the usage of restool is optional.
-> 
-> Optional or not, it still is a userspace ABI, and while I can see restool issuing ioctl
-> system calls to configure the HW, I cannot see the corresponding code in the
-> kernel tree. So how does it work?
-> If the syscall interface is not present in the mainline kernel, drop the reference
-> to it in the documentation. If it is there (and I obviously missed it), document it,
-> and get it reviewed. 
+> Because "simple-bus" indicates that child nodes are
+> simply memory mapped, but the node "register-bit-led"
+> can not be memory-mapped.
+> So, "simple-mfd" can not be replaced "simple-bus" here.
 
-Our original plan was to first get the bus out of staging and after that submit the restool support ASAP (patches are done - so I'm thinking at few days timeframe).
-if this is not acceptable, I can drop the restool reference from the README and resubmit the patch series. We'll re-add the reference together with the restool support patches.
+Yeah... just like Lee points out, you are spot on, this is exactly
+the reason why we created "simple-mfd" in the first place
+IIRC.
 
-> If there are associated DT bindings to the kernel code, they
-> must be documented (and reviewed) as part of the device-tree documentation,
-> and not in some obscure, hard to access document.
-
-There's only one binding involved and it's already accepted [1].
-
-[snip]
-
-> >
-> > We're also working on publishing the docs on github so that they're
-> > more accessible.
-> 
-> That'd be great, because the way the registration process is presented, I'd have
-> to agree to the Access Agreement *before* having a chance to read it. Not
-> going to happen...
-
-Sorry about that. Not much I can do. :-( 
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-
----
-Best Regards, Laurentiu
+Yours,
+Linus Walleij
