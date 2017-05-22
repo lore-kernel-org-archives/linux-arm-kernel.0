@@ -1,58 +1,17 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 22 May 2017 09:20:18 -0700
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: add hi8435 device
-In-Reply-To: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
-References: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
-Message-ID: <a74ee28c1c62fee5a5e75dda70a02990@agner.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 May 2017 09:22:46 -0700
+Subject: [PATCH] pinctrl: single: use of_device_get_match_data() to get
+ soc data
+In-Reply-To: <1495296137-6461-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1495296137-6461-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20170522162245.GT10472@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-05-22 06:10, Nikita Yushchenko wrote:
-> ZII dev board rev B has a Holt Hi8435 connected to dspi2.
-> Add it to device tree.
-> 
-> ZII dev board rev C does not have that, so use rev-b dts file,
-> not common dtsi file.
-> 
-> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-> ---
->  arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> index 37f95427616f..f433465c3a7c 100644
-> --- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> +++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> @@ -348,6 +348,25 @@
->  	};
->  };
->  
-> +&edma1 {
-> +	status = "okay";
-> +};
-> +
-> +&dspi2 {
-> +	bus-num = <1>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_dspi2>;
-> +	status = "okay";
-> +	spi-num-chipselects = <2>;
-> +
-> +	hi8435 at 1 {
-> +		compatible = "holt,hi8435";
-> +		reg = <1>;
-> +		spi-max-frequency = <20000000>;
-> +		gpios = <&gpio5 3 0>;
+* Masahiro Yamada <yamada.masahiro@socionext.com> [170520 09:06]:
+> Use of_device_get_match_data() instead of of_match_device().
+> It allows us to remove the forward declaration of pcs_of_match.
 
-Nit: GPIO_ACTIVE_HIGH instead of 0?
+That's nice:
 
---
-Stefan
-
-> +	};
-> +};
-> +
->  &i2c0 {
->  	clock-frequency = <100000>;
->  	pinctrl-names = "default";
+Acked-by: Tony Lindgren <tony@atomide.com>
