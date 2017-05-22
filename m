@@ -1,184 +1,64 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 22 May 2017 15:39:53 +0100
-Subject: [PATCH v3 06/11] arm64: hugetlb: Add break-before-make logic for
- contiguous entries
+Date: Mon, 22 May 2017 15:39:50 +0100
+Subject: [PATCH v3 03/11] arm64: hugetlb: Introduce pte_pgprot helper
 In-Reply-To: <20170522143958.12867-1-punit.agrawal@arm.com>
 References: <20170522143958.12867-1-punit.agrawal@arm.com>
-Message-ID: <20170522143958.12867-8-punit.agrawal@arm.com>
+Message-ID: <20170522143958.12867-5-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Steve Capper <steve.capper@arm.com>
 
-It has become apparent that one has to take special care when modifying
-attributes of memory mappings that employ the contiguous bit.
-
-Both the requirement and the architecturally correct "Break-Before-Make"
-technique of updating contiguous entries can be found described in:
-ARM DDI 0487A.k_iss10775, "Misprogramming of the Contiguous bit",
-page D4-1762.
-
-The huge pte accessors currently replace the attributes of contiguous
-pte entries in place thus can, on certain platforms, lead to TLB
-conflict aborts or even erroneous results returned from TLB lookups.
-
-This patch adds a helper function get_clear_flush(.) that clears a
-contiguous entry and returns the head pte (whilst taking care to
-retain dirty bit information that could have been modified by DBM).
-A tlb invalidate is performed to then ensure that there is no
-possibility of multiple tlb entries being present for the same
-region.
+Rather than xor pte bits in various places, use this helper function.
 
 Cc: David Woods <dwoods@mellanox.com>
 Signed-off-by: Steve Capper <steve.capper@arm.com>
-(Fixed indentation and some comments cleanup)
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/mm/hugetlbpage.c | 81 +++++++++++++++++++++++++++++++++++----------
- 1 file changed, 64 insertions(+), 17 deletions(-)
+ arch/arm64/mm/hugetlbpage.c | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 08deed7c71f0..f2c976464f39 100644
+index 804710dd7463..3058ec0fcedd 100644
 --- a/arch/arm64/mm/hugetlbpage.c
 +++ b/arch/arm64/mm/hugetlbpage.c
-@@ -68,6 +68,47 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
- 	return CONT_PTES;
+@@ -41,6 +41,16 @@ int pud_huge(pud_t pud)
+ #endif
  }
  
 +/*
-+ * Changing some bits of contiguous entries requires us to follow a
-+ * Break-Before-Make approach, breaking the whole contiguous set
-+ * before we can change any entries. See ARM DDI 0487A.k_iss10775,
-+ * "Misprogramming of the Contiguous bit", page D4-1762.
-+ *
-+ * This helper performs the break step.
++ * Select all bits except the pfn
 + */
-+static pte_t get_clear_flush(struct mm_struct *mm,
-+			     unsigned long addr,
-+			     pte_t *ptep,
-+			     unsigned long pgsize,
-+			     unsigned long ncontig)
++static inline pgprot_t pte_pgprot(pte_t pte)
 +{
-+	unsigned long i, saddr = addr;
-+	struct vm_area_struct vma = { .vm_mm = mm };
-+	pte_t orig_pte = huge_ptep_get(ptep);
++	unsigned long pfn = pte_pfn(pte);
 +
-+	/*
-+	 * If we already have a faulting entry then we don't need
-+	 * to break before make (there won't be a tlb entry cached).
-+	 */
-+	if (!pte_present(orig_pte))
-+		return orig_pte;
-+
-+	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
-+		pte_t pte = ptep_get_and_clear(mm, addr, ptep);
-+
-+		/*
-+		 * If HW_AFDBM is enabled, then the HW could turn on
-+		 * the dirty bit for any page in the set, so check
-+		 * them all.  All hugetlb entries are already young.
-+		 */
-+		if (IS_ENABLED(CONFIG_ARM64_HW_AFDBM) && pte_dirty(pte))
-+			orig_pte = pte_mkdirty(orig_pte);
-+	}
-+
-+	flush_tlb_range(&vma, saddr, addr);
-+	return orig_pte;
++	return __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
 +}
 +
- void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 			    pte_t *ptep, pte_t pte)
+ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
+ 			   pte_t *ptep, size_t *pgsize)
  {
-@@ -93,6 +134,8 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 	dpfn = pgsize >> PAGE_SHIFT;
- 	hugeprot = pte_pgprot(pte);
+@@ -80,7 +90,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
  
-+	get_clear_flush(mm, addr, ptep, pgsize, ncontig);
-+
- 	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
+ 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
+ 	pfn = pte_pfn(pte);
+-	hugeprot = __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
++	hugeprot = pte_pgprot(pte);
+ 	for (i = 0; i < ncontig; i++) {
  		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
  			 pte_val(pfn_pte(pfn, hugeprot)));
-@@ -194,7 +237,7 @@ pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
- pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 			      unsigned long addr, pte_t *ptep)
- {
--	int ncontig, i;
-+	int ncontig;
- 	size_t pgsize;
- 	pte_t orig_pte = huge_ptep_get(ptep);
+@@ -227,9 +237,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+ 		size_t pgsize = 0;
+ 		unsigned long pfn = pte_pfn(pte);
+ 		/* Select all bits except the pfn */
+-		pgprot_t hugeprot =
+-			__pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^
+-				 pte_val(pte));
++		pgprot_t hugeprot = pte_pgprot(pte);
  
-@@ -202,17 +245,8 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 		return ptep_get_and_clear(mm, addr, ptep);
- 
- 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
--	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
--		/*
--		 * If HW_AFDBM is enabled, then the HW could
--		 * turn on the dirty bit for any of the page
--		 * in the set, so check them all.
--		 */
--		if (pte_dirty(ptep_get_and_clear(mm, addr, ptep)))
--			orig_pte = pte_mkdirty(orig_pte);
--	}
- 
--	return orig_pte;
-+	return get_clear_flush(mm, addr, ptep, pgsize, ncontig);
- }
- 
- int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-@@ -222,6 +256,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 	int ncontig, i, changed = 0;
- 	size_t pgsize = 0;
- 	unsigned long pfn = pte_pfn(pte), dpfn;
-+	pte_t orig_pte;
- 	pgprot_t hugeprot;
- 
- 	if (!pte_cont(pte))
-@@ -231,10 +266,12 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 	dpfn = pgsize >> PAGE_SHIFT;
- 	hugeprot = pte_pgprot(pte);
- 
--	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
--		changed |= ptep_set_access_flags(vma, addr, ptep,
--				pfn_pte(pfn, hugeprot), dirty);
--	}
-+	orig_pte = get_clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
-+	if (!pte_same(orig_pte, pte))
-+		changed = 1;
-+
-+	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
-+		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn, hugeprot));
- 
- 	return changed;
- }
-@@ -244,6 +281,9 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
- {
- 	int ncontig, i;
- 	size_t pgsize;
-+	pte_t pte = pte_wrprotect(huge_ptep_get(ptep)), orig_pte;
-+	unsigned long pfn = pte_pfn(pte), dpfn;
-+	pgprot_t hugeprot;
- 
- 	if (!pte_cont(*ptep)) {
- 		ptep_set_wrprotect(mm, addr, ptep);
-@@ -251,8 +291,15 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 	}
- 
- 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
--	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize)
--		ptep_set_wrprotect(mm, addr, ptep);
-+	dpfn = pgsize >> PAGE_SHIFT;
-+
-+	orig_pte = get_clear_flush(mm, addr, ptep, pgsize, ncontig);
-+	if (pte_dirty(orig_pte))
-+		pte = pte_mkdirty(pte);
-+
-+	hugeprot = pte_pgprot(pte);
-+	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
-+		set_pte_at(mm, addr, ptep, pfn_pte(pfn, hugeprot));
- }
- 
- void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 		cpte = huge_pte_offset(vma->vm_mm, addr);
+ 		pfn = pte_pfn(*cpte);
 -- 
 2.11.0
