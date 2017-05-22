@@ -1,94 +1,28 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 22 May 2017 18:32:31 +0200
-Subject: [PATCH] drm/pl111: add ARM_AMBA dependency
-In-Reply-To: <20170522152058.3346428-1-arnd@arndb.de>
-References: <20170522152058.3346428-1-arnd@arndb.de>
-Message-ID: <20170522163231.bk6zltgzse4szm2o@kozik-lap>
+From: angus@akkea.ca (Angus Ainslie)
+Date: Mon, 22 May 2017 10:32:42 -0600
+Subject: CHIPPro NAND issue with 4.12 rc1
+In-Reply-To: <20170522070117.mwk4gm34o7idedye@flea.home>
+References: <399ea126f3b18071fbe46bfc9787df6b@www.akkea.ca>
+ <20170520171418.4e8a47e0@bbrezillon>
+ <6f3cefa6c54776f82160ed8954f4d0d4@www.akkea.ca>
+ <20170521074535.4a4ba6dd@bbrezillon>
+ <20170522070117.mwk4gm34o7idedye@flea.home>
+Message-ID: <63aca137397dc3700a34993205c8cfba@www.akkea.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 05:20:08PM +0200, Arnd Bergmann wrote:
-> The driver is written in a way to enable compile-testing without CONFIG_ARM_AMBA,
-> but it just causes needless warnings:
-> 
-> drivers/gpu/drm/pl111/pl111_drv.c:149:26: error: 'pl111_drm_driver' defined but not used [-Werror=unused-variable]
-> drivers/gpu/drm/pl111/pl111_drv.c:81:12: error: 'pl111_modeset_init' defined but not used [-Werror=unused-function]
-> 
-> This removes the #ifdef instead, and adds a dependency on ARM_AMBA to
-> only let us build the driver when the base support is enabled.
-> 
-> Unfortunately, this requires removing one redundant 'select ARM_AMBA'
-> line from mach-s3c64xx to avoid a circular dependency.
-> 
-> It might be good to allow manually enabling ARM_AMBA when COMPILE_TEST
-> is turned on, but that should be a separate patch and may cause other
-> build regressions.
-> 
-> Fixes: bed41005e617 ("drm/pl111: Initial drm/kms driver for pl111")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-s3c64xx/Kconfig     | 1 -
->  drivers/gpu/drm/pl111/Kconfig     | 1 +
->  drivers/gpu/drm/pl111/pl111_drv.c | 2 --
->  3 files changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-> index 459214fa20b4..5ee5ad74a3d6 100644
-> --- a/arch/arm/mach-s3c64xx/Kconfig
-> +++ b/arch/arm/mach-s3c64xx/Kconfig
-> @@ -40,7 +40,6 @@ config CPU_S3C6410
->  
->  config S3C64XX_PL080
->  	def_bool DMADEVICES
-> -	select ARM_AMBA
+Hi Maxime
 
-I must admit that I miss how pl111 DRM driver create circular dependency
-with S3C64XX_PL080 (or AMBA_PL08X?). Maybe it is unrelated change and
-should be a separate patch?
-
-Best regards,
-Krzysztof
-
-
->  	select AMBA_PL08X
->  
->  config S3C64XX_SETUP_SDHCI
-> diff --git a/drivers/gpu/drm/pl111/Kconfig b/drivers/gpu/drm/pl111/Kconfig
-> index 309f4fd52de7..e2f393fcc4bf 100644
-> --- a/drivers/gpu/drm/pl111/Kconfig
-> +++ b/drivers/gpu/drm/pl111/Kconfig
-> @@ -2,6 +2,7 @@ config DRM_PL111
->  	tristate "DRM Support for PL111 CLCD Controller"
->  	depends on DRM
->  	depends on ARM || ARM64 || COMPILE_TEST
-> +	depends on ARM_AMBA
->  	depends on COMMON_CLK
->  	select DRM_KMS_HELPER
->  	select DRM_KMS_CMA_HELPER
-> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-> index 97095b1aa961..dce382f97f8c 100644
-> --- a/drivers/gpu/drm/pl111/pl111_drv.c
-> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
-> @@ -179,7 +179,6 @@ static struct drm_driver pl111_drm_driver = {
->  #endif
->  };
->  
-> -#ifdef CONFIG_ARM_AMBA
->  static int pl111_amba_probe(struct amba_device *amba_dev,
->  			    const struct amba_id *id)
->  {
-> @@ -262,7 +261,6 @@ static struct amba_driver pl111_amba_driver = {
->  };
->  
->  module_amba_driver(pl111_amba_driver);
-> -#endif /* CONFIG_ARM_AMBA */
->  
->  MODULE_DESCRIPTION(DRIVER_DESC);
->  MODULE_AUTHOR("ARM Ltd.");
-> -- 
-> 2.9.0
+On 2017-05-22 01:01, Maxime Ripard wrote:
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> This just made me realise, this is also the time where the clocks are
+> disabled, and we changed our clock implementation in 4.11.
+> 
+> And using the 4.4 DT will keep the old driver...
+> 
+> Did you test in 4.11? If it's also broken, could you try to revert
+> 1f4ce3b6ca79 and 6b48644b1d29 (I'm not sure it's going to be a trivial
+> revert, but in that order it should work).
+> 
+
+Thanks reverting those two allow the kernel to boot and mount the NAND.
