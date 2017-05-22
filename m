@@ -1,71 +1,28 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 22 May 2017 11:37:31 +0100
-Subject: [PATCH V4 3/4] ACPI/IORT: Ignore all errors except EPROBE_DEFER
-In-Reply-To: <1495119257-26724-3-git-send-email-sricharan@codeaurora.org>
-References: <1495119257-26724-1-git-send-email-sricharan@codeaurora.org>
- <1495119257-26724-3-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20170522103730.GB7553@red-moon>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 22 May 2017 18:37:30 +0800
+Subject: [PATCH v10 02/10] doc: Add documentation for Coresight CPU debug
+In-Reply-To: <20170522101600.GD7759@e110455-lin.cambridge.arm.com>
+References: <1495167957-14923-1-git-send-email-leo.yan@linaro.org>
+ <1495167957-14923-3-git-send-email-leo.yan@linaro.org>
+ <20170522101600.GD7759@e110455-lin.cambridge.arm.com>
+Message-ID: <20170522103730.GA9325@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
-
-On Thu, May 18, 2017 at 08:24:16PM +0530, Sricharan R wrote:
-> While deferring the probe of IOMMU masters, xlate and
-> add_device callbacks called from iort_iommu_configure
-> can pass back error values like -ENODEV, which means
-> the IOMMU cannot be connected with that master for real
-> reasons. Before the IOMMU probe deferral, all such errors
-> were ignored. Now all those errors are propagated back,
-> killing the master's probe for such errors. Instead ignore
-> all the errors except EPROBE_DEFER, which is the only one
-> of concern and let the master work without IOMMU, thus
-> restoring the old behavior.
+On Mon, May 22, 2017 at 11:16:00AM +0100, Liviu Dudau wrote:
+> On Fri, May 19, 2017 at 12:25:49PM +0800, Leo Yan wrote:
+> > Add detailed documentation for Coresight CPU debug driver, which
+> > contains the info for driver implementation, Mike Leach excellent
+> > summary for "clock and power domain". At the end some examples on how
+> > to enable the debugging functionality are provided.
 > 
-> Fixes: 5a1bb638d567 ("drivers: acpi: Handle IOMMU lookup failure with deferred probing or error")
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
-> [V4] Added this patch newly.
+> Hi Leo,
 > 
->  drivers/acpi/arm64/iort.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index c5fecf9..16e101f 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -782,6 +782,12 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
->  	if (err)
->  		ops = ERR_PTR(err);
->  
-> +	/* Ignore all other errors apart from EPROBE_DEFER */
-> +	if (IS_ERR(ops) && (PTR_ERR(ops) != -EPROBE_DEFER)) {
-> +		dev_dbg(dev, "Adding to IOMMU failed: %ld\n", PTR_ERR(ops));
-> +		ops = NULL;
-> +	}
-> +
->  	return ops;
->  }
->  
+> Below are my minor suggestions to improve readability of the documentation.
 
-It is getting a bit convoluted. Is not it better to propagate the
-error back and let acpi_dma_configure() make a decision accordingly ?
+Thanks, Liviu. Accept all suggestions and will spin a new version.
 
-Something like:
+[...]
 
--- >8 --
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index e39ec7b..3a10d757 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -1371,8 +1371,8 @@ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
- 	iort_set_dma_mask(dev);
- 
- 	iommu = iort_iommu_configure(dev);
--	if (IS_ERR(iommu))
--		return PTR_ERR(iommu);
-+	if (IS_ERR(iommu) && PTR_ERR(iommu) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
- 
- 	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
- 	/*
+Thanks,
+Leo Yan
