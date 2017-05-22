@@ -1,65 +1,63 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 22 May 2017 14:59:25 +0200
-Subject: [PATCH 1/2] pinctrl: meson-gxl: Add SPI pins for the SPICC controller
-In-Reply-To: <1495457966-2359-1-git-send-email-narmstrong@baylibre.com>
-References: <1495457966-2359-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1495457966-2359-2-git-send-email-narmstrong@baylibre.com>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Mon, 22 May 2017 15:01:16 +0200
+Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
+In-Reply-To: <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
+References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
+ <20170510.212952.1440495072777358778.davem@davemloft.net>
+ <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
+ <20170510.215218.2185526627014393313.davem@davemloft.net>
+ <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
+ <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
+ <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
+ <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
+ <591A07A1.1030006@iogearbox.net>
+ <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
+Message-ID: <5922E11C.4070307@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPICC controller has dedicated SPI pins, this patchs add the pins
-definition in the GXL pinctrl driver.
+On 05/20/2017 10:01 PM, Shubham Bansal wrote:
+[...]
+> Before I send the patch, I have tested the JIT compiler on ARMv7 but
+> not on ARMv5 or ARMv6. So can you tell me which arch versions I should
+> test it for?
+> Also for my testing, CONFIG_FRAME_POINTER and CONFIG_CPU_BIG_ENDIAN
+> are both disabled. But I need to test JIT with these flags as well.
+> Whenever I put these flags in .config file, the arm kernel is not
+> getting compiler with these flags. Can you tell me why? If you need
+> more information regarding this, please let me know.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/pinctrl/meson/pinctrl-meson-gxl.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Maybe Mircea, Kees or someone from linux-arm-kernel can help you out
+on that.
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-index 998210e..719ff1b 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-@@ -141,6 +141,11 @@
- static const unsigned int nor_c_pins[]		= { PIN(BOOT_13, EE_OFF) };
- static const unsigned int nor_cs_pins[]		= { PIN(BOOT_15, EE_OFF) };
- 
-+static const unsigned int spi_mosi_pins[]	= { PIN(GPIOX_8, EE_OFF) };
-+static const unsigned int spi_miso_pins[]	= { PIN(GPIOX_9, EE_OFF) };
-+static const unsigned int spi_ss0_pins[]	= { PIN(GPIOX_10, EE_OFF) };
-+static const unsigned int spi_sclk_pins[]	= { PIN(GPIOX_11, EE_OFF) };
-+
- static const unsigned int sdcard_d0_pins[] = { PIN(CARD_1, EE_OFF) };
- static const unsigned int sdcard_d1_pins[] = { PIN(CARD_0, EE_OFF) };
- static const unsigned int sdcard_d2_pins[] = { PIN(CARD_5, EE_OFF) };
-@@ -405,6 +410,10 @@
- 	GROUP(pwm_a,		5,	25),
- 	GROUP(pwm_e,		5,	15),
- 	GROUP(pwm_f_x,		5,	14),
-+	GROUP(spi_mosi,		5,	3),
-+	GROUP(spi_miso,		5,	2),
-+	GROUP(spi_ss0,		5,	1),
-+	GROUP(spi_sclk,		5,	0),
- 
- 	/* Bank Z */
- 	GROUP(eth_mdio,		4,	23),
-@@ -560,6 +569,10 @@
- 	"nor_d", "nor_q", "nor_c", "nor_cs",
- };
- 
-+static const char * const spi_groups[] = {
-+	"spi_mosi", "spi_miso", "spi_ss0", "spi_sclk",
-+};
-+
- static const char * const sdcard_groups[] = {
- 	"sdcard_d0", "sdcard_d1", "sdcard_d2", "sdcard_d3",
- 	"sdcard_cmd", "sdcard_clk",
-@@ -693,6 +706,7 @@
- 	FUNCTION(gpio_periphs),
- 	FUNCTION(emmc),
- 	FUNCTION(nor),
-+	FUNCTION(spi),
- 	FUNCTION(sdcard),
- 	FUNCTION(sdio),
- 	FUNCTION(nand),
--- 
-1.9.1
+With regards to the below benchmark, I was mentioning how it compares
+to the interpreter. With only the numbers for jit it's hard to compare.
+So would be great to see the output for the following three cases:
+
+1) Interpreter:
+
+echo 0 > /proc/sys/net/core/bpf_jit_enable
+
+2) JIT enabled:
+
+echo 1 > /proc/sys/net/core/bpf_jit_enable
+
+3) JIT + blinding enabled:
+
+echo 1 > /proc/sys/net/core/bpf_jit_enable
+echo 2 > /proc/sys/net/core/bpf_jit_harden
+
+> With current config for ARMv7, benchmarks are :
+>
+> [root at vexpress modules]# insmod test_bpf.ko
+> [   25.797766] test_bpf: #0 TAX jited:1 180 170 169 PASS
+> [   25.811395] test_bpf: #1 TXA jited:1 93 89 111 PASS
+> [   25.815073] test_bpf: #2 ADD_SUB_MUL_K jited:1 94 PASS
+> [   25.816779] test_bpf: #3 DIV_MOD_KX jited:1 983 PASS
+> [   25.827310] test_bpf: #4 AND_OR_LSH_K jited:1 94 93 PASS
+> [   25.829843] test_bpf: #5 LD_IMM_0 jited:1 83 PASS
+> [   25.831260] test_bpf: #6 LD_IND jited:1 338 266 305 PASS
+[...]
+
+Thanks,
+Daniel
