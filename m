@@ -1,60 +1,66 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Mon, 22 May 2017 07:44:56 +0200
-Subject: [PATCH] i2c: designware: don't infer timings described by ACPI
- from clock rate
-In-Reply-To: <CAKv+Gu9x_KCdEGBBOw9yaYOcYBcYtxJX-xTX=4kQuWqY=VK0PA@mail.gmail.com>
-References: <20170519085640.15111-1-ard.biesheuvel@linaro.org>
- <CAKv+Gu9x_KCdEGBBOw9yaYOcYBcYtxJX-xTX=4kQuWqY=VK0PA@mail.gmail.com>
-Message-ID: <62548890-2541-32b2-2015-74b5ed40f115@siemens.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 22 May 2017 13:46:04 +0800
+Subject: [PATCH v2] drm: mediatek: change the variable type of rdma
+ threshold
+In-Reply-To: <1495187843-6882-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1495187843-6882-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1495431964.20811.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-05-21 10:09, Ard Biesheuvel wrote:
-> On 19 May 2017 at 09:56, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> Commit bd698d24b1b57 ("i2c: designware: Get selected speed mode
->> sda-hold-time via ACPI") updated the logic that reads the timing
->> parameters for various I2C bus rates from the DSDT, to only read
->> the timing parameters for the currently selected mode.
->>
->> This causes a WARN_ON() splat on platforms that legally omit the clock
->> frequency from the ACPI description, because in the new situation, the
->> core I2C designware driver still accesses the fields in the driver
->> struct that we no longer populate, and proceeds to calculate them from
->> the clock frequency. Since the clock frequency is unspecified, the
->> driver complains loudly using a WARN_ON().
->>
->> So revert back to the old situation, where the struct fields for all
->> timings are populated, but retain the new logic which chooses the SDA
->> hold time from the timing mode that is currently in use.
->>
->> Fixes: bd698d24b1b57 ("i2c: designware: Get selected speed mode ...")
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  drivers/i2c/busses/i2c-designware-platdrv.c | 18 ++++++++++--------
->>  1 file changed, 10 insertions(+), 8 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
->> index f2acd4b6bf01..6283b99d2b17 100644
->> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
->> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
->> @@ -96,6 +96,7 @@ static int dw_i2c_acpi_configure(struct platform_device *pdev)
->>         struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
->>         acpi_handle handle = ACPI_HANDLE(&pdev->dev);
->>         const struct acpi_device_id *id;
->> +       u32 ss_ht, fp_ht, hs_ht, fs_ht;
+Hi, Bibby:
+
+One comment inline.
+
+On Fri, 2017-05-19 at 17:57 +0800, Bibby Hsieh wrote:
+> For some greater resolution, the rdma threshold
+> variable will overflow.
 > 
-> Should these be initialized to zero? I realized that
-> dw_i2c_acpi_params() could fail, resulting in bogus hold time values
-> being returnted, but it is unclear to me how that affects the logic in
-> the core driver.
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> index 0df05f9..9afdcd7 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> @@ -37,7 +37,7 @@
+>  #define DISP_REG_RDMA_FIFO_CON			0x0040
+>  #define RDMA_FIFO_UNDERFLOW_EN				BIT(31)
+>  #define RDMA_FIFO_PSEUDO_SIZE(bytes)			(((bytes) / 16) << 16)
+> -#define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes)		((bytes) / 16)
+> +#define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes) (((bytes) / 16) & 0x3ff)
 
-I can tell you what happens: this breaks e.g. the Galileo and the
-IOT2000 boards. Will send a patch to initialize the vars to 0, restoring
-the previous behavior in the absence to the ACPI parameters. The core is
-prepared for sda_hold_time == 0.
+I think it's not necessary to do this mask operation. Before calling
+RDMA_OUTPUT_VALID_FIFO_THRESHOLD(), you should make sure that width,
+height, and vrefresh matches the HW spec, so the result of threshold
+likely does not exceed 0x3ff. If width, height, and vrefresh matches the
+HW spec but threshold exceed 0x3ff, maybe you should limited it to 0x3ff
+rather than truncating it.
 
-Jan
+Regards,
+CK
 
--- 
-Siemens AG, Corporate Technology, CT RDA ITP SES-DE
-Corporate Competence Center Embedded Linux
+>  
+>  /**
+>   * struct mtk_disp_rdma - DISP_RDMA driver structure
+> @@ -109,7 +109,7 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
+>  			    unsigned int height, unsigned int vrefresh,
+>  			    unsigned int bpc)
+>  {
+> -	unsigned int threshold;
+> +	unsigned long long threshold;
+>  	unsigned int reg;
+>  
+>  	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xfff, width);
+> @@ -121,7 +121,8 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
+>  	 * output threshold to 6 microseconds with 7/6 overhead to
+>  	 * account for blanking, and with a pixel depth of 4 bytes:
+>  	 */
+> -	threshold = width * height * vrefresh * 4 * 7 / 1000000;
+> +	threshold = (unsigned long long)width * height * vrefresh *
+> +		    4 * 7 / 1000000;
+>  	reg = RDMA_FIFO_UNDERFLOW_EN |
+>  	      RDMA_FIFO_PSEUDO_SIZE(SZ_8K) |
+>  	      RDMA_OUTPUT_VALID_FIFO_THRESHOLD(threshold);
