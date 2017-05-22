@@ -1,146 +1,69 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Mon, 22 May 2017 10:29:57 +0800
-Subject: [PATCH v2 3/4] arm: dts: rk3229: add a new cpu opp table
-In-Reply-To: <3157044.sksXPZM55k@phil>
-References: <1495016177-2413-1-git-send-email-frank.wang@rock-chips.com>
- <1495016177-2413-4-git-send-email-frank.wang@rock-chips.com>
- <3157044.sksXPZM55k@phil>
-Message-ID: <8d8af44c-353a-5415-ed15-ccc68db81159@rock-chips.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Mon, 22 May 2017 11:27:45 +0800
+Subject: [PATCH v3 1/2] PCI: mediatek: Add Mediatek PCIe host controller
+ support
+In-Reply-To: <CAP=VYLrjeq57S+o0bBBH4oi8Bgwp=XgTsdO8RkWY8xuJyhLP9g@mail.gmail.com>
+References: <1494382020-26790-1-git-send-email-ryder.lee@mediatek.com>
+ <1494382020-26790-2-git-send-email-ryder.lee@mediatek.com>
+ <CAP=VYLrjeq57S+o0bBBH4oi8Bgwp=XgTsdO8RkWY8xuJyhLP9g@mail.gmail.com>
+Message-ID: <1495423665.21021.6.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Sat, 2017-05-20 at 15:46 -0400, Paul Gortmaker wrote:
+> On Tue, May 9, 2017 at 10:06 PM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> > Add support for the Mediatek PCIe Gen2 controller which can
+> > be found on MT7623 series SoCs.
+> >
+> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > ---
+> >  drivers/pci/host/Kconfig         |  11 +
+> >  drivers/pci/host/Makefile        |   1 +
+> >  drivers/pci/host/pcie-mediatek.c | 563 +++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 575 insertions(+)
+> >  create mode 100644 drivers/pci/host/pcie-mediatek.c
+> >
+> > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> > index f7c1d4d..aef0de9 100644
+> > --- a/drivers/pci/host/Kconfig
+> > +++ b/drivers/pci/host/Kconfig
+> > @@ -174,6 +174,17 @@ config PCIE_ROCKCHIP
+> >           There is 1 internal PCIe port available to support GEN2 with
+> >           4 slots.
+> >
+> > +config PCIE_MEDIATEK
+> > +       bool "Mediatek PCIe controller"
+> 
+> You've got bool here and correctly use the builtin register
+> function, but you still have a couple stray references to
+> the module.h header and MODULE macros.  Can you
+> please also clean them up and resend with those gone?
+> 
+> Thanks,
+> Paul.
+> --
 
-On 2017/5/20 5:46, Heiko Stuebner wrote:
-> Hi Frank,
->
-> Am Mittwoch, 17. Mai 2017, 18:16:16 CEST schrieb Frank Wang:
->> From: Finley Xiao<finley.xiao@rock-chips.com>
->>
->> This patch adds some new frequencies for rk3229 board.
->>
->> Signed-off-by: Finley Xiao<finley.xiao@rock-chips.com>
->> Signed-off-by: Frank Wang<frank.wang@rock-chips.com>
->> Acked-by: Viresh Kumar<viresh.kumar@linaro.org>
->> ---
->>   arch/arm/boot/dts/rk3229-cpu-opp.dtsi | 85 +++++++++++++++++++++++++++++++++++
-> I'm not yet sure if I like that approach. The other option I'm considering
-> and also tend to prefer at the moment would be to have this in a
-> rk3229.dtsi, creating a chain of
-> 	rk322x.dtsi
-> 		\- rk3228-evb.dts
-> 		\- rk3229.dtsi
-> 			\- rk3229-evb.dts
->
-> similar to what we do with the rk3xxx.dtsi -> rk3188.dtsi.
->
-> If I remember correctly, there are some other tiny differences between the
-> rk3228 and rk3229, so having the rk3229.dtsi already would make it
-> easier to place needed stuff into it later on.
-
-That makes sense, I will amend that based on your comments.
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> 
+> [....]
+> 
+> > +};
+> > +MODULE_DEVICE_TABLE(of, mtk_pcie_ids);
+> > +
+> > +static struct platform_driver mtk_pcie_driver = {
+> > +       .probe = mtk_pcie_probe,
+> > +       .driver = {
+> > +               .name = "mtk-pcie",
+> > +               .of_match_table = mtk_pcie_ids,
+> > +               .suppress_bind_attrs = true,
+> > +       },
+> > +};
+> > +
+> > +builtin_platform_driver(mtk_pcie_driver);
+> > +
+> > +MODULE_DESCRIPTION("Mediatek PCIe host controller driver.");
+> > +MODULE_LICENSE("GPL v2");
 
 
-BR.
-Frank
-
-> Heiko
->
->>   1 file changed, 85 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/rk3229-cpu-opp.dtsi
->>
->> diff --git a/arch/arm/boot/dts/rk3229-cpu-opp.dtsi b/arch/arm/boot/dts/rk3229-cpu-opp.dtsi
->> new file mode 100644
->> index 0000000..89e8413
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/rk3229-cpu-opp.dtsi
->> @@ -0,0 +1,85 @@
->> +/*
->> + * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This library is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This library is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + *  Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +/ {
->> +	/delete-node/ opp-table0;
->> +
->> +	cpu0_opp_table: opp_table0 {
->> +		compatible = "operating-points-v2";
->> +		opp-shared;
->> +
->> +		opp-408000000 {
->> +			opp-hz = /bits/ 64 <408000000>;
->> +			opp-microvolt = <950000>;
->> +			clock-latency-ns = <40000>;
->> +			opp-suspend;
->> +		};
->> +		opp-600000000 {
->> +			opp-hz = /bits/ 64 <600000000>;
->> +			opp-microvolt = <975000>;
->> +		};
->> +		opp-816000000 {
->> +			opp-hz = /bits/ 64 <816000000>;
->> +			opp-microvolt = <1000000>;
->> +		};
->> +		opp-1008000000 {
->> +			opp-hz = /bits/ 64 <1008000000>;
->> +			opp-microvolt = <1175000>;
->> +		};
->> +		opp-1200000000 {
->> +			opp-hz = /bits/ 64 <1200000000>;
->> +			opp-microvolt = <1275000>;
->> +		};
->> +		opp-1296000000 {
->> +			opp-hz = /bits/ 64 <1296000000>;
->> +			opp-microvolt = <1325000>;
->> +		};
->> +		opp-1392000000 {
->> +			opp-hz = /bits/ 64 <1392000000>;
->> +			opp-microvolt = <1375000>;
->> +		};
->> +		opp-1464000000 {
->> +			opp-hz = /bits/ 64 <1464000000>;
->> +			opp-microvolt = <1400000>;
->> +		};
->> +	};
->> +};
->>
->
->
->
+I've already removed them at patch v5. Thanks a lot, Paul!
