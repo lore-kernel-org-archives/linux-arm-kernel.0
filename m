@@ -1,111 +1,66 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 22 May 2017 10:29:26 +0900
-Subject: [DT Question] "simple-mfd" DT binding
-Message-ID: <CAK7LNARQmfX+3RwFgwtvf2Qu79XNX1zh0O741-pPFWS6npytLw@mail.gmail.com>
+Date: Mon, 22 May 2017 11:03:49 +0900
+Subject: [GIT PULL (RESEND)] ARM: uniphier: UniPhier fixes for v4.12
+Message-ID: <CAK7LNARbSkbEOhs7QMd+6VV+KWbkjK4LR9rmQ=YBWqPY+8_XPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi DT experts,
+Hi Arnd, Olof,
 
-I have a question about "simple-mfd".
+Last week, I thought I found a problem in my pull request,
+but it turned out my misunderstanding.
 
+So, my pull request I sent is OK.
+I am re-sending this request mail for clarification.
 
-Documentation/devicetree/bindings/mfd/mfd.txt says as allows:
-
-----------------------8<---------------------
-Optional properties:
-
-- compatible : "simple-mfd" - this signifies that the operating system should
-  consider all subnodes of the MFD device as separate devices akin to how
-  "simple-bus" indicates when to see subnodes as children for a simple
-  memory-mapped bus.   <snip>
-----------------------8<---------------------
+Here are some ARM UniPhier SoC fixes for v4.12.
+Due to the eMMC driver update, PHY parameters must be specified
+via DT to make the eMMC controller work again.
+The rest is DTC warning fixes reported when building DT with W=1.
+Please pull!
 
 
-I'd like to be sure about the statement above.
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-Does this mean, "simple-bus" and "simple-mfd" are technically interchangeable?
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+tags/uniphier-fixes-v4.12
 
-If so, I thought the example some lines below is questionable.
+for you to fetch changes up to 96abf9ded7954d9e6f3a7775353d9550b1283db9:
 
----------------------8<---------------------------
-Example:
+  arm64: dts: uniphier: fix simple-bus unit address format error
+(2017-05-14 11:43:46 +0900)
 
-foo@1000 {
-        compatible = "syscon", "simple-mfd";
-        reg = <0x01000 0x1000>;
+----------------------------------------------------------------
+UniPhier ARM SoC fixes for v4.12
 
-        led at 08.0 {
-                compatible = "register-bit-led";
-                offset = <0x08>;
-                mask = <0x01>;
-                label = "myled";
-                default-state = "on";
-        };
-};
----------------------8<---------------------------
+- add necessary DT properties to get eMMC work again
+- fix DTC warnings when compiled with W=1
 
+----------------------------------------------------------------
+Masahiro Yamada (4):
+      arm64: dts: uniphier: add input-delay properties to Cadence eMMC node
+      arm64: dts: uniphier: add cdns, phy-dll-delay-sdclk(-hsmmc) for eMMC
+      ARM: dts: uniphier: fix simple-bus unit address format error
+      arm64: dts: uniphier: fix simple-bus unit address format error
 
-Because "simple-bus" indicates that child nodes are
-simply memory mapped, but the node "register-bit-led"
-can not be memory-mapped.
-So, "simple-mfd" can not be replaced "simple-bus" here.
+Viresh Kumar (2):
+      ARM: uniphier: Use - instead of @ for DT OPP entries
+      arm64: uniphier: Use - instead of @ for DT OPP entries
 
-
-
-arch/arm/boot/dts/arm-realview-pb1176.dts is a real example.
-
-If I replace "simple-mfd" with "simple-bus",
-DTC warns "empty reg/ranges property".
-
-
-
-$ sed -i  -e 's/simple-mfd/simple-bus/'
-arch/arm/boot/dts/arm-realview-pb1176.dts
-$ make -s ARCH=arm defconfig
-$ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- W=1  arm-realview-pb1176.dtb
-   ...
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/led at 08.0 missing or empty reg/ranges
-property
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/led at 08.1 missing or empty reg/ranges
-property
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/led at 08.2 missing or empty reg/ranges
-property
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/led at 08.3 missing or empty reg/ranges
-property
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/led at 08.4 missing or empty reg/ranges
-property
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/led at 08.5 missing or empty reg/ranges
-property
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/led at 08.6 missing or empty reg/ranges
-property
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/led at 08.7 missing or empty reg/ranges
-property
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/osc0 at 0c missing or empty reg/ranges property
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/osc1 at 10 missing or empty reg/ranges property
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/osc2 at 14 missing or empty reg/ranges property
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/osc3 at 18 missing or empty reg/ranges property
-arch/arm/boot/dts/arm-realview-pb1176.dtb: Warning (simple_bus_reg):
-Node /soc/syscon at 10000000/osc4@1c missing or empty reg/ranges property
-
-
-
-
-
+ arch/arm/boot/dts/uniphier-ld4.dtsi              |  2 +-
+ arch/arm/boot/dts/uniphier-pro4.dtsi             |  2 +-
+ arch/arm/boot/dts/uniphier-pro5.dtsi             | 34 ++++++++++-----------
+ arch/arm/boot/dts/uniphier-pxs2.dtsi             | 18 +++++------
+ arch/arm/boot/dts/uniphier-sld3.dtsi             |  2 +-
+ arch/arm/boot/dts/uniphier-sld8.dtsi             |  2 +-
+ arch/arm/boot/dts/uniphier-support-card.dtsi     |  4 +--
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 21 ++++++++-----
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 39 +++++++++++++-----------
+ 9 files changed, 67 insertions(+), 57 deletions(-)
 
 -- 
 Best Regards
