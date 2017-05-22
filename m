@@ -1,70 +1,116 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 22 May 2017 15:39:54 +0100
-Subject: [PATCH v3 07/11] arm64: hugetlbpages: Handle swap entries in
- huge_pte_offset() for contiguous hugepages
+Date: Mon, 22 May 2017 15:39:51 +0100
+Subject: [PATCH v3 04/11] arm64: hugetlb: Remove spurious calls to
+ huge_ptep_offset
 In-Reply-To: <20170522143958.12867-1-punit.agrawal@arm.com>
 References: <20170522143958.12867-1-punit.agrawal@arm.com>
-Message-ID: <20170522143958.12867-9-punit.agrawal@arm.com>
+Message-ID: <20170522143958.12867-6-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-huge_pte_offset() was updated to correctly handle swap entries for
-hugepages. With the addition of the size parameter, it is now possible
-to disambiguate whether the request is for a regular hugepage or a
-contiguous hugepage.
+From: Steve Capper <steve.capper@arm.com>
 
-Fix huge_pte_offset() for contiguous hugepages by using the size to find
-the correct page table entry.
+We don't need to call huge_ptep_offset as our accessors are already
+supplied with the pte_t *. This patch removes those spurious calls.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Cc: David Woods <dwoods@mellanox.com>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/mm/hugetlbpage.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ arch/arm64/mm/hugetlbpage.c | 37 ++++++++++++++-----------------------
+ 1 file changed, 14 insertions(+), 23 deletions(-)
 
 diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index f2c976464f39..e9061704aec3 100644
+index 3058ec0fcedd..cb84ca33bc6b 100644
 --- a/arch/arm64/mm/hugetlbpage.c
 +++ b/arch/arm64/mm/hugetlbpage.c
-@@ -195,6 +195,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
- 	pgd_t *pgd;
- 	pud_t *pud;
- 	pmd_t *pmd;
-+	pte_t *pte;
+@@ -200,21 +200,19 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 	if (pte_cont(*ptep)) {
+ 		int ncontig, i;
+ 		size_t pgsize;
+-		pte_t *cpte;
+ 		bool is_dirty = false;
  
- 	pgd = pgd_offset(mm, addr);
- 	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
-@@ -202,19 +203,29 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
- 		return NULL;
+-		cpte = huge_pte_offset(mm, addr);
+-		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
++		ncontig = find_num_contig(mm, addr, ptep, &pgsize);
+ 		/* save the 1st pte to return */
+-		pte = ptep_get_and_clear(mm, addr, cpte);
++		pte = ptep_get_and_clear(mm, addr, ptep);
+ 		for (i = 1, addr += pgsize; i < ncontig; ++i, addr += pgsize) {
+ 			/*
+ 			 * If HW_AFDBM is enabled, then the HW could
+ 			 * turn on the dirty bit for any of the page
+ 			 * in the set, so check them all.
+ 			 */
+-			++cpte;
+-			if (pte_dirty(ptep_get_and_clear(mm, addr, cpte)))
++			++ptep;
++			if (pte_dirty(ptep_get_and_clear(mm, addr, ptep)))
+ 				is_dirty = true;
+ 		}
+ 		if (is_dirty)
+@@ -230,8 +228,6 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+ 			       unsigned long addr, pte_t *ptep,
+ 			       pte_t pte, int dirty)
+ {
+-	pte_t *cpte;
+-
+ 	if (pte_cont(pte)) {
+ 		int ncontig, i, changed = 0;
+ 		size_t pgsize = 0;
+@@ -239,12 +235,11 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+ 		/* Select all bits except the pfn */
+ 		pgprot_t hugeprot = pte_pgprot(pte);
  
- 	pud = pud_offset(pgd, addr);
--	if (pud_none(*pud))
-+	if (pud_none(*pud) && sz != PUD_SIZE)
- 		return NULL;
- 	/* swap or huge page */
- 	if (!pud_present(*pud) || pud_huge(*pud))
- 		return (pte_t *)pud;
- 	/* table; check the next level */
+-		cpte = huge_pte_offset(vma->vm_mm, addr);
+-		pfn = pte_pfn(*cpte);
+-		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
++		pfn = pte_pfn(pte);
++		ncontig = find_num_contig(vma->vm_mm, addr, ptep,
+ 					  &pgsize);
+-		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize) {
+-			changed |= ptep_set_access_flags(vma, addr, cpte,
++		for (i = 0; i < ncontig; ++i, ++ptep, addr += pgsize) {
++			changed |= ptep_set_access_flags(vma, addr, ptep,
+ 							pfn_pte(pfn,
+ 								hugeprot),
+ 							dirty);
+@@ -261,13 +256,11 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
+ {
+ 	if (pte_cont(*ptep)) {
+ 		int ncontig, i;
+-		pte_t *cpte;
+ 		size_t pgsize = 0;
  
-+	if (sz == CONT_PMD_SIZE)
-+		addr &= CONT_PMD_MASK;
-+
- 	pmd = pmd_offset(pud, addr);
--	if (pmd_none(*pmd))
-+	if (pmd_none(*pmd) &&
-+	    !(sz == PMD_SIZE || sz == CONT_PMD_SIZE))
- 		return NULL;
- 	if (!pmd_present(*pmd) || pmd_huge(*pmd))
- 		return (pte_t *)pmd;
+-		cpte = huge_pte_offset(mm, addr);
+-		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
+-		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
+-			ptep_set_wrprotect(mm, addr, cpte);
++		ncontig = find_num_contig(mm, addr, ptep, &pgsize);
++		for (i = 0; i < ncontig; ++i, ++ptep, addr += pgsize)
++			ptep_set_wrprotect(mm, addr, ptep);
+ 	} else {
+ 		ptep_set_wrprotect(mm, addr, ptep);
+ 	}
+@@ -278,14 +271,12 @@ void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ {
+ 	if (pte_cont(*ptep)) {
+ 		int ncontig, i;
+-		pte_t *cpte;
+ 		size_t pgsize = 0;
  
-+	if (sz == CONT_PTE_SIZE) {
-+		pte = pte_offset_kernel(
-+			pmd, (addr & CONT_PTE_MASK));
-+		return pte;
-+	}
-+
- 	return NULL;
- }
- 
+-		cpte = huge_pte_offset(vma->vm_mm, addr);
+-		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
++		ncontig = find_num_contig(vma->vm_mm, addr, ptep,
+ 					  &pgsize);
+-		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
+-			ptep_clear_flush(vma, addr, cpte);
++		for (i = 0; i < ncontig; ++i, ++ptep, addr += pgsize)
++			ptep_clear_flush(vma, addr, ptep);
+ 	} else {
+ 		ptep_clear_flush(vma, addr, ptep);
+ 	}
 -- 
 2.11.0
