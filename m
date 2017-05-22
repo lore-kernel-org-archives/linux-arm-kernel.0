@@ -1,41 +1,52 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Mon, 22 May 2017 07:01:47 +0000
-Subject: [PATCH 2/2] arm64: switch ioremap_wc to use Device GRE
-In-Reply-To: <1495436507-81890-1-git-send-email-jnair@caviumnetworks.com>
-References: <1495436507-81890-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <1495436507-81890-3-git-send-email-jnair@caviumnetworks.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 22 May 2017 09:02:34 +0200
+Subject: [PATCH 1/1] xilinx ps uart: Adding a kernel parameter for the
+ number of xilinx ps uarts
+In-Reply-To: <20170520172008.5a979e8a@alans-desktop>
+References: <20170520022154.6766-1-kernel.development@povil.us>
+ <20170520172008.5a979e8a@alans-desktop>
+Message-ID: <517d864d-d230-3abc-eb3c-4b628dc4625f@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device "Gather" attribute is defined in the ARMv8 ARM as:
-"The Gathering attribute determines whether it is permissible for either:
-* Multiple memory accesses of the same type, read or write, to the same
-  memory location to be merged into a single transaction.
-* Multiple memory accesses of the same type, read or write, to different
-  memory locations to be merged into a single memory transaction on an
-  interconnect."
+Hi Alan,
 
-This attribute is more appropriate for the write combining ioremap_wc()
-than the non-cached memory attribute used now, so update the ioremap_wc
-implementation to use it.
+On 20.5.2017 18:20, Alan Cox wrote:
+> On Fri, 19 May 2017 20:21:54 -0600
+> Sam Povilus <kernel.development@povil.us> wrote:
+> 
+>> The number of xilinx ps uart should be set by a kernel parameter instead of
+>> using a #define. This allows the user to set the number of xilinx ps uart
+>> using only kconfig and not modifying kernel source.
+>>
+>> The ps uart is used in Xilnx Zynq chips usually in quantities maxing at
+>> two, but there may be other chips that use more in the future or that I
+>> don't know about. 
+> 
+> If it maxes at two then just set it to two. If in in future it maxes at
+> lots then when it's going to happen change the code to do dynamic
+> allocation and test it versus actual hardware. 
+> 
+> Otherwise you break some of the basic ideas of having one kernel for many
+> systems.
 
-Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
----
- arch/arm64/include/asm/io.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 35b2e50..b1c92e3 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -168,7 +168,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
- 
- #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
- #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
--#define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
-+#define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_GRE))
- #define ioremap_wt(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
- #define iounmap				__iounmap
- 
--- 
-2.7.4
+We have in soc vendor tree similar patch but the reason is different.
+
+    tty: serial: Added a CONFIG_SERIAL_XILINX_NR_UARTS option.
+
+    This patch Adds CONFIG_SERIAL_XILINX_NR_UARTS option to allow
+    the user to provide the Max number of uart ports information.
+    If multiple cards (or) PL UARTS are present, the default limit
+    of 2 ports should be increased.
+
+I haven't checked all drivers but in our case we have added this as
+quick fix for scenarios where you use serial aliases where alias is
+pointed to serial2 or more.
+In cdns_uart_init() cdns_uart_uart_driver is passed which contains .nr
+which is required to be passed.
+
+What's the best driver to look at dynamic allocation?
+
+Thanks,
+Michal
