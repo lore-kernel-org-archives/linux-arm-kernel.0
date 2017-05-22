@@ -1,98 +1,191 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon, 22 May 2017 18:41:26 +0100
-Subject: [PATCH v2] arm64: kernel: restrict /dev/mem read() calls to
- linear region
-In-Reply-To: <20170519154200.14158-1-ard.biesheuvel@linaro.org>
-References: <20170519154200.14158-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170522174126.GJ1657@bivouac.eciton.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 22 May 2017 18:52:33 +0100
+Subject: [PATCH 13/31] KVM: arm64: vgic-v3: Add ICV_IAR1_EL1 handler
+In-Reply-To: <9c11669c-ea66-bbe1-093d-907bcd190bab@redhat.com>
+References: <20170503104606.19342-1-marc.zyngier@arm.com>
+ <20170503104606.19342-14-marc.zyngier@arm.com>
+ <9c11669c-ea66-bbe1-093d-907bcd190bab@redhat.com>
+Message-ID: <81c9f8bc-8913-3e00-5360-1c61c9399854@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 04:42:00PM +0100, Ard Biesheuvel wrote:
-> When running lscpu on an AArch64 system that has SMBIOS version 2.0
-> tables, it will segfault in the following way:
-> 
->   Unable to handle kernel paging request at virtual address ffff8000bfff0000
->   pgd = ffff8000f9615000
->   [ffff8000bfff0000] *pgd=0000000000000000
->   Internal error: Oops: 96000007 [#1] PREEMPT SMP
->   Modules linked in:
->   CPU: 0 PID: 1284 Comm: lscpu Not tainted 4.11.0-rc3+ #103
->   Hardware name: QEMU QEMU Virtual Machine, BIOS 0.0.0 02/06/2015
->   task: ffff8000fa78e800 task.stack: ffff8000f9780000
->   PC is at __arch_copy_to_user+0x90/0x220
->   LR is at read_mem+0xcc/0x140
-> 
-> This is caused by the fact that lspci issues a read() on /dev/mem at the
-> offset where it expects to find the SMBIOS structure array. However, this
-> region is classified as EFI_RUNTIME_SERVICE_DATA (as per the UEFI spec),
-> and so it is omitted from the linear mapping.
-> 
-> So let's restrict /dev/mem read/write access to those areas that are
-> covered by the linear region.
+Hi Eric,
 
-So, I'm still of the opinion that /dev/mem simply should not be made
-available on systems where people care about accidentally hard-locking
-their systems from userland.
-
-To that extent, this workaround takes the pressure off people to
-configure their kernels properly.
-
-On the other hand, it probably removes 90% of the risk cases.
-
-I guess the solution depends on whether people think the remaining 10%
-matter.
-
-/
-    Leif
-
-> Reported-by: Alexander Graf <agraf@suse.de>
-> Fixes: 4dffbfc48d65 ("arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP")
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v2: check whether the entire region is covered by the same memblock that has
->     the MEMBLOCK_NOMAP attribute cleared
+On 18/05/17 08:41, Auger Eric wrote:
+> Hi Marc,
 > 
->  arch/arm64/mm/mmap.c | 19 +++++++++++++------
->  1 file changed, 13 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
-> index 7b0d55756eb1..adc208c2ae9c 100644
-> --- a/arch/arm64/mm/mmap.c
-> +++ b/arch/arm64/mm/mmap.c
-> @@ -18,6 +18,7 @@
->  
->  #include <linux/elf.h>
->  #include <linux/fs.h>
-> +#include <linux/memblock.h>
->  #include <linux/mm.h>
->  #include <linux/mman.h>
->  #include <linux/export.h>
-> @@ -103,12 +104,18 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
->   */
->  int valid_phys_addr_range(phys_addr_t addr, size_t size)
->  {
-> -	if (addr < PHYS_OFFSET)
-> -		return 0;
-> -	if (addr + size > __pa(high_memory - 1) + 1)
-> -		return 0;
-> -
-> -	return 1;
-> +	/*
-> +	 * Check whether addr is covered by a memory region without the
-> +	 * MEMBLOCK_NOMAP attribute, and whether that region covers the
-> +	 * entire range. In theory, this could lead to false negatives
-> +	 * if the range is covered by distinct but adjacent memory regions
-> +	 * that only differ in other attributes. However, few of such
-> +	 * attributes have been defined, and it is debatable whether it
-> +	 * follows that /dev/mem read() calls should be able traverse
-> +	 * such boundaries.
-> +	 */
-> +	return memblock_is_region_memory(addr, size) &&
-> +	       memblock_is_map_memory(addr);
->  }
->  
->  /*
-> -- 
-> 2.9.3
-> 
+> On 03/05/2017 12:45, Marc Zyngier wrote:
+>> Add a handler for reading the guest's view of the ICC_IAR1_EL1
+>> register. This involves finding the highest priority Group-1
+>> interrupt, checking against both PMR and the active group
+>> priority, activating the interrupt and setting the group
+>> priority as active.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  include/linux/irqchip/arm-gic-v3.h |   1 +
+>>  virt/kvm/arm/hyp/vgic-v3-sr.c      | 134 +++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 135 insertions(+)
+>>
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index 97cbca19430d..7610ea4e8337 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -391,6 +391,7 @@
+>>  #define ICH_LR_PHYS_ID_SHIFT		32
+>>  #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
+>>  #define ICH_LR_PRIORITY_SHIFT		48
+>> +#define ICH_LR_PRIORITY_MASK		(0xffULL << ICH_LR_PRIORITY_SHIFT)
+>>  
+>>  /* These are for GICv2 emulation only */
+>>  #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+>> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> index 473ef22508e6..49aad1de3ac8 100644
+>> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> @@ -375,6 +375,77 @@ void __hyp_text __vgic_v3_write_vmcr(u32 vmcr)
+>>  
+>>  #ifdef CONFIG_ARM64
+>>  
+>> +static int __hyp_text __vgic_v3_get_group(struct kvm_vcpu *vcpu)
+>> +{
+>> +	u32 esr = kvm_vcpu_get_hsr(vcpu);
+>> +	u8 crm = (esr & ESR_ELx_SYS64_ISS_CRM_MASK) >> ESR_ELx_SYS64_ISS_CRM_SHIFT;
+>> +
+>> +	return crm != 8;
+>> +}
+>> +
+>> +#define GICv3_IDLE_PRIORITY	0xff
+>> +
+>> +static int __hyp_text __vgic_v3_highest_priority_lr(struct kvm_vcpu *vcpu,
+>> +						    u32 vmcr,
+>> +						    u64 *lr_val)
+>> +{
+>> +	unsigned int used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+>> +	u8 priority = GICv3_IDLE_PRIORITY;
+>> +	int i, lr = -1;
+>> +
+>> +	for (i = 0; i < used_lrs; i++) {
+>> +		u64 val = __gic_v3_get_lr(i);
+>> +		u8 lr_prio = (val & ICH_LR_PRIORITY_MASK) >> ICH_LR_PRIORITY_SHIFT;
+>> +
+>> +		/* Not pending in the state? */
+>> +		if ((val & ICH_LR_STATE) != ICH_LR_PENDING_BIT)
+>> +			continue;
+>> +
+>> +		/* Group-0 interrupt, but Group-0 disabled? */
+>> +		if (!(val & ICH_LR_GROUP) && !(vmcr & ICH_VMCR_ENG0_MASK))
+>> +			continue;
+>> +
+>> +		/* Group-1 interrupt, but Group-1 disabled? */
+>> +		if ((val & ICH_LR_GROUP) && !(vmcr & ICH_VMCR_ENG1_MASK))
+>> +			continue;
+>> +
+>> +		/* Not the highest priority? */
+>> +		if (lr_prio >= priority)
+>> +			continue;
+>> +
+>> +		/* This is a candidate */
+>> +		priority = lr_prio;
+>> +		*lr_val = val;
+>> +		lr = i;
+>> +	}
+>> +
+>> +	if (lr == -1)
+>> +		*lr_val = ICC_IAR1_EL1_SPURIOUS;
+>> +
+>> +	return lr;
+>> +}
+>> +
+>> +static int __hyp_text __vgic_v3_get_highest_active_priority(void)
+>> +{
+>> +	u8 nr_pre_bits = vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
+>> +	u8 nr_aprs = 1 << (nr_pre_bits - 5);
+> s/nr_aprs/nr_apr_regs ?
+
+Sure, I can do that if that helps.
+
+>> +	u32 hap = 0;
+>> +	int i;
+>> +
+>> +	for (i = 0; i < nr_aprs; i++) {
+>> +		u32 val;
+>> +
+>> +		val  = __vgic_v3_read_ap0rn(i);
+>> +		val |= __vgic_v3_read_ap1rn(i);
+>> +		if (val)
+>> +			return (hap + __ffs(val)) << (8 - nr_pre_bits);
+> here don't we need to shift by the actual number of subpriority bits?
+> isn't nr_pre_bits the max implemented preemption bits but not
+> necessarily the actual chosen number set by bpr?
+
+Hmmm. I don't think that works. If you did that, you could end-up in a
+bizarre situation where you can completely miss the current active
+priority. Try for example:
+
+	nr_pre_bits=5
+	set BPR1=3 (5 preemption bits)
+	read IAR, interrupt priority = 0x10, set bit 2 in AP1R0
+	set BPR=4 (4 preemption bits)
+
+With this setting, you've changed the active priority from being 0x10
+(with BPR1=3) to being 8. This is wrong, as this should be an invariant.
+
+The only way to avoid this unfortunate state of affair is to always
+normalize the active priority to always be stored as if BPR had its
+smallest possible value (which happens to be nr_pre_bits).
+
+>> +
+>> +		hap += 32;
+>> +	}
+>> +
+>> +	return GICv3_IDLE_PRIORITY;
+>> +}
+>> +
+>>  static unsigned int __hyp_text __vgic_v3_get_bpr0(u32 vmcr)
+>>  {
+>>  	return (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
+>> @@ -395,6 +466,66 @@ static unsigned int __hyp_text __vgic_v3_get_bpr1(u32 vmcr)
+>>  	return bpr;
+>>  }
+>>  
+> Would be nice to have a short doc comment.
+> I understand this zeros the subpriority field in the priority value, is
+> it correct? pseudocode PriorityGroup()?
+
+Yes, I should probably add some references to the pseudocode.
+
+>> +static u8 __hyp_text __vgic_v3_pri_to_pre(u8 pri, u32 vmcr, int grp)
+>> +{
+>> +	unsigned int bpr;
+>> +
+>> +	if (!grp)
+>> +		bpr = __vgic_v3_get_bpr0(vmcr) + 1;
+>> +	else
+>> +		bpr = __vgic_v3_get_bpr1(vmcr);
+>> +
+>> +	return pri & (GENMASK(7, 0) << bpr);
+>  & GENMASK(7, bpr)?
+
+Not sure about that. If grp==0, bpr can range from 1 to 8. If it is 8,
+what is the meaning of GENMASK(7,8)?
+
+>> +}
+>> +
+>> +static void __hyp_text __vgic_v3_set_active_priority(u8 pre)
+>> +{
+>> +	u8 nr_pre_bits = vtr_to_nr_pre_bits(read_gicreg(ICH_VTR_EL2));
+>> +	u8 hap = pre >> (8 - nr_pre_bits);
+> Could you add a comment about what is hap. I tend to think it is the
+> group priority but then I don't get why we don't shift by 8 -bpr
+
+"hap" stands for Highest Active Priority. And for the reasons describer
+above, we need to normalize it, irrespective of the BPR.
+
+Does it make sense?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
