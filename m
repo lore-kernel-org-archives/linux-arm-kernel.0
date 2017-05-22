@@ -1,52 +1,26 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 22 May 2017 14:25:52 +0800
-Subject: [PATCH 6/6] ARM: sun8i: a83t: cubietruck-plus: Enable SPDIF output
-In-Reply-To: <20170522062552.19026-1-wens@csie.org>
-References: <20170522062552.19026-1-wens@csie.org>
-Message-ID: <20170522062552.19026-7-wens@csie.org>
+From: o-takashi@sakamocchi.jp (Takashi Sakamoto)
+Date: Mon, 22 May 2017 15:31:13 +0900
+Subject: [PATCH 0/7] ALSA: Fix/improve PCM ack callback
+In-Reply-To: <s5htw4dihpv.wl-tiwai@suse.de>
+References: <20170521190258.1178-1-tiwai@suse.de>
+ <7685a366-5b2f-0a96-a686-c49b79975c56@sakamocchi.jp>
+ <s5htw4dihpv.wl-tiwai@suse.de>
+Message-ID: <6cb4bbc8-2d5f-45d0-0635-37f1737972c3@sakamocchi.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cubietruck Plus has an optical SPDIF out connector.
-Enable SPDIF audio output for this board.
+On May 22 2017 14:27, Takashi Iwai wrote:
+> These functions will be modified again by other upcoming patchsets, so
+> I'd like not to touch so much for minor optimization at this stage.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+If you address to your latest patchset[1], it might not be applied 
+promptly because I have some comments (not posted yet, in this night). 
+It's not good to avoid better bahaviour in a reason of patchset 
+dependency, at least you seems to be too hasty.
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-index 9e10cc6f39d4..cff33454fc24 100644
---- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-@@ -82,6 +82,28 @@
- 			gpios = <&pio 4 4 GPIO_ACTIVE_HIGH>; /* PE4 */
- 		};
- 	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "On-board SPDIF";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&spdif>;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&spdif_out>;
-+		};
-+	};
-+
-+	spdif_out: spdif-out {
-+		#sound-dai-cells = <0>;
-+		compatible = "linux,spdif-dit";
-+	};
-+};
-+
-+&spdif {
-+	status = "okay";
- };
- 
- &uart0 {
--- 
-2.11.0
+
+[1] [alsa-devel] [PATCH 00/16] ALSA: Convert to new copy_silence PCM ops
+
+Regards
+
+Takashi Sakamoto
