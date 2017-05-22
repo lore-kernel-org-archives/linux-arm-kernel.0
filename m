@@ -1,108 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 22 May 2017 19:52:23 +0100
-Subject: [PATCH 07/31] KVM: arm/arm64: vgic-v3: Add accessors for the
- ICH_APxRn_EL2 registers
-In-Reply-To: <632e0b74-4d39-99b6-02aa-340f4d929bc6@redhat.com> (Auger Eric's
- message of "Wed, 17 May 2017 11:54:23 +0200")
-References: <20170503104606.19342-1-marc.zyngier@arm.com>
- <20170503104606.19342-8-marc.zyngier@arm.com>
- <632e0b74-4d39-99b6-02aa-340f4d929bc6@redhat.com>
-Message-ID: <87zie4lo60.fsf@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 22 May 2017 11:58:35 -0700
+Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
+In-Reply-To: <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
+References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
+ <20170510.212952.1440495072777358778.davem@davemloft.net>
+ <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
+ <20170510.215218.2185526627014393313.davem@davemloft.net>
+ <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
+ <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
+ <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
+ <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
+ <591A07A1.1030006@iogearbox.net>
+ <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
+Message-ID: <CAGXu5j+k+NMQGmmhuW-4pHFd6agfndJfxQ9k--h+ZpsDBVB8ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17 2017 at 11:54:23 am BST, Auger Eric <eric.auger@redhat.com> wrote:
-> Hi,
+On Sat, May 20, 2017 at 1:01 PM, Shubham Bansal
+<illusionist.neo@gmail.com> wrote:
+> Hi Daniel and Kees,
 >
-> On 03/05/2017 12:45, Marc Zyngier wrote:
->> As we're about to access the Active Priority registers a lot more,
->> let's define accessors that take the register number as a parameter.
->> 
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/hyp/vgic-v3-sr.c | 116 ++++++++++++++++++++++++++++++++++++------
->>  1 file changed, 100 insertions(+), 16 deletions(-)
->> 
->> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
->> index 32c3295929b0..990d9d1e85d0 100644
->> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
->> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
->> @@ -118,6 +118,90 @@ static void __hyp_text __gic_v3_set_lr(u64 val, int lr)
->>  	}
->>  }
->>  
->> +static void __hyp_text __vgic_v3_write_ap0rn(u32 val, int n)
->> +{
->> +	switch (n) {
->> +	case 0:
->> +		write_gicreg(val, ICH_AP0R0_EL2);
->> +		break;
->> +	case 1:
->> +		write_gicreg(val, ICH_AP0R1_EL2);
->> +		break;
->> +	case 2:
->> +		write_gicreg(val, ICH_AP0R2_EL2);
->> +		break;
->> +	case 3:
->> +		write_gicreg(val, ICH_AP0R3_EL2);
->> +		break;
->> +	}
->> +}
->> +
->> +static void __hyp_text __vgic_v3_write_ap1rn(u32 val, int n)
->> +{
->> +	switch (n) {
->> +	case 0:
->> +		write_gicreg(val, ICH_AP1R0_EL2);
->> +		break;
->> +	case 1:
->> +		write_gicreg(val, ICH_AP1R1_EL2);
->> +		break;
->> +	case 2:
->> +		write_gicreg(val, ICH_AP1R2_EL2);
->> +		break;
->> +	case 3:
->> +		write_gicreg(val, ICH_AP1R3_EL2);
->> +		break;
->> +	}
->> +}
->> +
->> +static u32 __hyp_text __vgic_v3_read_ap0rn(int n)
->> +{
->> +	u32 val;
->> +
->> +	switch (n) {
->> +	case 0:
->> +		val = read_gicreg(ICH_AP0R0_EL2);
->> +		break;
->> +	case 1:
->> +		val = read_gicreg(ICH_AP0R1_EL2);
->> +		break;
->> +	case 2:
->> +		val = read_gicreg(ICH_AP0R2_EL2);
->> +		break;
->> +	case 3:
->> +		val = read_gicreg(ICH_AP0R3_EL2);
->> +		break;
->> +	default:
->> +		unreachable();
-> I am not familiar with that macro. For my curiosity why is it used here
-> and not in write functions.
+> Before I send the patch, I have tested the JIT compiler on ARMv7 but
+> not on ARMv5 or ARMv6. So can you tell me which arch versions I should
+> test it for?
+> Also for my testing, CONFIG_FRAME_POINTER and CONFIG_CPU_BIG_ENDIAN
+> are both disabled. But I need to test JIT with these flags as well.
+> Whenever I put these flags in .config file, the arm kernel is not
+> getting compiler with these flags. Can you tell me why? If you need
+> more information regarding this, please let me know.
 
-I probably have looked at the assembly code and realised that using this
-macro was helping the compiler not to generate horrible code because it
-doesn't know that it will always return a value.
+I think it is fine to only target ARMv7. It is harder and harder to
+find devices on v5 or v6 CPUs that would want to be using BPF JIT,
+IMO.
 
-The "write" part doesn't need this not to be awful, so I didn't feel the
-need to add it. Can do though.
+When they "disappear", it's because there isn't a prerequisite met. I
+either read the Kconfig files or use "make menuconfig" and "search" to
+tell me where a config is defined and what is needed to meet the
+prerequisites.
 
->
-> Besides Mark's comment,
->
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+In the case of CPU_BIG_ENDIAN, you need ARCH_SUPPORTS_BIG_ENDIAN,
+which appears to be only ARCH_IXP4XX. I don't think you're going to
+find an emulator that will handle this, so I'd suggest ignoring this
+config for now unless you can find someone with that hardware that you
+can work with to test it.
 
-Thanks,
+In the case of CONFIG_FRAME_POINTER, I assume you built a
+THUMB2_KERNEL? I'd read the notes in arch/arm/Kconfig.debug for
+'config FRAME_POINTER'.
 
-	M.
+-Kees
+
 -- 
-Jazz is not dead, it just smell funny.
+Kees Cook
+Pixel Security
