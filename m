@@ -1,47 +1,37 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 22 May 2017 14:25:46 +0800
-Subject: [PATCH 0/6] ARM: sun8i: a83t: Enable SPDIF output support
-Message-ID: <20170522062552.19026-1-wens@csie.org>
+Date: Mon, 22 May 2017 14:25:49 +0800
+Subject: [PATCH 3/6] pinctrl: sunxi: Fix SPDIF function name for A83T
+In-Reply-To: <20170522062552.19026-1-wens@csie.org>
+References: <20170522062552.19026-1-wens@csie.org>
+Message-ID: <20170522062552.19026-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+We use well known standard names for functions that have name, such as
+I2C, SPI, SPDIF, etc..
 
-This series, apart from some minor fixes, adds SPDIF output support
-with existing drivers.
+Fix the function name of SPDIF, which was named OWA (One Wire Audio)
+based on Allwinner datasheets.
 
-The SPDIF transmitter block is the same as the one found on the H3.
-There is no receiver support. The A83T pinctrl and DMA engine drivers
-are already in the kernel.
+Fixes: 4730f33f0d82 ("pinctrl: sunxi: add allwinner A83T PIO controller
+		      support")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Patches 1 & 2 fix some overlooked errors in the A83T's new clk driver.
-
-Patch 3 fixes the name for the SPDIF pin function. We want to use
-well known standard names. (In addition, I found some of our drivers
-are using "s_twi" instead of "s_i2c". I will send fixes later.)
-
-Patch 4 adds a device node for the DMA controller.
-
-Patch 5 adds a device node and pinmux node for the SPDIF transmitter.
-
-Patch 6 enables SPDIF output on the Cubietruck Plus.
-
-Regards
-ChenYu
-
-Chen-Yu Tsai (6):
-  clk: sunxi-ng: a83t: Fix PLL lock status register offset
-  clk: sunxi-ng: a83t: Fix audio PLL divider offset
-  pinctrl: sunxi: Fix SPDIF function name for A83T
-  ARM: sun8i: a83t: Add device node for DMA controller
-  ARM: sun8i: a83t: Add device node for SPDIF transmitter
-  ARM: sun8i: a83t: cubietruck-plus: Enable SPDIF output
-
- arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts | 22 +++++++++++++++++
- arch/arm/boot/dts/sun8i-a83t.dtsi                | 30 ++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-a83t.c            |  4 ++--
- drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c       |  2 +-
- 4 files changed, 55 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
+index 9aec1d2232dd..6624499eae72 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
+@@ -394,7 +394,7 @@ static const struct sunxi_desc_pin sun8i_a83t_pins[] = {
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 18),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x3, "owa")),		/* DOUT */
++		  SUNXI_FUNCTION(0x3, "spdif")),	/* DOUT */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 19),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out")),
 -- 
 2.11.0
