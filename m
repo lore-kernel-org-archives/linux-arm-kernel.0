@@ -1,37 +1,33 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 22 May 2017 14:25:49 +0800
-Subject: [PATCH 3/6] pinctrl: sunxi: Fix SPDIF function name for A83T
+Date: Mon, 22 May 2017 14:25:47 +0800
+Subject: [PATCH 1/6] clk: sunxi-ng: a83t: Fix PLL lock status register offset
 In-Reply-To: <20170522062552.19026-1-wens@csie.org>
 References: <20170522062552.19026-1-wens@csie.org>
-Message-ID: <20170522062552.19026-4-wens@csie.org>
+Message-ID: <20170522062552.19026-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use well known standard names for functions that have name, such as
-I2C, SPI, SPDIF, etc..
+The offset for the PLL lock status register was incorrectly set to
+0x208, which actually points to an unused register. The correct
+register offset is 0x20c.
 
-Fix the function name of SPDIF, which was named OWA (One Wire Audio)
-based on Allwinner datasheets.
-
-Fixes: 4730f33f0d82 ("pinctrl: sunxi: add allwinner A83T PIO controller
-		      support")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c | 2 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
-index 9aec1d2232dd..6624499eae72 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
-@@ -394,7 +394,7 @@ static const struct sunxi_desc_pin sun8i_a83t_pins[] = {
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 18),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--		  SUNXI_FUNCTION(0x3, "owa")),		/* DOUT */
-+		  SUNXI_FUNCTION(0x3, "spdif")),	/* DOUT */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 19),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out")),
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+index 4a201a7e03b8..a9c5cc87d9d0 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+@@ -28,7 +28,7 @@
+ 
+ #include "ccu-sun8i-a83t.h"
+ 
+-#define CCU_SUN8I_A83T_LOCK_REG	0x208
++#define CCU_SUN8I_A83T_LOCK_REG	0x20c
+ 
+ /*
+  * The CPU PLLs are actually NP clocks, with P being /1 or /4. However
 -- 
 2.11.0
