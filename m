@@ -1,74 +1,83 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 22 May 2017 10:51:39 +0200
-Subject: [PATCH v4 2/3] watchdog: dw_wdt: get reset lines from dt
-In-Reply-To: <cover.50aaf23e8fbe9028f711a67e39b96910c986e8b0.1495443015.git-series.s.trumtrar@pengutronix.de>
-References: <cover.50aaf23e8fbe9028f711a67e39b96910c986e8b0.1495443015.git-series.s.trumtrar@pengutronix.de>
-Message-ID: <17fdba7aa0c8f356cfdc28792d228817030b152e.1495443015.git-series.s.trumtrar@pengutronix.de>
+From: vjitta@codeaurora.org (vjitta at codeaurora.org)
+Date: Mon, 22 May 2017 14:25:28 +0530
+Subject: [PATCH] iommu/arm-smmu: Use context bank TLBSTATUS registers
+Message-ID: <1495443328-19646-1-git-send-email-vjitta@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dw_wdt has an external reset line, that can keep the device in reset
-and therefore rendering it useless and also is the only way of stopping
-the watchdog once it was started.
+From: Vijayanand Jitta <vjitta@codeaurora.org>
 
-Get the reset lines for this core from the devicetree. As these lines are
-optional, use devm_reset_control_get_optional_shared. If the reset line
-is not specified in the devicetree, the reset framework will just skip
-deasserting and continue.
-This way all users of the driver will continue to function without
-any harm, even if the reset line is not specified in the devicetree.
+There are TLBSTATUS registers in SMMU global register space as well as
+context bank register space.  Currently we're polling the global
+TLBSTATUS registers after TLB invalidation, even when using the TLB
+invalidation registers from context bank address space.  This violates
+the usage model described in the ARM SMMU spec.  Fix this by polling
+context bank TLBSTATUS registers for context bank TLB operations, and
+global TLBSTATUS registers for global TLB operations.
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: Guenter Roeck <linux@roeck-us.net>
-Cc: linux-watchdog at vger.kernel.org
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Vijayanand Jitta <vjitta@codeaurora.org>
 ---
- drivers/watchdog/dw_wdt.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/iommu/arm-smmu.c | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-index 914da3a4d334..36be987ff9ef 100644
---- a/drivers/watchdog/dw_wdt.c
-+++ b/drivers/watchdog/dw_wdt.c
-@@ -29,6 +29,7 @@
- #include <linux/of.h>
- #include <linux/pm.h>
- #include <linux/platform_device.h>
-+#include <linux/reset.h>
- #include <linux/watchdog.h>
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 7cecc37..8dc6da9 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -233,6 +233,9 @@ enum arm_smmu_s2cr_privcfg {
+ #define ARM_SMMU_CB_S1_TLBIVAL		0x620
+ #define ARM_SMMU_CB_S2_TLBIIPAS2	0x630
+ #define ARM_SMMU_CB_S2_TLBIIPAS2L	0x638
++#define ARM_SMMU_CB_TLBSYNC		0x7f0
++#define ARM_SMMU_CB_TLBSTATUS		0x7f4
++#define TLBSTATUS_SACTIVE		(1 << 0)
+ #define ARM_SMMU_CB_ATS1PR		0x800
+ #define ARM_SMMU_CB_ATSR		0x8f0
  
- #define WDOG_CONTROL_REG_OFFSET		    0x00
-@@ -54,6 +55,7 @@ struct dw_wdt {
- 	struct clk		*clk;
- 	unsigned long		rate;
- 	struct watchdog_device	wdd;
-+	struct reset_control	*rst;
- };
+@@ -580,6 +583,19 @@ static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
+ }
  
- #define to_dw_wdt(wdd)	container_of(wdd, struct dw_wdt, wdd)
-@@ -234,6 +236,14 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
- 		goto out_disable_clk;
+ /* Wait for any pending TLB invalidations to complete */
++static void arm_smmu_tlb_sync_cb(struct arm_smmu_device *smmu,
++				int cbndx)
++{
++	void __iomem *base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cbndx);
++	u32 val;
++
++	writel_relaxed(0, base + ARM_SMMU_CB_TLBSYNC);
++	if (readl_poll_timeout_atomic(base + ARM_SMMU_CB_TLBSTATUS, val,
++				      !(val & TLBSTATUS_SACTIVE),
++				      0, TLB_LOOP_TIMEOUT))
++		dev_err(smmu->dev, "TLBSYNC timeout!\n");
++}
++
+ static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
+ {
+ 	int count = 0;
+@@ -601,7 +617,7 @@ static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
+ static void arm_smmu_tlb_sync(void *cookie)
+ {
+ 	struct arm_smmu_domain *smmu_domain = cookie;
+-	__arm_smmu_tlb_sync(smmu_domain->smmu);
++	arm_smmu_tlb_sync_cb(smmu_domain->smmu, smmu_domain->cfg.cbndx);
+ }
+ 
+ static void arm_smmu_tlb_inv_context(void *cookie)
+@@ -616,13 +632,13 @@ static void arm_smmu_tlb_inv_context(void *cookie)
+ 		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+ 		writel_relaxed(ARM_SMMU_CB_ASID(smmu, cfg),
+ 			       base + ARM_SMMU_CB_S1_TLBIASID);
++		arm_smmu_tlb_sync_cb(smmu, cfg->cbndx);
+ 	} else {
+ 		base = ARM_SMMU_GR0(smmu);
+ 		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg),
+ 			       base + ARM_SMMU_GR0_TLBIVMID);
++		__arm_smmu_tlb_sync(smmu);
  	}
+-
+-	__arm_smmu_tlb_sync(smmu);
+ }
  
-+	dw_wdt->rst = devm_reset_control_get_optional_shared(&pdev->dev, NULL);
-+	if (IS_ERR(dw_wdt->rst)) {
-+		ret = PTR_ERR(dw_wdt->rst);
-+		goto out_disable_clk;
-+	}
-+
-+	reset_control_deassert(dw_wdt->rst);
-+
- 	wdd = &dw_wdt->wdd;
- 	wdd->info = &dw_wdt_ident;
- 	wdd->ops = &dw_wdt_ops;
-@@ -279,6 +289,7 @@ static int dw_wdt_drv_remove(struct platform_device *pdev)
- 	struct dw_wdt *dw_wdt = platform_get_drvdata(pdev);
- 
- 	watchdog_unregister_device(&dw_wdt->wdd);
-+	reset_control_assert(dw_wdt->rst);
- 	clk_disable_unprepare(dw_wdt->clk);
- 
- 	return 0;
+ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
 -- 
-git-series 0.9.1
+1.9.1
