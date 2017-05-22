@@ -1,87 +1,35 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 22 May 2017 17:25:55 +0100
-Subject: [PATCH v3.1 4/6] mm/hugetlb: Allow architectures to override
- huge_pte_clear()
-In-Reply-To: <20170522133604.11392-5-punit.agrawal@arm.com>
-References: <20170522133604.11392-5-punit.agrawal@arm.com>
-Message-ID: <20170522162555.4313-1-punit.agrawal@arm.com>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Mon, 22 May 2017 19:29:14 +0300
+Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: add hi8435 device
+In-Reply-To: <a74ee28c1c62fee5a5e75dda70a02990@agner.ch>
+References: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
+ <a74ee28c1c62fee5a5e75dda70a02990@agner.ch>
+Message-ID: <076f6258-f0b4-6ba5-9670-e2c0582a92b5@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When unmapping a hugepage range, huge_pte_clear() is used to clear the
-page table entries that are marked as not present. huge_pte_clear()
-internally just ends up calling pte_clear() which does not correctly
-deal with hugepages consisting of contiguous page table entries.
+>> +	hi8435 at 1 {
+>> +		compatible = "holt,hi8435";
+>> +		reg = <1>;
+>> +		spi-max-frequency = <20000000>;
+>> +		gpios = <&gpio5 3 0>;
+> 
+> Nit: GPIO_ACTIVE_HIGH instead of 0?
 
-Add a size argument to address this issue and allow architectures to
-override huge_pte_clear() by wrapping it in a #ifndef block.
+Gray area here.
 
-Update s390 implementation with the size parameter as well.
+Chip's reset input is active LOW.
 
-Note that the change only affects huge_pte_clear() - the other generic
-hugetlb functions don't need any change.
+However, hi8435 driver historically was coded using inverted values
+passed to gpiolib calls.  And there are setups in the wild with device
+trees containing GPIO_ACTIVE_HIGH that I'd prefer not breaking.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
-Cc: Mike Kravetz <mike.kravetz@oracle.com>
----
+To solve, I submitted a patch on hi8435 driver that changes to _raw()
+gpio calls (thus making it independent of what is written in device
+tree), and want [future] device trees not to contain explicitly written
+gpio polarity.
 
-Changes since v3
+Far not ideal but better than device trees explicitly stating
+GPIO_ACTIVE_HIGH while it is active low.
 
-* Drop weak function and use #ifndef block to allow architecture override
-* Drop unnecessary move of s390 function definition
-
- arch/s390/include/asm/hugetlb.h | 2 +-
- include/asm-generic/hugetlb.h   | 4 +++-
- mm/hugetlb.c                    | 2 +-
- 3 files changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/arch/s390/include/asm/hugetlb.h b/arch/s390/include/asm/hugetlb.h
-index cd546a245c68..c0443500baec 100644
---- a/arch/s390/include/asm/hugetlb.h
-+++ b/arch/s390/include/asm/hugetlb.h
-@@ -39,7 +39,7 @@ static inline int prepare_hugepage_range(struct file *file,
- #define arch_clear_hugepage_flags(page)		do { } while (0)
- 
- static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
--				  pte_t *ptep)
-+				  pte_t *ptep, unsigned long sz)
- {
- 	if ((pte_val(*ptep) & _REGION_ENTRY_TYPE_MASK) == _REGION_ENTRY_TYPE_R3)
- 		pte_val(*ptep) = _REGION3_ENTRY_EMPTY;
-diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
-index 99b490b4d05a..540354f94f83 100644
---- a/include/asm-generic/hugetlb.h
-+++ b/include/asm-generic/hugetlb.h
-@@ -31,10 +31,12 @@ static inline pte_t huge_pte_modify(pte_t pte, pgprot_t newprot)
- 	return pte_modify(pte, newprot);
- }
- 
-+#ifndef huge_pte_clear
- static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
--				  pte_t *ptep)
-+		    pte_t *ptep, unsigned long sz)
- {
- 	pte_clear(mm, addr, ptep);
- }
-+#endif
- 
- #endif /* _ASM_GENERIC_HUGETLB_H */
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index 0e4d1fb3122f..ddfed20cd637 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -3338,7 +3338,7 @@ void __unmap_hugepage_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
- 		 * unmapped and its refcount is dropped, so just clear pte here.
- 		 */
- 		if (unlikely(!pte_present(pte))) {
--			huge_pte_clear(mm, address, ptep);
-+			huge_pte_clear(mm, address, ptep, sz);
- 			spin_unlock(ptl);
- 			continue;
- 		}
--- 
-2.11.0
+Nikita
