@@ -1,58 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 May 2017 15:59:43 +0200
-Subject: [PATCH v3 4/6] mm/hugetlb: Allow architectures to override
- huge_pte_clear()
-In-Reply-To: <20170522133604.11392-5-punit.agrawal@arm.com>
-References: <20170522133604.11392-1-punit.agrawal@arm.com>
- <20170522133604.11392-5-punit.agrawal@arm.com>
-Message-ID: <CAK8P3a3d=Yx3_stYiz25Qeh8wfFr5EGuGYGfCoXqrQPxz6oUAQ@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 22 May 2017 15:58:37 +0200
+Subject: [PATCH 04/35] arm64: dts: r8a7795: salvator-x: Update memory node to
+ 4 GiB map
+In-Reply-To: <cover.1495457812.git.horms+renesas@verge.net.au>
+References: <cover.1495457812.git.horms+renesas@verge.net.au>
+Message-ID: <63e76b90f0725c2a61dea4f067f6d652926ac074.1495457812.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 3:36 PM, Punit Agrawal <punit.agrawal@arm.com> wrote:
-> diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
-> index 99b490b4d05a..3138e126f43b 100644
-> --- a/include/asm-generic/hugetlb.h
-> +++ b/include/asm-generic/hugetlb.h
-> @@ -31,10 +31,7 @@ static inline pte_t huge_pte_modify(pte_t pte, pgprot_t newprot)
->         return pte_modify(pte, newprot);
->  }
->
-> -static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-> -                                 pte_t *ptep)
-> -{
-> -       pte_clear(mm, addr, ptep);
-> -}
-> +void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-> +                   pte_t *ptep, unsigned long sz);
->
->  #endif /* _ASM_GENERIC_HUGETLB_H */
-> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-> index 0e4d1fb3122f..2b0f6f96f2c1 100644
-> --- a/mm/hugetlb.c
-> +++ b/mm/hugetlb.c
-> @@ -3289,6 +3289,12 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
->         return ret;
->  }
->
-> +void __weak huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-> +                          pte_t *ptep, unsigned long sz)
-> +{
-> +       pte_clear(mm, addr, ptep);
-> +}
-> +
->  void __unmap_hugepage_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
->                             unsigned long start, unsigned long end,
->                             struct page *ref_page)
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-I don't really like how this moves the inline version from asm-generic into
-a __weak function here. I think it would be better to either stop
-using asm-generic/hugetlb.h
-on s390, or enclose the generic definition in
+This patch addes memory region:
 
-#ifndef huge_pte_clear
+  - After changes, the Salvator-X board has the following map:
+    Bank0: 1GiB RAM : 0x000048000000 -> 0x0007fffffff
+    Bank1: 1GiB RAM : 0x000500000000 -> 0x0053fffffff
+    Bank2: 1GiB RAM : 0x000600000000 -> 0x0063fffffff
+    Bank3: 1GiB RAM : 0x000700000000 -> 0x0073fffffff
 
-and then override by defining a macro in s390 as we do in other files
-in asm-generic.
+  - Before changes, the old map looked like this:
+    Bank0: 1GiB RAM : 0x000048000000 -> 0x0007fffffff
 
-       Arnd
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index 639aa085d996..f1b6ad3def15 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -56,6 +56,21 @@
+ 		reg = <0x0 0x48000000 0x0 0x38000000>;
+ 	};
+ 
++	memory at 500000000 {
++		device_type = "memory";
++		reg = <0x5 0x00000000 0x0 0x40000000>;
++	};
++
++	memory at 600000000 {
++		device_type = "memory";
++		reg = <0x6 0x00000000 0x0 0x40000000>;
++	};
++
++	memory at 700000000 {
++		device_type = "memory";
++		reg = <0x7 0x00000000 0x0 0x40000000>;
++	};
++
+ 	x12_clk: x12 {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-- 
+2.1.4
