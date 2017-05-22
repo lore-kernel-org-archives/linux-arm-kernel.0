@@ -1,63 +1,77 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Mon, 22 May 2017 15:01:16 +0200
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
-References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
- <20170510.212952.1440495072777358778.davem@davemloft.net>
- <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
- <20170510.215218.2185526627014393313.davem@davemloft.net>
- <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
- <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
- <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
- <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
- <591A07A1.1030006@iogearbox.net>
- <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
-Message-ID: <5922E11C.4070307@iogearbox.net>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 22 May 2017 16:01:52 +0300
+Subject: [PATCHv4 1/2] Documentation: dt: Add TI SCI clock driver
+In-Reply-To: <1495458113-7366-1-git-send-email-t-kristo@ti.com>
+References: <1495458113-7366-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1495458113-7366-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2017 10:01 PM, Shubham Bansal wrote:
-[...]
-> Before I send the patch, I have tested the JIT compiler on ARMv7 but
-> not on ARMv5 or ARMv6. So can you tell me which arch versions I should
-> test it for?
-> Also for my testing, CONFIG_FRAME_POINTER and CONFIG_CPU_BIG_ENDIAN
-> are both disabled. But I need to test JIT with these flags as well.
-> Whenever I put these flags in .config file, the arm kernel is not
-> getting compiler with these flags. Can you tell me why? If you need
-> more information regarding this, please let me know.
+Add a clock implementation, TI SCI clock, that will hook to the common
+clock framework, and allow each clock to be controlled via TI SCI
+protocol.
 
-Maybe Mircea, Kees or someone from linux-arm-kernel can help you out
-on that.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ .../devicetree/bindings/clock/ti,sci-clk.txt       | 37 ++++++++++++++++++++++
+ MAINTAINERS                                        |  1 +
+ 2 files changed, 38 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti,sci-clk.txt
 
-With regards to the below benchmark, I was mentioning how it compares
-to the interpreter. With only the numbers for jit it's hard to compare.
-So would be great to see the output for the following three cases:
-
-1) Interpreter:
-
-echo 0 > /proc/sys/net/core/bpf_jit_enable
-
-2) JIT enabled:
-
-echo 1 > /proc/sys/net/core/bpf_jit_enable
-
-3) JIT + blinding enabled:
-
-echo 1 > /proc/sys/net/core/bpf_jit_enable
-echo 2 > /proc/sys/net/core/bpf_jit_harden
-
-> With current config for ARMv7, benchmarks are :
->
-> [root at vexpress modules]# insmod test_bpf.ko
-> [   25.797766] test_bpf: #0 TAX jited:1 180 170 169 PASS
-> [   25.811395] test_bpf: #1 TXA jited:1 93 89 111 PASS
-> [   25.815073] test_bpf: #2 ADD_SUB_MUL_K jited:1 94 PASS
-> [   25.816779] test_bpf: #3 DIV_MOD_KX jited:1 983 PASS
-> [   25.827310] test_bpf: #4 AND_OR_LSH_K jited:1 94 93 PASS
-> [   25.829843] test_bpf: #5 LD_IMM_0 jited:1 83 PASS
-> [   25.831260] test_bpf: #6 LD_IND jited:1 338 266 305 PASS
-[...]
-
-Thanks,
-Daniel
+diff --git a/Documentation/devicetree/bindings/clock/ti,sci-clk.txt b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+new file mode 100644
+index 0000000..1e884c4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+@@ -0,0 +1,37 @@
++Texas Instruments TI-SCI Clocks
++===============================
++
++All clocks on Texas Instruments' SoCs that contain a System Controller,
++are only controlled by this entity. Communication between a host processor
++running an OS and the System Controller happens through a protocol known
++as TI-SCI[1]. This clock implementation plugs into the common clock
++framework and makes use of the TI-SCI protocol on clock API requests.
++
++[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
++
++Required properties:
++-------------------
++- compatible: Must be "ti,k2g-sci-clk"
++- #clock-cells: Shall be 2.
++  In clock consumers, this cell represents the device ID and clock ID
++  exposed by the PM firmware. The assignments can be found in the header
++  files <dt-bindings/genpd/<soc>.h> (which covers the device IDs) and
++  <dt-bindings/clock/<soc>.h> (which covers the clock IDs), where <soc>
++  is the SoC involved, for example 'k2g'.
++
++Examples:
++--------
++
++pmmc: pmmc {
++	compatible = "ti,k2g-sci";
++
++	k2g_clks: clocks {
++		compatible = "ti,k2g-sci-clk";
++		#clock-cells = <2>;
++	};
++};
++
++uart0: serial at 2530c00 {
++	compatible = "ns16550a";
++	clocks = <&k2g_clks 0x2c 0>;
++};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f7d568b..880a23d 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -12630,6 +12630,7 @@ F:	include/linux/soc/ti/ti_sci_protocol.h
+ F:	Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+ F:	include/dt-bindings/genpd/k2g.h
+ F:	drivers/soc/ti/ti_sci_pm_domains.c
++F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+ 
+ THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
+ M:	Hans Verkuil <hverkuil@xs4all.nl>
+-- 
+1.9.1
