@@ -1,71 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 22 May 2017 16:49:47 +0100
-Subject: [PATCH 0/2] ioremap_wc on arm64
-In-Reply-To: <20170522142059.GA83004@localhost>
-References: <1495436507-81890-1-git-send-email-jnair@caviumnetworks.com>
- <20170522085615.GC30129@e104818-lin.cambridge.arm.com>
- <20170522115349.GA82957@localhost> <20170522122236.GG1107@arm.com>
- <20170522142059.GA83004@localhost>
-Message-ID: <20170522154947.GF30129@e104818-lin.cambridge.arm.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Mon, 22 May 2017 17:53:54 +0200
+Subject: [PATCH v2 1/2] ACPICA: IORT: Update SMMU models for IORT rev. C
+In-Reply-To: <20170522154917.GA16981@rric.localdomain>
+References: <11ef7d28c535c01d42b7b3c8e632934f0e0f1048.1495459319.git.robin.murphy@arm.com>
+ <20170522154917.GA16981@rric.localdomain>
+Message-ID: <20170522155354.GB16981@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 02:21:00PM +0000, Jayachandran C wrote:
-> On Mon, May 22, 2017 at 01:22:37PM +0100, Will Deacon wrote:
-> > On Mon, May 22, 2017 at 11:53:50AM +0000, Jayachandran C wrote:
-> > > On Mon, May 22, 2017 at 09:56:16AM +0100, Catalin Marinas wrote:
-> > > > On Mon, May 22, 2017 at 07:01:45AM +0000, Jayachandran C wrote:
-> > > > > From its definition, the device "gather" attribute seems to be a better
-> > > > > fit for implementing write combining mapping in ioremap_wc().  And on
-> > > > > ThunderX2, Device GRE mapping has optimizations that makes it much faster
-> > > > > than normal uncached mapping.
-> > > > > 
-> > > > > I am not sure of the reasoning behind the original decision to make
-> > > > > ioremap_wc use "Normal Non-Cached" attribute, since all the other variants
-> > > > > of ioremap use device attributes, and ioremap_wc looks like an exception.
-> > > > 
-> > > > The reason we kept it as Normal NC is that Device_GRE does not allow
-> > > > unaligned accesses.
-> > > 
-> > > There does not to be an expectation to have unaligned access on __iomem
-> > > pointers. I also see that memremap can call ioremap_wc (which is a Normal
-> > > mapping) or ioremap_wt(which is a Device mapping), so that is inconsistent
-> > > as well.
-> > > 
-> > > Was this added for a specific use case? Also, do you think this patchset
-> > > is acceptable?
+On 22.05.17 17:49:17, Robert Richter wrote:
+> On 22.05.17 16:06:37, Robin Murphy wrote:
+> > IORT revision C has been published with a number of new SMMU
+> > implementation identifiers. Since IORT doesn't have any way of falling
+> > back to a more generic model code, we really need Linux to know about
+> > these before vendors start updating their firmware tables to use them.
 > > 
-> > I think it was used for framebuffers. Note that using normal-NC also aligns
-> > with arch/arm/ and, since normal-NC is strictly a more relaxed memory type
-> > than Device-GRE, I'm really not keen making on this change.
+> > CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+> > CC: Robert Moore <robert.moore@intel.com>
+> > CC: Lv Zheng <lv.zheng@intel.com>
+> > Acked-by: Robert Richter <rrichter@cavium.com>
+> > Tested-by: Robert Richter <rrichter@cavium.com>
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 > 
-> If there is a hardware requirement that Normal-NC has to be implemented
-> as more relaxed attribute than Device GRE, I can go back to the hardware
-> team on this. I did not see any text in the ARM ARM requiring this.
+> Robin, the stable tag is missing here, but we will need it for #2.
 
-It depends what you mean by "relaxed". Normal NC allows unaligned
-accesses and also allows speculative loads (you don't get any ordering
-guarantees of the Device memory). If you mean skipping some transparent
-cache snooping, it may break other use-cases.
+I just noticed the additional #defines in #2. So no need to mark this
+one stable too.
 
-> Even if that is the case, having Normal attribute for ioremap just for
-> ioremap_wc is inconsistent. The Device Gathering attribute by its definition
-> is exactly what write combining requires. The memremap() API looks like a
-> better way to expose Normal-NC mapping (with additional features like
-> speculation etc.) if implemented correctly.
-
-I agree, memremap() is a better way but this was merged in 4.3 while
-ioremap_wc() had been around for a long time. If you want to change its
-semantics, you'd need to go through all its uses in the kernel and make
-sure they *only* use I/O accessors with such memory. At a quick grep,
-there are several places where the __iomem pointer attribute is dropped
-shortly after ioremap() and the pointer is accessed directly. That's
-where things will break with Device GRE memory since the compiler
-doesn't guarantee aligned accesses.
-
-> Also, patch 1/2 should be useful anyway - can that be picked up?
-
-The patch is harmless but are we going to have a user of Device_GRE?
-
--- 
-Catalin
+-Robert
