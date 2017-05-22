@@ -1,23 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 22 May 2017 16:24:51 +0100
-Subject: [PATCH v2 2/3] KVM: arm/arm64: Separate guest and uaccess writes
- to dist {sc}active
-In-Reply-To: <20170516100431.4101-3-cdall@linaro.org>
-References: <20170516100431.4101-1-cdall@linaro.org>
- <20170516100431.4101-3-cdall@linaro.org>
-Message-ID: <eca50759-8682-d897-9ee1-22b285be8a54@arm.com>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Mon, 22 May 2017 15:24:55 +0000 (UTC)
+Subject: [15/16] hostap: convert hostap_cmd_queue.usecnt from atomic_t to
+ refcount_t
+In-Reply-To: <1490691403-4016-16-git-send-email-elena.reshetova@intel.com>
+References: <1490691403-4016-16-git-send-email-elena.reshetova@intel.com>
+Message-ID: <20170522152456.17EC860B7D@smtp.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/05/17 11:04, Christoffer Dall wrote:
-> Factor out the core register modifier functionality from the entry
-> points from the register description table, and only call the
-> prepare/finish functions from the guest path, not the uaccess path.
+Elena Reshetova <elena.reshetova@intel.com> wrote:
+> refcount_t type and corresponding API should be
+> used instead of atomic_t when the variable is used as
+> a reference counter. This allows to avoid accidental
+> refcounter overflows that might lead to use-after-free
+> situations.
 > 
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
+> Signed-off-by: Hans Liljestrand <ishkamiel@gmail.com>
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> Signed-off-by: David Windsor <dwindsor@gmail.com>
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+2 patches applied to wireless-drivers-next.git, thanks.
 
-	M.
+552aa585faff hostap: convert hostap_cmd_queue.usecnt from atomic_t to refcount_t
+0aeffa7041d8 orinoco_usb: convert request_context.refcount from atomic_t to refcount_t
+
 -- 
-Jazz is not dead. It just smells funny...
+https://patchwork.kernel.org/patch/9648427/
+
+https://wireless.wiki.kernel.org/en/developers/documentation/submittingpatches
