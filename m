@@ -1,77 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 22 May 2017 09:26:08 -0500
-Subject: [PATCH v4 00/20] eeprom: at24: Add OF device ID table
-In-Reply-To: <CAMuHMdXbhkGGFC80-39Axzv=BdEXyBNuPuHCSWW3eXWDB=SQ+w@mail.gmail.com>
-References: <20170522140208.24652-1-javier@dowhile0.org>
- <CAMuHMdXbhkGGFC80-39Axzv=BdEXyBNuPuHCSWW3eXWDB=SQ+w@mail.gmail.com>
-Message-ID: <CAL_JsqL2P=C+xRyL-BCC=RtFah4BRf8BHSvWNPZ+6r2ioSk_Yw@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 22 May 2017 16:30:49 +0200
+Subject: [PATCH v3 1/3] Documentation/bindings: Document the SafeXel
+ cryptographic engine driver
+In-Reply-To: <7986721e-3a2b-23fb-61d7-7032f0d65533@arm.com>
+References: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
+ <20170424075407.19730-2-antoine.tenart@free-electrons.com>
+ <7986721e-3a2b-23fb-61d7-7032f0d65533@arm.com>
+Message-ID: <20170522143049.GD14976@kwain.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 9:23 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Javier,
->
-> On Mon, May 22, 2017 at 4:01 PM, Javier Martinez Canillas
-> <javier@dowhile0.org> wrote:
->> This series is a follow-up to patch [0] that added an OF device ID table
->> to the at24 EEPROM driver. As you suggested [1], this version instead of
->> adding entries for every used <vendor,device> tuple, only adds a single
->> entry for each chip type using the "atmel" vendor as a generic fallback.
->>
->> This is a re-spin that addresses some issues pointed out by Rob Herring.
->>
->> The first patch documents in the DT binding what's the correct vendor to
->> use and what are the ones that are being deprecated. The second one adds
->> the OF device ID table for the at24 driver and the next patches use this
->> vendor in the compatible string to each DTS that defines a compatible I2C
->> EEPROM device node.
->>
->> Patches can be applied independently since the DTS changes without driver
->> changes are no-op and the OF table won't be used without the DTS changes.
->>
->> [0]: https://lkml.org/lkml/2017/3/14/589
->> [1]: https://lkml.org/lkml/2017/3/15/99
->>
->> Best regards,
->> Javier
->>
->> Changes in v4:
->> - Document the manufacturers that have been deprecated (Rob Herring).
->> - Only use the atmel manufacturer in the compatible string instead of
->>   keeping the deprecated ones (Rob Herring).
->
-> I think you're referring to this (https://lkml.org/lkml/2017/4/19/1136)?
->
-> | > --- a/arch/arm/boot/dts/am335x-baltos.dtsi
-> | > +++ b/arch/arm/boot/dts/am335x-baltos.dtsi
-> | > @@ -255,7 +255,7 @@
-> | >     };
-> | >
-> | >     at24 at 50 {
-> | > -           compatible = "at24,24c02";
-> | > +           compatible = "at24,24c02", "atmel,24c02";
-> |
-> | I think you can just drop the at24 compatibles. A new kernel doesn't
-> | need it. An old kernel ignores the manufacturer. I checked that u-boot
-> | only matches on "atmel,*", so okay there. Don't know about the *BSDs. I
-> | couldn't find anything.
->
-> I think you misunderstood what Rob means.
->
-> In the case above it makes sense to drop the first compatible, as "at24" is
-> not a manufacturer, but refers to ATMEL's "AT24" line of i2c FLASH ROMs.
->
-> However, in cases where a real vendor/part combo is specified, like on
-> r8a7791-koelsch.dts:
->
-> -               compatible = "renesas,24c02";
-> +               compatible = "atmel,24c02";
->
-> you do want to keep the real vendor/part combo, i.e.
->
->      compatible = "renesas,24c02", "atmel,24c02";
+Hi Marc,
 
-Yes, Geert is correct.
+On Wed, May 03, 2017 at 05:36:38PM +0100, Marc Zyngier wrote:
+> On 24/04/17 08:54, Antoine Tenart wrote:
+> > +
+> > +	crypto: crypto at 800000 {
+> > +		compatible = "inside-secure,safexcel-eip197";
+> > +		reg = <0x800000 0x200000>;
+> > +		interrupts = <GIC_SPI 34 (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH)>,
+> 
+> I'm puzzled. How can the interrupt can be both level *and* edge? That
+> doesn't make any sense.
 
-Rob
+I agree this looks odd. I took it from Russel's ICU mapping:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/489040.html
+
+The driver does not use this interrupt (yet?). I'm not sure what is this
+interrupt exact configuration...
+
+Do you want me to remove this from the documentation (and device trees)?
+
+Thanks,
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
