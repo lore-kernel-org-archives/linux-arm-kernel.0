@@ -1,52 +1,86 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 22 May 2017 09:02:34 +0200
-Subject: [PATCH 1/1] xilinx ps uart: Adding a kernel parameter for the
- number of xilinx ps uarts
-In-Reply-To: <20170520172008.5a979e8a@alans-desktop>
-References: <20170520022154.6766-1-kernel.development@povil.us>
- <20170520172008.5a979e8a@alans-desktop>
-Message-ID: <517d864d-d230-3abc-eb3c-4b628dc4625f@xilinx.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Mon, 22 May 2017 14:27:35 +0800
+Subject: [RFC PATCH 05/30] iommu/arm-smmu-v3: Disable tagged pointers when
+ ATS is in use
+In-Reply-To: <20170227195441.5170-6-jean-philippe.brucker@arm.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-6-jean-philippe.brucker@arm.com>
+Message-ID: <592284D7.60002@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
 
-On 20.5.2017 18:20, Alan Cox wrote:
-> On Fri, 19 May 2017 20:21:54 -0600
-> Sam Povilus <kernel.development@povil.us> wrote:
+
+On 2017/2/28 3:54, Jean-Philippe Brucker wrote:
+> The ARM architecture has a "Top Byte Ignore" (TBI) option that makes the
+> MMU mask out bits [63:56] of an address, allowing a userspace application
+> to store data in its pointers.
 > 
->> The number of xilinx ps uart should be set by a kernel parameter instead of
->> using a #define. This allows the user to set the number of xilinx ps uart
->> using only kconfig and not modifying kernel source.
->>
->> The ps uart is used in Xilnx Zynq chips usually in quantities maxing at
->> two, but there may be other chips that use more in the future or that I
->> don't know about. 
+> The ATS doesn't have an architected mechanism to enable TBI, and might
+> create ATC entries for addresses that include a tag. Software would then
+> have to send ATC invalidation packets for each 255 possible alias of an
+> address, or just wipe the whole address space. This is not a viable
+> option, so disable TBI when ATS is in use.
 > 
-> If it maxes at two then just set it to two. If in in future it maxes at
-> lots then when it's going to happen change the code to do dynamic
-> allocation and test it versus actual hardware. 
+> It is unclear for the moment how this restriction will affect user
+> applications. One example I can imagine (with my complete lack of
+> knowledge about JIT engines and their use of tagged pointers) is a JIT
+> translating a WebCL applications that uses SVM. Since this kind of
+> interpreted language doesn't expose addresses, the interpreter and SVM
+> implementations will be given the opportunity to do the right thing and
+> remove tags before handing pointers to devices.
 > 
-> Otherwise you break some of the basic ideas of having one kernel for many
-> systems.
+> Ideally we should remove TBI only for domains that are susceptible to use
+> ATS. But at the point we're writing the context descriptor of a domain, we
+> are still probing the first device in the group. If that device doesn't
+> have an ATC but the next one does, we would then have to clear the TBI
+> bit, invalidate the ATCs of previous devices, and notify the drivers that
+> their devices cannot use tagged pointers anymore. Such a level of
+> complexity doesn't make any sense here since it is unlikely devices will
+> use tagged pointers at all.
+> 
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index e7b940146ae3..06b29d4fcf65 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -987,7 +987,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+>  }
+>  
+>  /* Context descriptor manipulation functions */
+> -static u64 arm_smmu_cpu_tcr_to_cd(u64 tcr)
+> +static u64 arm_smmu_cpu_tcr_to_cd(struct arm_smmu_device *smmu, u64 tcr)
+>  {
+>  	u64 val = 0;
+>  
+> @@ -1000,7 +1000,8 @@ static u64 arm_smmu_cpu_tcr_to_cd(u64 tcr)
+>  	val |= ARM_SMMU_TCR2CD(tcr, EPD0);
+>  	val |= ARM_SMMU_TCR2CD(tcr, EPD1);
+>  	val |= ARM_SMMU_TCR2CD(tcr, IPS);
+> -	val |= ARM_SMMU_TCR2CD(tcr, TBI0);
+> +	if (!(smmu->features & ARM_SMMU_FEAT_ATS))
+> +		val |= ARM_SMMU_TCR2CD(tcr, TBI0);
+Maybe we should always disable TBI. Otherwise, a device behind a ATS supported or
+non-supported SMMU should use different strategies.
 
+>  
+>  	return val;
+>  }
+> @@ -1014,7 +1015,7 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_device *smmu,
+>  	 * We don't need to issue any invalidation here, as we'll invalidate
+>  	 * the STE when installing the new entry anyway.
+>  	 */
+> -	val = arm_smmu_cpu_tcr_to_cd(cfg->cd.tcr) |
+> +	val = arm_smmu_cpu_tcr_to_cd(smmu, cfg->cd.tcr) |
+>  #ifdef __BIG_ENDIAN
+>  	      CTXDESC_CD_0_ENDI |
+>  #endif
+> 
 
-We have in soc vendor tree similar patch but the reason is different.
-
-    tty: serial: Added a CONFIG_SERIAL_XILINX_NR_UARTS option.
-
-    This patch Adds CONFIG_SERIAL_XILINX_NR_UARTS option to allow
-    the user to provide the Max number of uart ports information.
-    If multiple cards (or) PL UARTS are present, the default limit
-    of 2 ports should be increased.
-
-I haven't checked all drivers but in our case we have added this as
-quick fix for scenarios where you use serial aliases where alias is
-pointed to serial2 or more.
-In cdns_uart_init() cdns_uart_uart_driver is passed which contains .nr
-which is required to be passed.
-
-What's the best driver to look at dynamic allocation?
-
-Thanks,
-Michal
+-- 
+Thanks!
+BestRegards
