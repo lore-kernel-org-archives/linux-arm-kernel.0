@@ -1,35 +1,37 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Mon, 22 May 2017 15:09:32 +0300
-Subject: [PATCH 2/5][v2] staging: fsl-mc: add binding path to MAINTAINERS
+Date: Mon, 22 May 2017 15:09:33 +0300
+Subject: [PATCH 3/5] staging: fsl-mc: drop reference to restool
 In-Reply-To: <20170522120935.4119-1-laurentiu.tudor@nxp.com>
 References: <20170522120935.4119-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170522120935.4119-3-laurentiu.tudor@nxp.com>
+Message-ID: <20170522120935.4119-4-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
+Drop reference to user space restool utility from the README.
+It will be added back together with the actual support in the
+bus driver.
+
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
+ drivers/staging/fsl-mc/README.txt | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Notes:
-    -v2
-      -no changes
-
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9e98464..ffac090 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -10545,6 +10545,7 @@ M:	Laurentiu Tudor <laurentiu.tudor@nxp.com>
- L:	linux-kernel at vger.kernel.org
- S:	Maintained
- F:	drivers/staging/fsl-mc/
-+F:	Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+diff --git a/drivers/staging/fsl-mc/README.txt b/drivers/staging/fsl-mc/README.txt
+index 179536a..d7cd70a 100644
+--- a/drivers/staging/fsl-mc/README.txt
++++ b/drivers/staging/fsl-mc/README.txt
+@@ -131,9 +131,7 @@ in creating a network interfaces.
  
- QT1010 MEDIA DRIVER
- M:	Antti Palosaari <crope@iki.fi>
+     DPRCs can be defined statically and populated with objects
+     via a config file passed to the MC when firmware starts
+-    it.  There is also a Linux user space tool called "restool"
+-    that can be used to create/destroy containers and objects
+-    dynamically.
++    it.
+ 
+ -DPAA2 Objects for an Ethernet Network Interface
+ 
 -- 
 2.9.4
