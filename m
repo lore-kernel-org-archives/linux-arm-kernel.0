@@ -1,10 +1,10 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 23 May 2017 15:34:41 +0200
-Subject: [PATCH v5 13/20] ARM: dts: zynq: Add generic compatible string for
- I2C EEPROM
+Date: Tue, 23 May 2017 15:34:42 +0200
+Subject: [PATCH v5 14/20] arm64: dts: ls1043a: Add generic compatible string
+ for I2C EEPROM
 In-Reply-To: <20170523133448.4794-1-javier@dowhile0.org>
 References: <20170523133448.4794-1-javier@dowhile0.org>
-Message-ID: <20170523133448.4794-14-javier@dowhile0.org>
+Message-ID: <20170523133448.4794-15-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -31,35 +31,26 @@ Changes in v4:
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/boot/dts/zynq-zc702.dts | 2 +-
- arch/arm/boot/dts/zynq-zc706.dts | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index 0cdad2cc8b78..f8c840f7118f 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -136,7 +136,7 @@
- 			#size-cells = <0>;
- 			reg = <2>;
- 			eeprom at 54 {
--				compatible = "at,24c08";
-+				compatible = "atmel,24c08";
- 				reg = <0x54>;
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-index ad4bb06dba25..76492be4a912 100644
---- a/arch/arm/boot/dts/zynq-zc706.dts
-+++ b/arch/arm/boot/dts/zynq-zc706.dts
-@@ -92,7 +92,7 @@
- 			#size-cells = <0>;
- 			reg = <2>;
- 			eeprom at 54 {
--				compatible = "at,24c08";
-+				compatible = "atmel,24c08";
- 				reg = <0x54>;
- 			};
- 		};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+index d64370ed0738..0a3853240c8b 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+@@ -75,11 +75,11 @@
+ 		reg = <0x4c>;
+ 	};
+ 	eeprom at 52 {
+-		compatible = "at24,24c512";
++		compatible = "atmel,24c512";
+ 		reg = <0x52>;
+ 	};
+ 	eeprom at 53 {
+-		compatible = "at24,24c512";
++		compatible = "atmel,24c512";
+ 		reg = <0x53>;
+ 	};
+ 	rtc at 68 {
 -- 
 2.9.3
