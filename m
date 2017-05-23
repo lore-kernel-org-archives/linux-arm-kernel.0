@@ -1,93 +1,77 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Tue, 23 May 2017 20:07:26 +0800
-Subject: [PATCH 12/12] arm64: dts: hikey960: add LED nodes
-In-Reply-To: <20170523004820.6x3lo3woqgrlnrtn@rob-hp-laptop>
-References: <20170517083745.24479-1-guodong.xu@linaro.org>
- <20170517083745.24479-13-guodong.xu@linaro.org>
- <20170523004820.6x3lo3woqgrlnrtn@rob-hp-laptop>
-Message-ID: <CAFGCpxwP-gvWocqcBmfzuNbMtE9NwUCTU+820F7vqCPcZT7QRg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 23 May 2017 14:11:04 +0200
+Subject: [PATCH 0/8] arm64: hi6220-hikey: Fix WiFi support
+In-Reply-To: <CAK8P3a2sO9+LVRu+Mjj_K+-1MtQhfSs33J+0EMEq+Um35=2Aow@mail.gmail.com>
+References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFqi2jiqKESdz8izq6thr6GT0HQDKt6xRKzwaCQ-mkMNSw@mail.gmail.com>
+ <CAK8P3a2sO9+LVRu+Mjj_K+-1MtQhfSs33J+0EMEq+Um35=2Aow@mail.gmail.com>
+Message-ID: <CAPDyKFpXYJ2EVTw7yVpXyJNDZmHMUj7FJmGbE5RLBLjV7KDRxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 8:48 AM, Rob Herring <robh@kernel.org> wrote:
-> On Wed, May 17, 2017 at 04:37:45PM +0800, Guodong Xu wrote:
->> HiKey960 has four user LEDs, and two special purpose LEDs: WiFi and BT
->> respectively.
+On 23 May 2017 at 14:00, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Mon, May 22, 2017 at 10:40 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> + Arnd, Rob
 >>
->> All of them are implemented as GPIO.
+>> On 8 May 2017 at 18:21, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> The Hikey board has a Wifi chip attached to the SDIO bus, which is managed by a
+>>> dwmmc controller. This is currently broken in that way that not even the SDIO
+>>> card is being detected.
+>>>
+>>> To fix this we need to make sure the correct resources are described for the
+>>> dwmmc controller, so the mmc core can power on/off the SDIO/WiFi chip
+>>> correctly. This is the main issue today.
+>>>
+>>> I have picked up one change from Daniel Lezcano's earlier submission [1] and
+>>> folded that into this series, as the Wifi support depends on it. As a matter of
+>>> fact I have even split Daniel's change into two halves, one for DT
+>>> documentation and one for arm64 hikey dts.
+>>>
+>>> It's important that this series goes together as to conform with TI's HW spec
+>>> of the wl18xx Wifi chip, as to prevent it from being damaged. We can either go
+>>> via arm-soc, unless Wei Xu the Hikey SoC maintainer, prefers to ack the dts
+>>> changes, then I can pick the series via my mmc tree.
+>>>
+>>> Moreover, I would suggest we send this as fixes for the 4.12 rcs to get the
+>>> Wifi working for Hikey again.
 >>
->> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->> ---
->>  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 48 +++++++++++++++++++++++
->>  1 file changed, 48 insertions(+)
+>> This series fixes my wifi issues on the Hikey board and currently all
+>> but the hikey dts changes seems to be okay/acked.
 >>
->> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->> index 6de86c0..4839885 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->> @@ -48,6 +48,54 @@
->>                               linux,code = <KEY_POWER>;
->>                       };
->>               };
->> +
->> +             leds {
+>> Rob and me had some discussions regarding the new mmc DT binding,
+>> however in the last response from Rob he indicates that he is not
+>> objecting to adding the new binding.
+>>
+>> So, unless I hear some objection from any of you, I am going to queue
+>> this up for fixes via my mmc tree within a day or so.
 >
-> This too should move out of the soc node.
+> Hi Ulf,
+>
+> I looked at all the changes, and they seem reasonable to me. Please
+> add my
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
 
-Thanks, Rob. I will fix these.
+Thanks Arnd!
 
--Guodong
+> and put them into a separate branch that you merge into your mmc
+> git, so we can merge the changes with the other updates in case
+> there are conflicts.
+
+I do that!
+
+However, these will be sent as fixes for 4.12 rcs. I guess you can
+pull the changes from there later instead.
 
 >
->> +                     compatible = "gpio-leds";
->> +                     status = "disabled";
->> +                     user_led1 {
->> +                             label = "user_led1";
->> +                             /* gpio_150_user_led1 */
->> +                             gpios = <&gpio18 6 0>;
->> +                             linux,default-trigger = "heartbeat";
->> +                     };
->> +
->> +                     user_led2 {
->> +                             label = "user_led2";
->> +                             /* gpio_151_user_led2 */
->> +                             gpios = <&gpio18 7 0>;
->> +                             linux,default-trigger = "mmc0";
->> +                     };
->> +
->> +                     user_led3 {
->> +                             label = "user_led3";
->> +                             /* gpio_189_user_led3 */
->> +                             gpios = <&gpio23 5 0>;
->> +                             default-state = "off";
->> +                     };
->> +
->> +                     user_led4 {
->> +                             label = "user_led4";
->> +                             /* gpio_190_user_led4 */
->> +                             gpios = <&gpio23 6 0>;
->> +                             linux,default-trigger = "cpu0";
->> +                     };
->> +
->> +                     wlan_active_led {
->> +                             label = "wifi_active";
->> +                             /* gpio_205_wifi_active */
->> +                             gpios = <&gpio25 5 0>;
->> +                             linux,default-trigger = "phy0tx";
->> +                             default-state = "off";
->> +                     };
->> +
->> +                     bt_active_led {
->> +                             label = "bt_active";
->> +                             gpios = <&gpio25 7 0>;
->> +                             /* gpio_207_user_led1 */
->> +                             linux,default-trigger = "hci0rx";
->> +                             default-state = "off";
->> +                     };
->> +             };
->>       };
->>  };
->>
->> --
->> 2.10.2
->>
+> I see that the only code change is in patch 2. Are you able to put
+> that patch last in the series without introducing bisection problems?
+> That would be preferred, as it allows us to keep a pure 'DT' branch
+> if we end up merging your other seven patches in.
+
+Unfortunate not. Because of one may then end up running an incorrect
+power off sequence, potentially damaging the Wifi chip.
+
+Kind regards
+Uffe
