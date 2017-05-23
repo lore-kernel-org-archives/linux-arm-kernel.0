@@ -1,118 +1,87 @@
-From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Tue, 23 May 2017 11:47:14 +0200
-Subject: [PATCH] arm: dts: r7s72100: Add support for GR-Peach
-Message-ID: <1495532834-25670-1-git-send-email-jacopo+renesas@jmondi.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 23 May 2017 11:49:00 +0200
+Subject: [GIT PULL] ARM: SoC fixes (and a cross-arch dt-include fix)
+In-Reply-To: <CAOesGMhfrWSvLtDtGRWBTJiAoeSwzGgsdUTm26j1mpoVu0ghDg@mail.gmail.com>
+References: <20170519193455.GA24206@localhost>
+ <CACRpkdaRdZTB39-=sAojO+OyHtP02KaFChqGcxy+fWA8qaB2bw@mail.gmail.com>
+ <CAOesGMhfrWSvLtDtGRWBTJiAoeSwzGgsdUTm26j1mpoVu0ghDg@mail.gmail.com>
+Message-ID: <CAMuHMdUivf9cw+LTn7UMueH=MMKi6i3wcOdgM6zbZBoxmkTZGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree source for Renesas GR-Peach board.
-GR-Peach is an RZ/A1H based board with 10MB of on-chip SRAM and 8MB
-QSPI flash storage.
-Add support for the board, and create a 2MB partition to use as rootfs.
+Hi Olof,
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
----
- Documentation/devicetree/bindings/arm/shmobile.txt |  2 +
- arch/arm/boot/dts/Makefile                         |  1 +
- arch/arm/boot/dts/r7s72100-grpeach.dts             | 65 ++++++++++++++++++++++
- 3 files changed, 68 insertions(+)
- create mode 100644 arch/arm/boot/dts/r7s72100-grpeach.dts
+On Mon, May 22, 2017 at 5:11 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, May 22, 2017 at 4:44 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Fri, May 19, 2017 at 9:34 PM, Olof Johansson <olof@lixom.net> wrote:
+>>>  - We've started telling people to avoid cross-tree shared branches if all
+>>>    they're doing is picking up one or two DT-used constants from a
+>>>    shared include file, and instead to use the numeric values on first
+>>>    submission. Follow-up moving over to symbolic names are sent in right
+>>>    after -rc1, i.e. here. It's only a few minor patches of this type.
+>>
+>> OK it seems like a reasonable process.
+>>
+>> It's not like I can think about anything better.
+>>
+>> I was more opting for doing things this way:
+>>
+>> - Create bindings and <dt-bindings/foo/bar.h> merge it into the
+>>   foo subsystem.
+>>
+>> - Merge driver into drivers/foo/bar.c that use <dt-bindings/foo/bar.h>
+>>
+>> - Submit DTS patch to ARM SoC (or whetever) using only numerical
+>>   values.
+>>
+>> - After the merge window, follow up with a patch replacing the
+>>   numerical constants with #defines from <dt-bindings/foo/bar.h>
+>
+> You're describing exactly what we've been pushing people towards.
+>
+> If it's just a few simple references it's not significantly more
+> awkward, and decouples merges and removes need for stable branches.
+> Essentially we've become slightly more lax in what we're willing to
+> consider _right after_ -rc1 to include these tweaks (and often patches
+> to turn on new drivers in defconfigs).
+>
+> If the amount of contents grows too large we might need to tweak
+> things further, maybe with something pre-rc1 but that's more awkward.
+>
+>> An alternative would obviously be to wait for the next merge window
+>> after merging the driver patch but I guess people are too impatient
+>> to do that (including me).
+>
+> Yeah, asking people to spread out across releases would remove
+> dependencies a lot, but it would also slow down progress and frustrate
+> a lot of contributors so we don't do that.
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index c950263..1199e48 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -51,6 +51,8 @@ Boards:
-     compatible = "renesas,bockw", "renesas,r8a7778"
-   - Genmai (RTK772100BC00000BR)
-     compatible = "renesas,genmai", "renesas,r7s72100"
-+  - GR-Peach (RTK772100BC00000BR)
-+    compatible = "renesas,grpeach", "renesas,r7s72100"
-   - Gose (RTP0RC7793SEB00010S)
-     compatible = "renesas,gose", "renesas,r8a7793"
-   - H3ULCB (R-Car Starter Kit Premier, RTP0RC7795SKB00010S)
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0118084..b238a3a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -716,6 +716,7 @@ dtb-$(CONFIG_ARCH_S5PV210) += \
- dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
- 	emev2-kzm9d.dtb \
- 	r7s72100-genmai.dtb \
-+	r7s72100-grpeach.dtb \
- 	r7s72100-rskrza1.dtb \
- 	r8a73a4-ape6evm.dtb \
- 	r8a7740-armadillo800eva.dtb \
-diff --git a/arch/arm/boot/dts/r7s72100-grpeach.dts b/arch/arm/boot/dts/r7s72100-grpeach.dts
-new file mode 100644
-index 0000000..5edd0a5
---- /dev/null
-+++ b/arch/arm/boot/dts/r7s72100-grpeach.dts
-@@ -0,0 +1,65 @@
-+/*
-+ * Device Tree Source for the GRPEACH board
-+ *
-+ * Copyright (C) 2017 Jacopo Mondi <jacopo+renesas@jmondi.org>
-+ * Copyright (C) 2016 Renesas Electronics
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "r7s72100.dtsi"
-+
-+/ {
-+	model = "GRPEACH";
-+	compatible = "renesas,grpeach", "renesas,r7s72100";
-+
-+	aliases {
-+		serial2 = &scif2;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttySC2,115200 ignore_loglevel rw root=/dev/mtdblock0";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x20000000 0x00A00000>;	/* 10Mb @ 0x20000000 */
-+
-+	};
-+
-+	lbsc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+	};
-+
-+	qspi at 18000000 {
-+		compatible = "mtd-rom";
-+		probe-type = "map_rom";
-+		reg = <0x18000000 0x00800000>;   /* 8 MB*/
-+		bank-width = <4>;
-+		device-width = <1>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		rootfs at 18600000 {
-+			label = "rootfs";
-+			reg = <0x00600000 0x00200000>; /* 2MB @ 0x18600000 */
-+		};
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <13330000>;
-+};
-+
-+&usb_x1_clk {
-+	clock-frequency = <48000000>;
-+};
-+
-+&scif2 {
-+	status = "okay";
-+};
--- 
-2.7.4
+The above works fine for new support, or for new platforms.
+
+There's still support being migrated from platform code to DT, which
+requires three steps:
+  1. New DT-aware driver support,
+  2. DT update to use the new driver support,
+  3. Clean up platform code after optional DTB backwards compatibility
+     grace period,
+To make matters worse, 1 may conflict with the existing platform code,
+and 2 must sometimes not be done before 1. Hence you may need three kernel
+releases.
+So we're already planning now what to clean up for v4.15 ;-)
+
+Would it be acceptable to do step 2 in the same release, after the driver
+support has entered in -rc1? I know this is more than just replacing
+numbers by symbolic values.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
