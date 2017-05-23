@@ -1,35 +1,74 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 23 May 2017 13:03:45 +0800
-Subject: [PATCH v2 0/9] crypto: add HMAC IPAD/OPAD constant
-In-Reply-To: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
-References: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170523050345.GF17569@gondor.apana.org.au>
+From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
+Date: Tue, 23 May 2017 08:24:18 +0300
+Subject: [V2, 2/6] tty: serial: lpuart: add little endian 32 bit register
+ support
+In-Reply-To: <20170519150722.GB23227@b29396-OptiPlex-7040>
+References: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
+ <b4a2ed13-c71f-c973-3b09-b632e083a88b@cogentembedded.com>
+ <20170517033139.GB9913@b29396-OptiPlex-7040>
+ <48819894-4943-7d14-ccf8-83cfd2195c9a@cogentembedded.com>
+ <AM3PR04MB306D5C86AED120D15C4D46A80E70@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <55bae8d2-0e23-b5e1-f304-63d9130ccb08@cogentembedded.com>
+ <20170517070019.GG9913@b29396-OptiPlex-7040>
+ <045d1888-4a23-cf73-ab4c-009e29fde974@cogentembedded.com>
+ <20170519150722.GB23227@b29396-OptiPlex-7040>
+Message-ID: <2f873a62-0e4e-7da6-5c5e-be570fcceff1@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 08:53:22AM +0200, Corentin Labbe wrote:
-> Hello
-> 
-> Many HMAC users directly use directly 0x36/0x5c values.
-> It's better with crypto to use a name instead of directly some crypto constant.
-> 
-> Changes since v1:
-> - Moved constant to include/crypto/hmac.h
-> - Added <crypto/hmac.h> to includes
-> 
-> Corentin Labbe (9):
->   crypto: add hmac IPAD/OPAD constant
->   crypto: brcm - Use IPAD/OPAD constant
->   crypto: ixp4xx - Use IPAD/OPAD constant
->   crypto: marvell - Use IPAD/OPAD constant
->   crypto: mv_cesa - Use IPAD/OPAD constant
->   crypto: omap-sham - Use IPAD/OPAD constant
->   crypto: qat - Use IPAD/OPAD constant
->   crypto: mediatek - Use IPAD/OPAD constant
->   crypto: ccp - Use IPAD/OPAD constant
+Hi,
 
-All applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+>>>> Alternative solution could be - have separate write path for earlycon.
+>>>
+>>> It looks to me having the same issue with a separate write patch
+>>> for earlycon as we still need distinguish Little or Big endian
+>>> for Layerscape and IMX.
+>>>
+>>>> At a glance, it is dozen lines of code.
+>>>
+>>> Would you please show some sample code?
+>>
+>> Do not reuse lpuart32_console_putchar() in earlycon code.
+>>
+>> Have two sets of early_setup/early_write/putchar - for BE and
+>> defaut-endian earlycon. And in these putchar's do not use
+>> lpuart_(read|write).
+>>
+> 
+> Isn't that introducing another consistency break after fix one
+> consistency break?
+> 
+> If doing that, we then have two register read/write APIs.
+> One for normal driver operation by dynamically checking lpuart_is_be
+> property to distinguish the endian difference problem.
+> Another is specifically implemented for only early console read/write
+> and use hardcoded way to read/write register directly instead of using
+> the standard API lpuart32_read/write, like follows:
+> e.g.
+> lpuart32_le_console_write() {
+> 	 writel();
+> }
+> 
+> lpuart32_be_console_write() {
+> 	 iowrite32be()
+> }
+> This also makes the driver a bit strange and ugly.
+> 
+> It looks to me both way are trade offs and the later one seems sacrifice
+> more. And i doubt if it's really necessary for probably a no real gain
+> purpose as the FPGA you mentioned is a theoretical case and less
+> possibility to exist.
+> 
+> I'm still wondering how about keep using the exist way and adding more
+> information in code to explain why use a global var?
+
+I've checked other driver under drivers/tty/serial/, for examples of
+similar cases.
+
+Please look at serial8250_early_in() / serial8250_early_out() ?
+These do handle different endian, via port->iotype
+
+Another example is drivers/tty/serial/samsung.c, where
+port->private_data is initialized and used.
+
+Nikita
