@@ -1,43 +1,48 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 23 May 2017 15:59:39 +0200
-Subject: [PATCH v3 5/5] ARM: dts: stm32: enable CRC32 on stm32429i-eval
- board
-In-Reply-To: <2819bf67e93e583229741b7f5f838fba85d41e33.1495463449.git.cosardindar@gmail.com>
-References: <cover.1495463449.git.cosardindar@gmail.com>
- <2819bf67e93e583229741b7f5f838fba85d41e33.1495463449.git.cosardindar@gmail.com>
-Message-ID: <eb66d194-ffbb-bf99-8af4-591790a4d83c@st.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 23 May 2017 16:00:25 +0200
+Subject: [PATCH v6 3/4] ARM: mvebu: Enable SENSORS_PWM_FAN in defconfig
+In-Reply-To: <CACRpkda6P026U4pBXPuEJ=cYu+Hz9N_-snXcOXr5c0Q9g4jBig@mail.gmail.com>
+ (Linus Walleij's message of "Mon, 24 Apr 2017 11:20:02 +0200")
+References: <20170414154056.32055-1-ralph.sennhauser@gmail.com>
+ <20170414154056.32055-4-ralph.sennhauser@gmail.com>
+ <CACRpkda6P026U4pBXPuEJ=cYu+Hz9N_-snXcOXr5c0Q9g4jBig@mail.gmail.com>
+Message-ID: <87lgpny8p2.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+ 
+ On lun., avril 24 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-
-On 05/22/2017 04:35 PM, Cosar Dindar wrote:
-> Enable the CRC32 crypto on stm32429i-eval board.
+> On Fri, Apr 14, 2017 at 5:40 PM, Ralph Sennhauser
+> <ralph.sennhauser@gmail.com> wrote:
 >
-> Signed-off-by: Cosar Dindar <cosardindar@gmail.com>
-> ---
-
-Will be applied in STM32 branch for next pull request.
-
-Thanks
-Alex
-
->  arch/arm/boot/dts/stm32429i-eval.dts | 4 ++++
->  1 file changed, 4 insertions(+)
+>> From: Andrew Lunn <andrew@lunn.ch>
+>>
+>> Now that the GPIO driver also supports PWM operation, enable the PWM
+>> framework and fan driver in mvebu_v7_defconfig.
+>>
+>> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+>> URL: https://patchwork.ozlabs.org/patch/427297/
+>> [Ralph Sennhauser: add fan driver to defconfig]
+>> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+>> Tested-by: Andrew Lunn <andrew@lunn.ch>
 >
-> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-> index b633114..360fb19 100644
-> --- a/arch/arm/boot/dts/stm32429i-eval.dts
-> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
-> @@ -141,6 +141,10 @@
->  	clock-frequency = <25000000>;
->  };
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 >
-> +&crc {
-> +	status = "okay";
-> +};
-> +
->  &i2c1 {
->  	pinctrl-0 = <&i2c1_pins>;
->  	pinctrl-names = "default";
+> Please funnel this through ARM SoC.
+
+Applied on mvebu/defconfig
+
+Thanks,
+
+Gregory
 >
+> Yours,
+> Linus Walleij
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
