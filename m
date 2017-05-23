@@ -1,69 +1,105 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 23 May 2017 16:24:53 +0200
-Subject: [PATCH 2/2] arm64: marvell: dts: add second 1G port on the Armada
- 8040 DB
-In-Reply-To: <1494890913-8360-3-git-send-email-mw@semihalf.com> (Marcin
- Wojtas's message of "Tue, 16 May 2017 01:28:33 +0200")
-References: <1494890913-8360-1-git-send-email-mw@semihalf.com>
- <1494890913-8360-3-git-send-email-mw@semihalf.com>
-Message-ID: <87zie3wszu.fsf@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 23 May 2017 09:26:29 -0500
+Subject: [PATCH v4 1/3] dt-bindings: Document STM32 I2S bindings
+In-Reply-To: <1495120793-11687-2-git-send-email-olivier.moysan@st.com>
+References: <1495120793-11687-1-git-send-email-olivier.moysan@st.com>
+ <1495120793-11687-2-git-send-email-olivier.moysan@st.com>
+Message-ID: <20170523142629.l3bcyqv7uzqsgme2@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On mar., mai 16 2017, Marcin Wojtas <mw@semihalf.com> wrote:
-
-> Armada 8040 DB is equipped with 4 (2x 10G SFI + 2x 1G RGMII)
-> ethernet ports of which only one was hitherto enabled.
-> Because currently mvpp2 driver is capable of supporting only
-> 1G RGMII/SGMII, enable second port from CP slave HW block.
->
-
-Applied on mvebu/dt64
-
-Thanks,
-
-Gregory
-
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+On Thu, May 18, 2017 at 05:19:51PM +0200, olivier moysan wrote:
+> Add documentation of device tree bindings for STM32 SPI/I2S.
+> 
+> Signed-off-by: olivier moysan <olivier.moysan@st.com>
 > ---
->  arch/arm64/boot/dts/marvell/armada-8040-db.dts | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> index dc0d084..3cde649 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> @@ -169,6 +169,22 @@
->  	status = "okay";
->  };
->  
-> +&cps_mdio {
-> +	phy0: ethernet-phy at 0 {
-> +		reg = <0>;
+>  .../devicetree/bindings/sound/st,stm32-i2s.txt     | 62 ++++++++++++++++++++++
+>  1 file changed, 62 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
+
+I see Mark already applied, but a few nits in the example. Please at 
+least make sure the dts files are fixed.
+
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-i2s.txt b/Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
+> new file mode 100644
+> index 0000000..4bda520
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/st,stm32-i2s.txt
+> @@ -0,0 +1,62 @@
+> +STMicroelectronics STM32 SPI/I2S Controller
+> +
+> +The SPI/I2S block supports I2S/PCM protocols when configured on I2S mode.
+> +Only some SPI instances support I2S.
+> +
+> +Required properties:
+> +  - compatible: Must be "st,stm32h7-i2s"
+> +  - reg: Offset and length of the device's register set.
+> +  - interrupts: Must contain the interrupt line id.
+> +  - clocks: Must contain phandle and clock specifier pairs for each entry
+> +	in clock-names.
+> +  - clock-names: Must contain "i2sclk", "pclk", "x8k" and "x11k".
+> +	"i2sclk": clock which feeds the internal clock generator
+> +	"pclk": clock which feeds the peripheral bus interface
+> +	"x8k": I2S parent clock for sampling rates multiple of 8kHz.
+> +	"x11k": I2S parent clock for sampling rates multiple of 11.025kHz.
+> +  - dmas: DMA specifiers for tx and rx dma.
+> +    See Documentation/devicetree/bindings/dma/stm32-dma.txt.
+> +  - dma-names: Identifier for each DMA request line. Must be "tx" and "rx".
+> +  - pinctrl-names: should contain only value "default"
+> +  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
+> +
+> +Optional properties:
+> +  - resets: Reference to a reset controller asserting the reset controller
+> +
+> +The device node should contain one 'port' child node with one child 'endpoint'
+> +node, according to the bindings defined in Documentation/devicetree/bindings/
+> +graph.txt.
+> +
+> +Example:
+> +sound_card {
+> +	compatible = "audio-graph-card";
+> +	dais = <&i2s2_port>;
+> +};
+> +
+> +i2s2: audio-controller at 40003800 {
+> +	compatible = "st,stm32h7-i2s";
+> +	reg = <0x40003800 0x400>;
+> +	interrupts = <36>;
+> +	clocks = <&rcc PCLK1>, <&rcc SPI2_CK>, <&rcc PLL1_Q>, <&rcc PLL2_P>;
+> +	clock-names = "pclk", "i2sclk",  "x8k", "x11k";
+> +	dmas = <&dmamux2 2 39 0x400 0x1>,
+> +           <&dmamux2 3 40 0x400 0x1>;
+> +	dma-names = "rx", "tx";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2s2>;
+> +
+> +	i2s2_port: port at 0 {
+
+Should not have a unit address here.
+
+> +		cpu_endpoint: endpoint {
+> +			remote-endpoint = <&codec_endpoint>;
+> +			format = "i2s";
+> +		};
 > +	};
 > +};
 > +
-> +&cps_ethernet {
-> +	status = "okay";
-> +};
-> +
-> +&cps_eth1 {
-> +	status = "okay";
-> +	phy = <&phy0>;
-> +	phy-mode = "rgmii-id";
-> +};
-> +
->  &ap_sdhci0 {
->  	status = "okay";
->  	bus-width = <4>;
-> -- 
-> 1.8.3.1
->
+> +audio-codec {
+> +	codec_port: port at 0 {
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Or here.
+
+> +		codec_endpoint: endpoint {
+> +			remote-endpoint = <&cpu_endpoint>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
