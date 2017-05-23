@@ -1,61 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 23 May 2017 08:05:47 +0100
-Subject: [DT Question] "simple-mfd" DT binding
-In-Reply-To: <CAK7LNAQ+DimarhHJOg=BqbH+EB19s+wgtRqJ8-XuLKW6_0FFaQ@mail.gmail.com>
-References: <CAK7LNARQmfX+3RwFgwtvf2Qu79XNX1zh0O741-pPFWS6npytLw@mail.gmail.com>
- <CACRpkdY88Zdp2zqabWPfYPnTwSzYuCqSQHQg9vF_+Zd=TFOvaA@mail.gmail.com>
- <CAK7LNAQ+DimarhHJOg=BqbH+EB19s+wgtRqJ8-XuLKW6_0FFaQ@mail.gmail.com>
-Message-ID: <20170523070547.hhxwrst6np6fpqql@dell>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 23 May 2017 09:13:07 +0200
+Subject: [PATCH v5 1/4] Documentation/bindings: Document the SafeXel
+ cryptographic engine driver
+In-Reply-To: <20170522213416.7440ee32@free-electrons.com>
+References: <20170522144514.6654-1-antoine.tenart@free-electrons.com>
+ <20170522144514.6654-2-antoine.tenart@free-electrons.com>
+ <20170522213416.7440ee32@free-electrons.com>
+Message-ID: <20170523071307.GA5465@kwain.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 May 2017, Masahiro Yamada wrote:
+Hi Thomas,
 
-> Hi Lee, Linus,
+On Mon, May 22, 2017 at 09:34:16PM +0200, Thomas Petazzoni wrote:
+> On Mon, 22 May 2017 16:45:11 +0200, Antoine Tenart wrote:
+> > +		interrupts = <GIC_SPI 34 (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH)>,
 > 
-> Thanks for your comments!
+> You already got the feedback previously that an interrupt that is both
+> edge and level at the same time doesn't make sense. Could you fix this?
 > 
-> 2017-05-22 17:43 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
-> > On Mon, May 22, 2017 at 3:29 AM, Masahiro Yamada
-> > <yamada.masahiro@socionext.com> wrote:
-> >
-> >> Because "simple-bus" indicates that child nodes are
-> >> simply memory mapped, but the node "register-bit-led"
-> >> can not be memory-mapped.
-> >> So, "simple-mfd" can not be replaced "simple-bus" here.
-> >
-> > Yeah... just like Lee points out, you are spot on, this is exactly
-> > the reason why we created "simple-mfd" in the first place
-> > IIRC.
-> 
-> OK, Linux treats simple-bus and simple-mfd in the same way
-> as far as I see drivers/of/platform.c
+> Also, the DTs that have already been merged by Gr?gory are wrong for
+> the same reason and should be fixed.
 
-Correct.  As I said, the functionality of the two are the same.  The
-difference is their meaning.  Initially we were using "simple-mfd" to
-achieve our aim (see below), but there was push-back due to the
-differences in what the two properties were trying to achieve.  Ergo,
-we introduced a second property.
+Sure, I'll fix this and send a new version :)
 
-> Perhaps, can we document the difference between simple-bus and
-> simple-mfd clearly?
-> For example, "Unlike simple-bus, it is legitimate that simple-mfd has
-> subnodes without reg property"
-> 
-> 
-> I think this is typical when "simple-mfd" is used together with "syscon".
-> The child devices will use regmap of the parent node.
-> I'd like to be sure this is valid usage.
-
-"simple-mfd" simply means "register all of my child nodes using the
-platform API without any further intervention".  It's goal is to
-prevent the MFD subsystem from being stuffed full of drivers where
-their only purpose is to call of_platform_populate().  All other rules
-and policy which must be followed are generic DT ones.  To that end, I
-do not believe making further statements is necessary.
+Thanks,
+Antoine
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
