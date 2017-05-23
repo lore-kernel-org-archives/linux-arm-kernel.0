@@ -1,90 +1,66 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 May 2017 07:44:35 -0500
+Date: Tue, 23 May 2017 07:48:10 -0500
 Subject: [PATCH 05/12] arm64: dts: Add I2C nodes for Hi3660
-In-Reply-To: <c7f16d66-f884-b230-4b44-29d603af12ab@linaro.org>
+In-Reply-To: <94d06900-d871-7bc6-e1f3-d2b22ba20aaf@linaro.org>
 References: <20170517083745.24479-1-guodong.xu@linaro.org>
  <20170517083745.24479-6-guodong.xu@linaro.org>
  <20170523003908.ztuh4oohdk3g34pm@rob-hp-laptop>
  <94d06900-d871-7bc6-e1f3-d2b22ba20aaf@linaro.org>
- <c7f16d66-f884-b230-4b44-29d603af12ab@linaro.org>
-Message-ID: <CAL_JsqK5m1oAvAntaJt4CWTCR+j09xunf-QacMTQJWfO3_jxvA@mail.gmail.com>
+Message-ID: <CAL_JsqJUH-TOufw=dtpgDww_VEvyTW_LZuSQqRSU-cYbAqfJ6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 1:36 AM, zhangfei <zhangfei.gao@linaro.org> wrote:
+On Tue, May 23, 2017 at 12:55 AM, zhangfei <zhangfei.gao@linaro.org> wrote:
+> Hi, Rob
 >
 >
-> On 2017?05?23? 13:55, zhangfei wrote:
+> Thanks for the review.
+>
+>
+> On 2017?05?23? 08:39, Rob Herring wrote:
 >>
->> Hi, Rob
->>
->>
->> Thanks for the review.
->>
->> On 2017?05?23? 08:39, Rob Herring wrote:
+>> On Wed, May 17, 2017 at 04:37:38PM +0800, Guodong Xu wrote:
 >>>
->>> On Wed, May 17, 2017 at 04:37:38PM +0800, Guodong Xu wrote:
->>>>
->>>> From: Zhangfei Gao <zhangfei.gao@linaro.org>
->>>>
->>>> Add I2C nodes for Hi3660-hikey960.
->>>>
->>>> On HiKey960,
->>>> I2C0, I2C7 is connected to Low Speed Expansion Connector.
->>>> I2C1 is connected to ADV7535.
->>>> I2C3 is connected to USB5734.
->>>>
->>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>>> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->>>> ---
->>>>   arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 18 ++++++++
->>>>   arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 56
->>>> +++++++++++++++++++++++
->>>>   2 files changed, 74 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->>>> b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->>>> index 64875a5..f685b1e 100644
->>>> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->>>> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
->>>> @@ -29,6 +29,24 @@
->>>>       };
->>>>   };
->>>>   +&i2c0 {
->>>> +    status = "okay";
->>>> +};
->>>> +
->>>> +&i2c1 {
->>>> +    status = "okay";
->>>> +
->>>> +    adv7533: adv7533 at 39 {
->>>> +        status = "ok";
->>>> +        compatible = "adi,adv7533";
->>>> +        reg = <0x39>;
->>>> +    };
->>>> +};
->>>> +
->>>> +&i2c7 {
->>>> +    status = "okay";
->>>> +};
+>>> From: Zhangfei Gao <zhangfei.gao@linaro.org>
 >>>
->>> labels for the LS connector?
->
->
-> Do you mean arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
->
->                 i2c at 78ba000 {
->                 /* On Low speed expansion */
->                         label = "LS-I2C1";
->                         status = "okay";
->                 };
->
->                 spi at 78b7000 {
->                 /* On High speed expansion */
->                         label = "HS-SPI1";
->                         status = "okay";
->                 };
+>>> Add I2C nodes for Hi3660-hikey960.
+>>>
+>>> On HiKey960,
+>>> I2C0, I2C7 is connected to Low Speed Expansion Connector.
+>>> I2C1 is connected to ADV7535.
+>>> I2C3 is connected to USB5734.
 
-Yes. And the names need to align across boards to be useful.
+[...]
+
+>>> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>>> b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>>> index f55710a..f217c9d 100644
+>>> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>>> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>>> @@ -186,6 +186,62 @@
+>>>                         #reset-cells = <2>;
+>>>                 };
+>>>   +             i2c0: i2c at FFD71000 {
+>>
+>> lowercase hex please.
+>
+> Yes, will change
+>>
+>>
+>>> +                       compatible = "snps,designware-i2c";
+>>
+>> These should have an SoC specific compatible.
+>
+> We directly use drivers/i2c/busses/i2c-designware-platdrv.c,
+> do we still an soc specific compatible?
+
+It's fine if the driver uses the snps compatible, but the dts should
+still have an SoC specific one.
+
+> Checked arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi, and other examples,
+>
+> compatible = "snps,designware-i2c" is used.
+
+That was a mistake in the other platforms. We shouldn't continue repeating it.
 
 Rob
