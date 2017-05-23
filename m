@@ -1,39 +1,39 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 May 2017 10:22:33 -0500
-Subject: [PATCH 4/7] clk: mvebu: cp110: introduce a new binding
-In-Reply-To: <a9ba62b9d6432af430e2f9cf7212c3ba8e1c5f03.1495208533.git-series.gregory.clement@free-electrons.com>
+Date: Tue, 23 May 2017 10:23:39 -0500
+Subject: [PATCH 5/7] clk: mvebu: cp110: add sdio clock to cp-110 system
+ controller
+In-Reply-To: <1833f47fdfa5fd05e9135d98e03501d9634a865b.1495208533.git-series.gregory.clement@free-electrons.com>
 References: <cover.737145f06ff0191d1a9210bcd141e679bf45fe5f.1495208533.git-series.gregory.clement@free-electrons.com>
- <a9ba62b9d6432af430e2f9cf7212c3ba8e1c5f03.1495208533.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170523152233.5jxya2rgluric2pd@rob-hp-laptop>
+ <1833f47fdfa5fd05e9135d98e03501d9634a865b.1495208533.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170523152339.ngjr6djukrrqcvxm@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 05:55:22PM +0200, Gregory CLEMENT wrote:
-> The initial intent when the binding of the cp110 system controller was to
-> have one flat node. The idea being that what is currently a clock-only
-> driver in drivers would become a MFD driver, exposing the clock, GPIO and
-> pinctrl functionality. However, after taking a step back, this would lead
-> to a messy binding. Indeed, a single node would be a GPIO controller,
-> clock controller, pinmux controller, and more.
+On Fri, May 19, 2017 at 05:55:23PM +0200, Gregory CLEMENT wrote:
+> From: Konstantin Porotchkin <kostap@marvell.com>
 > 
-> This patch adopts a more classical solution of a top-level syscon node
-> with sub-nodes for the individual devices. The main benefit will be to
-> have each functional block associated to its own sub-node where we can
-> put its own properties.
+> This commit updates the CP110 system controller driver to add the
+> definition for a missing clock.
 > 
-> The introduction of the Armada 7K/8K is still in the early stage so the
-> plan is to remove the old binding. However, we don't want to break the
-> device tree compatibility for the few devices already in the field. For
-> this we still keep the support of the legacy compatible string with a big
-> warning in the kernel about updating the device tree.
-
-Good.
-
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> The SDIO clock is dedicated driving the SDHCI interface and its frequency
+> is 400MHz (2/5 of PLL source clock).
+> 
+> The SDIO interface should be bound to this clock and not the core clock
+> as in the older code.
+> Using the wrong clock lead to a maximum SDHCI frequency of 250 Mhz, while
+> the HW really supports up to 400 Mhz.
+> 
+> This patch also fixes the NAND clock relationship documentation.
+> 
+> Signed-off-by: Konstantin Porotchkin <kostap@marvell.com>
+> [gregory.clement at free-electrons.com:
+> - use sdio instead of emmc to name the clock
+> - update binding documentation]
 > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt | 18 ++++++++++++++----
->  drivers/clk/mvebu/cp110-system-controller.c                                | 63 ++++++++++++++++++++++++++++++++++++++++++++++++---------------
->  2 files changed, 62 insertions(+), 19 deletions(-)
+>  Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt |  1 +
+>  drivers/clk/mvebu/cp110-system-controller.c                                | 28 +++++++++++++++++++++++-----
+>  2 files changed, 24 insertions(+), 5 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
