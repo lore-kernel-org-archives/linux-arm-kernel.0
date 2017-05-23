@@ -1,80 +1,42 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 23 May 2017 13:35:48 -0500
-Subject: [PATCH v4 2/2] PCI: Add tango PCIe host bridge support
-In-Reply-To: <7a46cfa6-3c8a-33a6-a821-da49535c5c8a@free.fr>
-References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
- <4a354b33-d59c-4ebb-4b31-0388ac8090d4@sigmadesigns.com>
- <20170523172409.GD24431@bhelgaas-glaptop.roam.corp.google.com>
- <7a46cfa6-3c8a-33a6-a821-da49535c5c8a@free.fr>
-Message-ID: <20170523183548.GB2637@bhelgaas-glaptop.roam.corp.google.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 23 May 2017 20:41:39 +0200
+Subject: [PATCH 1/3] pinctrl: samsung: Constify wakeup driver specific data
+Message-ID: <20170523184141.24284-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 07:43:16PM +0200, Mason wrote:
-> On 23/05/2017 19:24, Bjorn Helgaas wrote:
-> > On Thu, Apr 20, 2017 at 04:31:25PM +0200, Marc Gonzalez wrote:
-> >> This driver is required to work around several hardware bugs in the
-> >> PCIe controller.
-> >>
-> >> NB: Revision 1 does not support legacy interrupts, or IO space.
-> >>
-> >> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/pci/tango-pcie.txt |  32 ++++++++
-> >>  drivers/pci/host/Kconfig                             |   8 ++
-> >>  drivers/pci/host/Makefile                            |   1 +
-> >>  drivers/pci/host/pcie-tango.c                        | 161 +++++++++++++++++++++++++++++++++++++++
-> >>  include/linux/pci_ids.h                              |   2 +
-> >>  5 files changed, 204 insertions(+)
-> >> ...
-> > 
-> >> +static int smp8759_config_read(struct pci_bus *bus,
-> >> +		unsigned int devfn, int where, int size, u32 *val)
-> >> +{
-> >> +	int ret;
-> >> +	struct pci_config_window *cfg = bus->sysdata;
-> >> +	struct tango_pcie *pcie = dev_get_drvdata(cfg->parent);
-> >> +
-> >> +	/*
-> >> +	 * QUIRK #1
-> >> +	 * Reads in configuration space outside devfn 0 return garbage.
-> >> +	 */
-> >> +	if (devfn != 0)
-> >> +		return PCIBIOS_FUNC_NOT_SUPPORTED;
-> >> +
-> >> +	/*
-> >> +	 * QUIRK #2
-> >> +	 * Unfortunately, config and mem spaces are muxed.
-> >> +	 * Linux does not support such a setting, since drivers are free
-> >> +	 * to access mem space directly, at any time.
-> >> +	 * Therefore, we can only PRAY that config and mem space accesses
-> >> +	 * NEVER occur concurrently.
-> >> +	 */
-> >> +	writel_relaxed(1, pcie->mux);
-> >> +	ret = pci_generic_config_read(bus, devfn, where, size, val);
-> >> +	writel_relaxed(0, pcie->mux);
-> > 
-> > This is a major issue and possibly even a security problem.
-> > Unprivileged users can cause config accesses via lspci/setpci.
-> 
-> Since the host bridge doesn't support hotplug in any way,
-> how about setting a flag once enumeration is complete,
-> to prevent all future config accesses?
+Static exynos_irq_chip structures, containing driver specific data, are
+referenced only through opaque data pointer in const of_device_id table.
+The contents of pointed memory (exynos_irq_chip structure itself) is
+then copied with kmemdup() during wakeup initialization so
+exynos_irq_chip can be made const for code safenes.
 
-I thought about that, too, but I'm not sure it will work becuase I
-think drivers will need to do at least a few config accesses, e.g.,
-pci_enable_device() may write PCI_COMMAND to set PCI_COMMAND_MEMORY,
-it may read PCI_INTERRUPT_PIN, etc.  And MSI setup requires config
-access, too.
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ drivers/pinctrl/samsung/pinctrl-exynos.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> > I don't have a good suggestion for addressing it, but if you can't
-> > make this work reliably, you need at least a dev_err() in the probe
-> > function and probably a taint of the kernel (see add_taint()).
-> 
-> There is a chance that the issue will get fixed in rev2
-> of the bridge. But obviously, that won't help for rev1
-> already in the wild.
-
-Hopefully there will be a way to distinguish rev2 from rev1.
-
-Bjorn
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index 7b0e6cc35e04..cdea07af308a 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -387,7 +387,7 @@ static int exynos_wkup_irq_set_wake(struct irq_data *irqd, unsigned int on)
+ /*
+  * irq_chip for wakeup interrupts
+  */
+-static struct exynos_irq_chip exynos4210_wkup_irq_chip __initdata = {
++static const struct exynos_irq_chip exynos4210_wkup_irq_chip __initconst = {
+ 	.chip = {
+ 		.name = "exynos4210_wkup_irq_chip",
+ 		.irq_unmask = exynos_irq_unmask,
+@@ -403,7 +403,7 @@ static struct exynos_irq_chip exynos4210_wkup_irq_chip __initdata = {
+ 	.eint_pend = EXYNOS_WKUP_EPEND_OFFSET,
+ };
+ 
+-static struct exynos_irq_chip exynos7_wkup_irq_chip __initdata = {
++static const struct exynos_irq_chip exynos7_wkup_irq_chip __initconst = {
+ 	.chip = {
+ 		.name = "exynos7_wkup_irq_chip",
+ 		.irq_unmask = exynos_irq_unmask,
+-- 
+2.9.3
