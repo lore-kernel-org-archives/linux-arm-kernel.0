@@ -1,97 +1,52 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 May 2017 21:10:37 +0100
-Subject: [PATCH] ARM/shmem: Drop page coloring align for non-VIPT CPUs
-In-Reply-To: <4ba91200-3bc7-e6b0-69c1-40430b1b7e05@virtuozzo.com>
-References: <20170414100953.4703-1-dsafonov@virtuozzo.com>
- <571024bf-892d-4d08-dd9e-654b1e28c23e@virtuozzo.com>
- <20170425173546.GS17774@n2100.armlinux.org.uk>
- <4ba91200-3bc7-e6b0-69c1-40430b1b7e05@virtuozzo.com>
-Message-ID: <20170523201037.GH22219@n2100.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 May 2017 22:33:14 +0200
+Subject: [PATCH v4 6/7] ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class
+ cpus
+In-Reply-To: <20170523200142.GD22219@n2100.armlinux.org.uk>
+References: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
+ <1493029017-31382-7-git-send-email-vladimir.murzin@arm.com>
+ <20170523200142.GD22219@n2100.armlinux.org.uk>
+Message-ID: <CAK8P3a0tbaAHerjitDBJ9gz1SCFkAwKhfzjgMHiB5ESakQs7-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 02:22:57PM +0300, Dmitry Safonov wrote:
-> On 04/25/2017 08:35 PM, Russell King - ARM Linux wrote:
-> >On Tue, Apr 25, 2017 at 08:19:21PM +0300, Dmitry Safonov wrote:
-> >>On 04/14/2017 01:09 PM, Dmitry Safonov wrote:
-> >>>On ARMv6 CPUs with VIPT caches there are aliasing issues: if two
-> >>>different cache line indexes correspond to the same physical
-> >>>address, then changes made to one of the alias might be lost
-> >>>or they can overwrite each other. To overcome aliasing issues,
-> >>>the align for shared mappings was introduced with:
-> >>>
-> >>>commit 4197692eef113eeb8e3e413cc70993a5e667e5b8
-> >>>Author: Russell King <rmk@flint.arm.linux.org.uk>
-> >>>Date:   Wed Apr 28 22:22:33 2004 +0100
-> >>>
-> >>>     [ARM] Fix shared mmap()ings for ARM VIPT caches.
-> >>>
-> >>>     This allows us to appropriately align shared mappings on VIPT caches
-> >>>     with aliasing issues.
-> >>>
-> >>>Which introduced 4 pages align with SHMLBA, which resulted in
-> >>>unique physical address after any tag in cache (because two upper bits
-> >>>corresponding to page address get unused in tags).
-> >>>
-> >>>As this workaround is not needed by non-VIPT caches (like most armv7
-> >>>CPUs which have PIPT caches), ARM mmap() code checks if cache is VIPT
-> >>>aliasing for MAP_SHARED.
-> >>>
-> >>>The problem here is in shmat() syscall:
-> >>>1. if shmaddr is NULL then do_shmat() uses arch_get_unmapped_area()
-> >>>    to allocate shared mapping.
-> >>>2. if shmaddr is specified then do_shmat() checks that address has
-> >>>    SHMLBA alignment regardless to CPU cache aliasing.
-> >>>
-> >>>Which results on ARMv7 CPUs that shmat() with NULL shmaddr may return
-> >>>non-SHMLBA aligned address (page-aligned), but shmat() with the same
-> >>>address will fail.
-> >>>
-> >>>That is not critical issue for CRIU as after shmat() with NULL address,
-> >
-> >CRIU?  Please try to keep use of acronyms to a minimum.
-> >
-> >>>we can mremap() resulted shmem to restore shared memory mappings on the
-> >>>same address where they were on checkpointing.
-> >>>But it's still worth fixing because we can't reliably tell from
-> >>>userspace if the platform has VIPT cache, and so this mremap()
-> >>>workaround is done with HUGE warning that restoring application, that
-> >>>uses SHMBLA-unaligned shmem on ARMv6 CPU with VIPT cache may result
-> >>>in data corruptions.
-> >>>
-> >>>I also changed SHMLBA build-time check to init-time WARN_ON(), as
-> >>>it's not constant afterward.
-> >
-> >I'm not happy with this.  SHMLBA is defined by POSIX to be a constant,
-> >which means that if we want to have any kind of binary compatibility
-> >between different architecture versions, SHMLBA must be constant across
-> >all variants of the architecture.
-> >
-> >Making it dependent on the cache architecture means that userspace's
-> >assumptions can be broken.  Increasing it is not an issue (since SHMLBA
-> >is defined to be the address multiple - an address that is aligned to
-> >4-page is also by definition aligned to 1-page.)  So what I did back in
-> >2004 wasn't a problem.
-> >
-> >However, reducing it (as you're now suggesting) is - newly built programs
-> >are built today with:
-> >
-> >#define SHMLBA              (__getpagesize () << 2)
-> >
-> >so we must not allow the kernel to return addresses that violate that.
-> >As I say, we can't reduce SHMLBA now.
-> 
-> So, we violate this on return address with shmat(smid, NULL, shmflg)
-> when shmaddr == 0.
-> But we don't do this on shmat(smid, shmaddr, shmflg)
-> where shmaddr should be SHMLBA-aligned.
-> 
-> That API looks unexpected and creates difficulties, which I've
-> workarounded in CRIU, but still might worth fixing.
+On Tue, May 23, 2017 at 10:01 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Mon, Apr 24, 2017 at 11:16:56AM +0100, Vladimir Murzin wrote:
+>> Now, we have dedicated non-cacheable region for consistent DMA
+>> operations. However, that region can still be marked as bufferable by
+>> MPU, so it'd be safer to have barriers by default.
+>
+> What do you actually want here?  Your patch doesn't quite make sense,
+> the commit description seems to indicate that you require this option
+> to be set for V7M, but the patch says otherwise.
+>
+>>  config ARM_DMA_MEM_BUFFERABLE
+>> -     bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K) && !CPU_V7
+>> -     default y if CPU_V6 || CPU_V6K || CPU_V7
+>> +     bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K || CPU_V7M) && !CPU_V7
+>
+> This "if" conditional conditionalises the visibility of the option,
+> it doesn't conditionalise the value.
+>
+>> +     default y if CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M
+>
+> Taking both of these changes together what you end up with is an option
+> presented to the user for "Use non-cacheable memory for DMA" which
+> they can choose to disable.
+>
+> If you require this option to be set, that's incorrect - your modification
+> to the default line is correct, but the first line is not.  To achieve
+> that, you want the if condition to evaluate false for V7M, thereby hiding
+> the option from the user.  In that case, the default value will always be
+> assigned to the option.
 
-It should at least be self-consistent.
+I had the opposite comment in the previous version ;-)
+https://lkml.org/lkml/2017/4/19/185
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I think the current patch is correct, but the description could still be
+clarified: On some of the beefier ARMv7-M machines (with DMA
+and write buffers) we want this enabled, while those that didn't
+need it until now also won't need it in the future.
+
+        Arnd
