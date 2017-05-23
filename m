@@ -1,31 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 22 May 2017 17:55:53 -0700
-Subject: [PATCH] clk: sunxi-ng: select SUNXI_CCU_MULT for sun8i-a83t
-In-Reply-To: <20170522202951.2896280-1-arnd@arndb.de>
-References: <20170522202951.2896280-1-arnd@arndb.de>
-Message-ID: <20170523005553.GH20170@codeaurora.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 23 May 2017 10:21:49 +0900
+Subject: [DT Question] "simple-mfd" DT binding
+In-Reply-To: <CACRpkdY88Zdp2zqabWPfYPnTwSzYuCqSQHQg9vF_+Zd=TFOvaA@mail.gmail.com>
+References: <CAK7LNARQmfX+3RwFgwtvf2Qu79XNX1zh0O741-pPFWS6npytLw@mail.gmail.com>
+ <CACRpkdY88Zdp2zqabWPfYPnTwSzYuCqSQHQg9vF_+Zd=TFOvaA@mail.gmail.com>
+Message-ID: <CAK7LNAQ+DimarhHJOg=BqbH+EB19s+wgtRqJ8-XuLKW6_0FFaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22, Arnd Bergmann wrote:
-> We get a link error when CCU_MULT is not set with the
-> newly added driver:
-> 
-> drivers/clk/sunxi-ng/ccu-sun8i-a83t.o:(.data.__compound_literal.1+0x4): undefined reference to `ccu_mult_ops'
-> drivers/clk/sunxi-ng/ccu-sun8i-a83t.o:(.data.__compound_literal.3+0x4): undefined reference to `ccu_mult_ops'
-> 
-> Fixes: 46b492116666 ("clk: sunxi-ng: Add driver for A83T CCU")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi Lee, Linus,
 
-Is there any way we can automate finding these build errors and
-prevent them from creeping into the tree? It may be asking too
-much, but it seems like we should be able to find these
-particular problems with some script that greps for ccu_*_ops and
-checks that any file's Kconfig symbol also has that selected.
+Thanks for your comments!
 
-Anyway, I'm just tired of seeing these sorts of things in my
-inbox.
+2017-05-22 17:43 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Mon, May 22, 2017 at 3:29 AM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>
+>> Because "simple-bus" indicates that child nodes are
+>> simply memory mapped, but the node "register-bit-led"
+>> can not be memory-mapped.
+>> So, "simple-mfd" can not be replaced "simple-bus" here.
+>
+> Yeah... just like Lee points out, you are spot on, this is exactly
+> the reason why we created "simple-mfd" in the first place
+> IIRC.
+
+OK, Linux treats simple-bus and simple-mfd in the same way
+as far as I see drivers/of/platform.c
+
+Perhaps, can we document the difference between simple-bus and
+simple-mfd clearly?
+For example, "Unlike simple-bus, it is legitimate that simple-mfd has
+subnodes without reg property"
+
+
+I think this is typical when "simple-mfd" is used together with "syscon".
+The child devices will use regmap of the parent node.
+I'd like to be sure this is valid usage.
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best Regards
+Masahiro Yamada
