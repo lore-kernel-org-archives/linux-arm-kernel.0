@@ -1,44 +1,66 @@
-From: gnomes@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 23 May 2017 21:07:10 +0100
-Subject: [PATCH 1/1] xilinx ps uart: Adding a kernel parameter for the
- number of xilinx ps uarts
-In-Reply-To: <1668f36e-f9be-7008-004a-e467a6813e0f@xilinx.com>
-References: <20170520022154.6766-1-kernel.development@povil.us>
- <20170520172008.5a979e8a@alans-desktop>
- <517d864d-d230-3abc-eb3c-4b628dc4625f@xilinx.com>
- <20170522192636.5b578d89@alans-desktop>
- <1668f36e-f9be-7008-004a-e467a6813e0f@xilinx.com>
-Message-ID: <20170523210710.4e84dd2d@alans-desktop>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 May 2017 21:09:46 +0100
+Subject: [PATCHv2] ARM32: Support mremap() for sigpage/vDSO
+In-Reply-To: <bebbe3ce-12ed-419a-248a-55f41d74d9da@virtuozzo.com>
+References: <20170414132529.8337-1-dsafonov@virtuozzo.com>
+ <871579ef-ee9a-c321-80e4-47836bb0e472@virtuozzo.com>
+ <bebbe3ce-12ed-419a-248a-55f41d74d9da@virtuozzo.com>
+Message-ID: <20170523200946.GG22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> yep hardcoded max 4 where in probe first free space is found and used
-> (range 0-3) but still max3100s statically allocated.
-> Shouldn't be this also dynamically allocated?
-
-The code to do the dynamic allocation would be larger than the array of
-pointers for the sane worst case.
-
-> I am not quite sure how exactly you want to do this via DT.
-
-Count the number of DT entries for this kind of port and allocate that
-many ?
-
+On Thu, May 18, 2017 at 02:13:29PM +0300, Dmitry Safonov wrote:
+> On 04/25/2017 08:18 PM, Dmitry Safonov wrote:
+> >On 04/14/2017 04:25 PM, Dmitry Safonov wrote:
+> >>CRIU restores application mappings on the same place where they
+> >>were before Checkpoint. That means, that we need to move vDSO
+> >>and sigpage during restore on exactly the same place where
+> >>they were before C/R.
+> >>
+> >>Make mremap() code update mm->context.{sigpage,vdso} pointers
+> >>during VMA move. Sigpage is used for landing after handling
+> >>a signal - if the pointer is not updated during moving, the
+> >>application might crash on any signal after mremap().
+> >>
+> >>vDSO pointer on ARM32 is used only for setting auxv at this moment,
+> >>update it during mremap() in case of future usage.
+> >>
+> >>Without those updates, current work of CRIU on ARM32 is not reliable.
+> >>Historically, we error Checkpointing if we find vDSO page on ARM32
+> >>and suggest user to disable CONFIG_VDSO.
+> >>But that's not correct - it goes from x86 where signal processing
+> >>is ended in vDSO blob. For arm32 it's sigpage, which is not disabled
+> >>with `CONFIG_VDSO=n'.
+> >>
+> >>Looks like C/R was working by luck - because userspace on ARM32 at
+> >>this moment always sets SA_RESTORER.
+> >>
+> >>Cc: linux-arm-kernel at lists.infradead.org
+> >>Cc: Russell King <linux@armlinux.org.uk>
+> >>Cc: Will Deacon <will.deacon@arm.com>
+> >>Cc: Andy Lutomirski <luto@amacapital.net>
+> >>Cc: Thomas Gleixner <tglx@linutronix.de>
+> >>Cc: Cyrill Gorcunov <gorcunov@openvz.org>
+> >>Cc: Pavel Emelyanov <xemul@virtuozzo.com>
+> >>Cc: Christopher Covington <cov@codeaurora.org>
+> >>Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
+> >>---
+> >>v2: (buildbot) Fix (unsinged long) to (void*) cast warning.
+> >>
+> >>  arch/arm/kernel/process.c |  8 ++++++++
+> >>  arch/arm/kernel/vdso.c    | 18 ++++++++++++++++++
+> >>  arch/x86/entry/vdso/vma.c |  3 ---
+> >>  mm/mmap.c                 |  4 ++++
+> >>  4 files changed, 30 insertions(+), 3 deletions(-)
+> >
+> >Ping?
 > 
-> Also what do you think is a safe maximum number? This is fpga - hundreds
-> of pins which can do just uart.
-> 
-> > There are lots of options better than breaking the "one kernel many
-> > platforms" model.  
-> 
-> Another options is also module parameter and dynamically allocated array
-> in cdns_uart_init.
+> Ping?
 
-For a given platform the number is constant and they need to be
-described, so it seems to make no sense to put it anywhere other than the
-DT for that platform.
+I'm mostly happy with the ARM bits, but I can't take the patch without
+acks from others because it touches other architectures/generic code.
 
-Why should users have to pass magic config options not use DT as
-intended ?
-
-Alan
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
