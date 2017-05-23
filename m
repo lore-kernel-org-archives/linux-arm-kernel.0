@@ -1,40 +1,49 @@
-From: keescook@google.com (Kees Cook)
-Date: Tue, 23 May 2017 12:32:59 -0700
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <CAHgaXdJa9uJYO3bODuzDRaqOas0i=zMk0jioWFXKm_=UJRtVrw@mail.gmail.com>
-References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
- <20170510.212952.1440495072777358778.davem@davemloft.net>
- <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
- <20170510.215218.2185526627014393313.davem@davemloft.net>
- <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
- <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
- <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
- <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
- <591A07A1.1030006@iogearbox.net>
- <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
- <CAGXu5j+k+NMQGmmhuW-4pHFd6agfndJfxQ9k--h+ZpsDBVB8ig@mail.gmail.com>
- <8c53012b-cb81-5228-de79-f55457d1cf69@gmail.com>
- <CAHgaXdL2qReJF1Aw08k3C+OiC-3AOy3VeYmQ1Hs7vKcrfGQnvA@mail.gmail.com>
- <CAGXu5jKwTDYeNQggezzSKkFzZQkroC+6SdBB0qUKh5crfNk8PA@mail.gmail.com>
- <CAHgaXdKqt3mZmPG78w+4g_17D8EQoBgAZeuqM+MMsQg2f7apsw@mail.gmail.com>
- <CAGXu5jKDMUxRivMZdEQSBs81dkKRn5hRUiOz_wybCyphFFy+RQ@mail.gmail.com>
- <CAHgaXdJa9uJYO3bODuzDRaqOas0i=zMk0jioWFXKm_=UJRtVrw@mail.gmail.com>
-Message-ID: <CAGXu5j+DZ7+5zBh7s82AZPgDT=-WHo8bG6XwPT6SzaMtVMMn_Q@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 23 May 2017 21:52:39 +0200
+Subject: CHIPPro NAND issue with 4.12 rc1
+In-Reply-To: <63aca137397dc3700a34993205c8cfba@www.akkea.ca>
+References: <399ea126f3b18071fbe46bfc9787df6b@www.akkea.ca>
+ <20170520171418.4e8a47e0@bbrezillon>
+ <6f3cefa6c54776f82160ed8954f4d0d4@www.akkea.ca>
+ <20170521074535.4a4ba6dd@bbrezillon>
+ <20170522070117.mwk4gm34o7idedye@flea.home>
+ <63aca137397dc3700a34993205c8cfba@www.akkea.ca>
+Message-ID: <20170523195239.6nsv4ydrt4u7q6ge@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 11:39 AM, Shubham Bansal
-<illusionist.neo@gmail.com> wrote:
-> Here is the patch I sent to the arm mailing list.
+On Mon, May 22, 2017 at 10:32:42AM -0600, Angus Ainslie wrote:
+> Hi Maxime
+> 
+> On 2017-05-22 01:01, Maxime Ripard wrote:
+> > 
+> > This just made me realise, this is also the time where the clocks are
+> > disabled, and we changed our clock implementation in 4.11.
+> > 
+> > And using the 4.4 DT will keep the old driver...
+> > 
+> > Did you test in 4.11? If it's also broken, could you try to revert
+> > 1f4ce3b6ca79 and 6b48644b1d29 (I'm not sure it's going to be a trivial
+> > revert, but in that order it should work).
+> > 
+> 
+> Thanks reverting those two allow the kernel to boot and mount the NAND.
 
-Thanks for sending this!
+Ok, good.
 
-I'm trying to figure out the best way to split this up, but the bulk
-of it (the actual JIT changes) seems like they need to all land at the
-same time. Any thoughts on this Daniel?
+If you unrevert those patches, and add clk_ignore_unused to the kernel
+command line, is it still broken?
 
--Kees
+Maxime
 
 -- 
-Kees Cook
-Pixel Security
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170523/a4d8412e/attachment.sig>
