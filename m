@@ -1,18 +1,11 @@
 From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Tue, 23 May 2017 11:24:08 +0800
-Subject: [PATCH v4 0/3] Fix mdp device tree 
-Message-ID: <1495509851-29159-1-git-send-email-minghsiu.tsai@mediatek.com>
+Date: Tue, 23 May 2017 11:24:09 +0800
+Subject: [PATCH v4 1/3] dt-bindings: mt8173: Fix mdp device tree
+In-Reply-To: <1495509851-29159-1-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1495509851-29159-1-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <1495509851-29159-2-git-send-email-minghsiu.tsai@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Changes in v4:
-- Add backwards compability if dts is out-of-date
-
-Changes in v3:
-- Upload patches again because forget to add v2 in title
-
-Changes in v2:
-- Update commit message
 
 If the mdp_* nodes are under an mdp sub-node, their corresponding
 platform device does not automatically get its iommu assigned properly.
@@ -25,17 +18,55 @@ Although it fixes iommu assignment issue, it also break compatibility
 with old device tree. So, the patch in driver is needed to iterate over
 sibling mdp device nodes, not child ones, to keep driver work properly.
 
-Daniel Kurtz (2):
-  arm64: dts: mt8173: Fix mdp device tree
-  media: mtk-mdp: Fix mdp device tree
+Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 
-Minghsiu Tsai (1):
-  dt-bindings: mt8173: Fix mdp device tree
+---
+ Documentation/devicetree/bindings/media/mediatek-mdp.txt | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
- .../devicetree/bindings/media/mediatek-mdp.txt     |  12 +-
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 126 ++++++++++-----------
- drivers/media/platform/mtk-mdp/mtk_mdp_core.c      |  12 +-
- 3 files changed, 73 insertions(+), 77 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+index 4182063..0d03e3a 100644
+--- a/Documentation/devicetree/bindings/media/mediatek-mdp.txt
++++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+@@ -2,7 +2,7 @@
+ 
+ Media Data Path is used for scaling and color space conversion.
+ 
+-Required properties (controller (parent) node):
++Required properties (controller node):
+ - compatible: "mediatek,mt8173-mdp"
+ - mediatek,vpu: the node of video processor unit, see
+   Documentation/devicetree/bindings/media/mediatek-vpu.txt for details.
+@@ -32,21 +32,16 @@ Required properties (DMA function blocks, child node):
+   for details.
+ 
+ Example:
+-mdp {
+-	compatible = "mediatek,mt8173-mdp";
+-	#address-cells = <2>;
+-	#size-cells = <2>;
+-	ranges;
+-	mediatek,vpu = <&vpu>;
+-
+ 	mdp_rdma0: rdma at 14001000 {
+ 		compatible = "mediatek,mt8173-mdp-rdma";
++			     "mediatek,mt8173-mdp";
+ 		reg = <0 0x14001000 0 0x1000>;
+ 		clocks = <&mmsys CLK_MM_MDP_RDMA0>,
+ 			 <&mmsys CLK_MM_MUTEX_32K>;
+ 		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+ 		iommus = <&iommu M4U_PORT_MDP_RDMA0>;
+ 		mediatek,larb = <&larb0>;
++		mediatek,vpu = <&vpu>;
+ 	};
+ 
+ 	mdp_rdma1: rdma at 14002000 {
+@@ -106,4 +101,3 @@ mdp {
+ 		iommus = <&iommu M4U_PORT_MDP_WROT1>;
+ 		mediatek,larb = <&larb4>;
+ 	};
+-};
 -- 
 1.9.1
