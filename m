@@ -1,92 +1,17 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 23 May 2017 09:42:18 -0700
-Subject: [GIT PULL] ARM: SoC fixes (and a cross-arch dt-include fix)
-In-Reply-To: <CAMuHMdUivf9cw+LTn7UMueH=MMKi6i3wcOdgM6zbZBoxmkTZGQ@mail.gmail.com>
-References: <20170519193455.GA24206@localhost>
- <CACRpkdaRdZTB39-=sAojO+OyHtP02KaFChqGcxy+fWA8qaB2bw@mail.gmail.com>
- <CAOesGMhfrWSvLtDtGRWBTJiAoeSwzGgsdUTm26j1mpoVu0ghDg@mail.gmail.com>
- <CAMuHMdUivf9cw+LTn7UMueH=MMKi6i3wcOdgM6zbZBoxmkTZGQ@mail.gmail.com>
-Message-ID: <CAOesGMi98hJnUYVLkgcbBpXsi-Xe6QPh-gtLaPWPO-EW+KcGuQ@mail.gmail.com>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Tue, 23 May 2017 16:50:29 +0000
+Subject: [PATCH] MAINTAINERS: EP93XX: Update maintainership
+In-Reply-To: <20170522133021.24034-1-alexander.sverdlin@gmail.com>
+References: <20170522133021.24034-1-alexander.sverdlin@gmail.com>
+Message-ID: <SN1PR0101MB1565D841E19296BF41D4F763D0F90@SN1PR0101MB1565.prod.exchangelabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 2:49 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Olof,
+On Monday, May 22, 2017 6:30 AM, Alexander Sverdlin wrote:
+> As agreed with Ryan, change the maintainership.
 >
-> On Mon, May 22, 2017 at 5:11 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Mon, May 22, 2017 at 4:44 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> On Fri, May 19, 2017 at 9:34 PM, Olof Johansson <olof@lixom.net> wrote:
->>>>  - We've started telling people to avoid cross-tree shared branches if all
->>>>    they're doing is picking up one or two DT-used constants from a
->>>>    shared include file, and instead to use the numeric values on first
->>>>    submission. Follow-up moving over to symbolic names are sent in right
->>>>    after -rc1, i.e. here. It's only a few minor patches of this type.
->>>
->>> OK it seems like a reasonable process.
->>>
->>> It's not like I can think about anything better.
->>>
->>> I was more opting for doing things this way:
->>>
->>> - Create bindings and <dt-bindings/foo/bar.h> merge it into the
->>>   foo subsystem.
->>>
->>> - Merge driver into drivers/foo/bar.c that use <dt-bindings/foo/bar.h>
->>>
->>> - Submit DTS patch to ARM SoC (or whetever) using only numerical
->>>   values.
->>>
->>> - After the merge window, follow up with a patch replacing the
->>>   numerical constants with #defines from <dt-bindings/foo/bar.h>
->>
->> You're describing exactly what we've been pushing people towards.
->>
->> If it's just a few simple references it's not significantly more
->> awkward, and decouples merges and removes need for stable branches.
->> Essentially we've become slightly more lax in what we're willing to
->> consider _right after_ -rc1 to include these tweaks (and often patches
->> to turn on new drivers in defconfigs).
->>
->> If the amount of contents grows too large we might need to tweak
->> things further, maybe with something pre-rc1 but that's more awkward.
->>
->>> An alternative would obviously be to wait for the next merge window
->>> after merging the driver patch but I guess people are too impatient
->>> to do that (including me).
->>
->> Yeah, asking people to spread out across releases would remove
->> dependencies a lot, but it would also slow down progress and frustrate
->> a lot of contributors so we don't do that.
->
-> The above works fine for new support, or for new platforms.
->
-> There's still support being migrated from platform code to DT, which
-> requires three steps:
->   1. New DT-aware driver support,
->   2. DT update to use the new driver support,
->   3. Clean up platform code after optional DTB backwards compatibility
->      grace period,
-> To make matters worse, 1 may conflict with the existing platform code,
-> and 2 must sometimes not be done before 1. Hence you may need three kernel
-> releases.
-> So we're already planning now what to clean up for v4.15 ;-)
->
-> Would it be acceptable to do step 2 in the same release, after the driver
-> support has entered in -rc1? I know this is more than just replacing
-> numbers by symbolic values.
+> Signed-off-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 
-Part of why we encouraged a more stretched-out approach in your case
-was that we used to get quite a few dependent branches for Renesas
-platforms, and when there were things to fixup, a lot of respins and
-churn. So we asked to move a little slower to avoid DoS:ing ourselves.
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-As far as the above process goes: 1+2 is exactly what we're
-encouraging others to do. The main discussion point here is when
-there's substantial shared dt-includes between driver and the DTS
-contents. Most of the time, for most drivers, that's usually not the
-case. As Arnd suggested, it might be helpful to have specific examples
-to discuss here.
-
-
--Olof
+Welcome aboard!
