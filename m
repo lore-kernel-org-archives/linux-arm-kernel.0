@@ -1,67 +1,31 @@
-From: schwidefsky@de.ibm.com (Martin Schwidefsky)
-Date: Tue, 23 May 2017 07:26:29 +0200
-Subject: [PATCH v3.1 4/6] mm/hugetlb: Allow architectures to override
- huge_pte_clear()
-In-Reply-To: <20170522162555.4313-1-punit.agrawal@arm.com>
-References: <20170522133604.11392-5-punit.agrawal@arm.com>
- <20170522162555.4313-1-punit.agrawal@arm.com>
-Message-ID: <20170523072629.06163fa6@mschwideX1>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Tue, 23 May 2017 05:27:25 +0000
+Subject: pxa3xx-nand failing to find device on linux-next
+Message-ID: <b36366e358904310aee4970b77f57dba@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 May 2017 17:25:55 +0100
-Punit Agrawal <punit.agrawal@arm.com> wrote:
+Hi,
 
-> When unmapping a hugepage range, huge_pte_clear() is used to clear the
-> page table entries that are marked as not present. huge_pte_clear()
-> internally just ends up calling pte_clear() which does not correctly
-> deal with hugepages consisting of contiguous page table entries.
-> 
-> Add a size argument to address this issue and allow architectures to
-> override huge_pte_clear() by wrapping it in a #ifndef block.
-> 
-> Update s390 implementation with the size parameter as well.
-> 
-> Note that the change only affects huge_pte_clear() - the other generic
-> hugetlb functions don't need any change.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
-> Cc: Mike Kravetz <mike.kravetz@oracle.com>
-> ---
-> 
-> Changes since v3
-> 
-> * Drop weak function and use #ifndef block to allow architecture override
-> * Drop unnecessary move of s390 function definition
-> 
->  arch/s390/include/asm/hugetlb.h | 2 +-
->  include/asm-generic/hugetlb.h   | 4 +++-
->  mm/hugetlb.c                    | 2 +-
->  3 files changed, 5 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/s390/include/asm/hugetlb.h b/arch/s390/include/asm/hugetlb.h
-> index cd546a245c68..c0443500baec 100644
-> --- a/arch/s390/include/asm/hugetlb.h
-> +++ b/arch/s390/include/asm/hugetlb.h
-> @@ -39,7 +39,7 @@ static inline int prepare_hugepage_range(struct file *file,
->  #define arch_clear_hugepage_flags(page)		do { } while (0)
-> 
->  static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-> -				  pte_t *ptep)
-> +				  pte_t *ptep, unsigned long sz)
->  {
->  	if ((pte_val(*ptep) & _REGION_ENTRY_TYPE_MASK) == _REGION_ENTRY_TYPE_R3)
->  		pte_val(*ptep) = _REGION3_ENTRY_EMPTY;
+I'm doing some testing on linux-next and I'm finding that my nand flash 
+has disappeared.
 
-For the nop-change for s390:
-Acked-by: Martin Schwidefsky <schwidefsky@de.ibm.com>
+pxa3xx-nand f10d0000.flash: This platform can't do DMA on this device
+pxa3xx-nand f10d0000.flash: non-supported command ef
+pxa3xx-nand f10d0000.flash: non-supported command ee
+pxa3xx-nand f10d0000.flash: non-supported command ef
+pxa3xx-nand f10d0000.flash: non-supported command ee
+On-die ECC forcefully enabled, not supported
+nand: No NAND device found
+pxa3xx-nand f10d0000.flash: failed to scan nand at cs 0
 
--- 
-blue skies,
-   Martin.
+This was working around 4.11. I'll try to do some more digging tomorrow 
+to narrow down a failure point but I thought I'd send this out now just 
+in case it rings any bells.
 
-"Reality continues to ruin my life." - Calvin.
+The board I'm using (DB-88F6820-AMC) is unfortunately out-of tree but it 
+should be pretty close to the armada-388-db. I can make my dts available 
+if it's helpful.
+
+Thanks,
+Chris
