@@ -1,55 +1,51 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 23 May 2017 12:57:15 +0200
-Subject: [PATCH] ARM64: PCI: Fix struct acpi_pci_root_ops allocation
- failure path
-In-Reply-To: <20170522154828.10872-1-lorenzo.pieralisi@arm.com>
-References: <20170522154828.10872-1-lorenzo.pieralisi@arm.com>
-Message-ID: <6cf59b3d-0450-eac9-9597-0e42080820b7@semihalf.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 23 May 2017 13:12:35 +0200
+Subject: [PATCH 2/3] arm64: dts: rockchip: add ethernet alias on rk3399
+In-Reply-To: <20170523101540.txul7g3liyylg273@tarshish>
+References: <20170523095427.7421-1-heiko@sntech.de>
+ <20170523095427.7421-2-heiko@sntech.de>
+ <20170523101540.txul7g3liyylg273@tarshish>
+Message-ID: <1806134.4LkeRaXReF@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.05.2017 17:48, Lorenzo Pieralisi wrote:
-> From: Timmy Li <lixiaoping3@huawei.com>
->
-> Commit 093d24a20442 ("arm64: PCI: Manage controller-specific data on
-> per-controller basis") added code to allocate ACPI PCI root_ops
-> dynamically on a per host bridge basis but failed to update the
-> corresponding memory allocation failure path in pci_acpi_scan_root()
-> leading to a potential memory leakage.
->
-> Fix it by adding the required kfree call.
->
-> Fixes: 093d24a20442 ("arm64: PCI: Manage controller-specific data on per-controller basis")
-> Signed-off-by: Timmy Li <lixiaoping3@huawei.com>
-> [lorenzo.pieralisi at arm.com: refactored code, rewrote commit log]
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> CC: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  arch/arm64/kernel/pci.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index 4f0e3eb..c7e3e63 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -191,8 +191,10 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  		return NULL;
->
->  	root_ops = kzalloc_node(sizeof(*root_ops), GFP_KERNEL, node);
-> -	if (!root_ops)
-> +	if (!root_ops) {
-> +		kfree(ri);
->  		return NULL;
-> +	}
->
->  	ri->cfg = pci_acpi_setup_ecam_mapping(root);
->  	if (!ri->cfg) {
->
+Hi Baruch,
 
-Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
+Am Dienstag, 23. Mai 2017, 13:15:40 CEST schrieb Baruch Siach:
+> On Tue, May 23, 2017 at 11:54:26AM +0200, Heiko Stuebner wrote:
+> > This is used by bootloaders to override the mac address in the devicetree
+> > if needed.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > index db713c67ae17..3e1b1daa0964 100644
+> > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > @@ -56,6 +56,7 @@
+> >  	#size-cells = <2>;
+> >  
+> >  	aliases {
+> > +		ethernet = &gmac;
+> 
+> Consider adding an index number. E.g., see commit 10b6c0c2e2bb8c (ARM: dts: 
+> bcm2835: add index to the ethernet alias).
 
-Thanks for fixing this.
-Tomasz
+I'm not so sure about that. At least the reason to work around uboot issues
+is gone since u-boot commit 
+	f8e57c650d69 (fdt_support: Fixup 'ethernet' aliases not ending in digits)
+from march 20th 2017.
+
+The rk3399 only has one ethernet controller, but the rk3288 also uses the
+ethernet0 suffix, so it definitly makes sense to add it for rk3399 as well.
+
+So tl;dr, I'll make this ethernet0 when applying :-)
+
+
+Thanks for noticing
+Heiko
+
+    
