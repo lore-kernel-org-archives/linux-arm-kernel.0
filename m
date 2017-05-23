@@ -1,42 +1,36 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 23 May 2017 10:29:52 +0200
-Subject: [PATCH v3 1/3] clk: rockchip: add dt-binding header for rk3128
-In-Reply-To: <1495501865-18512-2-git-send-email-zhangqing@rock-chips.com>
-References: <1495501865-18512-1-git-send-email-zhangqing@rock-chips.com>
- <1495501865-18512-2-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1725571.3NA4bbO7jm@phil>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Tue, 23 May 2017 10:33:02 +0200
+Subject: [PATCH 08/13] ARM: dts: armada-385-linksys: use binary unit
+ prefixes
+In-Reply-To: <20170522202416.1c48d91a@gmail.com>
+References: <20170521124903.11050-1-ralph.sennhauser@gmail.com>
+ <20170521124903.11050-9-ralph.sennhauser@gmail.com>
+ <20170522150001.GM29447@lunn.ch>
+ <20170522202416.1c48d91a@gmail.com>
+Message-ID: <20170523103302.4f78eb93@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
+On Mon, 22 May 2017 20:24:16 +0200
+Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
 
-Am Dienstag, 23. Mai 2017, 09:11:03 CEST schrieb Elaine Zhang:
-> Add the dt-bindings header for the rk3128,
-> that gets shared between the clock controller and
-> the clock references in the dts.
-> Add softreset ID for rk3128.
-> And it also applies to the RK3126 SoC.
+> On Mon, 22 May 2017 17:00:01 +0200
+> Andrew Lunn <andrew@lunn.ch> wrote:
 > 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> ---
->  include/dt-bindings/clock/rk3128-cru.h | 283 +++++++++++++++++++++++++++++++++
->  1 file changed, 283 insertions(+)
->  create mode 100644 include/dt-bindings/clock/rk3128-cru.h
+> > On Sun, May 21, 2017 at 02:48:57PM +0200, Ralph Sennhauser wrote:  
+> > > Use IEEE 1541-2002 unit prefixes for sizes.    
+> > 
+> > Does ePAPR recommend this?  
 > 
-> diff --git a/include/dt-bindings/clock/rk3128-cru.h b/include/dt-bindings/clock/rk3128-cru.h
-> new file mode 100644
-> index 000000000000..5f055a41584b
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/rk3128-cru.h
+> Not directly, but the paper (v1.1) itself is using MiB as well which
+> could be seen as a recommendation.
 
-[...]
+Found the pdf again on the web, so here a link:
+http://elinux.org/images/c/cf/Power_ePAPR_APPROVED_v1.1.pdf
 
-> +#define SCLK_USB480M		154
-> +#define SCLK_USB480M_PHY	155
+Funny thing it's using KB(instead of KiB) and MiB. So it's
+inconsistent, also the unit with SI prefix would be kB and not KB. So
+I'd say ePAPR doesn't care / the authors didn't pay any attention to
+this.
 
-We probably don't need the clock-id for USB480M_PHY, as it is an external
-clock and is unused. Instead as I wrote in the previous patch, it should
-be added to the list of external clocks in the binding txt document.
-
-
-Heiko
+Ralph
