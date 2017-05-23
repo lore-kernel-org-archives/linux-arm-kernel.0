@@ -1,63 +1,70 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Tue, 23 May 2017 11:24:11 +0800
-Subject: [PATCH v4 3/3] media: mtk-mdp: Fix mdp device tree
-In-Reply-To: <1495509851-29159-1-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1495509851-29159-1-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <1495509851-29159-4-git-send-email-minghsiu.tsai@mediatek.com>
+From: illusionist.neo@gmail.com (Shubham Bansal)
+Date: Tue, 23 May 2017 09:04:40 +0530
+Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
+In-Reply-To: <8c53012b-cb81-5228-de79-f55457d1cf69@gmail.com>
+References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
+ <20170510.212952.1440495072777358778.davem@davemloft.net>
+ <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
+ <20170510.215218.2185526627014393313.davem@davemloft.net>
+ <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
+ <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
+ <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
+ <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
+ <591A07A1.1030006@iogearbox.net>
+ <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
+ <CAGXu5j+k+NMQGmmhuW-4pHFd6agfndJfxQ9k--h+ZpsDBVB8ig@mail.gmail.com>
+ <8c53012b-cb81-5228-de79-f55457d1cf69@gmail.com>
+Message-ID: <CAHgaXdL2qReJF1Aw08k3C+OiC-3AOy3VeYmQ1Hs7vKcrfGQnvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Kurtz <djkurtz@chromium.org>
+Hi Florian,
 
-If the mdp_* nodes are under an mdp sub-node, their corresponding
-platform device does not automatically get its iommu assigned properly.
+>> I think it is fine to only target ARMv7. It is harder and harder to
+>> find devices on v5 or v6 CPUs that would want to be using BPF JIT,
+>> IMO.
+>
+> There are still a ton of Marvell-based routers out there (e.g: Kirkwood,
+> Orion5x) that are ARMv5 and that prompted Nicholas (hey there) to fix
+> the cBPF JIT a while ago. I don't think you can just ignore those, it's
+> fine not to target them initially, but arguably, QEMU has decent support
+> for some ARMv5 platforms that could be used for testing as well
+> (realview-eb, versatileab/pbm.
 
-Fix this by moving the mdp component nodes up a level such that they are
-siblings of mdp and all other SoC subsystems.  This also simplifies the
-device tree.
+I am using busybox to get the rootfs. Here is what I am doing :-
 
-Although it fixes iommu assignment issue, it also break compatibility
-with old device tree. So, the patch in driver is needed to iterate over
-sibling mdp device nodes, not child ones, to keep driver work properly.
+1. ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- make -j4 (for kernel
+build as well as busybox build)
+2. qemu-system-arm -M vexpress-a9 -dtb
+./linux/arch/arm/boot/dts/versatile-ab.dts -kernel ./linux/arch/a
+rm/boot/zImage -append "root=/dev/mmcblk0 console=ttyAMA0" -sd
+./a9rootfs.ext3 --nographic
 
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+Can you help me with running qemu for ARMv5 and ARMv6 ?
 
----
- drivers/media/platform/mtk-mdp/mtk_mdp_core.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+>> When they "disappear", it's because there isn't a prerequisite met. I
+>> either read the Kconfig files or use "make menuconfig" and "search" to
+>> tell me where a config is defined and what is needed to meet the
+>> prerequisites.
+>>
+>> In the case of CPU_BIG_ENDIAN, you need ARCH_SUPPORTS_BIG_ENDIAN,
+>> which appears to be only ARCH_IXP4XX. I don't think you're going to
+>> find an emulator that will handle this, so I'd suggest ignoring this
+>> config for now unless you can find someone with that hardware that you
+>> can work with to test it.
+>>
+>> In the case of CONFIG_FRAME_POINTER, I assume you built a
+>> THUMB2_KERNEL? I'd read the notes in arch/arm/Kconfig.debug for
+>> 'config FRAME_POINTER'.
+>
+> It sounds like we are at the point where Shubham's patches should be
+> posted so people could test/fix on earlier ARM devices for instance.
+>
+I would post them as soon as I test them on ARMv5 and ARMv6. If you
+can help me with that, please let me know.
 
-diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-index 9e4eb7d..8134755 100644
---- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-+++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-@@ -103,7 +103,7 @@ static int mtk_mdp_probe(struct platform_device *pdev)
- {
- 	struct mtk_mdp_dev *mdp;
- 	struct device *dev = &pdev->dev;
--	struct device_node *node;
-+	struct device_node *node, *parent;
- 	int i, ret = 0;
- 
- 	mdp = devm_kzalloc(dev, sizeof(*mdp), GFP_KERNEL);
-@@ -117,8 +117,16 @@ static int mtk_mdp_probe(struct platform_device *pdev)
- 	mutex_init(&mdp->lock);
- 	mutex_init(&mdp->vpulock);
- 
-+	/* Old dts had the components as child nodes */
-+	if (of_get_next_child(dev->of_node, NULL)) {
-+		parent = dev->of_node;
-+		dev_warn(dev, "device tree is out of date\n");
-+	} else {
-+		parent = dev->of_node->parent;
-+	}
-+
- 	/* Iterate over sibling MDP function blocks */
--	for_each_child_of_node(dev->of_node, node) {
-+	for_each_child_of_node(parent, node) {
- 		const struct of_device_id *of_id;
- 		enum mtk_mdp_comp_type comp_type;
- 		int comp_id;
--- 
-1.9.1
+> Thanks
+> --
+> Florian
+
+-Shubham
