@@ -1,87 +1,44 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Tue, 23 May 2017 10:09:03 +0000
-Subject: [PATCH 0/2] ioremap_wc on arm64
-In-Reply-To: <20170522154947.GF30129@e104818-lin.cambridge.arm.com>
-References: <1495436507-81890-1-git-send-email-jnair@caviumnetworks.com>
- <20170522085615.GC30129@e104818-lin.cambridge.arm.com>
- <20170522115349.GA82957@localhost> <20170522122236.GG1107@arm.com>
- <20170522142059.GA83004@localhost>
- <20170522154947.GF30129@e104818-lin.cambridge.arm.com>
-Message-ID: <20170523100903.GA4562@localhost>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 23 May 2017 13:15:40 +0300
+Subject: [PATCH 2/3] arm64: dts: rockchip: add ethernet alias on rk3399
+In-Reply-To: <20170523095427.7421-2-heiko@sntech.de>
+References: <20170523095427.7421-1-heiko@sntech.de>
+ <20170523095427.7421-2-heiko@sntech.de>
+Message-ID: <20170523101540.txul7g3liyylg273@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 04:49:47PM +0100, Catalin Marinas wrote:
-> On Mon, May 22, 2017 at 02:21:00PM +0000, Jayachandran C wrote:
-> > On Mon, May 22, 2017 at 01:22:37PM +0100, Will Deacon wrote:
-> > > On Mon, May 22, 2017 at 11:53:50AM +0000, Jayachandran C wrote:
-> > > > On Mon, May 22, 2017 at 09:56:16AM +0100, Catalin Marinas wrote:
-> > > > > On Mon, May 22, 2017 at 07:01:45AM +0000, Jayachandran C wrote:
-> > > > > > From its definition, the device "gather" attribute seems to be a better
-> > > > > > fit for implementing write combining mapping in ioremap_wc().  And on
-> > > > > > ThunderX2, Device GRE mapping has optimizations that makes it much faster
-> > > > > > than normal uncached mapping.
-> > > > > > 
-> > > > > > I am not sure of the reasoning behind the original decision to make
-> > > > > > ioremap_wc use "Normal Non-Cached" attribute, since all the other variants
-> > > > > > of ioremap use device attributes, and ioremap_wc looks like an exception.
-> > > > > 
-> > > > > The reason we kept it as Normal NC is that Device_GRE does not allow
-> > > > > unaligned accesses.
-> > > > 
-> > > > There does not to be an expectation to have unaligned access on __iomem
-> > > > pointers. I also see that memremap can call ioremap_wc (which is a Normal
-> > > > mapping) or ioremap_wt(which is a Device mapping), so that is inconsistent
-> > > > as well.
-> > > > 
-> > > > Was this added for a specific use case? Also, do you think this patchset
-> > > > is acceptable?
-> > > 
-> > > I think it was used for framebuffers. Note that using normal-NC also aligns
-> > > with arch/arm/ and, since normal-NC is strictly a more relaxed memory type
-> > > than Device-GRE, I'm really not keen making on this change.
-> > 
-> > If there is a hardware requirement that Normal-NC has to be implemented
-> > as more relaxed attribute than Device GRE, I can go back to the hardware
-> > team on this. I did not see any text in the ARM ARM requiring this.
+Hi Heiko,
+
+On Tue, May 23, 2017 at 11:54:26AM +0200, Heiko Stuebner wrote:
+> This is used by bootloaders to override the mac address in the devicetree
+> if needed.
 > 
-> It depends what you mean by "relaxed". Normal NC allows unaligned
-> accesses and also allows speculative loads (you don't get any ordering
-> guarantees of the Device memory). If you mean skipping some transparent
-> cache snooping, it may break other use-cases.
-
-Ok. I was using Will's terminology here. This is not the main issue,
-but worth understanding. If there is a requirement in ARM spec that
-"Normal NC" must be "strictly more releaxed" than "Device GRE", I will
-have to point that out to our hardware team.
-
-> > Even if that is the case, having Normal attribute for ioremap just for
-> > ioremap_wc is inconsistent. The Device Gathering attribute by its definition
-> > is exactly what write combining requires. The memremap() API looks like a
-> > better way to expose Normal-NC mapping (with additional features like
-> > speculation etc.) if implemented correctly.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> I agree, memremap() is a better way but this was merged in 4.3 while
-> ioremap_wc() had been around for a long time. If you want to change its
-> semantics, you'd need to go through all its uses in the kernel and make
-> sure they *only* use I/O accessors with such memory. At a quick grep,
-> there are several places where the __iomem pointer attribute is dropped
-> shortly after ioremap() and the pointer is accessed directly. That's
-> where things will break with Device GRE memory since the compiler
-> doesn't guarantee aligned accesses.
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index db713c67ae17..3e1b1daa0964 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -56,6 +56,7 @@
+>  	#size-cells = <2>;
+>  
+>  	aliases {
+> +		ethernet = &gmac;
 
-There is a difference in behavior with regard to unaligned access between
-ioremap_wc and ioremap already. I don't follow why unaligned access has to
-supported for ioremap_wc but not for ioremap - it would be much better to
-be consistent here.
+Consider adding an index number. E.g., see commit 10b6c0c2e2bb8c (ARM: dts: 
+bcm2835: add index to the ethernet alias).
 
-> > Also, patch 1/2 should be useful anyway - can that be picked up?
-> 
-> The patch is harmless but are we going to have a user of Device_GRE?
+>  		i2c0 = &i2c0;
+>  		i2c1 = &i2c1;
+>  		i2c2 = &i2c2;
 
-This patch would make the attribute in MAIR and the index MT_DEVICE_GRE
-useful for __ioremap. Otherwise I don't see the use in having the
-attribute at  all. I can at least give this to people who want Device GRE
-mapping, which is the fastest way to access device memory on ThunderX2.
+baruch
 
-JC.
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
