@@ -1,21 +1,31 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 23 May 2017 16:09:17 +0200
-Subject: [PATCH 0/2] pinctrl: meson: Add missing GPIODV_18 pin for GXBB and GXL
-Message-ID: <1495548559-22261-1-git-send-email-narmstrong@baylibre.com>
+Date: Tue, 23 May 2017 16:09:18 +0200
+Subject: [PATCH 1/2] pinctrl: meson-gxl: Add missing GPIODV_18 pin entry
+In-Reply-To: <1495548559-22261-1-git-send-email-narmstrong@baylibre.com>
+References: <1495548559-22261-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1495548559-22261-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For unknown reasons, GPIODV_18 pin was missing in the GXBB driver and then
-was copied into the GXL driver.
-This patchset fixes the pin list for GXBB and GXL.
+GPIODV_18 entry was missing in the original driver push.
 
-Neil Armstrong (2):
-  pinctrl: meson-gxl: Add missing GPIODV_18 pin entry
-  pinctrl: meson-gxbb: Add missing GPIODV_18 pin entry
+Fixes: 0f15f500ff2c ("pinctrl: meson: Add GXL pinctrl definitions")
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/pinctrl/meson/pinctrl-meson-gxl.c | 1 +
+ 1 file changed, 1 insertion(+)
 
- drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 1 +
- drivers/pinctrl/meson/pinctrl-meson-gxl.c  | 1 +
- 2 files changed, 2 insertions(+)
-
+diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+index 719ff1b..2bc1e3d 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
++++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+@@ -89,6 +89,7 @@
+ 	MESON_PIN(GPIODV_15, EE_OFF),
+ 	MESON_PIN(GPIODV_16, EE_OFF),
+ 	MESON_PIN(GPIODV_17, EE_OFF),
++	MESON_PIN(GPIODV_18, EE_OFF),
+ 	MESON_PIN(GPIODV_19, EE_OFF),
+ 	MESON_PIN(GPIODV_20, EE_OFF),
+ 	MESON_PIN(GPIODV_21, EE_OFF),
 -- 
 1.9.1
