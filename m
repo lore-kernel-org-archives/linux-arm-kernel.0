@@ -1,37 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 May 2017 10:26:12 -0500
-Subject: [PATCH 3/5] clk: mvebu: ap806: introduce a new binding
-In-Reply-To: <fd62952c043aec1d87ff65d9d69105103a195908.1495209464.git-series.gregory.clement@free-electrons.com>
-References: <cover.fd6093dbad53cdac70eef4e53b238768721218ac.1495209464.git-series.gregory.clement@free-electrons.com>
- <fd62952c043aec1d87ff65d9d69105103a195908.1495209464.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170523152612.e5kpra2ir2vibgrh@rob-hp-laptop>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Tue, 23 May 2017 12:32:43 -0300
+Subject: [PATCH v2 1/2] ARM: dts: imx23-sansa: Remove 'enable-active-low'
+ property
+Message-ID: <1495553564-19112-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 05:58:03PM +0200, Gregory CLEMENT wrote:
-> As for cp110, the initial intent when the binding of the ap806 system
-> controller was to have one flat node. The idea being that what is
-> currently a clock-only driver in drivers would become a MFD driver,
-> exposing the clock, GPIO and pinctrl functionality. However, after taking
-> a step back, this would lead to a messy binding. Indeed, a single node
-> would be a GPIO controller, clock controller, pinmux controller, and
-> more.
-> 
-> This patch adopts a more classical solution of a top-level syscon node
-> with sub-nodes for the individual devices. The main benefit will be to
-> have each functional block associated to its own sub-node where we can
-> put its own properties.
-> 
-> The introduction of the Armada 7K/8K is still in the early stage so the
-> plan is to remove the old binding. However, we don't want to break the
-> device tree compatibility for the few devices already in the field. For
-> this we still keep the support of the legacy compatible string with a big
-> warning in the kernel about updating the device tree.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt | 20 +++++++++++++++-----
->  drivers/clk/mvebu/ap806-system-controller.c                               | 56 ++++++++++++++++++++++++++++++++++++++++++++------------
->  2 files changed, 59 insertions(+), 17 deletions(-)
+Property 'enable-active-low' does not exist. Only 'enable-active-high' is
+valid, and when this property is absent the gpio regulator will act as
+active low by default.
 
-Acked-by: Rob Herring <robh@kernel.org>
+So remove the unexisting 'enable-active-low' property. 
+
+Currently the GPIO flag is 0, which means active-high. In order to make
+the dts description accurate, pass the GPIO_ACTIVE_LOW flag instead.
+
+This change is safe because the gpio regulator driver does not take the
+GPIO flag polarity into account.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Changes since v1:
+- Improve commit log and explain why this change is safe (Stefan).
+
+ arch/arm/boot/dts/imx23-sansa.dts | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx23-sansa.dts b/arch/arm/boot/dts/imx23-sansa.dts
+index 4ec32f4..221fd55 100644
+--- a/arch/arm/boot/dts/imx23-sansa.dts
++++ b/arch/arm/boot/dts/imx23-sansa.dts
+@@ -42,6 +42,7 @@
+  */
+ 
+ /dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
+ #include "imx23.dtsi"
+ 
+ / {
+@@ -149,9 +150,8 @@
+ 		regulator-name = "vdd-touchpad0";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio0 26 0>;
++		gpio = <&gpio0 26 GPIO_ACTIVE_LOW>;
+ 		regulator-always-on;
+-		enable-active-low;
+ 	};
+ 
+ 	reg_vdd_tuner: regulator-vdd-tuner0 {
+@@ -159,9 +159,8 @@
+ 		regulator-name = "vdd-tuner0";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio0 29 0>;
++		gpio = <&gpio0 29 GPIO_ACTIVE_LOW>;
+ 		regulator-always-on;
+-		enable-active-low;
+ 	};
+ 
+ 	backlight {
+-- 
+2.7.4
