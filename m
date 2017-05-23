@@ -1,22 +1,33 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 23 May 2017 16:21:48 +0200
-Subject: [PATCH 0/3] ARM64: dts: meson: GXBB and GXL pinctrl fixes
-Message-ID: <1495549311-23660-1-git-send-email-narmstrong@baylibre.com>
+Date: Tue, 23 May 2017 16:21:49 +0200
+Subject: [PATCH 1/3] ARM64: dts: meson-gxl: Fix pinctrl periphs gpio-ranges
+In-Reply-To: <1495549311-23660-1-git-send-email-narmstrong@baylibre.com>
+References: <1495549311-23660-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1495549311-23660-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes the following :
- - bad gpio-ranges for GXL
- - bad pull-enable register base for GXBB & GXL
+The gpio-range was badly added on the GXL dtsi, the AO pin count is 10
+instead of 14.
 
-Neil Armstrong (3):
-  ARM64: dts: meson-gxl: Fix pinctrl periphs gpio-ranges
-  ARM64: dts: Fix GXL periphs pinctrl pull-enable register base
-  ARM64: dts: Fix GXBB periphs pinctrl pull-enable register base
+Fixes: 84412e4e857f ("ARM64: dts: meson-gxl: Add gpio-ranges properties")
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 +-
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index 3efad5f..4871ce5 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -244,7 +244,7 @@
+ 			reg-names = "mux", "pull", "pull-enable", "gpio";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+-			gpio-ranges = <&pinctrl_periphs 0 14 101>;
++			gpio-ranges = <&pinctrl_periphs 0 10 101>;
+ 		};
+ 
+ 		emmc_pins: emmc {
 -- 
 1.9.1
