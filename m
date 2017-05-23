@@ -1,51 +1,35 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Tue, 23 May 2017 10:33:26 +0530
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <CAGXu5jKwTDYeNQggezzSKkFzZQkroC+6SdBB0qUKh5crfNk8PA@mail.gmail.com>
-References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
- <20170510.212952.1440495072777358778.davem@davemloft.net>
- <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
- <20170510.215218.2185526627014393313.davem@davemloft.net>
- <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
- <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
- <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
- <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
- <591A07A1.1030006@iogearbox.net>
- <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
- <CAGXu5j+k+NMQGmmhuW-4pHFd6agfndJfxQ9k--h+ZpsDBVB8ig@mail.gmail.com>
- <8c53012b-cb81-5228-de79-f55457d1cf69@gmail.com>
- <CAHgaXdL2qReJF1Aw08k3C+OiC-3AOy3VeYmQ1Hs7vKcrfGQnvA@mail.gmail.com>
- <CAGXu5jKwTDYeNQggezzSKkFzZQkroC+6SdBB0qUKh5crfNk8PA@mail.gmail.com>
-Message-ID: <CAHgaXdKqt3mZmPG78w+4g_17D8EQoBgAZeuqM+MMsQg2f7apsw@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 23 May 2017 13:03:45 +0800
+Subject: [PATCH v2 0/9] crypto: add HMAC IPAD/OPAD constant
+In-Reply-To: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
+References: <20170519065331.27670-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170523050345.GF17569@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kees,
+On Fri, May 19, 2017 at 08:53:22AM +0200, Corentin Labbe wrote:
+> Hello
+> 
+> Many HMAC users directly use directly 0x36/0x5c values.
+> It's better with crypto to use a name instead of directly some crypto constant.
+> 
+> Changes since v1:
+> - Moved constant to include/crypto/hmac.h
+> - Added <crypto/hmac.h> to includes
+> 
+> Corentin Labbe (9):
+>   crypto: add hmac IPAD/OPAD constant
+>   crypto: brcm - Use IPAD/OPAD constant
+>   crypto: ixp4xx - Use IPAD/OPAD constant
+>   crypto: marvell - Use IPAD/OPAD constant
+>   crypto: mv_cesa - Use IPAD/OPAD constant
+>   crypto: omap-sham - Use IPAD/OPAD constant
+>   crypto: qat - Use IPAD/OPAD constant
+>   crypto: mediatek - Use IPAD/OPAD constant
+>   crypto: ccp - Use IPAD/OPAD constant
 
-I already have ARMv5 and ARMv6 code written. I just haven't tested it
-yet. Should i send the patch with those as well ?
-
-Best,
-Shubham Bansal
-
-
-On Tue, May 23, 2017 at 9:52 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Mon, May 22, 2017 at 8:34 PM, Shubham Bansal
-> <illusionist.neo@gmail.com> wrote:
->> I would post them as soon as I test them on ARMv5 and ARMv6. If you
->> can help me with that, please let me know.
->
-> Please post what you have: it would be better to see what you've got
-> now in case additional changes are needed so you don't have to do it
-> again on v5 and v6. Also, it means other people with real v5 and v6
-> hardware could test for you if they were so inclined, and you won't
-> need to be blocked on doing the tests in qemu.
->
-> You can send it as an "RFC" in the subject, just to make sure people
-> know it's not considered fully done. :)
->
-> -Kees
->
-> --
-> Kees Cook
-> Pixel Security
+All applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
