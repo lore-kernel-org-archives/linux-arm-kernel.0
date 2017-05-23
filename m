@@ -1,175 +1,84 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 23 May 2017 11:56:05 +0200
-Subject: [PATCH v2 3/3] KVM: arm/arm64: Simplify active_change_prepare
- and plug race
-In-Reply-To: <cf2875a8-faef-4d2f-7394-9378fadb9d1d@arm.com>
-References: <20170516100431.4101-1-cdall@linaro.org>
- <20170516100431.4101-4-cdall@linaro.org>
- <9a412ed2-70ea-b651-dd75-18d723ee8b71@arm.com>
- <20170523084329.GC6319@cbox>
- <cf2875a8-faef-4d2f-7394-9378fadb9d1d@arm.com>
-Message-ID: <20170523095605.GA19598@cbox>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 23 May 2017 18:04:42 +0800
+Subject: [PATCH v3 3/6] mm/hugetlb: add size parameter to huge_pte_offset()
+In-Reply-To: <20170522133604.11392-4-punit.agrawal@arm.com>
+Message-ID: <201705231817.OSRI6iib%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 10:05:13AM +0100, Marc Zyngier wrote:
-> On 23/05/17 09:43, Christoffer Dall wrote:
-> > On Mon, May 22, 2017 at 04:30:22PM +0100, Marc Zyngier wrote:
-> >> On 16/05/17 11:04, Christoffer Dall wrote:
-> >>> We don't need to stop a specific VCPU when changing the active state,
-> >>> because private IRQs can only be modified by a running VCPU for the
-> >>> VCPU itself and it is therefore already stopped.
-> >>>
-> >>> However, it is also possible for two VCPUs to be modifying the active
-> >>> state of SPIs at the same time, which can cause the thread being stuck
-> >>> in the loop that checks other VCPU threads for a potentially very long
-> >>> time, or to modify the active state of a running VCPU.  Fix this by
-> >>> serializing all accesses to setting and clearing the active state of
-> >>> interrupts using the KVM mutex.
-> >>>
-> >>> Reported-by: Andrew Jones <drjones@redhat.com>
-> >>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> >>> ---
-> >>>  arch/arm/include/asm/kvm_host.h   |  2 --
-> >>>  arch/arm64/include/asm/kvm_host.h |  2 --
-> >>>  virt/kvm/arm/arm.c                | 20 ++++----------------
-> >>>  virt/kvm/arm/vgic/vgic-mmio.c     | 18 ++++++++++--------
-> >>>  virt/kvm/arm/vgic/vgic.c          | 11 ++++++-----
-> >>>  5 files changed, 20 insertions(+), 33 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> >>> index f0e6657..12274d4 100644
-> >>> --- a/arch/arm/include/asm/kvm_host.h
-> >>> +++ b/arch/arm/include/asm/kvm_host.h
-> >>> @@ -233,8 +233,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
-> >>>  struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
-> >>>  void kvm_arm_halt_guest(struct kvm *kvm);
-> >>>  void kvm_arm_resume_guest(struct kvm *kvm);
-> >>> -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
-> >>> -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
-> >>>  
-> >>>  int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
-> >>>  unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
-> >>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >>> index 5e19165..32cbe8a 100644
-> >>> --- a/arch/arm64/include/asm/kvm_host.h
-> >>> +++ b/arch/arm64/include/asm/kvm_host.h
-> >>> @@ -333,8 +333,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
-> >>>  struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
-> >>>  void kvm_arm_halt_guest(struct kvm *kvm);
-> >>>  void kvm_arm_resume_guest(struct kvm *kvm);
-> >>> -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
-> >>> -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
-> >>>  
-> >>>  u64 __kvm_call_hyp(void *hypfn, ...);
-> >>>  #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
-> >>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> >>> index 3417e18..3c387fd 100644
-> >>> --- a/virt/kvm/arm/arm.c
-> >>> +++ b/virt/kvm/arm/arm.c
-> >>> @@ -539,27 +539,15 @@ void kvm_arm_halt_guest(struct kvm *kvm)
-> >>>  	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
-> >>>  }
-> >>>  
-> >>> -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu)
-> >>> -{
-> >>> -	vcpu->arch.pause = true;
-> >>> -	kvm_vcpu_kick(vcpu);
-> >>> -}
-> >>> -
-> >>> -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
-> >>> -{
-> >>> -	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
-> >>> -
-> >>> -	vcpu->arch.pause = false;
-> >>> -	swake_up(wq);
-> >>> -}
-> >>> -
-> >>>  void kvm_arm_resume_guest(struct kvm *kvm)
-> >>>  {
-> >>>  	int i;
-> >>>  	struct kvm_vcpu *vcpu;
-> >>>  
-> >>> -	kvm_for_each_vcpu(i, vcpu, kvm)
-> >>> -		kvm_arm_resume_vcpu(vcpu);
-> >>> +	kvm_for_each_vcpu(i, vcpu, kvm) {
-> >>> +		vcpu->arch.pause = false;
-> >>> +		swake_up(kvm_arch_vcpu_wq(vcpu));
-> >>> +	}
-> >>>  }
-> >>>  
-> >>>  static void vcpu_sleep(struct kvm_vcpu *vcpu)
-> >>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> >>> index 64cbcb4..c1e4bdd 100644
-> >>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> >>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> >>> @@ -231,23 +231,21 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-> >>>   * be migrated while we don't hold the IRQ locks and we don't want to be
-> >>>   * chasing moving targets.
-> >>>   *
-> >>> - * For private interrupts, we only have to make sure the single and only VCPU
-> >>> - * that can potentially queue the IRQ is stopped.
-> >>> + * For private interrupts we don't have to do anything because userspace
-> >>> + * accesses to the VGIC state already require all VCPUs to be stopped, and
-> >>> + * only the VCPU itself can modify its private interrupts active state, which
-> >>> + * guarantees that the VCPU is not running.
-> >>>   */
-> >>>  static void vgic_change_active_prepare(struct kvm_vcpu *vcpu, u32 intid)
-> >>>  {
-> >>> -	if (intid < VGIC_NR_PRIVATE_IRQS)
-> >>> -		kvm_arm_halt_vcpu(vcpu);
-> >>> -	else
-> >>> +	if (intid > VGIC_NR_PRIVATE_IRQS)
-> >>>  		kvm_arm_halt_guest(vcpu->kvm);
-> >>>  }
-> >>>  
-> >>>  /* See vgic_change_active_prepare */
-> >>>  static void vgic_change_active_finish(struct kvm_vcpu *vcpu, u32 intid)
-> >>>  {
-> >>> -	if (intid < VGIC_NR_PRIVATE_IRQS)
-> >>> -		kvm_arm_resume_vcpu(vcpu);
-> >>> -	else
-> >>> +	if (intid > VGIC_NR_PRIVATE_IRQS)
-> >>>  		kvm_arm_resume_guest(vcpu->kvm);
-> >>>  }
-> >>>  
-> >>> @@ -271,11 +269,13 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
-> >>>  {
-> >>>  	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
-> >>>  
-> >>> +	mutex_lock(&vcpu->kvm->lock);
-> >>>  	vgic_change_active_prepare(vcpu, intid);
-> >>>  
-> >>>  	__vgic_mmio_write_cactive(vcpu, addr, len, val);
-> >>>  
-> >>>  	vgic_change_active_finish(vcpu, intid);
-> >>> +	mutex_unlock(&vcpu->kvm->lock);
-> >>
-> >> Any reason not to move the lock/unlock calls to prepare/finish? Also, do
-> >> we need to take that mutex if intid is a PPI?
-> > 
-> > I guess we strictly don't need to take the mutex if it's a PPI, no.
-> > 
-> > But I actually preferred this symmetry because you can easily tell we
-> > don't have a bug (famous last words) by locking and unlocking the mutex
-> > in the same function.
-> > 
-> > I don't feel strongly about it though, so I can move it if you prefer
-> > it.
-> 
-> No, that's fine, I just wanted to check whether my understanding was
-> correct.
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
+Hi Punit,
 
-Thanks.
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.12-rc2 next-20170523]
+[cannot apply to mmotm/master]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-So assuming Drew's patches will go on top of these, should we merge this
-as fixes to -rcX, or queue them for v4.13 ?
+url:    https://github.com/0day-ci/linux/commits/Punit-Agrawal/Support-for-contiguous-pte-hugepages/20170523-142407
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-I'm leaning towards the latter because I don't think we've seen these
-races do something bad in the wild, and they're probably not going to be
-backportable to stable anyway.  Thoughts?
+All errors (new ones prefixed by >>):
 
--Christoffer
+   arch/arm64/mm/hugetlbpage.c: In function 'huge_ptep_get_and_clear':
+>> arch/arm64/mm/hugetlbpage.c:200:10: error: too few arguments to function 'huge_pte_offset'
+      cpte = huge_pte_offset(mm, addr);
+             ^~~~~~~~~~~~~~~
+   arch/arm64/mm/hugetlbpage.c:135:8: note: declared here
+    pte_t *huge_pte_offset(struct mm_struct *mm,
+           ^~~~~~~~~~~~~~~
+   arch/arm64/mm/hugetlbpage.c: In function 'huge_ptep_set_access_flags':
+   arch/arm64/mm/hugetlbpage.c:238:10: error: too few arguments to function 'huge_pte_offset'
+      cpte = huge_pte_offset(vma->vm_mm, addr);
+             ^~~~~~~~~~~~~~~
+   arch/arm64/mm/hugetlbpage.c:135:8: note: declared here
+    pte_t *huge_pte_offset(struct mm_struct *mm,
+           ^~~~~~~~~~~~~~~
+   arch/arm64/mm/hugetlbpage.c: In function 'huge_ptep_set_wrprotect':
+   arch/arm64/mm/hugetlbpage.c:263:10: error: too few arguments to function 'huge_pte_offset'
+      cpte = huge_pte_offset(mm, addr);
+             ^~~~~~~~~~~~~~~
+   arch/arm64/mm/hugetlbpage.c:135:8: note: declared here
+    pte_t *huge_pte_offset(struct mm_struct *mm,
+           ^~~~~~~~~~~~~~~
+   arch/arm64/mm/hugetlbpage.c: In function 'huge_ptep_clear_flush':
+   arch/arm64/mm/hugetlbpage.c:280:10: error: too few arguments to function 'huge_pte_offset'
+      cpte = huge_pte_offset(vma->vm_mm, addr);
+             ^~~~~~~~~~~~~~~
+   arch/arm64/mm/hugetlbpage.c:135:8: note: declared here
+    pte_t *huge_pte_offset(struct mm_struct *mm,
+           ^~~~~~~~~~~~~~~
+
+vim +/huge_pte_offset +200 arch/arm64/mm/hugetlbpage.c
+
+66b3923a David Woods 2015-12-17  194  	if (pte_cont(*ptep)) {
+66b3923a David Woods 2015-12-17  195  		int ncontig, i;
+66b3923a David Woods 2015-12-17  196  		size_t pgsize;
+66b3923a David Woods 2015-12-17  197  		pte_t *cpte;
+66b3923a David Woods 2015-12-17  198  		bool is_dirty = false;
+66b3923a David Woods 2015-12-17  199  
+66b3923a David Woods 2015-12-17 @200  		cpte = huge_pte_offset(mm, addr);
+66b3923a David Woods 2015-12-17  201  		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
+66b3923a David Woods 2015-12-17  202  		/* save the 1st pte to return */
+66b3923a David Woods 2015-12-17  203  		pte = ptep_get_and_clear(mm, addr, cpte);
+
+:::::: The code at line 200 was first introduced by commit
+:::::: 66b3923a1a0f77a563b43f43f6ad091354abbfe9 arm64: hugetlb: add support for PTE contiguous bit
+
+:::::: TO: David Woods <dwoods@ezchip.com>
+:::::: CC: Will Deacon <will.deacon@arm.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 35202 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170523/dd2d84e0/attachment-0001.gz>
