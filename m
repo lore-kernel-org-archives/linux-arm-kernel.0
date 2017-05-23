@@ -1,10 +1,10 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 23 May 2017 15:34:32 +0200
-Subject: [PATCH v5 04/20] ARM: dts: turris-omnia: Add generic compatible
- string for I2C EEPROM
+Date: Tue, 23 May 2017 15:34:33 +0200
+Subject: [PATCH v5 05/20] ARM: dts: efm32: Add generic compatible string for
+ I2C EEPROM
 In-Reply-To: <20170523133448.4794-1-javier@dowhile0.org>
 References: <20170523133448.4794-1-javier@dowhile0.org>
-Message-ID: <20170523133448.4794-5-javier@dowhile0.org>
+Message-ID: <20170523133448.4794-6-javier@dowhile0.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,7 +23,9 @@ Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
 
 ---
 
-Changes in v5: None
+Changes in v5:
+- Only replace atmel variant but keep other EEPROM vendors (Geert Uytterhoeven).
+
 Changes in v4:
 - Only use the atmel manufacturer in the compatible string instead of
   keeping the deprecated ones (Rob Herring).
@@ -31,21 +33,21 @@ Changes in v4:
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/boot/dts/armada-385-turris-omnia.dts | 2 +-
+ arch/arm/boot/dts/efm32gg-dk3750.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-index 28eede180e4f..be16ce39fb3d 100644
---- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
-+++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-@@ -171,7 +171,7 @@
- 			/* leds device (in STM32F0) at address 0x2b */
+diff --git a/arch/arm/boot/dts/efm32gg-dk3750.dts b/arch/arm/boot/dts/efm32gg-dk3750.dts
+index 98fc667d22c7..84f0a9abc290 100644
+--- a/arch/arm/boot/dts/efm32gg-dk3750.dts
++++ b/arch/arm/boot/dts/efm32gg-dk3750.dts
+@@ -36,7 +36,7 @@
+ 			};
  
- 			eeprom at 54 {
--				compatible = "at,24c64";
-+				compatible = "atmel,24c64";
- 				reg = <0x54>;
- 
- 				/* The EEPROM contains data for bootloader.
+ 			eeprom at 50 {
+-				compatible = "microchip,24c02";
++				compatible = "microchip,24c02", "atmel,24c02";
+ 				reg = <0x50>;
+ 				pagesize = <16>;
+ 			};
 -- 
 2.9.3
