@@ -1,101 +1,119 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 23 May 2017 13:30:58 +0900
-Subject: [PATCH v3 4/4] kgdb: select a correct cpu while in a single stepping
-In-Reply-To: <20170523043058.5463-1-takahiro.akashi@linaro.org>
-References: <20170523043058.5463-1-takahiro.akashi@linaro.org>
-Message-ID: <20170523043058.5463-5-takahiro.akashi@linaro.org>
+From: oza.oza@broadcom.com (Oza Oza)
+Date: Tue, 23 May 2017 10:30:51 +0530
+Subject: [PATCH v7 0/3] PCI/IOMMU: Reserve IOVAs for PCI inbound memory
+In-Reply-To: <20170522131838.71258483@w520.home>
+References: <1495471182-12490-1-git-send-email-oza.oza@broadcom.com>
+ <20170522131838.71258483@w520.home>
+Message-ID: <CAMSpPPf9O9tdK018VCdHvxnN2rb2Yp2da0=jz1iFDf21vs77wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a breakpoint is set somewhere in an irq handler and it is hit
-almost at the same time on multiple cpus, we may see the following
-error from gdb in trying to do a single stepping:
+On Tue, May 23, 2017 at 12:48 AM, Alex Williamson
+<alex.williamson@redhat.com> wrote:
+> On Mon, 22 May 2017 22:09:39 +0530
+> Oza Pawandeep <oza.oza@broadcom.com> wrote:
+>
+>> iproc based PCI RC and Stingray SOC has limitaiton of addressing only 512GB
+>> memory at once.
+>>
+>> IOVA allocation honors device's coherent_dma_mask/dma_mask.
+>> In PCI case, current code honors DMA mask set by EP, there is no
+>> concept of PCI host bridge dma-mask,  should be there and hence
+>> could truly reflect the limitation of PCI host bridge.
+>>
+>> However assuming Linux takes care of largest possible dma_mask, still the
+>> limitation could exist, because of the way memory banks are implemented.
+>>
+>> for e.g. memory banks:
+>> <0x00000000 0x80000000 0x0 0x80000000>, /* 2G @ 2G */
+>> <0x00000008 0x80000000 0x3 0x80000000>, /* 14G @ 34G */
+>> <0x00000090 0x00000000 0x4 0x00000000>, /* 16G @ 576G */
+>> <0x000000a0 0x00000000 0x4 0x00000000>; /* 16G @ 640G */
+>>
+>> When run User space (SPDK) which internally uses vfio in order to access
+>> PCI EndPoint directly.
+>>
+>> Vfio uses huge-pages which could come from 640G/0x000000a0.
+>> And the way vfio maps the hugepage is to have phys addr as iova,
+>> and ends up calling VFIO_IOMMU_MAP_DMA ends up calling iommu_map,
+>> inturn arm_lpae_map mapping iovas out of range.
+>>
+>> So the way kernel allocates IOVA (where it honours device dma_mask) and
+>> the way userspace gets IOVA is different.
+>>
+>> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>; will not work.
+>>
+>> Instead we have to go for scattered dma-ranges leaving holes.
+>> Hence, we have to reserve IOVA allocations for inbound memory.
+>> The patch-set caters to only addressing IOVA allocation problem.
+>
+>
+> The description here confuses me, with vfio the user owns the iova
+> allocation problem.  Mappings are only identity mapped if the user
+> chooses to do so.  The dma_mask of the device is set by the driver and
+> only relevant to the DMA-API.  vfio is a meta-driver and doesn't know
+> the dma_mask of any particular device, that's the user's job.  Is the
+> net result of what's happening here for the vfio case simply to expose
+> extra reserved regions in sysfs, which the user can then consume to
+> craft a compatible iova?  Thanks,
+>
+> Alex
 
-  (gdb) si
-  /home/tcwg-buildslave/workspace/tcwg-make-release/label/docker-trusty
-  -amd64-tcwg-build/target/aarch64-linux-gnu/snapshots/binutils-gdb.git
-  ~gdb-7.12-branch/gdb/infrun.c:5565: internal-error: int finish_step_o
-  ver(execution_control_state*): Assertion `ecs->event_thread->control.
-  trap_expected' failed.
-  A problem internal to GDB has been detected,
-  further debugging may prove unreliable.
-  Quit this debugging session? (y or n)
+Hi Alex,
 
-This message indicates that, before and after a single stepping,
-different cpus/tasks are selected as a kgdb master in kgdb_cpu_enter
-(DCPU_WANT_MASTER).
+this is not a VFIO problem, the reason I have mentioned VFIO because,
+wanted to bring problem
+statement as a whole (which includes both kernel space and user space).
+The way SPDK pipeline is set, yes mapping are identity mapped, and
+whatever user space passes down IOVA,
+VFIO use is as is. which is fine and expected.
 
-This issue was seen on arm64 when a breakpoint was set, for example,
-to gic_handle_irq.
+But the problem is, user space physical memory (hugepages)  reside
+high enough in
+memory, which could be beyond PCI RC's capability.
 
-How can this happen?
-With the following commit, kgdb_cpu_enter() tries to "only enter on
-the processor that was single stepping."
+Again, this is not VFIO's problem, neither is of user-space.
+In-fact both have nothing to do with dma-mask as well.
+My reference of dma-mask was for Linux IOMMU framework (not for VFIO)
 
-  commit 028e7b175970
-  Author: Jason Wessel <jason.wessel@windriver.com>
-  Date:   Fri Dec 11 08:43:17 2009 -0600
-
-      kgdb: allow for cpu switch when single stepping
-
-If idle task is running when a breakpoint is hit, kgdb_info[cpu].task
-is set to current, pid of which is 0 (zero).
-(Actually 'current' has nothing to do with this breakpoint though.)
-Then if a few cpus are competing for becoming a kgdb master while in
-idle state,
-
-        if (atomic_read(&kgdb_cpu_doing_single_step) != -1 &&
-            (kgdb_info[cpu].task &&
-             kgdb_info[cpu].task->pid != kgdb_sstep_pid) && --sstep_tries)
-
-this check will mistakenly pass and select a wrong cpu just because
-kgdb_info[cpu].task->pid can be equal to 0 for all of the cpus at this
-point.
-
-So the issue is fixed in this patch by using 'task_struct *' instead of
-process id to identify a targeted single-stepping cpu.
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Jason Wessel <jason.wessel@windriver.com>
----
- kernel/debug/debug_core.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/kernel/debug/debug_core.c b/kernel/debug/debug_core.c
-index 65c0f1363788..4dd2a41c8309 100644
---- a/kernel/debug/debug_core.c
-+++ b/kernel/debug/debug_core.c
-@@ -135,7 +135,7 @@ struct task_struct		*kgdb_usethread;
- struct task_struct		*kgdb_contthread;
- 
- int				kgdb_single_step;
--static pid_t			kgdb_sstep_pid;
-+static struct task_struct	*kgdb_sstep_thread;
- 
- /* to keep track of the CPU which is doing the single stepping*/
- atomic_t			kgdb_cpu_doing_single_step = ATOMIC_INIT(-1);
-@@ -555,7 +555,7 @@ static int kgdb_cpu_enter(struct kgdb_state *ks, struct pt_regs *regs,
- 	 */
- 	if (atomic_read(&kgdb_cpu_doing_single_step) != -1 &&
- 	    (kgdb_info[cpu].task &&
--	     kgdb_info[cpu].task->pid != kgdb_sstep_pid) && --sstep_tries) {
-+	     kgdb_info[cpu].task != kgdb_sstep_thread) && --sstep_tries) {
- 		atomic_set(&kgdb_active, -1);
- 		raw_spin_unlock(&dbg_master_lock);
- 		dbg_touch_watchdogs();
-@@ -658,9 +658,9 @@ static int kgdb_cpu_enter(struct kgdb_state *ks, struct pt_regs *regs,
- 	if (atomic_read(&kgdb_cpu_doing_single_step) != -1) {
- 		int sstep_cpu = atomic_read(&kgdb_cpu_doing_single_step);
- 		if (kgdb_info[sstep_cpu].task)
--			kgdb_sstep_pid = kgdb_info[sstep_cpu].task->pid;
-+			kgdb_sstep_thread = kgdb_info[sstep_cpu].task;
- 		else
--			kgdb_sstep_pid = 0;
-+			kgdb_sstep_thread = NULL;
- 	}
- 	if (arch_kgdb_ops.correct_hw_break)
- 		arch_kgdb_ops.correct_hw_break();
--- 
-2.11.1
+Regards,
+Oza.
+>
+>>
+>> Changes since v7:
+>> - Robin's comment addressed
+>> where he wanted to remove depedency between IOMMU and OF layer.
+>> - Bjorn Helgaas's comments addressed.
+>>
+>> Changes since v6:
+>> - Robin's comments addressed.
+>>
+>> Changes since v5:
+>> Changes since v4:
+>> Changes since v3:
+>> Changes since v2:
+>> - minor changes, redudant checkes removed
+>> - removed internal review
+>>
+>> Changes since v1:
+>> - address Rob's comments.
+>> - Add a get_dma_ranges() function to of_bus struct..
+>> - Convert existing contents of of_dma_get_range function to
+>>   of_bus_default_dma_get_ranges and adding that to the
+>>   default of_bus struct.
+>> - Make of_dma_get_range call of_bus_match() and then bus->get_dma_ranges.
+>>
+>>
+>> Oza Pawandeep (3):
+>>   OF/PCI: expose inbound memory interface to PCI RC drivers.
+>>   IOMMU/PCI: reserve IOVA for inbound memory for PCI masters
+>>   PCI: add support for inbound windows resources
+>>
+>>  drivers/iommu/dma-iommu.c | 44 ++++++++++++++++++++--
+>>  drivers/of/of_pci.c       | 96 +++++++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/pci/probe.c       | 30 +++++++++++++--
+>>  include/linux/of_pci.h    |  7 ++++
+>>  include/linux/pci.h       |  1 +
+>>  5 files changed, 170 insertions(+), 8 deletions(-)
+>>
+>
