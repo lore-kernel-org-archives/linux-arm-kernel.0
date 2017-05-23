@@ -1,106 +1,77 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 23 May 2017 10:29:36 -0600
-Subject: [PATCH v11 8/9] arm64: dts: hi6220: register debug module
-In-Reply-To: <1495548980-30432-9-git-send-email-leo.yan@linaro.org>
+Date: Tue, 23 May 2017 10:31:38 -0600
+Subject: [PATCH v11 9/9] arm64: dts: qcom: msm8916: Add debug unit
+In-Reply-To: <1495548980-30432-10-git-send-email-leo.yan@linaro.org>
 References: <1495548980-30432-1-git-send-email-leo.yan@linaro.org>
- <1495548980-30432-9-git-send-email-leo.yan@linaro.org>
-Message-ID: <CANLsYkwbjT38KhkOLJTBbubnDi4JOsGSK0rVuYuRbs3xsmWj0A@mail.gmail.com>
+ <1495548980-30432-10-git-send-email-leo.yan@linaro.org>
+Message-ID: <CANLsYkwkJkNCvf42hyQv6Fnkn1Ab-OAbPuJhLskKu=q4ReMEDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 23 May 2017 at 08:16, Leo Yan <leo.yan@linaro.org> wrote:
-> Bind debug module driver for Hi6220.
+> Add debug unit on Qualcomm msm8916 based platforms, including the
+> DragonBoard 410c board.
 >
 > Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 > Signed-off-by: Leo Yan <leo.yan@linaro.org>
 
-Wei and Mark,
+Andy and David,
 
-I think it makes sense to have this go through the coresight tree
-along with the rest of the driver.  Please have a look and let me
-know.
+Would you mind taking a look a this when you have a minute?  If it's
+fine with you we can make this go through my tree with the rest of the
+driver.
 
-Thanks,
+Regards,
 Mathieu
 
+
 > ---
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 64 +++++++++++++++++++++++++++++++
->  1 file changed, 64 insertions(+)
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
 >
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> index 1e5129b..21805b9 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> @@ -916,5 +916,69 @@
->                                 };
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> index ab30939..17691ab 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> @@ -1116,6 +1116,38 @@
 >                         };
 >                 };
-> +
-> +               debug at f6590000 {
+>
+> +               debug at 850000 {
 > +                       compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +                       reg = <0 0xf6590000 0 0x1000>;
-> +                       clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +                       reg = <0x850000 0x1000>;
+> +                       clocks = <&rpmcc RPM_QDSS_CLK>;
 > +                       clock-names = "apb_pclk";
-> +                       cpu = <&cpu0>;
+> +                       cpu = <&CPU0>;
 > +               };
 > +
-> +               debug at f6592000 {
+> +               debug at 852000 {
 > +                       compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +                       reg = <0 0xf6592000 0 0x1000>;
-> +                       clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +                       reg = <0x852000 0x1000>;
+> +                       clocks = <&rpmcc RPM_QDSS_CLK>;
 > +                       clock-names = "apb_pclk";
-> +                       cpu = <&cpu1>;
+> +                       cpu = <&CPU1>;
 > +               };
 > +
-> +               debug at f6594000 {
+> +               debug at 854000 {
 > +                       compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +                       reg = <0 0xf6594000 0 0x1000>;
-> +                       clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +                       reg = <0x854000 0x1000>;
+> +                       clocks = <&rpmcc RPM_QDSS_CLK>;
 > +                       clock-names = "apb_pclk";
-> +                       cpu = <&cpu2>;
+> +                       cpu = <&CPU2>;
 > +               };
 > +
-> +               debug at f6596000 {
+> +               debug at 856000 {
 > +                       compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +                       reg = <0 0xf6596000 0 0x1000>;
-> +                       clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +                       reg = <0x856000 0x1000>;
+> +                       clocks = <&rpmcc RPM_QDSS_CLK>;
 > +                       clock-names = "apb_pclk";
-> +                       cpu = <&cpu3>;
+> +                       cpu = <&CPU3>;
 > +               };
 > +
-> +               debug at f65d0000 {
-> +                       compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +                       reg = <0 0xf65d0000 0 0x1000>;
-> +                       clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +                       clock-names = "apb_pclk";
-> +                       cpu = <&cpu4>;
-> +               };
-> +
-> +               debug at f65d2000 {
-> +                       compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +                       reg = <0 0xf65d2000 0 0x1000>;
-> +                       clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +                       clock-names = "apb_pclk";
-> +                       cpu = <&cpu5>;
-> +               };
-> +
-> +               debug at f65d4000 {
-> +                       compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +                       reg = <0 0xf65d4000 0 0x1000>;
-> +                       clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +                       clock-names = "apb_pclk";
-> +                       cpu = <&cpu6>;
-> +               };
-> +
-> +               debug at f65d6000 {
-> +                       compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +                       reg = <0 0xf65d6000 0 0x1000>;
-> +                       clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> +                       clock-names = "apb_pclk";
-> +                       cpu = <&cpu7>;
-> +               };
->         };
->  };
+>                 etm at 85c000 {
+>                         compatible = "arm,coresight-etm4x", "arm,primecell";
+>                         reg = <0x85c000 0x1000>;
 > --
 > 2.7.4
 >
