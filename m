@@ -1,74 +1,62 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 May 2017 13:56:28 +0200
-Subject: [PATCH 7/8] arm64: dts: hi6220: Move board data from the dwmmc
- nodes to hikey dts
-In-Reply-To: <1494260477-25163-8-git-send-email-ulf.hansson@linaro.org>
+Date: Tue, 23 May 2017 14:00:17 +0200
+Subject: [PATCH 0/8] arm64: hi6220-hikey: Fix WiFi support
+In-Reply-To: <CAPDyKFqi2jiqKESdz8izq6thr6GT0HQDKt6xRKzwaCQ-mkMNSw@mail.gmail.com>
 References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
- <1494260477-25163-8-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAK8P3a1CZ4GOZ=rV9Dk5zTb0gheau+CCR_tUT4+_oqOhQXtghQ@mail.gmail.com>
+ <CAPDyKFqi2jiqKESdz8izq6thr6GT0HQDKt6xRKzwaCQ-mkMNSw@mail.gmail.com>
+Message-ID: <CAK8P3a2sO9+LVRu+Mjj_K+-1MtQhfSs33J+0EMEq+Um35=2Aow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 8, 2017 at 6:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> Move the board specific descriptions for the dwmmc nodes in the hi6220 SoC
-> dtsi, into the hikey dts as it's there these belongs.
+On Mon, May 22, 2017 at 10:40 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> + Arnd, Rob
 >
-> While changing this, let's take the opportunity to drop the use of the
-> "ti,non-removable" binding for one of the dwmmc device nodes, as it's not a
-> valid binding and not used. Drop also the unnecessary use of "num-slots =
-> <0x1>" for all of the dwmmc nodes, as there is no need to set this since
-> when default number of slots is one.
+> On 8 May 2017 at 18:21, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> The Hikey board has a Wifi chip attached to the SDIO bus, which is managed by a
+>> dwmmc controller. This is currently broken in that way that not even the SDIO
+>> card is being detected.
+>>
+>> To fix this we need to make sure the correct resources are described for the
+>> dwmmc controller, so the mmc core can power on/off the SDIO/WiFi chip
+>> correctly. This is the main issue today.
+>>
+>> I have picked up one change from Daniel Lezcano's earlier submission [1] and
+>> folded that into this series, as the Wifi support depends on it. As a matter of
+>> fact I have even split Daniel's change into two halves, one for DT
+>> documentation and one for arm64 hikey dts.
+>>
+>> It's important that this series goes together as to conform with TI's HW spec
+>> of the wl18xx Wifi chip, as to prevent it from being damaged. We can either go
+>> via arm-soc, unless Wei Xu the Hikey SoC maintainer, prefers to ack the dts
+>> changes, then I can pick the series via my mmc tree.
+>>
+>> Moreover, I would suggest we send this as fixes for the 4.12 rcs to get the
+>> Wifi working for Hikey again.
 >
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 23 ++++++++++++++++++++++-
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 19 -------------------
->  2 files changed, 22 insertions(+), 20 deletions(-)
+> This series fixes my wifi issues on the Hikey board and currently all
+> but the hikey dts changes seems to be okay/acked.
 >
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> index 6dab03a..d4b3879 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> @@ -281,8 +281,29 @@
+> Rob and me had some discussions regarding the new mmc DT binding,
+> however in the last response from Rob he indicates that he is not
+> objecting to adding the new binding.
 >
->                 /* GPIO blocks 16 thru 19 do not appear to be routed to pins */
->
-> +               dwmmc_0: dwmmc0 at f723d000 {
-> +                       cap-mmc-highspeed;
-> +                       non-removable;
-> +                       bus-width = <0x8>;
-> +                       vmmc-supply = <&ldo19>;
-> +               };
-> +
-> +               dwmmc_1: dwmmc1 at f723e000 {
-> +                       card-detect-delay = <200>;
-> +                       cap-sd-highspeed;
-> +                       sd-uhs-sdr12;
-> +                       sd-uhs-sdr25;
-> +                       sd-uhs-sdr50;
-> +                       vqmmc-supply = <&ldo7>;
-> +                       vmmc-supply = <&ldo10>;
-> +                       bus-width = <0x4>;
-> +                       disable-wp;
-> +                       cd-gpios = <&gpio1 0 1>;
-> +               };
-> +
->                 dwmmc_2: dwmmc2 at f723f000 {
-> -                       ti,non-removable;
-> +                       broken-cd;
-> +                       bus-width = <0x4>;
->                         non-removable;
->                         /* WL_EN */
+> So, unless I hear some objection from any of you, I am going to queue
+> this up for fixes via my mmc tree within a day or so.
 
-I see you are just following the style that is used for all other nodes
-in this file, but it's worth pointing out that it's really silly to use both
-a label and the full path in both the .dtsi file for the SoC and the
-board specific .dts file.
+Hi Ulf,
 
-If you already have labels for each node, they should be used.
+I looked at all the changes, and they seem reasonable to me. Please
+add my
 
-(no need to respin the patch for that, just pointing it out to
-the maintainers for future updates)
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-        Arnd
+and put them into a separate branch that you merge into your mmc
+git, so we can merge the changes with the other updates in case
+there are conflicts.
+
+I see that the only code change is in patch 2. Are you able to put
+that patch last in the series without introducing bisection problems?
+That would be preferred, as it allows us to keep a pure 'DT' branch
+if we end up merging your other seven patches in.
+
+       Arnd
