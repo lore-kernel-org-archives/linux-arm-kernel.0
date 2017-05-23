@@ -1,63 +1,52 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 23 May 2017 22:16:20 +0800
-Subject: [PATCH v11 9/9] arm64: dts: qcom: msm8916: Add debug unit
-In-Reply-To: <1495548980-30432-1-git-send-email-leo.yan@linaro.org>
-References: <1495548980-30432-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1495548980-30432-10-git-send-email-leo.yan@linaro.org>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Tue, 23 May 2017 16:17:06 +0200
+Subject: [PATCH] ARM: dts: moxart: rename sdhci mmc
+Message-ID: <1495549026-5805-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add debug unit on Qualcomm msm8916 based platforms, including the
-DragonBoard 410c board.
+The host driver compatible string changed to "moxa,moxart-mmc" during
+the review process while the old name was committed to moxart's dts* files.
 
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Correct the host driver compatible string and also fix the node name.
+
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index ab30939..17691ab 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -1116,6 +1116,38 @@
- 			};
+Notes:
+    Applies to next-20170518
+
+ arch/arm/boot/dts/moxart-uc7112lx.dts | 2 +-
+ arch/arm/boot/dts/moxart.dtsi         | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/moxart-uc7112lx.dts b/arch/arm/boot/dts/moxart-uc7112lx.dts
+index 4a962a2..59d8775 100644
+--- a/arch/arm/boot/dts/moxart-uc7112lx.dts
++++ b/arch/arm/boot/dts/moxart-uc7112lx.dts
+@@ -80,7 +80,7 @@
+ 	clocks = <&ref12>;
+ };
+ 
+-&sdhci {
++&mmc {
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/moxart.dtsi b/arch/arm/boot/dts/moxart.dtsi
+index e86f8c9..54a3ca2 100644
+--- a/arch/arm/boot/dts/moxart.dtsi
++++ b/arch/arm/boot/dts/moxart.dtsi
+@@ -91,8 +91,8 @@
+ 			clocks = <&clk_apb>;
  		};
  
-+		debug at 850000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0x850000 0x1000>;
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&CPU0>;
-+		};
-+
-+		debug at 852000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0x852000 0x1000>;
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&CPU1>;
-+		};
-+
-+		debug at 854000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0x854000 0x1000>;
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&CPU2>;
-+		};
-+
-+		debug at 856000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0x856000 0x1000>;
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&CPU3>;
-+		};
-+
- 		etm at 85c000 {
- 			compatible = "arm,coresight-etm4x", "arm,primecell";
- 			reg = <0x85c000 0x1000>;
+-		sdhci: sdhci at 98e00000 {
+-			compatible = "moxa,moxart-sdhci";
++		mmc: mmc at 98e00000 {
++			compatible = "moxa,moxart-mmc";
+ 			reg = <0x98e00000 0x5C>;
+ 			interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk_apb>;
 -- 
-2.7.4
+1.8.2.1
