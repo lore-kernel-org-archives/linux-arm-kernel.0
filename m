@@ -1,101 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 May 2017 12:30:19 +0100
-Subject: [RFC PATCH v2 4/6] arm64: signal: Allocate extra sigcontext
- space as needed
-In-Reply-To: <20170515132442.GB3559@e103592.cambridge.arm.com>
-References: <1492016239-19511-1-git-send-email-Dave.Martin@arm.com>
- <1492016495-19689-1-git-send-email-Dave.Martin@arm.com>
- <1492016495-19689-4-git-send-email-Dave.Martin@arm.com>
- <20170512165724.GB8387@e104818-lin.cambridge.arm.com>
- <20170515132442.GB3559@e103592.cambridge.arm.com>
-Message-ID: <20170523113019.GB5948@e104818-lin.cambridge.arm.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Tue, 23 May 2017 19:39:16 +0800
+Subject: [PATCH 10/12] arm64: dts: hi3660: add spi device nodes
+In-Reply-To: <20170523004627.caeoqezj3leydj2t@rob-hp-laptop>
+References: <20170517083745.24479-1-guodong.xu@linaro.org>
+ <20170517083745.24479-11-guodong.xu@linaro.org>
+ <20170523004627.caeoqezj3leydj2t@rob-hp-laptop>
+Message-ID: <CAFGCpxyy0vmGhEHEJ3inn98RsO3Fshkw=_RWr_9XQCXiS-C-1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 15, 2017 at 02:24:45PM +0100, Dave P Martin wrote:
-> On Fri, May 12, 2017 at 05:57:24PM +0100, Catalin Marinas wrote:
-> > On Wed, Apr 12, 2017 at 06:01:13PM +0100, Dave P Martin wrote:
-> > > --- a/arch/arm64/include/uapi/asm/sigcontext.h
-> > > +++ b/arch/arm64/include/uapi/asm/sigcontext.h
-> > > @@ -80,4 +80,31 @@ struct esr_context {
-> > >  	__u64 esr;
-> > >  };
-> > >  
-> > > +/*
-> > > + * Pointer to extra space for additional structures that don't fit in
-> > > + * sigcontext.__reserved[].  Note:
-> > > + *
-> > > + * 1) fpsimd_context, esr_context and extra_context must be placed in
-> > > + * sigcontext.__reserved[] if present.  They cannot be placed in the
-> > > + * extra space.  Any other record can be placed either in the extra
-> > > + * space or in sigcontext.__reserved[].
-> > > + *
-> > > + * 2) There must not be more than one extra_context.
-> > > + *
-> > > + * 3) If extra_context is present, it must be followed immediately in
-> > > + * sigcontext.__reserved[] by the terminating null _aarch64_ctx (i.e.,
-> > > + * extra_context must be the last record in sigcontext.__reserved[]
-> > > + * except for the terminator).
-> > > + *
-> > > + * 4) The extra space must itself be terminated with a null
-> > > + * _aarch64_ctx.
-> > > + */
-> > 
-> > IIUC, if we need to save some state that doesn't fit in what's left of
-> > sigcontext.__reserved[] (e.g. SVE with 1024-bit vector length), we
-> > ignore the available space and go for a memory block following the end
-> > of sigcontext.__reserved[] + 16. Is there a reason we can't store the
-> > new state across the end of sigcontext.__reserved[] and move fp/lr at
-> > the end of the new frame? I'm not sure the fp/lr position immediately
-> > after __reserved[] counts as ABI.
-> 
-> This was my original view.
-> 
-> Originally I preferred not to waste the space and did move fp/lr to the
-> end, but someone (I think you or Will) expressed concern that the fp/lr
-> position relative to the signal frame _might_ count as ABI.
-> 
-> I think it's not that likely that software will be relying on this,
-> since it appears easier just to follow the frame chain than to treat
-> this as a special case.
-> 
-> But it's hard to be certain.  It comes down to a judgement call.
+On Tue, May 23, 2017 at 8:46 AM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, May 17, 2017 at 04:37:43PM +0800, Guodong Xu wrote:
+>> From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+>>
+>> Add spi2 and spi3 device nodes for hi3660, and enable them for hikey960.
+>>
+>> On HiKey960:
+>>  - SPI2 is wired out through low speed expansion connector.
+>>  - SPI3 is wired out through high speed expansion connector.
+>>
+>> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+>> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+>> ---
+>>  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  8 ++++++
+>>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 30 +++++++++++++++++++++++
+>>  2 files changed, 38 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+>> index 69aa207..79735ee 100644
+>> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+>> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+>> @@ -69,3 +69,11 @@
+>>  &uart6 {
+>>       status = "okay";
+>>  };
+>> +
+>> +&spi2 {
+>> +     status = "okay";
+>> +};
+>> +
+>> +&spi3 {
+>> +     status = "okay";
+>
+> LS connector label?
 
-I would not consider this ABI. The ABI part is that the fp register
-points to where fp/lr were saved.
-
-> > > +#define EXTRA_MAGIC	0x45585401
-> > > +
-> > > +struct extra_context {
-> > > +	struct _aarch64_ctx head;
-> > > +	void __user *data;	/* 16-byte aligned pointer to extra space */
-> > "__user" is a kernel-only attribute, we shouldn't expose it in a uapi
-> > header.
-> 
-> This is filtered out by headers_install, just like #ifdef __KERNEL__.
-
-Ah, ok, I missed this.
-
-> > > +	__u32 size;		/* size in bytes of the extra space */
-> > > +};
-> > 
-> > Do we need the size of the extra space? Can we not infer it anyway by
-> > walking the contexts save there? Surely we don't expect more than one
-> > extra context.
-> 
-> Strictly speaking we don't need it.  When userspace parses a signal
-> frame generated by the kernel, it can trust the kernel to write a well-
-> formed signal frame.
-> 
-> In sigreturn it allows us to retain a sanity-check on overall size
-> similar to what sizeof(__reserved) gives us.  This "feels cleaner"
-> to me, but the value of it is debatable, since we can still apply
-> SIGFRAME_MAXSZ and uaccess should protect us against gross overruns.
-
-I'm not keen on the size information, it seems superfluous.
-
-BTW, does SIGFRAME_MAXSZ now become ABI? Or the user only needs to
-interrogate the frame size and we keep this internal to the kernel?
-
--- 
-Catalin
+Thanks Rob. I will fix that, adding label accordingly.
