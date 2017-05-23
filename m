@@ -1,35 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 May 2017 11:35:53 +0200
-Subject: [PATCH 2/3] gpio: pcf857x: move header file out of I2C realm
-In-Reply-To: <20170521215727.1243-3-wsa@the-dreams.de>
-References: <20170521215727.1243-1-wsa@the-dreams.de>
- <20170521215727.1243-3-wsa@the-dreams.de>
-Message-ID: <CACRpkdZzrtP0Jr5ZnOJrN9CZQDO1CXgW7Z9jTw1Mt_MkP0Saqw@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 23 May 2017 18:41:59 +0900
+Subject: [PATCH v1] PM / devfreq: exynos-ppmu : Handle return value of
+ clk_prepare_enable
+In-Reply-To: <1495191364-16015-1-git-send-email-arvind.yadav.cs@gmail.com>
+References: <CGME20170519105745epcas5p29a5cbb259cd15138d7220f34e130e00a@epcas5p2.samsung.com>
+ <1495191364-16015-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <592403E7.8060906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 21, 2017 at 11:57 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-
-> include/linux/i2c is not for client devices. Move the header file to a
-> more appropriate location.
->
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+On 2017? 05? 19? 19:56, Arvind Yadav wrote:
+> clk_prepare_enable() can fail here and we must check its return value.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 > ---
->  arch/arm/mach-davinci/board-da830-evm.c        | 2 +-
->  arch/arm/mach-davinci/board-dm644x-evm.c       | 2 +-
->  arch/arm/mach-davinci/board-dm646x-evm.c       | 2 +-
->  arch/arm/mach-pxa/balloon3.c                   | 2 +-
->  arch/arm/mach-pxa/stargate2.c                  | 2 +-
->  arch/mips/ath79/mach-pb44.c                    | 2 +-
->  drivers/gpio/gpio-pcf857x.c                    | 2 +-
->  include/linux/{i2c => platform_data}/pcf857x.h | 0
->  8 files changed, 7 insertions(+), 7 deletions(-)
->  rename include/linux/{i2c => platform_data}/pcf857x.h (100%)
+>  drivers/devfreq/event/exynos-ppmu.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
+> index 9b73509..8f6537a 100644
+> --- a/drivers/devfreq/event/exynos-ppmu.c
+> +++ b/drivers/devfreq/event/exynos-ppmu.c
+> @@ -648,7 +648,11 @@ static int exynos_ppmu_probe(struct platform_device *pdev)
+>  			dev_name(&pdev->dev), desc[i].name);
+>  	}
+>  
+> -	clk_prepare_enable(info->ppmu.clk);
+> +	ret = clk_prepare_enable(info->ppmu.clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to prepare ppmu clock\n");
+> +		return ret;
+> +	}
 
-Patch applied.
+You're right. But, actually, some ppmu device-tree node doesn't include
+the clock information because exynos clk driver don't support the
+clock for some ppmu devices. Until now, the clock of ppmu devices
+are default on state.
 
-BTW ARM SoC maintainers be warned, I optimistically assume this will
-not collide with any ARM SoC work...
+Before applying this patch, exynos clock driver have to support
+the ppmu's clock and then add the clock information to the device tree
+of ppmu devices.
 
-Yours,
-Linus Walleij
+>  
+>  	return 0;
+>  }
+> 
+
+
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
