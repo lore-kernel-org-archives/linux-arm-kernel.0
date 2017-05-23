@@ -1,41 +1,52 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Tue, 23 May 2017 16:09:47 +0300
-Subject: [PATCH v3 1/6] mm, gup: Remove broken VM_BUG_ON_PAGE compound
- check for hugepages
-In-Reply-To: <20170522133604.11392-2-punit.agrawal@arm.com>
-References: <20170522133604.11392-1-punit.agrawal@arm.com>
- <20170522133604.11392-2-punit.agrawal@arm.com>
-Message-ID: <20170523130947.cv3bbjxa2l4ifj55@node.shutemov.name>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 23 May 2017 15:12:43 +0200
+Subject: [PATCH] drm/mediatek: hdmi: Filter interlaced resolutions
+In-Reply-To: <1495531695.20811.19.camel@mtksdaap41>
+References: <1485234604-19889-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1495531695.20811.19.camel@mtksdaap41>
+Message-ID: <20170523131243.5bjz5n4uv73r2l7j@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 02:35:59PM +0100, Punit Agrawal wrote:
-> From: Will Deacon <will.deacon@arm.com>
+On Tue, May 23, 2017 at 05:28:15PM +0800, CK Hu wrote:
+> Hi, Bibby:
 > 
-> When operating on hugepages with DEBUG_VM enabled, the GUP code checks the
-> compound head for each tail page prior to calling page_cache_add_speculative.
-> This is broken, because on the fast-GUP path (where we don't hold any page
-> table locks) we can be racing with a concurrent invocation of
-> split_huge_page_to_list.
+> I've applied this patch to my branch mediatek-drm-fixes-4.12-rc1,
+> thanks.
 > 
-> split_huge_page_to_list deals with this race by using page_ref_freeze to
-> freeze the page and force concurrent GUPs to fail whilst the component
-> pages are modified. This modification includes clearing the compound_head
-> field for the tail pages, so checking this prior to a successful call
-> to page_cache_add_speculative can lead to false positives: In fact,
-> page_cache_add_speculative *already* has this check once the page refcount
-> has been successfully updated, so we can simply remove the broken calls
-> to VM_BUG_ON_PAGE.
+> Regards,
+> CK
 > 
-> Cc: "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
-> Cc: Aneesh Kumar K.V <aneesh.kumar@linux.vnet.ibm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Acked-by: Steve Capper <steve.capper@arm.com>
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> On Tue, 2017-01-24 at 13:10 +0800, Bibby Hsieh wrote:
+> > Current Mediatek DRM driver does not support interlaced mode, and
+> > will hang if such resolution is used: Filter those to prevent
+> > kernel hangs, until the DRM driver is fixed properly.
+> > 
+> > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> > ---
+> >  drivers/gpu/drm/mediatek/mtk_hdmi.c | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+> > index 0e8c4d9..e33678d 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+> > @@ -1244,6 +1244,8 @@ static int mtk_hdmi_conn_mode_valid(struct drm_connector *conn,
+> >  			return MODE_BAD;
+> >  	}
+> >  
+> > +	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
+> > +		return MODE_NO_INTERLACE;
+> >  	if (mode->clock < 27000)
+> >  		return MODE_CLOCK_LOW;
+> >  	if (mode->clock > 297000)
 
-Looks reasonable to me:
-
-Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-
+You probably want to check out Jose's mode_valid work, since only
+filtering in the connector's ->mode_valid callback isn't enough. You also
+need to filter in ->mode_fixup (or some other place called at atomic_check
+time).
+-Daniel
 -- 
- Kirill A. Shutemov
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
