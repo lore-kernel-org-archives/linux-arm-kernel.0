@@ -1,71 +1,60 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Tue, 23 May 2017 15:04:04 -0600
-Subject: [PATCH 0/2] PCI: Workaround for bus reset on Cavium cn8xxx root
- ports
-In-Reply-To: <20170523204750.GC15055@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170516001736.4001-1-david.daney@cavium.com>
- <20170523204750.GC15055@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170523150404.221b01c7@w520.home>
+From: illusionist.neo@gmail.com (Shubham Bansal)
+Date: Wed, 24 May 2017 02:47:52 +0530
+Subject: [PATCH] RFC: arm: eBPF JIT compiler
+In-Reply-To: <20170523204608.GG24807@lunn.ch>
+References: <1495564433-9750-1-git-send-email-illusionist.neo@gmail.com>
+ <20170523204608.GG24807@lunn.ch>
+Message-ID: <CAHgaXdK-bpPxMfi=J3v2hfrdqFaEGvibi09K4SVoPabe3T2u5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 May 2017 15:47:50 -0500
-Bjorn Helgaas <helgaas@kernel.org> wrote:
+Hi Andrew,
 
-> On Mon, May 15, 2017 at 05:17:34PM -0700, David Daney wrote:
-> > With the recent improvements in arm64 and vfio-pci, we are seeing
-> > failures like this (on cn8890 based systems):
-> > 
-> > [  235.622361] Unhandled fault: synchronous external abort (0x96000210) at 0xfffffc00c1000100
-> > [  235.630625] Internal error: : 96000210 [#1] PREEMPT SMP
-> > .
-> > .
-> > .
-> > [  236.208820] [<fffffc0008411250>] pci_generic_config_read+0x38/0x9c
-> > [  236.214992] [<fffffc0008435ed4>] thunder_pem_config_read+0x54/0x1e8
-> > [  236.221250] [<fffffc0008411620>] pci_bus_read_config_dword+0x74/0xa0
-> > [  236.227596] [<fffffc000841853c>] pci_find_next_ext_capability.part.15+0x40/0xb8
-> > [  236.234896] [<fffffc0008419428>] pci_find_ext_capability+0x20/0x30
-> > [  236.241068] [<fffffc0008423e2c>] pci_restore_vc_state+0x34/0x88
-> > [  236.246979] [<fffffc000841af3c>] pci_restore_state.part.37+0x2c/0x1fc
-> > [  236.253410] [<fffffc000841b174>] pci_dev_restore+0x4c/0x50
-> > [  236.258887] [<fffffc000841b19c>] pci_bus_restore+0x24/0x4c
-> > [  236.264362] [<fffffc000841c2dc>] pci_try_reset_bus+0x7c/0xa0
-> > [  236.270021] [<fffffc00060a1ab0>] vfio_pci_ioctl+0xc34/0xc3c [vfio_pci]
-> > [  236.276547] [<fffffc0005eb0410>] vfio_device_fops_unl_ioctl+0x20/0x30 [vfio]
-> > [  236.283587] [<fffffc000824b314>] do_vfs_ioctl+0xac/0x744
-> > [  236.288890] [<fffffc000824ba30>] SyS_ioctl+0x84/0x98
-> > [  236.293846] [<fffffc0008082ca0>] __sys_trace_return+0x0/0x4
-> > 
-> > These are caused by the inability of the PCIe root port and Intel
-> > e1000e to sucessfully do a bus reset.
-> > 
-> > The proposed fix is to not do a bus reset on these systems.
-> > 
-> > David Daney (2):
-> >   PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on bus device.
-> >   PCI: Avoid bus reset for Cavium cn8xxx root ports.
-> > 
-> >  drivers/pci/pci.c    | 4 ++++
-> >  drivers/pci/quirks.c | 8 ++++++++
-> >  2 files changed, 12 insertions(+)  
-> 
-> Applied with Eric's reviewed-by and typo fixes to pci/virtualization for
-> v4.13, thanks!
+I am attaching the additional patch to make it work for ARMv5 as well.
+Let me know if you find any issues with this.
 
-Hmm, well let me again express my concerns that I'm really not sure how
-to support this since it removes our last opportunity to reset devices
-that may otherwise have no reset mechanism.  Certain classes of devices
-are entirely unsupportable for the code path indicated above without a
-bus reset.  If we have an endpoint device that goes bonkers at a bus
-reset, at least we know it's going to behave just as poorly no matter
-what the host platform.  This series allows endpoints that work
-perfectly well on one host to be handled differently on another.  It
-certainly suggests something non-spec compliant about the root port
-implementation and I wish there was more analysis about exactly what
-that problem is since this is coming from the hardware vendor.
+Please apply 0002-Editted-for-ARMv5-compilation.patch after applying
+the first patch.
+Best,
+Shubham Bansal
 
-https://lkml.org/lkml/2017/5/16/662
 
-Thanks,
-Alex
+On Wed, May 24, 2017 at 2:16 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Wed, May 24, 2017 at 12:03:53AM +0530, Shubham Bansal wrote:
+>> The JIT compiler emits ARM 32 bit instructions. Currently, It supports
+>> eBPF only. Classic BPF is supported because of the conversion by BPF
+>> core.
+>
+> make mvebu_v5_defconfig
+>
+> make -s -j 16
+> arch/arm/net/bpf_jit_32.c: In function emit_rev16:
+> arch/arm/net/bpf_jit_32.c:1019:7: error: implicit declaration of function ARM_MOV_S [-Werror=implicit-function-declaration]
+>   emit(ARM_MOV_S(tmp2[0], rn, SRTYPE_LSR, 8), ctx);
+>        ^~~~~~~~~
+> arch/arm/net/bpf_jit_32.c: In function emit_rev32:
+> arch/arm/net/bpf_jit_32.c:1037:36: error: macro "ARM_MOV_I" passed 3 arguments, but takes just 2
+>   emit(ARM_MOV_I(tmp2[1], rn, 0xff00), ctx);
+>                                     ^
+> arch/arm/net/bpf_jit_32.c:1037:7: error: ARM_MOV_I undeclared (first use in this function)
+>   emit(ARM_MOV_I(tmp2[1], rn, 0xff00), ctx);
+>        ^~~~~~~~~
+> arch/arm/net/bpf_jit_32.c:1037:7: note: each undeclared identifier is reported only once for each function it appears in
+> arch/arm/net/bpf_jit_32.c:1039:41: error: macro "ARM_MOV_I" passed 3 arguments, but takes just 2
+>   emit(ARM_MOV_I(tmp2[0], tmp2[0], 0xff00), ctx);
+>                                          ^
+> arch/arm/net/bpf_jit_32.c: In function build_insn:
+> arch/arm/net/bpf_jit_32.c:1393:30: error: macro "ARM_AND_R" requires 3 arguments, but only 2 given
+>     emit(ARM_AND_R(rt, tmp2[1]), ctx);
+>                               ^
+> arch/arm/net/bpf_jit_32.c:1393:9: error: ARM_AND_R undeclared (first use in this function)
+>     emit(ARM_AND_R(rt, tmp2[1]), ctx);
+>
+>     Andrew
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-Editted-for-ARMv5-compilation.patch
+Type: application/octet-stream
+Size: 2045 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170524/646238cf/attachment.obj>
