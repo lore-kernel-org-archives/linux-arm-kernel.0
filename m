@@ -1,40 +1,43 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 22 May 2017 21:22:40 -0700
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <CAHgaXdL2qReJF1Aw08k3C+OiC-3AOy3VeYmQ1Hs7vKcrfGQnvA@mail.gmail.com>
-References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
- <20170510.212952.1440495072777358778.davem@davemloft.net>
- <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
- <20170510.215218.2185526627014393313.davem@davemloft.net>
- <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
- <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
- <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
- <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
- <591A07A1.1030006@iogearbox.net>
- <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
- <CAGXu5j+k+NMQGmmhuW-4pHFd6agfndJfxQ9k--h+ZpsDBVB8ig@mail.gmail.com>
- <8c53012b-cb81-5228-de79-f55457d1cf69@gmail.com>
- <CAHgaXdL2qReJF1Aw08k3C+OiC-3AOy3VeYmQ1Hs7vKcrfGQnvA@mail.gmail.com>
-Message-ID: <CAGXu5jKwTDYeNQggezzSKkFzZQkroC+6SdBB0qUKh5crfNk8PA@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 23 May 2017 13:30:54 +0900
+Subject: [PATCH v3 0/4] arm64: kgdb: fix single stepping
+Message-ID: <20170523043058.5463-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 8:34 PM, Shubham Bansal
-<illusionist.neo@gmail.com> wrote:
-> I would post them as soon as I test them on ARMv5 and ARMv6. If you
-> can help me with that, please let me know.
+This is the third version of my kgdb patch for fixing single stepping.
+(Sorry for this lazy update.)
 
-Please post what you have: it would be better to see what you've got
-now in case additional changes are needed so you don't have to do it
-again on v5 and v6. Also, it means other people with real v5 and v6
-hardware could test for you if they were so inclined, and you won't
-need to be blocked on doing the tests in qemu.
 
-You can send it as an "RFC" in the subject, just to make sure people
-know it's not considered fully done. :)
+Kgdb support on arm64 was merged in v3.15, but from its first appearance,
+"single step" has never worked well. This patchset fixes all the error
+cases I found so far. Issues are reproducable, at least, on Hikey and fast
+model and I tested the patches on both of them.
 
--Kees
+The original patch[1] was splitted into three pieces, patch #1 to #3,
+addressing issues one by one, in order for necessary part of changes to
+be applied to specific version of kernels, but it might no longer make
+much sense.
+
+Regarding to patch #4, I'm not still sure whether it is a right fix,
+but it certainly fixes some corner case.
+
+Changes for v3: (May 23, 2017)
+* simplify patch #1 to respect the original code
+* swap patch #2 and #3
+* add patch #4
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295632.html
+
+AKASHI Takahiro (4):
+  arm64: kgdb: fix single stepping
+  arm64: kgdb: disable interrupts while a software step is enabled
+  arm64: kgdb: prevent kgdb from being invoked recursively
+  kgdb: select a correct cpu while in a single stepping
+
+ arch/arm64/kernel/kgdb.c  | 62 ++++++++++++++++++++++++++++++++++++++---------
+ kernel/debug/debug_core.c |  8 +++---
+ 2 files changed, 55 insertions(+), 15 deletions(-)
 
 -- 
-Kees Cook
-Pixel Security
+2.11.1
