@@ -1,57 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 May 2017 09:54:38 +0200
-Subject: [PATCH] clk: sunxi-ng: select SUNXI_CCU_MULT for sun8i-a83t
-In-Reply-To: <20170523071940.xbnahikb4d5dge7v@wens.csie.org>
-References: <20170522202951.2896280-1-arnd@arndb.de>
- <20170523005553.GH20170@codeaurora.org>
- <20170523071940.xbnahikb4d5dge7v@wens.csie.org>
-Message-ID: <CAK8P3a37CT0tzdy4V8Hj=-Mu=JrdR08zv2fqVH5Y+hzT7OK4Vg@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 23 May 2017 08:57:08 +0100
+Subject: [RFC PATCH v2 0/7] ARM: NOMMU: MPU updates
+In-Reply-To: <907F9677-52F3-4379-BDB2-E703FAAED59A@esh.hu>
+References: <1495187206-14303-1-git-send-email-vladimir.murzin@arm.com>
+ <907F9677-52F3-4379-BDB2-E703FAAED59A@esh.hu>
+Message-ID: <310db372-8058-1c2d-5713-803265170185@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 9:19 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Mon, May 22, 2017 at 05:55:53PM -0700, Stephen Boyd wrote:
->> On 05/22, Arnd Bergmann wrote:
->> > We get a link error when CCU_MULT is not set with the
->> > newly added driver:
->> >
->> > drivers/clk/sunxi-ng/ccu-sun8i-a83t.o:(.data.__compound_literal.1+0x4): undefined reference to `ccu_mult_ops'
->> > drivers/clk/sunxi-ng/ccu-sun8i-a83t.o:(.data.__compound_literal.3+0x4): undefined reference to `ccu_mult_ops'
->> >
->> > Fixes: 46b492116666 ("clk: sunxi-ng: Add driver for A83T CCU")
->> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
->
->> Is there any way we can automate finding these build errors and
->> prevent them from creeping into the tree? It may be asking too
->> much, but it seems like we should be able to find these
->> particular problems with some script that greps for ccu_*_ops and
->> checks that any file's Kconfig symbol also has that selected.
+Hi,
+
+On 22/05/17 11:05, Szemz? Andr?s wrote:
+> Hi,
+> 
+>> On 2017. May 19., at 11:46, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
 >>
->> Anyway, I'm just tired of seeing these sorts of things in my
->> inbox.
+>> Hi,
+>>
+>> This is an update of the existent MPU code which consist set of
+>> clean-ups and enhancements. The most significant changes are in the way
+>> how MPU settings sync-up for secondaries (PATCH 3/7) and more flexible
+>> layout for memory (PATCH 7/7). Since there is no in-tree user of MPU,
+>> support for M-class has been added (PATCH 6/7).
+>>
+>> Thanks!
+>>
+>> Changelog:
+>> 	    RFC -> RFC v2
+>> 	       - fixed MPU enable for v7m (PATCH 6/7)
+>>
+>> Vladimir Murzin (7):
+>>  ARM: NOMMU: Move out MPU setup in separate module
+>>  ARM: NOMMU: Update MPU accessors to use cp15 helpers
+>>  ARM: NOMMU: Rework MPU to be mostly done in C
+>>  ARM: NOMMU: Disallow MPU for XIP
+>>  ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+>>  ARM: V7M: Add support for MPU to M-class
+>>  ARM: NOMMU: Use more MPU regions to cover memory
+>>
+>>
+> 
+>  I?ve tested these patches on my custom Atmel SAME70 armv7m board, along with the 
+> "ARM: Fix dma_alloc_coherent() and friends for NOMMU" patches.
+> 
+> Both series works fine for me. These MPU patches introduce a nice feature that it simplifies the bootloader:
+> do not need to setup the MPU, for example for coherent DMA region, which is described in device-tree too.
+> 
+> So you can add my Tested-by.
+> 
 
-Definitely, I'm also tired of writing the patches ;-)
+Much appreciated!
 
-> The (ugly) script below does the trick, though it does give results
-> for some symbols that are indirectly selected:
->
-> SUN5I_CCU uses SUNXI_CCU_GATE but does not select it
-> SUN5I_CCU uses SUNXI_CCU_MUX but does not select it
+> 
+> Booting Linux on physical CPU 0x0
+> Linux version 4.12.0-rc1 (root at devel) (gcc version 4.9.2 ( 4.9.2-10) ) #1 Fri May 19 06:26:34 EDT 2017
+> CPU: ARMv7-M [410fc271] revision 1 (ARMv7M), cr=00000000
+> CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+> OF: fdt: Machine model: SAME70-sampione board
+> bootconsole [earlycon0] enabled
+> Reserved memory: created DMA memory pool at 0x73e00000, size 2 MiB
+> OF: reserved mem: initialized node linux,cma, compatible id shared-dma-pool
+> Using ARMv7 PMSA Compliant MPU. Region independence: No, Used 4 of 16 regions
+> ?
+> 
+> 
+> Thanks for the patches!
 
-I think they are all caught implicitly, otherwise I would have run
-into them.
+I'm glad they work for you!
 
-> SUN5I_CCU uses SUNXI_CCU_NKMP but does not select it
+Cheers
+Vladimir
 
-I sent a patch for this on Feb 14 and again March 13, but haven't
-gotten around to resubmit again.
-
-An alternative would be to remove all the dependencies as 'lib-y'
-in the Makefile and remove the individual Kconfig symbols. That
-way, we would always build all of them when CONFIG_SUNXI_CCU
-is enabled, but the linker would drop the ones that do not get
-referenced.
-
-         Arnd
+> 
+> Regards,
+> Andras
+> 
+> 
