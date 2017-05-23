@@ -1,90 +1,72 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 May 2017 18:53:19 +0100
-Subject: [PATCH V3 6/8] arm: dma-mapping: Reset the device's dma_ops
-In-Reply-To: <a9debbce-17dc-aeaa-59bd-668aa15b97fe@arm.com>
-References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
- <1475600632-21289-7-git-send-email-sricharan@codeaurora.org>
- <a3d4533f-165d-f444-7681-141479617a18@arm.com>
- <004c01d23003$7230ed90$5692c8b0$@codeaurora.org>
- <20170523162507.GA1729@n2100.armlinux.org.uk>
- <a9debbce-17dc-aeaa-59bd-668aa15b97fe@arm.com>
-Message-ID: <20170523175319.GA22219@n2100.armlinux.org.uk>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 23 May 2017 19:54:37 +0200
+Subject: [PATCH v4 1/2] PCI: Add tango MSI controller support
+In-Reply-To: <20170523170319.GB24431@bhelgaas-glaptop.roam.corp.google.com>
+References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+ <1f6b50c7-4887-838e-8c7d-c014d82b6d8e@sigmadesigns.com>
+ <8e56647d-3b2d-9bfc-b59e-79a2efaa7826@sigmadesigns.com>
+ <20170523170319.GB24431@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <b6541fd2-200f-35be-208e-931bb0b5ba49@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 05:55:57PM +0100, Robin Murphy wrote:
-> On 23/05/17 17:25, Russell King - ARM Linux wrote:
-> > So, I've come to apply this patch (since it's finally landed in the patch
-> > system), and I'm not convinced that the commit message is really up to
-> > scratch.
-> > 
-> > The current commit message looks like this:
-> > 
-> > "   ARM: 8674/1: dma-mapping: Reset the device's dma_ops
-> > 
-> >     arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops(),
-> >     dma_ops should be cleared in the teardown path. Otherwise this causes
-> >     problem when the probe of device is retried after being deferred. The
-> >     device's iommu structures are cleared after EPROBEDEFER error, but on
-> >     the next try dma_ops will still be set to old value, which is not right."
-> > 
-> > It is obviously a fix, but a fix for which patch?  Looking at the
-> > history, we have "arm: dma-mapping: Don't override dma_ops in
-> > arch_setup_dma_ops()" which I would have guessed is the appropriate
-> > one, but this post-dates your patch (it's very recent, v4.12-rc
-> > recent.)
-> > 
-> > So, I need more description about the problem you were seeing when
-> > you first proposed this patch.
-> > 
-> > How does leaving the dma_ops in place prior to "arm: dma-mapping:
-> > Don't override dma_ops in arch_setup_dma_ops()" cause problems for
-> > deferred probing?
-> > 
-> > What patch is your change trying to fix?  In other words, how far
-> > back does this patch need to be backported?
+On 23/05/2017 19:03, Bjorn Helgaas wrote:
+> On Wed, May 17, 2017 at 04:56:08PM +0200, Marc Gonzalez wrote:
+>> On 20/04/2017 16:28, Marc Gonzalez wrote:
+>>
+>>> +static int tango_set_affinity(struct irq_data *data,
+>>> +		const struct cpumask *mask, bool force)
+>>> +{
+>>> +	return -EINVAL;
+>>> +}
+>>> +
+>>> +static struct irq_chip tango_chip = {
+>>> +	.irq_ack		= tango_ack,
+>>> +	.irq_mask		= tango_mask,
+>>> +	.irq_unmask		= tango_unmask,
+>>> +	.irq_set_affinity	= tango_set_affinity,
+>>> +	.irq_compose_msi_msg	= tango_compose_msi_msg,
+>>> +};
+>>
+>> Hmmm... I'm wondering why .irq_set_affinity is required.
+>>
+>> static int setup_affinity(struct irq_desc *desc, struct cpumask *mask)
+>> first calls __irq_can_set_affinity() to check whether
+>> desc->irq_data.chip->irq_set_affinity) exists.
+>>
+>> then calls irq_do_set_affinity(&desc->irq_data, mask, false);
+>> which calls chip->irq_set_affinity(data, mask, force);
+>> = msi_domain_set_affinity()
+>> which calls parent->chip->irq_set_affinity() unconditionally.
+>>
+>> Would it make sense to test that the callback is implemented
+>> before calling it?
+>>
+>>
+>> [    0.723895] Unable to handle kernel NULL pointer dereference at virtual address 00000000
 > 
-> In effect, it's fixing a latent inconsistency that's been present since
-> its introduction in 4bb25789ed28. However, that has clearly not proven
-> to be an issue in practice since then. With 09515ef5ddad we start
-> actually calling arch_teardown_dma_ops() in a manner that might leave
-> things partially initialised if anyone starts removing and reprobing
-> drivers, but so far that's still from code inspection[1] rather than
-> anyone hitting it.
+> I'm not sure what you're asking.
 > 
-> Given that the changes which tickle it are fresh in -rc1 I'd say there's
-> no need to backport this, but at the same time it shouldn't do any
-> damage if you really want to.
+> Is this a bug report for the v4 tango driver?
 
-Well, looking at this, I'm not convinced that much of it is correct.
+No.
 
-1) set_dma_ops() is in arch_setup_dma_ops() but this patch adds
-   the unsetting of the DMA ops inside arm_teardown_iommu_dma_ops()
-   rather than arch_teardown_dma_ops().
+> Or are you asking whether msi_domain_set_affinity() should be changed
+> to check whether parent->chip->irq_set_affinity is implemented?
 
-   This doesn't strike me as being particularly symmetric.
-   arm_teardown_iommu_dma_ops() is arm_setup_iommu_dma_ops()'s
-   counterpart.
+Yes. The way things are implemented now, drivers are forced
+to define an irq_set_affinity callback, even if it just returns
+an error, otherwise, the kernel crashes, because of the
+unconditional function pointer deref. 
 
-2) arch_setup_dma_ops(), the recent patch to add the existing dma_ops
-   check, and Xen - Xen wants to override the DMA ops if in the
-   initial domain.  It's not clear (at least to me) whether the recent
-   patch adding the dma_ops check took account of this or not.
+> msi_domain_set_affinity() has called parent->chip->irq_set_affinity()
+> without checking since it was added in 2014 by f3cf8bb0d6c3 ("genirq: Add
+> generic msi irq domain support"), so if there's a problem here, it's most
+> likely in the tango code.
 
-3) random places seem to fiddle with the dma_ops - notice that
-   arm_iommu_detach_device() sets the dma_ops to NULL.
+The issue is having to define an "empty" function.
+(Unnecessary code bloat and maintenance.)
 
-   In fact, I think moving __arm_iommu_detach_device() into
-   arm_iommu_detach_device(), calling arm_iommu_detach_device(),
-   and getting rid of the explicit set_dma_ops(, NULL) in this
-   path would be a good first step.
+I'll send a patch illustrating exactly what I intended.
 
-4) I think arch_setup_dma_ops() is over-complex.
-
-So, in summary, this code is a mess today, and that means it's not
-obviously correct - which is bad.  This needs sorting.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards.
