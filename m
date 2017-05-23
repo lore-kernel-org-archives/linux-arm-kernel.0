@@ -1,86 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 22 May 2017 19:48:20 -0500
-Subject: [PATCH 12/12] arm64: dts: hikey960: add LED nodes
-In-Reply-To: <20170517083745.24479-13-guodong.xu@linaro.org>
+Date: Mon, 22 May 2017 19:49:00 -0500
+Subject: [PATCH 04/12] arm64: dts: hi3660: add resources for clock and
+ reset
+In-Reply-To: <20170517083745.24479-5-guodong.xu@linaro.org>
 References: <20170517083745.24479-1-guodong.xu@linaro.org>
- <20170517083745.24479-13-guodong.xu@linaro.org>
-Message-ID: <20170523004820.6x3lo3woqgrlnrtn@rob-hp-laptop>
+ <20170517083745.24479-5-guodong.xu@linaro.org>
+Message-ID: <20170523004900.gh5cu6krez7b7cg7@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 04:37:45PM +0800, Guodong Xu wrote:
-> HiKey960 has four user LEDs, and two special purpose LEDs: WiFi and BT
-> respectively.
+On Wed, May 17, 2017 at 04:37:37PM +0800, Guodong Xu wrote:
+> From: Zhangfei Gao <zhangfei.gao@linaro.org>
 > 
-> All of them are implemented as GPIO.
+> Add some resource nodes for clock and reset
 > 
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 > ---
->  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 48 +++++++++++++++++++++++
->  1 file changed, 48 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> index 6de86c0..4839885 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> @@ -48,6 +48,54 @@
->  				linux,code = <KEY_POWER>;
->  			};
->  		};
-> +
-> +		leds {
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 53 +++++++++++++++++++++++++++----
+>  1 file changed, 46 insertions(+), 7 deletions(-)
 
-This too should move out of the soc node.
-
-> +			compatible = "gpio-leds";
-> +			status = "disabled";
-> +			user_led1 {
-> +				label = "user_led1";
-> +				/* gpio_150_user_led1 */
-> +				gpios = <&gpio18 6 0>;
-> +				linux,default-trigger = "heartbeat";
-> +			};
-> +
-> +			user_led2 {
-> +				label = "user_led2";
-> +				/* gpio_151_user_led2 */
-> +				gpios = <&gpio18 7 0>;
-> +				linux,default-trigger = "mmc0";
-> +			};
-> +
-> +			user_led3 {
-> +				label = "user_led3";
-> +				/* gpio_189_user_led3 */
-> +				gpios = <&gpio23 5 0>;
-> +				default-state = "off";
-> +			};
-> +
-> +			user_led4 {
-> +				label = "user_led4";
-> +				/* gpio_190_user_led4 */
-> +				gpios = <&gpio23 6 0>;
-> +				linux,default-trigger = "cpu0";
-> +			};
-> +
-> +			wlan_active_led {
-> +				label = "wifi_active";
-> +				/* gpio_205_wifi_active */
-> +				gpios = <&gpio25 5 0>;
-> +				linux,default-trigger = "phy0tx";
-> +				default-state = "off";
-> +			};
-> +
-> +			bt_active_led {
-> +				label = "bt_active";
-> +				gpios = <&gpio25 7 0>;
-> +				/* gpio_207_user_led1 */
-> +				linux,default-trigger = "hci0rx";
-> +				default-state = "off";
-> +			};
-> +		};
->  	};
->  };
->  
-> -- 
-> 2.10.2
-> 
+Acked-by: Rob Herring <robh@kernel.org> 
