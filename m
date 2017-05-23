@@ -1,109 +1,93 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 23 May 2017 08:31:53 +0200
-Subject: [RESEND PATCH v3 1/2] dt-bindings: i2c: Add Mediatek MT2701 i2c
- binding
-In-Reply-To: <1495510441.930.7.camel@mhfsdcap03>
-References: <1489029185-21447-1-git-send-email-jun.gao@mediatek.com>
- <1489029185-21447-2-git-send-email-jun.gao@mediatek.com>
- <20170322090543.sxacnddn2o7stjnq@ninjato>
- <1490694612.18582.11.camel@mhfsdcap03> <20170328192258.GA4525@katana>
- <4111ffc2-0a25-0811-fbd3-401649431315@gmail.com>
- <1495510441.930.7.camel@mhfsdcap03>
-Message-ID: <aa667dcb-2c11-8179-0098-edbc3eeaf093@gmail.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Tue, 23 May 2017 14:36:25 +0800
+Subject: [PATCH 05/12] arm64: dts: Add I2C nodes for Hi3660
+In-Reply-To: <94d06900-d871-7bc6-e1f3-d2b22ba20aaf@linaro.org>
+References: <20170517083745.24479-1-guodong.xu@linaro.org>
+ <20170517083745.24479-6-guodong.xu@linaro.org>
+ <20170523003908.ztuh4oohdk3g34pm@rob-hp-laptop>
+ <94d06900-d871-7bc6-e1f3-d2b22ba20aaf@linaro.org>
+Message-ID: <c7f16d66-f884-b230-4b44-29d603af12ab@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 23/05/17 05:34, Jun Gao wrote:
-> On Wed, 2017-05-10 at 12:35 +0200, Matthias Brugger wrote:
->>
->> On 28/03/17 21:22, Wolfram Sang wrote:
->>> On Tue, Mar 28, 2017 at 05:50:12PM +0800, Jun Gao wrote:
->>>> On Wed, 2017-03-22 at 10:05 +0100, Wolfram Sang wrote:
->>>>> On Thu, Mar 09, 2017 at 11:13:04AM +0800, Jun Gao wrote:
->>>>>> From: Jun Gao <jun.gao@mediatek.com>
->>>>>>
->>>>>> Add MT2701 i2c binding to i2c-mt6577.txt and there is no need to
->>>>>> modify i2c driver.
->>>>>>
->>>>>> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
->>>>>
->>>>> There is still the issue which Matthias Brugger pointed out on January,
->>>>> 24th: you need to describe the fallback compatibles.
->>>>>
->>>>
->>>> IMHO the value under compatible are just inputs which can be accepted.
->>>> It's little strange to add fallback information in binding. Some other
->>>> bindings do not describe so detailedly.
->>>> Is it OK to make binding as minimum standard?
->>>> If we describe it very detailedly, we will have to modify binding if
->>>> there are some changes for mt2701.
+On 2017?05?23? 13:55, zhangfei wrote:
+> Hi, Rob
+>
+>
+> Thanks for the review.
+>
+> On 2017?05?23? 08:39, Rob Herring wrote:
+>> On Wed, May 17, 2017 at 04:37:38PM +0800, Guodong Xu wrote:
+>>> From: Zhangfei Gao <zhangfei.gao@linaro.org>
 >>>
->>> My reading of the below is that I could simply use "mediatek,mt2701-i2c"
->>> as compatible and things will work. But it won't, we don't have that in
->>> the driver IIRC. So, we need a fallback for that to work.
+>>> Add I2C nodes for Hi3660-hikey960.
 >>>
->>>> Rob, could you give some suggestions?  Thanks!
+>>> On HiKey960,
+>>> I2C0, I2C7 is connected to Low Speed Expansion Connector.
+>>> I2C1 is connected to ADV7535.
+>>> I2C3 is connected to USB5734.
 >>>
->>> Would be welcome, yes. I lost track what the preferred solution is.
+>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+>>> ---
+>>>   arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 18 ++++++++
+>>>   arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 56 
+>>> +++++++++++++++++++++++
+>>>   2 files changed, 74 insertions(+)
 >>>
->>
->> We will need to define the fallback binding for each SoC.
->> As example take the rockchip mmc:
->> http://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
->>
->> Regards,
->> Matthias
->>
-> 
-> Hi Rob,
-> 
-> There is no such requirement for other components.
+>>> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts 
+>>> b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+>>> index 64875a5..f685b1e 100644
+>>> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+>>> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+>>> @@ -29,6 +29,24 @@
+>>>       };
+>>>   };
+>>>   +&i2c0 {
+>>> +    status = "okay";
+>>> +};
+>>> +
+>>> +&i2c1 {
+>>> +    status = "okay";
+>>> +
+>>> +    adv7533: adv7533 at 39 {
+>>> +        status = "ok";
+>>> +        compatible = "adi,adv7533";
+>>> +        reg = <0x39>;
+>>> +    };
+>>> +};
+>>> +
+>>> +&i2c7 {
+>>> +    status = "okay";
+>>> +};
+>> labels for the LS connector?
 
-The requirement is that the binding description reflects a compatible 
-the driver is able to consume. Right now if you pass 
-"mediatek,mt2701-i2c" the driver won't recognize this, therefor you need 
-the fallback compatible. Which point isn't clear to you?
+Do you mean arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
 
-Regards,
-Matthias
+                 i2c at 78ba000 {
+                 /* On Low speed expansion */
+                         label = "LS-I2C1";
+                         status = "okay";
+                 };
 
-> Could you give us some suggestions?
-> Thanks!
-> 
-> 
->>>>
->>>>>> ---
->>>>>>    .../devicetree/bindings/i2c/i2c-mt6577.txt         |   11 ++++++-----
->>>>>>    1 file changed, 6 insertions(+), 5 deletions(-)
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
->>>>>> index 0ce6fa3..27dbbf9 100644
->>>>>> --- a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
->>>>>> +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
->>>>>> @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
->>>>>>    
->>>>>>    Required properties:
->>>>>>      - compatible: value should be either of the following.
->>>>>> -      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
->>>>>> -      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
->>>>>> -      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
->>>>>> -      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
->>>>>> -      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
->>>>>> +	"mediatek,mt2701-i2c"
->>>>>> +	"mediatek,mt6577-i2c"
->>>>>> +	"mediatek,mt6589-i2c"
->>>>>> +	"mediatek,mt8127-i2c"
->>>>>> +	"mediatek,mt8135-i2c"
->>>>>> +	"mediatek,mt8173-i2c"
->>>>>>      - reg: physical base address of the controller and dma base, length of memory
->>>>>>        mapped region.
->>>>>>      - interrupts: interrupt number to the cpu.
->>>>>> -- 
->>>>>> 1.7.9.5
->>>>>>
->>>>
->>>>
-> 
-> 
+                 spi at 78b7000 {
+                 /* On High speed expansion */
+                         label = "HS-SPI1";
+                         status = "okay";
+                 };
+
+Thanks
+>>
+>>> +            compatible = "snps,designware-i2c";
+>> These should have an SoC specific compatible.
+> We directly use drivers/i2c/busses/i2c-designware-platdrv.c,
+> do we still an soc specific compatible?
+> Checked arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi, and other examples,
+>
+> compatible = "snps,designware-i2c" is used.
+>
+>
+> Thanks
+>
