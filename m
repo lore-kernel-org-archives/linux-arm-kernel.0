@@ -1,87 +1,40 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 23 May 2017 21:29:05 +0200
-Subject: [PATCH v4 2/2] PCI: Add tango PCIe host bridge support
-In-Reply-To: <20170523183548.GB2637@bhelgaas-glaptop.roam.corp.google.com>
-References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
- <4a354b33-d59c-4ebb-4b31-0388ac8090d4@sigmadesigns.com>
- <20170523172409.GD24431@bhelgaas-glaptop.roam.corp.google.com>
- <7a46cfa6-3c8a-33a6-a821-da49535c5c8a@free.fr>
- <20170523183548.GB2637@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <9bb2fdd4-59c3-13e9-7c7d-65107be6a32d@free.fr>
+From: keescook@google.com (Kees Cook)
+Date: Tue, 23 May 2017 12:32:59 -0700
+Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
+In-Reply-To: <CAHgaXdJa9uJYO3bODuzDRaqOas0i=zMk0jioWFXKm_=UJRtVrw@mail.gmail.com>
+References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
+ <20170510.212952.1440495072777358778.davem@davemloft.net>
+ <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
+ <20170510.215218.2185526627014393313.davem@davemloft.net>
+ <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
+ <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
+ <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
+ <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
+ <591A07A1.1030006@iogearbox.net>
+ <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
+ <CAGXu5j+k+NMQGmmhuW-4pHFd6agfndJfxQ9k--h+ZpsDBVB8ig@mail.gmail.com>
+ <8c53012b-cb81-5228-de79-f55457d1cf69@gmail.com>
+ <CAHgaXdL2qReJF1Aw08k3C+OiC-3AOy3VeYmQ1Hs7vKcrfGQnvA@mail.gmail.com>
+ <CAGXu5jKwTDYeNQggezzSKkFzZQkroC+6SdBB0qUKh5crfNk8PA@mail.gmail.com>
+ <CAHgaXdKqt3mZmPG78w+4g_17D8EQoBgAZeuqM+MMsQg2f7apsw@mail.gmail.com>
+ <CAGXu5jKDMUxRivMZdEQSBs81dkKRn5hRUiOz_wybCyphFFy+RQ@mail.gmail.com>
+ <CAHgaXdJa9uJYO3bODuzDRaqOas0i=zMk0jioWFXKm_=UJRtVrw@mail.gmail.com>
+Message-ID: <CAGXu5j+DZ7+5zBh7s82AZPgDT=-WHo8bG6XwPT6SzaMtVMMn_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/2017 20:35, Bjorn Helgaas wrote:
-> On Tue, May 23, 2017 at 07:43:16PM +0200, Mason wrote:
->> On 23/05/2017 19:24, Bjorn Helgaas wrote:
->>> On Thu, Apr 20, 2017 at 04:31:25PM +0200, Marc Gonzalez wrote:
->>>> This driver is required to work around several hardware bugs in the
->>>> PCIe controller.
->>>>
->>>> NB: Revision 1 does not support legacy interrupts, or IO space.
->>>>
->>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>>> ---
->>>>  Documentation/devicetree/bindings/pci/tango-pcie.txt |  32 ++++++++
->>>>  drivers/pci/host/Kconfig                             |   8 ++
->>>>  drivers/pci/host/Makefile                            |   1 +
->>>>  drivers/pci/host/pcie-tango.c                        | 161 +++++++++++++++++++++++++++++++++++++++
->>>>  include/linux/pci_ids.h                              |   2 +
->>>>  5 files changed, 204 insertions(+)
->>>> ...
->>>
->>>> +static int smp8759_config_read(struct pci_bus *bus,
->>>> +		unsigned int devfn, int where, int size, u32 *val)
->>>> +{
->>>> +	int ret;
->>>> +	struct pci_config_window *cfg = bus->sysdata;
->>>> +	struct tango_pcie *pcie = dev_get_drvdata(cfg->parent);
->>>> +
->>>> +	/*
->>>> +	 * QUIRK #1
->>>> +	 * Reads in configuration space outside devfn 0 return garbage.
->>>> +	 */
->>>> +	if (devfn != 0)
->>>> +		return PCIBIOS_FUNC_NOT_SUPPORTED;
->>>> +
->>>> +	/*
->>>> +	 * QUIRK #2
->>>> +	 * Unfortunately, config and mem spaces are muxed.
->>>> +	 * Linux does not support such a setting, since drivers are free
->>>> +	 * to access mem space directly, at any time.
->>>> +	 * Therefore, we can only PRAY that config and mem space accesses
->>>> +	 * NEVER occur concurrently.
->>>> +	 */
->>>> +	writel_relaxed(1, pcie->mux);
->>>> +	ret = pci_generic_config_read(bus, devfn, where, size, val);
->>>> +	writel_relaxed(0, pcie->mux);
->>>
->>> This is a major issue and possibly even a security problem.
->>> Unprivileged users can cause config accesses via lspci/setpci.
->>
->> Since the host bridge doesn't support hotplug in any way,
->> how about setting a flag once enumeration is complete,
->> to prevent all future config accesses?
-> 
-> I thought about that, too, but I'm not sure it will work becuase I
-> think drivers will need to do at least a few config accesses, e.g.,
-> pci_enable_device() may write PCI_COMMAND to set PCI_COMMAND_MEMORY,
-> it may read PCI_INTERRUPT_PIN, etc.  And MSI setup requires config
-> access, too.
-> 
->>> I don't have a good suggestion for addressing it, but if you can't
->>> make this work reliably, you need at least a dev_err() in the probe
->>> function and probably a taint of the kernel (see add_taint()).
->>
->> There is a chance that the issue will get fixed in rev2
->> of the bridge. But obviously, that won't help for rev1
->> already in the wild.
-> 
-> Hopefully there will be a way to distinguish rev2 from rev1.
+On Tue, May 23, 2017 at 11:39 AM, Shubham Bansal
+<illusionist.neo@gmail.com> wrote:
+> Here is the patch I sent to the arm mailing list.
 
-rev2 is embedded in a new SoC, so the DT node will specify a
-different compatible string. A "preview" of the intent was
-given in an older patch:
-"[RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge"
+Thanks for sending this!
 
-Regards.
+I'm trying to figure out the best way to split this up, but the bulk
+of it (the actual JIT changes) seems like they need to all land at the
+same time. Any thoughts on this Daniel?
+
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
