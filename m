@@ -1,248 +1,368 @@
 From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 23 May 2017 10:32:08 +0530
-Subject: [PATCH v3 1/2] kexec: arm64: create identity page table to be used in
- purgatory
+Date: Tue, 23 May 2017 10:32:09 +0530
+Subject: [PATCH v3 2/2] arm64: enable d-cache support during purgatory sha
+ verification
 In-Reply-To: <cover.1495514291.git.panand@redhat.com>
 References: <cover.1495514291.git.panand@redhat.com>
-Message-ID: <3355da35facd39ed02e66c0d7d50f86692d565a1.1495514291.git.panand@redhat.com>
+Message-ID: <800735a0173aa7204006a189e19d32e338e31507.1495514291.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Purgatory sha verification is very slow when D-cache is not enabled there.
-We need to enable MMU as well to enable D-Cache.Therefore,we need to
-have an identity mapped page table in purgatory.
-
-Since debugging is very difficult in purgatory therefore we prefer to do as
-much work as possible in kexec.
-
-This patch prepares page table for purgatory in advance. We support only 4K
-page table,because it will be available on most of the platform. This page
-table is passed to the purgatory as a new segment.
-
-VA bit is fixed as 48, page table level is 3 where 3rd level page table
-contains 2M block entries.
+If a platform supports 4K page table then enable D-cache in purgatory
+before SHA verification. Disable it before switching to kernel.
 
 Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
- kexec/arch/arm64/kexec-arm64.c | 119 +++++++++++++++++++++++++++++++++++++++++
- kexec/arch/arm64/kexec-mmu.h   |  58 ++++++++++++++++++++
- 2 files changed, 177 insertions(+)
- create mode 100644 kexec/arch/arm64/kexec-mmu.h
+ kexec/arch/arm64/kexec-mmu.h           |  20 ++-
+ purgatory/arch/arm64/Makefile          |   1 +
+ purgatory/arch/arm64/cache.S           | 264 +++++++++++++++++++++++++++++++++
+ purgatory/arch/arm64/purgatory-arm64.c |   5 +
+ 4 files changed, 289 insertions(+), 1 deletion(-)
+ create mode 100644 purgatory/arch/arm64/cache.S
 
-diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
-index 62f37585b788..af5dab331e97 100644
---- a/kexec/arch/arm64/kexec-arm64.c
-+++ b/kexec/arch/arm64/kexec-arm64.c
-@@ -17,6 +17,7 @@
- 
- #include "kexec.h"
- #include "kexec-arm64.h"
-+#include "kexec-mmu.h"
- #include "crashdump.h"
- #include "crashdump-arm64.h"
- #include "dt-ops.h"
-@@ -33,6 +34,10 @@
- #define PROP_ELFCOREHDR "linux,elfcorehdr"
- #define PROP_USABLE_MEM_RANGE "linux,usable-memory-range"
- 
-+typedef unsigned long guest_addr_t;
-+typedef unsigned long host_addr_t;
-+static int next_tbl_cnt = 1;
-+
- /* Global varables the core kexec routines expect. */
- 
- unsigned char reuse_initrd;
-@@ -519,6 +524,118 @@ unsigned long arm64_locate_kernel_segment(struct kexec_info *info)
- 	return hole;
- }
- 
-+static host_addr_t *create_table_entry(host_addr_t *pgtbl_buf,
-+		guest_addr_t pgtbl_mem, host_addr_t *tbl,
-+		guest_addr_t virt, int shift,
-+		unsigned long ptrs)
-+{
-+	unsigned long index, desc, offset;
-+
-+	index = (virt >> shift) & (ptrs - 1);
-+	/* check if we have allocated a table already for this index */
-+	if (tbl[index]) {
-+		/*
-+		 * table index will have entry as per purgatory (guest)page
-+		 * table memory. Find out corresponding buffer address of
-+		 * table (host).
-+		 */
-+		desc = tbl[index] & ~3UL;
-+		offset = desc - pgtbl_mem;
-+		return &pgtbl_buf[offset >> 3];
-+	}
-+
-+	if (next_tbl_cnt >= MAX_PGTBLE_SZ / PAGE_SIZE)
-+		die("%s:No more memory for page table\n", __func__);
-+	/*
-+	 * Always write page table content as per page table memory
-+	 * allocated for purgatory(guest) area, but return corresponding
-+	 * buffer area allocated in kexec (host).
-+	 */
-+
-+	tbl[index] = (pgtbl_mem + PAGE_SIZE * next_tbl_cnt) | PMD_TYPE_TABLE;
-+
-+	return &pgtbl_buf[(next_tbl_cnt++ * PAGE_SIZE) >> 3];
-+}
-+
-+static void create_block_entry(host_addr_t *tbl, unsigned long flags,
-+				guest_addr_t virt)
-+{
-+	unsigned long index;
-+	unsigned long desc;
-+
-+	index = pmd_index(virt);
-+	desc = virt & PMD_MASK;
-+	desc |= flags;
-+	tbl[index] = desc;
-+}
-+
-+static void create_identity_entry(host_addr_t *pgtbl_buf,
-+		guest_addr_t pgtbl_mem, guest_addr_t virt,
-+		unsigned long flags)
-+{
-+	host_addr_t *tbl = pgtbl_buf;
-+
-+	tbl = create_table_entry(pgtbl_buf, pgtbl_mem, tbl, virt,
-+			EXTRA_SHIFT, EXTRA_PTRS);
-+	tbl = create_table_entry(pgtbl_buf, pgtbl_mem, tbl, virt,
-+			IDENTITY_SHIFT, PTRS_PER_PTE);
-+	create_block_entry(tbl, flags, virt);
-+}
-+
-+/**
-+ * arm64_create_pgtbl_segment - Create page table segments to be used by
-+ * purgatory. Page table will have entries to access memory area of all
-+ * those segments which becomes part of sha verification in purgatory.
-+ * Additionally, we also create page table for purgatory segment as well.
-+ */
-+
-+static int arm64_create_pgtbl_segment(struct kexec_info *info,
-+		unsigned long hole_min, unsigned long hole_max)
-+{
-+	host_addr_t *pgtbl_buf;
-+	guest_addr_t pgtbl_mem, mstart, mend;
-+	int i;
-+	unsigned long purgatory_base, purgatory_len;
-+
-+	pgtbl_buf = xmalloc(MAX_PGTBLE_SZ);
-+	memset(pgtbl_buf, 0, MAX_PGTBLE_SZ);
-+	pgtbl_mem = add_buffer_phys_virt(info, pgtbl_buf, MAX_PGTBLE_SZ,
-+			MAX_PGTBLE_SZ, PAGE_SIZE, hole_min, hole_max, 1, 0);
-+	for (i = 0; i < info->nr_segments; i++) {
-+		if (info->segment[i].mem == (void *)info->rhdr.rel_addr) {
-+			purgatory_base = (unsigned long)info->segment[i].mem;
-+			purgatory_len = info->segment[i].memsz;
-+		}
-+		mstart = (unsigned long)info->segment[i].mem;
-+		mend = mstart + info->segment[i].memsz;
-+		mstart &= ~(SECTION_SIZE - 1);
-+		while (mstart < mend) {
-+			create_identity_entry(pgtbl_buf, pgtbl_mem,
-+					mstart, MMU_FLAGS_NORMAL);
-+			mstart += SECTION_SIZE;
-+		}
-+	}
-+
-+	/* we will need pgtble_base in purgatory for enabling d-cache */
-+	elf_rel_set_symbol(&info->rhdr, "pgtble_base", &pgtbl_mem,
-+		sizeof(pgtbl_mem));
-+	/*
-+	 * We need to disable d-cache before we exit from purgatory.
-+	 * Since, only d-cache flush by VAs is recommended, therefore we
-+	 * will also need memory location of all those area which will be
-+	 * accessed in purgatory with enabled d-cache. sha256_regions
-+	 * already have start and length for all the segments except
-+	 * purgatory. Therefore, we will need to pass start and length of
-+	 * purgatory additionally.
-+	 */
-+	elf_rel_set_symbol(&info->rhdr, "purgatory_base", &purgatory_base,
-+		sizeof(purgatory_base));
-+	elf_rel_set_symbol(&info->rhdr, "purgatory_len", &purgatory_len,
-+		sizeof(purgatory_len));
-+
-+	return 0;
-+}
-+
- /**
-  * arm64_load_other_segments - Prepare the dtb, initrd and purgatory segments.
-  */
-@@ -630,6 +747,8 @@ int arm64_load_other_segments(struct kexec_info *info,
- 	elf_rel_set_symbol(&info->rhdr, "arm64_dtb_addr", &dtb_base,
- 		sizeof(dtb_base));
- 
-+	arm64_create_pgtbl_segment(info, hole_min, hole_max);
-+
- 	return 0;
- }
- 
 diff --git a/kexec/arch/arm64/kexec-mmu.h b/kexec/arch/arm64/kexec-mmu.h
-new file mode 100644
-index 000000000000..55354b5e3002
---- /dev/null
+index 55354b5e3002..6f0a8e90a205 100644
+--- a/kexec/arch/arm64/kexec-mmu.h
 +++ b/kexec/arch/arm64/kexec-mmu.h
-@@ -0,0 +1,58 @@
-+#if !defined(KEXEC_MMU_H)
-+#define KEXEC_MMU_H
-+/*
-+ * kexec creates identity page table to be used in purgatory so that
-+ * dcache verification becomes faster.
-+ *
-+ * These are the definitions to be used by page table creation routine.
-+ *
-+ * Only 4K page table, 3 level, 2M block mapping, 48bit VA is supported
-+ */
-+#define PAGE_SHIFT		12
-+#define PGTABLE_LEVELS		3
-+#define ARM64_HW_PGTABLE_LEVEL_SHIFT(n) ((PAGE_SHIFT - 3) * (4 - (n)) + 3)
-+#define PGDIR_SHIFT		ARM64_HW_PGTABLE_LEVEL_SHIFT(4 - PGTABLE_LEVELS)
-+#define EXTRA_SHIFT		(PGDIR_SHIFT + PAGE_SHIFT - 3)
-+#define EXTRA_PTRS		(1 << (48 - EXTRA_SHIFT))
-+#define PUD_SHIFT		PGDIR_SHIFT
-+#define PMD_SHIFT		ARM64_HW_PGTABLE_LEVEL_SHIFT(2)
-+#define PMD_SIZE		(1UL << PMD_SHIFT)
-+#define PMD_MASK		(~(PMD_SIZE-1))
-+#define IDENTITY_SHIFT		PUD_SHIFT
-+#define PTRS_PER_PTE		(1 << (PAGE_SHIFT - 3))
-+#define PTRS_PER_PMD		PTRS_PER_PTE
-+#define pmd_index(addr)		(((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
-+#define PMD_TYPE_TABLE		(3UL << 0)
-+#define PMD_TYPE_SECT		(1UL << 0)
-+#define PMD_SECT_AF		(1UL << 10)
-+#define PMD_ATTRINDX(t)		((unsigned long)(t) << 2)
-+#define MT_NORMAL		0
-+#define PMD_FLAGS_NORMAL	(PMD_TYPE_SECT | PMD_SECT_AF)
-+#define MMU_FLAGS_NORMAL	(PMD_ATTRINDX(MT_NORMAL) | PMD_FLAGS_NORMAL)
-+#define SECTION_SHIFT		PMD_SHIFT
-+#define SECTION_SIZE		(1UL << SECTION_SHIFT)
-+#define PAGE_SIZE		(1 << PAGE_SHIFT)
-+/*
-+ * Since we are using 3 level of page tables, therefore minimum number of
-+ * table will be 3. Each entry in level 3 page table can map 2MB memory
-+ * area. Thus a level 3 page table indexed by bit 29:21 can map a total of
-+ * 1G memory area. Therefore, if any segment crosses 1G boundary, then we
-+ * will need one more level 3 table. Similarly, level 2 page table indexed
-+ * by bit 38:30 can map a total of 512G memory area. If segment addresses
-+ * are more than 512G apart then we will need two more table for each such
-+ * block.
-+ * Lets consider 2G as the maximum size of crashkernel. This 2G memory
-+ * location might not be allocated at 1G aligned boundary, so in that case
-+ * we need to have 5 table size resrved to map any location of the crash
-+ * kernel region.
-+ *
-+ * If we will ever wish to support uart debugging in purgatory then that
-+ * might cross the boundary and therefore additional 2 more table space. In
-+ * that case, we will need a total of 7 table space.
-+ *
-+ * As of now keep it fixed@5. Increase it if any platform either
-+ * supports uart or more than 2G of crash kernel size.
-+ */
-+#define MAX_PGTBLE_SZ	(5 * PAGE_SIZE)
+@@ -1,5 +1,24 @@
+ #if !defined(KEXEC_MMU_H)
+ #define KEXEC_MMU_H
 +
-+#endif
++#define SCTLR_ELx_I		(1 << 12)
++#define SCTLR_ELx_C		(1 << 2)
++#define SCTLR_ELx_M		(1 << 0)
++#define SCTLR_ELx_FLAGS 	(SCTLR_ELx_M | SCTLR_ELx_C | SCTLR_ELx_I)
++#define TCR_SHARED_NONE		(0 << 12)
++#define TCR_ORGN_WBWA		(1 << 10)
++#define TCR_IRGN_WBWA		(1 << 8)
++#define TCR_T0SZ_48		16
++#define TCR_TG0_4K		(0 << 14)
++#define TCR_FLAGS 		(TCR_SHARED_NONE | TCR_ORGN_WBWA |\
++				TCR_IRGN_WBWA | TCR_T0SZ_48 | TCR_TG0_4K)
++#define TCR_IPS_EL1_SHIFT	32
++#define TCR_IPS_EL2_SHIFT	16
++#define ID_AA64MMFR0_TGRAN4_SHIFT	28
++#define ID_AA64MMFR0_PARANGE_MASK	0xF
++#define MT_NORMAL		0
++#define MEMORY_ATTRIBUTES	(0xFF << (MT_NORMAL*8))
++
+ /*
+  * kexec creates identity page table to be used in purgatory so that
+  * dcache verification becomes faster.
+@@ -26,7 +45,6 @@
+ #define PMD_TYPE_SECT		(1UL << 0)
+ #define PMD_SECT_AF		(1UL << 10)
+ #define PMD_ATTRINDX(t)		((unsigned long)(t) << 2)
+-#define MT_NORMAL		0
+ #define PMD_FLAGS_NORMAL	(PMD_TYPE_SECT | PMD_SECT_AF)
+ #define MMU_FLAGS_NORMAL	(PMD_ATTRINDX(MT_NORMAL) | PMD_FLAGS_NORMAL)
+ #define SECTION_SHIFT		PMD_SHIFT
+diff --git a/purgatory/arch/arm64/Makefile b/purgatory/arch/arm64/Makefile
+index 636abeab17b2..db28a0de6891 100644
+--- a/purgatory/arch/arm64/Makefile
++++ b/purgatory/arch/arm64/Makefile
+@@ -11,6 +11,7 @@ arm64_PURGATORY_EXTRA_CFLAGS = \
+ 
+ arm64_PURGATORY_SRCS += \
+ 	purgatory/arch/arm64/entry.S \
++	purgatory/arch/arm64/cache.S \
+ 	purgatory/arch/arm64/purgatory-arm64.c
+ 
+ dist += \
+diff --git a/purgatory/arch/arm64/cache.S b/purgatory/arch/arm64/cache.S
+new file mode 100644
+index 000000000000..bb5e08397ef9
+--- /dev/null
++++ b/purgatory/arch/arm64/cache.S
+@@ -0,0 +1,264 @@
++/*
++ * Some of the routines have been copied from Linux Kernel, therefore
++ * copying the license as well.
++ *
++ * Copyright (C) 2001 Deep Blue Solutions Ltd.
++ * Copyright (C) 2012 ARM Ltd.
++ * Copyright (C) 2016 Pratyush Anand <panand@redhat.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include "../../../kexec/arch/arm64/kexec-mmu.h"
++/*
++ * 	dcache_line_size - get the minimum D-cache line size from the CTR register.
++ */
++	.macro	dcache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
++
++/*
++ *	flush_dcache_range(start, end)
++ *	- x0 - start	- start address of region
++ *	- x1 - end	- end address of region
++ *
++ */
++flush_dcache_range:
++	dcache_line_size x2, x3
++	sub	x3, x2, #1
++	bic	x0, x0, x3
++1:	dc	civac, x0			// clean & invalidate D line / unified line
++	add	x0, x0, x2
++	cmp	x0, x1
++	b.lo	1b
++	dsb	sy
++	ret
++
++/*
++ *	invalidate_tlbs_el1()
++ */
++invalidate_tlbs_el1:
++	dsb	nshst
++	tlbi	vmalle1
++	dsb	nsh
++	isb
++	ret
++
++/*
++ *	invalidate_tlbs_el2()
++ */
++invalidate_tlbs_el2:
++	dsb	nshst
++	tlbi	alle2
++	dsb	nsh
++	isb
++	ret
++/*
++ *	is_4k_page_not_supported - return nonzero if 4k page is not supported
++ */
++is_4k_page_not_supported:
++	mrs	x0, ID_AA64MMFR0_EL1
++	and	x0, x0, #(0xF << ID_AA64MMFR0_TGRAN4_SHIFT)
++	ret
++
++/*
++ *	get_ips_bits - return supported IPS bits
++ */
++get_ips_bits:
++	mrs	x0, ID_AA64MMFR0_EL1
++	and	x0, x0, #ID_AA64MMFR0_PARANGE_MASK
++	ret
++
++/*
++ * 	get_current_el - Get information about current exception level
++ */
++get_current_el:
++	mrs 	x0, CurrentEL
++	lsr	x0, x0, #2
++	ret
++
++/*
++ * 	invalidate_icache - Invalidate I-cache
++ */
++invalidate_icache:
++	ic	iallu
++	dsb	nsh
++	isb
++	ret
++
++/*
++ * 	set_mair_tcr_ttbr_sctlr_el1(page_table, tcr_flags) - sets MAIR, TCR , TTBR and SCTLR registers
++ * 	x0 - page_table - Page Table Base
++ * 	x1 - tcr_flags - TCR Flags to be set
++ */
++set_mair_tcr_ttbr_sctlr_el1:
++	ldr	x2, =MEMORY_ATTRIBUTES
++	msr	mair_el1, x2
++	msr	tcr_el1, x1
++	msr	ttbr0_el1, x0
++	isb
++	mrs	x0, sctlr_el1
++	ldr	x3, =SCTLR_ELx_FLAGS
++	orr	x0, x0, x3
++	msr	sctlr_el1, x0
++	isb
++	ret
++
++/*
++ * 	set_mair_tcr_ttbr_sctlr_el2(page_table, tcr_flags) - sets MAIR, TCR , TTBR and SCTLR registers
++ * 	x0 - page_table - Page Table Base
++ * 	x1 - tcr_flags - TCR Flags to be set
++ */
++set_mair_tcr_ttbr_sctlr_el2:
++	ldr	x2, =MEMORY_ATTRIBUTES
++	msr	mair_el2, x2
++	msr	tcr_el2, x1
++	msr	ttbr0_el2, x0
++	isb
++	mrs	x0, sctlr_el2
++	ldr	x3, =SCTLR_ELx_FLAGS
++	orr	x0, x0, x3
++	msr	sctlr_el2, x0
++	isb
++	ret
++
++/*
++ * reset_sctlr_el1 - disables cache and mmu
++ */
++reset_sctlr_el1:
++	mrs	x0, sctlr_el1
++	bic	x0, x0, #SCTLR_ELx_C
++	bic	x0, x0, #SCTLR_ELx_M
++	msr	sctlr_el1, x0
++	isb
++	ret
++
++/*
++ * reset_sctlr_el2 - disables cache and mmu
++ */
++reset_sctlr_el2:
++	mrs	x0, sctlr_el2
++	bic	x0, x0, #SCTLR_ELx_C
++	bic	x0, x0, #SCTLR_ELx_M
++	msr	sctlr_el2, x0
++	isb
++	ret
++
++.globl enable_dcache
++/*
++ * x6 - pgtble_base
++ * x7 - tcr_flags
++ * x8 - current_el
++ */
++enable_dcache:
++	stp	x29, x30, [sp,#-16]!
++	stp	x6, x7, [sp,#-16]!
++	stp	x8, x9, [sp,#-16]!
++	bl	is_4k_page_not_supported
++	cmp	x0, #0
++	b.ne	1f
++	ldr	x6, pgtble_base
++	ldr	x7, =TCR_FLAGS
++	bl	get_current_el
++	mov	x8, x0
++	cmp	x8, #2
++	b.ne	2f
++	bl	invalidate_tlbs_el2
++	bl	get_ips_bits
++	lsl	x1, x0, #TCR_IPS_EL2_SHIFT
++	orr	x1, x1, x7
++	mov	x0, x6
++	bl	set_mair_tcr_ttbr_sctlr_el2
++	b	1f
++2:
++	cmp	x8, #1
++	b.ne	1f
++	bl	invalidate_tlbs_el1
++	bl	get_ips_bits
++	lsl	x1, x0, #TCR_IPS_EL1_SHIFT
++	orr	x1, x1, x7
++	mov	x0, x6
++	bl	set_mair_tcr_ttbr_sctlr_el1
++1:
++	ldp	x8, x9, [sp],#16
++	ldp	x6, x7, [sp],#16
++	ldp	x29, x30, [sp],#16
++	ret
++
++.extern sha256_regions
++.globl disable_dcache
++/*
++ * x6 - pgtble_base
++ * x7 - current_el
++ */
++disable_dcache:
++	stp	x29, x30, [sp,#-16]!
++	stp	x6, x7, [sp,#-16]!
++	bl	is_4k_page_not_supported
++	cmp	x0, #0
++	b.ne	1f
++	ldr	x6, pgtble_base
++	bl	get_current_el
++	mov	x7, x0
++	cmp	x7, #2
++	b.ne	2f
++	bl	reset_sctlr_el2
++	b	3f
++2:
++	cmp	x7, #1
++	b.ne	1f
++	bl	reset_sctlr_el1
++3:
++	/*
++	 * we can only branch to function which does not use stack, until
++	 * all memories are flushed.
++	 */
++	bl	invalidate_icache
++	/* flush d cache for purgatory region */
++	ldr	x0, purgatory_base
++	ldr	x1, purgatory_len
++	add	x1, x1, x0
++	bl	flush_dcache_range
++	/* flush d cache for rest of the regions */
++	ldr	x6, =sha256_regions
++4:
++	ldp	x0, x1, [x6],#16
++	cmp	x1, #0
++	b.eq	1f
++	add	x1, x1, x0
++	bl	flush_dcache_range
++	b	4b
++1:
++	ldp	x6, x7, [sp],#16
++	ldp	x29, x30, [sp],#16
++	ret
++
++.align 3
++
++.globl pgtble_base
++pgtble_base:
++	.quad	0
++	.size	pgtble_base, .-pgtble_base
++
++.globl purgatory_base
++purgatory_base:
++	.quad	0
++	.size	purgatory_base, .-purgatory_base
++
++.globl purgatory_len
++purgatory_len:
++	.quad	0
++	.size	purgatory_len, .-purgatory_len
+diff --git a/purgatory/arch/arm64/purgatory-arm64.c b/purgatory/arch/arm64/purgatory-arm64.c
+index fe50fcf8ebc3..638fb11d9843 100644
+--- a/purgatory/arch/arm64/purgatory-arm64.c
++++ b/purgatory/arch/arm64/purgatory-arm64.c
+@@ -5,6 +5,9 @@
+ #include <stdint.h>
+ #include <purgatory.h>
+ 
++void enable_dcache(void);
++void disable_dcache(void);
++
+ void putchar(int ch)
+ {
+ 	/* Nothing for now */
+@@ -12,8 +15,10 @@ void putchar(int ch)
+ 
+ void post_verification_setup_arch(void)
+ {
++	disable_dcache();
+ }
+ 
+ void setup_arch(void)
+ {
++	enable_dcache();
+ }
 -- 
 2.9.3
