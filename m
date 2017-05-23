@@ -1,57 +1,50 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 23 May 2017 15:39:32 +0200
-Subject: [PATCH 1/2] dt-bindings: spi-meson: Add SPICC bindings
-In-Reply-To: <1495546773-20479-1-git-send-email-narmstrong@baylibre.com>
-References: <1495546773-20479-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1495546773-20479-2-git-send-email-narmstrong@baylibre.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 23 May 2017 15:53:03 +0200
+Subject: [PATCH v6 2/4] ARM: dts: mvebu: Add PWM properties to .dtsi files
+In-Reply-To: <CACRpkdZE0wnotF+OdAmutJcU9JSE_LxNd7Lz7yXqcn_bq5VqgQ@mail.gmail.com>
+ (Linus Walleij's message of "Mon, 24 Apr 2017 11:19:32 +0200")
+References: <20170414154056.32055-1-ralph.sennhauser@gmail.com>
+ <20170414154056.32055-3-ralph.sennhauser@gmail.com>
+ <CACRpkdZE0wnotF+OdAmutJcU9JSE_LxNd7Lz7yXqcn_bq5VqgQ@mail.gmail.com>
+Message-ID: <87tw4by91c.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SPICC (SPI Communications Controller) bindings variant.
+Hi,
+ 
+ On lun., avril 24 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- .../devicetree/bindings/spi/spi-meson.txt          | 31 ++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+> On Fri, Apr 14, 2017 at 5:40 PM, Ralph Sennhauser
+> <ralph.sennhauser@gmail.com> wrote:
+>
+>> From: Andrew Lunn <andrew@lunn.ch>
+>>
+>> Add properties to the GPIO nodes to allow them to be also used as PWM
+>> lines.
+>>
+>> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+>> URL: https://patchwork.ozlabs.org/patch/427294/
+>> [Ralph Sennhauser: Add new compatible string marvell,armada-370-xp-gpio]
+>> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+>> Tested-by: Andrew Lunn <andrew@lunn.ch>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Please funnel this through ARM SoC.
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-meson.txt b/Documentation/devicetree/bindings/spi/spi-meson.txt
-index dc6d031..825c39c 100644
---- a/Documentation/devicetree/bindings/spi/spi-meson.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-meson.txt
-@@ -20,3 +20,34 @@ Required properties:
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 	};
-+
-+* SPICC (SPI Communication Controller)
-+
-+The Meson SPICC is generic SPI controller for general purpose Full-Duplex
-+communications with dedicated 16 words RX/TX PIO FIFOs.
-+
-+Required properties:
-+ - compatible: should be "amlogic,meson-gx-spicc" on Amlogic GX SoCs.
-+ - reg: physical base address and length of the controller registers
-+ - interrupts: The interrupt specifier
-+ - clock-names: Must contain "core"
-+ - clocks: phandle of the input clock for the baud rate generator
-+ - #address-cells: should be 1
-+ - #size-cells: should be 0
-+
-+Optional properties:
-+ - resets: phandle of the internal reset line
-+
-+See ../spi/spi-bus.txt for more details on SPI bus master and slave devices
-+required and optional properties.
-+
-+Example :
-+	spi at c1108d80 {
-+		compatible = "amlogic,meson-gx-spicc";
-+		reg = <0xc1108d80 0x80>;
-+		interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
-+		clock-names = "core";
-+		clocks = <&clk81>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
+
+Applied on mvebu/dt
+
+Thanks,
+
+Gregory
+
+>
+> Yours,
+> Linus Walleij
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
