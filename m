@@ -1,36 +1,41 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Tue, 23 May 2017 14:39:43 +0800
-Subject: [PATCH] drm/rockchip: Don't allow zero sized gem buffer
-Message-ID: <1495521583-29151-1-git-send-email-jeffy.chen@rock-chips.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 23 May 2017 14:55:28 +0800
+Subject: [PATCH] drm/mediatek: re-phrase DRM_INFO error message
+In-Reply-To: <20170411134419.21277-1-colin.king@canonical.com>
+References: <20170411134419.21277-1-colin.king@canonical.com>
+Message-ID: <1495522528.20811.17.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The system would crash when trying to alloc zero sized gem buffer:
-[    6.712435] Unable to handle kernel NULL pointer dereference at virtual address 00000010 <--ZERO_SIZE_PTR
-...
-[    6.757502] PC is at sg_alloc_table_from_pages+0x170/0x1ec
+Hi, Colin:
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
+Sorry for my late reply. I've applied this patch to my branch
+mediatek-drm-next-4.13, thanks.
 
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Regards,
+CK
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index df9e570..8917922 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -315,6 +315,11 @@ struct rockchip_gem_object *
- 	struct drm_gem_object *obj;
- 	int ret;
- 
-+	if (!size) {
-+		DRM_ERROR("gem buffer size is zero\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
- 	size = round_up(size, PAGE_SIZE);
- 
- 	rk_obj = kzalloc(sizeof(*rk_obj), GFP_KERNEL);
--- 
-2.1.4
+On Tue, 2017-04-11 at 14:44 +0100, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> The current message contains a spelling mistake and is not easily
+> parsable. Re-phrase it to be more understandable.
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_dsi.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> index 808b995a990f..79d240ff1331 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> @@ -933,7 +933,7 @@ static u32 mtk_dsi_recv_cnt(u8 type, u8 *read_data)
+>  		DRM_INFO("type is 0x02, try again\n");
+>  		break;
+>  	default:
+> -		DRM_INFO("type(0x%x) cannot be non-recognite\n", type);
+> +		DRM_INFO("type(0x%x) not recognized\n", type);
+>  		break;
+>  	}
+>  
