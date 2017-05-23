@@ -1,27 +1,27 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 23 May 2017 16:21:51 +0200
-Subject: [PATCH 3/3] ARM64: dts: Fix GXBB periphs pinctrl pull-enable register
+Date: Tue, 23 May 2017 16:21:50 +0200
+Subject: [PATCH 2/3] ARM64: dts: Fix GXL periphs pinctrl pull-enable register
  base
 In-Reply-To: <1495549311-23660-1-git-send-email-narmstrong@baylibre.com>
 References: <1495549311-23660-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1495549311-23660-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1495549311-23660-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pull-enable register base was wrongly copied from the meson8b pinctrl node,
+The pull-enable register base was wrongly copied from the GXBB pinctrl node,
 but was not used yet.
 
-Fixes: c328666d58aa ("ARM64: dts: amlogic: Add Meson GX dtsi from GXBB")
+Fixes: fb0fe92294a9 ("ARM64: dts: meson-gxl: Add pinctrl nodes")
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 6f8b301..47ca44d 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -351,7 +351,7 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index 4871ce5..57fe1f5 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -239,7 +239,7 @@
  		gpio: bank at 4b0 {
  			reg = <0x0 0x004b0 0x0 0x28>,
  			      <0x0 0x004e8 0x0 0x14>,
