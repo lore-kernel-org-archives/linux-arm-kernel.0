@@ -1,57 +1,106 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 23 May 2017 12:13:28 +0100
-Subject: [PATCH v3 1/3] Documentation/bindings: Document the SafeXel
- cryptographic engine driver
-In-Reply-To: <20170522213746.403aa844@free-electrons.com>
-References: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
- <20170424075407.19730-2-antoine.tenart@free-electrons.com>
- <7986721e-3a2b-23fb-61d7-7032f0d65533@arm.com>
- <20170522143049.GD14976@kwain.lan>
- <e8ef1f11-539c-9abc-9977-36366d4994b1@arm.com>
- <20170522145440.GE14976@kwain.lan>
- <44fc18ba-a06a-de89-2172-08c093880e79@arm.com>
- <20170522213746.403aa844@free-electrons.com>
-Message-ID: <9a3961ee-1396-cc8f-64ca-12beacf75c2a@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 23 May 2017 13:17:18 +0200
+Subject: [PATCH] drm/pl111: add ARM_AMBA dependency
+In-Reply-To: <CAK8P3a2Rbd2tnehO4vnqgmMYTPqgvws3ZEtbzJ86AxVWd9j6nA@mail.gmail.com>
+References: <20170522152058.3346428-1-arnd@arndb.de>
+ <20170522163231.bk6zltgzse4szm2o@kozik-lap>
+ <CAK8P3a2Rbd2tnehO4vnqgmMYTPqgvws3ZEtbzJ86AxVWd9j6nA@mail.gmail.com>
+Message-ID: <CAJKOXPeweaJxUHM=uURarbW8dWeZ=PHt7W7k0wt-cfhz0_2QUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/05/17 20:37, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Mon, 22 May 2017 16:02:33 +0100, Marc Zyngier wrote:
-> 
->>> It also says: 87 =>  34 En Lv 5, which is the IRQ I'm looking for.  
+On Mon, May 22, 2017 at 11:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Mon, May 22, 2017 at 6:32 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> On Mon, May 22, 2017 at 05:20:08PM +0200, Arnd Bergmann wrote:
+>>> The driver is written in a way to enable compile-testing without CONFIG_ARM_AMBA,
+>>> but it just causes needless warnings:
+>>>
+>>> drivers/gpu/drm/pl111/pl111_drv.c:149:26: error: 'pl111_drm_driver' defined but not used [-Werror=unused-variable]
+>>> drivers/gpu/drm/pl111/pl111_drv.c:81:12: error: 'pl111_modeset_init' defined but not used [-Werror=unused-function]
+>>>
+>>> This removes the #ifdef instead, and adds a dependency on ARM_AMBA to
+>>> only let us build the driver when the base support is enabled.
+>>>
+>>> Unfortunately, this requires removing one redundant 'select ARM_AMBA'
+>>> line from mach-s3c64xx to avoid a circular dependency.
+>>>
+>>> It might be good to allow manually enabling ARM_AMBA when COMPILE_TEST
+>>> is turned on, but that should be a separate patch and may cause other
+>>> build regressions.
+>>>
+>>> Fixes: bed41005e617 ("drm/pl111: Initial drm/kms driver for pl111")
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>> ---
+>>>  arch/arm/mach-s3c64xx/Kconfig     | 1 -
+>>>  drivers/gpu/drm/pl111/Kconfig     | 1 +
+>>>  drivers/gpu/drm/pl111/pl111_drv.c | 2 --
+>>>  3 files changed, 1 insertion(+), 3 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+>>> index 459214fa20b4..5ee5ad74a3d6 100644
+>>> --- a/arch/arm/mach-s3c64xx/Kconfig
+>>> +++ b/arch/arm/mach-s3c64xx/Kconfig
+>>> @@ -40,7 +40,6 @@ config CPU_S3C6410
+>>>
+>>>  config S3C64XX_PL080
+>>>       def_bool DMADEVICES
+>>> -     select ARM_AMBA
 >>
->> Ah, that one as well. So how is the interrupt routed? Via the ICU, and
->> then to the GIC (with several ICU sources mapped on a single SPI)?
-> 
-> The crypto block being in the CP part, it has a wired interrupt to the
-> ICU (also in the CP). The ICU then turns this wired interrupt into a
-> memory write transaction to a register called GICP SPI in the AP, which
-> triggers a SPI interrupt in the GIC.
+>> I must admit that I miss how pl111 DRM driver create circular dependency
+>> with S3C64XX_PL080 (or AMBA_PL08X?). Maybe it is unrelated change and
+>> should be a separate patch?
+>
+> When I add 'depends on ARM_AMBA' for pl111, I get this dependency loop:
+>
+> drivers/i2c/Kconfig:7: symbol I2C is selected by FB_DDC
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/video/fbdev/Kconfig:63: symbol FB_DDC is selected by FB_CYBER2000_DDC
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/video/fbdev/Kconfig:381: symbol FB_CYBER2000_DDC depends on FB_CYBER2000
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/video/fbdev/Kconfig:369: symbol FB_CYBER2000 depends on FB
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/video/fbdev/Kconfig:5: symbol FB is selected by DRM_KMS_FB_HELPER
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/gpu/drm/Kconfig:72: symbol DRM_KMS_FB_HELPER is selected by
+> DRM_KMS_CMA_HELPER
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/gpu/drm/Kconfig:137: symbol DRM_KMS_CMA_HELPER is selected by DRM_PL111
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/gpu/drm/pl111/Kconfig:1: symbol DRM_PL111 depends on ARM_AMBA
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/amba/Kconfig:1: symbol ARM_AMBA is selected by S3C64XX_PL080
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> arch/arm/mach-s3c64xx/Kconfig:42: symbol S3C64XX_PL080 default value
+> contains DMADEVICES
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> drivers/dma/Kconfig:5: symbol DMADEVICES is selected by SND_SOC_SH4_SIU
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> sound/soc/sh/Kconfig:29: symbol SND_SOC_SH4_SIU is selected by SND_SIU_MIGOR
+> For a resolution refer to Documentation/kbuild/kconfig-language.txt
+> subsection "Kconfig recursive dependency limitations"
+> sound/soc/sh/Kconfig:59: symbol SND_SIU_MIGOR depends on I2C
+>
+> We could break the loop at any of those places, but the
+> S3C64XX_PL080 symbol seemed the easiest way since the
+> 'select' there is completely unnecessary and it directly relates
+> to the change I made in PL111.
 
-Is that some kind of Level-triggered MSI, ? la GICv3 GICD_SETSPI_NSR?
+Assuming ARM_AMBA is unnecessary here, then it should be unnecessary
+in other platforms as well but we have it (git grep 'select
+ARM_AMBA'). The ARM_AMBA is a dependency of AMBA_PL08X which is
+selected by S3C64xx... so IMHO this is needed.
 
-> In the current mainline kernel, the ICU is configured by the firmware
-> and creates static associations between wired interrupts in the CP and
-> corresponding SPI interrupts. Therefore the Device Tree currently
-> reference such SPI interrupts directly.
-> 
-> However, I have a patch series that I plan to submit hopefully in the
-> next days that adds an ICU driver, and changes the Device Tree to refer
-> to the ICU interrupt instead.
-
-OK, I'm quite interested to see that, specially if my above hunch is
-right...
-
-> Therefore, I don't think the binding should reference anything else
-> than the usual info about the interrupts property.
-
-That I completely agree with, as long as it doesn't describe anything
-that is semantically incorrect.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best regards,
+Krzysztof
