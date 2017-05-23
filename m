@@ -1,121 +1,76 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Tue, 23 May 2017 18:11:28 +0200
-Subject: [PATCH 00/13] Linksys WRT3200ACM (Rango) support
-In-Reply-To: <87mva3wqci.fsf@free-electrons.com>
-References: <20170521124903.11050-1-ralph.sennhauser@gmail.com>
- <87mva3wqci.fsf@free-electrons.com>
-Message-ID: <20170523181128.43bd1f96@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 May 2017 17:25:07 +0100
+Subject: [PATCH V3 6/8] arm: dma-mapping: Reset the device's dma_ops
+In-Reply-To: <004c01d23003$7230ed90$5692c8b0$@codeaurora.org>
+References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+ <1475600632-21289-7-git-send-email-sricharan@codeaurora.org>
+ <a3d4533f-165d-f444-7681-141479617a18@arm.com>
+ <004c01d23003$7230ed90$5692c8b0$@codeaurora.org>
+Message-ID: <20170523162507.GA1729@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 May 2017 17:22:05 +0200
-Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-
-> Hi Ralph,
->  
->  On dim., mai 21 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com>
-> wrote:
+On Thu, Oct 27, 2016 at 09:07:23AM +0530, Sricharan wrote:
+> Hi Robin,
 > 
-> > Hi everyone
+> >-----Original Message-----
+> >From: Robin Murphy [mailto:robin.murphy at arm.com]
+> >Sent: Wednesday, October 26, 2016 8:37 PM
+> >To: Sricharan R <sricharan@codeaurora.org>; will.deacon at arm.com; joro at 8bytes.org; iommu at lists.linux-foundation.org; linux-arm-
+> >kernel at lists.infradead.org; linux-arm-msm at vger.kernel.org; laurent.pinchart at ideasonboard.com; m.szyprowski at samsung.com;
+> >tfiga at chromium.org; srinivas.kandagatla at linaro.org
+> >Subject: Re: [PATCH V3 6/8] arm: dma-mapping: Reset the device's dma_ops
 > >
-> > This series adds support for the latest model in Linksys WRT AC
-> > series of routers. The WRT3200ACM was released in October 2016 and
-> > the code name is Rango.
+> >On 04/10/16 18:03, Sricharan R wrote:
+> >> The dma_ops for the device is not getting set to NULL in
+> >> arch_tear_down_dma_ops and this causes an issue when the
+> >> device's probe gets deferred and retried. So reset the
+> >> dma_ops to NULL.
 > >
-> > As it comes with a flash chip twice as big the dts Imre Kaloz has
-> > written for OpenWrt isn't based on armada-385-linksys.dtsi to avoid
-> > conflicts. Nonetheless its part of the same family, so the bigger
-> > part of this series is dedicated to reorganize / modernize /
-> > cleanup / somewhat future proof the armada-385-linksys.dtsi and
-> > it's dependants so the dts for the Rango addition can use the same
-> > dtsi.
+> >Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 > >
-> > Key differences to the earlier Armada-385 based devices in the
-> > series is a bigger flash chip, next generation wireless modules in
-> > the mini pcie slots as well as a Marvell SD8887. Finally the CPU is
-> > clocked at 1866 GHz by default.
-> >
-> > The series depends on Linux 4.12-rc1 and is targeted for 4.13.
-> >
-> > Ralph
-> >
-> >  
 > 
-
-Hi Gregory,
-
-> I applied the 11 first patches on mvebu/dt. I added the
-> "Signed-off-by" from Imre Kaloz <kaloz@openwrt.org> on all of them
-> and the "Reviewed-by" from Andrew Lunn <andrew@lunn.ch> when
-> approriate.
-
-That was a lot faster than expected
-
+>  Thanks.
 > 
-> I also did the following things:
+> >This seems like it could stand independently from the rest of the series
+> >- might be worth rewording the commit message to more general terms,
+> >i.e. arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops()
+> >thus clearing the ops set by the latter, and sending it to Russell as a
+> >fix in its own right.
 > 
-> > Ralph Sennhauser (13):
-> >   ARM: dts: armada-385-linksys: flatten dtsi
+>   Ok, will reword the commit log and push this separately.
 
-Just noticed the commit message has "helps helps" in it.
+So, I've come to apply this patch (since it's finally landed in the patch
+system), and I'm not convinced that the commit message is really up to
+scratch.
 
-> >   ARM: dts: armada-385-linksys: label nodes  
-> Fixed typo pointed by Andrew
-> 
-> >   ARM: dts: armada-385-linksys: flatten dependants  
-> Fixed typo pointed by Andrew
-> 
-> Something that I didn't change is the word "dependants", I don't know
-> what do you means exactly. But not being native speaker I maybe missed
-> something.
+The current commit message looks like this:
 
-Dependants is the noun, tho that might be a British English thing (what
-I had in school). I learned English as 4th/5th language together with
-Latin, so beside being a mixture of American and British English some
-custom English surfaces from time to time. :)
+"   ARM: 8674/1: dma-mapping: Reset the device's dma_ops
 
-> 
-> >   ARM: dts: armada-385-linksys: drop redundant properties in
-> > dependants ARM: dts: armada-385-linksys: bm pools by label order
-> >   ARM: dts: armada-385-linksys: usb3 label cleanup  
-> 
-> I applied this one because I found Ralph explanation convincing about
-> not modifying the ABI
-> 
-> >   ARM: dts: armada-385-linksys: drop leagcy DSA bindings  
-> Fixed typo in title and commit log
-> 
+    arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops(),
+    dma_ops should be cleared in the teardown path. Otherwise this causes
+    problem when the probe of device is retried after being deferred. The
+    device's iommu structures are cleared after EPROBEDEFER error, but on
+    the next try dma_ops will still be set to old value, which is not right."
 
-Didn't notice until you pointed it out. Thanks.
+It is obviously a fix, but a fix for which patch?  Looking at the
+history, we have "arm: dma-mapping: Don't override dma_ops in
+arch_setup_dma_ops()" which I would have guessed is the appropriate
+one, but this post-dates your patch (it's very recent, v4.12-rc
+recent.)
 
-> >   ARM: dts: armada-385-linksys: use binary unit prefixes  
-> 
-> As Ralph I prefer that we use normalized unit. Especially when we use
-> MiB or KiB then we are sure that we use a power of 2, whereas when we
-> see KB we don't know if it is 1024B or 1000B.
-> 
-> >   ARM: dts: armada-385-linksys: partition layout is board specific
-> >   ARM: dts: armada-385-linksys: group pins in pinctrl
-> >   ARM: dts: armada-385-linksys: fixup button node names  
-> 
-> >   clk: mvebu: add support for 1866MHz variants  
-> 
-> I didn't apply this one as it must go through the clk tree and there
-> was also a pending question from Andrew.
+So, I need more description about the problem you were seeing when
+you first proposed this patch.
 
-And the way he formulated it he probably already knows that more is
-needed. I'll investigate it.
+How does leaving the dma_ops in place prior to "arm: dma-mapping:
+Don't override dma_ops in arch_setup_dma_ops()" cause problems for
+deferred probing?
 
-> 
-> >   ARM: dts: mvebu: add support for Linksys WRT3200ACM (Rango)  
-> 
-> For this last one do you finally agree to use "non-removable" instead
-> of "broken-cd" ?
+What patch is your change trying to fix?  In other words, how far
+back does this patch need to be backported?
 
-The card isn't really accessible and as such polling sort of pointless.
-I prefer non-removable but left it as-is for V1.
-
-Thanks
-Ralph
-
-PS: Also thanks for applying the reminder of the pwm-fan series.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
