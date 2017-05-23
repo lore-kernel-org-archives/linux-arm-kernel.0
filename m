@@ -1,97 +1,59 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 23 May 2017 14:22:01 -0700
-Subject: [PATCH 0/2] PCI: Workaround for bus reset on Cavium cn8xxx root
- ports
-In-Reply-To: <20170523150404.221b01c7@w520.home>
-References: <20170516001736.4001-1-david.daney@cavium.com>
- <20170523204750.GC15055@bhelgaas-glaptop.roam.corp.google.com>
- <20170523150404.221b01c7@w520.home>
-Message-ID: <14ebfcd3-3f04-4dde-629a-cb2fc3843e39@caviumnetworks.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 23 May 2017 17:25:56 -0400
+Subject: [PATCH 3/4 v2] ata: Add driver for Faraday Technology FTIDE010
+In-Reply-To: <20170519230600.16782-3-linus.walleij@linaro.org>
+References: <20170519230600.16782-1-linus.walleij@linaro.org>
+ <20170519230600.16782-3-linus.walleij@linaro.org>
+Message-ID: <20170523212556.GK13222@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2017 02:04 PM, Alex Williamson wrote:
-> On Tue, 23 May 2017 15:47:50 -0500
-> Bjorn Helgaas <helgaas@kernel.org> wrote:
+Hello,
+
+On Sat, May 20, 2017 at 01:05:59AM +0200, Linus Walleij wrote:
+> This adds a driver for the Faraday Technology FTIDE010
+> PATA IP block.
 > 
->> On Mon, May 15, 2017 at 05:17:34PM -0700, David Daney wrote:
->>> With the recent improvements in arm64 and vfio-pci, we are seeing
->>> failures like this (on cn8890 based systems):
->>>
->>> [  235.622361] Unhandled fault: synchronous external abort (0x96000210) at 0xfffffc00c1000100
->>> [  235.630625] Internal error: : 96000210 [#1] PREEMPT SMP
->>> .
->>> .
->>> .
->>> [  236.208820] [<fffffc0008411250>] pci_generic_config_read+0x38/0x9c
->>> [  236.214992] [<fffffc0008435ed4>] thunder_pem_config_read+0x54/0x1e8
->>> [  236.221250] [<fffffc0008411620>] pci_bus_read_config_dword+0x74/0xa0
->>> [  236.227596] [<fffffc000841853c>] pci_find_next_ext_capability.part.15+0x40/0xb8
->>> [  236.234896] [<fffffc0008419428>] pci_find_ext_capability+0x20/0x30
->>> [  236.241068] [<fffffc0008423e2c>] pci_restore_vc_state+0x34/0x88
->>> [  236.246979] [<fffffc000841af3c>] pci_restore_state.part.37+0x2c/0x1fc
->>> [  236.253410] [<fffffc000841b174>] pci_dev_restore+0x4c/0x50
->>> [  236.258887] [<fffffc000841b19c>] pci_bus_restore+0x24/0x4c
->>> [  236.264362] [<fffffc000841c2dc>] pci_try_reset_bus+0x7c/0xa0
->>> [  236.270021] [<fffffc00060a1ab0>] vfio_pci_ioctl+0xc34/0xc3c [vfio_pci]
->>> [  236.276547] [<fffffc0005eb0410>] vfio_device_fops_unl_ioctl+0x20/0x30 [vfio]
->>> [  236.283587] [<fffffc000824b314>] do_vfs_ioctl+0xac/0x744
->>> [  236.288890] [<fffffc000824ba30>] SyS_ioctl+0x84/0x98
->>> [  236.293846] [<fffffc0008082ca0>] __sys_trace_return+0x0/0x4
->>>
->>> These are caused by the inability of the PCIe root port and Intel
->>> e1000e to sucessfully do a bus reset.
->>>
->>> The proposed fix is to not do a bus reset on these systems.
->>>
->>> David Daney (2):
->>>    PCI: Allow PCI_DEV_FLAGS_NO_BUS_RESET to be used on bus device.
->>>    PCI: Avoid bus reset for Cavium cn8xxx root ports.
->>>
->>>   drivers/pci/pci.c    | 4 ++++
->>>   drivers/pci/quirks.c | 8 ++++++++
->>>   2 files changed, 12 insertions(+)
->>
->> Applied with Eric's reviewed-by and typo fixes to pci/virtualization for
->> v4.13, thanks!
+> When used with the Storlink/Storm/Cortina Systems Gemini
+> SoC, the PATA interface is accompanied by a PATA<->SATA
+> bridge, so while the device appear as a PATA controller,
+> it attaches physically to SATA disks, and also has a
+> designated memory area with registers to set up the bridge.
 > 
-> Hmm, well let me again express my concerns that I'm really not sure how
-> to support this since it removes our last opportunity to reset devices
-> that may otherwise have no reset mechanism.  Certain classes of devices
-> are entirely unsupportable for the code path indicated above without a
-> bus reset.  If we have an endpoint device that goes bonkers at a bus
-> reset, at least we know it's going to behave just as poorly no matter
-> what the host platform.  This series allows endpoints that work
-> perfectly well on one host to be handled differently on another.
-
-Yes that is correct.  We choose not to crash the system.  I'm not sure 
-what you are suggesting as an alternative.
-
-If a PCI device doesn't work with vfio-pci in such a system, my 
-suggestion would be not to use vfio-pci with the device in that system.
-
->  It
-> certainly suggests something non-spec compliant about the root port
-> implementation and I wish there was more analysis about exactly what
-> that problem is since this is coming from the hardware vendor.
-
-There are two main possibilities here:
-
-1) Some (but not all) Intel e1000e and LSI HBA devices are non-spec 
-compliant.
-
-2) Cavium root port is non-spec compliant.
-
-If #1 turns out to be true, would you suggest blacklisting e1000e on all 
-systems, including Intel based servers?
-
-If #2 turns out to be true would you still object to the patch?
-
-
-
+> The Gemini SATA bridge is separated into its own driver
+> file to make things modular and make it possible to reuse
+> the PATA driver as stand-alone on other systems than the
+> Gemini.
 > 
-> https://lkml.org/lkml/2017/5/16/662
+> dmesg excerpt from the D-Link DIR-685 storage router:
+> gemini-sata-bridge 46000000.sata: SATA ID 00000e00, PHY ID: 01000100
+> gemini-sata-bridge 46000000.sata: set up the Gemini IDE/SATA nexus
+> ftide010 63000000.ata: set up Gemini PATA0
+> ftide010 63000000.ata: device ID 00000500, irq 26, io base 0x63000000
+> ftide010 63000000.ata: SATA0 (master) start
+> gemini-sata-bridge 46000000.sata: SATA0 PHY ready
+> scsi host0: pata-ftide010
+> ata1: PATA max UDMA/133 irq 26
+> ata1.00: ATA-8: INTEL SSDSA2CW120G3, 4PC10302, max UDMA/133
+> ata1.00: 234441648 sectors, multi 1: LBA48 NCQ (depth 0/32)
+> ata1.00: configured for UDMA/133
+> scsi 0:0:0:0: Direct-Access     ATA      INTEL SSDSA2CW12 0302 PQ: 0 ANSI: 5
+> ata1.00: Enabling discard_zeroes_data
+> sd 0:0:0:0: [sda] 234441648 512-byte logical blocks: (120 GB/112 GiB)
+> sd 0:0:0:0: [sda] Write Protect is off
+> sd 0:0:0:0: [sda] Write cache: enabled, read cache:
+>                   enabled, doesn't support DPO or FUA
+> ata1.00: Enabling discard_zeroes_data
+> ata1.00: Enabling discard_zeroes_data
+> sd 0:0:0:0: [sda] Attached SCSI disk
 > 
-> Thanks,
-> Alex
-> 
+> After this I can flawlessly mount and read/write copy etc files
+> from /dev/sda[n].
+
+Heh, that's a lot of driver.  Looks okay to me but, Bart, can you
+please review and ack this one?
+
+Thanks.
+
+-- 
+tejun
