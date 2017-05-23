@@ -1,13 +1,12 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 23 May 2017 16:34:45 +0200
-Subject: [PATCH 2/2] MAINTAINERS: add irqchip related drivers to Marvell
- EBU maintainers
-In-Reply-To: <20170522055208.GB23967@io.lakedaemon.net> (Jason Cooper's
- message of "Mon, 22 May 2017 05:52:08 +0000")
+Date: Tue, 23 May 2017 16:35:21 +0200
+Subject: [PATCH 1/2] MAINTAINERS: sort F entries for Marvell EBU
+ maintainers
+In-Reply-To: <20170522055032.GA23967@io.lakedaemon.net> (Jason Cooper's
+ message of "Mon, 22 May 2017 05:50:32 +0000")
 References: <1495112333-10494-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1495112333-10494-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170522055208.GB23967@io.lakedaemon.net>
-Message-ID: <87vaorwsje.fsf@free-electrons.com>
+ <20170522055032.GA23967@io.lakedaemon.net>
+Message-ID: <87r2zfwsie.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,18 +16,16 @@ Hi,
 
 > Hi Thomas,
 >
-> On Thu, May 18, 2017 at 02:58:53PM +0200, Thomas Petazzoni wrote:
->> This commit updates the MAINTAINERS file so that the Marvell EBU
->> maintainers are also responsible for their irqchip drivers in
->> drivers/irqchip/.
+> On Thu, May 18, 2017 at 02:58:52PM +0200, Thomas Petazzoni wrote:
+>> This commit sorts alphabetically the file entries of the Marvell EBU
+>> maintainers in the MAINTAINERS file.
 >> 
 >> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 >> ---
->>  MAINTAINERS | 2 ++
->>  1 file changed, 2 insertions(+)
+>>  MAINTAINERS | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
 >
 > Acked-by: Jason Cooper <jason@lakedaemon.net>
->
 
 
 Applied on mvebu/fixes-non-critical
@@ -37,6 +34,7 @@ Thanks,
 
 Gregory
 
+>
 > thx,
 >
 > Jason.
