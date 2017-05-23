@@ -1,29 +1,87 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 23 May 2017 21:25:40 +0200
-Subject: [PATCH] arm: dts: r7s72100: Add support for GR-Peach
-In-Reply-To: <1495567254-10226-1-git-send-email-jacopo+renesas@jmondi.org>
-References: <1495567254-10226-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdUovD=6YfJYckoftWyJZ3eRjcKFkScj=wLhyTDSFPavgw@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 23 May 2017 21:29:05 +0200
+Subject: [PATCH v4 2/2] PCI: Add tango PCIe host bridge support
+In-Reply-To: <20170523183548.GB2637@bhelgaas-glaptop.roam.corp.google.com>
+References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+ <4a354b33-d59c-4ebb-4b31-0388ac8090d4@sigmadesigns.com>
+ <20170523172409.GD24431@bhelgaas-glaptop.roam.corp.google.com>
+ <7a46cfa6-3c8a-33a6-a821-da49535c5c8a@free.fr>
+ <20170523183548.GB2637@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <9bb2fdd4-59c3-13e9-7c7d-65107be6a32d@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 9:20 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> Add device tree source for Renesas GR-Peach board.
-> GR-Peach is an RZ/A1H based board with 10MB of on-chip SRAM and 8MB
-> QSPI flash storage.
-> Add support for the board, and create a 2MB partition to use as rootfs.
->
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+On 23/05/2017 20:35, Bjorn Helgaas wrote:
+> On Tue, May 23, 2017 at 07:43:16PM +0200, Mason wrote:
+>> On 23/05/2017 19:24, Bjorn Helgaas wrote:
+>>> On Thu, Apr 20, 2017 at 04:31:25PM +0200, Marc Gonzalez wrote:
+>>>> This driver is required to work around several hardware bugs in the
+>>>> PCIe controller.
+>>>>
+>>>> NB: Revision 1 does not support legacy interrupts, or IO space.
+>>>>
+>>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/pci/tango-pcie.txt |  32 ++++++++
+>>>>  drivers/pci/host/Kconfig                             |   8 ++
+>>>>  drivers/pci/host/Makefile                            |   1 +
+>>>>  drivers/pci/host/pcie-tango.c                        | 161 +++++++++++++++++++++++++++++++++++++++
+>>>>  include/linux/pci_ids.h                              |   2 +
+>>>>  5 files changed, 204 insertions(+)
+>>>> ...
+>>>
+>>>> +static int smp8759_config_read(struct pci_bus *bus,
+>>>> +		unsigned int devfn, int where, int size, u32 *val)
+>>>> +{
+>>>> +	int ret;
+>>>> +	struct pci_config_window *cfg = bus->sysdata;
+>>>> +	struct tango_pcie *pcie = dev_get_drvdata(cfg->parent);
+>>>> +
+>>>> +	/*
+>>>> +	 * QUIRK #1
+>>>> +	 * Reads in configuration space outside devfn 0 return garbage.
+>>>> +	 */
+>>>> +	if (devfn != 0)
+>>>> +		return PCIBIOS_FUNC_NOT_SUPPORTED;
+>>>> +
+>>>> +	/*
+>>>> +	 * QUIRK #2
+>>>> +	 * Unfortunately, config and mem spaces are muxed.
+>>>> +	 * Linux does not support such a setting, since drivers are free
+>>>> +	 * to access mem space directly, at any time.
+>>>> +	 * Therefore, we can only PRAY that config and mem space accesses
+>>>> +	 * NEVER occur concurrently.
+>>>> +	 */
+>>>> +	writel_relaxed(1, pcie->mux);
+>>>> +	ret = pci_generic_config_read(bus, devfn, where, size, val);
+>>>> +	writel_relaxed(0, pcie->mux);
+>>>
+>>> This is a major issue and possibly even a security problem.
+>>> Unprivileged users can cause config accesses via lspci/setpci.
+>>
+>> Since the host bridge doesn't support hotplug in any way,
+>> how about setting a flag once enumeration is complete,
+>> to prevent all future config accesses?
+> 
+> I thought about that, too, but I'm not sure it will work becuase I
+> think drivers will need to do at least a few config accesses, e.g.,
+> pci_enable_device() may write PCI_COMMAND to set PCI_COMMAND_MEMORY,
+> it may read PCI_INTERRUPT_PIN, etc.  And MSI setup requires config
+> access, too.
+> 
+>>> I don't have a good suggestion for addressing it, but if you can't
+>>> make this work reliably, you need at least a dev_err() in the probe
+>>> function and probably a taint of the kernel (see add_taint()).
+>>
+>> There is a chance that the issue will get fixed in rev2
+>> of the bridge. But obviously, that won't help for rev1
+>> already in the wild.
+> 
+> Hopefully there will be a way to distinguish rev2 from rev1.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+rev2 is embedded in a new SoC, so the DT node will specify a
+different compatible string. A "preview" of the intent was
+given in an older patch:
+"[RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge"
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards.
