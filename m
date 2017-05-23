@@ -1,45 +1,38 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 23 May 2017 16:00:25 +0200
-Subject: [PATCH v6 3/4] ARM: mvebu: Enable SENSORS_PWM_FAN in defconfig
-In-Reply-To: <CACRpkda6P026U4pBXPuEJ=cYu+Hz9N_-snXcOXr5c0Q9g4jBig@mail.gmail.com>
- (Linus Walleij's message of "Mon, 24 Apr 2017 11:20:02 +0200")
-References: <20170414154056.32055-1-ralph.sennhauser@gmail.com>
- <20170414154056.32055-4-ralph.sennhauser@gmail.com>
- <CACRpkda6P026U4pBXPuEJ=cYu+Hz9N_-snXcOXr5c0Q9g4jBig@mail.gmail.com>
-Message-ID: <87lgpny8p2.fsf@free-electrons.com>
+Date: Tue, 23 May 2017 16:03:24 +0200
+Subject: [PATCH 0/2] ARM: dts: mvebu: dts updates for 98dx3236/98dx4251
+In-Reply-To: <20170420215814.6817-1-chris.packham@alliedtelesis.co.nz> (Chris
+ Packham's message of "Fri, 21 Apr 2017 09:58:12 +1200")
+References: <20170420215814.6817-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <87h90by8k3.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Chris,
  
- On lun., avril 24 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
+ On jeu., avril 20 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
 
-> On Fri, Apr 14, 2017 at 5:40 PM, Ralph Sennhauser
-> <ralph.sennhauser@gmail.com> wrote:
+> A couple of minor updates for the 98dx3236 and 98dx4251.
 >
->> From: Andrew Lunn <andrew@lunn.ch>
->>
->> Now that the GPIO driver also supports PWM operation, enable the PWM
->> framework and fan driver in mvebu_v7_defconfig.
->>
->> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
->> URL: https://patchwork.ozlabs.org/patch/427297/
->> [Ralph Sennhauser: add fan driver to defconfig]
->> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
->> Tested-by: Andrew Lunn <andrew@lunn.ch>
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Please funnel this through ARM SoC.
+> Chris Packham (2):
+>   ARM: dts: mvebu: add missing interrupt to 98dx4251 switch
+>   ARM: dts: mvebu: disable the rtc on 98dx3236 SoC
 
-Applied on mvebu/defconfig
+
+both patches applied on mvebu/dt
 
 Thanks,
 
 Gregory
+
 >
-> Yours,
-> Linus Walleij
+>  arch/arm/boot/dts/armada-xp-98dx3236.dtsi | 4 ++++
+>  arch/arm/boot/dts/armada-xp-98dx4251.dtsi | 1 +
+>  2 files changed, 5 insertions(+)
+>
+> -- 
+> 2.11.0.24.ge6920cf
+>
 
 -- 
 Gregory Clement, Free Electrons
