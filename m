@@ -1,107 +1,86 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Wed, 24 May 2017 00:43:59 +0530
-Subject: [PATCH] RFC: arm: eBPF JIT compiler
-In-Reply-To: <20170523190041.GB22219@n2100.armlinux.org.uk>
-References: <1495564433-9750-1-git-send-email-illusionist.neo@gmail.com>
- <20170523190041.GB22219@n2100.armlinux.org.uk>
-Message-ID: <CAHgaXdKEv8zt-pHUrDE9J3K_fY-+z9ctxP+YCBOiWm5TUusr7Q@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 23 May 2017 21:15:16 +0200
+Subject: [PATCH v4 1/2] PCI: Add tango MSI controller support
+In-Reply-To: <ef36137c-f0d1-23b9-8b91-a6ed87239578@arm.com>
+References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+ <1f6b50c7-4887-838e-8c7d-c014d82b6d8e@sigmadesigns.com>
+ <8e56647d-3b2d-9bfc-b59e-79a2efaa7826@sigmadesigns.com>
+ <20170523170319.GB24431@bhelgaas-glaptop.roam.corp.google.com>
+ <b6541fd2-200f-35be-208e-931bb0b5ba49@free.fr>
+ <ef36137c-f0d1-23b9-8b91-a6ed87239578@arm.com>
+Message-ID: <aec89b9a-8377-ff39-547c-9e6eaf254fab@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Wed, May 24, 2017 at 12:30 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> Hi,
->
-> On Wed, May 24, 2017 at 12:03:53AM +0530, Shubham Bansal wrote:
->> The JIT compiler emits ARM 32 bit instructions. Currently, It supports
->> eBPF only. Classic BPF is supported because of the conversion by BPF
->> core.
+On 23/05/2017 20:03, Robin Murphy wrote:
+> On 23/05/17 18:54, Mason wrote:
+>> On 23/05/2017 19:03, Bjorn Helgaas wrote:
+>>> On Wed, May 17, 2017 at 04:56:08PM +0200, Marc Gonzalez wrote:
+>>>> On 20/04/2017 16:28, Marc Gonzalez wrote:
+>>>>
+>>>>> +static int tango_set_affinity(struct irq_data *data,
+>>>>> +		const struct cpumask *mask, bool force)
+>>>>> +{
+>>>>> +	return -EINVAL;
+>>>>> +}
+>>>>> +
+>>>>> +static struct irq_chip tango_chip = {
+>>>>> +	.irq_ack		= tango_ack,
+>>>>> +	.irq_mask		= tango_mask,
+>>>>> +	.irq_unmask		= tango_unmask,
+>>>>> +	.irq_set_affinity	= tango_set_affinity,
+>>>>> +	.irq_compose_msi_msg	= tango_compose_msi_msg,
+>>>>> +};
+>>>>
+>>>> Hmmm... I'm wondering why .irq_set_affinity is required.
+>>>>
+>>>> static int setup_affinity(struct irq_desc *desc, struct cpumask *mask)
+>>>> first calls __irq_can_set_affinity() to check whether
+>>>> desc->irq_data.chip->irq_set_affinity) exists.
+>>>>
+>>>> then calls irq_do_set_affinity(&desc->irq_data, mask, false);
+>>>> which calls chip->irq_set_affinity(data, mask, force);
+>>>> = msi_domain_set_affinity()
+>>>> which calls parent->chip->irq_set_affinity() unconditionally.
+>>>>
+>>>> Would it make sense to test that the callback is implemented
+>>>> before calling it?
+>>>>
+>>>>
+>>>> [    0.723895] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>>>
+>>> I'm not sure what you're asking.
+>>>
+>>> Is this a bug report for the v4 tango driver?
 >>
->> JIT is enabled with
+>> No.
 >>
->>       echo 1 > /proc/sys/net/core/bpf_jit_enable
+>>> Or are you asking whether msi_domain_set_affinity() should be changed
+>>> to check whether parent->chip->irq_set_affinity is implemented?
 >>
->> Constant Blinding can be enabled along with JIT using
+>> Yes. The way things are implemented now, drivers are forced
+>> to define an irq_set_affinity callback, even if it just returns
+>> an error, otherwise, the kernel crashes, because of the
+>> unconditional function pointer deref. 
 >>
->>       echo 1 > /proc/sys/net/core/bpf_jit_enable
->>       echo 2 > /proc/sys/net/core/bpf_jit_harden
+>>> msi_domain_set_affinity() has called parent->chip->irq_set_affinity()
+>>> without checking since it was added in 2014 by f3cf8bb0d6c3 ("genirq: Add
+>>> generic msi irq domain support"), so if there's a problem here, it's most
+>>> likely in the tango code.
 >>
->> See Documentation/networking/filter.txt for more information.
->> Tested on ARMv7 with CONFIG_FRAME_POINTER enabled.
->
-> What is this patch actually doing?
-This is the first implementation of eBPF JIT for ARM.
->
-> The commit message doesn't describe what changes this patch is doing,
-> and it needs to.  Presumably, it's adding support for eBPF?
+>> The issue is having to define an "empty" function.
+>> (Unnecessary code bloat and maintenance.)
+> 
+> AFAICS, only one driver (other than this one) implements a "do nothing"
+> set_affinity callback - everyone else who doesn't do anything hardware
+> specific just passes it along via irq_chip_set_affinity_parent().
 
-Apologies. I thought commit message was good enough to understand. I
-will resend the patch if needed.
-Although, Its an RFC. I am requesting the community for with testing
-and suggestions.
+I counted 4. Where did I mess up?
 
->
-> If that's so, doesn't it need to change us from selecting HAVE_CBPF_JIT
-> to selecting HAVE_EBPF_JIT ?
+advk_msi_set_affinity
+altera_msi_set_affinity
+nwl_msi_set_affinity
+vmd_irq_set_affinity
+tango_set_affinity
 
-This patch is only for comments and testing. I thought, KConfig
-changes wouldn't be needed unless
-the patch is accepted.
-
->
-> What about cases where the frame pointer is not enabled?If that's
-> not supported then shouldn't the Kconfig be adjusted?  What about
-> users who are using cBPF without the frame pointer enabled?
-
-I have tested it with and without the frame pointer as indicated in
-the results shown in the mail.
-
->
-> I haven't been able to go through the patch analysing it fully, but
-> what I have read doesn't give me any immediate concerns.  Only one
-> spelling mistake stood out.
-
->
-> Some things that I'm wondering though - what about endian issues?
-> LDRD, for example, takes two registers, in ARM mode, these registers
-> must be an even-odd pair.  The even register is loaded from at the
-> lowest address, the odd register from the higher address.  This means
-> when loading a BE value, the most significant word is in the even
-> numbered register and the least significant word is in the odd numbered
-> register.  For LE values, the even numbered register contains the least
-> significant word.  Are we properly handling issues like this in all
-> places?
-
-Actually I haven't tested it with BE but tested it LE as I wasn't able
-to run qemu to test it properly for BE.
-I request anyone who has information on how to test it to help me with it.
-
->
->> +static const u8 bpf2a32[][2] = {
->> +     /* return value from in-kernel function, and exit value from eBPF */
->> +     [BPF_REG_0] = {ARM_R1, ARM_R0},
->> +     /* arguments from eBPF program to in-kernel function */
->> +     [BPF_REG_1] = {ARM_R3, ARM_R2},
->> +     /* Stored on stack scratch space */
->> +     [BPF_REG_2] = {STACK_OFFSET(0), STACK_OFFSET(4)},
->> +     [BPF_REG_3] = {STACK_OFFSET(8), STACK_OFFSET(12)},
->> +     [BPF_REG_4] = {STACK_OFFSET(16), STACK_OFFSET(20)},
->> +     [BPF_REG_5] = {STACK_OFFSET(24), STACK_OFFSET(28)},
->> +     /* callee saved registers that in-kernel function will preserve */
->> +     [BPF_REG_6] = {ARM_R5, ARM_R4},
->> +     /* Stored on stack scratch space */
->> +     [BPF_REG_7] = {STACK_OFFSET(32), STACK_OFFSET(36)},
->> +     [BPF_REG_8] = {STACK_OFFSET(40), STACK_OFFSET(44)},
->> +     [BPF_REG_9] = {STACK_OFFSET(48), STACK_OFFSET(52)},
->> +     /* Read only Frame Pointer to access Stack */
->> +     [BPF_REG_FP] = {STACK_OFFSET(56), STACK_OFFSET(60)},
->> +     /* Temperory Register for internal BPF JIT, can be used
->
->         "Temporary"
-I will correct that right away.
-
-Thanks for the suggestions Russell.
-
--Shubham
+Regards.
