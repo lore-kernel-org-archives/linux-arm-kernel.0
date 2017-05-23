@@ -1,20 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 22 May 2017 19:35:43 -0500
-Subject: [PATCH 01/12] dt-bindings: arm: hisilicon: add bindings for
- HiKey960 board
-In-Reply-To: <20170517083745.24479-2-guodong.xu@linaro.org>
+Date: Mon, 22 May 2017 19:36:11 -0500
+Subject: [PATCH 02/12] arm64: dts: hisilicon: update compatible string
+ for hikey960
+In-Reply-To: <20170517083745.24479-3-guodong.xu@linaro.org>
 References: <20170517083745.24479-1-guodong.xu@linaro.org>
- <20170517083745.24479-2-guodong.xu@linaro.org>
-Message-ID: <20170523003543.eu7brrfamtls7kqw@rob-hp-laptop>
+ <20170517083745.24479-3-guodong.xu@linaro.org>
+Message-ID: <20170523003611.jdv7o2lekpo4gkf4@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 04:37:34PM +0800, Guodong Xu wrote:
-> Add bindings for HiKey960 Board.
+On Wed, May 17, 2017 at 04:37:35PM +0800, Guodong Xu wrote:
+> Update compatible string for hikey960. HiKey960 is a develpment board built
+> with SoC Hi3660.
 > 
 > Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
 > ---
->  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
 Acked-by: Rob Herring <robh@kernel.org> 
