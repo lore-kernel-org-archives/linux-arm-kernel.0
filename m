@@ -1,182 +1,167 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 23 May 2017 11:36:36 +0100
-Subject: [PATCH v2 3/3] KVM: arm/arm64: Simplify active_change_prepare and
- plug race
-In-Reply-To: <20170523095605.GA19598@cbox>
-References: <20170516100431.4101-1-cdall@linaro.org>
- <20170516100431.4101-4-cdall@linaro.org>
- <9a412ed2-70ea-b651-dd75-18d723ee8b71@arm.com> <20170523084329.GC6319@cbox>
- <cf2875a8-faef-4d2f-7394-9378fadb9d1d@arm.com> <20170523095605.GA19598@cbox>
-Message-ID: <df01e241-3463-bc55-63ff-81fb09dc7df0@arm.com>
+From: aisheng.dong@nxp.com (A.S. Dong)
+Date: Tue, 23 May 2017 10:37:27 +0000
+Subject: [PATCH V2 4/5] dt-bindings: pinctrl: add imx7ulp pinctrl binding
+ doc
+In-Reply-To: <5e78ef100319f229a87e33804384e5b3@agner.ch>
+References: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
+ <1495177545-23006-5-git-send-email-aisheng.dong@nxp.com>
+ <5e78ef100319f229a87e33804384e5b3@agner.ch>
+Message-ID: <DBXPR04MB320A55DE4386DE561A1D4DC80F90@DBXPR04MB320.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/17 10:56, Christoffer Dall wrote:
-> On Tue, May 23, 2017 at 10:05:13AM +0100, Marc Zyngier wrote:
->> On 23/05/17 09:43, Christoffer Dall wrote:
->>> On Mon, May 22, 2017 at 04:30:22PM +0100, Marc Zyngier wrote:
->>>> On 16/05/17 11:04, Christoffer Dall wrote:
->>>>> We don't need to stop a specific VCPU when changing the active state,
->>>>> because private IRQs can only be modified by a running VCPU for the
->>>>> VCPU itself and it is therefore already stopped.
->>>>>
->>>>> However, it is also possible for two VCPUs to be modifying the active
->>>>> state of SPIs at the same time, which can cause the thread being stuck
->>>>> in the loop that checks other VCPU threads for a potentially very long
->>>>> time, or to modify the active state of a running VCPU.  Fix this by
->>>>> serializing all accesses to setting and clearing the active state of
->>>>> interrupts using the KVM mutex.
->>>>>
->>>>> Reported-by: Andrew Jones <drjones@redhat.com>
->>>>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
->>>>> ---
->>>>>  arch/arm/include/asm/kvm_host.h   |  2 --
->>>>>  arch/arm64/include/asm/kvm_host.h |  2 --
->>>>>  virt/kvm/arm/arm.c                | 20 ++++----------------
->>>>>  virt/kvm/arm/vgic/vgic-mmio.c     | 18 ++++++++++--------
->>>>>  virt/kvm/arm/vgic/vgic.c          | 11 ++++++-----
->>>>>  5 files changed, 20 insertions(+), 33 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>>>> index f0e6657..12274d4 100644
->>>>> --- a/arch/arm/include/asm/kvm_host.h
->>>>> +++ b/arch/arm/include/asm/kvm_host.h
->>>>> @@ -233,8 +233,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
->>>>>  struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
->>>>>  void kvm_arm_halt_guest(struct kvm *kvm);
->>>>>  void kvm_arm_resume_guest(struct kvm *kvm);
->>>>> -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
->>>>> -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
->>>>>  
->>>>>  int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
->>>>>  unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
->>>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>>>> index 5e19165..32cbe8a 100644
->>>>> --- a/arch/arm64/include/asm/kvm_host.h
->>>>> +++ b/arch/arm64/include/asm/kvm_host.h
->>>>> @@ -333,8 +333,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
->>>>>  struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
->>>>>  void kvm_arm_halt_guest(struct kvm *kvm);
->>>>>  void kvm_arm_resume_guest(struct kvm *kvm);
->>>>> -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
->>>>> -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
->>>>>  
->>>>>  u64 __kvm_call_hyp(void *hypfn, ...);
->>>>>  #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
->>>>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
->>>>> index 3417e18..3c387fd 100644
->>>>> --- a/virt/kvm/arm/arm.c
->>>>> +++ b/virt/kvm/arm/arm.c
->>>>> @@ -539,27 +539,15 @@ void kvm_arm_halt_guest(struct kvm *kvm)
->>>>>  	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
->>>>>  }
->>>>>  
->>>>> -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu)
->>>>> -{
->>>>> -	vcpu->arch.pause = true;
->>>>> -	kvm_vcpu_kick(vcpu);
->>>>> -}
->>>>> -
->>>>> -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
->>>>> -{
->>>>> -	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
->>>>> -
->>>>> -	vcpu->arch.pause = false;
->>>>> -	swake_up(wq);
->>>>> -}
->>>>> -
->>>>>  void kvm_arm_resume_guest(struct kvm *kvm)
->>>>>  {
->>>>>  	int i;
->>>>>  	struct kvm_vcpu *vcpu;
->>>>>  
->>>>> -	kvm_for_each_vcpu(i, vcpu, kvm)
->>>>> -		kvm_arm_resume_vcpu(vcpu);
->>>>> +	kvm_for_each_vcpu(i, vcpu, kvm) {
->>>>> +		vcpu->arch.pause = false;
->>>>> +		swake_up(kvm_arch_vcpu_wq(vcpu));
->>>>> +	}
->>>>>  }
->>>>>  
->>>>>  static void vcpu_sleep(struct kvm_vcpu *vcpu)
->>>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
->>>>> index 64cbcb4..c1e4bdd 100644
->>>>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
->>>>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
->>>>> @@ -231,23 +231,21 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->>>>>   * be migrated while we don't hold the IRQ locks and we don't want to be
->>>>>   * chasing moving targets.
->>>>>   *
->>>>> - * For private interrupts, we only have to make sure the single and only VCPU
->>>>> - * that can potentially queue the IRQ is stopped.
->>>>> + * For private interrupts we don't have to do anything because userspace
->>>>> + * accesses to the VGIC state already require all VCPUs to be stopped, and
->>>>> + * only the VCPU itself can modify its private interrupts active state, which
->>>>> + * guarantees that the VCPU is not running.
->>>>>   */
->>>>>  static void vgic_change_active_prepare(struct kvm_vcpu *vcpu, u32 intid)
->>>>>  {
->>>>> -	if (intid < VGIC_NR_PRIVATE_IRQS)
->>>>> -		kvm_arm_halt_vcpu(vcpu);
->>>>> -	else
->>>>> +	if (intid > VGIC_NR_PRIVATE_IRQS)
->>>>>  		kvm_arm_halt_guest(vcpu->kvm);
->>>>>  }
->>>>>  
->>>>>  /* See vgic_change_active_prepare */
->>>>>  static void vgic_change_active_finish(struct kvm_vcpu *vcpu, u32 intid)
->>>>>  {
->>>>> -	if (intid < VGIC_NR_PRIVATE_IRQS)
->>>>> -		kvm_arm_resume_vcpu(vcpu);
->>>>> -	else
->>>>> +	if (intid > VGIC_NR_PRIVATE_IRQS)
->>>>>  		kvm_arm_resume_guest(vcpu->kvm);
->>>>>  }
->>>>>  
->>>>> @@ -271,11 +269,13 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
->>>>>  {
->>>>>  	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
->>>>>  
->>>>> +	mutex_lock(&vcpu->kvm->lock);
->>>>>  	vgic_change_active_prepare(vcpu, intid);
->>>>>  
->>>>>  	__vgic_mmio_write_cactive(vcpu, addr, len, val);
->>>>>  
->>>>>  	vgic_change_active_finish(vcpu, intid);
->>>>> +	mutex_unlock(&vcpu->kvm->lock);
->>>>
->>>> Any reason not to move the lock/unlock calls to prepare/finish? Also, do
->>>> we need to take that mutex if intid is a PPI?
->>>
->>> I guess we strictly don't need to take the mutex if it's a PPI, no.
->>>
->>> But I actually preferred this symmetry because you can easily tell we
->>> don't have a bug (famous last words) by locking and unlocking the mutex
->>> in the same function.
->>>
->>> I don't feel strongly about it though, so I can move it if you prefer
->>> it.
->>
->> No, that's fine, I just wanted to check whether my understanding was
->> correct.
->>
->> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
->>
+> -----Original Message-----
+> From: Stefan Agner [mailto:stefan at agner.ch]
+> Sent: Tuesday, May 23, 2017 12:16 AM
+> To: A.S. Dong
+> Cc: linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linus.walleij at linaro.org; shawnguo at kernel.org; Jacky Bai; Andy Duan;
+> kernel at pengutronix.de; Rob Herring; Mark Rutland;
+> devicetree at vger.kernel.org
+> Subject: Re: [PATCH V2 4/5] dt-bindings: pinctrl: add imx7ulp pinctrl
+> binding doc
 > 
-> Thanks.
+> On 2017-05-19 00:05, Dong Aisheng wrote:
+> > i.MX 7ULP has three IOMUXC instances: IOMUXC0 for M4 ports,
+> > IOMUXC1 for A7 ports and IOMUXC DDR for DDR interface.
+> >
+> > This patch adds the IOMUXC1 support for A7.
+> >
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: devicetree at vger.kernel.org
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> >
+> > ---
+> > ChangeLog:
+> > v1->v2:
+> >  * add more descriptions in binding doc
+> >  * add missed prefix for private properties.
+> >  * move dt-bindings/pinctrl/imx7ulp-pinfunc.h to arch/arm/boot/dts
+> > ---
+> >  .../bindings/pinctrl/fsl,imx7ulp-pinctrl.txt       |  63 +++
+> >  arch/arm/boot/dts/imx7ulp-pinfunc.h                | 468
+> +++++++++++++++++++++
+> >  2 files changed, 531 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
+> >  create mode 100644 arch/arm/boot/dts/imx7ulp-pinfunc.h
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
+> > b/Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
+> > new file mode 100644
+> > index 0000000..7fbf367
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.tx
+> > +++ t
+> > @@ -0,0 +1,63 @@
+> > +* Freescale i.MX7ULP IOMUX Controller
+> > +
+> > +i.MX 7ULP has three IOMUXC instances: IOMUXC0 for M4 ports, IOMUXC1
+> > +for A7 ports and IOMUXC DDR for DDR interface.
+> > +
+> > +Note:
+> > +This binding doc is only for the IOMUXC1 support in A7 Domain and it
+> > +only supports generic pin config.
+> > +
+> > +Please also refer to fsl,imx-pinctrl.txt in this directory for IMX
+> > +common binding part and pinctrl-bindings.txt for the generic config
+> binding.
+> > +
+> > +=== Pin Controller Node ===
+> > +
+> > +Required properties:
+> > +- compatible:	"fsl,imx7ulp-iomuxc1"
+> > +- reg:		Should contain the base physical address and size of the
+> iomuxc
+> > +		registers.
+> > +
+> > +=== Pin Configuration Node ===
+> > +- pins: One integers array, represents a group of pins mux setting.
+> > +	The format is fsl,pins = <PIN_FUNC_ID>, PIN_FUNC_ID is a pin working
+> on
+> > +	a specific function.
+> > +
+> > +	NOTE: i.MX7ULP PIN_FUNC_ID consists of 4 integers as it shares one
+> mux
+> > +	and config register as follows:
+> > +	<mux_conf_reg input_reg mux_mode input_val>
+> > +
+> > +	Refer to imx7ulp-pinfunc.h in in device tree source folder for all
+> > +	available imx7ulp PIN_FUNC_ID.
+> > +
+> > +Optional Properties:
+> > +- nxp,output-buffer-enable:	Bool. Output buffer enabled
+> > +- nxp,input-buffer-enable:	Bool. Input buffer enabled
+> > +- drive-strength		Integer. Controls Drive Strength
+> > +					0: Standard
+> > +					1: Hi Driver
+> > +- drive-push-pull		Bool. Enable Pin Push-pull
+> > +- drive-open-drain		Bool. Enable Pin Open-drian
+> > +- slew-rate:			Integer. Controls Slew Rate
+> > +					0: Standard
+> > +					1: Slow
+> > +- bias-disable:			Bool. Pull disabled
+> > +- bias-pull-down:		Bool. Pull down on pin
+> > +- bias-pull-up:			Bool. Pull up on pin
+> > +
+> > +Examples:
+> > +#include "imx7ulp-pinfunc.h"
+> > +
+> > +/* Pin Controller Node */
+> > +iomuxc1: iomuxc at 40ac0000 {
+> > +	compatible = "fsl,imx7ulp-iomuxc1";
+> > +	reg = <0x40ac0000 0x1000>;
+> > +
+> > +	/* Pin Configuration Node */
+> > +	pinctrl_lpuart4: lpuart4grp {
+> > +		pins = <
+> > +			ULP1_PAD_PTC3__LPUART4_RX
+> > +			ULP1_PAD_PTC2__LPUART4_TX
+> > +		>;
+> > +		bias-pull-up;
+> > +	};
+> > +};
+> > diff --git a/arch/arm/boot/dts/imx7ulp-pinfunc.h
+> > b/arch/arm/boot/dts/imx7ulp-pinfunc.h
+> > new file mode 100644
+> > index 0000000..cafd3ed
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx7ulp-pinfunc.h
+> > @@ -0,0 +1,468 @@
+> > +/*
+> > + * Copyright 2016 Freescale Semiconductor, Inc.
+> > + * Copyright 2017 NXP
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > +modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + */
+> > +
+> > +#ifndef __DTS_IMX7ULP_PINFUNC_H
+> > +#define __DTS_IMX7ULP_PINFUNC_H
+> > +
+> > +/*
+> > + * The pin function ID is a tuple of
+> > + * <mux_conf_reg input_reg mux_mode input_val>  */
+> > +
+> > +#define ULP1_PAD_PTC0__PTC0
+> > 0x0000 0x0000 0x1 0x0
 > 
-> So assuming Drew's patches will go on top of these, should we merge this
-> as fixes to -rcX, or queue them for v4.13 ?
 > 
-> I'm leaning towards the latter because I don't think we've seen these
-> races do something bad in the wild, and they're probably not going to be
-> backportable to stable anyway.  Thoughts?
+> For consistency with other SoCs, can we add MX7 to the define? E.g.
+> MX7ULP1?
+> 
 
-The race would only impact a guest hammering its own registers, so I'm
-quite happy for this to go into 4.13.
+ULP1 is another SoC name of IMX7ULP.
+And there will be ULP0, ULPx in the future..
 
-Thanks,
+It looks like not big issue, so I did not change it.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Regards
+Dong Aisheng
