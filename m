@@ -1,87 +1,68 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 23 May 2017 11:49:00 +0200
-Subject: [GIT PULL] ARM: SoC fixes (and a cross-arch dt-include fix)
-In-Reply-To: <CAOesGMhfrWSvLtDtGRWBTJiAoeSwzGgsdUTm26j1mpoVu0ghDg@mail.gmail.com>
-References: <20170519193455.GA24206@localhost>
- <CACRpkdaRdZTB39-=sAojO+OyHtP02KaFChqGcxy+fWA8qaB2bw@mail.gmail.com>
- <CAOesGMhfrWSvLtDtGRWBTJiAoeSwzGgsdUTm26j1mpoVu0ghDg@mail.gmail.com>
-Message-ID: <CAMuHMdUivf9cw+LTn7UMueH=MMKi6i3wcOdgM6zbZBoxmkTZGQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 23 May 2017 11:51:08 +0200
+Subject: [PATCH 1/2] arm64: dts: rockchip: update common rk3399 operating
+ points
+Message-ID: <20170523095109.7337-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+The rk3399 has multiple variants with different frequency ratings.
+The operating points currently in the kernel stem from the op1 variant
+used in Gru ChromeOS devices and may not be suitable for general rk3399
+chips. Therefore bring it back to the official general operating points.
 
-On Mon, May 22, 2017 at 5:11 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Mon, May 22, 2017 at 4:44 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Fri, May 19, 2017 at 9:34 PM, Olof Johansson <olof@lixom.net> wrote:
->>>  - We've started telling people to avoid cross-tree shared branches if all
->>>    they're doing is picking up one or two DT-used constants from a
->>>    shared include file, and instead to use the numeric values on first
->>>    submission. Follow-up moving over to symbolic names are sent in right
->>>    after -rc1, i.e. here. It's only a few minor patches of this type.
->>
->> OK it seems like a reasonable process.
->>
->> It's not like I can think about anything better.
->>
->> I was more opting for doing things this way:
->>
->> - Create bindings and <dt-bindings/foo/bar.h> merge it into the
->>   foo subsystem.
->>
->> - Merge driver into drivers/foo/bar.c that use <dt-bindings/foo/bar.h>
->>
->> - Submit DTS patch to ARM SoC (or whetever) using only numerical
->>   values.
->>
->> - After the merge window, follow up with a patch replacing the
->>   numerical constants with #defines from <dt-bindings/foo/bar.h>
->
-> You're describing exactly what we've been pushing people towards.
->
-> If it's just a few simple references it's not significantly more
-> awkward, and decouples merges and removes need for stable branches.
-> Essentially we've become slightly more lax in what we're willing to
-> consider _right after_ -rc1 to include these tweaks (and often patches
-> to turn on new drivers in defconfigs).
->
-> If the amount of contents grows too large we might need to tweak
-> things further, maybe with something pre-rc1 but that's more awkward.
->
->> An alternative would obviously be to wait for the next merge window
->> after merging the driver patch but I guess people are too impatient
->> to do that (including me).
->
-> Yeah, asking people to spread out across releases would remove
-> dependencies a lot, but it would also slow down progress and frustrate
-> a lot of contributors so we don't do that.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi | 18 +++++-------------
+ 1 file changed, 5 insertions(+), 13 deletions(-)
 
-The above works fine for new support, or for new platforms.
-
-There's still support being migrated from platform code to DT, which
-requires three steps:
-  1. New DT-aware driver support,
-  2. DT update to use the new driver support,
-  3. Clean up platform code after optional DTB backwards compatibility
-     grace period,
-To make matters worse, 1 may conflict with the existing platform code,
-and 2 must sometimes not be done before 1. Hence you may need three kernel
-releases.
-So we're already planning now what to clean up for v4.15 ;-)
-
-Would it be acceptable to do step 2 in the same release, after the driver
-support has entered in -rc1? I know this is more than just replacing
-numbers by symbolic values.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
+index dd82e16236a8..c83460db130a 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
+@@ -56,22 +56,18 @@
+ 		};
+ 		opp02 {
+ 			opp-hz = /bits/ 64 <816000000>;
+-			opp-microvolt = <800000>;
++			opp-microvolt = <850000>;
+ 		};
+ 		opp03 {
+ 			opp-hz = /bits/ 64 <1008000000>;
+-			opp-microvolt = <875000>;
++			opp-microvolt = <925000>;
+ 		};
+ 		opp04 {
+ 			opp-hz = /bits/ 64 <1200000000>;
+-			opp-microvolt = <925000>;
++			opp-microvolt = <1000000>;
+ 		};
+ 		opp05 {
+ 			opp-hz = /bits/ 64 <1416000000>;
+-			opp-microvolt = <1050000>;
+-		};
+-		opp06 {
+-			opp-hz = /bits/ 64 <1512000000>;
+ 			opp-microvolt = <1125000>;
+ 		};
+ 	};
+@@ -107,15 +103,11 @@
+ 		};
+ 		opp06 {
+ 			opp-hz = /bits/ 64 <1608000000>;
+-			opp-microvolt = <1075000>;
++			opp-microvolt = <1100000>;
+ 		};
+ 		opp07 {
+ 			opp-hz = /bits/ 64 <1800000000>;
+-			opp-microvolt = <1150000>;
+-		};
+-		opp08 {
+-			opp-hz = /bits/ 64 <2016000000>;
+-			opp-microvolt = <1250000>;
++			opp-microvolt = <1200000>;
+ 		};
+ 	};
+ };
+-- 
+2.11.0
