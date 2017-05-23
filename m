@@ -1,82 +1,29 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 23 May 2017 19:03:36 +0100
-Subject: [PATCH v4 1/2] PCI: Add tango MSI controller support
-In-Reply-To: <b6541fd2-200f-35be-208e-931bb0b5ba49@free.fr>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 23 May 2017 20:07:53 +0200
+Subject: [PATCH v4 0/2] Tango PCIe controller support
+In-Reply-To: <20170523171758.GC24431@bhelgaas-glaptop.roam.corp.google.com>
 References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
- <1f6b50c7-4887-838e-8c7d-c014d82b6d8e@sigmadesigns.com>
- <8e56647d-3b2d-9bfc-b59e-79a2efaa7826@sigmadesigns.com>
- <20170523170319.GB24431@bhelgaas-glaptop.roam.corp.google.com>
- <b6541fd2-200f-35be-208e-931bb0b5ba49@free.fr>
-Message-ID: <ef36137c-f0d1-23b9-8b91-a6ed87239578@arm.com>
+ <20170523171758.GC24431@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <cb5d08d6-bbbe-486f-b721-2eeeb410ab5e@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/17 18:54, Mason wrote:
-> On 23/05/2017 19:03, Bjorn Helgaas wrote:
->> On Wed, May 17, 2017 at 04:56:08PM +0200, Marc Gonzalez wrote:
->>> On 20/04/2017 16:28, Marc Gonzalez wrote:
->>>
->>>> +static int tango_set_affinity(struct irq_data *data,
->>>> +		const struct cpumask *mask, bool force)
->>>> +{
->>>> +	return -EINVAL;
->>>> +}
->>>> +
->>>> +static struct irq_chip tango_chip = {
->>>> +	.irq_ack		= tango_ack,
->>>> +	.irq_mask		= tango_mask,
->>>> +	.irq_unmask		= tango_unmask,
->>>> +	.irq_set_affinity	= tango_set_affinity,
->>>> +	.irq_compose_msi_msg	= tango_compose_msi_msg,
->>>> +};
->>>
->>> Hmmm... I'm wondering why .irq_set_affinity is required.
->>>
->>> static int setup_affinity(struct irq_desc *desc, struct cpumask *mask)
->>> first calls __irq_can_set_affinity() to check whether
->>> desc->irq_data.chip->irq_set_affinity) exists.
->>>
->>> then calls irq_do_set_affinity(&desc->irq_data, mask, false);
->>> which calls chip->irq_set_affinity(data, mask, force);
->>> = msi_domain_set_affinity()
->>> which calls parent->chip->irq_set_affinity() unconditionally.
->>>
->>> Would it make sense to test that the callback is implemented
->>> before calling it?
->>>
->>>
->>> [    0.723895] Unable to handle kernel NULL pointer dereference at virtual address 00000000
->>
->> I'm not sure what you're asking.
->>
->> Is this a bug report for the v4 tango driver?
+On 23/05/2017 19:17, Bjorn Helgaas wrote:
+>
+> On Thu, Apr 20, 2017 at 04:24:39PM +0200, Marc Gonzalez wrote:
+>
+>> This patch was split in two, to ease review of two orthogonal
+>> parts (MSI controller and host bridge). NB: the patch is
+>> just split in two where host bridge support starts.
 > 
-> No.
-> 
->> Or are you asking whether msi_domain_set_affinity() should be changed
->> to check whether parent->chip->irq_set_affinity is implemented?
-> 
-> Yes. The way things are implemented now, drivers are forced
-> to define an irq_set_affinity callback, even if it just returns
-> an error, otherwise, the kernel crashes, because of the
-> unconditional function pointer deref. 
-> 
->> msi_domain_set_affinity() has called parent->chip->irq_set_affinity()
->> without checking since it was added in 2014 by f3cf8bb0d6c3 ("genirq: Add
->> generic msi irq domain support"), so if there's a problem here, it's most
->> likely in the tango code.
-> 
-> The issue is having to define an "empty" function.
-> (Unnecessary code bloat and maintenance.)
+> The split is backwards.  The first patch should add basic host bridge
+> support that is functional, though lacking MSI support.  The second should
+> add the MSI support.
 
-AFAICS, only one driver (other than this one) implements a "do nothing"
-set_affinity callback - everyone else who doesn't do anything hardware
-specific just passes it along via irq_chip_set_affinity_parent().
+OK, I'll invert the patches.
 
-Robin.
+Note: the bridge does not support legacy interrupts.
+Without MSI support, EPs can't interrupt the host.
+Is that still considered functional?
 
-> 
-> I'll send a patch illustrating exactly what I intended.
-> 
-> Regards.
-> 
+Regards.
