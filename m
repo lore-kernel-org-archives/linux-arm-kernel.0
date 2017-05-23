@@ -1,118 +1,105 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 23 May 2017 13:24:40 +0200
-Subject: [PATCH] drm/pl111: add ARM_AMBA dependency
-In-Reply-To: <CAK8P3a1EwzUH=4P96oOJyv42Z_hbOh5McLYiTT_Dn_XZshybEg@mail.gmail.com>
-References: <20170522152058.3346428-1-arnd@arndb.de>
- <20170522163231.bk6zltgzse4szm2o@kozik-lap>
- <CAK8P3a2Rbd2tnehO4vnqgmMYTPqgvws3ZEtbzJ86AxVWd9j6nA@mail.gmail.com>
- <CAJKOXPeweaJxUHM=uURarbW8dWeZ=PHt7W7k0wt-cfhz0_2QUg@mail.gmail.com>
- <CAK8P3a1EwzUH=4P96oOJyv42Z_hbOh5McLYiTT_Dn_XZshybEg@mail.gmail.com>
-Message-ID: <CAJKOXPePzfpaDdzN-7Jr2iEGimzM+Nqa8awZU+K8RmjJeKh_yA@mail.gmail.com>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Tue, 23 May 2017 07:27:38 -0400
+Subject: [PATCH V11 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <20170523092659.GA19999@red-moon>
+References: <1491823266-1209-1-git-send-email-sricharan@codeaurora.org>
+ <1491823266-1209-9-git-send-email-sricharan@codeaurora.org>
+ <41668eff-271c-1c4c-7665-3bf0faa74669@codeaurora.org>
+ <20170523085241.GA18204@red-moon>
+ <c6d5c033-a8f9-03e3-9963-cd291ae2d7e1@codeaurora.org>
+ <20170523092659.GA19999@red-moon>
+Message-ID: <647cbf74-d171-365c-7ef5-9f1e5986716c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 1:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tue, May 23, 2017 at 1:17 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> On Mon, May 22, 2017 at 11:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Mon, May 22, 2017 at 6:32 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->>>> On Mon, May 22, 2017 at 05:20:08PM +0200, Arnd Bergmann wrote:
->>>>> The driver is written in a way to enable compile-testing without CONFIG_ARM_AMBA,
->>>>> but it just causes needless warnings:
->>>>>
->>>>> drivers/gpu/drm/pl111/pl111_drv.c:149:26: error: 'pl111_drm_driver' defined but not used [-Werror=unused-variable]
->>>>> drivers/gpu/drm/pl111/pl111_drv.c:81:12: error: 'pl111_modeset_init' defined but not used [-Werror=unused-function]
->>>>>
->>>>> This removes the #ifdef instead, and adds a dependency on ARM_AMBA to
->>>>> only let us build the driver when the base support is enabled.
->>>>>
->>>>> Unfortunately, this requires removing one redundant 'select ARM_AMBA'
->>>>> line from mach-s3c64xx to avoid a circular dependency.
->>>>>
->>>>> It might be good to allow manually enabling ARM_AMBA when COMPILE_TEST
->>>>> is turned on, but that should be a separate patch and may cause other
->>>>> build regressions.
->>>>>
->>>>> Fixes: bed41005e617 ("drm/pl111: Initial drm/kms driver for pl111")
->>>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>>>> ---
->>>>>  arch/arm/mach-s3c64xx/Kconfig     | 1 -
->>>>>  drivers/gpu/drm/pl111/Kconfig     | 1 +
->>>>>  drivers/gpu/drm/pl111/pl111_drv.c | 2 --
->>>>>  3 files changed, 1 insertion(+), 3 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
->>>>> index 459214fa20b4..5ee5ad74a3d6 100644
->>>>> --- a/arch/arm/mach-s3c64xx/Kconfig
->>>>> +++ b/arch/arm/mach-s3c64xx/Kconfig
->>>>> @@ -40,7 +40,6 @@ config CPU_S3C6410
->>>>>
->>>>>  config S3C64XX_PL080
->>>>>       def_bool DMADEVICES
->>>>> -     select ARM_AMBA
->>>>
->>>> I must admit that I miss how pl111 DRM driver create circular dependency
->>>> with S3C64XX_PL080 (or AMBA_PL08X?). Maybe it is unrelated change and
->>>> should be a separate patch?
->>>
->>> When I add 'depends on ARM_AMBA' for pl111, I get this dependency loop:
->>>
->>> drivers/i2c/Kconfig:7: symbol I2C is selected by FB_DDC
->>> For a resolution refer to Documentation/kbuild/kconfig-language.txt
->>> subsection "Kconfig recursive dependency limitations"
->>> drivers/video/fbdev/Kconfig:63: symbol FB_DDC is selected by FB_CYBER2000_DDC
->>> For a resolution refer to Documentation/kbuild/kconfig-language.txt
->>> subsection "Kconfig recursive dependency limitations"
->>> drivers/video/fbdev/Kconfig:381: symbol FB_CYBER2000_DDC depends on FB_CYBER2000
->>> For a resolution refer to Documentation/kbuild/kconfig-language.txt
->>> subsection "Kconfig recursive dependency limitations"
->>> drivers/video/fbdev/Kconfig:369: symbol FB_CYBER2000 depends on FB
->>> For a resolution refer to Documentation/kbuild/kconfig-language.txt
->>> subsection "Kconfig recursive dependency limitations"
->>> drivers/video/fbdev/Kconfig:5: symbol FB is selected by DRM_KMS_FB_HELPER
->>> For a resolution refer to Documentation/kbuild/kconfig-language.txt
->>> subsection "Kconfig recursive dependency limitations"
->>> drivers/gpu/drm/Kconfig:72: symbol DRM_KMS_FB_HELPER is selected by
->>> DRM_KMS_CMA_HELPER
->>> For a resolution refer to Documentation/kbuild/kconfig-language.txt
->>> subsection "Kconfig recursive dependency limitations"
->>> drivers/gpu/drm/Kconfig:137: symbol DRM_KMS_CMA_HELPER is selected by DRM_PL111
->>> For a resolution refer to Documentation/kbuild/kconfig-language.txt
->>> subsection "Kconfig recursive dependency limitations"
->>> drivers/gpu/drm/pl111/Kconfig:1: symbol DRM_PL111 depends on ARM_AMBA
->>> For a resolution refer to Documentation/kbuild/kconfig-language.txt
->>> subsection "Kconfig recursive dependency limitations"
->>> drivers/amba/Kconfig:1: symbol ARM_AMBA is selected by S3C64XX_PL080
->>> For a resolution refer to Documentation/kbuild/kconfig-language.txt
->>> subsection "Kconfig recursive dependency limitations"
->>> arch/arm/mach-s3c64xx/Kconfig:42: symbol S3C64XX_PL080 default value
->>> contains DMADEVICES
->>> For a resolution refer to Documentation/kbuild/kconfig-language.txt
->>> subsection "Kconfig recursive dependency limitations"
->>> drivers/dma/Kconfig:5: symbol DMADEVICES is selected by SND_SOC_SH4_SIU
->>> For a resolution refer to Documentation/kbuild/kconfig-language.txt
->>> subsection "Kconfig recursive dependency limitations"
->>> sound/soc/sh/Kconfig:29: symbol SND_SOC_SH4_SIU is selected by SND_SIU_MIGOR
->>> For a resolution refer to Documentation/kbuild/kconfig-language.txt
->>> subsection "Kconfig recursive dependency limitations"
->>> sound/soc/sh/Kconfig:59: symbol SND_SIU_MIGOR depends on I2C
->>>
->>> We could break the loop at any of those places, but the
->>> S3C64XX_PL080 symbol seemed the easiest way since the
->>> 'select' there is completely unnecessary and it directly relates
->>> to the change I made in PL111.
+Hi Lorenzo,
+
+On 5/23/2017 5:26 AM, Lorenzo Pieralisi wrote:
+> On Tue, May 23, 2017 at 02:31:17PM +0530, Sricharan R wrote:
+>> Hi Lorenzo,
 >>
->> Assuming ARM_AMBA is unnecessary here, then it should be unnecessary
->> in other platforms as well but we have it (git grep 'select
->> ARM_AMBA'). The ARM_AMBA is a dependency of AMBA_PL08X which is
->> selected by S3C64xx... so IMHO this is needed.
->
-> I guess I should have explained it in more detail: S3C64XX_PL080
-> is set to 'ARCH_S3C64XX && DMADEVICES', and ARCH_S3C64XX
-> selects ARM_AMBA, so the 'select ARM_AMBA' for S3C64XX_PL080
-> is redundant. We still need it, but it's already guaranteed to be enabled.
+>> On 5/23/2017 2:22 PM, Lorenzo Pieralisi wrote:
+>>> On Tue, May 23, 2017 at 02:26:10AM -0400, Nate Watterson wrote:
+>>>> Hi Sricharan,
+>>>>
+>>>> On 4/10/2017 7:21 AM, Sricharan R wrote:
+>>>>> This is an equivalent to the DT's handling of the iommu master's probe
+>>>>> with deferred probing when the corrsponding iommu is not probed yet.
+>>>>> The lack of a registered IOMMU can be caused by the lack of a driver for
+>>>>> the IOMMU, the IOMMU device probe not having been performed yet, having
+>>>>> been deferred, or having failed.
+>>>>>
+>>>>> The first case occurs when the firmware describes the bus master and
+>>>>> IOMMU topology correctly but no device driver exists for the IOMMU yet
+>>>>> or the device driver has not been compiled in. Return NULL, the caller
+>>>>> will configure the device without an IOMMU.
+>>>>>
+>>>>> The second and third cases are handled by deferring the probe of the bus
+>>>>> master device which will eventually get reprobed after the IOMMU.
+>>>>>
+>>>>> The last case is currently handled by deferring the probe of the bus
+>>>>> master device as well. A mechanism to either configure the bus master
+>>>>> device without an IOMMU or to fail the bus master device probe depending
+>>>>> on whether the IOMMU is optional or mandatory would be a good
+>>>>> enhancement.
+>>>>>
+>>>>> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+>>>>> [Lorenzo: Added fixes for dma_coherent_mask overflow, acpi_dma_configure
+>>>>>            called multiple times for same device]
+>>>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>>>>> ---
+>>>>>   drivers/acpi/arm64/iort.c  | 33 ++++++++++++++++++++++++++++++++-
+>>>>>   drivers/acpi/scan.c        | 11 ++++++++---
+>>>>>   drivers/base/dma-mapping.c |  2 +-
+>>>>>   include/acpi/acpi_bus.h    |  2 +-
+>>>>>   include/linux/acpi.h       |  7 +++++--
+>>>>>   5 files changed, 47 insertions(+), 8 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>>>>> index 3dd9ec3..e323ece 100644
+>>>>> --- a/drivers/acpi/arm64/iort.c
+>>>>> +++ b/drivers/acpi/arm64/iort.c
+>>>>> @@ -543,6 +543,14 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+>>>>>   	const struct iommu_ops *ops = NULL;
+>>>>>   	int ret = -ENODEV;
+>>>>>   	struct fwnode_handle *iort_fwnode;
+>>>>> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+>>>>> +
+>>>>> +	/*
+>>>>> +	 * If we already translated the fwspec there
+>>>>> +	 * is nothing left to do, return the iommu_ops.
+>>>>> +	 */
+>>>>> +	if (fwspec && fwspec->ops)
+>>>>> +		return fwspec->ops;
+>>>>
+>>>> Is this logic strictly required? It breaks masters with multiple SIDs
+>>>> as only the first SID is actually added to the master's fwspec.
+>>>
+>>> My bad, that's indeed a silly bug I introduced. Please let me know if the
+>>> patch below fixes it, we will send it upstream shortly.
+>>>
+>>
+>> oops, i think emails crossed. Please let me know if you are ok to add
+>> this to the other fixes.
+> 
+> No worries, yes I am ok thanks but please give Nate some time to report
+> back to make sure the diff I sent actually fixes the problem.
 
-Ah, yes, I missed the S3C64XX_PL080. Looks fine. For the s3c64xx:
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+The patch you sent fixes the problem. Thanks for the quick turnaround.
 
-Best regards,
-Krzysztof
+> 
+> Apologies for the breakage.
+> 
+> Lorenzo
+> 
+>>
+>> Regards,
+>>   Sricharan
+>>
+
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
