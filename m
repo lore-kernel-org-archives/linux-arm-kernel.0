@@ -1,22 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 22 May 2017 19:49:00 -0500
-Subject: [PATCH 04/12] arm64: dts: hi3660: add resources for clock and
- reset
-In-Reply-To: <20170517083745.24479-5-guodong.xu@linaro.org>
+Date: Mon, 22 May 2017 19:49:34 -0500
+Subject: [PATCH 03/12] arm64: dts: hikey960: pinctrl: add more pinmux and
+ pinconfig
+In-Reply-To: <20170517083745.24479-4-guodong.xu@linaro.org>
 References: <20170517083745.24479-1-guodong.xu@linaro.org>
- <20170517083745.24479-5-guodong.xu@linaro.org>
-Message-ID: <20170523004900.gh5cu6krez7b7cg7@rob-hp-laptop>
+ <20170517083745.24479-4-guodong.xu@linaro.org>
+Message-ID: <20170523004934.mgdy7d6tktytdbqj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 04:37:37PM +0800, Guodong Xu wrote:
-> From: Zhangfei Gao <zhangfei.gao@linaro.org>
+On Wed, May 17, 2017 at 04:37:36PM +0800, Guodong Xu wrote:
+> From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
 > 
-> Add some resource nodes for clock and reset
+> This commit adds more pinmux and pinctrl information for devices
+> on HiKey960, including i2c, spi, cam, uart, ufs, pcie, csi, pwr_key,
+> isp, sd/sdio, i2s, and usb.
 > 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+> Signed-off-by: Chen Jun <chenjun14@huawei.com>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 > ---
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 53 +++++++++++++++++++++++++++----
->  1 file changed, 46 insertions(+), 7 deletions(-)
+>  .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 779 +++++++++++++++++++--
+>  1 file changed, 719 insertions(+), 60 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org> 
