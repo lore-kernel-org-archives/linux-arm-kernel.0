@@ -1,31 +1,51 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Tue, 23 May 2017 05:27:25 +0000
-Subject: pxa3xx-nand failing to find device on linux-next
-Message-ID: <b36366e358904310aee4970b77f57dba@svr-chch-ex1.atlnz.lc>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 22 May 2017 22:35:20 -0700
+Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
+In-Reply-To: <CAHgaXdKqt3mZmPG78w+4g_17D8EQoBgAZeuqM+MMsQg2f7apsw@mail.gmail.com>
+References: <CAHgaXdKsO2xoKYp7g91g+n+d_1KHSSByLjzBB-WjVXSjhB7qxw@mail.gmail.com>
+ <20170510.212952.1440495072777358778.davem@davemloft.net>
+ <CAHgaXdK8LEEUPm4jTRRzCnjwdWAauHmmB=caZsSFY8MmStH89Q@mail.gmail.com>
+ <20170510.215218.2185526627014393313.davem@davemloft.net>
+ <CAHgaXdKZ_v+iO7uqEDx7PA7D+xcp1FngGvJ1SRSsGXNQ-iWWDQ@mail.gmail.com>
+ <CAHgaXdLJoVUXXGTYs7FYXay5wx=sA-O+=dYhX+r7AQT7vSNfGQ@mail.gmail.com>
+ <CAGXu5j+2q4Wwfhuk_DnDaV894A9ZOD=A_AvAU_OZG6KQv0_KMg@mail.gmail.com>
+ <CAHgaXdL7GcVzs+ANPke_NywhcgHbe_fzi1sTDEy+Ni1-o82GYQ@mail.gmail.com>
+ <591A07A1.1030006@iogearbox.net>
+ <CAHgaXdKKbRVSpX-036TXpV5z=1=QCnPoku0+CeHxHco8-aasPQ@mail.gmail.com>
+ <CAGXu5j+k+NMQGmmhuW-4pHFd6agfndJfxQ9k--h+ZpsDBVB8ig@mail.gmail.com>
+ <8c53012b-cb81-5228-de79-f55457d1cf69@gmail.com>
+ <CAHgaXdL2qReJF1Aw08k3C+OiC-3AOy3VeYmQ1Hs7vKcrfGQnvA@mail.gmail.com>
+ <CAGXu5jKwTDYeNQggezzSKkFzZQkroC+6SdBB0qUKh5crfNk8PA@mail.gmail.com>
+ <CAHgaXdKqt3mZmPG78w+4g_17D8EQoBgAZeuqM+MMsQg2f7apsw@mail.gmail.com>
+Message-ID: <CAGXu5jKDMUxRivMZdEQSBs81dkKRn5hRUiOz_wybCyphFFy+RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, May 22, 2017 at 10:03 PM, Shubham Bansal
+<illusionist.neo@gmail.com> wrote:
+> On Tue, May 23, 2017 at 9:52 AM, Kees Cook <keescook@chromium.org> wrote:
+>> On Mon, May 22, 2017 at 8:34 PM, Shubham Bansal
+>> <illusionist.neo@gmail.com> wrote:
+>>> I would post them as soon as I test them on ARMv5 and ARMv6. If you
+>>> can help me with that, please let me know.
+>>
+>> Please post what you have: it would be better to see what you've got
+>> now in case additional changes are needed so you don't have to do it
+>> again on v5 and v6. Also, it means other people with real v5 and v6
+>> hardware could test for you if they were so inclined, and you won't
+>> need to be blocked on doing the tests in qemu.
+>>
+>> You can send it as an "RFC" in the subject, just to make sure people
+>> know it's not considered fully done. :)
+>
+> I already have ARMv5 and ARMv6 code written. I just haven't tested it
+> yet. Should i send the patch with those as well ?
 
-I'm doing some testing on linux-next and I'm finding that my nand flash 
-has disappeared.
+Sure, just to have a version up for people to examine. If there are
+bugs, that's fine, we'll iron them out.
 
-pxa3xx-nand f10d0000.flash: This platform can't do DMA on this device
-pxa3xx-nand f10d0000.flash: non-supported command ef
-pxa3xx-nand f10d0000.flash: non-supported command ee
-pxa3xx-nand f10d0000.flash: non-supported command ef
-pxa3xx-nand f10d0000.flash: non-supported command ee
-On-die ECC forcefully enabled, not supported
-nand: No NAND device found
-pxa3xx-nand f10d0000.flash: failed to scan nand at cs 0
+-Kees
 
-This was working around 4.11. I'll try to do some more digging tomorrow 
-to narrow down a failure point but I thought I'd send this out now just 
-in case it rings any bells.
-
-The board I'm using (DB-88F6820-AMC) is unfortunately out-of tree but it 
-should be pretty close to the armada-388-db. I can make my dts available 
-if it's helpful.
-
-Thanks,
-Chris
+-- 
+Kees Cook
+Pixel Security
