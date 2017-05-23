@@ -1,199 +1,109 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Tue, 23 May 2017 02:26:10 -0400
-Subject: [PATCH V11 08/11] drivers: acpi: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <1491823266-1209-9-git-send-email-sricharan@codeaurora.org>
-References: <1491823266-1209-1-git-send-email-sricharan@codeaurora.org>
- <1491823266-1209-9-git-send-email-sricharan@codeaurora.org>
-Message-ID: <41668eff-271c-1c4c-7665-3bf0faa74669@codeaurora.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 23 May 2017 08:31:53 +0200
+Subject: [RESEND PATCH v3 1/2] dt-bindings: i2c: Add Mediatek MT2701 i2c
+ binding
+In-Reply-To: <1495510441.930.7.camel@mhfsdcap03>
+References: <1489029185-21447-1-git-send-email-jun.gao@mediatek.com>
+ <1489029185-21447-2-git-send-email-jun.gao@mediatek.com>
+ <20170322090543.sxacnddn2o7stjnq@ninjato>
+ <1490694612.18582.11.camel@mhfsdcap03> <20170328192258.GA4525@katana>
+ <4111ffc2-0a25-0811-fbd3-401649431315@gmail.com>
+ <1495510441.930.7.camel@mhfsdcap03>
+Message-ID: <aa667dcb-2c11-8179-0098-edbc3eeaf093@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
 
-On 4/10/2017 7:21 AM, Sricharan R wrote:
-> This is an equivalent to the DT's handling of the iommu master's probe
-> with deferred probing when the corrsponding iommu is not probed yet.
-> The lack of a registered IOMMU can be caused by the lack of a driver for
-> the IOMMU, the IOMMU device probe not having been performed yet, having
-> been deferred, or having failed.
-> 
-> The first case occurs when the firmware describes the bus master and
-> IOMMU topology correctly but no device driver exists for the IOMMU yet
-> or the device driver has not been compiled in. Return NULL, the caller
-> will configure the device without an IOMMU.
-> 
-> The second and third cases are handled by deferring the probe of the bus
-> master device which will eventually get reprobed after the IOMMU.
-> 
-> The last case is currently handled by deferring the probe of the bus
-> master device as well. A mechanism to either configure the bus master
-> device without an IOMMU or to fail the bus master device probe depending
-> on whether the IOMMU is optional or mandatory would be a good
-> enhancement.
-> 
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> [Lorenzo: Added fixes for dma_coherent_mask overflow, acpi_dma_configure
->            called multiple times for same device]
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->   drivers/acpi/arm64/iort.c  | 33 ++++++++++++++++++++++++++++++++-
->   drivers/acpi/scan.c        | 11 ++++++++---
->   drivers/base/dma-mapping.c |  2 +-
->   include/acpi/acpi_bus.h    |  2 +-
->   include/linux/acpi.h       |  7 +++++--
->   5 files changed, 47 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 3dd9ec3..e323ece 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -543,6 +543,14 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
->   	const struct iommu_ops *ops = NULL;
->   	int ret = -ENODEV;
->   	struct fwnode_handle *iort_fwnode;
-> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-> +
-> +	/*
-> +	 * If we already translated the fwspec there
-> +	 * is nothing left to do, return the iommu_ops.
-> +	 */
-> +	if (fwspec && fwspec->ops)
-> +		return fwspec->ops;
 
-Is this logic strictly required? It breaks masters with multiple SIDs
-as only the first SID is actually added to the master's fwspec.
-
->   
->   	if (node) {
->   		iort_fwnode = iort_get_fwnode(node);
-> @@ -550,8 +558,17 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
->   			return NULL;
->   
->   		ops = iommu_ops_from_fwnode(iort_fwnode);
-> +		/*
-> +		 * If the ops look-up fails, this means that either
-> +		 * the SMMU drivers have not been probed yet or that
-> +		 * the SMMU drivers are not built in the kernel;
-> +		 * Depending on whether the SMMU drivers are built-in
-> +		 * in the kernel or not, defer the IOMMU configuration
-> +		 * or just abort it.
-> +		 */
->   		if (!ops)
-> -			return NULL;
-> +			return iort_iommu_driver_enabled(node->type) ?
-> +			       ERR_PTR(-EPROBE_DEFER) : NULL;
->   
->   		ret = arm_smmu_iort_xlate(dev, streamid, iort_fwnode, ops);
->   	}
-> @@ -625,12 +642,26 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
->   
->   		while (parent) {
->   			ops = iort_iommu_xlate(dev, parent, streamid);
-> +			if (IS_ERR_OR_NULL(ops))
-> +				return ops;
->   
->   			parent = iort_node_get_id(node, &streamid,
->   						  IORT_IOMMU_TYPE, i++);
->   		}
->   	}
->   
-> +	/*
-> +	 * If we have reason to believe the IOMMU driver missed the initial
-> +	 * add_device callback for dev, replay it to get things in order.
-> +	 */
-> +	if (!IS_ERR_OR_NULL(ops) && ops->add_device &&
-> +	    dev->bus && !dev->iommu_group) {
-> +		int err = ops->add_device(dev);
-> +
-> +		if (err)
-> +			ops = ERR_PTR(err);
-> +	}
-> +
->   	return ops;
->   }
->   
-> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> index 1926918..2a513cc 100644
-> --- a/drivers/acpi/scan.c
-> +++ b/drivers/acpi/scan.c
-> @@ -1373,20 +1373,25 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
->    * @dev: The pointer to the device
->    * @attr: device dma attributes
->    */
-> -void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
-> +int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
->   {
->   	const struct iommu_ops *iommu;
-> +	u64 size;
->   
->   	iort_set_dma_mask(dev);
->   
->   	iommu = iort_iommu_configure(dev);
-> +	if (IS_ERR(iommu))
-> +		return PTR_ERR(iommu);
->   
-> +	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->   	/*
->   	 * Assume dma valid range starts at 0 and covers the whole
->   	 * coherent_dma_mask.
->   	 */
-> -	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
-> -			   attr == DEV_DMA_COHERENT);
-> +	arch_setup_dma_ops(dev, 0, size, iommu, attr == DEV_DMA_COHERENT);
-> +
-> +	return 0;
->   }
->   EXPORT_SYMBOL_GPL(acpi_dma_configure);
->   
-> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-> index 82bd45c..755a2b5 100644
-> --- a/drivers/base/dma-mapping.c
-> +++ b/drivers/base/dma-mapping.c
-> @@ -368,7 +368,7 @@ int dma_configure(struct device *dev)
->   	} else if (has_acpi_companion(dma_dev)) {
->   		attr = acpi_get_dma_attr(to_acpi_device_node(dma_dev->fwnode));
->   		if (attr != DEV_DMA_NOT_SUPPORTED)
-> -			acpi_dma_configure(dev, attr);
-> +			ret = acpi_dma_configure(dev, attr);
->   	}
->   
->   	if (bridge)
-> diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
-> index ef0ae8a..2a9a5de 100644
-> --- a/include/acpi/acpi_bus.h
-> +++ b/include/acpi/acpi_bus.h
-> @@ -575,7 +575,7 @@ struct acpi_pci_root {
->   
->   bool acpi_dma_supported(struct acpi_device *adev);
->   enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev);
-> -void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr);
-> +int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr);
->   void acpi_dma_deconfigure(struct device *dev);
->   
->   struct acpi_device *acpi_find_child_device(struct acpi_device *parent,
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 9b05886..79d06ef6 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -762,8 +762,11 @@ static inline enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
->   	return DEV_DMA_NOT_SUPPORTED;
->   }
->   
-> -static inline void acpi_dma_configure(struct device *dev,
-> -				      enum dev_dma_attr attr) { }
-> +static inline int acpi_dma_configure(struct device *dev,
-> +				     enum dev_dma_attr attr)
-> +{
-> +	return 0;
-> +}
->   
->   static inline void acpi_dma_deconfigure(struct device *dev) { }
->   
+On 23/05/17 05:34, Jun Gao wrote:
+> On Wed, 2017-05-10 at 12:35 +0200, Matthias Brugger wrote:
+>>
+>> On 28/03/17 21:22, Wolfram Sang wrote:
+>>> On Tue, Mar 28, 2017 at 05:50:12PM +0800, Jun Gao wrote:
+>>>> On Wed, 2017-03-22 at 10:05 +0100, Wolfram Sang wrote:
+>>>>> On Thu, Mar 09, 2017 at 11:13:04AM +0800, Jun Gao wrote:
+>>>>>> From: Jun Gao <jun.gao@mediatek.com>
+>>>>>>
+>>>>>> Add MT2701 i2c binding to i2c-mt6577.txt and there is no need to
+>>>>>> modify i2c driver.
+>>>>>>
+>>>>>> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+>>>>>
+>>>>> There is still the issue which Matthias Brugger pointed out on January,
+>>>>> 24th: you need to describe the fallback compatibles.
+>>>>>
+>>>>
+>>>> IMHO the value under compatible are just inputs which can be accepted.
+>>>> It's little strange to add fallback information in binding. Some other
+>>>> bindings do not describe so detailedly.
+>>>> Is it OK to make binding as minimum standard?
+>>>> If we describe it very detailedly, we will have to modify binding if
+>>>> there are some changes for mt2701.
+>>>
+>>> My reading of the below is that I could simply use "mediatek,mt2701-i2c"
+>>> as compatible and things will work. But it won't, we don't have that in
+>>> the driver IIRC. So, we need a fallback for that to work.
+>>>
+>>>> Rob, could you give some suggestions?  Thanks!
+>>>
+>>> Would be welcome, yes. I lost track what the preferred solution is.
+>>>
+>>
+>> We will need to define the fallback binding for each SoC.
+>> As example take the rockchip mmc:
+>> http://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+>>
+>> Regards,
+>> Matthias
+>>
 > 
+> Hi Rob,
+> 
+> There is no such requirement for other components.
 
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+The requirement is that the binding description reflects a compatible 
+the driver is able to consume. Right now if you pass 
+"mediatek,mt2701-i2c" the driver won't recognize this, therefor you need 
+the fallback compatible. Which point isn't clear to you?
+
+Regards,
+Matthias
+
+> Could you give us some suggestions?
+> Thanks!
+> 
+> 
+>>>>
+>>>>>> ---
+>>>>>>    .../devicetree/bindings/i2c/i2c-mt6577.txt         |   11 ++++++-----
+>>>>>>    1 file changed, 6 insertions(+), 5 deletions(-)
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+>>>>>> index 0ce6fa3..27dbbf9 100644
+>>>>>> --- a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+>>>>>> +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+>>>>>> @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
+>>>>>>    
+>>>>>>    Required properties:
+>>>>>>      - compatible: value should be either of the following.
+>>>>>> -      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
+>>>>>> -      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
+>>>>>> -      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
+>>>>>> -      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
+>>>>>> -      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
+>>>>>> +	"mediatek,mt2701-i2c"
+>>>>>> +	"mediatek,mt6577-i2c"
+>>>>>> +	"mediatek,mt6589-i2c"
+>>>>>> +	"mediatek,mt8127-i2c"
+>>>>>> +	"mediatek,mt8135-i2c"
+>>>>>> +	"mediatek,mt8173-i2c"
+>>>>>>      - reg: physical base address of the controller and dma base, length of memory
+>>>>>>        mapped region.
+>>>>>>      - interrupts: interrupt number to the cpu.
+>>>>>> -- 
+>>>>>> 1.7.9.5
+>>>>>>
+>>>>
+>>>>
+> 
+> 
