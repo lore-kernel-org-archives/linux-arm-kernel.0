@@ -1,226 +1,106 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Tue, 23 May 2017 18:30:37 +0530
-Subject: [PATCH] ARM: dts: sun5i: a13: Add Olimex SOM board dts support
-Message-ID: <1495544437-32463-1-git-send-email-jteki@openedev.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Tue, 23 May 2017 21:00:59 +0800
+Subject: [linux-sunxi] Re: [RFC PATCH 07/11] drm: sun4i: add support for
+ the TV encoder in H3 SoC
+In-Reply-To: <20170523125321.t7y7yfrrfokpkzgd@flea.home>
+References: <20170517164354.16399-1-icenowy@aosc.io>
+ <1958057.WDKm0nQKgW@jernej-laptop>
+ <CAGb2v66aD=G+V75N-_nYo=dGqhxpKhadM84h9G-B34=dnDwCbg@mail.gmail.com>
+ <3164416.5xR36OcyjH@jernej-laptop>
+ <20170523125321.t7y7yfrrfokpkzgd@flea.home>
+Message-ID: <98c3572beee0a81755994b4bdc508b18@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@openedev.com>
+? 2017-05-23 20:53?Maxime Ripard ???
+> On Mon, May 22, 2017 at 07:55:56PM +0200, Jernej ?krabec wrote:
+>> Hi,
+>> 
+>> Dne sobota, 20. maj 2017 ob 03:37:53 CEST je Chen-Yu Tsai napisal(a):
+>> > On Sat, May 20, 2017 at 2:23 AM, Jernej ?krabec <jernej.skrabec@siol.net>
+>> wrote:
+>> > > Hi,
+>> > >
+>> > > Dne petek, 19. maj 2017 ob 20:08:18 CEST je Icenowy Zheng napisal(a):
+>> > >> ? 2017?5?20? GMT+08:00 ??2:03:30, Maxime Ripard <maxime.ripard@free-
+>> > >
+>> > > electrons.com> ??:
+>> > >> >On Thu, May 18, 2017 at 12:43:50AM +0800, Icenowy Zheng wrote:
+>> > >> >> Allwinner H3 features a TV encoder similar to the one in earlier
+>> > >> >
+>> > >> >SoCs,
+>> > >> >
+>> > >> >> but with some different points about clocks:
+>> > >> >> - It has a mod clock and a bus clock.
+>> > >> >> - The mod clock must be at a fixed rate to generate signal.
+>> > >> >
+>> > >> >Why?
+>> > >>
+>> > >> It's experiment result by Jernej.
+>> > >>
+>> > >> The clock rates in BSP kernel is also specially designed
+>> > >> (PLL_DE at 432MHz) in order to be able to feed the TVE.
+>> > >
+>> > > My experiments and search through BSP code showed that TVE seems to have
+>> > > additional fixed predivider 8. So if you want to generate 27 MHz clock,
+>> > > unit has to be feed with 216 MHz.
+>> > >
+>> > > TVE has only one PLL source PLL_DE. And since 216 MHz is a bit low for
+>> > > DE2,
+>> > > BSP defaults to 432 MHz for PLL_DE and use divider 2 to generate 216 MHz.
+>> > > This clock is then divided by 8 internaly to get final 27 MHz.
+>> > >
+>> > > Please note that I don't have any hard evidence to support that, only
+>> > > experimental data. However, only that explanation make sense to me.
+>> > >
+>> > > BTW, BSP H3/H5 TV driver supports only PAL and NTSC which both use 27 MHz
+>> > > base clock. Further experiments are needed to check if there is any
+>> > > possibility to have other resolutions by manipulating clocks and give
+>> > > other proper settings. I plan to do that, but not in very near future.
+>> >
+>> > You only have composite video output, and those are the only 2 standard
+>> > resolutions that make any sense.
+>> 
+>> Right, other resolutions are for VGA.
+>> 
+>> Anyway, I did some more digging in A10 and R40 datasheets. I think 
+>> that H3 TVE
+>> unit is something in between. R40 TVE has a setting to select "up 
+>> sample".
+> 
+> That might be just another translation of oversampling :)
+> 
+> I didn't know it could be applied to composite signals though, but I
+> guess this is just another analog signal after all.
+> 
+>> Possible settings are 27 MHz, 54 MHz, 108 MHz and 216 MHz. BSP driver 
+>> on R40
+>> has this setting enabled only for PAL and NTSC and it is always 216 
+>> MHz. I
+>> think that H3 may have this hardwired to 216 MHz and this would be the 
+>> reason
+>> why 216 MHz is needed.
+>> 
+>> Has anyone else any better explanation?
+> 
+> That's already a pretty good one.
+> 
+> Either way, wether this is upsampling, oversampling or just a
+> pre-divider, this can and should be dealt with in the mode_set
+> callback, and not in the probe.
 
-Add support for Olimex A13-512-SOM board, and this particular
-design is like A13-SOM-WIFI can mount on-top of A13-SOM.
+I got a better idea -- let TVE driver have the CLK_TVE as an
+input and create a subclock output with divider 16, and feed this
+subclock to TCON lcd-ch1.
 
-https://www.olimex.com/Products/SOM/A13/A13-SOM-512/
-https://www.olimex.com/Products/SOM/A13/A13-SOM-WIFI/open-source-hardware
+This is a model of the real hardware -- the clock divider is in
+TVE, not TCON.
 
-Features:
-- A13 Cortex A8 processor at 1GHz, 3D Mali400 GPU
-- 512MB DDR3 memory
-- MicroSD card connector
-- UART console connector
-- Status LEDs
-- BL-8188-8M WiFi wireless module with Realtek RTL8188CUS chip
-- USB-OTG with mini USB connector
-
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Jagan Teki <jagan@openedev.com>
----
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/sun5i-a13-olinuxino-som.dts | 174 ++++++++++++++++++++++++++
- 2 files changed, 175 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun5i-a13-olinuxino-som.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9c5e1d9..45c6e65 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -830,6 +830,7 @@ dtb-$(CONFIG_MACH_SUN5I) += \
- 	sun5i-a13-licheepi-one.dtb \
- 	sun5i-a13-olinuxino.dtb \
- 	sun5i-a13-olinuxino-micro.dtb \
-+	sun5i-a13-olinuxino-som.dtb \
- 	sun5i-a13-q8-tablet.dtb \
- 	sun5i-a13-utoo-p66.dtb \
- 	sun5i-gr8-chip-pro.dtb \
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino-som.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino-som.dts
-new file mode 100644
-index 0000000..3bb3b7d
---- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino-som.dts
-@@ -0,0 +1,174 @@
-+/*
-+ * Copyright 2012 Maxime Ripard <maxime.ripard@free-electrons.com>
-+ * Copyright 2013 Hans de Goede <hdegoede@redhat.com>
-+ * Copyright 2017 Jagan Teki <jagan@openedev.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun5i-a13.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Olimex A13-Olinuxino SOM";
-+	compatible = "olimex,a13-olinuxino-som", "allwinner,sun5i-a13";
-+
-+	aliases {
-+		serial0 = &uart1;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_olinuxinom>;
-+
-+		power {
-+			label = "a13-olinuxino-micro:green:power";
-+			gpios = <&pio 6 9 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+	};
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_olinuxinom>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 6 0 GPIO_ACTIVE_HIGH>; /* PG0 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+&pio {
-+	mmc0_cd_pin_olinuxinom: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PG0";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	led_pins_olinuxinom: led_pins at 0 {
-+		allwinner,pins = "PG9";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PG2";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-+		allwinner,pins = "PG1";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
-+	};
-+
-+	usb0_vbus_pin_olinuxinom: usb0_vbus_pin at 0 {
-+		allwinner,pins = "PG12";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	usb1_vbus_pin_olinuxinom: usb1_vbus_pin at 0 {
-+		allwinner,pins = "PG11";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&reg_usb0_vbus {
-+	pinctrl-0 = <&usb0_vbus_pin_olinuxinom>;
-+	gpio = <&pio 6 12 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&reg_usb1_vbus {
-+	pinctrl-0 = <&usb1_vbus_pin_olinuxinom>;
-+	gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_b>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-+	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
-+	usb0_vbus_det-gpio = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	status = "okay";
-+};
--- 
-1.9.1
+> 
+> Thanks!
+> Maxime
+> 
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
