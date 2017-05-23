@@ -1,74 +1,67 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Tue, 23 May 2017 08:24:18 +0300
-Subject: [V2, 2/6] tty: serial: lpuart: add little endian 32 bit register
- support
-In-Reply-To: <20170519150722.GB23227@b29396-OptiPlex-7040>
-References: <1494834539-17523-3-git-send-email-aisheng.dong@nxp.com>
- <b4a2ed13-c71f-c973-3b09-b632e083a88b@cogentembedded.com>
- <20170517033139.GB9913@b29396-OptiPlex-7040>
- <48819894-4943-7d14-ccf8-83cfd2195c9a@cogentembedded.com>
- <AM3PR04MB306D5C86AED120D15C4D46A80E70@AM3PR04MB306.eurprd04.prod.outlook.com>
- <55bae8d2-0e23-b5e1-f304-63d9130ccb08@cogentembedded.com>
- <20170517070019.GG9913@b29396-OptiPlex-7040>
- <045d1888-4a23-cf73-ab4c-009e29fde974@cogentembedded.com>
- <20170519150722.GB23227@b29396-OptiPlex-7040>
-Message-ID: <2f873a62-0e4e-7da6-5c5e-be570fcceff1@cogentembedded.com>
+From: schwidefsky@de.ibm.com (Martin Schwidefsky)
+Date: Tue, 23 May 2017 07:26:29 +0200
+Subject: [PATCH v3.1 4/6] mm/hugetlb: Allow architectures to override
+ huge_pte_clear()
+In-Reply-To: <20170522162555.4313-1-punit.agrawal@arm.com>
+References: <20170522133604.11392-5-punit.agrawal@arm.com>
+ <20170522162555.4313-1-punit.agrawal@arm.com>
+Message-ID: <20170523072629.06163fa6@mschwideX1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 22 May 2017 17:25:55 +0100
+Punit Agrawal <punit.agrawal@arm.com> wrote:
 
->>>> Alternative solution could be - have separate write path for earlycon.
->>>
->>> It looks to me having the same issue with a separate write patch
->>> for earlycon as we still need distinguish Little or Big endian
->>> for Layerscape and IMX.
->>>
->>>> At a glance, it is dozen lines of code.
->>>
->>> Would you please show some sample code?
->>
->> Do not reuse lpuart32_console_putchar() in earlycon code.
->>
->> Have two sets of early_setup/early_write/putchar - for BE and
->> defaut-endian earlycon. And in these putchar's do not use
->> lpuart_(read|write).
->>
+> When unmapping a hugepage range, huge_pte_clear() is used to clear the
+> page table entries that are marked as not present. huge_pte_clear()
+> internally just ends up calling pte_clear() which does not correctly
+> deal with hugepages consisting of contiguous page table entries.
 > 
-> Isn't that introducing another consistency break after fix one
-> consistency break?
+> Add a size argument to address this issue and allow architectures to
+> override huge_pte_clear() by wrapping it in a #ifndef block.
 > 
-> If doing that, we then have two register read/write APIs.
-> One for normal driver operation by dynamically checking lpuart_is_be
-> property to distinguish the endian difference problem.
-> Another is specifically implemented for only early console read/write
-> and use hardcoded way to read/write register directly instead of using
-> the standard API lpuart32_read/write, like follows:
-> e.g.
-> lpuart32_le_console_write() {
-> 	 writel();
-> }
+> Update s390 implementation with the size parameter as well.
 > 
-> lpuart32_be_console_write() {
-> 	 iowrite32be()
-> }
-> This also makes the driver a bit strange and ugly.
+> Note that the change only affects huge_pte_clear() - the other generic
+> hugetlb functions don't need any change.
 > 
-> It looks to me both way are trade offs and the later one seems sacrifice
-> more. And i doubt if it's really necessary for probably a no real gain
-> purpose as the FPGA you mentioned is a theoretical case and less
-> possibility to exist.
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
+> Cc: Mike Kravetz <mike.kravetz@oracle.com>
+> ---
 > 
-> I'm still wondering how about keep using the exist way and adding more
-> information in code to explain why use a global var?
+> Changes since v3
+> 
+> * Drop weak function and use #ifndef block to allow architecture override
+> * Drop unnecessary move of s390 function definition
+> 
+>  arch/s390/include/asm/hugetlb.h | 2 +-
+>  include/asm-generic/hugetlb.h   | 4 +++-
+>  mm/hugetlb.c                    | 2 +-
+>  3 files changed, 5 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/s390/include/asm/hugetlb.h b/arch/s390/include/asm/hugetlb.h
+> index cd546a245c68..c0443500baec 100644
+> --- a/arch/s390/include/asm/hugetlb.h
+> +++ b/arch/s390/include/asm/hugetlb.h
+> @@ -39,7 +39,7 @@ static inline int prepare_hugepage_range(struct file *file,
+>  #define arch_clear_hugepage_flags(page)		do { } while (0)
+> 
+>  static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+> -				  pte_t *ptep)
+> +				  pte_t *ptep, unsigned long sz)
+>  {
+>  	if ((pte_val(*ptep) & _REGION_ENTRY_TYPE_MASK) == _REGION_ENTRY_TYPE_R3)
+>  		pte_val(*ptep) = _REGION3_ENTRY_EMPTY;
 
-I've checked other driver under drivers/tty/serial/, for examples of
-similar cases.
+For the nop-change for s390:
+Acked-by: Martin Schwidefsky <schwidefsky@de.ibm.com>
 
-Please look at serial8250_early_in() / serial8250_early_out() ?
-These do handle different endian, via port->iotype
+-- 
+blue skies,
+   Martin.
 
-Another example is drivers/tty/serial/samsung.c, where
-port->private_data is initialized and used.
-
-Nikita
+"Reality continues to ruin my life." - Calvin.
