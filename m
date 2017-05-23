@@ -1,86 +1,195 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 23 May 2017 21:15:16 +0200
-Subject: [PATCH v4 1/2] PCI: Add tango MSI controller support
-In-Reply-To: <ef36137c-f0d1-23b9-8b91-a6ed87239578@arm.com>
-References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
- <1f6b50c7-4887-838e-8c7d-c014d82b6d8e@sigmadesigns.com>
- <8e56647d-3b2d-9bfc-b59e-79a2efaa7826@sigmadesigns.com>
- <20170523170319.GB24431@bhelgaas-glaptop.roam.corp.google.com>
- <b6541fd2-200f-35be-208e-931bb0b5ba49@free.fr>
- <ef36137c-f0d1-23b9-8b91-a6ed87239578@arm.com>
-Message-ID: <aec89b9a-8377-ff39-547c-9e6eaf254fab@free.fr>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 23 May 2017 12:16:01 -0700
+Subject: [PATCH 1/2] pinctrl: pinctrl-imx: add IBE and OBE SoC property
+In-Reply-To: <DBXPR04MB3205CEE820B4E130ACCE79280F90@DBXPR04MB320.eurprd04.prod.outlook.com>
+References: <1494830906-6442-1-git-send-email-aisheng.dong@nxp.com>
+ <1494830906-6442-2-git-send-email-aisheng.dong@nxp.com>
+ <6560bc05ac21060efb5d39d81a662a7a@agner.ch>
+ <DBXPR04MB3205CEE820B4E130ACCE79280F90@DBXPR04MB320.eurprd04.prod.outlook.com>
+Message-ID: <0e430fc802cb89a4bd793e95dee57501@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/2017 20:03, Robin Murphy wrote:
-> On 23/05/17 18:54, Mason wrote:
->> On 23/05/2017 19:03, Bjorn Helgaas wrote:
->>> On Wed, May 17, 2017 at 04:56:08PM +0200, Marc Gonzalez wrote:
->>>> On 20/04/2017 16:28, Marc Gonzalez wrote:
->>>>
->>>>> +static int tango_set_affinity(struct irq_data *data,
->>>>> +		const struct cpumask *mask, bool force)
->>>>> +{
->>>>> +	return -EINVAL;
->>>>> +}
->>>>> +
->>>>> +static struct irq_chip tango_chip = {
->>>>> +	.irq_ack		= tango_ack,
->>>>> +	.irq_mask		= tango_mask,
->>>>> +	.irq_unmask		= tango_unmask,
->>>>> +	.irq_set_affinity	= tango_set_affinity,
->>>>> +	.irq_compose_msi_msg	= tango_compose_msi_msg,
->>>>> +};
->>>>
->>>> Hmmm... I'm wondering why .irq_set_affinity is required.
->>>>
->>>> static int setup_affinity(struct irq_desc *desc, struct cpumask *mask)
->>>> first calls __irq_can_set_affinity() to check whether
->>>> desc->irq_data.chip->irq_set_affinity) exists.
->>>>
->>>> then calls irq_do_set_affinity(&desc->irq_data, mask, false);
->>>> which calls chip->irq_set_affinity(data, mask, force);
->>>> = msi_domain_set_affinity()
->>>> which calls parent->chip->irq_set_affinity() unconditionally.
->>>>
->>>> Would it make sense to test that the callback is implemented
->>>> before calling it?
->>>>
->>>>
->>>> [    0.723895] Unable to handle kernel NULL pointer dereference at virtual address 00000000
->>>
->>> I'm not sure what you're asking.
->>>
->>> Is this a bug report for the v4 tango driver?
->>
->> No.
->>
->>> Or are you asking whether msi_domain_set_affinity() should be changed
->>> to check whether parent->chip->irq_set_affinity is implemented?
->>
->> Yes. The way things are implemented now, drivers are forced
->> to define an irq_set_affinity callback, even if it just returns
->> an error, otherwise, the kernel crashes, because of the
->> unconditional function pointer deref. 
->>
->>> msi_domain_set_affinity() has called parent->chip->irq_set_affinity()
->>> without checking since it was added in 2014 by f3cf8bb0d6c3 ("genirq: Add
->>> generic msi irq domain support"), so if there's a problem here, it's most
->>> likely in the tango code.
->>
->> The issue is having to define an "empty" function.
->> (Unnecessary code bloat and maintenance.)
+On 2017-05-23 05:06, A.S. Dong wrote:
+> Hi Stefan,
 > 
-> AFAICS, only one driver (other than this one) implements a "do nothing"
-> set_affinity callback - everyone else who doesn't do anything hardware
-> specific just passes it along via irq_chip_set_affinity_parent().
+>> -----Original Message-----
+>> From: A.S. Dong
+>> Sent: Wednesday, May 17, 2017 2:14 PM
+>> To: 'Stefan Agner'
+>> Cc: linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> linus.walleij at linaro.org; shawnguo at kernel.org; Jacky Bai; Andy Duan;
+>> kernel at pengutronix.de; Alexandre Courbot
+>> Subject: RE: [PATCH 1/2] pinctrl: pinctrl-imx: add IBE and OBE SoC
+>> property
+>>
+>> > -----Original Message-----
+>> > From: Stefan Agner [mailto:stefan at agner.ch]
+>> > Sent: Tuesday, May 16, 2017 1:11 AM
+>> > To: A.S. Dong
+>> > Cc: linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> > linus.walleij at linaro.org; shawnguo at kernel.org; Jacky Bai; Andy Duan;
+>> > kernel at pengutronix.de; Alexandre Courbot
+>> > Subject: Re: [PATCH 1/2] pinctrl: pinctrl-imx: add IBE and OBE SoC
+>> > property
+>> >
+>> > On 2017-05-14 23:48, Dong Aisheng wrote:
+>> > > iMX ULP has different IOB/OBE shift from Vibrid, so let's make
+>> >
+>> > s/Vibrid/Vybrid
+>> >
+>> > > it a SoC property.
+>> > >
+>> > > Cc: Linus Walleij <linus.walleij@linaro.org>
+>> > > Cc: Alexandre Courbot <gnurou@gmail.com>
+>> > > Cc: Shawn Guo <shawnguo@kernel.org>
+>> > > Cc: Stefan Agner <stefan@agner.ch>
+>> > > Cc: Fugang Duan <fugang.duan@nxp.com>
+>> > > Cc: Bai Ping <ping.bai@nxp.com>
+>> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>> > > ---
+>> > >  drivers/pinctrl/freescale/pinctrl-imx.c     | 8 ++++----
+>> > >  drivers/pinctrl/freescale/pinctrl-imx.h     | 2 ++
+>> > >  drivers/pinctrl/freescale/pinctrl-imx7ulp.c | 2 ++
+>> > >  drivers/pinctrl/freescale/pinctrl-vf610.c   | 2 ++
+>> > >  4 files changed, 10 insertions(+), 4 deletions(-)
+>> > >
+>> > > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
+>> > > b/drivers/pinctrl/freescale/pinctrl-imx.c
+>> > > index 57e1f7a..0d6aaca 100644
+>> > > --- a/drivers/pinctrl/freescale/pinctrl-imx.c
+>> > > +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+>> > > @@ -331,8 +331,8 @@ static int imx_pmx_gpio_set_direction(struct
+>> > > pinctrl_dev *pctldev,
+>> > >  	u32 reg;
+>> > >
+>> > >  	/*
+>> > > -	 * Only Vybrid has the input/output buffer enable flags (IBE/OBE)
+>> > > -	 * They are part of the shared mux/conf register.
+>> > > +	 * Only Vybrid and iMX ULP has the input/output buffer enable flags
+>> > > +	 * (IBE/OBE) They are part of the shared mux/conf register.
+>> > >  	 */
+>> > >  	if (!(info->flags & SHARE_MUX_CONF_REG))
+>> > >  		return 0;
+>> > > @@ -344,9 +344,9 @@ static int imx_pmx_gpio_set_direction(struct
+>> > > pinctrl_dev *pctldev,
+>> > >  	/* IBE always enabled allows us to read the value "on the wire" */
+>> > >  	reg = readl(ipctl->base + pin_reg->mux_reg);
+>> > >  	if (input)
+>> > > -		reg &= ~0x2;
+>> > > +		reg = (reg & ~info->obe_bit) | info->ibe_bit;
+>> > >  	else
+>> > > -		reg |= 0x2;
+>> > > +		reg = (reg & ~info->ibe_bit) | info->obe_bit;
+>> >
+>> > Why disabling IBE bit now? As the comment above states, it is really
+>> > handy to leave the input buffer enabled so we can read back the true
+>> > value on the wire...
+>> >
+>>
+>> Does Vybrid reply on this bit to read the status of output from Port Data
+>> Input Register (GPIOx_PDIR)?
+>>
+>> Then, it is a bit strange that read status from input register when the
+>> GPIO is Actually configured as output.
+>>
+>> Probably it works on Vybrid, but I don't know if it's valid for MX7ULP.
+>>
+>> For MX7ULP, we will read input or output register accordingly by checking
+>> GPIO direction register (PDDR) and we will not enable Input buffer if the
+>> GPIO is configured as output, this also save a bit power.
+>>
+>> I know Vybrid has no PDDR, probably that's why you enable IBE by default
+>> always.
+>>
 
-I counted 4. Where did I mess up?
+The main reason I enable input buffer by default is so that software has
+a chance to see the actual state of the GPIO. E.g. when a GPIO is
+connected to GND, and you set it high, you can read back a 0... (of
+course you should not connect a GPIO to GND and set it high! But that is
+exactly the point, with enabling the input buffer you actually see that
+something is wrong!)
 
-advk_msi_set_affinity
-altera_msi_set_affinity
-nwl_msi_set_affinity
-vmd_irq_set_affinity
-tango_set_affinity
+Can we not do this for iMX7ULP too?
 
-Regards.
+> 
+> We need make a decision on how to address the difference between Vybrid
+> And IMX7ULP.
+> 
+> If Vybrid wants to keep input buffer enabled, we probably could invent
+> A IMX_PINCONF_HAVE_PDDR just like GPIO driver and only disable IBE for IMX?
+
+That would be one option yes. You also need a flag so you can opt out
+from imx_pmx_gpio_enable/disable_free...
+
+The more involved version would be to somehow move imx_pmx_gpio_* to
+pinctrl-vf610.c, e.g. store the callbacks in imx_pinctrl_soc_info and
+set them dynamically in imx_pinctrl_probe (you have to unconst
+pinmux_ops). With that you can provide no
+imx_pmx_gpio_enable/disable_free for iMX7ULP and your own
+imx_pmx_gpio_set_direction...
+
+--
+Stefan
+
+> 
+> Do you think it's ok?
+> 
+> 
+> Regards
+> Dong Aisheng
+> 
+> 
+>> Regards
+>> Dong Aisheng
+>>
+>> > --
+>> > Stefan
+>> >
+>> > >  	writel(reg, ipctl->base + pin_reg->mux_reg);
+>> > >
+>> > >  	return 0;
+>> > > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h
+>> > > b/drivers/pinctrl/freescale/pinctrl-imx.h
+>> > > index eb0ce95..9ded65d 100644
+>> > > --- a/drivers/pinctrl/freescale/pinctrl-imx.h
+>> > > +++ b/drivers/pinctrl/freescale/pinctrl-imx.h
+>> > > @@ -67,6 +67,8 @@ struct imx_pinctrl_soc_info {
+>> > >  	/* MUX_MODE shift and mask in case SHARE_MUX_CONF_REG */
+>> > >  	unsigned int mux_mask;
+>> > >  	u8 mux_shift;
+>> > > +	u32 ibe_bit;
+>> > > +	u32 obe_bit;
+>> > >
+>> > >  	/* generic pinconf */
+>> > >  	bool generic_pinconf;
+>> > > diff --git a/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
+>> > > b/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
+>> > > index dead416..f724a01 100644
+>> > > --- a/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
+>> > > +++ b/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
+>> > > @@ -324,6 +324,8 @@ static struct imx_pinctrl_soc_info
+>> > imx7ulp_pinctrl_info = {
+>> > >  	.flags = ZERO_OFFSET_VALID | SHARE_MUX_CONF_REG,
+>> > >  	.mux_mask = 0xf00,
+>> > >  	.mux_shift = 8,
+>> > > +	.ibe_bit = BIT(16),
+>> > > +	.obe_bit = BIT(17),
+>> > >  	.generic_pinconf = true,
+>> > >  	.custom_params = imx7ulp_cfg_params,
+>> > >  	.num_custom_params = ARRAY_SIZE(imx7ulp_cfg_params), diff --git
+>> > > a/drivers/pinctrl/freescale/pinctrl-vf610.c
+>> > > b/drivers/pinctrl/freescale/pinctrl-vf610.c
+>> > > index 3bd8556..c0823f9 100644
+>> > > --- a/drivers/pinctrl/freescale/pinctrl-vf610.c
+>> > > +++ b/drivers/pinctrl/freescale/pinctrl-vf610.c
+>> > > @@ -301,6 +301,8 @@ static struct imx_pinctrl_soc_info
+>> > vf610_pinctrl_info = {
+>> > >  	.flags = SHARE_MUX_CONF_REG | ZERO_OFFSET_VALID,
+>> > >  	.mux_mask = 0x700000,
+>> > >  	.mux_shift = 20,
+>> > > +	.ibe_bit = BIT(0),
+>> > > +	.obe_bit = BIT(1),
+>> > >  };
+>> > >
+>> > >  static const struct of_device_id vf610_pinctrl_of_match[] = {
