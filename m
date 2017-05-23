@@ -1,53 +1,24 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 23 May 2017 09:33:25 +0200
-Subject: [PATCH] spi: add null check before pointer dereference
-In-Reply-To: <CAJKOXPepyk6KtSUNXymjMkT6qTX9PnCC1LvTC4y_2dL0nZ-kMA@mail.gmail.com>
-References: <20170523002507.GA16670@embeddedgus>
- <CAJKOXPepyk6KtSUNXymjMkT6qTX9PnCC1LvTC4y_2dL0nZ-kMA@mail.gmail.com>
-Message-ID: <CAMuHMdVNTT9JJvZ_SuSUkAPMqYOmdG-4zLggwaT_ObStbGG_ow@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 May 2017 09:41:15 +0200
+Subject: [PATCH V2 0/5] pinctrl: imx: add generic pin config and imx7ulp
+ support
+In-Reply-To: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
+References: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CACRpkdY2--+JCaPA0zBGrF66DwgOPd6m4=QvCgkO50x35TCzzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 9:24 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Tue, May 23, 2017 at 2:25 AM, Gustavo A. R. Silva
-> <garsilva@embeddedor.com> wrote:
->> Add null check before dereferencing pointer desc
->>
->> Addresses-Coverity-ID: 1397997
->> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
->> ---
->>  drivers/spi/spi-s3c64xx.c | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
->> index b392cca..9f1013e 100644
->> --- a/drivers/spi/spi-s3c64xx.c
->> +++ b/drivers/spi/spi-s3c64xx.c
->> @@ -306,6 +306,12 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
->>         desc = dmaengine_prep_slave_sg(dma->ch, sgt->sgl, sgt->nents,
->>                                        dma->direction, DMA_PREP_INTERRUPT);
->>
->> +       if (!desc) {
->> +               dev_err(&sdd->master->dev,
->> +                       "%s:dmaengine_prep_slave_sg Failed\n", __func__);
->> +               return;
->> +       }
->
-> Although the check itself looks needed, but I think you did not handle
-> the error at all. You just bail out before submitting dma descriptor
-> but except that, everything else goes like there was no error. It
-> might work, might not... did you test this error path? How does it
-> behave?
+On Fri, May 19, 2017 at 9:05 AM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
 
-I.e. does it fall back to PIO?
+> This patch series intends to add the generic pin config support for imx
+> platforms.
 
-Gr{oetje,eeting}s,
+I applied patches 1,2,3 as you've seen, so please rebase on my "devel"
+branch in pin control and only resend the things we are still discussing.
 
-                        Geert
+I see there are some other patches flying for imx pin control and GPIO,
+if the patches are dependent on each other consider putting it all into
+one series. If they are not dependent, then don't.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
