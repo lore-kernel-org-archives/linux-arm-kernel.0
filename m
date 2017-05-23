@@ -1,89 +1,379 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Tue, 23 May 2017 12:21:51 +0100
-Subject: [RFC PATCH 04/30] iommu/arm-smmu-v3: Add support for PCI ATS
-In-Reply-To: <5923F5B1.2080209@huawei.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-5-jean-philippe.brucker@arm.com>
- <5923F5B1.2080209@huawei.com>
-Message-ID: <09d0c4de-ec01-bcce-9901-5ff36c6c69bd@arm.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Tue, 23 May 2017 19:20:18 +0800
+Subject: [PATCH 06/12] arm64: dts: hi3660: add gpio dtsi file for
+ Hisilicon Hi3660 SOC
+In-Reply-To: <20170523004145.6y4x5n3leohrn7zc@rob-hp-laptop>
+References: <20170517083745.24479-1-guodong.xu@linaro.org>
+ <20170517083745.24479-7-guodong.xu@linaro.org>
+ <20170523004145.6y4x5n3leohrn7zc@rob-hp-laptop>
+Message-ID: <CAFGCpxxhs0HOfwdR=1kX9=4LSNrqryziQKTOqz8SEGveGO11oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/17 09:41, Leizhen (ThunderTown) wrote:
-> On 2017/2/28 3:54, Jean-Philippe Brucker wrote:
->> PCIe devices can implement their own TLB, named Address Translation Cache
->> (ATC). Steps involved in the use and maintenance of such caches are:
+On Tue, May 23, 2017 at 8:41 AM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, May 17, 2017 at 04:37:39PM +0800, Guodong Xu wrote:
+>> From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
 >>
->> * Device sends an Address Translation Request for a given IOVA to the
->>   IOMMU. If the translation succeeds, the IOMMU returns the corresponding
->>   physical address, which is stored in the device's ATC.
+>> This patch adds pl061 device nodes for Hi3660 SoC.
 >>
->> * Device can then use the physical address directly in a transaction.
->>   A PCIe device does so by setting the TLP AT field to 0b10 - translated.
->>   The SMMU might check that the device is allowed to send translated
->>   transactions, and let it pass through.
+>> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+>> ---
+>>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 409 ++++++++++++++++++++++++++++++
+>>  1 file changed, 409 insertions(+)
 >>
->> * When an address is unmapped, CPU sends a CMD_ATC_INV command to the
->>   SMMU, that is relayed to the device.
->>
->> In theory, this doesn't require a lot of software intervention. The IOMMU
->> driver needs to enable ATS when adding a PCI device, and send an
->> invalidation request when unmapping. Note that this invalidation is
->> allowed to take up to a minute, according to the PCIe spec. In
->> addition, the invalidation queue on the ATC side is fairly small, 32 by
->> default, so we cannot keep many invalidations in flight (see ATS spec
->> section 3.5, Invalidate Flow Control).
->>
->> Handling these constraints properly would require to postpone
->> invalidations, and keep the stale mappings until we're certain that all
->> devices forgot about them. This requires major work in the page table
->> managers, and is therefore not done by this patch.
->>
->>   Range calculation
->>   -----------------
->>
->> The invalidation packet itself is a bit awkward: range must be naturally
->> aligned, which means that the start address is a multiple of the range
->> size. In addition, the size must be a power of two number of 4k pages. We
->> have a few options to enforce this constraint:
->>
->> (1) Find the smallest naturally aligned region that covers the requested
->>     range. This is simple to compute and only takes one ATC_INV, but it
->>     will spill on lots of neighbouring ATC entries.
->>
->> (2) Align the start address to the region size (rounded up to a power of
->>     two), and send a second invalidation for the next range of the same
->>     size. Still not great, but reduces spilling.
->>
->> (3) Cover the range exactly with the smallest number of naturally aligned
->>     regions. This would be interesting to implement but as for (2),
->>     requires multiple ATC_INV.
->>
->> As I suspect ATC invalidation packets will be a very scarce resource,
->> we'll go with option (1) for now, and only send one big invalidation.
->>
->> Note that with io-pgtable, the unmap function is called for each page, so
->> this doesn't matter. The problem shows up when sharing page tables with
->> the MMU.
-> Suppose this is true, I'd like to choose option (2). Because the worst cases of
-> both (1) and (2) will not be happened, but the code of (2) will look clearer.
-> And (2) is technically more acceptable.
+>> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>> index f217c9d..3bea0d2 100644
+>> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>> @@ -251,5 +251,414 @@
+>>                       clock-names = "uartclk", "apb_pclk";
+>>                       status = "disabled";
+>>               };
+>> +
+>> +             gpio0: gpio at e8a0b000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a0b000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 1 0 7>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO0>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>
+> You don't need "ok" here if these are default enabled.
+>
+>> +             };
+>> +
+>> +             gpio1: gpio at e8a0c000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a0c000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 1 7 7>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO1>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>
+> ditto...
+>
+>> +             };
+>> +
+>> +             gpio2: gpio at e8a0d000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a0d000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 14 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO2>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio3: gpio at e8a0e000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a0e000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 22 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO3>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio4: gpio at e8a0f000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a0f000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 30 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO4>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio5: gpio at e8a10000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a10000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 38 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO5>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio6: gpio at e8a11000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a11000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 46 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO6>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio7: gpio at e8a12000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a12000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 54 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO7>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio8: gpio at e8a13000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a13000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 62 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO8>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio9: gpio at e8a14000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a14000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 70 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO9>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio10: gpio at e8a15000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a15000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 78 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO10>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio11: gpio at e8a16000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a16000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 86 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO11>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio12: gpio at e8a17000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a17000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 94 3 &pmx0 7 101 1>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO12>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio13: gpio at e8a18000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a18000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 102 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO13>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio14: gpio at e8a19000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a19000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 110 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO14>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio15: gpio at e8a1a000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a1a000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx0 0 118 6>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO15>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio16: gpio at e8a1b000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a1b000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO16>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio17: gpio at e8a1c000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a1c000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO17>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio18: gpio at ff3b4000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xff3b4000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx2 0 0 8>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO18>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio19: gpio at ff3b5000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xff3b5000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx2 0 8 4>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO19>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio20: gpio at e8a1f000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a1f000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     gpio-ranges = <&pmx1 0 0 6>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO20>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio21: gpio at e8a20000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xe8a20000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     gpio-ranges = <&pmx3 0 0 6>;
+>> +                     clocks = <&crg_ctrl HI3660_PCLK_GPIO21>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio22: gpio at fff0b000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xfff0b000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     /* GPIO176 */
+>> +                     gpio-ranges = <&pmx4 2 0 6>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&sctrl HI3660_PCLK_AO_GPIO0>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +             gpio23: gpio at fff0c000 {
+>> +                     compatible = "arm,pl061", "arm,primecell";
+>> +                     reg = <0 0xfff0c000 0 0x1000>;
+>> +                     interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     gpio-controller;
+>> +                     #gpio-cells = <2>;
+>> +                     /* GPIO184 */
+>> +                     gpio-ranges = <&pmx4 0 6 7>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <2>;
+>> +                     clocks = <&sctrl HI3660_PCLK_AO_GPIO1>;
+>> +                     clock-names = "apb_pclk";
+>> +                     status = "ok";
+>> +             };
+>> +
+>> +              gpio24: gpio at fff0d000 {
+>
+> extra space     ^
 
-I agree that (2) is a bit clearer, but the question is of performance
-rather than readability. I'd like to see some benchmarks or experiment on
-my own before switching to a two-invalidation system.
-
-Intuitively one big invalidation will result in more ATC trashing and will
-bring overall device performance down. But then according to the PCI spec,
-ATC invalidations are grossly expensive, they have an upper bound of a
-minute. I agree that this is highly improbable and might depend on the
-range size, but purely from an architectural standpoint, reducing the
-number of ATC invalidation requests is the priority, because this is much
-worse than any performance slow-down incurred by ATC trashing. And for the
-moment I can only base my decisions on the architecture.
-
-So I'd like to keep (1) for now, and update it to (2) (or even (3)) once
-we have more hardware to experiment with.
-
-Thanks,
-Jean
+Thanks, Rob. I will fix this and all above.
