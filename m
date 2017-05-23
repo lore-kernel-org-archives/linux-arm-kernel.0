@@ -1,75 +1,26 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 23 May 2017 15:19:40 +0800
-Subject: [PATCH] clk: sunxi-ng: select SUNXI_CCU_MULT for sun8i-a83t
-In-Reply-To: <20170523005553.GH20170@codeaurora.org>
-References: <20170522202951.2896280-1-arnd@arndb.de>
- <20170523005553.GH20170@codeaurora.org>
-Message-ID: <20170523071940.xbnahikb4d5dge7v@wens.csie.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 23 May 2017 09:21:43 +0200
+Subject: [PATCH 3/3] mfd: twl: move header file out of I2C realm
+In-Reply-To: <20170523071636.hiws54msfxpg6qkb@dell>
+References: <20170521220212.1404-1-wsa@the-dreams.de>
+ <20170521220212.1404-4-wsa@the-dreams.de>
+ <20170523071636.hiws54msfxpg6qkb@dell>
+Message-ID: <20170523072143.njhh7mkbm2tt277l@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 05:55:53PM -0700, Stephen Boyd wrote:
-> On 05/22, Arnd Bergmann wrote:
-> > We get a link error when CCU_MULT is not set with the
-> > newly added driver:
-> > 
-> > drivers/clk/sunxi-ng/ccu-sun8i-a83t.o:(.data.__compound_literal.1+0x4): undefined reference to `ccu_mult_ops'
-> > drivers/clk/sunxi-ng/ccu-sun8i-a83t.o:(.data.__compound_literal.3+0x4): undefined reference to `ccu_mult_ops'
-> > 
-> > Fixes: 46b492116666 ("clk: sunxi-ng: Add driver for A83T CCU")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
-> Is there any way we can automate finding these build errors and
-> prevent them from creeping into the tree? It may be asking too
-> much, but it seems like we should be able to find these
-> particular problems with some script that greps for ccu_*_ops and
-> checks that any file's Kconfig symbol also has that selected.
+> For my own reference:
+>   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 > 
-> Anyway, I'm just tired of seeing these sorts of things in my
-> inbox.
+> I guess this will be going through the MFD tree?
 
-The (ugly) script below does the trick, though it does give results
-for some symbols that are indirectly selected:
+I'd prefer that, yes. Thanks!
 
-SUN5I_CCU uses SUNXI_CCU_GATE but does not select it
-SUN5I_CCU uses SUNXI_CCU_MUX but does not select it
-SUN5I_CCU uses SUNXI_CCU_NKMP but does not select it
-SUN6I_A31_CCU uses SUNXI_CCU_GATE but does not select it
-SUN6I_A31_CCU uses SUNXI_CCU_MUX but does not select it
-SUN8I_A23_CCU uses SUNXI_CCU_GATE but does not select it
-SUN8I_A23_CCU uses SUNXI_CCU_MUX but does not select it
-SUN8I_A33_CCU uses SUNXI_CCU_GATE but does not select it
-SUN8I_A33_CCU uses SUNXI_CCU_MUX but does not select it
-SUN8I_A83T_CCU uses SUNXI_CCU_MULT but does not select it
-SUN8I_H3_CCU uses SUNXI_CCU_GATE but does not select it
-SUN8I_H3_CCU uses SUNXI_CCU_MUX but does not select it
-SUN8I_V3S_CCU uses SUNXI_CCU_GATE but does not select it
-SUN8I_V3S_CCU uses SUNXI_CCU_MUX but does not select it
-SUN9I_A80_CCU uses SUNXI_CCU_MUX but does not select it
-
-------------------------------------------------------------------------
-
-#!/bin/bash
-
-LANG=C
-
-for i in drivers/clk/sunxi-ng/ccu-*.o; do
-	FILE=`basename $i`
-	CLKS=`nm -g $i | grep -P -o "ccu_.*(?=_ops)" | tr [a-z] [A-Z]`
-	CFG=`grep $FILE drivers/clk/sunxi-ng/Makefile |
-		grep -P -o "(?<=CONFIG_)SUN[A-Z0-9_]*"`
-
-	for clk in $CLKS; do
-		perl -0777 -ne "/$CFG(.*?)^(?:config|endif)/sm; print \$1" \
-			drivers/clk/sunxi-ng/Kconfig | grep -q "SUNXI_$clk" ||
-			echo "$CFG uses SUNXI_$clk but does not select it"
-	done
-done
-
-------------------------------------------------------------------------
-
-
-Regards
-ChenYu
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170523/2a1d46f1/attachment.sig>
