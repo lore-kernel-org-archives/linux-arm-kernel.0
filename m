@@ -1,36 +1,74 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Tue, 23 May 2017 10:33:02 +0200
-Subject: [PATCH 08/13] ARM: dts: armada-385-linksys: use binary unit
- prefixes
-In-Reply-To: <20170522202416.1c48d91a@gmail.com>
-References: <20170521124903.11050-1-ralph.sennhauser@gmail.com>
- <20170521124903.11050-9-ralph.sennhauser@gmail.com>
- <20170522150001.GM29447@lunn.ch>
- <20170522202416.1c48d91a@gmail.com>
-Message-ID: <20170523103302.4f78eb93@gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 23 May 2017 10:37:01 +0200
+Subject: [PATCH v3 0/4] tty/serial: meson_uart: add support for core clock
+ handling
+In-Reply-To: <20170331165437.26227-1-hgkr.klein@gmail.com>
+References: <20170331165437.26227-1-hgkr.klein@gmail.com>
+Message-ID: <81ec5e8e-2cf0-a59c-7355-c64e9f6106d9@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 May 2017 20:24:16 +0200
-Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
+Hi Helmut,
 
-> On Mon, 22 May 2017 17:00:01 +0200
-> Andrew Lunn <andrew@lunn.ch> wrote:
+
+On 03/31/2017 06:54 PM, Helmut Klein wrote:
+> To be able to use the three none AO uarts of the meson gx SoCs (uart_A,
+> uart_B & uart_C), the core clock has to be enabled (see chapter 22.3 of
+> the public s905 data sheet).
+> At least the u-boot of my s905 based media player (netxeon minimx-g)
+> doesn't do this. so the driver must enable the clock.
 > 
-> > On Sun, May 21, 2017 at 02:48:57PM +0200, Ralph Sennhauser wrote:  
-> > > Use IEEE 1541-2002 unit prefixes for sizes.    
-> > 
-> > Does ePAPR recommend this?  
+> This patch set does:
+> - exposes the UART clock ids to the dtb
+> - adds documentation for the dt-bindings of meson_uart
+> - adds the core clock handling to the driver
+> - adds the core clock handling to meson-gxbb.dtsi and meson-gxl.dtsi
 > 
-> Not directly, but the paper (v1.1) itself is using MiB as well which
-> could be seen as a recommendation.
+> The patchset is based on the branch "master" of the repository in [1]
+> 
+> Changes since v2
+> - mail subjects reworked
+> - add clocks/clock-names to the documentation
+> - add core clock handling to meson-gxbb.dtsi & meson-gxl.dtsi
+> 
+> Changes since v1
+> - use git to produce the patch set
+> - added the clock ids for uart_B and uart_C
+> 
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git
 
-Found the pdf again on the web, so here a link:
-http://elinux.org/images/c/cf/Power_ePAPR_APPROVED_v1.1.pdf
+I'll take the first patch then I will need to rework your patchset (keeping your
+autorship, don't worry) since we need to handle the old bindings.
 
-Funny thing it's using KB(instead of KiB) and MiB. So it's
-inconsistent, also the unit with SI prefix would be kB and not KB. So
-I'd say ePAPR doesn't care / the authors didn't pay any attention to
-this.
+I'll post it for review when ready.
 
-Ralph
+Anyway, thanks for the patchset.
+
+Neil
+
+> 
+> Helmut Klein (4):
+>   clk: meson: gxbb: expose CLKID_UARTx
+>   dt-bindings: meson_uart: add documentation for meson UARTs
+>   tty/serial: meson_uart: add the core clock handling to the driver
+>   ARM64: dts: meson-gx: add core clock support for uart_A, uart_B and
+>     uart_C
+> 
+>  .../bindings/serial/amlogic,meson_uart.txt         | 30 ++++++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 15 +++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 15 +++++++++++
+>  drivers/clk/meson/gxbb.h                           |  6 ++---
+>  drivers/tty/serial/meson_uart.c                    | 10 ++++++++
+>  include/dt-bindings/clock/gxbb-clkc.h              |  3 +++
+>  6 files changed, 76 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
+> 
+> --
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+> 
