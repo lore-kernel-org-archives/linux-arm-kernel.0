@@ -1,135 +1,87 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 23 May 2017 12:08:30 +0200
-Subject: [PATCH] arm: dts: r7s72100: Add support for GR-Peach
-In-Reply-To: <1495532834-25670-1-git-send-email-jacopo+renesas@jmondi.org>
-References: <1495532834-25670-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdUR0Djqi-7DWAHpN_F6xt-WcYzT4H2+mLCjHE9T+7UuJg@mail.gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Tue, 23 May 2017 10:09:03 +0000
+Subject: [PATCH 0/2] ioremap_wc on arm64
+In-Reply-To: <20170522154947.GF30129@e104818-lin.cambridge.arm.com>
+References: <1495436507-81890-1-git-send-email-jnair@caviumnetworks.com>
+ <20170522085615.GC30129@e104818-lin.cambridge.arm.com>
+ <20170522115349.GA82957@localhost> <20170522122236.GG1107@arm.com>
+ <20170522142059.GA83004@localhost>
+ <20170522154947.GF30129@e104818-lin.cambridge.arm.com>
+Message-ID: <20170523100903.GA4562@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
+On Mon, May 22, 2017 at 04:49:47PM +0100, Catalin Marinas wrote:
+> On Mon, May 22, 2017 at 02:21:00PM +0000, Jayachandran C wrote:
+> > On Mon, May 22, 2017 at 01:22:37PM +0100, Will Deacon wrote:
+> > > On Mon, May 22, 2017 at 11:53:50AM +0000, Jayachandran C wrote:
+> > > > On Mon, May 22, 2017 at 09:56:16AM +0100, Catalin Marinas wrote:
+> > > > > On Mon, May 22, 2017 at 07:01:45AM +0000, Jayachandran C wrote:
+> > > > > > From its definition, the device "gather" attribute seems to be a better
+> > > > > > fit for implementing write combining mapping in ioremap_wc().  And on
+> > > > > > ThunderX2, Device GRE mapping has optimizations that makes it much faster
+> > > > > > than normal uncached mapping.
+> > > > > > 
+> > > > > > I am not sure of the reasoning behind the original decision to make
+> > > > > > ioremap_wc use "Normal Non-Cached" attribute, since all the other variants
+> > > > > > of ioremap use device attributes, and ioremap_wc looks like an exception.
+> > > > > 
+> > > > > The reason we kept it as Normal NC is that Device_GRE does not allow
+> > > > > unaligned accesses.
+> > > > 
+> > > > There does not to be an expectation to have unaligned access on __iomem
+> > > > pointers. I also see that memremap can call ioremap_wc (which is a Normal
+> > > > mapping) or ioremap_wt(which is a Device mapping), so that is inconsistent
+> > > > as well.
+> > > > 
+> > > > Was this added for a specific use case? Also, do you think this patchset
+> > > > is acceptable?
+> > > 
+> > > I think it was used for framebuffers. Note that using normal-NC also aligns
+> > > with arch/arm/ and, since normal-NC is strictly a more relaxed memory type
+> > > than Device-GRE, I'm really not keen making on this change.
+> > 
+> > If there is a hardware requirement that Normal-NC has to be implemented
+> > as more relaxed attribute than Device GRE, I can go back to the hardware
+> > team on this. I did not see any text in the ARM ARM requiring this.
+> 
+> It depends what you mean by "relaxed". Normal NC allows unaligned
+> accesses and also allows speculative loads (you don't get any ordering
+> guarantees of the Device memory). If you mean skipping some transparent
+> cache snooping, it may break other use-cases.
 
-On Tue, May 23, 2017 at 11:47 AM, Jacopo Mondi
-<jacopo+renesas@jmondi.org> wrote:
-> Add device tree source for Renesas GR-Peach board.
-> GR-Peach is an RZ/A1H based board with 10MB of on-chip SRAM and 8MB
-> QSPI flash storage.
-> Add support for the board, and create a 2MB partition to use as rootfs.
->
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Ok. I was using Will's terminology here. This is not the main issue,
+but worth understanding. If there is a requirement in ARM spec that
+"Normal NC" must be "strictly more releaxed" than "Device GRE", I will
+have to point that out to our hardware team.
 
-Thanks for your patch!
+> > Even if that is the case, having Normal attribute for ioremap just for
+> > ioremap_wc is inconsistent. The Device Gathering attribute by its definition
+> > is exactly what write combining requires. The memremap() API looks like a
+> > better way to expose Normal-NC mapping (with additional features like
+> > speculation etc.) if implemented correctly.
+> 
+> I agree, memremap() is a better way but this was merged in 4.3 while
+> ioremap_wc() had been around for a long time. If you want to change its
+> semantics, you'd need to go through all its uses in the kernel and make
+> sure they *only* use I/O accessors with such memory. At a quick grep,
+> there are several places where the __iomem pointer attribute is dropped
+> shortly after ioremap() and the pointer is accessed directly. That's
+> where things will break with Device GRE memory since the compiler
+> doesn't guarantee aligned accesses.
 
-> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
-> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-> @@ -51,6 +51,8 @@ Boards:
->      compatible = "renesas,bockw", "renesas,r8a7778"
->    - Genmai (RTK772100BC00000BR)
->      compatible = "renesas,genmai", "renesas,r7s72100"
-> +  - GR-Peach (RTK772100BC00000BR)
+There is a difference in behavior with regard to unaligned access between
+ioremap_wc and ioremap already. I don't follow why unaligned access has to
+supported for ioremap_wc but not for ioremap - it would be much better to
+be consistent here.
 
-That part number is Genmai?
+> > Also, patch 1/2 should be useful anyway - can that be picked up?
+> 
+> The patch is harmless but are we going to have a user of Device_GRE?
 
-> +    compatible = "renesas,grpeach", "renesas,r7s72100"
+This patch would make the attribute in MAIR and the index MT_DEVICE_GRE
+useful for __ioremap. Otherwise I don't see the use in having the
+attribute at  all. I can at least give this to people who want Device GRE
+mapping, which is the fastest way to access device memory on ThunderX2.
 
-"renesas,gr-peach"?
-
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -716,6 +716,7 @@ dtb-$(CONFIG_ARCH_S5PV210) += \
->  dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
->         emev2-kzm9d.dtb \
->         r7s72100-genmai.dtb \
-> +       r7s72100-grpeach.dtb \
-
-r7s72100-gr-peach.dtb?
-
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/r7s72100-grpeach.dts
-
-r7s72100-gr-peach.dts
-
-> @@ -0,0 +1,65 @@
-> +/*
-> + * Device Tree Source for the GRPEACH board
-
-GR-PEACH
-
-> +/ {
-> +       model = "GRPEACH";
-
-GR-PEACH
-
-> +       compatible = "renesas,grpeach", "renesas,r7s72100";
-
-renesas,gr-peach
-
-> +
-> +       aliases {
-> +               serial2 = &scif2;
-
-The first serial port is supposed to be called serial0, unless labeled
-otherwise.
-
-> +       };
-> +
-> +       chosen {
-> +               bootargs = "console=ttySC2,115200 ignore_loglevel rw root=/dev/mtdblock0";
-
-bootargs = "ignore_loglevel rw root=/dev/mtdblock0";
-stdout-path = "serial0:115200n8";
-
-> +       memory {
-
-memory at 20000000
-
-(please run "make dtbs W=1")
-
-> +               device_type = "memory";
-> +               reg = <0x20000000 0x00A00000>;  /* 10Mb @ 0x20000000 */
-
-reg = <0x20000000 0x00a00000>;
-
-No need for the comment, esp. since it says 10 megabits instead of
-10 mebibyte ;-)
-
-> +       qspi at 18000000 {
-
-flash at 18000000?
-
-> +               compatible = "mtd-rom";
-> +               probe-type = "map_rom";
-> +               reg = <0x18000000 0x00800000>;   /* 8 MB*/
-
-No need for the comment (megabyte vs. mebibyte)
-
-> +               bank-width = <4>;
-> +               device-width = <1>;
-> +
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +
-> +               rootfs at 18600000 {
-
-rootfs at 600000?
-
-> +                       label = "rootfs";
-> +                       reg = <0x00600000 0x00200000>; /* 2MB @ 0x18600000 */
-
-Do we need the comment?
-
-> +&extal_clk {
-> +       clock-frequency = <13330000>;
-
-My schematics have one more digit of precision: <13333000>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+JC.
