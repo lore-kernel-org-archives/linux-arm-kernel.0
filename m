@@ -1,77 +1,72 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 23 May 2017 10:31:38 -0600
-Subject: [PATCH v11 9/9] arm64: dts: qcom: msm8916: Add debug unit
-In-Reply-To: <1495548980-30432-10-git-send-email-leo.yan@linaro.org>
-References: <1495548980-30432-1-git-send-email-leo.yan@linaro.org>
- <1495548980-30432-10-git-send-email-leo.yan@linaro.org>
-Message-ID: <CANLsYkwkJkNCvf42hyQv6Fnkn1Ab-OAbPuJhLskKu=q4ReMEDg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 23 May 2017 09:35:05 -0700
+Subject: [PATCH 2/2] arm64: dts: rockchip: introduce rk3399-op1 operating
+ points
+In-Reply-To: <1597629.2TFUO1J4Mt@phil>
+References: <20170523095109.7337-1-heiko@sntech.de>
+ <20170523095109.7337-2-heiko@sntech.de>
+ <CAD=FV=XbUjuvt+ctm8Xw6JPqe7m4PdyZ1hm3Uast2+1+nJ=nPw@mail.gmail.com>
+ <1597629.2TFUO1J4Mt@phil>
+Message-ID: <CAD=FV=WjwDd6VmeWmMxBb0_kE78zsbqiqxg7u4zXQy6LWWPV6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 May 2017 at 08:16, Leo Yan <leo.yan@linaro.org> wrote:
-> Add debug unit on Qualcomm msm8916 based platforms, including the
-> DragonBoard 410c board.
+Hi,
+
+On Tue, May 23, 2017 at 9:10 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Am Dienstag, 23. Mai 2017, 08:57:01 CEST schrieb Doug Anderson:
+>> Hi,
+>>
+>> On Tue, May 23, 2017 at 2:51 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+>> > The OP1 is a rk3399 variant used in ChromeOS devices with a slightly
+>> > higher frequency rating. Therefore introduce separate operting points,
+>> > from the ChromeOS tree, for it and use it in Gru devices.
+>> >
+>> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>> > ---
+>> >  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi     |   2 +-
+>> >  arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi | 145 +++++++++++++++++++++++
+>> >  2 files changed, 146 insertions(+), 1 deletion(-)
+>> >  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi
+>>
+>> The numbers here match what's in the Chrome OS tree and those were all
+>> approved by Rockchip.
+>>
+>> One slight nit is that the descriptions these two patches together
+>> make it look like this will be a no-op change for OP1 devices.  This
+>> is not true.  After things were posted upstream there have been
+>> several adjustments to the opp points in the Chrome OS tree.  Since
+>> what you have currently matches the ToT Chrome OS tree, that should
+>> mean that there's a net difference.  It would be nice to mention that
+>> in the commit message.
 >
-> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> In the mainline kernel it is a no-op change, as we're still running with
+> the cpu-regulators disabled on gru ;-)
 
-Andy and David,
-
-Would you mind taking a look a this when you have a minute?  If it's
-fine with you we can make this go through my tree with the rest of the
-driver.
-
-Regards,
-Mathieu
+Ah, that's true.
 
 
-> ---
->  arch/arm64/boot/dts/qcom/msm8916.dtsi | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
+> But to address your very valid point, I guess you mean something like
 >
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index ab30939..17691ab 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -1116,6 +1116,38 @@
->                         };
->                 };
+> ----
+> The OP1 is a rk3399 variant used in ChromeOS devices with a slightly
+> higher frequency rating compared to the regular rk3399, but right now
+> the only available operating points are somewhere in between both
+> variants with both needing adjustments to actually fit their specs.
+
+That would be fine and would make it obvious that it's a no-op.
+Ironically, the OPP points that were in mainline were actually not
+totally in between.  There were some numbers that were raised for
+both.  :)
+
+
+> Therefore introduce separate operting points, from the ChromeOS kernel,
+> for the OP1 and use it on Gru devices.
+> ----
 >
-> +               debug at 850000 {
-> +                       compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +                       reg = <0x850000 0x1000>;
-> +                       clocks = <&rpmcc RPM_QDSS_CLK>;
-> +                       clock-names = "apb_pclk";
-> +                       cpu = <&CPU0>;
-> +               };
-> +
-> +               debug at 852000 {
-> +                       compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +                       reg = <0x852000 0x1000>;
-> +                       clocks = <&rpmcc RPM_QDSS_CLK>;
-> +                       clock-names = "apb_pclk";
-> +                       cpu = <&CPU1>;
-> +               };
-> +
-> +               debug at 854000 {
-> +                       compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +                       reg = <0x854000 0x1000>;
-> +                       clocks = <&rpmcc RPM_QDSS_CLK>;
-> +                       clock-names = "apb_pclk";
-> +                       cpu = <&CPU2>;
-> +               };
-> +
-> +               debug at 856000 {
-> +                       compatible = "arm,coresight-cpu-debug","arm,primecell";
-> +                       reg = <0x856000 0x1000>;
-> +                       clocks = <&rpmcc RPM_QDSS_CLK>;
-> +                       clock-names = "apb_pclk";
-> +                       cpu = <&CPU3>;
-> +               };
-> +
->                 etm at 85c000 {
->                         compatible = "arm,coresight-etm4x", "arm,primecell";
->                         reg = <0x85c000 0x1000>;
-> --
-> 2.7.4
->
+> And I guess we should also swap patch ordering, first move Gru away from
+> the general opps and then adust them for the regular rk3399.
+
+Yeah, I think swapping the order would make it slightly better.
+
+-Doug
