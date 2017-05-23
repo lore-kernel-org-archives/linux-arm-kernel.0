@@ -1,27 +1,48 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 May 2017 09:27:39 -0500
-Subject: [PATCH 2/3] rtc: gemini: Augment DT bindings for Faraday
-In-Reply-To: <20170518215635.13505-2-linus.walleij@linaro.org>
-References: <20170518215635.13505-1-linus.walleij@linaro.org>
- <20170518215635.13505-2-linus.walleij@linaro.org>
-Message-ID: <20170523142739.34wyhtotl4jldsez@rob-hp-laptop>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 23 May 2017 16:34:45 +0200
+Subject: [PATCH 2/2] MAINTAINERS: add irqchip related drivers to Marvell
+ EBU maintainers
+In-Reply-To: <20170522055208.GB23967@io.lakedaemon.net> (Jason Cooper's
+ message of "Mon, 22 May 2017 05:52:08 +0000")
+References: <1495112333-10494-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1495112333-10494-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170522055208.GB23967@io.lakedaemon.net>
+Message-ID: <87vaorwsje.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 18, 2017 at 11:56:34PM +0200, Linus Walleij wrote:
-> The Gemini RTC is actually a standard IP block from Faraday
-> Technology called FTRTC010. Rename the bindings, add the
-> generic compatible string and add definitions for the two
-> available clocks.
-> 
-> Cc: devicetree at vger.kernel.org
-> Cc: Po-Yu Chuang <ratbert@faraday-tech.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  .../devicetree/bindings/rtc/cortina,gemini.txt     | 14 -----------
->  .../devicetree/bindings/rtc/faraday,ftrtc010.txt   | 28 ++++++++++++++++++++++
->  2 files changed, 28 insertions(+), 14 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/rtc/cortina,gemini.txt
->  create mode 100644 Documentation/devicetree/bindings/rtc/faraday,ftrtc010.txt
+Hi,
+ 
+ On lun., mai 22 2017, Jason Cooper <jason@lakedaemon.net> wrote:
 
-Acked-by: Rob Herring <robh@kernel.org> 
+> Hi Thomas,
+>
+> On Thu, May 18, 2017 at 02:58:53PM +0200, Thomas Petazzoni wrote:
+>> This commit updates the MAINTAINERS file so that the Marvell EBU
+>> maintainers are also responsible for their irqchip drivers in
+>> drivers/irqchip/.
+>> 
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> ---
+>>  MAINTAINERS | 2 ++
+>>  1 file changed, 2 insertions(+)
+>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>
+
+
+Applied on mvebu/fixes-non-critical
+
+Thanks,
+
+Gregory
+
+> thx,
+>
+> Jason.
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
