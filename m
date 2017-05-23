@@ -1,49 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 23 May 2017 21:52:39 +0200
-Subject: CHIPPro NAND issue with 4.12 rc1
-In-Reply-To: <63aca137397dc3700a34993205c8cfba@www.akkea.ca>
-References: <399ea126f3b18071fbe46bfc9787df6b@www.akkea.ca>
- <20170520171418.4e8a47e0@bbrezillon>
- <6f3cefa6c54776f82160ed8954f4d0d4@www.akkea.ca>
- <20170521074535.4a4ba6dd@bbrezillon>
- <20170522070117.mwk4gm34o7idedye@flea.home>
- <63aca137397dc3700a34993205c8cfba@www.akkea.ca>
-Message-ID: <20170523195239.6nsv4ydrt4u7q6ge@flea.home>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 May 2017 20:53:18 +0100
+Subject: [PATCH] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <1494623207-17195-1-git-send-email-abelvesa@gmail.com>
+References: <1494623207-17195-1-git-send-email-abelvesa@gmail.com>
+Message-ID: <20170523195318.GC22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 10:32:42AM -0600, Angus Ainslie wrote:
-> Hi Maxime
+On Fri, May 12, 2017 at 10:06:47PM +0100, Abel Vesa wrote:
+> The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
+> operation to specify if registers need to saved/restored by the ftrace handler.
+> This is needed by kgraft and possibly other ftrace-based tools, and the ARM
+> architecture is currently lacking this feature. It would also be the first step
+> to support the "Kprobes-on-ftrace" optimization on ARM.
 > 
-> On 2017-05-22 01:01, Maxime Ripard wrote:
-> > 
-> > This just made me realise, this is also the time where the clocks are
-> > disabled, and we changed our clock implementation in 4.11.
-> > 
-> > And using the 4.4 DT will keep the old driver...
-> > 
-> > Did you test in 4.11? If it's also broken, could you try to revert
-> > 1f4ce3b6ca79 and 6b48644b1d29 (I'm not sure it's going to be a trivial
-> > revert, but in that order it should work).
-> > 
+> This patch introduces a new ftrace handler that stores the registers on the
+> stack before calling the next stage. The registers are restored from the stack
+> before going back to the instrumented function.
 > 
-> Thanks reverting those two allow the kernel to boot and mount the NAND.
+> A side-effect of this patch is to activate the support for ftrace_modify_call()
+> as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture.
 
-Ok, good.
-
-If you unrevert those patches, and add clk_ignore_unused to the kernel
-command line, is it still broken?
-
-Maxime
+With the exception of the long lines in the commit message (please wrap
+before column 72 so that 'git log' is readable on 80 column displays) 
+I think this is fine.  Please amend the commit message and sent to the
+patch system.  Thanks.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170523/a4d8412e/attachment.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
