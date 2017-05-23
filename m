@@ -1,22 +1,53 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 23 May 2017 15:31:13 +0800
-Subject: [PATCH] clk: sunxi-ng: select SUNXI_CCU_MULT for sun8i-a83t
-In-Reply-To: <20170522202951.2896280-1-arnd@arndb.de>
-References: <20170522202951.2896280-1-arnd@arndb.de>
-Message-ID: <CAGb2v64-5d=G23NtZj2Kpx+kT9bxEfFEkfK9nRWh4Ab-8dX0-A@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 23 May 2017 09:33:25 +0200
+Subject: [PATCH] spi: add null check before pointer dereference
+In-Reply-To: <CAJKOXPepyk6KtSUNXymjMkT6qTX9PnCC1LvTC4y_2dL0nZ-kMA@mail.gmail.com>
+References: <20170523002507.GA16670@embeddedgus>
+ <CAJKOXPepyk6KtSUNXymjMkT6qTX9PnCC1LvTC4y_2dL0nZ-kMA@mail.gmail.com>
+Message-ID: <CAMuHMdVNTT9JJvZ_SuSUkAPMqYOmdG-4zLggwaT_ObStbGG_ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 4:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> We get a link error when CCU_MULT is not set with the
-> newly added driver:
+On Tue, May 23, 2017 at 9:24 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Tue, May 23, 2017 at 2:25 AM, Gustavo A. R. Silva
+> <garsilva@embeddedor.com> wrote:
+>> Add null check before dereferencing pointer desc
+>>
+>> Addresses-Coverity-ID: 1397997
+>> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+>> ---
+>>  drivers/spi/spi-s3c64xx.c | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+>> index b392cca..9f1013e 100644
+>> --- a/drivers/spi/spi-s3c64xx.c
+>> +++ b/drivers/spi/spi-s3c64xx.c
+>> @@ -306,6 +306,12 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
+>>         desc = dmaengine_prep_slave_sg(dma->ch, sgt->sgl, sgt->nents,
+>>                                        dma->direction, DMA_PREP_INTERRUPT);
+>>
+>> +       if (!desc) {
+>> +               dev_err(&sdd->master->dev,
+>> +                       "%s:dmaengine_prep_slave_sg Failed\n", __func__);
+>> +               return;
+>> +       }
 >
-> drivers/clk/sunxi-ng/ccu-sun8i-a83t.o:(.data.__compound_literal.1+0x4): undefined reference to `ccu_mult_ops'
-> drivers/clk/sunxi-ng/ccu-sun8i-a83t.o:(.data.__compound_literal.3+0x4): undefined reference to `ccu_mult_ops'
->
-> Fixes: 46b492116666 ("clk: sunxi-ng: Add driver for A83T CCU")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Although the check itself looks needed, but I think you did not handle
+> the error at all. You just bail out before submitting dma descriptor
+> but except that, everything else goes like there was no error. It
+> might work, might not... did you test this error path? How does it
+> behave?
 
-Applied.
+I.e. does it fall back to PIO?
 
-ChenYu
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
