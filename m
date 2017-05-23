@@ -1,199 +1,75 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 23 May 2017 08:18:19 +0100
-Subject: [PATCH 2/3] mfd: tps65010: move header file out of I2C realm
-In-Reply-To: <20170521220212.1404-3-wsa@the-dreams.de>
-References: <20170521220212.1404-1-wsa@the-dreams.de>
- <20170521220212.1404-3-wsa@the-dreams.de>
-Message-ID: <20170523071819.4zpdef7ofzz3moil@dell>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 23 May 2017 15:19:40 +0800
+Subject: [PATCH] clk: sunxi-ng: select SUNXI_CCU_MULT for sun8i-a83t
+In-Reply-To: <20170523005553.GH20170@codeaurora.org>
+References: <20170522202951.2896280-1-arnd@arndb.de>
+ <20170523005553.GH20170@codeaurora.org>
+Message-ID: <20170523071940.xbnahikb4d5dge7v@wens.csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 May 2017, Wolfram Sang wrote:
+On Mon, May 22, 2017 at 05:55:53PM -0700, Stephen Boyd wrote:
+> On 05/22, Arnd Bergmann wrote:
+> > We get a link error when CCU_MULT is not set with the
+> > newly added driver:
+> > 
+> > drivers/clk/sunxi-ng/ccu-sun8i-a83t.o:(.data.__compound_literal.1+0x4): undefined reference to `ccu_mult_ops'
+> > drivers/clk/sunxi-ng/ccu-sun8i-a83t.o:(.data.__compound_literal.3+0x4): undefined reference to `ccu_mult_ops'
+> > 
+> > Fixes: 46b492116666 ("clk: sunxi-ng: Add driver for A83T CCU")
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> include/linux/i2c is not for client devices. Move the header file to a
-> more appropriate location.
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+> Is there any way we can automate finding these build errors and
+> prevent them from creeping into the tree? It may be asking too
+> much, but it seems like we should be able to find these
+> particular problems with some script that greps for ccu_*_ops and
+> checks that any file's Kconfig symbol also has that selected.
 > 
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> ---
->  arch/arm/mach-omap1/board-h2-mmc.c      | 2 +-
->  arch/arm/mach-omap1/board-h2.c          | 2 +-
->  arch/arm/mach-omap1/board-h3-mmc.c      | 2 +-
->  arch/arm/mach-omap1/board-h3.c          | 2 +-
->  arch/arm/mach-omap1/board-osk.c         | 2 +-
->  arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 2 +-
->  arch/arm/mach-s3c24xx/mach-osiris.c     | 2 +-
+> Anyway, I'm just tired of seeing these sorts of things in my
+> inbox.
 
->  drivers/mfd/tps65010.c                  | 2 +-
+The (ugly) script below does the trick, though it does give results
+for some symbols that are indirectly selected:
 
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-  
->  drivers/usb/host/ohci-omap.c            | 2 +-
->  drivers/usb/phy/phy-isp1301-omap.c      | 2 +-
->  drivers/video/fbdev/omap/lcd_h3.c       | 2 +-
->  include/linux/{i2c => mfd}/tps65010.h   | 2 +-
->  12 files changed, 12 insertions(+), 12 deletions(-)
->  rename include/linux/{i2c => mfd}/tps65010.h (99%)
-> 
-> diff --git a/arch/arm/mach-omap1/board-h2-mmc.c b/arch/arm/mach-omap1/board-h2-mmc.c
-> index 357be2debc9da8..91bda9c802ff38 100644
-> --- a/arch/arm/mach-omap1/board-h2-mmc.c
-> +++ b/arch/arm/mach-omap1/board-h2-mmc.c
-> @@ -14,7 +14,7 @@
->  #include <linux/gpio.h>
->  #include <linux/platform_device.h>
->  #include <linux/platform_data/gpio-omap.h>
-> -#include <linux/i2c/tps65010.h>
-> +#include <linux/mfd/tps65010.h>
->  
->  #include "board-h2.h"
->  #include "mmc.h"
-> diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
-> index 675254ee4b1e93..dece47d76282ac 100644
-> --- a/arch/arm/mach-omap1/board-h2.c
-> +++ b/arch/arm/mach-omap1/board-h2.c
-> @@ -28,7 +28,7 @@
->  #include <linux/mtd/partitions.h>
->  #include <linux/mtd/physmap.h>
->  #include <linux/input.h>
-> -#include <linux/i2c/tps65010.h>
-> +#include <linux/mfd/tps65010.h>
->  #include <linux/smc91x.h>
->  #include <linux/omapfb.h>
->  #include <linux/platform_data/gpio-omap.h>
-> diff --git a/arch/arm/mach-omap1/board-h3-mmc.c b/arch/arm/mach-omap1/board-h3-mmc.c
-> index 4f58bfa5e7549e..692c267a9a9052 100644
-> --- a/arch/arm/mach-omap1/board-h3-mmc.c
-> +++ b/arch/arm/mach-omap1/board-h3-mmc.c
-> @@ -14,7 +14,7 @@
->  #include <linux/gpio.h>
->  #include <linux/platform_device.h>
->  
-> -#include <linux/i2c/tps65010.h>
-> +#include <linux/mfd/tps65010.h>
->  
->  #include "common.h"
->  #include "board-h3.h"
-> diff --git a/arch/arm/mach-omap1/board-h3.c b/arch/arm/mach-omap1/board-h3.c
-> index e62f9d454f1005..6d32beeb2d8857 100644
-> --- a/arch/arm/mach-omap1/board-h3.c
-> +++ b/arch/arm/mach-omap1/board-h3.c
-> @@ -28,7 +28,7 @@
->  #include <linux/mtd/physmap.h>
->  #include <linux/input.h>
->  #include <linux/spi/spi.h>
-> -#include <linux/i2c/tps65010.h>
-> +#include <linux/mfd/tps65010.h>
->  #include <linux/smc91x.h>
->  #include <linux/omapfb.h>
->  #include <linux/platform_data/gpio-omap.h>
-> diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
-> index 4dfb995048103b..f20361b8ffb6e0 100644
-> --- a/arch/arm/mach-omap1/board-osk.c
-> +++ b/arch/arm/mach-omap1/board-osk.c
-> @@ -38,7 +38,7 @@
->  #include <linux/mtd/mtd.h>
->  #include <linux/mtd/partitions.h>
->  #include <linux/mtd/physmap.h>
-> -#include <linux/i2c/tps65010.h>
-> +#include <linux/mfd/tps65010.h>
->  #include <linux/platform_data/gpio-omap.h>
->  #include <linux/platform_data/omap1_bl.h>
->  
-> diff --git a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
-> index 262ab07447483a..6cac7da15e2b0d 100644
-> --- a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
-> +++ b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
-> @@ -17,7 +17,7 @@
->  #include <linux/cpufreq.h>
->  #include <linux/gpio.h>
->  
-> -#include <linux/i2c/tps65010.h>
-> +#include <linux/mfd/tps65010.h>
->  
->  #include <plat/cpu-freq.h>
->  #include <mach/gpio-samsung.h>
-> diff --git a/arch/arm/mach-s3c24xx/mach-osiris.c b/arch/arm/mach-s3c24xx/mach-osiris.c
-> index 70b0eb7d31347f..64b1a0b7b803a1 100644
-> --- a/arch/arm/mach-s3c24xx/mach-osiris.c
-> +++ b/arch/arm/mach-s3c24xx/mach-osiris.c
-> @@ -24,7 +24,7 @@
->  #include <linux/io.h>
->  #include <linux/platform_device.h>
->  
-> -#include <linux/i2c/tps65010.h>
-> +#include <linux/mfd/tps65010.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> diff --git a/drivers/mfd/tps65010.c b/drivers/mfd/tps65010.c
-> index d829a6131f09e5..2ab67386b4ef1e 100644
-> --- a/drivers/mfd/tps65010.c
-> +++ b/drivers/mfd/tps65010.c
-> @@ -32,7 +32,7 @@
->  #include <linux/mutex.h>
->  #include <linux/platform_device.h>
->  
-> -#include <linux/i2c/tps65010.h>
-> +#include <linux/mfd/tps65010.h>
->  
->  #include <linux/gpio/driver.h>
->  
-> diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
-> index a4d814b7f38066..91393ec7d8503c 100644
-> --- a/drivers/usb/host/ohci-omap.c
-> +++ b/drivers/usb/host/ohci-omap.c
-> @@ -53,7 +53,7 @@
->  #define DRIVER_DESC "OHCI OMAP driver"
->  
->  #ifdef CONFIG_TPS65010
-> -#include <linux/i2c/tps65010.h>
-> +#include <linux/mfd/tps65010.h>
->  #else
->  
->  #define LOW	0
-> diff --git a/drivers/usb/phy/phy-isp1301-omap.c b/drivers/usb/phy/phy-isp1301-omap.c
-> index 042c5a8fd423d8..c6052c814bcc24 100644
-> --- a/drivers/usb/phy/phy-isp1301-omap.c
-> +++ b/drivers/usb/phy/phy-isp1301-omap.c
-> @@ -96,7 +96,7 @@ struct isp1301 {
->  
->  #if IS_REACHABLE(CONFIG_TPS65010)
->  
-> -#include <linux/i2c/tps65010.h>
-> +#include <linux/mfd/tps65010.h>
->  
->  #else
->  
-> diff --git a/drivers/video/fbdev/omap/lcd_h3.c b/drivers/video/fbdev/omap/lcd_h3.c
-> index 9d2da146813ef0..796f4634c4c6f1 100644
-> --- a/drivers/video/fbdev/omap/lcd_h3.c
-> +++ b/drivers/video/fbdev/omap/lcd_h3.c
-> @@ -21,7 +21,7 @@
->  
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
-> -#include <linux/i2c/tps65010.h>
-> +#include <linux/mfd/tps65010.h>
->  #include <linux/gpio.h>
->  
->  #include "omapfb.h"
-> diff --git a/include/linux/i2c/tps65010.h b/include/linux/mfd/tps65010.h
-> similarity index 99%
-> rename from include/linux/i2c/tps65010.h
-> rename to include/linux/mfd/tps65010.h
-> index 08aa92278d71cd..a1fb9bc5311de4 100644
-> --- a/include/linux/i2c/tps65010.h
-> +++ b/include/linux/mfd/tps65010.h
-> @@ -1,4 +1,4 @@
-> -/* linux/i2c/tps65010.h
-> +/* linux/mfd/tps65010.h
->   *
->   * Functions to access TPS65010 power management device.
->   *
+SUN5I_CCU uses SUNXI_CCU_GATE but does not select it
+SUN5I_CCU uses SUNXI_CCU_MUX but does not select it
+SUN5I_CCU uses SUNXI_CCU_NKMP but does not select it
+SUN6I_A31_CCU uses SUNXI_CCU_GATE but does not select it
+SUN6I_A31_CCU uses SUNXI_CCU_MUX but does not select it
+SUN8I_A23_CCU uses SUNXI_CCU_GATE but does not select it
+SUN8I_A23_CCU uses SUNXI_CCU_MUX but does not select it
+SUN8I_A33_CCU uses SUNXI_CCU_GATE but does not select it
+SUN8I_A33_CCU uses SUNXI_CCU_MUX but does not select it
+SUN8I_A83T_CCU uses SUNXI_CCU_MULT but does not select it
+SUN8I_H3_CCU uses SUNXI_CCU_GATE but does not select it
+SUN8I_H3_CCU uses SUNXI_CCU_MUX but does not select it
+SUN8I_V3S_CCU uses SUNXI_CCU_GATE but does not select it
+SUN8I_V3S_CCU uses SUNXI_CCU_MUX but does not select it
+SUN9I_A80_CCU uses SUNXI_CCU_MUX but does not select it
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+------------------------------------------------------------------------
+
+#!/bin/bash
+
+LANG=C
+
+for i in drivers/clk/sunxi-ng/ccu-*.o; do
+	FILE=`basename $i`
+	CLKS=`nm -g $i | grep -P -o "ccu_.*(?=_ops)" | tr [a-z] [A-Z]`
+	CFG=`grep $FILE drivers/clk/sunxi-ng/Makefile |
+		grep -P -o "(?<=CONFIG_)SUN[A-Z0-9_]*"`
+
+	for clk in $CLKS; do
+		perl -0777 -ne "/$CFG(.*?)^(?:config|endif)/sm; print \$1" \
+			drivers/clk/sunxi-ng/Kconfig | grep -q "SUNXI_$clk" ||
+			echo "$CFG uses SUNXI_$clk but does not select it"
+	done
+done
+
+------------------------------------------------------------------------
+
+
+Regards
+ChenYu
