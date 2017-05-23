@@ -1,41 +1,61 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 23 May 2017 14:55:28 +0800
-Subject: [PATCH] drm/mediatek: re-phrase DRM_INFO error message
-In-Reply-To: <20170411134419.21277-1-colin.king@canonical.com>
-References: <20170411134419.21277-1-colin.king@canonical.com>
-Message-ID: <1495522528.20811.17.camel@mtksdaap41>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 23 May 2017 08:05:47 +0100
+Subject: [DT Question] "simple-mfd" DT binding
+In-Reply-To: <CAK7LNAQ+DimarhHJOg=BqbH+EB19s+wgtRqJ8-XuLKW6_0FFaQ@mail.gmail.com>
+References: <CAK7LNARQmfX+3RwFgwtvf2Qu79XNX1zh0O741-pPFWS6npytLw@mail.gmail.com>
+ <CACRpkdY88Zdp2zqabWPfYPnTwSzYuCqSQHQg9vF_+Zd=TFOvaA@mail.gmail.com>
+ <CAK7LNAQ+DimarhHJOg=BqbH+EB19s+wgtRqJ8-XuLKW6_0FFaQ@mail.gmail.com>
+Message-ID: <20170523070547.hhxwrst6np6fpqql@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Colin:
+On Tue, 23 May 2017, Masahiro Yamada wrote:
 
-Sorry for my late reply. I've applied this patch to my branch
-mediatek-drm-next-4.13, thanks.
+> Hi Lee, Linus,
+> 
+> Thanks for your comments!
+> 
+> 2017-05-22 17:43 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+> > On Mon, May 22, 2017 at 3:29 AM, Masahiro Yamada
+> > <yamada.masahiro@socionext.com> wrote:
+> >
+> >> Because "simple-bus" indicates that child nodes are
+> >> simply memory mapped, but the node "register-bit-led"
+> >> can not be memory-mapped.
+> >> So, "simple-mfd" can not be replaced "simple-bus" here.
+> >
+> > Yeah... just like Lee points out, you are spot on, this is exactly
+> > the reason why we created "simple-mfd" in the first place
+> > IIRC.
+> 
+> OK, Linux treats simple-bus and simple-mfd in the same way
+> as far as I see drivers/of/platform.c
 
-Regards,
-CK
+Correct.  As I said, the functionality of the two are the same.  The
+difference is their meaning.  Initially we were using "simple-mfd" to
+achieve our aim (see below), but there was push-back due to the
+differences in what the two properties were trying to achieve.  Ergo,
+we introduced a second property.
 
-On Tue, 2017-04-11 at 14:44 +0100, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
+> Perhaps, can we document the difference between simple-bus and
+> simple-mfd clearly?
+> For example, "Unlike simple-bus, it is legitimate that simple-mfd has
+> subnodes without reg property"
 > 
-> The current message contains a spelling mistake and is not easily
-> parsable. Re-phrase it to be more understandable.
 > 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_dsi.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> index 808b995a990f..79d240ff1331 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> @@ -933,7 +933,7 @@ static u32 mtk_dsi_recv_cnt(u8 type, u8 *read_data)
->  		DRM_INFO("type is 0x02, try again\n");
->  		break;
->  	default:
-> -		DRM_INFO("type(0x%x) cannot be non-recognite\n", type);
-> +		DRM_INFO("type(0x%x) not recognized\n", type);
->  		break;
->  	}
->  
+> I think this is typical when "simple-mfd" is used together with "syscon".
+> The child devices will use regmap of the parent node.
+> I'd like to be sure this is valid usage.
+
+"simple-mfd" simply means "register all of my child nodes using the
+platform API without any further intervention".  It's goal is to
+prevent the MFD subsystem from being stuffed full of drivers where
+their only purpose is to call of_platform_populate().  All other rules
+and policy which must be followed are generic DT ones.  To that end, I
+do not believe making further statements is necessary.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
