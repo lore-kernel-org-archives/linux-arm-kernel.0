@@ -1,21 +1,65 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 22 May 2017 19:45:50 -0500
-Subject: [PATCH 09/12] arm64: dts: hi3660: Add pl031 rtc node
-In-Reply-To: <20170517083745.24479-10-guodong.xu@linaro.org>
+Date: Mon, 22 May 2017 19:47:26 -0500
+Subject: [PATCH 11/12] arm64: dts: hi3660: add power key dts node
+In-Reply-To: <20170517083745.24479-12-guodong.xu@linaro.org>
 References: <20170517083745.24479-1-guodong.xu@linaro.org>
- <20170517083745.24479-10-guodong.xu@linaro.org>
-Message-ID: <20170523004550.xmfftx7w4j5vuj6i@rob-hp-laptop>
+ <20170517083745.24479-12-guodong.xu@linaro.org>
+Message-ID: <20170523004726.lwdnzkveeadbkcqw@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 17, 2017 at 04:37:42PM +0800, Guodong Xu wrote:
-> From: Chen Feng <puck.chen@hisilicon.com>
+On Wed, May 17, 2017 at 04:37:44PM +0800, Guodong Xu wrote:
+> From: Chen Jun <chenjun14@huawei.com>
 > 
-> Add dts node to enable pl031 rtc.
+> We use gpio_034 as power key on hikey960, and set gpio with pull-up
+> state, when key press the voltage on the gpio will come to lower, and
+> power key event will be reported.
 > 
-> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
+> Signed-off-by: Chen Jun <chenjun14@huawei.com>
+> Signed-off-by: John Stultz <john.stultz@linaro.org>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 > ---
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
+>  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+> index 79735ee..6de86c0 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+> @@ -10,6 +10,8 @@
+>  #include "hi3660.dtsi"
+>  #include "hikey960-pinctrl.dtsi"
+>  #include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+>  
+>  / {
+>  	model = "HiKey960";
+> @@ -32,6 +34,21 @@
+>  		/* rewrite this at bootloader */
+>  		reg = <0x0 0x0 0x0 0x0>;
+>  	};
+> +
+> +	soc {
+> +		keys: gpio-keys {
 
-Acked-by: Rob Herring <robh@kernel.org> 
+This isn't part of the SoC, so it should move out of the soc node.
+
+> +			compatible = "gpio-keys";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pwr_key_pmx_func &pwr_key_cfg_func>;
+> +
+> +			power {
+> +				wakeup-source;
+> +				gpios = <&gpio4 2 GPIO_ACTIVE_LOW>;
+> +				label = "GPIO Power";
+> +				linux,code = <KEY_POWER>;
+> +			};
+> +		};
+> +	};
+>  };
+>  
+>  &i2c0 {
+> -- 
+> 2.10.2
+> 
