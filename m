@@ -1,60 +1,58 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue, 23 May 2017 12:32:44 -0300
-Subject: [PATCH v2 2/2] ARM: dts: tx6: Remove 'enable-active-low' property
-In-Reply-To: <1495553564-19112-1-git-send-email-fabio.estevam@nxp.com>
-References: <1495553564-19112-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <1495553564-19112-2-git-send-email-fabio.estevam@nxp.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 23 May 2017 16:43:50 +0100
+Subject: [PATCH v3 2/6] mm,
+ gup: Ensure real head page is ref-counted when using hugepages
+In-Reply-To: <20170523131312.aim6obne2t5sxtdr@node.shutemov.name> (Kirill
+ A. Shutemov's message of "Tue, 23 May 2017 16:13:12 +0300")
+References: <20170522133604.11392-1-punit.agrawal@arm.com>
+ <20170522133604.11392-3-punit.agrawal@arm.com>
+ <20170523131312.aim6obne2t5sxtdr@node.shutemov.name>
+Message-ID: <874lwbh93d.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Property 'enable-active-low' does not exist. Only 'enable-active-high' is
-valid, and when this property is absent the gpio regulator will act as
-active low by default.
+"Kirill A. Shutemov" <kirill@shutemov.name> writes:
 
-So remove the unexisting 'enable-active-low' property. 
+> On Mon, May 22, 2017 at 02:36:00PM +0100, Punit Agrawal wrote:
+>> When speculatively taking references to a hugepage using
+>> page_cache_add_speculative() in gup_huge_pmd(), it is assumed that the
+>> page returned by pmd_page() is the head page. Although normally true,
+>> this assumption doesn't hold when the hugepage comprises of successive
+>> page table entries such as when using contiguous bit on arm64 at PTE or
+>> PMD levels.
+>> 
+>> This can be addressed by ensuring that the page passed to
+>> page_cache_add_speculative() is the real head or by de-referencing the
+>> head page within the function.
+>> 
+>> We take the first approach to keep the usage pattern aligned with
+>> page_cache_get_speculative() where users already pass the appropriate
+>> page, i.e., the de-referenced head.
+>> 
+>> Apply the same logic to fix gup_huge_[pud|pgd]() as well.
+>
+> Hm. Okay. But I'm kinda surprise that this is the only place that need to
+> be adjusted.
+>
+> Have you validated all other pmd_page() use-cases?
 
-Currently the GPIO flag is GPIO_ACTIVE_HIGH. In order to make
-the dts description accurate, pass the GPIO_ACTIVE_LOW flag instead.
+I came across the gup issues were found while investigating a failing
+test from mce-tests.
 
-This change is safe because the gpio regulator driver does not take the
-GPIO flag polarity into account.
+I think the problem here is not due to the use of pmd_page() but because
+page_cache_[add|get]_speculative() don't ensure they ref-count the head
+page as is done in get_page().
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v1:
-- Improve commit log and explain why this change is safe (Stefan).
+Having said that, I had a quick look at the other uses of pmd_page() -
 
- arch/arm/boot/dts/imx6qdl-tx6.dtsi  | 3 +--
- arch/arm/boot/dts/imx6ul-tx6ul.dtsi | 3 +--
- 2 files changed, 2 insertions(+), 4 deletions(-)
+Quite a few of them are followed by an explicit BUG_ON() to check that
+the page returned is a head page. All other instances seem to be dealing
+with transparent hugepages where contiguous hugepages are not supported.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-index 1691714..a146fe7 100644
---- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-@@ -133,8 +133,7 @@
- 		regulator-max-microvolt = <3300000>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_flexcan_xcvr>;
--		gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
--		enable-active-low;
-+		gpio = <&gpio4 21 GPIO_ACTIVE_LOW>;
- 	};
- 
- 	reg_lcd0_pwr: regulator-lcd0-pwr {
-diff --git a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-index c784a0b..4ccc9e9 100644
---- a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-@@ -173,8 +173,7 @@
- 		regulator-max-microvolt = <3300000>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_flexcan_xcvr>;
--		gpio = <&gpio3 5 GPIO_ACTIVE_HIGH>;
--		enable-active-low;
-+		gpio = <&gpio3 5 GPIO_ACTIVE_LOW>;
- 	};
- 
- 	reg_lcd_pwr: regulator-lcdpwr {
--- 
-2.7.4
+I don't see any call sites that ring alarm bells.
+
+Did you have any particular part of the code in mind where pmd_page()
+usage might be a problem?
+
+Thanks,
+Punit
