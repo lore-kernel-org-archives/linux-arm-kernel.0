@@ -1,31 +1,75 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 23 May 2017 16:09:19 +0200
-Subject: [PATCH 2/2] pinctrl: meson-gxbb: Add missing GPIODV_18 pin entry
-In-Reply-To: <1495548559-22261-1-git-send-email-narmstrong@baylibre.com>
-References: <1495548559-22261-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1495548559-22261-3-git-send-email-narmstrong@baylibre.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 23 May 2017 16:10:25 +0200
+Subject: [PATCH] arm64: marvell: add clocks for Armada AP806 XOR engines
+In-Reply-To: <1493978108-12477-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Fri, 5 May 2017 11:55:08 +0200")
+References: <1493978108-12477-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87d1azy88e.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIODV_18 entry was missing in the original driver push.
+Hi Thomas,
+ 
+ On ven., mai 05 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-Fixes: 468c234f9ed7 ("pinctrl: amlogic: Add support for Amlogic Meson GXBB SoC")
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 1 +
- 1 file changed, 1 insertion(+)
+> The XORv2 engines in the AP side of the Armada 7K/8K SoCs are using the
+> AP MS core clock as input, so this commit adds the appropriate clocks
+> properties.
+>
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-index 3ccb0f4f..7d897c5 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-@@ -85,6 +85,7 @@
- 	MESON_PIN(GPIODV_15, EE_OFF),
- 	MESON_PIN(GPIODV_16, EE_OFF),
- 	MESON_PIN(GPIODV_17, EE_OFF),
-+	MESON_PIN(GPIODV_18, EE_OFF),
- 	MESON_PIN(GPIODV_19, EE_OFF),
- 	MESON_PIN(GPIODV_20, EE_OFF),
- 	MESON_PIN(GPIODV_21, EE_OFF),
+Applied on mvebu/dt64
+
+Thanks,
+
+Gregory
+
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> index a749ba2..2804231 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> @@ -159,6 +159,7 @@
+>  				reg = <0x400000 0x1000>,
+>  				      <0x410000 0x1000>;
+>  				msi-parent = <&gic_v2m0>;
+> +				clocks = <&ap_syscon 3>;
+>  				dma-coherent;
+>  			};
+>  
+> @@ -167,6 +168,7 @@
+>  				reg = <0x420000 0x1000>,
+>  				      <0x430000 0x1000>;
+>  				msi-parent = <&gic_v2m0>;
+> +				clocks = <&ap_syscon 3>;
+>  				dma-coherent;
+>  			};
+>  
+> @@ -175,6 +177,7 @@
+>  				reg = <0x440000 0x1000>,
+>  				      <0x450000 0x1000>;
+>  				msi-parent = <&gic_v2m0>;
+> +				clocks = <&ap_syscon 3>;
+>  				dma-coherent;
+>  			};
+>  
+> @@ -183,6 +186,7 @@
+>  				reg = <0x460000 0x1000>,
+>  				      <0x470000 0x1000>;
+>  				msi-parent = <&gic_v2m0>;
+> +				clocks = <&ap_syscon 3>;
+>  				dma-coherent;
+>  			};
+>  
+> -- 
+> 2.7.4
+>
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
