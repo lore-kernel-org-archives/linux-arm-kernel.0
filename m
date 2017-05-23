@@ -1,34 +1,31 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Mon, 22 May 2017 19:25:07 -0500
-Subject: [PATCH] spi: add null check before pointer dereference
-Message-ID: <20170523002507.GA16670@embeddedgus>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 22 May 2017 19:29:48 -0500
+Subject: [PATCH] crypto: stm32 - Add CRC32 support for STM32F4XX
+In-Reply-To: <1494969530-91589-1-git-send-email-cosardindar@gmail.com>
+References: <1494969530-91589-1-git-send-email-cosardindar@gmail.com>
+Message-ID: <20170523002948.k4fh24rzccix2bsn@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add null check before dereferencing pointer desc
+On Wed, May 17, 2017 at 12:18:50AM +0300, Cosar Dindar wrote:
+> This patch series add hardware CRC32 ("Ethernet") calculation support
+> for STMicroelectronics STM32F4XX series devices.
+> 
+> As an hardware limitation polynomial and key setting are not supported
+> as they are fixed as 0x4C11DB7 (poly) and 0xFFFFFFFF (key).
+> 
+> CRC32C Castagnoli algorithm is not supported also.
+> Module is tested on STM32F429-disco board with crypto testmgr using
+> cases within the key 0xFFFFFFFF.
+> 
+> Signed-off-by: Cosar Dindar <cosardindar@gmail.com>
+> ---
+>  .../devicetree/bindings/crypto/st,stm32-crc.txt    |  4 +-
+>  arch/arm/boot/dts/stm32429i-eval.dts               |  4 ++
+>  arch/arm/boot/dts/stm32f429-disco.dts              |  4 ++
+>  arch/arm/boot/dts/stm32f429.dtsi                   |  7 +++
+>  arch/arm/boot/dts/stm32f469-disco.dts              |  4 ++
+>  drivers/crypto/stm32/stm32_crc32.c                 | 68 ++++++++++++++++++----
+>  6 files changed, 79 insertions(+), 12 deletions(-)
 
-Addresses-Coverity-ID: 1397997
-Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
----
- drivers/spi/spi-s3c64xx.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index b392cca..9f1013e 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -306,6 +306,12 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
- 	desc = dmaengine_prep_slave_sg(dma->ch, sgt->sgl, sgt->nents,
- 				       dma->direction, DMA_PREP_INTERRUPT);
- 
-+	if (!desc) {
-+		dev_err(&sdd->master->dev,
-+			"%s:dmaengine_prep_slave_sg Failed\n", __func__);
-+		return;
-+	}
-+
- 	desc->callback = s3c64xx_spi_dmacb;
- 	desc->callback_param = dma;
- 
--- 
-2.5.0
+Acked-by: Rob Herring <robh@kernel.org>
