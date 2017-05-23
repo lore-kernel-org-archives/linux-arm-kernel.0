@@ -1,59 +1,74 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 23 May 2017 13:44:24 +0200
-Subject: [PATCH 1/1] xilinx ps uart: Adding a kernel parameter for the
- number of xilinx ps uarts
-In-Reply-To: <20170522192636.5b578d89@alans-desktop>
-References: <20170520022154.6766-1-kernel.development@povil.us>
- <20170520172008.5a979e8a@alans-desktop>
- <517d864d-d230-3abc-eb3c-4b628dc4625f@xilinx.com>
- <20170522192636.5b578d89@alans-desktop>
-Message-ID: <1668f36e-f9be-7008-004a-e467a6813e0f@xilinx.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 May 2017 13:56:28 +0200
+Subject: [PATCH 7/8] arm64: dts: hi6220: Move board data from the dwmmc
+ nodes to hikey dts
+In-Reply-To: <1494260477-25163-8-git-send-email-ulf.hansson@linaro.org>
+References: <1494260477-25163-1-git-send-email-ulf.hansson@linaro.org>
+ <1494260477-25163-8-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAK8P3a1CZ4GOZ=rV9Dk5zTb0gheau+CCR_tUT4+_oqOhQXtghQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.5.2017 20:26, Alan Cox wrote:
->> We have in soc vendor tree similar patch but the reason is different.
->>
->>     tty: serial: Added a CONFIG_SERIAL_XILINX_NR_UARTS option.
->>
->>     This patch Adds CONFIG_SERIAL_XILINX_NR_UARTS option to allow
->>     the user to provide the Max number of uart ports information.
->>     If multiple cards (or) PL UARTS are present, the default limit
->>     of 2 ports should be increased.
->>
->> I haven't checked all drivers but in our case we have added this as
->> quick fix for scenarios where you use serial aliases where alias is
->> pointed to serial2 or more.
->> In cdns_uart_init() cdns_uart_uart_driver is passed which contains .nr
->> which is required to be passed.
->>
->> What's the best driver to look at dynamic allocation?
-> 
-> So there are quite a few that dynamically allocate the objects as they
-> are enumerated (eg max3100), but have a maximum set that is just pointers
-> (so for the max number of ports cheaper than the dynamic code)
+On Mon, May 8, 2017 at 6:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Move the board specific descriptions for the dwmmc nodes in the hi6220 SoC
+> dtsi, into the hikey dts as it's there these belongs.
+>
+> While changing this, let's take the opportunity to drop the use of the
+> "ti,non-removable" binding for one of the dwmmc device nodes, as it's not a
+> valid binding and not used. Drop also the unnecessary use of "num-slots =
+> <0x1>" for all of the dwmmc nodes, as there is no need to set this since
+> when default number of slots is one.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 23 ++++++++++++++++++++++-
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 19 -------------------
+>  2 files changed, 22 insertions(+), 20 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> index 6dab03a..d4b3879 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> @@ -281,8 +281,29 @@
+>
+>                 /* GPIO blocks 16 thru 19 do not appear to be routed to pins */
+>
+> +               dwmmc_0: dwmmc0 at f723d000 {
+> +                       cap-mmc-highspeed;
+> +                       non-removable;
+> +                       bus-width = <0x8>;
+> +                       vmmc-supply = <&ldo19>;
+> +               };
+> +
+> +               dwmmc_1: dwmmc1 at f723e000 {
+> +                       card-detect-delay = <200>;
+> +                       cap-sd-highspeed;
+> +                       sd-uhs-sdr12;
+> +                       sd-uhs-sdr25;
+> +                       sd-uhs-sdr50;
+> +                       vqmmc-supply = <&ldo7>;
+> +                       vmmc-supply = <&ldo10>;
+> +                       bus-width = <0x4>;
+> +                       disable-wp;
+> +                       cd-gpios = <&gpio1 0 1>;
+> +               };
+> +
+>                 dwmmc_2: dwmmc2 at f723f000 {
+> -                       ti,non-removable;
+> +                       broken-cd;
+> +                       bus-width = <0x4>;
+>                         non-removable;
+>                         /* WL_EN */
 
-yep hardcoded max 4 where in probe first free space is found and used
-(range 0-3) but still max3100s statically allocated.
-Shouldn't be this also dynamically allocated?
+I see you are just following the style that is used for all other nodes
+in this file, but it's worth pointing out that it's really silly to use both
+a label and the full path in both the .dtsi file for the SoC and the
+board specific .dts file.
 
+If you already have labels for each node, they should be used.
 
-> The other question is why is it a CONFIG_ option. I'm assuming these
-> platforms are all ARM and in that case you could just pass the value in
-> the device tree, or hard code a safe maximum number of pointers to a
-> value which is the worst case and then install them as they are
-> enumerated.
+(no need to respin the patch for that, just pointing it out to
+the maintainers for future updates)
 
-I am not quite sure how exactly you want to do this via DT.
-
-Also what do you think is a safe maximum number? This is fpga - hundreds
-of pins which can do just uart.
-
-> There are lots of options better than breaking the "one kernel many
-> platforms" model.
-
-Another options is also module parameter and dynamically allocated array
-in cdns_uart_init.
-
-Thanks,
-Michal
+        Arnd
