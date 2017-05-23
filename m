@@ -1,9 +1,9 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 23 May 2017 22:34:55 +0200
+Date: Tue, 23 May 2017 22:46:08 +0200
 Subject: [PATCH] RFC: arm: eBPF JIT compiler
 In-Reply-To: <1495564433-9750-1-git-send-email-illusionist.neo@gmail.com>
 References: <1495564433-9750-1-git-send-email-illusionist.neo@gmail.com>
-Message-ID: <20170523203455.GF24807@lunn.ch>
+Message-ID: <20170523204608.GG24807@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,37 +11,30 @@ On Wed, May 24, 2017 at 12:03:53AM +0530, Shubham Bansal wrote:
 > The JIT compiler emits ARM 32 bit instructions. Currently, It supports
 > eBPF only. Classic BPF is supported because of the conversion by BPF
 > core.
-> 
-> JIT is enabled with
-> 
-> 	echo 1 > /proc/sys/net/core/bpf_jit_enable
-> 
-> Constant Blinding can be enabled along with JIT using
-> 
-> 	echo 1 > /proc/sys/net/core/bpf_jit_enable
-> 	echo 2 > /proc/sys/net/core/bpf_jit_harden
-> 
-> See Documentation/networking/filter.txt for more information.
-> Tested on ARMv7 with CONFIG_FRAME_POINTER enabled.
-> 
-> Results:
-> 
-> 1. Interpreter:
-> 
-> 	[   93.551176] test_bpf: Summary: 314 PASSED, 0 FAILED, [0/306 JIT'ed]
-> 
-> 2. JIT enabled:
-> 
-> 	[   92.913931] test_bpf: Summary: 314 PASSED, 0 FAILED, [278/306 JIT'ed]
-> 
-> 3. JIT + blinding enabled:
-> 
-> 	[  109.414506] test_bpf: Summary: 314 PASSED, 0 FAILED, [278/306 JIT'ed]
 
-Hi Shubham
+make mvebu_v5_defconfig
 
-Is there a HOWTO or a README somewhere about running the tests? I have
-a few ARMv5 platforms i can run tests on.
+make -s -j 16
+arch/arm/net/bpf_jit_32.c: In function emit_rev16:
+arch/arm/net/bpf_jit_32.c:1019:7: error: implicit declaration of function ARM_MOV_S [-Werror=implicit-function-declaration]
+  emit(ARM_MOV_S(tmp2[0], rn, SRTYPE_LSR, 8), ctx);
+       ^~~~~~~~~
+arch/arm/net/bpf_jit_32.c: In function emit_rev32:
+arch/arm/net/bpf_jit_32.c:1037:36: error: macro "ARM_MOV_I" passed 3 arguments, but takes just 2
+  emit(ARM_MOV_I(tmp2[1], rn, 0xff00), ctx);
+                                    ^
+arch/arm/net/bpf_jit_32.c:1037:7: error: ARM_MOV_I undeclared (first use in this function)
+  emit(ARM_MOV_I(tmp2[1], rn, 0xff00), ctx);
+       ^~~~~~~~~
+arch/arm/net/bpf_jit_32.c:1037:7: note: each undeclared identifier is reported only once for each function it appears in
+arch/arm/net/bpf_jit_32.c:1039:41: error: macro "ARM_MOV_I" passed 3 arguments, but takes just 2
+  emit(ARM_MOV_I(tmp2[0], tmp2[0], 0xff00), ctx);
+                                         ^
+arch/arm/net/bpf_jit_32.c: In function build_insn:
+arch/arm/net/bpf_jit_32.c:1393:30: error: macro "ARM_AND_R" requires 3 arguments, but only 2 given
+    emit(ARM_AND_R(rt, tmp2[1]), ctx);
+                              ^
+arch/arm/net/bpf_jit_32.c:1393:9: error: ARM_AND_R undeclared (first use in this function)
+    emit(ARM_AND_R(rt, tmp2[1]), ctx);
 
-  Thanks
-	Andrew
+    Andrew
