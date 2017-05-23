@@ -1,21 +1,62 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 23 May 2017 18:10:23 +0100
-Subject: [PATCH v2 3/9] KVM: arm/arm64: Move irq_is_ppi() to header file
-In-Reply-To: <20170516184556.26785-4-cdall@linaro.org>
-References: <20170516184556.26785-1-cdall@linaro.org>
- <20170516184556.26785-4-cdall@linaro.org>
-Message-ID: <89561287-b656-ec0d-2e00-95cdd3c0c2cd@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 23 May 2017 12:17:58 -0500
+Subject: [PATCH v4 0/2] Tango PCIe controller support
+In-Reply-To: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+Message-ID: <20170523171758.GC24431@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/05/17 19:45, Christoffer Dall wrote:
-> We are about to need this define in the arch timer code as well so move
-> it to a common location.
+On Thu, Apr 20, 2017 at 04:24:39PM +0200, Marc Gonzalez wrote:
+> Hello,
 > 
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> This patch was split in two, to ease review of two orthogonal
+> parts (MSI controller and host bridge). NB: the patch is
+> just split in two where host bridge support starts.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+The split is backwards.  The first patch should add basic host bridge
+support that is functional, though lacking MSI support.  The second should
+add the MSI support.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Changes from v3 to v4
+> 
+> In the MSI part:
+> - Support 256 MSIs instead of only 32
+> - Define tango_{ack,mask,unmask} callbacks for the HW irq_chip
+> - Use a spinlock instead of a mutex
+> - Rename msi_mask register to msi_enable
+> 
+> In the host bridge part:
+> - Move several quirk-handling snippets out of the config space read function
+> - Check whether the PCIe link is up at probe-time
+> 
+> Other files
+> - Let the framework compute the bus-range from the config space width
+> - Be slightly more verbose in the Kconfig help
+> 
+> 
+> What has *not* changed, waiting from feedback from Bjorn:
+> 
+> - Pray that config and mem space accesses NEVER occur concurrently.
+
+This is a pretty major issue that needs to be addressed in a more
+concrete way than praying.  
+
+> - Using of_device_is_compatible() vs of_device_get_match_data()
+> 
+> 
+> Marc Gonzalez (2):
+>   PCI: Add tango MSI controller support
+>   PCI: Add tango PCIe host bridge support
+> 
+>  Documentation/devicetree/bindings/pci/tango-pcie.txt |  32 ++++
+>  drivers/pci/host/Kconfig                             |   8 +
+>  drivers/pci/host/Makefile                            |   1 +
+>  drivers/pci/host/pcie-tango.c                        | 393 +++++++++++++++++++++++++++++++++++++++
+>  include/linux/pci_ids.h                              |   2 +
+>  5 files changed, 436 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/tango-pcie.txt
+>  create mode 100644 drivers/pci/host/pcie-tango.c
+> 
+> -- 
+> 2.11.0
