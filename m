@@ -1,257 +1,182 @@
-From: aisheng.dong@nxp.com (A.S. Dong)
-Date: Tue, 23 May 2017 10:23:23 +0000
-Subject: [PATCH 2/2] pinctrl: pinctrl-imx: do not assume mux 0 is gpio
-References: <1494830906-6442-1-git-send-email-aisheng.dong@nxp.com>
- <1494830906-6442-3-git-send-email-aisheng.dong@nxp.com>
- <6d47abc0527ae6f2214a9b37dfbeb154@agner.ch>
- <AM3PR04MB3061FB0760F94F2F816055A80E70@AM3PR04MB306.eurprd04.prod.outlook.com>
- <e056a1185a4094e558fb20c7eb19da3d@agner.ch>
-Message-ID: <DBXPR04MB320067F5C96D376B61730E780F90@DBXPR04MB320.eurprd04.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 23 May 2017 11:36:36 +0100
+Subject: [PATCH v2 3/3] KVM: arm/arm64: Simplify active_change_prepare and
+ plug race
+In-Reply-To: <20170523095605.GA19598@cbox>
+References: <20170516100431.4101-1-cdall@linaro.org>
+ <20170516100431.4101-4-cdall@linaro.org>
+ <9a412ed2-70ea-b651-dd75-18d723ee8b71@arm.com> <20170523084329.GC6319@cbox>
+ <cf2875a8-faef-4d2f-7394-9378fadb9d1d@arm.com> <20170523095605.GA19598@cbox>
+Message-ID: <df01e241-3463-bc55-63ff-81fb09dc7df0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On 23/05/17 10:56, Christoffer Dall wrote:
+> On Tue, May 23, 2017 at 10:05:13AM +0100, Marc Zyngier wrote:
+>> On 23/05/17 09:43, Christoffer Dall wrote:
+>>> On Mon, May 22, 2017 at 04:30:22PM +0100, Marc Zyngier wrote:
+>>>> On 16/05/17 11:04, Christoffer Dall wrote:
+>>>>> We don't need to stop a specific VCPU when changing the active state,
+>>>>> because private IRQs can only be modified by a running VCPU for the
+>>>>> VCPU itself and it is therefore already stopped.
+>>>>>
+>>>>> However, it is also possible for two VCPUs to be modifying the active
+>>>>> state of SPIs at the same time, which can cause the thread being stuck
+>>>>> in the loop that checks other VCPU threads for a potentially very long
+>>>>> time, or to modify the active state of a running VCPU.  Fix this by
+>>>>> serializing all accesses to setting and clearing the active state of
+>>>>> interrupts using the KVM mutex.
+>>>>>
+>>>>> Reported-by: Andrew Jones <drjones@redhat.com>
+>>>>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+>>>>> ---
+>>>>>  arch/arm/include/asm/kvm_host.h   |  2 --
+>>>>>  arch/arm64/include/asm/kvm_host.h |  2 --
+>>>>>  virt/kvm/arm/arm.c                | 20 ++++----------------
+>>>>>  virt/kvm/arm/vgic/vgic-mmio.c     | 18 ++++++++++--------
+>>>>>  virt/kvm/arm/vgic/vgic.c          | 11 ++++++-----
+>>>>>  5 files changed, 20 insertions(+), 33 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>>>>> index f0e6657..12274d4 100644
+>>>>> --- a/arch/arm/include/asm/kvm_host.h
+>>>>> +++ b/arch/arm/include/asm/kvm_host.h
+>>>>> @@ -233,8 +233,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+>>>>>  struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
+>>>>>  void kvm_arm_halt_guest(struct kvm *kvm);
+>>>>>  void kvm_arm_resume_guest(struct kvm *kvm);
+>>>>> -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
+>>>>> -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
+>>>>>  
+>>>>>  int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
+>>>>>  unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
+>>>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>>>> index 5e19165..32cbe8a 100644
+>>>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>>>> +++ b/arch/arm64/include/asm/kvm_host.h
+>>>>> @@ -333,8 +333,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+>>>>>  struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
+>>>>>  void kvm_arm_halt_guest(struct kvm *kvm);
+>>>>>  void kvm_arm_resume_guest(struct kvm *kvm);
+>>>>> -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
+>>>>> -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
+>>>>>  
+>>>>>  u64 __kvm_call_hyp(void *hypfn, ...);
+>>>>>  #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
+>>>>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+>>>>> index 3417e18..3c387fd 100644
+>>>>> --- a/virt/kvm/arm/arm.c
+>>>>> +++ b/virt/kvm/arm/arm.c
+>>>>> @@ -539,27 +539,15 @@ void kvm_arm_halt_guest(struct kvm *kvm)
+>>>>>  	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
+>>>>>  }
+>>>>>  
+>>>>> -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu)
+>>>>> -{
+>>>>> -	vcpu->arch.pause = true;
+>>>>> -	kvm_vcpu_kick(vcpu);
+>>>>> -}
+>>>>> -
+>>>>> -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
+>>>>> -{
+>>>>> -	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
+>>>>> -
+>>>>> -	vcpu->arch.pause = false;
+>>>>> -	swake_up(wq);
+>>>>> -}
+>>>>> -
+>>>>>  void kvm_arm_resume_guest(struct kvm *kvm)
+>>>>>  {
+>>>>>  	int i;
+>>>>>  	struct kvm_vcpu *vcpu;
+>>>>>  
+>>>>> -	kvm_for_each_vcpu(i, vcpu, kvm)
+>>>>> -		kvm_arm_resume_vcpu(vcpu);
+>>>>> +	kvm_for_each_vcpu(i, vcpu, kvm) {
+>>>>> +		vcpu->arch.pause = false;
+>>>>> +		swake_up(kvm_arch_vcpu_wq(vcpu));
+>>>>> +	}
+>>>>>  }
+>>>>>  
+>>>>>  static void vcpu_sleep(struct kvm_vcpu *vcpu)
+>>>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+>>>>> index 64cbcb4..c1e4bdd 100644
+>>>>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+>>>>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+>>>>> @@ -231,23 +231,21 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+>>>>>   * be migrated while we don't hold the IRQ locks and we don't want to be
+>>>>>   * chasing moving targets.
+>>>>>   *
+>>>>> - * For private interrupts, we only have to make sure the single and only VCPU
+>>>>> - * that can potentially queue the IRQ is stopped.
+>>>>> + * For private interrupts we don't have to do anything because userspace
+>>>>> + * accesses to the VGIC state already require all VCPUs to be stopped, and
+>>>>> + * only the VCPU itself can modify its private interrupts active state, which
+>>>>> + * guarantees that the VCPU is not running.
+>>>>>   */
+>>>>>  static void vgic_change_active_prepare(struct kvm_vcpu *vcpu, u32 intid)
+>>>>>  {
+>>>>> -	if (intid < VGIC_NR_PRIVATE_IRQS)
+>>>>> -		kvm_arm_halt_vcpu(vcpu);
+>>>>> -	else
+>>>>> +	if (intid > VGIC_NR_PRIVATE_IRQS)
+>>>>>  		kvm_arm_halt_guest(vcpu->kvm);
+>>>>>  }
+>>>>>  
+>>>>>  /* See vgic_change_active_prepare */
+>>>>>  static void vgic_change_active_finish(struct kvm_vcpu *vcpu, u32 intid)
+>>>>>  {
+>>>>> -	if (intid < VGIC_NR_PRIVATE_IRQS)
+>>>>> -		kvm_arm_resume_vcpu(vcpu);
+>>>>> -	else
+>>>>> +	if (intid > VGIC_NR_PRIVATE_IRQS)
+>>>>>  		kvm_arm_resume_guest(vcpu->kvm);
+>>>>>  }
+>>>>>  
+>>>>> @@ -271,11 +269,13 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+>>>>>  {
+>>>>>  	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+>>>>>  
+>>>>> +	mutex_lock(&vcpu->kvm->lock);
+>>>>>  	vgic_change_active_prepare(vcpu, intid);
+>>>>>  
+>>>>>  	__vgic_mmio_write_cactive(vcpu, addr, len, val);
+>>>>>  
+>>>>>  	vgic_change_active_finish(vcpu, intid);
+>>>>> +	mutex_unlock(&vcpu->kvm->lock);
+>>>>
+>>>> Any reason not to move the lock/unlock calls to prepare/finish? Also, do
+>>>> we need to take that mutex if intid is a PPI?
+>>>
+>>> I guess we strictly don't need to take the mutex if it's a PPI, no.
+>>>
+>>> But I actually preferred this symmetry because you can easily tell we
+>>> don't have a bug (famous last words) by locking and unlocking the mutex
+>>> in the same function.
+>>>
+>>> I don't feel strongly about it though, so I can move it if you prefer
+>>> it.
+>>
+>> No, that's fine, I just wanted to check whether my understanding was
+>> correct.
+>>
+>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+> 
+> Thanks.
+> 
+> So assuming Drew's patches will go on top of these, should we merge this
+> as fixes to -rcX, or queue them for v4.13 ?
+> 
+> I'm leaning towards the latter because I don't think we've seen these
+> races do something bad in the wild, and they're probably not going to be
+> backportable to stable anyway.  Thoughts?
 
-> -----Original Message-----
-> From: A.S. Dong
-> Sent: Thursday, May 18, 2017 3:00 PM
-> To: 'Stefan Agner'
-> Cc: linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linus.walleij at linaro.org; shawnguo at kernel.org; Jacky Bai; Andy Duan;
-> kernel at pengutronix.de; Alexandre Courbot
-> Subject: RE: [PATCH 2/2] pinctrl: pinctrl-imx: do not assume mux 0 is gpio
-> 
-> > -----Original Message-----
-> > From: Stefan Agner [mailto:stefan at agner.ch]
-> > Sent: Thursday, May 18, 2017 2:16 AM
-> > To: A.S. Dong
-> > Cc: linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > linus.walleij at linaro.org; shawnguo at kernel.org; Jacky Bai; Andy Duan;
-> > kernel at pengutronix.de; Alexandre Courbot
-> > Subject: Re: [PATCH 2/2] pinctrl: pinctrl-imx: do not assume mux 0 is
-> > gpio
-> >
-> > On 2017-05-17 00:18, A.S. Dong wrote:
-> > >> -----Original Message-----
-> > >> From: Stefan Agner [mailto:stefan at agner.ch]
-> > >> Sent: Tuesday, May 16, 2017 1:27 AM
-> > >> To: A.S. Dong
-> > >> Cc: linux-gpio at vger.kernel.org;
-> > >> linux-arm-kernel at lists.infradead.org;
-> > >> linus.walleij at linaro.org; shawnguo at kernel.org; Jacky Bai; Andy
-> > >> Duan; kernel at pengutronix.de; Alexandre Courbot
-> > >> Subject: Re: [PATCH 2/2] pinctrl: pinctrl-imx: do not assume mux 0
-> > >> is gpio
-> > >>
-> > >> On 2017-05-14 23:48, Dong Aisheng wrote:
-> > >> > Do not assume MUX 0 is GPIO function in core driver as a
-> > >> > different SoC may have different value. e.g. MX7ULP Mux 1 is GPIO.
-> > >> >
-> > >> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > >> > Cc: Alexandre Courbot <gnurou@gmail.com>
-> > >> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > >> > Cc: Stefan Agner <stefan@agner.ch>
-> > >> > Cc: Fugang Duan <fugang.duan@nxp.com>
-> > >> > Cc: Bai Ping <ping.bai@nxp.com>
-> > >> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > >> > ---
-> > >> >  drivers/pinctrl/freescale/pinctrl-imx.c | 3 ++-
-> > >> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > >> >
-> > >> > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
-> > >> > b/drivers/pinctrl/freescale/pinctrl-imx.c
-> > >> > index 0d6aaca..ed8ea32 100644
-> > >> > --- a/drivers/pinctrl/freescale/pinctrl-imx.c
-> > >> > +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-> > >> > @@ -281,7 +281,7 @@ static int imx_pmx_gpio_request_enable(struct
-> > >> > pinctrl_dev *pctldev,
-> > >> >  			continue;
-> > >> >  		for (pin = 0; pin < grp->num_pins; pin++) {
-> > >> >  			imx_pin = &((struct imx_pin *)(grp->data))[pin];
-> > >> > -			if (imx_pin->pin == offset && !imx_pin->mux_mode)
-> > >> > +			if (imx_pin->pin == offset)
-> > >> >  				goto mux_pin;
-> > >>
-> > >> The reason I added that check was to make sure we pick a mux option
-> > >> which is GPIO... With this change, any pinmux might be picked...
-> > >>
-> > >
-> > > First of all, this seems to be wrong to me that GPIO mux mode is SoC
-> > > Dependant and should not be put in pinctrl-imx core driver.
-> >
-> > Hm, agree, we should consider to move
-> > imx_pmx_gpio_request_enable/disable_free and
-> > imx_pmx_gpio_set_direction into pinctrl-vf610.c
-> >
-> 
-> IMX7ULP may want to use imx_pmx_gpio_set_direction as well to support
-> dynamically change GPIO from output to input.
-> 
-> > >
-> > > Secondly, I think we may be over worried and it's not quite
-> > > necessary As we did not do the sanity check for both raw config and
-> > > mux data read From Device tree, why only do it for GPIO?
-> > >
-> > > We may trust the data in device tree.
-> >
-> > In Vybrid, there is no need to explicitly assign a pinmux to use a pin
-> > as GPIO. So the pinmux could be anything... The implemented semantics
-> > for Vyrbid is really different than i.MX, see below.
-> >
-> 
-> Strange, I do see Vybrid assigning pinmux to GPIO in device tree.
-> e.g.
-> arch/arm/boot/dts/vf-colibri.dtsi
-> pinctrl_esdhc1: esdhc1grp {
->         fsl,pins = <
->                 VF610_PAD_PTA24__ESDHC1_CLK     0x31ef
->                 VF610_PAD_PTA25__ESDHC1_CMD     0x31ef
->                 VF610_PAD_PTA26__ESDHC1_DAT0    0x31ef
->                 VF610_PAD_PTA27__ESDHC1_DAT1    0x31ef
->                 VF610_PAD_PTA28__ESDHC1_DATA2   0x31ef
->                 VF610_PAD_PTA29__ESDHC1_DAT3    0x31ef
->                 VF610_PAD_PTB20__GPIO_42        0x219d
->         >;
-> };
-> 
-> > >
-> > >> >  		}
-> > >> >  	}
-> > >> > @@ -292,6 +292,7 @@ static int imx_pmx_gpio_request_enable(struct
-> > >> > pinctrl_dev *pctldev,
-> > >> >  	reg = readl(ipctl->base + pin_reg->mux_reg);
-> > >> >  	reg &= ~info->mux_mask;
-> > >> >  	reg |= imx_pin->config;
-> > >> > +	reg |= imx_pin->mux_mode << info->mux_shift;
-> > >>
-> > >> ... and muxed...
-> > >>
-> > >> Not sure if we want that.
-> > >>
-> > >> I had to control GPIO output/input through pinctrl since Vybrid
-> > >> does not allow to control that from the GPIO block.
-> > >>
-> > >> However, according to your GPIO patchset, the i.MX 7ULP has a new
-> > >> register GPIO_PDDR to control output from the GPIO block. Is
-> > >> controlling the output driver from IOMUXC still required?
-> > >
-> > > Yes, it's still required.
-> > >
-> >
-> > That sounds weird, what is the GPIO_PDDR for then? Sure I  need to
-> > enable the output driver to drive the pin, but can I disable output
-> > just using GPIO_PDDR?
-> 
-> No, to fully disable a output, you must disable OBE as well.
-> 
-> >
-> > Maybe we have a miss understanding here:
-> >
-> > Lets assume we want to switch a GPIO between output and input:
-> >
-> > echo "output" > /sys/class/gpio/gpioN/direction ..
-> > echo "input" > /sys/class/gpio/gpioN/direction
-> >
-> > Do I need to disable the output driver in the IOMUXC or can we just
-> > disable GPIO_PDDR and use the pin as input?
-> >
-> 
-> OBE should also be disabled. Otherwise the input may not function well.
-> 
-> > If we can disable the output driver just using GPIO_PDDR, we can avoid
-> > the gpio_set_direction cross call.
-> >
-> >
-> > >> If not, I really would just not use all that "find pinctrl config"
-> > >> hackery... e.g. add a new flag, USE_IOMUXC_FOR_GPIO_OUTPUT, and set
-> > >> that only for Vybrid.
-> > >>
-> > >> This would also align much better with the other i.MX devices,
-> > >> where pinmuxing and GPIO is completely orthogonal.
-> > >>
-> > >
-> > > Actually this patch came only because to make the exist code not
-> > > break MX7ULP.
-> > >
-> > > Actually I'm wondering why we need implement
-> > > imx_pmx_gpio_request_enable function?
-> > >
-> > > Per my understanding, IMX binding already set GPIO mux by Parsing
-> > > MUX mode from device tree, so why need gpio_request_enable which
-> > > looks like is duplicated.
-> > >
-> > > Can you help explain it?
-> >
-> > I suggest to read this clarification email wrt to pinctrl/gpio from
-> > Linus
-> > Walleij:
-> > https://lkml.org/lkml/2016/10/10/87
-> >
-> > To summarize: We have different semantics in Vybrid: The GPIO
-> > subsystem automatically mux the GPIO for you. So in Vybrid, you do not
-> > have to mux a GPIO (but a valid entry in your device tree is needed,
-> > but does not assigned to any node).
-> 
-> Okay, Clearer now.
-> 
-> But I do see the users of GPIO pads in Vybrid dts.
-> Above is an example which make me confuse at first.
-> 
-> >
-> > Is what the driver is doing for Vybrid wrong? It is different from
-> > i.MX, but afaik, it is not really wrong... Its a valid implementation
-> > according to the currently defined semantics...  Due to the *need* to
-> > touch pinctrl for direction, I had to implement cross calls anyway, so
-> > I thought I might as well go full mile and also mux the GPIO on
-> request...
-> >
-> 
-> It's not strickly wrong.
-> Just a bit confuse that gpio_request_enable seems not quite necessary As
-> we actually already and must define GPIO mux in device tree according To
-> standard IMX binding format.
-> e.g. VF610_PAD_PTB20__GPIO_42 in above sd pad group.
-> That means pinctrl already does the GPIO mux when enable sd function.
-> 
-> > So the question is, what semantic do we want for i.MX 7ULP? Since it
-> > is a i.MX device, we probably want the same semantics as i.MX 6/7 is
-> > already using for the sake of consistency. So in this case the
-> > gpio_request_enable/disable callbacks are not needed...
-> >
-> > This is how I hope we can do the implementation for i.MX 7ULP:
-> > - Do not use gpio_request_enable/disable
-> 
-> Yes, we do want that.
-> 
-> > - Do not use gpio_set_direction either
-> 
-> Not, ULP needs it to support GPIO direction switch.
-> 
-> > - Users using a GPIO should enable output driver in IOMUXC (just use a
-> > pin configuration where output driver is enabled)
-> 
-> Users still need configure OBE/IBE in devicetree for statically assignment.
-> 
-> > - The GPIO driver only enables/disables the output driver using its
-> > GPIO_PDDR register depending on GPIO direction
-> 
-> No, same reason as the second question.
-> 
-> 
-> So, finnaly, I think the solution may be:
-> 1. If Vybrid does not use gpio_request_enable/disable, we can simply
-> remove it. Both driver keeps using pinctrl gpio_set_direction.
-> 
-> Or.
-> 
-> 2. Make gpio_request_enable/disable and gpio_set_direction As pinctrl-imx
-> core driver callbacks. And only assign gpio_set_direction For IMX7ULP
-> platform driver while assign both for Vybrid.
-> 
-> Which one would you prefer?
-> 
+The race would only impact a guest hammering its own registers, so I'm
+quite happy for this to go into 4.13.
 
-Any answer about it?
+Thanks,
 
-Regards
-Dong Aisheng
+	M.
+-- 
+Jazz is not dead. It just smells funny...
