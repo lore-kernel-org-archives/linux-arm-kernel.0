@@ -1,33 +1,34 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 23 May 2017 16:21:49 +0200
-Subject: [PATCH 1/3] ARM64: dts: meson-gxl: Fix pinctrl periphs gpio-ranges
+Date: Tue, 23 May 2017 16:21:51 +0200
+Subject: [PATCH 3/3] ARM64: dts: Fix GXBB periphs pinctrl pull-enable register
+ base
 In-Reply-To: <1495549311-23660-1-git-send-email-narmstrong@baylibre.com>
 References: <1495549311-23660-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1495549311-23660-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1495549311-23660-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpio-range was badly added on the GXL dtsi, the AO pin count is 10
-instead of 14.
+The pull-enable register base was wrongly copied from the meson8b pinctrl node,
+but was not used yet.
 
-Fixes: 84412e4e857f ("ARM64: dts: meson-gxl: Add gpio-ranges properties")
+Fixes: c328666d58aa ("ARM64: dts: amlogic: Add Meson GX dtsi from GXBB")
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 3efad5f..4871ce5 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -244,7 +244,7 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 6f8b301..47ca44d 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -351,7 +351,7 @@
+ 		gpio: bank at 4b0 {
+ 			reg = <0x0 0x004b0 0x0 0x28>,
+ 			      <0x0 0x004e8 0x0 0x14>,
+-			      <0x0 0x00120 0x0 0x14>,
++			      <0x0 0x00520 0x0 0x14>,
+ 			      <0x0 0x00430 0x0 0x40>;
  			reg-names = "mux", "pull", "pull-enable", "gpio";
  			gpio-controller;
- 			#gpio-cells = <2>;
--			gpio-ranges = <&pinctrl_periphs 0 14 101>;
-+			gpio-ranges = <&pinctrl_periphs 0 10 101>;
- 		};
- 
- 		emmc_pins: emmc {
 -- 
 1.9.1
