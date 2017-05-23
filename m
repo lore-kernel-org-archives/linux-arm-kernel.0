@@ -1,94 +1,71 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 May 2017 10:07:30 -0500
-Subject: [PATCH 1/5] dt-bindings: iio: stm32-adc: add support for STM32H7
-In-Reply-To: <1495197928-1439-2-git-send-email-fabrice.gasnier@st.com>
-References: <1495197928-1439-1-git-send-email-fabrice.gasnier@st.com>
- <1495197928-1439-2-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170523150730.735kyrb5kuheqtyi@rob-hp-laptop>
+Date: Tue, 23 May 2017 10:14:08 -0500
+Subject: [PATCH v2 2/5] dt-bindings: display: Add Synopsys DW MIPI DSI
+ DRM bridge driver
+In-Reply-To: <1495207218-11372-3-git-send-email-philippe.cornu@st.com>
+References: <1495207218-11372-1-git-send-email-philippe.cornu@st.com>
+ <1495207218-11372-3-git-send-email-philippe.cornu@st.com>
+Message-ID: <20170523151408.jn3vlqh5i4xmmtqw@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 02:45:24PM +0200, Fabrice Gasnier wrote:
-> Document support for STM32H7 Analog to Digital Converter.
-> Main difference is regarding compatible, clock definitions and new
-> features like differential channels support:
-> STM32H7 ADC block has two clock inputs, common clock for all ADCs.
-> One 'bus' clock for registers access, and one optional 'adc' clock
-> for analog circuitry (bus clock may be used for conversions).
+On Fri, May 19, 2017 at 05:20:15PM +0200, Philippe CORNU wrote:
+> This patch adds documentation of device tree bindings for the
+> Synopsys DesignWare MIPI DSI host DRM bridge driver.
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
 > ---
->  .../devicetree/bindings/iio/adc/st,stm32-adc.txt     | 20 ++++++++++++++------
->  1 file changed, 14 insertions(+), 6 deletions(-)
+>  .../bindings/display/bridge/dw_mipi_dsi.txt        | 36 ++++++++++++++++++++++
+>  1 file changed, 36 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> index e35f9f1..9519d2e 100644
-> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> @@ -21,11 +21,17 @@ own configurable sequence and trigger:
->  Contents of a stm32 adc root node:
->  -----------------------------------
->  Required properties:
-> -- compatible: Should be "st,stm32f4-adc-core".
-> +- compatible: Should be one of "st,stm32f4-adc-core" or "st,stm32h7-adc-core".
+> diff --git a/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+> new file mode 100644
+> index 0000000..652c0f5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+> @@ -0,0 +1,36 @@
+> +Synopsys DesignWare MIPI DSI host controller
+> +============================================
+> +
+> +This document defines device tree properties for the Synopsys DesignWare MIPI
+> +DSI host controller. It doesn't constitue a device tree binding specification
+> +by itself but is meant to be referenced by platform-specific device tree
+> +bindings.
+> +
+> +When referenced from platform device tree bindings the properties defined in
+> +this document are defined as follows. The platform device tree bindings are
+> +responsible for defining whether each property is required or optional.
+> +
+> +- reg: Memory mapped base address and length of the DWC MIPI DSI registers.
+> +
+> +- clocks: References to all the clocks specified in the clock-names property
+> +  as specified in [1].
+> +
+> +- clock-names: The DWC MIPI DSI host uses the following clocks.
+> +
+> +  - "pclk" is the peripheral clock for either AHB and APB (mandatory).
+> +  - "ref" is the pll reference clock (mandatory).
+> +
+> +- resets: References to all the resets specified in the reset-names property
+> +  as specified in [2]. (optional)
+> +
+> +- reset-names: string reset name, must be "apb" if used. (optional)
+> +
+> +- ports: The connectivity of the DWC MIPI DSI host controller
+> +  with the rest of the system is expressed in using ports as specified in the
+> +  device graph bindings in [3] & [4]. The numbering of the ports
+> +  is platform-specific.
 
-Reformat this to 1 per line.
+Why is numbering platform specific? Are there differing numbers of 
+independent channels? I'm fine if platforms can override, but can we 
+define what is the default or common case?
 
->  - reg: Offset and length of the ADC block register set.
->  - interrupts: Must contain the interrupt for ADC block.
-> -- clocks: Clock for the analog circuitry (common to all ADCs).
-> -- clock-names: Must be "adc".
-> +- clocks: Core can use up to two clocks, depending on part used:
-> +  - "adc" clock: for the analog circuitry, common to all ADCs.
-> +    It's required on stm32f4.
-> +    It's optional on stm32h7, bus clock will be used by default if not set.
-
-The clocks listed should be all connections present, not policy as to 
-what clock you want to use for conversions.
-
-> +  - "bus" clock: for registers access, common to all ADCs.
-> +    It's unused on stm32f4.
-
-s/unused/not present/
-
-> +    It's required on stm32h7.
-> +- clock-names: Must be "adc" and/or "bus" depending on part used.
->  - interrupt-controller: Identifies the controller node as interrupt-parent
->  - vref-supply: Phandle to the vref input analog reference voltage.
->  - #interrupt-cells = <1>;
-> @@ -42,14 +48,16 @@ An ADC block node should contain at least one subnode, representing an
->  ADC instance available on the machine.
->  
->  Required properties:
-> -- compatible: Should be "st,stm32f4-adc".
-> +- compatible: Should be one of "st,stm32f4-adc" or "st,stm32h7-adc".
-
-One per line.
-
->  - reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
-> -- clocks: Input clock private to this ADC instance.
-> +- clocks: Input clock private to this ADC instance. It's required only on
-> +  stm32f4, that has per instance clock input for registers access.
-
-Does the h7 simply have the same parent connected to all ADC instances 
-or really doesn't have a per instance clock? For the former case, you 
-should still have a clock, but just all be the same parent.
-
->  - interrupt-parent: Phandle to the parent interrupt controller.
->  - interrupts: IRQ Line for the ADC (e.g. may be 0 for adc at 0, 1 for adc at 100 or
->    2 for adc at 200).
->  - st,adc-channels: List of single-ended channels muxed for this ADC.
-> -  It can have up to 16 channels, numbered from 0 to 15 (resp. for in0..in15).
-> +  It can have up to 16 channels on stm32f4 or 20 channels on stm32h7, numbered
-> +  from 0 to 15 or 19 (resp. for in0..in15 or in0..in19).
->  - #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
->    Documentation/devicetree/bindings/iio/iio-bindings.txt
->  
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +[2] Documentation/devicetree/bindings/reset/reset.txt
+> +[3] Documentation/devicetree/bindings/media/video-interfaces.txt
+> +[4] Documentation/devicetree/bindings/graph.txt
 > -- 
 > 1.9.1
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
