@@ -1,39 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 May 2017 10:23:39 -0500
-Subject: [PATCH 5/7] clk: mvebu: cp110: add sdio clock to cp-110 system
- controller
-In-Reply-To: <1833f47fdfa5fd05e9135d98e03501d9634a865b.1495208533.git-series.gregory.clement@free-electrons.com>
-References: <cover.737145f06ff0191d1a9210bcd141e679bf45fe5f.1495208533.git-series.gregory.clement@free-electrons.com>
- <1833f47fdfa5fd05e9135d98e03501d9634a865b.1495208533.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170523152339.ngjr6djukrrqcvxm@rob-hp-laptop>
+Date: Tue, 23 May 2017 10:25:06 -0500
+Subject: [PATCH 2/5] clk: mvebu: ap806: do not depend anymore of the
+ *-clock-output-names
+In-Reply-To: <83d2035a1d00773c8e4c4d09134c81b0cd24152c.1495209464.git-series.gregory.clement@free-electrons.com>
+References: <cover.fd6093dbad53cdac70eef4e53b238768721218ac.1495209464.git-series.gregory.clement@free-electrons.com>
+ <83d2035a1d00773c8e4c4d09134c81b0cd24152c.1495209464.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170523152506.ooa2hoyzfssbozid@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 19, 2017 at 05:55:23PM +0200, Gregory CLEMENT wrote:
-> From: Konstantin Porotchkin <kostap@marvell.com>
+On Fri, May 19, 2017 at 05:58:02PM +0200, Gregory CLEMENT wrote:
+> As it was done for the cp110, this patch modifies the way the clock names
+> are created. The name of each clock is now created by using its physical
+> address as a prefix (as it was done for the platform device
+> names). Thanks to this we have an automatic way to compute a unique name.
 > 
-> This commit updates the CP110 system controller driver to add the
-> definition for a missing clock.
-> 
-> The SDIO clock is dedicated driving the SDHCI interface and its frequency
-> is 400MHz (2/5 of PLL source clock).
-> 
-> The SDIO interface should be bound to this clock and not the core clock
-> as in the older code.
-> Using the wrong clock lead to a maximum SDHCI frequency of 250 Mhz, while
-> the HW really supports up to 400 Mhz.
-> 
-> This patch also fixes the NAND clock relationship documentation.
-> 
-> Signed-off-by: Konstantin Porotchkin <kostap@marvell.com>
-> [gregory.clement at free-electrons.com:
-> - use sdio instead of emmc to name the clock
-> - update binding documentation]
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
->  Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt |  1 +
->  drivers/clk/mvebu/cp110-system-controller.c                                | 28 +++++++++++++++++++++++-----
->  2 files changed, 24 insertions(+), 5 deletions(-)
+>  Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt |  4 ----
+>  drivers/clk/mvebu/ap806-system-controller.c                               | 46 ++++++++++++++++++++++++----------------------
+>  2 files changed, 24 insertions(+), 26 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
