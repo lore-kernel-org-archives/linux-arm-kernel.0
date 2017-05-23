@@ -1,126 +1,166 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 23 May 2017 14:31:17 +0530
-Subject: [PATCH V11 08/11] drivers: acpi: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <20170523085241.GA18204@red-moon>
-References: <1491823266-1209-1-git-send-email-sricharan@codeaurora.org>
- <1491823266-1209-9-git-send-email-sricharan@codeaurora.org>
- <41668eff-271c-1c4c-7665-3bf0faa74669@codeaurora.org>
- <20170523085241.GA18204@red-moon>
-Message-ID: <c6d5c033-a8f9-03e3-9963-cd291ae2d7e1@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 23 May 2017 10:05:13 +0100
+Subject: [PATCH v2 3/3] KVM: arm/arm64: Simplify active_change_prepare and
+ plug race
+In-Reply-To: <20170523084329.GC6319@cbox>
+References: <20170516100431.4101-1-cdall@linaro.org>
+ <20170516100431.4101-4-cdall@linaro.org>
+ <9a412ed2-70ea-b651-dd75-18d723ee8b71@arm.com> <20170523084329.GC6319@cbox>
+Message-ID: <cf2875a8-faef-4d2f-7394-9378fadb9d1d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On 5/23/2017 2:22 PM, Lorenzo Pieralisi wrote:
-> On Tue, May 23, 2017 at 02:26:10AM -0400, Nate Watterson wrote:
->> Hi Sricharan,
->>
->> On 4/10/2017 7:21 AM, Sricharan R wrote:
->>> This is an equivalent to the DT's handling of the iommu master's probe
->>> with deferred probing when the corrsponding iommu is not probed yet.
->>> The lack of a registered IOMMU can be caused by the lack of a driver for
->>> the IOMMU, the IOMMU device probe not having been performed yet, having
->>> been deferred, or having failed.
+On 23/05/17 09:43, Christoffer Dall wrote:
+> On Mon, May 22, 2017 at 04:30:22PM +0100, Marc Zyngier wrote:
+>> On 16/05/17 11:04, Christoffer Dall wrote:
+>>> We don't need to stop a specific VCPU when changing the active state,
+>>> because private IRQs can only be modified by a running VCPU for the
+>>> VCPU itself and it is therefore already stopped.
 >>>
->>> The first case occurs when the firmware describes the bus master and
->>> IOMMU topology correctly but no device driver exists for the IOMMU yet
->>> or the device driver has not been compiled in. Return NULL, the caller
->>> will configure the device without an IOMMU.
+>>> However, it is also possible for two VCPUs to be modifying the active
+>>> state of SPIs at the same time, which can cause the thread being stuck
+>>> in the loop that checks other VCPU threads for a potentially very long
+>>> time, or to modify the active state of a running VCPU.  Fix this by
+>>> serializing all accesses to setting and clearing the active state of
+>>> interrupts using the KVM mutex.
 >>>
->>> The second and third cases are handled by deferring the probe of the bus
->>> master device which will eventually get reprobed after the IOMMU.
->>>
->>> The last case is currently handled by deferring the probe of the bus
->>> master device as well. A mechanism to either configure the bus master
->>> device without an IOMMU or to fail the bus master device probe depending
->>> on whether the IOMMU is optional or mandatory would be a good
->>> enhancement.
->>>
->>> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
->>> [Lorenzo: Added fixes for dma_coherent_mask overflow, acpi_dma_configure
->>>           called multiple times for same device]
->>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>>> Reported-by: Andrew Jones <drjones@redhat.com>
+>>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
 >>> ---
->>>  drivers/acpi/arm64/iort.c  | 33 ++++++++++++++++++++++++++++++++-
->>>  drivers/acpi/scan.c        | 11 ++++++++---
->>>  drivers/base/dma-mapping.c |  2 +-
->>>  include/acpi/acpi_bus.h    |  2 +-
->>>  include/linux/acpi.h       |  7 +++++--
->>>  5 files changed, 47 insertions(+), 8 deletions(-)
+>>>  arch/arm/include/asm/kvm_host.h   |  2 --
+>>>  arch/arm64/include/asm/kvm_host.h |  2 --
+>>>  virt/kvm/arm/arm.c                | 20 ++++----------------
+>>>  virt/kvm/arm/vgic/vgic-mmio.c     | 18 ++++++++++--------
+>>>  virt/kvm/arm/vgic/vgic.c          | 11 ++++++-----
+>>>  5 files changed, 20 insertions(+), 33 deletions(-)
 >>>
->>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
->>> index 3dd9ec3..e323ece 100644
->>> --- a/drivers/acpi/arm64/iort.c
->>> +++ b/drivers/acpi/arm64/iort.c
->>> @@ -543,6 +543,14 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
->>>  	const struct iommu_ops *ops = NULL;
->>>  	int ret = -ENODEV;
->>>  	struct fwnode_handle *iort_fwnode;
->>> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
->>> +
->>> +	/*
->>> +	 * If we already translated the fwspec there
->>> +	 * is nothing left to do, return the iommu_ops.
->>> +	 */
->>> +	if (fwspec && fwspec->ops)
->>> +		return fwspec->ops;
+>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>>> index f0e6657..12274d4 100644
+>>> --- a/arch/arm/include/asm/kvm_host.h
+>>> +++ b/arch/arm/include/asm/kvm_host.h
+>>> @@ -233,8 +233,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+>>>  struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
+>>>  void kvm_arm_halt_guest(struct kvm *kvm);
+>>>  void kvm_arm_resume_guest(struct kvm *kvm);
+>>> -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
+>>> -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
+>>>  
+>>>  int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
+>>>  unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
+>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>> index 5e19165..32cbe8a 100644
+>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>> +++ b/arch/arm64/include/asm/kvm_host.h
+>>> @@ -333,8 +333,6 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+>>>  struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
+>>>  void kvm_arm_halt_guest(struct kvm *kvm);
+>>>  void kvm_arm_resume_guest(struct kvm *kvm);
+>>> -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu);
+>>> -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu);
+>>>  
+>>>  u64 __kvm_call_hyp(void *hypfn, ...);
+>>>  #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
+>>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+>>> index 3417e18..3c387fd 100644
+>>> --- a/virt/kvm/arm/arm.c
+>>> +++ b/virt/kvm/arm/arm.c
+>>> @@ -539,27 +539,15 @@ void kvm_arm_halt_guest(struct kvm *kvm)
+>>>  	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
+>>>  }
+>>>  
+>>> -void kvm_arm_halt_vcpu(struct kvm_vcpu *vcpu)
+>>> -{
+>>> -	vcpu->arch.pause = true;
+>>> -	kvm_vcpu_kick(vcpu);
+>>> -}
+>>> -
+>>> -void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
+>>> -{
+>>> -	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
+>>> -
+>>> -	vcpu->arch.pause = false;
+>>> -	swake_up(wq);
+>>> -}
+>>> -
+>>>  void kvm_arm_resume_guest(struct kvm *kvm)
+>>>  {
+>>>  	int i;
+>>>  	struct kvm_vcpu *vcpu;
+>>>  
+>>> -	kvm_for_each_vcpu(i, vcpu, kvm)
+>>> -		kvm_arm_resume_vcpu(vcpu);
+>>> +	kvm_for_each_vcpu(i, vcpu, kvm) {
+>>> +		vcpu->arch.pause = false;
+>>> +		swake_up(kvm_arch_vcpu_wq(vcpu));
+>>> +	}
+>>>  }
+>>>  
+>>>  static void vcpu_sleep(struct kvm_vcpu *vcpu)
+>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+>>> index 64cbcb4..c1e4bdd 100644
+>>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+>>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+>>> @@ -231,23 +231,21 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+>>>   * be migrated while we don't hold the IRQ locks and we don't want to be
+>>>   * chasing moving targets.
+>>>   *
+>>> - * For private interrupts, we only have to make sure the single and only VCPU
+>>> - * that can potentially queue the IRQ is stopped.
+>>> + * For private interrupts we don't have to do anything because userspace
+>>> + * accesses to the VGIC state already require all VCPUs to be stopped, and
+>>> + * only the VCPU itself can modify its private interrupts active state, which
+>>> + * guarantees that the VCPU is not running.
+>>>   */
+>>>  static void vgic_change_active_prepare(struct kvm_vcpu *vcpu, u32 intid)
+>>>  {
+>>> -	if (intid < VGIC_NR_PRIVATE_IRQS)
+>>> -		kvm_arm_halt_vcpu(vcpu);
+>>> -	else
+>>> +	if (intid > VGIC_NR_PRIVATE_IRQS)
+>>>  		kvm_arm_halt_guest(vcpu->kvm);
+>>>  }
+>>>  
+>>>  /* See vgic_change_active_prepare */
+>>>  static void vgic_change_active_finish(struct kvm_vcpu *vcpu, u32 intid)
+>>>  {
+>>> -	if (intid < VGIC_NR_PRIVATE_IRQS)
+>>> -		kvm_arm_resume_vcpu(vcpu);
+>>> -	else
+>>> +	if (intid > VGIC_NR_PRIVATE_IRQS)
+>>>  		kvm_arm_resume_guest(vcpu->kvm);
+>>>  }
+>>>  
+>>> @@ -271,11 +269,13 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+>>>  {
+>>>  	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+>>>  
+>>> +	mutex_lock(&vcpu->kvm->lock);
+>>>  	vgic_change_active_prepare(vcpu, intid);
+>>>  
+>>>  	__vgic_mmio_write_cactive(vcpu, addr, len, val);
+>>>  
+>>>  	vgic_change_active_finish(vcpu, intid);
+>>> +	mutex_unlock(&vcpu->kvm->lock);
 >>
->> Is this logic strictly required? It breaks masters with multiple SIDs
->> as only the first SID is actually added to the master's fwspec.
+>> Any reason not to move the lock/unlock calls to prepare/finish? Also, do
+>> we need to take that mutex if intid is a PPI?
 > 
-> My bad, that's indeed a silly bug I introduced. Please let me know if the
-> patch below fixes it, we will send it upstream shortly.
+> I guess we strictly don't need to take the mutex if it's a PPI, no.
 > 
+> But I actually preferred this symmetry because you can easily tell we
+> don't have a bug (famous last words) by locking and unlocking the mutex
+> in the same function.
+> 
+> I don't feel strongly about it though, so I can move it if you prefer
+> it.
 
-oops, i think emails crossed. Please let me know if you are ok to add this
-to the other fixes.
+No, that's fine, I just wanted to check whether my understanding was
+correct.
 
-Regards,
- Sricharan
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> Lorenzo
-> 
-> -- >8 --
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index c5fecf9..e326f2a 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -666,14 +666,6 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
->  	int ret = -ENODEV;
->  	struct fwnode_handle *iort_fwnode;
->  
-> -	/*
-> -	 * If we already translated the fwspec there
-> -	 * is nothing left to do, return the iommu_ops.
-> -	 */
-> -	ops = iort_fwspec_iommu_ops(dev->iommu_fwspec);
-> -	if (ops)
-> -		return ops;
-> -
->  	if (node) {
->  		iort_fwnode = iort_get_fwnode(node);
->  		if (!iort_fwnode)
-> @@ -735,6 +727,14 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
->  	u32 streamid = 0;
->  	int err;
->  
-> +	/*
-> +	 * If we already translated the fwspec there
-> +	 * is nothing left to do, return the iommu_ops.
-> +	 */
-> +	ops = iort_fwspec_iommu_ops(dev->iommu_fwspec);
-> +	if (ops)
-> +		return ops;
-> +
->  	if (dev_is_pci(dev)) {
->  		struct pci_bus *bus = to_pci_dev(dev)->bus;
->  		u32 rid;
-> 
-> 
+Thanks,
 
+	M.
 -- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Jazz is not dead. It just smells funny...
