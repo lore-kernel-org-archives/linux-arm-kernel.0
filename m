@@ -1,27 +1,98 @@
-From: Johannes.Stoelp@synopsys.com (Johannes Stoelp)
-Date: Tue, 23 May 2017 12:49:30 +0000
-Subject: Unwinding stop on irq handler or across it?
-In-Reply-To: <86o9ur8o6t.fsf@gmail.com>
-References: <86o9ur8o6t.fsf@gmail.com>
-Message-ID: <6ECCE8A0904A1643BE093611EF2098CE014841A4@DE02WEMBXB.internal.synopsys.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 23 May 2017 14:53:21 +0200
+Subject: [linux-sunxi] Re: [RFC PATCH 07/11] drm: sun4i: add support for
+ the TV encoder in H3 SoC
+In-Reply-To: <3164416.5xR36OcyjH@jernej-laptop>
+References: <20170517164354.16399-1-icenowy@aosc.io>
+ <1958057.WDKm0nQKgW@jernej-laptop>
+ <CAGb2v66aD=G+V75N-_nYo=dGqhxpKhadM84h9G-B34=dnDwCbg@mail.gmail.com>
+ <3164416.5xR36OcyjH@jernej-laptop>
+Message-ID: <20170523125321.t7y7yfrrfokpkzgd@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
+On Mon, May 22, 2017 at 07:55:56PM +0200, Jernej ?krabec wrote:
 > Hi,
-> When use GDB debug Linux kernel, GDB can't stop on unwinding from an irq handler,
+> 
+> Dne sobota, 20. maj 2017 ob 03:37:53 CEST je Chen-Yu Tsai napisal(a):
+> > On Sat, May 20, 2017 at 2:23 AM, Jernej ?krabec <jernej.skrabec@siol.net> 
+> wrote:
+> > > Hi,
+> > > 
+> > > Dne petek, 19. maj 2017 ob 20:08:18 CEST je Icenowy Zheng napisal(a):
+> > >> ? 2017?5?20? GMT+08:00 ??2:03:30, Maxime Ripard <maxime.ripard@free-
+> > > 
+> > > electrons.com> ??:
+> > >> >On Thu, May 18, 2017 at 12:43:50AM +0800, Icenowy Zheng wrote:
+> > >> >> Allwinner H3 features a TV encoder similar to the one in earlier
+> > >> >
+> > >> >SoCs,
+> > >> >
+> > >> >> but with some different points about clocks:
+> > >> >> - It has a mod clock and a bus clock.
+> > >> >> - The mod clock must be at a fixed rate to generate signal.
+> > >> >
+> > >> >Why?
+> > >> 
+> > >> It's experiment result by Jernej.
+> > >> 
+> > >> The clock rates in BSP kernel is also specially designed
+> > >> (PLL_DE at 432MHz) in order to be able to feed the TVE.
+> > > 
+> > > My experiments and search through BSP code showed that TVE seems to have
+> > > additional fixed predivider 8. So if you want to generate 27 MHz clock,
+> > > unit has to be feed with 216 MHz.
+> > > 
+> > > TVE has only one PLL source PLL_DE. And since 216 MHz is a bit low for
+> > > DE2,
+> > > BSP defaults to 432 MHz for PLL_DE and use divider 2 to generate 216 MHz.
+> > > This clock is then divided by 8 internaly to get final 27 MHz.
+> > > 
+> > > Please note that I don't have any hard evidence to support that, only
+> > > experimental data. However, only that explanation make sense to me.
+> > > 
+> > > BTW, BSP H3/H5 TV driver supports only PAL and NTSC which both use 27 MHz
+> > > base clock. Further experiments are needed to check if there is any
+> > > possibility to have other resolutions by manipulating clocks and give
+> > > other proper settings. I plan to do that, but not in very near future.
+> > 
+> > You only have composite video output, and those are the only 2 standard
+> > resolutions that make any sense.
+> 
+> Right, other resolutions are for VGA.
+> 
+> Anyway, I did some more digging in A10 and R40 datasheets. I think that H3 TVE 
+> unit is something in between. R40 TVE has a setting to select "up sample".
 
-> #0  gic_handle_irq (regs=0xffffffc07d9c7e30) at drivers/irqchip/irq-gic.c:263
-> #1  0xffffffc000083ce4 in el1_irq () at arch/arm64/kernel/entry.S:346
-> #2  0xffffffc000083ce4 in el1_irq () at arch/arm64/kernel/entry.S:346
-> #3  0xffffffc000083ce4 in el1_irq () at arch/arm64/kernel/entry.S:346 ....
+That might be just another translation of oversampling :)
 
-> This problem can be fixed by either adding .cfi directives in entry.S or adding some Linux awareness into GDB.  I want to know what is the expected behavior?  Is it reasonable that stack unwinding stops on irq handler, like el1_irq in this case? or something else?
+I didn't know it could be applied to composite signals though, but I
+guess this is just another analog signal after all.
 
-> Yao (??)
+> Possible settings are 27 MHz, 54 MHz, 108 MHz and 216 MHz. BSP driver on R40 
+> has this setting enabled only for PAL and NTSC and it is always 216 MHz. I 
+> think that H3 may have this hardwired to 216 MHz and this would be the reason 
+> why 216 MHz is needed.
+> 
+> Has anyone else any better explanation?
 
-I'm really interested in finding a solution to this issue, do you have any comments on Yao's mail?
+That's already a pretty good one.
 
-Best,
-Johannes
+Either way, wether this is upsampling, oversampling or just a
+pre-divider, this can and should be dealt with in the mode_set
+callback, and not in the probe.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170523/9b264e48/attachment.sig>
