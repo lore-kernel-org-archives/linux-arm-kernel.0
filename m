@@ -1,52 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 May 2017 22:33:14 +0200
-Subject: [PATCH v4 6/7] ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class
- cpus
-In-Reply-To: <20170523200142.GD22219@n2100.armlinux.org.uk>
-References: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
- <1493029017-31382-7-git-send-email-vladimir.murzin@arm.com>
- <20170523200142.GD22219@n2100.armlinux.org.uk>
-Message-ID: <CAK8P3a0tbaAHerjitDBJ9gz1SCFkAwKhfzjgMHiB5ESakQs7-g@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 23 May 2017 22:34:55 +0200
+Subject: [PATCH] RFC: arm: eBPF JIT compiler
+In-Reply-To: <1495564433-9750-1-git-send-email-illusionist.neo@gmail.com>
+References: <1495564433-9750-1-git-send-email-illusionist.neo@gmail.com>
+Message-ID: <20170523203455.GF24807@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 10:01 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Mon, Apr 24, 2017 at 11:16:56AM +0100, Vladimir Murzin wrote:
->> Now, we have dedicated non-cacheable region for consistent DMA
->> operations. However, that region can still be marked as bufferable by
->> MPU, so it'd be safer to have barriers by default.
->
-> What do you actually want here?  Your patch doesn't quite make sense,
-> the commit description seems to indicate that you require this option
-> to be set for V7M, but the patch says otherwise.
->
->>  config ARM_DMA_MEM_BUFFERABLE
->> -     bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K) && !CPU_V7
->> -     default y if CPU_V6 || CPU_V6K || CPU_V7
->> +     bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K || CPU_V7M) && !CPU_V7
->
-> This "if" conditional conditionalises the visibility of the option,
-> it doesn't conditionalise the value.
->
->> +     default y if CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M
->
-> Taking both of these changes together what you end up with is an option
-> presented to the user for "Use non-cacheable memory for DMA" which
-> they can choose to disable.
->
-> If you require this option to be set, that's incorrect - your modification
-> to the default line is correct, but the first line is not.  To achieve
-> that, you want the if condition to evaluate false for V7M, thereby hiding
-> the option from the user.  In that case, the default value will always be
-> assigned to the option.
+On Wed, May 24, 2017 at 12:03:53AM +0530, Shubham Bansal wrote:
+> The JIT compiler emits ARM 32 bit instructions. Currently, It supports
+> eBPF only. Classic BPF is supported because of the conversion by BPF
+> core.
+> 
+> JIT is enabled with
+> 
+> 	echo 1 > /proc/sys/net/core/bpf_jit_enable
+> 
+> Constant Blinding can be enabled along with JIT using
+> 
+> 	echo 1 > /proc/sys/net/core/bpf_jit_enable
+> 	echo 2 > /proc/sys/net/core/bpf_jit_harden
+> 
+> See Documentation/networking/filter.txt for more information.
+> Tested on ARMv7 with CONFIG_FRAME_POINTER enabled.
+> 
+> Results:
+> 
+> 1. Interpreter:
+> 
+> 	[   93.551176] test_bpf: Summary: 314 PASSED, 0 FAILED, [0/306 JIT'ed]
+> 
+> 2. JIT enabled:
+> 
+> 	[   92.913931] test_bpf: Summary: 314 PASSED, 0 FAILED, [278/306 JIT'ed]
+> 
+> 3. JIT + blinding enabled:
+> 
+> 	[  109.414506] test_bpf: Summary: 314 PASSED, 0 FAILED, [278/306 JIT'ed]
 
-I had the opposite comment in the previous version ;-)
-https://lkml.org/lkml/2017/4/19/185
+Hi Shubham
 
-I think the current patch is correct, but the description could still be
-clarified: On some of the beefier ARMv7-M machines (with DMA
-and write buffers) we want this enabled, while those that didn't
-need it until now also won't need it in the future.
+Is there a HOWTO or a README somewhere about running the tests? I have
+a few ARMv5 platforms i can run tests on.
 
-        Arnd
+  Thanks
+	Andrew
