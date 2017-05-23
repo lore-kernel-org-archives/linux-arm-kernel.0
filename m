@@ -1,40 +1,80 @@
-From: aisheng.dong@nxp.com (A.S. Dong)
-Date: Tue, 23 May 2017 09:17:19 +0000
-Subject: [PATCH V2 0/5] pinctrl: imx: add generic pin config and imx7ulp
- support
-In-Reply-To: <CACRpkdY2--+JCaPA0zBGrF66DwgOPd6m4=QvCgkO50x35TCzzw@mail.gmail.com>
-References: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
- <CACRpkdY2--+JCaPA0zBGrF66DwgOPd6m4=QvCgkO50x35TCzzw@mail.gmail.com>
-Message-ID: <DBXPR04MB320028F986D2E9B1FE1DDBB80F90@DBXPR04MB320.eurprd04.prod.outlook.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 23 May 2017 11:17:22 +0200
+Subject: [PATCH v3 1/4] dt-bindings: clock: gxbb: expose UART clocks
+In-Reply-To: <20170331165437.26227-2-hgkr.klein@gmail.com>
+References: <20170331165437.26227-1-hgkr.klein@gmail.com>
+ <20170331165437.26227-2-hgkr.klein@gmail.com>
+Message-ID: <95a5e461-a145-b301-564f-150aed2eea91@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> Sent: Tuesday, May 23, 2017 3:41 PM
-> To: A.S. Dong
-> Cc: linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> Shawn Guo; Stefan Agner; Jacky Bai; Andy Duan; Sascha Hauer
-> Subject: Re: [PATCH V2 0/5] pinctrl: imx: add generic pin config and
-> imx7ulp support
-> 
-> On Fri, May 19, 2017 at 9:05 AM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
-> 
-> > This patch series intends to add the generic pin config support for
-> > imx platforms.
-> 
-> I applied patches 1,2,3 as you've seen, so please rebase on my "devel"
-> branch in pin control and only resend the things we are still discussing.
-> 
+Hi Helmut,
 
-Got it, thanks for the reminder.
-
-> I see there are some other patches flying for imx pin control and GPIO, if
-> the patches are dependent on each other consider putting it all into one
-> series. If they are not dependent, then don't.
+On 03/31/2017 06:54 PM, Helmut Klein wrote:
+> Expose the clock ids of the three none AO uarts to the dt-bindings
 > 
+> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+> ---
+>  drivers/clk/meson/gxbb.h              | 6 +++---
+>  include/dt-bindings/clock/gxbb-clkc.h | 3 +++
+>  2 files changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+> index 8ee2022ce5d5..1edfaa5fe307 100644
+> --- a/drivers/clk/meson/gxbb.h
+> +++ b/drivers/clk/meson/gxbb.h
+> @@ -194,7 +194,7 @@
+>  /* #define CLKID_SAR_ADC */
+>  #define CLKID_SMART_CARD	  24
+>  #define CLKID_RNG0		  25
+> -#define CLKID_UART0		  26
+> +/* CLKID_UART0 */
+>  #define CLKID_SDHC		  27
+>  #define CLKID_STREAM		  28
+>  #define CLKID_ASYNC_FIFO	  29
+> @@ -216,7 +216,7 @@
+>  #define CLKID_ADC		  45
+>  #define CLKID_BLKMV		  46
+>  #define CLKID_AIU		  47
+> -#define CLKID_UART1		  48
+> +/* CLKID_UART1 */
+>  #define CLKID_G2D		  49
+>  /* CLKID_USB0 */
+>  /* CLKID_USB1 */
+> @@ -236,7 +236,7 @@
+>  /* CLKID_USB0_DDR_BRIDGE */
+>  #define CLKID_MMC_PCLK		  66
+>  #define CLKID_DVIN		  67
+> -#define CLKID_UART2		  68
+> +/* CLKID_UART2 */
+>  /* #define CLKID_SANA */
+>  #define CLKID_VPU_INTR		  70
+>  #define CLKID_SEC_AHB_AHB3_BRIDGE 71
+> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+> index 692846c7941b..7b329df47752 100644
+> --- a/include/dt-bindings/clock/gxbb-clkc.h
+> +++ b/include/dt-bindings/clock/gxbb-clkc.h
+> @@ -15,13 +15,16 @@
+>  #define CLKID_SPI		34
+>  #define CLKID_I2C		22
+>  #define CLKID_SAR_ADC		23
+> +#define CLKID_UART0		26
+>  #define CLKID_ETH		36
+> +#define CLKID_UART1		48
+>  #define CLKID_USB0		50
+>  #define CLKID_USB1		51
+>  #define CLKID_USB		55
+>  #define CLKID_HDMI_PCLK		63
+>  #define CLKID_USB1_DDR_BRIDGE	64
+>  #define CLKID_USB0_DDR_BRIDGE	65
+> +#define CLKID_UART2		68
+>  #define CLKID_SANA		69
+>  #define CLKID_GCLK_VENCI_INT0	77
+>  #define CLKID_AO_I2C		93
 
-I will consider it.
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Regards
-Dong Aisheng
+I rebased on 4.12-rc1 and applied on next/headers.
+
+Thanks,
+Neil
