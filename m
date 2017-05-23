@@ -1,165 +1,53 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Tue, 23 May 2017 11:11:34 +0900
-Subject: [PATCH v2 1/5] drm/stm: ltdc: Add bridge support
-In-Reply-To: <1495207218-11372-2-git-send-email-philippe.cornu@st.com>
-References: <1495207218-11372-1-git-send-email-philippe.cornu@st.com>
- <CGME20170520011404epcas1p3bfdaa032f246a5ece9c7b510af89e7fd@epcas1p3.samsung.com>
- <1495207218-11372-2-git-send-email-philippe.cornu@st.com>
-Message-ID: <c9b45faa-89f9-c31c-a5c4-2780fdb79d62@samsung.com>
+From: eddie.cai.linux@gmail.com (Eddie Cai)
+Date: Tue, 23 May 2017 10:51:05 +0800
+Subject: [PATCH] arm64: dts: rockchip: update cpu opp table for rk3399 op1
+In-Reply-To: <2392465.b79CVULcOX@phil>
+References: <1493014730-9670-1-git-send-email-wxt@rock-chips.com>
+ <3119382.DFiP2J6FnE@diego>
+ <CAJrj+DPzj0hieOHHpoxL4_uPUyaOa7LADJw+4_82VDZiPKxy1g@mail.gmail.com>
+ <2392465.b79CVULcOX@phil>
+Message-ID: <CAJrj+DPZf0Tb454R0=uAXRBDL-Ci63bZZ1ujWnYnsh94eY_0Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philippe,
+Hi Heiko
 
-W dniu 2017-05-20 o 00:20, Philippe CORNU pisze:
-> Add the bridge support, used by DSI host and HDMI/LVDS bridges.
+2017-05-22 23:02 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
+> Hi Eddie, Caesar,
 >
-> Signed-off-by: Philippe CORNU <philippe.cornu@st.com>
-> ---
->   drivers/gpu/drm/stm/ltdc.c | 74 ++++++++++++++++++++++++++++++++++------------
->   drivers/gpu/drm/stm/ltdc.h |  1 +
->   2 files changed, 56 insertions(+), 19 deletions(-)
+> Am Montag, 24. April 2017, 18:29:26 CEST schrieb Eddie Cai:
+>> Hi Heiko
+>>
+>> 2017-04-24 17:15 GMT+08:00 Heiko St?bner <heiko@sntech.de>:
+>> > Am Montag, 24. April 2017, 16:49:08 CEST schrieb Caesar Wang:
+>> >> ? 2017?04?24? 16:26, Heiko St?bner ??:
+>> >> > Hi Caesar,
+>> >> >
+>> >> > Am Montag, 24. April 2017, 14:18:50 CEST schrieb Caesar Wang:
+>> >> >> Update the cpu opp table for rk3399 op1.
+>> >> >
+>> >> > Ideally this should contain something about the "why".
+>> >> > Are these new voltage settings safer to operate under?
+>> >>
+>> >> The before opp table is for earlier batch of rk3399 SoCs,  that's no
+>> >> enough for the current and
+>> >> newer batch of rk3399 op1. In order to suit for the rk3399 op1, we need
+>> >> to little voltages changed.
+>> >
+>> > just to make sure, this is also safe for all the non-chromebook rk3399 socs
+>> > (like the firefly and tv-boxes, etc), right?
+>> This is only for op1. other 3399s should have a different opp table
 >
-> diff --git a/drivers/gpu/drm/stm/ltdc.c b/drivers/gpu/drm/stm/ltdc.c
-> index 7b2d63b..809e420 100644
-> --- a/drivers/gpu/drm/stm/ltdc.c
-> +++ b/drivers/gpu/drm/stm/ltdc.c
-> @@ -858,6 +858,43 @@ static struct drm_encoder *ltdc_rgb_encoder_create(struct drm_device *ddev)
->   	return encoder;
->   }
->   
-> +static const struct drm_encoder_funcs bridge_encoder_funcs = {
-> +	.destroy = drm_encoder_cleanup,
-> +};
-> +
-> +struct drm_encoder *bridge_encoder_create(struct drm_device *ddev,
-> +					  struct drm_bridge *bridge)
-> +{
-> +	struct drm_encoder *encoder;
-> +	int ret;
-> +
-> +	encoder = devm_kzalloc(ddev->dev, sizeof(*encoder), GFP_KERNEL);
-> +	if (!encoder)
-> +		return NULL;
-> +
-> +	encoder->possible_crtcs = CRTC_MASK;
-> +	encoder->possible_clones = 0; /* No cloning support */
-> +
-> +	drm_encoder_init(ddev, encoder, &bridge_encoder_funcs,
-> +			 DRM_MODE_ENCODER_TMDS, NULL);
-> +
-> +	drm_encoder_helper_add(encoder, NULL);
-> +
-> +	/* Link drm_bridge to encoder */
-> +	bridge->encoder = encoder;
-> +	encoder->bridge = bridge;
-
-I think the above two lines are redundant, drm_bridge_attach should do that.
-
-> +
-> +	ret = drm_bridge_attach(encoder, bridge, NULL);
-> +	if (ret) {
-> +		drm_encoder_cleanup(encoder);
-> +		return NULL;
-> +	}
-> +
-> +	DRM_DEBUG_DRIVER("Bridge encoder:%d created\n", encoder->base.id);
-> +
-> +	return encoder;
-> +}
-> +
->   /*
->    * DRM_CONNECTOR
->    */
-> @@ -967,12 +1004,13 @@ static int ltdc_get_caps(struct drm_device *ddev)
->   	return 0;
->   }
->   
-> -static struct drm_panel *ltdc_get_panel(struct drm_device *ddev)
-> +static int ltdc_parse_dt(struct drm_device *ddev)
->   {
-> +	struct ltdc_device *ldev = ddev->dev_private;
->   	struct device *dev = ddev->dev;
->   	struct device_node *np = dev->of_node;
-> -	struct device_node *entity, *port = NULL;
-> -	struct drm_panel *panel = NULL;
-> +	struct device_node *entity;
-> +	int ret;
->   
->   	DRM_DEBUG_DRIVER("\n");
->   
-> @@ -985,21 +1023,13 @@ static struct drm_panel *ltdc_get_panel(struct drm_device *ddev)
->   		if (!of_device_is_available(entity))
->   			continue;
->   
-> -		port = of_graph_get_remote_port_parent(entity);
-> -		if (port) {
-> -			panel = of_drm_find_panel(port);
-> -			of_node_put(port);
-> -			if (panel) {
-> -				DRM_DEBUG_DRIVER("remote panel %s\n",
-> -						 port->full_name);
-> -			} else {
-> -				DRM_DEBUG_DRIVER("panel missing\n");
-> -				of_node_put(entity);
-> -			}
-> -		}
-> +		ret = drm_of_find_panel_or_bridge(np, 0, 0,
-> +						  &ldev->panel, &ldev->bridge);
-> +		if (ret)
-> +			return ret;
->   	}
->   
-> -	return panel;
-> +	return 0;
->   }
->   
->   int ltdc_load(struct drm_device *ddev)
-> @@ -1017,9 +1047,9 @@ int ltdc_load(struct drm_device *ddev)
->   
->   	DRM_DEBUG_DRIVER("\n");
->   
-> -	ldev->panel = ltdc_get_panel(ddev);
-> -	if (!ldev->panel)
-> -		return -EPROBE_DEFER;
-> +	ret = ltdc_parse_dt(ddev);
-> +	if (ret)
-> +		return ret;
->   
->   	rstc = of_reset_control_get(np, NULL);
->   
-> @@ -1077,6 +1107,12 @@ int ltdc_load(struct drm_device *ddev)
->   
->   	DRM_INFO("ltdc hw version 0x%08x - ready\n", ldev->caps.hw_version);
->   
-> +	if (ldev->bridge) {
-> +		encoder = bridge_encoder_create(ddev, ldev->bridge);
-> +		if (!encoder)
-> +			return -EINVAL;
-> +	}
-> +
-
-I guess you could add 'else' clause after closing bracket - ldev->bridge 
-and ldev->panel are mutually exclusive, but it is up to you.
-
-Beside this:
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-
-Regards
-Andrzej
-
->   	if (ldev->panel) {
->   		encoder = ltdc_rgb_encoder_create(ddev);
->   		if (!encoder) {
-> diff --git a/drivers/gpu/drm/stm/ltdc.h b/drivers/gpu/drm/stm/ltdc.h
-> index 5427ef4..0083cad 100644
-> --- a/drivers/gpu/drm/stm/ltdc.h
-> +++ b/drivers/gpu/drm/stm/ltdc.h
-> @@ -25,6 +25,7 @@ struct ltdc_device {
->   	void __iomem *regs;
->   	struct clk *pixel_clk;	/* lcd pixel clock */
->   	struct drm_panel *panel;
-> +	struct drm_bridge *bridge;
->   	struct spinlock lock;	/* protecting irq status register */
->   	struct ltdc_caps caps;
->   	u32 clut[256];		/* color look up table */
+> digging this up, as I'm right now working on a rk3399-firefly, could you
+> provide the correct opp tables for the available rk3399 variants please?
+>
+> I.e. generally safe opps for boards like the firefly and the special ones
+> for op1-based devices?
+here is for 3399:
+https://github.com/rockchip-linux/kernel/blob/release-4.4/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
+here is for op1:
+https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4/arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
+>
+>
+> Thanks
+> Heiko
