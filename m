@@ -1,84 +1,135 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 23 May 2017 18:04:42 +0800
-Subject: [PATCH v3 3/6] mm/hugetlb: add size parameter to huge_pte_offset()
-In-Reply-To: <20170522133604.11392-4-punit.agrawal@arm.com>
-Message-ID: <201705231817.OSRI6iib%fengguang.wu@intel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 23 May 2017 12:08:30 +0200
+Subject: [PATCH] arm: dts: r7s72100: Add support for GR-Peach
+In-Reply-To: <1495532834-25670-1-git-send-email-jacopo+renesas@jmondi.org>
+References: <1495532834-25670-1-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdUR0Djqi-7DWAHpN_F6xt-WcYzT4H2+mLCjHE9T+7UuJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Punit,
+Hi Jacopo,
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.12-rc2 next-20170523]
-[cannot apply to mmotm/master]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On Tue, May 23, 2017 at 11:47 AM, Jacopo Mondi
+<jacopo+renesas@jmondi.org> wrote:
+> Add device tree source for Renesas GR-Peach board.
+> GR-Peach is an RZ/A1H based board with 10MB of on-chip SRAM and 8MB
+> QSPI flash storage.
+> Add support for the board, and create a 2MB partition to use as rootfs.
+>
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-url:    https://github.com/0day-ci/linux/commits/Punit-Agrawal/Support-for-contiguous-pte-hugepages/20170523-142407
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Thanks for your patch!
 
-All errors (new ones prefixed by >>):
+> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> @@ -51,6 +51,8 @@ Boards:
+>      compatible = "renesas,bockw", "renesas,r8a7778"
+>    - Genmai (RTK772100BC00000BR)
+>      compatible = "renesas,genmai", "renesas,r7s72100"
+> +  - GR-Peach (RTK772100BC00000BR)
 
-   arch/arm64/mm/hugetlbpage.c: In function 'huge_ptep_get_and_clear':
->> arch/arm64/mm/hugetlbpage.c:200:10: error: too few arguments to function 'huge_pte_offset'
-      cpte = huge_pte_offset(mm, addr);
-             ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c:135:8: note: declared here
-    pte_t *huge_pte_offset(struct mm_struct *mm,
-           ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c: In function 'huge_ptep_set_access_flags':
-   arch/arm64/mm/hugetlbpage.c:238:10: error: too few arguments to function 'huge_pte_offset'
-      cpte = huge_pte_offset(vma->vm_mm, addr);
-             ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c:135:8: note: declared here
-    pte_t *huge_pte_offset(struct mm_struct *mm,
-           ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c: In function 'huge_ptep_set_wrprotect':
-   arch/arm64/mm/hugetlbpage.c:263:10: error: too few arguments to function 'huge_pte_offset'
-      cpte = huge_pte_offset(mm, addr);
-             ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c:135:8: note: declared here
-    pte_t *huge_pte_offset(struct mm_struct *mm,
-           ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c: In function 'huge_ptep_clear_flush':
-   arch/arm64/mm/hugetlbpage.c:280:10: error: too few arguments to function 'huge_pte_offset'
-      cpte = huge_pte_offset(vma->vm_mm, addr);
-             ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c:135:8: note: declared here
-    pte_t *huge_pte_offset(struct mm_struct *mm,
-           ^~~~~~~~~~~~~~~
+That part number is Genmai?
 
-vim +/huge_pte_offset +200 arch/arm64/mm/hugetlbpage.c
+> +    compatible = "renesas,grpeach", "renesas,r7s72100"
 
-66b3923a David Woods 2015-12-17  194  	if (pte_cont(*ptep)) {
-66b3923a David Woods 2015-12-17  195  		int ncontig, i;
-66b3923a David Woods 2015-12-17  196  		size_t pgsize;
-66b3923a David Woods 2015-12-17  197  		pte_t *cpte;
-66b3923a David Woods 2015-12-17  198  		bool is_dirty = false;
-66b3923a David Woods 2015-12-17  199  
-66b3923a David Woods 2015-12-17 @200  		cpte = huge_pte_offset(mm, addr);
-66b3923a David Woods 2015-12-17  201  		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
-66b3923a David Woods 2015-12-17  202  		/* save the 1st pte to return */
-66b3923a David Woods 2015-12-17  203  		pte = ptep_get_and_clear(mm, addr, cpte);
+"renesas,gr-peach"?
 
-:::::: The code at line 200 was first introduced by commit
-:::::: 66b3923a1a0f77a563b43f43f6ad091354abbfe9 arm64: hugetlb: add support for PTE contiguous bit
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -716,6 +716,7 @@ dtb-$(CONFIG_ARCH_S5PV210) += \
+>  dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+>         emev2-kzm9d.dtb \
+>         r7s72100-genmai.dtb \
+> +       r7s72100-grpeach.dtb \
 
-:::::: TO: David Woods <dwoods@ezchip.com>
-:::::: CC: Will Deacon <will.deacon@arm.com>
+r7s72100-gr-peach.dtb?
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 35202 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170523/dd2d84e0/attachment-0001.gz>
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/r7s72100-grpeach.dts
+
+r7s72100-gr-peach.dts
+
+> @@ -0,0 +1,65 @@
+> +/*
+> + * Device Tree Source for the GRPEACH board
+
+GR-PEACH
+
+> +/ {
+> +       model = "GRPEACH";
+
+GR-PEACH
+
+> +       compatible = "renesas,grpeach", "renesas,r7s72100";
+
+renesas,gr-peach
+
+> +
+> +       aliases {
+> +               serial2 = &scif2;
+
+The first serial port is supposed to be called serial0, unless labeled
+otherwise.
+
+> +       };
+> +
+> +       chosen {
+> +               bootargs = "console=ttySC2,115200 ignore_loglevel rw root=/dev/mtdblock0";
+
+bootargs = "ignore_loglevel rw root=/dev/mtdblock0";
+stdout-path = "serial0:115200n8";
+
+> +       memory {
+
+memory at 20000000
+
+(please run "make dtbs W=1")
+
+> +               device_type = "memory";
+> +               reg = <0x20000000 0x00A00000>;  /* 10Mb @ 0x20000000 */
+
+reg = <0x20000000 0x00a00000>;
+
+No need for the comment, esp. since it says 10 megabits instead of
+10 mebibyte ;-)
+
+> +       qspi at 18000000 {
+
+flash at 18000000?
+
+> +               compatible = "mtd-rom";
+> +               probe-type = "map_rom";
+> +               reg = <0x18000000 0x00800000>;   /* 8 MB*/
+
+No need for the comment (megabyte vs. mebibyte)
+
+> +               bank-width = <4>;
+> +               device-width = <1>;
+> +
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +
+> +               rootfs at 18600000 {
+
+rootfs at 600000?
+
+> +                       label = "rootfs";
+> +                       reg = <0x00600000 0x00200000>; /* 2MB @ 0x18600000 */
+
+Do we need the comment?
+
+> +&extal_clk {
+> +       clock-frequency = <13330000>;
+
+My schematics have one more digit of precision: <13333000>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
