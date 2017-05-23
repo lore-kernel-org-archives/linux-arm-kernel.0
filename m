@@ -1,51 +1,57 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 23 May 2017 13:12:35 +0200
-Subject: [PATCH 2/3] arm64: dts: rockchip: add ethernet alias on rk3399
-In-Reply-To: <20170523101540.txul7g3liyylg273@tarshish>
-References: <20170523095427.7421-1-heiko@sntech.de>
- <20170523095427.7421-2-heiko@sntech.de>
- <20170523101540.txul7g3liyylg273@tarshish>
-Message-ID: <1806134.4LkeRaXReF@phil>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 23 May 2017 12:13:28 +0100
+Subject: [PATCH v3 1/3] Documentation/bindings: Document the SafeXel
+ cryptographic engine driver
+In-Reply-To: <20170522213746.403aa844@free-electrons.com>
+References: <20170424075407.19730-1-antoine.tenart@free-electrons.com>
+ <20170424075407.19730-2-antoine.tenart@free-electrons.com>
+ <7986721e-3a2b-23fb-61d7-7032f0d65533@arm.com>
+ <20170522143049.GD14976@kwain.lan>
+ <e8ef1f11-539c-9abc-9977-36366d4994b1@arm.com>
+ <20170522145440.GE14976@kwain.lan>
+ <44fc18ba-a06a-de89-2172-08c093880e79@arm.com>
+ <20170522213746.403aa844@free-electrons.com>
+Message-ID: <9a3961ee-1396-cc8f-64ca-12beacf75c2a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
-
-Am Dienstag, 23. Mai 2017, 13:15:40 CEST schrieb Baruch Siach:
-> On Tue, May 23, 2017 at 11:54:26AM +0200, Heiko Stuebner wrote:
-> > This is used by bootloaders to override the mac address in the devicetree
-> > if needed.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > index db713c67ae17..3e1b1daa0964 100644
-> > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > @@ -56,6 +56,7 @@
-> >  	#size-cells = <2>;
-> >  
-> >  	aliases {
-> > +		ethernet = &gmac;
+On 22/05/17 20:37, Thomas Petazzoni wrote:
+> Hello,
 > 
-> Consider adding an index number. E.g., see commit 10b6c0c2e2bb8c (ARM: dts: 
-> bcm2835: add index to the ethernet alias).
+> On Mon, 22 May 2017 16:02:33 +0100, Marc Zyngier wrote:
+> 
+>>> It also says: 87 =>  34 En Lv 5, which is the IRQ I'm looking for.  
+>>
+>> Ah, that one as well. So how is the interrupt routed? Via the ICU, and
+>> then to the GIC (with several ICU sources mapped on a single SPI)?
+> 
+> The crypto block being in the CP part, it has a wired interrupt to the
+> ICU (also in the CP). The ICU then turns this wired interrupt into a
+> memory write transaction to a register called GICP SPI in the AP, which
+> triggers a SPI interrupt in the GIC.
 
-I'm not so sure about that. At least the reason to work around uboot issues
-is gone since u-boot commit 
-	f8e57c650d69 (fdt_support: Fixup 'ethernet' aliases not ending in digits)
-from march 20th 2017.
+Is that some kind of Level-triggered MSI, ? la GICv3 GICD_SETSPI_NSR?
 
-The rk3399 only has one ethernet controller, but the rk3288 also uses the
-ethernet0 suffix, so it definitly makes sense to add it for rk3399 as well.
+> In the current mainline kernel, the ICU is configured by the firmware
+> and creates static associations between wired interrupts in the CP and
+> corresponding SPI interrupts. Therefore the Device Tree currently
+> reference such SPI interrupts directly.
+> 
+> However, I have a patch series that I plan to submit hopefully in the
+> next days that adds an ICU driver, and changes the Device Tree to refer
+> to the ICU interrupt instead.
 
-So tl;dr, I'll make this ethernet0 when applying :-)
+OK, I'm quite interested to see that, specially if my above hunch is
+right...
 
+> Therefore, I don't think the binding should reference anything else
+> than the usual info about the interrupts property.
 
-Thanks for noticing
-Heiko
+That I completely agree with, as long as it doesn't describe anything
+that is semantically incorrect.
 
-    
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
