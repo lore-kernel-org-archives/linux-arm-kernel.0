@@ -1,107 +1,78 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 May 2017 23:42:17 +0100
-Subject: [PATCH V3 6/8] arm: dma-mapping: Reset the device's dma_ops
-In-Reply-To: <11967423.kIiHBWZfPn@avalon>
-References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
- <a9debbce-17dc-aeaa-59bd-668aa15b97fe@arm.com>
- <20170523175319.GA22219@n2100.armlinux.org.uk>
- <11967423.kIiHBWZfPn@avalon>
-Message-ID: <20170523224216.GI22219@n2100.armlinux.org.uk>
+From: angus@akkea.ca (Angus Ainslie)
+Date: Tue, 23 May 2017 16:46:33 -0600
+Subject: CHIPPro NAND issue with 4.12 rc1
+In-Reply-To: <20170523195239.6nsv4ydrt4u7q6ge@flea.home>
+References: <399ea126f3b18071fbe46bfc9787df6b@www.akkea.ca>
+ <20170520171418.4e8a47e0@bbrezillon>
+ <6f3cefa6c54776f82160ed8954f4d0d4@www.akkea.ca>
+ <20170521074535.4a4ba6dd@bbrezillon>
+ <20170522070117.mwk4gm34o7idedye@flea.home>
+ <63aca137397dc3700a34993205c8cfba@www.akkea.ca>
+ <20170523195239.6nsv4ydrt4u7q6ge@flea.home>
+Message-ID: <6da4225205128b8f5bb920c7c3375752@www.akkea.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 12:46:51AM +0300, Laurent Pinchart wrote:
-> Hi Russell,
+On 2017-05-23 13:52, Maxime Ripard wrote:
+> On Mon, May 22, 2017 at 10:32:42AM -0600, Angus Ainslie wrote:
+>> Hi Maxime
+>> 
+>> On 2017-05-22 01:01, Maxime Ripard wrote:
+>> >
+>> > This just made me realise, this is also the time where the clocks are
+>> > disabled, and we changed our clock implementation in 4.11.
+>> >
+>> > And using the 4.4 DT will keep the old driver...
+>> >
+>> > Did you test in 4.11? If it's also broken, could you try to revert
+>> > 1f4ce3b6ca79 and 6b48644b1d29 (I'm not sure it's going to be a trivial
+>> > revert, but in that order it should work).
+>> >
+>> 
+>> Thanks reverting those two allow the kernel to boot and mount the 
+>> NAND.
 > 
-> On Tuesday 23 May 2017 18:53:19 Russell King - ARM Linux wrote:
-> > On Tue, May 23, 2017 at 05:55:57PM +0100, Robin Murphy wrote:
-> > > On 23/05/17 17:25, Russell King - ARM Linux wrote:
-> > >> So, I've come to apply this patch (since it's finally landed in the
-> > >> patch system), and I'm not convinced that the commit message is really
-> > >> up to scratch.
-> > >> 
-> > >> The current commit message looks like this:
-> > >> 
-> > >> "   ARM: 8674/1: dma-mapping: Reset the device's dma_ops
-> > >>     arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops(),
-> > >>     dma_ops should be cleared in the teardown path. Otherwise this
-> > >>     causes problem when the probe of device is retried after being
-> > >>     deferred. The device's iommu structures are cleared after
-> > >>     EPROBEDEFER error, but on the next try dma_ops will still be set to
-> > >>     old value, which is not right."
-> > >> 
-> > >> It is obviously a fix, but a fix for which patch?  Looking at the
-> > >> history, we have "arm: dma-mapping: Don't override dma_ops in
-> > >> arch_setup_dma_ops()" which I would have guessed is the appropriate
-> > >> one, but this post-dates your patch (it's very recent, v4.12-rc
-> > >> recent.)
-> > >> 
-> > >> So, I need more description about the problem you were seeing when
-> > >> you first proposed this patch.
-> > >> 
-> > >> How does leaving the dma_ops in place prior to "arm: dma-mapping:
-> > >> Don't override dma_ops in arch_setup_dma_ops()" cause problems for
-> > >> deferred probing?
-> > >> 
-> > >> What patch is your change trying to fix?  In other words, how far
-> > >> back does this patch need to be backported?
-> > > 
-> > > In effect, it's fixing a latent inconsistency that's been present since
-> > > its introduction in 4bb25789ed28. However, that has clearly not proven
-> > > to be an issue in practice since then. With 09515ef5ddad we start
-> > > actually calling arch_teardown_dma_ops() in a manner that might leave
-> > > things partially initialised if anyone starts removing and reprobing
-> > > drivers, but so far that's still from code inspection[1] rather than
-> > > anyone hitting it.
-> > > 
-> > > Given that the changes which tickle it are fresh in -rc1 I'd say there's
-> > > no need to backport this, but at the same time it shouldn't do any
-> > > damage if you really want to.
-> > 
-> > Well, looking at this, I'm not convinced that much of it is correct.
-> > 
-> > 1) set_dma_ops() is in arch_setup_dma_ops() but this patch adds
-> >    the unsetting of the DMA ops inside arm_teardown_iommu_dma_ops()
-> >    rather than arch_teardown_dma_ops().
-> > 
-> >    This doesn't strike me as being particularly symmetric.
-> >    arm_teardown_iommu_dma_ops() is arm_setup_iommu_dma_ops()'s
-> >    counterpart.
-> > 
-> > 2) arch_setup_dma_ops(), the recent patch to add the existing dma_ops
-> >    check, and Xen - Xen wants to override the DMA ops if in the
-> >    initial domain.  It's not clear (at least to me) whether the recent
-> >    patch adding the dma_ops check took account of this or not.
-> > 
-> > 3) random places seem to fiddle with the dma_ops - notice that
-> >    arm_iommu_detach_device() sets the dma_ops to NULL.
-> > 
-> >    In fact, I think moving __arm_iommu_detach_device() into
-> >    arm_iommu_detach_device(), calling arm_iommu_detach_device(),
-> >    and getting rid of the explicit set_dma_ops(, NULL) in this
-> >    path would be a good first step.
-> > 
-> > 4) I think arch_setup_dma_ops() is over-complex.
-> > 
-> > So, in summary, this code is a mess today, and that means it's not
-> > obviously correct - which is bad.  This needs sorting.
+> Ok, good.
 > 
-> We've reached the same conclusion independently, but I'll refrain from 
-> commenting on whether that's a good or bad thing :-)
+> If you unrevert those patches, and add clk_ignore_unused to the kernel
+> command line, is it still broken?
 > 
-> I don't think this patch should be applied, as it could break Xen (and other 
-> platforms/drivers that set the DMA operations manually) by resetting DMA 
-> operations at device remove() time even if they have been set independently of 
-> arch_setup_dma_ops().
+> Maxime
 
-That will only occur if the dma ops have been overriden once the DMA
-operations have been setup via arch_setup_dma_ops.  What saves it from
-wholesale NULLing of the DMA operations is the check for a valid
-dma_iommu_mapping structure in arm_teardown_iommu_dma_ops().  This only
-exists when arm_setup_iommu_dma_ops() has attached a mapping to the
-device.
+Putting those back in with the changed command line doesn't work
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+[    5.840000] UBI error: cannot open mtd 4, error -19
+[    5.840000] hctosys: unable to open rtc device (rtc0)
+[    5.860000] clk: Not disabling unused clocks
+[    5.860000] vcc3v0: disabling
+[    5.870000] ALSA device list:
+[    5.870000]   #0: sun4i-codec
+[    5.880000] VFS: Cannot open root device "ubi0:rootfs" or 
+unknown-block(0,0): error -19
+[    5.890000] Please append a correct "root=" boot option; here are the 
+available partitions:
+[    5.910000] Kernel panic - not syncing: VFS: Unable to mount root fs 
+on unknown-block(0,0)
+[    5.910000] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 
+4.12.0-rc2TNCPro #14
+[    5.910000] Hardware name: Allwinner sun4i/sun5i Families
+[    5.910000] [<c010e440>] (unwind_backtrace) from [<c010b01c>] 
+(show_stack+0x10/0x14)
+[    5.910000] [<c010b01c>] (show_stack) from [<c0372cac>] 
+(dump_stack+0x84/0x98)
+[    5.910000] [<c0372cac>] (dump_stack) from [<c01ad0b0>] 
+(panic+0xdc/0x248)
+[    5.910000] [<c01ad0b0>] (panic) from [<c0a01208>] 
+(mount_block_root+0x198/0x270)
+[    5.910000] [<c0a01208>] (mount_block_root) from [<c0a014a8>] 
+(prepare_namespace+0x9c/0x198)
+[    5.910000] [<c0a014a8>] (prepare_namespace) from [<c0a00e40>] 
+(kernel_init_freeable+0x1d8/0x1e8)
+[    5.910000] [<c0a00e40>] (kernel_init_freeable) from [<c0711e74>] 
+(kernel_init+0x8/0x110)
+[    5.910000] [<c0711e74>] (kernel_init) from [<c0107578>] 
+(ret_from_fork+0x14/0x3c)
+[    5.910000] ---[ end Kernel panic - not syncing: VFS: Unable to mount 
+root fs on unknown-block(0,0)
+[    6.430000] g_cdc gadget: high-speed config #1: CDC Composite (ECM + 
+ACM)
