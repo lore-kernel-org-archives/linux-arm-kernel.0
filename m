@@ -1,87 +1,47 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 23 May 2017 22:16:12 +0800
-Subject: [PATCH v11 1/9] coresight: bindings for CPU debug module
-In-Reply-To: <1495548980-30432-1-git-send-email-leo.yan@linaro.org>
-References: <1495548980-30432-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1495548980-30432-2-git-send-email-leo.yan@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 May 2017 16:17:07 +0200
+Subject: [GIT PULL] ARM: SoC fixes (and a cross-arch dt-include fix)
+In-Reply-To: <CAMuHMdUivf9cw+LTn7UMueH=MMKi6i3wcOdgM6zbZBoxmkTZGQ@mail.gmail.com>
+References: <20170519193455.GA24206@localhost>
+ <CACRpkdaRdZTB39-=sAojO+OyHtP02KaFChqGcxy+fWA8qaB2bw@mail.gmail.com>
+ <CAOesGMhfrWSvLtDtGRWBTJiAoeSwzGgsdUTm26j1mpoVu0ghDg@mail.gmail.com>
+ <CAMuHMdUivf9cw+LTn7UMueH=MMKi6i3wcOdgM6zbZBoxmkTZGQ@mail.gmail.com>
+Message-ID: <CAK8P3a2E1LtCNoGkAuzwJJdQdUTB_+8d=FM2asEGkXJprvm8oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to ARMv8 architecture reference manual (ARM DDI 0487A.k)
-Chapter 'Part H: External debug', the CPU can integrate debug module
-and it can support self-hosted debug and external debug. Especially
-for supporting self-hosted debug, this means the program can access
-the debug module from mmio region; and usually the mmio region is
-integrated with coresight.
+On Tue, May 23, 2017 at 11:49 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+>
+> On Mon, May 22, 2017 at 5:11 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On Mon, May 22, 2017 at 4:44 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> On Fri, May 19, 2017 at 9:34 PM, Olof Johansson <olof@lixom.net> wrote:
+>>
+>> Yeah, asking people to spread out across releases would remove
+>> dependencies a lot, but it would also slow down progress and frustrate
+>> a lot of contributors so we don't do that.
+>
+> The above works fine for new support, or for new platforms.
+>
+> There's still support being migrated from platform code to DT, which
+> requires three steps:
+>   1. New DT-aware driver support,
+>   2. DT update to use the new driver support,
+>   3. Clean up platform code after optional DTB backwards compatibility
+>      grace period,
+> To make matters worse, 1 may conflict with the existing platform code,
+> and 2 must sometimes not be done before 1. Hence you may need three kernel
+> releases.
+> So we're already planning now what to clean up for v4.15 ;-)
+>
+> Would it be acceptable to do step 2 in the same release, after the driver
+> support has entered in -rc1? I know this is more than just replacing
+> numbers by symbolic values.
 
-So add document for binding debug component, includes binding to APB
-clock; and also need specify the CPU node which the debug module is
-dedicated to specific CPU.
+I'd say it really depends on the individual case. Do you have a particular
+platform in mind? E.g. For some of the more obsolete platforms that
+Linus Walleij has worked on over time, we have sometimes relaxed the
+rules about clean bisection and just merged everything in parallel, knowing
+that nobody else was likely to run that code on a vanilla kernel anyway.
 
-Suggested-by: Mike Leach <mike.leach@linaro.org>
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- .../bindings/arm/coresight-cpu-debug.txt           | 49 ++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt b/Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
-new file mode 100644
-index 0000000..2982912
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
-@@ -0,0 +1,49 @@
-+* CoreSight CPU Debug Component:
-+
-+CoreSight CPU debug component are compliant with the ARMv8 architecture
-+reference manual (ARM DDI 0487A.k) Chapter 'Part H: External debug'. The
-+external debug module is mainly used for two modes: self-hosted debug and
-+external debug, and it can be accessed from mmio region from Coresight
-+and eventually the debug module connects with CPU for debugging. And the
-+debug module provides sample-based profiling extension, which can be used
-+to sample CPU program counter, secure state and exception level, etc;
-+usually every CPU has one dedicated debug module to be connected.
-+
-+Required properties:
-+
-+- compatible : should be "arm,coresight-cpu-debug"; supplemented with
-+               "arm,primecell" since this driver is using the AMBA bus
-+	       interface.
-+
-+- reg : physical base address and length of the register set.
-+
-+- clocks : the clock associated to this component.
-+
-+- clock-names : the name of the clock referenced by the code. Since we are
-+                using the AMBA framework, the name of the clock providing
-+		the interconnect should be "apb_pclk" and the clock is
-+		mandatory. The interface between the debug logic and the
-+		processor core is clocked by the internal CPU clock, so it
-+		is enabled with CPU clock by default.
-+
-+- cpu : the CPU phandle the debug module is affined to. When omitted
-+	the module is considered to belong to CPU0.
-+
-+Optional properties:
-+
-+- power-domains: a phandle to the debug power domain. We use "power-domains"
-+                 binding to turn on the debug logic if it has own dedicated
-+		 power domain and if necessary to use "cpuidle.off=1" or
-+		 "nohlt" in the kernel command line or sysfs node to
-+		 constrain idle states to ensure registers in the CPU power
-+		 domain are accessible.
-+
-+Example:
-+
-+	debug at f6590000 {
-+		compatible = "arm,coresight-cpu-debug","arm,primecell";
-+		reg = <0 0xf6590000 0 0x1000>;
-+		clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+		clock-names = "apb_pclk";
-+		cpu = <&cpu0>;
-+	};
--- 
-2.7.4
+       Arnd
