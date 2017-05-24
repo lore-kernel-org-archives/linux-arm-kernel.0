@@ -1,44 +1,49 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 24 May 2017 19:01:43 +0100
-Subject: [PATCH 7/7] iommu/arm-smmu-v3: Disable tagged pointers
-In-Reply-To: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
-References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
-Message-ID: <20170524180143.19855-8-jean-philippe.brucker@arm.com>
+From: angus@akkea.ca (Angus Ainslie)
+Date: Wed, 24 May 2017 12:51:20 -0600
+Subject: [PATCH] clk: sunxi-ng: sun5i: Fix ahb_bist_clk definition
+In-Reply-To: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <ad72ceff73364add5cfe25b6143a68ca@www.akkea.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM architecture has a "Top Byte Ignore" (TBI) option that makes the
-MMU mask out bits [63:56] of an address, allowing a userspace application
-to store data in its pointers. This option is incompatible with PCI ATS.
+On 2017-05-24 10:34, Boris Brezillon wrote:
+> AHB BIST gate is actually controlled with bit 7.
+> 
+> This bug was detected while trying to use the NAND controller which is
+> using the DMA engine to transfer data to the NAND.
+> Since the ahb_bist_clk gate bit conflicts with the ahb_dma_clk gate 
+> bit,
+> the core was disabling the DMA engine clock as part of its 'disable
+> unused clks' procedure, which was causing all DMA transfers to fail 
+> after
+> this point.
+> 
+> Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
+> Cc: stable at vger.kernel.org
+> Reported-by: Angus Ainslie <angus@akkea.ca>compatible = 
+> "nextthing,chip-pro", "nextthing,gr8";
+> Signed-off-by: Boris Brezillon <boris.brezillon@frecompatible = 
+> "nextthing,chip-pro", "nextthing,gr8";e-electrons.com>
+> ---
+>  drivers/clk/sunxi-ng/ccu-sun5i.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.c 
+> b/drivers/clk/sunxi-ng/ccu-sun5i.c
+> index 5c476f966a72..5372bf8be5e6 100644
+> --- a/drivers/clk/sunxi-ng/ccu-sun5i.c
+> +++ b/drivers/clk/sunxi-ng/ccu-sun5i.c
+> @@ -243,7 +243,7 @@ static SUNXI_CCU_GATE(ahb_ss_clk,	"ahb-ss",	"ahb",
+>  static SUNXI_CCU_GATE(ahb_dma_clk,	"ahb-dma",	"ahb",
+>  		      0x060, BIT(6), 0);
+>  static SUNXI_CCU_GATE(ahb_bist_clk,	"ahb-bist",	"ahb",
+> -		      0x060, BIT(6), 0);
+> +		      0x060, BIT(7), 0);
+>  static SUNXI_CCU_GATE(ahb_mmc0_clk,	"ahb-mmc0",	"ahb",
+>  		      0x060, BIT(8), 0);
+>  static SUNXI_CCU_GATE(ahb_mmc1_clk,	"ahb-mmc1",	"ahb",
 
-If TBI is enabled in the SMMU and userspace triggers DMA transactions on
-tagged pointers, the endpoint might create ATC entries for addresses that
-include a tag. Software would then have to send ATC invalidation packets
-for each 255 possible alias of an address, or just wipe the whole address
-space. This is not a viable option, so disable TBI.
 
-The impact of this change is unclear, since there are very few users of
-tagged pointers, much less SVM. But the requirement introduced by this
-patch doesn't seem excessive: a userspace application using both tagged
-pointers and SVM should now sanitize addresses (clear the tag) before
-using them for device DMA.
-
-Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 87ed6239b9a6..0b2674f8ba0f 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -997,7 +997,6 @@ static u64 arm_smmu_cpu_tcr_to_cd(u64 tcr)
- 	val |= ARM_SMMU_TCR2CD(tcr, EPD0);
- 	val |= ARM_SMMU_TCR2CD(tcr, EPD1);
- 	val |= ARM_SMMU_TCR2CD(tcr, IPS);
--	val |= ARM_SMMU_TCR2CD(tcr, TBI0);
- 
- 	return val;
- }
--- 
-2.12.1
+The patch works perfectly. Using that I was able to remove the 
+clk_ignore_unsed and CLK_IS_CRITICAL.
