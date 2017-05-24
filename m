@@ -1,70 +1,62 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 24 May 2017 19:01:37 +0100
-Subject: [PATCH 1/7] PCI: Move ATS declarations outside of CONFIG_PCI
+Date: Wed, 24 May 2017 19:01:38 +0100
+Subject: [PATCH 2/7] dt-bindings: PCI: Describe ATS property for root complex
+ nodes
 In-Reply-To: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
 References: <20170524180143.19855-1-jean-philippe.brucker@arm.com>
-Message-ID: <20170524180143.19855-2-jean-philippe.brucker@arm.com>
+Message-ID: <20170524180143.19855-3-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently ATS helpers like pci_enable_ats are only defined when CONFIG_PCI
-is enabled. The ARM SMMU driver might get built with CONFIG_PCI disabled.
-It would thus have to wrap any use of ATS helpers around #ifdef
-CONFIG_PCI, which isn't ideal.
+Address Translation Service (ATS) is an extension to PCIe allowing
+endpoints to manage their own IOTLB, called Address Translation Cache
+(ATC). Instead of having every memory transaction processed by the IOMMU,
+the endpoint can first send an Address Translation Requests for an IOVA,
+obtain the corresponding Physical Address from the IOMMU and store it in
+its ATC. Subsequent transactions to this memory region can be performed on
+the PA, in which case they are marked 'translated' and (partially) bypass
+the IOMMU.
 
-A nicer solution is to always define these helpers. Since CONFIG_PCI_ATS
-is only enabled in association with CONFIG_PCI, move defines outside of
-CONFIG_PCI to prevent build failure when PCI is disabled.
+Since the extension uses fields that were previously reserved in the
+PCIe Translation Layer Packet, it seems ill-advised to enabled it on a
+system that doesn't fully support ATS.
+
+To "old" root complexes that simply ignored the new AT field, an Address
+Translation Request will look exactly like a Memory Read Request, so the
+root bridge will forward a memory read to the IOMMU instead of a
+translation request. If the access succeeds, the RC will send a Read
+Completion, which looks like a Translation Completion, back to the
+endpoint. As a result the endpoint might end up storing the content of
+memory instead of a physical address in its ATC. In reality, it's more
+likely that the size fields will be invalid and either end will detect the
+error, but in any case, it is undesirable.
+
+Add a way for firmware to tell the OS that ATS is supported by the PCI
+root complex.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- include/linux/pci.h | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ Documentation/devicetree/bindings/pci/pci-iommu.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 33c2b0b77429..775d495ef8d7 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1415,19 +1415,6 @@ int  ht_create_irq(struct pci_dev *dev, int idx);
- void ht_destroy_irq(unsigned int irq);
- #endif /* CONFIG_HT_IRQ */
+diff --git a/Documentation/devicetree/bindings/pci/pci-iommu.txt b/Documentation/devicetree/bindings/pci/pci-iommu.txt
+index 0def586fdcdf..f21a68ec471a 100644
+--- a/Documentation/devicetree/bindings/pci/pci-iommu.txt
++++ b/Documentation/devicetree/bindings/pci/pci-iommu.txt
+@@ -44,6 +44,14 @@ Optional properties
+ - iommu-map-mask: A mask to be applied to each Requester ID prior to being
+   mapped to an IOMMU specifier per the iommu-map property.
  
--#ifdef CONFIG_PCI_ATS
--/* Address Translation Service */
--void pci_ats_init(struct pci_dev *dev);
--int pci_enable_ats(struct pci_dev *dev, int ps);
--void pci_disable_ats(struct pci_dev *dev);
--int pci_ats_queue_depth(struct pci_dev *dev);
--#else
--static inline void pci_ats_init(struct pci_dev *d) { }
--static inline int pci_enable_ats(struct pci_dev *d, int ps) { return -ENODEV; }
--static inline void pci_disable_ats(struct pci_dev *d) { }
--static inline int pci_ats_queue_depth(struct pci_dev *d) { return -ENODEV; }
--#endif
--
- #ifdef CONFIG_PCIE_PTM
- int pci_enable_ptm(struct pci_dev *dev, u8 *granularity);
- #else
-@@ -1613,6 +1600,19 @@ static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
- #define dev_is_pf(d) (false)
- #endif /* CONFIG_PCI */
- 
-+#ifdef CONFIG_PCI_ATS
-+/* Address Translation Service */
-+void pci_ats_init(struct pci_dev *dev);
-+int pci_enable_ats(struct pci_dev *dev, int ps);
-+void pci_disable_ats(struct pci_dev *dev);
-+int pci_ats_queue_depth(struct pci_dev *dev);
-+#else
-+static inline void pci_ats_init(struct pci_dev *d) { }
-+static inline int pci_enable_ats(struct pci_dev *d, int ps) { return -ENODEV; }
-+static inline void pci_disable_ats(struct pci_dev *d) { }
-+static inline int pci_ats_queue_depth(struct pci_dev *d) { return -ENODEV; }
-+#endif
++- ats-supported: if present, the root complex supports the Address
++  Translation Service (ATS). It is able to interpret the AT field in PCIe
++  Transaction Layer Packets, and forward Translation Completions or
++  Invalidation Requests to endpoints.
 +
- /* Include architecture-dependent settings and functions */
++  Device drivers should not enable ATS in endpoints unless this property
++  is present.
++
  
- #include <asm/pci.h>
+ Example (1)
+ ===========
 -- 
 2.12.1
