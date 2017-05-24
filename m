@@ -1,109 +1,35 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 24 May 2017 08:02:54 +0800
-Subject: [PATCH v12 6/9] coresight: refactor with function of_coresight_get_cpu
-In-Reply-To: <1495584177-32193-1-git-send-email-leo.yan@linaro.org>
-References: <1495584177-32193-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1495584177-32193-7-git-send-email-leo.yan@linaro.org>
+Date: Wed, 24 May 2017 08:14:51 +0800
+Subject: [PATCH v11 7/9] coresight: add support for CPU debug module
+In-Reply-To: <CANLsYkzosO8+uaphvNQFe80zOJoqkSWceaiWhKEH-xSuVH0uew@mail.gmail.com>
+References: <1495548980-30432-1-git-send-email-leo.yan@linaro.org>
+ <1495548980-30432-8-git-send-email-leo.yan@linaro.org>
+ <CANLsYkzosO8+uaphvNQFe80zOJoqkSWceaiWhKEH-xSuVH0uew@mail.gmail.com>
+Message-ID: <20170524001451.GA20279@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is refactor to add function of_coresight_get_cpu(), so it's used to
-retrieve CPU id for coresight component. Finally can use it as a common
-function for multiple places.
+Hi Mathieu,
 
-Suggested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- drivers/hwtracing/coresight/of_coresight.c | 43 +++++++++++++++++++-----------
- include/linux/coresight.h                  |  3 +++
- 2 files changed, 31 insertions(+), 15 deletions(-)
+On Tue, May 23, 2017 at 11:39:16AM -0600, Mathieu Poirier wrote:
 
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index 225b2dd..a187941 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -101,16 +101,40 @@ static int of_coresight_alloc_memory(struct device *dev,
- 	return 0;
- }
- 
-+int of_coresight_get_cpu(const struct device_node *node)
-+{
-+	int cpu;
-+	bool found;
-+	struct device_node *dn, *np;
-+
-+	dn = of_parse_phandle(node, "cpu", 0);
-+
-+	/* Affinity defaults to CPU0 */
-+	if (!dn)
-+		return 0;
-+
-+	for_each_possible_cpu(cpu) {
-+		np = of_cpu_device_node_get(cpu);
-+		found = (dn == np);
-+		of_node_put(np);
-+		if (found)
-+			break;
-+	}
-+	of_node_put(dn);
-+
-+	/* Affinity to CPU0 if no cpu nodes are found */
-+	return found ? cpu : 0;
-+}
-+EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
-+
- struct coresight_platform_data *
- of_get_coresight_platform_data(struct device *dev,
- 			       const struct device_node *node)
- {
--	int i = 0, ret = 0, cpu;
-+	int i = 0, ret = 0;
- 	struct coresight_platform_data *pdata;
- 	struct of_endpoint endpoint, rendpoint;
- 	struct device *rdev;
--	bool found;
--	struct device_node *dn, *np;
- 	struct device_node *ep = NULL;
- 	struct device_node *rparent = NULL;
- 	struct device_node *rport = NULL;
-@@ -177,18 +201,7 @@ of_get_coresight_platform_data(struct device *dev,
- 		} while (ep);
- 	}
- 
--	dn = of_parse_phandle(node, "cpu", 0);
--	for_each_possible_cpu(cpu) {
--		np = of_cpu_device_node_get(cpu);
--		found = (dn == np);
--		of_node_put(np);
--		if (found)
--			break;
--	}
--	of_node_put(dn);
--
--	/* Affinity to CPU0 if no cpu nodes are found */
--	pdata->cpu = found ? cpu : 0;
-+	pdata->cpu = of_coresight_get_cpu(node);
- 
- 	return pdata;
- }
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index bf0aa50..d950dad 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -263,10 +263,13 @@ static inline int coresight_timeout(void __iomem *addr, u32 offset,
- #endif
- 
- #ifdef CONFIG_OF
-+extern int of_coresight_get_cpu(const struct device_node *node);
- extern struct coresight_platform_data *
- of_get_coresight_platform_data(struct device *dev,
- 			       const struct device_node *node);
- #else
-+static inline int of_coresight_get_cpu(const struct device_node *node)
-+{ return 0; }
- static inline struct coresight_platform_data *of_get_coresight_platform_data(
- 	struct device *dev, const struct device_node *node) { return NULL; }
- #endif
--- 
-2.7.4
+[...]
+
+> > +static bool debug_enable;
+> > +module_param_named(enable, debug_enable, bool, 0600);
+> > +MODULE_PARM_DESC(enable, "Knob to enable debug functionality "
+> > +                "(default is 0, which means is disabled by default)");
+> 
+> Checkpatch complains about a quoted string split across multiple
+> lines.  You can probably removes the second one since information
+> about the default value is already detailed in patch 03/09.  In this
+> case I suggest modifiying the description to:
+> 
+> "Control to enable coresight CPU debug functionality"
+
+It's shame for checkpatch.pl warning. Although everytime I used script
+before sending out patch set, should think a bit more to handle them
+better. Have sent new patch set to dismiss them.
+
+Thanks,
+Leo Yan
