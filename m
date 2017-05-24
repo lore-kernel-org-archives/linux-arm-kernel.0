@@ -1,120 +1,96 @@
 From: james.morse@arm.com (James Morse)
-Date: Wed, 24 May 2017 17:58:03 +0100
-Subject: [PATCH 6/9] arm64: entry.S: convert el1_sync
+Date: Wed, 24 May 2017 17:58:02 +0100
+Subject: [PATCH 5/9] arm64: entry.S: move enable_step_tsk into kernel_exit
 In-Reply-To: <20170524165806.29866-1-james.morse@arm.com>
 References: <20170524165806.29866-1-james.morse@arm.com>
-Message-ID: <20170524165806.29866-7-james.morse@arm.com>
+Message-ID: <20170524165806.29866-6-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-el1_sync unmasks exceptions on a case-by-case basis, debug exceptions
-are unmasked, unless this was a debug exception. IRQs are unmasked
-for instruction and data aborts only if the interupted context had
-irqs unmasked.
+enable_step_tsk may enable single-step, so needs to mask debug
+exceptions to prevent us from single-stepping kernel_exit.  This
+should be the callers problem.
 
-Following our 'dai' order, el1_dbg should run with everything masked.
-For the other cases we can inherit whatever we interrupted.
+Earlier cleanup (2a2830703a23) moved disable_step_tsk into kernel_entry.
+enable_step_tsk has two callers, both immediatly before kernel_exit 0.
+Move the macro call into kernel_exit after local_mask_daif.
 
-Add a macro inherit_daif to set daif based on the interrupted pstate.
+enable_step_tsk is now only called with debug exceptions masked.
+This was the last user of disable_dbg, remove it.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-
 ---
- arch/arm64/include/asm/assembler.h |  6 ++++++
- arch/arm64/kernel/entry.S          | 21 ++++++---------------
- 2 files changed, 12 insertions(+), 15 deletions(-)
+ arch/arm64/include/asm/assembler.h | 9 +--------
+ arch/arm64/kernel/entry.S          | 7 ++++---
+ 2 files changed, 5 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index c6a0d956db8a..187d75f6efd3 100644
+index 896ddd9b21a6..c6a0d956db8a 100644
 --- a/arch/arm64/include/asm/assembler.h
 +++ b/arch/arm64/include/asm/assembler.h
-@@ -50,6 +50,12 @@
+@@ -70,13 +70,6 @@
  	msr	daif, \flags
  	.endm
  
-+	/* Only on aarch64 pstate, PSR_D_BIT is different for aarch32 */
-+	.macro	inherit_daif, pstate:req, tmp:req
-+	and	\tmp, \pstate, #(PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
-+	msr	daif, \tmp
-+	.endm
-+
- /*
-  * Enable and disable interrupts.
-  */
+-/*
+- * Enable and disable debug exceptions.
+- */
+-	.macro	disable_dbg
+-	msr	daifset, #8
+-	.endm
+-
+ 	.macro	enable_dbg
+ 	msr	daifclr, #8
+ 	.endm
+@@ -90,9 +83,9 @@
+ 9990:
+ 	.endm
+ 
++	/* call with daif masked */
+ 	.macro	enable_step_tsk, flgs, tmp
+ 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
+-	disable_dbg
+ 	mrs	\tmp, mdscr_el1
+ 	orr	\tmp, \tmp, #1
+ 	msr	mdscr_el1, \tmp
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 5fd3d494916d..714e15b1c135 100644
+index fd429d3ba29b..5fd3d494916d 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -408,8 +408,13 @@ ENDPROC(el1_error_invalid)
- 	.align	6
- el1_sync:
- 	kernel_entry 1
-+	mrs	x0, far_el1
- 	mrs	x1, esr_el1			// read the syndrome register
- 	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
-+	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
-+	b.ge	el1_dbg
+@@ -212,6 +212,10 @@ alternative_else_nop_endif
+ 	.if	\el == 0
+ 	ldr	x23, [sp, #S_SP]		// load return stack pointer
+ 	msr	sp_el0, x23
 +
-+	inherit_daif	pstate=x23, tmp=x2
- 	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
- 	b.eq	el1_da
- 	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
-@@ -422,8 +427,6 @@ el1_sync:
- 	b.eq	el1_sp_pc
- 	cmp	x24, #ESR_ELx_EC_UNKNOWN	// unknown exception in EL1
- 	b.eq	el1_undef
--	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
--	b.ge	el1_dbg
- 	b	el1_inv
++	ldr	x1, [tsk, #TSK_TI_FLAGS]
++	enable_step_tsk flgs=x1, tmp=x2
++
+ #ifdef CONFIG_ARM64_ERRATUM_845719
+ alternative_if ARM64_WORKAROUND_845719
+ 	tbz	x22, #4, 1f
+@@ -752,7 +756,6 @@ ret_fast_syscall:
+ 	cbnz	x2, ret_fast_syscall_trace
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
+-	enable_step_tsk x1, x2
+ 	kernel_exit 0
+ ret_fast_syscall_trace:
+ 	enable_irq				// enable interrupts
+@@ -767,7 +770,6 @@ work_pending:
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_on		// enabled while in userspace
+ #endif
+-	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for single-step
+ 	b	finish_ret_to_user
+ /*
+  * "slow" syscall return path.
+@@ -778,7 +780,6 @@ ret_to_user:
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
+ finish_ret_to_user:
+-	enable_step_tsk x1, x2
+ 	kernel_exit 0
+ ENDPROC(ret_to_user)
  
- el1_ia:
-@@ -434,32 +437,22 @@ el1_da:
- 	/*
- 	 * Data abort handling
- 	 */
--	mrs	x3, far_el1
--	enable_dbg
--	// re-enable interrupts if they were enabled in the aborted context
--	tbnz	x23, #7, 1f			// PSR_I_BIT
--	enable_irq
--1:
-+	mov	x3, x0
- 	clear_address_tag x0, x3
- 	mov	x2, sp				// struct pt_regs
- 	bl	do_mem_abort
- 
--	// disable interrupts before pulling preserved data off the stack
--	disable_irq
- 	kernel_exit 1
- el1_sp_pc:
- 	/*
- 	 * Stack or PC alignment exception handling
- 	 */
--	mrs	x0, far_el1
--	enable_dbg
- 	mov	x2, sp
- 	b	do_sp_pc_abort
- el1_undef:
- 	/*
- 	 * Undefined instruction
- 	 */
--	enable_dbg
- 	mov	x0, sp
- 	b	do_undefinstr
- el1_dbg:
-@@ -469,13 +462,11 @@ el1_dbg:
- 	cmp	x24, #ESR_ELx_EC_BRK64		// if BRK64
- 	cinc	x24, x24, eq			// set bit '0'
- 	tbz	x24, #0, el1_inv		// EL1 only
--	mrs	x0, far_el1
- 	mov	x2, sp				// struct pt_regs
- 	bl	do_debug_exception
- 	kernel_exit 1
- el1_inv:
- 	// TODO: add support for undefined instructions in kernel mode
--	enable_dbg
- 	mov	x0, sp
- 	mov	x2, x1
- 	mov	x1, #BAD_SYNC
 -- 
 2.11.0
