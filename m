@@ -1,44 +1,73 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 24 May 2017 10:28:23 +0200
-Subject: [PATCH 3/5] ARM64: dts: meson-gxl: Add Ethernet PHY LEDS pins nodes
-In-Reply-To: <1495614505-4437-1-git-send-email-narmstrong@baylibre.com>
-References: <1495614505-4437-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1495614505-4437-4-git-send-email-narmstrong@baylibre.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 24 May 2017 10:15:25 +0200
+Subject: [patch V3 14/32] ARM/hw_breakpoint: Use cpuhp_setup_state_cpuslocked()
+References: <20170524081511.203800767@linutronix.de>
+Message-ID: <20170524081548.170940729@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Amlogic Meson GXL SoCs embeds an 10/100 Ethernet PHY, this patchs adds
-the Link and Activity LEDs signals pins nodes.
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+arch_hw_breakpoint_init() holds get_online_cpus() while registerring the
+hotplug callbacks.
+
+cpuhp_setup_state() invokes get_online_cpus() as well. This is correct, but
+prevents the conversion of the hotplug locking to a percpu rwsem.
+
+Use cpuhp_setup_state_cpuslocked() to avoid the nested call. Convert
+*_online_cpus() to the new interfaces while at it.
+
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+
+
 ---
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/kernel/hw_breakpoint.c |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 478d3b4..300dfad 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -404,6 +404,20 @@
- 			};
- 		};
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -1090,7 +1090,7 @@ static int __init arch_hw_breakpoint_ini
+ 	 * driven low on this core and there isn't an architected way to
+ 	 * determine that.
+ 	 */
+-	get_online_cpus();
++	cpus_read_lock();
+ 	register_undef_hook(&debug_reg_hook);
  
-+		eth_link_led_pins: eth_link_led {
-+			mux {
-+				groups = "eth_link_led";
-+				function = "eth_led";
-+			};
-+		};
-+
-+		eth_act_led_pins: eth_act_led {
-+			mux {
-+				groups = "eth_act_led";
-+				function = "eth_led";
-+			};
-+		};
-+		
- 		pwm_a_pins: pwm_a {
- 			mux {
- 				groups = "pwm_a";
--- 
-1.9.1
+ 	/*
+@@ -1098,15 +1098,16 @@ static int __init arch_hw_breakpoint_ini
+ 	 * assume that a halting debugger will leave the world in a nice state
+ 	 * for us.
+ 	 */
+-	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "arm/hw_breakpoint:online",
+-				dbg_reset_online, NULL);
++	ret = cpuhp_setup_state_cpuslocked(CPUHP_AP_ONLINE_DYN,
++					   "arm/hw_breakpoint:online",
++					   dbg_reset_online, NULL);
+ 	unregister_undef_hook(&debug_reg_hook);
+ 	if (WARN_ON(ret < 0) || !cpumask_empty(&debug_err_mask)) {
+ 		core_num_brps = 0;
+ 		core_num_wrps = 0;
+ 		if (ret > 0)
+ 			cpuhp_remove_state_nocalls(ret);
+-		put_online_cpus();
++		cpus_read_unlock();
+ 		return 0;
+ 	}
+ 
+@@ -1124,7 +1125,7 @@ static int __init arch_hw_breakpoint_ini
+ 			TRAP_HWBKPT, "watchpoint debug exception");
+ 	hook_ifault_code(FAULT_CODE_DEBUG, hw_breakpoint_pending, SIGTRAP,
+ 			TRAP_HWBKPT, "breakpoint debug exception");
+-	put_online_cpus();
++	cpus_read_unlock();
+ 
+ 	/* Register PM notifiers. */
+ 	pm_init();
