@@ -1,35 +1,31 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 24 May 2017 08:14:51 +0800
-Subject: [PATCH v11 7/9] coresight: add support for CPU debug module
-In-Reply-To: <CANLsYkzosO8+uaphvNQFe80zOJoqkSWceaiWhKEH-xSuVH0uew@mail.gmail.com>
-References: <1495548980-30432-1-git-send-email-leo.yan@linaro.org>
- <1495548980-30432-8-git-send-email-leo.yan@linaro.org>
- <CANLsYkzosO8+uaphvNQFe80zOJoqkSWceaiWhKEH-xSuVH0uew@mail.gmail.com>
-Message-ID: <20170524001451.GA20279@leoy-ThinkPad-T440>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Wed, 24 May 2017 08:34:48 +0800
+Subject: [RESEND PATCH 1/2] Documentation: rockchip-dw-mshc: add description
+ for rk3328
+Message-ID: <1495586089-215607-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+Add "rockchip,rk3328-dw-mshc", "rockchip,rk3288-dw-mshc" for
+dwmmc on rk3328 platform.
 
-On Tue, May 23, 2017 at 11:39:16AM -0600, Mathieu Poirier wrote:
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+---
 
-[...]
+ Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-> > +static bool debug_enable;
-> > +module_param_named(enable, debug_enable, bool, 0600);
-> > +MODULE_PARM_DESC(enable, "Knob to enable debug functionality "
-> > +                "(default is 0, which means is disabled by default)");
-> 
-> Checkpatch complains about a quoted string split across multiple
-> lines.  You can probably removes the second one since information
-> about the default value is already detailed in patch 03/09.  In this
-> case I suggest modifiying the description to:
-> 
-> "Control to enable coresight CPU debug functionality"
-
-It's shame for checkpatch.pl warning. Although everytime I used script
-before sending out patch set, should think a bit more to handle them
-better. Have sent new patch set to dismiss them.
-
-Thanks,
-Leo Yan
+diff --git a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+index 520d61d..18e33cb 100644
+--- a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+@@ -15,6 +15,7 @@ Required Properties:
+ 	- "rockchip,rk3288-dw-mshc": for Rockchip RK3288
+ 	- "rockchip,rv1108-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RV1108
+ 	- "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3036
++	- "rockchip,rk3328-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3328
+ 	- "rockchip,rk3368-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3368
+ 	- "rockchip,rk3399-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3399
+ 
+-- 
+1.9.1
