@@ -1,15 +1,15 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 24 May 2017 10:15:23 +0200
-Subject: [patch V3 12/32] hwtracing/coresight-etm4x: Use
+Date: Wed, 24 May 2017 10:15:22 +0200
+Subject: [patch V3 11/32] hwtracing/coresight-etm3x: Use
  cpuhp_setup_state_nocalls_cpuslocked()
 References: <20170524081511.203800767@linutronix.de>
-Message-ID: <20170524081547.983493849@linutronix.de>
+Message-ID: <20170524081547.889092478@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-etm_probe4() holds get_online_cpus() while invoking
+etm_probe() holds get_online_cpus() while invoking
 cpuhp_setup_state_nocalls().
 
 cpuhp_setup_state_nocalls() invokes get_online_cpus() as well. This is
@@ -27,12 +27,12 @@ Cc: Steven Rostedt <rostedt@goodmis.org>
 Cc: linux-arm-kernel at lists.infradead.org
 
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c |   20 ++++++++++----------
+ drivers/hwtracing/coresight/coresight-etm3x.c |   20 ++++++++++----------
  1 file changed, 10 insertions(+), 10 deletions(-)
 
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -371,7 +371,7 @@ static void etm4_disable_sysfs(struct co
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -587,7 +587,7 @@ static void etm_disable_sysfs(struct cor
  	 * after cpu online mask indicates the cpu is offline but before the
  	 * DYING hotplug callback is serviced by the ETM driver.
  	 */
@@ -41,8 +41,8 @@ Cc: linux-arm-kernel at lists.infradead.org
  	spin_lock(&drvdata->spinlock);
  
  	/*
-@@ -381,7 +381,7 @@ static void etm4_disable_sysfs(struct co
- 	smp_call_function_single(drvdata->cpu, etm4_disable_hw, drvdata, 1);
+@@ -597,7 +597,7 @@ static void etm_disable_sysfs(struct cor
+ 	smp_call_function_single(drvdata->cpu, etm_disable_hw, drvdata, 1);
  
  	spin_unlock(&drvdata->spinlock);
 -	put_online_cpus();
@@ -50,7 +50,7 @@ Cc: linux-arm-kernel at lists.infradead.org
  
  	dev_info(drvdata->dev, "ETM tracing disabled\n");
  }
-@@ -982,7 +982,7 @@ static int etm4_probe(struct amba_device
+@@ -795,7 +795,7 @@ static int etm_probe(struct amba_device
  
  	drvdata->cpu = pdata ? pdata->cpu : 0;
  
@@ -59,29 +59,28 @@ Cc: linux-arm-kernel at lists.infradead.org
  	etmdrvdata[drvdata->cpu] = drvdata;
  
  	if (smp_call_function_single(drvdata->cpu,
-@@ -990,18 +990,18 @@ static int etm4_probe(struct amba_device
+@@ -803,17 +803,17 @@ static int etm_probe(struct amba_device
  		dev_err(dev, "ETM arch init failed\n");
  
- 	if (!etm4_count++) {
+ 	if (!etm_count++) {
 -		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CORESIGHT_STARTING,
--					  "arm/coresight4:starting",
--					  etm4_starting_cpu, etm4_dying_cpu);
+-					  "arm/coresight:starting",
+-					  etm_starting_cpu, etm_dying_cpu);
 -		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
--						"arm/coresight4:online",
--						etm4_online_cpu, NULL);
+-						"arm/coresight:online",
+-						etm_online_cpu, NULL);
 +		cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ARM_CORESIGHT_STARTING,
-+						     "arm/coresight4:starting",
-+						     etm4_starting_cpu, etm4_dying_cpu);
++						     "arm/coresight:starting",
++						     etm_starting_cpu, etm_dying_cpu);
 +		ret = cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ONLINE_DYN,
-+							   "arm/coresight4:online",
-+							   etm4_online_cpu, NULL);
++							   "arm/coresight:online",
++							   etm_online_cpu, NULL);
  		if (ret < 0)
  			goto err_arch_supported;
  		hp_online = ret;
  	}
- 
 -	put_online_cpus();
 +	cpus_read_unlock();
  
- 	if (etm4_arch_supported(drvdata->arch) == false) {
+ 	if (etm_arch_supported(drvdata->arch) == false) {
  		ret = -EINVAL;
