@@ -1,35 +1,63 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 24 May 2017 10:20:38 +0200
-Subject: [PATCH 1/5] pinctrl: meson-gxl: Fix typo in AO I2S pins
-In-Reply-To: <1495614042-2676-1-git-send-email-narmstrong@baylibre.com>
-References: <1495614042-2676-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1495614042-2676-2-git-send-email-narmstrong@baylibre.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 May 2017 10:36:37 +0200
+Subject: [PATCH v4 6/7] ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class
+ cpus
+In-Reply-To: <741c708e-9036-a0e1-46e1-90d82a195dff@arm.com>
+References: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
+ <1493029017-31382-7-git-send-email-vladimir.murzin@arm.com>
+ <20170523200142.GD22219@n2100.armlinux.org.uk>
+ <CAK8P3a0tbaAHerjitDBJ9gz1SCFkAwKhfzjgMHiB5ESakQs7-g@mail.gmail.com>
+ <741c708e-9036-a0e1-46e1-90d82a195dff@arm.com>
+Message-ID: <CAK8P3a0s-SLGwhdxX+FDsmRKnYh2nWPKPvwsn_qMOk_1Wb5YMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AO I2S pins were incorrectly defined with the EE pin offset.
+On Wed, May 24, 2017 at 10:31 AM, Vladimir Murzin
+<vladimir.murzin@arm.com> wrote:
+> On 23/05/17 21:33, Arnd Bergmann wrote:
+>> On Tue, May 23, 2017 at 10:01 PM, Russell King - ARM Linux
+>> <linux@armlinux.org.uk> wrote:
+>>> On Mon, Apr 24, 2017 at 11:16:56AM +0100, Vladimir Murzin wrote:
+>>>> Now, we have dedicated non-cacheable region for consistent DMA
+>>>> operations. However, that region can still be marked as bufferable by
+>>>> MPU, so it'd be safer to have barriers by default.
+>>>
+>>> What do you actually want here?  Your patch doesn't quite make sense,
+>>> the commit description seems to indicate that you require this option
+>>> to be set for V7M, but the patch says otherwise.
+>>>
+>>>>  config ARM_DMA_MEM_BUFFERABLE
+>>>> -     bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K) && !CPU_V7
+>>>> -     default y if CPU_V6 || CPU_V6K || CPU_V7
+>>>> +     bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K || CPU_V7M) && !CPU_V7
+>>>
+>>> This "if" conditional conditionalises the visibility of the option,
+>>> it doesn't conditionalise the value.
+>>>
+>>>> +     default y if CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M
+>>>
+>>> Taking both of these changes together what you end up with is an option
+>>> presented to the user for "Use non-cacheable memory for DMA" which
+>>> they can choose to disable.
+>>>
+>>> If you require this option to be set, that's incorrect - your modification
+>>> to the default line is correct, but the first line is not.  To achieve
+>>> that, you want the if condition to evaluate false for V7M, thereby hiding
+>>> the option from the user.  In that case, the default value will always be
+>>> assigned to the option.
+>>
+>> I had the opposite comment in the previous version ;-)
+>> https://lkml.org/lkml/2017/4/19/185
+>>
+>> I think the current patch is correct, but the description could still be
+>> clarified: On some of the beefier ARMv7-M machines (with DMA
+>> and write buffers) we want this enabled, while those that didn't
+>> need it until now also won't need it in the future.
+>
+> Ok. Do you want it go into commit message or option description or maybe both?
 
-Cc: Jerome Brunet <jbrunet@baylibre.com>
-Fixes: 2899adf0422 ("pinctrl: meson: gxl: add i2s output pins")
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/pinctrl/meson/pinctrl-meson-gxl.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I'd say both. It would also be helpful to identify specifically which platforms
+require this, and then add a 'select ARM_DMA_MEM_BUFFERABLE' from
+the platform, as we do from Moxart.
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-index 719ff1b..9af8e6a 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-@@ -276,8 +276,8 @@
- static const unsigned int pwm_ao_b_pins[]	= { PIN(GPIOAO_9, 0) };
- static const unsigned int pwm_ao_b_6_pins[]	= { PIN(GPIOAO_6, 0) };
- 
--static const unsigned int i2s_out_ch23_ao_pins[] = { PIN(GPIOAO_8, EE_OFF) };
--static const unsigned int i2s_out_ch45_ao_pins[] = { PIN(GPIOAO_9, EE_OFF) };
-+static const unsigned int i2s_out_ch23_ao_pins[] = { PIN(GPIOAO_8, 0) };
-+static const unsigned int i2s_out_ch45_ao_pins[] = { PIN(GPIOAO_9, 0) };
- 
- static const unsigned int spdif_out_ao_6_pins[]	= { PIN(GPIOAO_6, EE_OFF) };
- static const unsigned int spdif_out_ao_9_pins[]	= { PIN(GPIOAO_9, EE_OFF) };
--- 
-1.9.1
+      Arnd
