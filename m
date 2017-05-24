@@ -1,70 +1,54 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 24 May 2017 10:54:39 +0200
-Subject: [PATCH 4/5] pinctrl: meson-gxl: Add CEC pins
-In-Reply-To: <1495614042-2676-5-git-send-email-narmstrong@baylibre.com>
-References: <1495614042-2676-1-git-send-email-narmstrong@baylibre.com>
- <1495614042-2676-5-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1495616079.14589.11.camel@baylibre.com>
+From: eddie.cai.linux@gmail.com (Eddie Cai)
+Date: Wed, 24 May 2017 16:55:14 +0800
+Subject: [PATCH] ARM: dts: rockchip:remove hs200 support for firefly reload
+In-Reply-To: <65c7a442-4b2e-65e4-ea5e-0a723c257397@rock-chips.com>
+References: <1495612242-28873-1-git-send-email-eddie.cai.linux@gmail.com>
+ <65c7a442-4b2e-65e4-ea5e-0a723c257397@rock-chips.com>
+Message-ID: <CAJrj+DO2D3DFxby1aNS-V0-A2BNsgta22SJ3Y64LPzVuwvgaXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-05-24 at 10:20 +0200, Neil Armstrong wrote:
-> Add the AO and EE domain CEC pins for the Amlogic Meson GXL SoCs.
+Hi Shawn
 
-Same comment as patch 3 in the same series
-
-Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
-
-> 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
-> ?drivers/pinctrl/meson/pinctrl-meson-gxl.c | 10 ++++++++++
-> ?1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-> b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-> index 454d73f..7d81287 100644
-> --- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-> +++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-> @@ -282,6 +282,9 @@
-> ?static const unsigned int spdif_out_ao_6_pins[]	= { PIN(GPIOAO_6, 0)
-> };
-> ?static const unsigned int spdif_out_ao_9_pins[]	= { PIN(GPIOAO_9, 0)
-> };
-> ?
-> +static const unsigned int ao_cec_pins[]		= { PIN(GPIOAO_8, 0)
-> };
-> +static const unsigned int ee_cec_pins[]		= { PIN(GPIOAO_8, 0)
-> };
-> +
-> ?static struct meson_pmx_group meson_gxl_periphs_groups[] = {
-> ?	GPIO_GROUP(GPIOZ_0, EE_OFF),
-> ?	GPIO_GROUP(GPIOZ_1, EE_OFF),
-> @@ -527,6 +530,8 @@
-> ?	GROUP(i2s_out_ch45_ao,	1,	1),
-> ?	GROUP(spdif_out_ao_6,	0,	16),
-> ?	GROUP(spdif_out_ao_9,	0,	4),
-> +	GROUP(ao_cec,		0,	15),
-> +	GROUP(ee_cec,		0,	14),
-> ?};
-> ?
-> ?static const char * const gpio_periphs_groups[] = {
-> @@ -702,6 +707,10 @@
-> ?	"spdif_out_ao_6", "spdif_out_ao_9",
-> ?};
-> ?
-> +static const char * const cec_ao_groups[] = {
-> +	"ao_cec", "ee_cec",
-> +};
-> +
-> ?static struct meson_pmx_func meson_gxl_periphs_functions[] = {
-> ?	FUNCTION(gpio_periphs),
-> ?	FUNCTION(emmc),
-> @@ -740,6 +749,7 @@
-> ?	FUNCTION(pwm_ao_b),
-> ?	FUNCTION(i2s_out_ao),
-> ?	FUNCTION(spdif_out_ao),
-> +	FUNCTION(cec_ao),
-> ?};
-> ?
-> ?static struct meson_bank meson_gxl_periphs_banks[] = {
+2017-05-24 16:00 GMT+08:00 Shawn Lin <shawn.lin@rock-chips.com>:
+> Hi,
+>
+> On 2017/5/24 15:50, Eddie Cai wrote:
+>>
+>> due to layout limitation. not all of the reload board can support hs200.
+>> so remove hs200 support to make all board can boot up.
+>
+>
+> You now also remove DDR52, so all reload boards run at high speed mode?
+My mistake. I will add it back in next version
+>
+> I'm curious about what was the layout limitation that mmc tuning
+> process could never help?
+>
+>>
+>> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 2 --
+>>  1 file changed, 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+>> b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+>> index 4cfa109..56ac1e6f 100644
+>> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+>> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+>> @@ -75,8 +75,6 @@
+>>         bus-width = <8>;
+>>         cap-mmc-highspeed;
+>>         disable-wp;
+>> -       mmc-ddr-1_8v;
+>> -       mmc-hs200-1_8v;
+>>         non-removable;
+>>         num-slots = <1>;
+>>         pinctrl-names = "default";
+>>
+>
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
