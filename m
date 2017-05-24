@@ -1,87 +1,113 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 24 May 2017 11:19:48 +0100
-Subject: [PATCH v2] arm64: kernel: restrict /dev/mem read() calls to
- linear region
-In-Reply-To: <CAKv+Gu8vYP7xB5T_gFPvFQ6yiAprAMf5QfjqfhC8zbg4PwTMyA@mail.gmail.com>
-References: <20170519154200.14158-1-ard.biesheuvel@linaro.org>
- <20170522174126.GJ1657@bivouac.eciton.net>
- <CAKv+Gu8vYP7xB5T_gFPvFQ6yiAprAMf5QfjqfhC8zbg4PwTMyA@mail.gmail.com>
-Message-ID: <20170524101948.GB32240@bivouac.eciton.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 24 May 2017 11:22:36 +0100
+Subject: [PATCH v4 1/2] PCI: Add tango MSI controller support
+In-Reply-To: <f1a57255-be75-e8c4-6b8d-0254f4365d61@arm.com>
+References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+ <1f6b50c7-4887-838e-8c7d-c014d82b6d8e@sigmadesigns.com>
+ <8e56647d-3b2d-9bfc-b59e-79a2efaa7826@sigmadesigns.com>
+ <20170523170319.GB24431@bhelgaas-glaptop.roam.corp.google.com>
+ <b6541fd2-200f-35be-208e-931bb0b5ba49@free.fr>
+ <ef36137c-f0d1-23b9-8b91-a6ed87239578@arm.com>
+ <aec89b9a-8377-ff39-547c-9e6eaf254fab@free.fr>
+ <f1a57255-be75-e8c4-6b8d-0254f4365d61@arm.com>
+Message-ID: <c78b1e79-59e5-0097-989e-1f1e8cd93fc4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 03:51:11AM -0700, Ard Biesheuvel wrote:
-> > So, I'm still of the opinion that /dev/mem simply should not be made
-> > available on systems where people care about accidentally hard-locking
-> > their systems from userland.
-> >
-> > To that extent, this workaround takes the pressure off people to
-> > configure their kernels properly.
-> >
-> > On the other hand, it probably removes 90% of the risk cases.
+On 24/05/17 11:00, Robin Murphy wrote:
+> On 23/05/17 20:15, Mason wrote:
+>> On 23/05/2017 20:03, Robin Murphy wrote:
+>>> On 23/05/17 18:54, Mason wrote:
+>>>> On 23/05/2017 19:03, Bjorn Helgaas wrote:
+>>>>> On Wed, May 17, 2017 at 04:56:08PM +0200, Marc Gonzalez wrote:
+>>>>>> On 20/04/2017 16:28, Marc Gonzalez wrote:
+>>>>>>
+>>>>>>> +static int tango_set_affinity(struct irq_data *data,
+>>>>>>> +		const struct cpumask *mask, bool force)
+>>>>>>> +{
+>>>>>>> +	return -EINVAL;
+>>>>>>> +}
+>>>>>>> +
+>>>>>>> +static struct irq_chip tango_chip = {
+>>>>>>> +	.irq_ack		= tango_ack,
+>>>>>>> +	.irq_mask		= tango_mask,
+>>>>>>> +	.irq_unmask		= tango_unmask,
+>>>>>>> +	.irq_set_affinity	= tango_set_affinity,
+>>>>>>> +	.irq_compose_msi_msg	= tango_compose_msi_msg,
+>>>>>>> +};
+>>>>>>
+>>>>>> Hmmm... I'm wondering why .irq_set_affinity is required.
+>>>>>>
+>>>>>> static int setup_affinity(struct irq_desc *desc, struct cpumask *mask)
+>>>>>> first calls __irq_can_set_affinity() to check whether
+>>>>>> desc->irq_data.chip->irq_set_affinity) exists.
+>>>>>>
+>>>>>> then calls irq_do_set_affinity(&desc->irq_data, mask, false);
+>>>>>> which calls chip->irq_set_affinity(data, mask, force);
+>>>>>> = msi_domain_set_affinity()
+>>>>>> which calls parent->chip->irq_set_affinity() unconditionally.
+>>>>>>
+>>>>>> Would it make sense to test that the callback is implemented
+>>>>>> before calling it?
+>>>>>>
+>>>>>>
+>>>>>> [    0.723895] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>>>>>
+>>>>> I'm not sure what you're asking.
+>>>>>
+>>>>> Is this a bug report for the v4 tango driver?
+>>>>
+>>>> No.
+>>>>
+>>>>> Or are you asking whether msi_domain_set_affinity() should be changed
+>>>>> to check whether parent->chip->irq_set_affinity is implemented?
+>>>>
+>>>> Yes. The way things are implemented now, drivers are forced
+>>>> to define an irq_set_affinity callback, even if it just returns
+>>>> an error, otherwise, the kernel crashes, because of the
+>>>> unconditional function pointer deref. 
+>>>>
+>>>>> msi_domain_set_affinity() has called parent->chip->irq_set_affinity()
+>>>>> without checking since it was added in 2014 by f3cf8bb0d6c3 ("genirq: Add
+>>>>> generic msi irq domain support"), so if there's a problem here, it's most
+>>>>> likely in the tango code.
+>>>>
+>>>> The issue is having to define an "empty" function.
+>>>> (Unnecessary code bloat and maintenance.)
+>>>
+>>> AFAICS, only one driver (other than this one) implements a "do nothing"
+>>> set_affinity callback - everyone else who doesn't do anything hardware
+>>> specific just passes it along via irq_chip_set_affinity_parent().
+>>
+>> I counted 4. Where did I mess up?
+>>
+>> advk_msi_set_affinity
+>> altera_msi_set_affinity
+>> nwl_msi_set_affinity
+>> vmd_irq_set_affinity
+>> tango_set_affinity
 > 
-> Sadly, no. This change only fixes a kernel bug where we access a
-> region using read()/write() that is known to be memory, but may have
-> been left unmapped. It does not affect /dev/mem uses involving mmap()
-> at all.
+> Fair point - I went through drivers/irqchip and the various
+> arch-specific instances and found ls_scfg_msi_set_affinity(), but
+> somehow skipped over drivers/pci. Anyway, I think the question stands of
+> why are these handful of drivers *not* using irq_chip_set_affinity_parent()?
 
-Ah. Well, in that case I don't have much of an objection.
+Probably because they don't have a parent, in the hierarchical sense.
+All they have is a chained interrupt (*puke*). Which implies that
+changing the affinity of one MSI would affect all of them, completely
+confusing unsuspecting userspace such as irqbalance.
 
-> > I guess the solution depends on whether people think the remaining 10%
-> > matter.
-> 
-> I think there are two different aspects that we need to distinguish:
-> - on ARM, you cannot use /dev/mem to go looking for magic numbers in
-> memory to locate certain data structures left by the firmware,
-> - on ARM, you should [must] not use /dev/mem to map regions that are
-> already mapped with different attributes.
+> As an outsider, it naively seems logical that the affinity of an MSI
+> which just gets translated to a wired interrupt should propagate through
+> to the affinity of that wired interrupt, but maybe there are reasons not
+> to; I really don't know.
 
-And don't leave out the whopper:
-- on ARM, running userland applications written to use /dev/mem to do
-  specific things on x86 is unlikely to do what you expected it to do,
-  and is likely to crash your system.
+See above. The main issue is that HW folks haven't understood the actual
+use of MSIs, and persist in implementing them as an afterthought, based
+on some cascading interrupt controller design.
 
-Being architecturally safe does not mean your system is not
-vulnerable.
+Sad. So sad.
 
-> This fix is in neither category, it just fails read()s on /dev/mem
-> gracefully if they attempt to access NOMAP memory.
-
-Understood.
-
-> So the only moderately sane use case for /dev/mem on ARM is to do
-> cached accesses to DRAM regions that are covered by the linear
-> mapping.
-
-Aside from "writing proper kernel interfaces takes effort", is there a
-valid reason to do so?
-
-Even if we did restrict it down to cached known DRAM regions, we would
-still need to turn it read-only. Or a badly written program (I've
-heard a couple exist) can start trampling whatever.
-
-If people need a generic way to easily give access to certain defined
-memory regions, let's write a driver that chomps kernel command line
-or DT and provides simple mmap access to those specific regions.
-
-If people want arbitrary userspace access to any region in memory at
-any given time, why did we waste the gates and energy of implementing
-an MMU and managing permissions?
-
-> Interestingly, these are exactly the ones RESTRICT_DEVMEM
-> usually disallows IIRC, given that you may be poking into kernel
-> internals.
-
-Yes, well, given its history as being PROMISC_DEVMEM renamed and
-flipped logically, I doubt that't the only inconsistency...
-
-> My vote would be to deprecate other /dev/mem uses on arm64, so that we
-> can start getting a handle on things before the cat is too far out of
-> the bag. (and you can't 'break' a x86 userspace this way on arm64 if
-> it was simply recompiled but pokes memory for legacy BIOS strings etc)
-
-To no one's surprise, my vote is to deprecate all uses of /dev/mem on
-arm64. 
-
-/
-    Leif
+	M.
+-- 
+Jazz is not dead. It just smells funny...
