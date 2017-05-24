@@ -1,61 +1,77 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 24 May 2017 10:20:42 +0200
-Subject: [PATCH 5/5] pinctrl: meson-gxl: Add Ethernet PHY LEDS pins
-In-Reply-To: <1495614042-2676-1-git-send-email-narmstrong@baylibre.com>
-References: <1495614042-2676-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1495614042-2676-6-git-send-email-narmstrong@baylibre.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 24 May 2017 10:30:43 +0200
+Subject: [PATCH 1/5] random,stackprotect: introduce get_random_canary
+ function
+In-Reply-To: <20170519212636.30440-2-riel@redhat.com>
+References: <20170519212636.30440-1-riel@redhat.com>
+ <20170519212636.30440-2-riel@redhat.com>
+Message-ID: <20170524083043.hpbpuracjqj2bbv2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Amlogic Meson GXL SoCs embeds an 10/100 Ethernet PHY, this patchs enables
-the Link and Activity LEDs signals.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/pinctrl/meson/pinctrl-meson-gxl.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+* riel at redhat.com <riel@redhat.com> wrote:
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-index 7d81287..78a9af5 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-@@ -239,6 +239,9 @@
- 
- static const unsigned int spdif_out_h_pins[]	= { PIN(GPIOH_4, EE_OFF) };
- 
-+static const unsigned int eth_link_led_pins[]	= { PIN(GPIOZ_14, EE_OFF) };
-+static const unsigned int eth_act_led_pins[]	= { PIN(GPIOZ_15, EE_OFF) };
-+
- static const struct pinctrl_pin_desc meson_gxl_aobus_pins[] = {
- 	MESON_PIN(GPIOAO_0, 0),
- 	MESON_PIN(GPIOAO_1, 0),
-@@ -437,6 +440,8 @@
- 	GROUP(i2s_out_ch23_z,	3,	26),
- 	GROUP(i2s_out_ch45_z,	3,	25),
- 	GROUP(i2s_out_ch67_z,	3,	24),
-+	GROUP(eth_link_led,	4,	25),
-+	GROUP(eth_act_led,	4,	24),
- 
- 	/* Bank H */
- 	GROUP(hdmi_hpd,		6,	31),
-@@ -665,6 +670,10 @@
- 	"spdif_out_h",
- };
- 
-+static const char * const eth_led_groups[] = {
-+	"eth_link_led", "eth_act_led",
-+};
-+
- static const char * const gpio_aobus_groups[] = {
- 	"GPIOAO_0", "GPIOAO_1", "GPIOAO_2", "GPIOAO_3", "GPIOAO_4",
- 	"GPIOAO_5", "GPIOAO_6", "GPIOAO_7", "GPIOAO_8", "GPIOAO_9",
-@@ -736,6 +745,7 @@
- 	FUNCTION(hdmi_i2c),
- 	FUNCTION(i2s_out),
- 	FUNCTION(spdif_out),
-+	FUNCTION(eth_led),
- };
- 
- static struct meson_pmx_func meson_gxl_aobus_functions[] = {
--- 
-1.9.1
+> From: Rik van Riel <riel@redhat.com>
+> 
+> Introduce the get_random_canary function, which provides a random
+> unsigned long canary value with the first byte zeroed out on 64
+> bit architectures, in order to mitigate non-terminated C string
+> overflows.
+> 
+> Inspired by the "ascii armor" code in the old execshield patches,
+> and the current PaX/grsecurity code base.
+> 
+> Signed-off-by: Rik van Riel <riel@redhat.com>
+> ---
+>  include/linux/random.h | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/include/linux/random.h b/include/linux/random.h
+> index ed5c3838780d..765a992c6774 100644
+> --- a/include/linux/random.h
+> +++ b/include/linux/random.h
+> @@ -57,6 +57,26 @@ static inline unsigned long get_random_long(void)
+>  #endif
+>  }
+>  
+> +/*
+> + * On 64 bit architectures, protect against non-terminated C string overflows
+
+s/64 bit/64-bit
+
+> + * by zeroing out the first byte of the canary; this leaves 56 bits of entropy.
+> + */
+> +#ifdef CONFIG_64BIT
+> +#ifdef __LITTLE_ENDIAN
+> +#define CANARY_MASK 0xffffffffffffff00UL
+> +#else /* big endian 64 bits */
+> +#define CANARY_MASK 0x00ffffffffffffffUL
+> +#endif
+> +#else /* 32 bits */
+> +#define CANARY_MASK 0xffffffffUL
+> +#endif
+> +static inline unsigned long get_random_canary(void)
+> +{
+> +	unsigned long val = get_random_long();
+> +
+> +	return val & CANARY_MASK;
+> +}
+
+Please separate function definitions from macros by a separate empty line.
+
+Also, a bit of structure and organization would make the macro easier to read:
+
+#ifdef CONFIG_64BIT
+# ifdef __LITTLE_ENDIAN
+#  define CANARY_MASK 0xffffffffffffff00UL
+# else /* big endian, 64 bits: */
+#  define CANARY_MASK 0x00ffffffffffffffUL
+# endif
+#else /* 32 bits: */
+# define  CANARY_MASK 0x00000000ffffffffUL
+#endif
+
+Thanks,
+
+	Ingo
