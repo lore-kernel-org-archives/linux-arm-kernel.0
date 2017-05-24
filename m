@@ -1,144 +1,176 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 24 May 2017 08:42:28 -0700
-Subject: [RFC PATCH v2 2/2] arm64: neon: Remove support for nested or
- hardirq kernel-mode NEON
-In-Reply-To: <20170524153555.GM3559@e103592.cambridge.arm.com>
-References: <1495636986-30515-1-git-send-email-Dave.Martin@arm.com>
- <1495636986-30515-3-git-send-email-Dave.Martin@arm.com>
- <CAKv+Gu8+y9qrQqLWqpmwcd61L+vMN2iOTqFmK6dVJOFy0oiSbQ@mail.gmail.com>
- <20170524153555.GM3559@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu8OPzm1fnxthgjqLxezB2K-Xja0=fBX3M-uvGOYWBq2Mg@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 24 May 2017 16:45:20 +0100
+Subject: User-space code aborts on some (but not all) misaligned accesses
+In-Reply-To: <e80ee08d-e8ab-9eeb-9555-a743f8681d7d@free.fr>
+References: <e80ee08d-e8ab-9eeb-9555-a743f8681d7d@free.fr>
+Message-ID: <b9060068-5b9b-89b4-851e-430ec02f9fd8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 May 2017 at 08:35, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Wed, May 24, 2017 at 08:22:18AM -0700, Ard Biesheuvel wrote:
->> On 24 May 2017 at 07:42, Dave Martin <Dave.Martin@arm.com> wrote:
->> > Support for kernel-mode NEON to be nested and/or used in hardirq
->> > context adds significant complexity, and the benefits may be
->> > marginal.  In practice, kernel-mode NEON is not used in hardirq
->> > context, and is rarely used in softirq context (by certain mac80211
->> > drivers).
->> >
->> > This patch implements an arm64 may_use_simd() function to allow
->> > clients to check whether kernel-mode NEON is usable in the current
->> > context, and simplifies kernel_neon_{begin,end}() to handle only
->> > saving of the task FPSIMD state (if any).  Without nesting, there
->> > is no other state to save.
->> >
->> > The partial fpsimd save/restore functions become redundant as a
->> > result of these changes, so they are removed too.
->> >
->> > The save/restore model is changed to operate directly on
->> > task_struct without additional percpu storage.  This simplifies the
->> > code and saves a bit of memory, but means that softirqs must now be
->> > disabled when manipulating the task fpsimd state from task context:
->> > correspondingly, preempt_{en,dis}sable() calls are upgraded to
->> > local_bh_{en,dis}able() as appropriate, and softirqs are also
->> > disabled around the context switch code in fpsimd_thread_switch().
->> > The will be some increase in softirq latency, but hardirqs should
->> > be unaffected.
->> >
->> > These changes should make it easier to support kernel-mode NEON in
->> > the presence of the Scalable Vector Extension in the future.
->> >
->> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->
-> [...]
->
->> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->> > index 06da8ea..02023da 100644
->> > --- a/arch/arm64/kernel/fpsimd.c
->> > +++ b/arch/arm64/kernel/fpsimd.c
->> > @@ -17,16 +17,20 @@
->
-> [...]
->
->> > + * In order to allow softirq handlers to use FPSIMD, kernel_neon_begin() may
->> > + * save the task's FPSIMD context back to task_struct from softirq context.
->> > + * To prevent this from racing with the manipulation of the task's FPSIMD state
->> > + * from task context and thereby corrupting the state, it is necessary to
->> > + * protect any manipulation of a task's fpsimd_state or TIF_FOREIGN_FPSTATE
->> > + * flag with local_bh_disable().
->> > + *
->>
->> Surely, this doesn't mean all kernel mode NEON should execute with
->> bottom halves disabled? Because that is what this patch appears to be
->> doing.
->
-> Dang, I was deliberately paranoid when updating
-> kernel_neon_{begin,end}(), but was _too_ paranoid.
->
-> softirq must be masked around the read-modify-write on
-> TIF_FOREIGN_FPSTATE and thread.fpsimd_state: from kernel_neon_begin() to
-> kernel_neon_end() we only need to disable preemption, to hide the lack
-> of context switch machinery for kernel-mode NEON state in task context
-> (as at present).
->
-> I think they should do:
->
-> [...]
->
->> > +void kernel_neon_begin(void)
->> >  {
->> >         if (WARN_ON(!system_supports_fpsimd()))
->> >                 return;
->
-> [...]
->
->> > +       BUG_ON(!may_use_simd());
->> > +
->> > +       local_bh_disable();
->> > +
->> > +       __this_cpu_write(kernel_neon_busy, true);
->> > +
->> > +       /*
->> > +        * If there is unsaved task fpsimd state in the CPU, save it
->> > +        * and invalidate the copy stored in the fpsimd regs:
->> > +        */
->> > +       if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE)) {
->> > +               fpsimd_save_state(&current->thread.fpsimd_state);
->> >                 this_cpu_write(fpsimd_last_state, NULL);
->> >         }
->
->         preempt_disable();
->
->         local_bh_enable();
->
->> >  }
->> > -EXPORT_SYMBOL(kernel_neon_begin_partial);
->> > +EXPORT_SYMBOL(kernel_neon_begin);
->> >
->> > +/*
->> > + * kernel_neon_end(): give the CPU FPSIMD registers back to the current task
->> > + *
->> > + * Must be called from a context in which kernel_neon_begin() was previously
->> > + * called, with no call to kernel_neon_end() in the meantime.
->> > + *
->> > + * The caller must not use the FPSIMD registers after this function is called,
->> > + * unless kernel_neon_begin() is called again in the meantime.
->> > + */
->> >  void kernel_neon_end(void)
->> >  {
->> > +       bool busy;
->> > +
->> >         if (!system_supports_fpsimd())
->> >                 return;
->
-> [...]
->
->> > +
->> > +       busy = __this_cpu_xchg(kernel_neon_busy, false);
->> > +       WARN_ON(!busy); /* No matching kernel_neon_begin()? */
->> > +
->
->         preempt_enable();
->
->> >  }
->> >  EXPORT_SYMBOL(kernel_neon_end);
->
-> Make sense?
->
+On 24/05/17 16:26, Mason wrote:
+> [ Message sent to both gcc-help and LAKML ]
+> 
+> Hello,
+> 
+> Consider the following user-space code, split over two files
+> to defeat the optimizer.
+> 
+> This test program maps a page of memory not managed by Linux,
+> and writes 4 words to misaligned addresses within that page.
+> 
+> $ cat store.c 
+> void store_at_addr_plus_0(void *addr, int val)
+> {
+> 	__builtin_memcpy(addr + 0, &val, sizeof val);
+> }
+> void store_at_addr_plus_1(void *addr, int val)
+> {
+> 	__builtin_memcpy(addr + 1, &val, sizeof val);
+> }
+> 
+> $ cat testcase.c 
+> #include <fcntl.h>
+> #include <sys/mman.h>
+> #include <stdio.h>
+> void store_at_addr_plus_0(void *addr, int val);
+> void store_at_addr_plus_1(void *addr, int val);
+> int main(void)
+> {
+> 	int fd = open("/dev/mem", O_RDWR | O_SYNC);
+> 	void *ptr = mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0xc0000000);
+> 	store_at_addr_plus_0(ptr + 0, fd); puts("X");	// store at ptr + 0 => OK
+> 	store_at_addr_plus_0(ptr + 1, fd); puts("X");	// store at ptr + 1 => OK
+> 	store_at_addr_plus_1(ptr + 3, fd); puts("X");	// store at ptr + 4 => OK
+> 	store_at_addr_plus_1(ptr + 0, fd); puts("X");	// store at ptr + 1 => ABORT
+> 	return 0;
+> }
+> 
+> With optimizations turned off, the program works as expected.
+> 
+> $ arm-linux-gnueabihf-gcc-6.3.1 -Wall -O0 testcase.c store.c -o misaligned_stores
+> $ ./misaligned_stores 
+> X
+> X
+> X
+> X
+> 
+> But if optimizations are enabled, the program aborts on the last store.
+> 
+> $ arm-linux-gnueabihf-gcc-6.3.1 -Wall -O1 testcase.c store.c -o misaligned_stores
+> # ./misaligned_stores 
+> X
+> X
+> X
+> Bus error
+> [ 8736.457254] Alignment trap: not handling instruction f8c01001 at [<000104aa>]
 
+^^^
 
-Yes, that looks more like what I was expecting
+Note where that message comes from: The alignment fault fixup code
+doesn't recognise this instruction encoding, so it doesn't get fixed up.
+It's that simple.
+
+Try "echo 5 > /proc/cpu/alignment" then run it again, and it should
+become clearer what the kernel's doing (or not) behind your back - see
+Documentation/arm/mem_alignment
+
+The other thing to say, of course, is "don't make unaligned accesses to
+Strongly-Ordered memory in the first place".
+
+Robin.
+
+> [ 8736.464496] Unhandled fault: alignment exception (0x811) at 0xb6f4b001
+> [ 8736.471106] pgd = de2d4000
+> [ 8736.473839] [b6f4b001] *pgd=9f56b831, *pte=c0000743, *ppte=c0000c33
+> 
+> (gdb) disassemble store_at_addr_plus_0
+>    0x000104a6 <+0>:     str     r1, [r0, #0]
+>    0x000104a8 <+2>:     bx      lr
+> 
+> (gdb) disassemble store_at_addr_plus_1
+>    0x000104aa <+0>:     str.w   r1, [r0, #1]
+>    0x000104ae <+4>:     bx      lr
+> 
+> 
+> So the 4th store (a misaligned store) aborts.
+> But why doesn't the 2nd store abort as well?
+> It targets the *same* address.
+> They're using different versions of the str instruction.
+> 
+> The compiler generates
+> str	r1, [r0]	@ unaligned
+> str	r1, [r0, #1]	@ unaligned
+> 
+> According to objdump
+> 
+> 00000000 <store_at_addr_plus_0>:
+>    0:	6001      	str	r1, [r0, #0]
+>    2:	4770      	bx	lr
+> 
+> 00000004 <store_at_addr_plus_1>:
+>    4:	f8c0 1001 	str.w	r1, [r0, #1]
+>    8:	4770      	bx	lr
+> 
+> Side issue, the T2 encoding for the STR instruction states
+> 1 1 1 1 1 0 0 0 0 1 0 0 Rn
+> which comes out as f840, not f8c0; I don't understand.
+> 
+> My question is:
+> 
+> Why does instruction "6001" work on misaligned addresses,
+> while "f8c0 1001" aborts?
+> 
+> Below the disas of main FWIW.
+> 
+> Regards.
+> 
+> 
+> 
+> (gdb) disassemble main
+>    0x00010430 <+0>:     push    {r4, r5, r6, lr}
+>    0x00010432 <+2>:     sub     sp, #8
+>    0x00010434 <+4>:     movw    r1, #4098       ; 0x1002
+>    0x00010438 <+8>:     movt    r1, #16
+>    0x0001043c <+12>:    movw    r0, #4620       ; 0x120c
+>    0x00010440 <+16>:    movt    r0, #1
+>    0x00010444 <+20>:    blx     0x1032c <open@plt>
+>    0x00010448 <+24>:    mov     r5, r0
+>    0x0001044a <+26>:    mov.w   r3, #3221225472 ; 0xc0000000
+>    0x0001044e <+30>:    str     r3, [sp, #4]
+>    0x00010450 <+32>:    str     r0, [sp, #0]
+>    0x00010452 <+34>:    movs    r3, #1
+>    0x00010454 <+36>:    movs    r2, #3
+>    0x00010456 <+38>:    mov.w   r1, #4096       ; 0x1000
+>    0x0001045a <+42>:    movs    r0, #0
+>    0x0001045c <+44>:    blx     0x10338 <mmap@plt>
+>    0x00010460 <+48>:    mov     r6, r0
+>    0x00010462 <+50>:    mov     r1, r5
+>    0x00010464 <+52>:    bl      0x104a6 <store_at_addr_plus_0>
+>    0x00010468 <+56>:    movw    r4, #4632       ; 0x1218
+>    0x0001046c <+60>:    movt    r4, #1
+>    0x00010470 <+64>:    mov     r0, r4
+>    0x00010472 <+66>:    blx     0x10308 <puts@plt>
+>    0x00010476 <+70>:    mov     r1, r5
+>    0x00010478 <+72>:    adds    r0, r6, #1
+>    0x0001047a <+74>:    bl      0x104a6 <store_at_addr_plus_0>
+>    0x0001047e <+78>:    mov     r0, r4
+>    0x00010480 <+80>:    blx     0x10308 <puts@plt>
+>    0x00010484 <+84>:    mov     r1, r5
+>    0x00010486 <+86>:    adds    r0, r6, #3
+>    0x00010488 <+88>:    bl      0x104aa <store_at_addr_plus_1>
+>    0x0001048c <+92>:    mov     r0, r4
+>    0x0001048e <+94>:    blx     0x10308 <puts@plt>
+>    0x00010492 <+98>:    mov     r1, r5
+>    0x00010494 <+100>:   mov     r0, r6
+>    0x00010496 <+102>:   bl      0x104aa <store_at_addr_plus_1>
+>    0x0001049a <+106>:   mov     r0, r4
+>    0x0001049c <+108>:   blx     0x10308 <puts@plt>
+>    0x000104a0 <+112>:   movs    r0, #0
+>    0x000104a2 <+114>:   add     sp, #8
+>    0x000104a4 <+116>:   pop     {r4, r5, r6, pc}
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
