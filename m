@@ -1,77 +1,81 @@
 From: james.morse@arm.com (James Morse)
-Date: Wed, 24 May 2017 17:57:57 +0100
-Subject: [PATCH 0/9] SError rework to support RAS notifications via SEI
-Message-ID: <20170524165806.29866-1-james.morse@arm.com>
+Date: Wed, 24 May 2017 17:58:00 +0100
+Subject: [PATCH 3/9] arm64: unmask all exceptions on CPU startup
+In-Reply-To: <20170524165806.29866-1-james.morse@arm.com>
+References: <20170524165806.29866-1-james.morse@arm.com>
+Message-ID: <20170524165806.29866-4-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rules for when SError should be masked/unmasked are unclear. Today
-we unmask SError on each CPU during boot, but ignore it thereafter. This
-means once we enter userspace SError is always masked in the kernel.
-Because of this, we always blame the next user space process to be
-scheduled for any SError triggered by the kernel.
+Remove the local_{async,fiq}_{en,dis}able macros as they don't respect
+our newly defined order, and only have one user:
+CPU 0 unmasks SError during early boot once it can print an error message.
 
-When we add an ESB for synchronising RAS events in the context switch
-code, we won't ever take an SError (it will be deferred and written to
-a system register), we would need to always explicitly test for an error.
+Debug exceptions are already unmasked by __cpu_setup(), which has also
+configured MDSCR_EL1 to disable MDE and KDE.
 
-Instead we should unmask SError when running in the kernel, and we should
-decide an order for masking/unmasking exceptions.
+Change the local_async_enable() call to unmask everything except irqs.
+If we can print an error message about SError, we can do the same for FIQ.
+The same goes for secondary CPUs only here we are ready to receive
+interrupts. Just unmask everything.
 
-'dai' is memorable and almost what we have today.
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ arch/arm64/include/asm/irqflags.h | 6 ------
+ arch/arm64/kernel/setup.c         | 7 ++++---
+ arch/arm64/kernel/smp.c           | 4 ++--
+ 3 files changed, 6 insertions(+), 11 deletions(-)
 
-This means:
- * Masking debug will also mask SError and irq.
- * Masking SError will also mask irq.
- * Fiq is almost always unmasked. (It's masked by debug as that masks
-   everything)
-
-The entry.S changes are in very small pieces, hopefully this makes the bugs
-obvious. I intend to merge all the convert-foo patches together once they've
-been reviewed.
-
-The (expected) changes in behaviour for this series are:
- * SError and fiq may be unmasked in the kernel.
- * el1_sync exceptions (except debug) inherit their flags, instead of unmasking
-   debug and maybe irq for instruction/data abort. This means EL1's
-   undef/sp_pc/inv may now run with IRQs unmasked.
- * el0_sync exceptions (except debug) unmask everything. fpsimd_acc fpsimd_exc
-   and inv now run with interrupts enabled. (This looked like a side effect of
-   some earlier cleanup.)
- * kernel_exit explicitly masks all the flags.
-
-With these changes, adding further RAS support that depends on SError handling
-becomes simpler.
-
-Comments welcome.
-
-James Morse (8):
-  arm64: explicitly mask all exceptions
-  arm64: introduce an order for exceptions
-  arm64: unmask all exceptions on CPU startup
-  arm64: entry.S: mask all exceptions during kernel_exit
-  arm64: entry.S: move enable_step_tsk into kernel_exit
-  arm64: entry.S: convert el1_sync
-  arm64: entry.S convert el0_sync
-  arm64: entry.S: convert elX_irq
-
-Xie XiuQi (1):
-  arm64: entry.S: move SError handling into a C function for future
-    expansion
-
- arch/arm64/Kconfig                 |   1 +
- arch/arm64/include/asm/assembler.h |  47 +++++++++------
- arch/arm64/include/asm/irqflags.h  |  65 ++++++++++++++-------
- arch/arm64/kernel/debug-monitors.c |   4 +-
- arch/arm64/kernel/entry.S          | 116 +++++++++++++++++++------------------
- arch/arm64/kernel/hibernate.c      |   4 +-
- arch/arm64/kernel/machine_kexec.c  |   3 +-
- arch/arm64/kernel/setup.c          |   7 ++-
- arch/arm64/kernel/smp.c            |  12 ++--
- arch/arm64/kernel/suspend.c        |   6 +-
- arch/arm64/kernel/traps.c          |  15 ++++-
- arch/arm64/mm/proc.S               |   9 ++-
- 12 files changed, 167 insertions(+), 122 deletions(-)
-
+diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+index e8dd74cbb91a..4f4ebb1f6fd1 100644
+--- a/arch/arm64/include/asm/irqflags.h
++++ b/arch/arm64/include/asm/irqflags.h
+@@ -66,12 +66,6 @@ static inline void arch_local_irq_disable(void)
+ 		: "memory");
+ }
+ 
+-#define local_fiq_enable()	asm("msr	daifclr, #1" : : : "memory")
+-#define local_fiq_disable()	asm("msr	daifset, #1" : : : "memory")
+-
+-#define local_async_enable()	asm("msr	daifclr, #4" : : : "memory")
+-#define local_async_disable()	asm("msr	daifset, #4" : : : "memory")
+-
+ /*
+  * Save the current interrupt enable state.
+  */
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 2c822ef94f34..782add414132 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -259,10 +259,11 @@ void __init setup_arch(char **cmdline_p)
+ 	parse_early_param();
+ 
+ 	/*
+-	 *  Unmask asynchronous aborts after bringing up possible earlycon.
+-	 * (Report possible System Errors once we can report this occurred)
++	 * Unmask asynchronous aborts and fiq after bringing up possible
++	 * earlycon. (Report possible System Errors once we can report this
++	 * occurred).
+ 	 */
+-	local_async_enable();
++	local_restore_daif(PSR_I_BIT);
+ 
+ 	/*
+ 	 * TTBR0 is only used for the identity mapping at this stage. Make it
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 9a86a6927edf..11cd9eff06f3 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -271,8 +271,8 @@ asmlinkage void secondary_start_kernel(void)
+ 	set_cpu_online(cpu, true);
+ 	complete(&cpu_running);
+ 
+-	local_irq_enable();
+-	local_async_enable();
++	trace_hardirqs_on();
++	local_unmask_daif();
+ 
+ 	/*
+ 	 * OK, it's off to the idle thread for us
 -- 
 2.11.0
