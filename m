@@ -1,38 +1,84 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 24 May 2017 21:06:48 +0200
-Subject: [PATCH 07/11] crypto: sun4i-ss: simplify the appended bit assignment
+Date: Wed, 24 May 2017 21:06:47 +0200
+Subject: [PATCH 06/11] crypto: sun4i-ss: simplify the pad length calculation
 In-Reply-To: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
 References: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170524190652.13278-8-antoine.tenart@free-electrons.com>
+Message-ID: <20170524190652.13278-7-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A bit is appended at the end of the input buffer for sha1. Simplify the
-code assigning it.
+When sending the last block of data to the engine, it should be padded
+so that the total length of the request can be given to the engine as
+the last 2 words of the last 64 bytes block.
+
+Simplify the calculation of this pad offset.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 29 ++++++++++++-----------------
+ 1 file changed, 12 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-index 59d9b4412aca..0c2efc88bc0a 100644
+index 518bc7a7df6a..59d9b4412aca 100644
 --- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
 +++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-@@ -392,12 +392,8 @@ static int sun4i_hash(struct ahash_request *areq)
+@@ -177,7 +177,7 @@ static int sun4i_hash(struct ahash_request *areq)
+ 	 *
+ 	 * in_i: advancement in the current SG
+ 	 */
+-	unsigned int i = 0, end, index, padlen, nwait, nbw = 0, j = 0, todo;
++	unsigned int i = 0, end, fill, min_fill, nwait, nbw = 0, j = 0, todo;
+ 	unsigned int in_i = 0;
+ 	u32 spaces, rx_cnt = SS_RX_DEFAULT, bf[32] = {0}, wb = 0, v, ivmode = 0;
+ 	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+@@ -186,7 +186,7 @@ static int sun4i_hash(struct ahash_request *areq)
+ 	struct sun4i_ss_ctx *ss = tfmctx->ss;
+ 	struct scatterlist *in_sg = areq->src;
+ 	struct sg_mapping_iter mi;
+-	int in_r, err = 0, zeros;
++	int in_r, err = 0;
+ 	size_t copied = 0;
+ 
+ 	dev_dbg(ss->dev, "%s %s bc=%llu len=%u mode=%x wl=%u h0=%0x",
+@@ -387,6 +387,8 @@ static int sun4i_hash(struct ahash_request *areq)
+ 		nbw = op->len - 4 * nwait;
+ 		wb = *(u32 *)(op->buf + nwait * 4);
+ 		wb &= (0xFFFFFFFF >> (4 - nbw) * 8);
++
++		op->byte_count += nbw;
  	}
  
  	/* write the remaining bytes of the nbw buffer */
--	if (nbw) {
--		wb |= ((1 << 7) << (nbw * 8));
--		bf[j++] = wb;
--	} else {
--		bf[j++] = 1 << 7;
--	}
-+	wb |= ((1 << 7) << (nbw * 8));
-+	bf[j++] = wb;
+@@ -402,22 +404,15 @@ static int sun4i_hash(struct ahash_request *areq)
+ 	 * I take the operations from other MD5/SHA1 implementations
+ 	 */
  
- 	/*
- 	 * number of space to pad to obtain 64o minus 8(size) minus 4 (final 1)
+-	/* we have already send 4 more byte of which nbw data */
+-	if (op->mode == SS_OP_MD5) {
+-		index = (op->byte_count + 4) & 0x3f;
+-		op->byte_count += nbw;
+-		if (index > 56)
+-			zeros = (120 - index) / 4;
+-		else
+-			zeros = (56 - index) / 4;
+-	} else {
+-		op->byte_count += nbw;
+-		index = op->byte_count & 0x3f;
+-		padlen = (index < 56) ? (56 - index) : ((64 + 56) - index);
+-		zeros = (padlen - 1) / 4;
+-	}
++	/* last block size */
++	fill = 64 - (op->byte_count % 64);
++	min_fill = 2 * sizeof(u32) + (nbw ? 0 : sizeof(u32));
++
++	/* if we can't fill all data, jump to the next 64 block */
++	if (fill < min_fill)
++		fill += 64;
+ 
+-	j += zeros;
++	j += (fill - min_fill) / sizeof(u32);
+ 
+ 	/* write the length of data */
+ 	if (op->mode == SS_OP_SHA1) {
 -- 
 2.9.4
