@@ -1,82 +1,70 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 24 May 2017 09:07:45 -0700
-Subject: [RFC PATCH v2 0/2] Simplify kernel-mode NEON
-In-Reply-To: <20170524155431.GN3559@e103592.cambridge.arm.com>
-References: <1495636986-30515-1-git-send-email-Dave.Martin@arm.com>
- <CAKv+Gu-QoRkJysYpnzw-=fmEkuajDcFY77T28CLE0JjwogQWnA@mail.gmail.com>
- <20170524155431.GN3559@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu_YjxgYGQjG4tip8Y2ZSWrQHjeo47douTLeXSUSfO6Z=g@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 24 May 2017 18:09:11 +0200
+Subject: [PATCH 1/1] xilinx ps uart: Adding a kernel parameter for the
+ number of xilinx ps uarts
+In-Reply-To: <20170524143108.682a548d@alans-desktop>
+References: <20170520022154.6766-1-kernel.development@povil.us>
+ <20170520172008.5a979e8a@alans-desktop>
+ <517d864d-d230-3abc-eb3c-4b628dc4625f@xilinx.com>
+ <20170522192636.5b578d89@alans-desktop>
+ <1668f36e-f9be-7008-004a-e467a6813e0f@xilinx.com>
+ <20170523210710.4e84dd2d@alans-desktop>
+ <924433a1-7e27-6eb6-71ca-ed7baceb427f@xilinx.com>
+ <20170524143108.682a548d@alans-desktop>
+Message-ID: <b5a032c8-db86-c16b-750f-10aa2a132248@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 May 2017 at 08:54, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Wed, May 24, 2017 at 08:29:06AM -0700, Ard Biesheuvel wrote:
->> On 24 May 2017 at 07:42, Dave Martin <Dave.Martin@arm.com> wrote:
->> > This series aims to simplify kernel-mode NEON.
->> >
->> > The main motivation for these changes is that supporting kernel-mode
->> > NEON alongside SVE is tricky with the current framework: the current
->> > partial save/restore mechanisms would need additional porting to
->> > save/restore the extended SVE vector bits, and this renders the cost
->> > saving of partial save/restore rather doubtful -- even if not all vector
->> > registers are saved, the save/restore cost will still grow with
->> > increasing vector length.  We could get the mechanics of this to work in
->> > principle, but it doesn't feel like the right thing to do.
->> >
->> > If we withdraw kernel-mode NEON support for hardirq context, accept some
->> > extra softirq latency and disable nesting, then we can simplify the code
->> > by always saving the task context directly into task_struct and
->> > deferring all restore to ret_to_user.  Previous discussions with Ard
->> > Biesheuvel suggest that this is a feasible approach and reasonably
->> > aligned with other architectures.
->> >
->> > The main impact on client code is that callers must check that
->> > kernel-mode NEON is usable in the current context and fall back to a
->> > non-NEON when necessary.  Ard has already done some work on this. [1]
->> >
->> > The interesting changes are all in patch 2: the first patch just adds a
->> > header inclusion guard that I noted was missing.
->> >
->> > [1] git://git.kernel.org/pub/scm/linux/kernel/git/ardb/linux.git kernel-mode-neon
->> >
->> >
->> > I've only build-tested so far.
->> >
->> > Ard, do you have any suggestions for how to test these changes
->> > effectively?
->> >
->>
->> IIRC, a zd1211 based USB wifi stick will use the mac80211 crypto
->
-> Do you have one of those?
->
+On 24.5.2017 15:31, Alan Cox wrote:
+>> I am not saying that config option is perfect solution. It is at least
+>> aligned with 5 others serial drivers in the tree.
+> 
+> And the fact people keep doing hacks jutifies continuing to make a mess.
+> Especialy as in this case it's entirely theoretical. Nobody has produced
+> actual hardware that hits the limit. Nobody has filed a bug, nobody is
+> impacted.
 
-Yes, I should still have one. I am currently travelling but I will
-take a look when I get back.
+This is the reason why we are talking about it how to do it right.
 
->> routines that execute in softirq context (and I am sure there are
->> others). If you run a VPN over that, and only enable a single CPU, I
->> would expect most code paths to get exercised when pushing a lot of
->> data over that. In userland, you can run something like 'openssl speed
->> -evp aes-128-ctr' in a loop to exercise the userland part, although it
->> would be better to check the correctness as well (which 'speed' will
->> not do for you)
->
-> Another approach would be to hack up a softirq irritator that just does
->
->         kernel_neon_begin()
->
->         /* write garbage to FPSIMD regs */
->
->         kernel_neon_end()
->
-> alongside some userspace test that will spot corruption.
->
->
-> Writing softirq handlers seems to be a bit of a black art though...
-> I was wondering whether it would make sense to hack something into
-> the timer softirq code, but I'm not well clued-up on how that stuff
-> works.
->
+With this ps uart it is not that easy because this is cadence RTL which
+is not in public IP database but the same think is with uartlite.
+Limit there is 16. If you really want that I can create that HW design
+which will require more than 16 uartlites in one design.
 
-That should work as well, I suppose.
+
+> Creating extra CONFIG_ entries for junk like this is ridiculous, most of
+> the others at least have the excuse of being old code.
+
+No doubt about it. I am just trying to find out what's the way you are
+suggesting.
+
+
+> Generally it is better to call uart_register_driver from the probe method
+> because that way you don't waste time and memory registering drivers for
+> stuff that isn't even present however if you have no idea how many
+> devices there might be then you still really need to pass a suitable limit
+> and handle it internally dynamically allocating as needed.
+
+Ok. Is there any problem if uart_register_driver is called for every
+instance separately with nr=1? This driver has major 0, minor 0. Based
+on comment major 0 is for dynamic node allocation. Not sure about minor
+but it is easy to figured out if this should be 0 or 1, 2, 3, etc.
+
+> If someone was hitting this in the real world and you posted a patch that
+> just changed the constant to 8 or 16 or whatever was needed I wouldn't
+> care too much, but adding CONFIG_ entries just makes stuff harder and
+> harder to config and more and more impossible to keep generic.
+> 
+> I keep hearing that the ARM folks are trying to get one unified kernel.
+> CONFIG_ options is not how to do that.
+
+I have really not a problem with all of this. Just trying to understand
+how to do it properly and cleanup the second driver which we use on
+fpga. Last driver used by Xilinx is uart16550 where that old config
+macro already exists.
+
+Because at least now there is an issue in driver if you use serial
+aliases (serial2 and up) which needs to be fixed.
+
+Thanks,
+Michal
