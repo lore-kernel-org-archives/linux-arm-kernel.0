@@ -1,31 +1,31 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 24 May 2017 16:32:06 +0200
-Subject: [PATCH] gpio: mvebu: Select REGMAP_MMIO now that regmap is used
-Message-ID: <20170524143206.9727-1-gregory.clement@free-electrons.com>
+From: srishtishar@gmail.com (srishti sharma)
+Date: Wed, 24 May 2017 20:03:14 +0530
+Subject: [PATCH] Staging: bcm2835-audio: bcm2835-ctl.c: Fixed a comment coding
+ style issue.
+Message-ID: <1495636394-2431-1-git-send-email-srishtishar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the commit "gpio: mvebu: switch to regmap for register access" the
-driver use the regmap. Explicitly select the REGMAP_MMIO symbol to fix
-build error.
+fixed a trailing */ issue
 
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: srishti sharma <srishtishar@gmail.com>
 ---
- drivers/gpio/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/staging/bcm2835-audio/bcm2835-ctl.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 45ed9acfd095..68d9e6bde14d 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -339,6 +339,7 @@ config GPIO_MVEBU
- 	depends on PLAT_ORION
- 	depends on OF_GPIO
- 	select GENERIC_IRQ_CHIP
-+	select REGMAP_MMIO
- 
- config GPIO_MXC
- 	def_bool y
--- 
-2.11.0
+diff --git a/drivers/staging/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
+index a4ffa1b..38fabab 100644
+--- a/drivers/staging/bcm2835-audio/bcm2835-ctl.c
++++ b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
+@@ -247,8 +247,8 @@ static int snd_bcm2835_spdif_mask_get(struct snd_kcontrol *kcontrol,
+ 	struct snd_ctl_elem_value *ucontrol)
+ {
+ 	/* bcm2835 supports only consumer mode and sets all other format flags
+-	 * automatically. So the only thing left is signalling non-audio
+-	 * content */
++	 * automatically. So the only thing left is signalling non-audio content
++	 */
+ 	ucontrol->value.iec958.status[0] = IEC958_AES0_NONAUDIO;
+ 	return 0;
+ }
+2.7.4
