@@ -1,173 +1,63 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 24 May 2017 18:06:00 +0800
-Subject: [PATCH v3 2/9] ASoC: sun8i-codec-analog: prepare a mixer
- control/widget/route set for V3s
+Date: Wed, 24 May 2017 18:06:01 +0800
+Subject: [PATCH v3 3/9] ASoC: sun8i-codec-analog: add support for V3s SoC
 In-Reply-To: <20170524100607.29790-1-icenowy@aosc.io>
 References: <20170524100607.29790-1-icenowy@aosc.io>
-Message-ID: <20170524100607.29790-3-icenowy@aosc.io>
+Message-ID: <20170524100607.29790-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner V3s has an analog codec without MIC2 and Line In, which will
-need a special set of mixer controls/widgets/routes, otherwise meaningless
-controls will be exported to userspace and confuse the user.
+From: Icenowy Zheng <icenowy@aosc.xyz>
 
-Add the special set, and use it when the SoC has no MIC2 and Line In.
+The V3s SoC features an analog codec with headphone support but without
+mic2 and linein.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Add support for it.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
-New patch in v3.
+ Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt | 1 +
+ sound/soc/sunxi/sun8i-codec-analog.c                           | 9 +++++++++
+ 2 files changed, 10 insertions(+)
 
- sound/soc/sunxi/sun8i-codec-analog.c | 97 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 96 insertions(+), 1 deletion(-)
-
+diff --git a/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt b/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
+index 779b735781ba..1b6e7c4e50ab 100644
+--- a/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
++++ b/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
+@@ -4,6 +4,7 @@ Required properties:
+ - compatible: must be one of the following compatibles:
+ 		- "allwinner,sun8i-a23-codec-analog"
+ 		- "allwinner,sun8i-h3-codec-analog"
++		- "allwinner,sun8i-v3s-codec-analog"
+ 
+ Required properties if not a sub-node of the PRCM node:
+ - reg: must contain the registers location and length
 diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
-index edcc3eb7cd9a..4c34a12b3739 100644
+index 4c34a12b3739..465d53fa93ac 100644
 --- a/sound/soc/sunxi/sun8i-codec-analog.c
 +++ b/sound/soc/sunxi/sun8i-codec-analog.c
-@@ -219,6 +219,22 @@ static const struct snd_kcontrol_new sun8i_codec_mixer_controls[] = {
- 			  SUN8I_ADDA_LOMIXSC_MIC2, 1, 0),
- };
+@@ -808,6 +808,11 @@ static int sun8i_codec_analog_add_mixer(struct snd_soc_component *cmpnt,
+ 	return 0;
+ }
  
-+/* mixer controls */
-+static const struct snd_kcontrol_new sun8i_v3s_codec_mixer_controls[] = {
-+	SOC_DAPM_DOUBLE_R("DAC Playback Switch",
-+			  SUN8I_ADDA_LOMIXSC,
-+			  SUN8I_ADDA_ROMIXSC,
-+			  SUN8I_ADDA_LOMIXSC_DACL, 1, 0),
-+	SOC_DAPM_DOUBLE_R("DAC Reversed Playback Switch",
-+			  SUN8I_ADDA_LOMIXSC,
-+			  SUN8I_ADDA_ROMIXSC,
-+			  SUN8I_ADDA_LOMIXSC_DACR, 1, 0),
-+	SOC_DAPM_DOUBLE_R("Mic1 Playback Switch",
-+			  SUN8I_ADDA_LOMIXSC,
-+			  SUN8I_ADDA_ROMIXSC,
-+			  SUN8I_ADDA_LOMIXSC_MIC1, 1, 0),
++static const struct sun8i_codec_analog_quirks sun8i_v3s_quirks = {
++	.has_headphone	= true,
++	.has_hmic	= true,
 +};
-+
- /* ADC mixer controls */
- static const struct snd_kcontrol_new sun8i_codec_adc_mixer_controls[] = {
- 	SOC_DAPM_DOUBLE_R("Mixer Capture Switch",
-@@ -243,6 +259,22 @@ static const struct snd_kcontrol_new sun8i_codec_adc_mixer_controls[] = {
- 			  SUN8I_ADDA_LADCMIXSC_MIC2, 1, 0),
- };
- 
-+/* ADC mixer controls */
-+static const struct snd_kcontrol_new sun8i_v3s_codec_adc_mixer_controls[] = {
-+	SOC_DAPM_DOUBLE_R("Mixer Capture Switch",
-+			  SUN8I_ADDA_LADCMIXSC,
-+			  SUN8I_ADDA_RADCMIXSC,
-+			  SUN8I_ADDA_LADCMIXSC_OMIXRL, 1, 0),
-+	SOC_DAPM_DOUBLE_R("Mixer Reversed Capture Switch",
-+			  SUN8I_ADDA_LADCMIXSC,
-+			  SUN8I_ADDA_RADCMIXSC,
-+			  SUN8I_ADDA_LADCMIXSC_OMIXRR, 1, 0),
-+	SOC_DAPM_DOUBLE_R("Mic1 Capture Switch",
-+			  SUN8I_ADDA_LADCMIXSC,
-+			  SUN8I_ADDA_RADCMIXSC,
-+			  SUN8I_ADDA_LADCMIXSC_MIC1, 1, 0),
-+};
-+
- /* volume / mute controls */
- static const DECLARE_TLV_DB_SCALE(sun8i_codec_out_mixer_pregain_scale,
- 				  -450, 150, 0);
-@@ -292,8 +324,9 @@ static const struct snd_soc_dapm_widget sun8i_codec_common_widgets[] = {
- 	/* Mic input path */
- 	SND_SOC_DAPM_PGA("Mic1 Amplifier", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
- 			 SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MIC1AMPEN, 0, NULL, 0),
-+};
- 
--	/* Mixers */
-+static const struct snd_soc_dapm_widget sun8i_codec_mixer_widgets[] = {
- 	SND_SOC_DAPM_MIXER("Left Mixer", SUN8I_ADDA_DAC_PA_SRC,
- 			   SUN8I_ADDA_DAC_PA_SRC_LMIXEN, 0,
- 			   sun8i_codec_mixer_controls,
-@@ -312,10 +345,31 @@ static const struct snd_soc_dapm_widget sun8i_codec_common_widgets[] = {
- 			   ARRAY_SIZE(sun8i_codec_adc_mixer_controls)),
- };
- 
-+static const struct snd_soc_dapm_widget sun8i_v3s_codec_mixer_widgets[] = {
-+	SND_SOC_DAPM_MIXER("Left Mixer", SUN8I_ADDA_DAC_PA_SRC,
-+			   SUN8I_ADDA_DAC_PA_SRC_LMIXEN, 0,
-+			   sun8i_v3s_codec_mixer_controls,
-+			   ARRAY_SIZE(sun8i_v3s_codec_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("Right Mixer", SUN8I_ADDA_DAC_PA_SRC,
-+			   SUN8I_ADDA_DAC_PA_SRC_RMIXEN, 0,
-+			   sun8i_v3s_codec_mixer_controls,
-+			   ARRAY_SIZE(sun8i_v3s_codec_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("Left ADC Mixer", SUN8I_ADDA_ADC_AP_EN,
-+			   SUN8I_ADDA_ADC_AP_EN_ADCLEN, 0,
-+			   sun8i_v3s_codec_adc_mixer_controls,
-+			   ARRAY_SIZE(sun8i_v3s_codec_adc_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("Right ADC Mixer", SUN8I_ADDA_ADC_AP_EN,
-+			   SUN8I_ADDA_ADC_AP_EN_ADCREN, 0,
-+			   sun8i_v3s_codec_adc_mixer_controls,
-+			   ARRAY_SIZE(sun8i_v3s_codec_adc_mixer_controls)),
-+};
-+
- static const struct snd_soc_dapm_route sun8i_codec_common_routes[] = {
- 	/* Microphone Routes */
- 	{ "Mic1 Amplifier", NULL, "MIC1"},
-+};
- 
-+static const struct snd_soc_dapm_route sun8i_codec_mixer_routes[] = {
- 	/* Left Mixer Routes */
- 	{ "Left Mixer", "DAC Playback Switch", "Left DAC" },
- 	{ "Left Mixer", "DAC Reversed Playback Switch", "Right DAC" },
-@@ -714,6 +768,46 @@ static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
- 	.has_mic2	= true,
- };
- 
-+static int sun8i_codec_analog_add_mixer(struct snd_soc_component *cmpnt,
-+					const struct sun8i_codec_analog_quirks *quirks)
-+{
-+	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
-+	struct device *dev = cmpnt->dev;
-+	int ret;
-+
-+	if (!quirks->has_mic2 && !quirks->has_linein) {
-+		/*
-+		 * Apply the special widget set which has uses a control
-+		 * without MIC2 and Line In, for SoCs without these (V3s).
-+		 */
-+		ret = snd_soc_dapm_new_controls(dapm,
-+						sun8i_v3s_codec_mixer_widgets,
-+						ARRAY_SIZE(sun8i_v3s_codec_mixer_widgets));
-+		if (ret) {
-+			dev_err(dev, "Failed to add V3s Mixer DAPM widgets: %d\n", ret);
-+			return ret;
-+		}
-+	} else {
-+		/* Apply the generic mixer widget set. */
-+		ret = snd_soc_dapm_new_controls(dapm,
-+						sun8i_codec_mixer_widgets,
-+						ARRAY_SIZE(sun8i_codec_mixer_widgets));
-+		if (ret) {
-+			dev_err(dev, "Failed to add Mixer DAPM widgets: %d\n", ret);
-+			return ret;
-+		}
-+	}
-+
-+	ret = snd_soc_dapm_add_routes(dapm, sun8i_codec_mixer_routes,
-+				      ARRAY_SIZE(sun8i_codec_mixer_routes));
-+	if (ret) {
-+		dev_err(dev, "Failed to add Mixer DAPM routes: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
 +
  static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
  {
  	struct device *dev = cmpnt->dev;
-@@ -728,6 +822,7 @@ static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
- 	quirks = of_device_get_match_data(dev);
- 
- 	/* Add controls, widgets, and routes for individual features */
-+	sun8i_codec_analog_add_mixer(cmpnt, quirks);
- 
- 	if (quirks->has_headphone) {
- 		ret = sun8i_codec_add_headphone(cmpnt);
+@@ -882,6 +887,10 @@ static const struct of_device_id sun8i_codec_analog_of_match[] = {
+ 		.compatible = "allwinner,sun8i-h3-codec-analog",
+ 		.data = &sun8i_h3_quirks,
+ 	},
++	{
++		.compatible = "allwinner,sun8i-v3s-codec-analog",
++		.data = &sun8i_v3s_quirks,
++	},
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, sun8i_codec_analog_of_match);
 -- 
 2.12.2
