@@ -1,57 +1,60 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 24 May 2017 14:11:21 +0100
-Subject: [PATCH v4 8/9] arm64: Re-enable support for contiguous hugepages
+Date: Wed, 24 May 2017 14:11:20 +0100
+Subject: [PATCH v4 7/9] arm64: hugetlb: Override set_huge_swap_pte_at() to
+ support contiguous hugepages
 In-Reply-To: <20170524131122.5309-1-punit.agrawal@arm.com>
 References: <20170524131122.5309-1-punit.agrawal@arm.com>
-Message-ID: <20170524131122.5309-9-punit.agrawal@arm.com>
+Message-ID: <20170524131122.5309-8-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-also known as -
-
-Revert "Revert "Revert "arm64: hugetlb: partial revert of 66b3923a1a0f"""
-
-Now that our hugetlb implementation is compliant with the
-break-before-make requirements of the architecture and we have addressed
-some of the issues in core code required for properly dealing with
-hardware poisoning of contiguous hugepages let's re-enable support for
+The default implementation of set_huge_swap_pte_at() does not support
+hugepages consisting of contiguous ptes. Override it to add support for
 contiguous hugepages.
 
-This reverts commit 6ae979ab39a368c18ceb0424bf824d172d6ab56f.
-
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: David Woods <dwoods@mellanox.com>
 ---
- arch/arm64/mm/hugetlbpage.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm64/include/asm/hugetlb.h |  3 +++
+ arch/arm64/mm/hugetlbpage.c      | 12 ++++++++++++
+ 2 files changed, 15 insertions(+)
 
+diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
+index bb86f0741863..e5f6210d1321 100644
+--- a/arch/arm64/include/asm/hugetlb.h
++++ b/arch/arm64/include/asm/hugetlb.h
+@@ -84,6 +84,9 @@ extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ extern void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+ 			   pte_t *ptep, unsigned long sz);
+ #define huge_pte_clear huge_pte_clear
++extern void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
++				 pte_t *ptep, pte_t pte, unsigned long sz);
++#define set_huge_swap_pte_at set_huge_swap_pte_at
+ 
+ #include <asm-generic/hugetlb.h>
+ 
 diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 3e78673b1bcb..a10dfbd0ffd5 100644
+index 240b2fd53266..3e78673b1bcb 100644
 --- a/arch/arm64/mm/hugetlbpage.c
 +++ b/arch/arm64/mm/hugetlbpage.c
-@@ -385,6 +385,10 @@ static __init int setup_hugepagesz(char *opt)
- 		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
- 	} else if (ps == PUD_SIZE) {
- 		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
-+	} else if (ps == (PAGE_SIZE * CONT_PTES)) {
-+		hugetlb_add_hstate(CONT_PTE_SHIFT);
-+	} else if (ps == (PMD_SIZE * CONT_PMDS)) {
-+		hugetlb_add_hstate((PMD_SHIFT + CONT_PMD_SHIFT) - PAGE_SHIFT);
- 	} else {
- 		hugetlb_bad_size();
- 		pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
-@@ -393,3 +397,13 @@ static __init int setup_hugepagesz(char *opt)
- 	return 1;
+@@ -167,6 +167,18 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 	}
  }
- __setup("hugepagesz=", setup_hugepagesz);
-+
-+#ifdef CONFIG_ARM64_64K_PAGES
-+static __init int add_default_hugepagesz(void)
+ 
++void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
++			  pte_t *ptep, pte_t pte, unsigned long sz)
 +{
-+	if (size_to_hstate(CONT_PTES * PAGE_SIZE) == NULL)
-+		hugetlb_add_hstate(CONT_PTE_SHIFT);
-+	return 0;
++	int i, ncontig;
++	size_t pgsize;
++
++	ncontig = num_contig_ptes(sz, &pgsize);
++
++	for (i = 0; i < ncontig; i++, ptep++)
++		set_pte(ptep, pte);
 +}
-+arch_initcall(add_default_hugepagesz);
-+#endif
++
+ pte_t *huge_pte_alloc(struct mm_struct *mm,
+ 		      unsigned long addr, unsigned long sz)
+ {
 -- 
 2.11.0
