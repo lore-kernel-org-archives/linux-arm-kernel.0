@@ -1,18 +1,18 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 24 May 2017 18:06:04 +0800
-Subject: [PATCH v3 6/9] dmaengine: sun6i: support V3s SoC variant
+Date: Wed, 24 May 2017 18:06:06 +0800
+Subject: [PATCH v3 8/9] ARM: dts: sun8i: add audio codec support into V3s DTSI
 In-Reply-To: <20170524100607.29790-1-icenowy@aosc.io>
 References: <20170524100607.29790-1-icenowy@aosc.io>
-Message-ID: <20170524100607.29790-7-icenowy@aosc.io>
+Message-ID: <20170524100607.29790-9-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Icenowy Zheng <icenowy@aosc.xyz>
 
-Allwinner V3s has a DMA engine similar to the ones from A31, but with
-fewer channels and DRQs.
+Allwinner V3s SoC features an internal audio codec like the one in H3,
+and a analog codec like the one in H3/A23 (but much simpler).
 
-Add support for it.
+Add them in the DTSI file.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
@@ -20,50 +20,38 @@ Acked-by: Chen-Yu Tsai <wens@csie.org>
 Changes in v3:
 - Added Chen-Yu's ACK.
 
- Documentation/devicetree/bindings/dma/sun6i-dma.txt |  1 +
- drivers/dma/sun6i-dma.c                             | 13 +++++++++++++
- 2 files changed, 14 insertions(+)
+ arch/arm/boot/dts/sun8i-v3s.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-index 6b267045f522..98fbe1a5c6dd 100644
---- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-@@ -9,6 +9,7 @@ Required properties:
- 		  "allwinner,sun8i-a23-dma"
- 		  "allwinner,sun8i-a83t-dma"
- 		  "allwinner,sun8i-h3-dma"
-+		  "allwinner,sun8i-v3s-dma"
- - reg:		Should contain the registers base address and length
- - interrupts:	Should contain a reference to the interrupt used by this device
- - clocks:	Should contain a reference to the parent AHB clock
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 69840cf6fe98..a57eaace8e7d 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -1034,11 +1034,24 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
- 	.nr_max_vchans   = 34,
- };
+diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
+index e0e99bbebdb3..01751ea0761e 100644
+--- a/arch/arm/boot/dts/sun8i-v3s.dtsi
++++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
+@@ -271,6 +271,25 @@
+ 			status = "disabled";
+ 		};
  
-+/*
-+ * The V3s have only 8 physical channels, a maximum DRQ port id of 23,
-+ * and a total of 24 usable source and destination endpoints.
-+ */
++		codec: codec at 01c22c00 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun8i-v3s-codec";
++			reg = <0x01c22c00 0x400>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
++			clock-names = "apb", "codec";
++			resets = <&ccu RST_BUS_CODEC>;
++			dmas = <&dma 15>, <&dma 15>;
++			dma-names = "rx", "tx";
++			allwinner,codec-analog-controls = <&codec_analog>;
++			status = "disabled";
++		};
 +
-+static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
-+	.nr_max_channels = 8,
-+	.nr_max_requests = 23,
-+	.nr_max_vchans   = 24,
-+	.gate_needed	 = true,
-+};
++		codec_analog: codec-analog at 01c23000 {
++			compatible = "allwinner,sun8i-v3s-codec-analog";
++			reg = <0x01c23000 0x4>;
++		};
 +
- static const struct of_device_id sun6i_dma_match[] = {
- 	{ .compatible = "allwinner,sun6i-a31-dma", .data = &sun6i_a31_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
-+	{ .compatible = "allwinner,sun8i-v3s-dma", .data = &sun8i_v3s_dma_cfg },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
 -- 
 2.12.2
