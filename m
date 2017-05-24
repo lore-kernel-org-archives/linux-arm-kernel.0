@@ -1,100 +1,20 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 24 May 2017 12:54:02 +0100
-Subject: [PATCH v4 1/8] arm64: hugetlb: Refactor find_num_contig
-In-Reply-To: <20170524115409.31309-1-punit.agrawal@arm.com>
-References: <20170524115409.31309-1-punit.agrawal@arm.com>
-Message-ID: <20170524115409.31309-2-punit.agrawal@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 24 May 2017 08:55:06 -0300
+Subject: [PATCH 1/2] ARM: dts: imx23-sansa: Remove 'enable-active-low'
+ property
+In-Reply-To: <1348922230.22889.1495043579279@email.1und1.de>
+References: <1495039381-23126-1-git-send-email-fabio.estevam@nxp.com>
+ <764037594.21665.1495040359199@email.1und1.de>
+ <CAOMZO5BOu=qKuokq6st_=BOjxO9=nX6VGaTdWX444xCX3oddUA@mail.gmail.com>
+ <1348922230.22889.1495043579279@email.1und1.de>
+Message-ID: <CAOMZO5Az=mjv3iiX8VFCRTNTEXPUrxkiKYSdZC0tEsiya7m-vQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@arm.com>
+Hi Stefan,
 
-As we regularly check for contiguous pte's in the huge accessors, remove
-this extra check from find_num_contig.
+On Wed, May 17, 2017 at 2:52 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
-Cc: David Woods <dwoods@mellanox.com>
-Signed-off-by: Steve Capper <steve.capper@arm.com>
-[ Resolved rebase conflicts due to patch re-ordering ]
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
----
- arch/arm64/mm/hugetlbpage.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+> Thanks for this explanation, this wasn't clear to me from the subject / commit log.
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 69b8200b1cfd..710bf935a473 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -42,15 +42,13 @@ int pud_huge(pud_t pud)
- }
- 
- static int find_num_contig(struct mm_struct *mm, unsigned long addr,
--			   pte_t *ptep, pte_t pte, size_t *pgsize)
-+			   pte_t *ptep, size_t *pgsize)
- {
- 	pgd_t *pgd = pgd_offset(mm, addr);
- 	pud_t *pud;
- 	pmd_t *pmd;
- 
- 	*pgsize = PAGE_SIZE;
--	if (!pte_cont(pte))
--		return 1;
- 	pud = pud_offset(pgd, addr);
- 	pmd = pmd_offset(pud, addr);
- 	if ((pte_t *)pmd == ptep) {
-@@ -65,15 +63,16 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- {
- 	size_t pgsize;
- 	int i;
--	int ncontig = find_num_contig(mm, addr, ptep, pte, &pgsize);
-+	int ncontig;
- 	unsigned long pfn;
- 	pgprot_t hugeprot;
- 
--	if (ncontig == 1) {
-+	if (!pte_cont(pte)) {
- 		set_pte_at(mm, addr, ptep, pte);
- 		return;
- 	}
- 
-+	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
- 	pfn = pte_pfn(pte);
- 	hugeprot = __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
- 	for (i = 0; i < ncontig; i++) {
-@@ -188,7 +187,7 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 		bool is_dirty = false;
- 
- 		cpte = huge_pte_offset(mm, addr);
--		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
-+		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
- 		/* save the 1st pte to return */
- 		pte = ptep_get_and_clear(mm, addr, cpte);
- 		for (i = 1, addr += pgsize; i < ncontig; ++i, addr += pgsize) {
-@@ -228,7 +227,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 		cpte = huge_pte_offset(vma->vm_mm, addr);
- 		pfn = pte_pfn(*cpte);
- 		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
--					  *cpte, &pgsize);
-+					  &pgsize);
- 		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize) {
- 			changed |= ptep_set_access_flags(vma, addr, cpte,
- 							pfn_pte(pfn,
-@@ -251,7 +250,7 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 		size_t pgsize = 0;
- 
- 		cpte = huge_pte_offset(mm, addr);
--		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
-+		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
- 		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
- 			ptep_set_wrprotect(mm, addr, cpte);
- 	} else {
-@@ -269,7 +268,7 @@ void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 
- 		cpte = huge_pte_offset(vma->vm_mm, addr);
- 		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
--					  *cpte, &pgsize);
-+					  &pgsize);
- 		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
- 			ptep_clear_flush(vma, addr, cpte);
- 	} else {
--- 
-2.11.0
+I have sent a v2, where I try to make this clear. Thanks for your feedback.
