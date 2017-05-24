@@ -1,96 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 May 2017 11:07:48 +0200
-Subject: [PATCH] ARM: dts: augment Moxa and Aspeed DTS for FTTMR010
-Message-ID: <20170524090748.27345-1-linus.walleij@linaro.org>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 24 May 2017 10:08:34 +0100
+Subject: [PATCH v4 6/7] ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class
+ cpus
+In-Reply-To: <CAK8P3a0s-SLGwhdxX+FDsmRKnYh2nWPKPvwsn_qMOk_1Wb5YMQ@mail.gmail.com>
+References: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
+ <1493029017-31382-7-git-send-email-vladimir.murzin@arm.com>
+ <20170523200142.GD22219@n2100.armlinux.org.uk>
+ <CAK8P3a0tbaAHerjitDBJ9gz1SCFkAwKhfzjgMHiB5ESakQs7-g@mail.gmail.com>
+ <741c708e-9036-a0e1-46e1-90d82a195dff@arm.com>
+ <CAK8P3a0s-SLGwhdxX+FDsmRKnYh2nWPKPvwsn_qMOk_1Wb5YMQ@mail.gmail.com>
+Message-ID: <1adb8aec-8fdf-c4d5-fd9c-29b93ef8ef43@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This augments the Moxa Art and Aspeed device trees to:
+On 24/05/17 09:36, Arnd Bergmann wrote:
+> On Wed, May 24, 2017 at 10:31 AM, Vladimir Murzin
+> <vladimir.murzin@arm.com> wrote:
+>> On 23/05/17 21:33, Arnd Bergmann wrote:
+>>> On Tue, May 23, 2017 at 10:01 PM, Russell King - ARM Linux
+>>> <linux@armlinux.org.uk> wrote:
+>>>> On Mon, Apr 24, 2017 at 11:16:56AM +0100, Vladimir Murzin wrote:
+>>>>> Now, we have dedicated non-cacheable region for consistent DMA
+>>>>> operations. However, that region can still be marked as bufferable by
+>>>>> MPU, so it'd be safer to have barriers by default.
+>>>>
+>>>> What do you actually want here?  Your patch doesn't quite make sense,
+>>>> the commit description seems to indicate that you require this option
+>>>> to be set for V7M, but the patch says otherwise.
+>>>>
+>>>>>  config ARM_DMA_MEM_BUFFERABLE
+>>>>> -     bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K) && !CPU_V7
+>>>>> -     default y if CPU_V6 || CPU_V6K || CPU_V7
+>>>>> +     bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K || CPU_V7M) && !CPU_V7
+>>>>
+>>>> This "if" conditional conditionalises the visibility of the option,
+>>>> it doesn't conditionalise the value.
+>>>>
+>>>>> +     default y if CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M
+>>>>
+>>>> Taking both of these changes together what you end up with is an option
+>>>> presented to the user for "Use non-cacheable memory for DMA" which
+>>>> they can choose to disable.
+>>>>
+>>>> If you require this option to be set, that's incorrect - your modification
+>>>> to the default line is correct, but the first line is not.  To achieve
+>>>> that, you want the if condition to evaluate false for V7M, thereby hiding
+>>>> the option from the user.  In that case, the default value will always be
+>>>> assigned to the option.
+>>>
+>>> I had the opposite comment in the previous version ;-)
+>>> https://lkml.org/lkml/2017/4/19/185
+>>>
+>>> I think the current patch is correct, but the description could still be
+>>> clarified: On some of the beefier ARMv7-M machines (with DMA
+>>> and write buffers) we want this enabled, while those that didn't
+>>> need it until now also won't need it in the future.
+>>
+>> Ok. Do you want it go into commit message or option description or maybe both?
+> 
+> I'd say both. It would also be helpful to identify specifically which platforms
+> require this, and then add a 'select ARM_DMA_MEM_BUFFERABLE' from
+> the platform, as we do from Moxart.
+> 
 
-- Explicitly name the clock "PCLK" as the Faraday FTTMR010
-  names it.
-- List the Moxa timer as compatible with the Faradat FTTMR010
-  vanilla version.
-- Add a comment that the Aspeed driver is a Faraday
-  FTTMR010 derivative.
-- Pass all IRQs to the timer from Aspeed: they are all there
-  so they should be in the device tree, we only use the
-  first one anyways.
+I'm a bit confused here. In case we want to control it on platform level via
+'select ARM_DMA_MEM_BUFFERABLE' wouldn't we need to 'default n' for CPU_V7M?
+IIUC, Moxart needs to select this option because it is neither CPU_V6(K) or
+CPU_V7.
 
-Tested-by: Joel Stanley <joel@jms.id.au>
-Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC maintainers: this is the DTS changes needt to generalize
-the Faraday timer. Please merge this into some suitable ARM SoC
-DTS branch.
-Clocksource maintainers: I will ask the ARM SoC people to merge
-this patch orthogonally, it is only included in this series
-for reference and for testing.
----
- arch/arm/boot/dts/aspeed-g4.dtsi | 7 +++----
- arch/arm/boot/dts/aspeed-g5.dtsi | 7 +++----
- arch/arm/boot/dts/moxart.dtsi    | 3 ++-
- 3 files changed, 8 insertions(+), 9 deletions(-)
+Thanks
+Vladimir
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 8c6bc29eb7f6..8a04c7e2d818 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -886,13 +886,12 @@
- 			};
- 
- 			timer: timer at 1e782000 {
-+				/* This timer is a Faraday FTTMR010 derivative */
- 				compatible = "aspeed,ast2400-timer";
- 				reg = <0x1e782000 0x90>;
--				// The moxart_timer driver registers only one
--				// interrupt and assumes it's for timer 1
--				//interrupts = <16 17 18 35 36 37 38 39>;
--				interrupts = <16>;
-+				interrupts = <16 17 18 35 36 37 38 39>;
- 				clocks = <&clk_apb>;
-+				clock-names = "PCLK";
- 			};
- 
- 			wdt1: wdt at 1e785000 {
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index a0bea4a6ec77..9cffe347b828 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -993,13 +993,12 @@
- 			};
- 
- 			timer: timer at 1e782000 {
-+				/* This timer is a Faraday FTTMR010 derivative */
- 				compatible = "aspeed,ast2400-timer";
- 				reg = <0x1e782000 0x90>;
--				// The moxart_timer driver registers only one
--				// interrupt and assumes it's for timer 1
--				//interrupts = <16 17 18 35 36 37 38 39>;
--				interrupts = <16>;
-+				interrupts = <16 17 18 35 36 37 38 39>;
- 				clocks = <&clk_apb>;
-+				clock-names = "PCLK";
- 			};
- 
- 
-diff --git a/arch/arm/boot/dts/moxart.dtsi b/arch/arm/boot/dts/moxart.dtsi
-index e86f8c905ac5..1f4c795d3f72 100644
---- a/arch/arm/boot/dts/moxart.dtsi
-+++ b/arch/arm/boot/dts/moxart.dtsi
-@@ -58,10 +58,11 @@
- 		};
- 
- 		timer: timer at 98400000 {
--			compatible = "moxa,moxart-timer";
-+			compatible = "moxa,moxart-timer", "faraday,fttmr010";
- 			reg = <0x98400000 0x42>;
- 			interrupts = <19 IRQ_TYPE_EDGE_FALLING>;
- 			clocks = <&clk_apb>;
-+			clock-names = "PCLK";
- 		};
- 
- 		gpio: gpio at 98700000 {
--- 
-2.9.4
+>       Arnd
+> 
