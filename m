@@ -1,42 +1,57 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Wed, 24 May 2017 15:45:15 +0100
-Subject: [PATCH v4 0/8] Fix issues and factorize arm/arm64 capacity
- information code
-In-Reply-To: <20170511102718.qy54ajkzphasymhr@e106622-lin>
-References: <20170420144316.15632-1-juri.lelli@arm.com>
- <20170511084830.rn32pvi6weej2cna@e106622-lin>
- <20170511085952.GA6934@kroah.com>
- <20170511102718.qy54ajkzphasymhr@e106622-lin>
-Message-ID: <20170524144515.nuccflbdashlqmcs@e106622-lin>
+From: wei@redhat.com (Wei Huang)
+Date: Wed, 24 May 2017 09:36:41 -0500
+Subject: [PATCH 1/1] drivers/perf: arm_pmu_acpi: avoid perf IRQ init when
+ guest PMU is off
+Message-ID: <1495636601-14726-1-git-send-email-wei@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+We saw perf IRQ init failures when running Linux kernel in an ACPI
+guest without PMU (i.e. pmu=off). This is because perf IRQ is not
+present when pmu=off, but arm_pmu_acpi still tries to register
+or unregister GSI. This patch addresses the problem by checking
+gicc->performance_interrupt. If it is 0, which is the value set
+by qemu when pmu=off, we skip the IRQ register/unregister process.
 
-On 11/05/17 11:27, Juri Lelli wrote:
-> On 11/05/17 10:59, Greg KH wrote:
-> > On Thu, May 11, 2017 at 09:48:30AM +0100, Juri Lelli wrote:
-> > > Hi Greg,
-> > > 
-> > > I'm not sure what your plans are with this set. Are we targeting 4.12?
-> > > 
-> > > IMHO, if possible, it would be good to have this refactoring in now, so
-> > > that we can base further development on it for the next cycle.
-> > 
-> > It's way too late for new features that have not been in linux-next for
-> > a few weeks, to get merged into 4.12-rc1, sorry.  I'll review this
-> > patchset after -rc1 is out, and I get a chance to catch up on pending
-> > patches.
-> > 
-> 
-> Thanks for your reply, I perfecly understand.
-> 
-> OK, let's target 4.13 then. Looking forward to receive your comments
-> after -rc1 is out.
-> 
+[    4.069470] bc00: 0000000000040b00 ffff0000089db190
+[    4.070267] [<ffff000008134f80>] enable_percpu_irq+0xdc/0xe4
+[    4.071192] [<ffff000008667cc4>] arm_perf_starting_cpu+0x108/0x10c
+[    4.072200] [<ffff0000080cbdd4>] cpuhp_invoke_callback+0x14c/0x4ac
+[    4.073210] [<ffff0000080ccd3c>] cpuhp_thread_fun+0xd4/0x11c
+[    4.074132] [<ffff0000080f1394>] smpboot_thread_fn+0x1b4/0x1c4
+[    4.075081] [<ffff0000080ec90c>] kthread+0x10c/0x138
+[    4.075921] [<ffff0000080833c0>] ret_from_fork+0x10/0x50
+[    4.076947] genirq: Setting trigger mode 4 for irq 43 failed
+(gic_set_type+0x0/0x74)
 
-Did you have any chance to have a look at this set?
+Signed-off-by: Wei Huang <wei@redhat.com>
+---
+ drivers/perf/arm_pmu_acpi.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Thanks,
-
-- Juri
+diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+index 34c862f..d6bb75d 100644
+--- a/drivers/perf/arm_pmu_acpi.c
++++ b/drivers/perf/arm_pmu_acpi.c
+@@ -29,6 +29,9 @@ static int arm_pmu_acpi_register_irq(int cpu)
+ 		return -EINVAL;
+ 
+ 	gsi = gicc->performance_interrupt;
++	if (!gsi)
++		return 0;
++
+ 	if (gicc->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
+ 		trigger = ACPI_EDGE_SENSITIVE;
+ 	else
+@@ -58,7 +61,8 @@ static void arm_pmu_acpi_unregister_irq(int cpu)
+ 		return;
+ 
+ 	gsi = gicc->performance_interrupt;
+-	acpi_unregister_gsi(gsi);
++	if (gsi)
++		acpi_unregister_gsi(gsi);
+ }
+ 
+ static int arm_pmu_acpi_parse_irqs(void)
+-- 
+2.7.4
