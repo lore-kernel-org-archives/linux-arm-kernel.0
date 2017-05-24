@@ -1,83 +1,74 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 24 May 2017 10:50:46 +0200
-Subject: [PATCH 1/2] reset: add DT bindings header for Gemini reset
- controller
-In-Reply-To: <20170524081908.8255-1-linus.walleij@linaro.org>
-References: <20170524081908.8255-1-linus.walleij@linaro.org>
-Message-ID: <1495615846.3840.19.camel@pengutronix.de>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 24 May 2017 10:53:20 +0200
+Subject: [PATCH 3/5] pinctrl: meson-gxbb: Add CEC pins
+In-Reply-To: <1495614042-2676-4-git-send-email-narmstrong@baylibre.com>
+References: <1495614042-2676-1-git-send-email-narmstrong@baylibre.com>
+ <1495614042-2676-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1495616000.14589.10.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-05-24 at 10:19 +0200, Linus Walleij wrote:
-> This adds the DT binding macros used by the reset controller.
+On Wed, 2017-05-24 at 10:20 +0200, Neil Armstrong wrote:
+> Add the AO and EE domain CEC pins for the Amlogic Meson GXBB SoCs.
+
+The patch is correct but a slightly longer blurb would have been nice :)
+
+Here AO and EE are not referring to the GPIO controller like they usually do in
+our patches to pinctrl.
+They refer to the 2 different CEC controllers, located in each power domain and
+both connected to AO GPIO controller (same pin actually)
+
+Not sure if this worth a resent though.
+
+Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
-> Philipp: please merge this into the reset subsystem once
-> you're happy with it. Sorry for the back-and-forth. I will
-> deal with the ARM SoC DTS landing orthogonally.
-
-No problem, applied both to the reset/next branch.
-
-regards
-Philipp
-
-> The DTS files will be submitted with numerical values for
-> the reset lines, then a follow-up patch after -rc1 will
-> switch to using defines. This strategy was adviced by the
-> ARM SoC maintainers.
+> ?drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 10 ++++++++++
+> ?1 file changed, 10 insertions(+)
 > 
-> ChangeLog v1->v4:
-> - New file to merge the macros in isolation from the
->   DT bindings and implementation.
-> 
-> The bindings themselves will be merged as part of the DTS updates
-> through the ARM SoC tree.
-> ---
->  include/dt-bindings/reset/cortina,gemini-reset.h | 36 ++++++++++++++++++++++++
->  1 file changed, 36 insertions(+)
->  create mode 100644 include/dt-bindings/reset/cortina,gemini-reset.h
-> 
-> diff --git a/include/dt-bindings/reset/cortina,gemini-reset.h b/include/dt-bindings/reset/cortina,gemini-reset.h
-> new file mode 100644
-> index 000000000000..0b886aee65e3
-> --- /dev/null
-> +++ b/include/dt-bindings/reset/cortina,gemini-reset.h
-> @@ -0,0 +1,36 @@
-> +#ifndef _DT_BINDINGS_RESET_CORTINA_GEMINI_H
-> +#define _DT_BINDINGS_RESET_CORTINA_GEMINI_H
+> diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
+> b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
+> index 3ccb0f4f..b44314a 100644
+> --- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
+> +++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
+> @@ -295,6 +295,9 @@
+> ?static const unsigned int spdif_out_ao_6_pins[]	= { PIN(GPIOAO_6, 0)
+> };
+> ?static const unsigned int spdif_out_ao_13_pins[] = { PIN(GPIOAO_13, 0) };
+> ?
+> +static const unsigned int ao_cec_pins[]??????????= { PIN(GPIOAO_12, 0) };
+> +static const unsigned int ee_cec_pins[]??????????= { PIN(GPIOAO_12, 0) };
 > +
-> +#define GEMINI_RESET_DRAM	0
-> +#define GEMINI_RESET_FLASH	1
-> +#define GEMINI_RESET_IDE	2
-> +#define GEMINI_RESET_RAID	3
-> +#define GEMINI_RESET_SECURITY	4
-> +#define GEMINI_RESET_GMAC0	5
-> +#define GEMINI_RESET_GMAC1	6
-> +#define GEMINI_RESET_PCI	7
-> +#define GEMINI_RESET_USB0	8
-> +#define GEMINI_RESET_USB1	9
-> +#define GEMINI_RESET_DMAC	10
-> +#define GEMINI_RESET_APB	11
-> +#define GEMINI_RESET_LPC	12
-> +#define GEMINI_RESET_LCD	13
-> +#define GEMINI_RESET_INTCON0	14
-> +#define GEMINI_RESET_INTCON1	15
-> +#define GEMINI_RESET_RTC	16
-> +#define GEMINI_RESET_TIMER	17
-> +#define GEMINI_RESET_UART	18
-> +#define GEMINI_RESET_SSP	19
-> +#define GEMINI_RESET_GPIO0	20
-> +#define GEMINI_RESET_GPIO1	21
-> +#define GEMINI_RESET_GPIO2	22
-> +#define GEMINI_RESET_WDOG	23
-> +#define GEMINI_RESET_EXTERN	24
-> +#define GEMINI_RESET_CIR	25
-> +#define GEMINI_RESET_SATA0	26
-> +#define GEMINI_RESET_SATA1	27
-> +#define GEMINI_RESET_TVC	28
-> +#define GEMINI_RESET_CPU1	30
-> +#define GEMINI_RESET_GLOBAL	31
+> ?static struct meson_pmx_group meson_gxbb_periphs_groups[] = {
+> ?	GPIO_GROUP(GPIOZ_0, EE_OFF),
+> ?	GPIO_GROUP(GPIOZ_1, EE_OFF),
+> @@ -560,6 +563,8 @@
+> ?	GROUP(i2s_out_ch45_ao,	1,	1),
+> ?	GROUP(spdif_out_ao_6,	0,	16),
+> ?	GROUP(spdif_out_ao_13,	0,	4),
+> +	GROUP(ao_cec,???????????0,??????15),
+> +	GROUP(ee_cec,???????????0,??????14),
+> ?};
+> ?
+> ?static const char * const gpio_periphs_groups[] = {
+> @@ -752,6 +757,10 @@
+> ?	"spdif_out_ao_6", "spdif_out_ao_13",
+> ?};
+> ?
+> +static const char * const cec_ao_groups[] = {
+> +	"ao_cec", "ee_cec",
+> +};
 > +
-> +#endif
+> ?static struct meson_pmx_func meson_gxbb_periphs_functions[] = {
+> ?	FUNCTION(gpio_periphs),
+> ?	FUNCTION(emmc),
+> @@ -793,6 +802,7 @@
+> ?	FUNCTION(pwm_ao_b),
+> ?	FUNCTION(i2s_out_ao),
+> ?	FUNCTION(spdif_out_ao),
+> +	FUNCTION(cec_ao),
+> ?};
+> ?
+> ?static struct meson_bank meson_gxbb_periphs_banks[] = {
