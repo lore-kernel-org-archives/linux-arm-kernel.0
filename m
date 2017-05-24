@@ -1,63 +1,38 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 24 May 2017 17:20:45 +0800
-Subject: [PATCH] drm/mediatek: hdmi: Filter interlaced resolutions
-In-Reply-To: <20170523131243.5bjz5n4uv73r2l7j@phenom.ffwll.local>
-References: <1485234604-19889-1-git-send-email-bibby.hsieh@mediatek.com>
- <1495531695.20811.19.camel@mtksdaap41>
- <20170523131243.5bjz5n4uv73r2l7j@phenom.ffwll.local>
-Message-ID: <1495617645.15919.6.camel@mtksdaap41>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Wed, 24 May 2017 09:36:56 +0000
+Subject: pxa3xx-nand failing to find device on linux-next
+References: <b36366e358904310aee4970b77f57dba@svr-chch-ex1.atlnz.lc>
+Message-ID: <2a79405e219b4c37ba00defbe4a0dfe4@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-05-23 at 15:12 +0200, Daniel Vetter wrote:
-> On Tue, May 23, 2017 at 05:28:15PM +0800, CK Hu wrote:
-> > Hi, Bibby:
-> > 
-> > I've applied this patch to my branch mediatek-drm-fixes-4.12-rc1,
-> > thanks.
-> > 
-> > Regards,
-> > CK
-> > 
-> > On Tue, 2017-01-24 at 13:10 +0800, Bibby Hsieh wrote:
-> > > Current Mediatek DRM driver does not support interlaced mode, and
-> > > will hang if such resolution is used: Filter those to prevent
-> > > kernel hangs, until the DRM driver is fixed properly.
-> > > 
-> > > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> > > ---
-> > >  drivers/gpu/drm/mediatek/mtk_hdmi.c | 2 ++
-> > >  1 file changed, 2 insertions(+)
-> > > 
-> > > diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-> > > index 0e8c4d9..e33678d 100644
-> > > --- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
-> > > +++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-> > > @@ -1244,6 +1244,8 @@ static int mtk_hdmi_conn_mode_valid(struct drm_connector *conn,
-> > >  			return MODE_BAD;
-> > >  	}
-> > >  
-> > > +	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
-> > > +		return MODE_NO_INTERLACE;
-> > >  	if (mode->clock < 27000)
-> > >  		return MODE_CLOCK_LOW;
-> > >  	if (mode->clock > 297000)
-> 
-> You probably want to check out Jose's mode_valid work, since only
-> filtering in the connector's ->mode_valid callback isn't enough. You also
-> need to filter in ->mode_fixup (or some other place called at atomic_check
-> time).
-> -Daniel
+On 23/05/17 17:27, Chris Packham wrote:
+> Hi,
+>
+> I'm doing some testing on linux-next and I'm finding that my nand flash
+> has disappeared.
+>
+> pxa3xx-nand f10d0000.flash: This platform can't do DMA on this device
+> pxa3xx-nand f10d0000.flash: non-supported command ef
+> pxa3xx-nand f10d0000.flash: non-supported command ee
+> pxa3xx-nand f10d0000.flash: non-supported command ef
+> pxa3xx-nand f10d0000.flash: non-supported command ee
+> On-die ECC forcefully enabled, not supported
+> nand: No NAND device found
+> pxa3xx-nand f10d0000.flash: failed to scan nand at cs 0
+>
+> This was working around 4.11. I'll try to do some more digging tomorrow
+> to narrow down a failure point but I thought I'd send this out now just
+> in case it rings any bells.
+>
+> The board I'm using (DB-88F6820-AMC) is unfortunately out-of tree but it
+> should be pretty close to the armada-388-db. I can make my dts available
+> if it's helpful.
 
-Hi, Daniel:
+Still works on 4.12-rc2. Fails on next-20170524.
 
-Yes, I still need to filter in ->mode_fixup.
+This appears to be due to commit b566d9c055de ("mtd: nand: add support 
+for Micron on-die ECC"). Which based on the description seems intentional.
 
-Hi, Bibby:
-
-Because Jose's work plan to use mode_valid to replace mode_fixup, so
-it's better to refine this patch after Jose's work is done. And I would
-now remove this patch from my branch.
-
-Regards,
-CK
+Since I have access to a hardware platform that has a micron flash with
+ECC forcefully enabled how can I help to get this implemented.
