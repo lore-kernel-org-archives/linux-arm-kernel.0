@@ -1,39 +1,46 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 24 May 2017 19:31:41 +0530
-Subject: [PATCH v2] ARM: dts: da850: Add interrupt-controller property to gpio
- node
-Message-ID: <1495634501-3246-1-git-send-email-j-keerthy@ti.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 24 May 2017 16:10:33 +0200
+Subject: [PATCH v6 3/5] arm64: marvell: dts: add dma-mask in crypto nodes for
+ 7k/8k
+In-Reply-To: <20170524141035.21031-1-antoine.tenart@free-electrons.com>
+References: <20170524141035.21031-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170524141035.21031-4-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpio node has 144 gpios. Each gpio is capable of generating
-an interrupt. Hence add interrupt-controller property to the gpio
-node. With this in place one can use interrupts property in device
-tree to request for the gpio interrupts.
+The EIP197 cryptographic engine supports 64 bits address width but is
+limited to 40 bits on 7k/8k. Add a dma-mask property in the
+cryptographic engine nodes to reflect this.
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 1 +
+ 2 files changed, 2 insertions(+)
 
-Changes in v2:
-
-  * Added LAKML list.
-  * Chaned arm to upper case in $Subject
-
- arch/arm/boot/dts/da850.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 941d455..2693bd2 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -503,6 +503,8 @@
- 			ti,ngpio = <144>;
- 			ti,davinci-gpio-unbanked = <0>;
- 			status = "disabled";
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index b4bc42ece754..434d8a806ffa 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -240,6 +240,7 @@
+ 				interrupt-names = "mem", "ring0", "ring1",
+ 				"ring2", "ring3", "eip";
+ 				clocks = <&cpm_syscon0 1 26>;
++				dma-mask = <0xff 0xffffffff>;
+ 				status = "disabled";
+ 			};
  		};
- 		pinconf: pin-controller at 22c00c {
- 			compatible = "ti,da850-pupd";
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 6e2058847ddc..17ca94a5d6b4 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -230,6 +230,7 @@
+ 				interrupt-names = "mem", "ring0", "ring1",
+ 						  "ring2", "ring3", "eip";
+ 				clocks = <&cps_syscon0 1 26>;
++				dma-mask = <0xff 0xffffffff>;
+ 				status = "disabled";
+ 			};
+ 		};
 -- 
-1.9.1
+2.9.4
