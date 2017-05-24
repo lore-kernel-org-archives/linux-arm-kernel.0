@@ -1,87 +1,76 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 24 May 2017 10:17:03 +0200
-Subject: [PATCH] ARM: dts: rockchip: correct regular setting for act8846
-In-Reply-To: <1495611221-6749-1-git-send-email-eddie.cai.linux@gmail.com>
-References: <1495611221-6749-1-git-send-email-eddie.cai.linux@gmail.com>
-Message-ID: <5352430.FzU3E8oYou@phil>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 May 2017 10:19:08 +0200
+Subject: [PATCH 1/2] reset: add DT bindings header for Gemini reset controller
+Message-ID: <20170524081908.8255-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eddie,
+This adds the DT binding macros used by the reset controller.
 
-Am Mittwoch, 24. Mai 2017, 15:33:41 CEST schrieb Eddie Cai:
-> the previous setting of act8846 is just copy from firefly board. but
-> the reload board is a little different from firefly board. let's correct
-> it.
-> 
-> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
-> ---
->  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 21 +++++++++++----------
->  1 file changed, 11 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-> index 8134966..4cfa109 100644
-> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-> @@ -179,6 +179,7 @@
->  				regulator-name = "vccio_sd";
->  				regulator-min-microvolt = <3300000>;
->  				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Philipp: please merge this into the reset subsystem once
+you're happy with it. Sorry for the back-and-forth. I will
+deal with the ARM SoC DTS landing orthogonally.
 
-the rest below looks pretty straight forward, but why does vccio_sd
-need to be always on?
+The DTS files will be submitted with numerical values for
+the reset lines, then a follow-up patch after -rc1 will
+switch to using defines. This strategy was adviced by the
+ARM SoC maintainers.
 
-I've checked the reload's schematics but did not find any further users
-of vccio_sd that may warant this attribute.
+ChangeLog v1->v4:
+- New file to merge the macros in isolation from the
+  DT bindings and implementation.
 
+The bindings themselves will be merged as part of the DTS updates
+through the ARM SoC tree.
+---
+ include/dt-bindings/reset/cortina,gemini-reset.h | 36 ++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 include/dt-bindings/reset/cortina,gemini-reset.h
 
-Heiko
-
-
->  			};
->  
->  			vdd10_lcd: REG6 {
-> @@ -187,24 +188,23 @@
->  				regulator-max-microvolt = <1000000>;
->  			};
->  
-> -			vcca_18: REG7  {
-> -				regulator-name = "vcca_18";
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <1800000>;
-> -				regulator-always-on;
-> +			vcca_33: REG7  {
-> +				regulator-name = "vcca_33";
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
->  			};
->  
-> -			vcca_33: REG8 {
-> -				regulator-name = "vcca_33";
-> +			vcc_lan: REG8 {
-> +				regulator-name = "vcc_lan";
->  				regulator-min-microvolt = <3300000>;
->  				regulator-max-microvolt = <3300000>;
-> -				regulator-always-on;
->  			};
->  
-> -			vcc_lan: REG9 {
-> -				regulator-name = "vcca_lan";
-> +			vccio_pmu: REG9 {
-> +				regulator-name = "vccio_pmu";
->  				regulator-min-microvolt = <3300000>;
->  				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
->  			};
->  
->  			vdd_10: REG10 {
-> @@ -218,6 +218,7 @@
->  				regulator-name = "vcc_18";
->  				regulator-min-microvolt = <1800000>;
->  				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
->  			};
->  
->  			vcc18_lcd: REG12 {
-> 
+diff --git a/include/dt-bindings/reset/cortina,gemini-reset.h b/include/dt-bindings/reset/cortina,gemini-reset.h
+new file mode 100644
+index 000000000000..0b886aee65e3
+--- /dev/null
++++ b/include/dt-bindings/reset/cortina,gemini-reset.h
+@@ -0,0 +1,36 @@
++#ifndef _DT_BINDINGS_RESET_CORTINA_GEMINI_H
++#define _DT_BINDINGS_RESET_CORTINA_GEMINI_H
++
++#define GEMINI_RESET_DRAM	0
++#define GEMINI_RESET_FLASH	1
++#define GEMINI_RESET_IDE	2
++#define GEMINI_RESET_RAID	3
++#define GEMINI_RESET_SECURITY	4
++#define GEMINI_RESET_GMAC0	5
++#define GEMINI_RESET_GMAC1	6
++#define GEMINI_RESET_PCI	7
++#define GEMINI_RESET_USB0	8
++#define GEMINI_RESET_USB1	9
++#define GEMINI_RESET_DMAC	10
++#define GEMINI_RESET_APB	11
++#define GEMINI_RESET_LPC	12
++#define GEMINI_RESET_LCD	13
++#define GEMINI_RESET_INTCON0	14
++#define GEMINI_RESET_INTCON1	15
++#define GEMINI_RESET_RTC	16
++#define GEMINI_RESET_TIMER	17
++#define GEMINI_RESET_UART	18
++#define GEMINI_RESET_SSP	19
++#define GEMINI_RESET_GPIO0	20
++#define GEMINI_RESET_GPIO1	21
++#define GEMINI_RESET_GPIO2	22
++#define GEMINI_RESET_WDOG	23
++#define GEMINI_RESET_EXTERN	24
++#define GEMINI_RESET_CIR	25
++#define GEMINI_RESET_SATA0	26
++#define GEMINI_RESET_SATA1	27
++#define GEMINI_RESET_TVC	28
++#define GEMINI_RESET_CPU1	30
++#define GEMINI_RESET_GLOBAL	31
++
++#endif
+-- 
+2.9.4
