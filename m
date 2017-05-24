@@ -1,50 +1,56 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 24 May 2017 16:10:32 +0200
-Subject: [PATCH v6 2/5] arm64: marvell: dts: fix interrupts in 7k/8k crypto
- nodes
+Date: Wed, 24 May 2017 16:10:31 +0200
+Subject: [PATCH v6 1/5] Documentation/bindings: Document the SafeXel
+ cryptographic engine driver
 In-Reply-To: <20170524141035.21031-1-antoine.tenart@free-electrons.com>
 References: <20170524141035.21031-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170524141035.21031-3-antoine.tenart@free-electrons.com>
+Message-ID: <20170524141035.21031-2-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cryptographic engine nodes have an interrupt which is configured as
-both edge and level, which makes no sense at all. Fix this by
-configuring it the right way (level).
+The Inside Secure Safexcel cryptographic engine is found on some Marvell
+SoCs (7k/8k). Document the bindings used by its driver.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 +--
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 +--
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ .../bindings/crypto/inside-secure-safexcel.txt     | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index ac8df5201cd6..b4bc42ece754 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -231,8 +231,7 @@
- 			cpm_crypto: crypto at 800000 {
- 				compatible = "inside-secure,safexcel-eip197";
- 				reg = <0x800000 0x200000>;
--				interrupts = <GIC_SPI 34 (IRQ_TYPE_EDGE_RISING
--				| IRQ_TYPE_LEVEL_HIGH)>,
-+				interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 7740a75a8230..6e2058847ddc 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -221,8 +221,7 @@
- 			cps_crypto: crypto at 800000 {
- 				compatible = "inside-secure,safexcel-eip197";
- 				reg = <0x800000 0x200000>;
--				interrupts = <GIC_SPI 34 (IRQ_TYPE_EDGE_RISING
--				| IRQ_TYPE_LEVEL_HIGH)>,
-+				interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 279 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 280 IRQ_TYPE_LEVEL_HIGH>,
+diff --git a/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt b/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
+new file mode 100644
+index 000000000000..f69773f4252b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
+@@ -0,0 +1,29 @@
++Inside Secure SafeXcel cryptographic engine
++
++Required properties:
++- compatible: Should be "inside-secure,safexcel-eip197".
++- reg: Base physical address of the engine and length of memory mapped region.
++- interrupts: Interrupt numbers for the rings and engine.
++- interrupt-names: Should be "ring0", "ring1", "ring2", "ring3", "eip", "mem".
++
++Optional properties:
++- clocks: Reference to the crypto engine clock.
++- dma-mask: The address mask limitation. Defaults to 64.
++
++Example:
++
++	crypto: crypto at 800000 {
++		compatible = "inside-secure,safexcel-eip197";
++		reg = <0x800000 0x200000>;
++		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "mem", "ring0", "ring1", "ring2", "ring3",
++				  "eip";
++		clocks = <&cpm_syscon0 1 26>;
++		dma-mask = <0xff 0xffffffff>;
++		status = "disabled";
++	};
 -- 
 2.9.4
