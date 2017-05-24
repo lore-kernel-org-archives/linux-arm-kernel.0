@@ -1,38 +1,37 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Wed, 24 May 2017 09:36:56 +0000
-Subject: pxa3xx-nand failing to find device on linux-next
-References: <b36366e358904310aee4970b77f57dba@svr-chch-ex1.atlnz.lc>
-Message-ID: <2a79405e219b4c37ba00defbe4a0dfe4@svr-chch-ex1.atlnz.lc>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 24 May 2017 11:39:31 +0200
+Subject: [PATCH v2 1/2] clk: meson: meson8b: mark clk81 as critical
+In-Reply-To: <20170524093932.5262-1-jbrunet@baylibre.com>
+References: <20170524093932.5262-1-jbrunet@baylibre.com>
+Message-ID: <20170524093932.5262-2-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/17 17:27, Chris Packham wrote:
-> Hi,
->
-> I'm doing some testing on linux-next and I'm finding that my nand flash
-> has disappeared.
->
-> pxa3xx-nand f10d0000.flash: This platform can't do DMA on this device
-> pxa3xx-nand f10d0000.flash: non-supported command ef
-> pxa3xx-nand f10d0000.flash: non-supported command ee
-> pxa3xx-nand f10d0000.flash: non-supported command ef
-> pxa3xx-nand f10d0000.flash: non-supported command ee
-> On-die ECC forcefully enabled, not supported
-> nand: No NAND device found
-> pxa3xx-nand f10d0000.flash: failed to scan nand at cs 0
->
-> This was working around 4.11. I'll try to do some more digging tomorrow
-> to narrow down a failure point but I thought I'd send this out now just
-> in case it rings any bells.
->
-> The board I'm using (DB-88F6820-AMC) is unfortunately out-of tree but it
-> should be pretty close to the armada-388-db. I can make my dts available
-> if it's helpful.
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-Still works on 4.12-rc2. Fails on next-20170524.
+Disabling clk81 results in an immediate freeze of the whole system. This
+can happen "accidentally" when the last child-clock of clk81 is disabled
+(in this case the common clock framework also disables clk81, even if it
+was only enabled indirectly before).
 
-This appears to be due to commit b566d9c055de ("mtd: nand: add support 
-for Micron on-die ECC"). Which based on the description seems intentional.
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ drivers/clk/meson/meson8b.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Since I have access to a hardware platform that has a micron flash with
-ECC forcefully enabled how can I help to get this implemented.
+diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
+index e9985503165c..9d1aaf6e9ac6 100644
+--- a/drivers/clk/meson/meson8b.c
++++ b/drivers/clk/meson/meson8b.c
+@@ -399,7 +399,7 @@ struct clk_gate meson8b_clk81 = {
+ 		.ops = &clk_gate_ops,
+ 		.parent_names = (const char *[]){ "mpeg_clk_div" },
+ 		.num_parents = 1,
+-		.flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED),
++		.flags = (CLK_SET_RATE_PARENT | CLK_IS_CRITICAL),
+ 	},
+ };
+ 
+-- 
+2.9.4
