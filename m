@@ -1,77 +1,42 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 24 May 2017 10:30:43 +0200
-Subject: [PATCH 1/5] random,stackprotect: introduce get_random_canary
- function
-In-Reply-To: <20170519212636.30440-2-riel@redhat.com>
-References: <20170519212636.30440-1-riel@redhat.com>
- <20170519212636.30440-2-riel@redhat.com>
-Message-ID: <20170524083043.hpbpuracjqj2bbv2@gmail.com>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Wed, 24 May 2017 11:31:10 +0300
+Subject: [PATCH 05/12] arm64: dts: Add I2C nodes for Hi3660
+In-Reply-To: <10a19a02-21ac-364e-ab5c-de8aa16c3858@linaro.org>
+References: <20170517083745.24479-1-guodong.xu@linaro.org>
+ <20170517083745.24479-6-guodong.xu@linaro.org>
+ <20170523003908.ztuh4oohdk3g34pm@rob-hp-laptop>
+ <94d06900-d871-7bc6-e1f3-d2b22ba20aaf@linaro.org>
+ <CAL_JsqJUH-TOufw=dtpgDww_VEvyTW_LZuSQqRSU-cYbAqfJ6A@mail.gmail.com>
+ <10a19a02-21ac-364e-ab5c-de8aa16c3858@linaro.org>
+Message-ID: <a45b3ab7-4f77-be0a-6382-a94e43fd512e@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/24/2017 05:34 AM, zhangfei wrote:
+> Rob suggest add something like "hisilicon,hi3660-dw-i2c" as well.
+> "The problem is dw-i2c does not give any clue as to what the
+> configuration or version of the IP is.
+> Is that fully discoverable with version/capability registers? If not
+> then you need a specific compatible.
+> Generally when we have not required them, it ends up being a problem
+> later on."
+>
+Some features are discoverable from DW_IC_COMP_PARAM_1, 
+DW_IC_COMP_VERSION and DW_IC_COMP_TYPE registers. Although my 
+specification does not document what's inside of DW_IC_COMP_VERSION and 
+DW_IC_COMP_TYPE but code is using them.
 
-* riel at redhat.com <riel@redhat.com> wrote:
+>
+> While Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> compatible : should be "snps,designware-i2c"
+>
+> Besides, on Hikey960,
+> [    3.822353] dw_readl(dev, DW_IC_COMP_VERSION)=0x3132302a
+> [    3.827763] dw_readl(dev, DW_IC_COMP_TYPE)=0x44570140
+> Are these two registers enough to distinguish version etc?
+>
+I've seen DW_IC_COMP_VERSION being 0x3131352a or 0x3132312a in our 
+platforms. DW_IC_COMP_TYPE has the same value what you are seeing.
 
-> From: Rik van Riel <riel@redhat.com>
-> 
-> Introduce the get_random_canary function, which provides a random
-> unsigned long canary value with the first byte zeroed out on 64
-> bit architectures, in order to mitigate non-terminated C string
-> overflows.
-> 
-> Inspired by the "ascii armor" code in the old execshield patches,
-> and the current PaX/grsecurity code base.
-> 
-> Signed-off-by: Rik van Riel <riel@redhat.com>
-> ---
->  include/linux/random.h | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
-> 
-> diff --git a/include/linux/random.h b/include/linux/random.h
-> index ed5c3838780d..765a992c6774 100644
-> --- a/include/linux/random.h
-> +++ b/include/linux/random.h
-> @@ -57,6 +57,26 @@ static inline unsigned long get_random_long(void)
->  #endif
->  }
->  
-> +/*
-> + * On 64 bit architectures, protect against non-terminated C string overflows
-
-s/64 bit/64-bit
-
-> + * by zeroing out the first byte of the canary; this leaves 56 bits of entropy.
-> + */
-> +#ifdef CONFIG_64BIT
-> +#ifdef __LITTLE_ENDIAN
-> +#define CANARY_MASK 0xffffffffffffff00UL
-> +#else /* big endian 64 bits */
-> +#define CANARY_MASK 0x00ffffffffffffffUL
-> +#endif
-> +#else /* 32 bits */
-> +#define CANARY_MASK 0xffffffffUL
-> +#endif
-> +static inline unsigned long get_random_canary(void)
-> +{
-> +	unsigned long val = get_random_long();
-> +
-> +	return val & CANARY_MASK;
-> +}
-
-Please separate function definitions from macros by a separate empty line.
-
-Also, a bit of structure and organization would make the macro easier to read:
-
-#ifdef CONFIG_64BIT
-# ifdef __LITTLE_ENDIAN
-#  define CANARY_MASK 0xffffffffffffff00UL
-# else /* big endian, 64 bits: */
-#  define CANARY_MASK 0x00ffffffffffffffUL
-# endif
-#else /* 32 bits: */
-# define  CANARY_MASK 0x00000000ffffffffUL
-#endif
-
-Thanks,
-
-	Ingo
+-- 
+Jarkko
