@@ -1,42 +1,61 @@
-From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Wed, 24 May 2017 11:31:10 +0300
-Subject: [PATCH 05/12] arm64: dts: Add I2C nodes for Hi3660
-In-Reply-To: <10a19a02-21ac-364e-ab5c-de8aa16c3858@linaro.org>
-References: <20170517083745.24479-1-guodong.xu@linaro.org>
- <20170517083745.24479-6-guodong.xu@linaro.org>
- <20170523003908.ztuh4oohdk3g34pm@rob-hp-laptop>
- <94d06900-d871-7bc6-e1f3-d2b22ba20aaf@linaro.org>
- <CAL_JsqJUH-TOufw=dtpgDww_VEvyTW_LZuSQqRSU-cYbAqfJ6A@mail.gmail.com>
- <10a19a02-21ac-364e-ab5c-de8aa16c3858@linaro.org>
-Message-ID: <a45b3ab7-4f77-be0a-6382-a94e43fd512e@linux.intel.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 24 May 2017 09:31:54 +0100
+Subject: [PATCH v4 6/7] ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class
+ cpus
+In-Reply-To: <CAK8P3a0tbaAHerjitDBJ9gz1SCFkAwKhfzjgMHiB5ESakQs7-g@mail.gmail.com>
+References: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
+ <1493029017-31382-7-git-send-email-vladimir.murzin@arm.com>
+ <20170523200142.GD22219@n2100.armlinux.org.uk>
+ <CAK8P3a0tbaAHerjitDBJ9gz1SCFkAwKhfzjgMHiB5ESakQs7-g@mail.gmail.com>
+Message-ID: <741c708e-9036-a0e1-46e1-90d82a195dff@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/2017 05:34 AM, zhangfei wrote:
-> Rob suggest add something like "hisilicon,hi3660-dw-i2c" as well.
-> "The problem is dw-i2c does not give any clue as to what the
-> configuration or version of the IP is.
-> Is that fully discoverable with version/capability registers? If not
-> then you need a specific compatible.
-> Generally when we have not required them, it ends up being a problem
-> later on."
->
-Some features are discoverable from DW_IC_COMP_PARAM_1, 
-DW_IC_COMP_VERSION and DW_IC_COMP_TYPE registers. Although my 
-specification does not document what's inside of DW_IC_COMP_VERSION and 
-DW_IC_COMP_TYPE but code is using them.
+On 23/05/17 21:33, Arnd Bergmann wrote:
+> On Tue, May 23, 2017 at 10:01 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+>> On Mon, Apr 24, 2017 at 11:16:56AM +0100, Vladimir Murzin wrote:
+>>> Now, we have dedicated non-cacheable region for consistent DMA
+>>> operations. However, that region can still be marked as bufferable by
+>>> MPU, so it'd be safer to have barriers by default.
+>>
+>> What do you actually want here?  Your patch doesn't quite make sense,
+>> the commit description seems to indicate that you require this option
+>> to be set for V7M, but the patch says otherwise.
+>>
+>>>  config ARM_DMA_MEM_BUFFERABLE
+>>> -     bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K) && !CPU_V7
+>>> -     default y if CPU_V6 || CPU_V6K || CPU_V7
+>>> +     bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K || CPU_V7M) && !CPU_V7
+>>
+>> This "if" conditional conditionalises the visibility of the option,
+>> it doesn't conditionalise the value.
+>>
+>>> +     default y if CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M
+>>
+>> Taking both of these changes together what you end up with is an option
+>> presented to the user for "Use non-cacheable memory for DMA" which
+>> they can choose to disable.
+>>
+>> If you require this option to be set, that's incorrect - your modification
+>> to the default line is correct, but the first line is not.  To achieve
+>> that, you want the if condition to evaluate false for V7M, thereby hiding
+>> the option from the user.  In that case, the default value will always be
+>> assigned to the option.
+> 
+> I had the opposite comment in the previous version ;-)
+> https://lkml.org/lkml/2017/4/19/185
+> 
+> I think the current patch is correct, but the description could still be
+> clarified: On some of the beefier ARMv7-M machines (with DMA
+> and write buffers) we want this enabled, while those that didn't
+> need it until now also won't need it in the future.
 
->
-> While Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> compatible : should be "snps,designware-i2c"
->
-> Besides, on Hikey960,
-> [    3.822353] dw_readl(dev, DW_IC_COMP_VERSION)=0x3132302a
-> [    3.827763] dw_readl(dev, DW_IC_COMP_TYPE)=0x44570140
-> Are these two registers enough to distinguish version etc?
->
-I've seen DW_IC_COMP_VERSION being 0x3131352a or 0x3132312a in our 
-platforms. DW_IC_COMP_TYPE has the same value what you are seeing.
+Ok. Do you want it go into commit message or option description or maybe both?
 
--- 
-Jarkko
+Thanks
+Vladimir
+
+> 
+>         Arnd
+> 
