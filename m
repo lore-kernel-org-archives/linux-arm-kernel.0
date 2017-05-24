@@ -1,125 +1,85 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 May 2017 10:16:56 +0100
-Subject: [PATCH v2 1/9] KVM: arm64: Allow creating the PMU without the
- in-kernel GIC
-In-Reply-To: <20170524083805.GA7991@cbox>
-References: <20170516184556.26785-1-cdall@linaro.org>
- <20170516184556.26785-2-cdall@linaro.org>
- <51d0d9eb-3e72-2f37-3fac-89de28cea91b@arm.com> <20170524083805.GA7991@cbox>
-Message-ID: <4cf8f05e-1af1-eaed-151f-54e7a60d7b63@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 May 2017 11:20:48 +0200
+Subject: [PATCH v4 6/7] ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class
+ cpus
+In-Reply-To: <1adb8aec-8fdf-c4d5-fd9c-29b93ef8ef43@arm.com>
+References: <1493029017-31382-1-git-send-email-vladimir.murzin@arm.com>
+ <1493029017-31382-7-git-send-email-vladimir.murzin@arm.com>
+ <20170523200142.GD22219@n2100.armlinux.org.uk>
+ <CAK8P3a0tbaAHerjitDBJ9gz1SCFkAwKhfzjgMHiB5ESakQs7-g@mail.gmail.com>
+ <741c708e-9036-a0e1-46e1-90d82a195dff@arm.com>
+ <CAK8P3a0s-SLGwhdxX+FDsmRKnYh2nWPKPvwsn_qMOk_1Wb5YMQ@mail.gmail.com>
+ <1adb8aec-8fdf-c4d5-fd9c-29b93ef8ef43@arm.com>
+Message-ID: <CAK8P3a0hvR4Crtw6J=r32Z_bL07Ge3UUe2o7RymLLi8A9sfgVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/17 09:38, Christoffer Dall wrote:
-> On Tue, May 23, 2017 at 05:52:01PM +0100, Marc Zyngier wrote:
->> On 16/05/17 19:45, Christoffer Dall wrote:
->>> Since we got support for devices in userspace which allows reporting the
->>> PMU overflow output status to userspace, we should actually allow
->>> creating the PMU on systems without an in-kernel irqchip, which in turn
->>> requires us to slightly clarify error codes for the ABI and move things
->>> around for the initialization phase.
+On Wed, May 24, 2017 at 11:08 AM, Vladimir Murzin
+<vladimir.murzin@arm.com> wrote:
+> On 24/05/17 09:36, Arnd Bergmann wrote:
+>> On Wed, May 24, 2017 at 10:31 AM, Vladimir Murzin
+>> <vladimir.murzin@arm.com> wrote:
+>>> On 23/05/17 21:33, Arnd Bergmann wrote:
+>>>> On Tue, May 23, 2017 at 10:01 PM, Russell King - ARM Linux
+>>>> <linux@armlinux.org.uk> wrote:
+>>>>> On Mon, Apr 24, 2017 at 11:16:56AM +0100, Vladimir Murzin wrote:
+>>>>>> Now, we have dedicated non-cacheable region for consistent DMA
+>>>>>> operations. However, that region can still be marked as bufferable by
+>>>>>> MPU, so it'd be safer to have barriers by default.
+>>>>>
+>>>>> What do you actually want here?  Your patch doesn't quite make sense,
+>>>>> the commit description seems to indicate that you require this option
+>>>>> to be set for V7M, but the patch says otherwise.
+>>>>>
+>>>>>>  config ARM_DMA_MEM_BUFFERABLE
+>>>>>> -     bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K) && !CPU_V7
+>>>>>> -     default y if CPU_V6 || CPU_V6K || CPU_V7
+>>>>>> +     bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K || CPU_V7M) && !CPU_V7
+>>>>>
+>>>>> This "if" conditional conditionalises the visibility of the option,
+>>>>> it doesn't conditionalise the value.
+>>>>>
+>>>>>> +     default y if CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M
+>>>>>
+>>>>> Taking both of these changes together what you end up with is an option
+>>>>> presented to the user for "Use non-cacheable memory for DMA" which
+>>>>> they can choose to disable.
+>>>>>
+>>>>> If you require this option to be set, that's incorrect - your modification
+>>>>> to the default line is correct, but the first line is not.  To achieve
+>>>>> that, you want the if condition to evaluate false for V7M, thereby hiding
+>>>>> the option from the user.  In that case, the default value will always be
+>>>>> assigned to the option.
+>>>>
+>>>> I had the opposite comment in the previous version ;-)
+>>>> https://lkml.org/lkml/2017/4/19/185
+>>>>
+>>>> I think the current patch is correct, but the description could still be
+>>>> clarified: On some of the beefier ARMv7-M machines (with DMA
+>>>> and write buffers) we want this enabled, while those that didn't
+>>>> need it until now also won't need it in the future.
 >>>
->>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
->>> ---
->>>  Documentation/virtual/kvm/devices/vcpu.txt | 16 +++++++++-------
->>>  virt/kvm/arm/pmu.c                         | 30 ++++++++++++++++++++----------
->>>  2 files changed, 29 insertions(+), 17 deletions(-)
->>>
->>> diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
->>> index 02f5068..352af6e 100644
->>> --- a/Documentation/virtual/kvm/devices/vcpu.txt
->>> +++ b/Documentation/virtual/kvm/devices/vcpu.txt
->>> @@ -16,7 +16,9 @@ Parameters: in kvm_device_attr.addr the address for PMU overflow interrupt is a
->>>  Returns: -EBUSY: The PMU overflow interrupt is already set
->>>           -ENXIO: The overflow interrupt not set when attempting to get it
->>>           -ENODEV: PMUv3 not supported
->>> -         -EINVAL: Invalid PMU overflow interrupt number supplied
->>> +         -EINVAL: Invalid PMU overflow interrupt number supplied or
->>> +                  trying to set the IRQ number without using an in-kernel
->>> +                  irqchip.
->>>  
->>>  A value describing the PMUv3 (Performance Monitor Unit v3) overflow interrupt
->>>  number for this vcpu. This interrupt could be a PPI or SPI, but the interrupt
->>> @@ -25,11 +27,11 @@ all vcpus, while as an SPI it must be a separate number per vcpu.
->>>  
->>>  1.2 ATTRIBUTE: KVM_ARM_VCPU_PMU_V3_INIT
->>>  Parameters: no additional parameter in kvm_device_attr.addr
->>> -Returns: -ENODEV: PMUv3 not supported
->>> -         -ENXIO: PMUv3 not properly configured as required prior to calling this
->>> -                 attribute
->>> +Returns: -ENODEV: PMUv3 not supported or GIC not initialized
->>> +         -ENXIO: PMUv3 not properly configured or in-kernel irqchip not
->>> +                 conigured as required prior to calling this attribute
+>>> Ok. Do you want it go into commit message or option description or maybe both?
 >>
->>                     configured
+>> I'd say both. It would also be helpful to identify specifically which platforms
+>> require this, and then add a 'select ARM_DMA_MEM_BUFFERABLE' from
+>> the platform, as we do from Moxart.
 >>
->>>           -EBUSY: PMUv3 already initialized
->>>  
->>> -Request the initialization of the PMUv3.  This must be done after creating the
->>> -in-kernel irqchip.  Creating a PMU with a userspace irqchip is currently not
->>> -supported.
->>> +Request the initialization of the PMUv3.  If using the PMUv3 with an in-kernel
->>> +virtual GIC implementation, this must be done after initializing the in-kernel
->>> +irqchip.
->>> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
->>> index 4b43e7f..7209185 100644
->>> --- a/virt/kvm/arm/pmu.c
->>> +++ b/virt/kvm/arm/pmu.c
->>> @@ -456,21 +456,25 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
->>>  	if (!kvm_arm_support_pmu_v3())
->>>  		return -ENODEV;
->>>  
->>> -	/*
->>> -	 * We currently require an in-kernel VGIC to use the PMU emulation,
->>> -	 * because we do not support forwarding PMU overflow interrupts to
->>> -	 * userspace yet.
->>> -	 */
->>> -	if (!irqchip_in_kernel(vcpu->kvm) || !vgic_initialized(vcpu->kvm))
->>> -		return -ENODEV;
->>> -
->>> -	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features) ||
->>> -	    !kvm_arm_pmu_irq_initialized(vcpu))
->>> +	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
->>>  		return -ENXIO;
->>>  
->>>  	if (kvm_arm_pmu_v3_ready(vcpu))
->>>  		return -EBUSY;
->>>  
->>> +	if (irqchip_in_kernel(vcpu->kvm)) {
->>> +		/*
->>> +		 * If using the PMU with an in-kernel virtual GIC
->>> +		 * implementation, we require the GIC to be already
->>> +		 * initialized when initializing the PMU.
->>> +		 */
->>> +		if (!vgic_initialized(vcpu->kvm))
->>> +			return -ENODEV;
->>> +
->>> +		if (!kvm_arm_pmu_irq_initialized(vcpu))
->>> +			return -ENXIO;
->>> +	}
->>> +
->>
->> Do we also need to prevent a vgic to be created if the PMU has been
->> initialized beforehand?
->>
-> 
-> Sigh.  We probably have to.
-> 
-> I don't like having a cross-VGIC-PMU check, but we could do something
-> like setting a flag on the kvm struct so that irqchip_in_user() always
-> return true, and if that is set, it is not possible to create the VGIC.
-> 
-> Alternatively we can make the PMU init a no-op, and try to enable it via
-> the first-vcpu-run path, like the timer, and check that everything lines
-> up then (i.e. you have in-kernel irqchip with a non-conflicting irq
-> number or you have a userspace irqchip).
+>
+> I'm a bit confused here. In case we want to control it on platform level via
+> 'select ARM_DMA_MEM_BUFFERABLE' wouldn't we need to 'default n' for CPU_V7M?
+> IIUC, Moxart needs to select this option because it is neither CPU_V6(K) or
+> CPU_V7.
 
-I like this second solution better, as it gives us a common approach to
-similar problems. Would that also help with not having to implement the
-allocator you introduced in patches 6-9 (which I haven't reviewed yet)?
+It depends: If we want to control it purely by platform, then we don't need
+to patch anything here, just add the 'select' and be done with it, leaving
+the default to 'n' for ARMv7-M.
 
-Thanks,
+If there are platforms on which you might reasonably make the option
+user-visible (e.g. you only need it when you actually want to use one of
+the DMA masters, but most configurations don't), then having the 'default y'
+might still be appropriate, to default to the safe setting on platforms that
+don't have the 'select' but letting users turn it off when they know what they
+are doing.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+      Arnd
