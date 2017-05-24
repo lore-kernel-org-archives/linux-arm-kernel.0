@@ -1,103 +1,68 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 24 May 2017 14:11:19 +0100
-Subject: [PATCH v4 6/9] arm64: hugetlb: Override huge_pte_clear() to support
- contiguous hugepages
+Date: Wed, 24 May 2017 14:11:22 +0100
+Subject: [PATCH v4 9/9] arm64: hugetlb: Cleanup setup_hugepagesz
 In-Reply-To: <20170524131122.5309-1-punit.agrawal@arm.com>
 References: <20170524131122.5309-1-punit.agrawal@arm.com>
-Message-ID: <20170524131122.5309-7-punit.agrawal@arm.com>
+Message-ID: <20170524131122.5309-10-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default huge_pte_clear() implementation does not clear contiguous
-page table entries when it encounters contiguous hugepages that are
-supported on arm64.
+From: Steve Capper <steve.capper@arm.com>
 
-Fix this by overriding the default implementation to clear all the
-entries associated with contiguous hugepages.
+Replace a lot of if statements with switch and case labels to make it
+much clearer which huge page sizes are supported.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Also, we prevent PUD_SIZE from being used on systems not running with
+4KB PAGE_SIZE. Before if one supplied PUD_SIZE in these circumstances,
+then unusuable huge page sizes would be in use.
+
+Fixes: 084bd29810a5 ("ARM64: mm: HugeTLB support.")
 Cc: David Woods <dwoods@mellanox.com>
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/include/asm/hugetlb.h |  6 +++++-
- arch/arm64/mm/hugetlbpage.c      | 36 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+), 1 deletion(-)
+ arch/arm64/mm/hugetlbpage.c | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index bbc1e35aa601..bb86f0741863 100644
---- a/arch/arm64/include/asm/hugetlb.h
-+++ b/arch/arm64/include/asm/hugetlb.h
-@@ -18,7 +18,6 @@
- #ifndef __ASM_HUGETLB_H
- #define __ASM_HUGETLB_H
- 
--#include <asm-generic/hugetlb.h>
- #include <asm/page.h>
- 
- static inline pte_t huge_ptep_get(pte_t *ptep)
-@@ -82,5 +81,10 @@ extern void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 				    unsigned long addr, pte_t *ptep);
- extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 				  unsigned long addr, pte_t *ptep);
-+extern void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-+			   pte_t *ptep, unsigned long sz);
-+#define huge_pte_clear huge_pte_clear
-+
-+#include <asm-generic/hugetlb.h>
- 
- #endif /* __ASM_HUGETLB_H */
 diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index e9061704aec3..240b2fd53266 100644
+index a10dfbd0ffd5..b5dc7cca3f45 100644
 --- a/arch/arm64/mm/hugetlbpage.c
 +++ b/arch/arm64/mm/hugetlbpage.c
-@@ -68,6 +68,30 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
- 	return CONT_PTES;
- }
- 
-+static inline int num_contig_ptes(unsigned long size, size_t *pgsize)
-+{
-+	int contig_ptes = 0;
-+
-+	*pgsize = size;
-+
-+	switch (size) {
-+	case PUD_SIZE:
-+	case PMD_SIZE:
-+		contig_ptes = 1;
-+		break;
-+	case CONT_PMD_SIZE:
-+		*pgsize = PMD_SIZE;
-+		contig_ptes = CONT_PMDS;
-+		break;
-+	case CONT_PTE_SIZE:
-+		*pgsize = PAGE_SIZE;
-+		contig_ptes = CONT_PTES;
-+		break;
-+	}
-+
-+	return contig_ptes;
-+}
-+
- /*
-  * Changing some bits of contiguous entries requires us to follow a
-  * Break-Before-Make approach, breaking the whole contiguous set
-@@ -245,6 +269,18 @@ pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
- 	return entry;
- }
- 
-+void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-+		    pte_t *ptep, unsigned long sz)
-+{
-+	int i, ncontig;
-+	size_t pgsize;
-+
-+	ncontig = num_contig_ptes(sz, &pgsize);
-+
-+	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++)
-+		pte_clear(mm, addr, ptep);
-+}
-+
- pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 			      unsigned long addr, pte_t *ptep)
+@@ -381,20 +381,20 @@ static __init int setup_hugepagesz(char *opt)
  {
+ 	unsigned long ps = memparse(opt, &opt);
+ 
+-	if (ps == PMD_SIZE) {
+-		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
+-	} else if (ps == PUD_SIZE) {
+-		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
+-	} else if (ps == (PAGE_SIZE * CONT_PTES)) {
+-		hugetlb_add_hstate(CONT_PTE_SHIFT);
+-	} else if (ps == (PMD_SIZE * CONT_PMDS)) {
+-		hugetlb_add_hstate((PMD_SHIFT + CONT_PMD_SHIFT) - PAGE_SHIFT);
+-	} else {
+-		hugetlb_bad_size();
+-		pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
+-		return 0;
++	switch (ps) {
++#ifdef CONFIG_ARM64_4K_PAGES
++	case PUD_SIZE:
++#endif
++	case PMD_SIZE * CONT_PMDS:
++	case PMD_SIZE:
++	case PAGE_SIZE * CONT_PTES:
++		hugetlb_add_hstate(ilog2(ps) - PAGE_SHIFT);
++		return 1;
+ 	}
+-	return 1;
++
++	hugetlb_bad_size();
++	pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
++	return 0;
+ }
+ __setup("hugepagesz=", setup_hugepagesz);
+ 
 -- 
 2.11.0
