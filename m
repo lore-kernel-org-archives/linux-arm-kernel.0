@@ -1,38 +1,31 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 24 May 2017 15:54:09 +0200
-Subject: [PATCH 1/7] arm64: defconfig: enable Rockchip pcie support
+Date: Wed, 24 May 2017 15:54:14 +0200
+Subject: [PATCH 6/7] arm64: defconfig: enable Rockchip thermal controller
 In-Reply-To: <20170524135415.5590-1-heiko@sntech.de>
 References: <20170524135415.5590-1-heiko@sntech.de>
-Message-ID: <20170524135415.5590-2-heiko@sntech.de>
+Message-ID: <20170524135415.5590-7-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable to the controller and phy drivers as modules.
+Allows to read the cpu and gpu temperatures and affect frequency scaling
+if necessary.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 65cdd878cfbd..a12ccb40ce0a 100644
+index f6c50a403f1a..1716ed326f68 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -68,6 +68,7 @@ CONFIG_PCIE_QCOM=y
- CONFIG_PCIE_ARMADA_8K=y
- CONFIG_PCI_AARDVARK=y
- CONFIG_PCIE_RCAR=y
-+CONFIG_PCIE_ROCKCHIP=m
- CONFIG_PCI_HOST_GENERIC=y
- CONFIG_PCI_XGENE=y
- CONFIG_ARM64_VA_BITS_48=y
-@@ -484,6 +485,7 @@ CONFIG_PHY_HI6220_USB=y
- CONFIG_PHY_SUN4I_USB=y
- CONFIG_PHY_ROCKCHIP_INNO_USB2=y
- CONFIG_PHY_ROCKCHIP_EMMC=y
-+CONFIG_PHY_ROCKCHIP_PCIE=m
- CONFIG_PHY_XGENE=y
- CONFIG_PHY_TEGRA_XUSB=y
- CONFIG_ARM_SCPI_PROTOCOL=y
+@@ -296,6 +296,7 @@ CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_THERMAL_EMULATION=y
+ CONFIG_EXYNOS_THERMAL=y
++CONFIG_ROCKCHIP_THERMAL=m
+ CONFIG_WATCHDOG=y
+ CONFIG_S3C2410_WATCHDOG=y
+ CONFIG_MESON_GXBB_WATCHDOG=m
 -- 
 2.11.0
