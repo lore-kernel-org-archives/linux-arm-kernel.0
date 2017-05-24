@@ -1,8 +1,8 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 24 May 2017 10:15:37 +0200
-Subject: [patch V3 26/32] arm64: Prevent cpu hotplug rwsem recursion
+Date: Wed, 24 May 2017 10:15:38 +0200
+Subject: [patch V3 27/32] arm: Prevent hotplug rwsem recursion
 References: <20170524081511.203800767@linutronix.de>
-Message-ID: <20170524081549.197070135@linutronix.de>
+Message-ID: <20170524081549.275871311@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,43 +14,31 @@ rwsem. stop_machine_cpuslocked() contains a lockdep assertion to catch any
 unprotected callers.
 
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: Russell King <linux@armlinux.org.uk>
 ---
- arch/arm64/include/asm/insn.h |    1 -
- arch/arm64/kernel/insn.c      |    5 +++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/kernel/patch.c        |    2 +-
+ arch/arm/probes/kprobes/core.c |    3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -433,7 +433,6 @@ u32 aarch64_set_branch_offset(u32 insn,
- bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+--- a/arch/arm/kernel/patch.c
++++ b/arch/arm/kernel/patch.c
+@@ -124,5 +124,5 @@ void __kprobes patch_text(void *addr, un
+ 		.insn = insn,
+ 	};
  
- int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
--int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
- int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
- 
- s32 aarch64_insn_adrp_get_offset(u32 insn);
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -255,6 +255,7 @@ static int __kprobes aarch64_insn_patch_
- 	return ret;
+-	stop_machine(patch_text_stop_machine, &patch, NULL);
++	stop_machine_cpuslocked(patch_text_stop_machine, &patch, NULL);
+ }
+--- a/arch/arm/probes/kprobes/core.c
++++ b/arch/arm/probes/kprobes/core.c
+@@ -182,7 +182,8 @@ void __kprobes kprobes_remove_breakpoint
+ 		.addr = addr,
+ 		.insn = insn,
+ 	};
+-	stop_machine(__kprobes_remove_breakpoint, &p, cpu_online_mask);
++	stop_machine_cpuslocked(__kprobes_remove_breakpoint, &p,
++				cpu_online_mask);
  }
  
-+static
- int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
- {
- 	struct aarch64_insn_patch patch = {
-@@ -267,8 +268,8 @@ int __kprobes aarch64_insn_patch_text_sy
- 	if (cnt <= 0)
- 		return -EINVAL;
- 
--	return stop_machine(aarch64_insn_patch_text_cb, &patch,
--			    cpu_online_mask);
-+	return stop_machine_cpuslocked(aarch64_insn_patch_text_cb, &patch,
-+				       cpu_online_mask);
- }
- 
- int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+ void __kprobes arch_disarm_kprobe(struct kprobe *p)
