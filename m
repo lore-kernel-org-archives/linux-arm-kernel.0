@@ -1,48 +1,25 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 24 May 2017 12:16:52 -0500
-Subject: [PATCH] PCI: imx6: fix downstream bus scanning
-In-Reply-To: <CAOMZO5BgyMq0pMvnCAzG+bH9E6xX1NvX2vRy-FsQ1ojmAodrWA@mail.gmail.com>
-References: <20170510175752.6519-1-l.stach@pengutronix.de>
- <20170522221346.GG19733@bhelgaas-glaptop.roam.corp.google.com>
- <CAOMZO5BgyMq0pMvnCAzG+bH9E6xX1NvX2vRy-FsQ1ojmAodrWA@mail.gmail.com>
-Message-ID: <20170524171652.GA14714@bhelgaas-glaptop.roam.corp.google.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 24 May 2017 18:18:52 +0100
+Subject: [PATCH 1/2] dt-bindings: spi-meson: Add SPICC bindings
+In-Reply-To: <1495546773-20479-2-git-send-email-narmstrong@baylibre.com>
+References: <1495546773-20479-1-git-send-email-narmstrong@baylibre.com>
+ <1495546773-20479-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20170524171852.gktg6sek67vrt7gs@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 07:11:26PM -0300, Fabio Estevam wrote:
-> Hi Bjorn,
-> 
-> On Mon, May 22, 2017 at 7:13 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> 
-> > Applied to for-linus for v4.12 with tested-by and acks from Fabio,
-> > Peter, and Richard.  I updated the subject line to:
-> >
-> >   PCI: imx6: Fix config read timeout handling
-> >
-> > because I don't think this change is specific to bus scanning and I
-> > wanted a hint that it's related to the config space mapping changes.
-> >
-> > In fact, I'd really like to include the specific commit that caused
-> > this problem so that if the original commit is backported, there's a
-> > hint that we should backport this one, too.  I *think* it might be
-> > cc7b0d495589, so I updated the changelog to this:
-> >
-> >   Commit cc7b0d495589 ("PCI: designware: Update PCI config space remap
-> >   function") made PCI configuration requests non-posted, which means we now
-> >   get a synchronous abort when the CFG space read to probe for downstream
-> >   devices times out.
-> >
-> >   Synchronous aborts need to be handled differently from the async aborts we
-> >   were getting before, in particular the PC needs to be advanced when
-> >   resolving the abort.  This is mostly a copy of what other PCI drivers do on
-> >   ARM to handle those aborts.
-> >
-> >   [bhelgaas: changelog, "Fixes"]
-> >   Fixes: cc7b0d495589 ("PCI: designware: Update PCI config space remap function")
-> >
-> > Please let me know if this is the wrong commit.
-> 
-> I just tested on a mx6q board and can confirm that this is the correct
-> offending commit, thanks.
+On Tue, May 23, 2017 at 03:39:32PM +0200, Neil Armstrong wrote:
+> Add the SPICC (SPI Communications Controller) bindings variant.
 
-Thanks for checking this out, Fabio!
+Please submit patches using subject lines reflecting the style for the
+subsystem.  This makes it easier for people to identify relevant
+patches.  Look at what existing commits in the area you're changing are
+doing and make sure your subject lines visually resemble what they're
+doing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170524/0de63dc7/attachment.sig>
