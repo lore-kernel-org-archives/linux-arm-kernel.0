@@ -1,39 +1,32 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 24 May 2017 18:34:29 +0200
-Subject: [PATCH] clk: sunxi-ng: sun5i: Fix ahb_bist_clk definition
-Message-ID: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
+From: riel@redhat.com (Rik van Riel)
+Date: Wed, 24 May 2017 12:34:46 -0400
+Subject: [PATCH 5/5] sh64: ascii armor the sh64 boot init stack canary
+In-Reply-To: <20170524155751.424-1-riel@redhat.com>
+References: <20170524155751.424-1-riel@redhat.com>
+Message-ID: <20170524123446.78510066@annuminas.surriel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AHB BIST gate is actually controlled with bit 7.
+Use the ascii-armor canary to prevent unterminated C string overflows
+from being able to successfully overwrite the canary, even if they
+somehow obtain the canary value.
 
-This bug was detected while trying to use the NAND controller which is
-using the DMA engine to transfer data to the NAND.
-Since the ahb_bist_clk gate bit conflicts with the ahb_dma_clk gate bit,
-the core was disabling the DMA engine clock as part of its 'disable
-unused clks' procedure, which was causing all DMA transfers to fail after
-this point.
+Inspired by execshield ascii-armor and Daniel Micay's linux-hardened tree.
 
-Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
-Cc: stable at vger.kernel.org
-Reported-by: Angus Ainslie <angus@akkea.ca>
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Rik van Riel <riel@redhat.com>
 ---
- drivers/clk/sunxi-ng/ccu-sun5i.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/sh/include/asm/stackprotector.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.c b/drivers/clk/sunxi-ng/ccu-sun5i.c
-index 5c476f966a72..5372bf8be5e6 100644
---- a/drivers/clk/sunxi-ng/ccu-sun5i.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun5i.c
-@@ -243,7 +243,7 @@ static SUNXI_CCU_GATE(ahb_ss_clk,	"ahb-ss",	"ahb",
- static SUNXI_CCU_GATE(ahb_dma_clk,	"ahb-dma",	"ahb",
- 		      0x060, BIT(6), 0);
- static SUNXI_CCU_GATE(ahb_bist_clk,	"ahb-bist",	"ahb",
--		      0x060, BIT(6), 0);
-+		      0x060, BIT(7), 0);
- static SUNXI_CCU_GATE(ahb_mmc0_clk,	"ahb-mmc0",	"ahb",
- 		      0x060, BIT(8), 0);
- static SUNXI_CCU_GATE(ahb_mmc1_clk,	"ahb-mmc1",	"ahb",
--- 
-2.7.4
+diff --git a/arch/sh/include/asm/stackprotector.h b/arch/sh/include/asm/stackprotector.h
+index d9df3a76847c..141515a43b78 100644
+--- a/arch/sh/include/asm/stackprotector.h
++++ b/arch/sh/include/asm/stackprotector.h
+@@ -19,6 +19,7 @@ static __always_inline void boot_init_stack_canary(void)
+ 	/* Try to get a semi random initial value. */
+ 	get_random_bytes(&canary, sizeof(canary));
+ 	canary ^= LINUX_VERSION_CODE;
++	canary &= CANARY_MASK;
+ 
+ 	current->stack_canary = canary;
+ 	__stack_chk_guard = current->stack_canary;
