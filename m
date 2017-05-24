@@ -1,121 +1,66 @@
-From: aisheng.dong@nxp.com (A.S. Dong)
-Date: Wed, 24 May 2017 03:10:12 +0000
-Subject: [PATCH V3 1/2] dt-bindings: pinctrl: add imx7ulp pinctrl binding
- doc
-In-Reply-To: <20170523182321.GA13664@w540>
-References: <1495539829-23345-1-git-send-email-aisheng.dong@nxp.com>
- <20170523182321.GA13664@w540>
-Message-ID: <AM3PR04MB3065626F1B45C8459E5765580FE0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: kernel.development@povil.us (Sam Povilus)
+Date: Tue, 23 May 2017 21:27:46 -0600
+Subject: [PATCH 1/1] xilinx ps uart: Adding a kernel parameter for the
+ number of xilinx ps uarts
+In-Reply-To: <20170522192636.5b578d89@alans-desktop>
+References: <20170520022154.6766-1-kernel.development@povil.us>
+ <20170520172008.5a979e8a@alans-desktop>
+ <517d864d-d230-3abc-eb3c-4b628dc4625f@xilinx.com>
+ <20170522192636.5b578d89@alans-desktop>
+Message-ID: <20170524032746.43w6b5uut44qzbuc@irascible.povil.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi J
+On Mon, May 22, 2017 at 07:26:36PM +0100, Alan Cox wrote:
+> > We have in soc vendor tree similar patch but the reason is different.
+> > 
+> >     tty: serial: Added a CONFIG_SERIAL_XILINX_NR_UARTS option.
+> > 
+> >     This patch Adds CONFIG_SERIAL_XILINX_NR_UARTS option to allow
+> >     the user to provide the Max number of uart ports information.
+> >     If multiple cards (or) PL UARTS are present, the default limit
+> >     of 2 ports should be increased.
+> > 
+> > I haven't checked all drivers but in our case we have added this as
+> > quick fix for scenarios where you use serial aliases where alias is
+> > pointed to serial2 or more.
+> > In cdns_uart_init() cdns_uart_uart_driver is passed which contains .nr
+> > which is required to be passed.
+> > 
+> > What's the best driver to look at dynamic allocation?
+> 
+> So there are quite a few that dynamically allocate the objects as they
+> are enumerated (eg max3100), but have a maximum set that is just pointers
+> (so for the max number of ports cheaper than the dynamic code)
+> 
+> The other question is why is it a CONFIG_ option. I'm assuming these
+> platforms are all ARM and in that case you could just pass the value in
+> the device tree, or hard code a safe maximum number of pointers to a
+> value which is the worst case and then install them as they are
+> enumerated.
+> 
+> There are lots of options better than breaking the "one kernel many
+> platforms" model.
+> 
+> Alan
 
-> -----Original Message-----
-> From: jmondi [mailto:jacopo at jmondi.org]
-> Sent: Wednesday, May 24, 2017 2:24 AM
-> To: A.S. Dong
-> Cc: linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linus.walleij at linaro.org; shawnguo at kernel.org; stefan at agner.ch; Jacky Bai;
-> Andy Duan; kernel at pengutronix.de; Rob Herring; Mark Rutland;
-> devicetree at vger.kernel.org
-> Subject: Re: [PATCH V3 1/2] dt-bindings: pinctrl: add imx7ulp pinctrl
-> binding doc
-> 
-> Hi Dong,
-> 
-> On Tue, May 23, 2017 at 07:43:48PM +0800, Dong Aisheng wrote:
-> > i.MX 7ULP has three IOMUXC instances: IOMUXC0 for M4 ports,
-> > IOMUXC1 for A7 ports and IOMUXC DDR for DDR interface.
-> >
-> > This patch adds the IOMUXC1 support for A7.
-> >
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Acked-by: Shawn Guo <shawnguo@kernel.org>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> >
-> > ---
-> > ChangeLog:
-> > v2->v3:
-> >  * switch to generic input/output-enable property
-> > v1->v2:
-> >  * add more descriptions in binding doc
-> >  * add missed prefix for private properties.
-> >  * move dt-bindings/pinctrl/imx7ulp-pinfunc.h to arch/arm/boot/dts
-> > ---
-> >  .../bindings/pinctrl/fsl,imx7ulp-pinctrl.txt       |  63 +++
-> >  arch/arm/boot/dts/imx7ulp-pinfunc.h                | 468
-> +++++++++++++++++++++
-> >  2 files changed, 531 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
-> >  create mode 100644 arch/arm/boot/dts/imx7ulp-pinfunc.h
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
-> > b/Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.txt
-> > new file mode 100644
-> > index 0000000..67e4d1e
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx7ulp-pinctrl.tx
-> > +++ t
-> > @@ -0,0 +1,63 @@
-> > +* Freescale i.MX7ULP IOMUX Controller
-> > +
-> > +i.MX 7ULP has three IOMUXC instances: IOMUXC0 for M4 ports, IOMUXC1
-> > +for A7 ports and IOMUXC DDR for DDR interface.
-> > +
-> > +Note:
-> > +This binding doc is only for the IOMUXC1 support in A7 Domain and it
-> > +only supports generic pin config.
-> > +
-> > +Please also refer to fsl,imx-pinctrl.txt in this directory for IMX
-> > +common binding part and pinctrl-bindings.txt for the generic config
-> binding.
-> > +
-> > +=== Pin Controller Node ===
-> > +
-> > +Required properties:
-> > +- compatible:	"fsl,imx7ulp-iomuxc1"
-> > +- reg:		Should contain the base physical address and size of the
-> iomuxc
-> > +		registers.
-> > +
-> > +=== Pin Configuration Node ===
-> > +- pins: One integers array, represents a group of pins mux setting.
-> > +	The format is fsl,pins = <PIN_FUNC_ID>, PIN_FUNC_ID is a pin working
-> on
-> > +	a specific function.
-> > +
-> > +	NOTE: i.MX7ULP PIN_FUNC_ID consists of 4 integers as it shares one
-> mux
-> > +	and config register as follows:
-> > +	<mux_conf_reg input_reg mux_mode input_val>
-> 
-> As your PIN_FUNC_ID specifies both the pin ids and their mux settings,
-> shouldn't you use the newly documented 'pinmux' property in place of
-> 'pins'?
-> 
-> Please see
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/
-> ?id=8d5e7c5df0a6c442373628be5221321172b1badf
-> 
-> The current documentation specifies pin ids and mux settings have to be
-> assembled in one single integer, which is not your case, but that can be
-> changed to make it accept an array of integers values if needed.
-> 
 
-Thanks for the info.
-Looks good to me.
+I guess I'm confused how this isn't a better solution than what we have
+now, or how it breaks the "one kernel many platforms model".
 
-Shawn & Linus,
-Are you okay with this?
+I agree that it is not the best solution, certainly this driver should be
+re-written to use the device tree and dynamic allocation, but that is
+not the patch being offered at this time.
 
-If yes, I can extend the standard 'pinmux' property to support integer array
-and renew the patch series to use it.
+This is a very minor module buried deep in the drivers tree. I guess I
+don't understand how allowing users to choose how many UARTS they might
+want to implement breaks the "one kernel" model. The users of this module
+and those like it do not use a pre-compiled kernel and customize their
+kernels extensively.
 
-Regards
-Dong Aisheng
+Is there some documentation online I could read that explains this "one
+kernel many platforms" model? Specifically how it pertains to FPGAs? I
+am but a humble embedded developer trying to make the kernel more useful
+to myself (and hopefully others), and I think I might have a limited
+worldview that restricts my ability to see the full picture and I would
+like to learn.
