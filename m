@@ -1,29 +1,58 @@
-From: eddie.cai.linux@gmail.com (Eddie Cai)
-Date: Wed, 24 May 2017 16:57:47 +0800
-Subject: [PATCH V2] ARM: dts: rockchip:remove hs200 support for firefly reload
-Message-ID: <1495616267-5305-1-git-send-email-eddie.cai.linux@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 24 May 2017 10:55:58 +0200
+Subject: [PATCH] ARM: dts: rockchip: correct regular setting for act8846
+In-Reply-To: <CAJrj+DMU5XP9vHt60F8Uf7BTfv13DQQUoVXs0Fv2nKbWH8xKYw@mail.gmail.com>
+References: <1495611221-6749-1-git-send-email-eddie.cai.linux@gmail.com>
+ <7433998.EkqTVyWeUF@phil>
+ <CAJrj+DMU5XP9vHt60F8Uf7BTfv13DQQUoVXs0Fv2nKbWH8xKYw@mail.gmail.com>
+Message-ID: <3806769.RZqfsnRCGS@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-due to layout limitation. not all of the reload board can support hs200.
-so remove hs200 support to make all board can boot up.
+Am Mittwoch, 24. Mai 2017, 16:50:51 CEST schrieb Eddie Cai:
+> 2017-05-24 16:47 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
+> > Am Mittwoch, 24. Mai 2017, 16:44:05 CEST schrieb Eddie Cai:
+> >> 2017-05-24 16:17 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
+> >> > Hi Eddie,
+> >> >
+> >> > Am Mittwoch, 24. Mai 2017, 15:33:41 CEST schrieb Eddie Cai:
+> >> >> the previous setting of act8846 is just copy from firefly board. but
+> >> >> the reload board is a little different from firefly board. let's correct
+> >> >> it.
+> >> >>
+> >> >> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
+> >> >> ---
+> >> >>  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 21 +++++++++++----------
+> >> >>  1 file changed, 11 insertions(+), 10 deletions(-)
+> >> >>
+> >> >> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> >> >> index 8134966..4cfa109 100644
+> >> >> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> >> >> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> >> >> @@ -179,6 +179,7 @@
+> >> >>                               regulator-name = "vccio_sd";
+> >> >>                               regulator-min-microvolt = <3300000>;
+> >> >>                               regulator-max-microvolt = <3300000>;
+> >> >> +                             regulator-always-on;
+> >> >
+> >> > the rest below looks pretty straight forward, but why does vccio_sd
+> >> > need to be always on?
+> >> >
+> >> > I've checked the reload's schematics but did not find any further users
+> >> > of vccio_sd that may warant this attribute.
+> >> Oh, It's default on. thank you for point out my mistake. I will modify
+> >> it in next version.
+> >
+> > not default-on, but the mmc-core will turn on the vccio regulator on its
+> > own during probe. So yes, please fix :-) .
+> I mean it will be default on by hardware from schematics. I just modify it to
+> regulator-boot-on and send v1 patch
 
-Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
----
- arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 2 --
- 1 file changed, 2 deletions(-)
+nice, that is even better to make that explicit.
 
-diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-index 4cfa109..56ac1e6f 100644
---- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-@@ -75,8 +75,6 @@
- 	bus-width = <8>;
- 	cap-mmc-highspeed;
- 	disable-wp;
--	mmc-hs200-1_8v;
- 	non-removable;
- 	num-slots = <1>;
- 	pinctrl-names = "default";
--- 
-1.9.1
+No need to resent for that, but your new patch should actually be v2.
+The patch without version number always counts as v1, we just normally
+don't write that down :-)
+
+
+Heiko
