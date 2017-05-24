@@ -1,49 +1,71 @@
-From: angus@akkea.ca (Angus Ainslie)
-Date: Wed, 24 May 2017 12:51:20 -0600
-Subject: [PATCH] clk: sunxi-ng: sun5i: Fix ahb_bist_clk definition
-In-Reply-To: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <ad72ceff73364add5cfe25b6143a68ca@www.akkea.ca>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 24 May 2017 12:18:34 -0700
+Subject: [PATCH 1/5] ARM: dts: qcom: Remove s4/5vs1,2 from RPM pm8941
+ control
+In-Reply-To: <20170127004728.22490-2-stephen.boyd@linaro.org>
+References: <20170127004728.22490-1-stephen.boyd@linaro.org>
+ <20170127004728.22490-2-stephen.boyd@linaro.org>
+Message-ID: <20170524191834.GY12920@tuxbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-05-24 10:34, Boris Brezillon wrote:
-> AHB BIST gate is actually controlled with bit 7.
+On Thu 26 Jan 16:47 PST 2017, Stephen Boyd wrote:
+
+> These regulators are controlled by the SPMI regulator driver
+> instead of the RPM regulator driver in the downstream android
+> kernel sources. Let's remove them from the DTS here because
+> they'll never be used by the RPM regulator driver.
 > 
-> This bug was detected while trying to use the NAND controller which is
-> using the DMA engine to transfer data to the NAND.
-> Since the ahb_bist_clk gate bit conflicts with the ahb_dma_clk gate 
-> bit,
-> the core was disabling the DMA engine clock as part of its 'disable
-> unused clks' procedure, which was causing all DMA transfers to fail 
-> after
-> this point.
-> 
-> Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
-> Cc: stable at vger.kernel.org
-> Reported-by: Angus Ainslie <angus@akkea.ca>compatible = 
-> "nextthing,chip-pro", "nextthing,gr8";
-> Signed-off-by: Boris Brezillon <boris.brezillon@frecompatible = 
-> "nextthing,chip-pro", "nextthing,gr8";e-electrons.com>
+> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+But the same vin_5vs-supply property can be found in
+qcom-apq8074-dragonboard.dts, so that should probably also go.
+
+Regards,
+Bjorn
+
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
->  drivers/clk/sunxi-ng/ccu-sun5i.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts | 1 -
+>  arch/arm/boot/dts/qcom-msm8974.dtsi                   | 4 ----
+>  2 files changed, 5 deletions(-)
 > 
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.c 
-> b/drivers/clk/sunxi-ng/ccu-sun5i.c
-> index 5c476f966a72..5372bf8be5e6 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun5i.c
-> +++ b/drivers/clk/sunxi-ng/ccu-sun5i.c
-> @@ -243,7 +243,7 @@ static SUNXI_CCU_GATE(ahb_ss_clk,	"ahb-ss",	"ahb",
->  static SUNXI_CCU_GATE(ahb_dma_clk,	"ahb-dma",	"ahb",
->  		      0x060, BIT(6), 0);
->  static SUNXI_CCU_GATE(ahb_bist_clk,	"ahb-bist",	"ahb",
-> -		      0x060, BIT(6), 0);
-> +		      0x060, BIT(7), 0);
->  static SUNXI_CCU_GATE(ahb_mmc0_clk,	"ahb-mmc0",	"ahb",
->  		      0x060, BIT(8), 0);
->  static SUNXI_CCU_GATE(ahb_mmc1_clk,	"ahb-mmc1",	"ahb",
-
-
-The patch works perfectly. Using that I was able to remove the 
-clk_ignore_unsed and CLK_IS_CRITICAL.
+> diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
+> index e7c1577d56f4..50966378f9e4 100644
+> --- a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
+> +++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
+> @@ -92,7 +92,6 @@
+>  					vdd_l9_l10_l17_l22-supply = <&vreg_boost>;
+>  					vdd_l13_l20_l23_l24-supply = <&vreg_boost>;
+>  					vdd_l21-supply = <&vreg_boost>;
+> -					vin_5vs-supply = <&pm8941_5v>;
+>  
+>  					s1 {
+>  						regulator-min-microvolt = <1300000>;
+> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> index 0e9bbede860d..6c167c031368 100644
+> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> @@ -735,7 +735,6 @@
+>  					pm8941_s1: s1 {};
+>  					pm8941_s2: s2 {};
+>  					pm8941_s3: s3 {};
+> -					pm8941_5v: s4 {};
+>  
+>  					pm8941_l1: l1 {};
+>  					pm8941_l2: l2 {};
+> @@ -765,9 +764,6 @@
+>  					pm8941_lvs1: lvs1 {};
+>  					pm8941_lvs2: lvs2 {};
+>  					pm8941_lvs3: lvs3 {};
+> -
+> -					pm8941_5vs1: 5vs1 {};
+> -					pm8941_5vs2: 5vs2 {};
+>  				};
+>  			};
+>  		};
+> -- 
+> 2.10.0.297.gf6727b0
+> 
