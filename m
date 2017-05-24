@@ -1,26 +1,43 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 24 May 2017 10:28:20 +0200
-Subject: [PATCH 0/5] ARM64: dts: meson: Add CEC,
- Ethernet Link and SPI pins nodes
-Message-ID: <1495614505-4437-1-git-send-email-narmstrong@baylibre.com>
+Date: Wed, 24 May 2017 10:28:21 +0200
+Subject: [PATCH 1/5] ARM64: dts: meson-gxbb: Add CEC pins nodes
+In-Reply-To: <1495614505-4437-1-git-send-email-narmstrong@baylibre.com>
+References: <1495614505-4437-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1495614505-4437-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds the following DT Pins nodes :
- - CEC Pins for GXBB and GXL
- - SPICC Pins for GXBB and GXL
- - Internal Ethernet PHY LEDS pins for GXL
+Add the AO and EE domain CEC pins nodes for the Amlogic Meson GXBB SoCs.
 
-Neil Armstrong (5):
-  ARM64: dts: meson-gxbb: Add CEC pins nodes
-  ARM64: dts: meson-gxl: Add CEC pins nodes
-  ARM64: dts: meson-gxl: Add Ethernet PHY LEDS pins nodes
-  ARM64: dts: meson-gxbb: Add SPI pinctrl nodes
-  ARM64: dts: meson-gxl: Add SPI pinctrl nodes
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 30 ++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 44 +++++++++++++++++++++++++++++
- 2 files changed, 74 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 6f8b301..f0cfb02 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -242,6 +242,20 @@
+ 				function = "spdif_out_ao";
+ 			};
+ 		};
++
++		ao_cec_pins: ao_cec {
++			mux {
++				groups = "ao_cec";
++				function = "cec_ao";
++			};
++		};
++
++		ee_cec_pins: ee_cec {
++			mux {
++				groups = "ee_cec";
++				function = "cec_ao";
++			};
++		};
+ 	};
+ };
+ 
 -- 
 1.9.1
