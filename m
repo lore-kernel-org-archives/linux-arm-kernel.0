@@ -1,21 +1,22 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 24 May 2017 10:39:26 +0200
-Subject: [PATCH 1/3] ARM64: dts: meson-gxl: Fix pinctrl periphs gpio-ranges
-In-Reply-To: <1495549311-23660-2-git-send-email-narmstrong@baylibre.com>
+Date: Wed, 24 May 2017 10:39:49 +0200
+Subject: [PATCH 2/3] ARM64: dts: Fix GXL periphs pinctrl pull-enable
+ register base
+In-Reply-To: <1495549311-23660-3-git-send-email-narmstrong@baylibre.com>
 References: <1495549311-23660-1-git-send-email-narmstrong@baylibre.com>
- <1495549311-23660-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1495615166.14589.2.camel@baylibre.com>
+ <1495549311-23660-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1495615189.14589.3.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 2017-05-23 at 16:21 +0200, Neil Armstrong wrote:
-> The gpio-range was badly added on the GXL dtsi, the AO pin count is 10
-> instead of 14.
-> 
+> The pull-enable register base was wrongly copied from the GXBB pinctrl node,
+> but was not used yet.
 
 Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
 
-> Fixes: 84412e4e857f ("ARM64: dts: meson-gxl: Add gpio-ranges properties")
+> 
+> Fixes: fb0fe92294a9 ("ARM64: dts: meson-gxl: Add pinctrl nodes")
 > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
 > ?arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 2 +-
@@ -23,15 +24,15 @@ Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
 > 
 > diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
 > b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> index 3efad5f..4871ce5 100644
+> index 4871ce5..57fe1f5 100644
 > --- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
 > +++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> @@ -244,7 +244,7 @@
+> @@ -239,7 +239,7 @@
+> ?		gpio: bank at 4b0 {
+> ?			reg = <0x0 0x004b0 0x0 0x28>,
+> ?			??????<0x0 0x004e8 0x0 0x14>,
+> -			??????<0x0 0x00120 0x0 0x14>,
+> +			??????<0x0 0x00520 0x0 0x14>,
+> ?			??????<0x0 0x00430 0x0 0x40>;
 > ?			reg-names = "mux", "pull", "pull-enable", "gpio";
 > ?			gpio-controller;
-> ?			#gpio-cells = <2>;
-> -			gpio-ranges = <&pinctrl_periphs 0 14 101>;
-> +			gpio-ranges = <&pinctrl_periphs 0 10 101>;
-> ?		};
-> ?
-> ?		emmc_pins: emmc {
