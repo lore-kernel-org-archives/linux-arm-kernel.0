@@ -1,78 +1,95 @@
-From: dsafonov@virtuozzo.com (Dmitry Safonov)
-Date: Wed, 24 May 2017 13:09:14 +0300
-Subject: [PATCHv2] ARM32: Support mremap() for sigpage/vDSO
-In-Reply-To: <20170523200946.GG22219@n2100.armlinux.org.uk>
-References: <20170414132529.8337-1-dsafonov@virtuozzo.com>
- <871579ef-ee9a-c321-80e4-47836bb0e472@virtuozzo.com>
- <bebbe3ce-12ed-419a-248a-55f41d74d9da@virtuozzo.com>
- <20170523200946.GG22219@n2100.armlinux.org.uk>
-Message-ID: <7dc84202-9f12-4f0e-a925-e050974e17b9@virtuozzo.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 24 May 2017 11:09:49 +0100
+Subject: [PATCH v2 2/2] arm64: Add dump_backtrace() in show_regs
+In-Reply-To: <1494294817-29187-2-git-send-email-wangkefeng.wang@huawei.com>
+References: <20170508145535.GF5480@leverpostej>
+ <1494294817-29187-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1494294817-29187-2-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20170524100949.GA24574@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Adding back to CC x86 guys - as I've removed in ping messages.
+Hi,
 
-On 05/23/2017 11:09 PM, Russell King - ARM Linux wrote:
-> On Thu, May 18, 2017 at 02:13:29PM +0300, Dmitry Safonov wrote:
->> On 04/25/2017 08:18 PM, Dmitry Safonov wrote:
->>> On 04/14/2017 04:25 PM, Dmitry Safonov wrote:
->>>> CRIU restores application mappings on the same place where they
->>>> were before Checkpoint. That means, that we need to move vDSO
->>>> and sigpage during restore on exactly the same place where
->>>> they were before C/R.
->>>>
->>>> Make mremap() code update mm->context.{sigpage,vdso} pointers
->>>> during VMA move. Sigpage is used for landing after handling
->>>> a signal - if the pointer is not updated during moving, the
->>>> application might crash on any signal after mremap().
->>>>
->>>> vDSO pointer on ARM32 is used only for setting auxv at this moment,
->>>> update it during mremap() in case of future usage.
->>>>
->>>> Without those updates, current work of CRIU on ARM32 is not reliable.
->>>> Historically, we error Checkpointing if we find vDSO page on ARM32
->>>> and suggest user to disable CONFIG_VDSO.
->>>> But that's not correct - it goes from x86 where signal processing
->>>> is ended in vDSO blob. For arm32 it's sigpage, which is not disabled
->>>> with `CONFIG_VDSO=n'.
->>>>
->>>> Looks like C/R was working by luck - because userspace on ARM32 at
->>>> this moment always sets SA_RESTORER.
->>>>
->>>> Cc: linux-arm-kernel at lists.infradead.org
->>>> Cc: Russell King <linux@armlinux.org.uk>
->>>> Cc: Will Deacon <will.deacon@arm.com>
->>>> Cc: Andy Lutomirski <luto@amacapital.net>
->>>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
->>>> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
->>>> Cc: Christopher Covington <cov@codeaurora.org>
->>>> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
->>>> ---
->>>> v2: (buildbot) Fix (unsinged long) to (void*) cast warning.
->>>>
->>>>   arch/arm/kernel/process.c |  8 ++++++++
->>>>   arch/arm/kernel/vdso.c    | 18 ++++++++++++++++++
->>>>   arch/x86/entry/vdso/vma.c |  3 ---
->>>>   mm/mmap.c                 |  4 ++++
->>>>   4 files changed, 30 insertions(+), 3 deletions(-)
->>>
->>> Ping?
->>
->> Ping?
+On Tue, May 09, 2017 at 09:53:37AM +0800, Kefeng Wang wrote:
+> Generic code expects show_regs() to dump the stack, but arm64's
+> show_regs() does not. This makes it hard to debug softlockups and
+> other issues that result in show_regs() being called.
 > 
-> I'm mostly happy with the ARM bits, but I can't take the patch without
-> acks from others because it touches other architectures/generic code.
+> This patch updates arm64's show_regs() to dump the stack, as common
+> code expects.
 > 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  arch/arm64/include/asm/stacktrace.h | 1 +
+>  arch/arm64/kernel/process.c         | 1 +
+>  arch/arm64/kernel/traps.c           | 2 +-
+>  3 files changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+> index 801a16db..5b6eafc 100644
+> --- a/arch/arm64/include/asm/stacktrace.h
+> +++ b/arch/arm64/include/asm/stacktrace.h
+> @@ -30,5 +30,6 @@ struct stackframe {
+>  extern int unwind_frame(struct task_struct *tsk, struct stackframe *frame);
+>  extern void walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
+>  			    int (*fn)(struct stackframe *, void *), void *data);
+> +extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk);
+>  
+>  #endif	/* __ASM_STACKTRACE_H */
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index ae2a835..af1ea25 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -210,6 +210,7 @@ void __show_regs(struct pt_regs *regs)
+>  void show_regs(struct pt_regs * regs)
+>  {
+>  	__show_regs(regs);
+> +	dump_backtrace(regs, NULL);
+>  }
+>  
+>  static void tls_thread_flush(void)
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index d4d6ae0..368c3c8 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -140,7 +140,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
+>  	}
+>  }
+>  
+> -static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+> +void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+>  {
+>  	struct stackframe frame;
+>  	unsigned long irq_stack_ptr;
 
-Fair enough, thanks.
+I just realised that we'll need one additional fixup:
 
-Andy, does moving of this WARN_ON() looks good to you?
-I've done it to reuse it over arches and between vdso/sigpage mappings,
-reducing code duplication.
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 0805b44..f452fcc 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -728,8 +728,6 @@ static int bug_handler(struct pt_regs *regs, unsigned int esr)
+                break;
+ 
+        case BUG_TRAP_TYPE_WARN:
+-               /* Ideally, report_bug() should backtrace for us... but no. */
+-               dump_backtrace(regs, NULL);
+                break;
+ 
+        default:
 
-Here is the patch, so you don't need to search it in the mailbox:
-https://patchwork.kernel.org/patch/9681273/
+... since report_bug() will call show_regs(), and dump the stack itself
+now.
 
--- 
-              Dmitry
+With that change, these patches will also fix *_ONCE() traps spewing
+backtraces every time they're invoked, which was a side-effect of
+commit:
+
+  19d436268dde9538 ("debug: Add _ONCE() logic to report_bug()")
+
+Would you mind folding that into a v3?
+
+Thanks,
+Mark.
