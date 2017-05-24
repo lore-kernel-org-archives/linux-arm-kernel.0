@@ -1,60 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 24 May 2017 08:35:36 +0200
-Subject: [PATCH 2/2] ARM: dts: orange-pi-zero: enable SPI NOR
-In-Reply-To: <20170522203012.k2f2kizp5jkiliq7@speedy.hunter>
-References: <20170519213550.8434-1-geomatsi@gmail.com>
- <20170519213550.8434-3-geomatsi@gmail.com>
- <20170522092900.7v2mg5zkbt6eclhr@flea.lan>
- <20170522203012.k2f2kizp5jkiliq7@speedy.hunter>
-Message-ID: <20170524063536.lotdwmkecenywwmi@flea.home>
+From: jacopo@jmondi.org (jmondi)
+Date: Wed, 24 May 2017 09:07:02 +0200
+Subject: [PATCH] arm: dts: r7s72100: Add support for GR-Peach
+In-Reply-To: <CAMuHMdUovD=6YfJYckoftWyJZ3eRjcKFkScj=wLhyTDSFPavgw@mail.gmail.com>
+References: <1495567254-10226-1-git-send-email-jacopo+renesas@jmondi.org>
+ <CAMuHMdUovD=6YfJYckoftWyJZ3eRjcKFkScj=wLhyTDSFPavgw@mail.gmail.com>
+Message-ID: <20170524070702.GB4253@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergey,
+Hello Simon,
 
-On Mon, May 22, 2017 at 11:30:12PM +0300, Sergey Matyukevich wrote:
-> > > For more information see:
-> > > - http://linux-sunxi.org/Orange_Pi_Zero#SPI_NOR_flash
-> > 
-> > Same remark here than on the first patch
-> 
-> Ok, I will provide a more detailed commit message
-> w/o external references.
-> 
-> > > +&spi0 {
-> > > +	status = "okay";
-> > > +
-> > > +	flash at 0 {
-> > > +		#address-cells = <1>;
-> > > +		#size-cells = <1>;
-> > > +		compatible = "mxicy,mx25l1606e", "winbond,w25q128";
-> > > +		reg = <0>;
-> > > +		spi-max-frequency = <40000000>;
-> > 
-> > How do the other OPi Zero that doesn't have that SPI flash behave?
+On Tue, May 23, 2017 at 09:25:40PM +0200, Geert Uytterhoeven wrote:
+> On Tue, May 23, 2017 at 9:20 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+> > Add device tree source for Renesas GR-Peach board.
+> > GR-Peach is an RZ/A1H based board with 10MB of on-chip SRAM and 8MB
+> > QSPI flash storage.
+> > Add support for the board, and create a 2MB partition to use as rootfs.
+> >
+> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 >
-> Hmmm. Good point. According to linux-sunxi.org docs SPI NOR flash
-> was optional in the first production batch in Dec 2016. In later
-> batches flash chip was pre-populated. However there are should
-> be quite a few boards around which do not have flash.
-> 
-> Does it make sense to set status to 'disabled' by default adding
-> appropriate comment in the commit message ?
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-If it's just that the driver fails to probe, we can live with that I
-guess. If not, then yes, that's a solution too.
+I forgot to change subject to "PATCH v2".
+Could you please take this one, or would you like me to resend with
+Geert's reviewed-by ?
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170524/80610cf3/attachment-0001.sig>
+Thanks
+   j
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
