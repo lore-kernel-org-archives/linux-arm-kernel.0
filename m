@@ -1,75 +1,77 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 24 May 2017 15:06:13 +0200
-Subject: [PATCH 1/1] xilinx ps uart: Adding a kernel parameter for the
- number of xilinx ps uarts
-In-Reply-To: <20170523210710.4e84dd2d@alans-desktop>
-References: <20170520022154.6766-1-kernel.development@povil.us>
- <20170520172008.5a979e8a@alans-desktop>
- <517d864d-d230-3abc-eb3c-4b628dc4625f@xilinx.com>
- <20170522192636.5b578d89@alans-desktop>
- <1668f36e-f9be-7008-004a-e467a6813e0f@xilinx.com>
- <20170523210710.4e84dd2d@alans-desktop>
-Message-ID: <924433a1-7e27-6eb6-71ca-ed7baceb427f@xilinx.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 24 May 2017 14:11:13 +0100
+Subject: [PATCH v4 0/9] arm64: Enable contiguous pte hugepage support
+Message-ID: <20170524131122.5309-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.5.2017 22:07, Alan Cox wrote:
->> yep hardcoded max 4 where in probe first free space is found and used
->> (range 0-3) but still max3100s statically allocated.
->> Shouldn't be this also dynamically allocated?
-> 
-> The code to do the dynamic allocation would be larger than the array of
-> pointers for the sane worst case.
-> 
->> I am not quite sure how exactly you want to do this via DT.
-> 
-> Count the number of DT entries for this kind of port and allocate that
-> many ?
+Hi,
 
-:-) I think there is no doubt how to calculate that number for
-static/fixed system. But where do you want to put it? And who should
-read it?
+This patchset addresses all the known issues with contiguous hugetlb
+pages. Support for contiguous hugepages is useful on systems where the
+PMD hugepage size is too large (512MB hugepage when using 64k page
+granule) and contiguous hugepages can be used to provide reasonable
+hugepage sizes to the user.
 
-A lot of drivers are calling uart_register_driver in module_init.
-Others are calling it in probe(pl011 for example).
+The patches can be split as 
 
-In module init you probably don't have a pointer to DT to read this and
-this should be in generic location not in node itself.
-If all drivers should call it from probe then we should change that -
-then reading property is easy and only location should be cleared.
+* Patches 1-3, 9 cleanups and improvements
 
-That's why I am curious how exactly you would do it because I haven't
-seen this before.
+* Patch 4 addresses the break-before-make requirement of the
+  architecture for contiguous hugepages. These patches depend on
+  enabling memory failure handling on arm64[2].
 
-> 
->>
->> Also what do you think is a safe maximum number? This is fpga - hundreds
->> of pins which can do just uart.
->>
->>> There are lots of options better than breaking the "one kernel many
->>> platforms" model.  
->>
->> Another options is also module parameter and dynamically allocated array
->> in cdns_uart_init.
-> 
-> For a given platform the number is constant and they need to be
-> described, so it seems to make no sense to put it anywhere other than the
-> DT for that platform.
+* Patch 5-7 add support for handling swap entries for contiguous pte
+  hugepages. These patches depend on fixes to core code required to
+  support contiguous hugepages[3].
 
-Also I don't think this is really constant in all cases. Especially in
-connection to fpga where you can put others IPs to PL. You never know
-what it is present in partial region and how many of these are there.
-It means having truly dynamic behavior would be welcome.
+* Patch 8 enables contiguous hugepage support for arm64
 
-Can you call uart_register_driver() from probe for every instance? It
-means nr is 1 all the time.
+The patches are based on v4.12-rc2. Previous postings can be found at
+[0], [1].
 
-> 
-> Why should users have to pass magic config options not use DT as
-> intended ?
-
-I am not saying that config option is perfect solution. It is at least
-aligned with 5 others serial drivers in the tree.
+All feedback welcome.
 
 Thanks,
-Michal
+Punit
+
+[0] https://www.spinics.net/lists/arm-kernel/msg570422.html
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/497027.html
+[2] https://www.spinics.net/lists/arm-kernel/msg581657.html
+[3] https://www.spinics.net/lists/arm-kernel/msg583342.html
+
+Changes v3 -> v4
+* Moved Patches 2 and 4 to [3] due to dependencies
+
+Changes v2 -> v3
+* Rebased on v4.12-rc2
+* Included swap related fixes in this series
+* Enable contiguous pte hugepages
+
+Changes v1 -> v2:
+* Marked patch 2 for stable
+* Fixed comment issues in patch 7
+* Added tags
+
+Punit Agrawal (4):
+  arm64: hugetlbpages: Handle swap entries in huge_pte_offset() for
+    contiguous hugepages
+  arm64: hugetlb: Override huge_pte_clear() to support contiguous
+    hugepages
+  arm64: hugetlb: Override set_huge_swap_pte_at() to support contiguous
+    hugepages
+  arm64: Re-enable support for contiguous hugepages
+
+Steve Capper (5):
+  arm64: hugetlb: set_huge_pte_at Add WARN_ON on !pte_present
+  arm64: hugetlb: Introduce pte_pgprot helper
+  arm64: hugetlb: Spring clean huge pte accessors
+  arm64: hugetlb: Add break-before-make logic for contiguous entries
+  arm64: hugetlb: Cleanup setup_hugepagesz
+
+ arch/arm64/include/asm/hugetlb.h |   9 +-
+ arch/arm64/mm/hugetlbpage.c      | 287 ++++++++++++++++++++++++++++-----------
+ 2 files changed, 213 insertions(+), 83 deletions(-)
+
+-- 
+2.11.0
