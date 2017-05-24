@@ -1,95 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 24 May 2017 11:09:49 +0100
-Subject: [PATCH v2 2/2] arm64: Add dump_backtrace() in show_regs
-In-Reply-To: <1494294817-29187-2-git-send-email-wangkefeng.wang@huawei.com>
-References: <20170508145535.GF5480@leverpostej>
- <1494294817-29187-1-git-send-email-wangkefeng.wang@huawei.com>
- <1494294817-29187-2-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20170524100949.GA24574@leverpostej>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 24 May 2017 18:06:03 +0800
+Subject: [PATCH v3 5/9] dmaengine: sun6i: make gate bit in sun8i's DMA engines
+ a common quirk
+In-Reply-To: <20170524100607.29790-1-icenowy@aosc.io>
+References: <20170524100607.29790-1-icenowy@aosc.io>
+Message-ID: <20170524100607.29790-6-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Icenowy Zheng <icenowy@aosc.xyz>
 
-On Tue, May 09, 2017 at 09:53:37AM +0800, Kefeng Wang wrote:
-> Generic code expects show_regs() to dump the stack, but arm64's
-> show_regs() does not. This makes it hard to debug softlockups and
-> other issues that result in show_regs() being called.
-> 
-> This patch updates arm64's show_regs() to dump the stack, as common
-> code expects.
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
->  arch/arm64/include/asm/stacktrace.h | 1 +
->  arch/arm64/kernel/process.c         | 1 +
->  arch/arm64/kernel/traps.c           | 2 +-
->  3 files changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-> index 801a16db..5b6eafc 100644
-> --- a/arch/arm64/include/asm/stacktrace.h
-> +++ b/arch/arm64/include/asm/stacktrace.h
-> @@ -30,5 +30,6 @@ struct stackframe {
->  extern int unwind_frame(struct task_struct *tsk, struct stackframe *frame);
->  extern void walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
->  			    int (*fn)(struct stackframe *, void *), void *data);
-> +extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk);
->  
->  #endif	/* __ASM_STACKTRACE_H */
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index ae2a835..af1ea25 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -210,6 +210,7 @@ void __show_regs(struct pt_regs *regs)
->  void show_regs(struct pt_regs * regs)
->  {
->  	__show_regs(regs);
-> +	dump_backtrace(regs, NULL);
->  }
->  
->  static void tls_thread_flush(void)
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index d4d6ae0..368c3c8 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -140,7 +140,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
->  	}
->  }
->  
-> -static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
-> +void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
->  {
->  	struct stackframe frame;
->  	unsigned long irq_stack_ptr;
+Originally we enable a special gate bit when the compatible indicates
+A23/33.
 
-I just realised that we'll need one additional fixup:
+But according to BSP sources and user manuals, more SoCs will need this
+gate bit.
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 0805b44..f452fcc 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -728,8 +728,6 @@ static int bug_handler(struct pt_regs *regs, unsigned int esr)
-                break;
+So make it a common quirk configured in the config struct.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+Changes in v3:
+- Stripped out the A83T gate bit set.
+
+ drivers/dma/sun6i-dma.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index a2358780ab2c..69840cf6fe98 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -101,6 +101,11 @@ struct sun6i_dma_config {
+ 	u32 nr_max_channels;
+ 	u32 nr_max_requests;
+ 	u32 nr_max_vchans;
++	/*
++	 * The hardware has a special gate bit, which is needed to
++	 * be enabled for some SoCs with a sun6i-style DMA engine.
++	 */
++	bool gate_needed;
+ };
  
-        case BUG_TRAP_TYPE_WARN:
--               /* Ideally, report_bug() should backtrace for us... but no. */
--               dump_backtrace(regs, NULL);
-                break;
+ /*
+@@ -1009,6 +1014,7 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
+ 	.nr_max_channels = 8,
+ 	.nr_max_requests = 24,
+ 	.nr_max_vchans   = 37,
++	.gate_needed	 = true,
+ };
  
-        default:
-
-... since report_bug() will call show_regs(), and dump the stack itself
-now.
-
-With that change, these patches will also fix *_ONCE() traps spewing
-backtraces every time they're invoked, which was a side-effect of
-commit:
-
-  19d436268dde9538 ("debug: Add _ONCE() logic to report_bug()")
-
-Would you mind folding that into a v3?
-
-Thanks,
-Mark.
+ static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
+@@ -1177,10 +1183,10 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 	/*
+ 	 * sun8i variant requires us to toggle a dma gating register,
+ 	 * as seen in Allwinner's SDK. This register is not documented
+-	 * in the A23 user manual.
++	 * in the A23 user manual, but documented at least in V3s user
++	 * manual.
+ 	 */
+-	if (of_device_is_compatible(pdev->dev.of_node,
+-				    "allwinner,sun8i-a23-dma"))
++	if (sdc->cfg->gate_needed)
+ 		writel(SUN8I_DMA_GATE_ENABLE, sdc->base + SUN8I_DMA_GATE);
+ 
+ 	return 0;
+-- 
+2.12.2
