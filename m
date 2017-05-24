@@ -1,68 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 May 2017 14:00:02 +0100
-Subject: irqchip/irq-gic: BAD_MADT_GICC_ENTRY may fail when booting with
- ACPI 5.1
-In-Reply-To: <25d7230b-1dba-614c-7193-b9e44429b5a1@arm.com>
-References: <432c3a63-c89f-dccc-7bdf-9d9a0aaabfe2@arm.com>
- <20170523170657.GA3800@red-moon>
- <25d7230b-1dba-614c-7193-b9e44429b5a1@arm.com>
-Message-ID: <e9ca4338-bcf9-3fba-6250-200e05d2be3e@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 24 May 2017 15:06:13 +0200
+Subject: [PATCH 1/1] xilinx ps uart: Adding a kernel parameter for the
+ number of xilinx ps uarts
+In-Reply-To: <20170523210710.4e84dd2d@alans-desktop>
+References: <20170520022154.6766-1-kernel.development@povil.us>
+ <20170520172008.5a979e8a@alans-desktop>
+ <517d864d-d230-3abc-eb3c-4b628dc4625f@xilinx.com>
+ <20170522192636.5b578d89@alans-desktop>
+ <1668f36e-f9be-7008-004a-e467a6813e0f@xilinx.com>
+ <20170523210710.4e84dd2d@alans-desktop>
+Message-ID: <924433a1-7e27-6eb6-71ca-ed7baceb427f@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/17 12:18, Julien Grall wrote:
-> Hi Lorenzo,
+On 23.5.2017 22:07, Alan Cox wrote:
+>> yep hardcoded max 4 where in probe first free space is found and used
+>> (range 0-3) but still max3100s statically allocated.
+>> Shouldn't be this also dynamically allocated?
 > 
-> On 05/23/2017 06:06 PM, Lorenzo Pieralisi wrote:
->> [+Al]
->>
->> On Tue, May 23, 2017 at 05:40:28PM +0100, Julien Grall wrote:
->>> Hi all,
->>>
->>> I am currently looking at adding support of ACPI 5.1 in Xen.
->>> When trying to boot DOM00 I get a panic in Linux (for the full
->>> log see [1]):
->>>
->>> (XEN) DOM0: [    0.000000] No valid GICC entries exist
->>>
->>> The error message is coming from gic_v2_acpi_init.
->>> Digging down in the code, it is failing because of
->>> BAD_MADT_GICC_ENTRY is returning false in
->>> gic_acpi_parse_madt_cpu:
->>>
->>> /* Macros for consistency checks of the GICC subtable of MADT */
->>> #define ACPI_MADT_GICC_LENGTH	\
->>> 	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
->>>
->>> #define BAD_MADT_GICC_ENTRY(entry, end)						\
->>> 	(!(entry) || (unsigned long)(entry) + sizeof(*(entry)) > (end) ||	\
->>> 	 (entry)->header.length != ACPI_MADT_GICC_LENGTH)
->>>
->>> The 'end' parameter corresponds to the end of the MADT table.
->>> In the case of ACPI 5.1, the size of GICC is smaller compare
->>> to 6.0+ (76 vs 80 bytes) but the parameter 'entry' is type
->>> of acpi_madt_generic_interrupt (sizeof(...) = 80).
->>
->> #define BAD_MADT_GICC_ENTRY(entry, end)	\
->> 	(!(entry) || (entry)->header.length != ACPI_MADT_GICC_LENGTH ||	\
->> 	((unsigned long)(entry) + ACPI_MADT_GICC_LENGTH) > (end))
->>
->> Would this solve it ?
+> The code to do the dynamic allocation would be larger than the array of
+> pointers for the sane worst case.
 > 
-> Yes, I am now able to boot DOM0 up to the prompt. My concern with this 
-> solution is the code will still use the acpi_madt_generic_interrupt 
-> code. If someone tries to access field not existing in 5.1 (such as 
-> efficiency_class), it may return wrong value or even worst crash.
+>> I am not quite sure how exactly you want to do this via DT.
 > 
-> Although, I don't see any user of efficiency_class in Linux so far.
+> Count the number of DT entries for this kind of port and allocate that
+> many ?
 
-Such code would have to check whether the ACPI version before doing so.
-To be honest, it is quite surprising we don't have one structure per
-version of the GICC subtable. This would at least make the user aware of
-the potential gotcha...
+:-) I think there is no doubt how to calculate that number for
+static/fixed system. But where do you want to put it? And who should
+read it?
+
+A lot of drivers are calling uart_register_driver in module_init.
+Others are calling it in probe(pl011 for example).
+
+In module init you probably don't have a pointer to DT to read this and
+this should be in generic location not in node itself.
+If all drivers should call it from probe then we should change that -
+then reading property is easy and only location should be cleared.
+
+That's why I am curious how exactly you would do it because I haven't
+seen this before.
+
+> 
+>>
+>> Also what do you think is a safe maximum number? This is fpga - hundreds
+>> of pins which can do just uart.
+>>
+>>> There are lots of options better than breaking the "one kernel many
+>>> platforms" model.  
+>>
+>> Another options is also module parameter and dynamically allocated array
+>> in cdns_uart_init.
+> 
+> For a given platform the number is constant and they need to be
+> described, so it seems to make no sense to put it anywhere other than the
+> DT for that platform.
+
+Also I don't think this is really constant in all cases. Especially in
+connection to fpga where you can put others IPs to PL. You never know
+what it is present in partial region and how many of these are there.
+It means having truly dynamic behavior would be welcome.
+
+Can you call uart_register_driver() from probe for every instance? It
+means nr is 1 all the time.
+
+> 
+> Why should users have to pass magic config options not use DT as
+> intended ?
+
+I am not saying that config option is perfect solution. It is at least
+aligned with 5 others serial drivers in the tree.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Michal
