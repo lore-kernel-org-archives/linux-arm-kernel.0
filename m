@@ -1,72 +1,89 @@
-From: eddie.cai.linux@gmail.com (Eddie Cai)
-Date: Wed, 24 May 2017 16:48:06 +0800
-Subject: [PATCH V1] ARM: dts: rockchip: correct regular setting for act8846
-Message-ID: <1495615686-29949-1-git-send-email-eddie.cai.linux@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 May 2017 10:48:34 +0200
+Subject: [PATCH 1/3 v4] dt-bindings: Augment Gemini for clocks, resets
+Message-ID: <20170524084834.24876-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the previous setting of act8846 is just copy from firefly board. but
-the reload board is a little different from firefly board. let's correct
-it.
+This augments the platform bindings for the Gemini SoC to include
+the fact that the system controller also provides clock and reset
+lines.
 
-Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+ChangeLog v3->v4:
+- Spit off the header files into their own patches so they
+  can be merged to respective subsystem.
+ChangeLog v2->v3:
+- Essentially a new patch from the two old patches adding
+  bindings to the reset and clock controller separately.
+  Instead add it all into the system controller and use one
+  single compatible.
+---
+ Documentation/devicetree/bindings/arm/gemini.txt | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-index 8134966..4cfa109 100644
---- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-@@ -179,6 +179,7 @@
- 				regulator-name = "vccio_sd";
- 				regulator-min-microvolt = <3300000>;
- 				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
- 			};
+diff --git a/Documentation/devicetree/bindings/arm/gemini.txt b/Documentation/devicetree/bindings/arm/gemini.txt
+index 0041eb031116..55bf7ce96c44 100644
+--- a/Documentation/devicetree/bindings/arm/gemini.txt
++++ b/Documentation/devicetree/bindings/arm/gemini.txt
+@@ -24,6 +24,19 @@ Required nodes:
+   global control registers, with the compatible string
+   "cortina,gemini-syscon", "syscon";
  
- 			vdd10_lcd: REG6 {
-@@ -187,24 +188,23 @@
- 				regulator-max-microvolt = <1000000>;
- 			};
++  Required properties on the syscon:
++  - reg: syscon register location and size.
++  - #clock-cells: should be set to <1> - the system controller is also a
++                  clock provider.
++  - #reset-cells: should be set to <1> - the system controller is also a
++                  reset line provider.
++
++  The clock sources have shorthand defines in the include file:
++  <dt-bindings/clock/cortina,gemini-clock.h>
++
++  The reset lines have shorthand defines in the include file:
++  <dt-bindings/reset/cortina,gemini-reset.h>
++
+ - timer: the soc bus node must have a timer node pointing to the SoC timer
+   block, with the compatible string "cortina,gemini-timer"
+   See: clocksource/cortina,gemini-timer.txt
+@@ -56,12 +69,15 @@ Example:
+ 		syscon: syscon at 40000000 {
+ 			compatible = "cortina,gemini-syscon", "syscon";
+ 			reg = <0x40000000 0x1000>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
+ 		};
  
--			vcca_18: REG7  {
--				regulator-name = "vcca_18";
--				regulator-min-microvolt = <1800000>;
--				regulator-max-microvolt = <1800000>;
--				regulator-always-on;
-+			vcca_33: REG7  {
-+				regulator-name = "vcca_33";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
- 			};
+ 		uart0: serial at 42000000 {
+ 			compatible = "ns16550a";
+ 			reg = <0x42000000 0x100>;
+-			clock-frequency = <48000000>;
++			resets = <&syscon GEMINI_RESET_UART>;
++			clocks = <&syscon GEMINI_CLK_UART>;
+ 			interrupts = <18 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 		};
+@@ -73,12 +89,18 @@ Example:
+ 			interrupts = <14 IRQ_TYPE_EDGE_FALLING>, /* Timer 1 */
+ 				     <15 IRQ_TYPE_EDGE_FALLING>, /* Timer 2 */
+ 				     <16 IRQ_TYPE_EDGE_FALLING>; /* Timer 3 */
++			resets = <&syscon GEMINI_RESET_TIMER>;
++			/* APB clock or RTC clock */
++			clocks = <&syscon GEMINI_CLK_APB>,
++				 <&syscon GEMINI_CLK_RTC>;
++			clock-names = "PCLK", "EXTCLK";
+ 			syscon = <&syscon>;
+ 		};
  
--			vcca_33: REG8 {
--				regulator-name = "vcca_33";
-+			vcc_lan: REG8 {
-+				regulator-name = "vcc_lan";
- 				regulator-min-microvolt = <3300000>;
- 				regulator-max-microvolt = <3300000>;
--				regulator-always-on;
- 			};
- 
--			vcc_lan: REG9 {
--				regulator-name = "vcca_lan";
-+			vccio_pmu: REG9 {
-+				regulator-name = "vccio_pmu";
- 				regulator-min-microvolt = <3300000>;
- 				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
- 			};
- 
- 			vdd_10: REG10 {
-@@ -218,6 +218,7 @@
- 				regulator-name = "vcc_18";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
- 			};
- 
- 			vcc18_lcd: REG12 {
+ 		intcon: interrupt-controller at 48000000 {
+ 			compatible = "cortina,gemini-interrupt-controller";
+ 			reg = <0x48000000 0x1000>;
++			resets = <&syscon GEMINI_RESET_INTCON0>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+ 		};
 -- 
-1.9.1
+2.9.4
