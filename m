@@ -1,36 +1,37 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 24 May 2017 10:38:48 +0200
-Subject: [PATCH 2/2] pinctrl: meson-gxbb: Add missing GPIODV_18 pin entry
-In-Reply-To: <1495548559-22261-3-git-send-email-narmstrong@baylibre.com>
-References: <1495548559-22261-1-git-send-email-narmstrong@baylibre.com>
- <1495548559-22261-3-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1495615128.14589.1.camel@baylibre.com>
+Date: Wed, 24 May 2017 10:39:26 +0200
+Subject: [PATCH 1/3] ARM64: dts: meson-gxl: Fix pinctrl periphs gpio-ranges
+In-Reply-To: <1495549311-23660-2-git-send-email-narmstrong@baylibre.com>
+References: <1495549311-23660-1-git-send-email-narmstrong@baylibre.com>
+ <1495549311-23660-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1495615166.14589.2.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-05-23 at 16:09 +0200, Neil Armstrong wrote:
-> GPIODV_18 entry was missing in the original driver push.
+On Tue, 2017-05-23 at 16:21 +0200, Neil Armstrong wrote:
+> The gpio-range was badly added on the GXL dtsi, the AO pin count is 10
+> instead of 14.
+> 
 
 Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
 
-> 
-> Fixes: 468c234f9ed7 ("pinctrl: amlogic: Add support for Amlogic Meson GXBB
-> SoC")
+> Fixes: 84412e4e857f ("ARM64: dts: meson-gxl: Add gpio-ranges properties")
 > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
-> ?drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 1 +
-> ?1 file changed, 1 insertion(+)
+> ?arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-> b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-> index 3ccb0f4f..7d897c5 100644
-> --- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-> +++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-> @@ -85,6 +85,7 @@
-> ?	MESON_PIN(GPIODV_15, EE_OFF),
-> ?	MESON_PIN(GPIODV_16, EE_OFF),
-> ?	MESON_PIN(GPIODV_17, EE_OFF),
-> +	MESON_PIN(GPIODV_18, EE_OFF),
-> ?	MESON_PIN(GPIODV_19, EE_OFF),
-> ?	MESON_PIN(GPIODV_20, EE_OFF),
-> ?	MESON_PIN(GPIODV_21, EE_OFF),
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+> b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+> index 3efad5f..4871ce5 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+> @@ -244,7 +244,7 @@
+> ?			reg-names = "mux", "pull", "pull-enable", "gpio";
+> ?			gpio-controller;
+> ?			#gpio-cells = <2>;
+> -			gpio-ranges = <&pinctrl_periphs 0 14 101>;
+> +			gpio-ranges = <&pinctrl_periphs 0 10 101>;
+> ?		};
+> ?
+> ?		emmc_pins: emmc {
