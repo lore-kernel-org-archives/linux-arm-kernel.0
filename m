@@ -1,70 +1,85 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 24 May 2017 18:09:11 +0200
-Subject: [PATCH 1/1] xilinx ps uart: Adding a kernel parameter for the
- number of xilinx ps uarts
-In-Reply-To: <20170524143108.682a548d@alans-desktop>
-References: <20170520022154.6766-1-kernel.development@povil.us>
- <20170520172008.5a979e8a@alans-desktop>
- <517d864d-d230-3abc-eb3c-4b628dc4625f@xilinx.com>
- <20170522192636.5b578d89@alans-desktop>
- <1668f36e-f9be-7008-004a-e467a6813e0f@xilinx.com>
- <20170523210710.4e84dd2d@alans-desktop>
- <924433a1-7e27-6eb6-71ca-ed7baceb427f@xilinx.com>
- <20170524143108.682a548d@alans-desktop>
-Message-ID: <b5a032c8-db86-c16b-750f-10aa2a132248@xilinx.com>
+From: keescook@google.com (Kees Cook)
+Date: Wed, 24 May 2017 09:15:34 -0700
+Subject: [PATCH 1/5] random,
+ stackprotect: introduce get_random_canary function
+In-Reply-To: <20170524155751.424-2-riel@redhat.com>
+References: <20170524155751.424-1-riel@redhat.com>
+ <20170524155751.424-2-riel@redhat.com>
+Message-ID: <CAGXu5jKVTga05PqHKaZ_gEqjSYc4sfaD7Cy9eZeDaZSowJ_v3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.5.2017 15:31, Alan Cox wrote:
->> I am not saying that config option is perfect solution. It is at least
->> aligned with 5 others serial drivers in the tree.
-> 
-> And the fact people keep doing hacks jutifies continuing to make a mess.
-> Especialy as in this case it's entirely theoretical. Nobody has produced
-> actual hardware that hits the limit. Nobody has filed a bug, nobody is
-> impacted.
+On Wed, May 24, 2017 at 8:57 AM,  <riel@redhat.com> wrote:
+> From: Rik van Riel <riel@redhat.com>
+>
+> Introduce the get_random_canary function, which provides a random
+> unsigned long canary value with the first byte zeroed out on 64
+> bit architectures, in order to mitigate non-terminated C string
+> overflows.
+>
+> The null byte both prevents C string functions from reading the
+> canary, and from writing it if the canary value were guessed or
+> obtained through some other means.
+>
+> Reducing the entropy by 8 bits is acceptable on 64-bit systems,
+> which will still have 56 bits of entropy left, but not on 32
+> bit systems, so the "ascii armor" canary is only implemented on
+> 64-bit systems.
+>
+> Inspired by the "ascii armor" code in the old execshield patches,
+> and Daniel Micay's linux-hardened tree.
+>
+> Signed-off-by: Rik van Riel <riel@redhat.com>
 
-This is the reason why we are talking about it how to do it right.
+Since the other recent canary fix went via -mm, perhaps these should
+go that way too? If not, I can take them via my KSPP tree.
 
-With this ps uart it is not that easy because this is cadence RTL which
-is not in public IP database but the same think is with uartlite.
-Limit there is 16. If you really want that I can create that HW design
-which will require more than 16 uartlites in one design.
+Acked-by: Kees Cook <keescook@chromium.org>
+
+-Kees
+
+> ---
+>  include/linux/random.h | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>
+> diff --git a/include/linux/random.h b/include/linux/random.h
+> index ed5c3838780d..1fa0dc880bd7 100644
+> --- a/include/linux/random.h
+> +++ b/include/linux/random.h
+> @@ -57,6 +57,27 @@ static inline unsigned long get_random_long(void)
+>  #endif
+>  }
+>
+> +/*
+> + * On 64-bit architectures, protect against non-terminated C string overflows
+> + * by zeroing out the first byte of the canary; this leaves 56 bits of entropy.
+> + */
+> +#ifdef CONFIG_64BIT
+> +# ifdef __LITTLE_ENDIAN
+> +#  define CANARY_MASK 0xffffffffffffff00UL
+> +# else /* big endian, 64 bits: */
+> +#  define CANARY_MASK 0x00ffffffffffffffUL
+> +# endif
+> +#else /* 32 bits: */
+> +# define CANARY_MASK 0xffffffffUL
+> +#endif
+> +
+> +static inline unsigned long get_random_canary(void)
+> +{
+> +       unsigned long val = get_random_long();
+> +
+> +       return val & CANARY_MASK;
+> +}
+> +
+>  unsigned long randomize_page(unsigned long start, unsigned long range);
+>
+>  u32 prandom_u32(void);
+> --
+> 2.9.3
+>
 
 
-> Creating extra CONFIG_ entries for junk like this is ridiculous, most of
-> the others at least have the excuse of being old code.
 
-No doubt about it. I am just trying to find out what's the way you are
-suggesting.
-
-
-> Generally it is better to call uart_register_driver from the probe method
-> because that way you don't waste time and memory registering drivers for
-> stuff that isn't even present however if you have no idea how many
-> devices there might be then you still really need to pass a suitable limit
-> and handle it internally dynamically allocating as needed.
-
-Ok. Is there any problem if uart_register_driver is called for every
-instance separately with nr=1? This driver has major 0, minor 0. Based
-on comment major 0 is for dynamic node allocation. Not sure about minor
-but it is easy to figured out if this should be 0 or 1, 2, 3, etc.
-
-> If someone was hitting this in the real world and you posted a patch that
-> just changed the constant to 8 or 16 or whatever was needed I wouldn't
-> care too much, but adding CONFIG_ entries just makes stuff harder and
-> harder to config and more and more impossible to keep generic.
-> 
-> I keep hearing that the ARM folks are trying to get one unified kernel.
-> CONFIG_ options is not how to do that.
-
-I have really not a problem with all of this. Just trying to understand
-how to do it properly and cleanup the second driver which we use on
-fpga. Last driver used by Xilinx is uart16550 where that old config
-macro already exists.
-
-Because at least now there is an issue in driver if you use serial
-aliases (serial2 and up) which needs to be fixed.
-
-Thanks,
-Michal
+-- 
+Kees Cook
+Pixel Security
