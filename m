@@ -1,57 +1,26 @@
-From: wei@redhat.com (Wei Huang)
-Date: Wed, 24 May 2017 09:36:41 -0500
-Subject: [PATCH 1/1] drivers/perf: arm_pmu_acpi: avoid perf IRQ init when
- guest PMU is off
-Message-ID: <1495636601-14726-1-git-send-email-wei@redhat.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 24 May 2017 16:49:48 +0200
+Subject: [PATCH 1/2] ARM: dts: imx23-sansa: Remove 'enable-active-low'
+ property
+In-Reply-To: <CAOMZO5Az=mjv3iiX8VFCRTNTEXPUrxkiKYSdZC0tEsiya7m-vQ@mail.gmail.com>
+References: <1495039381-23126-1-git-send-email-fabio.estevam@nxp.com>
+ <764037594.21665.1495040359199@email.1und1.de>
+ <CAOMZO5BOu=qKuokq6st_=BOjxO9=nX6VGaTdWX444xCX3oddUA@mail.gmail.com>
+ <1348922230.22889.1495043579279@email.1und1.de>
+ <CAOMZO5Az=mjv3iiX8VFCRTNTEXPUrxkiKYSdZC0tEsiya7m-vQ@mail.gmail.com>
+Message-ID: <c991c2c3-d645-1228-ded7-44bdbdf4cf63@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We saw perf IRQ init failures when running Linux kernel in an ACPI
-guest without PMU (i.e. pmu=off). This is because perf IRQ is not
-present when pmu=off, but arm_pmu_acpi still tries to register
-or unregister GSI. This patch addresses the problem by checking
-gicc->performance_interrupt. If it is 0, which is the value set
-by qemu when pmu=off, we skip the IRQ register/unregister process.
+Am 24.05.2017 um 13:55 schrieb Fabio Estevam:
+> Hi Stefan,
+>
+> On Wed, May 17, 2017 at 2:52 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>
+>> Thanks for this explanation, this wasn't clear to me from the subject / commit log.
+> I have sent a v2, where I try to make this clear. Thanks for your feedback.
+>
 
-[    4.069470] bc00: 0000000000040b00 ffff0000089db190
-[    4.070267] [<ffff000008134f80>] enable_percpu_irq+0xdc/0xe4
-[    4.071192] [<ffff000008667cc4>] arm_perf_starting_cpu+0x108/0x10c
-[    4.072200] [<ffff0000080cbdd4>] cpuhp_invoke_callback+0x14c/0x4ac
-[    4.073210] [<ffff0000080ccd3c>] cpuhp_thread_fun+0xd4/0x11c
-[    4.074132] [<ffff0000080f1394>] smpboot_thread_fn+0x1b4/0x1c4
-[    4.075081] [<ffff0000080ec90c>] kthread+0x10c/0x138
-[    4.075921] [<ffff0000080833c0>] ret_from_fork+0x10/0x50
-[    4.076947] genirq: Setting trigger mode 4 for irq 43 failed
-(gic_set_type+0x0/0x74)
+Looks good to me. Unfortunately i don't a board to test it.
 
-Signed-off-by: Wei Huang <wei@redhat.com>
----
- drivers/perf/arm_pmu_acpi.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
-index 34c862f..d6bb75d 100644
---- a/drivers/perf/arm_pmu_acpi.c
-+++ b/drivers/perf/arm_pmu_acpi.c
-@@ -29,6 +29,9 @@ static int arm_pmu_acpi_register_irq(int cpu)
- 		return -EINVAL;
- 
- 	gsi = gicc->performance_interrupt;
-+	if (!gsi)
-+		return 0;
-+
- 	if (gicc->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
- 		trigger = ACPI_EDGE_SENSITIVE;
- 	else
-@@ -58,7 +61,8 @@ static void arm_pmu_acpi_unregister_irq(int cpu)
- 		return;
- 
- 	gsi = gicc->performance_interrupt;
--	acpi_unregister_gsi(gsi);
-+	if (gsi)
-+		acpi_unregister_gsi(gsi);
- }
- 
- static int arm_pmu_acpi_parse_irqs(void)
--- 
-2.7.4
+Stefan
