@@ -1,93 +1,61 @@
-From: eddie.cai.linux@gmail.com (Eddie Cai)
-Date: Wed, 24 May 2017 16:44:05 +0800
-Subject: [PATCH] ARM: dts: rockchip: correct regular setting for act8846
-In-Reply-To: <5352430.FzU3E8oYou@phil>
-References: <1495611221-6749-1-git-send-email-eddie.cai.linux@gmail.com>
- <5352430.FzU3E8oYou@phil>
-Message-ID: <CAJrj+DNeK_z1mZQQ_eLeMBQ9yTj50kdY4OFevAVfsFas5_tr=Q@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 24 May 2017 11:43:41 +0300
+Subject: [PATCH] ARM: dts: am43xx-clocks: Add support for CLKOUT2
+Message-ID: <20170524084341.16698-1-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-05-24 16:17 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
-> Hi Eddie,
->
-> Am Mittwoch, 24. Mai 2017, 15:33:41 CEST schrieb Eddie Cai:
->> the previous setting of act8846 is just copy from firefly board. but
->> the reload board is a little different from firefly board. let's correct
->> it.
->>
->> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
->> ---
->>  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 21 +++++++++++----------
->>  1 file changed, 11 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
->> index 8134966..4cfa109 100644
->> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
->> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
->> @@ -179,6 +179,7 @@
->>                               regulator-name = "vccio_sd";
->>                               regulator-min-microvolt = <3300000>;
->>                               regulator-max-microvolt = <3300000>;
->> +                             regulator-always-on;
->
-> the rest below looks pretty straight forward, but why does vccio_sd
-> need to be always on?
->
-> I've checked the reload's schematics but did not find any further users
-> of vccio_sd that may warant this attribute.
-Oh, It's default on. thank you for point out my mistake. I will modify
-it in next version.
->
->
-> Heiko
->
->
->>                       };
->>
->>                       vdd10_lcd: REG6 {
->> @@ -187,24 +188,23 @@
->>                               regulator-max-microvolt = <1000000>;
->>                       };
->>
->> -                     vcca_18: REG7  {
->> -                             regulator-name = "vcca_18";
->> -                             regulator-min-microvolt = <1800000>;
->> -                             regulator-max-microvolt = <1800000>;
->> -                             regulator-always-on;
->> +                     vcca_33: REG7  {
->> +                             regulator-name = "vcca_33";
->> +                             regulator-min-microvolt = <3300000>;
->> +                             regulator-max-microvolt = <3300000>;
->>                       };
->>
->> -                     vcca_33: REG8 {
->> -                             regulator-name = "vcca_33";
->> +                     vcc_lan: REG8 {
->> +                             regulator-name = "vcc_lan";
->>                               regulator-min-microvolt = <3300000>;
->>                               regulator-max-microvolt = <3300000>;
->> -                             regulator-always-on;
->>                       };
->>
->> -                     vcc_lan: REG9 {
->> -                             regulator-name = "vcca_lan";
->> +                     vccio_pmu: REG9 {
->> +                             regulator-name = "vccio_pmu";
->>                               regulator-min-microvolt = <3300000>;
->>                               regulator-max-microvolt = <3300000>;
->> +                             regulator-always-on;
->>                       };
->>
->>                       vdd_10: REG10 {
->> @@ -218,6 +218,7 @@
->>                               regulator-name = "vcc_18";
->>                               regulator-min-microvolt = <1800000>;
->>                               regulator-max-microvolt = <1800000>;
->> +                             regulator-always-on;
->>                       };
->>
->>                       vcc18_lcd: REG12 {
->>
->
->
+Add the needed clock nodes for the CLKOUT2 to be usable by boards.
+
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/boot/dts/am43xx-clocks.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
+index d1d73b725f47..430be5829f8f 100644
+--- a/arch/arm/boot/dts/am43xx-clocks.dtsi
++++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
+@@ -833,4 +833,40 @@
+ 		ti,bit-shift = <23>;
+ 		reg = <0x4100>;
+ 	};
++
++	clkout2_src_mux_ck: clkout2_src_mux_ck {
++		#clock-cells = <0>;
++		compatible = "ti,mux-clock";
++		clocks = <&clk_rc32k_ck>, <&sysclk_div>, <&dpll_ddr_m2_ck>,
++			 <&dpll_per_m2_ck>, <&dpll_disp_m2_ck>,
++			 <&dpll_mpu_m2_ck>, <&dpll_extdev_ck>;
++		reg = <0x4108>;
++	};
++
++	clkout2_pre_div_ck: clkout2_pre_div_ck {
++		#clock-cells = <0>;
++		compatible = "ti,divider-clock";
++		clocks = <&clkout2_src_mux_ck>;
++		ti,bit-shift = <4>;
++		ti,max-div = <8>;
++		reg = <0x4108>;
++	};
++
++	clkout2_post_div_ck: clkout2_post_div_ck {
++		#clock-cells = <0>;
++		compatible = "ti,divider-clock";
++		clocks = <&clkout2_pre_div_ck>;
++		ti,bit-shift = <8>;
++		ti,max-div = <32>;
++		ti,index-power-of-two;
++		reg = <0x4108>;
++	};
++
++	clkout2_ck: clkout2_ck {
++		#clock-cells = <0>;
++		compatible = "ti,gate-clock";
++		clocks = <&clkout2_post_div_ck>;
++		ti,bit-shift = <16>;
++		reg = <0x4108>;
++	};
+ };
+-- 
+2.13.0
