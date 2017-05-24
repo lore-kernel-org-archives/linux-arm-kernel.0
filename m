@@ -1,98 +1,98 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 24 May 2017 11:50:44 +0200
-Subject: [PATCH] ARM: dts: rockchip: add adc button for Firefly
-In-Reply-To: <20170507142627.5307-1-ayaka@soulik.info>
-References: <20170507142627.5307-1-ayaka@soulik.info>
-Message-ID: <2018816.Fb9eUWctIC@phil>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 24 May 2017 11:00:43 +0100
+Subject: [PATCH v4 1/2] PCI: Add tango MSI controller support
+In-Reply-To: <aec89b9a-8377-ff39-547c-9e6eaf254fab@free.fr>
+References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+ <1f6b50c7-4887-838e-8c7d-c014d82b6d8e@sigmadesigns.com>
+ <8e56647d-3b2d-9bfc-b59e-79a2efaa7826@sigmadesigns.com>
+ <20170523170319.GB24431@bhelgaas-glaptop.roam.corp.google.com>
+ <b6541fd2-200f-35be-208e-931bb0b5ba49@free.fr>
+ <ef36137c-f0d1-23b9-8b91-a6ed87239578@arm.com>
+ <aec89b9a-8377-ff39-547c-9e6eaf254fab@free.fr>
+Message-ID: <f1a57255-be75-e8c4-6b8d-0254f4365d61@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
-
-Am Sonntag, 7. Mai 2017, 22:26:27 CEST schrieb Randy Li:
-> The only adc button connected to adc input is recovery button.
+On 23/05/17 20:15, Mason wrote:
+> On 23/05/2017 20:03, Robin Murphy wrote:
+>> On 23/05/17 18:54, Mason wrote:
+>>> On 23/05/2017 19:03, Bjorn Helgaas wrote:
+>>>> On Wed, May 17, 2017 at 04:56:08PM +0200, Marc Gonzalez wrote:
+>>>>> On 20/04/2017 16:28, Marc Gonzalez wrote:
+>>>>>
+>>>>>> +static int tango_set_affinity(struct irq_data *data,
+>>>>>> +		const struct cpumask *mask, bool force)
+>>>>>> +{
+>>>>>> +	return -EINVAL;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static struct irq_chip tango_chip = {
+>>>>>> +	.irq_ack		= tango_ack,
+>>>>>> +	.irq_mask		= tango_mask,
+>>>>>> +	.irq_unmask		= tango_unmask,
+>>>>>> +	.irq_set_affinity	= tango_set_affinity,
+>>>>>> +	.irq_compose_msi_msg	= tango_compose_msi_msg,
+>>>>>> +};
+>>>>>
+>>>>> Hmmm... I'm wondering why .irq_set_affinity is required.
+>>>>>
+>>>>> static int setup_affinity(struct irq_desc *desc, struct cpumask *mask)
+>>>>> first calls __irq_can_set_affinity() to check whether
+>>>>> desc->irq_data.chip->irq_set_affinity) exists.
+>>>>>
+>>>>> then calls irq_do_set_affinity(&desc->irq_data, mask, false);
+>>>>> which calls chip->irq_set_affinity(data, mask, force);
+>>>>> = msi_domain_set_affinity()
+>>>>> which calls parent->chip->irq_set_affinity() unconditionally.
+>>>>>
+>>>>> Would it make sense to test that the callback is implemented
+>>>>> before calling it?
+>>>>>
+>>>>>
+>>>>> [    0.723895] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>>>>
+>>>> I'm not sure what you're asking.
+>>>>
+>>>> Is this a bug report for the v4 tango driver?
+>>>
+>>> No.
+>>>
+>>>> Or are you asking whether msi_domain_set_affinity() should be changed
+>>>> to check whether parent->chip->irq_set_affinity is implemented?
+>>>
+>>> Yes. The way things are implemented now, drivers are forced
+>>> to define an irq_set_affinity callback, even if it just returns
+>>> an error, otherwise, the kernel crashes, because of the
+>>> unconditional function pointer deref. 
+>>>
+>>>> msi_domain_set_affinity() has called parent->chip->irq_set_affinity()
+>>>> without checking since it was added in 2014 by f3cf8bb0d6c3 ("genirq: Add
+>>>> generic msi irq domain support"), so if there's a problem here, it's most
+>>>> likely in the tango code.
+>>>
+>>> The issue is having to define an "empty" function.
+>>> (Unnecessary code bloat and maintenance.)
+>>
+>> AFAICS, only one driver (other than this one) implements a "do nothing"
+>> set_affinity callback - everyone else who doesn't do anything hardware
+>> specific just passes it along via irq_chip_set_affinity_parent().
 > 
-> Signed-off-by: Randy Li <ayaka@soulik.info>
-> ---
->  arch/arm/boot/dts/rk3288-firefly-reload.dts | 17 +++++++++++++++++
->  arch/arm/boot/dts/rk3288-firefly.dtsi       | 13 +++++++++++++
->  2 files changed, 30 insertions(+)
+> I counted 4. Where did I mess up?
 > 
-> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload.dts b/arch/arm/boot/dts/rk3288-firefly-reload.dts
-> index d0b3204a..ed1baa8 100644
-> --- a/arch/arm/boot/dts/rk3288-firefly-reload.dts
-> +++ b/arch/arm/boot/dts/rk3288-firefly-reload.dts
-> @@ -48,6 +48,19 @@
->  	model = "Firefly-RK3288-reload";
->  	compatible = "firefly,firefly-rk3288-reload", "rockchip,rk3288";
->  
-> +	adc-keys {
-> +		compatible = "adc-keys";
-> +		io-channels = <&saradc 1>;
-> +		io-channel-names = "buttons";
-> +		keyup-threshold-microvolt = <1800000>;
-> +
-> +		button-recovery {
-> +			label = "Recovery";
-> +			linux,code = <KEY_BACK>;
+> advk_msi_set_affinity
+> altera_msi_set_affinity
+> nwl_msi_set_affinity
+> vmd_irq_set_affinity
+> tango_set_affinity
 
-I don't think KEY_BACK is really a suitable keycode for your recovery key.
+Fair point - I went through drivers/irqchip and the various
+arch-specific instances and found ls_scfg_msi_set_affinity(), but
+somehow skipped over drivers/pci. Anyway, I think the question stands of
+why are these handful of drivers *not* using irq_chip_set_affinity_parent()?
 
-Looking at other devices and already available keycodes. I guess nice
-choices would be one of
+As an outsider, it naively seems logical that the affinity of an MSI
+which just gets translated to a wired interrupt should propagate through
+to the affinity of that wired interrupt, but maybe there are reasons not
+to; I really don't know.
 
-- KEY_VENDOR
-- KEY_MENU
-- KEY_CONFIG
-
-With for example meson adding KEY_VENDOR as update key recently
-https://lkml.org/lkml/2017/3/7/196
-
-So KEY_VENDOR would look like a good choice for us as well.
-
-
-Heiko
-
-> +			press-threshold-microvolt = <0>;
-> +		};
-> +	};
-> +
->  	gpio-keys {
->  		compatible = "gpio-keys";
->  
-> @@ -246,6 +259,10 @@
->  	status = "okay";
->  };
->  
-> +&saradc {
-> +	status = "okay";
-> +};
-> +
->  &sdmmc {
->  	bus-width = <4>;
->  	cap-mmc-highspeed;
-> diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-> index 10793ac..63b8b2d 100644
-> --- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-> @@ -49,6 +49,19 @@
->  		reg = <0 0x80000000>;
->  	};
->  
-> +	adc-keys {
-> +		compatible = "adc-keys";
-> +		io-channels = <&saradc 1>;
-> +		io-channel-names = "buttons";
-> +		keyup-threshold-microvolt = <1800000>;
-> +
-> +		button-recovery {
-> +			label = "Recovery";
-> +			linux,code = <KEY_BACK>;
-> +			press-threshold-microvolt = <0>;
-> +		};
-> +	};
-> +
->  	dovdd_1v8: dovdd-1v8-regulator {
->  		compatible = "regulator-fixed";
->  		regulator-name = "dovdd_1v8";
-> 
+Robin.
