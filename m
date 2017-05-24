@@ -1,102 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 24 May 2017 10:19:28 +0200
-Subject: [linux-sunxi] Re: [RFC PATCH 10/11] ARM: sun8i: h3: add display
- engine pipeline for TVE
-In-Reply-To: <B72028D8-B055-4F53-A4EA-7E93A28DB8FF@aosc.io>
-References: <20170517164354.16399-1-icenowy@aosc.io>
- <20170517164354.16399-11-icenowy@aosc.io>
- <20170519180616.vzrlu2avuucsjkiu@flea.home>
- <B72028D8-B055-4F53-A4EA-7E93A28DB8FF@aosc.io>
-Message-ID: <20170524081928.xcbepxdt7txnadki@flea.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 May 2017 10:20:31 +0200
+Subject: [PATCH 1/2 v4] clk: add DT bindings header for Gemini clock controller
+Message-ID: <20170524082031.8424-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 20, 2017 at 02:10:35AM +0800, Icenowy Zheng wrote:
-> 
-> 
-> ? 2017?5?20? GMT+08:00 ??2:06:16, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
-> >On Thu, May 18, 2017 at 12:43:53AM +0800, Icenowy Zheng wrote:
-> >> As we have already the support for the TV encoder on Allwinner H3,
-> >add
-> >> the display engine pipeline device tree nodes to its DTSI file.
-> >> 
-> >> The H5 pipeline has some differences and will be enabled later.
-> >> 
-> >> The currently-unused mixer0 and tcon0 are also needed, for the
-> >> completement of the pipeline.
-> >> 
-> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >> ---
-> >>  arch/arm/boot/dts/sun8i-h3.dtsi | 189
-> >++++++++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 189 insertions(+)
-> >> 
-> >> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
-> >b/arch/arm/boot/dts/sun8i-h3.dtsi
-> >> index b36f9f423c39..20172ef92415 100644
-> >> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> >> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> >> @@ -41,6 +41,8 @@
-> >>   */
-> >>  
-> >>  #include "sunxi-h3-h5.dtsi"
-> >> +#include <dt-bindings/clock/sun8i-de2.h>
-> >> +#include <dt-bindings/reset/sun8i-de2.h>
-> >>  
-> >>  / {
-> >>  	cpus {
-> >> @@ -72,6 +74,193 @@
-> >>  		};
-> >>  	};
-> >>  
-> >> +	de: display-engine {
-> >> +		compatible = "allwinner,sun8i-h3-display-engine";
-> >> +		allwinner,pipelines = <&mixer0>,
-> >> +				      <&mixer1>;
-> >> +		status = "disabled";
-> >> +	};
-> >> +
-> >> +	soc {
-> >> +		display_clocks: clock at 1000000 {
-> >> +			compatible = "allwinner,sun8i-a83t-de2-clk";
-> >> +			reg = <0x01000000 0x100000>;
-> >> +			clocks = <&ccu CLK_BUS_DE>,
-> >> +				 <&ccu CLK_DE>;
-> >> +			clock-names = "bus",
-> >> +				      "mod";
-> >> +			resets = <&ccu RST_BUS_DE>;
-> >> +			#clock-cells = <1>;
-> >> +			#reset-cells = <1>;
-> >> +			assigned-clocks = <&ccu CLK_DE>;
-> >> +			assigned-clock-parents = <&ccu CLK_PLL_DE>;
-> >> +			assigned-clock-rates = <432000000>;
-> >
-> >This shouldn't be set in the DT, but evaluated at runtime when calling
-> >clk_set_rate.
-> 
-> Nope, DE2 clock doesn't need evalution, as the clock is decoupled with
-> DE2 mixers' output signal. (Although it seems that SoCs with larger
-> plane size will use higher clock.)
+This adds the DT binding macros used by the clock controller.
 
-So it's the display engine that needs that clock to operate properly?
-This is the wrong DT node to set that value then. It should be in the
-mixer node, or even better in the mixers' driver.
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Mike/Stephen: please merge this into the clock subsystem once
+you're happy with it. Sorry for the back-and-forth. I will
+deal with the ARM SoC DTS landing orthogonally.
 
-> And setting it to 432MHz is also needed for properly 216MHz clock to
-> TVE.
+The DTS files will be submitted with numerical values for
+the reset lines, then a follow-up patch after -rc1 will
+switch to using defines. This strategy was adviced by the
+ARM SoC maintainers.
 
-Just like the parenthood, this can and should be evaluated at runtime.
+ChangeLog v1->v4:
+- New file to merge the macros in isolation from the
+  DT bindings and implementation.
 
-Maxime
+The bindings themselves will be merged as part of the DTS updates
+through the ARM SoC tree.
+---
+ include/dt-bindings/clock/cortina,gemini-clock.h | 29 ++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 include/dt-bindings/clock/cortina,gemini-clock.h
 
+diff --git a/include/dt-bindings/clock/cortina,gemini-clock.h b/include/dt-bindings/clock/cortina,gemini-clock.h
+new file mode 100644
+index 000000000000..acf5cd550b0c
+--- /dev/null
++++ b/include/dt-bindings/clock/cortina,gemini-clock.h
+@@ -0,0 +1,29 @@
++#ifndef DT_BINDINGS_CORTINA_GEMINI_CLOCK_H
++#define DT_BINDINGS_CORTINA_GEMINI_CLOCK_H
++
++/* RTC, AHB, APB, CPU, PCI, TVC, UART clocks and 13 gates */
++#define GEMINI_NUM_CLKS 20
++
++#define GEMINI_CLK_RTC 0
++#define GEMINI_CLK_AHB 1
++#define GEMINI_CLK_APB 2
++#define GEMINI_CLK_CPU 3
++#define GEMINI_CLK_PCI 4
++#define GEMINI_CLK_TVC 5
++#define GEMINI_CLK_UART 6
++#define GEMINI_CLK_GATES 7
++#define GEMINI_CLK_GATE_SECURITY 7
++#define GEMINI_CLK_GATE_GMAC0 8
++#define GEMINI_CLK_GATE_GMAC1 9
++#define GEMINI_CLK_GATE_SATA0 10
++#define GEMINI_CLK_GATE_SATA1 11
++#define GEMINI_CLK_GATE_USB0 12
++#define GEMINI_CLK_GATE_USB1 13
++#define GEMINI_CLK_GATE_IDE 14
++#define GEMINI_CLK_GATE_PCI 15
++#define GEMINI_CLK_GATE_DDR 16
++#define GEMINI_CLK_GATE_FLASH 17
++#define GEMINI_CLK_GATE_TVC 18
++#define GEMINI_CLK_GATE_BOOT 19
++
++#endif /* DT_BINDINGS_CORTINA_GEMINI_CLOCK_H */
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170524/68b8e86b/attachment.sig>
+2.9.4
