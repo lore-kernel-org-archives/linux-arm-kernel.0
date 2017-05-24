@@ -1,76 +1,96 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 24 May 2017 11:07:27 +0200
-Subject: [PATCH v2 2/2] ARM: dts: tx6: Remove 'enable-active-low' property
-In-Reply-To: <1495553564-19112-2-git-send-email-fabio.estevam@nxp.com>
-References: <1495553564-19112-1-git-send-email-fabio.estevam@nxp.com>
- <1495553564-19112-2-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20170524110727.42dbb58d@ipc1.ka-ro>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 May 2017 11:07:48 +0200
+Subject: [PATCH] ARM: dts: augment Moxa and Aspeed DTS for FTTMR010
+Message-ID: <20170524090748.27345-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio Estevam <fabio.estevam@nxp.com> wrote:
+This augments the Moxa Art and Aspeed device trees to:
 
-> Property 'enable-active-low' does not exist. Only 'enable-active-high' is
-> valid, and when this property is absent the gpio regulator will act as
-> active low by default.
-> 
-> So remove the unexisting 'enable-active-low' property. 
-> 
-> Currently the GPIO flag is GPIO_ACTIVE_HIGH. In order to make
-> the dts description accurate, pass the GPIO_ACTIVE_LOW flag instead.
-> 
-> This change is safe because the gpio regulator driver does not take the
-> GPIO flag polarity into account.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
-> Changes since v1:
-> - Improve commit log and explain why this change is safe (Stefan).
-> 
->  arch/arm/boot/dts/imx6qdl-tx6.dtsi  | 3 +--
->  arch/arm/boot/dts/imx6ul-tx6ul.dtsi | 3 +--
->  2 files changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-> index 1691714..a146fe7 100644
-> --- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-> @@ -133,8 +133,7 @@
->  		regulator-max-microvolt = <3300000>;
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&pinctrl_flexcan_xcvr>;
-> -		gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
-> -		enable-active-low;
-> +		gpio = <&gpio4 21 GPIO_ACTIVE_LOW>;
->  	};
->  
->  	reg_lcd0_pwr: regulator-lcd0-pwr {
-> diff --git a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-> index c784a0b..4ccc9e9 100644
-> --- a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-> @@ -173,8 +173,7 @@
->  		regulator-max-microvolt = <3300000>;
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&pinctrl_flexcan_xcvr>;
-> -		gpio = <&gpio3 5 GPIO_ACTIVE_HIGH>;
-> -		enable-active-low;
-> +		gpio = <&gpio3 5 GPIO_ACTIVE_LOW>;
->  	};
->  
->  	reg_lcd_pwr: regulator-lcdpwr {
+- Explicitly name the clock "PCLK" as the Faraday FTTMR010
+  names it.
+- List the Moxa timer as compatible with the Faradat FTTMR010
+  vanilla version.
+- Add a comment that the Aspeed driver is a Faraday
+  FTTMR010 derivative.
+- Pass all IRQs to the timer from Aspeed: they are all there
+  so they should be in the device tree, we only use the
+  first one anyways.
 
-Acked-by: Lothar Wa?mann <LW@KARO-electronics.de>
+Tested-by: Joel Stanley <joel@jms.id.au>
+Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC maintainers: this is the DTS changes needt to generalize
+the Faraday timer. Please merge this into some suitable ARM SoC
+DTS branch.
+Clocksource maintainers: I will ask the ARM SoC people to merge
+this patch orthogonally, it is only included in this series
+for reference and for testing.
+---
+ arch/arm/boot/dts/aspeed-g4.dtsi | 7 +++----
+ arch/arm/boot/dts/aspeed-g5.dtsi | 7 +++----
+ arch/arm/boot/dts/moxart.dtsi    | 3 ++-
+ 3 files changed, 8 insertions(+), 9 deletions(-)
 
-Thanks for the cleanup,
-Lothar Wa?mann
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+index 8c6bc29eb7f6..8a04c7e2d818 100644
+--- a/arch/arm/boot/dts/aspeed-g4.dtsi
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -886,13 +886,12 @@
+ 			};
+ 
+ 			timer: timer at 1e782000 {
++				/* This timer is a Faraday FTTMR010 derivative */
+ 				compatible = "aspeed,ast2400-timer";
+ 				reg = <0x1e782000 0x90>;
+-				// The moxart_timer driver registers only one
+-				// interrupt and assumes it's for timer 1
+-				//interrupts = <16 17 18 35 36 37 38 39>;
+-				interrupts = <16>;
++				interrupts = <16 17 18 35 36 37 38 39>;
+ 				clocks = <&clk_apb>;
++				clock-names = "PCLK";
+ 			};
+ 
+ 			wdt1: wdt at 1e785000 {
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index a0bea4a6ec77..9cffe347b828 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -993,13 +993,12 @@
+ 			};
+ 
+ 			timer: timer at 1e782000 {
++				/* This timer is a Faraday FTTMR010 derivative */
+ 				compatible = "aspeed,ast2400-timer";
+ 				reg = <0x1e782000 0x90>;
+-				// The moxart_timer driver registers only one
+-				// interrupt and assumes it's for timer 1
+-				//interrupts = <16 17 18 35 36 37 38 39>;
+-				interrupts = <16>;
++				interrupts = <16 17 18 35 36 37 38 39>;
+ 				clocks = <&clk_apb>;
++				clock-names = "PCLK";
+ 			};
+ 
+ 
+diff --git a/arch/arm/boot/dts/moxart.dtsi b/arch/arm/boot/dts/moxart.dtsi
+index e86f8c905ac5..1f4c795d3f72 100644
+--- a/arch/arm/boot/dts/moxart.dtsi
++++ b/arch/arm/boot/dts/moxart.dtsi
+@@ -58,10 +58,11 @@
+ 		};
+ 
+ 		timer: timer at 98400000 {
+-			compatible = "moxa,moxart-timer";
++			compatible = "moxa,moxart-timer", "faraday,fttmr010";
+ 			reg = <0x98400000 0x42>;
+ 			interrupts = <19 IRQ_TYPE_EDGE_FALLING>;
+ 			clocks = <&clk_apb>;
++			clock-names = "PCLK";
+ 		};
+ 
+ 		gpio: gpio at 98700000 {
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+2.9.4
