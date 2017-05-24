@@ -1,51 +1,87 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 24 May 2017 17:45:51 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: add eDP panel support for Firefly
-In-Reply-To: <20170508155833.19652-1-ayaka@soulik.info>
-References: <20170508155833.19652-1-ayaka@soulik.info>
-Message-ID: <1982494.aeoIls14E7@phil>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 24 May 2017 16:47:28 +0100
+Subject: [PATCH] mm/migrate: Fix ref-count handling when
+ !hugepage_migration_supported()
+Message-ID: <20170524154728.2492-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
+On failing to migrate a page, soft_offline_huge_page() performs the
+necessary update to the hugepage ref-count. When
+!hugepage_migration_supported() , unmap_and_move_hugepage() also
+decrements the page ref-count for the hugepage. The combined behaviour
+leaves the ref-count in an inconsistent state.
 
-Am Montag, 8. Mai 2017, 23:58:33 CEST schrieb Randy Li:
-> This patch adds the supporting to the eDP panel sold by
-> the T-CHIP for the Firefly RK3288. I assign the VOP lite
-> for the eDP panel and VOP big to HDMI, as the HDMI supports
-> 4K resolution. With a different VOP device, eDP panel
-> and HDMI could display a different contents.
-> 
-> The InvenSense MPU6050 sensor at the botton of the panel
-> is also enabled.
-> 
-> The Firefly RK3288 Reload use a different GPIO pin to enable
-> the power of the eDP panel.
-> 
-> Signed-off-by: Randy Li <ayaka@soulik.info>
+This leads to soft lockups when running the overcommitted hugepage test
+from mce-tests suite.
 
-Sorry, I'm not yet sure, what to make of this patch.
+Soft offlining pfn 0x83ed600 at process virtual address 0x400000000000
+soft offline: 0x83ed600: migration failed 1, type
+1fffc00000008008 (uptodate|head)
+INFO: rcu_preempt detected stalls on CPUs/tasks:
+ Tasks blocked on level-0 rcu_node (CPUs 0-7): P2715
+  (detected by 7, t=5254 jiffies, g=963, c=962, q=321)
+  thugetlb_overco R  running task        0  2715   2685 0x00000008
+  Call trace:
+  [<ffff000008089f90>] dump_backtrace+0x0/0x268
+  [<ffff00000808a2d4>] show_stack+0x24/0x30
+  [<ffff000008100d34>] sched_show_task+0x134/0x180
+  [<ffff0000081c90fc>] rcu_print_detail_task_stall_rnp+0x54/0x7c
+  [<ffff00000813cfd4>] rcu_check_callbacks+0xa74/0xb08
+  [<ffff000008143a3c>] update_process_times+0x34/0x60
+  [<ffff0000081550e8>] tick_sched_handle.isra.7+0x38/0x70
+  [<ffff00000815516c>] tick_sched_timer+0x4c/0x98
+  [<ffff0000081442e0>] __hrtimer_run_queues+0xc0/0x300
+  [<ffff000008144fa4>] hrtimer_interrupt+0xac/0x228
+  [<ffff0000089a56d4>] arch_timer_handler_phys+0x3c/0x50
+  [<ffff00000812f1bc>] handle_percpu_devid_irq+0x8c/0x290
+  [<ffff0000081297fc>] generic_handle_irq+0x34/0x50
+  [<ffff000008129f00>] __handle_domain_irq+0x68/0xc0
+  [<ffff0000080816b4>] gic_handle_irq+0x5c/0xb0
 
-On the firefly the edp pins are actual part of the general pin header and
-while the edp pins themself do not have multiple functions, for example
-the pin you claim as interrupt for the mpu6050 (gpio5_b4) also is part
-of the spi0 set of pins and that pin also seems pretty randomly selected.
-Same with the enable-gpio of the display.
+Fix this by dropping the ref-count decrement in
+unmap_and_move_hugepage() when !hugepage_migration_supported().
 
+Fixes: 32665f2bbfed ("mm/migrate: correct failure handling if !hugepage_migration_support()")
+Reported-by: Manoj Iyer <manoj.iyer@canonical.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Cc: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
+Cc: Wanpeng Li <liwanp@linux.vnet.ibm.com>
+Cc: Christoph Lameter <cl@linux.com>
 
-Also claiming that every firefly board has this display connected also
-feels strange and the whole display thing would make more sense
-as a devicetree overlay [0], though I don't know how these
-should get handled in-kernel - if at all.
+--
+Hi Andrew,
 
+We ran into this bug when working towards enabling memory corruption
+on arm64. The patch was tested on an arm64 platform running v4.12-rc2
+with the series to enable memory corruption handling[0].
 
-And finally, please don't try to use the devicetree to configure outputs
-(forcing edp to one and hdmi to the other). The devicetree is supposed
-to describe the hardware and of course both vops can drive the edp and
-if necessary the drm driver should handle differences and decide on the
-vop to use.
+Please consider merging as a fix for the 4.12 release.
 
+Thanks,
+Punit
 
-Heiko
+[0] https://www.spinics.net/lists/arm-kernel/msg581657.html
+---
+ mm/migrate.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-[0] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/overlay-notes.txt
+diff --git a/mm/migrate.c b/mm/migrate.c
+index 89a0a1707f4c..187abd1526df 100644
+--- a/mm/migrate.c
++++ b/mm/migrate.c
+@@ -1201,10 +1201,8 @@ static int unmap_and_move_huge_page(new_page_t get_new_page,
+ 	 * tables or check whether the hugepage is pmd-based or not before
+ 	 * kicking migration.
+ 	 */
+-	if (!hugepage_migration_supported(page_hstate(hpage))) {
+-		putback_active_hugepage(hpage);
++	if (!hugepage_migration_supported(page_hstate(hpage)))
+ 		return -ENOSYS;
+-	}
+ 
+ 	new_hpage = get_new_page(hpage, private, &result);
+ 	if (!new_hpage)
+-- 
+2.11.0
