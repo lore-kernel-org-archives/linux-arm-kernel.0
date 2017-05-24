@@ -1,44 +1,26 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 24 May 2017 10:15:38 +0200
-Subject: [patch V3 27/32] arm: Prevent hotplug rwsem recursion
-References: <20170524081511.203800767@linutronix.de>
-Message-ID: <20170524081549.275871311@linutronix.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 24 May 2017 10:28:20 +0200
+Subject: [PATCH 0/5] ARM64: dts: meson: Add CEC,
+ Ethernet Link and SPI pins nodes
+Message-ID: <1495614505-4437-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The text patching functions which are invoked from jump_label and kprobes
-code are protected against cpu hotplug at the call sites.
+This patchset adds the following DT Pins nodes :
+ - CEC Pins for GXBB and GXL
+ - SPICC Pins for GXBB and GXL
+ - Internal Ethernet PHY LEDS pins for GXL
 
-Use stop_machine_cpuslocked() to avoid recursion on the cpu hotplug
-rwsem. stop_machine_cpuslocked() contains a lockdep assertion to catch any
-unprotected callers.
+Neil Armstrong (5):
+  ARM64: dts: meson-gxbb: Add CEC pins nodes
+  ARM64: dts: meson-gxl: Add CEC pins nodes
+  ARM64: dts: meson-gxl: Add Ethernet PHY LEDS pins nodes
+  ARM64: dts: meson-gxbb: Add SPI pinctrl nodes
+  ARM64: dts: meson-gxl: Add SPI pinctrl nodes
 
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Russell King <linux@armlinux.org.uk>
----
- arch/arm/kernel/patch.c        |    2 +-
- arch/arm/probes/kprobes/core.c |    3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 30 ++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 44 +++++++++++++++++++++++++++++
+ 2 files changed, 74 insertions(+)
 
---- a/arch/arm/kernel/patch.c
-+++ b/arch/arm/kernel/patch.c
-@@ -124,5 +124,5 @@ void __kprobes patch_text(void *addr, un
- 		.insn = insn,
- 	};
- 
--	stop_machine(patch_text_stop_machine, &patch, NULL);
-+	stop_machine_cpuslocked(patch_text_stop_machine, &patch, NULL);
- }
---- a/arch/arm/probes/kprobes/core.c
-+++ b/arch/arm/probes/kprobes/core.c
-@@ -182,7 +182,8 @@ void __kprobes kprobes_remove_breakpoint
- 		.addr = addr,
- 		.insn = insn,
- 	};
--	stop_machine(__kprobes_remove_breakpoint, &p, cpu_online_mask);
-+	stop_machine_cpuslocked(__kprobes_remove_breakpoint, &p,
-+				cpu_online_mask);
- }
- 
- void __kprobes arch_disarm_kprobe(struct kprobe *p)
+-- 
+1.9.1
