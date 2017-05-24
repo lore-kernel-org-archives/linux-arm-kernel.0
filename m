@@ -1,68 +1,46 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 24 May 2017 14:11:22 +0100
-Subject: [PATCH v4 9/9] arm64: hugetlb: Cleanup setup_hugepagesz
-In-Reply-To: <20170524131122.5309-1-punit.agrawal@arm.com>
-References: <20170524131122.5309-1-punit.agrawal@arm.com>
-Message-ID: <20170524131122.5309-10-punit.agrawal@arm.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 24 May 2017 08:18:48 -0500
+Subject: [PATCH v3 4/5] ARM64: dts: Add Realtek RTD1295 and Zidoo X9S
+In-Reply-To: <20170514022429.11555-5-afaerber@suse.de>
+References: <20170514022429.11555-1-afaerber@suse.de>
+ <20170514022429.11555-5-afaerber@suse.de>
+Message-ID: <CAL_JsqL5PZwKszn8Ge_VyxQE54pyD9GQUSMJp_mjtsGGVwN5xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@arm.com>
+On Sat, May 13, 2017 at 9:24 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Add initial device trees for the RTD1295 SoC and the Zidoo X9S TV box.
+>
+> The CPUs lack the enable-method property because the vendor device tree
+> uses a custom "rtk-spin-table" method and "psci" did not appear to work.
+>
+> The UARTs lack the interrupts properties because the vendor device tree
+> connects them to a custom interrupt controller. earlycon works without.
+>
+> A list of memory reservations is adopted from v1.2.11 vendor device tree:
+> 0x02200000 can be used for an initrd, 0x01b00000 is audio-related;
+> ion-related 0x02600000, 0x02c00000 and 0x11000000 are left out;
+> 0x10000000 is used for sharing the U-Boot environment; others remain
+> to be investigated.
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v2 -> v3:
+>  * Adopted SPDX-License-Identifier (Rob)
+>  * Added ranges for /soc node (Rob)
+>  * Changed #address-cells and #size-cells to 1 (Rob)
+>
+>  v1 -> v2:
+>  * Dropped 0x0000000010000000 /memreserve/
+>
+>  arch/arm64/boot/dts/Makefile                      |   1 +
+>  arch/arm64/boot/dts/realtek/Makefile              |   5 +
+>  arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts |  42 +++++++
+>  arch/arm64/boot/dts/realtek/rtd1295.dtsi          | 131 ++++++++++++++++++++++
+>  4 files changed, 179 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/realtek/Makefile
+>  create mode 100644 arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts
+>  create mode 100644 arch/arm64/boot/dts/realtek/rtd1295.dtsi
 
-Replace a lot of if statements with switch and case labels to make it
-much clearer which huge page sizes are supported.
-
-Also, we prevent PUD_SIZE from being used on systems not running with
-4KB PAGE_SIZE. Before if one supplied PUD_SIZE in these circumstances,
-then unusuable huge page sizes would be in use.
-
-Fixes: 084bd29810a5 ("ARM64: mm: HugeTLB support.")
-Cc: David Woods <dwoods@mellanox.com>
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Steve Capper <steve.capper@arm.com>
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/mm/hugetlbpage.c | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index a10dfbd0ffd5..b5dc7cca3f45 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -381,20 +381,20 @@ static __init int setup_hugepagesz(char *opt)
- {
- 	unsigned long ps = memparse(opt, &opt);
- 
--	if (ps == PMD_SIZE) {
--		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
--	} else if (ps == PUD_SIZE) {
--		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
--	} else if (ps == (PAGE_SIZE * CONT_PTES)) {
--		hugetlb_add_hstate(CONT_PTE_SHIFT);
--	} else if (ps == (PMD_SIZE * CONT_PMDS)) {
--		hugetlb_add_hstate((PMD_SHIFT + CONT_PMD_SHIFT) - PAGE_SHIFT);
--	} else {
--		hugetlb_bad_size();
--		pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
--		return 0;
-+	switch (ps) {
-+#ifdef CONFIG_ARM64_4K_PAGES
-+	case PUD_SIZE:
-+#endif
-+	case PMD_SIZE * CONT_PMDS:
-+	case PMD_SIZE:
-+	case PAGE_SIZE * CONT_PTES:
-+		hugetlb_add_hstate(ilog2(ps) - PAGE_SHIFT);
-+		return 1;
- 	}
--	return 1;
-+
-+	hugetlb_bad_size();
-+	pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
-+	return 0;
- }
- __setup("hugepagesz=", setup_hugepagesz);
- 
--- 
-2.11.0
+Reviewed-by: Rob Herring <robh@kernel.org>
