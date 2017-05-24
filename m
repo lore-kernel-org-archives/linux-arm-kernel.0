@@ -1,40 +1,35 @@
-From: jacopo@jmondi.org (jmondi)
-Date: Wed, 24 May 2017 09:07:02 +0200
-Subject: [PATCH] arm: dts: r7s72100: Add support for GR-Peach
-In-Reply-To: <CAMuHMdUovD=6YfJYckoftWyJZ3eRjcKFkScj=wLhyTDSFPavgw@mail.gmail.com>
-References: <1495567254-10226-1-git-send-email-jacopo+renesas@jmondi.org>
- <CAMuHMdUovD=6YfJYckoftWyJZ3eRjcKFkScj=wLhyTDSFPavgw@mail.gmail.com>
-Message-ID: <20170524070702.GB4253@w540>
+From: zhangshaokun@hisilicon.com (Shaokun Zhang)
+Date: Wed, 24 May 2017 15:43:18 +0800
+Subject: [PATCH] arm64: perf: Extend event config for ARMv8.1
+Message-ID: <1495611798-240082-1-git-send-email-zhangshaokun@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simon,
+Perf has supported ARMv8.1 feature with 16-bit evtCount filed [see c210ae8
+arm64: perf: Extend event mask for ARMv8.1], event config should be
+extended to 16-bit too, otherwise, if use -e event_name whose event_code
+is more than 0x3ff, pmu_config_term will return -EINVAL because function
+pmu_format_max_value depends on event config.
 
-On Tue, May 23, 2017 at 09:25:40PM +0200, Geert Uytterhoeven wrote:
-> On Tue, May 23, 2017 at 9:20 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> > Add device tree source for Renesas GR-Peach board.
-> > GR-Peach is an RZ/A1H based board with 10MB of on-chip SRAM and 8MB
-> > QSPI flash storage.
-> > Add support for the board, and create a 2MB partition to use as rootfs.
-> >
-> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
->
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This patch extends event config to 16-bit.
 
-I forgot to change subject to "PATCH v2".
-Could you please take this one, or would you like me to resend with
-Geert's reviewed-by ?
+Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+---
+ arch/arm64/kernel/perf_event.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks
-   j
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 83a1b1a..b5798ba 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -529,7 +529,7 @@
+ 	.is_visible = armv8pmu_event_attr_is_visible,
+ };
+ 
+-PMU_FORMAT_ATTR(event, "config:0-9");
++PMU_FORMAT_ATTR(event, "config:0-15");
+ 
+ static struct attribute *armv8_pmuv3_format_attrs[] = {
+ 	&format_attr_event.attr,
+-- 
+1.9.1
