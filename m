@@ -1,57 +1,78 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 24 May 2017 18:06:06 +0800
-Subject: [PATCH v3 8/9] ARM: dts: sun8i: add audio codec support into V3s DTSI
-In-Reply-To: <20170524100607.29790-1-icenowy@aosc.io>
-References: <20170524100607.29790-1-icenowy@aosc.io>
-Message-ID: <20170524100607.29790-9-icenowy@aosc.io>
+From: dsafonov@virtuozzo.com (Dmitry Safonov)
+Date: Wed, 24 May 2017 13:09:14 +0300
+Subject: [PATCHv2] ARM32: Support mremap() for sigpage/vDSO
+In-Reply-To: <20170523200946.GG22219@n2100.armlinux.org.uk>
+References: <20170414132529.8337-1-dsafonov@virtuozzo.com>
+ <871579ef-ee9a-c321-80e4-47836bb0e472@virtuozzo.com>
+ <bebbe3ce-12ed-419a-248a-55f41d74d9da@virtuozzo.com>
+ <20170523200946.GG22219@n2100.armlinux.org.uk>
+Message-ID: <7dc84202-9f12-4f0e-a925-e050974e17b9@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.xyz>
++ Adding back to CC x86 guys - as I've removed in ping messages.
 
-Allwinner V3s SoC features an internal audio codec like the one in H3,
-and a analog codec like the one in H3/A23 (but much simpler).
+On 05/23/2017 11:09 PM, Russell King - ARM Linux wrote:
+> On Thu, May 18, 2017 at 02:13:29PM +0300, Dmitry Safonov wrote:
+>> On 04/25/2017 08:18 PM, Dmitry Safonov wrote:
+>>> On 04/14/2017 04:25 PM, Dmitry Safonov wrote:
+>>>> CRIU restores application mappings on the same place where they
+>>>> were before Checkpoint. That means, that we need to move vDSO
+>>>> and sigpage during restore on exactly the same place where
+>>>> they were before C/R.
+>>>>
+>>>> Make mremap() code update mm->context.{sigpage,vdso} pointers
+>>>> during VMA move. Sigpage is used for landing after handling
+>>>> a signal - if the pointer is not updated during moving, the
+>>>> application might crash on any signal after mremap().
+>>>>
+>>>> vDSO pointer on ARM32 is used only for setting auxv at this moment,
+>>>> update it during mremap() in case of future usage.
+>>>>
+>>>> Without those updates, current work of CRIU on ARM32 is not reliable.
+>>>> Historically, we error Checkpointing if we find vDSO page on ARM32
+>>>> and suggest user to disable CONFIG_VDSO.
+>>>> But that's not correct - it goes from x86 where signal processing
+>>>> is ended in vDSO blob. For arm32 it's sigpage, which is not disabled
+>>>> with `CONFIG_VDSO=n'.
+>>>>
+>>>> Looks like C/R was working by luck - because userspace on ARM32 at
+>>>> this moment always sets SA_RESTORER.
+>>>>
+>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>> Cc: Russell King <linux@armlinux.org.uk>
+>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>> Cc: Andy Lutomirski <luto@amacapital.net>
+>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>>> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
+>>>> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
+>>>> Cc: Christopher Covington <cov@codeaurora.org>
+>>>> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
+>>>> ---
+>>>> v2: (buildbot) Fix (unsinged long) to (void*) cast warning.
+>>>>
+>>>>   arch/arm/kernel/process.c |  8 ++++++++
+>>>>   arch/arm/kernel/vdso.c    | 18 ++++++++++++++++++
+>>>>   arch/x86/entry/vdso/vma.c |  3 ---
+>>>>   mm/mmap.c                 |  4 ++++
+>>>>   4 files changed, 30 insertions(+), 3 deletions(-)
+>>>
+>>> Ping?
+>>
+>> Ping?
+> 
+> I'm mostly happy with the ARM bits, but I can't take the patch without
+> acks from others because it touches other architectures/generic code.
+> 
 
-Add them in the DTSI file.
+Fair enough, thanks.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes in v3:
-- Added Chen-Yu's ACK.
+Andy, does moving of this WARN_ON() looks good to you?
+I've done it to reuse it over arches and between vdso/sigpage mappings,
+reducing code duplication.
 
- arch/arm/boot/dts/sun8i-v3s.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Here is the patch, so you don't need to search it in the mailbox:
+https://patchwork.kernel.org/patch/9681273/
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-index e0e99bbebdb3..01751ea0761e 100644
---- a/arch/arm/boot/dts/sun8i-v3s.dtsi
-+++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-@@ -271,6 +271,25 @@
- 			status = "disabled";
- 		};
- 
-+		codec: codec at 01c22c00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-v3s-codec";
-+			reg = <0x01c22c00 0x400>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "apb", "codec";
-+			resets = <&ccu RST_BUS_CODEC>;
-+			dmas = <&dma 15>, <&dma 15>;
-+			dma-names = "rx", "tx";
-+			allwinner,codec-analog-controls = <&codec_analog>;
-+			status = "disabled";
-+		};
-+
-+		codec_analog: codec-analog at 01c23000 {
-+			compatible = "allwinner,sun8i-v3s-codec-analog";
-+			reg = <0x01c23000 0x4>;
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
 -- 
-2.12.2
+              Dmitry
