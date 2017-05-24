@@ -1,54 +1,68 @@
-From: eddie.cai.linux@gmail.com (Eddie Cai)
-Date: Wed, 24 May 2017 16:55:14 +0800
-Subject: [PATCH] ARM: dts: rockchip:remove hs200 support for firefly reload
-In-Reply-To: <65c7a442-4b2e-65e4-ea5e-0a723c257397@rock-chips.com>
-References: <1495612242-28873-1-git-send-email-eddie.cai.linux@gmail.com>
- <65c7a442-4b2e-65e4-ea5e-0a723c257397@rock-chips.com>
-Message-ID: <CAJrj+DO2D3DFxby1aNS-V0-A2BNsgta22SJ3Y64LPzVuwvgaXA@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 24 May 2017 10:57:01 +0200
+Subject: [PATCH 5/5] pinctrl: meson-gxl: Add Ethernet PHY LEDS pins
+In-Reply-To: <1495614042-2676-6-git-send-email-narmstrong@baylibre.com>
+References: <1495614042-2676-1-git-send-email-narmstrong@baylibre.com>
+ <1495614042-2676-6-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1495616221.14589.12.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn
+On Wed, 2017-05-24 at 10:20 +0200, Neil Armstrong wrote:
+> The Amlogic Meson GXL SoCs embeds an 10/100 Ethernet PHY, this patchs enables
+> the Link and Activity LEDs signals.
 
-2017-05-24 16:00 GMT+08:00 Shawn Lin <shawn.lin@rock-chips.com>:
-> Hi,
->
-> On 2017/5/24 15:50, Eddie Cai wrote:
->>
->> due to layout limitation. not all of the reload board can support hs200.
->> so remove hs200 support to make all board can boot up.
->
->
-> You now also remove DDR52, so all reload boards run at high speed mode?
-My mistake. I will add it back in next version
->
-> I'm curious about what was the layout limitation that mmc tuning
-> process could never help?
->
->>
->> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
->> ---
->>  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 2 --
->>  1 file changed, 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
->> b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
->> index 4cfa109..56ac1e6f 100644
->> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
->> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
->> @@ -75,8 +75,6 @@
->>         bus-width = <8>;
->>         cap-mmc-highspeed;
->>         disable-wp;
->> -       mmc-ddr-1_8v;
->> -       mmc-hs200-1_8v;
->>         non-removable;
->>         num-slots = <1>;
->>         pinctrl-names = "default";
->>
->
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+> ?drivers/pinctrl/meson/pinctrl-meson-gxl.c | 10 ++++++++++
+> ?1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+> b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+> index 7d81287..78a9af5 100644
+> --- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+> +++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+> @@ -239,6 +239,9 @@
+> ?
+> ?static const unsigned int spdif_out_h_pins[]	= { PIN(GPIOH_4, EE_OFF)
+> };
+> ?
+> +static const unsigned int eth_link_led_pins[]	= { PIN(GPIOZ_14,
+> EE_OFF) };
+> +static const unsigned int eth_act_led_pins[]	= { PIN(GPIOZ_15, EE_OFF)
+> };
+> +
+> ?static const struct pinctrl_pin_desc meson_gxl_aobus_pins[] = {
+> ?	MESON_PIN(GPIOAO_0, 0),
+> ?	MESON_PIN(GPIOAO_1, 0),
+> @@ -437,6 +440,8 @@
+> ?	GROUP(i2s_out_ch23_z,	3,	26),
+> ?	GROUP(i2s_out_ch45_z,	3,	25),
+> ?	GROUP(i2s_out_ch67_z,	3,	24),
+> +	GROUP(eth_link_led,	4,	25),
+> +	GROUP(eth_act_led,	4,	24),
+> ?
+> ?	/* Bank H */
+> ?	GROUP(hdmi_hpd,		6,	31),
+> @@ -665,6 +670,10 @@
+> ?	"spdif_out_h",
+> ?};
+> ?
+> +static const char * const eth_led_groups[] = {
+> +	"eth_link_led", "eth_act_led",
+> +};
+> +
+> ?static const char * const gpio_aobus_groups[] = {
+> ?	"GPIOAO_0", "GPIOAO_1", "GPIOAO_2", "GPIOAO_3", "GPIOAO_4",
+> ?	"GPIOAO_5", "GPIOAO_6", "GPIOAO_7", "GPIOAO_8", "GPIOAO_9",
+> @@ -736,6 +745,7 @@
+> ?	FUNCTION(hdmi_i2c),
+> ?	FUNCTION(i2s_out),
+> ?	FUNCTION(spdif_out),
+> +	FUNCTION(eth_led),
+> ?};
+> ?
+> ?static struct meson_pmx_func meson_gxl_aobus_functions[] = {
