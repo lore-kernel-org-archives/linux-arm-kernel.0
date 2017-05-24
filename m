@@ -1,34 +1,29 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 24 May 2017 11:39:31 +0200
-Subject: [PATCH v2 1/2] clk: meson: meson8b: mark clk81 as critical
+Date: Wed, 24 May 2017 11:39:32 +0200
+Subject: [PATCH v2 2/2] clk: gxbb: remove CLK_IGNORE_UNUSED from clk81
 In-Reply-To: <20170524093932.5262-1-jbrunet@baylibre.com>
 References: <20170524093932.5262-1-jbrunet@baylibre.com>
-Message-ID: <20170524093932.5262-2-jbrunet@baylibre.com>
+Message-ID: <20170524093932.5262-3-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+clk81 already has CLK_IS_CRITICAL so CLK_IGNORE_UNUSED is not
+necessary
 
-Disabling clk81 results in an immediate freeze of the whole system. This
-can happen "accidentally" when the last child-clock of clk81 is disabled
-(in this case the common clock framework also disables clk81, even if it
-was only enabled indirectly before).
-
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/clk/meson/meson8b.c | 2 +-
+ drivers/clk/meson/gxbb.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-index e9985503165c..9d1aaf6e9ac6 100644
---- a/drivers/clk/meson/meson8b.c
-+++ b/drivers/clk/meson/meson8b.c
-@@ -399,7 +399,7 @@ struct clk_gate meson8b_clk81 = {
+diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+index ad5f027af1a2..be6350a03074 100644
+--- a/drivers/clk/meson/gxbb.c
++++ b/drivers/clk/meson/gxbb.c
+@@ -676,7 +676,7 @@ static struct clk_gate gxbb_clk81 = {
  		.ops = &clk_gate_ops,
  		.parent_names = (const char *[]){ "mpeg_clk_div" },
  		.num_parents = 1,
--		.flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED),
+-		.flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED | CLK_IS_CRITICAL),
 +		.flags = (CLK_SET_RATE_PARENT | CLK_IS_CRITICAL),
  	},
  };
