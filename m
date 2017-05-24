@@ -1,57 +1,49 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 24 May 2017 18:22:19 +0100
-Subject: [PATCH v3 1/1] ARM64/PCI: Set root bus NUMA node on ACPI systems
-In-Reply-To: <20170524172219.5689-1-lorenzo.pieralisi@arm.com>
-References: <20170524172219.5689-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170524172219.5689-2-lorenzo.pieralisi@arm.com>
+Date: Wed, 24 May 2017 18:22:18 +0100
+Subject: [PATCH v3 0/1] ARM64/PCI: ACPI NUMA node set-up
+Message-ID: <20170524172219.5689-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCI core requires the NUMA node for the struct pci_host_bridge.dev to
-be set by using the pcibus_to_node(struct pci_bus*) API, that on ARM64
-systems relies on the struct pci_host_bridge->bus.dev NUMA node.
+This patch series is v3 of a previous posting:
 
-The struct pci_host_bridge.dev NUMA node is then propagated through
-the PCI device hierarchy as PCI devices (and bridges) are enumerated
-under it.
+v2 -> v3
 
-Therefore, in order to set-up the PCI NUMA hierarchy appropriately, the
-struct pci_host_bridge->bus.dev NUMA node must be set before core
-code calls pcibus_to_node(struct pci_bus*) on it so that PCI core can
-retrieve the NUMA node for the struct pci_host_bridge.dev device and can
-propagate it through the PCI bus tree.
+- Dropped generic approach
+  # It was not consistent between ACPI and DT and not reusable on x86/IA64
+- Trimmed the series to one patch ARM64 specific, three-line patch fixes
+  the issue
+- Rebased against v4.12-rc2
+- Dropped RFC/RFT tag
 
-On ARM64 ACPI based systems the struct pci_host_bridge->bus.dev NUMA
-node can be set-up in pcibios_root_bridge_prepare() by parsing the root
-bridge ACPI device firmware binding.
+v2: https://lkml.org/lkml/2017/5/15/433
 
-Add code to the pcibios_root_bridge_prepare() that, when booting with
-ACPI, parse the root bridge ACPI device companion NUMA binding and set
-the corresponding struct pci_host_bridge->bus.dev NUMA node
-appropriately.
+v1 -> v2:
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
----
+- Added missing call to acpi_pci_bus_find_numa_node()
+- Rebased against v4.12-rc1
+
+v1: https://lkml.org/lkml/2017/4/26/211
+
+--- Original Cover Letter --
+
+On the ARM64 architecture, the arch specific PCI pcibus_to_node() callback
+can be triggered on struct pci_bus.sysdata structures that carry host
+bridge specific data through different structures layout (ie sysdata
+pointer points at different structs for different host bridges), therefore
+it is not possible to have a unified pcibus_to_node() implementation.
+
+Given that the device NUMA node is a property of the struct pci_bus (and
+its associated struct device), move the struct pci_bus node assignment to
+generic PCI code, where according to the platform firmware the NUMA node
+for the device backing the struct pci_bus is retrieved and propagated
+through the PCI bus hierarchy.
+
+Lorenzo Pieralisi (1):
+  ARM64/PCI: Set root bus NUMA node on ACPI systems
+
  arch/arm64/kernel/pci.c | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 4f0e3eb..1082834 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -108,7 +108,10 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
- 	if (!acpi_disabled) {
- 		struct pci_config_window *cfg = bridge->bus->sysdata;
- 		struct acpi_device *adev = to_acpi_device(cfg->parent);
-+		struct device *bus_dev = &bridge->bus->dev;
-+
- 		ACPI_COMPANION_SET(&bridge->dev, adev);
-+		set_dev_node(bus_dev, acpi_get_node(acpi_device_handle(adev)));
- 	}
- 
- 	return 0;
 -- 
 2.10.0
