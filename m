@@ -1,129 +1,36 @@
-From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Wed, 24 May 2017 07:13:27 -0500
-Subject: [PATCH 1/2] staging: fsl-dpaa2/eth: Fix address translations
-Message-ID: <20170524121328.16984-1-ruxandra.radulescu@nxp.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 24 May 2017 20:13:18 +0800
+Subject: [PATCH 1/3] ARM: sun8i: v3s: add PWM device node
+Message-ID: <20170524121320.4171-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the correct mechanisms for translating a DMA-mapped IOVA
-address into a virtual one. Without this fix, once SMMU is
-enabled on Layerscape platforms, the Ethernet driver throws
-IOMMU translation faults.
+As we have already the support for the PWM controller on V3s SoC, add
+its device node in the SoC's DTSI file.
 
-Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 25 +++++++++++++++++++------
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h |  1 +
- 2 files changed, 20 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/sun8i-v3s.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index 6f9eed66c64d..3fee0d6f17e0 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -37,6 +37,7 @@
- #include <linux/interrupt.h>
- #include <linux/msi.h>
- #include <linux/kthread.h>
-+#include <linux/iommu.h>
+diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
+index a49ebef53c91..bb080c4bd22c 100644
+--- a/arch/arm/boot/dts/sun8i-v3s.dtsi
++++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
+@@ -255,6 +255,14 @@
+ 			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
  
- #include "../../fsl-mc/include/mc.h"
- #include "../../fsl-mc/include/mc-sys.h"
-@@ -54,6 +55,16 @@ MODULE_DESCRIPTION("Freescale DPAA2 Ethernet Driver");
- 
- const char dpaa2_eth_drv_version[] = "0.1";
- 
-+static void *dpaa2_iova_to_virt(struct iommu_domain *domain,
-+				dma_addr_t iova_addr)
-+{
-+	phys_addr_t phys_addr;
++		pwm: pwm at 1c21400 {
++			compatible = "allwinner,sun7i-a20-pwm";
++			reg = <0x01c21400 0x400>;
++			clocks = <&osc24M>;
++			#pwm-cells = <3>;
++			status = "disabled";
++		};
 +
-+	phys_addr = domain ? iommu_iova_to_phys(domain, iova_addr) : iova_addr;
-+
-+	return phys_to_virt(phys_addr);
-+}
-+
- static void validate_rx_csum(struct dpaa2_eth_priv *priv,
- 			     u32 fd_status,
- 			     struct sk_buff *skb)
-@@ -98,12 +109,11 @@ static void free_rx_fd(struct dpaa2_eth_priv *priv,
- 	sgt = vaddr + dpaa2_fd_get_offset(fd);
- 	for (i = 0; i < DPAA2_ETH_MAX_SG_ENTRIES; i++) {
- 		addr = dpaa2_sg_get_addr(&sgt[i]);
-+		sg_vaddr = dpaa2_iova_to_virt(priv->iommu_domain, addr);
- 		dma_unmap_single(dev, addr, DPAA2_ETH_RX_BUF_SIZE,
- 				 DMA_FROM_DEVICE);
- 
--		sg_vaddr = phys_to_virt(addr);
- 		skb_free_frag(sg_vaddr);
--
- 		if (dpaa2_sg_is_final(&sgt[i]))
- 			break;
- 	}
-@@ -159,10 +169,10 @@ static struct sk_buff *build_frag_skb(struct dpaa2_eth_priv *priv,
- 
- 		/* Get the address and length from the S/G entry */
- 		sg_addr = dpaa2_sg_get_addr(sge);
-+		sg_vaddr = dpaa2_iova_to_virt(priv->iommu_domain, sg_addr);
- 		dma_unmap_single(dev, sg_addr, DPAA2_ETH_RX_BUF_SIZE,
- 				 DMA_FROM_DEVICE);
- 
--		sg_vaddr = phys_to_virt(sg_addr);
- 		sg_length = dpaa2_sg_get_len(sge);
- 
- 		if (i == 0) {
-@@ -222,8 +232,8 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
- 	/* Tracing point */
- 	trace_dpaa2_rx_fd(priv->net_dev, fd);
- 
-+	vaddr = dpaa2_iova_to_virt(priv->iommu_domain, addr);
- 	dma_unmap_single(dev, addr, DPAA2_ETH_RX_BUF_SIZE, DMA_FROM_DEVICE);
--	vaddr = phys_to_virt(addr);
- 
- 	prefetch(vaddr + priv->buf_layout.private_data_size);
- 	prefetch(vaddr + dpaa2_fd_get_offset(fd));
-@@ -490,7 +500,7 @@ static void free_tx_fd(const struct dpaa2_eth_priv *priv,
- 	struct dpaa2_fas *fas;
- 
- 	fd_addr = dpaa2_fd_get_addr(fd);
--	skbh = phys_to_virt(fd_addr);
-+	skbh = dpaa2_iova_to_virt(priv->iommu_domain, fd_addr);
- 
- 	if (fd_format == dpaa2_fd_single) {
- 		skb = *skbh;
-@@ -802,10 +812,11 @@ static void drain_bufs(struct dpaa2_eth_priv *priv, int count)
- 		}
- 		for (i = 0; i < ret; i++) {
- 			/* Same logic as on regular Rx path */
-+			vaddr = dpaa2_iova_to_virt(priv->iommu_domain,
-+						   buf_array[i]);
- 			dma_unmap_single(dev, buf_array[i],
- 					 DPAA2_ETH_RX_BUF_SIZE,
- 					 DMA_FROM_DEVICE);
--			vaddr = phys_to_virt(buf_array[i]);
- 			skb_free_frag(vaddr);
- 		}
- 	} while (ret);
-@@ -2358,6 +2369,8 @@ static int dpaa2_eth_probe(struct fsl_mc_device *dpni_dev)
- 	priv = netdev_priv(net_dev);
- 	priv->net_dev = net_dev;
- 
-+	priv->iommu_domain = iommu_get_domain_for_dev(dev);
-+
- 	/* Obtain a MC portal */
- 	err = fsl_mc_portal_allocate(dpni_dev, FSL_MC_IO_ATOMIC_CONTEXT_PORTAL,
- 				     &priv->mc_io);
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-index c67cced55b72..55b47623008c 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-@@ -301,6 +301,7 @@ struct dpaa2_eth_priv {
- 
- 	struct fsl_mc_device *dpbp_dev;
- 	struct dpbp_attr dpbp_attrs;
-+	struct iommu_domain *iommu_domain;
- 
- 	u16 tx_qdid;
- 	struct fsl_mc_io *mc_io;
+ 		lradc: lradc at 1c22800 {
+ 			compatible = "allwinner,sun4i-a10-lradc-keys";
+ 			reg = <0x01c22800 0x400>;
 -- 
-2.11.0
+2.12.2
