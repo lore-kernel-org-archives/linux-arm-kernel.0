@@ -1,89 +1,113 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 May 2017 10:48:34 +0200
-Subject: [PATCH 1/3 v4] dt-bindings: Augment Gemini for clocks, resets
-Message-ID: <20170524084834.24876-1-linus.walleij@linaro.org>
+Date: Wed, 24 May 2017 10:48:52 +0200
+Subject: [PATCH 2/3 v4] ARM: dts: Add the Gemini reset controller
+Message-ID: <20170524084852.24925-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This augments the platform bindings for the Gemini SoC to include
-the fact that the system controller also provides clock and reset
-lines.
+This adds the Gemini reset controller to the Gemini SoC
+DTSI file and also adds the reset references to all existing
+blocks already in the device tree.
 
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v3->v4:
-- Spit off the header files into their own patches so they
-  can be merged to respective subsystem.
+- Use numerical values for the reset lines again. Adopt merge
+  strategy to replace this with macros after rc1 with a separate patch.
 ChangeLog v2->v3:
-- Essentially a new patch from the two old patches adding
-  bindings to the reset and clock controller separately.
-  Instead add it all into the system controller and use one
-  single compatible.
+- No special compatible on the syscon to indicate that it is
+  a reset controller.
+ChangeLog v1->v2:
+- Cut the reset controller child node and reference resets
+  directly from the syscon.
+- Use <dt-bindings/reset/cortina,gemini-reset.h> defines.
 ---
- Documentation/devicetree/bindings/arm/gemini.txt | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/gemini.dtsi | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/gemini.txt b/Documentation/devicetree/bindings/arm/gemini.txt
-index 0041eb031116..55bf7ce96c44 100644
---- a/Documentation/devicetree/bindings/arm/gemini.txt
-+++ b/Documentation/devicetree/bindings/arm/gemini.txt
-@@ -24,6 +24,19 @@ Required nodes:
-   global control registers, with the compatible string
-   "cortina,gemini-syscon", "syscon";
+diff --git a/arch/arm/boot/dts/gemini.dtsi b/arch/arm/boot/dts/gemini.dtsi
+index b8d011bdcc76..dadc8412243e 100644
+--- a/arch/arm/boot/dts/gemini.dtsi
++++ b/arch/arm/boot/dts/gemini.dtsi
+@@ -25,8 +25,10 @@
+ 		};
  
-+  Required properties on the syscon:
-+  - reg: syscon register location and size.
-+  - #clock-cells: should be set to <1> - the system controller is also a
-+                  clock provider.
-+  - #reset-cells: should be set to <1> - the system controller is also a
-+                  reset line provider.
-+
-+  The clock sources have shorthand defines in the include file:
-+  <dt-bindings/clock/cortina,gemini-clock.h>
-+
-+  The reset lines have shorthand defines in the include file:
-+  <dt-bindings/reset/cortina,gemini-reset.h>
-+
- - timer: the soc bus node must have a timer node pointing to the SoC timer
-   block, with the compatible string "cortina,gemini-timer"
-   See: clocksource/cortina,gemini-timer.txt
-@@ -56,12 +69,15 @@ Example:
  		syscon: syscon at 40000000 {
- 			compatible = "cortina,gemini-syscon", "syscon";
+-			compatible = "cortina,gemini-syscon", "syscon", "simple-mfd";
++			compatible = "cortina,gemini-syscon",
++				     "syscon", "simple-mfd";
  			reg = <0x40000000 0x1000>;
-+			#clock-cells = <1>;
 +			#reset-cells = <1>;
+ 
+ 			syscon-reboot {
+ 				compatible = "syscon-reboot";
+@@ -42,11 +44,13 @@
+ 			compatible = "cortina,gemini-watchdog";
+ 			reg = <0x41000000 0x1000>;
+ 			interrupts = <3 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&syscon 23>;
  		};
  
  		uart0: serial at 42000000 {
  			compatible = "ns16550a";
  			reg = <0x42000000 0x100>;
--			clock-frequency = <48000000>;
-+			resets = <&syscon GEMINI_RESET_UART>;
-+			clocks = <&syscon GEMINI_CLK_UART>;
++			resets = <&syscon 18>;
+ 			clock-frequency = <48000000>;
  			interrupts = <18 IRQ_TYPE_LEVEL_HIGH>;
  			reg-shift = <2>;
- 		};
-@@ -73,12 +89,18 @@ Example:
+@@ -59,6 +63,7 @@
  			interrupts = <14 IRQ_TYPE_EDGE_FALLING>, /* Timer 1 */
  				     <15 IRQ_TYPE_EDGE_FALLING>, /* Timer 2 */
  				     <16 IRQ_TYPE_EDGE_FALLING>; /* Timer 3 */
-+			resets = <&syscon GEMINI_RESET_TIMER>;
-+			/* APB clock or RTC clock */
-+			clocks = <&syscon GEMINI_CLK_APB>,
-+				 <&syscon GEMINI_CLK_RTC>;
-+			clock-names = "PCLK", "EXTCLK";
++			resets = <&syscon 17>;
  			syscon = <&syscon>;
  		};
  
+@@ -66,11 +71,13 @@
+ 			compatible = "cortina,gemini-rtc";
+ 			reg = <0x45000000 0x100>;
+ 			interrupts = <17 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&syscon 16>;
+ 		};
+ 
  		intcon: interrupt-controller at 48000000 {
- 			compatible = "cortina,gemini-interrupt-controller";
+ 			compatible = "faraday,ftintc010";
  			reg = <0x48000000 0x1000>;
-+			resets = <&syscon GEMINI_RESET_INTCON0>;
++			resets = <&syscon 14>;
  			interrupt-controller;
  			#interrupt-cells = <2>;
  		};
+@@ -85,6 +92,7 @@
+ 			compatible = "cortina,gemini-gpio", "faraday,ftgpio010";
+ 			reg = <0x4d000000 0x100>;
+ 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&syscon 20>;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+@@ -95,6 +103,7 @@
+ 			compatible = "cortina,gemini-gpio", "faraday,ftgpio010";
+ 			reg = <0x4e000000 0x100>;
+ 			interrupts = <23 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&syscon 21>;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+@@ -105,6 +114,7 @@
+ 			compatible = "cortina,gemini-gpio", "faraday,ftgpio010";
+ 			reg = <0x4f000000 0x100>;
+ 			interrupts = <24 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&syscon 22>;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+@@ -118,6 +128,7 @@
+ 			 * to configure the host bridge.
+ 			 */
+ 			reg = <0x50000000 0x100>;
++			resets = <&syscon 7>;
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			#interrupt-cells = <1>;
 -- 
 2.9.4
