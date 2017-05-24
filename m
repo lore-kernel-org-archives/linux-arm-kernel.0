@@ -1,78 +1,39 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 24 May 2017 12:54:08 +0100
-Subject: [PATCH v4 7/8] mm/hugetlb: Introduce set_huge_swap_pte_at() helper
-In-Reply-To: <20170524115409.31309-1-punit.agrawal@arm.com>
-References: <20170524115409.31309-1-punit.agrawal@arm.com>
-Message-ID: <20170524115409.31309-8-punit.agrawal@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 24 May 2017 13:57:52 +0200
+Subject: stackprotector: ascii armor the stack canary
+In-Reply-To: <CAGXu5jJ9O=ZOjbqp6M3xBZUnUwNqJENtxMHOcZta3eAq02e54Q@mail.gmail.com>
+References: <20170519212636.30440-1-riel@redhat.com>
+ <CAGXu5jJ9O=ZOjbqp6M3xBZUnUwNqJENtxMHOcZta3eAq02e54Q@mail.gmail.com>
+Message-ID: <CAMuHMdXEVLcn3=76H5zk9LNOPZLfV1XfuQ1EtrNjoZ3J3i2Nyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-set_huge_pte_at(), an architecture callback to populate hugepage ptes,
-does not provide the range of virtual memory that is targeted. This
-leads to ambiguity when dealing with swap entries on architectures that
-support hugepages consisting of contiguous ptes.
+On Fri, May 19, 2017 at 11:32 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Fri, May 19, 2017 at 2:26 PM,  <riel@redhat.com> wrote:
+>> Zero out the first byte of the stack canary value on 64 bit systems,
+>> in order to prevent unterminated C string overflows from being able
+>> to successfully overwrite the canary, even if an attacker somehow
+>> guessed or obtained the canary value.
+>
+> This also stops string functions from being able to read the canary.
+>
+> It might also be worth mentioning that the reduction in entropy for
+> 64-bit to gain this corner-case protection is worth it, but on 32-bit,
+> it is not. (Which is especially true given that the 64-bit canary was
+> only 32-bits in some cases until recently.)
 
-Fix the problem by introducing an overridable helper for architectures
-needing this support. The helper is called when populating the page
-tables with swap entries. The size of the targeted region is provided to
-the helper to help determine the number of entries to be updated.
++1
 
-Provide a default implementation that maintains the current behaviour.
+It took me a while to deduce that myself, when I started wondering why
+this was not done for 32-bit.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Acked-by: Steve Capper <steve.capper@arm.com>
-Cc: Mike Kravetz <mike.kravetz@oracle.com>
-Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
----
- include/linux/hugetlb.h | 8 ++++++++
- mm/hugetlb.c            | 8 +++++---
- 2 files changed, 13 insertions(+), 3 deletions(-)
+Gr{oetje,eeting}s,
 
-diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
-index 23010a3b2047..879eb063fb95 100644
---- a/include/linux/hugetlb.h
-+++ b/include/linux/hugetlb.h
-@@ -435,6 +435,14 @@ static inline pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
- }
- #endif
- 
-+#ifndef set_huge_swap_pte_at
-+static inline void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
-+					pte_t *ptep, pte_t pte, unsigned long sz)
-+{
-+	set_huge_pte_at(mm, addr, ptep, pte);
-+}
-+#endif
-+
- static inline struct hstate *page_hstate(struct page *page)
- {
- 	VM_BUG_ON_PAGE(!PageHuge(page), page);
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index ddfed20cd637..e3052c16d29a 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -3263,9 +3263,10 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
- 				 */
- 				make_migration_entry_read(&swp_entry);
- 				entry = swp_entry_to_pte(swp_entry);
--				set_huge_pte_at(src, addr, src_pte, entry);
-+				set_huge_swap_pte_at(src, addr, src_pte,
-+						     entry, sz);
- 			}
--			set_huge_pte_at(dst, addr, dst_pte, entry);
-+			set_huge_swap_pte_at(dst, addr, dst_pte, entry, sz);
- 		} else {
- 			if (cow) {
- 				huge_ptep_set_wrprotect(src, addr, src_pte);
-@@ -4277,7 +4278,8 @@ unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
- 
- 				make_migration_entry_read(&entry);
- 				newpte = swp_entry_to_pte(entry);
--				set_huge_pte_at(mm, address, ptep, newpte);
-+				set_huge_swap_pte_at(mm, address, ptep,
-+						     newpte, huge_page_size(h));
- 				pages++;
- 			}
- 			spin_unlock(ptl);
--- 
-2.11.0
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
