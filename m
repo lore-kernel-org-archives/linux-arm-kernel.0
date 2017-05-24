@@ -1,53 +1,105 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 24 May 2017 18:05:58 +0800
-Subject: [PATCH v3 0/9] Add support for the audio codec on Allwinner V3s
-Message-ID: <20170524100607.29790-1-icenowy@aosc.io>
+Date: Wed, 24 May 2017 18:05:59 +0800
+Subject: [PATCH v3 1/9] ASoC: sun8i-codec-analog: split out mbias
+In-Reply-To: <20170524100607.29790-1-icenowy@aosc.io>
+References: <20170524100607.29790-1-icenowy@aosc.io>
+Message-ID: <20170524100607.29790-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner V3s features a audio codec with dedicated digital and analog parts,
-like the ones on A23/H3, but much simpler (lack of MIC2, LINE IN and MBIAS).
+From: Icenowy Zheng <icenowy@aosc.xyz>
 
-Add support for it.
+Allwinner V3s features an analog codec without MBIAS pin.
 
-In order to make the codec usable, DMA support is also added in this series.
+Split out this part, in order to prepare for the V3s analog codec.
 
-Patch 1 split out MBIAS in analog codec driver.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+Changes in v3:
+- Fixed a missing line in v2.
 
-Patch 2 prepared a set of objects that have MIC2 and LINEIN stripped out
-for V3s.
+ sound/soc/sunxi/sun8i-codec-analog.c | 35 ++++++++++++++++++++++++++++++-----
+ 1 file changed, 30 insertions(+), 5 deletions(-)
 
-Patch 3/4 adds support for V3s in analog/digital codec.
-
-Patch 5 add the gate bit as a common quirk of sun6i-dma driver, as V3s also
-needs it.
-
-Patch 6 really adds support for V3s in DMA engine.
-
-Patch 7/8/9 adds three parts of device tree: DMA engine, codec support
-and enable the codec for Lichee Pi Zero dock.
-
-Icenowy Zheng (9):
-  ASoC: sun8i-codec-analog: split out mbias
-  ASoC: sun8i-codec-analog: prepare a mixer control/widget/route set for
-    V3s
-  ASoC: sun8i-codec-analog: add support for V3s SoC
-  ASoC: sun4i-codec: Add support for V3s codec
-  dmaengine: sun6i: make gate bit in sun8i's DMA engines a common quirk
-  dmaengine: sun6i: support V3s SoC variant
-  ARM: dts: sun8i: add DMA engine in V3s DTSI
-  ARM: dts: sun8i: add audio codec support into V3s DTSI
-  ARM: sun8i: v3s: enable audio on Lichee Pi Zero Dock board
-
- .../devicetree/bindings/dma/sun6i-dma.txt          |   1 +
- .../devicetree/bindings/sound/sun4i-codec.txt      |  11 +-
- .../bindings/sound/sun8i-codec-analog.txt          |   1 +
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts |   9 ++
- arch/arm/boot/dts/sun8i-v3s.dtsi                   |  28 ++++
- drivers/dma/sun6i-dma.c                            |  25 +++-
- sound/soc/sunxi/sun4i-codec.c                      |  63 +++++++++
- sound/soc/sunxi/sun8i-codec-analog.c               | 141 ++++++++++++++++++++-
- 8 files changed, 266 insertions(+), 13 deletions(-)
-
+diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
+index 6c17c99c2c8d..edcc3eb7cd9a 100644
+--- a/sound/soc/sunxi/sun8i-codec-analog.c
++++ b/sound/soc/sunxi/sun8i-codec-analog.c
+@@ -289,11 +289,6 @@ static const struct snd_soc_dapm_widget sun8i_codec_common_widgets[] = {
+ 	/* Microphone input */
+ 	SND_SOC_DAPM_INPUT("MIC1"),
+ 
+-	/* Microphone Bias */
+-	SND_SOC_DAPM_SUPPLY("MBIAS", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
+-			    SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MMICBIASEN,
+-			    0, NULL, 0),
+-
+ 	/* Mic input path */
+ 	SND_SOC_DAPM_PGA("Mic1 Amplifier", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
+ 			 SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MIC1AMPEN, 0, NULL, 0),
+@@ -453,6 +448,27 @@ static int sun8i_codec_add_headphone(struct snd_soc_component *cmpnt)
+ 	return 0;
+ }
+ 
++/* mbias specific widget */
++static const struct snd_soc_dapm_widget sun8i_codec_mbias_widgets[] = {
++	SND_SOC_DAPM_SUPPLY("MBIAS", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
++			    SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MMICBIASEN,
++			    0, NULL, 0),
++};
++
++static int sun8i_codec_add_mbias(struct snd_soc_component *cmpnt)
++{
++	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
++	struct device *dev = cmpnt->dev;
++	int ret;
++
++	ret = snd_soc_dapm_new_controls(dapm, sun8i_codec_mbias_widgets,
++					ARRAY_SIZE(sun8i_codec_mbias_widgets));
++	if (ret)
++		dev_err(dev, "Failed to add MBIAS DAPM widgets: %d\n", ret);
++
++	return ret;
++}
++
+ /* hmic specific widget */
+ static const struct snd_soc_dapm_widget sun8i_codec_hmic_widgets[] = {
+ 	SND_SOC_DAPM_SUPPLY("HBIAS", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
+@@ -679,6 +695,7 @@ struct sun8i_codec_analog_quirks {
+ 	bool has_hmic;
+ 	bool has_linein;
+ 	bool has_lineout;
++	bool has_mbias;
+ 	bool has_mic2;
+ };
+ 
+@@ -686,12 +703,14 @@ static const struct sun8i_codec_analog_quirks sun8i_a23_quirks = {
+ 	.has_headphone	= true,
+ 	.has_hmic	= true,
+ 	.has_linein	= true,
++	.has_mbias	= true,
+ 	.has_mic2	= true,
+ };
+ 
+ static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
+ 	.has_linein	= true,
+ 	.has_lineout	= true,
++	.has_mbias	= true,
+ 	.has_mic2	= true,
+ };
+ 
+@@ -734,6 +753,12 @@ static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
+ 			return ret;
+ 	}
+ 
++	if (quirks->has_mbias) {
++		ret = sun8i_codec_add_mbias(cmpnt);
++		if (ret)
++			return ret;
++	}
++
+ 	if (quirks->has_mic2) {
+ 		ret = sun8i_codec_add_mic2(cmpnt);
+ 		if (ret)
 -- 
 2.12.2
