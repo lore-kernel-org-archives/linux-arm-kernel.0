@@ -1,17 +1,18 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 24 May 2017 18:06:05 +0800
-Subject: [PATCH v3 7/9] ARM: dts: sun8i: add DMA engine in V3s DTSI
+Date: Wed, 24 May 2017 18:06:04 +0800
+Subject: [PATCH v3 6/9] dmaengine: sun6i: support V3s SoC variant
 In-Reply-To: <20170524100607.29790-1-icenowy@aosc.io>
 References: <20170524100607.29790-1-icenowy@aosc.io>
-Message-ID: <20170524100607.29790-8-icenowy@aosc.io>
+Message-ID: <20170524100607.29790-7-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Icenowy Zheng <icenowy@aosc.xyz>
 
-Allwinner V3s SoC features a DMA engine.
+Allwinner V3s has a DMA engine similar to the ones from A31, but with
+fewer channels and DRQs.
 
-Add it in the DTSI file.
+Add support for it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
@@ -19,28 +20,50 @@ Acked-by: Chen-Yu Tsai <wens@csie.org>
 Changes in v3:
 - Added Chen-Yu's ACK.
 
- arch/arm/boot/dts/sun8i-v3s.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ Documentation/devicetree/bindings/dma/sun6i-dma.txt |  1 +
+ drivers/dma/sun6i-dma.c                             | 13 +++++++++++++
+ 2 files changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-index a49ebef53c91..e0e99bbebdb3 100644
---- a/arch/arm/boot/dts/sun8i-v3s.dtsi
-+++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-@@ -95,6 +95,15 @@
- 		#size-cells = <1>;
- 		ranges;
+diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+index 6b267045f522..98fbe1a5c6dd 100644
+--- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
++++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+@@ -9,6 +9,7 @@ Required properties:
+ 		  "allwinner,sun8i-a23-dma"
+ 		  "allwinner,sun8i-a83t-dma"
+ 		  "allwinner,sun8i-h3-dma"
++		  "allwinner,sun8i-v3s-dma"
+ - reg:		Should contain the registers base address and length
+ - interrupts:	Should contain a reference to the interrupt used by this device
+ - clocks:	Should contain a reference to the parent AHB clock
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index 69840cf6fe98..a57eaace8e7d 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -1034,11 +1034,24 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
+ 	.nr_max_vchans   = 34,
+ };
  
-+		dma: dma-controller at 01c02000 {
-+			compatible = "allwinner,sun8i-v3s-dma";
-+			reg = <0x01c02000 0x1000>;
-+			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_DMA>;
-+			resets = <&ccu RST_BUS_DMA>;
-+			#dma-cells = <1>;
-+		};
++/*
++ * The V3s have only 8 physical channels, a maximum DRQ port id of 23,
++ * and a total of 24 usable source and destination endpoints.
++ */
 +
- 		mmc0: mmc at 01c0f000 {
- 			compatible = "allwinner,sun7i-a20-mmc";
- 			reg = <0x01c0f000 0x1000>;
++static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
++	.nr_max_channels = 8,
++	.nr_max_requests = 23,
++	.nr_max_vchans   = 24,
++	.gate_needed	 = true,
++};
++
+ static const struct of_device_id sun6i_dma_match[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-dma", .data = &sun6i_a31_dma_cfg },
+ 	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
+ 	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
+ 	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
++	{ .compatible = "allwinner,sun8i-v3s-dma", .data = &sun8i_v3s_dma_cfg },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
 -- 
 2.12.2
