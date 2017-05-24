@@ -1,71 +1,54 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 24 May 2017 12:18:34 -0700
-Subject: [PATCH 1/5] ARM: dts: qcom: Remove s4/5vs1,2 from RPM pm8941
- control
-In-Reply-To: <20170127004728.22490-2-stephen.boyd@linaro.org>
-References: <20170127004728.22490-1-stephen.boyd@linaro.org>
- <20170127004728.22490-2-stephen.boyd@linaro.org>
-Message-ID: <20170524191834.GY12920@tuxbook>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 25 May 2017 03:20:35 +0800
+Subject: [PATCH v4 8/8] mm: rmap: Use correct helper when poisoning
+ hugepages
+In-Reply-To: <20170524115409.31309-9-punit.agrawal@arm.com>
+Message-ID: <201705250342.fHpDVCsZ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 26 Jan 16:47 PST 2017, Stephen Boyd wrote:
+Hi Punit,
 
-> These regulators are controlled by the SPMI regulator driver
-> instead of the RPM regulator driver in the downstream android
-> kernel sources. Let's remove them from the DTS here because
-> they'll never be used by the RPM regulator driver.
-> 
-> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.12-rc2 next-20170524]
+[cannot apply to mmotm/master]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+url:    https://github.com/0day-ci/linux/commits/Punit-Agrawal/Support-for-contiguous-pte-hugepages/20170524-221905
+config: x86_64-kexec (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-But the same vin_5vs-supply property can be found in
-qcom-apq8074-dragonboard.dts, so that should probably also go.
+All errors (new ones prefixed by >>):
 
-Regards,
-Bjorn
+   mm/rmap.c: In function 'try_to_unmap_one':
+>> mm/rmap.c:1386:5: error: implicit declaration of function 'set_huge_swap_pte_at' [-Werror=implicit-function-declaration]
+        set_huge_swap_pte_at(mm, address,
+        ^~~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts | 1 -
->  arch/arm/boot/dts/qcom-msm8974.dtsi                   | 4 ----
->  2 files changed, 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-> index e7c1577d56f4..50966378f9e4 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-> +++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-> @@ -92,7 +92,6 @@
->  					vdd_l9_l10_l17_l22-supply = <&vreg_boost>;
->  					vdd_l13_l20_l23_l24-supply = <&vreg_boost>;
->  					vdd_l21-supply = <&vreg_boost>;
-> -					vin_5vs-supply = <&pm8941_5v>;
->  
->  					s1 {
->  						regulator-min-microvolt = <1300000>;
-> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> index 0e9bbede860d..6c167c031368 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> @@ -735,7 +735,6 @@
->  					pm8941_s1: s1 {};
->  					pm8941_s2: s2 {};
->  					pm8941_s3: s3 {};
-> -					pm8941_5v: s4 {};
->  
->  					pm8941_l1: l1 {};
->  					pm8941_l2: l2 {};
-> @@ -765,9 +764,6 @@
->  					pm8941_lvs1: lvs1 {};
->  					pm8941_lvs2: lvs2 {};
->  					pm8941_lvs3: lvs3 {};
-> -
-> -					pm8941_5vs1: 5vs1 {};
-> -					pm8941_5vs2: 5vs2 {};
->  				};
->  			};
->  		};
-> -- 
-> 2.10.0.297.gf6727b0
-> 
+vim +/set_huge_swap_pte_at +1386 mm/rmap.c
+
+  1380	
+  1381			if (PageHWPoison(page) && !(flags & TTU_IGNORE_HWPOISON)) {
+  1382				pteval = swp_entry_to_pte(make_hwpoison_entry(subpage));
+  1383				if (PageHuge(page)) {
+  1384					int nr = 1 << compound_order(page);
+  1385					hugetlb_count_sub(nr, mm);
+> 1386					set_huge_swap_pte_at(mm, address,
+  1387							     pvmw.pte, pteval,
+  1388							     vma_mmu_pagesize(vma));
+  1389				} else {
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 25343 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170525/305fb753/attachment-0001.gz>
