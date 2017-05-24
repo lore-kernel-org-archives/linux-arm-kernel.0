@@ -1,27 +1,51 @@
-From: riel@redhat.com (riel at redhat.com)
-Date: Wed, 24 May 2017 11:57:46 -0400
-Subject: [PATCH v2 0/5] stackprotector: ascii armor the stack canary
-Message-ID: <20170524155751.424-1-riel@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 May 2017 17:58:34 +0200
+Subject: [PATCH] ARM: s3c64xx: don't select ARM_AMBA from S3C64XX_PL080
+Message-ID: <20170524155845.1778223-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zero out the first byte of the stack canary value on 64 bit systems,
-in order to mitigate unterminated C string overflows.
+While trying a fix a build warning unrelated to s3c64xx, I ran into
+a circular dependency:
 
-The null byte both prevents C string functions from reading the
-canary, and from writing it if the canary value were guessed or
-obtained through some other means.
-    
-Reducing the entropy by 8 bits is acceptable on 64-bit systems,
-which will still have 56 bits of entropy left, but not on 32
-bit systems, so the "ascii armor" canary is only implemented on
-64-bit systems.
+drivers/i2c/Kconfig:7: symbol I2C is selected by FB_DDC
+drivers/video/fbdev/Kconfig:63: symbol FB_DDC is selected by FB_CYBER2000_DDC
+drivers/video/fbdev/Kconfig:381: symbol FB_CYBER2000_DDC depends on FB_CYBER2000
+drivers/video/fbdev/Kconfig:369: symbol FB_CYBER2000 depends on FB
+drivers/video/fbdev/Kconfig:5: symbol FB is selected by DRM_KMS_FB_HELPER
+drivers/gpu/drm/Kconfig:72: symbol DRM_KMS_FB_HELPER is selected by DRM_KMS_CMA_HELPER
+drivers/gpu/drm/Kconfig:137: symbol DRM_KMS_CMA_HELPER is selected by DRM_PL111
+drivers/gpu/drm/pl111/Kconfig:1: symbol DRM_PL111 depends on ARM_AMBA
+drivers/amba/Kconfig:1: symbol ARM_AMBA is selected by S3C64XX_PL080
+arch/arm/mach-s3c64xx/Kconfig:42: symbol S3C64XX_PL080 default value contains DMADEVICES
+drivers/dma/Kconfig:5: symbol DMADEVICES is selected by SND_SOC_SH4_SIU
+sound/soc/sh/Kconfig:29: symbol SND_SOC_SH4_SIU is selected by SND_SIU_MIGOR
+sound/soc/sh/Kconfig:59: symbol SND_SIU_MIGOR depends on I2C
 
-Inspired by the "ascii armor" code in execshield and Daniel Micay's
-linux-hardened tree.
+The I2C and FB dependencies are hard to untangle, but I notice that
+S3C64XX_PL080 selecting ARM_AMBA is one piece of the puzzle that
+can easily be avoided, as ARCH_S3C64XX already select ARM_AMBA.
+Removing the redundant 'select' now can help us in the future if we
+run into a variation of the same dependency.
 
-Also see https://github.com/thestinger/linux-hardened/
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Please apply this to the samsung tree
+---
+ arch/arm/mach-s3c64xx/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-v2:
- - improve changelogs
- - address Ingo's coding style comments
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 459214fa20b4..5ee5ad74a3d6 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -40,7 +40,6 @@ config CPU_S3C6410
+ 
+ config S3C64XX_PL080
+ 	def_bool DMADEVICES
+-	select ARM_AMBA
+ 	select AMBA_PL08X
+ 
+ config S3C64XX_SETUP_SDHCI
+-- 
+2.9.0
