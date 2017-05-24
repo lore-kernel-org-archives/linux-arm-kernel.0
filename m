@@ -1,32 +1,38 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 24 May 2017 21:06:45 +0200
-Subject: [PATCH 04/11] crypto: sun4i-ss: cannot use DMA is the request is 0
- length
+Date: Wed, 24 May 2017 21:06:48 +0200
+Subject: [PATCH 07/11] crypto: sun4i-ss: simplify the appended bit assignment
 In-Reply-To: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
 References: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170524190652.13278-5-antoine.tenart@free-electrons.com>
+Message-ID: <20170524190652.13278-8-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not use DMA is the request is 0 length.
+A bit is appended at the end of the input buffer for sha1. Simplify the
+code assigning it.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-index e53c3127b743..bc3cbde07219 100644
+index 59d9b4412aca..0c2efc88bc0a 100644
 --- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
 +++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-@@ -250,7 +250,7 @@ static int sun4i_hash(struct ahash_request *areq)
- 			i = 0;
- 		in_sg = sg_next(in_sg);
+@@ -392,12 +392,8 @@ static int sun4i_hash(struct ahash_request *areq)
  	}
--	if (i == 1 && !op->len)
-+	if (i == 1 && !op->len && areq->nbytes)
- 		dev_dbg(ss->dev, "We can DMA\n");
  
- 	i = 0;
+ 	/* write the remaining bytes of the nbw buffer */
+-	if (nbw) {
+-		wb |= ((1 << 7) << (nbw * 8));
+-		bf[j++] = wb;
+-	} else {
+-		bf[j++] = 1 << 7;
+-	}
++	wb |= ((1 << 7) << (nbw * 8));
++	bf[j++] = wb;
+ 
+ 	/*
+ 	 * number of space to pad to obtain 64o minus 8(size) minus 4 (final 1)
 -- 
 2.9.4
