@@ -1,50 +1,98 @@
-From: keescook@google.com (Kees Cook)
-Date: Wed, 24 May 2017 09:16:51 -0700
-Subject: [PATCH 4/5] arm64: ascii armor the arm64 boot init stack canary
-In-Reply-To: <20170524155751.424-5-riel@redhat.com>
-References: <20170524155751.424-1-riel@redhat.com>
- <20170524155751.424-5-riel@redhat.com>
-Message-ID: <CAGXu5j+b2UfdPs1yoweAy=jAFj9UQMGYYy1EjQUCi3JNjZD90A@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 24 May 2017 17:32:50 +0100
+Subject: [PATCH v2] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
+ hwpoison memory
+Message-ID: <20170524163250.29281-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 8:57 AM,  <riel@redhat.com> wrote:
-> From: Rik van Riel <riel@redhat.com>
->
-> Use the ascii-armor canary to prevent unterminated C string overflows
-> from being able to successfully overwrite the canary, even if they
-> somehow obtain the canary value.
->
-> Inspired by execshield ascii-armor and Daniel Micay's linux-hardened tree.
->
-> Signed-off-by: Rik van Riel <riel@redhat.com>
+Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64, notifications for
+broken memory can call memory_failure() in mm/memory-failure.c to deliver
+SIGBUS to any user space process using the page, and notify all the
+in-kernel users.
 
-Acked-by: Kees Cook <keescook@chromium.org>
+If the page corresponded with guest memory, KVM will unmap this page
+from its stage2 page tables. The user space process that allocated
+this memory may have never touched this page in which case it may not
+be mapped meaning SIGBUS won't be delivered.
 
--Kees
+This works well until a guest accesses that page, and KVM discovers
+pfn == KVM_PFN_ERR_HWPOISON when it comes to process the stage2 fault.
 
-> ---
->  arch/arm64/include/asm/stackprotector.h | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/include/asm/stackprotector.h b/arch/arm64/include/asm/stackprotector.h
-> index fe5e287dc56b..b86a0865ddf1 100644
-> --- a/arch/arm64/include/asm/stackprotector.h
-> +++ b/arch/arm64/include/asm/stackprotector.h
-> @@ -30,6 +30,7 @@ static __always_inline void boot_init_stack_canary(void)
->         /* Try to get a semi random initial value. */
->         get_random_bytes(&canary, sizeof(canary));
->         canary ^= LINUX_VERSION_CODE;
-> +       canary &= CANARY_MASK;
->
->         current->stack_canary = canary;
->         __stack_chk_guard = current->stack_canary;
-> --
-> 2.9.3
->
+Do as x86 does, and deliver the SIGBUS when we discover
+KVM_PFN_ERR_HWPOISON. Use the stage2 mapping size as the si_addr_lsb
+as this matches the user space mapping size.
+
+Cc: Punit Agrawal <punit.agrawal@arm.com>
+Signed-off-by: James Morse <james.morse@arm.com>
+
+---
+This will be needed once we enable ARCH_SUPPORTS_MEMORY_FAILURE for
+arm64[0]. It is harmless until then as KVM_PFN_ERR_HWPOISON will
+never be seen.
+
+Changes since v1:
+ * Pass the vma to kvm_send_hwpoison_signal(), used Punit's huge_page_shift()
+   calculation to find the block size.
+ * ... tested against hugepage not transparent huge page ...
+
+Today we will inherit some existing breakage between KVM, hugepages
+and hwpoison. Patch at [1].
 
 
+[0] https://www.spinics.net/lists/arm-kernel/msg581657.html
+[1] https://marc.info/?l=linux-mm&m=149564219918427&w=2
 
+ virt/kvm/arm/mmu.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 313ee646480f..eaa29aeb7c5b 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -20,6 +20,7 @@
+ #include <linux/kvm_host.h>
+ #include <linux/io.h>
+ #include <linux/hugetlb.h>
++#include <linux/sched/signal.h>
+ #include <trace/events/kvm.h>
+ #include <asm/pgalloc.h>
+ #include <asm/cacheflush.h>
+@@ -1249,6 +1250,24 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+ 	__coherent_cache_guest_page(vcpu, pfn, size);
+ }
+ 
++static void kvm_send_hwpoison_signal(unsigned long address,
++				     struct vm_area_struct *vma)
++{
++	siginfo_t info;
++
++	info.si_signo   = SIGBUS;
++	info.si_errno   = 0;
++	info.si_code    = BUS_MCEERR_AR;
++	info.si_addr    = (void __user *)address;
++
++	if (is_vm_hugetlb_page(vma))
++		info.si_addr_lsb = huge_page_shift(hstate_vma(vma));
++	else
++		info.si_addr_lsb = PAGE_SHIFT;
++
++	send_sig_info(SIGBUS, &info, current);
++}
++
+ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			  struct kvm_memory_slot *memslot, unsigned long hva,
+ 			  unsigned long fault_status)
+@@ -1318,6 +1337,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	smp_rmb();
+ 
+ 	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
++	if (pfn == KVM_PFN_ERR_HWPOISON) {
++		kvm_send_hwpoison_signal(hva, vma);
++		return 0;
++	}
+ 	if (is_error_noslot_pfn(pfn))
+ 		return -EFAULT;
+ 
 -- 
-Kees Cook
-Pixel Security
+2.11.0
