@@ -1,10 +1,9 @@
 From: riel@redhat.com (riel at redhat.com)
-Date: Wed, 24 May 2017 11:57:48 -0400
-Subject: [PATCH 2/5] fork,
- random: use get_random_canary to set tsk->stack_canary
+Date: Wed, 24 May 2017 11:57:50 -0400
+Subject: [PATCH 4/5] arm64: ascii armor the arm64 boot init stack canary
 In-Reply-To: <20170524155751.424-1-riel@redhat.com>
 References: <20170524155751.424-1-riel@redhat.com>
-Message-ID: <20170524155751.424-3-riel@redhat.com>
+Message-ID: <20170524155751.424-5-riel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,21 +17,20 @@ Inspired by execshield ascii-armor and Daniel Micay's linux-hardened tree.
 
 Signed-off-by: Rik van Riel <riel@redhat.com>
 ---
- kernel/fork.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/stackprotector.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/kernel/fork.c b/kernel/fork.c
-index aa1076c5e4a9..b3591e9250a8 100644
---- a/kernel/fork.c
-+++ b/kernel/fork.c
-@@ -560,7 +560,7 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
- 	set_task_stack_end_magic(tsk);
+diff --git a/arch/arm64/include/asm/stackprotector.h b/arch/arm64/include/asm/stackprotector.h
+index fe5e287dc56b..b86a0865ddf1 100644
+--- a/arch/arm64/include/asm/stackprotector.h
++++ b/arch/arm64/include/asm/stackprotector.h
+@@ -30,6 +30,7 @@ static __always_inline void boot_init_stack_canary(void)
+ 	/* Try to get a semi random initial value. */
+ 	get_random_bytes(&canary, sizeof(canary));
+ 	canary ^= LINUX_VERSION_CODE;
++	canary &= CANARY_MASK;
  
- #ifdef CONFIG_CC_STACKPROTECTOR
--	tsk->stack_canary = get_random_long();
-+	tsk->stack_canary = get_random_canary();
- #endif
- 
- 	/*
+ 	current->stack_canary = canary;
+ 	__stack_chk_guard = current->stack_canary;
 -- 
 2.9.3
