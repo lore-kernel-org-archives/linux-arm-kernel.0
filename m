@@ -1,63 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 24 May 2017 08:38:47 -0700
-Subject: [CFT] Always enable SMP mode on MP capable CPUs
-In-Reply-To: <20170519171526.GW22219@n2100.armlinux.org.uk>
-References: <20170518105209.GN22219@n2100.armlinux.org.uk>
- <CAOMZO5Da2R2_t2nU+MdrJiSzvcBQKS4pwYS96r4UyfGc8DtWww@mail.gmail.com>
- <CAOMZO5Dc=i7UdQH=r5RRr_4GmyZZT+rh7BTNV4WbfqKvtVDfsw@mail.gmail.com>
- <20170519171526.GW22219@n2100.armlinux.org.uk>
-Message-ID: <20170524153847.GY10472@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 May 2017 17:39:03 +0200
+Subject: [PATCH] ARM: at91: select CONFIG_ARM_CPU_SUSPEND
+Message-ID: <20170524153921.1682756-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [170519 10:19]:
-> On Fri, May 19, 2017 at 02:07:28PM -0300, Fabio Estevam wrote:
-> > On Thu, May 18, 2017 at 3:09 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > 
-> > > I tested this patch on a mx6ul, which is CortexA7 UP using USB serial
-> > > download mode.
-> > >
-> > > In this boot mode the ROM code does not set the SMP bit and I can
-> > > notice a very slow boot progress with CONFIG_SMP=n with an original
-> > > 4.12-rc1.
-> > >
-> > > With this patch applied it boots with the correct speed, so:
-> > 
-> > However the kernel still takes a long time to decompress when the
-> > bootloader or ROM does not set the SMP bit.
-> > 
-> > After it decompress, then it boots quickly.
-> > 
-> > Should the SMP bit be set inside arch/arm/boot/compressed/head.S?
-> 
-> We could expand the table to positively identify the SMP capable CPUs
-> and enable the SMP bit there, but it's going to add a lot of entries
-> there (one for each specific ARMv7 MP CPU) and is going to have to be
-> endlessly added to each time a new SMP CPU comes out.
+The reference to cpu_resume requires the corresponding
+generic code to be enabled when CONFIG_PM is set:
 
-Looks like commit e414690faa81 ("ARM: always enable SMP mode on SMP cores")
-causes booting to fail early at least on omap4430 duovero. It's a bit of
-a mystery as it is SMP.. And pandboard es (4460) and droid 4 (4430) work
-without the conditional write..
+arch/arm/mach-at91/pm.o: In function `sama5d2_pm_init':
+pm.c:(.init.text+0x5e8): undefined reference to `cpu_resume'
 
-Partial revert like below seems to make it boot again.
+Fixes: 24a0f5c539f9 ("ARM: at91: pm: Add sama5d2 backup mode")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-at91/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Regards,
-
-Tony
-
-8< -------------------
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 4d48a4cf563b..ad653ec0835e 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -289,7 +289,8 @@ __v7_ca17mp_setup:
- 	mrc	p15, 0, r0, c1, c0, 1
- 	orr	r10, r10, #(1 << 6)		@ Enable SMP/nAMP mode
- 	orr	r10, r10, r0			@ Set required bits
--	mcr	p15, 0, r10, c1, c0, 1		@ No, update register
-+	teq	r10, r0				@ Were they already set?
-+	mcrne	p15, 0, r10, c1, c0, 1		@ No, update register
- 	b	__v7_setup_cont
- 
- /*
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 841e924143f9..cbd959b73654 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -1,6 +1,7 @@
+ menuconfig ARCH_AT91
+ 	bool "Atmel SoCs"
+ 	depends on ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V7
++	select ARM_CPU_SUSPEND if PM
+ 	select COMMON_CLK_AT91
+ 	select GPIOLIB
+ 	select PINCTRL
+-- 
+2.9.0
