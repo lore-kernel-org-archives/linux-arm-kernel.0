@@ -1,26 +1,69 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 24 May 2017 16:49:48 +0200
-Subject: [PATCH 1/2] ARM: dts: imx23-sansa: Remove 'enable-active-low'
- property
-In-Reply-To: <CAOMZO5Az=mjv3iiX8VFCRTNTEXPUrxkiKYSdZC0tEsiya7m-vQ@mail.gmail.com>
-References: <1495039381-23126-1-git-send-email-fabio.estevam@nxp.com>
- <764037594.21665.1495040359199@email.1und1.de>
- <CAOMZO5BOu=qKuokq6st_=BOjxO9=nX6VGaTdWX444xCX3oddUA@mail.gmail.com>
- <1348922230.22889.1495043579279@email.1und1.de>
- <CAOMZO5Az=mjv3iiX8VFCRTNTEXPUrxkiKYSdZC0tEsiya7m-vQ@mail.gmail.com>
-Message-ID: <c991c2c3-d645-1228-ded7-44bdbdf4cf63@i2se.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 24 May 2017 17:13:16 +0200
+Subject: [PATCH v6 2/5] arm64: marvell: dts: fix interrupts in 7k/8k
+ crypto nodes
+In-Reply-To: <20170524141035.21031-3-antoine.tenart@free-electrons.com>
+ (Antoine Tenart's message of "Wed, 24 May 2017 16:10:32 +0200")
+References: <20170524141035.21031-1-antoine.tenart@free-electrons.com>
+ <20170524141035.21031-3-antoine.tenart@free-electrons.com>
+Message-ID: <87zie2uw37.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 24.05.2017 um 13:55 schrieb Fabio Estevam:
-> Hi Stefan,
+Hi Antoine,
+ 
+ On mer., mai 24 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+
+> The cryptographic engine nodes have an interrupt which is configured as
+> both edge and level, which makes no sense at all. Fix this by
+> configuring it the right way (level).
 >
-> On Wed, May 17, 2017 at 2:52 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+
+Applied on mvebu/fixes
+
+Thanks,
+
+Gregory
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 +--
+>  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 +--
+>  2 files changed, 2 insertions(+), 4 deletions(-)
 >
->> Thanks for this explanation, this wasn't clear to me from the subject / commit log.
-> I have sent a v2, where I try to make this clear. Thanks for your feedback.
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> index ac8df5201cd6..b4bc42ece754 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> @@ -231,8 +231,7 @@
+>  			cpm_crypto: crypto at 800000 {
+>  				compatible = "inside-secure,safexcel-eip197";
+>  				reg = <0x800000 0x200000>;
+> -				interrupts = <GIC_SPI 34 (IRQ_TYPE_EDGE_RISING
+> -				| IRQ_TYPE_LEVEL_HIGH)>,
+> +				interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
+>  					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
+>  					     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
+>  					     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> index 7740a75a8230..6e2058847ddc 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> @@ -221,8 +221,7 @@
+>  			cps_crypto: crypto at 800000 {
+>  				compatible = "inside-secure,safexcel-eip197";
+>  				reg = <0x800000 0x200000>;
+> -				interrupts = <GIC_SPI 34 (IRQ_TYPE_EDGE_RISING
+> -				| IRQ_TYPE_LEVEL_HIGH)>,
+> +				interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
+>  					     <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>,
+>  					     <GIC_SPI 279 IRQ_TYPE_LEVEL_HIGH>,
+>  					     <GIC_SPI 280 IRQ_TYPE_LEVEL_HIGH>,
+> -- 
+> 2.9.4
 >
 
-Looks good to me. Unfortunately i don't a board to test it.
-
-Stefan
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
