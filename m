@@ -1,36 +1,67 @@
 From: riel@redhat.com (riel at redhat.com)
-Date: Wed, 24 May 2017 11:57:49 -0400
-Subject: [PATCH 3/5] x86: ascii armor the x86_64 boot init stack canary
+Date: Wed, 24 May 2017 11:57:47 -0400
+Subject: [PATCH 1/5] random, stackprotect: introduce get_random_canary function
 In-Reply-To: <20170524155751.424-1-riel@redhat.com>
 References: <20170524155751.424-1-riel@redhat.com>
-Message-ID: <20170524155751.424-4-riel@redhat.com>
+Message-ID: <20170524155751.424-2-riel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rik van Riel <riel@redhat.com>
 
-Use the ascii-armor canary to prevent unterminated C string overflows
-from being able to successfully overwrite the canary, even if they
-somehow obtain the canary value.
+Introduce the get_random_canary function, which provides a random
+unsigned long canary value with the first byte zeroed out on 64
+bit architectures, in order to mitigate non-terminated C string
+overflows.
 
-Inspired by execshield ascii-armor and Daniel Micay's linux-hardened tree.
+The null byte both prevents C string functions from reading the
+canary, and from writing it if the canary value were guessed or
+obtained through some other means.
+
+Reducing the entropy by 8 bits is acceptable on 64-bit systems,
+which will still have 56 bits of entropy left, but not on 32
+bit systems, so the "ascii armor" canary is only implemented on
+64-bit systems.
+
+Inspired by the "ascii armor" code in the old execshield patches,
+and Daniel Micay's linux-hardened tree.
 
 Signed-off-by: Rik van Riel <riel@redhat.com>
 ---
- arch/x86/include/asm/stackprotector.h | 1 +
- 1 file changed, 1 insertion(+)
+ include/linux/random.h | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/x86/include/asm/stackprotector.h b/arch/x86/include/asm/stackprotector.h
-index dcbd9bcce714..8abedf1d650e 100644
---- a/arch/x86/include/asm/stackprotector.h
-+++ b/arch/x86/include/asm/stackprotector.h
-@@ -74,6 +74,7 @@ static __always_inline void boot_init_stack_canary(void)
- 	get_random_bytes(&canary, sizeof(canary));
- 	tsc = rdtsc();
- 	canary += tsc + (tsc << 32UL);
-+	canary &= CANARY_MASK;
+diff --git a/include/linux/random.h b/include/linux/random.h
+index ed5c3838780d..1fa0dc880bd7 100644
+--- a/include/linux/random.h
++++ b/include/linux/random.h
+@@ -57,6 +57,27 @@ static inline unsigned long get_random_long(void)
+ #endif
+ }
  
- 	current->stack_canary = canary;
- #ifdef CONFIG_X86_64
++/*
++ * On 64-bit architectures, protect against non-terminated C string overflows
++ * by zeroing out the first byte of the canary; this leaves 56 bits of entropy.
++ */
++#ifdef CONFIG_64BIT
++# ifdef __LITTLE_ENDIAN
++#  define CANARY_MASK 0xffffffffffffff00UL
++# else /* big endian, 64 bits: */
++#  define CANARY_MASK 0x00ffffffffffffffUL
++# endif
++#else /* 32 bits: */
++# define CANARY_MASK 0xffffffffUL
++#endif
++
++static inline unsigned long get_random_canary(void)
++{
++	unsigned long val = get_random_long();
++
++	return val & CANARY_MASK;
++}
++
+ unsigned long randomize_page(unsigned long start, unsigned long range);
+ 
+ u32 prandom_u32(void);
 -- 
 2.9.3
