@@ -1,86 +1,56 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 24 May 2017 10:15:22 +0200
-Subject: [patch V3 11/32] hwtracing/coresight-etm3x: Use
- cpuhp_setup_state_nocalls_cpuslocked()
+Date: Wed, 24 May 2017 10:15:37 +0200
+Subject: [patch V3 26/32] arm64: Prevent cpu hotplug rwsem recursion
 References: <20170524081511.203800767@linutronix.de>
-Message-ID: <20170524081547.889092478@linutronix.de>
+Message-ID: <20170524081549.197070135@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+The text patching functions which are invoked from jump_label and kprobes
+code are protected against cpu hotplug at the call sites.
 
-etm_probe() holds get_online_cpus() while invoking
-cpuhp_setup_state_nocalls().
+Use stop_machine_cpuslocked() to avoid recursion on the cpu hotplug
+rwsem. stop_machine_cpuslocked() contains a lockdep assertion to catch any
+unprotected callers.
 
-cpuhp_setup_state_nocalls() invokes get_online_cpus() as well. This is
-correct, but prevents the conversion of the hotplug locking to a percpu
-rwsem.
-
-Use cpuhp_setup_state_nocalls_cpuslocked() to avoid the nested
-call. Convert *_online_cpus() to the new interfaces while at it.
-
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: linux-arm-kernel at lists.infradead.org
-
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c |   20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/insn.h |    1 -
+ arch/arm64/kernel/insn.c      |    5 +++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -587,7 +587,7 @@ static void etm_disable_sysfs(struct cor
- 	 * after cpu online mask indicates the cpu is offline but before the
- 	 * DYING hotplug callback is serviced by the ETM driver.
- 	 */
--	get_online_cpus();
-+	cpus_read_lock();
- 	spin_lock(&drvdata->spinlock);
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -433,7 +433,6 @@ u32 aarch64_set_branch_offset(u32 insn,
+ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
  
- 	/*
-@@ -597,7 +597,7 @@ static void etm_disable_sysfs(struct cor
- 	smp_call_function_single(drvdata->cpu, etm_disable_hw, drvdata, 1);
+ int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
+-int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+ int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
  
- 	spin_unlock(&drvdata->spinlock);
--	put_online_cpus();
-+	cpus_read_unlock();
- 
- 	dev_info(drvdata->dev, "ETM tracing disabled\n");
+ s32 aarch64_insn_adrp_get_offset(u32 insn);
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -255,6 +255,7 @@ static int __kprobes aarch64_insn_patch_
+ 	return ret;
  }
-@@ -795,7 +795,7 @@ static int etm_probe(struct amba_device
  
- 	drvdata->cpu = pdata ? pdata->cpu : 0;
++static
+ int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
+ {
+ 	struct aarch64_insn_patch patch = {
+@@ -267,8 +268,8 @@ int __kprobes aarch64_insn_patch_text_sy
+ 	if (cnt <= 0)
+ 		return -EINVAL;
  
--	get_online_cpus();
-+	cpus_read_lock();
- 	etmdrvdata[drvdata->cpu] = drvdata;
+-	return stop_machine(aarch64_insn_patch_text_cb, &patch,
+-			    cpu_online_mask);
++	return stop_machine_cpuslocked(aarch64_insn_patch_text_cb, &patch,
++				       cpu_online_mask);
+ }
  
- 	if (smp_call_function_single(drvdata->cpu,
-@@ -803,17 +803,17 @@ static int etm_probe(struct amba_device
- 		dev_err(dev, "ETM arch init failed\n");
- 
- 	if (!etm_count++) {
--		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CORESIGHT_STARTING,
--					  "arm/coresight:starting",
--					  etm_starting_cpu, etm_dying_cpu);
--		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
--						"arm/coresight:online",
--						etm_online_cpu, NULL);
-+		cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ARM_CORESIGHT_STARTING,
-+						     "arm/coresight:starting",
-+						     etm_starting_cpu, etm_dying_cpu);
-+		ret = cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ONLINE_DYN,
-+							   "arm/coresight:online",
-+							   etm_online_cpu, NULL);
- 		if (ret < 0)
- 			goto err_arch_supported;
- 		hp_online = ret;
- 	}
--	put_online_cpus();
-+	cpus_read_unlock();
- 
- 	if (etm_arch_supported(drvdata->arch) == false) {
- 		ret = -EINVAL;
+ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
