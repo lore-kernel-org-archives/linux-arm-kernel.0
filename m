@@ -1,69 +1,116 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 24 May 2017 16:56:41 -0500
-Subject: [PATCH v5 0/2] Add PCIe host driver support for Mediatek SoCs
-In-Reply-To: <1495338145-9384-1-git-send-email-ryder.lee@mediatek.com>
-References: <1495338145-9384-1-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <20170524215641.GE2794@bhelgaas-glaptop.roam.corp.google.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Wed, 24 May 2017 22:03:52 +0000
+Subject: pxa3xx-nand failing to find device on linux-next
+References: <b36366e358904310aee4970b77f57dba@svr-chch-ex1.atlnz.lc>
+ <2a79405e219b4c37ba00defbe4a0dfe4@svr-chch-ex1.atlnz.lc>
+ <20170524132301.12ad33d8@bbrezillon> <20170524132508.420614c7@bbrezillon>
+Message-ID: <ebe9d9bca4754d1ba920295f2fdd1359@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 21, 2017 at 11:42:23AM +0800, Ryder Lee wrote:
-> Hi,
+On 24/05/17 23:25, Boris Brezillon wrote:
+> On Wed, 24 May 2017 13:23:01 +0200
+> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 > 
-> This patch series add Mediatek Gen2 PCIe host controller driver and
-> dt-binding document. It can be found on MT7623 series SoCs.
+>> Hi Chris,
+>>
+>> On Wed, 24 May 2017 09:36:56 +0000
+>> Chris Packham <Chris.Packham@alliedtelesis.co.nz> wrote:
+>>
+>>> On 23/05/17 17:27, Chris Packham wrote:
+>>>> Hi,
+>>>>
+>>>> I'm doing some testing on linux-next and I'm finding that my nand flash
+>>>> has disappeared.
+>>>>
+>>>> pxa3xx-nand f10d0000.flash: This platform can't do DMA on this device
+>>>> pxa3xx-nand f10d0000.flash: non-supported command ef
+>>>> pxa3xx-nand f10d0000.flash: non-supported command ee
+>>>> pxa3xx-nand f10d0000.flash: non-supported command ef
+>>>> pxa3xx-nand f10d0000.flash: non-supported command ee
+>>>> On-die ECC forcefully enabled, not supported
+>>>> nand: No NAND device found
+>>>> pxa3xx-nand f10d0000.flash: failed to scan nand at cs 0
+>>>>
+>>>> This was working around 4.11. I'll try to do some more digging tomorrow
+>>>> to narrow down a failure point but I thought I'd send this out now just
+>>>> in case it rings any bells.
+>>>>
+>>>> The board I'm using (DB-88F6820-AMC) is unfortunately out-of tree but it
+>>>> should be pretty close to the armada-388-db. I can make my dts available
+>>>> if it's helpful.
+>>>
+>>> Still works on 4.12-rc2. Fails on next-20170524.
+>>>
+>>> This appears to be due to commit b566d9c055de ("mtd: nand: add support
+>>> for Micron on-die ECC"). Which based on the description seems intentional.
+>>>
+>>> Since I have access to a hardware platform that has a micron flash with
+>>> ECC forcefully enabled how can I help to get this implemented.
+>>
+>> Can you try with this patch applied [1]?
 > 
-> This driver was validated using Broadcom Tigon3 and Intel(R) 82575/82576
-> gigabit ethernet card.
+> Sorry, wrong patch. Can you try this one [1] instead?
 > 
+> [1]http://code.bulix.org/pkfhmi-135875
 > 
-> Changes since v5:
-> - rebase to Linux 4.12-rc1.
-> - remove redundant module.h header and MODULE macros.
-> 
-> Changes since v4:
-> - move the per-port registers to the parent node.
-> - use a valid compatible for hifsys controller.
-> - use the 'sysirq' instead of 'gic' as a correct 'interrupt-parent' of the
->   interrupt-map properties.
-> 
->   'sysirq' is an interrupt-controller that could help us to reverse GIC SPIs polarity
->   so that we could properly set irq type to level low without any extra properties.
->   It was a mistake to select wrong interrupt-parent on the previous versions.
->   Now, we could remove unnecessary interrupt properties entirely from binding.
-> 
-> Changes since v3:
-> - correct sub-nodes unit addresses.
-> 
-> Changes since v2:
-> - modify Kconfig to avoid kbuild test error on some architecture.
-> - change compatible string.
-> - revise binding document:
->   add missing interrupt-names.
->   remove the board dts example and drop 'status' properties.
->   remove unnecessary descriptions bout standard PCI bus binding.
-> 
-> Changes since v1:
-> - add .suppress_bind_attrs.
-> - remove unnecessary *_valid_device() pattern.
-> - remove PCI_PROBE_ONLY.
-> - use the regular readl() instead of readl_relaxed().
-> - add .map_bus() and change to use pci_generic_config_read/pci_generic_config_write.
-> - revise dt-binding document and move nonstandard properties to root node.
-> - change compatible string.
-> - use interrupt-map property and replace mtk_pcie_map_irq() with of_irq_parse_and_map_pci().
-> - use the new pci_register_host_bridge() method instead of pci_scan_root_bus()*
-> 
-> Ryder Lee (2):
->   PCI: mediatek: Add Mediatek PCIe host controller support
->   dt-bindings: pcie: Add documentation for Mediatek PCIe
-> 
->  .../bindings/pci/mediatek,mt7623-pcie.txt          | 130 +++++
->  drivers/pci/host/Kconfig                           |  11 +
->  drivers/pci/host/Makefile                          |   1 +
->  drivers/pci/host/pcie-mediatek.c                   | 553 +++++++++++++++++++++
->  4 files changed, 695 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
->  create mode 100644 drivers/pci/host/pcie-mediatek.c
 
-Applied to pci/host-mediatek for v4.13, thanks!
+With the patch above the chip is detected but ubifs is unhappy
+
+ubi0: attaching mtd0
+random: fast init done
+random: crng init done
+ubi0: scanning is finished
+ubi0: attached mtd0 (name "pxa3xx_nand-0", size 1024 MiB)
+ubi0: PEB size: 262144 bytes (256 KiB), LEB size: 253952 bytes
+ubi0: min./max. I/O unit sizes: 4096/4096, sub-page size 4096
+ubi0: VID header offset: 4096 (aligned 4096), data offset: 8192
+ubi0: good PEBs: 4088, bad PEBs: 8, corrupted PEBs: 0
+ubi0: user volume: 1, internal volumes: 1, max. volumes count: 128
+ubi0: max/mean erase counter: 1/0, WL threshold: 4096, image sequence 
+number: 1508037110
+ubi0: available PEBs: 0, total reserved PEBs: 4088, PEBs reserved for 
+bad PEB handling: 72
+ubi0: background thread "ubi_bgt0d" started, PID 597
+UBIFS (ubi0:0): background thread "ubifs_bgt0_0" started, PID 601
+UBIFS (ubi0:0): recovery needed
+UBIFS (ubi0:0): recovery completed
+UBIFS (ubi0:0): UBIFS: mounted UBI device 0, volume 0, name "user"
+UBIFS (ubi0:0): LEB size: 253952 bytes (248 KiB), min./max. I/O unit 
+sizes: 4096 bytes/4096 bytes
+UBIFS (ubi0:0): FS size: 1016315904 bytes (969 MiB, 4002 LEBs), journal 
+size 9404416 bytes (8 MiB, 38 LEBs)
+UBIFS (ubi0:0): reserved for root: 0 bytes (0 KiB)
+UBIFS (ubi0:0): media format: w4/r0 (latest is w5/r0), UUID 
+9D7B5AAA-EFDC-41D4-875B-F9CDB457AE9D, small LPT model
+UBIFS error (ubi0:0 pid 599): ubifs_read_node: bad node type (160 but 
+expected 0)
+UBIFS error (ubi0:0 pid 599): ubifs_read_node: bad node at LEB 10:90344, 
+LEB mapping status 1
+Not a node, first 24 bytes:
+00000000: 00 00 00 00 31 18 10 06 c3 f6 23 f6 3b 00 00 00 00 00 00 00 a0 
+00 00 00                          ....1.....#.;...........
+CPU: 1 PID: 599 Comm: mount Not tainted 4.12.0-rc2-next-20170524-at1+ #56
+Hardware name: Marvell Armada 380/385 (Device Tree)
+[<801102dc>] (unwind_backtrace) from [<8010b658>] (show_stack+0x10/0x14)
+[<8010b658>] (show_stack) from [<8031aa0c>] (dump_stack+0x88/0x9c)
+[<8031aa0c>] (dump_stack) from [<802aebb8>] (ubifs_read_node+0x130/0x284)
+[<802aebb8>] (ubifs_read_node) from [<802ca2a4>] 
+(ubifs_tnc_read_node+0x4c/0xd4)
+[<802ca2a4>] (ubifs_tnc_read_node) from [<802b1e60>] 
+(ubifs_tnc_locate+0x1c0/0x1c8)
+[<802b1e60>] (ubifs_tnc_locate) from [<802aa15c>] (ubifs_iget+0x78/0x554)
+[<802aa15c>] (ubifs_iget) from [<802aa90c>] (ubifs_mount+0x2d4/0x1524)
+[<802aa90c>] (ubifs_mount) from [<801dfab4>] (mount_fs+0x14/0xa4)
+[<801dfab4>] (mount_fs) from [<801fa6b4>] (vfs_kern_mount+0x4c/0xf4)
+[<801fa6b4>] (vfs_kern_mount) from [<801fd738>] (do_mount+0x154/0xb50)
+[<801fd738>] (do_mount) from [<801fe49c>] (SyS_mount+0x74/0x9c)
+[<801fe49c>] (SyS_mount) from [<801077a0>] (ret_fast_syscall+0x0/0x3c)
+UBIFS error (ubi0:0 pid 599): ubifs_iget: failed to read inode 1, error -22
+UBIFS (ubi0:0): background thread "ubifs_bgt0_0" stops
+ubi0: detaching mtd0
+ubi0: mtd0 is detached
+ubi0: attaching mtd0
+ubi0: scanning is finished
+ubi0 error: ubi_read_volume_table: the layout volume was not found
+ubi0 error: ubi_attach_mtd_dev: failed to attach mtd0, error -22
