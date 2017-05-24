@@ -1,205 +1,154 @@
 From: james.morse@arm.com (James Morse)
-Date: Wed, 24 May 2017 17:58:04 +0100
-Subject: [PATCH 7/9] arm64: entry.S convert el0_sync
+Date: Wed, 24 May 2017 17:58:06 +0100
+Subject: [PATCH 9/9] arm64: entry.S: move SError handling into a C function
+ for future expansion
 In-Reply-To: <20170524165806.29866-1-james.morse@arm.com>
 References: <20170524165806.29866-1-james.morse@arm.com>
-Message-ID: <20170524165806.29866-8-james.morse@arm.com>
+Message-ID: <20170524165806.29866-10-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-el0_sync also unmasks exceptions on a case-by-case basis, debug exceptions
-are unmasked, unless this was a debug exception. Irqs are unmasked for
-some exception types but not for others.
+From: Xie XiuQi <xiexiuqi@huawei.com>
 
-el0_dbg should run with everything masked, for the other cases we can
-unmask everything. This changes the behaviour of fpsimd_{acc,exc} and
-el0_inv, which previously ran with irqs masked.
+Today SError is taken using the inv_entry macro that ends up in
+bad_mode.
 
-All of these exception types call ct_user_exit after unmasking interrupts.
-Move this into the switch statement. el0_dbg needs to do this itself once
-it has finished its work, el0_svc needs to pass a flag to restore the
-syscall args.
+SError can be used by the RAS Extensions to notify either the OS or
+firmware of CPU problems, some of which may have been corrected.
 
-This patch removed the last user of enable_dbg_and_irq, remove it.
+To allow this handling to be added, add a do_serror() C function
+that panic()s. Without the RAS features added by v8.2 we can't do any
+better. In particular the ARM-ARM's D1.14.4 "Prioritization and
+recognition of interrupts" allows an IRQ to be taken before SError
+if both are pending.
 
+Add the entry.S boiler plate to save/restore the CPU registers and
+unmask debug exceptions. Future patches may change do_serror() to
+return if the SError Interrupt was notification of a corrected error.
+
+Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
+Signed-off-by: Wang Xiongfeng <wangxiongfengi2@huawei.com>
+[Split out of a bigger patch, added compat path, renamed, enabled debug
+ exceptions]
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/assembler.h |  9 --------
- arch/arm64/kernel/entry.S          | 46 +++++++++++++-------------------------
- 2 files changed, 16 insertions(+), 39 deletions(-)
+ arch/arm64/Kconfig        |  1 +
+ arch/arm64/kernel/entry.S | 36 +++++++++++++++++++++++++++++-------
+ arch/arm64/kernel/traps.c | 13 +++++++++++++
+ 3 files changed, 43 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 187d75f6efd3..f09934ddc13b 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -99,15 +99,6 @@
- 	.endm
- 
- /*
-- * Enable both debug exceptions and interrupts. This is likely to be
-- * faster than two daifclr operations, since writes to this register
-- * are self-synchronising.
-- */
--	.macro	enable_dbg_and_irq
--	msr	daifclr, #(8 | 2)
--	.endm
--
--/*
-  * SMP data memory barrier
-  */
- 	.macro	smp_dmb, opt
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 3dcd7ec69bca..5813ecc8a3b9 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -92,6 +92,7 @@ config ARM64
+ 	select HAVE_IRQ_TIME_ACCOUNTING
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_MEMBLOCK_NODE_MAP if NUMA
++	select HAVE_NMI
+ 	select HAVE_PATA_PLATFORM
+ 	select HAVE_PERF_EVENTS
+ 	select HAVE_PERF_REGS
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 714e15b1c135..d0befb45aa8f 100644
+index bd1100105212..1f7cf906445d 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -513,9 +513,16 @@ el1_preempt:
- el0_sync:
- 	kernel_entry 0
- 	mrs	x25, esr_el1			// read the syndrome register
-+	mrs	x26, far_el1
- 	lsr	x24, x25, #ESR_ELx_EC_SHIFT	// exception class
-+	cmp	x24, #ESR_ELx_EC_BREAKPT_LOW	// debug exception in EL0
-+	b.ge	el0_dbg
-+
-+	enable_daif
- 	cmp	x24, #ESR_ELx_EC_SVC64		// SVC in 64-bit state
- 	b.eq	el0_svc
-+
-+	ct_user_exit
- 	cmp	x24, #ESR_ELx_EC_DABT_LOW	// data abort in EL0
- 	b.eq	el0_da
- 	cmp	x24, #ESR_ELx_EC_IABT_LOW	// instruction abort in EL0
-@@ -532,8 +539,6 @@ el0_sync:
- 	b.eq	el0_sp_pc
- 	cmp	x24, #ESR_ELx_EC_UNKNOWN	// unknown exception in EL0
- 	b.eq	el0_undef
--	cmp	x24, #ESR_ELx_EC_BREAKPT_LOW	// debug exception in EL0
--	b.ge	el0_dbg
- 	b	el0_inv
+@@ -329,18 +329,18 @@ ENTRY(vectors)
+ 	ventry	el1_sync			// Synchronous EL1h
+ 	ventry	el1_irq				// IRQ EL1h
+ 	ventry	el1_fiq_invalid			// FIQ EL1h
+-	ventry	el1_error_invalid		// Error EL1h
++	ventry	el1_serror			// Error EL1h
+ 
+ 	ventry	el0_sync			// Synchronous 64-bit EL0
+ 	ventry	el0_irq				// IRQ 64-bit EL0
+ 	ventry	el0_fiq_invalid			// FIQ 64-bit EL0
+-	ventry	el0_error_invalid		// Error 64-bit EL0
++	ventry	el0_serror			// Error 64-bit EL0
  
  #ifdef CONFIG_COMPAT
-@@ -541,9 +546,16 @@ el0_sync:
- el0_sync_compat:
- 	kernel_entry 0, 32
- 	mrs	x25, esr_el1			// read the syndrome register
-+	mrs	x26, far_el1
- 	lsr	x24, x25, #ESR_ELx_EC_SHIFT	// exception class
-+	cmp	x24, #ESR_ELx_EC_BREAKPT_LOW	// debug exception in EL0
-+	b.ge	el0_dbg
-+
-+	enable_daif
- 	cmp	x24, #ESR_ELx_EC_SVC32		// SVC in 32-bit state
- 	b.eq	el0_svc_compat
-+
-+	ct_user_exit
- 	cmp	x24, #ESR_ELx_EC_DABT_LOW	// data abort in EL0
- 	b.eq	el0_da
- 	cmp	x24, #ESR_ELx_EC_IABT_LOW	// instruction abort in EL0
-@@ -566,8 +578,6 @@ el0_sync_compat:
- 	b.eq	el0_undef
- 	cmp	x24, #ESR_ELx_EC_CP14_64	// CP14 MRRC/MCRR trap
- 	b.eq	el0_undef
--	cmp	x24, #ESR_ELx_EC_BREAKPT_LOW	// debug exception in EL0
--	b.ge	el0_dbg
- 	b	el0_inv
- el0_svc_compat:
- 	/*
-@@ -588,10 +598,6 @@ el0_da:
- 	/*
- 	 * Data abort handling
- 	 */
--	mrs	x26, far_el1
--	// enable interrupts before calling the main handler
--	enable_dbg_and_irq
--	ct_user_exit
- 	clear_address_tag x0, x26
- 	mov	x1, x25
- 	mov	x2, sp
-@@ -601,10 +607,6 @@ el0_ia:
- 	/*
- 	 * Instruction abort handling
- 	 */
--	mrs	x26, far_el1
--	// enable interrupts before calling the main handler
--	enable_dbg_and_irq
--	ct_user_exit
- 	mov	x0, x26
- 	mov	x1, x25
- 	mov	x2, sp
-@@ -614,8 +616,6 @@ el0_fpsimd_acc:
- 	/*
- 	 * Floating Point or Advanced SIMD access
- 	 */
--	enable_dbg
--	ct_user_exit
- 	mov	x0, x25
- 	mov	x1, sp
- 	bl	do_fpsimd_acc
-@@ -624,8 +624,6 @@ el0_fpsimd_exc:
- 	/*
- 	 * Floating Point or Advanced SIMD exception
- 	 */
--	enable_dbg
--	ct_user_exit
- 	mov	x0, x25
- 	mov	x1, sp
- 	bl	do_fpsimd_exc
-@@ -634,10 +632,6 @@ el0_sp_pc:
- 	/*
- 	 * Stack or PC alignment exception handling
- 	 */
--	mrs	x26, far_el1
--	// enable interrupts before calling the main handler
--	enable_dbg_and_irq
--	ct_user_exit
- 	mov	x0, x26
- 	mov	x1, x25
- 	mov	x2, sp
-@@ -647,9 +641,6 @@ el0_undef:
- 	/*
- 	 * Undefined instruction
- 	 */
--	// enable interrupts before calling the main handler
--	enable_dbg_and_irq
--	ct_user_exit
- 	mov	x0, sp
- 	bl	do_undefinstr
- 	b	ret_to_user
-@@ -657,8 +648,6 @@ el0_sys:
- 	/*
- 	 * System instructions, for trapped cache maintenance instructions
- 	 */
--	enable_dbg_and_irq
--	ct_user_exit
- 	mov	x0, x25
- 	mov	x1, sp
- 	bl	do_sysinstr
-@@ -668,16 +657,14 @@ el0_dbg:
- 	 * Debug exception handling
- 	 */
- 	tbnz	x24, #0, el0_inv		// EL0 only
--	mrs	x0, far_el1
-+	mov	x0, x26
- 	mov	x1, x25
- 	mov	x2, sp
- 	bl	do_debug_exception
--	enable_dbg
-+	enable_daif
- 	ct_user_exit
- 	b	ret_to_user
- el0_inv:
--	enable_dbg
--	ct_user_exit
- 	mov	x0, sp
- 	mov	x1, #BAD_SYNC
- 	mov	x2, x25
-@@ -796,7 +783,6 @@ el0_svc:
- 	mov	sc_nr, #__NR_syscalls
- el0_svc_naked:					// compat entry point
- 	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
--	enable_dbg_and_irq
- 	ct_user_exit 1
+ 	ventry	el0_sync_compat			// Synchronous 32-bit EL0
+ 	ventry	el0_irq_compat			// IRQ 32-bit EL0
+ 	ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
+-	ventry	el0_error_invalid_compat	// Error 32-bit EL0
++	ventry	el0_serror_compat		// Error 32-bit EL0
+ #else
+ 	ventry	el0_sync_invalid		// Synchronous 32-bit EL0
+ 	ventry	el0_irq_invalid			// IRQ 32-bit EL0
+@@ -380,10 +380,6 @@ ENDPROC(el0_error_invalid)
+ el0_fiq_invalid_compat:
+ 	inv_entry 0, BAD_FIQ, 32
+ ENDPROC(el0_fiq_invalid_compat)
+-
+-el0_error_invalid_compat:
+-	inv_entry 0, BAD_ERROR, 32
+-ENDPROC(el0_error_invalid_compat)
+ #endif
  
- 	ldr	x16, [tsk, #TSK_TI_FLAGS]	// check for syscall hooks
+ el1_sync_invalid:
+@@ -592,6 +588,10 @@ el0_svc_compat:
+ el0_irq_compat:
+ 	kernel_entry 0, 32
+ 	b	el0_irq_naked
++
++el0_serror_compat:
++	kernel_entry 0, 32
++	b	el0_serror_naked
+ #endif
+ 
+ el0_da:
+@@ -690,6 +690,28 @@ el0_irq_naked:
+ 	b	ret_to_user
+ ENDPROC(el0_irq)
+ 
++el1_serror:
++	kernel_entry 1
++	mrs	x1, esr_el1
++	enable_dbg
++	mov	x0, sp
++	bl	do_serror
++	kernel_exit 1
++ENDPROC(el1_serror)
++
++el0_serror:
++	kernel_entry 0
++el0_serror_naked:
++	mrs	x1, esr_el1
++	enable_dbg
++	mov	x0, sp
++	bl	do_serror
++	enable_daif
++	ct_user_exit
++	b	ret_to_user
++ENDPROC(el0_serror)
++
++
+ /*
+  * Register switch for AArch64. The callee-saved registers need to be saved
+  * and restored. On entry:
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 52d75e3dcd80..ef008103dcca 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -683,6 +683,19 @@ asmlinkage void bad_el0_sync(struct pt_regs *regs, int reason, unsigned int esr)
+ 	force_sig_info(info.si_signo, &info, current);
+ }
+ 
++asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
++{
++	nmi_enter();
++
++	console_verbose();
++
++	pr_crit("SError Interrupt on CPU%d, code 0x%08x -- %s\n",
++		smp_processor_id(), esr, esr_get_class_string(esr));
++	__show_regs(regs);
++
++	panic("Asynchronous SError Interrupt");
++}
++
+ void __pte_error(const char *file, int line, unsigned long val)
+ {
+ 	pr_err("%s:%d: bad pte %016lx.\n", file, line, val);
 -- 
 2.11.0
