@@ -1,204 +1,146 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 24 May 2017 17:08:36 +0530
-Subject: [PATCH V3 6/8] arm: dma-mapping: Reset the device's dma_ops
-In-Reply-To: <7413479.FJ3cKQnUFA@avalon>
-References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
- <20170523224216.GI22219@n2100.armlinux.org.uk>
- <c4ad7341-fa9f-81b7-a41c-417144c4f842@codeaurora.org>
- <7413479.FJ3cKQnUFA@avalon>
-Message-ID: <d8598cbc-4215-1eb3-def3-c8d8bf16fadc@codeaurora.org>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 24 May 2017 13:45:34 +0200
+Subject: [PATCH v2 1/9] KVM: arm64: Allow creating the PMU without the
+ in-kernel GIC
+In-Reply-To: <4cf8f05e-1af1-eaed-151f-54e7a60d7b63@arm.com>
+References: <20170516184556.26785-1-cdall@linaro.org>
+ <20170516184556.26785-2-cdall@linaro.org>
+ <51d0d9eb-3e72-2f37-3fac-89de28cea91b@arm.com>
+ <20170524083805.GA7991@cbox>
+ <4cf8f05e-1af1-eaed-151f-54e7a60d7b63@arm.com>
+Message-ID: <20170524114534.GB7991@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Wed, May 24, 2017 at 10:16:56AM +0100, Marc Zyngier wrote:
+> On 24/05/17 09:38, Christoffer Dall wrote:
+> > On Tue, May 23, 2017 at 05:52:01PM +0100, Marc Zyngier wrote:
+> >> On 16/05/17 19:45, Christoffer Dall wrote:
+> >>> Since we got support for devices in userspace which allows reporting the
+> >>> PMU overflow output status to userspace, we should actually allow
+> >>> creating the PMU on systems without an in-kernel irqchip, which in turn
+> >>> requires us to slightly clarify error codes for the ABI and move things
+> >>> around for the initialization phase.
+> >>>
+> >>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> >>> ---
+> >>>  Documentation/virtual/kvm/devices/vcpu.txt | 16 +++++++++-------
+> >>>  virt/kvm/arm/pmu.c                         | 30 ++++++++++++++++++++----------
+> >>>  2 files changed, 29 insertions(+), 17 deletions(-)
+> >>>
+> >>> diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
+> >>> index 02f5068..352af6e 100644
+> >>> --- a/Documentation/virtual/kvm/devices/vcpu.txt
+> >>> +++ b/Documentation/virtual/kvm/devices/vcpu.txt
+> >>> @@ -16,7 +16,9 @@ Parameters: in kvm_device_attr.addr the address for PMU overflow interrupt is a
+> >>>  Returns: -EBUSY: The PMU overflow interrupt is already set
+> >>>           -ENXIO: The overflow interrupt not set when attempting to get it
+> >>>           -ENODEV: PMUv3 not supported
+> >>> -         -EINVAL: Invalid PMU overflow interrupt number supplied
+> >>> +         -EINVAL: Invalid PMU overflow interrupt number supplied or
+> >>> +                  trying to set the IRQ number without using an in-kernel
+> >>> +                  irqchip.
+> >>>  
+> >>>  A value describing the PMUv3 (Performance Monitor Unit v3) overflow interrupt
+> >>>  number for this vcpu. This interrupt could be a PPI or SPI, but the interrupt
+> >>> @@ -25,11 +27,11 @@ all vcpus, while as an SPI it must be a separate number per vcpu.
+> >>>  
+> >>>  1.2 ATTRIBUTE: KVM_ARM_VCPU_PMU_V3_INIT
+> >>>  Parameters: no additional parameter in kvm_device_attr.addr
+> >>> -Returns: -ENODEV: PMUv3 not supported
+> >>> -         -ENXIO: PMUv3 not properly configured as required prior to calling this
+> >>> -                 attribute
+> >>> +Returns: -ENODEV: PMUv3 not supported or GIC not initialized
+> >>> +         -ENXIO: PMUv3 not properly configured or in-kernel irqchip not
+> >>> +                 conigured as required prior to calling this attribute
+> >>
+> >>                     configured
+> >>
+> >>>           -EBUSY: PMUv3 already initialized
+> >>>  
+> >>> -Request the initialization of the PMUv3.  This must be done after creating the
+> >>> -in-kernel irqchip.  Creating a PMU with a userspace irqchip is currently not
+> >>> -supported.
+> >>> +Request the initialization of the PMUv3.  If using the PMUv3 with an in-kernel
+> >>> +virtual GIC implementation, this must be done after initializing the in-kernel
+> >>> +irqchip.
+> >>> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> >>> index 4b43e7f..7209185 100644
+> >>> --- a/virt/kvm/arm/pmu.c
+> >>> +++ b/virt/kvm/arm/pmu.c
+> >>> @@ -456,21 +456,25 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+> >>>  	if (!kvm_arm_support_pmu_v3())
+> >>>  		return -ENODEV;
+> >>>  
+> >>> -	/*
+> >>> -	 * We currently require an in-kernel VGIC to use the PMU emulation,
+> >>> -	 * because we do not support forwarding PMU overflow interrupts to
+> >>> -	 * userspace yet.
+> >>> -	 */
+> >>> -	if (!irqchip_in_kernel(vcpu->kvm) || !vgic_initialized(vcpu->kvm))
+> >>> -		return -ENODEV;
+> >>> -
+> >>> -	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features) ||
+> >>> -	    !kvm_arm_pmu_irq_initialized(vcpu))
+> >>> +	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features))
+> >>>  		return -ENXIO;
+> >>>  
+> >>>  	if (kvm_arm_pmu_v3_ready(vcpu))
+> >>>  		return -EBUSY;
+> >>>  
+> >>> +	if (irqchip_in_kernel(vcpu->kvm)) {
+> >>> +		/*
+> >>> +		 * If using the PMU with an in-kernel virtual GIC
+> >>> +		 * implementation, we require the GIC to be already
+> >>> +		 * initialized when initializing the PMU.
+> >>> +		 */
+> >>> +		if (!vgic_initialized(vcpu->kvm))
+> >>> +			return -ENODEV;
+> >>> +
+> >>> +		if (!kvm_arm_pmu_irq_initialized(vcpu))
+> >>> +			return -ENXIO;
+> >>> +	}
+> >>> +
+> >>
+> >> Do we also need to prevent a vgic to be created if the PMU has been
+> >> initialized beforehand?
+> >>
+> > 
+> > Sigh.  We probably have to.
+> > 
+> > I don't like having a cross-VGIC-PMU check, but we could do something
+> > like setting a flag on the kvm struct so that irqchip_in_user() always
+> > return true, and if that is set, it is not possible to create the VGIC.
+> > 
+> > Alternatively we can make the PMU init a no-op, and try to enable it via
+> > the first-vcpu-run path, like the timer, and check that everything lines
+> > up then (i.e. you have in-kernel irqchip with a non-conflicting irq
+> > number or you have a userspace irqchip).
+> 
+> I like this second solution better, as it gives us a common approach to
+> similar problems.
 
-On 5/24/2017 4:56 PM, Laurent Pinchart wrote:
-> Hello,
-> 
-> On Wednesday 24 May 2017 16:01:45 Sricharan R wrote:
->> On 5/24/2017 4:12 AM, Russell King - ARM Linux wrote:
->>> On Wed, May 24, 2017 at 12:46:51AM +0300, Laurent Pinchart wrote:
->>>> On Tuesday 23 May 2017 18:53:19 Russell King - ARM Linux wrote:
->>>>> On Tue, May 23, 2017 at 05:55:57PM +0100, Robin Murphy wrote:
->>>>>> On 23/05/17 17:25, Russell King - ARM Linux wrote:
->>>>>>> So, I've come to apply this patch (since it's finally landed in the
->>>>>>> patch system), and I'm not convinced that the commit message is really
->>>>>>> up to scratch.
->>>>>>>
->>>>>>> The current commit message looks like this:
->>>>>>>
->>>>>>> "   ARM: 8674/1: dma-mapping: Reset the device's dma_ops
->>>>>>>
->>>>>>>     arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops(),
->>>>>>>     dma_ops should be cleared in the teardown path. Otherwise this
->>>>>>>     causes problem when the probe of device is retried after being
->>>>>>>     deferred. The device's iommu structures are cleared after
->>>>>>>     EPROBEDEFER error, but on the next try dma_ops will still be set
->>>>>>>     to old value, which is not right."
->>>>>>>
->>>>>>> It is obviously a fix, but a fix for which patch?  Looking at the
->>>>>>> history, we have "arm: dma-mapping: Don't override dma_ops in
->>>>>>> arch_setup_dma_ops()" which I would have guessed is the appropriate
->>>>>>> one, but this post-dates your patch (it's very recent, v4.12-rc
->>>>>>> recent.)
->>>>>>>
->>>>>>> So, I need more description about the problem you were seeing when
->>>>>>> you first proposed this patch.
->>>>>>>
->>>>>>> How does leaving the dma_ops in place prior to "arm: dma-mapping:
->>>>>>> Don't override dma_ops in arch_setup_dma_ops()" cause problems for
->>>>>>> deferred probing?
->>>>>>>
->>>>>>> What patch is your change trying to fix?  In other words, how far
->>>>>>> back does this patch need to be backported?
->>>>>>
->>>>>> In effect, it's fixing a latent inconsistency that's been present since
->>>>>> its introduction in 4bb25789ed28. However, that has clearly not proven
->>>>>> to be an issue in practice since then. With 09515ef5ddad we start
->>>>>> actually calling arch_teardown_dma_ops() in a manner that might leave
->>>>>> things partially initialised if anyone starts removing and reprobing
->>>>>> drivers, but so far that's still from code inspection[1] rather than
->>>>>> anyone hitting it.
->>>>>>
->>>>>> Given that the changes which tickle it are fresh in -rc1 I'd say
->>>>>> there's no need to backport this, but at the same time it shouldn't do
->>>>>> any damage if you really want to.
->>>>>
->>>>> Well, looking at this, I'm not convinced that much of it is correct.
->>>>>
->>>>> 1) set_dma_ops() is in arch_setup_dma_ops() but this patch adds
->>>>>    the unsetting of the DMA ops inside arm_teardown_iommu_dma_ops()
->>>>>    rather than arch_teardown_dma_ops().
->>>>>    
->>>>>    This doesn't strike me as being particularly symmetric.
->>>>>    arm_teardown_iommu_dma_ops() is arm_setup_iommu_dma_ops()'s
->>>>>    counterpart.
->>>>>
->>>>> 2) arch_setup_dma_ops(), the recent patch to add the existing dma_ops
->>>>>    check, and Xen - Xen wants to override the DMA ops if in the
->>>>>    initial domain.  It's not clear (at least to me) whether the recent
->>>>>    patch adding the dma_ops check took account of this or not.
->>>>>
->>>>> 3) random places seem to fiddle with the dma_ops - notice that
->>>>>    arm_iommu_detach_device() sets the dma_ops to NULL.
->>>>>    
->>>>>    In fact, I think moving __arm_iommu_detach_device() into
->>>>>    arm_iommu_detach_device(), calling arm_iommu_detach_device(),
->>>>>    and getting rid of the explicit set_dma_ops(, NULL) in this
->>>>>    path would be a good first step.
->>>>>
->>>>> 4) I think arch_setup_dma_ops() is over-complex.
->>>>>
->>>>> So, in summary, this code is a mess today, and that means it's not
->>>>> obviously correct - which is bad.  This needs sorting.
->>>>
->>>> We've reached the same conclusion independently, but I'll refrain from
->>>> commenting on whether that's a good or bad thing :-)
->>>>
->>>> I don't think this patch should be applied, as it could break Xen (and
->>>> other platforms/drivers that set the DMA operations manually) by
->>>> resetting DMA operations at device remove() time even if they have been
->>>> set independently of arch_setup_dma_ops().
->>>
->>> That will only occur if the dma ops have been overriden once the DMA
->>> operations have been setup via arch_setup_dma_ops. What saves it from
->>> wholesale NULLing of the DMA operations is the check for a valid
->>> dma_iommu_mapping structure in arm_teardown_iommu_dma_ops().  This only
->>> exists when arm_setup_iommu_dma_ops() has attached a mapping to the
->>> device.
-> 
-> Unfortunately I don't think that's always the case. The dma_iommu_mapping is 
-> also set by direct callers of arm_iommu_attach_device(), namely
-> 
-> - the Renesas R-Car IOMMU driver (ipmmu-vmsa)
-> - the Mediatek IOMMU driver (mtk-iommu-v1)
-> - the Exynos DRM driver
-> - the OMAP3 ISP driver
-> 
-> All these need to be fixed, but that's not v4.12-rc material. At least in the 
-> ipmmu-vmsa case, which is the one I noticed the problem with, 
-> arm_iommu_attach_device() is called before arch_setup_dma_ops(). 
-> arch_setup_dma_ops() then exits immediately when called due to the
-> 
->         if (dev->dma_ops)
->                 return;
-> 
-> check at the beginning of the function. We must ensure that in that case 
-> arch_teardown_dma_ops() will not remove the mapping or set the DMA ops to 
-> NULL, and testing to_dma_iommu_mapping(dev) won't help.
-> 
-
-Right, agree. Same issue highlighted in #1, #2 below and the fixes posted [1]
-for 4.12-rc.
-
->> Right, only if the dma ops are set and no dma_iommu_mapping is created for
->> the device, then arch_teardown_iommu_dma_ops does nothing.
->>
->> Firstly, this patch for resetting the dma_ops in teardown was required
->> only when arch_setup_dma_ops has created both the mapping and dma_ops
->> for the device. Because mappings that were created in arch_setup_dma_ops
->> are cleared in teardown, so dma ops should also be reset. But this can be
->> done by calling arm_iommu_detach_device() from arm_teardown_iommu_dma_ops
->> to avoid explicitly calling set_dma_ops again, probably this what was
->> suggested in #3 above ?
->>
->> Really sorry for the mess, but below cleanups looks required otherwise,
->>
->> 1) set_dma_ops is called for mach-highbank, mach-mevbu during the
->>    BUS_NOTIFY_ADD_DEVICE. That should be removed and made to come from
->>    DT path and arch_setup_dma_ops. dmabounce.c also does set_dma_ops,
->>    not very sure how to handle that (swiotlb ?), are call
->>    dmabounce_register_dev during the device's probe instead to have the
->>    dma_set_ops overriding later in probe ?
-> 
-> All this needs to be addressed, but it's definitely not v4.12-rc material.
-> 
->> 2) arm_iommu_attach_device is called from ipmmu-vmsa.c, mtk_iommu_v1.c,
->>    iommu drivers, from the iommu add_device callback, called
->>    from BUS_NOTIFY_ADD_DEVICE notifier. This is a problem because,
->>    with probe-deferral, this can be overridden in arch_setup_dma_ops
->>    during device probe and cleared in teardown path. But the add_device
->>    callback notifier is not called again when the device gets reprobed
->>    again.
->>
->>    With probe deferral, add_device callback also gets called from
->>    of_iommu_configure during device probe, so the above drivers should
->>    be adapted to properly register the iommu_ops to have its add_device
->>    called from of_iommu_configure path. mtk_iommu_v1.c seems to be fine,
->>    but ipmmu-vmsa.c should be adapted. otherwise if the devices attached
->>    to those iommus call arm_iommu_attach_device from its probe path to
->>    override the default ops set in arch_setup_dma_ops, then all is fine.
->>    This seems to be the case with exynos_drm_iommu.c, omap3isp/isp.c.
-> 
-> Same here, this needs to be addressed, but not in v4.12-rc. We need a simpler 
-> fix for v4.12-rc.
-> 
-
-Right, not for 4.12-rc, but as a better cleanup beyond, so
-wanted to discuss the right sequence further. The fixes posted are the ones
-for 4.12-rc.
-
->>    If the above two are done, the overridding of the default dma_ops and
->>    mapping should happen after arch_setup_dma_ops is called and also
->>    overridden every time the device gets reprobed. That should help to get
->>    rid of couple of fixes that has been added.
->>
->> 3) As Laurent already pointed out earlier, return error codes from some of
->>    the IOMMU apis needs to standardized.
->>
->>    Please let me know if its right way of doing it ?
-> 
-> Again, the patch I propose is the simplest v4.12-rc fix I can think of, short 
-> of reverting your complete IOMMU probe deferral patch series. Let's focus on 
-> the v4.12-rc fix, and then discuss how to move forward in v4.13 and beyond.
-> 
-
-Agree.
-
-[1] https://lkml.org/lkml/2017/5/23/411
+Yes, but on the other hand it's a bit like the lazy init stuff, where we
+defer things to happen at some point in time, and the whole PMU init
+thing was to avoid that.  On the first hand, it seems to work well for
+lots of things, so why not...
 
 
-Regards,
- Sricharan
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> Would that also help with not having to implement the
+> allocator you introduced in patches 6-9 (which I haven't reviewed yet)?
+> 
+
+Not really.  I mean, we could add some cross calls between the timer and
+PMU code, but I think that's fairly disgusting, and it doesn't prevent
+userspace from fiddling with an interrupt signal used in the kernel
+anyway.
+
+With patchs 6-9, I feel like we should take one of two overall stands;
+either we don't care that userspace can wire things up share an
+interrupt line, even with in-kernel driven devices, as it would be the
+equivalent of putting an OR gate before the GIC in hardware (not that I
+recommend anyone doing that), or we should implement the full story and
+prevent userspace from ever shooting itself in the foot.
+
+Thanks,
+-Christoffer
