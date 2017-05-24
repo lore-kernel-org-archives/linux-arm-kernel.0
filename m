@@ -1,40 +1,148 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Wed, 24 May 2017 16:00:53 +0800
-Subject: [PATCH] ARM: dts: rockchip:remove hs200 support for firefly reload
-In-Reply-To: <1495612242-28873-1-git-send-email-eddie.cai.linux@gmail.com>
-References: <1495612242-28873-1-git-send-email-eddie.cai.linux@gmail.com>
-Message-ID: <65c7a442-4b2e-65e4-ea5e-0a723c257397@rock-chips.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 24 May 2017 10:14:40 +0200
+Subject: [RFC PATCH 03/11] drm: sun4i: ignore swapped mixer<->tcon
+ connection for DE2
+In-Reply-To: <ECF29F56-DF18-4E3C-9C85-B29F89BD4228@aosc.io>
+References: <20170517164354.16399-1-icenowy@aosc.io>
+ <20170517164354.16399-4-icenowy@aosc.io>
+ <20170519175753.sygqnwopk7tuv35n@flea.home>
+ <ECF29F56-DF18-4E3C-9C85-B29F89BD4228@aosc.io>
+Message-ID: <20170524081440.cbtjvvmj5okrri6z@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, May 20, 2017 at 02:00:22AM +0800, Icenowy Zheng wrote:
+> 
+> 
+> ? 2017?5?20? GMT+08:00 ??1:57:53, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+> >On Thu, May 18, 2017 at 12:43:46AM +0800, Icenowy Zheng wrote:
+> >> Some SoC's DE2 has two mixers. Defaultly the mixer0 is connected to
+> >> tcon0 and mixer1 is connected to tcon1; however by setting a bit
+> >> the connection can be swapped.
+> >> 
+> >> As we now hardcode the default connection, ignore the bonus endpoint
+> >for
+> >> the mixer's output and the TCON's input, as they stands for the
+> >swapped
+> >> connection.
+> >> 
+> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >> ---
+> >>  drivers/gpu/drm/sun4i/sun4i_drv.c  | 27 ++++++++++++++++++++++++++
+> >>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 39
+> >+++++++++++++++++++++++++++++---------
+> >>  drivers/gpu/drm/sun4i/sun4i_tcon.h |  2 ++
+> >>  3 files changed, 59 insertions(+), 9 deletions(-)
+> >> 
+> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> >b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> >> index 1dd1948025d2..29bf1325ded6 100644
+> >> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> >> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> >> @@ -173,6 +173,13 @@ static bool sun4i_drv_node_is_frontend(struct
+> >device_node *node)
+> >>  		of_device_is_compatible(node,
+> >"allwinner,sun8i-a33-display-frontend");
+> >>  }
+> >>  
+> >> +static bool sun4i_drv_node_is_swappable_de2_mixer(struct device_node
+> >*node)
+> >> +{
+> >> +	/* The V3s has only one mixer-tcon pair, so it's not listed here.
+> >*/
+> >> +	return of_device_is_compatible(node,
+> >"allwinner,sun8i-h3-de2-mixer0") ||
+> >> +		of_device_is_compatible(node, "allwinner,sun8i-h3-de2-mixer1");
+> >> +}
+> >> +
+> >>  static bool sun4i_drv_node_is_tcon(struct device_node *node)
+> >>  {
+> >>  	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
+> >> @@ -249,6 +256,26 @@ static int sun4i_drv_add_endpoints(struct device
+> >*dev,
+> >>  			}
+> >>  		}
+> >>  
+> >> +		/*
+> >> +		 * The second endpoint of the output of a swappable DE2 mixer
+> >> +		 * is the TCON after connection swapping.
+> >> +		 * Ignore it now, as we now hardcode mixer0->tcon0,
+> >> +		 * mixer1->tcon1 connection.
+> >> +		 */
+> >> +		if (sun4i_drv_node_is_swappable_de2_mixer(node)) {
+> >> +			struct of_endpoint endpoint;
+> >> +
+> >> +			if (of_graph_parse_endpoint(ep, &endpoint)) {
+> >> +				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
+> >> +				continue;
+> >> +			}
+> >> +
+> >> +			if (endpoint.id) {
+> >> +				DRM_DEBUG_DRIVER("Endpoint is an unused connection for DE2
+> >mixer... skipping\n");
+> >> +				continue;
+> >> +			}
+> >> +		}
+> >> +
+> >>  		/* Walk down our tree */
+> >>  		count += sun4i_drv_add_endpoints(dev, match, remote);
+> >>  
+> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >> index f44a37a5993d..89a215ff2370 100644
+> >> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >> @@ -425,7 +425,8 @@ static int sun4i_tcon_init_regmap(struct device
+> >*dev,
+> >>   * requested via the get_id function of the engine.
+> >>   */
+> >>  static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv
+> >*drv,
+> >> -						   struct device_node *node)
+> >> +						   struct device_node *node,
+> >> +						   bool skip_bonus_ep)
+> >>  {
+> >>  	struct device_node *port, *ep, *remote;
+> >>  	struct sunxi_engine *engine;
+> >> @@ -439,6 +440,20 @@ static struct sunxi_engine
+> >*sun4i_tcon_find_engine(struct sun4i_drv *drv,
+> >>  		if (!remote)
+> >>  			continue;
+> >>  
+> >> +		if (skip_bonus_ep) {
+> >> +			struct of_endpoint endpoint;
+> >> +
+> >> +			if (of_graph_parse_endpoint(ep, &endpoint)) {
+> >> +				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
+> >> +				continue;
+> >> +			}
+> >> +
+> >> +			if (endpoint.id) {
+> >> +				DRM_DEBUG_DRIVER("Skipping bonus mixer->TCON connection when
+> >searching engine\n");
+> >> +				continue;
+> >> +			}
+> >> +		}
+> >> +
+> >
+> >You don't list the mixers in the tcon's output, why do you need that
+> >exactly?
+> 
+> Mixers are TCONs' input, not output...
 
-On 2017/5/24 15:50, Eddie Cai wrote:
-> due to layout limitation. not all of the reload board can support hs200.
-> so remove hs200 support to make all board can boot up.
+Then why are they even parsed? The whole parsing logic in the driver
+only searches for output nodes.
 
-You now also remove DDR52, so all reload boards run at high speed mode?
+Maxime
 
-I'm curious about what was the layout limitation that mmc tuning
-process could never help?
-
->
-> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
-> ---
->  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 2 --
->  1 file changed, 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-> index 4cfa109..56ac1e6f 100644
-> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-> @@ -75,8 +75,6 @@
->  	bus-width = <8>;
->  	cap-mmc-highspeed;
->  	disable-wp;
-> -	mmc-ddr-1_8v;
-> -	mmc-hs200-1_8v;
->  	non-removable;
->  	num-slots = <1>;
->  	pinctrl-names = "default";
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170524/d4efe716/attachment.sig>
