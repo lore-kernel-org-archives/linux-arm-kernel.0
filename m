@@ -1,39 +1,68 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 24 May 2017 21:06:52 +0200
-Subject: [PATCH 11/11] ARM: sun5i: add a cryptographic engine node
+Date: Wed, 24 May 2017 21:06:51 +0200
+Subject: [PATCH 10/11] crypto: sun4i-ss: fix large block size support
 In-Reply-To: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
 References: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170524190652.13278-12-antoine.tenart@free-electrons.com>
+Message-ID: <20170524190652.13278-11-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node for the cryptographic engine that can be found on sun5i SoCs.
-This cryptographic engine is compatible with the Allwinner cryptographic
-accelerator driver.
+The run-time self-tests fail quite early, as soon as the input block
+size is larger than 64 bytes:
+
+  alg: hash: Test 4 failed for sha1-sun4i-ss
+  00000000: b9 c9 1e 52 c0 26 d8 39 81 ff f2 3c 99 b1 27 b2
+  00000010: 30 d6 c9 85
+
+One thing to notice is the value of the last word, which is the one
+expected (it can sometime be the last two words). The datasheet isn't
+very clear about when the digest is ready to retrieve and is seems the
+bit SS_DATA_END is cleared when the digest was computed *but* that
+doesn't mean the digest is ready to retrieve in the registers.
+
+A ndelay(1) is added before reading the computed digest to ensure it is
+available in the SS_MD[] registers.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 5175f9cc9bed..9bfefa2c7224 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -355,6 +355,14 @@
- 			status = "disabled";
- 		};
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+index 685de5b6ab17..6da8d2bbd4da 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+@@ -358,6 +358,15 @@ static int sun4i_hash(struct ahash_request *areq)
+ 		goto release_ss;
+ 	}
  
-+		crypto: crypto-engine at 01c15000 {
-+			compatible = "allwinner,sun4i-a10-crypto";
-+			reg = <0x01c15000 0x1000>;
-+			interrupts = <54>;
-+			clocks = <&ccu CLK_AHB_SS>, <&ccu CLK_SS>;
-+			clock-names = "ahb", "mod";
-+		};
++	/*
++	 * The datasheet isn't very clear about when to retrieve the digest. The
++	 * bit SS_DATA_END is cleared when the engine has processed the data and
++	 * when the digest is computed *but* it doesn't mean the digest is
++	 * available in the diesgt registers. Hence the delay to be sure we can
++	 * read it.
++	 */
++	ndelay(1);
 +
- 		spi2: spi at 01c17000 {
- 			compatible = "allwinner,sun4i-a10-spi";
- 			reg = <0x01c17000 0x1000>;
+ 	for (i = 0; i < crypto_ahash_digestsize(tfm) / 4; i++)
+ 		op->hash[i] = readl(ss->base + SS_MD0 + i * 4);
+ 
+@@ -446,6 +455,15 @@ static int sun4i_hash(struct ahash_request *areq)
+ 		goto release_ss;
+ 	}
+ 
++	/*
++	 * The datasheet isn't very clear about when to retrieve the digest. The
++	 * bit SS_DATA_END is cleared when the engine has processed the data and
++	 * when the digest is computed *but* it doesn't mean the digest is
++	 * available in the diesgt registers. Hence the delay to be sure we can
++	 * read it.
++	 */
++	ndelay(1);
++
+ 	/* Get the hash from the device */
+ 	if (op->mode == SS_OP_SHA1) {
+ 		for (i = 0; i < 5; i++) {
 -- 
 2.9.4
