@@ -1,25 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 24 May 2017 18:18:52 +0100
-Subject: [PATCH 1/2] dt-bindings: spi-meson: Add SPICC bindings
-In-Reply-To: <1495546773-20479-2-git-send-email-narmstrong@baylibre.com>
-References: <1495546773-20479-1-git-send-email-narmstrong@baylibre.com>
- <1495546773-20479-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20170524171852.gktg6sek67vrt7gs@sirena.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 24 May 2017 18:22:19 +0100
+Subject: [PATCH v3 1/1] ARM64/PCI: Set root bus NUMA node on ACPI systems
+In-Reply-To: <20170524172219.5689-1-lorenzo.pieralisi@arm.com>
+References: <20170524172219.5689-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170524172219.5689-2-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 03:39:32PM +0200, Neil Armstrong wrote:
-> Add the SPICC (SPI Communications Controller) bindings variant.
+PCI core requires the NUMA node for the struct pci_host_bridge.dev to
+be set by using the pcibus_to_node(struct pci_bus*) API, that on ARM64
+systems relies on the struct pci_host_bridge->bus.dev NUMA node.
 
-Please submit patches using subject lines reflecting the style for the
-subsystem.  This makes it easier for people to identify relevant
-patches.  Look at what existing commits in the area you're changing are
-doing and make sure your subject lines visually resemble what they're
-doing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170524/0de63dc7/attachment.sig>
+The struct pci_host_bridge.dev NUMA node is then propagated through
+the PCI device hierarchy as PCI devices (and bridges) are enumerated
+under it.
+
+Therefore, in order to set-up the PCI NUMA hierarchy appropriately, the
+struct pci_host_bridge->bus.dev NUMA node must be set before core
+code calls pcibus_to_node(struct pci_bus*) on it so that PCI core can
+retrieve the NUMA node for the struct pci_host_bridge.dev device and can
+propagate it through the PCI bus tree.
+
+On ARM64 ACPI based systems the struct pci_host_bridge->bus.dev NUMA
+node can be set-up in pcibios_root_bridge_prepare() by parsing the root
+bridge ACPI device firmware binding.
+
+Add code to the pcibios_root_bridge_prepare() that, when booting with
+ACPI, parse the root bridge ACPI device companion NUMA binding and set
+the corresponding struct pci_host_bridge->bus.dev NUMA node
+appropriately.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/kernel/pci.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 4f0e3eb..1082834 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -108,7 +108,10 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ 	if (!acpi_disabled) {
+ 		struct pci_config_window *cfg = bridge->bus->sysdata;
+ 		struct acpi_device *adev = to_acpi_device(cfg->parent);
++		struct device *bus_dev = &bridge->bus->dev;
++
+ 		ACPI_COMPANION_SET(&bridge->dev, adev);
++		set_dev_node(bus_dev, acpi_get_node(acpi_device_handle(adev)));
+ 	}
+ 
+ 	return 0;
+-- 
+2.10.0
