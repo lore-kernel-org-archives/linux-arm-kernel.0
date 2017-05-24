@@ -1,42 +1,84 @@
-From: gnomes@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Wed, 24 May 2017 14:31:08 +0100
-Subject: [PATCH 1/1] xilinx ps uart: Adding a kernel parameter for the
- number of xilinx ps uarts
-In-Reply-To: <924433a1-7e27-6eb6-71ca-ed7baceb427f@xilinx.com>
-References: <20170520022154.6766-1-kernel.development@povil.us>
- <20170520172008.5a979e8a@alans-desktop>
- <517d864d-d230-3abc-eb3c-4b628dc4625f@xilinx.com>
- <20170522192636.5b578d89@alans-desktop>
- <1668f36e-f9be-7008-004a-e467a6813e0f@xilinx.com>
- <20170523210710.4e84dd2d@alans-desktop>
- <924433a1-7e27-6eb6-71ca-ed7baceb427f@xilinx.com>
-Message-ID: <20170524143108.682a548d@alans-desktop>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Wed, 24 May 2017 13:33:20 +0000
+Subject: [PATCH 0/2] ioremap_wc on arm64
+In-Reply-To: <20170523140824.GC5948@e104818-lin.cambridge.arm.com>
+References: <1495436507-81890-1-git-send-email-jnair@caviumnetworks.com>
+ <20170522085615.GC30129@e104818-lin.cambridge.arm.com>
+ <20170522115349.GA82957@localhost> <20170522122236.GG1107@arm.com>
+ <20170522142059.GA83004@localhost>
+ <20170522154947.GF30129@e104818-lin.cambridge.arm.com>
+ <20170523100903.GA4562@localhost>
+ <20170523140824.GC5948@e104818-lin.cambridge.arm.com>
+Message-ID: <20170524131054.GA5647@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I am not saying that config option is perfect solution. It is at least
-> aligned with 5 others serial drivers in the tree.
+On Tue, May 23, 2017 at 03:08:24PM +0100, Catalin Marinas wrote:
+> On Tue, May 23, 2017 at 10:09:03AM +0000, Jayachandran C wrote:
+> > On Mon, May 22, 2017 at 04:49:47PM +0100, Catalin Marinas wrote:
+> > > On Mon, May 22, 2017 at 02:21:00PM +0000, Jayachandran C wrote:
+> > > > On Mon, May 22, 2017 at 01:22:37PM +0100, Will Deacon wrote:
+> > > > > I think it was used for framebuffers. Note that using normal-NC also aligns
+> > > > > with arch/arm/ and, since normal-NC is strictly a more relaxed memory type
+> > > > > than Device-GRE, I'm really not keen making on this change.
+> > > > 
+> > > > Even if that is the case, having Normal attribute for ioremap just for
+> > > > ioremap_wc is inconsistent. The Device Gathering attribute by its definition
+> > > > is exactly what write combining requires. The memremap() API looks like a
+> > > > better way to expose Normal-NC mapping (with additional features like
+> > > > speculation etc.) if implemented correctly.
+> > > 
+> > > I agree, memremap() is a better way but this was merged in 4.3 while
+> > > ioremap_wc() had been around for a long time. If you want to change its
+> > > semantics, you'd need to go through all its uses in the kernel and make
+> > > sure they *only* use I/O accessors with such memory. At a quick grep,
+> > > there are several places where the __iomem pointer attribute is dropped
+> > > shortly after ioremap() and the pointer is accessed directly. That's
+> > > where things will break with Device GRE memory since the compiler
+> > > doesn't guarantee aligned accesses.
+> > 
+> > There is a difference in behavior with regard to unaligned access between
+> > ioremap_wc and ioremap already. I don't follow why unaligned access has to
+> > supported for ioremap_wc but not for ioremap - it would be much better to
+> > be consistent here.
+> 
+> Please re-read my paragraph above.
 
-And the fact people keep doing hacks jutifies continuing to make a mess.
-Especialy as in this case it's entirely theoretical. Nobody has produced
-actual hardware that hits the limit. Nobody has filed a bug, nobody is
-impacted.
+I had the same feeling after seeing your reply :)
 
-Creating extra CONFIG_ entries for junk like this is ridiculous, most of
-the others at least have the excuse of being old code.
+> It's nice if both ioremap_wc() and
+> ioremap() returned Device memory as long as you fix the ioremap_wc()
+> misuses throughout the kernel.
 
-Generally it is better to call uart_register_driver from the probe method
-because that way you don't waste time and memory registering drivers for
-stuff that isn't even present however if you have no idea how many
-devices there might be then you still really need to pass a suitable limit
-and handle it internally dynamically allocating as needed.
+ioremap and ioremap_wc is been used and abused in multiple places after
+dropping the __iomem annotation, and it is not an easy task to figure
+out where unaligned access is done on the pointer returned. I am told
+specifically that in ioremap_wc needs to support unaligned access as
+opposed to ioremap.
 
-If someone was hitting this in the real world and you posted a patch that
-just changed the constant to 8 or 16 or whatever was needed I wouldn't
-care too much, but adding CONFIG_ entries just makes stuff harder and
-harder to config and more and more impossible to keep generic.
+I am trying to figure out if there are specific cases you expect it to
+fail. Since arm64 is a fairly new architecture and it will be easy
+to get this correct now, rather than to let the status quo continue.
 
-I keep hearing that the ARM folks are trying to get one unified kernel.
-CONFIG_ options is not how to do that.
+There is no "Gather" attribute on arm, so using "Normal uncached" for
+ioremap_wc is understandable. On arm64, given that there is an attribute
+specifically for write combining - you have decided to go with Normal
+uncached. I had hoped for a proper reason for that and not a vague
+"maybe framebuffer, go grep the kernel and figure out" response.
 
-Alan
+> > > > Also, patch 1/2 should be useful anyway - can that be picked up?
+> > > 
+> > > The patch is harmless but are we going to have a user of Device_GRE?
+> > 
+> > This patch would make the attribute in MAIR and the index MT_DEVICE_GRE
+> > useful for __ioremap. Otherwise I don't see the use in having the
+> > attribute at  all. I can at least give this to people who want Device GRE
+> > mapping, which is the fastest way to access device memory on ThunderX2.
+> 
+> Is this a driver that's going to be used on arm64 kernels only? I'm not
+> that keen on __ioremap() since it's not a standard driver API, so you
+> end up with #ifdef CONFIG_ARM64 in the driver code.
+
+FWIW, __ioremap() is EXPORT_SYMBOL. Having the attribute will be useful.
+
+JC.
