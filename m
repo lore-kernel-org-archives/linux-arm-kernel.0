@@ -1,113 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 May 2017 11:22:36 +0100
-Subject: [PATCH v4 1/2] PCI: Add tango MSI controller support
-In-Reply-To: <f1a57255-be75-e8c4-6b8d-0254f4365d61@arm.com>
-References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
- <1f6b50c7-4887-838e-8c7d-c014d82b6d8e@sigmadesigns.com>
- <8e56647d-3b2d-9bfc-b59e-79a2efaa7826@sigmadesigns.com>
- <20170523170319.GB24431@bhelgaas-glaptop.roam.corp.google.com>
- <b6541fd2-200f-35be-208e-931bb0b5ba49@free.fr>
- <ef36137c-f0d1-23b9-8b91-a6ed87239578@arm.com>
- <aec89b9a-8377-ff39-547c-9e6eaf254fab@free.fr>
- <f1a57255-be75-e8c4-6b8d-0254f4365d61@arm.com>
-Message-ID: <c78b1e79-59e5-0097-989e-1f1e8cd93fc4@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 24 May 2017 11:24:26 +0100
+Subject: [PATCH v5 1/7] dma: Take into account dma_pfn_offset
+In-Reply-To: <1495621472-9323-1-git-send-email-vladimir.murzin@arm.com>
+References: <1495621472-9323-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1495621472-9323-2-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/17 11:00, Robin Murphy wrote:
-> On 23/05/17 20:15, Mason wrote:
->> On 23/05/2017 20:03, Robin Murphy wrote:
->>> On 23/05/17 18:54, Mason wrote:
->>>> On 23/05/2017 19:03, Bjorn Helgaas wrote:
->>>>> On Wed, May 17, 2017 at 04:56:08PM +0200, Marc Gonzalez wrote:
->>>>>> On 20/04/2017 16:28, Marc Gonzalez wrote:
->>>>>>
->>>>>>> +static int tango_set_affinity(struct irq_data *data,
->>>>>>> +		const struct cpumask *mask, bool force)
->>>>>>> +{
->>>>>>> +	return -EINVAL;
->>>>>>> +}
->>>>>>> +
->>>>>>> +static struct irq_chip tango_chip = {
->>>>>>> +	.irq_ack		= tango_ack,
->>>>>>> +	.irq_mask		= tango_mask,
->>>>>>> +	.irq_unmask		= tango_unmask,
->>>>>>> +	.irq_set_affinity	= tango_set_affinity,
->>>>>>> +	.irq_compose_msi_msg	= tango_compose_msi_msg,
->>>>>>> +};
->>>>>>
->>>>>> Hmmm... I'm wondering why .irq_set_affinity is required.
->>>>>>
->>>>>> static int setup_affinity(struct irq_desc *desc, struct cpumask *mask)
->>>>>> first calls __irq_can_set_affinity() to check whether
->>>>>> desc->irq_data.chip->irq_set_affinity) exists.
->>>>>>
->>>>>> then calls irq_do_set_affinity(&desc->irq_data, mask, false);
->>>>>> which calls chip->irq_set_affinity(data, mask, force);
->>>>>> = msi_domain_set_affinity()
->>>>>> which calls parent->chip->irq_set_affinity() unconditionally.
->>>>>>
->>>>>> Would it make sense to test that the callback is implemented
->>>>>> before calling it?
->>>>>>
->>>>>>
->>>>>> [    0.723895] Unable to handle kernel NULL pointer dereference at virtual address 00000000
->>>>>
->>>>> I'm not sure what you're asking.
->>>>>
->>>>> Is this a bug report for the v4 tango driver?
->>>>
->>>> No.
->>>>
->>>>> Or are you asking whether msi_domain_set_affinity() should be changed
->>>>> to check whether parent->chip->irq_set_affinity is implemented?
->>>>
->>>> Yes. The way things are implemented now, drivers are forced
->>>> to define an irq_set_affinity callback, even if it just returns
->>>> an error, otherwise, the kernel crashes, because of the
->>>> unconditional function pointer deref. 
->>>>
->>>>> msi_domain_set_affinity() has called parent->chip->irq_set_affinity()
->>>>> without checking since it was added in 2014 by f3cf8bb0d6c3 ("genirq: Add
->>>>> generic msi irq domain support"), so if there's a problem here, it's most
->>>>> likely in the tango code.
->>>>
->>>> The issue is having to define an "empty" function.
->>>> (Unnecessary code bloat and maintenance.)
->>>
->>> AFAICS, only one driver (other than this one) implements a "do nothing"
->>> set_affinity callback - everyone else who doesn't do anything hardware
->>> specific just passes it along via irq_chip_set_affinity_parent().
->>
->> I counted 4. Where did I mess up?
->>
->> advk_msi_set_affinity
->> altera_msi_set_affinity
->> nwl_msi_set_affinity
->> vmd_irq_set_affinity
->> tango_set_affinity
-> 
-> Fair point - I went through drivers/irqchip and the various
-> arch-specific instances and found ls_scfg_msi_set_affinity(), but
-> somehow skipped over drivers/pci. Anyway, I think the question stands of
-> why are these handful of drivers *not* using irq_chip_set_affinity_parent()?
+Even though dma-noop-ops assumes 1:1 memory mapping DMA memory range
+can be different to RAM. For example, ARM STM32F4 MCU offers the
+possibility to remap SDRAM from 0xc000_0000 to 0x0 to get CPU
+performance boost, but DMA continue to see SDRAM at 0xc000_0000. This
+difference in mapping is handled via device-tree "dma-range" property
+which leads to dev->dma_pfn_offset is set nonzero. To handle such
+cases take dma_pfn_offset into account.
 
-Probably because they don't have a parent, in the hierarchical sense.
-All they have is a chained interrupt (*puke*). Which implies that
-changing the affinity of one MSI would affect all of them, completely
-confusing unsuspecting userspace such as irqbalance.
+Cc: Joerg Roedel <jroedel@suse.de>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Andras Szemzo <sza@esh.hu>
+Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ lib/dma-noop.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-> As an outsider, it naively seems logical that the affinity of an MSI
-> which just gets translated to a wired interrupt should propagate through
-> to the affinity of that wired interrupt, but maybe there are reasons not
-> to; I really don't know.
-
-See above. The main issue is that HW folks haven't understood the actual
-use of MSIs, and persist in implementing them as an afterthought, based
-on some cascading interrupt controller design.
-
-Sad. So sad.
-
-	M.
+diff --git a/lib/dma-noop.c b/lib/dma-noop.c
+index de26c8b..ff4ef5e 100644
+--- a/lib/dma-noop.c
++++ b/lib/dma-noop.c
+@@ -7,6 +7,7 @@
+ #include <linux/mm.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/scatterlist.h>
++#include <linux/pfn.h>
+ 
+ static void *dma_noop_alloc(struct device *dev, size_t size,
+ 			    dma_addr_t *dma_handle, gfp_t gfp,
+@@ -16,7 +17,8 @@ static void *dma_noop_alloc(struct device *dev, size_t size,
+ 
+ 	ret = (void *)__get_free_pages(gfp, get_order(size));
+ 	if (ret)
+-		*dma_handle = virt_to_phys(ret);
++		*dma_handle = virt_to_phys(ret) - PFN_PHYS(dev->dma_pfn_offset);
++
+ 	return ret;
+ }
+ 
+@@ -32,7 +34,7 @@ static dma_addr_t dma_noop_map_page(struct device *dev, struct page *page,
+ 				      enum dma_data_direction dir,
+ 				      unsigned long attrs)
+ {
+-	return page_to_phys(page) + offset;
++	return page_to_phys(page) + offset - PFN_PHYS(dev->dma_pfn_offset);
+ }
+ 
+ static int dma_noop_map_sg(struct device *dev, struct scatterlist *sgl, int nents,
+@@ -47,7 +49,7 @@ static int dma_noop_map_sg(struct device *dev, struct scatterlist *sgl, int nent
+ 
+ 		BUG_ON(!sg_page(sg));
+ 		va = sg_virt(sg);
+-		sg_dma_address(sg) = (dma_addr_t)virt_to_phys(va);
++		sg_dma_address(sg) = (dma_addr_t)(virt_to_phys(va) - PFN_PHYS(dev->dma_pfn_offset));
+ 		sg_dma_len(sg) = sg->length;
+ 	}
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.0.0
