@@ -1,41 +1,41 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 24 May 2017 21:06:46 +0200
-Subject: [PATCH 05/11] crypto: sun4i-ss: do not dynamically set parts of the
- last buffer to 0
+Date: Wed, 24 May 2017 21:06:49 +0200
+Subject: [PATCH 08/11] crypto: sun4i-ss: use GENMASK to generate masks
 In-Reply-To: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
 References: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170524190652.13278-6-antoine.tenart@free-electrons.com>
+Message-ID: <20170524190652.13278-9-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parts of the bf buffer were dynamically set to 0. Change this to set the
-whole buffer to 0 by default to avoid any mistake.
+Use the GENMASK helper instead of custom calculations to generate masks,
+It also helps the readability.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-index bc3cbde07219..518bc7a7df6a 100644
+index 0c2efc88bc0a..685de5b6ab17 100644
 --- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
 +++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-@@ -179,7 +179,7 @@ static int sun4i_hash(struct ahash_request *areq)
- 	 */
- 	unsigned int i = 0, end, index, padlen, nwait, nbw = 0, j = 0, todo;
- 	unsigned int in_i = 0;
--	u32 spaces, rx_cnt = SS_RX_DEFAULT, bf[32], wb = 0, v, ivmode = 0;
-+	u32 spaces, rx_cnt = SS_RX_DEFAULT, bf[32] = {0}, wb = 0, v, ivmode = 0;
- 	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
- 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
- 	struct sun4i_tfm_ctx *tfmctx = crypto_ahash_ctx(tfm);
-@@ -417,7 +417,6 @@ static int sun4i_hash(struct ahash_request *areq)
- 		zeros = (padlen - 1) / 4;
+@@ -384,11 +384,14 @@ static int sun4i_hash(struct ahash_request *areq)
+ 			writesl(ss->base + SS_RXFIFO, op->buf, nwait);
+ 			op->byte_count += 4 * nwait;
+ 		}
++
+ 		nbw = op->len - 4 * nwait;
+-		wb = *(u32 *)(op->buf + nwait * 4);
+-		wb &= (0xFFFFFFFF >> (4 - nbw) * 8);
++		if (nbw) {
++			wb = *(u32 *)(op->buf + nwait * 4);
++			wb &= GENMASK((nbw * 8) - 1, 0);
+ 
+-		op->byte_count += nbw;
++			op->byte_count += nbw;
++		}
  	}
  
--	memset(bf + j, 0, 4 * zeros);
- 	j += zeros;
- 
- 	/* write the length of data */
+ 	/* write the remaining bytes of the nbw buffer */
 -- 
 2.9.4
