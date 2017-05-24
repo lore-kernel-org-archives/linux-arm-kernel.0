@@ -1,58 +1,76 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 24 May 2017 10:55:58 +0200
-Subject: [PATCH] ARM: dts: rockchip: correct regular setting for act8846
-In-Reply-To: <CAJrj+DMU5XP9vHt60F8Uf7BTfv13DQQUoVXs0Fv2nKbWH8xKYw@mail.gmail.com>
-References: <1495611221-6749-1-git-send-email-eddie.cai.linux@gmail.com>
- <7433998.EkqTVyWeUF@phil>
- <CAJrj+DMU5XP9vHt60F8Uf7BTfv13DQQUoVXs0Fv2nKbWH8xKYw@mail.gmail.com>
-Message-ID: <3806769.RZqfsnRCGS@phil>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 24 May 2017 11:07:27 +0200
+Subject: [PATCH v2 2/2] ARM: dts: tx6: Remove 'enable-active-low' property
+In-Reply-To: <1495553564-19112-2-git-send-email-fabio.estevam@nxp.com>
+References: <1495553564-19112-1-git-send-email-fabio.estevam@nxp.com>
+ <1495553564-19112-2-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <20170524110727.42dbb58d@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 24. Mai 2017, 16:50:51 CEST schrieb Eddie Cai:
-> 2017-05-24 16:47 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
-> > Am Mittwoch, 24. Mai 2017, 16:44:05 CEST schrieb Eddie Cai:
-> >> 2017-05-24 16:17 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
-> >> > Hi Eddie,
-> >> >
-> >> > Am Mittwoch, 24. Mai 2017, 15:33:41 CEST schrieb Eddie Cai:
-> >> >> the previous setting of act8846 is just copy from firefly board. but
-> >> >> the reload board is a little different from firefly board. let's correct
-> >> >> it.
-> >> >>
-> >> >> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
-> >> >> ---
-> >> >>  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 21 +++++++++++----------
-> >> >>  1 file changed, 11 insertions(+), 10 deletions(-)
-> >> >>
-> >> >> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-> >> >> index 8134966..4cfa109 100644
-> >> >> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-> >> >> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-> >> >> @@ -179,6 +179,7 @@
-> >> >>                               regulator-name = "vccio_sd";
-> >> >>                               regulator-min-microvolt = <3300000>;
-> >> >>                               regulator-max-microvolt = <3300000>;
-> >> >> +                             regulator-always-on;
-> >> >
-> >> > the rest below looks pretty straight forward, but why does vccio_sd
-> >> > need to be always on?
-> >> >
-> >> > I've checked the reload's schematics but did not find any further users
-> >> > of vccio_sd that may warant this attribute.
-> >> Oh, It's default on. thank you for point out my mistake. I will modify
-> >> it in next version.
-> >
-> > not default-on, but the mmc-core will turn on the vccio regulator on its
-> > own during probe. So yes, please fix :-) .
-> I mean it will be default on by hardware from schematics. I just modify it to
-> regulator-boot-on and send v1 patch
+Fabio Estevam <fabio.estevam@nxp.com> wrote:
 
-nice, that is even better to make that explicit.
+> Property 'enable-active-low' does not exist. Only 'enable-active-high' is
+> valid, and when this property is absent the gpio regulator will act as
+> active low by default.
+> 
+> So remove the unexisting 'enable-active-low' property. 
+> 
+> Currently the GPIO flag is GPIO_ACTIVE_HIGH. In order to make
+> the dts description accurate, pass the GPIO_ACTIVE_LOW flag instead.
+> 
+> This change is safe because the gpio regulator driver does not take the
+> GPIO flag polarity into account.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+> Changes since v1:
+> - Improve commit log and explain why this change is safe (Stefan).
+> 
+>  arch/arm/boot/dts/imx6qdl-tx6.dtsi  | 3 +--
+>  arch/arm/boot/dts/imx6ul-tx6ul.dtsi | 3 +--
+>  2 files changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+> index 1691714..a146fe7 100644
+> --- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+> @@ -133,8 +133,7 @@
+>  		regulator-max-microvolt = <3300000>;
+>  		pinctrl-names = "default";
+>  		pinctrl-0 = <&pinctrl_flexcan_xcvr>;
+> -		gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
+> -		enable-active-low;
+> +		gpio = <&gpio4 21 GPIO_ACTIVE_LOW>;
+>  	};
+>  
+>  	reg_lcd0_pwr: regulator-lcd0-pwr {
+> diff --git a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
+> index c784a0b..4ccc9e9 100644
+> --- a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
+> +++ b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
+> @@ -173,8 +173,7 @@
+>  		regulator-max-microvolt = <3300000>;
+>  		pinctrl-names = "default";
+>  		pinctrl-0 = <&pinctrl_flexcan_xcvr>;
+> -		gpio = <&gpio3 5 GPIO_ACTIVE_HIGH>;
+> -		enable-active-low;
+> +		gpio = <&gpio3 5 GPIO_ACTIVE_LOW>;
+>  	};
+>  
+>  	reg_lcd_pwr: regulator-lcdpwr {
 
-No need to resent for that, but your new patch should actually be v2.
-The patch without version number always counts as v1, we just normally
-don't write that down :-)
+Acked-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
+Thanks for the cleanup,
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Heiko
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
