@@ -1,68 +1,73 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 24 May 2017 21:06:51 +0200
-Subject: [PATCH 10/11] crypto: sun4i-ss: fix large block size support
+Date: Wed, 24 May 2017 21:06:42 +0200
+Subject: [PATCH 01/11] crypto: sun4i-ss: group variable definitions in
+ sun4i_hash()
 In-Reply-To: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
 References: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170524190652.13278-11-antoine.tenart@free-electrons.com>
+Message-ID: <20170524190652.13278-2-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The run-time self-tests fail quite early, as soon as the input block
-size is larger than 64 bytes:
-
-  alg: hash: Test 4 failed for sha1-sun4i-ss
-  00000000: b9 c9 1e 52 c0 26 d8 39 81 ff f2 3c 99 b1 27 b2
-  00000010: 30 d6 c9 85
-
-One thing to notice is the value of the last word, which is the one
-expected (it can sometime be the last two words). The datasheet isn't
-very clear about when the digest is ready to retrieve and is seems the
-bit SS_DATA_END is cleared when the digest was computed *but* that
-doesn't mean the digest is ready to retrieve in the registers.
-
-A ndelay(1) is added before reading the computed digest to ensure it is
-available in the SS_MD[] registers.
+Cosmetic change to avoid having a full screen a variable definitions. It
+also helps to see which variables share the same type.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 31 +++++++++++--------------------
+ 1 file changed, 11 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-index 685de5b6ab17..6da8d2bbd4da 100644
+index 0de2f62d51ff..855325338844 100644
 --- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
 +++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-@@ -358,6 +358,15 @@ static int sun4i_hash(struct ahash_request *areq)
- 		goto release_ss;
- 	}
+@@ -167,37 +167,28 @@ int sun4i_hash_import_sha1(struct ahash_request *areq, const void *in)
+  */
+ static int sun4i_hash(struct ahash_request *areq)
+ {
+-	u32 v, ivmode = 0;
+-	unsigned int i = 0;
+ 	/*
+ 	 * i is the total bytes read from SGs, to be compared to areq->nbytes
+ 	 * i is important because we cannot rely on SG length since the sum of
+ 	 * SG->length could be greater than areq->nbytes
++	 *
++	 * end is the position when we need to stop writing to the device,
++	 * to be compared to i
++	 *
++	 * in_i: advancement in the current SG
+ 	 */
+-
++	unsigned int i = 0, end, index, padlen, nwait, nbw = 0, j = 0, todo;
++	unsigned int in_i = 0;
++	u32 spaces, rx_cnt = SS_RX_DEFAULT, bf[32], wb = 0, v, ivmode = 0;
+ 	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+ 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
+ 	struct sun4i_tfm_ctx *tfmctx = crypto_ahash_ctx(tfm);
+ 	struct sun4i_ss_ctx *ss = tfmctx->ss;
+-	unsigned int in_i = 0; /* advancement in the current SG */
+-	unsigned int end;
+-	/*
+-	 * end is the position when we need to stop writing to the device,
+-	 * to be compared to i
+-	 */
+-	int in_r, err = 0;
+-	unsigned int todo;
+-	u32 spaces, rx_cnt = SS_RX_DEFAULT;
+-	size_t copied = 0;
++	struct scatterlist *in_sg = areq->src;
+ 	struct sg_mapping_iter mi;
+-	unsigned int j = 0;
+-	int zeros;
+-	unsigned int index, padlen;
++	int in_r, err = 0, zeros;
++	size_t copied = 0;
+ 	__be64 bits;
+-	u32 bf[32];
+-	u32 wb = 0;
+-	unsigned int nwait, nbw = 0;
+-	struct scatterlist *in_sg = areq->src;
  
-+	/*
-+	 * The datasheet isn't very clear about when to retrieve the digest. The
-+	 * bit SS_DATA_END is cleared when the engine has processed the data and
-+	 * when the digest is computed *but* it doesn't mean the digest is
-+	 * available in the diesgt registers. Hence the delay to be sure we can
-+	 * read it.
-+	 */
-+	ndelay(1);
-+
- 	for (i = 0; i < crypto_ahash_digestsize(tfm) / 4; i++)
- 		op->hash[i] = readl(ss->base + SS_MD0 + i * 4);
- 
-@@ -446,6 +455,15 @@ static int sun4i_hash(struct ahash_request *areq)
- 		goto release_ss;
- 	}
- 
-+	/*
-+	 * The datasheet isn't very clear about when to retrieve the digest. The
-+	 * bit SS_DATA_END is cleared when the engine has processed the data and
-+	 * when the digest is computed *but* it doesn't mean the digest is
-+	 * available in the diesgt registers. Hence the delay to be sure we can
-+	 * read it.
-+	 */
-+	ndelay(1);
-+
- 	/* Get the hash from the device */
- 	if (op->mode == SS_OP_SHA1) {
- 		for (i = 0; i < 5; i++) {
+ 	dev_dbg(ss->dev, "%s %s bc=%llu len=%u mode=%x wl=%u h0=%0x",
+ 		__func__, crypto_tfm_alg_name(areq->base.tfm),
 -- 
 2.9.4
