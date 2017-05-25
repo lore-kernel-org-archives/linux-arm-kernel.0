@@ -1,58 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 May 2017 11:58:32 +0100
-Subject: [PATCH v2 2/2] arm64: Add dump_backtrace() in show_regs
-In-Reply-To: <20170524100949.GA24574@leverpostej>
-References: <20170508145535.GF5480@leverpostej>
- <1494294817-29187-1-git-send-email-wangkefeng.wang@huawei.com>
- <1494294817-29187-2-git-send-email-wangkefeng.wang@huawei.com>
- <20170524100949.GA24574@leverpostej>
-Message-ID: <20170525105832.GA2859@arm.com>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Thu, 25 May 2017 14:17:10 +0300
+Subject: [PATCH v3 0/4] iio: adc: sama5d2_adc hw triggers and buffers
+Message-ID: <1495711034-28410-1-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 11:09:49AM +0100, Mark Rutland wrote:
-> On Tue, May 09, 2017 at 09:53:37AM +0800, Kefeng Wang wrote:
-> > Generic code expects show_regs() to dump the stack, but arm64's
-> > show_regs() does not. This makes it hard to debug softlockups and
-> > other issues that result in show_regs() being called.
-> > 
-> > This patch updates arm64's show_regs() to dump the stack, as common
-> > code expects.
-> > 
-> > Acked-by: Mark Rutland <mark.rutland@arm.com>
-> > Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+This patch implements the hardware triggers support and buffer management
+for sama5d2.
+The DT modifications ( [PATCH 1/3] ARM: dts: at91: sama5d2_xplained:
+enable ADTRG pin) are for demonstration purposes of the feature,
+setting the pinctrl for the ADC hw trigger pin,should go through
+at91 maintainers.
+As discussed on the mailing list, since we have a single external trigger
+namely the ADTRG, but three different possible edges that can trigger it,
+will have a single trigger in the IIO subsystem and three possible edges
+which can be selected from the device tree.
+Thus I created new bindings in the device tree for having the possible
+edge types for the ADTRG pin.
+The documentation for the bindings is in the patch
+[PATCH v3 2/4] Documentation: dt: iio: at91-sama5d2_adc: add adtrg
+ trigger binding
+The modifications in the DT are in the patch
+[PATCH v3 3/4] ARM: dts: at91: sama5d2: add ADC hw trigger
 
-[...]
+  Changes in v3:
+ - No longer have all three possible triggers registered in the subsystem and
+   available in the sysfs. Only registering one trigger, and the possible edge
+   is being read from the device tree. In the device tree, any possible edge
+   can be set. There are three already made nodes for each possible edge which
+   can be selected.
+ - Fixed a bug where software triggered conversion could be started even if
+   the hardware trigger was enabled.
+ - Preallocate enough space for the buffer, considering all the channels
+   and timestamp
 
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index 0805b44..f452fcc 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -728,8 +728,6 @@ static int bug_handler(struct pt_regs *regs, unsigned int esr)
->                 break;
->  
->         case BUG_TRAP_TYPE_WARN:
-> -               /* Ideally, report_bug() should backtrace for us... but no. */
-> -               dump_backtrace(regs, NULL);
->                 break;
->  
->         default:
-> 
-> ... since report_bug() will call show_regs(), and dump the stack itself
-> now.
-> 
-> With that change, these patches will also fix *_ONCE() traps spewing
-> backtraces every time they're invoked, which was a side-effect of
-> commit:
-> 
->   19d436268dde9538 ("debug: Add _ONCE() logic to report_bug()")
-> 
-> Would you mind folding that into a v3?
 
-I've queued this locally, so I can just fold that in too. No need to repost.
 
-I'll push what I have at -rc3.
+  Changes in v2:
+ - Moved buffer allocation and freeing into the preenable and postdisable
+   callbacks.
+   We have a total of scan bytes that can vary a lot depending on each channel
+   enabled at a certain point.
+ - made the at91 trigger list part of state structure
+ - made the iio trigger list preallocated in state structure
+ - moved irq enabling/disabling into the try_reenable callback
+ - on trigger disable must write disable registries as well
+ - Modified trigger name length to 64
 
-Cheers,
 
-Will
+
+Eugen Hristev (4):
+  ARM: dts: at91: sama5d2_xplained: enable ADTRG pin
+  Documentation: dt: iio: at91-sama5d2_adc: add adtrg trigger binding
+  ARM: dts: at91: sama5d2: add ADC hw trigger
+  iio: adc: at91-sama5d2_adc: add hw trigger and buffer support
+
+ .../bindings/iio/adc/at91-sama5d2_adc.txt          |  17 ++
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  16 +-
+ arch/arm/boot/dts/sama5d2.dtsi                     |  11 +
+ drivers/iio/adc/at91-sama5d2_adc.c                 | 229 ++++++++++++++++++++-
+ 4 files changed, 267 insertions(+), 6 deletions(-)
+
+-- 
+2.7.4
