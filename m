@@ -1,39 +1,116 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 25 May 2017 19:25:01 +0100
-Subject: [RFC PATCH v3 4/4] arm64: neon: Add backwards compatibility
- kernel_neon_begin_partial()
-In-Reply-To: <1495736721-20985-1-git-send-email-Dave.Martin@arm.com>
-References: <1495736721-20985-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1495736721-20985-5-git-send-email-Dave.Martin@arm.com>
+From: roy.lists@gmail.com (Roy Franz (Cavium))
+Date: Thu, 25 May 2017 11:27:18 -0700
+Subject: [RFC PATCH 04/30] iommu/arm-smmu-v3: Add support for PCI ATS
+In-Reply-To: <09d0c4de-ec01-bcce-9901-5ff36c6c69bd@arm.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-5-jean-philippe.brucker@arm.com>
+ <5923F5B1.2080209@huawei.com>
+ <09d0c4de-ec01-bcce-9901-5ff36c6c69bd@arm.com>
+Message-ID: <CAK-u0Q=29a3fRQHJiUoDtFO6vc9dbD3KH5zQf=Hpx6hhJhxjYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel_neon_begin_partial() is no longer available, but the
-implementation of kernel_neon_begin() should be sufficient to
-satisfy kernel_neon_begin_partial() callers.
+On Tue, May 23, 2017 at 4:21 AM, Jean-Philippe Brucker
+<jean-philippe.brucker@arm.com> wrote:
+> On 23/05/17 09:41, Leizhen (ThunderTown) wrote:
+>> On 2017/2/28 3:54, Jean-Philippe Brucker wrote:
+>>> PCIe devices can implement their own TLB, named Address Translation Cache
+>>> (ATC). Steps involved in the use and maintenance of such caches are:
+>>>
+>>> * Device sends an Address Translation Request for a given IOVA to the
+>>>   IOMMU. If the translation succeeds, the IOMMU returns the corresponding
+>>>   physical address, which is stored in the device's ATC.
+>>>
+>>> * Device can then use the physical address directly in a transaction.
+>>>   A PCIe device does so by setting the TLP AT field to 0b10 - translated.
+>>>   The SMMU might check that the device is allowed to send translated
+>>>   transactions, and let it pass through.
+>>>
+>>> * When an address is unmapped, CPU sends a CMD_ATC_INV command to the
+>>>   SMMU, that is relayed to the device.
+>>>
+>>> In theory, this doesn't require a lot of software intervention. The IOMMU
+>>> driver needs to enable ATS when adding a PCI device, and send an
+>>> invalidation request when unmapping. Note that this invalidation is
+>>> allowed to take up to a minute, according to the PCIe spec. In
+>>> addition, the invalidation queue on the ATC side is fairly small, 32 by
+>>> default, so we cannot keep many invalidations in flight (see ATS spec
+>>> section 3.5, Invalidate Flow Control).
+>>>
+>>> Handling these constraints properly would require to postpone
+>>> invalidations, and keep the stale mappings until we're certain that all
+>>> devices forgot about them. This requires major work in the page table
+>>> managers, and is therefore not done by this patch.
+>>>
+>>>   Range calculation
+>>>   -----------------
+>>>
+>>> The invalidation packet itself is a bit awkward: range must be naturally
+>>> aligned, which means that the start address is a multiple of the range
+>>> size. In addition, the size must be a power of two number of 4k pages. We
+>>> have a few options to enforce this constraint:
+>>>
+>>> (1) Find the smallest naturally aligned region that covers the requested
+>>>     range. This is simple to compute and only takes one ATC_INV, but it
+>>>     will spill on lots of neighbouring ATC entries.
+>>>
+>>> (2) Align the start address to the region size (rounded up to a power of
+>>>     two), and send a second invalidation for the next range of the same
+>>>     size. Still not great, but reduces spilling.
+>>>
+>>> (3) Cover the range exactly with the smallest number of naturally aligned
+>>>     regions. This would be interesting to implement but as for (2),
+>>>     requires multiple ATC_INV.
+>>>
+>>> As I suspect ATC invalidation packets will be a very scarce resource,
+>>> we'll go with option (1) for now, and only send one big invalidation.
+>>>
+>>> Note that with io-pgtable, the unmap function is called for each page, so
+>>> this doesn't matter. The problem shows up when sharing page tables with
+>>> the MMU.
+>> Suppose this is true, I'd like to choose option (2). Because the worst cases of
+>> both (1) and (2) will not be happened, but the code of (2) will look clearer.
+>> And (2) is technically more acceptable.
+>
+> I agree that (2) is a bit clearer, but the question is of performance
+> rather than readability. I'd like to see some benchmarks or experiment on
+> my own before switching to a two-invalidation system.
+>
+> Intuitively one big invalidation will result in more ATC trashing and will
+> bring overall device performance down. But then according to the PCI spec,
+> ATC invalidations are grossly expensive, they have an upper bound of a
+> minute. I agree that this is highly improbable and might depend on the
+> range size, but purely from an architectural standpoint, reducing the
+> number of ATC invalidation requests is the priority, because this is much
+> worse than any performance slow-down incurred by ATC trashing. And for the
+> moment I can only base my decisions on the architecture.
+>
+> So I'd like to keep (1) for now, and update it to (2) (or even (3)) once
+> we have more hardware to experiment with.
+>
+> Thanks,
+> Jean
+>
 
-Because of the changed semantics of may_use_simd() and
-kernel_neon_begin() such code really needs to be ported.
+I think (1) is a good place to start, as the same restricted encoding
+that is used in
+the invalidations is also used in the translation responses - all of
+the ATC entries
+were created with regions described this way.  We still may end up with nothing
+but STU sized ATC entries, as TAs are free to respond to large
+translation requests
+with multiple STU sized translations, and in some cases this is the
+best that they
+can do.  Picking the optimal strategy will depend on hardware, and
+maybe workload
+as well.
 
-In the meantime, this patch restores buildability of kernel-mode
-NEON client code.
+Thanks,
+Roy
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/include/asm/neon.h | 3 +++
- 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
-index fb9d137..885f7a6 100644
---- a/arch/arm64/include/asm/neon.h
-+++ b/arch/arm64/include/asm/neon.h
-@@ -19,4 +19,7 @@
- void kernel_neon_begin(void);
- void kernel_neon_end(void);
- 
-+/* FIXME: Backwards compatibility only, should go away: */
-+#define kernel_neon_begin_partial(num_regs) kernel_neon_begin()
-+
- #endif /* ! __ASM_NEON_H */
--- 
-2.1.4
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
