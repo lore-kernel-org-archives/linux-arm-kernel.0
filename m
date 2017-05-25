@@ -1,63 +1,51 @@
 From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Thu, 25 May 2017 10:29:10 -0700
-Subject: [PATCH v11 5/6] lib: add bitrev8x4()
+Date: Thu, 25 May 2017 10:29:11 -0700
+Subject: [PATCH v11 6/6] fpga-manager: altera-ps-spi: use bitrev8x4
 In-Reply-To: <20170525172911.11467-1-stillcompiling@gmail.com>
 References: <20170525172911.11467-1-stillcompiling@gmail.com>
-Message-ID: <20170525172911.11467-6-stillcompiling@gmail.com>
+Message-ID: <20170525172911.11467-7-stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a function to reverse bytes within a 32 bit word.
-Operate on a u32 rather than individual bytes.
+Speed up bit reversal by using hardware bit reversal
+Add extra code to handle less than 4byte remnants, if any
 
 Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 ---
- include/linux/bitrev.h | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ drivers/fpga/altera-ps-spi.c | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
 
-diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
-index fb790b8449c1..b97be27e5a85 100644
---- a/include/linux/bitrev.h
-+++ b/include/linux/bitrev.h
-@@ -29,6 +29,8 @@ static inline u32 __bitrev32(u32 x)
+diff --git a/drivers/fpga/altera-ps-spi.c b/drivers/fpga/altera-ps-spi.c
+index 9e90f8086cd5..baddead15476 100644
+--- a/drivers/fpga/altera-ps-spi.c
++++ b/drivers/fpga/altera-ps-spi.c
+@@ -149,12 +149,23 @@ static int altera_ps_write_init(struct fpga_manager *mgr,
  
- #endif /* CONFIG_HAVE_ARCH_BITREVERSE */
+ static void rev_buf(char *buf, size_t len)
+ {
+-	const char *fw_end = (buf + len);
++	u32 *fw32 = (u32 *)buf;
++	size_t extra_bytes = (len & 0x03);
++	const u32 *fw_end = (u32 *)(buf + len - extra_bytes);
  
-+#define __bitrev8x4(x)	(__bitrev32(swab32(x)))
+ 	/* set buffer to lsb first */
+-	while (buf < fw_end) {
+-		*buf = bitrev8(*buf);
+-		buf++;
++	while (fw32 < fw_end) {
++		*fw32 = bitrev8x4(*fw32);
++		fw32++;
++	}
 +
- #define __constant_bitrev32(x)	\
- ({					\
- 	u32 __x = x;			\
-@@ -50,6 +52,15 @@ static inline u32 __bitrev32(u32 x)
- 	__x;								\
- })
++	if (extra_bytes) {
++		buf = (char *)fw_end;
++		while (extra_bytes) {
++			*buf = bitrev8(*buf);
++			buf++;
++			extra_bytes--;
++		}
+ 	}
+ }
  
-+#define __constant_bitrev8x4(x) \
-+({			\
-+	u32 __x = x;	\
-+	__x = ((__x & (u32)0xF0F0F0F0UL) >> 4) | ((__x & (u32)0x0F0F0F0FUL) << 4);	\
-+	__x = ((__x & (u32)0xCCCCCCCCUL) >> 2) | ((__x & (u32)0x33333333UL) << 2);	\
-+	__x = ((__x & (u32)0xAAAAAAAAUL) >> 1) | ((__x & (u32)0x55555555UL) << 1);	\
-+	__x;								\
-+})
-+
- #define __constant_bitrev8(x)	\
- ({					\
- 	u8 __x = x;			\
-@@ -75,6 +86,14 @@ static inline u32 __bitrev32(u32 x)
- 	__bitrev16(__x);				\
-  })
- 
-+#define bitrev8x4(x) \
-+({			\
-+	u32 __x = x;	\
-+	__builtin_constant_p(__x) ?	\
-+	__constant_bitrev8x4(__x) :			\
-+	__bitrev8x4(__x);				\
-+ })
-+
- #define bitrev8(x) \
- ({			\
- 	u8 __x = x;	\
 -- 
 2.11.0
