@@ -1,57 +1,56 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 25 May 2017 18:22:04 +0100
-Subject: [PATCH v4 8/8] mm: rmap: Use correct helper when poisoning
- hugepages
-In-Reply-To: <201705250342.fHpDVCsZ%fengguang.wu@intel.com> (kbuild test
- robot's message of "Thu, 25 May 2017 03:20:35 +0800")
-References: <201705250342.fHpDVCsZ%fengguang.wu@intel.com>
-Message-ID: <878tlkets3.fsf@e105922-lin.cambridge.arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 25 May 2017 19:22:55 +0200
+Subject: [PATCH] RFC: arm: eBPF JIT compiler
+In-Reply-To: <20170525170051.GC18357@lunn.ch>
+References: <1495564433-9750-1-git-send-email-illusionist.neo@gmail.com>
+ <20170523204608.GG24807@lunn.ch>
+ <CAHgaXdJH7VjS__KPOc1scN9d=wxzY0DEQHutiL3qhtQAWd-v-A@mail.gmail.com>
+ <20170523232555.GY13759@lunn.ch>
+ <CAHgaXdKn4J==r_22T3N_7O5oESd8xwL6L+Ot8nT9bGCsSjAkHw@mail.gmail.com>
+ <20170525170051.GC18357@lunn.ch>
+Message-ID: <20170525172255.GF18357@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kbuild test robot <lkp@intel.com> writes:
+On Thu, May 25, 2017 at 07:00:51PM +0200, Andrew Lunn wrote:
+> On Thu, May 25, 2017 at 02:01:36AM +0530, Shubham Bansal wrote:
+> > Hi Andrew,
+> > 
+> > I am attaching the latest patch which should work on ARMv5 , ARMv6 and ARMv7.
+> > 
+> > Please test on your machines. Apologies for the last patch. This patch
+> > should work though.
+> 
+> andrew at shuttle:~/linux$ make -s -j 16
+> arch/arm/net/bpf_jit_32.c:1755:12: warning: ???validate_code??? defined but not used [-Wunused-function]
+>  static int validate_code(struct jit_ctx *ctx)
+>             ^~~~~~~~~~~~~
+> arch/arm/net/bpf_jit_32.c:1724:12: warning: ???build_body??? defined but not used [-Wunused-function]
+>  static int build_body(struct jit_ctx *ctx)
+>             ^~~~~~~~~~
+> arch/arm/net/bpf_jit_32.c:1122:13: warning: ???build_epilogue??? defined but not used [-Wunused-function]
+>  static void build_epilogue(struct jit_ctx *ctx)
+>              ^~~~~~~~~~~~~~
+> arch/arm/net/bpf_jit_32.c:1049:13: warning: ???build_prologue??? defined but not used [-Wunused-function]
+>  static void build_prologue(struct jit_ctx *ctx)
+>              ^~~~~~~~~~~~~~
+> arch/arm/net/bpf_jit_32.c:174:13: warning: ???jit_fill_hole??? defined but not used [-Wunused-function]
+>  static void jit_fill_hole(void *area, unsigned int size)
+>              ^~~~~~~~~~~~~
+> 
+> I _think_ this is because CONFIG_CPU_LITTLE_ENDIAN is not set. But it
+> is a little endian machine/configuration. ARM does not seem to use
+> CONFIG_CPU_LITTLE_ENDIAN, it just has CPU_BIG_ENDIAN.
 
-> Hi Punit,
->
-> [auto build test ERROR on linus/master]
-> [also build test ERROR on v4.12-rc2 next-20170524]
-> [cannot apply to mmotm/master]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Punit-Agrawal/Support-for-contiguous-pte-hugepages/20170524-221905
-> config: x86_64-kexec (attached as .config)
-> compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-> reproduce:
->         # save the attached .config to linux build tree
->         make ARCH=x86_64 
->
-> All errors (new ones prefixed by >>):
->
->    mm/rmap.c: In function 'try_to_unmap_one':
->>> mm/rmap.c:1386:5: error: implicit declaration of function 'set_huge_swap_pte_at' [-Werror=implicit-function-declaration]
->         set_huge_swap_pte_at(mm, address,
->         ^~~~~~~~~~~~~~~~~~~~
->    cc1: some warnings being treated as errors
->
-> vim +/set_huge_swap_pte_at +1386 mm/rmap.c
->
->   1380	
->   1381			if (PageHWPoison(page) && !(flags & TTU_IGNORE_HWPOISON)) {
->   1382				pteval = swp_entry_to_pte(make_hwpoison_entry(subpage));
->   1383				if (PageHuge(page)) {
->   1384					int nr = 1 << compound_order(page);
->   1385					hugetlb_count_sub(nr, mm);
->> 1386					set_huge_swap_pte_at(mm, address,
->   1387							     pvmw.pte, pteval,
->   1388							     vma_mmu_pagesize(vma));
->   1389				} else {
->
+After removing the #ifdef:
 
-Thanks for the report. The build failure is caused due to missing
-function definition for set_huge_swap_pte_at() when CONFIG_HUGETLB_PAGE
-is disabled. I've posted an update to Patch 7 where the function is
-introduced to fix this issue.
+test_bpf: Summary: 314 PASSED, 0 FAILED, [272/306 JIT'ed]
 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Each test prints:
+
+ARM version : 5
+ARM version : 5
+
+So the code needs some cleanup, but seems to basically work.
+
+   Andrew
