@@ -1,97 +1,128 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 25 May 2017 16:18:46 +0800
-Subject: [PATCH v2 04/12] arm64: dts: hi3660: add resources for clock and reset
+Date: Thu, 25 May 2017 16:18:47 +0800
+Subject: [PATCH v2 05/12] arm64: dts: Add I2C nodes for Hi3660
 In-Reply-To: <20170525081854.4701-1-guodong.xu@linaro.org>
 References: <20170525081854.4701-1-guodong.xu@linaro.org>
-Message-ID: <20170525081854.4701-5-guodong.xu@linaro.org>
+Message-ID: <20170525081854.4701-6-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Zhangfei Gao <zhangfei.gao@linaro.org>
 
-Add some resource nodes for clock and reset
+Add I2C nodes for Hi3660-hikey960.
 
+On HiKey960,
+I2C0, I2C7 are connected to Low Speed Expansion Connector.
+I2C1 is connected to ADV7535.
+I2C3 is connected to USB5734.
+
+Cc: Jarkko Nikula <jarkko.nikula@linux.intel.com>
 Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 53 +++++++++++++++++++++++++++----
- 1 file changed, 46 insertions(+), 7 deletions(-)
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 22 +++++++++
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 56 +++++++++++++++++++++++
+ 2 files changed, 78 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+index 64875a5..1a4d6c5 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+@@ -29,6 +29,28 @@
+ 	};
+ };
+ 
++&i2c0 {
++	/* On Low speed expansion */
++	label = "LS-I2C0";
++	status = "okay";
++};
++
++&i2c1 {
++	status = "okay";
++
++	adv7533: adv7533 at 39 {
++		status = "ok";
++		compatible = "adi,adv7533";
++		reg = <0x39>;
++	};
++};
++
++&i2c7 {
++	/* On Low speed expansion */
++	label = "LS-I2C1";
++	status = "okay";
++};
++
+ &uart5 {
+ 	status = "okay";
+ };
 diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 3983086..f55710a 100644
+index f55710a..9abe84e 100644
 --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
 +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -5,6 +5,7 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/hi3660-clock.h>
- 
- / {
- 	compatible = "hisilicon,hi3660";
-@@ -141,18 +142,56 @@
- 		#size-cells = <2>;
- 		ranges;
- 
--		fixed_uart5: fixed_19_2M {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <19200000>;
--			clock-output-names = "fixed:uart5";
-+		crg_ctrl: crg_ctrl at fff35000 {
-+			compatible = "hisilicon,hi3660-crgctrl", "syscon";
-+			reg = <0x0 0xfff35000 0x0 0x1000>;
-+			#clock-cells = <1>;
+@@ -186,6 +186,62 @@
+ 			#reset-cells = <2>;
  		};
  
--		uart5: uart at fdf05000 {
-+		crg_rst: crg_rst_controller {
-+			compatible = "hisilicon,hi3660-reset";
-+			#reset-cells = <2>;
-+			hisi,rst-syscon = <&crg_ctrl>;
++		i2c0: i2c at ffd71000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xffd71000 0x0 0x1000>;
++			interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			clock-frequency = <400000>;
++			clocks = <&crg_ctrl HI3660_CLK_GATE_I2C0>;
++			resets = <&iomcu_rst 0x20 3>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
++			status = "disabled";
 +		};
 +
-+
-+		pctrl: pctrl at e8a09000 {
-+			compatible = "hisilicon,hi3660-pctrl", "syscon";
-+			reg = <0x0 0xe8a09000 0x0 0x2000>;
-+			#clock-cells = <1>;
++		i2c1: i2c at ffd72000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xffd72000 0x0 0x1000>;
++			interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			clock-frequency = <400000>;
++			clocks = <&crg_ctrl HI3660_CLK_GATE_I2C1>;
++			resets = <&iomcu_rst 0x20 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
++			status = "disabled";
 +		};
 +
-+		pmuctrl: crg_ctrl at fff34000 {
-+			compatible = "hisilicon,hi3660-pmuctrl", "syscon";
-+			reg = <0x0 0xfff34000 0x0 0x1000>;
-+			#clock-cells = <1>;
++		i2c3: i2c at fdf0c000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xfdf0c000 0x0 0x1000>;
++			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			clock-frequency = <400000>;
++			clocks = <&crg_ctrl HI3660_CLK_GATE_I2C3>;
++			resets = <&crg_rst 0x78 7>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c3_pmx_func &i2c3_cfg_func>;
++			status = "disabled";
 +		};
 +
-+		sctrl: sctrl at fff0a000 {
-+			compatible = "hisilicon,hi3660-sctrl", "syscon";
-+			reg = <0x0 0xfff0a000 0x0 0x1000>;
-+			#clock-cells = <1>;
++		i2c7: i2c at fdf0b000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xfdf0b000 0x0 0x1000>;
++			interrupts = <GIC_SPI 314 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			clock-frequency = <400000>;
++			clocks = <&crg_ctrl HI3660_CLK_GATE_I2C7>;
++			resets = <&crg_rst 0x60 14>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c7_pmx_func &i2c7_cfg_func>;
++			status = "disabled";
 +		};
 +
-+		iomcu: iomcu at ffd7e000 {
-+			compatible = "hisilicon,hi3660-iomcu", "syscon";
-+			reg = <0x0 0xffd7e000 0x0 0x1000>;
-+			#clock-cells = <1>;
-+
-+		};
-+
-+		iomcu_rst: reset {
-+			compatible = "hisilicon,hi3660-reset";
-+			hisi,rst-syscon = <&iomcu>;
-+			#reset-cells = <2>;
-+		};
-+
-+		uart5: serial at fdf05000 {
+ 		uart5: serial at fdf05000 {
  			compatible = "arm,pl011", "arm,primecell";
  			reg = <0x0 0xfdf05000 0x0 0x1000>;
- 			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&fixed_uart5 &fixed_uart5>;
-+			clocks = <&crg_ctrl HI3660_CLK_GATE_UART5>,
-+				 <&crg_ctrl HI3660_CLK_GATE_UART5>;
- 			clock-names = "uartclk", "apb_pclk";
- 			status = "disabled";
- 		};
 -- 
 2.10.2
