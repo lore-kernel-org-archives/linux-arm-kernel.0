@@ -1,66 +1,61 @@
-From: angus@akkea.ca (Angus Ainslie)
-Date: Thu, 25 May 2017 06:39:16 -0600
-Subject: [PATCH] clk: sunxi-ng: sun5i: Fix ahb_bist_clk definition
-In-Reply-To: <CAGb2v66tpj4y2TdF2kz7Cb9fM-M1pBhuq137a80o0rjenF2AJA@mail.gmail.com>
-References: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
- <ad72ceff73364add5cfe25b6143a68ca@www.akkea.ca>
- <CAGb2v66tpj4y2TdF2kz7Cb9fM-M1pBhuq137a80o0rjenF2AJA@mail.gmail.com>
-Message-ID: <174d7dbf70471f4b823d8fa295303ad7@www.akkea.ca>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 25 May 2017 14:41:41 +0200
+Subject: [PATCH v4 2/2] PCI: Add tango PCIe host bridge support
+In-Reply-To: <1b0ec9c9-1036-619e-19c7-16818ca728e3@arm.com>
+References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+ <4a354b33-d59c-4ebb-4b31-0388ac8090d4@sigmadesigns.com>
+ <62bb805a-abd6-9aca-3641-8037f42a3b95@arm.com>
+ <57673076-4fbd-92ab-453c-3d77fd65407f@free.fr>
+ <1b0ec9c9-1036-619e-19c7-16818ca728e3@arm.com>
+Message-ID: <a7d4752f-001d-ba7e-07ff-435643a7e661@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-05-25 01:47, Chen-Yu Tsai wrote:
-> On Thu, May 25, 2017 at 2:51 AM, Angus Ainslie <angus@akkea.ca> wrote:
->> On 2017-05-24 10:34, Boris Brezillon wrote:
->>> 
->>> AHB BIST gate is actually controlled with bit 7.
->>> 
->>> This bug was detected while trying to use the NAND controller which 
->>> is
->>> using the DMA engine to transfer data to the NAND.
->>> Since the ahb_bist_clk gate bit conflicts with the ahb_dma_clk gate 
->>> bit,
->>> the core was disabling the DMA engine clock as part of its 'disable
->>> unused clks' procedure, which was causing all DMA transfers to fail 
->>> after
->>> this point.
->>> 
->>> Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
->>> Cc: stable at vger.kernel.org
->>> Reported-by: Angus Ainslie <angus@akkea.ca>compatible =
->>> "nextthing,chip-pro", "nextthing,gr8";
->>> Signed-off-by: Boris Brezillon <boris.brezillon@frecompatible =
->>> "nextthing,chip-pro", "nextthing,gr8";e-electrons.com>
->>> ---
->>>  drivers/clk/sunxi-ng/ccu-sun5i.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>> 
->>> diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.c
->>> b/drivers/clk/sunxi-ng/ccu-sun5i.c
->>> index 5c476f966a72..5372bf8be5e6 100644
->>> --- a/drivers/clk/sunxi-ng/ccu-sun5i.c
->>> +++ b/drivers/clk/sunxi-ng/ccu-sun5i.c
->>> @@ -243,7 +243,7 @@ static SUNXI_CCU_GATE(ahb_ss_clk,   "ahb-ss",
->>> "ahb",
->>>  static SUNXI_CCU_GATE(ahb_dma_clk,     "ahb-dma",      "ahb",
->>>                       0x060, BIT(6), 0);
->>>  static SUNXI_CCU_GATE(ahb_bist_clk,    "ahb-bist",     "ahb",
->>> -                     0x060, BIT(6), 0);
->>> +                     0x060, BIT(7), 0);
->>>  static SUNXI_CCU_GATE(ahb_mmc0_clk,    "ahb-mmc0",     "ahb",
->>>                       0x060, BIT(8), 0);
->>>  static SUNXI_CCU_GATE(ahb_mmc1_clk,    "ahb-mmc1",     "ahb",
->> 
->> 
->> 
->> The patch works perfectly. Using that I was able to remove the
->> clk_ignore_unsed and CLK_IS_CRITICAL.
->> 
+On 25/05/2017 14:23, Marc Zyngier wrote:
+> On 25/05/17 13:00, Mason wrote:
+>> On 25/05/2017 10:48, Marc Zyngier wrote:
+>>> Please have some defines for these magic values.
+>>
+>> Typical driver do
+>> #define MUX_OFFSET 0x48
+>> and then access the register's value through
+>> readl_relaxed(pcie->base + MUX_OFFSET);
+>>
+>> I can't do that because the registers were shuffled around
+>> between revision 1 and revision 2. Thus, instead of an
+>> explicitly-named macro (MUX_OFFSET), I used an explicitly-
+>> named field (pcie->mux) and access the register's value
+>> through readl_relaxed(pcie->mux);
 > 
-> Is that a Tested-by? :)
+> That doesn't prevent you from having a TANGO_V1_MUX_OFFSET define, which
+> you can supplement with a V2 at some point.
 > 
-> ChenYu
+>> This is equivalent to providing the offset definitions in the
+>> init functions, instead of at the top of the file.
+> 
+> Sorry, my brain parses text far better than hex number.
 
-Yeah :)
+Well, the hex numbers do need to show up somewhere :-)
 
-Tested-by: Angus Ainslie <angus@akkea.ca>
+IIUC, you're saying that
+#define MUX_OFFSET 0x48
+is clearer than
+pcie->mux = base + 0x48;
+
+OK, I can accept that. Maybe our brains have been trained
+to easily recognize and ingest the macro, or maybe it's
+the caps, or maybe the fact that the statement does
+several things (addition and assignment and hex).
+
+Out of curiosity, how would you feel about
+pcie->MUX_OFFSET = 0x48;
+and then using
+readl_relaxed(pcie->base + pcie->MUX_OFFSET);
+
+It feels weird to me, I think mostly because it is
+an unusual pattern.
+
+Anyway, I'll add the macros, if that improves review and
+maintenance.
+
+Regards.
