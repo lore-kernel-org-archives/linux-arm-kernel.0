@@ -1,43 +1,61 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Fri, 26 May 2017 00:39:03 +0530
-Subject: [PATCH] RFC: arm: eBPF JIT compiler
-In-Reply-To: <20170525184809.GH18357@lunn.ch>
-References: <1495564433-9750-1-git-send-email-illusionist.neo@gmail.com>
- <20170523204608.GG24807@lunn.ch>
- <CAHgaXdJH7VjS__KPOc1scN9d=wxzY0DEQHutiL3qhtQAWd-v-A@mail.gmail.com>
- <20170523232555.GY13759@lunn.ch>
- <CAHgaXdKn4J==r_22T3N_7O5oESd8xwL6L+Ot8nT9bGCsSjAkHw@mail.gmail.com>
- <20170525170051.GC18357@lunn.ch> <20170525172255.GF18357@lunn.ch>
- <CAHgaXd+CVrDEA=E2=23Qp6wk50=dBnFS6TiCtvphTBMjUywrGg@mail.gmail.com>
- <20170525182849.GG18357@lunn.ch>
- <CAHgaXdLCaTwaLiLsmkzWvzSa=67LzqwHkT6cS_CVUm9_8u2_2Q@mail.gmail.com>
- <20170525184809.GH18357@lunn.ch>
-Message-ID: <CAHgaXdJPSemCoaRH_5wSEE6e7sOzPg7XChuWVvykbWia4meOMw@mail.gmail.com>
+From: angus@akkea.ca (Angus Ainslie)
+Date: Thu, 25 May 2017 13:23:54 -0600
+Subject: [PATCH] clk: sunxi-ng: sun5i: Fix ahb_bist_clk definition
+In-Reply-To: <149573823221.52617.2350903252470015903@resonance>
+References: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
+ <149573823221.52617.2350903252470015903@resonance>
+Message-ID: <ae41e508eac104a1d0c305cceccea84a@www.akkea.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On 2017-05-25 12:50, Michael Turquette wrote:
+> Quoting Boris Brezillon (2017-05-24 09:34:29)
+>> AHB BIST gate is actually controlled with bit 7.
+>> 
+>> This bug was detected while trying to use the NAND controller which is
+>> using the DMA engine to transfer data to the NAND.
+>> Since the ahb_bist_clk gate bit conflicts with the ahb_dma_clk gate 
+>> bit,
+>> the core was disabling the DMA engine clock as part of its 'disable
+>> unused clks' procedure, which was causing all DMA transfers to fail 
+>> after
+>> this point.
+>> 
+>> Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
+>> Cc: stable at vger.kernel.org
+>> Reported-by: Angus Ainslie <angus@akkea.ca>
+>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> 
+> Patch looks good to me. Did this ever work? I'm trying to figure out if
+> it should go into -fixes or -next.
+> 
+> Thanks,
+> Mike
+> 
 
-On Fri, May 26, 2017 at 12:18 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Fri, May 26, 2017 at 12:05:23AM +0530, Shubham Bansal wrote:
->> Hi Andrew,
->>
->> My Apologies.
->>
->> I will remove the #ifdef CONFIG_CPU_LITTLE_ENDIAN. Do you have the
->> ARMv6 machine you can test it on?
->
-> Sorry, i don't have a v6.
->
-> Maybe try kzm with qemu-system-qemu?
+It fixed the problem for me so I think fixes is the right place.
 
-I am afraid I not so familiar with qemu, otherwise I would have tried
-to test the code on ARMv5,6,7 myself.
-If you can help me with that it would be great, Otherwise I think I
-have to wait for someone to test it for ARMv6. Although, I am pretty
-sure it would work on that as it worked on ARMv5.
+Angus
 
->
->       Andrew
-
--Shubham
+>> ---
+>>  drivers/clk/sunxi-ng/ccu-sun5i.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.c 
+>> b/drivers/clk/sunxi-ng/ccu-sun5i.c
+>> index 5c476f966a72..5372bf8be5e6 100644
+>> --- a/drivers/clk/sunxi-ng/ccu-sun5i.c
+>> +++ b/drivers/clk/sunxi-ng/ccu-sun5i.c
+>> @@ -243,7 +243,7 @@ static SUNXI_CCU_GATE(ahb_ss_clk,   "ahb-ss",      
+>>  "ahb",
+>>  static SUNXI_CCU_GATE(ahb_dma_clk,     "ahb-dma",      "ahb",
+>>                       0x060, BIT(6), 0);
+>>  static SUNXI_CCU_GATE(ahb_bist_clk,    "ahb-bist",     "ahb",
+>> -                     0x060, BIT(6), 0);
+>> +                     0x060, BIT(7), 0);
+>>  static SUNXI_CCU_GATE(ahb_mmc0_clk,    "ahb-mmc0",     "ahb",
+>>                       0x060, BIT(8), 0);
+>>  static SUNXI_CCU_GATE(ahb_mmc1_clk,    "ahb-mmc1",     "ahb",
+>> --
+>> 2.7.4
+>> 
