@@ -1,42 +1,95 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Thu, 25 May 2017 11:46:38 -0500
-Subject: [PATCH] mmc: host: fix potential null pointer dereference
-In-Reply-To: <746018130.108142.1495703528403@email.1und1.de>
-References: <20170523234227.GA13018@embeddedgus>
- <746018130.108142.1495703528403@email.1und1.de>
-Message-ID: <20170525114638.Horde.wq7PLKWCg8CwLM5WiWj1Obm@gator4166.hostgator.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 25 May 2017 10:47:00 -0600
+Subject: [patch V3 12/32] hwtracing/coresight-etm4x: Use
+ cpuhp_setup_state_nocalls_cpuslocked()
+In-Reply-To: <20170524081547.983493849@linutronix.de>
+References: <20170524081511.203800767@linutronix.de>
+ <20170524081547.983493849@linutronix.de>
+Message-ID: <20170525164700.GB31052@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Wed, May 24, 2017 at 10:15:23AM +0200, Thomas Gleixner wrote:
+> From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> 
+> etm_probe4() holds get_online_cpus() while invoking
+> cpuhp_setup_state_nocalls().
+> 
+> cpuhp_setup_state_nocalls() invokes get_online_cpus() as well. This is
+> correct, but prevents the conversion of the hotplug locking to a percpu
+> rwsem.
+> 
+> Use cpuhp_setup_state_nocalls_cpuslocked() to avoid the nested
+> call. Convert *_online_cpus() to the new interfaces while at it.
+> 
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+> Cc: linux-arm-kernel at lists.infradead.org
 
-Quoting Stefan Wahren <stefan.wahren@i2se.com>:
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-> Hi Gustavo,
->
->> "Gustavo A. R. Silva" <garsilva@embeddedor.com> hat am 24. Mai 2017  
->> um 01:42 geschrieben:
->>
->>
->> Null check at line 1165: if (mrq->cmd), implies that mrq->cmd might
->> be NULL.
->> Add null checks before dereferencing pointer mrq->cmd in order to avoid
->> any potential NULL pointer dereference.
->>
->> Addresses-Coverity-ID: 1408740
->> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
->
-> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
->
-> with a Raspberry Pi Zero.
->
-> But please change the subject to make sure it's bcm2835 related:
->
-> mmc: bcm2835: fix potential null pointer dereferences
->
-
-OK, I'll send v2 shortly.
-
-Thank you
---
-Gustavo A. R. Silva
+> 
+> ---
+>  drivers/hwtracing/coresight/coresight-etm4x.c |   20 ++++++++++----------
+>  1 file changed, 10 insertions(+), 10 deletions(-)
+> 
+> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+> @@ -371,7 +371,7 @@ static void etm4_disable_sysfs(struct co
+>  	 * after cpu online mask indicates the cpu is offline but before the
+>  	 * DYING hotplug callback is serviced by the ETM driver.
+>  	 */
+> -	get_online_cpus();
+> +	cpus_read_lock();
+>  	spin_lock(&drvdata->spinlock);
+>  
+>  	/*
+> @@ -381,7 +381,7 @@ static void etm4_disable_sysfs(struct co
+>  	smp_call_function_single(drvdata->cpu, etm4_disable_hw, drvdata, 1);
+>  
+>  	spin_unlock(&drvdata->spinlock);
+> -	put_online_cpus();
+> +	cpus_read_unlock();
+>  
+>  	dev_info(drvdata->dev, "ETM tracing disabled\n");
+>  }
+> @@ -982,7 +982,7 @@ static int etm4_probe(struct amba_device
+>  
+>  	drvdata->cpu = pdata ? pdata->cpu : 0;
+>  
+> -	get_online_cpus();
+> +	cpus_read_lock();
+>  	etmdrvdata[drvdata->cpu] = drvdata;
+>  
+>  	if (smp_call_function_single(drvdata->cpu,
+> @@ -990,18 +990,18 @@ static int etm4_probe(struct amba_device
+>  		dev_err(dev, "ETM arch init failed\n");
+>  
+>  	if (!etm4_count++) {
+> -		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CORESIGHT_STARTING,
+> -					  "arm/coresight4:starting",
+> -					  etm4_starting_cpu, etm4_dying_cpu);
+> -		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
+> -						"arm/coresight4:online",
+> -						etm4_online_cpu, NULL);
+> +		cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ARM_CORESIGHT_STARTING,
+> +						     "arm/coresight4:starting",
+> +						     etm4_starting_cpu, etm4_dying_cpu);
+> +		ret = cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ONLINE_DYN,
+> +							   "arm/coresight4:online",
+> +							   etm4_online_cpu, NULL);
+>  		if (ret < 0)
+>  			goto err_arch_supported;
+>  		hp_online = ret;
+>  	}
+>  
+> -	put_online_cpus();
+> +	cpus_read_unlock();
+>  
+>  	if (etm4_arch_supported(drvdata->arch) == false) {
+>  		ret = -EINVAL;
+> 
+> 
