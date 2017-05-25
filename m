@@ -1,53 +1,57 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 25 May 2017 12:02:43 +0800
-Subject: [PATCH v4 5/9] ARM: mediatek: add MT7623a smp bringup code
+Date: Thu, 25 May 2017 12:02:45 +0800
+Subject: [PATCH v4 7/9] arm: dts: mt7623: enable the usb device on the mt7623n
+ rfb
 In-Reply-To: <cover.1495683769.git.sean.wang@mediatek.com>
 References: <cover.1495683769.git.sean.wang@mediatek.com>
-Message-ID: <5505e57a74b83ecf31868ab2d5f0d15b0597c22b.1495683769.git.sean.wang@mediatek.com>
+Message-ID: <4cb528c77f4d44bd0932b69f39b0d5b557d9eab1.1495683769.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+From: John Crispin <john@phrozen.org>
 
-Add support for booting secondary CPUs on MT7623a.
+All versions of the mt7623n RFB have an USB port so enable the device.
+There is a gpio that gets used to power up the port supply. Add support
+for this gpio using the fixed-regulator driver.
 
+Signed-off-by: John Crispin <john@phrozen.org>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- arch/arm/mach-mediatek/mediatek.c | 2 ++
- arch/arm/mach-mediatek/platsmp.c  | 1 +
- 2 files changed, 3 insertions(+)
+ arch/arm/boot/dts/mt7623n-rfb.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-index a6e3c98..1b52011 100644
---- a/arch/arm/mach-mediatek/mediatek.c
-+++ b/arch/arm/mach-mediatek/mediatek.c
-@@ -30,6 +30,7 @@ static void __init mediatek_timer_init(void)
- 
- 	if (of_machine_is_compatible("mediatek,mt6589") ||
- 	    of_machine_is_compatible("mediatek,mt7623") ||
-+	    of_machine_is_compatible("mediatek,mt7623a") ||
- 	    of_machine_is_compatible("mediatek,mt8135") ||
- 	    of_machine_is_compatible("mediatek,mt8127")) {
- 		/* turn on GPT6 which ungates arch timer clocks */
-@@ -49,6 +50,7 @@ static const char * const mediatek_board_dt_compat[] = {
- 	"mediatek,mt6589",
- 	"mediatek,mt6592",
- 	"mediatek,mt7623",
-+	"mediatek,mt7623a",
- 	"mediatek,mt8127",
- 	"mediatek,mt8135",
- 	NULL,
-diff --git a/arch/arm/mach-mediatek/platsmp.c b/arch/arm/mach-mediatek/platsmp.c
-index 726eb69..27d78c9 100644
---- a/arch/arm/mach-mediatek/platsmp.c
-+++ b/arch/arm/mach-mediatek/platsmp.c
-@@ -59,6 +59,7 @@ static const struct of_device_id mtk_tz_smp_boot_infos[] __initconst = {
- static const struct of_device_id mtk_smp_boot_infos[] __initconst = {
- 	{ .compatible   = "mediatek,mt6589", .data = &mtk_mt6589_boot },
- 	{ .compatible   = "mediatek,mt7623", .data = &mtk_mt7623_boot },
-+	{ .compatible   = "mediatek,mt7623a", .data = &mtk_mt7623_boot },
+diff --git a/arch/arm/boot/dts/mt7623n-rfb.dtsi b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+index 4963e6a..2964b4c 100644
+--- a/arch/arm/boot/dts/mt7623n-rfb.dtsi
++++ b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+@@ -28,6 +28,15 @@
+ 		serial1 = &uart1;
+ 		serial2 = &uart2;
+ 	};
++
++	usb_p1_vbus: regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&pio 135 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
  };
  
- static void __iomem *mtk_smp_base;
+ &uart0 {
+@@ -41,3 +50,12 @@
+ &uart2 {
+ 	status = "okay";
+ };
++
++&usb1 {
++	vbus-supply = <&usb_p1_vbus>;
++	status = "okay";
++};
++
++&u3phy1 {
++	status = "okay";
++};
 -- 
 2.7.4
