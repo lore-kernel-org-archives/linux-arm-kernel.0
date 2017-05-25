@@ -1,78 +1,46 @@
 From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 25 May 2017 15:18:02 +0200
-Subject: [PATCH v4 8/8] arm,arm64,drivers: add a prefix to drivers
- arch_topology interfaces
-In-Reply-To: <20170420144316.15632-9-juri.lelli@arm.com>
+Date: Thu, 25 May 2017 15:18:31 +0200
+Subject: [PATCH v4 0/8] Fix issues and factorize arm/arm64 capacity
+ information code
+In-Reply-To: <20170524144515.nuccflbdashlqmcs@e106622-lin>
 References: <20170420144316.15632-1-juri.lelli@arm.com>
- <20170420144316.15632-9-juri.lelli@arm.com>
-Message-ID: <20170525131802.GE16244@kroah.com>
+ <20170511084830.rn32pvi6weej2cna@e106622-lin>
+ <20170511085952.GA6934@kroah.com>
+ <20170511102718.qy54ajkzphasymhr@e106622-lin>
+ <20170524144515.nuccflbdashlqmcs@e106622-lin>
+Message-ID: <20170525131831.GF16244@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 20, 2017 at 03:43:16PM +0100, Juri Lelli wrote:
-> Now that some functions that deal with arch topology information live
-> under drivers, there is a clash of naming that might create confusion.
+On Wed, May 24, 2017 at 03:45:15PM +0100, Juri Lelli wrote:
+> Hi,
 > 
-> Tidy things up by creating a drivers namespace for interfaces used by
-> arch code; achieve this by prepending a 'atd_' (arch topology driver)
-> prefix to driver interfaces.
+> On 11/05/17 11:27, Juri Lelli wrote:
+> > On 11/05/17 10:59, Greg KH wrote:
+> > > On Thu, May 11, 2017 at 09:48:30AM +0100, Juri Lelli wrote:
+> > > > Hi Greg,
+> > > > 
+> > > > I'm not sure what your plans are with this set. Are we targeting 4.12?
+> > > > 
+> > > > IMHO, if possible, it would be good to have this refactoring in now, so
+> > > > that we can base further development on it for the next cycle.
+> > > 
+> > > It's way too late for new features that have not been in linux-next for
+> > > a few weeks, to get merged into 4.12-rc1, sorry.  I'll review this
+> > > patchset after -rc1 is out, and I get a chance to catch up on pending
+> > > patches.
+> > > 
+> > 
+> > Thanks for your reply, I perfecly understand.
+> > 
+> > OK, let's target 4.13 then. Looking forward to receive your comments
+> > after -rc1 is out.
+> > 
+> 
+> Did you have any chance to have a look at this set?
 
-No one knows, nor will they ever remember, what "atd_" means :(
-
-Naming is hard, I know, here's my suggestion:
-
-> diff --git a/include/linux/arch_topology.h b/include/linux/arch_topology.h
-> index 4edae9fe8cdd..e25458d7ee9a 100644
-> --- a/include/linux/arch_topology.h
-> +++ b/include/linux/arch_topology.h
-> @@ -4,14 +4,14 @@
->  #ifndef _LINUX_ARCH_TOPOLOGY_H_
->  #define _LINUX_ARCH_TOPOLOGY_H_
->  
-> -void normalize_cpu_capacity(void);
-> +void atd_normalize_cpu_capacity(void);
-
-arch_cpu_normalize_capacity();
-or
-cpu_normalize_capacity();
-
-Why do you care if this is "arch" or not, of course it's arch-specific
-in a way, right?
-
->  
->  struct device_node;
-> -int parse_cpu_capacity(struct device_node *cpu_node, int cpu);
-> +int atd_parse_cpu_capacity(struct device_node *cpu_node, int cpu);
-
-cpu_parse_capacity();
-
->  struct sched_domain;
-> -unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu);
-> +unsigned long atd_scale_cpu_capacity(struct sched_domain *sd, int cpu);
-
-cpu_scale_capacity();
-
-> -void set_capacity_scale(unsigned int cpu, unsigned long capacity);
-> +void atd_set_capacity_scale(unsigned int cpu, unsigned long capacity);
-
-wait, where did the cpu go?  This doesn't make much sense, these are all
-"capacity" issues, right?  If so, then these should be:
-	capacity_normalize_cpu()
-	capacity_parse_cpu()
-	capacity_scale_cpu()
-	capacity_set_scale()
-
-But this is all really topology stuff, right?  Why use "capacity" at
-all:
-	topology_normalize_cpu()
-	topology_parse_cpu()
-	topology_scale_cpu()
-	topology_set_scale()
-?
-
-It's always best to put the "subsystem" name first, we have a bad
-history of getting this wrong in the past by putting the verb first, not
-the noun.
+Now reviewed.  Looks fine except for the final names in the last patch,
+naming is hard, I know :)
 
 thanks,
 
