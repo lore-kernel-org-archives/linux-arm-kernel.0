@@ -1,55 +1,35 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 25 May 2017 16:18:42 +0800
-Subject: [PATCH v2 00/12] arm64: dts: hi3660: add device nodes
-Message-ID: <20170525081854.4701-1-guodong.xu@linaro.org>
+Date: Thu, 25 May 2017 16:18:43 +0800
+Subject: [PATCH v2 01/12] dt-bindings: arm: hisilicon: add bindings for
+ HiKey960 board
+In-Reply-To: <20170525081854.4701-1-guodong.xu@linaro.org>
+References: <20170525081854.4701-1-guodong.xu@linaro.org>
+Message-ID: <20170525081854.4701-2-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds various devices nodes for hi3660 and hikey960.
+Add bindings for HiKey960 Board.
 
-HiKey960 is one of 96boards. For details information about it, please
-refer to [1].
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-[1] https://github.com/96boards/documentation/tree/master/ConsumerEdition/HiKey960
-
-in v2, incorporated review comments from Rob Herring <robh@kernel.org>
-* uart4: max-speed should be in slave device bluetooth node
-* LEDs:	- bt_active triggered by 'hci0-power'
-	- move out of SoC level
-* pinctrl: update dts to use #pinctrl-cells
-* uart: add pinctrl information into uart nodes; add label strings.
-* chosen: update stdout-path. serial6 is used.
-* i2c: add label strings. change reg address to lower case.
-* remove unnecessary status="ok"
-* gpio-keys: move out of SoC level.
-
-Chen Feng (2):
-  arm64: dts: hi3660: Add uarts nodes
-  arm64: dts: hi3660: Add pl031 rtc node
-
-Chen Jun (1):
-  arm64: dts: hi3660: add power key dts node
-
-Guodong Xu (4):
-  dt-bindings: arm: hisilicon: add bindings for HiKey960 board
-  arm64: dts: hisilicon: update compatible string for hikey960
-  arm64: dts: hikey960: add WL1837 Bluetooth device node
-  arm64: dts: hikey960: add LED nodes
-
-Wang Xiaoyin (3):
-  arm64: dts: hikey960: pinctrl: add more pinmux and pinconfig
-  arm64: dts: hi3660: add gpio dtsi file for Hisilicon Hi3660 SOC
-  arm64: dts: hi3660: add spi device nodes
-
-Zhangfei Gao (2):
-  arm64: dts: hi3660: add resources for clock and reset
-  arm64: dts: Add I2C nodes for Hi3660
-
- .../bindings/arm/hisilicon/hisilicon.txt           |   4 +
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  | 130 +++-
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 601 +++++++++++++++-
- .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 778 +++++++++++++++++++--
- 4 files changed, 1439 insertions(+), 74 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+index 2e73215..7111fbc8 100644
+--- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -4,6 +4,10 @@ Hi3660 SoC
+ Required root node properties:
+ 	- compatible = "hisilicon,hi3660";
+ 
++HiKey960 Board
++Required root node properties:
++	- compatible = "hisilicon,hi3660-hikey960", "hisilicon,hi3660";
++
+ Hi3798cv200 SoC
+ Required root node properties:
+ 	- compatible = "hisilicon,hi3798cv200";
 -- 
 2.10.2
