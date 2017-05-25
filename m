@@ -1,15 +1,15 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 25 May 2017 15:32:35 +0800
-Subject: [PATCH v5 06/20] ARM: dts: imx: Add generic compatible string
- for I2C EEPROM
-In-Reply-To: <20170523133448.4794-7-javier@dowhile0.org>
+Date: Thu, 25 May 2017 15:33:08 +0800
+Subject: [PATCH v5 14/20] arm64: dts: ls1043a: Add generic compatible
+ string for I2C EEPROM
+In-Reply-To: <20170523133448.4794-15-javier@dowhile0.org>
 References: <20170523133448.4794-1-javier@dowhile0.org>
- <20170523133448.4794-7-javier@dowhile0.org>
-Message-ID: <20170525073233.GW26102@dragon>
+ <20170523133448.4794-15-javier@dowhile0.org>
+Message-ID: <20170525073304.GX26102@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 03:34:34PM +0200, Javier Martinez Canillas wrote:
+On Tue, May 23, 2017 at 03:34:42PM +0200, Javier Martinez Canillas wrote:
 > The at24 driver allows to register I2C EEPROM chips using different vendor
 > and devices, but the I2C subsystem does not take the vendor into account
 > when matching using the I2C table since it only has device entries.
