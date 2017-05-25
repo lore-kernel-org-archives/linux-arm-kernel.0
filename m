@@ -1,29 +1,77 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 25 May 2017 17:33:29 +0200
-Subject: [PATCH 1/1] xilinx ps uart: Adding a kernel parameter for the
- number of xilinx ps uarts
-In-Reply-To: <20170525142920.1d662467@alans-desktop>
-References: <20170520022154.6766-1-kernel.development@povil.us>
- <20170520172008.5a979e8a@alans-desktop>
- <517d864d-d230-3abc-eb3c-4b628dc4625f@xilinx.com>
- <20170522192636.5b578d89@alans-desktop>
- <1668f36e-f9be-7008-004a-e467a6813e0f@xilinx.com>
- <20170523210710.4e84dd2d@alans-desktop>
- <924433a1-7e27-6eb6-71ca-ed7baceb427f@xilinx.com>
- <20170524143108.682a548d@alans-desktop>
- <b5a032c8-db86-c16b-750f-10aa2a132248@xilinx.com>
- <20170525142920.1d662467@alans-desktop>
-Message-ID: <f4b9843d-3811-f8a4-bacc-c576fff10284@xilinx.com>
+From: wei@redhat.com (Wei Huang)
+Date: Thu, 25 May 2017 10:49:49 -0500
+Subject: [PATCH 1/1] drivers/perf: arm_pmu_acpi: avoid perf IRQ init when
+ guest PMU is off
+In-Reply-To: <20170525152814.GR2859@arm.com>
+References: <1495636601-14726-1-git-send-email-wei@redhat.com>
+ <20170525152814.GR2859@arm.com>
+Message-ID: <c11672c5-b167-f50f-2035-40a3db3ec598@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.5.2017 15:29, Alan Cox wrote:
->> Ok. Is there any problem if uart_register_driver is called for every
->> instance separately with nr=1? This driver has major 0, minor 0. Based
+
+
+On 05/25/2017 10:28 AM, Will Deacon wrote:
+> Hi Wei,
 > 
-> If you are doing that level of code restructuring none that I am aware
-> of, and if you find one I'm happy to work on fixing it.
+> On Wed, May 24, 2017 at 09:36:41AM -0500, Wei Huang wrote:
+>> We saw perf IRQ init failures when running Linux kernel in an ACPI
+>> guest without PMU (i.e. pmu=off). This is because perf IRQ is not
+>> present when pmu=off, but arm_pmu_acpi still tries to register
+>> or unregister GSI. This patch addresses the problem by checking
+>> gicc->performance_interrupt. If it is 0, which is the value set
+>> by qemu when pmu=off, we skip the IRQ register/unregister process.
+>>
+>> [    4.069470] bc00: 0000000000040b00 ffff0000089db190
+>> [    4.070267] [<ffff000008134f80>] enable_percpu_irq+0xdc/0xe4
+>> [    4.071192] [<ffff000008667cc4>] arm_perf_starting_cpu+0x108/0x10c
+>> [    4.072200] [<ffff0000080cbdd4>] cpuhp_invoke_callback+0x14c/0x4ac
+>> [    4.073210] [<ffff0000080ccd3c>] cpuhp_thread_fun+0xd4/0x11c
+>> [    4.074132] [<ffff0000080f1394>] smpboot_thread_fn+0x1b4/0x1c4
+>> [    4.075081] [<ffff0000080ec90c>] kthread+0x10c/0x138
+>> [    4.075921] [<ffff0000080833c0>] ret_from_fork+0x10/0x50
+>> [    4.076947] genirq: Setting trigger mode 4 for irq 43 failed
+>> (gic_set_type+0x0/0x74)
+>>
+>> Signed-off-by: Wei Huang <wei@redhat.com>
+>> ---
+>>  drivers/perf/arm_pmu_acpi.c | 6 +++++-
+>>  1 file changed, 5 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+>> index 34c862f..d6bb75d 100644
+>> --- a/drivers/perf/arm_pmu_acpi.c
+>> +++ b/drivers/perf/arm_pmu_acpi.c
+>> @@ -29,6 +29,9 @@ static int arm_pmu_acpi_register_irq(int cpu)
+>>  		return -EINVAL;
+>>  
+>>  	gsi = gicc->performance_interrupt;
+>> +	if (!gsi)
+>> +		return 0;
+> 
+> So a GSI of zero means we return an IRQ of zero, which correctly gets
+> treated as "No ACPI PMU"...
 
-ok. Let me try to play with it and see if this is working.
+Yes, returning 0 here and dmesg prints out "No ACPI PMU IRQ for CPU" is
+acceptable.
 
-M
+> 
+>>  	if (gicc->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
+>>  		trigger = ACPI_EDGE_SENSITIVE;
+>>  	else
+>> @@ -58,7 +61,8 @@ static void arm_pmu_acpi_unregister_irq(int cpu)
+>>  		return;
+>>  
+>>  	gsi = gicc->performance_interrupt;
+>> -	acpi_unregister_gsi(gsi);
+>> +	if (gsi)
+>> +		acpi_unregister_gsi(gsi);
+> 
+> ... but then I don't see how we can get here, so I'll drop this hunk.
+
+I am OK to drop it. It was added just to be cautious... Do you need
+another version from me or you will remove this hunk?
+
+> 
+> Will
+> 
