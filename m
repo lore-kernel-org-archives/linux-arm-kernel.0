@@ -1,146 +1,98 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 24 May 2017 17:29:42 -0700
-Subject: [PATCH v7 27/34] media: imx: csi: add support for bayer formats
+Date: Wed, 24 May 2017 17:29:49 -0700
+Subject: [PATCH v7 34/34] media: imx: Drop warning upon multiple S_STREAM
+ disable calls
 In-Reply-To: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1495672189-29164-28-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1495672189-29164-35-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@armlinux.org.uk>
+From: Marek Vasut <marex@denx.de>
 
-Bayer formats must be treated as generic data and passthrough mode must
-be used.  Add the correct setup for these formats.
+Calling S_STREAM OFF multiple times on a video device is valid, although
+dubious, practice. Instead of warning about it and setting stream count
+lower than zero, just ignore the subsequent S_STREAM calls and correct
+the stream count to zero.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-
-- added check to csi_link_validate() to verify that destination is
-  IDMAC output pad when passthrough conditions exist: bayer formats
-  and 16-bit parallel buses.
-
-Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+Signed-off-by: Marek Vasut <marex@denx.de>
 ---
- drivers/staging/media/imx/imx-media-csi.c | 74 ++++++++++++++++++++++++-------
- 1 file changed, 57 insertions(+), 17 deletions(-)
+ drivers/staging/media/imx/imx-ic-prp.c      | 3 ++-
+ drivers/staging/media/imx/imx-ic-prpencvf.c | 3 ++-
+ drivers/staging/media/imx/imx-media-csi.c   | 3 ++-
+ drivers/staging/media/imx/imx-media-vdic.c  | 3 ++-
+ drivers/staging/media/imx/imx6-mipi-csi2.c  | 3 ++-
+ 5 files changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-index b9416ea6..7defe53 100644
---- a/drivers/staging/media/imx/imx-media-csi.c
-+++ b/drivers/staging/media/imx/imx-media-csi.c
-@@ -288,10 +288,11 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
- 	struct imx_media_video_dev *vdev = priv->vdev;
- 	struct v4l2_of_endpoint *sensor_ep;
- 	struct v4l2_mbus_framefmt *infmt;
--	unsigned int burst_size;
- 	struct ipu_image image;
-+	u32 passthrough_bits;
- 	dma_addr_t phys[2];
- 	bool passthrough;
-+	u32 burst_size;
- 	int ret;
+diff --git a/drivers/staging/media/imx/imx-ic-prp.c b/drivers/staging/media/imx/imx-ic-prp.c
+index 7bc293a..c34367e 100644
+--- a/drivers/staging/media/imx/imx-ic-prp.c
++++ b/drivers/staging/media/imx/imx-ic-prp.c
+@@ -387,7 +387,8 @@ static int prp_s_stream(struct v4l2_subdev *sd, int enable)
  
- 	infmt = &priv->format_mbus[CSI_SINK_PAD];
-@@ -309,24 +310,52 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
- 	image.phys0 = phys[0];
- 	image.phys1 = phys[1];
- 
--	ret = ipu_cpmem_set_image(priv->idmac_ch, &image);
--	if (ret)
--		goto unsetup_vb2;
--
--	burst_size = (image.pix.width & 0xf) ? 8 : 16;
--
--	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
--
- 	/*
--	 * If the sensor uses 16-bit parallel CSI bus, we must handle
--	 * the data internally in the IPU as 16-bit generic, aka
--	 * passthrough mode.
-+	 * Check for conditions that require the IPU to handle the
-+	 * data internally as generic data, aka passthrough mode:
-+	 * - raw bayer formats
-+	 * - the sensor bus is 16-bit parallel
- 	 */
--	passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
--		       sensor_ep->bus.parallel.bus_width >= 16);
-+	switch (image.pix.pixelformat) {
-+	case V4L2_PIX_FMT_SBGGR8:
-+	case V4L2_PIX_FMT_SGBRG8:
-+	case V4L2_PIX_FMT_SGRBG8:
-+	case V4L2_PIX_FMT_SRGGB8:
-+		burst_size = 8;
-+		passthrough = true;
-+		passthrough_bits = 8;
-+		break;
-+	case V4L2_PIX_FMT_SBGGR16:
-+	case V4L2_PIX_FMT_SGBRG16:
-+	case V4L2_PIX_FMT_SGRBG16:
-+	case V4L2_PIX_FMT_SRGGB16:
-+		burst_size = 4;
-+		passthrough = true;
-+		passthrough_bits = 16;
-+		break;
-+	default:
-+		burst_size = (image.pix.width & 0xf) ? 8 : 16;
-+		passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
-+			       sensor_ep->bus.parallel.bus_width >= 16);
-+		passthrough_bits = 16;
-+		break;
-+	}
- 
--	if (passthrough)
--		ipu_cpmem_set_format_passthrough(priv->idmac_ch, 16);
-+	if (passthrough) {
-+		ipu_cpmem_set_resolution(priv->idmac_ch, image.rect.width,
-+					 image.rect.height);
-+		ipu_cpmem_set_stride(priv->idmac_ch, image.pix.bytesperline);
-+		ipu_cpmem_set_buffer(priv->idmac_ch, 0, image.phys0);
-+		ipu_cpmem_set_buffer(priv->idmac_ch, 1, image.phys1);
-+		ipu_cpmem_set_format_passthrough(priv->idmac_ch,
-+						 passthrough_bits);
-+	} else {
-+		ret = ipu_cpmem_set_image(priv->idmac_ch, &image);
-+		if (ret)
-+			goto unsetup_vb2;
-+	}
-+
-+	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
- 
- 	/*
- 	 * Set the channel for the direct CSI-->memory via SMFC
-@@ -823,6 +852,7 @@ static int csi_link_validate(struct v4l2_subdev *sd,
- 			     struct v4l2_subdev_format *sink_fmt)
- {
- 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
-+	const struct imx_media_pixfmt *incc;
- 	struct v4l2_of_endpoint *sensor_ep;
- 	struct imx_media_subdev *sensor;
- 	bool is_csi2;
-@@ -844,6 +874,16 @@ static int csi_link_validate(struct v4l2_subdev *sd,
- 	priv->sensor = sensor;
- 	sensor_ep = &priv->sensor->sensor_ep;
- 	is_csi2 = (sensor_ep->bus_type == V4L2_MBUS_CSI2);
-+	incc = priv->cc[CSI_SINK_PAD];
-+
-+	if (priv->dest != IPU_CSI_DEST_IDMAC &&
-+	    (incc->bayer || (!is_csi2 &&
-+			     sensor_ep->bus.parallel.bus_width >= 16))) {
-+		v4l2_err(&priv->sd,
-+			 "bayer/16-bit parallel buses must go to IDMAC pad\n");
-+		ret = -EINVAL;
-+		goto out;
-+	}
- 
- 	if (is_csi2) {
- 		int vc_num = 0;
-@@ -868,7 +908,7 @@ static int csi_link_validate(struct v4l2_subdev *sd,
- 
- 	/* select either parallel or MIPI-CSI2 as input to CSI */
- 	ipu_set_csi_src_mux(priv->ipu, priv->csi_id, is_csi2);
--
-+out:
+ update_count:
+ 	priv->stream_count += enable ? 1 : -1;
+-	WARN_ON(priv->stream_count < 0);
++	if (priv->stream_count < 0)
++		priv->stream_count = 0;
+ out:
  	mutex_unlock(&priv->lock);
  	return ret;
- }
+diff --git a/drivers/staging/media/imx/imx-ic-prpencvf.c b/drivers/staging/media/imx/imx-ic-prpencvf.c
+index 5e9c817..ed363fe 100644
+--- a/drivers/staging/media/imx/imx-ic-prpencvf.c
++++ b/drivers/staging/media/imx/imx-ic-prpencvf.c
+@@ -1140,7 +1140,8 @@ static int prp_s_stream(struct v4l2_subdev *sd, int enable)
+ 
+ update_count:
+ 	priv->stream_count += enable ? 1 : -1;
+-	WARN_ON(priv->stream_count < 0);
++	if (priv->stream_count < 0)
++		priv->stream_count = 0;
+ out:
+ 	mutex_unlock(&priv->lock);
+ 	return ret;
+diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+index 4ab401d..0ec3176 100644
+--- a/drivers/staging/media/imx/imx-media-csi.c
++++ b/drivers/staging/media/imx/imx-media-csi.c
+@@ -861,7 +861,8 @@ static int csi_s_stream(struct v4l2_subdev *sd, int enable)
+ 
+ update_count:
+ 	priv->stream_count += enable ? 1 : -1;
+-	WARN_ON(priv->stream_count < 0);
++	if (priv->stream_count < 0)
++		priv->stream_count = 0;
+ out:
+ 	mutex_unlock(&priv->lock);
+ 	return ret;
+diff --git a/drivers/staging/media/imx/imx-media-vdic.c b/drivers/staging/media/imx/imx-media-vdic.c
+index c0b6d7f..7eabdc4 100644
+--- a/drivers/staging/media/imx/imx-media-vdic.c
++++ b/drivers/staging/media/imx/imx-media-vdic.c
+@@ -536,7 +536,8 @@ static int vdic_s_stream(struct v4l2_subdev *sd, int enable)
+ 
+ update_count:
+ 	priv->stream_count += enable ? 1 : -1;
+-	WARN_ON(priv->stream_count < 0);
++	if (priv->stream_count < 0)
++		priv->stream_count = 0;
+ out:
+ 	mutex_unlock(&priv->lock);
+ 	return ret;
+diff --git a/drivers/staging/media/imx/imx6-mipi-csi2.c b/drivers/staging/media/imx/imx6-mipi-csi2.c
+index 49bc2c2..cfaf34a 100644
+--- a/drivers/staging/media/imx/imx6-mipi-csi2.c
++++ b/drivers/staging/media/imx/imx6-mipi-csi2.c
+@@ -396,7 +396,8 @@ static int csi2_s_stream(struct v4l2_subdev *sd, int enable)
+ 
+ update_count:
+ 	csi2->stream_count += enable ? 1 : -1;
+-	WARN_ON(csi2->stream_count < 0);
++	if (csi2->stream_count < 0)
++		csi2->stream_count = 0;
+ out:
+ 	mutex_unlock(&csi2->lock);
+ 	return ret;
 -- 
 2.7.4
