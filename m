@@ -1,57 +1,53 @@
 From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Fri, 26 May 2017 00:56:21 +0530
-Subject: [PATCH 2/3] arm64: allwinner: h5: Add initial Orangepi Prime support
+Date: Fri, 26 May 2017 00:56:22 +0530
+Subject: [PATCH 3/3] arm64: allwinner: h5: Add initial Orangepi Zero Plus 2
+ support
 In-Reply-To: <1495740382-9061-1-git-send-email-jteki@openedev.com>
 References: <1495740382-9061-1-git-send-email-jteki@openedev.com>
-Message-ID: <1495740382-9061-2-git-send-email-jteki@openedev.com>
+Message-ID: <1495740382-9061-3-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Orangepi Prime is an open-source single-board computer
+Orangepi Zero Plus 2 is an open-source single-board computer
 using the Allwinner h5 SOC.
 
-H5 Orangepi Prime has
+H5 Orangepi Zero Plus 2 has
 - Quad-core Cortex-A53
-- 2GB DDR3
+- 512MB DDR3
 - Debug TTL UART
-- 1000M/100M Ethernet RJ45
-- Three USB 2.0
-- HDMI
-- Audio and MIC
-- Wifi + BT
-- IR receiver
 - HDMI
 - Wifi + BT
+- OTG+power supply
 
-http://www.orangepi.org/OrangePiPrime/
+http://www.orangepi.org/OrangePiZeroPlus2/
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../dts/allwinner/sun50i-h5-orangepi-prime.dts     | 100 +++++++++++++++++++++
- 2 files changed, 101 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
+ arch/arm64/boot/dts/allwinner/Makefile             |  1 +
+ .../allwinner/sun50i-h5-orangepi-zero-plus2.dts    | 88 ++++++++++++++++++++++
+ 2 files changed, 89 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
 
 diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 4120ce9..bf7d3fe 100644
+index bf7d3fe..1648700 100644
 --- a/arch/arm64/boot/dts/allwinner/Makefile
 +++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -2,6 +2,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+@@ -3,6 +3,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
  
  always		:= $(dtb-y)
  subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
 new file mode 100644
-index 0000000..9e98aac
+index 0000000..6dab1c4
 --- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-@@ -0,0 +1,100 @@
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+@@ -0,0 +1,88 @@
 +/*
 + * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
 + *
@@ -101,8 +97,8 @@ index 0000000..9e98aac
 +#include <dt-bindings/gpio/gpio.h>
 +
 +/ {
-+	model = "OrangePi Prime";
-+	compatible = "xunlong,orangepi-prime", "allwinner,sun50i-h5";
++	model = "OrangePi Zero Plus2";
++	compatible = "xunlong,orangepi-zero-plus2", "allwinner,sun50i-h5";
 +
 +	aliases {
 +		serial0 = &uart0;
@@ -113,7 +109,7 @@ index 0000000..9e98aac
 +	};
 +
 +	memory {
-+		reg = <0x40000000 0x80000000>;
++		reg = <0x40000000 0x20000000>;
 +	};
 +
 +	soc {
@@ -138,18 +134,6 @@ index 0000000..9e98aac
 +&uart0 {
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
 +	status = "okay";
 +};
 -- 
