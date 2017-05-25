@@ -1,60 +1,75 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 25 May 2017 10:24:46 -0700
-Subject: [CFT] Always enable SMP mode on MP capable CPUs
-In-Reply-To: <20170525165651.GK22219@n2100.armlinux.org.uk>
-References: <20170518105209.GN22219@n2100.armlinux.org.uk>
- <828a8817-b18d-6945-f35e-115abf30fe17@gmail.com>
- <20170525165651.GK22219@n2100.armlinux.org.uk>
-Message-ID: <0eac2f9f-8af7-b991-6021-320b91f3f98a@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 25 May 2017 18:27:11 +0100
+Subject: irqchip/irq-gic: BAD_MADT_GICC_ENTRY may fail when booting with
+ ACPI 5.1
+In-Reply-To: <e9ca4338-bcf9-3fba-6250-200e05d2be3e@arm.com>
+References: <432c3a63-c89f-dccc-7bdf-9d9a0aaabfe2@arm.com>
+ <20170523170657.GA3800@red-moon>
+ <25d7230b-1dba-614c-7193-b9e44429b5a1@arm.com>
+ <e9ca4338-bcf9-3fba-6250-200e05d2be3e@arm.com>
+Message-ID: <20170525172711.GB3935@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/2017 09:56 AM, Russell King - ARM Linux wrote:
-> On Thu, May 25, 2017 at 09:15:19AM -0700, Florian Fainelli wrote:
->> On 05/18/2017 03:52 AM, Russell King - ARM Linux wrote:
->>> As a result of a recent bug report, it has been found that certain CPUs
->>> must always have SMP mode enabled in order for the caches to work.
->>>
->>> Remove the conditional on setting the SMP bit(s).
->>>
->>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->>> ---
->>> This needs to be tested on:
->>>
->>> - Cortex A5MP
->>> - Cortex A9MP
->>> - Cortex R7MP
->>> - Cortex A7MP
->>> - Cortex A12MP
->>> - Cortex A15MP
->>> - Cortex A17MP
->>> - Brahma B15
->>
->> Sorry just saw this, what kind of test do you want me to run on B15?
->> Should I build a !SMP kernel, or force a SMP kernel with maxcpus=1?
+On Wed, May 24, 2017 at 02:00:02PM +0100, Marc Zyngier wrote:
+> On 24/05/17 12:18, Julien Grall wrote:
+> > Hi Lorenzo,
+> > 
+> > On 05/23/2017 06:06 PM, Lorenzo Pieralisi wrote:
+> >> [+Al]
+> >>
+> >> On Tue, May 23, 2017 at 05:40:28PM +0100, Julien Grall wrote:
+> >>> Hi all,
+> >>>
+> >>> I am currently looking at adding support of ACPI 5.1 in Xen.
+> >>> When trying to boot DOM00 I get a panic in Linux (for the full
+> >>> log see [1]):
+> >>>
+> >>> (XEN) DOM0: [    0.000000] No valid GICC entries exist
+> >>>
+> >>> The error message is coming from gic_v2_acpi_init.
+> >>> Digging down in the code, it is failing because of
+> >>> BAD_MADT_GICC_ENTRY is returning false in
+> >>> gic_acpi_parse_madt_cpu:
+> >>>
+> >>> /* Macros for consistency checks of the GICC subtable of MADT */
+> >>> #define ACPI_MADT_GICC_LENGTH	\
+> >>> 	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
+> >>>
+> >>> #define BAD_MADT_GICC_ENTRY(entry, end)						\
+> >>> 	(!(entry) || (unsigned long)(entry) + sizeof(*(entry)) > (end) ||	\
+> >>> 	 (entry)->header.length != ACPI_MADT_GICC_LENGTH)
+> >>>
+> >>> The 'end' parameter corresponds to the end of the MADT table.
+> >>> In the case of ACPI 5.1, the size of GICC is smaller compare
+> >>> to 6.0+ (76 vs 80 bytes) but the parameter 'entry' is type
+> >>> of acpi_madt_generic_interrupt (sizeof(...) = 80).
+> >>
+> >> #define BAD_MADT_GICC_ENTRY(entry, end)	\
+> >> 	(!(entry) || (entry)->header.length != ACPI_MADT_GICC_LENGTH ||	\
+> >> 	((unsigned long)(entry) + ACPI_MADT_GICC_LENGTH) > (end))
+> >>
+> >> Would this solve it ?
+> > 
+> > Yes, I am now able to boot DOM0 up to the prompt. My concern with this 
+> > solution is the code will still use the acpi_madt_generic_interrupt 
+> > code. If someone tries to access field not existing in 5.1 (such as 
+> > efficiency_class), it may return wrong value or even worst crash.
+> > 
+> > Although, I don't see any user of efficiency_class in Linux so far.
 > 
-> What I'm after is testing on any single-core systems with these SMP
-> capable cores.  If the core never appears in a single-core configuration,
-> then please let me know so it can be crossed off the list.
+> Such code would have to check whether the ACPI version before doing so.
+> To be honest, it is quite surprising we don't have one structure per
+> version of the GICC subtable. This would at least make the user aware of
+> the potential gotcha...
 
-We have chips like the 7250 that are single core, and we do run a
-CONFIG_SMP kernel on this guy as well. Feel free to add:
+We will have to, as soon as a) someone starts using the GICC
+efficiency_class field or b) we start using the three bytes left as
+reserved (which I suspect it may happen sooner than we think), whatever
+comes first.
 
-Tested-by: Florian Fainelli <f.fainelli@gmail.com>
+In the meantime to fix the regression Julien reported, is the kludge
+above ok for everyone ?
 
-on 7250 (single core), 7445 (core core) and 7278 (quad core Brahma B53
-in 32-bit mode) as well. If you are curious about what we report, B15
-report:
-
-7250, 7445: CPU: ARMv7 Processor [420f00f3] revision 3 (ARMv7), cr=30c5387d
-7278: CPU: ARMv7 Processor [420f1000] revision 0 (ARMv7), cr=30c5383d
-
-> 
-> With the bug that crept in fixed (as pointed out by Tony) there is no
-> difference for kernels built with SMP enabled and detected as a SMP
-> capable CPU.
-> 
-
-Got it, thanks!
--- 
-Florian
+Thanks,
+Lorenzo
