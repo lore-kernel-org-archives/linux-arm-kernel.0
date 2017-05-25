@@ -1,68 +1,90 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 24 May 2017 17:29:18 -0700
-Subject: [PATCH v7 03/34] [media] dt/bindings: Add bindings for OV5640
+Date: Wed, 24 May 2017 17:29:16 -0700
+Subject: [PATCH v7 01/34] dt-bindings: Add bindings for video-multiplexer
+ device
 In-Reply-To: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1495672189-29164-4-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1495672189-29164-2-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding documentation for the OV5640 camera sensor.
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
+Add bindings documentation for the video multiplexer device.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/media/i2c/ov5640.txt       | 45 ++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/i2c/ov5640.txt
+ .../devicetree/bindings/media/video-mux.txt        | 60 ++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/video-mux.txt
 
-diff --git a/Documentation/devicetree/bindings/media/i2c/ov5640.txt b/Documentation/devicetree/bindings/media/i2c/ov5640.txt
+diff --git a/Documentation/devicetree/bindings/media/video-mux.txt b/Documentation/devicetree/bindings/media/video-mux.txt
 new file mode 100644
-index 0000000..540b36c
+index 0000000..63b9dc9
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/media/i2c/ov5640.txt
-@@ -0,0 +1,45 @@
-+* Omnivision OV5640 MIPI CSI-2 sensor
++++ b/Documentation/devicetree/bindings/media/video-mux.txt
+@@ -0,0 +1,60 @@
++Video Multiplexer
++=================
 +
-+Required Properties:
-+- compatible: should be "ovti,ov5640"
-+- clocks: reference to the xclk input clock.
-+- clock-names: should be "xclk".
-+- DOVDD-supply: Digital I/O voltage supply, 1.8 volts
-+- AVDD-supply: Analog voltage supply, 2.8 volts
-+- DVDD-supply: Digital core voltage supply, 1.5 volts
++Video multiplexers allow to select between multiple input ports. Video received
++on the active input port is passed through to the output port. Muxes described
++by this binding are controlled by a multiplexer controller that is described by
++the bindings in Documentation/devicetree/bindings/mux/mux-controller.txt
 +
-+Optional Properties:
-+- reset-gpios: reference to the GPIO connected to the reset pin, if any.
-+	       This is an active low signal to the OV5640.
-+- powerdown-gpios: reference to the GPIO connected to the powerdown pin,
-+		   if any. This is an active high signal to the OV5640.
++Required properties:
++- compatible : should be "video-mux"
++- mux-controls : mux controller node to use for operating the mux
++- #address-cells: should be <1>
++- #size-cells: should be <0>
++- port@*: at least three port nodes containing endpoints connecting to the
++  source and sink devices according to of_graph bindings. The last port is
++  the output port, all others are inputs.
 +
-+The device node must contain one 'port' child node for its digital output
-+video port, in accordance with the video interface bindings defined in
-+Documentation/devicetree/bindings/media/video-interfaces.txt.
++Optionally, #address-cells, #size-cells, and port nodes can be grouped under a
++ports node as described in Documentation/devicetree/bindings/graph.txt.
 +
 +Example:
 +
-+&i2c1 {
-+	ov5640: camera at 3c {
-+		compatible = "ovti,ov5640";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ov5640>;
-+		reg = <0x3c>;
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		clock-names = "xclk";
-+		DOVDD-supply = <&vgen4_reg>; /* 1.8v */
-+		AVDD-supply = <&vgen3_reg>;  /* 2.8v */
-+		DVDD-supply = <&vgen2_reg>;  /* 1.5v */
-+		powerdown-gpios = <&gpio1 19 GPIO_ACTIVE_HIGH>;
-+		reset-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
++	mux: mux-controller {
++		compatible = "gpio-mux";
++		#mux-control-cells = <0>;
 +
-+		port {
-+			ov5640_to_mipi_csi2: endpoint {
-+				remote-endpoint = <&mipi_csi2_from_ov5640>;
-+				clock-lanes = <0>;
-+				data-lanes = <1 2>;
++		mux-gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;
++	};
++
++	video-mux {
++		compatible = "video-mux";
++		mux-controls = <&mux>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			reg = <0>;
++
++			mux_in0: endpoint {
++				remote-endpoint = <&video_source0_out>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++
++			mux_in1: endpoint {
++				remote-endpoint = <&video_source1_out>;
++			};
++		};
++
++		port at 2 {
++			reg = <2>;
++
++			mux_out: endpoint {
++				remote-endpoint = <&capture_interface_in>;
 +			};
 +		};
 +	};
