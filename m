@@ -1,61 +1,30 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 25 May 2017 14:41:41 +0200
-Subject: [PATCH v4 2/2] PCI: Add tango PCIe host bridge support
-In-Reply-To: <1b0ec9c9-1036-619e-19c7-16818ca728e3@arm.com>
-References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
- <4a354b33-d59c-4ebb-4b31-0388ac8090d4@sigmadesigns.com>
- <62bb805a-abd6-9aca-3641-8037f42a3b95@arm.com>
- <57673076-4fbd-92ab-453c-3d77fd65407f@free.fr>
- <1b0ec9c9-1036-619e-19c7-16818ca728e3@arm.com>
-Message-ID: <a7d4752f-001d-ba7e-07ff-435643a7e661@free.fr>
+From: madalin.bucur@nxp.com (Madalin-Cristian Bucur)
+Date: Thu, 25 May 2017 12:57:26 +0000
+Subject: [PATCH] dt-bindings: net: move FMan binding
+In-Reply-To: <20170515.103048.248884533404807350.davem@davemloft.net>
+References: <1494855398-26215-1-git-send-email-madalin.bucur@nxp.com>
+ <20170515.103048.248884533404807350.davem@davemloft.net>
+Message-ID: <AM5PR0402MB2691006D3DD1CEB8744EF8F4ECFF0@AM5PR0402MB2691.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/05/2017 14:23, Marc Zyngier wrote:
-> On 25/05/17 13:00, Mason wrote:
->> On 25/05/2017 10:48, Marc Zyngier wrote:
->>> Please have some defines for these magic values.
->>
->> Typical driver do
->> #define MUX_OFFSET 0x48
->> and then access the register's value through
->> readl_relaxed(pcie->base + MUX_OFFSET);
->>
->> I can't do that because the registers were shuffled around
->> between revision 1 and revision 2. Thus, instead of an
->> explicitly-named macro (MUX_OFFSET), I used an explicitly-
->> named field (pcie->mux) and access the register's value
->> through readl_relaxed(pcie->mux);
+> -----Original Message-----
+> From: David Miller [mailto:davem at davemloft.net]
+> Sent: Monday, May 15, 2017 5:31 PM
+> Subject: Re: [PATCH] dt-bindings: net: move FMan binding
 > 
-> That doesn't prevent you from having a TANGO_V1_MUX_OFFSET define, which
-> you can supplement with a V2 at some point.
+> From: Madalin Bucur <madalin.bucur@nxp.com>
+> Date: Mon, 15 May 2017 16:36:38 +0300
 > 
->> This is equivalent to providing the offset definitions in the
->> init functions, instead of at the top of the file.
+> > Besides the PPC SoCs, the QorIQ DPAA FMan is also present on ARM SoCs,
+> > moving the device tree binding document into the bindings/net folder.
+> >
+> > Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
 > 
-> Sorry, my brain parses text far better than hex number.
+> What tree is this targetted at for merging?
 
-Well, the hex numbers do need to show up somewhere :-)
+I hope Rob Herring will take this into his tree, it's a device tree binding
+change. 
 
-IIUC, you're saying that
-#define MUX_OFFSET 0x48
-is clearer than
-pcie->mux = base + 0x48;
-
-OK, I can accept that. Maybe our brains have been trained
-to easily recognize and ingest the macro, or maybe it's
-the caps, or maybe the fact that the statement does
-several things (addition and assignment and hex).
-
-Out of curiosity, how would you feel about
-pcie->MUX_OFFSET = 0x48;
-and then using
-readl_relaxed(pcie->base + pcie->MUX_OFFSET);
-
-It feels weird to me, I think mostly because it is
-an unusual pattern.
-
-Anyway, I'll add the macros, if that improves review and
-maintenance.
-
-Regards.
+Thanks,
+Madalin
