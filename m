@@ -1,52 +1,84 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 25 May 2017 22:17:40 +0200
-Subject: [PATCH v5 05/20] ARM: dts: efm32: Add generic compatible string
- for I2C EEPROM
-In-Reply-To: <20170525182902.irlm5zbgmbsosvq4@pengutronix.de>
-References: <20170523133448.4794-1-javier@dowhile0.org>
- <20170523133448.4794-6-javier@dowhile0.org>
- <20170525182902.irlm5zbgmbsosvq4@pengutronix.de>
-Message-ID: <CABxcv==49dyQJ6wLAWuet7hqQ36vo=Zd4-SB7OkMvR2L7XGnsQ@mail.gmail.com>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Thu, 25 May 2017 16:32:32 -0400
+Subject: [PATCH] soc/fsl/qbman: Check if CPU is offline when initializing
+ portals
+Message-ID: <1495744352-22476-1-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
+If the affine portal for a specific CPU is offline at boot time
+affine its interrupt to CPU 0. If the CPU is later brought online
+the hotplug handler will correctly adjust the affinity.
 
-On Thu, May 25, 2017 at 8:29 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello,
->
-> On Tue, May 23, 2017 at 03:34:33PM +0200, Javier Martinez Canillas wrote:
->> The at24 driver allows to register I2C EEPROM chips using different vendor
->> and devices, but the I2C subsystem does not take the vendor into account
->> when matching using the I2C table since it only has device entries.
->>
->> But when matching using an OF table, both the vendor and device has to be
->> taken into account so the driver defines only a set of compatible strings
->> using the "atmel" vendor as a generic fallback for compatible I2C devices.
->>
->> So add this generic fallback to the device node compatible string to make
->> the device to match the driver using the OF device ID table.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
->
-> Assuming the of-table patch is accepted this can have my:
->
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->
+Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+---
+ drivers/soc/fsl/qbman/bman.c | 17 +++++++++++++----
+ drivers/soc/fsl/qbman/qman.c | 18 +++++++++++++-----
+ 2 files changed, 26 insertions(+), 9 deletions(-)
 
-Thanks a lot for the Ack.
-
-> Otherwise I'm not convinced this is worth the churn.
->
-
-Both changes are needed in order to make sure that the driver and DTS
-won't regress when the I2C core is modified to report a proper
-MODALIAS for I2C devices registered via OF.
-
-> Thanks
-> Uwe
->
-
-Best regards,
-Javier
+diff --git a/drivers/soc/fsl/qbman/bman.c b/drivers/soc/fsl/qbman/bman.c
+index 1fa9099..b72a92c 100644
+--- a/drivers/soc/fsl/qbman/bman.c
++++ b/drivers/soc/fsl/qbman/bman.c
+@@ -560,10 +560,19 @@ static int bman_create_portal(struct bman_portal *portal,
+ 		dev_err(c->dev, "request_irq() failed\n");
+ 		goto fail_irq;
+ 	}
+-	if (c->cpu != -1 && irq_can_set_affinity(c->irq) &&
+-	    irq_set_affinity(c->irq, cpumask_of(c->cpu))) {
+-		dev_err(c->dev, "irq_set_affinity() failed\n");
+-		goto fail_affinity;
++	if (cpu_online(c->cpu) && c->cpu != -1 &&
++	    irq_can_set_affinity(c->irq)) {
++		if (irq_set_affinity(c->irq, cpumask_of(c->cpu))) {
++			dev_err(c->dev, "irq_set_affinity() failed %d\n",
++				c->cpu);
++			goto fail_affinity;
++		}
++	} else {
++		/* CPU is offline, direct IRQ to CPU 0 */
++		if (irq_set_affinity(c->irq, cpumask_of(0))) {
++			dev_err(c->dev, "irq_set_affinity() cpu 0 failed\n");
++			goto fail_affinity;
++		}
+ 	}
+ 
+ 	/* Need RCR to be empty before continuing */
+diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
+index aebcf16..b1b1268 100644
+--- a/drivers/soc/fsl/qbman/qman.c
++++ b/drivers/soc/fsl/qbman/qman.c
+@@ -941,7 +941,6 @@ static inline int qm_mc_result_timeout(struct qm_portal *portal,
+ 			break;
+ 		udelay(1);
+ 	} while (--timeout);
+-
+ 	return timeout;
+ }
+ 
+@@ -1218,10 +1217,19 @@ static int qman_create_portal(struct qman_portal *portal,
+ 		dev_err(c->dev, "request_irq() failed\n");
+ 		goto fail_irq;
+ 	}
+-	if (c->cpu != -1 && irq_can_set_affinity(c->irq) &&
+-	    irq_set_affinity(c->irq, cpumask_of(c->cpu))) {
+-		dev_err(c->dev, "irq_set_affinity() failed\n");
+-		goto fail_affinity;
++	if (cpu_online(c->cpu) && c->cpu != -1 &&
++	    irq_can_set_affinity(c->irq)) {
++		if (irq_set_affinity(c->irq, cpumask_of(c->cpu))) {
++			dev_err(c->dev, "irq_set_affinity() failed %d\n",
++				c->cpu);
++			goto fail_affinity;
++		}
++	} else {
++		/* CPU is offline, direct IRQ to CPU 0 */
++		if (irq_set_affinity(c->irq, cpumask_of(0))) {
++			dev_err(c->dev, "irq_set_affinity() cpu 0 failed\n");
++			goto fail_affinity;
++		}
+ 	}
+ 
+ 	/* Need EQCR to be empty before continuing */
+-- 
+2.7.4
