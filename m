@@ -1,37 +1,44 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 25 May 2017 15:31:34 +0800
-Subject: [PATCH 2/6] ARM: sun7i: a20: cubieboard2: Enable AXP209's ACIN power
- supply
-In-Reply-To: <20170525073138.20907-1-wens@csie.org>
-References: <20170525073138.20907-1-wens@csie.org>
-Message-ID: <20170525073138.20907-3-wens@csie.org>
+Date: Thu, 25 May 2017 15:31:32 +0800
+Subject: [PATCH 0/6] ARM: sunxi: Enable AXP PMIC power supplies
+Message-ID: <20170525073138.20907-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACIN pins of the AXP209 PMIC on the Cubieboard 2 are tied to the
-DC jack on the board.
+Hi Maxime,
 
-Enable the ACIN power supply.
+This series enables the power supplies for the AXP PMICs on boards
+that I currently have and am actively testing.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+The first patch re-orders the node references for the Cubieboard 2
+dts, to maintain alphabetical order.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index c21edd75d0b3..2a50207618cb 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -176,6 +176,10 @@
- 
- #include "axp209.dtsi"
- 
-+&ac_power_supply {
-+	status = "okay";
-+};
-+
- &reg_dcdc2 {
- 	regulator-always-on;
- 	regulator-min-microvolt = <1000000>;
+Patches 2 through 5 enable the ACIN power supply on various boards.
+
+Patch 6 ties the USB/VBUS power supply of the PMIC to the USB PHY.
+The PHY should have all available methods of VBUS detection configured.
+The Cubietruck already has the power supplies enabled, but the USB
+power supply was not configured to be used for VBUS detection.
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (6):
+  ARM: sun7i: a20: cubieboard2: Move usb_otg node for alphabetical
+    ordering
+  ARM: sun7i: a20: cubieboard2: Enable AXP209's ACIN power supply
+  ARM: sun7i: a20: bananapi-m1-plus: Enable AXP209's ACIN power supply
+  ARM: sun4i: a10: cubieboard: Enable AXP209's ACIN power supply
+  ARM: sun6i: a31: hummingbird: Enable AXP221's ACIN power supply
+  ARM: sun7i: a20: cubietruck: Tie AXP209's USB power supply to USB PHY
+
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts       |  4 ++++
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts      |  4 ++++
+ arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts |  4 ++++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts      | 12 ++++++++----
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts       |  1 +
+ 5 files changed, 21 insertions(+), 4 deletions(-)
+
 -- 
 2.11.0
