@@ -1,53 +1,41 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 25 May 2017 10:57:39 +0800
-Subject: [PATCH v2 1/2] ARM: dts: orange-pi-zero: specify wifi interrupts
-In-Reply-To: <20170524212433.14386-2-geomatsi@gmail.com>
-References: <20170524212433.14386-1-geomatsi@gmail.com>
- <20170524212433.14386-2-geomatsi@gmail.com>
-Message-ID: <CAGb2v647GTQW9-ZYrkWS7RoeYTu_7oTm8v4PDs0YD1pZ8oUohQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 25 May 2017 11:16:21 +0800
+Subject: [PATCH V2 4/5] dt-bindings: pinctrl: add imx7ulp pinctrl binding
+ doc
+In-Reply-To: <DBXPR04MB320A55DE4386DE561A1D4DC80F90@DBXPR04MB320.eurprd04.prod.outlook.com>
+References: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
+ <1495177545-23006-5-git-send-email-aisheng.dong@nxp.com>
+ <5e78ef100319f229a87e33804384e5b3@agner.ch>
+ <DBXPR04MB320A55DE4386DE561A1D4DC80F90@DBXPR04MB320.eurprd04.prod.outlook.com>
+Message-ID: <20170525031620.GS26102@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 25, 2017 at 5:24 AM, Sergey Matyukevich <geomatsi@gmail.com> wrote:
-> The orange-pi-zero board has Allwinner XR819 SDIO wifi chip. The board
-> dts file provides a node enabling mmc1 controller. Together with an
-> out-of-tree driver https://github.com/fifteenhex/xradio this node
-> enables using the wifi chip.
->
-> This commit specifies XR819 interrupt configuration for the driver.
->
-> Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> index 9e8b082c134f..e97dfd1775d1 100644
-> --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> @@ -128,6 +128,9 @@
->          */
->         xr819: sdio_wifi at 1 {
->                 reg = <1>;
-> +               compatible = "xradio,xr819";
+On Tue, May 23, 2017 at 10:37:27AM +0000, A.S. Dong wrote:
+> > > +#ifndef __DTS_IMX7ULP_PINFUNC_H
+> > > +#define __DTS_IMX7ULP_PINFUNC_H
+> > > +
+> > > +/*
+> > > + * The pin function ID is a tuple of
+> > > + * <mux_conf_reg input_reg mux_mode input_val>  */
+> > > +
+> > > +#define ULP1_PAD_PTC0__PTC0
+> > > 0x0000 0x0000 0x1 0x0
+> > 
+> > 
+> > For consistency with other SoCs, can we add MX7 to the define? E.g.
+> > MX7ULP1?
+> > 
+> 
+> ULP1 is another SoC name of IMX7ULP.
+> And there will be ULP0, ULPx in the future..
 
-You should submit device tree bindings first. See:
+What is the external/formal SoC name for ULP0 and ULPx?
 
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/Documentation/devicetree/bindings/net/wireless
+> 
+> It looks like not big issue, so I did not change it.
 
-for examples.
+It's an easy change to make things more obvious, so +1 on Stefan's
+opinion.
 
-> +               interrupt-parent = <&pio>;
-> +               interrupts = <6 10 IRQ_TYPE_EDGE_RISING>;
-
-Are these optional or required properties? AFAIK SDIO supports in-band
-interrupts with a bit of overhead, so they should be optional.
-
-ChenYu
-
->         };
->  };
->
-> --
-> 2.11.0
->
+Shawn
