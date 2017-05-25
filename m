@@ -1,70 +1,45 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 25 May 2017 14:05:57 -0700
-Subject: [PATCH] clk: sunxi-ng: sun5i: Fix ahb_bist_clk definition
-In-Reply-To: <ae41e508eac104a1d0c305cceccea84a@www.akkea.ca>
-References: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
- <149573823221.52617.2350903252470015903@resonance>
- <ae41e508eac104a1d0c305cceccea84a@www.akkea.ca>
-Message-ID: <149574635703.52617.18257216525587339599@resonance>
+Date: Thu, 25 May 2017 14:11:34 -0700
+Subject: [GIT PULL] Meson Kconfig fixes for 4.12-rc1
+In-Reply-To: <3059c91b-034c-3da3-9ca4-06ad11bcec42@baylibre.com>
+References: <3059c91b-034c-3da3-9ca4-06ad11bcec42@baylibre.com>
+Message-ID: <149574669436.52617.1861172521136194942@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Angus Ainslie (2017-05-25 12:23:54)
-> On 2017-05-25 12:50, Michael Turquette wrote:
-> > Quoting Boris Brezillon (2017-05-24 09:34:29)
-> >> AHB BIST gate is actually controlled with bit 7.
-> >> 
-> >> This bug was detected while trying to use the NAND controller which is
-> >> using the DMA engine to transfer data to the NAND.
-> >> Since the ahb_bist_clk gate bit conflicts with the ahb_dma_clk gate 
-> >> bit,
-> >> the core was disabling the DMA engine clock as part of its 'disable
-> >> unused clks' procedure, which was causing all DMA transfers to fail 
-> >> after
-> >> this point.
-> >> 
-> >> Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
-> >> Cc: stable at vger.kernel.org
-> >> Reported-by: Angus Ainslie <angus@akkea.ca>
-> >> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > 
-> > Patch looks good to me. Did this ever work? I'm trying to figure out if
-> > it should go into -fixes or -next.
-> > 
-> > Thanks,
-> > Mike
-> > 
+Quoting Neil Armstrong (2017-05-16 02:14:55)
+> Hi Mike, Stephen,
 > 
-> It fixed the problem for me so I think fixes is the right place.
+> Here is a single fix for the Meson Kconfig, that could go for 4.12-rc2.
+> 
+> Thanks,
+> Neil
+> 
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+> 
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/baylibre/clk-meson.git tags/meson-clk-fixes-for-4.12-rc2
+> 
+> for you to fetch changes up to dbed87a9d3a857a86f602775b5845f5f6d9652b5:
+> 
+>   clk: meson: gxbb: fix build error without RESET_CONTROLLER (2017-05-16 11:05:01 +0200)
 
-Applied to clk-fixes towards -rc3 or -rc4.
+Pulled into clk-fixes.
 
 Regards,
 Mike
 
 > 
-> Angus
+> ----------------------------------------------------------------
+> KConfig fix:
+> - clk: meson: gxbb: fix build error without RESET_CONTROLLER
 > 
-> >> ---
-> >>  drivers/clk/sunxi-ng/ccu-sun5i.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> 
-> >> diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.c 
-> >> b/drivers/clk/sunxi-ng/ccu-sun5i.c
-> >> index 5c476f966a72..5372bf8be5e6 100644
-> >> --- a/drivers/clk/sunxi-ng/ccu-sun5i.c
-> >> +++ b/drivers/clk/sunxi-ng/ccu-sun5i.c
-> >> @@ -243,7 +243,7 @@ static SUNXI_CCU_GATE(ahb_ss_clk,   "ahb-ss",      
-> >>  "ahb",
-> >>  static SUNXI_CCU_GATE(ahb_dma_clk,     "ahb-dma",      "ahb",
-> >>                       0x060, BIT(6), 0);
-> >>  static SUNXI_CCU_GATE(ahb_bist_clk,    "ahb-bist",     "ahb",
-> >> -                     0x060, BIT(6), 0);
-> >> +                     0x060, BIT(7), 0);
-> >>  static SUNXI_CCU_GATE(ahb_mmc0_clk,    "ahb-mmc0",     "ahb",
-> >>                       0x060, BIT(8), 0);
-> >>  static SUNXI_CCU_GATE(ahb_mmc1_clk,    "ahb-mmc1",     "ahb",
-> >> --
-> >> 2.7.4
-> >> 
+> ----------------------------------------------------------------
+> Tobias Regnery (1):
+>       clk: meson: gxbb: fix build error without RESET_CONTROLLER
 > 
+>  drivers/clk/meson/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
