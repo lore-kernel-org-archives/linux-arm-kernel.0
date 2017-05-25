@@ -1,30 +1,40 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 May 2017 23:10:50 +0100
-Subject: [PATCH] RFC: arm: eBPF JIT compiler
-In-Reply-To: <dc6d0a88-37e1-54dd-eecc-70989e997324@gmail.com>
-References: <20170523232555.GY13759@lunn.ch>
- <CAHgaXdKn4J==r_22T3N_7O5oESd8xwL6L+Ot8nT9bGCsSjAkHw@mail.gmail.com>
- <20170525170051.GC18357@lunn.ch> <20170525172255.GF18357@lunn.ch>
- <CAHgaXd+CVrDEA=E2=23Qp6wk50=dBnFS6TiCtvphTBMjUywrGg@mail.gmail.com>
- <20170525182849.GG18357@lunn.ch>
- <CAHgaXdLCaTwaLiLsmkzWvzSa=67LzqwHkT6cS_CVUm9_8u2_2Q@mail.gmail.com>
- <20170525184809.GH18357@lunn.ch>
- <CAHgaXdJPSemCoaRH_5wSEE6e7sOzPg7XChuWVvykbWia4meOMw@mail.gmail.com>
- <dc6d0a88-37e1-54dd-eecc-70989e997324@gmail.com>
-Message-ID: <20170525221050.GL22219@n2100.armlinux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 25 May 2017 15:13:33 -0700
+Subject: [CFT] Always enable SMP mode on MP capable CPUs
+In-Reply-To: <20170525180540.GW23750@n2100.armlinux.org.uk>
+References: <20170518105209.GN22219@n2100.armlinux.org.uk>
+ <CAOMZO5Da2R2_t2nU+MdrJiSzvcBQKS4pwYS96r4UyfGc8DtWww@mail.gmail.com>
+ <CAOMZO5Dc=i7UdQH=r5RRr_4GmyZZT+rh7BTNV4WbfqKvtVDfsw@mail.gmail.com>
+ <20170519171526.GW22219@n2100.armlinux.org.uk>
+ <20170524153847.GY10472@atomide.com>
+ <20170525144800.GV23750@n2100.armlinux.org.uk>
+ <20170525151103.GC10472@atomide.com>
+ <20170525180540.GW23750@n2100.armlinux.org.uk>
+Message-ID: <20170525221332.GE10472@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 25, 2017 at 12:44:19PM -0700, Florian Fainelli wrote:
-> Using QEMU is far less complex than the patch you wrote, the tricky
-> point me be to find an ARMv6 root filesystem, unless you build the
-> module into the kernel and let it run its tests.
+* Russell King - ARM Linux <linux@armlinux.org.uk> [170525 11:09]:
+> On Thu, May 25, 2017 at 08:11:03AM -0700, Tony Lindgren wrote:
+> > 
+> > OK. That may not work on am437x though as it's UP.
+> 
+> Maybe this is just too complicated to grasp - in which case just test
+> tonight's linux-next on *all* your boards irrespective of the CPU, and
+> let me know if there's a regression due to this patch, giving me full
+> details of your CPUs (CPU ID numbers, number of CPUs, etc.)  If no one
+> reports a regression that doesn't get fixed, I'll merge it during the
+> next merge window.
 
-I beg to differ - when I tried qemu during the last year, it was
-basically completely non-functional for ARM, and I gave up with it.
-I think what you get depends on your distro.
+OK so got my am437x-idk back up and running again. I'm kind of
+running out of space here..
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+And as suspected it won't boot with these changes. It's a UP core:
+
+CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c5387d
+CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+OF: fdt: Machine model: TI AM437x Industrial Development Kit
+
+Regards,
+
+Tony
