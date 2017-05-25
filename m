@@ -1,95 +1,93 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 May 2017 10:47:00 -0600
-Subject: [patch V3 12/32] hwtracing/coresight-etm4x: Use
- cpuhp_setup_state_nocalls_cpuslocked()
-In-Reply-To: <20170524081547.983493849@linutronix.de>
-References: <20170524081511.203800767@linutronix.de>
- <20170524081547.983493849@linutronix.de>
-Message-ID: <20170525164700.GB31052@xps15>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 25 May 2017 23:57:15 +0800
+Subject: [PATCH v13 8/9] arm64: dts: hi6220: register debug module
+In-Reply-To: <1495727836-30094-1-git-send-email-leo.yan@linaro.org>
+References: <1495727836-30094-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1495727836-30094-9-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 10:15:23AM +0200, Thomas Gleixner wrote:
-> From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> 
-> etm_probe4() holds get_online_cpus() while invoking
-> cpuhp_setup_state_nocalls().
-> 
-> cpuhp_setup_state_nocalls() invokes get_online_cpus() as well. This is
-> correct, but prevents the conversion of the hotplug locking to a percpu
-> rwsem.
-> 
-> Use cpuhp_setup_state_nocalls_cpuslocked() to avoid the nested
-> call. Convert *_online_cpus() to the new interfaces while at it.
-> 
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Steven Rostedt <rostedt@goodmis.org>
-> Cc: linux-arm-kernel at lists.infradead.org
+Bind debug module driver for Hi6220.
 
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 64 +++++++++++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
 
-> 
-> ---
->  drivers/hwtracing/coresight/coresight-etm4x.c |   20 ++++++++++----------
->  1 file changed, 10 insertions(+), 10 deletions(-)
-> 
-> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-> @@ -371,7 +371,7 @@ static void etm4_disable_sysfs(struct co
->  	 * after cpu online mask indicates the cpu is offline but before the
->  	 * DYING hotplug callback is serviced by the ETM driver.
->  	 */
-> -	get_online_cpus();
-> +	cpus_read_lock();
->  	spin_lock(&drvdata->spinlock);
->  
->  	/*
-> @@ -381,7 +381,7 @@ static void etm4_disable_sysfs(struct co
->  	smp_call_function_single(drvdata->cpu, etm4_disable_hw, drvdata, 1);
->  
->  	spin_unlock(&drvdata->spinlock);
-> -	put_online_cpus();
-> +	cpus_read_unlock();
->  
->  	dev_info(drvdata->dev, "ETM tracing disabled\n");
->  }
-> @@ -982,7 +982,7 @@ static int etm4_probe(struct amba_device
->  
->  	drvdata->cpu = pdata ? pdata->cpu : 0;
->  
-> -	get_online_cpus();
-> +	cpus_read_lock();
->  	etmdrvdata[drvdata->cpu] = drvdata;
->  
->  	if (smp_call_function_single(drvdata->cpu,
-> @@ -990,18 +990,18 @@ static int etm4_probe(struct amba_device
->  		dev_err(dev, "ETM arch init failed\n");
->  
->  	if (!etm4_count++) {
-> -		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CORESIGHT_STARTING,
-> -					  "arm/coresight4:starting",
-> -					  etm4_starting_cpu, etm4_dying_cpu);
-> -		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
-> -						"arm/coresight4:online",
-> -						etm4_online_cpu, NULL);
-> +		cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ARM_CORESIGHT_STARTING,
-> +						     "arm/coresight4:starting",
-> +						     etm4_starting_cpu, etm4_dying_cpu);
-> +		ret = cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ONLINE_DYN,
-> +							   "arm/coresight4:online",
-> +							   etm4_online_cpu, NULL);
->  		if (ret < 0)
->  			goto err_arch_supported;
->  		hp_online = ret;
->  	}
->  
-> -	put_online_cpus();
-> +	cpus_read_unlock();
->  
->  	if (etm4_arch_supported(drvdata->arch) == false) {
->  		ret = -EINVAL;
-> 
-> 
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 1e5129b..21805b9 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -916,5 +916,69 @@
+ 				};
+ 			};
+ 		};
++
++		debug at f6590000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf6590000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu0>;
++		};
++
++		debug at f6592000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf6592000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu1>;
++		};
++
++		debug at f6594000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf6594000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu2>;
++		};
++
++		debug at f6596000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf6596000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu3>;
++		};
++
++		debug at f65d0000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf65d0000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu4>;
++		};
++
++		debug at f65d2000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf65d2000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu5>;
++		};
++
++		debug at f65d4000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf65d4000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu6>;
++		};
++
++		debug at f65d6000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf65d6000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu7>;
++		};
+ 	};
+ };
+-- 
+2.7.4
