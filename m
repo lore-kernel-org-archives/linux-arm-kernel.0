@@ -1,42 +1,105 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 24 May 2017 17:29:28 -0700
-Subject: [PATCH v7 13/34] ARM: dts: imx6-sabreauto: add pinctrl for gpt input
- capture
+Date: Wed, 24 May 2017 17:29:29 -0700
+Subject: [PATCH v7 14/34] ARM: dts: imx6-sabreauto: add the ADV7180 video
+ decoder
 In-Reply-To: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1495672189-29164-14-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1495672189-29164-15-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl groups for both GPT input capture channels.
+Enables the ADV7180 decoder sensor. The ADV7180 connects to the
+parallel-bus mux input on ipu1_csi0_mux.
+
+The ADV7180 power pin is via max7310_b port expander.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 58 ++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 21dea5f..1212f82 100644
+index 1212f82..a712ff1 100644
 --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -456,6 +456,18 @@
+@@ -124,6 +124,21 @@
+ 			#size-cells = <0>;
+ 			reg = <1>;
+ 
++			adv7180: camera at 21 {
++				compatible = "adi,adv7180";
++				reg = <0x21>;
++				powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
++				interrupt-parent = <&gpio1>;
++				interrupts = <27 0x8>;
++
++				port {
++					adv7180_to_ipu1_csi0_mux: endpoint {
++						remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
++						bus-width = <8>;
++					};
++				};
++			};
++
+ 			max7310_a: gpio at 30 {
+ 				compatible = "maxim,max7310";
+ 				reg = <0x30>;
+@@ -151,6 +166,25 @@
+ 	};
+ };
+ 
++&ipu1_csi0_from_ipu1_csi0_mux {
++	bus-width = <8>;
++};
++
++&ipu1_csi0_mux_from_parallel_sensor {
++	remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
++	bus-width = <8>;
++};
++
++&ipu1_csi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ipu1_csi0>;
++
++	/* enable frame interval monitor on this port */
++	fim {
++		status = "okay";
++	};
++};
++
+ &clks {
+ 	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
+ 			  <&clks IMX6QDL_PLL4_BYPASS>,
+@@ -444,6 +478,30 @@
  			>;
  		};
  
-+		pinctrl_gpt_input_capture0: gptinputcapture0grp {
++		pinctrl_ipu1_csi0: ipu1csi0grp {
 +			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT0__GPT_CAPTURE1	0x1b0b0
++				MX6QDL_PAD_CSI0_DAT4__IPU1_CSI0_DATA04   0x1b0b0
++				MX6QDL_PAD_CSI0_DAT5__IPU1_CSI0_DATA05   0x1b0b0
++				MX6QDL_PAD_CSI0_DAT6__IPU1_CSI0_DATA06   0x1b0b0
++				MX6QDL_PAD_CSI0_DAT7__IPU1_CSI0_DATA07   0x1b0b0
++				MX6QDL_PAD_CSI0_DAT8__IPU1_CSI0_DATA08   0x1b0b0
++				MX6QDL_PAD_CSI0_DAT9__IPU1_CSI0_DATA09   0x1b0b0
++				MX6QDL_PAD_CSI0_DAT10__IPU1_CSI0_DATA10  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT11__IPU1_CSI0_DATA11  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x1b0b0
++				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x1b0b0
++				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x1b0b0
++				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x1b0b0
 +			>;
 +		};
 +
-+		pinctrl_gpt_input_capture1: gptinputcapture1grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT1__GPT_CAPTURE2	0x1b0b0
-+			>;
-+		};
-+
- 		pinctrl_spdif: spdifgrp {
+ 		pinctrl_max7310: max7310grp {
  			fsl,pins = <
- 				MX6QDL_PAD_KEY_COL3__SPDIF_IN 0x1b0b0
+ 				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15 0x1b0b0
 -- 
 2.7.4
