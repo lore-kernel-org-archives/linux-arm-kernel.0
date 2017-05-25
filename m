@@ -1,43 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 May 2017 23:02:22 +0200
-Subject: [PATCH 2/2] timer: imx-tpm: add imx tpm timer support
-In-Reply-To: <1494660575-30465-2-git-send-email-aisheng.dong@nxp.com>
-References: <1494660575-30465-1-git-send-email-aisheng.dong@nxp.com>
- <1494660575-30465-2-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CAK8P3a1JEzZFn4FXi2tb2jOFtV-3MRD-7O3gPBiZDM4qc3BTnA@mail.gmail.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 25 May 2017 14:05:57 -0700
+Subject: [PATCH] clk: sunxi-ng: sun5i: Fix ahb_bist_clk definition
+In-Reply-To: <ae41e508eac104a1d0c305cceccea84a@www.akkea.ca>
+References: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
+ <149573823221.52617.2350903252470015903@resonance>
+ <ae41e508eac104a1d0c305cceccea84a@www.akkea.ca>
+Message-ID: <149574635703.52617.18257216525587339599@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 13, 2017 at 9:29 AM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
+Quoting Angus Ainslie (2017-05-25 12:23:54)
+> On 2017-05-25 12:50, Michael Turquette wrote:
+> > Quoting Boris Brezillon (2017-05-24 09:34:29)
+> >> AHB BIST gate is actually controlled with bit 7.
+> >> 
+> >> This bug was detected while trying to use the NAND controller which is
+> >> using the DMA engine to transfer data to the NAND.
+> >> Since the ahb_bist_clk gate bit conflicts with the ahb_dma_clk gate 
+> >> bit,
+> >> the core was disabling the DMA engine clock as part of its 'disable
+> >> unused clks' procedure, which was causing all DMA transfers to fail 
+> >> after
+> >> this point.
+> >> 
+> >> Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
+> >> Cc: stable at vger.kernel.org
+> >> Reported-by: Angus Ainslie <angus@akkea.ca>
+> >> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > 
+> > Patch looks good to me. Did this ever work? I'm trying to figure out if
+> > it should go into -fixes or -next.
+> > 
+> > Thanks,
+> > Mike
+> > 
+> 
+> It fixed the problem for me so I think fixes is the right place.
 
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 3356ab8..03dfd6a 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -590,6 +590,11 @@ config CLKSRC_IMX_GPT
->         depends on ARM && CLKDEV_LOOKUP
->         select CLKSRC_MMIO
->
-> +config CLKSRC_IMX_TPM
-> +       bool "Clocksource using i.MX TPM" if COMPILE_TEST
-> +       depends on ARM && CLKDEV_LOOKUP && GENERIC_CLOCKEVENTS
-> +       select CLKSRC_MMIO
-> +
+Applied to clk-fixes towards -rc3 or -rc4.
 
-This needs a help text
+Regards,
+Mike
 
-
-> +static inline void tpm_timer_disable(void)
-> +{
-> +       unsigned int val;
-> +
-> +       /* channel disable */
-> +       val = __raw_readl(timer_base + TPM_C0SC);
-> +       val &= ~(TPM_C0SC_MODE_MASK | TPM_C0SC_CHIE);
-> +       __raw_writel(val, timer_base + TPM_C0SC);
-> +}
-
-__raw_readl/__raw_writel is broken on big-endian kernels, please
-use readl/writel instead.
-
-        Arnd
+> 
+> Angus
+> 
+> >> ---
+> >>  drivers/clk/sunxi-ng/ccu-sun5i.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> 
+> >> diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.c 
+> >> b/drivers/clk/sunxi-ng/ccu-sun5i.c
+> >> index 5c476f966a72..5372bf8be5e6 100644
+> >> --- a/drivers/clk/sunxi-ng/ccu-sun5i.c
+> >> +++ b/drivers/clk/sunxi-ng/ccu-sun5i.c
+> >> @@ -243,7 +243,7 @@ static SUNXI_CCU_GATE(ahb_ss_clk,   "ahb-ss",      
+> >>  "ahb",
+> >>  static SUNXI_CCU_GATE(ahb_dma_clk,     "ahb-dma",      "ahb",
+> >>                       0x060, BIT(6), 0);
+> >>  static SUNXI_CCU_GATE(ahb_bist_clk,    "ahb-bist",     "ahb",
+> >> -                     0x060, BIT(6), 0);
+> >> +                     0x060, BIT(7), 0);
+> >>  static SUNXI_CCU_GATE(ahb_mmc0_clk,    "ahb-mmc0",     "ahb",
+> >>                       0x060, BIT(8), 0);
+> >>  static SUNXI_CCU_GATE(ahb_mmc1_clk,    "ahb-mmc1",     "ahb",
+> >> --
+> >> 2.7.4
+> >> 
+> 
