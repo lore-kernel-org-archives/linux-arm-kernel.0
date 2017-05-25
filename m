@@ -1,35 +1,35 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 25 May 2017 16:18:43 +0800
-Subject: [PATCH v2 01/12] dt-bindings: arm: hisilicon: add bindings for
- HiKey960 board
+Date: Thu, 25 May 2017 16:18:44 +0800
+Subject: [PATCH v2 02/12] arm64: dts: hisilicon: update compatible string for
+ hikey960
 In-Reply-To: <20170525081854.4701-1-guodong.xu@linaro.org>
 References: <20170525081854.4701-1-guodong.xu@linaro.org>
-Message-ID: <20170525081854.4701-2-guodong.xu@linaro.org>
+Message-ID: <20170525081854.4701-3-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings for HiKey960 Board.
+Update compatible string for hikey960. HiKey960 is a develpment board built
+with SoC Hi3660.
 
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
 Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index 2e73215..7111fbc8 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -4,6 +4,10 @@ Hi3660 SoC
- Required root node properties:
- 	- compatible = "hisilicon,hi3660";
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+index 186251f..64875a5 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+@@ -12,7 +12,7 @@
  
-+HiKey960 Board
-+Required root node properties:
-+	- compatible = "hisilicon,hi3660-hikey960", "hisilicon,hi3660";
-+
- Hi3798cv200 SoC
- Required root node properties:
- 	- compatible = "hisilicon,hi3798cv200";
+ / {
+ 	model = "HiKey960";
+-	compatible = "hisilicon,hi3660";
++	compatible = "hisilicon,hi3660-hikey960", "hisilicon,hi3660";
+ 
+ 	aliases {
+ 		serial5 = &uart5;       /* console UART */
 -- 
 2.10.2
