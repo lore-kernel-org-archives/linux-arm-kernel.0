@@ -1,81 +1,198 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 25 May 2017 11:38:26 +0800
-Subject: [PATCH] drm/mediatek: hdmi: Filter interlaced resolutions
-In-Reply-To: <20170524122451.vc252rdphzwzljeu@phenom.ffwll.local>
-References: <1485234604-19889-1-git-send-email-bibby.hsieh@mediatek.com>
- <1495531695.20811.19.camel@mtksdaap41>
- <20170523131243.5bjz5n4uv73r2l7j@phenom.ffwll.local>
- <1495617645.15919.6.camel@mtksdaap41>
- <20170524122451.vc252rdphzwzljeu@phenom.ffwll.local>
-Message-ID: <1495683506.15919.10.camel@mtksdaap41>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 25 May 2017 11:56:04 +0800
+Subject: [linux-sunxi] [PATCH v3 2/9] ASoC: sun8i-codec-analog: prepare a
+ mixer control/widget/route set for V3s
+In-Reply-To: <20170524100607.29790-3-icenowy@aosc.io>
+References: <20170524100607.29790-1-icenowy@aosc.io>
+ <20170524100607.29790-3-icenowy@aosc.io>
+Message-ID: <CAGb2v66VWdBOgNWfVX-SZRr5mPGaKB21xu=0Y7w1iNSUb=C+ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-05-24 at 14:24 +0200, Daniel Vetter wrote:
-> On Wed, May 24, 2017 at 05:20:45PM +0800, CK Hu wrote:
-> > On Tue, 2017-05-23 at 15:12 +0200, Daniel Vetter wrote:
-> > > On Tue, May 23, 2017 at 05:28:15PM +0800, CK Hu wrote:
-> > > > Hi, Bibby:
-> > > > 
-> > > > I've applied this patch to my branch mediatek-drm-fixes-4.12-rc1,
-> > > > thanks.
-> > > > 
-> > > > Regards,
-> > > > CK
-> > > > 
-> > > > On Tue, 2017-01-24 at 13:10 +0800, Bibby Hsieh wrote:
-> > > > > Current Mediatek DRM driver does not support interlaced mode, and
-> > > > > will hang if such resolution is used: Filter those to prevent
-> > > > > kernel hangs, until the DRM driver is fixed properly.
-> > > > > 
-> > > > > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> > > > > ---
-> > > > >  drivers/gpu/drm/mediatek/mtk_hdmi.c | 2 ++
-> > > > >  1 file changed, 2 insertions(+)
-> > > > > 
-> > > > > diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-> > > > > index 0e8c4d9..e33678d 100644
-> > > > > --- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
-> > > > > +++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-> > > > > @@ -1244,6 +1244,8 @@ static int mtk_hdmi_conn_mode_valid(struct drm_connector *conn,
-> > > > >  			return MODE_BAD;
-> > > > >  	}
-> > > > >  
-> > > > > +	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
-> > > > > +		return MODE_NO_INTERLACE;
-> > > > >  	if (mode->clock < 27000)
-> > > > >  		return MODE_CLOCK_LOW;
-> > > > >  	if (mode->clock > 297000)
-> > > 
-> > > You probably want to check out Jose's mode_valid work, since only
-> > > filtering in the connector's ->mode_valid callback isn't enough. You also
-> > > need to filter in ->mode_fixup (or some other place called at atomic_check
-> > > time).
-> > > -Daniel
-> > 
-> > Hi, Daniel:
-> > 
-> > Yes, I still need to filter in ->mode_fixup.
-> > 
-> > Hi, Bibby:
-> > 
-> > Because Jose's work plan to use mode_valid to replace mode_fixup, so
-> > it's better to refine this patch after Jose's work is done. And I would
-> > now remove this patch from my branch.
-> 
-> Btw if you have a revised version of your patch on top of Jose's series, a
-> tested-by on that would be awesome. The more people find it useful, the
-> faster it will land.
-> -Daniel
+On Wed, May 24, 2017 at 6:06 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> Allwinner V3s has an analog codec without MIC2 and Line In, which will
+> need a special set of mixer controls/widgets/routes, otherwise meaningless
+> controls will be exported to userspace and confuse the user.
+>
+> Add the special set, and use it when the SoC has no MIC2 and Line In.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> New patch in v3.
+>
+>  sound/soc/sunxi/sun8i-codec-analog.c | 97 +++++++++++++++++++++++++++++++++++-
+>  1 file changed, 96 insertions(+), 1 deletion(-)
+>
+> diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
+> index edcc3eb7cd9a..4c34a12b3739 100644
+> --- a/sound/soc/sunxi/sun8i-codec-analog.c
+> +++ b/sound/soc/sunxi/sun8i-codec-analog.c
+> @@ -219,6 +219,22 @@ static const struct snd_kcontrol_new sun8i_codec_mixer_controls[] = {
+>                           SUN8I_ADDA_LOMIXSC_MIC2, 1, 0),
+>  };
+>
+> +/* mixer controls */
+> +static const struct snd_kcontrol_new sun8i_v3s_codec_mixer_controls[] = {
+> +       SOC_DAPM_DOUBLE_R("DAC Playback Switch",
+> +                         SUN8I_ADDA_LOMIXSC,
+> +                         SUN8I_ADDA_ROMIXSC,
+> +                         SUN8I_ADDA_LOMIXSC_DACL, 1, 0),
+> +       SOC_DAPM_DOUBLE_R("DAC Reversed Playback Switch",
+> +                         SUN8I_ADDA_LOMIXSC,
+> +                         SUN8I_ADDA_ROMIXSC,
+> +                         SUN8I_ADDA_LOMIXSC_DACR, 1, 0),
+> +       SOC_DAPM_DOUBLE_R("Mic1 Playback Switch",
+> +                         SUN8I_ADDA_LOMIXSC,
+> +                         SUN8I_ADDA_ROMIXSC,
+> +                         SUN8I_ADDA_LOMIXSC_MIC1, 1, 0),
+> +};
+> +
+>  /* ADC mixer controls */
+>  static const struct snd_kcontrol_new sun8i_codec_adc_mixer_controls[] = {
+>         SOC_DAPM_DOUBLE_R("Mixer Capture Switch",
+> @@ -243,6 +259,22 @@ static const struct snd_kcontrol_new sun8i_codec_adc_mixer_controls[] = {
+>                           SUN8I_ADDA_LADCMIXSC_MIC2, 1, 0),
+>  };
+>
+> +/* ADC mixer controls */
+> +static const struct snd_kcontrol_new sun8i_v3s_codec_adc_mixer_controls[] = {
+> +       SOC_DAPM_DOUBLE_R("Mixer Capture Switch",
+> +                         SUN8I_ADDA_LADCMIXSC,
+> +                         SUN8I_ADDA_RADCMIXSC,
+> +                         SUN8I_ADDA_LADCMIXSC_OMIXRL, 1, 0),
+> +       SOC_DAPM_DOUBLE_R("Mixer Reversed Capture Switch",
+> +                         SUN8I_ADDA_LADCMIXSC,
+> +                         SUN8I_ADDA_RADCMIXSC,
+> +                         SUN8I_ADDA_LADCMIXSC_OMIXRR, 1, 0),
+> +       SOC_DAPM_DOUBLE_R("Mic1 Capture Switch",
+> +                         SUN8I_ADDA_LADCMIXSC,
+> +                         SUN8I_ADDA_RADCMIXSC,
+> +                         SUN8I_ADDA_LADCMIXSC_MIC1, 1, 0),
+> +};
+> +
+>  /* volume / mute controls */
+>  static const DECLARE_TLV_DB_SCALE(sun8i_codec_out_mixer_pregain_scale,
+>                                   -450, 150, 0);
+> @@ -292,8 +324,9 @@ static const struct snd_soc_dapm_widget sun8i_codec_common_widgets[] = {
+>         /* Mic input path */
+>         SND_SOC_DAPM_PGA("Mic1 Amplifier", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
+>                          SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MIC1AMPEN, 0, NULL, 0),
+> +};
+>
+> -       /* Mixers */
+> +static const struct snd_soc_dapm_widget sun8i_codec_mixer_widgets[] = {
+>         SND_SOC_DAPM_MIXER("Left Mixer", SUN8I_ADDA_DAC_PA_SRC,
+>                            SUN8I_ADDA_DAC_PA_SRC_LMIXEN, 0,
+>                            sun8i_codec_mixer_controls,
+> @@ -312,10 +345,31 @@ static const struct snd_soc_dapm_widget sun8i_codec_common_widgets[] = {
+>                            ARRAY_SIZE(sun8i_codec_adc_mixer_controls)),
+>  };
+>
+> +static const struct snd_soc_dapm_widget sun8i_v3s_codec_mixer_widgets[] = {
+> +       SND_SOC_DAPM_MIXER("Left Mixer", SUN8I_ADDA_DAC_PA_SRC,
+> +                          SUN8I_ADDA_DAC_PA_SRC_LMIXEN, 0,
+> +                          sun8i_v3s_codec_mixer_controls,
+> +                          ARRAY_SIZE(sun8i_v3s_codec_mixer_controls)),
+> +       SND_SOC_DAPM_MIXER("Right Mixer", SUN8I_ADDA_DAC_PA_SRC,
+> +                          SUN8I_ADDA_DAC_PA_SRC_RMIXEN, 0,
+> +                          sun8i_v3s_codec_mixer_controls,
+> +                          ARRAY_SIZE(sun8i_v3s_codec_mixer_controls)),
+> +       SND_SOC_DAPM_MIXER("Left ADC Mixer", SUN8I_ADDA_ADC_AP_EN,
+> +                          SUN8I_ADDA_ADC_AP_EN_ADCLEN, 0,
+> +                          sun8i_v3s_codec_adc_mixer_controls,
+> +                          ARRAY_SIZE(sun8i_v3s_codec_adc_mixer_controls)),
+> +       SND_SOC_DAPM_MIXER("Right ADC Mixer", SUN8I_ADDA_ADC_AP_EN,
+> +                          SUN8I_ADDA_ADC_AP_EN_ADCREN, 0,
+> +                          sun8i_v3s_codec_adc_mixer_controls,
+> +                          ARRAY_SIZE(sun8i_v3s_codec_adc_mixer_controls)),
+> +};
+> +
+>  static const struct snd_soc_dapm_route sun8i_codec_common_routes[] = {
+>         /* Microphone Routes */
+>         { "Mic1 Amplifier", NULL, "MIC1"},
+> +};
+>
+> +static const struct snd_soc_dapm_route sun8i_codec_mixer_routes[] = {
+>         /* Left Mixer Routes */
+>         { "Left Mixer", "DAC Playback Switch", "Left DAC" },
+>         { "Left Mixer", "DAC Reversed Playback Switch", "Right DAC" },
+> @@ -714,6 +768,46 @@ static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
+>         .has_mic2       = true,
+>  };
+>
+> +static int sun8i_codec_analog_add_mixer(struct snd_soc_component *cmpnt,
+> +                                       const struct sun8i_codec_analog_quirks *quirks)
+> +{
+> +       struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
+> +       struct device *dev = cmpnt->dev;
+> +       int ret;
+> +
+> +       if (!quirks->has_mic2 && !quirks->has_linein) {
 
-Hi, Daniel:
+Please leave a TODO note saying that not all special cases are handled.
 
-I understand.
+> +               /*
+> +                * Apply the special widget set which has uses a control
+> +                * without MIC2 and Line In, for SoCs without these (V3s).
+> +                */
+> +               ret = snd_soc_dapm_new_controls(dapm,
+> +                                               sun8i_v3s_codec_mixer_widgets,
+> +                                               ARRAY_SIZE(sun8i_v3s_codec_mixer_widgets));
+> +               if (ret) {
+> +                       dev_err(dev, "Failed to add V3s Mixer DAPM widgets: %d\n", ret);
+> +                       return ret;
+> +               }
+> +       } else {
+> +               /* Apply the generic mixer widget set. */
+> +               ret = snd_soc_dapm_new_controls(dapm,
+> +                                               sun8i_codec_mixer_widgets,
+> +                                               ARRAY_SIZE(sun8i_codec_mixer_widgets));
+> +               if (ret) {
+> +                       dev_err(dev, "Failed to add Mixer DAPM widgets: %d\n", ret);
+> +                       return ret;
+> +               }
+> +       }
 
-Hi Bibby:
+I was thinking maybe having separate probe functions saved in the quirks
+structure might be better. The quirk-specific probe function would add
+the mixer widget, then chain to sun8i_codec_analog_cmpnt_probe to add
+the rest. That would make it harder to read though, and doesn't offer
+much improvement in terms of code size.
 
-If you have time, please help to test Jose's patches with the problem
-you have met. Otherwise, it would be a long process.
+Lets stick with what you have already.
 
-Regards,
-CK
+> +
+> +       ret = snd_soc_dapm_add_routes(dapm, sun8i_codec_mixer_routes,
+> +                                     ARRAY_SIZE(sun8i_codec_mixer_routes));
+> +       if (ret) {
+> +               dev_err(dev, "Failed to add Mixer DAPM routes: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+>  static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
+>  {
+>         struct device *dev = cmpnt->dev;
+> @@ -728,6 +822,7 @@ static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
+>         quirks = of_device_get_match_data(dev);
+>
+>         /* Add controls, widgets, and routes for individual features */
+> +       sun8i_codec_analog_add_mixer(cmpnt, quirks);
+
+You should check for errors.
+
+Thanks
+ChenYu
+
+>
+>         if (quirks->has_headphone) {
+>                 ret = sun8i_codec_add_headphone(cmpnt);
+> --
+> 2.12.2
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
