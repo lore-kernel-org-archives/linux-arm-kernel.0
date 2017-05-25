@@ -1,62 +1,48 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Thu, 25 May 2017 12:04:55 -0500
-Subject: [PATCH v2] mmc: bcm2835: fix potential null pointer dereferences
-In-Reply-To: <20170525114638.Horde.wq7PLKWCg8CwLM5WiWj1Obm@gator4166.hostgator.com>
-Message-ID: <20170525170455.GA6904@embeddedgus>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 25 May 2017 10:10:00 -0700
+Subject: [CFT] Always enable SMP mode on MP capable CPUs
+In-Reply-To: <20170525165651.GK22219@n2100.armlinux.org.uk>
+References: <20170518105209.GN22219@n2100.armlinux.org.uk>
+ <828a8817-b18d-6945-f35e-115abf30fe17@gmail.com>
+ <20170525165651.GK22219@n2100.armlinux.org.uk>
+Message-ID: <20170525171000.GD10472@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Null check at line 1165: if (mrq->cmd), implies that mrq->cmd might
-be NULL.
-Add null checks before dereferencing pointer mrq->cmd in order to avoid
-any potential NULL pointer dereference.
+* Russell King - ARM Linux <linux@armlinux.org.uk> [170525 10:00]:
+> On Thu, May 25, 2017 at 09:15:19AM -0700, Florian Fainelli wrote:
+> > On 05/18/2017 03:52 AM, Russell King - ARM Linux wrote:
+> > > As a result of a recent bug report, it has been found that certain CPUs
+> > > must always have SMP mode enabled in order for the caches to work.
+> > > 
+> > > Remove the conditional on setting the SMP bit(s).
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > > ---
+> > > This needs to be tested on:
+> > > 
+> > > - Cortex A5MP
+> > > - Cortex A9MP
+> > > - Cortex R7MP
+> > > - Cortex A7MP
+> > > - Cortex A12MP
+> > > - Cortex A15MP
+> > > - Cortex A17MP
+> > > - Brahma B15
+> > 
+> > Sorry just saw this, what kind of test do you want me to run on B15?
+> > Should I build a !SMP kernel, or force a SMP kernel with maxcpus=1?
+> 
+> What I'm after is testing on any single-core systems with these SMP
+> capable cores.  If the core never appears in a single-core configuration,
+> then please let me know so it can be crossed off the list.
+> 
+> With the bug that crept in fixed (as pointed out by Tony) there is no
+> difference for kernels built with SMP enabled and detected as a SMP
+> capable CPU.
 
-Addresses-Coverity-ID: 1408740
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
-Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
----
-Changes in v2:
- Change subject to make it clear the patch is bcm2835 related.
+At least am437x needs to be tested as it's UP with some quirks.
 
- drivers/mmc/host/bcm2835.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+Regards,
 
-diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
-index 1f343a4..abba9a2 100644
---- a/drivers/mmc/host/bcm2835.c
-+++ b/drivers/mmc/host/bcm2835.c
-@@ -1172,7 +1172,10 @@ static void bcm2835_request(struct mmc_host *mmc, struct mmc_request *mrq)
- 	if (mrq->data && !is_power_of_2(mrq->data->blksz)) {
- 		dev_err(dev, "unsupported block size (%d bytes)\n",
- 			mrq->data->blksz);
--		mrq->cmd->error = -EINVAL;
-+
-+		if (mrq->cmd)
-+			mrq->cmd->error = -EINVAL;
-+
- 		mmc_request_done(mmc, mrq);
- 		return;
- 	}
-@@ -1194,7 +1197,10 @@ static void bcm2835_request(struct mmc_host *mmc, struct mmc_request *mrq)
- 			readl(host->ioaddr + SDCMD) & SDCMD_CMD_MASK,
- 			edm);
- 		bcm2835_dumpregs(host);
--		mrq->cmd->error = -EILSEQ;
-+
-+		if (mrq->cmd)
-+			mrq->cmd->error = -EILSEQ;
-+
- 		bcm2835_finish_request(host);
- 		mutex_unlock(&host->mutex);
- 		return;
-@@ -1207,7 +1213,7 @@ static void bcm2835_request(struct mmc_host *mmc, struct mmc_request *mrq)
- 			if (!host->use_busy)
- 				bcm2835_finish_command(host);
- 		}
--	} else if (bcm2835_send_command(host, mrq->cmd)) {
-+	} else if (mrq->cmd && bcm2835_send_command(host, mrq->cmd)) {
- 		if (host->data && host->dma_desc) {
- 			/* DMA transfer starts now, PIO starts after irq */
- 			bcm2835_start_dma(host);
--- 
-2.5.0
+Tony
