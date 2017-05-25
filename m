@@ -1,26 +1,17 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 25 May 2017 15:48:46 +0800
-Subject: [PATCH] clk: sunxi-ng: sun5i: Fix ahb_bist_clk definition
-In-Reply-To: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CAGb2v663Tgcc1G2uue3SrD6vpOB5EnR+Um+2goiZWjUm+mt3Qg@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 25 May 2017 15:51:04 +0800
+Subject: [PATCH 1/2] ARM: dts: imx7d-pico: Add watchdog support
+In-Reply-To: <1495552569-18567-1-git-send-email-fabio.estevam@nxp.com>
+References: <1495552569-18567-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <20170525075102.GZ26102@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 25, 2017 at 12:34 AM, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> AHB BIST gate is actually controlled with bit 7.
->
-> This bug was detected while trying to use the NAND controller which is
-> using the DMA engine to transfer data to the NAND.
-> Since the ahb_bist_clk gate bit conflicts with the ahb_dma_clk gate bit,
-> the core was disabling the DMA engine clock as part of its 'disable
-> unused clks' procedure, which was causing all DMA transfers to fail after
-> this point.
->
-> Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
-> Cc: stable at vger.kernel.org
-> Reported-by: Angus Ainslie <angus@akkea.ca>
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Tue, May 23, 2017 at 12:16:08PM -0300, Fabio Estevam wrote:
+> imx7d-pico has the WDOG1_B pin connected to the PMIC, so add the
+> wdog1 node and use the 'fsl,ext-reset-output' property to
+> properly describe it.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Applied both, thanks.
