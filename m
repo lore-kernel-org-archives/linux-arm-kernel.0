@@ -1,28 +1,26 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 25 May 2017 15:51:39 +0800
-Subject: [PATCH v7 18/34] platform: video-mux: include temporary mmio-mux
- support
-In-Reply-To: <1495672189-29164-19-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <201705251540.fnn67915%fengguang.wu@intel.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 25 May 2017 15:56:36 +0800
+Subject: [PATCH v2 1/2] ARM: dts: imx23-sansa: Remove 'enable-active-low'
+ property
+In-Reply-To: <1495553564-19112-1-git-send-email-fabio.estevam@nxp.com>
+References: <1495553564-19112-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <20170525075334.GA26102@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On Tue, May 23, 2017 at 12:32:43PM -0300, Fabio Estevam wrote:
+> Property 'enable-active-low' does not exist. Only 'enable-active-high' is
+> valid, and when this property is absent the gpio regulator will act as
+> active low by default.
+> 
+> So remove the unexisting 'enable-active-low' property. 
+> 
+> Currently the GPIO flag is 0, which means active-high. In order to make
+> the dts description accurate, pass the GPIO_ACTIVE_LOW flag instead.
+> 
+> This change is safe because the gpio regulator driver does not take the
+> GPIO flag polarity into account.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-[auto build test WARNING on linuxtv-media/master]
-[also build test WARNING on v4.12-rc2 next-20170525]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Steve-Longerbeam/i-MX-Media-Driver/20170525-135051
-base:   git://linuxtv.org/media_tree.git master
-
-
-coccinelle warnings: (new ones prefixed by >>)
-
->> drivers/media/platform/video-mux.c:246:1-3: WARNING: PTR_ERR_OR_ZERO can be used
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Applied both, thanks.
