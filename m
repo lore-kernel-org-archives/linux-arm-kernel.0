@@ -1,26 +1,57 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 25 May 2017 15:33:08 +0800
-Subject: [PATCH v5 14/20] arm64: dts: ls1043a: Add generic compatible
- string for I2C EEPROM
-In-Reply-To: <20170523133448.4794-15-javier@dowhile0.org>
-References: <20170523133448.4794-1-javier@dowhile0.org>
- <20170523133448.4794-15-javier@dowhile0.org>
-Message-ID: <20170525073304.GX26102@dragon>
+Date: Thu, 25 May 2017 15:42:59 +0800
+Subject: [PATCH V3 1/2] dt-bindings: pinctrl: add imx7ulp pinctrl binding
+ doc
+In-Reply-To: <AM3PR04MB306BB77DD89C680DC42636D80FF0@AM3PR04MB306.eurprd04.prod.outlook.com>
+References: <1495539829-23345-1-git-send-email-aisheng.dong@nxp.com>
+ <20170523182321.GA13664@w540>
+ <AM3PR04MB3065626F1B45C8459E5765580FE0@AM3PR04MB306.eurprd04.prod.outlook.com>
+ <AM3PR04MB306BB77DD89C680DC42636D80FF0@AM3PR04MB306.eurprd04.prod.outlook.com>
+Message-ID: <20170525074255.GY26102@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 03:34:42PM +0200, Javier Martinez Canillas wrote:
-> The at24 driver allows to register I2C EEPROM chips using different vendor
-> and devices, but the I2C subsystem does not take the vendor into account
-> when matching using the I2C table since it only has device entries.
+On Thu, May 25, 2017 at 05:06:56AM +0000, A.S. Dong wrote:
+> > > > +=== Pin Configuration Node ===
+> > > > +- pins: One integers array, represents a group of pins mux setting.
+> > > > +	The format is fsl,pins = <PIN_FUNC_ID>, PIN_FUNC_ID is a pin
+> > > > +working
+> > > on
+> > > > +	a specific function.
+> > > > +
+> > > > +	NOTE: i.MX7ULP PIN_FUNC_ID consists of 4 integers as it shares one
+> > > mux
+> > > > +	and config register as follows:
+> > > > +	<mux_conf_reg input_reg mux_mode input_val>
+> > >
+> > > As your PIN_FUNC_ID specifies both the pin ids and their mux settings,
+> > > shouldn't you use the newly documented 'pinmux' property in place of
+> > > 'pins'?
+> > >
+> > > Please see
+> > > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/com
+> > > mit/ ?id=8d5e7c5df0a6c442373628be5221321172b1badf
+> > >
+> > > The current documentation specifies pin ids and mux settings have to
+> > > be assembled in one single integer, which is not your case, but that
+> > > can be changed to make it accept an array of integers values if needed.
+> > >
+> > 
+> > Thanks for the info.
+> > Looks good to me.
+> > 
+> > Shawn & Linus,
+> > Are you okay with this?
+> > 
+> > If yes, I can extend the standard 'pinmux' property to support integer
+> > array and renew the patch series to use it.
+> > 
 > 
-> But when matching using an OF table, both the vendor and device has to be
-> taken into account so the driver defines only a set of compatible strings
-> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+> Would you comment on this question?
 > 
-> So add this generic fallback to the device node compatible string to make
-> the device to match the driver using the OF device ID table.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+> Then I can decide whether sent a new series based on it.
 
-Applied, thanks.
+I'm fine with it.  But what's important is whether Linus is fine with
+extending the standard 'pinmux' property to cover IMX case.
+
+Shawn
