@@ -1,54 +1,49 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 24 May 2017 17:29:34 -0700
-Subject: [PATCH v7 19/34] media: Add userspace header file for i.MX
+Date: Wed, 24 May 2017 17:29:43 -0700
+Subject: [PATCH v7 28/34] media: imx: csi: increase burst size for YUV formats
 In-Reply-To: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1495672189-29164-20-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1495672189-29164-29-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a header file for use by userspace programs wanting to interact
-with the i.MX media driver. It defines custom events and v4l2 controls for
-the i.MX v4l2 subdevices.
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+The IDMAC supports burst sizes of up to 32 pixels for interleaved YUV
+formats and up to 64 pixels for planar YUV formats.
+
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- include/linux/imx-media.h | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 include/linux/imx-media.h
+ drivers/staging/media/imx/imx-media-csi.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/include/linux/imx-media.h b/include/linux/imx-media.h
-new file mode 100644
-index 0000000..267777f
---- /dev/null
-+++ b/include/linux/imx-media.h
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (c) 2014-2017 Mentor Graphics Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the
-+ * License, or (at your option) any later version
-+ */
-+
-+#ifndef __LINUX_IMX_MEDIA_H__
-+#define __LINUX_IMX_MEDIA_H__
-+
-+/*
-+ * events from the subdevs
-+ */
-+#define V4L2_EVENT_IMX_CLASS                V4L2_EVENT_PRIVATE_START
-+#define V4L2_EVENT_IMX_FRAME_INTERVAL_ERROR (V4L2_EVENT_IMX_CLASS + 1)
-+
-+enum imx_ctrl_id {
-+	V4L2_CID_IMX_FIM_ENABLE = (V4L2_CID_USER_IMX_BASE + 0),
-+	V4L2_CID_IMX_FIM_NUM,
-+	V4L2_CID_IMX_FIM_TOLERANCE_MIN,
-+	V4L2_CID_IMX_FIM_TOLERANCE_MAX,
-+	V4L2_CID_IMX_FIM_NUM_SKIP,
-+};
-+
-+#endif
+diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+index 7defe53..e26c025 100644
+--- a/drivers/staging/media/imx/imx-media-csi.c
++++ b/drivers/staging/media/imx/imx-media-csi.c
+@@ -333,6 +333,23 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
+ 		passthrough = true;
+ 		passthrough_bits = 16;
+ 		break;
++	case V4L2_PIX_FMT_YUV420:
++	case V4L2_PIX_FMT_NV12:
++		burst_size = (image.pix.width & 0x3f) ?
++			     ((image.pix.width & 0x1f) ?
++			      ((image.pix.width & 0xf) ? 8 : 16) : 32) : 64;
++		passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
++			       sensor_ep->bus.parallel.bus_width >= 16);
++		passthrough_bits = 16;
++		break;
++	case V4L2_PIX_FMT_YUYV:
++	case V4L2_PIX_FMT_UYVY:
++		burst_size = (image.pix.width & 0x1f) ?
++			     ((image.pix.width & 0xf) ? 8 : 16) : 32;
++		passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
++			       sensor_ep->bus.parallel.bus_width >= 16);
++		passthrough_bits = 16;
++		break;
+ 	default:
+ 		burst_size = (image.pix.width & 0xf) ? 8 : 16;
+ 		passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
 -- 
 2.7.4
