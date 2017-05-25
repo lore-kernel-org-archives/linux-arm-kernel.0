@@ -1,30 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 25 May 2017 20:48:09 +0200
-Subject: [PATCH] RFC: arm: eBPF JIT compiler
-In-Reply-To: <CAHgaXdLCaTwaLiLsmkzWvzSa=67LzqwHkT6cS_CVUm9_8u2_2Q@mail.gmail.com>
-References: <1495564433-9750-1-git-send-email-illusionist.neo@gmail.com>
- <20170523204608.GG24807@lunn.ch>
- <CAHgaXdJH7VjS__KPOc1scN9d=wxzY0DEQHutiL3qhtQAWd-v-A@mail.gmail.com>
- <20170523232555.GY13759@lunn.ch>
- <CAHgaXdKn4J==r_22T3N_7O5oESd8xwL6L+Ot8nT9bGCsSjAkHw@mail.gmail.com>
- <20170525170051.GC18357@lunn.ch> <20170525172255.GF18357@lunn.ch>
- <CAHgaXd+CVrDEA=E2=23Qp6wk50=dBnFS6TiCtvphTBMjUywrGg@mail.gmail.com>
- <20170525182849.GG18357@lunn.ch>
- <CAHgaXdLCaTwaLiLsmkzWvzSa=67LzqwHkT6cS_CVUm9_8u2_2Q@mail.gmail.com>
-Message-ID: <20170525184809.GH18357@lunn.ch>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 25 May 2017 11:50:32 -0700
+Subject: [PATCH] clk: sunxi-ng: sun5i: Fix ahb_bist_clk definition
+In-Reply-To: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1495643669-28221-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <149573823221.52617.2350903252470015903@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 26, 2017 at 12:05:23AM +0530, Shubham Bansal wrote:
-> Hi Andrew,
+Quoting Boris Brezillon (2017-05-24 09:34:29)
+> AHB BIST gate is actually controlled with bit 7.
 > 
-> My Apologies.
+> This bug was detected while trying to use the NAND controller which is
+> using the DMA engine to transfer data to the NAND.
+> Since the ahb_bist_clk gate bit conflicts with the ahb_dma_clk gate bit,
+> the core was disabling the DMA engine clock as part of its 'disable
+> unused clks' procedure, which was causing all DMA transfers to fail after
+> this point.
 > 
-> I will remove the #ifdef CONFIG_CPU_LITTLE_ENDIAN. Do you have the
-> ARMv6 machine you can test it on?
+> Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
+> Cc: stable at vger.kernel.org
+> Reported-by: Angus Ainslie <angus@akkea.ca>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Sorry, i don't have a v6.
+Patch looks good to me. Did this ever work? I'm trying to figure out if
+it should go into -fixes or -next.
 
-Maybe try kzm with qemu-system-qemu?
+Thanks,
+Mike
 
-      Andrew
+> ---
+>  drivers/clk/sunxi-ng/ccu-sun5i.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.c b/drivers/clk/sunxi-ng/ccu-sun5i.c
+> index 5c476f966a72..5372bf8be5e6 100644
+> --- a/drivers/clk/sunxi-ng/ccu-sun5i.c
+> +++ b/drivers/clk/sunxi-ng/ccu-sun5i.c
+> @@ -243,7 +243,7 @@ static SUNXI_CCU_GATE(ahb_ss_clk,   "ahb-ss",       "ahb",
+>  static SUNXI_CCU_GATE(ahb_dma_clk,     "ahb-dma",      "ahb",
+>                       0x060, BIT(6), 0);
+>  static SUNXI_CCU_GATE(ahb_bist_clk,    "ahb-bist",     "ahb",
+> -                     0x060, BIT(6), 0);
+> +                     0x060, BIT(7), 0);
+>  static SUNXI_CCU_GATE(ahb_mmc0_clk,    "ahb-mmc0",     "ahb",
+>                       0x060, BIT(8), 0);
+>  static SUNXI_CCU_GATE(ahb_mmc1_clk,    "ahb-mmc1",     "ahb",
+> -- 
+> 2.7.4
+> 
