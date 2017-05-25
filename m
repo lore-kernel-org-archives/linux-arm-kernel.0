@@ -1,44 +1,51 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 25 May 2017 15:31:32 +0800
-Subject: [PATCH 0/6] ARM: sunxi: Enable AXP PMIC power supplies
-Message-ID: <20170525073138.20907-1-wens@csie.org>
+Date: Thu, 25 May 2017 15:31:33 +0800
+Subject: [PATCH 1/6] ARM: sun7i: a20: cubieboard2: Move usb_otg node for
+ alphabetical ordering
+In-Reply-To: <20170525073138.20907-1-wens@csie.org>
+References: <20170525073138.20907-1-wens@csie.org>
+Message-ID: <20170525073138.20907-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+We want to keep node references in alphabetical order, except for
+instances where node must be #included first.
 
-This series enables the power supplies for the AXP PMICs on boards
-that I currently have and am actively testing.
+Move the usb_otg node reference so that all references to non-AXP209
+device nodes are in alphabetical order.
 
-The first patch re-orders the node references for the Cubieboard 2
-dts, to maintain alphabetical order.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Patches 2 through 5 enable the ACIN power supply on various boards.
-
-Patch 6 ties the USB/VBUS power supply of the PMIC to the USB PHY.
-The PHY should have all available methods of VBUS detection configured.
-The Cubietruck already has the power supplies enabled, but the USB
-power supply was not configured to be used for VBUS detection.
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (6):
-  ARM: sun7i: a20: cubieboard2: Move usb_otg node for alphabetical
-    ordering
-  ARM: sun7i: a20: cubieboard2: Enable AXP209's ACIN power supply
-  ARM: sun7i: a20: bananapi-m1-plus: Enable AXP209's ACIN power supply
-  ARM: sun4i: a10: cubieboard: Enable AXP209's ACIN power supply
-  ARM: sun6i: a31: hummingbird: Enable AXP221's ACIN power supply
-  ARM: sun7i: a20: cubietruck: Tie AXP209's USB power supply to USB PHY
-
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts       |  4 ++++
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts      |  4 ++++
- arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts |  4 ++++
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts      | 12 ++++++++----
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts       |  1 +
- 5 files changed, 21 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+index 7ac5bcc9f972..c21edd75d0b3 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+@@ -174,11 +174,6 @@
+ 	status = "okay";
+ };
+ 
+-&usb_otg {
+-	dr_mode = "otg";
+-	status = "okay";
+-};
+-
+ #include "axp209.dtsi"
+ 
+ &reg_dcdc2 {
+@@ -220,6 +215,11 @@
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&usb0_id_detect_pin>;
 -- 
 2.11.0
