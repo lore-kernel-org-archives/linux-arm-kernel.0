@@ -1,46 +1,56 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 25 May 2017 10:41:10 +0800
-Subject: [PATCH v2 0/2] Add PCIe phy driver for some Mediatek SoCs
-In-Reply-To: <1495338192-9423-1-git-send-email-ryder.lee@mediatek.com>
-References: <1495338192-9423-1-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <1495680070.11680.3.camel@mtkswgap22>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 25 May 2017 10:53:35 +0800
+Subject: [PATCH v2 2/2] ARM: dts: orange-pi-zero: add node for SPI NOR
+In-Reply-To: <20170524212433.14386-3-geomatsi@gmail.com>
+References: <20170524212433.14386-1-geomatsi@gmail.com>
+ <20170524212433.14386-3-geomatsi@gmail.com>
+Message-ID: <CAGb2v65g7Ki_ySW6ygtt7KJ-0NQNGWoekvLtU4nEUghrEXF1Xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 25, 2017 at 5:24 AM, Sergey Matyukevich <geomatsi@gmail.com> wrote:
+> SPI NOR flash was optional in the first production batch in Dec 2016.
+> In later batches flash chip was pre-populated. However there should
+> be quite a few boards around which do not have flash chip.
+>
+> Add node for SPI NOR flash on orange-pi-zero board. Disable this node
+> by default and leave it to users to enable it if their board has
+> SPI NOR flash chip populated.
+>
+> Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> index e97dfd1775d1..bbbd8c656914 100644
+> --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> @@ -138,6 +138,19 @@
+>         bias-pull-up;
+>  };
+>
+> +&spi0 {
+> +       /* Disable SPI NOR by default: it optional on Orange Pi Zero boards */
+> +       status = "disabled";
+> +
+> +       flash at 0 {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "mxicy,mx25l1606e", "winbond,w25q128";
+> +               reg = <0>;
+> +               spi-max-frequency = <40000000>;
+> +       };
+> +};
+> +
+>  &ohci0 {
 
-Hi Kishon,
+Please sort the node references in alphabetical order.
 
-I'd like to rename driver name to make it more generic so that we could
-reuse it for other MTK SoCs, and I'll resend patches with a new name.
+ChenYu
 
-Sorry for the inconvenience.
-
-Ryder.
-
-
-On Sun, 2017-05-21 at 11:43 +0800, Ryder Lee wrote:
-> Hi,
-> 
-> This patch series add PCIe phy driver and related dt-binding file for
-> Mediatek mt7623 SoCs families.
-> 
-> Changes since v2:
-> - rebase to Linux 4.12-rc1
-> 
-> Changes since v1:
-> - revise binding document:
->   drop 'status' properties.
->   add a description to 'phy-switch' property and add vendor prefix.
-> 
-> Ryder Lee (2):
->   phy: add PCIe PHY driver for mt7623 SoCs families
->   dt-bindings: phy: Add documentation for Mediatek PCIe PHY
-> 
->  .../devicetree/bindings/phy/phy-mt7623-pcie.txt    |  63 +++++
->  drivers/phy/Kconfig                                |   8 +
->  drivers/phy/Makefile                               |   1 +
->  drivers/phy/phy-mt7623-pcie.c                      | 290 +++++++++++++++++++++
->  4 files changed, 362 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-mt7623-pcie.txt
->  create mode 100644 drivers/phy/phy-mt7623-pcie.c
-> 
+>         status = "okay";
+>  };
+> --
+> 2.11.0
+>
