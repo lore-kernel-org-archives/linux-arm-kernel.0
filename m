@@ -1,22 +1,31 @@
 From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 25 May 2017 18:57:07 +0200
-Subject: [PATCH] Staging: bcm2835-audio: bcm2835_ctl.c: Fixed a comment
- coding style issue.
-In-Reply-To: <1495225824-4422-1-git-send-email-srishtishar@gmail.com>
-References: <1495225824-4422-1-git-send-email-srishtishar@gmail.com>
-Message-ID: <20170525165706.GA1201@kroah.com>
+Date: Thu, 25 May 2017 18:58:44 +0200
+Subject: [PATCH 1/5][v2] staging: fsl-mc: fix several checkpath.pl warnings
+In-Reply-To: <20170522120935.4119-2-laurentiu.tudor@nxp.com>
+References: <20170522120935.4119-1-laurentiu.tudor@nxp.com>
+ <20170522120935.4119-2-laurentiu.tudor@nxp.com>
+Message-ID: <20170525165844.GA8812@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 20, 2017 at 02:00:24AM +0530, srishti sharma wrote:
-> fixed a trailing */ issue .
-> 
-> Signed-off-by: srishti sharma <srishtishar@gmail.com>
-> ---
->  drivers/staging/bcm2835-audio/bcm2835-ctl.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+On Mon, May 22, 2017 at 03:09:31PM +0300, laurentiu.tudor at nxp.com wrote:
+> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-This file isn't in my tree, always work against linux-next please...
+Your subject line is very odd, please use the 'v2' marking properly...
+
+> 
+> Remove several unneeded #includes, forward
+> declarations and fix several issues reported
+> by checkpatch.pl --strict, such as:
+>  - kfree(NULL) is safe and check is not required
+>  - macro argument reuse may cause possible side effects
+>  - enclose macro params in parens to avoid precedence issues
+>  - coding style
+
+These, as always, need to be broken up into one-patch-per-type-of-thing,
+you have been in the staging tree long enough to know this :(
+
+Please do this first, then we can consider the rest of the series...
 
 thanks,
 
