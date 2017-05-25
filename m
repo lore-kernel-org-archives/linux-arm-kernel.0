@@ -1,135 +1,41 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 25 May 2017 16:30:40 +1200
-Subject: [RFC PATCH 2/5] ARM: ep93xx: add gpiod_lookup_table for spi
- chip-selects
-In-Reply-To: <20170525043043.1930-1-chris.packham@alliedtelesis.co.nz>
-References: <20170525043043.1930-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170525043043.1930-3-chris.packham@alliedtelesis.co.nz>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Thu, 25 May 2017 12:36:01 +0800
+Subject: [PATCH v3 0/2] Add PCIe phy driver for some Mediatek SoCs
+Message-ID: <1495686963-50071-1-git-send-email-ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a preparatory step which will allow the conversion of
-spi-ep93xx.c to gpiod.
+Hi,
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
- arch/arm/mach-ep93xx/edb93xx.c       | 12 ++++++++++++
- arch/arm/mach-ep93xx/simone.c        | 11 +++++++++++
- arch/arm/mach-ep93xx/vision_ep9307.c | 15 +++++++++++++++
- 3 files changed, 38 insertions(+)
+This patch series add PCIe phy driver and related dt-binding file for
+Mediatek SoCs.
 
-diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
-index 0ac176386789..9042adfe03de 100644
---- a/arch/arm/mach-ep93xx/edb93xx.c
-+++ b/arch/arm/mach-ep93xx/edb93xx.c
-@@ -27,6 +27,8 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
-+#include <linux/gpio.h>
-+#include <linux/gpio/machine.h>
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
- #include <linux/spi/spi.h>
-@@ -116,6 +118,15 @@ static struct spi_board_info edb93xx_spi_board_info[] __initdata = {
- 	},
- };
- 
-+static struct gpiod_lookup_table edb93xx_gpios_table = {
-+	.dev_id = "spi.0",
-+	.table = {
-+		GPIO_LOOKUP("gpio-ep93xx", EP93XX_GPIO_LINE_EGPIO6,
-+			    "spi-cs", GPIO_ACTIVE_HIGH),
-+		{},
-+	},
-+};
-+
- static int edb93xx_spi_chipselects[] __initdata = {
- 	EP93XX_GPIO_LINE_EGPIO6,
- };
-@@ -134,6 +145,7 @@ static void __init edb93xx_register_spi(void)
- 	else if (machine_is_edb9315a())
- 		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_EGPIO14;
- 
-+	gpiod_add_lookup_table(&edb93xx_gpios_table);
- 	ep93xx_register_spi(&edb93xx_spi_info, edb93xx_spi_board_info,
- 			    ARRAY_SIZE(edb93xx_spi_board_info));
- }
-diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
-index c7a40f245892..f297a7a89ed9 100644
---- a/arch/arm/mach-ep93xx/simone.c
-+++ b/arch/arm/mach-ep93xx/simone.c
-@@ -26,6 +26,7 @@
- #include <linux/platform_data/video-ep93xx.h>
- #include <linux/platform_data/spi-ep93xx.h>
- #include <linux/gpio.h>
-+#include <linux/gpio/machine.h>
- 
- #include <mach/hardware.h>
- #include <mach/gpio-ep93xx.h>
-@@ -119,6 +120,15 @@ static struct spi_board_info simone_spi_devices[] __initdata = {
-  * low between multi-message command blocks. From v1.4, it uses a GPIO instead.
-  * v1.3 parts will still work, since the signal on SFRMOUT is automatic.
-  */
-+static struct gpiod_lookup_table simone_gpios_table = {
-+	.dev_id = "spi.0",
-+	.table = {
-+		GPIO_LOOKUP("gpio-ep93xx", EP93XX_GPIO_LINE_EGPIO1,
-+			    "spi-cs", GPIO_ACTIVE_HIGH),
-+		{},
-+	},
-+};
-+
- static int simone_spi_chipselects[] __initdata = {
- 	EP93XX_GPIO_LINE_EGPIO1,
- };
-@@ -163,6 +173,7 @@ static void __init simone_init_machine(void)
- 	ep93xx_register_fb(&simone_fb_info);
- 	ep93xx_register_i2c(&simone_i2c_gpio_data, simone_i2c_board_info,
- 			    ARRAY_SIZE(simone_i2c_board_info));
-+	gpiod_add_lookup_table(&simone_gpios_table);
- 	ep93xx_register_spi(&simone_spi_info, simone_spi_devices,
- 			    ARRAY_SIZE(simone_spi_devices));
- 	simone_register_audio();
-diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
-index 1daf9441058c..3d9c66bbf2af 100644
---- a/arch/arm/mach-ep93xx/vision_ep9307.c
-+++ b/arch/arm/mach-ep93xx/vision_ep9307.c
-@@ -18,6 +18,7 @@
- #include <linux/platform_device.h>
- #include <linux/irq.h>
- #include <linux/gpio.h>
-+#include <linux/gpio/machine.h>
- #include <linux/fb.h>
- #include <linux/io.h>
- #include <linux/mtd/partitions.h>
-@@ -242,6 +243,19 @@ static struct spi_board_info vision_spi_board_info[] __initdata = {
- 	},
- };
- 
-+static struct gpiod_lookup_table vision_gpios_table = {
-+	.dev_id = "spi.0",
-+	.table = {
-+		GPIO_LOOKUP_IDX("gpio-ep93xx", EP93XX_GPIO_LINE_EGPIO6,
-+				"spi-cs", 0, GPIO_ACTIVE_HIGH),
-+		GPIO_LOOKUP_IDX("gpio-ep93xx", EP93XX_GPIO_LINE_EGPIO7,
-+				"spi-cs", 1, GPIO_ACTIVE_HIGH),
-+		GPIO_LOOKUP_IDX("gpio-ep93xx", EP93XX_GPIO_LINE_G(2),
-+				"spi-cs", 2, GPIO_ACTIVE_HIGH),
-+		{},
-+	},
-+};
-+
- static int vision_spi_chipselects[] __initdata = {
- 	EP93XX_GPIO_LINE_EGPIO6,
- 	EP93XX_GPIO_LINE_EGPIO7,
-@@ -291,6 +305,7 @@ static void __init vision_init_machine(void)
- 
- 	ep93xx_register_i2c(&vision_i2c_gpio_data, vision_i2c_info,
- 				ARRAY_SIZE(vision_i2c_info));
-+	gpiod_add_lookup_table(&vision_gpios_table);
- 	ep93xx_register_spi(&vision_spi_master, vision_spi_board_info,
- 				ARRAY_SIZE(vision_spi_board_info));
- 	vision_register_i2s();
+The PICe host driver has been applied to pci/host-mediatek for v4.13.
+
+Changes since v3:
+- rename both the driver and the binding document to make it more generic
+  so that we could reuse the driver if needed in the future.
+- correct some anotations.
+
+Changes since v2:
+- rebase to v4.12-rc1
+
+Changes since v1:
+- revise binding document:
+  drop 'status' properties.
+  add a description to 'phy-switch' property and add vendor prefix.
+
+Ryder Lee (2):
+  phy: add PCIe PHY driver for Mediatek SoCs
+  dt-bindings: phy: Add documentation for Mediatek PCIe PHY
+
+ .../devicetree/bindings/phy/phy-mediatek-pcie.txt  |  64 +++++
+ drivers/phy/Kconfig                                |   8 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-mediatek-pcie.c                    | 290 +++++++++++++++++++++
+ 4 files changed, 363 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-mediatek-pcie.txt
+ create mode 100644 drivers/phy/phy-mediatek-pcie.c
+
 -- 
-2.13.0
+1.9.1
