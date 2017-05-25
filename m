@@ -1,30 +1,31 @@
-From: madalin.bucur@nxp.com (Madalin-Cristian Bucur)
-Date: Thu, 25 May 2017 12:57:26 +0000
-Subject: [PATCH] dt-bindings: net: move FMan binding
-In-Reply-To: <20170515.103048.248884533404807350.davem@davemloft.net>
-References: <1494855398-26215-1-git-send-email-madalin.bucur@nxp.com>
- <20170515.103048.248884533404807350.davem@davemloft.net>
-Message-ID: <AM5PR0402MB2691006D3DD1CEB8744EF8F4ECFF0@AM5PR0402MB2691.eurprd04.prod.outlook.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 25 May 2017 15:12:51 +0200
+Subject: [PATCH v4 5/8] arm, arm64: factorize common cpu capacity default
+ code
+In-Reply-To: <20170420144316.15632-6-juri.lelli@arm.com>
+References: <20170420144316.15632-1-juri.lelli@arm.com>
+ <20170420144316.15632-6-juri.lelli@arm.com>
+Message-ID: <20170525131251.GB16244@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: David Miller [mailto:davem at davemloft.net]
-> Sent: Monday, May 15, 2017 5:31 PM
-> Subject: Re: [PATCH] dt-bindings: net: move FMan binding
+On Thu, Apr 20, 2017 at 03:43:13PM +0100, Juri Lelli wrote:
+> arm and arm64 share lot of code relative to parsing CPU capacity
+> information from DT, using that information for appropriate scaling and
+> exposing a sysfs interface for chaging such values at runtime.
 > 
-> From: Madalin Bucur <madalin.bucur@nxp.com>
-> Date: Mon, 15 May 2017 16:36:38 +0300
+> Factorize such code in a common place (driver/base/arch_topology.c) in
+> preparation for further additions.
 > 
-> > Besides the PPC SoCs, the QorIQ DPAA FMan is also present on ARM SoCs,
-> > moving the device tree binding document into the bindings/net folder.
-> >
-> > Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
-> 
-> What tree is this targetted at for merging?
+> Suggested-by: Will Deacon <will.deacon@arm.com>
+> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-I hope Rob Herring will take this into his tree, it's a device tree binding
-change. 
-
-Thanks,
-Madalin
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
