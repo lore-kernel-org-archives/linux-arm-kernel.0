@@ -1,39 +1,36 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 26 May 2017 08:03:01 +0800
-Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
- before scanning
-In-Reply-To: <1495712248-5232-6-git-send-email-gabriele.paoloni@huawei.com>
-Message-ID: <201705260735.XlDFJKOH%fengguang.wu@intel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 25 May 2017 16:59:02 -0700
+Subject: [GIT PULL (RESEND)] ARM: uniphier: UniPhier fixes for v4.12
+In-Reply-To: <CAK7LNARbSkbEOhs7QMd+6VV+KWbkjK4LR9rmQ=YBWqPY+8_XPQ@mail.gmail.com>
+References: <CAK7LNARbSkbEOhs7QMd+6VV+KWbkjK4LR9rmQ=YBWqPY+8_XPQ@mail.gmail.com>
+Message-ID: <20170525235902.GA25387@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriele,
+On Mon, May 22, 2017 at 11:03:49AM +0900, Masahiro Yamada wrote:
+> Hi Arnd, Olof,
+> 
+> Last week, I thought I found a problem in my pull request,
+> but it turned out my misunderstanding.
+> 
+> So, my pull request I sent is OK.
+> I am re-sending this request mail for clarification.
+> 
+> Here are some ARM UniPhier SoC fixes for v4.12.
+> Due to the eMMC driver update, PHY parameters must be specified
+> via DT to make the eMMC controller work again.
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.12-rc2 next-20170525]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+That's not good, that's a regression in behavior. The driver should
+have a fallback when the properties are not present to avoid regressions
+like these.
 
-url:    https://github.com/0day-ci/linux/commits/Gabriele-Paoloni/LPC-legacy-ISA-I-O-support/20170526-033719
-config: ia64-allmodconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
+Please work with the driver maintainer to either get them to revert
+their change that regresses you, or promptly fix it appropriately with
+fallback values.
 
-All errors (new ones prefixed by >>):
+Also, the driver changes were commited back in March, with plenty of time
+to land DT changes well before the merge window. Waiting until the merge
+window is closed is not appropriate -- this should have come in earlier.
 
-   drivers/built-in.o: In function `acpi_scan_init':
->> (.init.text+0x6742): undefined reference to `acpi_indirectio_scan_init'
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 47743 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170526/e1dfddfc/attachment-0001.gz>
+-Olof
