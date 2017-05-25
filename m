@@ -1,47 +1,73 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 25 May 2017 15:18:31 +0200
-Subject: [PATCH v4 0/8] Fix issues and factorize arm/arm64 capacity
- information code
-In-Reply-To: <20170524144515.nuccflbdashlqmcs@e106622-lin>
-References: <20170420144316.15632-1-juri.lelli@arm.com>
- <20170511084830.rn32pvi6weej2cna@e106622-lin>
- <20170511085952.GA6934@kroah.com>
- <20170511102718.qy54ajkzphasymhr@e106622-lin>
- <20170524144515.nuccflbdashlqmcs@e106622-lin>
-Message-ID: <20170525131831.GF16244@kroah.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 25 May 2017 14:20:16 +0100
+Subject: [PATCH v4 2/2] PCI: Add tango PCIe host bridge support
+In-Reply-To: <a7d4752f-001d-ba7e-07ff-435643a7e661@free.fr>
+References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+ <4a354b33-d59c-4ebb-4b31-0388ac8090d4@sigmadesigns.com>
+ <62bb805a-abd6-9aca-3641-8037f42a3b95@arm.com>
+ <57673076-4fbd-92ab-453c-3d77fd65407f@free.fr>
+ <1b0ec9c9-1036-619e-19c7-16818ca728e3@arm.com>
+ <a7d4752f-001d-ba7e-07ff-435643a7e661@free.fr>
+Message-ID: <276e40e8-6539-2765-7ce7-9a942b56d54d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 03:45:15PM +0100, Juri Lelli wrote:
-> Hi,
+On 25/05/17 13:41, Mason wrote:
+> On 25/05/2017 14:23, Marc Zyngier wrote:
+>> On 25/05/17 13:00, Mason wrote:
+>>> On 25/05/2017 10:48, Marc Zyngier wrote:
+>>>> Please have some defines for these magic values.
+>>>
+>>> Typical driver do
+>>> #define MUX_OFFSET 0x48
+>>> and then access the register's value through
+>>> readl_relaxed(pcie->base + MUX_OFFSET);
+>>>
+>>> I can't do that because the registers were shuffled around
+>>> between revision 1 and revision 2. Thus, instead of an
+>>> explicitly-named macro (MUX_OFFSET), I used an explicitly-
+>>> named field (pcie->mux) and access the register's value
+>>> through readl_relaxed(pcie->mux);
+>>
+>> That doesn't prevent you from having a TANGO_V1_MUX_OFFSET define, which
+>> you can supplement with a V2 at some point.
+>>
+>>> This is equivalent to providing the offset definitions in the
+>>> init functions, instead of at the top of the file.
+>>
+>> Sorry, my brain parses text far better than hex number.
 > 
-> On 11/05/17 11:27, Juri Lelli wrote:
-> > On 11/05/17 10:59, Greg KH wrote:
-> > > On Thu, May 11, 2017 at 09:48:30AM +0100, Juri Lelli wrote:
-> > > > Hi Greg,
-> > > > 
-> > > > I'm not sure what your plans are with this set. Are we targeting 4.12?
-> > > > 
-> > > > IMHO, if possible, it would be good to have this refactoring in now, so
-> > > > that we can base further development on it for the next cycle.
-> > > 
-> > > It's way too late for new features that have not been in linux-next for
-> > > a few weeks, to get merged into 4.12-rc1, sorry.  I'll review this
-> > > patchset after -rc1 is out, and I get a chance to catch up on pending
-> > > patches.
-> > > 
-> > 
-> > Thanks for your reply, I perfecly understand.
-> > 
-> > OK, let's target 4.13 then. Looking forward to receive your comments
-> > after -rc1 is out.
-> > 
+> Well, the hex numbers do need to show up somewhere :-)
 > 
-> Did you have any chance to have a look at this set?
+> IIUC, you're saying that
+> #define MUX_OFFSET 0x48
+> is clearer than
+> pcie->mux = base + 0x48;
 
-Now reviewed.  Looks fine except for the final names in the last patch,
-naming is hard, I know :)
+yes.
 
-thanks,
+> 
+> OK, I can accept that. Maybe our brains have been trained
+> to easily recognize and ingest the macro, or maybe it's
+> the caps, or maybe the fact that the statement does
+> several things (addition and assignment and hex).
+> 
+> Out of curiosity, how would you feel about
+> pcie->MUX_OFFSET = 0x48;
+> and then using
+> readl_relaxed(pcie->base + pcie->MUX_OFFSET);
+> 
+> It feels weird to me, I think mostly because it is
+> an unusual pattern.
 
-greg k-h
+Exactly. Use existing practices help the reviewers quite a lot.
+
+> 
+> Anyway, I'll add the macros, if that improves review and
+> maintenance.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
