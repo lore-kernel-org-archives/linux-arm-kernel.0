@@ -1,75 +1,46 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Thu, 25 May 2017 12:41:45 -0700
-Subject: [PATCH v2 2/2] arm64: Add support for CLOCK_MONOTONIC_RAW in
- clock_gettime() vDSO
-In-Reply-To: <20170525162938.GT2859@arm.com>
-References: <CAE2F3rCCJG5+cjTgWmHFN7zeJNhudKWyj5owg1aQnWWhMN3oKQ@mail.gmail.com>
- <20170525162938.GT2859@arm.com>
-Message-ID: <CALAqxLXdWkh-P+Lfk1ysj3W6r6RMynkimA5FOD6jR4F1roSV4w@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 25 May 2017 12:44:19 -0700
+Subject: [PATCH] RFC: arm: eBPF JIT compiler
+In-Reply-To: <CAHgaXdJPSemCoaRH_5wSEE6e7sOzPg7XChuWVvykbWia4meOMw@mail.gmail.com>
+References: <1495564433-9750-1-git-send-email-illusionist.neo@gmail.com>
+ <20170523204608.GG24807@lunn.ch>
+ <CAHgaXdJH7VjS__KPOc1scN9d=wxzY0DEQHutiL3qhtQAWd-v-A@mail.gmail.com>
+ <20170523232555.GY13759@lunn.ch>
+ <CAHgaXdKn4J==r_22T3N_7O5oESd8xwL6L+Ot8nT9bGCsSjAkHw@mail.gmail.com>
+ <20170525170051.GC18357@lunn.ch> <20170525172255.GF18357@lunn.ch>
+ <CAHgaXd+CVrDEA=E2=23Qp6wk50=dBnFS6TiCtvphTBMjUywrGg@mail.gmail.com>
+ <20170525182849.GG18357@lunn.ch>
+ <CAHgaXdLCaTwaLiLsmkzWvzSa=67LzqwHkT6cS_CVUm9_8u2_2Q@mail.gmail.com>
+ <20170525184809.GH18357@lunn.ch>
+ <CAHgaXdJPSemCoaRH_5wSEE6e7sOzPg7XChuWVvykbWia4meOMw@mail.gmail.com>
+Message-ID: <dc6d0a88-37e1-54dd-eecc-70989e997324@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 25, 2017 at 9:29 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Daniel,
->
-> [adding John, as I know he's working on patches for this]
->
-> On Mon, May 22, 2017 at 04:56:34PM -0700, Daniel Mentz wrote:
->> One of the tests in the kselftest suite fails for me on a HiKey board
->> (ARM Cortex-A53), and I believe that this change could be related to
->> it. The specific test that fails is
->> tools/testing/selftests/timers/inconsistency-check.c
->
-> Have you got any hints on reproducing this? I've failed to reproduce it
-> so far on any of my machines running 4.12-rc2.
->
-> Which version of the HiKey are you using? The latest one is big.LITTLE
-> with an A73, which has an unfortunate erratum that ends up disabling the
-> vDSO.
->
-> Will
->
->
->> Here is a snippet of the test output:
+On 05/25/2017 12:09 PM, Shubham Bansal wrote:
+> Hi Andrew,
+> 
+> On Fri, May 26, 2017 at 12:18 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> On Fri, May 26, 2017 at 12:05:23AM +0530, Shubham Bansal wrote:
+>>> Hi Andrew,
+>>>
+>>> My Apologies.
+>>>
+>>> I will remove the #ifdef CONFIG_CPU_LITTLE_ENDIAN. Do you have the
+>>> ARMv6 machine you can test it on?
 >>
->> 285:363928252
->> 285:363928252
->> 285:363928252
->> 285:363928252
->> --------------------
->> 285:363974918
->> 285:363974917
->> --------------------
->> 285:363974917
->> 285:363974917
->> 285:363974917
->> 285:363974917
->> 285:363974917
->> 285:363974917
->> 285:363974917
->> 285:363975751
->> 285:363975751
->> 285:363975751
->> 285:363975751
->> 285:363975751
->> 285:363975751
+>> Sorry, i don't have a v6.
 >>
->> As you can see between the two lines "--------------",
->> CLOCK_MONOTONIC_RAW went backwards by one nanosecond.
->
+>> Maybe try kzm with qemu-system-qemu?
+> 
+> I am afraid I not so familiar with qemu, otherwise I would have tried
+> to test the code on ARMv5,6,7 myself.
+> If you can help me with that it would be great, Otherwise I think I
+> have to wait for someone to test it for ARMv6. Although, I am pretty
+> sure it would work on that as it worked on ARMv5.
 
-
-Hey Daniel,
-   Yea. Apologies for the duplicated debugging effort you've done. You
-diagnosed the problem properly.
-
-I've already got patches to fix up the core handling and am testing a
-patch Will provided to correct the vdso. I'll add you to the cc when I
-send to the list.
-
-Will: This was all done on the original HiKey. I can reproduce it with
-4.12-rc2 (as well as 4.9). It looks like your vDSO patch is working
-properly.
-
-thanks
--john
+Using QEMU is far less complex than the patch you wrote, the tricky
+point me be to find an ARMv6 root filesystem, unless you build the
+module into the kernel and let it run its tests.
+-- 
+Florian
