@@ -1,42 +1,41 @@
-From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Thu, 25 May 2017 10:10:55 +0300
-Subject: [PATCH v2 1/2] ARM: dts: orange-pi-zero: specify wifi interrupts
-In-Reply-To: <CAGb2v647GTQW9-ZYrkWS7RoeYTu_7oTm8v4PDs0YD1pZ8oUohQ@mail.gmail.com>
-References: <20170524212433.14386-1-geomatsi@gmail.com>
- <20170524212433.14386-2-geomatsi@gmail.com>
- <CAGb2v647GTQW9-ZYrkWS7RoeYTu_7oTm8v4PDs0YD1pZ8oUohQ@mail.gmail.com>
-Message-ID: <20170525071055.xdd4sbpnzlkg7wa2@speedy.hunter>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Thu, 25 May 2017 15:12:47 +0800
+Subject: [PATCH v2 0/2] dmaengine: mtk-hsdma: add support for Mediatek
+ High-Speed DMA controller on MT7623 SoC
+Message-ID: <cover.1495695814.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> > index 9e8b082c134f..e97dfd1775d1 100644
-> > --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> > +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> > @@ -128,6 +128,9 @@
-> >          */
-> >         xr819: sdio_wifi at 1 {
-> >                 reg = <1>;
-> > +               compatible = "xradio,xr819";
-> 
-> You should submit device tree bindings first. See:
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/Documentation/devicetree/bindings/net/wireless
-> 
-> for examples.
+From: Sean Wang <sean.wang@mediatek.com>
 
-Does it make sense for the out-of-tree driver ?
+Changes since v1:
+- fix typo in the commit message.
+- delete status shown in the dt-binding example.
 
-> > +               interrupt-parent = <&pio>;
-> > +               interrupts = <6 10 IRQ_TYPE_EDGE_RISING>;
-> 
-> Are these optional or required properties? AFAIK SDIO supports in-band
-> interrupts with a bit of overhead, so they should be optional.
+This patchset introduces support for Mediatek High-Speed DMA controller
+(MTK-HSDMA) Currently, the driver is already tested successfully with
+dmatest module on MT7623 SoC. 
 
-Those properties are optional. Driver works anyway, though it complains about
-missing interrupts. IIUC xradio driver falls back to polling mode only if
-xr819 interrupt configuraton is not specified.
+MTK-HSDMA on MT7623 SoC has the single channel which is dedicated to
+memory-to-memory transfer through ring-based descriptor management.
+Even though there is only one physical channel available inside HSDMA,
+the driver is extended to the support for multiple virtual channels
+processing simultaneously in round-round way by means of the feature
+DMA_VIRTUAL_CHANNELS.
 
+Sean Wang (2):
+  dt-bindings: dmaengine: Add Mediatek High-Speed DMA controller
+    bindings
+  dmaengine: mtk-hsdma: Add Mediatek High-Speed DMA controller on MT7623
+    SoC
 
-Regards,
-Sergey
+ .../devicetree/bindings/dma/mtk-hsdma.txt          |  29 +
+ drivers/dma/Kconfig                                |  14 +
+ drivers/dma/Makefile                               |   1 +
+ drivers/dma/mtk-hsdma.c                            | 890 +++++++++++++++++++++
+ 4 files changed, 934 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/mtk-hsdma.txt
+ create mode 100644 drivers/dma/mtk-hsdma.c
+
+-- 
+2.7.4
