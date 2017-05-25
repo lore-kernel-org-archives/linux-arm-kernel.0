@@ -1,98 +1,40 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 25 May 2017 14:00:31 +0200
-Subject: [PATCH v4 2/2] PCI: Add tango PCIe host bridge support
-In-Reply-To: <62bb805a-abd6-9aca-3641-8037f42a3b95@arm.com>
-References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
- <4a354b33-d59c-4ebb-4b31-0388ac8090d4@sigmadesigns.com>
- <62bb805a-abd6-9aca-3641-8037f42a3b95@arm.com>
-Message-ID: <57673076-4fbd-92ab-453c-3d77fd65407f@free.fr>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 25 May 2017 13:04:00 +0100
+Subject: [RFC PATCH v2 5/7] ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+In-Reply-To: <20170525112725.GA6309@afzalpc>
+References: <1495187206-14303-1-git-send-email-vladimir.murzin@arm.com>
+ <1495187206-14303-6-git-send-email-vladimir.murzin@arm.com>
+ <20170525112725.GA6309@afzalpc>
+Message-ID: <1125c9e3-a5d1-f3df-e1aa-d8dcebf38dfc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/05/2017 10:48, Marc Zyngier wrote:
+Hi,
 
-> On 20/04/17 15:31, Marc Gonzalez wrote:
->
->> This driver is required to work around several hardware bugs in the
->> PCIe controller.
->>
->> NB: Revision 1 does not support legacy interrupts, or IO space.
->>
->> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->> ---
->>  Documentation/devicetree/bindings/pci/tango-pcie.txt |  32 ++++++++
->>  drivers/pci/host/Kconfig                             |   8 ++
->>  drivers/pci/host/Makefile                            |   1 +
->>  drivers/pci/host/pcie-tango.c                        | 161 +++++++++++++++++++++++++++++++++++++++
->>  include/linux/pci_ids.h                              |   2 +
->>  5 files changed, 204 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/pci/tango-pcie.txt b/Documentation/devicetree/bindings/pci/tango-pcie.txt
->> new file mode 100644
->> index 000000000000..3353b4e77309
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pci/tango-pcie.txt
->> @@ -0,0 +1,32 @@
->> +Sigma Designs Tango PCIe controller
->> +
->> +Required properties:
->> +
->> +- compatible: "sigma,smp8759-pcie"
->> +- reg: address/size of PCI configuration space, address/size of register area
->> +- device_type: "pci"
->> +- #size-cells: <2>
->> +- #address-cells: <3>
->> +- #interrupt-cells: <1>
+On 25/05/17 12:27, afzal mohammed wrote:
+> Hi,
 > 
-> What is the point of having an #interrupt-cells when this is *not* an
-> interrupt controller (as it doesn't support legacy interrupts)?
-
-My mistake.
-
-Thanks for kindly pointing out that the #interrupt-cells property
-is not needed when a controller doesn't support legacy interrupts.
-
-If a controller does support legacy interrupts, then I see other
-bindings define #interrupt-cells and interrupt-map.
-Is interrupt-controller also required?
-Is that redundant with msi-controller?
-
-(Rev2 will support legacy interrupts.)
-
-References for my own information:
-http://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-http://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/pci/altera-pcie.txt
-http://elinux.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
-
-> As mentioned earlier, this needs to be a separate patch to be reviewed
-> by the Keepers of the Faith (aka the DT maintainers).
-
-robh already acked v3 two months ago, but can split it up,
-and CC the DT folks for v5.
-
->> +static int smp8759_init(struct tango_pcie *pcie, void __iomem *base)
->> +{
->> +	pcie->mux		= base + 0x48;
->> +	pcie->msi_status	= base + 0x80;
->> +	pcie->msi_enable	= base + 0xa0;
->> +	pcie->msi_doorbell	= 0xa0000000 + 0x2e07c;
->> +
->> +	return tango_check_pcie_link(base + 0x74);
+> On Fri, May 19, 2017 at 10:46:44AM +0100, Vladimir Murzin wrote:
+>> The last user of CONFIG_VECTORS_BASE has gone, so kill it.
+>>
+>> Reported-by: Afzal Mohammed <afzal.mohd.ma@gmail.com>
 > 
-> Please have some defines for these magic values.
+> Ending up in this tag has left me scratching my head & amused :),
+> whether you keep any tag or not for me, i do not have any issues.
 
-Typical driver do
-#define MUX_OFFSET 0x48
-and then access the register's value through
-readl_relaxed(pcie->base + MUX_OFFSET);
+According to [1]:
 
-I can't do that because the registers were shuffled around
-between revision 1 and revision 2. Thus, instead of an
-explicitly-named macro (MUX_OFFSET), I used an explicitly-
-named field (pcie->mux) and access the register's value
-through readl_relaxed(pcie->mux);
+"This series also does the preparation for CONFIG_VECTORS_BASE removal."
 
-This is equivalent to providing the offset definitions in the
-init functions, instead of at the top of the file.
+IIRC, that time only thing which stopped you from complete CONFIG_VECTORS_BASE
+removal was MPU code, so I don't see a reason not to give you a credit ;)
 
-Regards.
+[1] https://lkml.org/lkml/2017/1/21/251
+
+Cheers
+Vladimir
+
+> 
+> Regards
+> afzal
+> 
