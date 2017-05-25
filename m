@@ -1,136 +1,34 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 25 May 2017 22:28:24 +0800
-Subject: [linux-sunxi] [PATCH 1/2] ARM: sun8i: v3s: add device nodes for
- DE2 display pipeline
-In-Reply-To: <CAGb2v66UG7nS=3zj=TWGY-BG62tsvSpxucKHT35g=4KGcS8kRA@mail.gmail.com>
-References: <20170524111724.28431-1-icenowy@aosc.io>
- <CAGb2v65bZ+VJYwcP24ipQ+4kuY28Babt-Cpm7uscjmWpcoeJ9g@mail.gmail.com>
- <5FF9B3F8-01F6-4B17-958C-9A4245199716@aosc.io>
- <CAGb2v66UG7nS=3zj=TWGY-BG62tsvSpxucKHT35g=4KGcS8kRA@mail.gmail.com>
-Message-ID: <1B75138F-B045-4E60-BE92-B9AA343CBB1D@aosc.io>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 May 2017 15:48:00 +0100
+Subject: [CFT] Always enable SMP mode on MP capable CPUs
+In-Reply-To: <20170524153847.GY10472@atomide.com>
+References: <20170518105209.GN22219@n2100.armlinux.org.uk>
+ <CAOMZO5Da2R2_t2nU+MdrJiSzvcBQKS4pwYS96r4UyfGc8DtWww@mail.gmail.com>
+ <CAOMZO5Dc=i7UdQH=r5RRr_4GmyZZT+rh7BTNV4WbfqKvtVDfsw@mail.gmail.com>
+ <20170519171526.GW22219@n2100.armlinux.org.uk>
+ <20170524153847.GY10472@atomide.com>
+Message-ID: <20170525144800.GV23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, May 24, 2017 at 08:38:47AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@armlinux.org.uk> [170519 10:19]:
+> > We could expand the table to positively identify the SMP capable CPUs
+> > and enable the SMP bit there, but it's going to add a lot of entries
+> > there (one for each specific ARMv7 MP CPU) and is going to have to be
+> > endlessly added to each time a new SMP CPU comes out.
+> 
+> Looks like commit e414690faa81 ("ARM: always enable SMP mode on SMP cores")
+> causes booting to fail early at least on omap4430 duovero. It's a bit of
+> a mystery as it is SMP.. And pandboard es (4460) and droid 4 (4430) work
+> without the conditional write..
+> 
+> Partial revert like below seems to make it boot again.
 
+Thanks for testing, I'll integrate your change, and it should be in
+tonight's linux-next.
 
-? 2017?5?25? GMT+08:00 ??10:20:33, Chen-Yu Tsai <wens@csie.org> ??:
->On Thu, May 25, 2017 at 9:54 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->>
->>
->> ? 2017?5?25? GMT+08:00 ??4:37:31, Chen-Yu Tsai <wens@csie.org> ??:
->>>On Wed, May 24, 2017 at 7:17 PM, Icenowy Zheng <icenowy@aosc.io>
->wrote:
->>>> Allwinner V3s SoC features a "Display Engine 2.0" with only one
->mixer
->>>> and only one TCON connected to this mixer, which have RGB LCD
->output.
->>>>
->>>> Add device nodes for this display pipeline.
->>>>
->>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>>> ---
->>>>  arch/arm/boot/dts/sun8i-v3s.dtsi | 83
->>>++++++++++++++++++++++++++++++++++++++++
->>>>  1 file changed, 83 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi
->>>b/arch/arm/boot/dts/sun8i-v3s.dtsi
->>>> index a49ebef53c91..3a06dc5b3746 100644
->>>> --- a/arch/arm/boot/dts/sun8i-v3s.dtsi
->>>> +++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
->>>> @@ -61,6 +61,12 @@
->>>>                 };
->>>>         };
->>>>
->>>> +       de: display-engine {
->>>> +               compatible = "allwinner,sun8i-v3s-display-engine";
->>>> +               allwinner,pipelines = <&mixer0>;
->>>> +               status = "disabled";
->>>> +       };
->>>> +
->>>>         timer {
->>>>                 compatible = "arm,armv7-timer";
->>>>                 interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
->>>IRQ_TYPE_LEVEL_LOW)>,
->>>> @@ -95,6 +101,83 @@
->>>>                 #size-cells = <1>;
->>>>                 ranges;
->>>>
->>>> +               display_clocks: clock at 1000000 {
->>>> +                       compatible = "allwinner,sun8i-v3s-de2-clk";
->>>> +                       reg = <0x01000000 0x100000>;
->>>> +                       clocks = <&ccu CLK_DE>,
->>>> +                                <&ccu CLK_BUS_DE>;
->>>> +                       clock-names = "mod",
->>>> +                                     "bus";
->>>> +                       resets = <&ccu RST_BUS_DE>;
->>>> +                       #clock-cells = <1>;
->>>> +                       #reset-cells = <1>;
->>>> +               };
->>>> +
->>>> +               mixer0: mixer at 1100000 {
->>>
->>>Since there's only one, can you drop the numbering suffix?
->>>Same with the TCON.
->>
->> I just want to keep the consistency with dual-pipeline SoCs. (H3,
->A64, H5, etc)
->>
->> However, if dropping it is better, I will drop it -- I think usually
->for things
->> that is available for multiple on some SoCs and single on others,
->> we keep the 0 in node name...
->
->You might want that if you were going to include it in another SoC's
->dtsi
->file, such as the situation with A23/A33. However that is not the case
->here.
->Moreover, the datasheet lists them without the number.
-
-OK...
-
->
->>
->>>
->>>> +                       compatible =
->"allwinner,sun8i-v3s-de2-mixer";
->>>> +                       reg = <0x01100000 0x100000>;
->>>
->>>The display engine also has an interrupt. Please list it
->>
->> It's a overall interrupt for DE2, not mixer interrupt.
->>
->> I will add it after we have proper interrupt chaining facility for
->DE2.
->>
->> It cannot fit here in mixer node.
->
->Could you elaborate? If it is just shared, then listing it several
->times
->is OK. If the interrupt registers are not in this address space, then
-
-The interrupt dealing code is still not so clear, and totally not
-present in BSP DE2 code (the BSP just didn't use the interrupt).
-
-We doesn't even know where the interrupt register is, and we cannot
-promise it's not broken (as their is even no application of it in BSP).
-
-So it couldn't be added now.
-
->I agree, it needs to be dealt with separately and not added here.
->However
->some thought should be given about how the device tree binding should
->be.
->
->ChenYu
->
->>
->>>
->>>ChenYu
->>
->> --
->> You received this message because you are subscribed to the Google
->Groups "linux-sunxi" group.
->> To unsubscribe from this group and stop receiving emails from it,
->send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> For more options, visit https://groups.google.com/d/optout.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
