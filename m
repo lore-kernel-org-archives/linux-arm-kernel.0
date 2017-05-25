@@ -1,49 +1,42 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 May 2017 19:05:41 +0100
-Subject: [CFT] Always enable SMP mode on MP capable CPUs
-In-Reply-To: <20170525151103.GC10472@atomide.com>
-References: <20170518105209.GN22219@n2100.armlinux.org.uk>
- <CAOMZO5Da2R2_t2nU+MdrJiSzvcBQKS4pwYS96r4UyfGc8DtWww@mail.gmail.com>
- <CAOMZO5Dc=i7UdQH=r5RRr_4GmyZZT+rh7BTNV4WbfqKvtVDfsw@mail.gmail.com>
- <20170519171526.GW22219@n2100.armlinux.org.uk>
- <20170524153847.GY10472@atomide.com>
- <20170525144800.GV23750@n2100.armlinux.org.uk>
- <20170525151103.GC10472@atomide.com>
-Message-ID: <20170525180540.GW23750@n2100.armlinux.org.uk>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 25 May 2017 11:24:07 -0700
+Subject: [PATCH v2 0/2] clk: meson: mark clk81 as critical
+In-Reply-To: <20170524093932.5262-1-jbrunet@baylibre.com>
+References: <20170524093932.5262-1-jbrunet@baylibre.com>
+Message-ID: <149573664766.52617.13819592607084950756@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 25, 2017 at 08:11:03AM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@armlinux.org.uk> [170525 07:51]:
-> > On Wed, May 24, 2017 at 08:38:47AM -0700, Tony Lindgren wrote:
-> > > * Russell King - ARM Linux <linux@armlinux.org.uk> [170519 10:19]:
-> > > > We could expand the table to positively identify the SMP capable CPUs
-> > > > and enable the SMP bit there, but it's going to add a lot of entries
-> > > > there (one for each specific ARMv7 MP CPU) and is going to have to be
-> > > > endlessly added to each time a new SMP CPU comes out.
-> > > 
-> > > Looks like commit e414690faa81 ("ARM: always enable SMP mode on SMP cores")
-> > > causes booting to fail early at least on omap4430 duovero. It's a bit of
-> > > a mystery as it is SMP.. And pandboard es (4460) and droid 4 (4430) work
-> > > without the conditional write..
-> > > 
-> > > Partial revert like below seems to make it boot again.
-> > 
-> > Thanks for testing, I'll integrate your change, and it should be in
-> > tonight's linux-next.
+Quoting Jerome Brunet (2017-05-24 02:39:30)
+> The GX (gxbb.c) clock controller driver already marks the clk81 clock
+> as criticial. However, the Meson8b clock controller driver does not do
+> this yet.
+> This can lead to a freeze of the whole system when clk81 is disabled
+> by the common clock framework (for example after the last child clock
+> is disabled by a driver which used that child clock).
 > 
-> OK. That may not work on am437x though as it's UP.
+> Changes since v1: [0]
+> With the clock flagged as CRITICAL, CLK_IGNORE_UNUSED is no longer
+> useful. Remove this flag from meson8b and gxbb's clk81.
 
-Maybe this is just too complicated to grasp - in which case just test
-tonight's linux-next on *all* your boards irrespective of the CPU, and
-let me know if there's a regression due to this patch, giving me full
-details of your CPUs (CPU ID numbers, number of CPUs, etc.)  If no one
-reports a regression that doesn't get fixed, I'll merge it during the
-next merge window.
+Both patches look good to me.
 
-(I can't believe that this is proving to be soo complicated...)
+Regards,
+Mike
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> 
+> [0]: https://lkml.kernel.org/r/20170504183201.13175-1-martin.blumenstingl at googlemail.com
+> 
+> Jerome Brunet (1):
+>   clk: gxbb: remove CLK_IGNORE_UNUSED from clk81
+> 
+> Martin Blumenstingl (1):
+>   clk: meson: meson8b: mark clk81 as critical
+> 
+>  drivers/clk/meson/gxbb.c    | 2 +-
+>  drivers/clk/meson/meson8b.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> -- 
+> 2.9.4
+> 
