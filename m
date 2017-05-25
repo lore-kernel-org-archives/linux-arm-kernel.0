@@ -1,37 +1,98 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 25 May 2017 12:37:28 +0100
-Subject: [PATCH v9 7/7] MANTAINERS: Add maintainer for HiSilicon LPC driver
-In-Reply-To: <1495712248-5232-1-git-send-email-gabriele.paoloni@huawei.com>
-References: <1495712248-5232-1-git-send-email-gabriele.paoloni@huawei.com>
-Message-ID: <1495712248-5232-8-git-send-email-gabriele.paoloni@huawei.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 25 May 2017 14:00:31 +0200
+Subject: [PATCH v4 2/2] PCI: Add tango PCIe host bridge support
+In-Reply-To: <62bb805a-abd6-9aca-3641-8037f42a3b95@arm.com>
+References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+ <4a354b33-d59c-4ebb-4b31-0388ac8090d4@sigmadesigns.com>
+ <62bb805a-abd6-9aca-3641-8037f42a3b95@arm.com>
+Message-ID: <57673076-4fbd-92ab-453c-3d77fd65407f@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added maintainer for drivers/bus/hisi_lpc.c
+On 25/05/2017 10:48, Marc Zyngier wrote:
 
-Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
----
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> On 20/04/17 15:31, Marc Gonzalez wrote:
+>
+>> This driver is required to work around several hardware bugs in the
+>> PCIe controller.
+>>
+>> NB: Revision 1 does not support legacy interrupts, or IO space.
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>>  Documentation/devicetree/bindings/pci/tango-pcie.txt |  32 ++++++++
+>>  drivers/pci/host/Kconfig                             |   8 ++
+>>  drivers/pci/host/Makefile                            |   1 +
+>>  drivers/pci/host/pcie-tango.c                        | 161 +++++++++++++++++++++++++++++++++++++++
+>>  include/linux/pci_ids.h                              |   2 +
+>>  5 files changed, 204 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/tango-pcie.txt b/Documentation/devicetree/bindings/pci/tango-pcie.txt
+>> new file mode 100644
+>> index 000000000000..3353b4e77309
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pci/tango-pcie.txt
+>> @@ -0,0 +1,32 @@
+>> +Sigma Designs Tango PCIe controller
+>> +
+>> +Required properties:
+>> +
+>> +- compatible: "sigma,smp8759-pcie"
+>> +- reg: address/size of PCI configuration space, address/size of register area
+>> +- device_type: "pci"
+>> +- #size-cells: <2>
+>> +- #address-cells: <3>
+>> +- #interrupt-cells: <1>
+> 
+> What is the point of having an #interrupt-cells when this is *not* an
+> interrupt controller (as it doesn't support legacy interrupts)?
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9e98464..8fb9006 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6061,6 +6061,14 @@ F:	include/uapi/linux/if_hippi.h
- F:	net/802/hippi.c
- F:	drivers/net/hippi/
- 
-+HISILICON LPC BUS DRIVER
-+M:	Gabriele Paoloni <gabriele.paoloni@huawei.com>
-+L:	linux-arm-kernel at lists.infradead.org
-+W:	http://www.hisilicon.com
-+S:	Maintained
-+F:	drivers/bus/hisi_lpc.c
-+F:	Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
-+
- HISILICON NETWORK SUBSYSTEM DRIVER
- M:	Yisen Zhuang <yisen.zhuang@huawei.com>
- M:	Salil Mehta <salil.mehta@huawei.com>
--- 
-2.7.4
+My mistake.
+
+Thanks for kindly pointing out that the #interrupt-cells property
+is not needed when a controller doesn't support legacy interrupts.
+
+If a controller does support legacy interrupts, then I see other
+bindings define #interrupt-cells and interrupt-map.
+Is interrupt-controller also required?
+Is that redundant with msi-controller?
+
+(Rev2 will support legacy interrupts.)
+
+References for my own information:
+http://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+http://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/pci/altera-pcie.txt
+http://elinux.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
+
+> As mentioned earlier, this needs to be a separate patch to be reviewed
+> by the Keepers of the Faith (aka the DT maintainers).
+
+robh already acked v3 two months ago, but can split it up,
+and CC the DT folks for v5.
+
+>> +static int smp8759_init(struct tango_pcie *pcie, void __iomem *base)
+>> +{
+>> +	pcie->mux		= base + 0x48;
+>> +	pcie->msi_status	= base + 0x80;
+>> +	pcie->msi_enable	= base + 0xa0;
+>> +	pcie->msi_doorbell	= 0xa0000000 + 0x2e07c;
+>> +
+>> +	return tango_check_pcie_link(base + 0x74);
+> 
+> Please have some defines for these magic values.
+
+Typical driver do
+#define MUX_OFFSET 0x48
+and then access the register's value through
+readl_relaxed(pcie->base + MUX_OFFSET);
+
+I can't do that because the registers were shuffled around
+between revision 1 and revision 2. Thus, instead of an
+explicitly-named macro (MUX_OFFSET), I used an explicitly-
+named field (pcie->mux) and access the register's value
+through readl_relaxed(pcie->mux);
+
+This is equivalent to providing the offset definitions in the
+init functions, instead of at the top of the file.
+
+Regards.
