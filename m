@@ -1,63 +1,64 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 25 May 2017 12:02:39 +0800
-Subject: [PATCH v4 1/9] dt-bindings: arm: mediatek: update for MT7623n SoC and
- relevant boards
-In-Reply-To: <cover.1495683769.git.sean.wang@mediatek.com>
-References: <cover.1495683769.git.sean.wang@mediatek.com>
-Message-ID: <ec281bfc67e633873bb519e607aca67213454b6d.1495683769.git.sean.wang@mediatek.com>
+Date: Thu, 25 May 2017 12:02:38 +0800
+Subject: [PATCH v4 0/9] arm: dts: extend mt7623 support
+Message-ID: <cover.1495683769.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Because there are two versions of MT7623 SoC that is MT7623a and MT7623n
-respectively. So update the part of MT7623n bindings to allow that people
-tend to differentiate which MT7623 SoC the boards applies.
+Changes since v3:
+- explain in the commit message why this binding is changed
+- patches for dt-binding is reordered at the beginning of patch list
+- be concise wigh using SPDX-License-Identifier in new dts file
 
-And "mediatek,mt7623-evb" can be safely changed to
-"mediatek,mt7623n-rfb-nand" because mt7623-evb is a kind of debug board
-internally in Mediatek which real users can't get. So instead we should
-indicate which variants it belongs to with more specific postfix as the
-adding here to let people easily know what board they use.
+Changes since v2:
+- exclude those patch are already queued into v4.11-next/dts32
+- exclude those patches already sent in separation
+- add mt7623a SoC basic support
+- update binding SoC for mt7623n and relevant boards
 
-Signed-off-by: John Crispin <john@phrozen.org>
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- Documentation/devicetree/bindings/arm/mediatek.txt | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Changes since v1:
+Continue the upstream journey based on the previous John Crispin's good work.
+- add fixes for the v1 suggestion
+- fix typo in the commit log
+- add missing pinctrl bindings for mt7623
+- reuse pinctrl driver for mt7623
+- enhance existing nodes since the way for binding is changed e.g USB
+- add more nodes which already gets support from the latest tree e.g MT7530 DSA
+- add the dts file for Bananapi R2 (BPI-R2) board
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index c860b24..0924b62 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -1,6 +1,6 @@
- MediaTek mt65xx, mt67xx & mt81xx Platforms Device Tree Bindings
- 
--Boards with a MediaTek mt65xx/mt67xx/mt81xx SoC shall have the
-+Boards with a MediaTek mt65xx/mt67xx/mt762x/mt81xx SoC shall have the
- following property:
- 
- Required root node property:
-@@ -12,7 +12,7 @@ compatible: Must contain one of
-    "mediatek,mt6592"
-    "mediatek,mt6755"
-    "mediatek,mt6795"
--   "mediatek,mt7623"
-+   "mediatek,mt7623" which is referred to MT7623N SoC
-    "mediatek,mt8127"
-    "mediatek,mt8135"
-    "mediatek,mt8173"
-@@ -38,9 +38,9 @@ Supported boards:
- - Evaluation board for MT6795(Helio X10):
-     Required root node properties:
-       - compatible = "mediatek,mt6795-evb", "mediatek,mt6795";
--- Evaluation board for MT7623:
-+- Reference  board for MT7623n with NAND:
-     Required root node properties:
--      - compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
-+      - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
- - MTK mt8127 tablet moose EVB:
-     Required root node properties:
-       - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
+John Crispin (4):
+  arm: dts: mt7623: add mt7623-mt6323.dtsi file
+  arm: dts: mt7623: cleanup the mt7623n rfb uart nodes
+  arm: dts: mt7623: enable the usb device on the mt7623n rfb
+  arm: dts: mt7623: enable the nand device on the mt7623n nand rfb
+
+Sean Wang (5):
+  dt-bindings: arm: mediatek: update for MT7623n SoC and relevant boards
+  dt-bindings: arm: mediatek: add bindings for mediatek MT7623a SoC
+    Platform
+  arm: dts: mt7623: rename mt7623-evb.dts to
+    arch/arm/boot/dts/mt7623n-rfb.dtsi
+  ARM: mediatek: add MT7623a smp bringup code
+  arm: dts: mt7623: add dts file for Bananapi R2 (BPI-R2) board
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |  11 +-
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/mt7623-evb.dts                   |  33 --
+ arch/arm/boot/dts/mt7623-mt6323.dtsi               | 269 +++++++++++++
+ arch/arm/boot/dts/mt7623.dtsi                      |   8 +-
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      | 440 +++++++++++++++++++++
+ arch/arm/boot/dts/mt7623n-rfb-nand.dts             | 109 +++++
+ arch/arm/boot/dts/mt7623n-rfb.dtsi                 |  61 +++
+ arch/arm/mach-mediatek/mediatek.c                  |   2 +
+ arch/arm/mach-mediatek/platsmp.c                   |   1 +
+ 10 files changed, 895 insertions(+), 42 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/mt7623-evb.dts
+ create mode 100644 arch/arm/boot/dts/mt7623-mt6323.dtsi
+ create mode 100644 arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+ create mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
+ create mode 100644 arch/arm/boot/dts/mt7623n-rfb.dtsi
+
 -- 
 2.7.4
