@@ -1,44 +1,56 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 25 May 2017 15:19:42 +0800
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: add hi8435 device
-In-Reply-To: <486f703b-fc8a-ccc1-134d-a908df798b2e@cogentembedded.com>
-References: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
- <a74ee28c1c62fee5a5e75dda70a02990@agner.ch>
- <076f6258-f0b4-6ba5-9670-e2c0582a92b5@cogentembedded.com>
- <20170522182119.GN29447@lunn.ch>
- <486f703b-fc8a-ccc1-134d-a908df798b2e@cogentembedded.com>
-Message-ID: <20170525071940.GV26102@dragon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 25 May 2017 15:21:44 +0800
+Subject: [PATCH v2 1/2] ARM: dts: orange-pi-zero: specify wifi interrupts
+In-Reply-To: <20170525071055.xdd4sbpnzlkg7wa2@speedy.hunter>
+References: <20170524212433.14386-1-geomatsi@gmail.com>
+ <20170524212433.14386-2-geomatsi@gmail.com>
+ <CAGb2v647GTQW9-ZYrkWS7RoeYTu_7oTm8v4PDs0YD1pZ8oUohQ@mail.gmail.com>
+ <20170525071055.xdd4sbpnzlkg7wa2@speedy.hunter>
+Message-ID: <CAGb2v671hWDaTqCAJiN0JAuiPynW+=XtN+Xr5WiyTPDSkk9-FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 09:02:27AM +0300, Nikita Yushchenko wrote:
-> >> However, hi8435 driver historically was coded using inverted values
-> >> passed to gpiolib calls.  And there are setups in the wild with device
-> >> trees containing GPIO_ACTIVE_HIGH that I'd prefer not breaking.
-> >>
-> >> To solve, I submitted a patch on hi8435 driver that changes to _raw()
-> >> gpio calls (thus making it independent of what is written in device
-> >> tree), and want [future] device trees not to contain explicitly written
-> >> gpio polarity.
-> > 
-> > So maybe add another #define, GPIO_ACTIVE_IGNORED, to make it clear
-> > that it does not matter what value you put there, it is ignored.
-> 
-> "Crap origin" here is that in vast majority of cases, polarity is
-> per-chip, not per-chip-use, knowledge. And proper location for per-chip
-> knowledge is chip's driver.  Moving this knowledge to per-chip-use
-> location in device trees only provides a source for errors, with little
-> gain.
-> 
-> Vladimir Barinov mentions possibility that signal can be inverted by
-> board between gpio provider and chip's pin ...   but do we have at least
-> one practical case of this?  And if we even do, it's quite uncommon, and
-> something special should be required in device tree for these special
-> cases and not for "normal" cases.
+On Thu, May 25, 2017 at 3:10 PM, Sergey Matyukevich <geomatsi@gmail.com> wrote:
+>> > diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+>> > index 9e8b082c134f..e97dfd1775d1 100644
+>> > --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+>> > +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+>> > @@ -128,6 +128,9 @@
+>> >          */
+>> >         xr819: sdio_wifi at 1 {
+>> >                 reg = <1>;
+>> > +               compatible = "xradio,xr819";
+>>
+>> You should submit device tree bindings first. See:
+>>
+>> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/Documentation/devicetree/bindings/net/wireless
+>>
+>> for examples.
+>
+> Does it make sense for the out-of-tree driver ?
 
-I disagree.  Not for hi8435, but I have seen quite some board designs
-invert GPIOs before getting them into board level components.  That's
-why we should define those xxx-gpios properties on board level DTS,
-where polarity can be chosen per board design.
+There is already a binding for ESP8089, which is supported out of tree.
+There are also bindings for Mali GPUs which are, again, supported out
+of tree.
 
-Shawn
+AFAIK there was some discussion about this during the submission of the
+Mali bindings. A set of stable bindings allows the vendor to create stable
+device trees. Given that the binding for this WiFi chip is relatively simple,
+and it might be compatible or similar to an existing chip already supported
+in kernel (but without a binding), it should be straight forward.
+
+>
+>> > +               interrupt-parent = <&pio>;
+>> > +               interrupts = <6 10 IRQ_TYPE_EDGE_RISING>;
+>>
+>> Are these optional or required properties? AFAIK SDIO supports in-band
+>> interrupts with a bit of overhead, so they should be optional.
+>
+> Those properties are optional. Driver works anyway, though it complains about
+> missing interrupts. IIUC xradio driver falls back to polling mode only if
+> xr819 interrupt configuraton is not specified.
+
+So it doesn't support in-band SDIO interrupts right now. Is that a hardware
+or driver limitation?
+
+ChenYu
