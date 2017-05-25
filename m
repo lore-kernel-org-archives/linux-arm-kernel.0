@@ -1,152 +1,363 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 24 May 2017 17:29:33 -0700
-Subject: [PATCH v7 18/34] platform: video-mux: include temporary mmio-mux
- support
+Date: Wed, 24 May 2017 17:29:32 -0700
+Subject: [PATCH v7 17/34] platform: add video-multiplexer subdevice driver
 In-Reply-To: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1495672189-29164-19-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1495672189-29164-18-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Philipp Zabel <p.zabel@pengutronix.de>
 
-As long as the mux framework is not merged, add temporary mmio-mux
-support to the video-mux driver itself. This patch is to be reverted
-once the "mux: minimal mux subsystem" and "mux: mmio-based syscon mux
-controller" patches are merged.
+This driver can handle SoC internal and external video bus multiplexers,
+controlled by mux controllers provided by the mux controller framework,
+such as MMIO register bitfields or GPIOs. The subdevice passes through
+the mbus configuration of the active input to the output side.
 
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 ---
- drivers/media/platform/Kconfig     |  1 -
- drivers/media/platform/video-mux.c | 62 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 62 insertions(+), 1 deletion(-)
+ drivers/media/platform/Kconfig     |   7 +
+ drivers/media/platform/Makefile    |   2 +
+ drivers/media/platform/video-mux.c | 295 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 304 insertions(+)
+ create mode 100644 drivers/media/platform/video-mux.c
 
 diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-index b98f755..fea1dc0 100644
+index ac026ee..b98f755 100644
 --- a/drivers/media/platform/Kconfig
 +++ b/drivers/media/platform/Kconfig
-@@ -77,7 +77,6 @@ config VIDEO_M32R_AR_M64278
- config VIDEO_MUX
- 	tristate "Video Multiplexer"
- 	depends on OF && VIDEO_V4L2_SUBDEV_API && MEDIA_CONTROLLER
--	depends on MULTIPLEXER
- 	help
- 	  This driver provides support for N:1 video bus multiplexers.
+@@ -74,6 +74,13 @@ config VIDEO_M32R_AR_M64278
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called arv.
  
++config VIDEO_MUX
++	tristate "Video Multiplexer"
++	depends on OF && VIDEO_V4L2_SUBDEV_API && MEDIA_CONTROLLER
++	depends on MULTIPLEXER
++	help
++	  This driver provides support for N:1 video bus multiplexers.
++
+ config VIDEO_OMAP3
+ 	tristate "OMAP 3 Camera support"
+ 	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API && ARCH_OMAP3
+diff --git a/drivers/media/platform/Makefile b/drivers/media/platform/Makefile
+index 63303d6..a636302 100644
+--- a/drivers/media/platform/Makefile
++++ b/drivers/media/platform/Makefile
+@@ -28,6 +28,8 @@ obj-$(CONFIG_VIDEO_SH_VEU)		+= sh_veu.o
+ 
+ obj-$(CONFIG_VIDEO_MEM2MEM_DEINTERLACE)	+= m2m-deinterlace.o
+ 
++obj-$(CONFIG_VIDEO_MUX)			+= video-mux.o
++
+ obj-$(CONFIG_VIDEO_S3C_CAMIF) 		+= s3c-camif/
+ obj-$(CONFIG_VIDEO_SAMSUNG_EXYNOS4_IS) 	+= exynos4-is/
+ obj-$(CONFIG_VIDEO_SAMSUNG_S5P_JPEG)	+= s5p-jpeg/
 diff --git a/drivers/media/platform/video-mux.c b/drivers/media/platform/video-mux.c
-index 5ce2bd3..630dd9a 100644
---- a/drivers/media/platform/video-mux.c
+new file mode 100644
+index 0000000..5ce2bd3
+--- /dev/null
 +++ b/drivers/media/platform/video-mux.c
-@@ -17,7 +17,12 @@
- #include <linux/err.h>
- #include <linux/module.h>
- #include <linux/mutex.h>
-+#ifdef CONFIG_MULTIPLEXER
- #include <linux/mux/consumer.h>
-+#else
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
-+#endif
- #include <linux/of.h>
- #include <linux/of_graph.h>
- #include <linux/platform_device.h>
-@@ -29,7 +34,11 @@ struct video_mux {
- 	struct v4l2_subdev subdev;
- 	struct media_pad *pads;
- 	struct v4l2_mbus_framefmt *format_mbus;
-+#ifdef CONFIG_MULTIPLEXER
- 	struct mux_control *mux;
-+#else
-+	struct regmap_field *field;
-+#endif
- 	struct mutex lock;
- 	int active;
- };
-@@ -70,7 +79,11 @@ static int video_mux_link_setup(struct media_entity *entity,
- 		}
- 
- 		dev_dbg(sd->dev, "setting %d active\n", local->index);
-+#ifdef CONFIG_MULTIPLEXER
- 		ret = mux_control_try_select(vmux->mux, local->index);
-+#else
-+		ret = regmap_field_write(vmux->field, local->index);
-+#endif
- 		if (ret < 0)
- 			goto out;
- 		vmux->active = local->index;
-@@ -79,7 +92,9 @@ static int video_mux_link_setup(struct media_entity *entity,
- 			goto out;
- 
- 		dev_dbg(sd->dev, "going inactive\n");
-+#ifdef CONFIG_MULTIPLEXER
- 		mux_control_deselect(vmux->mux);
-+#endif
- 		vmux->active = -1;
- 	}
- 
-@@ -193,6 +208,48 @@ static const struct v4l2_subdev_ops video_mux_subdev_ops = {
- 	.video = &video_mux_subdev_video_ops,
- };
- 
-+#ifndef CONFIG_MULTIPLEXER
-+static int video_mux_probe_mmio_mux(struct video_mux *vmux)
+@@ -0,0 +1,295 @@
++/*
++ * video stream multiplexer controlled via mux control
++ *
++ * Copyright (C) 2013 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
++ * Copyright (C) 2016-2017 Pengutronix, Philipp Zabel <kernel@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/err.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/mux/consumer.h>
++#include <linux/of.h>
++#include <linux/of_graph.h>
++#include <linux/platform_device.h>
++#include <media/v4l2-async.h>
++#include <media/v4l2-device.h>
++#include <media/v4l2-subdev.h>
++
++struct video_mux {
++	struct v4l2_subdev subdev;
++	struct media_pad *pads;
++	struct v4l2_mbus_framefmt *format_mbus;
++	struct mux_control *mux;
++	struct mutex lock;
++	int active;
++};
++
++static inline struct video_mux *v4l2_subdev_to_video_mux(struct v4l2_subdev *sd)
 +{
-+	struct device *dev = vmux->subdev.dev;
-+	struct of_phandle_args args;
-+	struct reg_field field;
-+	struct regmap *regmap;
-+	u32 reg, mask;
-+	int ret;
++	return container_of(sd, struct video_mux, subdev);
++}
 +
-+	ret = of_parse_phandle_with_args(dev->of_node, "mux-controls",
-+					 "#mux-control-cells", 0, &args);
-+	if (ret)
-+		return ret;
++static int video_mux_link_setup(struct media_entity *entity,
++				const struct media_pad *local,
++				const struct media_pad *remote, u32 flags)
++{
++	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
++	struct video_mux *vmux = v4l2_subdev_to_video_mux(sd);
++	int ret = 0;
 +
-+	if (!of_device_is_compatible(args.np, "mmio-mux"))
++	/*
++	 * The mux state is determined by the enabled sink pad link.
++	 * Enabling or disabling the source pad link has no effect.
++	 */
++	if (local->flags & MEDIA_PAD_FL_SOURCE)
++		return 0;
++
++	dev_dbg(sd->dev, "link setup '%s':%d->'%s':%d[%d]",
++		remote->entity->name, remote->index, local->entity->name,
++		local->index, flags & MEDIA_LNK_FL_ENABLED);
++
++	mutex_lock(&vmux->lock);
++
++	if (flags & MEDIA_LNK_FL_ENABLED) {
++		if (vmux->active == local->index)
++			goto out;
++
++		if (vmux->active >= 0) {
++			ret = -EBUSY;
++			goto out;
++		}
++
++		dev_dbg(sd->dev, "setting %d active\n", local->index);
++		ret = mux_control_try_select(vmux->mux, local->index);
++		if (ret < 0)
++			goto out;
++		vmux->active = local->index;
++	} else {
++		if (vmux->active != local->index)
++			goto out;
++
++		dev_dbg(sd->dev, "going inactive\n");
++		mux_control_deselect(vmux->mux);
++		vmux->active = -1;
++	}
++
++out:
++	mutex_unlock(&vmux->lock);
++	return ret;
++}
++
++static const struct media_entity_operations video_mux_ops = {
++	.link_setup = video_mux_link_setup,
++	.link_validate = v4l2_subdev_link_validate,
++};
++
++static int video_mux_s_stream(struct v4l2_subdev *sd, int enable)
++{
++	struct video_mux *vmux = v4l2_subdev_to_video_mux(sd);
++	struct v4l2_subdev *upstream_sd;
++	struct media_pad *pad;
++
++	if (vmux->active == -1) {
++		dev_err(sd->dev, "Can not start streaming on inactive mux\n");
 +		return -EINVAL;
++	}
 +
-+	regmap = syscon_node_to_regmap(args.np->parent);
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
++	pad = media_entity_remote_pad(&sd->entity.pads[vmux->active]);
++	if (!pad) {
++		dev_err(sd->dev, "Failed to find remote source pad\n");
++		return -ENOLINK;
++	}
 +
-+	ret = of_property_read_u32_index(args.np, "mux-reg-masks",
-+					 2 * args.args[0], &reg);
-+	if (!ret)
-+		ret = of_property_read_u32_index(args.np, "mux-reg-masks",
-+						 2 * args.args[0] + 1, &mask);
-+	if (ret < 0)
-+		return ret;
++	if (!is_media_entity_v4l2_subdev(pad->entity)) {
++		dev_err(sd->dev, "Upstream entity is not a v4l2 subdev\n");
++		return -ENODEV;
++	}
 +
-+	field.reg = reg;
-+	field.msb = fls(mask) - 1;
-+	field.lsb = ffs(mask) - 1;
++	upstream_sd = media_entity_to_v4l2_subdev(pad->entity);
 +
-+	vmux->field = devm_regmap_field_alloc(dev, regmap, field);
-+	if (IS_ERR(vmux->field))
-+		return PTR_ERR(vmux->field);
++	return v4l2_subdev_call(upstream_sd, video, s_stream, enable);
++}
++
++static const struct v4l2_subdev_video_ops video_mux_subdev_video_ops = {
++	.s_stream = video_mux_s_stream,
++};
++
++static struct v4l2_mbus_framefmt *
++__video_mux_get_pad_format(struct v4l2_subdev *sd,
++			   struct v4l2_subdev_pad_config *cfg,
++			   unsigned int pad, u32 which)
++{
++	struct video_mux *vmux = v4l2_subdev_to_video_mux(sd);
++
++	switch (which) {
++	case V4L2_SUBDEV_FORMAT_TRY:
++		return v4l2_subdev_get_try_format(sd, cfg, pad);
++	case V4L2_SUBDEV_FORMAT_ACTIVE:
++		return &vmux->format_mbus[pad];
++	default:
++		return NULL;
++	}
++}
++
++static int video_mux_get_format(struct v4l2_subdev *sd,
++				struct v4l2_subdev_pad_config *cfg,
++				struct v4l2_subdev_format *sdformat)
++{
++	struct video_mux *vmux = v4l2_subdev_to_video_mux(sd);
++
++	mutex_lock(&vmux->lock);
++
++	sdformat->format = *__video_mux_get_pad_format(sd, cfg, sdformat->pad,
++						       sdformat->which);
++
++	mutex_unlock(&vmux->lock);
 +
 +	return 0;
 +}
-+#endif
 +
- static int video_mux_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-@@ -230,9 +287,14 @@ static int video_mux_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
-+#ifdef CONFIG_MULTIPLEXER
- 	vmux->mux = devm_mux_control_get(dev, NULL);
- 	if (IS_ERR(vmux->mux)) {
- 		ret = PTR_ERR(vmux->mux);
-+#else
-+	ret = video_mux_probe_mmio_mux(vmux);
-+	if (ret) {
-+#endif
- 		if (ret != -EPROBE_DEFER)
- 			dev_err(dev, "Failed to get mux: %d\n", ret);
- 		return ret;
++static int video_mux_set_format(struct v4l2_subdev *sd,
++				struct v4l2_subdev_pad_config *cfg,
++				struct v4l2_subdev_format *sdformat)
++{
++	struct video_mux *vmux = v4l2_subdev_to_video_mux(sd);
++	struct v4l2_mbus_framefmt *mbusformat;
++	struct media_pad *pad = &vmux->pads[sdformat->pad];
++
++	mbusformat = __video_mux_get_pad_format(sd, cfg, sdformat->pad,
++						sdformat->which);
++	if (!mbusformat)
++		return -EINVAL;
++
++	mutex_lock(&vmux->lock);
++
++	/* Source pad mirrors active sink pad, no limitations on sink pads */
++	if ((pad->flags & MEDIA_PAD_FL_SOURCE) && vmux->active >= 0)
++		sdformat->format = vmux->format_mbus[vmux->active];
++
++	*mbusformat = sdformat->format;
++
++	mutex_unlock(&vmux->lock);
++
++	return 0;
++}
++
++static const struct v4l2_subdev_pad_ops video_mux_pad_ops = {
++	.get_fmt = video_mux_get_format,
++	.set_fmt = video_mux_set_format,
++};
++
++static const struct v4l2_subdev_ops video_mux_subdev_ops = {
++	.pad = &video_mux_pad_ops,
++	.video = &video_mux_subdev_video_ops,
++};
++
++static int video_mux_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct device *dev = &pdev->dev;
++	struct device_node *ep;
++	struct video_mux *vmux;
++	unsigned int num_pads = 0;
++	int ret;
++	int i;
++
++	vmux = devm_kzalloc(dev, sizeof(*vmux), GFP_KERNEL);
++	if (!vmux)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, vmux);
++
++	v4l2_subdev_init(&vmux->subdev, &video_mux_subdev_ops);
++	snprintf(vmux->subdev.name, sizeof(vmux->subdev.name), "%s", np->name);
++	vmux->subdev.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
++	vmux->subdev.dev = dev;
++
++	/*
++	 * The largest numbered port is the output port. It determines
++	 * total number of pads.
++	 */
++	for_each_endpoint_of_node(np, ep) {
++		struct of_endpoint endpoint;
++
++		of_graph_parse_endpoint(ep, &endpoint);
++		num_pads = max(num_pads, endpoint.port + 1);
++	}
++
++	if (num_pads < 2) {
++		dev_err(dev, "Not enough ports %d\n", num_pads);
++		return -EINVAL;
++	}
++
++	vmux->mux = devm_mux_control_get(dev, NULL);
++	if (IS_ERR(vmux->mux)) {
++		ret = PTR_ERR(vmux->mux);
++		if (ret != -EPROBE_DEFER)
++			dev_err(dev, "Failed to get mux: %d\n", ret);
++		return ret;
++	}
++
++	mutex_init(&vmux->lock);
++	vmux->active = -1;
++	vmux->pads = devm_kcalloc(dev, num_pads, sizeof(*vmux->pads),
++				  GFP_KERNEL);
++	vmux->format_mbus = devm_kcalloc(dev, num_pads,
++					 sizeof(*vmux->format_mbus),
++					 GFP_KERNEL);
++
++	for (i = 0; i < num_pads - 1; i++)
++		vmux->pads[i].flags = MEDIA_PAD_FL_SINK;
++	vmux->pads[num_pads - 1].flags = MEDIA_PAD_FL_SOURCE;
++
++	vmux->subdev.entity.function = MEDIA_ENT_F_VID_MUX;
++	ret = media_entity_pads_init(&vmux->subdev.entity, num_pads,
++				     vmux->pads);
++	if (ret < 0)
++		return ret;
++
++	vmux->subdev.entity.ops = &video_mux_ops;
++
++	return v4l2_async_register_subdev(&vmux->subdev);
++}
++
++static int video_mux_remove(struct platform_device *pdev)
++{
++	struct video_mux *vmux = platform_get_drvdata(pdev);
++	struct v4l2_subdev *sd = &vmux->subdev;
++
++	v4l2_async_unregister_subdev(sd);
++	media_entity_cleanup(&sd->entity);
++
++	return 0;
++}
++
++static const struct of_device_id video_mux_dt_ids[] = {
++	{ .compatible = "video-mux", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, video_mux_dt_ids);
++
++static struct platform_driver video_mux_driver = {
++	.probe		= video_mux_probe,
++	.remove		= video_mux_remove,
++	.driver		= {
++		.of_match_table = video_mux_dt_ids,
++		.name = "video-mux",
++	},
++};
++
++module_platform_driver(video_mux_driver);
++
++MODULE_DESCRIPTION("video stream multiplexer");
++MODULE_AUTHOR("Sascha Hauer, Pengutronix");
++MODULE_AUTHOR("Philipp Zabel, Pengutronix");
++MODULE_LICENSE("GPL");
 -- 
 2.7.4
