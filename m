@@ -1,35 +1,24 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 26 May 2017 01:44:43 +0200
-Subject: [PATCH 1/2] net: dsa: mv88e6xxx: Add eeprom-length to binding
-In-Reply-To: <1495755884-31341-1-git-send-email-andrew@lunn.ch>
-References: <1495755884-31341-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1495755884-31341-2-git-send-email-andrew@lunn.ch>
+Date: Fri, 26 May 2017 01:44:42 +0200
+Subject: [PATCH 0/2] Document and use eeprom-length property
+Message-ID: <1495755884-31341-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The binding documentation for the mv88e6xxx switch is missing the
-eeprom-length property, which has been implemented since May 2016,
-commit f8cd8753def0 ("dsa: mv88e6xxx: Handle eeprom-length property")
+The mv88e6xxx switch driver allows the size of the attached EEPROM to
+be described in DT. This property is missing from the binding
+documentation. Add it. And make use of it on the ZII Devel B board.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
+David, Shawn, please could you talk amongs yourself to decide who
+takes what.
+
+Andrew Lunn (2):
+  net: dsa: mv88e6xxx: Add eeprom-length to binding
+  ARM: VF610: ZII devel b: Add switch eeprom-length properties
+
  Documentation/devicetree/bindings/net/dsa/marvell.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/vf610-zii-dev-rev-b.dts             | 2 ++
+ 2 files changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/dsa/marvell.txt b/Documentation/devicetree/bindings/net/dsa/marvell.txt
-index 7ef9dbb08957..1d4d0f49c9d0 100644
---- a/Documentation/devicetree/bindings/net/dsa/marvell.txt
-+++ b/Documentation/devicetree/bindings/net/dsa/marvell.txt
-@@ -26,6 +26,10 @@ Optional properties:
- - interrupt-controller	: Indicates the switch is itself an interrupt
- 			  controller. This is used for the PHY interrupts.
- #interrupt-cells = <2>	: Controller uses two cells, number and flag
-+- eeprom-length		: Set to the length of an EEPROM connected to the
-+			  switch. Must be set if the switch can not detect
-+			  the presence and/or size of a connected EEPROM,
-+			  otherwise optional.
- - mdio			: Container of PHY and devices on the switches MDIO
- 			  bus.
- - mdio?		: Container of PHYs and devices on the external MDIO
 -- 
 2.11.0
