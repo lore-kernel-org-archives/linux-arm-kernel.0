@@ -1,117 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 25 May 2017 13:23:24 +0100
-Subject: [PATCH v4 2/2] PCI: Add tango PCIe host bridge support
-In-Reply-To: <57673076-4fbd-92ab-453c-3d77fd65407f@free.fr>
-References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
- <4a354b33-d59c-4ebb-4b31-0388ac8090d4@sigmadesigns.com>
- <62bb805a-abd6-9aca-3641-8037f42a3b95@arm.com>
- <57673076-4fbd-92ab-453c-3d77fd65407f@free.fr>
-Message-ID: <1b0ec9c9-1036-619e-19c7-16818ca728e3@arm.com>
+From: ruxandra.radulescu@nxp.com (Ruxandra Ioana Radulescu)
+Date: Thu, 25 May 2017 12:31:17 +0000
+Subject: [PATCH 1/2] staging: fsl-dpaa2/eth: Fix address translations
+In-Reply-To: <59257DB0.8010604@nxp.com>
+References: <20170524121328.16984-1-ruxandra.radulescu@nxp.com>
+ <59257DB0.8010604@nxp.com>
+Message-ID: <VI1PR0402MB28477848AE840A1E5C819C3E94FF0@VI1PR0402MB2847.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/05/17 13:00, Mason wrote:
-> On 25/05/2017 10:48, Marc Zyngier wrote:
+> -----Original Message-----
+> From: Laurentiu Tudor
+> Sent: Wednesday, May 24, 2017 3:34 PM
+> To: Ruxandra Ioana Radulescu <ruxandra.radulescu@nxp.com>;
+> gregkh at linuxfoundation.org
+> Cc: devel at driverdev.osuosl.org; linux-kernel at vger.kernel.org;
+> agraf at suse.de; arnd at arndb.de; linux-arm-kernel at lists.infradead.org;
+> iommu at lists.linux-foundation.org; Bogdan Purcareata
+> <bogdan.purcareata@nxp.com>; stuyoder at gmail.com; Nipun Gupta
+> <nipun.gupta@nxp.com>
+> Subject: Re: [PATCH 1/2] staging: fsl-dpaa2/eth: Fix address translations
 > 
->> On 20/04/17 15:31, Marc Gonzalez wrote:
->>
->>> This driver is required to work around several hardware bugs in the
->>> PCIe controller.
->>>
->>> NB: Revision 1 does not support legacy interrupts, or IO space.
->>>
->>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>> ---
->>>  Documentation/devicetree/bindings/pci/tango-pcie.txt |  32 ++++++++
->>>  drivers/pci/host/Kconfig                             |   8 ++
->>>  drivers/pci/host/Makefile                            |   1 +
->>>  drivers/pci/host/pcie-tango.c                        | 161 +++++++++++++++++++++++++++++++++++++++
->>>  include/linux/pci_ids.h                              |   2 +
->>>  5 files changed, 204 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/pci/tango-pcie.txt b/Documentation/devicetree/bindings/pci/tango-pcie.txt
->>> new file mode 100644
->>> index 000000000000..3353b4e77309
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/pci/tango-pcie.txt
->>> @@ -0,0 +1,32 @@
->>> +Sigma Designs Tango PCIe controller
->>> +
->>> +Required properties:
->>> +
->>> +- compatible: "sigma,smp8759-pcie"
->>> +- reg: address/size of PCI configuration space, address/size of register area
->>> +- device_type: "pci"
->>> +- #size-cells: <2>
->>> +- #address-cells: <3>
->>> +- #interrupt-cells: <1>
->>
->> What is the point of having an #interrupt-cells when this is *not* an
->> interrupt controller (as it doesn't support legacy interrupts)?
+> Hi Ioana,
 > 
-> My mistake.
+> Debatable nit inline.
 > 
-> Thanks for kindly pointing out that the #interrupt-cells property
-> is not needed when a controller doesn't support legacy interrupts.
+> On 05/24/2017 03:13 PM, Ioana Radulescu wrote:
+> > Use the correct mechanisms for translating a DMA-mapped IOVA
+> > address into a virtual one. Without this fix, once SMMU is
+> > enabled on Layerscape platforms, the Ethernet driver throws
+> > IOMMU translation faults.
+> >
+> > Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+> > Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
+> > ---
+> >   drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c | 25
+> +++++++++++++++++++------
+> >   drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h |  1 +
+> >   2 files changed, 20 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
+> b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
+> > index 6f9eed66c64d..3fee0d6f17e0 100644
+> > --- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
+> > +++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
+> > @@ -37,6 +37,7 @@
+> >   #include <linux/interrupt.h>
+> >   #include <linux/msi.h>
+> >   #include <linux/kthread.h>
+> > +#include <linux/iommu.h>
+> >
+> >   #include "../../fsl-mc/include/mc.h"
+> >   #include "../../fsl-mc/include/mc-sys.h"
+> > @@ -54,6 +55,16 @@ MODULE_DESCRIPTION("Freescale DPAA2 Ethernet
+> Driver");
+> >
+> >   const char dpaa2_eth_drv_version[] = "0.1";
+> >
+> > +static void *dpaa2_iova_to_virt(struct iommu_domain *domain,
 > 
-> If a controller does support legacy interrupts, then I see other
-> bindings define #interrupt-cells and interrupt-map.
-> Is interrupt-controller also required?
-
-Probably.
-
-> Is that redundant with msi-controller?
-
-No.
-
-> (Rev2 will support legacy interrupts.)
-> 
-> References for my own information:
-> http://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> http://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/pci/altera-pcie.txt
-> http://elinux.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
-> 
->> As mentioned earlier, this needs to be a separate patch to be reviewed
->> by the Keepers of the Faith (aka the DT maintainers).
-> 
-> robh already acked v3 two months ago, but can split it up,
-> and CC the DT folks for v5.
-
-You didn't add the Acked-by to this patch, making Rob's effort pretty
-useless.
-
->>> +static int smp8759_init(struct tango_pcie *pcie, void __iomem *base)
->>> +{
->>> +	pcie->mux		= base + 0x48;
->>> +	pcie->msi_status	= base + 0x80;
->>> +	pcie->msi_enable	= base + 0xa0;
->>> +	pcie->msi_doorbell	= 0xa0000000 + 0x2e07c;
->>> +
->>> +	return tango_check_pcie_link(base + 0x74);
->>
->> Please have some defines for these magic values.
-> 
-> Typical driver do
-> #define MUX_OFFSET 0x48
-> and then access the register's value through
-> readl_relaxed(pcie->base + MUX_OFFSET);
-> 
-> I can't do that because the registers were shuffled around
-> between revision 1 and revision 2. Thus, instead of an
-> explicitly-named macro (MUX_OFFSET), I used an explicitly-
-> named field (pcie->mux) and access the register's value
-> through readl_relaxed(pcie->mux);
-
-That doesn't prevent you from having a TANGO_V1_MUX_OFFSET define, which
-you can supplement with a V2 at some point.
-
-> This is equivalent to providing the offset definitions in the
-> init functions, instead of at the top of the file.
-
-Sorry, my brain parses text far better than hex number.
+> if you pass a "struct dpaa2_eth_priv *priv" instead of "iommu_domain"
+> you can move the priv->iommu_domain reference in the function and
+> slightly simplify the call sites.
+ 
+Fair point, but I'd prefer keeping this function independent of the
+Ethernet driver's private data structure. This way, if other (future)
+DPAA2 drivers will need a similar function, we can just move it
+to a common area instead of duplicating the code.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Ioana
