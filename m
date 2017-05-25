@@ -1,41 +1,35 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 26 May 2017 01:44:44 +0200
-Subject: [PATCH 2/2] ARM: VF610: ZII devel b: Add switch eeprom-length
- properties
+Date: Fri, 26 May 2017 01:44:43 +0200
+Subject: [PATCH 1/2] net: dsa: mv88e6xxx: Add eeprom-length to binding
 In-Reply-To: <1495755884-31341-1-git-send-email-andrew@lunn.ch>
 References: <1495755884-31341-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1495755884-31341-3-git-send-email-andrew@lunn.ch>
+Message-ID: <1495755884-31341-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two of the Ethernet switches on this board have EEPROMs connected.
-Add the eeprom-length property to the device tree, making it possible
-to access the EEPROM using ethtool -e.
+The binding documentation for the mv88e6xxx switch is missing the
+eeprom-length property, which has been implemented since May 2016,
+commit f8cd8753def0 ("dsa: mv88e6xxx: Handle eeprom-length property")
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/net/dsa/marvell.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-index 37f95427616f..acdf12ad0622 100644
---- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-+++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-@@ -78,6 +78,7 @@
- 				interrupts = <27 IRQ_TYPE_LEVEL_LOW>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
-+				eeprom-length = <512>;
- 
- 				ports {
- 					#address-cells = <1>;
-@@ -163,6 +164,7 @@
- 				interrupts = <26 IRQ_TYPE_LEVEL_LOW>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
-+				eeprom-length = <512>;
- 
- 				ports {
- 					#address-cells = <1>;
+diff --git a/Documentation/devicetree/bindings/net/dsa/marvell.txt b/Documentation/devicetree/bindings/net/dsa/marvell.txt
+index 7ef9dbb08957..1d4d0f49c9d0 100644
+--- a/Documentation/devicetree/bindings/net/dsa/marvell.txt
++++ b/Documentation/devicetree/bindings/net/dsa/marvell.txt
+@@ -26,6 +26,10 @@ Optional properties:
+ - interrupt-controller	: Indicates the switch is itself an interrupt
+ 			  controller. This is used for the PHY interrupts.
+ #interrupt-cells = <2>	: Controller uses two cells, number and flag
++- eeprom-length		: Set to the length of an EEPROM connected to the
++			  switch. Must be set if the switch can not detect
++			  the presence and/or size of a connected EEPROM,
++			  otherwise optional.
+ - mdio			: Container of PHY and devices on the switches MDIO
+ 			  bus.
+ - mdio?		: Container of PHYs and devices on the external MDIO
 -- 
 2.11.0
