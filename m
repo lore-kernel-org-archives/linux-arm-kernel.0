@@ -1,36 +1,58 @@
-From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Thu, 25 May 2017 11:38:08 +0300
-Subject: [PATCH v2 1/2] ARM: dts: orange-pi-zero: specify wifi interrupts
-In-Reply-To: <DAC099FE-6655-4EE2-A68A-AD2C5BBDDF76@aosc.io>
-References: <20170524212433.14386-1-geomatsi@gmail.com>
- <20170524212433.14386-2-geomatsi@gmail.com>
- <CAGb2v647GTQW9-ZYrkWS7RoeYTu_7oTm8v4PDs0YD1pZ8oUohQ@mail.gmail.com>
- <20170525071055.xdd4sbpnzlkg7wa2@speedy.hunter>
- <CAGb2v671hWDaTqCAJiN0JAuiPynW+=XtN+Xr5WiyTPDSkk9-FQ@mail.gmail.com>
- <DAC099FE-6655-4EE2-A68A-AD2C5BBDDF76@aosc.io>
-Message-ID: <CAFGfvX79A0+Q3iPgfQ8tDG5BX78Gp_PCtbsk8ogiSCd9fC+mug@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 25 May 2017 16:39:50 +0800
+Subject: [linux-sunxi] [PATCH 2/2] ARM: sun8i: v3s: add pinmux for LCD
+ pins of V3s SoC
+In-Reply-To: <20170524111724.28431-2-icenowy@aosc.io>
+References: <20170524111724.28431-1-icenowy@aosc.io>
+ <20170524111724.28431-2-icenowy@aosc.io>
+Message-ID: <CAGb2v65eC7eRn+JP_PZmF0w2e38rat5mta=xj9yamXQfB4mUsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> Those properties are optional. Driver works anyway, though it
->>complains about
->>> missing interrupts. IIUC xradio driver falls back to polling mode
->>only if
->>> xr819 interrupt configuraton is not specified.
->>
->>So it doesn't support in-band SDIO interrupts right now. Is that a
->>hardware
->>or driver limitation?
+Hi,
+
+On Wed, May 24, 2017 at 7:17 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> Allwinner V3s SoC features a set of pins that have functionality of RGB
+> LCD, the pins are at different pin ban than other SoCs.
 >
-> The original driver code modified by me to mainline uses in-band interrupts.
+> Add pinctrl node for them.
 >
-> But dgp modified it to use out-of-band interrupts.
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun8i-v3s.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
+> index 3a06dc5b3746..81e5406661b4 100644
+> --- a/arch/arm/boot/dts/sun8i-v3s.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
+> @@ -297,6 +297,15 @@
+>                                 function = "i2c0";
+>                         };
+>
+> +                       lcd_rgb666_pins: lcd_rgb666 {
 
-Current patch was intended to simplify using out of the box the following
-out-of-tree driver: https://github.com/fifteenhex/xradio.
+Please don't use underscores in the node name. Also, Please end the name
+with -pins. The node name should at least have that to indicate what it is.
 
-Could you please share a bit more details about the drivers you mention here.
-Is there any xr819 mainlining efforts ongoing ?
+ChenYu
 
-Regards,
-Sergey
+> +                               pins = "PE0", "PE1", "PE2", "PE3", "PE4",
+> +                                      "PE5", "PE6", "PE7", "PE8", "PE9",
+> +                                      "PE10", "PE11", "PE12", "PE13", "PE14",
+> +                                      "PE15", "PE16", "PE17", "PE18", "PE19",
+> +                                      "PE23", "PE24";
+> +                               function = "lcd";
+> +                       };
+> +
+>                         uart0_pins_a: uart0 at 0 {
+>                                 pins = "PB8", "PB9";
+>                                 function = "uart0";
+> --
+> 2.12.2
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
