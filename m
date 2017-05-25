@@ -1,84 +1,34 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Thu, 25 May 2017 16:32:32 -0400
-Subject: [PATCH] soc/fsl/qbman: Check if CPU is offline when initializing
- portals
-Message-ID: <1495744352-22476-1-git-send-email-roy.pledge@nxp.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 25 May 2017 22:54:55 +0200
+Subject: [PATCH 2/2] timer: imx-tpm: add imx tpm timer support
+In-Reply-To: <1494660575-30465-2-git-send-email-aisheng.dong@nxp.com>
+References: <1494660575-30465-1-git-send-email-aisheng.dong@nxp.com>
+ <1494660575-30465-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170525205455.GB9501@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the affine portal for a specific CPU is offline at boot time
-affine its interrupt to CPU 0. If the CPU is later brought online
-the hotplug handler will correctly adjust the affinity.
+On Sat, May 13, 2017 at 03:29:35PM +0800, Dong Aisheng wrote:
+> IMX Timer/PWM Module (TPM) supports both timer and pwm function while
+> this patch only adds the timer support. PWM would be added later.
+> 
+> The TPM counter, compare and capture registers are clocked by an
+> asynchronous clock that can remain enabled in low power modes.
+> 
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
 
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
----
- drivers/soc/fsl/qbman/bman.c | 17 +++++++++++++----
- drivers/soc/fsl/qbman/qman.c | 18 +++++++++++++-----
- 2 files changed, 26 insertions(+), 9 deletions(-)
+[ ... ]
 
-diff --git a/drivers/soc/fsl/qbman/bman.c b/drivers/soc/fsl/qbman/bman.c
-index 1fa9099..b72a92c 100644
---- a/drivers/soc/fsl/qbman/bman.c
-+++ b/drivers/soc/fsl/qbman/bman.c
-@@ -560,10 +560,19 @@ static int bman_create_portal(struct bman_portal *portal,
- 		dev_err(c->dev, "request_irq() failed\n");
- 		goto fail_irq;
- 	}
--	if (c->cpu != -1 && irq_can_set_affinity(c->irq) &&
--	    irq_set_affinity(c->irq, cpumask_of(c->cpu))) {
--		dev_err(c->dev, "irq_set_affinity() failed\n");
--		goto fail_affinity;
-+	if (cpu_online(c->cpu) && c->cpu != -1 &&
-+	    irq_can_set_affinity(c->irq)) {
-+		if (irq_set_affinity(c->irq, cpumask_of(c->cpu))) {
-+			dev_err(c->dev, "irq_set_affinity() failed %d\n",
-+				c->cpu);
-+			goto fail_affinity;
-+		}
-+	} else {
-+		/* CPU is offline, direct IRQ to CPU 0 */
-+		if (irq_set_affinity(c->irq, cpumask_of(0))) {
-+			dev_err(c->dev, "irq_set_affinity() cpu 0 failed\n");
-+			goto fail_affinity;
-+		}
- 	}
- 
- 	/* Need RCR to be empty before continuing */
-diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
-index aebcf16..b1b1268 100644
---- a/drivers/soc/fsl/qbman/qman.c
-+++ b/drivers/soc/fsl/qbman/qman.c
-@@ -941,7 +941,6 @@ static inline int qm_mc_result_timeout(struct qm_portal *portal,
- 			break;
- 		udelay(1);
- 	} while (--timeout);
--
- 	return timeout;
- }
- 
-@@ -1218,10 +1217,19 @@ static int qman_create_portal(struct qman_portal *portal,
- 		dev_err(c->dev, "request_irq() failed\n");
- 		goto fail_irq;
- 	}
--	if (c->cpu != -1 && irq_can_set_affinity(c->irq) &&
--	    irq_set_affinity(c->irq, cpumask_of(c->cpu))) {
--		dev_err(c->dev, "irq_set_affinity() failed\n");
--		goto fail_affinity;
-+	if (cpu_online(c->cpu) && c->cpu != -1 &&
-+	    irq_can_set_affinity(c->irq)) {
-+		if (irq_set_affinity(c->irq, cpumask_of(c->cpu))) {
-+			dev_err(c->dev, "irq_set_affinity() failed %d\n",
-+				c->cpu);
-+			goto fail_affinity;
-+		}
-+	} else {
-+		/* CPU is offline, direct IRQ to CPU 0 */
-+		if (irq_set_affinity(c->irq, cpumask_of(0))) {
-+			dev_err(c->dev, "irq_set_affinity() cpu 0 failed\n");
-+			goto fail_affinity;
-+		}
- 	}
- 
- 	/* Need EQCR to be empty before continuing */
--- 
-2.7.4
+> +	val = __raw_readl(timer_base + TPM_C0SC);
+> +	val &= ~(TPM_C0SC_MODE_MASK | TPM_C0SC_CHIE);
+> +	__raw_writel(val, timer_base + TPM_C0SC);
+
+Hi Dong,
+
+why are you using __raw_write/__raw_read instead of regular readl/writel?
