@@ -1,37 +1,26 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 25 May 2017 15:31:37 +0800
-Subject: [PATCH 5/6] ARM: sun6i: a31: hummingbird: Enable AXP221's ACIN power
- supply
-In-Reply-To: <20170525073138.20907-1-wens@csie.org>
-References: <20170525073138.20907-1-wens@csie.org>
-Message-ID: <20170525073138.20907-6-wens@csie.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 25 May 2017 15:32:35 +0800
+Subject: [PATCH v5 06/20] ARM: dts: imx: Add generic compatible string
+ for I2C EEPROM
+In-Reply-To: <20170523133448.4794-7-javier@dowhile0.org>
+References: <20170523133448.4794-1-javier@dowhile0.org>
+ <20170523133448.4794-7-javier@dowhile0.org>
+Message-ID: <20170525073233.GW26102@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACIN pins of the AXP221 PMIC on the A31 Hummingbird are tied to the
-DC jack on the board through a 12V to 5V buck converter.
+On Tue, May 23, 2017 at 03:34:34PM +0200, Javier Martinez Canillas wrote:
+> The at24 driver allows to register I2C EEPROM chips using different vendor
+> and devices, but the I2C subsystem does not take the vendor into account
+> when matching using the I2C table since it only has device entries.
+> 
+> But when matching using an OF table, both the vendor and device has to be
+> taken into account so the driver defines only a set of compatible strings
+> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+> 
+> So add this generic fallback to the device node compatible string to make
+> the device to match the driver using the OF device ID table.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
 
-Enable the ACIN power supply.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index 55607208468b..9ecb5f0b3f83 100644
---- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-@@ -253,6 +253,10 @@
- 
- #include "axp22x.dtsi"
- 
-+&ac_power_supply {
-+	status = "okay";
-+};
-+
- &reg_aldo1 {
- 	regulator-min-microvolt = <3300000>;
- 	regulator-max-microvolt = <3300000>;
--- 
-2.11.0
+Applied, thanks.
