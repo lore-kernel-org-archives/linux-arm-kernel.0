@@ -1,68 +1,42 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 25 May 2017 15:00:09 +0800
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: add hi8435 device
-In-Reply-To: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
-References: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
-Message-ID: <20170525070007.GU26102@dragon>
+From: geomatsi@gmail.com (Sergey Matyukevich)
+Date: Thu, 25 May 2017 10:10:55 +0300
+Subject: [PATCH v2 1/2] ARM: dts: orange-pi-zero: specify wifi interrupts
+In-Reply-To: <CAGb2v647GTQW9-ZYrkWS7RoeYTu_7oTm8v4PDs0YD1pZ8oUohQ@mail.gmail.com>
+References: <20170524212433.14386-1-geomatsi@gmail.com>
+ <20170524212433.14386-2-geomatsi@gmail.com>
+ <CAGb2v647GTQW9-ZYrkWS7RoeYTu_7oTm8v4PDs0YD1pZ8oUohQ@mail.gmail.com>
+Message-ID: <20170525071055.xdd4sbpnzlkg7wa2@speedy.hunter>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 04:10:10PM +0300, Nikita Yushchenko wrote:
-> ZII dev board rev B has a Holt Hi8435 connected to dspi2.
-> Add it to device tree.
+> > diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> > index 9e8b082c134f..e97dfd1775d1 100644
+> > --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> > +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> > @@ -128,6 +128,9 @@
+> >          */
+> >         xr819: sdio_wifi at 1 {
+> >                 reg = <1>;
+> > +               compatible = "xradio,xr819";
 > 
-> ZII dev board rev C does not have that, so use rev-b dts file,
-> not common dtsi file.
+> You should submit device tree bindings first. See:
 > 
-> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-> ---
->  arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/Documentation/devicetree/bindings/net/wireless
 > 
-> diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> index 37f95427616f..f433465c3a7c 100644
-> --- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> +++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> @@ -348,6 +348,25 @@
->  	};
->  };
->  
-> +&edma1 {
-> +	status = "okay";
-> +};
-> +
-> +&dspi2 {
+> for examples.
 
-Please keep these labelled nodes sort alphabetically.
+Does it make sense for the out-of-tree driver ?
 
-> +	bus-num = <1>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_dspi2>;
-> +	status = "okay";
-
-We usually have 'status' line at the bottom of property list.
-
-> +	spi-num-chipselects = <2>;
-> +
-> +	hi8435 at 1 {
-
-Node name should be something generic, while label can be specific
-model name.  The following form might be better.
-
-	hi8435: sensor at 1
-
-Shawn
-
-> +		compatible = "holt,hi8435";
-> +		reg = <1>;
-> +		spi-max-frequency = <20000000>;
-> +		gpios = <&gpio5 3 0>;
-> +	};
-> +};
-> +
->  &i2c0 {
->  	clock-frequency = <100000>;
->  	pinctrl-names = "default";
-> -- 
-> 2.11.0
+> > +               interrupt-parent = <&pio>;
+> > +               interrupts = <6 10 IRQ_TYPE_EDGE_RISING>;
 > 
+> Are these optional or required properties? AFAIK SDIO supports in-band
+> interrupts with a bit of overhead, so they should be optional.
+
+Those properties are optional. Driver works anyway, though it complains about
+missing interrupts. IIUC xradio driver falls back to polling mode only if
+xr819 interrupt configuraton is not specified.
+
+
+Regards,
+Sergey
