@@ -1,31 +1,30 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 25 May 2017 14:33:08 -0700
-Subject: [PATCH v4 03/11] clk: bcm: Add clocks for Stingray SOC
-In-Reply-To: <1495454307-23464-4-git-send-email-anup.patel@broadcom.com>
-References: <1495454307-23464-1-git-send-email-anup.patel@broadcom.com>
- <1495454307-23464-4-git-send-email-anup.patel@broadcom.com>
-Message-ID: <149574798866.52617.17864487502272102012@resonance>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 May 2017 23:10:50 +0100
+Subject: [PATCH] RFC: arm: eBPF JIT compiler
+In-Reply-To: <dc6d0a88-37e1-54dd-eecc-70989e997324@gmail.com>
+References: <20170523232555.GY13759@lunn.ch>
+ <CAHgaXdKn4J==r_22T3N_7O5oESd8xwL6L+Ot8nT9bGCsSjAkHw@mail.gmail.com>
+ <20170525170051.GC18357@lunn.ch> <20170525172255.GF18357@lunn.ch>
+ <CAHgaXd+CVrDEA=E2=23Qp6wk50=dBnFS6TiCtvphTBMjUywrGg@mail.gmail.com>
+ <20170525182849.GG18357@lunn.ch>
+ <CAHgaXdLCaTwaLiLsmkzWvzSa=67LzqwHkT6cS_CVUm9_8u2_2Q@mail.gmail.com>
+ <20170525184809.GH18357@lunn.ch>
+ <CAHgaXdJPSemCoaRH_5wSEE6e7sOzPg7XChuWVvykbWia4meOMw@mail.gmail.com>
+ <dc6d0a88-37e1-54dd-eecc-70989e997324@gmail.com>
+Message-ID: <20170525221050.GL22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Anup,
+On Thu, May 25, 2017 at 12:44:19PM -0700, Florian Fainelli wrote:
+> Using QEMU is far less complex than the patch you wrote, the tricky
+> point me be to find an ARMv6 root filesystem, unless you build the
+> module into the kernel and let it run its tests.
 
-Quoting Anup Patel (2017-05-22 04:58:19)
-> +#include <linux/kernel.h>
-> +#include <linux/err.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
+I beg to differ - when I tried qemu during the last year, it was
+basically completely non-functional for ARM, and I gave up with it.
+I think what you get depends on your distro.
 
-Are all of those headers really needed?
-
-> +CLK_OF_DECLARE(sr_genpll3_clk, "brcm,sr-genpll3",
-> +                       sr_genpll3_clk_init);
-
-Why use CLK_OF_DECLARE here? You've got a proper platform driver here.
-
-Regards,
-Mike
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
