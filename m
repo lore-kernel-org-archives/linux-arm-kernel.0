@@ -1,58 +1,89 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 25 May 2017 16:39:50 +0800
-Subject: [linux-sunxi] [PATCH 2/2] ARM: sun8i: v3s: add pinmux for LCD
- pins of V3s SoC
-In-Reply-To: <20170524111724.28431-2-icenowy@aosc.io>
-References: <20170524111724.28431-1-icenowy@aosc.io>
- <20170524111724.28431-2-icenowy@aosc.io>
-Message-ID: <CAGb2v65eC7eRn+JP_PZmF0w2e38rat5mta=xj9yamXQfB4mUsA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 25 May 2017 09:48:30 +0100
+Subject: [PATCH v4 2/2] PCI: Add tango PCIe host bridge support
+In-Reply-To: <4a354b33-d59c-4ebb-4b31-0388ac8090d4@sigmadesigns.com>
+References: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
+ <4a354b33-d59c-4ebb-4b31-0388ac8090d4@sigmadesigns.com>
+Message-ID: <62bb805a-abd6-9aca-3641-8037f42a3b95@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, May 24, 2017 at 7:17 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> Allwinner V3s SoC features a set of pins that have functionality of RGB
-> LCD, the pins are at different pin ban than other SoCs.
->
-> Add pinctrl node for them.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+On 20/04/17 15:31, Marc Gonzalez wrote:
+> This driver is required to work around several hardware bugs in the
+> PCIe controller.
+> 
+> NB: Revision 1 does not support legacy interrupts, or IO space.
+> 
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 > ---
->  arch/arm/boot/dts/sun8i-v3s.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-> index 3a06dc5b3746..81e5406661b4 100644
-> --- a/arch/arm/boot/dts/sun8i-v3s.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-> @@ -297,6 +297,15 @@
->                                 function = "i2c0";
->                         };
->
-> +                       lcd_rgb666_pins: lcd_rgb666 {
-
-Please don't use underscores in the node name. Also, Please end the name
-with -pins. The node name should at least have that to indicate what it is.
-
-ChenYu
-
-> +                               pins = "PE0", "PE1", "PE2", "PE3", "PE4",
-> +                                      "PE5", "PE6", "PE7", "PE8", "PE9",
-> +                                      "PE10", "PE11", "PE12", "PE13", "PE14",
-> +                                      "PE15", "PE16", "PE17", "PE18", "PE19",
-> +                                      "PE23", "PE24";
-> +                               function = "lcd";
-> +                       };
+>  Documentation/devicetree/bindings/pci/tango-pcie.txt |  32 ++++++++
+>  drivers/pci/host/Kconfig                             |   8 ++
+>  drivers/pci/host/Makefile                            |   1 +
+>  drivers/pci/host/pcie-tango.c                        | 161 +++++++++++++++++++++++++++++++++++++++
+>  include/linux/pci_ids.h                              |   2 +
+>  5 files changed, 204 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/tango-pcie.txt b/Documentation/devicetree/bindings/pci/tango-pcie.txt
+> new file mode 100644
+> index 000000000000..3353b4e77309
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/tango-pcie.txt
+> @@ -0,0 +1,32 @@
+> +Sigma Designs Tango PCIe controller
 > +
->                         uart0_pins_a: uart0 at 0 {
->                                 pins = "PB8", "PB9";
->                                 function = "uart0";
-> --
-> 2.12.2
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> +Required properties:
+> +
+> +- compatible: "sigma,smp8759-pcie"
+> +- reg: address/size of PCI configuration space, address/size of register area
+> +- device_type: "pci"
+> +- #size-cells: <2>
+> +- #address-cells: <3>
+> +- #interrupt-cells: <1>
+
+What is the point of having an #interrupt-cells when this is *not* an
+interrupt controller (as it doesn't support legacy interrupts)?
+
+> +- ranges: translation from system to bus addresses
+> +- interrupts: spec for misc interrupts, spec for MSI
+> +- msi-controller
+> +
+> +http://elinux.org/Device_Tree_Usage#PCI_Address_Translation
+> +http://elinux.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
+> +
+> +Example:
+> +
+> +	pcie at 2e000 {
+> +		compatible = "sigma,smp8759-pcie";
+> +		reg = <0x50000000 SZ_4M>, <0x2e000 0x100>;
+> +		device_type = "pci";
+> +		#size-cells = <2>;
+> +		#address-cells = <3>;
+> +		#interrupt-cells = <1>;
+> +		ranges = <0x02000000 0x0 0x00400000  0x50400000  0x0 SZ_60M>;
+> +		msi-controller;
+> +		interrupts =
+> +			<54 IRQ_TYPE_LEVEL_HIGH>, /* misc interrupts */
+> +			<55 IRQ_TYPE_LEVEL_HIGH>; /* MSI */
+> +	};
+
+As mentioned earlier, this needs to be a separate patch to be reviewed
+by the Keepers of the Faith (aka the DT maintainers).
+
+[...]
+
+> +static int smp8759_init(struct tango_pcie *pcie, void __iomem *base)
+> +{
+> +	pcie->mux		= base + 0x48;
+> +	pcie->msi_status	= base + 0x80;
+> +	pcie->msi_enable	= base + 0xa0;
+> +	pcie->msi_doorbell	= 0xa0000000 + 0x2e07c;
+> +
+> +	return tango_check_pcie_link(base + 0x74);
+
+Please have some defines for these magic values.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
