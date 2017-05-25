@@ -1,65 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 25 May 2017 16:37:31 +0800
-Subject: [linux-sunxi] [PATCH 1/2] ARM: sun8i: v3s: add device nodes for
- DE2 display pipeline
-In-Reply-To: <20170524111724.28431-1-icenowy@aosc.io>
-References: <20170524111724.28431-1-icenowy@aosc.io>
-Message-ID: <CAGb2v65bZ+VJYwcP24ipQ+4kuY28Babt-Cpm7uscjmWpcoeJ9g@mail.gmail.com>
+From: geomatsi@gmail.com (Sergey Matyukevich)
+Date: Thu, 25 May 2017 11:38:08 +0300
+Subject: [PATCH v2 1/2] ARM: dts: orange-pi-zero: specify wifi interrupts
+In-Reply-To: <DAC099FE-6655-4EE2-A68A-AD2C5BBDDF76@aosc.io>
+References: <20170524212433.14386-1-geomatsi@gmail.com>
+ <20170524212433.14386-2-geomatsi@gmail.com>
+ <CAGb2v647GTQW9-ZYrkWS7RoeYTu_7oTm8v4PDs0YD1pZ8oUohQ@mail.gmail.com>
+ <20170525071055.xdd4sbpnzlkg7wa2@speedy.hunter>
+ <CAGb2v671hWDaTqCAJiN0JAuiPynW+=XtN+Xr5WiyTPDSkk9-FQ@mail.gmail.com>
+ <DAC099FE-6655-4EE2-A68A-AD2C5BBDDF76@aosc.io>
+Message-ID: <CAFGfvX79A0+Q3iPgfQ8tDG5BX78Gp_PCtbsk8ogiSCd9fC+mug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 7:17 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> Allwinner V3s SoC features a "Display Engine 2.0" with only one mixer
-> and only one TCON connected to this mixer, which have RGB LCD output.
+>>> Those properties are optional. Driver works anyway, though it
+>>complains about
+>>> missing interrupts. IIUC xradio driver falls back to polling mode
+>>only if
+>>> xr819 interrupt configuraton is not specified.
+>>
+>>So it doesn't support in-band SDIO interrupts right now. Is that a
+>>hardware
+>>or driver limitation?
 >
-> Add device nodes for this display pipeline.
+> The original driver code modified by me to mainline uses in-band interrupts.
 >
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  arch/arm/boot/dts/sun8i-v3s.dtsi | 83 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 83 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-> index a49ebef53c91..3a06dc5b3746 100644
-> --- a/arch/arm/boot/dts/sun8i-v3s.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-> @@ -61,6 +61,12 @@
->                 };
->         };
->
-> +       de: display-engine {
-> +               compatible = "allwinner,sun8i-v3s-display-engine";
-> +               allwinner,pipelines = <&mixer0>;
-> +               status = "disabled";
-> +       };
-> +
->         timer {
->                 compatible = "arm,armv7-timer";
->                 interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> @@ -95,6 +101,83 @@
->                 #size-cells = <1>;
->                 ranges;
->
-> +               display_clocks: clock at 1000000 {
-> +                       compatible = "allwinner,sun8i-v3s-de2-clk";
-> +                       reg = <0x01000000 0x100000>;
-> +                       clocks = <&ccu CLK_DE>,
-> +                                <&ccu CLK_BUS_DE>;
-> +                       clock-names = "mod",
-> +                                     "bus";
-> +                       resets = <&ccu RST_BUS_DE>;
-> +                       #clock-cells = <1>;
-> +                       #reset-cells = <1>;
-> +               };
-> +
-> +               mixer0: mixer at 1100000 {
+> But dgp modified it to use out-of-band interrupts.
 
-Since there's only one, can you drop the numbering suffix?
-Same with the TCON.
+Current patch was intended to simplify using out of the box the following
+out-of-tree driver: https://github.com/fifteenhex/xradio.
 
-> +                       compatible = "allwinner,sun8i-v3s-de2-mixer";
-> +                       reg = <0x01100000 0x100000>;
+Could you please share a bit more details about the drivers you mention here.
+Is there any xr819 mainlining efforts ongoing ?
 
-The display engine also has an interrupt. Please list it.
-
-ChenYu
+Regards,
+Sergey
