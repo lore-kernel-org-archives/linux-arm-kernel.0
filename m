@@ -1,25 +1,55 @@
-From: gnomes@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Thu, 25 May 2017 14:29:20 +0100
-Subject: [PATCH 1/1] xilinx ps uart: Adding a kernel parameter for the
- number of xilinx ps uarts
-In-Reply-To: <b5a032c8-db86-c16b-750f-10aa2a132248@xilinx.com>
-References: <20170520022154.6766-1-kernel.development@povil.us>
- <20170520172008.5a979e8a@alans-desktop>
- <517d864d-d230-3abc-eb3c-4b628dc4625f@xilinx.com>
- <20170522192636.5b578d89@alans-desktop>
- <1668f36e-f9be-7008-004a-e467a6813e0f@xilinx.com>
- <20170523210710.4e84dd2d@alans-desktop>
- <924433a1-7e27-6eb6-71ca-ed7baceb427f@xilinx.com>
- <20170524143108.682a548d@alans-desktop>
- <b5a032c8-db86-c16b-750f-10aa2a132248@xilinx.com>
-Message-ID: <20170525142920.1d662467@alans-desktop>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Thu, 25 May 2017 14:30:34 +0100
+Subject: [PATCH v4 0/8] Fix issues and factorize arm/arm64 capacity
+ information code
+In-Reply-To: <20170525131831.GF16244@kroah.com>
+References: <20170420144316.15632-1-juri.lelli@arm.com>
+ <20170511084830.rn32pvi6weej2cna@e106622-lin>
+ <20170511085952.GA6934@kroah.com>
+ <20170511102718.qy54ajkzphasymhr@e106622-lin>
+ <20170524144515.nuccflbdashlqmcs@e106622-lin>
+ <20170525131831.GF16244@kroah.com>
+Message-ID: <20170525133034.xeyzbl327af6y5zo@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Ok. Is there any problem if uart_register_driver is called for every
-> instance separately with nr=1? This driver has major 0, minor 0. Based
+On 25/05/17 15:18, Greg KH wrote:
+> On Wed, May 24, 2017 at 03:45:15PM +0100, Juri Lelli wrote:
+> > Hi,
+> > 
+> > On 11/05/17 11:27, Juri Lelli wrote:
+> > > On 11/05/17 10:59, Greg KH wrote:
+> > > > On Thu, May 11, 2017 at 09:48:30AM +0100, Juri Lelli wrote:
+> > > > > Hi Greg,
+> > > > > 
+> > > > > I'm not sure what your plans are with this set. Are we targeting 4.12?
+> > > > > 
+> > > > > IMHO, if possible, it would be good to have this refactoring in now, so
+> > > > > that we can base further development on it for the next cycle.
+> > > > 
+> > > > It's way too late for new features that have not been in linux-next for
+> > > > a few weeks, to get merged into 4.12-rc1, sorry.  I'll review this
+> > > > patchset after -rc1 is out, and I get a chance to catch up on pending
+> > > > patches.
+> > > > 
+> > > 
+> > > Thanks for your reply, I perfecly understand.
+> > > 
+> > > OK, let's target 4.13 then. Looking forward to receive your comments
+> > > after -rc1 is out.
+> > > 
+> > 
+> > Did you have any chance to have a look at this set?
+> 
+> Now reviewed.  Looks fine except for the final names in the last patch,
+> naming is hard, I know :)
+> 
 
-If you are doing that level of code restructuring none that I am aware
-of, and if you find one I'm happy to work on fixing it.
+Thanks!
 
-Alan
+Just skimmed through your comments on 8/8. I'll address them in the next
+few days and post again.
+
+Best,
+
+- Juri
