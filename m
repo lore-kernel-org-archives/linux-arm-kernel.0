@@ -1,346 +1,503 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 25 May 2017 12:02:41 +0800
-Subject: [PATCH v4 3/9] arm: dts: mt7623: add mt7623-mt6323.dtsi file
+Date: Thu, 25 May 2017 12:02:47 +0800
+Subject: [PATCH v4 9/9] arm: dts: mt7623: add dts file for Bananapi R2
+ (BPI-R2) board
 In-Reply-To: <cover.1495683769.git.sean.wang@mediatek.com>
 References: <cover.1495683769.git.sean.wang@mediatek.com>
-Message-ID: <2c770301279b10b78382b53529a6b83a6d847e32.1495683769.git.sean.wang@mediatek.com>
+Message-ID: <5cc5489b38fc2723c30c8cfe0d4353f967d100f3.1495683769.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: John Crispin <john@phrozen.org>
+From: Sean Wang <sean.wang@mediatek.com>
 
-MediaTek produces various PMICs. Which one is used depends on the actual
-circuit design. Instead of adding the correct PMIC node to every dts file
-we instead add a new intermediate dtsi file which adds the PMIC node.
-Additionally we also add the phandles for the regulators to various nodes.
+Add support for the Bananapi R2 (BPI-R2) development board from
+BIPAI KEJI. Detailed hardware information for BPI-R2 which could be
+found on http://www.banana-pi.org/r2.html
 
-Signed-off-by: John Crispin <john@phrozen.org>
+The patch currently only adds Mediatek GMAC, MT7530 Switch, the crypto
+engine, USB, IR, I2S, I2C, UART, SPI, PWM, GPIO keys, GPIO LEDs and
+PMIC LEDs. As to the other missing hardware and peripherals, they would
+be added and integrated continuously.
+
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/mt7623-evb.dts     |   2 +-
- arch/arm/boot/dts/mt7623-mt6323.dtsi | 269 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/mt7623.dtsi        |   8 +-
- 3 files changed, 274 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/boot/dts/mt7623-mt6323.dtsi
+ Documentation/devicetree/bindings/arm/mediatek.txt |   2 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      | 440 +++++++++++++++++++++
+ 3 files changed, 443 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
 
-diff --git a/arch/arm/boot/dts/mt7623-evb.dts b/arch/arm/boot/dts/mt7623-evb.dts
-index b60b41c..a769149 100644
---- a/arch/arm/boot/dts/mt7623-evb.dts
-+++ b/arch/arm/boot/dts/mt7623-evb.dts
-@@ -13,7 +13,7 @@
-  */
- 
- /dts-v1/;
--#include "mt7623.dtsi"
-+#include "mt7623-mt6323.dtsi"
- 
- / {
- 	model = "MediaTek MT7623 evaluation board";
-diff --git a/arch/arm/boot/dts/mt7623-mt6323.dtsi b/arch/arm/boot/dts/mt7623-mt6323.dtsi
+diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+index 412c6bd..7b289bd 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+@@ -42,6 +42,8 @@ Supported boards:
+ - Reference  board for MT7623n with NAND:
+     Required root node properties:
+       - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
++- Bananapi BPI-R2 board:
++      - compatible = "bananapi,bpi-r2", "mediatek,mt7623";
+ - MTK mt8127 tablet moose EVB:
+     Required root node properties:
+       - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 20a7c9d..34eb03f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -1035,6 +1035,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
+ 	mt6589-aquaris5.dtb \
+ 	mt6592-evb.dtb \
+ 	mt7623n-rfb-nand.dtb \
++	mt7623n-bananapi-bpi-r2.dtb \
+ 	mt8127-moose.dtb \
+ 	mt8135-evbp1.dtb
+ dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
+diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
 new file mode 100644
-index 0000000..93d3f71
+index 0000000..72c7984
 --- /dev/null
-+++ b/arch/arm/boot/dts/mt7623-mt6323.dtsi
-@@ -0,0 +1,269 @@
++++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+@@ -0,0 +1,440 @@
 +/*
-+ * Copyright (c) 2016 MediaTek Inc.
-+ * Author: John Crispin <john@phrozen.org>
++ * Copyright 2017 Sean Wang <sean.wang@mediatek.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 + */
 +
-+#include "mt7623.dtsi"
++/dts-v1/;
++#include <dt-bindings/input/input.h>
++#include "mt7623-mt6323.dtsi"
 +
-+&cpu0 {
-+	proc-supply = <&mt6323_vproc_reg>;
++/ {
++	model = "Bananapi BPI-R2";
++	compatible = "bananapi,bpi-r2", "mediatek,mt7623";
++
++	aliases {
++		serial2 = &uart2;
++	};
++
++	chosen {
++		stdout-path = "serial2:115200n8";
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&key_pins_a>;
++
++		factory {
++			label = "factory";
++			linux,code = <BTN_0>;
++			gpios = <&pio 256 GPIO_ACTIVE_LOW>;
++		};
++
++		wps {
++			label = "wps";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&pio 257 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_a>;
++
++		red {
++			label = "bpi-r2:pio:red";
++			gpios = <&pio 239 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		green {
++			label = "bpi-r2:pio:green";
++			gpios = <&pio 240 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		blue {
++			label = "bpi-r2:pio:blue";
++			gpios = <&pio 241 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++	};
++
++	memory at 80000000 {
++		reg = <0 0x80000000 0 0x40000000>;
++	};
++
++	sound:sound {
++		compatible = "mediatek,mt2701-wm8960-machine";
++		mediatek,platform = <&afe>;
++		audio-routing =
++			"Headphone", "HP_L",
++			"Headphone", "HP_R",
++			"LINPUT1", "AMIC",
++			"RINPUT1", "AMIC";
++		mediatek,audio-codec = <&wm8960>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2s0_pins_a>;
++	};
 +};
 +
-+&cpu1 {
-+	proc-supply = <&mt6323_vproc_reg>;
++&pio {
++	cir_pins_a:cir at 0 {
++		pins_cir {
++			pinmux = <MT7623_PIN_46_IR_FUNC_IR>;
++			bias-disable;
++		};
++	};
++
++	i2c0_pins_a: i2c at 0 {
++		pins_i2c0 {
++			pinmux = <MT7623_PIN_75_SDA0_FUNC_SDA0>,
++				 <MT7623_PIN_76_SCL0_FUNC_SCL0>;
++			bias-disable;
++		};
++	};
++
++	i2c1_pins_a: i2c at 1 {
++		pin_i2c1 {
++			pinmux = <MT7623_PIN_57_SDA1_FUNC_SDA1>,
++				 <MT7623_PIN_58_SCL1_FUNC_SCL1>;
++			bias-disable;
++		};
++	};
++
++	i2s0_pins_a: i2s at 0 {
++		pin_i2s0 {
++			pinmux = <MT7623_PIN_49_I2S0_DATA_FUNC_I2S0_DATA>,
++				 <MT7623_PIN_72_I2S0_DATA_IN_FUNC_I2S0_DATA_IN>,
++				 <MT7623_PIN_73_I2S0_LRCK_FUNC_I2S0_LRCK>,
++				 <MT7623_PIN_74_I2S0_BCK_FUNC_I2S0_BCK>,
++				 <MT7623_PIN_126_I2S0_MCLK_FUNC_I2S0_MCLK>;
++			drive-strength = <MTK_DRIVE_12mA>;
++			bias-pull-down;
++		};
++	};
++
++	i2s1_pins_a: i2s at 1 {
++		pin_i2s1 {
++			pinmux = <MT7623_PIN_33_I2S1_DATA_FUNC_I2S1_DATA>,
++				 <MT7623_PIN_34_I2S1_DATA_IN_FUNC_I2S1_DATA_IN>,
++				 <MT7623_PIN_35_I2S1_BCK_FUNC_I2S1_BCK>,
++				 <MT7623_PIN_36_I2S1_LRCK_FUNC_I2S1_LRCK>,
++				 <MT7623_PIN_37_I2S1_MCLK_FUNC_I2S1_MCLK>;
++			drive-strength = <MTK_DRIVE_12mA>;
++			bias-pull-down;
++		};
++	};
++
++	key_pins_a: keys at 0 {
++		pins_keys {
++			pinmux = <MT7623_PIN_256_GPIO256_FUNC_GPIO256>,
++				 <MT7623_PIN_257_GPIO257_FUNC_GPIO257> ;
++			input-enable;
++		};
++	};
++
++	led_pins_a: leds at 0 {
++		pins_leds {
++			pinmux = <MT7623_PIN_239_EXT_SDIO0_FUNC_GPIO239>,
++				 <MT7623_PIN_240_EXT_XCS_FUNC_GPIO240>,
++				 <MT7623_PIN_241_EXT_SCK_FUNC_GPIO241>;
++		};
++	};
++
++	mmc0_pins_default: mmc0default {
++		pins_cmd_dat {
++			pinmux = <MT7623_PIN_111_MSDC0_DAT7_FUNC_MSDC0_DAT7>,
++				 <MT7623_PIN_112_MSDC0_DAT6_FUNC_MSDC0_DAT6>,
++				 <MT7623_PIN_113_MSDC0_DAT5_FUNC_MSDC0_DAT5>,
++				 <MT7623_PIN_114_MSDC0_DAT4_FUNC_MSDC0_DAT4>,
++				 <MT7623_PIN_118_MSDC0_DAT3_FUNC_MSDC0_DAT3>,
++				 <MT7623_PIN_119_MSDC0_DAT2_FUNC_MSDC0_DAT2>,
++				 <MT7623_PIN_120_MSDC0_DAT1_FUNC_MSDC0_DAT1>,
++				 <MT7623_PIN_121_MSDC0_DAT0_FUNC_MSDC0_DAT0>,
++				 <MT7623_PIN_116_MSDC0_CMD_FUNC_MSDC0_CMD>;
++			input-enable;
++			bias-pull-up;
++		};
++
++		pins_clk {
++			pinmux = <MT7623_PIN_117_MSDC0_CLK_FUNC_MSDC0_CLK>;
++			bias-pull-down;
++		};
++
++		pins_rst {
++			pinmux = <MT7623_PIN_115_MSDC0_RSTB_FUNC_MSDC0_RSTB>;
++			bias-pull-up;
++		};
++	};
++
++	mmc0_pins_uhs: mmc0 {
++		pins_cmd_dat {
++			pinmux = <MT7623_PIN_111_MSDC0_DAT7_FUNC_MSDC0_DAT7>,
++				 <MT7623_PIN_112_MSDC0_DAT6_FUNC_MSDC0_DAT6>,
++				 <MT7623_PIN_113_MSDC0_DAT5_FUNC_MSDC0_DAT5>,
++				 <MT7623_PIN_114_MSDC0_DAT4_FUNC_MSDC0_DAT4>,
++				 <MT7623_PIN_118_MSDC0_DAT3_FUNC_MSDC0_DAT3>,
++				 <MT7623_PIN_119_MSDC0_DAT2_FUNC_MSDC0_DAT2>,
++				 <MT7623_PIN_120_MSDC0_DAT1_FUNC_MSDC0_DAT1>,
++				 <MT7623_PIN_121_MSDC0_DAT0_FUNC_MSDC0_DAT0>,
++				 <MT7623_PIN_116_MSDC0_CMD_FUNC_MSDC0_CMD>;
++			input-enable;
++			drive-strength = <MTK_DRIVE_2mA>;
++			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
++		};
++
++		pins_clk {
++			pinmux = <MT7623_PIN_117_MSDC0_CLK_FUNC_MSDC0_CLK>;
++			drive-strength = <MTK_DRIVE_2mA>;
++			bias-pull-down = <MTK_PUPD_SET_R1R0_01>;
++		};
++
++		pins_rst {
++			pinmux = <MT7623_PIN_115_MSDC0_RSTB_FUNC_MSDC0_RSTB>;
++			bias-pull-up;
++		};
++	};
++
++	mmc1_pins_default: mmc1default {
++		pins_cmd_dat {
++			pinmux = <MT7623_PIN_107_MSDC1_DAT0_FUNC_MSDC1_DAT0>,
++				 <MT7623_PIN_108_MSDC1_DAT1_FUNC_MSDC1_DAT1>,
++				 <MT7623_PIN_109_MSDC1_DAT2_FUNC_MSDC1_DAT2>,
++				 <MT7623_PIN_110_MSDC1_DAT3_FUNC_MSDC1_DAT3>,
++				 <MT7623_PIN_105_MSDC1_CMD_FUNC_MSDC1_CMD>;
++			input-enable;
++			drive-strength = <MTK_DRIVE_4mA>;
++			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
++		};
++
++		pins_clk {
++			pinmux = <MT7623_PIN_106_MSDC1_CLK_FUNC_MSDC1_CLK>;
++			bias-pull-down;
++			drive-strength = <MTK_DRIVE_4mA>;
++		};
++	};
++
++	mmc1_pins_uhs: mmc1 {
++		pins_cmd_dat {
++			pinmux = <MT7623_PIN_107_MSDC1_DAT0_FUNC_MSDC1_DAT0>,
++				 <MT7623_PIN_108_MSDC1_DAT1_FUNC_MSDC1_DAT1>,
++				 <MT7623_PIN_109_MSDC1_DAT2_FUNC_MSDC1_DAT2>,
++				 <MT7623_PIN_110_MSDC1_DAT3_FUNC_MSDC1_DAT3>,
++				 <MT7623_PIN_105_MSDC1_CMD_FUNC_MSDC1_CMD>;
++			input-enable;
++			drive-strength = <MTK_DRIVE_4mA>;
++			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
++		};
++
++		pins_clk {
++			pinmux = <MT7623_PIN_106_MSDC1_CLK_FUNC_MSDC1_CLK>;
++			drive-strength = <MTK_DRIVE_4mA>;
++			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
++		};
++	};
++
++	spi0_pins_a: spi at 0 {
++		pins_spi {
++			pinmux = <MT7623_PIN_53_SPI0_CSN_FUNC_SPI0_CS>,
++				<MT7623_PIN_54_SPI0_CK_FUNC_SPI0_CK>,
++				<MT7623_PIN_55_SPI0_MI_FUNC_SPI0_MI>,
++				<MT7623_PIN_56_SPI0_MO_FUNC_SPI0_MO>;
++			bias-disable;
++		};
++	};
++
++	pwm_pins_a: pwm at 0 {
++		pins_pwm {
++			pinmux = <MT7623_PIN_203_PWM0_FUNC_PWM0>,
++				 <MT7623_PIN_204_PWM1_FUNC_PWM1>,
++				 <MT7623_PIN_205_PWM2_FUNC_PWM2>,
++				 <MT7623_PIN_206_PWM3_FUNC_PWM3>,
++				 <MT7623_PIN_207_PWM4_FUNC_PWM4>;
++		};
++	};
++
++	uart0_pins_a: uart at 0 {
++		pins_dat {
++			pinmux = <MT7623_PIN_79_URXD0_FUNC_URXD0>,
++				 <MT7623_PIN_80_UTXD0_FUNC_UTXD0>;
++		};
++	};
++
++	uart1_pins_a: uart at 1 {
++		pins_dat {
++			pinmux = <MT7623_PIN_81_URXD1_FUNC_URXD1>,
++				 <MT7623_PIN_82_UTXD1_FUNC_UTXD1>;
++		};
++	};
 +};
 +
-+&cpu2 {
-+	proc-supply = <&mt6323_vproc_reg>;
++&cir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&cir_pins_a>;
++	status = "okay";
 +};
 +
-+&cpu3 {
-+	proc-supply = <&mt6323_vproc_reg>;
++&crypto {
++	status = "okay";
 +};
 +
-+&pwrap {
-+	pmic: mt6323 {
-+		compatible = "mediatek,mt6323";
-+		interrupt-parent = <&pio>;
-+		interrupts = <150 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
++&eth {
++	status = "okay";
++	gmac0: mac at 0 {
++		compatible = "mediatek,eth-mac";
++		reg = <0>;
++		phy-mode = "trgmii";
++		fixed-link {
++			speed = <1000>;
++			full-duplex;
++			pause;
++		};
++	};
 +
-+		mt6323regulator: mt6323regulator{
-+			compatible = "mediatek,mt6323-regulator";
++	mdio: mdio-bus {
++		switch at 0 {
++			compatible = "mediatek,mt7530";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
 +
-+			mt6323_vproc_reg: buck_vproc{
-+				regulator-name = "vproc";
-+				regulator-min-microvolt = < 700000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-ramp-delay = <12500>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
++			pinctrl-names = "default";
++			reset-gpios = <&pio 33 0>;
++			core-supply = <&mt6323_vpa_reg>;
++			io-supply = <&mt6323_vemc3v3_reg>;
 +
-+			mt6323_vsys_reg: buck_vsys{
-+				regulator-name = "vsys";
-+				regulator-min-microvolt = <1400000>;
-+				regulator-max-microvolt = <2987500>;
-+				regulator-ramp-delay = <25000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0>;
++				port at 0 {
++					reg = <0>;
++					label = "lan0";
++				};
 +
-+			mt6323_vpa_reg: buck_vpa{
-+				regulator-name = "vpa";
-+				regulator-min-microvolt = < 500000>;
-+				regulator-max-microvolt = <3650000>;
-+			};
++				port at 1 {
++					reg = <1>;
++					label = "lan1";
++				};
 +
-+			mt6323_vtcxo_reg: ldo_vtcxo{
-+				regulator-name = "vtcxo";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <90>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
++				port at 2 {
++					reg = <2>;
++					label = "lan2";
++				};
 +
-+			mt6323_vcn28_reg: ldo_vcn28{
-+				regulator-name = "vcn28";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <185>;
-+			};
++				port at 3 {
++					reg = <3>;
++					label = "lan3";
++				};
 +
-+			mt6323_vcn33_bt_reg: ldo_vcn33_bt{
-+				regulator-name = "vcn33_bt";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3600000>;
-+				regulator-enable-ramp-delay = <185>;
-+			};
++				port at 4 {
++					reg = <4>;
++					label = "wan";
++				};
 +
-+			mt6323_vcn33_wifi_reg: ldo_vcn33_wifi{
-+				regulator-name = "vcn33_wifi";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3600000>;
-+				regulator-enable-ramp-delay = <185>;
-+			};
-+
-+			mt6323_va_reg: ldo_va{
-+				regulator-name = "va";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vcama_reg: ldo_vcama{
-+				regulator-name = "vcama";
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vio28_reg: ldo_vio28{
-+				regulator-name = "vio28";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vusb_reg: ldo_vusb{
-+				regulator-name = "vusb";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vmc_reg: ldo_vmc{
-+				regulator-name = "vmc";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vmch_reg: ldo_vmch{
-+				regulator-name = "vmch";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vemc3v3_reg: ldo_vemc3v3{
-+				regulator-name = "vemc3v3";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vgp1_reg: ldo_vgp1{
-+				regulator-name = "vgp1";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vgp2_reg: ldo_vgp2{
-+				regulator-name = "vgp2";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vgp3_reg: ldo_vgp3{
-+				regulator-name = "vgp3";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vcn18_reg: ldo_vcn18{
-+				regulator-name = "vcn18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vsim1_reg: ldo_vsim1{
-+				regulator-name = "vsim1";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vsim2_reg: ldo_vsim2{
-+				regulator-name = "vsim2";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vrtc_reg: ldo_vrtc{
-+				regulator-name = "vrtc";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vcamaf_reg: ldo_vcamaf{
-+				regulator-name = "vcamaf";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vibr_reg: ldo_vibr{
-+				regulator-name = "vibr";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+			};
-+
-+			mt6323_vrf18_reg: ldo_vrf18{
-+				regulator-name = "vrf18";
-+				regulator-min-microvolt = <1825000>;
-+				regulator-max-microvolt = <1825000>;
-+				regulator-enable-ramp-delay = <187>;
-+			};
-+
-+			mt6323_vm_reg: ldo_vm{
-+				regulator-name = "vm";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vio18_reg: ldo_vio18{
-+				regulator-name = "vio18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vcamd_reg: ldo_vcamd{
-+				regulator-name = "vcamd";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vcamio_reg: ldo_vcamio{
-+				regulator-name = "vcamio";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
++				port at 6 {
++					reg = <6>;
++					label = "cpu";
++					ethernet = <&gmac0>;
++					phy-mode = "rgmii";
++					fixed-link {
++						speed = <1000>;
++						full-duplex;
++					};
++				};
 +			};
 +		};
 +	};
 +};
 +
-+&mmc0 {
-+	vmmc-supply = <&mt6323_vemc3v3_reg>;
-+	vqmmc-supply = <&mt6323_vio18_reg>;
++&pwrap {
++	mt6323 {
++		mt6323led: led {
++			compatible = "mediatek,mt6323-led";
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			led at 0 {
++				reg = <0>;
++				label = "bpi-r2:isink:green";
++				default-state = "off";
++			};
++			led at 1 {
++				reg = <1>;
++				label = "bpi-r2:isink:red";
++				default-state = "off";
++			};
++			led at 2 {
++				reg = <2>;
++				label = "bpi-r2:isink:blue";
++				default-state = "off";
++			};
++		};
++	};
 +};
 +
-+&mmc1 {
-+	vmmc-supply = <&mt6323_vmch_reg>;
-+	vqmmc-supply = <&mt6323_vmc_reg>;
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
 +};
-diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index d81158b2..e9e0974 100644
---- a/arch/arm/boot/dts/mt7623.dtsi
-+++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -32,22 +32,22 @@
- 		#size-cells = <0>;
- 		enable-method = "mediatek,mt6589-smp";
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x0>;
- 		};
--		cpu at 1 {
-+		cpu1: cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x1>;
- 		};
--		cpu at 2 {
-+		cpu2: cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x2>;
- 		};
--		cpu at 3 {
-+		cpu3: cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x3>;
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++
++	wm8960: wm8960 at 1a {
++		compatible = "wlf,wm8960";
++		reg = <0x1a>;
++	};
++};
++
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm_pins_a>;
++	status = "okay";
++};
++
++&spi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pins_a>;
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "disabled";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins_a>;
++	status = "disabled";
++};
++
++&uart2 {
++	status = "okay";
++};
++
++&u3phy1 {
++	status = "okay";
++};
++
++&u3phy2 {
++	status = "okay";
++};
++
++&usb1 {
++	vusb33-supply = <&mt6323_vusb_reg>;
++	status = "okay";
++};
++
++&usb2 {
++	vusb33-supply = <&mt6323_vusb_reg>;
++	status = "okay";
++};
 -- 
 2.7.4
