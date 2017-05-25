@@ -1,36 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 25 May 2017 16:59:02 -0700
-Subject: [GIT PULL (RESEND)] ARM: uniphier: UniPhier fixes for v4.12
-In-Reply-To: <CAK7LNARbSkbEOhs7QMd+6VV+KWbkjK4LR9rmQ=YBWqPY+8_XPQ@mail.gmail.com>
-References: <CAK7LNARbSkbEOhs7QMd+6VV+KWbkjK4LR9rmQ=YBWqPY+8_XPQ@mail.gmail.com>
-Message-ID: <20170525235902.GA25387@localhost>
+Date: Thu, 25 May 2017 16:59:58 -0700
+Subject: [GIT PULL] DaVinci fixes for v4.12
+In-Reply-To: <ded91b7c-fcd0-0891-23ac-18d9b9e4ea39@ti.com>
+References: <ded91b7c-fcd0-0891-23ac-18d9b9e4ea39@ti.com>
+Message-ID: <20170525235958.GB25387@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 22, 2017 at 11:03:49AM +0900, Masahiro Yamada wrote:
-> Hi Arnd, Olof,
+On Wed, May 24, 2017 at 11:44:53AM +0530, Sekhar Nori wrote:
+> The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 > 
-> Last week, I thought I found a problem in my pull request,
-> but it turned out my misunderstanding.
+>   Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 > 
-> So, my pull request I sent is OK.
-> I am re-sending this request mail for clarification.
+> are available in the git repository at:
 > 
-> Here are some ARM UniPhier SoC fixes for v4.12.
-> Due to the eMMC driver update, PHY parameters must be specified
-> via DT to make the eMMC controller work again.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.12
+> 
+> for you to fetch changes up to 95d7c1f18bf8ac03b0fc48eac1f1b11f867765b8:
+> 
+>   ARM: davinci: PM: Do not free useful resources in normal path in 'davinci_pm_init' (2017-05-17 15:25:18 +0530)
+> 
+> ----------------------------------------------------------------
+> These fix issues with power management initialization code
+> on DaVinci. Some resources were getting freed prematurely.
+> And there was an issue with resources not being on error.
+> 
+> ----------------------------------------------------------------
+> Christophe JAILLET (2):
+>       ARM: davinci: PM: Free resources in error handling path in 'davinci_pm_init'
+>       ARM: davinci: PM: Do not free useful resources in normal path in 'davinci_pm_init'
 
-That's not good, that's a regression in behavior. The driver should
-have a fallback when the properties are not present to avoid regressions
-like these.
-
-Please work with the driver maintainer to either get them to revert
-their change that regresses you, or promptly fix it appropriately with
-fallback values.
-
-Also, the driver changes were commited back in March, with plenty of time
-to land DT changes well before the merge window. Waiting until the merge
-window is closed is not appropriate -- this should have come in earlier.
+Merged, thanks.
 
 
 -Olof
