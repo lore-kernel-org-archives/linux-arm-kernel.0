@@ -1,42 +1,53 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Thu, 25 May 2017 14:17:13 +0300
-Subject: [PATCH v3 3/4] ARM: dts: at91: sama5d2: add ADC hw trigger
+Date: Thu, 25 May 2017 14:17:12 +0300
+Subject: [PATCH v3 2/4] Documentation: dt: iio: at91-sama5d2_adc: add adtrg
+ trigger binding
 In-Reply-To: <1495711034-28410-1-git-send-email-eugen.hristev@microchip.com>
 References: <1495711034-28410-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1495711034-28410-4-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1495711034-28410-3-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ADTRG hardware pin possible edge types as nodes
-and default edge as property to the ADC
+Add node information for ADTRG hardware pin and the three possible
+edge nodes that are available for the driver
 
 Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 ---
- arch/arm/boot/dts/sama5d2.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ .../devicetree/bindings/iio/adc/at91-sama5d2_adc.txt    | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 8067c71..a06ca8d 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -1267,7 +1267,18 @@
- 				atmel,min-sample-rate-hz = <200000>;
- 				atmel,max-sample-rate-hz = <20000000>;
- 				atmel,startup-time-ms = <4>;
-+				atmel,trigger-edge-type = <&external_rising>;
- 				status = "disabled";
+diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+index 3223684..e30ede3 100644
+--- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+@@ -11,6 +11,13 @@ Required properties:
+   - atmel,min-sample-rate-hz: Minimum sampling rate, it depends on SoC.
+   - atmel,max-sample-rate-hz: Maximum sampling rate, it depends on SoC.
+   - atmel,startup-time-ms: Startup time expressed in ms, it depends on SoC.
++  - atmel,trigger-edge-type: phandle to one of the adtrg possible edge types
 +
-+				/* possible edge type for ADTRG trigger pin */
-+				adtrg: adtrg {
-+					external_rising: external_rising {
-+					};
-+					external_falling: external_falling {
-+					};
-+					external_any: external_any {
-+					};
-+				};
- 			};
++Required adtrg node:
++  - Required edge nodes:
++	For each possible edge type for the ADTRG hardware trigger pin,
++	 a specific sub node. The driver recognises only the three possible
++	 edge types: external_rising, external_falling, external_any.
  
- 			pioA: pinctrl at fc038000 {
+ Example:
+ 
+@@ -25,4 +32,14 @@ adc: adc at fc030000 {
+ 	atmel,startup-time-ms = <4>;
+ 	vddana-supply = <&vdd_3v3_lp_reg>;
+ 	vref-supply = <&vdd_3v3_lp_reg>;
++	atmel,trigger-edge-type = <&external_rising>;
++
++	adtrg: adtrg {
++		external_rising: external_rising {
++		};
++		external_falling: external_falling {
++		};
++		external_any: external_any {
++		};
++	};
+ }
 -- 
 2.7.4
