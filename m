@@ -1,75 +1,45 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 25 May 2017 18:27:11 +0100
-Subject: irqchip/irq-gic: BAD_MADT_GICC_ENTRY may fail when booting with
- ACPI 5.1
-In-Reply-To: <e9ca4338-bcf9-3fba-6250-200e05d2be3e@arm.com>
-References: <432c3a63-c89f-dccc-7bdf-9d9a0aaabfe2@arm.com>
- <20170523170657.GA3800@red-moon>
- <25d7230b-1dba-614c-7193-b9e44429b5a1@arm.com>
- <e9ca4338-bcf9-3fba-6250-200e05d2be3e@arm.com>
-Message-ID: <20170525172711.GB3935@red-moon>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Thu, 25 May 2017 10:29:05 -0700
+Subject: [PATCH v11 0/6] FPGA Manager support for altera passive serial
+Message-ID: <20170525172911.11467-1-stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 02:00:02PM +0100, Marc Zyngier wrote:
-> On 24/05/17 12:18, Julien Grall wrote:
-> > Hi Lorenzo,
-> > 
-> > On 05/23/2017 06:06 PM, Lorenzo Pieralisi wrote:
-> >> [+Al]
-> >>
-> >> On Tue, May 23, 2017 at 05:40:28PM +0100, Julien Grall wrote:
-> >>> Hi all,
-> >>>
-> >>> I am currently looking at adding support of ACPI 5.1 in Xen.
-> >>> When trying to boot DOM00 I get a panic in Linux (for the full
-> >>> log see [1]):
-> >>>
-> >>> (XEN) DOM0: [    0.000000] No valid GICC entries exist
-> >>>
-> >>> The error message is coming from gic_v2_acpi_init.
-> >>> Digging down in the code, it is failing because of
-> >>> BAD_MADT_GICC_ENTRY is returning false in
-> >>> gic_acpi_parse_madt_cpu:
-> >>>
-> >>> /* Macros for consistency checks of the GICC subtable of MADT */
-> >>> #define ACPI_MADT_GICC_LENGTH	\
-> >>> 	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
-> >>>
-> >>> #define BAD_MADT_GICC_ENTRY(entry, end)						\
-> >>> 	(!(entry) || (unsigned long)(entry) + sizeof(*(entry)) > (end) ||	\
-> >>> 	 (entry)->header.length != ACPI_MADT_GICC_LENGTH)
-> >>>
-> >>> The 'end' parameter corresponds to the end of the MADT table.
-> >>> In the case of ACPI 5.1, the size of GICC is smaller compare
-> >>> to 6.0+ (76 vs 80 bytes) but the parameter 'entry' is type
-> >>> of acpi_madt_generic_interrupt (sizeof(...) = 80).
-> >>
-> >> #define BAD_MADT_GICC_ENTRY(entry, end)	\
-> >> 	(!(entry) || (entry)->header.length != ACPI_MADT_GICC_LENGTH ||	\
-> >> 	((unsigned long)(entry) + ACPI_MADT_GICC_LENGTH) > (end))
-> >>
-> >> Would this solve it ?
-> > 
-> > Yes, I am now able to boot DOM0 up to the prompt. My concern with this 
-> > solution is the code will still use the acpi_madt_generic_interrupt 
-> > code. If someone tries to access field not existing in 5.1 (such as 
-> > efficiency_class), it may return wrong value or even worst crash.
-> > 
-> > Although, I don't see any user of efficiency_class in Linux so far.
-> 
-> Such code would have to check whether the ACPI version before doing so.
-> To be honest, it is quite surprising we don't have one structure per
-> version of the GICC subtable. This would at least make the user aware of
-> the potential gotcha...
+FPGA Manager passive serial can now support Stratix, Cyclone and Arria
+FPGAs.
+Thanks to Bastian and Anatolij for helping to extend support beyond Cyclone
 
-We will have to, as soon as a) someone starts using the GICC
-efficiency_class field or b) we start using the three bytes left as
-reserved (which I suspect it may happen sooner than we think), whatever
-comes first.
+changes from v10
 
-In the meantime to fix the regression Julien reported, is the kludge
-above ok for everyone ?
+- Rebase on v4.12-rc2
+- Remove an erroneous cyclone-ps-spi.o reference from drivers/fpga/Makefile
+- Change FPGA_MGR_SPI_BITSTREAM_LSB_FIRST tp FPGA_MGR_BITSTREAM_LSB_FIRST
+- Change CONF_DONE "low" to "inactive" in an error message
+- Add a MODULE_DEVICE_TABLE for SPI
+- Patches 1-4 can be merged without 5 and 6
+- Patches 5, and 6 Add back in the bitrev8x4 speed up code newly with support
+  for any size buffer.
 
-Thanks,
-Lorenzo
+Anatolij Gustschin (1):
+  fpga: Add flag to indicate SPI bitstream is bit-reversed
+
+Joshua Clayton (4):
+  doc: dt: add altera-ps-spi binding document
+  fpga manager: Add altera-ps-spi driver for Altera FPGAs
+  ARM: dts: imx6q-evi: support altera-ps-spi
+  lib: add bitrev8x4()
+  fpga-manager: altera-ps-spi: use bitrev8x4
+
+ .../bindings/fpga/altera-passive-serial.txt        |  29 ++
+ arch/arm/boot/dts/imx6q-evi.dts                    |  16 ++
+ drivers/fpga/Kconfig                               |   7 +
+ drivers/fpga/Makefile                              |   1 +
+ drivers/fpga/altera-ps-spi.c                       | 307 +++++++++++++++++++++
+ include/linux/bitrev.h                             |  19 ++
+ include/linux/fpga/fpga-mgr.h                      |   2 +
+ 7 files changed, 381 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fpga/altera-passive-serial.txt
+ create mode 100644 drivers/fpga/altera-ps-spi.c
+
+-- 
+2.11.0
