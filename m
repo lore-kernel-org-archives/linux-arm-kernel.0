@@ -1,105 +1,73 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 24 May 2017 17:29:29 -0700
-Subject: [PATCH v7 14/34] ARM: dts: imx6-sabreauto: add the ADV7180 video
- decoder
+Date: Wed, 24 May 2017 17:29:30 -0700
+Subject: [PATCH v7 15/34] add mux and video interface bridge entity functions
 In-Reply-To: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1495672189-29164-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1495672189-29164-15-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1495672189-29164-16-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables the ADV7180 decoder sensor. The ADV7180 connects to the
-parallel-bus mux input on ipu1_csi0_mux.
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-The ADV7180 power pin is via max7310_b port expander.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+- renamed MEDIA_ENT_F_MUX to MEDIA_ENT_F_VID_MUX
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 58 ++++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+ Documentation/media/uapi/mediactl/media-types.rst | 22 ++++++++++++++++++++++
+ include/uapi/linux/media.h                        |  6 ++++++
+ 2 files changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 1212f82..a712ff1 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -124,6 +124,21 @@
- 			#size-cells = <0>;
- 			reg = <1>;
+diff --git a/Documentation/media/uapi/mediactl/media-types.rst b/Documentation/media/uapi/mediactl/media-types.rst
+index 2a5164a..47ee003 100644
+--- a/Documentation/media/uapi/mediactl/media-types.rst
++++ b/Documentation/media/uapi/mediactl/media-types.rst
+@@ -299,6 +299,28 @@ Types and flags used to represent the media graph elements
+ 	  received on its sink pad and outputs the statistics data on
+ 	  its source pad.
  
-+			adv7180: camera at 21 {
-+				compatible = "adi,adv7180";
-+				reg = <0x21>;
-+				powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
-+				interrupt-parent = <&gpio1>;
-+				interrupts = <27 0x8>;
++    -  ..  row 29
 +
-+				port {
-+					adv7180_to_ipu1_csi0_mux: endpoint {
-+						remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
-+						bus-width = <8>;
-+					};
-+				};
-+			};
++       ..  _MEDIA-ENT-F-VID-MUX:
 +
- 			max7310_a: gpio at 30 {
- 				compatible = "maxim,max7310";
- 				reg = <0x30>;
-@@ -151,6 +166,25 @@
- 	};
- };
++       -  ``MEDIA_ENT_F_VID_MUX``
++
++       - Video multiplexer. An entity capable of multiplexing must have at
++         least two sink pads and one source pad, and must pass the video
++         frame(s) received from the active sink pad to the source pad. Video
++         frame(s) from the inactive sink pads are discarded.
++
++    -  ..  row 30
++
++       ..  _MEDIA-ENT-F-VID-IF-BRIDGE:
++
++       -  ``MEDIA_ENT_F_VID_IF_BRIDGE``
++
++       - Video interface bridge. A video interface bridge entity must have at
++         least one sink pad and one source pad. It receives video frame(s) on
++         its sink pad in one bus format (HDMI, eDP, MIPI CSI-2, ...) and
++         converts them and outputs them on its source pad in another bus format
++         (eDP, MIPI CSI-2, parallel, ...).
  
-+&ipu1_csi0_from_ipu1_csi0_mux {
-+	bus-width = <8>;
-+};
-+
-+&ipu1_csi0_mux_from_parallel_sensor {
-+	remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
-+	bus-width = <8>;
-+};
-+
-+&ipu1_csi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ipu1_csi0>;
-+
-+	/* enable frame interval monitor on this port */
-+	fim {
-+		status = "okay";
-+	};
-+};
-+
- &clks {
- 	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
- 			  <&clks IMX6QDL_PLL4_BYPASS>,
-@@ -444,6 +478,30 @@
- 			>;
- 		};
+ ..  tabularcolumns:: |p{5.5cm}|p{12.0cm}|
  
-+		pinctrl_ipu1_csi0: ipu1csi0grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT4__IPU1_CSI0_DATA04   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT5__IPU1_CSI0_DATA05   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT6__IPU1_CSI0_DATA06   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT7__IPU1_CSI0_DATA07   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT8__IPU1_CSI0_DATA08   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT9__IPU1_CSI0_DATA09   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT10__IPU1_CSI0_DATA10  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT11__IPU1_CSI0_DATA11  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x1b0b0
-+				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x1b0b0
-+				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x1b0b0
-+				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x1b0b0
-+			>;
-+		};
+diff --git a/include/uapi/linux/media.h b/include/uapi/linux/media.h
+index 4890787..fac96c6 100644
+--- a/include/uapi/linux/media.h
++++ b/include/uapi/linux/media.h
+@@ -105,6 +105,12 @@ struct media_device_info {
+ #define MEDIA_ENT_F_PROC_VIDEO_STATISTICS	(MEDIA_ENT_F_BASE + 0x4006)
+ 
+ /*
++ * Switch and bridge entitites
++ */
++#define MEDIA_ENT_F_VID_MUX			(MEDIA_ENT_F_BASE + 0x5001)
++#define MEDIA_ENT_F_VID_IF_BRIDGE		(MEDIA_ENT_F_BASE + 0x5002)
 +
- 		pinctrl_max7310: max7310grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15 0x1b0b0
++/*
+  * Connectors
+  */
+ /* It is a responsibility of the entity drivers to add connectors and links */
 -- 
 2.7.4
