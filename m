@@ -1,39 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 25 May 2017 20:29:02 +0200
-Subject: [PATCH v5 05/20] ARM: dts: efm32: Add generic compatible string
- for I2C EEPROM
-In-Reply-To: <20170523133448.4794-6-javier@dowhile0.org>
-References: <20170523133448.4794-1-javier@dowhile0.org>
- <20170523133448.4794-6-javier@dowhile0.org>
-Message-ID: <20170525182902.irlm5zbgmbsosvq4@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 25 May 2017 20:33:47 +0200
+Subject: [PATCH 7/8 v2] clocksource/drivers/fttmr010: Merge Moxa into
+ FTTMR010
+In-Reply-To: <CACRpkdZE-kG9ChQSsdbNDNUYgoAq3ZNHSR74GfG25XwQeKoV+A@mail.gmail.com>
+References: <20170518201705.28790-1-linus.walleij@linaro.org>
+ <20170518201705.28790-7-linus.walleij@linaro.org>
+ <CACRpkdZE-kG9ChQSsdbNDNUYgoAq3ZNHSR74GfG25XwQeKoV+A@mail.gmail.com>
+Message-ID: <25d9ee8a-2bef-bae0-0269-b3228254f477@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, May 23, 2017 at 03:34:33PM +0200, Javier Martinez Canillas wrote:
-> The at24 driver allows to register I2C EEPROM chips using different vendor
-> and devices, but the I2C subsystem does not take the vendor into account
-> when matching using the I2C table since it only has device entries.
+On 19/05/2017 15:58, Linus Walleij wrote:
+> On Thu, May 18, 2017 at 10:17 PM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
 > 
-> But when matching using an OF table, both the vendor and device has to be
-> taken into account so the driver defines only a set of compatible strings
-> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+>> This merges the Moxa Art timer driver into the Faraday FTTMR010
+>> driver and replaces all Kconfig symbols to use the Faraday
+>> driver instead. We are now so similar that the drivers can
+>> be merged by just adding a few lines to the Faraday timer.
 > 
-> So add this generic fallback to the device node compatible string to make
-> the device to match the driver using the OF device ID table.
+> OK Daniel, the series is tested clear by Joel and Jonas,
+> feel free to merge these patches up to and including this #7
+> when you feel they look good.
 > 
-> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+> Patch #8 I will send to the ARM SoC people pronto.
 
-Assuming the of-table patch is accepted this can have my:
+Hi Linus,
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+patches 1-7 is applied for 4.13.
 
-Otherwise I'm not convinced this is worth the churn.
+I assumed V1 Rob's ack applies also for the V2.
 
-Thanks
-Uwe
+Fixed a trivial conflict with the Kconfig.
+
+Thanks!
+
+  -- Daniel
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
