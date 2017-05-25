@@ -1,104 +1,75 @@
 From: n-horiguchi@ah.jp.nec.com (Naoya Horiguchi)
-Date: Thu, 25 May 2017 01:59:28 +0000
+Date: Thu, 25 May 2017 02:11:43 +0000
 Subject: [PATCH] mm/migrate: Fix ref-count handling when
  !hugepage_migration_supported()
-In-Reply-To: <20170524154728.2492-1-punit.agrawal@arm.com>
+In-Reply-To: <20170524125610.8fbc644f8fa1cf8175b7757b@linux-foundation.org>
 References: <20170524154728.2492-1-punit.agrawal@arm.com>
-Message-ID: <20170525015927.GA26520@hori1.linux.bs1.fc.nec.co.jp>
+ <20170524125610.8fbc644f8fa1cf8175b7757b@linux-foundation.org>
+Message-ID: <20170525021142.GB26520@hori1.linux.bs1.fc.nec.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 04:47:28PM +0100, Punit Agrawal wrote:
-> On failing to migrate a page, soft_offline_huge_page() performs the
-> necessary update to the hugepage ref-count. When
-> !hugepage_migration_supported() , unmap_and_move_hugepage() also
-> decrements the page ref-count for the hugepage. The combined behaviour
-> leaves the ref-count in an inconsistent state.
+On Wed, May 24, 2017 at 12:56:10PM -0700, Andrew Morton wrote:
+> On Wed, 24 May 2017 16:47:28 +0100 Punit Agrawal <punit.agrawal@arm.com> wrote:
 > 
-> This leads to soft lockups when running the overcommitted hugepage test
-> from mce-tests suite.
+> > On failing to migrate a page, soft_offline_huge_page() performs the
+> > necessary update to the hugepage ref-count. When
+> > !hugepage_migration_supported() , unmap_and_move_hugepage() also
+> > decrements the page ref-count for the hugepage. The combined behaviour
+> > leaves the ref-count in an inconsistent state.
+> > 
+> > This leads to soft lockups when running the overcommitted hugepage test
+> > from mce-tests suite.
+> > 
+> > Soft offlining pfn 0x83ed600 at process virtual address 0x400000000000
+> > soft offline: 0x83ed600: migration failed 1, type
+> > 1fffc00000008008 (uptodate|head)
+> > INFO: rcu_preempt detected stalls on CPUs/tasks:
+> >  Tasks blocked on level-0 rcu_node (CPUs 0-7): P2715
+> >   (detected by 7, t=5254 jiffies, g=963, c=962, q=321)
+> >   thugetlb_overco R  running task        0  2715   2685 0x00000008
+> >   Call trace:
+> >   [<ffff000008089f90>] dump_backtrace+0x0/0x268
+> >   [<ffff00000808a2d4>] show_stack+0x24/0x30
+> >   [<ffff000008100d34>] sched_show_task+0x134/0x180
+> >   [<ffff0000081c90fc>] rcu_print_detail_task_stall_rnp+0x54/0x7c
+> >   [<ffff00000813cfd4>] rcu_check_callbacks+0xa74/0xb08
+> >   [<ffff000008143a3c>] update_process_times+0x34/0x60
+> >   [<ffff0000081550e8>] tick_sched_handle.isra.7+0x38/0x70
+> >   [<ffff00000815516c>] tick_sched_timer+0x4c/0x98
+> >   [<ffff0000081442e0>] __hrtimer_run_queues+0xc0/0x300
+> >   [<ffff000008144fa4>] hrtimer_interrupt+0xac/0x228
+> >   [<ffff0000089a56d4>] arch_timer_handler_phys+0x3c/0x50
+> >   [<ffff00000812f1bc>] handle_percpu_devid_irq+0x8c/0x290
+> >   [<ffff0000081297fc>] generic_handle_irq+0x34/0x50
+> >   [<ffff000008129f00>] __handle_domain_irq+0x68/0xc0
+> >   [<ffff0000080816b4>] gic_handle_irq+0x5c/0xb0
+> > 
+> > Fix this by dropping the ref-count decrement in
+> > unmap_and_move_hugepage() when !hugepage_migration_supported().
+> > 
+> > Fixes: 32665f2bbfed ("mm/migrate: correct failure handling if !hugepage_migration_support()")
+> > Reported-by: Manoj Iyer <manoj.iyer@canonical.com>
+> > Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> > Cc: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> > Cc: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
+> > Cc: Wanpeng Li <liwanp@linux.vnet.ibm.com>
+> > Cc: Christoph Lameter <cl@linux.com>
 > 
-> Soft offlining pfn 0x83ed600 at process virtual address 0x400000000000
-> soft offline: 0x83ed600: migration failed 1, type
-> 1fffc00000008008 (uptodate|head)
-> INFO: rcu_preempt detected stalls on CPUs/tasks:
->  Tasks blocked on level-0 rcu_node (CPUs 0-7): P2715
->   (detected by 7, t=5254 jiffies, g=963, c=962, q=321)
->   thugetlb_overco R  running task        0  2715   2685 0x00000008
->   Call trace:
->   [<ffff000008089f90>] dump_backtrace+0x0/0x268
->   [<ffff00000808a2d4>] show_stack+0x24/0x30
->   [<ffff000008100d34>] sched_show_task+0x134/0x180
->   [<ffff0000081c90fc>] rcu_print_detail_task_stall_rnp+0x54/0x7c
->   [<ffff00000813cfd4>] rcu_check_callbacks+0xa74/0xb08
->   [<ffff000008143a3c>] update_process_times+0x34/0x60
->   [<ffff0000081550e8>] tick_sched_handle.isra.7+0x38/0x70
->   [<ffff00000815516c>] tick_sched_timer+0x4c/0x98
->   [<ffff0000081442e0>] __hrtimer_run_queues+0xc0/0x300
->   [<ffff000008144fa4>] hrtimer_interrupt+0xac/0x228
->   [<ffff0000089a56d4>] arch_timer_handler_phys+0x3c/0x50
->   [<ffff00000812f1bc>] handle_percpu_devid_irq+0x8c/0x290
->   [<ffff0000081297fc>] generic_handle_irq+0x34/0x50
->   [<ffff000008129f00>] __handle_domain_irq+0x68/0xc0
->   [<ffff0000080816b4>] gic_handle_irq+0x5c/0xb0
-> 
-> Fix this by dropping the ref-count decrement in
-> unmap_and_move_hugepage() when !hugepage_migration_supported().
-> 
-> Fixes: 32665f2bbfed ("mm/migrate: correct failure handling if !hugepage_migration_support()")
-> Reported-by: Manoj Iyer <manoj.iyer@canonical.com>
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> Cc: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
-> Cc: Wanpeng Li <liwanp@linux.vnet.ibm.com>
-> Cc: Christoph Lameter <cl@linux.com>
-> 
-> --
-> Hi Andrew,
-> 
-> We ran into this bug when working towards enabling memory corruption
-> on arm64. The patch was tested on an arm64 platform running v4.12-rc2
-> with the series to enable memory corruption handling[0].
-> 
-> Please consider merging as a fix for the 4.12 release.
-> 
-> Thanks,
-> Punit
-> 
-> [0] https://www.spinics.net/lists/arm-kernel/msg581657.html
-> ---
->  mm/migrate.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/mm/migrate.c b/mm/migrate.c
-> index 89a0a1707f4c..187abd1526df 100644
-> --- a/mm/migrate.c
-> +++ b/mm/migrate.c
-> @@ -1201,10 +1201,8 @@ static int unmap_and_move_huge_page(new_page_t get_new_page,
->  	 * tables or check whether the hugepage is pmd-based or not before
->  	 * kicking migration.
->  	 */
-> -	if (!hugepage_migration_supported(page_hstate(hpage))) {
-> -		putback_active_hugepage(hpage);
+> 32665f2bbfed was three years ago.  Do you have any theory as to why
+> this took so long to be detected?
 
-Thank you for reporting and suggestion, Punit, Manoj.
+My per-release testing only ran for "hugepage_migration_supported() == true"
+setting (i.e. x86 with CONFIG_HUGETLB_PAGE=y). I need extend the coverage.
+And other arch's developers recently have come to have interest in hugepage
+migration.
 
-Simply dropping this putback_active_hugepage() may resume the failure
-counting issue addressed in 32665f2bbfed, so I would recommend to call
-putback_movable_pages() in failure path in soft_offline_huge_page().
+>  And do you believe a -stable
+> backport is warranted?
 
-@@ -1600,7 +1600,8 @@ static int soft_offline_huge_page(struct page *page, int flags)
- 		 * only one hugepage pointed to by hpage, so we need not
- 		 * run through the pagelist here.
- 		 */
--		putback_active_hugepage(hpage);
-+		if (!list_empty(&pagelist))
-+			putback_movable_pages(&pagelist);
- 		if (ret > 0)
- 			ret = -EIO;
- 	} else {
+I agree to send the fix to stable, so the stable tag is wanted.
 
-Could you check this works for you?
+Cc: stable at kernel.org   # v3.14+
 
 Thanks,
 Naoya Horiguchi
