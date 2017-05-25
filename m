@@ -1,40 +1,51 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 25 May 2017 13:04:00 +0100
-Subject: [RFC PATCH v2 5/7] ARM: Kconfig: Kill CONFIG_VECTORS_BASE
-In-Reply-To: <20170525112725.GA6309@afzalpc>
-References: <1495187206-14303-1-git-send-email-vladimir.murzin@arm.com>
- <1495187206-14303-6-git-send-email-vladimir.murzin@arm.com>
- <20170525112725.GA6309@afzalpc>
-Message-ID: <1125c9e3-a5d1-f3df-e1aa-d8dcebf38dfc@arm.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Thu, 25 May 2017 14:04:04 +0200
+Subject: [GIT PULL] ARM: realtek: dt64 for v4.12
+In-Reply-To: <20170525120404.32034-1-afaerber@suse.de>
+References: <20170525120404.32034-1-afaerber@suse.de>
+Message-ID: <20170525120404.32034-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd and Olof,
 
-On 25/05/17 12:27, afzal mohammed wrote:
-> Hi,
-> 
-> On Fri, May 19, 2017 at 10:46:44AM +0100, Vladimir Murzin wrote:
->> The last user of CONFIG_VECTORS_BASE has gone, so kill it.
->>
->> Reported-by: Afzal Mohammed <afzal.mohd.ma@gmail.com>
-> 
-> Ending up in this tag has left me scratching my head & amused :),
-> whether you keep any tag or not for me, i do not have any issues.
+This is the initial dt64 pull for Realtek.
+The Kconfig symbol is introduced in the arm64 pull.
 
-According to [1]:
+Regards,
+Andreas
 
-"This series also does the preparation for CONFIG_VECTORS_BASE removal."
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
 
-IIRC, that time only thing which stopped you from complete CONFIG_VECTORS_BASE
-removal was MPU code, so I don't see a reason not to give you a credit ;)
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
 
-[1] https://lkml.org/lkml/2017/1/21/251
+are available in the git repository at:
 
-Cheers
-Vladimir
+  git://github.com/afaerber/linux.git tags/realtek-arm64-dt-for-4.12
 
-> 
-> Regards
-> afzal
-> 
+for you to fetch changes up to 72a7786c0a0d6554b1d2bd3c6a0c3589d4904fb3:
+
+  ARM64: dts: Add Realtek RTD1295 and Zidoo X9S (2017-05-25 12:13:58 +0200)
+
+----------------------------------------------------------------
+Realtek ARM64 based SoC DT for v4.12
+
+This adds an initial DT for the RTD1295 SoC and a TV box based on it.
+
+----------------------------------------------------------------
+Andreas F?rber (3):
+      dt-bindings: Add vendor prefix for Zidoo
+      dt-bindings: arm: Add Realtek RTD1295 bindings
+      ARM64: dts: Add Realtek RTD1295 and Zidoo X9S
+
+ Documentation/devicetree/bindings/arm/realtek.txt  |  20 ++++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/realtek/Makefile               |   5 +
+ arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts  |  42 +++++++
+ arch/arm64/boot/dts/realtek/rtd1295.dtsi           | 131 +++++++++++++++++++++
+ 6 files changed, 200 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/realtek.txt
+ create mode 100644 arch/arm64/boot/dts/realtek/Makefile
+ create mode 100644 arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts
+ create mode 100644 arch/arm64/boot/dts/realtek/rtd1295.dtsi
