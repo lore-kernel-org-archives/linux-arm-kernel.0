@@ -1,93 +1,45 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 25 May 2017 23:57:15 +0800
-Subject: [PATCH v13 8/9] arm64: dts: hi6220: register debug module
-In-Reply-To: <1495727836-30094-1-git-send-email-leo.yan@linaro.org>
-References: <1495727836-30094-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1495727836-30094-9-git-send-email-leo.yan@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 May 2017 17:56:51 +0100
+Subject: [CFT] Always enable SMP mode on MP capable CPUs
+In-Reply-To: <828a8817-b18d-6945-f35e-115abf30fe17@gmail.com>
+References: <20170518105209.GN22219@n2100.armlinux.org.uk>
+ <828a8817-b18d-6945-f35e-115abf30fe17@gmail.com>
+Message-ID: <20170525165651.GK22219@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bind debug module driver for Hi6220.
+On Thu, May 25, 2017 at 09:15:19AM -0700, Florian Fainelli wrote:
+> On 05/18/2017 03:52 AM, Russell King - ARM Linux wrote:
+> > As a result of a recent bug report, it has been found that certain CPUs
+> > must always have SMP mode enabled in order for the caches to work.
+> > 
+> > Remove the conditional on setting the SMP bit(s).
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> > This needs to be tested on:
+> > 
+> > - Cortex A5MP
+> > - Cortex A9MP
+> > - Cortex R7MP
+> > - Cortex A7MP
+> > - Cortex A12MP
+> > - Cortex A15MP
+> > - Cortex A17MP
+> > - Brahma B15
+> 
+> Sorry just saw this, what kind of test do you want me to run on B15?
+> Should I build a !SMP kernel, or force a SMP kernel with maxcpus=1?
 
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 64 +++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+What I'm after is testing on any single-core systems with these SMP
+capable cores.  If the core never appears in a single-core configuration,
+then please let me know so it can be crossed off the list.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 1e5129b..21805b9 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -916,5 +916,69 @@
- 				};
- 			};
- 		};
-+
-+		debug at f6590000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf6590000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu0>;
-+		};
-+
-+		debug at f6592000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf6592000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu1>;
-+		};
-+
-+		debug at f6594000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf6594000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu2>;
-+		};
-+
-+		debug at f6596000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf6596000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu3>;
-+		};
-+
-+		debug at f65d0000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf65d0000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu4>;
-+		};
-+
-+		debug at f65d2000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf65d2000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu5>;
-+		};
-+
-+		debug at f65d4000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf65d4000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu6>;
-+		};
-+
-+		debug at f65d6000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf65d6000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu7>;
-+		};
- 	};
- };
+With the bug that crept in fixed (as pointed out by Tony) there is no
+difference for kernels built with SMP enabled and detected as a SMP
+capable CPU.
+
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
