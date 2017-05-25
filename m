@@ -1,41 +1,81 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 25 May 2017 11:16:21 +0800
-Subject: [PATCH V2 4/5] dt-bindings: pinctrl: add imx7ulp pinctrl binding
- doc
-In-Reply-To: <DBXPR04MB320A55DE4386DE561A1D4DC80F90@DBXPR04MB320.eurprd04.prod.outlook.com>
-References: <1495177545-23006-1-git-send-email-aisheng.dong@nxp.com>
- <1495177545-23006-5-git-send-email-aisheng.dong@nxp.com>
- <5e78ef100319f229a87e33804384e5b3@agner.ch>
- <DBXPR04MB320A55DE4386DE561A1D4DC80F90@DBXPR04MB320.eurprd04.prod.outlook.com>
-Message-ID: <20170525031620.GS26102@dragon>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Thu, 25 May 2017 11:38:26 +0800
+Subject: [PATCH] drm/mediatek: hdmi: Filter interlaced resolutions
+In-Reply-To: <20170524122451.vc252rdphzwzljeu@phenom.ffwll.local>
+References: <1485234604-19889-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1495531695.20811.19.camel@mtksdaap41>
+ <20170523131243.5bjz5n4uv73r2l7j@phenom.ffwll.local>
+ <1495617645.15919.6.camel@mtksdaap41>
+ <20170524122451.vc252rdphzwzljeu@phenom.ffwll.local>
+Message-ID: <1495683506.15919.10.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 10:37:27AM +0000, A.S. Dong wrote:
-> > > +#ifndef __DTS_IMX7ULP_PINFUNC_H
-> > > +#define __DTS_IMX7ULP_PINFUNC_H
-> > > +
-> > > +/*
-> > > + * The pin function ID is a tuple of
-> > > + * <mux_conf_reg input_reg mux_mode input_val>  */
-> > > +
-> > > +#define ULP1_PAD_PTC0__PTC0
-> > > 0x0000 0x0000 0x1 0x0
+On Wed, 2017-05-24 at 14:24 +0200, Daniel Vetter wrote:
+> On Wed, May 24, 2017 at 05:20:45PM +0800, CK Hu wrote:
+> > On Tue, 2017-05-23 at 15:12 +0200, Daniel Vetter wrote:
+> > > On Tue, May 23, 2017 at 05:28:15PM +0800, CK Hu wrote:
+> > > > Hi, Bibby:
+> > > > 
+> > > > I've applied this patch to my branch mediatek-drm-fixes-4.12-rc1,
+> > > > thanks.
+> > > > 
+> > > > Regards,
+> > > > CK
+> > > > 
+> > > > On Tue, 2017-01-24 at 13:10 +0800, Bibby Hsieh wrote:
+> > > > > Current Mediatek DRM driver does not support interlaced mode, and
+> > > > > will hang if such resolution is used: Filter those to prevent
+> > > > > kernel hangs, until the DRM driver is fixed properly.
+> > > > > 
+> > > > > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> > > > > ---
+> > > > >  drivers/gpu/drm/mediatek/mtk_hdmi.c | 2 ++
+> > > > >  1 file changed, 2 insertions(+)
+> > > > > 
+> > > > > diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+> > > > > index 0e8c4d9..e33678d 100644
+> > > > > --- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
+> > > > > +++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+> > > > > @@ -1244,6 +1244,8 @@ static int mtk_hdmi_conn_mode_valid(struct drm_connector *conn,
+> > > > >  			return MODE_BAD;
+> > > > >  	}
+> > > > >  
+> > > > > +	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
+> > > > > +		return MODE_NO_INTERLACE;
+> > > > >  	if (mode->clock < 27000)
+> > > > >  		return MODE_CLOCK_LOW;
+> > > > >  	if (mode->clock > 297000)
+> > > 
+> > > You probably want to check out Jose's mode_valid work, since only
+> > > filtering in the connector's ->mode_valid callback isn't enough. You also
+> > > need to filter in ->mode_fixup (or some other place called at atomic_check
+> > > time).
+> > > -Daniel
 > > 
+> > Hi, Daniel:
 > > 
-> > For consistency with other SoCs, can we add MX7 to the define? E.g.
-> > MX7ULP1?
+> > Yes, I still need to filter in ->mode_fixup.
 > > 
+> > Hi, Bibby:
+> > 
+> > Because Jose's work plan to use mode_valid to replace mode_fixup, so
+> > it's better to refine this patch after Jose's work is done. And I would
+> > now remove this patch from my branch.
 > 
-> ULP1 is another SoC name of IMX7ULP.
-> And there will be ULP0, ULPx in the future..
+> Btw if you have a revised version of your patch on top of Jose's series, a
+> tested-by on that would be awesome. The more people find it useful, the
+> faster it will land.
+> -Daniel
 
-What is the external/formal SoC name for ULP0 and ULPx?
+Hi, Daniel:
 
-> 
-> It looks like not big issue, so I did not change it.
+I understand.
 
-It's an easy change to make things more obvious, so +1 on Stefan's
-opinion.
+Hi Bibby:
 
-Shawn
+If you have time, please help to test Jose's patches with the problem
+you have met. Otherwise, it would be a long process.
+
+Regards,
+CK
