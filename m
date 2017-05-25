@@ -1,46 +1,75 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Thu, 25 May 2017 11:06:47 +0300
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: add hi8435 device
-In-Reply-To: <20170525070007.GU26102@dragon>
-References: <20170522131010.3537-1-nikita.yoush@cogentembedded.com>
- <20170525070007.GU26102@dragon>
-Message-ID: <eb86f383-3c27-2276-6213-99c5143420f5@cogentembedded.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 25 May 2017 16:16:15 +0800
+Subject: [PATCH v2 1/2] ARM: dts: orange-pi-zero: specify wifi interrupts
+In-Reply-To: <CAGb2v671hWDaTqCAJiN0JAuiPynW+=XtN+Xr5WiyTPDSkk9-FQ@mail.gmail.com>
+References: <20170524212433.14386-1-geomatsi@gmail.com>
+ <20170524212433.14386-2-geomatsi@gmail.com>
+ <CAGb2v647GTQW9-ZYrkWS7RoeYTu_7oTm8v4PDs0YD1pZ8oUohQ@mail.gmail.com>
+ <20170525071055.xdd4sbpnzlkg7wa2@speedy.hunter>
+ <CAGb2v671hWDaTqCAJiN0JAuiPynW+=XtN+Xr5WiyTPDSkk9-FQ@mail.gmail.com>
+Message-ID: <DAC099FE-6655-4EE2-A68A-AD2C5BBDDF76@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +&edma1 {
->> +	status = "okay";
->> +};
->> +
->> +&dspi2 {
-> 
-> Please keep these labelled nodes sort alphabetically.
 
-Ok
 
->> +	bus-num = <1>;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_dspi2>;
->> +	status = "okay";
-> 
-> We usually have 'status' line at the bottom of property list.
+? 2017?5?25? GMT+08:00 ??3:21:44, Chen-Yu Tsai <wens@csie.org> ??:
+>On Thu, May 25, 2017 at 3:10 PM, Sergey Matyukevich
+><geomatsi@gmail.com> wrote:
+>>> > diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+>b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+>>> > index 9e8b082c134f..e97dfd1775d1 100644
+>>> > --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+>>> > +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+>>> > @@ -128,6 +128,9 @@
+>>> >          */
+>>> >         xr819: sdio_wifi at 1 {
+>>> >                 reg = <1>;
+>>> > +               compatible = "xradio,xr819";
+>>>
+>>> You should submit device tree bindings first. See:
+>>>
+>>>
+>https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/Documentation/devicetree/bindings/net/wireless
+>>>
+>>> for examples.
+>>
+>> Does it make sense for the out-of-tree driver ?
+>
+>There is already a binding for ESP8089, which is supported out of tree.
+>There are also bindings for Mali GPUs which are, again, supported out
+>of tree.
+>
+>AFAIK there was some discussion about this during the submission of the
+>Mali bindings. A set of stable bindings allows the vendor to create
+>stable
+>device trees. Given that the binding for this WiFi chip is relatively
+>simple,
+>and it might be compatible or similar to an existing chip already
+>supported
+>in kernel (but without a binding), it should be straight forward.
+>
+>>
+>>> > +               interrupt-parent = <&pio>;
+>>> > +               interrupts = <6 10 IRQ_TYPE_EDGE_RISING>;
+>>>
+>>> Are these optional or required properties? AFAIK SDIO supports
+>in-band
+>>> interrupts with a bit of overhead, so they should be optional.
+>>
+>> Those properties are optional. Driver works anyway, though it
+>complains about
+>> missing interrupts. IIUC xradio driver falls back to polling mode
+>only if
+>> xr819 interrupt configuraton is not specified.
+>
+>So it doesn't support in-band SDIO interrupts right now. Is that a
+>hardware
+>or driver limitation?
 
-Ok
+The original driver code modified by me to mainline uses in-band interrupts.
 
->> +	spi-num-chipselects = <2>;
->> +
->> +	hi8435 at 1 {
-> 
-> Node name should be something generic, while label can be specific
-> model name.  The following form might be better.
-> 
-> 	hi8435: sensor at 1
+But dgp modified it to use out-of-band interrupts.
 
-Ok
-
-Although the same file, in lines nearby, has m25p128 at 0 and at93c46d at 1.
-
-Anyway let's delay this a bit, up to the reset polarity description
-thing in hi8435 is resolved.
-
-Nikita
+>
+>ChenYu
