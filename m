@@ -1,63 +1,81 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 26 May 2017 10:12:43 +0000
-Subject: [PATCH v9 6/7] LPC: Add the ACPI LPC support
-In-Reply-To: <201705261155.i7TAp44f%fengguang.wu@intel.com>
-References: <1495712248-5232-7-git-send-email-gabriele.paoloni@huawei.com>
- <201705261155.i7TAp44f%fengguang.wu@intel.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40A6CABE@FRAEML521-MBX.china.huawei.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri, 26 May 2017 16:13:37 +0530
+Subject: [PATCH v2] arm: dma-mapping: Reset the device's dma_ops
+Message-ID: <1495795417-15177-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops()
+,dma_ops should be cleared in the teardown path. Currently, only the
+device's iommu mapping structures are cleared in arch_teardown_dma_ops,
+but not the dma_ops. So on the next reprobe, dma_ops left in place is
+stale from the first IOMMU setup, but iommu mappings has been disposed
+of. This is a problem when the probe of the device is deferred and
+recalled with the IOMMU probe deferral.
 
-> Hi zhichang.yuan,
-> 
-> [auto build test ERROR on linus/master]
-> [also build test ERROR on v4.12-rc2 next-20170525]
-> [if your patch is applied to the wrong git tree, please drop us a note
-> to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Gabriele-Paoloni/LPC-
-> legacy-ISA-I-O-support/20170526-033719
-> config: ia64-allmodconfig (attached as .config)
-> compiler: ia64-linux-gcc (GCC) 6.2.0
-> reproduce:
->         wget https://raw.githubusercontent.com/01org/lkp-
-> tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=ia64
-> 
-> All errors (new ones prefixed by >>):
-> 
->    drivers/built-in.o: In function `lpc_host_io_setup':
-> >> hisi_lpc.c:(.text+0x252): undefined reference to
-> `acpi_set_logic_pio_resource'
->    drivers/built-in.o: In function `acpi_scan_init':
->    (.init.text+0x6742): undefined reference to
-> `acpi_indirectio_scan_init'
+So for fixing this, slightly refactor by moving the code from
+__arm_iommu_detach_device to arm_iommu_detach_device and cleanup
+the former. This takes care of resetting the dma_ops in the teardown
+path.
 
-I believe the problem is in patch 4/7
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+Fixes: 09515ef5ddad ("of/acpi: Configure dma operations at probe time for platform/amba/pci bus devices")
+---
+ arch/arm/mm/dma-mapping.c | 25 ++++++++++---------------
+ 1 file changed, 10 insertions(+), 15 deletions(-)
 
-config HISILICON_LPC
-	bool "Support for ISA I/O space on Hisilicon Hip0X"
-	depends on (ARM64 && ARCH_HISI) || COMPILE_TEST
-                                         ^^^^^^^^^^^^
-
-the COMPILE_TEST above allowing HISILICON_LPC also for other architectures. 
-I think we can remove "|| COMPILE_TEST"...I will fix it in v10
-
-Gab
-
-+	select LOGIC_PIO
-+	select INDIRECT_PIO
-+	help
-+	  Driver needed for some legacy ISA devices attached to Low-Pin-Count
-+	  on Hisilicon Hip0X SoC.
-
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology
-> Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel
-> Corporation
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index c742dfd..6e82e87 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -2311,7 +2311,14 @@ int arm_iommu_attach_device(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(arm_iommu_attach_device);
+ 
+-static void __arm_iommu_detach_device(struct device *dev)
++/**
++ * arm_iommu_detach_device
++ * @dev: valid struct device pointer
++ *
++ * Detaches the provided device from a previously attached map.
++ * This voids the dma operations (dma_map_ops pointer)
++ */
++void arm_iommu_detach_device(struct device *dev)
+ {
+ 	struct dma_iommu_mapping *mapping;
+ 
+@@ -2324,22 +2331,10 @@ static void __arm_iommu_detach_device(struct device *dev)
+ 	iommu_detach_device(mapping->domain, dev);
+ 	kref_put(&mapping->kref, release_iommu_mapping);
+ 	to_dma_iommu_mapping(dev) = NULL;
++	set_dma_ops(dev, NULL);
+ 
+ 	pr_debug("Detached IOMMU controller from %s device.\n", dev_name(dev));
+ }
+-
+-/**
+- * arm_iommu_detach_device
+- * @dev: valid struct device pointer
+- *
+- * Detaches the provided device from a previously attached map.
+- * This voids the dma operations (dma_map_ops pointer)
+- */
+-void arm_iommu_detach_device(struct device *dev)
+-{
+-	__arm_iommu_detach_device(dev);
+-	set_dma_ops(dev, NULL);
+-}
+ EXPORT_SYMBOL_GPL(arm_iommu_detach_device);
+ 
+ static const struct dma_map_ops *arm_get_iommu_dma_map_ops(bool coherent)
+@@ -2379,7 +2374,7 @@ static void arm_teardown_iommu_dma_ops(struct device *dev)
+ 	if (!mapping)
+ 		return;
+ 
+-	__arm_iommu_detach_device(dev);
++	arm_iommu_detach_device(dev);
+ 	arm_iommu_release_mapping(mapping);
+ }
+ 
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
