@@ -1,7 +1,7 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 26 May 2017 17:17:42 +0900
+Date: Fri, 26 May 2017 17:18:15 +0900
 Subject: [PATCH] arm64: dts: uniphier: reserve more memory for LD11/LD20
-Message-ID: <1495786662-27862-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1495786695-27954-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
