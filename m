@@ -1,52 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 May 2017 17:24:47 +0200
-Subject: arm64 test_user_copy crash on copy_from_user(uptr, kptr, size)
-Message-ID: <CAK8P3a1tyU8J4VEWVwLOHWM+of9bnWvm+SXBxkfsZA7yfEei9A@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 26 May 2017 08:30:46 -0700
+Subject: [PATCH v2 1/2] ARM: dts: am335x-sl50: Fix card detect pin for mmc1
+In-Reply-To: <20170522090153.5596-1-enric.balletbo@collabora.com>
+References: <20170522090153.5596-1-enric.balletbo@collabora.com>
+Message-ID: <20170526153045.GA3717@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A kselftest run on arm64 on an older 4.4.y stable kernel ran into an
-unexpectedly trapping user space access:
+* Enric Balletbo i Serra <enric.balletbo@collabora.com> [170522 02:05]:
+> The second version of the hardware moved the card detect pin from gpio0_6
+> to gpio1_9, as we won't support the first hardware version fix the pinmux
+> configuration of this pin.
 
-[ 1277.857738] Internal error: Accessing user space memory outside
-uaccess.h routines: 96000045 [#1] PREEMPT SMP
+OK so proto vs production version misconfiguration, applying both into
+omap-for-v4.12/fixes-v2 thanks. Note that you're not supposed to send
+any email to the stable list unless requesting a backport of something.
+The idea is to add the stable tag when committing, and nowadays it seems
+having a proper "Fixes" tag seems to do the job automatically.
 
-Apparently the same thing happens on x86 as well, and it still happens on
-the latest kernels, see https://bugs.linaro.org/show_bug.cgi?id=3011
+Regards,
 
-The problem here is this test
-
-       ret |= test(!copy_from_user(bad_usermem, (char __user *)kmem,
-                                   PAGE_SIZE),
-                   "illegal reversed copy_from_user passed");
-
-where the destination kernel pointer intentionally points into user space
-memory, while copy_from_user checks the second argument for being
-a valid user space, which it also is not.:
-
-static inline unsigned long __must_check copy_from_user(void *to,
-const void __user *from, unsigned long n)
-{
-        unsigned long res = n;
-        kasan_check_write(to, n);
-
-        if (access_ok(VERIFY_READ, from, n)) {
-                check_object_size(to, n, false);
-                res = __arch_copy_from_user(to, from, n);
-        }
-        if (unlikely(res))
-                memset(to + (n - res), 0, res);
-        return res;
-}
-
-The memset here will now try to clear user space data, and the
-architecture notices that the fault did not come from a proper
-uaccess function.
-
-I think this will only happen when CONFIG_ARM64_PAN,
- X86_SMAP or an equivalent feature on another architecture is
-enabled, otherwise we just do the access anyway. I don't have
-a good idea for avoiding the problem though, other than
-removing the specific test that causes it.
-
-       Arnd
+Tony
