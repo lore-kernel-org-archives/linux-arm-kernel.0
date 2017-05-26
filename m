@@ -1,73 +1,61 @@
-From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 26 May 2017 20:06:06 +0200
-Subject: [PATCH RFC 2/5] ARM: dts: am335x-baltos: use IRQ_TYPE_* to specify
- irq flags
-In-Reply-To: <20170526180609.2699-1-uwe@kleine-koenig.org>
-References: <20170526180609.2699-1-uwe@kleine-koenig.org>
-Message-ID: <20170526180609.2699-2-uwe@kleine-koenig.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 26 May 2017 11:20:55 -0700
+Subject: [PATCH 1/2] ARM: dts: meson: organize devices in their
+ corresponding busses
+In-Reply-To: <CAFBinCBcWgS_qSMNEUH+QrPXxLyQo87paH3+wBkHf5LWarnmEQ@mail.gmail.com>
+ (Martin Blumenstingl's message of "Sat, 20 May 2017 10:45:02 +0200")
+References: <20170417213938.22626-1-martin.blumenstingl@googlemail.com>
+ <20170417213938.22626-2-martin.blumenstingl@googlemail.com>
+ <m2inkw4g47.fsf@baylibre.com>
+ <CAFBinCBcWgS_qSMNEUH+QrPXxLyQo87paH3+wBkHf5LWarnmEQ@mail.gmail.com>
+Message-ID: <m2vaon1nug.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the binding documentation and the source code the omap-gpio
-controller takes IRQ_TYPE_* as its flags values, not GPIO_ACTIVE_*.
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-This patch uses the right variable type which yields the same result
-when compiled. Note that this might be wrong and actually
-IRQ_TYPE_LEVEL_LOW is intended by the dt author.
+> On Sat, May 20, 2017 at 12:49 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+>>
+>>> The Amlogic Meson SoCs have most of the internal peripherals organized
+>>> in busses. Use them to make the dts easier to read and to avoid
+>>> duplicated register (bus) offset definitions.
+>>>
+>>> The bus information is taken from the vendor kernel:
+>>>       #define IO_CBUS_PHY_BASE        0xc1100000  ///2M
+>>>       #define IO_AOBUS_PHY_BASE       0xc8100000  ///1M
+>>>
+>>> There are more internal busses (such as the abp bus which seems to
+>>> contain audio, HDMI and Mali registers), but since we don't have
+>>> drivers for them yet these are not added (yet).
+>>>
+>>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>>
+>> I tested this series on my meson8b-odroidc1 and it boots fine.
+>>
+>> Series looks fine to me, except...
+>>
+>> [...]
+>>
+>>>
+>>>               ethmac: ethernet at c9410000 {
+>>>                       compatible = "amlogic,meson6-dwmac", "snps,dwmac";
+>>>                       reg = <0xc9410000 0x10000
+>>> -                            0xc1108108 0x4>;
+>>> +                     0xc1108108 0x4>;
+>>
+>> stray tab removal?
+> oh, excellent catch - thank you!
+>
+>> I fixed that up locally and applied to v4.13/dt64 branch.
+> nice, thank you!
+>
+> do the ARM maintainers still want separate pull-requests for 32-bit
+> and 64-bit .dts/defconfig/etc. changes?
+> you might want to move the three latest commits from v4.13/dt64 to
+> v4.13/dt32 in that case, but this should be trivial (since these
+> patches don't depend on anything else)
 
-Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
----
-Hello,
+yes, you're right.  I'll move them.
 
-can somebody with the hardware or it's documentation please check which
-flag is the right one?
-
-Best regards
-Uwe
-
- arch/arm/boot/dts/am335x-baltos-ir3220.dts | 2 +-
- arch/arm/boot/dts/am335x-baltos-ir5221.dts | 2 +-
- arch/arm/boot/dts/am335x-baltos.dtsi       | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir3220.dts b/arch/arm/boot/dts/am335x-baltos-ir3220.dts
-index 19f53b8569e1..7eb975ba044d 100644
---- a/arch/arm/boot/dts/am335x-baltos-ir3220.dts
-+++ b/arch/arm/boot/dts/am335x-baltos-ir3220.dts
-@@ -84,7 +84,7 @@
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		interrupt-parent = <&gpio0>;
--		interrupts = <20 GPIO_ACTIVE_LOW>;
-+		interrupts = <20 IRQ_TYPE_EDGE_RISING>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&tca6416_pins>;
- 	};
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir5221.dts b/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-index 2b9d7f4db23f..f24ae2836e1f 100644
---- a/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-+++ b/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-@@ -93,7 +93,7 @@
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		interrupt-parent = <&gpio0>;
--		interrupts = <20 GPIO_ACTIVE_LOW>;
-+		interrupts = <20 IRQ_TYPE_EDGE_RISING>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&tca6416_pins>;
- 	};
-diff --git a/arch/arm/boot/dts/am335x-baltos.dtsi b/arch/arm/boot/dts/am335x-baltos.dtsi
-index d42b98f15e8b..e3234d462741 100644
---- a/arch/arm/boot/dts/am335x-baltos.dtsi
-+++ b/arch/arm/boot/dts/am335x-baltos.dtsi
-@@ -249,7 +249,7 @@
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		interrupt-parent = <&gpio1>;
--		interrupts = <28 GPIO_ACTIVE_LOW>;
-+		interrupts = <28 IRQ_TYPE_EDGE_RISING>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&tps65910_pins>;
- 	};
--- 
-2.11.0
+Kevin
