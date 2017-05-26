@@ -1,32 +1,47 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Sat, 27 May 2017 00:51:07 +0800
-Subject: [linux-sunxi] [PATCH 2/3] arm64: allwinner: h5: Add initial
- Orangepi Prime support
-In-Reply-To: <CAD6G_RQ16z8rU2f2QwFdahzVwExexFuiXnz6nd_0Y8U6od=_5w@mail.gmail.com>
-References: <1495740382-9061-1-git-send-email-jteki@openedev.com>
- <1495740382-9061-2-git-send-email-jteki@openedev.com>
- <6bd8d6dfb9df0d21d0918d6b81f527e6@aosc.io>
- <CAD6G_RQ16z8rU2f2QwFdahzVwExexFuiXnz6nd_0Y8U6od=_5w@mail.gmail.com>
-Message-ID: <816a781514e9eadeb386c0275a5be642@aosc.io>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 26 May 2017 11:53:17 -0500
+Subject: [PATCH 3/3] remoteproc/keystone: ensure the DSPs are in reset in probe
+In-Reply-To: <20170526165317.23164-1-s-anna@ti.com>
+References: <20170526165317.23164-1-s-anna@ti.com>
+Message-ID: <20170526165317.23164-4-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-05-27 00:44?Jagan Teki ???
-> On Fri, May 26, 2017 at 10:10 PM,  <icenowy@aosc.io> wrote:
->> ? 2017-05-26 03:26?Jagan Teki ???
->>> 
->>> From: Jagan Teki <jagan@amarulasolutions.com>
->>> 
->>> Orangepi Prime is an open-source single-board computer
->>> using the Allwinner h5 SOC.
->> 
->> 
->> Sorry but I have already added this board and it's
->> scheduled at 4.13.
-> 
-> Ohh, unfortunately I missed to find it on ML, can you point?
+From: "Andrew F. Davis" <afd@ti.com>
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/501311.html
+The DSPs are expected to be in reset when the driver probes a device.
+If the DSPs are out of reset in probe, the system may crash when the
+firmware is being loaded. So, add a check to make sure the DSP resets
+are asserted, and if not, throw a eye-catchy warning and assert the
+resets specifically.
 
-> 
-> thanks!
+Signed-off-by: Andrew F. Davis <afd@ti.com>
+[s-anna at ti.com: replace warning with a WARN]
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ drivers/remoteproc/keystone_remoteproc.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/remoteproc/keystone_remoteproc.c b/drivers/remoteproc/keystone_remoteproc.c
+index d01d5e3fce28..8233664e85fa 100644
+--- a/drivers/remoteproc/keystone_remoteproc.c
++++ b/drivers/remoteproc/keystone_remoteproc.c
+@@ -456,6 +456,16 @@ static int keystone_rproc_probe(struct platform_device *pdev)
+ 	if (of_reserved_mem_device_init(dev))
+ 		dev_warn(dev, "device does not have specific CMA pool\n");
+ 
++	/* ensure the DSP is in reset before loading firmware */
++	ret = reset_control_status(ksproc->reset);
++	if (ret < 0) {
++		dev_err(dev, "failed to get reset status, status = %d\n", ret);
++		goto release_mem;
++	} else if (ret == 0) {
++		WARN(1, "device is not in reset\n");
++		keystone_rproc_dsp_reset(ksproc);
++	}
++
+ 	ret = rproc_add(rproc);
+ 	if (ret) {
+ 		dev_err(dev, "failed to add register device with remoteproc core, status = %d\n",
+-- 
+2.12.0
