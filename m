@@ -1,110 +1,88 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 26 May 2017 20:25:12 +0530
-Subject: [PATCH v2] arm: dma-mapping: Reset the device's dma_ops
-In-Reply-To: <2754945.XA69I2mJdj@avalon>
-References: <1495795417-15177-1-git-send-email-sricharan@codeaurora.org>
- <2754945.XA69I2mJdj@avalon>
-Message-ID: <f625ecf5-45ac-95bb-6d3d-6d02f6658711@codeaurora.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 26 May 2017 23:11:50 +0800
+Subject: [xlnx:2017.1_video_ea 11/28]
+ drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirxss_hdcp.c:2032:6:
+ sparse: no newline at end of file
+Message-ID: <201705262346.wWotiYkM%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+tree:   https://github.com/Xilinx/linux-xlnx 2017.1_video_ea
+head:   79a0e60e9f6535e89d9923e3987398318f0ed4e2
+commit: 2d6e151e6186db912023243302ba4880b00a8bad [11/28] staging: xilinx: Add xilinx hdmi drivers to staging area
+reproduce:
+        # apt-get install sparse
+        git checkout 2d6e151e6186db912023243302ba4880b00a8bad
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
-On 5/26/2017 7:44 PM, Laurent Pinchart wrote:
-> Hi Sricharan,
-> 
-> Thank you for the patch.
-> 
-> On Friday 26 May 2017 16:13:37 Sricharan R wrote:
->> arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops()
->> ,dma_ops should be cleared in the teardown path. Currently, only the
->> device's iommu mapping structures are cleared in arch_teardown_dma_ops,
->> but not the dma_ops. So on the next reprobe, dma_ops left in place is
->> stale from the first IOMMU setup, but iommu mappings has been disposed
->> of. This is a problem when the probe of the device is deferred and
->> recalled with the IOMMU probe deferral.
->>
->> So for fixing this, slightly refactor by moving the code from
->> __arm_iommu_detach_device to arm_iommu_detach_device and cleanup
->> the former. This takes care of resetting the dma_ops in the teardown
->> path.
->>
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> Fixes: 09515ef5ddad ("of/acpi: Configure dma operations at probe time for
->> platform/amba/pci bus devices")
-> 
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> 
-> Could you please push this upstream along with "[PATCH] ARM: dma-mapping: 
-> Don't tear third-party mappings" ?
-> 
-> (And feel free to s/tear/tear down/ in the subject of that patch, I've only 
-> noticed now that I forgot one word)
 
-ok, will change the above and post it with the other patches.
+sparse warnings: (new ones prefixed by >>)
 
-Regards,
- Sricharan
+>> drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirxss_hdcp.c:2032:6: sparse: no newline at end of file
+   include/linux/compiler.h:253:8: sparse: attribute 'no_sanitize_address': unknown attribute
+   In file included from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirx_hw.h:59:0,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirx.h:131,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirxss.h:77,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirxss_hdcp.c:36:
+   drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xil_io.h: In function 'Xil_Out32':
+   drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xil_io.h:65:19: warning: passing argument 2 of 'iowrite32' discards 'volatile' qualifier from pointer target type [-Wdiscarded-qualifiers]
+     iowrite32(Value, (volatile void *)Addr);
+                      ^
+   In file included from arch/x86/include/asm/io.h:203:0,
+                    from include/linux/io.h:25,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xil_io.h:61,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirx_hw.h:59,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirx.h:131,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirxss.h:77,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirxss_hdcp.c:36:
+   include/asm-generic/iomap.h:41:13: note: expected 'void *' but argument is of type 'volatile void *'
+    extern void iowrite32(u32, void __iomem *);
+                ^~~~~~~~~
+   In file included from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirx_hw.h:59:0,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirx.h:131,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirxss.h:77,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirxss_hdcp.c:36:
+   drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xil_io.h: In function 'Xil_In32':
+   drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xil_io.h:69:18: warning: passing argument 1 of 'ioread32' discards 'const volatile' qualifier from pointer target type [-Wdiscarded-qualifiers]
+     return ioread32((const volatile void *)Addr);
+                     ^
+   In file included from arch/x86/include/asm/io.h:203:0,
+                    from include/linux/io.h:25,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xil_io.h:61,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirx_hw.h:59,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirx.h:131,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirxss.h:77,
+                    from drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirxss_hdcp.c:36:
+   include/asm-generic/iomap.h:31:21: note: expected 'void *' but argument is of type 'const volatile void *'
+    extern unsigned int ioread32(void __iomem *);
+                        ^~~~~~~~
 
-> 
->> ---
->>  arch/arm/mm/dma-mapping.c | 25 ++++++++++---------------
->>  1 file changed, 10 insertions(+), 15 deletions(-)
->>
->> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> index c742dfd..6e82e87 100644
->> --- a/arch/arm/mm/dma-mapping.c
->> +++ b/arch/arm/mm/dma-mapping.c
->> @@ -2311,7 +2311,14 @@ int arm_iommu_attach_device(struct device *dev,
->>  }
->>  EXPORT_SYMBOL_GPL(arm_iommu_attach_device);
->>
->> -static void __arm_iommu_detach_device(struct device *dev)
->> +/**
->> + * arm_iommu_detach_device
->> + * @dev: valid struct device pointer
->> + *
->> + * Detaches the provided device from a previously attached map.
->> + * This voids the dma operations (dma_map_ops pointer)
->> + */
->> +void arm_iommu_detach_device(struct device *dev)
->>  {
->>  	struct dma_iommu_mapping *mapping;
->>
->> @@ -2324,22 +2331,10 @@ static void __arm_iommu_detach_device(struct device
->> *dev) iommu_detach_device(mapping->domain, dev);
->>  	kref_put(&mapping->kref, release_iommu_mapping);
->>  	to_dma_iommu_mapping(dev) = NULL;
->> +	set_dma_ops(dev, NULL);
->>
->>  	pr_debug("Detached IOMMU controller from %s device.\n", 
-> dev_name(dev));
->>  }
->> -
->> -/**
->> - * arm_iommu_detach_device
->> - * @dev: valid struct device pointer
->> - *
->> - * Detaches the provided device from a previously attached map.
->> - * This voids the dma operations (dma_map_ops pointer)
->> - */
->> -void arm_iommu_detach_device(struct device *dev)
->> -{
->> -	__arm_iommu_detach_device(dev);
->> -	set_dma_ops(dev, NULL);
->> -}
->>  EXPORT_SYMBOL_GPL(arm_iommu_detach_device);
->>
->>  static const struct dma_map_ops *arm_get_iommu_dma_map_ops(bool coherent)
->> @@ -2379,7 +2374,7 @@ static void arm_teardown_iommu_dma_ops(struct device
->> *dev) if (!mapping)
->>  		return;
->>
->> -	__arm_iommu_detach_device(dev);
->> +	arm_iommu_detach_device(dev);
->>  	arm_iommu_release_mapping(mapping);
->>  }
-> 
+vim +2032 drivers/staging/xilinx/hdmi/xilinx-hdmi-rx/xv_hdmirxss_hdcp.c
 
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+c7411816 Rohit Consul 2017-05-05  2016  #ifdef XPAR_XHDCP_NUM_INSTANCES
+c7411816 Rohit Consul 2017-05-05  2017    // HDCP 1.4
+c7411816 Rohit Consul 2017-05-05  2018    if (InstancePtr->Hdcp14Ptr) {
+c7411816 Rohit Consul 2017-05-05  2019      XHdcp1x_SetRepeater(InstancePtr->Hdcp14Ptr, Set);
+c7411816 Rohit Consul 2017-05-05  2020    }
+c7411816 Rohit Consul 2017-05-05  2021  #endif
+c7411816 Rohit Consul 2017-05-05  2022  
+c7411816 Rohit Consul 2017-05-05  2023  #ifdef XPAR_XHDCP22_RX_NUM_INSTANCES
+c7411816 Rohit Consul 2017-05-05  2024    // HDCP 2.2
+c7411816 Rohit Consul 2017-05-05  2025    if (InstancePtr->Hdcp22Ptr) {
+c7411816 Rohit Consul 2017-05-05  2026      XHdcp22Rx_SetRepeater(InstancePtr->Hdcp22Ptr, Set);
+c7411816 Rohit Consul 2017-05-05  2027    }
+c7411816 Rohit Consul 2017-05-05  2028  #endif
+c7411816 Rohit Consul 2017-05-05  2029  
+c7411816 Rohit Consul 2017-05-05  2030    return XST_SUCCESS;
+c7411816 Rohit Consul 2017-05-05  2031  }
+
+:::::: The code at line 2032 was first introduced by commit
+:::::: c7411816e42074e95f4172fa006408f76294af04 media: xilinx-hdmi-rx: Initial release of xilinx hdmi-rx soft IP driver
+
+:::::: TO: Rohit Consul <rohitco@xilinx.com>
+:::::: CC: Jeffrey Mouroux <jmouroux@xilinx.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
