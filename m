@@ -1,292 +1,79 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 26 May 2017 22:33:42 +0800
-Subject: [PATCH 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
- board dts and Makefile
-In-Reply-To: <20170523150137.ouyloy46ahuhsenu@rob-hp-laptop>
-References: <1495192186-22480-1-git-send-email-yt.shen@mediatek.com>
- <1495192186-22480-3-git-send-email-yt.shen@mediatek.com>
- <20170523150137.ouyloy46ahuhsenu@rob-hp-laptop>
-Message-ID: <1495809222.25681.11.camel@mtksdaap41>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 26 May 2017 16:55:01 +0200
+Subject: [PATCH 10/11] crypto: sun4i-ss: fix large block size support
+In-Reply-To: <20170524190652.13278-11-antoine.tenart@free-electrons.com>
+References: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
+ <20170524190652.13278-11-antoine.tenart@free-electrons.com>
+Message-ID: <20170526145501.GA19284@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-05-23 at 10:01 -0500, Rob Herring wrote:
-> On Fri, May 19, 2017 at 07:09:46PM +0800, YT Shen wrote:
-> > This adds basic chip support for Mediatek 2712
-> > 
-> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/Makefile       |   1 +
-> >  arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  44 +++++++
-> >  arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 172 ++++++++++++++++++++++++++++
-> >  3 files changed, 217 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> > 
-> > diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-> > index 9fbfd32..fcc0604 100644
-> > --- a/arch/arm64/boot/dts/mediatek/Makefile
-> > +++ b/arch/arm64/boot/dts/mediatek/Makefile
-> > @@ -1,3 +1,4 @@
-> > +dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
-> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
-> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
-> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> > new file mode 100644
-> > index 0000000..40b0c91
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-> > @@ -0,0 +1,44 @@
-> > +/*
-> > + * Copyright (c) 2017 MediaTek Inc.
-> > + * Author: YT Shen <yt.shen@mediatek.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
+On Wed, May 24, 2017 at 09:06:51PM +0200, Antoine Tenart wrote:
+> The run-time self-tests fail quite early, as soon as the input block
+> size is larger than 64 bytes:
 > 
-> You may want to dual license this. Not sure what the rest of Mediatek 
-> dts files do though. Also, you can use SPDX tag here if you want.
-Okay, will change to SPDX tag and dual license in the next version.
-  SPDX-License-Identifier: (GPL-2.0 OR MIT)
+>   alg: hash: Test 4 failed for sha1-sun4i-ss
+>   00000000: b9 c9 1e 52 c0 26 d8 39 81 ff f2 3c 99 b1 27 b2
+>   00000010: 30 d6 c9 85
+> 
+> One thing to notice is the value of the last word, which is the one
+> expected (it can sometime be the last two words). The datasheet isn't
+> very clear about when the digest is ready to retrieve and is seems the
+> bit SS_DATA_END is cleared when the digest was computed *but* that
+> doesn't mean the digest is ready to retrieve in the registers.
+> 
+> A ndelay(1) is added before reading the computed digest to ensure it is
+> available in the SS_MD[] registers.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+> index 685de5b6ab17..6da8d2bbd4da 100644
+> --- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+> +++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+> @@ -358,6 +358,15 @@ static int sun4i_hash(struct ahash_request *areq)
+>  		goto release_ss;
+>  	}
+>  
+> +	/*
+> +	 * The datasheet isn't very clear about when to retrieve the digest. The
+> +	 * bit SS_DATA_END is cleared when the engine has processed the data and
+> +	 * when the digest is computed *but* it doesn't mean the digest is
+> +	 * available in the diesgt registers. Hence the delay to be sure we can
 
-> 
-> > +
-> > +/dts-v1/;
-> > +#include "mt2712e.dtsi"
-> > +
-> > +/ {
-> > +	model = "MediaTek MT2712 evaluation board";
-> > +	compatible = "mediatek,mt2712-evb", "mediatek,mt2712";
-> > +
-> > +	aliases {
-> > +		serial0 = &uart0;
-> > +		serial1 = &uart1;
-> > +		serial2 = &uart2;
-> > +		serial3 = &uart3;
-> > +		serial4 = &uart4;
-> > +		serial5 = &uart5;
-> > +	};
-> > +
-> > +	memory at 40000000 {
-> > +		device_type = "memory";
-> > +		reg = <0 0x40000000 0 0x80000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		bootargs = "console=ttyS0,921600n1 initrd=0x45000000,90M";
-> 
-> Both of these have a way to be expressed in DT. For the initrd, the 
-> bootloader should be setting the address and size anyway.
-OK, will change to DT usage.
-  stdout-path = "serial0:921600n8";
-  linux,initrd-start = <...>;
-  linux,initrd-end = <...>;
+Hello
 
-> 
-> > +	};
-> > +};
-> > +
-> > +&uart0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> > new file mode 100644
-> > index 0000000..40747a9
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> > @@ -0,0 +1,172 @@
-> > +/*
-> > + * Copyright (c) 2017 MediaTek Inc.
-> > + * Author: YT Shen <yt.shen@mediatek.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include <dt-bindings/interrupt-controller/irq.h>
-> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> > +
-> > +/ {
-> > +	compatible = "mediatek,mt2712";
-> > +	interrupt-parent = <&sysirq>;
-> > +	#address-cells = <2>;
-> > +	#size-cells = <2>;
-> > +
-> > +	cpus {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		cpu-map {
-> > +			cluster0 {
-> > +				core0 {
-> > +					cpu = <&cpu0>;
-> > +				};
-> > +				core1 {
-> > +					cpu = <&cpu1>;
-> > +				};
-> > +			};
-> > +
-> > +			cluster1 {
-> > +				core0 {
-> > +					cpu = <&cpu2>;
-> > +				};
-> > +			};
-> > +		};
-> > +
-> > +		cpu0: cpu at 0 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a35";
-> > +			reg = <0x000>;
-> > +		};
-> > +
-> > +		cpu1: cpu at 1 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a35";
-> > +			reg = <0x001>;
-> > +			enable-method = "psci";
-> > +		};
-> > +
-> > +		cpu2: cpu at 200 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a72";
-> > +			reg = <0x200>;
-> > +			enable-method = "psci";
-> > +		};
-> > +	};
-> > +
-> > +	psci {
-> > +		compatible = "arm,psci-0.2";
-> > +		method = "smc";
-> > +	};
-> > +
-> > +	uart_clk: dummy26m {
-> > +		compatible = "fixed-clock";
-> > +		clock-frequency = <26000000>;
-> > +		#clock-cells = <0>;
-> > +	};
-> > +
-> > +	timer {
-> > +		compatible = "arm,armv8-timer";
-> > +		interrupt-parent = <&gic>;
-> > +		interrupts = <GIC_PPI 13
-> > +			      (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 14
-> > +			      (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 11
-> > +			      (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 10
-> > +			      (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
-> > +	};
-> > +
-> > +	soc {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		compatible = "simple-bus";
-> > +		ranges;
-> > +
-> > +		uart5: serial at 1000f000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x1000f000 0 0x400>;
-> > +			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		sysirq: intpol-controller at 10220a80 {
-> 
-> interrupt-controller at ...
-Will check this part, thanks for the review.
+Small typo here (diesgt/digest)
 
-yt.shen
+> +	 * read it.
+> +	 */
+> +	ndelay(1);
+> +
+>  	for (i = 0; i < crypto_ahash_digestsize(tfm) / 4; i++)
+>  		op->hash[i] = readl(ss->base + SS_MD0 + i * 4);
+>  
+> @@ -446,6 +455,15 @@ static int sun4i_hash(struct ahash_request *areq)
+>  		goto release_ss;
+>  	}
+>  
+> +	/*
+> +	 * The datasheet isn't very clear about when to retrieve the digest. The
+> +	 * bit SS_DATA_END is cleared when the engine has processed the data and
+> +	 * when the digest is computed *but* it doesn't mean the digest is
+> +	 * available in the diesgt registers. Hence the delay to be sure we can
 
-> 
-> > +			compatible = "mediatek,mt2712-sysirq",
-> > +				     "mediatek,mt6577-sysirq";
-> > +			interrupt-controller;
-> > +			#interrupt-cells = <3>;
-> > +			interrupt-parent = <&gic>;
-> > +			reg = <0 0x10220a80 0 0x40>;
-> > +		};
-> > +
-> > +		gic: interrupt-controller at 10510000 {
-> > +			compatible = "arm,gic-400";
-> > +			#interrupt-cells = <3>;
-> > +			interrupt-parent = <&gic>;
-> > +			interrupt-controller;
-> > +			reg = <0 0x10510000 0 0x1000>,
-> > +			      <0 0x10520000 0 0x1000>,
-> > +			      <0 0x10540000 0 0x2000>,
-> > +			      <0 0x10560000 0 0x2000>;
-> > +			interrupts = <GIC_PPI 9
-> > +				(GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
-> > +		};
-> > +
-> > +		uart0: serial at 11002000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x11002000 0 0x400>;
-> > +			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		uart1: serial at 11003000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x11003000 0 0x400>;
-> > +			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		uart2: serial at 11004000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x11004000 0 0x400>;
-> > +			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		uart3: serial at 11005000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x11005000 0 0x400>;
-> > +			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		uart4: serial at 11019000 {
-> > +			compatible = "mediatek,mt2712-uart",
-> > +				     "mediatek,mt6577-uart";
-> > +			reg = <0 0x11019000 0 0x400>;
-> > +			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_LOW>;
-> > +			clocks = <&uart_clk>;
-> > +			status = "disabled";
-> > +		};
-> > +	};
-> > +};
-> > +
-> > -- 
-> > 1.9.1
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+and here.
+
+This behaviour is very strange since I didnt get it on other platform.
+Could you give me the board name where you get it ?
+Does any wmb() after the writel(..SS_DATA_END..) do the trick ?
+Which speed are the SS clocks ?
+
+Anyway the whole serie seems good, I will test it just after this weekend.
+
+Thanks
+Regards
+Corentin Labbe
