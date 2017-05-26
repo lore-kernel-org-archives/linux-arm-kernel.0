@@ -1,79 +1,110 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 26 May 2017 16:55:01 +0200
-Subject: [PATCH 10/11] crypto: sun4i-ss: fix large block size support
-In-Reply-To: <20170524190652.13278-11-antoine.tenart@free-electrons.com>
-References: <20170524190652.13278-1-antoine.tenart@free-electrons.com>
- <20170524190652.13278-11-antoine.tenart@free-electrons.com>
-Message-ID: <20170526145501.GA19284@Red>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri, 26 May 2017 20:25:12 +0530
+Subject: [PATCH v2] arm: dma-mapping: Reset the device's dma_ops
+In-Reply-To: <2754945.XA69I2mJdj@avalon>
+References: <1495795417-15177-1-git-send-email-sricharan@codeaurora.org>
+ <2754945.XA69I2mJdj@avalon>
+Message-ID: <f625ecf5-45ac-95bb-6d3d-6d02f6658711@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 09:06:51PM +0200, Antoine Tenart wrote:
-> The run-time self-tests fail quite early, as soon as the input block
-> size is larger than 64 bytes:
+Hi Laurent,
+
+On 5/26/2017 7:44 PM, Laurent Pinchart wrote:
+> Hi Sricharan,
 > 
->   alg: hash: Test 4 failed for sha1-sun4i-ss
->   00000000: b9 c9 1e 52 c0 26 d8 39 81 ff f2 3c 99 b1 27 b2
->   00000010: 30 d6 c9 85
+> Thank you for the patch.
 > 
-> One thing to notice is the value of the last word, which is the one
-> expected (it can sometime be the last two words). The datasheet isn't
-> very clear about when the digest is ready to retrieve and is seems the
-> bit SS_DATA_END is cleared when the digest was computed *but* that
-> doesn't mean the digest is ready to retrieve in the registers.
+> On Friday 26 May 2017 16:13:37 Sricharan R wrote:
+>> arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops()
+>> ,dma_ops should be cleared in the teardown path. Currently, only the
+>> device's iommu mapping structures are cleared in arch_teardown_dma_ops,
+>> but not the dma_ops. So on the next reprobe, dma_ops left in place is
+>> stale from the first IOMMU setup, but iommu mappings has been disposed
+>> of. This is a problem when the probe of the device is deferred and
+>> recalled with the IOMMU probe deferral.
+>>
+>> So for fixing this, slightly refactor by moving the code from
+>> __arm_iommu_detach_device to arm_iommu_detach_device and cleanup
+>> the former. This takes care of resetting the dma_ops in the teardown
+>> path.
+>>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> Fixes: 09515ef5ddad ("of/acpi: Configure dma operations at probe time for
+>> platform/amba/pci bus devices")
 > 
-> A ndelay(1) is added before reading the computed digest to ensure it is
-> available in the SS_MD[] registers.
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
+> Could you please push this upstream along with "[PATCH] ARM: dma-mapping: 
+> Don't tear third-party mappings" ?
 > 
-> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-> index 685de5b6ab17..6da8d2bbd4da 100644
-> --- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-> +++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
-> @@ -358,6 +358,15 @@ static int sun4i_hash(struct ahash_request *areq)
->  		goto release_ss;
->  	}
->  
-> +	/*
-> +	 * The datasheet isn't very clear about when to retrieve the digest. The
-> +	 * bit SS_DATA_END is cleared when the engine has processed the data and
-> +	 * when the digest is computed *but* it doesn't mean the digest is
-> +	 * available in the diesgt registers. Hence the delay to be sure we can
+> (And feel free to s/tear/tear down/ in the subject of that patch, I've only 
+> noticed now that I forgot one word)
 
-Hello
+ok, will change the above and post it with the other patches.
 
-Small typo here (diesgt/digest)
+Regards,
+ Sricharan
 
-> +	 * read it.
-> +	 */
-> +	ndelay(1);
-> +
->  	for (i = 0; i < crypto_ahash_digestsize(tfm) / 4; i++)
->  		op->hash[i] = readl(ss->base + SS_MD0 + i * 4);
->  
-> @@ -446,6 +455,15 @@ static int sun4i_hash(struct ahash_request *areq)
->  		goto release_ss;
->  	}
->  
-> +	/*
-> +	 * The datasheet isn't very clear about when to retrieve the digest. The
-> +	 * bit SS_DATA_END is cleared when the engine has processed the data and
-> +	 * when the digest is computed *but* it doesn't mean the digest is
-> +	 * available in the diesgt registers. Hence the delay to be sure we can
+> 
+>> ---
+>>  arch/arm/mm/dma-mapping.c | 25 ++++++++++---------------
+>>  1 file changed, 10 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index c742dfd..6e82e87 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -2311,7 +2311,14 @@ int arm_iommu_attach_device(struct device *dev,
+>>  }
+>>  EXPORT_SYMBOL_GPL(arm_iommu_attach_device);
+>>
+>> -static void __arm_iommu_detach_device(struct device *dev)
+>> +/**
+>> + * arm_iommu_detach_device
+>> + * @dev: valid struct device pointer
+>> + *
+>> + * Detaches the provided device from a previously attached map.
+>> + * This voids the dma operations (dma_map_ops pointer)
+>> + */
+>> +void arm_iommu_detach_device(struct device *dev)
+>>  {
+>>  	struct dma_iommu_mapping *mapping;
+>>
+>> @@ -2324,22 +2331,10 @@ static void __arm_iommu_detach_device(struct device
+>> *dev) iommu_detach_device(mapping->domain, dev);
+>>  	kref_put(&mapping->kref, release_iommu_mapping);
+>>  	to_dma_iommu_mapping(dev) = NULL;
+>> +	set_dma_ops(dev, NULL);
+>>
+>>  	pr_debug("Detached IOMMU controller from %s device.\n", 
+> dev_name(dev));
+>>  }
+>> -
+>> -/**
+>> - * arm_iommu_detach_device
+>> - * @dev: valid struct device pointer
+>> - *
+>> - * Detaches the provided device from a previously attached map.
+>> - * This voids the dma operations (dma_map_ops pointer)
+>> - */
+>> -void arm_iommu_detach_device(struct device *dev)
+>> -{
+>> -	__arm_iommu_detach_device(dev);
+>> -	set_dma_ops(dev, NULL);
+>> -}
+>>  EXPORT_SYMBOL_GPL(arm_iommu_detach_device);
+>>
+>>  static const struct dma_map_ops *arm_get_iommu_dma_map_ops(bool coherent)
+>> @@ -2379,7 +2374,7 @@ static void arm_teardown_iommu_dma_ops(struct device
+>> *dev) if (!mapping)
+>>  		return;
+>>
+>> -	__arm_iommu_detach_device(dev);
+>> +	arm_iommu_detach_device(dev);
+>>  	arm_iommu_release_mapping(mapping);
+>>  }
+> 
 
-and here.
-
-This behaviour is very strange since I didnt get it on other platform.
-Could you give me the board name where you get it ?
-Does any wmb() after the writel(..SS_DATA_END..) do the trick ?
-Which speed are the SS clocks ?
-
-Anyway the whole serie seems good, I will test it just after this weekend.
-
-Thanks
-Regards
-Corentin Labbe
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
