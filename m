@@ -1,49 +1,46 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 26 May 2017 11:53:14 -0500
-Subject: [PATCH 0/3] Add Keystone2 Remoteproc driver
-Message-ID: <20170526165317.23164-1-s-anna@ti.com>
+From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri, 26 May 2017 20:06:09 +0200
+Subject: [PATCH RFC 5/5] ARM: dts: vf-colibri-eval: use IRQ_TYPE_* to specify
+ irq flags
+In-Reply-To: <20170526180609.2699-1-uwe@kleine-koenig.org>
+References: <20170526180609.2699-1-uwe@kleine-koenig.org>
+Message-ID: <20170526180609.2699-5-uwe@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+According to the binding documentation and the source code the
+vf610-gpio controller takes IRQ_TYPE_* as its flags values, not
+GPIO_ACTIVE_*.
 
-This series adds the DT binding and the driver for loading and booting
-the DSP devices present on various Keystone2 SoC families. The current
-series supports the 66AK2H/K, 66AK2L and 66AK2E SoC families. Support
-for the remaining 66AK2G SoC family will be added later as it is
-awaiting the dependent clock and reset drivers to be merged into
-mainline.
+This patch uses the right variable type which yields the same result
+when compiled. Note that this might be wrong and actually
+IRQ_TYPE_LEVEL_LOW is intended by the dt author.
 
-Supported features include basic load/boot using DSP internal memory
-regions and error recovery. IPC based on the virtio-rpmsg transport
-with vrings in external DDR memory and interrupts supported through
-MMRs.
+Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+---
+Hello,
 
-The DTS nodes will be posted separately once the binding is accepted.
-The virtio-rpmsg based IPC stack would require some support in the
-virtio_rpmsg driver (first 2 patches from Loic's "virtio_rpmsg: make
-rpmsg channel configurable" series [1] to begin with) if using CMA
-pools from HighMem area.
+can somebody with the hardware or it's documentation please check which
+flag is the right one?
 
-regards
-Suman
+Best regards
+Uwe
 
-[1] https://lkml.org/lkml/2017/3/28/349
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Andrew F. Davis (1):
-  remoteproc/keystone: ensure the DSPs are in reset in probe
-
-Suman Anna (2):
-  Documentation: DT: add Keystone DSP remoteproc binding
-  remoteproc/keystone: add a remoteproc driver for Keystone 2 DSPs
-
- .../bindings/remoteproc/ti,keystone-rproc.txt      | 132 ++++++
- drivers/remoteproc/Kconfig                         |  13 +
- drivers/remoteproc/Makefile                        |   1 +
- drivers/remoteproc/keystone_remoteproc.c           | 525 +++++++++++++++++++++
- 4 files changed, 671 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,keystone-rproc.txt
- create mode 100644 drivers/remoteproc/keystone_remoteproc.c
-
+diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+index 091b738041a0..3e0c84d79c43 100644
+--- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
++++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+@@ -117,7 +117,7 @@
+ 		clocks = <&clk16m>;
+ 		spi-max-frequency = <10000000>;
+ 		interrupt-parent = <&gpio1>;
+-		interrupts = <11 GPIO_ACTIVE_LOW>;
++		interrupts = <11 IRQ_TYPE_EDGE_RISING>;
+ 	};
+ };
+ 
 -- 
-2.12.0
+2.11.0
