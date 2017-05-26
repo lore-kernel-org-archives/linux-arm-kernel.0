@@ -1,224 +1,45 @@
-From: spjoshi@codeaurora.org (Sarangdhar Joshi)
-Date: Thu, 25 May 2017 17:39:59 -0700
-Subject: [PATCH v2 1/2] remoteproc: Introduce rproc_{start,stop}() functions
-Message-ID: <1495759200-5575-1-git-send-email-spjoshi@codeaurora.org>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Fri, 26 May 2017 10:02:01 +0900
+Subject: [PATCH v2] drm/exynos: dsi: Remove bridge node reference in removal
+References: <CGME20170526010217epcas1p3bfb8d9f733bcdafb4209d917fdf28dd8@epcas1p3.samsung.com>
+Message-ID: <1495760521-330-1-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the context of recovering from crash, rproc_trigger_recovery() does
-rproc_shutdown() followed by rproc_boot(). The remoteproc resources are
-cleaned up in rproc_shutdown() and immediately reallocated in
-rproc_boot() which is an unnecessary overhead. Furthermore, we want the
-memory regions to be accessible after stopping the remote processor, to
-be able to extract the memory content for a coredump.
+Since bridge node is referenced during in the probe, it should be
+released on removal.
 
-This patch factors out the code in rproc_boot() and rproc_shutdown()
-path and introduces rproc_{start,stop}() in order to avoid resource
-allocation overhead.
-
-Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+Suggested-by: Andrzej Hajda <a.hajda@samsung.com>
+Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
 ---
+Hi Inki,
 
-Changes from v1:
+This patch seems to have been forgotten... :)
 
-* Spliced the patches to separate rproc_{start,stop}() code from changing
-  the behavior of the recovery
-* Modified commit text to reflect this change
+Changes for V2:
 
- drivers/remoteproc/remoteproc_core.c | 139 +++++++++++++++++++++--------------
- 1 file changed, 85 insertions(+), 54 deletions(-)
+- Checked for rebase 4.12-rc2
 
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 9fd9ca5..aeb7bdd 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -851,6 +851,61 @@ static void rproc_resource_cleanup(struct rproc *rproc)
- 		kref_put(&rvdev->refcount, rproc_vdev_release);
- }
+Best regards,
+Hoegeun
+
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index 698a824..a11b795 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -1805,6 +1805,10 @@ static int exynos_dsi_probe(struct platform_device *pdev)
  
-+static int rproc_start(struct rproc *rproc, const struct firmware *fw)
-+{
-+	struct resource_table *table, *loaded_table;
-+	struct device *dev = &rproc->dev;
-+	int ret, tablesz;
-+
-+	/* look for the resource table */
-+	table = rproc_find_rsc_table(rproc, fw, &tablesz);
-+	if (!table) {
-+		dev_err(dev, "Resouce table look up failed\n");
-+		return -EINVAL;
-+	}
-+
-+	/* load the ELF segments to memory */
-+	ret = rproc_load_segments(rproc, fw);
-+	if (ret) {
-+		dev_err(dev, "Failed to load program segments: %d\n", ret);
-+		return ret;
-+	}
-+
-+	/*
-+	 * The starting device has been given the rproc->table_ptr as the
-+	 * resource table. The address of the vring along with the other
-+	 * allocated resources (carveouts etc) is stored in table_ptr.
-+	 * In order to pass this information to the remote device we must copy
-+	 * this information to device memory. We also update the table_ptr so
-+	 * that any subsequent changes will be applied to the loaded version.
-+	 */
-+	loaded_table = rproc_find_loaded_rsc_table(rproc, fw);
-+	if (loaded_table)
-+		memcpy(loaded_table, rproc->table_ptr, tablesz);
-+
-+	/* power up the remote processor */
-+	ret = rproc->ops->start(rproc);
-+	if (ret) {
-+		dev_err(dev, "can't start rproc %s: %d\n", rproc->name, ret);
-+		return ret;
-+	}
-+
-+	/* probe any subdevices for the remote processor */
-+	ret = rproc_probe_subdevices(rproc);
-+	if (ret) {
-+		dev_err(dev, "failed to probe subdevices for %s: %d\n",
-+			rproc->name, ret);
-+		rproc->ops->stop(rproc);
-+		return ret;
-+	}
-+
-+	rproc->state = RPROC_RUNNING;
-+
-+	dev_info(dev, "remote processor %s is now up\n", rproc->name);
-+
-+	return 0;
-+}
-+
- /*
-  * take a firmware and boot a remote processor with it.
-  */
-@@ -858,7 +913,7 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
+ static int exynos_dsi_remove(struct platform_device *pdev)
  {
- 	struct device *dev = &rproc->dev;
- 	const char *name = rproc->firmware;
--	struct resource_table *table, *loaded_table;
-+	struct resource_table *table;
- 	int ret, tablesz;
- 
- 	ret = rproc_fw_sanity_check(rproc, fw);
-@@ -907,48 +962,12 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
- 		goto clean_up_resources;
- 	}
- 
--	/* load the ELF segments to memory */
--	ret = rproc_load_segments(rproc, fw);
--	if (ret) {
--		dev_err(dev, "Failed to load program segments: %d\n", ret);
--		goto clean_up_resources;
--	}
--
--	/*
--	 * The starting device has been given the rproc->table_ptr as the
--	 * resource table. The address of the vring along with the other
--	 * allocated resources (carveouts etc) is stored in table_ptr.
--	 * In order to pass this information to the remote device we must copy
--	 * this information to device memory. We also update the table_ptr so
--	 * that any subsequent changes will be applied to the loaded version.
--	 */
--	loaded_table = rproc_find_loaded_rsc_table(rproc, fw);
--	if (loaded_table)
--		memcpy(loaded_table, rproc->table_ptr, tablesz);
--
--	/* power up the remote processor */
--	ret = rproc->ops->start(rproc);
--	if (ret) {
--		dev_err(dev, "can't start rproc %s: %d\n", rproc->name, ret);
-+	ret = rproc_start(rproc, fw);
-+	if (ret)
- 		goto clean_up_resources;
--	}
--
--	/* probe any subdevices for the remote processor */
--	ret = rproc_probe_subdevices(rproc);
--	if (ret) {
--		dev_err(dev, "failed to probe subdevices for %s: %d\n",
--			rproc->name, ret);
--		goto stop_rproc;
--	}
--
--	rproc->state = RPROC_RUNNING;
--
--	dev_info(dev, "remote processor %s is now up\n", rproc->name);
- 
- 	return 0;
- 
--stop_rproc:
--	rproc->ops->stop(rproc);
- clean_up_resources:
- 	rproc_resource_cleanup(rproc);
- clean_up:
-@@ -993,6 +1012,32 @@ static int rproc_trigger_auto_boot(struct rproc *rproc)
- 	return ret;
- }
- 
-+static int rproc_stop(struct rproc *rproc)
-+{
-+	struct device *dev = &rproc->dev;
-+	int ret;
++	struct exynos_dsi *dsi = platform_get_drvdata(pdev);
 +
-+	/* remove any subdevices for the remote processor */
-+	rproc_remove_subdevices(rproc);
++	of_node_put(dsi->bridge_node);
 +
-+	/* power off the remote processor */
-+	ret = rproc->ops->stop(rproc);
-+	if (ret) {
-+		dev_err(dev, "can't stop rproc: %d\n", ret);
-+		return ret;
-+	}
-+
-+	/* if in crash state, unlock crash handler */
-+	if (rproc->state == RPROC_CRASHED)
-+		complete_all(&rproc->crash_comp);
-+
-+	rproc->state = RPROC_OFFLINE;
-+
-+	dev_info(dev, "stopped remote processor %s\n", rproc->name);
-+
-+	return 0;
-+}
-+
- /**
-  * rproc_trigger_recovery() - recover a remoteproc
-  * @rproc: the remote processor
-@@ -1163,14 +1208,9 @@ void rproc_shutdown(struct rproc *rproc)
- 	if (!atomic_dec_and_test(&rproc->power))
- 		goto out;
+ 	pm_runtime_disable(&pdev->dev);
  
--	/* remove any subdevices for the remote processor */
--	rproc_remove_subdevices(rproc);
--
--	/* power off the remote processor */
--	ret = rproc->ops->stop(rproc);
-+	ret = rproc_stop(rproc);
- 	if (ret) {
- 		atomic_inc(&rproc->power);
--		dev_err(dev, "can't stop rproc: %d\n", ret);
- 		goto out;
- 	}
- 
-@@ -1182,15 +1222,6 @@ void rproc_shutdown(struct rproc *rproc)
- 	/* Free the copy of the resource table */
- 	kfree(rproc->table_ptr);
- 	rproc->table_ptr = NULL;
--
--	/* if in crash state, unlock crash handler */
--	if (rproc->state == RPROC_CRASHED)
--		complete_all(&rproc->crash_comp);
--
--	rproc->state = RPROC_OFFLINE;
--
--	dev_info(dev, "stopped remote processor %s\n", rproc->name);
--
- out:
- 	mutex_unlock(&rproc->lock);
- }
+ 	component_del(&pdev->dev, &exynos_dsi_component_ops);
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
