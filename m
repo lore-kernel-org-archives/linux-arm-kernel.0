@@ -1,48 +1,76 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 26 May 2017 08:50:49 +0200
-Subject: [PATCH] drm/rockchip: Don't allow zero sized gem buffer
-In-Reply-To: <20170526055218.GA23802@infradead.org>
-References: <1495521583-29151-1-git-send-email-jeffy.chen@rock-chips.com>
- <20170525153045.7svkkmfsqbqkfacp@art_vandelay>
- <59279331.3050402@rock-chips.com>
- <20170526055218.GA23802@infradead.org>
-Message-ID: <CAKMK7uHRsk79BzmgnQ23EaKwgMBcXmAYMLT8rqt-ebdJ36EW8g@mail.gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 26 May 2017 14:54:18 +0800
+Subject: [PATCH] ARM: dts: rockchip:add sd card support
+In-Reply-To: <1495777966-26212-1-git-send-email-eddie.cai.linux@gmail.com>
+References: <1495777966-26212-1-git-send-email-eddie.cai.linux@gmail.com>
+Message-ID: <0cf71840-a533-1810-04f3-e6c1a3290857@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 26, 2017 at 7:52 AM, Christoph Hellwig <hch@infradead.org> wrote:
-> On Fri, May 26, 2017 at 10:30:09AM +0800, jeffy wrote:
->> Hi sean,
->>
->> On 05/25/2017 11:30 PM, Sean Paul wrote:
->> > On Tue, May 23, 2017 at 02:39:43PM +0800, Jeffy Chen wrote:
->> > > The system would crash when trying to alloc zero sized gem buffer:
->> > > [    6.712435] Unable to handle kernel NULL pointer dereference at virtual address 00000010 <--ZERO_SIZE_PTR
->> > > ...
->> > > [    6.757502] PC is at sg_alloc_table_from_pages+0x170/0x1ec
->> >
->> > It's unfortunate that you didn't include the entire stack trace. From code
->> > inspection, it seems like the 0 size comes from the fb_probe path? Is there
->> > somewhere in the helpers that you could check the mode is sane so all drivers
->> > can benefit?
->>
->> hmm, sorry, i was testing it on chromeos 4.4 kernel, it turns out that we
->> have a custom ioctl for userspace to create gem buffer(the same as exynos
->> drm), which might get the the 0 size.
->>
->> but on upstream kernel, it could only be called by dump_create, and the
->> drm_mode_create_dumb_ioctl already did the size check.
->>
->> will resent this patch, and rewrite the commit message, thanx.
+Hi Eddie,
+
+? 2017/5/26 13:52, Eddie Cai ??:
+> firefly reload board not support sd card yet. so support it.
+
+It looks good overall, but I think you need to amend
+your commit title to say that you just add sd card support
+for rk3288-firefly-reload, otherwise,
+
+Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+
 >
-> That suggests that this patch isn't needed at all.
-
-Yes, not needed for upstream. But next time around pls include the
-entire backtrace (or at least the relevant parts), not just the last
-line, so that we can figure this out directly.
-
-Thanks, Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
+> ---
+>  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 31 +++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> index 413b61f..2f41209 100644
+> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> @@ -57,6 +57,17 @@
+>  		clock-output-names = "ext_gmac";
+>  	};
+>
+> +	vcc_sd: sdmmc-regulator {
+> +		compatible = "regulator-fixed";
+> +		gpio = <&gpio7 RK_PB3 GPIO_ACTIVE_LOW>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sdmmc_pwr>;
+> +		regulator-name = "vcc_sd";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		startup-delay-us = <100000>;
+> +		vin-supply = <&vcc_io>;
+> +	};
+>
+>  	vcc_flash: flash-regulator {
+>  		compatible = "regulator-fixed";
+> @@ -281,6 +292,26 @@
+>  			rockchip,pins = <4 8 RK_FUNC_GPIO &pcfg_output_high>;
+>  		};
+>  	};
+> +
+> +	sdmmc {
+> +		sdmmc_pwr: sdmmc-pwr {
+> +			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
+> +		};
+> +	};
+> +};
+> +
+> +&sdmmc {
+> +	bus-width = <4>;
+> +	cap-mmc-highspeed;
+> +	cap-sd-highspeed;
+> +	card-detect-delay = <200>;
+> +	disable-wp;
+> +	num-slots = <1>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&sdmmc_clk>, <&sdmmc_cmd>, <&sdmmc_cd>, <&sdmmc_bus4>;
+> +	vmmc-supply = <&vcc_sd>;
+> +	vqmmc-supply = <&vccio_sd>;
+> +	status = "okay";
+>  };
+>
+>  &tsadc {
+>
