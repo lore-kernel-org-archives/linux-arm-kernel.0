@@ -1,48 +1,46 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 26 May 2017 17:18:15 +0900
-Subject: [PATCH] arm64: dts: uniphier: reserve more memory for LD11/LD20
-Message-ID: <1495786695-27954-1-git-send-email-yamada.masahiro@socionext.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 May 2017 10:33:47 +0200
+Subject: [PATCH 2/6] mfd: hi6421-pmic: move hi6421_regmap_config
+ definition to header file
+In-Reply-To: <20170526063518.21246-3-guodong.xu@linaro.org>
+References: <20170526063518.21246-1-guodong.xu@linaro.org>
+ <20170526063518.21246-3-guodong.xu@linaro.org>
+Message-ID: <CAK8P3a0maxQdwLMMwEnYgmMHRHDRUaeYRb5JM0PtRbWopeHjUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reserve enough space below the kernel base.
-The assumed address map is:
-  80000000 - 80ffffff : for IPP
-  81000000 - 81ffffff : for ARM secure
-  82000000 -          : for Linux
+On Fri, May 26, 2017 at 8:35 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
+> Move hi6421_regmap_config definition from c code to common header:
+>  - include/linux/mfd/hi6421-pmic.h
+>
+> This is to improve code re-use for upcoming hi6421 series of MFD driver.
+>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+> diff --git a/include/linux/mfd/hi6421-pmic.h b/include/linux/mfd/hi6421-pmic.h
+> index 587273e..f4674ff 100644
+> --- a/include/linux/mfd/hi6421-pmic.h
+> +++ b/include/linux/mfd/hi6421-pmic.h
+> @@ -38,4 +38,10 @@ struct hi6421_pmic {
+>         struct regmap           *regmap;
+>  };
+>
+> +static const struct regmap_config hi6421_regmap_config = {
+> +       .reg_bits = 32,
+> +       .reg_stride = 4,
+> +       .val_bits = 8,
+> +       .max_register = HI6421_REG_TO_BUS_ADDR(HI6421_REG_MAX),
+> +};
+>  #endif         /* __HI6421_PMIC_H */
 
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 2 +-
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Header files should not have static variables in general, it will cause warnings
+about unused variables when you include the header from another file
+(depending on compiler version and warning options, I think older gcc
+versions don't warn about this, but clang and latest gcc do).
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-index 53ede23d68cb..702f5b175456 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-@@ -43,7 +43,7 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
--/memreserve/ 0x80000000 0x00080000;
-+/memreserve/ 0x80000000 0x02000000;
- 
- / {
- 	compatible = "socionext,uniphier-ld11";
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index aa4dad51bf46..f120059e6e24 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -43,7 +43,7 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
--/memreserve/ 0x80000000 0x00080000;
-+/memreserve/ 0x80000000 0x02000000;
- 
- / {
- 	compatible = "socionext,uniphier-ld20";
--- 
-2.7.4
+How about adding the new code into the existing
+drivers/mfd/hi6421-pmic-core.c file, and splitting out the part that differs
+(the regmap_update_bits is the only difference I see) into a callback
+that you reference through the of_device_id->data pointer?
+
+        Arnd
