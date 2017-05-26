@@ -1,65 +1,64 @@
-From: uwe@kleine-koenig.org (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 26 May 2017 21:07:03 +0200
-Subject: [PATCH v2 1/5] dts: gpio_atmel: adapt binding doc to reality
-In-Reply-To: <20170526185214.GB20946@lunn.ch>
-Message-ID: <20170526190703.t5fab33peh2cmobm@taurus.defre.kleine-koenig.org>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 26 May 2017 21:17:37 +0200
+Subject: [PATCH RFC 3/5] ARM: dts: at91-sama5d4: use IRQ_TYPE_* to specify
+ irq flags
+In-Reply-To: <20170526180609.2699-3-uwe@kleine-koenig.org>
+References: <20170526180609.2699-1-uwe@kleine-koenig.org>
+ <20170526180609.2699-3-uwe@kleine-koenig.org>
+Message-ID: <8bbb5802-518b-6ae1-6ea2-642b1f0b3d2e@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The second cell in a gpio reference is used to pass GPIO_ACTIVE_LOW or
-GPIO_ACTIVE_HIGH. The gpio device can also be used as irq controller and
-a reference can contain the IRQ_TYPE_* values in the second cell.
-
-Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
----
-On Fri, May 26, 2017 at 08:52:14PM +0200, Andrew Lunn wrote:
-> > +- interrupt-controller: Marks the device node as a GPIO controller.
+On 05/26/2017 08:06 PM, Uwe Kleine-K?nig wrote:
+> According to the binding documentation and the source code the atmel-gpio
+> controller takes IRQ_TYPE_* as its flags values, not GPIO_ACTIVE_*.
 > 
-> Interrupt controller, not GPIO controller.
+> This patch uses the right variable type which yields the same result
+> when compiled. Note that this might be wrong and actually
+> IRQ_TYPE_LEVEL_LOW is intended by the dt author.
 > 
-> > +- #interrupt-cells: Should be two. The first cell is the pin number and the
-> > +  second cell is used to specify irq type flags:
-> > +      1 = low-to-high edge triggered.
-> > +      2 = high-to-low edge triggered.
-> > +      4 = active high level-sensitive.
-> > +      8 = active low level-sensitive.
+> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> ---
+> Hello,
 > 
-> Maybe just reference interrupts.txt?
+> can somebody with the hardware or it's documentation please check which
+> flag is the right one?
 
-ack for both and changed in this v2.
+It's correct, I tested the CAN, so:
 
-Thanks
-Uwe
+Acked-by: Marek Vasut <marex@denx.de>
 
- Documentation/devicetree/bindings/gpio/gpio_atmel.txt | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+> Best regards
+> Uwe
+> 
+>  arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi b/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
+> index b5a5a91bc2ef..b813fdfa2842 100644
+> --- a/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
+> +++ b/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
+> @@ -75,7 +75,7 @@
+>  					reg = <0>;
+>  					clocks = <&clk20m>;
+>  					interrupt-parent = <&pioE>;
+> -					interrupts = <6 GPIO_ACTIVE_LOW>;
+> +					interrupts = <6 IRQ_TYPE_EDGE_RISING>;
+>  					spi-max-frequency = <10000000>;
+>  				};
+>  
+> @@ -84,7 +84,7 @@
+>  					reg = <1>;
+>  					clocks = <&clk20m>;
+>  					interrupt-parent = <&pioE>;
+> -					interrupts = <7 GPIO_ACTIVE_LOW>;
+> +					interrupts = <7 IRQ_TYPE_EDGE_RISING>;
+>  					spi-max-frequency = <10000000>;
+>  				};
+>  			};
+> 
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
---- a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
-@@ -5,9 +5,13 @@ Required properties:
- - reg: Should contain GPIO controller registers location and length
- - interrupts: Should be the port interrupt shared by all the pins.
- - #gpio-cells: Should be two.  The first cell is the pin number and
--  the second cell is used to specify optional parameters (currently
--  unused).
-+  the second cell is used to specify optional parameters to declare if the GPIO
-+  is active high or low. See gpio.txt.
- - gpio-controller: Marks the device node as a GPIO controller.
-+- interrupt-controller: Marks the device node as an interrupt controller.
-+- #interrupt-cells: Should be two. The first cell is the pin number and the
-+  second cell is used to specify irq type flags, see the two cell description
-+  in interrupt-controller/interrupts.txt for details.
- 
- optional properties:
- - #gpio-lines: Number of gpio if absent 32.
-@@ -21,5 +25,7 @@ Example:
- 		#gpio-cells = <2>;
- 		gpio-controller;
- 		#gpio-lines = <19>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
- 	};
- 
+
 -- 
-2.11.0
+Best regards,
+Marek Vasut
