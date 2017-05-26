@@ -1,43 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 25 May 2017 17:05:04 -0700
-Subject: [GIT PULL] ARM: exynos: Small update for v4.12
-In-Reply-To: <20170524160051.4597-1-krzk@kernel.org>
-References: <20170524160051.4597-1-krzk@kernel.org>
-Message-ID: <20170526000504.GA28071@localhost>
+Date: Thu, 25 May 2017 17:05:49 -0700
+Subject: [PATCH v2] arm64: defconfig: enable some core options for 64bit
+ Rockchip socs
+In-Reply-To: <20170524230650.17849-1-heiko@sntech.de>
+References: <20170524230650.17849-1-heiko@sntech.de>
+Message-ID: <20170526000549.GB28071@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 24, 2017 at 06:00:51PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
+On Thu, May 25, 2017 at 01:06:50AM +0200, Heiko Stuebner wrote:
+> Enable some very core config options used on 64bit Rockchip socs.
 > 
-> One update for current release cycle.
+> As built-in driver enable the Rockchip spi driver as well as the
+> cros-ec-spi and cros-ec keyboard driver, as this may be helpful
+> in case an initrd does not work as expected and drops the user
+> into a shell. Another built-in is the fan53555 regulator driver,
+> as it and its register-compatible cousins Silergy syr827 and syr828
+> are often used on Rockchip socs as cpu-supply next to regular pmic.
 > 
+> The rest can be enabled as modules and contains the pcie host
+> controller and its phy, the sucessive approximation adc (saradc)
+> that gets often used for additional buttons on Rockchip boards
+> as well as the adc-keys Keyboard driver for these keys.
 > 
-> Best regards,
-> Krzysztof
+> The cros-ec-pwm also can be a module, as it is normally only used to
+> drive display backlights as well as the Rockchip thermal controller
+> that allows to read the cpu and gpu temperatures and affect frequency
+> scaling if necessary.
 > 
-> 
-> The following changes since commit a351e9b9fc24e982ec2f0e76379a49826036da12:
-> 
->   Linux 4.11 (2017-04-30 19:47:48 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.12
-> 
-> for you to fetch changes up to 1c005f9c129201121ef90bde57c374a4403ccfa6:
-> 
->   MAINTAINERS: Remove Javier Martinez Canillas as reviewer for Exynos (2017-05-07 20:25:50 +0200)
-> 
-> ----------------------------------------------------------------
-> Update of maintainers entry for Samsung SoC.
-> 
-> ----------------------------------------------------------------
-> Javier Martinez Canillas (1):
->       MAINTAINERS: Remove Javier Martinez Canillas as reviewer for Exynos
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Sad to see you go, Javier.
+Applied to fixes for 4.12, since it seems beneficial to have the defconfig
+work well on Rockchip there.
 
-Merged.
 
 -Olof
