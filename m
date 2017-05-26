@@ -1,24 +1,39 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 26 May 2017 01:44:42 +0200
-Subject: [PATCH 0/2] Document and use eeprom-length property
-Message-ID: <1495755884-31341-1-git-send-email-andrew@lunn.ch>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 26 May 2017 08:03:01 +0800
+Subject: [PATCH v9 5/7] ACPI: Translate the I/O range of non-MMIO devices
+ before scanning
+In-Reply-To: <1495712248-5232-6-git-send-email-gabriele.paoloni@huawei.com>
+Message-ID: <201705260735.XlDFJKOH%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mv88e6xxx switch driver allows the size of the attached EEPROM to
-be described in DT. This property is missing from the binding
-documentation. Add it. And make use of it on the ZII Devel B board.
+Hi Gabriele,
 
-David, Shawn, please could you talk amongs yourself to decide who
-takes what.
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.12-rc2 next-20170525]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Andrew Lunn (2):
-  net: dsa: mv88e6xxx: Add eeprom-length to binding
-  ARM: VF610: ZII devel b: Add switch eeprom-length properties
+url:    https://github.com/0day-ci/linux/commits/Gabriele-Paoloni/LPC-legacy-ISA-I-O-support/20170526-033719
+config: ia64-allmodconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=ia64 
 
- Documentation/devicetree/bindings/net/dsa/marvell.txt | 4 ++++
- arch/arm/boot/dts/vf610-zii-dev-rev-b.dts             | 2 ++
- 2 files changed, 6 insertions(+)
+All errors (new ones prefixed by >>):
 
--- 
-2.11.0
+   drivers/built-in.o: In function `acpi_scan_init':
+>> (.init.text+0x6742): undefined reference to `acpi_indirectio_scan_init'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 47743 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170526/e1dfddfc/attachment-0001.gz>
