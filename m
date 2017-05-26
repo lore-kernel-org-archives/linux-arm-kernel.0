@@ -1,52 +1,98 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 26 May 2017 15:21:36 -0500
-Subject: [PATCH 0/4] Add DT support for davinci remoteproc driver
-Message-ID: <20170526202140.10472-1-s-anna@ti.com>
+Date: Fri, 26 May 2017 15:21:40 -0500
+Subject: [PATCH 4/4] remoteproc/davinci: Add device tree support for OMAP-L138
+ DSP
+In-Reply-To: <20170526202140.10472-1-s-anna@ti.com>
+References: <20170526202140.10472-1-s-anna@ti.com>
+Message-ID: <20170526202140.10472-5-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Davinci remoteproc driver currently supports the DSP remoteproc
+device created in legacy-style on OMAP-L13x SoCs. The driver has been
+enhanced to support the DSP remoteproc device created through Device
+Tree now. The current DT support handles the C674x DSP processor
+subsystem on OMAP-L138 SoCs.
 
-The following series adds the device tree support to the Davinci
-remoteproc driver. The TI Davinci family has boards booting both
-in legacy mode and DT mode, so both modes are still supported by
-this driver. Patches are baselined on 4.12-rc1 + the "Davinci
-remoteproc cleanups/fixes" series [1].
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ drivers/remoteproc/da8xx_remoteproc.c | 30 +++++++++++++++++++++++++++---
+ 1 file changed, 27 insertions(+), 3 deletions(-)
 
-Following is the patch summary:
- - Patch 1 uses resource names for retrieving resources to be
-   independent of the resource order, and prepare the driver
-   for DT.
- - Patch 2 parses the internal memory regions, to be able to
-   support loading into DSP internal memory regions.
- - Patch 3 adds the binding
- - Patch 4 adds the DT adaptation to the existing driver.
-
-The first 2 patches are dependent on the resource name additions
-(no direct build dependencies) to the davinci-rproc devices added
-in series [2] for maintaining functional parity for legacy-mode
-devices. This series is already accepted and being staged to be
-merged for v4.13. DTS nodes for the OMAP-L138 LCDK board will be
-added for a subsequent merge window once these patches are picked
-up.
-
-regards
-Suman
-
-[1] http://marc.info/?l=linux-arm-kernel&m=149514538506046&w=2
-[2] http://marc.info/?l=linux-kernel&m=149497287512869&w=2
-[3] https://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git/?h=v4.13/soc
-
-Suman Anna (4):
-  remoteproc/davinci: Switch to platform_get_resource_byname()
-  remoteproc/davinci: add support to parse internal memories
-  Documentation: dt: Add bindings for Davinci DSP processors
-  remoteproc/davinci: Add device tree support for OMAP-L138 DSP
-
- .../bindings/remoteproc/ti,davinci-rproc.txt       | 92 ++++++++++++++++++++
- drivers/remoteproc/da8xx_remoteproc.c              | 98 ++++++++++++++++++++--
- 2 files changed, 185 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,davinci-rproc.txt
-
+diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
+index 5250cc494775..02a4920d1af2 100644
+--- a/drivers/remoteproc/da8xx_remoteproc.c
++++ b/drivers/remoteproc/da8xx_remoteproc.c
+@@ -16,6 +16,7 @@
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of_reserved_mem.h>
+ #include <linux/platform_device.h>
+ #include <linux/remoteproc.h>
+ 
+@@ -272,10 +273,21 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+ 		return PTR_ERR(dsp_clk);
+ 	}
+ 
++	if (dev->of_node) {
++		ret = of_reserved_mem_device_init(dev);
++		if (ret) {
++			dev_err(dev, "device does not have specific CMA pool: %d\n",
++				ret);
++			return ret;
++		}
++	}
++
+ 	rproc = rproc_alloc(dev, "dsp", &da8xx_rproc_ops, da8xx_fw_name,
+ 		sizeof(*drproc));
+-	if (!rproc)
+-		return -ENOMEM;
++	if (!rproc) {
++		ret = -ENOMEM;
++		goto free_mem;
++	}
+ 
+ 	drproc = rproc->priv;
+ 	drproc->rproc = rproc;
+@@ -313,25 +325,37 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+ 
+ free_rproc:
+ 	rproc_free(rproc);
+-
++free_mem:
++	if (dev->of_node)
++		of_reserved_mem_device_release(dev);
+ 	return ret;
+ }
+ 
+ static int da8xx_rproc_remove(struct platform_device *pdev)
+ {
+ 	struct rproc *rproc = platform_get_drvdata(pdev);
++	struct device *dev = &pdev->dev;
+ 
+ 	rproc_del(rproc);
+ 	rproc_free(rproc);
++	if (dev->of_node)
++		of_reserved_mem_device_release(dev);
+ 
+ 	return 0;
+ }
+ 
++static const struct of_device_id davinci_rproc_of_match[] = {
++	{ .compatible = "ti,da850-dsp", },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, davinci_rproc_of_match);
++
+ static struct platform_driver da8xx_rproc_driver = {
+ 	.probe = da8xx_rproc_probe,
+ 	.remove = da8xx_rproc_remove,
+ 	.driver = {
+ 		.name = "davinci-rproc",
++		.of_match_table = davinci_rproc_of_match,
+ 	},
+ };
+ 
 -- 
 2.12.0
