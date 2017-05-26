@@ -1,23 +1,65 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 26 May 2017 15:02:42 -0400 (EDT)
-Subject: [PATCH 0/2] Document and use eeprom-length property
-In-Reply-To: <1495755884-31341-1-git-send-email-andrew@lunn.ch>
-References: <1495755884-31341-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20170526.150242.515745885812232154.davem@davemloft.net>
+From: uwe@kleine-koenig.org (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 26 May 2017 21:07:03 +0200
+Subject: [PATCH v2 1/5] dts: gpio_atmel: adapt binding doc to reality
+In-Reply-To: <20170526185214.GB20946@lunn.ch>
+Message-ID: <20170526190703.t5fab33peh2cmobm@taurus.defre.kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Lunn <andrew@lunn.ch>
-Date: Fri, 26 May 2017 01:44:42 +0200
+The second cell in a gpio reference is used to pass GPIO_ACTIVE_LOW or
+GPIO_ACTIVE_HIGH. The gpio device can also be used as irq controller and
+a reference can contain the IRQ_TYPE_* values in the second cell.
 
-> The mv88e6xxx switch driver allows the size of the attached EEPROM to
-> be described in DT. This property is missing from the binding
-> documentation. Add it. And make use of it on the ZII Devel B board.
+Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+---
+On Fri, May 26, 2017 at 08:52:14PM +0200, Andrew Lunn wrote:
+> > +- interrupt-controller: Marks the device node as a GPIO controller.
 > 
-> David, Shawn, please could you talk amongs yourself to decide who
-> takes what.
+> Interrupt controller, not GPIO controller.
+> 
+> > +- #interrupt-cells: Should be two. The first cell is the pin number and the
+> > +  second cell is used to specify irq type flags:
+> > +      1 = low-to-high edge triggered.
+> > +      2 = high-to-low edge triggered.
+> > +      4 = active high level-sensitive.
+> > +      8 = active low level-sensitive.
+> 
+> Maybe just reference interrupts.txt?
 
-I can take this if it works for Shawn, otherwise I'm also fine if Shawn
-takes it and if so feel free to add my:
+ack for both and changed in this v2.
 
-Acked-by: David S. Miller <davem@davemloft.net>
+Thanks
+Uwe
+
+ Documentation/devicetree/bindings/gpio/gpio_atmel.txt | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+--- a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+@@ -5,9 +5,13 @@ Required properties:
+ - reg: Should contain GPIO controller registers location and length
+ - interrupts: Should be the port interrupt shared by all the pins.
+ - #gpio-cells: Should be two.  The first cell is the pin number and
+-  the second cell is used to specify optional parameters (currently
+-  unused).
++  the second cell is used to specify optional parameters to declare if the GPIO
++  is active high or low. See gpio.txt.
+ - gpio-controller: Marks the device node as a GPIO controller.
++- interrupt-controller: Marks the device node as an interrupt controller.
++- #interrupt-cells: Should be two. The first cell is the pin number and the
++  second cell is used to specify irq type flags, see the two cell description
++  in interrupt-controller/interrupts.txt for details.
+ 
+ optional properties:
+ - #gpio-lines: Number of gpio if absent 32.
+@@ -21,5 +25,7 @@ Example:
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+ 		#gpio-lines = <19>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
+ 	};
+ 
+-- 
+2.11.0
