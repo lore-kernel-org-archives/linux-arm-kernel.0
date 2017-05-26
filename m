@@ -1,35 +1,82 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 May 2017 23:39:21 +0100
-Subject: [PATCH 1/4] ARM: ep93xx: switch to SPARSEMEM
-In-Reply-To: <c5d6d870-48f8-f6c4-1ec9-6b540d0dca98@gmail.com>
-References: <20170221181529.6780-1-hsweeten@visionengravers.com>
- <20170221181529.6780-2-hsweeten@visionengravers.com>
- <440efa53-dbbf-5600-3441-87c6891c5389@gmail.com>
- <c5d6d870-48f8-f6c4-1ec9-6b540d0dca98@gmail.com>
-Message-ID: <20170526223920.GM22219@n2100.armlinux.org.uk>
+From: spjoshi@codeaurora.org (Sarangdhar Joshi)
+Date: Fri, 26 May 2017 16:51:01 -0700
+Subject: [PATCH v3 2/2] remoteproc: Modify recovery path to use rproc_{start,
+ stop}()
+In-Reply-To: <1495842661-8926-1-git-send-email-spjoshi@codeaurora.org>
+References: <1495842661-8926-1-git-send-email-spjoshi@codeaurora.org>
+Message-ID: <1495842661-8926-2-git-send-email-spjoshi@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 26, 2017 at 09:13:36AM -0700, Florian Fainelli wrote:
-> OK this is weird, this patch applied against v4.11 works fine on a 32MB
-> board configuration, but applied against v4.12-rc2 I now get the following:
-> 
-> Uncompressing Linux... done, booting the kernel.
-> Warning: Neither atags nor dtb found
-> 
-> as if r2 was lost somehow.
-> 
-> I will start a bisection to figure out if/when it started to break.
-> Russell do you have an idea?
+Replace rproc_shutdown() by rproc_stop() and rproc_boot() by
+rproc_start() in the recovery path, in order to avoid remoteproc
+resources re-allocation overhead and to assist with extracting the
+coredumps after stopping the remote processor.
 
-I've seen it on other platforms where the dtb is placed too close to
-the kernel image, so when the decompressor relocates itself, it ends
-up overwriting the dtb.
+Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+---
 
-Remember that the bigger the decompressed kernel image, the higher
-the decompressor relocates itself in memory.
+Changes from v2:
 
+* Rebase on top of v4.12-rc1
+
+ drivers/remoteproc/remoteproc_core.c | 35 ++++++++++++++++++++++++++---------
+ 1 file changed, 26 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+index c8cb54b..369ba0f 100644
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@ -1051,23 +1051,40 @@ static int rproc_stop(struct rproc *rproc)
+  */
+ int rproc_trigger_recovery(struct rproc *rproc)
+ {
+-	dev_err(&rproc->dev, "recovering %s\n", rproc->name);
++	const struct firmware *firmware_p;
++	struct device *dev = &rproc->dev;
++	int ret;
++
++	dev_err(dev, "recovering %s\n", rproc->name);
+ 
+ 	init_completion(&rproc->crash_comp);
+ 
+-	/* shut down the remote */
+-	/* TODO: make sure this works with rproc->power > 1 */
+-	rproc_shutdown(rproc);
++	ret = mutex_lock_interruptible(&rproc->lock);
++	if (ret)
++		return ret;
++
++	ret = rproc_stop(rproc);
++	if (ret)
++		goto unlock_mutex;
+ 
+ 	/* wait until there is no more rproc users */
+ 	wait_for_completion(&rproc->crash_comp);
+ 
+-	/*
+-	 * boot the remote processor up again
+-	 */
+-	rproc_boot(rproc);
++	/* load firmware */
++	ret = request_firmware(&firmware_p, rproc->firmware, dev);
++	if (ret < 0) {
++		dev_err(dev, "request_firmware failed: %d\n", ret);
++		goto unlock_mutex;
++	}
+ 
+-	return 0;
++	/* boot the remote processor up again */
++	ret = rproc_start(rproc, firmware_p);
++
++	release_firmware(firmware_p);
++
++unlock_mutex:
++	mutex_unlock(&rproc->lock);
++	return ret;
+ }
+ 
+ /**
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
