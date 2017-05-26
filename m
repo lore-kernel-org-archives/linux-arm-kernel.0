@@ -1,164 +1,105 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Fri, 26 May 2017 10:29:39 -0700
-Subject: [RFC/RFT PATCH 03/18] PCI: Introduce pci_scan_root_bus_bridge()
-In-Reply-To: <20170526130748.GB27131@red-moon>
-References: <20170426111809.19922-1-lorenzo.pieralisi@arm.com>
- <20170426111809.19922-4-lorenzo.pieralisi@arm.com>
- <CAK8P3a0HmrrYBP5em1s4VOY4Tb6=bwOrDDN6K8rPp8OEXtpMtA@mail.gmail.com>
- <20170502171501.GA5545@red-moon>
- <20170525205643.GA9474@bhelgaas-glaptop.roam.corp.google.com>
- <20170526130748.GB27131@red-moon>
-Message-ID: <2a204641-a1da-977e-180a-0be130106891@broadcom.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 26 May 2017 19:44:46 +0200
+Subject: may_use_simd on aarch64, chacha20
+In-Reply-To: <20170526132808.GP3559@e103592.cambridge.arm.com>
+References: <CAHmME9qH=Wu-=9YUmxi7NPrczHu1UrB7phG0y68ipB+ProQ2TA@mail.gmail.com>
+ <4150EFDC-CD3A-4C5C-9EF7-689F63C142C2@linaro.org>
+ <20170526132808.GP3559@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu_RqVKjK5nh=qFb8OrkazSGEcjJiHnLS5c7j18=GehywQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 5/26/17 6:07 AM, Lorenzo Pieralisi wrote:
-> On Thu, May 25, 2017 at 03:56:43PM -0500, Bjorn Helgaas wrote:
->> [+cc Ray, Scott, Jon]
+On 26 May 2017 at 15:28, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Sun, May 21, 2017 at 10:55:20PM +0200, Ard Biesheuvel wrote:
+>> (+ Dave)
+>
+> Apologies for the slow reply -- hopefully this is still useful.
+>
+>> > On 21 May 2017, at 19:02, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+>> >
+>> > Hi folks,
+>> >
+>> > I noticed that the ARM implementation [1] of chacha20 makes a check to
+>> > may_use_simd(), but the ARM64 implementation [2] does not. Question 1:
+>> > is this a bug, in which case I'll submit a patch shortly, or is this
+>> > intentional? In case of the latter, could somebody explain the
+>> > reasoning?
 >>
->> On Tue, May 02, 2017 at 06:15:01PM +0100, Lorenzo Pieralisi wrote:
->>> On Fri, Apr 28, 2017 at 02:28:38PM +0200, Arnd Bergmann wrote:
->>>> On Wed, Apr 26, 2017 at 1:17 PM, Lorenzo Pieralisi
->>>> <lorenzo.pieralisi@arm.com> wrote:
->>>>> Current pci_scan_root_bus() interface is made up of two main
->>>>> code paths:
->>>>>
->>>>> - pci_create_root_bus()
->>>>> - pci_scan_child_bus()
->>>>>
->>>>> pci_create_root_bus() is a wrapper function that allows to create
->>>>> a struct pci_host_bridge structure, initialize it with the passed
->>>>> parameters and register it with the kernel.
->>>>>
->>>>> As the struct pci_host_bridge require additional struct members,
->>>>> pci_create_root_bus() parameters list has grown in time, making
->>>>> it unwieldy to add further parameters to it in case the struct
->>>>> pci_host_bridge gains more members fields to augment its functionality.
->>>>>
->>>>> Since PCI core code provides functions to allocate struct
->>>>> pci_host_bridge, instead of forcing the pci_create_root_bus() interface
->>>>> to add new parameters to cater for new struct pci_host_bridge
->>>>> functionality, it is more suitable to add an interface in PCI
->>>>> core code to scan a PCI bus straight from a struct pci_host_bridge
->>>>> created and customized by each specific PCI host controller driver.
->>>>>
->>>>> Add a pci_scan_root_bus_bridge() function to allow PCI host controller
->>>>> drivers to create and initialize struct pci_host_bridge and scan
->>>>> the resulting bus.
->>>>>
->>>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>>>> Cc: Arnd Bergmann <arnd@arndb.de>
->>>>> Cc: Bjorn Helgaas <bhelgaas@google.com>
->>>>
->>>> Good idea, yes. To avoid growing the number of interfaces too
->>>> much, should we change the existing users of pci_register_host_bridge
->>>> in host drivers over to this entry point, and make the other one
->>>> local to probe.c then?
->>>
->>> Yes, the problem is that there are drivers (ie pcie-iproc.c) that
->>> require the struct pci_bus (created by pci_register_host_bridge())
->>> to fiddle with it to check link status and THEN scan the bus (so
->>> the pci_register_host_bridge() call can't be embedded in the scan
->>> interface - the driver requires struct pci_bus for pci_ops to work
->>> before scanning the bus itself).
+>> This is intentional. arm64 supports kernel mode NEON in any context,
+>> whereas ARM only supports it in process context. This is due to the way
+>> lazy FP restore is implemented on ARM. However, we are about to change
+>> this on arm64 to only allow non-nested kernel mode NEON, similar to
+>> x86. This is necessary to support SVE.
 >>
->> I think code like iproc_pcie_check_link() that requires a struct
->> pci_bus before we even scan the bus is lame.  I think the driver
->> should be able to bring up the link before telling the PCI core about
->> the bridge.  Aardvark uses a typical pattern:
+>> > On a similar note, the only ARM64 glue code that uses
+>> > may_use_simd() is sha256; everything else does not. Shall I submit a
+>> > substantial patch series to fix this up everywhere?
+>> >
 >>
->>   advk_pcie_probe
->>     advk_pcie_setup_hw
->>       advk_pcie_wait_for_link
->>     pci_scan_root_bus
+>> Currently, may_use_simd() is only used as a hint on arm64 whether it
+>> makes sense to offload crypto to process context. In the sha256 code,
+>> whose arm64 neon implementation is only marginally faster than scalar
+>> on some micro-architectures, it is used to prefer the scalar code in
+>> interrupt context, because the NEON code preserves/restores the NEON
+>> state of the interrupted context eagerly, which is costly.
 >>
->> I would rather see iproc restructured along that line than add a
->> callback.
+>> > Secondly, I noticed that may_use_simd() is essentially aliased to
+>> > !in_interrupt(), since it uses the asm-generic variety. Question 2:
+>> > Isn't this overkill? Couldn't we make an arm/arm64 variant of this
+>> > that only checks in_irq()?
+>> >
 >>
->> That would require replacing the pci_bus_read_config uses in
->> iproc_pcie_check_link() with something different, maybe iproc-internal 
->> accessors.  Slightly messy, but I think doable.
-> 
-> I agree with you, it probably requires some cfg space accessors copy
-> and paste though but that's doable. I can write the patch myself but
-> I can't test it so help is appreciated here.
-> 
-> Thanks,
-> Lorenzo
-> 
+>> No. ARM does not support kernel mode NEON in softirq context, and
+>> arm64 will soon have its own override that only allows non-nested use
+>> in softirq context.
+>>
+>> > Lastly, APIs like pcrypts and padata execute with bottom halves
+>> > disabled, even though their actual execution environment is process
+>> > context, via a workqueue. Thus, here, in_interrupt() will always be
+>> > true, even though this is likely a place where we want to use simd.
+>> > Question 3: is there something better that could be done?
+>>
+>> I guess we should switch to in_serving_softirq() instead.
+>
+> For context, the arm64 kernel-mode NEON refactoring I've been working
+> on [1] defines may_use_simd() to indicate whether calling
+> kernel_neon_begin() is safe or not, rather then being a hint about
+> whether it is desirable to do so.
+>
 
-I agree with Bjorn on the new proposed sequence that link check should
-be done before the standard root bus scan starts.
+I should mention again, perhaps redundantly, that may_use_simd() was
+not intended as a hint. It only became this way after we removed the
+limitation on arm64 that SIMD may only be used in process context.
 
-Lorenzo, I'm getting quite busy and won't have time to re-write this in
-the near term. I appreciate that you offer to help to re-organize the
-code. Once you have a patch, I can help to test it on our platforms.
+> This changes the definition of may_use_simd() to something that is
+> probably appropriate for your scenario.  From process context without
+> any outer kernel_neon_begin()...kernel_neon_end(), it should return
+> true.
+>
+> In general, callers in any context should do something like:
+>
+>         if (may_use_simd()) {
+>                 kernel_neon_begin();
+>                 /* SIMD implementation */
+>                 kernel_neon_end();
+>         } else {
+>                 /* fallback implementation, or defer to another context */
+>         }
+>
+> Even from task context where may_use_simd() should always return true
+> and thus where the fallback path can be omitted, it may be a good idea
+> to do something like
+>
+>         if (!may_use_simd()) {
+>                 WARN_ON(1);
+>                 return -EBUSY;
+>         }
+>
+> ... or similar.
+>
 
-Thanks,
-
-Ray
-
->>> I will see how I can accommodate this change because you definitely
->>> have a point.
->>>
->>>>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->>>>> index 7e4ffc4..c7a7f72 100644
->>>>> --- a/drivers/pci/probe.c
->>>>> +++ b/drivers/pci/probe.c
->>>>> @@ -2412,6 +2412,44 @@ void pci_bus_release_busn_res(struct pci_bus *b)
->>>>>                         res, ret ? "can not be" : "is");
->>>>>  }
->>>>>
->>>>> +int pci_scan_root_bus_bridge(struct pci_host_bridge *bridge)
->>>>> +{
->>>>> +       struct resource_entry *window;
->>>>> +       bool found = false;
->>>>> +       struct pci_bus *b;
->>>>> +       int max, bus, ret;
->>>>> +
->>>>> +       if (!bridge)
->>>>> +               return -EINVAL;
->>>>> +
->>>>> +       resource_list_for_each_entry(window, &bridge->windows)
->>>>> +               if (window->res->flags & IORESOURCE_BUS) {
->>>>> +                       found = true;
->>>>> +                       break;
->>>>> +               }
->>>>> +
->>>>> +       ret = pci_register_host_bridge(bridge);
->>>>> +       if (ret < 0)
->>>>> +               return ret;
->>>>> +
->>>>> +       b = bridge->bus;
->>>>> +       bus = bridge->busnr;
->>>>> +
->>>>> +       if (!found) {
->>>>> +               dev_info(&b->dev,
->>>>> +                "No busn resource found for root bus, will use [bus %02x-ff]\n",
->>>>> +                       bus);
->>>>> +               pci_bus_insert_busn_res(b, bus, 255);
->>>>> +       }
->>>>> +
->>>>> +       max = pci_scan_child_bus(b);
->>>>> +
->>>>> +       if (!found)
->>>>> +               pci_bus_update_busn_res_end(b, max);
->>>>> +
->>>>> +       return 0;
->>>>> +}
->>>>> +
->>>>
->>>> We probably want an EXPORT_SYMBOL() here as well.
->>>
->>> Yep, sure.
->>>
->>> Thanks for having a look !
->>>
->>> Lorenzo
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I don't think it is generally a good idea to make inferences about
+whether may_use_simd() is going to return true or false in code that
+is not tightly coupled to the FP/SIMD arch code itself, although I do
+understand that there may be cases where it is cumbersome to provide a
+fallback, especially if you know it is never going to be used.
