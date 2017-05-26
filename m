@@ -1,13 +1,13 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 26 May 2017 16:40:48 +0100
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 26 May 2017 08:41:55 -0700
 Subject: arm64 test_user_copy crash on copy_from_user(uptr, kptr, size)
 In-Reply-To: <CAK8P3a1tyU8J4VEWVwLOHWM+of9bnWvm+SXBxkfsZA7yfEei9A@mail.gmail.com>
 References: <CAK8P3a1tyU8J4VEWVwLOHWM+of9bnWvm+SXBxkfsZA7yfEei9A@mail.gmail.com>
-Message-ID: <20170526154048.GB22865@leverpostej>
+Message-ID: <CAGXu5jLy66PXCG99xmSNG-C7F8OjCrOm5WaKEWcSV9SYB2gAqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 26, 2017 at 05:24:47PM +0200, Arnd Bergmann wrote:
+On Fri, May 26, 2017 at 8:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 > A kselftest run on arm64 on an older 4.4.y stable kernel ran into an
 > unexpectedly trapping user space access:
 >
@@ -22,6 +22,25 @@ On Fri, May 26, 2017 at 05:24:47PM +0200, Arnd Bergmann wrote:
 >        ret |= test(!copy_from_user(bad_usermem, (char __user *)kmem,
 >                                    PAGE_SIZE),
 >                    "illegal reversed copy_from_user passed");
+
+Hi! Yes, I removed that test from the current code:
+
+#if 0
+        /*
+         * When running with SMAP/PAN/etc, this will Oops the kernel
+         * due to the zeroing of userspace memory on failure. This needs
+         * to be tested in LKDTM instead, since this test module does not
+         * expect to explode.
+         */
+        ret |= test(!copy_from_user(bad_usermem, (char __user *)kmem,
+                                    PAGE_SIZE),
+                    "illegal reversed copy_from_user passed");
+#endif
+
+We can send a patch to -stable?
+
+-Kees
+
 >
 > where the destination kernel pointer intentionally points into user space
 > memory, while copy_from_user checks the second argument for being
@@ -51,13 +70,11 @@ On Fri, May 26, 2017 at 05:24:47PM +0200, Arnd Bergmann wrote:
 > enabled, otherwise we just do the access anyway. I don't have
 > a good idea for avoiding the problem though, other than
 > removing the specific test that causes it.
+>
+>        Arnd
 
-AFAICT, that test was disabled in commit:
 
-  f5f893c57e37ca73 ("usercopy: Adjust tests to deal with SMAP/PAN")
 
-... or have I misunderstood?
-
-Thanks,
-Mark.
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+-- 
+Kees Cook
+Pixel Security
