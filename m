@@ -1,32 +1,38 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Fri, 26 May 2017 12:07:41 +0530
-Subject: [PATCH] iio: adc: xilinx: Handle return value of clk_prepare_enable
-Message-ID: <29dda0d20f714ce828e294f99b7f400e89f5b35a.1495780467.git.arvind.yadav.cs@gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 26 May 2017 14:49:12 +0800
+Subject: [PATCH V2] ARM: dts: rockchip:remove hs200 support for firefly
+ reload
+In-Reply-To: <1495616267-5305-1-git-send-email-eddie.cai.linux@gmail.com>
+References: <1495616267-5305-1-git-send-email-eddie.cai.linux@gmail.com>
+Message-ID: <354b634b-0ba6-682e-95fa-52b32e3cc94c@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_prepare_enable() can fail here and we must check its return value.
+Hi Eddie,
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/iio/adc/xilinx-xadc-core.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+? 2017/5/24 16:57, Eddie Cai ??:
+> due to layout limitation. not all of the reload board can support hs200.
+> so remove hs200 support to make all board can boot up.
+>
+> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
+> ---
+>  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 2 --
+>  1 file changed, 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> index 4cfa109..56ac1e6f 100644
+> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> @@ -75,8 +75,6 @@
+>  	bus-width = <8>;
+>  	cap-mmc-highspeed;
+>  	disable-wp;
+> -	mmc-hs200-1_8v;
 
-diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-index 56cf590..4a60497 100644
---- a/drivers/iio/adc/xilinx-xadc-core.c
-+++ b/drivers/iio/adc/xilinx-xadc-core.c
-@@ -1204,7 +1204,10 @@ static int xadc_probe(struct platform_device *pdev)
- 		ret = PTR_ERR(xadc->clk);
- 		goto err_free_samplerate_trigger;
- 	}
--	clk_prepare_enable(xadc->clk);
-+
-+	ret = clk_prepare_enable(xadc->clk);
-+	if (ret)
-+		goto err_free_samplerate_trigger;
- 
- 	ret = xadc->ops->setup(pdev, indio_dev, irq);
- 	if (ret)
--- 
-1.9.1
+On which tree were you basing? I can't git-am this one for today's
+linux-next?
+
+>  	non-removable;
+>  	num-slots = <1>;
+>  	pinctrl-names = "default";
+>
