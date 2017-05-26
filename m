@@ -1,26 +1,23 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 26 May 2017 08:44:16 -0700
-Subject: [PATCHv3 1/3] ARM: OMAP2+: hwmod: assign main clock from DT if
- available
-In-Reply-To: <1495127772-7486-2-git-send-email-t-kristo@ti.com>
-References: <1495127772-7486-1-git-send-email-t-kristo@ti.com>
- <1495127772-7486-2-git-send-email-t-kristo@ti.com>
-Message-ID: <20170526154416.GC3717@atomide.com>
+Date: Fri, 26 May 2017 08:46:39 -0700
+Subject: [PATCH 0/2] Enable Mailboxes for AM57xx IDKs
+In-Reply-To: <20170519204742.1563-1-s-anna@ti.com>
+References: <20170519204742.1563-1-s-anna@ti.com>
+Message-ID: <20170526154639.GD3717@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170518 10:19]:
-> Fix the main clock assignment to assign clkctrl clk from DT as the main
-> clock if available. If main clock is assigned via DT, the direct PRCM
-> access for module handling is not used on OMAP4+ architectures either,
-> as it is assumed the main clock will be doing this instead.
+* Suman Anna <s-anna@ti.com> [170519 13:51]:
+> Hi Tony,
+> 
+> This series enables the mailbox nodes to be used for communicating with
+> the DSPs and IPUs on AM57xx IDKs using IPC 3.x. The mailbox nodes themselves
+> were already defined/added before for other DRA7 boards, and these patches
+> simply enable the respective nodes for the IDKs.
+> 
+> Patches are based on 4.12-rc1 and are intended for the 4.13 merge
+> window.
 
-Is this still needed based on what we chatted last week?
-
-I'd like to avoid adding the clkctrl clocks to the wrong node
-as we then end up moving them again later on when we have support
-for the wrapper device..
-
-Regards,
+Applying into omap-for-v4.13/dt thanks.
 
 Tony
