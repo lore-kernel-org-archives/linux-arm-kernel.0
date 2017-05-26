@@ -1,86 +1,75 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 26 May 2017 12:26:22 +0100
-Subject: Query: arm64: hwbreakpoint: single stepping in case of custom
- overflow_handler
-In-Reply-To: <d3b1a128-b97c-7e52-b30c-56ec3990381a@redhat.com>
-References: <d3b1a128-b97c-7e52-b30c-56ec3990381a@redhat.com>
-Message-ID: <20170526112621.GC21770@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 26 May 2017 12:31:53 +0100
+Subject: [PATCH V2] ARM: dts: rockchip:add sd card support for firefly
+ reload board
+In-Reply-To: <1495782439-27142-1-git-send-email-eddie.cai.linux@gmail.com>
+References: <1495782439-27142-1-git-send-email-eddie.cai.linux@gmail.com>
+Message-ID: <951b3bad-eae7-f870-2bc1-8e230bfa4904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 26, 2017 at 04:42:33PM +0530, Pratyush Anand wrote:
-> Hi Will,
-> 
-> When we run test from samples/hw_breakpoint/data_breakpoint.c, it
-> triggers continuous watchpoint exception handler.
-> 
-> Reproducer:
-> # insmod data_breakpoint.ko ksym=__sysrq_enabled
-> # cat /proc/sys/kernel/sysrq
-> 
-> So, wanted to understand that why do we not allow single stepping in
-> case overflow_handler is a customized one and not from perf
-> infrastructure?
-> 
-> Patch [1] allows to work with a custom overflow_handler, but I am
-> not sure if that could be an acceptable choice.
+On 26/05/17 08:07, Eddie Cai wrote:
+> firefly reload board not support sd card yet. so support it.
 
-Changing this would break userspace, such as GDB, as Will noted last
-time this came up:
+I'm confused... According to pictures and the schematic the microSD
+socket and vcc_sd supply are on the baseboard, not the core module, and
+these nodes already exist in rk3288-firefly-reload.dts :/
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/425363.html
+Robin.
 
-I don't beleive that this is something we can change.
-
-Thanks,
-Mark.
-
-> There are issues with samples/hw_breakpoint/data_breakpoint.c, even
-> when using patch [1],because overflow_handler  of test calls
-> dump_stack(). I am not yet sure,what happened here..my guess is that
-> dump_stack() triggered a SW BRK exception somewhere. Anyway,thats a
-> secondary problem,I can look into if patch [1] makes sense.
+> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
+> Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+> ---
+>  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 31 +++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
 > 
+> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> index 413b61f..2f41209 100644
+> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+> @@ -57,6 +57,17 @@
+>  		clock-output-names = "ext_gmac";
+>  	};
+>  
+> +	vcc_sd: sdmmc-regulator {
+> +		compatible = "regulator-fixed";
+> +		gpio = <&gpio7 RK_PB3 GPIO_ACTIVE_LOW>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sdmmc_pwr>;
+> +		regulator-name = "vcc_sd";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		startup-delay-us = <100000>;
+> +		vin-supply = <&vcc_io>;
+> +	};
+>  
+>  	vcc_flash: flash-regulator {
+>  		compatible = "regulator-fixed";
+> @@ -281,6 +292,26 @@
+>  			rockchip,pins = <4 8 RK_FUNC_GPIO &pcfg_output_high>;
+>  		};
+>  	};
+> +
+> +	sdmmc {
+> +		sdmmc_pwr: sdmmc-pwr {
+> +			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
+> +		};
+> +	};
+> +};
+> +
+> +&sdmmc {
+> +	bus-width = <4>;
+> +	cap-mmc-highspeed;
+> +	cap-sd-highspeed;
+> +	card-detect-delay = <200>;
+> +	disable-wp;
+> +	num-slots = <1>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&sdmmc_clk>, <&sdmmc_cmd>, <&sdmmc_cd>, <&sdmmc_bus4>;
+> +	vmmc-supply = <&vcc_sd>;
+> +	vqmmc-supply = <&vccio_sd>;
+> +	status = "okay";
+>  };
+>  
+>  &tsadc {
 > 
-> ~Pratyush
-> 
-> [1]
-> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-> index 749f81779420..ea8ab0656dd0 100644
-> --- a/arch/arm64/kernel/hw_breakpoint.c
-> +++ b/arch/arm64/kernel/hw_breakpoint.c
-> @@ -661,7 +661,7 @@ static int breakpoint_handler(unsigned long
-> unused, unsigned int esr,
->                 perf_bp_event(bp, regs);
-> 
->                 /* Do we need to handle the stepping? */
-> -               if (is_default_overflow_handler(bp))
-> +               if (bp->overflow_handler)
->                         step = 1;
->  unlock:
->                 rcu_read_unlock();
-> @@ -789,7 +789,7 @@ static int watchpoint_handler(unsigned long
-> addr, unsigned int esr,
->                 perf_bp_event(wp, regs);
-> 
->                 /* Do we need to handle the stepping? */
-> -               if (is_default_overflow_handler(wp))
-> +               if (wp->overflow_handler)
->                         step = 1;
->         }
->         if (min_dist > 0 && min_dist != -1) {
-> @@ -800,7 +800,7 @@ static int watchpoint_handler(unsigned long
-> addr, unsigned int esr,
->                 perf_bp_event(wp, regs);
-> 
->                 /* Do we need to handle the stepping? */
-> -               if (is_default_overflow_handler(wp))
-> +               if (wp->overflow_handler)
->                         step = 1;
->         }
->         rcu_read_unlock();
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
