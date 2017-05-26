@@ -1,65 +1,57 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 26 May 2017 09:13:36 -0700
-Subject: [PATCH 1/4] ARM: ep93xx: switch to SPARSEMEM
-In-Reply-To: <440efa53-dbbf-5600-3441-87c6891c5389@gmail.com>
-References: <20170221181529.6780-1-hsweeten@visionengravers.com>
- <20170221181529.6780-2-hsweeten@visionengravers.com>
- <440efa53-dbbf-5600-3441-87c6891c5389@gmail.com>
-Message-ID: <c5d6d870-48f8-f6c4-1ec9-6b540d0dca98@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 26 May 2017 17:40:02 +0100
+Subject: [PATCH] ARM64/ACPI: Fix BAD_MADT_GICC_ENTRY() macro implementation
+Message-ID: <20170526164002.30103-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/13/17 ? 11:21, Florian Fainelli a ?crit :
-> Le 02/21/17 ? 10:15, H Hartley Sweeten a ?crit :
->> The EP93xx has four chip selects that can be used for the SDRAM memory.
->> These chip selects are decoded to specify an address domain:
->>
->>   SDCS3  0x00000000-0x0fffffff with Boot Option ASDO=1
->>   SDCS0  0xc0000000-0xcfffffff
->>   SDCS1  0xd0000000-0xdfffffff
->>   SDCS2  0xe0000000-x0efffffff
->>   SDCS3  0xf0000000-0xffffffff with Boot Option ASDO=0
->>
->> Because of the row/column/bank architecture of SDRAM, the mapping of
->> these memories into the processor's memory space is discontiguous.
->>
->> Most ep93xx systems only use one of the chip selects. For these systems,
->> ARCH_HAS_HOLES_MEMORYMODEL has worked fine to handle the discontiguous
->> memory.
->>
->> But, some of the TS-72xx boards use multiple chip selects. The TS-7300 in
->> particular uses SDCS3 (with ASDO=1) and SDCS2. On that system with
->> ARCH_HAS_HOLES_MEMORYMODEL the SDCS2 memory does not get handled correctly
->> and results in the system not booting.
->>
->> Change the EP93xx to ARCH_SPARSEMEM_ENABLE. This handles the discontiguous
->> memory for all configurations.
->>
->> This has been tested on the following ep93xx platforms:
->>
->> EDB9307A with 64 MiB on SDCS0
->> Vision EP9307 with 64 MiB on SDCS0
->> TS-7300 with 64 MiB on SDCS3 (with ASDO=1) and 64 MiB on SDCS2
->> sim.one with 64 MiB on SDCS0
->>
->> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->> Tested-by: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Russell King <linux@armlinux.org.uk>
-> 
-> Tested-by: Florian Fainelli <f.fainelli@gmail.com>
-> 
-> On a TS-3700 with 32MiB of SDRAM, thanks!
-> 
+The BAD_MADT_GICC_ENTRY() macro checks if a GICC MADT entry passes
+muster from an ACPI specification standpoint. Current macro detects the
+MADT GICC entry length through ACPI firmware version (it changed from 76
+to 80 bytes in the transition from ACPI 5.1 to ACPI 6.0 specification)
+but always uses (erroneously) the ACPICA (latest) struct (ie struct
+acpi_madt_generic_interrupt - that is 80-bytes long) length to check if
+the current GICC entry memory record exceeds the MADT table end in
+memory as defined by the MADT table header itself, which may result in
+false negatives depending on the ACPI firmware version and how the MADT
+entries are laid out in memory (ie on ACPI 5.1 firmware MADT GICC
+entries are 76 bytes long, so by adding 80 to a GICC entry start address
+in memory the resulting address may well be past the actual MADT end,
+triggering a false negative).
 
-OK this is weird, this patch applied against v4.11 works fine on a 32MB
-board configuration, but applied against v4.12-rc2 I now get the following:
+Fix the BAD_MADT_GICC_ENTRY() macro by reshuffling the condition checks
+and update them to always use the firmware version specific MADT GICC
+entry length in order to carry out boundary checks.
 
-Uncompressing Linux... done, booting the kernel.
-Warning: Neither atags nor dtb found
+Fixes: b6cfb277378e ("ACPI / ARM64: add BAD_MADT_GICC_ENTRY() macro")
+Reported-by: Julien Grall <julien.grall@arm.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Julien Grall <julien.grall@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Al Stone <ahs3@redhat.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/acpi.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-as if r2 was lost somehow.
-
-I will start a bisection to figure out if/when it started to break.
-Russell do you have an idea?
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 0e99978..59cca1d 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -23,9 +23,9 @@
+ #define ACPI_MADT_GICC_LENGTH	\
+ 	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
+ 
+-#define BAD_MADT_GICC_ENTRY(entry, end)						\
+-	(!(entry) || (unsigned long)(entry) + sizeof(*(entry)) > (end) ||	\
+-	 (entry)->header.length != ACPI_MADT_GICC_LENGTH)
++#define BAD_MADT_GICC_ENTRY(entry, end)					\
++	(!(entry) || (entry)->header.length != ACPI_MADT_GICC_LENGTH ||	\
++	(unsigned long)(entry) + ACPI_MADT_GICC_LENGTH > (end))
+ 
+ /* Basic configuration for ACPI */
+ #ifdef	CONFIG_ACPI
 -- 
-Florian
+2.10.0
