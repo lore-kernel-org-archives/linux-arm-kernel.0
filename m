@@ -1,76 +1,61 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 26 May 2017 14:54:18 +0800
-Subject: [PATCH] ARM: dts: rockchip:add sd card support
-In-Reply-To: <1495777966-26212-1-git-send-email-eddie.cai.linux@gmail.com>
-References: <1495777966-26212-1-git-send-email-eddie.cai.linux@gmail.com>
-Message-ID: <0cf71840-a533-1810-04f3-e6c1a3290857@rock-chips.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 26 May 2017 08:54:31 +0200 (CEST)
+Subject: [PATCH 1/1] futex: remove duplicated code
+In-Reply-To: <20170525142829.GO2859@arm.com>
+References: <20170515130742.18357-1-jslaby@suse.cz>
+ <20170515131644.GA3605@arm.com> <alpine.DEB.2.20.1705222259580.2407@nanos>
+ <20170525142829.GO2859@arm.com>
+Message-ID: <alpine.DEB.2.20.1705260849520.1902@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eddie,
+On Thu, 25 May 2017, Will Deacon wrote:
+> On Mon, May 22, 2017 at 11:11:33PM +0200, Thomas Gleixner wrote:
+> > On Mon, 15 May 2017, Will Deacon wrote:
+> > > On Mon, May 15, 2017 at 03:07:42PM +0200, Jiri Slaby wrote:
+> > > > There is code duplicated over all architecture's headers for
+> > > > futex_atomic_op_inuser. Namely op decoding, access_ok check for uaddr,
+> > > > and comparison of the result.
+> > > > 
+> > > > Remove this duplication and leave up to the arches only the needed
+> > > > assembly which is now in arch_futex_atomic_op_inuser.
+> > > > 
+> > > > Note that s390 removed access_ok check in d12a29703 ("s390/uaccess:
+> > > > remove pointless access_ok() checks") as access_ok there returns true.
+> > > > We introduce it back to the helper for the sake of simplicity (it gets
+> > > > optimized away anyway).
+> > > 
+> > > Whilst I think this is a good idea, the code in question actually results
+> > > in undefined behaviour per the C spec and is reported by UBSAN. See my
+> > > patch fixing arm64 here (which I'd forgotten about):
+> > > 
+> > > https://www.spinics.net/lists/linux-arch/msg38564.html
+> > > 
+> > > But, as stated in the thread above, I think we should go a step further
+> > > and remove FUTEX_OP_{OR,ANDN,XOR,OPARG_SHIFT} altogether. They don't
+> > > appear to be used by userspace, and this whole thing is a total mess.
+> > 
+> > You wish. The constants are not used, but FUTEX_WAKE_OP _IS_ used by
+> > glibc. They only have one argument it seems:
+> > 
+> >    #define FUTEX_OP_CLEAR_WAKE_IF_GT_ONE      ((4 << 24) | 1)
+> > 
+> > but I'm pretty sure that there is enough (probably horrible) code (think
+> > java) out there using FUTEX_WAKE_OP for whatever (non)sensical reasons in
+> > any available combination.
+> 
+> Indeed, and I'm not proposing to get rid of that. It's the grossly
+> over-engineered array of operations and the FUTEX_OP_OPARG_SHIFT modifier
+> that I think we should kill. The latter likely behaves differently across
+> different architectures and potentially depending on the toolchain you used
+> to build the kernel.
+> 
+> Does anybody know the history behind the interface design?
 
-? 2017/5/26 13:52, Eddie Cai ??:
-> firefly reload board not support sd card yet. so support it.
+Which design?
 
-It looks good overall, but I think you need to amend
-your commit title to say that you just add sd card support
-for rk3288-firefly-reload, otherwise,
+4732efbeb997 ("[PATCH] FUTEX_WAKE_OP: pthread_cond_signal() speedup")
 
-Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+Thanks,
 
->
-> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
-> ---
->  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 31 +++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-> index 413b61f..2f41209 100644
-> --- a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
-> @@ -57,6 +57,17 @@
->  		clock-output-names = "ext_gmac";
->  	};
->
-> +	vcc_sd: sdmmc-regulator {
-> +		compatible = "regulator-fixed";
-> +		gpio = <&gpio7 RK_PB3 GPIO_ACTIVE_LOW>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&sdmmc_pwr>;
-> +		regulator-name = "vcc_sd";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		startup-delay-us = <100000>;
-> +		vin-supply = <&vcc_io>;
-> +	};
->
->  	vcc_flash: flash-regulator {
->  		compatible = "regulator-fixed";
-> @@ -281,6 +292,26 @@
->  			rockchip,pins = <4 8 RK_FUNC_GPIO &pcfg_output_high>;
->  		};
->  	};
-> +
-> +	sdmmc {
-> +		sdmmc_pwr: sdmmc-pwr {
-> +			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
-> +		};
-> +	};
-> +};
-> +
-> +&sdmmc {
-> +	bus-width = <4>;
-> +	cap-mmc-highspeed;
-> +	cap-sd-highspeed;
-> +	card-detect-delay = <200>;
-> +	disable-wp;
-> +	num-slots = <1>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&sdmmc_clk>, <&sdmmc_cmd>, <&sdmmc_cd>, <&sdmmc_bus4>;
-> +	vmmc-supply = <&vcc_sd>;
-> +	vqmmc-supply = <&vccio_sd>;
-> +	status = "okay";
->  };
->
->  &tsadc {
->
+	tglx
