@@ -1,61 +1,30 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 26 May 2017 08:54:31 +0200 (CEST)
-Subject: [PATCH 1/1] futex: remove duplicated code
-In-Reply-To: <20170525142829.GO2859@arm.com>
-References: <20170515130742.18357-1-jslaby@suse.cz>
- <20170515131644.GA3605@arm.com> <alpine.DEB.2.20.1705222259580.2407@nanos>
- <20170525142829.GO2859@arm.com>
-Message-ID: <alpine.DEB.2.20.1705260849520.1902@nanos>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 26 May 2017 08:56:27 +0200
+Subject: [PATCH] arm: dts: r7s72100: Add support for GR-Peach
+In-Reply-To: <20170524070702.GB4253@w540>
+References: <1495567254-10226-1-git-send-email-jacopo+renesas@jmondi.org>
+ <CAMuHMdUovD=6YfJYckoftWyJZ3eRjcKFkScj=wLhyTDSFPavgw@mail.gmail.com>
+ <20170524070702.GB4253@w540>
+Message-ID: <20170526065627.GE2628@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 May 2017, Will Deacon wrote:
-> On Mon, May 22, 2017 at 11:11:33PM +0200, Thomas Gleixner wrote:
-> > On Mon, 15 May 2017, Will Deacon wrote:
-> > > On Mon, May 15, 2017 at 03:07:42PM +0200, Jiri Slaby wrote:
-> > > > There is code duplicated over all architecture's headers for
-> > > > futex_atomic_op_inuser. Namely op decoding, access_ok check for uaddr,
-> > > > and comparison of the result.
-> > > > 
-> > > > Remove this duplication and leave up to the arches only the needed
-> > > > assembly which is now in arch_futex_atomic_op_inuser.
-> > > > 
-> > > > Note that s390 removed access_ok check in d12a29703 ("s390/uaccess:
-> > > > remove pointless access_ok() checks") as access_ok there returns true.
-> > > > We introduce it back to the helper for the sake of simplicity (it gets
-> > > > optimized away anyway).
-> > > 
-> > > Whilst I think this is a good idea, the code in question actually results
-> > > in undefined behaviour per the C spec and is reported by UBSAN. See my
-> > > patch fixing arm64 here (which I'd forgotten about):
-> > > 
-> > > https://www.spinics.net/lists/linux-arch/msg38564.html
-> > > 
-> > > But, as stated in the thread above, I think we should go a step further
-> > > and remove FUTEX_OP_{OR,ANDN,XOR,OPARG_SHIFT} altogether. They don't
-> > > appear to be used by userspace, and this whole thing is a total mess.
-> > 
-> > You wish. The constants are not used, but FUTEX_WAKE_OP _IS_ used by
-> > glibc. They only have one argument it seems:
-> > 
-> >    #define FUTEX_OP_CLEAR_WAKE_IF_GT_ONE      ((4 << 24) | 1)
-> > 
-> > but I'm pretty sure that there is enough (probably horrible) code (think
-> > java) out there using FUTEX_WAKE_OP for whatever (non)sensical reasons in
-> > any available combination.
+On Wed, May 24, 2017 at 09:07:02AM +0200, jmondi wrote:
+> Hello Simon,
 > 
-> Indeed, and I'm not proposing to get rid of that. It's the grossly
-> over-engineered array of operations and the FUTEX_OP_OPARG_SHIFT modifier
-> that I think we should kill. The latter likely behaves differently across
-> different architectures and potentially depending on the toolchain you used
-> to build the kernel.
+> On Tue, May 23, 2017 at 09:25:40PM +0200, Geert Uytterhoeven wrote:
+> > On Tue, May 23, 2017 at 9:20 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
+> > > Add device tree source for Renesas GR-Peach board.
+> > > GR-Peach is an RZ/A1H based board with 10MB of on-chip SRAM and 8MB
+> > > QSPI flash storage.
+> > > Add support for the board, and create a 2MB partition to use as rootfs.
+> > >
+> > > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> >
+> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > 
-> Does anybody know the history behind the interface design?
+> I forgot to change subject to "PATCH v2".
+> Could you please take this one, or would you like me to resend with
+> Geert's reviewed-by ?
 
-Which design?
-
-4732efbeb997 ("[PATCH] FUTEX_WAKE_OP: pthread_cond_signal() speedup")
-
-Thanks,
-
-	tglx
+No need to repost, I've queued-up this version for v4.13.
