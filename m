@@ -1,56 +1,83 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Fri, 26 May 2017 10:07:26 +0900
-Subject: [PATCH v2] drm/exynos: dsi: Remove bridge node reference in
- removal
-In-Reply-To: <1495760521-330-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <CGME20170526010217epcas1p3bfb8d9f733bcdafb4209d917fdf28dd8@epcas1p3.samsung.com>
- <1495760521-330-1-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <59277FCE.9010502@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 26 May 2017 10:42:14 +0900
+Subject: [GIT PULL (RESEND)] ARM: uniphier: UniPhier fixes for v4.12
+In-Reply-To: <20170525235902.GA25387@localhost>
+References: <CAK7LNARbSkbEOhs7QMd+6VV+KWbkjK4LR9rmQ=YBWqPY+8_XPQ@mail.gmail.com>
+ <20170525235902.GA25387@localhost>
+Message-ID: <CAK7LNARFkU42_FwUMjCUOU0kTZn2gvU4b=8LPhGXOUv6pQP-kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Olof,
+
+2017-05-26 8:59 GMT+09:00 Olof Johansson <olof@lixom.net>:
+> On Mon, May 22, 2017 at 11:03:49AM +0900, Masahiro Yamada wrote:
+>> Hi Arnd, Olof,
+>>
+>> Last week, I thought I found a problem in my pull request,
+>> but it turned out my misunderstanding.
+>>
+>> So, my pull request I sent is OK.
+>> I am re-sending this request mail for clarification.
+>>
+>> Here are some ARM UniPhier SoC fixes for v4.12.
+>> Due to the eMMC driver update, PHY parameters must be specified
+>> via DT to make the eMMC controller work again.
+>
+> That's not good, that's a regression in behavior. The driver should
+> have a fallback when the properties are not present to avoid regressions
+> like these.
+
+Right.  The care for old DT is missing from the driver change.
+Theoretically, it is a regression if Linux 4.12 kernel image is used with
+DT from Linux 4.11 tree.
+
+However, all our customer products are based on Linux 4.4 (or older)
+so I am sure there is no practical problem.
+Because the eMMC driver was not upstreamed at that time,
+products kernels are locally patched as needed.
+
+I am upstreaming patches to create a better code base for future products, but
+Linux 4.11 and 4.12 are not LTS, so never used at least on socionext products.
 
 
-2017? 05? 26? 10:02? Hoegeun Kwon ?(?) ? ?:
-> Since bridge node is referenced during in the probe, it should be
-> released on removal.
-> 
-> Suggested-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
-> ---
-> Hi Inki,
-> 
-> This patch seems to have been forgotten... :)
+> Please work with the driver maintainer to either get them to revert
+> their change that regresses you, or promptly fix it appropriately with
+> fallback values.
 
-Yeah, forgot this. Merged.
+You are right, but this is a different issue.
 
-Thanks,
-Inki Dae
 
-> 
-> Changes for V2:
-> 
-> - Checked for rebase 4.12-rc2
-> 
-> Best regards,
-> Hoegeun
-> 
->  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> index 698a824..a11b795 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> @@ -1805,6 +1805,10 @@ static int exynos_dsi_probe(struct platform_device *pdev)
->  
->  static int exynos_dsi_remove(struct platform_device *pdev)
->  {
-> +	struct exynos_dsi *dsi = platform_get_drvdata(pdev);
-> +
-> +	of_node_put(dsi->bridge_node);
-> +
->  	pm_runtime_disable(&pdev->dev);
->  
->  	component_del(&pdev->dev, &exynos_dsi_component_ops);
-> 
+If you are unhappy with pulling this as a fix
+(because it is not DT but the driver that should be fixed),
+I can include the DT changes in usual PRs for v4.13-rc1.
+
+
+As I said above, I admit this is not fatal for us
+because socionext kernel developers are co-located
+and know the upstream status.
+
+
+
+> Also, the driver changes were commited back in March, with plenty of time
+> to land DT changes well before the merge window. Waiting until the merge
+> window is closed is not appropriate -- this should have come in earlier.
+
+You are right.
+But, v4.11-rc4 had already passed and I had already sent the pull request
+before the driver change was merged.
+
+I generally try to send my PRs around -rc4
+because "sorry, this is too late" is scary.
+I should have sent the second pull request.
+If you do not mind some after -rc4, I will do late PRs next time.
+
+
+So, what should I do about this?
+
+If you do not want to pull this, I will move the patches
+to for-v4.13 branch, which will be sent around -rc4.
+
+-- 
+Best Regards
+Masahiro Yamada
